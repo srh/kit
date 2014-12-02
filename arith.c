@@ -1,0 +1,10 @@
+#include "arith.h"
+
+#include <stdint.h>
+
+#include "util.h"
+
+size_t size_mul(size_t x, size_t y) {
+  CHECK(y == 0 || x <= SIZE_MAX / y);
+  return x * y;
+}
