@@ -11,7 +11,6 @@ struct ast_ident {
 };
 
 struct ast_numeric_literal {
-  /* TODO: Support numeric literals other than decimal integers. */
   int8_t *digits;
   size_t digits_count;
 };
@@ -34,7 +33,6 @@ struct ast_expr {
     struct ast_ident name;
     struct ast_numeric_literal numeric_literal;
     struct ast_funcall funcall;
-    /* TODO: Support other expression types. */
   } u;
 };
 
