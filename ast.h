@@ -22,8 +22,14 @@ struct ast_funcall {
   size_t args_count;
 };
 
+enum ast_expr_tag {
+  AST_EXPR_NAME,
+  AST_EXPR_NUMERIC_LITERAL,
+  AST_EXPR_FUNCALL,
+};
+
 struct ast_expr {
-  int tag;
+  enum ast_expr_tag tag;
   union {
     struct ast_ident name;
     struct ast_numeric_literal numeric_literal;
@@ -31,6 +37,8 @@ struct ast_expr {
     /* TODO: Support other expression types. */
   } u;
 };
+
+void ast_expr_destroy(struct ast_expr *a);
 
 struct ast_typeexpr;
 
@@ -40,13 +48,20 @@ struct ast_typeapp {
   size_t params_count;
 };
 
+enum ast_typeexpr_tag {
+  AST_TYPEEXPR_NAME,
+  AST_TYPEEXPR_APP,
+};
+
 struct ast_typeexpr {
-  int tag;
+  enum ast_typeexpr_tag tag;
   union {
     struct ast_ident name;
     struct ast_typeapp app;
   } u;
 };
+
+void ast_typeexpr_destroy(struct ast_typeexpr *a);
 
 struct ast_def {
   struct ast_ident name;

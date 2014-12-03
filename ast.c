@@ -7,9 +7,50 @@ void ast_ident_destroy(struct ast_ident *a) {
   /* Do nothing. */
 }
 
+void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
+  free(a->digits);
+}
+
+void ast_funcall_destroy(struct ast_funcall *a) {
+  ast_expr_destroy(a->func);
+  free(a->func);
+  SLICE_FREE(a->args, a->args_count, ast_expr_destroy);
+}
+
+void ast_expr_destroy(struct ast_expr *a) {
+  switch (a->tag) {
+  case AST_EXPR_NAME:
+    ast_ident_destroy(&a->u.name);
+    break;
+  case AST_EXPR_NUMERIC_LITERAL:
+    ast_numeric_literal_destroy(&a->u.numeric_literal);
+    break;
+  case AST_EXPR_FUNCALL:
+    ast_funcall_destroy(&a->u.funcall);
+    break;
+  }
+}
+
+void ast_typeapp_destroy(struct ast_typeapp *a) {
+  ast_ident_destroy(&a->name);
+  SLICE_FREE(a->params, a->params_count, ast_typeexpr_destroy);
+}
+
+void ast_typeexpr_destroy(struct ast_typeexpr *a) {
+  switch (a->tag) {
+  case AST_TYPEEXPR_NAME:
+    ast_ident_destroy(&a->u.name);
+    break;
+  case AST_TYPEEXPR_APP:
+    ast_typeapp_destroy(&a->u.app);
+    break;
+  }
+}
+
 void ast_def_destroy(struct ast_def *a) {
-  (void)a;
-  /* TODO: Implement. */
+  ast_ident_destroy(&a->name);
+  ast_typeexpr_destroy(&a->type);
+  ast_expr_destroy(&a->rhs);
 }
 
 void ast_module_destroy(struct ast_module *a) {
