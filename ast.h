@@ -4,8 +4,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "identmap.h"
+
 struct ast_ident {
-  uint32_t value;
+  ident_value value;
 };
 
 struct ast_numeric_literal {

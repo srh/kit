@@ -1,0 +1,31 @@
+#ifndef KIRA_IDENTMAP_H_
+#define KIRA_IDENTMAP_H_
+
+#include <stddef.h>
+#include <stdint.h>
+
+struct ident_map_entry;
+
+typedef uint32_t ident_value;
+#define IDENT_VALUE_MAX UINT32_MAX
+
+struct ident_map {
+  struct ident_map_entry *table;
+  /* count is less than limit / 2, unless limit is 0. */
+  size_t count;
+  /* limit is either 0 or a power of 2 that is at least 8. */
+  size_t limit;
+  /* prev_value is initially zero, which means no ident can be zero. */
+  ident_value prev_value;
+};
+
+void ident_map_init(struct ident_map *m);
+void ident_map_destroy(struct ident_map *m);
+
+ident_value ident_map_intern(struct ident_map *m,
+			     const uint8_t *buf,
+			     size_t count);
+
+
+
+#endif /* KIRA_IDENTMAP_H_ */

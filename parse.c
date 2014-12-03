@@ -1,22 +1,16 @@
 #include "parse.h"
 
 #include "ast.h"
+#include "identmap.h"
 #include "slice.h"
 #include "util.h"
-
-struct ident_bounds {
-  size_t begin;
-  size_t end;
-};
 
 struct ps {
   const uint8_t *data;
   size_t length;
   size_t pos;
 
-  struct ident_bounds *ident_table;
-  size_t ident_table_count;
-  size_t ident_table_limit;
+  struct ident_map ident_table;
 };
 
 struct ps_savestate {
@@ -28,9 +22,14 @@ void ps_init(struct ps *p, const uint8_t *data, size_t length) {
   p->length = length;
   p->pos = 0;
 
-  p->ident_table = NULL;
-  p->ident_table_count = 0;
-  p->ident_table_limit = 0;
+  ident_map_init(&p->ident_table);
+}
+
+void ps_destroy(struct ps *p) {
+  ident_map_destroy(&p->ident_table);
+  p->data = NULL;
+  p->length = 0;
+  p->pos = 0;
 }
 
 int32_t ps_peek(struct ps *p) {
@@ -57,21 +56,14 @@ void ps_restore(struct ps *p, struct ps_savestate save) {
   p->pos = save.pos;
 }
 
-uint32_t ps_intern_ident(struct ps *p,
-			 struct ps_savestate ident_begin,
-			 struct ps_savestate ident_end) {
-  /* TODO: Actually dedup idents. */
-  (void)ident_end;
-  CHECK(ident_begin.pos <= p->length);
-  CHECK(p->ident_table_count <= UINT32_MAX);
-  uint32_t ret = p->ident_table_count;
-
-  struct ident_bounds bounds;
-  bounds.begin = ident_begin.pos;
-  bounds.end = ident_end.pos;
-  SLICE_PUSH(p->ident_table, p->ident_table_count, p->ident_table_limit,
-	     bounds);
-  return ret;
+ident_value ps_intern_ident(struct ps *p,
+			    struct ps_savestate ident_begin,
+			    struct ps_savestate ident_end) {
+  CHECK(ident_end.pos <= p->length);
+  CHECK(ident_begin.pos <= ident_end.pos);
+  return ident_map_intern(&p->ident_table,
+			  p->data + ident_begin.pos,
+			  ident_end.pos - ident_begin.pos);
 }
 
 int is_ws(int32_t ch) {
