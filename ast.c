@@ -28,6 +28,8 @@ void ast_expr_destroy(struct ast_expr *a) {
   case AST_EXPR_FUNCALL:
     ast_funcall_destroy(&a->u.funcall);
     break;
+  default:
+    UNREACHABLE();
   }
 }
 
@@ -44,6 +46,8 @@ void ast_typeexpr_destroy(struct ast_typeexpr *a) {
   case AST_TYPEEXPR_APP:
     ast_typeapp_destroy(&a->u.app);
     break;
+  default:
+    UNREACHABLE();
   }
 }
 
@@ -73,6 +77,8 @@ void ast_toplevel_destroy(struct ast_toplevel *a) {
   case AST_TOPLEVEL_DEF:
     ast_def_destroy(&a->u.def);
     break;
+  default:
+    UNREACHABLE();
   }
 }
 
