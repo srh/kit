@@ -183,13 +183,16 @@ int parse_rest_of_def(struct ps *p, struct ast_def *out) {
 
 int parse_rest_of_import(struct ps *p, struct ast_import *out) {
   skip_ws(p);
-  if (!parse_ident(p, &out->ident)) {
+  struct ast_ident ident;
+  if (!parse_ident(p, &ident)) {
     return 0;
   }
   skip_ws(p);
   if (!try_skip_semicolon(p)) {
+    ast_ident_destroy(&ident);
     return 0;
   }
+  out->ident = ident;
   return 1;
 }
 
@@ -197,11 +200,13 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out);
 
 int parse_rest_of_module(struct ps *p, struct ast_module *out) {
   skip_ws(p);
-  if (!parse_ident(p, &out->name)) {
+  struct ast_ident name;
+  if (!parse_ident(p, &name)) {
     return 0;
   }
   skip_ws(p);
   if (!try_skip_char(p, '{')) {
+    ast_ident_destroy(&name);
     return 0;
   }
 
@@ -212,6 +217,7 @@ int parse_rest_of_module(struct ps *p, struct ast_module *out) {
     skip_ws(p);
 
     if (try_skip_char(p, '}')) {
+      out->name = name;
       out->toplevels = toplevels;
       out->toplevels_count = toplevels_count;
       return 1;
@@ -220,6 +226,7 @@ int parse_rest_of_module(struct ps *p, struct ast_module *out) {
     struct ast_toplevel toplevel;
     if (!parse_toplevel(p, &toplevel)) {
       SLICE_FREE(toplevels, toplevels_count, ast_toplevel_destroy);
+      ast_ident_destroy(&name);
       return 0;
     }
     SLICE_PUSH(toplevels, toplevels_count, toplevels_limit, toplevel);

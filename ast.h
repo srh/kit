@@ -10,6 +10,8 @@ struct ast_ident {
   ident_value value;
 };
 
+void ast_ident_destroy(struct ast_ident *a);
+
 struct ast_numeric_literal {
   int8_t *digits;
   size_t digits_count;
