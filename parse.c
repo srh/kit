@@ -144,6 +144,16 @@ int try_skip_semicolon(struct ps *p) {
   return try_skip_char(p, ';');
 }
 
+int skip_oper(struct ps *p, const char *s) {
+  if (!skip_string(p, s)) {
+    return 0;
+  }
+  if (is_operlike(ps_peek(p))) {
+    return 0;
+  }
+  return 1;
+}
+
 int try_skip_keyword(struct ps *p, const char *kw) {
   struct ps_savestate save = ps_save(p);
   if (!skip_string(p, kw)) {
@@ -175,9 +185,95 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
   return 0;
 }
 
-int parse_rest_of_def(struct ps *p, struct ast_def *out) {
+int parse_expr(struct ps *p, struct ast_expr *out) {
   (void)p, (void)out;
   /* TODO: Implement. */
+  return 0;
+}
+
+int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
+  struct ast_ident ident;
+  if (!parse_ident(p, &ident)) {
+    return 0;
+  }
+
+  skip_ws(p);
+  if (!try_skip_char(p, '[')) {
+    out->tag = AST_TYPEEXPR_NAME;
+    out->u.name = ident;
+    return 1;
+  }
+
+  struct ast_typeexpr *params = NULL;
+  size_t params_count = 0;
+  size_t params_limit = 0;
+
+  for (;;) {
+    skip_ws(p);
+    if (try_skip_char(p, ']')) {
+      out->tag = AST_TYPEEXPR_APP;
+      out->u.app.name = ident;
+      out->u.app.params = params;
+      out->u.app.params_count = params_count;
+      return 1;
+    }
+
+    if (params_count != 0) {
+      if (!try_skip_char(p, ',')) {
+	goto fail;
+      }
+      skip_ws(p);
+    }
+
+    struct ast_typeexpr typeexpr;
+    if (!parse_typeexpr(p, &typeexpr)) {
+      goto fail;
+    }
+    SLICE_PUSH(params, params_count, params_limit, typeexpr);
+  }
+
+ fail:
+  SLICE_FREE(params, params_count, ast_typeexpr_destroy);
+  ast_ident_destroy(&ident);
+  return 0;
+}
+
+int parse_rest_of_def(struct ps *p, struct ast_def *out) {
+  struct ast_def def;
+
+  skip_ws(p);
+  if (!parse_ident(p, &def.name)) {
+    return 0;
+  }
+
+  skip_ws(p);
+  if (!parse_typeexpr(p, &def.type)) {
+    goto fail_ident;
+  }
+
+  skip_ws(p);
+  if (!skip_oper(p, "=")) {
+    goto fail_ident;
+  }
+
+  skip_ws(p);
+  if (!parse_expr(p, &def.rhs)) {
+    goto fail_typeexpr;
+  }
+
+  if (!try_skip_semicolon(p)) {
+    goto fail_rhs;
+  }
+
+  *out = def;
+  return 1;
+
+ fail_rhs:
+  ast_expr_destroy(&def.rhs);
+ fail_typeexpr:
+  ast_typeexpr_destroy(&def.type);
+ fail_ident:
+  ast_ident_destroy(&def.name);
   return 0;
 }
 
