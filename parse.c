@@ -681,6 +681,9 @@ int parse_test_defs(void) {
   pass &= run_count_test("def4", "def abc_def int = 12345;", 6);
   pass &= run_count_test("def5", "def foo func[int, int] = 1;", 11);
   pass &= run_count_test("def6", "def foo func[int, int] = fn(x int, y int) int 3;", 20);
+  pass &= run_count_test("def7", "def foo func[int, int] = \n"
+			 "\tfn(x int, y int) int foo(bar);\n",
+			 23);
   return pass;
 }
 
