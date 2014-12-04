@@ -17,6 +17,18 @@ void ast_funcall_destroy(struct ast_funcall *a) {
   SLICE_FREE(a->args, a->args_count, ast_expr_destroy);
 }
 
+void ast_vardecl_destroy(struct ast_vardecl *a) {
+  ast_ident_destroy(&a->name);
+  ast_typeexpr_destroy(&a->type);
+}
+
+void ast_lambda_destroy(struct ast_lambda *a) {
+  SLICE_FREE(a->params, a->params_count, ast_vardecl_destroy);
+  ast_typeexpr_destroy(&a->return_type);
+  ast_expr_destroy(a->body);
+  free(a->body);
+}
+
 void ast_expr_destroy(struct ast_expr *a) {
   switch (a->tag) {
   case AST_EXPR_NAME:
@@ -27,6 +39,9 @@ void ast_expr_destroy(struct ast_expr *a) {
     break;
   case AST_EXPR_FUNCALL:
     ast_funcall_destroy(&a->u.funcall);
+    break;
+  case AST_EXPR_LAMBDA:
+    ast_lambda_destroy(&a->u.lambda);
     break;
   default:
     UNREACHABLE();

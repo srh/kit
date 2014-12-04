@@ -23,23 +23,6 @@ struct ast_funcall {
   size_t args_count;
 };
 
-enum ast_expr_tag {
-  AST_EXPR_NAME,
-  AST_EXPR_NUMERIC_LITERAL,
-  AST_EXPR_FUNCALL,
-};
-
-struct ast_expr {
-  enum ast_expr_tag tag;
-  union {
-    struct ast_ident name;
-    struct ast_numeric_literal numeric_literal;
-    struct ast_funcall funcall;
-  } u;
-};
-
-void ast_expr_destroy(struct ast_expr *a);
-
 struct ast_typeexpr;
 
 struct ast_typeapp {
@@ -62,6 +45,41 @@ struct ast_typeexpr {
 };
 
 void ast_typeexpr_destroy(struct ast_typeexpr *a);
+
+struct ast_vardecl {
+  struct ast_ident name;
+  struct ast_typeexpr type;
+};
+
+void ast_vardecl_destroy(struct ast_vardecl *a);
+
+struct ast_expr;
+
+struct ast_lambda {
+  struct ast_vardecl *params;
+  size_t params_count;
+  struct ast_typeexpr return_type;
+  struct ast_expr *body;
+};
+
+enum ast_expr_tag {
+  AST_EXPR_NAME,
+  AST_EXPR_NUMERIC_LITERAL,
+  AST_EXPR_FUNCALL,
+  AST_EXPR_LAMBDA,
+};
+
+struct ast_expr {
+  enum ast_expr_tag tag;
+  union {
+    struct ast_ident name;
+    struct ast_numeric_literal numeric_literal;
+    struct ast_funcall funcall;
+    struct ast_lambda lambda;
+  } u;
+};
+
+void ast_expr_destroy(struct ast_expr *a);
 
 struct ast_def {
   struct ast_ident name;
