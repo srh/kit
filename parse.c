@@ -611,7 +611,7 @@ int parse_file(struct ps *p, struct ast_file *out) {
   }
 }
 
-int count_parse(const char *str, size_t *leafcount_out) {
+int count_parse(const char *str, size_t *leafcount_out, size_t *pos_out) {
   size_t length = strlen(str);
   const uint8_t *data = (const uint8_t *)str;
   struct ps p;
@@ -623,6 +623,8 @@ int count_parse(const char *str, size_t *leafcount_out) {
   if (ret) {
     *leafcount_out = p.leafcount;
     ast_file_destroy(&file);
+  } else {
+    *pos_out = p.pos;
   }
   ps_destroy(&p);
   return ret;
@@ -631,9 +633,10 @@ int count_parse(const char *str, size_t *leafcount_out) {
 int run_count_test(const char *name, const char *str, size_t expected) {
   DBG("run_count_test %s...\n", name);
   size_t count;
-  int res = count_parse(str, &count);
+  size_t pos;
+  int res = count_parse(str, &count, &pos);
   if (!res) {
-    DBG("run_count_test %s parse failed\n", name);
+    DBG("run_count_test %s parse failed at pos %"PRIz"\n", name, pos);
     return 0;
   }
   if (count != expected) {
@@ -666,8 +669,13 @@ int parse_test_modules(void) {
 }
 
 int parse_test_defs(void) {
-  /* TODO: Implement. */
-  return 1;
+  int pass = 1;
+  pass &= run_count_test("def1", "def a int = 0;", 6);
+  pass &= run_count_test("def2", "def b int = 1;", 6);
+  pass &= run_count_test("def3", "def a int =0   ;  ", 6);
+  pass &= run_count_test("def4", "def abc_def int = 12345;", 6);
+  pass &= run_count_test("def5", "def foo func[int, int] = 1;", 10);
+  return pass;
 }
 
 int parse_test(void) {
