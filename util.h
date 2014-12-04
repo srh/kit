@@ -1,6 +1,12 @@
 #ifndef KIRA_UTIL_H_
 #define KIRA_UTIL_H_
 
+#ifdef _WIN32
+#define PRIz "Iu"
+#else /* _WIN32 */
+#define PRIz "zu"
+#endif /* _WIN32 */
+
 #define STATIC_ASSERT(x) do { enum { assertion = 1/!!(x) }; } while (0)
 
 void report_and_abort(const char *file, int line,
