@@ -82,8 +82,8 @@ ident_value ps_intern_ident(struct ps *p,
 }
 
 int is_ws(int32_t ch) {
-  STATIC_ASSERT(' ' == 32 && '\r' == 13 && '\n' == 10);
-  return ch == ' ' || ch == '\r' || ch == '\n';
+  STATIC_ASSERT(' ' == 32 && '\r' == 13 && '\n' == 10 && '\t' == 9);
+  return ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t';
 }
 
 int is_one_of(const char *s, int32_t ch) {
@@ -628,39 +628,41 @@ int count_parse(const char *str, size_t *leafcount_out) {
   return ret;
 }
 
-int parse_test_nothing(void) {
-  DBG("parse_test_nothing...\n");
+int run_count_test(const char *name, const char *str, size_t expected) {
+  DBG("run_count_test %s...\n", name);
   size_t count;
-  int res = count_parse("", &count);
+  int res = count_parse(str, &count);
   if (!res) {
-    DBG("parse_test_nothing parse failed\n");
+    DBG("run_count_test %s parse failed\n", name);
     return 0;
   }
-  if (count != 0) {
-    DBG("parse_test_nothing wrong node count\n");
+  if (count != expected) {
+    DBG("run_count_test %s wrong count: expected %"PRIz", got %"PRIz"\n",
+	expected, count);
     return 0;
   }
   return 1;
+}
+
+int parse_test_nothing(void) {
+  return run_count_test("nothing", "", 0);
+}
+
+int parse_test_whitespace(void) {
+  return run_count_test("whitespace", "  \n\t  ", 0);
 }
 
 int parse_test_imports(void) {
-  DBG("parse_test_imports...\n");
-  size_t count;
-  int res = count_parse("import a; import aa; import bcd; import blah_quux;", &count);
-  if (!res) {
-    DBG("parse_test_imports parse failed\n");
-    return 0;
-  }
-  if (count != 12) {
-    DBG("parse_test_imports wrong node count\n");
-    return 0;
-  }
-  return 1;
+  return run_count_test("imports",
+			"import a; import aa; import bcd; import blah_quux;",
+			12);
 }
 
 int parse_test_modules(void) {
-  /* TODO: Implement. */
-  return 1;
+  return run_count_test("modules",
+			"module a { module b {import c; }import d; module egret{} } "
+			"module zed {\n\t}  ",
+			22);
 }
 
 int parse_test_defs(void) {
