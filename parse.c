@@ -8,6 +8,8 @@
 #include "slice.h"
 #include "util.h"
 
+#define PARSE_DBG(...)
+
 struct ps {
   const uint8_t *data;
   size_t length;
@@ -190,7 +192,7 @@ int try_skip_keyword(struct ps *p, const char *kw) {
 }
 
 int parse_ident(struct ps *p, struct ast_ident *out) {
-  DBG("parse_ident\n");
+  PARSE_DBG("parse_ident\n");
   if (!is_ident_firstchar(ps_peek(p))) {
     return 0;
   }
@@ -204,9 +206,9 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
     return 0;
   }
 
-  DBG("parse_ident about to ps_intern_ident\n");
+  PARSE_DBG("parse_ident about to ps_intern_ident\n");
   out->value = ps_intern_ident(p, save, ps_save(p));
-  DBG("parse_ident interned ident\n");
+  PARSE_DBG("parse_ident interned ident\n");
   ps_count_leaf(p);
   return 1;
 }
@@ -235,7 +237,7 @@ int parse_expr(struct ps *p, struct ast_expr *out);
 int parse_params_list(struct ps *p,
 		      struct ast_vardecl **params_out,
 		      size_t *params_count_out) {
-  DBG("parse_params_list\n");
+  PARSE_DBG("parse_params_list\n");
   if (!try_skip_char(p, '(')) {
     return 0;
   }
@@ -271,7 +273,7 @@ int parse_params_list(struct ps *p,
 }
 
 int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
-  DBG("parse_rest_of_lambda\n");
+  PARSE_DBG("parse_rest_of_lambda\n");
   skip_ws(p);
   struct ast_vardecl *params;
   size_t params_count;
@@ -280,13 +282,13 @@ int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
   }
 
   skip_ws(p);
-  DBG("parse_rest_of_lambda parsing return type\n");
+  PARSE_DBG("parse_rest_of_lambda parsing return type\n");
   struct ast_typeexpr return_type;
   if (!parse_typeexpr(p, &return_type)) {
     goto fail_params;
   }
 
-  DBG("parse_rest_of_lambda parsing body\n");
+  PARSE_DBG("parse_rest_of_lambda parsing body\n");
   skip_ws(p);
   struct ast_expr body;
   /* TODO: Semicolon precedence, when that's important. */
@@ -294,7 +296,7 @@ int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
     goto fail_return_type;
   }
 
-  DBG("parse_rest_of_lambda success\n");
+  PARSE_DBG("parse_rest_of_lambda success\n");
   struct ast_expr *heap_body = malloc(sizeof(*heap_body));
   CHECK(heap_body);
   *heap_body = body;
@@ -404,13 +406,13 @@ int parse_expr(struct ps *p, struct ast_expr *out) {
   if (!parse_atomic_expr(p, &lhs)) {
     return 0;
   }
-  DBG("parse_expr parsed atomic expr\n");
+  PARSE_DBG("parse_expr parsed atomic expr\n");
 
   for (;;) {
     skip_ws(p);
-    DBG("parse_expr looking for paren\n");
+    PARSE_DBG("parse_expr looking for paren\n");
     if (try_skip_char(p, '(')) {
-      DBG("parse_expr saw paren\n");
+      PARSE_DBG("parse_expr saw paren\n");
       struct ast_expr *args;
       size_t args_count;
       if (!parse_rest_of_arglist(p, &args, &args_count)) {
@@ -424,7 +426,7 @@ int parse_expr(struct ps *p, struct ast_expr *out) {
       lhs.u.funcall.args = args;
       lhs.u.funcall.args_count = args_count;
     } else {
-      DBG("parse_expr done\n");
+      PARSE_DBG("parse_expr done\n");
       *out = lhs;
       return 1;
     }
@@ -522,14 +524,14 @@ int parse_rest_of_def(struct ps *p, struct ast_def *out) {
 }
 
 int parse_rest_of_import(struct ps *p, struct ast_import *out) {
-  DBG("parse_rest_of_import\n");
+  PARSE_DBG("parse_rest_of_import\n");
   skip_ws(p);
   struct ast_ident ident;
   if (!parse_ident(p, &ident)) {
     return 0;
   }
   skip_ws(p);
-  DBG("parse_rest_of_import about to skip semicolon\n");
+  PARSE_DBG("parse_rest_of_import about to skip semicolon\n");
   if (!try_skip_semicolon(p)) {
     ast_ident_destroy(&ident);
     return 0;
@@ -577,7 +579,7 @@ int parse_rest_of_module(struct ps *p, struct ast_module *out) {
 
 
 int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
-  DBG("parse_toplevel\n");
+  PARSE_DBG("parse_toplevel\n");
   if (try_skip_keyword(p, "def")) {
     out->tag = AST_TOPLEVEL_DEF;
     return parse_rest_of_def(p, &out->u.def);
@@ -621,7 +623,7 @@ int count_parse(const char *str, size_t *leafcount_out, size_t *pos_out) {
   ps_init(&p, data, length);
 
   struct ast_file file;
-  DBG("parse_file...\n");
+  PARSE_DBG("parse_file...\n");
   int ret = parse_file(&p, &file);
   if (ret) {
     *leafcount_out = p.leafcount;
@@ -639,11 +641,11 @@ int run_count_test(const char *name, const char *str, size_t expected) {
   size_t pos;
   int res = count_parse(str, &count, &pos);
   if (!res) {
-    DBG("run_count_test %s parse failed at pos %"PRIz"\n", name, pos);
+    DBG("run_count_test %s FAIL: parse failed at pos %"PRIz"\n", name, pos);
     return 0;
   }
   if (count != expected) {
-    DBG("run_count_test %s wrong count: expected %"PRIz", got %"PRIz"\n",
+    DBG("run_count_test %s FAIL: wrong count: expected %"PRIz", got %"PRIz"\n",
 	str, expected, count);
     return 0;
   }
