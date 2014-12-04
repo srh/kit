@@ -8,6 +8,8 @@
 #include "arith.h"
 #include "util.h"
 
+#define IDENTMAP_DBG(...) do { } while (0)
+
 struct ident_map_entry {
   ident_value ident;
   const uint8_t *buf;
@@ -36,26 +38,26 @@ size_t ident_map_hash(const uint8_t *buf, size_t count) {
 
 void ident_map_rebuild(struct ident_map *m,
 		       size_t new_limit) {
-  DBG("ident_map_rebuild, new_limit=%"PRIz"\n", new_limit);
+  IDENTMAP_DBG("ident_map_rebuild, new_limit=%"PRIz"\n", new_limit);
   /* The limit must always be a power of two. */
   CHECK(0 == (new_limit & (new_limit - 1)));
   CHECK(m->count < new_limit / 2);
 
-  DBG("ident_map_rebuild, survived checks\n");
+  IDENTMAP_DBG("ident_map_rebuild, survived checks\n");
   size_t malloc_size = size_mul(new_limit, sizeof(struct ident_map_entry));
-  DBG("computed malloc_size of %"PRIz"\n", malloc_size);
+  IDENTMAP_DBG("computed malloc_size of %"PRIz"\n", malloc_size);
   struct ident_map_entry *new_table = malloc(malloc_size);
-  DBG("malloc returned\n");
+  IDENTMAP_DBG("malloc returned\n");
   CHECK(new_table);
 
-  DBG("ident_map_rebuild, malloced new_table\n");
+  IDENTMAP_DBG("ident_map_rebuild, malloced new_table\n");
   for (size_t i = 0; i < new_limit; i++) {
     new_table[i].ident = 0;
     new_table[i].buf = NULL;
     new_table[i].count = 0;
   }
 
-  DBG("ident_map_rebuild initialized new buf\n");
+  IDENTMAP_DBG("ident_map_rebuild initialized new buf\n");
 
   for (size_t i = 0; i < m->limit; i++) {
     if (!m->table[i].ident) {
@@ -69,7 +71,7 @@ void ident_map_rebuild(struct ident_map *m,
       step++;
     }
 
-    DBG("ident_map_rebuild moving from index %"PRIz" to %"PRIz"\n", i, offset);
+    IDENTMAP_DBG("ident_map_rebuild moving from index %"PRIz" to %"PRIz"\n", i, offset);
     new_table[offset] = m->table[i];
   }
 
@@ -84,18 +86,18 @@ ident_value ident_map_intern(struct ident_map *m,
 			     const uint8_t *buf,
 			     size_t count) {
   size_t limit = m->limit;
-  DBG("ident_map_intern count=%"PRIz", with limit %"PRIz"\n", count, limit);
+  IDENTMAP_DBG("ident_map_intern count=%"PRIz", with limit %"PRIz"\n", count, limit);
   if (limit == 0) {
     ident_map_rebuild(m, 8);
     limit = m->limit;
-    DBG("ident_map_intern rebuilt the map, its count and limit are %"PRIz" and %"PRIz"\n",
-	m->count, m->limit);
+    IDENTMAP_DBG("ident_map_intern rebuilt the map, its count and limit are %"PRIz" and %"PRIz"\n",
+		 m->count, m->limit);
   }
   size_t offset = ident_map_hash(buf, count) & (limit - 1);
   size_t step = 1;
   ident_value v;
   while ((v = m->table[offset].ident), v) {
-    DBG("a collision at offset %"PRIz"\n", offset);
+    IDENTMAP_DBG("a collision at offset %"PRIz"\n", offset);
     if (m->table[offset].count == count
 	&& 0 == memcmp(m->table[offset].buf, buf, count)) {
       return v;
@@ -114,10 +116,10 @@ ident_value ident_map_intern(struct ident_map *m,
   m->count++;
 
   if (count >= m->limit / 2) {
-    DBG("ident_map_intern rebuilding bigger map\n");
+    IDENTMAP_DBG("ident_map_intern rebuilding bigger map\n");
     ident_map_rebuild(m, size_mul(limit, 2));
   }
 
-  DBG("ident_map_intern succeeded, value %" PRIident_value "\n", v);
+  IDENTMAP_DBG("ident_map_intern succeeded, value %" PRIident_value "\n", v);
   return v;
 }

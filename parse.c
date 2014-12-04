@@ -235,6 +235,7 @@ int parse_expr(struct ps *p, struct ast_expr *out);
 int parse_params_list(struct ps *p,
 		      struct ast_vardecl **params_out,
 		      size_t *params_count_out) {
+  DBG("parse_params_list\n");
   if (!try_skip_char(p, '(')) {
     return 0;
   }
@@ -270,6 +271,7 @@ int parse_params_list(struct ps *p,
 }
 
 int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
+  DBG("parse_rest_of_lambda\n");
   skip_ws(p);
   struct ast_vardecl *params;
   size_t params_count;
@@ -278,11 +280,13 @@ int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
   }
 
   skip_ws(p);
+  DBG("parse_rest_of_lambda parsing return type\n");
   struct ast_typeexpr return_type;
   if (!parse_typeexpr(p, &return_type)) {
     goto fail_params;
   }
 
+  DBG("parse_rest_of_lambda parsing body\n");
   skip_ws(p);
   struct ast_expr body;
   /* TODO: Semicolon precedence, when that's important. */
@@ -290,10 +294,7 @@ int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
     goto fail_return_type;
   }
 
-  if (!try_skip_semicolon(p)) {
-    goto fail_body;
-  }
-
+  DBG("parse_rest_of_lambda success\n");
   struct ast_expr *heap_body = malloc(sizeof(*heap_body));
   CHECK(heap_body);
   *heap_body = body;
@@ -303,8 +304,6 @@ int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
   out->body = heap_body;
   return 1;
 
- fail_body:
-  ast_expr_destroy(&body);
  fail_return_type:
   ast_typeexpr_destroy(&return_type);
  fail_params:
@@ -405,10 +404,13 @@ int parse_expr(struct ps *p, struct ast_expr *out) {
   if (!parse_atomic_expr(p, &lhs)) {
     return 0;
   }
+  DBG("parse_expr parsed atomic expr\n");
 
   for (;;) {
     skip_ws(p);
+    DBG("parse_expr looking for paren\n");
     if (try_skip_char(p, '(')) {
+      DBG("parse_expr saw paren\n");
       struct ast_expr *args;
       size_t args_count;
       if (!parse_rest_of_arglist(p, &args, &args_count)) {
@@ -422,6 +424,7 @@ int parse_expr(struct ps *p, struct ast_expr *out) {
       lhs.u.funcall.args = args;
       lhs.u.funcall.args_count = args_count;
     } else {
+      DBG("parse_expr done\n");
       *out = lhs;
       return 1;
     }
@@ -675,6 +678,7 @@ int parse_test_defs(void) {
   pass &= run_count_test("def3", "def a int =0   ;  ", 6);
   pass &= run_count_test("def4", "def abc_def int = 12345;", 6);
   pass &= run_count_test("def5", "def foo func[int, int] = 1;", 11);
+  pass &= run_count_test("def6", "def foo func[int, int] = fn(x int, y int) int 3;", 20);
   return pass;
 }
 
