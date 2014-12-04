@@ -673,6 +673,7 @@ int parse_test_defs(void) {
 int parse_test(void) {
   int pass = 1;
   pass &= parse_test_nothing();
+  pass &= parse_test_whitespace();
   pass &= parse_test_imports();
   pass &= parse_test_modules();
   pass &= parse_test_defs();
