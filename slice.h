@@ -9,8 +9,8 @@
 #define SLICE_PUSH(ptr, count, limit, value) do { \
     CHECK((count) <= (limit)); \
     if ((count) == (limit)) { \
-      size_t SLICE_PUSH_new_limit = (limit) ? size_mul(sizeof(*ptr) * (limit), 2) : 4; \
-      (ptr) = realloc((ptr), SLICE_PUSH_new_limit); \
+      size_t SLICE_PUSH_new_limit = (limit) ? size_mul((limit), 2) : 4; \
+      (ptr) = realloc((ptr), size_mul(sizeof(*ptr), SLICE_PUSH_new_limit)); \
       CHECK(ptr); \
       (limit) = SLICE_PUSH_new_limit; \
     } \
