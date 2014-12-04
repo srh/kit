@@ -55,12 +55,45 @@ void ast_vardecl_destroy(struct ast_vardecl *a);
 
 struct ast_expr;
 
+struct ast_statement;
+
+struct ast_goto_statement {
+  struct ast_ident target;
+};
+
+struct ast_label_statement {
+  struct ast_ident label;
+};
+
+enum ast_statement_tag {
+  AST_STATEMENT_EXPR,
+  AST_STATEMENT_RETURN_EXPR,
+  AST_STATEMENT_GOTO,
+  AST_STATEMENT_LABEL,
+};
+
+struct ast_statement {
+  enum ast_statement_tag tag;
+  union {
+    struct ast_expr *expr;
+    struct ast_expr *return_expr;
+    struct ast_goto_statement goto_statement;
+    struct ast_label_statement label_statement;
+  } u;
+};
+
+void ast_statement_destroy(struct ast_statement *a);
+
+struct ast_bracebody {
+  struct ast_statement *statements;
+  size_t statements_count;
+};
+
 struct ast_lambda {
   struct ast_vardecl *params;
   size_t params_count;
   struct ast_typeexpr return_type;
-  /* TODO: Don't make the body be an expr. */
-  struct ast_expr *body;
+  struct ast_bracebody bracebody;
 };
 
 enum ast_expr_tag {

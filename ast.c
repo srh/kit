@@ -22,11 +22,43 @@ void ast_vardecl_destroy(struct ast_vardecl *a) {
   ast_typeexpr_destroy(&a->type);
 }
 
+void ast_goto_statement_destroy(struct ast_goto_statement *a) {
+  ast_ident_destroy(&a->target);
+}
+
+void ast_label_statement_destroy(struct ast_label_statement *a) {
+  ast_ident_destroy(&a->label);
+}
+
+void ast_statement_destroy(struct ast_statement *a) {
+  switch (a->tag) {
+  case AST_STATEMENT_EXPR:
+    ast_expr_destroy(a->u.expr);
+    free(a->u.expr);
+    break;
+  case AST_STATEMENT_RETURN_EXPR:
+    ast_expr_destroy(a->u.return_expr);
+    free(a->u.return_expr);
+    break;
+  case AST_STATEMENT_GOTO:
+    ast_goto_statement_destroy(&a->u.goto_statement);
+    break;
+  case AST_STATEMENT_LABEL:
+    ast_label_statement_destroy(&a->u.label_statement);
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void ast_bracebody_destroy(struct ast_bracebody *a) {
+  SLICE_FREE(a->statements, a->statements_count, ast_statement_destroy);
+}
+
 void ast_lambda_destroy(struct ast_lambda *a) {
   SLICE_FREE(a->params, a->params_count, ast_vardecl_destroy);
   ast_typeexpr_destroy(&a->return_type);
-  ast_expr_destroy(a->body);
-  free(a->body);
+  ast_bracebody_destroy(&a->bracebody);
 }
 
 void ast_expr_destroy(struct ast_expr *a) {

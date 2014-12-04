@@ -272,6 +272,99 @@ int parse_params_list(struct ps *p,
   return 0;
 }
 
+int parse_statement(struct ps *p, struct ast_statement *out) {
+  if (try_skip_keyword(p, "goto")) {
+    skip_ws(p);
+    struct ast_ident target;
+    if (!parse_ident(p, &target)) {
+      return 0;
+    }
+    skip_ws(p);
+    if (!try_skip_semicolon(p)) {
+      ast_ident_destroy(&target);
+      return 0;
+    }
+    out->tag = AST_STATEMENT_GOTO;
+    out->u.goto_statement.target = target;
+    return 1;
+  } else if (try_skip_keyword(p, "label")) {
+    skip_ws(p);
+    struct ast_ident label;
+    if (!parse_ident(p, &label)) {
+      return 0;
+    }
+    skip_ws(p);
+    if (!try_skip_semicolon(p)) {
+      ast_ident_destroy(&label);
+      return 0;
+    }
+    out->tag = AST_STATEMENT_LABEL;
+    out->u.label_statement.label = label;
+    return 1;
+  } else if (try_skip_keyword(p, "return")) {
+    skip_ws(p);
+    struct ast_expr expr;
+    /* TODO: Semicolon precedence. */
+    if (!parse_expr(p, &expr)) {
+      return 0;
+    }
+    if (!try_skip_semicolon(p)) {
+      ast_expr_destroy(&expr);
+      return 0;
+    }
+
+    struct ast_expr *heap_expr = malloc(sizeof(*heap_expr));
+    CHECK(heap_expr);
+    *heap_expr = expr;
+    out->tag = AST_STATEMENT_RETURN_EXPR;
+    out->u.return_expr = heap_expr;
+    return 1;
+  } else {
+    struct ast_expr expr;
+    if (!parse_expr(p, &expr)) {
+      return 0;
+    }
+
+    if (!try_skip_semicolon(p)) {
+      ast_expr_destroy(&expr);
+      return 0;
+    }
+
+    struct ast_expr *heap_expr = malloc(sizeof(*heap_expr));
+    CHECK(heap_expr);
+    *heap_expr = expr;
+    out->tag = AST_STATEMENT_EXPR;
+    out->u.expr = heap_expr;
+    return 1;
+  }
+}
+
+int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
+  if (!try_skip_char(p, '{')) {
+    return 0;
+  }
+
+  struct ast_statement *statements = NULL;
+  size_t statements_count = 0;
+  size_t statements_limit = 0;
+  for (;;) {
+    skip_ws(p);
+    if (try_skip_char(p, '}')) {
+      out->statements = statements;
+      out->statements_count = statements_count;
+      return 1;
+    }
+
+    struct ast_statement statement;
+    if (!parse_statement(p, &statement)) {
+      SLICE_FREE(statements, statements_count, ast_statement_destroy);
+      return 0;
+    }
+
+    SLICE_PUSH(statements, statements_count, statements_limit, statement);
+  }
+}
+
 int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
   PARSE_DBG("parse_rest_of_lambda\n");
   skip_ws(p);
@@ -288,22 +381,18 @@ int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
     goto fail_params;
   }
 
-  PARSE_DBG("parse_rest_of_lambda parsing body\n");
   skip_ws(p);
-  struct ast_expr body;
-  /* TODO: Semicolon precedence, when that's important. */
-  if (!parse_expr(p, &body)) {
+  PARSE_DBG("parse_rest_of_lambda parsing body\n");
+  struct ast_bracebody bracebody;
+  if (!parse_bracebody(p, &bracebody)) {
     goto fail_return_type;
   }
 
   PARSE_DBG("parse_rest_of_lambda success\n");
-  struct ast_expr *heap_body = malloc(sizeof(*heap_body));
-  CHECK(heap_body);
-  *heap_body = body;
   out->params = params;
   out->params_count = params_count;
   out->return_type = return_type;
-  out->body = heap_body;
+  out->bracebody = bracebody;
   return 1;
 
  fail_return_type:
@@ -680,10 +769,13 @@ int parse_test_defs(void) {
   pass &= run_count_test("def3", "def a int =0   ;  ", 6);
   pass &= run_count_test("def4", "def abc_def int = 12345;", 6);
   pass &= run_count_test("def5", "def foo func[int, int] = 1;", 11);
-  pass &= run_count_test("def6", "def foo func[int, int] = fn(x int, y int) int 3;", 20);
+  pass &= run_count_test("def6", "def foo func[int, int] = fn(x int, y int) int { 3; };", 23);
   pass &= run_count_test("def7", "def foo func[int, int] = \n"
-			 "\tfn(x int, y int) int foo(bar);\n",
-			 23);
+			 "\tfn(x int, y int) int { foo(bar); };\n",
+			 26);
+  pass &= run_count_test("def8", "def foo func[int, int] = \n"
+			 "\tfn(x int, y int) int { foo(bar); goto blah; label feh; };\n",
+			 32);
   return pass;
 }
 
