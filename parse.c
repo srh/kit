@@ -641,7 +641,7 @@ int run_count_test(const char *name, const char *str, size_t expected) {
   }
   if (count != expected) {
     DBG("run_count_test %s wrong count: expected %"PRIz", got %"PRIz"\n",
-	expected, count);
+	str, expected, count);
     return 0;
   }
   return 1;
