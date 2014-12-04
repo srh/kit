@@ -59,6 +59,7 @@ struct ast_lambda {
   struct ast_vardecl *params;
   size_t params_count;
   struct ast_typeexpr return_type;
+  /* TODO: Don't make the body be an expr. */
   struct ast_expr *body;
 };
 

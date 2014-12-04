@@ -189,11 +189,104 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
   return 0;
 }
 
+int parse_typeexpr(struct ps *p, struct ast_typeexpr *out);
+
+int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
+  struct ast_ident name;
+  if (!parse_ident(p, &name)) {
+    return 0;
+  }
+  skip_ws(p);
+  struct ast_typeexpr type;
+  if (!parse_typeexpr(p, &type)) {
+    ast_ident_destroy(&name);
+    return 0;
+  }
+
+  out->name = name;
+  out->type = type;
+  return 1;
+}
+
 int parse_expr(struct ps *p, struct ast_expr *out);
 
+int parse_params_list(struct ps *p,
+		      struct ast_vardecl **params_out,
+		      size_t *params_count_out) {
+  if (!try_skip_char(p, '(')) {
+    return 0;
+  }
+  struct ast_vardecl *params = NULL;
+  size_t params_count = 0;
+  size_t params_limit = 0;
+
+  for (;;) {
+    skip_ws(p);
+    if (try_skip_char(p, ')')) {
+      *params_out = params;
+      *params_count_out = params_count;
+      return 1;
+    }
+
+    if (params_count != 0) {
+      if (!try_skip_char(p, ',')) {
+	goto fail;
+      }
+      skip_ws(p);
+    }
+
+    struct ast_vardecl vardecl;
+    if (!parse_vardecl(p, &vardecl)) {
+      goto fail;
+    }
+    SLICE_PUSH(params, params_count, params_limit, vardecl);
+  }
+
+ fail:
+  SLICE_FREE(params, params_count, ast_vardecl_destroy);
+  return 0;
+}
+
 int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
-  (void)p, (void)out;
-  /* TODO: Implement. */
+  skip_ws(p);
+  struct ast_vardecl *params;
+  size_t params_count;
+  if (!parse_params_list(p, &params, &params_count)) {
+    return 0;
+  }
+
+  skip_ws(p);
+  struct ast_typeexpr return_type;
+  if (!parse_typeexpr(p, &return_type)) {
+    goto fail_params;
+  }
+
+  skip_ws(p);
+  struct ast_expr body;
+  /* TODO: Semicolon precedence, when that's important. */
+  if (!parse_expr(p, &body)) {
+    goto fail_return_type;
+  }
+
+  if (!try_skip_semicolon(p)) {
+    goto fail_body;
+  }
+
+  struct ast_expr *heap_body = malloc(sizeof(*heap_body));
+  CHECK(heap_body);
+  *heap_body = body;
+  out->params = params;
+  out->params_count = params_count;
+  out->return_type = return_type;
+  out->body = heap_body;
+  return 1;
+
+ fail_body:
+  ast_expr_destroy(&body);
+ fail_return_type:
+  ast_typeexpr_destroy(&return_type);
+ fail_params:
+  SLICE_FREE(params, params_count, ast_vardecl_destroy);
   return 0;
 }
 
