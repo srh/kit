@@ -674,7 +674,7 @@ int parse_test_defs(void) {
   pass &= run_count_test("def2", "def b int = 1;", 6);
   pass &= run_count_test("def3", "def a int =0   ;  ", 6);
   pass &= run_count_test("def4", "def abc_def int = 12345;", 6);
-  pass &= run_count_test("def5", "def foo func[int, int] = 1;", 10);
+  pass &= run_count_test("def5", "def foo func[int, int] = 1;", 11);
   return pass;
 }
 
