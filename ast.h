@@ -126,4 +126,6 @@ void ast_file_init(struct ast_file *a,
 		   struct ast_toplevel *toplevels,
 		   size_t toplevels_count);
 
+void ast_file_destroy(struct ast_file *a);
+
 #endif /* KIRA_AST_H_ */

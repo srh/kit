@@ -97,9 +97,14 @@ void ast_toplevel_destroy(struct ast_toplevel *a) {
   }
 }
 
+void ast_file_destroy(struct ast_file *a) {
+  SLICE_FREE(a->toplevels, a->toplevels_count, ast_toplevel_destroy);
+}
+
 void ast_file_init(struct ast_file *a,
 		   struct ast_toplevel *toplevels,
 		   size_t toplevels_count) {
   a->toplevels = toplevels;
   a->toplevels_count = toplevels_count;
 }
+

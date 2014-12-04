@@ -18,4 +18,9 @@ void report_and_abort(const char *file, int line,
 
 #define UNREACHABLE() CRASH("Unreachable.")
 
+#define DBG(...) do { \
+    fprintf(stderr, __VA_ARGS__); \
+    fflush(stderr); \
+  } while (0)
+
 #endif /* KIRA_UTIL_H_ */

@@ -1,5 +1,8 @@
 #include "parse.h"
 
+#include <stdio.h>
+#include <string.h>
+
 #include "ast.h"
 #include "identmap.h"
 #include "slice.h"
@@ -11,16 +14,19 @@ struct ps {
   size_t pos;
 
   struct ident_map ident_table;
+  size_t leafcount;
 };
 
 struct ps_savestate {
   size_t pos;
+  size_t leafcount;
 };
 
 void ps_init(struct ps *p, const uint8_t *data, size_t length) {
   p->data = data;
   p->length = length;
   p->pos = 0;
+  p->leafcount = 0;
 
   ident_map_init(&p->ident_table);
 }
@@ -30,6 +36,7 @@ void ps_destroy(struct ps *p) {
   p->data = NULL;
   p->length = 0;
   p->pos = 0;
+  p->leafcount = 0;
 }
 
 int32_t ps_peek(struct ps *p) {
@@ -48,12 +55,20 @@ void ps_step(struct ps *p) {
 struct ps_savestate ps_save(struct ps *p) {
   struct ps_savestate ret;
   ret.pos = p->pos;
+  ret.leafcount = p->leafcount;
   return ret;
 }
 
 void ps_restore(struct ps *p, struct ps_savestate save) {
   CHECK(save.pos <= p->pos);
+  CHECK(save.leafcount <= p->leafcount);
   p->pos = save.pos;
+  p->leafcount = save.leafcount;
+}
+
+void ps_count_leaf(struct ps *p) {
+  CHECK(p->leafcount != SIZE_MAX);
+  p->leafcount++;
 }
 
 ident_value ps_intern_ident(struct ps *p,
@@ -139,6 +154,7 @@ int try_skip_char(struct ps *p, char ch) {
   CHECK(ch > 0);
   if (ps_peek(p) == ch) {
     ps_step(p);
+    ps_count_leaf(p);
     return 1;
   }
   return 0;
@@ -155,6 +171,7 @@ int skip_oper(struct ps *p, const char *s) {
   if (is_operlike(ps_peek(p))) {
     return 0;
   }
+  ps_count_leaf(p);
   return 1;
 }
 
@@ -168,10 +185,12 @@ int try_skip_keyword(struct ps *p, const char *kw) {
     ps_restore(p, save);
     return 0;
   }
+  ps_count_leaf(p);
   return 1;
 }
 
 int parse_ident(struct ps *p, struct ast_ident *out) {
+  DBG("parse_ident\n");
   if (!is_ident_firstchar(ps_peek(p))) {
     return 0;
   }
@@ -185,7 +204,10 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
     return 0;
   }
 
+  DBG("parse_ident about to ps_intern_ident\n");
   out->value = ps_intern_ident(p, save, ps_save(p));
+  DBG("parse_ident interned ident\n");
+  ps_count_leaf(p);
   return 1;
 }
 
@@ -311,6 +333,7 @@ int parse_rest_of_numeric_literal(struct ps *p, int32_t first_digit,
 
   out->digits = digits;
   out->digits_count = digits_count;
+  ps_count_leaf(p);
   return 1;
 }
 
@@ -496,12 +519,14 @@ int parse_rest_of_def(struct ps *p, struct ast_def *out) {
 }
 
 int parse_rest_of_import(struct ps *p, struct ast_import *out) {
+  DBG("parse_rest_of_import\n");
   skip_ws(p);
   struct ast_ident ident;
   if (!parse_ident(p, &ident)) {
     return 0;
   }
   skip_ws(p);
+  DBG("parse_rest_of_import about to skip semicolon\n");
   if (!try_skip_semicolon(p)) {
     ast_ident_destroy(&ident);
     return 0;
@@ -549,6 +574,7 @@ int parse_rest_of_module(struct ps *p, struct ast_module *out) {
 
 
 int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
+  DBG("parse_toplevel\n");
   if (try_skip_keyword(p, "def")) {
     out->tag = AST_TOPLEVEL_DEF;
     return parse_rest_of_def(p, &out->u.def);
@@ -571,7 +597,8 @@ int parse_file(struct ps *p, struct ast_file *out) {
     skip_ws(p);
 
     if (ps_peek(p) == -1) {
-      ast_file_init(out, toplevels, toplevels_count);
+      out->toplevels = toplevels;
+      out->toplevels_count = toplevels_count;
       return 1;
     }
 
@@ -583,3 +610,70 @@ int parse_file(struct ps *p, struct ast_file *out) {
     SLICE_PUSH(toplevels, toplevels_count, toplevels_limit, toplevel);
   }
 }
+
+int count_parse(const char *str, size_t *leafcount_out) {
+  size_t length = strlen(str);
+  const uint8_t *data = (const uint8_t *)str;
+  struct ps p;
+  ps_init(&p, data, length);
+
+  struct ast_file file;
+  DBG("parse_file...\n");
+  int ret = parse_file(&p, &file);
+  if (ret) {
+    *leafcount_out = p.leafcount;
+    ast_file_destroy(&file);
+  }
+  ps_destroy(&p);
+  return ret;
+}
+
+int parse_test_nothing(void) {
+  DBG("parse_test_nothing...\n");
+  size_t count;
+  int res = count_parse("", &count);
+  if (!res) {
+    DBG("parse_test_nothing parse failed\n");
+    return 0;
+  }
+  if (count != 0) {
+    DBG("parse_test_nothing wrong node count\n");
+    return 0;
+  }
+  return 1;
+}
+
+int parse_test_imports(void) {
+  DBG("parse_test_imports...\n");
+  size_t count;
+  int res = count_parse("import a; import aa; import bcd; import blah_quux;", &count);
+  if (!res) {
+    DBG("parse_test_imports parse failed\n");
+    return 0;
+  }
+  if (count != 12) {
+    DBG("parse_test_imports wrong node count\n");
+    return 0;
+  }
+  return 1;
+}
+
+int parse_test_modules(void) {
+  /* TODO: Implement. */
+  return 1;
+}
+
+int parse_test_defs(void) {
+  /* TODO: Implement. */
+  return 1;
+}
+
+int parse_test(void) {
+  int pass = 1;
+  pass &= parse_test_nothing();
+  pass &= parse_test_imports();
+  pass &= parse_test_modules();
+  pass &= parse_test_defs();
+  return pass;
+}
+
