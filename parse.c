@@ -186,7 +186,7 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
   }
 
   out->value = ps_intern_ident(p, save, ps_save(p));
-  return 0;
+  return 1;
 }
 
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out);
