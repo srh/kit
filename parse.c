@@ -111,6 +111,10 @@ int is_ident_postchar(int32_t ch) {
   return is_ws(ch) || is_operlike(ch) || is_parenlike(ch);
 }
 
+int is_numeric_postchar(int32_t ch) {
+  return is_ident_postchar(ch);
+}
+
 void skip_ws(struct ps *p) {
   while (is_ws(ps_peek(p))) {
     ps_step(p);
@@ -185,9 +189,130 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
   return 0;
 }
 
-int parse_expr(struct ps *p, struct ast_expr *out) {
+int parse_expr(struct ps *p, struct ast_expr *out);
+
+int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
   (void)p, (void)out;
   /* TODO: Implement. */
+  return 0;
+}
+
+int parse_rest_of_numeric_literal(struct ps *p, int32_t first_digit,
+				  struct ast_numeric_literal *out) {
+  int8_t *digits = NULL;
+  size_t digits_count = 0;
+  size_t digits_limit = 0;
+  int8_t first_digit_value = (int8_t)(first_digit - '0');
+  SLICE_PUSH(digits, digits_count, digits_limit, first_digit_value);
+  int32_t ch;
+  while ((ch = ps_peek(p)), is_decimal_digit(ch)) {
+    int8_t ch_value = (int8_t)(ch - '0');
+    SLICE_PUSH(digits, digits_count, digits_limit, ch_value);
+    ps_step(p);
+  }
+
+  if (!is_numeric_postchar(ch)) {
+    free(digits);
+    return 0;
+  }
+
+  out->digits = digits;
+  out->digits_count = digits_count;
+  return 1;
+}
+
+int parse_rest_of_arglist(struct ps *p,
+			  struct ast_expr **args_out,
+			  size_t *args_count_out) {
+  struct ast_expr *args = NULL;
+  size_t args_count = 0;
+  size_t args_limit = 0;
+
+  for (;;) {
+    skip_ws(p);
+    if (try_skip_char(p, ')')) {
+      *args_out = args;
+      *args_count_out = args_count;
+      return 1;
+    }
+    if (args_count != 0) {
+      if (!try_skip_char(p, ',')) {
+	goto fail;
+      }
+      skip_ws(p);
+    }
+
+    struct ast_expr expr;
+    /* TODO: Comma precedence, when that's necessary. */
+    if (!parse_expr(p, &expr)) {
+      goto fail;
+    }
+
+    SLICE_PUSH(args, args_count, args_limit, expr);
+  }
+
+ fail:
+  SLICE_FREE(args, args_count, ast_expr_destroy);
+  return 0;
+}
+
+int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
+  if (try_skip_keyword(p, "fn")) {
+    out->tag = AST_EXPR_LAMBDA;
+    return parse_rest_of_lambda(p, &out->u.lambda);
+  } else if (is_decimal_digit(ps_peek(p))) {
+    int32_t ch = ps_peek(p);
+    ps_step(p);
+    out->tag = AST_EXPR_NUMERIC_LITERAL;
+    return parse_rest_of_numeric_literal(p, ch, &out->u.numeric_literal);
+  } else if (is_ident_firstchar(ps_peek(p))) {
+    out->tag = AST_EXPR_NAME;
+    return parse_ident(p, &out->u.name);
+  } else if (try_skip_char(p, '(')) {
+    struct ast_expr expr;
+    if (!parse_expr(p, &expr)) {
+      return 0;
+    }
+    if (!try_skip_char(p, ')')) {
+      ast_expr_destroy(&expr);
+      return 0;
+    }
+    *out = expr;
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+int parse_expr(struct ps *p, struct ast_expr *out) {
+  struct ast_expr lhs;
+  if (!parse_atomic_expr(p, &lhs)) {
+    return 0;
+  }
+
+  for (;;) {
+    skip_ws(p);
+    if (try_skip_char(p, '(')) {
+      struct ast_expr *args;
+      size_t args_count;
+      if (!parse_rest_of_arglist(p, &args, &args_count)) {
+	goto fail;
+      }
+      struct ast_expr *lhs_heap = malloc(sizeof(*lhs_heap));
+      CHECK(lhs_heap);
+      *lhs_heap = lhs;
+      lhs.tag = AST_EXPR_FUNCALL;
+      lhs.u.funcall.func = lhs_heap;
+      lhs.u.funcall.args = args;
+      lhs.u.funcall.args_count = args_count;
+    } else {
+      *out = lhs;
+      return 1;
+    }
+  }
+
+ fail:
+  ast_expr_destroy(&lhs);
   return 0;
 }
 
