@@ -714,8 +714,7 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
 
       enum ast_binop op;
       if (!parse_binop(p, &op)) {
-	/* TODO: Cleanup memory. */
-	return 0;
+	goto fail;
       }
 
       struct precedence_pair op_precedence = binop_precedence(op);
@@ -726,8 +725,7 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
 
       switch (cmp) {
       case PRECEDENCE_COMPARISON_CONFLICTS:
-	/* TODO: Cleanup memory. */
-	return 0;
+	goto fail;
       case PRECEDENCE_COMPARISON_PULLS_LEFT:
 	ps_restore(p, save);
 	*out = lhs;
@@ -741,7 +739,7 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       skip_ws(p);
       struct ast_expr rhs;
       if (!parse_expr(p, &rhs, op_precedence.right_precedence)) {
-	return 0;
+	goto fail;
       }
 
       struct ast_expr *heap_lhs;
