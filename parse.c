@@ -83,6 +83,13 @@ ident_value ps_intern_ident(struct ps *p,
 			  ident_end.pos - ident_begin.pos);
 }
 
+void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out) {
+  struct ast_expr *p = malloc(sizeof(*p));
+  CHECK(p);
+  *p = movee;
+  *out = p;
+}
+
 int is_ws(int32_t ch) {
   STATIC_ASSERT(' ' == 32 && '\r' == 13 && '\n' == 10 && '\t' == 9);
   return ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t';
@@ -100,6 +107,10 @@ int is_one_of(const char *s, int32_t ch) {
 
 int is_operlike(int32_t ch) {
   return is_one_of("~!%^&*+=-/?<,>.;:", ch);
+}
+
+int is_binop_start(int32_t ch) {
+  return is_one_of("!%^&*+=-/<>", ch);
 }
 
 int is_parenlike(int32_t ch) {
@@ -175,6 +186,82 @@ int skip_oper(struct ps *p, const char *s) {
   }
   ps_count_leaf(p);
   return 1;
+}
+
+int parse_binop(struct ps *p, enum ast_binop *out) {
+  int32_t ch1 = ps_peek(p);
+  if (!is_binop_start(ch1)) {
+    return 0;
+  }
+
+  enum ast_binop op;
+  ps_step(p);
+  switch (ch1) {
+  case '=':
+    if (ps_peek(p) == '=') {
+      ps_step(p);
+      op = AST_BINOP_EQ;
+      goto done;
+    }
+    op = AST_BINOP_ASSIGN;
+    goto done;
+  case '+': op = AST_BINOP_ADD; goto done;
+  case '-': op = AST_BINOP_SUB; goto done;
+  case '*': op = AST_BINOP_MUL; goto done;
+  case '/': op = AST_BINOP_DIV; goto done;
+  case '%': op = AST_BINOP_MOD; goto done;
+  case '<':
+    if (ps_peek(p) == '=') {
+      ps_step(p);
+      op = AST_BINOP_LE;
+      goto done;
+    }
+    op = AST_BINOP_LT;
+    goto done;
+  case '>':
+    if (ps_peek(p) == '=') {
+      ps_step(p);
+      op = AST_BINOP_GE;
+      goto done;
+    }
+    op = AST_BINOP_GT;
+    goto done;
+  case '!':
+    if (ps_peek(p) == '=') {
+      ps_step(p);
+      op = AST_BINOP_NE;
+      goto done;
+    }
+    return 0;
+  case '^': op = AST_BINOP_BIT_XOR; goto done;
+  case '|':
+    if (ps_peek(p) == '|') {
+      ps_step(p);
+      op = AST_BINOP_LOGICAL_OR;
+      goto done;
+    }
+    op = AST_BINOP_BIT_OR;
+    goto done;
+  case '&':
+    if (ps_peek(p) == '&') {
+      ps_step(p);
+      op = AST_BINOP_LOGICAL_AND;
+      goto done;
+    }
+    op = AST_BINOP_BIT_AND;
+    goto done;
+  default:
+    return 0;
+  }
+
+ done:
+  if (is_operlike(ps_peek(p))) {
+    return 0;
+  } else {
+    ps_count_leaf(p);
+    *out = op;
+    return 1;
+  }
 }
 
 int try_skip_keyword(struct ps *p, const char *kw) {
@@ -288,9 +375,8 @@ int parse_rest_of_if_statement(struct ps *p, struct ast_statement *out) {
 
   skip_ws(p);
   if (!try_skip_keyword(p, "else")) {
-    struct ast_expr *heap_condition = malloc(sizeof(*heap_condition));
-    CHECK(heap_condition);
-    *heap_condition = condition;
+    struct ast_expr *heap_condition;
+    malloc_move_ast_expr(condition, &heap_condition);
     out->tag = AST_STATEMENT_IFTHEN;
     out->u.ifthen_statement.condition = heap_condition;
     out->u.ifthen_statement.thenbody = thenbody;
@@ -303,9 +389,8 @@ int parse_rest_of_if_statement(struct ps *p, struct ast_statement *out) {
     goto fail_thenbody;
   }
 
-  struct ast_expr *heap_condition = malloc(sizeof(*heap_condition));
-  CHECK(heap_condition);
-  *heap_condition = condition;
+  struct ast_expr *heap_condition;
+  malloc_move_ast_expr(condition, &heap_condition);
   out->tag = AST_STATEMENT_IFTHENELSE;
   out->u.ifthenelse_statement.condition = heap_condition;
   out->u.ifthenelse_statement.thenbody = thenbody;
@@ -360,9 +445,8 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
       return 0;
     }
 
-    struct ast_expr *heap_expr = malloc(sizeof(*heap_expr));
-    CHECK(heap_expr);
-    *heap_expr = expr;
+    struct ast_expr *heap_expr;
+    malloc_move_ast_expr(expr, &heap_expr);
     out->tag = AST_STATEMENT_RETURN_EXPR;
     out->u.return_expr = heap_expr;
     return 1;
@@ -379,9 +463,8 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
       return 0;
     }
 
-    struct ast_expr *heap_expr = malloc(sizeof(*heap_expr));
-    CHECK(heap_expr);
-    *heap_expr = expr;
+    struct ast_expr *heap_expr;
+    malloc_move_ast_expr(expr, &heap_expr);
     out->tag = AST_STATEMENT_EXPR;
     out->u.expr = heap_expr;
     return 1;
@@ -556,14 +639,37 @@ int parse_expr(struct ps *p, struct ast_expr *out) {
       if (!parse_rest_of_arglist(p, &args, &args_count)) {
 	goto fail;
       }
-      struct ast_expr *lhs_heap = malloc(sizeof(*lhs_heap));
-      CHECK(lhs_heap);
-      *lhs_heap = lhs;
+      struct ast_expr *heap_lhs;
+      malloc_move_ast_expr(lhs, &heap_lhs);
       lhs.tag = AST_EXPR_FUNCALL;
-      lhs.u.funcall.func = lhs_heap;
+      lhs.u.funcall.func = heap_lhs;
       lhs.u.funcall.args = args;
       lhs.u.funcall.args_count = args_count;
+    } else if (is_binop_start(ps_peek(p))) {
+      /* TODO: Only parse this op if precedence allows. */
+      enum ast_binop op;
+      if (!parse_binop(p, &op)) {
+	return 0;
+      }
+
+      skip_ws(p);
+      /* TODO: Parse with right precedence of op. */
+      struct ast_expr rhs;
+      if (!parse_expr(p, &rhs)) {
+	return 0;
+      }
+
+      struct ast_expr *heap_lhs;
+      malloc_move_ast_expr(lhs, &heap_lhs);
+      struct ast_expr *heap_rhs;
+      malloc_move_ast_expr(rhs, &heap_rhs);
+
+      lhs.tag = AST_EXPR_BINOP;
+      lhs.u.binop_expr.operator = op;
+      lhs.u.binop_expr.lhs = heap_lhs;
+      lhs.u.binop_expr.rhs = heap_rhs;
     } else {
+      /* TODO: Parse binop. */
       PARSE_DBG("parse_expr done\n");
       *out = lhs;
       return 1;
@@ -813,24 +919,27 @@ int parse_test_modules(void) {
 
 int parse_test_defs(void) {
   int pass = 1;
-  pass &= run_count_test("def1", "def a int = 0;", 6);
-  pass &= run_count_test("def2", "def b int = 1;", 6);
-  pass &= run_count_test("def3", "def a int =0   ;  ", 6);
-  pass &= run_count_test("def4", "def abc_def int = 12345;", 6);
-  pass &= run_count_test("def5", "def foo func[int, int] = 1;", 11);
-  pass &= run_count_test("def6", "def foo func[int, int] = fn(x int, y int) int { 3; };", 23);
-  pass &= run_count_test("def7", "def foo func[int, int] = \n"
+  pass &= run_count_test("def01", "def a int = 0;", 6);
+  pass &= run_count_test("def02", "def b int = 1;", 6);
+  pass &= run_count_test("def03", "def a int =0   ;  ", 6);
+  pass &= run_count_test("def04", "def abc_def int = 12345;", 6);
+  pass &= run_count_test("def05", "def foo func[int, int] = 1;", 11);
+  pass &= run_count_test("def06", "def foo func[int, int] = fn(x int, y int) int { 3; };", 23);
+  pass &= run_count_test("def07", "def foo func[int, int] = \n"
 			 "\tfn(x int, y int) int { foo(bar); };\n",
 			 26);
-  pass &= run_count_test("def8", "def foo func[int, int] = \n"
+  pass &= run_count_test("def08", "def foo func[int, int] = \n"
 			 "\tfn(x int, y int) int { foo(bar); goto blah; label feh; };\n",
 			 32);
-  pass &= run_count_test("def9",
+  pass &= run_count_test("def09",
 			 "def foo func[int, int] = \n" /* 9 */
 			 "\tfn() int { foo(bar); if (n) { " /* 15 */
 			 "goto blah; } label feh; \n" /* 7 */
 			 "if n { goto blah; } else { meh; } };\n" /* 14 */,
 			 45);
+  pass &= run_count_test("def10",
+			 "def foo bar = 2 + 3;",
+			 8);
   return pass;
 }
 

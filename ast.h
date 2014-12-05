@@ -113,10 +113,37 @@ struct ast_lambda {
   struct ast_bracebody bracebody;
 };
 
+enum ast_binop {
+  AST_BINOP_ASSIGN,
+  AST_BINOP_ADD,
+  AST_BINOP_SUB,
+  AST_BINOP_MUL,
+  AST_BINOP_DIV,
+  AST_BINOP_MOD,
+  AST_BINOP_LT,
+  AST_BINOP_LE,
+  AST_BINOP_GT,
+  AST_BINOP_GE,
+  AST_BINOP_EQ,
+  AST_BINOP_NE,
+  AST_BINOP_BIT_XOR,
+  AST_BINOP_BIT_OR,
+  AST_BINOP_BIT_AND,
+  AST_BINOP_LOGICAL_OR,
+  AST_BINOP_LOGICAL_AND,
+};
+
+struct ast_binop_expr {
+  enum ast_binop operator;
+  struct ast_expr *lhs;
+  struct ast_expr *rhs;
+};
+
 enum ast_expr_tag {
   AST_EXPR_NAME,
   AST_EXPR_NUMERIC_LITERAL,
   AST_EXPR_FUNCALL,
+  AST_EXPR_BINOP,
   AST_EXPR_LAMBDA,
 };
 
@@ -126,6 +153,7 @@ struct ast_expr {
     struct ast_ident name;
     struct ast_numeric_literal numeric_literal;
     struct ast_funcall funcall;
+    struct ast_binop_expr binop_expr;
     struct ast_lambda lambda;
   } u;
 };
