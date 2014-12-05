@@ -90,6 +90,62 @@ void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out) {
   *out = p;
 }
 
+struct precedence_pair {
+  int left_precedence;
+  int right_precedence;
+};
+
+const int kSemicolonPrecedence = 205;
+/* There is no comma operator, so no intermingling of commas and semicolons. */
+const int kCommaPrecedence = 205;
+
+const struct precedence_pair binop_precedences[] = {
+  [AST_BINOP_ASSIGN] = { 306, 304 },
+  [AST_BINOP_ADD] = { 504, 506 },
+  [AST_BINOP_SUB] = { 504, 506 },
+  [AST_BINOP_MUL] = { 604, 606 },
+  [AST_BINOP_DIV] = { 604, 606 },
+  [AST_BINOP_MOD] = { 605, 605 },
+  [AST_BINOP_LT] = { 405, 405 },
+  [AST_BINOP_LE] = { 405, 405 },
+  [AST_BINOP_GT] = { 405, 405 },
+  [AST_BINOP_GE] = { 405, 405 },
+  [AST_BINOP_EQ] = { 405, 405 },
+  [AST_BINOP_EQ] = { 405, 405 },
+  [AST_BINOP_NE] = { 405, 405 },
+  /* TODO: Let bitwise ops self-associate but require parens for any
+     combination of them with other operators. */
+  [AST_BINOP_BIT_XOR] = { 405, 405 },
+  [AST_BINOP_BIT_OR] = { 405, 405 },
+  [AST_BINOP_BIT_AND] = { 405, 405 },
+  [AST_BINOP_BIT_LEFTSHIFT] = { 405, 405 },
+  [AST_BINOP_BIT_RIGHTSHIFT] = { 405, 405 },
+  [AST_BINOP_LOGICAL_OR] = { 356, 354 },
+  [AST_BINOP_LOGICAL_AND] = { 376, 374 },
+};
+
+struct precedence_pair binop_precedence(enum ast_binop op) {
+  CHECK(0 <= op && op < sizeof(binop_precedences) / sizeof(binop_precedences[0]));
+  return binop_precedences[op];
+}
+
+enum precedence_comparison {
+  PRECEDENCE_COMPARISON_CONFLICTS,
+  PRECEDENCE_COMPARISON_PULLS_LEFT,
+  PRECEDENCE_COMPARISON_PULLS_RIGHT,
+};
+
+enum precedence_comparison compare_precedence(int left, int right) {
+  if (left + 1 < right) {
+    return PRECEDENCE_COMPARISON_PULLS_RIGHT;
+  }
+  if (right + 1 < left) {
+    return PRECEDENCE_COMPARISON_PULLS_LEFT;
+  }
+  return PRECEDENCE_COMPARISON_CONFLICTS;
+}
+
+
 int is_ws(int32_t ch) {
   STATIC_ASSERT(' ' == 32 && '\r' == 13 && '\n' == 10 && '\t' == 9);
   return ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t';
@@ -216,12 +272,22 @@ int parse_binop(struct ps *p, enum ast_binop *out) {
       op = AST_BINOP_LE;
       goto done;
     }
+    if (ps_peek(p) == '<') {
+      ps_step(p);
+      op = AST_BINOP_BIT_LEFTSHIFT;
+      goto done;
+    }
     op = AST_BINOP_LT;
     goto done;
   case '>':
     if (ps_peek(p) == '=') {
       ps_step(p);
       op = AST_BINOP_GE;
+      goto done;
+    }
+    if (ps_peek(p) == '>') {
+      ps_step(p);
+      op = AST_BINOP_BIT_RIGHTSHIFT;
       goto done;
     }
     op = AST_BINOP_GT;
@@ -319,7 +385,7 @@ int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
   return 1;
 }
 
-int parse_expr(struct ps *p, struct ast_expr *out);
+int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context);
 
 int parse_params_list(struct ps *p,
 		      struct ast_vardecl **params_out,
@@ -364,7 +430,7 @@ int parse_bracebody(struct ps *p, struct ast_bracebody *out);
 int parse_rest_of_if_statement(struct ps *p, struct ast_statement *out) {
   skip_ws(p);
   struct ast_expr condition;
-  if (!parse_expr(p, &condition)) {
+  if (!parse_expr(p, &condition, kSemicolonPrecedence)) {
     return 0;
   }
 
@@ -436,8 +502,7 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
   } else if (try_skip_keyword(p, "return")) {
     skip_ws(p);
     struct ast_expr expr;
-    /* TODO: Semicolon precedence. */
-    if (!parse_expr(p, &expr)) {
+    if (!parse_expr(p, &expr, kSemicolonPrecedence)) {
       return 0;
     }
     if (!try_skip_semicolon(p)) {
@@ -454,7 +519,7 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
     return parse_rest_of_if_statement(p, out);
   } else {
     struct ast_expr expr;
-    if (!parse_expr(p, &expr)) {
+    if (!parse_expr(p, &expr, kSemicolonPrecedence)) {
       return 0;
     }
 
@@ -581,8 +646,7 @@ int parse_rest_of_arglist(struct ps *p,
     }
 
     struct ast_expr expr;
-    /* TODO: Comma precedence, when that's necessary. */
-    if (!parse_expr(p, &expr)) {
+    if (!parse_expr(p, &expr, kCommaPrecedence)) {
       goto fail;
     }
 
@@ -608,7 +672,7 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     return parse_ident(p, &out->u.name);
   } else if (try_skip_char(p, '(')) {
     struct ast_expr expr;
-    if (!parse_expr(p, &expr)) {
+    if (!parse_expr(p, &expr, kSemicolonPrecedence)) {
       return 0;
     }
     if (!try_skip_char(p, ')')) {
@@ -622,7 +686,7 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
   }
 }
 
-int parse_expr(struct ps *p, struct ast_expr *out) {
+int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
   struct ast_expr lhs;
   if (!parse_atomic_expr(p, &lhs)) {
     return 0;
@@ -646,16 +710,37 @@ int parse_expr(struct ps *p, struct ast_expr *out) {
       lhs.u.funcall.args = args;
       lhs.u.funcall.args_count = args_count;
     } else if (is_binop_start(ps_peek(p))) {
-      /* TODO: Only parse this op if precedence allows. */
+      struct ps_savestate save = ps_save(p);
+
       enum ast_binop op;
       if (!parse_binop(p, &op)) {
+	/* TODO: Cleanup memory. */
 	return 0;
       }
 
+      struct precedence_pair op_precedence = binop_precedence(op);
+
+      enum precedence_comparison cmp
+	= compare_precedence(precedence_context,
+			     op_precedence.left_precedence);
+
+      switch (cmp) {
+      case PRECEDENCE_COMPARISON_CONFLICTS:
+	/* TODO: Cleanup memory. */
+	return 0;
+      case PRECEDENCE_COMPARISON_PULLS_LEFT:
+	ps_restore(p, save);
+	*out = lhs;
+	return 1;
+      case PRECEDENCE_COMPARISON_PULLS_RIGHT:
+	break;
+      default:
+	UNREACHABLE();
+      }
+
       skip_ws(p);
-      /* TODO: Parse with right precedence of op. */
       struct ast_expr rhs;
-      if (!parse_expr(p, &rhs)) {
+      if (!parse_expr(p, &rhs, op_precedence.right_precedence)) {
 	return 0;
       }
 
@@ -669,7 +754,6 @@ int parse_expr(struct ps *p, struct ast_expr *out) {
       lhs.u.binop_expr.lhs = heap_lhs;
       lhs.u.binop_expr.rhs = heap_rhs;
     } else {
-      /* TODO: Parse binop. */
       PARSE_DBG("parse_expr done\n");
       *out = lhs;
       return 1;
@@ -747,7 +831,7 @@ int parse_rest_of_def(struct ps *p, struct ast_def *out) {
   }
 
   skip_ws(p);
-  if (!parse_expr(p, &def.rhs)) {
+  if (!parse_expr(p, &def.rhs, kSemicolonPrecedence)) {
     goto fail_typeexpr;
   }
 
@@ -940,6 +1024,12 @@ int parse_test_defs(void) {
   pass &= run_count_test("def10",
 			 "def foo bar = 2 + 3;",
 			 8);
+  pass &= run_count_test("def11",
+			 "def foo bar = 2 + 3 - 4;",
+			 10);
+  pass &= run_count_test("def12",
+			 "def foo bar = (2 ^ 3) - 4 && x;",
+			 14);
   return pass;
 }
 

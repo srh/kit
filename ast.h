@@ -113,6 +113,7 @@ struct ast_lambda {
   struct ast_bracebody bracebody;
 };
 
+/* See also: binop_precedence in parse.c. */
 enum ast_binop {
   AST_BINOP_ASSIGN,
   AST_BINOP_ADD,
@@ -129,6 +130,8 @@ enum ast_binop {
   AST_BINOP_BIT_XOR,
   AST_BINOP_BIT_OR,
   AST_BINOP_BIT_AND,
+  AST_BINOP_BIT_LEFTSHIFT,
+  AST_BINOP_BIT_RIGHTSHIFT,
   AST_BINOP_LOGICAL_OR,
   AST_BINOP_LOGICAL_AND,
 };
