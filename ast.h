@@ -57,6 +57,13 @@ struct ast_expr;
 
 struct ast_statement;
 
+struct ast_bracebody {
+  struct ast_statement *statements;
+  size_t statements_count;
+};
+
+void ast_bracebody_destroy(struct ast_bracebody *a);
+
 struct ast_goto_statement {
   struct ast_ident target;
 };
@@ -65,11 +72,24 @@ struct ast_label_statement {
   struct ast_ident label;
 };
 
+struct ast_ifthen_statement {
+  struct ast_expr *condition;
+  struct ast_bracebody thenbody;
+};
+
+struct ast_ifthenelse_statement {
+  struct ast_expr *condition;
+  struct ast_bracebody thenbody;
+  struct ast_bracebody elsebody;
+};
+
 enum ast_statement_tag {
   AST_STATEMENT_EXPR,
   AST_STATEMENT_RETURN_EXPR,
   AST_STATEMENT_GOTO,
   AST_STATEMENT_LABEL,
+  AST_STATEMENT_IFTHEN,
+  AST_STATEMENT_IFTHENELSE,
 };
 
 struct ast_statement {
@@ -79,15 +99,12 @@ struct ast_statement {
     struct ast_expr *return_expr;
     struct ast_goto_statement goto_statement;
     struct ast_label_statement label_statement;
+    struct ast_ifthen_statement ifthen_statement;
+    struct ast_ifthenelse_statement ifthenelse_statement;
   } u;
 };
 
 void ast_statement_destroy(struct ast_statement *a);
-
-struct ast_bracebody {
-  struct ast_statement *statements;
-  size_t statements_count;
-};
 
 struct ast_lambda {
   struct ast_vardecl *params;

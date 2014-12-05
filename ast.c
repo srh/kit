@@ -22,12 +22,29 @@ void ast_vardecl_destroy(struct ast_vardecl *a) {
   ast_typeexpr_destroy(&a->type);
 }
 
+void ast_bracebody_destroy(struct ast_bracebody *a) {
+  SLICE_FREE(a->statements, a->statements_count, ast_statement_destroy);
+}
+
 void ast_goto_statement_destroy(struct ast_goto_statement *a) {
   ast_ident_destroy(&a->target);
 }
 
 void ast_label_statement_destroy(struct ast_label_statement *a) {
   ast_ident_destroy(&a->label);
+}
+
+void ast_ifthen_statement_destroy(struct ast_ifthen_statement *a) {
+  ast_expr_destroy(a->condition);
+  free(a->condition);
+  ast_bracebody_destroy(&a->thenbody);
+}
+
+void ast_ifthenelse_statement_destroy(struct ast_ifthenelse_statement *a) {
+  ast_expr_destroy(a->condition);
+  free(a->condition);
+  ast_bracebody_destroy(&a->thenbody);
+  ast_bracebody_destroy(&a->elsebody);
 }
 
 void ast_statement_destroy(struct ast_statement *a) {
@@ -46,13 +63,15 @@ void ast_statement_destroy(struct ast_statement *a) {
   case AST_STATEMENT_LABEL:
     ast_label_statement_destroy(&a->u.label_statement);
     break;
+  case AST_STATEMENT_IFTHEN:
+    ast_ifthen_statement_destroy(&a->u.ifthen_statement);
+    break;
+  case AST_STATEMENT_IFTHENELSE:
+    ast_ifthenelse_statement_destroy(&a->u.ifthenelse_statement);
+    break;
   default:
     UNREACHABLE();
   }
-}
-
-void ast_bracebody_destroy(struct ast_bracebody *a) {
-  SLICE_FREE(a->statements, a->statements_count, ast_statement_destroy);
 }
 
 void ast_lambda_destroy(struct ast_lambda *a) {

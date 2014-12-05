@@ -272,6 +272,53 @@ int parse_params_list(struct ps *p,
   return 0;
 }
 
+int parse_bracebody(struct ps *p, struct ast_bracebody *out);
+
+int parse_rest_of_if_statement(struct ps *p, struct ast_statement *out) {
+  skip_ws(p);
+  struct ast_expr condition;
+  if (!parse_expr(p, &condition)) {
+    return 0;
+  }
+
+  struct ast_bracebody thenbody;
+  if (!parse_bracebody(p, &thenbody)) {
+    goto fail_condition;
+  }
+
+  skip_ws(p);
+  if (!try_skip_keyword(p, "else")) {
+    struct ast_expr *heap_condition = malloc(sizeof(*heap_condition));
+    CHECK(heap_condition);
+    *heap_condition = condition;
+    out->tag = AST_STATEMENT_IFTHEN;
+    out->u.ifthen_statement.condition = heap_condition;
+    out->u.ifthen_statement.thenbody = thenbody;
+    return 1;
+  }
+
+  skip_ws(p);
+  struct ast_bracebody elsebody;
+  if (!parse_bracebody(p, &elsebody)) {
+    goto fail_thenbody;
+  }
+
+  struct ast_expr *heap_condition = malloc(sizeof(*heap_condition));
+  CHECK(heap_condition);
+  *heap_condition = condition;
+  out->tag = AST_STATEMENT_IFTHENELSE;
+  out->u.ifthenelse_statement.condition = heap_condition;
+  out->u.ifthenelse_statement.thenbody = thenbody;
+  out->u.ifthenelse_statement.elsebody = elsebody;
+  return 1;
+
+ fail_thenbody:
+  ast_bracebody_destroy(&thenbody);
+ fail_condition:
+  ast_expr_destroy(&condition);
+  return 0;
+}
+
 int parse_statement(struct ps *p, struct ast_statement *out) {
   if (try_skip_keyword(p, "goto")) {
     skip_ws(p);
@@ -319,6 +366,8 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
     out->tag = AST_STATEMENT_RETURN_EXPR;
     out->u.return_expr = heap_expr;
     return 1;
+  } else if (try_skip_keyword(p, "if")) {
+    return parse_rest_of_if_statement(p, out);
   } else {
     struct ast_expr expr;
     if (!parse_expr(p, &expr)) {
@@ -776,6 +825,12 @@ int parse_test_defs(void) {
   pass &= run_count_test("def8", "def foo func[int, int] = \n"
 			 "\tfn(x int, y int) int { foo(bar); goto blah; label feh; };\n",
 			 32);
+  pass &= run_count_test("def9",
+			 "def foo func[int, int] = \n" /* 9 */
+			 "\tfn() int { foo(bar); if (n) { " /* 15 */
+			 "goto blah; } label feh; \n" /* 7 */
+			 "if n { goto blah; } else { meh; } };\n" /* 14 */,
+			 45);
   return pass;
 }
 
