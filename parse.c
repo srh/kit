@@ -944,11 +944,10 @@ int parse_file(struct ps *p, struct ast_file *out) {
   }
 }
 
-int count_parse(const char *str, size_t *leafcount_out, size_t *pos_out) {
-  size_t length = strlen(str);
-  const uint8_t *data = (const uint8_t *)str;
+int count_parse_buf(const uint8_t *buf, size_t length,
+		    size_t *leafcount_out, size_t *error_pos_out) {
   struct ps p;
-  ps_init(&p, data, length);
+  ps_init(&p, buf, length);
 
   struct ast_file file;
   PARSE_DBG("parse_file...\n");
@@ -957,10 +956,16 @@ int count_parse(const char *str, size_t *leafcount_out, size_t *pos_out) {
     *leafcount_out = p.leafcount;
     ast_file_destroy(&file);
   } else {
-    *pos_out = p.pos;
+    *error_pos_out = p.pos;
   }
   ps_destroy(&p);
   return ret;
+}
+
+int count_parse(const char *str, size_t *leafcount_out, size_t *error_pos_out) {
+  size_t length = strlen(str);
+  const uint8_t *data = (const uint8_t *)str;
+  return count_parse_buf(data, length, leafcount_out, error_pos_out);
 }
 
 int run_count_test(const char *name, const char *str, size_t expected) {

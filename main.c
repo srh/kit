@@ -16,6 +16,7 @@ int run_tests(void) {
 int main(int argc, char **argv) {
   if (argc != 2) {
     fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
+    fflush(stderr);
     return EXIT_FAILURE;
   }
 
@@ -29,11 +30,23 @@ int main(int argc, char **argv) {
   size_t size;
   if (!read_file(path, &data, &size)) {
     fprintf(stderr, "Could not read %s\n", path);
+    fflush(stderr);
     return EXIT_FAILURE;
   }
 
-  free(data);
+  size_t leafcount;
+  size_t error_pos;
+  int ret;
+  if (count_parse_buf(data, size, &leafcount, &error_pos)) {
+    fprintf(stderr, "Parse succeeded.  Leaf count is %"PRIz".\n", leafcount);
+    fflush(stderr);
+    ret = EXIT_SUCCESS;
+  } else {
+    fprintf(stderr, "Parse failed, at %"PRIz".\n", error_pos);
+    ret = EXIT_FAILURE;
+  }
 
-  return 0;
+  free(data);
+  return ret;
 }
 
