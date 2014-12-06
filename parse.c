@@ -15,12 +15,17 @@ struct ps {
   size_t length;
   size_t pos;
 
+  size_t line;
+  size_t column;
+
   struct ident_map ident_table;
   size_t leafcount;
 };
 
 struct ps_savestate {
   size_t pos;
+  size_t line;
+  size_t column;
   size_t leafcount;
 };
 
@@ -28,17 +33,16 @@ void ps_init(struct ps *p, const uint8_t *data, size_t length) {
   p->data = data;
   p->length = length;
   p->pos = 0;
-  p->leafcount = 0;
+
+  p->line = 1;
+  p->column = 0;
 
   ident_map_init(&p->ident_table);
+  p->leafcount = 0;
 }
 
 void ps_destroy(struct ps *p) {
   ident_map_destroy(&p->ident_table);
-  p->data = NULL;
-  p->length = 0;
-  p->pos = 0;
-  p->leafcount = 0;
 }
 
 int32_t ps_peek(struct ps *p) {
@@ -51,12 +55,24 @@ int32_t ps_peek(struct ps *p) {
 
 void ps_step(struct ps *p) {
   CHECK(p->pos < p->length);
+  int32_t ch = p->data[p->pos];
+  if (ch == '\n') {
+    p->line = size_add(p->line, 1);
+    p->column = 0;
+  } else if (ch == '\t') {
+    p->column = size_add((p->column | 7), 1);
+  } else {
+    p->column = size_add(p->column, 1);
+  }
+
   p->pos++;
 }
 
 struct ps_savestate ps_save(struct ps *p) {
   struct ps_savestate ret;
   ret.pos = p->pos;
+  ret.line = p->line;
+  ret.column = p->column;
   ret.leafcount = p->leafcount;
   return ret;
 }
@@ -65,6 +81,8 @@ void ps_restore(struct ps *p, struct ps_savestate save) {
   CHECK(save.pos <= p->pos);
   CHECK(save.leafcount <= p->leafcount);
   p->pos = save.pos;
+  p->line = save.line;
+  p->column = save.column;
   p->leafcount = save.leafcount;
 }
 
