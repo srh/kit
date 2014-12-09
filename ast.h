@@ -224,7 +224,7 @@ struct ast_module {
 };
 
 struct ast_import {
-  struct ast_ident ident;
+  struct ast_ident name;
 };
 
 struct ast_deftype {

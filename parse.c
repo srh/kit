@@ -1105,18 +1105,22 @@ int parse_rest_of_def(struct ps *p, struct ast_def *out) {
 int parse_rest_of_import(struct ps *p, struct ast_import *out) {
   PARSE_DBG("parse_rest_of_import\n");
   skip_ws(p);
-  struct ast_ident ident;
-  if (!parse_ident(p, &ident)) {
-    return 0;
+  struct ast_ident name;
+  if (!parse_ident(p, &name)) {
+    goto fail;
   }
   skip_ws(p);
   PARSE_DBG("parse_rest_of_import about to skip semicolon\n");
   if (!try_skip_semicolon(p)) {
-    ast_ident_destroy(&ident);
-    return 0;
+    goto fail_ident;
   }
-  out->ident = ident;
+  out->name = name;
   return 1;
+
+ fail_ident:
+  ast_ident_destroy(&name);
+ fail:
+  return 0;
 }
 
 int parse_toplevel(struct ps *p, struct ast_toplevel *out);

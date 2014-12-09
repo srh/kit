@@ -184,7 +184,7 @@ void ast_module_destroy(struct ast_module *a) {
 }
 
 void ast_import_destroy(struct ast_import *a) {
-  ast_ident_destroy(&a->ident);
+  ast_ident_destroy(&a->name);
 }
 
 void ast_deftype_destroy(struct ast_deftype *a) {
