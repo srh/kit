@@ -828,7 +828,62 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
   return 0;
 }
 
+int parse_braced_fields(struct ps *p,
+			struct ast_vardecl **fields_out,
+			size_t *fields_count_out) {
+  if (!try_skip_char(p, '{')) {
+    return 0;
+  }
+  struct ast_vardecl *fields = NULL;
+  size_t fields_count = 0;
+  size_t fields_limit = 0;
+  for (;;) {
+    skip_ws(p);
+    if (try_skip_char(p, '}')) {
+      *fields_out = fields;
+      *fields_count_out = fields_count;
+      return 1;
+    }
+
+    struct ast_vardecl field;
+    if (!parse_vardecl(p, &field)) {
+      goto fail;
+    }
+
+    skip_ws(p);
+    if (!try_skip_semicolon(p)) {
+      goto fail;
+    }
+
+    SLICE_PUSH(fields, fields_count, fields_limit, field);
+  }
+
+ fail:
+  SLICE_FREE(fields, fields_count, ast_vardecl_destroy);
+  return 0;
+}
+
+int parse_rest_of_structe(struct ps *p, struct ast_structe *out) {
+  skip_ws(p);
+  return parse_braced_fields(p, &out->fields, &out->fields_count);
+}
+
+int parse_rest_of_unione(struct ps *p, struct ast_unione *out) {
+  skip_ws(p);
+  return parse_braced_fields(p, &out->fields, &out->fields_count);
+}
+
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
+  if (try_skip_keyword(p, "struct")) {
+    out->tag = AST_TYPEEXPR_STRUCTE;
+    return parse_rest_of_structe(p, &out->u.structe);
+  }
+
+  if (try_skip_keyword(p, "union")) {
+    out->tag = AST_TYPEEXPR_UNIONE;
+    return parse_rest_of_unione(p, &out->u.unione);
+  }
+
   struct ast_ident ident;
   if (!parse_ident(p, &ident)) {
     return 0;
@@ -1142,6 +1197,10 @@ int parse_test_deftypes(void) {
   pass &= run_count_test("deftype2",
 			 "deftype foo func[int, int] ; ",
 			 9);
+  pass &= run_count_test("deftype3",
+			 "deftype foo struct { x y; z int; t func[beh]; };\n"
+			 "deftype bar union{a b;c d[e,f];};",
+			 35);
   return pass;
 }
 

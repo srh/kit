@@ -31,9 +31,21 @@ struct ast_typeapp {
   size_t params_count;
 };
 
+struct ast_structe {
+  struct ast_vardecl *fields;
+  size_t fields_count;
+};
+
+struct ast_unione {
+  struct ast_vardecl *fields;
+  size_t fields_count;
+};
+
 enum ast_typeexpr_tag {
   AST_TYPEEXPR_NAME,
   AST_TYPEEXPR_APP,
+  AST_TYPEEXPR_STRUCTE,
+  AST_TYPEEXPR_UNIONE,
 };
 
 struct ast_typeexpr {
@@ -41,6 +53,8 @@ struct ast_typeexpr {
   union {
     struct ast_ident name;
     struct ast_typeapp app;
+    struct ast_structe structe;
+    struct ast_unione unione;
   } u;
 };
 

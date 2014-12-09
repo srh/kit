@@ -124,6 +124,14 @@ void ast_typeapp_destroy(struct ast_typeapp *a) {
   SLICE_FREE(a->params, a->params_count, ast_typeexpr_destroy);
 }
 
+void ast_structe_destroy(struct ast_structe *a) {
+  SLICE_FREE(a->fields, a->fields_count, ast_vardecl_destroy);
+}
+
+void ast_unione_destroy(struct ast_unione *a) {
+  SLICE_FREE(a->fields, a->fields_count, ast_vardecl_destroy);
+}
+
 void ast_typeexpr_destroy(struct ast_typeexpr *a) {
   switch (a->tag) {
   case AST_TYPEEXPR_NAME:
@@ -131,6 +139,12 @@ void ast_typeexpr_destroy(struct ast_typeexpr *a) {
     break;
   case AST_TYPEEXPR_APP:
     ast_typeapp_destroy(&a->u.app);
+    break;
+  case AST_TYPEEXPR_STRUCTE:
+    ast_structe_destroy(&a->u.structe);
+    break;
+  case AST_TYPEEXPR_UNIONE:
+    ast_unione_destroy(&a->u.unione);
     break;
   default:
     UNREACHABLE();
