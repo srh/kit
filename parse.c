@@ -930,12 +930,54 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
   return 0;
 }
 
+int parse_type_params_if_present(struct ps *p,
+				 struct ast_optional_type_params *out) {
+  if (!try_skip_char(p, '[')) {
+    out->has_type_params = 0;
+    return 1;
+  }
+
+  struct ast_ident *params = NULL;
+  size_t params_count = 0;
+  size_t params_limit = 0;
+  for (;;) {
+    skip_ws(p);
+    if (try_skip_char(p, ']')) {
+      out->has_type_params = 1;
+      out->params = params;
+      out->params_count = params_count;
+      return 1;
+    }
+
+    if (params_count != 0) {
+      if (!try_skip_char(p, ',')) {
+	goto fail;
+      }
+      skip_ws(p);
+    }
+    struct ast_ident param;
+    if (!parse_ident(p, &param)) {
+      goto fail;
+    }
+    SLICE_PUSH(params, params_count, params_limit, param);
+  }
+
+ fail:
+  SLICE_FREE(params, params_count, ast_ident_destroy);
+  return 0;
+}
+
 int parse_rest_of_def(struct ps *p, struct ast_def *out) {
   struct ast_def def;
 
   skip_ws(p);
+  if (!parse_type_params_if_present(p, &def.generics)) {
+    goto fail;
+  }
+
+  skip_ws(p);
   if (!parse_ident(p, &def.name)) {
-    return 0;
+    goto fail_generics;
   }
 
   skip_ws(p);
@@ -966,6 +1008,9 @@ int parse_rest_of_def(struct ps *p, struct ast_def *out) {
   ast_typeexpr_destroy(&def.type);
  fail_ident:
   ast_ident_destroy(&def.name);
+ fail_generics:
+  ast_optional_type_params_destroy(&def.generics);
+ fail:
   return 0;
 }
 
@@ -1026,9 +1071,14 @@ int parse_rest_of_module(struct ps *p, struct ast_module *out) {
 int parse_rest_of_deftype(struct ps *p, struct ast_deftype *out) {
   PARSE_DBG("parse_rest_of_deftype");
   skip_ws(p);
+  struct ast_optional_type_params generics;
+  if (!parse_type_params_if_present(p, &generics)) {
+    goto fail;
+  }
+  skip_ws(p);
   struct ast_ident name;
   if (!parse_ident(p, &name)) {
-    return 0;
+    goto fail_generics;
   }
   skip_ws(p);
   struct ast_typeexpr type;
@@ -1037,14 +1087,20 @@ int parse_rest_of_deftype(struct ps *p, struct ast_deftype *out) {
   }
   skip_ws(p);
   if (!try_skip_semicolon(p)) {
-    goto fail_ident;
+    goto fail_typeexpr;
   }
+  out->generics = generics;
   out->name = name;
   out->type = type;
   return 1;
 
+ fail_typeexpr:
+  ast_typeexpr_destroy(&type);
  fail_ident:
   ast_ident_destroy(&name);
+ fail_generics:
+  ast_optional_type_params_destroy(&generics);
+ fail:
   return 0;
 }
 
@@ -1186,6 +1242,12 @@ int parse_test_defs(void) {
 			 "   return x;\n"
 			 "};\n",
 			 23);
+  pass &= run_count_test("def14",
+			 "def[a,b] foo func[int] = fn() int {\n"
+			 "   var x int = 3;\n"
+			 "   return x;\n"
+			 "};\n",
+			 28);
   return pass;
 }
 
@@ -1199,8 +1261,8 @@ int parse_test_deftypes(void) {
 			 9);
   pass &= run_count_test("deftype3",
 			 "deftype foo struct { x y; z int; t func[beh]; };\n"
-			 "deftype bar union{a b;c d[e,f];};",
-			 35);
+			 "deftype [ c, d ]  bar union{a b;c d[e,f];};",
+			 40);
   return pass;
 }
 

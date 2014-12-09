@@ -151,8 +151,15 @@ void ast_typeexpr_destroy(struct ast_typeexpr *a) {
   }
 }
 
+void ast_optional_type_params_destroy(struct ast_optional_type_params *a) {
+  if (a->has_type_params) {
+    SLICE_FREE(a->params, a->params_count, ast_ident_destroy);
+  }
+}
+
 void ast_def_destroy(struct ast_def *a) {
   ast_ident_destroy(&a->name);
+  ast_optional_type_params_destroy(&a->generics);
   ast_typeexpr_destroy(&a->type);
   ast_expr_destroy(&a->rhs);
 }
@@ -167,6 +174,7 @@ void ast_import_destroy(struct ast_import *a) {
 }
 
 void ast_deftype_destroy(struct ast_deftype *a) {
+  ast_optional_type_params_destroy(&a->generics);
   ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);
 }

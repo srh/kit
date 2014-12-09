@@ -185,8 +185,17 @@ struct ast_expr {
 
 void ast_expr_destroy(struct ast_expr *a);
 
+struct ast_optional_type_params {
+  int has_type_params;  /* 0 or 1 -- params is uninitialized if 0. */
+  struct ast_ident *params;
+  size_t params_count;
+};
+
+void ast_optional_type_params_destroy(struct ast_optional_type_params *a);
+
 struct ast_def {
   struct ast_ident name;
+  struct ast_optional_type_params generics;
   struct ast_typeexpr type;
   struct ast_expr rhs;
 };
@@ -204,6 +213,7 @@ struct ast_import {
 };
 
 struct ast_deftype {
+  struct ast_optional_type_params generics;
   struct ast_ident name;
   struct ast_typeexpr type;
 };
