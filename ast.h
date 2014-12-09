@@ -135,6 +135,15 @@ struct ast_lambda {
   struct ast_bracebody bracebody;
 };
 
+enum ast_unop {
+  AST_UNOP_DEREFERENCE,
+};
+
+struct ast_unop_expr {
+  enum ast_unop operator;
+  struct ast_expr *rhs;
+};
+
 /* See also: binop_precedence in parse.c. */
 enum ast_binop {
   AST_BINOP_ASSIGN,
@@ -168,6 +177,7 @@ enum ast_expr_tag {
   AST_EXPR_NAME,
   AST_EXPR_NUMERIC_LITERAL,
   AST_EXPR_FUNCALL,
+  AST_EXPR_UNOP,
   AST_EXPR_BINOP,
   AST_EXPR_LAMBDA,
   AST_EXPR_LOCAL_FIELD_ACCESS,
@@ -180,6 +190,7 @@ struct ast_expr {
     struct ast_ident name;
     struct ast_numeric_literal numeric_literal;
     struct ast_funcall funcall;
+    struct ast_unop_expr unop_expr;
     struct ast_binop_expr binop_expr;
     struct ast_lambda lambda;
     struct ast_ident local_field_access;

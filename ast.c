@@ -84,6 +84,11 @@ void ast_statement_destroy(struct ast_statement *a) {
   }
 }
 
+void ast_unop_expr_destroy(struct ast_unop_expr *a) {
+  ast_expr_destroy(a->rhs);
+  free(a->rhs);
+}
+
 void ast_binop_expr_destroy(struct ast_binop_expr *a) {
   ast_expr_destroy(a->lhs);
   free(a->lhs);
@@ -107,6 +112,9 @@ void ast_expr_destroy(struct ast_expr *a) {
     break;
   case AST_EXPR_FUNCALL:
     ast_funcall_destroy(&a->u.funcall);
+    break;
+  case AST_EXPR_UNOP:
+    ast_unop_expr_destroy(&a->u.unop_expr);
     break;
   case AST_EXPR_BINOP:
     ast_binop_expr_destroy(&a->u.binop_expr);

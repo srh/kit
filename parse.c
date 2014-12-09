@@ -143,9 +143,21 @@ const struct precedence_pair binop_precedences[] = {
 };
 
 struct precedence_pair binop_precedence(enum ast_binop op) {
-  CHECK(0 <= op && op < sizeof(binop_precedences) / sizeof(binop_precedences[0]));
+  CHECK(0 <= op &&
+	op < sizeof(binop_precedences) / sizeof(binop_precedences[0]));
   return binop_precedences[op];
 }
+
+const int unop_right_precedences[] = {
+  [AST_UNOP_DEREFERENCE] = { 905 },
+};
+
+const int unop_right_precedence(enum ast_unop op) {
+  CHECK(0 <= op &&
+	op < sizeof(unop_right_precedences) / sizeof(unop_right_precedences[0]));
+  return unop_right_precedences[op];
+}
+
 
 enum precedence_comparison {
   PRECEDENCE_COMPARISON_CONFLICTS,
@@ -268,6 +280,23 @@ int try_skip_oper(struct ps *p, const char *s) {
     return 1;
   } else {
     ps_restore(p, save);
+    return 0;
+  }
+}
+
+int try_parse_unop(struct ps *p, enum ast_unop *out) {
+  int32_t ch1 = ps_peek(p);
+  if (ch1 == '*') {
+    struct ps_savestate save = ps_save(p);
+    ps_step(p);
+    if (is_operlike(ps_peek(p))) {
+      ps_restore(p, save);
+      return 0;
+    }
+    *out = AST_UNOP_DEREFERENCE;
+    ps_count_leaf(p);
+    return 1;
+  } else {
     return 0;
   }
 }
@@ -737,15 +766,21 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
   if (try_skip_keyword(p, "fn")) {
     out->tag = AST_EXPR_LAMBDA;
     return parse_rest_of_lambda(p, &out->u.lambda);
-  } else if (is_decimal_digit(ps_peek(p))) {
+  }
+
+  if (is_decimal_digit(ps_peek(p))) {
     int32_t ch = ps_peek(p);
     ps_step(p);
     out->tag = AST_EXPR_NUMERIC_LITERAL;
     return parse_rest_of_numeric_literal(p, ch, &out->u.numeric_literal);
-  } else if (is_ident_firstchar(ps_peek(p))) {
+  }
+
+  if (is_ident_firstchar(ps_peek(p))) {
     out->tag = AST_EXPR_NAME;
     return parse_ident(p, &out->u.name);
-  } else if (try_skip_char(p, '(')) {
+  }
+
+  if (try_skip_char(p, '(')) {
     struct ast_expr expr;
     if (!parse_expr(p, &expr, kSemicolonPrecedence)) {
       return 0;
@@ -756,9 +791,24 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     }
     *out = expr;
     return 1;
-  } else {
-    return 0;
   }
+
+  enum ast_unop unop;
+  if (try_parse_unop(p, &unop)) {
+    struct ast_expr rhs;
+    if (!parse_expr(p, &rhs, unop_right_precedence(unop))) {
+      return 0;
+    }
+
+    struct ast_expr *heap_rhs;
+    malloc_move_ast_expr(rhs, &heap_rhs);
+    out->tag = AST_EXPR_UNOP;
+    out->u.unop_expr.operator = unop;
+    out->u.unop_expr.rhs = heap_rhs;
+    return 1;
+  }
+
+  return 0;
 }
 
 int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
@@ -1261,16 +1311,16 @@ int parse_test_defs(void) {
 			 32);
   pass &= run_count_test("def09",
 			 "def foo func[int, int] = \n" /* 9 */
-			 "\tfn() int { foo(bar.blah); if (n) { " /* 15 */
+			 "\tfn() int { foo(*bar.blah); if (n) { " /* 15 */
 			 "goto blah; } label feh; \n" /* 7 */
 			 "if n { goto blah; } else { meh; } };\n" /* 14 */,
-			 47);
+			 48);
   pass &= run_count_test("def10",
 			 "def foo bar = 2 + 3;",
 			 8);
   pass &= run_count_test("def11",
-			 "def foo bar = 2 + 3 - 4;",
-			 10);
+			 "def foo bar = 2 + *3 - 4;",
+			 11);
   pass &= run_count_test("def12",
 			 "def foo bar = (2 ^ 3) - 4 && x -> quux;",
 			 16);
