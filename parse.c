@@ -968,6 +968,30 @@ int parse_rest_of_module(struct ps *p, struct ast_module *out) {
   }
 }
 
+int parse_rest_of_deftype(struct ps *p, struct ast_deftype *out) {
+  PARSE_DBG("parse_rest_of_deftype");
+  skip_ws(p);
+  struct ast_ident name;
+  if (!parse_ident(p, &name)) {
+    return 0;
+  }
+  skip_ws(p);
+  struct ast_typeexpr type;
+  if (!parse_typeexpr(p, &type)) {
+    goto fail_ident;
+  }
+  skip_ws(p);
+  if (!try_skip_semicolon(p)) {
+    goto fail_ident;
+  }
+  out->name = name;
+  out->type = type;
+  return 1;
+
+ fail_ident:
+  ast_ident_destroy(&name);
+  return 0;
+}
 
 int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   PARSE_DBG("parse_toplevel\n");
@@ -980,6 +1004,9 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   } else if (try_skip_keyword(p, "module")) {
     out->tag = AST_TOPLEVEL_MODULE;
     return parse_rest_of_module(p, &out->u.module);
+  } else if (try_skip_keyword(p, "deftype")) {
+    out->tag = AST_TOPLEVEL_DEFTYPE;
+    return parse_rest_of_deftype(p, &out->u.deftype);
   } else {
     return 0;
   }
@@ -1107,6 +1134,17 @@ int parse_test_defs(void) {
   return pass;
 }
 
+int parse_test_deftypes(void) {
+  int pass = 1;
+  pass &= run_count_test("deftype1",
+			 " deftype foo bar;",
+			 4);
+  pass &= run_count_test("deftype2",
+			 "deftype foo func[int, int] ; ",
+			 9);
+  return pass;
+}
+
 int parse_test(void) {
   int pass = 1;
   pass &= parse_test_nothing();
@@ -1114,6 +1152,7 @@ int parse_test(void) {
   pass &= parse_test_imports();
   pass &= parse_test_modules();
   pass &= parse_test_defs();
+  pass &= parse_test_deftypes();
   return pass;
 }
 

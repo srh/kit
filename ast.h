@@ -189,10 +189,16 @@ struct ast_import {
   struct ast_ident ident;
 };
 
+struct ast_deftype {
+  struct ast_ident name;
+  struct ast_typeexpr type;
+};
+
 enum ast_toplevel_tag {
   AST_TOPLEVEL_IMPORT,
   AST_TOPLEVEL_MODULE,
   AST_TOPLEVEL_DEF,
+  AST_TOPLEVEL_DEFTYPE,
 };
 
 struct ast_toplevel {
@@ -201,6 +207,7 @@ struct ast_toplevel {
     struct ast_import import;
     struct ast_module module;
     struct ast_def def;
+    struct ast_deftype deftype;
   } u;
 };
 

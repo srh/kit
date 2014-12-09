@@ -152,6 +152,11 @@ void ast_import_destroy(struct ast_import *a) {
   ast_ident_destroy(&a->ident);
 }
 
+void ast_deftype_destroy(struct ast_deftype *a) {
+  ast_ident_destroy(&a->name);
+  ast_typeexpr_destroy(&a->type);
+}
+
 void ast_toplevel_destroy(struct ast_toplevel *a) {
   switch (a->tag) {
   case AST_TOPLEVEL_IMPORT:
@@ -162,6 +167,9 @@ void ast_toplevel_destroy(struct ast_toplevel *a) {
     break;
   case AST_TOPLEVEL_DEF:
     ast_def_destroy(&a->u.def);
+    break;
+  case AST_TOPLEVEL_DEFTYPE:
+    ast_deftype_destroy(&a->u.deftype);
     break;
   default:
     UNREACHABLE();
