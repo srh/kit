@@ -752,6 +752,7 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
 }
 
 int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
+  /* TODO: Struct and union field access. */
   struct ast_expr lhs;
   if (!parse_atomic_expr(p, &lhs)) {
     return 0;
@@ -968,20 +969,21 @@ int parse_type_params_if_present(struct ps *p,
 }
 
 int parse_rest_of_def(struct ps *p, struct ast_def *out) {
-  struct ast_def def;
-
   skip_ws(p);
-  if (!parse_type_params_if_present(p, &def.generics)) {
+  struct ast_optional_type_params generics;
+  if (!parse_type_params_if_present(p, &generics)) {
     goto fail;
   }
 
   skip_ws(p);
-  if (!parse_ident(p, &def.name)) {
+  struct ast_ident name;
+  if (!parse_ident(p, &name)) {
     goto fail_generics;
   }
 
   skip_ws(p);
-  if (!parse_typeexpr(p, &def.type)) {
+  struct ast_typeexpr type;
+  if (!parse_typeexpr(p, &type)) {
     goto fail_ident;
   }
 
@@ -991,7 +993,8 @@ int parse_rest_of_def(struct ps *p, struct ast_def *out) {
   }
 
   skip_ws(p);
-  if (!parse_expr(p, &def.rhs, kSemicolonPrecedence)) {
+  struct ast_expr rhs;
+  if (!parse_expr(p, &rhs, kSemicolonPrecedence)) {
     goto fail_typeexpr;
   }
 
@@ -999,17 +1002,20 @@ int parse_rest_of_def(struct ps *p, struct ast_def *out) {
     goto fail_rhs;
   }
 
-  *out = def;
+  out->name = name;
+  out->generics = generics;
+  out->type = type;
+  out->rhs = rhs;
   return 1;
 
  fail_rhs:
-  ast_expr_destroy(&def.rhs);
+  ast_expr_destroy(&rhs);
  fail_typeexpr:
-  ast_typeexpr_destroy(&def.type);
+  ast_typeexpr_destroy(&type);
  fail_ident:
-  ast_ident_destroy(&def.name);
+  ast_ident_destroy(&name);
  fail_generics:
-  ast_optional_type_params_destroy(&def.generics);
+  ast_optional_type_params_destroy(&generics);
  fail:
   return 0;
 }
