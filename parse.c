@@ -1002,8 +1002,8 @@ int parse_rest_of_def(struct ps *p, struct ast_def *out) {
     goto fail_rhs;
   }
 
-  out->name = name;
   out->generics = generics;
+  out->name = name;
   out->type = type;
   out->rhs = rhs;
   return 1;
