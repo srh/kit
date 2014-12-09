@@ -64,6 +64,12 @@ struct ast_bracebody {
 
 void ast_bracebody_destroy(struct ast_bracebody *a);
 
+struct ast_var_statement {
+  struct ast_ident name;
+  struct ast_typeexpr type;
+  struct ast_expr *rhs;
+};
+
 struct ast_goto_statement {
   struct ast_ident target;
 };
@@ -86,6 +92,7 @@ struct ast_ifthenelse_statement {
 enum ast_statement_tag {
   AST_STATEMENT_EXPR,
   AST_STATEMENT_RETURN_EXPR,
+  AST_STATEMENT_VAR,
   AST_STATEMENT_GOTO,
   AST_STATEMENT_LABEL,
   AST_STATEMENT_IFTHEN,
@@ -97,6 +104,7 @@ struct ast_statement {
   union {
     struct ast_expr *expr;
     struct ast_expr *return_expr;
+    struct ast_var_statement var_statement;
     struct ast_goto_statement goto_statement;
     struct ast_label_statement label_statement;
     struct ast_ifthen_statement ifthen_statement;

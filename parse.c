@@ -488,8 +488,55 @@ int parse_rest_of_if_statement(struct ps *p, struct ast_statement *out) {
   return 0;
 }
 
+int parse_rest_of_var_statement(struct ps *p, struct ast_var_statement *out) {
+    skip_ws(p);
+    struct ast_ident name;
+    if (!parse_ident(p, &name)) {
+      return 0;
+    }
+
+    skip_ws(p);
+    struct ast_typeexpr type;
+    if (!parse_typeexpr(p, &type)) {
+      goto fail_ident;
+    }
+
+    skip_ws(p);
+    if (!skip_oper(p, "=")) {
+      goto fail_typeexpr;
+    }
+
+    skip_ws(p);
+    struct ast_expr rhs;
+    if (!parse_expr(p, &rhs, kSemicolonPrecedence)) {
+      goto fail_typeexpr;
+    }
+
+    if (!try_skip_semicolon(p)) {
+      goto fail_rhs;
+    }
+
+    struct ast_expr *heap_rhs;
+    malloc_move_ast_expr(rhs, &heap_rhs);
+    out->name = name;
+    out->type = type;
+    out->rhs = heap_rhs;
+    return 1;
+
+ fail_rhs:
+    ast_expr_destroy(&rhs);
+ fail_typeexpr:
+    ast_typeexpr_destroy(&type);
+ fail_ident:
+    ast_ident_destroy(&name);
+    return 0;
+}
+
 int parse_statement(struct ps *p, struct ast_statement *out) {
-  if (try_skip_keyword(p, "goto")) {
+  if (try_skip_keyword(p, "var")) {
+    out->tag = AST_STATEMENT_VAR;
+    return parse_rest_of_var_statement(p, &out->u.var_statement);
+  } else if (try_skip_keyword(p, "goto")) {
     skip_ws(p);
     struct ast_ident target;
     if (!parse_ident(p, &target)) {
@@ -1051,6 +1098,12 @@ int parse_test_defs(void) {
   pass &= run_count_test("def12",
 			 "def foo bar = (2 ^ 3) - 4 && x;",
 			 14);
+  pass &= run_count_test("def13",
+			 "def foo func[int] = fn() int {\n"
+			 "   var x int = 3;\n"
+			 "   return x;\n"
+			 "};\n",
+			 23);
   return pass;
 }
 
