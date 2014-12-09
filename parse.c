@@ -262,6 +262,16 @@ int skip_oper(struct ps *p, const char *s) {
   return 1;
 }
 
+int try_skip_oper(struct ps *p, const char *s) {
+  struct ps_savestate save = ps_save(p);
+  if (skip_oper(p, s)) {
+    return 1;
+  } else {
+    ps_restore(p, save);
+    return 0;
+  }
+}
+
 int parse_binop(struct ps *p, enum ast_binop *out) {
   int32_t ch1 = ps_peek(p);
   if (!is_binop_start(ch1)) {
@@ -775,6 +785,28 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       lhs.u.funcall.func = heap_lhs;
       lhs.u.funcall.args = args;
       lhs.u.funcall.args_count = args_count;
+    } else if (try_skip_oper(p, ".")) {
+      skip_ws(p);
+      struct ast_ident field_name;
+      if (!parse_ident(p, &field_name)) {
+	goto fail;
+      }
+
+      struct ast_expr *heap_lhs;
+      malloc_move_ast_expr(lhs, &heap_lhs);
+      lhs.tag = AST_EXPR_LOCAL_FIELD_ACCESS;
+      lhs.u.local_field_access = field_name;
+    } else if (try_skip_oper(p, "->")) {
+      skip_ws(p);
+      struct ast_ident field_name;
+      if (!parse_ident(p, &field_name)) {
+	goto fail;
+      }
+
+      struct ast_expr *heap_lhs;
+      malloc_move_ast_expr(lhs, &heap_lhs);
+      lhs.tag = AST_EXPR_DEREFERENCING_FIELD_ACCESS;
+      lhs.u.dereferencing_field_access = field_name;
     } else if (is_binop_start(ps_peek(p))) {
       struct ps_savestate save = ps_save(p);
 
@@ -1229,10 +1261,10 @@ int parse_test_defs(void) {
 			 32);
   pass &= run_count_test("def09",
 			 "def foo func[int, int] = \n" /* 9 */
-			 "\tfn() int { foo(bar); if (n) { " /* 15 */
+			 "\tfn() int { foo(bar.blah); if (n) { " /* 15 */
 			 "goto blah; } label feh; \n" /* 7 */
 			 "if n { goto blah; } else { meh; } };\n" /* 14 */,
-			 45);
+			 47);
   pass &= run_count_test("def10",
 			 "def foo bar = 2 + 3;",
 			 8);
@@ -1240,8 +1272,8 @@ int parse_test_defs(void) {
 			 "def foo bar = 2 + 3 - 4;",
 			 10);
   pass &= run_count_test("def12",
-			 "def foo bar = (2 ^ 3) - 4 && x;",
-			 14);
+			 "def foo bar = (2 ^ 3) - 4 && x -> quux;",
+			 16);
   pass &= run_count_test("def13",
 			 "def foo func[int] = fn() int {\n"
 			 "   var x int = 3;\n"

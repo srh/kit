@@ -114,6 +114,12 @@ void ast_expr_destroy(struct ast_expr *a) {
   case AST_EXPR_LAMBDA:
     ast_lambda_destroy(&a->u.lambda);
     break;
+  case AST_EXPR_LOCAL_FIELD_ACCESS:
+    ast_ident_destroy(&a->u.local_field_access);
+    break;
+  case AST_EXPR_DEREFERENCING_FIELD_ACCESS:
+    ast_ident_destroy(&a->u.dereferencing_field_access);
+    break;
   default:
     UNREACHABLE();
   }

@@ -170,6 +170,8 @@ enum ast_expr_tag {
   AST_EXPR_FUNCALL,
   AST_EXPR_BINOP,
   AST_EXPR_LAMBDA,
+  AST_EXPR_LOCAL_FIELD_ACCESS,
+  AST_EXPR_DEREFERENCING_FIELD_ACCESS,
 };
 
 struct ast_expr {
@@ -180,6 +182,8 @@ struct ast_expr {
     struct ast_funcall funcall;
     struct ast_binop_expr binop_expr;
     struct ast_lambda lambda;
+    struct ast_ident local_field_access;
+    struct ast_ident dereferencing_field_access;
   } u;
 };
 
