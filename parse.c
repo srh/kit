@@ -843,7 +843,7 @@ int parse_rest_of_def(struct ps *p, struct ast_def *out) {
 
   skip_ws(p);
   if (!skip_oper(p, "=")) {
-    goto fail_ident;
+    goto fail_typeexpr;
   }
 
   skip_ws(p);
