@@ -194,8 +194,8 @@ struct ast_optional_type_params {
 void ast_optional_type_params_destroy(struct ast_optional_type_params *a);
 
 struct ast_def {
-  struct ast_ident name;
   struct ast_optional_type_params generics;
+  struct ast_ident name;
   struct ast_typeexpr type;
   struct ast_expr rhs;
 };

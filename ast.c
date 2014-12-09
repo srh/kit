@@ -158,8 +158,8 @@ void ast_optional_type_params_destroy(struct ast_optional_type_params *a) {
 }
 
 void ast_def_destroy(struct ast_def *a) {
-  ast_ident_destroy(&a->name);
   ast_optional_type_params_destroy(&a->generics);
+  ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);
   ast_expr_destroy(&a->rhs);
 }
