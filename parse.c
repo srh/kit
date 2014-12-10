@@ -826,7 +826,8 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     struct ast_expr *heap_rhs;
     malloc_move_ast_expr(rhs, &heap_rhs);
     out->tag = AST_EXPR_UNOP;
-    ast_unop_expr_init(&out->u.unop_expr, ast_meta_make(pos_start, ps_pos(p)),
+    ast_unop_expr_init(&out->u.unop_expr,
+		       ast_meta_make(pos_start, ast_expr_pos_end(heap_rhs)),
 		       unop, heap_rhs);
     return 1;
   }
@@ -925,11 +926,8 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       malloc_move_ast_expr(rhs, &heap_rhs);
 
       lhs.tag = AST_EXPR_BINOP;
-      /* TODO: This (and other calls to ast_meta_make after a
-	 parse_expr) can include trailing whitespace in the ast_meta
-	 interval. */
       ast_binop_expr_init(&lhs.u.binop_expr,
-			  ast_meta_make(pos_start, ps_pos(p)),
+			  ast_meta_make(pos_start, ast_expr_pos_end(heap_rhs)),
 			  op, heap_lhs, heap_rhs);
     } else {
       PARSE_DBG("parse_expr done\n");

@@ -257,6 +257,24 @@ void ast_deref_field_access_destroy(struct ast_deref_field_access *a) {
   ast_ident_destroy(&a->fieldname);
 }
 
+struct ast_meta ast_expr_meta(struct ast_expr *a) {
+  switch (a->tag) {
+  case AST_EXPR_NAME: return a->u.name.meta;
+  case AST_EXPR_NUMERIC_LITERAL: return a->u.numeric_literal.meta;
+  case AST_EXPR_FUNCALL: return a->u.funcall.meta;
+  case AST_EXPR_UNOP: return a->u.unop_expr.meta;
+  case AST_EXPR_BINOP: return a->u.binop_expr.meta;
+  case AST_EXPR_LAMBDA: return a->u.lambda.meta;
+  case AST_EXPR_LOCAL_FIELD_ACCESS: return a->u.local_field_access.meta;
+  case AST_EXPR_DEREF_FIELD_ACCESS: return a->u.deref_field_access.meta;
+  default: UNREACHABLE();
+  }
+}
+
+size_t ast_expr_pos_end(struct ast_expr *a) {
+  return ast_expr_meta(a).pos_end;
+}
+
 void ast_expr_destroy(struct ast_expr *a) {
   switch (a->tag) {
   case AST_EXPR_NAME:

@@ -298,6 +298,7 @@ struct ast_expr {
   } u;
 };
 
+size_t ast_expr_pos_end(struct ast_expr *a);
 void ast_expr_destroy(struct ast_expr *a);
 
 struct ast_optional_type_params {

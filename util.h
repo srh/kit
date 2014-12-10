@@ -3,14 +3,18 @@
 
 #ifdef _WIN32
 #define PRIz "Iu"
+#define NORETURN __declspec(noreturn)
 #else /* _WIN32 */
 #define PRIz "zu"
+/* TODO: Define NORETURN on Linux. */
+#define NORETURN
 #endif /* _WIN32 */
 
 #define STATIC_ASSERT(x) do { enum { assertion = 1/!!(x) }; } while (0)
 
-void report_and_abort(const char *file, int line,
-		      const char *msg1, const char *msg2);
+
+NORETURN void report_and_abort(const char *file, int line,
+			       const char *msg1, const char *msg2);
 
 #define CHECK(x) do { \
     if (!(x)) { \
