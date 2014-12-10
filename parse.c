@@ -154,6 +154,8 @@ struct precedence_pair binop_precedence(enum ast_binop op) {
 
 const int unop_right_precedences[] = {
   [AST_UNOP_DEREFERENCE] = { 905 },
+  [AST_UNOP_ADDRESSOF] = { 905 },
+  [AST_UNOP_NEGATE] = { 905 },
 };
 
 const int unop_right_precedence(enum ast_unop op) {
@@ -290,14 +292,16 @@ int try_skip_oper(struct ps *p, const char *s) {
 
 int try_parse_unop(struct ps *p, enum ast_unop *out) {
   int32_t ch1 = ps_peek(p);
-  if (ch1 == '*') {
+  if (is_one_of("*&-", ch1)) {
     struct ps_savestate save = ps_save(p);
     ps_step(p);
     if (is_operlike(ps_peek(p))) {
       ps_restore(p, save);
       return 0;
     }
-    *out = AST_UNOP_DEREFERENCE;
+    *out = (ch1 == '*' ? AST_UNOP_DEREFERENCE
+	    : ch1 == '&' ? AST_UNOP_ADDRESSOF
+	    : AST_UNOP_NEGATE);
     ps_count_leaf(p);
     return 1;
   } else {
@@ -1361,8 +1365,8 @@ int parse_test_defs(void) {
 			 "def foo func[int, int] = \n" /* 9 */
 			 "\tfn() int { foo(*bar.blah); if (n) { " /* 15 */
 			 "goto blah; } label feh; \n" /* 7 */
-			 "if n { goto blah; } else { meh; } };\n" /* 14 */,
-			 48);
+			 "if n { goto blah; } else { &meh; } };\n" /* 14 */,
+			 49);
   pass &= run_count_test("def10",
 			 "def foo bar = 2 + 3;",
 			 8);
@@ -1380,10 +1384,10 @@ int parse_test_defs(void) {
 			 23);
   pass &= run_count_test("def14",
 			 "def[a,b] foo func[int] = fn() int {\n"
-			 "   var x int = 3;\n"
+			 "   var x int = -3;\n"
 			 "   return x;\n"
 			 "};\n",
-			 28);
+			 29);
   return pass;
 }
 

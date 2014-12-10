@@ -210,6 +210,8 @@ void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,
 
 enum ast_unop {
   AST_UNOP_DEREFERENCE,
+  AST_UNOP_ADDRESSOF,
+  AST_UNOP_NEGATE,
 };
 
 struct ast_unop_expr {
