@@ -196,20 +196,30 @@ struct ast_statement {
 void ast_statement_destroy(struct ast_statement *a);
 
 struct ast_lambda {
+  struct ast_meta meta;
   struct ast_vardecl *params;
   size_t params_count;
   struct ast_typeexpr return_type;
   struct ast_bracebody bracebody;
 };
 
+void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,
+		     struct ast_vardecl *params, size_t params_count,
+		     struct ast_typeexpr return_type,
+		     struct ast_bracebody bracebody);
+
 enum ast_unop {
   AST_UNOP_DEREFERENCE,
 };
 
 struct ast_unop_expr {
+  struct ast_meta meta;
   enum ast_unop operator;
   struct ast_expr *rhs;
 };
+
+void ast_unop_expr_init(struct ast_unop_expr *a, struct ast_meta meta,
+			enum ast_unop operator, struct ast_expr *rhs);
 
 /* See also: binop_precedence in parse.c. */
 enum ast_binop {
@@ -235,10 +245,15 @@ enum ast_binop {
 };
 
 struct ast_binop_expr {
+  struct ast_meta meta;
   enum ast_binop operator;
   struct ast_expr *lhs;
   struct ast_expr *rhs;
 };
+
+void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
+			 enum ast_binop operator, struct ast_expr *lhs,
+			 struct ast_expr *rhs);
 
 enum ast_expr_tag {
   AST_EXPR_NAME,

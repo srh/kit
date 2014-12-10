@@ -186,9 +186,26 @@ void ast_statement_destroy(struct ast_statement *a) {
   }
 }
 
+void ast_unop_expr_init(struct ast_unop_expr *a, struct ast_meta meta,
+			enum ast_unop operator, struct ast_expr *rhs) {
+  a->meta = meta;
+  a->operator = operator;
+  a->rhs = rhs;
+}
+
 void ast_unop_expr_destroy(struct ast_unop_expr *a) {
+  ast_meta_destroy(&a->meta);
   ast_expr_destroy(a->rhs);
   free(a->rhs);
+}
+
+void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
+			 enum ast_binop operator, struct ast_expr *lhs,
+			 struct ast_expr *rhs) {
+  a->meta = meta;
+  a->operator = operator;
+  a->lhs = lhs;
+  a->rhs = rhs;
 }
 
 void ast_binop_expr_destroy(struct ast_binop_expr *a) {
@@ -198,7 +215,19 @@ void ast_binop_expr_destroy(struct ast_binop_expr *a) {
   free(a->rhs);
 }
 
+void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,
+		     struct ast_vardecl *params, size_t params_count,
+		     struct ast_typeexpr return_type,
+		     struct ast_bracebody bracebody) {
+  a->meta = meta;
+  a->params = params;
+  a->params_count = params_count;
+  a->return_type = return_type;
+  a->bracebody = bracebody;
+}
+
 void ast_lambda_destroy(struct ast_lambda *a) {
+  ast_meta_destroy(&a->meta);
   SLICE_FREE(a->params, a->params_count, ast_vardecl_destroy);
   ast_typeexpr_destroy(&a->return_type);
   ast_bracebody_destroy(&a->bracebody);

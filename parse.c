@@ -684,7 +684,8 @@ int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
   }
 }
 
-int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
+int parse_rest_of_lambda(struct ps *p, size_t pos_start,
+			 struct ast_lambda *out) {
   PARSE_DBG("parse_rest_of_lambda\n");
   skip_ws(p);
   struct ast_vardecl *params;
@@ -708,10 +709,8 @@ int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
   }
 
   PARSE_DBG("parse_rest_of_lambda success\n");
-  out->params = params;
-  out->params_count = params_count;
-  out->return_type = return_type;
-  out->bracebody = bracebody;
+  ast_lambda_init(out, ast_meta_make(pos_start, ps_pos(p)),
+		  params, params_count, return_type, bracebody);
   return 1;
 
  fail_return_type:
@@ -788,9 +787,10 @@ int parse_rest_of_arglist(struct ps *p,
 }
 
 int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
+  size_t pos_start = ps_pos(p);
   if (try_skip_keyword(p, "fn")) {
     out->tag = AST_EXPR_LAMBDA;
-    return parse_rest_of_lambda(p, &out->u.lambda);
+    return parse_rest_of_lambda(p, pos_start, &out->u.lambda);
   }
 
   if (is_decimal_digit(ps_peek(p))) {
@@ -826,8 +826,8 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     struct ast_expr *heap_rhs;
     malloc_move_ast_expr(rhs, &heap_rhs);
     out->tag = AST_EXPR_UNOP;
-    out->u.unop_expr.operator = unop;
-    out->u.unop_expr.rhs = heap_rhs;
+    ast_unop_expr_init(&out->u.unop_expr, ast_meta_make(pos_start, ps_pos(p)),
+		       unop, heap_rhs);
     return 1;
   }
 
@@ -922,9 +922,12 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       malloc_move_ast_expr(rhs, &heap_rhs);
 
       lhs.tag = AST_EXPR_BINOP;
-      lhs.u.binop_expr.operator = op;
-      lhs.u.binop_expr.lhs = heap_lhs;
-      lhs.u.binop_expr.rhs = heap_rhs;
+      /* TODO: This (and other calls to ast_meta_make after a
+	 parse_expr) can include trailing whitespace in the ast_meta
+	 interval. */
+      ast_binop_expr_init(&lhs.u.binop_expr,
+			  ast_meta_make(pos_start, ps_pos(p)),
+			  op, heap_lhs, heap_rhs);
     } else {
       PARSE_DBG("parse_expr done\n");
       *out = lhs;
