@@ -53,6 +53,13 @@ void ast_funcall_destroy(struct ast_funcall *a) {
   SLICE_FREE(a->args, a->args_count, ast_expr_destroy);
 }
 
+void ast_vardecl_init(struct ast_vardecl *a, struct ast_meta meta,
+		      struct ast_ident name, struct ast_typeexpr type) {
+  a->meta = meta;
+  a->name = name;
+  a->type = type;
+}
+
 void ast_vardecl_destroy(struct ast_vardecl *a) {
   ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);

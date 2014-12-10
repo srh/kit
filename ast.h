@@ -94,9 +94,13 @@ struct ast_typeexpr {
 void ast_typeexpr_destroy(struct ast_typeexpr *a);
 
 struct ast_vardecl {
+  struct ast_meta meta;
   struct ast_ident name;
   struct ast_typeexpr type;
 };
+
+void ast_vardecl_init(struct ast_vardecl *a, struct ast_meta meta,
+		      struct ast_ident name, struct ast_typeexpr type);
 
 void ast_vardecl_destroy(struct ast_vardecl *a);
 

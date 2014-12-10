@@ -430,6 +430,7 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out);
 
 int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
+  size_t pos_start = ps_pos(p);
   struct ast_ident name;
   if (!parse_ident(p, &name)) {
     return 0;
@@ -441,8 +442,8 @@ int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
     return 0;
   }
 
-  out->name = name;
-  out->type = type;
+  ast_vardecl_init(out, ast_meta_make(pos_start, ps_pos(p)),
+		   name, type);
   return 1;
 }
 
