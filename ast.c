@@ -78,11 +78,27 @@ void ast_bracebody_destroy(struct ast_bracebody *a) {
   SLICE_FREE(a->statements, a->statements_count, ast_statement_destroy);
 }
 
+
+void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
+			    struct ast_ident name, struct ast_typeexpr type,
+			    struct ast_expr *rhs) {
+  a->meta = meta;
+  a->name = name;
+  a->type = type;
+  a->rhs = rhs;
+}
+
 void ast_var_statement_destroy(struct ast_var_statement *a) {
   ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);
   ast_expr_destroy(a->rhs);
   free(a->rhs);
+}
+
+void ast_goto_statement_init(struct ast_goto_statement *a,
+			     struct ast_meta meta, struct ast_ident target) {
+  a->meta = meta;
+  a->target = target;
 }
 
 void ast_goto_statement_destroy(struct ast_goto_statement *a) {

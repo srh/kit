@@ -532,7 +532,8 @@ int parse_rest_of_if_statement(struct ps *p, struct ast_statement *out) {
   return 0;
 }
 
-int parse_rest_of_var_statement(struct ps *p, struct ast_var_statement *out) {
+int parse_rest_of_var_statement(struct ps *p, size_t pos_start,
+				struct ast_var_statement *out) {
     skip_ws(p);
     struct ast_ident name;
     if (!parse_ident(p, &name)) {
@@ -562,9 +563,8 @@ int parse_rest_of_var_statement(struct ps *p, struct ast_var_statement *out) {
 
     struct ast_expr *heap_rhs;
     malloc_move_ast_expr(rhs, &heap_rhs);
-    out->name = name;
-    out->type = type;
-    out->rhs = heap_rhs;
+    ast_var_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
+			   name, type, heap_rhs);
     return 1;
 
  fail_rhs:
@@ -577,9 +577,10 @@ int parse_rest_of_var_statement(struct ps *p, struct ast_var_statement *out) {
 }
 
 int parse_statement(struct ps *p, struct ast_statement *out) {
+  size_t pos_start = ps_pos(p);
   if (try_skip_keyword(p, "var")) {
     out->tag = AST_STATEMENT_VAR;
-    return parse_rest_of_var_statement(p, &out->u.var_statement);
+    return parse_rest_of_var_statement(p, pos_start, &out->u.var_statement);
   } else if (try_skip_keyword(p, "goto")) {
     skip_ws(p);
     struct ast_ident target;
@@ -592,7 +593,9 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
       return 0;
     }
     out->tag = AST_STATEMENT_GOTO;
-    out->u.goto_statement.target = target;
+    ast_goto_statement_init(&out->u.goto_statement,
+			    ast_meta_make(pos_start, ps_pos(p)),
+			    target);
     return 1;
   } else if (try_skip_keyword(p, "label")) {
     skip_ws(p);

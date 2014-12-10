@@ -120,14 +120,23 @@ void ast_bracebody_init(struct ast_bracebody *a,
 void ast_bracebody_destroy(struct ast_bracebody *a);
 
 struct ast_var_statement {
+  struct ast_meta meta;
   struct ast_ident name;
   struct ast_typeexpr type;
   struct ast_expr *rhs;
 };
 
+void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
+			    struct ast_ident name, struct ast_typeexpr type,
+			    struct ast_expr *rhs);
+
 struct ast_goto_statement {
+  struct ast_meta meta;
   struct ast_ident target;
 };
+
+void ast_goto_statement_init(struct ast_goto_statement *a,
+			     struct ast_meta meta, struct ast_ident target);
 
 struct ast_label_statement {
   struct ast_ident label;
