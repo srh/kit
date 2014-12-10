@@ -106,7 +106,7 @@ size_t ident_map_add_string(struct ident_map *m, const void *buf,
     m->strings_limit = new_limit;
   }
 
-  STATIC_ASSERT(sizeof(uint8_t) == sizeof(char));
+  STATIC_CHECK(sizeof(uint8_t) == sizeof(char));
   memcpy(m->strings + m->strings_size, buf, count);
   size_t ret = m->strings_size;
   m->strings_size = new_size;

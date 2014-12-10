@@ -9,7 +9,7 @@
 #define NORETURN __attribute__((__noreturn__))
 #endif /* _WIN32 */
 
-#define STATIC_ASSERT(x) do { enum { assertion = 1/!!(x) }; } while (0)
+#define STATIC_CHECK(x) do { enum { assertion = 1/!!(x) }; } while (0)
 
 
 NORETURN void report_and_abort(const char *file, int line,

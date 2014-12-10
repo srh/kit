@@ -32,7 +32,7 @@ int read_file(const char *path,
     return 0;
   }
 
-  STATIC_ASSERT(LONG_MAX < SIZE_MAX);
+  STATIC_CHECK(LONG_MAX < SIZE_MAX);
   size_t size = offset;
   uint8_t *buf = malloc(size);
   CHECK(buf);

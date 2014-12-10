@@ -182,7 +182,7 @@ enum precedence_comparison compare_precedence(int left, int right) {
 
 
 int is_ws(int32_t ch) {
-  STATIC_ASSERT(' ' == 32 && '\r' == 13 && '\n' == 10 && '\t' == 9);
+  STATIC_CHECK(' ' == 32 && '\r' == 13 && '\n' == 10 && '\t' == 9);
   return ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t';
 }
 
@@ -209,12 +209,12 @@ int is_parenlike(int32_t ch) {
 }
 
 int is_alpha(int32_t ch) {
-  STATIC_ASSERT('z' == 'a' + 25 && 'Z' == 'A' + 25);
+  STATIC_CHECK('z' == 'a' + 25 && 'Z' == 'A' + 25);
   return ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z');
 }
 
 int is_decimal_digit(int32_t ch) {
-  STATIC_ASSERT('9' == '0' + 9); /* redundant with C std, yes. */
+  STATIC_CHECK('9' == '0' + 9); /* redundant with C std, yes. */
   return '0' <= ch && ch <= '9';
 }
 
