@@ -33,10 +33,11 @@ void ident_map_destroy(struct ident_map *m) {
   ident_map_init(m);
 }
 
-size_t ident_map_hash(const uint8_t *buf, size_t count) {
+size_t ident_map_hash(const void *buf, size_t count) {
+  const uint8_t *p = (const uint8_t *)buf;
   size_t accum = 0x12345679;
   for (size_t i = 0; i < count; i++) {
-    accum = (accum * 33) ^ buf[i];
+    accum = (accum * 33) ^ p[i];
   }
   return accum;
 }
@@ -89,7 +90,7 @@ void ident_map_rebuild(struct ident_map *m,
 }
 
 /* Returns the added string's offset into m->strings. */
-size_t ident_map_add_string(struct ident_map *m, const uint8_t *buf,
+size_t ident_map_add_string(struct ident_map *m, const void *buf,
 			    size_t count) {
   IDENTMAP_DBG("ident_map_add_string\n");
   size_t new_size = size_add(m->strings_size, count);
@@ -99,7 +100,7 @@ size_t ident_map_add_string(struct ident_map *m, const uint8_t *buf,
       new_limit = new_limit ? size_mul(new_limit, 2) : 32;
     } while (new_size > new_limit);
 
-    uint8_t *new_strings = realloc(m->strings, new_limit);
+    char *new_strings = realloc(m->strings, new_limit);
     CHECK(new_strings);
     m->strings = new_strings;
     m->strings_limit = new_limit;
@@ -115,7 +116,7 @@ size_t ident_map_add_string(struct ident_map *m, const uint8_t *buf,
 }
 
 ident_value ident_map_intern(struct ident_map *m,
-			     const uint8_t *buf,
+			     const void *buf,
 			     size_t count) {
   size_t limit = m->limit;
   IDENTMAP_DBG("ident_map_intern count=%"PRIz", with limit %"PRIz"\n", count, limit);

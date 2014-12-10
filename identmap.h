@@ -20,7 +20,7 @@ struct ident_map {
   ident_value prev_value;
 
   /* Holds all the identifier values, concatenated. */
-  uint8_t *strings;
+  char *strings;
   size_t strings_size;
   size_t strings_limit;
 };
@@ -29,7 +29,7 @@ void ident_map_init(struct ident_map *m);
 void ident_map_destroy(struct ident_map *m);
 
 ident_value ident_map_intern(struct ident_map *m,
-			     const uint8_t *buf,
+			     const void *buf,
 			     size_t count);
 
 
