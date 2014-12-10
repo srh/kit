@@ -835,7 +835,6 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
 }
 
 int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
-  /* TODO: Struct and union field access. */
   size_t pos_start = ps_pos(p);
   struct ast_expr lhs;
   if (!parse_atomic_expr(p, &lhs)) {
