@@ -12,7 +12,8 @@
 
 struct ident_map_entry {
   ident_value ident;
-  const uint8_t *buf;
+  /* The offset into m->strings. */
+  size_t strings_offset;
   size_t count;
 };
 
@@ -21,10 +22,14 @@ void ident_map_init(struct ident_map *m) {
   m->count = 0;
   m->limit = 0;
   m->prev_value = 0;
+  m->strings = NULL;
+  m->strings_size = 0;
+  m->strings_limit = 0;
 }
 
 void ident_map_destroy(struct ident_map *m) {
   free(m->table);
+  free(m->strings);
   ident_map_init(m);
 }
 
@@ -53,7 +58,7 @@ void ident_map_rebuild(struct ident_map *m,
   IDENTMAP_DBG("ident_map_rebuild, malloced new_table\n");
   for (size_t i = 0; i < new_limit; i++) {
     new_table[i].ident = 0;
-    new_table[i].buf = NULL;
+    new_table[i].strings_offset = 0;
     new_table[i].count = 0;
   }
 
@@ -64,7 +69,10 @@ void ident_map_rebuild(struct ident_map *m,
       continue;
     }
 
-    size_t offset = ident_map_hash(m->table[i].buf, m->table[i].count) & (new_limit - 1);
+    size_t hash = ident_map_hash(m->strings + m->table[i].strings_offset,
+				 m->table[i].count);
+    size_t offset = hash & (new_limit - 1);
+
     size_t step = 1;
     while (new_table[offset].ident) {
       offset = size_add(offset, step) & (new_limit - 1);
@@ -80,7 +88,31 @@ void ident_map_rebuild(struct ident_map *m,
   m->limit = new_limit;
 }
 
+/* Returns the added string's offset into m->strings. */
+size_t ident_map_add_string(struct ident_map *m, const uint8_t *buf,
+			    size_t count) {
+  IDENTMAP_DBG("ident_map_add_string\n");
+  size_t new_size = size_add(m->strings_size, count);
+  if (new_size > m->strings_limit) {
+    size_t new_limit = m->strings_limit;
+    do {
+      new_limit = new_limit ? size_mul(new_limit, 2) : 32;
+    } while (new_size > new_limit);
 
+    uint8_t *new_strings = realloc(m->strings, new_limit);
+    CHECK(new_strings);
+    m->strings = new_strings;
+    m->strings_limit = new_limit;
+  }
+
+  STATIC_ASSERT(sizeof(uint8_t) == sizeof(char));
+  memcpy(m->strings + m->strings_size, buf, count);
+  size_t ret = m->strings_size;
+  m->strings_size = new_size;
+  CHECK(m->strings_size <= m->strings_limit);
+  IDENTMAP_DBG("ident_map_add_string returning\n");
+  return ret;
+}
 
 ident_value ident_map_intern(struct ident_map *m,
 			     const uint8_t *buf,
@@ -99,7 +131,7 @@ ident_value ident_map_intern(struct ident_map *m,
   while ((v = m->table[offset].ident), v) {
     IDENTMAP_DBG("a collision at offset %"PRIz"\n", offset);
     if (m->table[offset].count == count
-	&& 0 == memcmp(m->table[offset].buf, buf, count)) {
+	&& 0 == memcmp(m->strings + m->table[offset].strings_offset, buf, count)) {
       return v;
     }
 
@@ -107,11 +139,12 @@ ident_value ident_map_intern(struct ident_map *m,
     step++;
   }
 
+  size_t strings_offset = ident_map_add_string(m, buf, count);
   CHECK(m->prev_value != IDENT_VALUE_MAX);
   m->prev_value++;
   v = m->prev_value;
   m->table[offset].ident = v;
-  m->table[offset].buf = buf;
+  m->table[offset].strings_offset = strings_offset;
   m->table[offset].count = count;
   m->count++;
 

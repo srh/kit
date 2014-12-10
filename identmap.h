@@ -18,6 +18,11 @@ struct ident_map {
   size_t limit;
   /* prev_value is initially zero, which means no ident can be zero. */
   ident_value prev_value;
+
+  /* Holds all the identifier values, concatenated. */
+  uint8_t *strings;
+  size_t strings_size;
+  size_t strings_limit;
 };
 
 void ident_map_init(struct ident_map *m);
