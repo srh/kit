@@ -1099,7 +1099,7 @@ int parse_type_params_if_present(struct ps *p,
   return 0;
 }
 
-int parse_rest_of_def(struct ps *p, struct ast_def *out) {
+int parse_rest_of_def(struct ps *p, size_t pos_start, struct ast_def *out) {
   skip_ws(p);
   struct ast_optional_type_params generics;
   if (!parse_type_params_if_present(p, &generics)) {
@@ -1133,10 +1133,8 @@ int parse_rest_of_def(struct ps *p, struct ast_def *out) {
     goto fail_rhs;
   }
 
-  out->generics = generics;
-  out->name = name;
-  out->type = type;
-  out->rhs = rhs;
+  ast_def_init(out, ast_meta_make(pos_start, ps_pos(p)),
+	       generics, name, type, rhs);
   return 1;
 
  fail_rhs:
@@ -1151,7 +1149,7 @@ int parse_rest_of_def(struct ps *p, struct ast_def *out) {
   return 0;
 }
 
-int parse_rest_of_import(struct ps *p, struct ast_import *out) {
+int parse_rest_of_import(struct ps *p, size_t pos_start, struct ast_import *out) {
   PARSE_DBG("parse_rest_of_import\n");
   skip_ws(p);
   struct ast_ident name;
@@ -1163,7 +1161,7 @@ int parse_rest_of_import(struct ps *p, struct ast_import *out) {
   if (!try_skip_semicolon(p)) {
     goto fail_ident;
   }
-  out->name = name;
+  ast_import_init(out, ast_meta_make(pos_start, ps_pos(p)), name);
   return 1;
 
  fail_ident:
@@ -1174,7 +1172,8 @@ int parse_rest_of_import(struct ps *p, struct ast_import *out) {
 
 int parse_toplevel(struct ps *p, struct ast_toplevel *out);
 
-int parse_rest_of_module(struct ps *p, struct ast_module *out) {
+int parse_rest_of_module(struct ps *p, size_t pos_start,
+			 struct ast_module *out) {
   skip_ws(p);
   struct ast_ident name;
   if (!parse_ident(p, &name)) {
@@ -1193,9 +1192,8 @@ int parse_rest_of_module(struct ps *p, struct ast_module *out) {
     skip_ws(p);
 
     if (try_skip_char(p, '}')) {
-      out->name = name;
-      out->toplevels = toplevels;
-      out->toplevels_count = toplevels_count;
+      ast_module_init(out, ast_meta_make(pos_start, ps_pos(p)),
+		      name, toplevels, toplevels_count);
       return 1;
     }
 
@@ -1209,7 +1207,8 @@ int parse_rest_of_module(struct ps *p, struct ast_module *out) {
   }
 }
 
-int parse_rest_of_deftype(struct ps *p, struct ast_deftype *out) {
+int parse_rest_of_deftype(struct ps *p, size_t pos_start,
+			  struct ast_deftype *out) {
   PARSE_DBG("parse_rest_of_deftype");
   skip_ws(p);
   struct ast_optional_type_params generics;
@@ -1230,9 +1229,8 @@ int parse_rest_of_deftype(struct ps *p, struct ast_deftype *out) {
   if (!try_skip_semicolon(p)) {
     goto fail_typeexpr;
   }
-  out->generics = generics;
-  out->name = name;
-  out->type = type;
+  ast_deftype_init(out, ast_meta_make(pos_start, ps_pos(p)),
+		   generics, name, type);
   return 1;
 
  fail_typeexpr:
@@ -1247,18 +1245,19 @@ int parse_rest_of_deftype(struct ps *p, struct ast_deftype *out) {
 
 int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   PARSE_DBG("parse_toplevel\n");
+  size_t pos_start = ps_pos(p);
   if (try_skip_keyword(p, "def")) {
     out->tag = AST_TOPLEVEL_DEF;
-    return parse_rest_of_def(p, &out->u.def);
+    return parse_rest_of_def(p, pos_start, &out->u.def);
   } else if (try_skip_keyword(p, "import")) {
     out->tag = AST_TOPLEVEL_IMPORT;
-    return parse_rest_of_import(p, &out->u.import);
+    return parse_rest_of_import(p, pos_start, &out->u.import);
   } else if (try_skip_keyword(p, "module")) {
     out->tag = AST_TOPLEVEL_MODULE;
-    return parse_rest_of_module(p, &out->u.module);
+    return parse_rest_of_module(p, pos_start, &out->u.module);
   } else if (try_skip_keyword(p, "deftype")) {
     out->tag = AST_TOPLEVEL_DEFTYPE;
-    return parse_rest_of_deftype(p, &out->u.deftype);
+    return parse_rest_of_deftype(p, pos_start, &out->u.deftype);
   } else {
     return 0;
   }

@@ -368,23 +368,62 @@ void ast_optional_type_params_destroy(struct ast_optional_type_params *a) {
   }
 }
 
+void ast_def_init(struct ast_def *a, struct ast_meta meta,
+		  struct ast_optional_type_params generics,
+		  struct ast_ident name, struct ast_typeexpr type,
+		  struct ast_expr rhs) {
+  a->meta = meta;
+  a->generics = generics;
+  a->name = name;
+  a->type = type;
+  a->rhs = rhs;
+}
+
 void ast_def_destroy(struct ast_def *a) {
+  ast_meta_destroy(&a->meta);
   ast_optional_type_params_destroy(&a->generics);
   ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);
   ast_expr_destroy(&a->rhs);
 }
 
+void ast_module_init(struct ast_module *a, struct ast_meta meta,
+		     struct ast_ident name, struct ast_toplevel *toplevels,
+		     size_t toplevels_count) {
+  a->meta = meta;
+  a->name = name;
+  a->toplevels = toplevels;
+  a->toplevels_count = toplevels_count;
+}
+
 void ast_module_destroy(struct ast_module *a) {
+  ast_meta_destroy(&a->meta);
   ast_ident_destroy(&a->name);
   SLICE_FREE(a->toplevels, a->toplevels_count, ast_toplevel_destroy);
 }
 
+void ast_import_init(struct ast_import *a, struct ast_meta meta,
+		     struct ast_ident name) {
+  a->meta = meta;
+  a->name = name;
+}
+
 void ast_import_destroy(struct ast_import *a) {
+  ast_meta_destroy(&a->meta);
   ast_ident_destroy(&a->name);
 }
 
+void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
+		      struct ast_optional_type_params generics,
+		      struct ast_ident name, struct ast_typeexpr type) {
+  a->meta = meta;
+  a->generics = generics;
+  a->name = name;
+  a->type = type;
+}
+
 void ast_deftype_destroy(struct ast_deftype *a) {
+  ast_meta_destroy(&a->meta);
   ast_optional_type_params_destroy(&a->generics);
   ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);

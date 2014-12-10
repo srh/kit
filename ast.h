@@ -317,29 +317,49 @@ void ast_optional_type_params_init_has_params(
 void ast_optional_type_params_destroy(struct ast_optional_type_params *a);
 
 struct ast_def {
+  struct ast_meta meta;
   struct ast_optional_type_params generics;
   struct ast_ident name;
   struct ast_typeexpr type;
   struct ast_expr rhs;
 };
 
+void ast_def_init(struct ast_def *a, struct ast_meta meta,
+		  struct ast_optional_type_params generics,
+		  struct ast_ident name, struct ast_typeexpr type,
+		  struct ast_expr rhs);
+
 struct ast_toplevel;
 
 struct ast_module {
+  struct ast_meta meta;
   struct ast_ident name;
   struct ast_toplevel *toplevels;
   size_t toplevels_count;
 };
 
+void ast_module_init(struct ast_module *a, struct ast_meta meta,
+		     struct ast_ident name, struct ast_toplevel *toplevels,
+		     size_t toplevels_count);
+
 struct ast_import {
+  struct ast_meta meta;
   struct ast_ident name;
 };
 
+void ast_import_init(struct ast_import *a, struct ast_meta meta,
+		     struct ast_ident name);
+
 struct ast_deftype {
+  struct ast_meta meta;
   struct ast_optional_type_params generics;
   struct ast_ident name;
   struct ast_typeexpr type;
 };
+
+void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
+		      struct ast_optional_type_params generics,
+		      struct ast_ident name, struct ast_typeexpr type);
 
 enum ast_toplevel_tag {
   AST_TOPLEVEL_IMPORT,
