@@ -1062,8 +1062,9 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
 
 int parse_type_params_if_present(struct ps *p,
 				 struct ast_optional_type_params *out) {
+  size_t pos_start = ps_pos(p);
   if (!try_skip_char(p, '[')) {
-    out->has_type_params = 0;
+    ast_optional_type_params_init_no_params(out);
     return 1;
   }
 
@@ -1073,9 +1074,10 @@ int parse_type_params_if_present(struct ps *p,
   for (;;) {
     skip_ws(p);
     if (try_skip_char(p, ']')) {
-      out->has_type_params = 1;
-      out->params = params;
-      out->params_count = params_count;
+      ast_optional_type_params_init_has_params(out,
+					       ast_meta_make(pos_start,
+							     ps_pos(p)),
+					       params, params_count);
       return 1;
     }
 

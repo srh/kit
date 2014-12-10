@@ -346,8 +346,24 @@ void ast_typeexpr_destroy(struct ast_typeexpr *a) {
   }
 }
 
+void ast_optional_type_params_init_no_params(
+    struct ast_optional_type_params *a) {
+  a->has_type_params = 0;
+}
+void ast_optional_type_params_init_has_params(
+    struct ast_optional_type_params *a,
+    struct ast_meta meta,
+    struct ast_ident *params,
+    size_t params_count) {
+  a->has_type_params = 1;
+  a->meta = meta;
+  a->params = params;
+  a->params_count = params_count;
+}
+
 void ast_optional_type_params_destroy(struct ast_optional_type_params *a) {
   if (a->has_type_params) {
+    ast_meta_destroy(&a->meta);
     SLICE_FREE(a->params, a->params_count, ast_ident_destroy);
   }
 }

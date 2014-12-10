@@ -301,11 +301,19 @@ struct ast_expr {
 void ast_expr_destroy(struct ast_expr *a);
 
 struct ast_optional_type_params {
-  int has_type_params;  /* 0 or 1 -- params is uninitialized if 0. */
+  int has_type_params;  /* 0 or 1 -- meta & params is uninitialized if 0. */
+  struct ast_meta meta;
   struct ast_ident *params;
   size_t params_count;
 };
 
+void ast_optional_type_params_init_no_params(
+    struct ast_optional_type_params *a);
+void ast_optional_type_params_init_has_params(
+    struct ast_optional_type_params *a,
+    struct ast_meta meta,
+    struct ast_ident *params,
+    size_t params_count);
 void ast_optional_type_params_destroy(struct ast_optional_type_params *a);
 
 struct ast_def {
