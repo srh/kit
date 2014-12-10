@@ -24,9 +24,9 @@ void ast_ident_init(struct ast_ident *a,
 void ast_ident_destroy(struct ast_ident *a);
 
 struct ast_numeric_literal {
-  struct ast_meta meta_;
-  int8_t *digits_;
-  size_t digits_count_;
+  struct ast_meta meta;
+  int8_t *digits;
+  size_t digits_count;
 };
 
 void ast_numeric_literal_init(struct ast_numeric_literal *a,
