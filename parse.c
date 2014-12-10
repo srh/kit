@@ -707,11 +707,18 @@ int parse_rest_of_lambda(struct ps *p, struct ast_lambda *out) {
   return 0;
 }
 
-int parse_rest_of_numeric_literal(struct ps *p, int32_t first_digit,
-				  struct ast_numeric_literal *out) {
+int parse_numeric_literal(struct ps *p, struct ast_numeric_literal *out) {
   int8_t *digits = NULL;
   size_t digits_count = 0;
   size_t digits_limit = 0;
+
+  size_t pos_start = ps_pos(p);
+  int32_t first_digit = ps_peek(p);
+  if (!is_decimal_digit(first_digit)) {
+    return 0;
+  }
+  ps_step(p);
+
   int8_t first_digit_value = (int8_t)(first_digit - '0');
   SLICE_PUSH(digits, digits_count, digits_limit, first_digit_value);
   int32_t ch;
@@ -726,8 +733,8 @@ int parse_rest_of_numeric_literal(struct ps *p, int32_t first_digit,
     return 0;
   }
 
-  out->digits = digits;
-  out->digits_count = digits_count;
+  ast_numeric_literal_init(out, ast_make_meta(pos_start, ps_pos(p)),
+			   digits, digits_count);
   ps_count_leaf(p);
   return 1;
 }
@@ -773,10 +780,8 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
   }
 
   if (is_decimal_digit(ps_peek(p))) {
-    int32_t ch = ps_peek(p);
-    ps_step(p);
     out->tag = AST_EXPR_NUMERIC_LITERAL;
-    return parse_rest_of_numeric_literal(p, ch, &out->u.numeric_literal);
+    return parse_numeric_literal(p, &out->u.numeric_literal);
   }
 
   if (is_ident_firstchar(ps_peek(p))) {

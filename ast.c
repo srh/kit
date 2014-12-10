@@ -25,8 +25,18 @@ void ast_ident_destroy(struct ast_ident *a) {
   ast_meta_destroy(&a->meta);
 }
 
+
+void ast_numeric_literal_init(struct ast_numeric_literal *a,
+			      struct ast_meta meta, int8_t *digits,
+			      size_t digits_count) {
+  a->meta_ = meta;
+  a->digits_ = digits;
+  a->digits_count_ = digits_count;
+}
+
 void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
-  free(a->digits);
+  ast_meta_destroy(&a->meta_);
+  free(a->digits_);
 }
 
 void ast_funcall_destroy(struct ast_funcall *a) {

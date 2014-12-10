@@ -24,9 +24,14 @@ void ast_ident_init(struct ast_ident *a,
 void ast_ident_destroy(struct ast_ident *a);
 
 struct ast_numeric_literal {
-  int8_t *digits;
-  size_t digits_count;
+  struct ast_meta meta_;
+  int8_t *digits_;
+  size_t digits_count_;
 };
+
+void ast_numeric_literal_init(struct ast_numeric_literal *a,
+			      struct ast_meta meta, int8_t *digits,
+			      size_t digits_count);
 
 struct ast_funcall {
   struct ast_expr *func;
