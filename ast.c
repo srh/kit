@@ -48,6 +48,7 @@ void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
 }
 
 void ast_funcall_destroy(struct ast_funcall *a) {
+  ast_meta_destroy(&a->meta);
   ast_expr_destroy(a->func);
   free(a->func);
   SLICE_FREE(a->args, a->args_count, ast_expr_destroy);
@@ -61,6 +62,7 @@ void ast_vardecl_init(struct ast_vardecl *a, struct ast_meta meta,
 }
 
 void ast_vardecl_destroy(struct ast_vardecl *a) {
+  ast_meta_destroy(&a->meta);
   ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);
 }
@@ -75,6 +77,7 @@ void ast_bracebody_init(struct ast_bracebody *a,
 }
 
 void ast_bracebody_destroy(struct ast_bracebody *a) {
+  ast_meta_destroy(&a->meta);
   SLICE_FREE(a->statements, a->statements_count, ast_statement_destroy);
 }
 
@@ -89,6 +92,7 @@ void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
 }
 
 void ast_var_statement_destroy(struct ast_var_statement *a) {
+  ast_meta_destroy(&a->meta);
   ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);
   ast_expr_destroy(a->rhs);
@@ -102,6 +106,7 @@ void ast_goto_statement_init(struct ast_goto_statement *a,
 }
 
 void ast_goto_statement_destroy(struct ast_goto_statement *a) {
+  ast_meta_destroy(&a->meta);
   ast_ident_destroy(&a->target);
 }
 
@@ -211,12 +216,9 @@ void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
 }
 
 void ast_typeapp_destroy(struct ast_typeapp *a) {
+  ast_meta_destroy(&a->meta);
   ast_ident_destroy(&a->name);
   SLICE_FREE(a->params, a->params_count, ast_typeexpr_destroy);
-}
-
-void ast_structe_destroy(struct ast_structe *a) {
-  SLICE_FREE(a->fields, a->fields_count, ast_vardecl_destroy);
 }
 
 void ast_structe_init(struct ast_structe *a, struct ast_meta meta,
@@ -224,6 +226,11 @@ void ast_structe_init(struct ast_structe *a, struct ast_meta meta,
   a->meta = meta;
   a->fields = fields;
   a->fields_count = fields_count;
+}
+
+void ast_structe_destroy(struct ast_structe *a) {
+  ast_meta_destroy(&a->meta);
+  SLICE_FREE(a->fields, a->fields_count, ast_vardecl_destroy);
 }
 
 void ast_unione_init(struct ast_unione *a, struct ast_meta meta,
@@ -234,6 +241,7 @@ void ast_unione_init(struct ast_unione *a, struct ast_meta meta,
 }
 
 void ast_unione_destroy(struct ast_unione *a) {
+  ast_meta_destroy(&a->meta);
   SLICE_FREE(a->fields, a->fields_count, ast_vardecl_destroy);
 }
 
