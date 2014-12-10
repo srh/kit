@@ -18,8 +18,7 @@ struct ast_ident {
   ident_value value;
 };
 
-void ast_ident_init(struct ast_ident *a,
-		    struct ast_meta meta,
+void ast_ident_init(struct ast_ident *a, struct ast_meta meta,
 		    ident_value value);
 void ast_ident_destroy(struct ast_ident *a);
 
@@ -40,10 +39,8 @@ struct ast_funcall {
   size_t args_count;
 };
 
-void ast_funcall_init(struct ast_funcall *a,
-		      struct ast_meta meta,
-		      struct ast_expr *func,
-		      struct ast_expr *args,
+void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
+		      struct ast_expr *func, struct ast_expr *args,
 		      size_t args_count);
 
 struct ast_typeexpr;
@@ -55,10 +52,8 @@ struct ast_typeapp {
   size_t params_count;
 };
 
-void ast_typeapp_init(struct ast_typeapp *a,
-		      struct ast_meta meta,
-		      struct ast_ident name,
-		      struct ast_typeexpr *params,
+void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
+		      struct ast_ident name, struct ast_typeexpr *params,
 		      size_t params_count);
 
 struct ast_structe {

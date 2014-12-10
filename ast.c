@@ -14,8 +14,7 @@ void ast_meta_destroy(struct ast_meta *a) {
   /* Do nothing. */
 }
 
-void ast_ident_init(struct ast_ident *a,
-		    struct ast_meta meta,
+void ast_ident_init(struct ast_ident *a, struct ast_meta meta,
 		    ident_value value) {
   a->meta = meta;
   a->value = value;
@@ -39,10 +38,8 @@ void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
   free(a->digits);
 }
 
-void ast_funcall_init(struct ast_funcall *a,
-		      struct ast_meta meta,
-		      struct ast_expr *func,
-		      struct ast_expr *args,
+void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
+		      struct ast_expr *func, struct ast_expr *args,
 		      size_t args_count) {
   a->meta = meta;
   a->func = func;
@@ -172,10 +169,8 @@ void ast_expr_destroy(struct ast_expr *a) {
   }
 }
 
-void ast_typeapp_init(struct ast_typeapp *a,
-		      struct ast_meta meta,
-		      struct ast_ident name,
-		      struct ast_typeexpr *params,
+void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
+		      struct ast_ident name, struct ast_typeexpr *params,
 		      size_t params_count) {
   a->meta = meta;
   a->name = name;
