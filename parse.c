@@ -646,6 +646,7 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
 }
 
 int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
+  size_t pos_start = ps_pos(p);
   if (!try_skip_char(p, '{')) {
     return 0;
   }
@@ -656,8 +657,8 @@ int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
   for (;;) {
     skip_ws(p);
     if (try_skip_char(p, '}')) {
-      out->statements = statements;
-      out->statements_count = statements_count;
+      ast_bracebody_init(out, ast_meta_make(pos_start, ps_pos(p)),
+			 statements, statements_count);
       return 1;
     }
 

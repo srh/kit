@@ -65,6 +65,15 @@ void ast_vardecl_destroy(struct ast_vardecl *a) {
   ast_typeexpr_destroy(&a->type);
 }
 
+void ast_bracebody_init(struct ast_bracebody *a,
+			struct ast_meta meta,
+			struct ast_statement *statements,
+			size_t statements_count) {
+  a->meta = meta;
+  a->statements = statements;
+  a->statements_count = statements_count;
+}
+
 void ast_bracebody_destroy(struct ast_bracebody *a) {
   SLICE_FREE(a->statements, a->statements_count, ast_statement_destroy);
 }

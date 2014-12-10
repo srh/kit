@@ -109,10 +109,15 @@ struct ast_expr;
 struct ast_statement;
 
 struct ast_bracebody {
+  struct ast_meta meta;
   struct ast_statement *statements;
   size_t statements_count;
 };
 
+void ast_bracebody_init(struct ast_bracebody *a,
+			struct ast_meta meta,
+			struct ast_statement *statements,
+			size_t statements_count);
 void ast_bracebody_destroy(struct ast_bracebody *a);
 
 struct ast_var_statement {
