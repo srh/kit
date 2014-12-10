@@ -1271,8 +1271,7 @@ int parse_file(struct ps *p, struct ast_file *out) {
     skip_ws(p);
 
     if (ps_peek(p) == -1) {
-      out->toplevels = toplevels;
-      out->toplevels_count = toplevels_count;
+      ast_file_init(out, toplevels, toplevels_count);
       return 1;
     }
 
