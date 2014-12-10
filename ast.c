@@ -2,9 +2,27 @@
 
 #include "slice.h"
 
-void ast_ident_destroy(struct ast_ident *a) {
+struct ast_meta ast_make_meta(size_t pos_start, size_t pos_end) {
+  struct ast_meta ret;
+  ret.pos_start = pos_start;
+  ret.pos_end = pos_end;
+  return ret;
+}
+
+void ast_meta_destroy(struct ast_meta *a) {
   (void)a;
   /* Do nothing. */
+}
+
+void ast_ident_init(struct ast_ident *a,
+		    struct ast_meta meta,
+		    ident_value value) {
+  a->meta = meta;
+  a->value = value;
+}
+
+void ast_ident_destroy(struct ast_ident *a) {
+  ast_meta_destroy(&a->meta);
 }
 
 void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {

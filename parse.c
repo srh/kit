@@ -77,6 +77,10 @@ struct ps_savestate ps_save(struct ps *p) {
   return ret;
 }
 
+size_t ps_pos(struct ps *p) {
+  return p->pos;
+}
+
 void ps_restore(struct ps *p, struct ps_savestate save) {
   CHECK(save.pos <= p->pos);
   CHECK(save.leafcount <= p->leafcount);
@@ -403,6 +407,7 @@ int try_skip_keyword(struct ps *p, const char *kw) {
 
 int parse_ident(struct ps *p, struct ast_ident *out) {
   PARSE_DBG("parse_ident\n");
+  size_t pos_start = ps_pos(p);
   if (!is_ident_firstchar(ps_peek(p))) {
     return 0;
   }
@@ -416,9 +421,8 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
     return 0;
   }
 
-  PARSE_DBG("parse_ident about to ps_intern_ident\n");
-  out->value = ps_intern_ident(p, save, ps_save(p));
-  PARSE_DBG("parse_ident interned ident\n");
+  ast_ident_init(out, ast_make_meta(pos_start, ps_pos(p)),
+		 ps_intern_ident(p, save, ps_save(p)));
   ps_count_leaf(p);
   return 1;
 }

@@ -6,10 +6,21 @@
 
 #include "identmap.h"
 
+struct ast_meta {
+  size_t pos_start;
+  size_t pos_end;
+};
+
+struct ast_meta ast_make_meta(size_t pos_start, size_t pos_end);
+
 struct ast_ident {
+  struct ast_meta meta;
   ident_value value;
 };
 
+void ast_ident_init(struct ast_ident *a,
+		    struct ast_meta meta,
+		    ident_value value);
 void ast_ident_destroy(struct ast_ident *a);
 
 struct ast_numeric_literal {
