@@ -133,7 +133,6 @@ const struct precedence_pair binop_precedences[] = {
   [AST_BINOP_GT] = { 405, 405 },
   [AST_BINOP_GE] = { 405, 405 },
   [AST_BINOP_EQ] = { 405, 405 },
-  [AST_BINOP_EQ] = { 405, 405 },
   [AST_BINOP_NE] = { 405, 405 },
   /* TODO: Let bitwise ops self-associate but require parens for any
      combination of them with other operators. */
@@ -153,12 +152,12 @@ struct precedence_pair binop_precedence(enum ast_binop op) {
 }
 
 const int unop_right_precedences[] = {
-  [AST_UNOP_DEREFERENCE] = { 905 },
-  [AST_UNOP_ADDRESSOF] = { 905 },
-  [AST_UNOP_NEGATE] = { 905 },
+  [AST_UNOP_DEREFERENCE] = 905,
+  [AST_UNOP_ADDRESSOF] = 905,
+  [AST_UNOP_NEGATE] = 905,
 };
 
-const int unop_right_precedence(enum ast_unop op) {
+int unop_right_precedence(enum ast_unop op) {
   CHECK(0 <= op &&
 	op < sizeof(unop_right_precedences) / sizeof(unop_right_precedences[0]));
   return unop_right_precedences[op];

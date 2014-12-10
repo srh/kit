@@ -6,8 +6,7 @@
 #define NORETURN __declspec(noreturn)
 #else /* _WIN32 */
 #define PRIz "zu"
-/* TODO: Define NORETURN on Linux. */
-#define NORETURN
+#define NORETURN __attribute__((__noreturn__))
 #endif /* _WIN32 */
 
 #define STATIC_ASSERT(x) do { enum { assertion = 1/!!(x) }; } while (0)
