@@ -255,6 +255,24 @@ void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
 			 enum ast_binop operator, struct ast_expr *lhs,
 			 struct ast_expr *rhs);
 
+struct ast_local_field_access {
+  struct ast_meta meta;
+  struct ast_ident fieldname;
+};
+
+void ast_local_field_access_init(struct ast_local_field_access *a,
+				 struct ast_meta meta,
+				 struct ast_ident fieldname);
+
+struct ast_deref_field_access {
+  struct ast_meta meta;
+  struct ast_ident fieldname;
+};
+
+void ast_deref_field_access_init(struct ast_deref_field_access *a,
+				 struct ast_meta meta,
+				 struct ast_ident fieldname);
+
 enum ast_expr_tag {
   AST_EXPR_NAME,
   AST_EXPR_NUMERIC_LITERAL,
@@ -263,7 +281,7 @@ enum ast_expr_tag {
   AST_EXPR_BINOP,
   AST_EXPR_LAMBDA,
   AST_EXPR_LOCAL_FIELD_ACCESS,
-  AST_EXPR_DEREFERENCING_FIELD_ACCESS,
+  AST_EXPR_DEREF_FIELD_ACCESS,
 };
 
 struct ast_expr {
@@ -275,8 +293,8 @@ struct ast_expr {
     struct ast_unop_expr unop_expr;
     struct ast_binop_expr binop_expr;
     struct ast_lambda lambda;
-    struct ast_ident local_field_access;
-    struct ast_ident dereferencing_field_access;
+    struct ast_local_field_access local_field_access;
+    struct ast_deref_field_access deref_field_access;
   } u;
 };
 

@@ -233,6 +233,30 @@ void ast_lambda_destroy(struct ast_lambda *a) {
   ast_bracebody_destroy(&a->bracebody);
 }
 
+void ast_local_field_access_init(struct ast_local_field_access *a,
+				 struct ast_meta meta,
+				 struct ast_ident fieldname) {
+  a->meta = meta;
+  a->fieldname = fieldname;
+}
+
+void ast_local_field_access_destroy(struct ast_local_field_access *a) {
+  ast_meta_destroy(&a->meta);
+  ast_ident_destroy(&a->fieldname);
+}
+
+void ast_deref_field_access_init(struct ast_deref_field_access *a,
+				 struct ast_meta meta,
+				 struct ast_ident fieldname) {
+  a->meta = meta;
+  a->fieldname = fieldname;
+}
+
+void ast_deref_field_access_destroy(struct ast_deref_field_access *a) {
+  ast_meta_destroy(&a->meta);
+  ast_ident_destroy(&a->fieldname);
+}
+
 void ast_expr_destroy(struct ast_expr *a) {
   switch (a->tag) {
   case AST_EXPR_NAME:
@@ -254,10 +278,10 @@ void ast_expr_destroy(struct ast_expr *a) {
     ast_lambda_destroy(&a->u.lambda);
     break;
   case AST_EXPR_LOCAL_FIELD_ACCESS:
-    ast_ident_destroy(&a->u.local_field_access);
+    ast_local_field_access_destroy(&a->u.local_field_access);
     break;
-  case AST_EXPR_DEREFERENCING_FIELD_ACCESS:
-    ast_ident_destroy(&a->u.dereferencing_field_access);
+  case AST_EXPR_DEREF_FIELD_ACCESS:
+    ast_deref_field_access_destroy(&a->u.deref_field_access);
     break;
   default:
     UNREACHABLE();
