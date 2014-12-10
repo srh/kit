@@ -11,7 +11,7 @@ struct ast_meta {
   size_t pos_end;
 };
 
-struct ast_meta ast_make_meta(size_t pos_start, size_t pos_end);
+struct ast_meta ast_meta_make(size_t pos_start, size_t pos_end);
 
 struct ast_ident {
   struct ast_meta meta;

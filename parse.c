@@ -421,7 +421,7 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
     return 0;
   }
 
-  ast_ident_init(out, ast_make_meta(pos_start, ps_pos(p)),
+  ast_ident_init(out, ast_meta_make(pos_start, ps_pos(p)),
 		 ps_intern_ident(p, save, ps_save(p)));
   ps_count_leaf(p);
   return 1;
@@ -733,7 +733,7 @@ int parse_numeric_literal(struct ps *p, struct ast_numeric_literal *out) {
     return 0;
   }
 
-  ast_numeric_literal_init(out, ast_make_meta(pos_start, ps_pos(p)),
+  ast_numeric_literal_init(out, ast_meta_make(pos_start, ps_pos(p)),
 			   digits, digits_count);
   ps_count_leaf(p);
   return 1;

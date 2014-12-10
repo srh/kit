@@ -2,7 +2,7 @@
 
 #include "slice.h"
 
-struct ast_meta ast_make_meta(size_t pos_start, size_t pos_end) {
+struct ast_meta ast_meta_make(size_t pos_start, size_t pos_end) {
   struct ast_meta ret;
   ret.pos_start = pos_start;
   ret.pos_end = pos_end;
