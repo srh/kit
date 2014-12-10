@@ -101,7 +101,6 @@ struct ast_vardecl {
 
 void ast_vardecl_init(struct ast_vardecl *a, struct ast_meta meta,
 		      struct ast_ident name, struct ast_typeexpr type);
-
 void ast_vardecl_destroy(struct ast_vardecl *a);
 
 struct ast_expr;
