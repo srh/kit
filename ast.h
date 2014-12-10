@@ -139,19 +139,36 @@ void ast_goto_statement_init(struct ast_goto_statement *a,
 			     struct ast_meta meta, struct ast_ident target);
 
 struct ast_label_statement {
+  struct ast_meta meta;
   struct ast_ident label;
 };
 
+void ast_label_statement_init(struct ast_label_statement *a,
+			      struct ast_meta meta, struct ast_ident label);
+
 struct ast_ifthen_statement {
+  struct ast_meta meta;
   struct ast_expr *condition;
   struct ast_bracebody thenbody;
 };
 
+void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
+			       struct ast_meta meta,
+			       struct ast_expr *condition,
+			       struct ast_bracebody thenbody);
+
 struct ast_ifthenelse_statement {
+  struct ast_meta meta;
   struct ast_expr *condition;
   struct ast_bracebody thenbody;
   struct ast_bracebody elsebody;
 };
+
+void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,
+				   struct ast_meta meta,
+				   struct ast_expr *condition,
+				   struct ast_bracebody thenbody,
+				   struct ast_bracebody elsebody);
 
 enum ast_statement_tag {
   AST_STATEMENT_EXPR,

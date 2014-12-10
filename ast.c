@@ -110,17 +110,46 @@ void ast_goto_statement_destroy(struct ast_goto_statement *a) {
   ast_ident_destroy(&a->target);
 }
 
+void ast_label_statement_init(struct ast_label_statement *a,
+			      struct ast_meta meta, struct ast_ident label) {
+  a->meta = meta;
+  a->label = label;
+}
+
 void ast_label_statement_destroy(struct ast_label_statement *a) {
+  ast_meta_destroy(&a->meta);
   ast_ident_destroy(&a->label);
 }
 
+void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
+			       struct ast_meta meta,
+			       struct ast_expr *condition,
+			       struct ast_bracebody thenbody) {
+  a->meta = meta;
+  a->condition = condition;
+  a->thenbody = thenbody;
+}
+
 void ast_ifthen_statement_destroy(struct ast_ifthen_statement *a) {
+  ast_meta_destroy(&a->meta);
   ast_expr_destroy(a->condition);
   free(a->condition);
   ast_bracebody_destroy(&a->thenbody);
 }
 
+void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,
+				   struct ast_meta meta,
+				   struct ast_expr *condition,
+				   struct ast_bracebody thenbody,
+				   struct ast_bracebody elsebody) {
+  a->meta = meta;
+  a->condition = condition;
+  a->thenbody = thenbody;
+  a->elsebody = elsebody;
+}
+
 void ast_ifthenelse_statement_destroy(struct ast_ifthenelse_statement *a) {
+  ast_meta_destroy(&a->meta);
   ast_expr_destroy(a->condition);
   free(a->condition);
   ast_bracebody_destroy(&a->thenbody);

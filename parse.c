@@ -489,7 +489,8 @@ int parse_params_list(struct ps *p,
 
 int parse_bracebody(struct ps *p, struct ast_bracebody *out);
 
-int parse_rest_of_if_statement(struct ps *p, struct ast_statement *out) {
+int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
+			       struct ast_statement *out) {
   skip_ws(p);
   struct ast_expr condition;
   if (!parse_expr(p, &condition, kSemicolonPrecedence)) {
@@ -501,13 +502,17 @@ int parse_rest_of_if_statement(struct ps *p, struct ast_statement *out) {
     goto fail_condition;
   }
 
+  size_t pos_thenbody_end = ps_pos(p);
+
   skip_ws(p);
   if (!try_skip_keyword(p, "else")) {
     struct ast_expr *heap_condition;
     malloc_move_ast_expr(condition, &heap_condition);
     out->tag = AST_STATEMENT_IFTHEN;
-    out->u.ifthen_statement.condition = heap_condition;
-    out->u.ifthen_statement.thenbody = thenbody;
+    ast_ifthen_statement_init(&out->u.ifthen_statement,
+			      ast_meta_make(pos_start, pos_thenbody_end),
+			      heap_condition,
+			      thenbody);
     return 1;
   }
 
@@ -520,9 +525,11 @@ int parse_rest_of_if_statement(struct ps *p, struct ast_statement *out) {
   struct ast_expr *heap_condition;
   malloc_move_ast_expr(condition, &heap_condition);
   out->tag = AST_STATEMENT_IFTHENELSE;
-  out->u.ifthenelse_statement.condition = heap_condition;
-  out->u.ifthenelse_statement.thenbody = thenbody;
-  out->u.ifthenelse_statement.elsebody = elsebody;
+  ast_ifthenelse_statement_init(&out->u.ifthenelse_statement,
+				ast_meta_make(pos_start, ps_pos(p)),
+				heap_condition,
+				thenbody,
+				elsebody);
   return 1;
 
  fail_thenbody:
@@ -609,7 +616,9 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
       return 0;
     }
     out->tag = AST_STATEMENT_LABEL;
-    out->u.label_statement.label = label;
+    ast_label_statement_init(&out->u.label_statement,
+			     ast_meta_make(pos_start, ps_pos(p)),
+			     label);
     return 1;
   } else if (try_skip_keyword(p, "return")) {
     skip_ws(p);
@@ -628,7 +637,7 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
     out->u.return_expr = heap_expr;
     return 1;
   } else if (try_skip_keyword(p, "if")) {
-    return parse_rest_of_if_statement(p, out);
+    return parse_rest_of_if_statement(p, pos_start, out);
   } else {
     struct ast_expr expr;
     if (!parse_expr(p, &expr, kSemicolonPrecedence)) {
