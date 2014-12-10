@@ -172,6 +172,17 @@ void ast_expr_destroy(struct ast_expr *a) {
   }
 }
 
+void ast_typeapp_init(struct ast_typeapp *a,
+		      struct ast_meta meta,
+		      struct ast_ident name,
+		      struct ast_typeexpr *params,
+		      size_t params_count) {
+  a->meta = meta;
+  a->name = name;
+  a->params = params;
+  a->params_count = params_count;
+}
+
 void ast_typeapp_destroy(struct ast_typeapp *a) {
   ast_ident_destroy(&a->name);
   SLICE_FREE(a->params, a->params_count, ast_typeexpr_destroy);
@@ -179,6 +190,20 @@ void ast_typeapp_destroy(struct ast_typeapp *a) {
 
 void ast_structe_destroy(struct ast_structe *a) {
   SLICE_FREE(a->fields, a->fields_count, ast_vardecl_destroy);
+}
+
+void ast_structe_init(struct ast_structe *a, struct ast_meta meta,
+		      struct ast_vardecl *fields, size_t fields_count) {
+  a->meta = meta;
+  a->fields = fields;
+  a->fields_count = fields_count;
+}
+
+void ast_unione_init(struct ast_unione *a, struct ast_meta meta,
+		     struct ast_vardecl *fields, size_t fields_count) {
+  a->meta = meta;
+  a->fields = fields;
+  a->fields_count = fields_count;
 }
 
 void ast_unione_destroy(struct ast_unione *a) {

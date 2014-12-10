@@ -49,20 +49,35 @@ void ast_funcall_init(struct ast_funcall *a,
 struct ast_typeexpr;
 
 struct ast_typeapp {
+  struct ast_meta meta;
   struct ast_ident name;
   struct ast_typeexpr *params;
   size_t params_count;
 };
 
+void ast_typeapp_init(struct ast_typeapp *a,
+		      struct ast_meta meta,
+		      struct ast_ident name,
+		      struct ast_typeexpr *params,
+		      size_t params_count);
+
 struct ast_structe {
+  struct ast_meta meta;
   struct ast_vardecl *fields;
   size_t fields_count;
 };
 
+void ast_structe_init(struct ast_structe *a, struct ast_meta meta,
+		      struct ast_vardecl *fields, size_t fields_count);
+
 struct ast_unione {
+  struct ast_meta meta;
   struct ast_vardecl *fields;
   size_t fields_count;
 };
+
+void ast_unione_init(struct ast_unione *a, struct ast_meta meta,
+		     struct ast_vardecl *fields, size_t fields_count);
 
 enum ast_typeexpr_tag {
   AST_TYPEEXPR_NAME,

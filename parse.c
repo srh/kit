@@ -958,25 +958,40 @@ int parse_braced_fields(struct ps *p,
   return 0;
 }
 
-int parse_rest_of_structe(struct ps *p, struct ast_structe *out) {
+int parse_rest_of_structe(struct ps *p, size_t pos_start, struct ast_structe *out) {
   skip_ws(p);
-  return parse_braced_fields(p, &out->fields, &out->fields_count);
+  struct ast_vardecl *fields;
+  size_t fields_count;
+  if (!parse_braced_fields(p, &fields, &fields_count)) {
+    return 0;
+  }
+  ast_structe_init(out, ast_meta_make(pos_start, ps_pos(p)),
+		   fields, fields_count);
+  return 1;
 }
 
-int parse_rest_of_unione(struct ps *p, struct ast_unione *out) {
+int parse_rest_of_unione(struct ps *p, size_t pos_start, struct ast_unione *out) {
   skip_ws(p);
-  return parse_braced_fields(p, &out->fields, &out->fields_count);
+  struct ast_vardecl *fields;
+  size_t fields_count;
+  if (!parse_braced_fields(p, &fields, &fields_count)) {
+    return 0;
+  }
+  ast_unione_init(out, ast_meta_make(pos_start, ps_pos(p)),
+		  fields, fields_count);
+  return 1;
 }
 
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
+  size_t pos_start = ps_pos(p);
   if (try_skip_keyword(p, "struct")) {
     out->tag = AST_TYPEEXPR_STRUCTE;
-    return parse_rest_of_structe(p, &out->u.structe);
+    return parse_rest_of_structe(p, pos_start, &out->u.structe);
   }
 
   if (try_skip_keyword(p, "union")) {
     out->tag = AST_TYPEEXPR_UNIONE;
-    return parse_rest_of_unione(p, &out->u.unione);
+    return parse_rest_of_unione(p, pos_start, &out->u.unione);
   }
 
   struct ast_ident ident;
@@ -999,9 +1014,8 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
     skip_ws(p);
     if (try_skip_char(p, ']')) {
       out->tag = AST_TYPEEXPR_APP;
-      out->u.app.name = ident;
-      out->u.app.params = params;
-      out->u.app.params_count = params_count;
+      ast_typeapp_init(&out->u.app, ast_meta_make(pos_start, ps_pos(p)),
+		       ident, params, params_count);
       return 1;
     }
 
