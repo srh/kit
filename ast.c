@@ -39,6 +39,17 @@ void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
   free(a->digits);
 }
 
+void ast_funcall_init(struct ast_funcall *a,
+		      struct ast_meta meta,
+		      struct ast_expr *func,
+		      struct ast_expr *args,
+		      size_t args_count) {
+  a->meta = meta;
+  a->func = func;
+  a->args = args;
+  a->args_count = args_count;
+}
+
 void ast_funcall_destroy(struct ast_funcall *a) {
   ast_expr_destroy(a->func);
   free(a->func);

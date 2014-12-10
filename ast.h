@@ -34,10 +34,17 @@ void ast_numeric_literal_init(struct ast_numeric_literal *a,
 			      size_t digits_count);
 
 struct ast_funcall {
+  struct ast_meta meta;
   struct ast_expr *func;
   struct ast_expr *args;
   size_t args_count;
 };
+
+void ast_funcall_init(struct ast_funcall *a,
+		      struct ast_meta meta,
+		      struct ast_expr *func,
+		      struct ast_expr *args,
+		      size_t args_count);
 
 struct ast_typeexpr;
 

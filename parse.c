@@ -822,6 +822,7 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
 
 int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
   /* TODO: Struct and union field access. */
+  size_t pos_start = ps_pos(p);
   struct ast_expr lhs;
   if (!parse_atomic_expr(p, &lhs)) {
     return 0;
@@ -841,9 +842,11 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       struct ast_expr *heap_lhs;
       malloc_move_ast_expr(lhs, &heap_lhs);
       lhs.tag = AST_EXPR_FUNCALL;
-      lhs.u.funcall.func = heap_lhs;
-      lhs.u.funcall.args = args;
-      lhs.u.funcall.args_count = args_count;
+      ast_funcall_init(&lhs.u.funcall,
+		       ast_meta_make(pos_start, ps_pos(p)),
+		       heap_lhs,
+		       args,
+		       args_count);
     } else if (try_skip_oper(p, ".")) {
       skip_ws(p);
       struct ast_ident field_name;
