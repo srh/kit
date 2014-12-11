@@ -4,12 +4,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "util.h"
+
 struct ident_map_entry;
 
-typedef uint32_t ident_value;
-#define IDENT_VALUE_MAX UINT32_MAX
+typedef size_t ident_value;
+#define IDENT_VALUE_MAX SIZE_MAX
 #define IDENT_VALUE_INVALID 0
-#define PRIident_value PRIu32
+#define PRIident_value PRIz
 
 struct ident_map {
   struct ident_map_entry *table;
