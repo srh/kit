@@ -10,8 +10,9 @@ struct ast_meta ast_meta_make(size_t pos_start, size_t pos_end) {
 }
 
 void ast_meta_destroy(struct ast_meta *a) {
-  (void)a;
-  /* Do nothing. */
+  a->pos_start = SIZE_MAX;
+  a->pos_end = SIZE_MAX;
+  /* Do nothing useful. */
 }
 
 void ast_ident_init(struct ast_ident *a, struct ast_meta meta,
@@ -22,6 +23,7 @@ void ast_ident_init(struct ast_ident *a, struct ast_meta meta,
 
 void ast_ident_destroy(struct ast_ident *a) {
   ast_meta_destroy(&a->meta);
+  a->value = IDENT_VALUE_INVALID;
 }
 
 
@@ -36,6 +38,8 @@ void ast_numeric_literal_init(struct ast_numeric_literal *a,
 void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
   ast_meta_destroy(&a->meta);
   free(a->digits);
+  a->digits = NULL;
+  a->digits_count = 0;
 }
 
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
@@ -51,6 +55,7 @@ void ast_funcall_destroy(struct ast_funcall *a) {
   ast_meta_destroy(&a->meta);
   ast_expr_destroy(a->func);
   free(a->func);
+  a->func = NULL;
   SLICE_FREE(a->args, a->args_count, ast_expr_destroy);
 }
 
@@ -97,6 +102,7 @@ void ast_var_statement_destroy(struct ast_var_statement *a) {
   ast_typeexpr_destroy(&a->type);
   ast_expr_destroy(a->rhs);
   free(a->rhs);
+  a->rhs = NULL;
 }
 
 void ast_goto_statement_init(struct ast_goto_statement *a,
@@ -134,6 +140,7 @@ void ast_ifthen_statement_destroy(struct ast_ifthen_statement *a) {
   ast_meta_destroy(&a->meta);
   ast_expr_destroy(a->condition);
   free(a->condition);
+  a->condition = NULL;
   ast_bracebody_destroy(&a->thenbody);
 }
 
@@ -152,6 +159,7 @@ void ast_ifthenelse_statement_destroy(struct ast_ifthenelse_statement *a) {
   ast_meta_destroy(&a->meta);
   ast_expr_destroy(a->condition);
   free(a->condition);
+  a->condition = NULL;
   ast_bracebody_destroy(&a->thenbody);
   ast_bracebody_destroy(&a->elsebody);
 }
@@ -161,10 +169,12 @@ void ast_statement_destroy(struct ast_statement *a) {
   case AST_STATEMENT_EXPR:
     ast_expr_destroy(a->u.expr);
     free(a->u.expr);
+    a->u.expr = NULL;
     break;
   case AST_STATEMENT_RETURN_EXPR:
     ast_expr_destroy(a->u.return_expr);
     free(a->u.return_expr);
+    a->u.return_expr = NULL;
     break;
   case AST_STATEMENT_VAR:
     ast_var_statement_destroy(&a->u.var_statement);
@@ -184,6 +194,7 @@ void ast_statement_destroy(struct ast_statement *a) {
   default:
     UNREACHABLE();
   }
+  a->tag = (enum ast_statement_tag)-1;
 }
 
 void ast_unop_expr_init(struct ast_unop_expr *a, struct ast_meta meta,
@@ -195,8 +206,10 @@ void ast_unop_expr_init(struct ast_unop_expr *a, struct ast_meta meta,
 
 void ast_unop_expr_destroy(struct ast_unop_expr *a) {
   ast_meta_destroy(&a->meta);
+  a->operator = (enum ast_unop)-1;
   ast_expr_destroy(a->rhs);
   free(a->rhs);
+  a->rhs = NULL;
 }
 
 void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
@@ -210,9 +223,12 @@ void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
 
 void ast_binop_expr_destroy(struct ast_binop_expr *a) {
   ast_expr_destroy(a->lhs);
+  a->operator = (enum ast_binop)-1;
   free(a->lhs);
+  a->lhs = NULL;
   ast_expr_destroy(a->rhs);
   free(a->rhs);
+  a->rhs = NULL;
 }
 
 void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,
@@ -304,6 +320,7 @@ void ast_expr_destroy(struct ast_expr *a) {
   default:
     UNREACHABLE();
   }
+  a->tag = (enum ast_expr_tag)-1;
 }
 
 void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
@@ -362,11 +379,16 @@ void ast_typeexpr_destroy(struct ast_typeexpr *a) {
   default:
     UNREACHABLE();
   }
+  a->tag = (enum ast_typeexpr_tag)-1;
 }
 
 void ast_optional_type_params_init_no_params(
     struct ast_optional_type_params *a) {
   a->has_type_params = 0;
+  /* Dummy values for irrelevant fields. */
+  a->meta = ast_meta_make(SIZE_MAX, SIZE_MAX);
+  a->params = NULL;
+  a->params_count = 0;
 }
 void ast_optional_type_params_init_has_params(
     struct ast_optional_type_params *a,
@@ -381,6 +403,7 @@ void ast_optional_type_params_init_has_params(
 
 void ast_optional_type_params_destroy(struct ast_optional_type_params *a) {
   if (a->has_type_params) {
+    a->has_type_params = 0;
     ast_meta_destroy(&a->meta);
     SLICE_FREE(a->params, a->params_count, ast_ident_destroy);
   }
@@ -464,6 +487,7 @@ void ast_toplevel_destroy(struct ast_toplevel *a) {
   default:
     UNREACHABLE();
   }
+  a->tag = (enum ast_toplevel_tag)-1;
 }
 
 void ast_file_destroy(struct ast_file *a) {

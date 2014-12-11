@@ -62,7 +62,13 @@ void ps_remove_ident_table(struct ps *p, struct ident_map *im_out) {
 }
 
 void ps_destroy(struct ps *p) {
+  p->data = NULL;
+  p->length = 0;
+  p->pos = 0;
+  p->line = 0;
+  p->column = 0;
   ident_map_destroy(&p->ident_table);
+  p->leafcount = 0;
 }
 
 int32_t ps_peek(struct ps *p) {

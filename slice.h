@@ -22,6 +22,8 @@
       (destructor)(&(ptr)[SLICE_FREE_i]); \
     } \
     free(ptr); \
+    (ptr) = NULL; \
+    (count) = 0; \
   } while (0)
 
 #endif /* KIRA_SLICE_H_ */

@@ -8,6 +8,7 @@ struct ident_map_entry;
 
 typedef uint32_t ident_value;
 #define IDENT_VALUE_MAX UINT32_MAX
+#define IDENT_VALUE_INVALID 0
 #define PRIident_value PRIu32
 
 struct ident_map {
