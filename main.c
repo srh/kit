@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ast.h"
+#include "identmap.h"
 #include "io.h"
 #include "parse.h"
 #include "util.h"
@@ -34,18 +36,23 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  size_t leafcount;
-  size_t error_pos;
   int ret;
-  if (count_parse_buf(data, size, &leafcount, &error_pos)) {
-    fprintf(stderr, "Parse succeeded.  Leaf count is %"PRIz".\n", leafcount);
-    fflush(stderr);
-    ret = EXIT_SUCCESS;
-  } else {
+  struct ident_map im;
+  ident_map_init(&im);
+  struct ast_file file;
+  size_t error_pos;
+  if (!parse_buf_file(&im, data, size, &file, &error_pos)) {
     fprintf(stderr, "Parse failed, at %"PRIz".\n", error_pos);
     ret = EXIT_FAILURE;
+    goto cleanup_im;
   }
 
+  fprintf(stderr, "Parse succeeded.\n");
+  fflush(stderr);
+  ret = EXIT_SUCCESS;
+
+ cleanup_im:
+  ident_map_destroy(&im);
   free(data);
   return ret;
 }
