@@ -27,6 +27,11 @@ void ident_map_init(struct ident_map *m) {
   m->strings_limit = 0;
 }
 
+void ident_map_init_move(struct ident_map *m, struct ident_map *movee) {
+  *m = *movee;
+  ident_map_init(movee);
+}
+
 void ident_map_destroy(struct ident_map *m) {
   free(m->table);
   free(m->strings);

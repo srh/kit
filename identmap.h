@@ -26,6 +26,7 @@ struct ident_map {
 };
 
 void ident_map_init(struct ident_map *m);
+void ident_map_init_move(struct ident_map *m, struct ident_map *movee);
 void ident_map_destroy(struct ident_map *m);
 
 ident_value ident_map_intern(struct ident_map *m,

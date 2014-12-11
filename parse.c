@@ -41,6 +41,26 @@ void ps_init(struct ps *p, const uint8_t *data, size_t length) {
   p->leafcount = 0;
 }
 
+/* Takes ownership of the ident table -- use ps_remove_ident_table to
+   get it back. */
+void ps_init_with_ident_table(struct ps *p, struct ident_map *im,
+			      const uint8_t *data, size_t length) {
+  p->data = data;
+  p->length = length;
+  p->pos = 0;
+
+  p->line = 1;
+  p->column = 0;
+
+  ident_map_init_move(&p->ident_table, im);
+  p->leafcount = 0;
+}
+
+void ps_remove_ident_table(struct ps *p, struct ident_map *im_out) {
+  ident_map_init_move(im_out, &p->ident_table);
+  ident_map_init(&p->ident_table);
+}
+
 void ps_destroy(struct ps *p) {
   ident_map_destroy(&p->ident_table);
 }
@@ -1284,6 +1304,25 @@ int parse_file(struct ps *p, struct ast_file *out) {
   }
 }
 
+int parse_buf_file(struct ident_map *im,
+		   const uint8_t *buf, size_t length,
+		   struct ast_file *file_out,
+		   size_t *error_pos_out) {
+  struct ps p;
+  ps_init_with_ident_table(&p, im, buf, length);
+
+  struct ast_file file;
+  int ret = parse_file(&p, &file);
+  if (ret) {
+    *file_out = file;
+  } else {
+    *error_pos_out = ps_pos(&p);
+  }
+  ps_remove_ident_table(&p, im);
+  ps_destroy(&p);
+  return ret;
+}
+
 int count_parse_buf(const uint8_t *buf, size_t length,
 		    size_t *leafcount_out, size_t *error_pos_out) {
   struct ps p;
@@ -1296,7 +1335,7 @@ int count_parse_buf(const uint8_t *buf, size_t length,
     *leafcount_out = p.leafcount;
     ast_file_destroy(&file);
   } else {
-    *error_pos_out = p.pos;
+    *error_pos_out = ps_pos(&p);
   }
   ps_destroy(&p);
   return ret;
