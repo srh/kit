@@ -260,9 +260,72 @@ int is_numeric_postchar(int32_t ch) {
   return is_ident_postchar(ch);
 }
 
-void skip_ws(struct ps *p) {
-  while (is_ws(ps_peek(p))) {
-    ps_step(p);
+int is_ok_in_comment(int32_t ch) {
+  STATIC_CHECK(' ' == 32 && '~' == 126);
+  return is_ws(ch) || (' ' <= ch && ch <= '~');
+}
+
+/* Skips whitespace... including comments. */
+int skip_ws(struct ps *p) {
+ top:
+  for (;;) {
+    int32_t ch = ps_peek(p);
+    if (is_ws(ch)) {
+      ps_step(p);
+    } else if (ch == '/') {
+      struct ps_savestate save = ps_save(p);
+      ps_step(p);
+      int32_t ch2 = ps_peek(p);
+      if (ch2 == '/') {
+	ps_step(p);
+	goto skip_past_line_comment;
+      } else if (ch2 == '*') {
+	ps_step(p);
+	goto skip_past_star_comment;
+      } else {
+	ps_restore(p, save);
+	return 1;
+      }
+    } else {
+      return 1;
+    }
+  }
+
+ skip_past_line_comment:
+  for (;;) {
+    STATIC_CHECK('\n' == 10);
+    int32_t ch = ps_peek(p);
+    if (ch == '\n') {
+      ps_step(p);
+      goto top;
+    } else if (ch == -1) {
+      return 1;
+    } else if (is_ok_in_comment(ch)) {
+      ps_step(p);
+    } else {
+      return 0;
+    }
+  }
+
+ skip_past_star_comment:
+  for (;;) {
+    int32_t ch = ps_peek(p);
+    if (ch == '*') {
+      ps_step(p);
+      int32_t ch2 = ps_peek(p);
+      if (ch2 == '/') {
+	ps_step(p);
+	goto top;
+      } else if (is_ok_in_comment(ch)) {
+	ps_step(p);
+      } else {
+	return 0;
+      }
+    } else if (is_ok_in_comment(ch)) {
+      ps_step(p);
+    } else {
+      return 0;
+    }
   }
 }
 
@@ -462,18 +525,21 @@ int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
   size_t pos_start = ps_pos(p);
   struct ast_ident name;
   if (!parse_ident(p, &name)) {
-    return 0;
+    goto fail;
   }
-  skip_ws(p);
   struct ast_typeexpr type;
-  if (!parse_typeexpr(p, &type)) {
-    ast_ident_destroy(&name);
-    return 0;
+  if (!(skip_ws(p) && parse_typeexpr(p, &type))) {
+    goto fail_name;
   }
 
   ast_vardecl_init(out, ast_meta_make(pos_start, ps_pos(p)),
 		   name, type);
   return 1;
+
+ fail_name:
+  ast_ident_destroy(&name);
+ fail:
+  return 0;
 }
 
 int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context);
@@ -490,7 +556,9 @@ int parse_params_list(struct ps *p,
   size_t params_limit = 0;
 
   for (;;) {
-    skip_ws(p);
+    if (!skip_ws(p)) {
+      goto fail;
+    }
     if (try_skip_char(p, ')')) {
       *params_out = params;
       *params_count_out = params_count;
@@ -501,7 +569,9 @@ int parse_params_list(struct ps *p,
       if (!try_skip_char(p, ',')) {
 	goto fail;
       }
-      skip_ws(p);
+      if (!skip_ws(p)) {
+	goto fail;
+      }
     }
 
     struct ast_vardecl vardecl;
@@ -520,10 +590,9 @@ int parse_bracebody(struct ps *p, struct ast_bracebody *out);
 
 int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
 			       struct ast_statement *out) {
-  skip_ws(p);
   struct ast_expr condition;
-  if (!parse_expr(p, &condition, kSemicolonPrecedence)) {
-    return 0;
+  if (!(skip_ws(p) && parse_expr(p, &condition, kSemicolonPrecedence))) {
+    goto fail;
   }
 
   struct ast_bracebody thenbody;
@@ -533,7 +602,9 @@ int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
 
   size_t pos_thenbody_end = ps_pos(p);
 
-  skip_ws(p);
+  if (!skip_ws(p)) {
+    goto fail_thenbody;
+  }
   if (!try_skip_keyword(p, "else")) {
     struct ast_expr *heap_condition;
     malloc_move_ast_expr(condition, &heap_condition);
@@ -545,9 +616,8 @@ int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
     return 1;
   }
 
-  skip_ws(p);
   struct ast_bracebody elsebody;
-  if (!parse_bracebody(p, &elsebody)) {
+  if (!(skip_ws(p) && parse_bracebody(p, &elsebody))) {
     goto fail_thenbody;
   }
 
@@ -565,51 +635,49 @@ int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
   ast_bracebody_destroy(&thenbody);
  fail_condition:
   ast_expr_destroy(&condition);
+ fail:
   return 0;
 }
 
 int parse_rest_of_var_statement(struct ps *p, size_t pos_start,
 				struct ast_var_statement *out) {
-    skip_ws(p);
-    struct ast_ident name;
-    if (!parse_ident(p, &name)) {
-      return 0;
-    }
+  struct ast_ident name;
+  if (!(skip_ws(p) && parse_ident(p, &name))) {
+    goto fail;
+  }
 
-    skip_ws(p);
-    struct ast_typeexpr type;
-    if (!parse_typeexpr(p, &type)) {
-      goto fail_ident;
-    }
+  struct ast_typeexpr type;
+  if (!(skip_ws(p) && parse_typeexpr(p, &type))) {
+    goto fail_ident;
+  }
 
-    skip_ws(p);
-    if (!skip_oper(p, "=")) {
-      goto fail_typeexpr;
-    }
+  if (!(skip_ws(p) && skip_oper(p, "="))) {
+    goto fail_typeexpr;
+  }
 
-    skip_ws(p);
-    struct ast_expr rhs;
-    if (!parse_expr(p, &rhs, kSemicolonPrecedence)) {
-      goto fail_typeexpr;
-    }
+  struct ast_expr rhs;
+  if (!(skip_ws(p) && parse_expr(p, &rhs, kSemicolonPrecedence))) {
+    goto fail_typeexpr;
+  }
 
-    if (!try_skip_semicolon(p)) {
-      goto fail_rhs;
-    }
+  if (!try_skip_semicolon(p)) {
+    goto fail_rhs;
+  }
 
-    struct ast_expr *heap_rhs;
-    malloc_move_ast_expr(rhs, &heap_rhs);
-    ast_var_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
-			   name, type, heap_rhs);
-    return 1;
+  struct ast_expr *heap_rhs;
+  malloc_move_ast_expr(rhs, &heap_rhs);
+  ast_var_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
+			 name, type, heap_rhs);
+  return 1;
 
  fail_rhs:
-    ast_expr_destroy(&rhs);
+  ast_expr_destroy(&rhs);
  fail_typeexpr:
-    ast_typeexpr_destroy(&type);
+  ast_typeexpr_destroy(&type);
  fail_ident:
-    ast_ident_destroy(&name);
-    return 0;
+  ast_ident_destroy(&name);
+ fail:
+  return 0;
 }
 
 int parse_statement(struct ps *p, struct ast_statement *out) {
@@ -618,13 +686,11 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
     out->tag = AST_STATEMENT_VAR;
     return parse_rest_of_var_statement(p, pos_start, &out->u.var_statement);
   } else if (try_skip_keyword(p, "goto")) {
-    skip_ws(p);
     struct ast_ident target;
-    if (!parse_ident(p, &target)) {
+    if (!(skip_ws(p) && parse_ident(p, &target))) {
       return 0;
     }
-    skip_ws(p);
-    if (!try_skip_semicolon(p)) {
+    if (!(skip_ws(p) && try_skip_semicolon(p))) {
       ast_ident_destroy(&target);
       return 0;
     }
@@ -634,13 +700,11 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
 			    target);
     return 1;
   } else if (try_skip_keyword(p, "label")) {
-    skip_ws(p);
     struct ast_ident label;
-    if (!parse_ident(p, &label)) {
+    if (!(skip_ws(p) && parse_ident(p, &label))) {
       return 0;
     }
-    skip_ws(p);
-    if (!try_skip_semicolon(p)) {
+    if (!(skip_ws(p) && try_skip_semicolon(p))) {
       ast_ident_destroy(&label);
       return 0;
     }
@@ -650,9 +714,8 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
 			     label);
     return 1;
   } else if (try_skip_keyword(p, "return")) {
-    skip_ws(p);
     struct ast_expr expr;
-    if (!parse_expr(p, &expr, kSemicolonPrecedence)) {
+    if (!(skip_ws(p) && parse_expr(p, &expr, kSemicolonPrecedence))) {
       return 0;
     }
     if (!try_skip_semicolon(p)) {
@@ -696,7 +759,9 @@ int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
   size_t statements_count = 0;
   size_t statements_limit = 0;
   for (;;) {
-    skip_ws(p);
+    if (!skip_ws(p)) {
+      goto fail;
+    }
     if (try_skip_char(p, '}')) {
       ast_bracebody_init(out, ast_meta_make(pos_start, ps_pos(p)),
 			 statements, statements_count);
@@ -705,35 +770,35 @@ int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
 
     struct ast_statement statement;
     if (!parse_statement(p, &statement)) {
-      SLICE_FREE(statements, statements_count, ast_statement_destroy);
-      return 0;
+      goto fail;
     }
 
     SLICE_PUSH(statements, statements_count, statements_limit, statement);
   }
+
+ fail:
+  SLICE_FREE(statements, statements_count, ast_statement_destroy);
+  return 0;
 }
 
 int parse_rest_of_lambda(struct ps *p, size_t pos_start,
 			 struct ast_lambda *out) {
   PARSE_DBG("parse_rest_of_lambda\n");
-  skip_ws(p);
   struct ast_vardecl *params;
   size_t params_count;
-  if (!parse_params_list(p, &params, &params_count)) {
-    return 0;
+  if (!(skip_ws(p) && parse_params_list(p, &params, &params_count))) {
+    goto fail;
   }
 
-  skip_ws(p);
   PARSE_DBG("parse_rest_of_lambda parsing return type\n");
   struct ast_typeexpr return_type;
-  if (!parse_typeexpr(p, &return_type)) {
+  if (!(skip_ws(p) && parse_typeexpr(p, &return_type))) {
     goto fail_params;
   }
 
-  skip_ws(p);
   PARSE_DBG("parse_rest_of_lambda parsing body\n");
   struct ast_bracebody bracebody;
-  if (!parse_bracebody(p, &bracebody)) {
+  if (!(skip_ws(p) && parse_bracebody(p, &bracebody))) {
     goto fail_return_type;
   }
 
@@ -746,6 +811,7 @@ int parse_rest_of_lambda(struct ps *p, size_t pos_start,
   ast_typeexpr_destroy(&return_type);
  fail_params:
   SLICE_FREE(params, params_count, ast_vardecl_destroy);
+ fail:
   return 0;
 }
 
@@ -789,7 +855,9 @@ int parse_rest_of_arglist(struct ps *p,
   size_t args_limit = 0;
 
   for (;;) {
-    skip_ws(p);
+    if (!skip_ws(p)) {
+      goto fail;
+    }
     if (try_skip_char(p, ')')) {
       *args_out = args;
       *args_count_out = args_count;
@@ -799,7 +867,9 @@ int parse_rest_of_arglist(struct ps *p,
       if (!try_skip_char(p, ',')) {
 	goto fail;
       }
-      skip_ws(p);
+      if (!skip_ws(p)) {
+	goto fail;
+      }
     }
 
     struct ast_expr expr;
@@ -873,7 +943,9 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
   PARSE_DBG("parse_expr parsed atomic expr\n");
 
   for (;;) {
-    skip_ws(p);
+    if (!skip_ws(p)) {
+      goto fail;
+    }
     PARSE_DBG("parse_expr looking for paren\n");
     if (try_skip_char(p, '(')) {
       PARSE_DBG("parse_expr saw paren\n");
@@ -891,9 +963,8 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
 		       args,
 		       args_count);
     } else if (try_skip_oper(p, ".")) {
-      skip_ws(p);
       struct ast_ident field_name;
-      if (!parse_ident(p, &field_name)) {
+      if (!(skip_ws(p) && parse_ident(p, &field_name))) {
 	goto fail;
       }
 
@@ -904,9 +975,8 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
 				  ast_meta_make(pos_start, ps_pos(p)),
 				  field_name);
     } else if (try_skip_oper(p, "->")) {
-      skip_ws(p);
       struct ast_ident field_name;
-      if (!parse_ident(p, &field_name)) {
+      if (!(skip_ws(p) && parse_ident(p, &field_name))) {
 	goto fail;
       }
 
@@ -943,9 +1013,8 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
 	UNREACHABLE();
       }
 
-      skip_ws(p);
       struct ast_expr rhs;
-      if (!parse_expr(p, &rhs, op_precedence.right_precedence)) {
+      if (!(skip_ws(p) && parse_expr(p, &rhs, op_precedence.right_precedence))) {
 	goto fail;
       }
 
@@ -980,7 +1049,9 @@ int parse_braced_fields(struct ps *p,
   size_t fields_count = 0;
   size_t fields_limit = 0;
   for (;;) {
-    skip_ws(p);
+    if (!skip_ws(p)) {
+      goto fail;
+    }
     if (try_skip_char(p, '}')) {
       *fields_out = fields;
       *fields_count_out = fields_count;
@@ -992,8 +1063,8 @@ int parse_braced_fields(struct ps *p,
       goto fail;
     }
 
-    skip_ws(p);
-    if (!try_skip_semicolon(p)) {
+    if (!(skip_ws(p) && try_skip_semicolon(p))) {
+      ast_vardecl_destroy(&field);
       goto fail;
     }
 
@@ -1006,10 +1077,9 @@ int parse_braced_fields(struct ps *p,
 }
 
 int parse_rest_of_structe(struct ps *p, size_t pos_start, struct ast_structe *out) {
-  skip_ws(p);
   struct ast_vardecl *fields;
   size_t fields_count;
-  if (!parse_braced_fields(p, &fields, &fields_count)) {
+  if (!(skip_ws(p) && parse_braced_fields(p, &fields, &fields_count))) {
     return 0;
   }
   ast_structe_init(out, ast_meta_make(pos_start, ps_pos(p)),
@@ -1018,10 +1088,9 @@ int parse_rest_of_structe(struct ps *p, size_t pos_start, struct ast_structe *ou
 }
 
 int parse_rest_of_unione(struct ps *p, size_t pos_start, struct ast_unione *out) {
-  skip_ws(p);
   struct ast_vardecl *fields;
   size_t fields_count;
-  if (!parse_braced_fields(p, &fields, &fields_count)) {
+  if (!(skip_ws(p) && parse_braced_fields(p, &fields, &fields_count))) {
     return 0;
   }
   ast_unione_init(out, ast_meta_make(pos_start, ps_pos(p)),
@@ -1043,10 +1112,12 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
 
   struct ast_ident ident;
   if (!parse_ident(p, &ident)) {
-    return 0;
+    goto fail;
   }
 
-  skip_ws(p);
+  if (!skip_ws(p)) {
+    goto fail_ident;
+  }
   if (!try_skip_char(p, '[')) {
     out->tag = AST_TYPEEXPR_NAME;
     out->u.name = ident;
@@ -1058,7 +1129,9 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
   size_t params_limit = 0;
 
   for (;;) {
-    skip_ws(p);
+    if (!skip_ws(p)) {
+      goto fail_slice;
+    }
     if (try_skip_char(p, ']')) {
       out->tag = AST_TYPEEXPR_APP;
       ast_typeapp_init(&out->u.app, ast_meta_make(pos_start, ps_pos(p)),
@@ -1068,21 +1141,25 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
 
     if (params_count != 0) {
       if (!try_skip_char(p, ',')) {
-	goto fail;
+	goto fail_slice;
       }
-      skip_ws(p);
+      if (!skip_ws(p)) {
+	goto fail_slice;
+      }
     }
 
     struct ast_typeexpr typeexpr;
     if (!parse_typeexpr(p, &typeexpr)) {
-      goto fail;
+      goto fail_slice;
     }
     SLICE_PUSH(params, params_count, params_limit, typeexpr);
   }
 
- fail:
+ fail_slice:
   SLICE_FREE(params, params_count, ast_typeexpr_destroy);
+ fail_ident:
   ast_ident_destroy(&ident);
+ fail:
   return 0;
 }
 
@@ -1098,7 +1175,9 @@ int parse_type_params_if_present(struct ps *p,
   size_t params_count = 0;
   size_t params_limit = 0;
   for (;;) {
-    skip_ws(p);
+    if (!skip_ws(p)) {
+      goto fail;
+    }
     if (try_skip_char(p, ']')) {
       ast_optional_type_params_init_has_params(out,
 					       ast_meta_make(pos_start,
@@ -1111,7 +1190,9 @@ int parse_type_params_if_present(struct ps *p,
       if (!try_skip_char(p, ',')) {
 	goto fail;
       }
-      skip_ws(p);
+      if (!skip_ws(p)) {
+	goto fail;
+      }
     }
     struct ast_ident param;
     if (!parse_ident(p, &param)) {
@@ -1126,32 +1207,27 @@ int parse_type_params_if_present(struct ps *p,
 }
 
 int parse_rest_of_def(struct ps *p, size_t pos_start, struct ast_def *out) {
-  skip_ws(p);
   struct ast_optional_type_params generics;
-  if (!parse_type_params_if_present(p, &generics)) {
+  if (!(skip_ws(p) && parse_type_params_if_present(p, &generics))) {
     goto fail;
   }
 
-  skip_ws(p);
   struct ast_ident name;
-  if (!parse_ident(p, &name)) {
+  if (!(skip_ws(p) && parse_ident(p, &name))) {
     goto fail_generics;
   }
 
-  skip_ws(p);
   struct ast_typeexpr type;
-  if (!parse_typeexpr(p, &type)) {
+  if (!(skip_ws(p) && parse_typeexpr(p, &type))) {
     goto fail_ident;
   }
 
-  skip_ws(p);
-  if (!skip_oper(p, "=")) {
+  if (!(skip_ws(p) && skip_oper(p, "="))) {
     goto fail_typeexpr;
   }
 
-  skip_ws(p);
   struct ast_expr rhs;
-  if (!parse_expr(p, &rhs, kSemicolonPrecedence)) {
+  if (!(skip_ws(p) && parse_expr(p, &rhs, kSemicolonPrecedence))) {
     goto fail_typeexpr;
   }
 
@@ -1177,14 +1253,12 @@ int parse_rest_of_def(struct ps *p, size_t pos_start, struct ast_def *out) {
 
 int parse_rest_of_import(struct ps *p, size_t pos_start, struct ast_import *out) {
   PARSE_DBG("parse_rest_of_import\n");
-  skip_ws(p);
   struct ast_ident name;
-  if (!parse_ident(p, &name)) {
+  if (!(skip_ws(p) && parse_ident(p, &name))) {
     goto fail;
   }
-  skip_ws(p);
   PARSE_DBG("parse_rest_of_import about to skip semicolon\n");
-  if (!try_skip_semicolon(p)) {
+  if (!(skip_ws(p) && try_skip_semicolon(p))) {
     goto fail_ident;
   }
   ast_import_init(out, ast_meta_make(pos_start, ps_pos(p)), name);
@@ -1200,23 +1274,21 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out);
 
 int parse_rest_of_module(struct ps *p, size_t pos_start,
 			 struct ast_module *out) {
-  skip_ws(p);
   struct ast_ident name;
-  if (!parse_ident(p, &name)) {
-    return 0;
+  if (!(skip_ws(p) && parse_ident(p, &name))) {
+    goto fail;
   }
-  skip_ws(p);
-  if (!try_skip_char(p, '{')) {
-    ast_ident_destroy(&name);
-    return 0;
+  if (!(skip_ws(p) && try_skip_char(p, '{'))) {
+    goto fail_ident;
   }
 
   struct ast_toplevel *toplevels = NULL;
   size_t toplevels_count = 0;
   size_t toplevels_limit = 0;
   for (;;) {
-    skip_ws(p);
-
+    if (!skip_ws(p)) {
+      goto fail_slice;
+    }
     if (try_skip_char(p, '}')) {
       ast_module_init(out, ast_meta_make(pos_start, ps_pos(p)),
 		      name, toplevels, toplevels_count);
@@ -1225,34 +1297,35 @@ int parse_rest_of_module(struct ps *p, size_t pos_start,
 
     struct ast_toplevel toplevel;
     if (!parse_toplevel(p, &toplevel)) {
-      SLICE_FREE(toplevels, toplevels_count, ast_toplevel_destroy);
-      ast_ident_destroy(&name);
-      return 0;
+      goto fail_slice;
     }
     SLICE_PUSH(toplevels, toplevels_count, toplevels_limit, toplevel);
   }
+
+ fail_slice:
+  SLICE_FREE(toplevels, toplevels_count, ast_toplevel_destroy);
+ fail_ident:
+  ast_ident_destroy(&name);
+ fail:
+  return 0;
 }
 
 int parse_rest_of_deftype(struct ps *p, size_t pos_start,
 			  struct ast_deftype *out) {
   PARSE_DBG("parse_rest_of_deftype");
-  skip_ws(p);
   struct ast_optional_type_params generics;
-  if (!parse_type_params_if_present(p, &generics)) {
+  if (!(skip_ws(p) && parse_type_params_if_present(p, &generics))) {
     goto fail;
   }
-  skip_ws(p);
   struct ast_ident name;
-  if (!parse_ident(p, &name)) {
+  if (!(skip_ws(p) && parse_ident(p, &name))) {
     goto fail_generics;
   }
-  skip_ws(p);
   struct ast_typeexpr type;
-  if (!parse_typeexpr(p, &type)) {
+  if (!(skip_ws(p) && parse_typeexpr(p, &type))) {
     goto fail_ident;
   }
-  skip_ws(p);
-  if (!try_skip_semicolon(p)) {
+  if (!(skip_ws(p) && try_skip_semicolon(p))) {
     goto fail_typeexpr;
   }
   ast_deftype_init(out, ast_meta_make(pos_start, ps_pos(p)),
@@ -1294,8 +1367,9 @@ int parse_file(struct ps *p, struct ast_file *out) {
   size_t toplevels_count = 0;
   size_t toplevels_limit = 0;
   for (;;) {
-    skip_ws(p);
-
+    if (!skip_ws(p)) {
+      goto fail;
+    }
     if (ps_peek(p) == -1) {
       ast_file_init(out, toplevels, toplevels_count);
       return 1;
@@ -1303,11 +1377,13 @@ int parse_file(struct ps *p, struct ast_file *out) {
 
     struct ast_toplevel toplevel;
     if (!parse_toplevel(p, &toplevel)) {
-      SLICE_FREE(toplevels, toplevels_count, ast_toplevel_destroy);
-      return 0;
+      goto fail;
     }
     SLICE_PUSH(toplevels, toplevels_count, toplevels_limit, toplevel);
   }
+ fail:
+  SLICE_FREE(toplevels, toplevels_count, ast_toplevel_destroy);
+  return 0;
 }
 
 int parse_buf_file(struct ident_map *im,
@@ -1427,7 +1503,7 @@ int parse_test_defs(void) {
 			 "};\n",
 			 23);
   pass &= run_count_test("def14",
-			 "def[a,b] foo func[int] = fn() int {\n"
+			 "def[a,b] foo/*heh*/func[int] = fn() int {//blah blah blah\n"
 			 "   var x int = -3;\n"
 			 "   return x;\n"
 			 "};\n",
