@@ -2,7 +2,6 @@
 #define KIRA_IDENTMAP_H_
 
 #include <stddef.h>
-#include <stdint.h>
 
 #include "util.h"
 
