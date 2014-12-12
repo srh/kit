@@ -32,4 +32,6 @@ NORETURN void report_and_abort(const char *file, int line,
     fflush(stderr); \
   } while (0)
 
+#define TODO_IMPLEMENT CRASH("Unimplemented.")
+
 #endif /* KIRA_UTIL_H_ */
