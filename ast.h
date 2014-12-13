@@ -43,17 +43,31 @@ void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
 		      struct ast_expr *func, struct ast_expr *args,
 		      size_t args_count);
 
+struct ast_dotted_name {
+  struct ast_meta meta;
+  /* NULL if no more parts. */
+  struct ast_dotted_name *first_parts_or_null;
+  struct ast_ident last_part;
+};
+
+void ast_dotted_name_init(struct ast_dotted_name *a,
+			  struct ast_meta meta,
+			  struct ast_dotted_name *first_parts_or_null,
+			  struct ast_ident last_part);
+
+void ast_dotted_name_destroy(struct ast_dotted_name *a);
+
 struct ast_typeexpr;
 
 struct ast_typeapp {
   struct ast_meta meta;
-  struct ast_ident name;
+  struct ast_dotted_name name;
   struct ast_typeexpr *params;
   size_t params_count;
 };
 
 void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
-		      struct ast_ident name, struct ast_typeexpr *params,
+		      struct ast_dotted_name name, struct ast_typeexpr *params,
 		      size_t params_count);
 
 struct ast_structe {
@@ -84,7 +98,7 @@ enum ast_typeexpr_tag {
 struct ast_typeexpr {
   enum ast_typeexpr_tag tag;
   union {
-    struct ast_ident name;
+    struct ast_dotted_name name;
     struct ast_typeapp app;
     struct ast_structe structe;
     struct ast_unione unione;

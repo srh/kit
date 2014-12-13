@@ -323,8 +323,27 @@ void ast_expr_destroy(struct ast_expr *a) {
   a->tag = (enum ast_expr_tag)-1;
 }
 
+void ast_dotted_name_init(struct ast_dotted_name *a,
+			  struct ast_meta meta,
+			  struct ast_dotted_name *first_parts_or_null,
+			  struct ast_ident last_part) {
+  a->meta = meta;
+  a->first_parts_or_null = first_parts_or_null;
+  a->last_part = last_part;
+}
+
+void ast_dotted_name_destroy(struct ast_dotted_name *a) {
+  ast_meta_destroy(&a->meta);
+  if (a->first_parts_or_null) {
+    ast_dotted_name_destroy(a->first_parts_or_null);
+    free(a->first_parts_or_null);
+    a->first_parts_or_null = NULL;
+  }
+  ast_ident_destroy(&a->last_part);
+}
+
 void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
-		      struct ast_ident name, struct ast_typeexpr *params,
+		      struct ast_dotted_name name, struct ast_typeexpr *params,
 		      size_t params_count) {
   a->meta = meta;
   a->name = name;
@@ -334,7 +353,7 @@ void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
 
 void ast_typeapp_destroy(struct ast_typeapp *a) {
   ast_meta_destroy(&a->meta);
-  ast_ident_destroy(&a->name);
+  ast_dotted_name_destroy(&a->name);
   SLICE_FREE(a->params, a->params_count, ast_typeexpr_destroy);
 }
 
@@ -365,7 +384,7 @@ void ast_unione_destroy(struct ast_unione *a) {
 void ast_typeexpr_destroy(struct ast_typeexpr *a) {
   switch (a->tag) {
   case AST_TYPEEXPR_NAME:
-    ast_ident_destroy(&a->u.name);
+    ast_dotted_name_destroy(&a->u.name);
     break;
   case AST_TYPEEXPR_APP:
     ast_typeapp_destroy(&a->u.app);
