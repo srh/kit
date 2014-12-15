@@ -1098,46 +1098,6 @@ int parse_rest_of_unione(struct ps *p, size_t pos_start, struct ast_unione *out)
   return 1;
 }
 
-int parse_dotted_name(struct ps *p, struct ast_dotted_name *out) {
-  size_t pos_start = ps_pos(p);
-  struct ast_dotted_name dotted_name;
-  {
-    struct ast_ident ident;
-    if (!parse_ident(p, &ident)) {
-      goto fail;
-    }
-    ast_dotted_name_init(&dotted_name, ast_meta_make(pos_start, ps_pos(p)),
-			 NULL, ident);
-  }
-
-  for (;;) {
-    if (!skip_ws(p)) {
-      goto fail_dotted_name;
-    }
-
-    if (!try_skip_char(p, '.')) {
-      *out = dotted_name;
-      return 1;
-    }
-
-    struct ast_ident ident;
-    if (!(skip_ws(p) && parse_ident(p, &ident))) {
-      goto fail_dotted_name;
-    }
-
-    struct ast_dotted_name *first_parts = malloc(sizeof(*first_parts));
-    CHECK(first_parts);
-    *first_parts = dotted_name;
-    ast_dotted_name_init(&dotted_name, ast_meta_make(pos_start, ps_pos(p)),
-			 first_parts, ident);
-  }
-
- fail_dotted_name:
-  ast_dotted_name_destroy(&dotted_name);
- fail:
-  return 0;
-}
-
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
   size_t pos_start = ps_pos(p);
   if (try_skip_keyword(p, "struct")) {
@@ -1150,14 +1110,18 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
     return parse_rest_of_unione(p, pos_start, &out->u.unione);
   }
 
-  struct ast_dotted_name dotted_name;
-  if (!parse_dotted_name(p, &dotted_name)) {
+  struct ast_ident name;
+  if (!parse_ident(p, &name)) {
     goto fail;
+  }
+
+  if (!skip_ws(p)) {
+    goto fail_ident;
   }
 
   if (!try_skip_char(p, '[')) {
     out->tag = AST_TYPEEXPR_NAME;
-    out->u.name = dotted_name;
+    out->u.name = name;
     return 1;
   }
 
@@ -1172,7 +1136,7 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
     if (try_skip_char(p, ']')) {
       out->tag = AST_TYPEEXPR_APP;
       ast_typeapp_init(&out->u.app, ast_meta_make(pos_start, ps_pos(p)),
-		       dotted_name, params, params_count);
+		       name, params, params_count);
       return 1;
     }
 
@@ -1194,7 +1158,8 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
 
  fail_slice:
   SLICE_FREE(params, params_count, ast_typeexpr_destroy);
-  ast_dotted_name_destroy(&dotted_name);
+ fail_ident:
+  ast_ident_destroy(&name);
  fail:
   return 0;
 }
@@ -1308,44 +1273,6 @@ int parse_rest_of_import(struct ps *p, size_t pos_start, struct ast_import *out)
 
 int parse_toplevel(struct ps *p, struct ast_toplevel *out);
 
-int parse_rest_of_module(struct ps *p, size_t pos_start,
-			 struct ast_module *out) {
-  struct ast_ident name;
-  if (!(skip_ws(p) && parse_ident(p, &name))) {
-    goto fail;
-  }
-  if (!(skip_ws(p) && try_skip_char(p, '{'))) {
-    goto fail_ident;
-  }
-
-  struct ast_toplevel *toplevels = NULL;
-  size_t toplevels_count = 0;
-  size_t toplevels_limit = 0;
-  for (;;) {
-    if (!skip_ws(p)) {
-      goto fail_slice;
-    }
-    if (try_skip_char(p, '}')) {
-      ast_module_init(out, ast_meta_make(pos_start, ps_pos(p)),
-		      name, toplevels, toplevels_count);
-      return 1;
-    }
-
-    struct ast_toplevel toplevel;
-    if (!parse_toplevel(p, &toplevel)) {
-      goto fail_slice;
-    }
-    SLICE_PUSH(toplevels, toplevels_count, toplevels_limit, toplevel);
-  }
-
- fail_slice:
-  SLICE_FREE(toplevels, toplevels_count, ast_toplevel_destroy);
- fail_ident:
-  ast_ident_destroy(&name);
- fail:
-  return 0;
-}
-
 int parse_rest_of_deftype(struct ps *p, size_t pos_start,
 			  struct ast_deftype *out) {
   PARSE_DBG("parse_rest_of_deftype");
@@ -1387,9 +1314,6 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   } else if (try_skip_keyword(p, "import")) {
     out->tag = AST_TOPLEVEL_IMPORT;
     return parse_rest_of_import(p, pos_start, &out->u.import);
-  } else if (try_skip_keyword(p, "module")) {
-    out->tag = AST_TOPLEVEL_MODULE;
-    return parse_rest_of_module(p, pos_start, &out->u.module);
   } else if (try_skip_keyword(p, "deftype")) {
     out->tag = AST_TOPLEVEL_DEFTYPE;
     return parse_rest_of_deftype(p, pos_start, &out->u.deftype);
@@ -1496,13 +1420,6 @@ int parse_test_imports(void) {
 			12);
 }
 
-int parse_test_modules(void) {
-  return run_count_test("modules",
-			"module a { module b {import c; }import d; module egret{} } "
-			"module zed {\n\t}  ",
-			22);
-}
-
 int parse_test_defs(void) {
   int pass = 1;
   pass &= run_count_test("def01", "def a int = 0;", 6);
@@ -1510,8 +1427,8 @@ int parse_test_defs(void) {
   pass &= run_count_test("def03", "def a int =0   ;  ", 6);
   pass &= run_count_test("def04", "def abc_def int = 12345;", 6);
   pass &= run_count_test("def05", "def foo func[int, int] = 1;", 11);
-  pass &= run_count_test("def06", "def foo func[int, int] = fn(x int.heh, y int) int { 3; };",
-			 25);
+  pass &= run_count_test("def06", "def foo func[int, int] = fn(x int, y int) int { 3; };",
+			 23);
   pass &= run_count_test("def07", "def foo func[int, int] = \n"
 			 "\tfn(x int, y int) int { foo(bar); };\n",
 			 26);
@@ -1561,11 +1478,11 @@ int parse_test_deftypes(void) {
 			 "deftype [ c, d ]  bar union{a b;c d[e,f];};",
 			 40);
   pass &= run_count_test("deftype4",
-			 "deftype foo bar.baz.quux;\n",
-			 8);
+			 "deftype foo bar;\n",
+			 4);
   pass &= run_count_test("deftype5",
-			 "deftype foo struct { x bar.baz [quux .feh .khan  ]; };\n",
-			 18);
+			 "deftype foo struct { x bar [quux]; };\n",
+			 12);
   return pass;
 }
 
@@ -1574,7 +1491,6 @@ int parse_test(void) {
   pass &= parse_test_nothing();
   pass &= parse_test_whitespace();
   pass &= parse_test_imports();
-  pass &= parse_test_modules();
   pass &= parse_test_defs();
   pass &= parse_test_deftypes();
   return pass;

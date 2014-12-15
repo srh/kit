@@ -43,31 +43,17 @@ void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
 		      struct ast_expr *func, struct ast_expr *args,
 		      size_t args_count);
 
-struct ast_dotted_name {
-  struct ast_meta meta;
-  /* NULL if no more parts. */
-  struct ast_dotted_name *first_parts_or_null;
-  struct ast_ident last_part;
-};
-
-void ast_dotted_name_init(struct ast_dotted_name *a,
-			  struct ast_meta meta,
-			  struct ast_dotted_name *first_parts_or_null,
-			  struct ast_ident last_part);
-
-void ast_dotted_name_destroy(struct ast_dotted_name *a);
-
 struct ast_typeexpr;
 
 struct ast_typeapp {
   struct ast_meta meta;
-  struct ast_dotted_name name;
+  struct ast_ident name;
   struct ast_typeexpr *params;
   size_t params_count;
 };
 
 void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
-		      struct ast_dotted_name name, struct ast_typeexpr *params,
+		      struct ast_ident name, struct ast_typeexpr *params,
 		      size_t params_count);
 
 struct ast_structe {
@@ -98,7 +84,7 @@ enum ast_typeexpr_tag {
 struct ast_typeexpr {
   enum ast_typeexpr_tag tag;
   union {
-    struct ast_dotted_name name;
+    struct ast_ident name;
     struct ast_typeapp app;
     struct ast_structe structe;
     struct ast_unione unione;
@@ -348,17 +334,6 @@ void ast_def_init(struct ast_def *a, struct ast_meta meta,
 
 struct ast_toplevel;
 
-struct ast_module {
-  struct ast_meta meta;
-  struct ast_ident name;
-  struct ast_toplevel *toplevels;
-  size_t toplevels_count;
-};
-
-void ast_module_init(struct ast_module *a, struct ast_meta meta,
-		     struct ast_ident name, struct ast_toplevel *toplevels,
-		     size_t toplevels_count);
-
 struct ast_import {
   struct ast_meta meta;
   struct ast_ident name;
@@ -380,7 +355,6 @@ void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
 
 enum ast_toplevel_tag {
   AST_TOPLEVEL_IMPORT,
-  AST_TOPLEVEL_MODULE,
   AST_TOPLEVEL_DEF,
   AST_TOPLEVEL_DEFTYPE,
 };
@@ -389,7 +363,6 @@ struct ast_toplevel {
   enum ast_toplevel_tag tag;
   union {
     struct ast_import import;
-    struct ast_module module;
     struct ast_def def;
     struct ast_deftype deftype;
   } u;
