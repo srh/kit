@@ -91,6 +91,8 @@ struct ast_typeexpr {
   } u;
 };
 
+void ast_typeexpr_init_copy(struct ast_typeexpr *a,
+				 struct ast_typeexpr *copyee);
 void ast_typeexpr_destroy(struct ast_typeexpr *a);
 
 struct ast_vardecl {
@@ -317,6 +319,10 @@ void ast_optional_type_params_init_has_params(
     struct ast_meta meta,
     struct ast_ident *params,
     size_t params_count);
+void ast_optional_type_params_init_copy(
+    struct ast_optional_type_params *a,
+    struct ast_optional_type_params *copyee);
+
 void ast_optional_type_params_destroy(struct ast_optional_type_params *a);
 
 struct ast_def {

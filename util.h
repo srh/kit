@@ -34,4 +34,8 @@ NORETURN void report_and_abort(const char *file, int line,
 
 #define TODO_IMPLEMENT CRASH("Unimplemented.")
 
+/* TODO: Every use of ERR_DBG is a bad error message.  And this is in
+   the wrong place. */
+#define ERR_DBG(...) DBG(__VA_ARGS__)
+
 #endif /* KIRA_UTIL_H_ */

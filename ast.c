@@ -9,6 +9,10 @@ struct ast_meta ast_meta_make(size_t pos_start, size_t pos_end) {
   return ret;
 }
 
+struct ast_meta ast_meta_make_copy(struct ast_meta *c) {
+  return *c;
+}
+
 void ast_meta_destroy(struct ast_meta *a) {
   a->pos_start = SIZE_MAX;
   a->pos_end = SIZE_MAX;
@@ -19,6 +23,11 @@ void ast_ident_init(struct ast_ident *a, struct ast_meta meta,
 		    ident_value value) {
   a->meta = meta;
   a->value = value;
+}
+
+void ast_ident_init_copy(struct ast_ident *a, struct ast_ident *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  a->value = c->value;
 }
 
 void ast_ident_destroy(struct ast_ident *a) {
@@ -57,6 +66,12 @@ void ast_funcall_destroy(struct ast_funcall *a) {
   free(a->func);
   a->func = NULL;
   SLICE_FREE(a->args, a->args_count, ast_expr_destroy);
+}
+
+void ast_vardecl_init_copy(struct ast_vardecl *a, struct ast_vardecl *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_ident_init_copy(&a->name, &c->name);
+  ast_typeexpr_init_copy(&a->type, &c->type);
 }
 
 void ast_vardecl_init(struct ast_vardecl *a, struct ast_meta meta,
@@ -332,10 +347,34 @@ void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
   a->params_count = params_count;
 }
 
+void ast_typeapp_init_copy(struct ast_typeapp *a, struct ast_typeapp *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_ident_init_copy(&a->name, &c->name);
+  size_t params_count = c->params_count;
+  struct ast_typeexpr *params = malloc(size_mul(params_count, sizeof(*params)));
+  CHECK(params);
+  for (size_t i = 0; i < params_count; i++) {
+    ast_typeexpr_init_copy(&params[i], &c->params[i]);
+  }
+  a->params = params;
+  a->params_count = params_count;
+}
+
 void ast_typeapp_destroy(struct ast_typeapp *a) {
   ast_meta_destroy(&a->meta);
   ast_ident_destroy(&a->name);
   SLICE_FREE(a->params, a->params_count, ast_typeexpr_destroy);
+}
+
+void ast_fields_alloc_copy(struct ast_vardecl *fields, size_t fields_count,
+			   struct ast_vardecl **p_out, size_t *count_out) {
+  struct ast_vardecl *p = malloc(size_mul(fields_count, sizeof(*p)));
+  CHECK(p);
+  for (size_t i = 0; i < fields_count; i++) {
+    ast_vardecl_init_copy(&p[i], &fields[i]);
+  }
+  *p_out = p;
+  *count_out = fields_count;
 }
 
 void ast_structe_init(struct ast_structe *a, struct ast_meta meta,
@@ -343,6 +382,11 @@ void ast_structe_init(struct ast_structe *a, struct ast_meta meta,
   a->meta = meta;
   a->fields = fields;
   a->fields_count = fields_count;
+}
+
+void ast_structe_init_copy(struct ast_structe *a, struct ast_structe *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_fields_alloc_copy(c->fields, c->fields_count, &a->fields, &a->fields_count);
 }
 
 void ast_structe_destroy(struct ast_structe *a) {
@@ -357,9 +401,35 @@ void ast_unione_init(struct ast_unione *a, struct ast_meta meta,
   a->fields_count = fields_count;
 }
 
+void ast_unione_init_copy(struct ast_unione *a, struct ast_unione *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_fields_alloc_copy(c->fields, c->fields_count, &a->fields, &a->fields_count);
+}
+
 void ast_unione_destroy(struct ast_unione *a) {
   ast_meta_destroy(&a->meta);
   SLICE_FREE(a->fields, a->fields_count, ast_vardecl_destroy);
+}
+
+void ast_typeexpr_init_copy(struct ast_typeexpr *a,
+			    struct ast_typeexpr *c) {
+  a->tag = c->tag;
+  switch (c->tag) {
+  case AST_TYPEEXPR_NAME:
+    ast_ident_init_copy(&a->u.name, &c->u.name);
+    break;
+  case AST_TYPEEXPR_APP:
+    ast_typeapp_init_copy(&a->u.app, &c->u.app);
+    break;
+  case AST_TYPEEXPR_STRUCTE:
+    ast_structe_init_copy(&a->u.structe, &c->u.structe);
+    break;
+  case AST_TYPEEXPR_UNIONE:
+    ast_unione_init_copy(&a->u.unione, &c->u.unione);
+    break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void ast_typeexpr_destroy(struct ast_typeexpr *a) {
@@ -399,6 +469,25 @@ void ast_optional_type_params_init_has_params(
   a->meta = meta;
   a->params = params;
   a->params_count = params_count;
+}
+
+void ast_optional_type_params_init_copy(
+    struct ast_optional_type_params *a,
+    struct ast_optional_type_params *c) {
+  if (!c->has_type_params) {
+    ast_optional_type_params_init_no_params(a);
+  } else {
+    a->has_type_params = 1;
+    a->meta = ast_meta_make_copy(&c->meta);
+    size_t params_count = c->params_count;
+    struct ast_ident *params = malloc(size_mul(params_count, sizeof(*params)));
+    CHECK(params);
+    for (size_t i = 0; i < params_count; i++) {
+      ast_ident_init_copy(&params[i], &c->params[i]);
+    }
+    a->params = params;
+    a->params_count = params_count;
+  }
 }
 
 void ast_optional_type_params_destroy(struct ast_optional_type_params *a) {
