@@ -87,65 +87,69 @@ int resolve_import_filename_and_parse(struct ident_map *im,
   return ret;
 }
 
-int build_table_import(struct checkstate *cs, struct ast_import *a) {
-  for (size_t i = 0, e = cs->imports_count; i < e; i++) {
-    if (cs->imports[i].import_name == a->name.value) {
-      return 1;
+int chase_imports(struct checkstate *cs, ident_value name) {
+  int ret = 0;
+  ident_value *names = NULL;
+  size_t names_count = 0;
+  size_t names_limit = 0;
+
+  SLICE_PUSH(names, names_count, names_limit, name);
+
+  while (names_count) {
+    name = names[--names_count];
+
+    for (size_t i = 0, e = cs->imports_count; i < e; i++) {
+      if (cs->imports[i].import_name == name) {
+	goto continue_outer;
+      }
     }
+
+    struct ast_file file;
+    if (!resolve_import_filename_and_parse(cs->im, name, &file)) {
+      goto cleanup;
+    }
+
+    struct ast_file *heap_file = malloc(sizeof(*heap_file));
+    CHECK(heap_file);
+    *heap_file = file;
+    struct import imp;
+    imp.import_name = name;
+    imp.file = heap_file;
+    SLICE_PUSH(cs->imports, cs->imports_count, cs->imports_limit, imp);
+
+    for (size_t i = 0, e = heap_file->toplevels_count; i < e; i++) {
+      struct ast_toplevel *toplevel = &heap_file->toplevels[i];
+      if (toplevel->tag == AST_TOPLEVEL_IMPORT) {
+	SLICE_PUSH(names, names_count, names_limit, toplevel->u.import.name.value);
+      }
+    }
+
+  continue_outer:
+    continue;
   }
 
-  struct ast_file file;
-  if (!resolve_import_filename_and_parse(cs->im, a->name.value, &file)) {
-    return 0;
-  }
-  struct ast_file *heap_file = malloc(sizeof(*heap_file));
-  CHECK(heap_file);
-  *heap_file = file;
-  struct import imp;
-  imp.import_name = a->name.value;
-  imp.file = heap_file;
-  SLICE_PUSH(cs->imports, cs->imports_count, cs->imports_limit, imp);
-  return 1;
+  ret = 1;
+ cleanup:
+  free(names);
+  return ret;
 }
 
-int build_table_def(struct checkstate *cs, struct ast_def *a) {
-  (void)cs, (void)a;
-  /* TODO: Implement. */
-  DBG("Warning: build_table_def: not implemented.\n");
-  return 1;
-}
-
-int build_table_deftype(struct checkstate *cs, struct ast_deftype *a) {
-  (void)cs, (void)a;
-  /* TODO: Implement. */
-  DBG("Warning: build_table_deftype: not implemented.\n");
-  return 1;
-}
-
-int build_table_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
-  switch (a->tag) {
-  case AST_TOPLEVEL_IMPORT:
-    return build_table_import(cs, &a->u.import);
-  case AST_TOPLEVEL_DEF:
-    return build_table_def(cs, &a->u.def);
-  case AST_TOPLEVEL_DEFTYPE:
-    return build_table_deftype(cs, &a->u.deftype);
-  default:
-    UNREACHABLE();
-  }
-}
-
-int check_file(struct ident_map *im, struct ast_file *file) {
+int check_module(struct ident_map *im, ident_value name) {
+  int ret = 0;
   struct checkstate cs;
   checkstate_init(&cs, im);
 
-  for (size_t i = 0, e = file->toplevels_count; i < e; i++) {
-    build_table_toplevel(&cs, &file->toplevels[i]);
+  if (!chase_imports(&cs, name)) {
+    goto cleanup;
   }
 
-  /* TODO: Implement actual checking. */
+  /* TODO: Implement actual checking, of the module we're going to
+     compile. */
+  ret = 1;
+
+ cleanup:
   checkstate_destroy(&cs);
-  return 1;
+  return ret;
 }
 
 int test_check_file(void) {
@@ -155,34 +159,18 @@ int test_check_file(void) {
     goto cleanup_nothing;
   }
 
-  uint8_t *data;
-  size_t size;
-  if (!read_file("foo.ki", &data, &size)) {
-    DBG("Could not read file\n");
-    goto cleanup_chdir;
-  }
-
   struct ident_map im;
   ident_map_init(&im);
-  struct ast_file file;
-  size_t error_pos;
-  if (!parse_buf_file(&im, data, size, &file, &error_pos)) {
-    DBG("Could not parse file.\n");
+  ident_value foo = ident_map_intern(&im, "foo", strlen("foo"));
+
+  if (!check_module(&im, foo)) {
+    DBG("Could not check_module foo\n");
     goto cleanup_ident_map;
   }
 
-  if (!check_file(&im, &file)) {
-    DBG("check_file failed.\n");
-    goto cleanup_file;
-  }
-
   ret = 1;
- cleanup_file:
-  ast_file_destroy(&file);
  cleanup_ident_map:
   ident_map_destroy(&im);
-  free(data);
- cleanup_chdir:
   if (0 != _chdir("..")) {
     DBG("Could not chdir out of 'test'.\n");
     ret = 0;
