@@ -25,11 +25,6 @@ void import_destroy(struct import *imp) {
   free(imp->file);
 }
 
-typedef int module_loader(const uint8_t *module_name,
-			  size_t module_name_count,
-			  uint8_t **data_out,
-			  size_t *data_count_out);
-
 struct checkstate {
   module_loader *loader;
   struct ident_map *im;

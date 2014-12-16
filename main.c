@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arith.h"
 #include "ast.h"
 #include "identmap.h"
 #include "io.h"
@@ -25,38 +26,27 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  const char *path = argv[1];
+  const char *module = argv[1];
 
-  if (0 == strcmp(path, "--test")) {
+  if (0 == strcmp(module, "--test")) {
     return run_tests();
   }
 
-  uint8_t *data;
-  size_t size;
-  if (!read_file(path, &data, &size)) {
-    fprintf(stderr, "Could not read %s\n", path);
-    fflush(stderr);
-    return EXIT_FAILURE;
-  }
+  int ret = EXIT_FAILURE;
 
-  int ret;
   struct ident_map im;
   ident_map_init(&im);
-  struct ast_file file;
-  size_t error_pos;
-  if (!parse_buf_file(&im, data, size, &file, &error_pos)) {
-    fprintf(stderr, "Parse failed, at %"PRIz".\n", error_pos);
-    ret = EXIT_FAILURE;
+  ident_value ident_module = ident_map_intern(&im, module, strlen(module));
+  if (!check_module(&im, &read_module_file, ident_module)) {
     goto cleanup_im;
   }
 
-  fprintf(stderr, "Parse succeeded.\n");
-  fflush(stderr);
+
+  DBG("Success?\n");
   ret = EXIT_SUCCESS;
 
  cleanup_im:
   ident_map_destroy(&im);
-  free(data);
   return ret;
 }
 
