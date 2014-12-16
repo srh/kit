@@ -25,7 +25,13 @@ void import_destroy(struct import *imp) {
   free(imp->file);
 }
 
+typedef int module_loader(const uint8_t *module_name,
+			  size_t module_name_count,
+			  uint8_t **data_out,
+			  size_t *data_count_out);
+
 struct checkstate {
+  module_loader *loader;
   struct ident_map *im;
 
   struct import *imports;
@@ -35,7 +41,10 @@ struct checkstate {
   struct name_table nt;
 };
 
-void checkstate_init(struct checkstate *cs, struct ident_map *im) {
+void checkstate_init(struct checkstate *cs,
+		     module_loader *loader,
+		     struct ident_map *im) {
+  cs->loader = loader;
   cs->im = im;
   cs->imports = NULL;
   cs->imports_count = 0;
@@ -50,31 +59,24 @@ void checkstate_destroy(struct checkstate *cs) {
   cs->im = NULL;
 }
 
-int resolve_import_filename_and_parse(struct ident_map *im,
+int resolve_import_filename_and_parse(struct checkstate *cs,
 				      ident_value name,
 				      struct ast_file *file_out) {
   int ret = 0;
-  char *filename;
-  {
-    const void *buf;
-    size_t count;
-    ident_map_lookup(im, name, &buf, &count);
 
-    filename = malloc(size_add(count, 4));
-    CHECK(filename);
-    memcpy(filename, buf, count);
-    memcpy(filename + count, ".ki", 4);
-  }
+  const void *module_name;
+  size_t module_name_count;
+  ident_map_lookup(cs->im, name, &module_name, &module_name_count);
 
   uint8_t *data;
   size_t data_size;
-  if (!read_file(filename, &data, &data_size)) {
+  if (!(*cs->loader)(module_name, module_name_count, &data, &data_size)) {
     ERR_DBG("Could not read file.\n");
-    goto fail_filename;
+    goto fail;
   }
 
   size_t error_pos;
-  if (!parse_buf_file(im, data, data_size, file_out, &error_pos)) {
+  if (!parse_buf_file(cs->im, data, data_size, file_out, &error_pos)) {
     ERR_DBG("Could not parse import.\n");
     goto fail_data;
   }
@@ -82,8 +84,7 @@ int resolve_import_filename_and_parse(struct ident_map *im,
   ret = 1;
  fail_data:
   free(data);
- fail_filename:
-  free(filename);
+ fail:
   return ret;
 }
 
@@ -105,7 +106,7 @@ int chase_imports(struct checkstate *cs, ident_value name) {
     }
 
     struct ast_file file;
-    if (!resolve_import_filename_and_parse(cs->im, name, &file)) {
+    if (!resolve_import_filename_and_parse(cs, name, &file)) {
       goto cleanup;
     }
 
@@ -134,10 +135,10 @@ int chase_imports(struct checkstate *cs, ident_value name) {
   return ret;
 }
 
-int check_module(struct ident_map *im, ident_value name) {
+int check_module(struct ident_map *im, module_loader *loader, ident_value name) {
   int ret = 0;
   struct checkstate cs;
-  checkstate_init(&cs, im);
+  checkstate_init(&cs, loader, im);
 
   if (!chase_imports(&cs, name)) {
     goto cleanup;
@@ -152,6 +153,29 @@ int check_module(struct ident_map *im, ident_value name) {
   return ret;
 }
 
+int read_module_file(const uint8_t *module_name,
+		     size_t module_name_count,
+		     uint8_t **data_out,
+		     size_t *data_size_out) {
+  int ret = 0;
+  char *filename;
+  {
+    filename = malloc(size_add(module_name_count, 4));
+    CHECK(filename);
+    memcpy(filename, module_name, module_name_count);
+    memcpy(filename + module_name_count, ".ki", 4);
+  }
+
+  if (!read_file(filename, data_out, data_size_out)) {
+    ERR_DBG("Could not read file.\n");
+  } else {
+    ret = 1;
+  }
+
+  free(filename);
+  return ret;
+}
+
 int test_check_file(void) {
   int ret = 0;
   if (0 != _chdir("test")) {
@@ -163,7 +187,7 @@ int test_check_file(void) {
   ident_map_init(&im);
   ident_value foo = ident_map_intern(&im, "foo", strlen("foo"));
 
-  if (!check_module(&im, foo)) {
+  if (!check_module(&im, &read_module_file, foo)) {
     DBG("Could not check_module foo\n");
     goto cleanup_ident_map;
   }
