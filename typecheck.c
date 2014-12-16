@@ -4,9 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 
-/* TODO: Windows-specific. */
-#include <direct.h>
-
 #include "ast.h"
 #include "identmap.h"
 #include "io.h"
@@ -171,18 +168,52 @@ int read_module_file(const uint8_t *module_name,
   return ret;
 }
 
+struct test_module {
+  const char *name;
+  const char *data;
+};
+
+int load_test_module(struct test_module *a, size_t a_count,
+		     const uint8_t *name, size_t name_count,
+		     uint8_t **data_out, size_t *data_count_out) {
+  for (size_t i = 0; i < a_count; i++) {
+    if (strlen(a[i].name) == name_count
+	&& 0 == memcmp(a[i].name, name, name_count)) {
+      STATIC_CHECK(sizeof(uint8_t) == 1);
+      size_t data_count = strlen(a[i].data);
+      uint8_t *data = malloc(data_count);
+      CHECK(data);
+      memcpy(data, a[i].data, data_count);
+      *data_out = data;
+      *data_count_out = data_count;
+      return 1;
+    }
+  }
+  return 0;
+}
+
+int check_file_test_1(const uint8_t *name, size_t name_count,
+		      uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { { "foo",
+			       "import bar;\n"
+			       "\n"
+			       "def x int = 3;" },
+			     { "bar",
+			       "import foo;\n"
+			       "\n"
+			       "def y double = 5;\n" } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+			  name, name_count, data_out, data_count_out);
+}
+
 int test_check_file(void) {
   int ret = 0;
-  if (0 != _chdir("test")) {
-    DBG("Could not chdir into 'test'.\n");
-    goto cleanup_nothing;
-  }
-
   struct ident_map im;
   ident_map_init(&im);
   ident_value foo = ident_map_intern(&im, "foo", strlen("foo"));
 
-  if (!check_module(&im, &read_module_file, foo)) {
+  if (!check_module(&im, &check_file_test_1, foo)) {
     DBG("Could not check_module foo\n");
     goto cleanup_ident_map;
   }
@@ -190,10 +221,5 @@ int test_check_file(void) {
   ret = 1;
  cleanup_ident_map:
   ident_map_destroy(&im);
-  if (0 != _chdir("..")) {
-    DBG("Could not chdir out of 'test'.\n");
-    ret = 0;
-  }
- cleanup_nothing:
   return ret;
 }
