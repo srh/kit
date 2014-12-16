@@ -63,7 +63,8 @@ int def_shadowed(struct name_table *t, ident_value name) {
 int name_table_add_def(struct name_table *t,
 		       ident_value name,
 		       struct ast_optional_type_params *generics,
-		       struct ast_typeexpr *type) {
+		       struct ast_typeexpr *type,
+		       struct ast_def *def) {
   if (deftype_shadowed(t, name)) {
     ERR_DBG("def name shadows deftype name.\n");
     return 0;
@@ -90,13 +91,15 @@ int name_table_add_def(struct name_table *t,
   new_entry.name = name;
   ast_optional_type_params_init_copy(&new_entry.generics, generics);
   ast_typeexpr_init_copy(&new_entry.type, type);
+  new_entry.def = def;
   SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);
   return 1;
 }
 
 int name_table_add_deftype(struct name_table *t,
 			   ident_value name,
-			   struct generics_arity arity) {
+			   struct generics_arity arity,
+			   struct ast_deftype *deftype) {
   if (def_shadowed(t, name)) {
     ERR_DBG("deftype name shadows def name.\n");
     return 0;
@@ -123,6 +126,7 @@ int name_table_add_deftype(struct name_table *t,
   new_entry.name = name;
   new_entry.arity = arity;
   SLICE_PUSH(t->deftypes, t->deftypes_count, t->deftypes_limit, new_entry);
+  new_entry.deftype = deftype;
   return 1;
 }
 

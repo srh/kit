@@ -7,6 +7,7 @@ struct def_entry {
   ident_value name;
   struct ast_optional_type_params generics;
   struct ast_typeexpr type;
+  struct ast_def *def;
 };
 
 struct generics_arity {
@@ -17,6 +18,7 @@ struct generics_arity {
 struct deftype_entry {
   ident_value name;
   struct generics_arity arity;
+  struct ast_deftype *deftype;
 };
 
 struct name_table {
@@ -35,10 +37,12 @@ void name_table_destroy(struct name_table *t);
 int name_table_add_def(struct name_table *t,
 		       ident_value name,
 		       struct ast_optional_type_params *generics,
-		       struct ast_typeexpr *type);
+		       struct ast_typeexpr *type,
+		       struct ast_def *def);
 int name_table_add_deftype(struct name_table *t,
 			   ident_value name,
-			   struct generics_arity arity);
+			   struct generics_arity arity,
+			   struct ast_deftype *deftype);
 
 int name_table_lookup_def(struct name_table *t,
 			  ident_value name,

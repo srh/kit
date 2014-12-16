@@ -6,13 +6,16 @@
 #include "identmap.h"
 #include "io.h"
 #include "parse.h"
+#include "typecheck.h"
 #include "util.h"
 
 int run_tests(void) {
   DBG("Running parse_test...\n");
   int ret = parse_test();
   DBG("parse test: %s\n", ret ? "PASS" : "FAIL");
-  return ret;
+  int ret2 = test_check_file();
+  DBG("test_check_file: %s\n", ret2 ? "PASS" : "FAIL");
+  return ret && ret2;
 }
 
 int main(int argc, char **argv) {

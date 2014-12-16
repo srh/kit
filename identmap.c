@@ -63,7 +63,7 @@ void ident_map_rebuild(struct ident_map *m,
 
   IDENTMAP_DBG("ident_map_rebuild, malloced new_table\n");
   for (size_t i = 0; i < new_limit; i++) {
-    new_table[i].ident = 0;
+    new_table[i].ident = IDENT_VALUE_INVALID;
     new_table[i].strings_offset = 0;
     new_table[i].count = 0;
   }
@@ -71,7 +71,7 @@ void ident_map_rebuild(struct ident_map *m,
   IDENTMAP_DBG("ident_map_rebuild initialized new buf\n");
 
   for (size_t i = 0; i < m->limit; i++) {
-    if (!m->table[i].ident) {
+    if (m->table[i].ident == IDENT_VALUE_INVALID) {
       continue;
     }
 
@@ -80,7 +80,7 @@ void ident_map_rebuild(struct ident_map *m,
     size_t offset = hash & (new_limit - 1);
 
     size_t step = 1;
-    while (new_table[offset].ident) {
+    while (new_table[offset].ident != IDENT_VALUE_INVALID) {
       offset = size_add(offset, step) & (new_limit - 1);
       step++;
     }
@@ -134,7 +134,7 @@ ident_value ident_map_intern(struct ident_map *m,
   size_t offset = ident_map_hash(buf, count) & (limit - 1);
   size_t step = 1;
   ident_value v;
-  while ((v = m->table[offset].ident), v) {
+  while ((v = m->table[offset].ident), v != IDENT_VALUE_INVALID) {
     IDENTMAP_DBG("a collision at offset %"PRIz"\n", offset);
     if (m->table[offset].count == count
 	&& 0 == memcmp(m->strings + m->table[offset].strings_offset, buf, count)) {
@@ -161,4 +161,18 @@ ident_value ident_map_intern(struct ident_map *m,
 
   IDENTMAP_DBG("ident_map_intern succeeded, value %" PRIident_value "\n", v);
   return v;
+}
+
+void ident_map_lookup(struct ident_map *m, ident_value ident,
+		      const void **buf_out, size_t *count_out) {
+  CHECK(ident != IDENT_VALUE_INVALID);
+  /* TODO: We need a more efficient reverse lookup process. */
+  for (size_t i = 0, e = m->limit; i < e; i++) {
+    if (m->table[i].ident == ident) {
+      *buf_out = m->strings + m->table[i].strings_offset;
+      *count_out = m->table[i].count;
+      return;
+    }
+  }
+  CRASH("ident_map missing ident_value\n");
 }

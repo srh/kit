@@ -1,0 +1,3 @@
+import bar;
+
+def x int = 3;
