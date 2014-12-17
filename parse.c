@@ -1165,10 +1165,10 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
 }
 
 int parse_type_params_if_present(struct ps *p,
-				 struct ast_optional_type_params *out) {
+				 struct ast_generics *out) {
   size_t pos_start = ps_pos(p);
   if (!try_skip_char(p, '[')) {
-    ast_optional_type_params_init_no_params(out);
+    ast_generics_init_no_params(out);
     return 1;
   }
 
@@ -1180,10 +1180,9 @@ int parse_type_params_if_present(struct ps *p,
       goto fail;
     }
     if (try_skip_char(p, ']')) {
-      ast_optional_type_params_init_has_params(out,
-					       ast_meta_make(pos_start,
-							     ps_pos(p)),
-					       params, params_count);
+      ast_generics_init_has_params(out,
+				   ast_meta_make(pos_start, ps_pos(p)),
+				   params, params_count);
       return 1;
     }
 
@@ -1208,7 +1207,7 @@ int parse_type_params_if_present(struct ps *p,
 }
 
 int parse_rest_of_def(struct ps *p, size_t pos_start, struct ast_def *out) {
-  struct ast_optional_type_params generics;
+  struct ast_generics generics;
   if (!(skip_ws(p) && parse_type_params_if_present(p, &generics))) {
     goto fail;
   }
@@ -1247,7 +1246,7 @@ int parse_rest_of_def(struct ps *p, size_t pos_start, struct ast_def *out) {
  fail_ident:
   ast_ident_destroy(&name);
  fail_generics:
-  ast_optional_type_params_destroy(&generics);
+  ast_generics_destroy(&generics);
  fail:
   return 0;
 }
@@ -1276,7 +1275,7 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out);
 int parse_rest_of_deftype(struct ps *p, size_t pos_start,
 			  struct ast_deftype *out) {
   PARSE_DBG("parse_rest_of_deftype");
-  struct ast_optional_type_params generics;
+  struct ast_generics generics;
   if (!(skip_ws(p) && parse_type_params_if_present(p, &generics))) {
     goto fail;
   }
@@ -1300,7 +1299,7 @@ int parse_rest_of_deftype(struct ps *p, size_t pos_start,
  fail_ident:
   ast_ident_destroy(&name);
  fail_generics:
-  ast_optional_type_params_destroy(&generics);
+  ast_generics_destroy(&generics);
  fail:
   return 0;
 }

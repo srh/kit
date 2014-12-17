@@ -175,7 +175,7 @@ int lookup_import(struct checkstate *cs, ident_value name,
   return 0;
 }
 
-int generics_lookup_name(struct ast_optional_type_params *a,
+int generics_lookup_name(struct ast_generics *a,
 			 ident_value name,
 			 size_t *index_out) {
   if (!a->has_type_params) {
@@ -192,12 +192,12 @@ int generics_lookup_name(struct ast_optional_type_params *a,
 
 int check_deftype(struct checkstate *cs, struct deftype_entry *ent);
 int check_typeexpr(struct checkstate *cs,
-		   struct ast_optional_type_params *generics,
+		   struct ast_generics *generics,
 		   struct ast_typeexpr *a,
 		   struct deftype_entry *flat_typeexpr);
 
 int check_typeexpr_name(struct checkstate *cs,
-			struct ast_optional_type_params *generics,
+			struct ast_generics *generics,
 			struct ast_ident *a,
 			struct deftype_entry *flat_typeexpr) {
   CHECK_DBG("check_typeexpr_name\n");
@@ -227,7 +227,7 @@ int check_typeexpr_name(struct checkstate *cs,
 }
 
 int check_typeexpr_app(struct checkstate *cs,
-		       struct ast_optional_type_params *generics,
+		       struct ast_generics *generics,
 		       struct ast_typeapp *a,
 		       struct deftype_entry *flat_typeexpr) {
   CHECK_DBG("check_typeexpr_app\n");
@@ -256,7 +256,7 @@ int check_typeexpr_app(struct checkstate *cs,
 }
 
 int check_typeexpr_fields(struct checkstate *cs,
-			  struct ast_optional_type_params *generics,
+			  struct ast_generics *generics,
 			  struct ast_vardecl *fields,
 			  size_t fields_count,
 			  struct deftype_entry *flat_typeexpr) {
@@ -286,7 +286,7 @@ int check_typeexpr_fields(struct checkstate *cs,
 }
 
 int check_typeexpr(struct checkstate *cs,
-		   struct ast_optional_type_params *generics,
+		   struct ast_generics *generics,
 		   struct ast_typeexpr *a,
 		   struct deftype_entry *flat_typeexpr) {
   CHECK_DBG("check_typeexpr\n");
@@ -312,7 +312,7 @@ int check_typeexpr(struct checkstate *cs,
 }
 
 int check_generics_shadowing(struct checkstate *cs,
-			     struct ast_optional_type_params *a) {
+			     struct ast_generics *a) {
   if (!a->has_type_params) {
     return 1;
   }

@@ -7,7 +7,7 @@
 
 void def_entry_destroy(struct def_entry *e) {
   e->name = IDENT_VALUE_INVALID;
-  ast_optional_type_params_destroy(&e->generics);
+  ast_generics_destroy(&e->generics);
   ast_typeexpr_destroy(&e->type);
 }
 
@@ -32,7 +32,7 @@ struct generics_arity param_list_arity(size_t arity) {
   return make_arity(arity);
 }
 
-struct generics_arity params_arity(struct ast_optional_type_params *a) {
+struct generics_arity params_arity(struct ast_generics *a) {
   return make_arity(a->has_type_params ? a->params_count : ARITY_NO_PARAMLIST);
 }
 
@@ -136,7 +136,7 @@ void name_table_destroy(struct name_table *t) {
 }
 
 
-int generics_has_arity(struct ast_optional_type_params *generics,
+int generics_has_arity(struct ast_generics *generics,
 		       struct generics_arity arity) {
   return generics->has_type_params
     ? generics->params_count == arity.value
@@ -167,7 +167,7 @@ int name_table_shadowed(struct name_table *t, ident_value name) {
 
 int name_table_add_def(struct name_table *t,
 		       ident_value name,
-		       struct ast_optional_type_params *generics,
+		       struct ast_generics *generics,
 		       struct ast_typeexpr *type,
 		       struct ast_def *def) {
   if (deftype_shadowed(t, name)) {
@@ -197,7 +197,7 @@ int name_table_add_def(struct name_table *t,
   struct def_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);
   new_entry->name = name;
-  ast_optional_type_params_init_copy(&new_entry->generics, generics);
+  ast_generics_init_copy(&new_entry->generics, generics);
   ast_typeexpr_init_copy(&new_entry->type, type);
   new_entry->def = def;
   SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);

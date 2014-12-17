@@ -305,36 +305,33 @@ struct ast_expr {
 size_t ast_expr_pos_end(struct ast_expr *a);
 void ast_expr_destroy(struct ast_expr *a);
 
-struct ast_optional_type_params {
+struct ast_generics {
   int has_type_params;  /* 0 or 1 -- meta & params is uninitialized if 0. */
   struct ast_meta meta;
   struct ast_ident *params;
   size_t params_count;
 };
 
-void ast_optional_type_params_init_no_params(
-    struct ast_optional_type_params *a);
-void ast_optional_type_params_init_has_params(
-    struct ast_optional_type_params *a,
-    struct ast_meta meta,
-    struct ast_ident *params,
-    size_t params_count);
-void ast_optional_type_params_init_copy(
-    struct ast_optional_type_params *a,
-    struct ast_optional_type_params *copyee);
+void ast_generics_init_no_params(struct ast_generics *a);
+void ast_generics_init_has_params(struct ast_generics *a,
+				  struct ast_meta meta,
+				  struct ast_ident *params,
+				  size_t params_count);
+void ast_generics_init_copy(struct ast_generics *a,
+			    struct ast_generics *copyee);
 
-void ast_optional_type_params_destroy(struct ast_optional_type_params *a);
+void ast_generics_destroy(struct ast_generics *a);
 
 struct ast_def {
   struct ast_meta meta;
-  struct ast_optional_type_params generics;
+  struct ast_generics generics;
   struct ast_ident name;
   struct ast_typeexpr type;
   struct ast_expr rhs;
 };
 
 void ast_def_init(struct ast_def *a, struct ast_meta meta,
-		  struct ast_optional_type_params generics,
+		  struct ast_generics generics,
 		  struct ast_ident name, struct ast_typeexpr type,
 		  struct ast_expr rhs);
 
@@ -350,13 +347,13 @@ void ast_import_init(struct ast_import *a, struct ast_meta meta,
 
 struct ast_deftype {
   struct ast_meta meta;
-  struct ast_optional_type_params generics;
+  struct ast_generics generics;
   struct ast_ident name;
   struct ast_typeexpr type;
 };
 
 void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
-		      struct ast_optional_type_params generics,
+		      struct ast_generics generics,
 		      struct ast_ident name, struct ast_typeexpr type);
 
 enum ast_toplevel_tag {

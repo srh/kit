@@ -452,30 +452,27 @@ void ast_typeexpr_destroy(struct ast_typeexpr *a) {
   a->tag = (enum ast_typeexpr_tag)-1;
 }
 
-void ast_optional_type_params_init_no_params(
-    struct ast_optional_type_params *a) {
+void ast_generics_init_no_params(struct ast_generics *a) {
   a->has_type_params = 0;
   /* Dummy values for irrelevant fields. */
   a->meta = ast_meta_make(SIZE_MAX, SIZE_MAX);
   a->params = NULL;
   a->params_count = 0;
 }
-void ast_optional_type_params_init_has_params(
-    struct ast_optional_type_params *a,
-    struct ast_meta meta,
-    struct ast_ident *params,
-    size_t params_count) {
+void ast_generics_init_has_params(struct ast_generics *a,
+				  struct ast_meta meta,
+				  struct ast_ident *params,
+				  size_t params_count) {
   a->has_type_params = 1;
   a->meta = meta;
   a->params = params;
   a->params_count = params_count;
 }
 
-void ast_optional_type_params_init_copy(
-    struct ast_optional_type_params *a,
-    struct ast_optional_type_params *c) {
+void ast_generics_init_copy(struct ast_generics *a,
+			    struct ast_generics *c) {
   if (!c->has_type_params) {
-    ast_optional_type_params_init_no_params(a);
+    ast_generics_init_no_params(a);
   } else {
     a->has_type_params = 1;
     a->meta = ast_meta_make_copy(&c->meta);
@@ -490,7 +487,7 @@ void ast_optional_type_params_init_copy(
   }
 }
 
-void ast_optional_type_params_destroy(struct ast_optional_type_params *a) {
+void ast_generics_destroy(struct ast_generics *a) {
   if (a->has_type_params) {
     a->has_type_params = 0;
     ast_meta_destroy(&a->meta);
@@ -499,7 +496,7 @@ void ast_optional_type_params_destroy(struct ast_optional_type_params *a) {
 }
 
 void ast_def_init(struct ast_def *a, struct ast_meta meta,
-		  struct ast_optional_type_params generics,
+		  struct ast_generics generics,
 		  struct ast_ident name, struct ast_typeexpr type,
 		  struct ast_expr rhs) {
   a->meta = meta;
@@ -511,7 +508,7 @@ void ast_def_init(struct ast_def *a, struct ast_meta meta,
 
 void ast_def_destroy(struct ast_def *a) {
   ast_meta_destroy(&a->meta);
-  ast_optional_type_params_destroy(&a->generics);
+  ast_generics_destroy(&a->generics);
   ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);
   ast_expr_destroy(&a->rhs);
@@ -529,7 +526,7 @@ void ast_import_destroy(struct ast_import *a) {
 }
 
 void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
-		      struct ast_optional_type_params generics,
+		      struct ast_generics generics,
 		      struct ast_ident name, struct ast_typeexpr type) {
   a->meta = meta;
   a->generics = generics;
@@ -539,7 +536,7 @@ void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
 
 void ast_deftype_destroy(struct ast_deftype *a) {
   ast_meta_destroy(&a->meta);
-  ast_optional_type_params_destroy(&a->generics);
+  ast_generics_destroy(&a->generics);
   ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);
 }
