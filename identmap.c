@@ -49,7 +49,7 @@ size_t ident_map_hash(const void *buf, size_t count) {
 
 void ident_map_rebuild(struct ident_map *m,
 		       size_t new_limit) {
-  IDENTMAP_DBG("ident_map_rebuild, new_limit=%"PRIz"\n", new_limit);
+  IDENTMAP_DBG("ident_map_rebuild, m->count=%"PRIz", new_limit=%"PRIz"\n", m->count, new_limit);
   /* The limit must always be a power of two. */
   CHECK(0 == (new_limit & (new_limit - 1)));
   CHECK(m->count < new_limit / 2);
@@ -154,13 +154,18 @@ ident_value ident_map_intern(struct ident_map *m,
   m->table[offset].count = count;
   m->count++;
 
-  if (count >= m->limit / 2) {
+  if (m->count >= m->limit / 2) {
     IDENTMAP_DBG("ident_map_intern rebuilding bigger map\n");
     ident_map_rebuild(m, size_mul(limit, 2));
   }
 
   IDENTMAP_DBG("ident_map_intern succeeded, value %" PRIident_value "\n", v);
   return v;
+}
+
+ident_value ident_map_intern_c_str(struct ident_map *m,
+				   const char *s) {
+  return ident_map_intern(m, s, strlen(s));
 }
 
 void ident_map_lookup(struct ident_map *m, ident_value ident,

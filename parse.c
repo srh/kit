@@ -1483,6 +1483,10 @@ int parse_test_deftypes(void) {
   pass &= run_count_test("deftype5",
 			 "deftype foo struct { x bar [quux]; };\n",
 			 12);
+  pass &= run_count_test("deftype6",
+			 "def x int = 3;"
+			 "deftype[T] foo struct { count u32; p ptr[T]; };\n",
+			 24);
   return pass;
 }
 
