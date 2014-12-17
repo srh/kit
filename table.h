@@ -81,19 +81,13 @@ int name_table_lookup_deftype(struct name_table *t,
 
 int name_table_shadowed(struct name_table *t, ident_value name);
 
-/* TODO: Remove many of these "friendly"-ish functions, and just
-   expose the deftype_entry and deftype? */
-int deftype_has_been_checked(struct name_table *t,
-			     struct ast_deftype *a);
-int deftype_is_being_checked(struct name_table *t,
-			     struct ast_deftype *a);
-void deftype_mark_is_being_checked(struct name_table *t,
-				   struct ast_deftype *a);
-void deftype_mark_has_been_checked(struct name_table *t,
-				   struct ast_deftype *a);
-void deftype_mark_generic_flatly_held(struct name_table *t,
-				      struct ast_deftype *a,
-				      size_t which_generic);
+struct deftype_entry *lookup_deftype(struct name_table *t,
+				     struct ast_deftype *a);
+
+void deftype_entry_mark_is_being_checked(struct deftype_entry *ent);
+void deftype_entry_mark_has_been_checked(struct deftype_entry *ent);
+void deftype_entry_mark_generic_flatly_held(struct deftype_entry *ent,
+					    size_t which_generic);
 
 
 #endif /* KIRA_TABLE_H_ */

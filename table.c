@@ -307,27 +307,21 @@ int deftype_is_being_checked(struct name_table *t,
   return lookup_deftype(t, a)->is_being_checked;
 }
 
-void deftype_mark_is_being_checked(struct name_table *t,
-				   struct ast_deftype *a) {
-  struct deftype_entry *ent = lookup_deftype(t, a);
+void deftype_entry_mark_is_being_checked(struct deftype_entry *ent) {
   CHECK(!ent->is_being_checked);
   CHECK(!ent->has_been_checked);
   ent->is_being_checked = 1;
 }
 
-void deftype_mark_has_been_checked(struct name_table *t,
-				   struct ast_deftype *a) {
-  struct deftype_entry *ent = lookup_deftype(t, a);
+void deftype_entry_mark_has_been_checked(struct deftype_entry *ent) {
   CHECK(!ent->has_been_checked);
   CHECK(ent->is_being_checked);
   ent->is_being_checked = 0;
   ent->has_been_checked = 1;
 }
 
-void deftype_mark_generic_flatly_held(struct name_table *t,
-				      struct ast_deftype *a,
-				      size_t which_generic) {
-  struct deftype_entry *ent = lookup_deftype(t, a);
+void deftype_entry_mark_generic_flatly_held(struct deftype_entry *ent,
+					    size_t which_generic) {
   CHECK(ent->is_being_checked);
   CHECK(ent->flatly_held);
   CHECK(which_generic < ent->flatly_held_count);

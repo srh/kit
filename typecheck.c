@@ -190,23 +190,23 @@ int generics_lookup_name(struct ast_optional_type_params *a,
   return 0;
 }
 
-int check_deftype(struct checkstate *cs, struct ast_deftype *a);
-int check_deftype_entry(struct checkstate *cs, struct deftype_entry *ent);
+int check_deftype(struct checkstate *cs, struct deftype_entry *ent);
 int check_typeexpr(struct checkstate *cs,
 		   struct ast_optional_type_params *generics,
 		   struct ast_typeexpr *a,
-		   struct ast_deftype *flat_typeexpr);
+		   struct deftype_entry *flat_typeexpr);
 
 int check_typeexpr_name(struct checkstate *cs,
 			struct ast_optional_type_params *generics,
 			struct ast_ident *a,
-			struct ast_deftype *flat_typeexpr) {
+			struct deftype_entry *flat_typeexpr) {
   CHECK_DBG("check_typeexpr_name\n");
   ident_value name = a->value;
   size_t which_generic;
   if (generics_lookup_name(generics, name, &which_generic)) {
     if (flat_typeexpr) {
-      deftype_mark_generic_flatly_held(&cs->nt, flat_typeexpr, which_generic);
+      deftype_entry_mark_generic_flatly_held(flat_typeexpr,
+					     which_generic);
     }
   } else {
     struct deftype_entry *ent;
@@ -217,7 +217,7 @@ int check_typeexpr_name(struct checkstate *cs,
     }
 
     if (flat_typeexpr) {
-      if (!check_deftype_entry(cs, ent)) {
+      if (!check_deftype(cs, ent)) {
 	return 0;
       }
     }
@@ -229,7 +229,7 @@ int check_typeexpr_name(struct checkstate *cs,
 int check_typeexpr_app(struct checkstate *cs,
 		       struct ast_optional_type_params *generics,
 		       struct ast_typeapp *a,
-		       struct ast_deftype *flat_typeexpr) {
+		       struct deftype_entry *flat_typeexpr) {
   CHECK_DBG("check_typeexpr_app\n");
   struct deftype_entry *ent;
   if (!name_table_lookup_deftype(&cs->nt, a->name.value,
@@ -240,7 +240,7 @@ int check_typeexpr_app(struct checkstate *cs,
   }
 
   if (flat_typeexpr) {
-    if (!check_deftype_entry(cs, ent)) {
+    if (!check_deftype(cs, ent)) {
       return 0;
     }
   }
@@ -259,7 +259,7 @@ int check_typeexpr_fields(struct checkstate *cs,
 			  struct ast_optional_type_params *generics,
 			  struct ast_vardecl *fields,
 			  size_t fields_count,
-			  struct ast_deftype *flat_typeexpr) {
+			  struct deftype_entry *flat_typeexpr) {
   for (size_t i = 0; i < fields_count; i++) {
     struct ast_vardecl *field = &fields[i];
     for (size_t j = 0; j < i; j++) {
@@ -288,7 +288,7 @@ int check_typeexpr_fields(struct checkstate *cs,
 int check_typeexpr(struct checkstate *cs,
 		   struct ast_optional_type_params *generics,
 		   struct ast_typeexpr *a,
-		   struct ast_deftype *flat_typeexpr) {
+		   struct deftype_entry *flat_typeexpr) {
   CHECK_DBG("check_typeexpr\n");
   /* null means we have to worry about flatness, non-null means we don't. */
   switch (a->tag) {
@@ -335,37 +335,35 @@ int check_generics_shadowing(struct checkstate *cs,
   return 1;
 }
 
-int check_deftype_entry(struct checkstate *cs, struct deftype_entry *ent) {
-  if (ent->is_primitive) {
-    return 1;
-  } else {
-    return check_deftype(cs, ent->deftype);
-  }
-}
-
-int check_deftype(struct checkstate *cs, struct ast_deftype *a) {
+int check_deftype(struct checkstate *cs, struct deftype_entry *ent) {
   CHECK_DBG("check_deftype\n");
-  if (deftype_has_been_checked(&cs->nt, a)) {
+  if (ent->has_been_checked) {
     return 1;
   }
 
-  if (deftype_is_being_checked(&cs->nt, a)) {
+  /* Can't be primitive, because they all have has_been_checked be true. */
+  CHECK(!ent->is_primitive);
+
+  if (ent->is_being_checked) {
     ERR_DBG("deftype recursively held.\n");
     return 0;
   }
 
-  deftype_mark_is_being_checked(&cs->nt, a);
+  deftype_entry_mark_is_being_checked(ent);
+
+  struct ast_deftype *a = ent->deftype;
+  CHECK(a);  /* Must be non-null, because ent->is_primitive is false. */
 
   /* We know there's no clashes with a->name and the _arity_ of a->generics. */
   if (!check_generics_shadowing(cs, &a->generics)) {
     return 0;
   }
 
-  if (!check_typeexpr(cs, &a->generics, &a->type, a)) {
+  if (!check_typeexpr(cs, &a->generics, &a->type, ent)) {
     return 0;
   }
 
-  deftype_mark_has_been_checked(&cs->nt, a);
+  deftype_entry_mark_has_been_checked(ent);
   return 1;
 }
 
@@ -379,7 +377,7 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
     /* TODO: Implement. */
     return 1;
   case AST_TOPLEVEL_DEFTYPE:
-    return check_deftype(cs, &a->u.deftype);
+    return check_deftype(cs, lookup_deftype(&cs->nt, &a->u.deftype));
   default:
     UNREACHABLE();
   }
