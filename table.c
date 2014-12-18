@@ -175,24 +175,9 @@ int name_table_add_def(struct name_table *t,
     return 0;
   }
 
-  for (size_t i = 0, e = t->defs_count; i < e; i++) {
-    struct def_entry *ent = t->defs[i];
-    if (ent->name != name) {
-      continue;
-    }
-
-    /* TODO: This should be different, to allow overloading on
-       different types. */
-    if (!ent->generics.has_type_params || !generics->has_type_params) {
-      ERR_DBG("untemplated def name clash.\n");
-      return 0;
-    }
-
-    if (ent->generics.params_count == generics->params_count) {
-      ERR_DBG("Templated defs have same arity.\n");
-      return 0;
-    }
-  }
+  /* TODO: It would be nice to check for "obviously" conflicting defs
+     here, instead of at overloading -- so we catch them without them
+     needing to be used. */
 
   struct def_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);

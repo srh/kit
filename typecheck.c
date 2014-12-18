@@ -46,18 +46,22 @@ void checkstate_init(struct checkstate *cs,
   name_table_init(&cs->nt);
 }
 
-void checkstate_import_primitives(struct checkstate *cs) {
-  ident_value u32_name = ident_map_intern_c_str(cs->im, "u32");
-  int res = name_table_add_primitive_type(&cs->nt, u32_name, NULL, 0);
+void intern_primitive_type(struct checkstate *cs,
+			   const char *name,
+			   int *flatly_held,
+			   size_t flatly_held_count) {
+  ident_value ident = ident_map_intern_c_str(cs->im, name);
+  int res = name_table_add_primitive_type(&cs->nt, ident,
+					  flatly_held, flatly_held_count);
   CHECK(res);
-  ident_value f64_name = ident_map_intern_c_str(cs->im, "f64");
-  res = name_table_add_primitive_type(&cs->nt, f64_name, NULL, 0);
-  CHECK(res);
+}
 
+void checkstate_import_primitives(struct checkstate *cs) {
+  intern_primitive_type(cs, "u32", NULL, 0);
+  intern_primitive_type(cs, "i32", NULL, 0);
+  intern_primitive_type(cs, "f64", NULL, 0);
   int flatly_held[1] = { 0 };
-  ident_value ptr_name = ident_map_intern_c_str(cs->im, "ptr");
-  res = name_table_add_primitive_type(&cs->nt, ptr_name, flatly_held, 1);
-  CHECK(res);
+  intern_primitive_type(cs, "ptr", flatly_held, 1);
 }
 
 void checkstate_destroy(struct checkstate *cs) {
@@ -367,6 +371,34 @@ int check_deftype(struct checkstate *cs, struct deftype_entry *ent) {
   return 1;
 }
 
+int check_expr_with_type(struct checkstate *cs,
+			 struct ast_expr *x,
+			 struct ast_typeexpr *type) {
+  (void)cs, (void)x, (void)type;
+  /* TODO: Implement. */
+  return 1;
+}
+
+int check_def(struct checkstate *cs, struct ast_def *a) {
+  if (!check_generics_shadowing(cs, &a->generics)) {
+    return 0;
+  }
+
+  if (!check_typeexpr(cs, &a->generics, &a->type, NULL)) {
+    return 0;
+  }
+
+  /* We can only typecheck the def by instantiating it -- so we check
+     the ones with no template params. */
+  if (!a->generics.has_type_params) {
+    if (!check_expr_with_type(cs, &a->rhs, &a->type)) {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
 int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
   (void)cs;
   switch (a->tag) {
@@ -374,8 +406,7 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
     /* We already parsed and loaded the import. */
     return 1;
   case AST_TOPLEVEL_DEF:
-    /* TODO: Implement. */
-    return 1;
+    return check_def(cs, &a->u.def);
   case AST_TOPLEVEL_DEFTYPE:
     return check_deftype(cs, lookup_deftype(&cs->nt, &a->u.deftype));
   default:
@@ -463,12 +494,12 @@ int check_file_test_1(const uint8_t *name, size_t name_count,
   struct test_module a[] = { { "foo",
 			       "import bar;\n"
 			       "\n"
-			       "def x int = 3;"
+			       "def x i32 = 3;"
 			       "deftype dword u32;\n" },
 			     { "bar",
 			       "import foo;\n"
 			       "\n"
-			       "def y double = 5;\n" } };
+			       "def y f64 = 5;\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
 			  name, name_count, data_out, data_count_out);
@@ -478,7 +509,7 @@ int check_file_test_1(const uint8_t *name, size_t name_count,
 int check_file_test_2(const uint8_t *name, size_t name_count,
 		      uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
-			       "def x int = 3;"
+			       "def x i32 = 3;"
 			       "deftype dword u32;\n"
 			       "deftype blah dword;\n"
 			       "deftype feh ptr[blah];\n"
@@ -492,7 +523,7 @@ int check_file_test_3(const uint8_t *name, size_t name_count,
 		      uint8_t **data_out, size_t *data_count_out) {
   /* An invalid file: bar and foo recursively hold each other. */
   struct test_module a[] = { { "foo",
-			       "def x int = 3;"
+			       "def x i32 = 3;"
 			       "deftype foo bar;\n"
 			       "deftype bar foo;\n" } };
 
@@ -503,7 +534,7 @@ int check_file_test_3(const uint8_t *name, size_t name_count,
 int check_file_test_4(const uint8_t *name, size_t name_count,
 		      uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
-			       "def x int = 3;"
+			       "def x i32 = 3;"
 			       "deftype foo struct { x u32; y f64; z ptr[foo]; };\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -513,7 +544,7 @@ int check_file_test_4(const uint8_t *name, size_t name_count,
 int check_file_test_5(const uint8_t *name, size_t name_count,
 		      uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
-			       "def x int = 3;"
+			       "def x i32 = 3;"
 			       "deftype[T] foo T;" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -523,7 +554,7 @@ int check_file_test_5(const uint8_t *name, size_t name_count,
 int check_file_test_6(const uint8_t *name, size_t name_count,
 		      uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
-			       "def x int = 3;"
+			       "def x i32 = 3;"
 			       "deftype[T] foo struct { count u32; p ptr[T]; };\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
