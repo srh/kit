@@ -450,6 +450,8 @@ void ast_typeexpr_destroy(struct ast_typeexpr *a) {
   case AST_TYPEEXPR_UNIONE:
     ast_unione_destroy(&a->u.unione);
     break;
+  case AST_TYPEEXPR_UNKNOWN:
+    break;
   default:
     UNREACHABLE();
   }
