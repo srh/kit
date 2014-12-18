@@ -81,6 +81,9 @@ enum ast_typeexpr_tag {
   AST_TYPEEXPR_APP,
   AST_TYPEEXPR_STRUCTE,
   AST_TYPEEXPR_UNIONE,
+
+  /* Used in type checking.  Is never parsed. */
+  AST_TYPEEXPR_UNKNOWN,
 };
 
 struct ast_typeexpr {
