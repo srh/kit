@@ -9,6 +9,10 @@ struct ast_meta ast_meta_make(size_t pos_start, size_t pos_end) {
   return ret;
 }
 
+struct ast_meta ast_meta_make_garbage(void) {
+  return ast_meta_make(0, 0);
+}
+
 struct ast_meta ast_meta_make_copy(struct ast_meta *c) {
   return *c;
 }

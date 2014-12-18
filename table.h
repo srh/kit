@@ -68,10 +68,19 @@ int name_table_add_primitive_type(struct name_table *t,
 				  int *flatly_held,
 				  size_t flatly_held_count);
 
+/* TODO: Remove this, it's obviously wrong. */
 int name_table_lookup_def(struct name_table *t,
 			  ident_value name,
 			  struct generics_arity arity,
 			  struct def_entry **out);
+
+int name_table_match_def(struct name_table *t,
+			 ident_value name,
+			 struct ast_typeexpr *generics_or_null,
+			 size_t generics_count,
+			 struct ast_typeexpr *partial_type,
+			 struct ast_typeexpr *unified_type_out,
+			 struct def_entry **entry_out);
 
 int name_table_lookup_deftype(struct name_table *t,
 			      ident_value name,

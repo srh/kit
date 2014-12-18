@@ -12,6 +12,7 @@ struct ast_meta {
 };
 
 struct ast_meta ast_meta_make(size_t pos_start, size_t pos_end);
+struct ast_meta ast_meta_make_garbage(void);
 
 struct ast_ident {
   struct ast_meta meta;
@@ -20,6 +21,7 @@ struct ast_ident {
 
 void ast_ident_init(struct ast_ident *a, struct ast_meta meta,
 		    ident_value value);
+void ast_ident_init_copy(struct ast_ident *a, struct ast_ident *c);
 void ast_ident_destroy(struct ast_ident *a);
 
 struct ast_numeric_literal {
@@ -92,7 +94,7 @@ struct ast_typeexpr {
 };
 
 void ast_typeexpr_init_copy(struct ast_typeexpr *a,
-				 struct ast_typeexpr *copyee);
+			    struct ast_typeexpr *c);
 void ast_typeexpr_destroy(struct ast_typeexpr *a);
 
 struct ast_vardecl {
@@ -318,7 +320,7 @@ void ast_generics_init_has_params(struct ast_generics *a,
 				  struct ast_ident *params,
 				  size_t params_count);
 void ast_generics_init_copy(struct ast_generics *a,
-			    struct ast_generics *copyee);
+			    struct ast_generics *c);
 
 void ast_generics_destroy(struct ast_generics *a);
 

@@ -371,12 +371,112 @@ int check_deftype(struct checkstate *cs, struct deftype_entry *ent) {
   return 1;
 }
 
-int check_expr_with_type(struct checkstate *cs,
+struct exprscope {
+  struct checkstate *cs;
+  struct ast_generics *generics;
+
+  /* A stack of variables that are in scope. */
+  struct ast_vardecl **vars;
+  size_t vars_count;
+  size_t vars_limit;
+};
+
+void exprscope_init(struct exprscope *es, struct checkstate *cs,
+		    struct ast_generics *generics) {
+  es->cs = cs;
+  es->generics = generics;
+  es->vars = NULL;
+  es->vars_count = 0;
+  es->vars_limit = 0;
+}
+
+void exprscope_destroy(struct exprscope *es) {
+  es->cs = NULL;
+  es->generics = NULL;
+  free(es->vars);
+  es->vars = NULL;
+  es->vars_count = 0;
+  es->vars_limit = 0;
+}
+
+int unify_directionally(struct ast_typeexpr *partial_type,
+			struct ast_typeexpr *complete_type,
+			struct ast_typeexpr *out) {
+
+
+  (void)partial_type, (void)complete_type, (void)out;
+  /* TODO: Implement. */
+  return 0;
+}
+
+int exprscope_lookup_name(struct exprscope *es,
+			  ident_value name,
+			  struct ast_typeexpr *partial_type,
+			  struct ast_typeexpr *out) {
+  for (size_t i = es->vars_count; i-- > 0; ) {
+    struct ast_vardecl *decl = es->vars[i];
+    if (decl->name.value != name) {
+      continue;
+    }
+
+    struct ast_typeexpr unified;
+    if (!unify_directionally(partial_type, &decl->type, &unified)) {
+      ERR_DBG("Type mismatch for vardecl lookup.\n");
+      return 0;
+    }
+
+    *out = unified;
+    return 1;
+  }
+
+  struct ast_typeexpr unified;
+  struct def_entry *ent;
+  if (name_table_match_def(&es->cs->nt,
+			   name,
+			   NULL, /* No generic typeexpr parameters on this expr */
+			   0,
+			   partial_type,
+			   &unified, &ent)) {
+    *out = unified;
+    return 1;
+  }
+
+  ERR_DBG("Could not match def for name.\n");
+  return 0;
+}
+
+int check_expr(struct exprscope *es,
+	       struct ast_expr *x,
+	       struct ast_typeexpr *partial_type,
+	       struct ast_typeexpr *out) {
+  switch (x->tag) {
+  case AST_EXPR_NAME: {
+    struct ast_typeexpr name_type;
+    if (!exprscope_lookup_name(es, x->u.name.value, partial_type, &name_type)) {
+      ERR_DBG("Unrecognized name.\n");
+      return 0;
+    }
+
+    *out = name_type;
+    return 1;
+  } break;
+  default:
+    /* TODO: Implement. */
+    return 0;
+  }
+}
+
+/* Checks an expr, given that we know the type of expr. */
+int check_expr_with_type(struct exprscope *es,
 			 struct ast_expr *x,
 			 struct ast_typeexpr *type) {
-  (void)cs, (void)x, (void)type;
-  /* TODO: Implement. */
-  return 1;
+  struct ast_typeexpr out;
+  int ret = check_expr(es, x, type, &out);
+  if (ret) {
+    /* TODO: Assert that the types are identical? */
+    ast_typeexpr_destroy(&out);
+  }
+  return ret;
 }
 
 int check_def(struct checkstate *cs, struct ast_def *a) {
@@ -391,12 +491,14 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
   /* We can only typecheck the def by instantiating it -- so we check
      the ones with no template params. */
   if (!a->generics.has_type_params) {
-    if (!check_expr_with_type(cs, &a->rhs, &a->type)) {
-      return 0;
-    }
+    struct exprscope es;
+    exprscope_init(&es, cs, &a->generics);
+    int ret = check_expr_with_type(&es, &a->rhs, &a->type);
+    exprscope_destroy(&es);
+    return ret;
+  } else {
+    return 1;
   }
-
-  return 1;
 }
 
 int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
