@@ -354,12 +354,11 @@ int def_entry_matches(struct def_entry *ent,
       return 0;
     }
 
-    struct ast_typeexpr unified;
-    if (!unify_directionally(partial_type, &ent->type, &unified)) {
+    if (!unify_directionally(partial_type, &ent->type)) {
       return 0;
     }
 
-    *unified_type_out = unified;
+    ast_typeexpr_init_copy(unified_type_out, &ent->type);
     return 1;
   }
 
@@ -374,13 +373,12 @@ int def_entry_matches(struct def_entry *ent,
 			&ent_concrete_type);
 
     int ret = 0;
-    struct ast_typeexpr unified;
-    if (!unify_directionally(partial_type, &ent_concrete_type, &unified)) {
+    if (!unify_directionally(partial_type, &ent_concrete_type)) {
       goto cleanup_concrete_type;
     }
 
     ret = 1;
-    *unified_type_out = unified;
+    ast_typeexpr_init_copy(unified_type_out, &ent_concrete_type);
   cleanup_concrete_type:
     ast_typeexpr_destroy(&ent_concrete_type);
     return ret;

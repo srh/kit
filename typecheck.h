@@ -25,8 +25,7 @@ int read_module_file(const uint8_t *module_name,
 
 /* TODO: Move these functions elsewhere. */
 int unify_directionally(struct ast_typeexpr *partial_type,
-			struct ast_typeexpr *complete_type,
-			struct ast_typeexpr *out);
+			struct ast_typeexpr *complete_type);
 int generics_lookup_name(struct ast_generics *a,
 			 ident_value name,
 			 size_t *index_out);

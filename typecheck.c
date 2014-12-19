@@ -400,11 +400,8 @@ void exprscope_destroy(struct exprscope *es) {
 }
 
 int unify_directionally(struct ast_typeexpr *partial_type,
-			struct ast_typeexpr *complete_type,
-			struct ast_typeexpr *out) {
-
-
-  (void)partial_type, (void)complete_type, (void)out;
+			struct ast_typeexpr *complete_type) {
+  (void)partial_type, (void)complete_type;
   /* TODO: Implement. */
   return 0;
 }
@@ -419,13 +416,12 @@ int exprscope_lookup_name(struct exprscope *es,
       continue;
     }
 
-    struct ast_typeexpr unified;
-    if (!unify_directionally(partial_type, &decl->type, &unified)) {
+    if (!unify_directionally(partial_type, &decl->type)) {
       ERR_DBG("Type mismatch for vardecl lookup.\n");
       return 0;
     }
 
-    *out = unified;
+    ast_typeexpr_init_copy(out, &decl->type);
     return 1;
   }
 
