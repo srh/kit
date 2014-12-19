@@ -56,9 +56,11 @@ void intern_primitive_type(struct checkstate *cs,
   CHECK(res);
 }
 
+#define I32_TYPE_NAME "i32"
+
 void checkstate_import_primitives(struct checkstate *cs) {
   intern_primitive_type(cs, "u32", NULL, 0);
-  intern_primitive_type(cs, "i32", NULL, 0);
+  intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0);
   intern_primitive_type(cs, "f64", NULL, 0);
   int flatly_held[1] = { 0 };
   intern_primitive_type(cs, "ptr", flatly_held, 1);
@@ -497,6 +499,15 @@ int exprscope_lookup_name(struct exprscope *es,
   return 0;
 }
 
+void numeric_literal_type(struct ident_map *im,
+			  struct ast_numeric_literal *a,
+			  struct ast_typeexpr *out) {
+  (void)a;
+  out->tag = AST_TYPEEXPR_NAME;
+  ast_ident_init(&out->u.name, ast_meta_make_garbage(),
+		 ident_map_intern_c_str(im, I32_TYPE_NAME));
+}
+
 int check_expr(struct exprscope *es,
 	       struct ast_expr *x,
 	       struct ast_typeexpr *partial_type,
@@ -513,10 +524,16 @@ int check_expr(struct exprscope *es,
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
+    struct ast_typeexpr num_type;
+    numeric_literal_type(es->cs->im, &x->u.numeric_literal, &num_type);
+    if (!unify_directionally(partial_type, &num_type)) {
+      ERR_DBG("Numeric literal in bad place.\n");
+      ast_typeexpr_destroy(&num_type);
+      return 0;
+    }
 
-
-    /* TODO: Implement. */
-    return 0;
+    *out = num_type;
+    return 1;
   } break;
   default:
     /* TODO: Implement. */
@@ -744,6 +761,27 @@ int check_file_test_8(const uint8_t *name, size_t name_count,
 			  name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_def_1(const uint8_t *name, size_t name_count,
+			  uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { { "foo",
+			       "def x i32 = 3;\n" } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+			  name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_def_2(const uint8_t *name, size_t name_count,
+			  uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because numeric literals are dumb and have type i32. */
+  struct test_module a[] = { { "foo",
+			       "def x u32 = 3;\n" } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+			  name, name_count, data_out, data_count_out);
+}
+
+
+
 int test_check_file(void) {
   int ret = 0;
   struct ident_map im;
@@ -794,7 +832,19 @@ int test_check_file(void) {
 
   DBG("test_check_file check_file_test_8...\n");
   if (!check_module(&im, &check_file_test_8, foo)) {
-    DBG("check_file_test_7 fails\n");
+    DBG("check_file_test_8 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_def_1...\n");
+  if (!check_module(&im, &check_file_test_def_1, foo)) {
+    DBG("check_file_test_def_1 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_def_2...\n");
+  if (!!check_module(&im, &check_file_test_def_2, foo)) {
+    DBG("check_file_test_def_2 fails\n");
     goto cleanup_ident_map;
   }
 
