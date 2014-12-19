@@ -431,6 +431,8 @@ void ast_typeexpr_init_copy(struct ast_typeexpr *a,
   case AST_TYPEEXPR_UNIONE:
     ast_unione_init_copy(&a->u.unione, &c->u.unione);
     break;
+  case AST_TYPEEXPR_UNKNOWN:
+    break;
   default:
     UNREACHABLE();
   }

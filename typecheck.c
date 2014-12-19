@@ -512,6 +512,12 @@ int check_expr(struct exprscope *es,
     *out = name_type;
     return 1;
   } break;
+  case AST_EXPR_NUMERIC_LITERAL: {
+
+
+    /* TODO: Implement. */
+    return 0;
+  } break;
   default:
     /* TODO: Implement. */
     return 0;
