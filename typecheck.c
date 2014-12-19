@@ -399,11 +399,67 @@ void exprscope_destroy(struct exprscope *es) {
   es->vars_limit = 0;
 }
 
+int unify_fields_directionally(struct ast_vardecl *partial_fields,
+			       size_t partial_fields_count,
+			       struct ast_vardecl *complete_fields,
+			       size_t complete_fields_count) {
+  if (partial_fields_count != complete_fields_count) {
+    return 0;
+  }
+
+  for (size_t i = 0; i < partial_fields_count; i++) {
+    if (partial_fields[i].name.value != complete_fields[i].name.value
+	|| !unify_directionally(&partial_fields[i].type,
+				&complete_fields[i].type)) {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
 int unify_directionally(struct ast_typeexpr *partial_type,
 			struct ast_typeexpr *complete_type) {
-  (void)partial_type, (void)complete_type;
-  /* TODO: Implement. */
-  return 0;
+  CHECK(complete_type->tag != AST_TYPEEXPR_UNKNOWN);
+  if (partial_type->tag == AST_TYPEEXPR_UNKNOWN) {
+    return 1;
+  }
+
+  if (partial_type->tag != complete_type->tag) {
+    return 0;
+  }
+
+  switch (partial_type->tag) {
+  case AST_TYPEEXPR_NAME: {
+    return partial_type->u.name.value == complete_type->u.name.value;
+  } break;
+  case AST_TYPEEXPR_APP: {
+    struct ast_typeapp *p_app = &partial_type->u.app;
+    struct ast_typeapp *c_app = &complete_type->u.app;
+    if (p_app->name.value != c_app->name.value
+	|| p_app->params_count != c_app->params_count) {
+      return 0;
+    }
+    for (size_t i = 0, e = p_app->params_count; i < e; i++) {
+      if (!unify_directionally(&p_app->params[i], &c_app->params[i])) {
+	return 0;
+      }
+    }
+    return 1;
+  } break;
+  case AST_TYPEEXPR_STRUCTE:
+    return unify_fields_directionally(partial_type->u.structe.fields,
+				      partial_type->u.structe.fields_count,
+				      complete_type->u.structe.fields,
+				      complete_type->u.structe.fields_count);
+  case AST_TYPEEXPR_UNIONE:
+    return unify_fields_directionally(partial_type->u.unione.fields,
+				      partial_type->u.unione.fields_count,
+				      complete_type->u.unione.fields,
+				      complete_type->u.unione.fields_count);
+  default:
+    UNREACHABLE();
+  }
 }
 
 int exprscope_lookup_name(struct exprscope *es,
