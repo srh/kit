@@ -57,13 +57,17 @@ void intern_primitive_type(struct checkstate *cs,
 }
 
 #define I32_TYPE_NAME "i32"
+#define FUNC_TYPE_NAME "func"
 
 void checkstate_import_primitives(struct checkstate *cs) {
   intern_primitive_type(cs, "u32", NULL, 0);
   intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0);
   intern_primitive_type(cs, "f64", NULL, 0);
-  int flatly_held[1] = { 0 };
-  intern_primitive_type(cs, "ptr", flatly_held, 1);
+  int not_flatly_held[20] = { 0 };
+  intern_primitive_type(cs, "ptr", not_flatly_held, 1);
+  for (size_t i = 1; i < 21; i++) {
+    intern_primitive_type(cs, "func", not_flatly_held, i);
+  }
 }
 
 void checkstate_destroy(struct checkstate *cs) {
@@ -535,6 +539,51 @@ int check_expr(struct exprscope *es,
     *out = num_type;
     return 1;
   } break;
+  case AST_EXPR_FUNCALL: {
+    size_t args_count = x->u.funcall.args_count;
+    size_t args_types_count = size_add(args_count, 1);
+    struct ast_typeexpr *args_types = malloc(size_mul(sizeof(*args_types),
+						      args_types_count));
+    CHECK(args_types);
+    size_t i;
+    for (i = 0; i < args_count; i++) {
+      struct ast_typeexpr local_partial;
+      local_partial.tag = AST_TYPEEXPR_UNKNOWN;
+      if (!check_expr(es, &x->u.funcall.args[i], &local_partial, &args_types[i])) {
+	goto fail_cleanup_args_types;
+      }
+    }
+
+    ast_typeexpr_init_copy(&args_types[args_count], partial_type);
+
+    ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
+    struct ast_ident name;
+    ast_ident_init(&name, ast_meta_make_garbage(), func_ident);
+
+    struct ast_typeexpr funcexpr;
+    funcexpr.tag = AST_TYPEEXPR_APP;
+    ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(), name, args_types, args_types_count);
+
+    int ret = 0;
+    struct ast_typeexpr resolved_funcexpr;
+    if (!check_expr(es, x->u.funcall.func, &funcexpr, &resolved_funcexpr)) {
+      goto fail_cleanup_funcexpr;
+    }
+
+    CHECK(resolved_funcexpr.tag == AST_TYPEEXPR_APP);
+    CHECK(resolved_funcexpr.u.app.name.value == func_ident);
+    CHECK(resolved_funcexpr.u.app.params_count == args_types_count);
+    ast_typeexpr_init_copy(out, &resolved_funcexpr.u.app.params[args_count]);
+
+    ret = 1;
+  fail_cleanup_funcexpr:
+    ast_typeexpr_destroy(&funcexpr);
+    return ret;
+    /* Don't fall-through -- args_types was moved into funcexpr. */
+  fail_cleanup_args_types:
+    SLICE_FREE(args_types, i, ast_typeexpr_destroy);
+    return 0;
+  } break;
   default:
     /* TODO: Implement. */
     return 0;
@@ -780,6 +829,17 @@ int check_file_test_def_2(const uint8_t *name, size_t name_count,
 			  name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_def_3(const uint8_t *name, size_t name_count,
+			  uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because numeric literals are dumb and have type i32. */
+  struct test_module a[] = { { "foo",
+			       "def x i32 = 3;\n"
+			       "def y i32 = x;\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+			  name, name_count, data_out, data_count_out);
+}
 
 
 int test_check_file(void) {
@@ -845,6 +905,12 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_def_2...\n");
   if (!!check_module(&im, &check_file_test_def_2, foo)) {
     DBG("check_file_test_def_2 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_def_3...\n");
+  if (!check_module(&im, &check_file_test_def_3, foo)) {
+    DBG("check_file_test_def_3 fails\n");
     goto cleanup_ident_map;
   }
 
