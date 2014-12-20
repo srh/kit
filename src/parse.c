@@ -177,7 +177,7 @@ struct precedence_pair binop_precedence(enum ast_binop op) {
   return binop_precedences[op];
 }
 
-const int unop_right_precedences[] = {
+const int unop_precedences[] = {
   [AST_UNOP_DEREFERENCE] = 905,
   [AST_UNOP_ADDRESSOF] = 905,
   [AST_UNOP_NEGATE] = 905,
@@ -185,8 +185,8 @@ const int unop_right_precedences[] = {
 
 int unop_right_precedence(enum ast_unop op) {
   CHECK(0 <= op &&
-        op < sizeof(unop_right_precedences) / sizeof(unop_right_precedences[0]));
-  return unop_right_precedences[op];
+        op < sizeof(unop_precedences) / sizeof(unop_precedences[0]));
+  return unop_precedences[op];
 }
 
 
@@ -1016,7 +1016,8 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       }
 
       struct ast_expr rhs;
-      if (!(skip_ws(p) && parse_expr(p, &rhs, op_precedence.right_precedence))) {
+      if (!(skip_ws(p)
+            && parse_expr(p, &rhs, op_precedence.right_precedence))) {
         goto fail;
       }
 
@@ -1078,7 +1079,8 @@ int parse_braced_fields(struct ps *p,
   return 0;
 }
 
-int parse_rest_of_structe(struct ps *p, size_t pos_start, struct ast_structe *out) {
+int parse_rest_of_structe(struct ps *p, size_t pos_start,
+                          struct ast_structe *out) {
   struct ast_vardecl *fields;
   size_t fields_count;
   if (!(skip_ws(p) && parse_braced_fields(p, &fields, &fields_count))) {
@@ -1089,7 +1091,8 @@ int parse_rest_of_structe(struct ps *p, size_t pos_start, struct ast_structe *ou
   return 1;
 }
 
-int parse_rest_of_unione(struct ps *p, size_t pos_start, struct ast_unione *out) {
+int parse_rest_of_unione(struct ps *p, size_t pos_start,
+                         struct ast_unione *out) {
   struct ast_vardecl *fields;
   size_t fields_count;
   if (!(skip_ws(p) && parse_braced_fields(p, &fields, &fields_count))) {
@@ -1253,7 +1256,8 @@ int parse_rest_of_def(struct ps *p, size_t pos_start, struct ast_def *out) {
   return 0;
 }
 
-int parse_rest_of_import(struct ps *p, size_t pos_start, struct ast_import *out) {
+int parse_rest_of_import(struct ps *p, size_t pos_start,
+                         struct ast_import *out) {
   PARSE_DBG("parse_rest_of_import\n");
   struct ast_ident name;
   if (!(skip_ws(p) && parse_ident(p, &name))) {
@@ -1384,7 +1388,8 @@ int count_parse_buf(const uint8_t *buf, size_t length,
   return ret;
 }
 
-int count_parse(const char *str, size_t *leafcount_out, size_t *error_pos_out) {
+int count_parse(const char *str,
+                size_t *leafcount_out, size_t *error_pos_out) {
   size_t length = strlen(str);
   const uint8_t *data = (const uint8_t *)str;
   return count_parse_buf(data, length, leafcount_out, error_pos_out);
@@ -1428,19 +1433,22 @@ int parse_test_defs(void) {
   pass &= run_count_test("def03", "def a int =0   ;  ", 6);
   pass &= run_count_test("def04", "def abc_def int = 12345;", 6);
   pass &= run_count_test("def05", "def foo func[int, int] = 1;", 11);
-  pass &= run_count_test("def06", "def foo func[int, int] = fn(x int, y int) int { 3; };",
+  pass &= run_count_test("def06",
+                         "def foo func[int, int] = "
+                         "fn(x int, y int) int { 3; };",
                          23);
   pass &= run_count_test("def07", "def foo func[int, int] = \n"
                          "\tfn(x int, y int) int { foo(bar); };\n",
                          26);
   pass &= run_count_test("def08", "def foo func[int, int] = \n"
-                         "\tfn(x int, y int) int { foo(bar); goto blah; label feh; };\n",
+                         "\tfn(x int, y int) int { foo(bar); goto blah; "
+                         "label feh; };\n",
                          32);
   pass &= run_count_test("def09",
-                         "def foo func[int, int] = \n" /* 9 */
-                         "\tfn() int { foo(*bar.blah); if (n) { " /* 15 */
-                         "goto blah; } label feh; \n" /* 7 */
-                         "if n { goto blah; } else { &meh; } };\n" /* 14 */,
+                         "def foo func[int, int] = \n"
+                         "\tfn() int { foo(*bar.blah); if (n) { "
+                         "goto blah; } label feh; \n"
+                         "if n { goto blah; } else { &meh; } };\n",
                          49);
   pass &= run_count_test("def10",
                          "def foo bar = 2 + 3;",
@@ -1458,7 +1466,8 @@ int parse_test_defs(void) {
                          "};\n",
                          23);
   pass &= run_count_test("def14",
-                         "def[a,b] foo/*heh*/func[int] = fn() int {//blah blah blah\n"
+                         "def[a,b] foo/*heh*/func[int] = fn() int {"
+                         "//blah blah blah\n"
                          "   var x int = -3;\n"
                          "   return x;\n"
                          "};\n",

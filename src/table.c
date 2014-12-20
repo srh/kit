@@ -75,7 +75,8 @@ void deftype_entry_init_primitive(struct deftype_entry *e,
     no_param_list_arity() : param_list_arity(flatly_held_count);
 
   if (flatly_held) {
-    int *heap_flatly_held = malloc_mul(flatly_held_count, sizeof(*heap_flatly_held));
+    int *heap_flatly_held = malloc_mul(flatly_held_count,
+                                       sizeof(*heap_flatly_held));
     memcpy(heap_flatly_held, flatly_held,
            size_mul(flatly_held_count, sizeof(*heap_flatly_held)));
     e->flatly_held = heap_flatly_held;
@@ -92,7 +93,8 @@ void deftype_entry_init_primitive(struct deftype_entry *e,
   e->deftype = NULL;
 }
 
-int deftype_entry_param_is_flatly_held(struct deftype_entry *entry, size_t which_generic) {
+int deftype_entry_param_is_flatly_held(struct deftype_entry *entry,
+                                       size_t which_generic) {
   CHECK(entry->flatly_held);
   CHECK(which_generic < entry->flatly_held_count);
   return entry->flatly_held[which_generic];
@@ -239,7 +241,8 @@ int name_table_add_primitive_type(struct name_table *t,
                                   size_t flatly_held_count) {
   struct deftype_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);
-  deftype_entry_init_primitive(new_entry, name, flatly_held, flatly_held_count);
+  deftype_entry_init_primitive(new_entry, name,
+                               flatly_held, flatly_held_count);
   return name_table_help_add_deftype_entry(t, &new_entry);
 }
 
@@ -263,8 +266,10 @@ void substitute_generics(struct ast_typeexpr *type,
                          size_t args_count,
                          struct ast_typeexpr *concrete_type_out);
 
-void substitute_generics_fields(struct ast_vardecl *fields, size_t fields_count,
-                                struct ast_generics *g, struct ast_typeexpr *args,
+void substitute_generics_fields(struct ast_vardecl *fields,
+                                size_t fields_count,
+                                struct ast_generics *g,
+                                struct ast_typeexpr *args,
                                 size_t args_count,
                                 struct ast_vardecl **concrete_fields_out,
                                 size_t *concrete_fields_count_out) {
@@ -318,7 +323,8 @@ void substitute_generics(struct ast_typeexpr *type,
     concrete_type_out->tag = AST_TYPEEXPR_STRUCTE;
     struct ast_vardecl *fields;
     size_t fields_count;
-    substitute_generics_fields(type->u.structe.fields, type->u.structe.fields_count,
+    substitute_generics_fields(type->u.structe.fields,
+                               type->u.structe.fields_count,
                                g, args, args_count,
                                &fields, &fields_count);
 
@@ -329,7 +335,8 @@ void substitute_generics(struct ast_typeexpr *type,
     concrete_type_out->tag = AST_TYPEEXPR_UNIONE;
     struct ast_vardecl *fields;
     size_t fields_count;
-    substitute_generics_fields(type->u.unione.fields, type->u.unione.fields_count,
+    substitute_generics_fields(type->u.unione.fields,
+                               type->u.unione.fields_count,
                                g, args, args_count,
                                &fields, &fields_count);
 

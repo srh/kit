@@ -396,7 +396,8 @@ void ast_structe_init(struct ast_structe *a, struct ast_meta meta,
 
 void ast_structe_init_copy(struct ast_structe *a, struct ast_structe *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  ast_fields_alloc_copy(c->fields, c->fields_count, &a->fields, &a->fields_count);
+  ast_fields_alloc_copy(c->fields, c->fields_count,
+                        &a->fields, &a->fields_count);
 }
 
 void ast_structe_destroy(struct ast_structe *a) {
@@ -413,7 +414,8 @@ void ast_unione_init(struct ast_unione *a, struct ast_meta meta,
 
 void ast_unione_init_copy(struct ast_unione *a, struct ast_unione *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  ast_fields_alloc_copy(c->fields, c->fields_count, &a->fields, &a->fields_count);
+  ast_fields_alloc_copy(c->fields, c->fields_count,
+                        &a->fields, &a->fields_count);
 }
 
 void ast_unione_destroy(struct ast_unione *a) {

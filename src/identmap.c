@@ -49,12 +49,14 @@ size_t ident_map_hash(const void *buf, size_t count) {
 
 void ident_map_rebuild(struct ident_map *m,
                        size_t new_limit) {
-  IDENTMAP_DBG("ident_map_rebuild, m->count=%"PRIz", new_limit=%"PRIz"\n", m->count, new_limit);
+  IDENTMAP_DBG("ident_map_rebuild, m->count=%"PRIz", new_limit=%"PRIz"\n",
+               m->count, new_limit);
   /* The limit must always be a power of two. */
   CHECK(0 == (new_limit & (new_limit - 1)));
   CHECK(m->count < new_limit / 2);
 
-  struct ident_map_entry *new_table = malloc_mul(new_limit, sizeof(struct ident_map_entry));
+  struct ident_map_entry *new_table = malloc_mul(new_limit,
+                                                 sizeof(*new_table));
 
   IDENTMAP_DBG("ident_map_rebuild, malloced new_table\n");
   for (size_t i = 0; i < new_limit; i++) {
@@ -80,7 +82,8 @@ void ident_map_rebuild(struct ident_map *m,
       step++;
     }
 
-    IDENTMAP_DBG("ident_map_rebuild moving from index %"PRIz" to %"PRIz"\n", i, offset);
+    IDENTMAP_DBG("ident_map_rebuild moving from index %"PRIz" to %"PRIz"\n",
+                 i, offset);
     new_table[offset] = m->table[i];
   }
 
@@ -119,11 +122,13 @@ ident_value ident_map_intern(struct ident_map *m,
                              const void *buf,
                              size_t count) {
   size_t limit = m->limit;
-  IDENTMAP_DBG("ident_map_intern count=%"PRIz", with limit %"PRIz"\n", count, limit);
+  IDENTMAP_DBG("ident_map_intern count=%"PRIz", with limit %"PRIz"\n",
+               count, limit);
   if (limit == 0) {
     ident_map_rebuild(m, 8);
     limit = m->limit;
-    IDENTMAP_DBG("ident_map_intern rebuilt the map, its count and limit are %"PRIz" and %"PRIz"\n",
+    IDENTMAP_DBG("ident_map_intern rebuilt the map, its count and limit "
+                 "are %"PRIz" and %"PRIz"\n",
                  m->count, m->limit);
   }
   size_t offset = ident_map_hash(buf, count) & (limit - 1);
@@ -132,7 +137,8 @@ ident_value ident_map_intern(struct ident_map *m,
   while ((v = m->table[offset].ident), v != IDENT_VALUE_INVALID) {
     IDENTMAP_DBG("a collision at offset %"PRIz"\n", offset);
     if (m->table[offset].count == count
-        && 0 == memcmp(m->strings + m->table[offset].strings_offset, buf, count)) {
+        && 0 == memcmp(m->strings + m->table[offset].strings_offset,
+                       buf, count)) {
       return v;
     }
 

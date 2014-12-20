@@ -140,7 +140,8 @@ int chase_imports(struct checkstate *cs, ident_value name) {
       struct ast_toplevel *toplevel = &heap_file->toplevels[i];
       switch (toplevel->tag) {
       case AST_TOPLEVEL_IMPORT:
-        SLICE_PUSH(names, names_count, names_limit, toplevel->u.import.name.value);
+        SLICE_PUSH(names, names_count, names_limit,
+                   toplevel->u.import.name.value);
         break;
       case AST_TOPLEVEL_DEF: {
         if (!name_table_add_def(&cs->nt,
@@ -152,10 +153,11 @@ int chase_imports(struct checkstate *cs, ident_value name) {
         }
       } break;
       case AST_TOPLEVEL_DEFTYPE: {
-        if (!name_table_add_deftype(&cs->nt,
-                                    toplevel->u.deftype.name.value,
-                                    params_arity(&toplevel->u.deftype.generics),
-                                    &toplevel->u.deftype)) {
+        if (!name_table_add_deftype(
+                &cs->nt,
+                toplevel->u.deftype.name.value,
+                params_arity(&toplevel->u.deftype.generics),
+                &toplevel->u.deftype)) {
           goto cleanup;
         }
       } break;
@@ -257,7 +259,8 @@ int check_typeexpr_app(struct checkstate *cs,
 
   for (size_t i = 0, e = a->params_count; i < e; i++) {
     int f = deftype_entry_param_is_flatly_held(ent, i);
-    if (!check_typeexpr(cs, generics, &a->params[i], f ? flat_typeexpr : NULL)) {
+    if (!check_typeexpr(cs, generics, &a->params[i],
+                        f ? flat_typeexpr : NULL)) {
       return 0;
     }
   }
@@ -282,7 +285,8 @@ int check_typeexpr_fields(struct checkstate *cs,
     {
       size_t which_generic;
       if (generics_lookup_name(generics, field->name.value, &which_generic)) {
-        ERR_DBG("struct/union field shadows template parameter, which is gauche.\n");
+        ERR_DBG("struct/union field shadows template parameter, "
+                "which is gauche.\n");
         return 0;
       }
     }
@@ -503,7 +507,7 @@ int exprscope_lookup_name(struct exprscope *es,
   struct def_entry *ent;
   if (name_table_match_def(&es->cs->nt,
                            name,
-                           NULL, /* No generic typeexpr parameters on this expr */
+                           NULL, /* No generic typeexpr parameters here. */
                            0,
                            partial_type,
                            &unified, &ent)) {
@@ -565,7 +569,8 @@ void do_replace_generics(struct ast_generics *generics,
   case AST_TYPEEXPR_APP: {
     struct ast_typeapp *app = &a->u.app;
     size_t params_count = app->params_count;
-    struct ast_typeexpr *params = malloc_mul(sizeof(*params), app->params_count);
+    struct ast_typeexpr *params = malloc_mul(sizeof(*params),
+                                             app->params_count);
 
     for (size_t i = 0, e = params_count; i < e; i++) {
       do_replace_generics(generics, generics_substitutions,
@@ -583,7 +588,8 @@ void do_replace_generics(struct ast_generics *generics,
     struct ast_vardecl *fields;
     size_t fields_count;
     do_replace_generics_in_fields(generics, generics_substitutions,
-                                  a->u.structe.fields, a->u.structe.fields_count,
+                                  a->u.structe.fields,
+                                  a->u.structe.fields_count,
                                   &fields, &fields_count);
     out->tag = AST_TYPEEXPR_STRUCTE;
     ast_structe_init(&out->u.structe, ast_meta_make_garbage(),
@@ -647,7 +653,8 @@ int check_expr_funcall(struct exprscope *es,
 
   struct ast_typeexpr funcexpr;
   funcexpr.tag = AST_TYPEEXPR_APP;
-  ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(), name, args_types, args_types_count);
+  ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(), name,
+                   args_types, args_types_count);
 
   int ret = 0;
   struct ast_typeexpr resolved_funcexpr;
@@ -762,7 +769,8 @@ int check_expr(struct exprscope *es,
   switch (x->tag) {
   case AST_EXPR_NAME: {
     struct ast_typeexpr name_type;
-    if (!exprscope_lookup_name(es, x->u.name.value, partial_type, &name_type)) {
+    if (!exprscope_lookup_name(es, x->u.name.value, partial_type,
+                               &name_type)) {
       ERR_DBG("Unrecognized name.\n");
       return 0;
     }
@@ -855,7 +863,8 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
   }
 }
 
-int check_module(struct ident_map *im, module_loader *loader, ident_value name) {
+int check_module(struct ident_map *im, module_loader *loader,
+                 ident_value name) {
   int ret = 0;
   struct checkstate cs;
   checkstate_init(&cs, loader, im);
@@ -975,7 +984,8 @@ int check_file_test_4(const uint8_t *name, size_t name_count,
                       uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;"
-                               "deftype foo struct { x u32; y f64; z ptr[foo]; };\n" } };
+                               "deftype foo struct { "
+                               "x u32; y f64; z ptr[foo]; };\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);
@@ -995,7 +1005,8 @@ int check_file_test_6(const uint8_t *name, size_t name_count,
                       uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;"
-                               "deftype[T] foo struct { count u32; p ptr[T]; };\n" } };
+                               "deftype[T] foo struct { "
+                               "count u32; p ptr[T]; };\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);
@@ -1007,7 +1018,8 @@ int check_file_test_7(const uint8_t *name, size_t name_count,
      template parameter. */
   struct test_module a[] = { { "foo",
                                "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
-                               "deftype bar struct { z foo[u32, bar]; };\n" } };
+                               "deftype bar struct { z foo[u32, bar]; };\n" }
+  };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);
@@ -1018,7 +1030,8 @@ int check_file_test_8(const uint8_t *name, size_t name_count,
   /* But here bar holds itself indirectly. */
   struct test_module a[] = { { "foo",
                                "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
-                               "deftype bar struct { z foo[bar, u32]; };\n" } };
+                               "deftype bar struct { z foo[bar, u32]; };\n" }
+  };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);
