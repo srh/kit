@@ -16,6 +16,11 @@ int run_tests(void) {
   DBG("parse test: %s\n", ret ? "PASS" : "FAIL");
   int ret2 = test_check_file();
   DBG("test_check_file: %s\n", ret2 ? "PASS" : "FAIL");
+  if (ret && ret2) {
+    DBG("\nAll tests PASS!  :)\n");
+  } else {
+    DBG("\nA test FAILED.  You're a bad programmer!  :(\n");
+  }
   return ret && ret2;
 }
 

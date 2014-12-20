@@ -15,7 +15,7 @@
 
 
 NORETURN void report_and_abort(const char *file, int line,
-			       const char *msg1, const char *msg2);
+                               const char *msg1, const char *msg2);
 
 #define CHECK(x) do { \
     if (!(x)) { \

@@ -18,7 +18,7 @@
   } while (0)
 
 #define SLICE_FREE(ptr, count, destructor) do { \
-    for (size_t SLICE_FREE_i = (count); SLICE_FREE_i-- > 0; ) {	\
+    for (size_t SLICE_FREE_i = (count); SLICE_FREE_i-- > 0; ) { \
       (destructor)(&(ptr)[SLICE_FREE_i]); \
     } \
     free(ptr); \

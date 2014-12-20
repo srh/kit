@@ -42,9 +42,9 @@ int arity_no_paramlist(struct generics_arity arity) {
 }
 
 void deftype_entry_init(struct deftype_entry *e,
-			ident_value name,
-			struct generics_arity arity,
-			struct ast_deftype *deftype) {
+                        ident_value name,
+                        struct generics_arity arity,
+                        struct ast_deftype *deftype) {
   e->name = name;
   e->arity = arity;
 
@@ -67,9 +67,9 @@ void deftype_entry_init(struct deftype_entry *e,
 }
 
 void deftype_entry_init_primitive(struct deftype_entry *e,
-				  ident_value name,
-				  int *flatly_held,
-				  size_t flatly_held_count) {
+                                  ident_value name,
+                                  int *flatly_held,
+                                  size_t flatly_held_count) {
   e->name = name;
   e->arity = flatly_held == NULL ?
     no_param_list_arity() : param_list_arity(flatly_held_count);
@@ -77,7 +77,7 @@ void deftype_entry_init_primitive(struct deftype_entry *e,
   if (flatly_held) {
     int *heap_flatly_held = malloc_mul(flatly_held_count, sizeof(*heap_flatly_held));
     memcpy(heap_flatly_held, flatly_held,
-	   size_mul(flatly_held_count, sizeof(*heap_flatly_held)));
+           size_mul(flatly_held_count, sizeof(*heap_flatly_held)));
     e->flatly_held = heap_flatly_held;
     e->flatly_held_count = flatly_held_count;
   } else {
@@ -136,7 +136,7 @@ void name_table_destroy(struct name_table *t) {
 
 
 int generics_has_arity(struct ast_generics *generics,
-		       struct generics_arity arity) {
+                       struct generics_arity arity) {
   return generics->has_type_params
     ? generics->params_count == arity.value
     : arity_no_paramlist(arity);
@@ -165,10 +165,10 @@ int name_table_shadowed(struct name_table *t, ident_value name) {
 }
 
 int name_table_add_def(struct name_table *t,
-		       ident_value name,
-		       struct ast_generics *generics,
-		       struct ast_typeexpr *type,
-		       struct ast_def *def) {
+                       ident_value name,
+                       struct ast_generics *generics,
+                       struct ast_typeexpr *type,
+                       struct ast_def *def) {
   if (deftype_shadowed(t, name)) {
     ERR_DBG("def name shadows deftype name.\n");
     return 0;
@@ -189,7 +189,7 @@ int name_table_add_def(struct name_table *t,
 }
 
 int name_table_help_add_deftype_entry(struct name_table *t,
-				      struct deftype_entry **entry_ptr) {
+                                      struct deftype_entry **entry_ptr) {
   struct deftype_entry *entry = *entry_ptr;
   *entry_ptr = NULL;
 
@@ -224,9 +224,9 @@ int name_table_help_add_deftype_entry(struct name_table *t,
 }
 
 int name_table_add_deftype(struct name_table *t,
-			   ident_value name,
-			   struct generics_arity arity,
-			   struct ast_deftype *deftype) {
+                           ident_value name,
+                           struct generics_arity arity,
+                           struct ast_deftype *deftype) {
   struct deftype_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);
   deftype_entry_init(new_entry, name, arity, deftype);
@@ -234,9 +234,9 @@ int name_table_add_deftype(struct name_table *t,
 }
 
 int name_table_add_primitive_type(struct name_table *t,
-				  ident_value name,
-				  int *flatly_held,
-				  size_t flatly_held_count) {
+                                  ident_value name,
+                                  int *flatly_held,
+                                  size_t flatly_held_count) {
   struct deftype_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);
   deftype_entry_init_primitive(new_entry, name, flatly_held, flatly_held_count);
@@ -244,9 +244,9 @@ int name_table_add_primitive_type(struct name_table *t,
 }
 
 int name_table_lookup_def(struct name_table *t,
-			  ident_value name,
-			  struct generics_arity arity,
-			  struct def_entry **out) {
+                          ident_value name,
+                          struct generics_arity arity,
+                          struct def_entry **out) {
   for (size_t i = 0, e = t->defs_count; i < e; i++) {
     struct def_entry *ent = t->defs[i];
     if (ent->name == name && generics_has_arity(&ent->generics, arity)) {
@@ -258,16 +258,16 @@ int name_table_lookup_def(struct name_table *t,
 }
 
 void substitute_generics(struct ast_typeexpr *type,
-			 struct ast_generics *g,
-			 struct ast_typeexpr *args,
-			 size_t args_count,
-			 struct ast_typeexpr *concrete_type_out);
+                         struct ast_generics *g,
+                         struct ast_typeexpr *args,
+                         size_t args_count,
+                         struct ast_typeexpr *concrete_type_out);
 
 void substitute_generics_fields(struct ast_vardecl *fields, size_t fields_count,
-				struct ast_generics *g, struct ast_typeexpr *args,
-				size_t args_count,
-				struct ast_vardecl **concrete_fields_out,
-				size_t *concrete_fields_count_out) {
+                                struct ast_generics *g, struct ast_typeexpr *args,
+                                size_t args_count,
+                                struct ast_vardecl **concrete_fields_out,
+                                size_t *concrete_fields_count_out) {
   struct ast_vardecl *concrete_fields
     = malloc_mul(sizeof(*concrete_fields), fields_count);
   for (size_t i = 0; i < fields_count; i++) {
@@ -276,7 +276,7 @@ void substitute_generics_fields(struct ast_vardecl *fields, size_t fields_count,
     struct ast_typeexpr type;
     substitute_generics(&fields[i].type, g, args, args_count, &type);
     ast_vardecl_init(&concrete_fields[i], ast_meta_make_garbage(),
-		     name, type);
+                     name, type);
   }
 
   *concrete_fields_out = concrete_fields;
@@ -284,10 +284,10 @@ void substitute_generics_fields(struct ast_vardecl *fields, size_t fields_count,
 }
 
 void substitute_generics(struct ast_typeexpr *type,
-			 struct ast_generics *g,
-			 struct ast_typeexpr *args,
-			 size_t args_count,
-			 struct ast_typeexpr *concrete_type_out) {
+                         struct ast_generics *g,
+                         struct ast_typeexpr *args,
+                         size_t args_count,
+                         struct ast_typeexpr *concrete_type_out) {
   CHECK(g->has_type_params);
   CHECK(g->params_count == args_count);
 
@@ -306,35 +306,35 @@ void substitute_generics(struct ast_typeexpr *type,
     struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
     for (size_t i = 0; i < params_count; i++) {
       substitute_generics(&type->u.app.params[i], g, args, args_count,
-			  &params[i]);
+                          &params[i]);
     }
 
     struct ast_ident name;
     ast_ident_init_copy(&name, &type->u.app.name);
     ast_typeapp_init(&concrete_type_out->u.app, ast_meta_make_garbage(),
-		     name, params, params_count);
+                     name, params, params_count);
   } break;
   case AST_TYPEEXPR_STRUCTE: {
     concrete_type_out->tag = AST_TYPEEXPR_STRUCTE;
     struct ast_vardecl *fields;
     size_t fields_count;
     substitute_generics_fields(type->u.structe.fields, type->u.structe.fields_count,
-			       g, args, args_count,
-			       &fields, &fields_count);
+                               g, args, args_count,
+                               &fields, &fields_count);
 
     ast_structe_init(&concrete_type_out->u.structe, ast_meta_make_garbage(),
-		     fields, fields_count);
+                     fields, fields_count);
   } break;
   case AST_TYPEEXPR_UNIONE: {
     concrete_type_out->tag = AST_TYPEEXPR_UNIONE;
     struct ast_vardecl *fields;
     size_t fields_count;
     substitute_generics_fields(type->u.unione.fields, type->u.unione.fields_count,
-			       g, args, args_count,
-			       &fields, &fields_count);
+                               g, args, args_count,
+                               &fields, &fields_count);
 
     ast_unione_init(&concrete_type_out->u.unione, ast_meta_make_garbage(),
-		    fields, fields_count);
+                    fields, fields_count);
   } break;
   default:
     UNREACHABLE();
@@ -342,10 +342,10 @@ void substitute_generics(struct ast_typeexpr *type,
 }
 
 int def_entry_matches(struct def_entry *ent,
-		      struct ast_typeexpr *generics_or_null,
-		      size_t generics_count,
-		      struct ast_typeexpr *partial_type,
-		      struct ast_typeexpr *unified_type_out) {
+                      struct ast_typeexpr *generics_or_null,
+                      size_t generics_count,
+                      struct ast_typeexpr *partial_type,
+                      struct ast_typeexpr *unified_type_out) {
   if (!ent->generics.has_type_params) {
     if (generics_or_null) {
       return 0;
@@ -366,8 +366,8 @@ int def_entry_matches(struct def_entry *ent,
 
     struct ast_typeexpr ent_concrete_type;
     substitute_generics(&ent->type, &ent->generics,
-			generics_or_null, generics_count,
-			&ent_concrete_type);
+                        generics_or_null, generics_count,
+                        &ent_concrete_type);
 
     int ret = 0;
     if (!unify_directionally(partial_type, &ent_concrete_type)) {
@@ -387,12 +387,12 @@ int def_entry_matches(struct def_entry *ent,
 }
 
 int name_table_match_def(struct name_table *t,
-			 ident_value name,
-			 struct ast_typeexpr *generics_or_null,
-			 size_t generics_count,
-			 struct ast_typeexpr *partial_type,
-			 struct ast_typeexpr *unified_type_out,
-			 struct def_entry **entry_out) {
+                         ident_value name,
+                         struct ast_typeexpr *generics_or_null,
+                         size_t generics_count,
+                         struct ast_typeexpr *partial_type,
+                         struct ast_typeexpr *unified_type_out,
+                         struct def_entry **entry_out) {
   /* matched_type is initialized if matched_ent is non-null. */
   struct ast_typeexpr matched_type;
   /* Get cl to shut up about the "uninitialized value". */
@@ -407,14 +407,14 @@ int name_table_match_def(struct name_table *t,
 
     struct ast_typeexpr unified;
     if (def_entry_matches(ent, generics_or_null, generics_count,
-			  partial_type, &unified)) {
+                          partial_type, &unified)) {
       if (matched_ent) {
-	ast_typeexpr_destroy(&unified);
-	ERR_DBG("multiple matching definitions\n");
-	goto fail_multiple_matching;
+        ast_typeexpr_destroy(&unified);
+        ERR_DBG("multiple matching definitions\n");
+        goto fail_multiple_matching;
       } else {
-	matched_type = unified;
-	matched_ent = ent;
+        matched_type = unified;
+        matched_ent = ent;
       }
     }
   }
@@ -434,9 +434,9 @@ int name_table_match_def(struct name_table *t,
 }
 
 int name_table_lookup_deftype(struct name_table *t,
-			      ident_value name,
-			      struct generics_arity arity,
-			      struct deftype_entry **out) {
+                              ident_value name,
+                              struct generics_arity arity,
+                              struct deftype_entry **out) {
   for (size_t i = 0, e = t->deftypes_count; i < e; i++) {
     struct deftype_entry *ent = t->deftypes[i];
     if (ent->name == name && ent->arity.value == arity.value) {
@@ -448,22 +448,22 @@ int name_table_lookup_deftype(struct name_table *t,
 }
 
 struct deftype_entry *lookup_deftype(struct name_table *t,
-				     struct ast_deftype *a) {
+                                     struct ast_deftype *a) {
   struct deftype_entry *ent;
   int res = name_table_lookup_deftype(t, a->name.value,
-				      params_arity(&a->generics),
-				      &ent);
+                                      params_arity(&a->generics),
+                                      &ent);
   CHECK(res);
   return ent;
 }
 
 int deftype_has_been_checked(struct name_table *t,
-			     struct ast_deftype *a) {
+                             struct ast_deftype *a) {
   return lookup_deftype(t, a)->has_been_checked;
 }
 
 int deftype_is_being_checked(struct name_table *t,
-			     struct ast_deftype *a) {
+                             struct ast_deftype *a) {
   return lookup_deftype(t, a)->is_being_checked;
 }
 
@@ -481,7 +481,7 @@ void deftype_entry_mark_has_been_checked(struct deftype_entry *ent) {
 }
 
 void deftype_entry_mark_generic_flatly_held(struct deftype_entry *ent,
-					    size_t which_generic) {
+                                            size_t which_generic) {
   CHECK(ent->is_being_checked);
   CHECK(ent->flatly_held);
   CHECK(which_generic < ent->flatly_held_count);

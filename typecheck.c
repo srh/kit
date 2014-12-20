@@ -36,8 +36,8 @@ struct checkstate {
 };
 
 void checkstate_init(struct checkstate *cs,
-		     module_loader *loader,
-		     struct ident_map *im) {
+                     module_loader *loader,
+                     struct ident_map *im) {
   cs->loader = loader;
   cs->im = im;
   cs->imports = NULL;
@@ -47,12 +47,12 @@ void checkstate_init(struct checkstate *cs,
 }
 
 void intern_primitive_type(struct checkstate *cs,
-			   const char *name,
-			   int *flatly_held,
-			   size_t flatly_held_count) {
+                           const char *name,
+                           int *flatly_held,
+                           size_t flatly_held_count) {
   ident_value ident = ident_map_intern_c_str(cs->im, name);
   int res = name_table_add_primitive_type(&cs->nt, ident,
-					  flatly_held, flatly_held_count);
+                                          flatly_held, flatly_held_count);
   CHECK(res);
 }
 
@@ -78,8 +78,8 @@ void checkstate_destroy(struct checkstate *cs) {
 }
 
 int resolve_import_filename_and_parse(struct checkstate *cs,
-				      ident_value name,
-				      struct ast_file *file_out) {
+                                      ident_value name,
+                                      struct ast_file *file_out) {
   int ret = 0;
 
   const void *module_name;
@@ -119,7 +119,7 @@ int chase_imports(struct checkstate *cs, ident_value name) {
 
     for (size_t i = 0, e = cs->imports_count; i < e; i++) {
       if (cs->imports[i].import_name == name) {
-	goto continue_outer;
+        goto continue_outer;
       }
     }
 
@@ -140,27 +140,27 @@ int chase_imports(struct checkstate *cs, ident_value name) {
       struct ast_toplevel *toplevel = &heap_file->toplevels[i];
       switch (toplevel->tag) {
       case AST_TOPLEVEL_IMPORT:
-	SLICE_PUSH(names, names_count, names_limit, toplevel->u.import.name.value);
-	break;
+        SLICE_PUSH(names, names_count, names_limit, toplevel->u.import.name.value);
+        break;
       case AST_TOPLEVEL_DEF: {
-	if (!name_table_add_def(&cs->nt,
-				toplevel->u.def.name.value,
-				&toplevel->u.def.generics,
-				&toplevel->u.def.type,
-				&toplevel->u.def)) {
-	  goto cleanup;
-	}
+        if (!name_table_add_def(&cs->nt,
+                                toplevel->u.def.name.value,
+                                &toplevel->u.def.generics,
+                                &toplevel->u.def.type,
+                                &toplevel->u.def)) {
+          goto cleanup;
+        }
       } break;
       case AST_TOPLEVEL_DEFTYPE: {
-	if (!name_table_add_deftype(&cs->nt,
-				    toplevel->u.deftype.name.value,
-				    params_arity(&toplevel->u.deftype.generics),
-				    &toplevel->u.deftype)) {
-	  goto cleanup;
-	}
+        if (!name_table_add_deftype(&cs->nt,
+                                    toplevel->u.deftype.name.value,
+                                    params_arity(&toplevel->u.deftype.generics),
+                                    &toplevel->u.deftype)) {
+          goto cleanup;
+        }
       } break;
       default:
-	UNREACHABLE();
+        UNREACHABLE();
       }
     }
 
@@ -175,7 +175,7 @@ int chase_imports(struct checkstate *cs, ident_value name) {
 }
 
 int lookup_import(struct checkstate *cs, ident_value name,
-		  struct ast_file **file_out) {
+                  struct ast_file **file_out) {
   for (size_t i = 0, e = cs->imports_count; i < e; i++) {
     if (cs->imports[i].import_name == name) {
       *file_out = cs->imports[i].file;
@@ -186,8 +186,8 @@ int lookup_import(struct checkstate *cs, ident_value name,
 }
 
 int generics_lookup_name(struct ast_generics *a,
-			 ident_value name,
-			 size_t *index_out) {
+                         ident_value name,
+                         size_t *index_out) {
   if (!a->has_type_params) {
     return 0;
   }
@@ -202,33 +202,33 @@ int generics_lookup_name(struct ast_generics *a,
 
 int check_deftype(struct checkstate *cs, struct deftype_entry *ent);
 int check_typeexpr(struct checkstate *cs,
-		   struct ast_generics *generics,
-		   struct ast_typeexpr *a,
-		   struct deftype_entry *flat_typeexpr);
+                   struct ast_generics *generics,
+                   struct ast_typeexpr *a,
+                   struct deftype_entry *flat_typeexpr);
 
 int check_typeexpr_name(struct checkstate *cs,
-			struct ast_generics *generics,
-			struct ast_ident *a,
-			struct deftype_entry *flat_typeexpr) {
+                        struct ast_generics *generics,
+                        struct ast_ident *a,
+                        struct deftype_entry *flat_typeexpr) {
   CHECK_DBG("check_typeexpr_name\n");
   ident_value name = a->value;
   size_t which_generic;
   if (generics_lookup_name(generics, name, &which_generic)) {
     if (flat_typeexpr) {
       deftype_entry_mark_generic_flatly_held(flat_typeexpr,
-					     which_generic);
+                                             which_generic);
     }
   } else {
     struct deftype_entry *ent;
     if (!name_table_lookup_deftype(&cs->nt, name, no_param_list_arity(),
-				   &ent)) {
+                                   &ent)) {
       ERR_DBG("Unrecognized type name.\n");
       return 0;
     }
 
     if (flat_typeexpr) {
       if (!check_deftype(cs, ent)) {
-	return 0;
+        return 0;
       }
     }
   }
@@ -237,14 +237,14 @@ int check_typeexpr_name(struct checkstate *cs,
 }
 
 int check_typeexpr_app(struct checkstate *cs,
-		       struct ast_generics *generics,
-		       struct ast_typeapp *a,
-		       struct deftype_entry *flat_typeexpr) {
+                       struct ast_generics *generics,
+                       struct ast_typeapp *a,
+                       struct deftype_entry *flat_typeexpr) {
   CHECK_DBG("check_typeexpr_app\n");
   struct deftype_entry *ent;
   if (!name_table_lookup_deftype(&cs->nt, a->name.value,
-				 param_list_arity(a->params_count),
-				 &ent)) {
+                                 param_list_arity(a->params_count),
+                                 &ent)) {
     ERR_DBG("Unrecognized type name/bad arity.\n");
     return 0;
   }
@@ -266,24 +266,24 @@ int check_typeexpr_app(struct checkstate *cs,
 }
 
 int check_typeexpr_fields(struct checkstate *cs,
-			  struct ast_generics *generics,
-			  struct ast_vardecl *fields,
-			  size_t fields_count,
-			  struct deftype_entry *flat_typeexpr) {
+                          struct ast_generics *generics,
+                          struct ast_vardecl *fields,
+                          size_t fields_count,
+                          struct deftype_entry *flat_typeexpr) {
   for (size_t i = 0; i < fields_count; i++) {
     struct ast_vardecl *field = &fields[i];
     for (size_t j = 0; j < i; j++) {
       if (field->name.value == fields[j].name.value) {
-	ERR_DBG("struct/union fields have duplicate name.\n");
-	return 0;
+        ERR_DBG("struct/union fields have duplicate name.\n");
+        return 0;
       }
     }
 
     {
       size_t which_generic;
       if (generics_lookup_name(generics, field->name.value, &which_generic)) {
-	ERR_DBG("struct/union field shadows template parameter, which is gauche.\n");
-	return 0;
+        ERR_DBG("struct/union field shadows template parameter, which is gauche.\n");
+        return 0;
       }
     }
 
@@ -296,9 +296,9 @@ int check_typeexpr_fields(struct checkstate *cs,
 }
 
 int check_typeexpr(struct checkstate *cs,
-		   struct ast_generics *generics,
-		   struct ast_typeexpr *a,
-		   struct deftype_entry *flat_typeexpr) {
+                   struct ast_generics *generics,
+                   struct ast_typeexpr *a,
+                   struct deftype_entry *flat_typeexpr) {
   CHECK_DBG("check_typeexpr\n");
   /* null means we have to worry about flatness, non-null means we don't. */
   switch (a->tag) {
@@ -308,21 +308,21 @@ int check_typeexpr(struct checkstate *cs,
     return check_typeexpr_app(cs, generics, &a->u.app, flat_typeexpr);
   case AST_TYPEEXPR_STRUCTE:
     return check_typeexpr_fields(cs, generics,
-				 a->u.structe.fields,
-				 a->u.structe.fields_count,
-				 flat_typeexpr);
+                                 a->u.structe.fields,
+                                 a->u.structe.fields_count,
+                                 flat_typeexpr);
   case AST_TYPEEXPR_UNIONE:
     return check_typeexpr_fields(cs, generics,
-				 a->u.structe.fields,
-				 a->u.structe.fields_count,
-				 flat_typeexpr);
+                                 a->u.structe.fields,
+                                 a->u.structe.fields_count,
+                                 flat_typeexpr);
   default:
     UNREACHABLE();
   }
 }
 
 int check_generics_shadowing(struct checkstate *cs,
-			     struct ast_generics *a) {
+                             struct ast_generics *a) {
   if (!a->has_type_params) {
     return 1;
   }
@@ -331,8 +331,8 @@ int check_generics_shadowing(struct checkstate *cs,
     ident_value name = a->params[i].value;
     for (size_t j = 0; j < i; j++) {
       if (name == a->params[j].value) {
-	ERR_DBG("duplicate param names within same generics list.\n");
-	return 0;
+        ERR_DBG("duplicate param names within same generics list.\n");
+        return 0;
       }
     }
 
@@ -392,11 +392,11 @@ struct exprscope {
 };
 
 void exprscope_init(struct exprscope *es, struct checkstate *cs,
-		    struct ast_generics *generics,
-		    struct ast_typeexpr *generics_substitutions,
-		    size_t generics_substitutions_count) {
+                    struct ast_generics *generics,
+                    struct ast_typeexpr *generics_substitutions,
+                    size_t generics_substitutions_count) {
   CHECK(generics->params_count == (generics->has_type_params ?
-				   generics_substitutions_count : 0));
+                                   generics_substitutions_count : 0));
   es->cs = cs;
   es->generics = generics;
   es->generics_substitutions = generics_substitutions;
@@ -410,7 +410,7 @@ void exprscope_destroy(struct exprscope *es) {
   es->cs = NULL;
   es->generics = NULL;
   SLICE_FREE(es->generics_substitutions, es->generics_substitutions_count,
-	     ast_typeexpr_destroy);
+             ast_typeexpr_destroy);
   free(es->vars);
   es->vars = NULL;
   es->vars_count = 0;
@@ -418,17 +418,17 @@ void exprscope_destroy(struct exprscope *es) {
 }
 
 int unify_fields_directionally(struct ast_vardecl *partial_fields,
-			       size_t partial_fields_count,
-			       struct ast_vardecl *complete_fields,
-			       size_t complete_fields_count) {
+                               size_t partial_fields_count,
+                               struct ast_vardecl *complete_fields,
+                               size_t complete_fields_count) {
   if (partial_fields_count != complete_fields_count) {
     return 0;
   }
 
   for (size_t i = 0; i < partial_fields_count; i++) {
     if (partial_fields[i].name.value != complete_fields[i].name.value
-	|| !unify_directionally(&partial_fields[i].type,
-				&complete_fields[i].type)) {
+        || !unify_directionally(&partial_fields[i].type,
+                                &complete_fields[i].type)) {
       return 0;
     }
   }
@@ -437,7 +437,7 @@ int unify_fields_directionally(struct ast_vardecl *partial_fields,
 }
 
 int unify_directionally(struct ast_typeexpr *partial_type,
-			struct ast_typeexpr *complete_type) {
+                        struct ast_typeexpr *complete_type) {
   CHECK(complete_type->tag != AST_TYPEEXPR_UNKNOWN);
   if (partial_type->tag == AST_TYPEEXPR_UNKNOWN) {
     return 1;
@@ -455,35 +455,35 @@ int unify_directionally(struct ast_typeexpr *partial_type,
     struct ast_typeapp *p_app = &partial_type->u.app;
     struct ast_typeapp *c_app = &complete_type->u.app;
     if (p_app->name.value != c_app->name.value
-	|| p_app->params_count != c_app->params_count) {
+        || p_app->params_count != c_app->params_count) {
       return 0;
     }
     for (size_t i = 0, e = p_app->params_count; i < e; i++) {
       if (!unify_directionally(&p_app->params[i], &c_app->params[i])) {
-	return 0;
+        return 0;
       }
     }
     return 1;
   } break;
   case AST_TYPEEXPR_STRUCTE:
     return unify_fields_directionally(partial_type->u.structe.fields,
-				      partial_type->u.structe.fields_count,
-				      complete_type->u.structe.fields,
-				      complete_type->u.structe.fields_count);
+                                      partial_type->u.structe.fields_count,
+                                      complete_type->u.structe.fields,
+                                      complete_type->u.structe.fields_count);
   case AST_TYPEEXPR_UNIONE:
     return unify_fields_directionally(partial_type->u.unione.fields,
-				      partial_type->u.unione.fields_count,
-				      complete_type->u.unione.fields,
-				      complete_type->u.unione.fields_count);
+                                      partial_type->u.unione.fields_count,
+                                      complete_type->u.unione.fields,
+                                      complete_type->u.unione.fields_count);
   default:
     UNREACHABLE();
   }
 }
 
 int exprscope_lookup_name(struct exprscope *es,
-			  ident_value name,
-			  struct ast_typeexpr *partial_type,
-			  struct ast_typeexpr *out) {
+                          ident_value name,
+                          struct ast_typeexpr *partial_type,
+                          struct ast_typeexpr *out) {
   for (size_t i = es->vars_count; i-- > 0; ) {
     struct ast_vardecl *decl = es->vars[i];
     if (decl->name.value != name) {
@@ -502,11 +502,11 @@ int exprscope_lookup_name(struct exprscope *es,
   struct ast_typeexpr unified;
   struct def_entry *ent;
   if (name_table_match_def(&es->cs->nt,
-			   name,
-			   NULL, /* No generic typeexpr parameters on this expr */
-			   0,
-			   partial_type,
-			   &unified, &ent)) {
+                           name,
+                           NULL, /* No generic typeexpr parameters on this expr */
+                           0,
+                           partial_type,
+                           &unified, &ent)) {
     *out = unified;
     return 1;
   }
@@ -516,43 +516,43 @@ int exprscope_lookup_name(struct exprscope *es,
 }
 
 void numeric_literal_type(struct ident_map *im,
-			  struct ast_numeric_literal *a,
-			  struct ast_typeexpr *out) {
+                          struct ast_numeric_literal *a,
+                          struct ast_typeexpr *out) {
   (void)a;
   out->tag = AST_TYPEEXPR_NAME;
   ast_ident_init(&out->u.name, ast_meta_make_garbage(),
-		 ident_map_intern_c_str(im, I32_TYPE_NAME));
+                 ident_map_intern_c_str(im, I32_TYPE_NAME));
 }
 
 void do_replace_generics(struct ast_generics *generics,
-			 struct ast_typeexpr *generics_substitutions,
-			 struct ast_typeexpr *a,
-			 struct ast_typeexpr *out);
+                         struct ast_typeexpr *generics_substitutions,
+                         struct ast_typeexpr *a,
+                         struct ast_typeexpr *out);
 
 void do_replace_generics_in_fields(struct ast_generics *generics,
-				   struct ast_typeexpr *generics_substitutions,
-				   struct ast_vardecl *fields,
-				   size_t fields_count,
-				   struct ast_vardecl **fields_out,
-				   size_t *fields_count_out) {
+                                   struct ast_typeexpr *generics_substitutions,
+                                   struct ast_vardecl *fields,
+                                   size_t fields_count,
+                                   struct ast_vardecl **fields_out,
+                                   size_t *fields_count_out) {
   struct ast_vardecl *f = malloc_mul(sizeof(*f), fields_count);
   for (size_t i = 0; i < fields_count; i++) {
     struct ast_ident name;
     ast_ident_init_copy(&name, &fields[i].name);
     struct ast_typeexpr type;
     do_replace_generics(generics, generics_substitutions, &fields[i].type,
-			&type);
+                        &type);
     ast_vardecl_init(&f[i], ast_meta_make_garbage(),
-		     name, type);
+                     name, type);
   }
   *fields_out = f;
   *fields_count_out = fields_count;
 }
 
 void do_replace_generics(struct ast_generics *generics,
-			 struct ast_typeexpr *generics_substitutions,
-			 struct ast_typeexpr *a,
-			 struct ast_typeexpr *out) {
+                         struct ast_typeexpr *generics_substitutions,
+                         struct ast_typeexpr *a,
+                         struct ast_typeexpr *out) {
   switch (a->tag) {
   case AST_TYPEEXPR_NAME: {
     size_t which_generic;
@@ -569,7 +569,7 @@ void do_replace_generics(struct ast_generics *generics,
 
     for (size_t i = 0, e = params_count; i < e; i++) {
       do_replace_generics(generics, generics_substitutions,
-			  &app->params[i], &params[i]);
+                          &app->params[i], &params[i]);
     }
 
     struct ast_ident name;
@@ -577,27 +577,27 @@ void do_replace_generics(struct ast_generics *generics,
 
     out->tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
-		     name, params, params_count);
+                     name, params, params_count);
   } break;
   case AST_TYPEEXPR_STRUCTE: {
     struct ast_vardecl *fields;
     size_t fields_count;
     do_replace_generics_in_fields(generics, generics_substitutions,
-				  a->u.structe.fields, a->u.structe.fields_count,
-				  &fields, &fields_count);
+                                  a->u.structe.fields, a->u.structe.fields_count,
+                                  &fields, &fields_count);
     out->tag = AST_TYPEEXPR_STRUCTE;
     ast_structe_init(&out->u.structe, ast_meta_make_garbage(),
-		     fields, fields_count);
+                     fields, fields_count);
   } break;
   case AST_TYPEEXPR_UNIONE: {
     struct ast_vardecl *fields;
     size_t fields_count;
     do_replace_generics_in_fields(generics, generics_substitutions,
-				  a->u.unione.fields, a->u.unione.fields_count,
-				  &fields, &fields_count);
+                                  a->u.unione.fields, a->u.unione.fields_count,
+                                  &fields, &fields_count);
     out->tag = AST_TYPEEXPR_UNIONE;
     ast_unione_init(&out->u.unione, ast_meta_make_garbage(),
-		     fields, fields_count);
+                     fields, fields_count);
   } break;
   default:
     UNREACHABLE();
@@ -605,8 +605,8 @@ void do_replace_generics(struct ast_generics *generics,
 }
 
 void replace_generics(struct exprscope *es,
-		      struct ast_typeexpr *a,
-		      struct ast_typeexpr *out) {
+                      struct ast_typeexpr *a,
+                      struct ast_typeexpr *out) {
   if (!es->generics->has_type_params) {
     ast_typeexpr_init_copy(out, a);
   } else {
@@ -616,20 +616,20 @@ void replace_generics(struct exprscope *es,
 }
 
 int check_expr(struct exprscope *es,
-	       struct ast_expr *x,
-	       struct ast_typeexpr *partial_type,
-	       struct ast_typeexpr *out);
+               struct ast_expr *x,
+               struct ast_typeexpr *partial_type,
+               struct ast_typeexpr *out);
 
 int check_expr_funcall(struct exprscope *es,
-		       struct ast_funcall *x,
-		       struct ast_typeexpr *partial_type,
-		       struct ast_typeexpr *out) {
+                       struct ast_funcall *x,
+                       struct ast_typeexpr *partial_type,
+                       struct ast_typeexpr *out) {
   /* TODO: We also need to type-check any template instantiations. */
 
   size_t args_count = x->args_count;
   size_t args_types_count = size_add(args_count, 1);
   struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
-					       args_types_count);
+                                               args_types_count);
   size_t i;
   for (i = 0; i < args_count; i++) {
     struct ast_typeexpr local_partial;
@@ -695,9 +695,9 @@ int check_var_shadowing(struct exprscope *es, ident_value name) {
 }
 
 int check_expr_lambda(struct exprscope *es,
-		      struct ast_lambda *x,
-		      struct ast_typeexpr *partial_type,
-		      struct ast_typeexpr *out) {
+                      struct ast_lambda *x,
+                      struct ast_typeexpr *partial_type,
+                      struct ast_typeexpr *out) {
   ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
   size_t func_params_count = x->params_count;
   size_t args_count = size_add(func_params_count, 1);
@@ -708,18 +708,18 @@ int check_expr_lambda(struct exprscope *es,
     size_t i;
     for (i = 0; i < func_params_count; i++) {
       for (size_t j = 0; j < i; j++) {
-	if (x->params[i].name.value == x->params[j].name.value) {
-	  ERR_DBG("Duplicate lambda parameter name.\n");
-	  goto fail_args_up_to_i;
-	}
+        if (x->params[i].name.value == x->params[j].name.value) {
+          ERR_DBG("Duplicate lambda parameter name.\n");
+          goto fail_args_up_to_i;
+        }
       }
       if (!check_var_shadowing(es, x->params[i].name.value)) {
-	goto fail_args_up_to_i;
+        goto fail_args_up_to_i;
       }
 
       if (!check_typeexpr(es->cs, es->generics, &x->params[i].type, NULL)) {
-	ERR_DBG("Invalid type.\n");
-	goto fail_args_up_to_i;
+        ERR_DBG("Invalid type.\n");
+        goto fail_args_up_to_i;
       }
 
       replace_generics(es, &x->params[i].type, &args[i]);
@@ -738,7 +738,7 @@ int check_expr_lambda(struct exprscope *es,
 
     funcexpr.tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
-		     name, args, args_count);
+                     name, args, args_count);
   }
 
   if (!unify_directionally(partial_type, &funcexpr)) {
@@ -756,9 +756,9 @@ int check_expr_lambda(struct exprscope *es,
 }
 
 int check_expr(struct exprscope *es,
-	       struct ast_expr *x,
-	       struct ast_typeexpr *partial_type,
-	       struct ast_typeexpr *out) {
+               struct ast_expr *x,
+               struct ast_typeexpr *partial_type,
+               struct ast_typeexpr *out) {
   switch (x->tag) {
   case AST_EXPR_NAME: {
     struct ast_typeexpr name_type;
@@ -807,8 +807,8 @@ int check_expr(struct exprscope *es,
 
 /* Checks an expr, given that we know the type of expr. */
 int check_expr_with_type(struct exprscope *es,
-			 struct ast_expr *x,
-			 struct ast_typeexpr *type) {
+                         struct ast_expr *x,
+                         struct ast_typeexpr *type) {
   struct ast_typeexpr out;
   int ret = check_expr(es, x, type, &out);
   if (ret) {
@@ -884,9 +884,9 @@ int check_module(struct ident_map *im, module_loader *loader, ident_value name) 
 }
 
 int read_module_file(const uint8_t *module_name,
-		     size_t module_name_count,
-		     uint8_t **data_out,
-		     size_t *data_size_out) {
+                     size_t module_name_count,
+                     uint8_t **data_out,
+                     size_t *data_size_out) {
   int ret = 0;
   char *filename;
   {
@@ -912,11 +912,11 @@ struct test_module {
 };
 
 int load_test_module(struct test_module *a, size_t a_count,
-		     const uint8_t *name, size_t name_count,
-		     uint8_t **data_out, size_t *data_count_out) {
+                     const uint8_t *name, size_t name_count,
+                     uint8_t **data_out, size_t *data_count_out) {
   for (size_t i = 0; i < a_count; i++) {
     if (strlen(a[i].name) == name_count
-	&& 0 == memcmp(a[i].name, name, name_count)) {
+        && 0 == memcmp(a[i].name, name, name_count)) {
       STATIC_CHECK(sizeof(uint8_t) == 1);
       size_t data_count = strlen(a[i].data);
       uint8_t *data = malloc_mul(data_count, sizeof(uint8_t));
@@ -930,129 +930,129 @@ int load_test_module(struct test_module *a, size_t a_count,
 }
 
 int check_file_test_1(const uint8_t *name, size_t name_count,
-		      uint8_t **data_out, size_t *data_count_out) {
+                      uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
-			       "import bar;\n"
-			       "\n"
-			       "def x i32 = 3;"
-			       "deftype dword u32;\n" },
-			     { "bar",
-			       "import foo;\n"
-			       "\n"
-			       "def y f64 = 5;\n" } };
+                               "import bar;\n"
+                               "\n"
+                               "def x i32 = 3;"
+                               "deftype dword u32;\n" },
+                             { "bar",
+                               "import foo;\n"
+                               "\n"
+                               "def y f64 = 5;\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
-			  name, name_count, data_out, data_count_out);
+                          name, name_count, data_out, data_count_out);
 }
 
 
 int check_file_test_2(const uint8_t *name, size_t name_count,
-		      uint8_t **data_out, size_t *data_count_out) {
+                      uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
-			       "def x i32 = 3;"
-			       "deftype dword u32;\n"
-			       "deftype blah dword;\n"
-			       "deftype feh ptr[blah];\n"
-			       "deftype quux ptr[quux];\n" } };
+                               "def x i32 = 3;"
+                               "deftype dword u32;\n"
+                               "deftype blah dword;\n"
+                               "deftype feh ptr[blah];\n"
+                               "deftype quux ptr[quux];\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
-			  name, name_count, data_out, data_count_out);
+                          name, name_count, data_out, data_count_out);
 }
 
 int check_file_test_3(const uint8_t *name, size_t name_count,
-		      uint8_t **data_out, size_t *data_count_out) {
+                      uint8_t **data_out, size_t *data_count_out) {
   /* An invalid file: bar and foo recursively hold each other. */
   struct test_module a[] = { { "foo",
-			       "def x i32 = 3;"
-			       "deftype foo bar;\n"
-			       "deftype bar foo;\n" } };
+                               "def x i32 = 3;"
+                               "deftype foo bar;\n"
+                               "deftype bar foo;\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
-			  name, name_count, data_out, data_count_out);
+                          name, name_count, data_out, data_count_out);
 }
 
 int check_file_test_4(const uint8_t *name, size_t name_count,
-		      uint8_t **data_out, size_t *data_count_out) {
+                      uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
-			       "def x i32 = 3;"
-			       "deftype foo struct { x u32; y f64; z ptr[foo]; };\n" } };
+                               "def x i32 = 3;"
+                               "deftype foo struct { x u32; y f64; z ptr[foo]; };\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
-			  name, name_count, data_out, data_count_out);
+                          name, name_count, data_out, data_count_out);
 }
 
 int check_file_test_5(const uint8_t *name, size_t name_count,
-		      uint8_t **data_out, size_t *data_count_out) {
+                      uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
-			       "def x i32 = 3;"
-			       "deftype[T] foo T;" } };
+                               "def x i32 = 3;"
+                               "deftype[T] foo T;" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
-			  name, name_count, data_out, data_count_out);
+                          name, name_count, data_out, data_count_out);
 }
 
 int check_file_test_6(const uint8_t *name, size_t name_count,
-		      uint8_t **data_out, size_t *data_count_out) {
+                      uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
-			       "def x i32 = 3;"
-			       "deftype[T] foo struct { count u32; p ptr[T]; };\n" } };
+                               "def x i32 = 3;"
+                               "deftype[T] foo struct { count u32; p ptr[T]; };\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
-			  name, name_count, data_out, data_count_out);
+                          name, name_count, data_out, data_count_out);
 }
 
 int check_file_test_7(const uint8_t *name, size_t name_count,
-		      uint8_t **data_out, size_t *data_count_out) {
+                      uint8_t **data_out, size_t *data_count_out) {
   /* This fails because bar recursively holds itself through a
      template parameter. */
   struct test_module a[] = { { "foo",
-			       "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
-			       "deftype bar struct { z foo[u32, bar]; };\n" } };
+                               "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
+                               "deftype bar struct { z foo[u32, bar]; };\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
-			  name, name_count, data_out, data_count_out);
+                          name, name_count, data_out, data_count_out);
 }
 
 int check_file_test_8(const uint8_t *name, size_t name_count,
-		      uint8_t **data_out, size_t *data_count_out) {
+                      uint8_t **data_out, size_t *data_count_out) {
   /* But here bar holds itself indirectly. */
   struct test_module a[] = { { "foo",
-			       "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
-			       "deftype bar struct { z foo[bar, u32]; };\n" } };
+                               "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
+                               "deftype bar struct { z foo[bar, u32]; };\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
-			  name, name_count, data_out, data_count_out);
+                          name, name_count, data_out, data_count_out);
 }
 
 int check_file_test_def_1(const uint8_t *name, size_t name_count,
-			  uint8_t **data_out, size_t *data_count_out) {
+                          uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
-			       "def x i32 = 3;\n" } };
+                               "def x i32 = 3;\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
-			  name, name_count, data_out, data_count_out);
+                          name, name_count, data_out, data_count_out);
 }
 
 int check_file_test_def_2(const uint8_t *name, size_t name_count,
-			  uint8_t **data_out, size_t *data_count_out) {
+                          uint8_t **data_out, size_t *data_count_out) {
   /* Fails because numeric literals are dumb and have type i32. */
   struct test_module a[] = { { "foo",
-			       "def x u32 = 3;\n" } };
+                               "def x u32 = 3;\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
-			  name, name_count, data_out, data_count_out);
+                          name, name_count, data_out, data_count_out);
 }
 
 int check_file_test_def_3(const uint8_t *name, size_t name_count,
-			  uint8_t **data_out, size_t *data_count_out) {
+                          uint8_t **data_out, size_t *data_count_out) {
   /* Fails because numeric literals are dumb and have type i32. */
   struct test_module a[] = { { "foo",
-			       "def x i32 = 3;\n"
-			       "def y i32 = x;\n"
+                               "def x i32 = 3;\n"
+                               "def y i32 = x;\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
-			  name, name_count, data_out, data_count_out);
+                          name, name_count, data_out, data_count_out);
 }
 
 

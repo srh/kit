@@ -48,7 +48,7 @@ size_t ident_map_hash(const void *buf, size_t count) {
 }
 
 void ident_map_rebuild(struct ident_map *m,
-		       size_t new_limit) {
+                       size_t new_limit) {
   IDENTMAP_DBG("ident_map_rebuild, m->count=%"PRIz", new_limit=%"PRIz"\n", m->count, new_limit);
   /* The limit must always be a power of two. */
   CHECK(0 == (new_limit & (new_limit - 1)));
@@ -71,7 +71,7 @@ void ident_map_rebuild(struct ident_map *m,
     }
 
     size_t hash = ident_map_hash(m->strings + m->table[i].strings_offset,
-				 m->table[i].count);
+                                 m->table[i].count);
     size_t offset = hash & (new_limit - 1);
 
     size_t step = 1;
@@ -91,7 +91,7 @@ void ident_map_rebuild(struct ident_map *m,
 
 /* Returns the added string's offset into m->strings. */
 size_t ident_map_add_string(struct ident_map *m, const void *buf,
-			    size_t count) {
+                            size_t count) {
   IDENTMAP_DBG("ident_map_add_string\n");
   size_t new_size = size_add(m->strings_size, count);
   if (new_size > m->strings_limit) {
@@ -116,15 +116,15 @@ size_t ident_map_add_string(struct ident_map *m, const void *buf,
 }
 
 ident_value ident_map_intern(struct ident_map *m,
-			     const void *buf,
-			     size_t count) {
+                             const void *buf,
+                             size_t count) {
   size_t limit = m->limit;
   IDENTMAP_DBG("ident_map_intern count=%"PRIz", with limit %"PRIz"\n", count, limit);
   if (limit == 0) {
     ident_map_rebuild(m, 8);
     limit = m->limit;
     IDENTMAP_DBG("ident_map_intern rebuilt the map, its count and limit are %"PRIz" and %"PRIz"\n",
-		 m->count, m->limit);
+                 m->count, m->limit);
   }
   size_t offset = ident_map_hash(buf, count) & (limit - 1);
   size_t step = 1;
@@ -132,7 +132,7 @@ ident_value ident_map_intern(struct ident_map *m,
   while ((v = m->table[offset].ident), v != IDENT_VALUE_INVALID) {
     IDENTMAP_DBG("a collision at offset %"PRIz"\n", offset);
     if (m->table[offset].count == count
-	&& 0 == memcmp(m->strings + m->table[offset].strings_offset, buf, count)) {
+        && 0 == memcmp(m->strings + m->table[offset].strings_offset, buf, count)) {
       return v;
     }
 
@@ -159,12 +159,12 @@ ident_value ident_map_intern(struct ident_map *m,
 }
 
 ident_value ident_map_intern_c_str(struct ident_map *m,
-				   const char *s) {
+                                   const char *s) {
   return ident_map_intern(m, s, strlen(s));
 }
 
 void ident_map_lookup(struct ident_map *m, ident_value ident,
-		      const void **buf_out, size_t *count_out) {
+                      const void **buf_out, size_t *count_out) {
   CHECK(ident != IDENT_VALUE_INVALID);
   /* TODO: We need a more efficient reverse lookup process. */
   for (size_t i = 0, e = m->limit; i < e; i++) {

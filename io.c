@@ -7,8 +7,8 @@
 #include "util.h"
 
 int read_file(const char *path,
-	      uint8_t **data_out,
-	      size_t *size_out) {
+              uint8_t **data_out,
+              size_t *size_out) {
   FILE *fp = fopen(path, "rb");
   if (!fp) {
     return 0;

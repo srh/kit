@@ -44,7 +44,7 @@ void ps_init(struct ps *p, const uint8_t *data, size_t length) {
 /* Takes ownership of the ident table -- use ps_remove_ident_table to
    get it back. */
 void ps_init_with_ident_table(struct ps *p, struct ident_map *im,
-			      const uint8_t *data, size_t length) {
+                              const uint8_t *data, size_t length) {
   p->data = data;
   p->length = length;
   p->pos = 0;
@@ -122,13 +122,13 @@ void ps_count_leaf(struct ps *p) {
 }
 
 ident_value ps_intern_ident(struct ps *p,
-			    struct ps_savestate ident_begin,
-			    struct ps_savestate ident_end) {
+                            struct ps_savestate ident_begin,
+                            struct ps_savestate ident_end) {
   CHECK(ident_end.pos <= p->length);
   CHECK(ident_begin.pos <= ident_end.pos);
   return ident_map_intern(&p->ident_table,
-			  p->data + ident_begin.pos,
-			  ident_end.pos - ident_begin.pos);
+                          p->data + ident_begin.pos,
+                          ident_end.pos - ident_begin.pos);
 }
 
 void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out) {
@@ -173,7 +173,7 @@ const struct precedence_pair binop_precedences[] = {
 
 struct precedence_pair binop_precedence(enum ast_binop op) {
   CHECK(0 <= op &&
-	op < sizeof(binop_precedences) / sizeof(binop_precedences[0]));
+        op < sizeof(binop_precedences) / sizeof(binop_precedences[0]));
   return binop_precedences[op];
 }
 
@@ -185,7 +185,7 @@ const int unop_right_precedences[] = {
 
 int unop_right_precedence(enum ast_unop op) {
   CHECK(0 <= op &&
-	op < sizeof(unop_right_precedences) / sizeof(unop_right_precedences[0]));
+        op < sizeof(unop_right_precedences) / sizeof(unop_right_precedences[0]));
   return unop_right_precedences[op];
 }
 
@@ -277,14 +277,14 @@ int skip_ws(struct ps *p) {
       ps_step(p);
       int32_t ch2 = ps_peek(p);
       if (ch2 == '/') {
-	ps_step(p);
-	goto skip_past_line_comment;
+        ps_step(p);
+        goto skip_past_line_comment;
       } else if (ch2 == '*') {
-	ps_step(p);
-	goto skip_past_star_comment;
+        ps_step(p);
+        goto skip_past_star_comment;
       } else {
-	ps_restore(p, save);
-	return 1;
+        ps_restore(p, save);
+        return 1;
       }
     } else {
       return 1;
@@ -314,12 +314,12 @@ int skip_ws(struct ps *p) {
       ps_step(p);
       int32_t ch2 = ps_peek(p);
       if (ch2 == '/') {
-	ps_step(p);
-	goto top;
+        ps_step(p);
+        goto top;
       } else if (is_ok_in_comment(ch)) {
-	ps_step(p);
+        ps_step(p);
       } else {
-	return 0;
+        return 0;
       }
     } else if (is_ok_in_comment(ch)) {
       ps_step(p);
@@ -388,8 +388,8 @@ int try_parse_unop(struct ps *p, enum ast_unop *out) {
       return 0;
     }
     *out = (ch1 == '*' ? AST_UNOP_DEREFERENCE
-	    : ch1 == '&' ? AST_UNOP_ADDRESSOF
-	    : AST_UNOP_NEGATE);
+            : ch1 == '&' ? AST_UNOP_ADDRESSOF
+            : AST_UNOP_NEGATE);
     ps_count_leaf(p);
     return 1;
   } else {
@@ -514,7 +514,7 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
   }
 
   ast_ident_init(out, ast_meta_make(pos_start, ps_pos(p)),
-		 ps_intern_ident(p, save, ps_save(p)));
+                 ps_intern_ident(p, save, ps_save(p)));
   ps_count_leaf(p);
   return 1;
 }
@@ -533,7 +533,7 @@ int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
   }
 
   ast_vardecl_init(out, ast_meta_make(pos_start, ps_pos(p)),
-		   name, type);
+                   name, type);
   return 1;
 
  fail_name:
@@ -545,8 +545,8 @@ int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
 int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context);
 
 int parse_params_list(struct ps *p,
-		      struct ast_vardecl **params_out,
-		      size_t *params_count_out) {
+                      struct ast_vardecl **params_out,
+                      size_t *params_count_out) {
   PARSE_DBG("parse_params_list\n");
   if (!try_skip_char(p, '(')) {
     return 0;
@@ -567,10 +567,10 @@ int parse_params_list(struct ps *p,
 
     if (params_count != 0) {
       if (!try_skip_char(p, ',')) {
-	goto fail;
+        goto fail;
       }
       if (!skip_ws(p)) {
-	goto fail;
+        goto fail;
       }
     }
 
@@ -589,7 +589,7 @@ int parse_params_list(struct ps *p,
 int parse_bracebody(struct ps *p, struct ast_bracebody *out);
 
 int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
-			       struct ast_statement *out) {
+                               struct ast_statement *out) {
   struct ast_expr condition;
   if (!(skip_ws(p) && parse_expr(p, &condition, kSemicolonPrecedence))) {
     goto fail;
@@ -610,9 +610,9 @@ int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
     malloc_move_ast_expr(condition, &heap_condition);
     out->tag = AST_STATEMENT_IFTHEN;
     ast_ifthen_statement_init(&out->u.ifthen_statement,
-			      ast_meta_make(pos_start, pos_thenbody_end),
-			      heap_condition,
-			      thenbody);
+                              ast_meta_make(pos_start, pos_thenbody_end),
+                              heap_condition,
+                              thenbody);
     return 1;
   }
 
@@ -625,10 +625,10 @@ int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
   malloc_move_ast_expr(condition, &heap_condition);
   out->tag = AST_STATEMENT_IFTHENELSE;
   ast_ifthenelse_statement_init(&out->u.ifthenelse_statement,
-				ast_meta_make(pos_start, ps_pos(p)),
-				heap_condition,
-				thenbody,
-				elsebody);
+                                ast_meta_make(pos_start, ps_pos(p)),
+                                heap_condition,
+                                thenbody,
+                                elsebody);
   return 1;
 
  fail_thenbody:
@@ -640,7 +640,7 @@ int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
 }
 
 int parse_rest_of_var_statement(struct ps *p, size_t pos_start,
-				struct ast_var_statement *out) {
+                                struct ast_var_statement *out) {
   struct ast_ident name;
   if (!(skip_ws(p) && parse_ident(p, &name))) {
     goto fail;
@@ -667,7 +667,7 @@ int parse_rest_of_var_statement(struct ps *p, size_t pos_start,
   struct ast_expr *heap_rhs;
   malloc_move_ast_expr(rhs, &heap_rhs);
   ast_var_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
-			 name, type, heap_rhs);
+                         name, type, heap_rhs);
   return 1;
 
  fail_rhs:
@@ -696,8 +696,8 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
     }
     out->tag = AST_STATEMENT_GOTO;
     ast_goto_statement_init(&out->u.goto_statement,
-			    ast_meta_make(pos_start, ps_pos(p)),
-			    target);
+                            ast_meta_make(pos_start, ps_pos(p)),
+                            target);
     return 1;
   } else if (try_skip_keyword(p, "label")) {
     struct ast_ident label;
@@ -710,8 +710,8 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
     }
     out->tag = AST_STATEMENT_LABEL;
     ast_label_statement_init(&out->u.label_statement,
-			     ast_meta_make(pos_start, ps_pos(p)),
-			     label);
+                             ast_meta_make(pos_start, ps_pos(p)),
+                             label);
     return 1;
   } else if (try_skip_keyword(p, "return")) {
     struct ast_expr expr;
@@ -764,7 +764,7 @@ int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
     }
     if (try_skip_char(p, '}')) {
       ast_bracebody_init(out, ast_meta_make(pos_start, ps_pos(p)),
-			 statements, statements_count);
+                         statements, statements_count);
       return 1;
     }
 
@@ -782,7 +782,7 @@ int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
 }
 
 int parse_rest_of_lambda(struct ps *p, size_t pos_start,
-			 struct ast_lambda *out) {
+                         struct ast_lambda *out) {
   PARSE_DBG("parse_rest_of_lambda\n");
   struct ast_vardecl *params;
   size_t params_count;
@@ -804,7 +804,7 @@ int parse_rest_of_lambda(struct ps *p, size_t pos_start,
 
   PARSE_DBG("parse_rest_of_lambda success\n");
   ast_lambda_init(out, ast_meta_make(pos_start, ps_pos(p)),
-		  params, params_count, return_type, bracebody);
+                  params, params_count, return_type, bracebody);
   return 1;
 
  fail_return_type:
@@ -842,14 +842,14 @@ int parse_numeric_literal(struct ps *p, struct ast_numeric_literal *out) {
   }
 
   ast_numeric_literal_init(out, ast_meta_make(pos_start, ps_pos(p)),
-			   digits, digits_count);
+                           digits, digits_count);
   ps_count_leaf(p);
   return 1;
 }
 
 int parse_rest_of_arglist(struct ps *p,
-			  struct ast_expr **args_out,
-			  size_t *args_count_out) {
+                          struct ast_expr **args_out,
+                          size_t *args_count_out) {
   struct ast_expr *args = NULL;
   size_t args_count = 0;
   size_t args_limit = 0;
@@ -865,10 +865,10 @@ int parse_rest_of_arglist(struct ps *p,
     }
     if (args_count != 0) {
       if (!try_skip_char(p, ',')) {
-	goto fail;
+        goto fail;
       }
       if (!skip_ws(p)) {
-	goto fail;
+        goto fail;
       }
     }
 
@@ -926,8 +926,8 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     malloc_move_ast_expr(rhs, &heap_rhs);
     out->tag = AST_EXPR_UNOP;
     ast_unop_expr_init(&out->u.unop_expr,
-		       ast_meta_make(pos_start, ast_expr_pos_end(heap_rhs)),
-		       unop, heap_rhs);
+                       ast_meta_make(pos_start, ast_expr_pos_end(heap_rhs)),
+                       unop, heap_rhs);
     return 1;
   }
 
@@ -952,72 +952,72 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       struct ast_expr *args;
       size_t args_count;
       if (!parse_rest_of_arglist(p, &args, &args_count)) {
-	goto fail;
+        goto fail;
       }
       struct ast_expr *heap_lhs;
       malloc_move_ast_expr(lhs, &heap_lhs);
       lhs.tag = AST_EXPR_FUNCALL;
       ast_funcall_init(&lhs.u.funcall,
-		       ast_meta_make(pos_start, ps_pos(p)),
-		       heap_lhs,
-		       args,
-		       args_count);
+                       ast_meta_make(pos_start, ps_pos(p)),
+                       heap_lhs,
+                       args,
+                       args_count);
     } else if (try_skip_oper(p, ".")) {
       struct ast_ident field_name;
       if (!(skip_ws(p) && parse_ident(p, &field_name))) {
-	goto fail;
+        goto fail;
       }
 
       struct ast_expr *heap_lhs;
       malloc_move_ast_expr(lhs, &heap_lhs);
       lhs.tag = AST_EXPR_LOCAL_FIELD_ACCESS;
       ast_local_field_access_init(&lhs.u.local_field_access,
-				  ast_meta_make(pos_start, ps_pos(p)),
-				  heap_lhs,
-				  field_name);
+                                  ast_meta_make(pos_start, ps_pos(p)),
+                                  heap_lhs,
+                                  field_name);
     } else if (try_skip_oper(p, "->")) {
       struct ast_ident field_name;
       if (!(skip_ws(p) && parse_ident(p, &field_name))) {
-	goto fail;
+        goto fail;
       }
 
       struct ast_expr *heap_lhs;
       malloc_move_ast_expr(lhs, &heap_lhs);
       lhs.tag = AST_EXPR_DEREF_FIELD_ACCESS;
       ast_deref_field_access_init(&lhs.u.deref_field_access,
-				  ast_meta_make(pos_start, ps_pos(p)),
-				  heap_lhs,
-				  field_name);
+                                  ast_meta_make(pos_start, ps_pos(p)),
+                                  heap_lhs,
+                                  field_name);
     } else if (is_binop_start(ps_peek(p))) {
       struct ps_savestate save = ps_save(p);
 
       enum ast_binop op;
       if (!parse_binop(p, &op)) {
-	goto fail;
+        goto fail;
       }
 
       struct precedence_pair op_precedence = binop_precedence(op);
 
       enum precedence_comparison cmp
-	= compare_precedence(precedence_context,
-			     op_precedence.left_precedence);
+        = compare_precedence(precedence_context,
+                             op_precedence.left_precedence);
 
       switch (cmp) {
       case PRECEDENCE_COMPARISON_CONFLICTS:
-	goto fail;
+        goto fail;
       case PRECEDENCE_COMPARISON_PULLS_LEFT:
-	ps_restore(p, save);
-	*out = lhs;
-	return 1;
+        ps_restore(p, save);
+        *out = lhs;
+        return 1;
       case PRECEDENCE_COMPARISON_PULLS_RIGHT:
-	break;
+        break;
       default:
-	UNREACHABLE();
+        UNREACHABLE();
       }
 
       struct ast_expr rhs;
       if (!(skip_ws(p) && parse_expr(p, &rhs, op_precedence.right_precedence))) {
-	goto fail;
+        goto fail;
       }
 
       struct ast_expr *heap_lhs;
@@ -1027,8 +1027,8 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
 
       lhs.tag = AST_EXPR_BINOP;
       ast_binop_expr_init(&lhs.u.binop_expr,
-			  ast_meta_make(pos_start, ast_expr_pos_end(heap_rhs)),
-			  op, heap_lhs, heap_rhs);
+                          ast_meta_make(pos_start, ast_expr_pos_end(heap_rhs)),
+                          op, heap_lhs, heap_rhs);
     } else {
       PARSE_DBG("parse_expr done\n");
       *out = lhs;
@@ -1042,8 +1042,8 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
 }
 
 int parse_braced_fields(struct ps *p,
-			struct ast_vardecl **fields_out,
-			size_t *fields_count_out) {
+                        struct ast_vardecl **fields_out,
+                        size_t *fields_count_out) {
   if (!try_skip_char(p, '{')) {
     return 0;
   }
@@ -1085,7 +1085,7 @@ int parse_rest_of_structe(struct ps *p, size_t pos_start, struct ast_structe *ou
     return 0;
   }
   ast_structe_init(out, ast_meta_make(pos_start, ps_pos(p)),
-		   fields, fields_count);
+                   fields, fields_count);
   return 1;
 }
 
@@ -1096,7 +1096,7 @@ int parse_rest_of_unione(struct ps *p, size_t pos_start, struct ast_unione *out)
     return 0;
   }
   ast_unione_init(out, ast_meta_make(pos_start, ps_pos(p)),
-		  fields, fields_count);
+                  fields, fields_count);
   return 1;
 }
 
@@ -1138,16 +1138,16 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
     if (try_skip_char(p, ']')) {
       out->tag = AST_TYPEEXPR_APP;
       ast_typeapp_init(&out->u.app, ast_meta_make(pos_start, ps_pos(p)),
-		       name, params, params_count);
+                       name, params, params_count);
       return 1;
     }
 
     if (params_count != 0) {
       if (!try_skip_char(p, ',')) {
-	goto fail_slice;
+        goto fail_slice;
       }
       if (!skip_ws(p)) {
-	goto fail_slice;
+        goto fail_slice;
       }
     }
 
@@ -1167,7 +1167,7 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
 }
 
 int parse_type_params_if_present(struct ps *p,
-				 struct ast_generics *out) {
+                                 struct ast_generics *out) {
   size_t pos_start = ps_pos(p);
   if (!try_skip_char(p, '[')) {
     ast_generics_init_no_params(out);
@@ -1183,17 +1183,17 @@ int parse_type_params_if_present(struct ps *p,
     }
     if (try_skip_char(p, ']')) {
       ast_generics_init_has_params(out,
-				   ast_meta_make(pos_start, ps_pos(p)),
-				   params, params_count);
+                                   ast_meta_make(pos_start, ps_pos(p)),
+                                   params, params_count);
       return 1;
     }
 
     if (params_count != 0) {
       if (!try_skip_char(p, ',')) {
-	goto fail;
+        goto fail;
       }
       if (!skip_ws(p)) {
-	goto fail;
+        goto fail;
       }
     }
     struct ast_ident param;
@@ -1238,7 +1238,7 @@ int parse_rest_of_def(struct ps *p, size_t pos_start, struct ast_def *out) {
   }
 
   ast_def_init(out, ast_meta_make(pos_start, ps_pos(p)),
-	       generics, name, type, rhs);
+               generics, name, type, rhs);
   return 1;
 
  fail_rhs:
@@ -1275,7 +1275,7 @@ int parse_rest_of_import(struct ps *p, size_t pos_start, struct ast_import *out)
 int parse_toplevel(struct ps *p, struct ast_toplevel *out);
 
 int parse_rest_of_deftype(struct ps *p, size_t pos_start,
-			  struct ast_deftype *out) {
+                          struct ast_deftype *out) {
   PARSE_DBG("parse_rest_of_deftype");
   struct ast_generics generics;
   if (!(skip_ws(p) && parse_type_params_if_present(p, &generics))) {
@@ -1293,7 +1293,7 @@ int parse_rest_of_deftype(struct ps *p, size_t pos_start,
     goto fail_typeexpr;
   }
   ast_deftype_init(out, ast_meta_make(pos_start, ps_pos(p)),
-		   generics, name, type);
+                   generics, name, type);
   return 1;
 
  fail_typeexpr:
@@ -1348,9 +1348,9 @@ int parse_file(struct ps *p, struct ast_file *out) {
 }
 
 int parse_buf_file(struct ident_map *im,
-		   const uint8_t *buf, size_t length,
-		   struct ast_file *file_out,
-		   size_t *error_pos_out) {
+                   const uint8_t *buf, size_t length,
+                   struct ast_file *file_out,
+                   size_t *error_pos_out) {
   struct ps p;
   ps_init_with_ident_table(&p, im, buf, length);
 
@@ -1367,7 +1367,7 @@ int parse_buf_file(struct ident_map *im,
 }
 
 int count_parse_buf(const uint8_t *buf, size_t length,
-		    size_t *leafcount_out, size_t *error_pos_out) {
+                    size_t *leafcount_out, size_t *error_pos_out) {
   struct ps p;
   ps_init(&p, buf, length);
 
@@ -1401,7 +1401,7 @@ int run_count_test(const char *name, const char *str, size_t expected) {
   }
   if (count != expected) {
     DBG("run_count_test %s FAIL: wrong count: expected %"PRIz", got %"PRIz"\n",
-	str, expected, count);
+        str, expected, count);
     return 0;
   }
   return 1;
@@ -1417,8 +1417,8 @@ int parse_test_whitespace(void) {
 
 int parse_test_imports(void) {
   return run_count_test("imports",
-			"import a; import aa; import bcd; import blah_quux;",
-			12);
+                        "import a; import aa; import bcd; import blah_quux;",
+                        12);
 }
 
 int parse_test_defs(void) {
@@ -1429,65 +1429,65 @@ int parse_test_defs(void) {
   pass &= run_count_test("def04", "def abc_def int = 12345;", 6);
   pass &= run_count_test("def05", "def foo func[int, int] = 1;", 11);
   pass &= run_count_test("def06", "def foo func[int, int] = fn(x int, y int) int { 3; };",
-			 23);
+                         23);
   pass &= run_count_test("def07", "def foo func[int, int] = \n"
-			 "\tfn(x int, y int) int { foo(bar); };\n",
-			 26);
+                         "\tfn(x int, y int) int { foo(bar); };\n",
+                         26);
   pass &= run_count_test("def08", "def foo func[int, int] = \n"
-			 "\tfn(x int, y int) int { foo(bar); goto blah; label feh; };\n",
-			 32);
+                         "\tfn(x int, y int) int { foo(bar); goto blah; label feh; };\n",
+                         32);
   pass &= run_count_test("def09",
-			 "def foo func[int, int] = \n" /* 9 */
-			 "\tfn() int { foo(*bar.blah); if (n) { " /* 15 */
-			 "goto blah; } label feh; \n" /* 7 */
-			 "if n { goto blah; } else { &meh; } };\n" /* 14 */,
-			 49);
+                         "def foo func[int, int] = \n" /* 9 */
+                         "\tfn() int { foo(*bar.blah); if (n) { " /* 15 */
+                         "goto blah; } label feh; \n" /* 7 */
+                         "if n { goto blah; } else { &meh; } };\n" /* 14 */,
+                         49);
   pass &= run_count_test("def10",
-			 "def foo bar = 2 + 3;",
-			 8);
+                         "def foo bar = 2 + 3;",
+                         8);
   pass &= run_count_test("def11",
-			 "def foo bar = 2 + *3 - 4;",
-			 11);
+                         "def foo bar = 2 + *3 - 4;",
+                         11);
   pass &= run_count_test("def12",
-			 "def foo bar = (2 ^ 3) - 4 && x -> quux;",
-			 16);
+                         "def foo bar = (2 ^ 3) - 4 && x -> quux;",
+                         16);
   pass &= run_count_test("def13",
-			 "def foo func[int] = fn() int {\n"
-			 "   var x int = 3;\n"
-			 "   return x;\n"
-			 "};\n",
-			 23);
+                         "def foo func[int] = fn() int {\n"
+                         "   var x int = 3;\n"
+                         "   return x;\n"
+                         "};\n",
+                         23);
   pass &= run_count_test("def14",
-			 "def[a,b] foo/*heh*/func[int] = fn() int {//blah blah blah\n"
-			 "   var x int = -3;\n"
-			 "   return x;\n"
-			 "};\n",
-			 29);
+                         "def[a,b] foo/*heh*/func[int] = fn() int {//blah blah blah\n"
+                         "   var x int = -3;\n"
+                         "   return x;\n"
+                         "};\n",
+                         29);
   return pass;
 }
 
 int parse_test_deftypes(void) {
   int pass = 1;
   pass &= run_count_test("deftype1",
-			 " deftype foo bar;",
-			 4);
+                         " deftype foo bar;",
+                         4);
   pass &= run_count_test("deftype2",
-			 "deftype foo func[int, int] ; ",
-			 9);
+                         "deftype foo func[int, int] ; ",
+                         9);
   pass &= run_count_test("deftype3",
-			 "deftype foo struct { x y; z int; t func[beh]; };\n"
-			 "deftype [ c, d ]  bar union{a b;c d[e,f];};",
-			 40);
+                         "deftype foo struct { x y; z int; t func[beh]; };\n"
+                         "deftype [ c, d ]  bar union{a b;c d[e,f];};",
+                         40);
   pass &= run_count_test("deftype4",
-			 "deftype foo bar;\n",
-			 4);
+                         "deftype foo bar;\n",
+                         4);
   pass &= run_count_test("deftype5",
-			 "deftype foo struct { x bar [quux]; };\n",
-			 12);
+                         "deftype foo struct { x bar [quux]; };\n",
+                         12);
   pass &= run_count_test("deftype6",
-			 "def x int = 3;"
-			 "deftype[T] foo struct { count u32; p ptr[T]; };\n",
-			 24);
+                         "def x int = 3;"
+                         "deftype[T] foo struct { count u32; p ptr[T]; };\n",
+                         24);
   return pass;
 }
 

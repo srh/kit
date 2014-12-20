@@ -24,7 +24,7 @@ void ast_meta_destroy(struct ast_meta *a) {
 }
 
 void ast_ident_init(struct ast_ident *a, struct ast_meta meta,
-		    ident_value value) {
+                    ident_value value) {
   a->meta = meta;
   a->value = value;
 }
@@ -41,8 +41,8 @@ void ast_ident_destroy(struct ast_ident *a) {
 
 
 void ast_numeric_literal_init(struct ast_numeric_literal *a,
-			      struct ast_meta meta, int8_t *digits,
-			      size_t digits_count) {
+                              struct ast_meta meta, int8_t *digits,
+                              size_t digits_count) {
   a->meta = meta;
   a->digits = digits;
   a->digits_count = digits_count;
@@ -56,8 +56,8 @@ void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
 }
 
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
-		      struct ast_expr *func, struct ast_expr *args,
-		      size_t args_count) {
+                      struct ast_expr *func, struct ast_expr *args,
+                      size_t args_count) {
   a->meta = meta;
   a->func = func;
   a->args = args;
@@ -79,7 +79,7 @@ void ast_vardecl_init_copy(struct ast_vardecl *a, struct ast_vardecl *c) {
 }
 
 void ast_vardecl_init(struct ast_vardecl *a, struct ast_meta meta,
-		      struct ast_ident name, struct ast_typeexpr type) {
+                      struct ast_ident name, struct ast_typeexpr type) {
   a->meta = meta;
   a->name = name;
   a->type = type;
@@ -92,9 +92,9 @@ void ast_vardecl_destroy(struct ast_vardecl *a) {
 }
 
 void ast_bracebody_init(struct ast_bracebody *a,
-			struct ast_meta meta,
-			struct ast_statement *statements,
-			size_t statements_count) {
+                        struct ast_meta meta,
+                        struct ast_statement *statements,
+                        size_t statements_count) {
   a->meta = meta;
   a->statements = statements;
   a->statements_count = statements_count;
@@ -107,8 +107,8 @@ void ast_bracebody_destroy(struct ast_bracebody *a) {
 
 
 void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
-			    struct ast_ident name, struct ast_typeexpr type,
-			    struct ast_expr *rhs) {
+                            struct ast_ident name, struct ast_typeexpr type,
+                            struct ast_expr *rhs) {
   a->meta = meta;
   a->name = name;
   a->type = type;
@@ -125,7 +125,7 @@ void ast_var_statement_destroy(struct ast_var_statement *a) {
 }
 
 void ast_goto_statement_init(struct ast_goto_statement *a,
-			     struct ast_meta meta, struct ast_ident target) {
+                             struct ast_meta meta, struct ast_ident target) {
   a->meta = meta;
   a->target = target;
 }
@@ -136,7 +136,7 @@ void ast_goto_statement_destroy(struct ast_goto_statement *a) {
 }
 
 void ast_label_statement_init(struct ast_label_statement *a,
-			      struct ast_meta meta, struct ast_ident label) {
+                              struct ast_meta meta, struct ast_ident label) {
   a->meta = meta;
   a->label = label;
 }
@@ -147,9 +147,9 @@ void ast_label_statement_destroy(struct ast_label_statement *a) {
 }
 
 void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
-			       struct ast_meta meta,
-			       struct ast_expr *condition,
-			       struct ast_bracebody thenbody) {
+                               struct ast_meta meta,
+                               struct ast_expr *condition,
+                               struct ast_bracebody thenbody) {
   a->meta = meta;
   a->condition = condition;
   a->thenbody = thenbody;
@@ -164,10 +164,10 @@ void ast_ifthen_statement_destroy(struct ast_ifthen_statement *a) {
 }
 
 void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,
-				   struct ast_meta meta,
-				   struct ast_expr *condition,
-				   struct ast_bracebody thenbody,
-				   struct ast_bracebody elsebody) {
+                                   struct ast_meta meta,
+                                   struct ast_expr *condition,
+                                   struct ast_bracebody thenbody,
+                                   struct ast_bracebody elsebody) {
   a->meta = meta;
   a->condition = condition;
   a->thenbody = thenbody;
@@ -217,7 +217,7 @@ void ast_statement_destroy(struct ast_statement *a) {
 }
 
 void ast_unop_expr_init(struct ast_unop_expr *a, struct ast_meta meta,
-			enum ast_unop operator, struct ast_expr *rhs) {
+                        enum ast_unop operator, struct ast_expr *rhs) {
   a->meta = meta;
   a->operator = operator;
   a->rhs = rhs;
@@ -232,8 +232,8 @@ void ast_unop_expr_destroy(struct ast_unop_expr *a) {
 }
 
 void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
-			 enum ast_binop operator, struct ast_expr *lhs,
-			 struct ast_expr *rhs) {
+                         enum ast_binop operator, struct ast_expr *lhs,
+                         struct ast_expr *rhs) {
   a->meta = meta;
   a->operator = operator;
   a->lhs = lhs;
@@ -251,9 +251,9 @@ void ast_binop_expr_destroy(struct ast_binop_expr *a) {
 }
 
 void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,
-		     struct ast_vardecl *params, size_t params_count,
-		     struct ast_typeexpr return_type,
-		     struct ast_bracebody bracebody) {
+                     struct ast_vardecl *params, size_t params_count,
+                     struct ast_typeexpr return_type,
+                     struct ast_bracebody bracebody) {
   a->meta = meta;
   a->params = params;
   a->params_count = params_count;
@@ -269,9 +269,9 @@ void ast_lambda_destroy(struct ast_lambda *a) {
 }
 
 void ast_local_field_access_init(struct ast_local_field_access *a,
-				 struct ast_meta meta,
-				 struct ast_expr *lhs,
-				 struct ast_ident fieldname) {
+                                 struct ast_meta meta,
+                                 struct ast_expr *lhs,
+                                 struct ast_ident fieldname) {
   a->meta = meta;
   a->lhs = lhs;
   a->fieldname = fieldname;
@@ -285,9 +285,9 @@ void ast_local_field_access_destroy(struct ast_local_field_access *a) {
 }
 
 void ast_deref_field_access_init(struct ast_deref_field_access *a,
-				 struct ast_meta meta,
-				 struct ast_expr *lhs,
-				 struct ast_ident fieldname) {
+                                 struct ast_meta meta,
+                                 struct ast_expr *lhs,
+                                 struct ast_ident fieldname) {
   a->meta = meta;
   a->lhs = lhs;
   a->fieldname = fieldname;
@@ -351,8 +351,8 @@ void ast_expr_destroy(struct ast_expr *a) {
 }
 
 void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
-		      struct ast_ident name, struct ast_typeexpr *params,
-		      size_t params_count) {
+                      struct ast_ident name, struct ast_typeexpr *params,
+                      size_t params_count) {
   a->meta = meta;
   a->name = name;
   a->params = params;
@@ -378,7 +378,7 @@ void ast_typeapp_destroy(struct ast_typeapp *a) {
 }
 
 void ast_fields_alloc_copy(struct ast_vardecl *fields, size_t fields_count,
-			   struct ast_vardecl **p_out, size_t *count_out) {
+                           struct ast_vardecl **p_out, size_t *count_out) {
   struct ast_vardecl *p = malloc_mul(fields_count, sizeof(*p));
   for (size_t i = 0; i < fields_count; i++) {
     ast_vardecl_init_copy(&p[i], &fields[i]);
@@ -388,7 +388,7 @@ void ast_fields_alloc_copy(struct ast_vardecl *fields, size_t fields_count,
 }
 
 void ast_structe_init(struct ast_structe *a, struct ast_meta meta,
-		      struct ast_vardecl *fields, size_t fields_count) {
+                      struct ast_vardecl *fields, size_t fields_count) {
   a->meta = meta;
   a->fields = fields;
   a->fields_count = fields_count;
@@ -405,7 +405,7 @@ void ast_structe_destroy(struct ast_structe *a) {
 }
 
 void ast_unione_init(struct ast_unione *a, struct ast_meta meta,
-		     struct ast_vardecl *fields, size_t fields_count) {
+                     struct ast_vardecl *fields, size_t fields_count) {
   a->meta = meta;
   a->fields = fields;
   a->fields_count = fields_count;
@@ -422,7 +422,7 @@ void ast_unione_destroy(struct ast_unione *a) {
 }
 
 void ast_typeexpr_init_copy(struct ast_typeexpr *a,
-			    struct ast_typeexpr *c) {
+                            struct ast_typeexpr *c) {
   a->tag = c->tag;
   switch (c->tag) {
   case AST_TYPEEXPR_NAME:
@@ -474,9 +474,9 @@ void ast_generics_init_no_params(struct ast_generics *a) {
   a->params_count = 0;
 }
 void ast_generics_init_has_params(struct ast_generics *a,
-				  struct ast_meta meta,
-				  struct ast_ident *params,
-				  size_t params_count) {
+                                  struct ast_meta meta,
+                                  struct ast_ident *params,
+                                  size_t params_count) {
   a->has_type_params = 1;
   a->meta = meta;
   a->params = params;
@@ -484,7 +484,7 @@ void ast_generics_init_has_params(struct ast_generics *a,
 }
 
 void ast_generics_init_copy(struct ast_generics *a,
-			    struct ast_generics *c) {
+                            struct ast_generics *c) {
   if (!c->has_type_params) {
     ast_generics_init_no_params(a);
   } else {
@@ -509,9 +509,9 @@ void ast_generics_destroy(struct ast_generics *a) {
 }
 
 void ast_def_init(struct ast_def *a, struct ast_meta meta,
-		  struct ast_generics generics,
-		  struct ast_ident name, struct ast_typeexpr type,
-		  struct ast_expr rhs) {
+                  struct ast_generics generics,
+                  struct ast_ident name, struct ast_typeexpr type,
+                  struct ast_expr rhs) {
   a->meta = meta;
   a->generics = generics;
   a->name = name;
@@ -528,7 +528,7 @@ void ast_def_destroy(struct ast_def *a) {
 }
 
 void ast_import_init(struct ast_import *a, struct ast_meta meta,
-		     struct ast_ident name) {
+                     struct ast_ident name) {
   a->meta = meta;
   a->name = name;
 }
@@ -539,8 +539,8 @@ void ast_import_destroy(struct ast_import *a) {
 }
 
 void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
-		      struct ast_generics generics,
-		      struct ast_ident name, struct ast_typeexpr type) {
+                      struct ast_generics generics,
+                      struct ast_ident name, struct ast_typeexpr type) {
   a->meta = meta;
   a->generics = generics;
   a->name = name;
@@ -576,8 +576,8 @@ void ast_file_destroy(struct ast_file *a) {
 }
 
 void ast_file_init(struct ast_file *a,
-		   struct ast_toplevel *toplevels,
-		   size_t toplevels_count) {
+                   struct ast_toplevel *toplevels,
+                   size_t toplevels_count) {
   a->toplevels = toplevels;
   a->toplevels_count = toplevels_count;
 }
