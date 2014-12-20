@@ -575,6 +575,48 @@ int check_expr_funcall(struct exprscope *es,
   return 0;
 }
 
+int check_expr_lambda(struct exprscope *es,
+		      struct ast_lambda *x,
+		      struct ast_typeexpr *partial_type,
+		      struct ast_typeexpr *out) {
+  ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
+
+  struct ast_typeexpr funcexpr;
+  {
+    size_t func_params_count = x->params_count;
+    size_t args_count = size_add(func_params_count, 1);
+    struct ast_typeexpr *args = malloc(size_mul(sizeof(*args), args_count));
+    CHECK(args);
+    size_t i;
+    for (i = 0; i < func_params_count; i++) {
+      /* TODO: Prevent duplicate names, param arg name shadowing. */
+      if (!replace_generics(es, &x->params[i].type, &args[i])) {
+	SLICE_FREE(args, i, ast_typeexpr_destroy);
+	return 0;
+      }
+    }
+
+    ast_typeexpr_init_copy(&args[func_params_count], &x->return_type);
+
+    struct ast_ident name;
+    ast_ident_init(&name, ast_meta_make_garbage(), func_ident);
+
+    funcexpr.tag = AST_TYPEEXPR_APP;
+    ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
+		     name, args, args_count);
+  }
+
+  if (!unify_directionally(partial_type, &funcexpr)) {
+    ast_typeexpr_destroy(&funcexpr);
+    return 0;
+  }
+
+  /* TODO: Typecheck bracebody. */
+
+  *out = funcexpr;
+  return 1;
+}
+
 int check_expr(struct exprscope *es,
 	       struct ast_expr *x,
 	       struct ast_typeexpr *partial_type,
@@ -610,42 +652,7 @@ int check_expr(struct exprscope *es,
     /* TODO: Implement. */
     return 0;
   case AST_EXPR_LAMBDA: {
-    ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
-
-    struct ast_typeexpr funcexpr;
-    {
-      size_t func_params_count = x->u.lambda.params_count;
-      size_t args_count = size_add(func_params_count, 1);
-      struct ast_typeexpr *args = malloc(size_mul(sizeof(*args), args_count));
-      CHECK(args);
-      size_t i;
-      for (i = 0; i < func_params_count; i++) {
-	/* TODO: Prevent duplicate names, param arg name shadowing. */
-	if (!replace_generics(es, &x->u.lambda.params[i].type, &args[i])) {
-	  SLICE_FREE(args, i, ast_typeexpr_destroy);
-	  return 0;
-	}
-      }
-
-      ast_typeexpr_init_copy(&args[func_params_count], &x->u.lambda.return_type);
-
-      struct ast_ident name;
-      ast_ident_init(&name, ast_meta_make_garbage(), func_ident);
-
-      funcexpr.tag = AST_TYPEEXPR_APP;
-      ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
-		       name, args, args_count);
-    }
-
-    if (!unify_directionally(partial_type, &funcexpr)) {
-      ast_typeexpr_destroy(&funcexpr);
-      return 0;
-    }
-
-    /* TODO: Typecheck bracebody. */
-
-    *out = funcexpr;
-    return 1;
+    return check_expr_lambda(es, &x->u.lambda, partial_type, out);
   } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
     /* TODO: Implement. */
