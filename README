@@ -1,9 +1,9 @@
         Kira v0.0000...1.x
 
-At some future date, Kira will be a programming language.  Right now,
-it's a work in progress.  Use build_windows.bat or build_linux.sh to
-build it, or just pass *.c to your C compiler.  Then I recommend
-running
+At some future date, Kira will be a programming language.  Right
+now, it's a work in progress.  Use build_windows.bat or
+build_linux.sh to build it, or just pass *.c to your C compiler.
+Then I recommend running
 
    out --test
 
@@ -16,9 +16,10 @@ Here's the project timeline:
    3. Generate code, i.e. have a working compiler.
    4. Cleanup error messages to have useful source information.
    5. Cleanup the language syntax to make it more usable.
-   6. Make a self-hosted implementation (adding improvements and fixes
-      to the C implementation when useful).
+   6. Make a self-hosted implementation (adding improvements and
+      fixes to the C implementation when useful).
    7. ...
 
 As of step 6, the language will be "C with templates and RAII,"
-essentially.  Future versions of the language will be more advanced.
+essentially.  Future versions of the language will be more
+advanced.
