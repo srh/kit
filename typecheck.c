@@ -635,9 +635,16 @@ int check_expr(struct exprscope *es,
     *out = funcexpr;
     return 1;
   } break;
-  default:
+  case AST_EXPR_LOCAL_FIELD_ACCESS: {
     /* TODO: Implement. */
     return 0;
+  } break;
+  case AST_EXPR_DEREF_FIELD_ACCESS: {
+    /* TODO: Implement. */
+    return 0;
+  } break;
+  default:
+    UNREACHABLE();
   }
 }
 
