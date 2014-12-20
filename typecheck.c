@@ -524,12 +524,97 @@ void numeric_literal_type(struct ident_map *im,
 		 ident_map_intern_c_str(im, I32_TYPE_NAME));
 }
 
+void do_replace_generics(struct ast_generics *generics,
+			 struct ast_typeexpr *generics_substitutions,
+			 struct ast_typeexpr *a,
+			 struct ast_typeexpr *out);
+
+void do_replace_generics_in_fields(struct ast_generics *generics,
+				   struct ast_typeexpr *generics_substitutions,
+				   struct ast_vardecl *fields,
+				   size_t fields_count,
+				   struct ast_vardecl **fields_out,
+				   size_t *fields_count_out) {
+  struct ast_vardecl *f = malloc(size_mul(sizeof(*f), fields_count));
+  CHECK(f || fields_count == 0);
+  for (size_t i = 0; i < fields_count; i++) {
+    struct ast_ident name;
+    ast_ident_init_copy(&name, &fields[i].name);
+    struct ast_typeexpr type;
+    do_replace_generics(generics, generics_substitutions, &fields[i].type,
+			&type);
+    ast_vardecl_init(&f[i], ast_meta_make_garbage(),
+		     name, type);
+  }
+  *fields_out = f;
+  *fields_count_out = fields_count;
+}
+
+void do_replace_generics(struct ast_generics *generics,
+			 struct ast_typeexpr *generics_substitutions,
+			 struct ast_typeexpr *a,
+			 struct ast_typeexpr *out) {
+  switch (a->tag) {
+  case AST_TYPEEXPR_NAME: {
+    size_t which_generic;
+    if (generics_lookup_name(generics, a->u.name.value, &which_generic)) {
+      ast_typeexpr_init_copy(out, &generics_substitutions[which_generic]);
+    } else {
+      ast_typeexpr_init_copy(out, a);
+    }
+  } break;
+  case AST_TYPEEXPR_APP: {
+    struct ast_typeapp *app = &a->u.app;
+    size_t params_count = app->params_count;
+    struct ast_typeexpr *params = malloc(size_mul(sizeof(*params), app->params_count));
+    CHECK(params || params_count == 0);
+
+    for (size_t i = 0, e = params_count; i < e; i++) {
+      do_replace_generics(generics, generics_substitutions,
+			  &app->params[i], &params[i]);
+    }
+
+    struct ast_ident name;
+    ast_ident_init_copy(&name, &app->name);
+
+    out->tag = AST_TYPEEXPR_APP;
+    ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
+		     name, params, params_count);
+  } break;
+  case AST_TYPEEXPR_STRUCTE: {
+    struct ast_vardecl *fields;
+    size_t fields_count;
+    do_replace_generics_in_fields(generics, generics_substitutions,
+				  a->u.structe.fields, a->u.structe.fields_count,
+				  &fields, &fields_count);
+    out->tag = AST_TYPEEXPR_STRUCTE;
+    ast_structe_init(&out->u.structe, ast_meta_make_garbage(),
+		     fields, fields_count);
+  } break;
+  case AST_TYPEEXPR_UNIONE: {
+    struct ast_vardecl *fields;
+    size_t fields_count;
+    do_replace_generics_in_fields(generics, generics_substitutions,
+				  a->u.unione.fields, a->u.unione.fields_count,
+				  &fields, &fields_count);
+    out->tag = AST_TYPEEXPR_UNIONE;
+    ast_unione_init(&out->u.unione, ast_meta_make_garbage(),
+		     fields, fields_count);
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void replace_generics(struct exprscope *es,
 		      struct ast_typeexpr *a,
 		      struct ast_typeexpr *out) {
-  /* TODO: Implement for real. */
-  CHECK(!es->generics->has_type_params);
-  ast_typeexpr_init_copy(out, a);
+  if (!es->generics->has_type_params) {
+    ast_typeexpr_init_copy(out, a);
+  } else {
+    CHECK(es->generics->params_count == es->generics_substitutions_count);
+    do_replace_generics(es->generics, es->generics_substitutions, a, out);
+  }
 }
 
 int check_expr(struct exprscope *es,

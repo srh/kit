@@ -10,6 +10,9 @@
 
 #define PARSE_DBG(...)
 
+/* TODO: Make sure we aren't doing bad checks about mallocing
+   zero-length arrays returning NULL. */
+
 struct ps {
   const uint8_t *data;
   size_t length;
