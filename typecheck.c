@@ -512,13 +512,12 @@ void numeric_literal_type(struct ident_map *im,
 		 ident_map_intern_c_str(im, I32_TYPE_NAME));
 }
 
-int replace_generics(struct exprscope *es,
-		     struct ast_typeexpr *a,
-		     struct ast_typeexpr *out) {
+void replace_generics(struct exprscope *es,
+		      struct ast_typeexpr *a,
+		      struct ast_typeexpr *out) {
   /* TODO: Implement for real. */
   CHECK(!es->generics->has_type_params);
   ast_typeexpr_init_copy(out, a);
-  return 1;
 }
 
 int check_expr(struct exprscope *es,
@@ -575,25 +574,66 @@ int check_expr_funcall(struct exprscope *es,
   return 0;
 }
 
+int check_var_shadowing(struct exprscope *es, ident_value name) {
+  for (size_t i = 0, e = es->vars_count; i < e; i++) {
+    if (es->vars[i]->name.value == name) {
+      ERR_DBG("Variable name shadows local.\n");
+      return 0;
+    }
+  }
+
+  {
+    size_t which_generic;
+    if (generics_lookup_name(es->generics, name, &which_generic)) {
+      ERR_DBG("Variable name shadows template parameter, which is gauche.\n");
+      return 0;
+    }
+  }
+
+  if (name_table_shadowed(&es->cs->nt, name)) {
+    ERR_DBG("Variable name shadows a global def or type.\n");
+    return 0;
+  }
+
+  return 1;
+}
+
 int check_expr_lambda(struct exprscope *es,
 		      struct ast_lambda *x,
 		      struct ast_typeexpr *partial_type,
 		      struct ast_typeexpr *out) {
   ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
+  size_t func_params_count = x->params_count;
+  size_t args_count = size_add(func_params_count, 1);
 
   struct ast_typeexpr funcexpr;
   {
-    size_t func_params_count = x->params_count;
-    size_t args_count = size_add(func_params_count, 1);
     struct ast_typeexpr *args = malloc(size_mul(sizeof(*args), args_count));
     CHECK(args);
     size_t i;
     for (i = 0; i < func_params_count; i++) {
-      /* TODO: Prevent duplicate names, param arg name shadowing. */
-      if (!replace_generics(es, &x->params[i].type, &args[i])) {
-	SLICE_FREE(args, i, ast_typeexpr_destroy);
-	return 0;
+      for (size_t j = 0; j < i; j++) {
+	if (x->params[i].name.value == x->params[j].name.value) {
+	  ERR_DBG("Duplicate lambda parameter name.\n");
+	  goto fail_args_up_to_i;
+	}
       }
+      if (!check_var_shadowing(es, x->params[i].name.value)) {
+	goto fail_args_up_to_i;
+      }
+
+      if (!check_typeexpr(es->cs, es->generics, &x->params[i].type, NULL)) {
+	ERR_DBG("Invalid type.\n");
+	goto fail_args_up_to_i;
+      }
+
+      replace_generics(es, &x->params[i].type, &args[i]);
+    }
+
+    if (0) {
+    fail_args_up_to_i:
+      SLICE_FREE(args, i, ast_typeexpr_destroy);
+      return 0;
     }
 
     ast_typeexpr_init_copy(&args[func_params_count], &x->return_type);
@@ -607,14 +647,17 @@ int check_expr_lambda(struct exprscope *es,
   }
 
   if (!unify_directionally(partial_type, &funcexpr)) {
-    ast_typeexpr_destroy(&funcexpr);
-    return 0;
+    goto fail_funcexpr;
   }
 
   /* TODO: Typecheck bracebody. */
 
   *out = funcexpr;
   return 1;
+
+ fail_funcexpr:
+  ast_typeexpr_destroy(&funcexpr);
+  return 0;
 }
 
 int check_expr(struct exprscope *es,
