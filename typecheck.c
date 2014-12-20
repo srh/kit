@@ -380,6 +380,10 @@ int check_deftype(struct checkstate *cs, struct deftype_entry *ent) {
 struct exprscope {
   struct checkstate *cs;
   struct ast_generics *generics;
+  struct ast_typeexpr *generics_substitutions;
+  /* 0 if !generics->has_type_params; otherwise, equal to
+     generics->params_count. */
+  size_t generics_substitutions_count;
 
   /* A stack of variables that are in scope. */
   struct ast_vardecl **vars;
@@ -388,9 +392,15 @@ struct exprscope {
 };
 
 void exprscope_init(struct exprscope *es, struct checkstate *cs,
-		    struct ast_generics *generics) {
+		    struct ast_generics *generics,
+		    struct ast_typeexpr *generics_substitutions,
+		    size_t generics_substitutions_count) {
+  CHECK(generics->params_count == (generics->has_type_params ?
+				   generics_substitutions_count : 0));
   es->cs = cs;
   es->generics = generics;
+  es->generics_substitutions = generics_substitutions;
+  es->generics_substitutions_count = generics_substitutions_count;
   es->vars = NULL;
   es->vars_count = 0;
   es->vars_limit = 0;
@@ -399,6 +409,8 @@ void exprscope_init(struct exprscope *es, struct checkstate *cs,
 void exprscope_destroy(struct exprscope *es) {
   es->cs = NULL;
   es->generics = NULL;
+  SLICE_FREE(es->generics_substitutions, es->generics_substitutions_count,
+	     ast_typeexpr_destroy);
   free(es->vars);
   es->vars = NULL;
   es->vars_count = 0;
@@ -529,6 +541,8 @@ int check_expr_funcall(struct exprscope *es,
 		       struct ast_funcall *x,
 		       struct ast_typeexpr *partial_type,
 		       struct ast_typeexpr *out) {
+  /* TODO: We also need to type-check any template instantiations. */
+
   size_t args_count = x->args_count;
   size_t args_types_count = size_add(args_count, 1);
   struct ast_typeexpr *args_types = malloc(size_mul(sizeof(*args_types),
@@ -736,7 +750,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
      the ones with no template params. */
   if (!a->generics.has_type_params) {
     struct exprscope es;
-    exprscope_init(&es, cs, &a->generics);
+    exprscope_init(&es, cs, &a->generics, NULL, 0);
     int ret = check_expr_with_type(&es, &a->rhs, &a->type);
     exprscope_destroy(&es);
     return ret;
@@ -825,7 +839,7 @@ int load_test_module(struct test_module *a, size_t a_count,
       STATIC_CHECK(sizeof(uint8_t) == 1);
       size_t data_count = strlen(a[i].data);
       uint8_t *data = malloc(data_count);
-      CHECK(data);
+      CHECK(data || data_count == 0);
       memcpy(data, a[i].data, data_count);
       *data_out = data;
       *data_count_out = data_count;
