@@ -973,6 +973,7 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       lhs.tag = AST_EXPR_LOCAL_FIELD_ACCESS;
       ast_local_field_access_init(&lhs.u.local_field_access,
 				  ast_meta_make(pos_start, ps_pos(p)),
+				  heap_lhs,
 				  field_name);
     } else if (try_skip_oper(p, "->")) {
       struct ast_ident field_name;
@@ -985,6 +986,7 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       lhs.tag = AST_EXPR_DEREF_FIELD_ACCESS;
       ast_deref_field_access_init(&lhs.u.deref_field_access,
 				  ast_meta_make(pos_start, ps_pos(p)),
+				  heap_lhs,
 				  field_name);
     } else if (is_binop_start(ps_peek(p))) {
       struct ps_savestate save = ps_save(p);

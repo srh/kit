@@ -270,25 +270,33 @@ void ast_lambda_destroy(struct ast_lambda *a) {
 
 void ast_local_field_access_init(struct ast_local_field_access *a,
 				 struct ast_meta meta,
+				 struct ast_expr *lhs,
 				 struct ast_ident fieldname) {
   a->meta = meta;
+  a->lhs = lhs;
   a->fieldname = fieldname;
 }
 
 void ast_local_field_access_destroy(struct ast_local_field_access *a) {
   ast_meta_destroy(&a->meta);
+  ast_expr_destroy(a->lhs);
+  free(a->lhs);
   ast_ident_destroy(&a->fieldname);
 }
 
 void ast_deref_field_access_init(struct ast_deref_field_access *a,
 				 struct ast_meta meta,
+				 struct ast_expr *lhs,
 				 struct ast_ident fieldname) {
   a->meta = meta;
+  a->lhs = lhs;
   a->fieldname = fieldname;
 }
 
 void ast_deref_field_access_destroy(struct ast_deref_field_access *a) {
   ast_meta_destroy(&a->meta);
+  ast_expr_destroy(a->lhs);
+  free(a->lhs);
   ast_ident_destroy(&a->fieldname);
 }
 

@@ -266,20 +266,24 @@ void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
 
 struct ast_local_field_access {
   struct ast_meta meta;
+  struct ast_expr *lhs;
   struct ast_ident fieldname;
 };
 
 void ast_local_field_access_init(struct ast_local_field_access *a,
 				 struct ast_meta meta,
+				 struct ast_expr *lhs,
 				 struct ast_ident fieldname);
 
 struct ast_deref_field_access {
   struct ast_meta meta;
+  struct ast_expr *lhs;
   struct ast_ident fieldname;
 };
 
 void ast_deref_field_access_init(struct ast_deref_field_access *a,
 				 struct ast_meta meta,
+				 struct ast_expr *lhs,
 				 struct ast_ident fieldname);
 
 enum ast_expr_tag {
