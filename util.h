@@ -1,6 +1,8 @@
 #ifndef KIRA_UTIL_H_
 #define KIRA_UTIL_H_
 
+#include <stddef.h>
+
 #ifdef _WIN32
 #define PRIz "Iu"
 #define NORETURN __declspec(noreturn)
@@ -37,5 +39,7 @@ NORETURN void report_and_abort(const char *file, int line,
 /* TODO: Every use of ERR_DBG is a bad error message.  And this is in
    the wrong place. */
 #define ERR_DBG(...) DBG(__VA_ARGS__)
+
+void *malloc_mul(size_t a, size_t b);
 
 #endif /* KIRA_UTIL_H_ */

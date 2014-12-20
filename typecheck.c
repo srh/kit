@@ -535,8 +535,7 @@ void do_replace_generics_in_fields(struct ast_generics *generics,
 				   size_t fields_count,
 				   struct ast_vardecl **fields_out,
 				   size_t *fields_count_out) {
-  struct ast_vardecl *f = malloc(size_mul(sizeof(*f), fields_count));
-  CHECK(f || fields_count == 0);
+  struct ast_vardecl *f = malloc_mul(sizeof(*f), fields_count);
   for (size_t i = 0; i < fields_count; i++) {
     struct ast_ident name;
     ast_ident_init_copy(&name, &fields[i].name);
@@ -566,8 +565,7 @@ void do_replace_generics(struct ast_generics *generics,
   case AST_TYPEEXPR_APP: {
     struct ast_typeapp *app = &a->u.app;
     size_t params_count = app->params_count;
-    struct ast_typeexpr *params = malloc(size_mul(sizeof(*params), app->params_count));
-    CHECK(params || params_count == 0);
+    struct ast_typeexpr *params = malloc_mul(sizeof(*params), app->params_count);
 
     for (size_t i = 0, e = params_count; i < e; i++) {
       do_replace_generics(generics, generics_substitutions,
@@ -630,9 +628,8 @@ int check_expr_funcall(struct exprscope *es,
 
   size_t args_count = x->args_count;
   size_t args_types_count = size_add(args_count, 1);
-  struct ast_typeexpr *args_types = malloc(size_mul(sizeof(*args_types),
-						    args_types_count));
-  CHECK(args_types);
+  struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
+					       args_types_count);
   size_t i;
   for (i = 0; i < args_count; i++) {
     struct ast_typeexpr local_partial;
@@ -707,8 +704,7 @@ int check_expr_lambda(struct exprscope *es,
 
   struct ast_typeexpr funcexpr;
   {
-    struct ast_typeexpr *args = malloc(size_mul(sizeof(*args), args_count));
-    CHECK(args);
+    struct ast_typeexpr *args = malloc_mul(sizeof(*args), args_count);
     size_t i;
     for (i = 0; i < func_params_count; i++) {
       for (size_t j = 0; j < i; j++) {
@@ -923,8 +919,7 @@ int load_test_module(struct test_module *a, size_t a_count,
 	&& 0 == memcmp(a[i].name, name, name_count)) {
       STATIC_CHECK(sizeof(uint8_t) == 1);
       size_t data_count = strlen(a[i].data);
-      uint8_t *data = malloc(data_count);
-      CHECK(data || data_count == 0);
+      uint8_t *data = malloc_mul(data_count, sizeof(uint8_t));
       memcpy(data, a[i].data, data_count);
       *data_out = data;
       *data_count_out = data_count;

@@ -52,8 +52,7 @@ void deftype_entry_init(struct deftype_entry *e,
     e->flatly_held = NULL;
     e->flatly_held_count = SIZE_MAX;
   } else {
-    e->flatly_held = malloc(size_mul(sizeof(*e->flatly_held), arity.value));
-    CHECK(e->flatly_held || arity.value == 0);
+    e->flatly_held = malloc_mul(sizeof(*e->flatly_held), arity.value);
     for (size_t i = 0, end = arity.value; i < end; i++) {
       e->flatly_held[i] = 0;
     }
@@ -76,10 +75,9 @@ void deftype_entry_init_primitive(struct deftype_entry *e,
     no_param_list_arity() : param_list_arity(flatly_held_count);
 
   if (flatly_held) {
-    size_t bytes = size_mul(flatly_held_count, sizeof(*flatly_held));
-    int *heap_flatly_held = malloc(bytes);
-    CHECK(heap_flatly_held || flatly_held_count == 0);
-    memcpy(heap_flatly_held, flatly_held, bytes);
+    int *heap_flatly_held = malloc_mul(flatly_held_count, sizeof(*heap_flatly_held));
+    memcpy(heap_flatly_held, flatly_held,
+	   size_mul(flatly_held_count, sizeof(*heap_flatly_held)));
     e->flatly_held = heap_flatly_held;
     e->flatly_held_count = flatly_held_count;
   } else {
@@ -271,8 +269,7 @@ void substitute_generics_fields(struct ast_vardecl *fields, size_t fields_count,
 				struct ast_vardecl **concrete_fields_out,
 				size_t *concrete_fields_count_out) {
   struct ast_vardecl *concrete_fields
-    = malloc(size_mul(sizeof(*concrete_fields), fields_count));
-  CHECK(concrete_fields || fields_count == 0);
+    = malloc_mul(sizeof(*concrete_fields), fields_count);
   for (size_t i = 0; i < fields_count; i++) {
     struct ast_ident name;
     ast_ident_init_copy(&name, &fields[i].name);
@@ -306,8 +303,7 @@ void substitute_generics(struct ast_typeexpr *type,
   case AST_TYPEEXPR_APP: {
     concrete_type_out->tag = AST_TYPEEXPR_APP;
     size_t params_count = type->u.app.params_count;
-    struct ast_typeexpr *params = malloc(size_mul(sizeof(*params), params_count));
-    CHECK(params || params_count == 0);
+    struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
     for (size_t i = 0; i < params_count; i++) {
       substitute_generics(&type->u.app.params[i], g, args, args_count,
 			  &params[i]);

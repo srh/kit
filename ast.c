@@ -363,8 +363,7 @@ void ast_typeapp_init_copy(struct ast_typeapp *a, struct ast_typeapp *c) {
   a->meta = ast_meta_make_copy(&c->meta);
   ast_ident_init_copy(&a->name, &c->name);
   size_t params_count = c->params_count;
-  struct ast_typeexpr *params = malloc(size_mul(params_count, sizeof(*params)));
-  CHECK(params || params_count == 0);
+  struct ast_typeexpr *params = malloc_mul(params_count, sizeof(*params));
   for (size_t i = 0; i < params_count; i++) {
     ast_typeexpr_init_copy(&params[i], &c->params[i]);
   }
@@ -380,8 +379,7 @@ void ast_typeapp_destroy(struct ast_typeapp *a) {
 
 void ast_fields_alloc_copy(struct ast_vardecl *fields, size_t fields_count,
 			   struct ast_vardecl **p_out, size_t *count_out) {
-  struct ast_vardecl *p = malloc(size_mul(fields_count, sizeof(*p)));
-  CHECK(p || fields_count == 0);
+  struct ast_vardecl *p = malloc_mul(fields_count, sizeof(*p));
   for (size_t i = 0; i < fields_count; i++) {
     ast_vardecl_init_copy(&p[i], &fields[i]);
   }
@@ -493,8 +491,7 @@ void ast_generics_init_copy(struct ast_generics *a,
     a->has_type_params = 1;
     a->meta = ast_meta_make_copy(&c->meta);
     size_t params_count = c->params_count;
-    struct ast_ident *params = malloc(size_mul(params_count, sizeof(*params)));
-    CHECK(params || params_count == 0);
+    struct ast_ident *params = malloc_mul(params_count, sizeof(*params));
     for (size_t i = 0; i < params_count; i++) {
       ast_ident_init_copy(&params[i], &c->params[i]);
     }

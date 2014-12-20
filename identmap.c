@@ -54,12 +54,7 @@ void ident_map_rebuild(struct ident_map *m,
   CHECK(0 == (new_limit & (new_limit - 1)));
   CHECK(m->count < new_limit / 2);
 
-  IDENTMAP_DBG("ident_map_rebuild, survived checks\n");
-  size_t malloc_size = size_mul(new_limit, sizeof(struct ident_map_entry));
-  IDENTMAP_DBG("computed malloc_size of %"PRIz"\n", malloc_size);
-  struct ident_map_entry *new_table = malloc(malloc_size);
-  IDENTMAP_DBG("malloc returned\n");
-  CHECK(new_table);
+  struct ident_map_entry *new_table = malloc_mul(new_limit, sizeof(struct ident_map_entry));
 
   IDENTMAP_DBG("ident_map_rebuild, malloced new_table\n");
   for (size_t i = 0; i < new_limit; i++) {
