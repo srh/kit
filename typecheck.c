@@ -524,6 +524,60 @@ int replace_generics(struct exprscope *es,
 int check_expr(struct exprscope *es,
 	       struct ast_expr *x,
 	       struct ast_typeexpr *partial_type,
+	       struct ast_typeexpr *out);
+
+int check_expr_funcall(struct exprscope *es,
+		       struct ast_funcall *x,
+		       struct ast_typeexpr *partial_type,
+		       struct ast_typeexpr *out) {
+  size_t args_count = x->args_count;
+  size_t args_types_count = size_add(args_count, 1);
+  struct ast_typeexpr *args_types = malloc(size_mul(sizeof(*args_types),
+						    args_types_count));
+  CHECK(args_types);
+  size_t i;
+  for (i = 0; i < args_count; i++) {
+    struct ast_typeexpr local_partial;
+    local_partial.tag = AST_TYPEEXPR_UNKNOWN;
+    if (!check_expr(es, &x->args[i], &local_partial, &args_types[i])) {
+      goto fail_cleanup_args_types;
+    }
+  }
+
+  ast_typeexpr_init_copy(&args_types[args_count], partial_type);
+
+  ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
+  struct ast_ident name;
+  ast_ident_init(&name, ast_meta_make_garbage(), func_ident);
+
+  struct ast_typeexpr funcexpr;
+  funcexpr.tag = AST_TYPEEXPR_APP;
+  ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(), name, args_types, args_types_count);
+
+  int ret = 0;
+  struct ast_typeexpr resolved_funcexpr;
+  if (!check_expr(es, x->func, &funcexpr, &resolved_funcexpr)) {
+    goto fail_cleanup_funcexpr;
+  }
+
+  CHECK(resolved_funcexpr.tag == AST_TYPEEXPR_APP);
+  CHECK(resolved_funcexpr.u.app.name.value == func_ident);
+  CHECK(resolved_funcexpr.u.app.params_count == args_types_count);
+  ast_typeexpr_init_copy(out, &resolved_funcexpr.u.app.params[args_count]);
+
+  ret = 1;
+ fail_cleanup_funcexpr:
+  ast_typeexpr_destroy(&funcexpr);
+  return ret;
+  /* Don't fall-through -- args_types was moved into funcexpr. */
+ fail_cleanup_args_types:
+  SLICE_FREE(args_types, i, ast_typeexpr_destroy);
+  return 0;
+}
+
+int check_expr(struct exprscope *es,
+	       struct ast_expr *x,
+	       struct ast_typeexpr *partial_type,
 	       struct ast_typeexpr *out) {
   switch (x->tag) {
   case AST_EXPR_NAME: {
@@ -549,49 +603,7 @@ int check_expr(struct exprscope *es,
     return 1;
   } break;
   case AST_EXPR_FUNCALL: {
-    size_t args_count = x->u.funcall.args_count;
-    size_t args_types_count = size_add(args_count, 1);
-    struct ast_typeexpr *args_types = malloc(size_mul(sizeof(*args_types),
-						      args_types_count));
-    CHECK(args_types);
-    size_t i;
-    for (i = 0; i < args_count; i++) {
-      struct ast_typeexpr local_partial;
-      local_partial.tag = AST_TYPEEXPR_UNKNOWN;
-      if (!check_expr(es, &x->u.funcall.args[i], &local_partial, &args_types[i])) {
-	goto fail_cleanup_args_types;
-      }
-    }
-
-    ast_typeexpr_init_copy(&args_types[args_count], partial_type);
-
-    ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
-    struct ast_ident name;
-    ast_ident_init(&name, ast_meta_make_garbage(), func_ident);
-
-    struct ast_typeexpr funcexpr;
-    funcexpr.tag = AST_TYPEEXPR_APP;
-    ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(), name, args_types, args_types_count);
-
-    int ret = 0;
-    struct ast_typeexpr resolved_funcexpr;
-    if (!check_expr(es, x->u.funcall.func, &funcexpr, &resolved_funcexpr)) {
-      goto fail_cleanup_funcexpr;
-    }
-
-    CHECK(resolved_funcexpr.tag == AST_TYPEEXPR_APP);
-    CHECK(resolved_funcexpr.u.app.name.value == func_ident);
-    CHECK(resolved_funcexpr.u.app.params_count == args_types_count);
-    ast_typeexpr_init_copy(out, &resolved_funcexpr.u.app.params[args_count]);
-
-    ret = 1;
-  fail_cleanup_funcexpr:
-    ast_typeexpr_destroy(&funcexpr);
-    return ret;
-    /* Don't fall-through -- args_types was moved into funcexpr. */
-  fail_cleanup_args_types:
-    SLICE_FREE(args_types, i, ast_typeexpr_destroy);
-    return 0;
+    return check_expr_funcall(es, &x->u.funcall, partial_type, out);
   } break;
   case AST_EXPR_UNOP:
   case AST_EXPR_BINOP:
