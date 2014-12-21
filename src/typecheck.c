@@ -1350,7 +1350,6 @@ int check_file_test_def_2(const uint8_t *name, size_t name_count,
 
 int check_file_test_def_3(const uint8_t *name, size_t name_count,
                           uint8_t **data_out, size_t *data_count_out) {
-  /* Fails because numeric literals are dumb and have type i32. */
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
                                "def y i32 = x;\n"
@@ -1362,7 +1361,6 @@ int check_file_test_def_3(const uint8_t *name, size_t name_count,
 
 int check_file_test_lambda_1(const uint8_t *name, size_t name_count,
                              uint8_t **data_out, size_t *data_count_out) {
-  /* Fails because numeric literals are dumb and have type i32. */
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
                                "def y func[i32, i32] = fn(z i32)i32 {\n"
@@ -1376,7 +1374,6 @@ int check_file_test_lambda_1(const uint8_t *name, size_t name_count,
 
 int check_file_test_lambda_2(const uint8_t *name, size_t name_count,
                              uint8_t **data_out, size_t *data_count_out) {
-  /* Fails because numeric literals are dumb and have type i32. */
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
                                "def y func[i32, i32] = fn(z i32)i32 {\n"
@@ -1397,7 +1394,7 @@ int check_file_test_lambda_2(const uint8_t *name, size_t name_count,
 
 int check_file_test_lambda_3(const uint8_t *name, size_t name_count,
                              uint8_t **data_out, size_t *data_count_out) {
-  /* Fails because numeric literals are dumb and have type i32. */
+  /* Fails because there's no label named foo. */
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
                                "def y func[i32, i32] = fn(z i32)i32 {\n"
@@ -1408,6 +1405,22 @@ int check_file_test_lambda_3(const uint8_t *name, size_t name_count,
                                "    return x;\n"
                                "  }\n"
                                "  return z;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+
+int check_file_test_lambda_4(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because k is a u32. */
+  struct test_module a[] = { { "foo",
+                               "def k u32 = k;\n"
+                               "def x i32 = 3;\n"
+                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "  return k;\n"
                                "};\n"
     } };
 
@@ -1503,6 +1516,12 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_lambda_3...\n");
   if (!!check_module(&im, &check_file_test_lambda_3, foo)) {
     DBG("check_file_test_lambda_3 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_4...\n");
+  if (!!check_module(&im, &check_file_test_lambda_4, foo)) {
+    DBG("check_file_test_lambda_4 fails\n");
     goto cleanup_ident_map;
   }
 
