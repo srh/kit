@@ -70,6 +70,12 @@ void checkstate_import_primitives(struct checkstate *cs) {
   }
 }
 
+void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
+  a->tag = AST_TYPEEXPR_NAME;
+  ast_ident_init(&a->u.name, ast_meta_make_garbage(),
+                 ident_map_intern_c_str(cs->im, I32_TYPE_NAME));
+}
+
 void checkstate_destroy(struct checkstate *cs) {
   name_table_destroy(&cs->nt);
   SLICE_FREE(cs->imports, cs->imports_count, import_destroy);
@@ -95,7 +101,7 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
 
   size_t error_pos;
   if (!parse_buf_file(cs->im, data, data_size, file_out, &error_pos)) {
-    ERR_DBG("Could not parse import.\n");
+    ERR_DBG("Could not parse file, at %"PRIz".\n", error_pos);
     goto fail_data;
   }
 
@@ -447,6 +453,7 @@ int check_var_shadowing(struct exprscope *es, ident_value name) {
 
 int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var) {
   if (!check_var_shadowing(es, var->name.value)) {
+    ERR_DBG("Var name shadows.\n");
     return 0;
   }
   SLICE_PUSH(es->vars, es->vars_count, es->vars_limit, var);
@@ -520,6 +527,13 @@ int unify_directionally(struct ast_typeexpr *partial_type,
   default:
     UNREACHABLE();
   }
+}
+
+int exact_typeexprs_equal(struct ast_typeexpr *a, struct ast_typeexpr *b) {
+  /* TODO: Make this a "real" implementation -- this one is only
+     correct for now, but if we added general "const numeric" types or
+     something, it wouldn't be. */
+  return unify_directionally(a, b) && unify_directionally(b, a);
 }
 
 int exprscope_lookup_name(struct exprscope *es,
@@ -715,19 +729,240 @@ int check_expr_funcall(struct exprscope *es,
   return 0;
 }
 
+struct label_info {
+  /* The name of the label in question. */
+  ident_value label_name;
+  /* True if the label has been observed. */
+  int is_label_observed;
+  /* True if a goto has been observed. */
+  int is_goto_observed;
+};
+
+void label_info_wipe(struct label_info *a) {
+  a->label_name = IDENT_VALUE_INVALID;
+  a->is_label_observed = 0;
+  a->is_goto_observed = 0;
+}
+
+struct bodystate {
+  struct exprscope *es;
+  struct ast_typeexpr *partial_type;
+  int have_exact_return_type;
+  struct ast_typeexpr exact_return_type;
+
+  struct label_info *label_infos;
+  size_t label_infos_count;
+  size_t label_infos_limit;
+};
+
+void bodystate_init(struct bodystate *bs, struct exprscope *es,
+                    struct ast_typeexpr *partial_type) {
+  bs->es = es;
+  bs->partial_type = partial_type;
+  bs->have_exact_return_type = 0;
+  bs->label_infos = NULL;
+  bs->label_infos_count = 0;
+  bs->label_infos_limit = 0;
+}
+
+void bodystate_destroy(struct bodystate *bs) {
+  bs->es = NULL;
+  if (bs->have_exact_return_type) {
+    ast_typeexpr_destroy(&bs->exact_return_type);
+    bs->have_exact_return_type = 0;
+  }
+  SLICE_FREE(bs->label_infos, bs->label_infos_count, label_info_wipe);
+  bs->label_infos_limit = 0;
+}
+
+void bodystate_note_goto(struct bodystate *bs, ident_value target) {
+  for (size_t i = 0, e = bs->label_infos_count; i < e; i++) {
+    if (bs->label_infos[i].label_name == target) {
+      bs->label_infos[i].is_goto_observed = 1;
+      return;
+    }
+  }
+  struct label_info info;
+  info.label_name = target;
+  info.is_label_observed = 0;
+  info.is_goto_observed = 1;
+  SLICE_PUSH(bs->label_infos, bs->label_infos_count, bs->label_infos_limit,
+             info);
+}
+
+int bodystate_note_label(struct bodystate *bs, ident_value name) {
+  for (size_t i = 0, e = bs->label_infos_count; i < e; i++) {
+    if (bs->label_infos[i].label_name == name) {
+      if (bs->label_infos[i].is_label_observed) {
+        ERR_DBG("Duplicate label.\n");
+        return 0;
+      }
+      bs->label_infos[i].is_label_observed = 1;
+      return 1;
+    }
+  }
+  struct label_info info;
+  info.label_name = name;
+  info.is_label_observed = 1;
+  info.is_goto_observed = 0;
+  SLICE_PUSH(bs->label_infos, bs->label_infos_count, bs->label_infos_limit,
+             info);
+  return 1;
+}
+
+int check_expr_bracebody(struct bodystate *bs,
+                         struct ast_bracebody *x) {
+  size_t vars_pushed = 0;
+  int ret = 0;
+
+  for (size_t i = 0, e = x->statements_count; i < e; i++) {
+    struct ast_statement *s = &x->statements[i];
+    switch (s->tag) {
+    case AST_STATEMENT_EXPR: {
+      struct ast_typeexpr anything;
+      anything.tag = AST_TYPEEXPR_UNKNOWN;
+      struct ast_typeexpr discard;
+      if (!check_expr(bs->es, s->u.expr, &anything, &discard)) {
+        goto fail;
+      }
+      ast_typeexpr_destroy(&discard);
+    } break;
+    case AST_STATEMENT_RETURN_EXPR: {
+      struct ast_typeexpr type;
+      if (!check_expr(bs->es, s->u.return_expr, bs->partial_type, &type)) {
+        goto fail;
+      }
+      if (!bs->have_exact_return_type) {
+        bs->have_exact_return_type = 1;
+        bs->exact_return_type = type;
+      } else {
+        if (!exact_typeexprs_equal(&bs->exact_return_type, &type)) {
+          ERR_DBG("Return statements with conflicting return types.\n");
+          goto fail;
+        } else {
+          ast_typeexpr_destroy(&type);
+        }
+      }
+    } break;
+    case AST_STATEMENT_VAR: {
+      struct ast_typeexpr replaced_type;
+      replace_generics(bs->es, &s->u.var_statement.decl.type, &replaced_type);
+
+      struct ast_typeexpr rhs_type;
+      if (!check_expr(bs->es, s->u.var_statement.rhs, &replaced_type,
+                      &rhs_type)) {
+        ERR_DBG("Var decl type doesn't match rhs.\n");
+        ast_typeexpr_destroy(&replaced_type);
+        goto fail;
+      }
+
+      ast_typeexpr_destroy(&replaced_type);
+      ast_typeexpr_destroy(&rhs_type);
+
+      if (!exprscope_push_var(bs->es, &s->u.var_statement.decl)) {
+        goto fail;
+      }
+
+      vars_pushed = size_add(vars_pushed, 1);
+    } break;
+    case AST_STATEMENT_GOTO: {
+      bodystate_note_goto(bs, s->u.goto_statement.target.value);
+    } break;
+    case AST_STATEMENT_LABEL: {
+      if (!bodystate_note_label(bs, s->u.label_statement.label.value)) {
+        goto fail;
+      }
+    } break;
+    case AST_STATEMENT_IFTHEN: {
+      struct ast_typeexpr boolean;
+      init_boolean_typeexpr(bs->es->cs, &boolean);
+
+      struct ast_typeexpr discard;
+      if (!check_expr(bs->es, s->u.ifthen_statement.condition, &boolean, &discard)) {
+        ast_typeexpr_destroy(&boolean);
+        goto fail;
+      }
+      ast_typeexpr_destroy(&boolean);
+      ast_typeexpr_destroy(&discard);
+
+      if (!check_expr_bracebody(bs, &s->u.ifthen_statement.thenbody)) {
+        goto fail;
+      }
+    } break;
+    case AST_STATEMENT_IFTHENELSE: {
+      struct ast_typeexpr boolean;
+      init_boolean_typeexpr(bs->es->cs, &boolean);
+
+      struct ast_typeexpr discard;
+      if (!check_expr(bs->es, s->u.ifthenelse_statement.condition, &boolean, &discard)) {
+        ast_typeexpr_destroy(&boolean);
+        goto fail;
+      }
+      ast_typeexpr_destroy(&boolean);
+      ast_typeexpr_destroy(&discard);
+
+      if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.thenbody)) {
+        goto fail;
+      }
+
+      if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.elsebody)) {
+        goto fail;
+      }
+    } break;
+    default:
+      UNREACHABLE();
+    }
+  }
+
+  ret = 1;
+ fail:
+  for (size_t i = 0; i < vars_pushed; i++) {
+    exprscope_pop_var(bs->es);
+  }
+  return ret;
+}
+
 int check_expr_funcbody(struct exprscope *es,
                         struct ast_bracebody *x,
                         struct ast_typeexpr *partial_type,
                         struct ast_typeexpr *out) {
-  (void)es, (void)x, (void)partial_type, (void)out;
-  /* TODO: Implement. */
-  return 0;
+  int ret = 0;
+  struct bodystate bs;
+  bodystate_init(&bs, es, partial_type);
+
+  if (!check_expr_bracebody(&bs, x)) {
+    goto fail;
+  }
+
+  for (size_t i = 0; i < bs.label_infos_count; i++) {
+    if (!bs.label_infos[i].is_label_observed) {
+      ERR_DBG("goto without label.\n");
+      goto fail;
+    }
+    if (!bs.label_infos[i].is_goto_observed) {
+      ERR_DBG("label without goto.\n");
+      goto fail;
+    }
+  }
+
+  if (!bs.have_exact_return_type) {
+    ERR_DBG("Missing a return statement.\n");
+    goto fail;
+  }
+  *out = bs.exact_return_type;
+  bs.have_exact_return_type = 0;
+
+  ret = 1;
+ fail:
+  bodystate_destroy(&bs);
+  return ret;
 }
 
 int check_expr_lambda(struct exprscope *es,
                       struct ast_lambda *x,
                       struct ast_typeexpr *partial_type,
                       struct ast_typeexpr *out) {
+  CHECK_DBG("check_expr_lambda\n");
   ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
   size_t func_params_count = x->params_count;
   size_t args_count = size_add(func_params_count, 1);
@@ -772,6 +1007,7 @@ int check_expr_lambda(struct exprscope *es,
   }
 
   if (!unify_directionally(partial_type, &funcexpr)) {
+    ERR_DBG("lambda type does not match expression type.\n");
     goto fail_funcexpr;
   }
 
@@ -794,12 +1030,14 @@ int check_expr_lambda(struct exprscope *es,
           &x->bracebody,
           &funcexpr.u.app.params[size_sub(funcexpr.u.app.params_count, 1)],
           &computed_return_type)) {
+    CHECK_DBG("check_expr_funcbody fails\n");
     goto fail_bb_es;
   }
 
   ast_typeexpr_destroy(&computed_return_type);
   exprscope_destroy(&bb_es);
   *out = funcexpr;
+  CHECK_DBG("check_expr_lambda succeeds\n");
   return 1;
 
  fail_bb_es:
@@ -842,16 +1080,19 @@ int check_expr(struct exprscope *es,
   } break;
   case AST_EXPR_UNOP:
   case AST_EXPR_BINOP:
+    ERR_DBG("AST_EXPR_UNOP/BINOP not implemented.\n");
     /* TODO: Implement. */
     return 0;
   case AST_EXPR_LAMBDA: {
     return check_expr_lambda(es, &x->u.lambda, partial_type, out);
   } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
+    ERR_DBG("AST_EXPR_LOCAL_FIELD_ACCESS not implemented.\n");
     /* TODO: Implement. */
     return 0;
   } break;
   case AST_EXPR_DEREF_FIELD_ACCESS: {
+    ERR_DBG("AST_EXPR_DEREF_FIELD_ACCESS not implemented.\n");
     /* TODO: Implement. */
     return 0;
   } break;
@@ -864,6 +1105,7 @@ int check_expr(struct exprscope *es,
 int check_expr_with_type(struct exprscope *es,
                          struct ast_expr *x,
                          struct ast_typeexpr *type) {
+  CHECK_DBG("check_expr_with_type\n");
   struct ast_typeexpr out;
   int ret = check_expr(es, x, type, &out);
   if (ret) {
@@ -1115,6 +1357,20 @@ int check_file_test_def_3(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_1(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because numeric literals are dumb and have type i32. */
+  struct test_module a[] = { { "foo",
+                               "def x i32 = 3;\n"
+                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "  return x;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -1185,6 +1441,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_def_3...\n");
   if (!check_module(&im, &check_file_test_def_3, foo)) {
     DBG("check_file_test_def_3 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_1...\n");
+  if (!check_module(&im, &check_file_test_lambda_1, foo)) {
+    DBG("check_file_test_lambda_1 fails\n");
     goto cleanup_ident_map;
   }
 
