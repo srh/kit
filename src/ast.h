@@ -99,6 +99,7 @@ struct ast_typeexpr {
 void ast_typeexpr_init_copy(struct ast_typeexpr *a,
                             struct ast_typeexpr *c);
 void ast_typeexpr_destroy(struct ast_typeexpr *a);
+struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a);
 
 struct ast_vardecl {
   struct ast_meta meta;
@@ -128,8 +129,7 @@ void ast_bracebody_destroy(struct ast_bracebody *a);
 
 struct ast_var_statement {
   struct ast_meta meta;
-  struct ast_ident name;
-  struct ast_typeexpr type;
+  struct ast_vardecl decl;
   struct ast_expr *rhs;
 };
 

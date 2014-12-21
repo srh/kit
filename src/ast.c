@@ -110,15 +110,14 @@ void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
                             struct ast_ident name, struct ast_typeexpr type,
                             struct ast_expr *rhs) {
   a->meta = meta;
-  a->name = name;
-  a->type = type;
+  ast_vardecl_init(&a->decl, ast_meta_make(name.meta.pos_start, ast_typeexpr_meta(&type)->pos_end),
+                   name, type);
   a->rhs = rhs;
 }
 
 void ast_var_statement_destroy(struct ast_var_statement *a) {
   ast_meta_destroy(&a->meta);
-  ast_ident_destroy(&a->name);
-  ast_typeexpr_destroy(&a->type);
+  ast_vardecl_destroy(&a->decl);
   ast_expr_destroy(a->rhs);
   free(a->rhs);
   a->rhs = NULL;
@@ -466,6 +465,19 @@ void ast_typeexpr_destroy(struct ast_typeexpr *a) {
     UNREACHABLE();
   }
   a->tag = (enum ast_typeexpr_tag)-1;
+}
+
+struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a) {
+  switch (a->tag) {
+  case AST_TYPEEXPR_NAME: return &a->u.name.meta;
+  case AST_TYPEEXPR_APP: return &a->u.app.meta;
+  case AST_TYPEEXPR_STRUCTE: return &a->u.structe.meta;
+  case AST_TYPEEXPR_UNIONE: return &a->u.unione.meta;
+  case AST_TYPEEXPR_UNKNOWN:
+    CRASH("No meta data for \"unknown\" typeexpr.\n");
+  default:
+    UNREACHABLE();
+  }
 }
 
 void ast_generics_init_no_params(struct ast_generics *a) {
