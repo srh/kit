@@ -57,16 +57,19 @@ void intern_primitive_type(struct checkstate *cs,
 }
 
 #define I32_TYPE_NAME "i32"
+#define U32_TYPE_NAME "u32"
+#define F64_TYPE_NAME "f64"
+#define PTR_TYPE_NAME "ptr"
 #define FUNC_TYPE_NAME "func"
 
 void checkstate_import_primitives(struct checkstate *cs) {
-  intern_primitive_type(cs, "u32", NULL, 0);
+  intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0);
   intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0);
-  intern_primitive_type(cs, "f64", NULL, 0);
+  intern_primitive_type(cs, F64_TYPE_NAME, NULL, 0);
   int not_flatly_held[20] = { 0 };
-  intern_primitive_type(cs, "ptr", not_flatly_held, 1);
+  intern_primitive_type(cs, PTR_TYPE_NAME, not_flatly_held, 1);
   for (size_t i = 1; i < 21; i++) {
-    intern_primitive_type(cs, "func", not_flatly_held, i);
+    intern_primitive_type(cs, FUNC_TYPE_NAME, not_flatly_held, i);
   }
 }
 
@@ -1371,6 +1374,47 @@ int check_file_test_lambda_1(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_2(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because numeric literals are dumb and have type i32. */
+  struct test_module a[] = { { "foo",
+                               "def x i32 = 3;\n"
+                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "  if (z) {\n"
+                               "    goto foo;\n"
+                               "    var k i32 = y(x);\n"
+                               "  } else {\n"
+                               "    return x;\n"
+                               "  }\n"
+                               "  label foo;\n"
+                               "  return z;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_3(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because numeric literals are dumb and have type i32. */
+  struct test_module a[] = { { "foo",
+                               "def x i32 = 3;\n"
+                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "  if (z) {\n"
+                               "    y;\n"
+                               "    goto foo;\n"
+                               "  } else {\n"
+                               "    return x;\n"
+                               "  }\n"
+                               "  return z;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -1447,6 +1491,18 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_lambda_1...\n");
   if (!check_module(&im, &check_file_test_lambda_1, foo)) {
     DBG("check_file_test_lambda_1 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_2...\n");
+  if (!check_module(&im, &check_file_test_lambda_2, foo)) {
+    DBG("check_file_test_lambda_2 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_3...\n");
+  if (!!check_module(&im, &check_file_test_lambda_3, foo)) {
+    DBG("check_file_test_lambda_3 fails\n");
     goto cleanup_ident_map;
   }
 
