@@ -1428,6 +1428,36 @@ int check_file_test_lambda_4(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_5(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because x shadows a global. */
+  struct test_module a[] = { { "foo",
+                               "def x i32 = 3;\n"
+                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "  var x i32 = 4;\n"
+                               "  return z;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_6(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because z shadows a local. */
+  struct test_module a[] = { { "foo",
+                               "def x i32 = 3;\n"
+                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "  var z i32 = 4;\n"
+                               "  return x;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -1522,6 +1552,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_lambda_4...\n");
   if (!!check_module(&im, &check_file_test_lambda_4, foo)) {
     DBG("check_file_test_lambda_4 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_5...\n");
+  if (!!check_module(&im, &check_file_test_lambda_5, foo)) {
+    DBG("check_file_test_lambda_5 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_6...\n");
+  if (!!check_module(&im, &check_file_test_lambda_6, foo)) {
+    DBG("check_file_test_lambda_6 fails\n");
     goto cleanup_ident_map;
   }
 
