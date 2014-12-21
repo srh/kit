@@ -13,3 +13,8 @@ size_t size_add(size_t x, size_t y) {
   CHECK(x <= SIZE_MAX - y);
   return x + y;
 }
+
+size_t size_sub(size_t x, size_t y) {
+  CHECK(x >= y);
+  return x - y;
+}

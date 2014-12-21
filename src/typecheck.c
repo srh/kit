@@ -421,6 +421,44 @@ void exprscope_destroy(struct exprscope *es) {
   es->vars_limit = 0;
 }
 
+int check_var_shadowing(struct exprscope *es, ident_value name) {
+  for (size_t i = 0, e = es->vars_count; i < e; i++) {
+    if (es->vars[i]->name.value == name) {
+      ERR_DBG("Variable name shadows local.\n");
+      return 0;
+    }
+  }
+
+  {
+    size_t which_generic;
+    if (generics_lookup_name(es->generics, name, &which_generic)) {
+      ERR_DBG("Variable name shadows template parameter, which is gauche.\n");
+      return 0;
+    }
+  }
+
+  if (name_table_shadowed(&es->cs->nt, name)) {
+    ERR_DBG("Variable name shadows a global def or type.\n");
+    return 0;
+  }
+
+  return 1;
+}
+
+int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var) {
+  if (!check_var_shadowing(es, var->name.value)) {
+    return 0;
+  }
+  SLICE_PUSH(es->vars, es->vars_count, es->vars_limit, var);
+  return 1;
+}
+
+void exprscope_pop_var(struct exprscope *es) {
+  CHECK(es->vars_count > 0);
+  --es->vars_count;
+  es->vars[es->vars_count] = NULL;
+}
+
 int unify_fields_directionally(struct ast_vardecl *partial_fields,
                                size_t partial_fields_count,
                                struct ast_vardecl *complete_fields,
@@ -677,28 +715,13 @@ int check_expr_funcall(struct exprscope *es,
   return 0;
 }
 
-int check_var_shadowing(struct exprscope *es, ident_value name) {
-  for (size_t i = 0, e = es->vars_count; i < e; i++) {
-    if (es->vars[i]->name.value == name) {
-      ERR_DBG("Variable name shadows local.\n");
-      return 0;
-    }
-  }
-
-  {
-    size_t which_generic;
-    if (generics_lookup_name(es->generics, name, &which_generic)) {
-      ERR_DBG("Variable name shadows template parameter, which is gauche.\n");
-      return 0;
-    }
-  }
-
-  if (name_table_shadowed(&es->cs->nt, name)) {
-    ERR_DBG("Variable name shadows a global def or type.\n");
-    return 0;
-  }
-
-  return 1;
+int check_expr_funcbody(struct exprscope *es,
+                        struct ast_bracebody *x,
+                        struct ast_typeexpr *partial_type,
+                        struct ast_typeexpr *out) {
+  (void)es, (void)x, (void)partial_type, (void)out;
+  /* TODO: Implement. */
+  return 0;
 }
 
 int check_expr_lambda(struct exprscope *es,
@@ -738,7 +761,7 @@ int check_expr_lambda(struct exprscope *es,
       return 0;
     }
 
-    ast_typeexpr_init_copy(&args[func_params_count], &x->return_type);
+    replace_generics(es, &x->return_type, &args[func_params_count]);
 
     struct ast_ident name;
     ast_ident_init(&name, ast_meta_make_garbage(), func_ident);
@@ -752,11 +775,35 @@ int check_expr_lambda(struct exprscope *es,
     goto fail_funcexpr;
   }
 
-  /* TODO: Typecheck bracebody. */
+  /* Because lambdas can't capture variables, we make a fresh exprscope. */
 
+  struct exprscope bb_es;
+  exprscope_init(&bb_es, es->cs, es->generics, es->generics_substitutions,
+                 es->generics_substitutions_count);
+
+  for (size_t i = 0; i < func_params_count; i++) {
+    int res = exprscope_push_var(&bb_es, &x->params[i]);
+    /* Pushing the var should succeed, because we already called
+       check_var_shadowing above. */
+    CHECK(res);
+  }
+
+  struct ast_typeexpr computed_return_type;
+  if (!check_expr_funcbody(
+          &bb_es,
+          &x->bracebody,
+          &funcexpr.u.app.params[size_sub(funcexpr.u.app.params_count, 1)],
+          &computed_return_type)) {
+    goto fail_bb_es;
+  }
+
+  ast_typeexpr_destroy(&computed_return_type);
+  exprscope_destroy(&bb_es);
   *out = funcexpr;
   return 1;
 
+ fail_bb_es:
+  exprscope_destroy(&bb_es);
  fail_funcexpr:
   ast_typeexpr_destroy(&funcexpr);
   return 0;
