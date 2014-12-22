@@ -56,33 +56,41 @@ void intern_primitive_type(struct checkstate *cs,
   CHECK(res);
 }
 
-void intern_unop(struct checkstate *cs,
-                 enum ast_unop unop,
-                 struct ast_generics *generics,
-                 struct ast_typeexpr *type) {
+int is_magic_unop(enum ast_unop unop) {
+  return unop == AST_UNOP_DEREFERENCE || unop == AST_UNOP_ADDRESSOF;
+}
+
+const char *unop_fakename(enum ast_unop unop) {
   /* First check that unop isn't some magic lvalue thing. */
-  CHECK(unop != AST_UNOP_DEREFERENCE);
-  CHECK(unop != AST_UNOP_ADDRESSOF);
+  CHECK(!is_magic_unop(unop));
 
   static const char *const unop_names[] = {
     [AST_UNOP_DEREFERENCE] = NULL,
     [AST_UNOP_ADDRESSOF] = NULL,
     [AST_UNOP_NEGATE] = "$UNOP_NEGATE",
   };
-  name_table_add_primitive_def(&cs->nt,
-                               ident_map_intern_c_str(cs->im, unop_names[unop]),
-                               generics,
-                               type);
+
+  return unop_names[unop];
 }
 
-void intern_binop(struct checkstate *cs,
-                  enum ast_binop binop,
-                  struct ast_generics *generics,
-                  struct ast_typeexpr *type) {
-  /* First check that binop isn't something that can't be a function. */
-  CHECK(binop != AST_BINOP_ASSIGN);
-  CHECK(binop != AST_BINOP_LOGICAL_OR);
-  CHECK(binop != AST_BINOP_LOGICAL_AND);
+void intern_unop(struct checkstate *cs,
+                 enum ast_unop unop,
+                 struct ast_generics *generics,
+                 struct ast_typeexpr *type) {
+  name_table_add_primitive_def(
+      &cs->nt,
+      ident_map_intern_c_str(cs->im, unop_fakename(unop)),
+      generics,
+      type);
+}
+
+int is_magic_binop(enum ast_binop binop) {
+  return binop == AST_BINOP_ASSIGN || binop == AST_BINOP_LOGICAL_OR
+    || binop == AST_BINOP_LOGICAL_AND;
+}
+
+const char *binop_fakename(enum ast_binop binop) {
+  CHECK(!is_magic_binop(binop));
 
   static const char *const binop_names[] = {
     [AST_BINOP_ASSIGN] = NULL,
@@ -106,9 +114,17 @@ void intern_binop(struct checkstate *cs,
     [AST_BINOP_LOGICAL_AND] = NULL,
   };
 
+  return binop_names[binop];
+}
+
+void intern_binop(struct checkstate *cs,
+                  enum ast_binop binop,
+                  struct ast_generics *generics,
+                  struct ast_typeexpr *type) {
+
   name_table_add_primitive_def(&cs->nt,
                                ident_map_intern_c_str(cs->im,
-                                                      binop_names[binop]),
+                                                      binop_fakename(binop)),
                                generics,
                                type);
 }
@@ -733,7 +749,7 @@ int exprscope_lookup_name(struct exprscope *es,
   struct def_entry *ent;
   if (name_table_match_def(&es->cs->nt,
                            name,
-                           NULL, /* No generic typeexpr parameters here. */
+                           NULL, /* No generic params in the expr here. */
                            0,
                            partial_type,
                            &unified, &ent)) {
@@ -1221,6 +1237,77 @@ int check_expr_lambda(struct exprscope *es,
   return 0;
 }
 
+struct ast_ident make_ast_ident(ident_value ident) {
+  struct ast_ident ret;
+  ast_ident_init(&ret, ast_meta_make_garbage(), ident);
+  return ret;
+}
+
+int check_expr_binop(struct exprscope *es,
+                     struct ast_binop_expr *x,
+                     struct ast_typeexpr *partial_type,
+                     struct ast_typeexpr *out) {
+  if (is_magic_binop(x->operator)) {
+    ERR_DBG("Magic binary operators not implemented.\n");
+    return 0;
+  }
+
+  struct ast_typeexpr local_partial;
+  local_partial.tag = AST_TYPEEXPR_UNKNOWN;
+
+  struct ast_typeexpr lhs_type;
+  if (!check_expr(es, x->lhs, &local_partial, &lhs_type)) {
+    goto fail;
+  }
+
+  struct ast_typeexpr rhs_type;
+  if (!check_expr(es, x->rhs, &local_partial, &rhs_type)) {
+    goto fail_cleanup_lhs_type;
+  }
+
+  struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
+                                               3);
+  args_types[0] = lhs_type;
+  args_types[1] = rhs_type;
+  ast_typeexpr_init_copy(&args_types[2], partial_type);
+
+  ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
+
+  struct ast_typeexpr funcexpr;
+  funcexpr.tag = AST_TYPEEXPR_APP;
+  ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
+                   make_ast_ident(func_ident), args_types, 3);
+
+  int ret = 0;
+  struct ast_typeexpr resolved_funcexpr;
+  struct def_entry *ent;
+  if (!name_table_match_def(&es->cs->nt,
+                            ident_map_intern_c_str(es->cs->im,
+                                                   binop_fakename(x->operator)),
+                            NULL, /* No generic params in the expr here. */
+                            0,
+                            &funcexpr,
+                            &resolved_funcexpr,
+                            &ent)) {
+    goto fail_cleanup_funcexpr;
+  }
+
+  CHECK(resolved_funcexpr.tag == AST_TYPEEXPR_APP);
+  CHECK(resolved_funcexpr.u.app.name.value == func_ident);
+  CHECK(resolved_funcexpr.u.app.params_count == 3);
+  ast_typeexpr_init_copy(out, &resolved_funcexpr.u.app.params[2]);
+
+  ret = 1;
+ fail_cleanup_funcexpr:
+  ast_typeexpr_destroy(&funcexpr);
+  return ret;
+  /* Don't fall-through -- lhs_type was moved into funcexpr. */
+ fail_cleanup_lhs_type:
+  ast_typeexpr_destroy(&lhs_type);
+ fail:
+  return 0;
+}
+
 int check_expr(struct exprscope *es,
                struct ast_expr *x,
                struct ast_typeexpr *partial_type,
@@ -1256,10 +1343,9 @@ int check_expr(struct exprscope *es,
     /* TODO: Implement. */
     ERR_DBG("AST_EXPR_UNOP not implemented.\n");
     return 0;
-  case AST_EXPR_BINOP:
-    /* TODO: Implement. */
-    ERR_DBG("AST_EXPR_BINOP not implemented.\n");
-    return 0;
+  case AST_EXPR_BINOP: {
+    return check_expr_binop(es, &x->u.binop_expr, partial_type, out);
+  } break;
   case AST_EXPR_LAMBDA: {
     return check_expr_lambda(es, &x->u.lambda, partial_type, out);
   } break;
@@ -1632,6 +1718,33 @@ int check_file_test_lambda_6(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_7(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { { "foo",
+                               "def x i32 = 3;\n"
+                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "  return x + z + 5;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_8(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because x is a u32. */
+  struct test_module a[] = { { "foo",
+                               "def x u32 = x;\n"
+                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "  return x + z + 5;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -1738,6 +1851,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_lambda_6...\n");
   if (!!check_module(&im, &check_file_test_lambda_6, foo)) {
     DBG("check_file_test_lambda_6 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_7...\n");
+  if (!check_module(&im, &check_file_test_lambda_7, foo)) {
+    DBG("check_file_test_lambda_7 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_8...\n");
+  if (!!check_module(&im, &check_file_test_lambda_8, foo)) {
+    DBG("check_file_test_lambda_8 fails\n");
     goto cleanup_ident_map;
   }
 

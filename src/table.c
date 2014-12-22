@@ -447,6 +447,7 @@ int name_table_match_def(struct name_table *t,
   }
 
   if (!matched_ent) {
+    ERR_DBG("no matching definition\n");
     goto fail;
   }
 
