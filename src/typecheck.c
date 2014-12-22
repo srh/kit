@@ -14,6 +14,13 @@
 
 #define CHECK_DBG(...) do { } while (0)
 
+/* TODO: Move this elsewhere? */
+struct ast_ident make_ast_ident(ident_value ident) {
+  struct ast_ident ret;
+  ast_ident_init(&ret, ast_meta_make_garbage(), ident);
+  return ret;
+}
+
 struct import {
   ident_value import_name;
   struct ast_file *file;
@@ -154,13 +161,12 @@ void checkstate_import_primitive_types(struct checkstate *cs) {
 void init_func_type(struct ast_typeexpr *a, struct ident_map *im,
                     ident_value *args, size_t args_count) {
   a->tag = AST_TYPEEXPR_APP;
-  struct ast_ident name;
-  ast_ident_init(&name, ast_meta_make_garbage(),
-                 ident_map_intern_c_str(im, FUNC_TYPE_NAME));
+  struct ast_ident name
+    = make_ast_ident(ident_map_intern_c_str(im, FUNC_TYPE_NAME));
   struct ast_typeexpr *params = malloc_mul(sizeof(*params), args_count);
   for (size_t i = 0; i < args_count; i++) {
     params[i].tag = AST_TYPEEXPR_NAME;
-    ast_ident_init(&params[i].u.name, ast_meta_make_garbage(), args[i]);
+    params[i].u.name = make_ast_ident(args[i]);
   }
   ast_typeapp_init(&a->u.app, ast_meta_make_garbage(),
                    name, params, args_count);
@@ -262,8 +268,7 @@ void checkstate_import_primitives(struct checkstate *cs) {
 
 void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
   a->tag = AST_TYPEEXPR_NAME;
-  ast_ident_init(&a->u.name, ast_meta_make_garbage(),
-                 ident_map_intern_c_str(cs->im, I32_TYPE_NAME));
+  a->u.name = make_ast_ident(ident_map_intern_c_str(cs->im, I32_TYPE_NAME));
 }
 
 void checkstate_destroy(struct checkstate *cs) {
@@ -766,8 +771,7 @@ void numeric_literal_type(struct ident_map *im,
                           struct ast_typeexpr *out) {
   (void)a;
   out->tag = AST_TYPEEXPR_NAME;
-  ast_ident_init(&out->u.name, ast_meta_make_garbage(),
-                 ident_map_intern_c_str(im, I32_TYPE_NAME));
+  out->u.name = make_ast_ident(ident_map_intern_c_str(im, I32_TYPE_NAME));
 }
 
 void do_replace_generics(struct ast_generics *generics,
@@ -890,12 +894,11 @@ int check_expr_funcall(struct exprscope *es,
   ast_typeexpr_init_copy(&args_types[args_count], partial_type);
 
   ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
-  struct ast_ident name;
-  ast_ident_init(&name, ast_meta_make_garbage(), func_ident);
 
   struct ast_typeexpr funcexpr;
   funcexpr.tag = AST_TYPEEXPR_APP;
-  ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(), name,
+  ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
+                   make_ast_ident(func_ident),
                    args_types, args_types_count);
 
   int ret = 0;
@@ -1188,12 +1191,9 @@ int check_expr_lambda(struct exprscope *es,
 
     replace_generics(es, &x->return_type, &args[func_params_count]);
 
-    struct ast_ident name;
-    ast_ident_init(&name, ast_meta_make_garbage(), func_ident);
-
     funcexpr.tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
-                     name, args, args_count);
+                     make_ast_ident(func_ident), args, args_count);
   }
 
   if (!unify_directionally(partial_type, &funcexpr)) {
@@ -1235,12 +1235,6 @@ int check_expr_lambda(struct exprscope *es,
  fail_funcexpr:
   ast_typeexpr_destroy(&funcexpr);
   return 0;
-}
-
-struct ast_ident make_ast_ident(ident_value ident) {
-  struct ast_ident ret;
-  ast_ident_init(&ret, ast_meta_make_garbage(), ident);
-  return ret;
 }
 
 int check_expr_binop(struct exprscope *es,
