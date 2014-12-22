@@ -1330,19 +1330,16 @@ int check_expr(struct exprscope *es,
     *out = num_type;
     return 1;
   } break;
-  case AST_EXPR_FUNCALL: {
+  case AST_EXPR_FUNCALL:
     return check_expr_funcall(es, &x->u.funcall, partial_type, out);
-  } break;
   case AST_EXPR_UNOP:
     /* TODO: Implement. */
     ERR_DBG("AST_EXPR_UNOP not implemented.\n");
     return 0;
-  case AST_EXPR_BINOP: {
+  case AST_EXPR_BINOP:
     return check_expr_binop(es, &x->u.binop_expr, partial_type, out);
-  } break;
-  case AST_EXPR_LAMBDA: {
+  case AST_EXPR_LAMBDA:
     return check_expr_lambda(es, &x->u.lambda, partial_type, out);
-  } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
     ERR_DBG("AST_EXPR_LOCAL_FIELD_ACCESS not implemented.\n");
     /* TODO: Implement. */
