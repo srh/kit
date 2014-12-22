@@ -14,7 +14,6 @@
 
 #define CHECK_DBG(...) do { } while (0)
 
-/* TODO: Move this elsewhere? */
 struct ast_ident make_ast_ident(ident_value ident) {
   struct ast_ident ret;
   ast_ident_init(&ret, ast_meta_make_garbage(), ident);
@@ -1357,6 +1356,94 @@ int check_expr_unop(struct exprscope *es,
   return ret;
 }
 
+int lookup_fields_field_type(struct ast_vardecl *fields,
+                             size_t fields_count,
+                             ident_value field_name,
+                             struct ast_typeexpr *field_type_out) {
+  for (size_t i = 0; i < fields_count; i++) {
+    if (fields[i].name.value == field_name) {
+      ast_typeexpr_init_copy(field_type_out, &fields[i].type);
+      return 1;
+    }
+  }
+
+  ERR_DBG("Field name not found.\n");
+  return 0;
+}
+
+int lookup_field_type(struct exprscope *es,
+                      struct ast_typeexpr *type,
+                      ident_value field_name,
+                      struct ast_typeexpr *field_type_out) {
+  switch (type->tag) {
+  case AST_TYPEEXPR_NAME: {
+    struct deftype_entry *ent;
+    if (!name_table_lookup_deftype(&es->cs->nt, type->u.name.value,
+                                   no_param_list_arity(),
+                                   &ent)) {
+      CRASH("lookup_field_type sees an invalid type.\n");
+    }
+    if (ent->is_primitive) {
+      ERR_DBG("Looking up field on primitive type.\n");
+      return 0;
+    }
+
+    struct ast_deftype *deftype = ent->deftype;
+    CHECK(!deftype->generics.has_type_params);
+    return lookup_field_type(es, &deftype->type, field_name, field_type_out);
+  } break;
+  case AST_TYPEEXPR_APP:
+    /* TODO: Implement. */
+    ERR_DBG("Looking up fields on generic types is not implemented.\n");
+    return 0;
+  case AST_TYPEEXPR_STRUCTE:
+    return lookup_fields_field_type(type->u.structe.fields,
+                                    type->u.structe.fields_count, field_name,
+                                    field_type_out);
+  case AST_TYPEEXPR_UNIONE:
+    return lookup_fields_field_type(type->u.unione.fields,
+                                    type->u.unione.fields_count, field_name,
+                                    field_type_out);
+  default:
+    UNREACHABLE();
+  }
+}
+
+int check_expr_local_field_access(struct exprscope *es,
+                                  struct ast_local_field_access *x,
+                                  struct ast_typeexpr *partial_type,
+                                  struct ast_typeexpr *out) {
+  int ret = 0;
+  struct ast_typeexpr lhs_partial_type;
+  lhs_partial_type.tag = AST_TYPEEXPR_UNKNOWN;
+
+  struct ast_typeexpr lhs_type;
+  if (!check_expr(es, x->lhs, &lhs_partial_type,
+                  &lhs_type)) {
+    goto cleanup;
+  }
+
+  struct ast_typeexpr field_type;
+  if (!lookup_field_type(es, &lhs_type, x->fieldname.value, &field_type)) {
+    goto cleanup_lhs_type;
+  }
+
+  if (!unify_directionally(partial_type, &field_type)) {
+    goto cleanup_field_type;
+  }
+
+  *out = field_type;
+  ret = 1;
+  goto cleanup_lhs_type;
+
+ cleanup_field_type:
+  ast_typeexpr_destroy(&field_type);
+ cleanup_lhs_type:
+  ast_typeexpr_destroy(&lhs_type);
+ cleanup:
+  return ret;
+}
+
 int check_expr(struct exprscope *es,
                struct ast_expr *x,
                struct ast_typeexpr *partial_type,
@@ -1393,11 +1480,9 @@ int check_expr(struct exprscope *es,
     return check_expr_binop(es, &x->u.binop_expr, partial_type, out);
   case AST_EXPR_LAMBDA:
     return check_expr_lambda(es, &x->u.lambda, partial_type, out);
-  case AST_EXPR_LOCAL_FIELD_ACCESS: {
-    ERR_DBG("AST_EXPR_LOCAL_FIELD_ACCESS not implemented.\n");
-    /* TODO: Implement. */
-    return 0;
-  } break;
+  case AST_EXPR_LOCAL_FIELD_ACCESS:
+    return check_expr_local_field_access(es, &x->u.local_field_access,
+                                         partial_type, out);
   case AST_EXPR_DEREF_FIELD_ACCESS: {
     ERR_DBG("AST_EXPR_DEREF_FIELD_ACCESS not implemented.\n");
     /* TODO: Implement. */
@@ -1816,6 +1901,34 @@ int check_file_test_lambda_10(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_11(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { { "foo",
+                               "deftype foo struct { x i32; y i32; };\n"
+                               "def y func[foo, i32] = fn(z foo) i32 {\n"
+                               "  return z.x;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_12(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because the field x has type u32. */
+  struct test_module a[] = { { "foo",
+                               "deftype foo struct { x u32; y i32; };\n"
+                               "def y func[foo, i32] = fn(z foo) i32 {\n"
+                               "  return z.x;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -1946,6 +2059,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_lambda_10...\n");
   if (!!check_module(&im, &check_file_test_lambda_10, foo)) {
     DBG("check_file_test_lambda_10 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_11...\n");
+  if (!check_module(&im, &check_file_test_lambda_11, foo)) {
+    DBG("check_file_test_lambda_11 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_12...\n");
+  if (!!check_module(&im, &check_file_test_lambda_12, foo)) {
+    DBG("check_file_test_lambda_12 fails\n");
     goto cleanup_ident_map;
   }
 
