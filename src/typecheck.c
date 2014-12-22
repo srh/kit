@@ -762,18 +762,17 @@ int exprscope_lookup_name(struct exprscope *es,
 
   struct ast_typeexpr unified;
   struct def_entry *ent;
-  if (name_table_match_def(&es->cs->nt,
-                           name,
-                           NULL, /* No generic params in the expr here. */
-                           0,
-                           partial_type,
-                           &unified, &ent)) {
-    *out = unified;
-    return 1;
+  if (!name_table_match_def(&es->cs->nt,
+                            name,
+                            NULL, /* No generic params in the expr here. */
+                            0,
+                            partial_type,
+                            &unified, &ent)) {
+    return 0;
   }
 
-  ERR_DBG("Could not match def for name.\n");
-  return 0;
+  *out = unified;
+  return 1;
 }
 
 void numeric_literal_type(struct ident_map *im,
@@ -1051,7 +1050,6 @@ int check_expr_bracebody(struct bodystate *bs,
       struct ast_typeexpr rhs_type;
       if (!check_expr(bs->es, s->u.var_statement.rhs, &replaced_type,
                       &rhs_type)) {
-        ERR_DBG("Var decl type doesn't match rhs.\n");
         ast_typeexpr_destroy(&replaced_type);
         goto fail;
       }
@@ -1441,13 +1439,74 @@ int check_expr_local_field_access(struct exprscope *es,
   lhs_partial_type.tag = AST_TYPEEXPR_UNKNOWN;
 
   struct ast_typeexpr lhs_type;
-  if (!check_expr(es, x->lhs, &lhs_partial_type,
-                  &lhs_type)) {
+  if (!check_expr(es, x->lhs, &lhs_partial_type, &lhs_type)) {
     goto cleanup;
   }
 
   struct ast_typeexpr field_type;
   if (!lookup_field_type(es, &lhs_type, x->fieldname.value, &field_type)) {
+    goto cleanup_lhs_type;
+  }
+
+  if (!unify_directionally(partial_type, &field_type)) {
+    goto cleanup_field_type;
+  }
+
+  *out = field_type;
+  ret = 1;
+  goto cleanup_lhs_type;
+
+ cleanup_field_type:
+  ast_typeexpr_destroy(&field_type);
+ cleanup_lhs_type:
+  ast_typeexpr_destroy(&lhs_type);
+ cleanup:
+  return ret;
+}
+
+int view_ptr_target(struct ident_map *im,
+                    struct ast_typeexpr *ptr_type,
+                    struct ast_typeexpr **target_out) {
+  if (ptr_type->tag != AST_TYPEEXPR_APP) {
+    return 0;
+  }
+
+  ident_value ptr_ident = ident_map_intern_c_str(im, PTR_TYPE_NAME);
+  if (ptr_type->u.app.name.value != ptr_ident) {
+    return 0;
+  }
+
+  if (ptr_type->u.app.params_count != 1) {
+    return 0;
+  }
+
+  *target_out = &ptr_type->u.app.params[0];
+  return 1;
+}
+
+int check_expr_deref_field_access(struct exprscope *es,
+                                  struct ast_deref_field_access *x,
+                                  struct ast_typeexpr *partial_type,
+                                  struct ast_typeexpr *out) {
+  int ret = 0;
+  /* Even though we know the lhs is supposed to be a ptr, we shouldn't
+     put that info into the context when type checking it. */
+  struct ast_typeexpr lhs_partial_type;
+  lhs_partial_type.tag = AST_TYPEEXPR_UNKNOWN;
+
+  struct ast_typeexpr lhs_type;
+  if (!check_expr(es, x->lhs, &lhs_partial_type, &lhs_type)) {
+    goto cleanup;
+  }
+
+  struct ast_typeexpr *ptr_target;
+  if (!view_ptr_target(es->cs->im, &lhs_type, &ptr_target)) {
+    ERR_DBG("Dereferencing field access expects ptr type.\n");
+    goto cleanup_lhs_type;
+  }
+
+  struct ast_typeexpr field_type;
+  if (!lookup_field_type(es, ptr_target, x->fieldname.value, &field_type)) {
     goto cleanup_lhs_type;
   }
 
@@ -1476,7 +1535,6 @@ int check_expr(struct exprscope *es,
     struct ast_typeexpr name_type;
     if (!exprscope_lookup_name(es, x->u.name.value, partial_type,
                                &name_type)) {
-      ERR_DBG("Unrecognized name.\n");
       return 0;
     }
 
@@ -1506,11 +1564,9 @@ int check_expr(struct exprscope *es,
   case AST_EXPR_LOCAL_FIELD_ACCESS:
     return check_expr_local_field_access(es, &x->u.local_field_access,
                                          partial_type, out);
-  case AST_EXPR_DEREF_FIELD_ACCESS: {
-    ERR_DBG("AST_EXPR_DEREF_FIELD_ACCESS not implemented.\n");
-    /* TODO: Implement. */
-    return 0;
-  } break;
+  case AST_EXPR_DEREF_FIELD_ACCESS:
+    return check_expr_deref_field_access(es, &x->u.deref_field_access,
+                                         partial_type, out);
   default:
     UNREACHABLE();
   }
@@ -1978,6 +2034,65 @@ int check_file_test_lambda_14(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_15(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { { "foo",
+                               "def y func[i32, i32] = fn(z i32) i32 {\n"
+                               "  var k func[i32, i32] = fn(m i32) i32 {\n"
+                               "    return m + m;\n"
+                               "  };\n"
+                               "  return k(z) + k(z);\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_16(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because the inner lambda tries to capture "z". */
+  struct test_module a[] = { { "foo",
+                               "def y func[i32, i32] = fn(z i32) i32 {\n"
+                               "  var k func[i32, i32] = fn(m i32) i32 {\n"
+                               "    return m + z;\n"
+                               "  };\n"
+                               "  return k(z) + k(z);\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_17(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "deftype foo struct { x i32; y i32; };\n"
+      "def y func[ptr[foo], i32] = fn(z ptr[foo]) i32 {\n"
+      "  return z->x;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_18(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "deftype[T] foo struct { x T; y i32; };\n"
+      "def y func[ptr[foo[i32]], i32] = fn(z ptr[foo[i32]]) i32 {\n"
+      "  return z->x + z->y;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -2132,6 +2247,30 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_lambda_14...\n");
   if (!!check_module(&im, &check_file_test_lambda_14, foo)) {
     DBG("check_file_test_lambda_14 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_15...\n");
+  if (!check_module(&im, &check_file_test_lambda_15, foo)) {
+    DBG("check_file_test_lambda_15 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_16...\n");
+  if (!!check_module(&im, &check_file_test_lambda_16, foo)) {
+    DBG("check_file_test_lambda_16 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_17...\n");
+  if (!check_module(&im, &check_file_test_lambda_17, foo)) {
+    DBG("check_file_test_lambda_17 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_18...\n");
+  if (!check_module(&im, &check_file_test_lambda_18, foo)) {
+    DBG("check_file_test_lambda_18 fails\n");
     goto cleanup_ident_map;
   }
 
