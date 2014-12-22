@@ -1392,10 +1392,33 @@ int lookup_field_type(struct exprscope *es,
     CHECK(!deftype->generics.has_type_params);
     return lookup_field_type(es, &deftype->type, field_name, field_type_out);
   } break;
-  case AST_TYPEEXPR_APP:
-    /* TODO: Implement. */
-    ERR_DBG("Looking up fields on generic types is not implemented.\n");
-    return 0;
+  case AST_TYPEEXPR_APP: {
+    struct deftype_entry *ent;
+    if (!name_table_lookup_deftype(&es->cs->nt, type->u.app.name.value,
+                                   param_list_arity(type->u.app.params_count),
+                                   &ent)) {
+      CRASH("lookup_field_type sees an invalid generic type.\n");
+    }
+    if (ent->is_primitive) {
+      ERR_DBG("Lookup up field on primitive type.\n");
+      return 0;
+    }
+
+    struct ast_deftype *deftype = ent->deftype;
+    CHECK(deftype->generics.has_type_params
+          && deftype->generics.params_count == type->u.app.params_count);
+
+    struct ast_typeexpr concrete_deftype_type;
+    do_replace_generics(&deftype->generics,
+                        type->u.app.params,
+                        &deftype->type,
+                        &concrete_deftype_type);
+
+    int ret = lookup_field_type(es, &concrete_deftype_type, field_name,
+                                field_type_out);
+    ast_typeexpr_destroy(&concrete_deftype_type);
+    return ret;
+  } break;
   case AST_TYPEEXPR_STRUCTE:
     return lookup_fields_field_type(type->u.structe.fields,
                                     type->u.structe.fields_count, field_name,
@@ -1928,6 +1951,32 @@ int check_file_test_lambda_12(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_13(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { { "foo",
+                               "deftype[T] foo struct { x T; y i32; };\n"
+                               "def y func[foo[i32], i32] = fn(z foo[i32]) i32 {\n"
+                               "  return z.x + z.y;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_14(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because z.x is a u32. */
+  struct test_module a[] = { { "foo",
+                               "deftype[T] foo struct { x T; y i32; };\n"
+                               "def y func[foo[u32], i32] = fn(z foo[u32]) i32 {\n"
+                               "  return z.x + z.y;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
 
 
 int test_check_file(void) {
@@ -2071,6 +2120,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_lambda_12...\n");
   if (!!check_module(&im, &check_file_test_lambda_12, foo)) {
     DBG("check_file_test_lambda_12 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_13...\n");
+  if (!check_module(&im, &check_file_test_lambda_13, foo)) {
+    DBG("check_file_test_lambda_13 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_14...\n");
+  if (!!check_module(&im, &check_file_test_lambda_14, foo)) {
+    DBG("check_file_test_lambda_14 fails\n");
     goto cleanup_ident_map;
   }
 
