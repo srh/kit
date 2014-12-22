@@ -7,6 +7,8 @@ struct def_entry {
   ident_value name;
   struct ast_generics generics;
   struct ast_typeexpr type;
+
+  int is_primitive;
   struct ast_def *def;
 };
 
@@ -59,6 +61,10 @@ int name_table_add_def(struct name_table *t,
                        struct ast_generics *generics,
                        struct ast_typeexpr *type,
                        struct ast_def *def);
+int name_table_add_primitive_def(struct name_table *t,
+                                 ident_value name,
+                                 struct ast_generics *generics,
+                                 struct ast_typeexpr *type);
 int name_table_add_deftype(struct name_table *t,
                            ident_value name,
                            struct generics_arity arity,

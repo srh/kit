@@ -10,6 +10,8 @@ void def_entry_destroy(struct def_entry *e) {
   e->name = IDENT_VALUE_INVALID;
   ast_generics_destroy(&e->generics);
   ast_typeexpr_destroy(&e->type);
+  e->is_primitive = 0;
+  e->def = NULL;
 }
 
 void def_entry_ptr_destroy(struct def_entry **ptr) {
@@ -111,6 +113,7 @@ void deftype_entry_destroy(struct deftype_entry *e) {
   e->has_been_checked = 0;
   e->is_being_checked = 0;
 
+  e->is_primitive = 0;
   e->deftype = NULL;
 }
 
@@ -166,11 +169,12 @@ int name_table_shadowed(struct name_table *t, ident_value name) {
   return deftype_shadowed(t, name) || def_shadowed(t, name);
 }
 
-int name_table_add_def(struct name_table *t,
-                       ident_value name,
-                       struct ast_generics *generics,
-                       struct ast_typeexpr *type,
-                       struct ast_def *def) {
+int name_table_help_add_def(struct name_table *t,
+                            ident_value name,
+                            struct ast_generics *generics,
+                            struct ast_typeexpr *type,
+                            int is_primitive,
+                            struct ast_def *def) {
   if (deftype_shadowed(t, name)) {
     ERR_DBG("def name shadows deftype name.\n");
     return 0;
@@ -185,9 +189,25 @@ int name_table_add_def(struct name_table *t,
   new_entry->name = name;
   ast_generics_init_copy(&new_entry->generics, generics);
   ast_typeexpr_init_copy(&new_entry->type, type);
+  new_entry->is_primitive = is_primitive;
   new_entry->def = def;
   SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);
   return 1;
+}
+
+int name_table_add_def(struct name_table *t,
+                       ident_value name,
+                       struct ast_generics *generics,
+                       struct ast_typeexpr *type,
+                       struct ast_def *def) {
+  return name_table_help_add_def(t, name, generics, type, 0, def);
+}
+
+int name_table_add_primitive_def(struct name_table *t,
+                                 ident_value name,
+                                 struct ast_generics *generics,
+                                 struct ast_typeexpr *type) {
+  return name_table_help_add_def(t, name, generics, type, 1, NULL);
 }
 
 int name_table_help_add_deftype_entry(struct name_table *t,

@@ -56,6 +56,8 @@ void intern_primitive_type(struct checkstate *cs,
   CHECK(res);
 }
 
+#define VOID_TYPE_NAME "void"
+#define BYTE_TYPE_NAME "byte"
 #define I32_TYPE_NAME "i32"
 #define U32_TYPE_NAME "u32"
 #define F64_TYPE_NAME "f64"
@@ -63,6 +65,8 @@ void intern_primitive_type(struct checkstate *cs,
 #define FUNC_TYPE_NAME "func"
 
 void checkstate_import_primitives(struct checkstate *cs) {
+  intern_primitive_type(cs, VOID_TYPE_NAME, NULL, 0);
+  intern_primitive_type(cs, BYTE_TYPE_NAME, NULL, 0);
   intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0);
   intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0);
   intern_primitive_type(cs, F64_TYPE_NAME, NULL, 0);
@@ -1082,9 +1086,12 @@ int check_expr(struct exprscope *es,
     return check_expr_funcall(es, &x->u.funcall, partial_type, out);
   } break;
   case AST_EXPR_UNOP:
-  case AST_EXPR_BINOP:
-    ERR_DBG("AST_EXPR_UNOP/BINOP not implemented.\n");
     /* TODO: Implement. */
+    ERR_DBG("AST_EXPR_UNOP not implemented.\n");
+    return 0;
+  case AST_EXPR_BINOP:
+    /* TODO: Implement. */
+    ERR_DBG("AST_EXPR_BINOP not implemented.\n");
     return 0;
   case AST_EXPR_LAMBDA: {
     return check_expr_lambda(es, &x->u.lambda, partial_type, out);
