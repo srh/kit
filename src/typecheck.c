@@ -1247,6 +1247,7 @@ int check_expr_binop(struct exprscope *es,
                      struct ast_typeexpr *partial_type,
                      struct ast_typeexpr *out) {
   if (is_magic_binop(x->operator)) {
+    /* TODO: Implement magic binops somewhere. */
     ERR_DBG("Magic binary operators not implemented.\n");
     return 0;
   }
@@ -1309,6 +1310,7 @@ int check_expr_unop(struct exprscope *es,
                     struct ast_typeexpr *out) {
   int ret = 0;
   if (is_magic_unop(x->operator)) {
+    /* TODO: Implement magic unops somewhere. */
     ERR_DBG("Magic unary operators not implemented.\n");
     return 0;
   }
