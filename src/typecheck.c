@@ -1325,6 +1325,97 @@ int check_expr_binop(struct exprscope *es,
   return 0;
 }
 
+int view_ptr_target(struct ident_map *im,
+                    struct ast_typeexpr *ptr_type,
+                    struct ast_typeexpr **target_out) {
+  if (ptr_type->tag != AST_TYPEEXPR_APP) {
+    return 0;
+  }
+
+  ident_value ptr_ident = ident_map_intern_c_str(im, PTR_TYPE_NAME);
+  if (ptr_type->u.app.name.value != ptr_ident) {
+    return 0;
+  }
+
+  if (ptr_type->u.app.params_count != 1) {
+    return 0;
+  }
+
+  *target_out = &ptr_type->u.app.params[0];
+  return 1;
+}
+
+void wrap_in_ptr(struct ident_map *im,
+                 struct ast_typeexpr *target,
+                 struct ast_typeexpr *ptr_out) {
+  ptr_out->tag = AST_TYPEEXPR_APP;
+  struct ast_typeexpr *params = malloc_mul(sizeof(*params), 1);
+  ast_typeexpr_init_copy(&params[0], target);
+  ast_typeapp_init(&ptr_out->u.app, ast_meta_make_garbage(),
+                   make_ast_ident(ident_map_intern_c_str(im, PTR_TYPE_NAME)),
+                   params, 1);
+}
+
+int check_magic_unop(struct exprscope *es,
+                     struct ast_unop_expr *x,
+                     struct ast_typeexpr *partial_type,
+                     struct ast_typeexpr *out,
+                     int *is_lvalue_out) {
+  int ret = 0;
+  struct ast_typeexpr no_partial;
+  no_partial.tag = AST_TYPEEXPR_UNKNOWN;
+
+  struct ast_typeexpr rhs_type;
+  int rhs_is_lvalue;
+  if (!check_expr(es, x->rhs, &no_partial, &rhs_type, &rhs_is_lvalue)) {
+    return 0;
+  }
+
+  switch (x->operator) {
+  case AST_UNOP_DEREFERENCE: {
+    struct ast_typeexpr *rhs_target;
+    if (!view_ptr_target(es->cs->im, &rhs_type, &rhs_target)) {
+      ERR_DBG("Trying to dereference a non-pointer.\n");
+      goto cleanup_rhs_type;
+    }
+
+    if (!unify_directionally(partial_type, rhs_target)) {
+      ERR_DBG("Pointer dereference results in wrong type.\n");
+      goto cleanup_rhs_type;
+    }
+
+    ast_typeexpr_init_copy(out, rhs_target);
+    *is_lvalue_out = 1;
+    ret = 1;
+  } break;
+  case AST_UNOP_ADDRESSOF: {
+    if (!rhs_is_lvalue) {
+      ERR_DBG("Trying to take the address of a non-lvalue.\n");
+      goto cleanup_rhs_type;
+    }
+
+    struct ast_typeexpr pointer_type;
+    wrap_in_ptr(es->cs->im, &rhs_type, &pointer_type);
+
+    if (!unify_directionally(partial_type, &pointer_type)) {
+      ERR_DBG("Addressof results in wrong type.\n");
+      ast_typeexpr_destroy(&pointer_type);
+      goto cleanup_rhs_type;
+    }
+
+    *out = pointer_type;
+    *is_lvalue_out = 0;
+    ret = 1;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+
+ cleanup_rhs_type:
+  ast_typeexpr_destroy(&rhs_type);
+  return ret;
+}
+
 int check_expr_unop(struct exprscope *es,
                     struct ast_unop_expr *x,
                     struct ast_typeexpr *partial_type,
@@ -1332,9 +1423,7 @@ int check_expr_unop(struct exprscope *es,
                     int *is_lvalue_out) {
   int ret = 0;
   if (is_magic_unop(x->operator)) {
-    /* TODO: Implement magic unops somewhere. */
-    ERR_DBG("Magic unary operators not implemented.\n");
-    return 0;
+    return check_magic_unop(es, x, partial_type, out, is_lvalue_out);
   }
 
   struct ast_typeexpr local_partial;
@@ -1493,26 +1582,6 @@ int check_expr_local_field_access(struct exprscope *es,
   return ret;
 }
 
-int view_ptr_target(struct ident_map *im,
-                    struct ast_typeexpr *ptr_type,
-                    struct ast_typeexpr **target_out) {
-  if (ptr_type->tag != AST_TYPEEXPR_APP) {
-    return 0;
-  }
-
-  ident_value ptr_ident = ident_map_intern_c_str(im, PTR_TYPE_NAME);
-  if (ptr_type->u.app.name.value != ptr_ident) {
-    return 0;
-  }
-
-  if (ptr_type->u.app.params_count != 1) {
-    return 0;
-  }
-
-  *target_out = &ptr_type->u.app.params[0];
-  return 1;
-}
-
 int check_expr_deref_field_access(struct exprscope *es,
                                   struct ast_deref_field_access *x,
                                   struct ast_typeexpr *partial_type,
@@ -1543,6 +1612,7 @@ int check_expr_deref_field_access(struct exprscope *es,
   }
 
   if (!unify_directionally(partial_type, &field_type)) {
+    ERR_DBG("Dereferencing field access results in wrong type.\n");
     goto cleanup_field_type;
   }
 
@@ -2135,6 +2205,20 @@ int check_file_test_lambda_18(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_19(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "deftype[T] foo struct { x T; y i32; };\n"
+      "def y func[ptr[foo[i32]], i32] = fn(z ptr[foo[i32]]) i32 {\n"
+      "  return (*z).x + (&(*z))->y;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -2313,6 +2397,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_lambda_18...\n");
   if (!check_module(&im, &check_file_test_lambda_18, foo)) {
     DBG("check_file_test_lambda_18 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_19...\n");
+  if (!check_module(&im, &check_file_test_lambda_19, foo)) {
+    DBG("check_file_test_lambda_19 fails\n");
     goto cleanup_ident_map;
   }
 
