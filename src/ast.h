@@ -231,6 +231,8 @@ void ast_unop_expr_init(struct ast_unop_expr *a, struct ast_meta meta,
                         enum ast_unop operator, struct ast_expr *rhs);
 
 /* See also: binop_precedence in parse.c. */
+/* See also: Every use of these values in typecheck.c, including
+   dependencies on the order of these values. */
 enum ast_binop {
   AST_BINOP_ASSIGN,
   AST_BINOP_ADD,

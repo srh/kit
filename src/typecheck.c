@@ -56,6 +56,63 @@ void intern_primitive_type(struct checkstate *cs,
   CHECK(res);
 }
 
+void intern_unop(struct checkstate *cs,
+                 enum ast_unop unop,
+                 struct ast_generics *generics,
+                 struct ast_typeexpr *type) {
+  /* First check that unop isn't some magic lvalue thing. */
+  CHECK(unop != AST_UNOP_DEREFERENCE);
+  CHECK(unop != AST_UNOP_ADDRESSOF);
+
+  static const char *const unop_names[] = {
+    [AST_UNOP_DEREFERENCE] = NULL,
+    [AST_UNOP_ADDRESSOF] = NULL,
+    [AST_UNOP_NEGATE] = "$UNOP_NEGATE",
+  };
+  name_table_add_primitive_def(&cs->nt,
+                               ident_map_intern_c_str(cs->im, unop_names[unop]),
+                               generics,
+                               type);
+}
+
+void intern_binop(struct checkstate *cs,
+                  enum ast_binop binop,
+                  struct ast_generics *generics,
+                  struct ast_typeexpr *type) {
+  /* First check that binop isn't something that can't be a function. */
+  CHECK(binop != AST_BINOP_ASSIGN);
+  CHECK(binop != AST_BINOP_LOGICAL_OR);
+  CHECK(binop != AST_BINOP_LOGICAL_AND);
+
+  static const char *const binop_names[] = {
+    [AST_BINOP_ASSIGN] = NULL,
+    [AST_BINOP_ADD] = "$BINOP_ADD",
+    [AST_BINOP_SUB] = "$BINOP_SUB",
+    [AST_BINOP_MUL] = "$BINOP_MUL",
+    [AST_BINOP_DIV] = "$BINOP_DIV",
+    [AST_BINOP_MOD] = "$BINOP_MOD",
+    [AST_BINOP_LT] = "$BINOP_LT",
+    [AST_BINOP_LE] = "$BINOP_LE",
+    [AST_BINOP_GT] = "$BINOP_GT",
+    [AST_BINOP_GE] = "$BINOP_GE",
+    [AST_BINOP_EQ] = "$BINOP_EQ",
+    [AST_BINOP_NE] = "$BINOP_NE",
+    [AST_BINOP_BIT_XOR] = "$BINOP_BIT_XOR",
+    [AST_BINOP_BIT_OR] = "$BINOP_BIT_OR",
+    [AST_BINOP_BIT_AND] = "$BINOP_BIT_AND",
+    [AST_BINOP_BIT_LEFTSHIFT] = "$BINOP_BIT_LEFTSHIFT",
+    [AST_BINOP_BIT_RIGHTSHIFT] = "$BINOP_BIT_RIGHTSHIFT",
+    [AST_BINOP_LOGICAL_OR] = NULL,
+    [AST_BINOP_LOGICAL_AND] = NULL,
+  };
+
+  name_table_add_primitive_def(&cs->nt,
+                               ident_map_intern_c_str(cs->im,
+                                                      binop_names[binop]),
+                               generics,
+                               type);
+}
+
 #define VOID_TYPE_NAME "void"
 #define BYTE_TYPE_NAME "byte"
 #define I32_TYPE_NAME "i32"
@@ -63,8 +120,9 @@ void intern_primitive_type(struct checkstate *cs,
 #define F64_TYPE_NAME "f64"
 #define PTR_TYPE_NAME "ptr"
 #define FUNC_TYPE_NAME "func"
+#define BOOLEAN_STANDIN_TYPE_NAME I32_TYPE_NAME
 
-void checkstate_import_primitives(struct checkstate *cs) {
+void checkstate_import_primitive_types(struct checkstate *cs) {
   intern_primitive_type(cs, VOID_TYPE_NAME, NULL, 0);
   intern_primitive_type(cs, BYTE_TYPE_NAME, NULL, 0);
   intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0);
@@ -75,6 +133,115 @@ void checkstate_import_primitives(struct checkstate *cs) {
   for (size_t i = 1; i < 21; i++) {
     intern_primitive_type(cs, FUNC_TYPE_NAME, not_flatly_held, i);
   }
+}
+
+void init_func_type(struct ast_typeexpr *a, struct ident_map *im,
+                    ident_value *args, size_t args_count) {
+  a->tag = AST_TYPEEXPR_APP;
+  struct ast_ident name;
+  ast_ident_init(&name, ast_meta_make_garbage(),
+                 ident_map_intern_c_str(im, FUNC_TYPE_NAME));
+  struct ast_typeexpr *params = malloc_mul(sizeof(*params), args_count);
+  for (size_t i = 0; i < args_count; i++) {
+    params[i].tag = AST_TYPEEXPR_NAME;
+    ast_ident_init(&params[i].u.name, ast_meta_make_garbage(), args[i]);
+  }
+  ast_typeapp_init(&a->u.app, ast_meta_make_garbage(),
+                   name, params, args_count);
+}
+
+void init_binop_func_type(struct ast_typeexpr *a, struct ident_map *im,
+                          const char *type_name) {
+  ident_value name = ident_map_intern_c_str(im, type_name);
+  ident_value names[3];
+  names[0] = names[1] = names[2] = name;
+  init_func_type(a, im, names, 3);
+}
+
+void init_binop_compare_type(struct ast_typeexpr *a, struct ident_map *im,
+                             const char *type_name) {
+  ident_value name = ident_map_intern_c_str(im, type_name);
+  ident_value bool_name = ident_map_intern_c_str(im, BOOLEAN_STANDIN_TYPE_NAME);
+  ident_value names[3];
+  names[0] = names[1] = name;
+  names[2] = bool_name;
+  init_func_type(a, im, names, 3);
+}
+
+void import_integer_binops(struct checkstate *cs, const char *type_name) {
+  struct ast_generics generics;
+  ast_generics_init_no_params(&generics);
+  struct ast_typeexpr binop_type;
+  init_binop_func_type(&binop_type, cs->im, type_name);
+  for (enum ast_binop op = AST_BINOP_ADD; op < AST_BINOP_LT; op++) {
+    intern_binop(cs, op, &generics, &binop_type);
+  }
+  for (enum ast_binop op = AST_BINOP_BIT_XOR; op < AST_BINOP_LOGICAL_OR; op++) {
+    intern_binop(cs, op, &generics, &binop_type);
+  }
+  ast_typeexpr_destroy(&binop_type);
+  init_binop_compare_type(&binop_type, cs->im, type_name);
+  for (enum ast_binop op = AST_BINOP_LT; op < AST_BINOP_BIT_XOR; op++) {
+    intern_binop(cs, op, &generics, &binop_type);
+  }
+  ast_typeexpr_destroy(&binop_type);
+  ast_generics_destroy(&generics);
+}
+
+void import_floating_binops(struct checkstate *cs, const char *type_name) {
+  struct ast_generics generics;
+  ast_generics_init_no_params(&generics);
+  struct ast_typeexpr binop_type;
+  init_binop_func_type(&binop_type, cs->im, type_name);
+  for (enum ast_binop op = AST_BINOP_ADD; op < AST_BINOP_MOD; op++) {
+    intern_binop(cs, op, &generics, &binop_type);
+  }
+  ast_typeexpr_destroy(&binop_type);
+  init_binop_compare_type(&binop_type, cs->im, type_name);
+  for (enum ast_binop op = AST_BINOP_LT; op < AST_BINOP_BIT_XOR; op++) {
+    intern_binop(cs, op, &generics, &binop_type);
+  }
+  ast_typeexpr_destroy(&binop_type);
+  ast_generics_destroy(&generics);
+}
+
+void checkstate_import_primitive_defs(struct checkstate *cs) {
+  import_integer_binops(cs, I32_TYPE_NAME);
+  import_integer_binops(cs, U32_TYPE_NAME);
+  import_integer_binops(cs, BYTE_TYPE_NAME);
+  import_floating_binops(cs, F64_TYPE_NAME);
+
+  {
+    struct ast_generics generics;
+    ast_generics_init_no_params(&generics);
+
+    /* Unary minus on i32. */
+    {
+      struct ast_typeexpr type;
+      ident_value args[2];
+      args[0] = args[1] = ident_map_intern_c_str(cs->im, I32_TYPE_NAME);
+      init_func_type(&type, cs->im, args, 2);
+      intern_unop(cs, AST_UNOP_NEGATE, &generics, &type);
+      ast_typeexpr_destroy(&type);
+    }
+
+    /* Unary minus on f64. */
+    {
+      struct ast_typeexpr type;
+      ident_value args[2];
+      args[0] = args[1] = ident_map_intern_c_str(cs->im, F64_TYPE_NAME);
+      init_func_type(&type, cs->im, args, 2);
+      intern_unop(cs, AST_UNOP_NEGATE, &generics, &type);
+      ast_typeexpr_destroy(&type);
+    }
+
+    ast_generics_destroy(&generics);
+  }
+}
+
+void checkstate_import_primitives(struct checkstate *cs) {
+  checkstate_import_primitive_types(cs);
+  checkstate_import_primitive_defs(cs);
 }
 
 void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
