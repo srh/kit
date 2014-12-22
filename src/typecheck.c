@@ -21,6 +21,7 @@ struct ast_ident make_ast_ident(ident_value ident) {
   return ret;
 }
 
+
 struct import {
   ident_value import_name;
   struct ast_file *file;
@@ -170,6 +171,16 @@ void init_func_type(struct ast_typeexpr *a, struct ident_map *im,
   }
   ast_typeapp_init(&a->u.app, ast_meta_make_garbage(),
                    name, params, args_count);
+}
+
+void copy_func_return_type(struct ident_map *im,
+                           struct ast_typeexpr *func,
+                           size_t expected_params_count,
+                           struct ast_typeexpr *out) {
+  CHECK(func->tag == AST_TYPEEXPR_APP);
+  CHECK(func->u.app.name.value == ident_map_intern_c_str(im, FUNC_TYPE_NAME));
+  CHECK(func->u.app.params_count == expected_params_count);
+  ast_typeexpr_init_copy(out, &func->u.app.params[expected_params_count - 1]);
 }
 
 void init_binop_func_type(struct ast_typeexpr *a, struct ident_map *im,
@@ -907,10 +918,7 @@ int check_expr_funcall(struct exprscope *es,
     goto fail_cleanup_funcexpr;
   }
 
-  CHECK(resolved_funcexpr.tag == AST_TYPEEXPR_APP);
-  CHECK(resolved_funcexpr.u.app.name.value == func_ident);
-  CHECK(resolved_funcexpr.u.app.params_count == args_types_count);
-  ast_typeexpr_init_copy(out, &resolved_funcexpr.u.app.params[args_count]);
+  copy_func_return_type(es->cs->im, &resolved_funcexpr, args_types_count, out);
 
   ret = 1;
  fail_cleanup_funcexpr:
@@ -1285,10 +1293,7 @@ int check_expr_binop(struct exprscope *es,
     goto fail_cleanup_funcexpr;
   }
 
-  CHECK(resolved_funcexpr.tag == AST_TYPEEXPR_APP);
-  CHECK(resolved_funcexpr.u.app.name.value == func_ident);
-  CHECK(resolved_funcexpr.u.app.params_count == 3);
-  ast_typeexpr_init_copy(out, &resolved_funcexpr.u.app.params[2]);
+  copy_func_return_type(es->cs->im, &resolved_funcexpr, 3, out);
 
   ret = 1;
  fail_cleanup_funcexpr:
@@ -1343,11 +1348,7 @@ int check_expr_unop(struct exprscope *es,
     goto cleanup_funcexpr;
   }
 
-  /* TODO: Dedup these. */
-  CHECK(resolved_funcexpr.tag == AST_TYPEEXPR_APP);
-  CHECK(resolved_funcexpr.u.app.name.value == func_ident);
-  CHECK(resolved_funcexpr.u.app.params_count == 2);
-  ast_typeexpr_init_copy(out, &resolved_funcexpr.u.app.params[1]);
+  copy_func_return_type(es->cs->im, &resolved_funcexpr, 2, out);
 
   ret = 1;
  cleanup_funcexpr:
