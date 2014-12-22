@@ -1259,8 +1259,7 @@ int check_expr_binop(struct exprscope *es,
     goto fail_cleanup_lhs_type;
   }
 
-  struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
-                                               3);
+  struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types), 3);
   args_types[0] = lhs_type;
   args_types[1] = rhs_type;
   ast_typeexpr_init_copy(&args_types[2], partial_type);
@@ -1302,6 +1301,61 @@ int check_expr_binop(struct exprscope *es,
   return 0;
 }
 
+int check_expr_unop(struct exprscope *es,
+                    struct ast_unop_expr *x,
+                    struct ast_typeexpr *partial_type,
+                    struct ast_typeexpr *out) {
+  int ret = 0;
+  if (is_magic_unop(x->operator)) {
+    ERR_DBG("Magic unary operators not implemented.\n");
+    return 0;
+  }
+
+  struct ast_typeexpr local_partial;
+  local_partial.tag = AST_TYPEEXPR_UNKNOWN;
+
+  struct ast_typeexpr rhs_type;
+  if (!check_expr(es, x->rhs, &local_partial, &rhs_type)) {
+    goto fail;
+  }
+
+  struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types), 3);
+  args_types[0] = rhs_type;
+  ast_typeexpr_init_copy(&args_types[1], partial_type);
+
+  ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
+
+  struct ast_typeexpr funcexpr;
+  funcexpr.tag = AST_TYPEEXPR_APP;
+  ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
+                   make_ast_ident(func_ident), args_types, 2);
+
+  struct ast_typeexpr resolved_funcexpr;
+  struct def_entry *ent;
+  if (!name_table_match_def(&es->cs->nt,
+                            ident_map_intern_c_str(es->cs->im,
+                                                   unop_fakename(x->operator)),
+                            NULL, /* No generic params in the expr here. */
+                            0,
+                            &funcexpr,
+                            &resolved_funcexpr,
+                            &ent)) {
+    goto cleanup_funcexpr;
+  }
+
+  /* TODO: Dedup these. */
+  CHECK(resolved_funcexpr.tag == AST_TYPEEXPR_APP);
+  CHECK(resolved_funcexpr.u.app.name.value == func_ident);
+  CHECK(resolved_funcexpr.u.app.params_count == 2);
+  ast_typeexpr_init_copy(out, &resolved_funcexpr.u.app.params[1]);
+
+  ret = 1;
+ cleanup_funcexpr:
+  ast_typeexpr_destroy(&funcexpr);
+ fail:
+  return ret;
+}
+
 int check_expr(struct exprscope *es,
                struct ast_expr *x,
                struct ast_typeexpr *partial_type,
@@ -1333,9 +1387,7 @@ int check_expr(struct exprscope *es,
   case AST_EXPR_FUNCALL:
     return check_expr_funcall(es, &x->u.funcall, partial_type, out);
   case AST_EXPR_UNOP:
-    /* TODO: Implement. */
-    ERR_DBG("AST_EXPR_UNOP not implemented.\n");
-    return 0;
+    return check_expr_unop(es, &x->u.unop_expr, partial_type, out);
   case AST_EXPR_BINOP:
     return check_expr_binop(es, &x->u.binop_expr, partial_type, out);
   case AST_EXPR_LAMBDA:
@@ -1736,6 +1788,33 @@ int check_file_test_lambda_8(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_9(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { { "foo",
+                               "def x i32 = 3;\n"
+                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "  return -x + z + -5;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_10(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because you can't negate a u32. */
+  struct test_module a[] = { { "foo",
+                               "def x u32 = 3;\n"
+                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "  return -x;\n"
+                               "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -1854,6 +1933,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_lambda_8...\n");
   if (!!check_module(&im, &check_file_test_lambda_8, foo)) {
     DBG("check_file_test_lambda_8 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_9...\n");
+  if (!check_module(&im, &check_file_test_lambda_9, foo)) {
+    DBG("check_file_test_lambda_9 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_10...\n");
+  if (!!check_module(&im, &check_file_test_lambda_10, foo)) {
+    DBG("check_file_test_lambda_10 fails\n");
     goto cleanup_ident_map;
   }
 
