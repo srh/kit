@@ -1260,15 +1260,100 @@ int check_expr_lambda(struct exprscope *es,
   return 0;
 }
 
+int check_expr_magic_binop(struct exprscope *es,
+                           struct ast_binop_expr *x,
+                           struct ast_typeexpr *partial_type,
+                           struct ast_typeexpr *out,
+                           int *is_lvalue_out) {
+  int ret = 0;
+  struct ast_typeexpr no_partial;
+  no_partial.tag = AST_TYPEEXPR_UNKNOWN;
+
+  struct ast_typeexpr lhs_type;
+  int lhs_is_lvalue;
+  if (!check_expr(es, x->lhs, &no_partial, &lhs_type, &lhs_is_lvalue)) {
+    goto cleanup;
+  }
+
+  struct ast_typeexpr rhs_type;
+  int rhs_lvalue_discard;
+  if (!check_expr(es, x->rhs, &no_partial, &rhs_type, &rhs_lvalue_discard)) {
+    goto cleanup_lhs_type;
+  }
+
+  switch (x->operator) {
+  case AST_BINOP_ASSIGN: {
+    if (!lhs_is_lvalue) {
+      ERR_DBG("Trying to assign to non-lvalue.\n");
+      goto cleanup_both_types;
+    }
+    if (!exact_typeexprs_equal(&lhs_type, &rhs_type)) {
+      ERR_DBG("Assignment with non-matching types.\n");
+      goto cleanup_both_types;
+    }
+
+    if (!unify_directionally(partial_type, &lhs_type)) {
+      ERR_DBG("LHS type of assignment does not match contextual type.\n");
+      goto cleanup_both_types;
+    }
+
+    *out = lhs_type;
+    *is_lvalue_out = 1;
+    ret = 1;
+    goto cleanup_just_rhs_type;
+  } break;
+  case AST_BINOP_LOGICAL_OR:
+  case AST_BINOP_LOGICAL_AND: {
+    struct ast_typeexpr boolean;
+    boolean.tag = AST_TYPEEXPR_NAME;
+    boolean.u.name = make_ast_ident(
+        ident_map_intern_c_str(es->cs->im, BOOLEAN_STANDIN_TYPE_NAME));
+
+    if (!unify_directionally(&boolean, &lhs_type)) {
+      ERR_DBG("LHS of and/or is non-boolean.\n");
+      ast_typeexpr_destroy(&boolean);
+      goto cleanup_both_types;
+    }
+
+    if (!unify_directionally(&boolean, &rhs_type)) {
+      ERR_DBG("RHS of and/or is non-boolean.\n");
+      ast_typeexpr_destroy(&boolean);
+      goto cleanup_both_types;
+    }
+
+    if (!unify_directionally(partial_type, &boolean)) {
+      ERR_DBG("And/or expression in non-boolean context.\n");
+      ast_typeexpr_destroy(&boolean);
+      goto cleanup_both_types;
+    }
+
+    *out = boolean;
+    *is_lvalue_out = 0;
+    ret = 1;
+    goto cleanup_both_types;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+
+ cleanup_just_rhs_type:
+  ast_typeexpr_destroy(&rhs_type);
+  goto cleanup;
+ cleanup_both_types:
+  ast_typeexpr_destroy(&rhs_type);
+ cleanup_lhs_type:
+  ast_typeexpr_destroy(&lhs_type);
+ cleanup:
+  return ret;
+}
+
 int check_expr_binop(struct exprscope *es,
                      struct ast_binop_expr *x,
                      struct ast_typeexpr *partial_type,
                      struct ast_typeexpr *out,
                      int *is_lvalue_out) {
   if (is_magic_binop(x->operator)) {
-    /* TODO: Implement magic binops somewhere. */
-    ERR_DBG("Magic binary operators not implemented.\n");
-    return 0;
+    return check_expr_magic_binop(es, x, partial_type, out, is_lvalue_out);
   }
 
   struct ast_typeexpr local_partial;
@@ -1356,11 +1441,11 @@ void wrap_in_ptr(struct ident_map *im,
                    params, 1);
 }
 
-int check_magic_unop(struct exprscope *es,
-                     struct ast_unop_expr *x,
-                     struct ast_typeexpr *partial_type,
-                     struct ast_typeexpr *out,
-                     int *is_lvalue_out) {
+int check_expr_magic_unop(struct exprscope *es,
+                          struct ast_unop_expr *x,
+                          struct ast_typeexpr *partial_type,
+                          struct ast_typeexpr *out,
+                          int *is_lvalue_out) {
   int ret = 0;
   struct ast_typeexpr no_partial;
   no_partial.tag = AST_TYPEEXPR_UNKNOWN;
@@ -1423,7 +1508,7 @@ int check_expr_unop(struct exprscope *es,
                     int *is_lvalue_out) {
   int ret = 0;
   if (is_magic_unop(x->operator)) {
-    return check_magic_unop(es, x, partial_type, out, is_lvalue_out);
+    return check_expr_magic_unop(es, x, partial_type, out, is_lvalue_out);
   }
 
   struct ast_typeexpr local_partial;
@@ -2219,6 +2304,41 @@ int check_file_test_lambda_19(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_20(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "deftype[T] foo struct { x T; y i32; };\n"
+      "def y func[ptr[foo[i32]], i32] = fn(z ptr[foo[i32]]) i32 {\n"
+      "  if (z->x < 3 && z->y > 19) {\n"
+      "    z->x = (*z).y + 5;\n"
+      "  }\n"
+      "  return (*z).x + (&(*z))->y;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_21(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because assignment mismatches types. */
+  struct test_module a[] = { {
+      "foo",
+      "deftype[T] foo struct { x T; y i32; };\n"
+      "def y func[ptr[foo[i32]], i32] = fn(z ptr[foo[i32]]) i32 {\n"
+      "  if (z->x < 3 && z->y > 19) {\n"
+      "    z->x = z;\n"
+      "  }\n"
+      "  return (*z).x + (&(*z))->y;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -2403,6 +2523,18 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_lambda_19...\n");
   if (!check_module(&im, &check_file_test_lambda_19, foo)) {
     DBG("check_file_test_lambda_19 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_20...\n");
+  if (!check_module(&im, &check_file_test_lambda_20, foo)) {
+    DBG("check_file_test_lambda_20 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_21...\n");
+  if (!!check_module(&im, &check_file_test_lambda_21, foo)) {
+    DBG("check_file_test_lambda_21 fails\n");
     goto cleanup_ident_map;
   }
 
