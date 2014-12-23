@@ -735,9 +735,6 @@ int unify_directionally(struct ast_typeexpr *partial_type,
 }
 
 int exact_typeexprs_equal(struct ast_typeexpr *a, struct ast_typeexpr *b) {
-  /* TODO: Make this a "real" implementation -- this one is only
-     correct for now, but if we added general "const numeric" types or
-     something, it wouldn't be. */
   return unify_directionally(a, b) && unify_directionally(b, a);
 }
 
