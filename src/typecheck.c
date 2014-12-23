@@ -766,7 +766,8 @@ int exprscope_lookup_name(struct exprscope *es,
                             NULL, /* No generic params in the expr here. */
                             0,
                             partial_type,
-                            &unified, &ent)) {
+                            &unified,
+                            &ent)) {
     return 0;
   }
 
