@@ -4,7 +4,7 @@
 #include "ast.h"
 
 struct def_instantiation {
-  int needs_typechecking;
+  int typecheck_started;
   struct ast_typeexpr *types;
   size_t types_count;
 };
@@ -96,7 +96,8 @@ int name_table_match_def(struct name_table *t,
                          size_t generics_count,
                          struct ast_typeexpr *partial_type,
                          struct ast_typeexpr *unified_type_out,
-                         struct def_entry **entry_out);
+                         struct def_entry **entry_out,
+                         struct def_instantiation **instantiation_out);
 
 int name_table_lookup_deftype(struct name_table *t,
                               ident_value name,

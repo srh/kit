@@ -6,8 +6,18 @@
 #include "slice.h"
 #include "typecheck.h"
 
+void def_instantiation_init(struct def_instantiation *a,
+                            struct ast_typeexpr **types,
+                            size_t *types_count) {
+  a->typecheck_started = 0;
+  a->types = *types;
+  a->types_count = *types_count;
+  *types = NULL;
+  *types_count = 0;
+}
+
 void def_instantiation_destroy(struct def_instantiation *a) {
-  a->needs_typechecking = 0;
+  a->typecheck_started = 0;
   SLICE_FREE(a->types, a->types_count, ast_typeexpr_destroy);
 }
 
@@ -673,11 +683,55 @@ int unify_with_parameterized_type(
   return 0;
 }
 
+int typelists_equal(struct ast_typeexpr *a, size_t a_count,
+                    struct ast_typeexpr *b, size_t b_count) {
+  if (a_count != b_count) {
+    return 0;
+  }
+
+  for (size_t i = 0; i < a_count; i++) {
+    if (!exact_typeexprs_equal(a, b)) {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+struct def_instantiation *def_entry_insert_instantiation(
+    struct def_entry *ent,
+    struct ast_typeexpr *materialized,
+    size_t materialized_count) {
+  CHECK(materialized_count == (ent->generics.has_type_params ?
+                               ent->generics.params_count : 0));
+  for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
+    struct def_instantiation *inst = ent->instantiations[i];
+    if (typelists_equal(inst->types, inst->types_count,
+                        materialized, materialized_count)) {
+      return inst;
+    }
+  }
+
+  size_t copy_count = materialized_count;
+  struct ast_typeexpr *copy = malloc_mul(sizeof(*copy), copy_count);
+  for (size_t i = 0; i < copy_count; i++) {
+    ast_typeexpr_init_copy(&copy[i], &materialized[i]);
+  }
+
+  struct def_instantiation *inst = malloc(sizeof(*inst));
+  CHECK(inst);
+  def_instantiation_init(inst, &copy, &copy_count);
+  SLICE_PUSH(ent->instantiations, ent->instantiations_count,
+             ent->instantiations_limit, inst);
+  return inst;
+}
+
 int def_entry_matches(struct def_entry *ent,
                       struct ast_typeexpr *generics_or_null,
                       size_t generics_count,
                       struct ast_typeexpr *partial_type,
-                      struct ast_typeexpr *unified_type_out) {
+                      struct ast_typeexpr *unified_type_out,
+                      struct def_instantiation **instantiation_out) {
   if (!ent->generics.has_type_params) {
     if (generics_or_null) {
       return 0;
@@ -688,6 +742,7 @@ int def_entry_matches(struct def_entry *ent,
     }
 
     ast_typeexpr_init_copy(unified_type_out, &ent->type);
+    *instantiation_out = def_entry_insert_instantiation(ent, NULL, 0);
     return 1;
   }
 
@@ -708,6 +763,9 @@ int def_entry_matches(struct def_entry *ent,
 
     ret = 1;
     ast_typeexpr_init_copy(unified_type_out, &ent_concrete_type);
+    *instantiation_out = def_entry_insert_instantiation(ent,
+                                                        generics_or_null,
+                                                        generics_count);
   cleanup_concrete_type:
     ast_typeexpr_destroy(&ent_concrete_type);
     return ret;
@@ -730,6 +788,10 @@ int def_entry_matches(struct def_entry *ent,
   }
 
   *unified_type_out = concrete_type;
+  *instantiation_out
+    = def_entry_insert_instantiation(ent,
+                                     materialized_params,
+                                     materialized_params_count);
   SLICE_FREE(materialized_params, materialized_params_count,
              ast_typeexpr_destroy);
   return 1;
@@ -741,9 +803,11 @@ int name_table_match_def(struct name_table *t,
                          size_t generics_count,
                          struct ast_typeexpr *partial_type,
                          struct ast_typeexpr *unified_type_out,
-                         struct def_entry **entry_out) {
+                         struct def_entry **entry_out,
+                         struct def_instantiation **instantiation_out) {
   /* matched_type is initialized if matched_ent is non-null. */
   struct ast_typeexpr matched_type;
+  struct def_instantiation *matched_instantiation = NULL;
   /* Get cl to shut up about the "uninitialized value". */
   memset(&matched_type, 0, sizeof(matched_type));
   struct def_entry *matched_ent = NULL;
@@ -755,14 +819,16 @@ int name_table_match_def(struct name_table *t,
     }
 
     struct ast_typeexpr unified;
+    struct def_instantiation *instantiation;
     if (def_entry_matches(ent, generics_or_null, generics_count,
-                          partial_type, &unified)) {
+                          partial_type, &unified, &instantiation)) {
       if (matched_ent) {
         ast_typeexpr_destroy(&unified);
         ERR_DBG("multiple matching definitions\n");
         goto fail_multiple_matching;
       } else {
         matched_type = unified;
+        matched_instantiation = instantiation;
         matched_ent = ent;
       }
     }
@@ -775,6 +841,7 @@ int name_table_match_def(struct name_table *t,
 
   *unified_type_out = matched_type;
   *entry_out = matched_ent;
+  *instantiation_out = matched_instantiation;
   return 1;
 
  fail_multiple_matching:

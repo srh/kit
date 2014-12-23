@@ -761,13 +761,16 @@ int exprscope_lookup_name(struct exprscope *es,
 
   struct ast_typeexpr unified;
   struct def_entry *ent;
+  struct def_instantiation *inst;
+  /* TODO: Use inst somehow. */
   if (!name_table_match_def(&es->cs->nt,
                             name,
                             NULL, /* No generic params in the expr here. */
                             0,
                             partial_type,
                             &unified,
-                            &ent)) {
+                            &ent,
+                            &inst)) {
     return 0;
   }
 
@@ -1383,6 +1386,8 @@ int check_expr_binop(struct exprscope *es,
   int ret = 0;
   struct ast_typeexpr resolved_funcexpr;
   struct def_entry *ent;
+  struct def_instantiation *inst;
+  /* TODO: Use inst. */
   if (!name_table_match_def(&es->cs->nt,
                             ident_map_intern_c_str(es->cs->im,
                                                    binop_fakename(x->operator)),
@@ -1390,7 +1395,8 @@ int check_expr_binop(struct exprscope *es,
                             0,
                             &funcexpr,
                             &resolved_funcexpr,
-                            &ent)) {
+                            &ent,
+                            &inst)) {
     goto fail_cleanup_funcexpr;
   }
 
@@ -1531,6 +1537,7 @@ int check_expr_unop(struct exprscope *es,
 
   struct ast_typeexpr resolved_funcexpr;
   struct def_entry *ent;
+  struct def_instantiation *inst;
   if (!name_table_match_def(&es->cs->nt,
                             ident_map_intern_c_str(es->cs->im,
                                                    unop_fakename(x->operator)),
@@ -1538,7 +1545,8 @@ int check_expr_unop(struct exprscope *es,
                             0,
                             &funcexpr,
                             &resolved_funcexpr,
-                            &ent)) {
+                            &ent,
+                            &inst)) {
     goto cleanup_funcexpr;
   }
 

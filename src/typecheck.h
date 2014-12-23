@@ -31,5 +31,6 @@ int generics_lookup_name(struct ast_generics *a,
                          ident_value name,
                          size_t *index_out);
 struct ast_ident make_ast_ident(ident_value ident);
+int exact_typeexprs_equal(struct ast_typeexpr *a, struct ast_typeexpr *b);
 
 #endif /* KIRA_TYPECHECK_H_ */
