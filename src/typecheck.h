@@ -30,5 +30,6 @@ int unify_directionally(struct ast_typeexpr *partial_type,
 int generics_lookup_name(struct ast_generics *a,
                          ident_value name,
                          size_t *index_out);
+struct ast_ident make_ast_ident(ident_value ident);
 
 #endif /* KIRA_TYPECHECK_H_ */

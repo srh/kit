@@ -3,6 +3,12 @@
 
 #include "ast.h"
 
+struct def_instantiation {
+  int needs_typechecking;
+  struct ast_typeexpr *types;
+  size_t types_count;
+};
+
 struct def_entry {
   ident_value name;
   struct ast_generics generics;
@@ -10,6 +16,10 @@ struct def_entry {
 
   int is_primitive;
   struct ast_def *def;
+
+  struct def_instantiation **instantiations;
+  size_t instantiations_count;
+  size_t instantiations_limit;
 };
 
 #define ARITY_NO_PARAMLIST SIZE_MAX

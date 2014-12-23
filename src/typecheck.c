@@ -2337,6 +2337,37 @@ int check_file_test_lambda_21(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_22(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def[T] foo func[ptr[T], T] = fn(x ptr[T]) T { return *x; };\n"
+      "def bar func[i32] = fn() i32 {\n"
+      "  var x i32 = 3;\n"
+      "  return foo(&x);\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_23(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because the def does not match. */
+  struct test_module a[] = { {
+      "foo",
+      "def[T] foo func[ptr[T], T] = fn(x ptr[T]) T { return *x; };\n"
+      "def bar func[i32] = fn() i32 {\n"
+      "  var x i32 = 3;\n"
+      "  return foo(x);\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -2533,6 +2564,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_lambda_21...\n");
   if (!!check_module(&im, &check_file_test_lambda_21, foo)) {
     DBG("check_file_test_lambda_21 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_22...\n");
+  if (!check_module(&im, &check_file_test_lambda_22, foo)) {
+    DBG("check_file_test_lambda_21 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_23...\n");
+  if (!!check_module(&im, &check_file_test_lambda_23, foo)) {
+    DBG("check_file_test_lambda_23 fails\n");
     goto cleanup_ident_map;
   }
 

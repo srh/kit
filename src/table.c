@@ -6,12 +6,43 @@
 #include "slice.h"
 #include "typecheck.h"
 
+void def_instantiation_destroy(struct def_instantiation *a) {
+  a->needs_typechecking = 0;
+  SLICE_FREE(a->types, a->types_count, ast_typeexpr_destroy);
+}
+
+void def_instantiation_free(struct def_instantiation **p) {
+  def_instantiation_destroy(*p);
+  free(*p);
+  *p = NULL;
+}
+
+void def_entry_init(struct def_entry *e, ident_value name,
+                    struct ast_generics *generics,
+                    struct ast_typeexpr *type,
+                    int is_primitive,
+                    struct ast_def *def) {
+  e->name = name;
+  ast_generics_init_copy(&e->generics, generics);
+  ast_typeexpr_init_copy(&e->type, type);
+  e->is_primitive = is_primitive;
+  e->def = def;
+
+  e->instantiations = NULL;
+  e->instantiations_count = 0;
+  e->instantiations_limit = 0;
+}
+
 void def_entry_destroy(struct def_entry *e) {
   e->name = IDENT_VALUE_INVALID;
   ast_generics_destroy(&e->generics);
   ast_typeexpr_destroy(&e->type);
   e->is_primitive = 0;
   e->def = NULL;
+
+  SLICE_FREE(e->instantiations, e->instantiations_count,
+             def_instantiation_free);
+  e->instantiations_limit = 0;
 }
 
 void def_entry_ptr_destroy(struct def_entry **ptr) {
@@ -186,11 +217,7 @@ int name_table_help_add_def(struct name_table *t,
 
   struct def_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);
-  new_entry->name = name;
-  ast_generics_init_copy(&new_entry->generics, generics);
-  ast_typeexpr_init_copy(&new_entry->type, type);
-  new_entry->is_primitive = is_primitive;
-  new_entry->def = def;
+  def_entry_init(new_entry, name, generics, type, is_primitive, def);
   SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);
   return 1;
 }
@@ -368,6 +395,284 @@ void substitute_generics(struct ast_typeexpr *type,
   }
 }
 
+int combine_partial_types(struct ast_typeexpr *a,
+                          struct ast_typeexpr *b,
+                          struct ast_typeexpr *out);
+
+int combine_fields_partial_types(struct ast_vardecl *a_fields,
+                                 size_t a_fields_count,
+                                 struct ast_vardecl *b_fields,
+                                 size_t b_fields_count,
+                                 struct ast_vardecl **fields_out,
+                                 size_t *fields_count_out) {
+  if (a_fields_count != b_fields_count) {
+    return 0;
+  }
+
+  size_t fields_count = a_fields_count;
+  struct ast_vardecl *fields = malloc_mul(sizeof(*fields), fields_count);
+  for (size_t i = 0; i < fields_count; i++) {
+    if (a_fields[i].name.value != b_fields[i].name.value) {
+      goto fail;
+    }
+    struct ast_typeexpr type;
+    if (!combine_partial_types(&a_fields[i].type, &b_fields[i].type,
+                               &type)) {
+      goto fail;
+    }
+    ast_vardecl_init(&fields[i], ast_meta_make_garbage(),
+                     make_ast_ident(a_fields[i].name.value),
+                     type);
+    continue;
+  fail:
+    SLICE_FREE(fields, i, ast_vardecl_destroy);
+    return 0;
+  }
+
+  *fields_out = fields;
+  *fields_count_out = fields_count;
+  return 1;
+}
+
+int combine_partial_types(struct ast_typeexpr *a,
+                          struct ast_typeexpr *b,
+                          struct ast_typeexpr *out) {
+  if (a->tag == AST_TYPEEXPR_UNKNOWN) {
+    ast_typeexpr_init_copy(out, b);
+    return 1;
+  }
+
+  if (b->tag == AST_TYPEEXPR_UNKNOWN) {
+    ast_typeexpr_init_copy(out, a);
+    return 1;
+  }
+
+  if (a->tag != b->tag) {
+    return 0;
+  }
+
+  switch (a->tag) {
+  case AST_TYPEEXPR_NAME: {
+    if (a->u.name.value != b->u.name.value) {
+      return 0;
+    }
+    ast_typeexpr_init_copy(out, a);
+    return 1;
+  } break;
+  case AST_TYPEEXPR_APP: {
+    if (a->u.app.name.value != b->u.app.name.value
+        || a->u.app.params_count != b->u.app.params_count) {
+      return 0;
+    }
+    size_t params_count = a->u.app.params_count;
+    struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
+    for (size_t i = 0; i < params_count; i++) {
+      if (!combine_partial_types(&a->u.app.params[i], &b->u.app.params[i],
+                                 &params[i])) {
+        SLICE_FREE(params, i, ast_typeexpr_destroy);
+        return 0;
+      }
+    }
+    out->tag = AST_TYPEEXPR_APP;
+    ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
+                     make_ast_ident(a->u.app.name.value),
+                     params, params_count);
+    return 1;
+  } break;
+  case AST_TYPEEXPR_STRUCTE: {
+    struct ast_vardecl *fields;
+    size_t fields_count;
+    if (!combine_fields_partial_types(
+            a->u.structe.fields, a->u.structe.fields_count,
+            b->u.structe.fields, b->u.structe.fields_count,
+            &fields, &fields_count)) {
+      return 0;
+    }
+    out->tag = AST_TYPEEXPR_STRUCTE;
+    ast_structe_init(&out->u.structe, ast_meta_make_garbage(),
+                     fields, fields_count);
+    return 1;
+  } break;
+  case AST_TYPEEXPR_UNIONE: {
+    struct ast_vardecl *fields;
+    size_t fields_count;
+    if (!combine_fields_partial_types(
+            a->u.unione.fields, a->u.unione.fields_count,
+            b->u.unione.fields, b->u.unione.fields_count,
+            &fields, &fields_count)) {
+      return 0;
+    }
+    out->tag = AST_TYPEEXPR_UNIONE;
+    ast_unione_init(&out->u.unione, ast_meta_make_garbage(),
+                    fields, fields_count);
+    return 1;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+int learn_materializations(struct ast_generics *g,
+                           struct ast_typeexpr *materialized,
+                           struct ast_typeexpr *type,
+                           struct ast_typeexpr *partial_type);
+
+int learn_fields_materializations(struct ast_generics *g,
+                                  struct ast_typeexpr *materialized,
+                                  struct ast_vardecl *fields,
+                                  size_t fields_count,
+                                  struct ast_vardecl *partial_fields,
+                                  size_t partial_fields_count) {
+  if (fields_count != partial_fields_count) {
+    return 0;
+  }
+
+  for (size_t i = 0; i < fields_count; i++) {
+    if (fields[i].name.value != partial_fields[i].name.value) {
+      return 0;
+    }
+    if (!learn_materializations(g, materialized,
+                                &fields[i].type,
+                                &partial_fields[i].type)) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+int learn_materializations(struct ast_generics *g,
+                           struct ast_typeexpr *materialized,
+                           struct ast_typeexpr *type,
+                           struct ast_typeexpr *partial_type) {
+  CHECK(type->tag != AST_TYPEEXPR_UNKNOWN);
+  if (partial_type->tag == AST_TYPEEXPR_UNKNOWN) {
+    return 1;
+  }
+  size_t which_generic;
+  if (type->tag == AST_TYPEEXPR_NAME
+      && generics_lookup_name(g, type->u.name.value, &which_generic)) {
+    struct ast_typeexpr combined;
+    if (!combine_partial_types(&materialized[which_generic], partial_type,
+                               &combined)) {
+      return 0;
+    }
+    ast_typeexpr_destroy(&materialized[which_generic]);
+    materialized[which_generic] = combined;
+    return 1;
+  }
+
+  if (type->tag != partial_type->tag) {
+    return 0;
+  }
+
+  switch (type->tag) {
+  case AST_TYPEEXPR_NAME:
+    return type->u.name.value == partial_type->u.name.value;
+  case AST_TYPEEXPR_APP: {
+    if (type->u.app.name.value != partial_type->u.app.name.value
+        || type->u.app.params_count != partial_type->u.app.params_count) {
+      return 0;
+    }
+    for (size_t i = 0, e = type->u.app.params_count; i < e; i++) {
+      if (!learn_materializations(g, materialized,
+                                  &type->u.app.params[i],
+                                  &partial_type->u.app.params[i])) {
+        return 0;
+      }
+    }
+    return 1;
+  } break;
+  case AST_TYPEEXPR_STRUCTE: {
+    return learn_fields_materializations(g, materialized,
+                                         type->u.structe.fields,
+                                         type->u.structe.fields_count,
+                                         partial_type->u.structe.fields,
+                                         partial_type->u.structe.fields_count);
+  } break;
+  case AST_TYPEEXPR_UNIONE: {
+    return learn_fields_materializations(g, materialized,
+                                         type->u.unione.fields,
+                                         type->u.unione.fields_count,
+                                         partial_type->u.unione.fields,
+                                         partial_type->u.unione.fields_count);
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+int is_concrete(struct ast_typeexpr *type);
+
+int is_fields_concrete(struct ast_vardecl *fields, size_t fields_count) {
+  for (size_t i = 0; i < fields_count; i++) {
+    if (!is_concrete(&fields[i].type)) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+int is_concrete(struct ast_typeexpr *type) {
+  if (type->tag == AST_TYPEEXPR_UNKNOWN) {
+    return 0;
+  }
+  switch (type->tag) {
+  case AST_TYPEEXPR_NAME:
+    return 1;
+  case AST_TYPEEXPR_APP: {
+    for (size_t i = 0, e = type->u.app.params_count; i < e; i++) {
+      if (!is_concrete(&type->u.app.params[i])) {
+        return 0;
+      }
+    }
+    return 1;
+  } break;
+  case AST_TYPEEXPR_STRUCTE:
+    return is_fields_concrete(type->u.structe.fields,
+                              type->u.structe.fields_count);
+  case AST_TYPEEXPR_UNIONE:
+    return is_fields_concrete(type->u.unione.fields,
+                              type->u.unione.fields_count);
+  default:
+    UNREACHABLE();
+  }
+}
+
+int unify_with_parameterized_type(
+    struct ast_generics *g,
+    struct ast_typeexpr *type,
+    struct ast_typeexpr *partial_type,
+    struct ast_typeexpr **materialized_params_out,
+    size_t *materialized_params_count_out,
+    struct ast_typeexpr *concrete_type_out) {
+  CHECK(g->has_type_params);
+  size_t materialized_count = g->params_count;
+  struct ast_typeexpr *materialized = malloc_mul(sizeof(*materialized),
+                                                 materialized_count);
+  for (size_t i = 0, e = g->params_count; i < e; i++) {
+    materialized[i].tag = AST_TYPEEXPR_UNKNOWN;
+  }
+
+  if (!learn_materializations(g, materialized, type, partial_type)) {
+    goto fail;
+  }
+
+  for (size_t i = 0, e = g->params_count; i < e; i++) {
+    if (!is_concrete(&materialized[i])) {
+      goto fail;
+    }
+  }
+
+  substitute_generics(type, g, materialized, g->params_count, concrete_type_out);
+  *materialized_params_out = materialized;
+  *materialized_params_count_out = g->params_count;
+  return 1;
+
+ fail:
+  SLICE_FREE(materialized, materialized_count, ast_typeexpr_destroy);
+  return 0;
+}
+
 int def_entry_matches(struct def_entry *ent,
                       struct ast_typeexpr *generics_or_null,
                       size_t generics_count,
@@ -409,8 +714,25 @@ int def_entry_matches(struct def_entry *ent,
   }
 
   /* The tricky case:  No generic parameters were given by the expression. */
-  /* TODO: Implement. */
-  return 0;
+
+  CHECK(ent->generics.has_type_params && !generics_or_null);
+
+  struct ast_typeexpr *materialized_params;
+  size_t materialized_params_count;
+  struct ast_typeexpr concrete_type;
+  if (!unify_with_parameterized_type(&ent->generics,
+                                     &ent->type,
+                                     partial_type,
+                                     &materialized_params,
+                                     &materialized_params_count,
+                                     &concrete_type)) {
+    return 0;
+  }
+
+  *unified_type_out = concrete_type;
+  SLICE_FREE(materialized_params, materialized_params_count,
+             ast_typeexpr_destroy);
+  return 1;
 }
 
 int name_table_match_def(struct name_table *t,
