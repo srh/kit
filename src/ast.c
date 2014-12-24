@@ -42,10 +42,12 @@ void ast_ident_destroy(struct ast_ident *a) {
 
 void ast_numeric_literal_init(struct ast_numeric_literal *a,
                               struct ast_meta meta, int8_t *digits,
-                              size_t digits_count) {
+                              size_t digits_count,
+                              enum ast_numeric_type numeric_type) {
   a->meta = meta;
   a->digits = digits;
   a->digits_count = digits_count;
+  a->numeric_type = numeric_type;
 }
 
 void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
@@ -53,6 +55,7 @@ void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
   free(a->digits);
   a->digits = NULL;
   a->digits_count = 0;
+  a->numeric_type = (enum ast_numeric_type)-1;
 }
 
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,

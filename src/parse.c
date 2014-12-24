@@ -836,13 +836,20 @@ int parse_numeric_literal(struct ps *p, struct ast_numeric_literal *out) {
     ps_step(p);
   }
 
+  enum ast_numeric_type numeric_type = AST_NUMERIC_TYPE_SIGNED;
+  if (try_skip_char(p, 'u')) {
+    numeric_type = AST_NUMERIC_TYPE_UNSIGNED;
+    ch = ps_peek(p);
+  }
+
   if (!is_numeric_postchar(ch)) {
     free(digits);
     return 0;
   }
 
   ast_numeric_literal_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                           digits, digits_count);
+                           digits, digits_count,
+                           numeric_type);
   ps_count_leaf(p);
   return 1;
 }
@@ -1451,8 +1458,8 @@ int parse_test_defs(void) {
                          "if n { goto blah; } else { &meh; } };\n",
                          49);
   pass &= run_count_test("def10",
-                         "def foo bar = 2 + 3;",
-                         8);
+                         "def foo bar = 2 + 3u;",
+                         9);
   pass &= run_count_test("def11",
                          "def foo bar = 2 + *3 - 4;",
                          11);

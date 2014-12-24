@@ -24,15 +24,22 @@ void ast_ident_init(struct ast_ident *a, struct ast_meta meta,
 void ast_ident_init_copy(struct ast_ident *a, struct ast_ident *c);
 void ast_ident_destroy(struct ast_ident *a);
 
+enum ast_numeric_type {
+  AST_NUMERIC_TYPE_SIGNED,
+  AST_NUMERIC_TYPE_UNSIGNED,
+};
+
 struct ast_numeric_literal {
   struct ast_meta meta;
   int8_t *digits;
   size_t digits_count;
+  enum ast_numeric_type numeric_type;
 };
 
 void ast_numeric_literal_init(struct ast_numeric_literal *a,
                               struct ast_meta meta, int8_t *digits,
-                              size_t digits_count);
+                              size_t digits_count,
+                              enum ast_numeric_type numeric_type);
 
 struct ast_funcall {
   struct ast_meta meta;

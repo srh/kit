@@ -830,9 +830,19 @@ int exprscope_lookup_name(struct exprscope *es,
 void numeric_literal_type(struct ident_map *im,
                           struct ast_numeric_literal *a,
                           struct ast_typeexpr *out) {
-  (void)a;
   out->tag = AST_TYPEEXPR_NAME;
-  out->u.name = make_ast_ident(ident_map_intern_c_str(im, I32_TYPE_NAME));
+  const char *type_name;
+  switch (a->numeric_type) {
+  case AST_NUMERIC_TYPE_SIGNED:
+    type_name = I32_TYPE_NAME;
+    break;
+  case AST_NUMERIC_TYPE_UNSIGNED:
+    type_name = U32_TYPE_NAME;
+    break;
+  default:
+    UNREACHABLE();
+  }
+  out->u.name = make_ast_ident(ident_map_intern_c_str(im, type_name));
 }
 
 void do_replace_generics(struct ast_generics *generics,
@@ -2485,7 +2495,7 @@ int check_file_test_lambda_25(const uint8_t *name, size_t name_count,
       "  return rec(biggefy(x));\n"
       "};\n"
       "def bar func[i32] = fn() i32 {\n"
-      "  var x i32 = 5;\n"
+      "  var x u32 = 5u;\n"
       "  return rec(x);\n"
       "};\n"
     } };
