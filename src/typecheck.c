@@ -624,8 +624,8 @@ void exprscope_init(struct exprscope *es, struct checkstate *cs,
 void exprscope_destroy(struct exprscope *es) {
   es->cs = NULL;
   es->generics = NULL;
-  SLICE_FREE(es->generics_substitutions, es->generics_substitutions_count,
-             ast_typeexpr_destroy);
+  es->generics_substitutions = NULL;
+  es->generics_substitutions_count = 0;
   free(es->vars);
   es->vars = NULL;
   es->vars_count = 0;
@@ -738,6 +738,10 @@ int exact_typeexprs_equal(struct ast_typeexpr *a, struct ast_typeexpr *b) {
   return unify_directionally(a, b) && unify_directionally(b, a);
 }
 
+int check_expr_with_type(struct exprscope *es,
+                         struct ast_expr *x,
+                         struct ast_typeexpr *type);
+
 int lookup_global_maybe_typecheck(struct exprscope *es,
                                   ident_value name,
                                   struct ast_typeexpr *partial_type,
@@ -746,7 +750,6 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
   struct ast_typeexpr unified;
   struct def_entry *ent;
   struct def_instantiation *inst;
-  /* TODO: Use inst somehow. */
   if (!name_table_match_def(&es->cs->nt,
                             name,
                             NULL, /* No generic params in the expr here. */
@@ -756,6 +759,23 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
                             &ent,
                             &inst)) {
     return 0;
+  }
+
+  /* TODO: Avoid infinitely recursive template instantiation. */
+  if (!ent->is_primitive && !inst->typecheck_started) {
+    inst->typecheck_started = 1;
+    /* TODO: Don't reach into ent->def to grab the generics. */
+    struct exprscope scope;
+    exprscope_init(&scope, es->cs,
+                   &ent->def->generics,
+                   inst->types,
+                   inst->types_count);
+    if (!check_expr_with_type(&scope, &ent->def->rhs, &unified)) {
+      exprscope_destroy(&scope);
+      ast_typeexpr_destroy(&unified);
+      return 0;
+    }
+    exprscope_destroy(&scope);
   }
 
   *out = unified;
@@ -839,7 +859,7 @@ void do_replace_generics(struct ast_generics *generics,
     struct ast_typeapp *app = &a->u.app;
     size_t params_count = app->params_count;
     struct ast_typeexpr *params = malloc_mul(sizeof(*params),
-                                             app->params_count);
+                                             params_count);
 
     for (size_t i = 0, e = params_count; i < e; i++) {
       do_replace_generics(generics, generics_substitutions,
@@ -1236,12 +1256,25 @@ int check_expr_lambda(struct exprscope *es,
 
   /* Because lambdas can't capture variables, we make a fresh exprscope. */
 
+  struct ast_vardecl *replaced_vardecls
+    = malloc_mul(sizeof(*replaced_vardecls), func_params_count);
+  size_t replaced_vardecls_size = func_params_count;
+
+  for (size_t i = 0; i < func_params_count; i++) {
+    struct ast_typeexpr type;
+    ast_typeexpr_init_copy(&type, &funcexpr.u.app.params[i]);
+    ast_vardecl_init(&replaced_vardecls[i],
+                     ast_meta_make_garbage(),
+                     make_ast_ident(x->params[i].name.value),
+                     type);
+  }
+
   struct exprscope bb_es;
   exprscope_init(&bb_es, es->cs, es->generics, es->generics_substitutions,
                  es->generics_substitutions_count);
 
   for (size_t i = 0; i < func_params_count; i++) {
-    int res = exprscope_push_var(&bb_es, &x->params[i]);
+    int res = exprscope_push_var(&bb_es, &replaced_vardecls[i]);
     /* Pushing the var should succeed, because we already called
        check_var_shadowing above. */
     CHECK(res);
@@ -1259,12 +1292,14 @@ int check_expr_lambda(struct exprscope *es,
 
   ast_typeexpr_destroy(&computed_return_type);
   exprscope_destroy(&bb_es);
+  SLICE_FREE(replaced_vardecls, replaced_vardecls_size, ast_vardecl_destroy);
   *out = funcexpr;
   CHECK_DBG("check_expr_lambda succeeds\n");
   return 1;
 
  fail_bb_es:
   exprscope_destroy(&bb_es);
+  SLICE_FREE(replaced_vardecls, replaced_vardecls_size, ast_vardecl_destroy);
  fail_funcexpr:
   ast_typeexpr_destroy(&funcexpr);
   return 0;
@@ -1816,6 +1851,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
                                        &inst);
     CHECK(success);
     CHECK(exact_typeexprs_equal(&unified, &a->type));
+    CHECK(!ent->is_primitive);
 
     int ret;
     if (!inst->typecheck_started) {
@@ -2600,7 +2636,7 @@ int test_check_file(void) {
 
   DBG("test_check_file check_file_test_lambda_22...\n");
   if (!check_module(&im, &check_file_test_lambda_22, foo)) {
-    DBG("check_file_test_lambda_21 fails\n");
+    DBG("check_file_test_lambda_22 fails\n");
     goto cleanup_ident_map;
   }
 
