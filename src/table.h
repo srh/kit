@@ -38,7 +38,7 @@ struct deftype_entry {
   ident_value name;
   struct generics_arity arity;
 
-  /* Non-null, if !arity_no_paramlist(arity) */
+  /* Non-null, if !arity_no_paramlist(arity) and positive arity. */
   int *flatly_held;
   /* Equal to arity.value, if it has a value. */
   size_t flatly_held_count;

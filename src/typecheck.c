@@ -738,6 +738,32 @@ int exact_typeexprs_equal(struct ast_typeexpr *a, struct ast_typeexpr *b) {
   return unify_directionally(a, b) && unify_directionally(b, a);
 }
 
+int lookup_global_maybe_typecheck(struct exprscope *es,
+                                  ident_value name,
+                                  struct ast_typeexpr *partial_type,
+                                  struct ast_typeexpr *out,
+                                  int *is_lvalue_out) {
+  struct ast_typeexpr unified;
+  struct def_entry *ent;
+  struct def_instantiation *inst;
+  /* TODO: Use inst somehow. */
+  if (!name_table_match_def(&es->cs->nt,
+                            name,
+                            NULL, /* No generic params in the expr here. */
+                            0,
+                            partial_type,
+                            &unified,
+                            &ent,
+                            &inst)) {
+    return 0;
+  }
+
+  *out = unified;
+  /* Right now, there are no global variables. */
+  *is_lvalue_out = 0;
+  return 1;
+}
+
 int exprscope_lookup_name(struct exprscope *es,
                           ident_value name,
                           struct ast_typeexpr *partial_type,
@@ -759,25 +785,8 @@ int exprscope_lookup_name(struct exprscope *es,
     return 1;
   }
 
-  struct ast_typeexpr unified;
-  struct def_entry *ent;
-  struct def_instantiation *inst;
-  /* TODO: Use inst somehow. */
-  if (!name_table_match_def(&es->cs->nt,
-                            name,
-                            NULL, /* No generic params in the expr here. */
-                            0,
-                            partial_type,
-                            &unified,
-                            &ent,
-                            &inst)) {
-    return 0;
-  }
-
-  *out = unified;
-  /* Right now, there are no global variables. */
-  *is_lvalue_out = 0;
-  return 1;
+  return lookup_global_maybe_typecheck(es, name, partial_type,
+                                       out, is_lvalue_out);
 }
 
 void numeric_literal_type(struct ident_map *im,
@@ -1385,21 +1394,18 @@ int check_expr_binop(struct exprscope *es,
 
   int ret = 0;
   struct ast_typeexpr resolved_funcexpr;
-  struct def_entry *ent;
-  struct def_instantiation *inst;
-  /* TODO: Use inst. */
-  if (!name_table_match_def(&es->cs->nt,
-                            ident_map_intern_c_str(es->cs->im,
-                                                   binop_fakename(x->operator)),
-                            NULL, /* No generic params in the expr here. */
-                            0,
-                            &funcexpr,
-                            &resolved_funcexpr,
-                            &ent,
-                            &inst)) {
+  int funcexpr_lvalue_discard;
+  if (!lookup_global_maybe_typecheck(
+          es,
+          ident_map_intern_c_str(es->cs->im,
+                                 binop_fakename(x->operator)),
+          &funcexpr,
+          &resolved_funcexpr,
+          &funcexpr_lvalue_discard)) {
     goto fail_cleanup_funcexpr;
   }
 
+  /* TODO: Does resolved_funcexpr get destructed? */
   copy_func_return_type(es->cs->im, &resolved_funcexpr, 3, out);
   *is_lvalue_out = 0;
 
@@ -1536,20 +1542,17 @@ int check_expr_unop(struct exprscope *es,
                    make_ast_ident(func_ident), args_types, 2);
 
   struct ast_typeexpr resolved_funcexpr;
-  struct def_entry *ent;
-  struct def_instantiation *inst;
-  if (!name_table_match_def(&es->cs->nt,
-                            ident_map_intern_c_str(es->cs->im,
-                                                   unop_fakename(x->operator)),
-                            NULL, /* No generic params in the expr here. */
-                            0,
-                            &funcexpr,
-                            &resolved_funcexpr,
-                            &ent,
-                            &inst)) {
+  int funcexpr_lvalue_discard;
+  if (!lookup_global_maybe_typecheck(
+          es,
+          ident_map_intern_c_str(es->cs->im, unop_fakename(x->operator)),
+          &funcexpr,
+          &resolved_funcexpr,
+          &funcexpr_lvalue_discard)) {
     goto cleanup_funcexpr;
   }
 
+  /* TODO: Do we destruct resolved_funcexpr? */
   copy_func_return_type(es->cs->im, &resolved_funcexpr, 2, out);
   *is_lvalue_out = 0;
 
@@ -1801,10 +1804,30 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
   /* We can only typecheck the def by instantiating it -- so we check
      the ones with no template params. */
   if (!a->generics.has_type_params) {
-    struct exprscope es;
-    exprscope_init(&es, cs, &a->generics, NULL, 0);
-    int ret = check_expr_with_type(&es, &a->rhs, &a->type);
-    exprscope_destroy(&es);
+    struct ast_typeexpr unified;
+    struct def_entry *ent;
+    struct def_instantiation *inst;
+    int success = name_table_match_def(&cs->nt,
+                                       a->name.value,
+                                       NULL, 0, /* (no generics) */
+                                       &a->type,
+                                       &unified,
+                                       &ent,
+                                       &inst);
+    CHECK(success);
+    CHECK(exact_typeexprs_equal(&unified, &a->type));
+
+    int ret;
+    if (!inst->typecheck_started) {
+      inst->typecheck_started = 1;
+      struct exprscope es;
+      exprscope_init(&es, cs, &a->generics, NULL, 0);
+      ret = check_expr_with_type(&es, &a->rhs, &a->type);
+      exprscope_destroy(&es);
+    } else {
+      ret = 1;
+    }
+
     return ret;
   } else {
     return 1;
