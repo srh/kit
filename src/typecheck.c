@@ -1405,11 +1405,11 @@ int check_expr_binop(struct exprscope *es,
     goto fail_cleanup_funcexpr;
   }
 
-  /* TODO: Does resolved_funcexpr get destructed? */
   copy_func_return_type(es->cs->im, &resolved_funcexpr, 3, out);
   *is_lvalue_out = 0;
 
   ret = 1;
+  ast_typeexpr_destroy(&resolved_funcexpr);
  fail_cleanup_funcexpr:
   ast_typeexpr_destroy(&funcexpr);
   return ret;
@@ -1552,11 +1552,11 @@ int check_expr_unop(struct exprscope *es,
     goto cleanup_funcexpr;
   }
 
-  /* TODO: Do we destruct resolved_funcexpr? */
   copy_func_return_type(es->cs->im, &resolved_funcexpr, 2, out);
   *is_lvalue_out = 0;
 
   ret = 1;
+  ast_typeexpr_destroy(&resolved_funcexpr);
  cleanup_funcexpr:
   ast_typeexpr_destroy(&funcexpr);
  fail:
