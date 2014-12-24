@@ -31,6 +31,8 @@ void import_destroy(struct import *imp) {
   free(imp->file);
 }
 
+const int MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH = 50;
+
 struct checkstate {
   module_loader *loader;
   struct ident_map *im;
@@ -38,6 +40,8 @@ struct checkstate {
   struct import *imports;
   size_t imports_count;
   size_t imports_limit;
+
+  int template_instantiation_recursion_depth;
 
   struct name_table nt;
 };
@@ -50,6 +54,7 @@ void checkstate_init(struct checkstate *cs,
   cs->imports = NULL;
   cs->imports_count = 0;
   cs->imports_limit = 0;
+  cs->template_instantiation_recursion_depth = 0;
   name_table_init(&cs->nt);
 }
 
@@ -283,6 +288,7 @@ void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
 
 void checkstate_destroy(struct checkstate *cs) {
   name_table_destroy(&cs->nt);
+  CHECK(cs->template_instantiation_recursion_depth == 0);
   SLICE_FREE(cs->imports, cs->imports_count, import_destroy);
   cs->imports_limit = 0;
   cs->im = NULL;
@@ -761,10 +767,17 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
     return 0;
   }
 
-  /* TODO: Avoid infinitely recursive template instantiation. */
-  if (!ent->is_primitive && !inst->typecheck_started) {
+  if (!ent->is_primitive && ent->generics.has_type_params
+      && !inst->typecheck_started) {
+    if (es->cs->template_instantiation_recursion_depth
+        == MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH) {
+      ERR_DBG("Max template instantiation recursion depth exceeded.\n");
+      goto fail_unified;
+    }
+
+    es->cs->template_instantiation_recursion_depth++;
+
     inst->typecheck_started = 1;
-    /* TODO: Don't reach into ent->def to grab the generics. */
     struct exprscope scope;
     exprscope_init(&scope, es->cs,
                    &ent->def->generics,
@@ -772,16 +785,21 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
                    inst->types_count);
     if (!check_expr_with_type(&scope, &ent->def->rhs, &unified)) {
       exprscope_destroy(&scope);
-      ast_typeexpr_destroy(&unified);
-      return 0;
+      es->cs->template_instantiation_recursion_depth--;
+      goto fail_unified;
     }
     exprscope_destroy(&scope);
+
+    es->cs->template_instantiation_recursion_depth--;
   }
 
   *out = unified;
   /* Right now, there are no global variables. */
   *is_lvalue_out = 0;
   return 1;
+ fail_unified:
+  ast_typeexpr_destroy(&unified);
+  return 0;
 }
 
 int exprscope_lookup_name(struct exprscope *es,
@@ -920,8 +938,6 @@ int check_expr_funcall(struct exprscope *es,
                        struct ast_funcall *x,
                        struct ast_typeexpr *partial_type,
                        struct ast_typeexpr *out) {
-  /* TODO: We also need to type-check any template instantiations. */
-
   size_t args_count = x->args_count;
   size_t args_types_count = size_add(args_count, 1);
   struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
@@ -2435,6 +2451,50 @@ int check_file_test_lambda_23(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_24(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def[T] fac func[T, T] = fn(x T) T {\n"
+      "  if (x == 0) {\n"
+      "    return 1;\n"
+      "  } else {\n"
+      "    return x * fac(x - 1);\n"
+      "  }\n"
+      "};\n"
+      "def bar func[i32] = fn() i32 {\n"
+      "  var x i32 = 5;\n"
+      "  return fac(x);\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_25(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because of recursive template instantiation. */
+  struct test_module a[] = { {
+      "foo",
+      "deftype[T] foo struct { x i32; };\n"
+      "def[T] biggefy func[T, foo[T]] = fn(x T) foo[T] {\n"
+      "  return biggefy(x);\n"
+      "};\n"
+      "def[T] rec func[T, i32] = fn(x T) i32 {\n"
+      "  return rec(biggefy(x));\n"
+      "};\n"
+      "def bar func[i32] = fn() i32 {\n"
+      "  var x i32 = 5;\n"
+      "  return rec(x);\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -2643,6 +2703,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_lambda_23...\n");
   if (!!check_module(&im, &check_file_test_lambda_23, foo)) {
     DBG("check_file_test_lambda_23 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_24...\n");
+  if (!check_module(&im, &check_file_test_lambda_24, foo)) {
+    DBG("check_file_test_lambda_24 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_25...\n");
+  if (!!check_module(&im, &check_file_test_lambda_25, foo)) {
+    DBG("check_file_test_lambda_25 fails\n");
     goto cleanup_ident_map;
   }
 
