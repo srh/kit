@@ -45,6 +45,9 @@ void def_entry_init(struct def_entry *e, ident_value name,
   e->static_references = NULL;
   e->static_references_count = 0;
   e->static_references_limit = 0;
+
+  e->known_acyclic = 0;
+  e->acyclicity_being_chased = 0;
 }
 
 void def_entry_destroy(struct def_entry *e) {
@@ -65,14 +68,15 @@ void def_entry_ptr_destroy(struct def_entry **ptr) {
   *ptr = NULL;
 }
 
-void def_entry_note_static_reference(struct def_entry *ent, ident_value name) {
+void def_entry_note_static_reference(struct def_entry *ent,
+                                     struct def_entry *reference) {
   for (size_t i = 0, e = ent->static_references_count; i < e; i++) {
-    if (ent->static_references[i] == name) {
+    if (ent->static_references[i] == reference) {
       return;
     }
   }
   SLICE_PUSH(ent->static_references, ent->static_references_count,
-             ent->static_references_limit, name);
+             ent->static_references_limit, reference);
 }
 
 struct generics_arity make_arity(size_t value) {

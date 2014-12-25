@@ -656,9 +656,10 @@ void exprscope_destroy(struct exprscope *es) {
   es->vars_limit = 0;
 }
 
-void exprscope_note_static_reference(struct exprscope *es, ident_value name) {
+void exprscope_note_static_reference(struct exprscope *es,
+                                     struct def_entry *ent) {
   if (es->computation == STATIC_COMPUTATION_YES && es->entry_or_null) {
-    def_entry_note_static_reference(es->entry_or_null, name);
+    def_entry_note_static_reference(es->entry_or_null, ent);
   }
 }
 
@@ -790,6 +791,8 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
                             &inst)) {
     return 0;
   }
+
+  exprscope_note_static_reference(es, ent);
 
   if (!ent->is_primitive && ent->generics.has_type_params
       && !inst->typecheck_started) {
@@ -1869,8 +1872,6 @@ int check_expr(struct exprscope *es,
       return 0;
     }
 
-    exprscope_note_static_reference(es, x->u.name.value);
-
     *out = name_type;
     *is_lvalue_out = is_lvalue;
     return 1;
@@ -1985,6 +1986,37 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
   }
 }
 
+int chase_def_entry_acyclicity(struct def_entry *ent) {
+  if (ent->known_acyclic) {
+    return 1;
+  }
+  if (ent->acyclicity_being_chased) {
+    ERR_DBG("Cyclic reference in static expressions.\n");
+    return 0;
+  }
+  ent->acyclicity_being_chased = 1;
+  for (size_t i = 0, e = ent->static_references_count; i < e; i++) {
+    if (!chase_def_entry_acyclicity(ent->static_references[i])) {
+      return 0;
+    }
+  }
+  CHECK(ent->acyclicity_being_chased == 1);
+  ent->acyclicity_being_chased = 0;
+  CHECK(ent->known_acyclic == 0);
+  ent->known_acyclic = 1;
+  return 1;
+}
+
+int check_def_acyclicity(struct checkstate *cs) {
+  for (size_t i = 0, e = cs->nt.defs_count; i < e; i++) {
+    struct def_entry *ent = cs->nt.defs[i];
+    if (!chase_def_entry_acyclicity(ent)) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 int check_module(struct ident_map *im, module_loader *loader,
                  ident_value name) {
   int ret = 0;
@@ -2008,6 +2040,10 @@ int check_module(struct ident_map *im, module_loader *loader,
         goto cleanup;
       }
     }
+  }
+
+  if (!check_def_acyclicity(&cs)) {
+    goto cleanup;
   }
 
   ret = 1;
@@ -2619,6 +2655,19 @@ int check_file_test_lambda_28(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_29(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because of cyclic reference. */
+  struct test_module a[] = { {
+      "foo",
+      "def y i32 = -x;\n"
+      "def x i32 = -y;\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 int test_check_file(void) {
@@ -2858,6 +2907,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_lambda_28...\n");
   if (!check_module(&im, &check_file_test_lambda_28, foo)) {
     DBG("check_file_test_lambda_28 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_29...\n");
+  if (!!check_module(&im, &check_file_test_lambda_29, foo)) {
+    DBG("check_file_test_lambda_29 fails\n");
     goto cleanup_ident_map;
   }
 
