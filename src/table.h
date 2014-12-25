@@ -20,7 +20,17 @@ struct def_entry {
   struct def_instantiation **instantiations;
   size_t instantiations_count;
   size_t instantiations_limit;
+
+  /* Names of things whose value each def references at compile-time
+     evaluation.  We could do this per-instantiation but right now
+     that's irrelevant because there's no specialization.  These
+     references must form an acyclic graph (of course). */
+  ident_value *static_references;
+  size_t static_references_count;
+  size_t static_references_limit;
 };
+
+void def_entry_note_static_reference(struct def_entry *ent, ident_value name);
 
 #define ARITY_NO_PARAMLIST SIZE_MAX
 

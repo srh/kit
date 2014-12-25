@@ -598,6 +598,11 @@ int check_deftype(struct checkstate *cs, struct deftype_entry *ent) {
   return 1;
 }
 
+enum static_computability {
+  STATIC_COMPUTABILITY_YES,
+  STATIC_COMPUTABILITY_NO,
+};
+
 struct exprscope {
   struct checkstate *cs;
   struct ast_generics *generics;
@@ -605,6 +610,14 @@ struct exprscope {
   /* 0 if !generics->has_type_params; otherwise, equal to
      generics->params_count. */
   size_t generics_substitutions_count;
+
+  /* "YES" if the expr must be statically computable. */
+  enum static_computability computability;
+  /* The def_entry for this expr, maybe.  We record static_referents
+     that we see, if this is a statically-computed expression.  It
+     would be null for expressions that aren't statically computed for
+     a top-level def. */
+  struct def_entry *entry_or_null;
 
   /* A stack of variables that are in scope. */
   struct ast_vardecl **vars;
@@ -615,13 +628,17 @@ struct exprscope {
 void exprscope_init(struct exprscope *es, struct checkstate *cs,
                     struct ast_generics *generics,
                     struct ast_typeexpr *generics_substitutions,
-                    size_t generics_substitutions_count) {
+                    size_t generics_substitutions_count,
+                    enum static_computability computability,
+                    struct def_entry *entry_or_null) {
   CHECK(generics->params_count == (generics->has_type_params ?
                                    generics_substitutions_count : 0));
   es->cs = cs;
   es->generics = generics;
   es->generics_substitutions = generics_substitutions;
   es->generics_substitutions_count = generics_substitutions_count;
+  es->computability = computability;
+  es->entry_or_null = entry_or_null;
   es->vars = NULL;
   es->vars_count = 0;
   es->vars_limit = 0;
@@ -633,9 +650,16 @@ void exprscope_destroy(struct exprscope *es) {
   es->generics_substitutions = NULL;
   es->generics_substitutions_count = 0;
   free(es->vars);
+  es->computability = STATIC_COMPUTABILITY_YES;
   es->vars = NULL;
   es->vars_count = 0;
   es->vars_limit = 0;
+}
+
+void exprscope_note_static_reference(struct exprscope *es, ident_value name) {
+  if (es->computability == STATIC_COMPUTABILITY_YES && es->entry_or_null) {
+    def_entry_note_static_reference(es->entry_or_null, name);
+  }
 }
 
 int check_var_shadowing(struct exprscope *es, ident_value name) {
@@ -782,7 +806,9 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
     exprscope_init(&scope, es->cs,
                    &ent->def->generics,
                    inst->types,
-                   inst->types_count);
+                   inst->types_count,
+                   STATIC_COMPUTABILITY_YES,
+                   ent);
     if (!check_expr_with_type(&scope, &ent->def->rhs, &unified)) {
       exprscope_destroy(&scope);
       es->cs->template_instantiation_recursion_depth--;
@@ -948,6 +974,12 @@ int check_expr_funcall(struct exprscope *es,
                        struct ast_funcall *x,
                        struct ast_typeexpr *partial_type,
                        struct ast_typeexpr *out) {
+  if (es->computability == STATIC_COMPUTABILITY_YES) {
+    /* For now, there are no functions that are statically
+       callable. */
+    ERR_DBG("Function call in static expression.\n");
+    return 0;
+  }
   size_t args_count = x->args_count;
   size_t args_types_count = size_add(args_count, 1);
   struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
@@ -1295,9 +1327,12 @@ int check_expr_lambda(struct exprscope *es,
                      type);
   }
 
+  /* The funcbody does not need to be a statically computable
+     expression, because the lambda is not evaluated. */
   struct exprscope bb_es;
   exprscope_init(&bb_es, es->cs, es->generics, es->generics_substitutions,
-                 es->generics_substitutions_count);
+                 es->generics_substitutions_count,
+                 STATIC_COMPUTABILITY_NO, NULL);
 
   for (size_t i = 0; i < func_params_count; i++) {
     int res = exprscope_push_var(&bb_es, &replaced_vardecls[i]);
@@ -1354,6 +1389,10 @@ int check_expr_magic_binop(struct exprscope *es,
 
   switch (x->operator) {
   case AST_BINOP_ASSIGN: {
+    if (es->computability == STATIC_COMPUTABILITY_YES) {
+      ERR_DBG("Assignment within statically evaluated expression.\n");
+      goto cleanup_both_types;
+    }
     if (!lhs_is_lvalue) {
       ERR_DBG("Trying to assign to non-lvalue.\n");
       goto cleanup_both_types;
@@ -1418,6 +1457,13 @@ int check_expr_magic_binop(struct exprscope *es,
   return ret;
 }
 
+int is_statically_computable_non_magic_binop(enum ast_binop op) {
+  (void)op;
+  /* TODO: This will be incorrect when there's floats, because
+     compile-time float computation is weird? */
+  return 1;
+}
+
 int check_expr_binop(struct exprscope *es,
                      struct ast_binop_expr *x,
                      struct ast_typeexpr *partial_type,
@@ -1425,6 +1471,12 @@ int check_expr_binop(struct exprscope *es,
                      int *is_lvalue_out) {
   if (is_magic_binop(x->operator)) {
     return check_expr_magic_binop(es, x, partial_type, out, is_lvalue_out);
+  }
+
+  if (es->computability == STATIC_COMPUTABILITY_YES
+      && !is_statically_computable_non_magic_binop(x->operator)) {
+    ERR_DBG("Non-statically computable binop.\n");
+    return 0;
   }
 
   struct ast_typeexpr local_partial;
@@ -1517,6 +1569,11 @@ int check_expr_magic_unop(struct exprscope *es,
                           struct ast_typeexpr *partial_type,
                           struct ast_typeexpr *out,
                           int *is_lvalue_out) {
+  if (es->computability == STATIC_COMPUTABILITY_YES) {
+    ERR_DBG("Magic unops not allowed in static expressions.\n");
+    return 0;
+  }
+
   int ret = 0;
   struct ast_typeexpr no_partial;
   no_partial.tag = AST_TYPEEXPR_UNKNOWN;
@@ -1572,6 +1629,10 @@ int check_expr_magic_unop(struct exprscope *es,
   return ret;
 }
 
+int non_magic_unop_statically_computable(enum ast_unop operator) {
+  return operator == AST_UNOP_NEGATE;
+}
+
 int check_expr_unop(struct exprscope *es,
                     struct ast_unop_expr *x,
                     struct ast_typeexpr *partial_type,
@@ -1580,6 +1641,12 @@ int check_expr_unop(struct exprscope *es,
   int ret = 0;
   if (is_magic_unop(x->operator)) {
     return check_expr_magic_unop(es, x, partial_type, out, is_lvalue_out);
+  }
+
+  if (es->computability == STATIC_COMPUTABILITY_YES
+      && !non_magic_unop_statically_computable(x->operator)) {
+    ERR_DBG("Non-statically-computable unop function.\n");
+    return 0;
   }
 
   struct ast_typeexpr local_partial;
@@ -1742,6 +1809,10 @@ int check_expr_deref_field_access(struct exprscope *es,
                                   struct ast_typeexpr *partial_type,
                                   struct ast_typeexpr *out,
                                   int *is_lvalue_out) {
+  if (es->computability == STATIC_COMPUTABILITY_YES) {
+    ERR_DBG("Dereferencing field access disallowed in static computation.\n");
+    return 0;
+  }
   int ret = 0;
   /* Even though we know the lhs is supposed to be a ptr, we shouldn't
      put that info into the context when type checking it. */
@@ -1797,6 +1868,8 @@ int check_expr(struct exprscope *es,
                                &name_type, &is_lvalue)) {
       return 0;
     }
+
+    exprscope_note_static_reference(es, x->u.name.value);
 
     *out = name_type;
     *is_lvalue_out = is_lvalue;
@@ -1883,7 +1956,8 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
     if (!inst->typecheck_started) {
       inst->typecheck_started = 1;
       struct exprscope es;
-      exprscope_init(&es, cs, &a->generics, NULL, 0);
+      exprscope_init(&es, cs, &a->generics, NULL, 0,
+                     STATIC_COMPUTABILITY_YES, ent);
       ret = check_expr_with_type(&es, &a->rhs, &a->type);
       exprscope_destroy(&es);
     } else {
@@ -2504,6 +2578,44 @@ int check_file_test_lambda_25(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_lambda_26(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def x i32 = 3;\n"
+      "def y u32 = 3u + 4u;\n"
+      "def z func[i32, i32] = fn(k i32) i32 { return k + 1; };\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_27(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because you can't evaluate z(3) statically. */
+  struct test_module a[] = { {
+      "foo",
+      "def x i32 = z(3);\n"
+      "def z func[i32, i32] = fn(k i32) i32 { return k + 1; };\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_lambda_28(const uint8_t *name, size_t name_count,
+                              uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def y i32 = -x;\n"
+      "def x i32 = -3;\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 int test_check_file(void) {
@@ -2725,6 +2837,24 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_lambda_25...\n");
   if (!!check_module(&im, &check_file_test_lambda_25, foo)) {
     DBG("check_file_test_lambda_25 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_26...\n");
+  if (!check_module(&im, &check_file_test_lambda_26, foo)) {
+    DBG("check_file_test_lambda_26 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file !check_file_test_lambda_27...\n");
+  if (!!check_module(&im, &check_file_test_lambda_27, foo)) {
+    DBG("check_file_test_lambda_27 fails\n");
+    goto cleanup_ident_map;
+  }
+
+  DBG("test_check_file check_file_test_lambda_28...\n");
+  if (!check_module(&im, &check_file_test_lambda_28, foo)) {
+    DBG("check_file_test_lambda_28 fails\n");
     goto cleanup_ident_map;
   }
 
