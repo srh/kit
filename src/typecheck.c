@@ -598,9 +598,9 @@ int check_deftype(struct checkstate *cs, struct deftype_entry *ent) {
   return 1;
 }
 
-enum static_computability {
-  STATIC_COMPUTABILITY_YES,
-  STATIC_COMPUTABILITY_NO,
+enum static_computation {
+  STATIC_COMPUTATION_NO,
+  STATIC_COMPUTATION_YES,
 };
 
 struct exprscope {
@@ -612,7 +612,7 @@ struct exprscope {
   size_t generics_substitutions_count;
 
   /* "YES" if the expr must be statically computable. */
-  enum static_computability computability;
+  enum static_computation computation;
   /* The def_entry for this expr, maybe.  We record static_referents
      that we see, if this is a statically-computed expression.  It
      would be null for expressions that aren't statically computed for
@@ -629,7 +629,7 @@ void exprscope_init(struct exprscope *es, struct checkstate *cs,
                     struct ast_generics *generics,
                     struct ast_typeexpr *generics_substitutions,
                     size_t generics_substitutions_count,
-                    enum static_computability computability,
+                    enum static_computation computation,
                     struct def_entry *entry_or_null) {
   CHECK(generics->params_count == (generics->has_type_params ?
                                    generics_substitutions_count : 0));
@@ -637,7 +637,7 @@ void exprscope_init(struct exprscope *es, struct checkstate *cs,
   es->generics = generics;
   es->generics_substitutions = generics_substitutions;
   es->generics_substitutions_count = generics_substitutions_count;
-  es->computability = computability;
+  es->computation = computation;
   es->entry_or_null = entry_or_null;
   es->vars = NULL;
   es->vars_count = 0;
@@ -650,14 +650,14 @@ void exprscope_destroy(struct exprscope *es) {
   es->generics_substitutions = NULL;
   es->generics_substitutions_count = 0;
   free(es->vars);
-  es->computability = STATIC_COMPUTABILITY_YES;
+  es->computation = STATIC_COMPUTATION_YES;
   es->vars = NULL;
   es->vars_count = 0;
   es->vars_limit = 0;
 }
 
 void exprscope_note_static_reference(struct exprscope *es, ident_value name) {
-  if (es->computability == STATIC_COMPUTABILITY_YES && es->entry_or_null) {
+  if (es->computation == STATIC_COMPUTATION_YES && es->entry_or_null) {
     def_entry_note_static_reference(es->entry_or_null, name);
   }
 }
@@ -807,7 +807,7 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
                    &ent->def->generics,
                    inst->types,
                    inst->types_count,
-                   STATIC_COMPUTABILITY_YES,
+                   STATIC_COMPUTATION_YES,
                    ent);
     if (!check_expr_with_type(&scope, &ent->def->rhs, &unified)) {
       exprscope_destroy(&scope);
@@ -974,7 +974,7 @@ int check_expr_funcall(struct exprscope *es,
                        struct ast_funcall *x,
                        struct ast_typeexpr *partial_type,
                        struct ast_typeexpr *out) {
-  if (es->computability == STATIC_COMPUTABILITY_YES) {
+  if (es->computation == STATIC_COMPUTATION_YES) {
     /* For now, there are no functions that are statically
        callable. */
     ERR_DBG("Function call in static expression.\n");
@@ -1332,7 +1332,7 @@ int check_expr_lambda(struct exprscope *es,
   struct exprscope bb_es;
   exprscope_init(&bb_es, es->cs, es->generics, es->generics_substitutions,
                  es->generics_substitutions_count,
-                 STATIC_COMPUTABILITY_NO, NULL);
+                 STATIC_COMPUTATION_NO, NULL);
 
   for (size_t i = 0; i < func_params_count; i++) {
     int res = exprscope_push_var(&bb_es, &replaced_vardecls[i]);
@@ -1389,7 +1389,7 @@ int check_expr_magic_binop(struct exprscope *es,
 
   switch (x->operator) {
   case AST_BINOP_ASSIGN: {
-    if (es->computability == STATIC_COMPUTABILITY_YES) {
+    if (es->computation == STATIC_COMPUTATION_YES) {
       ERR_DBG("Assignment within statically evaluated expression.\n");
       goto cleanup_both_types;
     }
@@ -1473,7 +1473,7 @@ int check_expr_binop(struct exprscope *es,
     return check_expr_magic_binop(es, x, partial_type, out, is_lvalue_out);
   }
 
-  if (es->computability == STATIC_COMPUTABILITY_YES
+  if (es->computation == STATIC_COMPUTATION_YES
       && !is_statically_computable_non_magic_binop(x->operator)) {
     ERR_DBG("Non-statically computable binop.\n");
     return 0;
@@ -1569,7 +1569,7 @@ int check_expr_magic_unop(struct exprscope *es,
                           struct ast_typeexpr *partial_type,
                           struct ast_typeexpr *out,
                           int *is_lvalue_out) {
-  if (es->computability == STATIC_COMPUTABILITY_YES) {
+  if (es->computation == STATIC_COMPUTATION_YES) {
     ERR_DBG("Magic unops not allowed in static expressions.\n");
     return 0;
   }
@@ -1643,7 +1643,7 @@ int check_expr_unop(struct exprscope *es,
     return check_expr_magic_unop(es, x, partial_type, out, is_lvalue_out);
   }
 
-  if (es->computability == STATIC_COMPUTABILITY_YES
+  if (es->computation == STATIC_COMPUTATION_YES
       && !non_magic_unop_statically_computable(x->operator)) {
     ERR_DBG("Non-statically-computable unop function.\n");
     return 0;
@@ -1809,7 +1809,7 @@ int check_expr_deref_field_access(struct exprscope *es,
                                   struct ast_typeexpr *partial_type,
                                   struct ast_typeexpr *out,
                                   int *is_lvalue_out) {
-  if (es->computability == STATIC_COMPUTABILITY_YES) {
+  if (es->computation == STATIC_COMPUTATION_YES) {
     ERR_DBG("Dereferencing field access disallowed in static computation.\n");
     return 0;
   }
@@ -1957,7 +1957,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
       inst->typecheck_started = 1;
       struct exprscope es;
       exprscope_init(&es, cs, &a->generics, NULL, 0,
-                     STATIC_COMPUTABILITY_YES, ent);
+                     STATIC_COMPUTATION_YES, ent);
       ret = check_expr_with_type(&es, &a->rhs, &a->type);
       exprscope_destroy(&es);
     } else {
@@ -2001,9 +2001,12 @@ int check_module(struct ident_map *im, module_loader *loader,
     CRASH("lookup_import just failed after chase_imports succeeded.\n");
   }
 
-  for (size_t i = 0, e = file->toplevels_count; i < e; i++) {
-    if (!check_toplevel(&cs, &file->toplevels[i])) {
-      goto cleanup;
+  for (size_t i = 0, e = cs.imports_count; i < e; i++) {
+    struct ast_file *file = cs.imports[i].file;
+    for (size_t j = 0, f = file->toplevels_count; j < f; j++) {
+      if (!check_toplevel(&cs, &file->toplevels[j])) {
+        goto cleanup;
+      }
     }
   }
 
@@ -2070,7 +2073,7 @@ int check_file_test_1(const uint8_t *name, size_t name_count,
                              { "bar",
                                "import foo;\n"
                                "\n"
-                               "def y f64 = 5;\n" } };
+                               "def y u32 = 5u;\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);
