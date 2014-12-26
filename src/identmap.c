@@ -26,9 +26,7 @@ void ident_map_init(struct ident_map *m) {
   m->table = NULL;
   m->count = 0;
   m->limit = 0;
-  m->next_value = 0;
   m->datas = NULL;
-  m->datas_limit = 0;
   m->strings = NULL;
   m->strings_size = 0;
   m->strings_limit = 0;
@@ -94,6 +92,9 @@ void ident_map_rebuild(struct ident_map *m,
     new_table[offset] = m->table[i];
   }
 
+  m->datas = realloc(m->datas, size_mul(sizeof(*m->datas), new_limit / 2));
+  CHECK(m->datas);
+
   free(m->table);
   m->table = new_table;
   m->limit = new_limit;
@@ -156,17 +157,14 @@ ident_value ident_map_intern(struct ident_map *m,
   size_t strings_offset = ident_map_add_string(m, buf, count);
 
   STATIC_CHECK(IDENT_VALUE_INVALID == SIZE_MAX);
-  CHECK(m->next_value != IDENT_VALUE_INVALID);
-  v = m->next_value;
-  m->next_value++;
+  CHECK(m->count != IDENT_VALUE_INVALID);
+  v = m->count;
 
   m->table[offset].ident = v;
-  CHECK(v == m->count);
-  struct ident_map_data data;
-  data.strings_offset = strings_offset;
-  data.count = count;
-  SLICE_PUSH(m->datas, m->count, m->datas_limit, data);
-  CHECK(m->next_value == m->count);
+  /* Since datas is of length m->limit / 2, and since m->count <
+     m->limit / 2, we can write to m->datas[m->count]. */
+  m->datas[m->count].strings_offset = strings_offset;
+  m->datas[m->count].count = count; m->count++;
 
   if (m->count >= m->limit / 2) {
     IDENTMAP_DBG("ident_map_intern rebuilding bigger map\n");

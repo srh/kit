@@ -17,11 +17,9 @@ struct ident_map {
   size_t count;
   /* limit is either 0 or a power of 2 that is at least 8. */
   size_t limit;
-  /* next_value is initially zero -- the first ident has that value. */
-  ident_value next_value;
 
+  /* datas is of length limit / 2. */
   struct ident_map_data *datas;
-  size_t datas_limit;
 
   /* Holds all the identifier values, concatenated. */
   char *strings;
@@ -40,6 +38,7 @@ ident_value ident_map_intern(struct ident_map *m,
 ident_value ident_map_intern_c_str(struct ident_map *m,
                                    const char *s);
 
+/* buf_out is invalidated by the next ident_map operation. */
 void ident_map_lookup(struct ident_map *m, ident_value ident,
                       const void **buf_out, size_t *count_out);
 
