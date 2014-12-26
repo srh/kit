@@ -20,6 +20,9 @@ struct ident_map {
   /* next_value is initially zero -- the first ident has that value. */
   ident_value next_value;
 
+  struct ident_map_data *datas;
+  size_t datas_limit;
+
   /* Holds all the identifier values, concatenated. */
   char *strings;
   size_t strings_size;

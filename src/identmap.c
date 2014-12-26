@@ -6,15 +6,20 @@
 #include <inttypes.h>
 
 #include "arith.h"
+#include "slice.h"
 #include "util.h"
 
 #define IDENTMAP_DBG(...) do { } while (0)
 
-struct ident_map_entry {
-  ident_value ident;
+struct ident_map_data {
   /* The offset into m->strings. */
   size_t strings_offset;
   size_t count;
+};
+
+/* TODO: Unwrap this type. */
+struct ident_map_entry {
+  ident_value ident;
 };
 
 void ident_map_init(struct ident_map *m) {
@@ -22,6 +27,8 @@ void ident_map_init(struct ident_map *m) {
   m->count = 0;
   m->limit = 0;
   m->next_value = 0;
+  m->datas = NULL;
+  m->datas_limit = 0;
   m->strings = NULL;
   m->strings_size = 0;
   m->strings_limit = 0;
@@ -34,6 +41,7 @@ void ident_map_init_move(struct ident_map *m, struct ident_map *movee) {
 
 void ident_map_destroy(struct ident_map *m) {
   free(m->table);
+  free(m->datas);
   free(m->strings);
   ident_map_init(m);
 }
@@ -61,19 +69,18 @@ void ident_map_rebuild(struct ident_map *m,
   IDENTMAP_DBG("ident_map_rebuild, malloced new_table\n");
   for (size_t i = 0; i < new_limit; i++) {
     new_table[i].ident = IDENT_VALUE_INVALID;
-    new_table[i].strings_offset = 0;
-    new_table[i].count = 0;
   }
 
   IDENTMAP_DBG("ident_map_rebuild initialized new buf\n");
 
   for (size_t i = 0; i < m->limit; i++) {
-    if (m->table[i].ident == IDENT_VALUE_INVALID) {
+    ident_value id = m->table[i].ident;
+    if (id == IDENT_VALUE_INVALID) {
       continue;
     }
 
-    size_t hash = ident_map_hash(m->strings + m->table[i].strings_offset,
-                                 m->table[i].count);
+    size_t hash = ident_map_hash(m->strings + m->datas[id].strings_offset,
+                                 m->datas[id].count);
     size_t offset = hash & (new_limit - 1);
 
     size_t step = 1;
@@ -136,8 +143,8 @@ ident_value ident_map_intern(struct ident_map *m,
   ident_value v;
   while ((v = m->table[offset].ident), v != IDENT_VALUE_INVALID) {
     IDENTMAP_DBG("a collision at offset %"PRIz"\n", offset);
-    if (m->table[offset].count == count
-        && 0 == memcmp(m->strings + m->table[offset].strings_offset,
+    if (m->datas[v].count == count
+        && 0 == memcmp(m->strings + m->datas[v].strings_offset,
                        buf, count)) {
       return v;
     }
@@ -147,15 +154,19 @@ ident_value ident_map_intern(struct ident_map *m,
   }
 
   size_t strings_offset = ident_map_add_string(m, buf, count);
+
   STATIC_CHECK(IDENT_VALUE_INVALID == SIZE_MAX);
   CHECK(m->next_value != IDENT_VALUE_INVALID);
   v = m->next_value;
-  /* No overflow, because next_value != SIZE_MAX. */
   m->next_value++;
+
   m->table[offset].ident = v;
-  m->table[offset].strings_offset = strings_offset;
-  m->table[offset].count = count;
-  m->count++;
+  CHECK(v == m->count);
+  struct ident_map_data data;
+  data.strings_offset = strings_offset;
+  data.count = count;
+  SLICE_PUSH(m->datas, m->count, m->datas_limit, data);
+  CHECK(m->next_value == m->count);
 
   if (m->count >= m->limit / 2) {
     IDENTMAP_DBG("ident_map_intern rebuilding bigger map\n");
@@ -174,13 +185,7 @@ ident_value ident_map_intern_c_str(struct ident_map *m,
 void ident_map_lookup(struct ident_map *m, ident_value ident,
                       const void **buf_out, size_t *count_out) {
   CHECK(ident != IDENT_VALUE_INVALID);
-  /* TODO: We need a more efficient reverse lookup process. */
-  for (size_t i = 0, e = m->limit; i < e; i++) {
-    if (m->table[i].ident == ident) {
-      *buf_out = m->strings + m->table[i].strings_offset;
-      *count_out = m->table[i].count;
-      return;
-    }
-  }
-  CRASH("ident_map missing ident_value\n");
+  CHECK(ident < m->count);
+  *buf_out = m->strings + m->datas[ident].strings_offset;
+  *count_out = m->datas[ident].count;
 }
