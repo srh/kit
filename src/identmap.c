@@ -16,28 +16,37 @@ struct identmap_data {
   void *user_value;
 };
 
-void identmap_init(struct identmap *m) {
+void identmap_init_personal(struct identmap *m) {
   m->table = NULL;
   m->count = 0;
   m->limit = 0;
   m->datas = NULL;
 }
 
+void identmap_init(struct identmap *m) {
+  identmap_init_personal(m);
+  arena_init(&m->string_arena);
+}
+
 void identmap_init_move(struct identmap *m, struct identmap *movee) {
-  *m = *movee;
-  identmap_init(movee);
+  m->table = movee->table;
+  m->count = movee->count;
+  m->limit = movee->limit;
+  m->datas = movee->datas;
+  arena_init_move(&m->string_arena, &movee->string_arena);
+  identmap_init_personal(movee);
 }
 
 void identmap_destroy(struct identmap *m) {
   free(m->table);
   for (size_t i = 0, e = m->count; i < e; i++) {
-    free(m->datas[i].data);
     m->datas[i].data = NULL;
     m->datas[i].data_count = 0;
     m->datas[i].user_value = NULL;
   }
   free(m->datas);
-  identmap_init(m);
+  arena_destroy(&m->string_arena);
+  identmap_init_personal(m);
 }
 
 size_t identmap_hash(const void *buf, size_t count) {
@@ -121,7 +130,7 @@ ident_value identmap_intern(struct identmap *m,
     step++;
   }
 
-  void *data_copy = malloc_mul(count, 1);
+  void *data_copy = arena_unaligned(&m->string_arena, count);
   memcpy(data_copy, buf, count);
 
   STATIC_CHECK(IDENT_VALUE_INVALID == SIZE_MAX);

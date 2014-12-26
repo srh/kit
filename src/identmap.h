@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 
+#include "arena.h"
 #include "util.h"
 
 struct identmap_data;
@@ -20,6 +21,8 @@ struct identmap {
 
   /* datas is of length limit / 2. */
   struct identmap_data *datas;
+
+  struct arena string_arena;
 };
 
 void identmap_init(struct identmap *m);
