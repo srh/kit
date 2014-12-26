@@ -39,9 +39,9 @@ int main(int argc, char **argv) {
 
   int ret = EXIT_FAILURE;
 
-  struct ident_map im;
-  ident_map_init(&im);
-  ident_value ident_module = ident_map_intern(&im, module, strlen(module));
+  struct identmap im;
+  identmap_init(&im);
+  ident_value ident_module = identmap_intern(&im, module, strlen(module));
   if (!check_module(&im, &read_module_file, ident_module)) {
     goto cleanup_im;
   }
@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
   ret = EXIT_SUCCESS;
 
  cleanup_im:
-  ident_map_destroy(&im);
+  identmap_destroy(&im);
   return ret;
 }
 

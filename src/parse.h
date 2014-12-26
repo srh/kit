@@ -5,10 +5,10 @@
 #include <stdint.h>
 
 struct ast_file;
-struct ident_map;
+struct identmap;
 
 int parse_test(void);
-int parse_buf_file(struct ident_map *im,
+int parse_buf_file(struct identmap *im,
                    const uint8_t *buf, size_t length,
                    struct ast_file *file_out,
                    size_t *error_pos_out);

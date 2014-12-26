@@ -35,7 +35,7 @@ const int MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH = 50;
 
 struct checkstate {
   module_loader *loader;
-  struct ident_map *im;
+  struct identmap *im;
 
   struct import *imports;
   size_t imports_count;
@@ -48,7 +48,7 @@ struct checkstate {
 
 void checkstate_init(struct checkstate *cs,
                      module_loader *loader,
-                     struct ident_map *im) {
+                     struct identmap *im) {
   cs->loader = loader;
   cs->im = im;
   cs->imports = NULL;
@@ -62,7 +62,7 @@ void intern_primitive_type(struct checkstate *cs,
                            const char *name,
                            int *flatly_held,
                            size_t flatly_held_count) {
-  ident_value ident = ident_map_intern_c_str(cs->im, name);
+  ident_value ident = identmap_intern_c_str(cs->im, name);
   int res = name_table_add_primitive_type(&cs->nt, ident,
                                           flatly_held, flatly_held_count);
   CHECK(res);
@@ -91,7 +91,7 @@ void intern_unop(struct checkstate *cs,
                  struct ast_typeexpr *type) {
   name_table_add_primitive_def(
       &cs->nt,
-      ident_map_intern_c_str(cs->im, unop_fakename(unop)),
+      identmap_intern_c_str(cs->im, unop_fakename(unop)),
       generics,
       type);
 }
@@ -135,8 +135,8 @@ void intern_binop(struct checkstate *cs,
                   struct ast_typeexpr *type) {
 
   name_table_add_primitive_def(&cs->nt,
-                               ident_map_intern_c_str(cs->im,
-                                                      binop_fakename(binop)),
+                               identmap_intern_c_str(cs->im,
+                                                     binop_fakename(binop)),
                                generics,
                                type);
 }
@@ -163,11 +163,11 @@ void checkstate_import_primitive_types(struct checkstate *cs) {
   }
 }
 
-void init_func_type(struct ast_typeexpr *a, struct ident_map *im,
+void init_func_type(struct ast_typeexpr *a, struct identmap *im,
                     ident_value *args, size_t args_count) {
   a->tag = AST_TYPEEXPR_APP;
   struct ast_ident name
-    = make_ast_ident(ident_map_intern_c_str(im, FUNC_TYPE_NAME));
+    = make_ast_ident(identmap_intern_c_str(im, FUNC_TYPE_NAME));
   struct ast_typeexpr *params = malloc_mul(sizeof(*params), args_count);
   for (size_t i = 0; i < args_count; i++) {
     params[i].tag = AST_TYPEEXPR_NAME;
@@ -177,28 +177,28 @@ void init_func_type(struct ast_typeexpr *a, struct ident_map *im,
                    name, params, args_count);
 }
 
-void copy_func_return_type(struct ident_map *im,
+void copy_func_return_type(struct identmap *im,
                            struct ast_typeexpr *func,
                            size_t expected_params_count,
                            struct ast_typeexpr *out) {
   CHECK(func->tag == AST_TYPEEXPR_APP);
-  CHECK(func->u.app.name.value == ident_map_intern_c_str(im, FUNC_TYPE_NAME));
+  CHECK(func->u.app.name.value == identmap_intern_c_str(im, FUNC_TYPE_NAME));
   CHECK(func->u.app.params_count == expected_params_count);
   ast_typeexpr_init_copy(out, &func->u.app.params[expected_params_count - 1]);
 }
 
-void init_binop_func_type(struct ast_typeexpr *a, struct ident_map *im,
+void init_binop_func_type(struct ast_typeexpr *a, struct identmap *im,
                           const char *type_name) {
-  ident_value name = ident_map_intern_c_str(im, type_name);
+  ident_value name = identmap_intern_c_str(im, type_name);
   ident_value names[3];
   names[0] = names[1] = names[2] = name;
   init_func_type(a, im, names, 3);
 }
 
-void init_binop_compare_type(struct ast_typeexpr *a, struct ident_map *im,
+void init_binop_compare_type(struct ast_typeexpr *a, struct identmap *im,
                              const char *type_name) {
-  ident_value name = ident_map_intern_c_str(im, type_name);
-  ident_value bool_name = ident_map_intern_c_str(im, BOOLEAN_STANDIN_TYPE_NAME);
+  ident_value name = identmap_intern_c_str(im, type_name);
+  ident_value bool_name = identmap_intern_c_str(im, BOOLEAN_STANDIN_TYPE_NAME);
   ident_value names[3];
   names[0] = names[1] = name;
   names[2] = bool_name;
@@ -256,7 +256,7 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
     {
       struct ast_typeexpr type;
       ident_value args[2];
-      args[0] = args[1] = ident_map_intern_c_str(cs->im, I32_TYPE_NAME);
+      args[0] = args[1] = identmap_intern_c_str(cs->im, I32_TYPE_NAME);
       init_func_type(&type, cs->im, args, 2);
       intern_unop(cs, AST_UNOP_NEGATE, &generics, &type);
       ast_typeexpr_destroy(&type);
@@ -266,7 +266,7 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
     {
       struct ast_typeexpr type;
       ident_value args[2];
-      args[0] = args[1] = ident_map_intern_c_str(cs->im, F64_TYPE_NAME);
+      args[0] = args[1] = identmap_intern_c_str(cs->im, F64_TYPE_NAME);
       init_func_type(&type, cs->im, args, 2);
       intern_unop(cs, AST_UNOP_NEGATE, &generics, &type);
       ast_typeexpr_destroy(&type);
@@ -283,7 +283,7 @@ void checkstate_import_primitives(struct checkstate *cs) {
 
 void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
   a->tag = AST_TYPEEXPR_NAME;
-  a->u.name = make_ast_ident(ident_map_intern_c_str(cs->im, I32_TYPE_NAME));
+  a->u.name = make_ast_ident(identmap_intern_c_str(cs->im, I32_TYPE_NAME));
 }
 
 void checkstate_destroy(struct checkstate *cs) {
@@ -301,7 +301,7 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
 
   const void *module_name;
   size_t module_name_count;
-  ident_map_lookup(cs->im, name, &module_name, &module_name_count);
+  identmap_lookup(cs->im, name, &module_name, &module_name_count);
 
   uint8_t *data;
   size_t data_size;
@@ -856,7 +856,7 @@ int exprscope_lookup_name(struct exprscope *es,
                                        out, is_lvalue_out);
 }
 
-void numeric_literal_type(struct ident_map *im,
+void numeric_literal_type(struct identmap *im,
                           struct ast_numeric_literal *a,
                           struct ast_typeexpr *out) {
   out->tag = AST_TYPEEXPR_NAME;
@@ -871,7 +871,7 @@ void numeric_literal_type(struct ident_map *im,
   default:
     UNREACHABLE();
   }
-  out->u.name = make_ast_ident(ident_map_intern_c_str(im, type_name));
+  out->u.name = make_ast_ident(identmap_intern_c_str(im, type_name));
 }
 
 void do_replace_generics(struct ast_generics *generics,
@@ -1000,7 +1000,7 @@ int check_expr_funcall(struct exprscope *es,
 
   ast_typeexpr_init_copy(&args_types[args_count], partial_type);
 
-  ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
+  ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
 
   struct ast_typeexpr funcexpr;
   funcexpr.tag = AST_TYPEEXPR_APP;
@@ -1270,7 +1270,7 @@ int check_expr_lambda(struct exprscope *es,
                       struct ast_typeexpr *partial_type,
                       struct ast_typeexpr *out) {
   CHECK_DBG("check_expr_lambda\n");
-  ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
+  ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
   size_t func_params_count = x->params_count;
   size_t args_count = size_add(func_params_count, 1);
 
@@ -1420,7 +1420,7 @@ int check_expr_magic_binop(struct exprscope *es,
     struct ast_typeexpr boolean;
     boolean.tag = AST_TYPEEXPR_NAME;
     boolean.u.name = make_ast_ident(
-        ident_map_intern_c_str(es->cs->im, BOOLEAN_STANDIN_TYPE_NAME));
+        identmap_intern_c_str(es->cs->im, BOOLEAN_STANDIN_TYPE_NAME));
 
     if (!unify_directionally(&boolean, &lhs_type)) {
       ERR_DBG("LHS of and/or is non-boolean.\n");
@@ -1501,7 +1501,7 @@ int check_expr_binop(struct exprscope *es,
   args_types[1] = rhs_type;
   ast_typeexpr_init_copy(&args_types[2], partial_type);
 
-  ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
+  ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
 
   struct ast_typeexpr funcexpr;
   funcexpr.tag = AST_TYPEEXPR_APP;
@@ -1513,8 +1513,8 @@ int check_expr_binop(struct exprscope *es,
   int funcexpr_lvalue_discard;
   if (!lookup_global_maybe_typecheck(
           es,
-          ident_map_intern_c_str(es->cs->im,
-                                 binop_fakename(x->operator)),
+          identmap_intern_c_str(es->cs->im,
+                                binop_fakename(x->operator)),
           &funcexpr,
           &resolved_funcexpr,
           &funcexpr_lvalue_discard)) {
@@ -1536,14 +1536,14 @@ int check_expr_binop(struct exprscope *es,
   return 0;
 }
 
-int view_ptr_target(struct ident_map *im,
+int view_ptr_target(struct identmap *im,
                     struct ast_typeexpr *ptr_type,
                     struct ast_typeexpr **target_out) {
   if (ptr_type->tag != AST_TYPEEXPR_APP) {
     return 0;
   }
 
-  ident_value ptr_ident = ident_map_intern_c_str(im, PTR_TYPE_NAME);
+  ident_value ptr_ident = identmap_intern_c_str(im, PTR_TYPE_NAME);
   if (ptr_type->u.app.name.value != ptr_ident) {
     return 0;
   }
@@ -1556,14 +1556,14 @@ int view_ptr_target(struct ident_map *im,
   return 1;
 }
 
-void wrap_in_ptr(struct ident_map *im,
+void wrap_in_ptr(struct identmap *im,
                  struct ast_typeexpr *target,
                  struct ast_typeexpr *ptr_out) {
   ptr_out->tag = AST_TYPEEXPR_APP;
   struct ast_typeexpr *params = malloc_mul(sizeof(*params), 1);
   ast_typeexpr_init_copy(&params[0], target);
   ast_typeapp_init(&ptr_out->u.app, ast_meta_make_garbage(),
-                   make_ast_ident(ident_map_intern_c_str(im, PTR_TYPE_NAME)),
+                   make_ast_ident(identmap_intern_c_str(im, PTR_TYPE_NAME)),
                    params, 1);
 }
 
@@ -1665,7 +1665,7 @@ int check_expr_unop(struct exprscope *es,
   args_types[0] = rhs_type;
   ast_typeexpr_init_copy(&args_types[1], partial_type);
 
-  ident_value func_ident = ident_map_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
+  ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
 
   struct ast_typeexpr funcexpr;
   funcexpr.tag = AST_TYPEEXPR_APP;
@@ -1676,7 +1676,7 @@ int check_expr_unop(struct exprscope *es,
   int funcexpr_lvalue_discard;
   if (!lookup_global_maybe_typecheck(
           es,
-          ident_map_intern_c_str(es->cs->im, unop_fakename(x->operator)),
+          identmap_intern_c_str(es->cs->im, unop_fakename(x->operator)),
           &funcexpr,
           &resolved_funcexpr,
           &funcexpr_lvalue_discard)) {
@@ -2017,7 +2017,7 @@ int check_def_acyclicity(struct checkstate *cs) {
   return 1;
 }
 
-int check_module(struct ident_map *im, module_loader *loader,
+int check_module(struct identmap *im, module_loader *loader,
                  ident_value name) {
   int ret = 0;
   struct checkstate cs;
@@ -2672,252 +2672,252 @@ int check_file_test_lambda_29(const uint8_t *name, size_t name_count,
 
 int test_check_file(void) {
   int ret = 0;
-  struct ident_map im;
-  ident_map_init(&im);
-  ident_value foo = ident_map_intern_c_str(&im, "foo");
+  struct identmap im;
+  identmap_init(&im);
+  ident_value foo = identmap_intern_c_str(&im, "foo");
 
   DBG("test_check_file check_file_test_1...\n");
   if (!check_module(&im, &check_file_test_1, foo)) {
     DBG("check_file_test_1 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_2...\n");
   if (!check_module(&im, &check_file_test_2, foo)) {
     DBG("check_file_test_2 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_3...\n");
   if (!!check_module(&im, &check_file_test_3, foo)) {
     DBG("!check_file_test_3 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_4...\n");
   if (!check_module(&im, &check_file_test_4, foo)) {
     DBG("check_file_test_4 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_5...\n");
   if (!check_module(&im, &check_file_test_5, foo)) {
     DBG("check_file_test_5 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_6...\n");
   if (!check_module(&im, &check_file_test_6, foo)) {
     DBG("check_file_test_6 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_7...\n");
   if (!!check_module(&im, &check_file_test_7, foo)) {
     DBG("!check_file_test_7 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_8...\n");
   if (!check_module(&im, &check_file_test_8, foo)) {
     DBG("check_file_test_8 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_def_1...\n");
   if (!check_module(&im, &check_file_test_def_1, foo)) {
     DBG("check_file_test_def_1 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_def_2...\n");
   if (!!check_module(&im, &check_file_test_def_2, foo)) {
     DBG("check_file_test_def_2 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_def_3...\n");
   if (!check_module(&im, &check_file_test_def_3, foo)) {
     DBG("check_file_test_def_3 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_1...\n");
   if (!check_module(&im, &check_file_test_lambda_1, foo)) {
     DBG("check_file_test_lambda_1 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_2...\n");
   if (!check_module(&im, &check_file_test_lambda_2, foo)) {
     DBG("check_file_test_lambda_2 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_3...\n");
   if (!!check_module(&im, &check_file_test_lambda_3, foo)) {
     DBG("check_file_test_lambda_3 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_4...\n");
   if (!!check_module(&im, &check_file_test_lambda_4, foo)) {
     DBG("check_file_test_lambda_4 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_5...\n");
   if (!!check_module(&im, &check_file_test_lambda_5, foo)) {
     DBG("check_file_test_lambda_5 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_6...\n");
   if (!!check_module(&im, &check_file_test_lambda_6, foo)) {
     DBG("check_file_test_lambda_6 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_7...\n");
   if (!check_module(&im, &check_file_test_lambda_7, foo)) {
     DBG("check_file_test_lambda_7 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_8...\n");
   if (!!check_module(&im, &check_file_test_lambda_8, foo)) {
     DBG("check_file_test_lambda_8 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_9...\n");
   if (!check_module(&im, &check_file_test_lambda_9, foo)) {
     DBG("check_file_test_lambda_9 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_10...\n");
   if (!!check_module(&im, &check_file_test_lambda_10, foo)) {
     DBG("check_file_test_lambda_10 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_11...\n");
   if (!check_module(&im, &check_file_test_lambda_11, foo)) {
     DBG("check_file_test_lambda_11 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_12...\n");
   if (!!check_module(&im, &check_file_test_lambda_12, foo)) {
     DBG("check_file_test_lambda_12 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_13...\n");
   if (!check_module(&im, &check_file_test_lambda_13, foo)) {
     DBG("check_file_test_lambda_13 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_14...\n");
   if (!!check_module(&im, &check_file_test_lambda_14, foo)) {
     DBG("check_file_test_lambda_14 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_15...\n");
   if (!check_module(&im, &check_file_test_lambda_15, foo)) {
     DBG("check_file_test_lambda_15 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_16...\n");
   if (!!check_module(&im, &check_file_test_lambda_16, foo)) {
     DBG("check_file_test_lambda_16 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_17...\n");
   if (!check_module(&im, &check_file_test_lambda_17, foo)) {
     DBG("check_file_test_lambda_17 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_18...\n");
   if (!check_module(&im, &check_file_test_lambda_18, foo)) {
     DBG("check_file_test_lambda_18 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_19...\n");
   if (!check_module(&im, &check_file_test_lambda_19, foo)) {
     DBG("check_file_test_lambda_19 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_20...\n");
   if (!check_module(&im, &check_file_test_lambda_20, foo)) {
     DBG("check_file_test_lambda_20 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_21...\n");
   if (!!check_module(&im, &check_file_test_lambda_21, foo)) {
     DBG("check_file_test_lambda_21 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_22...\n");
   if (!check_module(&im, &check_file_test_lambda_22, foo)) {
     DBG("check_file_test_lambda_22 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_23...\n");
   if (!!check_module(&im, &check_file_test_lambda_23, foo)) {
     DBG("check_file_test_lambda_23 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_24...\n");
   if (!check_module(&im, &check_file_test_lambda_24, foo)) {
     DBG("check_file_test_lambda_24 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_25...\n");
   if (!!check_module(&im, &check_file_test_lambda_25, foo)) {
     DBG("check_file_test_lambda_25 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_26...\n");
   if (!check_module(&im, &check_file_test_lambda_26, foo)) {
     DBG("check_file_test_lambda_26 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_27...\n");
   if (!!check_module(&im, &check_file_test_lambda_27, foo)) {
     DBG("check_file_test_lambda_27 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_28...\n");
   if (!check_module(&im, &check_file_test_lambda_28, foo)) {
     DBG("check_file_test_lambda_28 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_29...\n");
   if (!!check_module(&im, &check_file_test_lambda_29, foo)) {
     DBG("check_file_test_lambda_29 fails\n");
-    goto cleanup_ident_map;
+    goto cleanup_identmap;
   }
 
   ret = 1;
- cleanup_ident_map:
-  ident_map_destroy(&im);
+ cleanup_identmap:
+  identmap_destroy(&im);
   return ret;
 }

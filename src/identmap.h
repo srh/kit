@@ -5,13 +5,13 @@
 
 #include "util.h"
 
-struct ident_map_data;
+struct identmap_data;
 
 typedef size_t ident_value;
 #define IDENT_VALUE_INVALID SIZE_MAX
 #define PRIident_value PRIz
 
-struct ident_map {
+struct identmap {
   ident_value *table;
   /* count is less than limit / 2, unless limit is 0. */
   size_t count;
@@ -19,26 +19,26 @@ struct ident_map {
   size_t limit;
 
   /* datas is of length limit / 2. */
-  struct ident_map_data *datas;
+  struct identmap_data *datas;
 };
 
-void ident_map_init(struct ident_map *m);
-void ident_map_init_move(struct ident_map *m, struct ident_map *movee);
-void ident_map_destroy(struct ident_map *m);
+void identmap_init(struct identmap *m);
+void identmap_init_move(struct identmap *m, struct identmap *movee);
+void identmap_destroy(struct identmap *m);
 
-ident_value ident_map_intern(struct ident_map *m,
-                             const void *buf,
-                             size_t count);
+ident_value identmap_intern(struct identmap *m,
+                            const void *buf,
+                            size_t count);
 
-ident_value ident_map_intern_c_str(struct ident_map *m,
-                                   const char *s);
+ident_value identmap_intern_c_str(struct identmap *m,
+                                  const char *s);
 
-void ident_map_lookup(struct ident_map *m, ident_value ident,
-                      const void **buf_out, size_t *count_out);
+void identmap_lookup(struct identmap *m, ident_value ident,
+                     const void **buf_out, size_t *count_out);
 
-void ident_map_set_user_value(struct ident_map *m, ident_value ident,
-                              void *user_value);
-void *ident_map_get_user_value(struct ident_map *m, ident_value ident);
+void identmap_set_user_value(struct identmap *m, ident_value ident,
+                             void *user_value);
+void *identmap_get_user_value(struct identmap *m, ident_value ident);
 
 
 #endif /* KIRA_IDENTMAP_H_ */

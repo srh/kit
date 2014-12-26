@@ -18,7 +18,7 @@ struct ps {
   size_t line;
   size_t column;
 
-  struct ident_map ident_table;
+  struct identmap ident_table;
   size_t leafcount;
 };
 
@@ -37,13 +37,13 @@ void ps_init(struct ps *p, const uint8_t *data, size_t length) {
   p->line = 1;
   p->column = 0;
 
-  ident_map_init(&p->ident_table);
+  identmap_init(&p->ident_table);
   p->leafcount = 0;
 }
 
 /* Takes ownership of the ident table -- use ps_remove_ident_table to
    get it back. */
-void ps_init_with_ident_table(struct ps *p, struct ident_map *im,
+void ps_init_with_ident_table(struct ps *p, struct identmap *im,
                               const uint8_t *data, size_t length) {
   p->data = data;
   p->length = length;
@@ -52,13 +52,13 @@ void ps_init_with_ident_table(struct ps *p, struct ident_map *im,
   p->line = 1;
   p->column = 0;
 
-  ident_map_init_move(&p->ident_table, im);
+  identmap_init_move(&p->ident_table, im);
   p->leafcount = 0;
 }
 
-void ps_remove_ident_table(struct ps *p, struct ident_map *im_out) {
-  ident_map_init_move(im_out, &p->ident_table);
-  ident_map_init(&p->ident_table);
+void ps_remove_ident_table(struct ps *p, struct identmap *im_out) {
+  identmap_init_move(im_out, &p->ident_table);
+  identmap_init(&p->ident_table);
 }
 
 void ps_destroy(struct ps *p) {
@@ -67,7 +67,7 @@ void ps_destroy(struct ps *p) {
   p->pos = 0;
   p->line = 0;
   p->column = 0;
-  ident_map_destroy(&p->ident_table);
+  identmap_destroy(&p->ident_table);
   p->leafcount = 0;
 }
 
@@ -126,9 +126,9 @@ ident_value ps_intern_ident(struct ps *p,
                             struct ps_savestate ident_end) {
   CHECK(ident_end.pos <= p->length);
   CHECK(ident_begin.pos <= ident_end.pos);
-  return ident_map_intern(&p->ident_table,
-                          p->data + ident_begin.pos,
-                          ident_end.pos - ident_begin.pos);
+  return identmap_intern(&p->ident_table,
+                         p->data + ident_begin.pos,
+                         ident_end.pos - ident_begin.pos);
 }
 
 void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out) {
@@ -1358,7 +1358,7 @@ int parse_file(struct ps *p, struct ast_file *out) {
   return 0;
 }
 
-int parse_buf_file(struct ident_map *im,
+int parse_buf_file(struct identmap *im,
                    const uint8_t *buf, size_t length,
                    struct ast_file *file_out,
                    size_t *error_pos_out) {
