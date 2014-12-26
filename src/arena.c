@@ -4,7 +4,7 @@
 
 #include "util.h"
 
-#define ONE_OFF_ALLOCATION_THRESHOLD 512
+#define ONE_OFF_ALLOCATION_THRESHOLD 256
 #define SEGMENT_SIZE 1024
 
 struct arena_segment {
