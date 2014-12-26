@@ -321,20 +321,6 @@ int name_table_add_primitive_type(struct name_table *t,
   return name_table_help_add_deftype_entry(t, &new_entry);
 }
 
-int name_table_lookup_def(struct name_table *t,
-                          ident_value name,
-                          struct generics_arity arity,
-                          struct def_entry **out) {
-  for (size_t i = 0, e = t->defs_count; i < e; i++) {
-    struct def_entry *ent = t->defs[i];
-    if (ent->name == name && generics_has_arity(&ent->generics, arity)) {
-      *out = ent;
-      return 1;
-    }
-  }
-  return 0;
-}
-
 void substitute_generics(struct ast_typeexpr *type,
                          struct ast_generics *g,
                          struct ast_typeexpr *args,
