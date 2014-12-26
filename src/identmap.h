@@ -5,14 +5,14 @@
 
 #include "util.h"
 
-struct ident_map_entry;
+struct ident_map_data;
 
 typedef size_t ident_value;
 #define IDENT_VALUE_INVALID SIZE_MAX
 #define PRIident_value PRIz
 
 struct ident_map {
-  struct ident_map_entry *table;
+  ident_value *table;
   /* count is less than limit / 2, unless limit is 0. */
   size_t count;
   /* limit is either 0 or a power of 2 that is at least 8. */

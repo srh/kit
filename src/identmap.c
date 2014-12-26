@@ -17,11 +17,6 @@ struct ident_map_data {
   size_t count;
 };
 
-/* TODO: Unwrap this type. */
-struct ident_map_entry {
-  ident_value ident;
-};
-
 void ident_map_init(struct ident_map *m) {
   m->table = NULL;
   m->count = 0;
@@ -61,18 +56,17 @@ void ident_map_rebuild(struct ident_map *m,
   CHECK(0 == (new_limit & (new_limit - 1)));
   CHECK(m->count < new_limit / 2);
 
-  struct ident_map_entry *new_table = malloc_mul(new_limit,
-                                                 sizeof(*new_table));
+  ident_value *new_table = malloc_mul(new_limit, sizeof(*new_table));
 
   IDENTMAP_DBG("ident_map_rebuild, malloced new_table\n");
   for (size_t i = 0; i < new_limit; i++) {
-    new_table[i].ident = IDENT_VALUE_INVALID;
+    new_table[i] = IDENT_VALUE_INVALID;
   }
 
   IDENTMAP_DBG("ident_map_rebuild initialized new buf\n");
 
   for (size_t i = 0; i < m->limit; i++) {
-    ident_value id = m->table[i].ident;
+    ident_value id = m->table[i];
     if (id == IDENT_VALUE_INVALID) {
       continue;
     }
@@ -82,7 +76,7 @@ void ident_map_rebuild(struct ident_map *m,
     size_t offset = hash & (new_limit - 1);
 
     size_t step = 1;
-    while (new_table[offset].ident != IDENT_VALUE_INVALID) {
+    while (new_table[offset] != IDENT_VALUE_INVALID) {
       offset = size_add(offset, step) & (new_limit - 1);
       step++;
     }
@@ -142,7 +136,7 @@ ident_value ident_map_intern(struct ident_map *m,
   size_t offset = ident_map_hash(buf, count) & (limit - 1);
   size_t step = 1;
   ident_value v;
-  while ((v = m->table[offset].ident), v != IDENT_VALUE_INVALID) {
+  while ((v = m->table[offset]), v != IDENT_VALUE_INVALID) {
     IDENTMAP_DBG("a collision at offset %"PRIz"\n", offset);
     if (m->datas[v].count == count
         && 0 == memcmp(m->strings + m->datas[v].strings_offset,
@@ -160,7 +154,7 @@ ident_value ident_map_intern(struct ident_map *m,
   CHECK(m->count != IDENT_VALUE_INVALID);
   v = m->count;
 
-  m->table[offset].ident = v;
+  m->table[offset] = v;
   /* Since datas is of length m->limit / 2, and since m->count <
      m->limit / 2, we can write to m->datas[m->count]. */
   m->datas[m->count].strings_offset = strings_offset;
