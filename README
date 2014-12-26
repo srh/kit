@@ -12,8 +12,8 @@ to see if the tests pass.
 Here's the project timeline:
 
    1. Parsing.  (DONE)
-   2. Typechecking/name-resolving.  (in progress)
-   3. Generate code, i.e. have a working compiler.
+   2. Typechecking/name-resolving.  (DONE)
+   3. Generate code, i.e. have a working compiler.  (in progress)
    4. Cleanup error messages to have useful source information.
    5. Cleanup the language syntax to make it more usable.
    6. Make a self-hosted implementation (adding improvements and
