@@ -21,7 +21,7 @@ void ident_map_init(struct ident_map *m) {
   m->table = NULL;
   m->count = 0;
   m->limit = 0;
-  m->prev_value = 0;
+  m->next_value = 0;
   m->strings = NULL;
   m->strings_size = 0;
   m->strings_limit = 0;
@@ -147,9 +147,11 @@ ident_value ident_map_intern(struct ident_map *m,
   }
 
   size_t strings_offset = ident_map_add_string(m, buf, count);
-  CHECK(m->prev_value != IDENT_VALUE_MAX);
-  m->prev_value++;
-  v = m->prev_value;
+  STATIC_CHECK(IDENT_VALUE_INVALID == SIZE_MAX);
+  CHECK(m->next_value != IDENT_VALUE_INVALID);
+  v = m->next_value;
+  /* No overflow, because next_value != SIZE_MAX. */
+  m->next_value++;
   m->table[offset].ident = v;
   m->table[offset].strings_offset = strings_offset;
   m->table[offset].count = count;

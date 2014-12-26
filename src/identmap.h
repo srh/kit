@@ -8,8 +8,7 @@
 struct ident_map_entry;
 
 typedef size_t ident_value;
-#define IDENT_VALUE_MAX SIZE_MAX
-#define IDENT_VALUE_INVALID 0
+#define IDENT_VALUE_INVALID SIZE_MAX
 #define PRIident_value PRIz
 
 struct ident_map {
@@ -18,8 +17,8 @@ struct ident_map {
   size_t count;
   /* limit is either 0 or a power of 2 that is at least 8. */
   size_t limit;
-  /* prev_value is initially zero, which means no ident can be zero. */
-  ident_value prev_value;
+  /* next_value is initially zero -- the first ident has that value. */
+  ident_value next_value;
 
   /* Holds all the identifier values, concatenated. */
   char *strings;
