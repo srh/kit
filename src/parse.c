@@ -1467,11 +1467,11 @@ int parse_test_defs(void) {
                          "def foo bar = (2 ^ 3) - 4 && x -> quux;",
                          16);
   pass &= run_count_test("def13",
-                         "def foo func[int] = fn() int {\n"
+                         "def[] foo func[int] = fn() int {\n"
                          "   var x int = 3;\n"
                          "   return x;\n"
                          "};\n",
-                         23);
+                         25);
   pass &= run_count_test("def14",
                          "def[a,b] foo/*heh*/func[int] = fn() int {"
                          "//blah blah blah\n"
@@ -1495,8 +1495,8 @@ int parse_test_deftypes(void) {
                          "deftype [ c, d ]  bar union{a b;c d[e,f];};",
                          40);
   pass &= run_count_test("deftype4",
-                         "deftype foo bar;\n",
-                         4);
+                         "deftype[] foo bar;\n",
+                         6);
   pass &= run_count_test("deftype5",
                          "deftype foo struct { x bar [quux]; };\n",
                          12);

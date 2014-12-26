@@ -2220,7 +2220,7 @@ int check_file_test_def_2(const uint8_t *name, size_t name_count,
 int check_file_test_def_3(const uint8_t *name, size_t name_count,
                           uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
-                               "def x i32 = 3;\n"
+                               "def[] x i32 = 3;\n"
                                "def y i32 = x;\n"
     } };
 
