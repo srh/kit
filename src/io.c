@@ -34,7 +34,7 @@ int read_file(const char *path,
 
   STATIC_CHECK(LONG_MAX < SIZE_MAX);
   size_t size = offset;
-  uint8_t *buf = malloc(size);
+  uint8_t *buf = malloc_mul(size, 1);
   CHECK(buf);
   size_t count = fread(buf, 1, size, fp);
   if (count < size) {

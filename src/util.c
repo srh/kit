@@ -15,7 +15,7 @@ void report_and_abort(const char *file, int line,
 
 void *malloc_mul(size_t a, size_t b) {
   size_t n = size_mul(a, b);
-  void *ret = malloc(n);
-  CHECK(ret || n == 0);
+  void *ret = malloc(n ? n : 1);
+  CHECK(ret);
   return ret;
 }
