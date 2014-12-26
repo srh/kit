@@ -13,6 +13,7 @@
 struct ident_map_data {
   void *data;
   size_t data_count;
+  void *user_value;
 };
 
 void ident_map_init(struct ident_map *m) {
@@ -33,6 +34,7 @@ void ident_map_destroy(struct ident_map *m) {
     free(m->datas[i].data);
     m->datas[i].data = NULL;
     m->datas[i].data_count = 0;
+    m->datas[i].user_value = NULL;
   }
   free(m->datas);
   ident_map_init(m);
@@ -131,6 +133,7 @@ ident_value ident_map_intern(struct ident_map *m,
      m->limit / 2, we can write to m->datas[m->count]. */
   m->datas[m->count].data = data_copy;
   m->datas[m->count].data_count = count;
+  m->datas[m->count].user_value = NULL;
   m->count++;
 
   if (m->count >= m->limit / 2) {
@@ -153,4 +156,17 @@ void ident_map_lookup(struct ident_map *m, ident_value ident,
   CHECK(ident < m->count);
   *buf_out = m->datas[ident].data;
   *count_out = m->datas[ident].data_count;
+}
+
+void ident_map_set_user_value(struct ident_map *m, ident_value ident,
+                              void *user_value) {
+  CHECK(ident != IDENT_VALUE_INVALID);
+  CHECK(ident < m->count);
+  m->datas[ident].user_value = user_value;
+}
+
+void *ident_map_get_user_value(struct ident_map *m, ident_value ident) {
+  CHECK(ident != IDENT_VALUE_INVALID);
+  CHECK(ident < m->count);
+  return m->datas[ident].user_value;
 }

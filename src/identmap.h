@@ -36,5 +36,9 @@ ident_value ident_map_intern_c_str(struct ident_map *m,
 void ident_map_lookup(struct ident_map *m, ident_value ident,
                       const void **buf_out, size_t *count_out);
 
+void ident_map_set_user_value(struct ident_map *m, ident_value ident,
+                              void *user_value);
+void *ident_map_get_user_value(struct ident_map *m, ident_value ident);
+
 
 #endif /* KIRA_IDENTMAP_H_ */
