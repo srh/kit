@@ -11,6 +11,11 @@ struct defs_by_name_node {
   struct defs_by_name_node *next;
 };
 
+struct deftypes_by_name_node {
+  struct deftype_entry *ent;
+  struct deftypes_by_name_node *next;
+};
+
 void def_instantiation_init(struct def_instantiation *a,
                             struct ast_typeexpr **types,
                             size_t *types_count) {
@@ -199,9 +204,13 @@ void name_table_init(struct name_table *t) {
   t->deftypes = NULL;
   t->deftypes_count = 0;
   t->deftypes_limit = 0;
+
+  identmap_init(&t->deftypes_by_name);
 }
 
 void name_table_destroy(struct name_table *t) {
+  identmap_destroy(&t->deftypes_by_name);
+
   SLICE_FREE(t->deftypes, t->deftypes_count, deftype_entry_ptr_destroy);
   t->deftypes_limit = 0;
 
@@ -222,12 +231,9 @@ int generics_has_arity(struct ast_generics *generics,
 }
 
 int deftype_shadowed(struct name_table *t, ident_value name) {
-  for (size_t i = 0, e = t->deftypes_count; i < e; i++) {
-    if (t->deftypes[i]->name == name) {
-      return 1;
-    }
-  }
-  return 0;
+  ident_value dtbn_id;
+  return identmap_is_interned(&t->deftypes_by_name, &name, sizeof(name),
+                              &dtbn_id);
 }
 
 int def_shadowed(struct name_table *t, ident_value name) {
@@ -287,18 +293,22 @@ int name_table_add_primitive_def(struct name_table *t,
 int name_table_help_add_deftype_entry(struct name_table *t,
                                       struct deftype_entry **entry_ptr) {
   struct deftype_entry *entry = *entry_ptr;
+  ident_value name = entry->name;
   *entry_ptr = NULL;
 
-  if (def_shadowed(t, entry->name)) {
+  if (def_shadowed(t, name)) {
     ERR_DBG("deftype name shadows def name.\n");
     goto fail_cleanup_entry;
   }
 
-  for (size_t i = 0, e = t->deftypes_count; i < e; i++) {
-    struct deftype_entry *ent = t->deftypes[i];
-    if (ent->name != entry->name) {
-      continue;
-    }
+  ident_value dtbn_id = identmap_intern(&t->deftypes_by_name,
+                                        &name, sizeof(name));
+  struct deftypes_by_name_node *node
+    = identmap_get_user_value(&t->deftypes_by_name, dtbn_id);
+
+  for (; node; node = node->next) {
+    struct deftype_entry *ent = node->ent;
+    CHECK(ent->name == name);
 
     if (arity_no_paramlist(ent->arity) || arity_no_paramlist(entry->arity)) {
       ERR_DBG("untemplated deftype name clash.\n");
@@ -312,6 +322,11 @@ int name_table_help_add_deftype_entry(struct name_table *t,
   }
 
   SLICE_PUSH(t->deftypes, t->deftypes_count, t->deftypes_limit, entry);
+  struct deftypes_by_name_node *new_node
+    = ARENA_TYPED(&t->arena, struct deftypes_by_name_node);
+  new_node->next = node;
+  new_node->ent = entry;
+  identmap_set_user_value(&t->deftypes_by_name, dtbn_id, new_node);
   return 1;
 
  fail_cleanup_entry:
@@ -887,6 +902,7 @@ int name_table_lookup_deftype(struct name_table *t,
                               ident_value name,
                               struct generics_arity arity,
                               struct deftype_entry **out) {
+  /* TODO: Make more efficient. */
   for (size_t i = 0, e = t->deftypes_count; i < e; i++) {
     struct deftype_entry *ent = t->deftypes[i];
     if (ent->name == name && ent->arity.value == arity.value) {

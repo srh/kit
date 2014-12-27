@@ -80,6 +80,8 @@ struct name_table {
   struct deftype_entry **deftypes;
   size_t deftypes_count;
   size_t deftypes_limit;
+
+  struct identmap deftypes_by_name;
 };
 
 void name_table_init(struct name_table *t);
