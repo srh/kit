@@ -4,15 +4,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "checkstate.h"
 #include "identmap.h"
 
 struct ast_generics;
 struct ast_typeexpr;
-
-typedef int module_loader(const uint8_t *module_name,
-                          size_t module_name_count,
-                          uint8_t **data_out,
-                          size_t *data_count_out);
 
 int check_module(struct identmap *im, module_loader *loader,
                  ident_value name);

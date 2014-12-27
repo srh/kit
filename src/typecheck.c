@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "ast.h"
+#include "checkstate.h"
 #include "identmap.h"
 #include "io.h"
 #include "parse.h"
@@ -21,42 +22,7 @@ struct ast_ident make_ast_ident(ident_value ident) {
 }
 
 
-struct import {
-  ident_value import_name;
-  struct ast_file *file;
-};
-
-void import_destroy(struct import *imp) {
-  ast_file_destroy(imp->file);
-  free(imp->file);
-}
-
 const int MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH = 50;
-
-struct checkstate {
-  module_loader *loader;
-  struct identmap *im;
-
-  struct import *imports;
-  size_t imports_count;
-  size_t imports_limit;
-
-  int template_instantiation_recursion_depth;
-
-  struct name_table nt;
-};
-
-void checkstate_init(struct checkstate *cs,
-                     module_loader *loader,
-                     struct identmap *im) {
-  cs->loader = loader;
-  cs->im = im;
-  cs->imports = NULL;
-  cs->imports_count = 0;
-  cs->imports_limit = 0;
-  cs->template_instantiation_recursion_depth = 0;
-  name_table_init(&cs->nt);
-}
 
 void intern_primitive_type(struct checkstate *cs,
                            const char *name,
@@ -284,14 +250,6 @@ void checkstate_import_primitives(struct checkstate *cs) {
 void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
   a->tag = AST_TYPEEXPR_NAME;
   a->u.name = make_ast_ident(identmap_intern_c_str(cs->im, I32_TYPE_NAME));
-}
-
-void checkstate_destroy(struct checkstate *cs) {
-  name_table_destroy(&cs->nt);
-  CHECK(cs->template_instantiation_recursion_depth == 0);
-  SLICE_FREE(cs->imports, cs->imports_count, import_destroy);
-  cs->imports_limit = 0;
-  cs->im = NULL;
 }
 
 int resolve_import_filename_and_parse(struct checkstate *cs,
@@ -2017,33 +1975,39 @@ int check_def_acyclicity(struct checkstate *cs) {
   return 1;
 }
 
-int check_module(struct identmap *im, module_loader *loader,
-                 ident_value name) {
+int chase_modules_and_typecheck(struct checkstate *cs,
+                                ident_value first_module) {
   int ret = 0;
-  struct checkstate cs;
-  checkstate_init(&cs, loader, im);
-  checkstate_import_primitives(&cs);
-
-  if (!chase_imports(&cs, name)) {
-    goto cleanup;
+  if (!chase_imports(cs, first_module)) {
+    goto fail;
   }
 
-  for (size_t i = 0, e = cs.imports_count; i < e; i++) {
-    struct ast_file *file = cs.imports[i].file;
+  for (size_t i = 0, e = cs->imports_count; i < e; i++) {
+    struct ast_file *file = cs->imports[i].file;
     for (size_t j = 0, f = file->toplevels_count; j < f; j++) {
-      if (!check_toplevel(&cs, &file->toplevels[j])) {
-        goto cleanup;
+      if (!check_toplevel(cs, &file->toplevels[j])) {
+        goto fail;
       }
     }
   }
 
-  if (!check_def_acyclicity(&cs)) {
-    goto cleanup;
+  if (!check_def_acyclicity(cs)) {
+    goto fail;
   }
 
   ret = 1;
+ fail:
+  return ret;
+}
 
- cleanup:
+int check_module(struct identmap *im, module_loader *loader,
+                 ident_value name) {
+  struct checkstate cs;
+  checkstate_init(&cs, loader, im);
+  checkstate_import_primitives(&cs);
+
+  int ret = chase_modules_and_typecheck(&cs, name);
+
   checkstate_destroy(&cs);
   return ret;
 }
