@@ -36,6 +36,11 @@ ident_value identmap_intern(struct identmap *m,
 ident_value identmap_intern_c_str(struct identmap *m,
                                   const char *s);
 
+int identmap_is_interned(struct identmap *m,
+                         const void *buf,
+                         size_t count,
+                         ident_value *out);
+
 void identmap_lookup(struct identmap *m, ident_value ident,
                      const void **buf_out, size_t *count_out);
 

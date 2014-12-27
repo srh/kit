@@ -103,9 +103,10 @@ void identmap_rebuild(struct identmap *m,
   m->limit = new_limit;
 }
 
-ident_value identmap_intern(struct identmap *m,
-                            const void *buf,
-                            size_t count) {
+ident_value identmap_help_intern(struct identmap *m,
+                                 const void *buf,
+                                 size_t count,
+                                 size_t *offset_out) {
   size_t limit = m->limit;
   IDENTMAP_DBG("identmap_intern count=%"PRIz", with limit %"PRIz"\n",
                count, limit);
@@ -130,6 +131,29 @@ ident_value identmap_intern(struct identmap *m,
     step++;
   }
 
+  *offset_out = offset;
+  return IDENT_VALUE_INVALID;
+}
+
+int identmap_is_interned(struct identmap *m,
+                         const void *buf,
+                         size_t count,
+                         ident_value *out) {
+  size_t offset;
+  ident_value v = identmap_help_intern(m, buf, count, &offset);
+  *out = v;
+  return v != IDENT_VALUE_INVALID;
+}
+
+ident_value identmap_intern(struct identmap *m,
+                            const void *buf,
+                            size_t count) {
+  size_t offset;
+  ident_value v = identmap_help_intern(m, buf, count, &offset);
+  if (v != IDENT_VALUE_INVALID) {
+    return v;
+  }
+
   void *data_copy = arena_unaligned(&m->string_arena, count);
   memcpy(data_copy, buf, count);
 
@@ -147,7 +171,7 @@ ident_value identmap_intern(struct identmap *m,
 
   if (m->count >= m->limit / 2) {
     IDENTMAP_DBG("identmap_intern rebuilding bigger map\n");
-    identmap_rebuild(m, size_mul(limit, 2));
+    identmap_rebuild(m, size_mul(m->limit, 2));
   }
 
   IDENTMAP_DBG("identmap_intern succeeded, value %" PRIident_value "\n", v);

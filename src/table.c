@@ -6,9 +6,9 @@
 #include "slice.h"
 #include "typecheck.h"
 
-struct def_by_name_node {
+struct defs_by_name_node {
   struct def_entry *ent;
-  struct def_by_name_node *next;
+  struct defs_by_name_node *next;
 };
 
 void def_instantiation_init(struct def_instantiation *a,
@@ -231,13 +231,9 @@ int deftype_shadowed(struct name_table *t, ident_value name) {
 }
 
 int def_shadowed(struct name_table *t, ident_value name) {
-  /* TODO: Some way to assert it's already been interned. */
-  ident_value dbn_id = identmap_intern(&t->defs_by_name,
-                                       &name, sizeof(name));
-  struct def_by_name_node *node
-    = identmap_get_user_value(&t->defs_by_name, dbn_id);
-
-  return node != NULL;
+  ident_value dbn_id;
+  return identmap_is_interned(&t->defs_by_name, &name, sizeof(name),
+                              &dbn_id);
 }
 
 int name_table_shadowed(struct name_table *t, ident_value name) {
@@ -265,7 +261,8 @@ int name_table_help_add_def(struct name_table *t,
   SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);
 
   ident_value dbn_id = identmap_intern(&t->defs_by_name, &name, sizeof(name));
-  struct def_by_name_node *node = ARENA_TYPED(&t->arena, struct def_by_name_node);
+  struct defs_by_name_node *node = ARENA_TYPED(&t->arena,
+                                               struct defs_by_name_node);
   node->next = identmap_get_user_value(&t->defs_by_name, dbn_id);
   node->ent = new_entry;
   identmap_set_user_value(&t->defs_by_name, dbn_id, node);
@@ -838,12 +835,16 @@ int name_table_match_def(struct name_table *t,
   memset(&matched_type, 0, sizeof(matched_type));
   struct def_entry *matched_ent = NULL;
 
-  struct def_by_name_node *node;
+  struct defs_by_name_node *node;
   {
-    /* TODO: Some way to assert it's already been interned. */
-    ident_value dbn_id = identmap_intern(&t->defs_by_name,
-                                         &name, sizeof(name));
-    node = identmap_get_user_value(&t->defs_by_name, dbn_id);
+    ident_value dbn_id;
+    if (identmap_is_interned(&t->defs_by_name, &name, sizeof(name),
+                             &dbn_id)) {
+      node = identmap_get_user_value(&t->defs_by_name, dbn_id);
+      CHECK(node);
+    } else {
+      node = NULL;
+    }
   }
 
   for (; node; node = node->next) {
