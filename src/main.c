@@ -7,6 +7,7 @@
 #include "identmap.h"
 #include "io.h"
 #include "parse.h"
+#include "build.h"
 #include "typecheck.h"
 #include "util.h"
 
@@ -42,7 +43,7 @@ int main(int argc, char **argv) {
   struct identmap im;
   identmap_init(&im);
   ident_value ident_module = identmap_intern(&im, module, strlen(module));
-  if (!check_module(&im, &read_module_file, ident_module)) {
+  if (!build_module(&im, &read_module_file, ident_module)) {
     goto cleanup_im;
   }
 

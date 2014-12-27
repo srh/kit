@@ -15,8 +15,9 @@ typedef int module_loader(const uint8_t *module_name,
                           uint8_t **data_out,
                           size_t *data_count_out);
 
-int check_module(struct identmap *im, module_loader *loader,
-                 ident_value name);
+int chase_modules_and_typecheck(struct checkstate *cs,
+                                module_loader *loader,
+                                ident_value first_module);
 
 int test_check_file(void);
 

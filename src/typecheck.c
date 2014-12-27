@@ -1979,6 +1979,8 @@ int check_def_acyclicity(struct checkstate *cs) {
 int chase_modules_and_typecheck(struct checkstate *cs,
                                 module_loader *loader,
                                 ident_value first_module) {
+  checkstate_import_primitives(cs);
+
   int ret = 0;
   if (!chase_imports(cs, loader, first_module)) {
     goto fail;
@@ -2002,11 +2004,10 @@ int chase_modules_and_typecheck(struct checkstate *cs,
   return ret;
 }
 
-int check_module(struct identmap *im, module_loader *loader,
-                 ident_value name) {
+int test_check_module(struct identmap *im, module_loader *loader,
+                      ident_value name) {
   struct checkstate cs;
   checkstate_init(&cs, im);
-  checkstate_import_primitives(&cs);
 
   int ret = chase_modules_and_typecheck(&cs, loader, name);
 
@@ -2638,241 +2639,241 @@ int test_check_file(void) {
   ident_value foo = identmap_intern_c_str(&im, "foo");
 
   DBG("test_check_file check_file_test_1...\n");
-  if (!check_module(&im, &check_file_test_1, foo)) {
+  if (!test_check_module(&im, &check_file_test_1, foo)) {
     DBG("check_file_test_1 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_2...\n");
-  if (!check_module(&im, &check_file_test_2, foo)) {
+  if (!test_check_module(&im, &check_file_test_2, foo)) {
     DBG("check_file_test_2 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_3...\n");
-  if (!!check_module(&im, &check_file_test_3, foo)) {
+  if (!!test_check_module(&im, &check_file_test_3, foo)) {
     DBG("!check_file_test_3 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_4...\n");
-  if (!check_module(&im, &check_file_test_4, foo)) {
+  if (!test_check_module(&im, &check_file_test_4, foo)) {
     DBG("check_file_test_4 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_5...\n");
-  if (!check_module(&im, &check_file_test_5, foo)) {
+  if (!test_check_module(&im, &check_file_test_5, foo)) {
     DBG("check_file_test_5 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_6...\n");
-  if (!check_module(&im, &check_file_test_6, foo)) {
+  if (!test_check_module(&im, &check_file_test_6, foo)) {
     DBG("check_file_test_6 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_7...\n");
-  if (!!check_module(&im, &check_file_test_7, foo)) {
+  if (!!test_check_module(&im, &check_file_test_7, foo)) {
     DBG("!check_file_test_7 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_8...\n");
-  if (!check_module(&im, &check_file_test_8, foo)) {
+  if (!test_check_module(&im, &check_file_test_8, foo)) {
     DBG("check_file_test_8 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_def_1...\n");
-  if (!check_module(&im, &check_file_test_def_1, foo)) {
+  if (!test_check_module(&im, &check_file_test_def_1, foo)) {
     DBG("check_file_test_def_1 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_def_2...\n");
-  if (!!check_module(&im, &check_file_test_def_2, foo)) {
+  if (!!test_check_module(&im, &check_file_test_def_2, foo)) {
     DBG("check_file_test_def_2 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_def_3...\n");
-  if (!check_module(&im, &check_file_test_def_3, foo)) {
+  if (!test_check_module(&im, &check_file_test_def_3, foo)) {
     DBG("check_file_test_def_3 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_1...\n");
-  if (!check_module(&im, &check_file_test_lambda_1, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_1, foo)) {
     DBG("check_file_test_lambda_1 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_2...\n");
-  if (!check_module(&im, &check_file_test_lambda_2, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_2, foo)) {
     DBG("check_file_test_lambda_2 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_3...\n");
-  if (!!check_module(&im, &check_file_test_lambda_3, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_3, foo)) {
     DBG("check_file_test_lambda_3 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_4...\n");
-  if (!!check_module(&im, &check_file_test_lambda_4, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_4, foo)) {
     DBG("check_file_test_lambda_4 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_5...\n");
-  if (!!check_module(&im, &check_file_test_lambda_5, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_5, foo)) {
     DBG("check_file_test_lambda_5 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_6...\n");
-  if (!!check_module(&im, &check_file_test_lambda_6, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_6, foo)) {
     DBG("check_file_test_lambda_6 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_7...\n");
-  if (!check_module(&im, &check_file_test_lambda_7, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_7, foo)) {
     DBG("check_file_test_lambda_7 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_8...\n");
-  if (!!check_module(&im, &check_file_test_lambda_8, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_8, foo)) {
     DBG("check_file_test_lambda_8 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_9...\n");
-  if (!check_module(&im, &check_file_test_lambda_9, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_9, foo)) {
     DBG("check_file_test_lambda_9 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_10...\n");
-  if (!!check_module(&im, &check_file_test_lambda_10, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_10, foo)) {
     DBG("check_file_test_lambda_10 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_11...\n");
-  if (!check_module(&im, &check_file_test_lambda_11, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_11, foo)) {
     DBG("check_file_test_lambda_11 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_12...\n");
-  if (!!check_module(&im, &check_file_test_lambda_12, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_12, foo)) {
     DBG("check_file_test_lambda_12 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_13...\n");
-  if (!check_module(&im, &check_file_test_lambda_13, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_13, foo)) {
     DBG("check_file_test_lambda_13 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_14...\n");
-  if (!!check_module(&im, &check_file_test_lambda_14, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_14, foo)) {
     DBG("check_file_test_lambda_14 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_15...\n");
-  if (!check_module(&im, &check_file_test_lambda_15, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_15, foo)) {
     DBG("check_file_test_lambda_15 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_16...\n");
-  if (!!check_module(&im, &check_file_test_lambda_16, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_16, foo)) {
     DBG("check_file_test_lambda_16 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_17...\n");
-  if (!check_module(&im, &check_file_test_lambda_17, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_17, foo)) {
     DBG("check_file_test_lambda_17 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_18...\n");
-  if (!check_module(&im, &check_file_test_lambda_18, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_18, foo)) {
     DBG("check_file_test_lambda_18 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_19...\n");
-  if (!check_module(&im, &check_file_test_lambda_19, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_19, foo)) {
     DBG("check_file_test_lambda_19 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_20...\n");
-  if (!check_module(&im, &check_file_test_lambda_20, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_20, foo)) {
     DBG("check_file_test_lambda_20 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_21...\n");
-  if (!!check_module(&im, &check_file_test_lambda_21, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_21, foo)) {
     DBG("check_file_test_lambda_21 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_22...\n");
-  if (!check_module(&im, &check_file_test_lambda_22, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_22, foo)) {
     DBG("check_file_test_lambda_22 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_23...\n");
-  if (!!check_module(&im, &check_file_test_lambda_23, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_23, foo)) {
     DBG("check_file_test_lambda_23 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_24...\n");
-  if (!check_module(&im, &check_file_test_lambda_24, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_24, foo)) {
     DBG("check_file_test_lambda_24 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_25...\n");
-  if (!!check_module(&im, &check_file_test_lambda_25, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_25, foo)) {
     DBG("check_file_test_lambda_25 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_26...\n");
-  if (!check_module(&im, &check_file_test_lambda_26, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_26, foo)) {
     DBG("check_file_test_lambda_26 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_27...\n");
-  if (!!check_module(&im, &check_file_test_lambda_27, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_27, foo)) {
     DBG("check_file_test_lambda_27 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file check_file_test_lambda_28...\n");
-  if (!check_module(&im, &check_file_test_lambda_28, foo)) {
+  if (!test_check_module(&im, &check_file_test_lambda_28, foo)) {
     DBG("check_file_test_lambda_28 fails\n");
     goto cleanup_identmap;
   }
 
   DBG("test_check_file !check_file_test_lambda_29...\n");
-  if (!!check_module(&im, &check_file_test_lambda_29, foo)) {
+  if (!!test_check_module(&im, &check_file_test_lambda_29, foo)) {
     DBG("check_file_test_lambda_29 fails\n");
     goto cleanup_identmap;
   }
