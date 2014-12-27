@@ -72,3 +72,11 @@ void *arena_unaligned(struct arena *a, size_t count) {
   a->offset -= count;
   return a->buf + a->offset;
 }
+
+void *arena_small_aligned(struct arena *a, size_t count, size_t alignment) {
+  CHECK(alignment > 0 && (alignment & (alignment - 1)) == 0);
+  CHECK((count & (alignment - 1)) == 0);
+  CHECK(count < ONE_OFF_ALLOCATION_THRESHOLD);
+  a->offset &= ~(alignment - 1);
+  return arena_unaligned(a, count);
+}

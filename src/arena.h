@@ -17,6 +17,10 @@ void arena_init_move(struct arena *a, struct arena *movee);
 void arena_destroy(struct arena *a);
 
 void *arena_unaligned(struct arena *a, size_t count);
+void *arena_small_aligned(struct arena *a, size_t count, size_t alignment);
+
+#define ARENA_TYPED(a, type) \
+  ((type *)arena_small_aligned((a), sizeof(type), ALIGNOF(type)))
 
 
 #endif /* KIRA_ARENA_H_ */

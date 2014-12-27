@@ -69,9 +69,13 @@ int deftype_entry_param_is_flatly_held(struct deftype_entry *entry,
                                        size_t which_generic);
 
 struct name_table {
+  struct arena arena;
+
   struct def_entry **defs;
   size_t defs_count;
   size_t defs_limit;
+
+  struct identmap defs_by_name;
 
   struct deftype_entry **deftypes;
   size_t deftypes_count;

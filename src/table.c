@@ -6,6 +6,11 @@
 #include "slice.h"
 #include "typecheck.h"
 
+struct def_by_name_node {
+  struct def_entry *ent;
+  struct def_by_name_node *next;
+};
+
 void def_instantiation_init(struct def_instantiation *a,
                             struct ast_typeexpr **types,
                             size_t *types_count) {
@@ -183,9 +188,13 @@ void deftype_entry_ptr_destroy(struct deftype_entry **ptr) {
 }
 
 void name_table_init(struct name_table *t) {
+  arena_init(&t->arena);
+
   t->defs = NULL;
   t->defs_count = 0;
   t->defs_limit = 0;
+
+  identmap_init(&t->defs_by_name);
 
   t->deftypes = NULL;
   t->deftypes_count = 0;
@@ -193,9 +202,15 @@ void name_table_init(struct name_table *t) {
 }
 
 void name_table_destroy(struct name_table *t) {
-  SLICE_FREE(t->defs, t->defs_count, def_entry_ptr_destroy);
   SLICE_FREE(t->deftypes, t->deftypes_count, deftype_entry_ptr_destroy);
-  name_table_init(t);
+  t->deftypes_limit = 0;
+
+  identmap_destroy(&t->defs_by_name);
+
+  SLICE_FREE(t->defs, t->defs_count, def_entry_ptr_destroy);
+  t->defs_limit = 0;
+
+  arena_destroy(&t->arena);
 }
 
 
@@ -216,12 +231,13 @@ int deftype_shadowed(struct name_table *t, ident_value name) {
 }
 
 int def_shadowed(struct name_table *t, ident_value name) {
-  for (size_t i = 0, e = t->defs_count; i < e; i++) {
-    if (t->defs[i]->name == name) {
-      return 1;
-    }
-  }
-  return 0;
+  /* TODO: Some way to assert it's already been interned. */
+  ident_value dbn_id = identmap_intern(&t->defs_by_name,
+                                       &name, sizeof(name));
+  struct def_by_name_node *node
+    = identmap_get_user_value(&t->defs_by_name, dbn_id);
+
+  return node != NULL;
 }
 
 int name_table_shadowed(struct name_table *t, ident_value name) {
@@ -247,6 +263,12 @@ int name_table_help_add_def(struct name_table *t,
   CHECK(new_entry);
   def_entry_init(new_entry, name, generics, type, is_primitive, def);
   SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);
+
+  ident_value dbn_id = identmap_intern(&t->defs_by_name, &name, sizeof(name));
+  struct def_by_name_node *node = ARENA_TYPED(&t->arena, struct def_by_name_node);
+  node->next = identmap_get_user_value(&t->defs_by_name, dbn_id);
+  node->ent = new_entry;
+  identmap_set_user_value(&t->defs_by_name, dbn_id, node);
   return 1;
 }
 
@@ -816,11 +838,17 @@ int name_table_match_def(struct name_table *t,
   memset(&matched_type, 0, sizeof(matched_type));
   struct def_entry *matched_ent = NULL;
 
-  for (size_t i = 0, e = t->defs_count; i < e; i++) {
-    struct def_entry *ent = t->defs[i];
-    if (ent->name != name) {
-      continue;
-    }
+  struct def_by_name_node *node;
+  {
+    /* TODO: Some way to assert it's already been interned. */
+    ident_value dbn_id = identmap_intern(&t->defs_by_name,
+                                         &name, sizeof(name));
+    node = identmap_get_user_value(&t->defs_by_name, dbn_id);
+  }
+
+  for (; node; node = node->next) {
+    struct def_entry *ent = node->ent;
+    CHECK(ent->name == name);
 
     struct ast_typeexpr unified;
     struct def_instantiation *instantiation;

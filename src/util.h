@@ -6,9 +6,11 @@
 #ifdef _WIN32
 #define PRIz "Iu"
 #define NORETURN __declspec(noreturn)
+#define ALIGNOF(x) __alignof(x)
 #else /* _WIN32 */
 #define PRIz "zu"
 #define NORETURN __attribute__((__noreturn__))
+#define ALIGNOF(x) __alignof__(x)
 #endif /* _WIN32 */
 
 #define STATIC_CHECK(x) do { enum { assertion = 1/!!(x) }; } while (0)
