@@ -2028,11 +2028,6 @@ int check_module(struct identmap *im, module_loader *loader,
     goto cleanup;
   }
 
-  struct ast_file *file;
-  if (!lookup_import(&cs, name, &file)) {
-    CRASH("lookup_import just failed after chase_imports succeeded.\n");
-  }
-
   for (size_t i = 0, e = cs.imports_count; i < e; i++) {
     struct ast_file *file = cs.imports[i].file;
     for (size_t j = 0, f = file->toplevels_count; j < f; j++) {
