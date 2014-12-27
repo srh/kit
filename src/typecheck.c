@@ -15,14 +15,13 @@
 
 #define CHECK_DBG(...) do { } while (0)
 
+const int MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH = 50;
+
 struct ast_ident make_ast_ident(ident_value ident) {
   struct ast_ident ret;
   ast_ident_init(&ret, ast_meta_make_garbage(), ident);
   return ret;
 }
-
-
-const int MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH = 50;
 
 void intern_primitive_type(struct checkstate *cs,
                            const char *name,
@@ -253,6 +252,7 @@ void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
 }
 
 int resolve_import_filename_and_parse(struct checkstate *cs,
+                                      module_loader *loader,
                                       ident_value name,
                                       struct ast_file *file_out) {
   int ret = 0;
@@ -263,7 +263,7 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
 
   uint8_t *data;
   size_t data_size;
-  if (!(*cs->loader)(module_name, module_name_count, &data, &data_size)) {
+  if (!(*loader)(module_name, module_name_count, &data, &data_size)) {
     ERR_DBG("Could not read file.\n");
     goto fail;
   }
@@ -281,7 +281,8 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
   return ret;
 }
 
-int chase_imports(struct checkstate *cs, ident_value name) {
+int chase_imports(struct checkstate *cs, module_loader *loader,
+                  ident_value name) {
   int ret = 0;
   ident_value *names = NULL;
   size_t names_count = 0;
@@ -299,7 +300,7 @@ int chase_imports(struct checkstate *cs, ident_value name) {
     }
 
     struct ast_file file;
-    if (!resolve_import_filename_and_parse(cs, name, &file)) {
+    if (!resolve_import_filename_and_parse(cs, loader, name, &file)) {
       goto cleanup;
     }
 
@@ -1976,9 +1977,10 @@ int check_def_acyclicity(struct checkstate *cs) {
 }
 
 int chase_modules_and_typecheck(struct checkstate *cs,
+                                module_loader *loader,
                                 ident_value first_module) {
   int ret = 0;
-  if (!chase_imports(cs, first_module)) {
+  if (!chase_imports(cs, loader, first_module)) {
     goto fail;
   }
 
@@ -2003,10 +2005,10 @@ int chase_modules_and_typecheck(struct checkstate *cs,
 int check_module(struct identmap *im, module_loader *loader,
                  ident_value name) {
   struct checkstate cs;
-  checkstate_init(&cs, loader, im);
+  checkstate_init(&cs, im);
   checkstate_import_primitives(&cs);
 
-  int ret = chase_modules_and_typecheck(&cs, name);
+  int ret = chase_modules_and_typecheck(&cs, loader, name);
 
   checkstate_destroy(&cs);
   return ret;

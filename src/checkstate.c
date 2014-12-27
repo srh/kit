@@ -15,10 +15,7 @@ void checkstate_destroy(struct checkstate *cs) {
   cs->im = NULL;
 }
 
-void checkstate_init(struct checkstate *cs,
-                     module_loader *loader,
-                     struct identmap *im) {
-  cs->loader = loader;
+void checkstate_init(struct checkstate *cs, struct identmap *im) {
   cs->im = im;
   cs->imports = NULL;
   cs->imports_count = 0;
