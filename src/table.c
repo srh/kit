@@ -303,10 +303,10 @@ int name_table_help_add_deftype_entry(struct name_table *t,
 
   ident_value dtbn_id = identmap_intern(&t->deftypes_by_name,
                                         &name, sizeof(name));
-  struct deftypes_by_name_node *node
+  struct deftypes_by_name_node *old_node
     = identmap_get_user_value(&t->deftypes_by_name, dtbn_id);
 
-  for (; node; node = node->next) {
+  for (struct deftypes_by_name_node *node = old_node; node; node = node->next) {
     struct deftype_entry *ent = node->ent;
     CHECK(ent->name == name);
 
@@ -324,7 +324,7 @@ int name_table_help_add_deftype_entry(struct name_table *t,
   SLICE_PUSH(t->deftypes, t->deftypes_count, t->deftypes_limit, entry);
   struct deftypes_by_name_node *new_node
     = ARENA_TYPED(&t->arena, struct deftypes_by_name_node);
-  new_node->next = node;
+  new_node->next = old_node;
   new_node->ent = entry;
   identmap_set_user_value(&t->deftypes_by_name, dtbn_id, new_node);
   return 1;
@@ -902,14 +902,24 @@ int name_table_lookup_deftype(struct name_table *t,
                               ident_value name,
                               struct generics_arity arity,
                               struct deftype_entry **out) {
-  /* TODO: Make more efficient. */
-  for (size_t i = 0, e = t->deftypes_count; i < e; i++) {
-    struct deftype_entry *ent = t->deftypes[i];
+  ident_value dtbn_id;
+  if (!identmap_is_interned(&t->deftypes_by_name,
+                            &name, sizeof(&name),
+                            &dtbn_id)) {
+    return 0;
+  }
+
+  struct deftypes_by_name_node *node
+    = identmap_get_user_value(&t->deftypes_by_name, dtbn_id);
+
+  for (; node; node = node->next) {
+    struct deftype_entry *ent = node->ent;
     if (ent->name == name && ent->arity.value == arity.value) {
       *out = ent;
       return 1;
     }
   }
+
   return 0;
 }
 

@@ -26,7 +26,7 @@ NORETURN void report_and_abort(const char *file, int line,
   } while (0)
 
 #define CRASH(msg) do { \
-    report_and_abort(__FILE__, __LINE__, "CRASH: ", #msg); \
+    report_and_abort(__FILE__, __LINE__, "CRASH: ", msg); \
   } while (0)
 
 #define UNREACHABLE() CRASH("Unreachable.")
