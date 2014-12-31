@@ -7,11 +7,20 @@
 #define PRIz "Iu"
 #define NORETURN __declspec(noreturn)
 #define ALIGNOF(x) __alignof(x)
+#define PACK_PUSH __pragma(pack(push, 1))
+#define PACK_POP __pragma(pack(pop))
+#define PACK_ATTRIBUTE
 #else /* _WIN32 */
 #define PRIz "zu"
 #define NORETURN __attribute__((__noreturn__))
 #define ALIGNOF(x) __alignof__(x)
+#define PACK_PUSH
+#define PACK_POP
+#define PACK_ATTRIBUTE __attribute__((__packed__))
 #endif /* _WIN32 */
+
+/* TODO: Define this properly somehow. */
+#define LITTLE_ENDIAN 1
 
 #define STATIC_CHECK(x) do { enum { assertion = 1/!!(x) }; } while (0)
 
