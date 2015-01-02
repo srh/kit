@@ -266,7 +266,7 @@ uint16_t objfile_section_small_relocations_count(struct objfile_section *s) {
    text is 3 (because that's the order we put them in). */
 static const uint16_t TEXT_SECTION_NUMBER = 3;
 
-struct objfile_data {
+struct objfile {
   struct objfile_section data;
   struct objfile_section rdata;
   struct objfile_section text;
@@ -289,7 +289,7 @@ struct objfile_data {
   int wrote_section_symbols;
 };
 
-void objfile_data_init(struct objfile_data *f) {
+void objfile_init(struct objfile *f) {
   static const char DataName[8] = ".data";
   objfile_section_init(&f->data, DataName);
   static const char ReadDataName[8] = ".rdata";
@@ -308,7 +308,7 @@ void objfile_data_init(struct objfile_data *f) {
   f->wrote_section_symbols = 0;
 }
 
-void objfile_data_destroy(struct objfile_data *f) {
+void objfile_destroy(struct objfile *f) {
   objfile_section_destroy(&f->data);
   objfile_section_destroy(&f->rdata);
   objfile_section_destroy(&f->text);
@@ -322,6 +322,20 @@ void objfile_data_destroy(struct objfile_data *f) {
   f->strings = NULL;
   f->strings_count = 0;
   f->strings_limit = 0;
+}
+
+void objfile_alloc(struct objfile **p_out) {
+  CHECK(*p_out == NULL);
+  struct objfile *p = malloc(sizeof(*p));
+  CHECK(p);
+  objfile_init(p);
+  *p_out = p;
+}
+
+void objfile_free(struct objfile **p_ref) {
+  CHECK(*p_ref);
+  objfile_destroy(*p_ref);
+  *p_ref = NULL;
 }
 
 void compute_section_dimensions(struct objfile_section *s,
@@ -382,7 +396,7 @@ void append_zeros_to_align(struct databuf *d, size_t alignment) {
   }
 }
 
-void munge_to_Name(struct objfile_data *f,
+void munge_to_Name(struct objfile *f,
                    const uint8_t *name,
                    size_t name_count,
                    union name_eight *Name_out) {
@@ -394,22 +408,13 @@ void munge_to_Name(struct objfile_data *f,
   memcpy(Name_out->ShortName, name, name_count);
 }
 
-enum is_function {
-  IS_FUNCTION_NO,
-  IS_FUNCTION_YES,
-};
-
-enum is_static {
-  IS_STATIC_NO,
-  IS_STATIC_YES,
-};
-
-void objfile_write_local_symbol(struct objfile_data *f,
-                                const uint8_t *name,
-                                size_t name_count,
-                                uint32_t Value,
-                                enum is_function is_function,
-                                enum is_static is_static) {
+uint32_t objfile_add_local_symbol(struct objfile *f,
+                                  const uint8_t *name,
+                                  size_t name_count,
+                                  uint32_t Value,
+                                  enum is_function is_function,
+                                  enum is_static is_static) {
+  uint32_t ret = size_to_uint32(f->symbol_table_count);
   union objfile_symbol_record u;
   munge_to_Name(f, name, name_count, &u.standard.Name);
   u.standard.Value = Value;
@@ -419,14 +424,16 @@ void objfile_write_local_symbol(struct objfile_data *f,
   u.standard.StorageClass = is_static == IS_STATIC_NO ? IMAGE_SYM_CLASS_EXTERNAL: IMAGE_SYM_CLASS_STATIC;
   u.standard.NumberOfAuxSymbols = 0;
   SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, u);
+  return ret;
 }
 
 static const uint16_t IMAGE_SYM_UNDEFINED = 0;
 
-void objfile_write_remote_symbol(struct objfile_data *f,
-                                 const uint8_t *name,
-                                 size_t name_count,
-                                 enum is_function is_function) {
+uint32_t objfile_add_remote_symbol(struct objfile *f,
+                                   const uint8_t *name,
+                                   size_t name_count,
+                                   enum is_function is_function) {
+  uint32_t ret = size_to_uint32(f->symbol_table_count);
   union objfile_symbol_record u;
   munge_to_Name(f, name, name_count, &u.standard.Name);
   u.standard.Value = 0;
@@ -435,12 +442,13 @@ void objfile_write_remote_symbol(struct objfile_data *f,
   u.standard.StorageClass = IMAGE_SYM_CLASS_EXTERNAL;
   u.standard.NumberOfAuxSymbols = 0;
   SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, u);
+  return ret;
 }
 
 
 
 void objfile_write_section_symbol(
-    struct objfile_data *f,
+    struct objfile *f,
     struct objfile_section *s,
     uint16_t SectionNumber) {
   {
@@ -467,7 +475,7 @@ void objfile_write_section_symbol(
   }
 }
 
-void objfile_flatten_write_section_symbols(struct objfile_data *f) {
+void objfile_flatten_write_section_symbols(struct objfile *f) {
   CHECK(f->wrote_section_symbols == 0);
   objfile_write_section_symbol(f, &f->data, 1);
   objfile_write_section_symbol(f, &f->rdata, 2);
@@ -475,7 +483,7 @@ void objfile_flatten_write_section_symbols(struct objfile_data *f) {
   f->wrote_section_symbols = 1;
 }
 
-void objfile_flatten(struct objfile_data *f, struct databuf **out) {
+void objfile_flatten(struct objfile *f, struct databuf **out) {
   STATIC_CHECK(LITTLE_ENDIAN);
   objfile_flatten_write_section_symbols(f);
   struct databuf *d = malloc(sizeof(*d));
@@ -608,22 +616,25 @@ void objfile_section_append_32bit_reloc(struct objfile_section *s,
   objfile_section_append_raw(s, &zero, sizeof(zero));
 }
 
-void objfile_section_append_dir32(struct objfile_section *s, uint32_t SymbolTableIndex) {
+void objfile_section_append_dir32(struct objfile_section *s,
+                                  uint32_t SymbolTableIndex) {
   objfile_section_append_32bit_reloc(s, SymbolTableIndex, IMAGE_REL_I386_DIR32);
 }
 
-void objfile_section_append_dir32nb(struct objfile_section *s, uint32_t SymbolTableIndex) {
+void objfile_section_append_dir32nb(struct objfile_section *s,
+                                    uint32_t SymbolTableIndex) {
   objfile_section_append_32bit_reloc(s, SymbolTableIndex, IMAGE_REL_I386_DIR32NB);
 }
 
-void objfile_section_append_rel32(struct objfile_section *s, uint32_t SymbolTableIndex) {
+void objfile_section_append_rel32(struct objfile_section *s,
+                                  uint32_t SymbolTableIndex) {
   objfile_section_append_32bit_reloc(s, SymbolTableIndex, IMAGE_REL_I386_REL32);
 }
 
 int make_almost_blank_objfile(void **buf_out, size_t *count_out) {
   STATIC_CHECK(LITTLE_ENDIAN);
-  struct objfile_data f;
-  objfile_data_init(&f);
+  struct objfile f;
+  objfile_init(&f);
   objfile_section_append_raw(&f.text, "abcdefghij", 10);
 
   struct databuf *d;
@@ -631,6 +642,16 @@ int make_almost_blank_objfile(void **buf_out, size_t *count_out) {
   databuf_move_destroy(d, buf_out, count_out);
   free(d);
 
-  objfile_data_destroy(&f);
+  objfile_destroy(&f);
   return 1;
+}
+
+struct objfile_section *objfile_data(struct objfile *f) {
+  return &f->data;
+}
+struct objfile_section *objfile_rdata(struct objfile *f) {
+  return &f->rdata;
+}
+struct objfile_section *objfile_text(struct objfile *f) {
+  return &f->text;
 }
