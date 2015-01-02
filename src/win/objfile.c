@@ -133,7 +133,14 @@ uint16_t real_file_characteristics(void) {
   return 0;
 }
 
-uint32_t executable_section_characteristics(void) {
+static const uint32_t IMAGE_SCN_CNT_CODE = (1 << 5);
+static const uint32_t IMAGE_SCN_CNT_INITIALIZED_DATA = (1 << 6);
+static const uint32_t IMAGE_SCN_ALIGN_16_BYTES = (5ul << 20);
+static const uint32_t IMAGE_SCN_MEM_EXECUTE = (1ul << 29);
+static const uint32_t IMAGE_SCN_MEM_READ = (1ul << 30);
+static const uint32_t IMAGE_SCN_MEM_WRITE = (1ul << 31);
+
+uint32_t text_section_characteristics(void) {
   /*
     bit  0. Reserved.
     bit  1. Reserved.
@@ -168,14 +175,29 @@ uint32_t executable_section_characteristics(void) {
     bit 30. IMAGE_SCN_MEM_READ. The section can be read.
     bit 31. IMAGE_SCN_MEM_WRITE. The section can be written to.
   */
-  const uint32_t IMAGE_SCN_CNT_CODE = (1 << 5);
-  const uint32_t IMAGE_SCN_ALIGN_16_BYTES = (5ul << 20);
-  const uint32_t IMAGE_SCN_MEM_EXECUTE = (1ul << 29);
-  const uint32_t IMAGE_SCN_MEM_READ = (1ul << 30);
   /* This value is also that produced by cl for its .text sections. */
   return IMAGE_SCN_CNT_CODE | IMAGE_SCN_ALIGN_16_BYTES | IMAGE_SCN_MEM_EXECUTE
     | IMAGE_SCN_MEM_READ;
 }
+
+uint32_t rdata_section_characteristics(void) {
+  /* TODO: cl uses IMAGE_SCN_ALIGN_4_BYTES in one example -- but maybe
+     with a double, it would output higher. */
+  return IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_ALIGN_16_BYTES
+    | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE;
+}
+
+uint32_t data_section_characteristics(void) {
+  /* TODO: cl uses IMAGE_SCN_ALIGN_4_BYTES in one example -- but maybe
+     with a double, it would output higher. */
+  return IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_ALIGN_16_BYTES
+    | IMAGE_SCN_MEM_READ;
+}
+
+static const uint8_t IMAGE_SYM_CLASS_EXTERNAL = 2;
+static const uint8_t IMAGE_SYM_CLASS_STATIC = 3;
+static const uint8_t IMAGE_SYM_CLASS_FUNCTION = 101;
+static const uint8_t IMAGE_SYM_CLASS_FILE = 103;
 
 PACK_PUSH
 struct objfile_symbol_standard_record {
@@ -240,10 +262,26 @@ struct objfile_symbol_aux_bfef {
 PACK_POP
 
 PACK_PUSH
+struct objfile_symbol_aux_sectiondef {
+  uint32_t Length;
+  uint16_t NumberOfRelocations;
+  uint16_t NumberOfLineNumbers;
+  /* COMDAT-only, set to zero. */
+  uint32_t CheckSum;
+  /* COMDAT-only, set to zero. */
+  uint16_t Number;
+  /* COMDAT selection number, set to zero. */
+  uint8_t Selection;
+  uint8_t Unused[3];
+} PACK_ATTRIBUTE;
+PACK_POP
+
+PACK_PUSH
 union objfile_symbol_record {
   struct objfile_symbol_standard_record standard;
   struct objfile_symbol_aux_function aux_function;
   struct objfile_symbol_aux_bfef aux_bfef;
+  struct objfile_symbol_aux_sectiondef aux_sectiondef;
 } PACK_ATTRIBUTE;
 PACK_POP
 
@@ -267,11 +305,13 @@ struct COFF_Relocation {
      IMAGE_REL_I386_SECREL7 0x000D The 7-bit offset from the base of the section that contains the target.
      IMAGE_REL_I386_REL32 0x0014 The 32-bit relative displacement from the target.  This supports the x86 relative branch and call instructions.
    */
+  /* Looking at cl output, I see a bunch of use of 6h and 14h. */
   uint16_t Type;
 } PACK_ATTRIBUTE;
 PACK_POP
 
 struct objfile_section {
+  char Name[8];
   struct databuf raw;
 
   struct COFF_Relocation *relocs;
@@ -279,7 +319,9 @@ struct objfile_section {
   size_t relocs_limit;
 };
 
-void objfile_section_init(struct objfile_section *s) {
+void objfile_section_init(struct objfile_section *s, const char Name[8]) {
+  memcpy(s->Name, Name, 8);
+
   databuf_init(&s->raw);
 
   s->relocs = NULL;
@@ -306,6 +348,8 @@ uint16_t objfile_section_small_relocations_count(struct objfile_section *s) {
 }
 
 struct objfile_data {
+  struct objfile_section data;
+  struct objfile_section rdata;
   struct objfile_section text;
 
   union objfile_symbol_record *symbol_table;
@@ -320,10 +364,19 @@ struct objfile_data {
   uint8_t *strings;
   size_t strings_count;
   size_t strings_limit;
+
+  /* Says that we wrote section symbols.  Makes sure that we can only
+     call objfile_flatten once. */
+  int wrote_section_symbols;
 };
 
 void objfile_data_init(struct objfile_data *f) {
-  objfile_section_init(&f->text);
+  static const char DataName[8] = ".data";
+  objfile_section_init(&f->data, DataName);
+  static const char ReadDataName[8] = ".rdata";
+  objfile_section_init(&f->rdata, ReadDataName);
+  static const char TextName[8] = ".text";
+  objfile_section_init(&f->text, TextName);
 
   f->symbol_table = NULL;
   f->symbol_table_count = 0;
@@ -332,9 +385,13 @@ void objfile_data_init(struct objfile_data *f) {
   f->strings = NULL;
   f->strings_count = 0;
   f->strings_limit = 0;
+
+  f->wrote_section_symbols = 0;
 }
 
 void objfile_data_destroy(struct objfile_data *f) {
+  objfile_section_destroy(&f->data);
+  objfile_section_destroy(&f->rdata);
   objfile_section_destroy(&f->text);
 
   free(f->symbol_table);
@@ -348,14 +405,109 @@ void objfile_data_destroy(struct objfile_data *f) {
   f->strings_limit = 0;
 }
 
+void compute_section_dimensions(struct objfile_section *s,
+                                uint32_t start_of_raw,
+                                uint32_t *PointerToRelocations_out,
+                                uint32_t *pointer_to_end_out) {
+  /* TODO: Magic number 16 alignment.  Should it be 4? */
+  CHECK(start_of_raw % 16 == 0);
+  uint32_t end_of_raw = uint32_add(start_of_raw, s->raw.count);
+  uint32_t start_of_relocs = uint32_ceil_aligned(end_of_raw, 2);
+  uint32_t end_of_relocs = uint32_add(start_of_relocs,
+                                      uint32_mul(s->relocs_count,
+                                                 sizeof(struct COFF_Relocation)));
+  *PointerToRelocations_out = start_of_relocs;
+  *pointer_to_end_out = end_of_relocs;
+}
+
+void objfile_write_section_header(struct databuf *d, struct objfile_section *s,
+                                  uint32_t start_of_raw, uint32_t Characteristics) {
+  uint32_t PointerToRelocations;
+  uint32_t pointer_to_end;
+  compute_section_dimensions(s, start_of_raw,
+                             &PointerToRelocations, &pointer_to_end);
+
+  struct Section_Header h;
+  STATIC_CHECK(sizeof(h) == Section_Header_EXPECTED_SIZE);
+  STATIC_CHECK(sizeof(h.Name) == 8 && sizeof(h.Name[0]) == 1);
+  STATIC_CHECK(sizeof(s->Name) == 8);
+  memcpy(h.Name, s->Name, 8);
+  /* Should be set to zero for object files. */
+  h.VirtualSize = 0;
+  /* For simplicity, should be set to zero for object files. */
+  h.VirtualAddress = 0;
+  h.SizeOfRawData = objfile_section_raw_size(s);
+  h.PointerToRawData = start_of_raw;
+  h.PointerToRelocations = PointerToRelocations;
+  /* We output no COFF line numbers. */
+  h.PointerToLineNumbers = 0;
+  h.NumberOfRelocations = objfile_section_small_relocations_count(s);
+  h.NumberOfLineNumbers = 0;
+  h.Characteristics = Characteristics;
+
+  databuf_append(d, &h, sizeof(h));
+}
+
+void append_zeros_to_align(struct databuf *d, size_t alignment) {
+  size_t n = d->count % alignment;
+  if (n != 0) {
+    static const uint8_t ch[16] = { 0 };
+
+    size_t m = alignment - n;
+
+    while (m > 16) {
+      databuf_append(d, ch, 16);
+      m -= 16;
+    }
+    databuf_append(d, ch, m);
+  }
+}
+
+void objfile_write_section_symbol(
+    struct objfile_data *f,
+    struct objfile_section *s,
+    uint16_t SectionNumber) {
+  {
+    union objfile_symbol_record u;
+    STATIC_CHECK(sizeof(u.standard.Name.ShortName) == 8);
+    memcpy(u.standard.Name.ShortName, s, 8);
+    u.standard.Value = 0;
+    u.standard.SectionNumber = SectionNumber;
+    u.standard.Type = IMAGE_SYM_CLASS_STATIC;
+    u.standard.NumberOfAuxSymbols = 1;
+    SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, u);
+  }
+  {
+    union objfile_symbol_record u;
+    u.aux_sectiondef.Length = size_to_uint32(objfile_section_raw_size(s));
+    u.aux_sectiondef.NumberOfRelocations = objfile_section_small_relocations_count(s);
+    u.aux_sectiondef.NumberOfLineNumbers = 0;
+    u.aux_sectiondef.CheckSum = 0;
+    u.aux_sectiondef.Number = 0;
+    u.aux_sectiondef.Selection = 0;
+    STATIC_CHECK(sizeof(u.aux_sectiondef.Unused) == 3);
+    memset(u.aux_sectiondef.Unused, 0, 3);
+    SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, u);
+  }
+}
+
+void objfile_flatten_write_section_symbols(struct objfile_data *f) {
+  CHECK(f->wrote_section_symbols == 0);
+  objfile_write_section_symbol(f, &f->data, 1);
+  objfile_write_section_symbol(f, &f->rdata, 2);
+  objfile_write_section_symbol(f, &f->text, 3);
+  f->wrote_section_symbols = 1;
+}
+
 void objfile_flatten(struct objfile_data *f, struct databuf **out) {
   STATIC_CHECK(LITTLE_ENDIAN);
+  objfile_flatten_write_section_symbols(f);
   struct databuf *d = malloc(sizeof(*d));
   CHECK(d);
   databuf_init(d);
 
-  /* Right now we just have a .text section. */
-  const uint16_t number_of_sections = 1;
+  /* Right now we have .data, .rdata, and .text sections. */
+  const uint16_t number_of_sections = 3;
   const uint32_t end_of_section_headers
     = uint32_add(sizeof(struct COFF_Header),
                  uint32_mul(number_of_sections,
@@ -363,16 +515,32 @@ void objfile_flatten(struct objfile_data *f, struct databuf **out) {
 
   const uint32_t end_of_symbols
     = uint32_add(end_of_section_headers,
-                 uint32_mul(size_to_uint32(f->symbol_table_count), sizeof(union objfile_symbol_record)));
+                 uint32_mul(size_to_uint32(f->symbol_table_count),
+                            sizeof(union objfile_symbol_record)));
   const uint32_t strings_size = uint32_add(size_to_uint32(f->strings_count), 4);
   STATIC_CHECK(sizeof(strings_size) == 4);
   const uint32_t end_of_strings = uint32_add(end_of_symbols, strings_size);
   const uint32_t ceil_end_of_strings = uint32_ceil_aligned(end_of_strings, 16);
-  const uint32_t end_of_text_raw = uint32_add(ceil_end_of_strings, f->text.raw.count);
-  const uint32_t ceil_end_of_text_raw = uint32_ceil_aligned(end_of_text_raw, 2);
-  const uint32_t end_of_text_relocs = uint32_add(ceil_end_of_text_raw,
-                                                 uint32_mul(f->text.relocs_count,
-                                                            sizeof(struct COFF_Relocation)));
+
+  const uint32_t start_of_data_raw = ceil_end_of_strings;
+  uint32_t start_of_data_relocs;
+  uint32_t end_of_data_relocs;
+  compute_section_dimensions(&f->data, start_of_data_raw,
+                             &start_of_data_relocs, &end_of_data_relocs);
+  const uint32_t ceil_end_of_data_relocs = uint32_ceil_aligned(end_of_data_relocs, 16);
+
+  const uint32_t start_of_read_data_raw = ceil_end_of_data_relocs;
+  uint32_t start_of_read_data_relocs;
+  uint32_t end_of_read_data_relocs;
+  compute_section_dimensions(&f->rdata, start_of_read_data_raw,
+                             &start_of_read_data_relocs, &end_of_read_data_relocs);
+  const uint32_t ceil_end_of_read_data_relocs = uint32_ceil_aligned(end_of_read_data_relocs, 16);
+
+  const uint32_t start_of_text_raw = ceil_end_of_read_data_relocs;
+  uint32_t start_of_text_relocs;
+  uint32_t end_of_text_relocs;
+  compute_section_dimensions(&f->text, start_of_text_raw,
+                             &start_of_text_relocs, &end_of_text_relocs);
 
 
   {
@@ -390,53 +558,55 @@ void objfile_flatten(struct objfile_data *f, struct databuf **out) {
     databuf_append(d, &h, sizeof(h));
   }
 
-  /* Right now, we've got the text section. */
-  {
-    struct Section_Header h;
-    STATIC_CHECK(sizeof(h) == Section_Header_EXPECTED_SIZE);
-    STATIC_CHECK(sizeof(h.Name) == 8 && sizeof(h.Name[0]) == 1);
-    static const char dot_text_string[8] = ".text";
-    memcpy(h.Name, dot_text_string, 8);
-    /* Should be set to zero for object files. */
-    h.VirtualSize = 0;
-    /* For simplicity, should be set to zero for object files. */
-    h.VirtualAddress = 0;
-    h.SizeOfRawData = objfile_section_raw_size(&f->text);
-    h.PointerToRawData = ceil_end_of_strings;
-    h.PointerToRelocations = ceil_end_of_text_raw;
-    /* We output no COFF line numbers. */
-    h.PointerToLineNumbers = 0;
-    h.NumberOfRelocations = objfile_section_small_relocations_count(&f->text);
-    h.NumberOfLineNumbers = 0;
-    h.Characteristics = executable_section_characteristics();
-
-    databuf_append(d, &h, sizeof(h));
-  }
+  /* Right now we've got 3 sections. */
+  CHECK(number_of_sections == 3);
+  objfile_write_section_header(d, &f->data, start_of_data_raw,
+                               data_section_characteristics());
+  objfile_write_section_header(d, &f->rdata, start_of_read_data_raw,
+                               rdata_section_characteristics());
+  objfile_write_section_header(d, &f->text, start_of_text_raw,
+                               text_section_characteristics());
   CHECK(d->count == end_of_section_headers);
 
-  databuf_append(d, f->symbol_table, size_mul(f->symbol_table_count, sizeof(union objfile_symbol_record)));
+  databuf_append(d, f->symbol_table, size_mul(f->symbol_table_count,
+                                              sizeof(union objfile_symbol_record)));
   CHECK(d->count == end_of_symbols);
   STATIC_CHECK(sizeof(strings_size) == 4);
   databuf_append(d, &strings_size, sizeof(strings_size));
   databuf_append(d, f->strings, f->strings_count);
   CHECK(d->count == end_of_strings);
 
-  if (d->count % 16 != 0) {
-    uint8_t ch[16] = { 0 };
-    databuf_append(d, ch, 16 - (d->count % 16));
-  }
-
+  append_zeros_to_align(d, 16);
   CHECK(d->count == ceil_end_of_strings);
 
-  databuf_append(d, f->text.raw.buf, f->text.raw.count);
-  CHECK(d->count == end_of_text_raw);
-  if (d->count % 2 != 0) {
-    uint8_t ch = 0;
-    databuf_append(d, &ch, 1);
-  }
-  CHECK(d->count == ceil_end_of_text_raw);
+  databuf_append(d, f->data.raw.buf, f->data.raw.count);
+  append_zeros_to_align(d, 2);
+  CHECK(d->count == start_of_data_relocs);
 
-  databuf_append(d, f->text.relocs, size_mul(f->text.relocs_count, sizeof(struct COFF_Relocation)));
+  databuf_append(d, f->data.relocs, size_mul(f->data.relocs_count,
+                                             sizeof(struct COFF_Relocation)));
+  CHECK(d->count == end_of_data_relocs);
+
+  append_zeros_to_align(d, 16);
+  CHECK(d->count == ceil_end_of_data_relocs);
+
+  databuf_append(d, f->rdata.raw.buf, f->rdata.raw.count);
+  append_zeros_to_align(d, 2);
+  CHECK(d->count == start_of_read_data_relocs);
+
+  databuf_append(d, f->rdata.relocs, size_mul(f->data.relocs_count,
+                                              sizeof(struct COFF_Relocation)));
+  CHECK(d->count == end_of_read_data_relocs);
+
+  append_zeros_to_align(d, 16);
+  CHECK(d->count == ceil_end_of_read_data_relocs);
+
+  databuf_append(d, f->text.raw.buf, f->text.raw.count);
+  append_zeros_to_align(d, 2);
+  CHECK(d->count == start_of_text_relocs);
+
+  databuf_append(d, f->text.relocs, size_mul(f->text.relocs_count,
+                                             sizeof(struct COFF_Relocation)));
   CHECK(d->count == end_of_text_relocs);
 
   *out = d;
