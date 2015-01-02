@@ -455,23 +455,36 @@ void munge_to_Name(struct objfile_data *f,
   memcpy(Name_out->ShortName, name, name_count);
 }
 
-void objfile_write_local_function_symbols(
-    struct objfile_data *f,
-    const uint8_t *name,
-    size_t name_count,
-    uint32_t Value) {
-  {
-    union objfile_symbol_record u;
-    munge_to_Name(f, name, name_count, &u.standard.Name);
-    u.standard.Value = Value;
-    u.standard.SectionNumber = TEXT_SECTION_NUMBER;
-    u.standard.Type = kFunctionSymType;
-    /* At some point we might want to support... static functions or external or something, idk. */
-    u.standard.StorageClass = IMAGE_SYM_CLASS_EXTERNAL;
-    u.standard.NumberOfAuxSymbols = 0;
-    SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, u);
-  }
+void objfile_write_local_function_symbol(struct objfile_data *f,
+                                         const uint8_t *name,
+                                         size_t name_count,
+                                         uint32_t Value) {
+  union objfile_symbol_record u;
+  munge_to_Name(f, name, name_count, &u.standard.Name);
+  u.standard.Value = Value;
+  u.standard.SectionNumber = TEXT_SECTION_NUMBER;
+  u.standard.Type = kFunctionSymType;
+  /* At some point we might want to support... static functions or external or something, idk. */
+  u.standard.StorageClass = IMAGE_SYM_CLASS_EXTERNAL;
+  u.standard.NumberOfAuxSymbols = 0;
+  SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, u);
 }
+
+static const uint16_t IMAGE_SYM_UNDEFINED = 0;
+
+void objfile_write_remote_function_symbol(struct objfile_data *f,
+                                          const uint8_t *name,
+                                          size_t name_count) {
+  union objfile_symbol_record u;
+  munge_to_Name(f, name, name_count, &u.standard.Name);
+  u.standard.Value = 0;
+  u.standard.SectionNumber = IMAGE_SYM_UNDEFINED;
+  u.standard.Type = kFunctionSymType;
+  u.standard.StorageClass = IMAGE_SYM_CLASS_EXTERNAL;
+  u.standard.NumberOfAuxSymbols = 0;
+  SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, u);
+}
+
 
 
 void objfile_write_section_symbol(
