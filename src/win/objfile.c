@@ -5,70 +5,9 @@
 #include <string.h>
 
 #include "arith.h"
+#include "databuf.h"
 #include "slice.h"
 #include "util.h"
-
-struct databuf {
-  uint8_t *buf;
-  size_t count;
-  size_t limit;
-};
-
-void databuf_init(struct databuf *b) {
-  b->buf = NULL;
-  b->count = 0;
-  b->limit = 0;
-}
-
-void databuf_destroy(struct databuf *b) {
-  free(b->buf);
-  databuf_init(b);
-}
-
-void databuf_move_destroy(struct databuf *b, void **buf_out, size_t *count_out) {
-  void *buf = realloc(b->buf, b->count);
-  CHECK(buf || b->count == 0);
-  *buf_out = buf;
-  *count_out = b->count;
-  databuf_init(b);
-}
-
-void databuf_grow(struct databuf *b, size_t accomodated_count) {
-  size_t limit = b->limit;
-  while (limit < accomodated_count) {
-    limit = limit ? size_mul(limit, 2) : 64;
-  }
-  b->buf = realloc(b->buf, limit);
-  CHECK(b->buf || limit == 0);
-  b->limit = limit;
-}
-
-void databuf_append(struct databuf *b, const void *p, size_t count) {
-  if (count == 0) {
-    /* Avoid possible memcpy NULL-pointer 0-count situations, which
-       would be undefined behavior. */
-    return;
-  }
-  if (b->limit - b->count < count) {
-    databuf_grow(b, size_add(b->count, count));
-  }
-  memcpy(b->buf + b->count, p, count);
-  b->count += count;
-}
-
-void app8(struct databuf *d, uint8_t x) {
-  databuf_append(d, &x, 1);
-}
-
-void app16(struct databuf *d, uint16_t x) {
-  STATIC_CHECK(LITTLE_ENDIAN);
-  databuf_append(d, &x, 2);
-}
-
-void app32(struct databuf *d, uint32_t x) {
-  STATIC_CHECK(LITTLE_ENDIAN);
-  databuf_append(d, &x, 4);
-}
 
 #define IMAGE_FILE_MACHINE_I386 0x14c
 #define kFakeTimeDateStamp 12345
@@ -455,31 +394,44 @@ void munge_to_Name(struct objfile_data *f,
   memcpy(Name_out->ShortName, name, name_count);
 }
 
-void objfile_write_local_function_symbol(struct objfile_data *f,
-                                         const uint8_t *name,
-                                         size_t name_count,
-                                         uint32_t Value) {
+enum is_function {
+  IS_FUNCTION_NO,
+  IS_FUNCTION_YES,
+};
+
+enum is_static {
+  IS_STATIC_NO,
+  IS_STATIC_YES,
+};
+
+void objfile_write_local_symbol(struct objfile_data *f,
+                                const uint8_t *name,
+                                size_t name_count,
+                                uint32_t Value,
+                                enum is_function is_function,
+                                enum is_static is_static) {
   union objfile_symbol_record u;
   munge_to_Name(f, name, name_count, &u.standard.Name);
   u.standard.Value = Value;
   u.standard.SectionNumber = TEXT_SECTION_NUMBER;
-  u.standard.Type = kFunctionSymType;
+  u.standard.Type = is_function == IS_FUNCTION_NO ? kNullSymType : kFunctionSymType;
   /* At some point we might want to support... static functions or external or something, idk. */
-  u.standard.StorageClass = IMAGE_SYM_CLASS_EXTERNAL;
+  u.standard.StorageClass = is_static == IS_STATIC_NO ? IMAGE_SYM_CLASS_EXTERNAL: IMAGE_SYM_CLASS_STATIC;
   u.standard.NumberOfAuxSymbols = 0;
   SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, u);
 }
 
 static const uint16_t IMAGE_SYM_UNDEFINED = 0;
 
-void objfile_write_remote_function_symbol(struct objfile_data *f,
-                                          const uint8_t *name,
-                                          size_t name_count) {
+void objfile_write_remote_symbol(struct objfile_data *f,
+                                 const uint8_t *name,
+                                 size_t name_count,
+                                 enum is_function is_function) {
   union objfile_symbol_record u;
   munge_to_Name(f, name, name_count, &u.standard.Name);
   u.standard.Value = 0;
   u.standard.SectionNumber = IMAGE_SYM_UNDEFINED;
-  u.standard.Type = kFunctionSymType;
+  u.standard.Type = is_function == IS_FUNCTION_NO ? kNullSymType : kFunctionSymType;
   u.standard.StorageClass = IMAGE_SYM_CLASS_EXTERNAL;
   u.standard.NumberOfAuxSymbols = 0;
   SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, u);
