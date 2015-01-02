@@ -200,14 +200,21 @@ static const uint8_t IMAGE_SYM_CLASS_FUNCTION = 101;
 static const uint8_t IMAGE_SYM_CLASS_FILE = 103;
 
 PACK_PUSH
+union name_eight {
+  uint8_t ShortName[8];
+  struct {
+    uint32_t Zeroes;
+    uint32_t Offset;
+  } LongName;
+} PACK_ATTRIBUTE;
+PACK_POP
+
+static const uint16_t kNullSymType = 0;
+static const uint16_t kFunctionSymType = 0x20;
+
+PACK_PUSH
 struct objfile_symbol_standard_record {
-  union {
-    uint8_t ShortName[8];
-    struct {
-      uint32_t Zeroes;
-      uint32_t Offset;
-    } LongName;
-  } Name;
+  union name_eight Name;
   uint32_t Value;
   /* Uses a 1-based index into the section table.  Special values:
      IMAGE_SYM_UNDEFINED (0).  Section not yet defined, e.g. for an
@@ -216,48 +223,19 @@ struct objfile_symbol_standard_record {
      not an address relative to some section.
      IMAGE_SYM_DEBUG (0xFFFE).  Some debuggery. */
   uint16_t SectionNumber;
-  /* MS tools set this field to 0x20 (function) or 0x0 (not a function). */
+  /* MS tools set this field to 0x20 (function) or 0x0 (not a
+     function).  I.e. kFunctionSymType or kNullSymType. */
   uint16_t Type;
   /* MS tools generally only use IMAGE_SYM_CLASS_EXTERNAL (2),
      IMAGE_SYM_CLASS_STATIC (3), IMAGE_SYM_CLASS_FUNCTION (101), and
      IMAGE_SYM_CLASS_FILE (103) which is followed by aux records that
      name the file.  There's also a 'weak external' storage class,
-     which is mentioned. */
+     which is mentioned.  Note: I don't see FILE used in a .obj file.
+     Also FUNCTION is used for .bf and .ef records, which I don't
+     see either.  */
   uint8_t StorageClass;
   /* How many aux records follow this record. */
   uint8_t NumberOfAuxSymbols;
-} PACK_ATTRIBUTE;
-PACK_POP
-
-PACK_PUSH
-struct objfile_symbol_aux_function {
-  /* Index of the corresponding .bf symbol record. */
-  uint32_t TagIndex;
-  /* The size of the executable code for the function itself.  Doesn't
-     overflow the section's SizeOfRawData. */
-  uint32_t TotalSize;
-  /* Zero if no COFF line number entry exists. */
-  uint32_t PointerToLineNumber;
-  /* Index of the symbol record for the next function.  Last function
-     has zero. */
-  uint32_t PointerToNextFunction;
-  /* Set this to zero, for hygiene. */
-  uint16_t Unused;
-} PACK_ATTRIBUTE;
-PACK_POP
-
-PACK_PUSH
-struct objfile_symbol_aux_bfef {
-  uint32_t Unused1;
-  /* The actual ordinal line number within the source file,
-     corresponding to the .bf or .ef record. */
-  uint16_t Linenumber;
-  uint16_t Unused2;
-  uint32_t Unused3;
-  /* .bf only.  The symbol-table index of the next .bf symbol record.
-     Zero for the last function in the symbol table. */
-  uint32_t PointerToNextFunction;
-  uint16_t Unused;
 } PACK_ATTRIBUTE;
 PACK_POP
 
@@ -279,8 +257,6 @@ PACK_POP
 PACK_PUSH
 union objfile_symbol_record {
   struct objfile_symbol_standard_record standard;
-  struct objfile_symbol_aux_function aux_function;
-  struct objfile_symbol_aux_bfef aux_bfef;
   struct objfile_symbol_aux_sectiondef aux_sectiondef;
 } PACK_ATTRIBUTE;
 PACK_POP
@@ -346,6 +322,10 @@ uint16_t objfile_section_small_relocations_count(struct objfile_section *s) {
   CHECK(s->relocs_count <= UINT16_MAX);
   return (uint16_t)s->relocs_count;
 }
+
+/* 1-based index in the section header table.  data is 1, rdata is 2,
+   text is 3 (because that's the order we put them in). */
+static const uint16_t TEXT_SECTION_NUMBER = 3;
 
 struct objfile_data {
   struct objfile_section data;
@@ -462,6 +442,37 @@ void append_zeros_to_align(struct databuf *d, size_t alignment) {
     databuf_append(d, ch, m);
   }
 }
+
+void munge_to_Name(struct objfile_data *f,
+                   const uint8_t *name,
+                   size_t name_count,
+                   union name_eight *Name_out) {
+  (void)f;
+  /* TODO: Implement for real. */
+  CHECK(name_count <= 8);
+  STATIC_CHECK(sizeof(Name_out->ShortName) == 8);
+  memset(Name_out->ShortName, 0, 8);
+  memcpy(Name_out->ShortName, name, name_count);
+}
+
+void objfile_write_local_function_symbols(
+    struct objfile_data *f,
+    const uint8_t *name,
+    size_t name_count,
+    uint32_t Value) {
+  {
+    union objfile_symbol_record u;
+    munge_to_Name(f, name, name_count, &u.standard.Name);
+    u.standard.Value = Value;
+    u.standard.SectionNumber = TEXT_SECTION_NUMBER;
+    u.standard.Type = kFunctionSymType;
+    /* At some point we might want to support... static functions or external or something, idk. */
+    u.standard.StorageClass = IMAGE_SYM_CLASS_EXTERNAL;
+    u.standard.NumberOfAuxSymbols = 0;
+    SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, u);
+  }
+}
+
 
 void objfile_write_section_symbol(
     struct objfile_data *f,
