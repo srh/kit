@@ -328,6 +328,13 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
           goto cleanup;
         }
       } break;
+      case AST_TOPLEVEL_EXTERN_DEF: {
+        if (!name_table_add_extern_def(&cs->nt,
+                                       toplevel->u.extern_def.name.value,
+                                       &toplevel->u.extern_def.type)) {
+          goto cleanup;
+        }
+      } break;
       case AST_TOPLEVEL_DEFTYPE: {
         if (!name_table_add_deftype(
                 &cs->nt,
@@ -753,8 +760,8 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
 
   exprscope_note_static_reference(es, ent);
 
-  if (!ent->is_primitive && ent->generics.has_type_params
-      && !inst->typecheck_started) {
+  if (!ent->is_primitive && !ent->is_extern
+      && ent->generics.has_type_params && !inst->typecheck_started) {
     if (es->cs->template_instantiation_recursion_depth
         == MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH) {
       ERR_DBG("Max template instantiation recursion depth exceeded.\n");
@@ -777,7 +784,6 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
       goto fail_unified;
     }
     exprscope_destroy(&scope);
-
     es->cs->template_instantiation_recursion_depth--;
   }
 
@@ -1930,6 +1936,14 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
   }
 }
 
+int check_extern_def(struct checkstate *cs, struct ast_extern_def *a) {
+  struct ast_generics generics;
+  ast_generics_init_no_params(&generics);
+  int ret = check_typeexpr(cs, &generics, &a->type, NULL);
+  ast_generics_destroy(&generics);
+  return ret;
+}
+
 int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
   (void)cs;
   switch (a->tag) {
@@ -1938,6 +1952,8 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
     return 1;
   case AST_TOPLEVEL_DEF:
     return check_def(cs, &a->u.def);
+  case AST_TOPLEVEL_EXTERN_DEF:
+    return check_extern_def(cs, &a->u.extern_def);
   case AST_TOPLEVEL_DEFTYPE:
     return check_deftype(cs, lookup_deftype(&cs->nt, &a->u.deftype));
   default:
@@ -2630,6 +2646,56 @@ int check_file_test_lambda_29(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_extern_1(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "extern putchar func[i32, i32];\n"
+      "def foo func[i32] = fn()i32 {\n"
+      "  putchar(65);\n"
+      "  putchar(10);\n"
+      "  return 1;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_extern_2(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because putchar is called with the wrong type. */
+  struct test_module a[] = { {
+      "foo",
+      "extern putchar func[i32, i32];\n"
+      "def foo func[i32] = fn()i32 {\n"
+      "  putchar(65u);\n"
+      "  putchar(10);\n"
+      "  return 1;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_extern_3(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because putchar has a nonsense return type. */
+  struct test_module a[] = { {
+      "foo",
+      "extern putchar func[i32, quack];\n"
+      "def foo func[i32] = fn()i32 {\n"
+      "  putchar(65);\n"
+      "  putchar(10);\n"
+      "  return 1;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 int test_check_file(void) {
@@ -2875,6 +2941,24 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_lambda_29...\n");
   if (!!test_check_module(&im, &check_file_test_lambda_29, foo)) {
     DBG("check_file_test_lambda_29 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_extern_1...\n");
+  if (!test_check_module(&im, &check_file_test_extern_1, foo)) {
+    DBG("check_file_test_extern_1 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_extern_2...\n");
+  if (!!test_check_module(&im, &check_file_test_extern_2, foo)) {
+    DBG("check_file_test_extern_2 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_extern_3...\n");
+  if (!!test_check_module(&im, &check_file_test_extern_3, foo)) {
+    DBG("check_file_test_extern_3 fails\n");
     goto cleanup_identmap;
   }
 

@@ -353,6 +353,15 @@ void ast_def_init(struct ast_def *a, struct ast_meta meta,
                   struct ast_ident name, struct ast_typeexpr type,
                   struct ast_expr rhs);
 
+struct ast_extern_def {
+  struct ast_meta meta;
+  struct ast_ident name;
+  struct ast_typeexpr type;
+};
+
+void ast_extern_def_init(struct ast_extern_def *a, struct ast_meta meta,
+                         struct ast_ident name, struct ast_typeexpr type);
+
 struct ast_toplevel;
 
 struct ast_import {
@@ -377,6 +386,7 @@ void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
 enum ast_toplevel_tag {
   AST_TOPLEVEL_IMPORT,
   AST_TOPLEVEL_DEF,
+  AST_TOPLEVEL_EXTERN_DEF,
   AST_TOPLEVEL_DEFTYPE,
 };
 
@@ -385,6 +395,7 @@ struct ast_toplevel {
   union {
     struct ast_import import;
     struct ast_def def;
+    struct ast_extern_def extern_def;
     struct ast_deftype deftype;
   } u;
 };

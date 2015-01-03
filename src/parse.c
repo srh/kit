@@ -1263,6 +1263,35 @@ int parse_rest_of_def(struct ps *p, size_t pos_start, struct ast_def *out) {
   return 0;
 }
 
+int parse_rest_of_extern_def(struct ps *p, size_t pos_start,
+                             struct ast_extern_def *out) {
+  struct ast_ident name;
+  if (!(skip_ws(p) && parse_ident(p, &name))) {
+    goto fail;
+  }
+
+  struct ast_typeexpr type;
+  if (!(skip_ws(p) && parse_typeexpr(p, &type))) {
+    goto fail_ident;
+  }
+
+  if (!(skip_ws(p) && try_skip_semicolon(p))) {
+    goto fail_typeexpr;
+  }
+
+  ast_extern_def_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                      name, type);
+  return 1;
+
+ fail_typeexpr:
+  ast_typeexpr_destroy(&type);
+ fail_ident:
+  ast_ident_destroy(&name);
+ fail:
+  return 0;
+}
+
+
 int parse_rest_of_import(struct ps *p, size_t pos_start,
                          struct ast_import *out) {
   PARSE_DBG("parse_rest_of_import\n");
@@ -1323,6 +1352,9 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   if (try_skip_keyword(p, "def")) {
     out->tag = AST_TOPLEVEL_DEF;
     return parse_rest_of_def(p, pos_start, &out->u.def);
+  } else if (try_skip_keyword(p, "extern")) {
+    out->tag = AST_TOPLEVEL_EXTERN_DEF;
+    return parse_rest_of_extern_def(p, pos_start, &out->u.extern_def);
   } else if (try_skip_keyword(p, "import")) {
     out->tag = AST_TOPLEVEL_IMPORT;
     return parse_rest_of_import(p, pos_start, &out->u.import);
@@ -1507,6 +1539,15 @@ int parse_test_deftypes(void) {
   return pass;
 }
 
+int parse_test_externs(void) {
+  int pass = 1;
+  pass &= run_count_test("externs1",
+                         "extern putchar func[i32, i32];\n"
+                         "def blah func[i32, i32] = 3;\n",
+                         20);
+  return pass;
+}
+
 int parse_test(void) {
   int pass = 1;
   pass &= parse_test_nothing();
@@ -1514,6 +1555,7 @@ int parse_test(void) {
   pass &= parse_test_imports();
   pass &= parse_test_defs();
   pass &= parse_test_deftypes();
+  pass &= parse_test_externs();
   return pass;
 }
 

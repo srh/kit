@@ -15,6 +15,7 @@ struct def_entry {
   struct ast_typeexpr type;
 
   int is_primitive;
+  int is_extern;
   struct ast_def *def;
 
   struct def_instantiation **instantiations;
@@ -96,6 +97,9 @@ int name_table_add_primitive_def(struct name_table *t,
                                  ident_value name,
                                  struct ast_generics *generics,
                                  struct ast_typeexpr *type);
+int name_table_add_extern_def(struct name_table *t,
+                              ident_value name,
+                              struct ast_typeexpr *type);
 int name_table_add_deftype(struct name_table *t,
                            ident_value name,
                            struct generics_arity arity,

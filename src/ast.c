@@ -544,6 +544,19 @@ void ast_def_destroy(struct ast_def *a) {
   ast_expr_destroy(&a->rhs);
 }
 
+void ast_extern_def_init(struct ast_extern_def *a, struct ast_meta meta,
+                         struct ast_ident name, struct ast_typeexpr type) {
+  a->meta = meta;
+  a->name = name;
+  a->type = type;
+}
+
+void ast_extern_def_destroy(struct ast_extern_def *a) {
+  ast_meta_destroy(&a->meta);
+  ast_ident_destroy(&a->name);
+  ast_typeexpr_destroy(&a->type);
+}
+
 void ast_import_init(struct ast_import *a, struct ast_meta meta,
                      struct ast_ident name) {
   a->meta = meta;
@@ -578,6 +591,9 @@ void ast_toplevel_destroy(struct ast_toplevel *a) {
     break;
   case AST_TOPLEVEL_DEF:
     ast_def_destroy(&a->u.def);
+    break;
+  case AST_TOPLEVEL_EXTERN_DEF:
+    ast_extern_def_destroy(&a->u.extern_def);
     break;
   case AST_TOPLEVEL_DEFTYPE:
     ast_deftype_destroy(&a->u.deftype);

@@ -41,11 +41,13 @@ void def_entry_init(struct def_entry *e, ident_value name,
                     struct ast_generics *generics,
                     struct ast_typeexpr *type,
                     int is_primitive,
+                    int is_extern,
                     struct ast_def *def) {
   e->name = name;
   ast_generics_init_copy(&e->generics, generics);
   ast_typeexpr_init_copy(&e->type, type);
   e->is_primitive = is_primitive;
+  e->is_extern = is_extern;
   e->def = def;
 
   e->instantiations = NULL;
@@ -65,6 +67,7 @@ void def_entry_destroy(struct def_entry *e) {
   ast_generics_destroy(&e->generics);
   ast_typeexpr_destroy(&e->type);
   e->is_primitive = 0;
+  e->is_extern = 0;
   e->def = NULL;
 
   SLICE_FREE(e->instantiations, e->instantiations_count,
@@ -251,19 +254,37 @@ int name_table_help_add_def(struct name_table *t,
                             struct ast_generics *generics,
                             struct ast_typeexpr *type,
                             int is_primitive,
+                            int is_extern,
                             struct ast_def *def) {
   if (deftype_shadowed(t, name)) {
     ERR_DBG("def name shadows deftype name.\n");
     return 0;
   }
 
-  /* TODO: It would be nice to check for "obviously" conflicting defs
-     here, instead of at overloading -- so we catch them without them
-     needing to be used. */
+  if (is_extern) {
+    if (def_shadowed(t, name)) {
+      ERR_DBG("extern def name shadows fellow def name.\n");
+      return 0;
+    }
+  } else {
+    ident_value dbn_id;
+    if (identmap_is_interned(&t->defs_by_name, &name, sizeof(name),
+                             &dbn_id)) {
+      struct defs_by_name_node *node
+        = identmap_get_user_value(&t->defs_by_name, dbn_id);
+      CHECK(node);
+      if (node->ent->is_extern) {
+        ERR_DBG("def name shadows extern def name.\n");
+        return 0;
+      }
+      /* (We only need to check the first node, because extern defs
+         disallow there to be conflicting names.) */
+    }
+  }
 
   struct def_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);
-  def_entry_init(new_entry, name, generics, type, is_primitive, def);
+  def_entry_init(new_entry, name, generics, type, is_primitive, is_extern, def);
   SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);
 
   ident_value dbn_id = identmap_intern(&t->defs_by_name, &name, sizeof(name));
@@ -280,14 +301,22 @@ int name_table_add_def(struct name_table *t,
                        struct ast_generics *generics,
                        struct ast_typeexpr *type,
                        struct ast_def *def) {
-  return name_table_help_add_def(t, name, generics, type, 0, def);
+  return name_table_help_add_def(t, name, generics, type, 0, 0, def);
 }
 
 int name_table_add_primitive_def(struct name_table *t,
                                  ident_value name,
                                  struct ast_generics *generics,
                                  struct ast_typeexpr *type) {
-  return name_table_help_add_def(t, name, generics, type, 1, NULL);
+  return name_table_help_add_def(t, name, generics, type, 1, 0, NULL);
+}
+
+int name_table_add_extern_def(struct name_table *t,
+                              ident_value name,
+                              struct ast_typeexpr *type) {
+  struct ast_generics generics;
+  ast_generics_init_no_params(&generics);
+  return name_table_help_add_def(t, name, &generics, type, 0, 1, NULL);
 }
 
 int name_table_help_add_deftype_entry(struct name_table *t,
