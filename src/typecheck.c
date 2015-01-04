@@ -2037,12 +2037,10 @@ int read_module_file(const uint8_t *module_name,
                      size_t *data_size_out) {
   int ret = 0;
   char *filename;
-  {
-    filename = malloc(size_add(module_name_count, 4));
-    CHECK(filename);
-    memcpy(filename, module_name, module_name_count);
-    memcpy(filename + module_name_count, ".ki", 4);
-  }
+  size_t filename_count;
+  alloc_half_strcat(module_name, module_name_count,
+                    ".ki",
+                    &filename, &filename_count);
 
   if (!read_file(filename, data_out, data_size_out)) {
     ERR_DBG("Could not read file.\n");
