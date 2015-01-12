@@ -3,10 +3,34 @@
 
 #include "ast.h"
 
+enum static_value_tag {
+  STATIC_VALUE_I32,
+  STATIC_VALUE_U32,
+  STATIC_VALUE_LAMBDA,
+};
+
+struct static_value {
+  enum static_value_tag tag;
+  union {
+    int32_t i32_value;
+    uint32_t u32_value;
+    /* An unowned ref to the parsed AST. */
+    struct ast_expr *lambda;
+  } u;
+};
+
+void static_value_init_i32(struct static_value *a, int32_t i32_value);
+void static_value_init_u32(struct static_value *a, uint32_t u32_value);
+void static_value_init_lambda(struct static_value *a, struct ast_expr *lambda);
+void static_value_destroy(struct static_value *a);
+
 struct def_instantiation {
   int typecheck_started;
   struct ast_typeexpr *types;
   size_t types_count;
+
+  int value_computed;
+  struct static_value value;
 };
 
 struct def_entry {

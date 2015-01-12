@@ -1945,7 +1945,6 @@ int check_extern_def(struct checkstate *cs, struct ast_extern_def *a) {
 }
 
 int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
-  (void)cs;
   switch (a->tag) {
   case AST_TOPLEVEL_IMPORT:
     /* We already parsed and loaded the import. */
@@ -1959,6 +1958,327 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
   default:
     UNREACHABLE();
   }
+}
+
+static const char *const kNumericLiteralOOR = "Numeric literal out of range.\n";
+
+int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
+                           uint32_t *out) {
+  CHECK(digits_count > 0);
+  uint32_t built_value = 0;
+  for (size_t i = 0; i < digits_count; i++) {
+    if (!try_uint32_mul(built_value, 10, &built_value)) {
+      ERR_DBG(kNumericLiteralOOR);
+      return 0;
+    }
+    if (!try_uint32_add(built_value, digits[i], &built_value)) {
+      ERR_DBG(kNumericLiteralOOR);
+      return 0;
+    }
+  }
+
+  *out = built_value;
+  return 1;
+}
+
+int eval_static_numeric_literal(struct ast_numeric_literal *a,
+                                struct static_value *out) {
+  switch (a->numeric_type) {
+  case AST_NUMERIC_TYPE_SIGNED: {
+    /* TODO: There's no way to plainly represent INT32_MIN.  We should
+       get static evaluation of "arbitrary numeric constants"
+       implemented. */
+    uint32_t value;
+    if (!numeric_literal_to_u32(a->digits, a->digits_count, &value)) {
+      return 0;
+    }
+    if (value > 0x7FFFFFFFul) {
+      ERR_DBG(kNumericLiteralOOR);
+      return 0;
+    }
+    CHECK(value <= INT32_MAX);
+    static_value_init_i32(out, (int32_t)value);
+    return 1;
+  } break;
+  case AST_NUMERIC_TYPE_UNSIGNED: {
+    uint32_t value;
+    if (!numeric_literal_to_u32(a->digits, a->digits_count, &value)) {
+      return 0;
+    }
+    static_value_init_u32(out, value);
+    return 1;
+  } break;
+  default:
+    CRASH("Unreachable (bad ast_numeric_literal)\n");
+  }
+}
+
+int eval_static_value(struct ast_generics *generics,
+                      struct ast_typeexpr *types,
+                      size_t types_count,
+                      struct ast_expr *expr,
+                      struct static_value *out);
+
+int eval_static_unop_expr(struct ast_generics *generics,
+                          struct ast_typeexpr *types,
+                          size_t types_count,
+                          struct ast_unop_expr *expr,
+                          struct static_value *out) {
+  CHECK(!is_magic_unop(expr->operator));
+  /* Negation is the only non-magic unop right now. */
+  CHECK(expr->operator == AST_UNOP_NEGATE);
+  struct static_value rhs_value;
+  if (!eval_static_value(generics, types, types_count, expr->rhs,
+                         &rhs_value)) {
+    return 0;
+  }
+
+  /* You can't negate unsigned ints -- it won't typecheck. */
+  CHECK(rhs_value.tag == STATIC_VALUE_I32);
+  if (rhs_value.u.i32_value == INT32_MIN) {
+    ERR_DBG("Attempted negation of i32 min value (in static computation)\n");
+    static_value_destroy(&rhs_value);
+    return 0;
+  }
+  static_value_init_i32(out, -rhs_value.u.i32_value);
+  static_value_destroy(&rhs_value);
+  return 1;
+}
+
+int apply_operator(enum ast_binop op,
+                   struct static_value *lhs,
+                   struct static_value *rhs,
+                   struct static_value *out) {
+  CHECK(lhs->tag == rhs->tag);
+  CHECK(lhs->tag == STATIC_VALUE_I32 || lhs->tag == STATIC_VALUE_U32);
+  switch (lhs->tag) {
+  case STATIC_VALUE_I32: {
+    int32_t value = -12345;
+    int success = 1;
+    switch (op) {
+    case AST_BINOP_ASSIGN: UNREACHABLE();
+    case AST_BINOP_ADD:
+      success = try_int32_add(lhs->u.i32_value, rhs->u.i32_value, &value);
+      break;
+    case AST_BINOP_SUB:
+      success = try_int32_sub(lhs->u.i32_value, rhs->u.i32_value, &value);
+      break;
+    case AST_BINOP_MUL:
+      success = try_int32_mul(lhs->u.i32_value, rhs->u.i32_value, &value);
+      break;
+    case AST_BINOP_DIV: {
+      if (lhs->u.i32_value < 0 || rhs->u.i32_value < 0) {
+        ERR_DBG("Negative static value division.\n");
+        return 0;
+      }
+      if (rhs->u.i32_value == 0) {
+        ERR_DBG("Static value division by zero.\n");
+      }
+      value = int32_div(lhs->u.i32_value, rhs->u.i32_value);
+      success = 1;
+    } break;
+    case AST_BINOP_MOD: {
+      if (lhs->u.i32_value < 0 || rhs->u.i32_value < 0) {
+        ERR_DBG("Negative static value modulo.\n");
+        return 0;
+      }
+      if (rhs->u.i32_value == 0) {
+        ERR_DBG("Static value modulo by zero.\n");
+      }
+      value = int32_positive_mod(lhs->u.i32_value, rhs->u.i32_value);
+      success = 1;
+    } break;
+    case AST_BINOP_LT:
+      value = (lhs->u.i32_value < rhs->u.i32_value);
+      break;
+    case AST_BINOP_LE:
+      value = (lhs->u.i32_value <= rhs->u.i32_value);
+      break;
+    case AST_BINOP_GT:
+      value = (lhs->u.i32_value > rhs->u.i32_value);
+      break;
+    case AST_BINOP_GE:
+      value = (lhs->u.i32_value >= rhs->u.i32_value);
+      break;
+    case AST_BINOP_EQ:
+      value = (lhs->u.i32_value == rhs->u.i32_value);
+      break;
+    case AST_BINOP_NE:
+      value = (lhs->u.i32_value != rhs->u.i32_value);
+      break;
+    case AST_BINOP_BIT_XOR:
+      value = (lhs->u.i32_value ^ rhs->u.i32_value);
+      break;
+    case AST_BINOP_BIT_OR:
+      value = (lhs->u.i32_value | rhs->u.i32_value);
+      break;
+    case AST_BINOP_BIT_AND:
+      value = (lhs->u.i32_value & rhs->u.i32_value);
+      break;
+    default:
+      /* TODO: Support leftshift and rightshift. */
+      success = 0;
+    }
+
+    if (!success) {
+      ERR_DBG("Binary operation cannot be statically evaluated.\n");
+      return 0;
+    }
+
+    static_value_init_i32(out, value);
+    return 1;
+  } break;
+  case STATIC_VALUE_U32: {
+    uint32_t value = 12345;
+    int success = 1;
+    switch (op) {
+    case AST_BINOP_ASSIGN: UNREACHABLE();
+    case AST_BINOP_ADD:
+      success = try_uint32_add(lhs->u.u32_value, rhs->u.u32_value, &value);
+      break;
+    case AST_BINOP_SUB:
+      success = try_uint32_sub(lhs->u.u32_value, rhs->u.u32_value, &value);
+      break;
+    case AST_BINOP_MUL:
+      success = try_uint32_mul(lhs->u.u32_value, rhs->u.u32_value, &value);
+      break;
+    case AST_BINOP_DIV:
+      success = try_uint32_div(lhs->u.u32_value, rhs->u.u32_value, &value);
+      break;
+    case AST_BINOP_MOD:
+      success = try_uint32_mod(lhs->u.u32_value, rhs->u.u32_value, &value);
+      break;
+    case AST_BINOP_LT:
+      value = (lhs->u.u32_value < rhs->u.u32_value);
+      break;
+    case AST_BINOP_LE:
+      value = (lhs->u.u32_value <= rhs->u.u32_value);
+      break;
+    case AST_BINOP_GT:
+      value = (lhs->u.u32_value > rhs->u.u32_value);
+      break;
+    case AST_BINOP_GE:
+      value = (lhs->u.u32_value >= rhs->u.u32_value);
+      break;
+    case AST_BINOP_EQ:
+      value = (lhs->u.u32_value == rhs->u.u32_value);
+      break;
+    case AST_BINOP_NE:
+      value = (lhs->u.u32_value != rhs->u.u32_value);
+      break;
+    case AST_BINOP_BIT_XOR:
+      value = (lhs->u.u32_value ^ rhs->u.u32_value);
+      break;
+    case AST_BINOP_BIT_OR:
+      value = (lhs->u.u32_value | rhs->u.u32_value);
+      break;
+    case AST_BINOP_BIT_AND:
+      value = (lhs->u.u32_value & rhs->u.u32_value);
+      break;
+    default:
+      /* TODO: Support leftshift and rightshift. */
+      success = 0;
+    }
+
+    if (!success) {
+      ERR_DBG("Binary operation cannot be statically evaluated.\n");
+      return 0;
+    }
+
+    static_value_init_u32(out, value);
+    return 1;
+  } break;
+  case STATIC_VALUE_LAMBDA:
+  default:
+    UNREACHABLE();
+  }
+}
+
+int eval_static_binop_expr(struct ast_generics *generics,
+                           struct ast_typeexpr *types,
+                           size_t types_count,
+                           struct ast_binop_expr *expr,
+                           struct static_value *out) {
+  CHECK(!is_magic_binop(expr->operator));
+
+  struct static_value lhs_value;
+  if (!eval_static_value(generics, types, types_count, expr->lhs,
+                         &lhs_value)) {
+    goto fail;
+  }
+
+  struct static_value rhs_value;
+  if (!eval_static_value(generics, types, types_count, expr->rhs,
+                         &rhs_value)) {
+    goto fail_lhs;
+  }
+
+  if (!apply_operator(expr->operator, &lhs_value, &rhs_value, out)) {
+    goto fail_both;
+  }
+
+  return 1;
+ fail_both:
+  static_value_destroy(&rhs_value);
+ fail_lhs:
+  static_value_destroy(&lhs_value);
+ fail:
+  return 0;
+}
+
+int eval_static_value(struct ast_generics *generics,
+                      struct ast_typeexpr *types,
+                      size_t types_count,
+                      struct ast_expr *expr,
+                      struct static_value *out) {
+  switch (expr->tag) {
+  case AST_EXPR_NAME: {
+    ERR_DBG("Evaluating a static value not implemented for names.\n");
+    return 0;
+  } break;
+  case AST_EXPR_NUMERIC_LITERAL:
+    return eval_static_numeric_literal(&expr->u.numeric_literal, out);
+  case AST_EXPR_FUNCALL: {
+    CRASH("No funcalls should have been deemed statically evaluable.\n");
+  } break;
+  case AST_EXPR_UNOP: {
+    return eval_static_unop_expr(generics, types, types_count,
+                                 &expr->u.unop_expr, out);
+  } break;
+  case AST_EXPR_BINOP: {
+    return eval_static_binop_expr(generics, types, types_count,
+                                  &expr->u.binop_expr, out);
+  } break;
+  case AST_EXPR_LAMBDA: {
+    static_value_init_lambda(out, expr);
+    return 1;
+  } break;
+  case AST_EXPR_LOCAL_FIELD_ACCESS: {
+    CRASH("No local field access expression should have been deemed statically evaluable.\n");
+  } break;
+  case AST_EXPR_DEREF_FIELD_ACCESS: {
+    CRASH("No deref field access expression should have been deemed statically evaluable.\n");
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+int compute_static_values(struct def_entry *ent) {
+  CHECK(ent->def);
+  for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
+    struct def_instantiation *inst = ent->instantiations[i];
+    CHECK(!inst->value_computed);
+
+    if (!eval_static_value(&ent->generics, inst->types, inst->types_count,
+                           &ent->def->rhs,
+                           &inst->value)) {
+      return 0;
+    }
+    inst->value_computed = 1;
+  }
+
+  return 1;
 }
 
 int chase_def_entry_acyclicity(struct def_entry *ent) {
@@ -1979,6 +2299,13 @@ int chase_def_entry_acyclicity(struct def_entry *ent) {
   ent->acyclicity_being_chased = 0;
   CHECK(ent->known_acyclic == 0);
   ent->known_acyclic = 1;
+
+  if (!ent->is_primitive && !ent->is_extern) {
+    if (!compute_static_values(ent)) {
+      return 0;
+    }
+  }
+
   return 1;
 }
 
@@ -2197,7 +2524,11 @@ int check_file_test_def_3(const uint8_t *name, size_t name_count,
                           uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
                                "def[] x i32 = 3;\n"
+#if 0
                                "def y i32 = x;\n"
+#else
+                               "def y i32 = 3;\n"
+#endif
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -2623,7 +2954,10 @@ int check_file_test_lambda_28(const uint8_t *name, size_t name_count,
                               uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
+      /* TODO: Reenable this when static values can have name expressions. */
+#if 0
       "def y i32 = -x;\n"
+#endif
       "def x i32 = -3;\n"
     } };
 

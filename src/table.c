@@ -16,12 +16,31 @@ struct deftypes_by_name_node {
   struct deftypes_by_name_node *next;
 };
 
+void static_value_init_i32(struct static_value *a, int32_t i32_value) {
+  a->tag = STATIC_VALUE_I32;
+  a->u.i32_value = i32_value;
+}
+void static_value_init_u32(struct static_value *a, uint32_t u32_value) {
+  a->tag = STATIC_VALUE_U32;
+  a->u.u32_value = u32_value;
+}
+
+void static_value_init_lambda(struct static_value *a, struct ast_expr *lambda) {
+  a->tag = STATIC_VALUE_LAMBDA;
+  a->u.lambda = lambda;
+}
+
+void static_value_destroy(struct static_value *sv) {
+  sv->tag = (enum static_value_tag)-1;
+}
+
 void def_instantiation_init(struct def_instantiation *a,
                             struct ast_typeexpr **types,
                             size_t *types_count) {
   a->typecheck_started = 0;
   a->types = *types;
   a->types_count = *types_count;
+  a->value_computed = 0;
   *types = NULL;
   *types_count = 0;
 }
@@ -29,6 +48,10 @@ void def_instantiation_init(struct def_instantiation *a,
 void def_instantiation_destroy(struct def_instantiation *a) {
   a->typecheck_started = 0;
   SLICE_FREE(a->types, a->types_count, ast_typeexpr_destroy);
+  if (a->value_computed) {
+    static_value_destroy(&a->value);
+    a->value_computed = 0;
+  }
 }
 
 void def_instantiation_free(struct def_instantiation **p) {
