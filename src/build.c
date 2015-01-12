@@ -10,13 +10,32 @@
 #include "io.h"
 #include "win/objfile.h"
 
+int build_instantiation(struct checkstate *cs, struct objfile *f,
+                        struct def_entry *ent,
+                        struct def_instantiation *inst) {
+  (void)cs, (void)f, (void)ent, (void)inst;
+  ERR_DBG("build_instantiation: not implemented.\n");
+  return 0;
+}
+
 int build_def(struct checkstate *cs, struct objfile *f,
               struct def_entry *ent) {
-  (void)cs, (void)f, (void)ent;
-  /* TODO: Implement. */
-  /* TODO: Implement the computing of static values. */
-  ERR_DBG("build_def: Not implemented.\n");
-  return 0;
+  if (ent->is_primitive) {
+    return 1;
+  }
+
+  if (ent->is_extern) {
+    /* TODO: Do we need to add its name to the symbol table? */
+    return 1;
+  }
+
+  for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
+    if (!build_instantiation(cs, f, ent, ent->instantiations[i])) {
+      return 0;
+    }
+  }
+
+  return 1;
 }
 
 int build_module(struct identmap *im, module_loader *loader,

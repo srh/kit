@@ -3042,6 +3042,57 @@ int check_file_test_extern_3(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_1(const uint8_t *name, size_t name_count,
+                           uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[u32, u32] = fn(x u32) u32 {\n"
+      "  return x + 4u;\n"
+      "};"
+      "def bar func[i32, i32] = foo;\n"
+      "def foo func[i32, i32] = fn(x i32) i32 {\n"
+      "  return x + 3;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_2(const uint8_t *name, size_t name_count,
+                           uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[u32, u32] = fn(x u32) u32 {\n"
+      "  return x + 4u;\n"
+      "};"
+      "def bar func[i32, i32] = foo;\n"
+      "def[T] foo func[T, i32] = fn(x T) i32 {\n"
+      "  return x + 3;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_3(const uint8_t *name, size_t name_count,
+                           uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because foo's instatiation won't typecheck. */
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[u32, u32] = fn(x u32) u32 {\n"
+      "  return x + 4u;\n"
+      "};"
+      "def bar func[u32, i32] = foo;\n"
+      "def[T] foo func[T, i32] = fn(x T) i32 {\n"
+      "  return x + 3;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
 
 
 int test_check_file(void) {
@@ -3305,6 +3356,24 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_extern_3...\n");
   if (!!test_check_module(&im, &check_file_test_extern_3, foo)) {
     DBG("check_file_test_extern_3 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_1...\n");
+  if (!test_check_module(&im, &check_file_test_more_1, foo)) {
+    DBG("check_file_test_more_1 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_2...\n");
+  if (!test_check_module(&im, &check_file_test_more_2, foo)) {
+    DBG("check_file_test_more_2 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_3...\n");
+  if (!!test_check_module(&im, &check_file_test_more_3, foo)) {
+    DBG("check_file_test_more_3 fails\n");
     goto cleanup_identmap;
   }
 
