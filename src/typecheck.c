@@ -743,7 +743,8 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
                                   ident_value name,
                                   struct ast_typeexpr *partial_type,
                                   struct ast_typeexpr *out,
-                                  int *is_lvalue_out) {
+                                  int *is_lvalue_out,
+                                  struct def_instantiation **inst_out) {
   struct ast_typeexpr unified;
   struct def_entry *ent;
   struct def_instantiation *inst;
@@ -790,6 +791,7 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
   *out = unified;
   /* Right now, there are no global variables. */
   *is_lvalue_out = 0;
+  *inst_out = inst;
   return 1;
  fail_unified:
   ast_typeexpr_destroy(&unified);
@@ -800,7 +802,8 @@ int exprscope_lookup_name(struct exprscope *es,
                           ident_value name,
                           struct ast_typeexpr *partial_type,
                           struct ast_typeexpr *out,
-                          int *is_lvalue_out) {
+                          int *is_lvalue_out,
+                          struct def_instantiation **inst_or_null_out) {
   for (size_t i = es->vars_count; i-- > 0; ) {
     struct ast_vardecl *decl = es->vars[i];
     if (decl->name.value != name) {
@@ -814,11 +817,13 @@ int exprscope_lookup_name(struct exprscope *es,
 
     ast_typeexpr_init_copy(out, &decl->type);
     *is_lvalue_out = 1;
+    *inst_or_null_out = NULL;  /* NULL because it's a local. */
     return 1;
   }
 
+  /* inst_or_null_out gets initialized to a non-NULL value. */
   return lookup_global_maybe_typecheck(es, name, partial_type,
-                                       out, is_lvalue_out);
+                                       out, is_lvalue_out, inst_or_null_out);
 }
 
 void numeric_literal_type(struct identmap *im,
@@ -1476,13 +1481,15 @@ int check_expr_binop(struct exprscope *es,
   int ret = 0;
   struct ast_typeexpr resolved_funcexpr;
   int funcexpr_lvalue_discard;
+  struct def_instantiation *inst_discard;
   if (!lookup_global_maybe_typecheck(
           es,
           identmap_intern_c_str(es->cs->im,
                                 binop_fakename(x->operator)),
           &funcexpr,
           &resolved_funcexpr,
-          &funcexpr_lvalue_discard)) {
+          &funcexpr_lvalue_discard,
+          &inst_discard)) {
     goto fail_cleanup_funcexpr;
   }
 
@@ -1639,12 +1646,14 @@ int check_expr_unop(struct exprscope *es,
 
   struct ast_typeexpr resolved_funcexpr;
   int funcexpr_lvalue_discard;
+  struct def_instantiation *inst_discard;
   if (!lookup_global_maybe_typecheck(
           es,
           identmap_intern_c_str(es->cs->im, unop_fakename(x->operator)),
           &funcexpr,
           &resolved_funcexpr,
-          &funcexpr_lvalue_discard)) {
+          &funcexpr_lvalue_discard,
+          &inst_discard)) {
     goto cleanup_funcexpr;
   }
 
@@ -1832,10 +1841,13 @@ int check_expr(struct exprscope *es,
   case AST_EXPR_NAME: {
     struct ast_typeexpr name_type;
     int is_lvalue;
+    struct def_instantiation *inst;
     if (!exprscope_lookup_name(es, x->u.name.value, partial_type,
-                               &name_type, &is_lvalue)) {
+                               &name_type, &is_lvalue, &inst)) {
       return 0;
     }
+
+    /* TODO: Record (inst, es->generic_substitutions) in the ast_expr, *x. */
 
     *out = name_type;
     *is_lvalue_out = is_lvalue;
