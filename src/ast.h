@@ -295,6 +295,13 @@ void ast_deref_field_access_init(struct ast_deref_field_access *a,
                                  struct ast_expr *lhs,
                                  struct ast_ident fieldname);
 
+struct ast_name_expr {
+  struct ast_ident ident;
+};
+
+void ast_name_expr_init(struct ast_name_expr *a,
+                        struct ast_ident ident);
+
 enum ast_expr_tag {
   AST_EXPR_NAME,
   AST_EXPR_NUMERIC_LITERAL,
@@ -309,7 +316,7 @@ enum ast_expr_tag {
 struct ast_expr {
   enum ast_expr_tag tag;
   union {
-    struct ast_ident name;
+    struct ast_name_expr name;
     struct ast_numeric_literal numeric_literal;
     struct ast_funcall funcall;
     struct ast_unop_expr unop_expr;

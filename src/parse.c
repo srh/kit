@@ -906,7 +906,12 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
 
   if (is_ident_firstchar(ps_peek(p))) {
     out->tag = AST_EXPR_NAME;
-    return parse_ident(p, &out->u.name);
+    struct ast_ident ident;
+    if (!parse_ident(p, &ident)) {
+      return 0;
+    }
+    ast_name_expr_init(&out->u.name, ident);
+    return 1;
   }
 
   if (try_skip_char(p, '(')) {

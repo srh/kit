@@ -302,9 +302,17 @@ void ast_deref_field_access_destroy(struct ast_deref_field_access *a) {
   ast_ident_destroy(&a->fieldname);
 }
 
+void ast_name_expr_init(struct ast_name_expr *a, struct ast_ident ident) {
+  a->ident = ident;
+}
+
+void ast_name_expr_destroy(struct ast_name_expr *a) {
+  ast_ident_destroy(&a->ident);
+}
+
 struct ast_meta ast_expr_meta(struct ast_expr *a) {
   switch (a->tag) {
-  case AST_EXPR_NAME: return a->u.name.meta;
+  case AST_EXPR_NAME: return a->u.name.ident.meta;
   case AST_EXPR_NUMERIC_LITERAL: return a->u.numeric_literal.meta;
   case AST_EXPR_FUNCALL: return a->u.funcall.meta;
   case AST_EXPR_UNOP: return a->u.unop_expr.meta;
@@ -323,7 +331,7 @@ size_t ast_expr_pos_end(struct ast_expr *a) {
 void ast_expr_destroy(struct ast_expr *a) {
   switch (a->tag) {
   case AST_EXPR_NAME:
-    ast_ident_destroy(&a->u.name);
+    ast_name_expr_destroy(&a->u.name);
     break;
   case AST_EXPR_NUMERIC_LITERAL:
     ast_numeric_literal_destroy(&a->u.numeric_literal);

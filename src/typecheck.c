@@ -1842,7 +1842,7 @@ int check_expr(struct exprscope *es,
     struct ast_typeexpr name_type;
     int is_lvalue;
     struct def_instantiation *inst;
-    if (!exprscope_lookup_name(es, x->u.name.value, partial_type,
+    if (!exprscope_lookup_name(es, x->u.name.ident.value, partial_type,
                                &name_type, &is_lvalue, &inst)) {
       return 0;
     }
