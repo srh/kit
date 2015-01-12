@@ -1847,8 +1847,10 @@ int check_expr(struct exprscope *es,
       return 0;
     }
 
-    /* TODO: Record (inst, es->generic_substitutions) in the ast_expr, *x. */
-
+    ast_meta_insts_add_copy(&x->u.name.insts,
+                            inst,
+                            es->generics_substitutions,
+                            es->generics_substitutions_count);
     *out = name_type;
     *is_lvalue_out = is_lvalue;
     return 1;
@@ -2245,8 +2247,15 @@ int eval_static_value(struct ast_generics *generics,
                       struct static_value *out) {
   switch (expr->tag) {
   case AST_EXPR_NAME: {
-    ERR_DBG("Evaluating a static value not implemented for names.\n");
-    return 0;
+    struct def_instantiation *inst;
+    if (!ast_meta_insts_lookup(&expr->u.name.insts, types, types_count,
+                               &inst)) {
+      CRASH("Could not find an instantation which should exist.");
+    }
+
+    CHECK(inst->value_computed);
+    static_value_init_copy(out, &inst->value);
+    return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL:
     return eval_static_numeric_literal(&expr->u.numeric_literal, out);
@@ -2536,11 +2545,7 @@ int check_file_test_def_3(const uint8_t *name, size_t name_count,
                           uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
                                "def[] x i32 = 3;\n"
-#if 0
                                "def y i32 = x;\n"
-#else
-                               "def y i32 = 3;\n"
-#endif
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -2966,10 +2971,7 @@ int check_file_test_lambda_28(const uint8_t *name, size_t name_count,
                               uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      /* TODO: Reenable this when static values can have name expressions. */
-#if 0
       "def y i32 = -x;\n"
-#endif
       "def x i32 = -3;\n"
     } };
 

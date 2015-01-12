@@ -295,7 +295,35 @@ void ast_deref_field_access_init(struct ast_deref_field_access *a,
                                  struct ast_expr *lhs,
                                  struct ast_ident fieldname);
 
+/* This metadata exists for all ast_name_expr expressions -- they say,
+   for a given generic instantiation (specified by
+   generics_substitutions) that the expression lies in, what
+   def_instantiation the name refers to.  (Maybe instead we should
+   store a (def_entry, instantiation_index) pair.) */
+struct ast_meta_insts_pair {
+  struct def_instantiation *inst;  /* an unowned pointer */
+  struct ast_typeexpr *generics_substitutions;
+  size_t generics_substitutions_count;
+};
+
+struct ast_meta_insts {
+  struct ast_meta_insts_pair *pairs;
+  size_t pairs_count;
+  size_t pairs_limit;
+};
+
+void ast_meta_insts_add_copy(struct ast_meta_insts *a,
+                             struct def_instantiation *inst,
+                             struct ast_typeexpr *generics_substitutions,
+                             size_t generics_substitutions_count);
+
+int ast_meta_insts_lookup(struct ast_meta_insts *a,
+                          struct ast_typeexpr *substitutions,
+                          size_t substitutions_count,
+                          struct def_instantiation **inst_out);
+
 struct ast_name_expr {
+  struct ast_meta_insts insts;
   struct ast_ident ident;
 };
 

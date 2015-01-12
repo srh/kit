@@ -1,6 +1,7 @@
 #include "ast.h"
 
 #include "slice.h"
+#include "table.h"  /* TODO: For typelists_equal.  Reorganize locations. */
 
 struct ast_meta ast_meta_make(size_t pos_start, size_t pos_end) {
   struct ast_meta ret;
@@ -302,11 +303,69 @@ void ast_deref_field_access_destroy(struct ast_deref_field_access *a) {
   ast_ident_destroy(&a->fieldname);
 }
 
+void ast_meta_insts_pair_init(struct ast_meta_insts_pair *a,
+                              struct def_instantiation *inst,
+                              struct ast_typeexpr *generics_substitutions,
+                              size_t generics_substitutions_count) {
+  a->inst = inst;
+  a->generics_substitutions = generics_substitutions;
+  a->generics_substitutions_count = generics_substitutions_count;
+}
+
+void ast_meta_insts_pair_destroy(struct ast_meta_insts_pair *a) {
+  a->inst = NULL;
+  SLICE_FREE(a->generics_substitutions, a->generics_substitutions_count,
+             ast_typeexpr_destroy);
+}
+
+void ast_meta_insts_init(struct ast_meta_insts *a) {
+  a->pairs = NULL;
+  a->pairs_count = 0;
+  a->pairs_limit = 0;
+}
+
+void ast_meta_insts_destroy(struct ast_meta_insts *a) {
+  SLICE_FREE(a->pairs, a->pairs_count, ast_meta_insts_pair_destroy);
+  a->pairs_limit = 0;
+}
+
+void ast_meta_insts_add_copy(struct ast_meta_insts *a,
+                             struct def_instantiation *inst,
+                             struct ast_typeexpr *generics_substitutions,
+                             size_t generics_substitutions_count) {
+  struct ast_typeexpr *copy = malloc_mul(sizeof(*copy), generics_substitutions_count);
+  for (size_t i = 0; i < generics_substitutions_count; i++) {
+    ast_typeexpr_init_copy(&copy[i], &generics_substitutions[i]);
+  }
+
+  struct ast_meta_insts_pair pair;
+  ast_meta_insts_pair_init(&pair, inst, copy, generics_substitutions_count);
+  SLICE_PUSH(a->pairs, a->pairs_count, a->pairs_limit, pair);
+}
+
+int ast_meta_insts_lookup(struct ast_meta_insts *a,
+                          struct ast_typeexpr *substitutions,
+                          size_t substitutions_count,
+                          struct def_instantiation **inst_out) {
+  for (size_t i = 0, e = a->pairs_count; i < e; i++) {
+    if (typelists_equal(a->pairs[i].generics_substitutions,
+                        a->pairs[i].generics_substitutions_count,
+                        substitutions,
+                        substitutions_count)) {
+      *inst_out = a->pairs[i].inst;
+      return 1;
+    }
+  }
+  return 0;
+}
+
 void ast_name_expr_init(struct ast_name_expr *a, struct ast_ident ident) {
+  ast_meta_insts_init(&a->insts);
   a->ident = ident;
 }
 
 void ast_name_expr_destroy(struct ast_name_expr *a) {
+  ast_meta_insts_destroy(&a->insts);
   ast_ident_destroy(&a->ident);
 }
 

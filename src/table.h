@@ -22,6 +22,7 @@ struct static_value {
 void static_value_init_i32(struct static_value *a, int32_t i32_value);
 void static_value_init_u32(struct static_value *a, uint32_t u32_value);
 void static_value_init_lambda(struct static_value *a, struct ast_expr *lambda);
+void static_value_init_copy(struct static_value *a, struct static_value *c);
 void static_value_destroy(struct static_value *a);
 
 struct def_instantiation {
@@ -157,5 +158,8 @@ void deftype_entry_mark_has_been_checked(struct deftype_entry *ent);
 void deftype_entry_mark_generic_flatly_held(struct deftype_entry *ent,
                                             size_t which_generic);
 
+/* TODO: This doesn't really belong here. */
+int typelists_equal(struct ast_typeexpr *a, size_t a_count,
+                    struct ast_typeexpr *b, size_t b_count);
 
 #endif /* KIRA_TABLE_H_ */

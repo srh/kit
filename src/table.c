@@ -30,6 +30,10 @@ void static_value_init_lambda(struct static_value *a, struct ast_expr *lambda) {
   a->u.lambda = lambda;
 }
 
+void static_value_init_copy(struct static_value *a, struct static_value *c) {
+  *a = *c;
+}
+
 void static_value_destroy(struct static_value *sv) {
   sv->tag = (enum static_value_tag)-1;
 }
