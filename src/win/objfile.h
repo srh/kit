@@ -32,6 +32,9 @@ struct objfile_section *objfile_data(struct objfile *f);
 struct objfile_section *objfile_rdata(struct objfile *f);
 struct objfile_section *objfile_text(struct objfile *f);
 
+uint32_t objfile_add_string(struct objfile *f,
+                            const void *string, size_t string_size);
+
 void objfile_section_append_32bit_reloc(struct objfile_section *s,
                                         uint32_t SymbolTableIndex,
                                         uint16_t Type);

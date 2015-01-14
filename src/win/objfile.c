@@ -405,6 +405,22 @@ int is_valid_for_Name(const uint8_t *name, size_t name_count) {
   return 1;
 }
 
+uint32_t objfile_add_string(struct objfile *f,
+                            const void *string, size_t string_count) {
+  const uint8_t *ch = string;
+  STATIC_CHECK(sizeof(uint8_t) == 1);
+  for (size_t i = 0; i < string_count; i++) {
+    CHECK(ch[i] != 0);
+  }
+  /* The docs say we want an offset into the strings table -- does
+     this include the leading 4 size bytes (which do include
+     themselves) or not?  I'm guessing it includes them. */
+  uint32_t ret = uint32_add(size_to_uint32(f->strings.count), 4);
+  databuf_append(&f->strings, string, string_count);
+  databuf_append(&f->strings, "\0", 1);
+  return ret;
+}
+
 void munge_to_Name(struct objfile *f,
                    const uint8_t *name,
                    size_t name_count,
@@ -415,9 +431,9 @@ void munge_to_Name(struct objfile *f,
     memset(Name_out->ShortName, 0, 8);
     memcpy(Name_out->ShortName, name, name_count);
   } else {
-    CRASH("munge_to_Name does not support >8 character names yet.\n");
-    (void)f;
-    /* TODO: Implement for real. */
+    uint32_t offset = objfile_add_string(f, name, name_count);
+    Name_out->LongName.Zeroes = 0;
+    Name_out->LongName.Offset = offset;
   }
 }
 
