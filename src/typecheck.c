@@ -775,8 +775,8 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
     struct exprscope scope;
     exprscope_init(&scope, es->cs,
                    &ent->def->generics,
-                   inst->types,
-                   inst->types_count,
+                   inst->substitutions,
+                   inst->substitutions_count,
                    STATIC_COMPUTATION_YES,
                    ent);
     if (!check_expr_with_type(&scope, &ent->def->rhs, &unified)) {
@@ -2291,7 +2291,8 @@ int compute_static_values(struct def_entry *ent) {
     struct def_instantiation *inst = ent->instantiations[i];
     CHECK(!inst->value_computed);
 
-    if (!eval_static_value(&ent->generics, inst->types, inst->types_count,
+    if (!eval_static_value(&ent->generics,
+                           inst->substitutions, inst->substitutions_count,
                            &ent->def->rhs,
                            &inst->value)) {
       return 0;

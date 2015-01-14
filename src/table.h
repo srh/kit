@@ -27,8 +27,8 @@ void static_value_destroy(struct static_value *a);
 
 struct def_instantiation {
   int typecheck_started;
-  struct ast_typeexpr *types;
-  size_t types_count;
+  struct ast_typeexpr *substitutions;
+  size_t substitutions_count;
 
   int value_computed;
   struct static_value value;

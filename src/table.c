@@ -39,19 +39,19 @@ void static_value_destroy(struct static_value *sv) {
 }
 
 void def_instantiation_init(struct def_instantiation *a,
-                            struct ast_typeexpr **types,
-                            size_t *types_count) {
+                            struct ast_typeexpr **substitutions,
+                            size_t *substitutions_count) {
   a->typecheck_started = 0;
-  a->types = *types;
-  a->types_count = *types_count;
+  a->substitutions = *substitutions;
+  a->substitutions_count = *substitutions_count;
   a->value_computed = 0;
-  *types = NULL;
-  *types_count = 0;
+  *substitutions = NULL;
+  *substitutions_count = 0;
 }
 
 void def_instantiation_destroy(struct def_instantiation *a) {
   a->typecheck_started = 0;
-  SLICE_FREE(a->types, a->types_count, ast_typeexpr_destroy);
+  SLICE_FREE(a->substitutions, a->substitutions_count, ast_typeexpr_destroy);
   if (a->value_computed) {
     static_value_destroy(&a->value);
     a->value_computed = 0;
@@ -800,7 +800,7 @@ struct def_instantiation *def_entry_insert_instantiation(
                                ent->generics.params_count : 0));
   for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
     struct def_instantiation *inst = ent->instantiations[i];
-    if (typelists_equal(inst->types, inst->types_count,
+    if (typelists_equal(inst->substitutions, inst->substitutions_count,
                         materialized, materialized_count)) {
       return inst;
     }
