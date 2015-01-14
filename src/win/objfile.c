@@ -262,9 +262,10 @@ uint16_t objfile_section_small_relocations_count(struct objfile_section *s) {
   return (uint16_t)s->relocs_count;
 }
 
-/* 1-based index in the section header table.  data is 1, rdata is 2,
-   text is 3 (because that's the order we put them in). */
-static const uint16_t TEXT_SECTION_NUMBER = 3;
+uint16_t section_to_SectionNumber(enum section section) {
+  CHECK(section >= SECTION_DATA && section <= SECTION_TEXT);
+  return section;
+}
 
 struct objfile {
   struct objfile_section data;
@@ -412,14 +413,14 @@ uint32_t objfile_add_local_symbol(struct objfile *f,
                                   const uint8_t *name,
                                   size_t name_count,
                                   uint32_t Value,
-                                  enum is_function is_function,
+                                  enum section section,
                                   enum is_static is_static) {
   uint32_t ret = size_to_uint32(f->symbol_table_count);
   union objfile_symbol_record u;
   munge_to_Name(f, name, name_count, &u.standard.Name);
   u.standard.Value = Value;
-  u.standard.SectionNumber = TEXT_SECTION_NUMBER;
-  u.standard.Type = is_function == IS_FUNCTION_NO ? kNullSymType : kFunctionSymType;
+  u.standard.SectionNumber = section_to_SectionNumber(section);
+  u.standard.Type = section == SECTION_TEXT ? kFunctionSymType : kNullSymType;
   /* At some point we might want to support... static functions or external or something, idk. */
   u.standard.StorageClass = is_static == IS_STATIC_NO ? IMAGE_SYM_CLASS_EXTERNAL: IMAGE_SYM_CLASS_STATIC;
   u.standard.NumberOfAuxSymbols = 0;
@@ -629,6 +630,15 @@ void objfile_section_append_dir32nb(struct objfile_section *s,
 void objfile_section_append_rel32(struct objfile_section *s,
                                   uint32_t SymbolTableIndex) {
   objfile_section_append_32bit_reloc(s, SymbolTableIndex, IMAGE_REL_I386_REL32);
+}
+
+int objfile_c_symbol_name(const void *name, size_t name_count,
+                          void **c_name_out, size_t *c_name_count_out) {
+  char *c_name;
+  alloc_memcat("_", 1, name, name_count,
+               &c_name, c_name_count_out);
+  *c_name_out = c_name;
+  return 1;
 }
 
 int make_almost_blank_objfile(void **buf_out, size_t *count_out) {

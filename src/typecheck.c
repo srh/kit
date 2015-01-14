@@ -115,6 +115,11 @@ void intern_binop(struct checkstate *cs,
 #define FUNC_TYPE_NAME "func"
 #define BOOLEAN_STANDIN_TYPE_NAME I32_TYPE_NAME
 
+int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x) {
+  return x->tag == AST_TYPEEXPR_APP
+    && x->u.app.name.value == identmap_intern(im, FUNC_TYPE_NAME, strlen(FUNC_TYPE_NAME));
+}
+
 void checkstate_import_primitive_types(struct checkstate *cs) {
   intern_primitive_type(cs, VOID_TYPE_NAME, NULL, 0);
   intern_primitive_type(cs, BYTE_TYPE_NAME, NULL, 0);

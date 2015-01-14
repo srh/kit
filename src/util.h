@@ -55,7 +55,7 @@ void *malloc_mul(size_t a, size_t b);
 
 /* Returns a pointer to a buffer of size *count_out + 1... so that
    there's a null terminator. */
-void alloc_strcat(const void *lbuf, size_t lcount,
+void alloc_memcat(const void *lbuf, size_t lcount,
                   const void *rbuf, size_t rcount,
                   char **buf_ptr_out, size_t *count_out);
 

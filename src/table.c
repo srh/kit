@@ -40,11 +40,14 @@ void static_value_destroy(struct static_value *sv) {
 
 void def_instantiation_init(struct def_instantiation *a,
                             struct ast_typeexpr **substitutions,
-                            size_t *substitutions_count) {
+                            size_t *substitutions_count,
+                            struct ast_typeexpr *concrete_type) {
   a->typecheck_started = 0;
   a->substitutions = *substitutions;
   a->substitutions_count = *substitutions_count;
+  ast_typeexpr_init_copy(&a->type, concrete_type);
   a->value_computed = 0;
+  a->symbol_table_index_computed = 0;
   *substitutions = NULL;
   *substitutions_count = 0;
 }
@@ -795,7 +798,8 @@ int typelists_equal(struct ast_typeexpr *a, size_t a_count,
 struct def_instantiation *def_entry_insert_instantiation(
     struct def_entry *ent,
     struct ast_typeexpr *materialized,
-    size_t materialized_count) {
+    size_t materialized_count,
+    struct ast_typeexpr *concrete_type) {
   CHECK(materialized_count == (ent->generics.has_type_params ?
                                ent->generics.params_count : 0));
   for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
@@ -814,7 +818,7 @@ struct def_instantiation *def_entry_insert_instantiation(
 
   struct def_instantiation *inst = malloc(sizeof(*inst));
   CHECK(inst);
-  def_instantiation_init(inst, &copy, &copy_count);
+  def_instantiation_init(inst, &copy, &copy_count, concrete_type);
   SLICE_PUSH(ent->instantiations, ent->instantiations_count,
              ent->instantiations_limit, inst);
   return inst;
@@ -836,7 +840,7 @@ int def_entry_matches(struct def_entry *ent,
     }
 
     ast_typeexpr_init_copy(unified_type_out, &ent->type);
-    *instantiation_out = def_entry_insert_instantiation(ent, NULL, 0);
+    *instantiation_out = def_entry_insert_instantiation(ent, NULL, 0, &ent->type);
     return 1;
   }
 
@@ -859,7 +863,8 @@ int def_entry_matches(struct def_entry *ent,
     ast_typeexpr_init_copy(unified_type_out, &ent_concrete_type);
     *instantiation_out = def_entry_insert_instantiation(ent,
                                                         generics_or_null,
-                                                        generics_count);
+                                                        generics_count,
+                                                        &ent_concrete_type);
   cleanup_concrete_type:
     ast_typeexpr_destroy(&ent_concrete_type);
     return ret;
@@ -885,7 +890,8 @@ int def_entry_matches(struct def_entry *ent,
   *instantiation_out
     = def_entry_insert_instantiation(ent,
                                      materialized_params,
-                                     materialized_params_count);
+                                     materialized_params_count,
+                                     unified_type_out);
   SLICE_FREE(materialized_params, materialized_params_count,
              ast_typeexpr_destroy);
   return 1;

@@ -22,6 +22,8 @@ struct checkstate {
 
   int template_instantiation_recursion_depth;
 
+  uint32_t kira_name_counter;
+
   struct name_table nt;
 };
 

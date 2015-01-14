@@ -29,9 +29,13 @@ struct def_instantiation {
   int typecheck_started;
   struct ast_typeexpr *substitutions;
   size_t substitutions_count;
+  struct ast_typeexpr type;
 
   int value_computed;
   struct static_value value;
+
+  int symbol_table_index_computed;
+  uint32_t symbol_table_index;
 };
 
 struct def_entry {

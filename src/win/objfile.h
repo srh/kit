@@ -17,6 +17,13 @@ enum is_static {
   IS_STATIC_YES,
 };
 
+/* 1-based index into the section header table, for that matter. */
+enum section {
+  SECTION_DATA = 1,
+  SECTION_RDATA = 2,
+  SECTION_TEXT = 3,
+};
+
 void objfile_alloc(struct objfile **p_out);
 void objfile_flatten(struct objfile *f, struct databuf **p_out);
 void objfile_free(struct objfile **p_ref);
@@ -42,13 +49,16 @@ uint32_t objfile_add_local_symbol(struct objfile *f,
                                   const uint8_t *name,
                                   size_t name_count,
                                   uint32_t Value,
-                                  enum is_function is_function,
+                                  enum section section,
                                   enum is_static is_static);
 
 uint32_t objfile_add_remote_symbol(struct objfile *f,
                                    const uint8_t *name,
                                    size_t name_count,
                                    enum is_function is_function);
+
+int objfile_c_symbol_name(const void *name, size_t name_count,
+                          void **c_name_out, size_t *c_name_count_out);
 
 int make_almost_blank_objfile(void **buf_out, size_t *count_out);
 
