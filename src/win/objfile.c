@@ -412,9 +412,9 @@ uint32_t objfile_add_string(struct objfile *f,
   for (size_t i = 0; i < string_count; i++) {
     CHECK(ch[i] != 0);
   }
-  /* The docs say we want an offset into the strings table -- does
-     this include the leading 4 size bytes (which do include
-     themselves) or not?  I'm guessing it includes them. */
+  /* The docs say we want an offset into the strings table -- that
+     offset includes the leading 4 size bytes, which means the minimum
+     possible offset is 4. */
   uint32_t ret = uint32_add(size_to_uint32(f->strings.count), 4);
   databuf_append(&f->strings, string, string_count);
   databuf_append(&f->strings, "\0", 1);

@@ -179,6 +179,12 @@ int build_module(struct identmap *im, module_loader *loader,
   objfile_alloc(&objfile);
 
   for (size_t i = 0, e = cs.nt.defs_count; i < e; i++) {
+    if (!add_def_symbols(&cs, objfile, cs.nt.defs[i])) {
+      goto cleanup_objfile;
+    }
+  }
+
+  for (size_t i = 0, e = cs.nt.defs_count; i < e; i++) {
     if (!build_def(&cs, objfile, cs.nt.defs[i])) {
       goto cleanup_objfile;
     }
