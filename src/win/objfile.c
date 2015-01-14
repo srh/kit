@@ -278,12 +278,10 @@ struct objfile {
 
   /* strings does not include the 4-byte size field that would exist
      at the beginning of the strings table (which immediately follows
-     the symbol table on disk).  Its value will be strings_count + 4
+     the symbol table on disk).  Its value will be strings.count + 4
      (because it accounts for its own size usage).  Following the size
      field is a concatenation of null-terminated strings. */
-  uint8_t *strings;
-  size_t strings_count;
-  size_t strings_limit;
+  struct databuf strings;
 
   /* Says that we wrote section symbols.  Makes sure that we can only
      call objfile_flatten once. */
@@ -302,9 +300,7 @@ void objfile_init(struct objfile *f) {
   f->symbol_table_count = 0;
   f->symbol_table_limit = 0;
 
-  f->strings = NULL;
-  f->strings_count = 0;
-  f->strings_limit = 0;
+  databuf_init(&f->strings);
 
   f->wrote_section_symbols = 0;
 }
@@ -319,10 +315,7 @@ void objfile_destroy(struct objfile *f) {
   f->symbol_table_count = 0;
   f->symbol_table_limit = 0;
 
-  free(f->strings);
-  f->strings = NULL;
-  f->strings_count = 0;
-  f->strings_limit = 0;
+  databuf_destroy(&f->strings);
 }
 
 void objfile_alloc(struct objfile **p_out) {
@@ -521,7 +514,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
     = uint32_add(end_of_section_headers,
                  uint32_mul(size_to_uint32(f->symbol_table_count),
                             sizeof(union objfile_symbol_record)));
-  const uint32_t strings_size = uint32_add(size_to_uint32(f->strings_count), 4);
+  const uint32_t strings_size = uint32_add(size_to_uint32(f->strings.count), 4);
   STATIC_CHECK(sizeof(strings_size) == 4);
   const uint32_t end_of_strings = uint32_add(end_of_symbols, strings_size);
   const uint32_t ceil_end_of_strings = uint32_ceil_aligned(end_of_strings, 16);
@@ -577,7 +570,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
   CHECK(d->count == end_of_symbols);
   STATIC_CHECK(sizeof(strings_size) == 4);
   databuf_append(d, &strings_size, sizeof(strings_size));
-  databuf_append(d, f->strings, f->strings_count);
+  databuf_append(d, f->strings.buf, f->strings.count);
   CHECK(d->count == end_of_strings);
 
   append_zeros_to_align(d, 16);
