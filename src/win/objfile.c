@@ -629,6 +629,24 @@ void objfile_section_append_raw(struct objfile_section *s, const void *buf, size
   databuf_append(&s->raw, buf, n);
 }
 
+void objfile_section_align_dword(struct objfile_section *s) {
+  size_t m = s->raw.count % 4;
+  if (m) {
+    databuf_append(&s->raw, "\0\0\0\0", 4 - m);
+  }
+}
+
+void objfile_set_symbol_Value(struct objfile *f,
+                              uint32_t SymbolTableIndex,
+                              uint32_t Value) {
+  CHECK(SymbolTableIndex < f->symbol_table_count);
+  /* We should only be assigning this once, I think -- and we set it
+     to zero before assigning it. */
+  CHECK(f->symbol_table[SymbolTableIndex].standard.Value == 0);
+  f->symbol_table[SymbolTableIndex].standard.Value = Value;
+}
+
+
 #define IMAGE_REL_I386_DIR32 0x0006
 #define IMAGE_REL_I386_DIR32NB 0x0007
 #define IMAGE_REL_I386_REL32 0x0014
@@ -692,4 +710,8 @@ struct objfile_section *objfile_rdata(struct objfile *f) {
 }
 struct objfile_section *objfile_text(struct objfile *f) {
   return &f->text;
+}
+
+uint32_t objfile_section_size(struct objfile_section *s) {
+  return size_to_uint32(s->raw.count);
 }

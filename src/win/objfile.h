@@ -32,6 +32,8 @@ struct objfile_section *objfile_data(struct objfile *f);
 struct objfile_section *objfile_rdata(struct objfile *f);
 struct objfile_section *objfile_text(struct objfile *f);
 
+uint32_t objfile_section_size(struct objfile_section *s);
+
 uint32_t objfile_add_string(struct objfile *f,
                             const void *string, size_t string_size);
 
@@ -47,6 +49,10 @@ void objfile_section_append_rel32(struct objfile_section *s,
                                   uint32_t SymbolTableIndex);
 void objfile_section_append_raw(struct objfile_section *s,
                                 const void *buf, size_t n);
+void objfile_section_align_dword(struct objfile_section *s);
+void objfile_set_symbol_Value(struct objfile *f,
+                              uint32_t SymbolTableIndex,
+                              uint32_t Value);
 
 uint32_t objfile_add_local_symbol(struct objfile *f,
                                   const uint8_t *name,

@@ -113,10 +113,37 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
 
 int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_entry *ent, struct def_instantiation *inst) {
-  (void)cs, (void)f, (void)ent, (void)inst;
-  ERR_DBG("build_instantiation: Unimplemented.\n");
-  /* TODO: Implement. */
-  return 0;
+  (void)cs, (void)ent;
+
+  switch (inst->value.tag) {
+  case STATIC_VALUE_I32: {
+    STATIC_CHECK(sizeof(inst->value.u.i32_value) == 4);
+    CHECK(inst->symbol_table_index_computed);
+    objfile_set_symbol_Value(f, inst->symbol_table_index,
+                             objfile_section_size(objfile_data(f)));
+    objfile_section_align_dword(objfile_data(f));
+    objfile_section_append_raw(objfile_data(f),
+                               &inst->value.u.i32_value,
+                               sizeof(inst->value.u.i32_value));
+    return 1;
+  } break;
+  case STATIC_VALUE_U32: {
+    STATIC_CHECK(sizeof(inst->value.u.u32_value) == 4);
+    CHECK(inst->symbol_table_index_computed);
+    objfile_set_symbol_Value(f, inst->symbol_table_index,
+                             objfile_section_size(objfile_data(f)));
+    objfile_section_align_dword(objfile_data(f));
+    objfile_section_append_raw(objfile_data(f),
+                               &inst->value.u.u32_value,
+                               sizeof(inst->value.u.u32_value));
+    return 1;
+  } break;
+  case STATIC_VALUE_LAMBDA: {
+    TODO_IMPLEMENT;
+  } break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 int build_def(struct checkstate *cs, struct objfile *f,
