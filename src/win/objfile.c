@@ -397,16 +397,35 @@ void append_zeros_to_align(struct databuf *d, size_t alignment) {
   }
 }
 
+/* Checks that name doesn't have any null characters (it must be
+   null-terminatable), and that it's non-empty (the first four
+   bytes of a Name field can't be zero). */
+int is_valid_for_Name(const uint8_t *name, size_t name_count) {
+  if (name_count == 0) {
+    return 0;
+  }
+  for (size_t i = 0; i < name_count; i++) {
+    if (name[i] == 0) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 void munge_to_Name(struct objfile *f,
                    const uint8_t *name,
                    size_t name_count,
                    union name_eight *Name_out) {
-  (void)f;
-  /* TODO: Implement for real. */
-  CHECK(name_count <= 8);
-  STATIC_CHECK(sizeof(Name_out->ShortName) == 8);
-  memset(Name_out->ShortName, 0, 8);
-  memcpy(Name_out->ShortName, name, name_count);
+  CHECK(is_valid_for_Name(name, name_count));
+  if (name_count <= 8) {
+    STATIC_CHECK(sizeof(Name_out->ShortName) == 8);
+    memset(Name_out->ShortName, 0, 8);
+    memcpy(Name_out->ShortName, name, name_count);
+  } else {
+    CRASH("munge_to_Name does not support >8 character names yet.\n");
+    (void)f;
+    /* TODO: Implement for real. */
+  }
 }
 
 uint32_t objfile_add_local_symbol(struct objfile *f,
