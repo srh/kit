@@ -195,7 +195,7 @@ struct objfile_symbol_aux_sectiondef {
   uint16_t NumberOfRelocations;
   uint16_t NumberOfLineNumbers;
   /* COMDAT-only, set to zero. */
-  /* TODO: I don't know if this is really COMDAT-only, I see it being used... */
+  /* I don't know if this is really COMDAT-only, I see it being used... */
   uint32_t CheckSum;
   /* COMDAT-only, set to zero. */
   uint16_t Number;
