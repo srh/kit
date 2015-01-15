@@ -74,6 +74,8 @@ uint16_t real_file_characteristics(void) {
 
 static const uint32_t IMAGE_SCN_CNT_CODE = (1 << 5);
 static const uint32_t IMAGE_SCN_CNT_INITIALIZED_DATA = (1 << 6);
+static const uint32_t IMAGE_SCN_ALIGN_4_BYTES = (3ul << 20);
+static const uint32_t IMAGE_SCN_ALIGN_8_BYTES = (4ul << 20);
 static const uint32_t IMAGE_SCN_ALIGN_16_BYTES = (5ul << 20);
 static const uint32_t IMAGE_SCN_MEM_EXECUTE = (1ul << 29);
 static const uint32_t IMAGE_SCN_MEM_READ = (1ul << 30);
@@ -119,18 +121,27 @@ uint32_t text_section_characteristics(void) {
     | IMAGE_SCN_MEM_READ;
 }
 
-uint32_t rdata_section_characteristics(void) {
-  /* TODO: cl uses IMAGE_SCN_ALIGN_4_BYTES in one example -- but maybe
-     with a double, it would output higher. */
-  return IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_ALIGN_16_BYTES
-    | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE;
+uint32_t section_alignment_characteristic(size_t max_requested_alignment) {
+ switch (max_requested_alignment) {
+ case 4: return IMAGE_SCN_ALIGN_4_BYTES;
+ case 8: return IMAGE_SCN_ALIGN_8_BYTES;
+ case 16: return IMAGE_SCN_ALIGN_16_BYTES;
+ default:
+   CRASH("max_requested_alignment has a weird value.\n");
+ }
 }
 
-uint32_t data_section_characteristics(void) {
-  /* TODO: cl uses IMAGE_SCN_ALIGN_4_BYTES in one example -- but maybe
-     with a double, it would output higher. */
-  return IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_ALIGN_16_BYTES
+uint32_t rdata_section_characteristics(size_t max_requested_alignment) {
+  return IMAGE_SCN_CNT_INITIALIZED_DATA
+    | section_alignment_characteristic(max_requested_alignment)
     | IMAGE_SCN_MEM_READ;
+}
+
+uint32_t data_section_characteristics(size_t max_requested_alignment) {
+  /* cl uses 8 bytes if there's a double, by the way. */
+  return IMAGE_SCN_CNT_INITIALIZED_DATA
+    | section_alignment_characteristic(max_requested_alignment)
+    | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE;
 }
 
 static const uint8_t IMAGE_SYM_CLASS_EXTERNAL = 2;
@@ -184,6 +195,7 @@ struct objfile_symbol_aux_sectiondef {
   uint16_t NumberOfRelocations;
   uint16_t NumberOfLineNumbers;
   /* COMDAT-only, set to zero. */
+  /* TODO: I don't know if this is really COMDAT-only, I see it being used... */
   uint32_t CheckSum;
   /* COMDAT-only, set to zero. */
   uint16_t Number;
@@ -229,6 +241,10 @@ struct objfile_section {
   char Name[8];
   struct databuf raw;
 
+  /* Relavant for .data and .rdata sections.  Not relevant for .text,
+     which just uses 16. */
+  size_t max_requested_alignment;
+
   struct COFF_Relocation *relocs;
   size_t relocs_count;
   size_t relocs_limit;
@@ -239,13 +255,19 @@ void objfile_section_init(struct objfile_section *s, const char Name[8]) {
 
   databuf_init(&s->raw);
 
+  /* Just start it off with 4, that's good. */
+  s->max_requested_alignment = 4;
+
   s->relocs = NULL;
   s->relocs_count = 0;
   s->relocs_limit = 0;
 }
 
 void objfile_section_destroy(struct objfile_section *s) {
+  STATIC_CHECK(sizeof(s->Name) == 8);
+  memset(s->Name, 0, sizeof(s->Name));
   databuf_destroy(&s->raw);
+  s->max_requested_alignment = 0;
   free(s->relocs);
   s->relocs = NULL;
   s->relocs_count = 0;
@@ -573,10 +595,12 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
 
   /* Right now we've got 3 sections. */
   CHECK(number_of_sections == 3);
-  objfile_write_section_header(d, &f->data, start_of_data_raw,
-                               data_section_characteristics());
-  objfile_write_section_header(d, &f->rdata, start_of_read_data_raw,
-                               rdata_section_characteristics());
+  objfile_write_section_header(
+      d, &f->data, start_of_data_raw,
+      data_section_characteristics(f->data.max_requested_alignment));
+  objfile_write_section_header(
+      d, &f->rdata, start_of_read_data_raw,
+      rdata_section_characteristics(f->rdata.max_requested_alignment));
   objfile_write_section_header(d, &f->text, start_of_text_raw,
                                text_section_characteristics());
   CHECK(d->count == end_of_section_headers);
@@ -630,9 +654,9 @@ void objfile_section_append_raw(struct objfile_section *s, const void *buf, size
 }
 
 void objfile_section_align_dword(struct objfile_section *s) {
-  size_t m = s->raw.count % 4;
-  if (m) {
-    databuf_append(&s->raw, "\0\0\0\0", 4 - m);
+  append_zeros_to_align(&s->raw, 4);
+  if (s->max_requested_alignment < 4) {
+    s->max_requested_alignment = 4;
   }
 }
 
