@@ -100,7 +100,7 @@ uint32_t text_section_characteristics(void) {
     bit 12. IMAGE_SCN_LNK_COMDAT. The section contains COMDAT data. Object files only.
     bit 13. Undocumented.
     bit 14. Undocumented.
-    bit 15. IMAGE_SCN_GPREL. The section contains data referenced through the global pointer (GP). TODO: Wtf is this?
+    bit 15. IMAGE_SCN_GPREL. The section contains data referenced through the global pointer (GP).
     bit 16. IMAGE_SCN_MEM_PURGEABLE (reserved)? Or undocumented?
     bit 17. IMAGE_SCN_MEM_PURGEABLE (reserved)? Or undocumented? IMAGE_SCN_MEM_16BIT for ARM, section contains Thumb code.
     bit 18. IMAGE_SCN_MEM_LOCKED. Reserved.
@@ -354,12 +354,15 @@ void objfile_free(struct objfile **p_ref) {
   *p_ref = NULL;
 }
 
+/* All section beginnings are aligned to 16 bytes.  I forget if
+   there's a reason. */
+#define SECTION_ALIGNMENT 16
+
 void compute_section_dimensions(struct objfile_section *s,
                                 uint32_t start_of_raw,
                                 uint32_t *PointerToRelocations_out,
                                 uint32_t *pointer_to_end_out) {
-  /* TODO: Magic number 16 alignment.  Should it be 4? */
-  CHECK(start_of_raw % 16 == 0);
+  CHECK(start_of_raw % SECTION_ALIGNMENT == 0);
   uint32_t end_of_raw = uint32_add(start_of_raw, s->raw.count);
   uint32_t start_of_relocs = uint32_ceil_aligned(end_of_raw, 2);
   uint32_t end_of_relocs = uint32_add(start_of_relocs,
@@ -555,21 +558,24 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
   const uint32_t strings_size = uint32_add(size_to_uint32(f->strings.count), 4);
   STATIC_CHECK(sizeof(strings_size) == 4);
   const uint32_t end_of_strings = uint32_add(end_of_symbols, strings_size);
-  const uint32_t ceil_end_of_strings = uint32_ceil_aligned(end_of_strings, 16);
+  const uint32_t ceil_end_of_strings
+    = uint32_ceil_aligned(end_of_strings, SECTION_ALIGNMENT);
 
   const uint32_t start_of_data_raw = ceil_end_of_strings;
   uint32_t start_of_data_relocs;
   uint32_t end_of_data_relocs;
   compute_section_dimensions(&f->data, start_of_data_raw,
                              &start_of_data_relocs, &end_of_data_relocs);
-  const uint32_t ceil_end_of_data_relocs = uint32_ceil_aligned(end_of_data_relocs, 16);
+  const uint32_t ceil_end_of_data_relocs
+    = uint32_ceil_aligned(end_of_data_relocs, SECTION_ALIGNMENT);
 
   const uint32_t start_of_read_data_raw = ceil_end_of_data_relocs;
   uint32_t start_of_read_data_relocs;
   uint32_t end_of_read_data_relocs;
   compute_section_dimensions(&f->rdata, start_of_read_data_raw,
                              &start_of_read_data_relocs, &end_of_read_data_relocs);
-  const uint32_t ceil_end_of_read_data_relocs = uint32_ceil_aligned(end_of_read_data_relocs, 16);
+  const uint32_t ceil_end_of_read_data_relocs
+    = uint32_ceil_aligned(end_of_read_data_relocs, SECTION_ALIGNMENT);
 
   const uint32_t start_of_text_raw = ceil_end_of_read_data_relocs;
   uint32_t start_of_text_relocs;
@@ -613,7 +619,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
   databuf_append(d, f->strings.buf, f->strings.count);
   CHECK(d->count == end_of_strings);
 
-  append_zeros_to_align(d, 16);
+  append_zeros_to_align(d, SECTION_ALIGNMENT);
   CHECK(d->count == ceil_end_of_strings);
 
   databuf_append(d, f->data.raw.buf, f->data.raw.count);
@@ -624,7 +630,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
                                              sizeof(struct COFF_Relocation)));
   CHECK(d->count == end_of_data_relocs);
 
-  append_zeros_to_align(d, 16);
+  append_zeros_to_align(d, SECTION_ALIGNMENT);
   CHECK(d->count == ceil_end_of_data_relocs);
 
   databuf_append(d, f->rdata.raw.buf, f->rdata.raw.count);
@@ -635,7 +641,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
                                               sizeof(struct COFF_Relocation)));
   CHECK(d->count == end_of_read_data_relocs);
 
-  append_zeros_to_align(d, 16);
+  append_zeros_to_align(d, SECTION_ALIGNMENT);
   CHECK(d->count == ceil_end_of_read_data_relocs);
 
   databuf_append(d, f->text.raw.buf, f->text.raw.count);
