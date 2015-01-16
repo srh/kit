@@ -72,10 +72,10 @@ void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
 }
 
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
-                      struct ast_expr *func, struct ast_expr *args,
-                      size_t args_count) {
+                      struct ast_expr func,
+                      struct ast_expr *args, size_t args_count) {
   a->meta = meta;
-  a->func = func;
+  ast_expr_alloc_move(func, &a->func);
   a->args = args;
   a->args_count = args_count;
 }
@@ -155,11 +155,12 @@ void ast_bracebody_destroy(struct ast_bracebody *a) {
 
 void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
                             struct ast_ident name, struct ast_typeexpr type,
-                            struct ast_expr *rhs) {
+                            struct ast_expr rhs) {
   a->meta = meta;
+  /* TODO: This is freaking weird. */
   ast_vardecl_init(&a->decl, ast_meta_make(name.meta.pos_start, ast_typeexpr_meta(&type)->pos_end),
                    name, type);
-  a->rhs = rhs;
+  ast_expr_alloc_move(rhs, &a->rhs);
 }
 
 void ast_var_statement_init_copy(struct ast_var_statement *a,
@@ -213,10 +214,10 @@ void ast_label_statement_destroy(struct ast_label_statement *a) {
 
 void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
                                struct ast_meta meta,
-                               struct ast_expr *condition,
+                               struct ast_expr condition,
                                struct ast_bracebody thenbody) {
   a->meta = meta;
-  a->condition = condition;
+  ast_expr_alloc_move(condition, &a->condition);
   a->thenbody = thenbody;
 }
 
@@ -237,11 +238,11 @@ void ast_ifthen_statement_destroy(struct ast_ifthen_statement *a) {
 
 void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,
                                    struct ast_meta meta,
-                                   struct ast_expr *condition,
+                                   struct ast_expr condition,
                                    struct ast_bracebody thenbody,
                                    struct ast_bracebody elsebody) {
   a->meta = meta;
-  a->condition = condition;
+  ast_expr_alloc_move(condition, &a->condition);
   a->thenbody = thenbody;
   a->elsebody = elsebody;
 }
@@ -328,10 +329,10 @@ void ast_statement_destroy(struct ast_statement *a) {
 }
 
 void ast_unop_expr_init(struct ast_unop_expr *a, struct ast_meta meta,
-                        enum ast_unop operator, struct ast_expr *rhs) {
+                        enum ast_unop operator, struct ast_expr rhs) {
   a->meta = meta;
   a->operator = operator;
-  a->rhs = rhs;
+  ast_expr_alloc_move(rhs, &a->rhs);
 }
 
 void ast_unop_expr_init_copy(struct ast_unop_expr *a,
@@ -350,12 +351,12 @@ void ast_unop_expr_destroy(struct ast_unop_expr *a) {
 }
 
 void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
-                         enum ast_binop operator, struct ast_expr *lhs,
-                         struct ast_expr *rhs) {
+                         enum ast_binop operator, struct ast_expr lhs,
+                         struct ast_expr rhs) {
   a->meta = meta;
   a->operator = operator;
-  a->lhs = lhs;
-  a->rhs = rhs;
+  ast_expr_alloc_move(lhs, &a->lhs);
+  ast_expr_alloc_move(rhs, &a->rhs);
 }
 
 void ast_binop_expr_init_copy(struct ast_binop_expr *a,
@@ -408,10 +409,10 @@ void ast_lambda_destroy(struct ast_lambda *a) {
 
 void ast_local_field_access_init(struct ast_local_field_access *a,
                                  struct ast_meta meta,
-                                 struct ast_expr *lhs,
+                                 struct ast_expr lhs,
                                  struct ast_ident fieldname) {
   a->meta = meta;
-  a->lhs = lhs;
+  ast_expr_alloc_move(lhs, &a->lhs);
   a->fieldname = fieldname;
 }
 
@@ -431,10 +432,10 @@ void ast_local_field_access_destroy(struct ast_local_field_access *a) {
 
 void ast_deref_field_access_init(struct ast_deref_field_access *a,
                                  struct ast_meta meta,
-                                 struct ast_expr *lhs,
+                                 struct ast_expr lhs,
                                  struct ast_ident fieldname) {
   a->meta = meta;
-  a->lhs = lhs;
+  ast_expr_alloc_move(lhs, &a->lhs);
   a->fieldname = fieldname;
 }
 
@@ -629,6 +630,13 @@ void ast_expr_destroy(struct ast_expr *a) {
     UNREACHABLE();
   }
   a->tag = (enum ast_expr_tag)-1;
+}
+
+void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out) {
+  struct ast_expr *p = malloc(sizeof(*p));
+  CHECK(p);
+  *p = movee;
+  *out = p;
 }
 
 void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,

@@ -131,13 +131,6 @@ ident_value ps_intern_ident(struct ps *p,
                          ident_end.pos - ident_begin.pos);
 }
 
-void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out) {
-  struct ast_expr *p = malloc(sizeof(*p));
-  CHECK(p);
-  *p = movee;
-  *out = p;
-}
-
 struct precedence_pair {
   int left_precedence;
   int right_precedence;
@@ -606,12 +599,10 @@ int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
     goto fail_thenbody;
   }
   if (!try_skip_keyword(p, "else")) {
-    struct ast_expr *heap_condition;
-    malloc_move_ast_expr(condition, &heap_condition);
     out->tag = AST_STATEMENT_IFTHEN;
     ast_ifthen_statement_init(&out->u.ifthen_statement,
                               ast_meta_make(pos_start, pos_thenbody_end),
-                              heap_condition,
+                              condition,
                               thenbody);
     return 1;
   }
@@ -621,12 +612,10 @@ int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
     goto fail_thenbody;
   }
 
-  struct ast_expr *heap_condition;
-  malloc_move_ast_expr(condition, &heap_condition);
   out->tag = AST_STATEMENT_IFTHENELSE;
   ast_ifthenelse_statement_init(&out->u.ifthenelse_statement,
                                 ast_meta_make(pos_start, ps_pos(p)),
-                                heap_condition,
+                                condition,
                                 thenbody,
                                 elsebody);
   return 1;
@@ -664,10 +653,8 @@ int parse_rest_of_var_statement(struct ps *p, size_t pos_start,
     goto fail_rhs;
   }
 
-  struct ast_expr *heap_rhs;
-  malloc_move_ast_expr(rhs, &heap_rhs);
   ast_var_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                         name, type, heap_rhs);
+                         name, type, rhs);
   return 1;
 
  fail_rhs:
@@ -723,10 +710,8 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
       return 0;
     }
 
-    struct ast_expr *heap_expr;
-    malloc_move_ast_expr(expr, &heap_expr);
     out->tag = AST_STATEMENT_RETURN_EXPR;
-    out->u.return_expr = heap_expr;
+    ast_expr_alloc_move(expr, &out->u.return_expr);
     return 1;
   } else if (try_skip_keyword(p, "if")) {
     return parse_rest_of_if_statement(p, pos_start, out);
@@ -741,10 +726,8 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
       return 0;
     }
 
-    struct ast_expr *heap_expr;
-    malloc_move_ast_expr(expr, &heap_expr);
     out->tag = AST_STATEMENT_EXPR;
-    out->u.expr = heap_expr;
+    ast_expr_alloc_move(expr, &out->u.expr);
     return 1;
   }
 }
@@ -934,12 +917,10 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
       return 0;
     }
 
-    struct ast_expr *heap_rhs;
-    malloc_move_ast_expr(rhs, &heap_rhs);
     out->tag = AST_EXPR_UNOP;
     ast_unop_expr_init(&out->u.unop_expr,
-                       ast_meta_make(pos_start, ast_expr_pos_end(heap_rhs)),
-                       unop, heap_rhs);
+                       ast_meta_make(pos_start, ast_expr_pos_end(&rhs)),
+                       unop, rhs);
     return 1;
   }
 
@@ -966,12 +947,11 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       if (!parse_rest_of_arglist(p, &args, &args_count)) {
         goto fail;
       }
-      struct ast_expr *heap_lhs;
-      malloc_move_ast_expr(lhs, &heap_lhs);
+      struct ast_expr old_lhs = lhs;
       lhs.tag = AST_EXPR_FUNCALL;
       ast_funcall_init(&lhs.u.funcall,
                        ast_meta_make(pos_start, ps_pos(p)),
-                       heap_lhs,
+                       old_lhs,
                        args,
                        args_count);
     } else if (try_skip_oper(p, ".")) {
@@ -980,12 +960,11 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
         goto fail;
       }
 
-      struct ast_expr *heap_lhs;
-      malloc_move_ast_expr(lhs, &heap_lhs);
+      struct ast_expr old_lhs = lhs;
       lhs.tag = AST_EXPR_LOCAL_FIELD_ACCESS;
       ast_local_field_access_init(&lhs.u.local_field_access,
                                   ast_meta_make(pos_start, ps_pos(p)),
-                                  heap_lhs,
+                                  old_lhs,
                                   field_name);
     } else if (try_skip_oper(p, "->")) {
       struct ast_ident field_name;
@@ -993,12 +972,11 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
         goto fail;
       }
 
-      struct ast_expr *heap_lhs;
-      malloc_move_ast_expr(lhs, &heap_lhs);
+      struct ast_expr old_lhs = lhs;
       lhs.tag = AST_EXPR_DEREF_FIELD_ACCESS;
       ast_deref_field_access_init(&lhs.u.deref_field_access,
                                   ast_meta_make(pos_start, ps_pos(p)),
-                                  heap_lhs,
+                                  old_lhs,
                                   field_name);
     } else if (is_binop_start(ps_peek(p))) {
       struct ps_savestate save = ps_save(p);
@@ -1033,15 +1011,11 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
         goto fail;
       }
 
-      struct ast_expr *heap_lhs;
-      malloc_move_ast_expr(lhs, &heap_lhs);
-      struct ast_expr *heap_rhs;
-      malloc_move_ast_expr(rhs, &heap_rhs);
-
+      struct ast_expr old_lhs = lhs;
       lhs.tag = AST_EXPR_BINOP;
       ast_binop_expr_init(&lhs.u.binop_expr,
-                          ast_meta_make(pos_start, ast_expr_pos_end(heap_rhs)),
-                          op, heap_lhs, heap_rhs);
+                          ast_meta_make(pos_start, ast_expr_pos_end(&rhs)),
+                          op, old_lhs, rhs);
     } else {
       PARSE_DBG("parse_expr done\n");
       *out = lhs;

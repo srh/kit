@@ -49,8 +49,8 @@ struct ast_funcall {
 };
 
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
-                      struct ast_expr *func, struct ast_expr *args,
-                      size_t args_count);
+                      struct ast_expr func,
+                      struct ast_expr *args, size_t args_count);
 
 struct ast_typeexpr;
 
@@ -142,7 +142,7 @@ struct ast_var_statement {
 
 void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
                             struct ast_ident name, struct ast_typeexpr type,
-                            struct ast_expr *rhs);
+                            struct ast_expr rhs);
 
 struct ast_goto_statement {
   struct ast_meta meta;
@@ -168,7 +168,7 @@ struct ast_ifthen_statement {
 
 void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
                                struct ast_meta meta,
-                               struct ast_expr *condition,
+                               struct ast_expr condition,
                                struct ast_bracebody thenbody);
 
 struct ast_ifthenelse_statement {
@@ -180,7 +180,7 @@ struct ast_ifthenelse_statement {
 
 void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,
                                    struct ast_meta meta,
-                                   struct ast_expr *condition,
+                                   struct ast_expr condition,
                                    struct ast_bracebody thenbody,
                                    struct ast_bracebody elsebody);
 
@@ -237,7 +237,7 @@ struct ast_unop_expr {
 };
 
 void ast_unop_expr_init(struct ast_unop_expr *a, struct ast_meta meta,
-                        enum ast_unop operator, struct ast_expr *rhs);
+                        enum ast_unop operator, struct ast_expr rhs);
 
 /* See also: binop_precedence in parse.c. */
 /* See also: Every use of these values in typecheck.c, including
@@ -272,8 +272,8 @@ struct ast_binop_expr {
 };
 
 void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
-                         enum ast_binop operator, struct ast_expr *lhs,
-                         struct ast_expr *rhs);
+                         enum ast_binop operator, struct ast_expr lhs,
+                         struct ast_expr rhs);
 
 struct ast_local_field_access {
   struct ast_meta meta;
@@ -283,7 +283,7 @@ struct ast_local_field_access {
 
 void ast_local_field_access_init(struct ast_local_field_access *a,
                                  struct ast_meta meta,
-                                 struct ast_expr *lhs,
+                                 struct ast_expr lhs,
                                  struct ast_ident fieldname);
 
 struct ast_deref_field_access {
@@ -294,7 +294,7 @@ struct ast_deref_field_access {
 
 void ast_deref_field_access_init(struct ast_deref_field_access *a,
                                  struct ast_meta meta,
-                                 struct ast_expr *lhs,
+                                 struct ast_expr lhs,
                                  struct ast_ident fieldname);
 
 /* This metadata exists for all ast_name_expr expressions -- they say,
@@ -359,9 +359,10 @@ struct ast_expr {
 };
 
 void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c);
+void ast_expr_destroy(struct ast_expr *a);
 
 size_t ast_expr_pos_end(struct ast_expr *a);
-void ast_expr_destroy(struct ast_expr *a);
+void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out);
 
 struct ast_generics {
   int has_type_params;  /* 0 or 1 -- meta & params is uninitialized if 0. */
