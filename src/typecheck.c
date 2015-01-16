@@ -794,6 +794,7 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
 
   if (!ent->is_primitive && !ent->is_extern
       && ent->generics.has_type_params && !inst->typecheck_started) {
+    CHECK(!inst->annotated_rhs_computed);
     if (es->cs->template_instantiation_recursion_depth
         == MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH) {
       ERR_DBG("Max template instantiation recursion depth exceeded.\n");
@@ -810,15 +811,17 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
                    inst->substitutions_count,
                    STATIC_COMPUTATION_YES,
                    ent);
-    /* TODO: Supposedly we're supposed to do something with this
-       "annotated" expr (instead of just destroying it). */
-    struct ast_expr annotated;
-    if (!check_expr_with_type(&scope, &ent->def->rhs, &unified, &annotated)) {
+
+    struct ast_expr annotated_rhs;
+    if (!check_expr_with_type(&scope, &ent->def->rhs, &unified, &annotated_rhs)) {
       exprscope_destroy(&scope);
       es->cs->template_instantiation_recursion_depth--;
       goto fail_unified;
     }
-    ast_expr_destroy(&annotated);
+    CHECK(!inst->annotated_rhs_computed);
+    inst->annotated_rhs_computed = 1;
+    inst->annotated_rhs = annotated_rhs;
+
     exprscope_destroy(&scope);
     es->cs->template_instantiation_recursion_depth--;
   }
@@ -2168,16 +2171,17 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
 
     int ret;
     if (!inst->typecheck_started) {
+      CHECK(!inst->annotated_rhs_computed);
       inst->typecheck_started = 1;
       struct exprscope es;
       exprscope_init(&es, cs, &a->generics, NULL, 0,
                      STATIC_COMPUTATION_YES, ent);
-      /* TODO: We're supposed to do something with this "annotated"
-         expr (besides just destroying it). */
-      struct ast_expr annotated;
-      ret = check_expr_with_type(&es, &a->rhs, &a->type, &annotated);
+      struct ast_expr annotated_rhs;
+      ret = check_expr_with_type(&es, &a->rhs, &a->type, &annotated_rhs);
       if (ret) {
-        ast_expr_destroy(&annotated);
+        CHECK(!inst->annotated_rhs_computed);
+        inst->annotated_rhs_computed = 1;
+        inst->annotated_rhs = annotated_rhs;
       }
       exprscope_destroy(&es);
     } else {

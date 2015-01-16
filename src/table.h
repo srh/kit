@@ -34,6 +34,9 @@ struct def_instantiation {
   size_t substitutions_count;
   struct ast_typeexpr type;
 
+  int annotated_rhs_computed;
+  struct ast_expr annotated_rhs;
+
   int value_computed;
   struct static_value value;
 

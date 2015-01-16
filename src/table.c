@@ -72,6 +72,7 @@ void def_instantiation_init(struct def_instantiation *a,
   a->substitutions = *substitutions;
   a->substitutions_count = *substitutions_count;
   ast_typeexpr_init_copy(&a->type, concrete_type);
+  a->annotated_rhs_computed = 0;
   a->value_computed = 0;
   a->symbol_table_index_computed = 0;
   *substitutions = NULL;
@@ -81,6 +82,10 @@ void def_instantiation_init(struct def_instantiation *a,
 void def_instantiation_destroy(struct def_instantiation *a) {
   a->typecheck_started = 0;
   SLICE_FREE(a->substitutions, a->substitutions_count, ast_typeexpr_destroy);
+  if (a->annotated_rhs_computed) {
+    ast_expr_destroy(&a->annotated_rhs);
+    a->annotated_rhs_computed = 0;
+  }
   if (a->value_computed) {
     static_value_destroy(&a->value);
     a->value_computed = 0;
