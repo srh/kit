@@ -1136,6 +1136,7 @@ int check_expr_bracebody(struct bodystate *bs,
       } else {
         if (!exact_typeexprs_equal(&bs->exact_return_type, &type)) {
           ERR_DBG("Return statements with conflicting return types.\n");
+          ast_typeexpr_destroy(&type);
           goto fail;
         } else {
           ast_typeexpr_destroy(&type);
