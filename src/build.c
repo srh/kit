@@ -94,7 +94,7 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    /* TODO: We'll need to overwrite the symbol's value (we write zero here). */
+    /* We later overwrite the symbol's value (we write zero here). */
     /* No defs are put in a read-only section... for now. */
     uint32_t symbol_table_index
       = objfile_add_local_symbol(f, gen_name, gen_name_count,
@@ -376,24 +376,39 @@ void gen_kiracall_start(struct checkstate *cs,
   kc->return_location = return_location;
 }
 
-void gen_kiracall_finish(struct objfile *f, struct varstate *vs,
-                         struct gen_kiracall *kc) {
+void gen_kiracall_destroy(struct varstate *vs, struct gen_kiracall *kc) {
   for (size_t i = 0, e = kc->num_vars; i < e; i++) {
     varstate_pop_var(vs);
   }
 
   kc->num_vars = 0;
+}
 
+void gen_kiracall_finish(struct objfile *f, struct varstate *vs,
+                         struct gen_kiracall *kc) {
   emit_leave_ret(f);
+  gen_kiracall_destroy(vs, kc);
+}
+
+int build_bracebody(struct checkstate *cs, struct objfile *f,
+                    struct varstate *vs, struct locinfo return_location,
+                    struct ast_bracebody *x) {
+  (void)cs, (void)f, (void)vs, (void)return_location, (void)x;
+  /* TODO: Implement. */
+  ERR_DBG("build_bracebody: not implement.d\n");
+  return 0;
 }
 
 int build_lambda_instantiation(struct checkstate *cs, struct objfile *f,
-                               struct def_entry *ent, struct def_instantiation *inst,
+                               struct def_instantiation *inst,
                                struct ast_expr *x) {
   CHECK(x->tag == AST_EXPR_LAMBDA);
   struct ast_lambda *lambda = &x->u.lambda;
 
   objfile_fillercode_align_double_quadword(f);
+
+  objfile_set_symbol_Value(f, inst->symbol_table_index,
+                           objfile_section_size(objfile_text(f)));
 
   struct varstate vs;
   varstate_init(&vs);
@@ -401,17 +416,24 @@ int build_lambda_instantiation(struct checkstate *cs, struct objfile *f,
   struct gen_kiracall kc;
   gen_kiracall_start(cs, f, &vs, &kc, lambda, &inst->type);
 
-  (void)ent;  /* TODO */
+  int ret = 0;
+  if (!build_bracebody(cs, f, &vs, kc.return_location, &lambda->bracebody)) {
+    goto cleanup_kiracall;
+  }
 
   gen_kiracall_finish(f, &vs, &kc);
 
+  ret = 1;
+  goto cleanup_varstate;
+ cleanup_kiracall:
+  gen_kiracall_destroy(&vs, &kc);
+ cleanup_varstate:
   varstate_destroy(&vs);
-  ERR_DBG("build_lambda_instantation not completely implemented.\n");
-  return 0;
+  return ret;
 }
 
 int build_instantiation(struct checkstate *cs, struct objfile *f,
-                        struct def_entry *ent, struct def_instantiation *inst) {
+                        struct def_instantiation *inst) {
   switch (inst->value.tag) {
   case STATIC_VALUE_I32: {
     STATIC_CHECK(sizeof(inst->value.u.i32_value) == 4);
@@ -436,7 +458,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {
-    return build_lambda_instantiation(cs, f, ent, inst, inst->value.u.lambda);
+    return build_lambda_instantiation(cs, f, inst, inst->value.u.lambda);
   } break;
   default:
     UNREACHABLE();
@@ -454,7 +476,7 @@ int build_def(struct checkstate *cs, struct objfile *f,
   }
 
   for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
-    if (!build_instantiation(cs, f, ent, ent->instantiations[i])) {
+    if (!build_instantiation(cs, f, ent->instantiations[i])) {
       return 0;
     }
   }
