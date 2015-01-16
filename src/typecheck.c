@@ -114,7 +114,10 @@ void intern_binop(struct checkstate *cs,
 #define BYTE_TYPE_NAME "byte"
 #define I32_TYPE_NAME "i32"
 #define U32_TYPE_NAME "u32"
+/* TODO: Support the type f64. */
+#if 0
 #define F64_TYPE_NAME "f64"
+#endif  /* 0 */
 #define PTR_TYPE_NAME "ptr"
 #define FUNC_TYPE_NAME "func"
 #define BOOLEAN_STANDIN_TYPE_NAME I32_TYPE_NAME
@@ -129,8 +132,11 @@ void checkstate_import_primitive_types(struct checkstate *cs) {
   intern_primitive_type(cs, BYTE_TYPE_NAME, NULL, 0, 1, 1);
   intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0, 4, 4);
   intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0, 4, 4);
+  /* TODO: Add the type f64. */
+#if 0
   /* X86 or WINDOWS-specific alignment of f64. */
   intern_primitive_type(cs, F64_TYPE_NAME, NULL, 0, 8, 8);
+#endif
   int not_flatly_held[20] = { 0 };
   /* X86 -- 32-bit pointers */
   intern_primitive_type(cs, PTR_TYPE_NAME, not_flatly_held, 1, 4, 4);
@@ -202,6 +208,8 @@ void import_integer_binops(struct checkstate *cs, const char *type_name) {
   ast_generics_destroy(&generics);
 }
 
+/* TODO: Add the type f64 and call this. */
+#if 0
 void import_floating_binops(struct checkstate *cs, const char *type_name) {
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
@@ -218,12 +226,16 @@ void import_floating_binops(struct checkstate *cs, const char *type_name) {
   ast_typeexpr_destroy(&binop_type);
   ast_generics_destroy(&generics);
 }
+#endif
 
 void checkstate_import_primitive_defs(struct checkstate *cs) {
   import_integer_binops(cs, I32_TYPE_NAME);
   import_integer_binops(cs, U32_TYPE_NAME);
   import_integer_binops(cs, BYTE_TYPE_NAME);
+  /* TODO: Add the type f64. */
+#if 0
   import_floating_binops(cs, F64_TYPE_NAME);
+#endif
 
   {
     struct ast_generics generics;
@@ -239,6 +251,8 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
       ast_typeexpr_destroy(&type);
     }
 
+    /* TODO: Add the type f64. */
+#if 0
     /* Unary minus on f64. */
     {
       struct ast_typeexpr type;
@@ -248,6 +262,7 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
       intern_unop(cs, AST_UNOP_NEGATE, &generics, &type);
       ast_typeexpr_destroy(&type);
     }
+#endif  /* 0 */
 
     ast_generics_destroy(&generics);
   }
@@ -2478,7 +2493,7 @@ int check_file_test_4(const uint8_t *name, size_t name_count,
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;"
                                "deftype foo struct { "
-                               "x u32; y f64; z ptr[foo]; };\n" } };
+                               "x u32; y i32; z ptr[foo]; };\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);

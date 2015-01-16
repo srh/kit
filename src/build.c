@@ -112,14 +112,40 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+/* X86 */
+enum x86_datareg {
+  X86_DATAREG_EAX,
+  X86_DATAREG_ECX,
+  X86_DATAREG_EDX,
+  X86_DATAREG_EBX,
+  X86_DATAREG_ESI,
+  X86_DATAREG_EDI,
+};
+
 enum locinfo_tag {
+  /* The memory address ebp + u.ebp_offset */
   LOCINFO_EBP_OFFSET,
+  /* The memory address stored in (ebp + u.ebp_offset) */
+  LOCINFO_DEREF_EBP_OFFSET,
+  /* X86 */
+  /* The given register (for <= 4-byte values). */
+  LOCINFO_DATAREG,
+  /* The given two registers (for <= 8-byte values). */
+  LOCINFO_TWO_DATAREGS,
+};
+
+struct two_dataregs {
+  enum x86_datareg lo;
+  enum x86_datareg hi;
 };
 
 struct locinfo {
   enum locinfo_tag tag;
   union {
     uint32_t ebp_offset;
+    uint32_t deref_ebp_offset;
+    enum x86_datareg datareg;
+    struct two_dataregs two_dataregs;
   } u;
 };
 
@@ -127,6 +153,28 @@ struct locinfo ebp_offset(uint32_t offset) {
   struct locinfo ret;
   ret.tag = LOCINFO_EBP_OFFSET;
   ret.u.ebp_offset = offset;
+  return ret;
+}
+
+struct locinfo deref_ebp_offset(uint32_t offset) {
+  struct locinfo ret;
+  ret.tag = LOCINFO_DEREF_EBP_OFFSET;
+  ret.u.deref_ebp_offset = offset;
+  return ret;
+}
+
+struct locinfo datareg(enum x86_datareg reg) {
+  struct locinfo ret;
+  ret.tag = LOCINFO_DATAREG;
+  ret.u.datareg = reg;
+  return ret;
+}
+
+struct locinfo two_dataregs(enum x86_datareg lo, enum x86_datareg hi) {
+  struct locinfo ret;
+  ret.tag = LOCINFO_TWO_DATAREGS;
+  ret.u.two_dataregs.lo = lo;
+  ret.u.two_dataregs.hi = hi;
   return ret;
 }
 
@@ -178,6 +226,7 @@ void varstate_pop_var(struct varstate *vs) {
 
 struct gen_kiracall {
   size_t num_vars;
+  struct locinfo return_location;
 };
 
 void emit_push_ebp(struct objfile *f) {
@@ -301,8 +350,19 @@ void gen_kiracall_start(struct checkstate *cs,
   /* X86 (and WINDOWS?) */
   uint32_t var_ebp_offset = 8;
   size_t ret_param = concrete_type->u.app.params_count - 1;
-  if (kira_sizeof(&cs->nt, &concrete_type->u.app.params[ret_param]) > 8) {
+
+  struct locinfo return_location;
+  uint32_t return_sizeof
+    = kira_sizeof(&cs->nt, &concrete_type->u.app.params[ret_param]);
+  if (return_sizeof > 8) {
+    return_location = deref_ebp_offset(var_ebp_offset);
     var_ebp_offset = uint32_add(var_ebp_offset, DWORD_SIZE);
+  } else if (return_sizeof > 4) {
+    /* X86 + WINDOWS: return value (if it's not a raw double) is spread
+       in eax/edx */
+    return_location = two_dataregs(X86_DATAREG_EAX, X86_DATAREG_EDX);
+  } else {
+    return_location = datareg(X86_DATAREG_EAX);
   }
 
   for (size_t i = 0, e = ret_param; i < e; i++) {
@@ -313,6 +373,7 @@ void gen_kiracall_start(struct checkstate *cs,
   }
 
   kc->num_vars = lambda->params_count;
+  kc->return_location = return_location;
 }
 
 void gen_kiracall_finish(struct objfile *f, struct varstate *vs,
