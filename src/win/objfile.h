@@ -50,6 +50,8 @@ void objfile_section_append_rel32(struct objfile_section *s,
 void objfile_section_append_raw(struct objfile_section *s,
                                 const void *buf, size_t n);
 void objfile_section_align_dword(struct objfile_section *s);
+void objfile_fillercode_align_double_quadword(struct objfile *f);
+
 void objfile_set_symbol_Value(struct objfile *f,
                               uint32_t SymbolTableIndex,
                               uint32_t Value);

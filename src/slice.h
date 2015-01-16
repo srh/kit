@@ -17,6 +17,11 @@
     (ptr)[(count)++] = (value); \
   } while (0)
 
+#define SLICE_POP(ptr, count, destructor) do { \
+    CHECK((count) > 0); \
+    (destructor)(&(ptr)[--(count)]); \
+  } while (0)
+
 #define SLICE_FREE(ptr, count, destructor) do { \
     for (size_t SLICE_FREE_i = (count); SLICE_FREE_i-- > 0; ) { \
       (destructor)(&(ptr)[SLICE_FREE_i]); \

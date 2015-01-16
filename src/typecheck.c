@@ -26,10 +26,14 @@ struct ast_ident make_ast_ident(ident_value ident) {
 void intern_primitive_type(struct checkstate *cs,
                            const char *name,
                            int *flatly_held,
-                           size_t flatly_held_count) {
+                           size_t flatly_held_count,
+                           uint32_t primitive_sizeof,
+                           uint32_t primitive_alignof) {
   ident_value ident = identmap_intern_c_str(cs->im, name);
   int res = name_table_add_primitive_type(&cs->nt, ident,
-                                          flatly_held, flatly_held_count);
+                                          flatly_held, flatly_held_count,
+                                          primitive_sizeof,
+                                          primitive_alignof);
   CHECK(res);
 }
 
@@ -121,15 +125,18 @@ int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x) {
 }
 
 void checkstate_import_primitive_types(struct checkstate *cs) {
-  intern_primitive_type(cs, VOID_TYPE_NAME, NULL, 0);
-  intern_primitive_type(cs, BYTE_TYPE_NAME, NULL, 0);
-  intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0);
-  intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0);
-  intern_primitive_type(cs, F64_TYPE_NAME, NULL, 0);
+  intern_primitive_type(cs, VOID_TYPE_NAME, NULL, 0, 0, 1);
+  intern_primitive_type(cs, BYTE_TYPE_NAME, NULL, 0, 1, 1);
+  intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0, 4, 4);
+  intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0, 4, 4);
+  /* X86 or WINDOWS-specific alignment of f64. */
+  intern_primitive_type(cs, F64_TYPE_NAME, NULL, 0, 8, 8);
   int not_flatly_held[20] = { 0 };
-  intern_primitive_type(cs, PTR_TYPE_NAME, not_flatly_held, 1);
+  /* X86 -- 32-bit pointers */
+  intern_primitive_type(cs, PTR_TYPE_NAME, not_flatly_held, 1, 4, 4);
   for (size_t i = 1; i < 21; i++) {
-    intern_primitive_type(cs, FUNC_TYPE_NAME, not_flatly_held, i);
+    /* X86 -- 32-bit function pointers */
+    intern_primitive_type(cs, FUNC_TYPE_NAME, not_flatly_held, i, 4, 4);
   }
 }
 
@@ -848,11 +855,6 @@ void numeric_literal_type(struct identmap *im,
   }
   out->u.name = make_ast_ident(identmap_intern_c_str(im, type_name));
 }
-
-void do_replace_generics(struct ast_generics *generics,
-                         struct ast_typeexpr *generics_substitutions,
-                         struct ast_typeexpr *a,
-                         struct ast_typeexpr *out);
 
 void do_replace_generics_in_fields(struct ast_generics *generics,
                                    struct ast_typeexpr *generics_substitutions,

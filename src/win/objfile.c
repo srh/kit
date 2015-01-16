@@ -400,6 +400,21 @@ void objfile_write_section_header(struct databuf *d, struct objfile_section *s,
   databuf_append(d, &h, sizeof(h));
 }
 
+void append_fillercode_to_align(struct databuf *d, size_t alignment) {
+  size_t n = d->count % alignment;
+  if (n != 0) {
+    static const uint8_t ch[16] = { 0xCC };
+
+    size_t m = alignment - n;
+
+    while (m > 16) {
+      databuf_append(d, ch, 16);
+      m -= 16;
+    }
+    databuf_append(d, ch, m);
+  }
+}
+
 void append_zeros_to_align(struct databuf *d, size_t alignment) {
   size_t n = d->count % alignment;
   if (n != 0) {
@@ -664,6 +679,10 @@ void objfile_section_align_dword(struct objfile_section *s) {
   if (s->max_requested_alignment < 4) {
     s->max_requested_alignment = 4;
   }
+}
+
+void objfile_fillercode_align_double_quadword(struct objfile *f) {
+  append_fillercode_to_align(&f->text.raw, 16);
 }
 
 void objfile_set_symbol_Value(struct objfile *f,

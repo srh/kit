@@ -8,6 +8,7 @@
 #include "checkstate.h"
 #include "databuf.h"
 #include "io.h"
+#include "slice.h"
 #include "win/objfile.h"
 
 /* Right now we don't worry about generating multiple objfiles, so we
@@ -111,10 +112,245 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+enum locinfo_tag {
+  LOCINFO_EBP_OFFSET,
+};
+
+struct locinfo {
+  enum locinfo_tag tag;
+  union {
+    uint32_t ebp_offset;
+  } u;
+};
+
+struct locinfo ebp_offset(uint32_t offset) {
+  struct locinfo ret;
+  ret.tag = LOCINFO_EBP_OFFSET;
+  ret.u.ebp_offset = offset;
+  return ret;
+}
+
+struct varinfo {
+  ident_value name;
+  struct ast_typeexpr type;
+  struct locinfo loc;
+};
+
+void varinfo_init(struct varinfo *vi, ident_value name,
+                  struct ast_typeexpr *type, struct locinfo loc) {
+  vi->name = name;
+  ast_typeexpr_init_copy(&vi->type, type);
+  vi->loc = loc;
+}
+
+void varinfo_destroy(struct varinfo *vi) {
+  vi->name = IDENT_VALUE_INVALID;
+  ast_typeexpr_destroy(&vi->type);
+}
+
+struct varstate {
+  struct varinfo *infos;
+  size_t infos_count;
+  size_t infos_limit;
+};
+
+void varstate_init(struct varstate *vs) {
+  vs->infos = NULL;
+  vs->infos_count = 0;
+  vs->infos_limit = 0;
+}
+
+void varstate_destroy(struct varstate *vs) {
+  CHECK(vs->infos_count == 0);
+  free(vs->infos);
+}
+
+void varstate_push_var(struct varstate *vs, ident_value name,
+                       struct ast_typeexpr *type, struct locinfo loc) {
+  struct varinfo vi;
+  varinfo_init(&vi, name, type, loc);
+  SLICE_PUSH(vs->infos, vs->infos_count, vs->infos_limit, vi);
+}
+
+void varstate_pop_var(struct varstate *vs) {
+  SLICE_POP(vs->infos, vs->infos_count, varinfo_destroy);
+}
+
+struct gen_kiracall {
+  size_t num_vars;
+};
+
+void emit_push_ebp(struct objfile *f) {
+  /* X86 */
+  objfile_section_append_raw(objfile_text(f), "\x55\x8B\xEC", 3);
+}
+
+void emit_leave_ret(struct objfile *f) {
+  /* X86 */
+  objfile_section_append_raw(objfile_text(f), "\x5D\xC3", 2);
+}
+
+#define DWORD_SIZE 4
+
+void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
+                      uint32_t *sizeof_out, uint32_t *alignof_out) {
+  switch (type->tag) {
+  case AST_TYPEEXPR_NAME: {
+    struct deftype_entry *ent;
+    if (!name_table_lookup_deftype(nt, type->u.name.value,
+                                   no_param_list_arity(),
+                                   &ent)) {
+      CRASH("Type name should be found, it was not.\n");
+    }
+    CHECK(ent->arity.value == ARITY_NO_PARAMLIST);
+    if (ent->is_primitive) {
+      *sizeof_out = ent->primitive_sizeof;
+      *alignof_out = ent->primitive_alignof;
+    } else {
+      struct ast_deftype *deftype = ent->deftype;
+      CHECK(!deftype->generics.has_type_params);
+      kira_sizealignof(nt, &deftype->type, sizeof_out, alignof_out);
+    }
+  } break;
+  case AST_TYPEEXPR_APP: {
+    struct deftype_entry *ent;
+    if (!name_table_lookup_deftype(nt, type->u.app.name.value,
+                                   param_list_arity(type->u.app.params_count),
+                                   &ent)) {
+      CRASH("Type app name should be found, it was not.\n");
+    }
+    CHECK(ent->arity.value == type->u.app.params_count);
+    if (ent->is_primitive) {
+      *sizeof_out = ent->primitive_sizeof;
+      *alignof_out = ent->primitive_alignof;
+    } else {
+      struct ast_deftype *deftype = ent->deftype;
+      CHECK(deftype->generics.has_type_params
+            && deftype->generics.params_count == type->u.app.params_count);
+      struct ast_typeexpr substituted;
+      do_replace_generics(&deftype->generics,
+                          type->u.app.params,
+                          &deftype->type,
+                          &substituted);
+      kira_sizealignof(nt, &substituted, sizeof_out, alignof_out);
+      ast_typeexpr_destroy(&substituted);
+    }
+  } break;
+  case AST_TYPEEXPR_STRUCTE: {
+    uint32_t count = 0;
+    uint32_t max_alignment = 1;
+    for (size_t i = 0, e = type->u.structe.fields_count; i < e; i++) {
+      uint32_t size;
+      uint32_t alignment;
+      kira_sizealignof(nt, &type->u.structe.fields[i].type,
+                       &size, &alignment);
+      count = uint32_ceil_aligned(count, alignment);
+      if (max_alignment < alignment) {
+        max_alignment = alignment;
+      }
+      count = uint32_add(count, size);
+    }
+    count = uint32_ceil_aligned(count, max_alignment);
+    *sizeof_out = count;
+    *alignof_out = max_alignment;
+  } break;
+  case AST_TYPEEXPR_UNIONE: {
+    uint32_t max_size = 0;
+    uint32_t max_alignment = 1;
+    for (size_t i = 0, e = type->u.unione.fields_count; i < e; i++) {
+      uint32_t size;
+      uint32_t alignment;
+      kira_sizealignof(nt, &type->u.unione.fields[i].type,
+                       &size, &alignment);
+      if (max_size < size) {
+        size = max_size;
+      }
+      if (max_alignment < alignment) {
+        max_alignment = alignment;
+      }
+    }
+    uint32_t final_size = uint32_ceil_aligned(max_size, max_alignment);
+    *sizeof_out = final_size;
+    *alignof_out = max_alignment;
+  } break;
+  case AST_TYPEEXPR_UNKNOWN:
+  default:
+    UNREACHABLE();
+  }
+}
+
+uint32_t kira_sizeof(struct name_table *nt, struct ast_typeexpr *type) {
+  uint32_t size;
+  uint32_t alignment;
+  kira_sizealignof(nt, type, &size, &alignment);
+  return size;
+}
+
+void gen_kiracall_start(struct checkstate *cs,
+                        struct objfile *f,
+                        struct varstate *vs,
+                        struct gen_kiracall *kc,
+                        struct ast_lambda *lambda,
+                        struct ast_typeexpr *concrete_type) {
+  CHECK(typeexpr_is_func_type(cs->im, concrete_type));
+  CHECK(concrete_type->tag == AST_TYPEEXPR_APP);
+  CHECK(concrete_type->u.app.params_count == size_add(lambda->params_count, 1));
+
+  emit_push_ebp(f);
+
+  /* X86 (and WINDOWS?) */
+  uint32_t var_ebp_offset = 8;
+  size_t ret_param = concrete_type->u.app.params_count - 1;
+  if (kira_sizeof(&cs->nt, &concrete_type->u.app.params[ret_param]) > 8) {
+    var_ebp_offset = uint32_add(var_ebp_offset, DWORD_SIZE);
+  }
+
+  for (size_t i = 0, e = ret_param; i < e; i++) {
+    struct ast_typeexpr *param_type = &concrete_type->u.app.params[i];
+    varstate_push_var(vs, lambda->params[i].name.value,
+                      param_type, ebp_offset(var_ebp_offset));
+    var_ebp_offset = uint32_add(var_ebp_offset, kira_sizeof(&cs->nt, param_type));
+  }
+
+  kc->num_vars = lambda->params_count;
+}
+
+void gen_kiracall_finish(struct objfile *f, struct varstate *vs,
+                         struct gen_kiracall *kc) {
+  for (size_t i = 0, e = kc->num_vars; i < e; i++) {
+    varstate_pop_var(vs);
+  }
+
+  kc->num_vars = 0;
+
+  emit_leave_ret(f);
+}
+
+int build_lambda_instantiation(struct checkstate *cs, struct objfile *f,
+                               struct def_entry *ent, struct def_instantiation *inst,
+                               struct ast_expr *x) {
+  CHECK(x->tag == AST_EXPR_LAMBDA);
+  struct ast_lambda *lambda = &x->u.lambda;
+
+  objfile_fillercode_align_double_quadword(f);
+
+  struct varstate vs;
+  varstate_init(&vs);
+
+  struct gen_kiracall kc;
+
+  gen_kiracall_start(cs, f, &vs, &kc, lambda, &inst->type);
+
+  (void)ent;  /* TODO */
+
+  gen_kiracall_finish(f, &vs, &kc);
+
+  varstate_destroy(&vs);
+  return 0;
+}
+
 int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_entry *ent, struct def_instantiation *inst) {
-  (void)cs, (void)ent;
-
   switch (inst->value.tag) {
   case STATIC_VALUE_I32: {
     STATIC_CHECK(sizeof(inst->value.u.i32_value) == 4);
@@ -139,7 +375,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {
-    TODO_IMPLEMENT;
+    return build_lambda_instantiation(cs, f, ent, inst, inst->value.u.lambda);
   } break;
   default:
     UNREACHABLE();

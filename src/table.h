@@ -92,6 +92,8 @@ struct deftype_entry {
   int is_being_checked;
 
   int is_primitive;
+  uint32_t primitive_sizeof;
+  uint32_t primitive_alignof;
   struct ast_deftype *deftype;
 };
 
@@ -136,7 +138,9 @@ int name_table_add_deftype(struct name_table *t,
 int name_table_add_primitive_type(struct name_table *t,
                                   ident_value name,
                                   int *flatly_held,
-                                  size_t flatly_held_count);
+                                  size_t flatly_held_count,
+                                  uint32_t primitive_sizeof,
+                                  uint32_t primitive_alignof);
 
 int name_table_match_def(struct name_table *t,
                          ident_value name,

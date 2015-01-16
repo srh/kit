@@ -167,13 +167,17 @@ void deftype_entry_init(struct deftype_entry *e,
   e->is_being_checked = 0;
 
   e->is_primitive = 0;
+  e->primitive_sizeof = 0;
+  e->primitive_alignof = 0;
   e->deftype = deftype;
 }
 
 void deftype_entry_init_primitive(struct deftype_entry *e,
                                   ident_value name,
                                   int *flatly_held,
-                                  size_t flatly_held_count) {
+                                  size_t flatly_held_count,
+                                  uint32_t primitive_sizeof,
+                                  uint32_t primitive_alignof) {
   e->name = name;
   e->arity = flatly_held == NULL ?
     no_param_list_arity() : param_list_arity(flatly_held_count);
@@ -194,6 +198,8 @@ void deftype_entry_init_primitive(struct deftype_entry *e,
   e->is_being_checked = 0;
 
   e->is_primitive = 1;
+  e->primitive_sizeof = primitive_sizeof;
+  e->primitive_alignof = primitive_alignof;
   e->deftype = NULL;
 }
 
@@ -406,11 +412,14 @@ int name_table_add_deftype(struct name_table *t,
 int name_table_add_primitive_type(struct name_table *t,
                                   ident_value name,
                                   int *flatly_held,
-                                  size_t flatly_held_count) {
+                                  size_t flatly_held_count,
+                                  uint32_t primitive_sizeof,
+                                  uint32_t primitive_alignof) {
   struct deftype_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);
   deftype_entry_init_primitive(new_entry, name,
-                               flatly_held, flatly_held_count);
+                               flatly_held, flatly_held_count,
+                               primitive_sizeof, primitive_alignof);
   return name_table_help_add_deftype_entry(t, &new_entry);
 }
 

@@ -36,5 +36,10 @@ struct ast_ident make_ast_ident(ident_value ident);
 int exact_typeexprs_equal(struct ast_typeexpr *a, struct ast_typeexpr *b);
 
 int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x);
+void do_replace_generics(struct ast_generics *generics,
+                         struct ast_typeexpr *generics_substitutions,
+                         struct ast_typeexpr *a,
+                         struct ast_typeexpr *out);
+
 
 #endif /* KIRA_TYPECHECK_H_ */
