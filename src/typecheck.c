@@ -2092,71 +2092,71 @@ int apply_operator(enum ast_binop op,
   CHECK(lhs->tag == STATIC_VALUE_I32 || lhs->tag == STATIC_VALUE_U32);
   switch (lhs->tag) {
   case STATIC_VALUE_I32: {
+    int32_t left = lhs->u.i32_value;
+    int32_t right = rhs->u.i32_value;
     int32_t value = -12345;
     int success = 1;
     switch (op) {
     case AST_BINOP_ASSIGN: UNREACHABLE();
     case AST_BINOP_ADD:
-      success = try_int32_add(lhs->u.i32_value, rhs->u.i32_value, &value);
+      success = try_int32_add(left, right, &value);
       break;
     case AST_BINOP_SUB:
-      success = try_int32_sub(lhs->u.i32_value, rhs->u.i32_value, &value);
+      success = try_int32_sub(left, right, &value);
       break;
     case AST_BINOP_MUL:
-      success = try_int32_mul(lhs->u.i32_value, rhs->u.i32_value, &value);
+      success = try_int32_mul(left, right, &value);
       break;
     case AST_BINOP_DIV: {
-      if (lhs->u.i32_value < 0 || rhs->u.i32_value < 0) {
+      if (left < 0 || right < 0) {
         ERR_DBG("Negative static value division.\n");
         return 0;
       }
-      if (rhs->u.i32_value == 0) {
+      if (right == 0) {
         ERR_DBG("Static value division by zero.\n");
       }
-      value = int32_div(lhs->u.i32_value, rhs->u.i32_value);
+      value = int32_div(left, right);
       success = 1;
     } break;
     case AST_BINOP_MOD: {
-      if (lhs->u.i32_value < 0 || rhs->u.i32_value < 0) {
+      if (left < 0 || right < 0) {
         ERR_DBG("Negative static value modulo.\n");
         return 0;
       }
-      if (rhs->u.i32_value == 0) {
+      if (right == 0) {
         ERR_DBG("Static value modulo by zero.\n");
       }
-      value = int32_positive_mod(lhs->u.i32_value, rhs->u.i32_value);
+      value = int32_positive_mod(left, right);
       success = 1;
     } break;
     case AST_BINOP_LT:
-      value = (lhs->u.i32_value < rhs->u.i32_value);
+      value = (left < right);
       break;
     case AST_BINOP_LE:
-      value = (lhs->u.i32_value <= rhs->u.i32_value);
+      value = (left <= right);
       break;
     case AST_BINOP_GT:
-      value = (lhs->u.i32_value > rhs->u.i32_value);
+      value = (left > right);
       break;
     case AST_BINOP_GE:
-      value = (lhs->u.i32_value >= rhs->u.i32_value);
+      value = (left >= right);
       break;
     case AST_BINOP_EQ:
-      value = (lhs->u.i32_value == rhs->u.i32_value);
+      value = (left == right);
       break;
     case AST_BINOP_NE:
-      value = (lhs->u.i32_value != rhs->u.i32_value);
+      value = (left != right);
       break;
     case AST_BINOP_BIT_XOR:
-      value = (lhs->u.i32_value ^ rhs->u.i32_value);
+      value = (left ^ right);
       break;
     case AST_BINOP_BIT_OR:
-      value = (lhs->u.i32_value | rhs->u.i32_value);
+      value = (left | right);
       break;
     case AST_BINOP_BIT_AND:
-      value = (lhs->u.i32_value & rhs->u.i32_value);
+      value = (left & right);
       break;
     case AST_BINOP_BIT_LEFTSHIFT: {
-      int32_t left = lhs->u.i32_value;
-      int32_t right = rhs->u.i32_value;
       if (left < 0 || right < 0 || right >= 32) {
         success = 0;
       } else {
@@ -2170,8 +2170,6 @@ int apply_operator(enum ast_binop op,
       }
     } break;
     case AST_BINOP_BIT_RIGHTSHIFT: {
-      int32_t left = lhs->u.i32_value;
-      int32_t right = rhs->u.i32_value;
       if (left < 0 || right < 0 || right >= 32) {
         ERR_DBG("Invalid i32 right-shift.\n");
       } else {
@@ -2179,7 +2177,6 @@ int apply_operator(enum ast_binop op,
       }
     } break;
     default:
-      /* TODO: Support leftshift and rightshift. */
       success = 0;
     }
 
@@ -2191,56 +2188,57 @@ int apply_operator(enum ast_binop op,
     static_value_init_i32(out, value);
     return 1;
   } break;
+
   case STATIC_VALUE_U32: {
+    uint32_t left = lhs->u.u32_value;
+    uint32_t right = rhs->u.u32_value;
     uint32_t value = 12345;
     int success = 1;
     switch (op) {
     case AST_BINOP_ASSIGN: UNREACHABLE();
     case AST_BINOP_ADD:
-      success = try_uint32_add(lhs->u.u32_value, rhs->u.u32_value, &value);
+      success = try_uint32_add(left, right, &value);
       break;
     case AST_BINOP_SUB:
-      success = try_uint32_sub(lhs->u.u32_value, rhs->u.u32_value, &value);
+      success = try_uint32_sub(left, right, &value);
       break;
     case AST_BINOP_MUL:
-      success = try_uint32_mul(lhs->u.u32_value, rhs->u.u32_value, &value);
+      success = try_uint32_mul(left, right, &value);
       break;
     case AST_BINOP_DIV:
-      success = try_uint32_div(lhs->u.u32_value, rhs->u.u32_value, &value);
+      success = try_uint32_div(left, right, &value);
       break;
     case AST_BINOP_MOD:
-      success = try_uint32_mod(lhs->u.u32_value, rhs->u.u32_value, &value);
+      success = try_uint32_mod(left, right, &value);
       break;
     case AST_BINOP_LT:
-      value = (lhs->u.u32_value < rhs->u.u32_value);
+      value = (left < right);
       break;
     case AST_BINOP_LE:
-      value = (lhs->u.u32_value <= rhs->u.u32_value);
+      value = (left <= right);
       break;
     case AST_BINOP_GT:
-      value = (lhs->u.u32_value > rhs->u.u32_value);
+      value = (left > right);
       break;
     case AST_BINOP_GE:
-      value = (lhs->u.u32_value >= rhs->u.u32_value);
+      value = (left >= right);
       break;
     case AST_BINOP_EQ:
-      value = (lhs->u.u32_value == rhs->u.u32_value);
+      value = (left == right);
       break;
     case AST_BINOP_NE:
-      value = (lhs->u.u32_value != rhs->u.u32_value);
+      value = (left != right);
       break;
     case AST_BINOP_BIT_XOR:
-      value = (lhs->u.u32_value ^ rhs->u.u32_value);
+      value = (left ^ right);
       break;
     case AST_BINOP_BIT_OR:
-      value = (lhs->u.u32_value | rhs->u.u32_value);
+      value = (left | right);
       break;
     case AST_BINOP_BIT_AND:
-      value = (lhs->u.u32_value & rhs->u.u32_value);
+      value = (left & right);
       break;
     case AST_BINOP_BIT_LEFTSHIFT: {
-      uint32_t left = lhs->u.u32_value;
-      uint32_t right = rhs->u.u32_value;
       if (right >= 32) {
         success = 0;
       } else {
@@ -2254,8 +2252,6 @@ int apply_operator(enum ast_binop op,
       }
     } break;
     case AST_BINOP_BIT_RIGHTSHIFT: {
-      uint32_t left = lhs->u.u32_value;
-      uint32_t right = rhs->u.u32_value;
       if (right >= 32) {
         success = 0;
       } else {
@@ -2263,7 +2259,6 @@ int apply_operator(enum ast_binop op,
       }
     } break;
     default:
-      /* TODO: Support leftshift and rightshift. */
       success = 0;
     }
 
