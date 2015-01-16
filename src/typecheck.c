@@ -1229,6 +1229,9 @@ int check_expr_funcbody(struct exprscope *es,
   struct bodystate bs;
   bodystate_init(&bs, es, partial_type);
 
+  /* TODO: We need to analyze whether _all_ paths return.  Also, goto
+     should be restricted from jumping to non-subset variable
+     scopes. */
   if (!check_expr_bracebody(&bs, x)) {
     goto fail;
   }
@@ -3117,6 +3120,23 @@ int check_file_test_more_3(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_4(const uint8_t *name, size_t name_count,
+                           uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because foo lacks a return statement. */
+  /* Unfortunately we don't check (yet) that _all_ paths return. */
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[u32, u32] = fn(x u32) u32 {\n"
+      "  x + x;\n"
+      "};"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -3397,6 +3417,12 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_3...\n");
   if (!!test_check_module(&im, &check_file_test_more_3, foo)) {
     DBG("check_file_test_more_3 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_4...\n");
+  if (!!test_check_module(&im, &check_file_test_more_4, foo)) {
+    DBG("check_file_test_more_4 fails\n");
     goto cleanup_identmap;
   }
 
