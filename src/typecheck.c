@@ -2154,6 +2154,30 @@ int apply_operator(enum ast_binop op,
     case AST_BINOP_BIT_AND:
       value = (lhs->u.i32_value & rhs->u.i32_value);
       break;
+    case AST_BINOP_BIT_LEFTSHIFT: {
+      int32_t left = lhs->u.i32_value;
+      int32_t right = rhs->u.i32_value;
+      if (left < 0 || right < 0 || right >= 32) {
+        success = 0;
+      } else {
+        int64_t left64 = left;
+        left64 <<= right;
+        if (left64 > INT32_MAX) {
+          success = 0;
+        } else {
+          value = (int32_t)left64;
+        }
+      }
+    } break;
+    case AST_BINOP_BIT_RIGHTSHIFT: {
+      int32_t left = lhs->u.i32_value;
+      int32_t right = rhs->u.i32_value;
+      if (left < 0 || right < 0 || right >= 32) {
+        ERR_DBG("Invalid i32 right-shift.\n");
+      } else {
+        value = (left >> right);
+      }
+    } break;
     default:
       /* TODO: Support leftshift and rightshift. */
       success = 0;
@@ -2214,6 +2238,30 @@ int apply_operator(enum ast_binop op,
     case AST_BINOP_BIT_AND:
       value = (lhs->u.u32_value & rhs->u.u32_value);
       break;
+    case AST_BINOP_BIT_LEFTSHIFT: {
+      uint32_t left = lhs->u.u32_value;
+      uint32_t right = rhs->u.u32_value;
+      if (right >= 32) {
+        success = 0;
+      } else {
+        uint64_t left64 = left;
+        left64 <<= right;
+        if (left64 > UINT32_MAX) {
+          success = 0;
+        } else {
+          value = (uint32_t)left64;
+        }
+      }
+    } break;
+    case AST_BINOP_BIT_RIGHTSHIFT: {
+      uint32_t left = lhs->u.u32_value;
+      uint32_t right = rhs->u.u32_value;
+      if (right >= 32) {
+        success = 0;
+      } else {
+        value = (left >> right);
+      }
+    } break;
     default:
       /* TODO: Support leftshift and rightshift. */
       success = 0;
@@ -3137,6 +3185,31 @@ int check_file_test_more_4(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_5(const uint8_t *name, size_t name_count,
+                           uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def foo i32 = 7;\n"
+      "def bar i32 = 5 << foo;\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_6(const uint8_t *name, size_t name_count,
+                           uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because shift overflows. */
+  struct test_module a[] = { {
+      "foo",
+      "def foo i32 = 30;\n"
+      "def bar i32 = 5 << foo;\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 
@@ -3425,6 +3498,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_4...\n");
   if (!!test_check_module(&im, &check_file_test_more_4, foo)) {
     DBG("check_file_test_more_4 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_5...\n");
+  if (!test_check_module(&im, &check_file_test_more_5, foo)) {
+    DBG("check_file_test_more_5 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_6...\n");
+  if (!!test_check_module(&im, &check_file_test_more_6, foo)) {
+    DBG("check_file_test_more_6 fails\n");
     goto cleanup_identmap;
   }
 
