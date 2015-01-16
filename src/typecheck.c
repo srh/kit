@@ -2296,7 +2296,9 @@ int eval_static_value(struct ast_generics *generics,
                                   &expr->u.binop_expr, out);
   } break;
   case AST_EXPR_LAMBDA: {
-    static_value_init_lambda(out, expr);
+    struct ast_expr copy;
+    ast_expr_init_copy(&copy, expr);
+    static_value_init_typechecked_lambda(out, copy);
     return 1;
   } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {

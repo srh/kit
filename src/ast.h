@@ -207,6 +207,8 @@ struct ast_statement {
   } u;
 };
 
+void ast_statement_init_copy(struct ast_statement *a,
+                             struct ast_statement *c);
 void ast_statement_destroy(struct ast_statement *a);
 
 struct ast_lambda {
@@ -300,6 +302,7 @@ void ast_deref_field_access_init(struct ast_deref_field_access *a,
    generics_substitutions) that the expression lies in, what
    def_instantiation the name refers to.  (Maybe instead we should
    store a (def_entry, instantiation_index) pair.) */
+/* TODO: Ugh, let's just copy the instantiation expression entirely. */
 struct ast_meta_insts_pair {
   struct def_instantiation *inst;  /* an unowned pointer */
   struct ast_typeexpr *generics_substitutions;
@@ -354,6 +357,8 @@ struct ast_expr {
     struct ast_deref_field_access deref_field_access;
   } u;
 };
+
+void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c);
 
 size_t ast_expr_pos_end(struct ast_expr *a);
 void ast_expr_destroy(struct ast_expr *a);

@@ -14,14 +14,17 @@ struct static_value {
   union {
     int32_t i32_value;
     uint32_t u32_value;
-    /* An unowned ref to the parsed AST. */
-    struct ast_expr *lambda;
+    /* An owned ref to the _typechecked_ AST. */
+    /* TODO: Right now this is still just a plain-jane copy of the
+       AST, with generics unreplaced, no annotations. */
+    struct ast_expr typechecked_lambda;
   } u;
 };
 
 void static_value_init_i32(struct static_value *a, int32_t i32_value);
 void static_value_init_u32(struct static_value *a, uint32_t u32_value);
-void static_value_init_lambda(struct static_value *a, struct ast_expr *lambda);
+void static_value_init_typechecked_lambda(struct static_value *a,
+                                          struct ast_expr lambda);
 void static_value_init_copy(struct static_value *a, struct static_value *c);
 void static_value_destroy(struct static_value *a);
 

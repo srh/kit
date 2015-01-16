@@ -25,16 +25,42 @@ void static_value_init_u32(struct static_value *a, uint32_t u32_value) {
   a->u.u32_value = u32_value;
 }
 
-void static_value_init_lambda(struct static_value *a, struct ast_expr *lambda) {
+void static_value_init_typechecked_lambda(struct static_value *a,
+                                          struct ast_expr lambda) {
+  /* TODO: Assert somehow that this ast_expr is a typechecked (and annotated) one. */
   a->tag = STATIC_VALUE_LAMBDA;
-  a->u.lambda = lambda;
+  a->u.typechecked_lambda = lambda;
 }
 
 void static_value_init_copy(struct static_value *a, struct static_value *c) {
-  *a = *c;
+  a->tag = c->tag;
+  switch (c->tag) {
+  case STATIC_VALUE_I32:
+    a->u.i32_value = c->u.i32_value;
+    break;
+  case STATIC_VALUE_U32:
+    a->u.u32_value = c->u.u32_value;
+    break;
+  case STATIC_VALUE_LAMBDA:
+    ast_expr_init_copy(&a->u.typechecked_lambda,
+                       &c->u.typechecked_lambda);
+    break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void static_value_destroy(struct static_value *sv) {
+  switch (sv->tag) {
+  case STATIC_VALUE_I32:  /* fallthrough */
+  case STATIC_VALUE_U32:
+    break;
+  case STATIC_VALUE_LAMBDA:
+    ast_expr_destroy(&sv->u.typechecked_lambda);
+    break;
+  default:
+    UNREACHABLE();
+  }
   sv->tag = (enum static_value_tag)-1;
 }
 

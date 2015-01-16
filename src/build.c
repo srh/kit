@@ -277,6 +277,8 @@ void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
       CHECK(deftype->generics.has_type_params
             && deftype->generics.params_count == type->u.app.params_count);
       struct ast_typeexpr substituted;
+      /* TODO: Since we're using exprs from a def_instantiation, I
+         think the generics have already been replaced. */
       do_replace_generics(&deftype->generics,
                           type->u.app.params,
                           &deftype->type,
@@ -395,7 +397,7 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
                     struct ast_bracebody *x) {
   (void)cs, (void)f, (void)vs, (void)return_location, (void)x;
   /* TODO: Implement. */
-  ERR_DBG("build_bracebody: not implement.d\n");
+  ERR_DBG("build_bracebody: not implemented.\n");
   return 0;
 }
 
@@ -458,7 +460,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {
-    return build_lambda_instantiation(cs, f, inst, inst->value.u.lambda);
+    return build_lambda_instantiation(cs, f, inst, &inst->value.u.typechecked_lambda);
   } break;
   default:
     UNREACHABLE();

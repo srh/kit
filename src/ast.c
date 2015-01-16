@@ -51,6 +51,18 @@ void ast_numeric_literal_init(struct ast_numeric_literal *a,
   a->numeric_type = numeric_type;
 }
 
+void ast_numeric_literal_init_copy(struct ast_numeric_literal *a,
+                                   struct ast_numeric_literal *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  int8_t *digits = malloc_mul(sizeof(*digits), c->digits_count);
+  for (size_t i = 0, e = c->digits_count; i < e; i++) {
+    digits[i] = c->digits[i];
+  }
+  a->digits = digits;
+  a->digits_count = c->digits_count;
+  a->numeric_type = c->numeric_type;
+}
+
 void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
   ast_meta_destroy(&a->meta);
   free(a->digits);
@@ -66,6 +78,25 @@ void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
   a->func = func;
   a->args = args;
   a->args_count = args_count;
+}
+
+void ast_expr_alloc_init_copy(struct ast_expr *c, struct ast_expr **out) {
+  struct ast_expr *a = malloc(sizeof(*a));
+  CHECK(a);
+  ast_expr_init_copy(a, c);
+  *out = a;
+}
+
+void ast_funcall_init_copy(struct ast_funcall *a, struct ast_funcall *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_expr_alloc_init_copy(c->func, &a->func);
+
+  struct ast_expr *args = malloc_mul(sizeof(*args), c->args_count);
+  for (size_t i = 0, e = c->args_count; i < e; i++) {
+    ast_expr_init_copy(&args[i], &c->args[i]);
+  }
+  a->args = args;
+  a->args_count = c->args_count;
 }
 
 void ast_funcall_destroy(struct ast_funcall *a) {
@@ -104,6 +135,18 @@ void ast_bracebody_init(struct ast_bracebody *a,
   a->statements_count = statements_count;
 }
 
+void ast_bracebody_init_copy(struct ast_bracebody *a,
+                             struct ast_bracebody *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  struct ast_statement *statements = malloc_mul(sizeof(*statements),
+                                                c->statements_count);
+  for (size_t i = 0, e = c->statements_count; i < e; i++) {
+    ast_statement_init_copy(&statements[i], &c->statements[i]);
+  }
+  a->statements = statements;
+  a->statements_count = c->statements_count;
+}
+
 void ast_bracebody_destroy(struct ast_bracebody *a) {
   ast_meta_destroy(&a->meta);
   SLICE_FREE(a->statements, a->statements_count, ast_statement_destroy);
@@ -117,6 +160,13 @@ void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
   ast_vardecl_init(&a->decl, ast_meta_make(name.meta.pos_start, ast_typeexpr_meta(&type)->pos_end),
                    name, type);
   a->rhs = rhs;
+}
+
+void ast_var_statement_init_copy(struct ast_var_statement *a,
+                                 struct ast_var_statement *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_vardecl_init_copy(&a->decl, &c->decl);
+  ast_expr_alloc_init_copy(c->rhs, &a->rhs);
 }
 
 void ast_var_statement_destroy(struct ast_var_statement *a) {
@@ -133,6 +183,12 @@ void ast_goto_statement_init(struct ast_goto_statement *a,
   a->target = target;
 }
 
+void ast_goto_statement_init_copy(struct ast_goto_statement *a,
+                                  struct ast_goto_statement *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_ident_init_copy(&a->target, &c->target);
+}
+
 void ast_goto_statement_destroy(struct ast_goto_statement *a) {
   ast_meta_destroy(&a->meta);
   ast_ident_destroy(&a->target);
@@ -142,6 +198,12 @@ void ast_label_statement_init(struct ast_label_statement *a,
                               struct ast_meta meta, struct ast_ident label) {
   a->meta = meta;
   a->label = label;
+}
+
+void ast_label_statement_init_copy(struct ast_label_statement *a,
+                                   struct ast_label_statement *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_ident_init_copy(&a->label, &c->label);
 }
 
 void ast_label_statement_destroy(struct ast_label_statement *a) {
@@ -156,6 +218,13 @@ void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
   a->meta = meta;
   a->condition = condition;
   a->thenbody = thenbody;
+}
+
+void ast_ifthen_statement_init_copy(struct ast_ifthen_statement *a,
+                                    struct ast_ifthen_statement *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_expr_alloc_init_copy(c->condition, &a->condition);
+  ast_bracebody_init_copy(&a->thenbody, &c->thenbody);
 }
 
 void ast_ifthen_statement_destroy(struct ast_ifthen_statement *a) {
@@ -177,6 +246,14 @@ void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,
   a->elsebody = elsebody;
 }
 
+void ast_ifthenelse_statement_init_copy(struct ast_ifthenelse_statement *a,
+                                        struct ast_ifthenelse_statement *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_expr_alloc_init_copy(c->condition, &a->condition);
+  ast_bracebody_init_copy(&a->thenbody, &c->thenbody);
+  ast_bracebody_init_copy(&a->elsebody, &c->elsebody);
+}
+
 void ast_ifthenelse_statement_destroy(struct ast_ifthenelse_statement *a) {
   ast_meta_destroy(&a->meta);
   ast_expr_destroy(a->condition);
@@ -184,6 +261,37 @@ void ast_ifthenelse_statement_destroy(struct ast_ifthenelse_statement *a) {
   a->condition = NULL;
   ast_bracebody_destroy(&a->thenbody);
   ast_bracebody_destroy(&a->elsebody);
+}
+
+void ast_statement_init_copy(struct ast_statement *a,
+                             struct ast_statement *c) {
+  a->tag = c->tag;
+  switch (c->tag) {
+  case AST_STATEMENT_EXPR:
+    ast_expr_alloc_init_copy(c->u.expr, &a->u.expr);
+    break;
+  case AST_STATEMENT_RETURN_EXPR:
+    ast_expr_alloc_init_copy(c->u.return_expr, &a->u.return_expr);
+    break;
+  case AST_STATEMENT_VAR:
+    ast_var_statement_init_copy(&a->u.var_statement, &c->u.var_statement);
+    break;
+  case AST_STATEMENT_GOTO:
+    ast_goto_statement_init_copy(&a->u.goto_statement, &c->u.goto_statement);
+    break;
+  case AST_STATEMENT_LABEL:
+    ast_label_statement_init_copy(&a->u.label_statement, &c->u.label_statement);
+    break;
+  case AST_STATEMENT_IFTHEN:
+    ast_ifthen_statement_init_copy(&a->u.ifthen_statement, &c->u.ifthen_statement);
+    break;
+  case AST_STATEMENT_IFTHENELSE:
+    ast_ifthenelse_statement_init_copy(&a->u.ifthenelse_statement,
+                                       &c->u.ifthenelse_statement);
+    break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void ast_statement_destroy(struct ast_statement *a) {
@@ -226,6 +334,13 @@ void ast_unop_expr_init(struct ast_unop_expr *a, struct ast_meta meta,
   a->rhs = rhs;
 }
 
+void ast_unop_expr_init_copy(struct ast_unop_expr *a,
+                             struct ast_unop_expr *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  a->operator = c->operator;
+  ast_expr_alloc_init_copy(c->rhs, &a->rhs);
+}
+
 void ast_unop_expr_destroy(struct ast_unop_expr *a) {
   ast_meta_destroy(&a->meta);
   a->operator = (enum ast_unop)-1;
@@ -241,6 +356,14 @@ void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
   a->operator = operator;
   a->lhs = lhs;
   a->rhs = rhs;
+}
+
+void ast_binop_expr_init_copy(struct ast_binop_expr *a,
+                              struct ast_binop_expr *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  a->operator = c->operator;
+  ast_expr_alloc_init_copy(c->lhs, &a->lhs);
+  ast_expr_alloc_init_copy(c->rhs, &a->rhs);
 }
 
 void ast_binop_expr_destroy(struct ast_binop_expr *a) {
@@ -264,6 +387,18 @@ void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,
   a->bracebody = bracebody;
 }
 
+void ast_lambda_init_copy(struct ast_lambda *a, struct ast_lambda *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  struct ast_vardecl *params = malloc_mul(sizeof(*params), c->params_count);
+  for (size_t i = 0, e = c->params_count; i < e; i++) {
+    ast_vardecl_init_copy(&params[i], &c->params[i]);
+  }
+  a->params = params;
+  a->params_count = c->params_count;
+  ast_typeexpr_init_copy(&a->return_type, &c->return_type);
+  ast_bracebody_init_copy(&a->bracebody, &c->bracebody);
+}
+
 void ast_lambda_destroy(struct ast_lambda *a) {
   ast_meta_destroy(&a->meta);
   SLICE_FREE(a->params, a->params_count, ast_vardecl_destroy);
@@ -278,6 +413,13 @@ void ast_local_field_access_init(struct ast_local_field_access *a,
   a->meta = meta;
   a->lhs = lhs;
   a->fieldname = fieldname;
+}
+
+void ast_local_field_access_init_copy(struct ast_local_field_access *a,
+                                      struct ast_local_field_access *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_expr_alloc_init_copy(c->lhs, &a->lhs);
+  ast_ident_init_copy(&a->fieldname, &c->fieldname);
 }
 
 void ast_local_field_access_destroy(struct ast_local_field_access *a) {
@@ -296,6 +438,13 @@ void ast_deref_field_access_init(struct ast_deref_field_access *a,
   a->fieldname = fieldname;
 }
 
+void ast_deref_field_access_init_copy(struct ast_deref_field_access *a,
+                                      struct ast_deref_field_access *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_expr_alloc_init_copy(c->lhs, &a->lhs);
+  ast_ident_init_copy(&a->fieldname, &c->fieldname);
+}
+
 void ast_deref_field_access_destroy(struct ast_deref_field_access *a) {
   ast_meta_destroy(&a->meta);
   ast_expr_destroy(a->lhs);
@@ -312,6 +461,18 @@ void ast_meta_insts_pair_init(struct ast_meta_insts_pair *a,
   a->generics_substitutions_count = generics_substitutions_count;
 }
 
+void ast_meta_insts_pair_init_copy(struct ast_meta_insts_pair *a,
+                                   struct ast_meta_insts_pair *c) {
+  a->inst = c->inst;
+  struct ast_typeexpr *substs = malloc_mul(sizeof(*substs),
+                                           c->generics_substitutions_count);
+  for (size_t i = 0, e = c->generics_substitutions_count; i < e; i++) {
+    ast_typeexpr_init_copy(&substs[i], &c->generics_substitutions[i]);
+  }
+  a->generics_substitutions = substs;
+  a->generics_substitutions_count = c->generics_substitutions_count;
+}
+
 void ast_meta_insts_pair_destroy(struct ast_meta_insts_pair *a) {
   a->inst = NULL;
   SLICE_FREE(a->generics_substitutions, a->generics_substitutions_count,
@@ -322,6 +483,16 @@ void ast_meta_insts_init(struct ast_meta_insts *a) {
   a->pairs = NULL;
   a->pairs_count = 0;
   a->pairs_limit = 0;
+}
+
+void ast_meta_insts_init_copy(struct ast_meta_insts *a, struct ast_meta_insts *c) {
+  struct ast_meta_insts_pair *pairs = malloc_mul(sizeof(*pairs), c->pairs_count);
+  for (size_t i = 0, e = c->pairs_count; i < e; i++) {
+    ast_meta_insts_pair_init_copy(&pairs[i], &c->pairs[i]);
+  }
+  a->pairs = pairs;
+  a->pairs_count = c->pairs_count;
+  a->pairs_limit = a->pairs_count;
 }
 
 void ast_meta_insts_destroy(struct ast_meta_insts *a) {
@@ -364,6 +535,12 @@ void ast_name_expr_init(struct ast_name_expr *a, struct ast_ident ident) {
   a->ident = ident;
 }
 
+void ast_name_expr_init_copy(struct ast_name_expr *a,
+                             struct ast_name_expr *c) {
+  ast_meta_insts_init_copy(&a->insts, &c->insts);
+  ast_ident_init_copy(&a->ident, &c->ident);
+}
+
 void ast_name_expr_destroy(struct ast_name_expr *a) {
   ast_meta_insts_destroy(&a->insts);
   ast_ident_destroy(&a->ident);
@@ -385,6 +562,41 @@ struct ast_meta ast_expr_meta(struct ast_expr *a) {
 
 size_t ast_expr_pos_end(struct ast_expr *a) {
   return ast_expr_meta(a).pos_end;
+}
+
+void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c) {
+  a->tag = c->tag;
+  switch (c->tag) {
+  case AST_EXPR_NAME:
+    ast_name_expr_init_copy(&a->u.name, &c->u.name);
+    break;
+  case AST_EXPR_NUMERIC_LITERAL:
+    ast_numeric_literal_init_copy(&a->u.numeric_literal,
+                                  &c->u.numeric_literal);
+    break;
+  case AST_EXPR_FUNCALL:
+    ast_funcall_init_copy(&a->u.funcall, &c->u.funcall);
+    break;
+  case AST_EXPR_UNOP:
+    ast_unop_expr_init_copy(&a->u.unop_expr, &c->u.unop_expr);
+    break;
+  case AST_EXPR_BINOP:
+    ast_binop_expr_init_copy(&a->u.binop_expr, &c->u.binop_expr);
+    break;
+  case AST_EXPR_LAMBDA:
+    ast_lambda_init_copy(&a->u.lambda, &c->u.lambda);
+    break;
+  case AST_EXPR_LOCAL_FIELD_ACCESS:
+    ast_local_field_access_init_copy(&a->u.local_field_access,
+                                     &c->u.local_field_access);
+    break;
+  case AST_EXPR_DEREF_FIELD_ACCESS:
+    ast_deref_field_access_init_copy(&a->u.deref_field_access,
+                                     &c->u.deref_field_access);
+    break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void ast_expr_destroy(struct ast_expr *a) {
