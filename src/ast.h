@@ -12,6 +12,7 @@ struct ast_meta {
 };
 
 struct ast_meta ast_meta_make(size_t pos_start, size_t pos_end);
+struct ast_meta ast_meta_make_copy(struct ast_meta *c);
 struct ast_meta ast_meta_make_garbage(void);
 
 struct ast_ident {
@@ -40,6 +41,8 @@ void ast_numeric_literal_init(struct ast_numeric_literal *a,
                               struct ast_meta meta, int8_t *digits,
                               size_t digits_count,
                               enum ast_numeric_type numeric_type);
+void ast_numeric_literal_init_copy(struct ast_numeric_literal *a,
+                                   struct ast_numeric_literal *c);
 
 struct ast_funcall {
   struct ast_meta meta;
@@ -116,6 +119,7 @@ struct ast_vardecl {
 
 void ast_vardecl_init(struct ast_vardecl *a, struct ast_meta meta,
                       struct ast_ident name, struct ast_typeexpr type);
+void ast_vardecl_init_copy(struct ast_vardecl *a, struct ast_vardecl *c);
 void ast_vardecl_destroy(struct ast_vardecl *a);
 
 struct ast_expr;
@@ -332,7 +336,8 @@ struct ast_name_expr {
 
 void ast_name_expr_init(struct ast_name_expr *a,
                         struct ast_ident ident);
-
+void ast_name_expr_init_copy(struct ast_name_expr *a,
+                             struct ast_name_expr *c);
 enum ast_expr_tag {
   AST_EXPR_NAME,
   AST_EXPR_NUMERIC_LITERAL,
@@ -360,6 +365,8 @@ struct ast_expr {
 
 void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c);
 void ast_expr_destroy(struct ast_expr *a);
+
+void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out);
 
 size_t ast_expr_pos_end(struct ast_expr *a);
 void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out);

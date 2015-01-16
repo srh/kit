@@ -767,7 +767,8 @@ int exact_typeexprs_equal(struct ast_typeexpr *a, struct ast_typeexpr *b) {
 
 int check_expr_with_type(struct exprscope *es,
                          struct ast_expr *x,
-                         struct ast_typeexpr *type);
+                         struct ast_typeexpr *type,
+                         struct ast_expr *annotated_out);
 
 int lookup_global_maybe_typecheck(struct exprscope *es,
                                   ident_value name,
@@ -809,11 +810,15 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
                    inst->substitutions_count,
                    STATIC_COMPUTATION_YES,
                    ent);
-    if (!check_expr_with_type(&scope, &ent->def->rhs, &unified)) {
+    /* TODO: Supposedly we're supposed to do something with this
+       "annotated" expr (instead of just destroying it). */
+    struct ast_expr annotated;
+    if (!check_expr_with_type(&scope, &ent->def->rhs, &unified, &annotated)) {
       exprscope_destroy(&scope);
       es->cs->template_instantiation_recursion_depth--;
       goto fail_unified;
     }
+    ast_expr_destroy(&annotated);
     exprscope_destroy(&scope);
     es->cs->template_instantiation_recursion_depth--;
   }
@@ -966,12 +971,14 @@ int check_expr(struct exprscope *es,
                struct ast_expr *x,
                struct ast_typeexpr *partial_type,
                struct ast_typeexpr *out,
-               int *is_lvalue_out);
+               int *is_lvalue_out,
+               struct ast_expr *annotated_out);
 
 int check_expr_funcall(struct exprscope *es,
                        struct ast_funcall *x,
                        struct ast_typeexpr *partial_type,
-                       struct ast_typeexpr *out) {
+                       struct ast_typeexpr *out,
+                       struct ast_funcall *annotated_out) {
   if (es->computation == STATIC_COMPUTATION_YES) {
     /* For now, there are no functions that are statically
        callable. */
@@ -982,14 +989,17 @@ int check_expr_funcall(struct exprscope *es,
   size_t args_types_count = size_add(args_count, 1);
   struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
                                                args_types_count);
+  struct ast_expr *args_annotated = malloc_mul(sizeof(*args_annotated),
+                                               args_count);
   size_t i;
   for (i = 0; i < args_count; i++) {
     struct ast_typeexpr local_partial;
     local_partial.tag = AST_TYPEEXPR_UNKNOWN;
     int lvalue_discard;
     if (!check_expr(es, &x->args[i], &local_partial,
-                    &args_types[i], &lvalue_discard)) {
-      goto fail_cleanup_args_types;
+                    &args_types[i], &lvalue_discard,
+                    &args_annotated[i])) {
+      goto fail_cleanup_args_types_and_annotated;
     }
   }
 
@@ -1003,23 +1013,29 @@ int check_expr_funcall(struct exprscope *es,
                    make_ast_ident(func_ident),
                    args_types, args_types_count);
 
-  int ret = 0;
   struct ast_typeexpr resolved_funcexpr;
   int lvalue_discard;
+  struct ast_expr annotated_funcexpr;
   if (!check_expr(es, x->func, &funcexpr,
-                  &resolved_funcexpr, &lvalue_discard)) {
+                  &resolved_funcexpr, &lvalue_discard, &annotated_funcexpr)) {
     goto fail_cleanup_funcexpr;
   }
 
+  ast_funcall_init(annotated_out, ast_meta_make_copy(&x->meta),
+                   annotated_funcexpr, args_annotated, args_count);
   copy_func_return_type(es->cs->im, &resolved_funcexpr, args_types_count, out);
 
-  ret = 1;
+  ast_typeexpr_destroy(&funcexpr);
+  return 1;
+  /* Don't fall-through -- args_annotated was moved into annotated_out. */
  fail_cleanup_funcexpr:
   ast_typeexpr_destroy(&funcexpr);
-  return ret;
+  SLICE_FREE(args_annotated, args_count, ast_expr_destroy);
+  return 0;
   /* Don't fall-through -- args_types was moved into funcexpr. */
- fail_cleanup_args_types:
+ fail_cleanup_args_types_and_annotated:
   SLICE_FREE(args_types, i, ast_typeexpr_destroy);
+  SLICE_FREE(args_annotated, i, ast_expr_destroy);
   return 0;
 }
 
@@ -1105,11 +1121,16 @@ int bodystate_note_label(struct bodystate *bs, ident_value name) {
 }
 
 int check_expr_bracebody(struct bodystate *bs,
-                         struct ast_bracebody *x) {
+                         struct ast_bracebody *x,
+                         struct ast_bracebody *annotated_out) {
   size_t vars_pushed = 0;
   int ret = 0;
 
-  for (size_t i = 0, e = x->statements_count; i < e; i++) {
+  struct ast_statement *annotated_statements
+    = malloc_mul(sizeof(*annotated_statements), x->statements_count);
+
+  size_t i = 0;
+  for (size_t e = x->statements_count; i < e; i++) {
     struct ast_statement *s = &x->statements[i];
     switch (s->tag) {
     case AST_STATEMENT_EXPR: {
@@ -1117,17 +1138,21 @@ int check_expr_bracebody(struct bodystate *bs,
       anything.tag = AST_TYPEEXPR_UNKNOWN;
       struct ast_typeexpr discard;
       int lvalue_discard;
+      struct ast_expr annotated_expr;
       if (!check_expr(bs->es, s->u.expr, &anything,
-                      &discard, &lvalue_discard)) {
+                      &discard, &lvalue_discard, &annotated_expr)) {
         goto fail;
       }
+      annotated_statements[i].tag = AST_STATEMENT_EXPR;
+      malloc_move_ast_expr(annotated_expr, &annotated_statements[i].u.expr);
       ast_typeexpr_destroy(&discard);
     } break;
     case AST_STATEMENT_RETURN_EXPR: {
       struct ast_typeexpr type;
       int lvalue_discard;
+      struct ast_expr annotated_expr;
       if (!check_expr(bs->es, s->u.return_expr, bs->partial_type,
-                      &type, &lvalue_discard)) {
+                      &type, &lvalue_discard, &annotated_expr)) {
         goto fail;
       }
       if (!bs->have_exact_return_type) {
@@ -1136,12 +1161,15 @@ int check_expr_bracebody(struct bodystate *bs,
       } else {
         if (!exact_typeexprs_equal(&bs->exact_return_type, &type)) {
           ERR_DBG("Return statements with conflicting return types.\n");
+          ast_expr_destroy(&annotated_expr);
           ast_typeexpr_destroy(&type);
           goto fail;
         } else {
           ast_typeexpr_destroy(&type);
         }
       }
+      annotated_statements[i].tag = AST_STATEMENT_RETURN_EXPR;
+      malloc_move_ast_expr(annotated_expr, &annotated_statements[i].u.return_expr);
     } break;
     case AST_STATEMENT_VAR: {
       struct ast_typeexpr replaced_type;
@@ -1149,8 +1177,9 @@ int check_expr_bracebody(struct bodystate *bs,
 
       struct ast_typeexpr rhs_type;
       int lvalue_discard;
+      struct ast_expr annotated_rhs;
       if (!check_expr(bs->es, s->u.var_statement.rhs, &replaced_type,
-                      &rhs_type, &lvalue_discard)) {
+                      &rhs_type, &lvalue_discard, &annotated_rhs)) {
         ast_typeexpr_destroy(&replaced_type);
         goto fail;
       }
@@ -1159,18 +1188,30 @@ int check_expr_bracebody(struct bodystate *bs,
       ast_typeexpr_destroy(&rhs_type);
 
       if (!exprscope_push_var(bs->es, &s->u.var_statement.decl)) {
+        ast_expr_destroy(&annotated_rhs);
         goto fail;
       }
 
       vars_pushed = size_add(vars_pushed, 1);
+      struct ast_ident name;
+      ast_ident_init_copy(&name, &s->u.var_statement.decl.name);
+      struct ast_typeexpr type;
+      ast_typeexpr_init_copy(&type, &s->u.var_statement.decl.type);
+      /* TODO: What.  Where does the vardecl meta value come from? */
+      annotated_statements[i].tag = AST_STATEMENT_VAR;
+      ast_var_statement_init(&annotated_statements[i].u.var_statement,
+                             ast_meta_make_copy(&s->u.var_statement.meta),
+                             name, type, annotated_rhs);
     } break;
     case AST_STATEMENT_GOTO: {
       bodystate_note_goto(bs, s->u.goto_statement.target.value);
+      ast_statement_init_copy(&annotated_statements[i], s);
     } break;
     case AST_STATEMENT_LABEL: {
       if (!bodystate_note_label(bs, s->u.label_statement.label.value)) {
         goto fail;
       }
+      ast_statement_init_copy(&annotated_statements[i], s);
     } break;
     case AST_STATEMENT_IFTHEN: {
       struct ast_typeexpr boolean;
@@ -1178,17 +1219,27 @@ int check_expr_bracebody(struct bodystate *bs,
 
       struct ast_typeexpr discard;
       int lvalue_discard;
+      struct ast_expr annotated_condition;
       if (!check_expr(bs->es, s->u.ifthen_statement.condition, &boolean,
-                      &discard, &lvalue_discard)) {
+                      &discard, &lvalue_discard, &annotated_condition)) {
         ast_typeexpr_destroy(&boolean);
         goto fail;
       }
       ast_typeexpr_destroy(&boolean);
       ast_typeexpr_destroy(&discard);
 
-      if (!check_expr_bracebody(bs, &s->u.ifthen_statement.thenbody)) {
+      struct ast_bracebody annotated_thenbody;
+      if (!check_expr_bracebody(bs, &s->u.ifthen_statement.thenbody,
+                                &annotated_thenbody)) {
+        ast_expr_destroy(&annotated_condition);
         goto fail;
       }
+
+      annotated_statements[i].tag = AST_STATEMENT_IFTHEN;
+      ast_ifthen_statement_init(&annotated_statements[i].u.ifthen_statement,
+                                ast_meta_make_copy(&s->u.ifthen_statement.meta),
+                                annotated_condition,
+                                annotated_thenbody);
     } break;
     case AST_STATEMENT_IFTHENELSE: {
       struct ast_typeexpr boolean;
@@ -1196,30 +1247,50 @@ int check_expr_bracebody(struct bodystate *bs,
 
       struct ast_typeexpr discard;
       int lvalue_discard;
+      struct ast_expr annotated_condition;
       if (!check_expr(bs->es, s->u.ifthenelse_statement.condition, &boolean,
-                      &discard, &lvalue_discard)) {
+                      &discard, &lvalue_discard, &annotated_condition)) {
         ast_typeexpr_destroy(&boolean);
         goto fail;
       }
       ast_typeexpr_destroy(&boolean);
       ast_typeexpr_destroy(&discard);
 
-      if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.thenbody)) {
+      struct ast_bracebody annotated_thenbody;
+      if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.thenbody,
+                                &annotated_thenbody)) {
+        ast_expr_destroy(&annotated_condition);
         goto fail;
       }
 
-      if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.elsebody)) {
+      struct ast_bracebody annotated_elsebody;
+      if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.elsebody,
+                                &annotated_elsebody)) {
+        ast_bracebody_destroy(&annotated_thenbody);
+        ast_expr_destroy(&annotated_condition);
         goto fail;
       }
+
+      annotated_statements[i].tag = AST_STATEMENT_IFTHENELSE;
+      ast_ifthenelse_statement_init(&annotated_statements[i].u.ifthenelse_statement,
+                                    ast_meta_make_copy(&s->u.ifthenelse_statement.meta),
+                                    annotated_condition,
+                                    annotated_thenbody,
+                                    annotated_elsebody);
     } break;
     default:
       UNREACHABLE();
     }
   }
 
+  ast_bracebody_init(annotated_out, ast_meta_make_copy(&x->meta),
+                     annotated_statements, x->statements_count);
   ret = 1;
  fail:
-  for (size_t i = 0; i < vars_pushed; i++) {
+  if (!ret) {
+    SLICE_FREE(annotated_statements, i, ast_statement_destroy);
+  }
+  for (size_t j = 0; j < vars_pushed; j++) {
     exprscope_pop_var(bs->es);
   }
   return ret;
@@ -1228,7 +1299,8 @@ int check_expr_bracebody(struct bodystate *bs,
 int check_expr_funcbody(struct exprscope *es,
                         struct ast_bracebody *x,
                         struct ast_typeexpr *partial_type,
-                        struct ast_typeexpr *out) {
+                        struct ast_typeexpr *out,
+                        struct ast_bracebody *annotated_out) {
   int ret = 0;
   struct bodystate bs;
   bodystate_init(&bs, es, partial_type);
@@ -1236,29 +1308,35 @@ int check_expr_funcbody(struct exprscope *es,
   /* TODO: We need to analyze whether _all_ paths return.  Also, goto
      should be restricted from jumping to non-subset variable
      scopes. */
-  if (!check_expr_bracebody(&bs, x)) {
+  struct ast_bracebody annotated_bracebody;
+  if (!check_expr_bracebody(&bs, x, &annotated_bracebody)) {
     goto fail;
   }
 
   for (size_t i = 0; i < bs.label_infos_count; i++) {
     if (!bs.label_infos[i].is_label_observed) {
       ERR_DBG("goto without label.\n");
-      goto fail;
+      goto fail_annotated;
     }
     if (!bs.label_infos[i].is_goto_observed) {
       ERR_DBG("label without goto.\n");
-      goto fail;
+      goto fail_annotated;
     }
   }
 
   if (!bs.have_exact_return_type) {
     ERR_DBG("Missing a return statement.\n");
-    goto fail;
+    goto fail_annotated;
   }
   *out = bs.exact_return_type;
   bs.have_exact_return_type = 0;
+  *annotated_out = annotated_bracebody;
 
   ret = 1;
+ fail_annotated:
+  if (!ret) {
+    ast_bracebody_destroy(&annotated_bracebody);
+  }
  fail:
   bodystate_destroy(&bs);
   return ret;
@@ -1267,7 +1345,8 @@ int check_expr_funcbody(struct exprscope *es,
 int check_expr_lambda(struct exprscope *es,
                       struct ast_lambda *x,
                       struct ast_typeexpr *partial_type,
-                      struct ast_typeexpr *out) {
+                      struct ast_typeexpr *out,
+                      struct ast_lambda *annotated_out) {
   CHECK_DBG("check_expr_lambda\n");
   ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
   size_t func_params_count = x->params_count;
@@ -1344,11 +1423,13 @@ int check_expr_lambda(struct exprscope *es,
   }
 
   struct ast_typeexpr computed_return_type;
+  struct ast_bracebody annotated_bracebody;
   if (!check_expr_funcbody(
           &bb_es,
           &x->bracebody,
           &funcexpr.u.app.params[size_sub(funcexpr.u.app.params_count, 1)],
-          &computed_return_type)) {
+          &computed_return_type,
+          &annotated_bracebody)) {
     CHECK_DBG("check_expr_funcbody fails\n");
     goto fail_bb_es;
   }
@@ -1357,6 +1438,17 @@ int check_expr_lambda(struct exprscope *es,
   exprscope_destroy(&bb_es);
   SLICE_FREE(replaced_vardecls, replaced_vardecls_size, ast_vardecl_destroy);
   *out = funcexpr;
+  {
+    struct ast_vardecl *params = malloc_mul(sizeof(*params), x->params_count);
+    for (size_t i = 0, e = x->params_count; i < e; i++) {
+      ast_vardecl_init_copy(&params[i], &x->params[i]);
+    }
+    struct ast_typeexpr return_type;
+    ast_typeexpr_init_copy(&return_type, &x->return_type);
+
+    ast_lambda_init(annotated_out, ast_meta_make_copy(&x->meta), params, x->params_count,
+                    return_type, annotated_bracebody);
+  }
   CHECK_DBG("check_expr_lambda succeeds\n");
   return 1;
 
@@ -1372,20 +1464,25 @@ int check_expr_magic_binop(struct exprscope *es,
                            struct ast_binop_expr *x,
                            struct ast_typeexpr *partial_type,
                            struct ast_typeexpr *out,
-                           int *is_lvalue_out) {
+                           int *is_lvalue_out,
+                           struct ast_binop_expr *annotated_out) {
   int ret = 0;
   struct ast_typeexpr no_partial;
   no_partial.tag = AST_TYPEEXPR_UNKNOWN;
 
   struct ast_typeexpr lhs_type;
   int lhs_is_lvalue;
-  if (!check_expr(es, x->lhs, &no_partial, &lhs_type, &lhs_is_lvalue)) {
+  struct ast_expr annotated_lhs;
+  if (!check_expr(es, x->lhs, &no_partial, &lhs_type, &lhs_is_lvalue,
+                  &annotated_lhs)) {
     goto cleanup;
   }
 
   struct ast_typeexpr rhs_type;
   int rhs_lvalue_discard;
-  if (!check_expr(es, x->rhs, &no_partial, &rhs_type, &rhs_lvalue_discard)) {
+  struct ast_expr annotated_rhs;
+  if (!check_expr(es, x->rhs, &no_partial, &rhs_type, &rhs_lvalue_discard,
+                  &annotated_rhs)) {
     goto cleanup_lhs_type;
   }
 
@@ -1411,6 +1508,10 @@ int check_expr_magic_binop(struct exprscope *es,
 
     *out = lhs_type;
     *is_lvalue_out = 1;
+
+    ast_binop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
+                        x->operator, annotated_lhs, annotated_rhs);
+
     ret = 1;
     goto cleanup_just_rhs_type;
   } break;
@@ -1441,6 +1542,10 @@ int check_expr_magic_binop(struct exprscope *es,
 
     *out = boolean;
     *is_lvalue_out = 0;
+
+    ast_binop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
+                        x->operator, annotated_lhs, annotated_rhs);
+
     ret = 1;
     goto cleanup_both_types;
   } break;
@@ -1449,11 +1554,20 @@ int check_expr_magic_binop(struct exprscope *es,
   }
 
  cleanup_just_rhs_type:
+  if (!ret) {
+    ast_expr_destroy(&annotated_rhs);
+  }
   ast_typeexpr_destroy(&rhs_type);
   goto cleanup;
  cleanup_both_types:
+  if (!ret) {
+    ast_expr_destroy(&annotated_rhs);
+  }
   ast_typeexpr_destroy(&rhs_type);
  cleanup_lhs_type:
+  if (!ret) {
+    ast_expr_destroy(&annotated_lhs);
+  }
   ast_typeexpr_destroy(&lhs_type);
  cleanup:
   return ret;
@@ -1470,9 +1584,11 @@ int check_expr_binop(struct exprscope *es,
                      struct ast_binop_expr *x,
                      struct ast_typeexpr *partial_type,
                      struct ast_typeexpr *out,
-                     int *is_lvalue_out) {
+                     int *is_lvalue_out,
+                     struct ast_binop_expr *annotated_out) {
   if (is_magic_binop(x->operator)) {
-    return check_expr_magic_binop(es, x, partial_type, out, is_lvalue_out);
+    return check_expr_magic_binop(es, x, partial_type, out, is_lvalue_out,
+                                  annotated_out);
   }
 
   if (es->computation == STATIC_COMPUTATION_YES
@@ -1486,12 +1602,16 @@ int check_expr_binop(struct exprscope *es,
 
   struct ast_typeexpr lhs_type;
   int lvalue_discard;
-  if (!check_expr(es, x->lhs, &local_partial, &lhs_type, &lvalue_discard)) {
+  struct ast_expr annotated_lhs;
+  if (!check_expr(es, x->lhs, &local_partial, &lhs_type, &lvalue_discard,
+                  &annotated_lhs)) {
     goto fail;
   }
 
   struct ast_typeexpr rhs_type;
-  if (!check_expr(es, x->rhs, &local_partial, &rhs_type, &lvalue_discard)) {
+  struct ast_expr annotated_rhs;
+  if (!check_expr(es, x->rhs, &local_partial, &rhs_type, &lvalue_discard,
+                  &annotated_rhs)) {
     goto fail_cleanup_lhs_type;
   }
 
@@ -1525,13 +1645,21 @@ int check_expr_binop(struct exprscope *es,
   copy_func_return_type(es->cs->im, &resolved_funcexpr, 3, out);
   *is_lvalue_out = 0;
 
+  ast_binop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
+                      x->operator, annotated_lhs, annotated_rhs);
+
   ret = 1;
   ast_typeexpr_destroy(&resolved_funcexpr);
  fail_cleanup_funcexpr:
+  if (!ret) {
+    ast_expr_destroy(&annotated_rhs);
+    ast_expr_destroy(&annotated_lhs);
+  }
   ast_typeexpr_destroy(&funcexpr);
   return ret;
   /* Don't fall-through -- lhs_type was moved into funcexpr. */
  fail_cleanup_lhs_type:
+  ast_expr_destroy(&annotated_lhs);
   ast_typeexpr_destroy(&lhs_type);
  fail:
   return 0;
@@ -1572,7 +1700,8 @@ int check_expr_magic_unop(struct exprscope *es,
                           struct ast_unop_expr *x,
                           struct ast_typeexpr *partial_type,
                           struct ast_typeexpr *out,
-                          int *is_lvalue_out) {
+                          int *is_lvalue_out,
+                          struct ast_unop_expr *annotated_out) {
   if (es->computation == STATIC_COMPUTATION_YES) {
     ERR_DBG("Magic unops not allowed in static expressions.\n");
     return 0;
@@ -1584,7 +1713,9 @@ int check_expr_magic_unop(struct exprscope *es,
 
   struct ast_typeexpr rhs_type;
   int rhs_is_lvalue;
-  if (!check_expr(es, x->rhs, &no_partial, &rhs_type, &rhs_is_lvalue)) {
+  struct ast_expr annotated_rhs;
+  if (!check_expr(es, x->rhs, &no_partial, &rhs_type, &rhs_is_lvalue,
+                  &annotated_rhs)) {
     return 0;
   }
 
@@ -1603,6 +1734,8 @@ int check_expr_magic_unop(struct exprscope *es,
 
     ast_typeexpr_init_copy(out, rhs_target);
     *is_lvalue_out = 1;
+    ast_unop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
+                       x->operator, annotated_rhs);
     ret = 1;
   } break;
   case AST_UNOP_ADDRESSOF: {
@@ -1622,6 +1755,8 @@ int check_expr_magic_unop(struct exprscope *es,
 
     *out = pointer_type;
     *is_lvalue_out = 0;
+    ast_unop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
+                       x->operator, annotated_rhs);
     ret = 1;
   } break;
   default:
@@ -1629,6 +1764,9 @@ int check_expr_magic_unop(struct exprscope *es,
   }
 
  cleanup_rhs_type:
+  if (!ret) {
+    ast_expr_destroy(&annotated_rhs);
+  }
   ast_typeexpr_destroy(&rhs_type);
   return ret;
 }
@@ -1641,10 +1779,12 @@ int check_expr_unop(struct exprscope *es,
                     struct ast_unop_expr *x,
                     struct ast_typeexpr *partial_type,
                     struct ast_typeexpr *out,
-                    int *is_lvalue_out) {
+                    int *is_lvalue_out,
+                    struct ast_unop_expr *annotated_out) {
   int ret = 0;
   if (is_magic_unop(x->operator)) {
-    return check_expr_magic_unop(es, x, partial_type, out, is_lvalue_out);
+    return check_expr_magic_unop(es, x, partial_type, out, is_lvalue_out,
+                                 annotated_out);
   }
 
   if (es->computation == STATIC_COMPUTATION_YES
@@ -1658,7 +1798,9 @@ int check_expr_unop(struct exprscope *es,
 
   struct ast_typeexpr rhs_type;
   int lvalue_discard;
-  if (!check_expr(es, x->rhs, &local_partial, &rhs_type, &lvalue_discard)) {
+  struct ast_expr annotated_rhs;
+  if (!check_expr(es, x->rhs, &local_partial, &rhs_type, &lvalue_discard,
+                  &annotated_rhs)) {
     goto fail;
   }
 
@@ -1688,11 +1830,16 @@ int check_expr_unop(struct exprscope *es,
 
   copy_func_return_type(es->cs->im, &resolved_funcexpr, 2, out);
   *is_lvalue_out = 0;
+  ast_unop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
+                     x->operator, annotated_rhs);
 
   ret = 1;
   ast_typeexpr_destroy(&resolved_funcexpr);
  cleanup_funcexpr:
   ast_typeexpr_destroy(&funcexpr);
+  if (!ret) {
+    ast_expr_destroy(&annotated_rhs);
+  }
  fail:
   return ret;
 }
@@ -1777,14 +1924,17 @@ int check_expr_local_field_access(struct exprscope *es,
                                   struct ast_local_field_access *x,
                                   struct ast_typeexpr *partial_type,
                                   struct ast_typeexpr *out,
-                                  int *is_lvalue_out) {
+                                  int *is_lvalue_out,
+                                  struct ast_local_field_access *annotated_out) {
   int ret = 0;
   struct ast_typeexpr lhs_partial_type;
   lhs_partial_type.tag = AST_TYPEEXPR_UNKNOWN;
 
   struct ast_typeexpr lhs_type;
   int lhs_lvalue;
-  if (!check_expr(es, x->lhs, &lhs_partial_type, &lhs_type, &lhs_lvalue)) {
+  struct ast_expr annotated_lhs;
+  if (!check_expr(es, x->lhs, &lhs_partial_type, &lhs_type, &lhs_lvalue,
+                  &annotated_lhs)) {
     goto cleanup;
   }
 
@@ -1799,12 +1949,19 @@ int check_expr_local_field_access(struct exprscope *es,
 
   *out = field_type;
   *is_lvalue_out = lhs_lvalue;
+  struct ast_ident fieldname;
+  ast_ident_init_copy(&fieldname, &x->fieldname);
+  ast_local_field_access_init(annotated_out, ast_meta_make_copy(&x->meta),
+                              annotated_lhs, fieldname);
   ret = 1;
   goto cleanup_lhs_type;
 
  cleanup_field_type:
   ast_typeexpr_destroy(&field_type);
  cleanup_lhs_type:
+  if (!ret) {
+    ast_expr_destroy(&annotated_lhs);
+  }
   ast_typeexpr_destroy(&lhs_type);
  cleanup:
   return ret;
@@ -1814,7 +1971,8 @@ int check_expr_deref_field_access(struct exprscope *es,
                                   struct ast_deref_field_access *x,
                                   struct ast_typeexpr *partial_type,
                                   struct ast_typeexpr *out,
-                                  int *is_lvalue_out) {
+                                  int *is_lvalue_out,
+                                  struct ast_deref_field_access *annotated_out) {
   if (es->computation == STATIC_COMPUTATION_YES) {
     ERR_DBG("Dereferencing field access disallowed in static computation.\n");
     return 0;
@@ -1827,8 +1985,9 @@ int check_expr_deref_field_access(struct exprscope *es,
 
   struct ast_typeexpr lhs_type;
   int lvalue_discard;
+  struct ast_expr annotated_lhs;
   if (!check_expr(es, x->lhs, &lhs_partial_type,
-                  &lhs_type, &lvalue_discard)) {
+                  &lhs_type, &lvalue_discard, &annotated_lhs)) {
     goto cleanup;
   }
 
@@ -1850,12 +2009,19 @@ int check_expr_deref_field_access(struct exprscope *es,
 
   *out = field_type;
   *is_lvalue_out = 1;
+  struct ast_ident fieldname;
+  ast_ident_init_copy(&fieldname, &x->fieldname);
+  ast_deref_field_access_init(annotated_out, ast_meta_make_copy(&x->meta),
+                              annotated_lhs, fieldname);
   ret = 1;
   goto cleanup_lhs_type;
 
  cleanup_field_type:
   ast_typeexpr_destroy(&field_type);
  cleanup_lhs_type:
+  if (!ret) {
+    ast_expr_destroy(&annotated_lhs);
+  }
   ast_typeexpr_destroy(&lhs_type);
  cleanup:
   return ret;
@@ -1865,7 +2031,8 @@ int check_expr(struct exprscope *es,
                struct ast_expr *x,
                struct ast_typeexpr *partial_type,
                struct ast_typeexpr *out,
-               int *is_lvalue_out) {
+               int *is_lvalue_out,
+               struct ast_expr *annotated_out) {
   switch (x->tag) {
   case AST_EXPR_NAME: {
     struct ast_typeexpr name_type;
@@ -1882,6 +2049,9 @@ int check_expr(struct exprscope *es,
                             es->generics_substitutions_count);
     *out = name_type;
     *is_lvalue_out = is_lvalue;
+    /* TODO: Uhhhh we're adding ast_meta_insts above, we should do actual annotation. */
+    annotated_out->tag = AST_EXPR_NAME;
+    ast_name_expr_init_copy(&annotated_out->u.name, &x->u.name);
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
@@ -1895,27 +2065,61 @@ int check_expr(struct exprscope *es,
 
     *out = num_type;
     *is_lvalue_out = 0;
+    annotated_out->tag = AST_EXPR_NUMERIC_LITERAL;
+    ast_numeric_literal_init_copy(&annotated_out->u.numeric_literal,
+                                  &x->u.numeric_literal);
     return 1;
   } break;
-  case AST_EXPR_FUNCALL:
+  case AST_EXPR_FUNCALL: {
     *is_lvalue_out = 0;
-    return check_expr_funcall(es, &x->u.funcall, partial_type, out);
-  case AST_EXPR_UNOP:
-    return check_expr_unop(es, &x->u.unop_expr, partial_type,
-                           out, is_lvalue_out);
-  case AST_EXPR_BINOP:
-    return check_expr_binop(es, &x->u.binop_expr, partial_type,
-                            out, is_lvalue_out);
-  case AST_EXPR_LAMBDA:
+    if (!check_expr_funcall(es, &x->u.funcall, partial_type, out, &annotated_out->u.funcall)) {
+      return 0;
+    }
+    annotated_out->tag = AST_EXPR_FUNCALL;
+    return 1;
+  } break;
+  case AST_EXPR_UNOP: {
+    if (!check_expr_unop(es, &x->u.unop_expr, partial_type,
+                         out, is_lvalue_out, &annotated_out->u.unop_expr)) {
+      return 0;
+    }
+    annotated_out->tag = AST_EXPR_UNOP;
+    return 1;
+  } break;
+  case AST_EXPR_BINOP: {
+    if (!check_expr_binop(es, &x->u.binop_expr, partial_type,
+                          out, is_lvalue_out, &annotated_out->u.binop_expr)) {
+      return 0;
+    }
+    annotated_out->tag = AST_EXPR_BINOP;
+    return 1;
+  } break;
+  case AST_EXPR_LAMBDA: {
     *is_lvalue_out = 0;
-    return check_expr_lambda(es, &x->u.lambda, partial_type,
-                             out);
-  case AST_EXPR_LOCAL_FIELD_ACCESS:
-    return check_expr_local_field_access(es, &x->u.local_field_access,
-                                         partial_type, out, is_lvalue_out);
-  case AST_EXPR_DEREF_FIELD_ACCESS:
-    return check_expr_deref_field_access(es, &x->u.deref_field_access,
-                                         partial_type, out, is_lvalue_out);
+    if (!check_expr_lambda(es, &x->u.lambda, partial_type, out, &annotated_out->u.lambda)) {
+      return 0;
+    }
+    annotated_out->tag = AST_EXPR_LAMBDA;
+    return 1;
+  } break;
+  case AST_EXPR_LOCAL_FIELD_ACCESS: {
+    if (!check_expr_local_field_access(es, &x->u.local_field_access,
+                                       partial_type, out, is_lvalue_out,
+                                       &annotated_out->u.local_field_access)) {
+      return 0;
+    }
+    annotated_out->tag = AST_EXPR_LOCAL_FIELD_ACCESS;
+    return 1;
+  } break;
+  case AST_EXPR_DEREF_FIELD_ACCESS: {
+    if (!check_expr_deref_field_access(es, &x->u.deref_field_access,
+                                       partial_type, out, is_lvalue_out,
+                                       &annotated_out->u.deref_field_access)) {
+      return 0;
+    }
+    annotated_out->tag = AST_EXPR_DEREF_FIELD_ACCESS;
+    return 1;
+  } break;
   default:
     UNREACHABLE();
   }
@@ -1924,11 +2128,12 @@ int check_expr(struct exprscope *es,
 /* Checks an expr, given that we know the type of expr. */
 int check_expr_with_type(struct exprscope *es,
                          struct ast_expr *x,
-                         struct ast_typeexpr *type) {
+                         struct ast_typeexpr *type,
+                         struct ast_expr *annotated_out) {
   CHECK_DBG("check_expr_with_type\n");
   struct ast_typeexpr out;
   int lvalue_discard;
-  int ret = check_expr(es, x, type, &out, &lvalue_discard);
+  int ret = check_expr(es, x, type, &out, &lvalue_discard, annotated_out);
   if (ret) {
     ast_typeexpr_destroy(&out);
   }
@@ -1967,7 +2172,13 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
       struct exprscope es;
       exprscope_init(&es, cs, &a->generics, NULL, 0,
                      STATIC_COMPUTATION_YES, ent);
-      ret = check_expr_with_type(&es, &a->rhs, &a->type);
+      /* TODO: We're supposed to do something with this "annotated"
+         expr (besides just destroying it). */
+      struct ast_expr annotated;
+      ret = check_expr_with_type(&es, &a->rhs, &a->type, &annotated);
+      if (ret) {
+        ast_expr_destroy(&annotated);
+      }
       exprscope_destroy(&es);
     } else {
       ret = 1;

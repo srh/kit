@@ -600,6 +600,13 @@ void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c) {
   }
 }
 
+void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out) {
+  struct ast_expr *p = malloc(sizeof(*p));
+  CHECK(p);
+  *p = movee;
+  *out = p;
+}
+
 void ast_expr_destroy(struct ast_expr *a) {
   switch (a->tag) {
   case AST_EXPR_NAME:
