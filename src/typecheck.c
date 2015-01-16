@@ -110,14 +110,18 @@ void intern_binop(struct checkstate *cs,
                                type);
 }
 
+/* TODO: Support the type f64 (or rip out the code). */
+#define F64_SUPPORTED 0
+
 #define VOID_TYPE_NAME "void"
 #define BYTE_TYPE_NAME "byte"
 #define I32_TYPE_NAME "i32"
 #define U32_TYPE_NAME "u32"
-/* TODO: Support the type f64. */
-#if 0
+
+#if F64_SUPPORTED
 #define F64_TYPE_NAME "f64"
-#endif  /* 0 */
+#endif
+
 #define PTR_TYPE_NAME "ptr"
 #define FUNC_TYPE_NAME "func"
 #define BOOLEAN_STANDIN_TYPE_NAME I32_TYPE_NAME
@@ -132,11 +136,12 @@ void checkstate_import_primitive_types(struct checkstate *cs) {
   intern_primitive_type(cs, BYTE_TYPE_NAME, NULL, 0, 1, 1);
   intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0, 4, 4);
   intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0, 4, 4);
-  /* TODO: Add the type f64. */
-#if 0
+
+#if F64_SUPPORTED
   /* X86 or WINDOWS-specific alignment of f64. */
   intern_primitive_type(cs, F64_TYPE_NAME, NULL, 0, 8, 8);
 #endif
+
   int not_flatly_held[20] = { 0 };
   /* X86 -- 32-bit pointers */
   intern_primitive_type(cs, PTR_TYPE_NAME, not_flatly_held, 1, 4, 4);
@@ -208,8 +213,7 @@ void import_integer_binops(struct checkstate *cs, const char *type_name) {
   ast_generics_destroy(&generics);
 }
 
-/* TODO: Add the type f64 and call this. */
-#if 0
+#if F64_SUPPORTED
 void import_floating_binops(struct checkstate *cs, const char *type_name) {
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
@@ -232,8 +236,8 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
   import_integer_binops(cs, I32_TYPE_NAME);
   import_integer_binops(cs, U32_TYPE_NAME);
   import_integer_binops(cs, BYTE_TYPE_NAME);
-  /* TODO: Add the type f64. */
-#if 0
+
+#if F64_SUPPORTED
   import_floating_binops(cs, F64_TYPE_NAME);
 #endif
 
@@ -251,8 +255,7 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
       ast_typeexpr_destroy(&type);
     }
 
-    /* TODO: Add the type f64. */
-#if 0
+#if F64_SUPPORTED
     /* Unary minus on f64. */
     {
       struct ast_typeexpr type;
@@ -1457,8 +1460,8 @@ int check_expr_magic_binop(struct exprscope *es,
 
 int is_statically_computable_non_magic_binop(enum ast_binop op) {
   (void)op;
-  /* TODO: This will be incorrect when there's floats, because
-     compile-time float computation is weird? */
+  /* This will be incorrect when there's floats, because compile-time
+     float computation is weird? */
   return 1;
 }
 
