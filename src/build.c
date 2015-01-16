@@ -399,7 +399,6 @@ int build_lambda_instantiation(struct checkstate *cs, struct objfile *f,
   varstate_init(&vs);
 
   struct gen_kiracall kc;
-
   gen_kiracall_start(cs, f, &vs, &kc, lambda, &inst->type);
 
   (void)ent;  /* TODO */
@@ -407,6 +406,7 @@ int build_lambda_instantiation(struct checkstate *cs, struct objfile *f,
   gen_kiracall_finish(f, &vs, &kc);
 
   varstate_destroy(&vs);
+  ERR_DBG("build_lambda_instantation not completely implemented.\n");
   return 0;
 }
 
@@ -416,9 +416,9 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
   case STATIC_VALUE_I32: {
     STATIC_CHECK(sizeof(inst->value.u.i32_value) == 4);
     CHECK(inst->symbol_table_index_computed);
+    objfile_section_align_dword(objfile_data(f));
     objfile_set_symbol_Value(f, inst->symbol_table_index,
                              objfile_section_size(objfile_data(f)));
-    objfile_section_align_dword(objfile_data(f));
     objfile_section_append_raw(objfile_data(f),
                                &inst->value.u.i32_value,
                                sizeof(inst->value.u.i32_value));
@@ -427,9 +427,9 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
   case STATIC_VALUE_U32: {
     STATIC_CHECK(sizeof(inst->value.u.u32_value) == 4);
     CHECK(inst->symbol_table_index_computed);
+    objfile_section_align_dword(objfile_data(f));
     objfile_set_symbol_Value(f, inst->symbol_table_index,
                              objfile_section_size(objfile_data(f)));
-    objfile_section_align_dword(objfile_data(f));
     objfile_section_append_raw(objfile_data(f),
                                &inst->value.u.u32_value,
                                sizeof(inst->value.u.u32_value));
