@@ -2048,16 +2048,19 @@ int check_expr(struct exprscope *es,
   case AST_EXPR_NAME: {
     struct ast_typeexpr name_type;
     int is_lvalue;
-    struct def_instantiation *inst;
+    struct def_instantiation *inst_or_null;
     if (!exprscope_lookup_name(es, x->u.name.ident.value, partial_type,
-                               &name_type, &is_lvalue, &inst)) {
+                               &name_type, &is_lvalue, &inst_or_null)) {
       return 0;
     }
 
-    ast_meta_insts_add_copy(&x->u.name.insts,
-                            inst,
-                            es->generics_substitutions,
-                            es->generics_substitutions_count);
+    if (inst_or_null) {
+      ast_meta_insts_add_copy(&x->u.name.insts,
+                              inst_or_null,
+                              es->generics_substitutions,
+                              es->generics_substitutions_count);
+    }
+
     *out = name_type;
     *is_lvalue_out = is_lvalue;
     /* TODO: Uhhhh we're adding ast_meta_insts above, we should do
