@@ -345,7 +345,8 @@ void gen_kiracall_start(struct checkstate *cs,
                         struct ast_typeexpr *concrete_type) {
   CHECK(typeexpr_is_func_type(cs->im, concrete_type));
   CHECK(concrete_type->tag == AST_TYPEEXPR_APP);
-  CHECK(concrete_type->u.app.params_count == size_add(lambda->params_count, 1));
+  CHECK(concrete_type->u.app.params_count
+        == size_add(lambda->params_count, 1));
 
   emit_push_ebp(f);
 
@@ -371,7 +372,8 @@ void gen_kiracall_start(struct checkstate *cs,
     struct ast_typeexpr *param_type = &concrete_type->u.app.params[i];
     varstate_push_var(vs, lambda->params[i].name.value,
                       param_type, ebp_offset(var_ebp_offset));
-    var_ebp_offset = uint32_add(var_ebp_offset, kira_sizeof(&cs->nt, param_type));
+    var_ebp_offset = uint32_add(var_ebp_offset,
+                                kira_sizeof(&cs->nt, param_type));
   }
 
   kc->num_vars = lambda->params_count;
@@ -460,7 +462,8 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {
-    return build_lambda_instantiation(cs, f, inst, &inst->value.u.typechecked_lambda);
+    return build_lambda_instantiation(cs, f, inst,
+                                      &inst->value.u.typechecked_lambda);
   } break;
   default:
     UNREACHABLE();

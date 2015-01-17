@@ -27,7 +27,8 @@ void static_value_init_u32(struct static_value *a, uint32_t u32_value) {
 
 void static_value_init_typechecked_lambda(struct static_value *a,
                                           struct ast_expr lambda) {
-  /* TODO: Assert somehow that this ast_expr is a typechecked (and annotated) one. */
+  /* TODO: Assert somehow that this ast_expr is a typechecked (and
+     annotated) one. */
   a->tag = STATIC_VALUE_LAMBDA;
   a->u.typechecked_lambda = lambda;
 }
@@ -351,7 +352,8 @@ int name_table_help_add_def(struct name_table *t,
 
   struct def_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);
-  def_entry_init(new_entry, name, generics, type, is_primitive, is_extern, def);
+  def_entry_init(new_entry, name, generics, type, is_primitive,
+                 is_extern, def);
   SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);
 
   ident_value dbn_id = identmap_intern(&t->defs_by_name, &name, sizeof(name));
@@ -402,7 +404,9 @@ int name_table_help_add_deftype_entry(struct name_table *t,
   struct deftypes_by_name_node *old_node
     = identmap_get_user_value(&t->deftypes_by_name, dtbn_id);
 
-  for (struct deftypes_by_name_node *node = old_node; node; node = node->next) {
+  for (struct deftypes_by_name_node *node = old_node;
+       node;
+       node = node->next) {
     struct deftype_entry *ent = node->ent;
     CHECK(ent->name == name);
 
@@ -810,7 +814,8 @@ int unify_with_parameterized_type(
     }
   }
 
-  substitute_generics(type, g, materialized, g->params_count, concrete_type_out);
+  substitute_generics(type, g, materialized, g->params_count,
+                      concrete_type_out);
   *materialized_params_out = materialized;
   *materialized_params_count_out = g->params_count;
   return 1;
@@ -880,7 +885,8 @@ int def_entry_matches(struct def_entry *ent,
     }
 
     ast_typeexpr_init_copy(unified_type_out, &ent->type);
-    *instantiation_out = def_entry_insert_instantiation(ent, NULL, 0, &ent->type);
+    *instantiation_out = def_entry_insert_instantiation(ent, NULL, 0,
+                                                        &ent->type);
     return 1;
   }
 

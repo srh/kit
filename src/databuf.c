@@ -18,7 +18,8 @@ void databuf_destroy(struct databuf *b) {
   databuf_init(b);
 }
 
-void databuf_move_destroy(struct databuf *b, void **buf_out, size_t *count_out) {
+void databuf_move_destroy(struct databuf *b,
+                          void **buf_out, size_t *count_out) {
   void *buf = realloc(b->buf, b->count);
   CHECK(buf || b->count == 0);
   *buf_out = buf;

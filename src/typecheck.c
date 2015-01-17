@@ -128,7 +128,8 @@ void intern_binop(struct checkstate *cs,
 
 int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x) {
   return x->tag == AST_TYPEEXPR_APP
-    && x->u.app.name.value == identmap_intern(im, FUNC_TYPE_NAME, strlen(FUNC_TYPE_NAME));
+    && x->u.app.name.value == identmap_intern(im, FUNC_TYPE_NAME,
+                                              strlen(FUNC_TYPE_NAME));
 }
 
 void checkstate_import_primitive_types(struct checkstate *cs) {
@@ -201,7 +202,9 @@ void import_integer_binops(struct checkstate *cs, const char *type_name) {
   for (enum ast_binop op = AST_BINOP_ADD; op < AST_BINOP_LT; op++) {
     intern_binop(cs, op, &generics, &binop_type);
   }
-  for (enum ast_binop op = AST_BINOP_BIT_XOR; op < AST_BINOP_LOGICAL_OR; op++) {
+  for (enum ast_binop op = AST_BINOP_BIT_XOR;
+       op < AST_BINOP_LOGICAL_OR;
+       op++) {
     intern_binop(cs, op, &generics, &binop_type);
   }
   ast_typeexpr_destroy(&binop_type);
@@ -813,7 +816,8 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
                    ent);
 
     struct ast_expr annotated_rhs;
-    if (!check_expr_with_type(&scope, &ent->def->rhs, &unified, &annotated_rhs)) {
+    if (!check_expr_with_type(&scope, &ent->def->rhs, &unified,
+                              &annotated_rhs)) {
       exprscope_destroy(&scope);
       es->cs->template_instantiation_recursion_depth--;
       goto fail_unified;
@@ -1172,7 +1176,8 @@ int check_expr_bracebody(struct bodystate *bs,
         }
       }
       annotated_statements[i].tag = AST_STATEMENT_RETURN_EXPR;
-      malloc_move_ast_expr(annotated_expr, &annotated_statements[i].u.return_expr);
+      malloc_move_ast_expr(annotated_expr,
+                           &annotated_statements[i].u.return_expr);
     } break;
     case AST_STATEMENT_VAR: {
       struct ast_typeexpr replaced_type;
@@ -1237,10 +1242,11 @@ int check_expr_bracebody(struct bodystate *bs,
       }
 
       annotated_statements[i].tag = AST_STATEMENT_IFTHEN;
-      ast_ifthen_statement_init(&annotated_statements[i].u.ifthen_statement,
-                                ast_meta_make_copy(&s->u.ifthen_statement.meta),
-                                annotated_condition,
-                                annotated_thenbody);
+      ast_ifthen_statement_init(
+          &annotated_statements[i].u.ifthen_statement,
+          ast_meta_make_copy(&s->u.ifthen_statement.meta),
+          annotated_condition,
+          annotated_thenbody);
     } break;
     case AST_STATEMENT_IFTHENELSE: {
       struct ast_typeexpr boolean;
@@ -1273,11 +1279,12 @@ int check_expr_bracebody(struct bodystate *bs,
       }
 
       annotated_statements[i].tag = AST_STATEMENT_IFTHENELSE;
-      ast_ifthenelse_statement_init(&annotated_statements[i].u.ifthenelse_statement,
-                                    ast_meta_make_copy(&s->u.ifthenelse_statement.meta),
-                                    annotated_condition,
-                                    annotated_thenbody,
-                                    annotated_elsebody);
+      ast_ifthenelse_statement_init(
+          &annotated_statements[i].u.ifthenelse_statement,
+          ast_meta_make_copy(&s->u.ifthenelse_statement.meta),
+          annotated_condition,
+          annotated_thenbody,
+          annotated_elsebody);
     } break;
     default:
       UNREACHABLE();
@@ -1447,7 +1454,8 @@ int check_expr_lambda(struct exprscope *es,
     struct ast_typeexpr return_type;
     ast_typeexpr_init_copy(&return_type, &x->return_type);
 
-    ast_lambda_init(annotated_out, ast_meta_make_copy(&x->meta), params, x->params_count,
+    ast_lambda_init(annotated_out, ast_meta_make_copy(&x->meta),
+                    params, x->params_count,
                     return_type, annotated_bracebody);
   }
   CHECK_DBG("check_expr_lambda succeeds\n");
@@ -1921,12 +1929,13 @@ int lookup_field_type(struct exprscope *es,
   }
 }
 
-int check_expr_local_field_access(struct exprscope *es,
-                                  struct ast_local_field_access *x,
-                                  struct ast_typeexpr *partial_type,
-                                  struct ast_typeexpr *out,
-                                  int *is_lvalue_out,
-                                  struct ast_local_field_access *annotated_out) {
+int check_expr_local_field_access(
+    struct exprscope *es,
+    struct ast_local_field_access *x,
+    struct ast_typeexpr *partial_type,
+    struct ast_typeexpr *out,
+    int *is_lvalue_out,
+    struct ast_local_field_access *annotated_out) {
   int ret = 0;
   struct ast_typeexpr lhs_partial_type;
   lhs_partial_type.tag = AST_TYPEEXPR_UNKNOWN;
@@ -1968,12 +1977,13 @@ int check_expr_local_field_access(struct exprscope *es,
   return ret;
 }
 
-int check_expr_deref_field_access(struct exprscope *es,
-                                  struct ast_deref_field_access *x,
-                                  struct ast_typeexpr *partial_type,
-                                  struct ast_typeexpr *out,
-                                  int *is_lvalue_out,
-                                  struct ast_deref_field_access *annotated_out) {
+int check_expr_deref_field_access(
+    struct exprscope *es,
+    struct ast_deref_field_access *x,
+    struct ast_typeexpr *partial_type,
+    struct ast_typeexpr *out,
+    int *is_lvalue_out,
+    struct ast_deref_field_access *annotated_out) {
   if (es->computation == STATIC_COMPUTATION_YES) {
     ERR_DBG("Dereferencing field access disallowed in static computation.\n");
     return 0;
@@ -2050,7 +2060,8 @@ int check_expr(struct exprscope *es,
                             es->generics_substitutions_count);
     *out = name_type;
     *is_lvalue_out = is_lvalue;
-    /* TODO: Uhhhh we're adding ast_meta_insts above, we should do actual annotation. */
+    /* TODO: Uhhhh we're adding ast_meta_insts above, we should do
+       actual annotation. */
     annotated_out->tag = AST_EXPR_NAME;
     ast_name_expr_init_copy(&annotated_out->u.name, &x->u.name);
     return 1;
@@ -2073,7 +2084,8 @@ int check_expr(struct exprscope *es,
   } break;
   case AST_EXPR_FUNCALL: {
     *is_lvalue_out = 0;
-    if (!check_expr_funcall(es, &x->u.funcall, partial_type, out, &annotated_out->u.funcall)) {
+    if (!check_expr_funcall(es, &x->u.funcall, partial_type,
+                            out, &annotated_out->u.funcall)) {
       return 0;
     }
     annotated_out->tag = AST_EXPR_FUNCALL;
@@ -2097,7 +2109,8 @@ int check_expr(struct exprscope *es,
   } break;
   case AST_EXPR_LAMBDA: {
     *is_lvalue_out = 0;
-    if (!check_expr_lambda(es, &x->u.lambda, partial_type, out, &annotated_out->u.lambda)) {
+    if (!check_expr_lambda(es, &x->u.lambda, partial_type,
+                           out, &annotated_out->u.lambda)) {
       return 0;
     }
     annotated_out->tag = AST_EXPR_LAMBDA;
@@ -2216,7 +2229,8 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
   }
 }
 
-static const char *const kNumericLiteralOOR = "Numeric literal out of range.\n";
+static const char *const kNumericLiteralOOR =
+  "Numeric literal out of range.\n";
 
 int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
                            uint32_t *out) {
@@ -2562,10 +2576,12 @@ int eval_static_value(struct ast_generics *generics,
     return 1;
   } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
-    CRASH("No local field access expression should have been deemed statically evaluable.\n");
+    CRASH("No local field access expression should have been deemed "
+          "statically evaluable.\n");
   } break;
   case AST_EXPR_DEREF_FIELD_ACCESS: {
-    CRASH("No deref field access expression should have been deemed statically evaluable.\n");
+    CRASH("No deref field access expression should have been deemed"
+          "statically evaluable.\n");
   } break;
   default:
     UNREACHABLE();
@@ -3022,11 +3038,12 @@ int check_file_test_lambda_12(const uint8_t *name, size_t name_count,
 
 int check_file_test_lambda_13(const uint8_t *name, size_t name_count,
                               uint8_t **data_out, size_t *data_count_out) {
-  struct test_module a[] = { { "foo",
-                               "deftype[T] foo struct { x T; y i32; };\n"
-                               "def y func[foo[i32], i32] = fn(z foo[i32]) i32 {\n"
-                               "  return z.x + z.y;\n"
-                               "};\n"
+  struct test_module a[] = { {
+      "foo",
+      "deftype[T] foo struct { x T; y i32; };\n"
+      "def y func[foo[i32], i32] = fn(z foo[i32]) i32 {\n"
+      "  return z.x + z.y;\n"
+      "};\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -3036,11 +3053,12 @@ int check_file_test_lambda_13(const uint8_t *name, size_t name_count,
 int check_file_test_lambda_14(const uint8_t *name, size_t name_count,
                               uint8_t **data_out, size_t *data_count_out) {
   /* Fails because z.x is a u32. */
-  struct test_module a[] = { { "foo",
-                               "deftype[T] foo struct { x T; y i32; };\n"
-                               "def y func[foo[u32], i32] = fn(z foo[u32]) i32 {\n"
-                               "  return z.x + z.y;\n"
-                               "};\n"
+  struct test_module a[] = { {
+      "foo",
+      "deftype[T] foo struct { x T; y i32; };\n"
+      "def y func[foo[u32], i32] = fn(z foo[u32]) i32 {\n"
+      "  return z.x + z.y;\n"
+      "};\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),

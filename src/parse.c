@@ -525,8 +525,11 @@ int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
     goto fail_name;
   }
 
-  ast_vardecl_init(out, ast_meta_make(pos_start, ast_typeexpr_meta(&type)->pos_end),
-                   name, type);
+  ast_vardecl_init(out,
+                   ast_meta_make(pos_start,
+                                 ast_typeexpr_meta(&type)->pos_end),
+                   name,
+                   type);
   return 1;
 
  fail_name:

@@ -278,10 +278,12 @@ void ast_statement_init_copy(struct ast_statement *a,
     ast_goto_statement_init_copy(&a->u.goto_statement, &c->u.goto_statement);
     break;
   case AST_STATEMENT_LABEL:
-    ast_label_statement_init_copy(&a->u.label_statement, &c->u.label_statement);
+    ast_label_statement_init_copy(&a->u.label_statement,
+                                  &c->u.label_statement);
     break;
   case AST_STATEMENT_IFTHEN:
-    ast_ifthen_statement_init_copy(&a->u.ifthen_statement, &c->u.ifthen_statement);
+    ast_ifthen_statement_init_copy(&a->u.ifthen_statement,
+                                   &c->u.ifthen_statement);
     break;
   case AST_STATEMENT_IFTHENELSE:
     ast_ifthenelse_statement_init_copy(&a->u.ifthenelse_statement,
@@ -483,8 +485,10 @@ void ast_meta_insts_init(struct ast_meta_insts *a) {
   a->pairs_limit = 0;
 }
 
-void ast_meta_insts_init_copy(struct ast_meta_insts *a, struct ast_meta_insts *c) {
-  struct ast_meta_insts_pair *pairs = malloc_mul(sizeof(*pairs), c->pairs_count);
+void ast_meta_insts_init_copy(struct ast_meta_insts *a,
+                              struct ast_meta_insts *c) {
+  struct ast_meta_insts_pair *pairs
+    = malloc_mul(sizeof(*pairs), c->pairs_count);
   for (size_t i = 0, e = c->pairs_count; i < e; i++) {
     ast_meta_insts_pair_init_copy(&pairs[i], &c->pairs[i]);
   }
@@ -502,7 +506,8 @@ void ast_meta_insts_add_copy(struct ast_meta_insts *a,
                              struct def_instantiation *inst,
                              struct ast_typeexpr *generics_substitutions,
                              size_t generics_substitutions_count) {
-  struct ast_typeexpr *copy = malloc_mul(sizeof(*copy), generics_substitutions_count);
+  struct ast_typeexpr *copy
+    = malloc_mul(sizeof(*copy), generics_substitutions_count);
   for (size_t i = 0; i < generics_substitutions_count; i++) {
     ast_typeexpr_init_copy(&copy[i], &generics_substitutions[i]);
   }
