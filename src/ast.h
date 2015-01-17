@@ -348,8 +348,18 @@ enum ast_expr_tag {
   AST_EXPR_DEREF_FIELD_ACCESS,
 };
 
+struct ast_expr_info {
+  int is_typechecked;
+  struct ast_typeexpr concrete_type;
+};
+
+struct ast_expr_info ast_expr_info_default(void);
+struct ast_expr_info ast_expr_info_typechecked(
+    struct ast_typeexpr concrete_type);
+
 struct ast_expr {
   enum ast_expr_tag tag;
+  struct ast_expr_info expr_info;
   union {
     struct ast_name_expr name;
     struct ast_numeric_literal numeric_literal;
@@ -361,6 +371,10 @@ struct ast_expr {
     struct ast_deref_field_access deref_field_access;
   } u;
 };
+
+void ast_expr_partial_init(struct ast_expr *a,
+                           enum ast_expr_tag tag,
+                           struct ast_expr_info expr_info);
 
 void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c);
 void ast_expr_destroy(struct ast_expr *a);

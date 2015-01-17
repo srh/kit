@@ -549,7 +549,35 @@ void ast_name_expr_destroy(struct ast_name_expr *a) {
   ast_ident_destroy(&a->ident);
 }
 
-struct ast_meta ast_expr_meta(struct ast_expr *a) {
+struct ast_expr_info ast_expr_info_default(void) {
+  struct ast_expr_info ret;
+  ret.is_typechecked = 0;
+  return ret;
+}
+
+struct ast_expr_info ast_expr_info_typechecked(
+    struct ast_typeexpr concrete_type) {
+  struct ast_expr_info ret;
+  ret.is_typechecked = 1;
+  ret.concrete_type = concrete_type;
+  return ret;
+}
+
+void ast_expr_info_init_copy(struct ast_expr_info *a, struct ast_expr_info *c) {
+  a->is_typechecked = c->is_typechecked;
+  if (c->is_typechecked) {
+    ast_typeexpr_init_copy(&a->concrete_type, &c->concrete_type);
+  }
+}
+
+void ast_expr_info_destroy(struct ast_expr_info *m) {
+  if (m->is_typechecked) {
+    ast_typeexpr_destroy(&m->concrete_type);
+    m->is_typechecked = 0;
+  }
+}
+
+struct ast_meta ast_expr_ast_meta(struct ast_expr *a) {
   switch (a->tag) {
   case AST_EXPR_NAME: return a->u.name.ident.meta;
   case AST_EXPR_NUMERIC_LITERAL: return a->u.numeric_literal.meta;
@@ -564,11 +592,19 @@ struct ast_meta ast_expr_meta(struct ast_expr *a) {
 }
 
 size_t ast_expr_pos_end(struct ast_expr *a) {
-  return ast_expr_meta(a).pos_end;
+  return ast_expr_ast_meta(a).pos_end;
+}
+
+void ast_expr_partial_init(struct ast_expr *a,
+                           enum ast_expr_tag tag,
+                           struct ast_expr_info expr_info) {
+  a->tag = tag;
+  a->expr_info = expr_info;
 }
 
 void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c) {
   a->tag = c->tag;
+  ast_expr_info_init_copy(&a->expr_info, &c->expr_info);
   switch (c->tag) {
   case AST_EXPR_NAME:
     ast_name_expr_init_copy(&a->u.name, &c->u.name);
@@ -638,6 +674,7 @@ void ast_expr_destroy(struct ast_expr *a) {
   default:
     UNREACHABLE();
   }
+  ast_expr_info_destroy(&a->expr_info);
   a->tag = (enum ast_expr_tag)-1;
 }
 

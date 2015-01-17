@@ -874,17 +874,17 @@ int parse_rest_of_arglist(struct ps *p,
 int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
   size_t pos_start = ps_pos(p);
   if (try_skip_keyword(p, "fn")) {
-    out->tag = AST_EXPR_LAMBDA;
+    ast_expr_partial_init(out, AST_EXPR_LAMBDA, ast_expr_info_default());
     return parse_rest_of_lambda(p, pos_start, &out->u.lambda);
   }
 
   if (is_decimal_digit(ps_peek(p))) {
-    out->tag = AST_EXPR_NUMERIC_LITERAL;
+    ast_expr_partial_init(out, AST_EXPR_NUMERIC_LITERAL, ast_expr_info_default());
     return parse_numeric_literal(p, &out->u.numeric_literal);
   }
 
   if (is_ident_firstchar(ps_peek(p))) {
-    out->tag = AST_EXPR_NAME;
+    ast_expr_partial_init(out, AST_EXPR_NAME, ast_expr_info_default());
     struct ast_ident ident;
     if (!parse_ident(p, &ident)) {
       return 0;
@@ -913,7 +913,7 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
       return 0;
     }
 
-    out->tag = AST_EXPR_UNOP;
+    ast_expr_partial_init(out, AST_EXPR_UNOP, ast_expr_info_default());
     ast_unop_expr_init(&out->u.unop_expr,
                        ast_meta_make(pos_start, ast_expr_pos_end(&rhs)),
                        unop, rhs);
@@ -944,7 +944,7 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
         goto fail;
       }
       struct ast_expr old_lhs = lhs;
-      lhs.tag = AST_EXPR_FUNCALL;
+      ast_expr_partial_init(&lhs, AST_EXPR_FUNCALL, ast_expr_info_default());
       ast_funcall_init(&lhs.u.funcall,
                        ast_meta_make(pos_start, ps_pos(p)),
                        old_lhs,
@@ -957,7 +957,8 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       }
 
       struct ast_expr old_lhs = lhs;
-      lhs.tag = AST_EXPR_LOCAL_FIELD_ACCESS;
+      ast_expr_partial_init(&lhs, AST_EXPR_LOCAL_FIELD_ACCESS,
+                            ast_expr_info_default());
       ast_local_field_access_init(&lhs.u.local_field_access,
                                   ast_meta_make(pos_start, ps_pos(p)),
                                   old_lhs,
@@ -969,7 +970,8 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       }
 
       struct ast_expr old_lhs = lhs;
-      lhs.tag = AST_EXPR_DEREF_FIELD_ACCESS;
+      ast_expr_partial_init(&lhs, AST_EXPR_DEREF_FIELD_ACCESS,
+                            ast_expr_info_default());
       ast_deref_field_access_init(&lhs.u.deref_field_access,
                                   ast_meta_make(pos_start, ps_pos(p)),
                                   old_lhs,
@@ -1008,7 +1010,7 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       }
 
       struct ast_expr old_lhs = lhs;
-      lhs.tag = AST_EXPR_BINOP;
+      ast_expr_partial_init(&lhs, AST_EXPR_BINOP, ast_expr_info_default());
       ast_binop_expr_init(&lhs.u.binop_expr,
                           ast_meta_make(pos_start, ast_expr_pos_end(&rhs)),
                           op, old_lhs, rhs);

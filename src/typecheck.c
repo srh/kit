@@ -648,8 +648,8 @@ void exprscope_destroy(struct exprscope *es) {
   es->generics = NULL;
   es->generics_substitutions = NULL;
   es->generics_substitutions_count = 0;
-  free(es->vars);
   es->computation = STATIC_COMPUTATION_YES;
+  free(es->vars);
   es->vars = NULL;
   es->vars_count = 0;
   es->vars_limit = 0;
@@ -2062,7 +2062,9 @@ int check_expr(struct exprscope *es,
     *is_lvalue_out = is_lvalue;
     /* TODO: Uhhhh we're adding ast_meta_insts above, we should do
        actual annotation. */
-    annotated_out->tag = AST_EXPR_NAME;
+    /* TODO: Every use of ast_expr_info_default() should be replaced
+       in this file. */
+    ast_expr_partial_init(annotated_out, AST_EXPR_NAME, ast_expr_info_default());
     ast_name_expr_init_copy(&annotated_out->u.name, &x->u.name);
     return 1;
   } break;
@@ -2077,7 +2079,8 @@ int check_expr(struct exprscope *es,
 
     *out = num_type;
     *is_lvalue_out = 0;
-    annotated_out->tag = AST_EXPR_NUMERIC_LITERAL;
+    ast_expr_partial_init(annotated_out, AST_EXPR_NUMERIC_LITERAL,
+                          ast_expr_info_default());
     ast_numeric_literal_init_copy(&annotated_out->u.numeric_literal,
                                   &x->u.numeric_literal);
     return 1;
@@ -2088,7 +2091,8 @@ int check_expr(struct exprscope *es,
                             out, &annotated_out->u.funcall)) {
       return 0;
     }
-    annotated_out->tag = AST_EXPR_FUNCALL;
+    ast_expr_partial_init(annotated_out, AST_EXPR_FUNCALL,
+                          ast_expr_info_default());
     return 1;
   } break;
   case AST_EXPR_UNOP: {
@@ -2096,7 +2100,8 @@ int check_expr(struct exprscope *es,
                          out, is_lvalue_out, &annotated_out->u.unop_expr)) {
       return 0;
     }
-    annotated_out->tag = AST_EXPR_UNOP;
+    ast_expr_partial_init(annotated_out, AST_EXPR_UNOP,
+                          ast_expr_info_default());
     return 1;
   } break;
   case AST_EXPR_BINOP: {
@@ -2104,7 +2109,8 @@ int check_expr(struct exprscope *es,
                           out, is_lvalue_out, &annotated_out->u.binop_expr)) {
       return 0;
     }
-    annotated_out->tag = AST_EXPR_BINOP;
+    ast_expr_partial_init(annotated_out, AST_EXPR_BINOP,
+                          ast_expr_info_default());
     return 1;
   } break;
   case AST_EXPR_LAMBDA: {
@@ -2113,7 +2119,8 @@ int check_expr(struct exprscope *es,
                            out, &annotated_out->u.lambda)) {
       return 0;
     }
-    annotated_out->tag = AST_EXPR_LAMBDA;
+    ast_expr_partial_init(annotated_out, AST_EXPR_LAMBDA,
+                          ast_expr_info_default());
     return 1;
   } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
@@ -2122,7 +2129,8 @@ int check_expr(struct exprscope *es,
                                        &annotated_out->u.local_field_access)) {
       return 0;
     }
-    annotated_out->tag = AST_EXPR_LOCAL_FIELD_ACCESS;
+    ast_expr_partial_init(annotated_out, AST_EXPR_LOCAL_FIELD_ACCESS,
+                          ast_expr_info_default());
     return 1;
   } break;
   case AST_EXPR_DEREF_FIELD_ACCESS: {
@@ -2131,7 +2139,8 @@ int check_expr(struct exprscope *es,
                                        &annotated_out->u.deref_field_access)) {
       return 0;
     }
-    annotated_out->tag = AST_EXPR_DEREF_FIELD_ACCESS;
+    ast_expr_partial_init(annotated_out, AST_EXPR_DEREF_FIELD_ACCESS,
+                          ast_expr_info_default());
     return 1;
   } break;
   default:
