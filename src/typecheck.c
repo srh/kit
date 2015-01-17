@@ -2072,13 +2072,11 @@ int check_expr(struct exprscope *es,
       return 0;
     }
 
-    *out = name_type;
+    ast_typeexpr_init_copy(out, &name_type);
     *is_lvalue_out = is_lvalue;
-    /* TODO: Uhhhh we're adding ast_meta_insts above, we should do
-       actual annotation. */
     /* TODO: Every use of ast_expr_info_default() should be replaced
        in this file. */
-    ast_expr_partial_init(annotated_out, AST_EXPR_NAME, ast_expr_info_default());
+    ast_expr_partial_init(annotated_out, AST_EXPR_NAME, ast_expr_info_typechecked(name_type));
     ast_name_expr_init_copy(&annotated_out->u.name, &x->u.name);
     ast_name_expr_info_mark_inst(&annotated_out->u.name.info, inst_or_null);
     return 1;
