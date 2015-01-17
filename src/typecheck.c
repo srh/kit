@@ -2071,12 +2071,11 @@ int check_expr(struct exprscope *es,
                                &name_type, &is_lvalue, &inst_or_null)) {
       return 0;
     }
-    ast_typeexpr_init_copy(out, &name_type);
     *is_lvalue_out = is_lvalue;
     ast_expr_partial_init(annotated_out, AST_EXPR_NAME, ast_expr_info_typechecked(name_type));
     ast_name_expr_init_copy(&annotated_out->u.name, &x->u.name);
     ast_name_expr_info_mark_inst(&annotated_out->u.name.info, inst_or_null);
-    return 1;
+    goto success;
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
     struct ast_typeexpr num_type;
@@ -2086,13 +2085,12 @@ int check_expr(struct exprscope *es,
       ast_typeexpr_destroy(&num_type);
       return 0;
     }
-    ast_typeexpr_init_copy(out, &num_type);
     *is_lvalue_out = 0;
     ast_expr_partial_init(annotated_out, AST_EXPR_NUMERIC_LITERAL,
                           ast_expr_info_typechecked(num_type));
     ast_numeric_literal_init_copy(&annotated_out->u.numeric_literal,
                                   &x->u.numeric_literal);
-    return 1;
+    goto success;
   } break;
   case AST_EXPR_FUNCALL: {
     struct ast_typeexpr return_type;
@@ -2101,10 +2099,9 @@ int check_expr(struct exprscope *es,
       return 0;
     }
     *is_lvalue_out = 0;
-    ast_typeexpr_init_copy(out, &return_type);
     ast_expr_partial_init(annotated_out, AST_EXPR_FUNCALL,
                           ast_expr_info_typechecked(return_type));
-    return 1;
+    goto success;
   } break;
   case AST_EXPR_UNOP: {
     struct ast_typeexpr return_type;
@@ -2112,10 +2109,9 @@ int check_expr(struct exprscope *es,
                          &return_type, is_lvalue_out, &annotated_out->u.unop_expr)) {
       return 0;
     }
-    ast_typeexpr_init_copy(out, &return_type);
     ast_expr_partial_init(annotated_out, AST_EXPR_UNOP,
                           ast_expr_info_typechecked(return_type));
-    return 1;
+    goto success;
   } break;
   case AST_EXPR_BINOP: {
     struct ast_typeexpr return_type;
@@ -2123,10 +2119,9 @@ int check_expr(struct exprscope *es,
                           &return_type, is_lvalue_out, &annotated_out->u.binop_expr)) {
       return 0;
     }
-    ast_typeexpr_init_copy(out, &return_type);
     ast_expr_partial_init(annotated_out, AST_EXPR_BINOP,
                           ast_expr_info_typechecked(return_type));
-    return 1;
+    goto success;
   } break;
   case AST_EXPR_LAMBDA: {
     struct ast_typeexpr type;
@@ -2135,10 +2130,9 @@ int check_expr(struct exprscope *es,
       return 0;
     }
     *is_lvalue_out = 0;
-    ast_typeexpr_init_copy(out, &type);
     ast_expr_partial_init(annotated_out, AST_EXPR_LAMBDA,
                           ast_expr_info_typechecked(type));
-    return 1;
+    goto success;
   } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
     struct ast_typeexpr type;
@@ -2147,10 +2141,9 @@ int check_expr(struct exprscope *es,
                                        &annotated_out->u.local_field_access)) {
       return 0;
     }
-    ast_typeexpr_init_copy(out, &type);
     ast_expr_partial_init(annotated_out, AST_EXPR_LOCAL_FIELD_ACCESS,
                           ast_expr_info_typechecked(type));
-    return 1;
+    goto success;
   } break;
   case AST_EXPR_DEREF_FIELD_ACCESS: {
     struct ast_typeexpr type;
@@ -2159,14 +2152,17 @@ int check_expr(struct exprscope *es,
                                        &annotated_out->u.deref_field_access)) {
       return 0;
     }
-    ast_typeexpr_init_copy(out, &type);
     ast_expr_partial_init(annotated_out, AST_EXPR_DEREF_FIELD_ACCESS,
                           ast_expr_info_typechecked(type));
-    return 1;
+    goto success;
   } break;
   default:
     UNREACHABLE();
   }
+
+ success:
+  ast_typeexpr_init_copy(out, &annotated_out->expr_info.concrete_type);
+  return 1;
 }
 
 /* Checks an expr, given that we know the type of expr. */
