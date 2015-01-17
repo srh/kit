@@ -840,6 +840,7 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
   return 0;
 }
 
+/* TODO: Is *out getting initialized with a concrete type? */
 int exprscope_lookup_name(struct exprscope *es,
                           ident_value name,
                           struct ast_typeexpr *partial_type,
@@ -1127,10 +1128,18 @@ int bodystate_note_label(struct bodystate *bs, ident_value name) {
   return 1;
 }
 
+void free_ast_vardecl(struct ast_vardecl **p) {
+  ast_vardecl_destroy(*p);
+  free(*p);
+  *p = NULL;
+}
+
 int check_expr_bracebody(struct bodystate *bs,
                          struct ast_bracebody *x,
                          struct ast_bracebody *annotated_out) {
-  size_t vars_pushed = 0;
+  struct ast_vardecl **vardecls_pushed = NULL;
+  size_t vardecls_pushed_count = 0;
+  size_t vardecls_pushed_limit = 0;
   int ret = 0;
 
   struct ast_statement *annotated_statements
@@ -1192,15 +1201,24 @@ int check_expr_bracebody(struct bodystate *bs,
         goto fail;
       }
 
-      ast_typeexpr_destroy(&replaced_type);
       ast_typeexpr_destroy(&rhs_type);
 
-      if (!exprscope_push_var(bs->es, &s->u.var_statement.decl)) {
+      struct ast_ident name;
+      ast_ident_init_copy(&name, &s->u.var_statement.decl.name);
+
+      struct ast_vardecl *replaced_decl = malloc(sizeof(*replaced_decl));
+      CHECK(replaced_decl);
+      ast_vardecl_init(replaced_decl, ast_meta_make_garbage(), name,
+                       replaced_type);
+
+      if (!exprscope_push_var(bs->es, replaced_decl)) {
+        free_ast_vardecl(&replaced_decl);
         ast_expr_destroy(&annotated_rhs);
         goto fail;
       }
 
-      vars_pushed = size_add(vars_pushed, 1);
+      SLICE_PUSH(vardecls_pushed, vardecls_pushed_count, vardecls_pushed_limit,
+                 replaced_decl);
 
       struct ast_vardecl decl;
       ast_vardecl_init_copy(&decl, &s->u.var_statement.decl);
@@ -1298,9 +1316,10 @@ int check_expr_bracebody(struct bodystate *bs,
   if (!ret) {
     SLICE_FREE(annotated_statements, i, ast_statement_destroy);
   }
-  for (size_t j = 0; j < vars_pushed; j++) {
+  for (size_t j = 0; j < vardecls_pushed_count; j++) {
     exprscope_pop_var(bs->es);
   }
+  SLICE_FREE(vardecls_pushed, vardecls_pushed_count, free_ast_vardecl);
   return ret;
 }
 
@@ -3452,6 +3471,23 @@ int check_file_test_more_6(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_7(const uint8_t *name, size_t name_count,
+                           uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def[T] foo func[T, T] = fn(x T) T {\n"
+      "  var y T = x;\n"
+      "  return y;\n"
+      "};\n"
+      "def bar func[i32] = fn() i32 {\n"
+      "  return foo(3);\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 
@@ -3752,6 +3788,12 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_6...\n");
   if (!!test_check_module(&im, &check_file_test_more_6, foo)) {
     DBG("check_file_test_more_6 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_7...\n");
+  if (!test_check_module(&im, &check_file_test_more_7, foo)) {
+    DBG("check_file_test_more_7 fails\n");
     goto cleanup_identmap;
   }
 
