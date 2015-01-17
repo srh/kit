@@ -126,6 +126,8 @@ void intern_binop(struct checkstate *cs,
 #define FUNC_TYPE_NAME "func"
 #define BOOLEAN_STANDIN_TYPE_NAME I32_TYPE_NAME
 
+#define CONVERT_FUNCTION_NAME "convert"
+
 int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x) {
   return x->tag == AST_TYPEEXPR_APP
     && x->u.app.name.value == identmap_intern(im, FUNC_TYPE_NAME,
@@ -216,6 +218,30 @@ void import_integer_binops(struct checkstate *cs, const char *type_name) {
   ast_generics_destroy(&generics);
 }
 
+void import_integer_conversions(struct checkstate *cs) {
+  ident_value types[3];
+  types[0] = identmap_intern_c_str(cs->im, BYTE_TYPE_NAME);
+  types[1] = identmap_intern_c_str(cs->im, U32_TYPE_NAME);
+  types[2] = identmap_intern_c_str(cs->im, U32_TYPE_NAME);
+  ident_value convert = identmap_intern_c_str(cs->im, CONVERT_FUNCTION_NAME);
+
+  struct ast_generics generics;
+  ast_generics_init_no_params(&generics);
+
+  struct ast_typeexpr func_type;
+  ident_value names[2];
+  for (size_t i = 0; i < 3; i++) {
+    for (size_t j = 0; j < 3; j++) {
+      init_func_type(&func_type, cs->im, names, 2);
+      name_table_add_primitive_def(&cs->nt,
+                                   convert,
+                                   &generics,
+                                   &func_type);
+      ast_typeexpr_destroy(&func_type);
+    }
+  }
+}
+
 #if F64_SUPPORTED
 void import_floating_binops(struct checkstate *cs, const char *type_name) {
   struct ast_generics generics;
@@ -239,6 +265,8 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
   import_integer_binops(cs, I32_TYPE_NAME);
   import_integer_binops(cs, U32_TYPE_NAME);
   import_integer_binops(cs, BYTE_TYPE_NAME);
+
+  import_integer_conversions(cs);
 
 #if F64_SUPPORTED
   import_floating_binops(cs, F64_TYPE_NAME);
