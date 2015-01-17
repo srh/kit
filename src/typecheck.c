@@ -1196,15 +1196,13 @@ int check_expr_bracebody(struct bodystate *bs,
       }
 
       vars_pushed = size_add(vars_pushed, 1);
-      struct ast_ident name;
-      ast_ident_init_copy(&name, &s->u.var_statement.decl.name);
-      struct ast_typeexpr type;
-      ast_typeexpr_init_copy(&type, &s->u.var_statement.decl.type);
-      /* TODO: What.  Where does the vardecl meta value come from? */
+
+      struct ast_vardecl decl;
+      ast_vardecl_init_copy(&decl, &s->u.var_statement.decl);
       annotated_statements[i].tag = AST_STATEMENT_VAR;
       ast_var_statement_init(&annotated_statements[i].u.var_statement,
                              ast_meta_make_copy(&s->u.var_statement.meta),
-                             name, type, annotated_rhs);
+                             decl, annotated_rhs);
     } break;
     case AST_STATEMENT_GOTO: {
       bodystate_note_goto(bs, s->u.goto_statement.target.value);

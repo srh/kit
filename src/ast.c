@@ -154,12 +154,9 @@ void ast_bracebody_destroy(struct ast_bracebody *a) {
 
 
 void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
-                            struct ast_ident name, struct ast_typeexpr type,
-                            struct ast_expr rhs) {
+                            struct ast_vardecl decl, struct ast_expr rhs) {
   a->meta = meta;
-  /* TODO: This is freaking weird. */
-  ast_vardecl_init(&a->decl, ast_meta_make(name.meta.pos_start, ast_typeexpr_meta(&type)->pos_end),
-                   name, type);
+  a->decl = decl;
   ast_expr_alloc_move(rhs, &a->rhs);
 }
 

@@ -525,7 +525,7 @@ int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
     goto fail_name;
   }
 
-  ast_vardecl_init(out, ast_meta_make(pos_start, ps_pos(p)),
+  ast_vardecl_init(out, ast_meta_make(pos_start, ast_typeexpr_meta(&type)->pos_end),
                    name, type);
   return 1;
 
@@ -630,23 +630,18 @@ int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
 
 int parse_rest_of_var_statement(struct ps *p, size_t pos_start,
                                 struct ast_var_statement *out) {
-  struct ast_ident name;
-  if (!(skip_ws(p) && parse_ident(p, &name))) {
+  struct ast_vardecl decl;
+  if (!(skip_ws(p) && parse_vardecl(p, &decl))) {
     goto fail;
   }
 
-  struct ast_typeexpr type;
-  if (!(skip_ws(p) && parse_typeexpr(p, &type))) {
-    goto fail_ident;
-  }
-
   if (!(skip_ws(p) && skip_oper(p, "="))) {
-    goto fail_typeexpr;
+    goto fail_decl;
   }
 
   struct ast_expr rhs;
   if (!(skip_ws(p) && parse_expr(p, &rhs, kSemicolonPrecedence))) {
-    goto fail_typeexpr;
+    goto fail_decl;
   }
 
   if (!try_skip_semicolon(p)) {
@@ -654,15 +649,13 @@ int parse_rest_of_var_statement(struct ps *p, size_t pos_start,
   }
 
   ast_var_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                         name, type, rhs);
+                         decl, rhs);
   return 1;
 
  fail_rhs:
   ast_expr_destroy(&rhs);
- fail_typeexpr:
-  ast_typeexpr_destroy(&type);
- fail_ident:
-  ast_ident_destroy(&name);
+ fail_decl:
+  ast_vardecl_destroy(&decl);
  fail:
   return 0;
 }

@@ -145,8 +145,7 @@ struct ast_var_statement {
 };
 
 void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
-                            struct ast_ident name, struct ast_typeexpr type,
-                            struct ast_expr rhs);
+                            struct ast_vardecl decl, struct ast_expr rhs);
 
 struct ast_goto_statement {
   struct ast_meta meta;
