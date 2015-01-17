@@ -840,7 +840,6 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
   return 0;
 }
 
-/* TODO: Is *out getting initialized with a concrete type? */
 int exprscope_lookup_name(struct exprscope *es,
                           ident_value name,
                           struct ast_typeexpr *partial_type,
@@ -2073,13 +2072,6 @@ int check_expr(struct exprscope *es,
       return 0;
     }
 
-    if (inst_or_null) {
-      ast_meta_insts_add_copy(&x->u.name.insts,
-                              inst_or_null,
-                              es->generics_substitutions,
-                              es->generics_substitutions_count);
-    }
-
     *out = name_type;
     *is_lvalue_out = is_lvalue;
     /* TODO: Uhhhh we're adding ast_meta_insts above, we should do
@@ -2088,6 +2080,7 @@ int check_expr(struct exprscope *es,
        in this file. */
     ast_expr_partial_init(annotated_out, AST_EXPR_NAME, ast_expr_info_default());
     ast_name_expr_init_copy(&annotated_out->u.name, &x->u.name);
+    ast_name_expr_info_mark_inst(&annotated_out->u.name.info, inst_or_null);
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
@@ -2577,14 +2570,14 @@ int eval_static_value(struct ast_generics *generics,
                       struct static_value *out) {
   switch (expr->tag) {
   case AST_EXPR_NAME: {
-    struct def_instantiation *inst;
-    if (!ast_meta_insts_lookup(&expr->u.name.insts, types, types_count,
-                               &inst)) {
-      CRASH("Could not find an instantation which should exist.");
+    struct def_instantiation *inst_or_null;
+    if (!ast_name_expr_info_get_inst(&expr->u.name.info,
+                                     &inst_or_null)) {
+      CRASH("Could not lookup instantation.");
     }
-
-    CHECK(inst->value_computed);
-    static_value_init_copy(out, &inst->value);
+    CHECK(inst_or_null);
+    CHECK(inst_or_null->value_computed);
+    static_value_init_copy(out, &inst_or_null->value);
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL:
@@ -2625,9 +2618,12 @@ int compute_static_values(struct def_entry *ent) {
     struct def_instantiation *inst = ent->instantiations[i];
     CHECK(!inst->value_computed);
 
+    CHECK(inst->annotated_rhs_computed);
+    /* TODO: We shouldn't need substitions, substitutions_count, as
+       parameters here, if we're using annotated_rhs, should we. */
     if (!eval_static_value(&ent->generics,
                            inst->substitutions, inst->substitutions_count,
-                           &ent->def->rhs,
+                           &inst->annotated_rhs,
                            &inst->value)) {
       return 0;
     }

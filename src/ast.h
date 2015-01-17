@@ -6,6 +6,8 @@
 
 #include "identmap.h"
 
+struct def_instantiation;
+
 struct ast_meta {
   size_t pos_start;
   size_t pos_end;
@@ -300,36 +302,23 @@ void ast_deref_field_access_init(struct ast_deref_field_access *a,
                                  struct ast_expr lhs,
                                  struct ast_ident fieldname);
 
-/* This metadata exists for all ast_name_expr expressions -- they say,
-   for a given generic instantiation (specified by
-   generics_substitutions) that the expression lies in, what
-   def_instantiation the name refers to.  (Maybe instead we should
-   store a (def_entry, instantiation_index) pair.) */
-/* TODO: Ugh, let's just copy the instantiation expression entirely. */
-struct ast_meta_insts_pair {
-  struct def_instantiation *inst;  /* an unowned pointer */
-  struct ast_typeexpr *generics_substitutions;
-  size_t generics_substitutions_count;
+struct ast_name_expr_info {
+  /* True if typechecking happened and the info means something. */
+  int info_valid;
+  /* The instantiation this name refers to -- if it refers to a
+     global.  NULL if the name refers to a local variable. */
+  struct def_instantiation *inst_or_null;
 };
 
-struct ast_meta_insts {
-  struct ast_meta_insts_pair *pairs;
-  size_t pairs_count;
-  size_t pairs_limit;
-};
-
-void ast_meta_insts_add_copy(struct ast_meta_insts *a,
-                             struct def_instantiation *inst,
-                             struct ast_typeexpr *generics_substitutions,
-                             size_t generics_substitutions_count);
-
-int ast_meta_insts_lookup(struct ast_meta_insts *a,
-                          struct ast_typeexpr *substitutions,
-                          size_t substitutions_count,
-                          struct def_instantiation **inst_out);
+void ast_name_expr_info_init(struct ast_name_expr_info *a);
+void ast_name_expr_info_destroy(struct ast_name_expr_info *a);
+void ast_name_expr_info_mark_inst(struct ast_name_expr_info *a,
+                                  struct def_instantiation *inst_or_null);
+int ast_name_expr_info_get_inst(struct ast_name_expr_info *a,
+                                struct def_instantiation **inst_or_null_out);
 
 struct ast_name_expr {
-  struct ast_meta_insts insts;
+  struct ast_name_expr_info info;
   struct ast_ident ident;
 };
 

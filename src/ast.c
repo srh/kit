@@ -452,100 +452,49 @@ void ast_deref_field_access_destroy(struct ast_deref_field_access *a) {
   ast_ident_destroy(&a->fieldname);
 }
 
-void ast_meta_insts_pair_init(struct ast_meta_insts_pair *a,
-                              struct def_instantiation *inst,
-                              struct ast_typeexpr *generics_substitutions,
-                              size_t generics_substitutions_count) {
-  a->inst = inst;
-  a->generics_substitutions = generics_substitutions;
-  a->generics_substitutions_count = generics_substitutions_count;
+void ast_name_expr_info_init(struct ast_name_expr_info *a) {
+  a->info_valid = 0;
 }
 
-void ast_meta_insts_pair_init_copy(struct ast_meta_insts_pair *a,
-                                   struct ast_meta_insts_pair *c) {
-  a->inst = c->inst;
-  struct ast_typeexpr *substs = malloc_mul(sizeof(*substs),
-                                           c->generics_substitutions_count);
-  for (size_t i = 0, e = c->generics_substitutions_count; i < e; i++) {
-    ast_typeexpr_init_copy(&substs[i], &c->generics_substitutions[i]);
+void ast_name_expr_info_init_copy(struct ast_name_expr_info *a,
+                                  struct ast_name_expr_info *c) {
+  *a = *c;
+}
+
+void ast_name_expr_info_destroy(struct ast_name_expr_info *a) {
+  a->info_valid = 0;
+}
+
+void ast_name_expr_info_mark_inst(struct ast_name_expr_info *a,
+                                  struct def_instantiation *inst_or_null) {
+  CHECK(!a->info_valid);
+  a->info_valid = 1;
+  a->inst_or_null = inst_or_null;
+}
+
+int ast_name_expr_info_get_inst(struct ast_name_expr_info *a,
+                                struct def_instantiation **inst_or_null_out) {
+  if (a->info_valid) {
+    *inst_or_null_out = a->inst_or_null;
+    return 1;
+  } else {
+    return 0;
   }
-  a->generics_substitutions = substs;
-  a->generics_substitutions_count = c->generics_substitutions_count;
-}
-
-void ast_meta_insts_pair_destroy(struct ast_meta_insts_pair *a) {
-  a->inst = NULL;
-  SLICE_FREE(a->generics_substitutions, a->generics_substitutions_count,
-             ast_typeexpr_destroy);
-}
-
-void ast_meta_insts_init(struct ast_meta_insts *a) {
-  a->pairs = NULL;
-  a->pairs_count = 0;
-  a->pairs_limit = 0;
-}
-
-void ast_meta_insts_init_copy(struct ast_meta_insts *a,
-                              struct ast_meta_insts *c) {
-  struct ast_meta_insts_pair *pairs
-    = malloc_mul(sizeof(*pairs), c->pairs_count);
-  for (size_t i = 0, e = c->pairs_count; i < e; i++) {
-    ast_meta_insts_pair_init_copy(&pairs[i], &c->pairs[i]);
-  }
-  a->pairs = pairs;
-  a->pairs_count = c->pairs_count;
-  a->pairs_limit = a->pairs_count;
-}
-
-void ast_meta_insts_destroy(struct ast_meta_insts *a) {
-  SLICE_FREE(a->pairs, a->pairs_count, ast_meta_insts_pair_destroy);
-  a->pairs_limit = 0;
-}
-
-void ast_meta_insts_add_copy(struct ast_meta_insts *a,
-                             struct def_instantiation *inst,
-                             struct ast_typeexpr *generics_substitutions,
-                             size_t generics_substitutions_count) {
-  struct ast_typeexpr *copy
-    = malloc_mul(sizeof(*copy), generics_substitutions_count);
-  for (size_t i = 0; i < generics_substitutions_count; i++) {
-    ast_typeexpr_init_copy(&copy[i], &generics_substitutions[i]);
-  }
-
-  struct ast_meta_insts_pair pair;
-  ast_meta_insts_pair_init(&pair, inst, copy, generics_substitutions_count);
-  SLICE_PUSH(a->pairs, a->pairs_count, a->pairs_limit, pair);
-}
-
-int ast_meta_insts_lookup(struct ast_meta_insts *a,
-                          struct ast_typeexpr *substitutions,
-                          size_t substitutions_count,
-                          struct def_instantiation **inst_out) {
-  for (size_t i = 0, e = a->pairs_count; i < e; i++) {
-    if (typelists_equal(a->pairs[i].generics_substitutions,
-                        a->pairs[i].generics_substitutions_count,
-                        substitutions,
-                        substitutions_count)) {
-      *inst_out = a->pairs[i].inst;
-      return 1;
-    }
-  }
-  return 0;
 }
 
 void ast_name_expr_init(struct ast_name_expr *a, struct ast_ident ident) {
-  ast_meta_insts_init(&a->insts);
+  ast_name_expr_info_init(&a->info);
   a->ident = ident;
 }
 
 void ast_name_expr_init_copy(struct ast_name_expr *a,
                              struct ast_name_expr *c) {
-  ast_meta_insts_init_copy(&a->insts, &c->insts);
+  ast_name_expr_info_init_copy(&a->info, &c->info);
   ast_ident_init_copy(&a->ident, &c->ident);
 }
 
 void ast_name_expr_destroy(struct ast_name_expr *a) {
-  ast_meta_insts_destroy(&a->insts);
+  ast_name_expr_info_destroy(&a->info);
   ast_ident_destroy(&a->ident);
 }
 
