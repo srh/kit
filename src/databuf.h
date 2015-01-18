@@ -1,6 +1,7 @@
 #ifndef KIRA_DATABUF_H_
 #define KIRA_DATABUF_H_
 
+#include <stddef.h>
 #include <stdint.h>
 
 struct databuf {

@@ -219,10 +219,6 @@ void import_integer_binops(struct checkstate *cs, const char *type_name) {
 }
 
 void import_integer_conversions(struct checkstate *cs) {
-  ident_value types[3];
-  types[0] = identmap_intern_c_str(cs->im, BYTE_TYPE_NAME);
-  types[1] = identmap_intern_c_str(cs->im, U32_TYPE_NAME);
-  types[2] = identmap_intern_c_str(cs->im, U32_TYPE_NAME);
   ident_value convert = identmap_intern_c_str(cs->im, CONVERT_FUNCTION_NAME);
 
   struct ast_generics generics;
@@ -2283,8 +2279,7 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
   }
 }
 
-static const char *const kNumericLiteralOOR =
-  "Numeric literal out of range.\n";
+#define kNumericLiteralOOR "Numeric literal out of range.\n"
 
 int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
                            uint32_t *out) {

@@ -1,6 +1,7 @@
 #ifndef KIRA_WIN_OBJFILE_H_
 #define KIRA_WIN_OBJFILE_H_
 
+#include <stddef.h>
 #include <stdint.h>
 
 struct databuf;
