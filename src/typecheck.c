@@ -110,18 +110,10 @@ void intern_binop(struct checkstate *cs,
                                type);
 }
 
-/* TODO: Support the type f64 (or rip out the code). */
-#define F64_SUPPORTED 0
-
 #define VOID_TYPE_NAME "void"
 #define BYTE_TYPE_NAME "byte"
 #define I32_TYPE_NAME "i32"
 #define U32_TYPE_NAME "u32"
-
-#if F64_SUPPORTED
-#define F64_TYPE_NAME "f64"
-#endif
-
 #define PTR_TYPE_NAME "ptr"
 #define FUNC_TYPE_NAME "func"
 #define BOOLEAN_STANDIN_TYPE_NAME I32_TYPE_NAME
@@ -139,11 +131,6 @@ void checkstate_import_primitive_types(struct checkstate *cs) {
   intern_primitive_type(cs, BYTE_TYPE_NAME, NULL, 0, 1, 1);
   intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0, 4, 4);
   intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0, 4, 4);
-
-#if F64_SUPPORTED
-  /* X86 or WINDOWS-specific alignment of f64. */
-  intern_primitive_type(cs, F64_TYPE_NAME, NULL, 0, 8, 8);
-#endif
 
   int not_flatly_held[20] = { 0 };
   /* X86 -- 32-bit pointers */
@@ -245,35 +232,12 @@ void import_integer_conversions(struct checkstate *cs) {
   }
 }
 
-#if F64_SUPPORTED
-void import_floating_binops(struct checkstate *cs, const char *type_name) {
-  struct ast_generics generics;
-  ast_generics_init_no_params(&generics);
-  struct ast_typeexpr binop_type;
-  init_binop_func_type(&binop_type, cs->im, type_name);
-  for (enum ast_binop op = AST_BINOP_ADD; op < AST_BINOP_MOD; op++) {
-    intern_binop(cs, op, &generics, &binop_type);
-  }
-  ast_typeexpr_destroy(&binop_type);
-  init_binop_compare_type(&binop_type, cs->im, type_name);
-  for (enum ast_binop op = AST_BINOP_LT; op < AST_BINOP_BIT_XOR; op++) {
-    intern_binop(cs, op, &generics, &binop_type);
-  }
-  ast_typeexpr_destroy(&binop_type);
-  ast_generics_destroy(&generics);
-}
-#endif
-
 void checkstate_import_primitive_defs(struct checkstate *cs) {
   import_integer_binops(cs, I32_TYPE_NAME);
   import_integer_binops(cs, U32_TYPE_NAME);
   import_integer_binops(cs, BYTE_TYPE_NAME);
 
   import_integer_conversions(cs);
-
-#if F64_SUPPORTED
-  import_floating_binops(cs, F64_TYPE_NAME);
-#endif
 
   {
     struct ast_generics generics;
@@ -288,18 +252,6 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
       intern_unop(cs, AST_UNOP_NEGATE, &generics, &type);
       ast_typeexpr_destroy(&type);
     }
-
-#if F64_SUPPORTED
-    /* Unary minus on f64. */
-    {
-      struct ast_typeexpr type;
-      ident_value args[2];
-      args[0] = args[1] = identmap_intern_c_str(cs->im, F64_TYPE_NAME);
-      init_func_type(&type, cs->im, args, 2);
-      intern_unop(cs, AST_UNOP_NEGATE, &generics, &type);
-      ast_typeexpr_destroy(&type);
-    }
-#endif  /* 0 */
 
     ast_generics_destroy(&generics);
   }
