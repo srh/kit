@@ -2238,7 +2238,7 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
   }
 }
 
-#define kNumericLiteralOOR "Numeric literal out of range.\n"
+#define NUMERIC_LITERAL_OOR "Numeric literal out of range.\n"
 
 int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
                            uint32_t *out) {
@@ -2246,11 +2246,11 @@ int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
   uint32_t built_value = 0;
   for (size_t i = 0; i < digits_count; i++) {
     if (!try_uint32_mul(built_value, 10, &built_value)) {
-      ERR_DBG(kNumericLiteralOOR);
+      ERR_DBG(NUMERIC_LITERAL_OOR);
       return 0;
     }
     if (!try_uint32_add(built_value, digits[i], &built_value)) {
-      ERR_DBG(kNumericLiteralOOR);
+      ERR_DBG(NUMERIC_LITERAL_OOR);
       return 0;
     }
   }
@@ -2271,7 +2271,7 @@ int eval_static_numeric_literal(struct ast_numeric_literal *a,
       return 0;
     }
     if (value > 0x7FFFFFFFul) {
-      ERR_DBG(kNumericLiteralOOR);
+      ERR_DBG(NUMERIC_LITERAL_OOR);
       return 0;
     }
     CHECK(value <= INT32_MAX);
