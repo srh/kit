@@ -219,15 +219,22 @@ void import_integer_binops(struct checkstate *cs, const char *type_name) {
 }
 
 void import_integer_conversions(struct checkstate *cs) {
+  ident_value types[3];
+  types[0] = identmap_intern_c_str(cs->im, BYTE_TYPE_NAME);
+  types[1] = identmap_intern_c_str(cs->im, I32_TYPE_NAME);
+  types[2] = identmap_intern_c_str(cs->im, U32_TYPE_NAME);
+
   ident_value convert = identmap_intern_c_str(cs->im, CONVERT_FUNCTION_NAME);
 
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
 
-  struct ast_typeexpr func_type;
-  ident_value names[2];
   for (size_t i = 0; i < 3; i++) {
     for (size_t j = 0; j < 3; j++) {
+      struct ast_typeexpr func_type;
+      ident_value names[2];
+      names[0] = types[i];
+      names[1] = types[j];
       init_func_type(&func_type, cs->im, names, 2);
       name_table_add_primitive_def(&cs->nt,
                                    convert,
@@ -3488,6 +3495,24 @@ int check_file_test_more_7(const uint8_t *name, size_t name_count,
 }
 
 
+int check_file_test_more_8(const uint8_t *name, size_t name_count,
+                           uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def[T] add32 func[i32, T, i32] = fn(x i32, y T) i32 {\n"
+      "  var z i32 = convert(4);\n"
+      "  return x + z;\n"
+      "};\n"
+      "def bar func[i32] = fn() i32 {\n"
+      "  return add32(3, 4u);\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+
 
 
 int test_check_file(void) {
@@ -3793,6 +3818,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_7...\n");
   if (!test_check_module(&im, &check_file_test_more_7, foo)) {
     DBG("check_file_test_more_7 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_8...\n");
+  if (!test_check_module(&im, &check_file_test_more_8, foo)) {
+    DBG("check_file_test_more_8 fails\n");
     goto cleanup_identmap;
   }
 
