@@ -2337,23 +2337,15 @@ int eval_static_numeric_literal(struct ast_numeric_literal *a,
   }
 }
 
-int eval_static_value(struct ast_generics *generics,
-                      struct ast_typeexpr *types,
-                      size_t types_count,
-                      struct ast_expr *expr,
-                      struct static_value *out);
+int eval_static_value(struct ast_expr *expr, struct static_value *out);
 
-int eval_static_unop_expr(struct ast_generics *generics,
-                          struct ast_typeexpr *types,
-                          size_t types_count,
-                          struct ast_unop_expr *expr,
+int eval_static_unop_expr(struct ast_unop_expr *expr,
                           struct static_value *out) {
   CHECK(!is_magic_unop(expr->operator));
   /* Negation is the only non-magic unop right now. */
   CHECK(expr->operator == AST_UNOP_NEGATE);
   struct static_value rhs_value;
-  if (!eval_static_value(generics, types, types_count, expr->rhs,
-                         &rhs_value)) {
+  if (!eval_static_value(expr->rhs, &rhs_value)) {
     return 0;
   }
 
@@ -2561,22 +2553,17 @@ int apply_operator(enum ast_binop op,
   }
 }
 
-int eval_static_binop_expr(struct ast_generics *generics,
-                           struct ast_typeexpr *types,
-                           size_t types_count,
-                           struct ast_binop_expr *expr,
+int eval_static_binop_expr(struct ast_binop_expr *expr,
                            struct static_value *out) {
   CHECK(!is_magic_binop(expr->operator));
 
   struct static_value lhs_value;
-  if (!eval_static_value(generics, types, types_count, expr->lhs,
-                         &lhs_value)) {
+  if (!eval_static_value(expr->lhs, &lhs_value)) {
     goto fail;
   }
 
   struct static_value rhs_value;
-  if (!eval_static_value(generics, types, types_count, expr->rhs,
-                         &rhs_value)) {
+  if (!eval_static_value(expr->rhs, &rhs_value)) {
     goto fail_lhs;
   }
 
@@ -2593,10 +2580,8 @@ int eval_static_binop_expr(struct ast_generics *generics,
   return 0;
 }
 
-int eval_static_value(struct ast_generics *generics,
-                      struct ast_typeexpr *types,
-                      size_t types_count,
-                      struct ast_expr *expr,
+/* expr must have been annotated by typechecking. */
+int eval_static_value(struct ast_expr *expr,
                       struct static_value *out) {
   switch (expr->tag) {
   case AST_EXPR_NAME: {
@@ -2616,12 +2601,10 @@ int eval_static_value(struct ast_generics *generics,
     CRASH("No funcalls should have been deemed statically evaluable.\n");
   } break;
   case AST_EXPR_UNOP: {
-    return eval_static_unop_expr(generics, types, types_count,
-                                 &expr->u.unop_expr, out);
+    return eval_static_unop_expr(&expr->u.unop_expr, out);
   } break;
   case AST_EXPR_BINOP: {
-    return eval_static_binop_expr(generics, types, types_count,
-                                  &expr->u.binop_expr, out);
+    return eval_static_binop_expr(&expr->u.binop_expr, out);
   } break;
   case AST_EXPR_LAMBDA: {
     struct ast_expr copy;
@@ -2649,12 +2632,7 @@ int compute_static_values(struct def_entry *ent) {
     CHECK(!inst->value_computed);
 
     CHECK(inst->annotated_rhs_computed);
-    /* TODO: We shouldn't need substitions, substitutions_count, as
-       parameters here, if we're using annotated_rhs, should we. */
-    if (!eval_static_value(&ent->generics,
-                           inst->substitutions, inst->substitutions_count,
-                           &inst->annotated_rhs,
-                           &inst->value)) {
+    if (!eval_static_value(&inst->annotated_rhs, &inst->value)) {
       return 0;
     }
     inst->value_computed = 1;
