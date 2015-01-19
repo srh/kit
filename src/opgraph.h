@@ -41,6 +41,9 @@ struct opnum opgraph_branch(struct opgraph *g,
                             struct varnum condition,
                             struct opnum true_next,
                             struct opnum false_next);
+void opgraph_update_branch_else(struct opgraph *g,
+                                struct opnum incomplete_op,
+                                struct opnum false_target);
 struct opnum opgraph_mov(struct opgraph *g,
                          struct varnum src,
                          struct varnum dest);
@@ -50,6 +53,7 @@ struct opnum opgraph_return(struct opgraph *g);
 struct opnum opgraph_future_0(struct opgraph *g);
 /* Returns g->ops_count + 1. */
 struct opnum opgraph_future_1(struct opgraph *g);
+
 
 struct funcgraph {
   struct opgraph opg;

@@ -291,6 +291,11 @@ void builder_state_push_varnum(struct builder_state *st,
   SLICE_PUSH(st->varnums, st->varnums_count, st->varnums_limit, pair);
 }
 
+void builder_state_pop_varnum(struct builder_state *st) {
+  CHECK(st->varnums_count > 0);
+  st->varnums_count--;
+}
+
 struct opnum builder_state_lookup_label_opnum(struct builder_state *st,
                                               ident_value label_name) {
   for (size_t i = 0, e = st->labels_count; i < e; i++) {
@@ -310,9 +315,6 @@ int build_expr(struct checkstate *cs, struct objfile *f,
   TODO_IMPLEMENT;
 }
 
-/* TODO: Right now we're jumping into implementing build_bracebody so
-   that we can see what additional info we'll need (like labels and
-   such) before setting the entry_point. */
 int build_bracebody(struct checkstate *cs, struct objfile *f,
                     struct opgraph *g,
                     struct builder_state *st,
@@ -337,15 +339,16 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
     } break;
     case AST_STATEMENT_VAR: {
       struct ast_var_statement *vs = &s->u.var_statement;
+      struct varnum rhs_result;
+      if (!build_expr(cs, f, g, st, vs->rhs, &rhs_result)) {
+        return 0;
+      }
+
       CHECK(vs->info.var_statement_info_valid);
       struct varnum varnum = opgraph_add_var(g, &vs->info.concrete_type);
       builder_state_push_varnum(st, vs->decl.name.value, varnum);
       vars_pushed = size_add(vars_pushed, 1);
 
-      struct varnum rhs_result;
-      if (!build_expr(cs, f, g, st, vs->rhs, &rhs_result)) {
-        return 0;
-      }
       opgraph_mov(g, rhs_result, varnum);
     } break;
     case AST_STATEMENT_GOTO: {
@@ -361,14 +364,50 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
       opgraph_make_nop_complete(g, label_node, label_target);
     } break;
     case AST_STATEMENT_IFTHEN: {
-      TODO_IMPLEMENT;
+      struct ast_ifthen_statement *its = &s->u.ifthen_statement;
+      struct varnum condition_result;
+      if (!build_expr(cs, f, g, st, its->condition, &condition_result)) {
+        return 0;
+      }
+      struct opnum fut1 = opgraph_future_1(g);
+      struct opnum branch_opnum = opgraph_branch(g, condition_result,
+                                                 fut1,
+                                                 opnum_invalid());
+      if (!build_bracebody(cs, f, g, st, &its->thenbody)) {
+        return 0;
+      }
+      struct opnum after_thenbody = opgraph_future_0(g);
+      opgraph_update_branch_else(g, branch_opnum, after_thenbody);
     } break;
     case AST_STATEMENT_IFTHENELSE: {
-      TODO_IMPLEMENT;
+      struct ast_ifthenelse_statement *ites = &s->u.ifthenelse_statement;
+      struct varnum condition_result;
+      if (!build_expr(cs, f, g, st, ites->condition, &condition_result)) {
+        return 0;
+      }
+      struct opnum fut1 = opgraph_future_1(g);
+      struct opnum branch_opnum = opgraph_branch(g, condition_result,
+                                                 fut1,
+                                                 opnum_invalid());
+      if (!build_bracebody(cs, f, g, st, &ites->thenbody)) {
+        return 0;
+      }
+      struct opnum thenbody_nop = opgraph_incomplete_nop(g);
+      struct opnum after_thenbody = opgraph_future_0(g);
+      opgraph_update_branch_else(g, branch_opnum, after_thenbody);
+      if (!build_bracebody(cs, f, g, st, &ites->elsebody)) {
+        return 0;
+      }
+      struct opnum after_elsebody = opgraph_future_0(g);
+      opgraph_make_nop_complete(g, thenbody_nop, after_elsebody);
     } break;
     default:
       UNREACHABLE();
     }
+  }
+
+  for (size_t i = 0; i < vars_pushed; i++) {
+    builder_state_pop_varnum(st);
   }
 
   return 1;

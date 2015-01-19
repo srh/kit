@@ -157,6 +157,16 @@ struct opnum opgraph_branch(struct opgraph *g,
   return opgraph_add(g, node);
 }
 
+void opgraph_update_branch_else(struct opgraph *g,
+                                struct opnum incomplete_op,
+                                struct opnum false_target) {
+  CHECK(opnum_is_valid(incomplete_op) && incomplete_op.value < g->ops_count);
+  CHECK(g->ops[incomplete_op.value].tag == OPNODE_BRANCH
+        && !opnum_is_valid(g->ops[incomplete_op.value].u.branch.false_next));
+  CHECK(opnum_is_valid(false_target));
+  g->ops[incomplete_op.value].u.branch.false_next = false_target;
+}
+
 struct opnum opgraph_mov(struct opgraph *g,
                          struct varnum src,
                          struct varnum dest) {
