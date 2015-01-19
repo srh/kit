@@ -306,13 +306,84 @@ struct opnum builder_state_lookup_label_opnum(struct builder_state *st,
   CRASH("Label name not found.\n");
 }
 
+int build_numeric_literal(struct checkstate *cs,
+                          struct opgraph *g,
+                          struct ast_numeric_literal *a,
+                          struct varnum *varnum_out) {
+  struct ast_typeexpr type;
+  numeric_literal_type(cs->im, a, &type);
+  struct varnum v = opgraph_add_var(g, &type);
+  ast_typeexpr_destroy(&type);
+
+  switch (a->numeric_type) {
+  case AST_NUMERIC_TYPE_SIGNED: {
+    int32_t value;
+    if (!numeric_literal_to_i32(a->digits, a->digits_count, &value)) {
+      return 0;
+    }
+    opgraph_i32_immediate(g, value, v);
+  } break;
+  case AST_NUMERIC_TYPE_UNSIGNED: {
+    uint32_t value;
+    if (!numeric_literal_to_u32(a->digits, a->digits_count, &value)) {
+      return 0;
+    }
+    opgraph_u32_immediate(g, value, v);
+  } break;
+  default:
+    UNREACHABLE();
+  }
+
+  *varnum_out = v;
+  return 1;
+}
+
 int build_expr(struct checkstate *cs, struct objfile *f,
                struct opgraph *g,
                struct builder_state *st,
                struct ast_expr *a,
                struct varnum *varnum_out) {
-  (void)cs, (void)f, (void)g, (void)st, (void)a, (void)varnum_out;
-  TODO_IMPLEMENT;
+  (void)cs, (void)f, (void)g, (void)st, (void)varnum_out; /* TODO */
+  switch (a->tag) {
+  case AST_EXPR_NAME: {
+    struct ast_name_expr *ne = &a->u.name;
+    CHECK(ne->info.info_valid);
+    if (ne->info.inst_or_null) {
+      struct def_instantiation *inst = ne->info.inst_or_null;
+      struct varnum v = opgraph_add_var(g, &inst->type);
+      /* TODO: We need to make functions move the pointer, not value, _somewhere_. */
+      opgraph_mov_from_global(g, inst->symbol_table_index, v);
+      *varnum_out = v;
+      return 1;
+    } else {
+      return builder_state_try_lookup_varnum(st, ne->ident.value, varnum_out);
+    }
+  } break;
+  case AST_EXPR_NUMERIC_LITERAL: {
+    return build_numeric_literal(cs, g, &a->u.numeric_literal, varnum_out);
+  } break;
+  case AST_EXPR_FUNCALL: {
+    struct ast_funcall *fe = &a->u.funcall;
+    struct varnum func;
+    if (!build_expr(cs, f, g, st, fe->func, &func)) {
+      return 0;
+    }
+    size_t args_count = fe->args_count;
+    struct varnum *args = malloc_mul(sizeof(*args), args_count);
+    for (size_t i = 0; i < args_count; i++) {
+      if (!build_expr(cs, f, g, st, &fe->args[i], &args[i])) {
+        free(args);
+        return 0;
+      }
+    }
+    opgraph_call(g, func, args, args_count);
+    return 1;
+  } break;
+  case AST_EXPR_UNOP:
+    TODO_IMPLEMENT;
+  default:
+    TODO_IMPLEMENT;
+  }
 }
 
 int build_bracebody(struct checkstate *cs, struct objfile *f,

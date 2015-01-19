@@ -2288,23 +2288,33 @@ int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
   return 1;
 }
 
+int numeric_literal_to_i32(int8_t *digits, size_t digits_count,
+                           int32_t *out) {
+  /* TODO: There's no way to plainly represent INT32_MIN.  We should
+     get static evaluation of "arbitrary numeric constants"
+     implemented. */
+  uint32_t value;
+  if (!numeric_literal_to_u32(digits, digits_count, &value)) {
+    return 0;
+  }
+  if (value > 0x7FFFFFFFul) {
+    ERR_DBG(NUMERIC_LITERAL_OOR);
+    return 0;
+  }
+  CHECK(value <= INT32_MAX);
+  *out = (int32_t)value;
+  return 1;
+}
+
 int eval_static_numeric_literal(struct ast_numeric_literal *a,
                                 struct static_value *out) {
   switch (a->numeric_type) {
   case AST_NUMERIC_TYPE_SIGNED: {
-    /* TODO: There's no way to plainly represent INT32_MIN.  We should
-       get static evaluation of "arbitrary numeric constants"
-       implemented. */
-    uint32_t value;
-    if (!numeric_literal_to_u32(a->digits, a->digits_count, &value)) {
+    int32_t value;
+    if (!numeric_literal_to_i32(a->digits, a->digits_count, &value)) {
       return 0;
     }
-    if (value > 0x7FFFFFFFul) {
-      ERR_DBG(NUMERIC_LITERAL_OOR);
-      return 0;
-    }
-    CHECK(value <= INT32_MAX);
-    static_value_init_i32(out, (int32_t)value);
+    static_value_init_i32(out, value);
     return 1;
   } break;
   case AST_NUMERIC_TYPE_UNSIGNED: {
@@ -2316,7 +2326,7 @@ int eval_static_numeric_literal(struct ast_numeric_literal *a,
     return 1;
   } break;
   default:
-    CRASH("Unreachable (bad ast_numeric_literal)\n");
+    UNREACHABLE();
   }
 }
 

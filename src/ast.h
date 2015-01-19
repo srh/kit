@@ -326,6 +326,7 @@ void ast_deref_field_access_init(struct ast_deref_field_access *a,
 
 struct ast_name_expr_info {
   /* True if typechecking happened and the info means something. */
+  /* TODO: Name other info_valid fields info_valid. */
   int info_valid;
   /* The instantiation this name refers to -- if it refers to a
      global.  NULL if the name refers to a local variable. */

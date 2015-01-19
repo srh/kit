@@ -39,6 +39,30 @@ struct opnode_mov {
   struct opnum next;
 };
 
+struct opnode_mov_from_global {
+  uint32_t symbol_table_index;
+  struct varnum dest;
+  struct opnum next;
+};
+
+struct opnode_i32 {
+  int32_t value;
+  struct varnum dest;
+  struct opnum next;
+};
+
+struct opnode_u32 {
+  int32_t value;
+  struct varnum dest;
+  struct opnum next;
+};
+
+struct opnode_call {
+  struct varnum func;
+  struct varnum *args;
+  size_t args_count;
+};
+
 enum opnode_tag {
   /* NOP nodes just redirect you to another node -- often we fill in
      the NOP node's "next node" later, when constructing the opgraph. */
@@ -49,6 +73,14 @@ enum opnode_tag {
   OPNODE_BRANCH,
   /* Copies data from src to dest. */
   OPNODE_MOV,
+  /* Copies data from a symbol to dest. */
+  OPNODE_MOV_FROM_GLOBAL,
+  /* Immediate i32. */
+  OPNODE_I32,
+  /* Immediate u32. */
+  OPNODE_U32,
+  /* Function call. */
+  OPNODE_CALL,
 };
 
 struct opnode {
@@ -57,6 +89,10 @@ struct opnode {
     struct opnum nop_next;
     struct opnode_branch branch;
     struct opnode_mov mov;
+    struct opnode_mov_from_global mov_from_global;
+    struct opnode_i32 i32;
+    struct opnode_u32 u32;
+    struct opnode_call call;
   } u;
 };
 
@@ -64,6 +100,14 @@ void opnode_destroy(struct opnode *n) {
   switch (n->tag) {
   case OPNODE_NOP: break;
   case OPNODE_RETURN: break;
+  case OPNODE_BRANCH: break;
+  case OPNODE_MOV: break;
+  case OPNODE_MOV_FROM_GLOBAL: break;
+  case OPNODE_I32: break;
+  case OPNODE_U32: break;
+  case OPNODE_CALL:
+    free(n->u.call.args);
+    break;
   default:
     UNREACHABLE();
   }
@@ -184,6 +228,48 @@ struct opnum opgraph_return(struct opgraph *g) {
   return opgraph_add(g, node);
 }
 
+struct opnum opgraph_call(struct opgraph *g, struct varnum func,
+                          struct varnum *args, size_t args_count) {
+  struct opnode node;
+  node.tag = OPNODE_CALL;
+  node.u.call.func = func;
+  node.u.call.args = args;
+  node.u.call.args_count = args_count;
+  return opgraph_add(g, node);
+}
+
+struct opnum opgraph_mov_from_global(struct opgraph *g,
+                                     uint32_t symbol_table_index,
+                                     struct varnum dest) {
+  struct opnode node;
+  node.tag = OPNODE_MOV_FROM_GLOBAL;
+  node.u.mov_from_global.symbol_table_index = symbol_table_index;
+  node.u.mov_from_global.dest = dest;
+  node.u.mov_from_global.next = opgraph_future_1(g);
+  return opgraph_add(g, node);
+}
+
+struct opnum opgraph_i32_immediate(struct opgraph *g,
+                                   int32_t value,
+                                   struct varnum dest) {
+  struct opnode node;
+  node.tag = OPNODE_I32;
+  node.u.i32.value = value;
+  node.u.i32.dest = dest;
+  node.u.i32.next = opgraph_future_1(g);
+  return opgraph_add(g, node);
+}
+
+struct opnum opgraph_u32_immediate(struct opgraph *g,
+                                   uint32_t value,
+                                   struct varnum dest) {
+  struct opnode node;
+  node.tag = OPNODE_U32;
+  node.u.u32.value = value;
+  node.u.u32.dest = dest;
+  node.u.u32.next = opgraph_future_1(g);
+  return opgraph_add(g, node);
+}
 
 struct opnum opgraph_future_0(struct opgraph *g) {
   struct opnum ret;

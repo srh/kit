@@ -2,6 +2,7 @@
 #define KIRA_OPGRAPH_H_
 
 #include <stddef.h>
+#include <stdint.h>
 
 struct ast_typeexpr;
 struct opnode;
@@ -47,7 +48,18 @@ void opgraph_update_branch_else(struct opgraph *g,
 struct opnum opgraph_mov(struct opgraph *g,
                          struct varnum src,
                          struct varnum dest);
+struct opnum opgraph_mov_from_global(struct opgraph *g,
+                                     uint32_t symbol_table_index,
+                                     struct varnum dest);
+struct opnum opgraph_i32_immediate(struct opgraph *g,
+                                   int32_t value,
+                                   struct varnum dest);
+struct opnum opgraph_u32_immediate(struct opgraph *g,
+                                   uint32_t value,
+                                   struct varnum dest);
 struct opnum opgraph_return(struct opgraph *g);
+struct opnum opgraph_call(struct opgraph *g, struct varnum func,
+                          struct varnum *args, size_t args_count);
 
 /* Returns g->ops_count. */
 struct opnum opgraph_future_0(struct opgraph *g);

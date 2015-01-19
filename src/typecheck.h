@@ -43,4 +43,11 @@ void do_replace_generics(struct ast_generics *generics,
 struct ast_typeexpr *expose_func_return_type(struct identmap *im,
                                              struct ast_typeexpr *func,
                                              size_t expected_params_count);
+void numeric_literal_type(struct identmap *im,
+                          struct ast_numeric_literal *a,
+                          struct ast_typeexpr *out);
+int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
+                           uint32_t *out);
+int numeric_literal_to_i32(int8_t *digits, size_t digits_count,
+                           int32_t *out);
 #endif /* KIRA_TYPECHECK_H_ */
