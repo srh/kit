@@ -223,15 +223,22 @@ struct label_pair {
 };
 
 struct builder_state {
+  /* A stack of active variable names and their varnums.  (This gets
+     pushed and popped as we traverse scopes of a bracebody.) */
   struct varnum_pair *varnums;
   size_t varnums_count;
   size_t varnums_limit;
 
+  /* An unchanging map of labels to opnums.  (We preallocate
+     nop-valued opnodes for each label.) */
+  /* TODO: Shouldn't we instead just have a list of (label name, goto
+     opnum) pairs?  */
   struct label_pair *labels;
   size_t labels_count;
 };
 
-void builder_state_init(struct builder_state *st,
+void builder_state_init(struct opgraph *g,
+                        struct builder_state *st,
                         ident_value *label_names,
                         size_t label_names_count) {
   st->varnums = NULL;
@@ -241,7 +248,7 @@ void builder_state_init(struct builder_state *st,
   struct label_pair *labels = malloc_mul(sizeof(*labels), label_names_count);
   for (size_t i = 0; i < label_names_count; i++) {
     labels[i].label_name = label_names[i];
-    labels[i].opnum = opnum_invalid();
+    labels[i].opnum = opgraph_incomplete_nop(g);
   }
   st->labels = labels;
   st->labels_count = label_names_count;
@@ -284,33 +291,64 @@ void builder_state_push_varnum(struct builder_state *st,
   SLICE_PUSH(st->varnums, st->varnums_count, st->varnums_limit, pair);
 }
 
+struct opnum builder_state_lookup_label_opnum(struct builder_state *st,
+                                              ident_value label_name) {
+  for (size_t i = 0, e = st->labels_count; i < e; i++) {
+    if (st->labels[i].label_name == label_name) {
+      return st->labels[i].opnum;
+    }
+  }
+  CRASH("Label name not found.\n");
+}
+
+int build_expr(struct checkstate *cs, struct objfile *f,
+               struct opgraph *g,
+               struct builder_state *st,
+               struct ast_expr *a,
+               struct varnum *varnum_out) {
+  (void)cs, (void)f, (void)g, (void)st, (void)a, (void)varnum_out;
+  TODO_IMPLEMENT;
+}
+
 /* TODO: Right now we're jumping into implementing build_bracebody so
    that we can see what additional info we'll need (like labels and
    such) before setting the entry_point. */
 int build_bracebody(struct checkstate *cs, struct objfile *f,
-                    struct funcgraph *g,
+                    struct opgraph *g,
                     struct builder_state *st,
                     struct ast_bracebody *a) {
-  (void)cs, (void)st, (void)g, (void)a, (void)f;
-  TODO_IMPLEMENT;
-#if 0
   for (size_t i = 0, e = a->statements_count; i < e; i++) {
     struct ast_statement *s = &a->statements[i];
     switch (s->tag) {
     case AST_STATEMENT_EXPR: {
-      TODO_IMPLEMENT;
+      struct varnum discard;
+      if (!build_expr(cs, f, g, st, s->u.expr, &discard)) {
+        return 0;
+      }
     } break;
     case AST_STATEMENT_RETURN_EXPR: {
-      TODO_IMPLEMENT;
+      struct varnum var;
+      if (!build_expr(cs, f, g, st, s->u.return_expr, &var)) {
+        return 0;
+      }
+      opgraph_mov(g, var, g->fg->return_var);
+      opgraph_return(g);
     } break;
     case AST_STATEMENT_VAR: {
-      TODO_IMPLEMENT;
+      struct ast_var_statement *vs = &s->u.var_statement;
+      
     } break;
     case AST_STATEMENT_GOTO: {
-      TODO_IMPLEMENT;
+      struct opnum target_node = builder_state_lookup_label_opnum(
+          st, s->u.goto_statement.target.value);
+      opgraph_nop(g, target_node);
     } break;
     case AST_STATEMENT_LABEL: {
-      TODO_IMPLEMENT;
+      struct opnum s1 = opgraph_future_1(g);
+      struct opnum label_target = opgraph_nop(g, s1);
+      struct opnum label_node = builder_state_lookup_label_opnum(
+          st, s->u.label_statement.label.value);
+      opgraph_make_nop_complete(g, label_node, label_target);
     } break;
     case AST_STATEMENT_IFTHEN: {
       TODO_IMPLEMENT;
@@ -322,7 +360,8 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
       UNREACHABLE();
     }
   }
-#endif /* 0 */
+
+  return 1;
 }
 
 int build_funcgraph(struct checkstate *cs, struct objfile *f,
@@ -339,7 +378,7 @@ int build_funcgraph(struct checkstate *cs, struct objfile *f,
   CHECK(lambda->info.lambda_info_valid);
 
   struct builder_state st;
-  builder_state_init(&st, lambda->info.label_names, lambda->info.label_names_count);
+  builder_state_init(&g.opg, &st, lambda->info.label_names, lambda->info.label_names_count);
 
   struct ast_typeexpr *return_type
     = expose_func_return_type(cs->im,
@@ -358,8 +397,10 @@ int build_funcgraph(struct checkstate *cs, struct objfile *f,
   g.arg_vars = arg_vars;
   g.arg_vars_count = lambda->params_count;
 
-  /* TODO: Set g->entry_point. */
-  int ret = build_bracebody(cs, f, &g, &st, &lambda->bracebody);
+  CHECK(!opnum_is_valid(g.entry_point));
+  g.entry_point = opgraph_future_0(&g.opg);
+
+  int ret = build_bracebody(cs, f, &g.opg, &st, &lambda->bracebody);
   builder_state_destroy(&st);
 
   if (ret) {
