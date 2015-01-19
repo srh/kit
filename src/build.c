@@ -593,10 +593,37 @@ int build_expr(struct checkstate *cs, struct objfile *f,
     return 0;
   } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
-    TODO_IMPLEMENT;
+    struct ast_local_field_access *lfa = &a->u.local_field_access;
+    struct varnum operand;
+    if (!build_expr(cs, f, g, st, lfa->lhs, lvalue, &operand)) {
+      return 0;
+    }
+
+    struct varnum narrowed = opgraph_add_var(g, &a->expr_info.concrete_type);
+    opgraph_structfield(g, operand, lfa->fieldname.value, narrowed);
+    *varnum_out = narrowed;
+    return 1;
   } break;
   case AST_EXPR_DEREF_FIELD_ACCESS: {
-    TODO_IMPLEMENT;
+    struct ast_deref_field_access *dfa = &a->u.deref_field_access;
+    struct varnum operand;
+    if (!build_expr(cs, f, g, st, dfa->lhs, lvalue, &operand)) {
+      return 0;
+    }
+
+    struct ast_typeexpr *ptr_target;
+    if (!view_ptr_target(cs->im, &dfa->lhs->expr_info.concrete_type,
+                         &ptr_target)) {
+      CRASH("Expected pointer type when building deref field access expr.\n");
+    }
+
+    struct varnum derefed = opgraph_add_var(g, ptr_target);
+    opgraph_deref(g, operand, derefed);
+
+    struct varnum narrowed = opgraph_add_var(g, &a->expr_info.concrete_type);
+    opgraph_structfield(g, derefed, dfa->fieldname.value, narrowed);
+    *varnum_out = narrowed;
+    return 1;
   } break;
   default:
     UNREACHABLE();
@@ -752,7 +779,6 @@ int build_funcgraph(struct checkstate *cs, struct objfile *f,
 
 int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_instantiation *inst) {
-  (void)cs;  /* TODO */
   switch (inst->value.tag) {
   case STATIC_VALUE_I32: {
     STATIC_CHECK(sizeof(inst->value.u.i32_value) == 4);

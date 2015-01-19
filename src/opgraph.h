@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "identmap.h"
+
 enum ast_binop;
 struct ast_typeexpr;
 struct opnode;
@@ -70,6 +72,9 @@ struct opnum opgraph_deref(struct opgraph *g, struct varnum pointer,
                            struct varnum pointee);
 struct opnum opgraph_addressof(struct opgraph *g, struct varnum pointee,
                                struct varnum pointer);
+struct opnum opgraph_structfield(struct opgraph *g, struct varnum operand,
+                                 ident_value fieldname,
+                                 struct varnum narrowed);
 struct opnum opgraph_i32_negate(struct opgraph *g, struct varnum param,
                                 struct varnum result, struct varnum overflow);
 struct opnum opgraph_binop_intrinsic(struct opgraph *g,

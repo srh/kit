@@ -83,6 +83,13 @@ struct opnode_addressof {
   struct opnum next;
 };
 
+struct opnode_structfield {
+  struct varnum operand;
+  ident_value fieldname;
+  struct varnum narrowed;
+  struct opnum next;
+};
+
 struct opnode_i32_negate {
   struct varnum src;
   struct varnum dest;
@@ -129,6 +136,7 @@ enum opnode_tag {
      has no specified location beforehand? */
   OPNODE_DEREF,
   OPNODE_ADDRESSOF,
+  OPNODE_STRUCTFIELD,
   OPNODE_I32_NEGATE,
   OPNODE_BINOP,
 };
@@ -146,6 +154,7 @@ struct opnode {
     struct opnode_call call;
     struct opnode_deref deref;
     struct opnode_addressof addressof;
+    struct opnode_structfield structfield;
     struct opnode_i32_negate i32_negate;
     struct opnode_binop binop;
   } u;
@@ -167,6 +176,7 @@ void opnode_destroy(struct opnode *n) {
     break;
   case OPNODE_DEREF: break;
   case OPNODE_ADDRESSOF: break;
+  case OPNODE_STRUCTFIELD: break;
   case OPNODE_I32_NEGATE: break;
   case OPNODE_BINOP: break;
   default:
@@ -328,6 +338,18 @@ struct opnum opgraph_addressof(struct opgraph *g, struct varnum pointee,
   node.u.addressof.pointee = pointee;
   node.u.addressof.pointer = pointer;
   node.u.addressof.next = opgraph_future_1(g);
+  return opgraph_add(g, node);
+}
+
+struct opnum opgraph_structfield(struct opgraph *g, struct varnum operand,
+                                 ident_value fieldname,
+                                 struct varnum narrowed) {
+  struct opnode node;
+  node.tag = OPNODE_STRUCTFIELD;
+  node.u.structfield.operand = operand;
+  node.u.structfield.fieldname = fieldname;
+  node.u.structfield.narrowed = narrowed;
+  node.u.structfield.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 

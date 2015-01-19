@@ -44,6 +44,9 @@ struct ast_ident make_ast_ident(ident_value ident);
 void init_name_type(struct ast_typeexpr *a, ident_value name);
 int exact_typeexprs_equal(struct ast_typeexpr *a, struct ast_typeexpr *b);
 int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x);
+int view_ptr_target(struct identmap *im,
+                    struct ast_typeexpr *ptr_type,
+                    struct ast_typeexpr **target_out);
 void do_replace_generics(struct ast_generics *generics,
                          struct ast_typeexpr *generics_substitutions,
                          struct ast_typeexpr *a,
