@@ -112,135 +112,9 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* X86 */
-enum x86_datareg {
-  X86_DATAREG_EAX,
-  X86_DATAREG_ECX,
-  X86_DATAREG_EDX,
-  X86_DATAREG_EBX,
-  X86_DATAREG_ESI,
-  X86_DATAREG_EDI,
-};
-
-enum locinfo_tag {
-  /* The memory address ebp + u.ebp_offset */
-  LOCINFO_EBP_OFFSET,
-  /* The memory address stored in (ebp + u.ebp_offset) */
-  LOCINFO_DEREF_EBP_OFFSET,
-  /* X86 */
-  /* The given register (for <= 4-byte values). */
-  LOCINFO_DATAREG,
-  /* The given two registers (for <= 8-byte values). */
-  LOCINFO_TWO_DATAREGS,
-};
-
-struct two_dataregs {
-  enum x86_datareg lo;
-  enum x86_datareg hi;
-};
-
-struct locinfo {
-  enum locinfo_tag tag;
-  union {
-    uint32_t ebp_offset;
-    uint32_t deref_ebp_offset;
-    enum x86_datareg datareg;
-    struct two_dataregs two_dataregs;
-  } u;
-};
-
-struct locinfo ebp_offset(uint32_t offset) {
-  struct locinfo ret;
-  ret.tag = LOCINFO_EBP_OFFSET;
-  ret.u.ebp_offset = offset;
-  return ret;
-}
-
-struct locinfo deref_ebp_offset(uint32_t offset) {
-  struct locinfo ret;
-  ret.tag = LOCINFO_DEREF_EBP_OFFSET;
-  ret.u.deref_ebp_offset = offset;
-  return ret;
-}
-
-struct locinfo datareg(enum x86_datareg reg) {
-  struct locinfo ret;
-  ret.tag = LOCINFO_DATAREG;
-  ret.u.datareg = reg;
-  return ret;
-}
-
-struct locinfo two_dataregs(enum x86_datareg lo, enum x86_datareg hi) {
-  struct locinfo ret;
-  ret.tag = LOCINFO_TWO_DATAREGS;
-  ret.u.two_dataregs.lo = lo;
-  ret.u.two_dataregs.hi = hi;
-  return ret;
-}
-
-struct varinfo {
-  ident_value name;
-  struct ast_typeexpr type;
-  struct locinfo loc;
-};
-
-void varinfo_init(struct varinfo *vi, ident_value name,
-                  struct ast_typeexpr *type, struct locinfo loc) {
-  vi->name = name;
-  ast_typeexpr_init_copy(&vi->type, type);
-  vi->loc = loc;
-}
-
-void varinfo_destroy(struct varinfo *vi) {
-  vi->name = IDENT_VALUE_INVALID;
-  ast_typeexpr_destroy(&vi->type);
-}
-
-struct varstate {
-  struct varinfo *infos;
-  size_t infos_count;
-  size_t infos_limit;
-};
-
-void varstate_init(struct varstate *vs) {
-  vs->infos = NULL;
-  vs->infos_count = 0;
-  vs->infos_limit = 0;
-}
-
-void varstate_destroy(struct varstate *vs) {
-  CHECK(vs->infos_count == 0);
-  free(vs->infos);
-}
-
-void varstate_push_var(struct varstate *vs, ident_value name,
-                       struct ast_typeexpr *type, struct locinfo loc) {
-  struct varinfo vi;
-  varinfo_init(&vi, name, type, loc);
-  SLICE_PUSH(vs->infos, vs->infos_count, vs->infos_limit, vi);
-}
-
-void varstate_pop_var(struct varstate *vs) {
-  SLICE_POP(vs->infos, vs->infos_count, varinfo_destroy);
-}
-
-struct gen_kiracall {
-  size_t num_vars;
-  struct locinfo return_location;
-};
-
-void emit_push_ebp(struct objfile *f) {
-  /* X86 */
-  objfile_section_append_raw(objfile_text(f), "\x55\x8B\xEC", 3);
-}
-
-void emit_leave_ret(struct objfile *f) {
-  /* X86 */
-  objfile_section_append_raw(objfile_text(f), "\x5D\xC3", 2);
-}
-
 #define DWORD_SIZE 4
 
+/* X86 WINDOWS */
 void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                       uint32_t *sizeof_out, uint32_t *alignof_out) {
   switch (type->tag) {
@@ -337,107 +211,9 @@ uint32_t kira_sizeof(struct name_table *nt, struct ast_typeexpr *type) {
   return size;
 }
 
-void gen_kiracall_start(struct checkstate *cs,
-                        struct objfile *f,
-                        struct varstate *vs,
-                        struct gen_kiracall *kc,
-                        struct ast_lambda *lambda,
-                        struct ast_typeexpr *concrete_type) {
-  CHECK(typeexpr_is_func_type(cs->im, concrete_type));
-  CHECK(concrete_type->tag == AST_TYPEEXPR_APP);
-  CHECK(concrete_type->u.app.params_count
-        == size_add(lambda->params_count, 1));
-
-  emit_push_ebp(f);
-
-  /* X86 (and WINDOWS?) */
-  uint32_t var_ebp_offset = 8;
-  size_t ret_param = concrete_type->u.app.params_count - 1;
-
-  struct locinfo return_location;
-  uint32_t return_sizeof
-    = kira_sizeof(&cs->nt, &concrete_type->u.app.params[ret_param]);
-  if (return_sizeof > 8) {
-    return_location = deref_ebp_offset(var_ebp_offset);
-    var_ebp_offset = uint32_add(var_ebp_offset, DWORD_SIZE);
-  } else if (return_sizeof > 4) {
-    /* X86 + WINDOWS: return value (if it's not a raw double) is spread
-       in eax/edx */
-    return_location = two_dataregs(X86_DATAREG_EAX, X86_DATAREG_EDX);
-  } else {
-    return_location = datareg(X86_DATAREG_EAX);
-  }
-
-  for (size_t i = 0, e = ret_param; i < e; i++) {
-    struct ast_typeexpr *param_type = &concrete_type->u.app.params[i];
-    varstate_push_var(vs, lambda->params[i].name.value,
-                      param_type, ebp_offset(var_ebp_offset));
-    var_ebp_offset = uint32_add(var_ebp_offset,
-                                kira_sizeof(&cs->nt, param_type));
-  }
-
-  kc->num_vars = lambda->params_count;
-  kc->return_location = return_location;
-}
-
-void gen_kiracall_destroy(struct varstate *vs, struct gen_kiracall *kc) {
-  for (size_t i = 0, e = kc->num_vars; i < e; i++) {
-    varstate_pop_var(vs);
-  }
-
-  kc->num_vars = 0;
-}
-
-void gen_kiracall_finish(struct objfile *f, struct varstate *vs,
-                         struct gen_kiracall *kc) {
-  emit_leave_ret(f);
-  gen_kiracall_destroy(vs, kc);
-}
-
-int build_bracebody(struct checkstate *cs, struct objfile *f,
-                    struct varstate *vs, struct locinfo return_location,
-                    struct ast_bracebody *x) {
-  (void)cs, (void)f, (void)vs, (void)return_location, (void)x;
-  /* TODO: Implement. */
-  ERR_DBG("build_bracebody: not implemented.\n");
-  return 0;
-}
-
-int build_lambda_instantiation(struct checkstate *cs, struct objfile *f,
-                               struct def_instantiation *inst,
-                               struct ast_expr *x) {
-  CHECK(x->tag == AST_EXPR_LAMBDA);
-  struct ast_lambda *lambda = &x->u.lambda;
-
-  objfile_fillercode_align_double_quadword(f);
-
-  objfile_set_symbol_Value(f, inst->symbol_table_index,
-                           objfile_section_size(objfile_text(f)));
-
-  struct varstate vs;
-  varstate_init(&vs);
-
-  struct gen_kiracall kc;
-  gen_kiracall_start(cs, f, &vs, &kc, lambda, &inst->type);
-
-  int ret = 0;
-  if (!build_bracebody(cs, f, &vs, kc.return_location, &lambda->bracebody)) {
-    goto cleanup_kiracall;
-  }
-
-  gen_kiracall_finish(f, &vs, &kc);
-
-  ret = 1;
-  goto cleanup_varstate;
- cleanup_kiracall:
-  gen_kiracall_destroy(&vs, &kc);
- cleanup_varstate:
-  varstate_destroy(&vs);
-  return ret;
-}
-
 int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_instantiation *inst) {
+  (void)cs;  /* TODO */
   switch (inst->value.tag) {
   case STATIC_VALUE_I32: {
     STATIC_CHECK(sizeof(inst->value.u.i32_value) == 4);
@@ -462,8 +238,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {
-    return build_lambda_instantiation(cs, f, inst,
-                                      &inst->value.u.typechecked_lambda);
+    TODO_IMPLEMENT;
   } break;
   default:
     UNREACHABLE();
