@@ -346,14 +346,14 @@ void build_conditional_abort(struct opgraph *g,
   opgraph_update_branch_else(g, node, opgraph_future_0(g));
 }
 
-int build_expr(struct checkstate *cs, struct objfile *f,
+int build_expr(struct checkstate *cs,
                struct opgraph *g,
                struct builder_state *st,
                struct ast_expr *a,
                int lvalue,
                struct varnum *varnum_out);
 
-int build_binop_expr(struct checkstate *cs, struct objfile *f,
+int build_binop_expr(struct checkstate *cs,
                      struct opgraph *g,
                      struct builder_state *st,
                      struct ast_expr *a,  /* a->tag == AST_EXPR_BINOP */
@@ -363,11 +363,11 @@ int build_binop_expr(struct checkstate *cs, struct objfile *f,
   switch (be->operator) {
   case AST_BINOP_ASSIGN: {
     struct varnum lhs;
-    if (!build_expr(cs, f, g, st, be->lhs, 1, &lhs)) {
+    if (!build_expr(cs, g, st, be->lhs, 1, &lhs)) {
       return 0;
     }
     struct varnum rhs;
-    if (!build_expr(cs, f, g, st, be->rhs, 0, &rhs)) {
+    if (!build_expr(cs, g, st, be->rhs, 0, &rhs)) {
       return 0;
     }
     opgraph_mov(g, rhs, lhs);
@@ -377,7 +377,7 @@ int build_binop_expr(struct checkstate *cs, struct objfile *f,
   case AST_BINOP_LOGICAL_OR: {
     CHECK(!lvalue);
     struct varnum lhs;
-    if (!build_expr(cs, f, g, st, be->lhs, 0, &lhs)) {
+    if (!build_expr(cs, g, st, be->lhs, 0, &lhs)) {
       return 0;
     }
     struct ast_typeexpr bool_type;
@@ -395,7 +395,7 @@ int build_binop_expr(struct checkstate *cs, struct objfile *f,
                                opgraph_future_0(g));
 
     struct varnum rhs;
-    if (!build_expr(cs, f, g, st, be->rhs, 0, &rhs)) {
+    if (!build_expr(cs, g, st, be->rhs, 0, &rhs)) {
       return 0;
     }
     opgraph_mov(g, rhs, result);
@@ -407,7 +407,7 @@ int build_binop_expr(struct checkstate *cs, struct objfile *f,
   case AST_BINOP_LOGICAL_AND: {
     CHECK(!lvalue);
     struct varnum lhs;
-    if (!build_expr(cs, f, g, st, be->lhs, 0, &lhs)) {
+    if (!build_expr(cs, g, st, be->lhs, 0, &lhs)) {
       return 0;
     }
     struct ast_typeexpr bool_type;
@@ -420,7 +420,7 @@ int build_binop_expr(struct checkstate *cs, struct objfile *f,
                                          true_fut,
                                          opnum_invalid());
     struct varnum rhs;
-    if (!build_expr(cs, f, g, st, be->rhs, 0, &rhs)) {
+    if (!build_expr(cs, g, st, be->rhs, 0, &rhs)) {
       return 0;
     }
 
@@ -454,11 +454,11 @@ int build_binop_expr(struct checkstate *cs, struct objfile *f,
   case AST_BINOP_BIT_LEFTSHIFT:  /* fall-through */
   case AST_BINOP_BIT_RIGHTSHIFT: {
     struct varnum lhs;
-    if (!build_expr(cs, f, g, st, be->lhs, 0, &lhs)) {
+    if (!build_expr(cs, g, st, be->lhs, 0, &lhs)) {
       return 0;
     }
     struct varnum rhs;
-    if (!build_expr(cs, f, g, st, be->rhs, 0, &rhs)) {
+    if (!build_expr(cs, g, st, be->rhs, 0, &rhs)) {
       return 0;
     }
     struct varnum dest = opgraph_add_var(g, &a->expr_info.concrete_type);
@@ -479,7 +479,7 @@ int build_binop_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
-int build_unop_expr(struct checkstate *cs, struct objfile *f,
+int build_unop_expr(struct checkstate *cs,
                     struct opgraph *g,
                     struct builder_state *st,
                     struct ast_expr *a,  /* a->tag == AST_EXPR_UNOP */
@@ -489,7 +489,7 @@ int build_unop_expr(struct checkstate *cs, struct objfile *f,
   switch (ue->operator) {
   case AST_UNOP_DEREFERENCE: {
     struct varnum rhs;
-    if (!build_expr(cs, f, g, st, ue->rhs, 0, &rhs)) {
+    if (!build_expr(cs, g, st, ue->rhs, 0, &rhs)) {
       return 0;
     }
     struct varnum deref = opgraph_add_var(g, &a->expr_info.concrete_type);
@@ -500,7 +500,7 @@ int build_unop_expr(struct checkstate *cs, struct objfile *f,
   case AST_UNOP_ADDRESSOF: {
     CHECK(!lvalue);
     struct varnum rhs;
-    if (!build_expr(cs, f, g, st, ue->rhs, 1, &rhs)) {
+    if (!build_expr(cs, g, st, ue->rhs, 1, &rhs)) {
       return 0;
     }
     struct varnum ref = opgraph_add_var(g, &a->expr_info.concrete_type);
@@ -511,7 +511,7 @@ int build_unop_expr(struct checkstate *cs, struct objfile *f,
   case AST_UNOP_NEGATE: {
     CHECK(!lvalue);
     struct varnum rhs;
-    if (!build_expr(cs, f, g, st, ue->rhs, 0, &rhs)) {
+    if (!build_expr(cs, g, st, ue->rhs, 0, &rhs)) {
       return 0;
     }
     struct varnum result = opgraph_add_var(g, &a->expr_info.concrete_type);
@@ -532,7 +532,7 @@ int build_unop_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
-int build_expr(struct checkstate *cs, struct objfile *f,
+int build_expr(struct checkstate *cs,
                struct opgraph *g,
                struct builder_state *st,
                struct ast_expr *a,
@@ -562,13 +562,13 @@ int build_expr(struct checkstate *cs, struct objfile *f,
     CHECK(!lvalue);
     struct ast_funcall *fe = &a->u.funcall;
     struct varnum func;
-    if (!build_expr(cs, f, g, st, fe->func, 0, &func)) {
+    if (!build_expr(cs, g, st, fe->func, 0, &func)) {
       return 0;
     }
     size_t args_count = fe->args_count;
     struct varnum *args = malloc_mul(sizeof(*args), args_count);
     for (size_t i = 0; i < args_count; i++) {
-      if (!build_expr(cs, f, g, st, &fe->args[i], 0, &args[i])) {
+      if (!build_expr(cs, g, st, &fe->args[i], 0, &args[i])) {
         free(args);
         return 0;
       }
@@ -582,10 +582,10 @@ int build_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_UNOP: {
-    return build_unop_expr(cs, f, g, st, a, lvalue, varnum_out);
+    return build_unop_expr(cs, g, st, a, lvalue, varnum_out);
   } break;
   case AST_EXPR_BINOP: {
-    return build_binop_expr(cs, f, g, st, a, lvalue, varnum_out);
+    return build_binop_expr(cs, g, st, a, lvalue, varnum_out);
   } break;
   case AST_EXPR_LAMBDA: {
     /* TODO: Support inline lambdas. */
@@ -595,7 +595,7 @@ int build_expr(struct checkstate *cs, struct objfile *f,
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
     struct ast_local_field_access *lfa = &a->u.local_field_access;
     struct varnum operand;
-    if (!build_expr(cs, f, g, st, lfa->lhs, lvalue, &operand)) {
+    if (!build_expr(cs, g, st, lfa->lhs, lvalue, &operand)) {
       return 0;
     }
 
@@ -607,7 +607,7 @@ int build_expr(struct checkstate *cs, struct objfile *f,
   case AST_EXPR_DEREF_FIELD_ACCESS: {
     struct ast_deref_field_access *dfa = &a->u.deref_field_access;
     struct varnum operand;
-    if (!build_expr(cs, f, g, st, dfa->lhs, lvalue, &operand)) {
+    if (!build_expr(cs, g, st, dfa->lhs, lvalue, &operand)) {
       return 0;
     }
 
@@ -630,7 +630,7 @@ int build_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
-int build_bracebody(struct checkstate *cs, struct objfile *f,
+int build_bracebody(struct checkstate *cs,
                     struct opgraph *g,
                     struct builder_state *st,
                     struct ast_bracebody *a) {
@@ -640,13 +640,13 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
     switch (s->tag) {
     case AST_STATEMENT_EXPR: {
       struct varnum discard;
-      if (!build_expr(cs, f, g, st, s->u.expr, 0, &discard)) {
+      if (!build_expr(cs, g, st, s->u.expr, 0, &discard)) {
         return 0;
       }
     } break;
     case AST_STATEMENT_RETURN_EXPR: {
       struct varnum var;
-      if (!build_expr(cs, f, g, st, s->u.return_expr, 0, &var)) {
+      if (!build_expr(cs, g, st, s->u.return_expr, 0, &var)) {
         return 0;
       }
       opgraph_mov(g, var, g->fg->return_var);
@@ -655,7 +655,7 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
     case AST_STATEMENT_VAR: {
       struct ast_var_statement *vs = &s->u.var_statement;
       struct varnum rhs_result;
-      if (!build_expr(cs, f, g, st, vs->rhs, 0, &rhs_result)) {
+      if (!build_expr(cs, g, st, vs->rhs, 0, &rhs_result)) {
         return 0;
       }
 
@@ -681,14 +681,14 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
     case AST_STATEMENT_IFTHEN: {
       struct ast_ifthen_statement *its = &s->u.ifthen_statement;
       struct varnum condition_result;
-      if (!build_expr(cs, f, g, st, its->condition, 0, &condition_result)) {
+      if (!build_expr(cs, g, st, its->condition, 0, &condition_result)) {
         return 0;
       }
       struct opnum fut1 = opgraph_future_1(g);
       struct opnum branch_opnum = opgraph_branch(g, condition_result,
                                                  fut1,
                                                  opnum_invalid());
-      if (!build_bracebody(cs, f, g, st, &its->thenbody)) {
+      if (!build_bracebody(cs, g, st, &its->thenbody)) {
         return 0;
       }
       struct opnum after_thenbody = opgraph_future_0(g);
@@ -697,20 +697,20 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
     case AST_STATEMENT_IFTHENELSE: {
       struct ast_ifthenelse_statement *ites = &s->u.ifthenelse_statement;
       struct varnum condition_result;
-      if (!build_expr(cs, f, g, st, ites->condition, 0, &condition_result)) {
+      if (!build_expr(cs, g, st, ites->condition, 0, &condition_result)) {
         return 0;
       }
       struct opnum fut1 = opgraph_future_1(g);
       struct opnum branch_opnum = opgraph_branch(g, condition_result,
                                                  fut1,
                                                  opnum_invalid());
-      if (!build_bracebody(cs, f, g, st, &ites->thenbody)) {
+      if (!build_bracebody(cs, g, st, &ites->thenbody)) {
         return 0;
       }
       struct opnum thenbody_nop = opgraph_incomplete_nop(g);
       struct opnum after_thenbody = opgraph_future_0(g);
       opgraph_update_branch_else(g, branch_opnum, after_thenbody);
-      if (!build_bracebody(cs, f, g, st, &ites->elsebody)) {
+      if (!build_bracebody(cs, g, st, &ites->elsebody)) {
         return 0;
       }
       struct opnum after_elsebody = opgraph_future_0(g);
@@ -728,7 +728,7 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-int build_funcgraph(struct checkstate *cs, struct objfile *f,
+int build_funcgraph(struct checkstate *cs,
                     struct ast_expr *lambda_expr,
                     struct funcgraph *out) {
   CHECK(typeexpr_is_func_type(cs->im, &lambda_expr->expr_info.concrete_type));
@@ -764,7 +764,7 @@ int build_funcgraph(struct checkstate *cs, struct objfile *f,
   CHECK(!opnum_is_valid(g.entry_point));
   g.entry_point = opgraph_future_0(&g.opg);
 
-  int ret = build_bracebody(cs, f, &g.opg, &st, &lambda->bracebody);
+  int ret = build_bracebody(cs, &g.opg, &st, &lambda->bracebody);
   builder_state_destroy(&st);
 
   if (ret) {
@@ -804,7 +804,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
   } break;
   case STATIC_VALUE_LAMBDA: {
     struct funcgraph g;
-    if (!build_funcgraph(cs, f, &inst->value.u.typechecked_lambda, &g)) {
+    if (!build_funcgraph(cs, &inst->value.u.typechecked_lambda, &g)) {
       return 0;
     }
     TODO_IMPLEMENT;     /* (Generate machine code.) */
