@@ -143,6 +143,7 @@ enum opnode_tag {
 
 struct opnode {
   enum opnode_tag tag;
+  int is_recursing;
   union {
     struct opnum nop_next;
     struct opnode_branch branch;
@@ -159,6 +160,11 @@ struct opnode {
     struct opnode_binop binop;
   } u;
 };
+
+void opnode_init_tag(struct opnode *n, enum opnode_tag tag) {
+  n->tag = tag;
+  n->is_recursing = 0;
+}
 
 void opnode_destroy(struct opnode *n) {
   switch (n->tag) {
@@ -182,7 +188,7 @@ void opnode_destroy(struct opnode *n) {
   default:
     UNREACHABLE();
   }
-  n->tag = (enum opnode_tag)-1;
+  opnode_init_tag(n, (enum opnode_tag)-1);
 }
 
 struct varnode {
@@ -242,7 +248,7 @@ struct opnum opgraph_add(struct opgraph *g, struct opnode node) {
 
 struct opnum opgraph_nop(struct opgraph *g, struct opnum target) {
   struct opnode node;
-  node.tag = OPNODE_NOP;
+  opnode_init_tag(&node, OPNODE_NOP);
   node.u.nop_next = target;
   return opgraph_add(g, node);
 }
@@ -265,7 +271,7 @@ struct opnum opgraph_branch(struct opgraph *g,
                             struct opnum true_next,
                             struct opnum false_next) {
   struct opnode node;
-  node.tag = OPNODE_BRANCH;
+  opnode_init_tag(&node, OPNODE_BRANCH);
   node.u.branch.condition = condition;
   node.u.branch.true_next = true_next;
   node.u.branch.false_next = false_next;
@@ -286,7 +292,7 @@ struct opnum opgraph_mov(struct opgraph *g,
                          struct varnum src,
                          struct varnum dest) {
   struct opnode node;
-  node.tag = OPNODE_MOV;
+  opnode_init_tag(&node, OPNODE_MOV);
   node.u.mov.src = src;
   node.u.mov.dest = dest;
   node.u.mov.next = opgraph_future_1(g);
@@ -295,13 +301,13 @@ struct opnum opgraph_mov(struct opgraph *g,
 
 struct opnum opgraph_return(struct opgraph *g) {
   struct opnode node;
-  node.tag = OPNODE_RETURN;
+  opnode_init_tag(&node, OPNODE_RETURN);
   return opgraph_add(g, node);
 }
 
 struct opnum opgraph_abort(struct opgraph *g) {
   struct opnode node;
-  node.tag = OPNODE_ABORT;
+  opnode_init_tag(&node, OPNODE_ABORT);
   return opgraph_add(g, node);
 }
 
@@ -310,7 +316,7 @@ struct opnum opgraph_call(struct opgraph *g, struct varnum func,
                           struct varnum dest) {
   /* TODO: Check type? */
   struct opnode node;
-  node.tag = OPNODE_CALL;
+  opnode_init_tag(&node, OPNODE_CALL);
   node.u.call.func = func;
   node.u.call.args = args;
   node.u.call.args_count = args_count;
@@ -323,7 +329,7 @@ struct opnum opgraph_deref(struct opgraph *g, struct varnum pointer,
                            struct varnum pointee_var) {
   /* TODO: Check type? */
   struct opnode node;
-  node.tag = OPNODE_DEREF;
+  opnode_init_tag(&node, OPNODE_DEREF);
   node.u.deref.pointer = pointer;
   node.u.deref.pointee_var = pointee_var;
   node.u.deref.next = opgraph_future_1(g);
@@ -334,7 +340,7 @@ struct opnum opgraph_addressof(struct opgraph *g, struct varnum pointee,
                                struct varnum pointer) {
   /* TODO: Check type? */
   struct opnode node;
-  node.tag = OPNODE_ADDRESSOF;
+  opnode_init_tag(&node, OPNODE_ADDRESSOF);
   node.u.addressof.pointee = pointee;
   node.u.addressof.pointer = pointer;
   node.u.addressof.next = opgraph_future_1(g);
@@ -345,7 +351,7 @@ struct opnum opgraph_structfield(struct opgraph *g, struct varnum operand,
                                  ident_value fieldname,
                                  struct varnum narrowed) {
   struct opnode node;
-  node.tag = OPNODE_STRUCTFIELD;
+  opnode_init_tag(&node, OPNODE_STRUCTFIELD);
   node.u.structfield.operand = operand;
   node.u.structfield.fieldname = fieldname;
   node.u.structfield.narrowed = narrowed;
@@ -357,7 +363,7 @@ struct opnum opgraph_i32_negate(struct opgraph *g, struct varnum param,
                                 struct varnum result, struct varnum overflow) {
   /* TODO: Check type? */
   struct opnode node;
-  node.tag = OPNODE_I32_NEGATE;
+  opnode_init_tag(&node, OPNODE_I32_NEGATE);
   node.u.i32_negate.src = param;
   node.u.i32_negate.dest = result;
   node.u.i32_negate.overflow = overflow;
@@ -373,7 +379,7 @@ struct opnum opgraph_binop_intrinsic(struct opgraph *g,
                                      struct varnum overflow) {
   /* TODO: Check type? */
   struct opnode node;
-  node.tag = OPNODE_BINOP;
+  opnode_init_tag(&node, OPNODE_BINOP);
   node.u.binop.operator = operator;
   node.u.binop.lhs = lhs;
   node.u.binop.rhs = rhs;
@@ -387,7 +393,7 @@ struct opnum opgraph_mov_from_global(struct opgraph *g,
                                      uint32_t symbol_table_index,
                                      struct varnum dest) {
   struct opnode node;
-  node.tag = OPNODE_MOV_FROM_GLOBAL;
+  opnode_init_tag(&node, OPNODE_MOV_FROM_GLOBAL);
   node.u.mov_from_global.symbol_table_index = symbol_table_index;
   node.u.mov_from_global.dest = dest;
   node.u.mov_from_global.next = opgraph_future_1(g);
@@ -398,7 +404,7 @@ struct opnum opgraph_bool_immediate(struct opgraph *g,
                                     int value, /* 1 or 0 */
                                     struct varnum dest) {
   struct opnode node;
-  node.tag = OPNODE_BOOL;
+  opnode_init_tag(&node, OPNODE_BOOL);
   node.u.boole.value = value;
   node.u.boole.dest = dest;
   node.u.boole.next = opgraph_future_1(g);
@@ -409,7 +415,7 @@ struct opnum opgraph_i32_immediate(struct opgraph *g,
                                    int32_t value,
                                    struct varnum dest) {
   struct opnode node;
-  node.tag = OPNODE_I32;
+  opnode_init_tag(&node, OPNODE_I32);
   node.u.i32.value = value;
   node.u.i32.dest = dest;
   node.u.i32.next = opgraph_future_1(g);
@@ -420,7 +426,7 @@ struct opnum opgraph_u32_immediate(struct opgraph *g,
                                    uint32_t value,
                                    struct varnum dest) {
   struct opnode node;
-  node.tag = OPNODE_U32;
+  opnode_init_tag(&node, OPNODE_U32);
   node.u.u32.value = value;
   node.u.u32.dest = dest;
   node.u.u32.next = opgraph_future_1(g);
