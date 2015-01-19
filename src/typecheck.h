@@ -40,6 +40,7 @@ void do_replace_generics(struct ast_generics *generics,
                          struct ast_typeexpr *generics_substitutions,
                          struct ast_typeexpr *a,
                          struct ast_typeexpr *out);
-
-
+struct ast_typeexpr *expose_func_return_type(struct identmap *im,
+                                             struct ast_typeexpr *func,
+                                             size_t expected_params_count);
 #endif /* KIRA_TYPECHECK_H_ */

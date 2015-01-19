@@ -1,5 +1,7 @@
 #include "ast.h"
 
+#include <string.h>
+
 #include "slice.h"
 #include "table.h"  /* TODO: For typelists_equal.  Reorganize locations. */
 
@@ -376,11 +378,52 @@ void ast_binop_expr_destroy(struct ast_binop_expr *a) {
   a->rhs = NULL;
 }
 
+void ast_lambda_info_init(struct ast_lambda_info *a) {
+  a->lambda_info_valid = 0;
+}
+
+void ast_lambda_info_init_copy(struct ast_lambda_info *a,
+                               struct ast_lambda_info *c) {
+  a->lambda_info_valid = c->lambda_info_valid;
+  if (c->lambda_info_valid) {
+    /* (We avoid passing NULL c->label_names value to memcpy.) */
+    /* TODO: Implement an ok_memcpy. */
+    if (c->label_names_count) {
+      ident_value *label_names = malloc_mul(sizeof(*label_names),
+                                            c->label_names_count);
+      memcpy(label_names, c->label_names,
+             size_mul(sizeof(*label_names), c->label_names_count));
+      a->label_names = label_names;
+      a->label_names_count = c->label_names_count;
+    } else {
+      a->label_names = NULL;
+      a->label_names_count = 0;
+    }
+  }
+}
+
+void ast_lambda_info_destroy(struct ast_lambda_info *a) {
+  if (a->lambda_info_valid) {
+    free(a->label_names);
+    a->lambda_info_valid = 0;
+  }
+}
+
+void ast_lambda_info_set_labels(struct ast_lambda_info *a,
+                                ident_value *label_names,
+                                size_t label_names_count) {
+  CHECK(!a->lambda_info_valid);
+  a->lambda_info_valid = 1;
+  a->label_names = label_names;
+  a->label_names_count = label_names_count;
+}
+
 void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,
                      struct ast_vardecl *params, size_t params_count,
                      struct ast_typeexpr return_type,
                      struct ast_bracebody bracebody) {
   a->meta = meta;
+  ast_lambda_info_init(&a->info);
   a->params = params;
   a->params_count = params_count;
   a->return_type = return_type;
@@ -389,6 +432,7 @@ void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,
 
 void ast_lambda_init_copy(struct ast_lambda *a, struct ast_lambda *c) {
   a->meta = ast_meta_make_copy(&c->meta);
+  ast_lambda_info_init_copy(&a->info, &c->info);
   struct ast_vardecl *params = malloc_mul(sizeof(*params), c->params_count);
   for (size_t i = 0, e = c->params_count; i < e; i++) {
     ast_vardecl_init_copy(&params[i], &c->params[i]);
@@ -401,6 +445,7 @@ void ast_lambda_init_copy(struct ast_lambda *a, struct ast_lambda *c) {
 
 void ast_lambda_destroy(struct ast_lambda *a) {
   ast_meta_destroy(&a->meta);
+  ast_lambda_info_destroy(&a->info);
   SLICE_FREE(a->params, a->params_count, ast_vardecl_destroy);
   ast_typeexpr_destroy(&a->return_type);
   ast_bracebody_destroy(&a->bracebody);

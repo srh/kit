@@ -8,6 +8,7 @@
 #include "checkstate.h"
 #include "databuf.h"
 #include "io.h"
+#include "opgraph.h"
 #include "slice.h"
 #include "win/objfile.h"
 
@@ -211,6 +212,166 @@ uint32_t kira_sizeof(struct name_table *nt, struct ast_typeexpr *type) {
   return size;
 }
 
+struct varnum_pair {
+  ident_value varname;
+  struct varnum varnum;
+};
+
+struct label_pair {
+  ident_value label_name;
+  struct opnum opnum;
+};
+
+struct builder_state {
+  struct varnum_pair *varnums;
+  size_t varnums_count;
+  size_t varnums_limit;
+
+  struct label_pair *labels;
+  size_t labels_count;
+};
+
+void builder_state_init(struct builder_state *st,
+                        ident_value *label_names,
+                        size_t label_names_count) {
+  st->varnums = NULL;
+  st->varnums_count = 0;
+  st->varnums_limit = 0;
+
+  struct label_pair *labels = malloc_mul(sizeof(*labels), label_names_count);
+  for (size_t i = 0; i < label_names_count; i++) {
+    labels[i].label_name = label_names[i];
+    labels[i].opnum = opnum_invalid();
+  }
+  st->labels = labels;
+  st->labels_count = label_names_count;
+}
+
+void builder_state_destroy(struct builder_state *st) {
+  free(st->labels);
+  free(st->varnums);
+
+  st->varnums = NULL;
+  st->varnums_count = 0;
+  st->varnums_limit = 0;
+
+  st->labels = NULL;
+  st->labels_count = 0;
+}
+
+int builder_state_try_lookup_varnum(struct builder_state *st,
+                                    ident_value varname,
+                                    struct varnum *varnum_out) {
+  for (size_t i = 0, e = st->varnums_count; i < e; i++) {
+    if (st->varnums[i].varname == varname) {
+      *varnum_out = st->varnums[i].varnum;
+      return 1;
+    }
+  }
+  return 0;
+}
+
+void builder_state_push_varnum(struct builder_state *st,
+                               ident_value varname,
+                               struct varnum varnum) {
+  {
+    struct varnum dummy;
+    CHECK(!builder_state_try_lookup_varnum(st, varname, &dummy));
+  }
+  struct varnum_pair pair;
+  pair.varname = varname;
+  pair.varnum = varnum;
+  SLICE_PUSH(st->varnums, st->varnums_count, st->varnums_limit, pair);
+}
+
+/* TODO: Right now we're jumping into implementing build_bracebody so
+   that we can see what additional info we'll need (like labels and
+   such) before setting the entry_point. */
+int build_bracebody(struct checkstate *cs, struct objfile *f,
+                    struct funcgraph *g,
+                    struct builder_state *st,
+                    struct ast_bracebody *a) {
+  (void)cs, (void)st, (void)g, (void)a, (void)f;
+  TODO_IMPLEMENT;
+#if 0
+  for (size_t i = 0, e = a->statements_count; i < e; i++) {
+    struct ast_statement *s = &a->statements[i];
+    switch (s->tag) {
+    case AST_STATEMENT_EXPR: {
+      TODO_IMPLEMENT;
+    } break;
+    case AST_STATEMENT_RETURN_EXPR: {
+      TODO_IMPLEMENT;
+    } break;
+    case AST_STATEMENT_VAR: {
+      TODO_IMPLEMENT;
+    } break;
+    case AST_STATEMENT_GOTO: {
+      TODO_IMPLEMENT;
+    } break;
+    case AST_STATEMENT_LABEL: {
+      TODO_IMPLEMENT;
+    } break;
+    case AST_STATEMENT_IFTHEN: {
+      TODO_IMPLEMENT;
+    } break;
+    case AST_STATEMENT_IFTHENELSE: {
+      TODO_IMPLEMENT;
+    } break;
+    default:
+      UNREACHABLE();
+    }
+  }
+#endif /* 0 */
+}
+
+int build_funcgraph(struct checkstate *cs, struct objfile *f,
+                    struct ast_expr *lambda_expr,
+                    struct funcgraph *out) {
+  CHECK(typeexpr_is_func_type(cs->im, &lambda_expr->expr_info.concrete_type));
+  CHECK(lambda_expr->tag == AST_EXPR_LAMBDA);
+
+  struct funcgraph g;
+  funcgraph_init(&g);
+
+  struct ast_lambda *lambda = &lambda_expr->u.lambda;
+
+  CHECK(lambda->info.lambda_info_valid);
+
+  struct builder_state st;
+  builder_state_init(&st, lambda->info.label_names, lambda->info.label_names_count);
+
+  struct ast_typeexpr *return_type
+    = expose_func_return_type(cs->im,
+                              &lambda_expr->expr_info.concrete_type,
+                              size_add(lambda->params_count, 1));
+
+  g.return_var = opgraph_add_var(&g.opg, return_type);
+  struct varnum *arg_vars = malloc_mul(sizeof(*arg_vars),
+                                       lambda->params_count);
+  for (size_t i = 0, e = lambda->params_count; i < e; i++) {
+    arg_vars[i] = opgraph_add_var(&g.opg,
+                                  &lambda_expr->expr_info.concrete_type.u.app.params[i]);
+    builder_state_push_varnum(&st, lambda->params[i].name.value, arg_vars[i]);
+  }
+
+  g.arg_vars = arg_vars;
+  g.arg_vars_count = lambda->params_count;
+
+  /* TODO: Set g->entry_point. */
+  int ret = build_bracebody(cs, f, &g, &st, &lambda->bracebody);
+  builder_state_destroy(&st);
+
+  if (ret) {
+    funcgraph_init_move(out, &g);
+  } else {
+    funcgraph_destroy(&g);
+  }
+
+  return ret;
+}
+
+
 int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_instantiation *inst) {
   (void)cs;  /* TODO */
@@ -238,7 +399,11 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {
-    TODO_IMPLEMENT;
+    struct funcgraph g;
+    if (!build_funcgraph(cs, f, &inst->value.u.typechecked_lambda, &g)) {
+      return 0;
+    }
+    TODO_IMPLEMENT;     /* (Generate machine code.) */
   } break;
   default:
     UNREACHABLE();

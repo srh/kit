@@ -216,8 +216,21 @@ void ast_statement_init_copy(struct ast_statement *a,
                              struct ast_statement *c);
 void ast_statement_destroy(struct ast_statement *a);
 
+struct ast_lambda_info {
+  int lambda_info_valid;
+  ident_value *label_names;
+  size_t label_names_count;
+};
+
+void ast_lambda_info_init(struct ast_lambda_info *a);
+void ast_lambda_info_destroy(struct ast_lambda_info *a);
+void ast_lambda_info_set_labels(struct ast_lambda_info *a,
+                                ident_value *label_names,
+                                size_t label_names_count);
+
 struct ast_lambda {
   struct ast_meta meta;
+  struct ast_lambda_info info;
   struct ast_vardecl *params;
   size_t params_count;
   struct ast_typeexpr return_type;

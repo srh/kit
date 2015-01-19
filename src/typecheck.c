@@ -155,14 +155,21 @@ void init_func_type(struct ast_typeexpr *a, struct identmap *im,
                    name, params, args_count);
 }
 
+struct ast_typeexpr *expose_func_return_type(struct identmap *im,
+                                             struct ast_typeexpr *func,
+                                             size_t expected_params_count) {
+  CHECK(func->tag == AST_TYPEEXPR_APP);
+  CHECK(func->u.app.name.value == identmap_intern_c_str(im, FUNC_TYPE_NAME));
+  CHECK(func->u.app.params_count == expected_params_count);
+  return &func->u.app.params[expected_params_count - 1];
+}
+
 void copy_func_return_type(struct identmap *im,
                            struct ast_typeexpr *func,
                            size_t expected_params_count,
                            struct ast_typeexpr *out) {
-  CHECK(func->tag == AST_TYPEEXPR_APP);
-  CHECK(func->u.app.name.value == identmap_intern_c_str(im, FUNC_TYPE_NAME));
-  CHECK(func->u.app.params_count == expected_params_count);
-  ast_typeexpr_init_copy(out, &func->u.app.params[expected_params_count - 1]);
+  ast_typeexpr_init_copy(
+      out, expose_func_return_type(im, func, expected_params_count));
 }
 
 void init_binop_func_type(struct ast_typeexpr *a, struct identmap *im,
@@ -1309,8 +1316,11 @@ int check_expr_funcbody(struct exprscope *es,
                         struct ast_bracebody *x,
                         struct ast_typeexpr *partial_type,
                         struct ast_typeexpr *out,
+                        ident_value **label_names_out,
+                        size_t *label_names_count_out,
                         struct ast_bracebody *annotated_out) {
   int ret = 0;
+
   struct bodystate bs;
   bodystate_init(&bs, es, partial_type);
 
@@ -1322,28 +1332,35 @@ int check_expr_funcbody(struct exprscope *es,
     goto fail;
   }
 
+  ident_value *label_names = malloc_mul(sizeof(*label_names),
+                                        bs.label_infos_count);
+
   for (size_t i = 0; i < bs.label_infos_count; i++) {
     if (!bs.label_infos[i].is_label_observed) {
       ERR_DBG("goto without label.\n");
-      goto fail_annotated;
+      goto fail_label_names;
     }
     if (!bs.label_infos[i].is_goto_observed) {
       ERR_DBG("label without goto.\n");
-      goto fail_annotated;
+      goto fail_label_names;
     }
+    label_names[i] = bs.label_infos[i].label_name;
   }
 
   if (!bs.have_exact_return_type) {
     ERR_DBG("Missing a return statement.\n");
-    goto fail_annotated;
+    goto fail_label_names;
   }
   *out = bs.exact_return_type;
   bs.have_exact_return_type = 0;
   *annotated_out = annotated_bracebody;
+  *label_names_out = label_names;
+  *label_names_count_out = bs.label_infos_count;
 
   ret = 1;
- fail_annotated:
+ fail_label_names:
   if (!ret) {
+    free(label_names);
     ast_bracebody_destroy(&annotated_bracebody);
   }
  fail:
@@ -1432,12 +1449,16 @@ int check_expr_lambda(struct exprscope *es,
   }
 
   struct ast_typeexpr computed_return_type;
+  ident_value *label_names;
+  size_t label_names_count;
   struct ast_bracebody annotated_bracebody;
   if (!check_expr_funcbody(
           &bb_es,
           &x->bracebody,
           &funcexpr.u.app.params[size_sub(funcexpr.u.app.params_count, 1)],
           &computed_return_type,
+          &label_names,
+          &label_names_count,
           &annotated_bracebody)) {
     CHECK_DBG("check_expr_funcbody fails\n");
     goto fail_bb_es;
@@ -1458,6 +1479,7 @@ int check_expr_lambda(struct exprscope *es,
     ast_lambda_init(annotated_out, ast_meta_make_copy(&x->meta),
                     params, x->params_count,
                     return_type, annotated_bracebody);
+    ast_lambda_info_set_labels(&annotated_out->info, label_names, label_names_count);
   }
   CHECK_DBG("check_expr_lambda succeeds\n");
   return 1;
@@ -3446,7 +3468,6 @@ int check_file_test_more_7(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
-
 int check_file_test_more_8(const uint8_t *name, size_t name_count,
                            uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
@@ -3457,6 +3478,20 @@ int check_file_test_more_8(const uint8_t *name, size_t name_count,
       "};\n"
       "def bar func[i32] = fn() i32 {\n"
       "  return add32(3, 4u);\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_9(const uint8_t *name, size_t name_count,
+                           uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because return type in return expression is wrong. */
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[i32] = fn() i32 {\n"
+      "  return 4u;\n"
       "};\n"
     } };
 
@@ -3776,6 +3811,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_8...\n");
   if (!test_check_module(&im, &check_file_test_more_8, foo)) {
     DBG("check_file_test_more_8 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_9...\n");
+  if (!!test_check_module(&im, &check_file_test_more_9, foo)) {
+    DBG("check_file_test_more_9 fails\n");
     goto cleanup_identmap;
   }
 
