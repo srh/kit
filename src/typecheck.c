@@ -110,14 +110,6 @@ void intern_binop(struct checkstate *cs,
                                type);
 }
 
-#define VOID_TYPE_NAME "void"
-#define BYTE_TYPE_NAME "byte"
-#define I32_TYPE_NAME "i32"
-#define U32_TYPE_NAME "u32"
-#define PTR_TYPE_NAME "ptr"
-#define FUNC_TYPE_NAME "func"
-#define BOOLEAN_STANDIN_TYPE_NAME I32_TYPE_NAME
-
 #define CONVERT_FUNCTION_NAME "convert"
 
 int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x) {
@@ -153,6 +145,11 @@ void init_func_type(struct ast_typeexpr *a, struct identmap *im,
   }
   ast_typeapp_init(&a->u.app, ast_meta_make_garbage(),
                    name, params, args_count);
+}
+
+void init_name_type(struct ast_typeexpr *a, ident_value name) {
+  a->tag = AST_TYPEEXPR_NAME;
+  a->u.name = make_ast_ident(name);
 }
 
 struct ast_typeexpr *expose_func_return_type(struct identmap *im,

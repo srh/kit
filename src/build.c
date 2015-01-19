@@ -152,8 +152,6 @@ void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
       CHECK(deftype->generics.has_type_params
             && deftype->generics.params_count == type->u.app.params_count);
       struct ast_typeexpr substituted;
-      /* TODO: Since we're using exprs from a def_instantiation, I
-         think the generics have already been replaced. */
       do_replace_generics(&deftype->generics,
                           type->u.app.params,
                           &deftype->type,
@@ -338,17 +336,214 @@ int build_numeric_literal(struct checkstate *cs,
   return 1;
 }
 
+void build_conditional_abort(struct opgraph *g,
+                             struct varnum condition) {
+  struct opnum then_fut = opgraph_future_1(g);
+  struct opnum node = opgraph_branch(g, condition,
+                                     then_fut,
+                                     opnum_invalid());
+  opgraph_abort(g);
+  opgraph_update_branch_else(g, node, opgraph_future_0(g));
+}
+
 int build_expr(struct checkstate *cs, struct objfile *f,
                struct opgraph *g,
                struct builder_state *st,
                struct ast_expr *a,
+               int lvalue,
+               struct varnum *varnum_out);
+
+int build_binop_expr(struct checkstate *cs, struct objfile *f,
+                     struct opgraph *g,
+                     struct builder_state *st,
+                     struct ast_expr *a,  /* a->tag == AST_EXPR_BINOP */
+                     int lvalue,
+                     struct varnum *varnum_out) {
+  struct ast_binop_expr *be = &a->u.binop_expr;
+  switch (be->operator) {
+  case AST_BINOP_ASSIGN: {
+    struct varnum lhs;
+    if (!build_expr(cs, f, g, st, be->lhs, 1, &lhs)) {
+      return 0;
+    }
+    struct varnum rhs;
+    if (!build_expr(cs, f, g, st, be->rhs, 0, &rhs)) {
+      return 0;
+    }
+    opgraph_mov(g, rhs, lhs);
+    *varnum_out = lhs;
+    return 1;
+  } break;
+  case AST_BINOP_LOGICAL_OR: {
+    CHECK(!lvalue);
+    struct varnum lhs;
+    if (!build_expr(cs, f, g, st, be->lhs, 0, &lhs)) {
+      return 0;
+    }
+    struct ast_typeexpr bool_type;
+    init_name_type(&bool_type, identmap_intern_c_str(cs->im, BOOLEAN_STANDIN_TYPE_NAME));
+    struct varnum result = opgraph_add_var(g, &bool_type);
+    ast_typeexpr_destroy(&bool_type);
+
+    struct opnum true_fut = opgraph_future_1(g);
+    struct opnum branch = opgraph_branch(g, lhs,
+                                         true_fut,
+                                         opnum_invalid());
+    opgraph_bool_immediate(g, 1, result);
+    struct opnum true_nop = opgraph_incomplete_nop(g);
+    opgraph_update_branch_else(g, branch,
+                               opgraph_future_0(g));
+
+    struct varnum rhs;
+    if (!build_expr(cs, f, g, st, be->rhs, 0, &rhs)) {
+      return 0;
+    }
+    opgraph_mov(g, rhs, result);
+
+    opgraph_make_nop_complete(g, true_nop, opgraph_future_0(g));
+    *varnum_out = result;
+    return 1;
+  } break;
+  case AST_BINOP_LOGICAL_AND: {
+    CHECK(!lvalue);
+    struct varnum lhs;
+    if (!build_expr(cs, f, g, st, be->lhs, 0, &lhs)) {
+      return 0;
+    }
+    struct ast_typeexpr bool_type;
+    init_name_type(&bool_type, identmap_intern_c_str(cs->im, BOOLEAN_STANDIN_TYPE_NAME));
+    struct varnum result = opgraph_add_var(g, &bool_type);
+    ast_typeexpr_destroy(&bool_type);
+
+    struct opnum true_fut = opgraph_future_1(g);
+    struct opnum branch = opgraph_branch(g, lhs,
+                                         true_fut,
+                                         opnum_invalid());
+    struct varnum rhs;
+    if (!build_expr(cs, f, g, st, be->rhs, 0, &rhs)) {
+      return 0;
+    }
+
+    opgraph_mov(g, rhs, result);
+
+    struct opnum true_nop = opgraph_incomplete_nop(g);
+
+    opgraph_update_branch_else(g, branch,
+                               opgraph_future_0(g));
+
+    opgraph_bool_immediate(g, 0, result);
+
+    opgraph_make_nop_complete(g, true_nop, opgraph_future_0(g));
+    *varnum_out = result;
+    return 1;
+  } break;
+  case AST_BINOP_ADD:  /* fall-through */
+  case AST_BINOP_SUB:  /* fall-through */
+  case AST_BINOP_MUL:  /* fall-through */
+  case AST_BINOP_DIV:  /* fall-through */
+  case AST_BINOP_MOD:  /* fall-through */
+  case AST_BINOP_LT:  /* fall-through */
+  case AST_BINOP_LE:  /* fall-through */
+  case AST_BINOP_GT:  /* fall-through */
+  case AST_BINOP_GE:  /* fall-through */
+  case AST_BINOP_EQ:  /* fall-through */
+  case AST_BINOP_NE:  /* fall-through */
+  case AST_BINOP_BIT_XOR:  /* fall-through */
+  case AST_BINOP_BIT_OR:  /* fall-through */
+  case AST_BINOP_BIT_AND:  /* fall-through */
+  case AST_BINOP_BIT_LEFTSHIFT:  /* fall-through */
+  case AST_BINOP_BIT_RIGHTSHIFT: {
+    struct varnum lhs;
+    if (!build_expr(cs, f, g, st, be->lhs, 0, &lhs)) {
+      return 0;
+    }
+    struct varnum rhs;
+    if (!build_expr(cs, f, g, st, be->rhs, 0, &rhs)) {
+      return 0;
+    }
+    struct varnum dest = opgraph_add_var(g, &a->expr_info.concrete_type);
+
+    struct ast_typeexpr bool_type;
+    init_name_type(&bool_type, identmap_intern_c_str(cs->im, BOOLEAN_STANDIN_TYPE_NAME));
+    struct varnum overflow = opgraph_add_var(g, &bool_type);
+    ast_typeexpr_destroy(&bool_type);
+
+    opgraph_binop_intrinsic(g, be->operator, lhs, rhs, dest, overflow);
+    build_conditional_abort(g, overflow);
+
+    *varnum_out = dest;
+    return 1;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+int build_unop_expr(struct checkstate *cs, struct objfile *f,
+                    struct opgraph *g,
+                    struct builder_state *st,
+                    struct ast_expr *a,  /* a->tag == AST_EXPR_UNOP */
+                    int lvalue,
+                    struct varnum *varnum_out) {
+  struct ast_unop_expr *ue = &a->u.unop_expr;
+  switch (ue->operator) {
+  case AST_UNOP_DEREFERENCE: {
+    struct varnum rhs;
+    if (!build_expr(cs, f, g, st, ue->rhs, 0, &rhs)) {
+      return 0;
+    }
+    struct varnum deref = opgraph_add_var(g, &a->expr_info.concrete_type);
+    opgraph_deref(g, rhs, deref);
+    *varnum_out = deref;
+    return 1;
+  } break;
+  case AST_UNOP_ADDRESSOF: {
+    CHECK(!lvalue);
+    struct varnum rhs;
+    if (!build_expr(cs, f, g, st, ue->rhs, 1, &rhs)) {
+      return 0;
+    }
+    struct varnum ref = opgraph_add_var(g, &a->expr_info.concrete_type);
+    opgraph_addressof(g, rhs, ref);
+    *varnum_out = ref;
+    return 1;
+  } break;
+  case AST_UNOP_NEGATE: {
+    CHECK(!lvalue);
+    struct varnum rhs;
+    if (!build_expr(cs, f, g, st, ue->rhs, 0, &rhs)) {
+      return 0;
+    }
+    struct varnum result = opgraph_add_var(g, &a->expr_info.concrete_type);
+
+    struct ast_typeexpr bool_type;
+    init_name_type(&bool_type, identmap_intern_c_str(cs->im, BOOLEAN_STANDIN_TYPE_NAME));
+    struct varnum overflow = opgraph_add_var(g, &bool_type);
+    ast_typeexpr_destroy(&bool_type);
+
+    opgraph_i32_negate(g, rhs, result, overflow);
+
+    build_conditional_abort(g, overflow);
+    *varnum_out = result;
+    return 1;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+int build_expr(struct checkstate *cs, struct objfile *f,
+               struct opgraph *g,
+               struct builder_state *st,
+               struct ast_expr *a,
+               int lvalue,
                struct varnum *varnum_out) {
-  (void)cs, (void)f, (void)g, (void)st, (void)varnum_out; /* TODO */
   switch (a->tag) {
   case AST_EXPR_NAME: {
     struct ast_name_expr *ne = &a->u.name;
     CHECK(ne->info.info_valid);
     if (ne->info.inst_or_null) {
+      CHECK(!lvalue);
       struct def_instantiation *inst = ne->info.inst_or_null;
       struct varnum v = opgraph_add_var(g, &inst->type);
       /* TODO: We need to make functions move the pointer, not value, _somewhere_. */
@@ -360,29 +555,51 @@ int build_expr(struct checkstate *cs, struct objfile *f,
     }
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
+    CHECK(!lvalue);
     return build_numeric_literal(cs, g, &a->u.numeric_literal, varnum_out);
   } break;
   case AST_EXPR_FUNCALL: {
+    CHECK(!lvalue);
     struct ast_funcall *fe = &a->u.funcall;
     struct varnum func;
-    if (!build_expr(cs, f, g, st, fe->func, &func)) {
+    if (!build_expr(cs, f, g, st, fe->func, 0, &func)) {
       return 0;
     }
     size_t args_count = fe->args_count;
     struct varnum *args = malloc_mul(sizeof(*args), args_count);
     for (size_t i = 0; i < args_count; i++) {
-      if (!build_expr(cs, f, g, st, &fe->args[i], &args[i])) {
+      if (!build_expr(cs, f, g, st, &fe->args[i], 0, &args[i])) {
         free(args);
         return 0;
       }
     }
-    opgraph_call(g, func, args, args_count);
+    struct varnum result
+      = opgraph_add_var(g, expose_func_return_type(cs->im,
+                                                   &a->expr_info.concrete_type,
+                                                   size_add(args_count, 1)));
+    opgraph_call(g, func, args, args_count, result);
+    *varnum_out = result;
     return 1;
   } break;
-  case AST_EXPR_UNOP:
+  case AST_EXPR_UNOP: {
+    return build_unop_expr(cs, f, g, st, a, lvalue, varnum_out);
+  } break;
+  case AST_EXPR_BINOP: {
+    return build_binop_expr(cs, f, g, st, a, lvalue, varnum_out);
+  } break;
+  case AST_EXPR_LAMBDA: {
+    /* TODO: Support inline lambdas. */
+    ERR_DBG("Compiling inline lambdas doesn't work right now (but it did type-check!)\n");
+    return 0;
+  } break;
+  case AST_EXPR_LOCAL_FIELD_ACCESS: {
     TODO_IMPLEMENT;
+  } break;
+  case AST_EXPR_DEREF_FIELD_ACCESS: {
+    TODO_IMPLEMENT;
+  } break;
   default:
-    TODO_IMPLEMENT;
+    UNREACHABLE();
   }
 }
 
@@ -396,13 +613,13 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
     switch (s->tag) {
     case AST_STATEMENT_EXPR: {
       struct varnum discard;
-      if (!build_expr(cs, f, g, st, s->u.expr, &discard)) {
+      if (!build_expr(cs, f, g, st, s->u.expr, 0, &discard)) {
         return 0;
       }
     } break;
     case AST_STATEMENT_RETURN_EXPR: {
       struct varnum var;
-      if (!build_expr(cs, f, g, st, s->u.return_expr, &var)) {
+      if (!build_expr(cs, f, g, st, s->u.return_expr, 0, &var)) {
         return 0;
       }
       opgraph_mov(g, var, g->fg->return_var);
@@ -411,7 +628,7 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
     case AST_STATEMENT_VAR: {
       struct ast_var_statement *vs = &s->u.var_statement;
       struct varnum rhs_result;
-      if (!build_expr(cs, f, g, st, vs->rhs, &rhs_result)) {
+      if (!build_expr(cs, f, g, st, vs->rhs, 0, &rhs_result)) {
         return 0;
       }
 
@@ -437,7 +654,7 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
     case AST_STATEMENT_IFTHEN: {
       struct ast_ifthen_statement *its = &s->u.ifthen_statement;
       struct varnum condition_result;
-      if (!build_expr(cs, f, g, st, its->condition, &condition_result)) {
+      if (!build_expr(cs, f, g, st, its->condition, 0, &condition_result)) {
         return 0;
       }
       struct opnum fut1 = opgraph_future_1(g);
@@ -453,7 +670,7 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
     case AST_STATEMENT_IFTHENELSE: {
       struct ast_ifthenelse_statement *ites = &s->u.ifthenelse_statement;
       struct varnum condition_result;
-      if (!build_expr(cs, f, g, st, ites->condition, &condition_result)) {
+      if (!build_expr(cs, f, g, st, ites->condition, 0, &condition_result)) {
         return 0;
       }
       struct opnum fut1 = opgraph_future_1(g);

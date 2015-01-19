@@ -7,6 +7,14 @@
 #include "checkstate.h"
 #include "identmap.h"
 
+#define VOID_TYPE_NAME "void"
+#define BYTE_TYPE_NAME "byte"
+#define I32_TYPE_NAME "i32"
+#define U32_TYPE_NAME "u32"
+#define PTR_TYPE_NAME "ptr"
+#define FUNC_TYPE_NAME "func"
+#define BOOLEAN_STANDIN_TYPE_NAME I32_TYPE_NAME
+
 struct ast_generics;
 struct ast_typeexpr;
 
@@ -33,8 +41,8 @@ int generics_lookup_name(struct ast_generics *a,
                          ident_value name,
                          size_t *index_out);
 struct ast_ident make_ast_ident(ident_value ident);
+void init_name_type(struct ast_typeexpr *a, ident_value name);
 int exact_typeexprs_equal(struct ast_typeexpr *a, struct ast_typeexpr *b);
-
 int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x);
 void do_replace_generics(struct ast_generics *generics,
                          struct ast_typeexpr *generics_substitutions,

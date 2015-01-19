@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+enum ast_binop;
 struct ast_typeexpr;
 struct opnode;
 struct varnode;
@@ -51,6 +52,9 @@ struct opnum opgraph_mov(struct opgraph *g,
 struct opnum opgraph_mov_from_global(struct opgraph *g,
                                      uint32_t symbol_table_index,
                                      struct varnum dest);
+struct opnum opgraph_bool_immediate(struct opgraph *g,
+                                    int value,
+                                    struct varnum dest);
 struct opnum opgraph_i32_immediate(struct opgraph *g,
                                    int32_t value,
                                    struct varnum dest);
@@ -58,8 +62,22 @@ struct opnum opgraph_u32_immediate(struct opgraph *g,
                                    uint32_t value,
                                    struct varnum dest);
 struct opnum opgraph_return(struct opgraph *g);
+struct opnum opgraph_abort(struct opgraph *g);
 struct opnum opgraph_call(struct opgraph *g, struct varnum func,
-                          struct varnum *args, size_t args_count);
+                          struct varnum *args, size_t args_count,
+                          struct varnum dest);
+struct opnum opgraph_deref(struct opgraph *g, struct varnum pointer,
+                           struct varnum pointee);
+struct opnum opgraph_addressof(struct opgraph *g, struct varnum pointee,
+                               struct varnum pointer);
+struct opnum opgraph_i32_negate(struct opgraph *g, struct varnum param,
+                                struct varnum result, struct varnum overflow);
+struct opnum opgraph_binop_intrinsic(struct opgraph *g,
+                                     enum ast_binop operator,  /* non-magic binop */
+                                     /* lhs and rhs and dest MUST have same type. */
+                                     struct varnum lhs, struct varnum rhs,
+                                     struct varnum dest,
+                                     struct varnum overflow);
 
 /* Returns g->ops_count. */
 struct opnum opgraph_future_0(struct opgraph *g);

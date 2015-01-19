@@ -45,6 +45,12 @@ struct opnode_mov_from_global {
   struct opnum next;
 };
 
+struct opnode_bool {
+  int value;
+  struct varnum dest;
+  struct opnum next;
+};
+
 struct opnode_i32 {
   int32_t value;
   struct varnum dest;
@@ -61,6 +67,38 @@ struct opnode_call {
   struct varnum func;
   struct varnum *args;
   size_t args_count;
+  struct varnum dest;
+  struct opnum next;
+};
+
+struct opnode_deref {
+  struct varnum pointer;
+  struct varnum pointee_var;
+  struct opnum next;
+};
+
+struct opnode_addressof {
+  struct varnum pointee;
+  struct varnum pointer;
+  struct opnum next;
+};
+
+struct opnode_i32_negate {
+  struct varnum src;
+  struct varnum dest;
+  struct varnum overflow;
+  struct opnum next;
+};
+
+struct opnode_binop {
+  /* A non-magic binop. */
+  enum ast_binop operator;
+  /* lhs and rhs and dest have same type. */
+  struct varnum lhs;
+  struct varnum rhs;
+  struct varnum dest;
+  struct varnum overflow;
+  struct opnum next;
 };
 
 enum opnode_tag {
@@ -69,18 +107,30 @@ enum opnode_tag {
   OPNODE_NOP,
   /* Returns from the function -- there is no "next node". */
   OPNODE_RETURN,
+  /* Aborts the process immediately. */
+  OPNODE_ABORT,
   /* Jumps to one of two targets depending on the value. */
   OPNODE_BRANCH,
   /* Copies data from src to dest. */
   OPNODE_MOV,
   /* Copies data from a symbol to dest. */
   OPNODE_MOV_FROM_GLOBAL,
+  /* Immediate bool. */
+  OPNODE_BOOL,
   /* Immediate i32. */
   OPNODE_I32,
   /* Immediate u32. */
   OPNODE_U32,
   /* Function call. */
   OPNODE_CALL,
+  /* This is unusual because instead of modifying the _contents_ of
+     its varnum, pointee_var, it modifies (or specifies) the
+     _location_ of its varnum.  TODO: Should we check that the varnum
+     has no specified location beforehand? */
+  OPNODE_DEREF,
+  OPNODE_ADDRESSOF,
+  OPNODE_I32_NEGATE,
+  OPNODE_BINOP,
 };
 
 struct opnode {
@@ -92,7 +142,12 @@ struct opnode {
     struct opnode_mov_from_global mov_from_global;
     struct opnode_i32 i32;
     struct opnode_u32 u32;
+    struct opnode_bool boole;
     struct opnode_call call;
+    struct opnode_deref deref;
+    struct opnode_addressof addressof;
+    struct opnode_i32_negate i32_negate;
+    struct opnode_binop binop;
   } u;
 };
 
@@ -100,14 +155,20 @@ void opnode_destroy(struct opnode *n) {
   switch (n->tag) {
   case OPNODE_NOP: break;
   case OPNODE_RETURN: break;
+  case OPNODE_ABORT: break;
   case OPNODE_BRANCH: break;
   case OPNODE_MOV: break;
   case OPNODE_MOV_FROM_GLOBAL: break;
+  case OPNODE_BOOL: break;
   case OPNODE_I32: break;
   case OPNODE_U32: break;
   case OPNODE_CALL:
     free(n->u.call.args);
     break;
+  case OPNODE_DEREF: break;
+  case OPNODE_ADDRESSOF: break;
+  case OPNODE_I32_NEGATE: break;
+  case OPNODE_BINOP: break;
   default:
     UNREACHABLE();
   }
@@ -228,13 +289,75 @@ struct opnum opgraph_return(struct opgraph *g) {
   return opgraph_add(g, node);
 }
 
+struct opnum opgraph_abort(struct opgraph *g) {
+  struct opnode node;
+  node.tag = OPNODE_ABORT;
+  return opgraph_add(g, node);
+}
+
 struct opnum opgraph_call(struct opgraph *g, struct varnum func,
-                          struct varnum *args, size_t args_count) {
+                          struct varnum *args, size_t args_count,
+                          struct varnum dest) {
+  /* TODO: Check type? */
   struct opnode node;
   node.tag = OPNODE_CALL;
   node.u.call.func = func;
   node.u.call.args = args;
   node.u.call.args_count = args_count;
+  node.u.call.dest = dest;
+  node.u.call.next = opgraph_future_1(g);
+  return opgraph_add(g, node);
+}
+
+struct opnum opgraph_deref(struct opgraph *g, struct varnum pointer,
+                           struct varnum pointee_var) {
+  /* TODO: Check type? */
+  struct opnode node;
+  node.tag = OPNODE_DEREF;
+  node.u.deref.pointer = pointer;
+  node.u.deref.pointee_var = pointee_var;
+  node.u.deref.next = opgraph_future_1(g);
+  return opgraph_add(g, node);
+}
+
+struct opnum opgraph_addressof(struct opgraph *g, struct varnum pointee,
+                               struct varnum pointer) {
+  /* TODO: Check type? */
+  struct opnode node;
+  node.tag = OPNODE_ADDRESSOF;
+  node.u.addressof.pointee = pointee;
+  node.u.addressof.pointer = pointer;
+  node.u.addressof.next = opgraph_future_1(g);
+  return opgraph_add(g, node);
+}
+
+struct opnum opgraph_i32_negate(struct opgraph *g, struct varnum param,
+                                struct varnum result, struct varnum overflow) {
+  /* TODO: Check type? */
+  struct opnode node;
+  node.tag = OPNODE_I32_NEGATE;
+  node.u.i32_negate.src = param;
+  node.u.i32_negate.dest = result;
+  node.u.i32_negate.overflow = overflow;
+  node.u.i32_negate.next = opgraph_future_1(g);
+  return opgraph_add(g, node);
+}
+
+struct opnum opgraph_binop_intrinsic(struct opgraph *g,
+                                     enum ast_binop operator,  /* non-magic binop */
+                                     /* lhs and rhs MUST have same type. */
+                                     struct varnum lhs, struct varnum rhs,
+                                     struct varnum dest,
+                                     struct varnum overflow) {
+  /* TODO: Check type? */
+  struct opnode node;
+  node.tag = OPNODE_BINOP;
+  node.u.binop.operator = operator;
+  node.u.binop.lhs = lhs;
+  node.u.binop.rhs = rhs;
+  node.u.binop.dest = dest;
+  node.u.binop.overflow = overflow;
+  node.u.binop.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
@@ -246,6 +369,17 @@ struct opnum opgraph_mov_from_global(struct opgraph *g,
   node.u.mov_from_global.symbol_table_index = symbol_table_index;
   node.u.mov_from_global.dest = dest;
   node.u.mov_from_global.next = opgraph_future_1(g);
+  return opgraph_add(g, node);
+}
+
+struct opnum opgraph_bool_immediate(struct opgraph *g,
+                                    int value, /* 1 or 0 */
+                                    struct varnum dest) {
+  struct opnode node;
+  node.tag = OPNODE_BOOL;
+  node.u.boole.value = value;
+  node.u.boole.dest = dest;
+  node.u.boole.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
