@@ -154,10 +154,37 @@ void ast_bracebody_destroy(struct ast_bracebody *a) {
   SLICE_FREE(a->statements, a->statements_count, ast_statement_destroy);
 }
 
+void ast_var_statement_info_init(struct ast_var_statement_info *a) {
+  a->var_statement_info_valid = 0;
+}
+
+void ast_var_statement_info_init_copy(struct ast_var_statement_info *a,
+                                      struct ast_var_statement_info *c) {
+  a->var_statement_info_valid = c->var_statement_info_valid;
+  if (c->var_statement_info_valid) {
+    ast_typeexpr_init_copy(&a->concrete_type, &c->concrete_type);
+  }
+}
+
+void ast_var_statement_info_destroy(struct ast_var_statement_info *a) {
+  if (a->var_statement_info_valid) {
+    ast_typeexpr_destroy(&a->concrete_type);
+    a->var_statement_info_valid = 0;
+  }
+}
+
+void ast_var_statement_info_note_type(struct ast_var_statement_info *a,
+                                      struct ast_typeexpr concrete_type) {
+  CHECK(!a->var_statement_info_valid);
+  a->var_statement_info_valid = 1;
+  a->concrete_type = concrete_type;
+}
+
 
 void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
                             struct ast_vardecl decl, struct ast_expr rhs) {
   a->meta = meta;
+  ast_var_statement_info_init(&a->info);
   a->decl = decl;
   ast_expr_alloc_move(rhs, &a->rhs);
 }
@@ -165,12 +192,14 @@ void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
 void ast_var_statement_init_copy(struct ast_var_statement *a,
                                  struct ast_var_statement *c) {
   a->meta = ast_meta_make_copy(&c->meta);
+  ast_var_statement_info_init_copy(&a->info, &c->info);
   ast_vardecl_init_copy(&a->decl, &c->decl);
   ast_expr_alloc_init_copy(c->rhs, &a->rhs);
 }
 
 void ast_var_statement_destroy(struct ast_var_statement *a) {
   ast_meta_destroy(&a->meta);
+  ast_var_statement_info_destroy(&a->info);
   ast_vardecl_destroy(&a->decl);
   ast_expr_destroy(a->rhs);
   free(a->rhs);

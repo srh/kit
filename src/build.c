@@ -317,6 +317,7 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
                     struct opgraph *g,
                     struct builder_state *st,
                     struct ast_bracebody *a) {
+  size_t vars_pushed = 0;
   for (size_t i = 0, e = a->statements_count; i < e; i++) {
     struct ast_statement *s = &a->statements[i];
     switch (s->tag) {
@@ -336,7 +337,16 @@ int build_bracebody(struct checkstate *cs, struct objfile *f,
     } break;
     case AST_STATEMENT_VAR: {
       struct ast_var_statement *vs = &s->u.var_statement;
-      
+      CHECK(vs->info.var_statement_info_valid);
+      struct varnum varnum = opgraph_add_var(g, &vs->info.concrete_type);
+      builder_state_push_varnum(st, vs->decl.name.value, varnum);
+      vars_pushed = size_add(vars_pushed, 1);
+
+      struct varnum rhs_result;
+      if (!build_expr(cs, f, g, st, vs->rhs, &rhs_result)) {
+        return 0;
+      }
+      opgraph_mov(g, rhs_result, varnum);
     } break;
     case AST_STATEMENT_GOTO: {
       struct opnum target_node = builder_state_lookup_label_opnum(

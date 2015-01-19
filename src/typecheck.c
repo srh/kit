@@ -1195,13 +1195,17 @@ int check_expr_bracebody(struct bodystate *bs,
       struct ast_ident name;
       ast_ident_init_copy(&name, &s->u.var_statement.decl.name);
 
+      struct ast_typeexpr replaced_type_copy;
+      ast_typeexpr_init_copy(&replaced_type_copy, &replaced_type);
+
       struct ast_vardecl *replaced_decl = malloc(sizeof(*replaced_decl));
       CHECK(replaced_decl);
       ast_vardecl_init(replaced_decl, ast_meta_make_garbage(), name,
-                       replaced_type);
+                       replaced_type_copy);
 
       if (!exprscope_push_var(bs->es, replaced_decl)) {
         free_ast_vardecl(&replaced_decl);
+        ast_typeexpr_destroy(&replaced_type);
         ast_expr_destroy(&annotated_rhs);
         goto fail;
       }
@@ -1215,6 +1219,9 @@ int check_expr_bracebody(struct bodystate *bs,
       ast_var_statement_init(&annotated_statements[i].u.var_statement,
                              ast_meta_make_copy(&s->u.var_statement.meta),
                              decl, annotated_rhs);
+      ast_var_statement_info_note_type(
+          &annotated_statements[i].u.var_statement.info,
+          replaced_type);
     } break;
     case AST_STATEMENT_GOTO: {
       bodystate_note_goto(bs, s->u.goto_statement.target.value);

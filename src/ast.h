@@ -140,8 +140,17 @@ void ast_bracebody_init(struct ast_bracebody *a,
                         size_t statements_count);
 void ast_bracebody_destroy(struct ast_bracebody *a);
 
+struct ast_var_statement_info {
+  int var_statement_info_valid;
+  struct ast_typeexpr concrete_type;
+};
+
+void ast_var_statement_info_note_type(struct ast_var_statement_info *a,
+                                      struct ast_typeexpr concrete_type);
+
 struct ast_var_statement {
   struct ast_meta meta;
+  struct ast_var_statement_info info;
   struct ast_vardecl decl;
   struct ast_expr *rhs;
 };
