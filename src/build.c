@@ -807,6 +807,11 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     if (!build_funcgraph(cs, &inst->value.u.typechecked_lambda, &g)) {
       return 0;
     }
+    if (!simplify_funcgraph(cs, &g)) {
+      funcgraph_destroy(&g);
+      return 0;
+    }
+
     TODO_IMPLEMENT;     /* (Generate machine code.) */
   } break;
   default:

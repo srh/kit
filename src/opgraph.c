@@ -472,3 +472,127 @@ void funcgraph_destroy(struct funcgraph *g) {
   opgraph_destroy(&g->opg);
   funcgraph_init_personal_fields(g);
 }
+
+void get_nexts(struct opnode *node, struct opnum *nexts[2], size_t *nexts_count_out) {
+  switch (node->tag) {
+  case OPNODE_NOP:
+    nexts[0] = &node->u.nop_next;
+    *nexts_count_out = 1;
+    break;
+  case OPNODE_RETURN:
+    *nexts_count_out = 0;
+    break;
+  case OPNODE_ABORT:
+    *nexts_count_out = 0;
+    break;
+  case OPNODE_BRANCH:
+    nexts[0] = &node->u.branch.true_next;
+    nexts[1] = &node->u.branch.false_next;
+    *nexts_count_out = 2;
+    break;
+  case OPNODE_MOV:
+    nexts[0] = &node->u.mov.next;
+    *nexts_count_out = 1;
+    break;
+  case OPNODE_MOV_FROM_GLOBAL:
+    nexts[0] = &node->u.mov_from_global.next;
+    *nexts_count_out = 1;
+    break;
+  case OPNODE_BOOL:
+    nexts[0] = &node->u.boole.next;
+    *nexts_count_out = 1;
+    break;
+  case OPNODE_I32:
+    nexts[0] = &node->u.i32.next;
+    *nexts_count_out = 1;
+    break;
+  case OPNODE_U32:
+    nexts[0] = &node->u.u32.next;
+    *nexts_count_out = 1;
+    break;
+  case OPNODE_CALL:
+    nexts[0] = &node->u.call.next;
+    *nexts_count_out = 1;
+    break;
+  case OPNODE_DEREF:
+    nexts[0] = &node->u.deref.next;
+    *nexts_count_out = 1;
+    break;
+  case OPNODE_ADDRESSOF:
+    nexts[0] = &node->u.addressof.next;
+    *nexts_count_out = 1;
+    break;
+  case OPNODE_STRUCTFIELD:
+    nexts[0] = &node->u.structfield.next;
+    *nexts_count_out = 1;
+    break;
+  case OPNODE_I32_NEGATE:
+    nexts[0] = &node->u.i32_negate.next;
+    *nexts_count_out = 1;
+    break;
+  case OPNODE_BINOP:
+    nexts[0] = &node->u.binop.next;
+    *nexts_count_out = 1;
+    break;
+
+
+  }
+}
+
+void collapse_nop_chain(struct opgraph *g, struct opnum *next_ref) {
+  struct opnum *r = next_ref;
+
+  struct opnum target;
+  size_t count = 0;
+  for (;;) {
+    CHECK(opnum_is_valid(*r));
+    CHECK(r->value <= g->ops_count);
+
+    if (r->value == g->ops_count || g->ops[r->value].tag != OPNODE_NOP
+        || g->ops[r->value].is_recursing) {
+      target = *r;
+      break;
+    }
+
+    g->ops[r->value].is_recursing = 1;
+    count = size_add(count, 1);
+    r = &g->ops[r->value].u.nop_next;
+  }
+
+  struct opnum *w = next_ref;
+  while (count > 0) {
+    struct opnum next = *w;
+    *w = target;
+    CHECK(next.value < g->ops_count &&
+          g->ops[next.value].tag == OPNODE_NOP
+          && g->ops[next.value].is_recursing);
+    g->ops[next.value].is_recursing = 0;
+    w = &g->ops[next.value].u.nop_next;
+  }
+}
+
+/* The only accessible nops that remain are self-referencing,
+   empty-infinite-loop nops. */
+void eliminate_nops(struct opgraph *g) {
+  struct opnode *ops = g->ops;
+  for (size_t i = 0, e = g->ops_count; i < e; i++) {
+    struct opnum *nexts[2];
+    size_t num_nexts;
+    get_nexts(&ops[i], nexts, &num_nexts);
+
+    if (num_nexts == 1) {
+      collapse_nop_chain(g, nexts[0]);
+    } else if (num_nexts == 2) {
+      collapse_nop_chain(g, nexts[0]);
+      collapse_nop_chain(g, nexts[1]);
+    }
+  }
+}
+
+int simplify_funcgraph(struct checkstate *cs, struct funcgraph *g) {
+  eliminate_nops(&g->opg);
+  (void)cs;
+  /* TODO: Implement... some more. */
+  return 1;
+}
+

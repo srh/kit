@@ -8,6 +8,7 @@
 
 enum ast_binop;
 struct ast_typeexpr;
+struct checkstate;
 struct opnode;
 struct varnode;
 
@@ -72,6 +73,7 @@ struct opnum opgraph_deref(struct opgraph *g, struct varnum pointer,
                            struct varnum pointee);
 struct opnum opgraph_addressof(struct opgraph *g, struct varnum pointee,
                                struct varnum pointer);
+/* TODO: Oops, we're also using this for unions. */
 struct opnum opgraph_structfield(struct opgraph *g, struct varnum operand,
                                  ident_value fieldname,
                                  struct varnum narrowed);
@@ -103,5 +105,6 @@ void funcgraph_init(struct funcgraph *g);
 void funcgraph_init_move(struct funcgraph *g, struct funcgraph *movee);
 void funcgraph_destroy(struct funcgraph *g);
 
+int simplify_funcgraph(struct checkstate *cs, struct funcgraph *g);
 
 #endif /* KIRA_OPGRAPH_H_ */
