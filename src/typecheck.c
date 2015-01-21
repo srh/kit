@@ -2215,6 +2215,8 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
     CHECK(exact_typeexprs_equal(&unified, &a->type));
     CHECK(!ent->is_primitive);
 
+    ast_typeexpr_destroy(&unified);
+
     int ret;
     if (!inst->typecheck_started) {
       CHECK(!inst->annotated_rhs_computed);
