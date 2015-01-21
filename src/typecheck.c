@@ -1019,6 +1019,7 @@ int check_expr_funcall(struct exprscope *es,
                    annotated_funcexpr, args_annotated, args_count);
   copy_func_return_type(es->cs->im, &resolved_funcexpr, args_types_count, out);
 
+  ast_typeexpr_destroy(&resolved_funcexpr);
   ast_typeexpr_destroy(&funcexpr);
   return 1;
   /* Don't fall-through -- args_annotated was moved into annotated_out. */
