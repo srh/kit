@@ -135,6 +135,14 @@ void def_entry_destroy(struct def_entry *e) {
   SLICE_FREE(e->instantiations, e->instantiations_count,
              def_instantiation_free);
   e->instantiations_limit = 0;
+
+  free(e->static_references);
+  e->static_references = NULL;
+  e->static_references_count = 0;
+  e->static_references_limit = 0;
+
+  e->known_acyclic = 0;
+  e->acyclicity_being_chased = 0;
 }
 
 void def_entry_ptr_destroy(struct def_entry **ptr) {
