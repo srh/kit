@@ -105,6 +105,6 @@ void funcgraph_init(struct funcgraph *g);
 void funcgraph_init_move(struct funcgraph *g, struct funcgraph *movee);
 void funcgraph_destroy(struct funcgraph *g);
 
-int simplify_funcgraph(struct checkstate *cs, struct funcgraph *g);
+int annotate_funcgraph(struct checkstate *cs, struct funcgraph *g);
 
 #endif /* KIRA_OPGRAPH_H_ */

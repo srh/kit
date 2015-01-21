@@ -135,9 +135,17 @@ enum opnode_tag {
      _location_ of its varnum.  TODO: Should we check that the varnum
      has no specified location beforehand? */
   OPNODE_DEREF,
+  /* Primitive addressof operation. */
   OPNODE_ADDRESSOF,
+  /* A struct or union field (because I forgot about unions when
+     naming this and when writing the code). */
   OPNODE_STRUCTFIELD,
+  /* Primitive i32 negation.  Has an overflow output slot.  It's the
+     only non-magic unary operator -- which is why we don't have
+     OPNODE_UNOP. */
   OPNODE_I32_NEGATE,
+  /* Primitive binary operations.  Has an overflow output slot, even
+     for binary operations that cannot overflow!? */
   OPNODE_BINOP,
 };
 
@@ -571,8 +579,8 @@ void collapse_nop_chain(struct opgraph *g, struct opnum *next_ref) {
   }
 }
 
-/* The only accessible nops that remain are self-referencing,
-   empty-infinite-loop nops. */
+/* The only accessible nops that remain reachable are
+   self-referencing, empty-infinite-loop nops. */
 void eliminate_nops(struct opgraph *g) {
   struct opnode *ops = g->ops;
   for (size_t i = 0, e = g->ops_count; i < e; i++) {
@@ -589,7 +597,7 @@ void eliminate_nops(struct opgraph *g) {
   }
 }
 
-int simplify_funcgraph(struct checkstate *cs, struct funcgraph *g) {
+int annotate_funcgraph(struct checkstate *cs, struct funcgraph *g) {
   eliminate_nops(&g->opg);
   (void)cs;
   /* TODO: Implement... some more. */

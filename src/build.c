@@ -353,6 +353,15 @@ int build_expr(struct checkstate *cs,
                int lvalue,
                struct varnum *varnum_out);
 
+struct varnum add_bool_var(struct identmap *im, struct opgraph *g) {
+  struct ast_typeexpr bool_type;
+  init_name_type(&bool_type,
+                 identmap_intern_c_str(im, BOOLEAN_STANDIN_TYPE_NAME));
+  struct varnum ret = opgraph_add_var(g, &bool_type);
+  ast_typeexpr_destroy(&bool_type);
+  return ret;
+}
+
 int build_binop_expr(struct checkstate *cs,
                      struct opgraph *g,
                      struct builder_state *st,
@@ -380,10 +389,7 @@ int build_binop_expr(struct checkstate *cs,
     if (!build_expr(cs, g, st, be->lhs, 0, &lhs)) {
       return 0;
     }
-    struct ast_typeexpr bool_type;
-    init_name_type(&bool_type, identmap_intern_c_str(cs->im, BOOLEAN_STANDIN_TYPE_NAME));
-    struct varnum result = opgraph_add_var(g, &bool_type);
-    ast_typeexpr_destroy(&bool_type);
+    struct varnum result = add_bool_var(cs->im, g);
 
     struct opnum true_fut = opgraph_future_1(g);
     struct opnum branch = opgraph_branch(g, lhs,
@@ -410,10 +416,7 @@ int build_binop_expr(struct checkstate *cs,
     if (!build_expr(cs, g, st, be->lhs, 0, &lhs)) {
       return 0;
     }
-    struct ast_typeexpr bool_type;
-    init_name_type(&bool_type, identmap_intern_c_str(cs->im, BOOLEAN_STANDIN_TYPE_NAME));
-    struct varnum result = opgraph_add_var(g, &bool_type);
-    ast_typeexpr_destroy(&bool_type);
+    struct varnum result = add_bool_var(cs->im, g);
 
     struct opnum true_fut = opgraph_future_1(g);
     struct opnum branch = opgraph_branch(g, lhs,
@@ -462,11 +465,7 @@ int build_binop_expr(struct checkstate *cs,
       return 0;
     }
     struct varnum dest = opgraph_add_var(g, &a->expr_info.concrete_type);
-
-    struct ast_typeexpr bool_type;
-    init_name_type(&bool_type, identmap_intern_c_str(cs->im, BOOLEAN_STANDIN_TYPE_NAME));
-    struct varnum overflow = opgraph_add_var(g, &bool_type);
-    ast_typeexpr_destroy(&bool_type);
+    struct varnum overflow = add_bool_var(cs->im, g);
 
     opgraph_binop_intrinsic(g, be->operator, lhs, rhs, dest, overflow);
     build_conditional_abort(g, overflow);
@@ -515,11 +514,7 @@ int build_unop_expr(struct checkstate *cs,
       return 0;
     }
     struct varnum result = opgraph_add_var(g, &a->expr_info.concrete_type);
-
-    struct ast_typeexpr bool_type;
-    init_name_type(&bool_type, identmap_intern_c_str(cs->im, BOOLEAN_STANDIN_TYPE_NAME));
-    struct varnum overflow = opgraph_add_var(g, &bool_type);
-    ast_typeexpr_destroy(&bool_type);
+    struct varnum overflow = add_bool_var(cs->im, g);
 
     opgraph_i32_negate(g, rhs, result, overflow);
 
@@ -807,7 +802,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     if (!build_funcgraph(cs, &inst->value.u.typechecked_lambda, &g)) {
       return 0;
     }
-    if (!simplify_funcgraph(cs, &g)) {
+    if (!annotate_funcgraph(cs, &g)) {
       funcgraph_destroy(&g);
       return 0;
     }
