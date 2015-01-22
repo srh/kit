@@ -897,7 +897,6 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    DBG("Built the funcgraph.\n");
     /* TODO: Actually generate machine code. */
     return 1;
   } break;

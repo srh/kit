@@ -4,13 +4,16 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "ast.h"  /* TODO: Solely for enum ast_binop. */
 #include "identmap.h"
 
-enum ast_binop;
 struct ast_typeexpr;
 struct checkstate;
 struct opnode;
 struct varnode;
+
+struct opnum { size_t value; };
+struct varnum { size_t value; };
 
 struct opgraph {
   /* This is the fg the opgraph belongs to.  It's icky like this but
@@ -27,11 +30,167 @@ struct opgraph {
   size_t vars_limit;
 };
 
-struct opnum { size_t value; };
+struct varnode {
+  struct ast_typeexpr type;
+
+  /* True if the var's data's existence and location is statically
+     computable (or provided) as a function of esp, ebp, and eip.  If
+     true, begin/end are initialized -- the var exists in a subset of
+     the half-open opnum interval [begin, end).  If false, the var
+     could still be statically computable as a struct field of another
+     var, or for some other reason. */
+  int is_known_static;
+  /* True only if is_known_static is true. */
+  int is_temporary;
+  struct opnum begin;
+  struct opnum end;
+};
+
+struct opnode_branch {
+  struct varnum condition;
+  struct opnum true_next;
+  struct opnum false_next;
+};
+
+struct opnode_mov {
+  struct varnum src;
+  struct varnum dest;
+  struct opnum next;
+};
+
+struct opnode_mov_from_global {
+  uint32_t symbol_table_index;
+  struct varnum dest;
+  struct opnum next;
+};
+
+struct opnode_bool {
+  int value;
+  struct varnum dest;
+  struct opnum next;
+};
+
+struct opnode_i32 {
+  int32_t value;
+  struct varnum dest;
+  struct opnum next;
+};
+
+struct opnode_u32 {
+  int32_t value;
+  struct varnum dest;
+  struct opnum next;
+};
+
+struct opnode_call {
+  struct varnum func;
+  struct varnum *args;
+  size_t args_count;
+  struct varnum dest;
+  struct opnum next;
+};
+
+struct opnode_deref {
+  struct varnum pointer;
+  struct varnum pointee_var;
+  struct opnum next;
+};
+
+struct opnode_addressof {
+  struct varnum pointee;
+  struct varnum pointer;
+  struct opnum next;
+};
+
+struct opnode_structfield {
+  struct varnum operand;
+  ident_value fieldname;
+  struct varnum narrowed;
+  struct opnum next;
+};
+
+struct opnode_i32_negate {
+  struct varnum src;
+  struct varnum dest;
+  struct varnum overflow;
+  struct opnum next;
+};
+
+struct opnode_binop {
+  /* A non-magic binop. */
+  enum ast_binop operator;
+  /* lhs and rhs and dest have same type. */
+  struct varnum lhs;
+  struct varnum rhs;
+  struct varnum dest;
+  struct varnum overflow;
+  struct opnum next;
+};
+
+enum opnode_tag {
+  /* NOP nodes just redirect you to another node -- often we fill in
+     the NOP node's "next node" later, when constructing the opgraph. */
+  OPNODE_NOP,
+  /* Returns from the function -- there is no "next node". */
+  OPNODE_RETURN,
+  /* Aborts the process immediately. */
+  OPNODE_ABORT,
+  /* Jumps to one of two targets depending on the value. */
+  OPNODE_BRANCH,
+  /* Copies data from src to dest. */
+  OPNODE_MOV,
+  /* Copies data from a symbol to dest. */
+  OPNODE_MOV_FROM_GLOBAL,
+  /* Immediate bool. */
+  OPNODE_BOOL,
+  /* Immediate i32. */
+  OPNODE_I32,
+  /* Immediate u32. */
+  OPNODE_U32,
+  /* Function call. */
+  OPNODE_CALL,
+  /* This is unusual because instead of modifying the _contents_ of
+     its varnum, pointee_var, it modifies (or specifies) the
+     _location_ of its varnum.  TODO: Should we check that the varnum
+     has no specified location beforehand? */
+  OPNODE_DEREF,
+  /* Primitive addressof operation. */
+  OPNODE_ADDRESSOF,
+  /* A struct or union field (because I forgot about unions when
+     naming this and when writing the code). */
+  OPNODE_STRUCTFIELD,
+  /* Primitive i32 negation.  Has an overflow output slot.  It's the
+     only non-magic unary operator -- which is why we don't have
+     OPNODE_UNOP. */
+  OPNODE_I32_NEGATE,
+  /* Primitive binary operations.  Has an overflow output slot, even
+     for binary operations that cannot overflow!? */
+  OPNODE_BINOP,
+};
+
+struct opnode {
+  enum opnode_tag tag;
+  int is_recursing;
+  union {
+    struct opnum nop_next;
+    struct opnode_branch branch;
+    struct opnode_mov mov;
+    struct opnode_mov_from_global mov_from_global;
+    struct opnode_i32 i32;
+    struct opnode_u32 u32;
+    struct opnode_bool boole;
+    struct opnode_call call;
+    struct opnode_deref deref;
+    struct opnode_addressof addressof;
+    struct opnode_structfield structfield;
+    struct opnode_i32_negate i32_negate;
+    struct opnode_binop binop;
+  } u;
+};
+
+
 struct opnum opnum_invalid(void);
 int opnum_is_valid(struct opnum);
-
-struct varnum { size_t value; };
 
 struct varnum varnum_invalid(void);
 int varnum_is_valid(struct varnum);
