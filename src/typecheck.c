@@ -1009,14 +1009,14 @@ int check_expr_funcall(struct exprscope *es,
 
   struct ast_typeexpr resolved_funcexpr;
   int lvalue_discard;
-  struct ast_expr annotated_funcexpr;
+  struct ast_expr annotated_func;
   if (!check_expr(es, x->func, &funcexpr,
-                  &resolved_funcexpr, &lvalue_discard, &annotated_funcexpr)) {
+                  &resolved_funcexpr, &lvalue_discard, &annotated_func)) {
     goto fail_cleanup_funcexpr;
   }
 
   ast_funcall_init(annotated_out, ast_meta_make_copy(&x->meta),
-                   annotated_funcexpr, args_annotated, args_count);
+                   annotated_func, args_annotated, args_count);
   copy_func_return_type(es->cs->im, &resolved_funcexpr, args_types_count, out);
 
   ast_typeexpr_destroy(&resolved_funcexpr);
