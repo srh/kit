@@ -204,17 +204,20 @@ struct varnode {
 
   /* True if the var's data's existence and location is statically
      computable (or provided) as a function of esp, ebp, and eip.  If
-     true, first/last are initialized -- the var exists in a subset of
-     the half-open opnum interval [first, last).  If false, the var
+     true, begin/end are initialized -- the var exists in a subset of
+     the half-open opnum interval [begin, end).  If false, the var
      could still be statically computable as a struct field of another
      var, or for some other reason. */
   int is_known_static;
-  struct opnum first;
-  struct opnum last;
+  /* True only if is_known_static is true. */
+  int is_temporary;
+  struct opnum begin;
+  struct opnum end;
 };
 
 void varnode_init(struct varnode *v, struct ast_typeexpr *type) {
   v->is_known_static = 0;
+  v->is_temporary = 0;
   ast_typeexpr_init_copy(&v->type, type);
 }
 
@@ -259,29 +262,45 @@ struct varnum opgraph_add_var(struct opgraph *g, struct ast_typeexpr *type) {
 }
 
 /* This can only be called once per varnum. */
-void opgraph_var_starts(struct opgraph *g, struct varnum v, struct opnum first) {
+void opgraph_var_starts(struct opgraph *g, struct varnum v, struct opnum begin) {
   CHECK(varnum_is_valid(v));
   CHECK(v.value < g->vars_count);
-  CHECK(opnum_is_valid(first));
+  CHECK(opnum_is_valid(begin));
   struct varnode *node = &g->vars[v.value];
   CHECK(!node->is_known_static);
 
   node->is_known_static = 1;
-  node->first = first;
-  node->last = opnum_invalid();
+  node->begin = begin;
+  node->end = opnum_invalid();
 }
+
+void opgraph_var_start_temporary(struct opgraph *g, struct varnum v,
+                                 struct opnum begin) {
+  opgraph_var_starts(g, v, begin);
+  g->vars[v.value].is_temporary = 1;
+}
+
 
 /* This can also only be called once per varnum (and must be called
    after opgraph_var_starts is called). */
-void opgraph_var_ends(struct opgraph *g, struct varnum v, struct opnum last) {
+void opgraph_var_ends(struct opgraph *g, struct varnum v, struct opnum end) {
   CHECK(varnum_is_valid(v));
   CHECK(v.value < g->vars_count);
-  CHECK(opnum_is_valid(last));
+  CHECK(opnum_is_valid(end));
   struct varnode *node = &g->vars[v.value];
   CHECK(node->is_known_static);
-  CHECK(!opnum_is_valid(node->last));
+  CHECK(!opnum_is_valid(node->end));
 
-  node->last = last;
+  node->end = end;
+}
+
+void opgraph_var_maybe_end_temporary(struct opgraph *g, struct varnum v,
+                                     struct opnum end) {
+  CHECK(varnum_is_valid(v));
+  CHECK(v.value < g->vars_count);
+  if (g->vars[v.value].is_temporary) {
+    opgraph_var_ends(g, v, end);
+  }
 }
 
 struct opnum opgraph_add(struct opgraph *g, struct opnode node) {
