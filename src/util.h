@@ -51,6 +51,8 @@ NORETURN void report_and_abort(const char *file, int line,
    the wrong place. */
 #define ERR_DBG(...) DBG(__VA_ARGS__)
 
+/* Never returns a null pointer.  (Checks if a * b overflows, and
+   calls malloc(1) instead of malloc(0).) */
 void *malloc_mul(size_t a, size_t b);
 
 /* Returns a pointer to a buffer of size *count_out + 1... so that
@@ -63,5 +65,9 @@ void alloc_memcat(const void *lbuf, size_t lcount,
 void alloc_half_strcat(const void *lbuf, size_t lcount,
                        const char *r,
                        char **buf_ptr_out, size_t *count_out);
+
+/* memcpy, only if n == 0 and dest or src is NULL, you don't have
+   undefined behavior. */
+void ok_memcpy(void *dest, const void *src, size_t n);
 
 #endif /* KIRA_UTIL_H_ */

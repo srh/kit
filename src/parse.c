@@ -232,9 +232,14 @@ int is_alpha(int32_t ch) {
   return ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z');
 }
 
-int is_decimal_digit(int32_t ch) {
+int is_decimal_digit(int32_t ch, int8_t *digit_value_out) {
   STATIC_CHECK('9' == '0' + 9); /* redundant with C std, yes. */
-  return '0' <= ch && ch <= '9';
+  if ('0' <= ch && ch <= '9') {
+    *digit_value_out = (int8_t)(ch - '0');
+    return 1;
+  } else {
+    return 0;
+  }
 }
 
 int is_ident_firstchar(int32_t ch) {
@@ -242,7 +247,8 @@ int is_ident_firstchar(int32_t ch) {
 }
 
 int is_ident_midchar(int32_t ch) {
-  return is_ident_firstchar(ch) || is_decimal_digit(ch);
+  int8_t digit_value_discard;
+  return is_ident_firstchar(ch) || is_decimal_digit(ch, &digit_value_discard);
 }
 
 int is_ident_postchar(int32_t ch) {
@@ -801,16 +807,16 @@ int parse_numeric_literal(struct ps *p, struct ast_numeric_literal *out) {
 
   size_t pos_start = ps_pos(p);
   int32_t first_digit = ps_peek(p);
-  if (!is_decimal_digit(first_digit)) {
+  int8_t first_digit_value;
+  if (!is_decimal_digit(first_digit, &first_digit_value)) {
     return 0;
   }
   ps_step(p);
 
-  int8_t first_digit_value = (int8_t)(first_digit - '0');
   SLICE_PUSH(digits, digits_count, digits_limit, first_digit_value);
   int32_t ch;
-  while ((ch = ps_peek(p)), is_decimal_digit(ch)) {
-    int8_t ch_value = (int8_t)(ch - '0');
+  int8_t ch_value;
+  while ((ch = ps_peek(p)), is_decimal_digit(ch, &ch_value)) {
     SLICE_PUSH(digits, digits_count, digits_limit, ch_value);
     ps_step(p);
   }
@@ -878,7 +884,8 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     return parse_rest_of_lambda(p, pos_start, &out->u.lambda);
   }
 
-  if (is_decimal_digit(ps_peek(p))) {
+  int8_t digit_value_discard;
+  if (is_decimal_digit(ps_peek(p), &digit_value_discard)) {
     ast_expr_partial_init(out, AST_EXPR_NUMERIC_LITERAL, ast_expr_info_default());
     return parse_numeric_literal(p, &out->u.numeric_literal);
   }

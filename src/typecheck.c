@@ -158,7 +158,7 @@ struct ast_typeexpr *expose_func_return_type(struct identmap *im,
   CHECK(func->tag == AST_TYPEEXPR_APP);
   CHECK(func->u.app.name.value == identmap_intern_c_str(im, FUNC_TYPE_NAME));
   CHECK(func->u.app.params_count == expected_params_count);
-  return &func->u.app.params[expected_params_count - 1];
+  return &func->u.app.params[size_sub(expected_params_count, 1)];
 }
 
 void copy_func_return_type(struct identmap *im,
@@ -2721,7 +2721,7 @@ int load_test_module(struct test_module *a, size_t a_count,
       STATIC_CHECK(sizeof(uint8_t) == 1);
       size_t data_count = strlen(a[i].data);
       uint8_t *data = malloc_mul(data_count, sizeof(uint8_t));
-      memcpy(data, a[i].data, data_count);
+      ok_memcpy(data, a[i].data, data_count);
       *data_out = data;
       *data_count_out = data_count;
       return 1;

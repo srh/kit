@@ -26,9 +26,9 @@ void alloc_memcat(const void *lbuf, size_t lcount,
                   char **buf_ptr_out, size_t *count_out) {
   size_t count = size_add(lcount, rcount);
   char *buf = malloc_mul(1, size_add(1, count));
-  memcpy(buf, lbuf, lcount);
-  memcpy(buf + lcount, rbuf, rcount);
-  buf[lcount + rcount] = '\0';
+  ok_memcpy(buf, lbuf, lcount);
+  ok_memcpy(buf + lcount, rbuf, rcount);
+  buf[count] = '\0';
   *buf_ptr_out = buf;
   *count_out = count;
 }
@@ -38,4 +38,11 @@ void alloc_half_strcat(const void *lbuf, size_t lcount,
                        char **buf_ptr_out, size_t *count_out) {
   alloc_memcat(lbuf, lcount, r, strlen(r),
                buf_ptr_out, count_out);
+}
+
+void ok_memcpy(void *dest, const void *src, size_t n) {
+  if (n == 0) {
+    return;
+  }
+  memcpy(dest, src, n);
 }

@@ -2,7 +2,6 @@
 
 #include <stdarg.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "arith.h"
 #include "util.h"
@@ -38,14 +37,9 @@ void databuf_grow(struct databuf *b, size_t accomodated_count) {
 }
 
 void databuf_append(struct databuf *b, const void *p, size_t count) {
-  if (count == 0) {
-    /* Avoid possible memcpy NULL-pointer 0-count situations, which
-       would be undefined behavior. */
-    return;
-  }
   if (b->limit - b->count < count) {
     databuf_grow(b, size_add(b->count, count));
   }
-  memcpy(b->buf + b->count, p, count);
-  b->count += count;
+  ok_memcpy(b->buf + b->count, p, count);
+  b->count = size_add(b->count, count);
 }

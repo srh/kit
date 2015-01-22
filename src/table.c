@@ -226,8 +226,8 @@ void deftype_entry_init_primitive(struct deftype_entry *e,
   if (flatly_held) {
     int *heap_flatly_held = malloc_mul(flatly_held_count,
                                        sizeof(*heap_flatly_held));
-    memcpy(heap_flatly_held, flatly_held,
-           size_mul(flatly_held_count, sizeof(*heap_flatly_held)));
+    ok_memcpy(heap_flatly_held, flatly_held,
+              size_mul(flatly_held_count, sizeof(*heap_flatly_held)));
     e->flatly_held = heap_flatly_held;
     e->flatly_held_count = flatly_held_count;
   } else {

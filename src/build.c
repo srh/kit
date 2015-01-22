@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "arith.h"
 #include "checkstate.h"
@@ -34,13 +33,13 @@ int generate_kira_name(struct checkstate *cs,
   while (number_append > 0) {
     buf[i] = '0' + (number_append % 10);
     number_append /= 10;
-    i++;
+    i = size_add(i, 1);
   }
 
   char rbuf[20] = { 0 };
 
   for (size_t j = 0; j < i; j++) {
-    rbuf[j] = buf[i - 1 - j];
+    rbuf[j] = buf[size_sub(size_sub(i, 1), j)];
   }
 
   databuf_append(&b, rbuf, i);

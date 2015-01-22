@@ -63,7 +63,8 @@ void identmap_rebuild(struct identmap *m,
   IDENTMAP_DBG("identmap_rebuild, m->count=%"PRIz", new_limit=%"PRIz"\n",
                m->count, new_limit);
   /* The limit must always be a power of two. */
-  CHECK(0 == (new_limit & (new_limit - 1)));
+  size_t new_limit_minus_1 = size_sub(new_limit, 1);
+  CHECK(0 == (new_limit & new_limit_minus_1));
   CHECK(m->count < new_limit / 2);
 
   ident_value *new_table = malloc_mul(new_limit, sizeof(*new_table));
@@ -82,11 +83,11 @@ void identmap_rebuild(struct identmap *m,
     }
 
     size_t hash = identmap_hash(m->datas[id].data, m->datas[id].data_count);
-    size_t offset = hash & (new_limit - 1);
+    size_t offset = hash & new_limit_minus_1;
 
     size_t step = 1;
     while (new_table[offset] != IDENT_VALUE_INVALID) {
-      offset = size_add(offset, step) & (new_limit - 1);
+      offset = size_add(offset, step) & new_limit_minus_1;
       step++;
     }
 
@@ -117,7 +118,8 @@ ident_value identmap_help_intern(struct identmap *m,
                  "are %"PRIz" and %"PRIz"\n",
                  m->count, m->limit);
   }
-  size_t offset = identmap_hash(buf, count) & (limit - 1);
+  size_t limit_minus_1 = size_sub(limit, 1);
+  size_t offset = identmap_hash(buf, count) & limit_minus_1;
   size_t step = 1;
   ident_value v;
   while ((v = m->table[offset]), v != IDENT_VALUE_INVALID) {
@@ -127,7 +129,7 @@ ident_value identmap_help_intern(struct identmap *m,
       return v;
     }
 
-    offset = size_add(offset, step) & (limit - 1);
+    offset = size_add(offset, step) & limit_minus_1;
     step++;
   }
 
@@ -155,7 +157,7 @@ ident_value identmap_intern(struct identmap *m,
   }
 
   void *data_copy = arena_unaligned(&m->string_arena, count);
-  memcpy(data_copy, buf, count);
+  ok_memcpy(data_copy, buf, count);
 
   STATIC_CHECK(IDENT_VALUE_INVALID == SIZE_MAX);
   CHECK(m->count != IDENT_VALUE_INVALID);

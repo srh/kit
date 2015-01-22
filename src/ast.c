@@ -1,7 +1,5 @@
 #include "ast.h"
 
-#include <string.h>
-
 #include "slice.h"
 #include "table.h"  /* TODO: For typelists_equal.  Reorganize locations. */
 
@@ -415,19 +413,12 @@ void ast_lambda_info_init_copy(struct ast_lambda_info *a,
                                struct ast_lambda_info *c) {
   a->lambda_info_valid = c->lambda_info_valid;
   if (c->lambda_info_valid) {
-    /* (We avoid passing NULL c->label_names value to memcpy.) */
-    /* TODO: Implement an ok_memcpy. */
-    if (c->label_names_count) {
-      ident_value *label_names = malloc_mul(sizeof(*label_names),
-                                            c->label_names_count);
-      memcpy(label_names, c->label_names,
-             size_mul(sizeof(*label_names), c->label_names_count));
-      a->label_names = label_names;
-      a->label_names_count = c->label_names_count;
-    } else {
-      a->label_names = NULL;
-      a->label_names_count = 0;
-    }
+    ident_value *label_names = malloc_mul(sizeof(*label_names),
+                                          c->label_names_count);
+    ok_memcpy(label_names, c->label_names,
+              size_mul(sizeof(*label_names), c->label_names_count));
+    a->label_names = label_names;
+    a->label_names_count = c->label_names_count;
   }
 }
 

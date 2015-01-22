@@ -419,30 +419,32 @@ void objfile_write_section_header(
 }
 
 void append_fillercode_to_align(struct databuf *d, size_t alignment) {
+  CHECK(alignment > 0);
   size_t n = d->count % alignment;
   if (n != 0) {
     static const uint8_t ch[16] = { 0xCC };
 
-    size_t m = alignment - n;
+    size_t m = size_sub(alignment, n);
 
     while (m > 16) {
       databuf_append(d, ch, 16);
-      m -= 16;
+      m = size_sub(m, 16);
     }
     databuf_append(d, ch, m);
   }
 }
 
 void append_zeros_to_align(struct databuf *d, size_t alignment) {
+  CHECK(alignment > 0);
   size_t n = d->count % alignment;
   if (n != 0) {
     static const uint8_t ch[16] = { 0 };
 
-    size_t m = alignment - n;
+    size_t m = size_sub(alignment, n);
 
     while (m > 16) {
       databuf_append(d, ch, 16);
-      m -= 16;
+      m = size_sub(m, 16);
     }
     databuf_append(d, ch, m);
   }
