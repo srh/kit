@@ -68,8 +68,29 @@ void varnode_destroy(struct varnode *v) {
   ast_typeexpr_destroy(&v->type);
 }
 
-void opgraph_init(struct opgraph *g, struct funcgraph *fg) {
-  g->fg = fg;
+void funcinfo_init(struct funcinfo *fi) {
+  fi->entry_point = opnum_invalid();
+  fi->arg_vars = NULL;
+  fi->arg_vars_count = 0;
+  fi->return_var = varnum_invalid();
+}
+
+void funcinfo_init_move(struct funcinfo *fi, struct funcinfo *movee) {
+  fi->entry_point = movee->entry_point;
+  fi->arg_vars = movee->arg_vars;
+  fi->arg_vars_count = movee->arg_vars_count;
+  fi->return_var = movee->return_var;
+
+  funcinfo_init(movee);
+}
+
+void funcinfo_destroy(struct funcinfo *fi) {
+  free(fi->arg_vars);
+  funcinfo_init(fi);
+}
+
+void opgraph_init(struct opgraph *g) {
+  funcinfo_init(&g->fg);
 
   g->ops = NULL;
   g->ops_count = 0;
@@ -80,15 +101,26 @@ void opgraph_init(struct opgraph *g, struct funcgraph *fg) {
   g->vars_limit = 0;
 }
 
-void opgraph_init_move(struct opgraph *g, struct opgraph *movee,
-                       struct funcgraph *new_owner) {
-  *g = *movee;
-  g->fg = new_owner;
-  opgraph_init(movee, NULL);
+void opgraph_init_move(struct opgraph *g, struct opgraph *movee) {
+  funcinfo_init_move(&g->fg, &movee->fg);
+
+  g->ops = movee->ops;
+  movee->ops = NULL;
+  g->ops_count = movee->ops_count;
+  movee->ops_count = 0;
+  g->ops_limit = movee->ops_limit;
+  movee->ops_limit = 0;
+
+  g->vars = movee->vars;
+  movee->vars = NULL;
+  g->vars_count = movee->vars_count;
+  movee->vars_count = 0;
+  g->vars_limit = movee->vars_limit;
+  movee->vars_limit = 0;
 }
 
 void opgraph_destroy(struct opgraph *g) {
-  g->fg = NULL;
+  funcinfo_destroy(&g->fg);
   SLICE_FREE(g->ops, g->ops_count, opnode_destroy);
   g->ops_limit = 0;
   SLICE_FREE(g->vars, g->vars_count, varnode_destroy);
@@ -350,34 +382,6 @@ struct opnum opgraph_future_1(struct opgraph *g) {
   struct opnum ret;
   ret.value = size_add(g->ops_count, 1);
   return ret;
-}
-
-void funcgraph_init_personal_fields(struct funcgraph *g) {
-  g->entry_point = opnum_invalid();
-  g->arg_vars = NULL;
-  g->arg_vars_count = 0;
-  g->return_var = varnum_invalid();
-}
-
-void funcgraph_init(struct funcgraph *g) {
-  opgraph_init(&g->opg, g);
-  funcgraph_init_personal_fields(g);
-}
-
-void funcgraph_init_move(struct funcgraph *g, struct funcgraph *movee) {
-  opgraph_init_move(&g->opg, &movee->opg, g);
-  g->entry_point = movee->entry_point;
-  g->arg_vars = movee->arg_vars;
-  g->arg_vars_count = movee->arg_vars_count;
-  g->return_var = movee->return_var;
-
-  funcgraph_init_personal_fields(movee);
-}
-
-void funcgraph_destroy(struct funcgraph *g) {
-  free(g->arg_vars);
-  opgraph_destroy(&g->opg);
-  funcgraph_init_personal_fields(g);
 }
 
 void get_nexts(struct opnode *node, struct opnum *nexts[2], size_t *nexts_count_out) {

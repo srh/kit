@@ -629,7 +629,7 @@ int build_bracebody(struct checkstate *cs,
       if (!build_expr(cs, g, st, s->u.return_expr, 0, &var)) {
         return 0;
       }
-      opgraph_mov(g, var, g->fg->return_var);
+      opgraph_mov(g, var, g->fg.return_var);
       end_if_temporary_0(g, var);
       opgraph_return(g);
     } break;
@@ -714,14 +714,14 @@ int build_bracebody(struct checkstate *cs,
   return 1;
 }
 
-int build_funcgraph(struct checkstate *cs,
-                    struct ast_expr *lambda_expr,
-                    struct funcgraph *out) {
+int build_opgraph(struct checkstate *cs,
+                  struct ast_expr *lambda_expr,
+                  struct opgraph *out) {
   CHECK(typeexpr_is_func_type(cs->im, &lambda_expr->expr_info.concrete_type));
   CHECK(lambda_expr->tag == AST_EXPR_LAMBDA);
 
-  struct funcgraph g;
-  funcgraph_init(&g);
+  struct opgraph g;
+  opgraph_init(&g);
 
   struct ast_lambda *lambda = &lambda_expr->u.lambda;
 
@@ -735,31 +735,31 @@ int build_funcgraph(struct checkstate *cs,
                               &lambda_expr->expr_info.concrete_type,
                               size_add(lambda->params_count, 1));
 
-  g.return_var = opgraph_add_var(&g.opg, return_type);
+  g.fg.return_var = opgraph_add_var(&g, return_type);
   struct varnum *arg_vars = malloc_mul(sizeof(*arg_vars),
                                        lambda->params_count);
   for (size_t i = 0, e = lambda->params_count; i < e; i++) {
-    arg_vars[i] = opgraph_add_var(&g.opg,
+    arg_vars[i] = opgraph_add_var(&g,
                                   &lambda_expr->expr_info.concrete_type.u.app.params[i]);
     builder_state_push_varnum(&st, lambda->params[i].name.value, arg_vars[i]);
   }
 
-  g.arg_vars = arg_vars;
-  g.arg_vars_count = lambda->params_count;
+  g.fg.arg_vars = arg_vars;
+  g.fg.arg_vars_count = lambda->params_count;
 
-  CHECK(!opnum_is_valid(g.entry_point));
-  g.entry_point = opgraph_future_0(&g.opg);
+  CHECK(!opnum_is_valid(g.fg.entry_point));
+  g.fg.entry_point = opgraph_future_0(&g);
 
-  int ret = build_bracebody(cs, &g.opg, &st, &lambda->bracebody);
+  int ret = build_bracebody(cs, &g, &st, &lambda->bracebody);
 
-  connect_gotos_and_labels(&st, &g.opg);
+  connect_gotos_and_labels(&st, &g);
 
   builder_state_destroy(&st);
 
   if (ret) {
-    funcgraph_init_move(out, &g);
+    opgraph_init_move(out, &g);
   } else {
-    funcgraph_destroy(&g);
+    opgraph_destroy(&g);
   }
 
   return ret;
@@ -792,8 +792,8 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {
-    struct funcgraph g;
-    if (!build_funcgraph(cs, &inst->value.u.typechecked_lambda, &g)) {
+    struct opgraph g;
+    if (!build_opgraph(cs, &inst->value.u.typechecked_lambda, &g)) {
       return 0;
     }
 

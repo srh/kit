@@ -14,11 +14,15 @@ struct varnode;
 struct opnum { size_t value; };
 struct varnum { size_t value; };
 
+struct funcinfo {
+  struct opnum entry_point;
+  struct varnum *arg_vars;
+  size_t arg_vars_count;
+  struct varnum return_var;
+};
+
 struct opgraph {
-  /* This is the fg the opgraph belongs to.  It's icky like this but
-     it's more convenient than passing the funcgraph and using &g->opg
-     everywhere. */
-  struct funcgraph *fg;
+  struct funcinfo fg;
 
   struct opnode *ops;
   size_t ops_count;
@@ -194,6 +198,9 @@ int opnum_is_valid(struct opnum);
 struct varnum varnum_invalid(void);
 int varnum_is_valid(struct varnum);
 
+void opgraph_init(struct opgraph *g);
+void opgraph_init_move(struct opgraph *g, struct opgraph *movee);
+void opgraph_destroy(struct opgraph *g);
 
 struct varnum opgraph_add_var(struct opgraph *g, struct ast_typeexpr *type);
 
@@ -258,19 +265,5 @@ struct opnum opgraph_binop_intrinsic(struct opgraph *g,
 struct opnum opgraph_future_0(struct opgraph *g);
 /* Returns g->ops_count + 1. */
 struct opnum opgraph_future_1(struct opgraph *g);
-
-
-struct funcgraph {
-  struct opgraph opg;
-
-  struct opnum entry_point;
-  struct varnum *arg_vars;
-  size_t arg_vars_count;
-  struct varnum return_var;
-};
-
-void funcgraph_init(struct funcgraph *g);
-void funcgraph_init_move(struct funcgraph *g, struct funcgraph *movee);
-void funcgraph_destroy(struct funcgraph *g);
 
 #endif /* KIRA_OPGRAPH_H_ */

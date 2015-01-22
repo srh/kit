@@ -123,8 +123,8 @@ void x86_frame_destroy(struct x86_frame *a) {
 }
 
 void annotate_calling_convention_locs(struct checkstate *cs,
-                                      struct funcgraph *g) {
-  size_t return_size = kira_sizeof(&cs->nt, &opgraph_varnode(&g->opg, g->return_var)->type);
+                                      struct opgraph *g) {
+  size_t return_size = kira_sizeof(&cs->nt, &opgraph_varnode(g, g->fg.return_var)->type);
 
   (void)return_size;
 
@@ -132,7 +132,7 @@ void annotate_calling_convention_locs(struct checkstate *cs,
 }
 
 int gen_x86_function(struct checkstate *cs, struct objfile *f,
-                     struct funcgraph *g) {
+                     struct opgraph *g) {
   annotate_calling_convention_locs(cs, g);
 
 
