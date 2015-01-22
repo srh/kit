@@ -299,9 +299,10 @@ void builder_state_push_varnum(struct builder_state *st,
   SLICE_PUSH(st->varnums, st->varnums_count, st->varnums_limit, pair);
 }
 
-void builder_state_pop_varnum(struct builder_state *st) {
+struct varnum builder_state_pop_varnum(struct builder_state *st) {
   CHECK(st->varnums_count > 0);
   st->varnums_count--;
+  return st->varnums[st->varnums_count].varnum;
 }
 
 void builder_state_note_label_target(struct builder_state *st,
@@ -694,6 +695,11 @@ int build_bracebody(struct checkstate *cs,
 
       CHECK(vs->info.var_statement_info_valid);
       struct varnum varnum = opgraph_add_var(g, &vs->info.concrete_type);
+
+      /* We call opgraph_var_ends when we pop the var from the
+         builder_state. */
+      opgraph_var_starts(g, varnum, opgraph_future_0(g));
+
       builder_state_push_varnum(st, vs->decl.name.value, varnum);
       vars_pushed = size_add(vars_pushed, 1);
 
@@ -751,7 +757,8 @@ int build_bracebody(struct checkstate *cs,
   }
 
   for (size_t i = 0; i < vars_pushed; i++) {
-    builder_state_pop_varnum(st);
+    struct varnum v = builder_state_pop_varnum(st);
+    opgraph_var_ends(g, v, opgraph_future_0(g));
   }
 
   return 1;
@@ -844,7 +851,9 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    TODO_IMPLEMENT;     /* (Generate machine code.) */
+    DBG("Built the funcgraph.\n");
+    /* TODO: Actually generate machine code. */
+    return 1;
   } break;
   default:
     UNREACHABLE();

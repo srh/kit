@@ -38,6 +38,10 @@ int varnum_is_valid(struct varnum);
 
 
 struct varnum opgraph_add_var(struct opgraph *g, struct ast_typeexpr *type);
+
+void opgraph_var_starts(struct opgraph *g, struct varnum v, struct opnum start);
+void opgraph_var_ends(struct opgraph *g, struct varnum v, struct opnum end);
+
 struct opnum opgraph_incomplete_nop(struct opgraph *g);
 void opgraph_make_nop_complete(struct opgraph *g, struct opnum incomplete_nop,
                                struct opnum target);

@@ -201,9 +201,20 @@ void opnode_destroy(struct opnode *n) {
 
 struct varnode {
   struct ast_typeexpr type;
+
+  /* True if the var's data's existence and location is statically
+     computable (or provided) as a function of esp, ebp, and eip.  If
+     true, first/last are initialized -- the var exists in a subset of
+     the half-open opnum interval [first, last).  If false, the var
+     could still be statically computable as a struct field of another
+     var, or for some other reason. */
+  int is_known_static;
+  struct opnum first;
+  struct opnum last;
 };
 
 void varnode_init(struct varnode *v, struct ast_typeexpr *type) {
+  v->is_known_static = 0;
   ast_typeexpr_init_copy(&v->type, type);
 }
 
@@ -245,6 +256,32 @@ struct varnum opgraph_add_var(struct opgraph *g, struct ast_typeexpr *type) {
   vnum.value = g->vars_count;
   SLICE_PUSH(g->vars, g->vars_count, g->vars_limit, node);
   return vnum;
+}
+
+/* This can only be called once per varnum. */
+void opgraph_var_starts(struct opgraph *g, struct varnum v, struct opnum first) {
+  CHECK(varnum_is_valid(v));
+  CHECK(v.value < g->vars_count);
+  CHECK(opnum_is_valid(first));
+  struct varnode *node = &g->vars[v.value];
+  CHECK(!node->is_known_static);
+
+  node->is_known_static = 1;
+  node->first = first;
+  node->last = opnum_invalid();
+}
+
+/* This can also only be called once per varnum (and must be called
+   after opgraph_var_starts is called). */
+void opgraph_var_ends(struct opgraph *g, struct varnum v, struct opnum last) {
+  CHECK(varnum_is_valid(v));
+  CHECK(v.value < g->vars_count);
+  CHECK(opnum_is_valid(last));
+  struct varnode *node = &g->vars[v.value];
+  CHECK(node->is_known_static);
+  CHECK(!opnum_is_valid(node->last));
+
+  node->last = last;
 }
 
 struct opnum opgraph_add(struct opgraph *g, struct opnode node) {
