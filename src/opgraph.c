@@ -547,60 +547,9 @@ void get_nexts(struct opnode *node, struct opnum *nexts[2], size_t *nexts_count_
   }
 }
 
-void collapse_nop_chain(struct opgraph *g, struct opnum *next_ref) {
-  struct opnum *r = next_ref;
-
-  struct opnum target;
-  size_t count = 0;
-  for (;;) {
-    CHECK(opnum_is_valid(*r));
-    CHECK(r->value <= g->ops_count);
-
-    if (r->value == g->ops_count || g->ops[r->value].tag != OPNODE_NOP
-        || g->ops[r->value].is_recursing) {
-      target = *r;
-      break;
-    }
-
-    g->ops[r->value].is_recursing = 1;
-    count = size_add(count, 1);
-    r = &g->ops[r->value].u.nop_next;
-  }
-
-  struct opnum *w = next_ref;
-  while (count > 0) {
-    struct opnum next = *w;
-    *w = target;
-    CHECK(next.value < g->ops_count &&
-          g->ops[next.value].tag == OPNODE_NOP
-          && g->ops[next.value].is_recursing);
-    g->ops[next.value].is_recursing = 0;
-    w = &g->ops[next.value].u.nop_next;
-  }
-}
-
-/* The only accessible nops that remain reachable are
-   self-referencing, empty-infinite-loop nops. */
-void eliminate_nops(struct opgraph *g) {
-  struct opnode *ops = g->ops;
-  for (size_t i = 0, e = g->ops_count; i < e; i++) {
-    struct opnum *nexts[2];
-    size_t num_nexts;
-    get_nexts(&ops[i], nexts, &num_nexts);
-
-    if (num_nexts == 1) {
-      collapse_nop_chain(g, nexts[0]);
-    } else if (num_nexts == 2) {
-      collapse_nop_chain(g, nexts[0]);
-      collapse_nop_chain(g, nexts[1]);
-    }
-  }
-}
-
 int annotate_funcgraph(struct checkstate *cs, struct funcgraph *g) {
-  eliminate_nops(&g->opg);
-  (void)cs;
-  /* TODO: Implement... some more. */
+  (void)cs, (void)g;
+  /* TODO: Implement... */
   return 1;
 }
 
