@@ -220,6 +220,12 @@ struct label_pair {
   struct opnum opnum;
 };
 
+struct goto_pair {
+  /* Which nop should be made to point at the target. */
+  struct opnum opnum;
+  ident_value target_name;
+};
+
 struct builder_state {
   /* A stack of active variable names and their varnums.  (This gets
      pushed and popped as we traverse scopes of a bracebody.) */
@@ -227,32 +233,32 @@ struct builder_state {
   size_t varnums_count;
   size_t varnums_limit;
 
-  /* An unchanging map of labels to opnums.  (We preallocate
-     nop-valued opnodes for each label.) */
-  /* TODO: Shouldn't we instead just have a list of (label name, goto
-     opnum) pairs?  */
+  /* An map of labels to opnums. */
   struct label_pair *labels;
   size_t labels_count;
+  size_t labels_limit;
+
+  struct goto_pair *gotos;
+  size_t gotos_count;
+  size_t gotos_limit;
 };
 
-void builder_state_init(struct opgraph *g,
-                        struct builder_state *st,
-                        ident_value *label_names,
-                        size_t label_names_count) {
+void builder_state_init(struct builder_state *st) {
   st->varnums = NULL;
   st->varnums_count = 0;
   st->varnums_limit = 0;
 
-  struct label_pair *labels = malloc_mul(sizeof(*labels), label_names_count);
-  for (size_t i = 0; i < label_names_count; i++) {
-    labels[i].label_name = label_names[i];
-    labels[i].opnum = opgraph_incomplete_nop(g);
-  }
-  st->labels = labels;
-  st->labels_count = label_names_count;
+  st->labels = NULL;
+  st->labels_count = 0;
+  st->labels_limit = 0;
+
+  st->gotos = NULL;
+  st->gotos_count = 0;
+  st->gotos_limit = 0;
 }
 
 void builder_state_destroy(struct builder_state *st) {
+  free(st->gotos);
   free(st->labels);
   free(st->varnums);
 
@@ -262,6 +268,11 @@ void builder_state_destroy(struct builder_state *st) {
 
   st->labels = NULL;
   st->labels_count = 0;
+  st->labels_limit = 0;
+
+  st->gotos = NULL;
+  st->gotos_count = 0;
+  st->gotos_limit = 0;
 }
 
 int builder_state_try_lookup_varnum(struct builder_state *st,
@@ -294,14 +305,42 @@ void builder_state_pop_varnum(struct builder_state *st) {
   st->varnums_count--;
 }
 
-struct opnum builder_state_lookup_label_opnum(struct builder_state *st,
-                                              ident_value label_name) {
+void builder_state_note_label_target(struct builder_state *st,
+                                     ident_value label_name,
+                                     struct opnum target) {
+  struct label_pair pair;
+  pair.label_name = label_name;
+  pair.opnum = target;
+  SLICE_PUSH(st->labels, st->labels_count, st->labels_limit, pair);
+}
+
+void builder_state_note_goto(struct builder_state *st,
+                             struct opnum incomplete_nop,
+                             ident_value target) {
+  struct goto_pair pair;
+  pair.opnum = incomplete_nop;
+  pair.target_name = target;
+  SLICE_PUSH(st->gotos, st->gotos_count, st->gotos_limit, pair);
+}
+
+struct opnum builder_state_lookup_label(struct builder_state *st,
+                                        ident_value label_name) {
   for (size_t i = 0, e = st->labels_count; i < e; i++) {
     if (st->labels[i].label_name == label_name) {
       return st->labels[i].opnum;
     }
   }
-  CRASH("Label name not found.\n");
+  UNREACHABLE();
+}
+
+void connect_gotos_and_labels(struct builder_state *st,
+                              struct opgraph *g) {
+  for (size_t i = 0, e = st->gotos_count; i < e; i++) {
+    struct opnum target
+      = builder_state_lookup_label(st, st->gotos[i].target_name);
+
+    opgraph_make_nop_complete(g, st->gotos[i].opnum, target);
+  }
 }
 
 int build_numeric_literal(struct checkstate *cs,
@@ -662,16 +701,12 @@ int build_bracebody(struct checkstate *cs,
       opgraph_mov(g, rhs_result, varnum);
     } break;
     case AST_STATEMENT_GOTO: {
-      struct opnum target_node = builder_state_lookup_label_opnum(
-          st, s->u.goto_statement.target.value);
-      opgraph_nop(g, target_node);
+      struct opnum nop = opgraph_incomplete_nop(g);
+      builder_state_note_goto(st, nop, s->u.goto_statement.target.value);
     } break;
     case AST_STATEMENT_LABEL: {
-      struct opnum s1 = opgraph_future_1(g);
-      struct opnum label_target = opgraph_nop(g, s1);
-      struct opnum label_node = builder_state_lookup_label_opnum(
-          st, s->u.label_statement.label.value);
-      opgraph_make_nop_complete(g, label_node, label_target);
+      builder_state_note_label_target(st, s->u.label_statement.label.value,
+                                      opgraph_future_0(g));
     } break;
     case AST_STATEMENT_IFTHEN: {
       struct ast_ifthen_statement *its = &s->u.ifthen_statement;
@@ -737,7 +772,7 @@ int build_funcgraph(struct checkstate *cs,
   CHECK(lambda->info.lambda_info_valid);
 
   struct builder_state st;
-  builder_state_init(&g.opg, &st, lambda->info.label_names, lambda->info.label_names_count);
+  builder_state_init(&st);
 
   struct ast_typeexpr *return_type
     = expose_func_return_type(cs->im,
@@ -760,6 +795,9 @@ int build_funcgraph(struct checkstate *cs,
   g.entry_point = opgraph_future_0(&g.opg);
 
   int ret = build_bracebody(cs, &g.opg, &st, &lambda->bracebody);
+
+  connect_gotos_and_labels(&st, &g.opg);
+
   builder_state_destroy(&st);
 
   if (ret) {

@@ -225,6 +225,7 @@ void ast_statement_init_copy(struct ast_statement *a,
                              struct ast_statement *c);
 void ast_statement_destroy(struct ast_statement *a);
 
+/* TODO: I don't think this information is used anymore. */
 struct ast_lambda_info {
   int lambda_info_valid;
   ident_value *label_names;
