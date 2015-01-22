@@ -542,8 +542,8 @@ void get_nexts(struct opnode *node, struct opnum *nexts[2], size_t *nexts_count_
     nexts[0] = &node->u.binop.next;
     *nexts_count_out = 1;
     break;
-
-
+  default:
+    UNREACHABLE();
   }
 }
 
