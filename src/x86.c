@@ -218,12 +218,20 @@ void x86_annotate_calling_convention_locs(struct checkstate *cs,
   }
 }
 
+void x86_annotate_graph_locs(struct checkstate *cs,
+                             struct opgraph *g,
+                             struct x86_frame *h) {
+  (void)cs, (void)g, (void)h;
+  /* TODO: Implement. */
+}
+
 int gen_x86_function(struct checkstate *cs, struct objfile *f,
                      struct opgraph *g) {
   struct x86_frame h;
   x86_frame_init(g, &h);
   x86_annotate_calling_convention_locs(cs, g, &h);
 
+  x86_annotate_graph_locs(cs, g, &h);
 
 
   (void)cs, (void)g;  /* TODO */

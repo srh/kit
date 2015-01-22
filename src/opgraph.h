@@ -46,8 +46,6 @@ struct varnode {
   int is_temporary;
   struct opnum begin;
   struct opnum end;
-
-  void *plat;
 };
 
 struct opnode_branch {
