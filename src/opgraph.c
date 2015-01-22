@@ -382,7 +382,6 @@ struct opnum opgraph_abort(struct opgraph *g) {
 struct opnum opgraph_call(struct opgraph *g, struct varnum func,
                           struct varnum *args, size_t args_count,
                           struct varnum dest) {
-  /* TODO: Check type? */
   struct opnode node;
   opnode_init_tag(&node, OPNODE_CALL);
   node.u.call.func = func;
@@ -395,7 +394,6 @@ struct opnum opgraph_call(struct opgraph *g, struct varnum func,
 
 struct opnum opgraph_deref(struct opgraph *g, struct varnum pointer,
                            struct varnum pointee_var) {
-  /* TODO: Check type? */
   struct opnode node;
   opnode_init_tag(&node, OPNODE_DEREF);
   node.u.deref.pointer = pointer;
@@ -406,7 +404,6 @@ struct opnum opgraph_deref(struct opgraph *g, struct varnum pointer,
 
 struct opnum opgraph_addressof(struct opgraph *g, struct varnum pointee,
                                struct varnum pointer) {
-  /* TODO: Check type? */
   struct opnode node;
   opnode_init_tag(&node, OPNODE_ADDRESSOF);
   node.u.addressof.pointee = pointee;
@@ -429,7 +426,6 @@ struct opnum opgraph_structfield(struct opgraph *g, struct varnum operand,
 
 struct opnum opgraph_i32_negate(struct opgraph *g, struct varnum param,
                                 struct varnum result, struct varnum overflow) {
-  /* TODO: Check type? */
   struct opnode node;
   opnode_init_tag(&node, OPNODE_I32_NEGATE);
   node.u.i32_negate.src = param;
@@ -445,7 +441,6 @@ struct opnum opgraph_binop_intrinsic(struct opgraph *g,
                                      struct varnum lhs, struct varnum rhs,
                                      struct varnum dest,
                                      struct varnum overflow) {
-  /* TODO: Check type? */
   struct opnode node;
   opnode_init_tag(&node, OPNODE_BINOP);
   node.u.binop.operator = operator;
