@@ -104,12 +104,15 @@ struct varnum opgraph_add_var(struct opgraph *g, struct ast_typeexpr *type) {
   return vnum;
 }
 
-/* This can only be called once per varnum. */
-void opgraph_var_starts(struct opgraph *g, struct varnum v, struct opnum begin) {
+struct varnode *opgraph_varnode(struct opgraph *g, struct varnum v) {
   CHECK(varnum_is_valid(v));
   CHECK(v.value < g->vars_count);
+  return &g->vars[v.value];
+}
+
+void opgraph_var_starts(struct opgraph *g, struct varnum v, struct opnum begin) {
   CHECK(opnum_is_valid(begin));
-  struct varnode *node = &g->vars[v.value];
+  struct varnode *node = opgraph_varnode(g, v);
   CHECK(!node->is_known_static);
 
   node->is_known_static = 1;
@@ -127,10 +130,8 @@ void opgraph_var_start_temporary(struct opgraph *g, struct varnum v,
 /* This can also only be called once per varnum (and must be called
    after opgraph_var_starts is called). */
 void opgraph_var_ends(struct opgraph *g, struct varnum v, struct opnum end) {
-  CHECK(varnum_is_valid(v));
-  CHECK(v.value < g->vars_count);
   CHECK(opnum_is_valid(end));
-  struct varnode *node = &g->vars[v.value];
+  struct varnode *node = opgraph_varnode(g, v);
   CHECK(node->is_known_static);
   CHECK(!opnum_is_valid(node->end));
 
@@ -444,10 +445,3 @@ void get_nexts(struct opnode *node, struct opnum *nexts[2], size_t *nexts_count_
     UNREACHABLE();
   }
 }
-
-int annotate_funcgraph(struct checkstate *cs, struct funcgraph *g) {
-  (void)cs, (void)g;
-  /* TODO: Implement... */
-  return 1;
-}
-

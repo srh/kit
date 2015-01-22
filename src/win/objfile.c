@@ -422,6 +422,7 @@ void append_fillercode_to_align(struct databuf *d, size_t alignment) {
   CHECK(alignment > 0);
   size_t n = d->count % alignment;
   if (n != 0) {
+    /* X86 */
     static const uint8_t ch[16] = { 0xCC };
 
     size_t m = size_sub(alignment, n);

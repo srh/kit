@@ -4,11 +4,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "ast.h"  /* TODO: Solely for enum ast_binop. */
+#include "ast.h"
 #include "identmap.h"
 
 struct ast_typeexpr;
-struct checkstate;
 struct opnode;
 struct varnode;
 
@@ -198,6 +197,7 @@ int varnum_is_valid(struct varnum);
 
 struct varnum opgraph_add_var(struct opgraph *g, struct ast_typeexpr *type);
 
+struct varnode *opgraph_varnode(struct opgraph *g, struct varnum v);
 void opgraph_var_starts(struct opgraph *g, struct varnum v, struct opnum start);
 void opgraph_var_ends(struct opgraph *g, struct varnum v, struct opnum end);
 void opgraph_var_start_temporary(struct opgraph *g, struct varnum v,
@@ -272,7 +272,5 @@ struct funcgraph {
 void funcgraph_init(struct funcgraph *g);
 void funcgraph_init_move(struct funcgraph *g, struct funcgraph *movee);
 void funcgraph_destroy(struct funcgraph *g);
-
-int annotate_funcgraph(struct checkstate *cs, struct funcgraph *g);
 
 #endif /* KIRA_OPGRAPH_H_ */
