@@ -1,11 +1,16 @@
 #include "x86.h"
 
+#include <stdlib.h>
+
 #include "arith.h"
 #include "ast.h"
 #include "opgraph.h"
+#include "slice.h"
 #include "table.h"
 #include "typecheck.h"
 #include "win/objfile.h"
+
+#define DWORD_SIZE 4
 
 /* X86 WINDOWS */
 void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
@@ -102,38 +107,122 @@ uint32_t kira_sizeof(struct name_table *nt, struct ast_typeexpr *type) {
   return size;
 }
 
-struct x86_frame {
+enum loc_tag {
+  LOC_EBP,
+  LOC_REGNUM,
+};
 
+struct loc {
+  enum loc_tag tag;
+  union {
+    int32_t ebp_offset;
+    int regnum;
+  } u;
+};
+
+struct loc loc_ebp_offset(int32_t offset) {
+  struct loc ret;
+  ret.tag = LOC_EBP;
+  ret.u.ebp_offset = offset;
+  return ret;
+}
+
+struct loc_interval {
+  struct opnum begin;
+  struct opnum end;
+  struct loc loc;
+};
+
+struct loc_interval loc_interval(struct opnum begin,
+                                 struct opnum end,
+                                 struct loc loc) {
+  struct loc_interval ret;
+  ret.begin = begin;
+  ret.end = end;
+  ret.loc = loc;
+  return ret;
+}
+
+struct x86_varnode {
+  struct loc_interval *intervals;
+  size_t intervals_count;
+  size_t intervals_limit;
+};
+
+void x86_varnode_init(struct x86_varnode *xvn) {
+  xvn->intervals = NULL;
+  xvn->intervals_count = 0;
+  xvn->intervals_limit = 0;
+}
+
+void x86_varnode_destroy(struct x86_varnode *xvn) {
+  free(xvn->intervals);
+  x86_varnode_init(xvn);
+}
+
+struct x86_frame {
   /* TODO: Check WINDOWS X86 esp alignment rules. */
 
   /* How much space to reserve (below ebp) for static info. */
   size_t static_size;
   /* How much space to reserve for misc info. */
   size_t misc_size;
+
+  struct x86_varnode *varinfo;
+  size_t varinfo_count;
 };
 
-void x86_frame_init(struct x86_frame *a) {
+void x86_frame_init(struct opgraph *g, struct x86_frame *a) {
   a->static_size = 0;
   a->misc_size = 0;
+  struct x86_varnode *xvns = malloc_mul(sizeof(*xvns), g->vars_count);
+  for (size_t i = 0, e = g->vars_count; i < e; i++) {
+    x86_varnode_init(&xvns[i]);
+  }
+  a->varinfo = xvns;
+  a->varinfo_count = g->vars_count;
 }
 
 void x86_frame_destroy(struct x86_frame *a) {
   a->static_size = 0;
   a->misc_size = 0;
+  SLICE_FREE(a->varinfo, a->varinfo_count, x86_varnode_destroy);
 }
 
-void annotate_calling_convention_locs(struct checkstate *cs,
-                                      struct opgraph *g) {
-  size_t return_size = kira_sizeof(&cs->nt, &opgraph_varnode(g, g->fg.return_var)->type);
+void x86_annotate_calling_convention_locs(struct checkstate *cs,
+                                          struct opgraph *g,
+                                          struct x86_frame *h) {
+  uint32_t return_size = kira_sizeof(&cs->nt, &opgraph_varnode(g, g->fg.return_var)->type);
 
-  (void)return_size;
+  /* The ebp_offset starts at 2 * DWORD_SIZE -- we have the saved ebp,
+     and return pointer, in our way.  Then, if the return type has
+     size greater than 8, we have a DWORD-sized pointer to where the
+     return value should be written.  Then comes the first
+     argument. */
+  int32_t ebp_offset = (2 + (return_size > 8)) * DWORD_SIZE;
 
-  /* TODO: Implement. */
+  for (size_t i = 0, e = g->fg.arg_vars_count; i < e; i++) {
+    struct varnum argvar = g->fg.arg_vars[i];
+    struct varnode *node = opgraph_varnode(g, argvar);
+
+    uint32_t var_size = kira_sizeof(&cs->nt, &node->type);
+
+    struct x86_varnode *xvn = &h->varinfo[argvar.value];
+
+    struct loc_interval li = loc_interval(opgraph_entry_point(g),
+                                          opgraph_future_0(g),
+                                          loc_ebp_offset(ebp_offset));
+    SLICE_PUSH(xvn->intervals, xvn->intervals_count, xvn->intervals_limit, li);
+
+    ebp_offset = int32_add(ebp_offset, uint32_to_int32(var_size));
+  }
 }
 
 int gen_x86_function(struct checkstate *cs, struct objfile *f,
                      struct opgraph *g) {
-  annotate_calling_convention_locs(cs, g);
+  struct x86_frame h;
+  x86_frame_init(g, &h);
+  x86_annotate_calling_convention_locs(cs, g, &h);
 
 
 
@@ -141,6 +230,7 @@ int gen_x86_function(struct checkstate *cs, struct objfile *f,
   /* X86 WINDOWS */
   objfile_fillercode_align_double_quadword(f);
 
+  x86_frame_destroy(&h);
   /* TODO: Implement. */
   return 1;
 }

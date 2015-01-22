@@ -69,14 +69,12 @@ void varnode_destroy(struct varnode *v) {
 }
 
 void funcinfo_init(struct funcinfo *fi) {
-  fi->entry_point = opnum_invalid();
   fi->arg_vars = NULL;
   fi->arg_vars_count = 0;
   fi->return_var = varnum_invalid();
 }
 
 void funcinfo_init_move(struct funcinfo *fi, struct funcinfo *movee) {
-  fi->entry_point = movee->entry_point;
   fi->arg_vars = movee->arg_vars;
   fi->arg_vars_count = movee->arg_vars_count;
   fi->return_var = movee->return_var;
@@ -370,6 +368,13 @@ struct opnum opgraph_u32_immediate(struct opgraph *g,
   node.u.u32.dest = dest;
   node.u.u32.next = opgraph_future_1(g);
   return opgraph_add(g, node);
+}
+
+struct opnum opgraph_entry_point(struct opgraph *g) {
+  (void)g;
+  struct opnum ret;
+  ret.value = 0;
+  return ret;
 }
 
 struct opnum opgraph_future_0(struct opgraph *g) {

@@ -747,9 +747,6 @@ int build_opgraph(struct checkstate *cs,
   g.fg.arg_vars = arg_vars;
   g.fg.arg_vars_count = lambda->params_count;
 
-  CHECK(!opnum_is_valid(g.fg.entry_point));
-  g.fg.entry_point = opgraph_future_0(&g);
-
   int ret = build_bracebody(cs, &g, &st, &lambda->bracebody);
 
   connect_gotos_and_labels(&st, &g);

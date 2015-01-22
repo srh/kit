@@ -104,6 +104,13 @@ int try_int32_add(int32_t x, int32_t y, int32_t *out) {
   return 1;
 }
 
+int32_t int32_add(int32_t x, int32_t y) {
+  int32_t ret;
+  int success = try_int32_add(x, y, &ret);
+  CHECK(success);
+  return ret;
+}
+
 int try_int32_sub(int32_t x, int32_t y, int32_t *out) {
   if (x < 0 && y > 0) {
     if (x < INT32_MIN + y) {
@@ -137,4 +144,9 @@ int32_t int32_div(int32_t x, int32_t y) {
 int32_t int32_positive_mod(int32_t x, int32_t y) {
   CHECK(x >= 0 && y > 0);
   return x % y;
+}
+
+int32_t uint32_to_int32(uint32_t x) {
+  CHECK(x < (uint32_t)INT32_MAX);
+  return (int32_t)x;
 }

@@ -15,7 +15,6 @@ struct opnum { size_t value; };
 struct varnum { size_t value; };
 
 struct funcinfo {
-  struct opnum entry_point;
   struct varnum *arg_vars;
   size_t arg_vars_count;
   struct varnum return_var;
@@ -47,6 +46,8 @@ struct varnode {
   int is_temporary;
   struct opnum begin;
   struct opnum end;
+
+  void *plat;
 };
 
 struct opnode_branch {
@@ -260,6 +261,8 @@ struct opnum opgraph_binop_intrinsic(struct opgraph *g,
                                      struct varnum lhs, struct varnum rhs,
                                      struct varnum dest,
                                      struct varnum overflow);
+
+struct opnum opgraph_entry_point(struct opgraph *g);
 
 /* Returns g->ops_count. */
 struct opnum opgraph_future_0(struct opgraph *g);
