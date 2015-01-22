@@ -43,8 +43,9 @@ void opgraph_var_starts(struct opgraph *g, struct varnum v, struct opnum start);
 void opgraph_var_ends(struct opgraph *g, struct varnum v, struct opnum end);
 void opgraph_var_start_temporary(struct opgraph *g, struct varnum v,
                                  struct opnum begin);
-void opgraph_var_maybe_end_temporary(struct opgraph *g, struct varnum v,
-                                     struct opnum end);
+int opgraph_var_is_temporary(struct opgraph *g, struct varnum v);
+void opgraph_var_end_if_temporary(struct opgraph *g, struct varnum v,
+                                  struct opnum end);
 
 struct opnum opgraph_incomplete_nop(struct opgraph *g);
 void opgraph_make_nop_complete(struct opgraph *g, struct opnum incomplete_nop,

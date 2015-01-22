@@ -294,11 +294,15 @@ void opgraph_var_ends(struct opgraph *g, struct varnum v, struct opnum end) {
   node->end = end;
 }
 
-void opgraph_var_maybe_end_temporary(struct opgraph *g, struct varnum v,
-                                     struct opnum end) {
+int opgraph_var_is_temporary(struct opgraph *g, struct varnum v) {
   CHECK(varnum_is_valid(v));
   CHECK(v.value < g->vars_count);
-  if (g->vars[v.value].is_temporary) {
+  return g->vars[v.value].is_temporary;
+}
+
+void opgraph_var_end_if_temporary(struct opgraph *g, struct varnum v,
+                                  struct opnum end) {
+  if (opgraph_var_is_temporary(g, v)) {
     opgraph_var_ends(g, v, end);
   }
 }

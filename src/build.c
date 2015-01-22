@@ -351,6 +351,7 @@ int build_numeric_literal(struct checkstate *cs,
   numeric_literal_type(cs->im, a, &type);
   struct varnum v = opgraph_add_var(g, &type);
   ast_typeexpr_destroy(&type);
+  opgraph_var_start_temporary(g, v, opgraph_future_0(g));
 
   switch (a->numeric_type) {
   case AST_NUMERIC_TYPE_SIGNED: {
@@ -401,6 +402,14 @@ struct varnum add_bool_var(struct identmap *im, struct opgraph *g) {
   return ret;
 }
 
+void end_if_temporary_0(struct opgraph *g, struct varnum v) {
+  opgraph_var_end_if_temporary(g, v, opgraph_future_0(g));
+}
+
+void start_temporary_0(struct opgraph *g, struct varnum v) {
+  opgraph_var_start_temporary(g, v, opgraph_future_0(g));
+}
+
 int build_binop_expr(struct checkstate *cs,
                      struct opgraph *g,
                      struct builder_state *st,
@@ -419,6 +428,7 @@ int build_binop_expr(struct checkstate *cs,
       return 0;
     }
     opgraph_mov(g, rhs, lhs);
+    end_if_temporary_0(g, rhs);
     *varnum_out = lhs;
     return 1;
   } break;
@@ -434,6 +444,9 @@ int build_binop_expr(struct checkstate *cs,
     struct opnum branch = opgraph_branch(g, lhs,
                                          true_fut,
                                          opnum_invalid());
+    end_if_temporary_0(g, lhs);
+
+    start_temporary_0(g, result);
     opgraph_bool_immediate(g, 1, result);
     struct opnum true_nop = opgraph_incomplete_nop(g);
     opgraph_update_branch_else(g, branch,
@@ -444,6 +457,7 @@ int build_binop_expr(struct checkstate *cs,
       return 0;
     }
     opgraph_mov(g, rhs, result);
+    end_if_temporary_0(g, rhs);
 
     opgraph_make_nop_complete(g, true_nop, opgraph_future_0(g));
     *varnum_out = result;
@@ -461,12 +475,16 @@ int build_binop_expr(struct checkstate *cs,
     struct opnum branch = opgraph_branch(g, lhs,
                                          true_fut,
                                          opnum_invalid());
+    end_if_temporary_0(g, lhs);
+
     struct varnum rhs;
     if (!build_expr(cs, g, st, be->rhs, 0, &rhs)) {
       return 0;
     }
 
+    start_temporary_0(g, result);
     opgraph_mov(g, rhs, result);
+    end_if_temporary_0(g, rhs);
 
     struct opnum true_nop = opgraph_incomplete_nop(g);
 
@@ -506,8 +524,13 @@ int build_binop_expr(struct checkstate *cs,
     struct varnum dest = opgraph_add_var(g, &a->expr_info.concrete_type);
     struct varnum overflow = add_bool_var(cs->im, g);
 
+    start_temporary_0(g, dest);
+    start_temporary_0(g, overflow);
     opgraph_binop_intrinsic(g, be->operator, lhs, rhs, dest, overflow);
+    end_if_temporary_0(g, lhs);
+    end_if_temporary_0(g, rhs);
     build_conditional_abort(g, overflow);
+    end_if_temporary_0(g, overflow);
 
     *varnum_out = dest;
     return 1;
@@ -532,6 +555,7 @@ int build_unop_expr(struct checkstate *cs,
     }
     struct varnum deref = opgraph_add_var(g, &a->expr_info.concrete_type);
     opgraph_deref(g, rhs, deref);
+    end_if_temporary_0(g, rhs);
     *varnum_out = deref;
     return 1;
   } break;
@@ -543,6 +567,7 @@ int build_unop_expr(struct checkstate *cs,
     }
     struct varnum ref = opgraph_add_var(g, &a->expr_info.concrete_type);
     opgraph_addressof(g, rhs, ref);
+    CHECK(!opgraph_var_is_temporary(g, rhs));
     *varnum_out = ref;
     return 1;
   } break;
@@ -554,10 +579,14 @@ int build_unop_expr(struct checkstate *cs,
     }
     struct varnum result = opgraph_add_var(g, &a->expr_info.concrete_type);
     struct varnum overflow = add_bool_var(cs->im, g);
+    start_temporary_0(g, result);
+    start_temporary_0(g, overflow);
 
     opgraph_i32_negate(g, rhs, result, overflow);
+    end_if_temporary_0(g, rhs);
 
     build_conditional_abort(g, overflow);
+    end_if_temporary_0(g, overflow);
     *varnum_out = result;
     return 1;
   } break;
@@ -611,7 +640,14 @@ int build_expr(struct checkstate *cs,
       = opgraph_add_var(g, expose_func_return_type(cs->im,
                                                    &a->expr_info.concrete_type,
                                                    size_add(args_count, 1)));
+    start_temporary_0(g, result);
     opgraph_call(g, func, args, args_count, result);
+    end_if_temporary_0(g, func);
+    /* TODO: Copy args or something, it's ghetto to assume it's still
+       valid after moving the array into opgraph_call. */
+    for (size_t i = 0; i < args_count; i++) {
+      end_if_temporary_0(g, args[i]);
+    }
     *varnum_out = result;
     return 1;
   } break;
@@ -634,7 +670,11 @@ int build_expr(struct checkstate *cs,
     }
 
     struct varnum narrowed = opgraph_add_var(g, &a->expr_info.concrete_type);
+    if (opgraph_var_is_temporary(g, operand)) {
+      start_temporary_0(g, narrowed);
+    }
     opgraph_structfield(g, operand, lfa->fieldname.value, narrowed);
+    end_if_temporary_0(g, operand);
     *varnum_out = narrowed;
     return 1;
   } break;
@@ -653,6 +693,7 @@ int build_expr(struct checkstate *cs,
 
     struct varnum derefed = opgraph_add_var(g, ptr_target);
     opgraph_deref(g, operand, derefed);
+    end_if_temporary_0(g, operand);
 
     struct varnum narrowed = opgraph_add_var(g, &a->expr_info.concrete_type);
     opgraph_structfield(g, derefed, dfa->fieldname.value, narrowed);
@@ -673,10 +714,11 @@ int build_bracebody(struct checkstate *cs,
     struct ast_statement *s = &a->statements[i];
     switch (s->tag) {
     case AST_STATEMENT_EXPR: {
-      struct varnum discard;
-      if (!build_expr(cs, g, st, s->u.expr, 0, &discard)) {
+      struct varnum result;
+      if (!build_expr(cs, g, st, s->u.expr, 0, &result)) {
         return 0;
       }
+      end_if_temporary_0(g, result);
     } break;
     case AST_STATEMENT_RETURN_EXPR: {
       struct varnum var;
@@ -684,6 +726,7 @@ int build_bracebody(struct checkstate *cs,
         return 0;
       }
       opgraph_mov(g, var, g->fg->return_var);
+      end_if_temporary_0(g, var);
       opgraph_return(g);
     } break;
     case AST_STATEMENT_VAR: {
@@ -704,6 +747,7 @@ int build_bracebody(struct checkstate *cs,
       vars_pushed = size_add(vars_pushed, 1);
 
       opgraph_mov(g, rhs_result, varnum);
+      end_if_temporary_0(g, rhs_result);
     } break;
     case AST_STATEMENT_GOTO: {
       struct opnum nop = opgraph_incomplete_nop(g);
@@ -723,6 +767,7 @@ int build_bracebody(struct checkstate *cs,
       struct opnum branch_opnum = opgraph_branch(g, condition_result,
                                                  fut1,
                                                  opnum_invalid());
+      end_if_temporary_0(g, condition_result);
       if (!build_bracebody(cs, g, st, &its->thenbody)) {
         return 0;
       }
@@ -739,6 +784,7 @@ int build_bracebody(struct checkstate *cs,
       struct opnum branch_opnum = opgraph_branch(g, condition_result,
                                                  fut1,
                                                  opnum_invalid());
+      end_if_temporary_0(g, condition_result);
       if (!build_bracebody(cs, g, st, &ites->thenbody)) {
         return 0;
       }
