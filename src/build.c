@@ -275,9 +275,9 @@ void builder_state_destroy(struct builder_state *st) {
   st->gotos_limit = 0;
 }
 
-int builder_state_try_lookup_varnum(struct builder_state *st,
-                                    ident_value varname,
-                                    struct varnum *varnum_out) {
+int builder_state_lookup_varnum(struct builder_state *st,
+                                ident_value varname,
+                                struct varnum *varnum_out) {
   for (size_t i = 0, e = st->varnums_count; i < e; i++) {
     if (st->varnums[i].varname == varname) {
       *varnum_out = st->varnums[i].varnum;
@@ -292,7 +292,7 @@ void builder_state_push_varnum(struct builder_state *st,
                                struct varnum varnum) {
   {
     struct varnum dummy;
-    CHECK(!builder_state_try_lookup_varnum(st, varname, &dummy));
+    CHECK(!builder_state_lookup_varnum(st, varname, &dummy));
   }
   struct varnum_pair pair;
   pair.varname = varname;
@@ -585,7 +585,7 @@ int build_expr(struct checkstate *cs,
       *varnum_out = v;
       return 1;
     } else {
-      return builder_state_try_lookup_varnum(st, ne->ident.value, varnum_out);
+      return builder_state_lookup_varnum(st, ne->ident.value, varnum_out);
     }
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
