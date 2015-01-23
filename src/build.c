@@ -123,6 +123,18 @@ struct loc {
   } u;
 };
 
+int loc_equal(struct loc a, struct loc b) {
+  if (a.tag != b.tag) {
+    return 0;
+  }
+  switch (a.tag) {
+  case LOC_EBP_OFFSET:
+    return a.u.ebp_offset == b.u.ebp_offset;
+  default:
+    UNREACHABLE();
+  }
+}
+
 struct vardata {
   ident_value name;
   /* A non-owned reference to the type. */
@@ -143,6 +155,11 @@ void vardata_init(struct vardata *vd,
   vd->loc = initial_loc;
 }
 
+void vardata_init_copy(struct vardata *vd,
+                       struct vardata *c) {
+  *vd = *c;
+}
+
 void vardata_destroy(struct vardata *vd) {
   vd->name = IDENT_VALUE_INVALID;
   vd->concrete_type = NULL;
@@ -150,21 +167,73 @@ void vardata_destroy(struct vardata *vd) {
   vd->loc.tag = (enum loc_tag)-1;
 }
 
+struct labeldata {
+  ident_value labelname;
+
+  struct vardata *captured_vardata;
+  size_t captured_vardata_count;
+  size_t captured_vardata_limit;
+
+  int label_found;
+};
+
+void labeldata_init(struct labeldata *ld, ident_value labelname,
+                    struct vardata *vardata, size_t vardata_count,
+                    int label_found) {
+  ld->labelname = labelname;
+
+  struct vardata *copy = malloc_mul(sizeof(*copy), vardata_count);
+  for (size_t i = 0; i < vardata_count; i++) {
+    vardata_init_copy(copy, vardata);
+  }
+
+  ld->captured_vardata = copy;
+  ld->captured_vardata_count = vardata_count;
+  ld->captured_vardata_limit = vardata_count;
+  ld->label_found = label_found;
+}
+
+void labeldata_destroy(struct labeldata *ld) {
+  ld->labelname = IDENT_VALUE_INVALID;
+  SLICE_FREE(ld->captured_vardata, ld->captured_vardata_count, vardata_destroy);
+  ld->captured_vardata_limit = 0;
+  ld->label_found = 0;
+}
+
 struct frame {
   struct vardata *vardata;
   size_t vardata_count;
   size_t vardata_limit;
+
+  struct labeldata *labeldata;
+  size_t labeldata_count;
+  size_t labeldata_limit;
 };
 
 void frame_init(struct frame *h) {
   h->vardata = NULL;
   h->vardata_count = 0;
   h->vardata_limit = 0;
+
+  h->labeldata = NULL;
+  h->labeldata_count = 0;
+  h->labeldata_limit = 0;
 }
 
 void frame_destroy(struct frame *h) {
   SLICE_FREE(h->vardata, h->vardata_count, vardata_destroy);
   h->vardata_limit = 0;
+  SLICE_FREE(h->labeldata, h->labeldata_count, labeldata_destroy);
+  h->labeldata_limit = 0;
+}
+
+struct labeldata *frame_try_find_labeldata(struct frame *h, ident_value labelname) {
+  for (size_t i = 0, e = h->labeldata_count; i < e; i++) {
+    if (h->labeldata[i].labelname == labelname) {
+      return &h->labeldata[i];
+    }
+  }
+  return NULL;
 }
 
 /* X86 and maybe WINDOWS-specific calling convention stuff. */
@@ -196,15 +265,159 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
   }
 }
 
+void gen_expr(struct checkstate *cs, struct objfile *f,
+              struct frame *h, struct ast_expr *expr,
+              struct loc *return_val_out) {
+  (void)cs, (void)f, (void)h, (void)expr, (void)return_val_out;
+  /* TODO: Implement. */
+}
+
+void gen_return(struct checkstate *cs, struct objfile *f,
+                struct frame *h, struct loc return_value) {
+  (void)cs, (void)f, (void)h, (void)return_value;
+  /* TODO: Implement. */
+}
+
+/* TODO: Looking up by name is wrong. */
+int lookup_vardata(struct vardata *vd, size_t vd_count, ident_value name,
+                   size_t *index_out) {
+  for (size_t i = 0; i < vd_count; i++) {
+    if (vd->name == name) {
+      *index_out = i;
+      return 1;
+    }
+  }
+  return 0;
+}
+
+struct movpair {
+  /* TODO: Use specific variable specifier, not "name" which is wrong. */
+  ident_value name;
+  struct loc src;
+  struct loc dest;
+};
+
+void move_and_add_vardata(struct labeldata *ld,
+                          struct frame *h, struct objfile *f) {
+  (void)f;  /* TODO */
+  struct movpair *movpack = NULL;
+  size_t movpack_count = 0;
+  size_t movpack_limit = 0;
+
+  for (size_t i = 0, e = ld->captured_vardata_count; i < e; i++) {
+    size_t hi;
+    if (lookup_vardata(h->vardata, h->vardata_count, ld->captured_vardata[i].name, &hi)) {
+      struct vardata *datum = &h->vardata[hi];
+      /* The frame has the given var for the label, so move it to the right place. */
+      if (!loc_equal(datum->loc, ld->captured_vardata[i].loc)) {
+        struct movpair mp;
+        mp.name = datum->name;
+        mp.src = datum->loc;
+        mp.dest = ld->captured_vardata[i].loc;
+        SLICE_PUSH(movpack, movpack_count, movpack_limit, mp);
+        /* TODO: We'll need to update h's vardata's loc when we do the mov. */
+      } else {
+        /* Do nothing -- it's already in the right place. */
+      }
+    } else {
+      /* The frame doesn't have the given var for the label. */
+    }
+  }
+
+  /* TODO: Actually use the movpack to do a bunch of movs (and update h's locations). */
+  free(movpack);
+}
+
+void gen_bracebody(struct checkstate *cs, struct objfile *f,
+                   struct frame *h, struct ast_bracebody *a) {
+  size_t vars_pushed = 0;
+
+  for (size_t i = 0, e = a->statements_count; i < e; i++) {
+    struct ast_statement *s = &a->statements[i];
+    switch (s->tag) {
+    case AST_STATEMENT_EXPR: {
+      struct loc discard;
+      gen_expr(cs, f, h, s->u.expr, &discard);
+    } break;
+    case AST_STATEMENT_RETURN_EXPR: {
+      struct loc loc;
+      gen_expr(cs, f, h, s->u.return_expr, &loc);
+
+      gen_return(cs, f, h, loc);
+    } break;
+    case AST_STATEMENT_VAR: {
+      struct loc loc;
+      gen_expr(cs, f, h, s->u.var_statement.rhs, &loc);
+      struct vardata vd;
+      vardata_init(&vd, s->u.var_statement.decl.name.value,
+                   &s->u.var_statement.info.concrete_type,
+                   kira_sizeof(&cs->nt, &s->u.var_statement.info.concrete_type),
+                   loc);
+      SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+    } break;
+    case AST_STATEMENT_GOTO: {
+      struct labeldata *data = frame_try_find_labeldata(h, s->u.goto_statement.target.value);
+      if (data) {
+        /* The label is seen -- it has info on its var locations. */
+        /* TODO: Implement. */
+
+      } else {
+        /* The label is not seen yet -- impose our var locations upon it! */
+        struct labeldata ld;
+        labeldata_init(&ld, s->u.goto_statement.target.value,
+                       h->vardata, h->vardata_count,
+                       0);
+        SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
+        /* TODO: Generate a placeholder jmp. */
+      }
+    } break;
+    case AST_STATEMENT_LABEL: {
+      struct labeldata *data = frame_try_find_labeldata(h, s->u.label_statement.label.value);
+      if (data) {
+        /* The goto was seen -- it has info on our var locations. */
+        /* TODO: Implement. */
+      } else {
+        /* The goto was not seen yet -- define our own var locations! */
+        struct labeldata ld;
+        labeldata_init(&ld, s->u.label_statement.label.value,
+                       h->vardata, h->vardata_count,
+                       1);
+        SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
+      }
+    } break;
+    default:
+      TODO_IMPLEMENT;
+    }
+  }
+
+  (void)vars_pushed;
+  /* TODO: Pop h->vardata. */
+}
+
+void gen_function_intro(struct objfile *f, struct frame *h) {
+  (void)f, (void)h;
+  /* TODO: push ebp, mov esp ebp */
+}
+
+void gen_function_exit(struct objfile *f, struct frame *h) {
+  (void)f, (void)h;
+  /* TODO: leave, ret */
+}
+
 void gen_lambda_expr(struct checkstate *cs, struct objfile *f,
-                     struct ast_expr *expr) {
-  CHECK(expr->tag == AST_EXPR_LAMBDA);
+                     struct ast_expr *a) {
+  CHECK(a->tag == AST_EXPR_LAMBDA);
   struct frame h;
   frame_init(&h);
 
-  note_param_locations(cs, &h, expr);
+  note_param_locations(cs, &h, a);
 
-  (void)f; /* TODO */
+  gen_function_intro(f, &h);
+
+  gen_bracebody(cs, f, &h, &a->u.lambda.bracebody);
+
+  gen_function_exit(f, &h);
+  /* TODO: Someplace we have to update goto destinations and such. */
 
   frame_destroy(&h);
 }
