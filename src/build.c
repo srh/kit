@@ -568,6 +568,7 @@ int build_expr(struct checkstate *cs,
     }
 
     struct varnum narrowed = opgraph_add_var(g, &a->expr_info.concrete_type);
+    opgraph_var_mark_structfield(g, narrowed, operand);
     if (opgraph_var_is_temporary(g, operand)) {
       start_temporary_0(g, narrowed);
     }
@@ -594,6 +595,7 @@ int build_expr(struct checkstate *cs,
     end_if_temporary_0(g, operand);
 
     struct varnum narrowed = opgraph_add_var(g, &a->expr_info.concrete_type);
+    opgraph_var_mark_structfield(g, narrowed, derefed);
     opgraph_structfield(g, derefed, dfa->fieldname.value, narrowed);
     *varnum_out = narrowed;
     return 1;

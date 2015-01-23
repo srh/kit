@@ -46,6 +46,11 @@ struct varnode {
   int is_temporary;
   struct opnum begin;
   struct opnum end;
+
+  /* True if it's a structfield, in which case the containing varnum
+     is given. */
+  int is_structfield;
+  struct varnum container;
 };
 
 /* This is really a "jmp if false" operation. */
@@ -201,6 +206,8 @@ void opgraph_var_start_temporary(struct opgraph *g, struct varnum v,
 int opgraph_var_is_temporary(struct opgraph *g, struct varnum v);
 void opgraph_var_end_if_temporary(struct opgraph *g, struct varnum v,
                                   struct opnum end);
+void opgraph_var_mark_structfield(struct opgraph *g, struct varnum v,
+                                  struct varnum container);
 
 struct opnum opgraph_incomplete_nop(struct opgraph *g);
 void opgraph_make_nop_complete(struct opgraph *g, struct opnum incomplete_nop,

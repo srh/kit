@@ -59,9 +59,10 @@ void opnode_destroy(struct opnode *n) {
 }
 
 void varnode_init(struct varnode *v, struct ast_typeexpr *type) {
+  ast_typeexpr_init_copy(&v->type, type);
   v->is_known_static = 0;
   v->is_temporary = 0;
-  ast_typeexpr_init_copy(&v->type, type);
+  v->is_structfield = 0;
 }
 
 void varnode_destroy(struct varnode *v) {
@@ -179,6 +180,14 @@ void opgraph_var_end_if_temporary(struct opgraph *g, struct varnum v,
   if (opgraph_var_is_temporary(g, v)) {
     opgraph_var_ends(g, v, end);
   }
+}
+
+void opgraph_var_mark_structfield(struct opgraph *g, struct varnum v,
+                                  struct varnum container) {
+  struct varnode *node = opgraph_varnode(g, v);
+  CHECK(!node->is_structfield);
+  node->is_structfield = 1;
+  node->container = container;
 }
 
 struct opnum opgraph_add(struct opgraph *g, struct opnode node) {
