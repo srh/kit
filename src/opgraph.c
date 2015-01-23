@@ -210,12 +210,10 @@ void opgraph_make_nop_complete(struct opgraph *g, struct opnum incomplete_nop,
 
 struct opnum opgraph_branch(struct opgraph *g,
                             struct varnum condition,
-                            struct opnum true_next,
                             struct opnum false_next) {
   struct opnode node;
   opnode_init_tag(&node, OPNODE_BRANCH);
   node.u.branch.condition = condition;
-  node.u.branch.true_next = true_next;
   node.u.branch.false_next = false_next;
   return opgraph_add(g, node);
 }
@@ -369,11 +367,5 @@ struct opnum opgraph_entry_point(struct opgraph *g) {
 struct opnum opgraph_future_0(struct opgraph *g) {
   struct opnum ret;
   ret.value = g->ops_count;
-  return ret;
-}
-
-struct opnum opgraph_future_1(struct opgraph *g) {
-  struct opnum ret;
-  ret.value = size_add(g->ops_count, 1);
   return ret;
 }

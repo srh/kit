@@ -282,9 +282,7 @@ int build_numeric_literal(struct checkstate *cs,
 
 void build_conditional_abort(struct opgraph *g,
                              struct varnum condition) {
-  struct opnum then_fut = opgraph_future_1(g);
   struct opnum node = opgraph_branch(g, condition,
-                                     then_fut,
                                      opnum_invalid());
   opgraph_abort(g);
   opgraph_update_branch_else(g, node, opgraph_future_0(g));
@@ -344,9 +342,7 @@ int build_binop_expr(struct checkstate *cs,
     }
     struct varnum result = add_bool_var(cs->im, g);
 
-    struct opnum true_fut = opgraph_future_1(g);
     struct opnum branch = opgraph_branch(g, lhs,
-                                         true_fut,
                                          opnum_invalid());
     end_if_temporary_0(g, lhs);
 
@@ -375,9 +371,7 @@ int build_binop_expr(struct checkstate *cs,
     }
     struct varnum result = add_bool_var(cs->im, g);
 
-    struct opnum true_fut = opgraph_future_1(g);
     struct opnum branch = opgraph_branch(g, lhs,
-                                         true_fut,
                                          opnum_invalid());
     end_if_temporary_0(g, lhs);
 
@@ -667,9 +661,7 @@ int build_bracebody(struct checkstate *cs,
       if (!build_expr(cs, g, st, its->condition, 0, &condition_result)) {
         return 0;
       }
-      struct opnum fut1 = opgraph_future_1(g);
       struct opnum branch_opnum = opgraph_branch(g, condition_result,
-                                                 fut1,
                                                  opnum_invalid());
       end_if_temporary_0(g, condition_result);
       if (!build_bracebody(cs, g, st, &its->thenbody)) {
@@ -684,9 +676,7 @@ int build_bracebody(struct checkstate *cs,
       if (!build_expr(cs, g, st, ites->condition, 0, &condition_result)) {
         return 0;
       }
-      struct opnum fut1 = opgraph_future_1(g);
       struct opnum branch_opnum = opgraph_branch(g, condition_result,
-                                                 fut1,
                                                  opnum_invalid());
       end_if_temporary_0(g, condition_result);
       if (!build_bracebody(cs, g, st, &ites->thenbody)) {

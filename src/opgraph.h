@@ -48,9 +48,9 @@ struct varnode {
   struct opnum end;
 };
 
+/* This is really a "jmp if false" operation. */
 struct opnode_branch {
   struct varnum condition;
-  struct opnum true_next;
   struct opnum false_next;
 };
 
@@ -208,7 +208,6 @@ void opgraph_make_nop_complete(struct opgraph *g, struct opnum incomplete_nop,
 struct opnum opgraph_nop(struct opgraph *g, struct opnum target);
 struct opnum opgraph_branch(struct opgraph *g,
                             struct varnum condition,
-                            struct opnum true_next,
                             struct opnum false_next);
 void opgraph_update_branch_else(struct opgraph *g,
                                 struct opnum incomplete_op,
@@ -254,7 +253,5 @@ struct opnum opgraph_entry_point(struct opgraph *g);
 
 /* Returns g->ops_count. */
 struct opnum opgraph_future_0(struct opgraph *g);
-/* Returns g->ops_count + 1. */
-struct opnum opgraph_future_1(struct opgraph *g);
 
 #endif /* KIRA_OPGRAPH_H_ */
