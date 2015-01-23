@@ -137,6 +137,8 @@ int loc_equal(struct loc a, struct loc b) {
 
 struct vardata {
   ident_value name;
+  size_t number;
+
   /* A non-owned reference to the type. */
   struct ast_typeexpr *concrete_type;
   /* The size of the type. */
@@ -146,10 +148,12 @@ struct vardata {
 
 void vardata_init(struct vardata *vd,
                   ident_value name,
+                  size_t var_number,
                   struct ast_typeexpr *concrete_type,
                   uint32_t size,
                   struct loc initial_loc) {
   vd->name = name;
+  vd->number = var_number;
   vd->concrete_type = concrete_type;
   vd->size = size;
   vd->loc = initial_loc;
@@ -201,6 +205,8 @@ void labeldata_destroy(struct labeldata *ld) {
 }
 
 struct frame {
+  size_t var_number;
+
   struct vardata *vardata;
   size_t vardata_count;
   size_t vardata_limit;
@@ -211,6 +217,8 @@ struct frame {
 };
 
 void frame_init(struct frame *h) {
+  h->var_number = 0;
+
   h->vardata = NULL;
   h->vardata_count = 0;
   h->vardata_limit = 0;
@@ -255,9 +263,12 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
 
     uint32_t size = kira_sizeof(&cs->nt, param_type);
 
+    size_t var_number = h->var_number;
+    h->var_number++;
+
     struct vardata vd;
     vardata_init(&vd, expr->u.lambda.params[i].name.value,
-                 param_type, size, loc);
+                 var_number, param_type, size, loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
     offset = int32_add(offset,
@@ -278,11 +289,10 @@ void gen_return(struct checkstate *cs, struct objfile *f,
   /* TODO: Implement. */
 }
 
-/* TODO: Looking up by name is wrong. */
-int lookup_vardata(struct vardata *vd, size_t vd_count, ident_value name,
+int lookup_vardata(struct vardata *vd, size_t vd_count, size_t var_number,
                    size_t *index_out) {
   for (size_t i = 0; i < vd_count; i++) {
-    if (vd->name == name) {
+    if (vd->number == var_number) {
       *index_out = i;
       return 1;
     }
@@ -291,31 +301,30 @@ int lookup_vardata(struct vardata *vd, size_t vd_count, ident_value name,
 }
 
 struct movpair {
-  /* TODO: Use specific variable specifier, not "name" which is wrong. */
-  ident_value name;
+  size_t number;
   struct loc src;
   struct loc dest;
 };
 
-void move_and_add_vardata(struct labeldata *ld,
-                          struct frame *h, struct objfile *f) {
-  (void)f;  /* TODO */
+/* When you see the label, this must be called _before_ setting
+   ld->label_found! */
+void mov_and_add_vardata(struct labeldata *ld,
+                         struct frame *h, struct objfile *f) {
   struct movpair *movpack = NULL;
   size_t movpack_count = 0;
   size_t movpack_limit = 0;
 
   for (size_t i = 0, e = ld->captured_vardata_count; i < e; i++) {
     size_t hi;
-    if (lookup_vardata(h->vardata, h->vardata_count, ld->captured_vardata[i].name, &hi)) {
+    if (lookup_vardata(h->vardata, h->vardata_count, ld->captured_vardata[i].number, &hi)) {
       struct vardata *datum = &h->vardata[hi];
       /* The frame has the given var for the label, so move it to the right place. */
       if (!loc_equal(datum->loc, ld->captured_vardata[i].loc)) {
         struct movpair mp;
-        mp.name = datum->name;
+        mp.number = datum->number;
         mp.src = datum->loc;
         mp.dest = ld->captured_vardata[i].loc;
         SLICE_PUSH(movpack, movpack_count, movpack_limit, mp);
-        /* TODO: We'll need to update h's vardata's loc when we do the mov. */
       } else {
         /* Do nothing -- it's already in the right place. */
       }
@@ -324,7 +333,27 @@ void move_and_add_vardata(struct labeldata *ld,
     }
   }
 
+  /* Now add the current frame's vardata to the info. */
+  if (!ld->label_found) {
+    for (size_t i = 0, e = h->vardata_count; i < e; i++) {
+      size_t li;
+      if (lookup_vardata(ld->captured_vardata, ld->captured_vardata_count,
+                         h->vardata[i].number, &li)) {
+        /* The label already has a location for this variable -- it's
+           part of the movpack if necessary. */
+      } else {
+        /* Capture our frame's vardata.  The label adopts our frame's
+           variable location as its own. */
+        struct vardata vd;
+        vardata_init_copy(&vd, &h->vardata[i]);
+        SLICE_PUSH(ld->captured_vardata, ld->captured_vardata_count,
+                   ld->captured_vardata_limit, vd);
+      }
+    }
+  }
+
   /* TODO: Actually use the movpack to do a bunch of movs (and update h's locations). */
+  (void)f;
   free(movpack);
 }
 
@@ -349,7 +378,10 @@ void gen_bracebody(struct checkstate *cs, struct objfile *f,
       struct loc loc;
       gen_expr(cs, f, h, s->u.var_statement.rhs, &loc);
       struct vardata vd;
+      size_t var_number = h->var_number;
+      h->var_number++;
       vardata_init(&vd, s->u.var_statement.decl.name.value,
+                   var_number,
                    &s->u.var_statement.info.concrete_type,
                    kira_sizeof(&cs->nt, &s->u.var_statement.info.concrete_type),
                    loc);
@@ -359,10 +391,10 @@ void gen_bracebody(struct checkstate *cs, struct objfile *f,
       struct labeldata *data = frame_try_find_labeldata(h, s->u.goto_statement.target.value);
       if (data) {
         /* The label is seen -- it has info on its var locations. */
-        /* TODO: Implement. */
-
+        mov_and_add_vardata(data, h, f);
+        /* TODO: Generate a jmp. */
       } else {
-        /* The label is not seen yet -- impose our var locations upon it! */
+        /* The label is not seen yet -- plainly impose our var locations upon it! */
         struct labeldata ld;
         labeldata_init(&ld, s->u.goto_statement.target.value,
                        h->vardata, h->vardata_count,
@@ -375,7 +407,9 @@ void gen_bracebody(struct checkstate *cs, struct objfile *f,
       struct labeldata *data = frame_try_find_labeldata(h, s->u.label_statement.label.value);
       if (data) {
         /* The goto was seen -- it has info on our var locations. */
-        /* TODO: Implement. */
+        CHECK(!data->label_found);
+        mov_and_add_vardata(data, h, f);
+        data->label_found = 1;
       } else {
         /* The goto was not seen yet -- define our own var locations! */
         struct labeldata ld;
