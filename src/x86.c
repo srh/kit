@@ -226,6 +226,10 @@ void x86_annotate_graph_locs(struct checkstate *cs,
     struct opnode *op = &g->ops[i];
 
     switch (op->tag) {
+    case OPNODE_STRUCTFIELD: {
+      
+
+    } break;
     default:
       break;
     }
@@ -258,6 +262,33 @@ void emit_incomplete_jmp_to_leave_ret(struct objfile *f,
   (void)f, (void)h;
 }
 
+void emit_mov(struct objfile *f, struct x86_frame *h,
+              struct varnum src, struct varnum dest) {
+  /* TODO: Implement. */
+  (void)f, (void)h, (void)src, (void)dest;
+}
+
+void emit_mov_from_global(struct objfile *f, struct x86_frame *h,
+                          uint32_t symbol_table_index, struct varnum dest) {
+  /* TODO: Really we want to alias the global (so that it could become
+     an lvalue) -- but right now it can't. */
+  /* TODO: Implement. */
+  (void)f, (void)h, (void)symbol_table_index, (void)dest;
+}
+
+void emit_i32_negation(struct objfile *f, struct x86_frame *h,
+                       struct varnum src, struct varnum dest,
+                       struct varnum overflow) {
+  (void)f, (void)h, (void)src, (void)dest, (void)overflow;
+  /* TODO: Implement. */
+}
+
+void x86_gen_binop(struct checkstate *cs, struct objfile *f,
+                   struct x86_frame *h, struct opnode_binop *op) {
+  (void)cs, (void)f, (void)h, (void)op;
+  /* TODO: Implement. */
+}
+
 void x86_gen_code(struct checkstate *cs, struct objfile *f,
                   struct opgraph *g, struct x86_frame *h) {
   (void)cs; /* TODO */
@@ -275,9 +306,45 @@ void x86_gen_code(struct checkstate *cs, struct objfile *f,
     case OPNODE_BRANCH: {
       /* TODO: Implement. */
     } break;
-    default:
+    case OPNODE_MOV: {
+      emit_mov(f, h, op->u.mov.src, op->u.mov.dest);
+    } break;
+    case OPNODE_MOV_FROM_GLOBAL: {
+      emit_mov_from_global(f, h,
+                           op->u.mov_from_global.symbol_table_index,
+                           op->u.mov_from_global.dest);
+    } break;
+    case OPNODE_BOOL: {
       /* TODO: Implement. */
-      break;
+    } break;
+    case OPNODE_I32: {
+      /* TODO: Implement. */
+    } break;
+    case OPNODE_U32: {
+      /* TODO: Implement. */
+    } break;
+    case OPNODE_CALL: {
+      /* TODO: Implement. */
+    } break;
+    case OPNODE_DEREF: {
+      /* TODO: Implement. */
+    } break;
+    case OPNODE_ADDRESSOF: {
+      /* TODO: Implement. */
+    } break;
+    case OPNODE_STRUCTFIELD: {
+      /* TODO: Implement. */
+    } break;
+    case OPNODE_I32_NEGATE: {
+      emit_i32_negation(f, h, op->u.i32_negate.src,
+                        op->u.i32_negate.dest,
+                        op->u.i32_negate.overflow);
+    } break;
+    case OPNODE_BINOP: {
+      x86_gen_binop(cs, f, h, &op->u.binop);
+    } break;
+    default:
+      UNREACHABLE();
     }
   }
 }
