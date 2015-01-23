@@ -221,12 +221,69 @@ void x86_annotate_calling_convention_locs(struct checkstate *cs,
 void x86_annotate_graph_locs(struct checkstate *cs,
                              struct opgraph *g,
                              struct x86_frame *h) {
-  (void)cs, (void)g, (void)h;
+  (void)cs, (void)h; /* TODO */
+  for (size_t i = 0, e = g->ops_count; i < e; i++) {
+    struct opnode *op = &g->ops[i];
+
+    switch (op->tag) {
+    default:
+      break;
+    }
+  }
+}
+
+void emit_trade_ebp(struct objfile *f) {
+  /* push ebp; mov ebp esp; */
+  (void)f;
   /* TODO: Implement. */
 }
 
+void emit_incomplete_jmp(struct objfile *f,
+                         struct x86_frame *h,
+                         struct opnum jmp_target) {
+  /* TODO: Implement. */
+  /* TODO: Set the jmp target later. */
+  (void)f, (void)h, (void)jmp_target;
+}
+
+void x86_frame_note_op_location(struct x86_frame *h, struct objfile *f,
+                                size_t opnum) {
+  (void)h, (void)f, (void)opnum;
+  /* TODO: Implement. */
+}
+
+void emit_incomplete_jmp_to_leave_ret(struct objfile *f,
+                                      struct x86_frame *h) {
+  /* TODO: Implement. */
+  (void)f, (void)h;
+}
+
+void x86_gen_code(struct checkstate *cs, struct objfile *f,
+                  struct opgraph *g, struct x86_frame *h) {
+  (void)cs; /* TODO */
+  emit_trade_ebp(f);
+  for (size_t i = 0, e = g->ops_count; i < e; i++) {
+    x86_frame_note_op_location(h, f, i);
+    struct opnode *op = &g->ops[i];
+    switch (op->tag) {
+    case OPNODE_NOP: {
+      emit_incomplete_jmp(f, h, op->u.nop_next);
+    } break;
+    case OPNODE_RETURN: {
+      emit_incomplete_jmp_to_leave_ret(f, h);
+    } break;
+    case OPNODE_BRANCH: {
+      /* TODO: Implement. */
+    } break;
+    default:
+      /* TODO: Implement. */
+      break;
+    }
+  }
+}
+
 int gen_x86_function(struct checkstate *cs, struct objfile *f,
-                     struct opgraph *g) {
+                     struct opgraph *g, uint32_t *symbol_Value_out) {
   struct x86_frame h;
   x86_frame_init(g, &h);
   x86_annotate_calling_convention_locs(cs, g, &h);
@@ -234,12 +291,13 @@ int gen_x86_function(struct checkstate *cs, struct objfile *f,
   x86_annotate_graph_locs(cs, g, &h);
 
 
-  (void)cs, (void)g;  /* TODO */
   /* X86 WINDOWS */
   objfile_fillercode_align_double_quadword(f);
+  *symbol_Value_out = objfile_section_size(objfile_text(f));
+
+  x86_gen_code(cs, f, g, &h);
 
   x86_frame_destroy(&h);
-  /* TODO: Implement. */
   return 1;
 }
 

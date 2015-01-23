@@ -794,9 +794,13 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    if (!gen_x86_function(cs, f, &g)) {
+    uint32_t Value;
+    if (!gen_x86_function(cs, f, &g, &Value)) {
       return 0;
     }
+
+    objfile_set_symbol_Value(f, inst->symbol_table_index,
+                             Value);
     return 1;
   } break;
   default:
