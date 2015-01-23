@@ -352,8 +352,16 @@ void mov_and_add_vardata(struct labeldata *ld,
     }
   }
 
-  /* TODO: Actually use the movpack to do a bunch of movs (and update h's locations). */
+  /* TODO: Actually use the movpack to do a bunch of movs (instead of just updating h's locations). */
+  for (size_t i = 0; i < movpack_count; i++) {
+    size_t hi;
+    int success = lookup_vardata(h->vardata, h->vardata_count, movpack[i].number, &hi);
+    CHECK(success);
+    h->vardata[i].loc = movpack[i].dest;
+  }
+
   (void)f;
+
   free(movpack);
 }
 
@@ -419,13 +427,20 @@ void gen_bracebody(struct checkstate *cs, struct objfile *f,
         SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
       }
     } break;
-    default:
+    case AST_STATEMENT_IFTHEN: {
       TODO_IMPLEMENT;
+    } break;
+    case AST_STATEMENT_IFTHENELSE: {
+      TODO_IMPLEMENT;
+    } break;
+    default:
+      UNREACHABLE();
     }
   }
 
-  (void)vars_pushed;
-  /* TODO: Pop h->vardata. */
+  for (size_t i = 0; i < vars_pushed; i++) {
+    SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+  }
 }
 
 void gen_function_intro(struct objfile *f, struct frame *h) {
