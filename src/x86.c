@@ -214,26 +214,26 @@ void x86_annotate_calling_convention_locs(struct checkstate *cs,
                                           loc_ebp_offset(ebp_offset));
     SLICE_PUSH(xvn->intervals, xvn->intervals_count, xvn->intervals_limit, li);
 
-    ebp_offset = int32_add(ebp_offset, uint32_to_int32(var_size));
+    ebp_offset = int32_add(ebp_offset, uint32_to_int32(uint32_ceil_aligned(var_size, DWORD_SIZE)));
   }
 }
 
 void x86_annotate_graph_locs(struct checkstate *cs,
                              struct opgraph *g,
                              struct x86_frame *h) {
-  (void)cs, (void)h; /* TODO */
-  for (size_t i = 0, e = g->ops_count; i < e; i++) {
-    struct opnode *op = &g->ops[i];
-
-    switch (op->tag) {
-    case OPNODE_STRUCTFIELD: {
-      
-
-    } break;
-    default:
-      break;
+  int32_t ebp_offset = 0;
+  for (size_t i = 0, e = g->vars_count; i < e; i++) {
+    struct varnode *node = opgraph_varnode(g, i);
+    if (node->is_known_static) {
+      uint32_t var_size = kira_sizeof(&node->type);
+      ebp_offset = int32_sub(ebp_offset, uint32_to_int32(uint32_ceil_aligned(var_size, DWORD_SIZE)));
+      struct loc_interval li = loc_interval(node->begin, node->end,
+                                            loc_ebp_offset(ebp_offset));
+      struct x86_varnode *xvn = &h->varinfo[i];
+      SLICE_PUSH(xvn->intervals, xvn->intervals_count, xvn->intervals_limit, li);
     }
   }
+
 }
 
 void emit_trade_ebp(struct objfile *f) {
@@ -262,6 +262,13 @@ void emit_incomplete_jmp_to_leave_ret(struct objfile *f,
   (void)f, (void)h;
 }
 
+void emit_incomplete_jmp_if_var_zero(struct objfile *f,
+                                     struct x86_frame *h,
+                                     struct varnum var) {
+  (void)f, (void)h, (void)var;
+  /* TODO: Implement. */
+}
+
 void emit_mov(struct objfile *f, struct x86_frame *h,
               struct varnum src, struct varnum dest) {
   /* TODO: Implement. */
@@ -283,12 +290,6 @@ void emit_i32_negation(struct objfile *f, struct x86_frame *h,
   /* TODO: Implement. */
 }
 
-void x86_gen_binop(struct checkstate *cs, struct objfile *f,
-                   struct x86_frame *h, struct opnode_binop *op) {
-  (void)cs, (void)f, (void)h, (void)op;
-  /* TODO: Implement. */
-}
-
 void x86_gen_code(struct checkstate *cs, struct objfile *f,
                   struct opgraph *g, struct x86_frame *h) {
   (void)cs; /* TODO */
@@ -303,8 +304,11 @@ void x86_gen_code(struct checkstate *cs, struct objfile *f,
     case OPNODE_RETURN: {
       emit_incomplete_jmp_to_leave_ret(f, h);
     } break;
-    case OPNODE_BRANCH: {
+    case OPNODE_ABORT: {
       /* TODO: Implement. */
+    }
+    case OPNODE_BRANCH: {
+      emit_incomplete_jmp_if_var_zero(f, h, op->u.branch.condition);
     } break;
     case OPNODE_MOV: {
       emit_mov(f, h, op->u.mov.src, op->u.mov.dest);
