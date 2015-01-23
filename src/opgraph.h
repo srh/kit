@@ -57,31 +57,26 @@ struct opnode_branch {
 struct opnode_mov {
   struct varnum src;
   struct varnum dest;
-  struct opnum next;
 };
 
 struct opnode_mov_from_global {
   uint32_t symbol_table_index;
   struct varnum dest;
-  struct opnum next;
 };
 
 struct opnode_bool {
   int value;
   struct varnum dest;
-  struct opnum next;
 };
 
 struct opnode_i32 {
   int32_t value;
   struct varnum dest;
-  struct opnum next;
 };
 
 struct opnode_u32 {
   int32_t value;
   struct varnum dest;
-  struct opnum next;
 };
 
 struct opnode_call {
@@ -89,33 +84,28 @@ struct opnode_call {
   struct varnum *args;
   size_t args_count;
   struct varnum dest;
-  struct opnum next;
 };
 
 struct opnode_deref {
   struct varnum pointer;
   struct varnum pointee_var;
-  struct opnum next;
 };
 
 struct opnode_addressof {
   struct varnum pointee;
   struct varnum pointer;
-  struct opnum next;
 };
 
 struct opnode_structfield {
   struct varnum operand;
   ident_value fieldname;
   struct varnum narrowed;
-  struct opnum next;
 };
 
 struct opnode_i32_negate {
   struct varnum src;
   struct varnum dest;
   struct varnum overflow;
-  struct opnum next;
 };
 
 struct opnode_binop {
@@ -126,12 +116,12 @@ struct opnode_binop {
   struct varnum rhs;
   struct varnum dest;
   struct varnum overflow;
-  struct opnum next;
 };
 
 enum opnode_tag {
-  /* NOP nodes just redirect you to another node -- often we fill in
-     the NOP node's "next node" later, when constructing the opgraph. */
+  /* NOP is misnamed -- it's goto.  Nodes just redirect you to another
+     node -- often we fill in the NOP node's "next node" later, when
+     constructing the opgraph. */
   OPNODE_NOP,
   /* Returns from the function -- there is no "next node". */
   OPNODE_RETURN,

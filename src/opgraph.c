@@ -237,7 +237,6 @@ struct opnum opgraph_mov(struct opgraph *g,
   opnode_init_tag(&node, OPNODE_MOV);
   node.u.mov.src = src;
   node.u.mov.dest = dest;
-  node.u.mov.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
@@ -262,7 +261,6 @@ struct opnum opgraph_call(struct opgraph *g, struct varnum func,
   node.u.call.args = args;
   node.u.call.args_count = args_count;
   node.u.call.dest = dest;
-  node.u.call.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
@@ -272,7 +270,6 @@ struct opnum opgraph_deref(struct opgraph *g, struct varnum pointer,
   opnode_init_tag(&node, OPNODE_DEREF);
   node.u.deref.pointer = pointer;
   node.u.deref.pointee_var = pointee_var;
-  node.u.deref.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
@@ -282,7 +279,6 @@ struct opnum opgraph_addressof(struct opgraph *g, struct varnum pointee,
   opnode_init_tag(&node, OPNODE_ADDRESSOF);
   node.u.addressof.pointee = pointee;
   node.u.addressof.pointer = pointer;
-  node.u.addressof.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
@@ -294,7 +290,6 @@ struct opnum opgraph_structfield(struct opgraph *g, struct varnum operand,
   node.u.structfield.operand = operand;
   node.u.structfield.fieldname = fieldname;
   node.u.structfield.narrowed = narrowed;
-  node.u.structfield.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
@@ -305,7 +300,6 @@ struct opnum opgraph_i32_negate(struct opgraph *g, struct varnum param,
   node.u.i32_negate.src = param;
   node.u.i32_negate.dest = result;
   node.u.i32_negate.overflow = overflow;
-  node.u.i32_negate.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
@@ -322,7 +316,6 @@ struct opnum opgraph_binop_intrinsic(struct opgraph *g,
   node.u.binop.rhs = rhs;
   node.u.binop.dest = dest;
   node.u.binop.overflow = overflow;
-  node.u.binop.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
@@ -333,7 +326,6 @@ struct opnum opgraph_mov_from_global(struct opgraph *g,
   opnode_init_tag(&node, OPNODE_MOV_FROM_GLOBAL);
   node.u.mov_from_global.symbol_table_index = symbol_table_index;
   node.u.mov_from_global.dest = dest;
-  node.u.mov_from_global.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
@@ -344,7 +336,6 @@ struct opnum opgraph_bool_immediate(struct opgraph *g,
   opnode_init_tag(&node, OPNODE_BOOL);
   node.u.boole.value = value;
   node.u.boole.dest = dest;
-  node.u.boole.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
@@ -355,7 +346,6 @@ struct opnum opgraph_i32_immediate(struct opgraph *g,
   opnode_init_tag(&node, OPNODE_I32);
   node.u.i32.value = value;
   node.u.i32.dest = dest;
-  node.u.i32.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
@@ -366,7 +356,6 @@ struct opnum opgraph_u32_immediate(struct opgraph *g,
   opnode_init_tag(&node, OPNODE_U32);
   node.u.u32.value = value;
   node.u.u32.dest = dest;
-  node.u.u32.next = opgraph_future_1(g);
   return opgraph_add(g, node);
 }
 
@@ -387,70 +376,4 @@ struct opnum opgraph_future_1(struct opgraph *g) {
   struct opnum ret;
   ret.value = size_add(g->ops_count, 1);
   return ret;
-}
-
-void get_nexts(struct opnode *node, struct opnum *nexts[2], size_t *nexts_count_out) {
-  switch (node->tag) {
-  case OPNODE_NOP:
-    nexts[0] = &node->u.nop_next;
-    *nexts_count_out = 1;
-    break;
-  case OPNODE_RETURN:
-    *nexts_count_out = 0;
-    break;
-  case OPNODE_ABORT:
-    *nexts_count_out = 0;
-    break;
-  case OPNODE_BRANCH:
-    nexts[0] = &node->u.branch.true_next;
-    nexts[1] = &node->u.branch.false_next;
-    *nexts_count_out = 2;
-    break;
-  case OPNODE_MOV:
-    nexts[0] = &node->u.mov.next;
-    *nexts_count_out = 1;
-    break;
-  case OPNODE_MOV_FROM_GLOBAL:
-    nexts[0] = &node->u.mov_from_global.next;
-    *nexts_count_out = 1;
-    break;
-  case OPNODE_BOOL:
-    nexts[0] = &node->u.boole.next;
-    *nexts_count_out = 1;
-    break;
-  case OPNODE_I32:
-    nexts[0] = &node->u.i32.next;
-    *nexts_count_out = 1;
-    break;
-  case OPNODE_U32:
-    nexts[0] = &node->u.u32.next;
-    *nexts_count_out = 1;
-    break;
-  case OPNODE_CALL:
-    nexts[0] = &node->u.call.next;
-    *nexts_count_out = 1;
-    break;
-  case OPNODE_DEREF:
-    nexts[0] = &node->u.deref.next;
-    *nexts_count_out = 1;
-    break;
-  case OPNODE_ADDRESSOF:
-    nexts[0] = &node->u.addressof.next;
-    *nexts_count_out = 1;
-    break;
-  case OPNODE_STRUCTFIELD:
-    nexts[0] = &node->u.structfield.next;
-    *nexts_count_out = 1;
-    break;
-  case OPNODE_I32_NEGATE:
-    nexts[0] = &node->u.i32_negate.next;
-    *nexts_count_out = 1;
-    break;
-  case OPNODE_BINOP:
-    nexts[0] = &node->u.binop.next;
-    *nexts_count_out = 1;
-    break;
-  default:
-    UNREACHABLE();
-  }
 }
