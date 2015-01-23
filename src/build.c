@@ -112,6 +112,103 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+enum loc_tag {
+  LOC_EBP_OFFSET,
+};
+
+struct loc {
+  enum loc_tag tag;
+  union {
+    uint32_t ebp_offset;
+  } u;
+};
+
+struct vardata {
+  ident_value name;
+  /* A non-owned reference to the type. */
+  struct ast_typeexpr *concrete_type;
+  /* The size of the type. */
+  uint32_t size;
+  struct loc loc;
+};
+
+void vardata_init(struct vardata *vd,
+                  ident_value name,
+                  struct ast_typeexpr *concrete_type,
+                  uint32_t size,
+                  struct loc initial_loc) {
+  vd->name = name;
+  vd->concrete_type = concrete_type;
+  vd->size = size;
+  vd->loc = initial_loc;
+}
+
+void vardata_destroy(struct vardata *vd) {
+  vd->name = IDENT_VALUE_INVALID;
+  vd->concrete_type = NULL;
+  vd->size = 0;
+  vd->loc.tag = (enum loc_tag)-1;
+}
+
+struct frame {
+  struct vardata *vardata;
+  size_t vardata_count;
+  size_t vardata_limit;
+};
+
+void frame_init(struct frame *h) {
+  h->vardata = NULL;
+  h->vardata_count = 0;
+  h->vardata_limit = 0;
+}
+
+void frame_destroy(struct frame *h) {
+  SLICE_FREE(h->vardata, h->vardata_count, vardata_destroy);
+  h->vardata_limit = 0;
+}
+
+/* X86 and maybe WINDOWS-specific calling convention stuff. */
+void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
+  struct ast_typeexpr *type = &expr->expr_info.concrete_type;
+  size_t args_count = expr->u.lambda.params_count;
+  struct ast_typeexpr *return_type
+    = expose_func_return_type(cs->im, type, size_add(args_count, 1));
+
+  uint32_t return_type_size = kira_sizeof(&cs->nt, return_type);
+
+  int32_t offset = (2 + (return_type_size > 8)) * DWORD_SIZE;
+
+  for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
+    struct ast_typeexpr *param_type = &type->u.app.params[i];
+    struct loc loc;
+    loc.tag = LOC_EBP_OFFSET;
+    loc.u.ebp_offset = offset;
+
+    uint32_t size = kira_sizeof(&cs->nt, param_type);
+
+    struct vardata vd;
+    vardata_init(&vd, expr->u.lambda.params[i].name.value,
+                 param_type, size, loc);
+    SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+
+    offset = int32_add(offset,
+                       uint32_to_int32(uint32_ceil_aligned(size, DWORD_SIZE)));
+  }
+}
+
+void gen_lambda_expr(struct checkstate *cs, struct objfile *f,
+                     struct ast_expr *expr) {
+  CHECK(expr->tag == AST_EXPR_LAMBDA);
+  struct frame h;
+  frame_init(&h);
+
+  note_param_locations(cs, &h, expr);
+
+  (void)f; /* TODO */
+
+  frame_destroy(&h);
+}
+
 int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_instantiation *inst) {
   switch (inst->value.tag) {
@@ -142,8 +239,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     objfile_set_symbol_Value(f, inst->symbol_table_index,
                             objfile_section_size(objfile_text(f)));
 
-    (void)cs;  /* TODO: Implement. */
-
+    gen_lambda_expr(cs, f, &inst->value.u.typechecked_lambda);
     return 1;
   } break;
   default:
