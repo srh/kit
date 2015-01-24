@@ -112,24 +112,84 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+enum immediate_tag {
+  IMMEDIATE_FUNC,
+  IMMEDIATE_U32,
+  IMMEDIATE_I32,
+};
+
+struct immediate {
+  enum immediate_tag tag;
+  union {
+    uint32_t func_sti;
+    uint32_t u32;
+    int32_t i32;
+  } u;
+};
+
+int immediate_equal(struct immediate a, struct immediate b) {
+  if (a.tag != b.tag) {
+    return 0;
+  }
+  switch (a.tag) {
+  case IMMEDIATE_FUNC:
+    return a.u.func_sti == b.u.func_sti;
+  case IMMEDIATE_U32:
+    return a.u.u32 == b.u.u32;
+  case IMMEDIATE_I32:
+    return a.u.i32 == b.u.i32;
+  default:
+    UNREACHABLE();
+  }
+}
+
 enum loc_tag {
-  LOC_EBP_OFFSET,
+  LOC_EBP_OFFSET = 0,
+  LOC_GLOBAL = 1,
+  LOC_IMMEDIATE = 2,
+  LOC_REGISTER = 3,
+  LOC_BIREGISTER = 4,
+  LOC_INDIRECT = 8,
 };
 
 struct loc {
   enum loc_tag tag;
   union {
     uint32_t ebp_offset;
+    uint32_t global_sti;
+    struct immediate imm;
+    int reg;
+    struct { int lo, hi; } bireg;
   } u;
+};
+
+enum x86_reg {
+  /* TODO: Double-check order. */
+  X86_EAX,
+  X86_ECX,
+  X86_EDX,
+  X86_EBX,
+  X86_ESI,
+  X86_EDI,
+  X86_ESP,
+  X86_EBP,
 };
 
 int loc_equal(struct loc a, struct loc b) {
   if (a.tag != b.tag) {
     return 0;
   }
-  switch (a.tag) {
+  switch (a.tag & (LOC_INDIRECT - 1)) {
   case LOC_EBP_OFFSET:
     return a.u.ebp_offset == b.u.ebp_offset;
+  case LOC_GLOBAL:
+    return a.u.global_sti == b.u.global_sti;
+  case LOC_IMMEDIATE:
+    return immediate_equal(a.u.imm, b.u.imm);
+  case LOC_REGISTER:
+    return a.u.reg == b.u.reg;
+  case LOC_BIREGISTER:
+    return a.u.bireg.lo == b.u.bireg.lo && a.u.bireg.hi == b.u.bireg.hi;
   default:
     UNREACHABLE();
   }
@@ -173,36 +233,34 @@ void vardata_destroy(struct vardata *vd) {
 
 struct labeldata {
   ident_value labelname;
-
-  struct vardata *captured_vardata;
-  size_t captured_vardata_count;
-  size_t captured_vardata_limit;
+  size_t target_number;
 
   int label_found;
 };
 
 void labeldata_init(struct labeldata *ld, ident_value labelname,
-                    struct vardata *vardata, size_t vardata_count,
+                    size_t target_number,
                     int label_found) {
   ld->labelname = labelname;
+  ld->target_number = target_number;
 
-  struct vardata *copy = malloc_mul(sizeof(*copy), vardata_count);
-  for (size_t i = 0; i < vardata_count; i++) {
-    vardata_init_copy(copy, vardata);
-  }
-
-  ld->captured_vardata = copy;
-  ld->captured_vardata_count = vardata_count;
-  ld->captured_vardata_limit = vardata_count;
   ld->label_found = label_found;
 }
 
 void labeldata_destroy(struct labeldata *ld) {
   ld->labelname = IDENT_VALUE_INVALID;
-  SLICE_FREE(ld->captured_vardata, ld->captured_vardata_count, vardata_destroy);
-  ld->captured_vardata_limit = 0;
   ld->label_found = 0;
 }
+
+struct targetdata {
+  int target_known;
+  size_t target_offset;
+};
+
+struct jmpdata {
+  size_t target_number;
+  size_t jmp_location;
+};
 
 struct frame {
   size_t var_number;
@@ -214,6 +272,22 @@ struct frame {
   struct labeldata *labeldata;
   size_t labeldata_count;
   size_t labeldata_limit;
+
+  struct targetdata *targetdata;
+  size_t targetdata_count;
+  size_t targetdata_limit;
+
+  struct jmpdata *jmpdata;
+  size_t jmpdata_count;
+  size_t jmpdata_limit;
+
+  int return_loc_valid;
+  struct loc return_loc;
+
+  /* The offset (relative to ebp) of "free space" available --
+     e.g. esp is at or below this address, but you could wipe anywhere
+     below here without harm. */
+  int32_t stack_offset;
 };
 
 void frame_init(struct frame *h) {
@@ -226,6 +300,18 @@ void frame_init(struct frame *h) {
   h->labeldata = NULL;
   h->labeldata_count = 0;
   h->labeldata_limit = 0;
+
+  h->targetdata = NULL;
+  h->targetdata_count = 0;
+  h->targetdata_limit = 0;
+
+  h->jmpdata = NULL;
+  h->jmpdata_count = 0;
+  h->jmpdata_limit = 0;
+
+  h->return_loc_valid = 0;
+
+  h->stack_offset = 0;
 }
 
 void frame_destroy(struct frame *h) {
@@ -233,6 +319,77 @@ void frame_destroy(struct frame *h) {
   h->vardata_limit = 0;
   SLICE_FREE(h->labeldata, h->labeldata_count, labeldata_destroy);
   h->labeldata_limit = 0;
+  free(h->targetdata);
+  h->targetdata = NULL;
+  h->targetdata_count = 0;
+  h->targetdata_limit = 0;
+  free(h->jmpdata);
+  h->jmpdata = NULL;
+  h->jmpdata_count = 0;
+  h->jmpdata_limit = 0;
+}
+
+void frame_specify_return_loc(struct frame *h, struct loc loc) {
+  CHECK(!h->return_loc_valid);
+  h->return_loc_valid = 1;
+  h->return_loc = loc;
+}
+
+struct loc frame_return_loc(struct frame *h) {
+  CHECK(h->return_loc_valid);
+  return h->return_loc;
+}
+
+size_t frame_add_target(struct frame *h) {
+  size_t ret = h->targetdata_count;
+  struct targetdata td;
+  td.target_known = 0;
+  SLICE_PUSH(h->targetdata, h->targetdata_count, h->targetdata_limit, td);
+  return ret;
+}
+
+void frame_define_target(struct frame *h, size_t target_number, uint32_t target_offset) {
+  struct targetdata *td = &h->targetdata[target_number];
+  CHECK(!td->target_known);
+  td->target_known = 1;
+  td->target_offset = target_offset;
+}
+
+struct loc register_loc(struct frame *h) {
+  (void)h;
+  /* TODO: Implement for real?  This is broken?  Or is eax always okay? */
+  struct loc ret;
+  ret.tag = LOC_REGISTER;
+  ret.u.reg = X86_EAX;
+  return ret;
+}
+
+struct loc frame_push_loc(struct frame *h, uint32_t size) {
+  /* X86 */
+  uint32_t aligned = uint32_ceil_aligned(size, DWORD_SIZE);
+  h->stack_offset = int32_sub(h->stack_offset, uint32_to_int32(aligned));
+  struct loc ret;
+  ret.tag = LOC_EBP_OFFSET;
+  ret.u.ebp_offset = h->stack_offset;
+  return ret;
+}
+
+int32_t frame_save_offset(struct frame *h) {
+  return h->stack_offset;
+}
+
+void frame_restore_offset(struct frame *h, int32_t stack_offset) {
+  /* The stack is made _smaller_ by this function by increasing the
+     offset (which is nonpositive). */
+  CHECK(stack_offset <= 0);
+  CHECK(stack_offset >= h->stack_offset);
+  h->stack_offset = stack_offset;
+}
+
+void frame_pop(struct frame *h, uint32_t size) {
+  /* X86 */
+  uint32_t aligned = uint32_ceil_aligned(size, DWORD_SIZE);
+  h->stack_offset = int32_add(h->stack_offset, uint32_to_int32(aligned));
 }
 
 struct labeldata *frame_try_find_labeldata(struct frame *h, ident_value labelname) {
@@ -274,25 +431,30 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
     offset = int32_add(offset,
                        uint32_to_int32(uint32_ceil_aligned(size, DWORD_SIZE)));
   }
+
+  if (return_type_size > 8) {
+    struct loc loc;
+    loc.tag = LOC_EBP_OFFSET | LOC_INDIRECT;
+    loc.u.ebp_offset = 2 * DWORD_SIZE;
+    frame_specify_return_loc(h, loc);
+  } else if (return_type_size > 4) {
+    struct loc loc;
+    /* TODO: doublecheck */
+    loc.tag = LOC_BIREGISTER;
+    loc.u.bireg.lo = X86_EAX;
+    loc.u.bireg.hi = X86_EDX;
+    frame_specify_return_loc(h, loc);
+  } else {
+    struct loc loc;
+    loc.tag = LOC_REGISTER;
+    loc.u.reg = X86_EAX;
+    frame_specify_return_loc(h, loc);
+  }
 }
 
-void gen_expr(struct checkstate *cs, struct objfile *f,
-              struct frame *h, struct ast_expr *expr,
-              struct loc *return_val_out) {
-  (void)cs, (void)f, (void)h, (void)expr, (void)return_val_out;
-  /* TODO: Implement. */
-}
-
-void gen_return(struct checkstate *cs, struct objfile *f,
-                struct frame *h, struct loc return_value) {
-  (void)cs, (void)f, (void)h, (void)return_value;
-  /* TODO: Implement. */
-}
-
-int lookup_vardata(struct vardata *vd, size_t vd_count, size_t var_number,
-                   size_t *index_out) {
-  for (size_t i = 0; i < vd_count; i++) {
-    if (vd->number == var_number) {
+int lookup_vardata_by_name(struct frame *h, ident_value name, size_t *index_out) {
+  for (size_t i = 0, e = h->vardata_count; i < e; i++) {
+    if (h->vardata[i].name == name) {
       *index_out = i;
       return 1;
     }
@@ -300,91 +462,331 @@ int lookup_vardata(struct vardata *vd, size_t vd_count, size_t var_number,
   return 0;
 }
 
-struct movpair {
-  size_t number;
-  struct loc src;
-  struct loc dest;
-};
-
-/* When you see the label, this must be called _before_ setting
-   ld->label_found! */
-void mov_and_add_vardata(struct labeldata *ld,
-                         struct frame *h, struct objfile *f) {
-  struct movpair *movpack = NULL;
-  size_t movpack_count = 0;
-  size_t movpack_limit = 0;
-
-  for (size_t i = 0, e = ld->captured_vardata_count; i < e; i++) {
-    size_t hi;
-    if (lookup_vardata(h->vardata, h->vardata_count, ld->captured_vardata[i].number, &hi)) {
-      struct vardata *datum = &h->vardata[hi];
-      /* The frame has the given var for the label, so move it to the right place. */
-      if (!loc_equal(datum->loc, ld->captured_vardata[i].loc)) {
-        struct movpair mp;
-        mp.number = datum->number;
-        mp.src = datum->loc;
-        mp.dest = ld->captured_vardata[i].loc;
-        SLICE_PUSH(movpack, movpack_count, movpack_limit, mp);
-      } else {
-        /* Do nothing -- it's already in the right place. */
-      }
-    } else {
-      /* The frame doesn't have the given var for the label. */
+int gen_immediate_numeric_literal(struct ast_numeric_literal *a,
+                                  struct loc *return_val_out) {
+  switch (a->numeric_type) {
+  case AST_NUMERIC_TYPE_SIGNED: {
+    int32_t value;
+    if (!numeric_literal_to_i32(a->digits, a->digits_count, &value)) {
+      return 0;
     }
-  }
 
-  /* Now add the current frame's vardata to the info. */
-  if (!ld->label_found) {
-    for (size_t i = 0, e = h->vardata_count; i < e; i++) {
-      size_t li;
-      if (lookup_vardata(ld->captured_vardata, ld->captured_vardata_count,
-                         h->vardata[i].number, &li)) {
-        /* The label already has a location for this variable -- it's
-           part of the movpack if necessary. */
-      } else {
-        /* Capture our frame's vardata.  The label adopts our frame's
-           variable location as its own. */
-        struct vardata vd;
-        vardata_init_copy(&vd, &h->vardata[i]);
-        SLICE_PUSH(ld->captured_vardata, ld->captured_vardata_count,
-                   ld->captured_vardata_limit, vd);
-      }
+    struct loc loc;
+    loc.tag = LOC_IMMEDIATE;
+    loc.u.imm.tag = IMMEDIATE_I32;
+    loc.u.imm.u.i32 = value;
+    *return_val_out = loc;
+    return 1;
+  } break;
+  case AST_NUMERIC_TYPE_UNSIGNED: {
+    uint32_t value;
+    if (!numeric_literal_to_u32(a->digits, a->digits_count, &value)) {
+      return 0;
     }
+
+    struct loc loc;
+    loc.tag = LOC_IMMEDIATE;
+    loc.u.imm.tag = IMMEDIATE_U32;
+    loc.u.imm.u.u32 = value;
+    *return_val_out = loc;
+    return 1;
+  } break;
+  default:
+    UNREACHABLE();
   }
-
-  /* TODO: Actually use the movpack to do a bunch of movs (instead of just updating h's locations). */
-  for (size_t i = 0; i < movpack_count; i++) {
-    size_t hi;
-    int success = lookup_vardata(h->vardata, h->vardata_count, movpack[i].number, &hi);
-    CHECK(success);
-    h->vardata[i].loc = movpack[i].dest;
-  }
-
-  (void)f;
-
-  free(movpack);
 }
 
-void gen_bracebody(struct checkstate *cs, struct objfile *f,
-                   struct frame *h, struct ast_bracebody *a) {
+void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
+  (void)f, (void)dest, (void)src;
+  /* TODO: Implement. */
+}
+
+void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc memory_loc) {
+  (void)f, (void)dest, (void)memory_loc;
+  /* TODO: Implement. */
+}
+
+void gen_call(struct objfile *f, uint32_t func_sti) {
+  (void)f, (void)func_sti;
+  /* TODO: Implement. */
+}
+
+/* An expr_return tells how gen_expr should provide the return value. */
+enum expr_return_tag {
+  /* The location where the data is to be returned is precisely
+     specified. */
+  EXPR_RETURN_DEMANDED,
+  /* The location is not specified -- gen_expr should write the
+     data's location to "loc", and preserve lvalues. */
+  EXPR_RETURN_OPEN,
+  /* The expr returns a boolean -- and instead of returning, it should
+     jmp to the given target, if true. */
+  EXPR_RETURN_JMP_IF_TRUE,
+  /* Likewise, only negated. */
+  EXPR_RETURN_JMP_IF_FALSE,
+};
+
+struct expr_return {
+  enum expr_return_tag tag;
+  union {
+    struct loc loc;
+    size_t jmp_target_number;
+  } u;
+};
+
+void expr_return_set(struct objfile *f, struct expr_return *er, struct loc loc) {
+  (void)f, (void)er, (void)loc;
+  TODO_IMPLEMENT;
+}
+
+struct expr_return open_expr_return(void) {
+  struct expr_return ret;
+  ret.tag = EXPR_RETURN_OPEN;
+  return ret;
+}
+
+struct expr_return demand_expr_return(struct loc loc) {
+  struct expr_return ret;
+  ret.tag = EXPR_RETURN_DEMANDED;
+  ret.u.loc = loc;
+  return ret;
+}
+
+/* TODO: Remove all uses of this. */
+struct expr_return placeholder_expr_return(void) {
+  return open_expr_return();
+}
+
+int gen_expr(struct checkstate *cs, struct objfile *f,
+             struct frame *h, struct ast_expr *a,
+             struct expr_return *ret);
+
+int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
+                     struct frame *h, struct ast_expr *a,
+                     struct loc *return_val_out) {
+  size_t args_count = a->u.funcall.args_count;
+
+  uint32_t return_size = kira_sizeof(&cs->nt,
+                                     &a->expr_info.concrete_type);
+
+  /* X86 */
+  struct loc return_loc;
+  if (return_size > 8) {
+    return_loc = frame_push_loc(h, return_size);
+  } else if (return_size > 4) {
+    /* There's no floating point which means it's in eax:edx. */
+    /* TODO: doublecheck */
+    return_loc.tag = LOC_BIREGISTER;
+    return_loc.u.bireg.lo = X86_EAX;
+    return_loc.u.bireg.hi = X86_EDX;
+  } else {
+    return_loc.tag = LOC_REGISTER;
+    return_loc.u.reg = X86_EAX;
+  }
+
+  for (size_t i = args_count; i > 0;) {
+    i--;
+
+    struct ast_expr *arg = &a->u.funcall.args[i];
+
+    struct loc arg_loc = frame_push_loc(h, kira_sizeof(&cs->nt,
+                                                       &arg->expr_info.concrete_type));
+
+    struct expr_return er = demand_expr_return(arg_loc);
+    /* TODO: gen_expr here could totally push stuff onto the stack and not pop it. */
+    if (!gen_expr(cs, f, h, arg, &er)) {
+      return 0;
+    }
+  }
+
+  if (return_size > 8) {
+    struct loc ptr_loc = frame_push_loc(h, DWORD_SIZE);
+    gen_mov_addressof(f, ptr_loc, return_loc);
+  }
+
+  struct expr_return func_er = open_expr_return();
+  if (!gen_expr(cs, f, h, a->u.funcall.func, &func_er)) {
+    return 0;
+  }
+
+  if (func_er.u.loc.tag == LOC_IMMEDIATE) {
+    CHECK(func_er.u.loc.u.imm.tag == IMMEDIATE_FUNC);
+    gen_call(f, func_er.u.loc.u.imm.u.func_sti);
+  } else {
+    ERR_DBG("Indirect function calls not yet supported.\n");
+    return 0;
+    /* TODO: Support indirect function calls. */
+  }
+
+  *return_val_out = return_loc;
+  return 1;
+}
+
+void gen_i32_negate(struct objfile *f, struct frame *h,
+                    struct loc dest, struct loc src) {
+  (void)f, (void)h, (void)dest, (void)src;
+  /* TODO: Implement (with overflow check). */
+}
+
+int gen_unop_expr(struct checkstate *cs, struct objfile *f,
+                  struct frame *h, struct ast_expr *a,
+                  struct expr_return *er) {
+  struct ast_unop_expr *ue = &a->u.unop_expr;
+  switch (ue->operator) {
+  case AST_UNOP_DEREFERENCE: {
+    struct expr_return rhs_er = open_expr_return();
+    if (!gen_expr(cs, f, h, ue->rhs, &rhs_er)) {
+      return 0;
+    }
+
+    if (rhs_er.u.loc.tag & LOC_INDIRECT) {
+      struct loc ret = register_loc(h);
+      gen_mov(f, ret, rhs_er.u.loc);
+      ret.tag |= LOC_INDIRECT;
+      expr_return_set(f, er, ret);
+      return 1;
+    } else {
+      struct loc ret = rhs_er.u.loc;
+      ret.tag |= LOC_INDIRECT;
+      expr_return_set(f, er, ret);
+      return 1;
+    }
+  } break;
+  case AST_UNOP_ADDRESSOF: {
+    struct expr_return rhs_er = open_expr_return();
+    if (!gen_expr(cs, f, h, ue->rhs, &rhs_er)) {
+      return 0;
+    }
+
+    struct loc ret = register_loc(h);
+    gen_mov_addressof(f, ret, rhs_er.u.loc);
+    expr_return_set(f, er, ret);
+    return 1;
+  } break;
+  case AST_UNOP_NEGATE: {
+    /* Right now the only type of negation is i32 negation. */
+    struct expr_return rhs_er = open_expr_return();
+    if (!gen_expr(cs, f, h, ue->rhs, &rhs_er)) {
+      return 0;
+    }
+
+    struct loc ret = register_loc(h);
+    gen_i32_negate(f, h, ret, rhs_er.u.loc);
+    expr_return_set(f, er, ret);
+    /* TODO: gen_negate needs to jump upon overflow. */
+    return 1;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+
+void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number) {
+  struct jmpdata jd;
+  jd.target_number = target_number;
+  jd.jmp_location = objfile_section_size(objfile_text(f));
+  SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
+}
+
+int gen_binop_expr(struct checkstate *cs, struct objfile *f,
+                   struct frame *h, struct ast_expr *a,
+                   struct expr_return *er) {
+  (void)cs, (void)f, (void)h, (void)a, (void)er;
+  TODO_IMPLEMENT;
+}
+
+int gen_expr(struct checkstate *cs, struct objfile *f,
+             struct frame *h, struct ast_expr *a,
+             struct expr_return *er) {
+  switch (a->tag) {
+  case AST_EXPR_NAME: {
+    CHECK(a->u.name.info.info_valid);
+    struct def_instantiation *inst = a->u.name.info.inst_or_null;
+    if (inst) {
+      CHECK(inst->symbol_table_index_computed);
+      if (typeexpr_is_func_type(cs->im, &inst->type)) {
+        struct loc loc;
+        loc.tag = LOC_IMMEDIATE;
+        loc.u.imm.tag = IMMEDIATE_FUNC;
+        loc.u.imm.u.func_sti = inst->symbol_table_index;
+        expr_return_set(f, er, loc);
+      } else {
+        struct loc loc;
+        loc.tag = LOC_GLOBAL;
+        loc.u.global_sti = inst->symbol_table_index;
+        expr_return_set(f, er, loc);
+      }
+    } else {
+      size_t vi;
+      int found_vi = lookup_vardata_by_name(h, a->u.name.ident.value, &vi);
+      CHECK(found_vi);
+      expr_return_set(f, er, h->vardata[vi].loc);
+    }
+    return 1;
+  } break;
+  case AST_EXPR_NUMERIC_LITERAL: {
+    struct loc loc;
+    if (!gen_immediate_numeric_literal(&a->u.numeric_literal, &loc)) {
+      return 0;
+    }
+    expr_return_set(f, er, loc);
+    return 1;
+  } break;
+  case AST_EXPR_FUNCALL: {
+    struct loc loc;
+    if (!gen_funcall_expr(cs, f, h, a, &loc)) {
+      return 0;
+    }
+    expr_return_set(f, er, loc);
+    return 1;
+  } break;
+  case AST_EXPR_UNOP: {
+    return gen_unop_expr(cs, f, h, a, er);
+  } break;
+  case AST_EXPR_BINOP: {
+    return gen_binop_expr(cs, f, h, a, er);
+  } break;
+  default:
+    TODO_IMPLEMENT;
+  }
+}
+
+void gen_return(struct checkstate *cs, struct objfile *f,
+                struct frame *h) {
+  (void)cs, (void)f, (void)h;
+  /* TODO: Implement. */
+}
+
+int gen_bracebody(struct checkstate *cs, struct objfile *f,
+                  struct frame *h, struct ast_bracebody *a) {
   size_t vars_pushed = 0;
 
   for (size_t i = 0, e = a->statements_count; i < e; i++) {
     struct ast_statement *s = &a->statements[i];
     switch (s->tag) {
     case AST_STATEMENT_EXPR: {
-      struct loc discard;
-      gen_expr(cs, f, h, s->u.expr, &discard);
+      struct expr_return er = open_expr_return();
+      if (!gen_expr(cs, f, h, s->u.expr, &er)) {
+        return 0;
+      }
     } break;
     case AST_STATEMENT_RETURN_EXPR: {
-      struct loc loc;
-      gen_expr(cs, f, h, s->u.return_expr, &loc);
+      struct expr_return er = demand_expr_return(frame_return_loc(h));
+      if (!gen_expr(cs, f, h, s->u.return_expr, &er)) {
+        return 0;
+      }
 
-      gen_return(cs, f, h, loc);
+      gen_return(cs, f, h);
     } break;
     case AST_STATEMENT_VAR: {
-      struct loc loc;
-      gen_expr(cs, f, h, s->u.var_statement.rhs, &loc);
+      struct loc var_loc = frame_push_loc(h, kira_sizeof(&cs->nt, &s->u.var_statement.info.concrete_type));
+
+      struct expr_return er = demand_expr_return(var_loc);
+      if (!gen_expr(cs, f, h, s->u.var_statement.rhs, &er)) {
+        return 0;
+      }
+
       struct vardata vd;
       size_t var_number = h->var_number;
       h->var_number++;
@@ -392,23 +794,23 @@ void gen_bracebody(struct checkstate *cs, struct objfile *f,
                    var_number,
                    &s->u.var_statement.info.concrete_type,
                    kira_sizeof(&cs->nt, &s->u.var_statement.info.concrete_type),
-                   loc);
+                   var_loc);
       SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
     } break;
     case AST_STATEMENT_GOTO: {
       struct labeldata *data = frame_try_find_labeldata(h, s->u.goto_statement.target.value);
       if (data) {
         /* The label is seen -- it has info on its var locations. */
-        mov_and_add_vardata(data, h, f);
-        /* TODO: Generate a jmp. */
+        gen_placeholder_jmp(f, h, data->target_number);
       } else {
+        size_t target_number = frame_add_target(h);
         /* The label is not seen yet -- plainly impose our var locations upon it! */
         struct labeldata ld;
         labeldata_init(&ld, s->u.goto_statement.target.value,
-                       h->vardata, h->vardata_count,
+                       target_number,
                        0);
         SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
-        /* TODO: Generate a placeholder jmp. */
+        gen_placeholder_jmp(f, h, target_number);
       }
     } break;
     case AST_STATEMENT_LABEL: {
@@ -416,13 +818,16 @@ void gen_bracebody(struct checkstate *cs, struct objfile *f,
       if (data) {
         /* The goto was seen -- it has info on our var locations. */
         CHECK(!data->label_found);
-        mov_and_add_vardata(data, h, f);
         data->label_found = 1;
+        frame_define_target(h, data->target_number, objfile_section_size(objfile_text(f)));
       } else {
+        size_t target_number = frame_add_target(h);
+        frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
+
         /* The goto was not seen yet -- define our own var locations! */
         struct labeldata ld;
         labeldata_init(&ld, s->u.label_statement.label.value,
-                       h->vardata, h->vardata_count,
+                       target_number,
                        1);
         SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
       }
@@ -439,8 +844,11 @@ void gen_bracebody(struct checkstate *cs, struct objfile *f,
   }
 
   for (size_t i = 0; i < vars_pushed; i++) {
+    /* TODO: Just do frame_reset or something, it's more reliable. */
+    frame_pop(h, h->vardata[size_sub(h->vardata_count, 1)].size);
     SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
   }
+  return 1;
 }
 
 void gen_function_intro(struct objfile *f, struct frame *h) {
@@ -453,8 +861,8 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
   /* TODO: leave, ret */
 }
 
-void gen_lambda_expr(struct checkstate *cs, struct objfile *f,
-                     struct ast_expr *a) {
+int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
+                    struct ast_expr *a) {
   CHECK(a->tag == AST_EXPR_LAMBDA);
   struct frame h;
   frame_init(&h);
@@ -463,12 +871,15 @@ void gen_lambda_expr(struct checkstate *cs, struct objfile *f,
 
   gen_function_intro(f, &h);
 
-  gen_bracebody(cs, f, &h, &a->u.lambda.bracebody);
+  int res = gen_bracebody(cs, f, &h, &a->u.lambda.bracebody);
 
-  gen_function_exit(f, &h);
+  if (res) {
+    gen_function_exit(f, &h);
+  }
   /* TODO: Someplace we have to update goto destinations and such. */
 
   frame_destroy(&h);
+  return res;
 }
 
 int build_instantiation(struct checkstate *cs, struct objfile *f,

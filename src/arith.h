@@ -21,6 +21,7 @@ uint32_t size_to_uint32(size_t x);
 
 int try_int32_add(int32_t x, int32_t y, int32_t *out);
 int try_int32_sub(int32_t x, int32_t y, int32_t *out);
+int32_t int32_sub(int32_t x, int32_t y);
 int try_int32_mul(int32_t x, int32_t y, int32_t *out);
 int32_t int32_add(int32_t x, int32_t y);
 int32_t int32_div(int32_t x, int32_t y);

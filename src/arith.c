@@ -125,6 +125,13 @@ int try_int32_sub(int32_t x, int32_t y, int32_t *out) {
   return 1;
 }
 
+int32_t int32_sub(int32_t x, int32_t y) {
+  int32_t ret;
+  int success = try_int32_sub(x, y, &ret);
+  CHECK(success);
+  return ret;
+}
+
 int try_int32_mul(int32_t x, int32_t y, int32_t *out) {
   int64_t xll = x;
   int64_t yll = y;
