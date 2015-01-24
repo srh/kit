@@ -438,8 +438,8 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
     loc.u.ebp_offset = 2 * DWORD_SIZE;
     frame_specify_return_loc(h, loc);
   } else if (return_type_size > 4) {
+    /* WINDOWS */
     struct loc loc;
-    /* TODO: doublecheck */
     loc.tag = LOC_BIREGISTER;
     loc.u.bireg.lo = X86_EAX;
     loc.u.bireg.hi = X86_EDX;
@@ -552,11 +552,6 @@ struct expr_return demand_expr_return(struct loc loc) {
   return ret;
 }
 
-/* TODO: Remove all uses of this. */
-struct expr_return placeholder_expr_return(void) {
-  return open_expr_return();
-}
-
 int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *ret);
@@ -575,7 +570,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     return_loc = frame_push_loc(h, return_size);
   } else if (return_size > 4) {
     /* There's no floating point which means it's in eax:edx. */
-    /* TODO: doublecheck */
+    /* WINDOWS */
     return_loc.tag = LOC_BIREGISTER;
     return_loc.u.bireg.lo = X86_EAX;
     return_loc.u.bireg.hi = X86_EDX;
