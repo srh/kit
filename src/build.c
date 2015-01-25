@@ -558,16 +558,25 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
 
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
-                     struct loc *return_val_out) {
+                     struct expr_return *er) {
   size_t args_count = a->u.funcall.args_count;
 
   uint32_t return_size = kira_sizeof(&cs->nt,
                                      &a->expr_info.concrete_type);
 
   /* X86 */
+  int memory_demanded = (er->tag == EXPR_RETURN_DEMANDED
+                         && (er->u.loc.tag == LOC_EBP_OFFSET
+                             || er->u.loc.tag == LOC_GLOBAL
+                             || (er->u.loc.tag & LOC_INDIRECT)));
   struct loc return_loc;
+
   if (return_size > 8) {
-    return_loc = frame_push_loc(h, return_size);
+    if (memory_demanded) {
+      return_loc = er->u.loc;
+    } else {
+      return_loc = frame_push_loc(h, return_size);
+    }
   } else if (return_size > 4) {
     /* There's no floating point which means it's in eax:edx. */
     /* WINDOWS */
@@ -588,10 +597,11 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                                                        &arg->expr_info.concrete_type));
 
     struct expr_return er = demand_expr_return(arg_loc);
-    /* TODO: gen_expr here could totally push stuff onto the stack and not pop it. */
+    int32_t saved_offset = frame_save_offset(h);
     if (!gen_expr(cs, f, h, arg, &er)) {
       return 0;
     }
+    frame_restore_offset(h, saved_offset);
   }
 
   if (return_size > 8) {
@@ -600,9 +610,11 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   }
 
   struct expr_return func_er = open_expr_return();
+  int32_t saved_offset = frame_save_offset(h);
   if (!gen_expr(cs, f, h, a->u.funcall.func, &func_er)) {
     return 0;
   }
+  frame_restore_offset(h, saved_offset);
 
   if (func_er.u.loc.tag == LOC_IMMEDIATE) {
     CHECK(func_er.u.loc.u.imm.tag == IMMEDIATE_FUNC);
@@ -613,7 +625,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     /* TODO: Support indirect function calls. */
   }
 
-  *return_val_out = return_loc;
+  expr_return_set(f, er, return_loc);
   return 1;
 }
 
@@ -729,12 +741,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_FUNCALL: {
-    struct loc loc;
-    if (!gen_funcall_expr(cs, f, h, a, &loc)) {
-      return 0;
-    }
-    expr_return_set(f, er, loc);
-    return 1;
+    return gen_funcall_expr(cs, f, h, a, er);
   } break;
   case AST_EXPR_UNOP: {
     return gen_unop_expr(cs, f, h, a, er);
