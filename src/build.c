@@ -164,15 +164,14 @@ struct loc {
 };
 
 enum x86_reg {
-  /* TODO: Double-check order. */
   X86_EAX,
   X86_ECX,
   X86_EDX,
   X86_EBX,
-  X86_ESI,
-  X86_EDI,
   X86_ESP,
   X86_EBP,
+  X86_ESI,
+  X86_EDI,
 };
 
 int loc_equal(struct loc a, struct loc b) {
@@ -498,17 +497,17 @@ int gen_immediate_numeric_literal(struct ast_numeric_literal *a,
 
 void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   (void)f, (void)dest, (void)src;
-  /* TODO: Implement. */
+  TODO_IMPLEMENT;
 }
 
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc memory_loc) {
   (void)f, (void)dest, (void)memory_loc;
-  /* TODO: Implement. */
+  TODO_IMPLEMENT;
 }
 
 void gen_call(struct objfile *f, uint32_t func_sti) {
   (void)f, (void)func_sti;
-  /* TODO: Implement. */
+  TODO_IMPLEMENT;
 }
 
 /* An expr_return tells how gen_expr should provide the return value. */
@@ -632,7 +631,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 void gen_i32_negate(struct objfile *f, struct frame *h,
                     struct loc dest, struct loc src) {
   (void)f, (void)h, (void)dest, (void)src;
-  /* TODO: Implement (with overflow check). */
+  TODO_IMPLEMENT;
 }
 
 int gen_unop_expr(struct checkstate *cs, struct objfile *f,
@@ -757,12 +756,13 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
 void gen_return(struct checkstate *cs, struct objfile *f,
                 struct frame *h) {
   (void)cs, (void)f, (void)h;
-  /* TODO: Implement. */
+  TODO_IMPLEMENT;
 }
 
 int gen_bracebody(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_bracebody *a) {
   size_t vars_pushed = 0;
+  int32_t initial_stack_offset = h->stack_offset;
 
   for (size_t i = 0, e = a->statements_count; i < e; i++) {
     struct ast_statement *s = &a->statements[i];
@@ -850,17 +850,26 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
     frame_pop(h, h->vardata[size_sub(h->vardata_count, 1)].size);
     SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
   }
+
+  CHECK(h->stack_offset == initial_stack_offset);
   return 1;
 }
 
 void gen_function_intro(struct objfile *f, struct frame *h) {
+  /* X86 */
+  push_ebp
   (void)f, (void)h;
-  /* TODO: push ebp, mov esp ebp */
+  TODO_IMPLEMENT;
 }
 
 void gen_function_exit(struct objfile *f, struct frame *h) {
   (void)f, (void)h;
-  /* TODO: leave, ret */
+  TODO_IMPLEMENT;
+}
+
+int tie_gotos(struct objfile *f, struct frame *h) {
+  (void)f, (void)h;
+  TODO_IMPLEMENT;
 }
 
 int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
@@ -877,8 +886,8 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
 
   if (res) {
     gen_function_exit(f, &h);
+    res = tie_gotos(f, &h);
   }
-  /* TODO: Someplace we have to update goto destinations and such. */
 
   frame_destroy(&h);
   return res;
