@@ -707,6 +707,12 @@ void objfile_section_append_raw(struct objfile_section *s,
   databuf_append(&s->raw, buf, n);
 }
 
+void objfile_section_overwrite_raw(struct objfile_section *s,
+                                   size_t offset,
+                                   const void *buf, size_t n) {
+  databuf_overwrite(&s->raw, offset, buf, n);
+}
+
 void objfile_section_align_dword(struct objfile_section *s) {
   append_zeros_to_align(&s->raw, 4);
   if (s->max_requested_alignment < 4) {

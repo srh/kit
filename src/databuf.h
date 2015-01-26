@@ -15,5 +15,7 @@ void databuf_destroy(struct databuf *b);
 void databuf_move_destroy(struct databuf *b,
                           void **buf_out, size_t *count_out);
 void databuf_append(struct databuf *b, const void *p, size_t count);
+void databuf_overwrite(struct databuf *b, size_t offset,
+                       const void *p, size_t count);
 
 #endif /* KIRA_DATABUF_H_ */

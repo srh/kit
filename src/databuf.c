@@ -43,3 +43,9 @@ void databuf_append(struct databuf *b, const void *p, size_t count) {
   ok_memcpy(b->buf + b->count, p, count);
   b->count = size_add(b->count, count);
 }
+
+void databuf_overwrite(struct databuf *b, size_t offset,
+                       const void *p, size_t count) {
+  CHECK(size_add(offset, count) <= b->count);
+  ok_memcpy(b->buf + offset, p, count);
+}

@@ -19,6 +19,11 @@ size_t size_sub(size_t x, size_t y) {
   return x - y;
 }
 
+int32_t size_to_int32(size_t x) {
+  CHECK(x <= INT32_MAX);
+  return (int32_t)x;
+}
+
 int try_uint32_mul(uint32_t x, uint32_t y, uint32_t *out) {
   if (y == 0 || x <= UINT32_MAX / y) {
     *out = x * y;
@@ -121,7 +126,7 @@ int try_int32_sub(int32_t x, int32_t y, int32_t *out) {
       return 0;
     }
   }
-  *out = x + y;
+  *out = x - y;
   return 1;
 }
 

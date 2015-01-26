@@ -263,6 +263,17 @@ struct jmpdata {
   size_t jmp_location;
 };
 
+struct reset_esp_data {
+  /* The .text offset where we need to reset esp. */
+  size_t reset_esp_offset;
+  /* esp's current offset relative to ebp, when we need to reset it.
+     (This is a nonpositive value). */
+  int32_t ebp_offset;
+  /* Says whether we're setting esp to ebp_offset or setting esp back
+     from ebp_offset. */
+  int downward;
+};
+
 struct frame {
   size_t var_number;
 
@@ -282,13 +293,24 @@ struct frame {
   size_t jmpdata_count;
   size_t jmpdata_limit;
 
+  struct reset_esp_data *espdata;
+  size_t espdata_count;
+  size_t espdata_limit;
+
   int return_loc_valid;
   struct loc return_loc;
+
+  int return_target_valid;
+  size_t return_target_number;
 
   /* The offset (relative to ebp) of "free space" available --
      e.g. esp is at or below this address, but you could wipe anywhere
      below here without harm. */
   int32_t stack_offset;
+  /* min_stack_offset tells us where to put esp.  TODO: Must esp be 8-
+     or 16-byte aligned?  For function calls?  Remember that ret ptr
+     and ebp take up 8 bytes.  */
+  int32_t min_stack_offset;
 };
 
 void frame_init(struct frame *h) {
@@ -310,9 +332,16 @@ void frame_init(struct frame *h) {
   h->jmpdata_count = 0;
   h->jmpdata_limit = 0;
 
+  h->espdata = NULL;
+  h->espdata_count = 0;
+  h->espdata_limit = 0;
+
   h->return_loc_valid = 0;
 
+  h->return_target_valid = 0;
+
   h->stack_offset = 0;
+  h->min_stack_offset = 0;
 }
 
 void frame_destroy(struct frame *h) {
@@ -328,6 +357,10 @@ void frame_destroy(struct frame *h) {
   h->jmpdata = NULL;
   h->jmpdata_count = 0;
   h->jmpdata_limit = 0;
+  free(h->espdata);
+  h->espdata = NULL;
+  h->espdata_count = 0;
+  h->espdata_limit = 0;
 }
 
 void frame_specify_return_loc(struct frame *h, struct loc loc) {
@@ -370,6 +403,9 @@ struct loc frame_push_loc(struct frame *h, uint32_t size) {
   /* X86 */
   uint32_t aligned = uint32_ceil_aligned(size, DWORD_SIZE);
   h->stack_offset = int32_sub(h->stack_offset, uint32_to_int32(aligned));
+  if (h->stack_offset < h->min_stack_offset) {
+    h->min_stack_offset = h->stack_offset;
+  }
   struct loc ret;
   ret.tag = LOC_EBP_OFFSET;
   ret.size = size;
@@ -413,7 +449,7 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
 
   uint32_t return_type_size = kira_sizeof(&cs->nt, return_type);
 
-  int32_t offset = (2 + (return_type_size > 8)) * DWORD_SIZE;
+  int32_t offset = (2 + (return_type_size > 2 * DWORD_SIZE)) * DWORD_SIZE;
 
   for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
     struct ast_typeexpr *param_type = &type->u.app.params[i];
@@ -437,13 +473,13 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
                        uint32_to_int32(uint32_ceil_aligned(size, DWORD_SIZE)));
   }
 
-  if (return_type_size > 8) {
+  if (return_type_size > 2 * DWORD_SIZE) {
     struct loc loc;
     loc.tag = LOC_EBP_OFFSET | LOC_INDIRECT;
     loc.size = return_type_size;
     loc.u.ebp_offset = 2 * DWORD_SIZE;
     frame_specify_return_loc(h, loc);
-  } else if (return_type_size > 4) {
+  } else if (return_type_size > DWORD_SIZE) {
     /* WINDOWS */
     struct loc loc;
     loc.tag = LOC_BIREGISTER;
@@ -506,9 +542,197 @@ int gen_immediate_numeric_literal(struct ast_numeric_literal *a,
   }
 }
 
-void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
-  (void)f, (void)dest, (void)src;
-  TODO_IMPLEMENT;
+uint8_t mod_reg_rm(int mod, int reg, int rm) {
+  return (uint8_t)((mod << 6) | (reg << 3) | rm);
+}
+
+#define MOD00 0
+#define MOD01 1
+#define MOD10 2
+#define MOD11 3
+
+void x86_gen_push32(struct objfile *f, enum x86_reg reg) {
+  uint8_t b = 0x50 + (uint8_t)reg;
+  objfile_section_append_raw(objfile_text(f), &b, 1);
+}
+
+void x86_gen_pop32(struct objfile *f, enum x86_reg reg) {
+  uint8_t b = 0x58 + (uint8_t)reg;
+  objfile_section_append_raw(objfile_text(f), &b, 1);
+}
+
+void x86_gen_ret(struct objfile *f) {
+  uint8_t b = 0xC3;
+  objfile_section_append_raw(objfile_text(f), &b, 1);
+}
+
+void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
+  uint8_t b[2];
+  b[0] = 0x8B;
+  b[1] = mod_reg_rm(MOD11, dest, src);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
+                           struct immediate imm) {
+  uint8_t b = 0xB8 + (uint8_t)dest;
+  objfile_section_append_raw(objfile_text(f), &b, 1);
+  switch (imm.tag) {
+  case IMMEDIATE_FUNC: {
+    /* TODO: Is dir32 the right one? */
+    objfile_section_append_dir32(objfile_text(f), imm.u.func_sti);
+  } break;
+  case IMMEDIATE_U32: {
+    /* LITTLEENDIAN etc. */
+    objfile_section_append_raw(objfile_text(f), &imm.u.u32, sizeof(uint32_t));
+  } break;
+  case IMMEDIATE_I32: {
+    /* LITTLEENDIAN etc. */
+    objfile_section_append_raw(objfile_text(f), &imm.u.i32, sizeof(int32_t));
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
+  int8_t b[6];
+  b[0] = 0x81;
+  b[1] = mod_reg_rm(MOD11, 0, X86_ESP);
+  STATIC_CHECK(sizeof(int32_t) == 4);
+  ok_memcpy(b + 2, &x, sizeof(int32_t));
+  objfile_section_append_raw(objfile_text(f), b, 6);
+}
+
+void gen_placeholder_stack_adjustment(struct objfile *f,
+                                      struct frame *h,
+                                      int downward) {
+  struct reset_esp_data red;
+  red.reset_esp_offset = objfile_section_size(objfile_text(f));
+  red.ebp_offset = h->stack_offset;
+  red.downward = downward;
+  SLICE_PUSH(h->espdata, h->espdata_count, h->espdata_limit, red);
+  uint8_t b[6] = { 0x81, 0 };
+  b[1] = mod_reg_rm(MOD11, 0, X86_ESP);
+  objfile_section_append_raw(objfile_text(f), b, 6);
+}
+
+void replace_placeholder_stack_adjustment(struct objfile *f,
+                                          size_t location,
+                                          int32_t stack_adjustment) {
+  objfile_section_overwrite_raw(objfile_text(f),
+                                location + 2,
+                                &stack_adjustment,
+                                sizeof(stack_adjustment));
+}
+
+/* Check callers if max count returned increases. */
+size_t x86_encode_reg_rm(uint8_t *b, int reg, enum x86_reg rm_addr,
+                         int32_t rm_addr_disp) {
+  if (rm_addr_disp == 0 && rm_addr != X86_ESP && rm_addr != X86_EBP) {
+    b[0] = mod_reg_rm(MOD00, reg, rm_addr);
+    return 1;
+  } else if (rm_addr == X86_ESP) {
+    TODO_IMPLEMENT;
+  } else if (rm_addr_disp >= -128 && rm_addr_disp <= 127) {
+    b[0] = mod_reg_rm(MOD01, reg, rm_addr);
+    b[1] = (int8_t)rm_addr_disp;
+    return 2;
+  } else {
+    b[0] = mod_reg_rm(MOD10, reg, rm_addr);
+    STATIC_CHECK(sizeof(rm_addr_disp) == 4);
+    ok_memcpy(b + 1, &rm_addr_disp, sizeof(rm_addr_disp));
+    return 5;
+  }
+}
+
+void x86_gen_load32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
+                    int32_t src_disp) {
+  uint8_t b[10];
+  b[0] = 0x8B;
+  size_t count = x86_encode_reg_rm(b + 1, dest, src_addr, src_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 1);
+}
+
+int x86_reg_has_lowbyte(enum x86_reg reg) {
+  return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
+}
+
+void x86_gen_load8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
+                   int32_t src_disp) {
+  CHECK(x86_reg_has_lowbyte(dest));
+  uint8_t b[10];
+  b[0] = 0x8A;
+  size_t count = x86_encode_reg_rm(b + 1, dest, src_addr, src_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 1);
+}
+
+void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, uint32_t dest_disp,
+                     enum x86_reg src) {
+  uint8_t b[10];
+  b[0] = 0x89;
+  size_t count = x86_encode_reg_rm(b + 1, src, dest_addr, dest_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 1);
+}
+
+void x86_gen_store8(struct objfile *f, enum x86_reg dest_addr, uint32_t dest_disp,
+                    enum x86_reg src) {
+  CHECK(x86_reg_has_lowbyte(src));
+  uint8_t b[10];
+  b[0] = 0x88;
+  size_t count = x86_encode_reg_rm(b + 1, src, dest_addr, dest_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 1);
+}
+
+void gen_function_intro(struct objfile *f, struct frame *h) {
+  /* X86 */
+  x86_gen_push32(f, X86_EBP);
+  x86_gen_mov_reg32(f, X86_EBP, X86_ESP);
+  gen_placeholder_stack_adjustment(f, h, 1);
+}
+
+void gen_function_exit(struct objfile *f, struct frame *h) {
+  if (h->return_target_valid) {
+    frame_define_target(h, h->return_target_number,
+                        objfile_section_size(objfile_text(f)));
+  }
+  x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
+  x86_gen_pop32(f, X86_EBP);
+  x86_gen_ret(f);
+}
+
+enum x86_reg choose_register_2(enum x86_reg used1, enum x86_reg used2) {
+  if (used1 == X86_EAX || used2 == X86_EAX) {
+    if (used1 == X86_ECX || used2 == X86_ECX) {
+      return X86_EDX;
+    } else {
+      return X86_ECX;
+    }
+  } else {
+    return X86_EAX;
+  }
+}
+
+/* Chooses a register (one of EAX, ECX, EDX) that doesn't conflict
+   with register_user. */
+enum x86_reg choose_register(struct loc register_user) {
+  int tag_lo = (register_user.tag & (LOC_INDIRECT - 1));
+  if (tag_lo == LOC_REGISTER) {
+    if (register_user.u.reg == X86_EAX) {
+      return X86_ECX;
+    } else {
+      return X86_EAX;
+    }
+  } else if (tag_lo == LOC_BIREGISTER) {
+    return choose_register_2(register_user.u.bireg.lo,
+                             register_user.u.bireg.hi);
+  } else {
+    return X86_EAX;
+  }
 }
 
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc memory_loc) {
@@ -516,9 +740,105 @@ void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc memory_loc
   TODO_IMPLEMENT;
 }
 
-void gen_call(struct objfile *f, uint32_t func_sti) {
-  (void)f, (void)func_sti;
-  TODO_IMPLEMENT;
+/* Makes the memory not be "too" indirect. */
+struct loc make_movable(struct objfile *f, struct loc loc, struct loc register_user) {
+  if (loc.tag & LOC_INDIRECT) {
+    int tag_lo = (loc.tag & (LOC_INDIRECT - 1));
+    if (tag_lo == LOC_EBP_OFFSET) {
+      struct loc x;
+      x.tag = LOC_REGISTER;
+      x.size = DWORD_SIZE;
+      x.u.reg = choose_register(register_user);
+
+      gen_mov_addressof(f, x, loc);
+
+      x.size = loc.size;
+      x.tag |= LOC_INDIRECT;
+      return x;
+    } else if (tag_lo == LOC_REGISTER) {
+      return loc;
+    } else {
+      CRASH("Bad indirect loc.\n");
+    }
+  } else {
+    return loc;
+  }
+}
+
+void gen_memmem_mov(struct objfile *f,
+                    enum x86_reg dest_reg,
+                    int32_t dest_disp,
+                    enum x86_reg src_reg,
+                    int32_t src_disp,
+                    uint32_t usize) {
+  int32_t size = uint32_to_int32(usize);
+  enum x86_reg reg = choose_register_2(dest_reg, src_reg);
+  int32_t n = 0;
+  while (n < size) {
+    if (size - n >= DWORD_SIZE) {
+      x86_gen_load32(f, reg, src_reg, int32_add(n, src_disp));
+      x86_gen_store32(f, dest_reg, int32_add(n, dest_disp), reg);
+      n += DWORD_SIZE;
+    } else {
+      x86_gen_load8(f, reg, src_reg, int32_add(n, src_disp));
+      x86_gen_store8(f, dest_reg, int32_add(n, dest_disp), reg);
+      n += 1;
+    }
+  }
+}
+
+/* When we call this, the only things using registers (besides esp and
+   ebp) are dest or loc. */
+void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
+  CHECK(dest.size == src.size);
+  if (loc_equal(dest, src)) {
+    return;
+  }
+
+  CHECK((dest.tag & (LOC_INDIRECT - 1)) != LOC_IMMEDIATE);
+  CHECK((dest.tag & (LOC_INDIRECT - 1)) != LOC_GLOBAL);
+
+  dest = make_movable(f, dest, src);
+  src = make_movable(f, src, dest);
+
+  if (dest.tag == (LOC_REGISTER | LOC_INDIRECT)) {
+    if (src.tag == (LOC_REGISTER | LOC_INDIRECT)) {
+      gen_memmem_mov(f, dest.u.reg, 0, src.u.reg, 0, src.size);
+    } else {
+      TODO_IMPLEMENT;
+    }
+  } else if (dest.tag == LOC_EBP_OFFSET) {
+    if (src.tag == (LOC_REGISTER | LOC_INDIRECT)) {
+      gen_memmem_mov(f, X86_EBP, dest.u.ebp_offset, src.u.reg, 0, src.size);
+    } else if (src.tag == LOC_EBP_OFFSET) {
+      gen_memmem_mov(f, X86_EBP, dest.u.ebp_offset, X86_EBP, src.u.ebp_offset, src.size);
+    } else {
+      TODO_IMPLEMENT;
+    }
+  } else if (dest.tag == LOC_REGISTER) {
+    CHECK(dest.size <= DWORD_SIZE);
+    if (src.tag == (LOC_REGISTER | LOC_INDIRECT)) {
+      x86_gen_load32(f, dest.u.reg, src.u.reg, 0);
+    } else if (src.tag == LOC_EBP_OFFSET) {
+      x86_gen_load32(f, dest.u.reg, X86_EBP, src.u.ebp_offset);
+    } else if (src.tag == LOC_REGISTER) {
+      x86_gen_mov_reg32(f, dest.u.reg, src.u.reg);
+    } else if (src.tag == LOC_GLOBAL) {
+      TODO_IMPLEMENT;
+    } else if (src.tag == LOC_IMMEDIATE) {
+      x86_gen_mov_reg_imm32(f, dest.u.reg, src.u.imm);
+    }
+  } else if (dest.tag == LOC_BIREGISTER) {
+    TODO_IMPLEMENT;
+  } else {
+    UNREACHABLE();
+  }
+}
+
+void x86_gen_call(struct objfile *f, uint32_t func_sti) {
+  uint8_t b = 0xE8;
+  objfile_section_append_raw(objfile_text(f), &b, 1);
+  objfile_section_append_rel32(objfile_text(f), func_sti);
 }
 
 /* An expr_return tells how gen_expr should provide the return value. */
@@ -545,8 +865,20 @@ struct expr_return {
 };
 
 void expr_return_set(struct objfile *f, struct expr_return *er, struct loc loc) {
-  (void)f, (void)er, (void)loc;
-  TODO_IMPLEMENT;
+  switch (er->tag) {
+  case EXPR_RETURN_DEMANDED: {
+    gen_mov(f, er->u.loc, loc);
+  } break;
+  case EXPR_RETURN_OPEN: {
+    er->u.loc = loc;
+  } break;
+  case EXPR_RETURN_JMP_IF_TRUE: /* fall-through */
+  case EXPR_RETURN_JMP_IF_FALSE: {
+    TODO_IMPLEMENT;
+  } break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 struct expr_return open_expr_return(void) {
@@ -581,13 +913,13 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                              || (er->u.loc.tag & LOC_INDIRECT)));
   struct loc return_loc;
 
-  if (return_size > 8) {
+  if (return_size > 2 * DWORD_SIZE) {
     if (memory_demanded) {
       return_loc = er->u.loc;
     } else {
       return_loc = frame_push_loc(h, return_size);
     }
-  } else if (return_size > 4) {
+  } else if (return_size > DWORD_SIZE) {
     /* There's no floating point which means it's in eax:edx. */
     /* WINDOWS */
     return_loc.tag = LOC_BIREGISTER;
@@ -616,7 +948,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, saved_offset);
   }
 
-  if (return_size > 8) {
+  if (return_size > 2 * DWORD_SIZE) {
     struct loc ptr_loc = frame_push_loc(h, DWORD_SIZE);
     gen_mov_addressof(f, ptr_loc, return_loc);
   }
@@ -630,7 +962,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
   if (func_er.u.loc.tag == LOC_IMMEDIATE) {
     CHECK(func_er.u.loc.u.imm.tag == IMMEDIATE_FUNC);
-    gen_call(f, func_er.u.loc.u.imm.u.func_sti);
+    gen_placeholder_stack_adjustment(f, h, 0);
+    x86_gen_call(f, func_er.u.loc.u.imm.u.func_sti);
+    gen_placeholder_stack_adjustment(f, h, 1);
   } else {
     ERR_DBG("Indirect function calls not yet supported.\n");
     return 0;
@@ -708,6 +1042,20 @@ void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_numbe
   jd.target_number = target_number;
   jd.jmp_location = objfile_section_size(objfile_text(f));
   SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
+  /* X86 */
+  uint8_t b[5] = { 0xE9, 0, 0, 0, 0 };
+  objfile_section_append_raw(objfile_text(f), b, 5);
+}
+
+void replace_placeholder_jmp(struct objfile *f, size_t jmp_location,
+                             size_t target_offset) {
+  int32_t target32 = size_to_int32(target_offset);
+  int32_t jmp32 = size_to_int32(size_add(jmp_location, 5));
+  int32_t diff = int32_sub(target32, jmp32);
+  objfile_section_overwrite_raw(objfile_text(f),
+                                jmp_location + 1,
+                                &diff,
+                                sizeof(diff));
 }
 
 int gen_binop_expr(struct checkstate *cs, struct objfile *f,
@@ -770,10 +1118,12 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
-void gen_return(struct checkstate *cs, struct objfile *f,
-                struct frame *h) {
-  (void)cs, (void)f, (void)h;
-  TODO_IMPLEMENT;
+void gen_return(struct objfile *f, struct frame *h) {
+  if (!h->return_target_valid) {
+    h->return_target_valid = 1;
+    h->return_target_number = frame_add_target(h);
+  }
+  gen_placeholder_jmp(f, h, h->return_target_number);
 }
 
 int gen_bracebody(struct checkstate *cs, struct objfile *f,
@@ -785,26 +1135,33 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
     struct ast_statement *s = &a->statements[i];
     switch (s->tag) {
     case AST_STATEMENT_EXPR: {
+      int32_t saved_offset = frame_save_offset(h);
       struct expr_return er = open_expr_return();
       if (!gen_expr(cs, f, h, s->u.expr, &er)) {
         return 0;
       }
+      frame_restore_offset(h, saved_offset);
     } break;
     case AST_STATEMENT_RETURN_EXPR: {
+      int32_t saved_offset = frame_save_offset(h);
       struct expr_return er = demand_expr_return(frame_return_loc(h));
       if (!gen_expr(cs, f, h, s->u.return_expr, &er)) {
         return 0;
       }
 
-      gen_return(cs, f, h);
+      gen_return(f, h);
+      frame_restore_offset(h, saved_offset);
     } break;
     case AST_STATEMENT_VAR: {
       struct loc var_loc = frame_push_loc(h, kira_sizeof(&cs->nt, &s->u.var_statement.info.concrete_type));
+
+      int32_t saved_offset = frame_save_offset(h);
 
       struct expr_return er = demand_expr_return(var_loc);
       if (!gen_expr(cs, f, h, s->u.var_statement.rhs, &er)) {
         return 0;
       }
+      frame_restore_offset(h, saved_offset);
 
       struct vardata vd;
       size_t var_number = h->var_number;
@@ -872,50 +1229,25 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-void x86_gen_push32(struct objfile *f, enum x86_reg reg) {
-  uint8_t b = 0x50 + (uint8_t)reg;
-  objfile_section_append_raw(objfile_text(f), &b, 1);
+void tie_gotos(struct objfile *f, struct frame *h) {
+  for (size_t i = 0, e = h->jmpdata_count; i < e; i++) {
+    struct jmpdata jd = h->jmpdata[i];
+    CHECK(jd.target_number < h->targetdata_count);
+    struct targetdata td = h->targetdata[jd.target_number];
+    CHECK(td.target_known);
+    replace_placeholder_jmp(f, jd.jmp_location, td.target_offset);
+  }
 }
 
-void x86_gen_pop32(struct objfile *f, enum x86_reg reg) {
-  uint8_t b = 0x58 + (uint8_t)reg;
-  objfile_section_append_raw(objfile_text(f), &b, 1);
-}
-
-void x86_gen_ret(struct objfile *f) {
-  uint8_t b = 0xC3;
-  objfile_section_append_raw(objfile_text(f), &b, 1);
-}
-
-uint8_t mod_reg_rm(int mod, int reg, int rm) {
-  return (uint8_t)((mod << 6) | (reg << 3) | rm);
-}
-
-#define RMREG 3
-
-void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
-  uint8_t b[2];
-  b[0] = 0x8B;
-  b[1] = mod_reg_rm(RMREG, dest, src);
-  objfile_section_append_raw(objfile_text(f), b, 2);
-}
-
-void gen_function_intro(struct objfile *f, struct frame *h) {
-  (void)h;  /* TODO: h was passed for some reason. */
-  /* X86 */
-  x86_gen_push32(f, X86_EBP);
-  x86_gen_mov_reg32(f, X86_EBP, X86_ESP);
-}
-
-void gen_function_exit(struct objfile *f, struct frame *h) {
-  (void)h;  /* TODO: h was passed for some reason. */
-  x86_gen_pop32(f, X86_EBP);
-  x86_gen_ret(f);
-}
-
-int tie_gotos(struct objfile *f, struct frame *h) {
-  (void)f, (void)h;
-  TODO_IMPLEMENT;
+void tie_stack_adjustments(struct objfile *f, struct frame *h) {
+  for (size_t i = 0, e = h->espdata_count; i < e; i++) {
+    struct reset_esp_data red = h->espdata[i];
+    replace_placeholder_stack_adjustment(
+        f, red.reset_esp_offset,
+        red.downward
+        ? int32_sub(h->min_stack_offset, red.ebp_offset)
+        : int32_sub(red.ebp_offset, h->min_stack_offset));
+  }
 }
 
 int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
@@ -932,7 +1264,8 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
 
   if (res) {
     gen_function_exit(f, &h);
-    res = tie_gotos(f, &h);
+    tie_gotos(f, &h);
+    tie_stack_adjustments(f, &h);
   }
 
   frame_destroy(&h);
