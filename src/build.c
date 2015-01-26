@@ -154,6 +154,7 @@ enum loc_tag {
 
 struct loc {
   enum loc_tag tag;
+  uint32_t size;
   union {
     uint32_t ebp_offset;
     uint32_t global_sti;
@@ -174,8 +175,9 @@ enum x86_reg {
   X86_EDI,
 };
 
+/* TODO: Does anybody use this? */
 int loc_equal(struct loc a, struct loc b) {
-  if (a.tag != b.tag) {
+  if (a.tag != b.tag || a.size != b.size) {
     return 0;
   }
   switch (a.tag & (LOC_INDIRECT - 1)) {
@@ -359,6 +361,7 @@ struct loc register_loc(struct frame *h) {
   /* TODO: Implement for real?  This is broken?  Or is eax always okay? */
   struct loc ret;
   ret.tag = LOC_REGISTER;
+  ret.size = DWORD_SIZE;
   ret.u.reg = X86_EAX;
   return ret;
 }
@@ -369,6 +372,7 @@ struct loc frame_push_loc(struct frame *h, uint32_t size) {
   h->stack_offset = int32_sub(h->stack_offset, uint32_to_int32(aligned));
   struct loc ret;
   ret.tag = LOC_EBP_OFFSET;
+  ret.size = size;
   ret.u.ebp_offset = h->stack_offset;
   return ret;
 }
@@ -413,11 +417,13 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
 
   for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
     struct ast_typeexpr *param_type = &type->u.app.params[i];
-    struct loc loc;
-    loc.tag = LOC_EBP_OFFSET;
-    loc.u.ebp_offset = offset;
 
     uint32_t size = kira_sizeof(&cs->nt, param_type);
+
+    struct loc loc;
+    loc.tag = LOC_EBP_OFFSET;
+    loc.size = size;
+    loc.u.ebp_offset = offset;
 
     size_t var_number = h->var_number;
     h->var_number++;
@@ -434,18 +440,21 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
   if (return_type_size > 8) {
     struct loc loc;
     loc.tag = LOC_EBP_OFFSET | LOC_INDIRECT;
+    loc.size = return_type_size;
     loc.u.ebp_offset = 2 * DWORD_SIZE;
     frame_specify_return_loc(h, loc);
   } else if (return_type_size > 4) {
     /* WINDOWS */
     struct loc loc;
     loc.tag = LOC_BIREGISTER;
+    loc.size = return_type_size;
     loc.u.bireg.lo = X86_EAX;
     loc.u.bireg.hi = X86_EDX;
     frame_specify_return_loc(h, loc);
   } else {
     struct loc loc;
     loc.tag = LOC_REGISTER;
+    loc.size = return_type_size;
     loc.u.reg = X86_EAX;
     frame_specify_return_loc(h, loc);
   }
@@ -472,6 +481,7 @@ int gen_immediate_numeric_literal(struct ast_numeric_literal *a,
 
     struct loc loc;
     loc.tag = LOC_IMMEDIATE;
+    loc.size = DWORD_SIZE;
     loc.u.imm.tag = IMMEDIATE_I32;
     loc.u.imm.u.i32 = value;
     *return_val_out = loc;
@@ -485,6 +495,7 @@ int gen_immediate_numeric_literal(struct ast_numeric_literal *a,
 
     struct loc loc;
     loc.tag = LOC_IMMEDIATE;
+    loc.size = DWORD_SIZE;
     loc.u.imm.tag = IMMEDIATE_U32;
     loc.u.imm.u.u32 = value;
     *return_val_out = loc;
@@ -580,10 +591,12 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     /* There's no floating point which means it's in eax:edx. */
     /* WINDOWS */
     return_loc.tag = LOC_BIREGISTER;
+    return_loc.size = return_size;
     return_loc.u.bireg.lo = X86_EAX;
     return_loc.u.bireg.hi = X86_EDX;
   } else {
     return_loc.tag = LOC_REGISTER;
+    return_loc.size = return_size;
     return_loc.u.reg = X86_EAX;
   }
 
@@ -648,11 +661,13 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
     if (rhs_er.u.loc.tag & LOC_INDIRECT) {
       struct loc ret = register_loc(h);
       gen_mov(f, ret, rhs_er.u.loc);
+      ret.size = kira_sizeof(&cs->nt, &a->expr_info.concrete_type);
       ret.tag |= LOC_INDIRECT;
       expr_return_set(f, er, ret);
       return 1;
     } else {
       struct loc ret = rhs_er.u.loc;
+      ret.size = kira_sizeof(&cs->nt, &a->expr_info.concrete_type);
       ret.tag |= LOC_INDIRECT;
       expr_return_set(f, er, ret);
       return 1;
@@ -714,12 +729,14 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
       if (typeexpr_is_func_type(cs->im, &inst->type)) {
         struct loc loc;
         loc.tag = LOC_IMMEDIATE;
+        loc.size = DWORD_SIZE;
         loc.u.imm.tag = IMMEDIATE_FUNC;
         loc.u.imm.u.func_sti = inst->symbol_table_index;
         expr_return_set(f, er, loc);
       } else {
         struct loc loc;
         loc.tag = LOC_GLOBAL;
+        loc.size = kira_sizeof(&cs->nt, &inst->type);
         loc.u.global_sti = inst->symbol_table_index;
         expr_return_set(f, er, loc);
       }
@@ -855,16 +872,45 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+void x86_gen_push32(struct objfile *f, enum x86_reg reg) {
+  uint8_t b = 0x50 + (uint8_t)reg;
+  objfile_section_append_raw(objfile_text(f), &b, 1);
+}
+
+void x86_gen_pop32(struct objfile *f, enum x86_reg reg) {
+  uint8_t b = 0x58 + (uint8_t)reg;
+  objfile_section_append_raw(objfile_text(f), &b, 1);
+}
+
+void x86_gen_ret(struct objfile *f) {
+  uint8_t b = 0xC3;
+  objfile_section_append_raw(objfile_text(f), &b, 1);
+}
+
+uint8_t mod_reg_rm(int mod, int reg, int rm) {
+  return (uint8_t)((mod << 6) | (reg << 3) | rm);
+}
+
+#define RMREG 3
+
+void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
+  uint8_t b[2];
+  b[0] = 0x8B;
+  b[1] = mod_reg_rm(RMREG, dest, src);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 void gen_function_intro(struct objfile *f, struct frame *h) {
+  (void)h;  /* TODO: h was passed for some reason. */
   /* X86 */
-  push_ebp
-  (void)f, (void)h;
-  TODO_IMPLEMENT;
+  x86_gen_push32(f, X86_EBP);
+  x86_gen_mov_reg32(f, X86_EBP, X86_ESP);
 }
 
 void gen_function_exit(struct objfile *f, struct frame *h) {
-  (void)f, (void)h;
-  TODO_IMPLEMENT;
+  (void)h;  /* TODO: h was passed for some reason. */
+  x86_gen_pop32(f, X86_EBP);
+  x86_gen_ret(f);
 }
 
 int tie_gotos(struct objfile *f, struct frame *h) {
