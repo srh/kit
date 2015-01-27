@@ -895,11 +895,23 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
 }
 
 void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src) {
-  struct loc loc;
-  loc.tag = LOC_IMMEDIATE;
-  loc.size = DWORD_SIZE;  /* All immediates (right now) are this big. */
-  loc.u.imm = src;
-  gen_mov(f, dest, loc);
+  CHECK(dest.size == DWORD_SIZE);
+
+  CHECK((dest.tag & (LOC_INDIRECT - 1)) != LOC_IMMEDIATE);
+  CHECK((dest.tag & (LOC_INDIRECT - 1)) != LOC_GLOBAL);
+
+  if (dest.tag == (LOC_REGISTER | LOC_INDIRECT)) {
+    TODO_IMPLEMENT;
+  } else if (dest.tag == LOC_EBP_OFFSET) {
+    x86_gen_mov_mem_imm32(f, X86_EBP, dest.u.ebp_offset, src);
+  } else if (dest.tag == LOC_REGISTER) {
+    x86_gen_mov_reg_imm32(f, dest.u.reg, src);
+  } else if (dest.tag == LOC_EBP_INDIRECT) {
+    x86_gen_load32(f, X86_EAX, X86_EBP, dest.u.ebp_offset);
+    x86_gen_mov_mem_imm32(f, X86_EAX, 0, src);
+  } else {
+    TODO_IMPLEMENT;
+  }
 }
 
 
