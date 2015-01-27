@@ -720,6 +720,14 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
   x86_gen_ret(f);
 }
 
+enum x86_reg choose_altreg(enum x86_reg used) {
+  if (used == X86_EAX) {
+    return X86_ECX;
+  } else {
+    return X86_EAX;
+  }
+}
+
 enum x86_reg choose_register_2(enum x86_reg used1, enum x86_reg used2) {
   if (used1 == X86_EAX || used2 == X86_EAX) {
     if (used1 == X86_ECX || used2 == X86_ECX) {
@@ -737,11 +745,7 @@ enum x86_reg choose_register_2(enum x86_reg used1, enum x86_reg used2) {
 enum x86_reg choose_register(struct loc register_user) {
   int tag_lo = (register_user.tag & (LOC_INDIRECT - 1));
   if (tag_lo == LOC_REGISTER) {
-    if (register_user.u.reg == X86_EAX) {
-      return X86_ECX;
-    } else {
-      return X86_EAX;
-    }
+    return choose_altreg(register_user.u.reg);
   } else {
     return X86_EAX;
   }
@@ -877,14 +881,44 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   }
 }
 
+void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
+  /* TODO: We'll want to check the padding here, or support generating
+     code that writes to smaller sizes. */
+  CHECK(dest.size <= DWORD_SIZE);
+  if (dest.tag == LOC_EBP_OFFSET) {
+    x86_gen_store32(f, X86_EBP, dest.u.ebp_offset, reg);
+  } else if (dest.tag == LOC_EBP_INDIRECT) {
+    enum x86_reg altreg = choose_altreg(reg);
+    x86_gen_load32(f, altreg, X86_EBP, dest.u.ebp_offset);
+    x86_gen_store32(f, altreg, 0, reg);
+  } else {
+    TODO_IMPLEMENT;
+  }
+}
+
+void gen_store_biregister(struct objfile *f, struct loc dest, enum x86_reg lo, enum x86_reg hi) {
+  /* TODO: We'll want to check the padding here, or support generating
+     code that writes to smaller sizes. */
+  CHECK(DWORD_SIZE < dest.size && dest.size <= 2 * DWORD_SIZE);
+  if (dest.tag == LOC_EBP_OFFSET) {
+    x86_gen_store32(f, X86_EBP, dest.u.ebp_offset, lo);
+    x86_gen_store32(f, X86_EBP, int32_add(dest.u.ebp_offset, DWORD_SIZE), hi);
+  } else if (dest.tag == LOC_EBP_INDIRECT) {
+    enum x86_reg altreg = choose_register_2(lo, hi);
+    x86_gen_load32(f, altreg, X86_EBP, dest.u.ebp_offset);
+    x86_gen_store32(f, altreg, 0, lo);
+    x86_gen_store32(f, altreg, DWORD_SIZE, hi);
+  } else {
+    TODO_IMPLEMENT;
+  }
+}
+
 void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src) {
   CHECK(dest.size == DWORD_SIZE);
 
   CHECK((dest.tag & (LOC_INDIRECT - 1)) != LOC_GLOBAL);
 
-  if (dest.tag == (LOC_REGISTER | LOC_INDIRECT)) {
-    TODO_IMPLEMENT;
-  } else if (dest.tag == LOC_EBP_OFFSET) {
+  if (dest.tag == LOC_EBP_OFFSET) {
     x86_gen_mov_mem_imm32(f, X86_EBP, dest.u.ebp_offset, src);
   } else if (dest.tag == LOC_REGISTER) {
     x86_gen_mov_reg_imm32(f, dest.u.reg, src);
@@ -1054,14 +1088,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
   if (return_size <= DWORD_SIZE) {
     /* Return value in eax. */
-    struct loc eax_loc;
-    eax_loc.tag = LOC_REGISTER;
-    eax_loc.size = return_size;
-    eax_loc.u.reg = X86_EAX;
-    gen_mov(f, return_loc, eax_loc);
+    gen_store_register(f, return_loc, X86_EAX);
   } else if (return_size <= 2 * DWORD_SIZE) {
-    /* We need to copy eax:edx into return_loc. */
-    TODO_IMPLEMENT;
+    gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
   } else {
     /* Value already in return_loc. */
   }
