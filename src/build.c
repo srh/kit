@@ -196,6 +196,10 @@ int loc_equal(struct loc a, struct loc b) {
   }
 }
 
+int loc_in_memory(struct loc a) {
+  return a.tag != LOC_REGISTER && a.tag != LOC_BIREGISTER && a.tag != LOC_IMMEDIATE;
+}
+
 struct vardata {
   ident_value name;
   size_t number;
@@ -1058,11 +1062,92 @@ void replace_placeholder_jmp(struct objfile *f, size_t jmp_location,
                                 sizeof(diff));
 }
 
+struct loc memory_loc_make_use_no_registers(struct objfile *f, struct frame *h,
+                                            struct loc loc) {
+  CHECK(loc_in_memory(loc));
+  switch (loc.tag & (LOC_INDIRECT - 1)) {
+  case LOC_EBP_OFFSET:  /* fall-through */
+  case LOC_GLOBAL:  /* fall-through */
+  case LOC_IMMEDIATE:
+    return loc;
+  case LOC_REGISTER: {
+    CHECK(loc.tag & LOC_INDIRECT);
+    loc.tag = LOC_REGISTER;
+    uint32_t size = loc.size;
+    loc.size = DWORD_SIZE;
+    struct loc newloc = frame_push_loc(h, DWORD_SIZE);
+    gen_mov(f, newloc, loc);
+    CHECK(!(newloc.tag & LOC_INDIRECT));
+    newloc.tag |= LOC_INDIRECT;
+    newloc.size = size;
+    return newloc;
+  } break;
+  case LOC_BIREGISTER:
+    UNREACHABLE();
+  default:
+    UNREACHABLE();
+  }
+}
+
+struct loc gen_loc_without_registers(struct objfile *f, struct frame *h,
+                                     struct loc loc) {
+  (void)f, (void)h;  /* TODO */
+  switch (loc.tag & (LOC_INDIRECT - 1)) {
+  case LOC_EBP_OFFSET:  /* fall-through */
+  case LOC_GLOBAL:  /* fall-through */
+  case LOC_IMMEDIATE:
+    return loc;
+  case LOC_REGISTER: {
+    TODO_IMPLEMENT;
+  } break;
+  case LOC_BIREGISTER: {
+    TODO_IMPLEMENT;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 int gen_binop_expr(struct checkstate *cs, struct objfile *f,
                    struct frame *h, struct ast_expr *a,
                    struct expr_return *er) {
-  (void)cs, (void)f, (void)h, (void)a, (void)er;
-  TODO_IMPLEMENT;
+  struct ast_binop_expr *be = &a->u.binop_expr;
+  switch (be->operator) {
+  case AST_BINOP_ASSIGN: {
+    struct expr_return lhs_er = open_expr_return();
+    if (!gen_expr(cs, f, h, be->lhs, &lhs_er)) {
+      return 0;
+    }
+    /* lhs_er is a location of an lvalue.  We want to make it not use
+       any registers (so that we can dumbly evaluate the rhs) and
+       assign the rhs to it. */
+    lhs_er.u.loc = memory_loc_make_use_no_registers(f, h, lhs_er.u.loc);
+    lhs_er.tag = EXPR_RETURN_DEMANDED;
+    if (!gen_expr(cs, f, h, be->rhs, &lhs_er)) {
+      return 0;
+    }
+
+    /* gen_expr above did our assignment.  Our expression has a return
+       value though, expr_return_set does that. */
+    expr_return_set(f, er, lhs_er.u.loc);
+    return 1;
+  } break;
+  case AST_BINOP_ADD: {
+    struct expr_return lhs_er = open_expr_return();
+    if (!gen_expr(cs, f, h, be->lhs, &lhs_er)) {
+      return 0;
+    }
+    lhs_er.u.loc = gen_loc_without_registers(f, h, lhs_er.u.loc);
+    struct expr_return rhs_er = open_expr_return();
+    if (!gen_expr(cs, f, h, be->rhs, &rhs_er)) {
+      return 0;
+    }
+
+    TODO_IMPLEMENT;
+  } break;
+  default:
+    TODO_IMPLEMENT;
+  }
 }
 
 int gen_expr(struct checkstate *cs, struct objfile *f,
@@ -1153,7 +1238,8 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
       frame_restore_offset(h, saved_offset);
     } break;
     case AST_STATEMENT_VAR: {
-      struct loc var_loc = frame_push_loc(h, kira_sizeof(&cs->nt, &s->u.var_statement.info.concrete_type));
+      uint32_t var_size = kira_sizeof(&cs->nt, &s->u.var_statement.info.concrete_type);
+      struct loc var_loc = frame_push_loc(h, var_size);
 
       int32_t saved_offset = frame_save_offset(h);
 
@@ -1169,9 +1255,10 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
       vardata_init(&vd, s->u.var_statement.decl.name.value,
                    var_number,
                    &s->u.var_statement.info.concrete_type,
-                   kira_sizeof(&cs->nt, &s->u.var_statement.info.concrete_type),
+                   var_size,
                    var_loc);
       SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+      vars_pushed++;
     } break;
     case AST_STATEMENT_GOTO: {
       struct labeldata *data = frame_try_find_labeldata(h, s->u.goto_statement.target.value);
