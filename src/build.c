@@ -169,6 +169,7 @@ enum loc_tag {
 struct loc {
   enum loc_tag tag;
   uint32_t size;
+  uint32_t padded_size;
   union {
     int32_t ebp_offset;
     uint32_t global_sti;
@@ -176,26 +177,29 @@ struct loc {
   } u;
 };
 
-struct loc ebp_loc(uint32_t size, int32_t ebp_offset) {
+struct loc ebp_loc(uint32_t size, uint32_t padded_size, int32_t ebp_offset) {
   struct loc ret;
   ret.tag = LOC_EBP_OFFSET;
   ret.size = size;
+  ret.padded_size = padded_size;
   ret.u.ebp_offset = ebp_offset;
   return ret;
 }
 
-struct loc global_loc(uint32_t size, uint32_t global_sti) {
+struct loc global_loc(uint32_t size, uint32_t padded_size, uint32_t global_sti) {
   struct loc ret;
   ret.tag = LOC_GLOBAL;
   ret.size = size;
+  ret.padded_size = padded_size;
   ret.u.global_sti = global_sti;
   return ret;
 }
 
-struct loc ebp_indirect_loc(uint32_t size, int32_t ebp_offset) {
+struct loc ebp_indirect_loc(uint32_t size, uint32_t padded_size, int32_t ebp_offset) {
   struct loc ret;
   ret.tag = LOC_EBP_INDIRECT;
   ret.size = size;
+  ret.padded_size = padded_size;
   ret.u.ebp_indirect = ebp_offset;
   return ret;
 }
@@ -411,12 +415,12 @@ void frame_define_target(struct frame *h, size_t target_number, uint32_t target_
 
 struct loc frame_push_loc(struct frame *h, uint32_t size) {
   /* X86 */
-  uint32_t aligned = uint32_ceil_aligned(size, DWORD_SIZE);
-  h->stack_offset = int32_sub(h->stack_offset, uint32_to_int32(aligned));
+  uint32_t padded_size = uint32_ceil_aligned(size, DWORD_SIZE);
+  h->stack_offset = int32_sub(h->stack_offset, uint32_to_int32(padded_size));
   if (h->stack_offset < h->min_stack_offset) {
     h->min_stack_offset = h->stack_offset;
   }
-  return ebp_loc(size, h->stack_offset);
+  return ebp_loc(size, padded_size, h->stack_offset);
 }
 
 int32_t frame_save_offset(struct frame *h) {
@@ -461,8 +465,9 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
     struct ast_typeexpr *param_type = &type->u.app.params[i];
 
     uint32_t size = kira_sizeof(&cs->nt, param_type);
+    uint32_t padded_size = uint32_ceil_aligned(size, DWORD_SIZE);
 
-    struct loc loc = ebp_loc(size, offset);
+    struct loc loc = ebp_loc(size, padded_size, offset);
 
     size_t var_number = h->var_number;
     h->var_number++;
@@ -472,12 +477,15 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
                  var_number, param_type, size, loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
-    offset = int32_add(offset,
-                       uint32_to_int32(uint32_ceil_aligned(size, DWORD_SIZE)));
+    offset = int32_add(offset, uint32_to_int32(padded_size));
   }
 
   if (return_type_size > 2 * DWORD_SIZE) {
-    struct loc loc = ebp_indirect_loc(return_type_size, 2 * DWORD_SIZE);
+    /* TODO: I don't know if WINDOWS promises padding. */
+    uint32_t return_type_padded_size = return_type_size;
+    struct loc loc = ebp_indirect_loc(return_type_size,
+                                      return_type_padded_size,
+                                      2 * DWORD_SIZE);
     frame_specify_return_loc(h, loc);
   } else {
     struct loc loc = frame_push_loc(h, return_type_size);
@@ -712,11 +720,11 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
 
   if (h->return_loc.size <= DWORD_SIZE) {
     CHECK(h->return_loc.tag == LOC_EBP_OFFSET);
-    /* TODO: check that padding is 4. */
+    CHECK(h->return_loc.padded_size == DWORD_SIZE);
     x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset);
   } else if (h->return_loc.size <= 2 * DWORD_SIZE) {
     CHECK(h->return_loc.tag == LOC_EBP_OFFSET);
-    /* TODO: check that padding is 8. */
+    CHECK(h->return_loc.padded_size == 2 * DWORD_SIZE);
     x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset);
     x86_gen_load32(f, X86_EDX, X86_EBP, int32_add(h->return_loc.u.ebp_offset, DWORD_SIZE));
   }
@@ -1106,10 +1114,14 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    struct loc ret = frame_push_loc(h, DWORD_SIZE);
-    gen_mov(f, ret, rhs_er.u.loc);
-    CHECK(ret.tag == LOC_EBP_OFFSET);
-    ret.tag = LOC_EBP_INDIRECT;
+    struct loc loc = frame_push_loc(h, DWORD_SIZE);
+    gen_mov(f, loc, rhs_er.u.loc);
+    CHECK(loc.tag == LOC_EBP_OFFSET);
+
+    uint32_t size = kira_sizeof(&cs->nt, &a->expr_info.concrete_type);
+    /* When dereferencing a pointer, we have no info about padding, so
+       the padded size is the same as the size. */
+    struct loc ret = ebp_indirect_loc(size, size, loc.u.ebp_offset);
     expr_return_set(f, er, ret);
     return 1;
   } break;
@@ -1354,7 +1366,10 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
         imm.u.func_sti = inst->symbol_table_index;
         expr_return_immediate(f, h, er, imm);
       } else {
-        struct loc loc = global_loc(kira_sizeof(&cs->nt, &inst->type),
+        uint32_t size = kira_sizeof(&cs->nt, &inst->type);
+        /* TODO: Maybe globals' alignment rules are softer. */
+        uint32_t padded_size = size;
+        struct loc loc = global_loc(size, padded_size,
                                     inst->symbol_table_index);
         expr_return_set(f, er, loc);
       }
