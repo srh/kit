@@ -15,6 +15,14 @@
 #define FUNC_TYPE_NAME "func"
 #define BOOLEAN_STANDIN_TYPE_NAME I32_TYPE_NAME
 
+enum numeric_type {
+  NUMERIC_TYPE_BYTE,
+  NUMERIC_TYPE_I32,
+  NUMERIC_TYPE_U32,
+};
+
+uint32_t numeric_type_size(enum numeric_type t);
+
 struct ast_generics;
 struct ast_typeexpr;
 

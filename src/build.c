@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "arith.h"
 #include "checkstate.h"
@@ -10,6 +11,10 @@
 #include "slice.h"
 #include "win/objfile.h"
 #include "x86.h"
+
+struct loc;
+
+void gen_mov(struct objfile *f, struct loc dest, struct loc src);
 
 /* Right now we don't worry about generating multiple objfiles, so we
    just blithely attach a serial number to each name to make them
@@ -600,12 +605,19 @@ void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
 }
 
 void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
-  int8_t b[6];
+  uint8_t b[6];
   b[0] = 0x81;
   b[1] = mod_reg_rm(MOD11, 0, X86_ESP);
   STATIC_CHECK(sizeof(int32_t) == 4);
   ok_memcpy(b + 2, &x, sizeof(int32_t));
   objfile_section_append_raw(objfile_text(f), b, 6);
+}
+
+void x86_gen_add_i32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
+  uint8_t b[2];
+  b[0] = 0x01;
+  b[1] = mod_reg_rm(MOD11, src, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
 void gen_placeholder_stack_adjustment(struct objfile *f,
@@ -739,6 +751,32 @@ enum x86_reg choose_register(struct loc register_user) {
   }
 }
 
+struct loc move_to_register(struct objfile *f, struct loc a, struct loc user) {
+  CHECK(a.size <= DWORD_SIZE);
+  /* First move a to a register. */
+  if (a.tag == LOC_REGISTER) {
+    return a;
+  } else {
+    struct loc regloc;
+    regloc.tag = LOC_REGISTER;
+    regloc.size = a.size;
+    regloc.u.reg = choose_register(user);
+    gen_mov(f, regloc, a);
+    return regloc;
+  }
+}
+
+void move_to_registers(struct objfile *f, struct loc a, struct loc b,
+                       struct loc *a_out, struct loc *b_out) {
+  CHECK(a.size <= DWORD_SIZE);
+  CHECK(b.size <= DWORD_SIZE);
+
+  a = move_to_register(f, a, b);
+  b = move_to_register(f, b, a);
+  *a_out = a;
+  *b_out = b;
+}
+
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc memory_loc) {
   (void)f, (void)dest, (void)memory_loc;
   TODO_IMPLEMENT;
@@ -816,16 +854,25 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
       gen_memmem_mov(f, X86_EBP, dest.u.ebp_offset, src.u.reg, 0, src.size);
     } else if (src.tag == LOC_EBP_OFFSET) {
       gen_memmem_mov(f, X86_EBP, dest.u.ebp_offset, X86_EBP, src.u.ebp_offset, src.size);
+    } else if (src.tag == LOC_REGISTER) {
+      if (src.size == DWORD_SIZE) {
+        x86_gen_store32(f, X86_EBP, dest.u.ebp_offset, src.u.reg);
+      } else {
+        TODO_IMPLEMENT;
+      }
     } else {
       TODO_IMPLEMENT;
     }
   } else if (dest.tag == LOC_REGISTER) {
     CHECK(dest.size <= DWORD_SIZE);
     if (src.tag == (LOC_REGISTER | LOC_INDIRECT)) {
+      CHECK(dest.size == DWORD_SIZE);
       x86_gen_load32(f, dest.u.reg, src.u.reg, 0);
     } else if (src.tag == LOC_EBP_OFFSET) {
+      CHECK(dest.size == DWORD_SIZE);
       x86_gen_load32(f, dest.u.reg, X86_EBP, src.u.ebp_offset);
     } else if (src.tag == LOC_REGISTER) {
+      CHECK(dest.size == DWORD_SIZE);
       x86_gen_mov_reg32(f, dest.u.reg, src.u.reg);
     } else if (src.tag == LOC_GLOBAL) {
       TODO_IMPLEMENT;
@@ -1108,6 +1155,23 @@ struct loc gen_loc_without_registers(struct objfile *f, struct frame *h,
   }
 }
 
+enum numeric_type get_numeric_type(struct identmap *im, struct ast_typeexpr *a) {
+  CHECK(a->tag == AST_TYPEEXPR_NAME);
+  const void *buf;
+  size_t count;
+  identmap_lookup(im, a->u.name.value, &buf, &count);
+  if (count == strlen(BYTE_TYPE_NAME) && 0 == memcmp(buf, BYTE_TYPE_NAME, count)) {
+    return NUMERIC_TYPE_BYTE;
+  }
+  if (count == strlen(I32_TYPE_NAME) && 0 == memcmp(buf, I32_TYPE_NAME, count)) {
+    return NUMERIC_TYPE_I32;
+  }
+  if (count == strlen(U32_TYPE_NAME) && 0 == memcmp(buf, U32_TYPE_NAME, count)) {
+    return NUMERIC_TYPE_U32;
+  }
+  CRASH("Expected a numeric type.");
+}
+
 int gen_binop_expr(struct checkstate *cs, struct objfile *f,
                    struct frame *h, struct ast_expr *a,
                    struct expr_return *er) {
@@ -1132,7 +1196,15 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
     expr_return_set(f, er, lhs_er.u.loc);
     return 1;
   } break;
+  case AST_BINOP_LOGICAL_OR:
+    TODO_IMPLEMENT;
+  case AST_BINOP_LOGICAL_AND:
+    TODO_IMPLEMENT;
   case AST_BINOP_ADD: {
+    enum numeric_type lhs_type = get_numeric_type(cs->im, &be->lhs->expr_info.concrete_type);
+    enum numeric_type rhs_type = get_numeric_type(cs->im, &be->rhs->expr_info.concrete_type);
+    CHECK(lhs_type == rhs_type);
+
     struct expr_return lhs_er = open_expr_return();
     if (!gen_expr(cs, f, h, be->lhs, &lhs_er)) {
       return 0;
@@ -1143,7 +1215,32 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    TODO_IMPLEMENT;
+    size_t size = numeric_type_size(lhs_type);
+    CHECK(lhs_er.u.loc.size == size);
+    CHECK(rhs_er.u.loc.size == size);
+
+    struct loc lhs_reg;
+    struct loc rhs_reg;
+    move_to_registers(f, lhs_er.u.loc, rhs_er.u.loc,
+                      &lhs_reg, &rhs_reg);
+
+    switch (lhs_type) {
+    case NUMERIC_TYPE_BYTE: {
+      TODO_IMPLEMENT;
+    } break;
+    case NUMERIC_TYPE_I32: {
+      x86_gen_add_i32(f, lhs_reg.u.reg, rhs_reg.u.reg);
+      /* TODO: Handle overflow. */
+      expr_return_set(f, er, lhs_reg);
+    } break;
+    case NUMERIC_TYPE_U32: {
+      TODO_IMPLEMENT;
+    } break;
+    default:
+      UNREACHABLE();
+    }
+
+    return 1;
   } break;
   default:
     TODO_IMPLEMENT;

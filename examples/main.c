@@ -11,7 +11,7 @@ int main(void) {
   kira_goo2('H');
   kira_goo2('A');
   kira_goo2('L');
-  kira_goo2('\n');
+  putchar('\n');
 
   return 0;
 }

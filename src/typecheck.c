@@ -17,6 +17,15 @@
 
 const int MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH = 50;
 
+uint32_t numeric_type_size(enum numeric_type t) {
+  switch (t) {
+  case NUMERIC_TYPE_BYTE: return 1;
+  case NUMERIC_TYPE_I32: return 4;
+  case NUMERIC_TYPE_U32: return 4;
+  default: UNREACHABLE();
+  }
+}
+
 struct ast_ident make_ast_ident(ident_value ident) {
   struct ast_ident ret;
   ast_ident_init(&ret, ast_meta_make_garbage(), ident);
@@ -1571,6 +1580,7 @@ int check_expr_magic_binop(struct exprscope *es,
 
     ast_binop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
                         x->operator, annotated_lhs, annotated_rhs);
+    ast_binop_expr_info_mark_magic(&annotated_out->info);
 
     ret = 1;
     goto cleanup_both;
@@ -1653,7 +1663,7 @@ int check_expr_binop(struct exprscope *es,
   int ret = 0;
   struct ast_typeexpr resolved_funcexpr;
   int funcexpr_lvalue_discard;
-  struct def_instantiation *inst_discard;
+  struct def_instantiation *inst;
   if (!lookup_global_maybe_typecheck(
           es,
           identmap_intern_c_str(es->cs->im,
@@ -1661,7 +1671,7 @@ int check_expr_binop(struct exprscope *es,
           &funcexpr,
           &resolved_funcexpr,
           &funcexpr_lvalue_discard,
-          &inst_discard)) {
+          &inst)) {
     goto fail_cleanup_funcexpr;
   }
 
@@ -1670,6 +1680,7 @@ int check_expr_binop(struct exprscope *es,
 
   ast_binop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
                       x->operator, annotated_lhs, annotated_rhs);
+  ast_binop_expr_info_mark_inst(&annotated_out->info, inst);
 
   ret = 1;
   ast_typeexpr_destroy(&resolved_funcexpr);
