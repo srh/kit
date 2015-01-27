@@ -930,8 +930,14 @@ void expr_return_set(struct objfile *f, struct expr_return *er, struct loc loc) 
   case EXPR_RETURN_OPEN: {
     er->u.loc = loc;
   } break;
-  case EXPR_RETURN_JMP_IF_TRUE: /* fall-through */
+  case EXPR_RETURN_JMP_IF_TRUE: {
+    /* This should be a boolean. */
+    CHECK(loc.size == 1);
+    TODO_IMPLEMENT;
+  } break;
   case EXPR_RETURN_JMP_IF_FALSE: {
+    /* This should be a boolean. */
+    CHECK(loc.size == 1);
     TODO_IMPLEMENT;
   } break;
   default:
