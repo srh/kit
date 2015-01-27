@@ -2,15 +2,6 @@ extern putchar func[i32, i32];
 
 def foo i32 = 3;
 
-def goo func[i32, i32] = fn(x i32) i32 {
-  return hoo(x);
-};
-
-def hoo func[i32, i32] = fn(x i32) i32 {
-  var y i32 = x;
-  return putchar(y + 1);
-};
-
 def ioo func[i32, i32] = fn(x i32) i32 {
   return putchar(x - 1);
 };

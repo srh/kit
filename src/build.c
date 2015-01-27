@@ -394,7 +394,6 @@ void frame_destroy(struct frame *h) {
 }
 
 void frame_specify_return_loc(struct frame *h, struct loc loc) {
-  /* TODO: No need to specify the return loc -- just specify its size. */
   CHECK(!h->return_loc_valid);
   h->return_loc_valid = 1;
   h->return_loc = loc;
@@ -500,15 +499,8 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
   if (return_type_size > 2 * DWORD_SIZE) {
     struct loc loc = ebp_indirect_loc(return_type_size, 2 * DWORD_SIZE);
     frame_specify_return_loc(h, loc);
-  } else if (return_type_size > DWORD_SIZE) {
-    /* The return location is eax:edx, we shouldn't be specifying
-       return_loc like this. */
-    TODO_IMPLEMENT;
   } else {
-    struct loc loc;
-    loc.tag = LOC_REGISTER;
-    loc.size = return_type_size;
-    loc.u.reg = X86_EAX;
+    struct loc loc = frame_push_loc(h, return_type_size);
     frame_specify_return_loc(h, loc);
   }
 }
@@ -730,7 +722,21 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
   if (h->return_target_valid) {
     frame_define_target(h, h->return_target_number,
                         objfile_section_size(objfile_text(f)));
+  } else {
+    CRASH("return_target_valid false (no return statements?)");
   }
+
+  if (h->return_loc.size <= DWORD_SIZE) {
+    CHECK(h->return_loc.tag == LOC_EBP_OFFSET);
+    /* TODO: check that padding is 4. */
+    x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset);
+  } else if (h->return_loc.size <= 2 * DWORD_SIZE) {
+    CHECK(h->return_loc.tag == LOC_EBP_OFFSET);
+    /* TODO: check that padding is 8. */
+    x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset);
+    x86_gen_load32(f, X86_EDX, X86_EBP, int32_add(h->return_loc.u.ebp_offset, DWORD_SIZE));
+  }
+
   x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
   x86_gen_pop32(f, X86_EBP);
   x86_gen_ret(f);
@@ -1471,9 +1477,8 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
   struct frame h;
   frame_init(&h);
 
-  note_param_locations(cs, &h, a);
-
   gen_function_intro(f, &h);
+  note_param_locations(cs, &h, a);
 
   int res = gen_bracebody(cs, f, &h, &a->u.lambda.bracebody);
 
