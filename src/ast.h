@@ -141,7 +141,7 @@ void ast_bracebody_init(struct ast_bracebody *a,
 void ast_bracebody_destroy(struct ast_bracebody *a);
 
 struct ast_var_statement_info {
-  int var_statement_info_valid;
+  int info_valid;
   struct ast_typeexpr concrete_type;
 };
 
@@ -227,7 +227,7 @@ void ast_statement_destroy(struct ast_statement *a);
 
 /* TODO: I don't think this information is used anymore. */
 struct ast_lambda_info {
-  int lambda_info_valid;
+  int info_valid;
   ident_value *label_names;
   size_t label_names_count;
 };
@@ -327,7 +327,6 @@ void ast_deref_field_access_init(struct ast_deref_field_access *a,
 
 struct ast_name_expr_info {
   /* True if typechecking happened and the info means something. */
-  /* TODO: Name other info_valid fields info_valid. */
   int info_valid;
   /* The instantiation this name refers to -- if it refers to a
      global.  NULL if the name refers to a local variable. */

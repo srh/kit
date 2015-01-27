@@ -153,28 +153,28 @@ void ast_bracebody_destroy(struct ast_bracebody *a) {
 }
 
 void ast_var_statement_info_init(struct ast_var_statement_info *a) {
-  a->var_statement_info_valid = 0;
+  a->info_valid = 0;
 }
 
 void ast_var_statement_info_init_copy(struct ast_var_statement_info *a,
                                       struct ast_var_statement_info *c) {
-  a->var_statement_info_valid = c->var_statement_info_valid;
-  if (c->var_statement_info_valid) {
+  a->info_valid = c->info_valid;
+  if (c->info_valid) {
     ast_typeexpr_init_copy(&a->concrete_type, &c->concrete_type);
   }
 }
 
 void ast_var_statement_info_destroy(struct ast_var_statement_info *a) {
-  if (a->var_statement_info_valid) {
+  if (a->info_valid) {
     ast_typeexpr_destroy(&a->concrete_type);
-    a->var_statement_info_valid = 0;
+    a->info_valid = 0;
   }
 }
 
 void ast_var_statement_info_note_type(struct ast_var_statement_info *a,
                                       struct ast_typeexpr concrete_type) {
-  CHECK(!a->var_statement_info_valid);
-  a->var_statement_info_valid = 1;
+  CHECK(!a->info_valid);
+  a->info_valid = 1;
   a->concrete_type = concrete_type;
 }
 
@@ -406,13 +406,13 @@ void ast_binop_expr_destroy(struct ast_binop_expr *a) {
 }
 
 void ast_lambda_info_init(struct ast_lambda_info *a) {
-  a->lambda_info_valid = 0;
+  a->info_valid = 0;
 }
 
 void ast_lambda_info_init_copy(struct ast_lambda_info *a,
                                struct ast_lambda_info *c) {
-  a->lambda_info_valid = c->lambda_info_valid;
-  if (c->lambda_info_valid) {
+  a->info_valid = c->info_valid;
+  if (c->info_valid) {
     ident_value *label_names = malloc_mul(sizeof(*label_names),
                                           c->label_names_count);
     ok_memcpy(label_names, c->label_names,
@@ -423,17 +423,17 @@ void ast_lambda_info_init_copy(struct ast_lambda_info *a,
 }
 
 void ast_lambda_info_destroy(struct ast_lambda_info *a) {
-  if (a->lambda_info_valid) {
+  if (a->info_valid) {
     free(a->label_names);
-    a->lambda_info_valid = 0;
+    a->info_valid = 0;
   }
 }
 
 void ast_lambda_info_set_labels(struct ast_lambda_info *a,
                                 ident_value *label_names,
                                 size_t label_names_count) {
-  CHECK(!a->lambda_info_valid);
-  a->lambda_info_valid = 1;
+  CHECK(!a->info_valid);
+  a->info_valid = 1;
   a->label_names = label_names;
   a->label_names_count = label_names_count;
 }

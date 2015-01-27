@@ -8,5 +8,5 @@ def goo func[i32, i32] = fn(x i32) i32 {
 
 def hoo func[i32, i32] = fn(x i32) i32 {
   var y i32 = x;
-  return putchar(y);
+  return putchar(y + 1);
 };
