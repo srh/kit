@@ -200,7 +200,6 @@ struct loc ebp_indirect_loc(uint32_t size, int32_t ebp_offset) {
   return ret;
 }
 
-/* TODO: Does anybody use this? */
 int loc_equal(struct loc a, struct loc b) {
   if (a.tag != b.tag || a.size != b.size) {
     return 0;
@@ -837,14 +836,20 @@ void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
   /* TODO: We'll want to check the padding here, or support generating
      code that writes to smaller sizes. */
   CHECK(dest.size <= DWORD_SIZE);
-  if (dest.tag == LOC_EBP_OFFSET) {
+  switch (dest.tag) {
+  case LOC_EBP_OFFSET:
     x86_gen_store32(f, X86_EBP, dest.u.ebp_offset, reg);
-  } else if (dest.tag == LOC_EBP_INDIRECT) {
+    break;
+  case LOC_GLOBAL:
+    CRASH("Writing to globals not supported.");
+    break;
+  case LOC_EBP_INDIRECT: {
     enum x86_reg altreg = choose_altreg(reg);
     x86_gen_load32(f, altreg, X86_EBP, dest.u.ebp_indirect);
     x86_gen_store32(f, altreg, 0, reg);
-  } else {
-    TODO_IMPLEMENT;
+  } break;
+  default:
+    UNREACHABLE();
   }
 }
 
@@ -852,13 +857,20 @@ void gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src) {
   /* TODO: We'll want to check the padding here, or support generating
      code that reads from smaller sizes. */
   CHECK(src.size <= DWORD_SIZE);
-  if (src.tag == LOC_EBP_OFFSET) {
+  switch (src.tag) {
+  case LOC_EBP_OFFSET:
     x86_gen_load32(f, reg, X86_EBP, src.u.ebp_offset);
-  } else if (src.tag == LOC_EBP_INDIRECT) {
+    break;
+  case LOC_GLOBAL:
+    x86_gen_mov_reg_stiptr(f, reg, src.u.global_sti);
+    x86_gen_load32(f, reg, reg, 0);
+    break;
+  case LOC_EBP_INDIRECT:
     x86_gen_load32(f, reg, X86_EBP, src.u.ebp_indirect);
     x86_gen_load32(f, reg, reg, 0);
-  } else {
-    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
   }
 }
 
