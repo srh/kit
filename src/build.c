@@ -546,10 +546,9 @@ void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
-                           struct immediate imm) {
-  uint8_t b = 0xB8 + (uint8_t)dest;
-  objfile_section_append_raw(objfile_text(f), &b, 1);
+/* Appends funcaddrs with dir32 -- not suitable for relative address
+   call instructions. */
+void append_immediate(struct objfile *f, struct immediate imm) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC: {
     /* TODO: Is dir32 the right one? */
@@ -566,6 +565,13 @@ void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
   default:
     UNREACHABLE();
   }
+}
+
+void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
+                           struct immediate imm) {
+  uint8_t b = 0xB8 + (uint8_t)dest;
+  objfile_section_append_raw(objfile_text(f), &b, 1);
+  append_immediate(f, imm);
 }
 
 void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
@@ -631,6 +637,18 @@ size_t x86_encode_reg_rm(uint8_t *b, int reg, enum x86_reg rm_addr,
     ok_memcpy(b + 1, &rm_addr_disp, sizeof(rm_addr_disp));
     return 5;
   }
+}
+
+void x86_gen_mov_mem_imm32(struct objfile *f,
+                           enum x86_reg dest,
+                           int32_t dest_disp,
+                           struct immediate imm) {
+  uint8_t b[10];
+  b[0] = 0xC7;
+  size_t count = x86_encode_reg_rm(b + 1, 0, dest, dest_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 1);
+  append_immediate(f, imm);
 }
 
 void x86_gen_load32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
@@ -842,6 +860,12 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
       } else {
         TODO_IMPLEMENT;
       }
+    } else if (src.tag == LOC_IMMEDIATE) {
+      if (src.size == DWORD_SIZE) {
+        x86_gen_mov_mem_imm32(f, X86_EBP, dest.u.ebp_offset, src.u.imm);
+      } else {
+        TODO_IMPLEMENT;
+      }
     } else {
       TODO_IMPLEMENT;
     }
@@ -859,12 +883,25 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
     } else if (src.tag == LOC_GLOBAL) {
       TODO_IMPLEMENT;
     } else if (src.tag == LOC_IMMEDIATE) {
-      x86_gen_mov_reg_imm32(f, dest.u.reg, src.u.imm);
+      if (src.size == DWORD_SIZE) {
+        x86_gen_mov_reg_imm32(f, dest.u.reg, src.u.imm);
+      } else {
+        TODO_IMPLEMENT;
+      }
     }
   } else {
     UNREACHABLE();
   }
 }
+
+void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src) {
+  struct loc loc;
+  loc.tag = LOC_IMMEDIATE;
+  loc.size = DWORD_SIZE;  /* All immediates (right now) are this big. */
+  loc.u.imm = src;
+  gen_mov(f, dest, loc);
+}
+
 
 void x86_gen_call(struct objfile *f, uint32_t func_sti) {
   uint8_t b = 0xE8;
@@ -1002,17 +1039,17 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     gen_mov_addressof(f, ptr_loc, return_loc);
   }
 
-  struct expr_return func_er = open_expr_return();
+  struct expr_return func_er = free_expr_return();
   int32_t saved_offset = frame_save_offset(h);
   if (!gen_expr(cs, f, h, a->u.funcall.func, &func_er)) {
     return 0;
   }
 
-  if (func_er.u.loc.tag == LOC_IMMEDIATE) {
+  if (func_er.u.free.tag == EXPR_RETURN_FREE_IMM) {
     frame_restore_offset(h, saved_offset);
-    CHECK(func_er.u.loc.u.imm.tag == IMMEDIATE_FUNC);
+    CHECK(func_er.u.free.u.imm.tag == IMMEDIATE_FUNC);
     gen_placeholder_stack_adjustment(f, h, 0);
-    x86_gen_call(f, func_er.u.loc.u.imm.u.func_sti);
+    x86_gen_call(f, func_er.u.free.u.imm.u.func_sti);
     gen_placeholder_stack_adjustment(f, h, 1);
   } else {
     /* TODO: frame_restore_offset after loading func into register. */
@@ -1275,16 +1312,34 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
-void expr_return_immediate(struct objfile *f, struct expr_return *er,
+void expr_return_immediate(struct objfile *f, struct frame *h,
+                           struct expr_return *er,
                            struct immediate imm) {
-  struct loc loc;
-  loc.tag = LOC_IMMEDIATE;
-  loc.size = DWORD_SIZE;
-  loc.u.imm = imm;
-  expr_return_set(f, er, loc);
+  switch (er->tag) {
+  case EXPR_RETURN_DEMANDED: {
+    gen_mov_immediate(f, er->u.loc, imm);
+  } break;
+  case EXPR_RETURN_OPEN: {
+    /* All immediates (right now) are DWORD-sized. */
+    struct loc floc = frame_push_loc(h, DWORD_SIZE);
+    gen_mov_immediate(f, floc, imm);
+    er->u.loc = floc;
+  } break;
+  case EXPR_RETURN_FREE: {
+    er->u.free.tag = EXPR_RETURN_FREE_IMM;
+    er->u.free.u.imm = imm;
+  } break;
+  case EXPR_RETURN_JMP_IF_TRUE:
+  case EXPR_RETURN_JMP_IF_FALSE: {
+    CRASH("There are no boolean immediates.");
+  }
+  default:
+    UNREACHABLE();
+  }
 }
 
 int gen_immediate_numeric_literal(struct objfile *f,
+                                  struct frame *h,
                                   struct ast_numeric_literal *a,
                                   struct expr_return *er) {
   switch (a->numeric_type) {
@@ -1297,7 +1352,7 @@ int gen_immediate_numeric_literal(struct objfile *f,
     struct immediate imm;
     imm.tag = IMMEDIATE_I32;
     imm.u.i32 = value;
-    expr_return_immediate(f, er, imm);
+    expr_return_immediate(f, h, er, imm);
     return 1;
   } break;
   case AST_NUMERIC_TYPE_UNSIGNED: {
@@ -1309,7 +1364,7 @@ int gen_immediate_numeric_literal(struct objfile *f,
     struct immediate imm;
     imm.tag = IMMEDIATE_U32;
     imm.u.u32 = value;
-    expr_return_immediate(f, er, imm);
+    expr_return_immediate(f, h, er, imm);
     return 1;
   } break;
   default:
@@ -1327,12 +1382,10 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     if (inst) {
       CHECK(inst->symbol_table_index_computed);
       if (typeexpr_is_func_type(cs->im, &inst->type)) {
-        struct loc loc;
-        loc.tag = LOC_IMMEDIATE;
-        loc.size = DWORD_SIZE;
-        loc.u.imm.tag = IMMEDIATE_FUNC;
-        loc.u.imm.u.func_sti = inst->symbol_table_index;
-        expr_return_set(f, er, loc);
+        struct immediate imm;
+        imm.tag = IMMEDIATE_FUNC;
+        imm.u.func_sti = inst->symbol_table_index;
+        expr_return_immediate(f, h, er, imm);
       } else {
         struct loc loc = global_loc(kira_sizeof(&cs->nt, &inst->type),
                                     inst->symbol_table_index);
@@ -1347,7 +1400,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
-    return gen_immediate_numeric_literal(f, &a->u.numeric_literal, er);
+    return gen_immediate_numeric_literal(f, h, &a->u.numeric_literal, er);
   } break;
   case AST_EXPR_FUNCALL: {
     return gen_funcall_expr(cs, f, h, a, er);
