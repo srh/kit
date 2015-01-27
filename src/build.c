@@ -515,42 +515,6 @@ int lookup_vardata_by_name(struct frame *h, ident_value name, size_t *index_out)
   return 0;
 }
 
-int gen_immediate_numeric_literal(struct ast_numeric_literal *a,
-                                  struct loc *return_val_out) {
-  switch (a->numeric_type) {
-  case AST_NUMERIC_TYPE_SIGNED: {
-    int32_t value;
-    if (!numeric_literal_to_i32(a->digits, a->digits_count, &value)) {
-      return 0;
-    }
-
-    struct loc loc;
-    loc.tag = LOC_IMMEDIATE;
-    loc.size = DWORD_SIZE;
-    loc.u.imm.tag = IMMEDIATE_I32;
-    loc.u.imm.u.i32 = value;
-    *return_val_out = loc;
-    return 1;
-  } break;
-  case AST_NUMERIC_TYPE_UNSIGNED: {
-    uint32_t value;
-    if (!numeric_literal_to_u32(a->digits, a->digits_count, &value)) {
-      return 0;
-    }
-
-    struct loc loc;
-    loc.tag = LOC_IMMEDIATE;
-    loc.size = DWORD_SIZE;
-    loc.u.imm.tag = IMMEDIATE_U32;
-    loc.u.imm.u.u32 = value;
-    *return_val_out = loc;
-    return 1;
-  } break;
-  default:
-    UNREACHABLE();
-  }
-}
-
 uint8_t mod_reg_rm(int mod, int reg, int rm) {
   return (uint8_t)((mod << 6) | (reg << 3) | rm);
 }
@@ -916,6 +880,7 @@ enum expr_return_tag {
   /* The location is not specified -- gen_expr should write the
      data's location to "loc", and preserve lvalues. */
   EXPR_RETURN_OPEN,
+  EXPR_RETURN_FREE,
   /* The expr returns a boolean -- and instead of returning, it should
      jmp to the given target, if true. */
   EXPR_RETURN_JMP_IF_TRUE,
@@ -923,11 +888,25 @@ enum expr_return_tag {
   EXPR_RETURN_JMP_IF_FALSE,
 };
 
+enum expr_return_free_tag {
+  EXPR_RETURN_FREE_LOC,
+  EXPR_RETURN_FREE_IMM,
+};
+
+struct expr_return_free {
+  enum expr_return_free_tag tag;
+  union {
+    struct loc loc;
+    struct immediate imm;
+  } u;
+};
+
 struct expr_return {
   enum expr_return_tag tag;
   union {
     struct loc loc;
     size_t jmp_target_number;
+    struct expr_return_free free;
   } u;
 };
 
@@ -938,6 +917,10 @@ void expr_return_set(struct objfile *f, struct expr_return *er, struct loc loc) 
   } break;
   case EXPR_RETURN_OPEN: {
     er->u.loc = loc;
+  } break;
+  case EXPR_RETURN_FREE: {
+    er->u.free.tag = EXPR_RETURN_FREE_LOC;
+    er->u.free.u.loc = loc;
   } break;
   case EXPR_RETURN_JMP_IF_TRUE: {
     /* This should be a boolean. */
@@ -952,6 +935,12 @@ void expr_return_set(struct objfile *f, struct expr_return *er, struct loc loc) 
   default:
     UNREACHABLE();
   }
+}
+
+struct expr_return free_expr_return(void) {
+  struct expr_return ret;
+  ret.tag = EXPR_RETURN_FREE;
+  return ret;
 }
 
 struct expr_return open_expr_return(void) {
@@ -1286,6 +1275,48 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
+void expr_return_immediate(struct objfile *f, struct expr_return *er,
+                           struct immediate imm) {
+  struct loc loc;
+  loc.tag = LOC_IMMEDIATE;
+  loc.size = DWORD_SIZE;
+  loc.u.imm = imm;
+  expr_return_set(f, er, loc);
+}
+
+int gen_immediate_numeric_literal(struct objfile *f,
+                                  struct ast_numeric_literal *a,
+                                  struct expr_return *er) {
+  switch (a->numeric_type) {
+  case AST_NUMERIC_TYPE_SIGNED: {
+    int32_t value;
+    if (!numeric_literal_to_i32(a->digits, a->digits_count, &value)) {
+      return 0;
+    }
+
+    struct immediate imm;
+    imm.tag = IMMEDIATE_I32;
+    imm.u.i32 = value;
+    expr_return_immediate(f, er, imm);
+    return 1;
+  } break;
+  case AST_NUMERIC_TYPE_UNSIGNED: {
+    uint32_t value;
+    if (!numeric_literal_to_u32(a->digits, a->digits_count, &value)) {
+      return 0;
+    }
+
+    struct immediate imm;
+    imm.tag = IMMEDIATE_U32;
+    imm.u.u32 = value;
+    expr_return_immediate(f, er, imm);
+    return 1;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *er) {
@@ -1316,12 +1347,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
-    struct loc loc;
-    if (!gen_immediate_numeric_literal(&a->u.numeric_literal, &loc)) {
-      return 0;
-    }
-    expr_return_set(f, er, loc);
-    return 1;
+    return gen_immediate_numeric_literal(f, &a->u.numeric_literal, er);
   } break;
   case AST_EXPR_FUNCALL: {
     return gen_funcall_expr(cs, f, h, a, er);
