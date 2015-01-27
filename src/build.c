@@ -161,7 +161,7 @@ struct loc {
   enum loc_tag tag;
   uint32_t size;
   union {
-    uint32_t ebp_offset;
+    int32_t ebp_offset;
     uint32_t global_sti;
     struct immediate imm;
     int reg;
