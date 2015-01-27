@@ -1,7 +1,12 @@
 extern putchar func[i32, i32];
 
-def foo i32 = 3;
+def foo i32 = 1;
 
 def ioo func[i32, i32] = fn(x i32) i32 {
-  return putchar(x - (-foo));
+  var f func[i32, i32, i32] = hoo;
+  return putchar(f(x, -(-foo)));
+};
+
+def hoo func[i32, i32, i32] = fn(x i32, y i32) i32 {
+  return x + y;
 };

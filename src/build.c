@@ -841,7 +841,7 @@ void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
     x86_gen_store32(f, X86_EBP, dest.u.ebp_offset, reg);
     break;
   case LOC_GLOBAL:
-    CRASH("Writing to globals not supported.");
+    CRASH("Writing to globals is impossible.");
     break;
   case LOC_EBP_INDIRECT: {
     enum x86_reg altreg = choose_altreg(reg);
@@ -880,16 +880,22 @@ void gen_store_biregister(struct objfile *f, struct loc dest, enum x86_reg lo, e
   /* TODO: We'll want to check the padding here, or support generating
      code that writes to smaller sizes. */
   CHECK(DWORD_SIZE < dest.size && dest.size <= 2 * DWORD_SIZE);
-  if (dest.tag == LOC_EBP_OFFSET) {
+  switch (dest.tag) {
+  case LOC_EBP_OFFSET:
     x86_gen_store32(f, X86_EBP, dest.u.ebp_offset, lo);
     x86_gen_store32(f, X86_EBP, int32_add(dest.u.ebp_offset, DWORD_SIZE), hi);
-  } else if (dest.tag == LOC_EBP_INDIRECT) {
+    break;
+  case LOC_GLOBAL: {
+    CRASH("Writing to globals is impossible.");
+  } break;
+  case LOC_EBP_INDIRECT: {
     enum x86_reg altreg = choose_register_2(lo, hi);
     x86_gen_load32(f, altreg, X86_EBP, dest.u.ebp_indirect);
     x86_gen_store32(f, altreg, 0, lo);
     x86_gen_store32(f, altreg, DWORD_SIZE, hi);
-  } else {
-    TODO_IMPLEMENT;
+  } break;
+  default:
+    UNREACHABLE();
   }
 }
 
@@ -916,6 +922,13 @@ void x86_gen_call(struct objfile *f, uint32_t func_sti) {
   uint8_t b = 0xE8;
   objfile_section_append_raw(objfile_text(f), &b, 1);
   objfile_section_append_rel32(objfile_text(f), func_sti);
+}
+
+void x86_gen_indirect_call_reg(struct objfile *f, enum x86_reg reg) {
+  uint8_t b[2];
+  b[0] = 0xFF;
+  b[1] = mod_reg_rm(MOD11, 2, reg);
+  objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
 /* An expr_return tells how gen_expr should provide the return value. */
@@ -1047,23 +1060,27 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     gen_mov_addressof(f, ptr_loc, return_loc);
   }
 
-  struct expr_return func_er = free_expr_return();
   int32_t saved_offset = frame_save_offset(h);
+  struct expr_return func_er = free_expr_return();
   if (!gen_expr(cs, f, h, a->u.funcall.func, &func_er)) {
     return 0;
   }
 
-  if (func_er.u.free.tag == EXPR_RETURN_FREE_IMM) {
+  switch (func_er.u.free.tag) {
+  case EXPR_RETURN_FREE_IMM: {
     frame_restore_offset(h, saved_offset);
     CHECK(func_er.u.free.u.imm.tag == IMMEDIATE_FUNC);
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_call(f, func_er.u.free.u.imm.u.func_sti);
     gen_placeholder_stack_adjustment(f, h, 1);
-  } else {
-    /* TODO: frame_restore_offset after loading func into register. */
-    ERR_DBG("Indirect function calls not yet supported.\n");
-    return 0;
-    /* TODO: Support indirect function calls. */
+  } break;
+  case EXPR_RETURN_FREE_LOC: {
+    gen_load_register(f, X86_EAX, func_er.u.free.u.loc);
+    frame_restore_offset(h, saved_offset);
+    gen_placeholder_stack_adjustment(f, h, 0);
+    x86_gen_indirect_call_reg(f, X86_EAX);
+    gen_placeholder_stack_adjustment(f, h, 1);
+  } break;
   }
 
   if (return_size <= DWORD_SIZE) {
