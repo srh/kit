@@ -170,7 +170,7 @@ struct loc {
   enum loc_tag tag;
   uint32_t size;
   union {
-    int32_t ebp_offset_;  /* TODO: no underscore. */
+    int32_t ebp_offset;
     uint32_t global_sti;
     int32_t ebp_indirect;
   } u;
@@ -180,7 +180,7 @@ struct loc ebp_loc(uint32_t size, int32_t ebp_offset) {
   struct loc ret;
   ret.tag = LOC_EBP_OFFSET;
   ret.size = size;
-  ret.u.ebp_offset_ = ebp_offset;
+  ret.u.ebp_offset = ebp_offset;
   return ret;
 }
 
@@ -207,7 +207,7 @@ int loc_equal(struct loc a, struct loc b) {
   }
   switch (a.tag) {
   case LOC_EBP_OFFSET:
-    return a.u.ebp_offset_ == b.u.ebp_offset_;
+    return a.u.ebp_offset == b.u.ebp_offset;
   case LOC_GLOBAL:
     return a.u.global_sti == b.u.global_sti;
   case LOC_EBP_INDIRECT:
@@ -715,12 +715,12 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
   if (h->return_loc.size <= DWORD_SIZE) {
     CHECK(h->return_loc.tag == LOC_EBP_OFFSET);
     /* TODO: check that padding is 4. */
-    x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset_);
+    x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset);
   } else if (h->return_loc.size <= 2 * DWORD_SIZE) {
     CHECK(h->return_loc.tag == LOC_EBP_OFFSET);
     /* TODO: check that padding is 8. */
-    x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset_);
-    x86_gen_load32(f, X86_EDX, X86_EBP, int32_add(h->return_loc.u.ebp_offset_, DWORD_SIZE));
+    x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset);
+    x86_gen_load32(f, X86_EDX, X86_EBP, int32_add(h->return_loc.u.ebp_offset, DWORD_SIZE));
   }
 
   x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
@@ -752,7 +752,7 @@ void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc) {
   CHECK(dest.size == DWORD_SIZE);
   switch (loc.tag) {
   case LOC_EBP_OFFSET: {
-    x86_gen_lea32(f, X86_EAX, X86_EBP, loc.u.ebp_offset_);
+    x86_gen_lea32(f, X86_EAX, X86_EBP, loc.u.ebp_offset);
     gen_store_register(f, dest, X86_EAX);
   } break;
   case LOC_GLOBAL: {
@@ -796,7 +796,7 @@ void put_ptr_in_reg(struct objfile *f, struct loc loc, enum x86_reg free_reg,
   switch (loc.tag) {
   case LOC_EBP_OFFSET: {
     *reg_out = X86_EBP;
-    *disp_out = loc.u.ebp_offset_;
+    *disp_out = loc.u.ebp_offset;
   } break;
   case LOC_GLOBAL: {
     x86_gen_mov_reg_stiptr(f, free_reg, loc.u.global_sti);
@@ -838,7 +838,7 @@ void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
      code that writes to smaller sizes. */
   CHECK(dest.size <= DWORD_SIZE);
   if (dest.tag == LOC_EBP_OFFSET) {
-    x86_gen_store32(f, X86_EBP, dest.u.ebp_offset_, reg);
+    x86_gen_store32(f, X86_EBP, dest.u.ebp_offset, reg);
   } else if (dest.tag == LOC_EBP_INDIRECT) {
     enum x86_reg altreg = choose_altreg(reg);
     x86_gen_load32(f, altreg, X86_EBP, dest.u.ebp_indirect);
@@ -853,7 +853,7 @@ void gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src) {
      code that reads from smaller sizes. */
   CHECK(src.size <= DWORD_SIZE);
   if (src.tag == LOC_EBP_OFFSET) {
-    x86_gen_load32(f, reg, X86_EBP, src.u.ebp_offset_);
+    x86_gen_load32(f, reg, X86_EBP, src.u.ebp_offset);
   } else if (src.tag == LOC_EBP_INDIRECT) {
     x86_gen_load32(f, reg, X86_EBP, src.u.ebp_indirect);
     x86_gen_load32(f, reg, reg, 0);
@@ -869,8 +869,8 @@ void gen_store_biregister(struct objfile *f, struct loc dest, enum x86_reg lo, e
      code that writes to smaller sizes. */
   CHECK(DWORD_SIZE < dest.size && dest.size <= 2 * DWORD_SIZE);
   if (dest.tag == LOC_EBP_OFFSET) {
-    x86_gen_store32(f, X86_EBP, dest.u.ebp_offset_, lo);
-    x86_gen_store32(f, X86_EBP, int32_add(dest.u.ebp_offset_, DWORD_SIZE), hi);
+    x86_gen_store32(f, X86_EBP, dest.u.ebp_offset, lo);
+    x86_gen_store32(f, X86_EBP, int32_add(dest.u.ebp_offset, DWORD_SIZE), hi);
   } else if (dest.tag == LOC_EBP_INDIRECT) {
     enum x86_reg altreg = choose_register_2(lo, hi);
     x86_gen_load32(f, altreg, X86_EBP, dest.u.ebp_indirect);
@@ -886,7 +886,7 @@ void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src)
 
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
-    x86_gen_mov_mem_imm32(f, X86_EBP, dest.u.ebp_offset_, src);
+    x86_gen_mov_mem_imm32(f, X86_EBP, dest.u.ebp_offset, src);
     break;
   case LOC_EBP_INDIRECT:
     x86_gen_load32(f, X86_EAX, X86_EBP, dest.u.ebp_indirect);
