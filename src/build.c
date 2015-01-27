@@ -761,7 +761,7 @@ struct loc move_to_register(struct objfile *f, struct loc a, struct loc user) {
     regloc.tag = LOC_REGISTER;
     regloc.size = a.size;
     regloc.u.reg = choose_register(user);
-    gen_mov(f, regloc, a);
+    gen_load_register(f, regloc.u.reg, a);
     return regloc;
   }
 }
@@ -895,6 +895,22 @@ void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
     TODO_IMPLEMENT;
   }
 }
+
+void gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src) {
+  /* TODO: We'll want to check the padding here, or support generating
+     code that reads from smaller sizes. */
+  CHECK(src.size <= DWORD_SIZE);
+  if (src.tag == LOC_EBP_OFFSET) {
+    x86_gen_load32(f, reg, X86_EBP, src.u.ebp_offset);
+  } else if (src.tag == LOC_EBP_INDIRECT) {
+    x86_gen_load32(f, reg, X86_EBP, src.u.ebp_offset);
+    x86_gen_load32(f, reg, reg, 0);
+  } else {
+    TODO_IMPLEMENT;
+  }
+}
+
+
 
 void gen_store_biregister(struct objfile *f, struct loc dest, enum x86_reg lo, enum x86_reg hi) {
   /* TODO: We'll want to check the padding here, or support generating
