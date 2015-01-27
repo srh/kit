@@ -153,8 +153,8 @@ enum loc_tag {
   LOC_GLOBAL = 1,
   LOC_IMMEDIATE = 2,
   LOC_REGISTER = 3,
-  LOC_BIREGISTER = 4,
   LOC_INDIRECT = 8,
+  LOC_EBP_INDIRECT = 8,
 };
 
 struct loc {
@@ -165,9 +165,32 @@ struct loc {
     uint32_t global_sti;
     struct immediate imm;
     int reg;
-    struct { int lo, hi; } bireg;
   } u;
 };
+
+struct loc ebp_loc(uint32_t size, int32_t ebp_offset) {
+  struct loc ret;
+  ret.tag = LOC_EBP_OFFSET;
+  ret.size = size;
+  ret.u.ebp_offset = ebp_offset;
+  return ret;
+}
+
+struct loc global_loc(uint32_t size, uint32_t global_sti) {
+  struct loc ret;
+  ret.tag = LOC_GLOBAL;
+  ret.size = size;
+  ret.u.global_sti = global_sti;
+  return ret;
+}
+
+struct loc ebp_indirect_loc(uint32_t size, int32_t ebp_offset) {
+  struct loc ret;
+  ret.tag = LOC_EBP_INDIRECT;
+  ret.size = size;
+  ret.u.ebp_offset = ebp_offset;
+  return ret;
+}
 
 enum x86_reg {
   X86_EAX,
@@ -194,15 +217,13 @@ int loc_equal(struct loc a, struct loc b) {
     return immediate_equal(a.u.imm, b.u.imm);
   case LOC_REGISTER:
     return a.u.reg == b.u.reg;
-  case LOC_BIREGISTER:
-    return a.u.bireg.lo == b.u.bireg.lo && a.u.bireg.hi == b.u.bireg.hi;
   default:
     UNREACHABLE();
   }
 }
 
 int loc_in_memory(struct loc a) {
-  return a.tag != LOC_REGISTER && a.tag != LOC_BIREGISTER && a.tag != LOC_IMMEDIATE;
+  return a.tag != LOC_REGISTER && a.tag != LOC_IMMEDIATE;
 }
 
 struct vardata {
@@ -373,6 +394,7 @@ void frame_destroy(struct frame *h) {
 }
 
 void frame_specify_return_loc(struct frame *h, struct loc loc) {
+  /* TODO: No need to specify the return loc -- just specify its size. */
   CHECK(!h->return_loc_valid);
   h->return_loc_valid = 1;
   h->return_loc = loc;
@@ -415,11 +437,7 @@ struct loc frame_push_loc(struct frame *h, uint32_t size) {
   if (h->stack_offset < h->min_stack_offset) {
     h->min_stack_offset = h->stack_offset;
   }
-  struct loc ret;
-  ret.tag = LOC_EBP_OFFSET;
-  ret.size = size;
-  ret.u.ebp_offset = h->stack_offset;
-  return ret;
+  return ebp_loc(size, h->stack_offset);
 }
 
 int32_t frame_save_offset(struct frame *h) {
@@ -465,10 +483,7 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
 
     uint32_t size = kira_sizeof(&cs->nt, param_type);
 
-    struct loc loc;
-    loc.tag = LOC_EBP_OFFSET;
-    loc.size = size;
-    loc.u.ebp_offset = offset;
+    struct loc loc = ebp_loc(size, offset);
 
     size_t var_number = h->var_number;
     h->var_number++;
@@ -483,19 +498,12 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
   }
 
   if (return_type_size > 2 * DWORD_SIZE) {
-    struct loc loc;
-    loc.tag = LOC_EBP_OFFSET | LOC_INDIRECT;
-    loc.size = return_type_size;
-    loc.u.ebp_offset = 2 * DWORD_SIZE;
+    struct loc loc = ebp_indirect_loc(return_type_size, 2 * DWORD_SIZE);
     frame_specify_return_loc(h, loc);
   } else if (return_type_size > DWORD_SIZE) {
-    /* WINDOWS */
-    struct loc loc;
-    loc.tag = LOC_BIREGISTER;
-    loc.size = return_type_size;
-    loc.u.bireg.lo = X86_EAX;
-    loc.u.bireg.hi = X86_EDX;
-    frame_specify_return_loc(h, loc);
+    /* The return location is eax:edx, we shouldn't be specifying
+       return_loc like this. */
+    TODO_IMPLEMENT;
   } else {
     struct loc loc;
     loc.tag = LOC_REGISTER;
@@ -750,9 +758,6 @@ enum x86_reg choose_register(struct loc register_user) {
     } else {
       return X86_EAX;
     }
-  } else if (tag_lo == LOC_BIREGISTER) {
-    return choose_register_2(register_user.u.bireg.lo,
-                             register_user.u.bireg.hi);
   } else {
     return X86_EAX;
   }
@@ -886,8 +891,6 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
     } else if (src.tag == LOC_IMMEDIATE) {
       x86_gen_mov_reg_imm32(f, dest.u.reg, src.u.imm);
     }
-  } else if (dest.tag == LOC_BIREGISTER) {
-    TODO_IMPLEMENT;
   } else {
     UNREACHABLE();
   }
@@ -975,25 +978,12 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                          && (er->u.loc.tag == LOC_EBP_OFFSET
                              || er->u.loc.tag == LOC_GLOBAL
                              || (er->u.loc.tag & LOC_INDIRECT)));
-  struct loc return_loc;
 
-  if (return_size > 2 * DWORD_SIZE) {
-    if (memory_demanded) {
-      return_loc = er->u.loc;
-    } else {
-      return_loc = frame_push_loc(h, return_size);
-    }
-  } else if (return_size > DWORD_SIZE) {
-    /* There's no floating point which means it's in eax:edx. */
-    /* WINDOWS */
-    return_loc.tag = LOC_BIREGISTER;
-    return_loc.size = return_size;
-    return_loc.u.bireg.lo = X86_EAX;
-    return_loc.u.bireg.hi = X86_EDX;
+  struct loc return_loc;
+  if (memory_demanded) {
+    return_loc = er->u.loc;
   } else {
-    return_loc.tag = LOC_REGISTER;
-    return_loc.size = return_size;
-    return_loc.u.reg = X86_EAX;
+    return_loc = frame_push_loc(h, return_size);
   }
 
   for (size_t i = args_count; i > 0;) {
@@ -1022,17 +1012,32 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   if (!gen_expr(cs, f, h, a->u.funcall.func, &func_er)) {
     return 0;
   }
-  frame_restore_offset(h, saved_offset);
 
   if (func_er.u.loc.tag == LOC_IMMEDIATE) {
+    frame_restore_offset(h, saved_offset);
     CHECK(func_er.u.loc.u.imm.tag == IMMEDIATE_FUNC);
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_call(f, func_er.u.loc.u.imm.u.func_sti);
     gen_placeholder_stack_adjustment(f, h, 1);
   } else {
+    /* TODO: frame_restore_offset after loading func into register. */
     ERR_DBG("Indirect function calls not yet supported.\n");
     return 0;
     /* TODO: Support indirect function calls. */
+  }
+
+  if (return_size <= DWORD_SIZE) {
+    /* Return value in eax. */
+    struct loc eax_loc;
+    eax_loc.tag = LOC_REGISTER;
+    eax_loc.size = return_size;
+    eax_loc.u.reg = X86_EAX;
+    gen_mov(f, return_loc, eax_loc);
+  } else if (return_size <= 2 * DWORD_SIZE) {
+    /* We need to copy eax:edx into return_loc. */
+    TODO_IMPLEMENT;
+  } else {
+    /* Value already in return_loc. */
   }
 
   expr_return_set(f, er, return_loc);
@@ -1142,8 +1147,6 @@ struct loc memory_loc_make_use_no_registers(struct objfile *f, struct frame *h,
     newloc.size = size;
     return newloc;
   } break;
-  case LOC_BIREGISTER:
-    UNREACHABLE();
   default:
     UNREACHABLE();
   }
@@ -1158,9 +1161,6 @@ struct loc gen_loc_without_registers(struct objfile *f, struct frame *h,
   case LOC_IMMEDIATE:
     return loc;
   case LOC_REGISTER: {
-    TODO_IMPLEMENT;
-  } break;
-  case LOC_BIREGISTER: {
     TODO_IMPLEMENT;
   } break;
   default:
@@ -1297,10 +1297,8 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
         loc.u.imm.u.func_sti = inst->symbol_table_index;
         expr_return_set(f, er, loc);
       } else {
-        struct loc loc;
-        loc.tag = LOC_GLOBAL;
-        loc.size = kira_sizeof(&cs->nt, &inst->type);
-        loc.u.global_sti = inst->symbol_table_index;
+        struct loc loc = global_loc(kira_sizeof(&cs->nt, &inst->type),
+                                    inst->symbol_table_index);
         expr_return_set(f, er, loc);
       }
     } else {
