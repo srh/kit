@@ -531,7 +531,6 @@ void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
 void append_immediate(struct objfile *f, struct immediate imm) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC: {
-    /* TODO: Is dir32 the right one? */
     objfile_section_append_dir32(objfile_text(f), imm.u.func_sti);
   } break;
   case IMMEDIATE_U32: {
@@ -1096,12 +1095,6 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-void gen_i32_negate(struct objfile *f, struct frame *h,
-                    struct loc dest, struct loc src) {
-  (void)f, (void)h, (void)dest, (void)src;
-  TODO_IMPLEMENT;
-}
-
 int gen_unop_expr(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_expr *a,
                   struct expr_return *er) {
@@ -1494,7 +1487,6 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
   }
 
   for (size_t i = 0; i < vars_pushed; i++) {
-    /* TODO: Just do frame_reset or something, it's more reliable. */
     frame_pop(h, h->vardata[size_sub(h->vardata_count, 1)].size);
     SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
   }
