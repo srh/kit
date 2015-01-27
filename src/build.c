@@ -151,8 +151,7 @@ int immediate_equal(struct immediate a, struct immediate b) {
 enum loc_tag {
   LOC_EBP_OFFSET = 0,
   LOC_GLOBAL = 1,
-  LOC_IMMEDIATE = 2,
-  LOC_REGISTER = 3,
+  LOC_REGISTER = 2,
   LOC_INDIRECT = 8,
   LOC_EBP_INDIRECT = 8,
 };
@@ -163,7 +162,6 @@ struct loc {
   union {
     int32_t ebp_offset;
     uint32_t global_sti;
-    struct immediate imm;
     int reg;
   } u;
 };
@@ -213,8 +211,6 @@ int loc_equal(struct loc a, struct loc b) {
     return a.u.ebp_offset == b.u.ebp_offset;
   case LOC_GLOBAL:
     return a.u.global_sti == b.u.global_sti;
-  case LOC_IMMEDIATE:
-    return immediate_equal(a.u.imm, b.u.imm);
   case LOC_REGISTER:
     return a.u.reg == b.u.reg;
   default:
@@ -223,7 +219,7 @@ int loc_equal(struct loc a, struct loc b) {
 }
 
 int loc_in_memory(struct loc a) {
-  return a.tag != LOC_REGISTER && a.tag != LOC_IMMEDIATE;
+  return a.tag != LOC_REGISTER;
 }
 
 struct vardata {
@@ -837,7 +833,6 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
     return;
   }
 
-  CHECK((dest.tag & (LOC_INDIRECT - 1)) != LOC_IMMEDIATE);
   CHECK((dest.tag & (LOC_INDIRECT - 1)) != LOC_GLOBAL);
 
   dest = make_movable(f, dest, src);
@@ -860,12 +855,6 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
       } else {
         TODO_IMPLEMENT;
       }
-    } else if (src.tag == LOC_IMMEDIATE) {
-      if (src.size == DWORD_SIZE) {
-        x86_gen_mov_mem_imm32(f, X86_EBP, dest.u.ebp_offset, src.u.imm);
-      } else {
-        TODO_IMPLEMENT;
-      }
     } else {
       TODO_IMPLEMENT;
     }
@@ -882,12 +871,6 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
       x86_gen_mov_reg32(f, dest.u.reg, src.u.reg);
     } else if (src.tag == LOC_GLOBAL) {
       TODO_IMPLEMENT;
-    } else if (src.tag == LOC_IMMEDIATE) {
-      if (src.size == DWORD_SIZE) {
-        x86_gen_mov_reg_imm32(f, dest.u.reg, src.u.imm);
-      } else {
-        TODO_IMPLEMENT;
-      }
     }
   } else {
     UNREACHABLE();
@@ -897,7 +880,6 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
 void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src) {
   CHECK(dest.size == DWORD_SIZE);
 
-  CHECK((dest.tag & (LOC_INDIRECT - 1)) != LOC_IMMEDIATE);
   CHECK((dest.tag & (LOC_INDIRECT - 1)) != LOC_GLOBAL);
 
   if (dest.tag == (LOC_REGISTER | LOC_INDIRECT)) {
@@ -1176,8 +1158,7 @@ struct loc memory_loc_make_use_no_registers(struct objfile *f, struct frame *h,
   CHECK(loc_in_memory(loc));
   switch (loc.tag & (LOC_INDIRECT - 1)) {
   case LOC_EBP_OFFSET:  /* fall-through */
-  case LOC_GLOBAL:  /* fall-through */
-  case LOC_IMMEDIATE:
+  case LOC_GLOBAL:
     return loc;
   case LOC_REGISTER: {
     CHECK(loc.tag & LOC_INDIRECT);
@@ -1201,8 +1182,7 @@ struct loc gen_loc_without_registers(struct objfile *f, struct frame *h,
   (void)f, (void)h;  /* TODO */
   switch (loc.tag & (LOC_INDIRECT - 1)) {
   case LOC_EBP_OFFSET:  /* fall-through */
-  case LOC_GLOBAL:  /* fall-through */
-  case LOC_IMMEDIATE:
+  case LOC_GLOBAL:
     return loc;
   case LOC_REGISTER: {
     TODO_IMPLEMENT;
