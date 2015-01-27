@@ -613,9 +613,16 @@ void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
   objfile_section_append_raw(objfile_text(f), b, 6);
 }
 
-void x86_gen_add_i32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
+void x86_gen_add_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   uint8_t b[2];
   b[0] = 0x01;
+  b[1] = mod_reg_rm(MOD11, src, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_sub_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
+  uint8_t b[2];
+  b[0] = 0x29;
   b[1] = mod_reg_rm(MOD11, src, dest);
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
@@ -1200,7 +1207,7 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
     TODO_IMPLEMENT;
   case AST_BINOP_LOGICAL_AND:
     TODO_IMPLEMENT;
-  case AST_BINOP_ADD: {
+  default: {
     enum numeric_type lhs_type = get_numeric_type(cs->im, &be->lhs->expr_info.concrete_type);
     enum numeric_type rhs_type = get_numeric_type(cs->im, &be->rhs->expr_info.concrete_type);
     CHECK(lhs_type == rhs_type);
@@ -1224,26 +1231,46 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
     move_to_registers(f, lhs_er.u.loc, rhs_er.u.loc,
                       &lhs_reg, &rhs_reg);
 
-    switch (lhs_type) {
-    case NUMERIC_TYPE_BYTE: {
-      TODO_IMPLEMENT;
+    switch (be->operator) {
+    case AST_BINOP_ADD: {
+      switch (lhs_type) {
+      case NUMERIC_TYPE_BYTE: {
+        TODO_IMPLEMENT;
+      } break;
+      case NUMERIC_TYPE_I32: {
+        x86_gen_add_w32(f, lhs_reg.u.reg, rhs_reg.u.reg);
+        /* TODO: Handle overflow. */
+      } break;
+      case NUMERIC_TYPE_U32: {
+        x86_gen_add_w32(f, lhs_reg.u.reg, rhs_reg.u.reg);
+        /* TODO: Handle overflow. */
+      } break;
+      default:
+        UNREACHABLE();
+      }
     } break;
-    case NUMERIC_TYPE_I32: {
-      x86_gen_add_i32(f, lhs_reg.u.reg, rhs_reg.u.reg);
-      /* TODO: Handle overflow. */
-      expr_return_set(f, er, lhs_reg);
-    } break;
-    case NUMERIC_TYPE_U32: {
-      TODO_IMPLEMENT;
+    case AST_BINOP_SUB: {
+      switch (lhs_type) {
+      case NUMERIC_TYPE_BYTE: {
+        TODO_IMPLEMENT;
+      } break;
+      case NUMERIC_TYPE_I32: {
+        x86_gen_sub_w32(f, lhs_reg.u.reg, rhs_reg.u.reg);
+        /* TODO: Handle overflow. */
+      } break;
+      case NUMERIC_TYPE_U32: {
+        x86_gen_sub_w32(f, lhs_reg.u.reg, rhs_reg.u.reg);
+        /* TODO: Handle overflow. */
+      } break;
+      }
     } break;
     default:
-      UNREACHABLE();
+      TODO_IMPLEMENT;
     }
 
+    expr_return_set(f, er, lhs_reg);
     return 1;
   } break;
-  default:
-    TODO_IMPLEMENT;
   }
 }
 
