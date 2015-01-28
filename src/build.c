@@ -1487,7 +1487,8 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
       frame_restore_offset(h, saved_offset);
     } break;
     case AST_STATEMENT_VAR: {
-      uint32_t var_size = kira_sizeof(&cs->nt, &s->u.var_statement.info.concrete_type);
+      uint32_t var_size = kira_sizeof(&cs->nt,
+                                      ast_var_statement_type(&s->u.var_statement));
       struct loc var_loc = frame_push_loc(h, var_size);
 
       int32_t saved_offset = frame_save_offset(h);
@@ -1503,7 +1504,7 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
       h->var_number++;
       vardata_init(&vd, s->u.var_statement.decl.name.value,
                    var_number,
-                   &s->u.var_statement.info.concrete_type,
+                   ast_var_statement_type(&s->u.var_statement),
                    var_size,
                    var_loc);
       SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);

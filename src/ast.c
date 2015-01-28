@@ -187,6 +187,11 @@ void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
   ast_expr_alloc_move(rhs, &a->rhs);
 }
 
+struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a) {
+  CHECK(a->info.info_valid);
+  return &a->info.concrete_type;
+}
+
 void ast_var_statement_init_copy(struct ast_var_statement *a,
                                  struct ast_var_statement *c) {
   a->meta = ast_meta_make_copy(&c->meta);
