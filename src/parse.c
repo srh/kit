@@ -218,11 +218,11 @@ int is_one_of(const char *s, int32_t ch) {
 }
 
 int is_operlike(int32_t ch) {
-  return is_one_of("~!%^&*+=-/?<,>.;:", ch);
+  return is_one_of("~!%^&*+=-/?<,>.;:|", ch);
 }
 
 int is_binop_start(int32_t ch) {
-  return is_one_of("!%^&*+=-/<>", ch);
+  return is_one_of("!%^&*+=-/<>|", ch);
 }
 
 int is_parenlike(int32_t ch) {
@@ -1497,6 +1497,9 @@ int parse_test_defs(void) {
                          "   return x;\n"
                          "};\n",
                          29);
+  pass &= run_count_test("def15",
+                         "def foo i32 = 1 == 1 || 2 == 1;\n",
+                         12);
   return pass;
 }
 

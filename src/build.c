@@ -1231,10 +1231,58 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
     expr_return_set(f, er, lhs_er.u.loc);
     return 1;
   } break;
-  case AST_BINOP_LOGICAL_OR:
-    TODO_IMPLEMENT;
-  case AST_BINOP_LOGICAL_AND:
-    TODO_IMPLEMENT;
+  case AST_BINOP_LOGICAL_OR: {
+    struct expr_return lhs_er = open_expr_return();
+    if (!gen_expr(cs, f, h, be->lhs, &lhs_er)) {
+      return 0;
+    }
+
+    struct loc ret = frame_push_loc(h, KIRA_BOOL_SIZE);
+
+    size_t target_number = frame_add_target(h);
+    gen_placeholder_jmp_if_false(f, h, lhs_er.u.loc, target_number);
+    gen_mov(f, ret, lhs_er.u.loc);
+    size_t end_target_number = frame_add_target(h);
+
+    gen_placeholder_jmp(f, h, end_target_number);
+    frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
+
+    struct expr_return rhs_er = demand_expr_return(ret);
+    if (!gen_expr(cs, f, h, be->rhs, &rhs_er)) {
+      return 0;
+    }
+
+    frame_define_target(h, end_target_number, objfile_section_size(objfile_text(f)));
+    expr_return_set(f, er, ret);
+    return 1;
+  } break;
+  case AST_BINOP_LOGICAL_AND: {
+    struct expr_return lhs_er = open_expr_return();
+    if (!gen_expr(cs, f, h, be->lhs, &lhs_er)) {
+      return 0;
+    }
+
+    struct loc ret = frame_push_loc(h, KIRA_BOOL_SIZE);
+
+    size_t target_number = frame_add_target(h);
+    gen_placeholder_jmp_if_false(f, h, lhs_er.u.loc, target_number);
+
+    struct expr_return rhs_er = demand_expr_return(ret);
+    if (!gen_expr(cs, f, h, be->rhs, &rhs_er)) {
+      return 0;
+    }
+
+    size_t end_target_number = frame_add_target(h);
+    gen_placeholder_jmp(f, h, end_target_number);
+    frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
+
+    gen_mov(f, ret, lhs_er.u.loc);
+
+    frame_define_target(h, end_target_number, objfile_section_size(objfile_text(f)));
+
+    expr_return_set(f, er, ret);
+    return 1;
+  } break;
   default: {
     enum numeric_type lhs_type = get_numeric_type(cs->im, &be->lhs->expr_info.concrete_type);
     enum numeric_type rhs_type = get_numeric_type(cs->im, &be->rhs->expr_info.concrete_type);

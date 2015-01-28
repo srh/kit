@@ -3,7 +3,7 @@ extern putchar func[i32, i32];
 def foo i32 = 1;
 
 def ioo func[i32, i32] = fn(x i32) i32 {
-  if (x - 65) {
+  if (x - 65 && x - 66) {
     putchar(x);
   } else {
     putchar(64 + 24);
