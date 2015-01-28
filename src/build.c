@@ -455,7 +455,7 @@ struct labeldata *frame_try_find_labeldata(struct frame *h, ident_value labelnam
 
 /* X86 and maybe WINDOWS-specific calling convention stuff. */
 void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
-  struct ast_typeexpr *type = &expr->expr_info.concrete_type;
+  struct ast_typeexpr *type = &expr->info.concrete_type;
   size_t args_count = expr->u.lambda.params_count;
   struct ast_typeexpr *return_type
     = expose_func_return_type(cs->im, type, size_add(args_count, 1));
@@ -1027,7 +1027,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   size_t args_count = a->u.funcall.args_count;
 
   uint32_t return_size = kira_sizeof(&cs->nt,
-                                     &a->expr_info.concrete_type);
+                                     &a->info.concrete_type);
 
   /* X86 */
   int memory_demanded = (er->tag == EXPR_RETURN_DEMANDED);
@@ -1045,7 +1045,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     struct ast_expr *arg = &a->u.funcall.args[i];
 
     struct loc arg_loc = frame_push_loc(h, kira_sizeof(&cs->nt,
-                                                       &arg->expr_info.concrete_type));
+                                                       &arg->info.concrete_type));
 
     struct expr_return er = demand_expr_return(arg_loc);
     int32_t saved_offset = frame_save_offset(h);
@@ -1111,7 +1111,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
     gen_mov(f, loc, rhs_er.u.loc);
     CHECK(loc.tag == LOC_EBP_OFFSET);
 
-    uint32_t size = kira_sizeof(&cs->nt, &a->expr_info.concrete_type);
+    uint32_t size = kira_sizeof(&cs->nt, &a->info.concrete_type);
     /* When dereferencing a pointer, we have no info about padding, so
        the padded size is the same as the size. */
     struct loc ret = ebp_indirect_loc(size, size, loc.u.ebp_offset);
@@ -1284,8 +1284,8 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   default: {
-    enum numeric_type lhs_type = get_numeric_type(cs->im, &be->lhs->expr_info.concrete_type);
-    enum numeric_type rhs_type = get_numeric_type(cs->im, &be->rhs->expr_info.concrete_type);
+    enum numeric_type lhs_type = get_numeric_type(cs->im, &be->lhs->info.concrete_type);
+    enum numeric_type rhs_type = get_numeric_type(cs->im, &be->rhs->info.concrete_type);
     CHECK(lhs_type == rhs_type);
 
     struct expr_return lhs_er = open_expr_return();

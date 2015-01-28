@@ -1003,7 +1003,7 @@ int check_expr_funcall(struct exprscope *es,
       goto fail_cleanup_args_types_and_annotated;
     }
     ast_typeexpr_init_copy(&args_types[i],
-                           &args_annotated[i].expr_info.concrete_type);
+                           &args_annotated[i].info.concrete_type);
   }
 
   ast_typeexpr_init_copy(&args_types[args_count], partial_type);
@@ -1022,7 +1022,7 @@ int check_expr_funcall(struct exprscope *es,
     goto fail_cleanup_funcexpr;
   }
 
-  copy_func_return_type(es->cs->im, &annotated_func.expr_info.concrete_type,
+  copy_func_return_type(es->cs->im, &annotated_func.info.concrete_type,
                         args_types_count, out);
   ast_funcall_init(annotated_out, ast_meta_make_copy(&x->meta),
                    annotated_func, args_annotated, args_count);
@@ -1165,10 +1165,10 @@ int check_expr_bracebody(struct bodystate *bs,
       if (!bs->have_exact_return_type) {
         bs->have_exact_return_type = 1;
         ast_typeexpr_init_copy(&bs->exact_return_type,
-                               &annotated_expr.expr_info.concrete_type);
+                               &annotated_expr.info.concrete_type);
       } else {
         if (!exact_typeexprs_equal(&bs->exact_return_type,
-                                   &annotated_expr.expr_info.concrete_type)) {
+                                   &annotated_expr.info.concrete_type)) {
           ERR_DBG("Return statements with conflicting return types.\n");
           ast_expr_destroy(&annotated_expr);
           goto fail;
@@ -1527,19 +1527,19 @@ int check_expr_magic_binop(struct exprscope *es,
       ERR_DBG("Trying to assign to non-lvalue.\n");
       goto cleanup_both;
     }
-    if (!exact_typeexprs_equal(&annotated_lhs.expr_info.concrete_type,
-                               &annotated_rhs.expr_info.concrete_type)) {
+    if (!exact_typeexprs_equal(&annotated_lhs.info.concrete_type,
+                               &annotated_rhs.info.concrete_type)) {
       ERR_DBG("Assignment with non-matching types.\n");
       goto cleanup_both;
     }
 
     if (!unify_directionally(partial_type,
-                             &annotated_lhs.expr_info.concrete_type)) {
+                             &annotated_lhs.info.concrete_type)) {
       ERR_DBG("LHS type of assignment does not match contextual type.\n");
       goto cleanup_both;
     }
 
-    ast_typeexpr_init_copy(out, &annotated_lhs.expr_info.concrete_type);
+    ast_typeexpr_init_copy(out, &annotated_lhs.info.concrete_type);
     *is_lvalue_out = 1;
 
     ast_binop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
@@ -1556,14 +1556,14 @@ int check_expr_magic_binop(struct exprscope *es,
         identmap_intern_c_str(es->cs->im, BOOLEAN_STANDIN_TYPE_NAME));
 
     if (!unify_directionally(&boolean,
-                             &annotated_lhs.expr_info.concrete_type)) {
+                             &annotated_lhs.info.concrete_type)) {
       ERR_DBG("LHS of and/or is non-boolean.\n");
       ast_typeexpr_destroy(&boolean);
       goto cleanup_both;
     }
 
     if (!unify_directionally(&boolean,
-                             &annotated_rhs.expr_info.concrete_type)) {
+                             &annotated_rhs.info.concrete_type)) {
       ERR_DBG("RHS of and/or is non-boolean.\n");
       ast_typeexpr_destroy(&boolean);
       goto cleanup_both;
@@ -1648,9 +1648,9 @@ int check_expr_binop(struct exprscope *es,
 
   struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types), 3);
   ast_typeexpr_init_copy(&args_types[0],
-                         &annotated_lhs.expr_info.concrete_type);
+                         &annotated_lhs.info.concrete_type);
   ast_typeexpr_init_copy(&args_types[1],
-                         &annotated_rhs.expr_info.concrete_type);
+                         &annotated_rhs.info.concrete_type);
   ast_typeexpr_init_copy(&args_types[2], partial_type);
 
   ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
@@ -1755,7 +1755,7 @@ int check_expr_magic_unop(struct exprscope *es,
   case AST_UNOP_DEREFERENCE: {
     struct ast_typeexpr *rhs_target;
     if (!view_ptr_target(es->cs->im,
-                         &annotated_rhs.expr_info.concrete_type,
+                         &annotated_rhs.info.concrete_type,
                          &rhs_target)) {
       ERR_DBG("Trying to dereference a non-pointer.\n");
       goto cleanup_rhs;
@@ -1779,7 +1779,7 @@ int check_expr_magic_unop(struct exprscope *es,
     }
 
     struct ast_typeexpr pointer_type;
-    wrap_in_ptr(es->cs->im, &annotated_rhs.expr_info.concrete_type,
+    wrap_in_ptr(es->cs->im, &annotated_rhs.info.concrete_type,
                 &pointer_type);
 
     if (!unify_directionally(partial_type, &pointer_type)) {
@@ -1839,7 +1839,7 @@ int check_expr_unop(struct exprscope *es,
 
   struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types), 3);
   ast_typeexpr_init_copy(&args_types[0],
-                         &annotated_rhs.expr_info.concrete_type);
+                         &annotated_rhs.info.concrete_type);
   ast_typeexpr_init_copy(&args_types[1], partial_type);
 
   ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
@@ -1973,7 +1973,7 @@ int check_expr_local_field_access(
   }
 
   struct ast_typeexpr field_type;
-  if (!lookup_field_type(es, &annotated_lhs.expr_info.concrete_type,
+  if (!lookup_field_type(es, &annotated_lhs.info.concrete_type,
                          x->fieldname.value, &field_type)) {
     goto cleanup_lhs;
   }
@@ -2026,7 +2026,7 @@ int check_expr_deref_field_access(
   }
 
   struct ast_typeexpr *ptr_target;
-  if (!view_ptr_target(es->cs->im, &annotated_lhs.expr_info.concrete_type,
+  if (!view_ptr_target(es->cs->im, &annotated_lhs.info.concrete_type,
                        &ptr_target)) {
     ERR_DBG("Dereferencing field access expects ptr type.\n");
     goto cleanup_lhs;

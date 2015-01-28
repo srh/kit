@@ -384,7 +384,7 @@ struct ast_expr_info ast_expr_info_typechecked(
 
 struct ast_expr {
   enum ast_expr_tag tag;
-  struct ast_expr_info expr_info;
+  struct ast_expr_info info;
   union {
     struct ast_name_expr name;
     struct ast_numeric_literal numeric_literal;

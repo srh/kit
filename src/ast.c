@@ -644,14 +644,14 @@ size_t ast_expr_pos_end(struct ast_expr *a) {
 
 void ast_expr_partial_init(struct ast_expr *a,
                            enum ast_expr_tag tag,
-                           struct ast_expr_info expr_info) {
+                           struct ast_expr_info info) {
   a->tag = tag;
-  a->expr_info = expr_info;
+  a->info = info;
 }
 
 void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c) {
   a->tag = c->tag;
-  ast_expr_info_init_copy(&a->expr_info, &c->expr_info);
+  ast_expr_info_init_copy(&a->info, &c->info);
   switch (c->tag) {
   case AST_EXPR_NAME:
     ast_name_expr_init_copy(&a->u.name, &c->u.name);
@@ -721,7 +721,7 @@ void ast_expr_destroy(struct ast_expr *a) {
   default:
     UNREACHABLE();
   }
-  ast_expr_info_destroy(&a->expr_info);
+  ast_expr_info_destroy(&a->info);
   a->tag = (enum ast_expr_tag)-1;
 }
 
