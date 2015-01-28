@@ -104,12 +104,14 @@ void def_entry_init(struct def_entry *e, ident_value name,
                     struct ast_generics *generics,
                     struct ast_typeexpr *type,
                     int is_primitive,
+                    enum primitive_op primitive_op,
                     int is_extern,
                     struct ast_def *def) {
   e->name = name;
   ast_generics_init_copy(&e->generics, generics);
   ast_typeexpr_init_copy(&e->type, type);
   e->is_primitive = is_primitive;
+  e->primitive_op = primitive_op;
   e->is_extern = is_extern;
   e->def = def;
 
@@ -130,6 +132,7 @@ void def_entry_destroy(struct def_entry *e) {
   ast_generics_destroy(&e->generics);
   ast_typeexpr_destroy(&e->type);
   e->is_primitive = 0;
+  e->primitive_op = PRIMITIVE_OP_INVALID;
   e->is_extern = 0;
   e->def = NULL;
 
@@ -331,6 +334,7 @@ int name_table_help_add_def(struct name_table *t,
                             struct ast_generics *generics,
                             struct ast_typeexpr *type,
                             int is_primitive,
+                            enum primitive_op primitive_op,
                             int is_extern,
                             struct ast_def *def) {
   if (deftype_shadowed(t, name)) {
@@ -361,7 +365,7 @@ int name_table_help_add_def(struct name_table *t,
 
   struct def_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);
-  def_entry_init(new_entry, name, generics, type, is_primitive,
+  def_entry_init(new_entry, name, generics, type, is_primitive, primitive_op,
                  is_extern, def);
   SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);
 
@@ -379,14 +383,29 @@ int name_table_add_def(struct name_table *t,
                        struct ast_generics *generics,
                        struct ast_typeexpr *type,
                        struct ast_def *def) {
-  return name_table_help_add_def(t, name, generics, type, 0, 0, def);
+  return name_table_help_add_def(t, name, generics, type,
+                                 0, PRIMITIVE_OP_INVALID,
+                                 0, def);
 }
 
 int name_table_add_primitive_def(struct name_table *t,
                                  ident_value name,
                                  struct ast_generics *generics,
                                  struct ast_typeexpr *type) {
-  return name_table_help_add_def(t, name, generics, type, 1, 0, NULL);
+  return name_table_help_add_def(t, name, generics, type,
+                                 1, PRIMITIVE_OP_INVALID,  /* TODO: Have no primitive defs with invalid primitive ops. */
+                                 0, NULL);
+}
+
+/* TODO: Get rid of / rename this fucntion to name_table_add_primitive_def. */
+int name_table_add_primitive_def_with_primitive_op(struct name_table *t,
+                                                   ident_value name,
+                                                   enum primitive_op primitive_op,
+                                                   struct ast_generics *generics,
+                                                   struct ast_typeexpr *type) {
+  return name_table_help_add_def(t, name, generics, type,
+                                 1, primitive_op,
+                                 0, NULL);
 }
 
 int name_table_add_extern_def(struct name_table *t,
@@ -394,7 +413,9 @@ int name_table_add_extern_def(struct name_table *t,
                               struct ast_typeexpr *type) {
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
-  return name_table_help_add_def(t, name, &generics, type, 0, 1, NULL);
+  return name_table_help_add_def(t, name, &generics, type,
+                                 0, PRIMITIVE_OP_INVALID,
+                                 1, NULL);
 }
 
 int name_table_help_add_deftype_entry(struct name_table *t,

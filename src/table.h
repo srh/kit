@@ -3,6 +3,20 @@
 
 #include "ast.h"
 
+enum primitive_op {
+  PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE,
+  PRIMITIVE_OP_CONVERT_BYTE_TO_I32,
+  PRIMITIVE_OP_CONVERT_BYTE_TO_U32,
+  PRIMITIVE_OP_CONVERT_I32_TO_BYTE,
+  PRIMITIVE_OP_CONVERT_I32_TO_I32,
+  PRIMITIVE_OP_CONVERT_I32_TO_U32,
+  PRIMITIVE_OP_CONVERT_U32_TO_BYTE,
+  PRIMITIVE_OP_CONVERT_U32_TO_I32,
+  PRIMITIVE_OP_CONVERT_U32_TO_U32,
+};
+
+#define PRIMITIVE_OP_INVALID ((enum primitive_op)-1)
+
 enum static_value_tag {
   STATIC_VALUE_I32,
   STATIC_VALUE_U32,
@@ -50,6 +64,7 @@ struct def_entry {
   struct ast_typeexpr type;
 
   int is_primitive;
+  enum primitive_op primitive_op;
   int is_extern;
   struct ast_def *def;
 
@@ -134,6 +149,12 @@ int name_table_add_primitive_def(struct name_table *t,
                                  ident_value name,
                                  struct ast_generics *generics,
                                  struct ast_typeexpr *type);
+int name_table_add_primitive_def_with_primitive_op(
+    struct name_table *t,
+    ident_value name,
+    enum primitive_op primitive_op,
+    struct ast_generics *generics,
+    struct ast_typeexpr *type);
 int name_table_add_extern_def(struct name_table *t,
                               ident_value name,
                               struct ast_typeexpr *type);

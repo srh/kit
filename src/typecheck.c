@@ -229,6 +229,22 @@ void import_integer_conversions(struct checkstate *cs) {
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
 
+  enum primitive_op conversions[3][3] = {
+    {
+      PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE,
+      PRIMITIVE_OP_CONVERT_BYTE_TO_I32,
+      PRIMITIVE_OP_CONVERT_BYTE_TO_U32,
+    }, {
+      PRIMITIVE_OP_CONVERT_I32_TO_BYTE,
+      PRIMITIVE_OP_CONVERT_I32_TO_I32,
+      PRIMITIVE_OP_CONVERT_I32_TO_U32,
+    }, {
+      PRIMITIVE_OP_CONVERT_U32_TO_BYTE,
+      PRIMITIVE_OP_CONVERT_U32_TO_I32,
+      PRIMITIVE_OP_CONVERT_U32_TO_U32,
+    },
+  };
+
   for (size_t i = 0; i < 3; i++) {
     for (size_t j = 0; j < 3; j++) {
       struct ast_typeexpr func_type;
@@ -236,10 +252,11 @@ void import_integer_conversions(struct checkstate *cs) {
       names[0] = types[i];
       names[1] = types[j];
       init_func_type(&func_type, cs->im, names, 2);
-      name_table_add_primitive_def(&cs->nt,
-                                   convert,
-                                   &generics,
-                                   &func_type);
+      name_table_add_primitive_def_with_primitive_op(&cs->nt,
+                                                     convert,
+                                                     conversions[i][j],
+                                                     &generics,
+                                                     &func_type);
       ast_typeexpr_destroy(&func_type);
     }
   }
