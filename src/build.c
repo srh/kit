@@ -178,6 +178,7 @@ struct loc {
 };
 
 struct loc ebp_loc(uint32_t size, uint32_t padded_size, int32_t ebp_offset) {
+  CHECK(size <= padded_size && padded_size - size < DWORD_SIZE);
   struct loc ret;
   ret.tag = LOC_EBP_OFFSET;
   ret.size = size;
@@ -187,6 +188,7 @@ struct loc ebp_loc(uint32_t size, uint32_t padded_size, int32_t ebp_offset) {
 }
 
 struct loc global_loc(uint32_t size, uint32_t padded_size, uint32_t global_sti) {
+  CHECK(size <= padded_size && padded_size - size < DWORD_SIZE);
   struct loc ret;
   ret.tag = LOC_GLOBAL;
   ret.size = size;
@@ -196,6 +198,7 @@ struct loc global_loc(uint32_t size, uint32_t padded_size, uint32_t global_sti) 
 }
 
 struct loc ebp_indirect_loc(uint32_t size, uint32_t padded_size, int32_t ebp_offset) {
+  CHECK(size <= padded_size && padded_size - size < DWORD_SIZE);
   struct loc ret;
   ret.tag = LOC_EBP_INDIRECT;
   ret.size = size;
@@ -774,18 +777,17 @@ void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc) {
   }
 }
 
-/* TODO: This could be improved with padding or something. */
 void gen_memmem_mov(struct objfile *f,
                     enum x86_reg dest_reg,
                     int32_t dest_disp,
                     enum x86_reg src_reg,
                     int32_t src_disp,
-                    uint32_t usize) {
-  int32_t size = uint32_to_int32(usize);
+                    uint32_t upadded_size) {
+  int32_t padded_size = uint32_to_int32(upadded_size);
   enum x86_reg reg = choose_register_2(dest_reg, src_reg);
   int32_t n = 0;
-  while (n < size) {
-    if (size - n >= DWORD_SIZE) {
+  while (n < padded_size) {
+    if (padded_size - n >= DWORD_SIZE) {
       x86_gen_load32(f, reg, src_reg, int32_add(n, src_disp));
       x86_gen_store32(f, dest_reg, int32_add(n, dest_disp), reg);
       n += DWORD_SIZE;
@@ -836,13 +838,14 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   int32_t src_disp;
   put_ptr_in_reg(f, src, X86_EDX, &src_reg, &src_disp);
 
-  gen_memmem_mov(f, dest_reg, dest_disp, src_reg, src_disp, src.size);
+  uint32_t padded_size = dest.padded_size < src.padded_size ? dest.padded_size : src.padded_size;
+  CHECK(padded_size >= src.size);
+  gen_memmem_mov(f, dest_reg, dest_disp, src_reg, src_disp, padded_size);
 }
 
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
-  /* TODO: We'll want to check the padding here, or support generating
-     code that writes to smaller sizes. */
   CHECK(dest.size <= DWORD_SIZE);
+  CHECK(dest.padded_size == DWORD_SIZE);
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
     x86_gen_store32(f, X86_EBP, dest.u.ebp_offset, reg);
@@ -861,9 +864,8 @@ void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
 }
 
 void gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src) {
-  /* TODO: We'll want to check the padding here, or support generating
-     code that reads from smaller sizes. */
   CHECK(src.size <= DWORD_SIZE);
+  CHECK(src.padded_size == DWORD_SIZE);
   switch (src.tag) {
   case LOC_EBP_OFFSET:
     x86_gen_load32(f, reg, X86_EBP, src.u.ebp_offset);
@@ -884,9 +886,8 @@ void gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src) {
 
 
 void gen_store_biregister(struct objfile *f, struct loc dest, enum x86_reg lo, enum x86_reg hi) {
-  /* TODO: We'll want to check the padding here, or support generating
-     code that writes to smaller sizes. */
   CHECK(DWORD_SIZE < dest.size && dest.size <= 2 * DWORD_SIZE);
+  CHECK(dest.padded_size == 2 * DWORD_SIZE);
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
     x86_gen_store32(f, X86_EBP, dest.u.ebp_offset, lo);
