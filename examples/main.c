@@ -3,17 +3,12 @@
 #include <stdio.h>
 
 extern int32_t kira_foo1;
-int32_t kira_ioo2(int32_t);
+int32_t kira_showfacs4(void);
 
 int main(void) {
   printf("foo value: %" PRIu32 "\n", kira_foo1);
 
-  kira_ioo2('@');
-  kira_ioo2('A');
-  kira_ioo2('B');
-  kira_ioo2('C');
-  kira_ioo2('D');
-  kira_ioo2('E');
+  kira_showfacs4();
   putchar('\n');
 
   return 0;

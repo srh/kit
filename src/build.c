@@ -161,9 +161,9 @@ int immediate_equal(struct immediate a, struct immediate b) {
 }
 
 enum loc_tag {
-  LOC_EBP_OFFSET = 0,
-  LOC_GLOBAL = 1,
-  LOC_EBP_INDIRECT = 8,
+  LOC_EBP_OFFSET,
+  LOC_GLOBAL,
+  LOC_EBP_INDIRECT,
 };
 
 struct loc {
