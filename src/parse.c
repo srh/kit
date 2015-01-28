@@ -917,6 +917,7 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
 
   enum ast_unop unop;
   if (try_parse_unop(p, &unop)) {
+    skip_ws(p);
     struct ast_expr rhs;
     if (!parse_expr(p, &rhs, unop_right_precedence(unop))) {
       return 0;
@@ -1500,6 +1501,9 @@ int parse_test_defs(void) {
   pass &= run_count_test("def15",
                          "def foo i32 = 1 == 1 || 2 == 1;\n",
                          12);
+  pass &= run_count_test("def16",
+                         "def foo i32 = 1 + - 1;\n",
+                         9);
   return pass;
 }
 
