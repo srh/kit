@@ -3,8 +3,12 @@ extern putchar func[i32, i32];
 def foo i32 = 1;
 
 def ioo func[i32, i32] = fn(x i32) i32 {
-  var f func[i32, i32, i32] = hoo;
-  return putchar(f(x, -(-foo)));
+  if (x - 65) {
+    putchar(x);
+  } else {
+    putchar(64 + 24);
+  }
+  return 1;
 };
 
 def hoo func[i32, i32, i32] = fn(x i32, y i32) i32 {

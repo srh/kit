@@ -14,6 +14,7 @@
 #define PTR_TYPE_NAME "ptr"
 #define FUNC_TYPE_NAME "func"
 #define BOOLEAN_STANDIN_TYPE_NAME I32_TYPE_NAME
+#define KIRA_BOOL_SIZE 4
 
 enum numeric_type {
   NUMERIC_TYPE_BYTE,

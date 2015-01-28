@@ -537,6 +537,13 @@ void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_test_regs32(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2) {
+  uint8_t b[2];
+  b[0] = 0x85;
+  b[1] = mod_reg_rm(MOD11, reg2, reg1);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 /* Appends funcaddrs with dir32 -- not suitable for relative address
    call instructions. */
 void append_immediate(struct objfile *f, struct immediate imm) {
@@ -948,11 +955,6 @@ enum expr_return_tag {
      data's location to "loc", and preserve lvalues. */
   EXPR_RETURN_OPEN,
   EXPR_RETURN_FREE,
-  /* The expr returns a boolean -- and instead of returning, it should
-     jmp to the given target, if true. */
-  EXPR_RETURN_JMP_IF_TRUE,
-  /* Likewise, only negated. */
-  EXPR_RETURN_JMP_IF_FALSE,
 };
 
 enum expr_return_free_tag {
@@ -988,16 +990,6 @@ void expr_return_set(struct objfile *f, struct expr_return *er, struct loc loc) 
   case EXPR_RETURN_FREE: {
     er->u.free.tag = EXPR_RETURN_FREE_LOC;
     er->u.free.u.loc = loc;
-  } break;
-  case EXPR_RETURN_JMP_IF_TRUE: {
-    /* This should be a boolean. */
-    CHECK(loc.size == 1);
-    TODO_IMPLEMENT;
-  } break;
-  case EXPR_RETURN_JMP_IF_FALSE: {
-    /* This should be a boolean. */
-    CHECK(loc.size == 1);
-    TODO_IMPLEMENT;
   } break;
   default:
     UNREACHABLE();
@@ -1160,6 +1152,24 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
+void gen_placeholder_jmp_if_false(struct objfile *f, struct frame *h,
+                                  struct loc loc, size_t target_number) {
+  CHECK(loc.size == KIRA_BOOL_SIZE);
+
+  gen_load_register(f, X86_EAX, loc);
+
+  x86_gen_test_regs32(f, X86_EAX, X86_EAX);
+
+  struct jmpdata jd;
+  jd.target_number = target_number;
+  jd.jmp_location = 2 + objfile_section_size(objfile_text(f));
+  SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
+
+  /* X86 */
+  /* 0F 84 JZ rel32 */
+  uint8_t b[6] = { 0x0F, 0x84, 0, 0, 0, 0 };
+  objfile_section_append_raw(objfile_text(f), b, 6);
+}
 
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number) {
   struct jmpdata jd;
@@ -1167,12 +1177,13 @@ void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_numbe
   jd.jmp_location = 1 + objfile_section_size(objfile_text(f));
   SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
   /* X86 */
+  /* E9 jmp instruction */
   uint8_t b[5] = { 0xE9, 0, 0, 0, 0 };
   objfile_section_append_raw(objfile_text(f), b, 5);
 }
 
-void replace_placeholder_jmp(struct objfile *f, size_t jmp_location,
-                             size_t target_offset) {
+void replace_placeholder_jump(struct objfile *f, size_t jmp_location,
+                              size_t target_offset) {
   int32_t target32 = size_to_int32(target_offset);
   int32_t jmp32 = size_to_int32(size_add(jmp_location, 4));
   int32_t diff = int32_sub(target32, jmp32);
@@ -1309,10 +1320,6 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
     er->u.free.tag = EXPR_RETURN_FREE_IMM;
     er->u.free.u.imm = imm;
   } break;
-  case EXPR_RETURN_JMP_IF_TRUE:
-  case EXPR_RETURN_JMP_IF_FALSE: {
-    CRASH("There are no boolean immediates.");
-  }
   default:
     UNREACHABLE();
   }
@@ -1492,10 +1499,43 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
       }
     } break;
     case AST_STATEMENT_IFTHEN: {
-      TODO_IMPLEMENT;
+      int32_t saved_offset = frame_save_offset(h);
+      struct expr_return er = open_expr_return();
+      if (!gen_expr(cs, f, h, s->u.ifthen_statement.condition, &er)) {
+        return 0;
+      }
+
+      size_t target_number = frame_add_target(h);
+      gen_placeholder_jmp_if_false(f, h, er.u.loc, target_number);
+      frame_restore_offset(h, saved_offset);
+
+      gen_bracebody(cs, f, h, &s->u.ifthen_statement.thenbody);
+
+      frame_define_target(h, target_number,
+                          objfile_section_size(objfile_text(f)));
     } break;
     case AST_STATEMENT_IFTHENELSE: {
-      TODO_IMPLEMENT;
+      int32_t saved_offset = frame_save_offset(h);
+      struct expr_return er = open_expr_return();
+      if (!gen_expr(cs, f, h, s->u.ifthenelse_statement.condition, &er)) {
+        return 0;
+      }
+
+      size_t target_number = frame_add_target(h);
+      gen_placeholder_jmp_if_false(f, h, er.u.loc, target_number);
+      frame_restore_offset(h, saved_offset);
+
+      gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.thenbody);
+
+      size_t end_target_number = frame_add_target(h);
+      gen_placeholder_jmp(f, h, end_target_number);
+
+      frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
+
+      gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.elsebody);
+
+      frame_define_target(h, end_target_number,
+                          objfile_section_size(objfile_text(f)));
     } break;
     default:
       UNREACHABLE();
@@ -1517,7 +1557,7 @@ void tie_gotos(struct objfile *f, struct frame *h) {
     CHECK(jd.target_number < h->targetdata_count);
     struct targetdata td = h->targetdata[jd.target_number];
     CHECK(td.target_known);
-    replace_placeholder_jmp(f, jd.jmp_location, td.target_offset);
+    replace_placeholder_jump(f, jd.jmp_location, td.target_offset);
   }
 }
 
