@@ -294,21 +294,8 @@ enum ast_binop {
   AST_BINOP_LOGICAL_AND,
 };
 
-/* TODO: Right now nothing uses this. */
-struct ast_binop_expr_info {
-  int info_valid;
-  /* Non-null for non-magic binops (if info_valid is true) */
-  struct def_instantiation *inst;
-};
-
-void ast_binop_expr_info_mark_inst(struct ast_binop_expr_info *a,
-                                   struct def_instantiation *inst);
-void ast_binop_expr_info_mark_magic(struct ast_binop_expr_info *a);
-
-
 struct ast_binop_expr {
   struct ast_meta meta;
-  struct ast_binop_expr_info info;
   enum ast_binop operator;
   struct ast_expr *lhs;
   struct ast_expr *rhs;

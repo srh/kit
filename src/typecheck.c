@@ -1580,7 +1580,6 @@ int check_expr_magic_binop(struct exprscope *es,
 
     ast_binop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
                         x->operator, annotated_lhs, annotated_rhs);
-    ast_binop_expr_info_mark_magic(&annotated_out->info);
 
     ret = 1;
     goto cleanup_both;
@@ -1680,7 +1679,6 @@ int check_expr_binop(struct exprscope *es,
 
   ast_binop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
                       x->operator, annotated_lhs, annotated_rhs);
-  ast_binop_expr_info_mark_inst(&annotated_out->info, inst);
 
   ret = 1;
   ast_typeexpr_destroy(&resolved_funcexpr);

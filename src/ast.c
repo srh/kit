@@ -383,40 +383,10 @@ void ast_unop_expr_destroy(struct ast_unop_expr *a) {
   a->rhs = NULL;
 }
 
-void ast_binop_expr_info_init(struct ast_binop_expr_info *a) {
-  a->info_valid = 0;
-  a->inst = NULL;
-}
-
-void ast_binop_expr_info_init_copy(struct ast_binop_expr_info *a,
-                                   struct ast_binop_expr_info *c) {
-  *a = *c;
-}
-
-void ast_binop_expr_info_destroy(struct ast_binop_expr_info *a) {
-  a->info_valid = 0;
-  a->inst = NULL;
-}
-
-void ast_binop_expr_info_mark_inst(struct ast_binop_expr_info *a,
-                                   struct def_instantiation *inst) {
-  CHECK(!a->info_valid);
-  CHECK(inst);
-  a->info_valid = 1;
-  a->inst = inst;
-}
-
-void ast_binop_expr_info_mark_magic(struct ast_binop_expr_info *a) {
-  CHECK(!a->info_valid);
-  a->info_valid = 1;
-  a->inst = NULL;
-}
-
 void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
                          enum ast_binop operator, struct ast_expr lhs,
                          struct ast_expr rhs) {
   a->meta = meta;
-  ast_binop_expr_info_init(&a->info);
   a->operator = operator;
   ast_expr_alloc_move(lhs, &a->lhs);
   ast_expr_alloc_move(rhs, &a->rhs);
@@ -425,7 +395,6 @@ void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
 void ast_binop_expr_init_copy(struct ast_binop_expr *a,
                               struct ast_binop_expr *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  ast_binop_expr_info_init_copy(&a->info, &c->info);
   a->operator = c->operator;
   ast_expr_alloc_init_copy(c->lhs, &a->lhs);
   ast_expr_alloc_init_copy(c->rhs, &a->rhs);
@@ -433,7 +402,6 @@ void ast_binop_expr_init_copy(struct ast_binop_expr *a,
 
 void ast_binop_expr_destroy(struct ast_binop_expr *a) {
   ast_meta_destroy(&a->meta);
-  ast_binop_expr_info_destroy(&a->info);
   a->operator = (enum ast_binop)-1;
   ast_expr_destroy(a->lhs);
   free(a->lhs);
