@@ -685,13 +685,6 @@ void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c) {
   }
 }
 
-void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out) {
-  struct ast_expr *p = malloc(sizeof(*p));
-  CHECK(p);
-  *p = movee;
-  *out = p;
-}
-
 void ast_expr_destroy(struct ast_expr *a) {
   switch (a->tag) {
   case AST_EXPR_NAME:
@@ -723,6 +716,18 @@ void ast_expr_destroy(struct ast_expr *a) {
   }
   ast_expr_info_destroy(&a->info);
   a->tag = (enum ast_expr_tag)-1;
+}
+
+void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out) {
+  struct ast_expr *p = malloc(sizeof(*p));
+  CHECK(p);
+  *p = movee;
+  *out = p;
+}
+
+struct ast_typeexpr *ast_expr_type(struct ast_expr *a) {
+  CHECK(a->info.is_typechecked);
+  return &a->info.concrete_type;
 }
 
 void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out) {

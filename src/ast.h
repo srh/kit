@@ -406,6 +406,7 @@ void ast_expr_destroy(struct ast_expr *a);
 
 void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out);
 
+struct ast_typeexpr *ast_expr_type(struct ast_expr *a);
 size_t ast_expr_pos_end(struct ast_expr *a);
 void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out);
 
