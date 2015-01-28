@@ -1317,8 +1317,6 @@ int check_expr_funcbody(struct exprscope *es,
                         struct ast_bracebody *x,
                         struct ast_typeexpr *partial_type,
                         struct ast_typeexpr *out,
-                        ident_value **label_names_out,
-                        size_t *label_names_count_out,
                         struct ast_bracebody *annotated_out) {
   int ret = 0;
 
@@ -1333,35 +1331,28 @@ int check_expr_funcbody(struct exprscope *es,
     goto fail;
   }
 
-  ident_value *label_names = malloc_mul(sizeof(*label_names),
-                                        bs.label_infos_count);
-
   for (size_t i = 0; i < bs.label_infos_count; i++) {
     if (!bs.label_infos[i].is_label_observed) {
       ERR_DBG("goto without label.\n");
-      goto fail_label_names;
+      goto fail_annotated_bracebody;
     }
     if (!bs.label_infos[i].is_goto_observed) {
       ERR_DBG("label without goto.\n");
-      goto fail_label_names;
+      goto fail_annotated_bracebody;
     }
-    label_names[i] = bs.label_infos[i].label_name;
   }
 
   if (!bs.have_exact_return_type) {
     ERR_DBG("Missing a return statement.\n");
-    goto fail_label_names;
+    goto fail_annotated_bracebody;
   }
   *out = bs.exact_return_type;
   bs.have_exact_return_type = 0;
   *annotated_out = annotated_bracebody;
-  *label_names_out = label_names;
-  *label_names_count_out = bs.label_infos_count;
 
   ret = 1;
- fail_label_names:
+ fail_annotated_bracebody:
   if (!ret) {
-    free(label_names);
     ast_bracebody_destroy(&annotated_bracebody);
   }
  fail:
@@ -1450,16 +1441,12 @@ int check_expr_lambda(struct exprscope *es,
   }
 
   struct ast_typeexpr computed_return_type;
-  ident_value *label_names;
-  size_t label_names_count;
   struct ast_bracebody annotated_bracebody;
   if (!check_expr_funcbody(
           &bb_es,
           &x->bracebody,
           &funcexpr.u.app.params[size_sub(funcexpr.u.app.params_count, 1)],
           &computed_return_type,
-          &label_names,
-          &label_names_count,
           &annotated_bracebody)) {
     CHECK_DBG("check_expr_funcbody fails\n");
     goto fail_bb_es;
@@ -1480,7 +1467,6 @@ int check_expr_lambda(struct exprscope *es,
     ast_lambda_init(annotated_out, ast_meta_make_copy(&x->meta),
                     params, x->params_count,
                     return_type, annotated_bracebody);
-    ast_lambda_info_set_labels(&annotated_out->info, label_names, label_names_count);
   }
   CHECK_DBG("check_expr_lambda succeeds\n");
   return 1;
