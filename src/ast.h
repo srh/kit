@@ -364,6 +364,7 @@ void ast_name_expr_init(struct ast_name_expr *a,
                         struct ast_ident ident);
 void ast_name_expr_init_copy(struct ast_name_expr *a,
                              struct ast_name_expr *c);
+
 enum ast_expr_tag {
   AST_EXPR_NAME,
   AST_EXPR_NUMERIC_LITERAL,
