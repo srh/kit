@@ -1164,7 +1164,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number) {
   struct jmpdata jd;
   jd.target_number = target_number;
-  jd.jmp_location = objfile_section_size(objfile_text(f));
+  jd.jmp_location = 1 + objfile_section_size(objfile_text(f));
   SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
   /* X86 */
   uint8_t b[5] = { 0xE9, 0, 0, 0, 0 };
@@ -1174,10 +1174,10 @@ void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_numbe
 void replace_placeholder_jmp(struct objfile *f, size_t jmp_location,
                              size_t target_offset) {
   int32_t target32 = size_to_int32(target_offset);
-  int32_t jmp32 = size_to_int32(size_add(jmp_location, 5));
+  int32_t jmp32 = size_to_int32(size_add(jmp_location, 4));
   int32_t diff = int32_sub(target32, jmp32);
   objfile_section_overwrite_raw(objfile_text(f),
-                                jmp_location + 1,
+                                jmp_location,
                                 &diff,
                                 sizeof(diff));
 }
