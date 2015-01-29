@@ -27,8 +27,7 @@ void static_value_init_u32(struct static_value *a, uint32_t u32_value) {
 
 void static_value_init_typechecked_lambda(struct static_value *a,
                                           struct ast_expr lambda) {
-  /* TODO: Assert somehow that this ast_expr is a typechecked (and
-     annotated) one. */
+  CHECK(lambda.info.is_typechecked);
   a->tag = STATIC_VALUE_LAMBDA;
   a->u.typechecked_lambda = lambda;
 }
@@ -397,15 +396,6 @@ int name_table_add_def(struct name_table *t,
   return name_table_help_add_def(t, name, generics, type,
                                  0, PRIMITIVE_OP_INVALID,
                                  0, def);
-}
-
-int name_table_add_primitive_def(struct name_table *t,
-                                 ident_value name,
-                                 struct ast_generics *generics,
-                                 struct ast_typeexpr *type) {
-  return name_table_help_add_def(t, name, generics, type,
-                                 1, PRIMITIVE_OP_INVALID,  /* TODO: Have no primitive defs with invalid primitive ops. */
-                                 0, NULL);
 }
 
 /* TODO: Get rid of / rename this fucntion to name_table_add_primitive_def. */

@@ -10,8 +10,6 @@
 
 #define PARSE_DBG(...)
 
-/* TODO: Can't parse x - -y. */
-
 struct ps {
   const uint8_t *data;
   size_t length;
