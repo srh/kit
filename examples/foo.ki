@@ -19,15 +19,22 @@ def print func[u32, u32] = fn(x u32) u32 {
     putchar(48);
     return 1u;
   } else {
+    var acc u32 = 0u;
+    var count u32 = 0u;
     label top;
     if (x > 0u) {
-      // This prints the number backwards, I know.
-      var units u32 = x % 10u;
+      acc = acc * 10u + x % 10u;
       x = x / 10u;
-      var ch i32 = convert(48u + units);
-      putchar(ch);
-      printed = printed + 1u;
+      count = count + 1u;
       goto top;
+    }
+    label printtop;
+    if (printed < count) {
+      var ch i32 = convert(48u | (acc % 10u));
+      putchar(ch);
+      acc = acc / 10u;
+      printed = printed + 1u;
+      goto printtop;
     }
     return printed;
   }

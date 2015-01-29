@@ -634,6 +634,20 @@ void x86_gen_xor_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_or_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
+  uint8_t b[2];
+  b[0] = 0x09;
+  b[1] = mod_reg_rm(MOD11, src, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_and_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
+  uint8_t b[2];
+  b[0] = 0x21;
+  b[1] = mod_reg_rm(MOD11, src, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 void x86_gen_negate_w32(struct objfile *f, enum x86_reg dest) {
   uint8_t b[2];
   b[0] = 0xF7;
@@ -1176,9 +1190,21 @@ void gen_primitive_op_behavior(struct objfile *f,
   case PRIMITIVE_OP_NE_I32: {
     gen_cmp_behavior(f, loc, rloc, X86_SETCC_NE);
   } break;
-  case PRIMITIVE_OP_BIT_XOR_I32:
-  case PRIMITIVE_OP_BIT_OR_I32:
-  case PRIMITIVE_OP_BIT_AND_I32:
+  case PRIMITIVE_OP_BIT_XOR_I32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_OR_I32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_AND_I32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+  } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_I32:
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_I32:
     TODO_IMPLEMENT;
@@ -1234,9 +1260,21 @@ void gen_primitive_op_behavior(struct objfile *f,
   case PRIMITIVE_OP_NE_U32: {
     gen_cmp_behavior(f, loc, rloc, X86_SETCC_NE);
   } break;
-  case PRIMITIVE_OP_BIT_XOR_U32:
-  case PRIMITIVE_OP_BIT_OR_U32:
-  case PRIMITIVE_OP_BIT_AND_U32:
+  case PRIMITIVE_OP_BIT_XOR_U32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_OR_U32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_AND_U32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+  } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U32:
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32:
     TODO_IMPLEMENT;
