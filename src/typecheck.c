@@ -148,7 +148,7 @@ void intern_binop(struct checkstate *cs,
                   struct ast_generics *generics,
                   struct ast_typeexpr *type) {
 
-  name_table_add_primitive_def_with_primitive_op(
+  name_table_add_primitive_def(
       &cs->nt,
       identmap_intern_c_str(cs->im, binop_name(binop)),
       primop_array[binop],
@@ -291,11 +291,11 @@ void import_integer_conversions(struct checkstate *cs) {
       names[0] = types[i];
       names[1] = types[j];
       init_func_type(&func_type, cs->im, names, 2);
-      name_table_add_primitive_def_with_primitive_op(&cs->nt,
-                                                     convert,
-                                                     conversions[i][j],
-                                                     &generics,
-                                                     &func_type);
+      name_table_add_primitive_def(&cs->nt,
+                                   convert,
+                                   conversions[i][j],
+                                   &generics,
+                                   &func_type);
       ast_typeexpr_destroy(&func_type);
     }
   }
@@ -318,7 +318,7 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
       ident_value args[2];
       args[0] = args[1] = identmap_intern_c_str(cs->im, I32_TYPE_NAME);
       init_func_type(&type, cs->im, args, 2);
-      name_table_add_primitive_def_with_primitive_op(
+      name_table_add_primitive_def(
           &cs->nt,
           /* TODO: String value duplicated with parse code, I guess. */
           identmap_intern_c_str(cs->im, "-"),

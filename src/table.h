@@ -202,7 +202,7 @@ int name_table_add_def(struct name_table *t,
                        struct ast_generics *generics,
                        struct ast_typeexpr *type,
                        struct ast_def *def);
-int name_table_add_primitive_def_with_primitive_op(
+int name_table_add_primitive_def(
     struct name_table *t,
     ident_value name,
     enum primitive_op primitive_op,

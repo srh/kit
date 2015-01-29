@@ -398,12 +398,11 @@ int name_table_add_def(struct name_table *t,
                                  0, def);
 }
 
-/* TODO: Get rid of / rename this fucntion to name_table_add_primitive_def. */
-int name_table_add_primitive_def_with_primitive_op(struct name_table *t,
-                                                   ident_value name,
-                                                   enum primitive_op primitive_op,
-                                                   struct ast_generics *generics,
-                                                   struct ast_typeexpr *type) {
+int name_table_add_primitive_def(struct name_table *t,
+                                 ident_value name,
+                                 enum primitive_op primitive_op,
+                                 struct ast_generics *generics,
+                                 struct ast_typeexpr *type) {
   return name_table_help_add_def(t, name, generics, type,
                                  1, primitive_op,
                                  0, NULL);
