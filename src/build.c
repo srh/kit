@@ -567,6 +567,30 @@ void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
   objfile_section_append_dir32(objfile_text(f), symbol_table_index);
 }
 
+void x86_gen_shl_cl_w32(struct objfile *f, enum x86_reg dest) {
+  uint8_t b[2];
+  /* SHL, SHR, SAR have different reg/opcode fields. */
+  b[0] = 0xD3;
+  b[1] = mod_reg_rm(MOD11, 4, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_shr_cl_w32(struct objfile *f, enum x86_reg dest) {
+  uint8_t b[2];
+  /* SHL, SHR, SAR have different reg/opcode fields. */
+  b[0] = 0xD3;
+  b[1] = mod_reg_rm(MOD11, 5, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_sar_cl_w32(struct objfile *f, enum x86_reg dest) {
+  uint8_t b[2];
+  /* SHL, SHR, SAR have different reg/opcode fields. */
+  b[0] = 0xD3;
+  b[1] = mod_reg_rm(MOD11, 7, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
   uint8_t b[6];
   b[0] = 0x81;
@@ -1205,9 +1229,18 @@ void gen_primitive_op_behavior(struct objfile *f,
     gen_load_register(f, X86_ECX, rloc);
     x86_gen_and_w32(f, X86_EAX, X86_ECX);
   } break;
-  case PRIMITIVE_OP_BIT_LEFTSHIFT_I32:
-  case PRIMITIVE_OP_BIT_RIGHTSHIFT_I32:
-    TODO_IMPLEMENT;
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_I32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_shl_cl_w32(f, X86_EAX);
+    /* TODO: Handle masked rhs?  Overflow? */
+  } break;
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_I32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_sar_cl_w32(f, X86_EAX);
+    /* TODO: Handle masked rhs?  Overflow? */
+  } break;
 
   case PRIMITIVE_OP_ADD_U32: {
     gen_load_register(f, X86_EAX, loc);
@@ -1275,9 +1308,18 @@ void gen_primitive_op_behavior(struct objfile *f,
     gen_load_register(f, X86_ECX, rloc);
     x86_gen_and_w32(f, X86_EAX, X86_ECX);
   } break;
-  case PRIMITIVE_OP_BIT_LEFTSHIFT_U32:
-  case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32:
-    TODO_IMPLEMENT;
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_U32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_shl_cl_w32(f, X86_EAX);
+    /* TODO: Handle masked rhs?  Overflow? */
+  } break;
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_shr_cl_w32(f, X86_EAX);
+    /* TODO: Handle masked rhs?  Overflow? */
+  } break;
 
   case PRIMITIVE_OP_ADD_BYTE:
   case PRIMITIVE_OP_SUB_BYTE:

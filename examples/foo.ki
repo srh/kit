@@ -45,7 +45,7 @@ def showfacs func[i32] = fn() i32 {
   var f4 u32 = convert(fac(4));
   print(f4);
   putchar(10);
-  var f5 u32 = convert(fac(5));
+  var f5 u32 = convert(fac(20 >> 2));
   print(f5);
   putchar(10);
   return 1;
