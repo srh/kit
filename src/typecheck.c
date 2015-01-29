@@ -51,30 +51,6 @@ int is_magic_unop(enum ast_unop unop) {
   return unop == AST_UNOP_DEREFERENCE || unop == AST_UNOP_ADDRESSOF;
 }
 
-const char *unop_fakename(enum ast_unop unop) {
-  /* First check that unop isn't some magic lvalue thing. */
-  CHECK(!is_magic_unop(unop));
-
-  static const char *const unop_names[] = {
-    [AST_UNOP_DEREFERENCE] = NULL,
-    [AST_UNOP_ADDRESSOF] = NULL,
-    [AST_UNOP_NEGATE] = "$UNOP_NEGATE",
-  };
-
-  return unop_names[unop];
-}
-
-void intern_unop(struct checkstate *cs,
-                 enum ast_unop unop,
-                 struct ast_generics *generics,
-                 struct ast_typeexpr *type) {
-  name_table_add_primitive_def(
-      &cs->nt,
-      identmap_intern_c_str(cs->im, unop_fakename(unop)),
-      generics,
-      type);
-}
-
 int is_magic_binop(enum ast_binop binop) {
   return binop == AST_BINOP_ASSIGN || binop == AST_BINOP_LOGICAL_OR
     || binop == AST_BINOP_LOGICAL_AND;
@@ -280,7 +256,13 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
       ident_value args[2];
       args[0] = args[1] = identmap_intern_c_str(cs->im, I32_TYPE_NAME);
       init_func_type(&type, cs->im, args, 2);
-      intern_unop(cs, AST_UNOP_NEGATE, &generics, &type);
+      name_table_add_primitive_def_with_primitive_op(
+          &cs->nt,
+          /* TODO: String value duplicated with parse code, I guess. */
+          identmap_intern_c_str(cs->im, "-"),
+          PRIMITIVE_OP_NEGATE_I32,
+          &generics,
+          &type);
       ast_typeexpr_destroy(&type);
     }
 
@@ -1811,67 +1793,9 @@ int check_expr_unop(struct exprscope *es,
                     struct ast_typeexpr *out,
                     int *is_lvalue_out,
                     struct ast_unop_expr *annotated_out) {
-  int ret = 0;
-  if (is_magic_unop(x->operator)) {
-    return check_expr_magic_unop(es, x, partial_type, out, is_lvalue_out,
-                                 annotated_out);
-  }
-
-  if (es->computation == STATIC_COMPUTATION_YES
-      && !non_magic_unop_statically_computable(x->operator)) {
-    ERR_DBG("Non-statically-computable unop function.\n");
-    return 0;
-  }
-
-  struct ast_typeexpr local_partial;
-  local_partial.tag = AST_TYPEEXPR_UNKNOWN;
-
-  int lvalue_discard;
-  struct ast_expr annotated_rhs;
-  if (!check_expr(es, x->rhs, &local_partial, &lvalue_discard,
-                  &annotated_rhs)) {
-    goto fail;
-  }
-
-  struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types), 3);
-  ast_typeexpr_init_copy(&args_types[0],
-                         ast_expr_type(&annotated_rhs));
-  ast_typeexpr_init_copy(&args_types[1], partial_type);
-
-  ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
-
-  struct ast_typeexpr funcexpr;
-  funcexpr.tag = AST_TYPEEXPR_APP;
-  ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
-                   make_ast_ident(func_ident), args_types, 2);
-
-  struct ast_typeexpr resolved_funcexpr;
-  int funcexpr_lvalue_discard;
-  struct def_instantiation *inst_discard;
-  if (!lookup_global_maybe_typecheck(
-          es,
-          identmap_intern_c_str(es->cs->im, unop_fakename(x->operator)),
-          &funcexpr,
-          &resolved_funcexpr,
-          &funcexpr_lvalue_discard,
-          &inst_discard)) {
-    goto cleanup_funcexpr;
-  }
-
-  copy_func_return_type(es->cs->im, &resolved_funcexpr, 2, out);
-  *is_lvalue_out = 0;
-  ast_unop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
-                     x->operator, annotated_rhs);
-
-  ret = 1;
-  ast_typeexpr_destroy(&resolved_funcexpr);
- cleanup_funcexpr:
-  ast_typeexpr_destroy(&funcexpr);
-  if (!ret) {
-    ast_expr_destroy(&annotated_rhs);
-  }
- fail:
-  return ret;
+  CHECK(is_magic_unop(x->operator));
+  return check_expr_magic_unop(es, x, partial_type, out, is_lvalue_out,
+                               annotated_out);
 }
 
 int lookup_fields_field_type(struct ast_vardecl *fields,
@@ -2607,6 +2531,18 @@ int apply_static_funcall(struct static_value *func,
     CHECK(params_count == 1);
     CHECK(params[0].tag == STATIC_VALUE_U32);
     static_value_init_u32(out, params[0].u.u32_value);
+    return 1;
+  } break;
+  case PRIMITIVE_OP_NEGATE_I32: {
+    CHECK(params_count == 1);
+    CHECK(params[0].tag == STATIC_VALUE_I32);
+    int32_t val = params[0].u.i32_value;
+    int32_t result;
+    if (!try_int32_sub(0, val, &result)) {
+      ERR_DBG("Could not negate i32 %"PRIi32".\n", val);
+      return 0;
+    }
+    static_value_init_i32(out, result);
     return 1;
   } break;
   default:

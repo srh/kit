@@ -379,7 +379,8 @@ int try_skip_oper(struct ps *p, const char *s) {
   }
 }
 
-int try_parse_unop(struct ps *p, enum ast_unop *out) {
+int try_parse_unop(struct ps *p, enum ast_unop *out, struct ast_ident *name_out) {
+  size_t start_pos = ps_pos(p);
   int32_t ch1 = ps_peek(p);
   if (is_one_of("*&-", ch1)) {
     struct ps_savestate save = ps_save(p);
@@ -388,9 +389,14 @@ int try_parse_unop(struct ps *p, enum ast_unop *out) {
       ps_restore(p, save);
       return 0;
     }
-    *out = (ch1 == '*' ? AST_UNOP_DEREFERENCE
-            : ch1 == '&' ? AST_UNOP_ADDRESSOF
-            : AST_UNOP_NEGATE);
+    enum ast_unop op = (ch1 == '*' ? AST_UNOP_DEREFERENCE
+                        : ch1 == '&' ? AST_UNOP_ADDRESSOF
+                        : AST_UNOP_NEGATE);
+    uint8_t buf[1];
+    buf[0] = (uint8_t)ch1;
+    ident_value ident = identmap_intern(&p->ident_table, buf, 1);
+    ast_ident_init(name_out, ast_meta_make(start_pos, ps_pos(p)), ident);
+    *out = op;
     ps_count_leaf(p);
     return 1;
   } else {
@@ -915,18 +921,34 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     return 1;
   }
 
+  struct ast_ident unop_name;
   enum ast_unop unop;
-  if (try_parse_unop(p, &unop)) {
+  if (try_parse_unop(p, &unop, &unop_name)) {
     skip_ws(p);
     struct ast_expr rhs;
     if (!parse_expr(p, &rhs, unop_right_precedence(unop))) {
+      ast_ident_destroy(&unop_name);
       return 0;
     }
+    struct ast_meta meta = ast_meta_make(pos_start, ast_expr_pos_end(&rhs));
 
-    ast_expr_partial_init(out, AST_EXPR_UNOP, ast_expr_info_default());
-    ast_unop_expr_init(&out->u.unop_expr,
-                       ast_meta_make(pos_start, ast_expr_pos_end(&rhs)),
-                       unop, rhs);
+    if (unop == AST_UNOP_NEGATE) {
+      struct ast_expr func;
+      ast_expr_partial_init(&func, AST_EXPR_NAME, ast_expr_info_default());
+      ast_name_expr_init(&func.u.name,
+                         unop_name);
+
+      struct ast_expr *args = malloc_mul(sizeof(*args), 1);
+      args[0] = rhs;
+
+      ast_expr_partial_init(out, AST_EXPR_FUNCALL, ast_expr_info_default());
+      ast_funcall_init(&out->u.funcall, meta,
+                       func, args, 1);
+    } else {
+      ast_ident_destroy(&unop_name);
+      ast_expr_partial_init(out, AST_EXPR_UNOP, ast_expr_info_default());
+      ast_unop_expr_init(&out->u.unop_expr, meta, unop, rhs);
+    }
     return 1;
   }
 

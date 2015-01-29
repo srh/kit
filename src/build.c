@@ -1053,6 +1053,11 @@ void gen_primitive_op_behavior(struct objfile *f,
   case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
     gen_load_register(f, X86_EAX, loc);
   } break;
+  case PRIMITIVE_OP_NEGATE_I32: {
+    gen_load_register(f, X86_EAX, loc);
+    x86_gen_negate_w32(f, X86_EAX);
+    /* TODO: Check overflow. */
+  } break;
   default:
     UNREACHABLE();
   }
@@ -1176,24 +1181,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
     expr_return_set(f, er, ret);
     return 1;
   } break;
-  case AST_UNOP_NEGATE: {
-    /* Right now the only type of negation is i32 negation. */
-    struct expr_return rhs_er = open_expr_return();
-    if (!gen_expr(cs, f, h, ue->rhs, &rhs_er)) {
-      return 0;
-    }
-
-    /* Right now the only type of negation is i32 negation. */
-    CHECK(rhs_er.u.loc.size == DWORD_SIZE);
-
-    struct loc ret = frame_push_loc(h, DWORD_SIZE);
-    gen_load_register(f, X86_EAX, rhs_er.u.loc);
-    x86_gen_negate_w32(f, X86_EAX);
-    /* TODO: needs to jump upon overflow. */
-    gen_store_register(f, ret, X86_EAX);
-    expr_return_set(f, er, ret);
-    return 1;
-  } break;
+  case AST_UNOP_NEGATE:
   default:
     UNREACHABLE();
   }

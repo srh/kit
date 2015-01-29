@@ -243,6 +243,7 @@ void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,
 enum ast_unop {
   AST_UNOP_DEREFERENCE,
   AST_UNOP_ADDRESSOF,
+  /* TODO: Remove this (only have magic unops). */
   AST_UNOP_NEGATE,
 };
 
