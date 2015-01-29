@@ -585,15 +585,45 @@ void x86_gen_add_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
 
 void x86_gen_eaxedx_mul_w32(struct objfile *f, enum x86_reg src) {
   uint8_t b[2];
+  /* MUL, DIV, IDIV have different modr/m opcode. */
   b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 4, src);
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-void x86_gen_eaxedx_divmod_w32(struct objfile *f, enum x86_reg denom) {
+void x86_gen_imul_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
+  uint8_t b[3];
+  b[0] = 0x0F;
+  b[1] = 0xAF;
+  b[2] = mod_reg_rm(MOD11, dest, src);
+  objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
+void x86_gen_eaxedx_div_w32(struct objfile *f, enum x86_reg denom) {
   uint8_t b[2];
-  b[0] = 0xF7;  /* Has a different modr/m opcode than mul. */
+  /* MUL, DIV, IDIV have different modr/m opcode. */
+  b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 6, denom);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_eaxedx_idiv_w32(struct objfile *f, enum x86_reg denom) {
+  uint8_t b[2];
+  /* MUL, DIV, IDIV have different modr/m opcode. */
+  b[0] = 0xF7;
+  b[1] = mod_reg_rm(MOD11, 7, denom);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_cdq_w32(struct objfile *f) {
+  uint8_t b = 0x99;
+  objfile_section_append_raw(objfile_text(f), &b, 1);
+}
+
+void x86_gen_cmp_w32(struct objfile *f, enum x86_reg lhs, enum x86_reg rhs) {
+  uint8_t b[2];
+  b[0] = 0x39;
+  b[1] = mod_reg_rm(MOD11, rhs, lhs);
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
@@ -616,6 +646,34 @@ void x86_gen_sub_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   b[0] = 0x29;
   b[1] = mod_reg_rm(MOD11, src, dest);
   objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+/* Returns true if the reg has a lobyte (also, the register code
+   happens to identify the lowbyte in a reg or modr/m field). */
+int x86_reg_has_lowbyte(enum x86_reg reg) {
+  return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
+}
+
+enum x86_setcc {
+  X86_SETCC_L = 0x9C,
+  X86_SETCC_LE = 0x9E,
+  X86_SETCC_G = 0x9F,
+  X86_SETCC_GE = 0x9D,
+  X86_SETCC_E = 0x94,
+  X86_SETCC_NE = 0x95,
+  X86_SETCC_A = 0x97,
+  X86_SETCC_AE = 0x93,
+  X86_SETCC_B = 0x92,
+  X86_SETCC_BE = 0x96,
+};
+
+void x86_gen_setcc_b8(struct objfile *f, enum x86_reg dest, enum x86_setcc code) {
+  CHECK(x86_reg_has_lowbyte(dest));
+  uint8_t b[3];
+  b[0] = 0x0F;
+  b[1] = (uint8_t)code;
+  b[2] = mod_reg_rm(MOD11, 0, dest);
+  objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
 void gen_placeholder_stack_adjustment(struct objfile *f,
@@ -688,10 +746,6 @@ void x86_gen_lea32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   size_t count = x86_encode_reg_rm(b + 1, dest, src_addr, src_disp);
   CHECK(count <= 9);
   objfile_section_append_raw(objfile_text(f), b, count + 1);
-}
-
-int x86_reg_has_lowbyte(enum x86_reg reg) {
-  return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
 }
 
 void x86_gen_load8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
@@ -1029,6 +1083,16 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *ret);
 
+void gen_cmp_behavior(struct objfile *f,
+                      struct loc loc, struct loc rloc,
+                      enum x86_setcc setcc_code) {
+  gen_load_register(f, X86_EDX, loc);
+  gen_load_register(f, X86_ECX, rloc);
+  x86_gen_xor_w32(f, X86_EAX, X86_EAX);
+  x86_gen_cmp_w32(f, X86_EDX, X86_ECX);
+  x86_gen_setcc_b8(f, X86_EAX, setcc_code);
+}
+
 void gen_primitive_op_behavior(struct objfile *f,
                                struct frame *h,
                                enum primitive_op prim_op) {
@@ -1073,15 +1137,45 @@ void gen_primitive_op_behavior(struct objfile *f,
     x86_gen_sub_w32(f, X86_EAX, X86_ECX);
     /* TODO: Handle overflow. */
   } break;
-  case PRIMITIVE_OP_MUL_I32:
-  case PRIMITIVE_OP_DIV_I32:
-  case PRIMITIVE_OP_MOD_I32:
-  case PRIMITIVE_OP_LT_I32:
-  case PRIMITIVE_OP_LE_I32:
-  case PRIMITIVE_OP_GT_I32:
-  case PRIMITIVE_OP_GE_I32:
-  case PRIMITIVE_OP_EQ_I32:
-  case PRIMITIVE_OP_NE_I32:
+  case PRIMITIVE_OP_MUL_I32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_imul_w32(f, X86_EAX, X86_ECX);
+    /* TODO: Handle overflow. */
+  } break;
+  case PRIMITIVE_OP_DIV_I32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_cdq_w32(f);
+    x86_gen_eaxedx_idiv_w32(f, X86_ECX);
+    /* TODO: Handle divide by zero?  Handle INT32_MIN / -1? */
+  } break;
+  case PRIMITIVE_OP_MOD_I32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_cdq_w32(f);
+    x86_gen_eaxedx_idiv_w32(f, X86_ECX);
+    x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
+    /* TODO: Handle divide by zero?  Handle INT32_MIN / -1? */
+  } break;
+  case PRIMITIVE_OP_LT_I32: {
+    gen_cmp_behavior(f, loc, rloc, X86_SETCC_L);
+  } break;
+  case PRIMITIVE_OP_LE_I32: {
+    gen_cmp_behavior(f, loc, rloc, X86_SETCC_LE);
+  } break;
+  case PRIMITIVE_OP_GT_I32: {
+    gen_cmp_behavior(f, loc, rloc, X86_SETCC_G);
+  } break;
+  case PRIMITIVE_OP_GE_I32: {
+    gen_cmp_behavior(f, loc, rloc, X86_SETCC_GE);
+  } break;
+  case PRIMITIVE_OP_EQ_I32: {
+    gen_cmp_behavior(f, loc, rloc, X86_SETCC_E);
+  } break;
+  case PRIMITIVE_OP_NE_I32: {
+    gen_cmp_behavior(f, loc, rloc, X86_SETCC_NE);
+  } break;
   case PRIMITIVE_OP_BIT_XOR_I32:
   case PRIMITIVE_OP_BIT_OR_I32:
   case PRIMITIVE_OP_BIT_AND_I32:
@@ -1111,23 +1205,35 @@ void gen_primitive_op_behavior(struct objfile *f,
     gen_load_register(f, X86_EAX, loc);
     gen_load_register(f, X86_ECX, rloc);
     x86_gen_xor_w32(f, X86_EDX, X86_EDX);
-    x86_gen_eaxedx_divmod_w32(f, X86_ECX);
+    x86_gen_eaxedx_div_w32(f, X86_ECX);
     /* TODO: Handle divide by zero? */
   } break;
   case PRIMITIVE_OP_MOD_U32: {
     gen_load_register(f, X86_EAX, loc);
     gen_load_register(f, X86_ECX, rloc);
     x86_gen_xor_w32(f, X86_EDX, X86_EDX);
-    x86_gen_eaxedx_divmod_w32(f, X86_ECX);
+    x86_gen_eaxedx_div_w32(f, X86_ECX);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
     /* TODO: Handle divide by zero? */
   } break;
-  case PRIMITIVE_OP_LT_U32:
-  case PRIMITIVE_OP_LE_U32:
-  case PRIMITIVE_OP_GT_U32:
-  case PRIMITIVE_OP_GE_U32:
-  case PRIMITIVE_OP_EQ_U32:
-  case PRIMITIVE_OP_NE_U32:
+  case PRIMITIVE_OP_LT_U32: {
+    gen_cmp_behavior(f, loc, rloc, X86_SETCC_B);
+  } break;
+  case PRIMITIVE_OP_LE_U32: {
+    gen_cmp_behavior(f, loc, rloc, X86_SETCC_BE);
+  } break;
+  case PRIMITIVE_OP_GT_U32: {
+    gen_cmp_behavior(f, loc, rloc, X86_SETCC_A);
+  } break;
+  case PRIMITIVE_OP_GE_U32: {
+    gen_cmp_behavior(f, loc, rloc, X86_SETCC_AE);
+  } break;
+  case PRIMITIVE_OP_EQ_U32: {
+    gen_cmp_behavior(f, loc, rloc, X86_SETCC_E);
+  } break;
+  case PRIMITIVE_OP_NE_U32: {
+    gen_cmp_behavior(f, loc, rloc, X86_SETCC_NE);
+  } break;
   case PRIMITIVE_OP_BIT_XOR_U32:
   case PRIMITIVE_OP_BIT_OR_U32:
   case PRIMITIVE_OP_BIT_AND_U32:
