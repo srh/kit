@@ -41,12 +41,20 @@ def print func[u32, u32] = fn(x u32) u32 {
 };
 
 def showfacs func[i32] = fn() i32 {
-  var x i32 = convert(4u);
-  var f4 u32 = convert(fac(4));
+  var x i32 = convert(byte_func());
+  var f4 u32 = convert(fac(x));
   print(f4);
   putchar(10);
   var f5 u32 = convert(fac(20 >> 2));
   print(f5);
   putchar(10);
   return 1;
+};
+
+def byte_value byte = convert(3);
+
+def byte_func func[byte] = fn() byte {
+  var x byte = convert(4);
+  var y byte = convert(5);
+  return x + y;
 };

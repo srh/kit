@@ -25,6 +25,23 @@ enum x86_reg {
   X86_EDI,
 };
 
+enum x86_reg8 {
+  X86_AL,
+  X86_CL,
+  X86_DL,
+  X86_BL,
+  X86_AH,
+  X86_CH,
+  X86_DH,
+  X86_BH,
+};
+
+/* Returns true if the reg has a lobyte (also, the register code
+   happens to identify the lowbyte in a reg or modr/m field). */
+int x86_reg_has_lowbyte(enum x86_reg reg) {
+  return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
+}
+
 void gen_mov(struct objfile *f, struct loc dest, struct loc src);
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg);
 
@@ -523,6 +540,13 @@ void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
+  uint8_t b[2];
+  b[0] = 0x8A;
+  b[1] = mod_reg_rm(MOD11, dest, src);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 void x86_gen_test_regs32(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2) {
   uint8_t b[2];
   b[0] = 0x85;
@@ -575,10 +599,26 @@ void x86_gen_shl_cl_w32(struct objfile *f, enum x86_reg dest) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_shl_cl_w8(struct objfile *f, enum x86_reg8 dest) {
+  uint8_t b[2];
+  /* SHL, SHR, SAR have different reg/opcode fields. */
+  b[0] = 0xD2;
+  b[1] = mod_reg_rm(MOD11, 4, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 void x86_gen_shr_cl_w32(struct objfile *f, enum x86_reg dest) {
   uint8_t b[2];
   /* SHL, SHR, SAR have different reg/opcode fields. */
   b[0] = 0xD3;
+  b[1] = mod_reg_rm(MOD11, 5, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_shr_cl_w8(struct objfile *f, enum x86_reg8 dest) {
+  uint8_t b[2];
+  /* SHL, SHR, SAR have different reg/opcode fields. */
+  b[0] = 0xD2;
   b[1] = mod_reg_rm(MOD11, 5, dest);
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
@@ -607,10 +647,24 @@ void x86_gen_add_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_add_w8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
+  uint8_t b[2];
+  b[0] = 0x00;
+  b[1] = mod_reg_rm(MOD11, src, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 void x86_gen_eaxedx_mul_w32(struct objfile *f, enum x86_reg src) {
   uint8_t b[2];
   /* MUL, DIV, IDIV have different modr/m opcode. */
   b[0] = 0xF7;
+  b[1] = mod_reg_rm(MOD11, 4, src);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_alah_mul_w8(struct objfile *f, enum x86_reg8 src) {
+  uint8_t b[2];
+  b[0] = 0xF6;
   b[1] = mod_reg_rm(MOD11, 4, src);
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
@@ -627,6 +681,13 @@ void x86_gen_eaxedx_div_w32(struct objfile *f, enum x86_reg denom) {
   uint8_t b[2];
   /* MUL, DIV, IDIV have different modr/m opcode. */
   b[0] = 0xF7;
+  b[1] = mod_reg_rm(MOD11, 6, denom);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_alah_div_w8(struct objfile *f, enum x86_reg8 denom) {
+  uint8_t b[2];
+  b[0] = 0xF6;
   b[1] = mod_reg_rm(MOD11, 6, denom);
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
@@ -686,10 +747,11 @@ void x86_gen_sub_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-/* Returns true if the reg has a lobyte (also, the register code
-   happens to identify the lowbyte in a reg or modr/m field). */
-int x86_reg_has_lowbyte(enum x86_reg reg) {
-  return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
+void x86_gen_sub_w8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
+  uint8_t b[2];
+  b[0] = 0x28;
+  b[1] = mod_reg_rm(MOD11, src, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
 enum x86_setcc {
@@ -705,8 +767,7 @@ enum x86_setcc {
   X86_SETCC_BE = 0x96,
 };
 
-void x86_gen_setcc_b8(struct objfile *f, enum x86_reg dest, enum x86_setcc code) {
-  CHECK(x86_reg_has_lowbyte(dest));
+void x86_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest, enum x86_setcc code) {
   uint8_t b[3];
   b[0] = 0x0F;
   b[1] = (uint8_t)code;
@@ -743,7 +804,7 @@ size_t x86_encode_reg_rm(uint8_t *b, int reg, enum x86_reg rm_addr,
     b[0] = mod_reg_rm(MOD00, reg, rm_addr);
     return 1;
   } else if (rm_addr == X86_ESP) {
-    TODO_IMPLEMENT;
+    CRASH("Encoding esp here is not supported.");
   } else if (rm_addr_disp >= -128 && rm_addr_disp <= 127) {
     b[0] = mod_reg_rm(MOD01, reg, rm_addr);
     b[1] = (int8_t)rm_addr_disp;
@@ -777,6 +838,24 @@ void x86_gen_load32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
+void x86_gen_movzx8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
+                    int32_t src_disp) {
+  uint8_t b[11];
+  b[0] = 0x0F;
+  b[1] = 0xB6;
+  size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 2);
+}
+
+void x86_gen_movzx8_reg8(struct objfile *f, enum x86_reg dest, enum x86_reg8 src) {
+  uint8_t b[3];
+  b[0] = 0x0F;
+  b[1] = 0xB6;
+  b[2] = mod_reg_rm(MOD11, dest, src);
+  objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
 void x86_gen_lea32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
                    int32_t src_disp) {
   uint8_t b[10];
@@ -786,7 +865,7 @@ void x86_gen_lea32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
-void x86_gen_load8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
+void x86_gen_load8(struct objfile *f, enum x86_reg8 dest, enum x86_reg src_addr,
                    int32_t src_disp) {
   CHECK(x86_reg_has_lowbyte(dest));
   uint8_t b[10];
@@ -975,20 +1054,40 @@ void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
 void gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src) {
   CHECK(src.size <= DWORD_SIZE);
   CHECK(src.padded_size == DWORD_SIZE);
-  switch (src.tag) {
-  case LOC_EBP_OFFSET:
-    x86_gen_load32(f, reg, X86_EBP, src.u.ebp_offset);
-    break;
-  case LOC_GLOBAL:
-    x86_gen_mov_reg_stiptr(f, reg, src.u.global_sti);
-    x86_gen_load32(f, reg, reg, 0);
-    break;
-  case LOC_EBP_INDIRECT:
-    x86_gen_load32(f, reg, X86_EBP, src.u.ebp_indirect);
-    x86_gen_load32(f, reg, reg, 0);
-    break;
-  default:
-    UNREACHABLE();
+  if (src.size == DWORD_SIZE) {
+    switch (src.tag) {
+    case LOC_EBP_OFFSET:
+      x86_gen_load32(f, reg, X86_EBP, src.u.ebp_offset);
+      break;
+    case LOC_GLOBAL:
+      x86_gen_mov_reg_stiptr(f, reg, src.u.global_sti);
+      x86_gen_load32(f, reg, reg, 0);
+      break;
+    case LOC_EBP_INDIRECT:
+      x86_gen_load32(f, reg, X86_EBP, src.u.ebp_indirect);
+      x86_gen_load32(f, reg, reg, 0);
+      break;
+    default:
+      UNREACHABLE();
+    }
+  } else if (src.size == 1) {
+    switch (src.tag) {
+    case LOC_EBP_OFFSET:
+      x86_gen_movzx8(f, reg, X86_EBP, src.u.ebp_offset);
+      break;
+    case LOC_GLOBAL:
+      x86_gen_mov_reg_stiptr(f, reg, src.u.global_sti);
+      x86_gen_movzx8(f, reg, reg, 0);
+      break;
+    case LOC_EBP_INDIRECT:
+      x86_gen_load32(f, reg, X86_EBP, src.u.ebp_indirect);
+      x86_gen_movzx8(f, reg, reg, 0);
+      break;
+    default:
+      UNREACHABLE();
+    }
+  } else {
+    CRASH("not implemented or unreachable.");
   }
 }
 
@@ -1121,223 +1220,303 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *ret);
 
-void gen_cmp_behavior(struct objfile *f,
-                      struct loc loc, struct loc rloc,
-                      enum x86_setcc setcc_code) {
-  gen_load_register(f, X86_EDX, loc);
-  gen_load_register(f, X86_ECX, rloc);
-  x86_gen_xor_w32(f, X86_EAX, X86_EAX);
+void gen_cmp32_behavior(struct objfile *f,
+                        int32_t off0, int32_t off1,
+                        enum x86_setcc setcc_code) {
+  x86_gen_load32(f, X86_EDX, X86_EBP, off0);
+  x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+  x86_gen_cmp_w32(f, X86_EDX, X86_ECX);
+  x86_gen_setcc_b8(f, X86_AL, setcc_code);
+  x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+}
+
+void gen_cmp8_behavior(struct objfile *f,
+                       int32_t off0, int32_t off1,
+                       enum x86_setcc setcc_code) {
+  x86_gen_movzx8(f, X86_EDX, X86_EBP, off0);
+  x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
   x86_gen_cmp_w32(f, X86_EDX, X86_ECX);
   x86_gen_setcc_b8(f, X86_EAX, setcc_code);
+  x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
 
 void gen_primitive_op_behavior(struct objfile *f,
                                struct frame *h,
                                enum primitive_op prim_op) {
-  struct loc loc = ebp_loc(DWORD_SIZE, DWORD_SIZE, h->stack_offset);
-  struct loc rloc = ebp_loc(DWORD_SIZE, DWORD_SIZE, int32_add(h->stack_offset, DWORD_SIZE));
+  int32_t off0 = h->stack_offset;
+  int32_t off1 = int32_add(h->stack_offset, DWORD_SIZE);
   switch (prim_op) {
-  case PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE:
-  case PRIMITIVE_OP_CONVERT_BYTE_TO_I32:
-  case PRIMITIVE_OP_CONVERT_BYTE_TO_U32:
-  case PRIMITIVE_OP_CONVERT_I32_TO_BYTE:
-    TODO_IMPLEMENT;
+  case PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+  } break;
+  case PRIMITIVE_OP_CONVERT_BYTE_TO_I32: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+  } break;
+  case PRIMITIVE_OP_CONVERT_BYTE_TO_U32: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I32_TO_BYTE: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+  } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
-    gen_load_register(f, X86_EAX, loc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
   } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_U32: {
-    gen_load_register(f, X86_EAX, loc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     /* TODO: Check overflow. */
   } break;
-  case PRIMITIVE_OP_CONVERT_U32_TO_BYTE:
-    TODO_IMPLEMENT;
+  case PRIMITIVE_OP_CONVERT_U32_TO_BYTE: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    /* TODO: Check overflow. */
+  } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
-    gen_load_register(f, X86_EAX, loc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     /* TODO: Check overflow. */
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
-    gen_load_register(f, X86_EAX, loc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
   } break;
   case PRIMITIVE_OP_NEGATE_I32: {
-    gen_load_register(f, X86_EAX, loc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_negate_w32(f, X86_EAX);
     /* TODO: Check overflow. */
   } break;
   case PRIMITIVE_OP_ADD_I32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_add_w32(f, X86_EAX, X86_ECX);
     /* TODO: Handle overflow. */
   } break;
   case PRIMITIVE_OP_SUB_I32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_sub_w32(f, X86_EAX, X86_ECX);
     /* TODO: Handle overflow. */
   } break;
   case PRIMITIVE_OP_MUL_I32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_imul_w32(f, X86_EAX, X86_ECX);
     /* TODO: Handle overflow. */
   } break;
   case PRIMITIVE_OP_DIV_I32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_cdq_w32(f);
     x86_gen_eaxedx_idiv_w32(f, X86_ECX);
     /* TODO: Handle divide by zero?  Handle INT32_MIN / -1? */
   } break;
   case PRIMITIVE_OP_MOD_I32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_cdq_w32(f);
     x86_gen_eaxedx_idiv_w32(f, X86_ECX);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
     /* TODO: Handle divide by zero?  Handle INT32_MIN / -1? */
   } break;
   case PRIMITIVE_OP_LT_I32: {
-    gen_cmp_behavior(f, loc, rloc, X86_SETCC_L);
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_L);
   } break;
   case PRIMITIVE_OP_LE_I32: {
-    gen_cmp_behavior(f, loc, rloc, X86_SETCC_LE);
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_LE);
   } break;
   case PRIMITIVE_OP_GT_I32: {
-    gen_cmp_behavior(f, loc, rloc, X86_SETCC_G);
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_G);
   } break;
   case PRIMITIVE_OP_GE_I32: {
-    gen_cmp_behavior(f, loc, rloc, X86_SETCC_GE);
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_GE);
   } break;
   case PRIMITIVE_OP_EQ_I32: {
-    gen_cmp_behavior(f, loc, rloc, X86_SETCC_E);
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
   } break;
   case PRIMITIVE_OP_NE_I32: {
-    gen_cmp_behavior(f, loc, rloc, X86_SETCC_NE);
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
   } break;
   case PRIMITIVE_OP_BIT_XOR_I32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_xor_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_OR_I32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_or_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_AND_I32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_and_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_I32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_shl_cl_w32(f, X86_EAX);
     /* TODO: Handle masked rhs?  Overflow? */
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_I32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_sar_cl_w32(f, X86_EAX);
     /* TODO: Handle masked rhs?  Overflow? */
   } break;
 
   case PRIMITIVE_OP_ADD_U32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_add_w32(f, X86_EAX, X86_ECX);
     /* TODO: Handle overflow. */
   } break;
   case PRIMITIVE_OP_SUB_U32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_sub_w32(f, X86_EAX, X86_ECX);
     /* TODO: Handle overflow. */
   } break;
   case PRIMITIVE_OP_MUL_U32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_eaxedx_mul_w32(f, X86_ECX);
     /* TODO: Handle overflow. */
   } break;
   case PRIMITIVE_OP_DIV_U32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_xor_w32(f, X86_EDX, X86_EDX);
     x86_gen_eaxedx_div_w32(f, X86_ECX);
     /* TODO: Handle divide by zero? */
   } break;
   case PRIMITIVE_OP_MOD_U32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_xor_w32(f, X86_EDX, X86_EDX);
     x86_gen_eaxedx_div_w32(f, X86_ECX);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
     /* TODO: Handle divide by zero? */
   } break;
   case PRIMITIVE_OP_LT_U32: {
-    gen_cmp_behavior(f, loc, rloc, X86_SETCC_B);
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_B);
   } break;
   case PRIMITIVE_OP_LE_U32: {
-    gen_cmp_behavior(f, loc, rloc, X86_SETCC_BE);
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_BE);
   } break;
   case PRIMITIVE_OP_GT_U32: {
-    gen_cmp_behavior(f, loc, rloc, X86_SETCC_A);
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_A);
   } break;
   case PRIMITIVE_OP_GE_U32: {
-    gen_cmp_behavior(f, loc, rloc, X86_SETCC_AE);
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_AE);
   } break;
   case PRIMITIVE_OP_EQ_U32: {
-    gen_cmp_behavior(f, loc, rloc, X86_SETCC_E);
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
   } break;
   case PRIMITIVE_OP_NE_U32: {
-    gen_cmp_behavior(f, loc, rloc, X86_SETCC_NE);
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
   } break;
   case PRIMITIVE_OP_BIT_XOR_U32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_xor_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_OR_U32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_or_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_AND_U32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_and_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_shl_cl_w32(f, X86_EAX);
     /* TODO: Handle masked rhs?  Overflow? */
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32: {
-    gen_load_register(f, X86_EAX, loc);
-    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_shr_cl_w32(f, X86_EAX);
     /* TODO: Handle masked rhs?  Overflow? */
   } break;
 
-  case PRIMITIVE_OP_ADD_BYTE:
-  case PRIMITIVE_OP_SUB_BYTE:
-  case PRIMITIVE_OP_MUL_BYTE:
-  case PRIMITIVE_OP_DIV_BYTE:
-  case PRIMITIVE_OP_MOD_BYTE:
-  case PRIMITIVE_OP_LT_BYTE:
-  case PRIMITIVE_OP_LE_BYTE:
-  case PRIMITIVE_OP_GT_BYTE:
-  case PRIMITIVE_OP_GE_BYTE:
-  case PRIMITIVE_OP_EQ_BYTE:
-  case PRIMITIVE_OP_NE_BYTE:
-  case PRIMITIVE_OP_BIT_XOR_BYTE:
-  case PRIMITIVE_OP_BIT_OR_BYTE:
-  case PRIMITIVE_OP_BIT_AND_BYTE:
-  case PRIMITIVE_OP_BIT_LEFTSHIFT_BYTE:
-  case PRIMITIVE_OP_BIT_RIGHTSHIFT_BYTE:
-    TODO_IMPLEMENT;
+  case PRIMITIVE_OP_ADD_BYTE: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_add_w8(f, X86_AL, X86_CL);
+    /* TODO: Handle overflow. */
+  } break;
+  case PRIMITIVE_OP_SUB_BYTE: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_sub_w8(f, X86_AL, X86_CL);
+    /* TODO: Handle overflow. */
+  } break;
+  case PRIMITIVE_OP_MUL_BYTE: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_alah_mul_w8(f, X86_CL);
+    x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+    /* TODO: Handle overflow. */
+  } break;
+  case PRIMITIVE_OP_DIV_BYTE: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_alah_div_w8(f, X86_CL);
+    x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+    /* TODO: Handle divide-by-zero? */
+  } break;
+  case PRIMITIVE_OP_MOD_BYTE: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_alah_div_w8(f, X86_CL);
+    x86_gen_mov_reg8(f, X86_AL, X86_AH);
+    /* TODO: Handle mod-by-zero? */
+  } break;
+  case PRIMITIVE_OP_LT_BYTE: {
+    gen_cmp8_behavior(f, off0, off1, X86_SETCC_B);
+  } break;
+  case PRIMITIVE_OP_LE_BYTE: {
+    gen_cmp8_behavior(f, off0, off1, X86_SETCC_BE);
+  } break;
+  case PRIMITIVE_OP_GT_BYTE: {
+    gen_cmp8_behavior(f, off0, off1, X86_SETCC_A);
+  } break;
+  case PRIMITIVE_OP_GE_BYTE: {
+    gen_cmp8_behavior(f, off0, off1, X86_SETCC_AE);
+  } break;
+  case PRIMITIVE_OP_EQ_BYTE: {
+    gen_cmp8_behavior(f, off0, off1, X86_SETCC_E);
+  } break;
+  case PRIMITIVE_OP_NE_BYTE: {
+    gen_cmp8_behavior(f, off0, off1, X86_SETCC_NE);
+  } break;
+  case PRIMITIVE_OP_BIT_XOR_BYTE: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_OR_BYTE: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_AND_BYTE: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_BYTE: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_shl_cl_w8(f, X86_AL);
+    /* TODO: Handle masked rhs?  Overflow? */
+  } break;
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_BYTE: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_shr_cl_w8(f, X86_AL);
+    /* TODO: Handle masked rhs? */
+  } break;
 
   default:
     UNREACHABLE();
@@ -1356,6 +1535,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
   struct loc return_loc;
   if (memory_demanded) {
+    /* TODO: Not sure about the calling convention -- cl is genning
+       code that passes an intermediate location on the stack, and
+       then uses eax after return, instead of the location. */
     return_loc = er->u.loc;
   } else {
     return_loc = frame_push_loc(h, return_size);
@@ -1923,6 +2105,16 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     objfile_section_append_raw(objfile_data(f),
                                &inst->value.u.u32_value,
                                sizeof(inst->value.u.u32_value));
+    return 1;
+  } break;
+  case STATIC_VALUE_BYTE: {
+    /* TODO: How should we align our bytes? */
+    objfile_section_align_dword(objfile_data(f));
+    objfile_set_symbol_Value(f, inst->symbol_table_index,
+                             objfile_section_size(objfile_data(f)));
+    uint8_t bytes[4] = { 0 };
+    bytes[0] = inst->value.u.byte_value;
+    objfile_section_append_raw(objfile_data(f), bytes, 4);
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {

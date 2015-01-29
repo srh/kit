@@ -93,6 +93,50 @@ uint32_t size_to_uint32(size_t x) {
   return x;
 }
 
+int try_uint8_add(uint8_t x, uint8_t y, uint8_t *out) {
+  if (x > UINT8_MAX - y) {
+    return 0;
+  } else {
+    *out = x + y;
+    return 1;
+  }
+}
+int try_uint8_sub(uint8_t x, uint8_t y, uint8_t *out) {
+  if (x < y) {
+    return 0;
+  } else {
+    *out = x - y;
+    return 1;
+  }
+}
+int try_uint8_mul(uint8_t x, uint8_t y, uint8_t *out) {
+  uint32_t prod = ((uint32_t)x) * ((uint32_t)y);
+  if (prod <= UINT8_MAX) {
+    *out = (uint8_t)prod;
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+int try_uint8_div(uint8_t x, uint8_t y, uint8_t *out) {
+  if (y == 0) {
+    return 0;
+  } else {
+    *out = x / y;
+    return 1;
+  }
+}
+
+int try_uint8_mod(uint8_t x, uint8_t y, uint8_t *out) {
+  if (y == 0) {
+    return 0;
+  } else {
+    *out = x % y;
+    return 1;
+  }
+}
+
 
 int try_int32_add(int32_t x, int32_t y, int32_t *out) {
   if (x < 0 && y < 0) {
@@ -167,9 +211,27 @@ int try_int32_to_uint32(int32_t x, uint32_t *out) {
   }
 }
 
+int try_int32_to_uint8(int32_t x, uint8_t *out) {
+  if (x >= 0 && x <= UINT8_MAX) {
+    *out = (uint8_t)x;
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
 int try_uint32_to_int32(uint32_t x, int32_t *out) {
   if (x <= (uint32_t)INT32_MAX) {
     *out = (int32_t)x;
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+int try_uint32_to_uint8(uint32_t x, uint8_t *out) {
+  if (x <= UINT8_MAX) {
+    *out = (uint8_t)x;
     return 1;
   } else {
     return 0;

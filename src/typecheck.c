@@ -2226,6 +2226,11 @@ uint32_t st_u32(struct static_value *value) {
   return value->u.u32_value;
 }
 
+uint8_t st_byte(struct static_value *value) {
+  CHECK(value->tag == STATIC_VALUE_BYTE);
+  return value->u.byte_value;
+}
+
 int apply_static_funcall(struct static_value *func,
                          struct static_value *params,
                          size_t params_count,
@@ -2238,19 +2243,38 @@ int apply_static_funcall(struct static_value *func,
   switch (params_count) {
   case 1:
     switch (func->u.primitive_op) {
-    case PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE:
-    case PRIMITIVE_OP_CONVERT_BYTE_TO_I32:
-    case PRIMITIVE_OP_CONVERT_BYTE_TO_U32:
-    case PRIMITIVE_OP_CONVERT_I32_TO_BYTE:
-      goto crash_byte;
+    case PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE: {
+      CHECK(params[0].tag == STATIC_VALUE_BYTE);
+      static_value_init_byte(out, params[0].u.byte_value);
+      return 1;
+    } break;
+    case PRIMITIVE_OP_CONVERT_BYTE_TO_I32: {
+      CHECK(params[0].tag == STATIC_VALUE_BYTE);
+      static_value_init_i32(out, params[0].u.byte_value);
+      return 1;
+    } break;
+    case PRIMITIVE_OP_CONVERT_BYTE_TO_U32: {
+      CHECK(params[0].tag == STATIC_VALUE_BYTE);
+      static_value_init_u32(out, params[0].u.byte_value);
+      return 1;
+    } break;
+    case PRIMITIVE_OP_CONVERT_I32_TO_BYTE: {
+      CHECK(params[0].tag == STATIC_VALUE_I32);
+      int32_t val = params[0].u.i32_value;
+      uint8_t result;
+      if (!try_int32_to_uint8(val, &result)) {
+        ERR_DBG("Could not convert i32 %"PRIi32" to a byte.\n", val);
+        return 0;
+      }
+      static_value_init_byte(out, result);
+      return 1;
+    } break;
     case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
-      CHECK(params_count == 1);
       CHECK(params[0].tag == STATIC_VALUE_I32);
       static_value_init_i32(out, params[0].u.i32_value);
       return 1;
     } break;
     case PRIMITIVE_OP_CONVERT_I32_TO_U32: {
-      CHECK(params_count == 1);
       CHECK(params[0].tag == STATIC_VALUE_I32);
       int32_t val = params[0].u.i32_value;
       uint32_t result;
@@ -2261,10 +2285,18 @@ int apply_static_funcall(struct static_value *func,
       static_value_init_u32(out, result);
       return 1;
     } break;
-    case PRIMITIVE_OP_CONVERT_U32_TO_BYTE:
-      goto crash_byte;
+    case PRIMITIVE_OP_CONVERT_U32_TO_BYTE: {
+      CHECK(params[0].tag == STATIC_VALUE_U32);
+      uint32_t val = params[0].u.u32_value;
+      uint8_t result;
+      if (!try_uint32_to_uint8(val, &result)) {
+        ERR_DBG("Could not convert u32 %"PRIu32" to a byte.\n", val);
+        return 0;
+      }
+      static_value_init_byte(out, result);
+      return 1;
+    } break;
     case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
-      CHECK(params_count == 1);
       CHECK(params[0].tag == STATIC_VALUE_U32);
       uint32_t val = params[0].u.u32_value;
       int32_t result;
@@ -2276,13 +2308,11 @@ int apply_static_funcall(struct static_value *func,
       return 1;
     } break;
     case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
-      CHECK(params_count == 1);
       CHECK(params[0].tag == STATIC_VALUE_U32);
       static_value_init_u32(out, params[0].u.u32_value);
       return 1;
     } break;
     case PRIMITIVE_OP_NEGATE_I32: {
-      CHECK(params_count == 1);
       CHECK(params[0].tag == STATIC_VALUE_I32);
       int32_t val = params[0].u.i32_value;
       int32_t result;
@@ -2300,8 +2330,10 @@ int apply_static_funcall(struct static_value *func,
   case 2: {
     int succ_i32 = 0;
     int succ_u32 = 0;
+    int succ_byte = 0;
     int32_t val_i32 = 0; /* Initialized to make cl shut up. */
     uint32_t val_u32 = 0; /* Initialized to make cl shut up. */
+    uint8_t val_byte = 0; /* Initialized to make cl shut up. */
     switch (func->u.primitive_op) {
     case PRIMITIVE_OP_ADD_I32:
       succ_i32 = try_int32_add(st_i32(&params[0]), st_i32(&params[1]), &val_i32);
@@ -2331,7 +2363,7 @@ int apply_static_funcall(struct static_value *func,
       }
       if (st_i32(&params[1]) == 0) {
         ERR_DBG("Static value modulo by zero.\n");
-        return 0; 
+        return 0;
       }
       val_i32 = int32_positive_mod(st_i32(&params[0]), st_i32(&params[1]));
       succ_i32 = 1;
@@ -2475,22 +2507,78 @@ int apply_static_funcall(struct static_value *func,
     } break;
 
     case PRIMITIVE_OP_ADD_BYTE:
+      succ_byte = try_uint8_add(st_byte(&params[0]), st_byte(&params[1]), &val_byte);
+      break;
     case PRIMITIVE_OP_SUB_BYTE:
+      succ_byte = try_uint8_sub(st_byte(&params[0]), st_byte(&params[1]), &val_byte);
+      break;
     case PRIMITIVE_OP_MUL_BYTE:
+      succ_byte = try_uint8_mul(st_byte(&params[0]), st_byte(&params[1]), &val_byte);
+      break;
     case PRIMITIVE_OP_DIV_BYTE:
+      succ_byte = try_uint8_div(st_byte(&params[0]), st_byte(&params[1]), &val_byte);
+      break;
     case PRIMITIVE_OP_MOD_BYTE:
+      succ_byte = try_uint8_mod(st_byte(&params[0]), st_byte(&params[1]), &val_byte);
+      break;
     case PRIMITIVE_OP_LT_BYTE:
+      val_byte = (st_byte(&params[0]) < st_byte(&params[1]));
+      succ_byte = 1;
+      break;
     case PRIMITIVE_OP_LE_BYTE:
+      val_byte = (st_byte(&params[0]) <= st_byte(&params[1]));
+      succ_byte = 1;
+      break;
     case PRIMITIVE_OP_GT_BYTE:
+      val_byte = (st_byte(&params[0]) > st_byte(&params[1]));
+      succ_byte = 1;
+      break;
     case PRIMITIVE_OP_GE_BYTE:
+      val_byte = (st_byte(&params[0]) >= st_byte(&params[1]));
+      succ_byte = 1;
+      break;
     case PRIMITIVE_OP_EQ_BYTE:
+      val_byte = (st_byte(&params[0]) == st_byte(&params[1]));
+      succ_byte = 1;
+      break;
     case PRIMITIVE_OP_NE_BYTE:
+      val_byte = (st_byte(&params[0]) != st_byte(&params[1]));
+      succ_byte = 1;
+      break;
     case PRIMITIVE_OP_BIT_XOR_BYTE:
+      val_byte = (st_byte(&params[0]) ^ st_byte(&params[1]));
+      succ_byte = 1;
+      break;
     case PRIMITIVE_OP_BIT_OR_BYTE:
+      val_byte = (st_byte(&params[0]) | st_byte(&params[1]));
+      succ_byte = 1;
+      break;
     case PRIMITIVE_OP_BIT_AND_BYTE:
-    case PRIMITIVE_OP_BIT_LEFTSHIFT_BYTE:
-    case PRIMITIVE_OP_BIT_RIGHTSHIFT_BYTE:
-      goto crash_byte;
+      val_byte = (st_byte(&params[0]) & st_byte(&params[1]));
+      succ_byte = 1;
+      break;
+    case PRIMITIVE_OP_BIT_LEFTSHIFT_BYTE: {
+      if (st_byte(&params[1]) >= 8) {
+        break;
+      } else {
+        uint32_t left32 = st_byte(&params[0]);
+        left32 <<= st_byte(&params[1]);
+        if (left32 > UINT8_MAX) {
+          break;
+        } else {
+          val_byte = (uint8_t)left32;
+          succ_byte = 1;
+        }
+      }
+    } break;
+    case PRIMITIVE_OP_BIT_RIGHTSHIFT_BYTE: {
+      if (st_byte(&params[1]) >= 8) {
+        break;
+      } else {
+        val_byte = (st_byte(&params[0]) >> st_byte(&params[1]));
+        succ_byte = 1;
+      }
+    } break;
     default:
       UNREACHABLE();
     }
@@ -2499,6 +2587,8 @@ int apply_static_funcall(struct static_value *func,
       static_value_init_i32(out, val_i32);
     } else if (succ_u32) {
       static_value_init_u32(out, val_u32);
+    } else if (succ_byte) {
+      static_value_init_byte(out, val_byte);
     } else {
       ERR_DBG("Binary operation cannot be statically evaluated.\n");
       return 0;
@@ -2508,9 +2598,6 @@ int apply_static_funcall(struct static_value *func,
   default:
     CRASH("Static funcall has not 1 and not 2 arguments.");
   }
-
- crash_byte:
-  CRASH("Static evaluation involving bytes is not supported yet.\n");
 }
 
 int eval_static_funcall(struct ast_funcall *funcall,

@@ -15,7 +15,6 @@ enum primitive_op {
   PRIMITIVE_OP_CONVERT_U32_TO_U32,
   PRIMITIVE_OP_NEGATE_I32,
 
-  /* TODO: Fully support the ops below. */
   PRIMITIVE_OP_ADD_I32,
   PRIMITIVE_OP_SUB_I32,
   PRIMITIVE_OP_MUL_I32,
@@ -50,6 +49,7 @@ enum primitive_op {
   PRIMITIVE_OP_BIT_LEFTSHIFT_U32,
   PRIMITIVE_OP_BIT_RIGHTSHIFT_U32,
 
+  /* TODO: Fully support the ops below. */
   PRIMITIVE_OP_ADD_BYTE,
   PRIMITIVE_OP_SUB_BYTE,
   PRIMITIVE_OP_MUL_BYTE,
@@ -73,6 +73,7 @@ enum primitive_op {
 enum static_value_tag {
   STATIC_VALUE_I32,
   STATIC_VALUE_U32,
+  STATIC_VALUE_BYTE,
   STATIC_VALUE_LAMBDA,
   STATIC_VALUE_PRIMITIVE_OP,
 };
@@ -82,6 +83,7 @@ struct static_value {
   union {
     int32_t i32_value;
     uint32_t u32_value;
+    uint8_t byte_value;
     /* An owned ref to the _typechecked_ AST. */
     /* TODO: Right now this is still just a plain-jane copy of the
        AST, with generics unreplaced, no annotations.  (TODO: Or is it?) */
@@ -92,6 +94,7 @@ struct static_value {
 
 void static_value_init_i32(struct static_value *a, int32_t i32_value);
 void static_value_init_u32(struct static_value *a, uint32_t u32_value);
+void static_value_init_byte(struct static_value *a, uint8_t byte_value);
 void static_value_init_typechecked_lambda(struct static_value *a,
                                           struct ast_expr lambda);
 void static_value_init_primitive_op(struct static_value *a,

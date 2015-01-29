@@ -21,6 +21,12 @@ uint32_t uint32_ceil_aligned(uint32_t x, uint32_t m);
 
 uint32_t size_to_uint32(size_t x);
 
+int try_uint8_add(uint8_t x, uint8_t y, uint8_t *out);
+int try_uint8_sub(uint8_t x, uint8_t y, uint8_t *out);
+int try_uint8_mul(uint8_t x, uint8_t y, uint8_t *out);
+int try_uint8_div(uint8_t x, uint8_t y, uint8_t *out);
+int try_uint8_mod(uint8_t x, uint8_t y, uint8_t *out);
+
 int try_int32_add(int32_t x, int32_t y, int32_t *out);
 int try_int32_sub(int32_t x, int32_t y, int32_t *out);
 int32_t int32_sub(int32_t x, int32_t y);
@@ -30,7 +36,9 @@ int32_t int32_div(int32_t x, int32_t y);
 int32_t int32_positive_mod(int32_t x, int32_t y);
 
 int try_int32_to_uint32(int32_t x, uint32_t *out);
+int try_int32_to_uint8(int32_t x, uint8_t *out);
 int try_uint32_to_int32(uint32_t x, int32_t *out);
+int try_uint32_to_uint8(uint32_t x, uint8_t *out);
 
 int32_t uint32_to_int32(uint32_t x);
 

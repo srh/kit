@@ -20,9 +20,15 @@ void static_value_init_i32(struct static_value *a, int32_t i32_value) {
   a->tag = STATIC_VALUE_I32;
   a->u.i32_value = i32_value;
 }
+
 void static_value_init_u32(struct static_value *a, uint32_t u32_value) {
   a->tag = STATIC_VALUE_U32;
   a->u.u32_value = u32_value;
+}
+
+void static_value_init_byte(struct static_value *a, uint8_t byte_value) {
+  a->tag = STATIC_VALUE_BYTE;
+  a->u.byte_value = byte_value;
 }
 
 void static_value_init_typechecked_lambda(struct static_value *a,
@@ -47,6 +53,9 @@ void static_value_init_copy(struct static_value *a, struct static_value *c) {
   case STATIC_VALUE_U32:
     a->u.u32_value = c->u.u32_value;
     break;
+  case STATIC_VALUE_BYTE:
+    a->u.byte_value = c->u.byte_value;
+    break;
   case STATIC_VALUE_LAMBDA:
     ast_expr_init_copy(&a->u.typechecked_lambda,
                        &c->u.typechecked_lambda);
@@ -59,10 +68,12 @@ void static_value_init_copy(struct static_value *a, struct static_value *c) {
   }
 }
 
+/* TODO: standardize fallthrough vs. fall-through. */
 void static_value_destroy(struct static_value *sv) {
   switch (sv->tag) {
   case STATIC_VALUE_I32:  /* fallthrough */
-  case STATIC_VALUE_U32:
+  case STATIC_VALUE_U32:  /* fallthrough */
+  case STATIC_VALUE_BYTE:
     break;
   case STATIC_VALUE_LAMBDA:
     ast_expr_destroy(&sv->u.typechecked_lambda);
