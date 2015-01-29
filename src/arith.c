@@ -158,7 +158,27 @@ int32_t int32_positive_mod(int32_t x, int32_t y) {
   return x % y;
 }
 
+int try_int32_to_uint32(int32_t x, uint32_t *out) {
+  if (x >= 0) {
+    *out = (uint32_t)x;
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+int try_uint32_to_int32(uint32_t x, int32_t *out) {
+  if (x <= (uint32_t)INT32_MAX) {
+    *out = (int32_t)x;
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
 int32_t uint32_to_int32(uint32_t x) {
-  CHECK(x < (uint32_t)INT32_MAX);
-  return (int32_t)x;
+  int32_t ret;
+  int success = try_uint32_to_int32(x, &ret);
+  CHECK(success);
+  return ret;
 }

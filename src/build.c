@@ -131,6 +131,7 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
 
 enum immediate_tag {
   IMMEDIATE_FUNC,
+  IMMEDIATE_PRIMITIVE_OP,
   IMMEDIATE_U32,
   IMMEDIATE_I32,
 };
@@ -139,11 +140,13 @@ struct immediate {
   enum immediate_tag tag;
   union {
     uint32_t func_sti;
+    enum primitive_op primitive_op;
     uint32_t u32;
     int32_t i32;
   } u;
 };
 
+/* TODO: Anybody use this? */
 int immediate_equal(struct immediate a, struct immediate b) {
   if (a.tag != b.tag) {
     return 0;
@@ -151,6 +154,8 @@ int immediate_equal(struct immediate a, struct immediate b) {
   switch (a.tag) {
   case IMMEDIATE_FUNC:
     return a.u.func_sti == b.u.func_sti;
+  case IMMEDIATE_PRIMITIVE_OP:
+    return a.u.primitive_op == b.u.primitive_op;
   case IMMEDIATE_U32:
     return a.u.u32 == b.u.u32;
   case IMMEDIATE_I32:
@@ -550,6 +555,9 @@ void append_immediate(struct objfile *f, struct immediate imm) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC: {
     objfile_section_append_dir32(objfile_text(f), imm.u.func_sti);
+  } break;
+  case IMMEDIATE_PRIMITIVE_OP: {
+    CRASH("Trying to put a primitive op immediate in memory.\n");
   } break;
   case IMMEDIATE_U32: {
     /* LITTLEENDIAN etc. */
@@ -1019,6 +1027,37 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *ret);
 
+void gen_primitive_op_behavior(struct objfile *f,
+                               struct frame *h,
+                               enum primitive_op prim_op) {
+  struct loc loc = ebp_loc(DWORD_SIZE, DWORD_SIZE, h->stack_offset);
+  switch (prim_op) {
+  case PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE:
+  case PRIMITIVE_OP_CONVERT_BYTE_TO_I32:
+  case PRIMITIVE_OP_CONVERT_BYTE_TO_U32:
+  case PRIMITIVE_OP_CONVERT_I32_TO_BYTE:
+    TODO_IMPLEMENT;
+  case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
+    gen_load_register(f, X86_EAX, loc);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I32_TO_U32: {
+    gen_load_register(f, X86_EAX, loc);
+    /* TODO: Check overflow. */
+  } break;
+  case PRIMITIVE_OP_CONVERT_U32_TO_BYTE:
+    TODO_IMPLEMENT;
+  case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
+    gen_load_register(f, X86_EAX, loc);
+    /* TODO: Check overflow. */
+  } break;
+  case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
+    gen_load_register(f, X86_EAX, loc);
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
@@ -1067,10 +1106,20 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   switch (func_er.u.free.tag) {
   case EXPR_RETURN_FREE_IMM: {
     frame_restore_offset(h, saved_offset);
-    CHECK(func_er.u.free.u.imm.tag == IMMEDIATE_FUNC);
-    gen_placeholder_stack_adjustment(f, h, 0);
-    x86_gen_call(f, func_er.u.free.u.imm.u.func_sti);
-    gen_placeholder_stack_adjustment(f, h, 1);
+    switch (func_er.u.free.u.imm.tag) {
+    case IMMEDIATE_FUNC:
+      gen_placeholder_stack_adjustment(f, h, 0);
+      x86_gen_call(f, func_er.u.free.u.imm.u.func_sti);
+      gen_placeholder_stack_adjustment(f, h, 1);
+      break;
+    case IMMEDIATE_PRIMITIVE_OP: {
+      gen_primitive_op_behavior(f, h, func_er.u.free.u.imm.u.primitive_op);
+    } break;
+    case IMMEDIATE_U32:
+    case IMMEDIATE_I32:
+    default:
+      UNREACHABLE();
+    }
   } break;
   case EXPR_RETURN_FREE_LOC: {
     gen_load_register(f, X86_EAX, func_er.u.free.u.loc);
@@ -1413,19 +1462,26 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     CHECK(a->u.name.info.info_valid);
     struct def_instantiation *inst = a->u.name.info.inst_or_null;
     if (inst) {
-      CHECK(inst->symbol_table_index_computed);
-      if (typeexpr_is_func_type(cs->im, &inst->type)) {
+      if (inst->value_computed && inst->value.tag == STATIC_VALUE_PRIMITIVE_OP) {
         struct immediate imm;
-        imm.tag = IMMEDIATE_FUNC;
-        imm.u.func_sti = inst->symbol_table_index;
+        imm.tag = IMMEDIATE_PRIMITIVE_OP;
+        imm.u.primitive_op = inst->value.u.primitive_op;
         expr_return_immediate(f, h, er, imm);
       } else {
-        uint32_t size = kira_sizeof(&cs->nt, &inst->type);
-        /* TODO: Maybe globals' alignment rules are softer. */
-        uint32_t padded_size = size;
-        struct loc loc = global_loc(size, padded_size,
-                                    inst->symbol_table_index);
-        expr_return_set(f, er, loc);
+        CHECK(inst->symbol_table_index_computed);
+        if (typeexpr_is_func_type(cs->im, &inst->type)) {
+          struct immediate imm;
+          imm.tag = IMMEDIATE_FUNC;
+          imm.u.func_sti = inst->symbol_table_index;
+          expr_return_immediate(f, h, er, imm);
+        } else {
+          uint32_t size = kira_sizeof(&cs->nt, &inst->type);
+          /* TODO: Maybe globals' alignment rules are softer. */
+          uint32_t padded_size = size;
+          struct loc loc = global_loc(size, padded_size,
+                                      inst->symbol_table_index);
+          expr_return_set(f, er, loc);
+        }
       }
     } else {
       size_t vi;

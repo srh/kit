@@ -33,6 +33,12 @@ void static_value_init_typechecked_lambda(struct static_value *a,
   a->u.typechecked_lambda = lambda;
 }
 
+void static_value_init_primitive_op(struct static_value *a,
+                                    enum primitive_op primitive_op) {
+  a->tag = STATIC_VALUE_PRIMITIVE_OP;
+  a->u.primitive_op = primitive_op;
+}
+
 void static_value_init_copy(struct static_value *a, struct static_value *c) {
   a->tag = c->tag;
   switch (c->tag) {
@@ -46,6 +52,9 @@ void static_value_init_copy(struct static_value *a, struct static_value *c) {
     ast_expr_init_copy(&a->u.typechecked_lambda,
                        &c->u.typechecked_lambda);
     break;
+  case STATIC_VALUE_PRIMITIVE_OP:
+    a->u.primitive_op = c->u.primitive_op;
+    break;
   default:
     UNREACHABLE();
   }
@@ -58,6 +67,8 @@ void static_value_destroy(struct static_value *sv) {
     break;
   case STATIC_VALUE_LAMBDA:
     ast_expr_destroy(&sv->u.typechecked_lambda);
+    break;
+  case STATIC_VALUE_PRIMITIVE_OP:
     break;
   default:
     UNREACHABLE();

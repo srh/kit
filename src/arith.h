@@ -29,6 +29,9 @@ int32_t int32_add(int32_t x, int32_t y);
 int32_t int32_div(int32_t x, int32_t y);
 int32_t int32_positive_mod(int32_t x, int32_t y);
 
+int try_int32_to_uint32(int32_t x, uint32_t *out);
+int try_uint32_to_int32(uint32_t x, int32_t *out);
+
 int32_t uint32_to_int32(uint32_t x);
 
 #endif /* KIRA_ARITH_H_ */

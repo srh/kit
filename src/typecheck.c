@@ -1,5 +1,6 @@
 #include "typecheck.h"
 
+#include <inttypes.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -998,12 +999,6 @@ int check_expr_funcall(struct exprscope *es,
                        struct ast_typeexpr *partial_type,
                        struct ast_typeexpr *out,
                        struct ast_funcall *annotated_out) {
-  if (es->computation == STATIC_COMPUTATION_YES) {
-    /* For now, there are no functions that are statically
-       callable. */
-    ERR_DBG("Function call in static expression.\n");
-    return 0;
-  }
   size_t args_count = x->args_count;
   size_t args_types_count = size_add(args_count, 1);
   struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
@@ -2528,6 +2523,7 @@ int apply_operator(enum ast_binop op,
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA:
+  case STATIC_VALUE_PRIMITIVE_OP:
   default:
     UNREACHABLE();
   }
@@ -2560,6 +2556,97 @@ int eval_static_binop_expr(struct ast_binop_expr *expr,
   return 0;
 }
 
+int apply_static_funcall(struct static_value *func,
+                         struct static_value *params,
+                         size_t params_count,
+                         struct static_value *out) {
+  if (func->tag != STATIC_VALUE_PRIMITIVE_OP) {
+    ERR_DBG("Trying to statically evaluate non-primitive funcall.\n");
+    return 0;
+  }
+
+  switch (func->u.primitive_op) {
+  case PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE:
+  case PRIMITIVE_OP_CONVERT_BYTE_TO_I32:
+  case PRIMITIVE_OP_CONVERT_BYTE_TO_U32:
+  case PRIMITIVE_OP_CONVERT_I32_TO_BYTE:
+    goto crash_byte;
+  case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
+    CHECK(params_count == 1);
+    CHECK(params[0].tag == STATIC_VALUE_I32);
+    static_value_init_i32(out, params[0].u.i32_value);
+    return 1;
+  } break;
+  case PRIMITIVE_OP_CONVERT_I32_TO_U32: {
+    CHECK(params_count == 1);
+    CHECK(params[0].tag == STATIC_VALUE_I32);
+    int32_t val = params[0].u.i32_value;
+    uint32_t result;
+    if (!try_int32_to_uint32(val, &result)) {
+      ERR_DBG("Could not convert i32 %"PRIi32" to a u32.\n", val);
+      return 0;
+    }
+    static_value_init_u32(out, result);
+    return 1;
+  } break;
+  case PRIMITIVE_OP_CONVERT_U32_TO_BYTE:
+    goto crash_byte;
+  case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
+    CHECK(params_count == 1);
+    CHECK(params[0].tag == STATIC_VALUE_U32);
+    uint32_t val = params[0].u.u32_value;
+    int32_t result;
+    if (!try_uint32_to_int32(val, &result)) {
+      ERR_DBG("Could not convert u32 %"PRIu32" to an i32.\n", val);
+      return 0;
+    }
+    static_value_init_i32(out, result);
+    return 1;
+  } break;
+  case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
+    CHECK(params_count == 1);
+    CHECK(params[0].tag == STATIC_VALUE_U32);
+    static_value_init_u32(out, params[0].u.u32_value);
+    return 1;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+
+ crash_byte:
+  CRASH("Static evaluation involving bytes is not supported yet.\n");
+}
+
+int eval_static_funcall(struct ast_funcall *funcall,
+                        struct static_value *out) {
+  int ret = 0;
+  struct static_value func_value;
+  if (!eval_static_value(funcall->func, &func_value)) {
+    goto cleanup;
+  }
+
+  size_t params_count = funcall->args_count;
+  struct static_value *params = malloc_mul(sizeof(*params), params_count);
+  size_t i = 0;
+  for (; i < params_count; i++) {
+    if (!eval_static_value(&funcall->args[i], &params[i])) {
+      goto cleanup_params;
+    }
+  }
+
+  if (!apply_static_funcall(&func_value, params, params_count, out)) {
+    goto cleanup_params;
+  }
+
+  ret = 1;
+
+ cleanup_params:
+  SLICE_FREE(params, i, static_value_destroy);
+  static_value_destroy(&func_value);
+ cleanup:
+  return ret;
+}
+
 /* expr must have been annotated by typechecking. */
 int eval_static_value(struct ast_expr *expr,
                       struct static_value *out) {
@@ -2578,7 +2665,7 @@ int eval_static_value(struct ast_expr *expr,
   case AST_EXPR_NUMERIC_LITERAL:
     return eval_static_numeric_literal(&expr->u.numeric_literal, out);
   case AST_EXPR_FUNCALL: {
-    CRASH("No funcalls should have been deemed statically evaluable.\n");
+    return eval_static_funcall(&expr->u.funcall, out);
   } break;
   case AST_EXPR_UNOP: {
     return eval_static_unop_expr(&expr->u.unop_expr, out);
@@ -2606,16 +2693,25 @@ int eval_static_value(struct ast_expr *expr,
 }
 
 int compute_static_values(struct def_entry *ent) {
-  CHECK(ent->def);
+  int is_primitive = ent->is_primitive;
+  CHECK(is_primitive || ent->def != NULL);
   for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
     struct def_instantiation *inst = ent->instantiations[i];
     CHECK(!inst->value_computed);
 
-    CHECK(inst->annotated_rhs_computed);
-    if (!eval_static_value(&inst->annotated_rhs, &inst->value)) {
-      return 0;
+    if (is_primitive) {
+      /* TODO: Eventually this'll never be invalid. */
+      if (ent->primitive_op != PRIMITIVE_OP_INVALID) {
+        static_value_init_primitive_op(&inst->value, ent->primitive_op);
+        inst->value_computed = 1;
+      }
+    } else {
+      CHECK(inst->annotated_rhs_computed);
+      if (!eval_static_value(&inst->annotated_rhs, &inst->value)) {
+        return 0;
+      }
+      inst->value_computed = 1;
     }
-    inst->value_computed = 1;
   }
 
   return 1;
@@ -2640,7 +2736,7 @@ int chase_def_entry_acyclicity(struct def_entry *ent) {
   CHECK(ent->known_acyclic == 0);
   ent->known_acyclic = 1;
 
-  if (!ent->is_primitive && !ent->is_extern) {
+  if (!ent->is_extern) {
     if (!compute_static_values(ent)) {
       return 0;
     }
@@ -3503,6 +3599,16 @@ int check_file_test_more_9(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_10(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def x i32 = convert(4u);\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
 
 
 
@@ -3821,6 +3927,12 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_9...\n");
   if (!!test_check_module(&im, &check_file_test_more_9, foo)) {
     DBG("check_file_test_more_9 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_10...\n");
+  if (!test_check_module(&im, &check_file_test_more_10, foo)) {
+    DBG("check_file_test_more_10 fails\n");
     goto cleanup_identmap;
   }
 
