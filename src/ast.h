@@ -247,6 +247,8 @@ enum ast_unop {
   AST_UNOP_NEGATE,
 };
 
+int is_magic_unop(enum ast_unop unop);
+
 struct ast_unop_expr {
   struct ast_meta meta;
   enum ast_unop operator;
@@ -280,6 +282,8 @@ enum ast_binop {
   AST_BINOP_LOGICAL_OR,
   AST_BINOP_LOGICAL_AND,
 };
+
+int is_magic_binop(enum ast_binop binop);
 
 struct ast_binop_expr {
   struct ast_meta meta;

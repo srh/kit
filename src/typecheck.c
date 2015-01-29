@@ -47,36 +47,27 @@ void intern_primitive_type(struct checkstate *cs,
   CHECK(res);
 }
 
-int is_magic_unop(enum ast_unop unop) {
-  return unop == AST_UNOP_DEREFERENCE || unop == AST_UNOP_ADDRESSOF;
-}
-
-int is_magic_binop(enum ast_binop binop) {
-  return binop == AST_BINOP_ASSIGN || binop == AST_BINOP_LOGICAL_OR
-    || binop == AST_BINOP_LOGICAL_AND;
-}
-
-const char *binop_fakename(enum ast_binop binop) {
+const char *binop_name(enum ast_binop binop) {
   CHECK(!is_magic_binop(binop));
 
   static const char *const binop_names[] = {
     [AST_BINOP_ASSIGN] = NULL,
-    [AST_BINOP_ADD] = "$BINOP_ADD",
-    [AST_BINOP_SUB] = "$BINOP_SUB",
-    [AST_BINOP_MUL] = "$BINOP_MUL",
-    [AST_BINOP_DIV] = "$BINOP_DIV",
-    [AST_BINOP_MOD] = "$BINOP_MOD",
-    [AST_BINOP_LT] = "$BINOP_LT",
-    [AST_BINOP_LE] = "$BINOP_LE",
-    [AST_BINOP_GT] = "$BINOP_GT",
-    [AST_BINOP_GE] = "$BINOP_GE",
-    [AST_BINOP_EQ] = "$BINOP_EQ",
-    [AST_BINOP_NE] = "$BINOP_NE",
-    [AST_BINOP_BIT_XOR] = "$BINOP_BIT_XOR",
-    [AST_BINOP_BIT_OR] = "$BINOP_BIT_OR",
-    [AST_BINOP_BIT_AND] = "$BINOP_BIT_AND",
-    [AST_BINOP_BIT_LEFTSHIFT] = "$BINOP_BIT_LEFTSHIFT",
-    [AST_BINOP_BIT_RIGHTSHIFT] = "$BINOP_BIT_RIGHTSHIFT",
+    [AST_BINOP_ADD] = "+",
+    [AST_BINOP_SUB] = "-",
+    [AST_BINOP_MUL] = "*",
+    [AST_BINOP_DIV] = "/",
+    [AST_BINOP_MOD] = "%",
+    [AST_BINOP_LT] = "<",
+    [AST_BINOP_LE] = "<=",
+    [AST_BINOP_GT] = ">",
+    [AST_BINOP_GE] = ">=",
+    [AST_BINOP_EQ] = "==",
+    [AST_BINOP_NE] = "!=",
+    [AST_BINOP_BIT_XOR] = "^",
+    [AST_BINOP_BIT_OR] = "|",
+    [AST_BINOP_BIT_AND] = "&",
+    [AST_BINOP_BIT_LEFTSHIFT] = "<<",
+    [AST_BINOP_BIT_RIGHTSHIFT] = ">>",
     [AST_BINOP_LOGICAL_OR] = NULL,
     [AST_BINOP_LOGICAL_AND] = NULL,
   };
@@ -84,16 +75,85 @@ const char *binop_fakename(enum ast_binop binop) {
   return binop_names[binop];
 }
 
+static const enum primitive_op binop_i32_primitive_ops[] = {
+  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_I32,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_I32,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_I32,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_I32,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_I32,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_I32,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_I32,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_I32,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_I32,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_I32,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_I32,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_I32,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_I32,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_I32,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_I32,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_I32,
+  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
+};
+
+static const enum primitive_op binop_u32_primitive_ops[] = {
+  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_U32,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_U32,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_U32,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_U32,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_U32,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_U32,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_U32,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_U32,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_U32,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_U32,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_U32,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_U32,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_U32,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_U32,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_U32,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_U32,
+  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
+};
+
+static const enum primitive_op binop_byte_primitive_ops[] = {
+  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_BYTE,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_BYTE,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_BYTE,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_BYTE,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_BYTE,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_BYTE,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_BYTE,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_BYTE,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_BYTE,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_BYTE,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_BYTE,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_BYTE,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_BYTE,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_BYTE,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_BYTE,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_BYTE,
+  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
+};
+
+
 void intern_binop(struct checkstate *cs,
                   enum ast_binop binop,
+                  const enum primitive_op *primop_array,
                   struct ast_generics *generics,
                   struct ast_typeexpr *type) {
 
-  name_table_add_primitive_def(&cs->nt,
-                               identmap_intern_c_str(cs->im,
-                                                     binop_fakename(binop)),
-                               generics,
-                               type);
+  name_table_add_primitive_def_with_primitive_op(
+      &cs->nt,
+      identmap_intern_c_str(cs->im, binop_name(binop)),
+      primop_array[binop],
+      generics,
+      type);
 }
 
 #define CONVERT_FUNCTION_NAME "convert"
@@ -173,23 +233,25 @@ void init_binop_compare_type(struct ast_typeexpr *a, struct identmap *im,
   init_func_type(a, im, names, 3);
 }
 
-void import_integer_binops(struct checkstate *cs, const char *type_name) {
+void import_integer_binops(struct checkstate *cs,
+                           const enum primitive_op *primop_array,
+                           const char *type_name) {
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
   struct ast_typeexpr binop_type;
   init_binop_func_type(&binop_type, cs->im, type_name);
   for (enum ast_binop op = AST_BINOP_ADD; op < AST_BINOP_LT; op++) {
-    intern_binop(cs, op, &generics, &binop_type);
+    intern_binop(cs, op, primop_array, &generics, &binop_type);
   }
   for (enum ast_binop op = AST_BINOP_BIT_XOR;
        op < AST_BINOP_LOGICAL_OR;
        op++) {
-    intern_binop(cs, op, &generics, &binop_type);
+    intern_binop(cs, op, primop_array, &generics, &binop_type);
   }
   ast_typeexpr_destroy(&binop_type);
   init_binop_compare_type(&binop_type, cs->im, type_name);
   for (enum ast_binop op = AST_BINOP_LT; op < AST_BINOP_BIT_XOR; op++) {
-    intern_binop(cs, op, &generics, &binop_type);
+    intern_binop(cs, op, primop_array, &generics, &binop_type);
   }
   ast_typeexpr_destroy(&binop_type);
   ast_generics_destroy(&generics);
@@ -240,9 +302,9 @@ void import_integer_conversions(struct checkstate *cs) {
 }
 
 void checkstate_import_primitive_defs(struct checkstate *cs) {
-  import_integer_binops(cs, I32_TYPE_NAME);
-  import_integer_binops(cs, U32_TYPE_NAME);
-  import_integer_binops(cs, BYTE_TYPE_NAME);
+  import_integer_binops(cs, binop_i32_primitive_ops, I32_TYPE_NAME);
+  import_integer_binops(cs, binop_u32_primitive_ops, U32_TYPE_NAME);
+  import_integer_binops(cs, binop_byte_primitive_ops, BYTE_TYPE_NAME);
 
   import_integer_conversions(cs);
 
@@ -1598,82 +1660,9 @@ int check_expr_binop(struct exprscope *es,
                      struct ast_typeexpr *out,
                      int *is_lvalue_out,
                      struct ast_binop_expr *annotated_out) {
-  if (is_magic_binop(x->operator)) {
-    return check_expr_magic_binop(es, x, partial_type, out, is_lvalue_out,
-                                  annotated_out);
-  }
-
-  if (es->computation == STATIC_COMPUTATION_YES
-      && !is_statically_computable_non_magic_binop(x->operator)) {
-    ERR_DBG("Non-statically computable binop.\n");
-    return 0;
-  }
-
-  struct ast_typeexpr local_partial;
-  local_partial.tag = AST_TYPEEXPR_UNKNOWN;
-
-  int lvalue_discard;
-  struct ast_expr annotated_lhs;
-  if (!check_expr(es, x->lhs, &local_partial, &lvalue_discard,
-                  &annotated_lhs)) {
-    goto fail;
-  }
-
-  struct ast_expr annotated_rhs;
-  if (!check_expr(es, x->rhs, &local_partial, &lvalue_discard,
-                  &annotated_rhs)) {
-    goto fail_cleanup_lhs_type;
-  }
-
-  struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types), 3);
-  ast_typeexpr_init_copy(&args_types[0],
-                         ast_expr_type(&annotated_lhs));
-  ast_typeexpr_init_copy(&args_types[1],
-                         ast_expr_type(&annotated_rhs));
-  ast_typeexpr_init_copy(&args_types[2], partial_type);
-
-  ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
-
-  struct ast_typeexpr funcexpr;
-  funcexpr.tag = AST_TYPEEXPR_APP;
-  ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
-                   make_ast_ident(func_ident), args_types, 3);
-
-  int ret = 0;
-  struct ast_typeexpr resolved_funcexpr;
-  int funcexpr_lvalue_discard;
-  struct def_instantiation *inst;
-  if (!lookup_global_maybe_typecheck(
-          es,
-          identmap_intern_c_str(es->cs->im,
-                                binop_fakename(x->operator)),
-          &funcexpr,
-          &resolved_funcexpr,
-          &funcexpr_lvalue_discard,
-          &inst)) {
-    goto fail_cleanup_funcexpr;
-  }
-
-  copy_func_return_type(es->cs->im, &resolved_funcexpr, 3, out);
-  *is_lvalue_out = 0;
-
-  ast_binop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
-                      x->operator, annotated_lhs, annotated_rhs);
-
-  ret = 1;
-  ast_typeexpr_destroy(&resolved_funcexpr);
- fail_cleanup_funcexpr:
-  if (!ret) {
-    ast_expr_destroy(&annotated_rhs);
-    ast_expr_destroy(&annotated_lhs);
-  }
-  ast_typeexpr_destroy(&funcexpr);
-  return ret;
-  /* Don't fall-through -- lhs_type was moved into funcexpr. */
- fail_cleanup_lhs_type:
-  ast_expr_destroy(&annotated_lhs);
- fail:
-  return 0;
+  CHECK(is_magic_binop(x->operator));
+  return check_expr_magic_binop(es, x, partial_type, out, is_lvalue_out,
+                                annotated_out);
 }
 
 int view_ptr_target(struct identmap *im,
@@ -2238,246 +2227,14 @@ int eval_static_numeric_literal(struct ast_numeric_literal *a,
 
 int eval_static_value(struct ast_expr *expr, struct static_value *out);
 
-int eval_static_unop_expr(struct ast_unop_expr *expr,
-                          struct static_value *out) {
-  CHECK(!is_magic_unop(expr->operator));
-  /* Negation is the only non-magic unop right now. */
-  CHECK(expr->operator == AST_UNOP_NEGATE);
-  struct static_value rhs_value;
-  if (!eval_static_value(expr->rhs, &rhs_value)) {
-    return 0;
-  }
-
-  /* You can't negate unsigned ints -- it won't typecheck. */
-  CHECK(rhs_value.tag == STATIC_VALUE_I32);
-  if (rhs_value.u.i32_value == INT32_MIN) {
-    ERR_DBG("Attempted negation of i32 min value (in static computation)\n");
-    static_value_destroy(&rhs_value);
-    return 0;
-  }
-  static_value_init_i32(out, -rhs_value.u.i32_value);
-  static_value_destroy(&rhs_value);
-  return 1;
+int32_t st_i32(struct static_value *value) {
+  CHECK(value->tag == STATIC_VALUE_I32);
+  return value->u.i32_value;
 }
 
-int apply_operator(enum ast_binop op,
-                   struct static_value *lhs,
-                   struct static_value *rhs,
-                   struct static_value *out) {
-  CHECK(lhs->tag == rhs->tag);
-  CHECK(lhs->tag == STATIC_VALUE_I32 || lhs->tag == STATIC_VALUE_U32);
-  switch (lhs->tag) {
-  case STATIC_VALUE_I32: {
-    int32_t left = lhs->u.i32_value;
-    int32_t right = rhs->u.i32_value;
-    int32_t value = -12345;
-    int success = 1;
-    switch (op) {
-    case AST_BINOP_ASSIGN: UNREACHABLE();
-    case AST_BINOP_ADD:
-      success = try_int32_add(left, right, &value);
-      break;
-    case AST_BINOP_SUB:
-      success = try_int32_sub(left, right, &value);
-      break;
-    case AST_BINOP_MUL:
-      success = try_int32_mul(left, right, &value);
-      break;
-    case AST_BINOP_DIV: {
-      if (left < 0 || right < 0) {
-        ERR_DBG("Negative static value division.\n");
-        return 0;
-      }
-      if (right == 0) {
-        ERR_DBG("Static value division by zero.\n");
-      }
-      value = int32_div(left, right);
-      success = 1;
-    } break;
-    case AST_BINOP_MOD: {
-      if (left < 0 || right < 0) {
-        ERR_DBG("Negative static value modulo.\n");
-        return 0;
-      }
-      if (right == 0) {
-        ERR_DBG("Static value modulo by zero.\n");
-      }
-      value = int32_positive_mod(left, right);
-      success = 1;
-    } break;
-    case AST_BINOP_LT:
-      value = (left < right);
-      break;
-    case AST_BINOP_LE:
-      value = (left <= right);
-      break;
-    case AST_BINOP_GT:
-      value = (left > right);
-      break;
-    case AST_BINOP_GE:
-      value = (left >= right);
-      break;
-    case AST_BINOP_EQ:
-      value = (left == right);
-      break;
-    case AST_BINOP_NE:
-      value = (left != right);
-      break;
-    case AST_BINOP_BIT_XOR:
-      value = (left ^ right);
-      break;
-    case AST_BINOP_BIT_OR:
-      value = (left | right);
-      break;
-    case AST_BINOP_BIT_AND:
-      value = (left & right);
-      break;
-    case AST_BINOP_BIT_LEFTSHIFT: {
-      if (left < 0 || right < 0 || right >= 32) {
-        success = 0;
-      } else {
-        int64_t left64 = left;
-        left64 <<= right;
-        if (left64 > INT32_MAX) {
-          success = 0;
-        } else {
-          value = (int32_t)left64;
-        }
-      }
-    } break;
-    case AST_BINOP_BIT_RIGHTSHIFT: {
-      if (left < 0 || right < 0 || right >= 32) {
-        ERR_DBG("Invalid i32 right-shift.\n");
-      } else {
-        value = (left >> right);
-      }
-    } break;
-    default:
-      success = 0;
-    }
-
-    if (!success) {
-      ERR_DBG("Binary operation cannot be statically evaluated.\n");
-      return 0;
-    }
-
-    static_value_init_i32(out, value);
-    return 1;
-  } break;
-
-  case STATIC_VALUE_U32: {
-    uint32_t left = lhs->u.u32_value;
-    uint32_t right = rhs->u.u32_value;
-    uint32_t value = 12345;
-    int success = 1;
-    switch (op) {
-    case AST_BINOP_ASSIGN: UNREACHABLE();
-    case AST_BINOP_ADD:
-      success = try_uint32_add(left, right, &value);
-      break;
-    case AST_BINOP_SUB:
-      success = try_uint32_sub(left, right, &value);
-      break;
-    case AST_BINOP_MUL:
-      success = try_uint32_mul(left, right, &value);
-      break;
-    case AST_BINOP_DIV:
-      success = try_uint32_div(left, right, &value);
-      break;
-    case AST_BINOP_MOD:
-      success = try_uint32_mod(left, right, &value);
-      break;
-    case AST_BINOP_LT:
-      value = (left < right);
-      break;
-    case AST_BINOP_LE:
-      value = (left <= right);
-      break;
-    case AST_BINOP_GT:
-      value = (left > right);
-      break;
-    case AST_BINOP_GE:
-      value = (left >= right);
-      break;
-    case AST_BINOP_EQ:
-      value = (left == right);
-      break;
-    case AST_BINOP_NE:
-      value = (left != right);
-      break;
-    case AST_BINOP_BIT_XOR:
-      value = (left ^ right);
-      break;
-    case AST_BINOP_BIT_OR:
-      value = (left | right);
-      break;
-    case AST_BINOP_BIT_AND:
-      value = (left & right);
-      break;
-    case AST_BINOP_BIT_LEFTSHIFT: {
-      if (right >= 32) {
-        success = 0;
-      } else {
-        uint64_t left64 = left;
-        left64 <<= right;
-        if (left64 > UINT32_MAX) {
-          success = 0;
-        } else {
-          value = (uint32_t)left64;
-        }
-      }
-    } break;
-    case AST_BINOP_BIT_RIGHTSHIFT: {
-      if (right >= 32) {
-        success = 0;
-      } else {
-        value = (left >> right);
-      }
-    } break;
-    default:
-      success = 0;
-    }
-
-    if (!success) {
-      ERR_DBG("Binary operation cannot be statically evaluated.\n");
-      return 0;
-    }
-
-    static_value_init_u32(out, value);
-    return 1;
-  } break;
-  case STATIC_VALUE_LAMBDA:
-  case STATIC_VALUE_PRIMITIVE_OP:
-  default:
-    UNREACHABLE();
-  }
-}
-
-int eval_static_binop_expr(struct ast_binop_expr *expr,
-                           struct static_value *out) {
-  CHECK(!is_magic_binop(expr->operator));
-
-  struct static_value lhs_value;
-  if (!eval_static_value(expr->lhs, &lhs_value)) {
-    goto fail;
-  }
-
-  struct static_value rhs_value;
-  if (!eval_static_value(expr->rhs, &rhs_value)) {
-    goto fail_lhs;
-  }
-
-  if (!apply_operator(expr->operator, &lhs_value, &rhs_value, out)) {
-    goto fail_both;
-  }
-
-  return 1;
- fail_both:
-  static_value_destroy(&rhs_value);
- fail_lhs:
-  static_value_destroy(&lhs_value);
- fail:
-  return 0;
+uint32_t st_u32(struct static_value *value) {
+  CHECK(value->tag == STATIC_VALUE_U32);
+  return value->u.u32_value;
 }
 
 int apply_static_funcall(struct static_value *func,
@@ -2489,64 +2246,278 @@ int apply_static_funcall(struct static_value *func,
     return 0;
   }
 
-  switch (func->u.primitive_op) {
-  case PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE:
-  case PRIMITIVE_OP_CONVERT_BYTE_TO_I32:
-  case PRIMITIVE_OP_CONVERT_BYTE_TO_U32:
-  case PRIMITIVE_OP_CONVERT_I32_TO_BYTE:
-    goto crash_byte;
-  case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
-    CHECK(params_count == 1);
-    CHECK(params[0].tag == STATIC_VALUE_I32);
-    static_value_init_i32(out, params[0].u.i32_value);
-    return 1;
-  } break;
-  case PRIMITIVE_OP_CONVERT_I32_TO_U32: {
-    CHECK(params_count == 1);
-    CHECK(params[0].tag == STATIC_VALUE_I32);
-    int32_t val = params[0].u.i32_value;
-    uint32_t result;
-    if (!try_int32_to_uint32(val, &result)) {
-      ERR_DBG("Could not convert i32 %"PRIi32" to a u32.\n", val);
+  switch (params_count) {
+  case 1:
+    switch (func->u.primitive_op) {
+    case PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE:
+    case PRIMITIVE_OP_CONVERT_BYTE_TO_I32:
+    case PRIMITIVE_OP_CONVERT_BYTE_TO_U32:
+    case PRIMITIVE_OP_CONVERT_I32_TO_BYTE:
+      goto crash_byte;
+    case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
+      CHECK(params_count == 1);
+      CHECK(params[0].tag == STATIC_VALUE_I32);
+      static_value_init_i32(out, params[0].u.i32_value);
+      return 1;
+    } break;
+    case PRIMITIVE_OP_CONVERT_I32_TO_U32: {
+      CHECK(params_count == 1);
+      CHECK(params[0].tag == STATIC_VALUE_I32);
+      int32_t val = params[0].u.i32_value;
+      uint32_t result;
+      if (!try_int32_to_uint32(val, &result)) {
+        ERR_DBG("Could not convert i32 %"PRIi32" to a u32.\n", val);
+        return 0;
+      }
+      static_value_init_u32(out, result);
+      return 1;
+    } break;
+    case PRIMITIVE_OP_CONVERT_U32_TO_BYTE:
+      goto crash_byte;
+    case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
+      CHECK(params_count == 1);
+      CHECK(params[0].tag == STATIC_VALUE_U32);
+      uint32_t val = params[0].u.u32_value;
+      int32_t result;
+      if (!try_uint32_to_int32(val, &result)) {
+        ERR_DBG("Could not convert u32 %"PRIu32" to an i32.\n", val);
+        return 0;
+      }
+      static_value_init_i32(out, result);
+      return 1;
+    } break;
+    case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
+      CHECK(params_count == 1);
+      CHECK(params[0].tag == STATIC_VALUE_U32);
+      static_value_init_u32(out, params[0].u.u32_value);
+      return 1;
+    } break;
+    case PRIMITIVE_OP_NEGATE_I32: {
+      CHECK(params_count == 1);
+      CHECK(params[0].tag == STATIC_VALUE_I32);
+      int32_t val = params[0].u.i32_value;
+      int32_t result;
+      if (!try_int32_sub(0, val, &result)) {
+        ERR_DBG("Could not negate i32 %"PRIi32".\n", val);
+        return 0;
+      }
+      static_value_init_i32(out, result);
+      return 1;
+    } break;
+    default:
+      UNREACHABLE();
+    }
+    break;
+  case 2: {
+    int succ_i32 = 0;
+    int succ_u32 = 0;
+    int32_t val_i32 = 0; /* Initialized to make cl shut up. */
+    uint32_t val_u32 = 0; /* Initialized to make cl shut up. */
+    switch (func->u.primitive_op) {
+    case PRIMITIVE_OP_ADD_I32:
+      succ_i32 = try_int32_add(st_i32(&params[0]), st_i32(&params[1]), &val_i32);
+      break;
+    case PRIMITIVE_OP_SUB_I32:
+      succ_i32 = try_int32_sub(st_i32(&params[0]), st_i32(&params[1]), &val_i32);
+      break;
+    case PRIMITIVE_OP_MUL_I32:
+      succ_i32 = try_int32_mul(st_i32(&params[0]), st_i32(&params[1]), &val_i32);
+      break;
+    case PRIMITIVE_OP_DIV_I32:
+      if (st_i32(&params[0]) < 0 || st_i32(&params[1]) < 0) {
+        ERR_DBG("Negative static value division.\n");
+        return 0;
+      }
+      if (st_i32(&params[1]) == 0) {
+        ERR_DBG("Static value division by zero.\n");
+        return 0;
+      }
+      val_i32 = int32_div(st_i32(&params[0]), st_i32(&params[1]));
+      succ_i32 = 1;
+      break;
+    case PRIMITIVE_OP_MOD_I32:
+      if (st_i32(&params[0]) < 0 || st_i32(&params[1]) < 0) {
+        ERR_DBG("Negative static value modulo.\n");
+        return 0;
+      }
+      if (st_i32(&params[1]) == 0) {
+        ERR_DBG("Static value modulo by zero.\n");
+        return 0; 
+      }
+      val_i32 = int32_positive_mod(st_i32(&params[0]), st_i32(&params[1]));
+      succ_i32 = 1;
+      break;
+    case PRIMITIVE_OP_LT_I32:
+      val_i32 = (st_i32(&params[0]) < st_i32(&params[1]));
+      succ_i32 = 1;
+      break;
+    case PRIMITIVE_OP_LE_I32:
+      val_i32 = (st_i32(&params[0]) <= st_i32(&params[1]));
+      succ_i32 = 1;
+      break;
+    case PRIMITIVE_OP_GT_I32:
+      val_i32 = (st_i32(&params[0]) > st_i32(&params[1]));
+      succ_i32 = 1;
+      break;
+    case PRIMITIVE_OP_GE_I32:
+      val_i32 = (st_i32(&params[0]) >= st_i32(&params[1]));
+      succ_i32 = 1;
+      break;
+    case PRIMITIVE_OP_EQ_I32:
+      val_i32 = (st_i32(&params[0]) == st_i32(&params[1]));
+      succ_i32 = 1;
+      break;
+    case PRIMITIVE_OP_NE_I32:
+      val_i32 = (st_i32(&params[0]) != st_i32(&params[1]));
+      succ_i32 = 1;
+      break;
+    case PRIMITIVE_OP_BIT_XOR_I32:
+      val_i32 = (st_i32(&params[0]) ^ st_i32(&params[1]));
+      succ_i32 = 1;
+      break;
+    case PRIMITIVE_OP_BIT_OR_I32:
+      val_i32 = (st_i32(&params[0]) | st_i32(&params[1]));
+      succ_i32 = 1;
+      break;
+    case PRIMITIVE_OP_BIT_AND_I32:
+      val_i32 = (st_i32(&params[0]) & st_i32(&params[1]));
+      succ_i32 = 1;
+      break;
+    case PRIMITIVE_OP_BIT_LEFTSHIFT_I32: {
+      int32_t left = st_i32(&params[0]);
+      int32_t right = st_i32(&params[1]);
+      if (left < 0 || right < 0 || right >= 32) {
+        break;
+      } else {
+        int64_t left64 = left;
+        left64 <<= right;
+        if (left64 > INT32_MAX) {
+          break;
+        } else {
+          val_i32 = (int32_t)left64;
+          succ_i32 = 1;
+        }
+      }
+    } break;
+    case PRIMITIVE_OP_BIT_RIGHTSHIFT_I32: {
+      int32_t left = st_i32(&params[0]);
+      int32_t right = st_i32(&params[1]);
+      if (left < 0 || right < 0 || right >= 32) {
+        ERR_DBG("Invalid i32 right-shift.\n");
+        return 0;
+      } else {
+        val_i32 = (left >> right);
+        succ_i32 = 1;
+      }
+    } break;
+
+    case PRIMITIVE_OP_ADD_U32:
+      succ_u32 = try_uint32_add(st_u32(&params[0]), st_u32(&params[1]), &val_u32);
+      break;
+    case PRIMITIVE_OP_SUB_U32:
+      succ_u32 = try_uint32_sub(st_u32(&params[0]), st_u32(&params[1]), &val_u32);
+      break;
+    case PRIMITIVE_OP_MUL_U32:
+      succ_u32 = try_uint32_mul(st_u32(&params[0]), st_u32(&params[1]), &val_u32);
+      break;
+    case PRIMITIVE_OP_DIV_U32:
+      succ_u32 = try_uint32_div(st_u32(&params[0]), st_u32(&params[1]), &val_u32);
+      break;
+    case PRIMITIVE_OP_MOD_U32:
+      succ_u32 = try_uint32_mod(st_u32(&params[0]), st_u32(&params[1]), &val_u32);
+      break;
+    case PRIMITIVE_OP_LT_U32:
+      val_u32 = (st_u32(&params[0]) < st_u32(&params[1]));
+      succ_u32 = 1;
+      break;
+    case PRIMITIVE_OP_LE_U32:
+      val_u32 = (st_u32(&params[0]) <= st_u32(&params[1]));
+      succ_u32 = 1;
+      break;
+    case PRIMITIVE_OP_GT_U32:
+      val_u32 = (st_u32(&params[0]) > st_u32(&params[1]));
+      succ_u32 = 1;
+      break;
+    case PRIMITIVE_OP_GE_U32:
+      val_u32 = (st_u32(&params[0]) >= st_u32(&params[1]));
+      succ_u32 = 1;
+      break;
+    case PRIMITIVE_OP_EQ_U32:
+      val_u32 = (st_u32(&params[0]) == st_u32(&params[1]));
+      succ_u32 = 1;
+      break;
+    case PRIMITIVE_OP_NE_U32:
+      val_u32 = (st_u32(&params[0]) != st_u32(&params[1]));
+      succ_u32 = 1;
+      break;
+    case PRIMITIVE_OP_BIT_XOR_U32:
+      val_u32 = (st_u32(&params[0]) ^ st_u32(&params[1]));
+      succ_u32 = 1;
+      break;
+    case PRIMITIVE_OP_BIT_OR_U32:
+      val_u32 = (st_u32(&params[0]) | st_u32(&params[1]));
+      succ_u32 = 1;
+      break;
+    case PRIMITIVE_OP_BIT_AND_U32:
+      val_u32 = (st_u32(&params[0]) & st_u32(&params[1]));
+      succ_u32 = 1;
+      break;
+    case PRIMITIVE_OP_BIT_LEFTSHIFT_U32: {
+      if (st_u32(&params[1]) >= 32) {
+        break;
+      } else {
+        uint64_t left64 = st_u32(&params[0]);
+        left64 <<= st_u32(&params[1]);
+        if (left64 > UINT32_MAX) {
+          break;
+        } else {
+          val_u32 = (uint32_t)left64;
+          succ_u32 = 1;
+        }
+      }
+    } break;
+    case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32: {
+      if (st_u32(&params[1]) >= 32) {
+        break;
+      } else {
+        val_u32 = (st_u32(&params[0]) >> st_u32(&params[1]));
+        succ_u32 = 1;
+      }
+    } break;
+
+    case PRIMITIVE_OP_ADD_BYTE:
+    case PRIMITIVE_OP_SUB_BYTE:
+    case PRIMITIVE_OP_MUL_BYTE:
+    case PRIMITIVE_OP_DIV_BYTE:
+    case PRIMITIVE_OP_MOD_BYTE:
+    case PRIMITIVE_OP_LT_BYTE:
+    case PRIMITIVE_OP_LE_BYTE:
+    case PRIMITIVE_OP_GT_BYTE:
+    case PRIMITIVE_OP_GE_BYTE:
+    case PRIMITIVE_OP_EQ_BYTE:
+    case PRIMITIVE_OP_NE_BYTE:
+    case PRIMITIVE_OP_BIT_XOR_BYTE:
+    case PRIMITIVE_OP_BIT_OR_BYTE:
+    case PRIMITIVE_OP_BIT_AND_BYTE:
+    case PRIMITIVE_OP_BIT_LEFTSHIFT_BYTE:
+    case PRIMITIVE_OP_BIT_RIGHTSHIFT_BYTE:
+      goto crash_byte;
+    default:
+      UNREACHABLE();
+    }
+
+    if (succ_i32) {
+      static_value_init_i32(out, val_i32);
+    } else if (succ_u32) {
+      static_value_init_u32(out, val_u32);
+    } else {
+      ERR_DBG("Binary operation cannot be statically evaluated.\n");
       return 0;
     }
-    static_value_init_u32(out, result);
-    return 1;
-  } break;
-  case PRIMITIVE_OP_CONVERT_U32_TO_BYTE:
-    goto crash_byte;
-  case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
-    CHECK(params_count == 1);
-    CHECK(params[0].tag == STATIC_VALUE_U32);
-    uint32_t val = params[0].u.u32_value;
-    int32_t result;
-    if (!try_uint32_to_int32(val, &result)) {
-      ERR_DBG("Could not convert u32 %"PRIu32" to an i32.\n", val);
-      return 0;
-    }
-    static_value_init_i32(out, result);
-    return 1;
-  } break;
-  case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
-    CHECK(params_count == 1);
-    CHECK(params[0].tag == STATIC_VALUE_U32);
-    static_value_init_u32(out, params[0].u.u32_value);
-    return 1;
-  } break;
-  case PRIMITIVE_OP_NEGATE_I32: {
-    CHECK(params_count == 1);
-    CHECK(params[0].tag == STATIC_VALUE_I32);
-    int32_t val = params[0].u.i32_value;
-    int32_t result;
-    if (!try_int32_sub(0, val, &result)) {
-      ERR_DBG("Could not negate i32 %"PRIi32".\n", val);
-      return 0;
-    }
-    static_value_init_i32(out, result);
     return 1;
   } break;
   default:
-    UNREACHABLE();
+    CRASH("Static funcall has not 1 and not 2 arguments.");
   }
 
  crash_byte:
@@ -2604,10 +2575,12 @@ int eval_static_value(struct ast_expr *expr,
     return eval_static_funcall(&expr->u.funcall, out);
   } break;
   case AST_EXPR_UNOP: {
-    return eval_static_unop_expr(&expr->u.unop_expr, out);
+    CRASH("No (magic) unop exprs should have been deemed "
+          "statically evaluable.\n");
   } break;
   case AST_EXPR_BINOP: {
-    return eval_static_binop_expr(&expr->u.binop_expr, out);
+    CRASH("No (magic) binop exprs should have been deemed "
+          "statically evaluable.\n");
   } break;
   case AST_EXPR_LAMBDA: {
     struct ast_expr copy;

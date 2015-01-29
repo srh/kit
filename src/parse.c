@@ -895,11 +895,14 @@ void build_unop_expr(struct ast_meta meta,
                      enum ast_unop unop,
                      struct ast_expr rhs,
                      struct ast_expr *out) {
-  if (unop == AST_UNOP_NEGATE) {
+  if (is_magic_unop(unop)) {
+    ast_ident_destroy(&unop_name);
+    ast_expr_partial_init(out, AST_EXPR_UNOP, ast_expr_info_default());
+    ast_unop_expr_init(&out->u.unop_expr, meta, unop, rhs);
+  } else {
     struct ast_expr func;
     ast_expr_partial_init(&func, AST_EXPR_NAME, ast_expr_info_default());
-    ast_name_expr_init(&func.u.name,
-                       unop_name);
+    ast_name_expr_init(&func.u.name, unop_name);
 
     struct ast_expr *args = malloc_mul(sizeof(*args), 1);
     args[0] = rhs;
@@ -907,10 +910,6 @@ void build_unop_expr(struct ast_meta meta,
     ast_expr_partial_init(out, AST_EXPR_FUNCALL, ast_expr_info_default());
     ast_funcall_init(&out->u.funcall, meta,
                      func, args, 1);
-  } else {
-    ast_ident_destroy(&unop_name);
-    ast_expr_partial_init(out, AST_EXPR_UNOP, ast_expr_info_default());
-    ast_unop_expr_init(&out->u.unop_expr, meta, unop, rhs);
   }
 }
 
@@ -920,10 +919,24 @@ void build_binop_expr(struct ast_meta meta,
                       struct ast_expr old_lhs,
                       struct ast_expr rhs,
                       struct ast_expr *out) {
-  ast_ident_destroy(&binop_name);
-  ast_expr_partial_init(out, AST_EXPR_BINOP, ast_expr_info_default());
-  ast_binop_expr_init(&out->u.binop_expr,
-                      meta, binop, old_lhs, rhs);
+  if (is_magic_binop(binop)) {
+    ast_ident_destroy(&binop_name);
+    ast_expr_partial_init(out, AST_EXPR_BINOP, ast_expr_info_default());
+    ast_binop_expr_init(&out->u.binop_expr,
+                        meta, binop, old_lhs, rhs);
+  } else {
+    struct ast_expr func;
+    ast_expr_partial_init(&func, AST_EXPR_NAME, ast_expr_info_default());
+    ast_name_expr_init(&func.u.name, binop_name);
+
+    struct ast_expr *args = malloc_mul(sizeof(*args), 2);
+    args[0] = old_lhs;
+    args[1] = rhs;
+
+    ast_expr_partial_init(out, AST_EXPR_FUNCALL, ast_expr_info_default());
+    ast_funcall_init(&out->u.funcall, meta,
+                     func, args, 2);
+  }
 }
 
 int parse_atomic_expr(struct ps *p, struct ast_expr *out) {

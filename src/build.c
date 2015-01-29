@@ -1031,6 +1031,7 @@ void gen_primitive_op_behavior(struct objfile *f,
                                struct frame *h,
                                enum primitive_op prim_op) {
   struct loc loc = ebp_loc(DWORD_SIZE, DWORD_SIZE, h->stack_offset);
+  struct loc rloc = ebp_loc(DWORD_SIZE, DWORD_SIZE, int32_add(h->stack_offset, DWORD_SIZE));
   switch (prim_op) {
   case PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE:
   case PRIMITIVE_OP_CONVERT_BYTE_TO_I32:
@@ -1058,6 +1059,80 @@ void gen_primitive_op_behavior(struct objfile *f,
     x86_gen_negate_w32(f, X86_EAX);
     /* TODO: Check overflow. */
   } break;
+  case PRIMITIVE_OP_ADD_I32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_add_w32(f, X86_EAX, X86_ECX);
+    /* TODO: Handle overflow. */
+  } break;
+  case PRIMITIVE_OP_SUB_I32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_sub_w32(f, X86_EAX, X86_ECX);
+    /* TODO: Handle overflow. */
+  } break;
+  case PRIMITIVE_OP_MUL_I32:
+  case PRIMITIVE_OP_DIV_I32:
+  case PRIMITIVE_OP_MOD_I32:
+  case PRIMITIVE_OP_LT_I32:
+  case PRIMITIVE_OP_LE_I32:
+  case PRIMITIVE_OP_GT_I32:
+  case PRIMITIVE_OP_GE_I32:
+  case PRIMITIVE_OP_EQ_I32:
+  case PRIMITIVE_OP_NE_I32:
+  case PRIMITIVE_OP_BIT_XOR_I32:
+  case PRIMITIVE_OP_BIT_OR_I32:
+  case PRIMITIVE_OP_BIT_AND_I32:
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_I32:
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_I32:
+    TODO_IMPLEMENT;
+
+  case PRIMITIVE_OP_ADD_U32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_add_w32(f, X86_EAX, X86_ECX);
+    /* TODO: Handle overflow. */
+  } break;
+  case PRIMITIVE_OP_SUB_U32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_add_w32(f, X86_EAX, X86_ECX);
+    /* TODO: Handle overflow. */
+  } break;
+  case PRIMITIVE_OP_MUL_U32:
+  case PRIMITIVE_OP_DIV_U32:
+  case PRIMITIVE_OP_MOD_U32:
+  case PRIMITIVE_OP_LT_U32:
+  case PRIMITIVE_OP_LE_U32:
+  case PRIMITIVE_OP_GT_U32:
+  case PRIMITIVE_OP_GE_U32:
+  case PRIMITIVE_OP_EQ_U32:
+  case PRIMITIVE_OP_NE_U32:
+  case PRIMITIVE_OP_BIT_XOR_U32:
+  case PRIMITIVE_OP_BIT_OR_U32:
+  case PRIMITIVE_OP_BIT_AND_U32:
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_U32:
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32:
+    TODO_IMPLEMENT;
+
+  case PRIMITIVE_OP_ADD_BYTE:
+  case PRIMITIVE_OP_SUB_BYTE:
+  case PRIMITIVE_OP_MUL_BYTE:
+  case PRIMITIVE_OP_DIV_BYTE:
+  case PRIMITIVE_OP_MOD_BYTE:
+  case PRIMITIVE_OP_LT_BYTE:
+  case PRIMITIVE_OP_LE_BYTE:
+  case PRIMITIVE_OP_GT_BYTE:
+  case PRIMITIVE_OP_GE_BYTE:
+  case PRIMITIVE_OP_EQ_BYTE:
+  case PRIMITIVE_OP_NE_BYTE:
+  case PRIMITIVE_OP_BIT_XOR_BYTE:
+  case PRIMITIVE_OP_BIT_OR_BYTE:
+  case PRIMITIVE_OP_BIT_AND_BYTE:
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_BYTE:
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_BYTE:
+    TODO_IMPLEMENT;
+
   default:
     UNREACHABLE();
   }
@@ -1318,71 +1393,8 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
     expr_return_set(f, er, ret);
     return 1;
   } break;
-  default: {
-    enum numeric_type lhs_type = get_numeric_type(cs->im, ast_expr_type(be->lhs));
-    enum numeric_type rhs_type = get_numeric_type(cs->im, ast_expr_type(be->rhs));
-    CHECK(lhs_type == rhs_type);
-
-    struct expr_return lhs_er = open_expr_return();
-    if (!gen_expr(cs, f, h, be->lhs, &lhs_er)) {
-      return 0;
-    }
-
-    struct expr_return rhs_er = open_expr_return();
-    if (!gen_expr(cs, f, h, be->rhs, &rhs_er)) {
-      return 0;
-    }
-
-    size_t size = numeric_type_size(lhs_type);
-    CHECK(lhs_er.u.loc.size == size);
-    CHECK(rhs_er.u.loc.size == size);
-
-    gen_load_register(f, X86_EAX, lhs_er.u.loc);
-    gen_load_register(f, X86_ECX, rhs_er.u.loc);
-
-    switch (be->operator) {
-    case AST_BINOP_ADD: {
-      switch (lhs_type) {
-      case NUMERIC_TYPE_BYTE: {
-        TODO_IMPLEMENT;
-      } break;
-      case NUMERIC_TYPE_I32: {
-        x86_gen_add_w32(f, X86_EAX, X86_ECX);
-        /* TODO: Handle overflow. */
-      } break;
-      case NUMERIC_TYPE_U32: {
-        x86_gen_add_w32(f, X86_EAX, X86_ECX);
-        /* TODO: Handle overflow. */
-      } break;
-      default:
-        UNREACHABLE();
-      }
-    } break;
-    case AST_BINOP_SUB: {
-      switch (lhs_type) {
-      case NUMERIC_TYPE_BYTE: {
-        TODO_IMPLEMENT;
-      } break;
-      case NUMERIC_TYPE_I32: {
-        x86_gen_sub_w32(f, X86_EAX, X86_ECX);
-        /* TODO: Handle overflow. */
-      } break;
-      case NUMERIC_TYPE_U32: {
-        x86_gen_sub_w32(f, X86_EAX, X86_ECX);
-        /* TODO: Handle overflow. */
-      } break;
-      }
-    } break;
-    default:
-      TODO_IMPLEMENT;
-    }
-
-    struct loc ret = frame_push_loc(h, lhs_er.u.loc.size);
-    gen_store_register(f, ret, X86_EAX);
-
-    expr_return_set(f, er, ret);
-    return 1;
-  } break;
+  default:
+    UNREACHABLE();
   }
 }
 

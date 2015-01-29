@@ -361,6 +361,10 @@ void ast_statement_destroy(struct ast_statement *a) {
   a->tag = (enum ast_statement_tag)-1;
 }
 
+int is_magic_unop(enum ast_unop unop) {
+  return unop == AST_UNOP_DEREFERENCE || unop == AST_UNOP_ADDRESSOF;
+}
+
 void ast_unop_expr_init(struct ast_unop_expr *a, struct ast_meta meta,
                         enum ast_unop operator, struct ast_expr rhs) {
   a->meta = meta;
@@ -381,6 +385,11 @@ void ast_unop_expr_destroy(struct ast_unop_expr *a) {
   ast_expr_destroy(a->rhs);
   free(a->rhs);
   a->rhs = NULL;
+}
+
+int is_magic_binop(enum ast_binop binop) {
+  return binop == AST_BINOP_ASSIGN || binop == AST_BINOP_LOGICAL_OR
+    || binop == AST_BINOP_LOGICAL_AND;
 }
 
 void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
