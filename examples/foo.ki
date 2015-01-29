@@ -2,27 +2,16 @@ extern putchar func[i32, i32];
 
 def foo i32 = convert(1u);
 
-def multiply func[i32, i32, i32] = fn(x i32, y i32) i32 {
-  var acc i32 = 0;
-  label top;
-  if (x && y) {
-    acc = acc + x + y + -1;
-    x = x - 1;
-    y = y - 1;
-    goto top;
-  }
-  return acc;
-};
-
 def fac func[i32, i32] = fn(x i32) i32 {
-  var acc i32 = 1;
+  var acc u32 = 1u;
+  var ux u32 = convert(x);
   label top;
-  if (x) {
-    acc = multiply(acc, x);
-    x = x - 1;
+  if (convert(ux)) {
+    acc = acc * ux;
+    ux = ux - 1u;
     goto top;
   }
-  return acc;
+  return convert(acc);
 };
 
 def showfacs func[i32] = fn() i32 {

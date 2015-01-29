@@ -583,6 +583,27 @@ void x86_gen_add_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_eaxedx_mul_w32(struct objfile *f, enum x86_reg src) {
+  uint8_t b[2];
+  b[0] = 0xF7;
+  b[1] = mod_reg_rm(MOD11, 4, src);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_eaxedx_divmod_w32(struct objfile *f, enum x86_reg denom) {
+  uint8_t b[2];
+  b[0] = 0xF7;  /* Has a different modr/m opcode than mul. */
+  b[1] = mod_reg_rm(MOD11, 6, denom);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_xor_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
+  uint8_t b[2];
+  b[0] = 0x31;
+  b[1] = mod_reg_rm(MOD11, src, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 void x86_gen_negate_w32(struct objfile *f, enum x86_reg dest) {
   uint8_t b[2];
   b[0] = 0xF7;
@@ -1077,12 +1098,30 @@ void gen_primitive_op_behavior(struct objfile *f,
   case PRIMITIVE_OP_SUB_U32: {
     gen_load_register(f, X86_EAX, loc);
     gen_load_register(f, X86_ECX, rloc);
-    x86_gen_add_w32(f, X86_EAX, X86_ECX);
+    x86_gen_sub_w32(f, X86_EAX, X86_ECX);
     /* TODO: Handle overflow. */
   } break;
-  case PRIMITIVE_OP_MUL_U32:
-  case PRIMITIVE_OP_DIV_U32:
-  case PRIMITIVE_OP_MOD_U32:
+  case PRIMITIVE_OP_MUL_U32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_eaxedx_mul_w32(f, X86_ECX);
+    /* TODO: Handle overflow. */
+  } break;
+  case PRIMITIVE_OP_DIV_U32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
+    x86_gen_eaxedx_divmod_w32(f, X86_ECX);
+    /* TODO: Handle divide by zero? */
+  } break;
+  case PRIMITIVE_OP_MOD_U32: {
+    gen_load_register(f, X86_EAX, loc);
+    gen_load_register(f, X86_ECX, rloc);
+    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
+    x86_gen_eaxedx_divmod_w32(f, X86_ECX);
+    x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
+    /* TODO: Handle divide by zero? */
+  } break;
   case PRIMITIVE_OP_LT_U32:
   case PRIMITIVE_OP_LE_U32:
   case PRIMITIVE_OP_GT_U32:
