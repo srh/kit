@@ -146,25 +146,6 @@ struct immediate {
   } u;
 };
 
-/* TODO: Anybody use this? */
-int immediate_equal(struct immediate a, struct immediate b) {
-  if (a.tag != b.tag) {
-    return 0;
-  }
-  switch (a.tag) {
-  case IMMEDIATE_FUNC:
-    return a.u.func_sti == b.u.func_sti;
-  case IMMEDIATE_PRIMITIVE_OP:
-    return a.u.primitive_op == b.u.primitive_op;
-  case IMMEDIATE_U32:
-    return a.u.u32 == b.u.u32;
-  case IMMEDIATE_I32:
-    return a.u.i32 == b.u.i32;
-  default:
-    UNREACHABLE();
-  }
-}
-
 enum loc_tag {
   LOC_EBP_OFFSET,
   LOC_GLOBAL,
@@ -1141,8 +1122,6 @@ void gen_primitive_op_behavior(struct objfile *f,
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
-  /* TODO: Built-in immediate functions (such as convert) need treatment. */
-
   size_t args_count = a->u.funcall.args_count;
 
   uint32_t return_size = kira_sizeof(&cs->nt, ast_expr_type(a));

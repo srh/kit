@@ -2598,11 +2598,8 @@ int compute_static_values(struct def_entry *ent) {
     CHECK(!inst->value_computed);
 
     if (is_primitive) {
-      /* TODO: Eventually this'll never be invalid. */
-      if (ent->primitive_op != PRIMITIVE_OP_INVALID) {
-        static_value_init_primitive_op(&inst->value, ent->primitive_op);
-        inst->value_computed = 1;
-      }
+      static_value_init_primitive_op(&inst->value, ent->primitive_op);
+      inst->value_computed = 1;
     } else {
       CHECK(inst->annotated_rhs_computed);
       if (!eval_static_value(&inst->annotated_rhs, &inst->value)) {
