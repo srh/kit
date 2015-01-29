@@ -20,7 +20,7 @@ struct ps {
   size_t line;
   size_t column;
 
-  struct identmap ident_table;
+  struct identmap im;
   size_t leafcount;
 };
 
@@ -39,14 +39,14 @@ void ps_init(struct ps *p, const uint8_t *data, size_t length) {
   p->line = 1;
   p->column = 0;
 
-  identmap_init(&p->ident_table);
+  identmap_init(&p->im);
   p->leafcount = 0;
 }
 
-/* Takes ownership of the ident table -- use ps_remove_ident_table to
+/* Takes ownership of the ident table -- use ps_remove_identmap to
    get it back. */
-void ps_init_with_ident_table(struct ps *p, struct identmap *im,
-                              const uint8_t *data, size_t length) {
+void ps_init_with_identmap(struct ps *p, struct identmap *im,
+                           const uint8_t *data, size_t length) {
   p->data = data;
   p->length = length;
   p->pos = 0;
@@ -54,13 +54,13 @@ void ps_init_with_ident_table(struct ps *p, struct identmap *im,
   p->line = 1;
   p->column = 0;
 
-  identmap_init_move(&p->ident_table, im);
+  identmap_init_move(&p->im, im);
   p->leafcount = 0;
 }
 
-void ps_remove_ident_table(struct ps *p, struct identmap *im_out) {
-  identmap_init_move(im_out, &p->ident_table);
-  identmap_init(&p->ident_table);
+void ps_remove_identmap(struct ps *p, struct identmap *im_out) {
+  identmap_init_move(im_out, &p->im);
+  identmap_init(&p->im);
 }
 
 void ps_destroy(struct ps *p) {
@@ -69,7 +69,7 @@ void ps_destroy(struct ps *p) {
   p->pos = 0;
   p->line = 0;
   p->column = 0;
-  identmap_destroy(&p->ident_table);
+  identmap_destroy(&p->im);
   p->leafcount = 0;
 }
 
@@ -128,7 +128,7 @@ ident_value ps_intern_ident(struct ps *p,
                             size_t end_pos) {
   CHECK(end_pos <= p->length);
   CHECK(begin_pos <= end_pos);
-  return identmap_intern(&p->ident_table,
+  return identmap_intern(&p->im,
                          p->data + begin_pos,
                          end_pos - begin_pos);
 }
@@ -394,7 +394,7 @@ int try_parse_unop(struct ps *p, enum ast_unop *out, struct ast_ident *name_out)
                         : AST_UNOP_NEGATE);
     uint8_t buf[1];
     buf[0] = (uint8_t)ch1;
-    ident_value ident = identmap_intern(&p->ident_table, buf, 1);
+    ident_value ident = identmap_intern(&p->im, buf, 1);
     ast_ident_init(name_out, ast_meta_make(start_pos, ps_pos(p)), ident);
     *out = op;
     ps_count_leaf(p);
@@ -1442,7 +1442,7 @@ int parse_buf_file(struct identmap *im,
                    struct ast_file *file_out,
                    size_t *error_pos_out) {
   struct ps p;
-  ps_init_with_ident_table(&p, im, buf, length);
+  ps_init_with_identmap(&p, im, buf, length);
 
   struct ast_file file;
   int ret = parse_file(&p, &file);
@@ -1451,7 +1451,7 @@ int parse_buf_file(struct identmap *im,
   } else {
     *error_pos_out = ps_pos(&p);
   }
-  ps_remove_ident_table(&p, im);
+  ps_remove_identmap(&p, im);
   ps_destroy(&p);
   return ret;
 }
