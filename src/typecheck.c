@@ -1647,13 +1647,6 @@ int check_expr_magic_binop(struct exprscope *es,
   return ret;
 }
 
-int is_statically_computable_non_magic_binop(enum ast_binop op) {
-  (void)op;
-  /* This will be incorrect when there's floats, because compile-time
-     float computation is weird? */
-  return 1;
-}
-
 int check_expr_binop(struct exprscope *es,
                      struct ast_binop_expr *x,
                      struct ast_typeexpr *partial_type,
@@ -1770,10 +1763,6 @@ int check_expr_magic_unop(struct exprscope *es,
     ast_expr_destroy(&annotated_rhs);
   }
   return ret;
-}
-
-int non_magic_unop_statically_computable(enum ast_unop operator) {
-  return operator == AST_UNOP_NEGATE;
 }
 
 int check_expr_unop(struct exprscope *es,
