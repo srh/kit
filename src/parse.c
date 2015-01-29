@@ -124,13 +124,13 @@ void ps_count_leaf(struct ps *p) {
 }
 
 ident_value ps_intern_ident(struct ps *p,
-                            struct ps_savestate ident_begin,
-                            struct ps_savestate ident_end) {
-  CHECK(ident_end.pos <= p->length);
-  CHECK(ident_begin.pos <= ident_end.pos);
+                            size_t begin_pos,
+                            size_t end_pos) {
+  CHECK(end_pos <= p->length);
+  CHECK(begin_pos <= end_pos);
   return identmap_intern(&p->ident_table,
-                         p->data + ident_begin.pos,
-                         ident_end.pos - ident_begin.pos);
+                         p->data + begin_pos,
+                         end_pos - begin_pos);
 }
 
 struct precedence_pair {
@@ -404,12 +404,14 @@ int try_parse_unop(struct ps *p, enum ast_unop *out, struct ast_ident *name_out)
   }
 }
 
-int parse_binop(struct ps *p, enum ast_binop *out) {
+int parse_binop(struct ps *p, enum ast_binop *out,
+                struct ast_ident *name_out) {
   int32_t ch1 = ps_peek(p);
   if (!is_binop_start(ch1)) {
     return 0;
   }
 
+  size_t pos_start = ps_pos(p);
   enum ast_binop op;
   ps_step(p);
   switch (ch1) {
@@ -486,6 +488,9 @@ int parse_binop(struct ps *p, enum ast_binop *out) {
   } else {
     ps_count_leaf(p);
     *out = op;
+    size_t pos_end = ps_pos(p);
+    ast_ident_init(name_out, ast_meta_make(pos_start, pos_end),
+                   ps_intern_ident(p, pos_start, pos_end));
     return 1;
   }
 }
@@ -510,7 +515,6 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
   if (!is_ident_firstchar(ps_peek(p))) {
     return 0;
   }
-  struct ps_savestate save = ps_save(p);
   ps_step(p);
   while (is_ident_midchar(ps_peek(p))) {
     ps_step(p);
@@ -520,8 +524,9 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
     return 0;
   }
 
-  ast_ident_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                 ps_intern_ident(p, save, ps_save(p)));
+  size_t pos_end = ps_pos(p);
+  ast_ident_init(out, ast_meta_make(pos_start, pos_end),
+                 ps_intern_ident(p, pos_start, pos_end));
   ps_count_leaf(p);
   return 1;
 }
@@ -907,7 +912,18 @@ void build_unop_expr(struct ast_meta meta,
     ast_expr_partial_init(out, AST_EXPR_UNOP, ast_expr_info_default());
     ast_unop_expr_init(&out->u.unop_expr, meta, unop, rhs);
   }
+}
 
+void build_binop_expr(struct ast_meta meta,
+                      struct ast_ident binop_name,
+                      enum ast_binop binop,
+                      struct ast_expr old_lhs,
+                      struct ast_expr rhs,
+                      struct ast_expr *out) {
+  ast_ident_destroy(&binop_name);
+  ast_expr_partial_init(out, AST_EXPR_BINOP, ast_expr_info_default());
+  ast_binop_expr_init(&out->u.binop_expr,
+                      meta, binop, old_lhs, rhs);
 }
 
 int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
@@ -1020,7 +1036,8 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       struct ps_savestate save = ps_save(p);
 
       enum ast_binop op;
-      if (!parse_binop(p, &op)) {
+      struct ast_ident op_name;
+      if (!parse_binop(p, &op, &op_name)) {
         goto fail;
       }
 
@@ -1032,6 +1049,7 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
 
       switch (cmp) {
       case PRECEDENCE_COMPARISON_CONFLICTS:
+        ast_ident_destroy(&op_name);
         goto fail;
       case PRECEDENCE_COMPARISON_PULLS_LEFT:
         ps_restore(p, save);
@@ -1046,14 +1064,13 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       struct ast_expr rhs;
       if (!(skip_ws(p)
             && parse_expr(p, &rhs, op_precedence.right_precedence))) {
+        ast_ident_destroy(&op_name);
         goto fail;
       }
 
       struct ast_expr old_lhs = lhs;
-      ast_expr_partial_init(&lhs, AST_EXPR_BINOP, ast_expr_info_default());
-      ast_binop_expr_init(&lhs.u.binop_expr,
-                          ast_meta_make(pos_start, ast_expr_pos_end(&rhs)),
-                          op, old_lhs, rhs);
+      build_binop_expr(ast_meta_make(pos_start, ast_expr_pos_end(&rhs)),
+                       op_name, op, old_lhs, rhs, &lhs);
     } else {
       PARSE_DBG("parse_expr done\n");
       *out = lhs;
