@@ -37,10 +37,26 @@ enum x86_reg8 {
   X86_BH,
 };
 
+/* Only applicable for 0F-prefixed off32 instructions (I think). */
+enum x86_setcc {
+  X86_SETCC_L = 0x9C,
+  X86_SETCC_LE = 0x9E,
+  X86_SETCC_G = 0x9F,
+  X86_SETCC_GE = 0x9D,
+  X86_SETCC_E = 0x94,
+  X86_SETCC_NE = 0x95,
+  X86_SETCC_A = 0x97,
+  X86_SETCC_AE = 0x93,
+  X86_SETCC_B = 0x92,
+  X86_SETCC_BE = 0x96,
+};
+
+/* Only applicable for 0F-prefixed jmp instructions (I think). */
 enum x86_jcc {
   X86_JCC_O = 0x80,
   X86_JCC_Z = 0x84,
   X86_JCC_S = 0x88,
+  X86_JCC_A = 0x87,
 };
 
 /* Returns true if the reg has a lobyte (also, the register code
@@ -735,6 +751,16 @@ void x86_gen_cmp_w32(struct objfile *f, enum x86_reg lhs, enum x86_reg rhs) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_cmp_imm32(struct objfile *f, enum x86_reg lhs, int32_t imm32) {
+  uint8_t b[6];
+  b[0] = 0x81;
+  b[1] = mod_reg_rm(MOD11, 7, lhs);
+  /* LITTLEENDIAN */
+  CHECK(sizeof(imm32) == 4);
+  memcpy(b + 2, &imm32, sizeof(imm32));
+  objfile_section_append_raw(objfile_text(f), b, 6);
+}
+
 void x86_gen_xor_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   uint8_t b[2];
   b[0] = 0x31;
@@ -756,7 +782,7 @@ void x86_gen_and_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-void x86_gen_negate_w32(struct objfile *f, enum x86_reg dest) {
+void x86_gen_neg_w32(struct objfile *f, enum x86_reg dest) {
   uint8_t b[2];
   b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 3, dest);
@@ -776,20 +802,6 @@ void x86_gen_sub_w8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
   b[1] = mod_reg_rm(MOD11, src, dest);
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
-
-/* Only applicable for 0F-prefixed off32 instructions (I think). */
-enum x86_setcc {
-  X86_SETCC_L = 0x9C,
-  X86_SETCC_LE = 0x9E,
-  X86_SETCC_G = 0x9F,
-  X86_SETCC_GE = 0x9D,
-  X86_SETCC_E = 0x94,
-  X86_SETCC_NE = 0x95,
-  X86_SETCC_A = 0x97,
-  X86_SETCC_AE = 0x93,
-  X86_SETCC_B = 0x92,
-  X86_SETCC_BE = 0x96,
-};
 
 void x86_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest, enum x86_setcc code) {
   uint8_t b[3];
@@ -1313,37 +1325,41 @@ void gen_primitive_op_behavior(struct objfile *f,
   } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-
     x86_gen_test_regs32(f, X86_EAX, X86_EAX);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_BYTE: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    /* TODO: Check overflow. */
+    x86_gen_cmp_imm32(f, X86_EAX, 255);
+    gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    /* TODO: Check overflow. */
+    x86_gen_test_regs32(f, X86_EAX, X86_EAX);
+    gen_crash_jcc(f, h, X86_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
   } break;
   case PRIMITIVE_OP_NEGATE_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_negate_w32(f, X86_EAX);
-    /* TODO: Check overflow. */
+    /* Crashes if the value is INT32_MIN by subtracting 1 and
+       overflowing. */
+    x86_gen_cmp_imm32(f, X86_EAX, 1);
+    gen_crash_jcc(f, h, X86_JCC_O);
+    x86_gen_neg_w32(f, X86_EAX);
   } break;
   case PRIMITIVE_OP_ADD_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_add_w32(f, X86_EAX, X86_ECX);
-    /* TODO: Handle overflow. */
+    gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_SUB_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_sub_w32(f, X86_EAX, X86_ECX);
-    /* TODO: Handle overflow. */
+    gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
