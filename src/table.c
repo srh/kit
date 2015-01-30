@@ -68,7 +68,6 @@ void static_value_init_copy(struct static_value *a, struct static_value *c) {
   }
 }
 
-/* TODO: standardize fallthrough vs. fall-through. */
 void static_value_destroy(struct static_value *sv) {
   switch (sv->tag) {
   case STATIC_VALUE_I32:  /* fallthrough */

@@ -522,10 +522,9 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
   }
 
   if (exists_hidden_return_param(return_type_size)) {
-    /* TODO: I don't know if WINDOWS promises padding.  Don't assume padding. */
-    uint32_t return_type_padded_size = return_type_size;
+    /* I don't know yet if WINDOWS promises padding, so we assume none. */
     struct loc loc = ebp_indirect_loc(return_type_size,
-                                      return_type_padded_size,
+                                      return_type_size,
                                       2 * DWORD_SIZE);
     frame_specify_return_loc(h, loc);
   } else {

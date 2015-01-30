@@ -1085,12 +1085,12 @@ int check_expr_funcall(struct exprscope *es,
 
   ast_typeexpr_destroy(&funcexpr);
   return 1;
-  /* Don't fall-through -- args_annotated was moved into annotated_out. */
+  /* Don't fallthrough -- args_annotated was moved into annotated_out. */
  fail_cleanup_funcexpr:
   ast_typeexpr_destroy(&funcexpr);
   SLICE_FREE(args_annotated, args_count, ast_expr_destroy);
   return 0;
-  /* Don't fall-through -- args_types was moved into funcexpr. */
+  /* Don't fallthrough -- args_types was moved into funcexpr. */
  fail_cleanup_args_types_and_annotated:
   SLICE_FREE(args_types, i, ast_typeexpr_destroy);
   SLICE_FREE(args_annotated, i, ast_expr_destroy);
@@ -1379,9 +1379,7 @@ int check_expr_funcbody(struct exprscope *es,
   struct bodystate bs;
   bodystate_init(&bs, es, partial_type);
 
-  /* TODO: We need to analyze whether _all_ paths return.  Also, goto
-     should be restricted from jumping to non-subset variable
-     scopes. */
+  /* TODO: We oughtta analyze whether _all_ paths return. */
   struct ast_bracebody annotated_bracebody;
   if (!check_expr_bracebody(&bs, x, &annotated_bracebody)) {
     goto fail;
