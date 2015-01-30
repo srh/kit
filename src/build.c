@@ -1988,8 +1988,18 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
   case AST_EXPR_BINOP: {
     return gen_binop_expr(cs, f, h, a, er);
   } break;
-  default:
+  case AST_EXPR_LAMBDA: {
+    /* Lambdas should be compiled to global functions.. separately. */
     TODO_IMPLEMENT;
+  } break;
+  case AST_EXPR_LOCAL_FIELD_ACCESS: {
+    TODO_IMPLEMENT;
+  } break;
+  case AST_EXPR_DEREF_FIELD_ACCESS: {
+    TODO_IMPLEMENT;
+  } break;
+  default:
+    UNREACHABLE();
   }
 }
 
