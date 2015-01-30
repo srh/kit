@@ -1,4 +1,5 @@
 extern putchar func[i32, i32];
+extern flushstdout func[i32];
 
 def print func[u32, u32] = fn(x u32) u32 {
   var printed u32 = 0u;
