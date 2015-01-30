@@ -1705,6 +1705,20 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+void apply_dereference(struct objfile *f,
+                       struct frame *h, struct loc ptr_loc,
+                       uint32_t pointee_size, struct expr_return *er) {
+  struct loc loc = frame_push_loc(h, DWORD_SIZE);
+  gen_mov(f, loc, ptr_loc);
+  CHECK(loc.tag == LOC_EBP_OFFSET);
+
+  /* When dereferencing a pointer, we have no info about padding, so
+     the padded size is the same as the size. */
+  struct loc ret = ebp_indirect_loc(pointee_size, pointee_size,
+                                    loc.u.ebp_offset);
+  expr_return_set(f, er, ret);
+}
+
 int gen_unop_expr(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_expr *a,
                   struct expr_return *er) {
@@ -1716,15 +1730,8 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    struct loc loc = frame_push_loc(h, DWORD_SIZE);
-    gen_mov(f, loc, rhs_er.u.loc);
-    CHECK(loc.tag == LOC_EBP_OFFSET);
-
     uint32_t size = kira_sizeof(&cs->nt, ast_expr_type(a));
-    /* When dereferencing a pointer, we have no info about padding, so
-       the padded size is the same as the size. */
-    struct loc ret = ebp_indirect_loc(size, size, loc.u.ebp_offset);
-    expr_return_set(f, er, ret);
+    apply_dereference(f, h, rhs_er.u.loc, size, er);
     return 1;
   } break;
   case AST_UNOP_ADDRESSOF: {
@@ -1939,6 +1946,70 @@ int gen_immediate_numeric_literal(struct objfile *f,
   }
 }
 
+void apply_field_access(struct checkstate *cs,
+                        struct objfile *f,
+                        struct frame *h,
+                        struct loc lhs_loc,
+                        struct ast_typeexpr *type,
+                        ident_value fieldname,
+                        struct expr_return *er) {
+  /* Generally speaking: There's no way the field possibly gets a
+     padded_size, because the first N fields of two struct types, if
+     identical, need to be accessible when they're in a union
+     without touching subsequent fields. */
+  uint32_t size;
+  uint32_t offset;
+  kira_field_sizeoffset(&cs->nt, type, fieldname,
+                        &size, &offset);
+
+  /* Note: This code needs to preserve lvalues (and it does so). */
+
+  switch (lhs_loc.tag) {
+  case LOC_EBP_OFFSET: {
+    struct loc field_loc = ebp_loc(size, size,
+                                   int32_add(lhs_loc.u.ebp_offset,
+                                             uint32_to_int32(offset)));
+    expr_return_set(f, er, field_loc);
+  } break;
+  case LOC_GLOBAL: {
+    /* This could probably be implemented more smartly, with
+       advanced symbol-making, but who cares. */
+    struct loc field_ptr_loc = frame_push_loc(h, DWORD_SIZE);
+    x86_gen_mov_reg_stiptr(f, X86_EAX, lhs_loc.u.global_sti);
+    x86_gen_lea32(f, X86_EAX, X86_EAX, uint32_to_int32(offset));
+    x86_gen_store32(f, X86_EBP, field_ptr_loc.u.ebp_offset, X86_EAX);
+    struct loc field_loc = ebp_indirect_loc(size, size,
+                                            field_ptr_loc.u.ebp_offset);
+    expr_return_set(f, er, field_loc);
+  } break;
+  case LOC_EBP_INDIRECT: {
+    struct loc field_ptr_loc = frame_push_loc(h, DWORD_SIZE);
+    x86_gen_load32(f, X86_EAX, X86_EBP, lhs_loc.u.ebp_indirect);
+    x86_gen_lea32(f, X86_EAX, X86_EAX, uint32_to_int32(offset));
+    x86_gen_store32(f, X86_EBP, field_ptr_loc.u.ebp_offset, X86_EAX);
+    struct loc field_loc = ebp_indirect_loc(size, size,
+                                            field_ptr_loc.u.ebp_offset);
+    expr_return_set(f, er, field_loc);
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+int gen_local_field_access(struct checkstate *cs, struct objfile *f,
+                           struct frame *h, struct ast_expr *a,
+                           struct expr_return *er) {
+  struct expr_return lhs_er = open_expr_return();
+  if (!gen_expr(cs, f, h, a->u.local_field_access.lhs, &lhs_er)) {
+    return 0;
+  }
+
+  apply_field_access(cs, f, h, lhs_er.u.loc,
+                     &a->u.local_field_access.lhs->info.concrete_type,
+                     a->u.local_field_access.fieldname.value, er);
+  return 1;
+}
+
 int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *er) {
@@ -1993,62 +2064,27 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     TODO_IMPLEMENT;
   } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
+    return gen_local_field_access(cs, f, h, a, er);
+  } break;
+  case AST_EXPR_DEREF_FIELD_ACCESS: {
     struct expr_return lhs_er = open_expr_return();
-    if (!gen_expr(cs, f, h, a->u.local_field_access.lhs, &lhs_er)) {
+    if (!gen_expr(cs, f, h, a->u.deref_field_access.lhs, &lhs_er)) {
       return 0;
     }
 
-    /* Generally speaking: There's no way the field possibly gets a
-       padded_size, because the first N fields of two struct types, if
-       identical, need to be accessible when they're in a union
-       without touching subsequent fields. */
-    uint32_t size;
-    uint32_t offset;
-    kira_field_sizeoffset(&cs->nt,
-                          &a->u.local_field_access.lhs->info.concrete_type,
-                          a->u.local_field_access.fieldname.value,
-                          &size,
-                          &offset);
-
-    /* Note: We need to preserve lvalues. */
-
-    switch (lhs_er.u.loc.tag) {
-    case LOC_EBP_OFFSET: {
-      struct loc field_loc = ebp_loc(size, size,
-                                     int32_add(lhs_er.u.loc.u.ebp_offset,
-                                               uint32_to_int32(offset)));
-      expr_return_set(f, er, field_loc);
-      return 1;
-    } break;
-    case LOC_GLOBAL: {
-      /* This could probably be implemented more smartly, with
-         advanced symbol-making, but who cares. */
-      struct loc field_ptr_loc = frame_push_loc(h, DWORD_SIZE);
-      x86_gen_mov_reg_stiptr(f, X86_EAX, lhs_er.u.loc.u.global_sti);
-      /* TODO: This and the ebp_indirect case have some copy/pasted code. */
-      x86_gen_lea32(f, X86_EAX, X86_EAX, uint32_to_int32(offset));
-      x86_gen_store32(f, X86_EBP, field_ptr_loc.u.ebp_offset, X86_EAX);
-      struct loc field_loc = ebp_indirect_loc(size, size,
-                                              field_ptr_loc.u.ebp_offset);
-      expr_return_set(f, er, field_loc);
-      return 1;
-    } break;
-    case LOC_EBP_INDIRECT: {
-      struct loc field_ptr_loc = frame_push_loc(h, DWORD_SIZE);
-      x86_gen_load32(f, X86_EAX, X86_EBP, lhs_er.u.loc.u.ebp_indirect);
-      x86_gen_lea32(f, X86_EAX, X86_EAX, uint32_to_int32(offset));
-      x86_gen_store32(f, X86_EBP, field_ptr_loc.u.ebp_offset, X86_EAX);
-      struct loc field_loc = ebp_indirect_loc(size, size,
-                                              field_ptr_loc.u.ebp_offset);
-      expr_return_set(f, er, field_loc);
-      return 1;
-    } break;
-    default:
-      UNREACHABLE();
+    struct ast_typeexpr *ptr_target;
+    if (!view_ptr_target(cs->im, ast_expr_type(a->u.deref_field_access.lhs),
+                         &ptr_target)) {
+      CRASH("deref field access typechecked on a non-pointer.");
     }
-  } break;
-  case AST_EXPR_DEREF_FIELD_ACCESS: {
-    TODO_IMPLEMENT;
+
+    uint32_t full_size = kira_sizeof(&cs->nt, ptr_target);
+    struct expr_return deref_er = open_expr_return();
+    apply_dereference(f, h, lhs_er.u.loc, full_size, &deref_er);
+
+    apply_field_access(cs, f, h, deref_er.u.loc, ptr_target,
+                       a->u.deref_field_access.fieldname.value, er);
+    return 1;
   } break;
   default:
     UNREACHABLE();
