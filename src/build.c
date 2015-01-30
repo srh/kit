@@ -2305,7 +2305,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_BYTE: {
-    /* TODO: How should we align our bytes? */
+    /* TODO: How should we align our global bytes? */
     objfile_section_align_dword(objfile_data(f));
     objfile_set_symbol_Value(f, inst->symbol_table_index,
                              objfile_section_size(objfile_data(f)));
