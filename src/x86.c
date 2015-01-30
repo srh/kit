@@ -10,8 +10,15 @@
 #include "win/objfile.h"
 
 /* X86 WINDOWS */
-void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
-                      uint32_t *sizeof_out, uint32_t *alignof_out) {
+/* This is a bi-use function -- if fieldstop is IDENT_VALUE_INVALID,
+   then *sizeof_out and *alignof_out are initialized with the size and
+   alignment of the type, and zero is returned.  Otherwise,
+   *offsetof_out and *sizeof_out are initialized with the offset and
+   size of the type's field named fieldstop, and 1 is returned.  If
+   the field name is not found, zero is returned. */
+int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
+                     ident_value fieldstop, uint32_t *offsetof_out,
+                     uint32_t *sizeof_out, uint32_t *alignof_out) {
   switch (type->tag) {
   case AST_TYPEEXPR_NAME: {
     struct deftype_entry *ent;
@@ -22,12 +29,15 @@ void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     }
     CHECK(ent->arity.value == ARITY_NO_PARAMLIST);
     if (ent->is_primitive) {
+      *offsetof_out = 0;
       *sizeof_out = ent->primitive_sizeof;
       *alignof_out = ent->primitive_alignof;
+      return 0;
     } else {
       struct ast_deftype *deftype = ent->deftype;
       CHECK(!deftype->generics.has_type_params);
-      kira_sizealignof(nt, &deftype->type, sizeof_out, alignof_out);
+      return help_sizealignof(nt, &deftype->type, fieldstop,
+                              offsetof_out, sizeof_out, alignof_out);
     }
   } break;
   case AST_TYPEEXPR_APP: {
@@ -39,8 +49,10 @@ void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     }
     CHECK(ent->arity.value == type->u.app.params_count);
     if (ent->is_primitive) {
+      *offsetof_out = 0;
       *sizeof_out = ent->primitive_sizeof;
       *alignof_out = ent->primitive_alignof;
+      return 0;
     } else {
       struct ast_deftype *deftype = ent->deftype;
       CHECK(deftype->generics.has_type_params
@@ -50,19 +62,31 @@ void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                           type->u.app.params,
                           &deftype->type,
                           &substituted);
-      kira_sizealignof(nt, &substituted, sizeof_out, alignof_out);
+      int ret = help_sizealignof(nt, &substituted, fieldstop,
+                                 offsetof_out, sizeof_out, alignof_out);
       ast_typeexpr_destroy(&substituted);
+      return ret;
     }
   } break;
   case AST_TYPEEXPR_STRUCTE: {
     uint32_t count = 0;
     uint32_t max_alignment = 1;
     for (size_t i = 0, e = type->u.structe.fields_count; i < e; i++) {
+      uint32_t invalid_offsetof_param;
       uint32_t size;
       uint32_t alignment;
-      kira_sizealignof(nt, &type->u.structe.fields[i].type,
-                       &size, &alignment);
+      help_sizealignof(nt, &type->u.structe.fields[i].type,
+                       IDENT_VALUE_INVALID,
+                       &invalid_offsetof_param, &size, &alignment);
       count = uint32_ceil_aligned(count, alignment);
+
+      if (type->u.structe.fields[i].name.value == fieldstop) {
+        CHECK(fieldstop != IDENT_VALUE_INVALID);
+        *offsetof_out = count;
+        *sizeof_out = size;
+        return 1;
+      }
+
       if (max_alignment < alignment) {
         max_alignment = alignment;
       }
@@ -71,15 +95,27 @@ void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     count = uint32_ceil_aligned(count, max_alignment);
     *sizeof_out = count;
     *alignof_out = max_alignment;
+    return 0;
   } break;
   case AST_TYPEEXPR_UNIONE: {
     uint32_t max_size = 0;
     uint32_t max_alignment = 1;
     for (size_t i = 0, e = type->u.unione.fields_count; i < e; i++) {
+      uint32_t invalid_offsetof_param;
       uint32_t size;
       uint32_t alignment;
-      kira_sizealignof(nt, &type->u.unione.fields[i].type,
-                       &size, &alignment);
+      help_sizealignof(nt, &type->u.unione.fields[i].type,
+                       IDENT_VALUE_INVALID,
+                       &invalid_offsetof_param, &size, &alignment);
+
+      if (type->u.structe.fields[i].name.value == fieldstop) {
+        CHECK(fieldstop != IDENT_VALUE_INVALID);
+        *offsetof_out = 0;
+        *sizeof_out = size;
+        *alignof_out = 0;
+        return 1;
+      }
+
       if (max_size < size) {
         size = max_size;
       }
@@ -90,11 +126,33 @@ void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     uint32_t final_size = uint32_ceil_aligned(max_size, max_alignment);
     *sizeof_out = final_size;
     *alignof_out = max_alignment;
+    return 0;
   } break;
   case AST_TYPEEXPR_UNKNOWN:
   default:
     UNREACHABLE();
   }
+}
+
+void kira_field_sizeoffset(struct name_table *nt, struct ast_typeexpr *type,
+                           ident_value field_name, uint32_t *sizeof_out,
+                           uint32_t *offsetof_out) {
+  CHECK(field_name != IDENT_VALUE_INVALID);
+  uint32_t offset;
+  uint32_t size;
+  uint32_t invalid_alignment_param;
+  int res = help_sizealignof(nt, type, field_name,
+                             &offset, &size, &invalid_alignment_param);
+  CHECK(res);
+  *sizeof_out = size;
+  *offsetof_out = offset;
+}
+
+void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
+                      uint32_t *sizeof_out, uint32_t *alignof_out) {
+  uint32_t invalid_offsetof_param;
+  help_sizealignof(nt, type, IDENT_VALUE_INVALID,
+                   &invalid_offsetof_param, sizeof_out, alignof_out);
 }
 
 uint32_t kira_sizeof(struct name_table *nt, struct ast_typeexpr *type) {

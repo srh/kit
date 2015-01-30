@@ -13,47 +13,24 @@ def fac func[i32, i32] = fn(x i32) i32 {
   return acc;
 };
 
-def showfacs func[i32] = fn() i32 {
-  var n i32 = 4;
-  var m i32 = 5;
-  var p i32 = n / m;
-  putchar(65);
-  putchar(10);
-  flushstdout();
-  n = 2147483647;
-  n = n - 1;
-  putchar(66);
-  putchar(10);
-  flushstdout();
+deftype ty struct {
+  x i32;
+  y i32;
+};
 
-  var x i32 = convert(byte_func());
-  x = -x;
-  var f4 u32 = convert(fac(-x));
-  print(f4);
+def showfacs func[ty, i32] = fn(p ty) i32 {
+  p.x = -5;
+  p.y = fac(7);
+  p.x = -p.x;
+
+  var tmp u32 = convert(fac(p.x));
+  var y u32 = convert(p.y);
+  print(tmp);
   putchar(10);
-  flushstdout();
-  x = 2147483647;
-  x = -x;
-  x = x - 1;
-  putchar(67);
+  print(y);
   putchar(10);
-  flushstdout();
-  var f5 u32 = convert(fac(20 >> 2));
-  print(f5);
-  putchar(10);
-  flushstdout();
-  // Overflows.
-  var y i32 = -x;
-  putchar(66);
-  putchar(10);
-  flushstdout();
+
   return 1;
 };
 
 def byte_value byte = convert(3);
-
-def byte_func func[byte] = fn() byte {
-  var x byte = convert(4);
-  var y byte = convert(5);
-  return x + y;
-};
