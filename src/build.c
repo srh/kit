@@ -461,6 +461,11 @@ struct labeldata *frame_try_find_labeldata(struct frame *h, ident_value labelnam
   return NULL;
 }
 
+int exists_hidden_return_param(uint32_t return_type_size) {
+  return !(return_type_size <= 2 || return_type_size == DWORD_SIZE
+           || return_type_size == 2 * DWORD_SIZE);
+}
+
 /* X86 and maybe WINDOWS-specific calling convention stuff. */
 void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
   struct ast_typeexpr *type = ast_expr_type(expr);
@@ -470,7 +475,7 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
 
   uint32_t return_type_size = kira_sizeof(&cs->nt, return_type);
 
-  int32_t offset = (2 + (return_type_size > 2 * DWORD_SIZE)) * DWORD_SIZE;
+  int32_t offset = (2 + exists_hidden_return_param(return_type_size)) * DWORD_SIZE;
 
   for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
     struct ast_typeexpr *param_type = &type->u.app.params[i];
@@ -491,8 +496,8 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
     offset = int32_add(offset, uint32_to_int32(padded_size));
   }
 
-  if (return_type_size > 2 * DWORD_SIZE) {
-    /* TODO: I don't know if WINDOWS promises padding. */
+  if (exists_hidden_return_param(return_type_size)) {
+    /* TODO: I don't know if WINDOWS promises padding.  Don't assume padding. */
     uint32_t return_type_padded_size = return_type_size;
     struct loc loc = ebp_indirect_loc(return_type_size,
                                       return_type_padded_size,
@@ -919,21 +924,20 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
     CRASH("return_target_valid false (no return statements?)");
   }
 
-  /* TODO: This is incorrect (and incorrect elsewhere).  Sizes 3, 5,
-     6, and 7 use a return pointer. */
-  if (h->return_loc.size <= DWORD_SIZE) {
+  if (exists_hidden_return_param(h->return_loc.size)) {
+    CHECK(h->return_loc.tag == LOC_EBP_INDIRECT);
+    CHECK(h->return_loc.u.ebp_indirect == 8);
+    x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_indirect);
+  } else if (h->return_loc.size <= DWORD_SIZE) {
     CHECK(h->return_loc.tag == LOC_EBP_OFFSET);
     CHECK(h->return_loc.padded_size == DWORD_SIZE);
     x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset);
-  } else if (h->return_loc.size <= 2 * DWORD_SIZE) {
+  } else {
+    CHECK(h->return_loc.size == 2 * DWORD_SIZE);
     CHECK(h->return_loc.tag == LOC_EBP_OFFSET);
     CHECK(h->return_loc.padded_size == 2 * DWORD_SIZE);
     x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset);
     x86_gen_load32(f, X86_EDX, X86_EBP, int32_add(h->return_loc.u.ebp_offset, DWORD_SIZE));
-  } else {
-    CHECK(h->return_loc.tag == LOC_EBP_INDIRECT);
-    CHECK(h->return_loc.u.ebp_indirect == 8);
-    x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_indirect);
   }
 
   x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
@@ -1581,7 +1585,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, saved_offset);
   }
 
-  if (return_size > 2 * DWORD_SIZE) {
+  if (exists_hidden_return_param(return_size)) {
     struct loc ptr_loc = frame_push_loc(h, DWORD_SIZE);
     gen_mov_addressof(f, ptr_loc, return_loc);
   }
@@ -1619,13 +1623,16 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   } break;
   }
 
-  if (return_size <= DWORD_SIZE) {
+  if (exists_hidden_return_param(return_size)) {
+    /* Value already in return_loc. */
+    /* TODO: But a pointer is also returned in EAX.  What's the
+       deal?  Also mentioned above. */
+  } else if (return_size <= DWORD_SIZE) {
     /* Return value in eax. */
     gen_store_register(f, return_loc, X86_EAX);
-  } else if (return_size <= 2 * DWORD_SIZE) {
-    gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
   } else {
-    /* Value already in return_loc. */
+    CHECK(return_size == 2 * DWORD_SIZE);
+    gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
   }
 
   expr_return_set(f, er, return_loc);
