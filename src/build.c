@@ -333,6 +333,9 @@ struct frame {
   int return_target_valid;
   size_t return_target_number;
 
+  int crash_target_exists;
+  size_t crash_target_number;
+
   /* The offset (relative to ebp) of "free space" available --
      e.g. esp is at or below this address, but you could wipe anywhere
      below here without harm. */
@@ -369,6 +372,8 @@ void frame_init(struct frame *h) {
   h->return_loc_valid = 0;
 
   h->return_target_valid = 0;
+
+  h->crash_target_exists = 0;
 
   h->stack_offset = 0;
   h->min_stack_offset = 0;
@@ -589,6 +594,11 @@ void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
   uint8_t b = 0xB8 + (uint8_t)dest;
   objfile_section_append_raw(objfile_text(f), &b, 1);
   objfile_section_append_dir32(objfile_text(f), symbol_table_index);
+}
+
+void x86_gen_int_3(struct objfile *f) {
+  uint8_t b = 0xCC;
+  objfile_section_append_raw(objfile_text(f), &b, 1);
 }
 
 void x86_gen_shl_cl_w32(struct objfile *f, enum x86_reg dest) {
@@ -909,6 +919,8 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
     CRASH("return_target_valid false (no return statements?)");
   }
 
+  /* TODO: This is incorrect (and incorrect elsewhere).  Sizes 3, 5,
+     6, and 7 use a return pointer. */
   if (h->return_loc.size <= DWORD_SIZE) {
     CHECK(h->return_loc.tag == LOC_EBP_OFFSET);
     CHECK(h->return_loc.padded_size == DWORD_SIZE);
@@ -918,11 +930,22 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
     CHECK(h->return_loc.padded_size == 2 * DWORD_SIZE);
     x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset);
     x86_gen_load32(f, X86_EDX, X86_EBP, int32_add(h->return_loc.u.ebp_offset, DWORD_SIZE));
+  } else {
+    CHECK(h->return_loc.tag == LOC_EBP_INDIRECT);
+    CHECK(h->return_loc.u.ebp_indirect == 8);
+    x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_indirect);
   }
 
   x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
   x86_gen_pop32(f, X86_EBP);
   x86_gen_ret(f);
+
+  if (h->crash_target_exists) {
+    frame_define_target(h, h->crash_target_number,
+                        objfile_section_size(objfile_text(f)));
+    /* TODO: I don't know what I really want to do here.  Print a message too? */
+    x86_gen_int_3(f);
+  }
 }
 
 enum x86_reg choose_altreg(enum x86_reg used) {
