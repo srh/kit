@@ -14,6 +14,18 @@ def fac func[i32, i32] = fn(x i32) i32 {
 };
 
 def showfacs func[i32] = fn() i32 {
+  var n i32 = 4;
+  var m i32 = 5;
+  var p i32 = n / m;
+  putchar(65);
+  putchar(10);
+  flushstdout();
+  n = 2147483647;
+  n = n - 1;
+  putchar(66);
+  putchar(10);
+  flushstdout();
+
   var x i32 = convert(byte_func());
   x = -x;
   var f4 u32 = convert(fac(-x));

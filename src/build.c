@@ -57,6 +57,7 @@ enum x86_jcc {
   X86_JCC_Z = 0x84,
   X86_JCC_S = 0x88,
   X86_JCC_A = 0x87,
+  X86_JCC_C = 0x82,
 };
 
 /* Returns true if the reg has a lobyte (also, the register code
@@ -1365,14 +1366,14 @@ void gen_primitive_op_behavior(struct objfile *f,
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_imul_w32(f, X86_EAX, X86_ECX);
-    /* TODO: Handle overflow. */
+    gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_DIV_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_cdq_w32(f);
     x86_gen_eaxedx_idiv_w32(f, X86_ECX);
-    /* TODO: Handle divide by zero?  Handle INT32_MIN / -1? */
+    /* Divide by zero or INT32_MIN / -1 will produce #DE. */
   } break;
   case PRIMITIVE_OP_MOD_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
@@ -1380,7 +1381,7 @@ void gen_primitive_op_behavior(struct objfile *f,
     x86_gen_cdq_w32(f);
     x86_gen_eaxedx_idiv_w32(f, X86_ECX);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
-    /* TODO: Handle divide by zero?  Handle INT32_MIN / -1? */
+    /* Divide by zero or INT32_MIN / -1 will produce #DE. */
   } break;
   case PRIMITIVE_OP_LT_I32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_L);
@@ -1418,40 +1419,48 @@ void gen_primitive_op_behavior(struct objfile *f,
   case PRIMITIVE_OP_BIT_LEFTSHIFT_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
     x86_gen_shl_cl_w32(f, X86_EAX);
-    /* TODO: Handle masked rhs?  Overflow? */
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
     x86_gen_sar_cl_w32(f, X86_EAX);
-    /* TODO: Handle masked rhs?  Overflow? */
   } break;
 
   case PRIMITIVE_OP_ADD_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_add_w32(f, X86_EAX, X86_ECX);
-    /* TODO: Handle overflow. */
+    gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_SUB_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_sub_w32(f, X86_EAX, X86_ECX);
-    /* TODO: Handle overflow. */
+    gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_MUL_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_eaxedx_mul_w32(f, X86_ECX);
-    /* TODO: Handle overflow. */
+    gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_DIV_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_xor_w32(f, X86_EDX, X86_EDX);
     x86_gen_eaxedx_div_w32(f, X86_ECX);
-    /* TODO: Handle divide by zero? */
+    /* Divide by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_MOD_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
@@ -1459,7 +1468,7 @@ void gen_primitive_op_behavior(struct objfile *f,
     x86_gen_xor_w32(f, X86_EDX, X86_EDX);
     x86_gen_eaxedx_div_w32(f, X86_ECX);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
-    /* TODO: Handle divide by zero? */
+    /* Modulus by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_LT_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_B);
@@ -1497,48 +1506,56 @@ void gen_primitive_op_behavior(struct objfile *f,
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
     x86_gen_shl_cl_w32(f, X86_EAX);
-    /* TODO: Handle masked rhs?  Overflow? */
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
     x86_gen_shr_cl_w32(f, X86_EAX);
-    /* TODO: Handle masked rhs?  Overflow? */
   } break;
 
   case PRIMITIVE_OP_ADD_BYTE: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_add_w8(f, X86_AL, X86_CL);
-    /* TODO: Handle overflow. */
+    gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_SUB_BYTE: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_sub_w8(f, X86_AL, X86_CL);
-    /* TODO: Handle overflow. */
+    gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_MUL_BYTE: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_alah_mul_w8(f, X86_CL);
+    gen_crash_jcc(f, h, X86_JCC_C);
     x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
-    /* TODO: Handle overflow. */
   } break;
   case PRIMITIVE_OP_DIV_BYTE: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_alah_div_w8(f, X86_CL);
+    /* Divide by zero will produce #DE. (I guess.) */
     x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
-    /* TODO: Handle divide-by-zero? */
   } break;
   case PRIMITIVE_OP_MOD_BYTE: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_alah_div_w8(f, X86_CL);
+    /* Divide by zero will produce #DE. (I guess.) */
     x86_gen_mov_reg8(f, X86_AL, X86_AH);
-    /* TODO: Handle mod-by-zero? */
   } break;
   case PRIMITIVE_OP_LT_BYTE: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_B);
@@ -1576,14 +1593,22 @@ void gen_primitive_op_behavior(struct objfile *f,
   case PRIMITIVE_OP_BIT_LEFTSHIFT_BYTE: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
     x86_gen_shl_cl_w8(f, X86_AL);
-    /* TODO: Handle masked rhs?  Overflow? */
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_BYTE: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
     x86_gen_shr_cl_w8(f, X86_AL);
-    /* TODO: Handle masked rhs? */
   } break;
 
   default:
