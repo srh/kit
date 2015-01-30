@@ -769,6 +769,7 @@ void x86_gen_sub_w8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+/* Only applicable for 0F-prefixed off32 instructions (I think). */
 enum x86_setcc {
   X86_SETCC_L = 0x9C,
   X86_SETCC_LE = 0x9E,
@@ -788,6 +789,24 @@ void x86_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest, enum x86_setcc code
   b[1] = (uint8_t)code;
   b[2] = mod_reg_rm(MOD11, 0, dest);
   objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
+enum x86_jmpcc {
+  X86_JMPCC_O = 0x80,
+  X86_JMPCC_Z = 0x84,
+};
+
+void gen_placeholder_jmpcc(struct objfile *f, struct frame *h,
+                           enum x86_jmpcc code, size_t target_number) {
+  struct jmpdata jd;
+  jd.target_number = target_number;
+  /* X86 */
+  jd.jmp_location = 2 + objfile_section_size(objfile_text(f));
+  SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
+
+  uint8_t b[6] = { 0x0F, 0, 0, 0, 0, 0 };
+  b[1] = code;
+  objfile_section_append_raw(objfile_text(f), b, 6);
 }
 
 void gen_placeholder_stack_adjustment(struct objfile *f,
@@ -1686,15 +1705,7 @@ void gen_placeholder_jmp_if_false(struct objfile *f, struct frame *h,
 
   x86_gen_test_regs32(f, X86_EAX, X86_EAX);
 
-  struct jmpdata jd;
-  jd.target_number = target_number;
-  jd.jmp_location = 2 + objfile_section_size(objfile_text(f));
-  SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
-
-  /* X86 */
-  /* 0F 84 JZ rel32 */
-  uint8_t b[6] = { 0x0F, 0x84, 0, 0, 0, 0 };
-  objfile_section_append_raw(objfile_text(f), b, 6);
+  gen_placeholder_jmpcc(f, h, X86_JMPCC_Z, target_number);
 }
 
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number) {
