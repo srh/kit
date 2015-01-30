@@ -113,3 +113,13 @@ struct b3sb3 b3sb3func(void) {
 float floatfunc(void) {
   return 3.0;
 }
+
+struct b10 b10_declared(void);
+
+/* Allocates a spot on its own stack frame, and then copies to its
+   return pointer, under any optimization setting I've tried.  I don't
+   know if there's a reason why it can't just pass its return pointer
+   upward. */
+struct b10 b10_call_declared(void) {
+  return b10_declared();
+}
