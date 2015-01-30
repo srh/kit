@@ -37,10 +37,10 @@ enum x86_reg8 {
   X86_BH,
 };
 
-enum x86_jmpcc {
-  X86_JMPCC_O = 0x80,
-  X86_JMPCC_Z = 0x84,
-  X86_JMPCC_S = 0x88,
+enum x86_jcc {
+  X86_JCC_O = 0x80,
+  X86_JCC_Z = 0x84,
+  X86_JCC_S = 0x88,
 };
 
 /* Returns true if the reg has a lobyte (also, the register code
@@ -51,7 +51,7 @@ int x86_reg_has_lowbyte(enum x86_reg reg) {
 
 void gen_mov(struct objfile *f, struct loc dest, struct loc src);
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg);
-void gen_crash_jmpcc(struct objfile *f, struct frame *h, enum x86_jmpcc code);
+void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
 
 /* Right now we don't worry about generating multiple objfiles, so we
    just blithely attach a serial number to each name to make them
@@ -799,8 +799,8 @@ void x86_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest, enum x86_setcc code
   objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
-void gen_placeholder_jmpcc(struct objfile *f, struct frame *h,
-                           enum x86_jmpcc code, size_t target_number) {
+void gen_placeholder_jcc(struct objfile *f, struct frame *h,
+                         enum x86_jcc code, size_t target_number) {
   struct jmpdata jd;
   jd.target_number = target_number;
   /* X86 */
@@ -1315,8 +1315,7 @@ void gen_primitive_op_behavior(struct objfile *f,
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
 
     x86_gen_test_regs32(f, X86_EAX, X86_EAX);
-    /* TODO: Rename jmpcc to jcc everywhere. */
-    gen_crash_jmpcc(f, h, X86_JMPCC_S);
+    gen_crash_jcc(f, h, X86_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_BYTE: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
@@ -1712,10 +1711,10 @@ void gen_placeholder_jmp_if_false(struct objfile *f, struct frame *h,
 
   x86_gen_test_regs32(f, X86_EAX, X86_EAX);
 
-  gen_placeholder_jmpcc(f, h, X86_JMPCC_Z, target_number);
+  gen_placeholder_jcc(f, h, X86_JCC_Z, target_number);
 }
 
-void gen_crash_jmpcc(struct objfile *f, struct frame *h, enum x86_jmpcc code) {
+void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code) {
   /* The crash target code gets generated (at the end) only if we call
      this function -- only if h->crash_target_exists is true. */
   if (!h->crash_target_exists) {
@@ -1723,7 +1722,7 @@ void gen_crash_jmpcc(struct objfile *f, struct frame *h, enum x86_jmpcc code) {
     h->crash_target_exists = 1;
   }
 
-  gen_placeholder_jmpcc(f, h, code, h->crash_target_number);
+  gen_placeholder_jcc(f, h, code, h->crash_target_number);
 }
 
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number) {
