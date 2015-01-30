@@ -8,7 +8,7 @@ struct ty {
 };
 
 extern int32_t kira_foo1;
-int32_t kira_showfacs3(struct ty *t);
+struct ty kira_showfacs3(struct ty *t);
 
 int32_t flushstdout(void) {
   fflush(stdout);
@@ -19,8 +19,9 @@ int main(void) {
   printf("foo value: %" PRIu32 "\n", kira_foo1);
 
   struct ty blah = { 0, 0 };
-  kira_showfacs3(&blah);
-  printf("x = %"PRIi32", y = %"PRIi32"\n", blah.x, blah.y);
+  struct ty res = kira_showfacs3(&blah);
+  printf("blah.x = %"PRIi32", .y = %"PRIi32"\n", blah.x, blah.y);
+  printf("res.x = %"PRIi32", .y = %"PRIi32"\n", res.x, res.y);
 
   return 0;
 }

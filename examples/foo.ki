@@ -18,7 +18,8 @@ deftype ty struct {
   y i32;
 };
 
-def showfacs func[ptr[ty], i32] = fn(p ptr[ty]) i32 {
+def showfacs func[ptr[ty], ty] = fn(p ptr[ty]) ty {
+  var ret ty = *p;
   p->x = -5;
   p->y = fac(7);
   p->x = -p->x;
@@ -33,7 +34,9 @@ def showfacs func[ptr[ty], i32] = fn(p ptr[ty]) i32 {
   p->x = 99;
   (*p).y = 77;
 
-  return 1;
+  ret.x = p->x;
+  ret.y = 22;
+  return ret;
 };
 
 def byte_value byte = convert(3);

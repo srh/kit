@@ -1073,7 +1073,9 @@ void put_ptr_in_reg(struct objfile *f, struct loc loc, enum x86_reg free_reg,
 }
 
 /* When we call this, the only things using registers (besides esp and
-   ebp) are dest or loc. */
+   ebp) are dest or loc.  It's safe to use this if dest and src point
+   to the same _exact_ memory location, through different means (or
+   through the same means). */
 void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   CHECK(dest.size == src.size);
   if (loc_equal(dest, src)) {
@@ -1624,17 +1626,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   uint32_t return_size = kira_sizeof(&cs->nt, ast_expr_type(a));
 
   /* X86 */
-  int memory_demanded = (er->tag == EXPR_RETURN_DEMANDED);
-
-  struct loc return_loc;
-  if (memory_demanded) {
-    /* TODO: Not sure about the calling convention -- cl is genning
-       code that passes an intermediate location on the stack, and
-       then uses eax after return, instead of the location. */
-    return_loc = er->u.loc;
-  } else {
-    return_loc = frame_push_loc(h, return_size);
-  }
+  struct loc return_loc = frame_push_loc(h, return_size);
 
   for (size_t i = args_count; i > 0;) {
     i--;
@@ -1690,18 +1682,26 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   }
 
   if (exists_hidden_return_param(return_size)) {
-    /* Value already in return_loc. */
-    /* TODO: But a pointer is also returned in EAX.  What's the
-       deal?  Also mentioned above. */
+    /* We're going to act like the pointer returned by the callee (in
+       EAX) could be pointing to something different than
+       return_loc. */
+
+    struct loc return_ptr_loc = frame_push_loc(h, DWORD_SIZE);
+    gen_store_register(f, return_ptr_loc, X86_EAX);
+    struct loc eax_return_val_loc = ebp_indirect_loc(return_size, return_size,
+                                                     return_ptr_loc.u.ebp_offset);
+
+    expr_return_set(f, er, eax_return_val_loc);
   } else if (return_size <= DWORD_SIZE) {
     /* Return value in eax. */
     gen_store_register(f, return_loc, X86_EAX);
+    expr_return_set(f, er, return_loc);
   } else {
     CHECK(return_size == 2 * DWORD_SIZE);
     gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
+    expr_return_set(f, er, return_loc);
   }
 
-  expr_return_set(f, er, return_loc);
   return 1;
 }
 
