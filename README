@@ -9,6 +9,15 @@ Then I recommend running
 
 to see if the tests pass.
 
+Then, try running,
+
+   cd examples
+   ..\out foo
+   cl main.c foo.obj
+   main
+
+to see things actually working.
+
 Here's the project timeline:
 
    1. Parsing.  (DONE)
