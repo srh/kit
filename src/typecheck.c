@@ -1486,9 +1486,11 @@ int check_expr_lambda(struct exprscope *es,
   for (size_t i = 0; i < func_params_count; i++) {
     struct ast_typeexpr type;
     ast_typeexpr_init_copy(&type, &funcexpr.u.app.params[i]);
+    struct ast_ident name_copy;
+    ast_ident_init_copy(&name_copy, &x->params[i].name);
     ast_vardecl_init(&replaced_vardecls[i],
-                     ast_meta_make_garbage(),
-                     make_ast_ident(x->params[i].name.value),
+                     ast_meta_make_copy(&x->params[i].meta),
+                     name_copy,
                      type);
   }
 

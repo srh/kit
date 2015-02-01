@@ -518,7 +518,7 @@ void substitute_generics_fields(struct ast_vardecl *fields,
     ast_ident_init_copy(&name, &fields[i].name);
     struct ast_typeexpr type;
     substitute_generics(&fields[i].type, g, args, args_count, &type);
-    ast_vardecl_init(&concrete_fields[i], ast_meta_make_garbage(),
+    ast_vardecl_init(&concrete_fields[i], ast_meta_make_copy(&fields[i].meta),
                      name, type);
   }
 
@@ -554,7 +554,7 @@ void substitute_generics(struct ast_typeexpr *type,
 
     struct ast_ident name;
     ast_ident_init_copy(&name, &type->u.app.name);
-    ast_typeapp_init(&concrete_type_out->u.app, ast_meta_make_garbage(),
+    ast_typeapp_init(&concrete_type_out->u.app, ast_meta_make_copy(&type->u.app.meta),
                      name, params, params_count);
   } break;
   case AST_TYPEEXPR_STRUCTE: {
@@ -566,7 +566,7 @@ void substitute_generics(struct ast_typeexpr *type,
                                g, args, args_count,
                                &fields, &fields_count);
 
-    ast_structe_init(&concrete_type_out->u.structe, ast_meta_make_garbage(),
+    ast_structe_init(&concrete_type_out->u.structe, ast_meta_make_copy(&type->u.structe.meta),
                      fields, fields_count);
   } break;
   case AST_TYPEEXPR_UNIONE: {
@@ -578,7 +578,7 @@ void substitute_generics(struct ast_typeexpr *type,
                                g, args, args_count,
                                &fields, &fields_count);
 
-    ast_unione_init(&concrete_type_out->u.unione, ast_meta_make_garbage(),
+    ast_unione_init(&concrete_type_out->u.unione, ast_meta_make_copy(&type->u.unione.meta),
                     fields, fields_count);
   } break;
   default:
