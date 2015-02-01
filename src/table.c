@@ -992,10 +992,8 @@ int name_table_match_def(struct name_table *t,
                          struct def_entry **entry_out,
                          struct def_instantiation **instantiation_out) {
   /* matched_type is initialized if matched_ent is non-null. */
-  struct ast_typeexpr matched_type;
+  struct ast_typeexpr matched_type = { 0 };  /* Initialized to appease cl. */
   struct def_instantiation *matched_instantiation = NULL;
-  /* Get cl to shut up about the "uninitialized value". */
-  memset(&matched_type, 0, sizeof(matched_type));
   struct def_entry *matched_ent = NULL;
 
   struct defs_by_name_node *node;

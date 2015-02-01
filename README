@@ -22,9 +22,11 @@ Here's the project timeline:
 
    1. Parsing.  (DONE)
    2. Typechecking/name-resolving.  (DONE)
-   3. Generate code, i.e. have a working compiler.  (in progress)
+   3. Generate code, i.e. have a working compiler.  (DONE)
+   3a. Support interior lambda expressions.
+   3b. Support the stdcall calling convention.
    4. Cleanup error messages to have useful source information.
-   5. Cleanup the language syntax to make it more usable.
+   5. Cleanup the language syntax to make it more usable. (in progress)
    6. Make a self-hosted implementation (adding improvements and
       fixes to the C implementation when useful).
    7. ...

@@ -152,11 +152,14 @@ struct ast_var_statement {
   struct ast_meta meta;
   struct ast_var_statement_info info;
   struct ast_vardecl decl;
-  struct ast_expr *rhs;
+  int has_rhs;
+  struct ast_expr *rhs_;
 };
 
-void ast_var_statement_init(struct ast_var_statement *a, struct ast_meta meta,
-                            struct ast_vardecl decl, struct ast_expr rhs);
+void ast_var_statement_init_with_rhs(struct ast_var_statement *a, struct ast_meta meta,
+                                     struct ast_vardecl decl, struct ast_expr rhs);
+void ast_var_statement_init_without_rhs(struct ast_var_statement *a, struct ast_meta meta,
+                                        struct ast_vardecl decl);
 
 struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a);
 

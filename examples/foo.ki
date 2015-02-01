@@ -19,7 +19,7 @@ deftype ty struct {
 };
 
 def showfacs func[ptr[ty], ty] = fn(p ptr[ty]) ty {
-  var ret ty = *p;
+  var ret ty;
   p->x = -5;
   p->y = fac(7);
   p->x = -p->x;

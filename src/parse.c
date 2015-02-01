@@ -655,10 +655,19 @@ int parse_rest_of_var_statement(struct ps *p, size_t pos_start,
     goto fail;
   }
 
-  if (!(skip_ws(p) && skip_oper(p, "="))) {
-    goto fail_decl;
+  if (!skip_ws(p)) {
+    goto fail;
   }
 
+  if (try_skip_semicolon(p)) {
+    ast_var_statement_init_without_rhs(out, ast_meta_make(pos_start, ps_pos(p)),
+                                       decl);
+    return 1;
+  }
+
+  if (!try_skip_oper(p, "=")) {
+    goto fail;
+  }
   struct ast_expr rhs;
   if (!(skip_ws(p) && parse_expr(p, &rhs, kSemicolonPrecedence))) {
     goto fail_decl;
@@ -668,8 +677,8 @@ int parse_rest_of_var_statement(struct ps *p, size_t pos_start,
     goto fail_rhs;
   }
 
-  ast_var_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                         decl, rhs);
+  ast_var_statement_init_with_rhs(out, ast_meta_make(pos_start, ps_pos(p)),
+                                  decl, rhs);
   return 1;
 
  fail_rhs:
@@ -1562,6 +1571,11 @@ int parse_test_defs(void) {
   pass &= run_count_test("def16",
                          "def foo i32 = 1 + - 1;\n",
                          9);
+  pass &= run_count_test("def17",
+                         "def foo func[int] = fn() int {\n"
+                         "  var x int;\n"
+                         "};\n",
+                         18);
   return pass;
 }
 

@@ -2129,13 +2129,15 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
                                       ast_var_statement_type(&s->u.var_statement));
       struct loc var_loc = frame_push_loc(h, var_size);
 
-      int32_t saved_offset = frame_save_offset(h);
+      if (s->u.var_statement.has_rhs) {
+        int32_t saved_offset = frame_save_offset(h);
 
-      struct expr_return er = demand_expr_return(var_loc);
-      if (!gen_expr(cs, f, h, s->u.var_statement.rhs, &er)) {
-        return 0;
+        struct expr_return er = demand_expr_return(var_loc);
+        if (!gen_expr(cs, f, h, s->u.var_statement.rhs_, &er)) {
+          return 0;
+        }
+        frame_restore_offset(h, saved_offset);
       }
-      frame_restore_offset(h, saved_offset);
 
       struct vardata vd;
       size_t var_number = h->var_number;

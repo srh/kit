@@ -1238,12 +1238,16 @@ int check_expr_bracebody(struct bodystate *bs,
       struct ast_typeexpr replaced_type;
       replace_generics(bs->es, &s->u.var_statement.decl.type, &replaced_type);
 
+
       int lvalue_discard;
-      struct ast_expr annotated_rhs;
-      if (!check_expr(bs->es, s->u.var_statement.rhs, &replaced_type,
-                      &lvalue_discard, &annotated_rhs)) {
-        ast_typeexpr_destroy(&replaced_type);
-        goto fail;
+      int has_rhs = s->u.var_statement.has_rhs;
+      struct ast_expr annotated_rhs = { 0 };  /* Initialize to appease cl. */
+      if (has_rhs) {
+        if (!check_expr(bs->es, s->u.var_statement.rhs_, &replaced_type,
+                        &lvalue_discard, &annotated_rhs)) {
+          ast_typeexpr_destroy(&replaced_type);
+          goto fail;
+        }
       }
 
       struct ast_ident name;
@@ -1260,7 +1264,9 @@ int check_expr_bracebody(struct bodystate *bs,
       if (!exprscope_push_var(bs->es, replaced_decl)) {
         free_ast_vardecl(&replaced_decl);
         ast_typeexpr_destroy(&replaced_type);
-        ast_expr_destroy(&annotated_rhs);
+        if (has_rhs) {
+          ast_expr_destroy(&annotated_rhs);
+        }
         goto fail;
       }
 
@@ -1270,9 +1276,15 @@ int check_expr_bracebody(struct bodystate *bs,
       struct ast_vardecl decl;
       ast_vardecl_init_copy(&decl, &s->u.var_statement.decl);
       annotated_statements[i].tag = AST_STATEMENT_VAR;
-      ast_var_statement_init(&annotated_statements[i].u.var_statement,
-                             ast_meta_make_copy(&s->u.var_statement.meta),
-                             decl, annotated_rhs);
+      if (has_rhs) {
+        ast_var_statement_init_with_rhs(&annotated_statements[i].u.var_statement,
+                                        ast_meta_make_copy(&s->u.var_statement.meta),
+                                        decl, annotated_rhs);
+      } else {
+        ast_var_statement_init_without_rhs(&annotated_statements[i].u.var_statement,
+                                           ast_meta_make_copy(&s->u.var_statement.meta),
+                                           decl);
+      }
       ast_var_statement_info_note_type(
           &annotated_statements[i].u.var_statement.info,
           replaced_type);
