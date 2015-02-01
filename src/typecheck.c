@@ -359,9 +359,12 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
     goto fail;
   }
 
-  size_t error_pos;
-  if (!parse_buf_file(cs->im, data, data_size, file_out, &error_pos)) {
-    ERR_DBG("Could not parse file, at %"PRIz".\n", error_pos);
+  struct error_info error_info;
+  if (!parse_buf_file(cs->im, data, data_size, file_out, &error_info)) {
+    ERR_DBG("Could not parse module %.*s at %"PRIz":%"PRIz".\n",
+            (int)module_name_count, module_name,
+            error_info.line, error_info.column);
+    error_info_destroy(&error_info);
     goto fail_data;
   }
 

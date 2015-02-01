@@ -1444,10 +1444,22 @@ int parse_file(struct ps *p, struct ast_file *out) {
   return 0;
 }
 
+void error_info_init(struct error_info *ei, size_t line, size_t column) {
+  ei->line = line;
+  ei->column = column;
+  databuf_init(&ei->message);
+}
+
+void error_info_destroy(struct error_info *ei) {
+  ei->line = 0;
+  ei->column = 0;
+  databuf_destroy(&ei->message);
+}
+
 int parse_buf_file(struct identmap *im,
                    const uint8_t *buf, size_t length,
                    struct ast_file *file_out,
-                   size_t *error_pos_out) {
+                   struct error_info *error_info_out) {
   struct ps p;
   ps_init_with_identmap(&p, im, buf, length);
 
@@ -1456,7 +1468,7 @@ int parse_buf_file(struct identmap *im,
   if (ret) {
     *file_out = file;
   } else {
-    *error_pos_out = ps_pos(&p);
+    error_info_init(error_info_out, p.line, p.column);
   }
   ps_remove_identmap(&p, im);
   ps_destroy(&p);
