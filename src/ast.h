@@ -346,10 +346,26 @@ void ast_name_expr_init(struct ast_name_expr *a,
 void ast_name_expr_init_copy(struct ast_name_expr *a,
                              struct ast_name_expr *c);
 
+struct ast_index_expr {
+  struct ast_meta meta;
+  struct ast_expr *lhs;
+  struct ast_expr *rhs;
+};
+
+void ast_index_expr_init(struct ast_index_expr *a,
+                         struct ast_meta meta,
+                         struct ast_expr lhs,
+                         struct ast_expr rhs);
+void ast_index_expr_init_copy(struct ast_index_expr *a,
+                              struct ast_index_expr *c);
+
+void ast_index_expr_destroy(struct ast_index_expr *a);
+
 enum ast_expr_tag {
   AST_EXPR_NAME,
   AST_EXPR_NUMERIC_LITERAL,
   AST_EXPR_FUNCALL,
+  AST_EXPR_INDEX,
   AST_EXPR_UNOP,
   AST_EXPR_BINOP,
   AST_EXPR_LAMBDA,
@@ -373,6 +389,7 @@ struct ast_expr {
     struct ast_name_expr name;
     struct ast_numeric_literal numeric_literal;
     struct ast_funcall funcall;
+    struct ast_index_expr index_expr;
     struct ast_unop_expr unop_expr;
     struct ast_binop_expr binop_expr;
     struct ast_lambda lambda;

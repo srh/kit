@@ -1750,6 +1750,44 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
+int gen_index_expr(struct checkstate *cs, struct objfile *f,
+                   struct frame *h, struct ast_expr *a,
+                   struct expr_return *er) {
+  uint32_t return_size = kira_sizeof(&cs->nt, ast_expr_type(a));
+
+  struct ast_index_expr *ie = &a->u.index_expr;
+  struct expr_return lhs_er = open_expr_return();
+  if (!gen_expr(cs, f, h, ie->lhs, &lhs_er)) {
+    return 0;
+  }
+
+  CHECK(lhs_er.u.loc.size == DWORD_SIZE);
+
+  struct expr_return rhs_er = open_expr_return();
+  if (!gen_expr(cs, f, h, ie->rhs, &rhs_er)) {
+    return 0;
+  }
+
+  CHECK(rhs_er.u.loc.size == DWORD_SIZE);
+
+  gen_load_register(f, X86_EAX, rhs_er.u.loc);
+  gen_load_register(f, X86_EDX, lhs_er.u.loc);
+  struct immediate imm;
+  imm.tag = IMMEDIATE_U32;
+  imm.u.u32 = return_size;
+  x86_gen_mov_reg_imm32(f, X86_ECX, imm);
+  x86_gen_imul_w32(f, X86_EAX, X86_ECX);
+  gen_crash_jcc(f, h, X86_JCC_O);
+
+  x86_gen_add_w32(f, X86_EAX, X86_EDX);
+
+  struct loc loc = frame_push_loc(h, DWORD_SIZE);
+  gen_store_register(f, loc, X86_EAX);
+
+  struct loc retloc = ebp_indirect_loc(return_size, return_size, loc.u.ebp_offset);
+  expr_return_set(f, er, retloc);
+  return 1;
+}
 void gen_placeholder_jmp_if_false(struct objfile *f, struct frame *h,
                                   struct loc loc, size_t target_number) {
   CHECK(loc.size == KIRA_BOOL_SIZE);
@@ -2051,6 +2089,9 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
   } break;
   case AST_EXPR_FUNCALL: {
     return gen_funcall_expr(cs, f, h, a, er);
+  } break;
+  case AST_EXPR_INDEX: {
+    return gen_index_expr(cs, f, h, a, er);
   } break;
   case AST_EXPR_UNOP: {
     return gen_unop_expr(cs, f, h, a, er);

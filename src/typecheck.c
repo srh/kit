@@ -1986,6 +1986,64 @@ int check_expr_deref_field_access(
   return ret;
 }
 
+int check_is_ptr_index_type(struct checkstate *cs, struct ast_typeexpr *type) {
+  return type->tag == AST_TYPEEXPR_NAME
+    && (type->u.name.value == identmap_intern_c_str(cs->im, I32_TYPE_NAME)
+        || type->u.name.value == identmap_intern_c_str(cs->im, U32_TYPE_NAME));
+}
+
+int check_index_expr(struct exprscope *es,
+                     struct ast_index_expr *a,
+                     struct ast_typeexpr *partial_type,
+                     struct ast_typeexpr *return_type_out,
+                     struct ast_index_expr *annotated_out) {
+  struct ast_typeexpr no_partial_type;
+  no_partial_type.tag = AST_TYPEEXPR_UNKNOWN;
+
+  struct ast_expr lhs_annotated;
+  int lvalue_discard;
+  if (!check_expr(es, a->lhs, &no_partial_type,
+                  &lvalue_discard, &lhs_annotated)) {
+    return 0;
+  }
+
+  struct ast_expr rhs_annotated;
+  if (!check_expr(es, a->rhs, &no_partial_type,
+                  &lvalue_discard, &rhs_annotated)) {
+    goto fail_lhs_annotated;
+  }
+
+  if (!check_is_ptr_index_type(es->cs, ast_expr_type(&rhs_annotated))) {
+    goto fail_rhs_annotated;
+  }
+
+  struct ast_typeexpr *lhs_target;
+  if (!view_ptr_target(es->cs->im, ast_expr_type(&lhs_annotated),
+                       &lhs_target)) {
+    ERR_DBG("Indexing into a non-pointer.\n");
+    goto fail_rhs_annotated;
+  }
+
+  if (!unify_directionally(partial_type, lhs_target)) {
+    ERR_DBG("Indexing expression returns wrong type.\n");
+    goto fail_rhs_annotated;
+  }
+
+  ast_typeexpr_init_copy(return_type_out, lhs_target);
+
+  ast_index_expr_init(annotated_out,
+                      ast_meta_make_copy(&a->meta),
+                      lhs_annotated,
+                      rhs_annotated);
+  return 1;
+ fail_rhs_annotated:
+  ast_expr_destroy(&rhs_annotated);
+  return 0;
+ fail_lhs_annotated:
+  ast_expr_destroy(&lhs_annotated);
+  return 0;
+}
+
 int check_expr(struct exprscope *es,
                struct ast_expr *x,
                struct ast_typeexpr *partial_type,
@@ -2029,6 +2087,17 @@ int check_expr(struct exprscope *es,
     }
     *is_lvalue_out = 0;
     ast_expr_partial_init(annotated_out, AST_EXPR_FUNCALL,
+                          ast_expr_info_typechecked(return_type));
+    return 1;
+  } break;
+  case AST_EXPR_INDEX: {
+    struct ast_typeexpr return_type;
+    if (!check_index_expr(es, &x->u.index_expr, partial_type,
+                          &return_type, &annotated_out->u.index_expr)) {
+      return 0;
+    }
+    *is_lvalue_out = 1;
+    ast_expr_partial_init(annotated_out, AST_EXPR_INDEX,
                           ast_expr_info_typechecked(return_type));
     return 1;
   } break;
@@ -2674,8 +2743,11 @@ int eval_static_value(struct ast_expr *expr,
   } break;
   case AST_EXPR_NUMERIC_LITERAL:
     return eval_static_numeric_literal(&expr->u.numeric_literal, out);
-  case AST_EXPR_FUNCALL: {
+  case AST_EXPR_FUNCALL:
     return eval_static_funcall(&expr->u.funcall, out);
+  case AST_EXPR_INDEX: {
+    CRASH("Pointer indexing should not have been deemed statically "
+          "evaluable.\n");
   } break;
   case AST_EXPR_UNOP: {
     CRASH("No (magic) unop exprs should have been deemed "
@@ -3620,6 +3692,21 @@ int check_file_test_more_10(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_11(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def[T] foo func[ptr[T], i32, T] = fn(p ptr[T], i i32) T {\n"
+      "  var ret T = p[i];\n"
+      "  p[i] = p[i + 1];\n"
+      "  return ret;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 int test_check_file(void) {
@@ -3943,6 +4030,12 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_10...\n");
   if (!test_check_module(&im, &check_file_test_more_10, foo)) {
     DBG("check_file_test_more_10 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_11...\n");
+  if (!test_check_module(&im, &check_file_test_more_11, foo)) {
+    DBG("check_file_test_more_11 fails\n");
     goto cleanup_identmap;
   }
 

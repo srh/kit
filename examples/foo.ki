@@ -31,8 +31,13 @@ def showfacs func[ptr[ty], ty] = fn(p ptr[ty]) ty {
   print(y);
   putchar(10);
 
-  p->x = 99;
-  (*p).y = 77;
+  var yptr ptr[i32] = &p->y;
+  *yptr = 77;
+  var xptr ptr[i32] = &p->x;
+  xptr[0] = 99;
+
+  p[1].x = 33;
+  p[1].y = 44;
 
   ret.x = p->x;
   ret.y = 22;

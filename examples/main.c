@@ -18,9 +18,10 @@ int32_t flushstdout(void) {
 int main(void) {
   printf("foo value: %" PRIu32 "\n", kira_foo1);
 
-  struct ty blah = { 0, 0 };
-  struct ty res = kira_showfacs3(&blah);
-  printf("blah.x = %"PRIi32", .y = %"PRIi32"\n", blah.x, blah.y);
+  struct ty blah[2];
+  struct ty res = kira_showfacs3(blah);
+  printf("blah[0].x = %"PRIi32", .y = %"PRIi32"\n", blah[0].x, blah[0].y);
+  printf("blah[1].x = %"PRIi32", .y = %"PRIi32"\n", blah[1].x, blah[1].y);
   printf("res.x = %"PRIi32", .y = %"PRIi32"\n", res.x, res.y);
 
   return 0;

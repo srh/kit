@@ -1026,6 +1026,20 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
                        old_lhs,
                        args,
                        args_count);
+    } else if (try_skip_char(p, '[')) {
+      PARSE_DBG("parse_expr saw bracket\n");
+      struct ast_expr arg;
+      if (!parse_expr(p, &arg, kCommaPrecedence)) {
+        goto fail;
+      }
+      if (!try_skip_char(p, ']')) {
+        ast_expr_destroy(&arg);
+        goto fail;
+      }
+      struct ast_expr old_lhs = lhs;
+      ast_expr_partial_init(&lhs, AST_EXPR_INDEX, ast_expr_info_default());
+      ast_index_expr_init(&lhs.u.index_expr, ast_meta_make(pos_start, ps_pos(p)),
+                          old_lhs, arg);
     } else if (try_skip_oper(p, ".")) {
       struct ast_ident field_name;
       if (!(skip_ws(p) && parse_ident(p, &field_name))) {
@@ -1588,6 +1602,12 @@ int parse_test_defs(void) {
                          "  var x int;\n"
                          "};\n",
                          18);
+  pass &= run_count_test("def17",
+                         "def foo bar = fn() void {\n"
+                         "  (x+3)[y(z)] = 3;\n"
+                         "  return x[y];\n"
+                         "};\n",
+                         31);
   return pass;
 }
 

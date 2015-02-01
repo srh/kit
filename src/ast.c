@@ -560,6 +560,32 @@ void ast_name_expr_destroy(struct ast_name_expr *a) {
   ast_ident_destroy(&a->ident);
 }
 
+void ast_index_expr_init(struct ast_index_expr *a,
+                         struct ast_meta meta,
+                         struct ast_expr lhs,
+                         struct ast_expr rhs) {
+  a->meta = meta;
+  ast_expr_alloc_move(lhs, &a->lhs);
+  ast_expr_alloc_move(rhs, &a->rhs);
+}
+
+void ast_index_expr_init_copy(struct ast_index_expr *a,
+                              struct ast_index_expr *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_expr_alloc_init_copy(c->lhs, &a->lhs);
+  ast_expr_alloc_init_copy(c->rhs, &a->rhs);
+}
+
+void ast_index_expr_destroy(struct ast_index_expr *a) {
+  ast_meta_destroy(&a->meta);
+  ast_expr_destroy(a->lhs);
+  free(a->lhs);
+  a->lhs = NULL;
+  ast_expr_destroy(a->rhs);
+  free(a->rhs);
+  a->rhs = NULL;
+}
+
 struct ast_expr_info ast_expr_info_default(void) {
   struct ast_expr_info ret;
   ret.is_typechecked = 0;
@@ -593,6 +619,7 @@ struct ast_meta ast_expr_ast_meta(struct ast_expr *a) {
   case AST_EXPR_NAME: return a->u.name.ident.meta;
   case AST_EXPR_NUMERIC_LITERAL: return a->u.numeric_literal.meta;
   case AST_EXPR_FUNCALL: return a->u.funcall.meta;
+  case AST_EXPR_INDEX: return a->u.index_expr.meta;
   case AST_EXPR_UNOP: return a->u.unop_expr.meta;
   case AST_EXPR_BINOP: return a->u.binop_expr.meta;
   case AST_EXPR_LAMBDA: return a->u.lambda.meta;
@@ -627,6 +654,9 @@ void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c) {
   case AST_EXPR_FUNCALL:
     ast_funcall_init_copy(&a->u.funcall, &c->u.funcall);
     break;
+  case AST_EXPR_INDEX:
+    ast_index_expr_init_copy(&a->u.index_expr, &c->u.index_expr);
+    break;
   case AST_EXPR_UNOP:
     ast_unop_expr_init_copy(&a->u.unop_expr, &c->u.unop_expr);
     break;
@@ -659,6 +689,9 @@ void ast_expr_destroy(struct ast_expr *a) {
     break;
   case AST_EXPR_FUNCALL:
     ast_funcall_destroy(&a->u.funcall);
+    break;
+  case AST_EXPR_INDEX:
+    ast_index_expr_destroy(&a->u.index_expr);
     break;
   case AST_EXPR_UNOP:
     ast_unop_expr_destroy(&a->u.unop_expr);
