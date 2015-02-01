@@ -51,6 +51,9 @@ NORETURN void report_and_abort(const char *file, int line,
    the wrong place. */
 #define ERR_DBG(...) DBG(__VA_ARGS__)
 
+/* Uses of ERR are better error messages than what we had before. */
+#define ERR(...) DBG(__VA_ARGS__)
+
 /* Never returns a null pointer.  (Checks if a * b overflows, and
    calls malloc(1) instead of malloc(0).) */
 void *malloc_mul(size_t a, size_t b);

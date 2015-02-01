@@ -355,15 +355,16 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
   uint8_t *data;
   size_t data_size;
   if (!(*loader)(module_name, module_name_count, &data, &data_size)) {
-    ERR_DBG("Could not read file.\n");
+    ERR("Could not read file for module %.*s.\n",
+        size_to_int(module_name_count), module_name);
     goto fail;
   }
 
   struct error_info error_info;
   if (!parse_buf_file(cs->im, data, data_size, file_out, &error_info)) {
-    ERR_DBG("Could not parse module %.*s at %"PRIz":%"PRIz".\n",
-            (int)module_name_count, module_name,
-            error_info.line, error_info.column);
+    ERR("Parse error in module %.*s at %"PRIz":%"PRIz".\n",
+        size_to_int(module_name_count), module_name,
+        error_info.line, error_info.column);
     error_info_destroy(&error_info);
     goto fail_data;
   }
@@ -501,7 +502,7 @@ int check_typeexpr_name(struct checkstate *cs,
     struct deftype_entry *ent;
     if (!name_table_lookup_deftype(&cs->nt, name, no_param_list_arity(),
                                    &ent)) {
-      ERR_DBG("Unrecognized type name.\n");
+      ERR_DBG("Unrecognized type name %.*s.\n", IM_P(cs->im, name));
       return 0;
     }
 
@@ -524,7 +525,8 @@ int check_typeexpr_app(struct checkstate *cs,
   if (!name_table_lookup_deftype(&cs->nt, a->name.value,
                                  param_list_arity(a->params_count),
                                  &ent)) {
-    ERR_DBG("Unrecognized type name/bad arity.\n");
+    ERR_DBG("Type lookup fail for %.*s, arity %"PRIz"\n",
+            IM_P(cs->im, a->name.value), a->params_count);
     return 0;
   }
 
@@ -554,7 +556,8 @@ int check_typeexpr_fields(struct checkstate *cs,
     struct ast_vardecl *field = &fields[i];
     for (size_t j = 0; j < i; j++) {
       if (field->name.value == fields[j].name.value) {
-        ERR_DBG("struct/union fields have duplicate name.\n");
+        ERR_DBG("struct/union fields have duplicate name %.*s\n",
+                IM_P(cs->im, field->name.value));
         return 0;
       }
     }
@@ -562,8 +565,9 @@ int check_typeexpr_fields(struct checkstate *cs,
     {
       size_t which_generic;
       if (generics_lookup_name(generics, field->name.value, &which_generic)) {
-        ERR_DBG("struct/union field shadows template parameter, "
-                "which is gauche.\n");
+        ERR_DBG("struct/union field shadows template parameter %.*s, "
+                "which is gauche.\n",
+                IM_P(cs->im, field->name.value));
         return 0;
       }
     }
@@ -612,13 +616,15 @@ int check_generics_shadowing(struct checkstate *cs,
     ident_value name = a->params[i].value;
     for (size_t j = 0; j < i; j++) {
       if (name == a->params[j].value) {
-        ERR_DBG("duplicate param names within same generics list.\n");
+        ERR_DBG("duplicate param names %.*s within same generics list.\n",
+                IM_P(cs->im, name));
         return 0;
       }
     }
 
     if (name_table_shadowed(&cs->nt, name)) {
-      ERR_DBG("generics list shadows global name.\n");
+      ERR_DBG("generics list shadows global name %.*s.\n",
+              IM_P(cs->im, name));
       return 0;
     }
   }
@@ -636,7 +642,8 @@ int check_deftype(struct checkstate *cs, struct deftype_entry *ent) {
   CHECK(!ent->is_primitive);
 
   if (ent->is_being_checked) {
-    ERR_DBG("deftype recursively held.\n");
+    ERR_DBG("deftype %.*s recursively held.\n",
+            IM_P(cs->im, ent->name));
     return 0;
   }
 
@@ -726,7 +733,8 @@ void exprscope_note_static_reference(struct exprscope *es,
 int check_var_shadowing(struct exprscope *es, ident_value name) {
   for (size_t i = 0, e = es->vars_count; i < e; i++) {
     if (es->vars[i]->name.value == name) {
-      ERR_DBG("Variable name shadows local.\n");
+      ERR_DBG("Variable name %.*s shadows local.\n",
+              IM_P(es->cs->im, name));
       return 0;
     }
   }
@@ -734,13 +742,15 @@ int check_var_shadowing(struct exprscope *es, ident_value name) {
   {
     size_t which_generic;
     if (generics_lookup_name(es->generics, name, &which_generic)) {
-      ERR_DBG("Variable name shadows template parameter, which is gauche.\n");
+      ERR_DBG("Variable name %.*s shadows template parameter, which is gauche.\n",
+              IM_P(es->cs->im, name));
       return 0;
     }
   }
 
   if (name_table_shadowed(&es->cs->nt, name)) {
-    ERR_DBG("Variable name shadows a global def or type.\n");
+    ERR_DBG("Variable name %.*s shadows a global def or type.\n",
+            IM_P(es->cs->im, name));
     return 0;
   }
 
@@ -749,7 +759,6 @@ int check_var_shadowing(struct exprscope *es, ident_value name) {
 
 int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var) {
   if (!check_var_shadowing(es, var->name.value)) {
-    ERR_DBG("Var name shadows.\n");
     return 0;
   }
   SLICE_PUSH(es->vars, es->vars_count, es->vars_limit, var);
@@ -914,7 +923,8 @@ int exprscope_lookup_name(struct exprscope *es,
     }
 
     if (!unify_directionally(partial_type, &decl->type)) {
-      ERR_DBG("Type mismatch for vardecl lookup.\n");
+      ERR_DBG("Type mismatch for vardecl %.*s lookup.\n",
+              IM_P(es->cs->im, name));
       return 0;
     }
 
@@ -1165,7 +1175,7 @@ int bodystate_note_label(struct bodystate *bs, ident_value name) {
   for (size_t i = 0, e = bs->label_infos_count; i < e; i++) {
     if (bs->label_infos[i].label_name == name) {
       if (bs->label_infos[i].is_label_observed) {
-        ERR_DBG("Duplicate label.\n");
+        ERR_DBG("Duplicate label %.*s.\n", IM_P(bs->es->cs->im, name));
         return 0;
       }
       bs->label_infos[i].is_label_observed = 1;
@@ -1402,11 +1412,13 @@ int check_expr_funcbody(struct exprscope *es,
 
   for (size_t i = 0; i < bs.label_infos_count; i++) {
     if (!bs.label_infos[i].is_label_observed) {
-      ERR_DBG("goto without label.\n");
+      ERR_DBG("goto without label for name %.*s.\n",
+              IM_P(bs.es->cs->im, bs.label_infos[i].label_name));
       goto fail_annotated_bracebody;
     }
     if (!bs.label_infos[i].is_goto_observed) {
-      ERR_DBG("label without goto.\n");
+      ERR_DBG("label without goto for name %.*s.\n",
+              IM_P(bs.es->cs->im, bs.label_infos[i].label_name));
       goto fail_annotated_bracebody;
     }
   }
@@ -1446,7 +1458,8 @@ int check_expr_lambda(struct exprscope *es,
     for (i = 0; i < func_params_count; i++) {
       for (size_t j = 0; j < i; j++) {
         if (x->params[i].name.value == x->params[j].name.value) {
-          ERR_DBG("Duplicate lambda parameter name.\n");
+          ERR_DBG("Duplicate lambda parameter name %.*s.\n",
+                  IM_P(es->cs->im, x->params[i].name.value));
           goto fail_args_up_to_i;
         }
       }
@@ -1455,7 +1468,6 @@ int check_expr_lambda(struct exprscope *es,
       }
 
       if (!check_typeexpr(es->cs, es->generics, &x->params[i].type, NULL)) {
-        ERR_DBG("Invalid type.\n");
         goto fail_args_up_to_i;
       }
 
@@ -2803,7 +2815,8 @@ int read_module_file(const uint8_t *module_name,
                     &filename, &filename_count);
 
   if (!read_file(filename, data_out, data_size_out)) {
-    ERR_DBG("Could not read file.\n");
+    ERR_DBG("Could not read file %.*s.\n",
+            size_to_int(filename_count), filename);
   } else {
     ret = 1;
   }

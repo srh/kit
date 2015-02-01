@@ -9,6 +9,7 @@ size_t size_add(size_t x, size_t y);
 size_t size_sub(size_t x, size_t y);
 
 int32_t size_to_int32(size_t x);
+int size_to_int(size_t x);
 
 int try_uint32_mul(uint32_t x, uint32_t y, uint32_t *out);
 uint32_t uint32_mul(uint32_t x, uint32_t y);

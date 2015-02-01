@@ -1,5 +1,6 @@
 #include "arith.h"
 
+#include <limits.h>
 #include <stdint.h>
 
 #include "util.h"
@@ -20,8 +21,15 @@ size_t size_sub(size_t x, size_t y) {
 }
 
 int32_t size_to_int32(size_t x) {
-  CHECK(x <= INT32_MAX);
+  STATIC_CHECK(INT32_MAX <= SIZE_MAX);
+  CHECK(x <= (size_t)INT32_MAX);
   return (int32_t)x;
+}
+
+int size_to_int(size_t x) {
+  STATIC_CHECK(INT_MAX <= SIZE_MAX);
+  CHECK(x <= (size_t)INT_MAX);
+  return (int)x;
 }
 
 int try_uint32_mul(uint32_t x, uint32_t y, uint32_t *out) {

@@ -193,6 +193,20 @@ void identmap_lookup(struct identmap *m, ident_value ident,
   *count_out = m->datas[ident].data_count;
 }
 
+const void *im_s(struct identmap *m, ident_value ident) {
+  const void *buf;
+  size_t count;
+  identmap_lookup(m, ident, &buf, &count);
+  return buf;
+}
+
+int im_i(struct identmap *m, ident_value ident) {
+  const void *buf;
+  size_t count;
+  identmap_lookup(m, ident, &buf, &count);
+  return size_to_int(count);
+}
+
 void identmap_set_user_value(struct identmap *m, ident_value ident,
                              void *user_value) {
   CHECK(ident != IDENT_VALUE_INVALID);
