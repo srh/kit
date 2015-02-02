@@ -1014,8 +1014,7 @@ void do_replace_generics(struct ast_generics *generics,
     ast_ident_init_copy(&name, &app->name);
 
     out->tag = AST_TYPEEXPR_APP;
-    /* TODO: Bad uses of make_garbage() in this function. */
-    ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
+    ast_typeapp_init(&out->u.app, ast_meta_make_copy(&a->u.app.meta),
                      name, params, params_count);
   } break;
   case AST_TYPEEXPR_STRUCTE: {
@@ -1026,7 +1025,7 @@ void do_replace_generics(struct ast_generics *generics,
                                   a->u.structe.fields_count,
                                   &fields, &fields_count);
     out->tag = AST_TYPEEXPR_STRUCTE;
-    ast_structe_init(&out->u.structe, ast_meta_make_garbage(),
+    ast_structe_init(&out->u.structe, ast_meta_make_copy(&a->u.structe.meta),
                      fields, fields_count);
   } break;
   case AST_TYPEEXPR_UNIONE: {
@@ -1036,7 +1035,7 @@ void do_replace_generics(struct ast_generics *generics,
                                   a->u.unione.fields, a->u.unione.fields_count,
                                   &fields, &fields_count);
     out->tag = AST_TYPEEXPR_UNIONE;
-    ast_unione_init(&out->u.unione, ast_meta_make_garbage(),
+    ast_unione_init(&out->u.unione, ast_meta_make_copy(&a->u.unione.meta),
                     fields, fields_count);
   } break;
   case AST_TYPEEXPR_ARRAY: {
@@ -1044,7 +1043,7 @@ void do_replace_generics(struct ast_generics *generics,
     do_replace_generics(generics, generics_substitutions, a->u.arraytype.param,
                         &param);
     out->tag = AST_TYPEEXPR_ARRAY;
-    ast_arraytype_init(&out->u.arraytype, ast_meta_make_garbage(),
+    ast_arraytype_init(&out->u.arraytype, ast_meta_make_copy(&a->u.arraytype.meta),
                        a->u.arraytype.count, param);
   } break;
   default:
@@ -1289,7 +1288,7 @@ int check_expr_bracebody(struct bodystate *bs,
 
       struct ast_vardecl *replaced_decl = malloc(sizeof(*replaced_decl));
       CHECK(replaced_decl);
-      ast_vardecl_init(replaced_decl, ast_meta_make_garbage(), name,
+      ast_vardecl_init(replaced_decl, ast_meta_make_copy(&s->u.var_statement.decl.meta), name,
                        replaced_type_copy);
 
       if (!exprscope_push_var(bs->es, replaced_decl)) {
