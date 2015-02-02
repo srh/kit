@@ -1007,24 +1007,26 @@ enum x86_reg choose_register_2(enum x86_reg used1, enum x86_reg used2) {
   }
 }
 
-void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc) {
-  CHECK(dest.size == DWORD_SIZE);
+void gen_load_addressof(struct objfile *f, enum x86_reg dest, struct loc loc) {
   switch (loc.tag) {
   case LOC_EBP_OFFSET: {
-    x86_gen_lea32(f, X86_EAX, X86_EBP, loc.u.ebp_offset);
-    gen_store_register(f, dest, X86_EAX);
+    x86_gen_lea32(f, dest, X86_EBP, loc.u.ebp_offset);
   } break;
   case LOC_GLOBAL: {
-    x86_gen_mov_reg_stiptr(f, X86_EAX, loc.u.global_sti);
-    gen_store_register(f, dest, X86_EAX);
+    x86_gen_mov_reg_stiptr(f, dest, loc.u.global_sti);
   } break;
   case LOC_EBP_INDIRECT: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, loc.u.ebp_indirect);
-    gen_store_register(f, dest, X86_EAX);
+    x86_gen_load32(f, dest, X86_EBP, loc.u.ebp_indirect);
   } break;
   default:
     UNREACHABLE();
   }
+}
+
+void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc) {
+  CHECK(dest.size == DWORD_SIZE);
+  gen_load_addressof(f, X86_EAX, loc);
+  gen_store_register(f, dest, X86_EAX);
 }
 
 void gen_memmem_mov(struct objfile *f,
@@ -1753,28 +1755,44 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
 int gen_index_expr(struct checkstate *cs, struct objfile *f,
                    struct frame *h, struct ast_expr *a,
                    struct expr_return *er) {
-  uint32_t return_size = kira_sizeof(&cs->nt, ast_expr_type(a));
-
   struct ast_index_expr *ie = &a->u.index_expr;
+
+  uint32_t elem_size;
   struct expr_return lhs_er = open_expr_return();
+  struct expr_return rhs_er = open_expr_return();
+
   if (!gen_expr(cs, f, h, ie->lhs, &lhs_er)) {
     return 0;
   }
 
-  CHECK(lhs_er.u.loc.size == DWORD_SIZE);
-
-  struct expr_return rhs_er = open_expr_return();
   if (!gen_expr(cs, f, h, ie->rhs, &rhs_er)) {
     return 0;
   }
 
-  CHECK(rhs_er.u.loc.size == DWORD_SIZE);
+  struct ast_typeexpr *ptr_target;
+  if (view_ptr_target(cs->im, ast_expr_type(ie->lhs), &ptr_target)) {
+    elem_size = kira_sizeof(&cs->nt, ptr_target);
+
+    CHECK(lhs_er.u.loc.size == DWORD_SIZE);
+    CHECK(rhs_er.u.loc.size == DWORD_SIZE);
+
+    gen_load_register(f, X86_EDX, lhs_er.u.loc);
+  } else {
+    struct ast_typeexpr *lhs_type = ast_expr_type(ie->lhs);
+    CHECK(lhs_type->tag == AST_TYPEEXPR_ARRAY);
+    elem_size = kira_sizeof(&cs->nt, lhs_type->u.arraytype.param);
+
+    CHECK(lhs_er.u.loc.size == uint32_mul(elem_size, lhs_type->u.arraytype.count));
+    CHECK(rhs_er.u.loc.size == DWORD_SIZE);
+
+    gen_load_addressof(f, X86_EDX, lhs_er.u.loc);
+  }
 
   gen_load_register(f, X86_EAX, rhs_er.u.loc);
-  gen_load_register(f, X86_EDX, lhs_er.u.loc);
+
   struct immediate imm;
   imm.tag = IMMEDIATE_U32;
-  imm.u.u32 = return_size;
+  imm.u.u32 = elem_size;
   x86_gen_mov_reg_imm32(f, X86_ECX, imm);
   x86_gen_imul_w32(f, X86_EAX, X86_ECX);
   gen_crash_jcc(f, h, X86_JCC_O);
@@ -1784,10 +1802,11 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   struct loc loc = frame_push_loc(h, DWORD_SIZE);
   gen_store_register(f, loc, X86_EAX);
 
-  struct loc retloc = ebp_indirect_loc(return_size, return_size, loc.u.ebp_offset);
+  struct loc retloc = ebp_indirect_loc(elem_size, elem_size, loc.u.ebp_offset);
   expr_return_set(f, er, retloc);
   return 1;
 }
+
 void gen_placeholder_jmp_if_false(struct objfile *f, struct frame *h,
                                   struct loc loc, size_t target_number) {
   CHECK(loc.size == KIRA_BOOL_SIZE);

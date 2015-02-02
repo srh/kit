@@ -39,6 +39,11 @@ def showfacs func[ptr[ty], ty] = fn(p ptr[ty]) ty {
   p[1].x = 33;
   p[1].y = 44;
 
+  var heh [2]ty;
+  heh[0] = p[1];
+  heh[0].x = 34;
+  p[1] = heh[0];
+
   ret.x = p->x;
   ret.y = 22;
   return ret;

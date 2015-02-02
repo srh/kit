@@ -2008,7 +2008,7 @@ int check_expr_deref_field_access(
   return ret;
 }
 
-int check_is_ptr_index_type(struct checkstate *cs, struct ast_typeexpr *type) {
+int check_is_index_rhs_type(struct checkstate *cs, struct ast_typeexpr *type) {
   return type->tag == AST_TYPEEXPR_NAME
     && (type->u.name.value == identmap_intern_c_str(cs->im, I32_TYPE_NAME)
         || type->u.name.value == identmap_intern_c_str(cs->im, U32_TYPE_NAME));
@@ -2035,19 +2035,24 @@ int check_index_expr(struct exprscope *es,
     goto fail_lhs_annotated;
   }
 
-  if (!check_is_ptr_index_type(es->cs, ast_expr_type(&rhs_annotated))) {
+  if (!check_is_index_rhs_type(es->cs, ast_expr_type(&rhs_annotated))) {
     goto fail_rhs_annotated;
   }
 
+  struct ast_typeexpr *lhs_type = ast_expr_type(&lhs_annotated);
+
   struct ast_typeexpr *lhs_target;
-  if (!view_ptr_target(es->cs->im, ast_expr_type(&lhs_annotated),
-                       &lhs_target)) {
-    ERR_DBG("Indexing into a non-pointer.\n");
-    goto fail_rhs_annotated;
+  if (!view_ptr_target(es->cs->im, lhs_type, &lhs_target)) {
+    if (lhs_type->tag != AST_TYPEEXPR_ARRAY) {
+      ERR_DBG("Indexing into a non-pointer, non-array type.\n");
+      goto fail_rhs_annotated;
+    }
+
+    lhs_target = lhs_type->u.arraytype.param;
   }
 
   if (!unify_directionally(partial_type, lhs_target)) {
-    ERR_DBG("Indexing expression returns wrong type.\n");
+    ERR_DBG("Indexing returns wrong type.\n");
     goto fail_rhs_annotated;
   }
 
