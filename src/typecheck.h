@@ -21,9 +21,9 @@
 #define PTR_TYPE_NAME "ptr"
 #define FUNC_TYPE_NAME "func"
 
-/* TODO: Make this be I8_TYPE_NAME, but later add a distinct bool type. */
-#define BOOLEAN_STANDIN_TYPE_NAME I32_TYPE_NAME
-#define KIRA_BOOL_SIZE 4
+/* TODO: Later add a distinct bool type. */
+#define BOOLEAN_STANDIN_TYPE_NAME I8_TYPE_NAME
+#define KIRA_BOOL_SIZE 1
 
 enum numeric_type {
   NUMERIC_TYPE_U8,

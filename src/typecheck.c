@@ -456,7 +456,7 @@ void checkstate_import_primitives(struct checkstate *cs) {
 
 void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
   a->tag = AST_TYPEEXPR_NAME;
-  a->u.name = make_ast_ident(identmap_intern_c_str(cs->im, I32_TYPE_NAME));
+  a->u.name = make_ast_ident(identmap_intern_c_str(cs->im, BOOLEAN_STANDIN_TYPE_NAME));
 }
 
 int resolve_import_filename_and_parse(struct checkstate *cs,
@@ -3240,7 +3240,7 @@ int check_file_test_lambda_2(const uint8_t *name, size_t name_count,
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
                                "def y func[i32, i32] = fn(z i32)i32 {\n"
-                               "  if (z) {\n"
+                               "  if (~z) {\n"
                                "    goto foo;\n"
                                "    var k i32 = y(x);\n"
                                "  } else {\n"
