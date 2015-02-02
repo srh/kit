@@ -1,0 +1,12 @@
+def runloop func[i32] = fn() i32 {
+  var acc i32 = 0;
+  var i i32 = 0;
+  label top;
+  if (i < 1000000000) {
+    acc = acc + 1;
+    i = i + 1;
+    goto top;
+  }
+
+  return acc;
+};
