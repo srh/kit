@@ -2768,152 +2768,165 @@ void gen_return(struct objfile *f, struct frame *h) {
 }
 
 int gen_bracebody(struct checkstate *cs, struct objfile *f,
+                  struct frame *h, struct ast_bracebody *a);
+
+int gen_statement(struct checkstate *cs, struct objfile *f,
+                  struct frame *h, struct ast_statement *s,
+                  size_t *vars_pushed_ref) {
+  switch (s->tag) {
+  case AST_STATEMENT_EXPR: {
+    int32_t saved_offset = frame_save_offset(h);
+    struct expr_return er = open_expr_return();
+    if (!gen_expr(cs, f, h, s->u.expr, &er)) {
+      return 0;
+    }
+    frame_restore_offset(h, saved_offset);
+  } break;
+  case AST_STATEMENT_RETURN_EXPR: {
+    int32_t saved_offset = frame_save_offset(h);
+    struct expr_return er = demand_expr_return(frame_return_loc(h));
+    if (!gen_expr(cs, f, h, s->u.return_expr, &er)) {
+      return 0;
+    }
+
+    gen_return(f, h);
+    frame_restore_offset(h, saved_offset);
+  } break;
+  case AST_STATEMENT_VAR: {
+    uint32_t var_size = kira_sizeof(&cs->nt,
+                                    ast_var_statement_type(&s->u.var_statement));
+    struct loc var_loc = frame_push_loc(h, var_size);
+
+    if (s->u.var_statement.has_rhs) {
+      int32_t saved_offset = frame_save_offset(h);
+
+      struct expr_return er = demand_expr_return(var_loc);
+      if (!gen_expr(cs, f, h, s->u.var_statement.rhs_, &er)) {
+        return 0;
+      }
+      frame_restore_offset(h, saved_offset);
+    }
+
+    struct vardata vd;
+    size_t var_number = h->var_number;
+    h->var_number++;
+    vardata_init(&vd, s->u.var_statement.decl.name.value,
+                 var_number,
+                 ast_var_statement_type(&s->u.var_statement),
+                 var_size,
+                 var_loc);
+    SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+    (*vars_pushed_ref)++;
+  } break;
+  case AST_STATEMENT_GOTO: {
+    struct labeldata *data = frame_try_find_labeldata(h, s->u.goto_statement.target.value);
+    if (data) {
+      /* The label is seen -- it has info on its var locations. */
+      gen_placeholder_jmp(f, h, data->target_number);
+    } else {
+      size_t target_number = frame_add_target(h);
+      /* The label is not seen yet -- plainly impose our var locations upon it! */
+      struct labeldata ld;
+      labeldata_init(&ld, s->u.goto_statement.target.value,
+                     target_number,
+                     0);
+      SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
+      gen_placeholder_jmp(f, h, target_number);
+    }
+  } break;
+  case AST_STATEMENT_LABEL: {
+    struct labeldata *data = frame_try_find_labeldata(h, s->u.label_statement.label.value);
+    if (data) {
+      /* The goto was seen -- it has info on our var locations. */
+      CHECK(!data->label_found);
+      data->label_found = 1;
+      frame_define_target(h, data->target_number, objfile_section_size(objfile_text(f)));
+    } else {
+      size_t target_number = frame_add_target(h);
+      frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
+
+      /* The goto was not seen yet -- define our own var locations! */
+      struct labeldata ld;
+      labeldata_init(&ld, s->u.label_statement.label.value,
+                     target_number,
+                     1);
+      SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
+    }
+  } break;
+  case AST_STATEMENT_IFTHEN: {
+    int32_t saved_offset = frame_save_offset(h);
+    struct expr_return er = open_expr_return();
+    if (!gen_expr(cs, f, h, s->u.ifthen_statement.condition, &er)) {
+      return 0;
+    }
+
+    size_t target_number = frame_add_target(h);
+    gen_placeholder_jmp_if_false(f, h, er.u.loc, target_number);
+    frame_restore_offset(h, saved_offset);
+
+    gen_bracebody(cs, f, h, &s->u.ifthen_statement.thenbody);
+
+    frame_define_target(h, target_number,
+                        objfile_section_size(objfile_text(f)));
+  } break;
+  case AST_STATEMENT_IFTHENELSE: {
+    int32_t saved_offset = frame_save_offset(h);
+    struct expr_return er = open_expr_return();
+    if (!gen_expr(cs, f, h, s->u.ifthenelse_statement.condition, &er)) {
+      return 0;
+    }
+
+    size_t target_number = frame_add_target(h);
+    gen_placeholder_jmp_if_false(f, h, er.u.loc, target_number);
+    frame_restore_offset(h, saved_offset);
+
+    gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.thenbody);
+
+    size_t end_target_number = frame_add_target(h);
+    gen_placeholder_jmp(f, h, end_target_number);
+
+    frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
+
+    gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.elsebody);
+
+    frame_define_target(h, end_target_number,
+                        objfile_section_size(objfile_text(f)));
+  } break;
+  case AST_STATEMENT_WHILE: {
+    size_t top_target_number = frame_add_target(h);
+    frame_define_target(h, top_target_number, objfile_section_size(objfile_text(f)));
+
+    int32_t saved_offset = frame_save_offset(h);
+    struct expr_return er = open_expr_return();
+    if (!gen_expr(cs, f, h, s->u.while_statement.condition, &er)) {
+      return 0;
+    }
+
+    size_t bottom_target_number = frame_add_target(h);
+    gen_placeholder_jmp_if_false(f, h, er.u.loc, bottom_target_number);
+    frame_restore_offset(h, saved_offset);
+
+    gen_bracebody(cs, f, h, &s->u.while_statement.body);
+
+    gen_placeholder_jmp(f, h, top_target_number);
+    frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
+  } break;
+  default:
+    UNREACHABLE();
+  }
+
+  return 1;
+}
+
+int gen_bracebody(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_bracebody *a) {
   size_t vars_pushed = 0;
   int32_t initial_stack_offset = h->stack_offset;
 
   for (size_t i = 0, e = a->statements_count; i < e; i++) {
     struct ast_statement *s = &a->statements[i];
-    switch (s->tag) {
-    case AST_STATEMENT_EXPR: {
-      int32_t saved_offset = frame_save_offset(h);
-      struct expr_return er = open_expr_return();
-      if (!gen_expr(cs, f, h, s->u.expr, &er)) {
-        return 0;
-      }
-      frame_restore_offset(h, saved_offset);
-    } break;
-    case AST_STATEMENT_RETURN_EXPR: {
-      int32_t saved_offset = frame_save_offset(h);
-      struct expr_return er = demand_expr_return(frame_return_loc(h));
-      if (!gen_expr(cs, f, h, s->u.return_expr, &er)) {
-        return 0;
-      }
-
-      gen_return(f, h);
-      frame_restore_offset(h, saved_offset);
-    } break;
-    case AST_STATEMENT_VAR: {
-      uint32_t var_size = kira_sizeof(&cs->nt,
-                                      ast_var_statement_type(&s->u.var_statement));
-      struct loc var_loc = frame_push_loc(h, var_size);
-
-      if (s->u.var_statement.has_rhs) {
-        int32_t saved_offset = frame_save_offset(h);
-
-        struct expr_return er = demand_expr_return(var_loc);
-        if (!gen_expr(cs, f, h, s->u.var_statement.rhs_, &er)) {
-          return 0;
-        }
-        frame_restore_offset(h, saved_offset);
-      }
-
-      struct vardata vd;
-      size_t var_number = h->var_number;
-      h->var_number++;
-      vardata_init(&vd, s->u.var_statement.decl.name.value,
-                   var_number,
-                   ast_var_statement_type(&s->u.var_statement),
-                   var_size,
-                   var_loc);
-      SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
-      vars_pushed++;
-    } break;
-    case AST_STATEMENT_GOTO: {
-      struct labeldata *data = frame_try_find_labeldata(h, s->u.goto_statement.target.value);
-      if (data) {
-        /* The label is seen -- it has info on its var locations. */
-        gen_placeholder_jmp(f, h, data->target_number);
-      } else {
-        size_t target_number = frame_add_target(h);
-        /* The label is not seen yet -- plainly impose our var locations upon it! */
-        struct labeldata ld;
-        labeldata_init(&ld, s->u.goto_statement.target.value,
-                       target_number,
-                       0);
-        SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
-        gen_placeholder_jmp(f, h, target_number);
-      }
-    } break;
-    case AST_STATEMENT_LABEL: {
-      struct labeldata *data = frame_try_find_labeldata(h, s->u.label_statement.label.value);
-      if (data) {
-        /* The goto was seen -- it has info on our var locations. */
-        CHECK(!data->label_found);
-        data->label_found = 1;
-        frame_define_target(h, data->target_number, objfile_section_size(objfile_text(f)));
-      } else {
-        size_t target_number = frame_add_target(h);
-        frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
-
-        /* The goto was not seen yet -- define our own var locations! */
-        struct labeldata ld;
-        labeldata_init(&ld, s->u.label_statement.label.value,
-                       target_number,
-                       1);
-        SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
-      }
-    } break;
-    case AST_STATEMENT_IFTHEN: {
-      int32_t saved_offset = frame_save_offset(h);
-      struct expr_return er = open_expr_return();
-      if (!gen_expr(cs, f, h, s->u.ifthen_statement.condition, &er)) {
-        return 0;
-      }
-
-      size_t target_number = frame_add_target(h);
-      gen_placeholder_jmp_if_false(f, h, er.u.loc, target_number);
-      frame_restore_offset(h, saved_offset);
-
-      gen_bracebody(cs, f, h, &s->u.ifthen_statement.thenbody);
-
-      frame_define_target(h, target_number,
-                          objfile_section_size(objfile_text(f)));
-    } break;
-    case AST_STATEMENT_IFTHENELSE: {
-      int32_t saved_offset = frame_save_offset(h);
-      struct expr_return er = open_expr_return();
-      if (!gen_expr(cs, f, h, s->u.ifthenelse_statement.condition, &er)) {
-        return 0;
-      }
-
-      size_t target_number = frame_add_target(h);
-      gen_placeholder_jmp_if_false(f, h, er.u.loc, target_number);
-      frame_restore_offset(h, saved_offset);
-
-      gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.thenbody);
-
-      size_t end_target_number = frame_add_target(h);
-      gen_placeholder_jmp(f, h, end_target_number);
-
-      frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
-
-      gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.elsebody);
-
-      frame_define_target(h, end_target_number,
-                          objfile_section_size(objfile_text(f)));
-    } break;
-    case AST_STATEMENT_WHILE: {
-      size_t top_target_number = frame_add_target(h);
-      frame_define_target(h, top_target_number, objfile_section_size(objfile_text(f)));
-
-      int32_t saved_offset = frame_save_offset(h);
-      struct expr_return er = open_expr_return();
-      if (!gen_expr(cs, f, h, s->u.while_statement.condition, &er)) {
-        return 0;
-      }
-
-      size_t bottom_target_number = frame_add_target(h);
-      gen_placeholder_jmp_if_false(f, h, er.u.loc, bottom_target_number);
-      frame_restore_offset(h, saved_offset);
-
-      gen_bracebody(cs, f, h, &s->u.while_statement.body);
-
-      gen_placeholder_jmp(f, h, top_target_number);
-      frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
-    } break;
-    default:
-      UNREACHABLE();
+    if (!gen_statement(cs, f, h, s, &vars_pushed)) {
+      return 0;
     }
   }
 
