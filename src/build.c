@@ -1312,16 +1312,16 @@ void gen_primitive_op_behavior(struct objfile *f,
   int32_t off0 = h->stack_offset;
   int32_t off1 = int32_add(h->stack_offset, DWORD_SIZE);
   switch (prim_op) {
-  case PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE: {
+  case PRIMITIVE_OP_CONVERT_U8_TO_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
   } break;
-  case PRIMITIVE_OP_CONVERT_BYTE_TO_I32: {
+  case PRIMITIVE_OP_CONVERT_U8_TO_I32: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
   } break;
-  case PRIMITIVE_OP_CONVERT_BYTE_TO_U32: {
+  case PRIMITIVE_OP_CONVERT_U8_TO_U32: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
   } break;
-  case PRIMITIVE_OP_CONVERT_I32_TO_BYTE: {
+  case PRIMITIVE_OP_CONVERT_I32_TO_U8: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
   } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
@@ -1332,7 +1332,7 @@ void gen_primitive_op_behavior(struct objfile *f,
     x86_gen_test_regs32(f, X86_EAX, X86_EAX);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
-  case PRIMITIVE_OP_CONVERT_U32_TO_BYTE: {
+  case PRIMITIVE_OP_CONVERT_U32_TO_U8: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_cmp_imm32(f, X86_EAX, 255);
     gen_crash_jcc(f, h, X86_JCC_A);
@@ -1527,73 +1527,73 @@ void gen_primitive_op_behavior(struct objfile *f,
     x86_gen_shr_cl_w32(f, X86_EAX);
   } break;
 
-  case PRIMITIVE_OP_ADD_BYTE: {
+  case PRIMITIVE_OP_ADD_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_add_w8(f, X86_AL, X86_CL);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
-  case PRIMITIVE_OP_SUB_BYTE: {
+  case PRIMITIVE_OP_SUB_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_sub_w8(f, X86_AL, X86_CL);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
-  case PRIMITIVE_OP_MUL_BYTE: {
+  case PRIMITIVE_OP_MUL_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_alah_mul_w8(f, X86_CL);
     gen_crash_jcc(f, h, X86_JCC_C);
     x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
   } break;
-  case PRIMITIVE_OP_DIV_BYTE: {
+  case PRIMITIVE_OP_DIV_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_alah_div_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
     x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
   } break;
-  case PRIMITIVE_OP_MOD_BYTE: {
+  case PRIMITIVE_OP_MOD_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_alah_div_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
     x86_gen_mov_reg8(f, X86_AL, X86_AH);
   } break;
-  case PRIMITIVE_OP_LT_BYTE: {
+  case PRIMITIVE_OP_LT_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_B);
   } break;
-  case PRIMITIVE_OP_LE_BYTE: {
+  case PRIMITIVE_OP_LE_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_BE);
   } break;
-  case PRIMITIVE_OP_GT_BYTE: {
+  case PRIMITIVE_OP_GT_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_A);
   } break;
-  case PRIMITIVE_OP_GE_BYTE: {
+  case PRIMITIVE_OP_GE_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_AE);
   } break;
-  case PRIMITIVE_OP_EQ_BYTE: {
+  case PRIMITIVE_OP_EQ_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_E);
   } break;
-  case PRIMITIVE_OP_NE_BYTE: {
+  case PRIMITIVE_OP_NE_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_NE);
   } break;
-  case PRIMITIVE_OP_BIT_XOR_BYTE: {
+  case PRIMITIVE_OP_BIT_XOR_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_xor_w32(f, X86_EAX, X86_ECX);
   } break;
-  case PRIMITIVE_OP_BIT_OR_BYTE: {
+  case PRIMITIVE_OP_BIT_OR_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_or_w32(f, X86_EAX, X86_ECX);
   } break;
-  case PRIMITIVE_OP_BIT_AND_BYTE: {
+  case PRIMITIVE_OP_BIT_AND_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_and_w32(f, X86_EAX, X86_ECX);
   } break;
-  case PRIMITIVE_OP_BIT_LEFTSHIFT_BYTE: {
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
@@ -1603,7 +1603,7 @@ void gen_primitive_op_behavior(struct objfile *f,
 
     x86_gen_shl_cl_w8(f, X86_AL);
   } break;
-  case PRIMITIVE_OP_BIT_RIGHTSHIFT_BYTE: {
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
@@ -1856,8 +1856,8 @@ enum numeric_type get_numeric_type(struct identmap *im, struct ast_typeexpr *a) 
   const void *buf;
   size_t count;
   identmap_lookup(im, a->u.name.value, &buf, &count);
-  if (count == strlen(BYTE_TYPE_NAME) && 0 == memcmp(buf, BYTE_TYPE_NAME, count)) {
-    return NUMERIC_TYPE_BYTE;
+  if (count == strlen(U8_TYPE_NAME) && 0 == memcmp(buf, U8_TYPE_NAME, count)) {
+    return NUMERIC_TYPE_U8;
   }
   if (count == strlen(I32_TYPE_NAME) && 0 == memcmp(buf, I32_TYPE_NAME, count)) {
     return NUMERIC_TYPE_I32;
@@ -2365,13 +2365,13 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
                                sizeof(inst->value.u.u32_value));
     return 1;
   } break;
-  case STATIC_VALUE_BYTE: {
+  case STATIC_VALUE_U8: {
     /* TODO: How should we align our global bytes? */
     objfile_section_align_dword(objfile_data(f));
     objfile_set_symbol_Value(f, inst->symbol_table_index,
                              objfile_section_size(objfile_data(f)));
     uint8_t bytes[4] = { 0 };
-    bytes[0] = inst->value.u.byte_value;
+    bytes[0] = inst->value.u.u8_value;
     objfile_section_append_raw(objfile_data(f), bytes, 4);
     return 1;
   } break;

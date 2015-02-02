@@ -49,4 +49,4 @@ def showfacs func[ptr[ty], ty] = fn(p ptr[ty]) ty {
   return ret;
 };
 
-def byte_value byte = convert(3);
+def u8_value u8 = convert(3);

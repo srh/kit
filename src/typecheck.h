@@ -8,7 +8,7 @@
 #include "identmap.h"
 
 #define VOID_TYPE_NAME "void"
-#define BYTE_TYPE_NAME "byte"
+#define U8_TYPE_NAME "u8"
 #define I32_TYPE_NAME "i32"
 #define U32_TYPE_NAME "u32"
 #define PTR_TYPE_NAME "ptr"
@@ -17,7 +17,7 @@
 #define KIRA_BOOL_SIZE 4
 
 enum numeric_type {
-  NUMERIC_TYPE_BYTE,
+  NUMERIC_TYPE_U8,
   NUMERIC_TYPE_I32,
   NUMERIC_TYPE_U32,
 };

@@ -20,7 +20,7 @@ const int MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH = 50;
 
 uint32_t numeric_type_size(enum numeric_type t) {
   switch (t) {
-  case NUMERIC_TYPE_BYTE: return 1;
+  case NUMERIC_TYPE_U8: return 1;
   case NUMERIC_TYPE_I32: return 4;
   case NUMERIC_TYPE_U32: return 4;
   default: UNREACHABLE();
@@ -119,24 +119,24 @@ static const enum primitive_op binop_u32_primitive_ops[] = {
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
 
-static const enum primitive_op binop_byte_primitive_ops[] = {
+static const enum primitive_op binop_u8_primitive_ops[] = {
   [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
-  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_BYTE,
-  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_BYTE,
-  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_BYTE,
-  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_BYTE,
-  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_BYTE,
-  [AST_BINOP_LT] = PRIMITIVE_OP_LT_BYTE,
-  [AST_BINOP_LE] = PRIMITIVE_OP_LE_BYTE,
-  [AST_BINOP_GT] = PRIMITIVE_OP_GT_BYTE,
-  [AST_BINOP_GE] = PRIMITIVE_OP_GE_BYTE,
-  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_BYTE,
-  [AST_BINOP_NE] = PRIMITIVE_OP_NE_BYTE,
-  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_BYTE,
-  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_BYTE,
-  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_BYTE,
-  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_BYTE,
-  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_BYTE,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_U8,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_U8,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_U8,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_U8,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_U8,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_U8,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_U8,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_U8,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_U8,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_U8,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_U8,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_U8,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_U8,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_U8,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_U8,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_U8,
   [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
@@ -166,7 +166,7 @@ int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x) {
 
 void checkstate_import_primitive_types(struct checkstate *cs) {
   intern_primitive_type(cs, VOID_TYPE_NAME, NULL, 0, 0, 1);
-  intern_primitive_type(cs, BYTE_TYPE_NAME, NULL, 0, 1, 1);
+  intern_primitive_type(cs, U8_TYPE_NAME, NULL, 0, 1, 1);
   intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0, 4, 4);
   intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0, 4, 4);
 
@@ -259,7 +259,7 @@ void import_integer_binops(struct checkstate *cs,
 
 void import_integer_conversions(struct checkstate *cs) {
   ident_value types[3];
-  types[0] = identmap_intern_c_str(cs->im, BYTE_TYPE_NAME);
+  types[0] = identmap_intern_c_str(cs->im, U8_TYPE_NAME);
   types[1] = identmap_intern_c_str(cs->im, I32_TYPE_NAME);
   types[2] = identmap_intern_c_str(cs->im, U32_TYPE_NAME);
 
@@ -270,15 +270,15 @@ void import_integer_conversions(struct checkstate *cs) {
 
   enum primitive_op conversions[3][3] = {
     {
-      PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE,
-      PRIMITIVE_OP_CONVERT_BYTE_TO_I32,
-      PRIMITIVE_OP_CONVERT_BYTE_TO_U32,
+      PRIMITIVE_OP_CONVERT_U8_TO_U8,
+      PRIMITIVE_OP_CONVERT_U8_TO_I32,
+      PRIMITIVE_OP_CONVERT_U8_TO_U32,
     }, {
-      PRIMITIVE_OP_CONVERT_I32_TO_BYTE,
+      PRIMITIVE_OP_CONVERT_I32_TO_U8,
       PRIMITIVE_OP_CONVERT_I32_TO_I32,
       PRIMITIVE_OP_CONVERT_I32_TO_U32,
     }, {
-      PRIMITIVE_OP_CONVERT_U32_TO_BYTE,
+      PRIMITIVE_OP_CONVERT_U32_TO_U8,
       PRIMITIVE_OP_CONVERT_U32_TO_I32,
       PRIMITIVE_OP_CONVERT_U32_TO_U32,
     },
@@ -304,7 +304,7 @@ void import_integer_conversions(struct checkstate *cs) {
 void checkstate_import_primitive_defs(struct checkstate *cs) {
   import_integer_binops(cs, binop_i32_primitive_ops, I32_TYPE_NAME);
   import_integer_binops(cs, binop_u32_primitive_ops, U32_TYPE_NAME);
-  import_integer_binops(cs, binop_byte_primitive_ops, BYTE_TYPE_NAME);
+  import_integer_binops(cs, binop_u8_primitive_ops, U8_TYPE_NAME);
 
   import_integer_conversions(cs);
 
@@ -2349,9 +2349,9 @@ uint32_t st_u32(struct static_value *value) {
   return value->u.u32_value;
 }
 
-uint8_t st_byte(struct static_value *value) {
-  CHECK(value->tag == STATIC_VALUE_BYTE);
-  return value->u.byte_value;
+uint8_t st_u8(struct static_value *value) {
+  CHECK(value->tag == STATIC_VALUE_U8);
+  return value->u.u8_value;
 }
 
 int apply_static_funcall(struct static_value *func,
@@ -2366,30 +2366,30 @@ int apply_static_funcall(struct static_value *func,
   switch (params_count) {
   case 1:
     switch (func->u.primitive_op) {
-    case PRIMITIVE_OP_CONVERT_BYTE_TO_BYTE: {
-      CHECK(params[0].tag == STATIC_VALUE_BYTE);
-      static_value_init_byte(out, params[0].u.byte_value);
+    case PRIMITIVE_OP_CONVERT_U8_TO_U8: {
+      CHECK(params[0].tag == STATIC_VALUE_U8);
+      static_value_init_u8(out, params[0].u.u8_value);
       return 1;
     } break;
-    case PRIMITIVE_OP_CONVERT_BYTE_TO_I32: {
-      CHECK(params[0].tag == STATIC_VALUE_BYTE);
-      static_value_init_i32(out, params[0].u.byte_value);
+    case PRIMITIVE_OP_CONVERT_U8_TO_I32: {
+      CHECK(params[0].tag == STATIC_VALUE_U8);
+      static_value_init_i32(out, params[0].u.u8_value);
       return 1;
     } break;
-    case PRIMITIVE_OP_CONVERT_BYTE_TO_U32: {
-      CHECK(params[0].tag == STATIC_VALUE_BYTE);
-      static_value_init_u32(out, params[0].u.byte_value);
+    case PRIMITIVE_OP_CONVERT_U8_TO_U32: {
+      CHECK(params[0].tag == STATIC_VALUE_U8);
+      static_value_init_u32(out, params[0].u.u8_value);
       return 1;
     } break;
-    case PRIMITIVE_OP_CONVERT_I32_TO_BYTE: {
+    case PRIMITIVE_OP_CONVERT_I32_TO_U8: {
       CHECK(params[0].tag == STATIC_VALUE_I32);
       int32_t val = params[0].u.i32_value;
       uint8_t result;
       if (!try_int32_to_uint8(val, &result)) {
-        ERR_DBG("Could not convert i32 %"PRIi32" to a byte.\n", val);
+        ERR_DBG("Could not convert i32 %"PRIi32" to a u8.\n", val);
         return 0;
       }
-      static_value_init_byte(out, result);
+      static_value_init_u8(out, result);
       return 1;
     } break;
     case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
@@ -2408,15 +2408,15 @@ int apply_static_funcall(struct static_value *func,
       static_value_init_u32(out, result);
       return 1;
     } break;
-    case PRIMITIVE_OP_CONVERT_U32_TO_BYTE: {
+    case PRIMITIVE_OP_CONVERT_U32_TO_U8: {
       CHECK(params[0].tag == STATIC_VALUE_U32);
       uint32_t val = params[0].u.u32_value;
       uint8_t result;
       if (!try_uint32_to_uint8(val, &result)) {
-        ERR_DBG("Could not convert u32 %"PRIu32" to a byte.\n", val);
+        ERR_DBG("Could not convert u32 %"PRIu32" to a u8.\n", val);
         return 0;
       }
-      static_value_init_byte(out, result);
+      static_value_init_u8(out, result);
       return 1;
     } break;
     case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
@@ -2453,10 +2453,10 @@ int apply_static_funcall(struct static_value *func,
   case 2: {
     int succ_i32 = 0;
     int succ_u32 = 0;
-    int succ_byte = 0;
+    int succ_u8 = 0;
     int32_t val_i32 = 0; /* Initialized to make cl shut up. */
     uint32_t val_u32 = 0; /* Initialized to make cl shut up. */
-    uint8_t val_byte = 0; /* Initialized to make cl shut up. */
+    uint8_t val_u8 = 0; /* Initialized to make cl shut up. */
     switch (func->u.primitive_op) {
     case PRIMITIVE_OP_ADD_I32:
       succ_i32 = try_int32_add(st_i32(&params[0]), st_i32(&params[1]), &val_i32);
@@ -2629,77 +2629,77 @@ int apply_static_funcall(struct static_value *func,
       }
     } break;
 
-    case PRIMITIVE_OP_ADD_BYTE:
-      succ_byte = try_uint8_add(st_byte(&params[0]), st_byte(&params[1]), &val_byte);
+    case PRIMITIVE_OP_ADD_U8:
+      succ_u8 = try_uint8_add(st_u8(&params[0]), st_u8(&params[1]), &val_u8);
       break;
-    case PRIMITIVE_OP_SUB_BYTE:
-      succ_byte = try_uint8_sub(st_byte(&params[0]), st_byte(&params[1]), &val_byte);
+    case PRIMITIVE_OP_SUB_U8:
+      succ_u8 = try_uint8_sub(st_u8(&params[0]), st_u8(&params[1]), &val_u8);
       break;
-    case PRIMITIVE_OP_MUL_BYTE:
-      succ_byte = try_uint8_mul(st_byte(&params[0]), st_byte(&params[1]), &val_byte);
+    case PRIMITIVE_OP_MUL_U8:
+      succ_u8 = try_uint8_mul(st_u8(&params[0]), st_u8(&params[1]), &val_u8);
       break;
-    case PRIMITIVE_OP_DIV_BYTE:
-      succ_byte = try_uint8_div(st_byte(&params[0]), st_byte(&params[1]), &val_byte);
+    case PRIMITIVE_OP_DIV_U8:
+      succ_u8 = try_uint8_div(st_u8(&params[0]), st_u8(&params[1]), &val_u8);
       break;
-    case PRIMITIVE_OP_MOD_BYTE:
-      succ_byte = try_uint8_mod(st_byte(&params[0]), st_byte(&params[1]), &val_byte);
+    case PRIMITIVE_OP_MOD_U8:
+      succ_u8 = try_uint8_mod(st_u8(&params[0]), st_u8(&params[1]), &val_u8);
       break;
-    case PRIMITIVE_OP_LT_BYTE:
-      val_byte = (st_byte(&params[0]) < st_byte(&params[1]));
-      succ_byte = 1;
+    case PRIMITIVE_OP_LT_U8:
+      val_u8 = (st_u8(&params[0]) < st_u8(&params[1]));
+      succ_u8 = 1;
       break;
-    case PRIMITIVE_OP_LE_BYTE:
-      val_byte = (st_byte(&params[0]) <= st_byte(&params[1]));
-      succ_byte = 1;
+    case PRIMITIVE_OP_LE_U8:
+      val_u8 = (st_u8(&params[0]) <= st_u8(&params[1]));
+      succ_u8 = 1;
       break;
-    case PRIMITIVE_OP_GT_BYTE:
-      val_byte = (st_byte(&params[0]) > st_byte(&params[1]));
-      succ_byte = 1;
+    case PRIMITIVE_OP_GT_U8:
+      val_u8 = (st_u8(&params[0]) > st_u8(&params[1]));
+      succ_u8 = 1;
       break;
-    case PRIMITIVE_OP_GE_BYTE:
-      val_byte = (st_byte(&params[0]) >= st_byte(&params[1]));
-      succ_byte = 1;
+    case PRIMITIVE_OP_GE_U8:
+      val_u8 = (st_u8(&params[0]) >= st_u8(&params[1]));
+      succ_u8 = 1;
       break;
-    case PRIMITIVE_OP_EQ_BYTE:
-      val_byte = (st_byte(&params[0]) == st_byte(&params[1]));
-      succ_byte = 1;
+    case PRIMITIVE_OP_EQ_U8:
+      val_u8 = (st_u8(&params[0]) == st_u8(&params[1]));
+      succ_u8 = 1;
       break;
-    case PRIMITIVE_OP_NE_BYTE:
-      val_byte = (st_byte(&params[0]) != st_byte(&params[1]));
-      succ_byte = 1;
+    case PRIMITIVE_OP_NE_U8:
+      val_u8 = (st_u8(&params[0]) != st_u8(&params[1]));
+      succ_u8 = 1;
       break;
-    case PRIMITIVE_OP_BIT_XOR_BYTE:
-      val_byte = (st_byte(&params[0]) ^ st_byte(&params[1]));
-      succ_byte = 1;
+    case PRIMITIVE_OP_BIT_XOR_U8:
+      val_u8 = (st_u8(&params[0]) ^ st_u8(&params[1]));
+      succ_u8 = 1;
       break;
-    case PRIMITIVE_OP_BIT_OR_BYTE:
-      val_byte = (st_byte(&params[0]) | st_byte(&params[1]));
-      succ_byte = 1;
+    case PRIMITIVE_OP_BIT_OR_U8:
+      val_u8 = (st_u8(&params[0]) | st_u8(&params[1]));
+      succ_u8 = 1;
       break;
-    case PRIMITIVE_OP_BIT_AND_BYTE:
-      val_byte = (st_byte(&params[0]) & st_byte(&params[1]));
-      succ_byte = 1;
+    case PRIMITIVE_OP_BIT_AND_U8:
+      val_u8 = (st_u8(&params[0]) & st_u8(&params[1]));
+      succ_u8 = 1;
       break;
-    case PRIMITIVE_OP_BIT_LEFTSHIFT_BYTE: {
-      if (st_byte(&params[1]) >= 8) {
+    case PRIMITIVE_OP_BIT_LEFTSHIFT_U8: {
+      if (st_u8(&params[1]) >= 8) {
         break;
       } else {
-        uint32_t left32 = st_byte(&params[0]);
-        left32 <<= st_byte(&params[1]);
+        uint32_t left32 = st_u8(&params[0]);
+        left32 <<= st_u8(&params[1]);
         if (left32 > UINT8_MAX) {
           break;
         } else {
-          val_byte = (uint8_t)left32;
-          succ_byte = 1;
+          val_u8 = (uint8_t)left32;
+          succ_u8 = 1;
         }
       }
     } break;
-    case PRIMITIVE_OP_BIT_RIGHTSHIFT_BYTE: {
-      if (st_byte(&params[1]) >= 8) {
+    case PRIMITIVE_OP_BIT_RIGHTSHIFT_U8: {
+      if (st_u8(&params[1]) >= 8) {
         break;
       } else {
-        val_byte = (st_byte(&params[0]) >> st_byte(&params[1]));
-        succ_byte = 1;
+        val_u8 = (st_u8(&params[0]) >> st_u8(&params[1]));
+        succ_u8 = 1;
       }
     } break;
     default:
@@ -2710,8 +2710,8 @@ int apply_static_funcall(struct static_value *func,
       static_value_init_i32(out, val_i32);
     } else if (succ_u32) {
       static_value_init_u32(out, val_u32);
-    } else if (succ_byte) {
-      static_value_init_byte(out, val_byte);
+    } else if (succ_u8) {
+      static_value_init_u8(out, val_u8);
     } else {
       ERR_DBG("Binary operation cannot be statically evaluated.\n");
       return 0;
