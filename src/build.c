@@ -1747,6 +1747,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_UNOP_NEGATE:
+  case AST_UNOP_CONVERT:
   default:
     UNREACHABLE();
   }

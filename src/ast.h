@@ -258,8 +258,10 @@ void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,
 enum ast_unop {
   AST_UNOP_DEREFERENCE,
   AST_UNOP_ADDRESSOF,
-  /* TODO: Remove this (only have magic unops). */
+  /* Ops below are seen while parsing, but don't show up in
+     ast_unop_expr. */
   AST_UNOP_NEGATE,
+  AST_UNOP_CONVERT,
 };
 
 int is_magic_unop(enum ast_unop unop);

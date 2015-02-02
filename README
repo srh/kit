@@ -30,7 +30,7 @@ Here's the project timeline:
    5a. Array indexing through pointers. (DONE)
    5b. Non-redundant function syntax.
    5c. Implicit conversions (for array->ptr, user-defined(?), and literals).
-   5d. Tilde-conversion operator.
+   5d. Tilde-conversion operator. (DONE)
    5e. An array type. (DONE)
    5f. Bitwise not operator.
    5g. i16, u16, i8 datatypes.

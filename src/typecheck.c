@@ -156,7 +156,7 @@ void intern_binop(struct checkstate *cs,
       type);
 }
 
-#define CONVERT_FUNCTION_NAME "convert"
+#define CONVERT_FUNCTION_NAME "~"
 
 int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x) {
   return x->tag == AST_TYPEEXPR_APP
@@ -1800,6 +1800,8 @@ int check_expr_magic_unop(struct exprscope *es,
                        x->operator, annotated_rhs);
     ret = 1;
   } break;
+  case AST_UNOP_NEGATE:
+  case AST_UNOP_CONVERT:
   default:
     UNREACHABLE();
   }
@@ -3708,7 +3710,7 @@ int check_file_test_more_8(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def[T] add32 func[i32, T, i32] = fn(x i32, y T) i32 {\n"
-      "  var z i32 = convert(4);\n"
+      "  var z i32 = ~4;\n"
       "  return x + z;\n"
       "};\n"
       "def bar func[i32] = fn() i32 {\n"
@@ -3738,7 +3740,7 @@ int check_file_test_more_10(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def x i32 = convert(4u);\n"
+      "def x i32 = ~4u;\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -3783,7 +3785,7 @@ int check_file_test_more_13(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def foo func[i32] = fn() i32 {\n"
-      "  return 2 + convert(3u);\n"
+      "  return 2 + ~3u;\n"
       "};\n"
     } };
 
@@ -3796,7 +3798,7 @@ int check_file_test_more_14(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def foo func[i32] = fn() i32 {\n"
-      "  return 2 + convert(3u) :: i32;\n"
+      "  return 2 + ~3u :: i32;\n"
       "};\n"
     } };
 

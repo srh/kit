@@ -180,6 +180,7 @@ const int unop_precedences[] = {
   [AST_UNOP_DEREFERENCE] = 905,
   [AST_UNOP_ADDRESSOF] = 905,
   [AST_UNOP_NEGATE] = 905,
+  [AST_UNOP_CONVERT] = 905,
 };
 
 int unop_right_precedence(enum ast_unop op) {
@@ -386,7 +387,7 @@ int try_skip_oper(struct ps *p, const char *s) {
 int try_parse_unop(struct ps *p, enum ast_unop *out, struct ast_ident *name_out) {
   struct pos start_pos = ps_pos(p);
   int32_t ch1 = ps_peek(p);
-  if (is_one_of("*&-", ch1)) {
+  if (is_one_of("*&-~", ch1)) {
     struct ps_savestate save = ps_save(p);
     ps_step(p);
     if (is_operlike(ps_peek(p))) {
@@ -395,7 +396,8 @@ int try_parse_unop(struct ps *p, enum ast_unop *out, struct ast_ident *name_out)
     }
     enum ast_unop op = (ch1 == '*' ? AST_UNOP_DEREFERENCE
                         : ch1 == '&' ? AST_UNOP_ADDRESSOF
-                        : AST_UNOP_NEGATE);
+                        : ch1 == '-' ? AST_UNOP_NEGATE
+                        : AST_UNOP_CONVERT);
     uint8_t buf[1];
     buf[0] = (uint8_t)ch1;
     ident_value ident = identmap_intern(&p->im, buf, 1);
