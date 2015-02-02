@@ -586,6 +586,31 @@ void ast_index_expr_destroy(struct ast_index_expr *a) {
   a->rhs = NULL;
 }
 
+void ast_typed_expr_init(struct ast_typed_expr *a,
+                         struct ast_meta meta,
+                         struct ast_expr lhs,
+                         struct ast_typeexpr type) {
+  a->meta = meta;
+  ast_expr_alloc_move(lhs, &a->lhs);
+  a->type = type;
+}
+
+void ast_typed_expr_init_copy(struct ast_typed_expr *a,
+                              struct ast_typed_expr *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_expr_alloc_init_copy(c->lhs, &a->lhs);
+  ast_typeexpr_init_copy(&a->type, &c->type);
+}
+
+void ast_typed_expr_destroy(struct ast_typed_expr *a) {
+  ast_meta_destroy(&a->meta);
+  ast_expr_destroy(a->lhs);
+  free(a->lhs);
+  a->lhs = NULL;
+  ast_typeexpr_destroy(&a->type);
+}
+
+
 struct ast_expr_info ast_expr_info_default(void) {
   struct ast_expr_info ret;
   ret.is_typechecked = 0;
@@ -625,6 +650,7 @@ struct ast_meta *ast_expr_ast_meta(struct ast_expr *a) {
   case AST_EXPR_LAMBDA: return &a->u.lambda.meta;
   case AST_EXPR_LOCAL_FIELD_ACCESS: return &a->u.local_field_access.meta;
   case AST_EXPR_DEREF_FIELD_ACCESS: return &a->u.deref_field_access.meta;
+  case AST_EXPR_TYPED: return &a->u.typed_expr.meta;
   default: UNREACHABLE();
   }
 }
@@ -674,6 +700,9 @@ void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c) {
     ast_deref_field_access_init_copy(&a->u.deref_field_access,
                                      &c->u.deref_field_access);
     break;
+  case AST_EXPR_TYPED:
+    ast_typed_expr_init_copy(&a->u.typed_expr, &c->u.typed_expr);
+    break;
   default:
     UNREACHABLE();
   }
@@ -707,6 +736,9 @@ void ast_expr_destroy(struct ast_expr *a) {
     break;
   case AST_EXPR_DEREF_FIELD_ACCESS:
     ast_deref_field_access_destroy(&a->u.deref_field_access);
+    break;
+  case AST_EXPR_TYPED:
+    ast_typed_expr_destroy(&a->u.typed_expr);
     break;
   default:
     UNREACHABLE();

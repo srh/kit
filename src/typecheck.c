@@ -2182,6 +2182,28 @@ int check_expr(struct exprscope *es,
                           ast_expr_info_typechecked(type));
     return 1;
   } break;
+  case AST_EXPR_TYPED: {
+    struct ast_typeexpr replaced_type;
+    replace_generics(es, &x->u.typed_expr.type, &replaced_type);
+
+    struct ast_expr annotated_lhs;
+    int is_lvalue;
+    if (!check_expr(es, x->u.typed_expr.lhs, &replaced_type, &is_lvalue,
+                    &annotated_lhs)) {
+      ast_typeexpr_destroy(&replaced_type);
+    }
+
+    struct ast_typeexpr old_type_copy;
+    ast_typeexpr_init_copy(&old_type_copy, &x->u.typed_expr.type);
+    ast_expr_partial_init(annotated_out, AST_EXPR_TYPED,
+                          ast_expr_info_typechecked(replaced_type));
+    ast_typed_expr_init(&annotated_out->u.typed_expr,
+                        ast_meta_make_copy(&x->u.typed_expr.meta),
+                        annotated_lhs,
+                        old_type_copy);
+    *is_lvalue_out = is_lvalue;
+    return 1;
+  } break;
   default:
     UNREACHABLE();
   }
@@ -2799,6 +2821,8 @@ int eval_static_value(struct ast_expr *expr,
     CRASH("No deref field access expression should have been deemed"
           "statically evaluable.\n");
   } break;
+  case AST_EXPR_TYPED:
+    return eval_static_value(expr->u.typed_expr.lhs, out);
   default:
     UNREACHABLE();
   }
@@ -3752,6 +3776,34 @@ int check_file_test_more_12(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_13(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because convert doesn't have a type in context.  (See
+     check_file_test_more_14.) */
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[i32] = fn() i32 {\n"
+      "  return 2 + convert(3u);\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_14(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[i32] = fn() i32 {\n"
+      "  return 2 + convert(3u) :: i32;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -4086,6 +4138,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_12...\n");
   if (!!test_check_module(&im, &check_file_test_more_12, foo)) {
     DBG("check_file_test_more_12 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_13...\n");
+  if (!!test_check_module(&im, &check_file_test_more_13, foo)) {
+    DBG("check_file_test_more_13 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_14...\n");
+  if (!test_check_module(&im, &check_file_test_more_14, foo)) {
+    DBG("check_file_test_more_14 fails\n");
     goto cleanup_identmap;
   }
 

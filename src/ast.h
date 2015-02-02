@@ -296,6 +296,7 @@ enum ast_binop {
   AST_BINOP_BIT_RIGHTSHIFT,
   AST_BINOP_LOGICAL_OR,
   AST_BINOP_LOGICAL_AND,
+  AST_BINOP_TYPE_SPECIFIER,
 };
 
 int is_magic_binop(enum ast_binop binop);
@@ -373,6 +374,21 @@ void ast_index_expr_init_copy(struct ast_index_expr *a,
 
 void ast_index_expr_destroy(struct ast_index_expr *a);
 
+struct ast_typed_expr {
+  struct ast_meta meta;
+  struct ast_expr *lhs;
+  struct ast_typeexpr type;
+};
+
+void ast_typed_expr_init(struct ast_typed_expr *a,
+                         struct ast_meta meta,
+                         struct ast_expr lhs,
+                         struct ast_typeexpr type);
+
+void ast_typed_expr_init_copy(struct ast_typed_expr *a,
+                              struct ast_typed_expr *c);
+
+
 enum ast_expr_tag {
   AST_EXPR_NAME,
   AST_EXPR_NUMERIC_LITERAL,
@@ -383,6 +399,7 @@ enum ast_expr_tag {
   AST_EXPR_LAMBDA,
   AST_EXPR_LOCAL_FIELD_ACCESS,
   AST_EXPR_DEREF_FIELD_ACCESS,
+  AST_EXPR_TYPED,
 };
 
 struct ast_expr_info {
@@ -407,6 +424,7 @@ struct ast_expr {
     struct ast_lambda lambda;
     struct ast_local_field_access local_field_access;
     struct ast_deref_field_access deref_field_access;
+    struct ast_typed_expr typed_expr;
   } u;
 };
 

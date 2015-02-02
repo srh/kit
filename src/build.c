@@ -2145,6 +2145,8 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
                        a->u.deref_field_access.fieldname.value, er);
     return 1;
   } break;
+  case AST_EXPR_TYPED:
+    return gen_expr(cs, f, h, a->u.typed_expr.lhs, er);
   default:
     UNREACHABLE();
   }

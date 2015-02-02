@@ -166,6 +166,8 @@ const struct precedence_pair binop_precedences[] = {
   [AST_BINOP_BIT_RIGHTSHIFT] = { 405, 405 },
   [AST_BINOP_LOGICAL_OR] = { 356, 354 },
   [AST_BINOP_LOGICAL_AND] = { 376, 374 },
+  /* Not really a binary operator at all, but is parsed like one. */
+  [AST_BINOP_TYPE_SPECIFIER] = { 805, 805 },
 };
 
 struct precedence_pair binop_precedence(enum ast_binop op) {
@@ -224,7 +226,7 @@ int is_operlike(int32_t ch) {
 }
 
 int is_binop_start(int32_t ch) {
-  return is_one_of("!%^&*+=-/<>|", ch);
+  return is_one_of("!%^&*+=-/<>|:", ch);
 }
 
 int is_parenlike(int32_t ch) {
@@ -480,6 +482,13 @@ int parse_binop(struct ps *p, enum ast_binop *out,
     }
     op = AST_BINOP_BIT_AND;
     goto done;
+  case ':':
+    if (ps_peek(p) == ':') {
+      ps_step(p);
+      op = AST_BINOP_TYPE_SPECIFIER;
+      goto done;
+    }
+    return 0;
   default:
     return 0;
   }
@@ -1099,16 +1108,34 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
         UNREACHABLE();
       }
 
-      struct ast_expr rhs;
-      if (!(skip_ws(p)
-            && parse_expr(p, &rhs, op_precedence.right_precedence))) {
+      if (op == AST_BINOP_TYPE_SPECIFIER) {
         ast_ident_destroy(&op_name);
-        goto fail;
-      }
 
-      struct ast_expr old_lhs = lhs;
-      build_binop_expr(ast_meta_make(pos_start, ast_expr_pos_end(&rhs)),
-                       op_name, op, old_lhs, rhs, &lhs);
+        struct ast_typeexpr rhs;
+        if (!(skip_ws(p)
+              && parse_typeexpr(p, &rhs))) {
+          goto fail;
+        }
+
+        struct ast_expr old_lhs = lhs;
+        ast_expr_partial_init(&lhs, AST_EXPR_TYPED,
+                              ast_expr_info_default());
+        ast_typed_expr_init(&lhs.u.typed_expr,
+                            ast_meta_make(pos_start, ps_pos(p)),
+                            old_lhs,
+                            rhs);
+      } else {
+        struct ast_expr rhs;
+        if (!(skip_ws(p)
+              && parse_expr(p, &rhs, op_precedence.right_precedence))) {
+          ast_ident_destroy(&op_name);
+          goto fail;
+        }
+
+        struct ast_expr old_lhs = lhs;
+        build_binop_expr(ast_meta_make(pos_start, ast_expr_pos_end(&rhs)),
+                         op_name, op, old_lhs, rhs, &lhs);
+      }
     } else {
       PARSE_DBG("parse_expr done\n");
       *out = lhs;
