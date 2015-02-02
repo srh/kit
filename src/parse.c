@@ -10,14 +10,6 @@
 
 #define PARSE_DBG(...)
 
-struct pos make_pos(size_t offset, size_t line, size_t column) {
-  struct pos ret;
-  ret.offset = offset;
-  ret.line = line;
-  ret.column = column;
-  return ret;
-}
-
 struct ps {
   const uint8_t *data;
   size_t length;
@@ -111,8 +103,12 @@ struct ps_savestate ps_save(struct ps *p) {
   return ret;
 }
 
-size_t ps_pos(struct ps *p) {
-  return p->pos;
+struct pos ps_pos(struct ps *p) {
+  struct pos ret;
+  ret.offset = p->pos;
+  ret.line = p->line;
+  ret.column = p->column;
+  return ret;
 }
 
 void ps_restore(struct ps *p, struct ps_savestate save) {
@@ -386,7 +382,7 @@ int try_skip_oper(struct ps *p, const char *s) {
 }
 
 int try_parse_unop(struct ps *p, enum ast_unop *out, struct ast_ident *name_out) {
-  size_t start_pos = ps_pos(p);
+  struct pos start_pos = ps_pos(p);
   int32_t ch1 = ps_peek(p);
   if (is_one_of("*&-", ch1)) {
     struct ps_savestate save = ps_save(p);
@@ -417,7 +413,7 @@ int parse_binop(struct ps *p, enum ast_binop *out,
     return 0;
   }
 
-  size_t pos_start = ps_pos(p);
+  struct pos pos_start = ps_pos(p);
   enum ast_binop op;
   ps_step(p);
   switch (ch1) {
@@ -494,9 +490,9 @@ int parse_binop(struct ps *p, enum ast_binop *out,
   } else {
     ps_count_leaf(p);
     *out = op;
-    size_t pos_end = ps_pos(p);
+    struct pos pos_end = ps_pos(p);
     ast_ident_init(name_out, ast_meta_make(pos_start, pos_end),
-                   ps_intern_ident(p, pos_start, pos_end));
+                   ps_intern_ident(p, pos_start.offset, pos_end.offset));
     return 1;
   }
 }
@@ -517,7 +513,7 @@ int try_skip_keyword(struct ps *p, const char *kw) {
 
 int parse_ident(struct ps *p, struct ast_ident *out) {
   PARSE_DBG("parse_ident\n");
-  size_t pos_start = ps_pos(p);
+  struct pos pos_start = ps_pos(p);
   if (!is_ident_firstchar(ps_peek(p))) {
     return 0;
   }
@@ -530,9 +526,9 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
     return 0;
   }
 
-  size_t pos_end = ps_pos(p);
+  struct pos pos_end = ps_pos(p);
   ast_ident_init(out, ast_meta_make(pos_start, pos_end),
-                 ps_intern_ident(p, pos_start, pos_end));
+                 ps_intern_ident(p, pos_start.offset, pos_end.offset));
   ps_count_leaf(p);
   return 1;
 }
@@ -540,7 +536,7 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out);
 
 int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
-  size_t pos_start = ps_pos(p);
+  struct pos pos_start = ps_pos(p);
   struct ast_ident name;
   if (!parse_ident(p, &name)) {
     goto fail;
@@ -609,7 +605,7 @@ int parse_params_list(struct ps *p,
 
 int parse_bracebody(struct ps *p, struct ast_bracebody *out);
 
-int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
+int parse_rest_of_if_statement(struct ps *p, struct pos pos_start,
                                struct ast_statement *out) {
   struct ast_expr condition;
   if (!(skip_ws(p) && parse_expr(p, &condition, kSemicolonPrecedence))) {
@@ -621,7 +617,7 @@ int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
     goto fail_condition;
   }
 
-  size_t pos_thenbody_end = ps_pos(p);
+  struct pos pos_thenbody_end = ps_pos(p);
 
   if (!skip_ws(p)) {
     goto fail_thenbody;
@@ -656,7 +652,7 @@ int parse_rest_of_if_statement(struct ps *p, size_t pos_start,
   return 0;
 }
 
-int parse_rest_of_var_statement(struct ps *p, size_t pos_start,
+int parse_rest_of_var_statement(struct ps *p, struct pos pos_start,
                                 struct ast_var_statement *out) {
   struct ast_vardecl decl;
   if (!(skip_ws(p) && parse_vardecl(p, &decl))) {
@@ -698,7 +694,7 @@ int parse_rest_of_var_statement(struct ps *p, size_t pos_start,
 }
 
 int parse_statement(struct ps *p, struct ast_statement *out) {
-  size_t pos_start = ps_pos(p);
+  struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "var")) {
     out->tag = AST_STATEMENT_VAR;
     return parse_rest_of_var_statement(p, pos_start, &out->u.var_statement);
@@ -763,7 +759,7 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
 }
 
 int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
-  size_t pos_start = ps_pos(p);
+  struct pos pos_start = ps_pos(p);
   if (!try_skip_char(p, '{')) {
     return 0;
   }
@@ -794,7 +790,7 @@ int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
   return 0;
 }
 
-int parse_rest_of_lambda(struct ps *p, size_t pos_start,
+int parse_rest_of_lambda(struct ps *p, struct pos pos_start,
                          struct ast_lambda *out) {
   PARSE_DBG("parse_rest_of_lambda\n");
   struct ast_vardecl *params;
@@ -833,7 +829,7 @@ int parse_numeric_literal(struct ps *p, struct ast_numeric_literal *out) {
   size_t digits_count = 0;
   size_t digits_limit = 0;
 
-  size_t pos_start = ps_pos(p);
+  struct pos pos_start = ps_pos(p);
   int32_t first_digit = ps_peek(p);
   int8_t first_digit_value;
   if (!is_decimal_digit(first_digit, &first_digit_value)) {
@@ -955,7 +951,7 @@ void build_binop_expr(struct ast_meta meta,
 }
 
 int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
-  size_t pos_start = ps_pos(p);
+  struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "fn")) {
     ast_expr_partial_init(out, AST_EXPR_LAMBDA, ast_expr_info_default());
     return parse_rest_of_lambda(p, pos_start, &out->u.lambda);
@@ -1008,7 +1004,7 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
 }
 
 int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
-  size_t pos_start = ps_pos(p);
+  struct pos pos_start = ps_pos(p);
   struct ast_expr lhs;
   if (!parse_atomic_expr(p, &lhs)) {
     return 0;
@@ -1162,7 +1158,7 @@ int parse_braced_fields(struct ps *p,
   return 0;
 }
 
-int parse_rest_of_structe(struct ps *p, size_t pos_start,
+int parse_rest_of_structe(struct ps *p, struct pos pos_start,
                           struct ast_structe *out) {
   struct ast_vardecl *fields;
   size_t fields_count;
@@ -1174,7 +1170,7 @@ int parse_rest_of_structe(struct ps *p, size_t pos_start,
   return 1;
 }
 
-int parse_rest_of_unione(struct ps *p, size_t pos_start,
+int parse_rest_of_unione(struct ps *p, struct pos pos_start,
                          struct ast_unione *out) {
   struct ast_vardecl *fields;
   size_t fields_count;
@@ -1186,7 +1182,7 @@ int parse_rest_of_unione(struct ps *p, size_t pos_start,
   return 1;
 }
 
-int parse_rest_of_arraytype(struct ps *p, size_t pos_start,
+int parse_rest_of_arraytype(struct ps *p, struct pos pos_start,
                             struct ast_arraytype *out) {
   if (!skip_ws(p)) {
     return 0;
@@ -1226,7 +1222,7 @@ int parse_rest_of_arraytype(struct ps *p, size_t pos_start,
 }
 
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
-  size_t pos_start = ps_pos(p);
+  struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "struct")) {
     out->tag = AST_TYPEEXPR_STRUCTE;
     return parse_rest_of_structe(p, pos_start, &out->u.structe);
@@ -1298,7 +1294,7 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
 
 int parse_type_params_if_present(struct ps *p,
                                  struct ast_generics *out) {
-  size_t pos_start = ps_pos(p);
+  struct pos pos_start = ps_pos(p);
   if (!try_skip_char(p, '[')) {
     ast_generics_init_no_params(out);
     return 1;
@@ -1338,7 +1334,7 @@ int parse_type_params_if_present(struct ps *p,
   return 0;
 }
 
-int parse_rest_of_def(struct ps *p, size_t pos_start, struct ast_def *out) {
+int parse_rest_of_def(struct ps *p, struct pos pos_start, struct ast_def *out) {
   struct ast_generics generics;
   if (!(skip_ws(p) && parse_type_params_if_present(p, &generics))) {
     goto fail;
@@ -1383,7 +1379,7 @@ int parse_rest_of_def(struct ps *p, size_t pos_start, struct ast_def *out) {
   return 0;
 }
 
-int parse_rest_of_extern_def(struct ps *p, size_t pos_start,
+int parse_rest_of_extern_def(struct ps *p, struct pos pos_start,
                              struct ast_extern_def *out) {
   struct ast_ident name;
   if (!(skip_ws(p) && parse_ident(p, &name))) {
@@ -1412,7 +1408,7 @@ int parse_rest_of_extern_def(struct ps *p, size_t pos_start,
 }
 
 
-int parse_rest_of_import(struct ps *p, size_t pos_start,
+int parse_rest_of_import(struct ps *p, struct pos pos_start,
                          struct ast_import *out) {
   PARSE_DBG("parse_rest_of_import\n");
   struct ast_ident name;
@@ -1434,7 +1430,7 @@ int parse_rest_of_import(struct ps *p, size_t pos_start,
 
 int parse_toplevel(struct ps *p, struct ast_toplevel *out);
 
-int parse_rest_of_deftype(struct ps *p, size_t pos_start,
+int parse_rest_of_deftype(struct ps *p, struct pos pos_start,
                           struct ast_deftype *out) {
   PARSE_DBG("parse_rest_of_deftype");
   struct ast_generics generics;
@@ -1468,7 +1464,7 @@ int parse_rest_of_deftype(struct ps *p, size_t pos_start,
 
 int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   PARSE_DBG("parse_toplevel\n");
-  size_t pos_start = ps_pos(p);
+  struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "def")) {
     out->tag = AST_TOPLEVEL_DEF;
     return parse_rest_of_def(p, pos_start, &out->u.def);
@@ -1540,7 +1536,7 @@ int parse_buf_file(struct identmap *im,
 }
 
 int count_parse_buf(const uint8_t *buf, size_t length,
-                    size_t *leafcount_out, size_t *error_pos_out) {
+                    size_t *leafcount_out, struct pos *error_pos_out) {
   struct ps p;
   ps_init(&p, buf, length);
 
@@ -1558,7 +1554,7 @@ int count_parse_buf(const uint8_t *buf, size_t length,
 }
 
 int count_parse(const char *str,
-                size_t *leafcount_out, size_t *error_pos_out) {
+                size_t *leafcount_out, struct pos *error_pos_out) {
   size_t length = strlen(str);
   const uint8_t *data = (const uint8_t *)str;
   return count_parse_buf(data, length, leafcount_out, error_pos_out);
@@ -1567,10 +1563,11 @@ int count_parse(const char *str,
 int run_count_test(const char *name, const char *str, size_t expected) {
   DBG("run_count_test %s...\n", name);
   size_t count;
-  size_t pos;
+  struct pos pos;
   int res = count_parse(str, &count, &pos);
   if (!res) {
-    DBG("run_count_test %s FAIL: parse failed at pos %"PRIz"\n", name, pos);
+    DBG("run_count_test %s FAIL: parse failed at %"PRIz":%"PRIz"\n",
+        name, pos.line, pos.column);
     return 0;
   }
   if (count != expected) {

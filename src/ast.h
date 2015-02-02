@@ -5,15 +5,16 @@
 #include <stdint.h>
 
 #include "identmap.h"
+#include "pos.h"
 
 struct def_instantiation;
 
 struct ast_meta {
-  size_t pos_start;
-  size_t pos_end;
+  struct pos pos_start;
+  struct pos pos_end;
 };
 
-struct ast_meta ast_meta_make(size_t pos_start, size_t pos_end);
+struct ast_meta ast_meta_make(struct pos start, struct pos end);
 struct ast_meta ast_meta_make_copy(struct ast_meta *c);
 struct ast_meta ast_meta_make_garbage(void);
 
@@ -419,7 +420,7 @@ void ast_expr_destroy(struct ast_expr *a);
 void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out);
 
 struct ast_typeexpr *ast_expr_type(struct ast_expr *a);
-size_t ast_expr_pos_end(struct ast_expr *a);
+struct pos ast_expr_pos_end(struct ast_expr *a);
 void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out);
 
 struct ast_generics {

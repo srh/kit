@@ -3,7 +3,7 @@
 #include "slice.h"
 #include "table.h"  /* TODO: For typelists_equal.  Reorganize locations. */
 
-struct ast_meta ast_meta_make(size_t pos_start, size_t pos_end) {
+struct ast_meta ast_meta_make(struct pos pos_start, struct pos pos_end) {
   struct ast_meta ret;
   ret.pos_start = pos_start;
   ret.pos_end = pos_end;
@@ -11,7 +11,7 @@ struct ast_meta ast_meta_make(size_t pos_start, size_t pos_end) {
 }
 
 struct ast_meta ast_meta_make_garbage(void) {
-  return ast_meta_make(0, 0);
+  return ast_meta_make(make_pos(0, 0, 0), make_pos(0, 0, 0));
 }
 
 struct ast_meta ast_meta_make_copy(struct ast_meta *c) {
@@ -19,8 +19,8 @@ struct ast_meta ast_meta_make_copy(struct ast_meta *c) {
 }
 
 void ast_meta_destroy(struct ast_meta *a) {
-  a->pos_start = SIZE_MAX;
-  a->pos_end = SIZE_MAX;
+  a->pos_start = make_pos(SIZE_MAX, SIZE_MAX, SIZE_MAX);
+  a->pos_end = a->pos_start;
   /* Do nothing useful. */
 }
 
@@ -629,7 +629,7 @@ struct ast_meta ast_expr_ast_meta(struct ast_expr *a) {
   }
 }
 
-size_t ast_expr_pos_end(struct ast_expr *a) {
+struct pos ast_expr_pos_end(struct ast_expr *a) {
   return ast_expr_ast_meta(a).pos_end;
 }
 
@@ -900,7 +900,8 @@ struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a) {
 void ast_generics_init_no_params(struct ast_generics *a) {
   a->has_type_params = 0;
   /* Dummy values for irrelevant fields. */
-  a->meta = ast_meta_make(SIZE_MAX, SIZE_MAX);
+  a->meta = ast_meta_make_garbage();
+  ast_meta_destroy(&a->meta);
   a->params = NULL;
   a->params_count = 0;
 }

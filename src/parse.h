@@ -5,17 +5,10 @@
 #include <stdint.h>
 
 #include "databuf.h"
+#include "pos.h"
 
 struct ast_file;
 struct identmap;
-
-struct pos {
-  size_t offset;
-  size_t line;
-  size_t column;
-};
-
-struct pos make_pos(size_t offset, size_t line, size_t column);
 
 struct error_info {
   struct pos pos;
