@@ -43,6 +43,8 @@ Here's the project timeline:
    5n. Sizeof/alignof operator.
    5o. Declare expression to be of type. (DONE)
    5p. While loops, for loops.
+   5q. Better void support, pointer arithmetic, proper treatment of zero-size entities.
+   5r. Partial type syntax (var x = ...;  and  var x blah[_] = ...;  and  x :: foo[_])
    6. Linux support.
    7. Make a self-hosted implementation (adding improvements and
       fixes to the C implementation when useful).
