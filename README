@@ -34,7 +34,7 @@ Here's the project timeline:
    5e. An array type. (DONE)
    5f. Bitwise not operator.
    5g. i16, u16, i8 datatypes.
-   5h. Rename byte to u8.
+   5h. Rename byte to u8. (DONE)
    5i. Analyze label & goto variable scopage.
    5j. Constructors/destructors.
    5k. Pointer type syntax.

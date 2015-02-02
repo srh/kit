@@ -8,7 +8,6 @@ void import_destroy(struct import *imp) {
 }
 
 void checkstate_destroy(struct checkstate *cs) {
-  databuf_destroy(&cs->error_message);
   name_table_destroy(&cs->nt);
   cs->kira_name_counter = 0;
   CHECK(cs->template_instantiation_recursion_depth == 0);
@@ -25,6 +24,5 @@ void checkstate_init(struct checkstate *cs, struct identmap *im) {
   cs->template_instantiation_recursion_depth = 0;
   cs->kira_name_counter = 0;
   name_table_init(&cs->nt);
-  databuf_init(&cs->error_message);
 }
 

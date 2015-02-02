@@ -26,8 +26,6 @@ struct checkstate {
   uint32_t kira_name_counter;
 
   struct name_table nt;
-
-  struct databuf error_message;
 };
 
 void checkstate_init(struct checkstate *cs, struct identmap *im);
