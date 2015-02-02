@@ -313,6 +313,30 @@ void ast_ifthenelse_statement_destroy(struct ast_ifthenelse_statement *a) {
   ast_bracebody_destroy(&a->elsebody);
 }
 
+void ast_while_statement_init(struct ast_while_statement *a,
+                              struct ast_meta meta,
+                              struct ast_expr condition,
+                              struct ast_bracebody body) {
+  a->meta = meta;
+  ast_expr_alloc_move(condition, &a->condition);
+  a->body = body;
+}
+
+void ast_while_statement_init_copy(struct ast_while_statement *a,
+                                   struct ast_while_statement *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_expr_alloc_init_copy(c->condition, &a->condition);
+  ast_bracebody_init_copy(&a->body, &c->body);
+}
+
+void ast_while_statement_destroy(struct ast_while_statement *a) {
+  ast_meta_destroy(&a->meta);
+  ast_expr_destroy(a->condition);
+  free(a->condition);
+  a->condition = NULL;
+  ast_bracebody_destroy(&a->body);
+}
+
 void ast_statement_init_copy(struct ast_statement *a,
                              struct ast_statement *c) {
   a->tag = c->tag;
@@ -340,6 +364,10 @@ void ast_statement_init_copy(struct ast_statement *a,
   case AST_STATEMENT_IFTHENELSE:
     ast_ifthenelse_statement_init_copy(&a->u.ifthenelse_statement,
                                        &c->u.ifthenelse_statement);
+    break;
+  case AST_STATEMENT_WHILE:
+    ast_while_statement_init_copy(&a->u.while_statement,
+                                  &c->u.while_statement);
     break;
   default:
     UNREACHABLE();
@@ -372,6 +400,9 @@ void ast_statement_destroy(struct ast_statement *a) {
     break;
   case AST_STATEMENT_IFTHENELSE:
     ast_ifthenelse_statement_destroy(&a->u.ifthenelse_statement);
+    break;
+  case AST_STATEMENT_WHILE:
+    ast_while_statement_destroy(&a->u.while_statement);
     break;
   default:
     UNREACHABLE();

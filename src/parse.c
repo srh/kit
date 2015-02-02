@@ -704,6 +704,29 @@ int parse_rest_of_var_statement(struct ps *p, struct pos pos_start,
   return 0;
 }
 
+int parse_rest_of_while_statement(struct ps *p, struct pos pos_start,
+                                  struct ast_while_statement *out) {
+  struct ast_expr condition;
+  if (!(skip_ws(p) && parse_expr(p, &condition, kSemicolonPrecedence))) {
+    goto fail;
+  }
+
+  struct ast_bracebody body;
+  if (!parse_bracebody(p, &body)) {
+    goto fail_condition;
+  }
+
+  ast_while_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                           condition, body);
+  return 1;
+
+ fail_condition:
+  ast_expr_destroy(&condition);
+ fail:
+  return 0;
+}
+
+
 int parse_statement(struct ps *p, struct ast_statement *out) {
   struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "var")) {
@@ -752,6 +775,9 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
     return 1;
   } else if (try_skip_keyword(p, "if")) {
     return parse_rest_of_if_statement(p, pos_start, out);
+  } else if (try_skip_keyword(p, "while")) {
+    out->tag = AST_STATEMENT_WHILE;
+    return parse_rest_of_while_statement(p, pos_start, &out->u.while_statement);
   } else {
     struct ast_expr expr;
     if (!parse_expr(p, &expr, kSemicolonPrecedence)) {

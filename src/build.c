@@ -2885,6 +2885,25 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
       frame_define_target(h, end_target_number,
                           objfile_section_size(objfile_text(f)));
     } break;
+    case AST_STATEMENT_WHILE: {
+      size_t top_target_number = frame_add_target(h);
+      frame_define_target(h, top_target_number, objfile_section_size(objfile_text(f)));
+
+      int32_t saved_offset = frame_save_offset(h);
+      struct expr_return er = open_expr_return();
+      if (!gen_expr(cs, f, h, s->u.while_statement.condition, &er)) {
+        return 0;
+      }
+
+      size_t bottom_target_number = frame_add_target(h);
+      gen_placeholder_jmp_if_false(f, h, er.u.loc, bottom_target_number);
+      frame_restore_offset(h, saved_offset);
+
+      gen_bracebody(cs, f, h, &s->u.while_statement.body);
+
+      gen_placeholder_jmp(f, h, top_target_number);
+      frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
+    } break;
     default:
       UNREACHABLE();
     }

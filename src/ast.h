@@ -215,6 +215,17 @@ void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,
                                    struct ast_bracebody thenbody,
                                    struct ast_bracebody elsebody);
 
+struct ast_while_statement {
+  struct ast_meta meta;
+  struct ast_expr *condition;
+  struct ast_bracebody body;
+};
+
+void ast_while_statement_init(struct ast_while_statement *a,
+                              struct ast_meta meta,
+                              struct ast_expr condition,
+                              struct ast_bracebody body);
+
 enum ast_statement_tag {
   AST_STATEMENT_EXPR,
   AST_STATEMENT_RETURN_EXPR,
@@ -223,6 +234,7 @@ enum ast_statement_tag {
   AST_STATEMENT_LABEL,
   AST_STATEMENT_IFTHEN,
   AST_STATEMENT_IFTHENELSE,
+  AST_STATEMENT_WHILE,
 };
 
 struct ast_statement {
@@ -235,6 +247,7 @@ struct ast_statement {
     struct ast_label_statement label_statement;
     struct ast_ifthen_statement ifthen_statement;
     struct ast_ifthenelse_statement ifthenelse_statement;
+    struct ast_while_statement while_statement;
   } u;
 };
 

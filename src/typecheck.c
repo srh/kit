@@ -1511,6 +1511,32 @@ int check_expr_bracebody(struct bodystate *bs,
           annotated_thenbody,
           annotated_elsebody);
     } break;
+    case AST_STATEMENT_WHILE: {
+      struct ast_typeexpr boolean;
+      init_boolean_typeexpr(bs->es->cs, &boolean);
+
+      int lvalue_discard;
+      struct ast_expr annotated_condition;
+      if (!check_expr(bs->es, s->u.while_statement.condition, &boolean,
+                      &lvalue_discard, &annotated_condition)) {
+        ast_typeexpr_destroy(&boolean);
+        goto fail;
+      }
+      ast_typeexpr_destroy(&boolean);
+
+      struct ast_bracebody annotated_body;
+      if (!check_expr_bracebody(bs, &s->u.while_statement.body, &annotated_body)) {
+        ast_expr_destroy(&annotated_condition);
+        goto fail;
+      }
+
+      annotated_statements[i].tag = AST_STATEMENT_WHILE;
+      ast_while_statement_init(
+          &annotated_statements[i].u.while_statement,
+          ast_meta_make_copy(&s->u.while_statement.meta),
+          annotated_condition,
+          annotated_body);
+    } break;
     default:
       UNREACHABLE();
     }
@@ -3924,6 +3950,23 @@ int check_file_test_more_14(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_15(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[i32] = fn() i32 {\n"
+      "  var x i32 = 5;\n"
+      "  while (x > 3) {\n"
+      "    x = x + 1;\n"
+      "  }\n"
+      "  return x;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -4270,6 +4313,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_14...\n");
   if (!test_check_module(&im, &check_file_test_more_14, foo)) {
     DBG("check_file_test_more_14 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_15...\n");
+  if (!test_check_module(&im, &check_file_test_more_15, foo)) {
+    DBG("check_file_test_more_15 fails\n");
     goto cleanup_identmap;
   }
 
