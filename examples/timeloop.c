@@ -7,7 +7,7 @@ int32_t kira_runloop1(void);
 int main(void) {
   clock_t c = clock();
 
-#if 1
+#if 0
   size_t acc = kira_runloop1();
 #else
   size_t acc = 0;

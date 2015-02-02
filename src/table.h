@@ -225,7 +225,7 @@ int name_table_add_primitive_type(struct name_table *t,
                                   uint32_t primitive_alignof);
 
 int name_table_match_def(struct name_table *t,
-                         ident_value name,
+                         struct ast_ident *name,
                          struct ast_typeexpr *generics_or_null,
                          size_t generics_count,
                          struct ast_typeexpr *partial_type,

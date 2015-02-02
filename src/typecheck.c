@@ -502,7 +502,7 @@ int check_typeexpr_name(struct checkstate *cs,
     struct deftype_entry *ent;
     if (!name_table_lookup_deftype(&cs->nt, name, no_param_list_arity(),
                                    &ent)) {
-      ERR_DBG("Unrecognized type name %.*s.\n", IM_P(cs->im, name));
+      QMETERR(a->meta, "Unrecognized type name %.*s.\n", IM_P(cs->im, name));
       return 0;
     }
 
@@ -525,7 +525,7 @@ int check_typeexpr_app(struct checkstate *cs,
   if (!name_table_lookup_deftype(&cs->nt, a->name.value,
                                  param_list_arity(a->params_count),
                                  &ent)) {
-    ERR_DBG("Type lookup fail for %.*s, arity %"PRIz"\n",
+    QMETERR(a->meta, "Type lookup fail for %.*s, arity %"PRIz"\n",
             IM_P(cs->im, a->name.value), a->params_count);
     return 0;
   }
@@ -556,7 +556,7 @@ int check_typeexpr_fields(struct checkstate *cs,
     struct ast_vardecl *field = &fields[i];
     for (size_t j = 0; j < i; j++) {
       if (field->name.value == fields[j].name.value) {
-        ERR_DBG("struct/union fields have duplicate name %.*s\n",
+        QMETERR(field->meta, "struct/union fields have duplicate name %.*s\n",
                 IM_P(cs->im, field->name.value));
         return 0;
       }
@@ -565,7 +565,8 @@ int check_typeexpr_fields(struct checkstate *cs,
     {
       size_t which_generic;
       if (generics_lookup_name(generics, field->name.value, &which_generic)) {
-        ERR_DBG("struct/union field shadows template parameter %.*s, "
+        QMETERR(field->meta,
+                "struct/union field shadows template parameter %.*s, "
                 "which is gauche.\n",
                 IM_P(cs->im, field->name.value));
         return 0;
@@ -618,14 +619,14 @@ int check_generics_shadowing(struct checkstate *cs,
     ident_value name = a->params[i].value;
     for (size_t j = 0; j < i; j++) {
       if (name == a->params[j].value) {
-        ERR_DBG("duplicate param names %.*s within same generics list.\n",
+        QMETERR(a->meta, "duplicate param names %.*s within same generics list.\n",
                 IM_P(cs->im, name));
         return 0;
       }
     }
 
     if (name_table_shadowed(&cs->nt, name)) {
-      ERR_DBG("generics list shadows global name %.*s.\n",
+      QMETERR(a->meta, "generics list shadows global name %.*s.\n",
               IM_P(cs->im, name));
       return 0;
     }
@@ -643,16 +644,16 @@ int check_deftype(struct checkstate *cs, struct deftype_entry *ent) {
   /* Can't be primitive, because they all have has_been_checked be true. */
   CHECK(!ent->is_primitive);
 
+  struct ast_deftype *a = ent->deftype;
+  CHECK(a);  /* Must be non-null, because ent->is_primitive is false. */
+
   if (ent->is_being_checked) {
-    ERR_DBG("deftype %.*s recursively held.\n",
-            IM_P(cs->im, ent->name));
+    METERR(a->meta, "deftype %.*s recursively held.\n",
+           IM_P(cs->im, ent->name));
     return 0;
   }
 
   deftype_entry_mark_is_being_checked(ent);
-
-  struct ast_deftype *a = ent->deftype;
-  CHECK(a);  /* Must be non-null, because ent->is_primitive is false. */
 
   /* We know there's no clashes with a->name and the _arity_ of a->generics. */
   if (!check_generics_shadowing(cs, &a->generics)) {
@@ -732,27 +733,27 @@ void exprscope_note_static_reference(struct exprscope *es,
   }
 }
 
-int check_var_shadowing(struct exprscope *es, ident_value name) {
+int check_var_shadowing(struct exprscope *es, struct ast_ident *name) {
   for (size_t i = 0, e = es->vars_count; i < e; i++) {
-    if (es->vars[i]->name.value == name) {
-      ERR_DBG("Variable name %.*s shadows local.\n",
-              IM_P(es->cs->im, name));
+    if (es->vars[i]->name.value == name->value) {
+      METERR(name->meta, "Variable name %.*s shadows local.\n",
+             IM_P(es->cs->im, name->value));
       return 0;
     }
   }
 
   {
     size_t which_generic;
-    if (generics_lookup_name(es->generics, name, &which_generic)) {
-      ERR_DBG("Variable name %.*s shadows template parameter, which is gauche.\n",
-              IM_P(es->cs->im, name));
+    if (generics_lookup_name(es->generics, name->value, &which_generic)) {
+      METERR(name->meta, "Variable name %.*s shadows template parameter, which is gauche.\n",
+             IM_P(es->cs->im, name->value));
       return 0;
     }
   }
 
-  if (name_table_shadowed(&es->cs->nt, name)) {
-    ERR_DBG("Variable name %.*s shadows a global def or type.\n",
-            IM_P(es->cs->im, name));
+  if (name_table_shadowed(&es->cs->nt, name->value)) {
+    METERR(name->meta, "Variable name %.*s shadows a global def or type.\n",
+           IM_P(es->cs->im, name->value));
     return 0;
   }
 
@@ -760,7 +761,7 @@ int check_var_shadowing(struct exprscope *es, ident_value name) {
 }
 
 int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var) {
-  if (!check_var_shadowing(es, var->name.value)) {
+  if (!check_var_shadowing(es, &var->name)) {
     return 0;
   }
   SLICE_PUSH(es->vars, es->vars_count, es->vars_limit, var);
@@ -853,7 +854,7 @@ int check_expr_with_type(struct exprscope *es,
                          struct ast_expr *annotated_out);
 
 int lookup_global_maybe_typecheck(struct exprscope *es,
-                                  ident_value name,
+                                  struct ast_ident *name,
                                   struct ast_typeexpr *partial_type,
                                   struct ast_typeexpr *out,
                                   int *is_lvalue_out,
@@ -876,10 +877,11 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
 
   if (!ent->is_primitive && !ent->is_extern
       && ent->generics.has_type_params && !inst->typecheck_started) {
+    CHECK(ent->def);
     CHECK(!inst->annotated_rhs_computed);
     if (es->cs->template_instantiation_recursion_depth
         == MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH) {
-      ERR_DBG("Max template instantiation recursion depth exceeded.\n");
+      METERR(ent->def->meta, "Max template instantiation recursion depth exceeded.%s", "\n");
       goto fail_unified;
     }
 
@@ -920,20 +922,20 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
 }
 
 int exprscope_lookup_name(struct exprscope *es,
-                          ident_value name,
+                          struct ast_ident *name,
                           struct ast_typeexpr *partial_type,
                           struct ast_typeexpr *out,
                           int *is_lvalue_out,
                           struct def_instantiation **inst_or_null_out) {
   for (size_t i = es->vars_count; i-- > 0; ) {
     struct ast_vardecl *decl = es->vars[i];
-    if (decl->name.value != name) {
+    if (decl->name.value != name->value) {
       continue;
     }
 
     if (!unify_directionally(partial_type, &decl->type)) {
-      ERR_DBG("Type mismatch for vardecl %.*s lookup.\n",
-              IM_P(es->cs->im, name));
+      METERR(name->meta, "Type mismatch for vardecl %.*s lookup.\n",
+             IM_P(es->cs->im, name->value));
       return 0;
     }
 
@@ -1188,11 +1190,11 @@ void bodystate_note_goto(struct bodystate *bs, ident_value target) {
              info);
 }
 
-int bodystate_note_label(struct bodystate *bs, ident_value name) {
+int bodystate_note_label(struct bodystate *bs, struct ast_ident *name) {
   for (size_t i = 0, e = bs->label_infos_count; i < e; i++) {
-    if (bs->label_infos[i].label_name == name) {
+    if (bs->label_infos[i].label_name == name->value) {
       if (bs->label_infos[i].is_label_observed) {
-        ERR_DBG("Duplicate label %.*s.\n", IM_P(bs->es->cs->im, name));
+        METERR(name->meta, "Duplicate label %.*s.\n", IM_P(bs->es->cs->im, name->value));
         return 0;
       }
       bs->label_infos[i].is_label_observed = 1;
@@ -1200,7 +1202,7 @@ int bodystate_note_label(struct bodystate *bs, ident_value name) {
     }
   }
   struct label_info info;
-  info.label_name = name;
+  info.label_name = name->value;
   info.is_label_observed = 1;
   info.is_goto_observed = 0;
   SLICE_PUSH(bs->label_infos, bs->label_infos_count, bs->label_infos_limit,
@@ -1255,7 +1257,7 @@ int check_expr_bracebody(struct bodystate *bs,
       } else {
         if (!exact_typeexprs_equal(&bs->exact_return_type,
                                    ast_expr_type(&annotated_expr))) {
-          ERR_DBG("Return statements with conflicting return types.\n");
+          METERR(*ast_expr_ast_meta(s->u.return_expr), "Return statements with conflicting return types.%s", "\n");
           ast_expr_destroy(&annotated_expr);
           goto fail;
         }
@@ -1324,7 +1326,7 @@ int check_expr_bracebody(struct bodystate *bs,
       ast_statement_init_copy(&annotated_statements[i], s);
     } break;
     case AST_STATEMENT_LABEL: {
-      if (!bodystate_note_label(bs, s->u.label_statement.label.value)) {
+      if (!bodystate_note_label(bs, &s->u.label_statement.label)) {
         goto fail;
       }
       ast_statement_init_copy(&annotated_statements[i], s);
@@ -1429,19 +1431,19 @@ int check_expr_funcbody(struct exprscope *es,
 
   for (size_t i = 0; i < bs.label_infos_count; i++) {
     if (!bs.label_infos[i].is_label_observed) {
-      ERR_DBG("goto without label for name %.*s.\n",
-              IM_P(bs.es->cs->im, bs.label_infos[i].label_name));
+      METERR(x->meta, "goto without label for name %.*s.\n",
+             IM_P(bs.es->cs->im, bs.label_infos[i].label_name));
       goto fail_annotated_bracebody;
     }
     if (!bs.label_infos[i].is_goto_observed) {
-      ERR_DBG("label without goto for name %.*s.\n",
-              IM_P(bs.es->cs->im, bs.label_infos[i].label_name));
+      METERR(x->meta, "label without goto for name %.*s.\n",
+             IM_P(bs.es->cs->im, bs.label_infos[i].label_name));
       goto fail_annotated_bracebody;
     }
   }
 
   if (!bs.have_exact_return_type) {
-    ERR_DBG("Missing a return statement.\n");
+    METERR(x->meta, "Missing a return statement.%s", "\n");
     goto fail_annotated_bracebody;
   }
   *out = bs.exact_return_type;
@@ -1475,12 +1477,12 @@ int check_expr_lambda(struct exprscope *es,
     for (i = 0; i < func_params_count; i++) {
       for (size_t j = 0; j < i; j++) {
         if (x->params[i].name.value == x->params[j].name.value) {
-          ERR_DBG("Duplicate lambda parameter name %.*s.\n",
-                  IM_P(es->cs->im, x->params[i].name.value));
+          METERR(x->params[i].meta, "Duplicate lambda parameter name %.*s.\n",
+                 IM_P(es->cs->im, x->params[i].name.value));
           goto fail_args_up_to_i;
         }
       }
-      if (!check_var_shadowing(es, x->params[i].name.value)) {
+      if (!check_var_shadowing(es, &x->params[i].name)) {
         goto fail_args_up_to_i;
       }
 
@@ -1505,7 +1507,7 @@ int check_expr_lambda(struct exprscope *es,
   }
 
   if (!unify_directionally(partial_type, &funcexpr)) {
-    ERR_DBG("lambda type does not match expression type.\n");
+    METERR(x->meta, "lambda type does not match expression type.%s", "\n");
     goto fail_funcexpr;
   }
 
@@ -1606,22 +1608,22 @@ int check_expr_magic_binop(struct exprscope *es,
   switch (x->operator) {
   case AST_BINOP_ASSIGN: {
     if (es->computation == STATIC_COMPUTATION_YES) {
-      ERR_DBG("Assignment within statically evaluated expression.\n");
+      METERR(x->meta, "Assignment within statically evaluated expression.%s", "\n");
       goto cleanup_both;
     }
     if (!lhs_is_lvalue) {
-      ERR_DBG("Trying to assign to non-lvalue.\n");
+      METERR(x->meta, "Trying to assign to non-lvalue.%s", "\n");
       goto cleanup_both;
     }
     if (!exact_typeexprs_equal(ast_expr_type(&annotated_lhs),
                                ast_expr_type(&annotated_rhs))) {
-      ERR_DBG("Assignment with non-matching types.\n");
+      METERR(x->meta, "Assignment with non-matching types.%s", "\n");
       goto cleanup_both;
     }
 
     if (!unify_directionally(partial_type,
                              ast_expr_type(&annotated_lhs))) {
-      ERR_DBG("LHS type of assignment does not match contextual type.\n");
+      METERR(x->meta, "LHS type of assignment does not match contextual type.%s", "\n");
       goto cleanup_both;
     }
 
@@ -1643,20 +1645,20 @@ int check_expr_magic_binop(struct exprscope *es,
 
     if (!unify_directionally(&boolean,
                              ast_expr_type(&annotated_lhs))) {
-      ERR_DBG("LHS of and/or is non-boolean.\n");
+      METERR(x->meta, "LHS of and/or is non-boolean.%s", "\n");
       ast_typeexpr_destroy(&boolean);
       goto cleanup_both;
     }
 
     if (!unify_directionally(&boolean,
                              ast_expr_type(&annotated_rhs))) {
-      ERR_DBG("RHS of and/or is non-boolean.\n");
+      METERR(x->meta, "RHS of and/or is non-boolean.%s", "\n");
       ast_typeexpr_destroy(&boolean);
       goto cleanup_both;
     }
 
     if (!unify_directionally(partial_type, &boolean)) {
-      ERR_DBG("And/or expression in non-boolean context.\n");
+      METERR(x->meta, "And/or expression in non-boolean context.%s", "\n");
       ast_typeexpr_destroy(&boolean);
       goto cleanup_both;
     }
@@ -1740,7 +1742,7 @@ int check_expr_magic_unop(struct exprscope *es,
                           int *is_lvalue_out,
                           struct ast_unop_expr *annotated_out) {
   if (es->computation == STATIC_COMPUTATION_YES) {
-    ERR_DBG("Magic unops not allowed in static expressions.\n");
+    METERR(x->meta, "Magic unops not allowed in static expressions.%s", "\n");
     return 0;
   }
 
@@ -1761,12 +1763,12 @@ int check_expr_magic_unop(struct exprscope *es,
     if (!view_ptr_target(es->cs->im,
                          ast_expr_type(&annotated_rhs),
                          &rhs_target)) {
-      ERR_DBG("Trying to dereference a non-pointer.\n");
+      METERR(x->meta, "Trying to dereference a non-pointer.%s", "\n");
       goto cleanup_rhs;
     }
 
     if (!unify_directionally(partial_type, rhs_target)) {
-      ERR_DBG("Pointer dereference results in wrong type.\n");
+      METERR(x->meta, "Pointer dereference results in wrong type.%s", "\n");
       goto cleanup_rhs;
     }
 
@@ -1778,7 +1780,7 @@ int check_expr_magic_unop(struct exprscope *es,
   } break;
   case AST_UNOP_ADDRESSOF: {
     if (!rhs_is_lvalue) {
-      ERR_DBG("Trying to take the address of a non-lvalue.\n");
+      METERR(x->meta, "Trying to take the address of a non-lvalue.%s", "\n");
       goto cleanup_rhs;
     }
 
@@ -1787,7 +1789,7 @@ int check_expr_magic_unop(struct exprscope *es,
                 &pointer_type);
 
     if (!unify_directionally(partial_type, &pointer_type)) {
-      ERR_DBG("Addressof results in wrong type.\n");
+      METERR(x->meta, "Addressof results in wrong type.%s", "\n");
       ast_typeexpr_destroy(&pointer_type);
       goto cleanup_rhs;
     }
@@ -1822,22 +1824,22 @@ int check_expr_unop(struct exprscope *es,
 
 int lookup_fields_field_type(struct ast_vardecl *fields,
                              size_t fields_count,
-                             ident_value field_name,
+                             struct ast_ident *field_name,
                              struct ast_typeexpr *field_type_out) {
   for (size_t i = 0; i < fields_count; i++) {
-    if (fields[i].name.value == field_name) {
+    if (fields[i].name.value == field_name->value) {
       ast_typeexpr_init_copy(field_type_out, &fields[i].type);
       return 1;
     }
   }
 
-  ERR_DBG("Field name not found.\n");
+  METERR(field_name->meta, "Field name not found.%s", "\n");
   return 0;
 }
 
 int lookup_field_type(struct exprscope *es,
                       struct ast_typeexpr *type,
-                      ident_value field_name,
+                      struct ast_ident *field_name,
                       struct ast_typeexpr *field_type_out) {
   switch (type->tag) {
   case AST_TYPEEXPR_NAME: {
@@ -1848,7 +1850,7 @@ int lookup_field_type(struct exprscope *es,
       CRASH("lookup_field_type sees an invalid type.\n");
     }
     if (ent->is_primitive) {
-      ERR_DBG("Looking up field on primitive type.\n");
+      METERR(field_name->meta, "Looking up field on primitive type.%s", "\n");
       return 0;
     }
 
@@ -1864,7 +1866,7 @@ int lookup_field_type(struct exprscope *es,
       CRASH("lookup_field_type sees an invalid generic type.\n");
     }
     if (ent->is_primitive) {
-      ERR_DBG("Lookup up field on primitive type.\n");
+      METERR(field_name->meta, "Lookup up field on primitive type.%s", "\n");
       return 0;
     }
 
@@ -1892,7 +1894,7 @@ int lookup_field_type(struct exprscope *es,
                                     type->u.unione.fields_count, field_name,
                                     field_type_out);
   case AST_TYPEEXPR_ARRAY: {
-    ERR_DBG("Looking up field on array type.\n");
+    METERR(field_name->meta, "Looking up field on array type.%s", "\n");
     return 0;
   } break;
   default:
@@ -1920,7 +1922,7 @@ int check_expr_local_field_access(
 
   struct ast_typeexpr field_type;
   if (!lookup_field_type(es, ast_expr_type(&annotated_lhs),
-                         x->fieldname.value, &field_type)) {
+                         &x->fieldname, &field_type)) {
     goto cleanup_lhs;
   }
 
@@ -1955,7 +1957,7 @@ int check_expr_deref_field_access(
     int *is_lvalue_out,
     struct ast_deref_field_access *annotated_out) {
   if (es->computation == STATIC_COMPUTATION_YES) {
-    ERR_DBG("Dereferencing field access disallowed in static computation.\n");
+    METERR(x->meta, "Dereferencing field access disallowed in static computation.%s", "\n");
     return 0;
   }
   int ret = 0;
@@ -1974,17 +1976,17 @@ int check_expr_deref_field_access(
   struct ast_typeexpr *ptr_target;
   if (!view_ptr_target(es->cs->im, ast_expr_type(&annotated_lhs),
                        &ptr_target)) {
-    ERR_DBG("Dereferencing field access expects ptr type.\n");
+    METERR(x->meta, "Dereferencing field access expects ptr type.%s", "\n");
     goto cleanup_lhs;
   }
 
   struct ast_typeexpr field_type;
-  if (!lookup_field_type(es, ptr_target, x->fieldname.value, &field_type)) {
+  if (!lookup_field_type(es, ptr_target, &x->fieldname, &field_type)) {
     goto cleanup_lhs;
   }
 
   if (!unify_directionally(partial_type, &field_type)) {
-    ERR_DBG("Dereferencing field access results in wrong type.\n");
+    METERR(x->meta, "Dereferencing field access results in wrong type.%s", "\n");
     goto cleanup_field_type;
   }
 
@@ -2043,7 +2045,7 @@ int check_index_expr(struct exprscope *es,
   struct ast_typeexpr *lhs_target;
   if (!view_ptr_target(es->cs->im, lhs_type, &lhs_target)) {
     if (lhs_type->tag != AST_TYPEEXPR_ARRAY) {
-      ERR_DBG("Indexing into a non-pointer, non-array type.\n");
+      METERR(a->meta, "Indexing into a non-pointer, non-array type.%s", "\n");
       goto fail_rhs_annotated;
     }
 
@@ -2051,7 +2053,7 @@ int check_index_expr(struct exprscope *es,
   }
 
   if (!unify_directionally(partial_type, lhs_target)) {
-    ERR_DBG("Indexing returns wrong type.\n");
+    METERR(a->meta, "Indexing returns wrong type.%s", "\n");
     goto fail_rhs_annotated;
   }
 
@@ -2080,7 +2082,7 @@ int check_expr(struct exprscope *es,
     struct ast_typeexpr name_type;
     int is_lvalue;
     struct def_instantiation *inst_or_null;
-    if (!exprscope_lookup_name(es, x->u.name.ident.value, partial_type,
+    if (!exprscope_lookup_name(es, &x->u.name.ident, partial_type,
                                &name_type, &is_lvalue, &inst_or_null)) {
       return 0;
     }
@@ -2094,7 +2096,7 @@ int check_expr(struct exprscope *es,
     struct ast_typeexpr num_type;
     numeric_literal_type(es->cs->im, &x->u.numeric_literal, &num_type);
     if (!unify_directionally(partial_type, &num_type)) {
-      ERR_DBG("Numeric literal in bad place.\n");
+      METERR(x->u.numeric_literal.meta, "Numeric literal in bad place.%s", "\n");
       ast_typeexpr_destroy(&num_type);
       return 0;
     }
@@ -2212,7 +2214,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
     struct def_entry *ent;
     struct def_instantiation *inst;
     int success = name_table_match_def(&cs->nt,
-                                       a->name.value,
+                                       &a->name,
                                        NULL, 0, /* (no generics) */
                                        &a->type,
                                        &unified,
@@ -2829,7 +2831,8 @@ int chase_def_entry_acyclicity(struct def_entry *ent) {
     return 1;
   }
   if (ent->acyclicity_being_chased) {
-    ERR_DBG("Cyclic reference in static expressions.\n");
+    CHECK(ent->def);
+    METERR(ent->def->meta, "Cyclic reference in static expressions.%s", "\n");
     return 0;
   }
   ent->acyclicity_being_chased = 1;
@@ -2913,8 +2916,8 @@ int read_module_file(const uint8_t *module_name,
                     &filename, &filename_count);
 
   if (!read_file(filename, data_out, data_size_out)) {
-    ERR_DBG("Could not read file %.*s.\n",
-            size_to_int(filename_count), filename);
+    ERR("Could not read file %.*s.\n",
+        size_to_int(filename_count), filename);
   } else {
     ret = 1;
   }

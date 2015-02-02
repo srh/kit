@@ -614,23 +614,23 @@ void ast_expr_info_destroy(struct ast_expr_info *m) {
   }
 }
 
-struct ast_meta ast_expr_ast_meta(struct ast_expr *a) {
+struct ast_meta *ast_expr_ast_meta(struct ast_expr *a) {
   switch (a->tag) {
-  case AST_EXPR_NAME: return a->u.name.ident.meta;
-  case AST_EXPR_NUMERIC_LITERAL: return a->u.numeric_literal.meta;
-  case AST_EXPR_FUNCALL: return a->u.funcall.meta;
-  case AST_EXPR_INDEX: return a->u.index_expr.meta;
-  case AST_EXPR_UNOP: return a->u.unop_expr.meta;
-  case AST_EXPR_BINOP: return a->u.binop_expr.meta;
-  case AST_EXPR_LAMBDA: return a->u.lambda.meta;
-  case AST_EXPR_LOCAL_FIELD_ACCESS: return a->u.local_field_access.meta;
-  case AST_EXPR_DEREF_FIELD_ACCESS: return a->u.deref_field_access.meta;
+  case AST_EXPR_NAME: return &a->u.name.ident.meta;
+  case AST_EXPR_NUMERIC_LITERAL: return &a->u.numeric_literal.meta;
+  case AST_EXPR_FUNCALL: return &a->u.funcall.meta;
+  case AST_EXPR_INDEX: return &a->u.index_expr.meta;
+  case AST_EXPR_UNOP: return &a->u.unop_expr.meta;
+  case AST_EXPR_BINOP: return &a->u.binop_expr.meta;
+  case AST_EXPR_LAMBDA: return &a->u.lambda.meta;
+  case AST_EXPR_LOCAL_FIELD_ACCESS: return &a->u.local_field_access.meta;
+  case AST_EXPR_DEREF_FIELD_ACCESS: return &a->u.deref_field_access.meta;
   default: UNREACHABLE();
   }
 }
 
 struct pos ast_expr_pos_end(struct ast_expr *a) {
-  return ast_expr_ast_meta(a).pos_end;
+  return ast_expr_ast_meta(a)->pos_end;
 }
 
 void ast_expr_partial_init(struct ast_expr *a,

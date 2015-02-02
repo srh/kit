@@ -1013,7 +1013,7 @@ int def_entry_matches(struct def_entry *ent,
 }
 
 int name_table_match_def(struct name_table *t,
-                         ident_value name,
+                         struct ast_ident *ident,
                          struct ast_typeexpr *generics_or_null,
                          size_t generics_count,
                          struct ast_typeexpr *partial_type,
@@ -1025,6 +1025,7 @@ int name_table_match_def(struct name_table *t,
   struct def_instantiation *matched_instantiation = NULL;
   struct def_entry *matched_ent = NULL;
 
+  ident_value name = ident->value;
   struct defs_by_name_node *node;
   {
     ident_value dbn_id;
@@ -1047,7 +1048,7 @@ int name_table_match_def(struct name_table *t,
                           partial_type, &unified, &instantiation)) {
       if (matched_ent) {
         ast_typeexpr_destroy(&unified);
-        ERR_DBG("multiple matching definitions\n");
+        METERR(ident->meta, "multiple matching definitions%s", "\n");
         goto fail_multiple_matching;
       } else {
         matched_type = unified;
@@ -1058,7 +1059,7 @@ int name_table_match_def(struct name_table *t,
   }
 
   if (!matched_ent) {
-    ERR_DBG("no matching definition\n");
+    METERR(ident->meta, "no matching definition%s", "\n");
     goto fail;
   }
 
