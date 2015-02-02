@@ -601,6 +601,8 @@ int check_typeexpr(struct checkstate *cs,
                                  a->u.structe.fields,
                                  a->u.structe.fields_count,
                                  flat_typeexpr);
+  case AST_TYPEEXPR_ARRAY:
+    return check_typeexpr(cs, generics, a->u.arraytype.param, flat_typeexpr);
   default:
     UNREACHABLE();
   }
@@ -829,6 +831,13 @@ int unify_directionally(struct ast_typeexpr *partial_type,
                                       partial_type->u.unione.fields_count,
                                       complete_type->u.unione.fields,
                                       complete_type->u.unione.fields_count);
+  case AST_TYPEEXPR_ARRAY: {
+    if (partial_type->u.arraytype.count != complete_type->u.arraytype.count) {
+      return 0;
+    }
+    return unify_directionally(partial_type->u.arraytype.param,
+                               complete_type->u.arraytype.param);
+  } break;
   default:
     UNREACHABLE();
   }
@@ -1005,6 +1014,7 @@ void do_replace_generics(struct ast_generics *generics,
     ast_ident_init_copy(&name, &app->name);
 
     out->tag = AST_TYPEEXPR_APP;
+    /* TODO: Bad uses of make_garbage() in this function. */
     ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
                      name, params, params_count);
   } break;
@@ -1027,7 +1037,15 @@ void do_replace_generics(struct ast_generics *generics,
                                   &fields, &fields_count);
     out->tag = AST_TYPEEXPR_UNIONE;
     ast_unione_init(&out->u.unione, ast_meta_make_garbage(),
-                     fields, fields_count);
+                    fields, fields_count);
+  } break;
+  case AST_TYPEEXPR_ARRAY: {
+    struct ast_typeexpr param;
+    do_replace_generics(generics, generics_substitutions, a->u.arraytype.param,
+                        &param);
+    out->tag = AST_TYPEEXPR_ARRAY;
+    ast_arraytype_init(&out->u.arraytype, ast_meta_make_garbage(),
+                       a->u.arraytype.count, param);
   } break;
   default:
     UNREACHABLE();
@@ -1874,6 +1892,10 @@ int lookup_field_type(struct exprscope *es,
     return lookup_fields_field_type(type->u.unione.fields,
                                     type->u.unione.fields_count, field_name,
                                     field_type_out);
+  case AST_TYPEEXPR_ARRAY: {
+    ERR_DBG("Looking up field on array type.\n");
+    return 0;
+  } break;
   default:
     UNREACHABLE();
   }
@@ -3707,6 +3729,21 @@ int check_file_test_more_11(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_12(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because vec3 and [3]u32 are different types. */
+  struct test_module a[] = { {
+      "foo",
+      "deftype vec3 [3]u32;\n"
+      "def foo func[[3]u32, vec3] = fn(arr [3]u32) vec3 {\n"
+      "  var vec3 v = arr;\n"
+      "  return v;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
 
 
 int test_check_file(void) {
@@ -4027,15 +4064,21 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file !check_file_test_more_10...\n");
+  DBG("test_check_file check_file_test_more_10...\n");
   if (!test_check_module(&im, &check_file_test_more_10, foo)) {
     DBG("check_file_test_more_10 fails\n");
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file !check_file_test_more_11...\n");
+  DBG("test_check_file check_file_test_more_11...\n");
   if (!test_check_module(&im, &check_file_test_more_11, foo)) {
     DBG("check_file_test_more_11 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_12...\n");
+  if (!!test_check_module(&im, &check_file_test_more_12, foo)) {
+    DBG("check_file_test_more_12 fails\n");
     goto cleanup_identmap;
   }
 

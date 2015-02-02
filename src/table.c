@@ -581,6 +581,13 @@ void substitute_generics(struct ast_typeexpr *type,
     ast_unione_init(&concrete_type_out->u.unione, ast_meta_make_copy(&type->u.unione.meta),
                     fields, fields_count);
   } break;
+  case AST_TYPEEXPR_ARRAY: {
+    concrete_type_out->tag = AST_TYPEEXPR_ARRAY;
+    struct ast_typeexpr param;
+    substitute_generics(type->u.arraytype.param, g, args, args_count, &param);
+    ast_arraytype_init(&concrete_type_out->u.arraytype, ast_meta_make_copy(&type->u.arraytype.meta),
+                       type->u.arraytype.count, param);
+  } break;
   default:
     UNREACHABLE();
   }
@@ -698,6 +705,19 @@ int combine_partial_types(struct ast_typeexpr *a,
                     fields, fields_count);
     return 1;
   } break;
+  case AST_TYPEEXPR_ARRAY: {
+    if (a->u.arraytype.count != b->u.arraytype.count) {
+      return 0;
+    }
+    struct ast_typeexpr param;
+    if (!combine_partial_types(a->u.arraytype.param, b->u.arraytype.param, &param)) {
+      return 0;
+    }
+    out->tag = AST_TYPEEXPR_ARRAY;
+    ast_arraytype_init(&out->u.arraytype, ast_meta_make_garbage(),
+                       a->u.arraytype.count, param);
+    return 1;
+  } break;
   default:
     UNREACHABLE();
   }
@@ -787,6 +807,13 @@ int learn_materializations(struct ast_generics *g,
                                          partial_type->u.unione.fields,
                                          partial_type->u.unione.fields_count);
   } break;
+  case AST_TYPEEXPR_ARRAY: {
+    if (type->u.arraytype.count != partial_type->u.arraytype.count) {
+      return 0;
+    }
+    return learn_materializations(g, materialized, type->u.arraytype.param,
+                                  partial_type->u.arraytype.param);
+  } break;
   default:
     UNREACHABLE();
   }
@@ -824,6 +851,8 @@ int is_concrete(struct ast_typeexpr *type) {
   case AST_TYPEEXPR_UNIONE:
     return is_fields_concrete(type->u.unione.fields,
                               type->u.unione.fields_count);
+  case AST_TYPEEXPR_ARRAY:
+    return is_concrete(type->u.arraytype.param);
   default:
     UNREACHABLE();
   }

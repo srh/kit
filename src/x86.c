@@ -15,7 +15,7 @@
    alignment of the type, and zero is returned.  Otherwise,
    *offsetof_out and *sizeof_out are initialized with the offset and
    size of the type's field named fieldstop, and 1 is returned.  If
-   the field name is not found, zero is returned. */
+   the field name is not found, crashes. */
 int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                      ident_value fieldstop, uint32_t *offsetof_out,
                      uint32_t *sizeof_out, uint32_t *alignof_out) {
@@ -29,6 +29,7 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     }
     CHECK(ent->arity.value == ARITY_NO_PARAMLIST);
     if (ent->is_primitive) {
+      CHECK(fieldstop == IDENT_VALUE_INVALID);
       *offsetof_out = 0;
       *sizeof_out = ent->primitive_sizeof;
       *alignof_out = ent->primitive_alignof;
@@ -49,6 +50,7 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     }
     CHECK(ent->arity.value == type->u.app.params_count);
     if (ent->is_primitive) {
+      CHECK(fieldstop == IDENT_VALUE_INVALID);
       *offsetof_out = 0;
       *sizeof_out = ent->primitive_sizeof;
       *alignof_out = ent->primitive_alignof;
@@ -84,6 +86,7 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
         CHECK(fieldstop != IDENT_VALUE_INVALID);
         *offsetof_out = count;
         *sizeof_out = size;
+        *alignof_out = 0;
         return 1;
       }
 
@@ -92,7 +95,9 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
       }
       count = uint32_add(count, size);
     }
+    CHECK(fieldstop == IDENT_VALUE_INVALID);
     count = uint32_ceil_aligned(count, max_alignment);
+    *offsetof_out = 0;
     *sizeof_out = count;
     *alignof_out = max_alignment;
     return 0;
@@ -123,9 +128,25 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
         max_alignment = alignment;
       }
     }
+    CHECK(fieldstop == IDENT_VALUE_INVALID);
     uint32_t final_size = uint32_ceil_aligned(max_size, max_alignment);
+    *offsetof_out = 0;
     *sizeof_out = final_size;
     *alignof_out = max_alignment;
+    return 0;
+  } break;
+  case AST_TYPEEXPR_ARRAY: {
+    CHECK(fieldstop == IDENT_VALUE_INVALID);
+
+    uint32_t offsetof_discard;
+    uint32_t elem_size;
+    uint32_t elem_alignment;
+    int res = help_sizealignof(nt, type->u.arraytype.param, IDENT_VALUE_INVALID,
+                               &offsetof_discard, &elem_size, &elem_alignment);
+    CHECK(res == 0);
+    *offsetof_out = 0;
+    *sizeof_out = uint32_mul(elem_size, type->u.arraytype.count);
+    *alignof_out = 0;
     return 0;
   } break;
   case AST_TYPEEXPR_UNKNOWN:

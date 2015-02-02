@@ -1178,6 +1178,45 @@ int parse_rest_of_unione(struct ps *p, size_t pos_start,
   return 1;
 }
 
+int parse_rest_of_arraytype(struct ps *p, size_t pos_start,
+                            struct ast_arraytype *out) {
+  if (!skip_ws(p)) {
+    return 0;
+  }
+  int32_t ch = ps_peek(p);
+  int8_t ch_value;
+  if (!is_decimal_digit(ch, &ch_value)) {
+    return 0;
+  }
+  ps_step(p);
+
+  uint32_t count = ch_value;
+  while ((ch = ps_peek(p)), is_decimal_digit(ch, &ch_value)) {
+    if (!try_uint32_mul(count, 10, &count)) {
+      return 0;
+    }
+    if (!try_uint32_add(count, (uint32_t)ch_value, &count)) {
+      return 0;
+    }
+  }
+
+  ps_count_leaf(p);
+
+  if (!(is_numeric_postchar(ch) && skip_ws(p) && try_skip_char(p, ']')
+        && skip_ws(p))) {
+    return 0;
+  }
+
+  struct ast_typeexpr param;
+  if (!parse_typeexpr(p, &param)) {
+    return 0;
+  }
+
+  ast_arraytype_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                     count, param);
+  return 1;
+}
+
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
   size_t pos_start = ps_pos(p);
   if (try_skip_keyword(p, "struct")) {
@@ -1188,6 +1227,11 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
   if (try_skip_keyword(p, "union")) {
     out->tag = AST_TYPEEXPR_UNIONE;
     return parse_rest_of_unione(p, pos_start, &out->u.unione);
+  }
+
+  if (try_skip_char(p, '[')) {
+    out->tag = AST_TYPEEXPR_ARRAY;
+    return parse_rest_of_arraytype(p, pos_start, &out->u.arraytype);
   }
 
   struct ast_ident name;
@@ -1633,6 +1677,10 @@ int parse_test_deftypes(void) {
                          "def x int = 3;"
                          "deftype[T] foo struct { count u32; p ptr[T]; };\n",
                          24);
+  pass &= run_count_test("deftype7",
+                         "deftype foo [7]bar;\n"
+                         "deftype[T] foo struct { count u32; p [3]T; };\n",
+                         25);
   return pass;
 }
 

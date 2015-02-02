@@ -807,6 +807,31 @@ void ast_unione_destroy(struct ast_unione *a) {
   SLICE_FREE(a->fields, a->fields_count, ast_vardecl_destroy);
 }
 
+void ast_arraytype_init(struct ast_arraytype *a, struct ast_meta meta,
+                        uint32_t count, struct ast_typeexpr param) {
+  a->meta = meta;
+  a->count = count;
+  a->param = malloc(sizeof(*a->param));
+  CHECK(a->param);
+  *a->param = param;
+}
+
+void ast_arraytype_init_copy(struct ast_arraytype *a, struct ast_arraytype *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  a->count = c->count;
+  a->param = malloc(sizeof(*a->param));
+  CHECK(a->param);
+  ast_typeexpr_init_copy(a->param, c->param);
+}
+
+void ast_arraytype_destroy(struct ast_arraytype *a) {
+  ast_meta_destroy(&a->meta);
+  a->count = 0;
+  ast_typeexpr_destroy(a->param);
+  free(a->param);
+  a->param = NULL;
+}
+
 void ast_typeexpr_init_copy(struct ast_typeexpr *a,
                             struct ast_typeexpr *c) {
   a->tag = c->tag;
@@ -822,6 +847,9 @@ void ast_typeexpr_init_copy(struct ast_typeexpr *a,
     break;
   case AST_TYPEEXPR_UNIONE:
     ast_unione_init_copy(&a->u.unione, &c->u.unione);
+    break;
+  case AST_TYPEEXPR_ARRAY:
+    ast_arraytype_init_copy(&a->u.arraytype, &c->u.arraytype);
     break;
   case AST_TYPEEXPR_UNKNOWN:
     break;
@@ -844,6 +872,9 @@ void ast_typeexpr_destroy(struct ast_typeexpr *a) {
   case AST_TYPEEXPR_UNIONE:
     ast_unione_destroy(&a->u.unione);
     break;
+  case AST_TYPEEXPR_ARRAY:
+    ast_arraytype_destroy(&a->u.arraytype);
+    break;
   case AST_TYPEEXPR_UNKNOWN:
     break;
   default:
@@ -858,6 +889,7 @@ struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a) {
   case AST_TYPEEXPR_APP: return &a->u.app.meta;
   case AST_TYPEEXPR_STRUCTE: return &a->u.structe.meta;
   case AST_TYPEEXPR_UNIONE: return &a->u.unione.meta;
+  case AST_TYPEEXPR_ARRAY: return &a->u.arraytype.meta;
   case AST_TYPEEXPR_UNKNOWN:
     CRASH("No meta data for \"unknown\" typeexpr.\n");
   default:

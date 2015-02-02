@@ -88,11 +88,21 @@ struct ast_unione {
 void ast_unione_init(struct ast_unione *a, struct ast_meta meta,
                      struct ast_vardecl *fields, size_t fields_count);
 
+struct ast_arraytype {
+  struct ast_meta meta;
+  uint32_t count;
+  struct ast_typeexpr *param;
+};
+
+void ast_arraytype_init(struct ast_arraytype *a, struct ast_meta meta,
+                        uint32_t count, struct ast_typeexpr param);
+
 enum ast_typeexpr_tag {
   AST_TYPEEXPR_NAME,
   AST_TYPEEXPR_APP,
   AST_TYPEEXPR_STRUCTE,
   AST_TYPEEXPR_UNIONE,
+  AST_TYPEEXPR_ARRAY,
 
   /* Used in type checking.  Is never parsed. */
   AST_TYPEEXPR_UNKNOWN,
@@ -105,6 +115,7 @@ struct ast_typeexpr {
     struct ast_typeapp app;
     struct ast_structe structe;
     struct ast_unione unione;
+    struct ast_arraytype arraytype;
   } u;
 };
 
