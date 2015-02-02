@@ -37,6 +37,17 @@ enum x86_reg8 {
   X86_BH,
 };
 
+enum x86_reg16 {
+  X86_AX,
+  X86_CX,
+  X86_DX,
+  X86_BX,
+  X86_SP,
+  X86_BP,
+  X86_SI,
+  X86_DI,
+};
+
 /* Only applicable for 0F-prefixed off32 instructions (I think). */
 enum x86_setcc {
   X86_SETCC_L = 0x9C,
@@ -58,6 +69,8 @@ enum x86_jcc {
   X86_JCC_S = 0x88,
   X86_JCC_A = 0x87,
   X86_JCC_C = 0x82,
+  X86_JCC_G = 0x8F,
+  X86_JCC_L = 0x8C,
 };
 
 /* Returns true if the reg has a lobyte (also, the register code
@@ -588,6 +601,13 @@ void x86_gen_test_regs32(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_test_regs8(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2) {
+  uint8_t b[2];
+  b[0] = 0x84;
+  b[1] = mod_reg_rm(MOD11, reg2, reg1);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 /* Appends funcaddrs with dir32 -- not suitable for relative address
    call instructions. */
 void append_immediate(struct objfile *f, struct immediate imm) {
@@ -638,6 +658,15 @@ void x86_gen_shl_cl_w32(struct objfile *f, enum x86_reg dest) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_shl_cl_w16(struct objfile *f, enum x86_reg16 dest) {
+  uint8_t b[3];
+  /* SHL, SHR, SAR have different reg/opcode fields. */
+  b[0] = 0x66;
+  b[1] = 0xD3;
+  b[2] = mod_reg_rm(MOD11, 4, dest);
+  objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
 void x86_gen_shl_cl_w8(struct objfile *f, enum x86_reg8 dest) {
   uint8_t b[2];
   /* SHL, SHR, SAR have different reg/opcode fields. */
@@ -654,6 +683,15 @@ void x86_gen_shr_cl_w32(struct objfile *f, enum x86_reg dest) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_shr_cl_w16(struct objfile *f, enum x86_reg16 dest) {
+  uint8_t b[3];
+  /* SHL, SHR, SAR have different reg/opcode fields. */
+  b[0] = 0x66;
+  b[1] = 0xD3;
+  b[2] = mod_reg_rm(MOD11, 5, dest);
+  objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
 void x86_gen_shr_cl_w8(struct objfile *f, enum x86_reg8 dest) {
   uint8_t b[2];
   /* SHL, SHR, SAR have different reg/opcode fields. */
@@ -666,6 +704,23 @@ void x86_gen_sar_cl_w32(struct objfile *f, enum x86_reg dest) {
   uint8_t b[2];
   /* SHL, SHR, SAR have different reg/opcode fields. */
   b[0] = 0xD3;
+  b[1] = mod_reg_rm(MOD11, 7, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_sar_cl_w16(struct objfile *f, enum x86_reg16 dest) {
+  uint8_t b[3];
+  /* SHL, SHR, SAR have different reg/opcode fields. */
+  b[0] = 0x66;
+  b[1] = 0xD3;
+  b[2] = mod_reg_rm(MOD11, 7, dest);
+  objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
+void x86_gen_sar_cl_w8(struct objfile *f, enum x86_reg8 dest) {
+  uint8_t b[2];
+  /* SHL, SHR, SAR have different reg/opcode fields. */
+  b[0] = 0xD2;
   b[1] = mod_reg_rm(MOD11, 7, dest);
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
@@ -686,6 +741,14 @@ void x86_gen_add_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_add_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
+  uint8_t b[3];
+  b[0] = 0x66;
+  b[1] = 0x01;
+  b[2] = mod_reg_rm(MOD11, src, dest);
+  objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
 void x86_gen_add_w8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
   uint8_t b[2];
   b[0] = 0x00;
@@ -699,6 +762,15 @@ void x86_gen_eaxedx_mul_w32(struct objfile *f, enum x86_reg src) {
   b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 4, src);
   objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_dxax_mul_w16(struct objfile *f, enum x86_reg16 src) {
+  uint8_t b[3];
+  /* MUL, DIV, IDIV have different modr/m opcode. */
+  b[0] = 0x66;
+  b[1] = 0xF7;
+  b[2] = mod_reg_rm(MOD11, 4, src);
+  objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
 void x86_gen_alah_mul_w8(struct objfile *f, enum x86_reg8 src) {
@@ -716,12 +788,37 @@ void x86_gen_imul_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
+void x86_gen_imul_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
+  uint8_t b[4];
+  b[0] = 0x66;  /* TODO: Check prefix order. */
+  b[1] = 0x0F;
+  b[2] = 0xAF;
+  b[3] = mod_reg_rm(MOD11, dest, src);
+  objfile_section_append_raw(objfile_text(f), b, 4);
+}
+
+void x86_gen_alah_imul_w8(struct objfile *f, enum x86_reg8 src) {
+  uint8_t b[2];
+  b[0] = 0xF6;
+  b[1] = mod_reg_rm(MOD11, 5, src);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 void x86_gen_eaxedx_div_w32(struct objfile *f, enum x86_reg denom) {
   uint8_t b[2];
   /* MUL, DIV, IDIV have different modr/m opcode. */
   b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 6, denom);
   objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_axdx_div_w16(struct objfile *f, enum x86_reg16 denom) {
+  uint8_t b[3];
+  /* MUL, DIV, IDIV have different modr/m opcode. */
+  b[0] = 0x66;
+  b[1] = 0xF7;
+  b[2] = mod_reg_rm(MOD11, 6, denom);
+  objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
 void x86_gen_alah_div_w8(struct objfile *f, enum x86_reg8 denom) {
@@ -739,6 +836,22 @@ void x86_gen_eaxedx_idiv_w32(struct objfile *f, enum x86_reg denom) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_axdx_idiv_w16(struct objfile *f, enum x86_reg16 denom) {
+  uint8_t b[3];
+  /* MUL, DIV, IDIV have different modr/m opcode. */
+  b[0] = 0x66;
+  b[1] = 0xF7;
+  b[2] = mod_reg_rm(MOD11, 7, denom);
+  objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
+void x86_gen_alah_idiv_w8(struct objfile *f, enum x86_reg8 denom) {
+  uint8_t b[2];
+  b[0] = 0xF6;
+  b[1] = mod_reg_rm(MOD11, 7, denom);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 void x86_gen_cdq_w32(struct objfile *f) {
   uint8_t b = 0x99;
   objfile_section_append_raw(objfile_text(f), &b, 1);
@@ -751,6 +864,14 @@ void x86_gen_cmp_w32(struct objfile *f, enum x86_reg lhs, enum x86_reg rhs) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_cmp_w16(struct objfile *f, enum x86_reg16 lhs, enum x86_reg16 rhs) {
+  uint8_t b[3];
+  b[0] = 0x66;
+  b[1] = 0x39;
+  b[2] = mod_reg_rm(MOD11, rhs, lhs);
+  objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
 void x86_gen_cmp_imm32(struct objfile *f, enum x86_reg lhs, int32_t imm32) {
   uint8_t b[6];
   b[0] = 0x81;
@@ -759,6 +880,25 @@ void x86_gen_cmp_imm32(struct objfile *f, enum x86_reg lhs, int32_t imm32) {
   CHECK(sizeof(imm32) == 4);
   memcpy(b + 2, &imm32, sizeof(imm32));
   objfile_section_append_raw(objfile_text(f), b, 6);
+}
+
+void x86_gen_cmp_reg16_imm16(struct objfile *f, enum x86_reg16 lhs, int16_t imm16) {
+  uint8_t b[5];
+  b[0] = 0x66;
+  b[1] = 0x81;
+  b[2] = mod_reg_rm(MOD11, 7, lhs);
+  /* LITTLEENDIAN */
+  CHECK(sizeof(imm16) == 2);
+  memcpy(b + 3, &imm16, sizeof(imm16));
+  objfile_section_append_raw(objfile_text(f), b, 5);
+}
+
+void x86_gen_cmp_reg8_imm8(struct objfile *f, enum x86_reg8 lhs, int8_t imm8) {
+  uint8_t b[3];
+  b[0] = 0x80;
+  b[1] = mod_reg_rm(MOD11, 7, lhs);
+  b[2] = (uint8_t)imm8;
+  objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
 void x86_gen_xor_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
@@ -794,6 +934,14 @@ void x86_gen_sub_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   b[0] = 0x29;
   b[1] = mod_reg_rm(MOD11, src, dest);
   objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_sub_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
+  uint8_t b[3];
+  b[0] = 0x66;
+  b[1] = 0x29;
+  b[2] = mod_reg_rm(MOD11, src, dest);
+  objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
 void x86_gen_sub_w8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
@@ -892,6 +1040,36 @@ void x86_gen_movzx8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   uint8_t b[11];
   b[0] = 0x0F;
   b[1] = 0xB6;
+  size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 2);
+}
+
+void x86_gen_movzx16(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
+                     int32_t src_disp) {
+  uint8_t b[11];
+  b[0] = 0x0F;
+  b[1] = 0xB7;
+  size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 2);
+}
+
+void x86_gen_movsx8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
+                    int32_t src_disp) {
+  uint8_t b[11];
+  b[0] = 0x0F;
+  b[1] = 0xBE;
+  size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 2);
+}
+
+void x86_gen_movsx16(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
+                     int32_t src_disp) {
+  uint8_t b[11];
+  b[0] = 0x0F;
+  b[1] = 0xBF;
   size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
   CHECK(count <= 9);
   objfile_section_append_raw(objfile_text(f), b, count + 2);
@@ -1296,6 +1474,16 @@ void gen_cmp32_behavior(struct objfile *f,
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
 
+void gen_cmp16_behavior(struct objfile *f,
+                        int32_t off0, int32_t off1,
+                        enum x86_setcc setcc_code) {
+  x86_gen_movzx16(f, X86_EDX, X86_EBP, off0);
+  x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+  x86_gen_cmp_w16(f, X86_DX, X86_CX);
+  x86_gen_setcc_b8(f, X86_AL, setcc_code);
+  x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+}
+
 void gen_cmp8_behavior(struct objfile *f,
                        int32_t off0, int32_t off1,
                        enum x86_setcc setcc_code) {
@@ -1315,35 +1503,175 @@ void gen_primitive_op_behavior(struct objfile *f,
   case PRIMITIVE_OP_CONVERT_U8_TO_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
   } break;
+  case PRIMITIVE_OP_CONVERT_U8_TO_I8: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_test_regs8(f, X86_AL, X86_AL);
+    gen_crash_jcc(f, h, X86_JCC_S);
+  } break;
+  case PRIMITIVE_OP_CONVERT_U8_TO_U16: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_U8_TO_I16: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_U8_TO_U32: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U8_TO_I32: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
   } break;
-  case PRIMITIVE_OP_CONVERT_U8_TO_U32: {
+
+  case PRIMITIVE_OP_CONVERT_I8_TO_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_test_regs8(f, X86_AL, X86_AL);
+    gen_crash_jcc(f, h, X86_JCC_S);
   } break;
-  case PRIMITIVE_OP_CONVERT_I32_TO_U8: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+  case PRIMITIVE_OP_CONVERT_I8_TO_I8: {
+    x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
   } break;
-  case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+  case PRIMITIVE_OP_CONVERT_I8_TO_U16: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_test_regs8(f, X86_AL, X86_AL);
+    gen_crash_jcc(f, h, X86_JCC_S);
   } break;
-  case PRIMITIVE_OP_CONVERT_I32_TO_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+  case PRIMITIVE_OP_CONVERT_I8_TO_I16: {
+    x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I8_TO_U32: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_test_regs8(f, X86_AL, X86_AL);
+    gen_crash_jcc(f, h, X86_JCC_S);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I8_TO_I32: {
+    x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
+  } break;
+
+  case PRIMITIVE_OP_CONVERT_U16_TO_U8: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
+    gen_crash_jcc(f, h, X86_JCC_A);
+  } break;
+  case PRIMITIVE_OP_CONVERT_U16_TO_I8: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_cmp_imm32(f, X86_EAX, 0x7F);
+    gen_crash_jcc(f, h, X86_JCC_A);
+  } break;
+  case PRIMITIVE_OP_CONVERT_U16_TO_U16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+  } break;
+  case PRIMITIVE_OP_CONVERT_U16_TO_I16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_cmp_imm32(f, X86_EAX, 0x7FFF);
+    gen_crash_jcc(f, h, X86_JCC_A);
+  } break;
+  case PRIMITIVE_OP_CONVERT_U16_TO_U32: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_U16_TO_I32: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+  } break;
+
+  case PRIMITIVE_OP_CONVERT_I16_TO_U8: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
+    gen_crash_jcc(f, h, X86_JCC_A);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I16_TO_I8: {
+    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_cmp_imm32(f, X86_EAX, 0x7F);
+    gen_crash_jcc(f, h, X86_JCC_G);
+    x86_gen_cmp_imm32(f, X86_EAX, -0x80);
+    gen_crash_jcc(f, h, X86_JCC_L);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I16_TO_U16: {
+    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_test_regs32(f, X86_EAX, X86_EAX);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
+  case PRIMITIVE_OP_CONVERT_I16_TO_I16: {
+    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I16_TO_U32: {
+    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_test_regs32(f, X86_EAX, X86_EAX);
+    gen_crash_jcc(f, h, X86_JCC_S);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I16_TO_I32: {
+    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
+  } break;
+
   case PRIMITIVE_OP_CONVERT_U32_TO_U8: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_cmp_imm32(f, X86_EAX, 255);
+    x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
     gen_crash_jcc(f, h, X86_JCC_A);
+  } break;
+  case PRIMITIVE_OP_CONVERT_U32_TO_I8: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_cmp_imm32(f, X86_EAX, 0x7F);
+    gen_crash_jcc(f, h, X86_JCC_A);
+  } break;
+  case PRIMITIVE_OP_CONVERT_U32_TO_U16: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_cmp_imm32(f, X86_EAX, 0xFFFF);
+    gen_crash_jcc(f, h, X86_JCC_A);
+  } break;
+  case PRIMITIVE_OP_CONVERT_U32_TO_I16: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_cmp_imm32(f, X86_EAX, 0x7FFF);
+    gen_crash_jcc(f, h, X86_JCC_A);
+  } break;
+  case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_test_regs32(f, X86_EAX, X86_EAX);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
-  case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
+
+  case PRIMITIVE_OP_CONVERT_I32_TO_U8: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
+    gen_crash_jcc(f, h, X86_JCC_A);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I32_TO_I8: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_cmp_imm32(f, X86_EAX, 0x7F);
+    gen_crash_jcc(f, h, X86_JCC_G);
+    x86_gen_cmp_imm32(f, X86_EAX, -0x80);
+    gen_crash_jcc(f, h, X86_JCC_L);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I32_TO_U16: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_cmp_imm32(f, X86_EAX, 0xFFFF);
+    gen_crash_jcc(f, h, X86_JCC_A);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I32_TO_I16: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_cmp_imm32(f, X86_EAX, 0x7FFF);
+    gen_crash_jcc(f, h, X86_JCC_G);
+    x86_gen_cmp_imm32(f, X86_EAX, -0x8000);
+    gen_crash_jcc(f, h, X86_JCC_L);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I32_TO_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_test_regs32(f, X86_EAX, X86_EAX);
+    gen_crash_jcc(f, h, X86_JCC_S);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+  } break;
+
+  case PRIMITIVE_OP_NEGATE_I8: {
+    x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
+    /* TODO: For this and the other negations, can't we just check OF
+       after the fact?  I missed that in the docs on the first
+       read? */
+    /* Crashes if the value is INT8_MIN by subtracting 1 and
+       overflowing. */
+    x86_gen_cmp_reg8_imm8(f, X86_AL, 1);
+    gen_crash_jcc(f, h, X86_JCC_O);
+    x86_gen_neg_w32(f, X86_AL);
+  } break;
+  case PRIMITIVE_OP_NEGATE_I16: {
+    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
+    /* Crashes if the value is INT16_MIN by subtracting 1 and
+       overflowing. */
+    x86_gen_cmp_reg16_imm16(f, X86_AX, 1);
+    gen_crash_jcc(f, h, X86_JCC_O);
+    x86_gen_neg_w32(f, X86_EAX);
   } break;
   case PRIMITIVE_OP_NEGATE_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
@@ -1353,6 +1681,7 @@ void gen_primitive_op_behavior(struct objfile *f,
     gen_crash_jcc(f, h, X86_JCC_O);
     x86_gen_neg_w32(f, X86_EAX);
   } break;
+
   case PRIMITIVE_OP_ADD_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
@@ -1614,6 +1943,266 @@ void gen_primitive_op_behavior(struct objfile *f,
     x86_gen_shr_cl_w8(f, X86_AL);
   } break;
 
+  case PRIMITIVE_OP_ADD_I8: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_add_w8(f, X86_AL, X86_CL);
+    gen_crash_jcc(f, h, X86_JCC_O);
+  } break;
+  case PRIMITIVE_OP_SUB_I8: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_sub_w8(f, X86_AL, X86_CL);
+    gen_crash_jcc(f, h, X86_JCC_O);
+  } break;
+  case PRIMITIVE_OP_MUL_I8: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_alah_imul_w8(f, X86_CL);
+    gen_crash_jcc(f, h, X86_JCC_O);
+    x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+  } break;
+  case PRIMITIVE_OP_DIV_I8: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_alah_idiv_w8(f, X86_CL);
+    /* Divide by zero will produce #DE. (I guess.) */
+    x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+  } break;
+  case PRIMITIVE_OP_MOD_I8: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_alah_idiv_w8(f, X86_CL);
+    /* Divide by zero will produce #DE. (I guess.) */
+    x86_gen_mov_reg8(f, X86_AL, X86_AH);
+  } break;
+  case PRIMITIVE_OP_LT_I8: {
+    gen_cmp8_behavior(f, off0, off1, X86_SETCC_L);
+  } break;
+  case PRIMITIVE_OP_LE_I8: {
+    gen_cmp8_behavior(f, off0, off1, X86_SETCC_LE);
+  } break;
+  case PRIMITIVE_OP_GT_I8: {
+    gen_cmp8_behavior(f, off0, off1, X86_SETCC_G);
+  } break;
+  case PRIMITIVE_OP_GE_I8: {
+    gen_cmp8_behavior(f, off0, off1, X86_SETCC_GE);
+  } break;
+  case PRIMITIVE_OP_EQ_I8: {
+    gen_cmp8_behavior(f, off0, off1, X86_SETCC_E);
+  } break;
+  case PRIMITIVE_OP_NE_I8: {
+    gen_cmp8_behavior(f, off0, off1, X86_SETCC_NE);
+  } break;
+  case PRIMITIVE_OP_BIT_XOR_I8: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_OR_I8: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_AND_I8: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_I8: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
+    x86_gen_shl_cl_w8(f, X86_AL);
+  } break;
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_I8: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
+    x86_gen_sar_cl_w8(f, X86_AL);
+  } break;
+
+  case PRIMITIVE_OP_ADD_U16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_add_w16(f, X86_AX, X86_CX);
+    gen_crash_jcc(f, h, X86_JCC_C);
+  } break;
+  case PRIMITIVE_OP_SUB_U16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_sub_w16(f, X86_AX, X86_CX);
+    gen_crash_jcc(f, h, X86_JCC_C);
+  } break;
+  case PRIMITIVE_OP_MUL_U16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_dxax_mul_w16(f, X86_CX);
+    gen_crash_jcc(f, h, X86_JCC_C);
+  } break;
+  case PRIMITIVE_OP_DIV_U16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
+    x86_gen_axdx_div_w16(f, X86_CX);
+    /* Divide by zero will produce #DE. (I guess.) */
+  } break;
+  case PRIMITIVE_OP_MOD_U16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
+    x86_gen_axdx_div_w16(f, X86_CX);
+    /* Divide by zero will produce #DE. (I guess.) */
+    x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
+  } break;
+  case PRIMITIVE_OP_LT_U16: {
+    gen_cmp16_behavior(f, off0, off1, X86_SETCC_B);
+  } break;
+  case PRIMITIVE_OP_LE_U16: {
+    gen_cmp16_behavior(f, off0, off1, X86_SETCC_BE);
+  } break;
+  case PRIMITIVE_OP_GT_U16: {
+    gen_cmp16_behavior(f, off0, off1, X86_SETCC_A);
+  } break;
+  case PRIMITIVE_OP_GE_U16: {
+    gen_cmp16_behavior(f, off0, off1, X86_SETCC_AE);
+  } break;
+  case PRIMITIVE_OP_EQ_U16: {
+    gen_cmp16_behavior(f, off0, off1, X86_SETCC_E);
+  } break;
+  case PRIMITIVE_OP_NE_U16: {
+    gen_cmp16_behavior(f, off0, off1, X86_SETCC_NE);
+  } break;
+  case PRIMITIVE_OP_BIT_XOR_U16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_OR_U16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_AND_U16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_U16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
+    x86_gen_shl_cl_w16(f, X86_AX);
+  } break;
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_U16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
+    x86_gen_shr_cl_w16(f, X86_AX);
+  } break;
+
+  case PRIMITIVE_OP_ADD_I16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_add_w16(f, X86_AX, X86_CX);
+    gen_crash_jcc(f, h, X86_JCC_O);
+  } break;
+  case PRIMITIVE_OP_SUB_I16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_sub_w16(f, X86_AX, X86_CX);
+    gen_crash_jcc(f, h, X86_JCC_O);
+  } break;
+  case PRIMITIVE_OP_MUL_I16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_imul_w16(f, X86_AX, X86_CX);
+    gen_crash_jcc(f, h, X86_JCC_O);
+  } break;
+  case PRIMITIVE_OP_DIV_I16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
+    x86_gen_axdx_idiv_w16(f, X86_CX);
+    /* Divide by zero will produce #DE. (I guess.) */
+  } break;
+  case PRIMITIVE_OP_MOD_I16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
+    x86_gen_axdx_idiv_w16(f, X86_CX);
+    x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
+  } break;
+  case PRIMITIVE_OP_LT_I16: {
+    gen_cmp16_behavior(f, off0, off1, X86_SETCC_L);
+  } break;
+  case PRIMITIVE_OP_LE_I16: {
+    gen_cmp16_behavior(f, off0, off1, X86_SETCC_LE);
+  } break;
+  case PRIMITIVE_OP_GT_I16: {
+    gen_cmp16_behavior(f, off0, off1, X86_SETCC_G);
+  } break;
+  case PRIMITIVE_OP_GE_I16: {
+    gen_cmp16_behavior(f, off0, off1, X86_SETCC_GE);
+  } break;
+  case PRIMITIVE_OP_EQ_I16: {
+    gen_cmp16_behavior(f, off0, off1, X86_SETCC_E);
+  } break;
+  case PRIMITIVE_OP_NE_I16: {
+    gen_cmp16_behavior(f, off0, off1, X86_SETCC_NE);
+  } break;
+  case PRIMITIVE_OP_BIT_XOR_I16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_OR_I16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_AND_I16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_I16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
+    x86_gen_shl_cl_w16(f, X86_AX);
+  } break;
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_I16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
+    x86_gen_sar_cl_w16(f, X86_AX);
+  } break;
+
   default:
     UNREACHABLE();
   }
@@ -1859,6 +2448,15 @@ enum numeric_type get_numeric_type(struct identmap *im, struct ast_typeexpr *a) 
   identmap_lookup(im, a->u.name.value, &buf, &count);
   if (count == strlen(U8_TYPE_NAME) && 0 == memcmp(buf, U8_TYPE_NAME, count)) {
     return NUMERIC_TYPE_U8;
+  }
+  if (count == strlen(I8_TYPE_NAME) && 0 == memcmp(buf, I8_TYPE_NAME, count)) {
+    return NUMERIC_TYPE_I8;
+  }
+  if (count == strlen(U16_TYPE_NAME) && 0 == memcmp(buf, U16_TYPE_NAME, count)) {
+    return NUMERIC_TYPE_U16;
+  }
+  if (count == strlen(I16_TYPE_NAME) && 0 == memcmp(buf, I16_TYPE_NAME, count)) {
+    return NUMERIC_TYPE_I16;
   }
   if (count == strlen(I32_TYPE_NAME) && 0 == memcmp(buf, I32_TYPE_NAME, count)) {
     return NUMERIC_TYPE_I32;

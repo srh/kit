@@ -1,6 +1,6 @@
 import bar;
 
-def foo i32 = convert(1u);
+def foo i32 = ~(1u);
 
 def fac func[i32, i32] = fn(x i32) i32 {
   var acc i32 = 1;
@@ -18,14 +18,14 @@ deftype ty struct {
   y i32;
 };
 
-def showfacs func[ptr[ty], ty] = fn(p ptr[ty]) ty {
+def showfacs func[ptr[ty], ptr[u16], ty] = fn(p ptr[ty], num ptr[u16]) ty {
   var ret ty;
   p->x = -5;
   p->y = fac(7);
   p->x = -p->x;
 
-  var tmp u32 = convert(fac(p->x));
-  var y u32 = convert((*p).y);
+  var tmp u32 = ~fac(p->x);
+  var y u32 = ~(*p).y;
   print(tmp);
   putchar(10);
   print(y);
@@ -37,7 +37,8 @@ def showfacs func[ptr[ty], ty] = fn(p ptr[ty]) ty {
   xptr[0] = 99;
 
   p[1].x = 33;
-  p[1].y = 44;
+  *num = (~29 :: u16);
+  p[1].y = (~((~22 :: u16) + (~44 :: u16)) :: i32);
 
   var heh [2]ty;
   heh[0] = p[1];
@@ -49,4 +50,4 @@ def showfacs func[ptr[ty], ty] = fn(p ptr[ty]) ty {
   return ret;
 };
 
-def u8_value u8 = convert(3);
+def u8_value u8 = ~3;

@@ -13,15 +13,23 @@
 
 #define VOID_TYPE_NAME "void"
 #define U8_TYPE_NAME "u8"
+#define I8_TYPE_NAME "i8"
+#define U16_TYPE_NAME "u16"
+#define I16_TYPE_NAME "i16"
 #define I32_TYPE_NAME "i32"
 #define U32_TYPE_NAME "u32"
 #define PTR_TYPE_NAME "ptr"
 #define FUNC_TYPE_NAME "func"
+
+/* TODO: Make this be I8_TYPE_NAME, but later add a distinct bool type. */
 #define BOOLEAN_STANDIN_TYPE_NAME I32_TYPE_NAME
 #define KIRA_BOOL_SIZE 4
 
 enum numeric_type {
   NUMERIC_TYPE_U8,
+  NUMERIC_TYPE_I8,
+  NUMERIC_TYPE_U16,
+  NUMERIC_TYPE_I16,
   NUMERIC_TYPE_I32,
   NUMERIC_TYPE_U32,
 };

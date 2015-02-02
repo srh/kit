@@ -21,6 +21,9 @@ const int MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH = 50;
 uint32_t numeric_type_size(enum numeric_type t) {
   switch (t) {
   case NUMERIC_TYPE_U8: return 1;
+  case NUMERIC_TYPE_I8: return 1;
+  case NUMERIC_TYPE_U16: return 2;
+  case NUMERIC_TYPE_I16: return 2;
   case NUMERIC_TYPE_I32: return 4;
   case NUMERIC_TYPE_U32: return 4;
   default: UNREACHABLE();
@@ -141,6 +144,74 @@ static const enum primitive_op binop_u8_primitive_ops[] = {
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
 
+static const enum primitive_op binop_i8_primitive_ops[] = {
+  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_I8,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_I8,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_I8,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_I8,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_I8,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_I8,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_I8,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_I8,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_I8,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_I8,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_I8,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_I8,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_I8,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_I8,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_I8,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_I8,
+  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
+};
+
+static const enum primitive_op binop_u16_primitive_ops[] = {
+  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_U16,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_U16,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_U16,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_U16,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_U16,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_U16,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_U16,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_U16,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_U16,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_U16,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_U16,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_U16,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_U16,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_U16,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_U16,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_U16,
+  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
+};
+
+static const enum primitive_op binop_i16_primitive_ops[] = {
+  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_I16,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_I16,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_I16,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_I16,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_I16,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_I16,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_I16,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_I16,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_I16,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_I16,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_I16,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_I16,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_I16,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_I16,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_I16,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_I16,
+  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
+};
+
+
+
 
 void intern_binop(struct checkstate *cs,
                   enum ast_binop binop,
@@ -167,6 +238,9 @@ int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x) {
 void checkstate_import_primitive_types(struct checkstate *cs) {
   intern_primitive_type(cs, VOID_TYPE_NAME, NULL, 0, 0, 1);
   intern_primitive_type(cs, U8_TYPE_NAME, NULL, 0, 1, 1);
+  intern_primitive_type(cs, I8_TYPE_NAME, NULL, 0, 1, 1);
+  intern_primitive_type(cs, U16_TYPE_NAME, NULL, 0, 2, 2);
+  intern_primitive_type(cs, I16_TYPE_NAME, NULL, 0, 2, 2);
   intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0, 4, 4);
   intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0, 4, 4);
 
@@ -258,34 +332,67 @@ void import_integer_binops(struct checkstate *cs,
 }
 
 void import_integer_conversions(struct checkstate *cs) {
-  ident_value types[3];
+  ident_value types[6];
   types[0] = identmap_intern_c_str(cs->im, U8_TYPE_NAME);
-  types[1] = identmap_intern_c_str(cs->im, I32_TYPE_NAME);
-  types[2] = identmap_intern_c_str(cs->im, U32_TYPE_NAME);
+  types[1] = identmap_intern_c_str(cs->im, I8_TYPE_NAME);
+  types[2] = identmap_intern_c_str(cs->im, U16_TYPE_NAME);
+  types[3] = identmap_intern_c_str(cs->im, I16_TYPE_NAME);
+  types[4] = identmap_intern_c_str(cs->im, U32_TYPE_NAME);
+  types[5] = identmap_intern_c_str(cs->im, I32_TYPE_NAME);
 
   ident_value convert = identmap_intern_c_str(cs->im, CONVERT_FUNCTION_NAME);
 
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
 
-  enum primitive_op conversions[3][3] = {
+  enum primitive_op conversions[6][6] = {
     {
       PRIMITIVE_OP_CONVERT_U8_TO_U8,
-      PRIMITIVE_OP_CONVERT_U8_TO_I32,
+      PRIMITIVE_OP_CONVERT_U8_TO_I8,
+      PRIMITIVE_OP_CONVERT_U8_TO_U16,
+      PRIMITIVE_OP_CONVERT_U8_TO_I16,
       PRIMITIVE_OP_CONVERT_U8_TO_U32,
+      PRIMITIVE_OP_CONVERT_U8_TO_I32,
     }, {
-      PRIMITIVE_OP_CONVERT_I32_TO_U8,
-      PRIMITIVE_OP_CONVERT_I32_TO_I32,
-      PRIMITIVE_OP_CONVERT_I32_TO_U32,
+      PRIMITIVE_OP_CONVERT_I8_TO_U8,
+      PRIMITIVE_OP_CONVERT_I8_TO_I8,
+      PRIMITIVE_OP_CONVERT_I8_TO_U16,
+      PRIMITIVE_OP_CONVERT_I8_TO_I16,
+      PRIMITIVE_OP_CONVERT_I8_TO_U32,
+      PRIMITIVE_OP_CONVERT_I8_TO_I32,
+    }, {
+      PRIMITIVE_OP_CONVERT_U16_TO_U8,
+      PRIMITIVE_OP_CONVERT_U16_TO_I8,
+      PRIMITIVE_OP_CONVERT_U16_TO_U16,
+      PRIMITIVE_OP_CONVERT_U16_TO_I16,
+      PRIMITIVE_OP_CONVERT_U16_TO_U32,
+      PRIMITIVE_OP_CONVERT_U16_TO_I32,
+    }, {
+      PRIMITIVE_OP_CONVERT_I16_TO_U8,
+      PRIMITIVE_OP_CONVERT_I16_TO_I8,
+      PRIMITIVE_OP_CONVERT_I16_TO_U16,
+      PRIMITIVE_OP_CONVERT_I16_TO_I16,
+      PRIMITIVE_OP_CONVERT_I16_TO_U32,
+      PRIMITIVE_OP_CONVERT_I16_TO_I32,
     }, {
       PRIMITIVE_OP_CONVERT_U32_TO_U8,
-      PRIMITIVE_OP_CONVERT_U32_TO_I32,
+      PRIMITIVE_OP_CONVERT_U32_TO_I8,
+      PRIMITIVE_OP_CONVERT_U32_TO_U16,
+      PRIMITIVE_OP_CONVERT_U32_TO_I16,
       PRIMITIVE_OP_CONVERT_U32_TO_U32,
+      PRIMITIVE_OP_CONVERT_U32_TO_I32,
+    }, {
+      PRIMITIVE_OP_CONVERT_I32_TO_U8,
+      PRIMITIVE_OP_CONVERT_I32_TO_I8,
+      PRIMITIVE_OP_CONVERT_I32_TO_U16,
+      PRIMITIVE_OP_CONVERT_I32_TO_I16,
+      PRIMITIVE_OP_CONVERT_I32_TO_U32,
+      PRIMITIVE_OP_CONVERT_I32_TO_I32,
     },
   };
 
-  for (size_t i = 0; i < 3; i++) {
-    for (size_t j = 0; j < 3; j++) {
+  for (size_t i = 0; i < 6; i++) {
+    for (size_t j = 0; j < 6; j++) {
       struct ast_typeexpr func_type;
       ident_value names[2];
       names[0] = types[i];
@@ -301,34 +408,44 @@ void import_integer_conversions(struct checkstate *cs) {
   }
 }
 
+void import_unary_minus(struct checkstate *cs,
+                        enum primitive_op primitive_op,
+                        const char *type_name) {
+  struct ast_generics generics;
+  ast_generics_init_no_params(&generics);
+
+  struct ast_typeexpr type;
+  ident_value args[2];
+  args[0] = args[1] = identmap_intern_c_str(cs->im, type_name);
+  init_func_type(&type, cs->im, args, 2);
+  name_table_add_primitive_def(
+      &cs->nt,
+      /* TODO: String value duplicated with parse code, I guess. */
+      identmap_intern_c_str(cs->im, "-"),
+      primitive_op,
+      &generics,
+      &type);
+  ast_typeexpr_destroy(&type);
+
+  ast_generics_destroy(&generics);
+}
+
 void checkstate_import_primitive_defs(struct checkstate *cs) {
   import_integer_binops(cs, binop_i32_primitive_ops, I32_TYPE_NAME);
   import_integer_binops(cs, binop_u32_primitive_ops, U32_TYPE_NAME);
   import_integer_binops(cs, binop_u8_primitive_ops, U8_TYPE_NAME);
+  import_integer_binops(cs, binop_i8_primitive_ops, I8_TYPE_NAME);
+  import_integer_binops(cs, binop_u16_primitive_ops, U16_TYPE_NAME);
+  import_integer_binops(cs, binop_i16_primitive_ops, I16_TYPE_NAME);
 
   import_integer_conversions(cs);
 
   {
-    struct ast_generics generics;
-    ast_generics_init_no_params(&generics);
 
     /* Unary minus on i32. */
-    {
-      struct ast_typeexpr type;
-      ident_value args[2];
-      args[0] = args[1] = identmap_intern_c_str(cs->im, I32_TYPE_NAME);
-      init_func_type(&type, cs->im, args, 2);
-      name_table_add_primitive_def(
-          &cs->nt,
-          /* TODO: String value duplicated with parse code, I guess. */
-          identmap_intern_c_str(cs->im, "-"),
-          PRIMITIVE_OP_NEGATE_I32,
-          &generics,
-          &type);
-      ast_typeexpr_destroy(&type);
-    }
-
-    ast_generics_destroy(&generics);
+    import_unary_minus(cs, PRIMITIVE_OP_NEGATE_I8, I8_TYPE_NAME);
+    import_unary_minus(cs, PRIMITIVE_OP_NEGATE_I16, I16_TYPE_NAME);
+    import_unary_minus(cs, PRIMITIVE_OP_NEGATE_I32, I32_TYPE_NAME);
   }
 }
 
@@ -2193,6 +2310,7 @@ int check_expr(struct exprscope *es,
     if (!check_expr(es, x->u.typed_expr.lhs, &replaced_type, &is_lvalue,
                     &annotated_lhs)) {
       ast_typeexpr_destroy(&replaced_type);
+      return 0;
     }
 
     struct ast_typeexpr old_type_copy;
