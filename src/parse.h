@@ -9,9 +9,16 @@
 struct ast_file;
 struct identmap;
 
-struct error_info {
+struct pos {
+  size_t offset;
   size_t line;
   size_t column;
+};
+
+struct pos make_pos(size_t offset, size_t line, size_t column);
+
+struct error_info {
+  struct pos pos;
   struct databuf message;
 };
 

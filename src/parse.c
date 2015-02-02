@@ -10,6 +10,14 @@
 
 #define PARSE_DBG(...)
 
+struct pos make_pos(size_t offset, size_t line, size_t column) {
+  struct pos ret;
+  ret.offset = offset;
+  ret.line = line;
+  ret.column = column;
+  return ret;
+}
+
 struct ps {
   const uint8_t *data;
   size_t length;
@@ -1502,15 +1510,13 @@ int parse_file(struct ps *p, struct ast_file *out) {
   return 0;
 }
 
-void error_info_init(struct error_info *ei, size_t line, size_t column) {
-  ei->line = line;
-  ei->column = column;
+void error_info_init(struct error_info *ei, size_t offset, size_t line, size_t column) {
+  ei->pos = make_pos(offset, line, column);
   databuf_init(&ei->message);
 }
 
 void error_info_destroy(struct error_info *ei) {
-  ei->line = 0;
-  ei->column = 0;
+  ei->pos = make_pos(SIZE_MAX, SIZE_MAX, SIZE_MAX);
   databuf_destroy(&ei->message);
 }
 
@@ -1526,7 +1532,7 @@ int parse_buf_file(struct identmap *im,
   if (ret) {
     *file_out = file;
   } else {
-    error_info_init(error_info_out, p.line, p.column);
+    error_info_init(error_info_out, p.pos, p.line, p.column);
   }
   ps_remove_identmap(&p, im);
   ps_destroy(&p);

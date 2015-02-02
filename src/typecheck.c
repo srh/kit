@@ -364,7 +364,7 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
   if (!parse_buf_file(cs->im, data, data_size, file_out, &error_info)) {
     ERR("Parse error in module %.*s at %"PRIz":%"PRIz".\n",
         size_to_int(module_name_count), module_name,
-        error_info.line, error_info.column);
+        error_info.pos.line, error_info.pos.column);
     error_info_destroy(&error_info);
     goto fail_data;
   }
