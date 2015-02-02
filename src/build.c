@@ -1682,180 +1682,6 @@ void gen_primitive_op_behavior(struct objfile *f,
     x86_gen_neg_w32(f, X86_EAX);
   } break;
 
-  case PRIMITIVE_OP_ADD_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_add_w32(f, X86_EAX, X86_ECX);
-    gen_crash_jcc(f, h, X86_JCC_O);
-  } break;
-  case PRIMITIVE_OP_SUB_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_sub_w32(f, X86_EAX, X86_ECX);
-    gen_crash_jcc(f, h, X86_JCC_O);
-  } break;
-  case PRIMITIVE_OP_MUL_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_imul_w32(f, X86_EAX, X86_ECX);
-    gen_crash_jcc(f, h, X86_JCC_O);
-  } break;
-  case PRIMITIVE_OP_DIV_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_cdq_w32(f);
-    x86_gen_eaxedx_idiv_w32(f, X86_ECX);
-    /* Divide by zero or INT32_MIN / -1 will produce #DE. */
-  } break;
-  case PRIMITIVE_OP_MOD_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_cdq_w32(f);
-    x86_gen_eaxedx_idiv_w32(f, X86_ECX);
-    x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
-    /* Divide by zero or INT32_MIN / -1 will produce #DE. */
-  } break;
-  case PRIMITIVE_OP_LT_I32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_L);
-  } break;
-  case PRIMITIVE_OP_LE_I32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_LE);
-  } break;
-  case PRIMITIVE_OP_GT_I32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_G);
-  } break;
-  case PRIMITIVE_OP_GE_I32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_GE);
-  } break;
-  case PRIMITIVE_OP_EQ_I32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
-  } break;
-  case PRIMITIVE_OP_NE_I32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
-  } break;
-  case PRIMITIVE_OP_BIT_XOR_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
-  } break;
-  case PRIMITIVE_OP_BIT_OR_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_or_w32(f, X86_EAX, X86_ECX);
-  } break;
-  case PRIMITIVE_OP_BIT_AND_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_and_w32(f, X86_EAX, X86_ECX);
-  } break;
-  case PRIMITIVE_OP_BIT_LEFTSHIFT_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-
-    /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
-    gen_crash_jcc(f, h, X86_JCC_A);
-
-    x86_gen_shl_cl_w32(f, X86_EAX);
-  } break;
-  case PRIMITIVE_OP_BIT_RIGHTSHIFT_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-
-    /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
-    gen_crash_jcc(f, h, X86_JCC_A);
-
-    x86_gen_sar_cl_w32(f, X86_EAX);
-  } break;
-
-  case PRIMITIVE_OP_ADD_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_add_w32(f, X86_EAX, X86_ECX);
-    gen_crash_jcc(f, h, X86_JCC_C);
-  } break;
-  case PRIMITIVE_OP_SUB_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_sub_w32(f, X86_EAX, X86_ECX);
-    gen_crash_jcc(f, h, X86_JCC_C);
-  } break;
-  case PRIMITIVE_OP_MUL_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_eaxedx_mul_w32(f, X86_ECX);
-    gen_crash_jcc(f, h, X86_JCC_C);
-  } break;
-  case PRIMITIVE_OP_DIV_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
-    x86_gen_eaxedx_div_w32(f, X86_ECX);
-    /* Divide by zero will produce #DE. (I guess.) */
-  } break;
-  case PRIMITIVE_OP_MOD_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
-    x86_gen_eaxedx_div_w32(f, X86_ECX);
-    x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
-    /* Modulus by zero will produce #DE. (I guess.) */
-  } break;
-  case PRIMITIVE_OP_LT_U32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_B);
-  } break;
-  case PRIMITIVE_OP_LE_U32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_BE);
-  } break;
-  case PRIMITIVE_OP_GT_U32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_A);
-  } break;
-  case PRIMITIVE_OP_GE_U32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_AE);
-  } break;
-  case PRIMITIVE_OP_EQ_U32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
-  } break;
-  case PRIMITIVE_OP_NE_U32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
-  } break;
-  case PRIMITIVE_OP_BIT_XOR_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
-  } break;
-  case PRIMITIVE_OP_BIT_OR_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_or_w32(f, X86_EAX, X86_ECX);
-  } break;
-  case PRIMITIVE_OP_BIT_AND_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_and_w32(f, X86_EAX, X86_ECX);
-  } break;
-  case PRIMITIVE_OP_BIT_LEFTSHIFT_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-
-    /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
-    gen_crash_jcc(f, h, X86_JCC_A);
-
-    x86_gen_shl_cl_w32(f, X86_EAX);
-  } break;
-  case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-
-    /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
-    gen_crash_jcc(f, h, X86_JCC_A);
-
-    x86_gen_shr_cl_w32(f, X86_EAX);
-  } break;
-
   case PRIMITIVE_OP_ADD_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
@@ -2201,6 +2027,180 @@ void gen_primitive_op_behavior(struct objfile *f,
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_sar_cl_w16(f, X86_AX);
+  } break;
+
+  case PRIMITIVE_OP_ADD_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_add_w32(f, X86_EAX, X86_ECX);
+    gen_crash_jcc(f, h, X86_JCC_C);
+  } break;
+  case PRIMITIVE_OP_SUB_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_sub_w32(f, X86_EAX, X86_ECX);
+    gen_crash_jcc(f, h, X86_JCC_C);
+  } break;
+  case PRIMITIVE_OP_MUL_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_eaxedx_mul_w32(f, X86_ECX);
+    gen_crash_jcc(f, h, X86_JCC_C);
+  } break;
+  case PRIMITIVE_OP_DIV_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
+    x86_gen_eaxedx_div_w32(f, X86_ECX);
+    /* Divide by zero will produce #DE. (I guess.) */
+  } break;
+  case PRIMITIVE_OP_MOD_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
+    x86_gen_eaxedx_div_w32(f, X86_ECX);
+    x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
+    /* Modulus by zero will produce #DE. (I guess.) */
+  } break;
+  case PRIMITIVE_OP_LT_U32: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_B);
+  } break;
+  case PRIMITIVE_OP_LE_U32: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_BE);
+  } break;
+  case PRIMITIVE_OP_GT_U32: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_A);
+  } break;
+  case PRIMITIVE_OP_GE_U32: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_AE);
+  } break;
+  case PRIMITIVE_OP_EQ_U32: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
+  } break;
+  case PRIMITIVE_OP_NE_U32: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
+  } break;
+  case PRIMITIVE_OP_BIT_XOR_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_OR_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_AND_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
+    x86_gen_shl_cl_w32(f, X86_EAX);
+  } break;
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
+    x86_gen_shr_cl_w32(f, X86_EAX);
+  } break;
+
+  case PRIMITIVE_OP_ADD_I32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_add_w32(f, X86_EAX, X86_ECX);
+    gen_crash_jcc(f, h, X86_JCC_O);
+  } break;
+  case PRIMITIVE_OP_SUB_I32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_sub_w32(f, X86_EAX, X86_ECX);
+    gen_crash_jcc(f, h, X86_JCC_O);
+  } break;
+  case PRIMITIVE_OP_MUL_I32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_imul_w32(f, X86_EAX, X86_ECX);
+    gen_crash_jcc(f, h, X86_JCC_O);
+  } break;
+  case PRIMITIVE_OP_DIV_I32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_cdq_w32(f);
+    x86_gen_eaxedx_idiv_w32(f, X86_ECX);
+    /* Divide by zero or INT32_MIN / -1 will produce #DE. */
+  } break;
+  case PRIMITIVE_OP_MOD_I32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_cdq_w32(f);
+    x86_gen_eaxedx_idiv_w32(f, X86_ECX);
+    x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
+    /* Divide by zero or INT32_MIN / -1 will produce #DE. */
+  } break;
+  case PRIMITIVE_OP_LT_I32: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_L);
+  } break;
+  case PRIMITIVE_OP_LE_I32: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_LE);
+  } break;
+  case PRIMITIVE_OP_GT_I32: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_G);
+  } break;
+  case PRIMITIVE_OP_GE_I32: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_GE);
+  } break;
+  case PRIMITIVE_OP_EQ_I32: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
+  } break;
+  case PRIMITIVE_OP_NE_I32: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
+  } break;
+  case PRIMITIVE_OP_BIT_XOR_I32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_OR_I32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_AND_I32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_I32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
+    x86_gen_shl_cl_w32(f, X86_EAX);
+  } break;
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_I32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+
+    /* We handle out-of-range rhs, that's all. */
+    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gen_crash_jcc(f, h, X86_JCC_A);
+
+    x86_gen_sar_cl_w32(f, X86_EAX);
   } break;
 
   default:
