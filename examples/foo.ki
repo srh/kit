@@ -16,7 +16,7 @@ deftype ty struct {
   y i32;
 };
 
-def showfacs func[ptr[ty], ptr[u16], ty] = fn(p ptr[ty], num ptr[u16]) ty {
+def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
   var ret ty;
   p->x = -5;
   p->y = fac(7);
@@ -29,9 +29,9 @@ def showfacs func[ptr[ty], ptr[u16], ty] = fn(p ptr[ty], num ptr[u16]) ty {
   print(y);
   putchar(10);
 
-  var yptr ptr[i32] = &p->y;
+  var yptr * i32 = &p->y;
   *yptr = 77;
-  var xptr ptr[i32] = &p->x;
+  var xptr * i32 = &p->x;
   xptr[0] = 99;
 
   p[1].x = 33;
@@ -42,6 +42,8 @@ def showfacs func[ptr[ty], ptr[u16], ty] = fn(p ptr[ty], num ptr[u16]) ty {
   heh[0] = p[1];
   heh[0].x = 34;
   p[1] = heh[0];
+
+  var void_value void;
 
   ret.x = p->x;
   ret.y = 22;

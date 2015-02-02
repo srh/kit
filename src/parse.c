@@ -6,6 +6,7 @@
 #include "ast.h"
 #include "identmap.h"
 #include "slice.h"
+#include "typecheck.h"
 #include "util.h"
 
 #define PARSE_DBG(...)
@@ -1276,6 +1277,36 @@ int parse_rest_of_arraytype(struct ps *p, struct pos pos_start,
   return 1;
 }
 
+int parse_rest_of_pointer(struct ps *p, struct ast_meta star_operator_meta,
+                          struct ast_typeexpr *out) {
+  if (!skip_ws(p)) {
+    goto fail;
+  }
+
+  struct ast_typeexpr param;
+  if (!parse_typeexpr(p, &param)) {
+    goto fail;
+  }
+
+  struct pos pos_start = star_operator_meta.pos_start;
+
+  struct ast_ident star_name;
+  ast_ident_init(&star_name, star_operator_meta,
+                 identmap_intern_c_str(&p->im, PTR_TYPE_NAME));
+
+  struct ast_typeexpr *params = malloc_mul(sizeof(*params), 1);
+  params[0] = param;
+
+  out->tag = AST_TYPEEXPR_APP;
+  ast_typeapp_init(&out->u.app, ast_meta_make(pos_start, ps_pos(p)),
+                   star_name, params, 1);
+  return 1;
+
+ fail:
+  ast_meta_destroy(&star_operator_meta);
+  return 0;
+}
+
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
   struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "struct")) {
@@ -1291,6 +1322,10 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
   if (try_skip_char(p, '[')) {
     out->tag = AST_TYPEEXPR_ARRAY;
     return parse_rest_of_arraytype(p, pos_start, &out->u.arraytype);
+  }
+
+  if (try_skip_char(p, '*')) {
+    return parse_rest_of_pointer(p, ast_meta_make(pos_start, ps_pos(p)), out);
   }
 
   struct ast_ident name;

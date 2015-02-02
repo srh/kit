@@ -17,6 +17,7 @@ struct ast_meta {
 struct ast_meta ast_meta_make(struct pos start, struct pos end);
 struct ast_meta ast_meta_make_copy(struct ast_meta *c);
 struct ast_meta ast_meta_make_garbage(void);
+void ast_meta_destroy(struct ast_meta *a);
 
 struct ast_ident {
   struct ast_meta meta;
