@@ -45,7 +45,7 @@ Here's the project timeline:
    5p. While loops (DONE), for loops.
    5q. Better void support, pointer arithmetic, proper treatment of zero-size entities.
    5r. Partial type syntax (var x = ...;  and  var x blah[_] = ...;  and  x :: foo[_])
-   5s. Logical not operator.
+   5s. Logical not operator. (DONE)
    6. Linux support.
    7. Make a self-hosted implementation (adding improvements and
       fixes to the C implementation when useful).

@@ -408,9 +408,10 @@ void import_integer_conversions(struct checkstate *cs) {
   }
 }
 
-void import_unary_minus(struct checkstate *cs,
-                        enum primitive_op primitive_op,
-                        const char *type_name) {
+void import_unop(struct checkstate *cs,
+                 enum primitive_op primitive_op,
+                 const char *op_name,
+                 const char *type_name) {
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
 
@@ -420,8 +421,7 @@ void import_unary_minus(struct checkstate *cs,
   init_func_type(&type, cs->im, args, 2);
   name_table_add_primitive_def(
       &cs->nt,
-      /* TODO: String value duplicated with parse code, I guess. */
-      identmap_intern_c_str(cs->im, "-"),
+      identmap_intern_c_str(cs->im, op_name),
       primitive_op,
       &generics,
       &type);
@@ -441,11 +441,12 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
   import_integer_conversions(cs);
 
   {
+    /* TODO: String values duplicated with parse code, I guess. */
+    import_unop(cs, PRIMITIVE_OP_NEGATE_I8, "-", I8_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_NEGATE_I16, "-", I16_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_NEGATE_I32, "-", I32_TYPE_NAME);
 
-    /* Unary minus on i32. */
-    import_unary_minus(cs, PRIMITIVE_OP_NEGATE_I8, I8_TYPE_NAME);
-    import_unary_minus(cs, PRIMITIVE_OP_NEGATE_I16, I16_TYPE_NAME);
-    import_unary_minus(cs, PRIMITIVE_OP_NEGATE_I32, I32_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_LOGICAL_NOT, "!", BOOLEAN_STANDIN_TYPE_NAME);
   }
 }
 
@@ -1945,6 +1946,7 @@ int check_expr_magic_unop(struct exprscope *es,
   } break;
   case AST_UNOP_NEGATE:
   case AST_UNOP_CONVERT:
+  case AST_UNOP_LOGICAL_NOT:
   default:
     UNREACHABLE();
   }
@@ -3967,6 +3969,23 @@ int check_file_test_more_15(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_16(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[i32] = fn() i32 {\n"
+      "  var x i32 = 5;\n"
+      "  while !(x > 3) {\n"
+      "    x = x + 1;\n"
+      "  }\n"
+      "  return x;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -4319,6 +4338,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_15...\n");
   if (!test_check_module(&im, &check_file_test_more_15, foo)) {
     DBG("check_file_test_more_15 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_16...\n");
+  if (!test_check_module(&im, &check_file_test_more_16, foo)) {
+    DBG("check_file_test_more_16 fails\n");
     goto cleanup_identmap;
   }
 

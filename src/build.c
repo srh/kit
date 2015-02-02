@@ -60,6 +60,7 @@ enum x86_setcc {
   X86_SETCC_AE = 0x93,
   X86_SETCC_B = 0x92,
   X86_SETCC_BE = 0x96,
+  X86_SETCC_Z = 0x94,
 };
 
 /* Only applicable for 0F-prefixed jmp instructions (I think). */
@@ -1490,7 +1491,7 @@ void gen_cmp8_behavior(struct objfile *f,
   x86_gen_movzx8(f, X86_EDX, X86_EBP, off0);
   x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
   x86_gen_cmp_w32(f, X86_EDX, X86_ECX);
-  x86_gen_setcc_b8(f, X86_EAX, setcc_code);
+  x86_gen_setcc_b8(f, X86_AL, setcc_code);
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
 
@@ -1680,6 +1681,12 @@ void gen_primitive_op_behavior(struct objfile *f,
     x86_gen_cmp_imm32(f, X86_EAX, 1);
     gen_crash_jcc(f, h, X86_JCC_O);
     x86_gen_neg_w32(f, X86_EAX);
+  } break;
+
+  case PRIMITIVE_OP_LOGICAL_NOT: {
+    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_test_regs8(f, X86_AL, X86_AL);
+    x86_gen_setcc_b8(f, X86_AL, X86_SETCC_Z);
   } break;
 
   case PRIMITIVE_OP_ADD_U8: {
@@ -2337,6 +2344,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
   } break;
   case AST_UNOP_NEGATE:
   case AST_UNOP_CONVERT:
+  case AST_UNOP_LOGICAL_NOT:
   default:
     UNREACHABLE();
   }

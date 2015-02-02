@@ -276,6 +276,7 @@ enum ast_unop {
      ast_unop_expr. */
   AST_UNOP_NEGATE,
   AST_UNOP_CONVERT,
+  AST_UNOP_LOGICAL_NOT,
 };
 
 int is_magic_unop(enum ast_unop unop);

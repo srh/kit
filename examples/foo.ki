@@ -4,7 +4,7 @@ def foo i32 = ~(1u);
 
 def fac func[i32, i32] = fn(x i32) i32 {
   var acc i32 = 1;
-  while x > 0 {
+  while !(x <= 0) {
     acc = acc * x;
     x = x - 1;
   }
