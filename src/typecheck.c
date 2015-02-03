@@ -2166,17 +2166,19 @@ int check_index_expr(struct exprscope *es,
                      struct ast_index_expr *a,
                      struct ast_typeexpr *partial_type,
                      struct ast_typeexpr *return_type_out,
+                     int *is_lvalue_out,
                      struct ast_index_expr *annotated_out) {
   struct ast_typeexpr no_partial_type;
   no_partial_type.tag = AST_TYPEEXPR_UNKNOWN;
 
   struct ast_expr lhs_annotated;
-  int lvalue_discard;
+  int lhs_lvalue;
   if (!check_expr(es, a->lhs, &no_partial_type,
-                  &lvalue_discard, &lhs_annotated)) {
-    return 0;
+                  &lhs_lvalue, &lhs_annotated)) {
+    goto fail;
   }
 
+  int lvalue_discard;
   struct ast_expr rhs_annotated;
   if (!check_expr(es, a->rhs, &no_partial_type,
                   &lvalue_discard, &rhs_annotated)) {
@@ -2189,6 +2191,7 @@ int check_index_expr(struct exprscope *es,
 
   struct ast_typeexpr *lhs_type = ast_expr_type(&lhs_annotated);
 
+  int is_lvalue;
   struct ast_typeexpr *lhs_target;
   if (!view_ptr_target(es->cs->im, lhs_type, &lhs_target)) {
     if (lhs_type->tag != AST_TYPEEXPR_ARRAY) {
@@ -2196,7 +2199,10 @@ int check_index_expr(struct exprscope *es,
       goto fail_rhs_annotated;
     }
 
+    is_lvalue = lhs_lvalue;
     lhs_target = lhs_type->u.arraytype.param;
+  } else {
+    is_lvalue = 1;
   }
 
   if (!unify_directionally(partial_type, lhs_target)) {
@@ -2206,16 +2212,18 @@ int check_index_expr(struct exprscope *es,
 
   ast_typeexpr_init_copy(return_type_out, lhs_target);
 
+  *is_lvalue_out = is_lvalue;
   ast_index_expr_init(annotated_out,
                       ast_meta_make_copy(&a->meta),
                       lhs_annotated,
                       rhs_annotated);
   return 1;
+
  fail_rhs_annotated:
   ast_expr_destroy(&rhs_annotated);
-  return 0;
  fail_lhs_annotated:
   ast_expr_destroy(&lhs_annotated);
+ fail:
   return 0;
 }
 
@@ -2267,11 +2275,12 @@ int check_expr(struct exprscope *es,
   } break;
   case AST_EXPR_INDEX: {
     struct ast_typeexpr return_type;
+    int is_lvalue;
     if (!check_index_expr(es, &x->u.index_expr, partial_type,
-                          &return_type, &annotated_out->u.index_expr)) {
+                          &return_type, &is_lvalue, &annotated_out->u.index_expr)) {
       return 0;
     }
-    *is_lvalue_out = 1;
+    *is_lvalue_out = is_lvalue;
     ast_expr_partial_init(annotated_out, AST_EXPR_INDEX,
                           ast_expr_info_typechecked(return_type));
     return 1;
