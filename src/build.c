@@ -1112,6 +1112,16 @@ void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, uint32_t dest_di
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
+void x86_gen_store16(struct objfile *f, enum x86_reg dest_addr, uint32_t dest_disp,
+                     enum x86_reg16 src) {
+  uint8_t b[11];
+  b[0] = 0x66;
+  b[1] = 0x89;
+  size_t count = x86_encode_reg_rm(b + 2, src, dest_addr, dest_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 2);
+}
+
 void x86_gen_store8(struct objfile *f, enum x86_reg dest_addr, uint32_t dest_disp,
                     enum x86_reg src) {
   CHECK(x86_reg_has_lowbyte(src));
@@ -1279,59 +1289,78 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
   CHECK(dest.size <= DWORD_SIZE);
   CHECK(dest.padded_size == DWORD_SIZE);
+
+  enum x86_reg dest_addr;
+  int32_t dest_disp;
+
   switch (dest.tag) {
-  case LOC_EBP_OFFSET:
-    x86_gen_store32(f, X86_EBP, dest.u.ebp_offset, reg);
+    case LOC_EBP_OFFSET:
+      dest_addr = X86_EBP;
+      dest_disp = dest.u.ebp_offset;
+      break;
+    case LOC_GLOBAL:
+      CRASH("Writing to globals is impossible.");
+      break;
+    case LOC_EBP_INDIRECT: {
+      dest_addr = choose_altreg(reg);
+      dest_disp = 0;
+      x86_gen_load32(f, dest_addr, X86_EBP, dest.u.ebp_indirect);
+    } break;
+    default:
+      UNREACHABLE();
+  }
+
+  switch (dest.size) {
+  case DWORD_SIZE:
+    x86_gen_store32(f, dest_addr, dest_disp, reg);
     break;
-  case LOC_GLOBAL:
-    CRASH("Writing to globals is impossible.");
+  case 2:
+    x86_gen_store16(f, dest_addr, dest_disp, reg);
     break;
-  case LOC_EBP_INDIRECT: {
-    enum x86_reg altreg = choose_altreg(reg);
-    x86_gen_load32(f, altreg, X86_EBP, dest.u.ebp_indirect);
-    x86_gen_store32(f, altreg, 0, reg);
-  } break;
+  case 1:
+    x86_gen_store8(f, dest_addr, dest_disp, reg);
+    break;
   default:
-    UNREACHABLE();
+    CRASH("not implemented or unreachable.");
   }
 }
 
 void gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src) {
   CHECK(src.size <= DWORD_SIZE);
-  CHECK(src.padded_size == DWORD_SIZE);
-  if (src.size == DWORD_SIZE) {
-    switch (src.tag) {
-    case LOC_EBP_OFFSET:
-      x86_gen_load32(f, reg, X86_EBP, src.u.ebp_offset);
-      break;
-    case LOC_GLOBAL:
-      x86_gen_mov_reg_stiptr(f, reg, src.u.global_sti);
-      x86_gen_load32(f, reg, reg, 0);
-      break;
-    case LOC_EBP_INDIRECT:
-      x86_gen_load32(f, reg, X86_EBP, src.u.ebp_indirect);
-      x86_gen_load32(f, reg, reg, 0);
-      break;
-    default:
-      UNREACHABLE();
-    }
-  } else if (src.size == 1) {
-    switch (src.tag) {
-    case LOC_EBP_OFFSET:
-      x86_gen_movzx8(f, reg, X86_EBP, src.u.ebp_offset);
-      break;
-    case LOC_GLOBAL:
-      x86_gen_mov_reg_stiptr(f, reg, src.u.global_sti);
-      x86_gen_movzx8(f, reg, reg, 0);
-      break;
-    case LOC_EBP_INDIRECT:
-      x86_gen_load32(f, reg, X86_EBP, src.u.ebp_indirect);
-      x86_gen_movzx8(f, reg, reg, 0);
-      break;
-    default:
-      UNREACHABLE();
-    }
-  } else {
+
+  enum x86_reg src_addr;
+  int32_t src_disp;
+
+  switch (src.tag) {
+  case LOC_EBP_OFFSET:
+    src_addr = X86_EBP;
+    src_disp = src.u.ebp_offset;
+    break;
+  case LOC_GLOBAL:
+    x86_gen_mov_reg_stiptr(f, reg, src.u.global_sti);
+    src_addr = reg;
+    src_disp = 0;
+    break;
+  case LOC_EBP_INDIRECT:
+    x86_gen_load32(f, reg, X86_EBP, src.u.ebp_indirect);
+    src_addr = reg;
+    src_disp = 0;
+    break;
+  default:
+    UNREACHABLE();
+  }
+
+  switch (src.size) {
+  case DWORD_SIZE:
+    x86_gen_load32(f, reg, src_addr, src_disp);
+    break;
+  case 2:
+    x86_gen_movzx16(f, reg, src_addr, src_disp);
+    break;
+  case 1:
+    x86_gen_movzx8(f, reg, src_addr, src_disp);
+    break;
+  default:
     CRASH("not implemented or unreachable.");
   }
 }

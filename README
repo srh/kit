@@ -25,6 +25,7 @@ Here's the project timeline:
    3. Generate code, i.e. have a working compiler.  (DONE)
    3a. Support interior lambda expressions.
    3b. Support the stdcall calling convention.
+   3c. Support exporting specific names for C interop.
    4. Cleanup error messages to have useful source information. (BETTER)
    5. Cleanup the language to make it more usable. (in progress)
    5a. Array indexing through pointers. (DONE)
@@ -46,6 +47,9 @@ Here's the project timeline:
    5q. Better void support, pointer arithmetic, proper treatment of zero-size entities.
    5r. Partial type syntax (var x = ...;  and  var x blah[_] = ...;  and  x :: foo[_])
    5s. Logical not operator. (DONE)
+   5t. Array lookup should preserve the lvalueness of the array value.
+   5u. String literal and character literal syntax.
+   5v. Structure / array initialization syntax.
    6. Linux support.
    7. Make a self-hosted implementation (adding improvements and
       fixes to the C implementation when useful).
