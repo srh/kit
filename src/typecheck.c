@@ -1393,7 +1393,7 @@ int check_expr_bracebody(struct bodystate *bs,
       int has_rhs = s->u.var_statement.has_rhs;
       struct ast_expr annotated_rhs = { 0 };  /* Initialize to appease cl. */
       if (has_rhs) {
-        if (!check_expr(bs->es, s->u.var_statement.rhs_, &replaced_type,
+        if (!check_expr(bs->es, s->u.var_statement.rhs, &replaced_type,
                         &lvalue_discard, &annotated_rhs)) {
           ast_typeexpr_destroy(&replaced_type);
           goto fail;

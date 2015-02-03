@@ -185,7 +185,7 @@ void ast_var_statement_init_with_rhs(struct ast_var_statement *a, struct ast_met
   ast_var_statement_info_init(&a->info);
   a->decl = decl;
   a->has_rhs = 1;
-  ast_expr_alloc_move(rhs, &a->rhs_);
+  ast_expr_alloc_move(rhs, &a->rhs);
 }
 
 void ast_var_statement_init_without_rhs(struct ast_var_statement *a, struct ast_meta meta,
@@ -194,7 +194,7 @@ void ast_var_statement_init_without_rhs(struct ast_var_statement *a, struct ast_
   ast_var_statement_info_init(&a->info);
   a->decl = decl;
   a->has_rhs = 0;
-  a->rhs_ = NULL;
+  a->rhs = NULL;
 }
 
 struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a) {
@@ -209,9 +209,9 @@ void ast_var_statement_init_copy(struct ast_var_statement *a,
   ast_vardecl_init_copy(&a->decl, &c->decl);
   a->has_rhs = c->has_rhs;
   if (c->has_rhs) {
-    ast_expr_alloc_init_copy(c->rhs_, &a->rhs_);
+    ast_expr_alloc_init_copy(c->rhs, &a->rhs);
   } else {
-    c->rhs_ = NULL;
+    c->rhs = NULL;
   }
 }
 
@@ -221,9 +221,9 @@ void ast_var_statement_destroy(struct ast_var_statement *a) {
   ast_vardecl_destroy(&a->decl);
   if (a->has_rhs) {
     a->has_rhs = 0;
-    ast_expr_destroy(a->rhs_);
-    free(a->rhs_);
-    a->rhs_ = NULL;
+    ast_expr_destroy(a->rhs);
+    free(a->rhs);
+    a->rhs = NULL;
   }
 }
 

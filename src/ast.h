@@ -166,7 +166,7 @@ struct ast_var_statement {
   struct ast_var_statement_info info;
   struct ast_vardecl decl;
   int has_rhs;
-  struct ast_expr *rhs_;
+  struct ast_expr *rhs;
 };
 
 void ast_var_statement_init_with_rhs(struct ast_var_statement *a, struct ast_meta meta,

@@ -2830,7 +2830,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       int32_t saved_offset = frame_save_offset(h);
 
       struct expr_return er = demand_expr_return(var_loc);
-      if (!gen_expr(cs, f, h, s->u.var_statement.rhs_, &er)) {
+      if (!gen_expr(cs, f, h, s->u.var_statement.rhs, &er)) {
         return 0;
       }
       frame_restore_offset(h, saved_offset);
