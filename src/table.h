@@ -213,6 +213,7 @@ struct def_entry {
   int is_primitive;
   enum primitive_op primitive_op;
   int is_extern;
+  int is_export;
   struct ast_def *def;
 
   struct def_instantiation **instantiations;
@@ -291,6 +292,7 @@ int name_table_add_def(struct name_table *t,
                        ident_value name,
                        struct ast_generics *generics,
                        struct ast_typeexpr *type,
+                       int is_export,
                        struct ast_def *def);
 int name_table_add_primitive_def(
     struct name_table *t,

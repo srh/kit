@@ -1,6 +1,6 @@
 import bar;
 
-def foo i32 = ~(1u);
+export def foo i32 = ~(1u);
 
 def fac func[i32, i32] = fn(x i32) i32 {
   var acc i32 = 1;
@@ -16,7 +16,7 @@ deftype ty struct {
   y i32;
 };
 
-def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
+export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
   var ret ty;
   p->x = -5;
   p->y = fac(7);

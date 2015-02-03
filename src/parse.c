@@ -1426,10 +1426,13 @@ int parse_type_params_if_present(struct ps *p,
   return 0;
 }
 
-int parse_rest_of_def(struct ps *p, struct pos pos_start, struct ast_def *out) {
-  struct ast_generics generics;
-  if (!(skip_ws(p) && parse_type_params_if_present(p, &generics))) {
-    goto fail;
+int parse_rest_of_def(struct ps *p, struct pos pos_start,
+                      int is_export, struct ast_def *out) {
+  struct ast_generics generics = { 0 };
+  if (!is_export) {
+    if (!(skip_ws(p) && parse_type_params_if_present(p, &generics))) {
+      goto fail;
+    }
   }
 
   struct ast_ident name;
@@ -1455,8 +1458,12 @@ int parse_rest_of_def(struct ps *p, struct pos pos_start, struct ast_def *out) {
     goto fail_rhs;
   }
 
-  ast_def_init(out, ast_meta_make(pos_start, ps_pos(p)),
-               generics, name, type, rhs);
+  struct ast_meta meta = ast_meta_make(pos_start, ps_pos(p));
+  if (is_export) {
+    ast_def_export_init(out, meta, name, type, rhs);
+  } else {
+    ast_def_init(out, meta, generics, name, type, rhs);
+  }
   return 1;
 
  fail_rhs:
@@ -1466,7 +1473,9 @@ int parse_rest_of_def(struct ps *p, struct pos pos_start, struct ast_def *out) {
  fail_ident:
   ast_ident_destroy(&name);
  fail_generics:
-  ast_generics_destroy(&generics);
+  if (!is_export) {
+    ast_generics_destroy(&generics);
+  }
  fail:
   return 0;
 }
@@ -1559,7 +1568,13 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "def")) {
     out->tag = AST_TOPLEVEL_DEF;
-    return parse_rest_of_def(p, pos_start, &out->u.def);
+    return parse_rest_of_def(p, pos_start, 0, &out->u.def);
+  } else if (try_skip_keyword(p, "export")) {
+    if (!(skip_ws(p) && try_skip_keyword(p, "def"))) {
+      return 0;
+    }
+    out->tag = AST_TOPLEVEL_DEF;
+    return parse_rest_of_def(p, pos_start, 1, &out->u.def);
   } else if (try_skip_keyword(p, "extern")) {
     out->tag = AST_TOPLEVEL_EXTERN_DEF;
     return parse_rest_of_extern_def(p, pos_start, &out->u.extern_def);
@@ -1788,6 +1803,14 @@ int parse_test_externs(void) {
   return pass;
 }
 
+int parse_test_exports(void) {
+  int pass = 1;
+  pass &= run_count_test("externs1",
+                         "export def blah func[i32, i32] = 3;\n",
+                         12);
+  return pass;
+}
+
 int parse_test(void) {
   int pass = 1;
   pass &= parse_test_nothing();
@@ -1796,6 +1819,7 @@ int parse_test(void) {
   pass &= parse_test_defs();
   pass &= parse_test_deftypes();
   pass &= parse_test_externs();
+  pass &= parse_test_exports();
   return pass;
 }
 

@@ -534,9 +534,10 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
         break;
       case AST_TOPLEVEL_DEF: {
         if (!name_table_add_def(&cs->nt,
-                                toplevel->u.def.name.value,
-                                &toplevel->u.def.generics,
-                                &toplevel->u.def.type,
+                                toplevel->u.def.name_.value,
+                                &toplevel->u.def.generics_,
+                                &toplevel->u.def.type_,
+                                toplevel->u.def.is_export,
                                 &toplevel->u.def)) {
           goto cleanup;
         }
@@ -1008,14 +1009,14 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
     inst->typecheck_started = 1;
     struct exprscope scope;
     exprscope_init(&scope, es->cs,
-                   &ent->def->generics,
+                   &ent->def->generics_,
                    inst->substitutions,
                    inst->substitutions_count,
                    STATIC_COMPUTATION_YES,
                    ent);
 
     struct ast_expr annotated_rhs;
-    if (!check_expr_with_type(&scope, &ent->def->rhs, &unified,
+    if (!check_expr_with_type(&scope, &ent->def->rhs_, &unified,
                               &annotated_rhs)) {
       exprscope_destroy(&scope);
       es->cs->template_instantiation_recursion_depth--;
@@ -2378,29 +2379,29 @@ int check_expr_with_type(struct exprscope *es,
 }
 
 int check_def(struct checkstate *cs, struct ast_def *a) {
-  if (!check_generics_shadowing(cs, &a->generics)) {
+  if (!check_generics_shadowing(cs, &a->generics_)) {
     return 0;
   }
 
-  if (!check_typeexpr(cs, &a->generics, &a->type, NULL)) {
+  if (!check_typeexpr(cs, &a->generics_, &a->type_, NULL)) {
     return 0;
   }
 
   /* We can only typecheck the def by instantiating it -- so we check
      the ones with no template params. */
-  if (!a->generics.has_type_params) {
+  if (!a->generics_.has_type_params) {
     struct ast_typeexpr unified;
     struct def_entry *ent;
     struct def_instantiation *inst;
     int success = name_table_match_def(&cs->nt,
-                                       &a->name,
+                                       &a->name_,
                                        NULL, 0, /* (no generics) */
-                                       &a->type,
+                                       &a->type_,
                                        &unified,
                                        &ent,
                                        &inst);
     CHECK(success);
-    CHECK(exact_typeexprs_equal(&unified, &a->type));
+    CHECK(exact_typeexprs_equal(&unified, &a->type_));
     CHECK(!ent->is_primitive);
 
     ast_typeexpr_destroy(&unified);
@@ -2410,10 +2411,10 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
       CHECK(!inst->annotated_rhs_computed);
       inst->typecheck_started = 1;
       struct exprscope es;
-      exprscope_init(&es, cs, &a->generics, NULL, 0,
+      exprscope_init(&es, cs, &a->generics_, NULL, 0,
                      STATIC_COMPUTATION_YES, ent);
       struct ast_expr annotated_rhs;
-      ret = check_expr_with_type(&es, &a->rhs, &a->type, &annotated_rhs);
+      ret = check_expr_with_type(&es, &a->rhs_, &a->type_, &annotated_rhs);
       if (ret) {
         CHECK(!inst->annotated_rhs_computed);
         inst->annotated_rhs_computed = 1;

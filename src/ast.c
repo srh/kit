@@ -1008,18 +1008,31 @@ void ast_def_init(struct ast_def *a, struct ast_meta meta,
                   struct ast_ident name, struct ast_typeexpr type,
                   struct ast_expr rhs) {
   a->meta = meta;
-  a->generics = generics;
-  a->name = name;
-  a->type = type;
-  a->rhs = rhs;
+  a->is_export = 0;
+  a->generics_ = generics;
+  a->name_ = name;
+  a->type_ = type;
+  a->rhs_ = rhs;
+}
+
+void ast_def_export_init(struct ast_def *a, struct ast_meta meta,
+                         struct ast_ident name, struct ast_typeexpr type,
+                         struct ast_expr rhs) {
+  a->meta = meta;
+  a->is_export = 1;
+  ast_generics_init_no_params(&a->generics_);
+  a->name_ = name;
+  a->type_ = type;
+  a->rhs_ = rhs;
 }
 
 void ast_def_destroy(struct ast_def *a) {
   ast_meta_destroy(&a->meta);
-  ast_generics_destroy(&a->generics);
-  ast_ident_destroy(&a->name);
-  ast_typeexpr_destroy(&a->type);
-  ast_expr_destroy(&a->rhs);
+  a->is_export = 0;
+  ast_generics_destroy(&a->generics_);
+  ast_ident_destroy(&a->name_);
+  ast_typeexpr_destroy(&a->type_);
+  ast_expr_destroy(&a->rhs_);
 }
 
 void ast_extern_def_init(struct ast_extern_def *a, struct ast_meta meta,

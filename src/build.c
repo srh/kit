@@ -89,33 +89,39 @@ void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
    unique. */
 int generate_kira_name(struct checkstate *cs,
                        const void *name, size_t name_count,
+                       int is_export,
                        void **gen_name_out, size_t *gen_name_count_out) {
   CHECK(cs->kira_name_counter != UINT32_MAX);
   cs->kira_name_counter++;
   uint32_t number_append = cs->kira_name_counter;
   struct databuf b;
   databuf_init(&b);
-  databuf_append(&b, "_kira_", 6);
-  databuf_append(&b, name, name_count);
+  if (is_export) {
+    databuf_append(&b, "_", 1);
+    databuf_append(&b, name, name_count);
+  } else {
+    databuf_append(&b, "_kira_", 6);
+    databuf_append(&b, name, name_count);
 
-  /* I just don't want to lookup the stdarg documentation and
-     implement databuf_appendf. */
-  char buf[20] = { 0 };
-  size_t i = 0;
-  CHECK(number_append > 0);
-  while (number_append > 0) {
-    buf[i] = '0' + (number_append % 10);
-    number_append /= 10;
-    i = size_add(i, 1);
+    /* I just don't want to lookup the stdarg documentation and
+       implement databuf_appendf. */
+    char buf[20] = { 0 };
+    size_t i = 0;
+    CHECK(number_append > 0);
+    while (number_append > 0) {
+      buf[i] = '0' + (number_append % 10);
+      number_append /= 10;
+      i = size_add(i, 1);
+    }
+
+    char rbuf[20] = { 0 };
+
+    for (size_t j = 0; j < i; j++) {
+      rbuf[j] = buf[size_sub(size_sub(i, 1), j)];
+    }
+
+    databuf_append(&b, rbuf, i);
   }
-
-  char rbuf[20] = { 0 };
-
-  for (size_t j = 0; j < i; j++) {
-    rbuf[j] = buf[size_sub(size_sub(i, 1), j)];
-  }
-
-  databuf_append(&b, rbuf, i);
   databuf_move_destroy(&b, gen_name_out, gen_name_count_out);
   return 1;
 }
@@ -157,12 +163,15 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
     return 1;
   }
 
+  CHECK(!(ent->is_export && ent->instantiations_count > 1));
+
   for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
     struct def_instantiation *inst = ent->instantiations[i];
 
     void *gen_name;
     size_t gen_name_count;
     if (!generate_kira_name(cs, name, name_count,
+                            ent->is_export,
                             &gen_name, &gen_name_count)) {
       return 0;
     }

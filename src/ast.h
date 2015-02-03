@@ -478,16 +478,21 @@ void ast_generics_destroy(struct ast_generics *a);
 
 struct ast_def {
   struct ast_meta meta;
-  struct ast_generics generics;
-  struct ast_ident name;
-  struct ast_typeexpr type;
-  struct ast_expr rhs;
+  int is_export;
+  struct ast_generics generics_;
+  struct ast_ident name_;
+  struct ast_typeexpr type_;
+  struct ast_expr rhs_;
 };
 
 void ast_def_init(struct ast_def *a, struct ast_meta meta,
                   struct ast_generics generics,
                   struct ast_ident name, struct ast_typeexpr type,
                   struct ast_expr rhs);
+
+void ast_def_export_init(struct ast_def *a, struct ast_meta meta,
+                         struct ast_ident name, struct ast_typeexpr type,
+                         struct ast_expr rhs);
 
 struct ast_extern_def {
   struct ast_meta meta;

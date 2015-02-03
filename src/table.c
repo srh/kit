@@ -126,6 +126,7 @@ void def_entry_init(struct def_entry *e, ident_value name,
                     int is_primitive,
                     enum primitive_op primitive_op,
                     int is_extern,
+                    int is_export,
                     struct ast_def *def) {
   e->name = name;
   ast_generics_init_copy(&e->generics, generics);
@@ -133,6 +134,7 @@ void def_entry_init(struct def_entry *e, ident_value name,
   e->is_primitive = is_primitive;
   e->primitive_op = primitive_op;
   e->is_extern = is_extern;
+  e->is_export = is_export;
   e->def = def;
 
   e->instantiations = NULL;
@@ -356,15 +358,16 @@ int name_table_help_add_def(struct name_table *t,
                             int is_primitive,
                             enum primitive_op primitive_op,
                             int is_extern,
+                            int is_export,
                             struct ast_def *def) {
   if (deftype_shadowed(t, name)) {
     ERR_DBG("def name shadows deftype name.\n");
     return 0;
   }
 
-  if (is_extern) {
+  if (is_extern || is_export) {
     if (def_shadowed(t, name)) {
-      ERR_DBG("extern def name shadows fellow def name.\n");
+      ERR_DBG("extern or exported def name shadows fellow def name.\n");
       return 0;
     }
   } else {
@@ -374,11 +377,11 @@ int name_table_help_add_def(struct name_table *t,
       struct defs_by_name_node *node
         = identmap_get_user_value(&t->defs_by_name, dbn_id);
       CHECK(node);
-      if (node->ent->is_extern) {
-        ERR_DBG("def name shadows extern def name.\n");
+      if (node->ent->is_extern || node->ent->is_export) {
+        ERR_DBG("def name shadows extern or exported def name.\n");
         return 0;
       }
-      /* (We only need to check the first node, because extern defs
+      /* (We only need to check the first node, because extern/export defs
          disallow there to be conflicting names.) */
     }
   }
@@ -386,7 +389,7 @@ int name_table_help_add_def(struct name_table *t,
   struct def_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);
   def_entry_init(new_entry, name, generics, type, is_primitive, primitive_op,
-                 is_extern, def);
+                 is_extern, is_export, def);
   SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);
 
   ident_value dbn_id = identmap_intern(&t->defs_by_name, &name, sizeof(name));
@@ -402,10 +405,12 @@ int name_table_add_def(struct name_table *t,
                        ident_value name,
                        struct ast_generics *generics,
                        struct ast_typeexpr *type,
+                       int is_export,
                        struct ast_def *def) {
+  CHECK(!(is_export && generics->has_type_params));
   return name_table_help_add_def(t, name, generics, type,
                                  0, PRIMITIVE_OP_INVALID,
-                                 0, def);
+                                 0, is_export, def);
 }
 
 int name_table_add_primitive_def(struct name_table *t,
@@ -415,7 +420,7 @@ int name_table_add_primitive_def(struct name_table *t,
                                  struct ast_typeexpr *type) {
   return name_table_help_add_def(t, name, generics, type,
                                  1, primitive_op,
-                                 0, NULL);
+                                 0, 0, NULL);
 }
 
 int name_table_add_extern_def(struct name_table *t,
@@ -425,7 +430,7 @@ int name_table_add_extern_def(struct name_table *t,
   ast_generics_init_no_params(&generics);
   return name_table_help_add_def(t, name, &generics, type,
                                  0, PRIMITIVE_OP_INVALID,
-                                 1, NULL);
+                                 1, 0, NULL);
 }
 
 int name_table_help_add_deftype_entry(struct name_table *t,
