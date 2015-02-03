@@ -511,14 +511,14 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
   size_t data_size;
   if (!(*loader)(module_name, module_name_count, &data, &data_size)) {
     ERR("Could not read file for module %.*s.\n",
-        size_to_int(module_name_count), module_name);
+        size_to_int(module_name_count), (const char *)module_name);
     goto fail;
   }
 
   struct error_info error_info;
   if (!parse_buf_file(cs->im, data, data_size, file_out, &error_info)) {
     ERR("Parse error in module %.*s at %"PRIz":%"PRIz".\n",
-        size_to_int(module_name_count), module_name,
+        size_to_int(module_name_count), (const char *)module_name,
         error_info.pos.line, error_info.pos.column);
     error_info_destroy(&error_info);
     goto fail_data;

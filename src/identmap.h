@@ -44,7 +44,7 @@ int identmap_is_interned(struct identmap *m,
 void identmap_lookup(struct identmap *m, ident_value ident,
                      const void **buf_out, size_t *count_out);
 
-const void *im_s(struct identmap *m, ident_value ident);
+const char *im_s(struct identmap *m, ident_value ident);
 int im_i(struct identmap *m, ident_value ident);
 
 #define IM_P(im, iv) im_i((im), (iv)), im_s((im), (iv))

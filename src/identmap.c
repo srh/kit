@@ -193,11 +193,11 @@ void identmap_lookup(struct identmap *m, ident_value ident,
   *count_out = m->datas[ident].data_count;
 }
 
-const void *im_s(struct identmap *m, ident_value ident) {
+const char *im_s(struct identmap *m, ident_value ident) {
   const void *buf;
   size_t count;
   identmap_lookup(m, ident, &buf, &count);
-  return buf;
+  return (const char *)buf;
 }
 
 int im_i(struct identmap *m, ident_value ident) {
