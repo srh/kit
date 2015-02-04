@@ -925,13 +925,6 @@ void ast_expr_destroy(struct ast_expr *a) {
   a->tag = (enum ast_expr_tag)-1;
 }
 
-void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out) {
-  struct ast_expr *p = malloc(sizeof(*p));
-  CHECK(p);
-  *p = movee;
-  *out = p;
-}
-
 struct ast_typeexpr *ast_expr_type(struct ast_expr *a) {
   CHECK(a->info.is_typechecked);
   return &a->info.concrete_type;

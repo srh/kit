@@ -1417,7 +1417,7 @@ int check_statement(struct bodystate *bs,
       goto fail;
     }
     annotated_out->tag = AST_STATEMENT_EXPR;
-    malloc_move_ast_expr(annotated_expr, &annotated_out->u.expr);
+    ast_expr_alloc_move(annotated_expr, &annotated_out->u.expr);
     fallthrough = FALLTHROUGH_FROMTHETOP;
   } break;
   case AST_STATEMENT_RETURN_EXPR: {
@@ -1440,8 +1440,7 @@ int check_statement(struct bodystate *bs,
       }
     }
     annotated_out->tag = AST_STATEMENT_RETURN_EXPR;
-    malloc_move_ast_expr(annotated_expr,
-                         &annotated_out->u.return_expr);
+    ast_expr_alloc_move(annotated_expr, &annotated_out->u.return_expr);
     fallthrough = FALLTHROUGH_NEVER;
   } break;
   case AST_STATEMENT_VAR: {
