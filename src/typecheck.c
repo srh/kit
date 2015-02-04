@@ -1624,6 +1624,104 @@ int check_statement(struct bodystate *bs,
 
     fallthrough = max_fallthrough(FALLTHROUGH_FROMTHETOP, body_fallthrough);
   } break;
+  case AST_STATEMENT_FOR: {
+    struct ast_for_statement *fs = &s->u.for_statement;
+
+    struct ast_statement annotated_initializer = { 0 };
+    size_t vars_pushed = 0;
+    if (fs->has_initializer) {
+      CHECK(fs->initializer->tag == AST_STATEMENT_EXPR
+            || fs->initializer->tag == AST_STATEMENT_VAR);
+      enum fallthrough initializer_fallthrough;
+      struct ast_vardecl *vardecl_to_push_or_null;
+      if (!check_statement(bs, fs->initializer, &annotated_initializer,
+                           &initializer_fallthrough, &vardecl_to_push_or_null)) {
+        goto for_fail;
+      }
+
+      CHECK(initializer_fallthrough == FALLTHROUGH_FROMTHETOP);
+      if (vardecl_to_push_or_null) {
+        vars_pushed = size_add(vars_pushed, 1);
+      }
+    }
+
+    struct ast_expr annotated_condition = { 0 };
+    if (fs->has_condition) {
+      struct ast_typeexpr boolean;
+      init_boolean_typeexpr(bs->es->cs, &boolean);
+
+      int lvalue_discard;
+      if (!check_expr(bs->es, fs->condition, &boolean,
+                      &lvalue_discard, &annotated_condition)) {
+        ast_typeexpr_destroy(&boolean);
+        goto for_fail_annotated_initializer;
+      }
+      ast_typeexpr_destroy(&boolean);
+    }
+
+    struct ast_expr annotated_increment = { 0 };
+    if (fs->has_increment) {
+      struct ast_typeexpr anything;
+      anything.tag = AST_TYPEEXPR_UNKNOWN;
+      int lvalue_discard;
+      if (!check_expr(bs->es, fs->increment, &anything,
+                      &lvalue_discard, &annotated_increment)) {
+        goto for_fail_annotated_condition;
+      }
+    }
+
+    enum fallthrough body_fallthrough;
+    struct ast_bracebody annotated_body;
+    if (!check_expr_bracebody(bs, &fs->body, &annotated_body, &body_fallthrough)) {
+      goto for_fail_annotated_increment;
+    }
+
+    if (fs->has_condition) {
+      fallthrough = max_fallthrough(FALLTHROUGH_FROMTHETOP, body_fallthrough);
+    } else {
+      fallthrough = FALLTHROUGH_NEVER;
+    }
+
+    for (size_t j = 0; j < vars_pushed; j++) {
+      exprscope_pop_var(bs->es);
+    }
+
+    struct ast_statement *ini = NULL;
+    struct ast_expr *con = NULL;
+    struct ast_expr *inc = NULL;
+    if (fs->has_initializer) {
+      ast_statement_alloc_move(annotated_initializer, &ini);
+    }
+    if (fs->has_condition) {
+      ast_expr_alloc_move(annotated_condition, &con);
+    }
+    if (fs->has_increment) {
+      ast_expr_alloc_move(annotated_increment, &inc);
+    }
+    annotated_out->tag = AST_STATEMENT_FOR;
+    ast_for_statement_init(&annotated_out->u.for_statement,
+                           ast_meta_make_copy(&fs->meta),
+                           fs->has_initializer, ini,
+                           fs->has_condition, con,
+                           fs->has_increment, inc,
+                           annotated_body);
+
+    break;
+  for_fail_annotated_increment:
+    if (fs->has_increment) {
+      ast_expr_destroy(&annotated_increment);
+    }
+  for_fail_annotated_condition:
+    if (fs->has_condition) {
+      ast_expr_destroy(&annotated_condition);
+    }
+  for_fail_annotated_initializer:
+    if (fs->has_initializer) {
+      ast_statement_destroy(&annotated_initializer);
+    }
+  for_fail:
+    goto fail;
+  } break;
   default:
     UNREACHABLE();
   }
@@ -4153,6 +4251,23 @@ int check_file_test_more_17(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_18(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[i32] = fn() i32 {\n"
+      "  var acc u32 = 0u;\n"
+      "  for var i u32 = 0u; i < 10u; i = i + 1u {\n"
+      "    acc = acc + i;\n"
+      "  }\n"
+      "  return ~acc;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -4517,6 +4632,12 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_17...\n");
   if (!!test_check_module(&im, &check_file_test_more_17, foo)) {
     DBG("check_file_test_more_17 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_18...\n");
+  if (!test_check_module(&im, &check_file_test_more_18, foo)) {
+    DBG("check_file_test_more_18 fails\n");
     goto cleanup_identmap;
   }
 

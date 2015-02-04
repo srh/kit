@@ -247,6 +247,28 @@ void ast_while_statement_init(struct ast_while_statement *a,
                               struct ast_expr condition,
                               struct ast_bracebody body);
 
+struct ast_for_statement {
+  struct ast_meta meta;
+  /* Can only be an AST_STATEMENT_EXPR or AST_STATEMENT_VAR. */
+  int has_initializer;
+  struct ast_statement *initializer;
+  int has_condition;
+  struct ast_expr *condition;
+  int has_increment;
+  struct ast_expr *increment;
+  struct ast_bracebody body;
+};
+
+void ast_for_statement_init(struct ast_for_statement *a,
+                            struct ast_meta meta,
+                            int has_initializer,
+                            struct ast_statement *initializer,
+                            int has_condition,
+                            struct ast_expr *condition,
+                            int has_expr,
+                            struct ast_expr *expr,
+                            struct ast_bracebody body);
+
 enum ast_statement_tag {
   AST_STATEMENT_EXPR,
   AST_STATEMENT_RETURN_EXPR,
@@ -256,6 +278,7 @@ enum ast_statement_tag {
   AST_STATEMENT_IFTHEN,
   AST_STATEMENT_IFTHENELSE,
   AST_STATEMENT_WHILE,
+  AST_STATEMENT_FOR,
 };
 
 struct ast_statement {
@@ -269,12 +292,16 @@ struct ast_statement {
     struct ast_ifthen_statement ifthen_statement;
     struct ast_ifthenelse_statement ifthenelse_statement;
     struct ast_while_statement while_statement;
+    struct ast_for_statement for_statement;
   } u;
 };
 
 void ast_statement_init_copy(struct ast_statement *a,
                              struct ast_statement *c);
 void ast_statement_destroy(struct ast_statement *a);
+
+void ast_statement_alloc_move(struct ast_statement movee,
+                              struct ast_statement **out);
 
 struct ast_lambda {
   struct ast_meta meta;
@@ -296,6 +323,7 @@ enum ast_unop {
      ast_unop_expr. */
   AST_UNOP_NEGATE,
   AST_UNOP_CONVERT,
+  /* TODO: Remove underscore. */
   AST_UNOP_LOGICAL_NOT_,
   AST_UNOP_BITWISE_NOT,
 };
@@ -474,6 +502,7 @@ void ast_expr_partial_init(struct ast_expr *a,
 void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c);
 void ast_expr_destroy(struct ast_expr *a);
 
+/* TODO: Redundant with ast_expr_alloc_move, is this even implemented? */
 void malloc_move_ast_expr(struct ast_expr movee, struct ast_expr **out);
 
 struct ast_typeexpr *ast_expr_type(struct ast_expr *a);

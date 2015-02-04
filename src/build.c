@@ -2988,6 +2988,53 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     gen_placeholder_jmp(f, h, top_target_number);
     frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
   } break;
+  case AST_STATEMENT_FOR: {
+    struct ast_for_statement *fs = &s->u.for_statement;
+    size_t vars_pushed = 0;
+    if (fs->has_initializer) {
+      if (!gen_statement(cs, f, h, fs->initializer, &vars_pushed)) {
+        return 0;
+      }
+    }
+
+    size_t top_target_number = frame_add_target(h);
+    frame_define_target(h, top_target_number, objfile_section_size(objfile_text(f)));
+
+    size_t bottom_target_number = SIZE_MAX;
+    if (fs->has_condition) {
+      int32_t saved_offset = frame_save_offset(h);
+      struct expr_return er = open_expr_return();
+      if (!gen_expr(cs, f, h, fs->condition, &er)) {
+        return 0;
+      }
+
+      bottom_target_number = frame_add_target(h);
+      gen_placeholder_jmp_if_false(f, h, er.u.loc, bottom_target_number);
+      frame_restore_offset(h, saved_offset);
+    }
+
+    gen_bracebody(cs, f, h, &fs->body);
+
+    if (fs->has_increment) {
+      int32_t saved_offset = frame_save_offset(h);
+      struct expr_return er = open_expr_return();
+      if (!gen_expr(cs, f, h, fs->increment, &er)) {
+        return 0;
+      }
+      frame_restore_offset(h, saved_offset);
+    }
+
+    gen_placeholder_jmp(f, h, top_target_number);
+    if (fs->has_condition) {
+      frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
+    }
+
+    /* TODO: Dedup with code in gen_bracebody. */
+    for (size_t i = 0; i < vars_pushed; i++) {
+      frame_pop(h, h->vardata[size_sub(h->vardata_count, 1)].size);
+      SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+    }
+  } break;
   default:
     UNREACHABLE();
   }

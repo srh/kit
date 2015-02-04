@@ -398,6 +398,77 @@ void ast_while_statement_destroy(struct ast_while_statement *a) {
   ast_bracebody_destroy(&a->body);
 }
 
+void ast_for_statement_init(struct ast_for_statement *a,
+                            struct ast_meta meta,
+                            int has_initializer,
+                            struct ast_statement *initializer,
+                            int has_condition,
+                            struct ast_expr *condition,
+                            int has_increment,
+                            struct ast_expr *increment,
+                            struct ast_bracebody body) {
+  a->meta = meta;
+  CHECK(has_initializer || initializer == NULL);
+  a->has_initializer = has_initializer;
+  a->initializer = initializer;
+  CHECK(has_condition || condition == NULL);
+  a->has_condition = has_condition;
+  a->condition = condition;
+  CHECK(has_increment || increment == NULL);
+  a->has_increment = has_increment;
+  a->increment = increment;
+  a->body = body;
+}
+
+void ast_for_statement_init_copy(struct ast_for_statement *a,
+                                 struct ast_for_statement *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  a->has_initializer = c->has_initializer;
+  if (c->has_initializer) {
+    struct ast_statement *initializer = malloc(sizeof(*initializer));
+    ast_statement_init_copy(initializer, c->initializer);
+    a->initializer = initializer;
+  } else {
+    a->initializer = NULL;
+  }
+
+  a->has_condition = c->has_condition;
+  if (c->has_condition) {
+    ast_expr_alloc_init_copy(c->condition, &a->condition);
+  } else {
+    a->condition = NULL;
+  }
+
+  a->has_increment = c->has_increment;
+  if (c->has_increment) {
+    ast_expr_alloc_init_copy(c->increment, &a->increment);
+  } else {
+    a->increment = NULL;
+  }
+
+  ast_bracebody_init_copy(&a->body, &c->body);
+}
+
+void ast_for_statement_destroy(struct ast_for_statement *a) {
+  ast_meta_destroy(&a->meta);
+  if (a->has_initializer) {
+    ast_statement_destroy(a->initializer);
+    free(a->initializer);
+    a->initializer = NULL;
+  }
+  if (a->has_condition) {
+    ast_expr_destroy(a->condition);
+    free(a->condition);
+    a->condition = NULL;
+  }
+  if (a->has_increment) {
+    ast_expr_destroy(a->increment);
+    free(a->increment);
+    a->increment = NULL;
+  }
+  ast_bracebody_destroy(&a->body);
+}
+
 void ast_statement_init_copy(struct ast_statement *a,
                              struct ast_statement *c) {
   a->tag = c->tag;
@@ -429,6 +500,10 @@ void ast_statement_init_copy(struct ast_statement *a,
   case AST_STATEMENT_WHILE:
     ast_while_statement_init_copy(&a->u.while_statement,
                                   &c->u.while_statement);
+    break;
+  case AST_STATEMENT_FOR:
+    ast_for_statement_init_copy(&a->u.for_statement,
+                                &c->u.for_statement);
     break;
   default:
     UNREACHABLE();
@@ -465,10 +540,21 @@ void ast_statement_destroy(struct ast_statement *a) {
   case AST_STATEMENT_WHILE:
     ast_while_statement_destroy(&a->u.while_statement);
     break;
+  case AST_STATEMENT_FOR:
+    ast_for_statement_destroy(&a->u.for_statement);
+    break;
   default:
     UNREACHABLE();
   }
   a->tag = (enum ast_statement_tag)-1;
+}
+
+void ast_statement_alloc_move(struct ast_statement movee,
+                              struct ast_statement **out) {
+  struct ast_statement *p = malloc(sizeof(*p));
+  CHECK(p);
+  *p = movee;
+  *out = p;
 }
 
 int is_magic_unop(enum ast_unop unop) {

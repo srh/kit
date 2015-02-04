@@ -731,6 +731,122 @@ int parse_rest_of_while_statement(struct ps *p, struct pos pos_start,
   return 0;
 }
 
+int parse_rest_of_expr_statement(struct ps *p, struct ast_expr **out) {
+  struct ast_expr expr;
+  if (!parse_expr(p, &expr, kSemicolonPrecedence)) {
+    return 0;
+  }
+
+  if (!try_skip_semicolon(p)) {
+    ast_expr_destroy(&expr);
+    return 0;
+  }
+
+  ast_expr_alloc_move(expr, out);
+  return 1;
+}
+
+int parse_rest_of_for_statement(struct ps *p, struct pos pos_start,
+                                struct ast_for_statement *out) {
+  if (!skip_ws(p)) {
+    goto fail;
+  }
+
+  struct pos initializer_start = ps_pos(p);
+  int has_initializer;
+  struct ast_statement initializer = { 0 };
+  if (try_skip_semicolon(p)) {
+    has_initializer = 0;
+  } else {
+    has_initializer = 1;
+    if (try_skip_keyword(p, "var")) {
+      initializer.tag = AST_STATEMENT_VAR;
+      if (!parse_rest_of_var_statement(p, initializer_start, &initializer.u.var_statement)) {
+        goto fail;
+      }
+    } else {
+      initializer.tag = AST_STATEMENT_EXPR;
+      if (!parse_rest_of_expr_statement(p, &initializer.u.expr)) {
+        goto fail;
+      }
+    }
+  }
+
+  if (!skip_ws(p)) {
+    goto fail_initializer;
+  }
+
+  int has_condition;
+  struct ast_expr condition = { 0 };
+  if (try_skip_semicolon(p)) {
+    has_condition = 0;
+  } else {
+    has_condition = 1;
+    if (!parse_expr(p, &condition, kSemicolonPrecedence)) {
+      goto fail_initializer;
+    }
+
+    if (!try_skip_semicolon(p)) {
+      goto fail_condition;
+    }
+  }
+
+  if (!skip_ws(p)) {
+    goto fail_condition;
+  }
+
+  int has_increment;
+  struct ast_expr increment = { 0 };
+  if (ps_peek(p) == '{') {
+    has_increment = 0;
+  } else {
+    has_increment = 1;
+    if (!parse_expr(p, &increment, kSemicolonPrecedence)) {
+      goto fail_condition;
+    }
+  }
+
+  struct ast_bracebody body;
+  if (!parse_bracebody(p, &body)) {
+    goto fail_increment;
+  }
+
+  struct ast_statement *ini = NULL;
+  struct ast_expr *con = NULL;
+  struct ast_expr *inc = NULL;
+  if (has_initializer) {
+    ast_statement_alloc_move(initializer, &ini);
+  }
+  if (has_condition) {
+    ast_expr_alloc_move(condition, &con);
+  }
+  if (has_increment) {
+    ast_expr_alloc_move(increment, &inc);
+  }
+
+  ast_for_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                         has_initializer, ini,
+                         has_condition, con,
+                         has_increment, inc,
+                         body);
+  return 1;
+
+ fail_increment:
+  if (has_increment) {
+    ast_expr_destroy(&increment);
+  }
+ fail_condition:
+  if (has_condition) {
+    ast_expr_destroy(&condition);
+  }
+ fail_initializer:
+  if (has_initializer) {
+    ast_statement_destroy(&initializer);
+  }
+ fail:
+  return 0;
+}
+
 
 int parse_statement(struct ps *p, struct ast_statement *out) {
   struct pos pos_start = ps_pos(p);
@@ -783,20 +899,12 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
   } else if (try_skip_keyword(p, "while")) {
     out->tag = AST_STATEMENT_WHILE;
     return parse_rest_of_while_statement(p, pos_start, &out->u.while_statement);
+  } else if (try_skip_keyword(p, "for")) {
+    out->tag = AST_STATEMENT_FOR;
+    return parse_rest_of_for_statement(p, pos_start, &out->u.for_statement);
   } else {
-    struct ast_expr expr;
-    if (!parse_expr(p, &expr, kSemicolonPrecedence)) {
-      return 0;
-    }
-
-    if (!try_skip_semicolon(p)) {
-      ast_expr_destroy(&expr);
-      return 0;
-    }
-
     out->tag = AST_STATEMENT_EXPR;
-    ast_expr_alloc_move(expr, &out->u.expr);
-    return 1;
+    return parse_rest_of_expr_statement(p, &out->u.expr);
   }
 }
 
@@ -1758,12 +1866,25 @@ int parse_test_defs(void) {
                          "  var x int;\n"
                          "};\n",
                          18);
-  pass &= run_count_test("def17",
+  pass &= run_count_test("def18",
                          "def foo bar = fn() void {\n"
                          "  (x+3)[y(z)] = 3;\n"
                          "  return x[y];\n"
                          "};\n",
                          31);
+  pass &= run_count_test("def19",
+                         "def foo bar = fn() void {\n"
+                         "  for var i i32 = 3; i < 3; i = i + 1 {\n"
+                         "  }\n"
+                         "};\n",
+                         29);
+  pass &= run_count_test("def20",
+                         "def foo bar = fn() void {\n"
+                         "  for var i i32 = 3; i < 3; i = i + 1 {\n"
+                         "    x = 2;\n"
+                         "  }\n"
+                         "};\n",
+                         33);
   return pass;
 }
 
