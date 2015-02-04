@@ -126,8 +126,17 @@ void ast_typeexpr_init_copy(struct ast_typeexpr *a,
 void ast_typeexpr_destroy(struct ast_typeexpr *a);
 struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a);
 
+/* TODO: This varnum info is unused (but should be used soon). */
+struct ast_var_info {
+  int info_valid;
+  size_t varnum;
+};
+
+void ast_var_info_specify_varnum(struct ast_var_info *a, size_t varnum);
+
 struct ast_vardecl {
   struct ast_meta meta;
+  struct ast_var_info var_info;
   struct ast_ident name;
   struct ast_typeexpr type;
 };

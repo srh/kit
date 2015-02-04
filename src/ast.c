@@ -107,21 +107,42 @@ void ast_funcall_destroy(struct ast_funcall *a) {
   SLICE_FREE(a->args, a->args_count, ast_expr_destroy);
 }
 
-void ast_vardecl_init_copy(struct ast_vardecl *a, struct ast_vardecl *c) {
-  a->meta = ast_meta_make_copy(&c->meta);
-  ast_ident_init_copy(&a->name, &c->name);
-  ast_typeexpr_init_copy(&a->type, &c->type);
+void ast_var_info_init(struct ast_var_info *a) {
+  a->info_valid = 0;
+}
+
+void ast_var_info_init_copy(struct ast_var_info *a, struct ast_var_info *c) {
+  *a = *c;
+}
+
+void ast_var_info_destroy(struct ast_var_info *a) {
+  a->info_valid = 0;
+}
+
+void ast_var_info_specify_varnum(struct ast_var_info *a, size_t varnum) {
+  CHECK(!a->info_valid);
+  a->info_valid = 1;
+  a->varnum = varnum;
 }
 
 void ast_vardecl_init(struct ast_vardecl *a, struct ast_meta meta,
                       struct ast_ident name, struct ast_typeexpr type) {
   a->meta = meta;
+  ast_var_info_init(&a->var_info);
   a->name = name;
   a->type = type;
 }
 
+void ast_vardecl_init_copy(struct ast_vardecl *a, struct ast_vardecl *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_var_info_init_copy(&a->var_info, &c->var_info);
+  ast_ident_init_copy(&a->name, &c->name);
+  ast_typeexpr_init_copy(&a->type, &c->type);
+}
+
 void ast_vardecl_destroy(struct ast_vardecl *a) {
   ast_meta_destroy(&a->meta);
+  ast_var_info_destroy(&a->var_info);
   ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);
 }

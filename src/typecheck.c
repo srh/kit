@@ -799,6 +799,11 @@ enum static_computation {
   STATIC_COMPUTATION_YES,
 };
 
+struct varpair {
+  struct ast_vardecl *decl;
+  size_t varnum;
+};
+
 struct exprscope {
   struct checkstate *cs;
   struct ast_generics *generics;
@@ -816,9 +821,11 @@ struct exprscope {
   struct def_entry *entry_or_null;
 
   /* A stack of variables that are in scope. */
-  struct ast_vardecl **vars;
+  struct varpair *vars;
   size_t vars_count;
   size_t vars_limit;
+
+  size_t varnum_counter;
 };
 
 void exprscope_init(struct exprscope *es, struct checkstate *cs,
@@ -838,6 +845,7 @@ void exprscope_init(struct exprscope *es, struct checkstate *cs,
   es->vars = NULL;
   es->vars_count = 0;
   es->vars_limit = 0;
+  es->varnum_counter = 0;
 }
 
 void exprscope_destroy(struct exprscope *es) {
@@ -850,6 +858,7 @@ void exprscope_destroy(struct exprscope *es) {
   es->vars = NULL;
   es->vars_count = 0;
   es->vars_limit = 0;
+  es->varnum_counter = 0;
 }
 
 void exprscope_note_static_reference(struct exprscope *es,
@@ -861,7 +870,7 @@ void exprscope_note_static_reference(struct exprscope *es,
 
 int check_var_shadowing(struct exprscope *es, struct ast_ident *name) {
   for (size_t i = 0, e = es->vars_count; i < e; i++) {
-    if (es->vars[i]->name.value == name->value) {
+    if (es->vars[i].decl->name.value == name->value) {
       METERR(name->meta, "Variable name %.*s shadows local.\n",
              IM_P(es->cs->im, name->value));
       return 0;
@@ -886,18 +895,28 @@ int check_var_shadowing(struct exprscope *es, struct ast_ident *name) {
   return 1;
 }
 
-int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var) {
+int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var,
+                       size_t *varnum_out) {
   if (!check_var_shadowing(es, &var->name)) {
     return 0;
   }
-  SLICE_PUSH(es->vars, es->vars_count, es->vars_limit, var);
+  size_t varnum = es->varnum_counter;
+  es->varnum_counter = size_add(es->varnum_counter, 1);
+
+  struct varpair pair;
+  pair.decl = var;
+  pair.varnum = varnum;
+
+  SLICE_PUSH(es->vars, es->vars_count, es->vars_limit, pair);
+  *varnum_out = varnum;
   return 1;
 }
 
 void exprscope_pop_var(struct exprscope *es) {
   CHECK(es->vars_count > 0);
   --es->vars_count;
-  es->vars[es->vars_count] = NULL;
+  es->vars[es->vars_count].decl = NULL;
+  es->vars[es->vars_count].varnum = SIZE_MAX;
 }
 
 int unify_fields_directionally(struct ast_vardecl *partial_fields,
@@ -1054,7 +1073,7 @@ int exprscope_lookup_name(struct exprscope *es,
                           int *is_lvalue_out,
                           struct def_instantiation **inst_or_null_out) {
   for (size_t i = es->vars_count; i-- > 0; ) {
-    struct ast_vardecl *decl = es->vars[i];
+    struct ast_vardecl *decl = es->vars[i].decl;
     if (decl->name.value != name->value) {
       continue;
     }
@@ -1427,7 +1446,8 @@ int check_expr_bracebody(struct bodystate *bs,
       ast_vardecl_init(replaced_decl, ast_meta_make_copy(&s->u.var_statement.decl.meta), name,
                        replaced_type_copy);
 
-      if (!exprscope_push_var(bs->es, replaced_decl)) {
+      size_t varnum;
+      if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
         free_ast_vardecl(&replaced_decl);
         ast_typeexpr_destroy(&replaced_type);
         if (has_rhs) {
@@ -1441,6 +1461,7 @@ int check_expr_bracebody(struct bodystate *bs,
 
       struct ast_vardecl decl;
       ast_vardecl_init_copy(&decl, &s->u.var_statement.decl);
+      ast_var_info_specify_varnum(&decl.var_info, varnum);
       annotated_statements[i].tag = AST_STATEMENT_VAR;
       if (has_rhs) {
         ast_var_statement_init_with_rhs(&annotated_statements[i].u.var_statement,
@@ -1709,8 +1730,10 @@ int check_expr_lambda(struct exprscope *es,
                  es->generics_substitutions_count,
                  STATIC_COMPUTATION_NO, NULL);
 
+  size_t *varnums = malloc_mul(sizeof(*varnums), func_params_count);
+
   for (size_t i = 0; i < func_params_count; i++) {
-    int res = exprscope_push_var(&bb_es, &replaced_vardecls[i]);
+    int res = exprscope_push_var(&bb_es, &replaced_vardecls[i], &varnums[i]);
     /* Pushing the var should succeed, because we already called
        check_var_shadowing above. */
     CHECK(res);
@@ -1736,7 +1759,9 @@ int check_expr_lambda(struct exprscope *es,
     struct ast_vardecl *params = malloc_mul(sizeof(*params), x->params_count);
     for (size_t i = 0, e = x->params_count; i < e; i++) {
       ast_vardecl_init_copy(&params[i], &x->params[i]);
+      ast_var_info_specify_varnum(&params[i].var_info, varnums[i]);
     }
+    free(varnums);
     struct ast_typeexpr return_type;
     ast_typeexpr_init_copy(&return_type, &x->return_type);
 
@@ -1748,6 +1773,7 @@ int check_expr_lambda(struct exprscope *es,
   return 1;
 
  fail_bb_es:
+  free(varnums);
   exprscope_destroy(&bb_es);
   SLICE_FREE(replaced_vardecls, replaced_vardecls_size, ast_vardecl_destroy);
  fail_funcexpr:
