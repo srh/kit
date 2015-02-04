@@ -1361,6 +1361,38 @@ void free_ast_vardecl(struct ast_vardecl **p) {
   *p = NULL;
 }
 
+/* Tells how a bracebody or statement falls through. */
+enum fallthrough {
+  /* Says a statement/bracebody never exits "out the bottom" -- it
+     exits with a goto or return. */
+  FALLTHROUGH_NEVER,
+  /* Says a statement/bracebody could exit "out the bottom" only if
+     you can enter "from the top." */
+  FALLTHROUGH_FROMTHETOP,
+  /* Says a statement/bracebody has a non-local entrance -- it is or
+     has a label statement such that it could exit "out the bottom"
+     without entering "from the top." */
+  FALLTHROUGH_NONLOCAL,
+};
+
+enum fallthrough max_fallthrough(enum fallthrough x, enum fallthrough y) {
+  return x < y ? y : x;
+}
+
+enum fallthrough compose_fallthrough(enum fallthrough top_reachability,
+                                     enum fallthrough statement_fallthrough) {
+  switch (statement_fallthrough) {
+  case FALLTHROUGH_NEVER:
+    return FALLTHROUGH_NEVER;
+  case FALLTHROUGH_FROMTHETOP:
+    return top_reachability;
+  case FALLTHROUGH_NONLOCAL:
+    return FALLTHROUGH_NONLOCAL;
+  default:
+    UNREACHABLE();
+  }
+}
+
 /* fallthrough_out says if evaluating the bracebody could "fall off
    the end", i.e. it has a label without a subsequent goto or return
    statement.  This is more conservative than "conservative" analysis,
@@ -1368,13 +1400,13 @@ void free_ast_vardecl(struct ast_vardecl **p) {
 int check_expr_bracebody(struct bodystate *bs,
                          struct ast_bracebody *x,
                          struct ast_bracebody *annotated_out,
-                         int *fallthrough_out) {
+                         enum fallthrough *fallthrough_out) {
   struct ast_vardecl **vardecls_pushed = NULL;
   size_t vardecls_pushed_count = 0;
   size_t vardecls_pushed_limit = 0;
   int ret = 0;
 
-  int reachable = 1;
+  enum fallthrough reachable = FALLTHROUGH_FROMTHETOP;
 
   struct ast_statement *annotated_statements
     = malloc_mul(sizeof(*annotated_statements), x->statements_count);
@@ -1417,7 +1449,7 @@ int check_expr_bracebody(struct bodystate *bs,
       annotated_statements[i].tag = AST_STATEMENT_RETURN_EXPR;
       malloc_move_ast_expr(annotated_expr,
                            &annotated_statements[i].u.return_expr);
-      reachable = 0;
+      reachable = FALLTHROUGH_NEVER;
     } break;
     case AST_STATEMENT_VAR: {
       struct ast_typeexpr replaced_type;
@@ -1480,7 +1512,7 @@ int check_expr_bracebody(struct bodystate *bs,
       bodystate_note_goto(bs, s->u.goto_statement.target.value);
       ast_statement_init_copy(&annotated_statements[i], s);
 
-      reachable = 0;
+      reachable = FALLTHROUGH_NEVER;
     } break;
     case AST_STATEMENT_LABEL: {
       if (!bodystate_note_label(bs, &s->u.label_statement.label)) {
@@ -1498,7 +1530,7 @@ int check_expr_bracebody(struct bodystate *bs,
                                        vars_in_scope,
                                        vars_in_scope_count);
 
-      reachable = 1;
+      reachable = FALLTHROUGH_NONLOCAL;
     } break;
     case AST_STATEMENT_IFTHEN: {
       struct ast_typeexpr boolean;
@@ -1514,9 +1546,9 @@ int check_expr_bracebody(struct bodystate *bs,
       ast_typeexpr_destroy(&boolean);
 
       struct ast_bracebody annotated_thenbody;
-      int fallthrough_discard;
+      enum fallthrough thenbody_fallthrough;
       if (!check_expr_bracebody(bs, &s->u.ifthen_statement.thenbody,
-                                &annotated_thenbody, &fallthrough_discard)) {
+                                &annotated_thenbody, &thenbody_fallthrough)) {
         ast_expr_destroy(&annotated_condition);
         goto fail;
       }
@@ -1527,6 +1559,8 @@ int check_expr_bracebody(struct bodystate *bs,
           ast_meta_make_copy(&s->u.ifthen_statement.meta),
           annotated_condition,
           annotated_thenbody);
+      reachable = max_fallthrough(reachable,
+                                  compose_fallthrough(reachable, thenbody_fallthrough));
     } break;
     case AST_STATEMENT_IFTHENELSE: {
       struct ast_typeexpr boolean;
@@ -1542,7 +1576,7 @@ int check_expr_bracebody(struct bodystate *bs,
       ast_typeexpr_destroy(&boolean);
 
       struct ast_bracebody annotated_thenbody;
-      int thenbody_fallthrough;
+      enum fallthrough thenbody_fallthrough;
       if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.thenbody,
                                 &annotated_thenbody, &thenbody_fallthrough)) {
         ast_expr_destroy(&annotated_condition);
@@ -1550,7 +1584,7 @@ int check_expr_bracebody(struct bodystate *bs,
       }
 
       struct ast_bracebody annotated_elsebody;
-      int elsebody_fallthrough;
+      enum fallthrough elsebody_fallthrough;
       if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.elsebody,
                                 &annotated_elsebody, &elsebody_fallthrough)) {
         ast_bracebody_destroy(&annotated_thenbody);
@@ -1565,7 +1599,9 @@ int check_expr_bracebody(struct bodystate *bs,
           annotated_condition,
           annotated_thenbody,
           annotated_elsebody);
-      reachable = (reachable && (thenbody_fallthrough || elsebody_fallthrough));
+
+      reachable = compose_fallthrough(reachable, max_fallthrough(thenbody_fallthrough,
+                                                                 elsebody_fallthrough));
     } break;
     case AST_STATEMENT_WHILE: {
       struct ast_typeexpr boolean;
@@ -1581,9 +1617,9 @@ int check_expr_bracebody(struct bodystate *bs,
       ast_typeexpr_destroy(&boolean);
 
       struct ast_bracebody annotated_body;
-      int fallthrough_discard;
+      enum fallthrough body_fallthrough;
       if (!check_expr_bracebody(bs, &s->u.while_statement.body, &annotated_body,
-                                &fallthrough_discard)) {
+                                &body_fallthrough)) {
         ast_expr_destroy(&annotated_condition);
         goto fail;
       }
@@ -1594,6 +1630,9 @@ int check_expr_bracebody(struct bodystate *bs,
           ast_meta_make_copy(&s->u.while_statement.meta),
           annotated_condition,
           annotated_body);
+
+      reachable = max_fallthrough(reachable,
+                                  compose_fallthrough(reachable, body_fallthrough));
     } break;
     default:
       UNREACHABLE();
@@ -1626,12 +1665,12 @@ int check_expr_funcbody(struct exprscope *es,
   bodystate_init(&bs, es, partial_type);
 
   struct ast_bracebody annotated_bracebody;
-  int fallthrough;
+  enum fallthrough fallthrough;
   if (!check_expr_bracebody(&bs, x, &annotated_bracebody, &fallthrough)) {
     goto fail;
   }
 
-  if (fallthrough) {
+  if (fallthrough != FALLTHROUGH_NEVER) {
     METERR(x->meta, "not all control paths return a value.%s", "\n");
     goto fail_annotated_bracebody;
   }
