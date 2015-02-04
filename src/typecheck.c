@@ -2181,7 +2181,7 @@ int check_expr_magic_unop(struct exprscope *es,
   } break;
   case AST_UNOP_NEGATE:
   case AST_UNOP_CONVERT:
-  case AST_UNOP_LOGICAL_NOT_:
+  case AST_UNOP_LOGICAL_NOT:
   case AST_UNOP_BITWISE_NOT:
   default:
     UNREACHABLE();

@@ -182,7 +182,7 @@ const int unop_precedences[] = {
   [AST_UNOP_ADDRESSOF] = 905,
   [AST_UNOP_NEGATE] = 905,
   [AST_UNOP_CONVERT] = 905,
-  [AST_UNOP_LOGICAL_NOT_] = 905,
+  [AST_UNOP_LOGICAL_NOT] = 905,
   [AST_UNOP_BITWISE_NOT] = 905,
 };
 
@@ -400,7 +400,7 @@ int try_parse_unop(struct ps *p, enum ast_unop *out, struct ast_ident *name_out)
     enum ast_unop op = (ch1 == '*' ? AST_UNOP_DEREFERENCE
                         : ch1 == '&' ? AST_UNOP_ADDRESSOF
                         : ch1 == '-' ? AST_UNOP_NEGATE
-                        : ch1 == '!' ? AST_UNOP_LOGICAL_NOT_
+                        : ch1 == '!' ? AST_UNOP_LOGICAL_NOT
                         : ch1 == '^' ? AST_UNOP_BITWISE_NOT
                         : AST_UNOP_CONVERT);
     uint8_t buf[1];
