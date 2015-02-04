@@ -265,20 +265,60 @@ void ast_goto_statement_destroy(struct ast_goto_statement *a) {
   ast_ident_destroy(&a->target);
 }
 
+void ast_label_info_init(struct ast_label_info *a) {
+  a->info_valid = 0;
+  a->vars_in_scope = NULL;
+  a->vars_in_scope_count = 0;
+}
+
+void ast_label_info_init_copy(struct ast_label_info *a, struct ast_label_info *c) {
+  a->info_valid = c->info_valid;
+  if (c->info_valid) {
+    size_t count = c->vars_in_scope_count;
+    a->vars_in_scope = malloc_mul(sizeof(*a->vars_in_scope), count);
+    for (size_t i = 0; i < count; i++) {
+      a->vars_in_scope[i] = c->vars_in_scope[i];
+    }
+    a->vars_in_scope_count = count;
+  } else {
+    a->vars_in_scope = NULL;
+    a->vars_in_scope_count = 0;
+  }
+}
+
+void ast_label_info_set_vars_in_scope(struct ast_label_info *a,
+                                      size_t *vars_in_scope,
+                                      size_t vars_in_scope_count) {
+  CHECK(!a->info_valid);
+  a->info_valid = 1;
+  a->vars_in_scope = vars_in_scope;
+  a->vars_in_scope_count = vars_in_scope_count;
+}
+
+void ast_label_info_destroy(struct ast_label_info *a) {
+  if (a->info_valid) {
+    free(a->vars_in_scope);
+  }
+  ast_label_info_init(a);
+}
+
 void ast_label_statement_init(struct ast_label_statement *a,
                               struct ast_meta meta, struct ast_ident label) {
   a->meta = meta;
+  ast_label_info_init(&a->info);
   a->label = label;
 }
 
 void ast_label_statement_init_copy(struct ast_label_statement *a,
                                    struct ast_label_statement *c) {
   a->meta = ast_meta_make_copy(&c->meta);
+  ast_label_info_init_copy(&a->info, &c->info);
   ast_ident_init_copy(&a->label, &c->label);
 }
 
 void ast_label_statement_destroy(struct ast_label_statement *a) {
   ast_meta_destroy(&a->meta);
+  ast_label_info_destroy(&a->info);
   ast_ident_destroy(&a->label);
 }
 

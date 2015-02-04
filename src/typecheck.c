@@ -1479,6 +1479,7 @@ int check_expr_bracebody(struct bodystate *bs,
     case AST_STATEMENT_GOTO: {
       bodystate_note_goto(bs, s->u.goto_statement.target.value);
       ast_statement_init_copy(&annotated_statements[i], s);
+
       reachable = 0;
     } break;
     case AST_STATEMENT_LABEL: {
@@ -1486,6 +1487,17 @@ int check_expr_bracebody(struct bodystate *bs,
         goto fail;
       }
       ast_statement_init_copy(&annotated_statements[i], s);
+
+      size_t vars_in_scope_count = bs->es->vars_count;
+      size_t *vars_in_scope = malloc_mul(sizeof(*vars_in_scope), vars_in_scope_count);
+      for (size_t i = 0; i < vars_in_scope_count; i++) {
+        vars_in_scope[i] = bs->es->vars[i].varnum;
+      }
+
+      ast_label_info_set_vars_in_scope(&annotated_statements[i].u.label_statement.info,
+                                       vars_in_scope,
+                                       vars_in_scope_count);
+
       reachable = 1;
     } break;
     case AST_STATEMENT_IFTHEN: {
