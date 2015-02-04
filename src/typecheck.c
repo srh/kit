@@ -447,6 +447,13 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
     import_unop(cs, PRIMITIVE_OP_NEGATE_I32, "-", I32_TYPE_NAME);
 
     import_unop(cs, PRIMITIVE_OP_LOGICAL_NOT, "!", BOOLEAN_STANDIN_TYPE_NAME);
+
+    import_unop(cs, PRIMITIVE_OP_BIT_NOT_I8, "^", I8_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_BIT_NOT_U8, "^", U8_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_BIT_NOT_I16, "^", I16_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_BIT_NOT_U16, "^", U16_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_BIT_NOT_I32, "^", I32_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_BIT_NOT_U32, "^", U32_TYPE_NAME);
   }
 }
 
@@ -1947,7 +1954,8 @@ int check_expr_magic_unop(struct exprscope *es,
   } break;
   case AST_UNOP_NEGATE:
   case AST_UNOP_CONVERT:
-  case AST_UNOP_LOGICAL_NOT:
+  case AST_UNOP_LOGICAL_NOT_:
+  case AST_UNOP_BITWISE_NOT:
   default:
     UNREACHABLE();
   }

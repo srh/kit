@@ -276,7 +276,8 @@ enum ast_unop {
      ast_unop_expr. */
   AST_UNOP_NEGATE,
   AST_UNOP_CONVERT,
-  AST_UNOP_LOGICAL_NOT,
+  AST_UNOP_LOGICAL_NOT_,
+  AST_UNOP_BITWISE_NOT,
 };
 
 int is_magic_unop(enum ast_unop unop);
@@ -313,6 +314,7 @@ enum ast_binop {
   AST_BINOP_BIT_RIGHTSHIFT,
   AST_BINOP_LOGICAL_OR,
   AST_BINOP_LOGICAL_AND,
+  /* This is just seen during parsing. */
   AST_BINOP_TYPE_SPECIFIER,
 };
 

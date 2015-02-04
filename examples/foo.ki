@@ -40,7 +40,7 @@ export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
 
   var heh [2]ty;
   heh[0] = p[1];
-  heh[0].x = 34;
+  heh[0].x = ^34;
   p[1] = heh[0];
 
   var void_value void;

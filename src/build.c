@@ -932,6 +932,28 @@ void x86_gen_and_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x86_gen_not_w8(struct objfile *f, enum x86_reg8 dest) {
+  uint8_t b[2];
+  b[0] = 0xF6;
+  b[1] = mod_reg_rm(MOD11, 2, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x86_gen_not_w16(struct objfile *f, enum x86_reg16 dest) {
+  uint8_t b[3];
+  b[0] = 0x66;
+  b[1] = 0xF7;
+  b[2] = mod_reg_rm(MOD11, 2, dest);
+  objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
+void x86_gen_not_w32(struct objfile *f, enum x86_reg16 dest) {
+  uint8_t b[2];
+  b[0] = 0xF7;
+  b[1] = mod_reg_rm(MOD11, 2, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 void x86_gen_neg_w32(struct objfile *f, enum x86_reg dest) {
   uint8_t b[2];
   b[0] = 0xF7;
@@ -1722,9 +1744,25 @@ void gen_primitive_op_behavior(struct objfile *f,
   } break;
 
   case PRIMITIVE_OP_LOGICAL_NOT: {
-    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_test_regs8(f, X86_AL, X86_AL);
     x86_gen_setcc_b8(f, X86_AL, X86_SETCC_Z);
+  } break;
+
+  case PRIMITIVE_OP_BIT_NOT_I8:
+  case PRIMITIVE_OP_BIT_NOT_U8: {
+    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    x86_gen_not_w8(f, X86_AL);
+  } break;
+  case PRIMITIVE_OP_BIT_NOT_I16:
+  case PRIMITIVE_OP_BIT_NOT_U16: {
+    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    x86_gen_not_w16(f, X86_AX);
+  } break;
+  case PRIMITIVE_OP_BIT_NOT_I32:
+  case PRIMITIVE_OP_BIT_NOT_U32: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_not_w32(f, X86_EAX);
   } break;
 
   case PRIMITIVE_OP_ADD_U8: {
@@ -2382,7 +2420,8 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
   } break;
   case AST_UNOP_NEGATE:
   case AST_UNOP_CONVERT:
-  case AST_UNOP_LOGICAL_NOT:
+  case AST_UNOP_LOGICAL_NOT_:
+  case AST_UNOP_BITWISE_NOT:
   default:
     UNREACHABLE();
   }
