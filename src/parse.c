@@ -226,7 +226,7 @@ int is_one_of(const char *s, int32_t ch) {
 }
 
 int is_operlike(int32_t ch) {
-  return is_one_of("~!%^&*+=-/?<,>.;:|", ch);
+  return is_one_of("~!%^&*+=-/?<,>.;:|@", ch);
 }
 
 int is_binop_start(int32_t ch) {
@@ -1100,6 +1100,9 @@ void build_binop_expr(struct ast_meta meta,
   }
 }
 
+int parse_rest_of_type_param_list(struct ps *p, struct ast_typeexpr **params_out,
+                                  size_t *params_count_out);
+
 int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
   struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "fn")) {
@@ -1119,7 +1122,23 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     if (!parse_ident(p, &ident)) {
       return 0;
     }
-    ast_name_expr_init(&out->u.name, ident);
+
+    skip_ws(p);
+    if (!try_skip_char(p, '@')) {
+      ast_name_expr_init(&out->u.name, ident);
+      return 1;
+    }
+
+    struct ast_typeexpr *params;
+    size_t params_count;
+    if (!(try_skip_char(p, '[')
+          && parse_rest_of_type_param_list(p, &params, &params_count))) {
+      ast_ident_destroy(&ident);
+      return 0;
+    }
+
+    ast_name_expr_init_with_params(&out->u.name, ast_meta_make(pos_start, ps_pos(p)),
+                                   ident, params, params_count);
     return 1;
   }
 
@@ -1419,6 +1438,43 @@ int parse_rest_of_pointer(struct ps *p, struct ast_meta star_operator_meta,
   return 0;
 }
 
+int parse_rest_of_type_param_list(struct ps *p, struct ast_typeexpr **params_out,
+                                  size_t *params_count_out) {
+  struct ast_typeexpr *params = NULL;
+  size_t params_count = 0;
+  size_t params_limit = 0;
+
+  for (;;) {
+    if (!skip_ws(p)) {
+      goto fail;
+    }
+    if (try_skip_char(p, ']')) {
+      *params_out = params;
+      *params_count_out = params_count;
+      return 1;
+    }
+
+    if (params_count != 0) {
+      if (!try_skip_char(p, ',')) {
+        goto fail;
+      }
+      if (!skip_ws(p)) {
+        goto fail;
+      }
+    }
+
+    struct ast_typeexpr typeexpr;
+    if (!parse_typeexpr(p, &typeexpr)) {
+      goto fail;
+    }
+    SLICE_PUSH(params, params_count, params_limit, typeexpr);
+  }
+
+ fail:
+  SLICE_FREE(params, params_count, ast_typeexpr_destroy);
+  return 0;
+}
+
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
   struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "struct")) {
@@ -1457,37 +1513,15 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
 
   struct ast_typeexpr *params = NULL;
   size_t params_count = 0;
-  size_t params_limit = 0;
-
-  for (;;) {
-    if (!skip_ws(p)) {
-      goto fail_slice;
-    }
-    if (try_skip_char(p, ']')) {
-      out->tag = AST_TYPEEXPR_APP;
-      ast_typeapp_init(&out->u.app, ast_meta_make(pos_start, ps_pos(p)),
-                       name, params, params_count);
-      return 1;
-    }
-
-    if (params_count != 0) {
-      if (!try_skip_char(p, ',')) {
-        goto fail_slice;
-      }
-      if (!skip_ws(p)) {
-        goto fail_slice;
-      }
-    }
-
-    struct ast_typeexpr typeexpr;
-    if (!parse_typeexpr(p, &typeexpr)) {
-      goto fail_slice;
-    }
-    SLICE_PUSH(params, params_count, params_limit, typeexpr);
+  if (!parse_rest_of_type_param_list(p, &params, &params_count)) {
+    goto fail_ident;
   }
 
- fail_slice:
-  SLICE_FREE(params, params_count, ast_typeexpr_destroy);
+  out->tag = AST_TYPEEXPR_APP;
+  ast_typeapp_init(&out->u.app, ast_meta_make(pos_start, ps_pos(p)),
+                   name, params, params_count);
+  return 1;
+
  fail_ident:
   ast_ident_destroy(&name);
  fail:
@@ -1885,6 +1919,9 @@ int parse_test_defs(void) {
                          "  }\n"
                          "};\n",
                          33);
+  pass &= run_count_test("def20",
+                         "def foo bar = baz@[a, b](1, 2, 3);\n",
+                         19);
   return pass;
 }
 

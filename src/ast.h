@@ -416,12 +416,22 @@ int ast_name_expr_info_get_inst(struct ast_name_expr_info *a,
                                 struct def_instantiation **inst_or_null_out);
 
 struct ast_name_expr {
-  struct ast_name_expr_info info;
-  struct ast_ident ident;
+  struct ast_meta meta;
+  struct ast_name_expr_info info_;
+  struct ast_ident ident_;
+
+  int has_params;
+  struct ast_typeexpr *params;
+  size_t params_count;
 };
 
 void ast_name_expr_init(struct ast_name_expr *a,
                         struct ast_ident ident);
+void ast_name_expr_init_with_params(struct ast_name_expr *a,
+                                    struct ast_meta meta,
+                                    struct ast_ident ident,
+                                    struct ast_typeexpr *params,
+                                    size_t params_count);
 void ast_name_expr_init_copy(struct ast_name_expr *a,
                              struct ast_name_expr *c);
 

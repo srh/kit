@@ -999,7 +999,7 @@ int check_expr_with_type(struct exprscope *es,
                          struct ast_expr *annotated_out);
 
 int lookup_global_maybe_typecheck(struct exprscope *es,
-                                  struct ast_ident *name,
+                                  struct ast_name_expr *name,
                                   struct ast_typeexpr *partial_type,
                                   struct ast_typeexpr *out,
                                   int *is_lvalue_out,
@@ -1008,9 +1008,9 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
   struct def_entry *ent;
   struct def_instantiation *inst;
   if (!name_table_match_def(&es->cs->nt,
-                            name,
-                            NULL, /* No generic params in the expr here. */
-                            0,
+                            &name->ident_,
+                            name->has_params ? name->params : NULL,
+                            name->has_params ? name->params_count : 0,
                             partial_type,
                             &unified,
                             &ent,
@@ -1067,20 +1067,20 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
 }
 
 int exprscope_lookup_name(struct exprscope *es,
-                          struct ast_ident *name,
+                          struct ast_name_expr *name,
                           struct ast_typeexpr *partial_type,
                           struct ast_typeexpr *out,
                           int *is_lvalue_out,
                           struct def_instantiation **inst_or_null_out) {
   for (size_t i = es->vars_count; i-- > 0; ) {
     struct ast_vardecl *decl = es->vars[i].decl;
-    if (decl->name.value != name->value) {
+    if (decl->name.value != name->ident_.value) {
       continue;
     }
 
     if (!unify_directionally(partial_type, &decl->type)) {
       METERR(name->meta, "Type mismatch for vardecl %.*s lookup.\n",
-             IM_P(es->cs->im, name->value));
+             IM_P(es->cs->im, name->ident_.value));
       return 0;
     }
 
@@ -2473,14 +2473,14 @@ int check_expr(struct exprscope *es,
     struct ast_typeexpr name_type;
     int is_lvalue;
     struct def_instantiation *inst_or_null;
-    if (!exprscope_lookup_name(es, &x->u.name.ident, partial_type,
+    if (!exprscope_lookup_name(es, &x->u.name, partial_type,
                                &name_type, &is_lvalue, &inst_or_null)) {
       return 0;
     }
     *is_lvalue_out = is_lvalue;
     ast_expr_partial_init(annotated_out, AST_EXPR_NAME, ast_expr_info_typechecked(name_type));
     ast_name_expr_init_copy(&annotated_out->u.name, &x->u.name);
-    ast_name_expr_info_mark_inst(&annotated_out->u.name.info, inst_or_null);
+    ast_name_expr_info_mark_inst(&annotated_out->u.name.info_, inst_or_null);
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
@@ -3175,8 +3175,7 @@ int eval_static_value(struct ast_expr *expr,
   switch (expr->tag) {
   case AST_EXPR_NAME: {
     struct def_instantiation *inst_or_null;
-    if (!ast_name_expr_info_get_inst(&expr->u.name.info,
-                                     &inst_or_null)) {
+    if (!ast_name_expr_info_get_inst(&expr->u.name.info_, &inst_or_null)) {
       CRASH("Could not lookup instantation.");
     }
     CHECK(inst_or_null);
@@ -4267,6 +4266,50 @@ int check_file_test_more_18(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_19(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because in baz, we can't figure out type of foo instantiation. */
+  struct test_module a[] = { {
+      "foo",
+      "def[T] foo func[i32, T] = fn(x i32) T {\n"
+      "  // Why not test ':: T' works where T is generic.\n"
+      "  var y T = (~x :: T);\n"
+      "  return y;\n"
+      "};\n"
+      "def bar func[func[i32, i16], i32, i16] = fn(x func[i32, i16], y i32) i16 {\n"
+      "  return x(y);\n"
+      "};\n"
+      "def baz func[i16] = fn() i16 {\n"
+      "  return bar(foo, 4);\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+
+int check_file_test_more_20(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def[T] foo func[i32, T] = fn(x i32) T {\n"
+      "  // Why not test ':: T' works where T is generic.\n"
+      "  var y T = (~x :: T);\n"
+      "  return y;\n"
+      "};\n"
+      "def bar func[func[i32, i16], i32, i16] = fn(x func[i32, i16], y i32) i16 {\n"
+      "  return x(y);\n"
+      "};\n"
+      "def baz func[i16] = fn() i16 {\n"
+      "  return bar(foo@[i16], 4);\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -4637,6 +4680,18 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_18...\n");
   if (!test_check_module(&im, &check_file_test_more_18, foo)) {
     DBG("check_file_test_more_18 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_19...\n");
+  if (!!test_check_module(&im, &check_file_test_more_19, foo)) {
+    DBG("check_file_test_more_19 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_20...\n");
+  if (!test_check_module(&im, &check_file_test_more_20, foo)) {
+    DBG("check_file_test_more_20 fails\n");
     goto cleanup_identmap;
   }
 

@@ -722,20 +722,52 @@ int ast_name_expr_info_get_inst(struct ast_name_expr_info *a,
   }
 }
 
-void ast_name_expr_init(struct ast_name_expr *a, struct ast_ident ident) {
-  ast_name_expr_info_init(&a->info);
-  a->ident = ident;
+void ast_name_expr_init(struct ast_name_expr *a,
+                        struct ast_ident ident) {
+  a->meta = ast_meta_make_copy(&ident.meta);
+  ast_name_expr_info_init(&a->info_);
+  a->ident_ = ident;
+  a->has_params = 0;
+}
+
+void ast_name_expr_init_with_params(struct ast_name_expr *a,
+                                    struct ast_meta meta,
+                                    struct ast_ident ident,
+                                    struct ast_typeexpr *params,
+                                    size_t params_count) {
+  a->meta = meta;
+  ast_name_expr_info_init(&a->info_);
+  a->ident_ = ident;
+  a->has_params = 1;
+  a->params = params;
+  a->params_count = params_count;
 }
 
 void ast_name_expr_init_copy(struct ast_name_expr *a,
                              struct ast_name_expr *c) {
-  ast_name_expr_info_init_copy(&a->info, &c->info);
-  ast_ident_init_copy(&a->ident, &c->ident);
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_name_expr_info_init_copy(&a->info_, &c->info_);
+  ast_ident_init_copy(&a->ident_, &c->ident_);
+  a->has_params = c->has_params;
+  if (c->has_params) {
+    size_t count = c->params_count;
+    struct ast_typeexpr *params = malloc_mul(sizeof(*params), count);
+    for (size_t i = 0; i < count; i++) {
+      ast_typeexpr_init_copy(&params[i], &c->params[i]);
+    }
+    a->params = params;
+    a->params_count = c->params_count;
+  }
 }
 
 void ast_name_expr_destroy(struct ast_name_expr *a) {
-  ast_name_expr_info_destroy(&a->info);
-  ast_ident_destroy(&a->ident);
+  ast_meta_destroy(&a->meta);
+  ast_name_expr_info_destroy(&a->info_);
+  ast_ident_destroy(&a->ident_);
+  if (a->has_params) {
+    a->has_params = 0;
+    SLICE_FREE(a->params, a->params_count, ast_typeexpr_destroy);
+  }
 }
 
 void ast_index_expr_init(struct ast_index_expr *a,
@@ -819,7 +851,7 @@ void ast_expr_info_destroy(struct ast_expr_info *m) {
 
 struct ast_meta *ast_expr_ast_meta(struct ast_expr *a) {
   switch (a->tag) {
-  case AST_EXPR_NAME: return &a->u.name.ident.meta;
+  case AST_EXPR_NAME: return &a->u.name.meta;
   case AST_EXPR_NUMERIC_LITERAL: return &a->u.numeric_literal.meta;
   case AST_EXPR_FUNCALL: return &a->u.funcall.meta;
   case AST_EXPR_INDEX: return &a->u.index_expr.meta;
