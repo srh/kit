@@ -1342,13 +1342,20 @@ void free_ast_vardecl(struct ast_vardecl **p) {
   *p = NULL;
 }
 
+/* fallthrough_out says if evaluating the bracebody could "fall off
+   the end", i.e. it has a label without a subsequent goto or return
+   statement.  This is more conservative than "conservative" analysis,
+   because we assume that all labels are reachable. */
 int check_expr_bracebody(struct bodystate *bs,
                          struct ast_bracebody *x,
-                         struct ast_bracebody *annotated_out) {
+                         struct ast_bracebody *annotated_out,
+                         int *fallthrough_out) {
   struct ast_vardecl **vardecls_pushed = NULL;
   size_t vardecls_pushed_count = 0;
   size_t vardecls_pushed_limit = 0;
   int ret = 0;
+
+  int reachable = 1;
 
   struct ast_statement *annotated_statements
     = malloc_mul(sizeof(*annotated_statements), x->statements_count);
@@ -1391,6 +1398,7 @@ int check_expr_bracebody(struct bodystate *bs,
       annotated_statements[i].tag = AST_STATEMENT_RETURN_EXPR;
       malloc_move_ast_expr(annotated_expr,
                            &annotated_statements[i].u.return_expr);
+      reachable = 0;
     } break;
     case AST_STATEMENT_VAR: {
       struct ast_typeexpr replaced_type;
@@ -1450,12 +1458,14 @@ int check_expr_bracebody(struct bodystate *bs,
     case AST_STATEMENT_GOTO: {
       bodystate_note_goto(bs, s->u.goto_statement.target.value);
       ast_statement_init_copy(&annotated_statements[i], s);
+      reachable = 0;
     } break;
     case AST_STATEMENT_LABEL: {
       if (!bodystate_note_label(bs, &s->u.label_statement.label)) {
         goto fail;
       }
       ast_statement_init_copy(&annotated_statements[i], s);
+      reachable = 1;
     } break;
     case AST_STATEMENT_IFTHEN: {
       struct ast_typeexpr boolean;
@@ -1471,8 +1481,9 @@ int check_expr_bracebody(struct bodystate *bs,
       ast_typeexpr_destroy(&boolean);
 
       struct ast_bracebody annotated_thenbody;
+      int fallthrough_discard;
       if (!check_expr_bracebody(bs, &s->u.ifthen_statement.thenbody,
-                                &annotated_thenbody)) {
+                                &annotated_thenbody, &fallthrough_discard)) {
         ast_expr_destroy(&annotated_condition);
         goto fail;
       }
@@ -1498,15 +1509,17 @@ int check_expr_bracebody(struct bodystate *bs,
       ast_typeexpr_destroy(&boolean);
 
       struct ast_bracebody annotated_thenbody;
+      int thenbody_fallthrough;
       if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.thenbody,
-                                &annotated_thenbody)) {
+                                &annotated_thenbody, &thenbody_fallthrough)) {
         ast_expr_destroy(&annotated_condition);
         goto fail;
       }
 
       struct ast_bracebody annotated_elsebody;
+      int elsebody_fallthrough;
       if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.elsebody,
-                                &annotated_elsebody)) {
+                                &annotated_elsebody, &elsebody_fallthrough)) {
         ast_bracebody_destroy(&annotated_thenbody);
         ast_expr_destroy(&annotated_condition);
         goto fail;
@@ -1519,6 +1532,7 @@ int check_expr_bracebody(struct bodystate *bs,
           annotated_condition,
           annotated_thenbody,
           annotated_elsebody);
+      reachable = (reachable && (thenbody_fallthrough || elsebody_fallthrough));
     } break;
     case AST_STATEMENT_WHILE: {
       struct ast_typeexpr boolean;
@@ -1534,7 +1548,9 @@ int check_expr_bracebody(struct bodystate *bs,
       ast_typeexpr_destroy(&boolean);
 
       struct ast_bracebody annotated_body;
-      if (!check_expr_bracebody(bs, &s->u.while_statement.body, &annotated_body)) {
+      int fallthrough_discard;
+      if (!check_expr_bracebody(bs, &s->u.while_statement.body, &annotated_body,
+                                &fallthrough_discard)) {
         ast_expr_destroy(&annotated_condition);
         goto fail;
       }
@@ -1553,6 +1569,7 @@ int check_expr_bracebody(struct bodystate *bs,
 
   ast_bracebody_init(annotated_out, ast_meta_make_copy(&x->meta),
                      annotated_statements, x->statements_count);
+  *fallthrough_out = reachable;
   ret = 1;
  fail:
   if (!ret) {
@@ -1575,10 +1592,15 @@ int check_expr_funcbody(struct exprscope *es,
   struct bodystate bs;
   bodystate_init(&bs, es, partial_type);
 
-  /* TODO: We oughtta analyze whether _all_ paths return. */
   struct ast_bracebody annotated_bracebody;
-  if (!check_expr_bracebody(&bs, x, &annotated_bracebody)) {
+  int fallthrough;
+  if (!check_expr_bracebody(&bs, x, &annotated_bracebody, &fallthrough)) {
     goto fail;
+  }
+
+  if (fallthrough) {
+    METERR(x->meta, "not all control paths return a value.%s", "\n");
+    goto fail_annotated_bracebody;
   }
 
   for (size_t i = 0; i < bs.label_infos_count; i++) {
@@ -4004,6 +4026,25 @@ int check_file_test_more_16(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_17(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because some control paths don't return a value. */
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[i32] = fn() i32 {\n"
+      "  var x i32 = 2;\n"
+      "  if (x < 3) {\n"
+      "    x = x + 1;\n"
+      "  } else {\n"
+      "    return x;\n"
+      "  }\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -4362,6 +4403,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_16...\n");
   if (!test_check_module(&im, &check_file_test_more_16, foo)) {
     DBG("check_file_test_more_16 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_17...\n");
+  if (!!test_check_module(&im, &check_file_test_more_17, foo)) {
+    DBG("check_file_test_more_17 fails\n");
     goto cleanup_identmap;
   }
 
