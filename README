@@ -35,13 +35,13 @@ Here's the project timeline:
    5h. Rename byte to u8. (DONE)
    5k. Pointer type syntax. (DONE)
    5o. Declare expression to be of type. (DONE)
-   5p. While loops (DONE), for loops.
+   5p. While loops, for loops. (DONE)
    5s. Logical not operator. (DONE)
    5t. Array lookup should preserve the lvalueness of the array value. (DONE)
    5f. Bitwise not operator. (DONE) but ugh, ^.
    5b. Non-redundant function syntax.
    5c. Implicit conversions (for array->ptr, user-defined(?), and literals).
-   5i. Analyze label & goto variable scopage.
+   5i. Analyze label & goto variable scopage. (DONE)
    5j. Constructors/destructors.
    5l. Structure packing.
    5m. Tagged unions / enums.
