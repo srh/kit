@@ -1393,6 +1393,248 @@ enum fallthrough compose_fallthrough(enum fallthrough top_reachability,
   }
 }
 
+int check_expr_bracebody(struct bodystate *bs,
+                         struct ast_bracebody *x,
+                         struct ast_bracebody *annotated_out,
+                         enum fallthrough *fallthrough_out);
+
+int check_statement(struct bodystate *bs,
+                    struct ast_statement *s,
+                    struct ast_statement *annotated_out,
+                    enum fallthrough *fallthrough_out,
+                    struct ast_vardecl **vardecl_to_push_or_null_out) {
+  enum fallthrough fallthrough;
+  struct ast_vardecl *vardecl_to_push = NULL;
+
+  switch (s->tag) {
+  case AST_STATEMENT_EXPR: {
+    struct ast_typeexpr anything;
+    anything.tag = AST_TYPEEXPR_UNKNOWN;
+    int lvalue_discard;
+    struct ast_expr annotated_expr;
+    if (!check_expr(bs->es, s->u.expr, &anything,
+                    &lvalue_discard, &annotated_expr)) {
+      goto fail;
+    }
+    annotated_out->tag = AST_STATEMENT_EXPR;
+    malloc_move_ast_expr(annotated_expr, &annotated_out->u.expr);
+    fallthrough = FALLTHROUGH_FROMTHETOP;
+  } break;
+  case AST_STATEMENT_RETURN_EXPR: {
+    int lvalue_discard;
+    struct ast_expr annotated_expr;
+    if (!check_expr(bs->es, s->u.return_expr, bs->partial_type,
+                    &lvalue_discard, &annotated_expr)) {
+      goto fail;
+    }
+    if (!bs->have_exact_return_type) {
+      bs->have_exact_return_type = 1;
+      ast_typeexpr_init_copy(&bs->exact_return_type,
+                             ast_expr_type(&annotated_expr));
+    } else {
+      if (!exact_typeexprs_equal(&bs->exact_return_type,
+                                 ast_expr_type(&annotated_expr))) {
+        METERR(*ast_expr_ast_meta(s->u.return_expr), "Return statements with conflicting return types.%s", "\n");
+        ast_expr_destroy(&annotated_expr);
+        goto fail;
+      }
+    }
+    annotated_out->tag = AST_STATEMENT_RETURN_EXPR;
+    malloc_move_ast_expr(annotated_expr,
+                         &annotated_out->u.return_expr);
+    fallthrough = FALLTHROUGH_NEVER;
+  } break;
+  case AST_STATEMENT_VAR: {
+    struct ast_typeexpr replaced_type;
+    replace_generics(bs->es, &s->u.var_statement.decl.type, &replaced_type);
+
+
+    int lvalue_discard;
+    int has_rhs = s->u.var_statement.has_rhs;
+    struct ast_expr annotated_rhs = { 0 };  /* Initialize to appease cl. */
+    if (has_rhs) {
+      if (!check_expr(bs->es, s->u.var_statement.rhs, &replaced_type,
+                      &lvalue_discard, &annotated_rhs)) {
+        ast_typeexpr_destroy(&replaced_type);
+        goto fail;
+      }
+    }
+
+    struct ast_ident name;
+    ast_ident_init_copy(&name, &s->u.var_statement.decl.name);
+
+    struct ast_typeexpr replaced_type_copy;
+    ast_typeexpr_init_copy(&replaced_type_copy, &replaced_type);
+
+    struct ast_vardecl *replaced_decl = malloc(sizeof(*replaced_decl));
+    CHECK(replaced_decl);
+    ast_vardecl_init(replaced_decl, ast_meta_make_copy(&s->u.var_statement.decl.meta), name,
+                     replaced_type_copy);
+
+    size_t varnum;
+    if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
+      free_ast_vardecl(&replaced_decl);
+      ast_typeexpr_destroy(&replaced_type);
+      if (has_rhs) {
+        ast_expr_destroy(&annotated_rhs);
+      }
+      goto fail;
+    }
+
+    vardecl_to_push = replaced_decl;
+
+    struct ast_vardecl decl;
+    ast_vardecl_init_copy(&decl, &s->u.var_statement.decl);
+    ast_var_info_specify_varnum(&decl.var_info, varnum);
+    annotated_out->tag = AST_STATEMENT_VAR;
+    if (has_rhs) {
+      ast_var_statement_init_with_rhs(&annotated_out->u.var_statement,
+                                      ast_meta_make_copy(&s->u.var_statement.meta),
+                                      decl, annotated_rhs);
+    } else {
+      ast_var_statement_init_without_rhs(&annotated_out->u.var_statement,
+                                         ast_meta_make_copy(&s->u.var_statement.meta),
+                                         decl);
+    }
+    ast_var_statement_info_note_type(
+        &annotated_out->u.var_statement.info,
+        replaced_type);
+    fallthrough = FALLTHROUGH_FROMTHETOP;
+  } break;
+  case AST_STATEMENT_GOTO: {
+    bodystate_note_goto(bs, s->u.goto_statement.target.value);
+    ast_statement_init_copy(annotated_out, s);
+
+    fallthrough = FALLTHROUGH_NEVER;
+  } break;
+  case AST_STATEMENT_LABEL: {
+    if (!bodystate_note_label(bs, &s->u.label_statement.label)) {
+      goto fail;
+    }
+    ast_statement_init_copy(annotated_out, s);
+
+    size_t vars_in_scope_count = bs->es->vars_count;
+    size_t *vars_in_scope = malloc_mul(sizeof(*vars_in_scope), vars_in_scope_count);
+    for (size_t i = 0; i < vars_in_scope_count; i++) {
+      vars_in_scope[i] = bs->es->vars[i].varnum;
+    }
+
+    ast_label_info_set_vars_in_scope(&annotated_out->u.label_statement.info,
+                                     vars_in_scope,
+                                     vars_in_scope_count);
+
+    fallthrough = FALLTHROUGH_NONLOCAL;
+  } break;
+  case AST_STATEMENT_IFTHEN: {
+    struct ast_typeexpr boolean;
+    init_boolean_typeexpr(bs->es->cs, &boolean);
+
+    int lvalue_discard;
+    struct ast_expr annotated_condition;
+    if (!check_expr(bs->es, s->u.ifthen_statement.condition, &boolean,
+                    &lvalue_discard, &annotated_condition)) {
+      ast_typeexpr_destroy(&boolean);
+      goto fail;
+    }
+    ast_typeexpr_destroy(&boolean);
+
+    struct ast_bracebody annotated_thenbody;
+    enum fallthrough thenbody_fallthrough;
+    if (!check_expr_bracebody(bs, &s->u.ifthen_statement.thenbody,
+                              &annotated_thenbody, &thenbody_fallthrough)) {
+      ast_expr_destroy(&annotated_condition);
+      goto fail;
+    }
+
+    annotated_out->tag = AST_STATEMENT_IFTHEN;
+    ast_ifthen_statement_init(
+        &annotated_out->u.ifthen_statement,
+        ast_meta_make_copy(&s->u.ifthen_statement.meta),
+        annotated_condition,
+        annotated_thenbody);
+    fallthrough = max_fallthrough(FALLTHROUGH_FROMTHETOP, thenbody_fallthrough);
+  } break;
+  case AST_STATEMENT_IFTHENELSE: {
+    struct ast_typeexpr boolean;
+    init_boolean_typeexpr(bs->es->cs, &boolean);
+
+    int lvalue_discard;
+    struct ast_expr annotated_condition;
+    if (!check_expr(bs->es, s->u.ifthenelse_statement.condition, &boolean,
+                    &lvalue_discard, &annotated_condition)) {
+      ast_typeexpr_destroy(&boolean);
+      goto fail;
+    }
+    ast_typeexpr_destroy(&boolean);
+
+    struct ast_bracebody annotated_thenbody;
+    enum fallthrough thenbody_fallthrough;
+    if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.thenbody,
+                              &annotated_thenbody, &thenbody_fallthrough)) {
+      ast_expr_destroy(&annotated_condition);
+      goto fail;
+    }
+
+    struct ast_bracebody annotated_elsebody;
+    enum fallthrough elsebody_fallthrough;
+    if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.elsebody,
+                              &annotated_elsebody, &elsebody_fallthrough)) {
+      ast_bracebody_destroy(&annotated_thenbody);
+      ast_expr_destroy(&annotated_condition);
+      goto fail;
+    }
+
+    annotated_out->tag = AST_STATEMENT_IFTHENELSE;
+    ast_ifthenelse_statement_init(
+        &annotated_out->u.ifthenelse_statement,
+        ast_meta_make_copy(&s->u.ifthenelse_statement.meta),
+        annotated_condition,
+        annotated_thenbody,
+        annotated_elsebody);
+
+    fallthrough = max_fallthrough(thenbody_fallthrough, elsebody_fallthrough);
+  } break;
+  case AST_STATEMENT_WHILE: {
+    struct ast_typeexpr boolean;
+    init_boolean_typeexpr(bs->es->cs, &boolean);
+
+    int lvalue_discard;
+    struct ast_expr annotated_condition;
+    if (!check_expr(bs->es, s->u.while_statement.condition, &boolean,
+                    &lvalue_discard, &annotated_condition)) {
+      ast_typeexpr_destroy(&boolean);
+      goto fail;
+    }
+    ast_typeexpr_destroy(&boolean);
+
+    struct ast_bracebody annotated_body;
+    enum fallthrough body_fallthrough;
+    if (!check_expr_bracebody(bs, &s->u.while_statement.body, &annotated_body,
+                              &body_fallthrough)) {
+      ast_expr_destroy(&annotated_condition);
+      goto fail;
+    }
+
+    annotated_out->tag = AST_STATEMENT_WHILE;
+    ast_while_statement_init(
+        &annotated_out->u.while_statement,
+        ast_meta_make_copy(&s->u.while_statement.meta),
+        annotated_condition,
+        annotated_body);
+
+    fallthrough = max_fallthrough(FALLTHROUGH_FROMTHETOP, body_fallthrough);
+  } break;
+  default:
+    UNREACHABLE();
+  }
+
+  *fallthrough_out = fallthrough;
+  *vardecl_to_push_or_null_out = vardecl_to_push;
+  return 1;
+ fail:
+  return 0;
+}
+
 /* fallthrough_out says if evaluating the bracebody could "fall off
    the end", i.e. it has a label without a subsequent goto or return
    statement.  This is more conservative than "conservative" analysis,
@@ -1414,228 +1656,17 @@ int check_expr_bracebody(struct bodystate *bs,
   size_t i = 0;
   for (size_t e = x->statements_count; i < e; i++) {
     struct ast_statement *s = &x->statements[i];
-    switch (s->tag) {
-    case AST_STATEMENT_EXPR: {
-      struct ast_typeexpr anything;
-      anything.tag = AST_TYPEEXPR_UNKNOWN;
-      int lvalue_discard;
-      struct ast_expr annotated_expr;
-      if (!check_expr(bs->es, s->u.expr, &anything,
-                      &lvalue_discard, &annotated_expr)) {
-        goto fail;
-      }
-      annotated_statements[i].tag = AST_STATEMENT_EXPR;
-      malloc_move_ast_expr(annotated_expr, &annotated_statements[i].u.expr);
-    } break;
-    case AST_STATEMENT_RETURN_EXPR: {
-      int lvalue_discard;
-      struct ast_expr annotated_expr;
-      if (!check_expr(bs->es, s->u.return_expr, bs->partial_type,
-                      &lvalue_discard, &annotated_expr)) {
-        goto fail;
-      }
-      if (!bs->have_exact_return_type) {
-        bs->have_exact_return_type = 1;
-        ast_typeexpr_init_copy(&bs->exact_return_type,
-                               ast_expr_type(&annotated_expr));
-      } else {
-        if (!exact_typeexprs_equal(&bs->exact_return_type,
-                                   ast_expr_type(&annotated_expr))) {
-          METERR(*ast_expr_ast_meta(s->u.return_expr), "Return statements with conflicting return types.%s", "\n");
-          ast_expr_destroy(&annotated_expr);
-          goto fail;
-        }
-      }
-      annotated_statements[i].tag = AST_STATEMENT_RETURN_EXPR;
-      malloc_move_ast_expr(annotated_expr,
-                           &annotated_statements[i].u.return_expr);
-      reachable = FALLTHROUGH_NEVER;
-    } break;
-    case AST_STATEMENT_VAR: {
-      struct ast_typeexpr replaced_type;
-      replace_generics(bs->es, &s->u.var_statement.decl.type, &replaced_type);
+    enum fallthrough fallthrough;
+    struct ast_vardecl *vardecl_to_push_or_null;
+    if (!check_statement(bs, s, &annotated_statements[i], &fallthrough,
+                         &vardecl_to_push_or_null)) {
+      goto fail;
+    }
 
-
-      int lvalue_discard;
-      int has_rhs = s->u.var_statement.has_rhs;
-      struct ast_expr annotated_rhs = { 0 };  /* Initialize to appease cl. */
-      if (has_rhs) {
-        if (!check_expr(bs->es, s->u.var_statement.rhs, &replaced_type,
-                        &lvalue_discard, &annotated_rhs)) {
-          ast_typeexpr_destroy(&replaced_type);
-          goto fail;
-        }
-      }
-
-      struct ast_ident name;
-      ast_ident_init_copy(&name, &s->u.var_statement.decl.name);
-
-      struct ast_typeexpr replaced_type_copy;
-      ast_typeexpr_init_copy(&replaced_type_copy, &replaced_type);
-
-      struct ast_vardecl *replaced_decl = malloc(sizeof(*replaced_decl));
-      CHECK(replaced_decl);
-      ast_vardecl_init(replaced_decl, ast_meta_make_copy(&s->u.var_statement.decl.meta), name,
-                       replaced_type_copy);
-
-      size_t varnum;
-      if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
-        free_ast_vardecl(&replaced_decl);
-        ast_typeexpr_destroy(&replaced_type);
-        if (has_rhs) {
-          ast_expr_destroy(&annotated_rhs);
-        }
-        goto fail;
-      }
-
+    reachable = compose_fallthrough(reachable, fallthrough);
+    if (vardecl_to_push_or_null) {
       SLICE_PUSH(vardecls_pushed, vardecls_pushed_count, vardecls_pushed_limit,
-                 replaced_decl);
-
-      struct ast_vardecl decl;
-      ast_vardecl_init_copy(&decl, &s->u.var_statement.decl);
-      ast_var_info_specify_varnum(&decl.var_info, varnum);
-      annotated_statements[i].tag = AST_STATEMENT_VAR;
-      if (has_rhs) {
-        ast_var_statement_init_with_rhs(&annotated_statements[i].u.var_statement,
-                                        ast_meta_make_copy(&s->u.var_statement.meta),
-                                        decl, annotated_rhs);
-      } else {
-        ast_var_statement_init_without_rhs(&annotated_statements[i].u.var_statement,
-                                           ast_meta_make_copy(&s->u.var_statement.meta),
-                                           decl);
-      }
-      ast_var_statement_info_note_type(
-          &annotated_statements[i].u.var_statement.info,
-          replaced_type);
-    } break;
-    case AST_STATEMENT_GOTO: {
-      bodystate_note_goto(bs, s->u.goto_statement.target.value);
-      ast_statement_init_copy(&annotated_statements[i], s);
-
-      reachable = FALLTHROUGH_NEVER;
-    } break;
-    case AST_STATEMENT_LABEL: {
-      if (!bodystate_note_label(bs, &s->u.label_statement.label)) {
-        goto fail;
-      }
-      ast_statement_init_copy(&annotated_statements[i], s);
-
-      size_t vars_in_scope_count = bs->es->vars_count;
-      size_t *vars_in_scope = malloc_mul(sizeof(*vars_in_scope), vars_in_scope_count);
-      for (size_t i = 0; i < vars_in_scope_count; i++) {
-        vars_in_scope[i] = bs->es->vars[i].varnum;
-      }
-
-      ast_label_info_set_vars_in_scope(&annotated_statements[i].u.label_statement.info,
-                                       vars_in_scope,
-                                       vars_in_scope_count);
-
-      reachable = FALLTHROUGH_NONLOCAL;
-    } break;
-    case AST_STATEMENT_IFTHEN: {
-      struct ast_typeexpr boolean;
-      init_boolean_typeexpr(bs->es->cs, &boolean);
-
-      int lvalue_discard;
-      struct ast_expr annotated_condition;
-      if (!check_expr(bs->es, s->u.ifthen_statement.condition, &boolean,
-                      &lvalue_discard, &annotated_condition)) {
-        ast_typeexpr_destroy(&boolean);
-        goto fail;
-      }
-      ast_typeexpr_destroy(&boolean);
-
-      struct ast_bracebody annotated_thenbody;
-      enum fallthrough thenbody_fallthrough;
-      if (!check_expr_bracebody(bs, &s->u.ifthen_statement.thenbody,
-                                &annotated_thenbody, &thenbody_fallthrough)) {
-        ast_expr_destroy(&annotated_condition);
-        goto fail;
-      }
-
-      annotated_statements[i].tag = AST_STATEMENT_IFTHEN;
-      ast_ifthen_statement_init(
-          &annotated_statements[i].u.ifthen_statement,
-          ast_meta_make_copy(&s->u.ifthen_statement.meta),
-          annotated_condition,
-          annotated_thenbody);
-      reachable = max_fallthrough(reachable,
-                                  compose_fallthrough(reachable, thenbody_fallthrough));
-    } break;
-    case AST_STATEMENT_IFTHENELSE: {
-      struct ast_typeexpr boolean;
-      init_boolean_typeexpr(bs->es->cs, &boolean);
-
-      int lvalue_discard;
-      struct ast_expr annotated_condition;
-      if (!check_expr(bs->es, s->u.ifthenelse_statement.condition, &boolean,
-                      &lvalue_discard, &annotated_condition)) {
-        ast_typeexpr_destroy(&boolean);
-        goto fail;
-      }
-      ast_typeexpr_destroy(&boolean);
-
-      struct ast_bracebody annotated_thenbody;
-      enum fallthrough thenbody_fallthrough;
-      if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.thenbody,
-                                &annotated_thenbody, &thenbody_fallthrough)) {
-        ast_expr_destroy(&annotated_condition);
-        goto fail;
-      }
-
-      struct ast_bracebody annotated_elsebody;
-      enum fallthrough elsebody_fallthrough;
-      if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.elsebody,
-                                &annotated_elsebody, &elsebody_fallthrough)) {
-        ast_bracebody_destroy(&annotated_thenbody);
-        ast_expr_destroy(&annotated_condition);
-        goto fail;
-      }
-
-      annotated_statements[i].tag = AST_STATEMENT_IFTHENELSE;
-      ast_ifthenelse_statement_init(
-          &annotated_statements[i].u.ifthenelse_statement,
-          ast_meta_make_copy(&s->u.ifthenelse_statement.meta),
-          annotated_condition,
-          annotated_thenbody,
-          annotated_elsebody);
-
-      reachable = compose_fallthrough(reachable, max_fallthrough(thenbody_fallthrough,
-                                                                 elsebody_fallthrough));
-    } break;
-    case AST_STATEMENT_WHILE: {
-      struct ast_typeexpr boolean;
-      init_boolean_typeexpr(bs->es->cs, &boolean);
-
-      int lvalue_discard;
-      struct ast_expr annotated_condition;
-      if (!check_expr(bs->es, s->u.while_statement.condition, &boolean,
-                      &lvalue_discard, &annotated_condition)) {
-        ast_typeexpr_destroy(&boolean);
-        goto fail;
-      }
-      ast_typeexpr_destroy(&boolean);
-
-      struct ast_bracebody annotated_body;
-      enum fallthrough body_fallthrough;
-      if (!check_expr_bracebody(bs, &s->u.while_statement.body, &annotated_body,
-                                &body_fallthrough)) {
-        ast_expr_destroy(&annotated_condition);
-        goto fail;
-      }
-
-      annotated_statements[i].tag = AST_STATEMENT_WHILE;
-      ast_while_statement_init(
-          &annotated_statements[i].u.while_statement,
-          ast_meta_make_copy(&s->u.while_statement.meta),
-          annotated_condition,
-          annotated_body);
-
-      reachable = max_fallthrough(reachable,
-                                  compose_fallthrough(reachable, body_fallthrough));
-    } break;
-    default:
-      UNREACHABLE();
+                 vardecl_to_push_or_null);
     }
   }
 
