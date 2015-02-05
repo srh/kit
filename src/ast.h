@@ -92,6 +92,9 @@ void ast_unione_init(struct ast_unione *a, struct ast_meta meta,
 
 struct ast_arraytype {
   struct ast_meta meta;
+  /* TODO: This should be a (statically evaluable) expr.  But such an
+     expr would need to be analyzed for sizeof and alignof expressions
+     when seen in another type. */
   uint32_t count;
   struct ast_typeexpr *param;
 };

@@ -3219,6 +3219,8 @@ int eval_static_value(struct ast_expr *expr,
   case AST_EXPR_FUNCALL:
     return eval_static_funcall(&expr->u.funcall, out);
   case AST_EXPR_INDEX: {
+    /* Array indexing might be deemed such, but right now non-integer,
+       non-lambda types are not deemed statically evaluable. */
     CRASH("Pointer indexing should not have been deemed statically "
           "evaluable.\n");
   } break;
