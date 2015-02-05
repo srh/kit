@@ -417,8 +417,8 @@ int ast_name_expr_info_get_inst(struct ast_name_expr_info *a,
 
 struct ast_name_expr {
   struct ast_meta meta;
-  struct ast_name_expr_info info_;
-  struct ast_ident ident_;
+  struct ast_name_expr_info info;
+  struct ast_ident ident;
 
   int has_params;
   struct ast_typeexpr *params;

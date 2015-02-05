@@ -2762,8 +2762,8 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
              struct expr_return *er) {
   switch (a->tag) {
   case AST_EXPR_NAME: {
-    CHECK(a->u.name.info_.info_valid);
-    struct def_instantiation *inst = a->u.name.info_.inst_or_null;
+    CHECK(a->u.name.info.info_valid);
+    struct def_instantiation *inst = a->u.name.info.inst_or_null;
     if (inst) {
       if (inst->value_computed && inst->value.tag == STATIC_VALUE_PRIMITIVE_OP) {
         struct immediate imm;
@@ -2793,7 +2793,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
       /* No template params when looking up a local variable. */
       CHECK(!a->u.name.has_params);
       size_t vi;
-      int found_vi = lookup_vardata_by_name(h, a->u.name.ident_.value, &vi);
+      int found_vi = lookup_vardata_by_name(h, a->u.name.ident.value, &vi);
       CHECK(found_vi);
       expr_return_set(f, er, h->vardata[vi].loc);
     }

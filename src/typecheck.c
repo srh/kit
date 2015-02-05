@@ -1038,7 +1038,7 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
   struct def_entry *ent;
   struct def_instantiation *inst;
   if (!name_table_match_def(&es->cs->nt,
-                            &name->ident_,
+                            &name->ident,
                             name->has_params ? name->params : NULL,
                             name->has_params ? name->params_count : 0,
                             partial_type,
@@ -1104,13 +1104,13 @@ int exprscope_lookup_name(struct exprscope *es,
                           struct def_instantiation **inst_or_null_out) {
   for (size_t i = es->vars_count; i-- > 0; ) {
     struct ast_vardecl *decl = es->vars[i].decl;
-    if (decl->name.value != name->ident_.value) {
+    if (decl->name.value != name->ident.value) {
       continue;
     }
 
     if (!unify_directionally(partial_type, &decl->type)) {
       METERR(name->meta, "Type mismatch for vardecl %.*s lookup.\n",
-             IM_P(es->cs->im, name->ident_.value));
+             IM_P(es->cs->im, name->ident.value));
       return 0;
     }
 
@@ -2510,7 +2510,7 @@ int check_expr(struct exprscope *es,
     *is_lvalue_out = is_lvalue;
     ast_expr_partial_init(annotated_out, AST_EXPR_NAME, ast_expr_info_typechecked(name_type));
     ast_name_expr_init_copy(&annotated_out->u.name, &x->u.name);
-    ast_name_expr_info_mark_inst(&annotated_out->u.name.info_, inst_or_null);
+    ast_name_expr_info_mark_inst(&annotated_out->u.name.info, inst_or_null);
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
@@ -3206,7 +3206,7 @@ int eval_static_value(struct ast_expr *expr,
   switch (expr->tag) {
   case AST_EXPR_NAME: {
     struct def_instantiation *inst_or_null;
-    if (!ast_name_expr_info_get_inst(&expr->u.name.info_, &inst_or_null)) {
+    if (!ast_name_expr_info_get_inst(&expr->u.name.info, &inst_or_null)) {
       CRASH("Could not lookup instantation.");
     }
     CHECK(inst_or_null);
