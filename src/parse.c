@@ -42,8 +42,8 @@ void ps_init(struct ps *p, const uint8_t *data, size_t length) {
   p->leafcount = 0;
 }
 
-/* Takes ownership of the ident table -- use ps_remove_identmap to
-   get it back. */
+/* Takes ownership of the ident table -- use ps_remove_identmap to get
+it back. */
 void ps_init_with_identmap(struct ps *p, struct identmap *im,
                            const uint8_t *data, size_t length) {
   p->data = data;
@@ -142,7 +142,8 @@ struct precedence_pair {
 };
 
 const int kSemicolonPrecedence = 205;
-/* There is no comma operator, so no intermingling of commas and semicolons. */
+/* There is no comma operator, so no intermingling of commas and
+semicolons. */
 const int kCommaPrecedence = 205;
 
 const struct precedence_pair binop_precedences[] = {
@@ -159,7 +160,7 @@ const struct precedence_pair binop_precedences[] = {
   [AST_BINOP_EQ] = { 405, 405 },
   [AST_BINOP_NE] = { 405, 405 },
   /* TODO: Let bitwise ops self-associate but require parens for any
-     combination of them with other operators. */
+  combination of them with other operators. */
   [AST_BINOP_BIT_XOR] = { 405, 405 },
   [AST_BINOP_BIT_OR] = { 405, 405 },
   [AST_BINOP_BIT_AND] = { 405, 405 },

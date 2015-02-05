@@ -381,8 +381,8 @@ int name_table_help_add_def(struct name_table *t,
         ERR_DBG("def name shadows extern or exported def name.\n");
         return 0;
       }
-      /* (We only need to check the first node, because extern/export defs
-         disallow there to be conflicting names.) */
+      /* (We only need to check the first node, because extern/export
+      defs disallow there to be conflicting names.) */
     }
   }
 

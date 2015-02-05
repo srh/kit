@@ -48,7 +48,7 @@ NORETURN void report_and_abort(const char *file, int line,
 #define TODO_IMPLEMENT CRASH("Unimplemented.")
 
 /* TODO: Every use of ERR_DBG is a bad error message.  And this is in
-   the wrong place. */
+the wrong place. */
 #define ERR_DBG(...) DBG(__VA_ARGS__)
 
 /* Uses of ERR are better error messages than what we had before. */
@@ -59,7 +59,7 @@ NORETURN void report_and_abort(const char *file, int line,
 void *malloc_mul(size_t a, size_t b);
 
 /* Returns a pointer to a buffer of size *count_out + 1... so that
-   there's a null terminator. */
+there's a null terminator. */
 void alloc_memcat(const void *lbuf, size_t lcount,
                   const void *rbuf, size_t rcount,
                   char **buf_ptr_out, size_t *count_out);
@@ -70,7 +70,7 @@ void alloc_half_strcat(const void *lbuf, size_t lcount,
                        char **buf_ptr_out, size_t *count_out);
 
 /* memcpy, only if n == 0 and dest or src is NULL, you don't have
-   undefined behavior. */
+undefined behavior. */
 void ok_memcpy(void *dest, const void *src, size_t n);
 
 #endif /* KIRA_UTIL_H_ */

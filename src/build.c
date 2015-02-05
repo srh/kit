@@ -75,7 +75,7 @@ enum x86_jcc {
 };
 
 /* Returns true if the reg has a lobyte (also, the register code
-   happens to identify the lowbyte in a reg or modr/m field). */
+happens to identify the lowbyte in a reg or modr/m field). */
 int x86_reg_has_lowbyte(enum x86_reg reg) {
   return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
 }
@@ -85,8 +85,8 @@ void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg);
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
 
 /* Right now we don't worry about generating multiple objfiles, so we
-   just blithely attach a serial number to each name to make them
-   unique. */
+just blithely attach a serial number to each name to make them
+unique. */
 int generate_kira_name(struct checkstate *cs,
                        const void *name, size_t name_count,
                        int is_export,
@@ -104,7 +104,7 @@ int generate_kira_name(struct checkstate *cs,
     databuf_append(&b, name, name_count);
 
     /* I just don't want to lookup the stdarg documentation and
-       implement databuf_appendf. */
+    implement databuf_appendf. */
     char buf[20] = { 0 };
     size_t i = 0;
     CHECK(number_append > 0);
@@ -134,7 +134,7 @@ int is_primitive_but_not_sizeof_alignof(struct def_entry *ent) {
 int add_def_symbols(struct checkstate *cs, struct objfile *f,
                     struct def_entry *ent) {
   /* TODO: I'd actually like to not define symbols for sizeof and
-     alignof.  Their values should be inlined. */
+  alignof.  Their values should be inlined. */
   if (is_primitive_but_not_sizeof_alignof(ent)) {
     return 1;
   }
@@ -352,10 +352,10 @@ struct reset_esp_data {
   /* The .text offset where we need to reset esp. */
   size_t reset_esp_offset;
   /* esp's current offset relative to ebp, when we need to reset it.
-     (This is a nonpositive value). */
+  (This is a nonpositive value). */
   int32_t ebp_offset;
   /* Says whether we're setting esp to ebp_offset or setting esp back
-     from ebp_offset. */
+  from ebp_offset. */
   int downward;
 };
 
@@ -392,12 +392,12 @@ struct frame {
   size_t crash_target_number;
 
   /* The offset (relative to ebp) of "free space" available --
-     e.g. esp is at or below this address, but you could wipe anywhere
-     below here without harm. */
+  e.g. esp is at or below this address, but you could wipe anywhere
+  below here without harm. */
   int32_t stack_offset;
   /* min_stack_offset tells us where to put esp.  TODO: Must esp be 8-
-     or 16-byte aligned?  For function calls?  Remember that ret ptr
-     and ebp take up 8 bytes.  */
+  or 16-byte aligned?  For function calls?  Remember that ret ptr
+  and ebp take up 8 bytes.  */
   int32_t min_stack_offset;
 };
 
@@ -495,7 +495,7 @@ int32_t frame_save_offset(struct frame *h) {
 
 void frame_restore_offset(struct frame *h, int32_t stack_offset) {
   /* The stack is made _smaller_ by this function by increasing the
-     offset (which is nonpositive). */
+  offset (which is nonpositive). */
   CHECK(stack_offset <= 0);
   CHECK(stack_offset >= h->stack_offset);
   h->stack_offset = stack_offset;
@@ -626,7 +626,7 @@ void x86_gen_test_regs8(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2)
 }
 
 /* Appends funcaddrs with dir32 -- not suitable for relative address
-   call instructions. */
+call instructions. */
 void append_immediate(struct objfile *f, struct immediate imm) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC: {
@@ -1209,7 +1209,7 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
     frame_define_target(h, h->crash_target_number,
                         objfile_section_size(objfile_text(f)));
     /* TODO: I don't know what I really want to do here.  Call a
-       Kira-specific function?  Call abort?  (What does abort do?) */
+    Kira-specific function?  Call abort?  (What does abort do?) */
     x86_gen_int_3(f);
   }
 }
@@ -1301,9 +1301,9 @@ void put_ptr_in_reg(struct objfile *f, struct loc loc, enum x86_reg free_reg,
 }
 
 /* When we call this, the only things using registers (besides esp and
-   ebp) are dest or loc.  It's safe to use this if dest and src point
-   to the same _exact_ memory location, through different means (or
-   through the same means). */
+ebp) are dest or loc.  It's safe to use this if dest and src point to
+the same _exact_ memory location, through different means (or through
+the same means). */
 void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   CHECK(dest.size == src.size);
   if (loc_equal(dest, src)) {
@@ -1462,10 +1462,10 @@ void x86_gen_indirect_call_reg(struct objfile *f, enum x86_reg reg) {
 /* An expr_return tells how gen_expr should provide the return value. */
 enum expr_return_tag {
   /* The location where the data is to be returned is precisely
-     specified. */
+  specified. */
   EXPR_RETURN_DEMANDED,
-  /* The location is not specified -- gen_expr should write the
-     data's location to "loc", and preserve lvalues. */
+  /* The location is not specified -- gen_expr should write the data's
+  location to "loc", and preserve lvalues. */
   EXPR_RETURN_OPEN,
   EXPR_RETURN_FREE,
 };
@@ -1725,10 +1725,9 @@ void gen_primitive_op_behavior(struct objfile *f,
   case PRIMITIVE_OP_NEGATE_I8: {
     x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
     /* TODO: For this and the other negations, can't we just check OF
-       after the fact?  I missed that in the docs on the first
-       read? */
+    after the fact?  I missed that in the docs on the first read? */
     /* Crashes if the value is INT8_MIN by subtracting 1 and
-       overflowing. */
+    overflowing. */
     x86_gen_cmp_reg8_imm8(f, X86_AL, 1);
     gen_crash_jcc(f, h, X86_JCC_O);
     x86_gen_neg_w32(f, X86_AL);
@@ -1736,7 +1735,7 @@ void gen_primitive_op_behavior(struct objfile *f,
   case PRIMITIVE_OP_NEGATE_I16: {
     x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
     /* Crashes if the value is INT16_MIN by subtracting 1 and
-       overflowing. */
+    overflowing. */
     x86_gen_cmp_reg16_imm16(f, X86_AX, 1);
     gen_crash_jcc(f, h, X86_JCC_O);
     x86_gen_neg_w32(f, X86_EAX);
@@ -1744,7 +1743,7 @@ void gen_primitive_op_behavior(struct objfile *f,
   case PRIMITIVE_OP_NEGATE_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     /* Crashes if the value is INT32_MIN by subtracting 1 and
-       overflowing. */
+    overflowing. */
     x86_gen_cmp_imm32(f, X86_EAX, 1);
     gen_crash_jcc(f, h, X86_JCC_O);
     x86_gen_neg_w32(f, X86_EAX);
@@ -2363,8 +2362,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
   if (exists_hidden_return_param(return_size)) {
     /* We're going to act like the pointer returned by the callee (in
-       EAX) could be pointing to something different than
-       return_loc. */
+    EAX) could be pointing to something different than return_loc. */
 
     struct loc return_ptr_loc = frame_push_loc(h, DWORD_SIZE);
     gen_store_register(f, return_ptr_loc, X86_EAX);
@@ -2393,7 +2391,7 @@ void apply_dereference(struct objfile *f,
   CHECK(loc.tag == LOC_EBP_OFFSET);
 
   /* When dereferencing a pointer, we have no info about padding, so
-     the padded size is the same as the size. */
+  the padded size is the same as the size. */
   struct loc ret = ebp_indirect_loc(pointee_size, pointee_size,
                                     loc.u.ebp_offset);
   expr_return_set(f, er, ret);
@@ -2502,7 +2500,7 @@ void gen_placeholder_jmp_if_false(struct objfile *f, struct frame *h,
 
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code) {
   /* The crash target code gets generated (at the end) only if we call
-     this function -- only if h->crash_target_exists is true. */
+  this function -- only if h->crash_target_exists is true. */
   if (!h->crash_target_exists) {
     h->crash_target_number = frame_add_target(h);
     h->crash_target_exists = 1;
@@ -2576,7 +2574,7 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
     }
 
     /* gen_expr above did our assignment.  Our expression has a return
-       value though, expr_return_set does that. */
+    value though, expr_return_set does that. */
     expr_return_set(f, er, lhs_er.u.loc);
     return 1;
   } break;
@@ -2701,9 +2699,9 @@ void apply_field_access(struct checkstate *cs,
                         ident_value fieldname,
                         struct expr_return *er) {
   /* Generally speaking: There's no way the field possibly gets a
-     padded_size, because the first N fields of two struct types, if
-     identical, need to be accessible when they're in a union
-     without touching subsequent fields. */
+  padded_size, because the first N fields of two struct types, if
+  identical, need to be accessible when they're in a union without
+  touching subsequent fields. */
   uint32_t size;
   uint32_t offset;
   kira_field_sizeoffset(&cs->nt, type, fieldname,
@@ -2719,8 +2717,8 @@ void apply_field_access(struct checkstate *cs,
     expr_return_set(f, er, field_loc);
   } break;
   case LOC_GLOBAL: {
-    /* This could probably be implemented more smartly, with
-       advanced symbol-making, but who cares. */
+    /* This could probably be implemented more smartly, with advanced
+    symbol-making, but who cares. */
     struct loc field_ptr_loc = frame_push_loc(h, DWORD_SIZE);
     x86_gen_mov_reg_stiptr(f, X86_EAX, lhs_loc.u.global_sti);
     x86_gen_lea32(f, X86_EAX, X86_EAX, uint32_to_int32(offset));
@@ -2779,8 +2777,8 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
           expr_return_immediate(f, h, er, imm);
         } else {
           /* TODO: Support immediate values, distinction between defs
-             of variables and other defs -- only make a symbol for
-             exported defs (if they're small). */
+          of variables and other defs -- only make a symbol for
+          exported defs (if they're small). */
           uint32_t size = kira_sizeof(&cs->nt, &inst->type);
           /* TODO: Maybe globals' alignment rules are softer. */
           uint32_t padded_size = size;

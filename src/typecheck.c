@@ -839,15 +839,15 @@ struct exprscope {
   struct ast_generics *generics;
   struct ast_typeexpr *generics_substitutions;
   /* 0 if !generics->has_type_params; otherwise, equal to
-     generics->params_count. */
+  generics->params_count. */
   size_t generics_substitutions_count;
 
   /* "YES" if the expr must be statically computable. */
   enum static_computation computation;
   /* The def_entry for this expr, maybe.  We record static_referents
-     that we see, if this is a statically-computed expression.  It
-     would be null for expressions that aren't statically computed for
-     a top-level def. */
+  that we see, if this is a statically-computed expression.  It would
+  be null for expressions that aren't statically computed for a
+  top-level def. */
   struct def_entry *entry_or_null;
 
   /* A stack of variables that are in scope. */
@@ -1394,14 +1394,14 @@ void free_ast_vardecl(struct ast_vardecl **p) {
 /* Tells how a bracebody or statement falls through. */
 enum fallthrough {
   /* Says a statement/bracebody never exits "out the bottom" -- it
-     exits with a goto or return. */
+  exits with a goto or return. */
   FALLTHROUGH_NEVER,
   /* Says a statement/bracebody could exit "out the bottom" only if
-     you can enter "from the top." */
+  you can enter "from the top." */
   FALLTHROUGH_FROMTHETOP,
   /* Says a statement/bracebody has a non-local entrance -- it is or
-     has a label statement such that it could exit "out the bottom"
-     without entering "from the top." */
+  has a label statement such that it could exit "out the bottom"
+  without entering "from the top." */
   FALLTHROUGH_NONLOCAL,
 };
 
@@ -1763,9 +1763,9 @@ int check_statement(struct bodystate *bs,
 }
 
 /* fallthrough_out says if evaluating the bracebody could "fall off
-   the end", i.e. it has a label without a subsequent goto or return
-   statement.  This is more conservative than "conservative" analysis,
-   because we assume that all labels are reachable. */
+the end", i.e. it has a label without a subsequent goto or return
+statement.  This is more conservative than "conservative" analysis,
+because we assume that all labels are reachable. */
 int check_expr_bracebody(struct bodystate *bs,
                          struct ast_bracebody *x,
                          struct ast_bracebody *annotated_out,
@@ -1933,7 +1933,7 @@ int check_expr_lambda(struct exprscope *es,
   }
 
   /* The funcbody does not need to be a statically computable
-     expression, because the lambda is not evaluated. */
+  expression, because the lambda is not evaluated. */
   struct exprscope bb_es;
   exprscope_init(&bb_es, es->cs, es->generics, es->generics_substitutions,
                  es->generics_substitutions_count,
@@ -1944,7 +1944,7 @@ int check_expr_lambda(struct exprscope *es,
   for (size_t i = 0; i < func_params_count; i++) {
     int res = exprscope_push_var(&bb_es, &replaced_vardecls[i], &varnums[i]);
     /* Pushing the var should succeed, because we already called
-       check_var_shadowing above. */
+    check_var_shadowing above. */
     CHECK(res);
   }
 
@@ -2375,7 +2375,7 @@ int check_expr_deref_field_access(
   }
   int ret = 0;
   /* Even though we know the lhs is supposed to be a ptr, we shouldn't
-     put that info into the context when type checking it. */
+  put that info into the context when type checking it. */
   struct ast_typeexpr lhs_partial_type;
   lhs_partial_type.tag = AST_TYPEEXPR_UNKNOWN;
 
@@ -2653,7 +2653,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
   }
 
   /* We can only typecheck the def by instantiating it -- so we check
-     the ones with no template params. */
+  the ones with no template params. */
   if (!a->generics_.has_type_params) {
     struct ast_typeexpr unified;
     struct def_entry *ent;
@@ -2744,8 +2744,8 @@ int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
 int numeric_literal_to_i32(int8_t *digits, size_t digits_count,
                            int32_t *out) {
   /* TODO: There's no way to plainly represent INT32_MIN.  We should
-     get static evaluation of "arbitrary numeric constants"
-     implemented. */
+  get static evaluation of "arbitrary numeric constants"
+  implemented. */
   uint32_t value;
   if (!numeric_literal_to_u32(digits, digits_count, &value)) {
     return 0;
@@ -2809,7 +2809,8 @@ int apply_static_funcall(struct static_value *func,
     return 0;
   }
 
-  /* TODO: Um, we're missing a lot of primitive ops here now. */
+  /* TODO: We're missing a lot of primitive ops here now.  Implement
+  those which... are needed. */
   switch (params_count) {
   case 1:
     switch (func->u.primitive_op) {
@@ -3220,7 +3221,7 @@ int eval_static_value(struct ast_expr *expr,
     return eval_static_funcall(&expr->u.funcall, out);
   case AST_EXPR_INDEX: {
     /* Array indexing might be deemed such, but right now non-integer,
-       non-lambda types are not deemed statically evaluable. */
+    non-lambda types are not deemed statically evaluable. */
     CRASH("Pointer indexing should not have been deemed statically "
           "evaluable.\n");
   } break;
@@ -3489,7 +3490,7 @@ int check_file_test_6(const uint8_t *name, size_t name_count,
 int check_file_test_7(const uint8_t *name, size_t name_count,
                       uint8_t **data_out, size_t *data_count_out) {
   /* This fails because bar recursively holds itself through a
-     template parameter. */
+  template parameter. */
   struct test_module a[] = { { "foo",
                                "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
                                "deftype bar struct { z foo[u32, bar]; };\n" }

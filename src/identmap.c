@@ -165,7 +165,7 @@ ident_value identmap_intern(struct identmap *m,
 
   m->table[offset] = v;
   /* Since datas is of length m->limit / 2, and since m->count <
-     m->limit / 2, we can write to m->datas[m->count]. */
+  m->limit / 2, we can write to m->datas[m->count]. */
   m->datas[m->count].data = data_copy;
   m->datas[m->count].data_count = count;
   m->datas[m->count].user_value = NULL;

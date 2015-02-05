@@ -182,9 +182,10 @@ struct static_value {
     int32_t i32_value;
     uint32_t u32_value;
     uint8_t u8_value;
+    int8_t i8_value;
     /* An owned ref to the _typechecked_ AST. */
     /* TODO: Right now this is still just a plain-jane copy of the
-       AST, with generics unreplaced, no annotations.  (TODO: Or is it?) */
+    AST, with generics unreplaced, no annotations.  (TODO: Or is it?) */
     struct ast_expr typechecked_lambda;
     enum primitive_op primitive_op;
   } u;
@@ -232,10 +233,9 @@ struct def_entry {
   size_t instantiations_limit;
 
   /* Names of things whose value each def references at compile-time
-     evaluation.  We could do this per-instantiation but right now
-     that's irrelevant because there's no specialization.  These
-     references must form an acyclic graph -- or the user's program is
-     invalid. */
+  evaluation.  We could do this per-instantiation but right now that's
+  irrelevant because there's no specialization.  These references must
+  form an acyclic graph -- or the user's program is invalid. */
   struct def_entry **static_references;
   size_t static_references_count;
   size_t static_references_limit;

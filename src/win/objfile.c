@@ -45,30 +45,30 @@ PACK_POP
 
 uint16_t real_file_characteristics(void) {
   /*
-    0x0001 IMAGE_FILE_RELOCS_STRIPPED: image only.
-    0x0002 IMAGE_FILE_EXECUTABLE_IMAGE: image only.
-    0x0004 IMAGE_FILE_LINE_NUMS_STRIPPED: deprecated, should be zero.
-    0x0008 IMAGE_FILE_LOCAL_SYMS_STRIPPED: deprecated, should be zero.
-    0x0010 IMAGE_FILE_AGGRESSIVE_WS_TRIM: deprecated, must be zero.
-    0x0020 IMAGE_FILE_LARGE_ADDRESS_AWARE:
-               Presumably zero, unaware, for 32-bit progs.
-    0x0040 reserved
-    0x0080 IMAGE_FILE_BYTES_REVERSED_LO: deprecated, should be zero.
-    0x0100 IMAGE_FILE_32BIT_MACHINE:
-               Machine is 32-bit. (As opposed to 16-bit?  Or 64-bit?
-               cl is outputting 0 for 32-bit obj files.)
-    0x0200 IMAGE_FILE_DEBUG_STRIPPED:
-               Debugging information is removed from the image file.
-               (Irrelevant for obj files?  cl is outputting 0.)
-    0x0400 IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP:
-               for if the image is on removable media... I say, set to zero.
-    0x0800 IMAGE_FILE_NET_RUN_FROM_SWAP:
-               for if the image is on network-mounted media... I say,
-               set to zero.
-    0x1000 IMAGE_FILE_SYSTEM: a system file, not a user program
-    0x2000 IMAGE_FILE_DLL: The image file is a DLL.
-    0x4000 IMAGE_FILE_UP_SYSTEM_ONLY: Only run file on a uniprocessor machine.
-    0x8000 IMAGE_FILE_BYTES_REVERSED_HI: deprecated, should be zero.
+  0x0001 IMAGE_FILE_RELOCS_STRIPPED: image only.
+  0x0002 IMAGE_FILE_EXECUTABLE_IMAGE: image only.
+  0x0004 IMAGE_FILE_LINE_NUMS_STRIPPED: deprecated, should be zero.
+  0x0008 IMAGE_FILE_LOCAL_SYMS_STRIPPED: deprecated, should be zero.
+  0x0010 IMAGE_FILE_AGGRESSIVE_WS_TRIM: deprecated, must be zero.
+  0x0020 IMAGE_FILE_LARGE_ADDRESS_AWARE:
+             Presumably zero, unaware, for 32-bit progs.
+  0x0040 reserved
+  0x0080 IMAGE_FILE_BYTES_REVERSED_LO: deprecated, should be zero.
+  0x0100 IMAGE_FILE_32BIT_MACHINE:
+             Machine is 32-bit. (As opposed to 16-bit?  Or 64-bit?
+             cl is outputting 0 for 32-bit obj files.)
+  0x0200 IMAGE_FILE_DEBUG_STRIPPED:
+             Debugging information is removed from the image file.
+             (Irrelevant for obj files?  cl is outputting 0.)
+  0x0400 IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP:
+             for if the image is on removable media... I say, set to zero.
+  0x0800 IMAGE_FILE_NET_RUN_FROM_SWAP:
+             for if the image is on network-mounted media... I say,
+             set to zero.
+  0x1000 IMAGE_FILE_SYSTEM: a system file, not a user program
+  0x2000 IMAGE_FILE_DLL: The image file is a DLL.
+  0x4000 IMAGE_FILE_UP_SYSTEM_ONLY: Only run file on a uniprocessor machine.
+  0x8000 IMAGE_FILE_BYTES_REVERSED_HI: deprecated, should be zero.
   */
 
   /* cl outputs 0 for a general .obj file too. */
@@ -86,47 +86,47 @@ static const uint32_t IMAGE_SCN_MEM_WRITE = (1ul << 31);
 
 uint32_t text_section_characteristics(void) {
   /*
-    bit  0. Reserved.
-    bit  1. Reserved.
-    bit  2. Reserved.
-    bit  3. IMAGE_SCN_TYPE_NO_PAD.
-            Obsolete, replaced by IMAGE_SCN_ALIGN_1BYTES.
-    bit  4. Reserved.
-    bit  5. IMAGE_SCN_CNT_CODE. The section contains executable code.
-    bit  6. IMAGE_SCN_CNT_INITIALIZED_DATA.
-            The section contains initialized data.
-    bit  7. IMAGE_SCN_CNT_UNINITIALIZED_DATA.
-            The section contains uninitialized data.
-    bit  8. IMAGE_SCN_LNK_OTHER. Reserved.
-    bit  9. IMAGE_SCN_LINK_INFO. The section contains comments or other
-            information. The .drectve section has this type. Object files only.
-    bit 10. Reserved.
-    bit 11. IMAGE_SCN_LNK_REMOVE. The section will not become part of
-            the image. Object files only.
-    bit 12. IMAGE_SCN_LNK_COMDAT. The section contains COMDAT
-            data. Object files only.
-    bit 13. Undocumented.
-    bit 14. Undocumented.
-    bit 15. IMAGE_SCN_GPREL.
-        The section contains data referenced through the global pointer (GP).
-    bit 16. IMAGE_SCN_MEM_PURGEABLE (reserved)? Or undocumented?
-    bit 17. IMAGE_SCN_MEM_PURGEABLE (reserved)? Or undocumented?
-            IMAGE_SCN_MEM_16BIT for ARM, section contains Thumb code.
-    bit 18. IMAGE_SCN_MEM_LOCKED. Reserved.
-    bit 19. IMAGE_SCN_MEM_PRELOAD. Reserved.
-    bits 20:23. IMAGE_SCN_ALIGN_ ## n ## BYTES. Align data on a 2^(k-1)
-                boundary. Valid only for object files.
-    bit 24. IMAGE_SCN_LNK_NRELOC_OVFL. The section contains extended
-            relocations. (We don't support that yet.)
-    bit 25. IMAGE_SCN_MEM_DISCARDABLE. The section can be discarded
-            as needed. (I guess ours can't be.)
-    bit 26. IMAGE_SCN_MEM_NOT_CACHED. The section cannot be cached.
-            (Who knows.)
-    bit 27. IMAGE_SCN_MEM_NOT_PAGED. The section is not pageable. (Ours are.)
-    bit 28. IMAGE_SCN_MEM_SHARED. The section can be shared in memory. (Ok...)
-    bit 29. IMAGE_SCN_MEM_EXECUTE. The section can be executed as code.
-    bit 30. IMAGE_SCN_MEM_READ. The section can be read.
-    bit 31. IMAGE_SCN_MEM_WRITE. The section can be written to.
+  bit  0. Reserved.
+  bit  1. Reserved.
+  bit  2. Reserved.
+  bit  3. IMAGE_SCN_TYPE_NO_PAD.
+          Obsolete, replaced by IMAGE_SCN_ALIGN_1BYTES.
+  bit  4. Reserved.
+  bit  5. IMAGE_SCN_CNT_CODE. The section contains executable code.
+  bit  6. IMAGE_SCN_CNT_INITIALIZED_DATA.
+          The section contains initialized data.
+  bit  7. IMAGE_SCN_CNT_UNINITIALIZED_DATA.
+          The section contains uninitialized data.
+  bit  8. IMAGE_SCN_LNK_OTHER. Reserved.
+  bit  9. IMAGE_SCN_LINK_INFO. The section contains comments or other
+          information. The .drectve section has this type. Object files only.
+  bit 10. Reserved.
+  bit 11. IMAGE_SCN_LNK_REMOVE. The section will not become part of
+          the image. Object files only.
+  bit 12. IMAGE_SCN_LNK_COMDAT. The section contains COMDAT
+          data. Object files only.
+  bit 13. Undocumented.
+  bit 14. Undocumented.
+  bit 15. IMAGE_SCN_GPREL.
+      The section contains data referenced through the global pointer (GP).
+  bit 16. IMAGE_SCN_MEM_PURGEABLE (reserved)? Or undocumented?
+  bit 17. IMAGE_SCN_MEM_PURGEABLE (reserved)? Or undocumented?
+          IMAGE_SCN_MEM_16BIT for ARM, section contains Thumb code.
+  bit 18. IMAGE_SCN_MEM_LOCKED. Reserved.
+  bit 19. IMAGE_SCN_MEM_PRELOAD. Reserved.
+  bits 20:23. IMAGE_SCN_ALIGN_ ## n ## BYTES. Align data on a 2^(k-1)
+              boundary. Valid only for object files.
+  bit 24. IMAGE_SCN_LNK_NRELOC_OVFL. The section contains extended
+          relocations. (We don't support that yet.)
+  bit 25. IMAGE_SCN_MEM_DISCARDABLE. The section can be discarded
+          as needed. (I guess ours can't be.)
+  bit 26. IMAGE_SCN_MEM_NOT_CACHED. The section cannot be cached.
+          (Who knows.)
+  bit 27. IMAGE_SCN_MEM_NOT_PAGED. The section is not pageable. (Ours are.)
+  bit 28. IMAGE_SCN_MEM_SHARED. The section can be shared in memory. (Ok...)
+  bit 29. IMAGE_SCN_MEM_EXECUTE. The section can be executed as code.
+  bit 30. IMAGE_SCN_MEM_READ. The section can be read.
+  bit 31. IMAGE_SCN_MEM_WRITE. The section can be written to.
   */
   /* This value is also that produced by cl for its .text sections. */
   return IMAGE_SCN_CNT_CODE | IMAGE_SCN_ALIGN_16_BYTES | IMAGE_SCN_MEM_EXECUTE
@@ -179,22 +179,22 @@ struct objfile_symbol_standard_record {
   union name_eight Name;
   uint32_t Value;
   /* Uses a 1-based index into the section table.  Special values:
-     IMAGE_SYM_UNDEFINED (0).  Section not yet defined, e.g. for an
-     external symbol.
-     IMAGE_SYM_ABSOLUTE (0xFFFF).  The symbol has an absolute value,
-     not an address relative to some section.
-     IMAGE_SYM_DEBUG (0xFFFE).  Some debuggery. */
+  IMAGE_SYM_UNDEFINED (0).  Section not yet defined, e.g. for an
+  external symbol.
+  IMAGE_SYM_ABSOLUTE (0xFFFF).  The symbol has an absolute value,
+  not an address relative to some section.
+  IMAGE_SYM_DEBUG (0xFFFE).  Some debuggery. */
   uint16_t SectionNumber;
   /* MS tools set this field to 0x20 (function) or 0x0 (not a
-     function).  I.e. kFunctionSymType or kNullSymType. */
+  function).  I.e. kFunctionSymType or kNullSymType. */
   uint16_t Type;
   /* MS tools generally only use IMAGE_SYM_CLASS_EXTERNAL (2),
-     IMAGE_SYM_CLASS_STATIC (3), IMAGE_SYM_CLASS_FUNCTION (101), and
-     IMAGE_SYM_CLASS_FILE (103) which is followed by aux records that
-     name the file.  There's also a 'weak external' storage class,
-     which is mentioned.  Note: I don't see FILE used in a .obj file.
-     Also FUNCTION is used for .bf and .ef records, which I don't
-     see either.  */
+  IMAGE_SYM_CLASS_STATIC (3), IMAGE_SYM_CLASS_FUNCTION (101), and
+  IMAGE_SYM_CLASS_FILE (103) which is followed by aux records that
+  name the file.  There's also a 'weak external' storage class, which
+  is mentioned.  Note: I don't see FILE used in a .obj file.  Also
+  FUNCTION is used for .bf and .ef records, which I don't see
+  either. */
   uint8_t StorageClass;
   /* How many aux records follow this record. */
   uint8_t NumberOfAuxSymbols;
@@ -227,28 +227,28 @@ PACK_POP
 PACK_PUSH
 struct COFF_Relocation {
   /* Offset from beginning of section, assuming its section header
-     VirtualAddress is zero. */
+  VirtualAddress is zero. */
   uint32_t VirtualAddress;
   /* Index into the symbol table. */
   uint32_t SymbolTableIndex;
   /* What kind of relocation should be performed?
-     IMAGE_REL_I386_ABSOLUTE 0x0000 The relocation is ignored.
-     IMAGE_REL_I386_DIR16 0x0001 Not supported.
-     IMAGE_REL_I386_REL16 0x0002 Not supported.
-     IMAGE_REL_I386_DIR32 0x0006 The target's 32-bit VA.
-     IMAGE_REL_I386_DIR32NB 0x0007 The target's 32-bit RVA.
-     IMAGE_REL_I386_SEG12 0x0009 Not supported.
-     IMAGE_REL_I386_SECTION 0x000A The 16-bit section index of the section
-     that contains the target.  For debugging information.
-     IMAGE_REL_I386_SECREL 0x000B The 32-bit offset of the target from the
-     beginning of its section.  For debugging info.  Also for static thread
-     local storage.
-     IMAGE_REL_I386_TOKEN 0x000C The CLR token.  (wut.)
-     IMAGE_REL_I386_SECREL7 0x000D The 7-bit offset from the base of the
-     section that contains the target.
-     IMAGE_REL_I386_REL32 0x0014 The 32-bit relative displacement from the
-     target.  This supports the x86 relative branch and call instructions.
-   */
+  IMAGE_REL_I386_ABSOLUTE 0x0000 The relocation is ignored.
+  IMAGE_REL_I386_DIR16 0x0001 Not supported.
+  IMAGE_REL_I386_REL16 0x0002 Not supported.
+  IMAGE_REL_I386_DIR32 0x0006 The target's 32-bit VA.
+  IMAGE_REL_I386_DIR32NB 0x0007 The target's 32-bit RVA.
+  IMAGE_REL_I386_SEG12 0x0009 Not supported.
+  IMAGE_REL_I386_SECTION 0x000A The 16-bit section index of the section
+  that contains the target.  For debugging information.
+  IMAGE_REL_I386_SECREL 0x000B The 32-bit offset of the target from the
+  beginning of its section.  For debugging info.  Also for static thread
+  local storage.
+  IMAGE_REL_I386_TOKEN 0x000C The CLR token.  (wut.)
+  IMAGE_REL_I386_SECREL7 0x000D The 7-bit offset from the base of the
+  section that contains the target.
+  IMAGE_REL_I386_REL32 0x0014 The 32-bit relative displacement from the
+  target.  This supports the x86 relative branch and call instructions.
+  */
   /* Looking at cl output, I see a bunch of use of 6h and 14h. */
   uint16_t Type;
 } PACK_ATTRIBUTE;
@@ -259,7 +259,7 @@ struct objfile_section {
   struct databuf raw;
 
   /* Relavant for .data and .rdata sections.  Not relevant for .text,
-     which just uses 16. */
+  which just uses 16. */
   size_t max_requested_alignment;
 
   struct COFF_Relocation *relocs;
@@ -316,14 +316,14 @@ struct objfile {
   size_t symbol_table_limit;
 
   /* strings does not include the 4-byte size field that would exist
-     at the beginning of the strings table (which immediately follows
-     the symbol table on disk).  Its value will be strings.count + 4
-     (because it accounts for its own size usage).  Following the size
-     field is a concatenation of null-terminated strings. */
+  at the beginning of the strings table (which immediately follows the
+  symbol table on disk).  Its value will be strings.count + 4 (because
+  it accounts for its own size usage).  Following the size field is a
+  concatenation of null-terminated strings. */
   struct databuf strings;
 
   /* Says that we wrote section symbols.  Makes sure that we can only
-     call objfile_flatten once. */
+  call objfile_flatten once. */
   int wrote_section_symbols;
 };
 
@@ -372,7 +372,7 @@ void objfile_free(struct objfile **p_ref) {
 }
 
 /* All section beginnings are aligned to 16 bytes.  I forget if
-   there's a reason. */
+there's a reason. */
 #define SECTION_ALIGNMENT 16
 
 void compute_section_dimensions(struct objfile_section *s,
@@ -455,8 +455,8 @@ void append_zeros_to_align(struct databuf *d, size_t alignment) {
 }
 
 /* Checks that name doesn't have any null characters (it must be
-   null-terminatable), and that it's non-empty (the first four
-   bytes of a Name field can't be zero). */
+null-terminatable), and that it's non-empty (the first four bytes of a
+Name field can't be zero). */
 int is_valid_for_Name(const uint8_t *name, size_t name_count) {
   if (name_count == 0) {
     return 0;
@@ -477,8 +477,8 @@ uint32_t objfile_add_string(struct objfile *f,
     CHECK(ch[i] != 0);
   }
   /* The docs say we want an offset into the strings table -- that
-     offset includes the leading 4 size bytes, which means the minimum
-     possible offset is 4. */
+  offset includes the leading 4 size bytes, which means the minimum
+  possible offset is 4. */
   uint32_t ret = uint32_add(size_to_uint32(f->strings.count), 4);
   databuf_append(&f->strings, string, string_count);
   databuf_append(&f->strings, "\0", 1);
@@ -514,7 +514,7 @@ uint32_t objfile_add_local_symbol(struct objfile *f,
   u.standard.SectionNumber = section_to_SectionNumber(section);
   u.standard.Type = section == SECTION_TEXT ? kFunctionSymType : kNullSymType;
   /* At some point we might want to support... static functions or
-     external or something, idk. */
+  external or something, idk. */
   u.standard.StorageClass = is_static == IS_STATIC_NO
     ? IMAGE_SYM_CLASS_EXTERNAL
     : IMAGE_SYM_CLASS_STATIC;
@@ -732,7 +732,7 @@ void objfile_set_symbol_Value(struct objfile *f,
                               uint32_t Value) {
   CHECK(SymbolTableIndex < f->symbol_table_count);
   /* We should only be assigning this once, I think -- and we set it
-     to zero before assigning it. */
+  to zero before assigning it. */
   CHECK(f->symbol_table[SymbolTableIndex].standard.Value == 0);
   f->symbol_table[SymbolTableIndex].standard.Value = Value;
 }

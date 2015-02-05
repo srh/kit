@@ -93,8 +93,8 @@ void ast_unione_init(struct ast_unione *a, struct ast_meta meta,
 struct ast_arraytype {
   struct ast_meta meta;
   /* TODO: This should be a (statically evaluable) expr.  But such an
-     expr would need to be analyzed for sizeof and alignof expressions
-     when seen in another type. */
+  expr would need to be analyzed for sizeof and alignof expressions
+  when seen in another type. */
   uint32_t count;
   struct ast_typeexpr *param;
 };
@@ -343,7 +343,7 @@ void ast_unop_expr_init(struct ast_unop_expr *a, struct ast_meta meta,
 
 /* See also: binop_precedence in parse.c. */
 /* See also: Every use of these values in typecheck.c, including
-   dependencies on the order of these values. */
+dependencies on the order of these values. */
 enum ast_binop {
   AST_BINOP_ASSIGN,
   AST_BINOP_ADD,
@@ -407,7 +407,7 @@ struct ast_name_expr_info {
   /* True if typechecking happened and the info means something. */
   int info_valid;
   /* The instantiation this name refers to -- if it refers to a
-     global.  NULL if the name refers to a local variable. */
+  global.  NULL if the name refers to a local variable. */
   struct def_instantiation *inst_or_null;
 };
 

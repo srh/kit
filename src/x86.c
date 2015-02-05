@@ -11,11 +11,11 @@
 
 /* X86 WINDOWS */
 /* This is a bi-use function -- if fieldstop is IDENT_VALUE_INVALID,
-   then *sizeof_out and *alignof_out are initialized with the size and
-   alignment of the type, and zero is returned.  Otherwise,
-   *offsetof_out and *sizeof_out are initialized with the offset and
-   size of the type's field named fieldstop, and 1 is returned.  If
-   the field name is not found, crashes. */
+then *sizeof_out and *alignof_out are initialized with the size and
+alignment of the type, and zero is returned.  Otherwise, *offsetof_out
+and *sizeof_out are initialized with the offset and size of the type's
+field named fieldstop, and 1 is returned.  If the field name is not
+found, crashes. */
 int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                      ident_value fieldstop, uint32_t *offsetof_out,
                      uint32_t *sizeof_out, uint32_t *alignof_out) {
