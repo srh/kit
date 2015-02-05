@@ -45,7 +45,7 @@ export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
   var void_value void;
 
   ret.x = p->x;
-  ret.y = 22;
+  ret.y = (~sizeof@[ty] :: i32);
   return ret;
 };
 

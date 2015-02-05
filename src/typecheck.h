@@ -25,6 +25,8 @@
 #define BOOLEAN_STANDIN_TYPE_NAME I8_TYPE_NAME
 #define KIRA_BOOL_SIZE 1
 
+#define SIZE_STANDIN_TYPE_NAME U32_TYPE_NAME
+
 enum numeric_type {
   NUMERIC_TYPE_U8,
   NUMERIC_TYPE_I8,
@@ -82,4 +84,5 @@ int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
                            uint32_t *out);
 int numeric_literal_to_i32(int8_t *digits, size_t digits_count,
                            int32_t *out);
+
 #endif /* KIRA_TYPECHECK_H_ */

@@ -183,3 +183,10 @@ uint32_t kira_sizeof(struct name_table *nt, struct ast_typeexpr *type) {
   return size;
 }
 
+uint32_t kira_alignof(struct name_table *nt, struct ast_typeexpr *type) {
+  uint32_t size;
+  uint32_t alignment;
+  kira_sizealignof(nt, type, &size, &alignment);
+  return alignment;
+}
+

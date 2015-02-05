@@ -126,9 +126,16 @@ int generate_kira_name(struct checkstate *cs,
   return 1;
 }
 
+int is_primitive_but_not_sizeof_alignof(struct def_entry *ent) {
+  return ent->is_primitive && ent->primitive_op != PRIMITIVE_OP_SIZEOF
+    && ent->primitive_op != PRIMITIVE_OP_ALIGNOF;
+}
+
 int add_def_symbols(struct checkstate *cs, struct objfile *f,
                     struct def_entry *ent) {
-  if (ent->is_primitive) {
+  /* TODO: I'd actually like to not define symbols for sizeof and
+     alignof.  Their values should be inlined. */
+  if (is_primitive_but_not_sizeof_alignof(ent)) {
     return 1;
   }
 
@@ -2771,6 +2778,9 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
           imm.u.func_sti = inst->symbol_table_index;
           expr_return_immediate(f, h, er, imm);
         } else {
+          /* TODO: Support immediate values, distinction between defs
+             of variables and other defs -- only make a symbol for
+             exported defs (if they're small). */
           uint32_t size = kira_sizeof(&cs->nt, &inst->type);
           /* TODO: Maybe globals' alignment rules are softer. */
           uint32_t padded_size = size;
@@ -3157,7 +3167,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
 
 int build_def(struct checkstate *cs, struct objfile *f,
               struct def_entry *ent) {
-  if (ent->is_primitive) {
+  if (is_primitive_but_not_sizeof_alignof(ent)) {
     return 1;
   }
 

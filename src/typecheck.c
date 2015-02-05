@@ -13,6 +13,7 @@
 #include "slice.h"
 #include "table.h"
 #include "util.h"
+#include "x86.h"
 
 #define CHECK_DBG(...) do { } while (0)
 
@@ -430,6 +431,33 @@ void import_unop(struct checkstate *cs,
   ast_generics_destroy(&generics);
 }
 
+void import_sizeof_alignof(struct checkstate *cs) {
+  struct ast_ident *param = malloc_mul(sizeof(*param), 1);
+  param[0] = make_ast_ident(identmap_intern_c_str(cs->im, "T"));
+
+  struct ast_generics generics;
+  ast_generics_init_has_params(&generics, ast_meta_make_garbage(), param, 1);
+  struct ast_typeexpr type;
+  init_name_type(&type, identmap_intern_c_str(cs->im, SIZE_STANDIN_TYPE_NAME));
+
+  name_table_add_primitive_def(
+      &cs->nt,
+      identmap_intern_c_str(cs->im, "sizeof"),
+      PRIMITIVE_OP_SIZEOF,
+      &generics,
+      &type);
+
+  name_table_add_primitive_def(
+      &cs->nt,
+      identmap_intern_c_str(cs->im, "alignof"),
+      PRIMITIVE_OP_ALIGNOF,
+      &generics,
+      &type);
+
+  ast_typeexpr_destroy(&type);
+  ast_generics_destroy(&generics);
+}
+
 void checkstate_import_primitive_defs(struct checkstate *cs) {
   import_integer_binops(cs, binop_i32_primitive_ops, I32_TYPE_NAME);
   import_integer_binops(cs, binop_u32_primitive_ops, U32_TYPE_NAME);
@@ -455,6 +483,8 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_I32, "^", I32_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_U32, "^", U32_TYPE_NAME);
   }
+
+  import_sizeof_alignof(cs);
 }
 
 void checkstate_import_primitives(struct checkstate *cs) {
@@ -2779,6 +2809,7 @@ int apply_static_funcall(struct static_value *func,
     return 0;
   }
 
+  /* TODO: Um, we're missing a lot of primitive ops here now. */
   switch (params_count) {
   case 1:
     switch (func->u.primitive_op) {
@@ -3220,7 +3251,7 @@ int eval_static_value(struct ast_expr *expr,
   }
 }
 
-int compute_static_values(struct def_entry *ent) {
+int compute_static_values(struct name_table *nt, struct def_entry *ent) {
   int is_primitive = ent->is_primitive;
   CHECK(is_primitive || ent->def != NULL);
   for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
@@ -3228,7 +3259,21 @@ int compute_static_values(struct def_entry *ent) {
     CHECK(!inst->value_computed);
 
     if (is_primitive) {
-      static_value_init_primitive_op(&inst->value, ent->primitive_op);
+      switch (ent->primitive_op) {
+      case PRIMITIVE_OP_SIZEOF: {
+        CHECK(inst->substitutions_count == 1);
+        uint32_t size = kira_sizeof(nt, &inst->substitutions[0]);
+        static_value_init_u32(&inst->value, size);
+      } break;
+      case PRIMITIVE_OP_ALIGNOF: {
+        CHECK(inst->substitutions_count == 1);
+        uint32_t alignment = kira_alignof(nt, &inst->substitutions[0]);
+        static_value_init_u32(&inst->value, alignment);
+      } break;
+      default:
+        static_value_init_primitive_op(&inst->value, ent->primitive_op);
+        break;
+      }
       inst->value_computed = 1;
     } else {
       CHECK(inst->annotated_rhs_computed);
@@ -3242,7 +3287,7 @@ int compute_static_values(struct def_entry *ent) {
   return 1;
 }
 
-int chase_def_entry_acyclicity(struct def_entry *ent) {
+int chase_def_entry_acyclicity(struct name_table *nt, struct def_entry *ent) {
   if (ent->known_acyclic) {
     return 1;
   }
@@ -3253,7 +3298,7 @@ int chase_def_entry_acyclicity(struct def_entry *ent) {
   }
   ent->acyclicity_being_chased = 1;
   for (size_t i = 0, e = ent->static_references_count; i < e; i++) {
-    if (!chase_def_entry_acyclicity(ent->static_references[i])) {
+    if (!chase_def_entry_acyclicity(nt, ent->static_references[i])) {
       return 0;
     }
   }
@@ -3263,7 +3308,7 @@ int chase_def_entry_acyclicity(struct def_entry *ent) {
   ent->known_acyclic = 1;
 
   if (!ent->is_extern) {
-    if (!compute_static_values(ent)) {
+    if (!compute_static_values(nt, ent)) {
       return 0;
     }
   }
@@ -3274,7 +3319,7 @@ int chase_def_entry_acyclicity(struct def_entry *ent) {
 int check_def_acyclicity(struct checkstate *cs) {
   for (size_t i = 0, e = cs->nt.defs_count; i < e; i++) {
     struct def_entry *ent = cs->nt.defs[i];
-    if (!chase_def_entry_acyclicity(ent)) {
+    if (!chase_def_entry_acyclicity(&cs->nt, ent)) {
       return 0;
     }
   }
@@ -4288,7 +4333,6 @@ int check_file_test_more_19(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
-
 int check_file_test_more_20(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
@@ -4309,6 +4353,21 @@ int check_file_test_more_20(const uint8_t *name, size_t name_count,
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);
 }
+
+int check_file_test_more_21(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "deftype ty struct { x i32; y i32; };\n"
+      "def foo func[u32] = fn() u32 {\n"
+      "  return sizeof@[ty];\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 int test_check_file(void) {
@@ -4692,6 +4751,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_20...\n");
   if (!test_check_module(&im, &check_file_test_more_20, foo)) {
     DBG("check_file_test_more_20 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_21...\n");
+  if (!test_check_module(&im, &check_file_test_more_21, foo)) {
+    DBG("check_file_test_more_21 fails\n");
     goto cleanup_identmap;
   }
 
