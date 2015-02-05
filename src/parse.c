@@ -1677,6 +1677,7 @@ int parse_rest_of_import(struct ps *p, struct pos pos_start,
 int parse_toplevel(struct ps *p, struct ast_toplevel *out);
 
 int parse_rest_of_deftype(struct ps *p, struct pos pos_start,
+                          int is_class,
                           struct ast_deftype *out) {
   PARSE_DBG("parse_rest_of_deftype");
   struct ast_generics generics;
@@ -1695,6 +1696,7 @@ int parse_rest_of_deftype(struct ps *p, struct pos pos_start,
     goto fail_typeexpr;
   }
   ast_deftype_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                   is_class,
                    generics, name, type);
   return 1;
 
@@ -1728,7 +1730,10 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
     return parse_rest_of_import(p, pos_start, &out->u.import);
   } else if (try_skip_keyword(p, "deftype")) {
     out->tag = AST_TOPLEVEL_DEFTYPE;
-    return parse_rest_of_deftype(p, pos_start, &out->u.deftype);
+    return parse_rest_of_deftype(p, pos_start, 0, &out->u.deftype);
+  } else if (try_skip_keyword(p, "defclass")) {
+    out->tag = AST_TOPLEVEL_DEFTYPE;
+    return parse_rest_of_deftype(p, pos_start, 1, &out->u.deftype);
   } else {
     return 0;
   }

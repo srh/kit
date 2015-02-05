@@ -2493,6 +2493,24 @@ int check_index_expr(struct exprscope *es,
   return 0;
 }
 
+void replace_name_expr_params(struct exprscope *es,
+                              struct ast_name_expr *x,
+                              struct ast_name_expr *out) {
+  struct ast_name_expr copy;
+  ast_name_expr_init_copy(&copy, x);
+
+  if (copy.has_params) {
+    for (size_t i = 0, e = copy.params_count; i < e; i++) {
+      struct ast_typeexpr replaced;
+      replace_generics(es, &copy.params[i], &replaced);
+      ast_typeexpr_destroy(&copy.params[i]);
+      copy.params[i] = replaced;
+    }
+  }
+
+  *out = copy;
+}
+
 int check_expr(struct exprscope *es,
                struct ast_expr *x,
                struct ast_typeexpr *partial_type,
@@ -2500,16 +2518,20 @@ int check_expr(struct exprscope *es,
                struct ast_expr *annotated_out) {
   switch (x->tag) {
   case AST_EXPR_NAME: {
+    struct ast_name_expr replaced_name;
+    replace_name_expr_params(es, &x->u.name, &replaced_name);
+
     struct ast_typeexpr name_type;
     int is_lvalue;
     struct def_instantiation *inst_or_null;
-    if (!exprscope_lookup_name(es, &x->u.name, partial_type,
+    if (!exprscope_lookup_name(es, &replaced_name, partial_type,
                                &name_type, &is_lvalue, &inst_or_null)) {
+      ast_name_expr_destroy(&replaced_name);
       return 0;
     }
     *is_lvalue_out = is_lvalue;
     ast_expr_partial_init(annotated_out, AST_EXPR_NAME, ast_expr_info_typechecked(name_type));
-    ast_name_expr_init_copy(&annotated_out->u.name, &x->u.name);
+    annotated_out->u.name = replaced_name;
     ast_name_expr_info_mark_inst(&annotated_out->u.name.info, inst_or_null);
     return 1;
   } break;

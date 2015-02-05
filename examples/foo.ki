@@ -15,6 +15,10 @@ deftype ty struct {
   y i32;
 };
 
+def[T] getsize func[u32] = fn() u32 {
+  return sizeof@[T];
+};
+
 export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
   var ret ty;
   p->x = -5;
@@ -45,7 +49,7 @@ export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
   var void_value void;
 
   ret.x = p->x;
-  ret.y = (~sizeof@[ty] :: i32);
+  ret.y = (~getsize@[ty]() :: i32);
   return ret;
 };
 

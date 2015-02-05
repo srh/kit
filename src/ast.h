@@ -437,6 +437,7 @@ void ast_name_expr_init_with_params(struct ast_name_expr *a,
                                     size_t params_count);
 void ast_name_expr_init_copy(struct ast_name_expr *a,
                              struct ast_name_expr *c);
+void ast_name_expr_destroy(struct ast_name_expr *a);
 
 struct ast_index_expr {
   struct ast_meta meta;
@@ -575,12 +576,14 @@ void ast_import_init(struct ast_import *a, struct ast_meta meta,
 
 struct ast_deftype {
   struct ast_meta meta;
+  int is_class;
   struct ast_generics generics;
   struct ast_ident name;
   struct ast_typeexpr type;
 };
 
 void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
+                      int is_class,
                       struct ast_generics generics,
                       struct ast_ident name, struct ast_typeexpr type);
 
