@@ -383,6 +383,9 @@ struct frame {
   size_t espdata_limit;
 
   int return_loc_valid;
+  /* True if loc is the "final destination" of the return value,
+  because the function uses a hidden return param. */
+  int hidden_return_param;
   struct loc return_loc;
 
   int return_target_valid;
@@ -453,10 +456,16 @@ void frame_destroy(struct frame *h) {
   h->espdata_limit = 0;
 }
 
-void frame_specify_return_loc(struct frame *h, struct loc loc) {
+void frame_specify_return_loc(struct frame *h, struct loc loc, int is_return_hidden) {
   CHECK(!h->return_loc_valid);
   h->return_loc_valid = 1;
+  h->hidden_return_param = is_return_hidden;
   h->return_loc = loc;
+}
+
+int frame_hidden_return_param(struct frame *h) {
+  CHECK(h->return_loc_valid);
+  return h->hidden_return_param;
 }
 
 struct loc frame_return_loc(struct frame *h) {
@@ -516,7 +525,10 @@ struct labeldata *frame_try_find_labeldata(struct frame *h, ident_value labelnam
   return NULL;
 }
 
-int exists_hidden_return_param(uint32_t return_type_size) {
+int exists_hidden_return_param(struct name_table *nt, struct ast_typeexpr *return_type,
+                               uint32_t *return_type_size_out) {
+  uint32_t return_type_size = kira_sizeof(nt, return_type);
+  *return_type_size_out = return_type_size;
   return !(return_type_size <= 2 || return_type_size == DWORD_SIZE
            || return_type_size == 2 * DWORD_SIZE);
 }
@@ -528,9 +540,9 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
   struct ast_typeexpr *return_type
     = expose_func_return_type(cs->im, type, size_add(args_count, 1));
 
-  uint32_t return_type_size = kira_sizeof(&cs->nt, return_type);
-
-  int32_t offset = (2 + exists_hidden_return_param(return_type_size)) * DWORD_SIZE;
+  uint32_t return_type_size;
+  int is_return_hidden = exists_hidden_return_param(&cs->nt, return_type, &return_type_size);
+  int32_t offset = (2 + is_return_hidden) * DWORD_SIZE;
 
   for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
     struct ast_typeexpr *param_type = &type->u.app.params[i];
@@ -551,15 +563,15 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
     offset = int32_add(offset, uint32_to_int32(padded_size));
   }
 
-  if (exists_hidden_return_param(return_type_size)) {
+  if (is_return_hidden) {
     /* I don't know yet if WINDOWS promises padding, so we assume none. */
     struct loc loc = ebp_indirect_loc(return_type_size,
                                       return_type_size,
                                       2 * DWORD_SIZE);
-    frame_specify_return_loc(h, loc);
+    frame_specify_return_loc(h, loc, is_return_hidden);
   } else {
     struct loc loc = frame_push_loc(h, return_type_size);
-    frame_specify_return_loc(h, loc);
+    frame_specify_return_loc(h, loc, is_return_hidden);
   }
 }
 
@@ -1185,7 +1197,7 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
     CRASH("return_target_valid false (no return statements?)");
   }
 
-  if (exists_hidden_return_param(h->return_loc.size)) {
+  if (frame_hidden_return_param(h)) {
     CHECK(h->return_loc.tag == LOC_EBP_INDIRECT);
     CHECK(h->return_loc.u.ebp_indirect == 8);
     x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_indirect);
@@ -2302,7 +2314,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct expr_return *er) {
   size_t args_count = a->u.funcall.args_count;
 
-  uint32_t return_size = kira_sizeof(&cs->nt, ast_expr_type(a));
+  uint32_t return_size;
+  int hidden_return_param = exists_hidden_return_param(&cs->nt, ast_expr_type(a),
+                                                       &return_size);
 
   /* X86 */
   struct loc return_loc = frame_push_loc(h, return_size);
@@ -2322,7 +2336,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, saved_offset);
   }
 
-  if (exists_hidden_return_param(return_size)) {
+  if (hidden_return_param) {
     struct loc ptr_loc = frame_push_loc(h, DWORD_SIZE);
     gen_mov_addressof(f, ptr_loc, return_loc);
   }
@@ -2360,16 +2374,15 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   } break;
   }
 
-  if (exists_hidden_return_param(return_size)) {
-    /* We're going to act like the pointer returned by the callee (in
-    EAX) could be pointing to something different than return_loc. */
+  if (hidden_return_param) {
+    /* Let's just pray that the pointer returned by the callee (in
+    EAX) is the same as the hidden return param that we passed! */
 
-    struct loc return_ptr_loc = frame_push_loc(h, DWORD_SIZE);
-    gen_store_register(f, return_ptr_loc, X86_EAX);
-    struct loc eax_return_val_loc = ebp_indirect_loc(return_size, return_size,
-                                                     return_ptr_loc.u.ebp_offset);
+    /* TODO: Get one example of cl generating code that assumes this
+    too. */
 
-    expr_return_set(f, er, eax_return_val_loc);
+    /* TODO: This could be expr_return_move or something. */
+    expr_return_set(f, er, return_loc);
   } else if (return_size <= DWORD_SIZE) {
     /* Return value in eax. */
     gen_store_register(f, return_loc, X86_EAX);
