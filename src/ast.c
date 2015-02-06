@@ -1232,11 +1232,11 @@ void ast_import_destroy(struct ast_import *a) {
 }
 
 void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
-                      int is_class,
+                      enum ast_deftype_disposition disposition,
                       struct ast_generics generics,
                       struct ast_ident name, struct ast_typeexpr type) {
   a->meta = meta;
-  a->is_class = is_class;
+  a->disposition = disposition;
   a->generics = generics;
   a->name = name;
   a->type = type;
@@ -1244,7 +1244,7 @@ void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
 
 void ast_deftype_destroy(struct ast_deftype *a) {
   ast_meta_destroy(&a->meta);
-  a->is_class = 0;
+  a->disposition = (enum ast_deftype_disposition)-1;
   ast_generics_destroy(&a->generics);
   ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);

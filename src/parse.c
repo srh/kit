@@ -1693,7 +1693,7 @@ int parse_rest_of_deftype(struct ps *p, struct pos pos_start,
     goto fail_typeexpr;
   }
   ast_deftype_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                   is_class,
+                   is_class ? AST_DEFTYPE_CLASS_DEFAULT_COPY_MOVE_DESTROY : AST_DEFTYPE_NOT_CLASS,
                    generics, name, type);
   return 1;
 

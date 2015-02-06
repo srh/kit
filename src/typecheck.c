@@ -678,7 +678,7 @@ int chase_through_toplevels(struct checkstate *cs,
 
       struct defclass_ident *private_to = NULL;
       size_t private_to_count = 0;
-      if (dt->is_class) {
+      if (dt->disposition != AST_DEFTYPE_NOT_CLASS) {
         private_to = malloc_mul(sizeof(*private_to), 1);
         private_to_count = 1;
         private_to[0].name = dt->name.value;
@@ -1201,7 +1201,7 @@ int is_accessible(struct exprscope *es, struct defclass_ident accessee_privacy_s
 }
 
 int deftype_is_accessible(struct exprscope *es, struct ast_deftype *deftype) {
-  if (!deftype->is_class) {
+  if (deftype->disposition == AST_DEFTYPE_NOT_CLASS) {
     return 1;
   }
 
@@ -2965,7 +2965,7 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
       METERR(a->u.access.meta, "access block refers to non-existant type.%s", "\n");
       return 0;
     }
-    if (ent->is_primitive || !ent->deftype->is_class) {
+    if (ent->is_primitive || ent->deftype->disposition == AST_DEFTYPE_NOT_CLASS) {
       METERR(a->u.access.meta, "access block refers to non-class type.%s", "\n");
       return 0;
     }

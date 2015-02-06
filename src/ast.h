@@ -575,16 +575,23 @@ struct ast_import {
 void ast_import_init(struct ast_import *a, struct ast_meta meta,
                      struct ast_ident name);
 
+enum ast_deftype_disposition {
+  AST_DEFTYPE_NOT_CLASS,
+  AST_DEFTYPE_CLASS_DEFAULT_COPY_MOVE_DESTROY,
+  AST_DEFTYPE_CLASS_DEFAULT_MOVE,
+  AST_DEFTYPE_CLASS_NO_DEFAULTS,
+};
+
 struct ast_deftype {
   struct ast_meta meta;
-  int is_class;
+  enum ast_deftype_disposition disposition;
   struct ast_generics generics;
   struct ast_ident name;
   struct ast_typeexpr type;
 };
 
 void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
-                      int is_class,
+                      enum ast_deftype_disposition disposition,
                       struct ast_generics generics,
                       struct ast_ident name, struct ast_typeexpr type);
 
