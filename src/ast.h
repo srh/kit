@@ -591,13 +591,14 @@ void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
 struct ast_access {
   struct ast_meta meta;
   struct ast_ident name;
+  struct generics_arity arity;
   struct ast_toplevel *toplevels;
   size_t toplevels_count;
 };
 
 void ast_access_init(struct ast_access *a, struct ast_meta meta,
-                     struct ast_ident name, struct ast_toplevel *toplevels,
-                     size_t toplevels_count);
+                     struct ast_ident name, struct generics_arity arity,
+                     struct ast_toplevel *toplevels, size_t toplevels_count);
 
 enum ast_toplevel_tag {
   AST_TOPLEVEL_IMPORT,

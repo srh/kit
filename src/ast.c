@@ -1252,10 +1252,11 @@ void ast_deftype_destroy(struct ast_deftype *a) {
 
 
 void ast_access_init(struct ast_access *a, struct ast_meta meta,
-                     struct ast_ident name, struct ast_toplevel *toplevels,
-                     size_t toplevels_count) {
+                     struct ast_ident name, struct generics_arity arity,
+                     struct ast_toplevel *toplevels, size_t toplevels_count) {
   a->meta = meta;
   a->name = name;
+  a->arity = arity;
   a->toplevels = toplevels;
   a->toplevels_count = toplevels_count;
 }

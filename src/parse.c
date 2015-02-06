@@ -600,10 +600,7 @@ int parse_params_list(struct ps *p,
     }
 
     if (params_count != 0) {
-      if (!try_skip_char(p, ',')) {
-        goto fail;
-      }
-      if (!skip_ws(p)) {
+      if (!(try_skip_char(p, ',') && skip_ws(p))) {
         goto fail;
       }
     }
@@ -1751,9 +1748,41 @@ int parse_rest_of_access(struct ps *p, struct pos pos_start, struct ast_access *
     goto fail;
   }
 
+  if (!skip_ws(p)) {
+    goto fail_name;
+  }
+
+  struct generics_arity arity;
+  if (!try_skip_char(p, '[')) {
+    arity = no_param_list_arity();
+  } else {
+    uint32_t counter = 0;
+    for (;;) {
+      if (!skip_ws(p)) {
+        goto fail_name;
+      }
+      if (try_skip_char(p, ']')) {
+        break;
+      }
+      if (counter != 0) {
+        if (!(try_skip_char(p, ',') && skip_ws(p))) {
+          goto fail_name;
+        }
+      }
+      if (!try_skip_char(p, '_')) {
+        goto fail_name;
+      }
+      counter = uint32_add(counter, 1);
+    }
+    arity = param_list_arity(counter);
+    if (!skip_ws(p)) {
+      goto fail_name;
+    }
+  }
+
   struct ast_toplevel *toplevels;
   size_t toplevels_count;
-  if (!(skip_ws(p) && try_skip_char(p, '{')
+  if (!(try_skip_char(p, '{')
         && parse_toplevels(p, '}', &toplevels, &toplevels_count))) {
     goto fail_name;
   }
@@ -1763,7 +1792,7 @@ int parse_rest_of_access(struct ps *p, struct pos pos_start, struct ast_access *
   }
 
   ast_access_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                  name, toplevels, toplevels_count);
+                  name, arity, toplevels, toplevels_count);
   return 1;
 
  fail_toplevels:
@@ -2036,6 +2065,10 @@ int parse_test_access(void) {
                          "def x i32 = 4;\n"
                          "access string { def foo i32 = 3; }\n",
                          16);
+  pass &= run_count_test("access1",
+                         "def x i32 = 4;\n"
+                         "access vec[_] { def foo i32 = 3; }\n",
+                         19);
   return pass;
 }
 
