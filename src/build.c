@@ -1499,7 +1499,6 @@ struct expr_return {
   enum expr_return_tag tag;
   union {
     struct loc loc;
-    size_t jmp_target_number;
     struct expr_return_free free;
   } u;
 };
