@@ -228,8 +228,13 @@ struct def_entry {
   struct ast_generics generics;
   struct ast_typeexpr type;
 
+  /* The access scopes this entry has _access_ to. */
   struct defclass_ident *accessible;
   size_t accessible_count;
+
+  /* The access scopes you need to access this entry. */
+  struct defclass_ident *private_to;
+  size_t private_to_count;
 
   int is_primitive;
   enum primitive_op primitive_op;

@@ -1070,6 +1070,27 @@ int exact_typeexprs_equal(struct ast_typeexpr *a, struct ast_typeexpr *b) {
   return unify_directionally(a, b) && unify_directionally(b, a);
 }
 
+int is_accessible(struct exprscope *es, struct defclass_ident accessee_privacy_scope) {
+  for (size_t i = 0, e = es->accessible_count; i < e; i++) {
+    if (es->accessible[i].name == accessee_privacy_scope.name
+        && es->accessible[i].arity.value == accessee_privacy_scope.arity.value) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+int deftype_is_accessible(struct exprscope *es, struct ast_deftype *deftype) {
+  if (!deftype->is_class) {
+    return 1;
+  }
+
+  struct defclass_ident privacy_scope;
+  privacy_scope.name = deftype->name.value;
+  privacy_scope.arity = params_arity(&deftype->generics);
+  return is_accessible(es, privacy_scope);
+}
+
 int check_expr_with_type(struct exprscope *es,
                          struct ast_expr *x,
                          struct ast_typeexpr *type,
@@ -1093,6 +1114,13 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
                             &ent,
                             &inst)) {
     return 0;
+  }
+
+  for (size_t i = 0, e = ent->private_to_count; i < e; i++) {
+    if (!is_accessible(es, ent->private_to[i])) {
+      METERR(name->meta, "Access denied.%s", "\n");
+      goto fail_unified;
+    }
   }
 
   exprscope_note_static_reference(es, ent);
@@ -2297,22 +2325,6 @@ int lookup_fields_field_type(struct ast_vardecl *fields,
   }
 
   METERR(field_name->meta, "Field name not found.%s", "\n");
-  return 0;
-}
-
-int deftype_is_accessible(struct exprscope *es, struct ast_deftype *deftype) {
-  if (!deftype->is_class) {
-    return 1;
-  }
-
-  ident_value name = deftype->name.value;
-  struct generics_arity arity = params_arity(&deftype->generics);
-  for (size_t i = 0, e = es->accessible_count; i < e; i++) {
-    if (es->accessible[i].name == name
-        && es->accessible[i].arity.value == arity.value) {
-      return 1;
-    }
-  }
   return 0;
 }
 

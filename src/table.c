@@ -129,6 +129,8 @@ void def_entry_init(struct def_entry *e, ident_value name,
                     struct ast_typeexpr *type,
                     struct defclass_ident *accessible,
                     size_t accessible_count,
+                    struct defclass_ident *private_to,
+                    size_t private_to_count,
                     int is_primitive,
                     enum primitive_op primitive_op,
                     int is_extern,
@@ -140,6 +142,10 @@ void def_entry_init(struct def_entry *e, ident_value name,
 
   SLICE_INIT_COPY(e->accessible, e->accessible_count,
                   accessible, accessible_count,
+                  defclass_ident_init_copy);
+
+  SLICE_INIT_COPY(e->private_to, e->private_to_count,
+                  private_to, private_to_count,
                   defclass_ident_init_copy);
 
   e->is_primitive = is_primitive;
@@ -168,6 +174,10 @@ void def_entry_destroy(struct def_entry *e) {
   free(e->accessible);
   e->accessible = NULL;
   e->accessible_count = 0;
+
+  free(e->private_to);
+  e->private_to = NULL;
+  e->private_to_count = 0;
 
   e->is_primitive = 0;
   e->primitive_op = PRIMITIVE_OP_INVALID;
@@ -350,6 +360,8 @@ int name_table_help_add_def(struct name_table *t,
                             struct ast_typeexpr *type,
                             struct defclass_ident *accessible,
                             size_t accessible_count,
+                            struct defclass_ident *private_to,
+                            size_t private_to_count,
                             int is_primitive,
                             enum primitive_op primitive_op,
                             int is_extern,
@@ -385,6 +397,7 @@ int name_table_help_add_def(struct name_table *t,
   CHECK(new_entry);
   def_entry_init(new_entry, name, generics, type,
                  accessible, accessible_count,
+                 private_to, private_to_count,
                  is_primitive, primitive_op,
                  is_extern, is_export, def);
   SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);
@@ -409,8 +422,23 @@ int name_table_add_def(struct name_table *t,
   CHECK(!(is_export && generics->has_type_params));
   return name_table_help_add_def(t, name, generics, type,
                                  accessible, accessible_count,
+                                 NULL, 0,  /* Not private to anything. */
                                  0, PRIMITIVE_OP_INVALID,
                                  0, is_export, def);
+}
+
+int name_table_add_private_primitive_def(struct name_table *t,
+                                         ident_value name,
+                                         enum primitive_op primitive_op,
+                                         struct ast_generics *generics,
+                                         struct ast_typeexpr *type,
+                                         struct defclass_ident *private_to,
+                                         size_t private_to_count) {
+  return name_table_help_add_def(t, name, generics, type,
+                                 NULL, 0, /* Needs no special access. */
+                                 private_to, private_to_count,
+                                 1, primitive_op,
+                                 0, 0, NULL);
 }
 
 int name_table_add_primitive_def(struct name_table *t,
@@ -419,7 +447,8 @@ int name_table_add_primitive_def(struct name_table *t,
                                  struct ast_generics *generics,
                                  struct ast_typeexpr *type) {
   return name_table_help_add_def(t, name, generics, type,
-                                 NULL, 0,
+                                 NULL, 0, /* Needs no special access. */
+                                 NULL, 0, /* Not private to anything. */
                                  1, primitive_op,
                                  0, 0, NULL);
 }
@@ -430,7 +459,8 @@ int name_table_add_extern_def(struct name_table *t,
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
   return name_table_help_add_def(t, name, &generics, type,
-                                 NULL, 0,
+                                 NULL, 0, /* Needs no special access. */
+                                 NULL, 0, /* Not private to anything. */
                                  0, PRIMITIVE_OP_INVALID,
                                  1, 0, NULL);
 }
