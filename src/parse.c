@@ -1681,6 +1681,19 @@ int parse_rest_of_deftype(struct ps *p, struct pos pos_start,
   if (!(skip_ws(p) && parse_type_params_if_present(p, &generics))) {
     goto fail;
   }
+  if (!skip_ws(p)) {
+    goto fail_generics;
+  }
+  enum ast_deftype_disposition disposition;
+  if (!is_class) {
+    disposition = AST_DEFTYPE_NOT_CLASS;
+  } else if (try_skip_keyword(p, "copy")) {
+    disposition = AST_DEFTYPE_CLASS_DEFAULT_COPY_MOVE_DESTROY;
+  } else if (try_skip_keyword(p, "move")) {
+    disposition = AST_DEFTYPE_CLASS_DEFAULT_MOVE;
+  } else {
+    disposition = AST_DEFTYPE_CLASS_NO_DEFAULTS;
+  }
   struct ast_ident name;
   if (!(skip_ws(p) && parse_ident(p, &name))) {
     goto fail_generics;
@@ -1693,8 +1706,7 @@ int parse_rest_of_deftype(struct ps *p, struct pos pos_start,
     goto fail_typeexpr;
   }
   ast_deftype_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                   is_class ? AST_DEFTYPE_CLASS_DEFAULT_COPY_MOVE_DESTROY : AST_DEFTYPE_NOT_CLASS,
-                   generics, name, type);
+                   disposition, generics, name, type);
   return 1;
 
  fail_typeexpr:
@@ -2039,6 +2051,14 @@ int parse_test_deftypes(void) {
                          "deftype foo [7]bar;\n"
                          "deftype[T] foo struct { count u32; p [3]T; };\n",
                          25);
+  pass &= run_count_test("deftype8",
+                         "defclass move foo [7]bar;\n"
+                         "deftype[T] foo struct { count u32; p [3]T; };\n",
+                         26);
+  pass &= run_count_test("deftype9",
+                         "defclass move foo [7]bar;\n"
+                         "defclass[T] copy foo struct { count u32; p [3]T; };\n",
+                         27);
   return pass;
 }
 
