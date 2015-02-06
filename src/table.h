@@ -2,6 +2,7 @@
 #define KIRA_TABLE_H_
 
 #include "ast.h"
+#include "arity.h"
 
 enum primitive_op {
   PRIMITIVE_OP_CONVERT_U8_TO_U8,
@@ -246,18 +247,6 @@ struct def_entry {
 
 void def_entry_note_static_reference(struct def_entry *ent,
                                      struct def_entry *referent);
-
-#define ARITY_NO_PARAMLIST SIZE_MAX
-
-struct generics_arity {
-  /* ARITY_NO_PARAMLIST means no param list, 0 means an empty param list. */
-  size_t value;
-};
-
-struct generics_arity params_arity(struct ast_generics *a);
-
-struct generics_arity no_param_list_arity(void);
-struct generics_arity param_list_arity(size_t arity);
 
 struct deftype_entry {
   ident_value name;

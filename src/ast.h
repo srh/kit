@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "arity.h"
 #include "identmap.h"
 #include "pos.h"
 

@@ -188,29 +188,6 @@ void def_entry_note_static_reference(struct def_entry *ent,
              ent->static_references_limit, reference);
 }
 
-struct generics_arity make_arity(size_t value) {
-  struct generics_arity ret;
-  ret.value = value;
-  return ret;
-}
-
-struct generics_arity no_param_list_arity(void) {
-  return make_arity(ARITY_NO_PARAMLIST);
-}
-
-struct generics_arity param_list_arity(size_t arity) {
-  CHECK(arity != ARITY_NO_PARAMLIST);
-  return make_arity(arity);
-}
-
-struct generics_arity params_arity(struct ast_generics *a) {
-  return make_arity(a->has_type_params ? a->params_count : ARITY_NO_PARAMLIST);
-}
-
-int arity_no_paramlist(struct generics_arity arity) {
-  return arity.value == ARITY_NO_PARAMLIST;
-}
-
 void deftype_entry_init(struct deftype_entry *e,
                         ident_value name,
                         struct generics_arity arity,
