@@ -48,8 +48,11 @@ export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
 
   var void_value void;
 
-  ret.x = p->x;
-  ret.y = (~getsize@[ty]() :: i32);
+  var naked struct { x i32; y i32; };
+  naked.x = p->x;
+  naked.y = (~getsize@[ty]() :: i32);
+
+  ret = ~naked;
   return ret;
 };
 

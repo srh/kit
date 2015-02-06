@@ -70,6 +70,9 @@ int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x);
 int view_ptr_target(struct identmap *im,
                     struct ast_typeexpr *ptr_type,
                     struct ast_typeexpr **target_out);
+void wrap_in_ptr(struct identmap *im,
+                 struct ast_typeexpr *target,
+                 struct ast_typeexpr *ptr_out);
 void do_replace_generics(struct ast_generics *generics,
                          struct ast_typeexpr *generics_substitutions,
                          struct ast_typeexpr *a,

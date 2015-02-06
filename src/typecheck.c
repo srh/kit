@@ -273,6 +273,29 @@ void init_name_type(struct ast_typeexpr *a, ident_value name) {
   a->u.name = make_ast_ident(name);
 }
 
+void init_generics_type(struct ast_typeexpr *a,
+                        struct ast_ident *name,
+                        struct ast_generics *generics) {
+  if (!generics->has_type_params) {
+    a->tag = AST_TYPEEXPR_NAME;
+    ast_ident_init_copy(&a->u.name, name);
+  } else {
+    struct ast_ident name_copy;
+    ast_ident_init_copy(&name_copy, name);
+
+    size_t params_count = generics->params_count;
+    struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
+
+    for (size_t i = 0; i < params_count; i++) {
+      init_name_type(&params[i], generics->params[i].value);
+    }
+
+    a->tag = AST_TYPEEXPR_APP;
+    ast_typeapp_init(&a->u.app, ast_meta_make_garbage(),
+                     name_copy, params, params_count);
+  }
+}
+
 struct ast_typeexpr *expose_func_return_type(struct identmap *im,
                                              struct ast_typeexpr *func,
                                              size_t expected_params_count) {
@@ -546,6 +569,73 @@ void defclass_ident_destroy(struct defclass_ident *dci) {
   /* Do nothing. */
 }
 
+void copy_make_unary_func_type(struct checkstate *cs,
+                               struct ast_typeexpr *arg_type,
+                               struct ast_typeexpr *return_type,
+                               struct ast_typeexpr *out) {
+
+  struct ast_ident name = make_ast_ident(identmap_intern_c_str(cs->im, FUNC_TYPE_NAME));
+  struct ast_typeexpr *params = malloc_mul(sizeof(*params), 2);
+  ast_typeexpr_init_copy(&params[0], arg_type);
+  ast_typeexpr_init_copy(&params[1], return_type);
+
+  out->tag = AST_TYPEEXPR_APP;
+  ast_typeapp_init(&out->u.app, ast_meta_make_garbage(), name,
+                   params, 2);
+}
+
+int add_conversion_operator(struct checkstate *cs,
+                            struct defclass_ident *private_to,
+                            size_t private_to_count,
+                            struct ast_generics *generics,
+                            struct ast_typeexpr *arg_type,
+                            struct ast_typeexpr *return_type) {
+  /* This is actually a magical thing, not a function.  It gets
+  treated specially by build.c Maybe we should implement this
+  differently. */
+
+  struct ast_typeexpr func_type;
+  copy_make_unary_func_type(cs, arg_type, return_type, &func_type);
+
+  int ret = name_table_add_private_primitive_def(
+      &cs->nt,
+      identmap_intern_c_str(cs->im, "~"),
+      PRIMITIVE_OP_REINTERPRET,
+      generics,
+      &func_type,
+      private_to,
+      private_to_count);
+
+  ast_typeexpr_destroy(&func_type);
+  return ret;
+}
+
+/* TODO: pass im, not cs. */
+int add_direct_and_ptr_conversion_operator(
+    struct checkstate *cs,
+    struct defclass_ident *private_to,
+    size_t private_to_count,
+    struct ast_generics *generics,
+    struct ast_typeexpr *arg_type,
+    struct ast_typeexpr *return_type) {
+  if (!add_conversion_operator(cs, private_to, private_to_count, generics,
+                               arg_type, return_type)) {
+    return 0;
+  }
+
+  struct ast_typeexpr ptr_arg;
+  wrap_in_ptr(cs->im, arg_type, &ptr_arg);
+  struct ast_typeexpr ptr_return;
+  wrap_in_ptr(cs->im, return_type, &ptr_return);
+  if (!add_conversion_operator(cs, private_to, private_to_count, generics,
+                               &ptr_arg, &ptr_return)) {
+    return 0;
+  }
+  ast_typeexpr_destroy(&ptr_return);
+  ast_typeexpr_destroy(&ptr_arg);
+  return 1;
+}
+
 int chase_through_toplevels(struct checkstate *cs,
                             struct import_chase_state *ics,
                             struct ast_toplevel *toplevels,
@@ -577,11 +667,41 @@ int chase_through_toplevels(struct checkstate *cs,
       }
     } break;
     case AST_TOPLEVEL_DEFTYPE: {
-      if (!name_table_add_deftype(
-              &cs->nt,
-              toplevel->u.deftype.name.value,
-              params_arity(&toplevel->u.deftype.generics),
-              &toplevel->u.deftype)) {
+      struct ast_deftype *dt = &toplevel->u.deftype;
+      struct generics_arity arity = params_arity(&dt->generics);
+      if (!name_table_add_deftype(&cs->nt, dt->name.value, arity, dt)) {
+        return 0;
+      }
+
+      struct ast_typeexpr name_type;
+      init_generics_type(&name_type, &dt->name, &dt->generics);
+
+      struct defclass_ident *private_to = NULL;
+      size_t private_to_count = 0;
+      if (dt->is_class) {
+        private_to = malloc_mul(sizeof(*private_to), 1);
+        private_to_count = 1;
+        private_to[0].name = dt->name.value;
+        private_to[0].arity = arity;
+      }
+
+      int ret = 0;
+      if (!add_direct_and_ptr_conversion_operator(cs, private_to, private_to_count,
+                                                  &toplevel->u.deftype.generics,
+                                                  &name_type, &toplevel->u.deftype.type)) {
+        goto deftype_fail;
+      }
+      if (!add_direct_and_ptr_conversion_operator(cs, private_to, private_to_count,
+                                                  &toplevel->u.deftype.generics,
+                                                  &toplevel->u.deftype.type, &name_type)) {
+        goto deftype_fail;
+      }
+
+      ret = 1;
+    deftype_fail:
+      free(private_to);
+      ast_typeexpr_destroy(&name_type);
+      if (ret == 0) {
         return 0;
       }
     } break;
@@ -4605,6 +4725,152 @@ int check_file_test_more_27(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_28(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "deftype ty i32;\n"
+      "def foo func[ty, i32] = fn(t ty) i32 {\n"
+      "  return ~t;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_29(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails (unlike more_28) because ty is defclass, and the conversion
+  operator is private. */
+  struct test_module a[] = { {
+      "foo",
+      "defclass ty i32;\n"
+      "def foo func[ty, i32] = fn(t ty) i32 {\n"
+      "  return ~t;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_30(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defclass ty i32;\n"
+      "access ty {\n"
+      "def foo func[ty, i32] = fn(t ty) i32 {\n"
+      "  return ~t;\n"
+      "};\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_31(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails (like more_29) because ty is defclass, and the conversion
+  operator is private. */
+  struct test_module a[] = { {
+      "foo",
+      "defclass[T] ty i32;\n"
+      "def[T] foo func[ty[T], i32] = fn(t ty[T]) i32 {\n"
+      "  return ~t;\n"
+      "};\n"
+      "def bar func[ty[u32], i32] = foo;\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_32(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defclass[T] ty i32;\n"
+      "access ty[_] {\n"
+      "def[T] foo func[ty[T], i32] = fn(t ty[T]) i32 {\n"
+      "  return ~t;\n"
+      "};\n"
+      "}\n"
+      "def bar func[ty[u32], i32] = foo;\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_33(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails (unlike more_28) because ty is defclass, and the conversion
+  operator is private. */
+  struct test_module a[] = { {
+      "foo",
+      "defclass ty i32;\n"
+      "def foo func[*ty, *i32] = fn(t *ty) *i32 {\n"
+      "  return ~t;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_34(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defclass ty i32;\n"
+      "access ty {\n"
+      "def foo func[*ty, *i32] = fn(t *ty) *i32 {\n"
+      "  return ~t;\n"
+      "};\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_35(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails (like more_29) because ty is defclass, and the conversion
+  operator is private. */
+  struct test_module a[] = { {
+      "foo",
+      "defclass[T] ty i32;\n"
+      "def[T] foo func[*ty[T], *i32] = fn(t *ty[T]) *i32 {\n"
+      "  return ~t;\n"
+      "};\n"
+      "def bar func[*ty[u32], *i32] = foo;\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_36(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defclass[T] ty i32;\n"
+      "access ty[_] {\n"
+      "def[T] foo func[*ty[T], *i32] = fn(t *ty[T]) *i32 {\n"
+      "  return ~t;\n"
+      "};\n"
+      "}\n"
+      "def bar func[*ty[u32], *i32] = foo;\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -5029,6 +5295,60 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_27...\n");
   if (!!test_check_module(&im, &check_file_test_more_27, foo)) {
     DBG("check_file_test_more_27 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_28...\n");
+  if (!test_check_module(&im, &check_file_test_more_28, foo)) {
+    DBG("check_file_test_more_28 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_29...\n");
+  if (!!test_check_module(&im, &check_file_test_more_29, foo)) {
+    DBG("check_file_test_more_29 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_30...\n");
+  if (!test_check_module(&im, &check_file_test_more_30, foo)) {
+    DBG("check_file_test_more_30 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_31...\n");
+  if (!!test_check_module(&im, &check_file_test_more_31, foo)) {
+    DBG("check_file_test_more_31 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_32...\n");
+  if (!test_check_module(&im, &check_file_test_more_32, foo)) {
+    DBG("check_file_test_more_32 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_33...\n");
+  if (!!test_check_module(&im, &check_file_test_more_33, foo)) {
+    DBG("check_file_test_more_33 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_34...\n");
+  if (!test_check_module(&im, &check_file_test_more_34, foo)) {
+    DBG("check_file_test_more_34 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_35...\n");
+  if (!!test_check_module(&im, &check_file_test_more_35, foo)) {
+    DBG("check_file_test_more_35 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_36...\n");
+  if (!test_check_module(&im, &check_file_test_more_36, foo)) {
+    DBG("check_file_test_more_36 fails\n");
     goto cleanup_identmap;
   }
 

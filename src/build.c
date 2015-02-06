@@ -2314,12 +2314,29 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct expr_return *er) {
   size_t args_count = a->u.funcall.args_count;
 
+  struct expr_return func_er = free_expr_return();
+  if (!gen_expr(cs, f, h, a->u.funcall.func, &func_er)) {
+    return 0;
+  }
+
+  // As a special case we need to handle the primitive op being
+  // PRIMITIVE_OP_REINTERPRET (and as a general case we might
+  // implement other primitive behaviors this way in the future).
+  if (func_er.u.free.tag == EXPR_RETURN_FREE_IMM
+      && func_er.u.free.u.imm.tag == IMMEDIATE_PRIMITIVE_OP
+      && func_er.u.free.u.imm.u.primitive_op == PRIMITIVE_OP_REINTERPRET) {
+    CHECK(args_count == 1);
+    return gen_expr(cs, f, h, &a->u.funcall.args[0], er);
+  }
+
   uint32_t return_size;
   int hidden_return_param = exists_hidden_return_param(&cs->nt, ast_expr_type(a),
                                                        &return_size);
 
   /* X86 */
   struct loc return_loc = frame_push_loc(h, return_size);
+
+  int32_t return_loc_offset = frame_save_offset(h);
 
   for (size_t i = args_count; i > 0;) {
     i--;
@@ -2341,15 +2358,8 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     gen_mov_addressof(f, ptr_loc, return_loc);
   }
 
-  int32_t saved_offset = frame_save_offset(h);
-  struct expr_return func_er = free_expr_return();
-  if (!gen_expr(cs, f, h, a->u.funcall.func, &func_er)) {
-    return 0;
-  }
-
   switch (func_er.u.free.tag) {
   case EXPR_RETURN_FREE_IMM: {
-    frame_restore_offset(h, saved_offset);
     switch (func_er.u.free.u.imm.tag) {
     case IMMEDIATE_FUNC:
       gen_placeholder_stack_adjustment(f, h, 0);
@@ -2367,7 +2377,6 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   } break;
   case EXPR_RETURN_FREE_LOC: {
     gen_load_register(f, X86_EAX, func_er.u.free.u.loc);
-    frame_restore_offset(h, saved_offset);
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_indirect_call_reg(f, X86_EAX);
     gen_placeholder_stack_adjustment(f, h, 1);
@@ -2392,6 +2401,8 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
     expr_return_set(f, er, return_loc);
   }
+
+  frame_restore_offset(h, return_loc_offset);
 
   return 1;
 }

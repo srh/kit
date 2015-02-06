@@ -5,6 +5,9 @@
 #include "arity.h"
 
 enum primitive_op {
+  /* TODO: Implement. */
+  PRIMITIVE_OP_REINTERPRET,
+
   PRIMITIVE_OP_CONVERT_U8_TO_U8,
   PRIMITIVE_OP_CONVERT_U8_TO_I8,
   PRIMITIVE_OP_CONVERT_U8_TO_U16,
@@ -315,6 +318,16 @@ int name_table_add_primitive_def(
     enum primitive_op primitive_op,
     struct ast_generics *generics,
     struct ast_typeexpr *type);
+/* private_to_count is how many access scopes you need to get access
+to the type.  So if it's zero, this is a public def. */
+int name_table_add_private_primitive_def(struct name_table *t,
+                                         ident_value name,
+                                         enum primitive_op primitive_op,
+                                         struct ast_generics *generics,
+                                         struct ast_typeexpr *type,
+                                         struct defclass_ident *private_to,
+                                         size_t private_to_count);
+
 int name_table_add_extern_def(struct name_table *t,
                               ident_value name,
                               struct ast_typeexpr *type);
