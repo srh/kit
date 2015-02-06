@@ -80,7 +80,6 @@ int x86_reg_has_lowbyte(enum x86_reg reg) {
   return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
 }
 
-void gen_mov(struct objfile *f, struct loc dest, struct loc src);
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg);
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
 
@@ -819,7 +818,7 @@ void x86_gen_imul_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
 
 void x86_gen_imul_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
   uint8_t b[4];
-  b[0] = 0x66;  /* TODO: Check prefix order. */
+  b[0] = 0x66;
   b[1] = 0x0F;
   b[2] = 0xAF;
   b[3] = mod_reg_rm(MOD11, dest, src);
@@ -1197,6 +1196,8 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
     CRASH("return_target_valid false (no return statements?)");
   }
 
+  /* TODO: Call destructors of params. */
+
   if (frame_hidden_return_param(h)) {
     CHECK(h->return_loc.tag == LOC_EBP_INDIRECT);
     CHECK(h->return_loc.u.ebp_indirect == 8);
@@ -1220,8 +1221,6 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
   if (h->crash_target_exists) {
     frame_define_target(h, h->crash_target_number,
                         objfile_section_size(objfile_text(f)));
-    /* TODO: I don't know what I really want to do here.  Call a
-    Kira-specific function?  Call abort?  (What does abort do?) */
     x86_gen_int_3(f);
   }
 }
@@ -1317,6 +1316,7 @@ ebp) are dest or loc.  It's safe to use this if dest and src point to
 the same _exact_ memory location, through different means (or through
 the same means). */
 void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
+  /* TODO: This (or its callee) should invoke copy or move constructors. */
   CHECK(dest.size == src.size);
   if (loc_equal(dest, src)) {
     return;
@@ -1507,6 +1507,7 @@ struct expr_return {
 void expr_return_set(struct objfile *f, struct expr_return *er, struct loc loc) {
   switch (er->tag) {
   case EXPR_RETURN_DEMANDED: {
+    /* TODO: This (or gen_mov) should use a move or copy constructor. */
     gen_mov(f, er->u.loc, loc);
   } break;
   case EXPR_RETURN_OPEN: {
@@ -2887,6 +2888,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   switch (s->tag) {
   case AST_STATEMENT_EXPR: {
     int32_t saved_offset = frame_save_offset(h);
+    /* TODO: Destroy the object returned if it's a temporary.  (And
+    hey, destroy all temporaries.) */
     struct expr_return er = open_expr_return();
     if (!gen_expr(cs, f, h, s->u.expr, &er)) {
       return 0;
@@ -2916,6 +2919,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
         return 0;
       }
       frame_restore_offset(h, saved_offset);
+    } else {
+      /* TODO: Call a constructor if appropriate. */
     }
 
     struct vardata vd;
@@ -2930,6 +2935,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     (*vars_pushed_ref)++;
   } break;
   case AST_STATEMENT_GOTO: {
+    /* TODO: Call constructors/destructors as appropriate. */
     struct labeldata *data = frame_try_find_labeldata(h, s->u.goto_statement.target.value);
     if (data) {
       /* The label is seen -- it has info on its var locations. */
@@ -3023,6 +3029,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
   } break;
   case AST_STATEMENT_FOR: {
+    /* TODO: Call destructor for initializer variable, or expression. */
     struct ast_for_statement *fs = &s->u.for_statement;
     size_t vars_pushed = 0;
     if (fs->has_initializer) {
@@ -3049,6 +3056,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
     gen_bracebody(cs, f, h, &fs->body);
 
+    /* TODO: Call destructor for incremente expr. */
     if (fs->has_increment) {
       int32_t saved_offset = frame_save_offset(h);
       struct expr_return er = open_expr_return();
