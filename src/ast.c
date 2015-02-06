@@ -1250,6 +1250,22 @@ void ast_deftype_destroy(struct ast_deftype *a) {
   ast_typeexpr_destroy(&a->type);
 }
 
+
+void ast_access_init(struct ast_access *a, struct ast_meta meta,
+                     struct ast_ident name, struct ast_toplevel *toplevels,
+                     size_t toplevels_count) {
+  a->meta = meta;
+  a->name = name;
+  a->toplevels = toplevels;
+  a->toplevels_count = toplevels_count;
+}
+
+void ast_access_destroy(struct ast_access *a) {
+  ast_meta_destroy(&a->meta);
+  ast_ident_destroy(&a->name);
+  SLICE_FREE(a->toplevels, a->toplevels_count, ast_toplevel_destroy);
+}
+
 void ast_toplevel_destroy(struct ast_toplevel *a) {
   switch (a->tag) {
   case AST_TOPLEVEL_IMPORT:
@@ -1263,6 +1279,9 @@ void ast_toplevel_destroy(struct ast_toplevel *a) {
     break;
   case AST_TOPLEVEL_DEFTYPE:
     ast_deftype_destroy(&a->u.deftype);
+    break;
+  case AST_TOPLEVEL_ACCESS:
+    ast_access_destroy(&a->u.access);
     break;
   default:
     UNREACHABLE();

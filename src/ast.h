@@ -587,11 +587,23 @@ void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
                       struct ast_generics generics,
                       struct ast_ident name, struct ast_typeexpr type);
 
+struct ast_access {
+  struct ast_meta meta;
+  struct ast_ident name;
+  struct ast_toplevel *toplevels;
+  size_t toplevels_count;
+};
+
+void ast_access_init(struct ast_access *a, struct ast_meta meta,
+                     struct ast_ident name, struct ast_toplevel *toplevels,
+                     size_t toplevels_count);
+
 enum ast_toplevel_tag {
   AST_TOPLEVEL_IMPORT,
   AST_TOPLEVEL_DEF,
   AST_TOPLEVEL_EXTERN_DEF,
   AST_TOPLEVEL_DEFTYPE,
+  AST_TOPLEVEL_ACCESS,
 };
 
 struct ast_toplevel {
@@ -601,6 +613,7 @@ struct ast_toplevel {
     struct ast_def def;
     struct ast_extern_def extern_def;
     struct ast_deftype deftype;
+    struct ast_access access;
   } u;
 };
 

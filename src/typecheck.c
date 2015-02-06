@@ -531,17 +531,73 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
   return ret;
 }
 
+struct import_chase_state {
+  ident_value *names;
+  size_t names_count;
+  size_t names_limit;
+};
+
+int chase_through_toplevels(struct checkstate *cs,
+                            struct import_chase_state *ics,
+                            struct ast_toplevel *toplevels,
+                            size_t toplevels_count) {
+  for (size_t i = 0; i < toplevels_count; i++) {
+    struct ast_toplevel *toplevel = &toplevels[i];
+    switch (toplevel->tag) {
+    case AST_TOPLEVEL_IMPORT: {
+      SLICE_PUSH(ics->names, ics->names_count, ics->names_limit,
+                 toplevel->u.import.name.value);
+    } break;
+    case AST_TOPLEVEL_DEF: {
+      if (!name_table_add_def(&cs->nt,
+                              toplevel->u.def.name_.value,
+                              &toplevel->u.def.generics_,
+                              &toplevel->u.def.type_,
+                              toplevel->u.def.is_export,
+                              &toplevel->u.def)) {
+        return 0;
+      }
+    } break;
+    case AST_TOPLEVEL_EXTERN_DEF: {
+      if (!name_table_add_extern_def(&cs->nt,
+                                     toplevel->u.extern_def.name.value,
+                                     &toplevel->u.extern_def.type)) {
+        return 0;
+      }
+    } break;
+    case AST_TOPLEVEL_DEFTYPE: {
+      if (!name_table_add_deftype(
+              &cs->nt,
+              toplevel->u.deftype.name.value,
+              params_arity(&toplevel->u.deftype.generics),
+              &toplevel->u.deftype)) {
+        return 0;
+      }
+    } break;
+    case AST_TOPLEVEL_ACCESS: {
+      if (!chase_through_toplevels(cs, ics,
+                                   toplevel->u.access.toplevels,
+                                   toplevel->u.access.toplevels_count)) {
+        return 0;
+      }
+    } break;
+    default:
+      UNREACHABLE();
+    }
+  }
+
+  return 1;
+}
+
 int chase_imports(struct checkstate *cs, module_loader *loader,
                   ident_value name) {
   int ret = 0;
-  ident_value *names = NULL;
-  size_t names_count = 0;
-  size_t names_limit = 0;
+  struct import_chase_state ics = { NULL, 0, 0 };
 
-  SLICE_PUSH(names, names_count, names_limit, name);
+  SLICE_PUSH(ics.names, ics.names_count, ics.names_limit, name);
 
-  while (names_count) {
-    name = names[--names_count];
+  while (ics.names_count) {
+    name = ics.names[--ics.names_count];
 
     for (size_t i = 0, e = cs->imports_count; i < e; i++) {
       if (cs->imports[i].import_name == name) {
@@ -562,43 +618,7 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
     imp.file = heap_file;
     SLICE_PUSH(cs->imports, cs->imports_count, cs->imports_limit, imp);
 
-    for (size_t i = 0, e = heap_file->toplevels_count; i < e; i++) {
-      struct ast_toplevel *toplevel = &heap_file->toplevels[i];
-      switch (toplevel->tag) {
-      case AST_TOPLEVEL_IMPORT:
-        SLICE_PUSH(names, names_count, names_limit,
-                   toplevel->u.import.name.value);
-        break;
-      case AST_TOPLEVEL_DEF: {
-        if (!name_table_add_def(&cs->nt,
-                                toplevel->u.def.name_.value,
-                                &toplevel->u.def.generics_,
-                                &toplevel->u.def.type_,
-                                toplevel->u.def.is_export,
-                                &toplevel->u.def)) {
-          goto cleanup;
-        }
-      } break;
-      case AST_TOPLEVEL_EXTERN_DEF: {
-        if (!name_table_add_extern_def(&cs->nt,
-                                       toplevel->u.extern_def.name.value,
-                                       &toplevel->u.extern_def.type)) {
-          goto cleanup;
-        }
-      } break;
-      case AST_TOPLEVEL_DEFTYPE: {
-        if (!name_table_add_deftype(
-                &cs->nt,
-                toplevel->u.deftype.name.value,
-                params_arity(&toplevel->u.deftype.generics),
-                &toplevel->u.deftype)) {
-          goto cleanup;
-        }
-      } break;
-      default:
-        UNREACHABLE();
-      }
-    }
+    chase_through_toplevels(cs, &ics, heap_file->toplevels, heap_file->toplevels_count);
 
   continue_outer:
     continue;
@@ -606,7 +626,7 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
 
   ret = 1;
  cleanup:
-  free(names);
+  free(ics.names);
   return ret;
 }
 
@@ -2726,6 +2746,19 @@ int check_extern_def(struct checkstate *cs, struct ast_extern_def *a) {
   return ret;
 }
 
+int check_toplevel(struct checkstate *cs, struct ast_toplevel *a);
+
+int check_toplevels(struct checkstate *cs,
+                    struct ast_toplevel *toplevels,
+                    size_t toplevels_count) {
+  for (size_t i = 0; i < toplevels_count; i++) {
+    if (!check_toplevel(cs, &toplevels[i])) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
   switch (a->tag) {
   case AST_TOPLEVEL_IMPORT:
@@ -2737,6 +2770,11 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
     return check_extern_def(cs, &a->u.extern_def);
   case AST_TOPLEVEL_DEFTYPE:
     return check_deftype(cs, lookup_deftype(&cs->nt, &a->u.deftype));
+  case AST_TOPLEVEL_ACCESS: {
+    /* TODO: We need to specify the access of the thing, somehow, when
+    typechecking through an access block. */
+    return check_toplevels(cs, a->u.access.toplevels, a->u.access.toplevels_count);
+  } break;
   default:
     UNREACHABLE();
   }
@@ -3363,10 +3401,8 @@ int chase_modules_and_typecheck(struct checkstate *cs,
 
   for (size_t i = 0, e = cs->imports_count; i < e; i++) {
     struct ast_file *file = cs->imports[i].file;
-    for (size_t j = 0, f = file->toplevels_count; j < f; j++) {
-      if (!check_toplevel(cs, &file->toplevels[j])) {
-        goto fail;
-      }
+    if (!check_toplevels(cs, file->toplevels, file->toplevels_count)) {
+      goto fail;
     }
   }
 
@@ -4393,6 +4429,23 @@ int check_file_test_more_21(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_22(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* TODO: This should fail because whatever is not the name of a
+  defclass type. */
+  struct test_module a[] = { {
+      "foo",
+      "deftype ty struct { x i32; y i32; };\n"
+      "access whatever {\n"
+      "def foo func[u32] = fn() u32 {\n"
+      "  return sizeof@[ty];\n"
+      "};\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
 
 
 int test_check_file(void) {
@@ -4781,6 +4834,12 @@ int test_check_file(void) {
 
   DBG("test_check_file check_file_test_more_21...\n");
   if (!test_check_module(&im, &check_file_test_more_21, foo)) {
+    DBG("check_file_test_more_21 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_22...\n");
+  if (!test_check_module(&im, &check_file_test_more_22, foo)) {
     DBG("check_file_test_more_21 fails\n");
     goto cleanup_identmap;
   }

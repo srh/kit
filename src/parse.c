@@ -1710,6 +1710,70 @@ int parse_rest_of_deftype(struct ps *p, struct pos pos_start,
   return 0;
 }
 
+int parse_toplevels(struct ps *p, int32_t until_ch,
+                    struct ast_toplevel **toplevels_out,
+                    size_t *toplevels_count_out) {
+  struct ast_toplevel *toplevels = NULL;
+  size_t toplevels_count = 0;
+  size_t toplevels_limit = 0;
+  for (;;) {
+    if (!skip_ws(p)) {
+      goto fail;
+    }
+    if (ps_peek(p) == until_ch) {
+      *toplevels_out = toplevels;
+      *toplevels_count_out = toplevels_count;
+      return 1;
+    }
+
+    struct ast_toplevel toplevel;
+    if (!parse_toplevel(p, &toplevel)) {
+      goto fail;
+    }
+    SLICE_PUSH(toplevels, toplevels_count, toplevels_limit, toplevel);
+  }
+ fail:
+  SLICE_FREE(toplevels, toplevels_count, ast_toplevel_destroy);
+  return 0;
+}
+
+int parse_rest_of_access(struct ps *p, struct pos pos_start, struct ast_access *out) {
+  /* This is weird: We require exactly one space between the keyword
+  "access" and the type being accessed.  This way, you can grep
+  "access typename" */
+  if (ps_peek(p) != ' ') {
+    goto fail;
+  }
+  ps_step(p);
+
+  struct ast_ident name;
+  if (!parse_ident(p, &name)) {
+    goto fail;
+  }
+
+  struct ast_toplevel *toplevels;
+  size_t toplevels_count;
+  if (!(skip_ws(p) && try_skip_char(p, '{')
+        && parse_toplevels(p, '}', &toplevels, &toplevels_count))) {
+    goto fail_name;
+  }
+
+  if (!try_skip_char(p, '}')) {
+    goto fail_toplevels;
+  }
+
+  ast_access_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                  name, toplevels, toplevels_count);
+  return 1;
+
+ fail_toplevels:
+  SLICE_FREE(toplevels, toplevels_count, ast_toplevel_destroy);
+ fail_name:
+  ast_ident_destroy(&name);
+ fail:
+  return 0;
+}
+
 int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   PARSE_DBG("parse_toplevel\n");
   struct pos pos_start = ps_pos(p);
@@ -1734,6 +1798,9 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   } else if (try_skip_keyword(p, "defclass")) {
     out->tag = AST_TOPLEVEL_DEFTYPE;
     return parse_rest_of_deftype(p, pos_start, 1, &out->u.deftype);
+  } else if (try_skip_keyword(p, "access")) {
+    out->tag = AST_TOPLEVEL_ACCESS;
+    return parse_rest_of_access(p, pos_start, &out->u.access);
   } else {
     return 0;
   }
@@ -1742,25 +1809,11 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
 int parse_file(struct ps *p, struct ast_file *out) {
   struct ast_toplevel *toplevels = NULL;
   size_t toplevels_count = 0;
-  size_t toplevels_limit = 0;
-  for (;;) {
-    if (!skip_ws(p)) {
-      goto fail;
-    }
-    if (ps_peek(p) == -1) {
-      ast_file_init(out, toplevels, toplevels_count);
-      return 1;
-    }
-
-    struct ast_toplevel toplevel;
-    if (!parse_toplevel(p, &toplevel)) {
-      goto fail;
-    }
-    SLICE_PUSH(toplevels, toplevels_count, toplevels_limit, toplevel);
+  if (!parse_toplevels(p, -1, &toplevels, &toplevels_count)) {
+    return 0;
   }
- fail:
-  SLICE_FREE(toplevels, toplevels_count, ast_toplevel_destroy);
-  return 0;
+  ast_file_init(out, toplevels, toplevels_count);
+  return 1;
 }
 
 void error_info_init(struct error_info *ei, size_t offset, size_t line, size_t column) {
@@ -1977,6 +2030,15 @@ int parse_test_exports(void) {
   return pass;
 }
 
+int parse_test_access(void) {
+  int pass = 1;
+  pass &= run_count_test("access1",
+                         "def x i32 = 4;\n"
+                         "access string { def foo i32 = 3; }\n",
+                         16);
+  return pass;
+}
+
 int parse_test(void) {
   int pass = 1;
   pass &= parse_test_nothing();
@@ -1986,6 +2048,7 @@ int parse_test(void) {
   pass &= parse_test_deftypes();
   pass &= parse_test_externs();
   pass &= parse_test_exports();
+  pass &= parse_test_access();
   return pass;
 }
 
