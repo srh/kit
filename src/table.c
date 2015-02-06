@@ -120,9 +120,15 @@ void def_instantiation_free(struct def_instantiation **p) {
   *p = NULL;
 }
 
+void defclass_ident_init_copy(struct defclass_ident *a, struct defclass_ident *c) {
+  *a = *c;
+}
+
 void def_entry_init(struct def_entry *e, ident_value name,
                     struct ast_generics *generics,
                     struct ast_typeexpr *type,
+                    struct defclass_ident *accessible,
+                    size_t accessible_count,
                     int is_primitive,
                     enum primitive_op primitive_op,
                     int is_extern,
@@ -131,6 +137,11 @@ void def_entry_init(struct def_entry *e, ident_value name,
   e->name = name;
   ast_generics_init_copy(&e->generics, generics);
   ast_typeexpr_init_copy(&e->type, type);
+
+  SLICE_INIT_COPY(e->accessible, e->accessible_count,
+                  accessible, accessible_count,
+                  defclass_ident_init_copy);
+
   e->is_primitive = is_primitive;
   e->primitive_op = primitive_op;
   e->is_extern = is_extern;
@@ -153,6 +164,11 @@ void def_entry_destroy(struct def_entry *e) {
   e->name = IDENT_VALUE_INVALID;
   ast_generics_destroy(&e->generics);
   ast_typeexpr_destroy(&e->type);
+
+  free(e->accessible);
+  e->accessible = NULL;
+  e->accessible_count = 0;
+
   e->is_primitive = 0;
   e->primitive_op = PRIMITIVE_OP_INVALID;
   e->is_extern = 0;
@@ -332,6 +348,8 @@ int name_table_help_add_def(struct name_table *t,
                             ident_value name,
                             struct ast_generics *generics,
                             struct ast_typeexpr *type,
+                            struct defclass_ident *accessible,
+                            size_t accessible_count,
                             int is_primitive,
                             enum primitive_op primitive_op,
                             int is_extern,
@@ -365,7 +383,9 @@ int name_table_help_add_def(struct name_table *t,
 
   struct def_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);
-  def_entry_init(new_entry, name, generics, type, is_primitive, primitive_op,
+  def_entry_init(new_entry, name, generics, type,
+                 accessible, accessible_count,
+                 is_primitive, primitive_op,
                  is_extern, is_export, def);
   SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);
 
@@ -382,10 +402,13 @@ int name_table_add_def(struct name_table *t,
                        ident_value name,
                        struct ast_generics *generics,
                        struct ast_typeexpr *type,
+                       struct defclass_ident *accessible,
+                       size_t accessible_count,
                        int is_export,
                        struct ast_def *def) {
   CHECK(!(is_export && generics->has_type_params));
   return name_table_help_add_def(t, name, generics, type,
+                                 accessible, accessible_count,
                                  0, PRIMITIVE_OP_INVALID,
                                  0, is_export, def);
 }
@@ -396,6 +419,7 @@ int name_table_add_primitive_def(struct name_table *t,
                                  struct ast_generics *generics,
                                  struct ast_typeexpr *type) {
   return name_table_help_add_def(t, name, generics, type,
+                                 NULL, 0,
                                  1, primitive_op,
                                  0, 0, NULL);
 }
@@ -406,6 +430,7 @@ int name_table_add_extern_def(struct name_table *t,
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
   return name_table_help_add_def(t, name, &generics, type,
+                                 NULL, 0,
                                  0, PRIMITIVE_OP_INVALID,
                                  1, 0, NULL);
 }

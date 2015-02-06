@@ -31,4 +31,15 @@
     (count) = 0; \
   } while (0)
 
+#define SLICE_INIT_COPY(dest_ptr, dest_count, src_ptr, src_count, copier) do { \
+    size_t SLICE_INIT_COPY_count = (src_count); \
+    (dest_ptr) = malloc(size_mul(sizeof(*(dest_ptr)), SLICE_INIT_COPY_count)); \
+    (dest_count) = SLICE_INIT_COPY_count; \
+    for (size_t SLICE_INIT_COPY_i = 0; \
+         SLICE_INIT_COPY_i < SLICE_INIT_COPY_count; \
+         SLICE_INIT_COPY_i++) { \
+      (copier)(&(dest_ptr)[SLICE_INIT_COPY_i], &(src_ptr)[SLICE_INIT_COPY_i]); \
+    } \
+  } while (0)
+
 #endif /* KIRA_SLICE_H_ */

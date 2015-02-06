@@ -535,7 +535,16 @@ struct import_chase_state {
   ident_value *names;
   size_t names_count;
   size_t names_limit;
+
+  struct defclass_ident *accessible;
+  size_t accessible_count;
+  size_t accessible_limit;
 };
+
+void defclass_ident_destroy(struct defclass_ident *dci) {
+  (void)dci;
+  /* Do nothing. */
+}
 
 int chase_through_toplevels(struct checkstate *cs,
                             struct import_chase_state *ics,
@@ -553,6 +562,8 @@ int chase_through_toplevels(struct checkstate *cs,
                               toplevel->u.def.name_.value,
                               &toplevel->u.def.generics_,
                               &toplevel->u.def.type_,
+                              ics->accessible,
+                              ics->accessible_count,
                               toplevel->u.def.is_export,
                               &toplevel->u.def)) {
         return 0;
@@ -575,9 +586,15 @@ int chase_through_toplevels(struct checkstate *cs,
       }
     } break;
     case AST_TOPLEVEL_ACCESS: {
-      if (!chase_through_toplevels(cs, ics,
-                                   toplevel->u.access.toplevels,
-                                   toplevel->u.access.toplevels_count)) {
+      struct defclass_ident dci;
+      dci.name = toplevel->u.access.name.value;
+      dci.arity = toplevel->u.access.arity;
+      SLICE_PUSH(ics->accessible, ics->accessible_count, ics->accessible_limit, dci);
+      int success = chase_through_toplevels(cs, ics,
+                                            toplevel->u.access.toplevels,
+                                            toplevel->u.access.toplevels_count);
+      SLICE_POP(ics->accessible, ics->accessible_count, defclass_ident_destroy);
+      if (!success) {
         return 0;
       }
     } break;
@@ -592,7 +609,7 @@ int chase_through_toplevels(struct checkstate *cs,
 int chase_imports(struct checkstate *cs, module_loader *loader,
                   ident_value name) {
   int ret = 0;
-  struct import_chase_state ics = { NULL, 0, 0 };
+  struct import_chase_state ics = { NULL, 0, 0, NULL, 0, 0 };
 
   SLICE_PUSH(ics.names, ics.names_count, ics.names_limit, name);
 
@@ -627,6 +644,7 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
   ret = 1;
  cleanup:
   free(ics.names);
+  free(ics.accessible);
   return ret;
 }
 
@@ -862,6 +880,9 @@ struct exprscope {
   generics->params_count. */
   size_t generics_substitutions_count;
 
+  struct defclass_ident *accessible;
+  size_t accessible_count;
+
   /* "YES" if the expr must be statically computable. */
   enum static_computation computation;
   /* The def_entry for this expr, maybe.  We record static_referents
@@ -882,6 +903,8 @@ void exprscope_init(struct exprscope *es, struct checkstate *cs,
                     struct ast_generics *generics,
                     struct ast_typeexpr *generics_substitutions,
                     size_t generics_substitutions_count,
+                    struct defclass_ident *accessible,
+                    size_t accessible_count,
                     enum static_computation computation,
                     struct def_entry *entry_or_null) {
   CHECK(generics->params_count == (generics->has_type_params ?
@@ -890,6 +913,8 @@ void exprscope_init(struct exprscope *es, struct checkstate *cs,
   es->generics = generics;
   es->generics_substitutions = generics_substitutions;
   es->generics_substitutions_count = generics_substitutions_count;
+  es->accessible = accessible;
+  es->accessible_count = accessible_count;
   es->computation = computation;
   es->entry_or_null = entry_or_null;
   es->vars = NULL;
@@ -903,6 +928,8 @@ void exprscope_destroy(struct exprscope *es) {
   es->generics = NULL;
   es->generics_substitutions = NULL;
   es->generics_substitutions_count = 0;
+  es->accessible = NULL;
+  es->accessible_count = 0;
   es->computation = STATIC_COMPUTATION_YES;
   free(es->vars);
   es->vars = NULL;
@@ -1088,6 +1115,8 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
                    &ent->def->generics_,
                    inst->substitutions,
                    inst->substitutions_count,
+                   ent->accessible,
+                   ent->accessible_count,
                    STATIC_COMPUTATION_YES,
                    ent);
 
@@ -1957,6 +1986,7 @@ int check_expr_lambda(struct exprscope *es,
   struct exprscope bb_es;
   exprscope_init(&bb_es, es->cs, es->generics, es->generics_substitutions,
                  es->generics_substitutions_count,
+                 es->accessible, es->accessible_count,
                  STATIC_COMPUTATION_NO, NULL);
 
   size_t *varnums = malloc_mul(sizeof(*varnums), func_params_count);
@@ -2270,6 +2300,22 @@ int lookup_fields_field_type(struct ast_vardecl *fields,
   return 0;
 }
 
+int deftype_is_accessible(struct exprscope *es, struct ast_deftype *deftype) {
+  if (!deftype->is_class) {
+    return 1;
+  }
+
+  ident_value name = deftype->name.value;
+  struct generics_arity arity = params_arity(&deftype->generics);
+  for (size_t i = 0, e = es->accessible_count; i < e; i++) {
+    if (es->accessible[i].name == name
+        && es->accessible[i].arity.value == arity.value) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 int lookup_field_type(struct exprscope *es,
                       struct ast_typeexpr *type,
                       struct ast_ident *field_name,
@@ -2289,6 +2335,10 @@ int lookup_field_type(struct exprscope *es,
 
     struct ast_deftype *deftype = ent->deftype;
     CHECK(!deftype->generics.has_type_params);
+    if (!deftype_is_accessible(es, deftype)) {
+      METERR(field_name->meta, "Looking up field on inaccessible type.%s", "\n");
+      return 0;
+    }
     return lookup_field_type(es, &deftype->type, field_name, field_type_out);
   } break;
   case AST_TYPEEXPR_APP: {
@@ -2299,13 +2349,17 @@ int lookup_field_type(struct exprscope *es,
       CRASH("lookup_field_type sees an invalid generic type.\n");
     }
     if (ent->is_primitive) {
-      METERR(field_name->meta, "Lookup up field on primitive type.%s", "\n");
+      METERR(field_name->meta, "Looking up field on primitive type.%s", "\n");
       return 0;
     }
 
     struct ast_deftype *deftype = ent->deftype;
     CHECK(deftype->generics.has_type_params
           && deftype->generics.params_count == type->u.app.params_count);
+    if (!deftype_is_accessible(es, deftype)) {
+      METERR(field_name->meta, "Looking up field on inaccessible type.%s", "\n");
+      return 0;
+    }
 
     struct ast_typeexpr concrete_deftype_type;
     do_replace_generics(&deftype->generics,
@@ -2719,6 +2773,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
       inst->typecheck_started = 1;
       struct exprscope es;
       exprscope_init(&es, cs, &a->generics_, NULL, 0,
+                     ent->accessible, ent->accessible_count,
                      STATIC_COMPUTATION_YES, ent);
       struct ast_expr annotated_rhs;
       ret = check_expr_with_type(&es, &a->rhs_, &a->type_, &annotated_rhs);
@@ -2771,8 +2826,17 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
   case AST_TOPLEVEL_DEFTYPE:
     return check_deftype(cs, lookup_deftype(&cs->nt, &a->u.deftype));
   case AST_TOPLEVEL_ACCESS: {
-    /* TODO: We need to specify the access of the thing, somehow, when
-    typechecking through an access block. */
+    /* Check that the type the access block refers to actually exists, and is a class. */
+    struct deftype_entry *ent;
+    if (!name_table_lookup_deftype(&cs->nt, a->u.access.name.value, a->u.access.arity,
+                                   &ent)) {
+      METERR(a->u.access.meta, "access block refers to non-existant type.%s", "\n");
+      return 0;
+    }
+    if (ent->is_primitive || !ent->deftype->is_class) {
+      METERR(a->u.access.meta, "access block refers to non-class type.%s", "\n");
+      return 0;
+    }
     return check_toplevels(cs, a->u.access.toplevels, a->u.access.toplevels_count);
   } break;
   default:
@@ -4431,16 +4495,98 @@ int check_file_test_more_21(const uint8_t *name, size_t name_count,
 
 int check_file_test_more_22(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
-  /* TODO: This should fail because whatever is not the name of a
-  defclass type. */
+  /* Fails because whatever is not the name of a defclass type. */
   struct test_module a[] = { {
       "foo",
-      "deftype ty struct { x i32; y i32; };\n"
+      "defclass ty struct { x i32; y i32; };\n"
       "access whatever {\n"
-      "def foo func[u32] = fn() u32 {\n"
-      "  return sizeof@[ty];\n"
+      "def foo func[*ty, i32] = fn(t *ty) i32 {\n"
+      "  return t->x;\n"
       "};\n"
       "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_23(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because ty[] has bad arity. */
+  struct test_module a[] = { {
+      "foo",
+      "defclass ty struct { x i32; y i32; };\n"
+      "access ty[] {\n"
+      "def foo func[*ty, i32] = fn(t *ty) i32 {\n"
+      "  return t->x;\n"
+      "};\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_24(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because ty[_, _] has bad arity. */
+  struct test_module a[] = { {
+      "foo",
+      "defclass ty struct { x i32; y i32; };\n"
+      "access ty[_, _] {\n"
+      "def foo func[*ty, i32] = fn(t *ty) i32 {\n"
+      "  return t->x;\n"
+      "};\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_25(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defclass ty struct { x i32; y i32; };\n"
+      "access ty {\n"
+      "def foo func[*ty, i32] = fn(t *ty) i32 {\n"
+      "  return t->x;\n"
+      "};\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_26(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defclass[T] ty struct { x T; y T; };\n"
+      "access ty[_] {\n"
+      "def[T] foo func[*ty[T], T] = fn(t *ty[T]) T {\n"
+      "  return t->x;\n"
+      "};\n"
+      "}\n"
+      "def bar func[*ty[i32], i32] = foo;\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_27(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because we try to access a field of a defclass type. */
+  struct test_module a[] = { {
+      "foo",
+      "defclass[T] ty struct { x T; y T; };\n"
+      "def[T] foo func[*ty[T], T] = fn(t *ty[T]) T {\n"
+      "  return t->x;\n"
+      "};\n"
+      "def bar func[*ty[i32], i32] = foo;\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -4838,9 +4984,39 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file check_file_test_more_22...\n");
-  if (!test_check_module(&im, &check_file_test_more_22, foo)) {
-    DBG("check_file_test_more_21 fails\n");
+  DBG("test_check_file !check_file_test_more_22...\n");
+  if (!!test_check_module(&im, &check_file_test_more_22, foo)) {
+    DBG("check_file_test_more_22 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_23...\n");
+  if (!!test_check_module(&im, &check_file_test_more_23, foo)) {
+    DBG("check_file_test_more_23 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_24...\n");
+  if (!!test_check_module(&im, &check_file_test_more_24, foo)) {
+    DBG("check_file_test_more_24 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_25...\n");
+  if (!test_check_module(&im, &check_file_test_more_25, foo)) {
+    DBG("check_file_test_more_25 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_26...\n");
+  if (!test_check_module(&im, &check_file_test_more_26, foo)) {
+    DBG("check_file_test_more_26 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_27...\n");
+  if (!!test_check_module(&im, &check_file_test_more_27, foo)) {
+    DBG("check_file_test_more_27 fails\n");
     goto cleanup_identmap;
   }
 

@@ -218,10 +218,18 @@ struct def_instantiation {
   uint32_t symbol_table_index;
 };
 
+struct defclass_ident {
+  ident_value name;
+  struct generics_arity arity;
+};
+
 struct def_entry {
   ident_value name;
   struct ast_generics generics;
   struct ast_typeexpr type;
+
+  struct defclass_ident *accessible;
+  size_t accessible_count;
 
   int is_primitive;
   enum primitive_op primitive_op;
@@ -292,6 +300,8 @@ int name_table_add_def(struct name_table *t,
                        ident_value name,
                        struct ast_generics *generics,
                        struct ast_typeexpr *type,
+                       struct defclass_ident *accessible,
+                       size_t accessible_count,
                        int is_export,
                        struct ast_def *def);
 int name_table_add_primitive_def(
