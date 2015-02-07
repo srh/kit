@@ -25,7 +25,7 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     if (!name_table_lookup_deftype(nt, type->u.name.value,
                                    no_param_list_arity(),
                                    &ent)) {
-      CRASH("Type name should be found, it was not.\n");
+      CRASH("Type name should be found, it was not.");
     }
     CHECK(ent->arity.value == ARITY_NO_PARAMLIST);
     if (ent->is_primitive) {
@@ -46,7 +46,7 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     if (!name_table_lookup_deftype(nt, type->u.app.name.value,
                                    param_list_arity(type->u.app.params_count),
                                    &ent)) {
-      CRASH("Type app name should be found, it was not.\n");
+      CRASH("Type app name should be found, it was not.");
     }
     CHECK(ent->arity.value == type->u.app.params_count);
     if (ent->is_primitive) {

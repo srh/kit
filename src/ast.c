@@ -1126,7 +1126,7 @@ struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a) {
   case AST_TYPEEXPR_UNIONE: return &a->u.unione.meta;
   case AST_TYPEEXPR_ARRAY: return &a->u.arraytype.meta;
   case AST_TYPEEXPR_UNKNOWN:
-    CRASH("No meta data for \"unknown\" typeexpr.\n");
+    CRASH("No meta data for \"unknown\" typeexpr.");
   default:
     UNREACHABLE();
   }

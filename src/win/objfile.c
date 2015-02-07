@@ -139,7 +139,7 @@ uint32_t section_alignment_characteristic(size_t max_requested_alignment) {
  case 8: return IMAGE_SCN_ALIGN_8_BYTES;
  case 16: return IMAGE_SCN_ALIGN_16_BYTES;
  default:
-   CRASH("max_requested_alignment has a weird value.\n");
+   CRASH("max_requested_alignment has a weird value.");
  }
 }
 

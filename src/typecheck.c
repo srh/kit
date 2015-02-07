@@ -2766,8 +2766,7 @@ int lookup_field_type(struct exprscope *es,
     if (!name_table_lookup_deftype(&es->cs->nt, type->u.name.value,
                                    no_param_list_arity(),
                                    &ent)) {
-      /* TODO: Remove all \n's in CRASH. */
-      CRASH("lookup_field_type sees an invalid type.\n");
+      CRASH("lookup_field_type sees an invalid type.");
     }
     if (ent->is_primitive) {
       METERR(field_name->meta, "Looking up field on primitive type.%s", "\n");
@@ -2787,7 +2786,7 @@ int lookup_field_type(struct exprscope *es,
     if (!name_table_lookup_deftype(&es->cs->nt, type->u.app.name.value,
                                    param_list_arity(type->u.app.params_count),
                                    &ent)) {
-      CRASH("lookup_field_type sees an invalid generic type.\n");
+      CRASH("lookup_field_type sees an invalid generic type.");
     }
     if (ent->is_primitive) {
       METERR(field_name->meta, "Looking up field on primitive type.%s", "\n");

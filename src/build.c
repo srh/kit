@@ -644,7 +644,7 @@ void append_immediate(struct objfile *f, struct immediate imm) {
     objfile_section_append_dir32(objfile_text(f), imm.u.func_sti);
   } break;
   case IMMEDIATE_PRIMITIVE_OP: {
-    CRASH("Trying to put a primitive op immediate in memory.\n");
+    CRASH("Trying to put a primitive op immediate in memory.");
   } break;
   case IMMEDIATE_U32: {
     /* LITTLEENDIAN etc. */
