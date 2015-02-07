@@ -351,6 +351,12 @@ int name_table_match_def(struct name_table *t,
                          struct def_entry **entry_out,
                          struct def_instantiation **instantiation_out);
 
+size_t name_table_count_matching_defs(struct name_table *t,
+                                      struct ast_ident *name,
+                                      struct ast_typeexpr *generics_or_null,
+                                      size_t generics_count,
+                                      struct ast_typeexpr *partial_type);
+
 int name_table_lookup_deftype(struct name_table *t,
                               ident_value name,
                               struct generics_arity arity,

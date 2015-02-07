@@ -1049,6 +1049,43 @@ int def_entry_matches(struct def_entry *ent,
   return 1;
 }
 
+/* TODO: Dedup this with name_table_match_def, this is a copy/paste job. */
+size_t name_table_count_matching_defs(struct name_table *t,
+                                      struct ast_ident *ident,
+                                      struct ast_typeexpr *generics_or_null,
+                                      size_t generics_count,
+                                      struct ast_typeexpr *partial_type) {
+  size_t num_matched = 0;
+
+  ident_value name = ident->value;
+  struct defs_by_name_node *node;
+  {
+    ident_value dbn_id;
+    if (identmap_is_interned(&t->defs_by_name, &name, sizeof(name),
+                             &dbn_id)) {
+      node = identmap_get_user_value(&t->defs_by_name, dbn_id);
+      CHECK(node);
+    } else {
+      node = NULL;
+    }
+  }
+
+  for (; node; node = node->next) {
+    struct def_entry *ent = node->ent;
+    CHECK(ent->name == name);
+
+    struct ast_typeexpr unified;
+    struct def_instantiation *instantiation;
+    if (def_entry_matches(ent, generics_or_null, generics_count,
+                          partial_type, &unified, &instantiation)) {
+      num_matched = size_add(num_matched, 1);
+      ast_typeexpr_destroy(&unified);
+    }
+  }
+
+  return num_matched;
+}
+
 int name_table_match_def(struct name_table *t,
                          struct ast_ident *ident,
                          struct ast_typeexpr *generics_or_null,

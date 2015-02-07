@@ -923,6 +923,314 @@ int check_typeexpr(struct checkstate *cs,
   }
 }
 
+enum typeexpr_trait {
+  TRAIT_LACKED,
+  TRAIT_HAD,
+  TRAIT_TRIVIALLY_HAD,
+};
+
+enum typeexpr_trait min_typeexpr_trait(enum typeexpr_trait a, enum typeexpr_trait b) {
+  return a < b ? a : b;
+}
+
+struct typeexpr_traits {
+  enum typeexpr_trait movable;
+  enum typeexpr_trait copyable;
+};
+
+/* TODO: This should really return a 3-way enum.  It's icky that the
+caller assumes it only needs to check the destructor on
+lookup_copy. */
+void deftype_trait_strategies(enum ast_deftype_disposition disposition,
+                              int *lookup_move_out,
+                              int *lookup_copy_out) {
+  switch (disposition) {
+  case AST_DEFTYPE_NOT_CLASS:
+  case AST_DEFTYPE_CLASS_DEFAULT_COPY_MOVE_DESTROY:
+    *lookup_move_out = 0;
+    *lookup_copy_out = 0;
+    break;
+  case AST_DEFTYPE_CLASS_DEFAULT_MOVE:
+    *lookup_move_out = 0;
+    *lookup_copy_out = 1;
+    break;
+  case AST_DEFTYPE_CLASS_NO_DEFAULTS:
+    *lookup_move_out = 1;
+    *lookup_copy_out = 1;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void make_pointee_func_lookup_type(struct checkstate *cs,
+                                   struct ast_typeexpr *a,
+                                   size_t count,
+                                   struct ast_typeexpr *out) {
+  size_t params_count = size_add(count, 1);
+  struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
+  for (size_t i = 0; i < count; i++) {
+    wrap_in_ptr(cs->im, a, &params[i]);
+  }
+  /* Unknown return type -- we'll match anything named
+  "copy"/"move"/"destroy" with any return type. */
+  params[count].tag = AST_TYPEEXPR_UNKNOWN;
+
+  struct ast_ident func_name = make_ast_ident(identmap_intern_c_str(cs->im, FUNC_TYPE_NAME));
+
+  out->tag = AST_TYPEEXPR_APP;
+  ast_typeapp_init(&out->u.app, ast_meta_make_garbage(), func_name, params, params_count);
+}
+
+/* Returns false if multiple matching definitions. */
+int has_explicit_movecopydestroy(struct checkstate *cs,
+                                 struct ast_typeexpr *a,
+                                 /* copy/move takes 2, destroy takes 1. */
+                                 size_t argdupes,
+                                 const char *name,
+                                 int *result_out) {
+  struct ast_typeexpr func_type;
+  make_pointee_func_lookup_type(cs, a, argdupes, &func_type);
+
+  struct ast_ident func_name = make_ast_ident(identmap_intern_c_str(cs->im, name));
+
+  /* TODO: Where do the copy constructors and the like (for a specific instantiation) get type-checked? */
+  size_t matching_defs = name_table_count_matching_defs(&cs->nt,
+                                                        &func_name,
+                                                        NULL,
+                                                        0,
+                                                        &func_type);
+
+  ast_ident_destroy(&func_name);
+  ast_typeexpr_destroy(&func_type);
+
+  if (matching_defs < 2) {
+    *result_out = (matching_defs == 1);
+    return 1;
+  } else {
+    METERR(*ast_typeexpr_meta(a), "Multiple matching %s definitions\n", name);
+    return 0;
+  }
+}
+
+int has_explicit_copy(struct checkstate *cs, struct ast_typeexpr *a, int *result_out) {
+  return has_explicit_movecopydestroy(cs, a, 2, "copy", result_out);
+}
+
+int has_explicit_destroy(struct checkstate *cs, struct ast_typeexpr *a, int *result_out) {
+  return has_explicit_movecopydestroy(cs, a, 1, "destroy", result_out);
+}
+
+int has_explicit_move(struct checkstate *cs, struct ast_typeexpr *a, int *result_out) {
+  return has_explicit_movecopydestroy(cs, a, 2, "move", result_out);
+}
+
+int check_typeexpr_traits(struct checkstate *cs,
+                          /* a is a concrete type. */
+                          struct ast_typeexpr *a,
+                          struct typeexpr_traits *out);
+
+int finish_checking_name_traits(struct checkstate *cs,
+                                /* The original concrete name/app type we are checking traits for. */
+                                struct ast_typeexpr *a,
+                                struct ast_meta *deftype_meta,
+                                enum ast_deftype_disposition deftype_disposition,
+                                struct ast_typeexpr *concrete_deftype_type,
+                                struct typeexpr_traits *out) {
+  int lookup_move;
+  int lookup_copy;
+  deftype_trait_strategies(deftype_disposition, &lookup_move, &lookup_copy);
+
+  struct typeexpr_traits rhs_traits = { 0 };
+  if (!(lookup_move && lookup_copy)) {
+    if (!check_typeexpr_traits(cs, concrete_deftype_type, &rhs_traits)) {
+      return 0;
+    }
+  }
+
+  int explicit_move;
+  if (!has_explicit_move(cs, a, &explicit_move)) {
+    return 0;
+  }
+
+  int explicit_copy;
+  if (!has_explicit_copy(cs, a, &explicit_copy)) {
+    return 0;
+  }
+
+  int explicit_destroy;
+  if (!has_explicit_destroy(cs, a, &explicit_destroy)) {
+    return 0;
+  }
+
+  if (lookup_move) {
+    rhs_traits.movable = explicit_move ? TRAIT_HAD : TRAIT_LACKED;
+  } else {
+    if (explicit_move) {
+      METERR(*deftype_meta, "Type has both implicit and explicit move.%s", "\n");
+      return 0;
+    }
+  }
+
+  if (lookup_copy) {
+    rhs_traits.copyable = explicit_copy ? TRAIT_HAD : TRAIT_LACKED;
+    if (!explicit_destroy) {
+      METERR(*deftype_meta, "Type lacks explicit destructor.%s", "\n");
+      return 0;
+    }
+  } else {
+    if (explicit_copy) {
+      METERR(*deftype_meta, "Type has both implicit and explicit copy.%s", "\n");
+      return 0;
+    }
+    if (explicit_destroy) {
+      METERR(*deftype_meta, "Type has both implicit and explicit destroy.%s", "\n");
+      return 0;
+    }
+  }
+
+  *out = rhs_traits;
+  return 1;
+}
+
+int check_typeexpr_name_traits(struct checkstate *cs,
+                               struct ast_typeexpr *a,
+                               struct typeexpr_traits *out) {
+  struct deftype_entry *ent;
+  if (!name_table_lookup_deftype(&cs->nt, a->u.name.value,
+                                 no_param_list_arity(),
+                                 &ent)) {
+    CRASH("an invalid type");
+  }
+
+  if (ent->is_primitive) {
+    out->movable = TRAIT_TRIVIALLY_HAD;
+    out->copyable = TRAIT_TRIVIALLY_HAD;
+    return 1;
+  }
+
+  return finish_checking_name_traits(cs,
+                                     a,
+                                     &ent->deftype->meta,
+                                     ent->deftype->disposition,
+                                     &ent->deftype->type,
+                                     out);
+}
+
+int check_typeexpr_app_traits(struct checkstate *cs,
+                              struct ast_typeexpr *a,
+                              struct typeexpr_traits *out) {
+  struct deftype_entry *ent;
+  if (!name_table_lookup_deftype(&cs->nt, a->u.app.name.value,
+                                 param_list_arity(a->u.app.params_count),
+                                 &ent)) {
+    CRASH("an invalid generic type");
+  }
+
+  if (ent->is_primitive) {
+    out->movable = TRAIT_TRIVIALLY_HAD;
+    out->copyable = TRAIT_TRIVIALLY_HAD;
+    return 1;
+  }
+
+  struct ast_deftype *deftype = ent->deftype;
+
+  CHECK(deftype->generics.has_type_params
+        && deftype->generics.params_count == a->u.app.params_count);
+
+  struct ast_typeexpr concrete_deftype_type;
+  do_replace_generics(&deftype->generics,
+                      a->u.app.params,
+                      &deftype->type,
+                      &concrete_deftype_type);
+
+  int res = finish_checking_name_traits(cs,
+                                        a,
+                                        &deftype->meta,
+                                        deftype->disposition,
+                                        &concrete_deftype_type,
+                                        out);
+  ast_typeexpr_destroy(&concrete_deftype_type);
+  return res;
+}
+
+int check_typeexpr_structe_traits(struct checkstate *cs,
+                                  struct ast_typeexpr *a,
+                                  struct typeexpr_traits *out) {
+  struct typeexpr_traits combined;
+  combined.movable = TRAIT_TRIVIALLY_HAD;
+  combined.copyable = TRAIT_TRIVIALLY_HAD;
+  for (size_t i = 0, e = a->u.structe.fields_count; i < e; i++) {
+    struct typeexpr_traits traits;
+    if (!check_typeexpr_traits(cs, &a->u.structe.fields[i].type, &traits)) {
+      return 0;
+    }
+
+    combined.movable = min_typeexpr_trait(combined.movable, traits.movable);
+    combined.copyable = min_typeexpr_trait(combined.copyable, traits.copyable);
+  }
+
+  *out = combined;
+  return 1;
+}
+
+int check_typeexpr_unione_traits(struct checkstate *cs,
+                                 struct ast_typeexpr *a,
+                                 struct typeexpr_traits *out) {
+  for (size_t i = 0, e = a->u.unione.fields_count; i < e; i++) {
+    struct typeexpr_traits traits;
+    if (!check_typeexpr_traits(cs, &a->u.unione.fields[i].type, &traits)) {
+      return 0;
+    }
+
+    if (traits.movable != TRAIT_TRIVIALLY_HAD) {
+      METERR(a->u.unione.meta, "Union field %.*s is not trivially movable.\n",
+             IM_P(cs->im, a->u.unione.fields[i].name.value));
+      return 0;
+    }
+
+    if (traits.copyable != TRAIT_TRIVIALLY_HAD) {
+      METERR(a->u.unione.meta, "Union field %.*s is not trivially copyable.\n",
+             IM_P(cs->im, a->u.unione.fields[i].name.value));
+      return 0;
+    }
+  }
+
+  out->movable = TRAIT_TRIVIALLY_HAD;
+  out->copyable = TRAIT_TRIVIALLY_HAD;
+  return 1;
+}
+
+
+/* Returns false if the type is invalid, e.g. a union with fields that
+are not trivially copyable and movable, or a class type that needs a
+defined destructor, or a type that has multiply defined
+move/copy/destroy operations. */
+/* TODO: It's possible a templated copy/move/destroy operator won't
+get typechecked -- we need some way to force that, someplace where
+there is an exprscope. */
+int check_typeexpr_traits(struct checkstate *cs,
+                          /* a is a concrete type. */
+                          struct ast_typeexpr *a,
+                          struct typeexpr_traits *out) {
+  switch (a->tag) {
+  case AST_TYPEEXPR_NAME:
+    return check_typeexpr_name_traits(cs, a, out);
+  case AST_TYPEEXPR_APP:
+    return check_typeexpr_app_traits(cs, a, out);
+  case AST_TYPEEXPR_STRUCTE:
+    return check_typeexpr_structe_traits(cs, a, out);
+  case AST_TYPEEXPR_UNIONE:
+    return check_typeexpr_unione_traits(cs, a, out);
+  case AST_TYPEEXPR_ARRAY:
+    return check_typeexpr_traits(cs, a->u.arraytype.param, out);
+  default:
+    UNREACHABLE();
+  }
+}
+
+
+
 int check_generics_shadowing(struct checkstate *cs,
                              struct ast_generics *a) {
   if (!a->has_type_params) {
@@ -2458,6 +2766,7 @@ int lookup_field_type(struct exprscope *es,
     if (!name_table_lookup_deftype(&es->cs->nt, type->u.name.value,
                                    no_param_list_arity(),
                                    &ent)) {
+      /* TODO: Remove all \n's in CRASH. */
       CRASH("lookup_field_type sees an invalid type.\n");
     }
     if (ent->is_primitive) {
