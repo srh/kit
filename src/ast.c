@@ -125,6 +125,11 @@ void ast_var_info_specify_varnum(struct ast_var_info *a, size_t varnum) {
   a->varnum = varnum;
 }
 
+size_t ast_var_info_varnum(struct ast_var_info *a) {
+  CHECK(a->info_valid);
+  return a->varnum;
+}
+
 void ast_vardecl_init(struct ast_vardecl *a, struct ast_meta meta,
                       struct ast_ident name, struct ast_typeexpr type) {
   a->meta = meta;

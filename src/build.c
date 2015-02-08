@@ -80,6 +80,17 @@ int x86_reg_has_lowbyte(enum x86_reg reg) {
   return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
 }
 
+/* TODO: gen_destroy and gen_move_or_copydestroy (etc) better damn
+well check that the functions they invoke have been typechecked (by
+checking a field like is_typechecked). */
+void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
+                 struct loc loc, struct ast_typeexpr *type);
+void gen_copy(struct checkstate *cs, struct objfile *f, struct frame *h,
+              struct loc dest, struct loc src, struct ast_typeexpr *type);
+void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct frame *h,
+                             struct loc dest, struct loc src, struct ast_typeexpr *type);
+void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
+                           struct loc dest, struct ast_typeexpr *type);
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg);
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
 
@@ -376,7 +387,8 @@ struct frame {
   size_t espdata_count;
   size_t espdata_limit;
 
-  int return_loc_valid;
+  int calling_info_valid;
+  size_t arg_count;
   /* True if loc is the "final destination" of the return value,
   because the function uses a hidden return param. */
   int hidden_return_param;
@@ -421,7 +433,7 @@ void frame_init(struct frame *h) {
   h->espdata_count = 0;
   h->espdata_limit = 0;
 
-  h->return_loc_valid = 0;
+  h->calling_info_valid = 0;
 
   h->return_target_valid = 0;
 
@@ -450,21 +462,28 @@ void frame_destroy(struct frame *h) {
   h->espdata_limit = 0;
 }
 
-void frame_specify_return_loc(struct frame *h, struct loc loc, int is_return_hidden) {
-  CHECK(!h->return_loc_valid);
-  h->return_loc_valid = 1;
+void frame_specify_calling_info(struct frame *h, size_t arg_count,
+                                struct loc loc, int is_return_hidden) {
+  CHECK(!h->calling_info_valid);
+  h->calling_info_valid = 1;
+  h->arg_count = arg_count;
   h->hidden_return_param = is_return_hidden;
   h->return_loc = loc;
 }
 
 int frame_hidden_return_param(struct frame *h) {
-  CHECK(h->return_loc_valid);
+  CHECK(h->calling_info_valid);
   return h->hidden_return_param;
 }
 
 struct loc frame_return_loc(struct frame *h) {
-  CHECK(h->return_loc_valid);
+  CHECK(h->calling_info_valid);
   return h->return_loc;
+}
+
+size_t frame_arg_count(struct frame *h) {
+  CHECK(h->calling_info_valid);
+  return h->arg_count;
 }
 
 size_t frame_add_target(struct frame *h) {
@@ -547,6 +566,8 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
   int is_return_hidden = exists_hidden_return_param(cs, return_type, &return_type_size);
   int32_t offset = (2 + is_return_hidden) * DWORD_SIZE;
 
+  size_t vars_pushed = 0;
+
   for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
     struct ast_typeexpr *param_type = &type->u.app.params[i];
 
@@ -563,6 +584,8 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
                  var_number, param_type, loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
+    vars_pushed = size_add(vars_pushed, 1);
+
     offset = int32_add(offset, uint32_to_int32(padded_size));
   }
 
@@ -571,10 +594,10 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
     struct loc loc = ebp_indirect_loc(return_type_size,
                                       return_type_size,
                                       2 * DWORD_SIZE);
-    frame_specify_return_loc(h, loc, is_return_hidden);
+    frame_specify_calling_info(h, vars_pushed, loc, is_return_hidden);
   } else {
     struct loc loc = frame_push_loc(h, return_type_size);
-    frame_specify_return_loc(h, loc, is_return_hidden);
+    frame_specify_calling_info(h, vars_pushed, loc, is_return_hidden);
   }
 }
 
@@ -1192,7 +1215,29 @@ void gen_function_intro(struct objfile *f, struct frame *h) {
   gen_placeholder_stack_adjustment(f, h, 1);
 }
 
-void gen_function_exit(struct objfile *f, struct frame *h) {
+void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
+                 struct loc loc, struct ast_typeexpr *type) {
+  (void)cs, (void)f, (void)h, (void)loc, (void)type;
+  TODO_IMPLEMENT;
+}
+void gen_copy(struct checkstate *cs, struct objfile *f, struct frame *h,
+              struct loc dest, struct loc src, struct ast_typeexpr *type) {
+  (void)cs, (void)f, (void)h, (void)dest, (void)src, (void)type;
+  TODO_IMPLEMENT;
+}
+void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct frame *h,
+                             struct loc dest, struct loc src, struct ast_typeexpr *type) {
+  (void)cs, (void)f, (void)h, (void)dest, (void)src, (void)type;
+  TODO_IMPLEMENT;
+}
+void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
+                           struct loc loc, struct ast_typeexpr *type) {
+  (void)cs, (void)f, (void)h, (void)loc, (void)type;
+  TODO_IMPLEMENT;
+}
+
+
+void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h) {
   if (h->return_target_valid) {
     frame_define_target(h, h->return_target_number,
                         objfile_section_size(objfile_text(f)));
@@ -1200,7 +1245,11 @@ void gen_function_exit(struct objfile *f, struct frame *h) {
     CRASH("return_target_valid false (no return statements?)");
   }
 
-  /* TODO: Call destructors of params. */
+  for (size_t i = 0, e = frame_arg_count(h); i < e; i++) {
+    struct vardata *vd = &h->vardata[size_sub(h->vardata_count, 1)];
+    gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
+    SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+  }
 
   if (frame_hidden_return_param(h)) {
     CHECK(h->return_loc.tag == LOC_EBP_INDIRECT);
@@ -1475,17 +1524,6 @@ void x86_gen_indirect_call_reg(struct objfile *f, enum x86_reg reg) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-/* An expr_return tells how gen_expr should provide the return value. */
-enum expr_return_tag {
-  /* The location where the data is to be returned is precisely
-  specified. */
-  EXPR_RETURN_DEMANDED,
-  /* The location is not specified -- gen_expr should write the data's
-  location to "loc", and preserve lvalues. */
-  EXPR_RETURN_OPEN,
-  EXPR_RETURN_FREE,
-};
-
 enum expr_return_free_tag {
   EXPR_RETURN_FREE_LOC,
   EXPR_RETURN_FREE_IMM,
@@ -1499,30 +1537,116 @@ struct expr_return_free {
   } u;
 };
 
+/* Returns info as to whether a "temporary" of non-trivial type
+exists, and where its true loc is.  This is used, generally speaking,
+to describe a loc, and the fact that it's part of a temporary (that
+will eventually need to be destroyed or moved from, etc). */
+struct temp_return {
+  int exists;
+  struct loc loc;
+
+  /* ast_typeexpr is an unowned pointer. */
+  struct ast_typeexpr *temporary_type;
+  int whole_thing;
+};
+
+struct temp_return temp_none(void) {
+  struct temp_return ret;
+  ret.exists = 0;
+  return ret;
+}
+
+struct temp_return temp_exists(struct loc loc,
+                               struct ast_typeexpr *temporary_type,
+                               int whole_thing) {
+  struct temp_return ret;
+  ret.exists = 1;
+  ret.loc = loc;
+  ret.temporary_type = temporary_type;
+  ret.whole_thing = whole_thing;
+  return ret;
+}
+
+struct temp_return temp_subobject(struct temp_return other) {
+  struct temp_return ret = other;
+  if (ret.exists) {
+    ret.whole_thing = 0;
+  }
+  return ret;
+}
+
+
+/* An expr_return tells how gen_expr should provide the return value. */
+enum expr_return_tag {
+  /* The location where the data is to be returned is precisely
+  specified. */
+  EXPR_RETURN_DEMANDED,
+  /* The location is not specified -- gen_expr should write the data's
+  location to "loc", and preserve lvalues. */
+  EXPR_RETURN_OPEN,
+  EXPR_RETURN_FREE,
+};
+
 struct expr_return {
   enum expr_return_tag tag;
   union {
     struct loc loc;
     struct expr_return_free free;
   } u;
+  /* gen_expr always writes this value. */
+  struct temp_return tr;
 };
 
-void expr_return_set(struct objfile *f, struct expr_return *er, struct loc loc) {
+void gen_destroy_temp(struct checkstate *cs, struct objfile *f, struct frame *h,
+                      struct temp_return tr) {
+  if (tr.exists) {
+    gen_destroy(cs, f, h, tr.loc, tr.temporary_type);
+  }
+}
+
+void move_or_copy_temporary_into_loc(struct checkstate *cs, struct objfile *f, struct frame *h,
+                                     struct loc dest, struct loc src, struct ast_typeexpr *type,
+                                     struct temp_return tr) {
+  /* We have to copy the value, unless tr.exists and tr.whole_thing. */
+  if (tr.exists && tr.whole_thing) {
+    /* (Still possible we have to copy the value because... a move
+    constructor does not exist?) */
+    gen_move_or_copydestroy(cs, f, h, dest, src, type);
+  } else {
+    gen_copy(cs, f, h, dest, src, type);
+    gen_destroy_temp(cs, f, h, tr);
+  }
+}
+
+/* The tr argument applies to the temporary in _loc_, the parameter,
+and it's not the same as the tr value that ends up in er. */
+void expr_return_set(struct checkstate *cs, struct objfile *f, struct frame *h,
+                     struct expr_return *er, struct loc loc, struct ast_typeexpr *type,
+                     struct temp_return tr) {
   switch (er->tag) {
   case EXPR_RETURN_DEMANDED: {
-    /* TODO: This (or gen_mov) should use a move or copy constructor. */
-    gen_mov(f, er->u.loc, loc);
+    move_or_copy_temporary_into_loc(cs, f, h, er->u.loc, loc, type, tr);
+    er->tr = temp_exists(er->u.loc, type, 1);
   } break;
   case EXPR_RETURN_OPEN: {
     er->u.loc = loc;
+    er->tr = tr;
   } break;
   case EXPR_RETURN_FREE: {
     er->u.free.tag = EXPR_RETURN_FREE_LOC;
     er->u.free.u.loc = loc;
+    er->tr = tr;
   } break;
   default:
     UNREACHABLE();
   }
+}
+
+void wipe_temporaries(struct checkstate *cs, struct objfile *f, struct frame *h,
+                      struct expr_return *src, struct loc *dest_out) {
+  CHECK(src->tag != EXPR_RETURN_DEMANDED);
+  (void)cs, (void)f, (void)h, (void)src, (void)dest_out;
+  TODO_IMPLEMENT;
 }
 
 struct expr_return free_expr_return(void) {
@@ -2333,9 +2457,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     return gen_expr(cs, f, h, &a->u.funcall.args[0], er);
   }
 
+  struct ast_typeexpr *return_type = ast_expr_type(a);
   uint32_t return_size;
-  int hidden_return_param = exists_hidden_return_param(cs, ast_expr_type(a),
-                                                       &return_size);
+  int hidden_return_param = exists_hidden_return_param(cs, return_type, &return_size);
 
   /* X86 */
   struct loc return_loc = frame_push_loc(h, return_size);
@@ -2380,30 +2504,32 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     }
   } break;
   case EXPR_RETURN_FREE_LOC: {
-    gen_load_register(f, X86_EAX, func_er.u.free.u.loc);
+    struct loc func_loc;
+    wipe_temporaries(cs, f, h, &func_er, &func_loc);
+    gen_load_register(f, X86_EAX, func_loc);
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_indirect_call_reg(f, X86_EAX);
     gen_placeholder_stack_adjustment(f, h, 1);
   } break;
+  default:
+    UNREACHABLE();
   }
 
   if (hidden_return_param) {
     /* Let's just pray that the pointer returned by the callee (in
     EAX) is the same as the hidden return param that we passed! */
-
-    /* TODO: Get one example of cl generating code that assumes this
-    too. */
-
-    /* TODO: This could be expr_return_move or something. */
-    expr_return_set(f, er, return_loc);
+    expr_return_set(cs, f, h, er, return_loc, return_type,
+                    temp_exists(return_loc, return_type, 1));
   } else if (return_size <= DWORD_SIZE) {
     /* Return value in eax. */
     gen_store_register(f, return_loc, X86_EAX);
-    expr_return_set(f, er, return_loc);
+    expr_return_set(cs, f, h, er, return_loc, return_type,
+                    temp_exists(return_loc, return_type, 1));
   } else {
     CHECK(return_size == 2 * DWORD_SIZE);
     gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
-    expr_return_set(f, er, return_loc);
+    expr_return_set(cs, f, h, er, return_loc, return_type,
+                    temp_exists(return_loc, return_type, 1));
   }
 
   frame_restore_offset(h, return_loc_offset);
@@ -2411,9 +2537,10 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-void apply_dereference(struct objfile *f,
+void apply_dereference(struct checkstate *cs, struct objfile *f,
                        struct frame *h, struct loc ptr_loc,
-                       uint32_t pointee_size, struct expr_return *er) {
+                       uint32_t pointee_size, struct expr_return *er,
+                       struct ast_typeexpr *type) {
   struct loc loc = frame_push_loc(h, DWORD_SIZE);
   gen_mov(f, loc, ptr_loc);
   CHECK(loc.tag == LOC_EBP_OFFSET);
@@ -2422,7 +2549,7 @@ void apply_dereference(struct objfile *f,
   the padded size is the same as the size. */
   struct loc ret = ebp_indirect_loc(pointee_size, pointee_size,
                                     loc.u.ebp_offset);
-  expr_return_set(f, er, ret);
+  expr_return_set(cs, f, h, er, ret, type, temp_none());
 }
 
 int gen_unop_expr(struct checkstate *cs, struct objfile *f,
@@ -2436,8 +2563,12 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    uint32_t size = kira_sizeof(&cs->nt, ast_expr_type(a));
-    apply_dereference(f, h, rhs_er.u.loc, size, er);
+    struct loc rhs_loc;
+    wipe_temporaries(cs, f, h, &rhs_er, &rhs_loc);
+
+    struct ast_typeexpr *type = ast_expr_type(a);
+    uint32_t size = kira_sizeof(&cs->nt, type);
+    apply_dereference(cs, f, h, rhs_loc, size, er, type);
     return 1;
   } break;
   case AST_UNOP_ADDRESSOF: {
@@ -2446,9 +2577,13 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
+    /* There must be no temporary return because then we'd be taking
+    the address of a temporary. */
+    CHECK(!rhs_er.tr.exists);
+
     struct loc ret = frame_push_loc(h, DWORD_SIZE);
     gen_mov_addressof(f, ret, rhs_er.u.loc);
-    expr_return_set(f, er, ret);
+    expr_return_set(cs, f, h, er, ret, ast_expr_type(a), temp_none());
     return 1;
   } break;
   case AST_UNOP_NEGATE:
@@ -2465,38 +2600,54 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
                    struct expr_return *er) {
   struct ast_index_expr *ie = &a->u.index_expr;
 
-  uint32_t elem_size;
-  struct expr_return lhs_er = open_expr_return();
-  struct expr_return rhs_er = open_expr_return();
+  struct ast_typeexpr *ptr_target = NULL;
+  int is_ptr = view_ptr_target(cs->im, ast_expr_type(ie->lhs), &ptr_target);
 
+  uint32_t elem_size;
+  /* Soon becomes dead/alive depending on is_ptr value. */
+  struct expr_return lhs_er = open_expr_return();
   if (!gen_expr(cs, f, h, ie->lhs, &lhs_er)) {
     return 0;
   }
 
-  if (!gen_expr(cs, f, h, ie->rhs, &rhs_er)) {
-    return 0;
+  struct loc lhs_loc;
+  if (is_ptr) {
+    wipe_temporaries(cs, f, h, &lhs_er, &lhs_loc);
+  } else {
+    lhs_loc = lhs_er.u.loc;
   }
 
-  struct ast_typeexpr *ptr_target;
-  if (view_ptr_target(cs->im, ast_expr_type(ie->lhs), &ptr_target)) {
+  /* Great, now lhs_er is dead if is_ptr is true and alive if is_ptr
+  is false. */
+
+  struct loc rhs_loc;
+  {
+    struct expr_return rhs_er = open_expr_return();
+    if (!gen_expr(cs, f, h, ie->rhs, &rhs_er)) {
+      return 0;
+    }
+    wipe_temporaries(cs, f, h, &rhs_er, &rhs_loc);
+  }
+
+  if (is_ptr) {
     elem_size = kira_sizeof(&cs->nt, ptr_target);
 
-    CHECK(lhs_er.u.loc.size == DWORD_SIZE);
-    CHECK(rhs_er.u.loc.size == DWORD_SIZE);
+    CHECK(lhs_loc.size == DWORD_SIZE);
+    CHECK(rhs_loc.size == DWORD_SIZE);
 
-    gen_load_register(f, X86_EDX, lhs_er.u.loc);
+    gen_load_register(f, X86_EDX, lhs_loc);
   } else {
     struct ast_typeexpr *lhs_type = ast_expr_type(ie->lhs);
     CHECK(lhs_type->tag == AST_TYPEEXPR_ARRAY);
     elem_size = kira_sizeof(&cs->nt, lhs_type->u.arraytype.param);
 
-    CHECK(lhs_er.u.loc.size == uint32_mul(elem_size, lhs_type->u.arraytype.count));
-    CHECK(rhs_er.u.loc.size == DWORD_SIZE);
+    CHECK(lhs_loc.size == uint32_mul(elem_size, lhs_type->u.arraytype.count));
+    CHECK(rhs_loc.size == DWORD_SIZE);
 
-    gen_load_addressof(f, X86_EDX, lhs_er.u.loc);
+    gen_load_addressof(f, X86_EDX, lhs_loc);
   }
 
-  gen_load_register(f, X86_EAX, rhs_er.u.loc);
+  gen_load_register(f, X86_EAX, rhs_loc);
 
   struct immediate imm;
   imm.tag = IMMEDIATE_U32;
@@ -2511,7 +2662,11 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   gen_store_register(f, loc, X86_EAX);
 
   struct loc retloc = ebp_indirect_loc(elem_size, elem_size, loc.u.ebp_offset);
-  expr_return_set(f, er, retloc);
+  if (is_ptr) {
+    expr_return_set(cs, f, h, er, retloc, ast_expr_type(a), temp_none());
+  } else {
+    expr_return_set(cs, f, h, er, retloc, ast_expr_type(a), temp_subobject(lhs_er.tr));
+  }
   return 1;
 }
 
@@ -2585,6 +2740,17 @@ enum numeric_type get_numeric_type(struct identmap *im, struct ast_typeexpr *a) 
   CRASH("Expected a numeric type.");
 }
 
+void gen_assignment(struct checkstate *cs, struct objfile *f,
+                    struct frame *h, struct loc lhs_loc,
+                    struct loc rhs_loc, struct ast_typeexpr *type,
+                    struct temp_return rhs_tr) {
+  (void)cs, (void)f, (void)h, (void)lhs_loc, (void)rhs_loc, (void)type, (void)rhs_tr;
+  /* TODO: We need to check for self-assignment, and then destruct
+  lhs, and move-construct lhs from rhs, and then temp_destroy
+  rhs_tr. */
+  TODO_IMPLEMENT;
+}
+
 int gen_binop_expr(struct checkstate *cs, struct objfile *f,
                    struct frame *h, struct ast_expr *a,
                    struct expr_return *er) {
@@ -2596,27 +2762,38 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    lhs_er.tag = EXPR_RETURN_DEMANDED;
-    if (!gen_expr(cs, f, h, be->rhs, &lhs_er)) {
+    /* We are assigning to a value, so it can't be a temporary. */
+    CHECK(!lhs_er.tr.exists);
+
+    struct expr_return rhs_er = open_expr_return();
+    if (!gen_expr(cs, f, h, be->rhs, &rhs_er)) {
       return 0;
     }
 
-    /* gen_expr above did our assignment.  Our expression has a return
+    struct ast_typeexpr *lhs_type = ast_expr_type(be->lhs);
+    gen_assignment(cs, f, h, lhs_er.u.loc, rhs_er.u.loc, lhs_type, rhs_er.tr);
+
+    /* We have done our assignment.  Our expression has a return
     value though, expr_return_set does that. */
-    expr_return_set(f, er, lhs_er.u.loc);
+    expr_return_set(cs, f, h, er, lhs_er.u.loc, lhs_type, temp_none());
     return 1;
   } break;
   case AST_BINOP_LOGICAL_OR: {
-    struct expr_return lhs_er = open_expr_return();
-    if (!gen_expr(cs, f, h, be->lhs, &lhs_er)) {
-      return 0;
+    struct loc lhs_loc;
+    {
+      struct expr_return lhs_er = open_expr_return();
+      if (!gen_expr(cs, f, h, be->lhs, &lhs_er)) {
+        return 0;
+      }
+
+      wipe_temporaries(cs, f, h, &lhs_er, &lhs_loc);
     }
 
     struct loc ret = frame_push_loc(h, KIRA_BOOL_SIZE);
 
     size_t target_number = frame_add_target(h);
-    gen_placeholder_jmp_if_false(f, h, lhs_er.u.loc, target_number);
-    gen_mov(f, ret, lhs_er.u.loc);
+    gen_placeholder_jmp_if_false(f, h, lhs_loc, target_number);
+    gen_mov(f, ret, lhs_loc);
     size_t end_target_number = frame_add_target(h);
 
     gen_placeholder_jmp(f, h, end_target_number);
@@ -2628,19 +2805,23 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
     }
 
     frame_define_target(h, end_target_number, objfile_section_size(objfile_text(f)));
-    expr_return_set(f, er, ret);
+    expr_return_set(cs, f, h, er, ret, ast_expr_type(a), temp_none());
     return 1;
   } break;
   case AST_BINOP_LOGICAL_AND: {
-    struct expr_return lhs_er = open_expr_return();
-    if (!gen_expr(cs, f, h, be->lhs, &lhs_er)) {
-      return 0;
+    struct loc lhs_loc;
+    {
+      struct expr_return lhs_er = open_expr_return();
+      if (!gen_expr(cs, f, h, be->lhs, &lhs_er)) {
+        return 0;
+      }
+      wipe_temporaries(cs, f, h, &lhs_er, &lhs_loc);
     }
 
     struct loc ret = frame_push_loc(h, KIRA_BOOL_SIZE);
 
     size_t target_number = frame_add_target(h);
-    gen_placeholder_jmp_if_false(f, h, lhs_er.u.loc, target_number);
+    gen_placeholder_jmp_if_false(f, h, lhs_loc, target_number);
 
     struct expr_return rhs_er = demand_expr_return(ret);
     if (!gen_expr(cs, f, h, be->rhs, &rhs_er)) {
@@ -2651,11 +2832,12 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
     gen_placeholder_jmp(f, h, end_target_number);
     frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
 
-    gen_mov(f, ret, lhs_er.u.loc);
+    gen_mov(f, ret, lhs_loc);
 
     frame_define_target(h, end_target_number, objfile_section_size(objfile_text(f)));
 
-    expr_return_set(f, er, ret);
+    /* (Sigh:) We "know" that the type is bool, a trivial type. */
+    expr_return_set(cs, f, h, er, ret, ast_expr_type(a), temp_none());
     return 1;
   } break;
   default:
@@ -2669,16 +2851,19 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
   switch (er->tag) {
   case EXPR_RETURN_DEMANDED: {
     gen_mov_immediate(f, er->u.loc, imm);
+    er->tr = temp_none();
   } break;
   case EXPR_RETURN_OPEN: {
     /* All immediates (right now) are DWORD-sized. */
     struct loc floc = frame_push_loc(h, DWORD_SIZE);
     gen_mov_immediate(f, floc, imm);
     er->u.loc = floc;
+    er->tr = temp_none();
   } break;
   case EXPR_RETURN_FREE: {
     er->u.free.tag = EXPR_RETURN_FREE_IMM;
     er->u.free.u.imm = imm;
+    er->tr = temp_none();
   } break;
   default:
     UNREACHABLE();
@@ -2723,8 +2908,10 @@ void apply_field_access(struct checkstate *cs,
                         struct objfile *f,
                         struct frame *h,
                         struct loc lhs_loc,
+                        struct temp_return lhs_tr,
                         struct ast_typeexpr *type,
                         ident_value fieldname,
+                        struct ast_typeexpr *field_type,
                         struct expr_return *er) {
   /* Generally speaking: There's no way the field possibly gets a
   padded_size, because the first N fields of two struct types, if
@@ -2737,12 +2924,11 @@ void apply_field_access(struct checkstate *cs,
 
   /* Note: This code needs to preserve lvalues (and it does so). */
 
+  struct loc field_loc;
   switch (lhs_loc.tag) {
   case LOC_EBP_OFFSET: {
-    struct loc field_loc = ebp_loc(size, size,
-                                   int32_add(lhs_loc.u.ebp_offset,
-                                             uint32_to_int32(offset)));
-    expr_return_set(f, er, field_loc);
+    field_loc = ebp_loc(size, size, int32_add(lhs_loc.u.ebp_offset,
+                                              uint32_to_int32(offset)));
   } break;
   case LOC_GLOBAL: {
     /* This could probably be implemented more smartly, with advanced
@@ -2751,22 +2937,20 @@ void apply_field_access(struct checkstate *cs,
     x86_gen_mov_reg_stiptr(f, X86_EAX, lhs_loc.u.global_sti);
     x86_gen_lea32(f, X86_EAX, X86_EAX, uint32_to_int32(offset));
     x86_gen_store32(f, X86_EBP, field_ptr_loc.u.ebp_offset, X86_EAX);
-    struct loc field_loc = ebp_indirect_loc(size, size,
-                                            field_ptr_loc.u.ebp_offset);
-    expr_return_set(f, er, field_loc);
+    field_loc = ebp_indirect_loc(size, size, field_ptr_loc.u.ebp_offset);
   } break;
   case LOC_EBP_INDIRECT: {
     struct loc field_ptr_loc = frame_push_loc(h, DWORD_SIZE);
     x86_gen_load32(f, X86_EAX, X86_EBP, lhs_loc.u.ebp_indirect);
     x86_gen_lea32(f, X86_EAX, X86_EAX, uint32_to_int32(offset));
     x86_gen_store32(f, X86_EBP, field_ptr_loc.u.ebp_offset, X86_EAX);
-    struct loc field_loc = ebp_indirect_loc(size, size,
-                                            field_ptr_loc.u.ebp_offset);
-    expr_return_set(f, er, field_loc);
+    field_loc = ebp_indirect_loc(size, size, field_ptr_loc.u.ebp_offset);
   } break;
   default:
     UNREACHABLE();
   }
+
+  expr_return_set(cs, f, h, er, field_loc, field_type, temp_subobject(lhs_tr));
 }
 
 int gen_local_field_access(struct checkstate *cs, struct objfile *f,
@@ -2777,9 +2961,10 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
     return 0;
   }
 
-  apply_field_access(cs, f, h, lhs_er.u.loc,
+  apply_field_access(cs, f, h, lhs_er.u.loc, lhs_er.tr,
                      &a->u.local_field_access.lhs->info.concrete_type,
-                     a->u.local_field_access.fieldname.value, er);
+                     a->u.local_field_access.fieldname.value,
+                     ast_expr_type(a), er);
   return 1;
 }
 
@@ -2812,7 +2997,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
           uint32_t padded_size = size;
           struct loc loc = global_loc(size, padded_size,
                                       inst->symbol_table_index);
-          expr_return_set(f, er, loc);
+          expr_return_set(cs, f, h, er, loc, &inst->type, temp_none());
         }
       }
     } else {
@@ -2821,7 +3006,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
       size_t vi;
       int found_vi = lookup_vardata_by_name(h, a->u.name.ident.value, &vi);
       CHECK(found_vi);
-      expr_return_set(f, er, h->vardata[vi].loc);
+      expr_return_set(cs, f, h, er, h->vardata[vi].loc, h->vardata[vi].concrete_type, temp_none());
     }
     return 1;
   } break;
@@ -2848,9 +3033,13 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return gen_local_field_access(cs, f, h, a, er);
   } break;
   case AST_EXPR_DEREF_FIELD_ACCESS: {
-    struct expr_return lhs_er = open_expr_return();
-    if (!gen_expr(cs, f, h, a->u.deref_field_access.lhs, &lhs_er)) {
-      return 0;
+    struct loc lhs_loc;
+    {
+      struct expr_return lhs_er = open_expr_return();
+      if (!gen_expr(cs, f, h, a->u.deref_field_access.lhs, &lhs_er)) {
+        return 0;
+      }
+      wipe_temporaries(cs, f, h, &lhs_er, &lhs_loc);
     }
 
     struct ast_typeexpr *ptr_target;
@@ -2861,10 +3050,12 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
 
     uint32_t full_size = kira_sizeof(&cs->nt, ptr_target);
     struct expr_return deref_er = open_expr_return();
-    apply_dereference(f, h, lhs_er.u.loc, full_size, &deref_er);
+    apply_dereference(cs, f, h, lhs_loc, full_size, &deref_er, ptr_target);
 
-    apply_field_access(cs, f, h, deref_er.u.loc, ptr_target,
-                       a->u.deref_field_access.fieldname.value, er);
+    /* (We pass deref_er.tr but we know it's temp_none().) */
+    apply_field_access(cs, f, h, deref_er.u.loc, deref_er.tr, ptr_target,
+                       a->u.deref_field_access.fieldname.value,
+                       ast_expr_type(a), er);
     return 1;
   } break;
   case AST_EXPR_TYPED:
@@ -2891,12 +3082,11 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   switch (s->tag) {
   case AST_STATEMENT_EXPR: {
     int32_t saved_offset = frame_save_offset(h);
-    /* TODO: Destroy the object returned if it's a temporary.  (And
-    hey, destroy all temporaries.) */
     struct expr_return er = open_expr_return();
     if (!gen_expr(cs, f, h, s->u.expr, &er)) {
       return 0;
     }
+    gen_destroy_temp(cs, f, h, er.tr);
     frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_RETURN_EXPR: {
@@ -2910,8 +3100,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_VAR: {
-    uint32_t var_size = kira_sizeof(&cs->nt,
-                                    ast_var_statement_type(&s->u.var_statement));
+    struct ast_typeexpr *var_type = ast_var_statement_type(&s->u.var_statement);
+    uint32_t var_size = kira_sizeof(&cs->nt, var_type);
     struct loc var_loc = frame_push_loc(h, var_size);
 
     if (s->u.var_statement.has_rhs) {
@@ -2921,9 +3111,10 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       if (!gen_expr(cs, f, h, s->u.var_statement.rhs, &er)) {
         return 0;
       }
+      /* Do nothing -- er is var_loc, there is nothing to destroy. */
       frame_restore_offset(h, saved_offset);
     } else {
-      /* TODO: Call a constructor if appropriate. */
+      gen_default_construct(cs, f, h, var_loc, var_type);
     }
 
     struct vardata vd;
@@ -2974,13 +3165,17 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   } break;
   case AST_STATEMENT_IFTHEN: {
     int32_t saved_offset = frame_save_offset(h);
-    struct expr_return er = open_expr_return();
-    if (!gen_expr(cs, f, h, s->u.ifthen_statement.condition, &er)) {
-      return 0;
+    struct loc cond_loc;
+    {
+      struct expr_return cond_er = open_expr_return();
+      if (!gen_expr(cs, f, h, s->u.ifthen_statement.condition, &cond_er)) {
+        return 0;
+      }
+      wipe_temporaries(cs, f, h, &cond_er, &cond_loc);
     }
 
     size_t target_number = frame_add_target(h);
-    gen_placeholder_jmp_if_false(f, h, er.u.loc, target_number);
+    gen_placeholder_jmp_if_false(f, h, cond_loc, target_number);
     frame_restore_offset(h, saved_offset);
 
     gen_bracebody(cs, f, h, &s->u.ifthen_statement.thenbody);
@@ -2990,13 +3185,17 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   } break;
   case AST_STATEMENT_IFTHENELSE: {
     int32_t saved_offset = frame_save_offset(h);
-    struct expr_return er = open_expr_return();
-    if (!gen_expr(cs, f, h, s->u.ifthenelse_statement.condition, &er)) {
-      return 0;
+    struct loc cond_loc;
+    {
+      struct expr_return cond_er = open_expr_return();
+      if (!gen_expr(cs, f, h, s->u.ifthenelse_statement.condition, &cond_er)) {
+        return 0;
+      }
+      wipe_temporaries(cs, f, h, &cond_er, &cond_loc);
     }
 
     size_t target_number = frame_add_target(h);
-    gen_placeholder_jmp_if_false(f, h, er.u.loc, target_number);
+    gen_placeholder_jmp_if_false(f, h, cond_loc, target_number);
     frame_restore_offset(h, saved_offset);
 
     gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.thenbody);
@@ -3016,13 +3215,17 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     frame_define_target(h, top_target_number, objfile_section_size(objfile_text(f)));
 
     int32_t saved_offset = frame_save_offset(h);
-    struct expr_return er = open_expr_return();
-    if (!gen_expr(cs, f, h, s->u.while_statement.condition, &er)) {
-      return 0;
+    struct loc cond_loc;
+    {
+      struct expr_return cond_er = open_expr_return();
+      if (!gen_expr(cs, f, h, s->u.while_statement.condition, &cond_er)) {
+        return 0;
+      }
+      wipe_temporaries(cs, f, h, &cond_er, &cond_loc);
     }
 
     size_t bottom_target_number = frame_add_target(h);
-    gen_placeholder_jmp_if_false(f, h, er.u.loc, bottom_target_number);
+    gen_placeholder_jmp_if_false(f, h, cond_loc, bottom_target_number);
     frame_restore_offset(h, saved_offset);
 
     gen_bracebody(cs, f, h, &s->u.while_statement.body);
@@ -3031,7 +3234,6 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
   } break;
   case AST_STATEMENT_FOR: {
-    /* TODO: Call destructor for initializer variable, or expression. */
     struct ast_for_statement *fs = &s->u.for_statement;
     size_t vars_pushed = 0;
     if (fs->has_initializer) {
@@ -3046,25 +3248,29 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     size_t bottom_target_number = SIZE_MAX;
     if (fs->has_condition) {
       int32_t saved_offset = frame_save_offset(h);
-      struct expr_return er = open_expr_return();
-      if (!gen_expr(cs, f, h, fs->condition, &er)) {
-        return 0;
+      struct loc cond_loc;
+      {
+        struct expr_return cond_er = open_expr_return();
+        if (!gen_expr(cs, f, h, fs->condition, &cond_er)) {
+          return 0;
+        }
+        wipe_temporaries(cs, f, h, &cond_er, &cond_loc);
       }
 
       bottom_target_number = frame_add_target(h);
-      gen_placeholder_jmp_if_false(f, h, er.u.loc, bottom_target_number);
+      gen_placeholder_jmp_if_false(f, h, cond_loc, bottom_target_number);
       frame_restore_offset(h, saved_offset);
     }
 
     gen_bracebody(cs, f, h, &fs->body);
 
-    /* TODO: Call destructor for incremente expr. */
     if (fs->has_increment) {
       int32_t saved_offset = frame_save_offset(h);
       struct expr_return er = open_expr_return();
       if (!gen_expr(cs, f, h, fs->increment, &er)) {
         return 0;
       }
+      gen_destroy_temp(cs, f, h, er.tr);
       frame_restore_offset(h, saved_offset);
     }
 
@@ -3075,7 +3281,9 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
     /* TODO: Dedup with code in gen_bracebody. */
     for (size_t i = 0; i < vars_pushed; i++) {
-      frame_pop(h, h->vardata[size_sub(h->vardata_count, 1)].loc.size);
+      struct vardata *vd = &h->vardata[size_sub(h->vardata_count, 1)];
+      gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
+      frame_pop(h, vd->loc.size);
       SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
     }
   } break;
@@ -3099,7 +3307,9 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
   }
 
   for (size_t i = 0; i < vars_pushed; i++) {
-    frame_pop(h, h->vardata[size_sub(h->vardata_count, 1)].loc.size);
+    struct vardata *vd = &h->vardata[size_sub(h->vardata_count, 1)];
+    gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
+    frame_pop(h, vd->loc.size);
     SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
   }
 
@@ -3140,7 +3350,7 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
   int res = gen_bracebody(cs, f, &h, &a->u.lambda.bracebody);
 
   if (res) {
-    gen_function_exit(f, &h);
+    gen_function_exit(cs, f, &h);
     tie_gotos(f, &h);
     tie_stack_adjustments(f, &h);
   }

@@ -137,6 +137,7 @@ struct ast_var_info {
 };
 
 void ast_var_info_specify_varnum(struct ast_var_info *a, size_t varnum);
+size_t ast_var_info_varnum(struct ast_var_info *a);
 
 struct ast_vardecl {
   struct ast_meta meta;
