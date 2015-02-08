@@ -486,11 +486,38 @@ enum ast_expr_tag {
 struct ast_expr_info {
   int is_typechecked;
   struct ast_typeexpr concrete_type;
+
+  /* Does a temporary exist?  Subsequent fields are ignored if not.
+  (All this is only valid if is_typechecked is true.)
+
+  When evaluating, an expr can produce exactly 0 or 1 temporary
+  objects.  The expr's return value could be a subfield or array
+  element of the temporary object. */
+  int temporary_exists;
+  /* The type of the temporary. */
+  struct ast_typeexpr temporary_type;
+  /* Says that the temporary is the whole value this expr returns --
+  field access exprs will have this be false, for example. */
+  int whole_thing;
+  /* The temptag.  Exprs that have the same temporary object have the
+  same temptag. */
+  size_t temptag;
 };
 
 struct ast_expr_info ast_expr_info_default(void);
-struct ast_expr_info ast_expr_info_typechecked(
+struct ast_expr_info ast_expr_info_typechecked_no_temporary(
     struct ast_typeexpr concrete_type);
+struct ast_expr_info ast_expr_info_typechecked_trivial_temporary(
+    struct ast_typeexpr concrete_type);
+struct ast_expr_info ast_expr_info_typechecked_no_or_trivial_temporary(
+    struct ast_typeexpr concrete_type);
+struct ast_expr_info ast_expr_info_typechecked_temporary(
+    struct ast_typeexpr concrete_type,
+    struct ast_typeexpr temporary_type,
+    int whole_thing,
+    size_t temptag);
+struct ast_expr_info ast_expr_info_typechecked_identical(
+    struct ast_expr_info *info);
 
 struct ast_expr {
   enum ast_expr_tag tag;

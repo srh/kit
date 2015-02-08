@@ -923,20 +923,9 @@ int check_typeexpr(struct checkstate *cs,
   }
 }
 
-enum typeexpr_trait {
-  TRAIT_LACKED,
-  TRAIT_HAD,
-  TRAIT_TRIVIALLY_HAD,
-};
-
 enum typeexpr_trait min_typeexpr_trait(enum typeexpr_trait a, enum typeexpr_trait b) {
   return a < b ? a : b;
 }
-
-struct typeexpr_traits {
-  enum typeexpr_trait movable;
-  enum typeexpr_trait copyable;
-};
 
 /* TODO: This should really return a 3-way enum.  It's icky that the
 caller assumes it only needs to check the destructor on
@@ -1325,9 +1314,13 @@ struct exprscope {
   size_t vars_limit;
 
   size_t varnum_counter;
+
+  /* A counter for uniquely numbering temporaries. */
+  size_t temp_counter;
 };
 
-void exprscope_init(struct exprscope *es, struct checkstate *cs,
+void exprscope_init(struct exprscope *es,
+                    struct checkstate *cs,
                     struct ast_generics *generics,
                     struct ast_typeexpr *generics_substitutions,
                     size_t generics_substitutions_count,
@@ -1349,6 +1342,7 @@ void exprscope_init(struct exprscope *es, struct checkstate *cs,
   es->vars_count = 0;
   es->vars_limit = 0;
   es->varnum_counter = 0;
+  es->temp_counter = 0;
 }
 
 void exprscope_destroy(struct exprscope *es) {
@@ -1364,6 +1358,13 @@ void exprscope_destroy(struct exprscope *es) {
   es->vars_count = 0;
   es->vars_limit = 0;
   es->varnum_counter = 0;
+  es->temp_counter = SIZE_MAX;
+}
+
+size_t exprscope_temptag(struct exprscope *es) {
+  /* Notably, never returns zero. */
+  es->temp_counter = size_add(es->temp_counter, 1);
+  return es->temp_counter;
 }
 
 void exprscope_note_static_reference(struct exprscope *es,
@@ -1744,6 +1745,23 @@ void replace_generics(struct exprscope *es,
   }
 }
 
+struct ast_expr_info expr_info_typechecked_subobject(
+    struct ast_typeexpr concrete_type,
+    struct ast_expr_info *info) {
+  CHECK(info->is_typechecked);
+  if (!info->temporary_exists) {
+    return ast_expr_info_typechecked_no_temporary(concrete_type);
+  } else {
+    struct ast_typeexpr temporary_type;
+    ast_typeexpr_init_copy(&temporary_type, &info->temporary_type);
+    return ast_expr_info_typechecked_temporary(
+        concrete_type,
+        temporary_type,
+        0,
+        info->temptag);
+  }
+}
+
 int check_expr(struct exprscope *es,
                struct ast_expr *x,
                struct ast_typeexpr *partial_type,
@@ -1753,21 +1771,24 @@ int check_expr(struct exprscope *es,
 int check_expr_funcall(struct exprscope *es,
                        struct ast_funcall *x,
                        struct ast_typeexpr *partial_type,
-                       struct ast_typeexpr *out,
-                       struct ast_funcall *annotated_out) {
+                       int *is_lvalue_out,
+                       struct ast_expr *annotated_out) {
   size_t args_count = x->args_count;
   size_t args_types_count = size_add(args_count, 1);
   struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
                                                args_types_count);
   struct ast_expr *args_annotated = malloc_mul(sizeof(*args_annotated),
                                                args_count);
+  /* Used for the case where args_count == 1 and we have
+  PRIMITIVE_OP_REINTERPRET.  FML. */
+  /* TODO: Just put is_lvalue in expr_info. */
+  int last_arg_is_lvalue = 0;
   size_t i;
   for (i = 0; i < args_count; i++) {
     struct ast_typeexpr local_partial;
     local_partial.tag = AST_TYPEEXPR_UNKNOWN;
-    int lvalue_discard;
     if (!check_expr(es, &x->args[i], &local_partial,
-                    &lvalue_discard, &args_annotated[i])) {
+                    &last_arg_is_lvalue, &args_annotated[i])) {
       goto fail_cleanup_args_types_and_annotated;
     }
     ast_typeexpr_init_copy(&args_types[i],
@@ -1790,9 +1811,42 @@ int check_expr_funcall(struct exprscope *es,
     goto fail_cleanup_funcexpr;
   }
 
+  /* We need to analyze annotated_func to see if it's a
+  PRIMITIVE_OP_REINTERPRET op, which affects the calculation of
+  whether a temporary object happens. */
+
+  int is_PRIMITIVE_OP_REINTERPRET = 0;
+  if (annotated_func.tag == AST_EXPR_NAME) {
+    CHECK(annotated_func.u.name.info.info_valid);
+    if (annotated_func.u.name.info.inst_or_null
+        && annotated_func.u.name.info.inst_or_null->owner->is_primitive
+        && annotated_func.u.name.info.inst_or_null->owner->primitive_op == PRIMITIVE_OP_REINTERPRET) {
+      is_PRIMITIVE_OP_REINTERPRET = 1;
+    }
+  }
+
+  struct ast_typeexpr return_type;
   copy_func_return_type(es->cs->im, ast_expr_type(&annotated_func),
-                        args_types_count, out);
-  ast_funcall_init(annotated_out, ast_meta_make_copy(&x->meta),
+                        args_types_count, &return_type);
+
+  struct ast_expr_info expr_info;
+  if (is_PRIMITIVE_OP_REINTERPRET) {
+    CHECK(args_count == 1);
+    *is_lvalue_out = last_arg_is_lvalue;
+    expr_info = expr_info_typechecked_subobject(return_type, &args_annotated[0].info);
+  } else {
+    *is_lvalue_out = 0;
+    struct ast_typeexpr temporary_type;
+    ast_typeexpr_init_copy(&temporary_type, &return_type);
+    expr_info = ast_expr_info_typechecked_temporary(
+        return_type,
+        temporary_type,
+        1,
+        exprscope_temptag(es));
+  }
+
+  ast_expr_partial_init(annotated_out, AST_EXPR_FUNCALL, expr_info);
+  ast_funcall_init(&annotated_out->u.funcall, ast_meta_make_copy(&x->meta),
                    annotated_func, args_annotated, args_count);
 
   ast_typeexpr_destroy(&funcexpr);
@@ -2653,9 +2707,8 @@ void wrap_in_ptr(struct identmap *im,
 int check_expr_magic_unop(struct exprscope *es,
                           struct ast_unop_expr *x,
                           struct ast_typeexpr *partial_type,
-                          struct ast_typeexpr *out,
                           int *is_lvalue_out,
-                          struct ast_unop_expr *annotated_out) {
+                          struct ast_expr *annotated_out) {
   if (es->computation == STATIC_COMPUTATION_YES) {
     METERR(x->meta, "Magic unops not allowed in static expressions.%s", "\n");
     return 0;
@@ -2687,9 +2740,12 @@ int check_expr_magic_unop(struct exprscope *es,
       goto cleanup_rhs;
     }
 
-    ast_typeexpr_init_copy(out, rhs_target);
+    struct ast_typeexpr return_type;
+    ast_typeexpr_init_copy(&return_type, rhs_target);
     *is_lvalue_out = 1;
-    ast_unop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
+    ast_expr_partial_init(annotated_out, AST_EXPR_UNOP,
+                          ast_expr_info_typechecked_no_temporary(return_type));
+    ast_unop_expr_init(&annotated_out->u.unop_expr, ast_meta_make_copy(&x->meta),
                        x->operator, annotated_rhs);
     ret = 1;
   } break;
@@ -2709,9 +2765,11 @@ int check_expr_magic_unop(struct exprscope *es,
       goto cleanup_rhs;
     }
 
-    *out = pointer_type;
     *is_lvalue_out = 0;
-    ast_unop_expr_init(annotated_out, ast_meta_make_copy(&x->meta),
+    /* addressof returns a pointer, which is a temporary though it is also trivial. */
+    ast_expr_partial_init(annotated_out, AST_EXPR_UNOP,
+                          ast_expr_info_typechecked_trivial_temporary(pointer_type));
+    ast_unop_expr_init(&annotated_out->u.unop_expr, ast_meta_make_copy(&x->meta),
                        x->operator, annotated_rhs);
     ret = 1;
   } break;
@@ -2733,11 +2791,10 @@ int check_expr_magic_unop(struct exprscope *es,
 int check_expr_unop(struct exprscope *es,
                     struct ast_unop_expr *x,
                     struct ast_typeexpr *partial_type,
-                    struct ast_typeexpr *out,
                     int *is_lvalue_out,
-                    struct ast_unop_expr *annotated_out) {
+                    struct ast_expr *annotated_out) {
   CHECK(is_magic_unop(x->operator));
-  return check_expr_magic_unop(es, x, partial_type, out, is_lvalue_out,
+  return check_expr_magic_unop(es, x, partial_type, is_lvalue_out,
                                annotated_out);
 }
 
@@ -2945,9 +3002,8 @@ int check_is_index_rhs_type(struct checkstate *cs, struct ast_typeexpr *type) {
 int check_index_expr(struct exprscope *es,
                      struct ast_index_expr *a,
                      struct ast_typeexpr *partial_type,
-                     struct ast_typeexpr *return_type_out,
                      int *is_lvalue_out,
-                     struct ast_index_expr *annotated_out) {
+                     struct ast_expr *annotated_out) {
   struct ast_typeexpr no_partial_type;
   no_partial_type.tag = AST_TYPEEXPR_UNKNOWN;
 
@@ -2990,10 +3046,21 @@ int check_index_expr(struct exprscope *es,
     goto fail_rhs_annotated;
   }
 
-  ast_typeexpr_init_copy(return_type_out, lhs_target);
+  struct ast_typeexpr return_type;
+  ast_typeexpr_init_copy(&return_type, lhs_target);
 
   *is_lvalue_out = is_lvalue;
-  ast_index_expr_init(annotated_out,
+
+  struct ast_expr_info expr_info;
+
+  if (lhs_type->tag == AST_TYPEEXPR_ARRAY) {
+    expr_info = expr_info_typechecked_subobject(return_type, &lhs_annotated.info);
+  } else {
+    expr_info = ast_expr_info_typechecked_no_temporary(return_type);
+  }
+
+  ast_expr_partial_init(annotated_out, AST_EXPR_INDEX, expr_info);
+  ast_index_expr_init(&annotated_out->u.index_expr,
                       ast_meta_make_copy(&a->meta),
                       lhs_annotated,
                       rhs_annotated);
@@ -3044,7 +3111,8 @@ int check_expr(struct exprscope *es,
       return 0;
     }
     *is_lvalue_out = is_lvalue;
-    ast_expr_partial_init(annotated_out, AST_EXPR_NAME, ast_expr_info_typechecked(name_type));
+    ast_expr_partial_init(annotated_out, AST_EXPR_NAME,
+                          ast_expr_info_typechecked_no_temporary(name_type));
     annotated_out->u.name = replaced_name;
     ast_name_expr_info_mark_inst(&annotated_out->u.name.info, inst_or_null);
     return 1;
@@ -3059,43 +3127,22 @@ int check_expr(struct exprscope *es,
     }
     *is_lvalue_out = 0;
     ast_expr_partial_init(annotated_out, AST_EXPR_NUMERIC_LITERAL,
-                          ast_expr_info_typechecked(num_type));
+                          ast_expr_info_typechecked_no_temporary(num_type));
     ast_numeric_literal_init_copy(&annotated_out->u.numeric_literal,
                                   &x->u.numeric_literal);
     return 1;
   } break;
   case AST_EXPR_FUNCALL: {
-    struct ast_typeexpr return_type;
-    if (!check_expr_funcall(es, &x->u.funcall, partial_type,
-                            &return_type, &annotated_out->u.funcall)) {
-      return 0;
-    }
-    *is_lvalue_out = 0;
-    ast_expr_partial_init(annotated_out, AST_EXPR_FUNCALL,
-                          ast_expr_info_typechecked(return_type));
-    return 1;
+    return check_expr_funcall(es, &x->u.funcall, partial_type,
+                              is_lvalue_out, annotated_out);
   } break;
   case AST_EXPR_INDEX: {
-    struct ast_typeexpr return_type;
-    int is_lvalue;
-    if (!check_index_expr(es, &x->u.index_expr, partial_type,
-                          &return_type, &is_lvalue, &annotated_out->u.index_expr)) {
-      return 0;
-    }
-    *is_lvalue_out = is_lvalue;
-    ast_expr_partial_init(annotated_out, AST_EXPR_INDEX,
-                          ast_expr_info_typechecked(return_type));
-    return 1;
+    return check_index_expr(es, &x->u.index_expr, partial_type,
+                            is_lvalue_out, annotated_out);
   } break;
   case AST_EXPR_UNOP: {
-    struct ast_typeexpr return_type;
-    if (!check_expr_unop(es, &x->u.unop_expr, partial_type,
-                         &return_type, is_lvalue_out, &annotated_out->u.unop_expr)) {
-      return 0;
-    }
-    ast_expr_partial_init(annotated_out, AST_EXPR_UNOP,
-                          ast_expr_info_typechecked(return_type));
-    return 1;
+    return check_expr_unop(es, &x->u.unop_expr, partial_type,
+                           is_lvalue_out, annotated_out);
   } break;
   case AST_EXPR_BINOP: {
     struct ast_typeexpr return_type;
@@ -3103,8 +3150,10 @@ int check_expr(struct exprscope *es,
                           &return_type, is_lvalue_out, &annotated_out->u.binop_expr)) {
       return 0;
     }
+    /* Assignment opers return no temporary, and logical opers return
+    a trivial temporary. */
     ast_expr_partial_init(annotated_out, AST_EXPR_BINOP,
-                          ast_expr_info_typechecked(return_type));
+                          ast_expr_info_typechecked_no_or_trivial_temporary(return_type));
     return 1;
   } break;
   case AST_EXPR_LAMBDA: {
@@ -3114,8 +3163,10 @@ int check_expr(struct exprscope *es,
       return 0;
     }
     *is_lvalue_out = 0;
+    /* Function pointers (whenever they get supported) for C-style
+    functions are trivial.*/
     ast_expr_partial_init(annotated_out, AST_EXPR_LAMBDA,
-                          ast_expr_info_typechecked(type));
+                          ast_expr_info_typechecked_trivial_temporary(type));
     return 1;
   } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
@@ -3125,8 +3176,11 @@ int check_expr(struct exprscope *es,
                                        &annotated_out->u.local_field_access)) {
       return 0;
     }
-    ast_expr_partial_init(annotated_out, AST_EXPR_LOCAL_FIELD_ACCESS,
-                          ast_expr_info_typechecked(type));
+    ast_expr_partial_init(annotated_out,
+                          AST_EXPR_LOCAL_FIELD_ACCESS,
+                          expr_info_typechecked_subobject(
+                              type,
+                              &annotated_out->u.local_field_access.lhs->info));
     return 1;
   } break;
   case AST_EXPR_DEREF_FIELD_ACCESS: {
@@ -3136,8 +3190,10 @@ int check_expr(struct exprscope *es,
                                        &annotated_out->u.deref_field_access)) {
       return 0;
     }
-    ast_expr_partial_init(annotated_out, AST_EXPR_DEREF_FIELD_ACCESS,
-                          ast_expr_info_typechecked(type));
+    /* No temporary, because we're derefing a pointer. */
+    ast_expr_partial_init(annotated_out,
+                          AST_EXPR_DEREF_FIELD_ACCESS,
+                          ast_expr_info_typechecked_no_temporary(type));
     return 1;
   } break;
   case AST_EXPR_TYPED: {
@@ -3151,11 +3207,13 @@ int check_expr(struct exprscope *es,
       ast_typeexpr_destroy(&replaced_type);
       return 0;
     }
+    ast_typeexpr_destroy(&replaced_type);
 
     struct ast_typeexpr old_type_copy;
     ast_typeexpr_init_copy(&old_type_copy, &x->u.typed_expr.type);
     ast_expr_partial_init(annotated_out, AST_EXPR_TYPED,
-                          ast_expr_info_typechecked(replaced_type));
+                          ast_expr_info_typechecked_identical(
+                              &annotated_lhs.info));
     ast_typed_expr_init(&annotated_out->u.typed_expr,
                         ast_meta_make_copy(&x->u.typed_expr.meta),
                         annotated_lhs,

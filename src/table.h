@@ -206,6 +206,9 @@ void static_value_init_copy(struct static_value *a, struct static_value *c);
 void static_value_destroy(struct static_value *a);
 
 struct def_instantiation {
+  /* TODO: Sigh, backpointers. */
+  struct def_entry *owner;
+
   int typecheck_started;
   struct ast_typeexpr *substitutions;
   size_t substitutions_count;

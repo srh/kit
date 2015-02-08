@@ -86,9 +86,11 @@ void static_value_destroy(struct static_value *sv) {
 }
 
 void def_instantiation_init(struct def_instantiation *a,
+                            struct def_entry *owner,
                             struct ast_typeexpr **substitutions,
                             size_t *substitutions_count,
                             struct ast_typeexpr *concrete_type) {
+  a->owner = owner;
   a->typecheck_started = 0;
   a->substitutions = *substitutions;
   a->substitutions_count = *substitutions_count;
@@ -101,6 +103,7 @@ void def_instantiation_init(struct def_instantiation *a,
 }
 
 void def_instantiation_destroy(struct def_instantiation *a) {
+  a->owner = NULL;
   a->typecheck_started = 0;
   SLICE_FREE(a->substitutions, a->substitutions_count, ast_typeexpr_destroy);
   ast_typeexpr_destroy(&a->type);
@@ -969,7 +972,7 @@ struct def_instantiation *def_entry_insert_instantiation(
 
   struct def_instantiation *inst = malloc(sizeof(*inst));
   CHECK(inst);
-  def_instantiation_init(inst, &copy, &copy_count, concrete_type);
+  def_instantiation_init(inst, ent, &copy, &copy_count, concrete_type);
   SLICE_PUSH(ent->instantiations, ent->instantiations_count,
              ent->instantiations_limit, inst);
   return inst;

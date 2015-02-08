@@ -524,12 +524,21 @@ struct labeldata *frame_try_find_labeldata(struct frame *h, ident_value labelnam
   return NULL;
 }
 
-int exists_hidden_return_param(struct name_table *nt, struct ast_typeexpr *return_type,
+int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *return_type,
                                uint32_t *return_type_size_out) {
-  uint32_t return_type_size = kira_sizeof(nt, return_type);
+  uint32_t return_type_size = kira_sizeof(&cs->nt, return_type);
   *return_type_size_out = return_type_size;
-  return !(return_type_size <= 2 || return_type_size == DWORD_SIZE
-           || return_type_size == 2 * DWORD_SIZE);
+  if (!(return_type_size <= 2 || return_type_size == DWORD_SIZE
+        || return_type_size == 2 * DWORD_SIZE)) {
+    return 1;
+  } else {
+    struct typeexpr_traits traits;
+    int success = check_typeexpr_traits(cs, return_type, &traits);
+    CHECK(success);
+    /* WINDOWS: This ain't C++, and this ain't consistent with the
+    Windows calling convention regarding non-pod (for C++03) types. */
+    return traits.movable != TRAIT_TRIVIALLY_HAD;
+  }
 }
 
 /* X86 and maybe WINDOWS-specific calling convention stuff. */
@@ -540,7 +549,7 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
     = expose_func_return_type(cs->im, type, size_add(args_count, 1));
 
   uint32_t return_type_size;
-  int is_return_hidden = exists_hidden_return_param(&cs->nt, return_type, &return_type_size);
+  int is_return_hidden = exists_hidden_return_param(cs, return_type, &return_type_size);
   int32_t offset = (2 + is_return_hidden) * DWORD_SIZE;
 
   for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
@@ -2330,7 +2339,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   }
 
   uint32_t return_size;
-  int hidden_return_param = exists_hidden_return_param(&cs->nt, ast_expr_type(a),
+  int hidden_return_param = exists_hidden_return_param(cs, ast_expr_type(a),
                                                        &return_size);
 
   /* X86 */

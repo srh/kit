@@ -827,11 +827,37 @@ struct ast_expr_info ast_expr_info_default(void) {
   return ret;
 }
 
-struct ast_expr_info ast_expr_info_typechecked(
+struct ast_expr_info ast_expr_info_typechecked_no_temporary(
     struct ast_typeexpr concrete_type) {
   struct ast_expr_info ret;
   ret.is_typechecked = 1;
   ret.concrete_type = concrete_type;
+  ret.temporary_exists = 0;
+  return ret;
+}
+
+struct ast_expr_info ast_expr_info_typechecked_trivial_temporary(
+    struct ast_typeexpr concrete_type) {
+  return ast_expr_info_typechecked_no_temporary(concrete_type);
+}
+
+struct ast_expr_info ast_expr_info_typechecked_no_or_trivial_temporary(
+    struct ast_typeexpr concrete_type) {
+  return ast_expr_info_typechecked_no_temporary(concrete_type);
+}
+
+struct ast_expr_info ast_expr_info_typechecked_temporary(
+    struct ast_typeexpr concrete_type,
+    struct ast_typeexpr temporary_type,
+    int whole_thing,
+    size_t temptag) {
+  struct ast_expr_info ret;
+  ret.is_typechecked = 1;
+  ret.concrete_type = concrete_type;
+  ret.temporary_exists = 1;
+  ret.temporary_type = temporary_type;
+  ret.whole_thing = whole_thing;
+  ret.temptag = temptag;
   return ret;
 }
 
@@ -839,12 +865,31 @@ void ast_expr_info_init_copy(struct ast_expr_info *a, struct ast_expr_info *c) {
   a->is_typechecked = c->is_typechecked;
   if (c->is_typechecked) {
     ast_typeexpr_init_copy(&a->concrete_type, &c->concrete_type);
+    a->temporary_exists = c->temporary_exists;
+    if (c->temporary_exists) {
+      ast_typeexpr_init_copy(&a->temporary_type, &c->temporary_type);
+      a->whole_thing = c->whole_thing;
+      a->temptag = c->temptag;
+    }
   }
+}
+
+struct ast_expr_info ast_expr_info_typechecked_identical(
+    struct ast_expr_info *info) {
+  struct ast_expr_info ret;
+  ast_expr_info_init_copy(&ret, info);
+  return ret;
 }
 
 void ast_expr_info_destroy(struct ast_expr_info *m) {
   if (m->is_typechecked) {
     ast_typeexpr_destroy(&m->concrete_type);
+    if (m->temporary_exists) {
+      ast_typeexpr_destroy(&m->temporary_type);
+      m->whole_thing = 0;
+      m->temptag = 0;
+      m->temporary_exists = 0;
+    }
     m->is_typechecked = 0;
   }
 }

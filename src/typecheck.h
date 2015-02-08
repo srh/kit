@@ -88,4 +88,21 @@ int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
 int numeric_literal_to_i32(int8_t *digits, size_t digits_count,
                            int32_t *out);
 
+/* TODO: Rename enum values to TYPEEXPR_TRAIT_... */
+enum typeexpr_trait {
+  TRAIT_LACKED,
+  TRAIT_HAD,
+  TRAIT_TRIVIALLY_HAD,
+};
+
+struct typeexpr_traits {
+  enum typeexpr_trait movable;
+  enum typeexpr_trait copyable;
+};
+
+int check_typeexpr_traits(struct checkstate *cs,
+                          /* a is a concrete type. */
+                          struct ast_typeexpr *a,
+                          struct typeexpr_traits *out);
+
 #endif /* KIRA_TYPECHECK_H_ */
