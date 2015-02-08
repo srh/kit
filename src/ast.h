@@ -485,6 +485,7 @@ enum ast_expr_tag {
 
 struct ast_expr_info {
   int is_typechecked;
+  int is_lvalue;
   struct ast_typeexpr concrete_type;
 
   /* Does a temporary exist?  Subsequent fields are ignored if not.
@@ -506,12 +507,16 @@ struct ast_expr_info {
 
 struct ast_expr_info ast_expr_info_default(void);
 struct ast_expr_info ast_expr_info_typechecked_no_temporary(
+    int is_lvalue,
     struct ast_typeexpr concrete_type);
 struct ast_expr_info ast_expr_info_typechecked_trivial_temporary(
+    int is_lvalue,
     struct ast_typeexpr concrete_type);
 struct ast_expr_info ast_expr_info_typechecked_no_or_trivial_temporary(
+    int is_lvalue,
     struct ast_typeexpr concrete_type);
 struct ast_expr_info ast_expr_info_typechecked_temporary(
+    int is_lvalue,
     struct ast_typeexpr concrete_type,
     struct ast_typeexpr temporary_type,
     int whole_thing,
