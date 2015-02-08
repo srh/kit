@@ -308,8 +308,13 @@ void ast_statement_destroy(struct ast_statement *a);
 void ast_statement_alloc_move(struct ast_statement movee,
                               struct ast_statement **out);
 
+struct ast_lambda_info {
+  int info_valid;
+};
+
 struct ast_lambda {
   struct ast_meta meta;
+  struct ast_lambda_info info;
   struct ast_vardecl *params;
   size_t params_count;
   struct ast_typeexpr return_type;
