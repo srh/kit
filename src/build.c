@@ -293,7 +293,7 @@ int loc_equal(struct loc a, struct loc b) {
 
 struct vardata {
   ident_value name;
-  size_t number;
+  size_t varnum;
 
   /* A non-owned reference to the type. */
   struct ast_typeexpr *concrete_type;
@@ -302,11 +302,11 @@ struct vardata {
 
 void vardata_init(struct vardata *vd,
                   ident_value name,
-                  size_t var_number,
+                  size_t varnum,
                   struct ast_typeexpr *concrete_type,
                   struct loc loc) {
   vd->name = name;
-  vd->number = var_number;
+  vd->varnum = varnum;
   vd->concrete_type = concrete_type;
   vd->loc = loc;
 }
@@ -365,8 +365,6 @@ struct reset_esp_data {
 };
 
 struct frame {
-  size_t var_number;
-
   struct vardata *vardata;
   size_t vardata_count;
   size_t vardata_limit;
@@ -411,8 +409,6 @@ struct frame {
 };
 
 void frame_init(struct frame *h) {
-  h->var_number = 0;
-
   h->vardata = NULL;
   h->vardata_count = 0;
   h->vardata_limit = 0;
@@ -576,12 +572,11 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
 
     struct loc loc = ebp_loc(size, padded_size, offset);
 
-    size_t var_number = h->var_number;
-    h->var_number++;
+    size_t varnum = ast_var_info_varnum(&expr->u.lambda.params[i].var_info);
 
     struct vardata vd;
     vardata_init(&vd, expr->u.lambda.params[i].name.value,
-                 var_number, param_type, loc);
+                 varnum, param_type, loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
     vars_pushed = size_add(vars_pushed, 1);
@@ -3118,10 +3113,9 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     }
 
     struct vardata vd;
-    size_t var_number = h->var_number;
-    h->var_number++;
+    size_t varnum = ast_var_info_varnum(&s->u.var_statement.decl.var_info);
     vardata_init(&vd, s->u.var_statement.decl.name.value,
-                 var_number,
+                 varnum,
                  ast_var_statement_type(&s->u.var_statement),
                  var_loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
