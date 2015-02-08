@@ -1402,7 +1402,7 @@ int check_var_shadowing(struct exprscope *es, struct ast_ident *name) {
 }
 
 int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var,
-                       size_t *varnum_out) {
+                       struct varnum *varnum_out) {
   if (!check_var_shadowing(es, &var->name)) {
     return 0;
   }
@@ -1414,7 +1414,7 @@ int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var,
   pair.varnum = varnum;
 
   SLICE_PUSH(es->vars, es->vars_count, es->vars_limit, pair);
-  *varnum_out = varnum;
+  varnum_out->value = varnum;
   return 1;
 }
 
@@ -2047,7 +2047,7 @@ int check_statement(struct bodystate *bs,
     ast_vardecl_init(replaced_decl, ast_meta_make_copy(&s->u.var_statement.decl.meta), name,
                      replaced_type_copy);
 
-    size_t varnum;
+    struct varnum varnum;
     if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
       free_ast_vardecl(&replaced_decl);
       ast_typeexpr_destroy(&replaced_type);
@@ -2479,7 +2479,7 @@ int check_expr_lambda(struct exprscope *es,
                  es->accessible, es->accessible_count,
                  STATIC_COMPUTATION_NO, NULL);
 
-  size_t *varnums = malloc_mul(sizeof(*varnums), func_params_count);
+  struct varnum *varnums = malloc_mul(sizeof(*varnums), func_params_count);
 
   for (size_t i = 0; i < func_params_count; i++) {
     int res = exprscope_push_var(&bb_es, &replaced_vardecls[i], &varnums[i]);

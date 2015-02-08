@@ -119,13 +119,13 @@ void ast_var_info_destroy(struct ast_var_info *a) {
   a->info_valid = 0;
 }
 
-void ast_var_info_specify_varnum(struct ast_var_info *a, size_t varnum) {
+void ast_var_info_specify_varnum(struct ast_var_info *a, struct varnum varnum) {
   CHECK(!a->info_valid);
   a->info_valid = 1;
   a->varnum = varnum;
 }
 
-size_t ast_var_info_varnum(struct ast_var_info *a) {
+struct varnum ast_var_info_varnum(struct ast_var_info *a) {
   CHECK(a->info_valid);
   return a->varnum;
 }
