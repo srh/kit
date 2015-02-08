@@ -286,8 +286,6 @@ struct vardata {
 
   /* A non-owned reference to the type. */
   struct ast_typeexpr *concrete_type;
-  /* The size of the type. */
-  uint32_t size;
   struct loc loc;
 };
 
@@ -295,13 +293,11 @@ void vardata_init(struct vardata *vd,
                   ident_value name,
                   size_t var_number,
                   struct ast_typeexpr *concrete_type,
-                  uint32_t size,
-                  struct loc initial_loc) {
+                  struct loc loc) {
   vd->name = name;
   vd->number = var_number;
   vd->concrete_type = concrete_type;
-  vd->size = size;
-  vd->loc = initial_loc;
+  vd->loc = loc;
 }
 
 void vardata_init_copy(struct vardata *vd,
@@ -312,7 +308,6 @@ void vardata_init_copy(struct vardata *vd,
 void vardata_destroy(struct vardata *vd) {
   vd->name = IDENT_VALUE_INVALID;
   vd->concrete_type = NULL;
-  vd->size = 0;
   vd->loc.tag = (enum loc_tag)-1;
 }
 
@@ -565,7 +560,7 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
 
     struct vardata vd;
     vardata_init(&vd, expr->u.lambda.params[i].name.value,
-                 var_number, param_type, size, loc);
+                 var_number, param_type, loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
     offset = int32_add(offset, uint32_to_int32(padded_size));
@@ -2937,7 +2932,6 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     vardata_init(&vd, s->u.var_statement.decl.name.value,
                  var_number,
                  ast_var_statement_type(&s->u.var_statement),
-                 var_size,
                  var_loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
     (*vars_pushed_ref)++;
@@ -3081,7 +3075,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
     /* TODO: Dedup with code in gen_bracebody. */
     for (size_t i = 0; i < vars_pushed; i++) {
-      frame_pop(h, h->vardata[size_sub(h->vardata_count, 1)].size);
+      frame_pop(h, h->vardata[size_sub(h->vardata_count, 1)].loc.size);
       SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
     }
   } break;
@@ -3105,7 +3099,7 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
   }
 
   for (size_t i = 0; i < vars_pushed; i++) {
-    frame_pop(h, h->vardata[size_sub(h->vardata_count, 1)].size);
+    frame_pop(h, h->vardata[size_sub(h->vardata_count, 1)].loc.size);
     SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
   }
 
