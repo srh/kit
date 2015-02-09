@@ -2097,9 +2097,9 @@ int check_statement(struct bodystate *bs,
       vars_in_scope[i] = bs->es->vars[i].varnum;
     }
 
-    ast_label_info_set_vars_in_scope(&annotated_out->u.label_statement.info,
-                                     vars_in_scope,
-                                     vars_in_scope_count);
+    ast_statement_info_set_vars_in_scope(&annotated_out->u.label_statement.info,
+                                         vars_in_scope,
+                                         vars_in_scope_count);
 
     fallthrough = FALLTHROUGH_NONLOCAL;
   } break;

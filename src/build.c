@@ -328,12 +328,12 @@ struct labeldata {
   size_t target_number;
 
   /* An unowned reference. */
-  struct ast_label_info *label_info;
+  struct ast_statement_info *label_info;
 };
 
 void labeldata_init(struct labeldata *ld, ident_value labelname,
                     size_t target_number,
-                    struct ast_label_info *label_info) {
+                    struct ast_statement_info *label_info) {
   ld->labelname = labelname;
   ld->target_number = target_number;
   ld->label_info = label_info;

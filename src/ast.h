@@ -194,6 +194,16 @@ void ast_var_statement_init_without_rhs(struct ast_var_statement *a, struct ast_
 
 struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a);
 
+struct ast_statement_info {
+  int info_valid;
+  struct varnum *vars_in_scope;
+  size_t vars_in_scope_count;
+};
+
+void ast_statement_info_set_vars_in_scope(struct ast_statement_info *a,
+                                          struct varnum *vars_in_scope,
+                                          size_t vars_in_scope_count);
+
 struct ast_goto_statement {
   struct ast_meta meta;
   struct ast_ident target;
@@ -202,19 +212,9 @@ struct ast_goto_statement {
 void ast_goto_statement_init(struct ast_goto_statement *a,
                              struct ast_meta meta, struct ast_ident target);
 
-struct ast_label_info {
-  int info_valid;
-  struct varnum *vars_in_scope;
-  size_t vars_in_scope_count;
-};
-
-void ast_label_info_set_vars_in_scope(struct ast_label_info *a,
-                                      struct varnum *vars_in_scope,
-                                      size_t vars_in_scope_count);
-
 struct ast_label_statement {
   struct ast_meta meta;
-  struct ast_label_info info;
+  struct ast_statement_info info;
   struct ast_ident label;
 };
 
