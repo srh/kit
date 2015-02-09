@@ -9,20 +9,16 @@ def print func[u32, u32] = fn(x u32) u32 {
   } else {
     var acc u32 = 0u;
     var count u32 = 0u;
-    label top;
-    if (x > 0u) {
+    while (x > 0u) {
       acc = acc * 10u + x % 10u;
       x = x / 10u;
       count = count + 1u;
-      goto top;
     }
-    label printtop;
-    if (printed < count) {
+    while (printed < count) {
       var ch i32 = ~(48u | (acc % 10u));
       putchar(ch);
       acc = acc / 10u;
       printed = printed + 1u;
-      goto printtop;
     }
     return printed;
   }
