@@ -100,9 +100,11 @@ struct typeexpr_traits {
   enum typeexpr_trait copyable;
 };
 
+struct exprscope;
 int check_typeexpr_traits(struct checkstate *cs,
                           /* a is a concrete type. */
                           struct ast_typeexpr *a,
+                          struct exprscope *also_typecheck,
                           struct typeexpr_traits *out);
 
 #endif /* KIRA_TYPECHECK_H_ */

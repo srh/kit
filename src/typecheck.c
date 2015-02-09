@@ -17,6 +17,14 @@
 
 #define CHECK_DBG(...) do { } while (0)
 
+struct exprscope;
+int lookup_global_maybe_typecheck(struct exprscope *es,
+                                  struct ast_name_expr *name,
+                                  struct ast_typeexpr *partial_type,
+                                  struct ast_typeexpr *out,
+                                  int *is_lvalue_out,
+                                  struct def_instantiation **inst_out);
+
 const int MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH = 50;
 
 uint32_t numeric_type_size(enum numeric_type t) {
@@ -977,46 +985,66 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
                                  /* copy/move takes 2, destroy takes 1. */
                                  size_t argdupes,
                                  const char *name,
+                                 struct exprscope *also_typecheck,
                                  int *result_out) {
   struct ast_typeexpr func_type;
   make_pointee_func_lookup_type(cs, a, argdupes, &func_type);
 
-  struct ast_ident func_name = make_ast_ident(identmap_intern_c_str(cs->im, name));
+  struct ast_name_expr func_name;
+  ast_name_expr_init(&func_name, make_ast_ident(identmap_intern_c_str(cs->im, name)));
 
-  /* TODO: Where do the copy constructors and the like (for a specific instantiation) get type-checked? */
   size_t matching_defs = name_table_count_matching_defs(&cs->nt,
-                                                        &func_name,
+                                                        &func_name.ident,
                                                         NULL,
                                                         0,
                                                         &func_type);
 
-  ast_ident_destroy(&func_name);
-  ast_typeexpr_destroy(&func_type);
-
   if (matching_defs < 2) {
+    if (matching_defs == 1 && also_typecheck) {
+      struct ast_typeexpr unified;
+      int lvalue_discard;
+      struct def_instantiation *inst;
+      if (!lookup_global_maybe_typecheck(also_typecheck,
+                                         &func_name,
+                                         &func_type,
+                                         &unified,
+                                         &lvalue_discard,
+                                         &inst)) {
+        goto fail;
+      }
+      ast_typeexpr_destroy(&unified);
+    }
+
+    ast_name_expr_destroy(&func_name);
+    ast_typeexpr_destroy(&func_type);
+
     *result_out = (matching_defs == 1);
     return 1;
-  } else {
-    METERR(*ast_typeexpr_meta(a), "Multiple matching %s definitions\n", name);
-    return 0;
   }
+
+  METERR(*ast_typeexpr_meta(a), "Multiple matching %s definitions\n", name);
+ fail:
+  ast_name_expr_destroy(&func_name);
+  ast_typeexpr_destroy(&func_type);
+  return 0;
 }
 
-int has_explicit_copy(struct checkstate *cs, struct ast_typeexpr *a, int *result_out) {
-  return has_explicit_movecopydestroy(cs, a, 2, "copy", result_out);
+int has_explicit_copy(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out) {
+  return has_explicit_movecopydestroy(cs, a, 2, "copy", also_typecheck, result_out);
 }
 
-int has_explicit_destroy(struct checkstate *cs, struct ast_typeexpr *a, int *result_out) {
-  return has_explicit_movecopydestroy(cs, a, 1, "destroy", result_out);
+int has_explicit_destroy(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out) {
+  return has_explicit_movecopydestroy(cs, a, 1, "destroy", also_typecheck, result_out);
 }
 
-int has_explicit_move(struct checkstate *cs, struct ast_typeexpr *a, int *result_out) {
-  return has_explicit_movecopydestroy(cs, a, 2, "move", result_out);
+int has_explicit_move(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out) {
+  return has_explicit_movecopydestroy(cs, a, 2, "move", also_typecheck, result_out);
 }
 
 int check_typeexpr_traits(struct checkstate *cs,
                           /* a is a concrete type. */
                           struct ast_typeexpr *a,
+                          struct exprscope *also_typecheck,
                           struct typeexpr_traits *out);
 
 int finish_checking_name_traits(struct checkstate *cs,
@@ -1025,6 +1053,7 @@ int finish_checking_name_traits(struct checkstate *cs,
                                 struct ast_meta *deftype_meta,
                                 enum ast_deftype_disposition deftype_disposition,
                                 struct ast_typeexpr *concrete_deftype_type,
+                                struct exprscope *also_typecheck,
                                 struct typeexpr_traits *out) {
   int lookup_move;
   int lookup_copy;
@@ -1032,23 +1061,23 @@ int finish_checking_name_traits(struct checkstate *cs,
 
   struct typeexpr_traits rhs_traits = { 0 };
   if (!(lookup_move && lookup_copy)) {
-    if (!check_typeexpr_traits(cs, concrete_deftype_type, &rhs_traits)) {
+    if (!check_typeexpr_traits(cs, concrete_deftype_type, also_typecheck, &rhs_traits)) {
       return 0;
     }
   }
 
   int explicit_move;
-  if (!has_explicit_move(cs, a, &explicit_move)) {
+  if (!has_explicit_move(cs, a, also_typecheck, &explicit_move)) {
     return 0;
   }
 
   int explicit_copy;
-  if (!has_explicit_copy(cs, a, &explicit_copy)) {
+  if (!has_explicit_copy(cs, a, also_typecheck, &explicit_copy)) {
     return 0;
   }
 
   int explicit_destroy;
-  if (!has_explicit_destroy(cs, a, &explicit_destroy)) {
+  if (!has_explicit_destroy(cs, a, also_typecheck, &explicit_destroy)) {
     return 0;
   }
 
@@ -1084,6 +1113,7 @@ int finish_checking_name_traits(struct checkstate *cs,
 
 int check_typeexpr_name_traits(struct checkstate *cs,
                                struct ast_typeexpr *a,
+                               struct exprscope *also_typecheck,
                                struct typeexpr_traits *out) {
   struct deftype_entry *ent;
   if (!name_table_lookup_deftype(&cs->nt, a->u.name.value,
@@ -1103,11 +1133,13 @@ int check_typeexpr_name_traits(struct checkstate *cs,
                                      &ent->deftype->meta,
                                      ent->deftype->disposition,
                                      &ent->deftype->type,
+                                     also_typecheck,
                                      out);
 }
 
 int check_typeexpr_app_traits(struct checkstate *cs,
                               struct ast_typeexpr *a,
+                              struct exprscope *also_typecheck,
                               struct typeexpr_traits *out) {
   struct deftype_entry *ent;
   if (!name_table_lookup_deftype(&cs->nt, a->u.app.name.value,
@@ -1138,6 +1170,7 @@ int check_typeexpr_app_traits(struct checkstate *cs,
                                         &deftype->meta,
                                         deftype->disposition,
                                         &concrete_deftype_type,
+                                        also_typecheck,
                                         out);
   ast_typeexpr_destroy(&concrete_deftype_type);
   return res;
@@ -1145,13 +1178,14 @@ int check_typeexpr_app_traits(struct checkstate *cs,
 
 int check_typeexpr_structe_traits(struct checkstate *cs,
                                   struct ast_typeexpr *a,
+                                  struct exprscope *also_typecheck,
                                   struct typeexpr_traits *out) {
   struct typeexpr_traits combined;
   combined.movable = TRAIT_TRIVIALLY_HAD;
   combined.copyable = TRAIT_TRIVIALLY_HAD;
   for (size_t i = 0, e = a->u.structe.fields_count; i < e; i++) {
     struct typeexpr_traits traits;
-    if (!check_typeexpr_traits(cs, &a->u.structe.fields[i].type, &traits)) {
+    if (!check_typeexpr_traits(cs, &a->u.structe.fields[i].type, also_typecheck, &traits)) {
       return 0;
     }
 
@@ -1165,10 +1199,15 @@ int check_typeexpr_structe_traits(struct checkstate *cs,
 
 int check_typeexpr_unione_traits(struct checkstate *cs,
                                  struct ast_typeexpr *a,
+                                 struct exprscope *also_typecheck,
                                  struct typeexpr_traits *out) {
+  (void)also_typecheck;
+
   for (size_t i = 0, e = a->u.unione.fields_count; i < e; i++) {
+    /* We don't typecheck the traits since we know they must have
+    trivial copy constructors. */
     struct typeexpr_traits traits;
-    if (!check_typeexpr_traits(cs, &a->u.unione.fields[i].type, &traits)) {
+    if (!check_typeexpr_traits(cs, &a->u.unione.fields[i].type, NULL, &traits)) {
       return 0;
     }
 
@@ -1201,18 +1240,19 @@ there is an exprscope. */
 int check_typeexpr_traits(struct checkstate *cs,
                           /* a is a concrete type. */
                           struct ast_typeexpr *a,
+                          struct exprscope *also_typecheck,
                           struct typeexpr_traits *out) {
   switch (a->tag) {
   case AST_TYPEEXPR_NAME:
-    return check_typeexpr_name_traits(cs, a, out);
+    return check_typeexpr_name_traits(cs, a, also_typecheck, out);
   case AST_TYPEEXPR_APP:
-    return check_typeexpr_app_traits(cs, a, out);
+    return check_typeexpr_app_traits(cs, a, also_typecheck, out);
   case AST_TYPEEXPR_STRUCTE:
-    return check_typeexpr_structe_traits(cs, a, out);
+    return check_typeexpr_structe_traits(cs, a, also_typecheck, out);
   case AST_TYPEEXPR_UNIONE:
-    return check_typeexpr_unione_traits(cs, a, out);
+    return check_typeexpr_unione_traits(cs, a, also_typecheck, out);
   case AST_TYPEEXPR_ARRAY:
-    return check_typeexpr_traits(cs, a->u.arraytype.param, out);
+    return check_typeexpr_traits(cs, a->u.arraytype.param, also_typecheck, out);
   default:
     UNREACHABLE();
   }

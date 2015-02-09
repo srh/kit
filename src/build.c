@@ -508,7 +508,7 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
     return 1;
   } else {
     struct typeexpr_traits traits;
-    int success = check_typeexpr_traits(cs, return_type, &traits);
+    int success = check_typeexpr_traits(cs, return_type, NULL, &traits);
     CHECK(success);
     /* WINDOWS: This ain't C++, and this ain't consistent with the
     Windows calling convention regarding non-pod (for C++03) types. */
