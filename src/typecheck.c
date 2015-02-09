@@ -1469,6 +1469,7 @@ int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var,
   if (!check_var_shadowing(es, &var->name)) {
     return 0;
   }
+
   struct varnum varnum;
   varnum.value = es->varnum_counter;
   es->varnum_counter = size_add(es->varnum_counter, 1);
@@ -2050,7 +2051,6 @@ int check_statement(struct bodystate *bs,
     struct ast_typeexpr replaced_type;
     replace_generics(bs->es, &s->u.var_statement.decl.type, &replaced_type);
 
-
     int has_rhs = s->u.var_statement.has_rhs;
     struct ast_expr annotated_rhs = { 0 };  /* Initialize to appease cl. */
     if (has_rhs) {
@@ -2058,6 +2058,12 @@ int check_statement(struct bodystate *bs,
         ast_typeexpr_destroy(&replaced_type);
         goto fail;
       }
+    }
+
+    struct typeexpr_traits traits_discard;
+    if (!check_typeexpr_traits(bs->es->cs, &replaced_type, bs->es, &traits_discard)) {
+      ast_typeexpr_destroy(&replaced_type);
+      goto fail;
     }
 
     struct ast_ident name;
@@ -2379,6 +2385,12 @@ int check_expr_funcbody(struct exprscope *es,
     METERR(x->meta, "Missing a return statement.%s", "\n");
     goto fail_annotated_bracebody;
   }
+
+  struct typeexpr_traits discard;
+  if (!check_typeexpr_traits(es->cs, &bs.exact_return_type, es, &discard)) {
+    goto fail_annotated_bracebody;
+  }
+
   *out = bs.exact_return_type;
   bs.have_exact_return_type = 0;
   *annotated_out = annotated_bracebody;
@@ -2424,6 +2436,12 @@ int check_expr_lambda(struct exprscope *es,
       }
 
       replace_generics(es, &x->params[i].type, &args[i]);
+
+      struct typeexpr_traits discard;
+      if (!check_typeexpr_traits(es->cs, &args[i], es, &discard)) {
+        ast_typeexpr_destroy(&args[i]);
+        goto fail_args_up_to_i;
+      }
     }
 
     if (0) {
@@ -5011,11 +5029,28 @@ int check_file_test_more_29(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
-int check_file_test_more_30(const uint8_t *name, size_t name_count,
-                            uint8_t **data_out, size_t *data_count_out) {
+int check_file_test_more_30a(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because the type ty lacks an explicit destructor. */
   struct test_module a[] = { {
       "foo",
       "defclass ty i32;\n"
+      "access ty {\n"
+      "def foo func[ty, i32] = fn(t ty) i32 {\n"
+      "  return ~t;\n"
+      "};\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_30b(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defclass copy ty i32;\n"
       "access ty {\n"
       "def foo func[ty, i32] = fn(t ty) i32 {\n"
       "  return ~t;\n"
@@ -5044,11 +5079,29 @@ int check_file_test_more_31(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
-int check_file_test_more_32(const uint8_t *name, size_t name_count,
-                            uint8_t **data_out, size_t *data_count_out) {
+int check_file_test_more_32a(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because ty[u32] lacks an explicit destructor. */
   struct test_module a[] = { {
       "foo",
       "defclass[T] ty i32;\n"
+      "access ty[_] {\n"
+      "def[T] foo func[ty[T], i32] = fn(t ty[T]) i32 {\n"
+      "  return ~t;\n"
+      "};\n"
+      "}\n"
+      "def bar func[ty[u32], i32] = foo;\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_32b(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defclass[T] copy ty i32;\n"
       "access ty[_] {\n"
       "def[T] foo func[ty[T], i32] = fn(t ty[T]) i32 {\n"
       "  return ~t;\n"
@@ -5554,9 +5607,15 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file check_file_test_more_30...\n");
-  if (!test_check_module(&im, &check_file_test_more_30, foo)) {
-    DBG("check_file_test_more_30 fails\n");
+  DBG("test_check_file !check_file_test_more_30a...\n");
+  if (!!test_check_module(&im, &check_file_test_more_30a, foo)) {
+    DBG("check_file_test_more_30a fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_30b...\n");
+  if (!test_check_module(&im, &check_file_test_more_30b, foo)) {
+    DBG("check_file_test_more_30b fails\n");
     goto cleanup_identmap;
   }
 
@@ -5566,9 +5625,15 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file check_file_test_more_32...\n");
-  if (!test_check_module(&im, &check_file_test_more_32, foo)) {
-    DBG("check_file_test_more_32 fails\n");
+  DBG("test_check_file !check_file_test_more_32a...\n");
+  if (!!test_check_module(&im, &check_file_test_more_32a, foo)) {
+    DBG("check_file_test_more_32a fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_32b...\n");
+  if (!test_check_module(&im, &check_file_test_more_32b, foo)) {
+    DBG("check_file_test_more_32b fails\n");
     goto cleanup_identmap;
   }
 
