@@ -3284,7 +3284,7 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-void tie_gotos(struct objfile *f, struct frame *h) {
+void tie_jmps(struct objfile *f, struct frame *h) {
   for (size_t i = 0, e = h->jmpdata_count; i < e; i++) {
     struct jmpdata jd = h->jmpdata[i];
     CHECK(jd.target_number < h->targetdata_count);
@@ -3378,7 +3378,7 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
 
   if (res) {
     gen_function_exit(cs, f, &h);
-    tie_gotos(f, &h);
+    tie_jmps(f, &h);
     tie_stack_adjustments(f, &h);
   }
 
