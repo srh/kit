@@ -323,26 +323,6 @@ void vardata_destroy(struct vardata *vd) {
   vd->loc.tag = (enum loc_tag)-1;
 }
 
-struct labeldata {
-  ident_value labelname;
-  size_t target_number;
-
-  /* An unowned reference. */
-  struct ast_statement_info *label_info;
-};
-
-void labeldata_init(struct labeldata *ld, ident_value labelname,
-                    size_t target_number,
-                    struct ast_statement_info *label_info) {
-  ld->labelname = labelname;
-  ld->target_number = target_number;
-  ld->label_info = label_info;
-}
-
-void labeldata_destroy(struct labeldata *ld) {
-  ld->labelname = IDENT_VALUE_INVALID;
-}
-
 struct targetdata {
   int target_known;
   size_t target_offset;
@@ -385,10 +365,6 @@ struct frame {
   struct vardata *vardata;
   size_t vardata_count;
   size_t vardata_limit;
-
-  struct labeldata *labeldata;
-  size_t labeldata_count;
-  size_t labeldata_limit;
 
   struct targetdata *targetdata;
   size_t targetdata_count;
@@ -435,10 +411,6 @@ void frame_init(struct frame *h) {
   h->vardata_count = 0;
   h->vardata_limit = 0;
 
-  h->labeldata = NULL;
-  h->labeldata_count = 0;
-  h->labeldata_limit = 0;
-
   h->targetdata = NULL;
   h->targetdata_count = 0;
   h->targetdata_limit = 0;
@@ -469,8 +441,6 @@ void frame_destroy(struct frame *h) {
   h->varlocdata_limit = 0;
   SLICE_FREE(h->vardata, h->vardata_count, vardata_destroy);
   h->vardata_limit = 0;
-  SLICE_FREE(h->labeldata, h->labeldata_count, labeldata_destroy);
-  h->labeldata_limit = 0;
   free(h->targetdata);
   h->targetdata = NULL;
   h->targetdata_count = 0;
@@ -570,15 +540,6 @@ void frame_pop(struct frame *h, uint32_t size) {
   /* X86 */
   uint32_t aligned = uint32_ceil_aligned(size, DWORD_SIZE);
   h->stack_offset = int32_add(h->stack_offset, uint32_to_int32(aligned));
-}
-
-struct labeldata *frame_try_find_labeldata(struct frame *h, ident_value labelname) {
-  for (size_t i = 0, e = h->labeldata_count; i < e; i++) {
-    if (h->labeldata[i].labelname == labelname) {
-      return &h->labeldata[i];
-    }
-  }
-  return NULL;
 }
 
 int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *return_type,
