@@ -1913,6 +1913,9 @@ struct bodystate {
   size_t label_infos_limit;
 };
 
+/* TODO: Just asking, do we typecheck var or temporary destruction (or
+gosh, copying or moving?) at any point? */
+
 void bodystate_init(struct bodystate *bs, struct exprscope *es,
                     struct ast_typeexpr *partial_type) {
   bs->es = es;
