@@ -1550,6 +1550,8 @@ int deftype_is_accessible(struct exprscope *es, struct ast_deftype *deftype) {
   return is_accessible(es, privacy_scope);
 }
 
+/* TODO: Anyplace check_expr is called, we need to analyze how we're
+going to destruct it and typecheck that. */
 int check_expr_with_type(struct exprscope *es,
                          struct ast_expr *x,
                          struct ast_typeexpr *type,
@@ -1614,6 +1616,10 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
       es->cs->template_instantiation_recursion_depth--;
       goto fail_unified;
     }
+
+    /* We just assume there's no temporaries, no constructors or
+    destructors, because the expression was statically computable. */
+
     CHECK(!inst->annotated_rhs_computed);
     inst->annotated_rhs_computed = 1;
     inst->annotated_rhs = annotated_rhs;
