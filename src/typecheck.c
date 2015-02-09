@@ -2102,8 +2102,8 @@ int check_statement(struct bodystate *bs,
     struct ast_typeexpr replaced_type;
     replace_generics(bs->es, &s->u.var_statement.decl.type, &replaced_type);
 
-    struct typeexpr_traits traits_discard;
-    if (!check_typeexpr_traits(bs->es->cs, &replaced_type, bs->es, &traits_discard)) {
+    struct typeexpr_traits traits;
+    if (!check_typeexpr_traits(bs->es->cs, &replaced_type, bs->es, &traits)) {
       ast_typeexpr_destroy(&replaced_type);
       goto fail;
     }
@@ -2112,6 +2112,13 @@ int check_statement(struct bodystate *bs,
     struct ast_expr annotated_rhs = { 0 };  /* Initialize to appease cl. */
     if (has_rhs) {
       if (!check_expr(bs->es, s->u.var_statement.rhs, &replaced_type, &annotated_rhs)) {
+        ast_typeexpr_destroy(&replaced_type);
+        goto fail;
+      }
+    } else {
+      if (!traits.inittible) {
+        METERR(s->u.var_statement.meta, "Variable %.*s not default-initializable.\n",
+               IM_P(bs->es->cs->im, s->u.var_statement.decl.name.value));
         ast_typeexpr_destroy(&replaced_type);
         goto fail;
       }
@@ -5268,6 +5275,22 @@ int check_file_test_more_38(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_39(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because k is not default-initializable. */
+  struct test_module a[] = { {
+      "foo",
+      "defclass copy ty i32;\n"
+      "def foo func[i32] = fn() i32 {\n"
+      "  var k ty;\n"
+      "  return 1;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -5758,6 +5781,12 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_38...\n");
   if (!!test_check_module(&im, &check_file_test_more_38, foo)) {
     DBG("check_file_test_more_38 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_39...\n");
+  if (!!test_check_module(&im, &check_file_test_more_39, foo)) {
+    DBG("check_file_test_more_39 fails\n");
     goto cleanup_identmap;
   }
 
