@@ -1926,10 +1926,6 @@ enum fallthrough {
   /* Says a statement/bracebody could exit "out the bottom" only if
   you can enter "from the top." */
   FALLTHROUGH_FROMTHETOP,
-  /* Says a statement/bracebody has a non-local entrance -- it is or
-  has a label statement such that it could exit "out the bottom"
-  without entering "from the top." */
-  FALLTHROUGH_NONLOCAL,
 };
 
 enum fallthrough max_fallthrough(enum fallthrough x, enum fallthrough y) {
@@ -1943,8 +1939,6 @@ enum fallthrough compose_fallthrough(enum fallthrough top_reachability,
     return FALLTHROUGH_NEVER;
   case FALLTHROUGH_FROMTHETOP:
     return top_reachability;
-  case FALLTHROUGH_NONLOCAL:
-    return FALLTHROUGH_NONLOCAL;
   default:
     UNREACHABLE();
   }
