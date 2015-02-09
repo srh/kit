@@ -2213,12 +2213,12 @@ int check_statement(struct bodystate *bs,
     struct ast_for_statement *fs = &s->u.for_statement;
 
     struct ast_statement annotated_initializer = { 0 };
-    size_t vars_pushed = 0;
+    struct ast_vardecl *vardecl_to_push_or_null = NULL;
+    int var_pushed = 0;
     if (fs->has_initializer) {
       CHECK(fs->initializer->tag == AST_STATEMENT_EXPR
             || fs->initializer->tag == AST_STATEMENT_VAR);
       enum fallthrough initializer_fallthrough;
-      struct ast_vardecl *vardecl_to_push_or_null;
       if (!check_statement(bs, fs->initializer, &annotated_initializer,
                            &initializer_fallthrough, &vardecl_to_push_or_null)) {
         goto for_fail;
@@ -2226,7 +2226,7 @@ int check_statement(struct bodystate *bs,
 
       CHECK(initializer_fallthrough == FALLTHROUGH_FROMTHETOP);
       if (vardecl_to_push_or_null) {
-        vars_pushed = size_add(vars_pushed, 1);
+        var_pushed = 1;
       }
     }
 
@@ -2263,9 +2263,11 @@ int check_statement(struct bodystate *bs,
       fallthrough = FALLTHROUGH_NEVER;
     }
 
-    for (size_t j = 0; j < vars_pushed; j++) {
+    if (var_pushed) {
       exprscope_pop_var(bs->es);
+      free_ast_vardecl(&vardecl_to_push_or_null);
     }
+    CHECK(vardecl_to_push_or_null == NULL);
 
     struct ast_statement *ini = NULL;
     struct ast_expr *con = NULL;
