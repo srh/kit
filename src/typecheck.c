@@ -1887,30 +1887,11 @@ int check_expr_funcall(struct exprscope *es,
   return 0;
 }
 
-struct label_info {
-  /* The name of the label in question. */
-  ident_value label_name;
-  /* True if the label has been observed. */
-  int is_label_observed;
-  /* True if a goto has been observed. */
-  int is_goto_observed;
-};
-
-void label_info_wipe(struct label_info *a) {
-  a->label_name = IDENT_VALUE_INVALID;
-  a->is_label_observed = 0;
-  a->is_goto_observed = 0;
-}
-
 struct bodystate {
   struct exprscope *es;
   struct ast_typeexpr *partial_type;
   int have_exact_return_type;
   struct ast_typeexpr exact_return_type;
-
-  struct label_info *label_infos;
-  size_t label_infos_count;
-  size_t label_infos_limit;
 };
 
 /* TODO: Just asking, do we typecheck var or temporary destruction (or
@@ -1921,9 +1902,6 @@ void bodystate_init(struct bodystate *bs, struct exprscope *es,
   bs->es = es;
   bs->partial_type = partial_type;
   bs->have_exact_return_type = 0;
-  bs->label_infos = NULL;
-  bs->label_infos_count = 0;
-  bs->label_infos_limit = 0;
 }
 
 void bodystate_destroy(struct bodystate *bs) {
@@ -1932,43 +1910,6 @@ void bodystate_destroy(struct bodystate *bs) {
     ast_typeexpr_destroy(&bs->exact_return_type);
     bs->have_exact_return_type = 0;
   }
-  SLICE_FREE(bs->label_infos, bs->label_infos_count, label_info_wipe);
-  bs->label_infos_limit = 0;
-}
-
-void bodystate_note_goto(struct bodystate *bs, ident_value target) {
-  for (size_t i = 0, e = bs->label_infos_count; i < e; i++) {
-    if (bs->label_infos[i].label_name == target) {
-      bs->label_infos[i].is_goto_observed = 1;
-      return;
-    }
-  }
-  struct label_info info;
-  info.label_name = target;
-  info.is_label_observed = 0;
-  info.is_goto_observed = 1;
-  SLICE_PUSH(bs->label_infos, bs->label_infos_count, bs->label_infos_limit,
-             info);
-}
-
-int bodystate_note_label(struct bodystate *bs, struct ast_ident *name) {
-  for (size_t i = 0, e = bs->label_infos_count; i < e; i++) {
-    if (bs->label_infos[i].label_name == name->value) {
-      if (bs->label_infos[i].is_label_observed) {
-        METERR(name->meta, "Duplicate label %.*s.\n", IM_P(bs->es->cs->im, name->value));
-        return 0;
-      }
-      bs->label_infos[i].is_label_observed = 1;
-      return 1;
-    }
-  }
-  struct label_info info;
-  info.label_name = name->value;
-  info.is_label_observed = 1;
-  info.is_goto_observed = 0;
-  SLICE_PUSH(bs->label_infos, bs->label_infos_count, bs->label_infos_limit,
-             info);
-  return 1;
 }
 
 void free_ast_vardecl(struct ast_vardecl **p) {
@@ -2382,19 +2323,6 @@ int check_expr_funcbody(struct exprscope *es,
   if (fallthrough != FALLTHROUGH_NEVER) {
     METERR(x->meta, "not all control paths return a value.%s", "\n");
     goto fail_annotated_bracebody;
-  }
-
-  for (size_t i = 0; i < bs.label_infos_count; i++) {
-    if (!bs.label_infos[i].is_label_observed) {
-      METERR(x->meta, "goto without label for name %.*s.\n",
-             IM_P(bs.es->cs->im, bs.label_infos[i].label_name));
-      goto fail_annotated_bracebody;
-    }
-    if (!bs.label_infos[i].is_goto_observed) {
-      METERR(x->meta, "label without goto for name %.*s.\n",
-             IM_P(bs.es->cs->im, bs.label_infos[i].label_name));
-      goto fail_annotated_bracebody;
-    }
   }
 
   if (!bs.have_exact_return_type) {
