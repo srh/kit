@@ -1289,6 +1289,19 @@ struct varpair {
   struct varnum varnum;
 };
 
+struct var_by_varnum {
+  struct ast_typeexpr concrete_type;
+};
+
+void var_by_varnum_init(struct var_by_varnum *v,
+                        struct ast_typeexpr *concrete_type_copyee) {
+  ast_typeexpr_init_copy(&v->concrete_type, concrete_type_copyee);
+}
+
+void var_by_varnum_destroy(struct var_by_varnum *v) {
+  ast_typeexpr_destroy(&v->concrete_type);
+}
+
 struct exprscope {
   struct checkstate *cs;
   struct ast_generics *generics;
@@ -1309,11 +1322,16 @@ struct exprscope {
   struct def_entry *entry_or_null;
 
   /* A stack of variables that are in scope. */
+  /* TODO: We could probably have a stack of varnums that are in scope instead. */
   struct varpair *vars;
   size_t vars_count;
   size_t vars_limit;
 
   size_t varnum_counter;
+
+  struct var_by_varnum *vars_by_varnum;
+  size_t vars_by_varnum_count;
+  size_t vars_by_varnum_limit;
 
   /* A counter for uniquely numbering temporaries. */
   size_t temp_counter;
@@ -1342,6 +1360,9 @@ void exprscope_init(struct exprscope *es,
   es->vars_count = 0;
   es->vars_limit = 0;
   es->varnum_counter = 0;
+  es->vars_by_varnum = NULL;
+  es->vars_by_varnum_count = 0;
+  es->vars_by_varnum_limit = 0;
   es->temp_counter = 0;
 }
 
@@ -1358,6 +1379,8 @@ void exprscope_destroy(struct exprscope *es) {
   es->vars_count = 0;
   es->vars_limit = 0;
   es->varnum_counter = 0;
+  SLICE_FREE(es->vars_by_varnum, es->vars_by_varnum_count, var_by_varnum_destroy);
+  es->vars_by_varnum_limit = 0;
   es->temp_counter = SIZE_MAX;
 }
 
@@ -1414,8 +1437,13 @@ int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var,
   struct varpair pair;
   pair.decl = var;
   pair.varnum = varnum;
-
   SLICE_PUSH(es->vars, es->vars_count, es->vars_limit, pair);
+
+  CHECK(varnum.value == es->vars_by_varnum_count);
+  struct var_by_varnum vbv;
+  var_by_varnum_init(&vbv, &var->type);
+  SLICE_PUSH(es->vars_by_varnum, es->vars_by_varnum_count, es->vars_by_varnum_limit, vbv);
+
   *varnum_out = varnum;
   return 1;
 }
