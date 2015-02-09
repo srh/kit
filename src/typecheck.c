@@ -1907,6 +1907,13 @@ int check_expr_funcall(struct exprscope *es,
   } else {
     struct ast_typeexpr temporary_type;
     ast_typeexpr_init_copy(&temporary_type, &return_type);
+
+    struct typeexpr_traits discard;
+    if (!check_typeexpr_traits(es->cs, &temporary_type, es, &discard)) {
+      ast_typeexpr_destroy(&temporary_type);
+      goto fail_cleanup_return_type;
+    }
+
     expr_info = ast_expr_info_typechecked_temporary(
         0,
         return_type,
@@ -1922,6 +1929,9 @@ int check_expr_funcall(struct exprscope *es,
   ast_typeexpr_destroy(&funcexpr);
   return 1;
   /* Don't fallthrough -- args_annotated was moved into annotated_out. */
+ fail_cleanup_return_type:
+  ast_typeexpr_destroy(&return_type);
+  ast_expr_destroy(&annotated_func);
  fail_cleanup_funcexpr:
   ast_typeexpr_destroy(&funcexpr);
   SLICE_FREE(args_annotated, args_count, ast_expr_destroy);
