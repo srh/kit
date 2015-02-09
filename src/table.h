@@ -350,6 +350,7 @@ int name_table_match_def(struct name_table *t,
                          struct ast_typeexpr *generics_or_null,
                          size_t generics_count,
                          struct ast_typeexpr *partial_type,
+                         int *zero_defs_out,
                          struct ast_typeexpr *unified_type_out,
                          struct def_entry **entry_out,
                          struct def_instantiation **instantiation_out);

@@ -174,10 +174,12 @@ void ast_bracebody_destroy(struct ast_bracebody *a);
 struct ast_var_statement_info {
   int info_valid;
   struct ast_typeexpr concrete_type;
+  struct def_instantiation *default_constructor_or_null;
 };
 
 void ast_var_statement_info_note_type(struct ast_var_statement_info *a,
-                                      struct ast_typeexpr concrete_type);
+                                      struct ast_typeexpr concrete_type,
+                                      struct def_instantiation *default_constructor_or_null);
 
 struct ast_var_statement {
   struct ast_meta meta;

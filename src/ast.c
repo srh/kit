@@ -198,10 +198,12 @@ void ast_var_statement_info_destroy(struct ast_var_statement_info *a) {
 }
 
 void ast_var_statement_info_note_type(struct ast_var_statement_info *a,
-                                      struct ast_typeexpr concrete_type) {
+                                      struct ast_typeexpr concrete_type,
+                                      struct def_instantiation *default_constructor_or_null) {
   CHECK(!a->info_valid);
   a->info_valid = 1;
   a->concrete_type = concrete_type;
+  a->default_constructor_or_null = default_constructor_or_null;
 }
 
 
