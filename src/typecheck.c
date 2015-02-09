@@ -5291,6 +5291,45 @@ int check_file_test_more_39(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_40(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defclass copy ty i32;\n"
+      "access ty {\n"
+      "def init func[*ty, void] = fn(t *ty) void {\n"
+      "  var ret void;\n"
+      "  return ret;\n"
+      "};\n"
+      "}\n"
+      "deftype ty2 struct { x i32; y ty; };\n"
+      "def foo func[i32] = fn() i32 {\n"
+      "  var k ty2;\n"
+      "  return 1;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_41(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because k is not default-initializable. */
+  struct test_module a[] = { {
+      "foo",
+      "defclass copy ty i32;\n"
+      "deftype ty2 struct { x i32; y ty; };\n"
+      "def foo func[i32] = fn() i32 {\n"
+      "  var k ty2;\n"
+      "  return 1;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -5787,6 +5826,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_39...\n");
   if (!!test_check_module(&im, &check_file_test_more_39, foo)) {
     DBG("check_file_test_more_39 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_40...\n");
+  if (!test_check_module(&im, &check_file_test_more_40, foo)) {
+    DBG("check_file_test_more_40 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_41...\n");
+  if (!!test_check_module(&im, &check_file_test_more_41, foo)) {
+    DBG("check_file_test_more_41 fails\n");
     goto cleanup_identmap;
   }
 
