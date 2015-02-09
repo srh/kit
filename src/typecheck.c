@@ -1286,7 +1286,7 @@ enum static_computation {
 
 struct varpair {
   struct ast_vardecl *decl;
-  size_t varnum;
+  struct varnum varnum;
 };
 
 struct exprscope {
@@ -1406,15 +1406,17 @@ int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var,
   if (!check_var_shadowing(es, &var->name)) {
     return 0;
   }
-  size_t varnum = es->varnum_counter;
+  struct varnum varnum;
+  varnum.value = es->varnum_counter;
   es->varnum_counter = size_add(es->varnum_counter, 1);
+
 
   struct varpair pair;
   pair.decl = var;
   pair.varnum = varnum;
 
   SLICE_PUSH(es->vars, es->vars_count, es->vars_limit, pair);
-  varnum_out->value = varnum;
+  *varnum_out = varnum;
   return 1;
 }
 
@@ -1422,7 +1424,7 @@ void exprscope_pop_var(struct exprscope *es) {
   CHECK(es->vars_count > 0);
   --es->vars_count;
   es->vars[es->vars_count].decl = NULL;
-  es->vars[es->vars_count].varnum = SIZE_MAX;
+  es->vars[es->vars_count].varnum.value = SIZE_MAX;
 }
 
 int unify_fields_directionally(struct ast_vardecl *partial_fields,
@@ -2090,7 +2092,7 @@ int check_statement(struct bodystate *bs,
     ast_statement_init_copy(annotated_out, s);
 
     size_t vars_in_scope_count = bs->es->vars_count;
-    size_t *vars_in_scope = malloc_mul(sizeof(*vars_in_scope), vars_in_scope_count);
+    struct varnum *vars_in_scope = malloc_mul(sizeof(*vars_in_scope), vars_in_scope_count);
     for (size_t i = 0; i < vars_in_scope_count; i++) {
       vars_in_scope[i] = bs->es->vars[i].varnum;
     }

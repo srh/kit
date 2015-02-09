@@ -292,7 +292,7 @@ void ast_label_info_init_copy(struct ast_label_info *a, struct ast_label_info *c
 }
 
 void ast_label_info_set_vars_in_scope(struct ast_label_info *a,
-                                      size_t *vars_in_scope,
+                                      struct varnum *vars_in_scope,
                                       size_t vars_in_scope_count) {
   CHECK(!a->info_valid);
   a->info_valid = 1;

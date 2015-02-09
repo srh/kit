@@ -204,12 +204,12 @@ void ast_goto_statement_init(struct ast_goto_statement *a,
 
 struct ast_label_info {
   int info_valid;
-  size_t *vars_in_scope;
+  struct varnum *vars_in_scope;
   size_t vars_in_scope_count;
 };
 
 void ast_label_info_set_vars_in_scope(struct ast_label_info *a,
-                                      size_t *vars_in_scope,
+                                      struct varnum *vars_in_scope,
                                       size_t vars_in_scope_count);
 
 struct ast_label_statement {
@@ -224,6 +224,7 @@ void ast_label_statement_init(struct ast_label_statement *a,
 struct ast_ifthen_statement {
   struct ast_meta meta;
   struct ast_expr *condition;
+  /* TODO: Rename to body, it's safer not to share same name as ifthenelse_statement. */
   struct ast_bracebody thenbody;
 };
 
@@ -312,6 +313,7 @@ void ast_statement_destroy(struct ast_statement *a);
 void ast_statement_alloc_move(struct ast_statement movee,
                               struct ast_statement **out);
 
+/* TODO: This info is empty and unused.  We don't even set info_valid = 1. */
 struct ast_lambda_info {
   int info_valid;
 };

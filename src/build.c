@@ -296,6 +296,7 @@ struct vardata {
   struct varnum varnum;
 
   /* A non-owned reference to the type. */
+  /* TODO: Remove this, use varlocdata instead. */
   struct ast_typeexpr *concrete_type;
   struct loc loc;
 };
@@ -326,21 +327,20 @@ struct labeldata {
   ident_value labelname;
   size_t target_number;
 
-  int label_found;
+  /* An unowned reference. */
+  struct ast_label_info *label_info;
 };
 
 void labeldata_init(struct labeldata *ld, ident_value labelname,
                     size_t target_number,
-                    int label_found) {
+                    struct ast_label_info *label_info) {
   ld->labelname = labelname;
   ld->target_number = target_number;
-
-  ld->label_found = label_found;
+  ld->label_info = label_info;
 }
 
 void labeldata_destroy(struct labeldata *ld) {
   ld->labelname = IDENT_VALUE_INVALID;
-  ld->label_found = 0;
 }
 
 struct targetdata {
@@ -364,7 +364,24 @@ struct reset_esp_data {
   int downward;
 };
 
+struct varlocdata {
+  /* A non-owned reference to the type. */
+  struct ast_typeexpr *concrete_type;
+  /* Where (in the stack frame) the variable is stored.  This never
+  changes as the function runs.  (This is a simple compiler.) */
+  struct loc loc;
+};
+
 struct frame {
+  /* These are indexed by varnum values, and contain all the variables
+  declared within the function. */
+
+  /* TODO: Rename to has_all_varlocdata or freezed_varlocdata. */
+  int has_varlocdata;
+  struct varlocdata *varlocdata;
+  size_t varlocdata_count;
+  size_t varlocdata_limit;
+
   struct vardata *vardata;
   size_t vardata_count;
   size_t vardata_limit;
@@ -409,6 +426,11 @@ struct frame {
 };
 
 void frame_init(struct frame *h) {
+  h->has_varlocdata = 0;
+  h->varlocdata = NULL;
+  h->varlocdata_count = 0;
+  h->varlocdata_limit = 0;
+
   h->vardata = NULL;
   h->vardata_count = 0;
   h->vardata_limit = 0;
@@ -440,6 +462,11 @@ void frame_init(struct frame *h) {
 }
 
 void frame_destroy(struct frame *h) {
+  h->has_varlocdata = 0;
+  free(h->varlocdata);
+  h->varlocdata = NULL;
+  h->varlocdata_count = 0;
+  h->varlocdata_limit = 0;
   SLICE_FREE(h->vardata, h->vardata_count, vardata_destroy);
   h->vardata_limit = 0;
   SLICE_FREE(h->labeldata, h->labeldata_count, labeldata_destroy);
@@ -465,6 +492,26 @@ void frame_specify_calling_info(struct frame *h, size_t arg_count,
   h->arg_count = arg_count;
   h->hidden_return_param = is_return_hidden;
   h->return_loc = loc;
+}
+
+void frame_add_varlocdata(struct frame *h, struct varnum varnum,
+                          struct varlocdata data) {
+  CHECK(!h->has_varlocdata);
+  /* Since varnums increment starting from 0, and we traverse the
+  bracebody in the same order, we can make this assertion. */
+  CHECK(varnum.value == h->varlocdata_count);
+  SLICE_PUSH(h->varlocdata, h->varlocdata_count, h->varlocdata_limit, data);
+}
+
+void frame_freeze_varlocdata(struct frame *h) {
+  CHECK(!h->has_varlocdata);
+  h->has_varlocdata = 1;
+}
+
+struct varlocdata *frame_get_varlocdata(struct frame *h, struct varnum varnum) {
+  CHECK(h->has_varlocdata);
+  CHECK(varnum.value < h->varlocdata_count);
+  return &h->varlocdata[varnum.value];
 }
 
 int frame_hidden_return_param(struct frame *h) {
@@ -3122,40 +3169,19 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     (*vars_pushed_ref)++;
   } break;
   case AST_STATEMENT_GOTO: {
-    /* TODO: Call constructors/destructors as appropriate. */
     struct labeldata *data = frame_try_find_labeldata(h, s->u.goto_statement.target.value);
-    if (data) {
-      /* The label is seen -- it has info on its var locations. */
-      gen_placeholder_jmp(f, h, data->target_number);
-    } else {
-      size_t target_number = frame_add_target(h);
-      /* The label is not seen yet -- plainly impose our var locations upon it! */
-      struct labeldata ld;
-      labeldata_init(&ld, s->u.goto_statement.target.value,
-                     target_number,
-                     0);
-      SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
-      gen_placeholder_jmp(f, h, target_number);
-    }
+    CHECK(data);
+
+    /* TODO: Call constructors/destructors as appropriate. */
+    /* TODO: Are the constructors/destructors actually type-checked? */
+    /* TODO: Also we must call destructors then constructors, in the right order. */
+
+    gen_placeholder_jmp(f, h, data->target_number);
   } break;
   case AST_STATEMENT_LABEL: {
     struct labeldata *data = frame_try_find_labeldata(h, s->u.label_statement.label.value);
-    if (data) {
-      /* The goto was seen -- it has info on our var locations. */
-      CHECK(!data->label_found);
-      data->label_found = 1;
-      frame_define_target(h, data->target_number, objfile_section_size(objfile_text(f)));
-    } else {
-      size_t target_number = frame_add_target(h);
-      frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
-
-      /* The goto was not seen yet -- define our own var locations! */
-      struct labeldata ld;
-      labeldata_init(&ld, s->u.label_statement.label.value,
-                     target_number,
-                     1);
-      SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
-    }
+    CHECK(data);
+    frame_define_target(h, data->target_number, objfile_section_size(objfile_text(f)));
   } break;
   case AST_STATEMENT_IFTHEN: {
     int32_t saved_offset = frame_save_offset(h);
@@ -3291,7 +3317,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 int gen_bracebody(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_bracebody *a) {
   size_t vars_pushed = 0;
-  int32_t initial_stack_offset = h->stack_offset;
+  int32_t initial_stack_offset = frame_save_offset(h);
 
   for (size_t i = 0, e = a->statements_count; i < e; i++) {
     struct ast_statement *s = &a->statements[i];
@@ -3332,6 +3358,76 @@ void tie_stack_adjustments(struct objfile *f, struct frame *h) {
   }
 }
 
+void note_bracebody_var_locations(struct checkstate *cs, struct frame *h,
+                                  struct ast_bracebody *a);
+
+void note_statement_var_locations(struct checkstate *cs, struct frame *h,
+                                  struct ast_statement *a) {
+  switch (a->tag) {
+  case AST_STATEMENT_EXPR:
+    break;
+  case AST_STATEMENT_RETURN_EXPR:
+    break;
+  case AST_STATEMENT_VAR: {
+    struct ast_typeexpr *var_type = ast_var_statement_type(&a->u.var_statement);
+    uint32_t var_size = kira_sizeof(&cs->nt, var_type);
+    struct loc var_loc = frame_push_loc(h, var_size);
+    struct varlocdata vld;
+    vld.concrete_type = var_type;
+    vld.loc = var_loc;
+    frame_add_varlocdata(h, ast_var_info_varnum(&a->u.var_statement.decl.var_info), vld);
+  } break;
+  case AST_STATEMENT_GOTO:
+    break;
+  case AST_STATEMENT_LABEL: {
+    size_t target_number = frame_add_target(h);
+    struct labeldata ld;
+    labeldata_init(&ld, a->u.label_statement.label.value,
+                   target_number,
+                   &a->u.label_statement.info);
+    SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
+  } break;
+  case AST_STATEMENT_IFTHEN: {
+    note_bracebody_var_locations(cs, h, &a->u.ifthen_statement.thenbody);
+  } break;
+  case AST_STATEMENT_IFTHENELSE: {
+    note_bracebody_var_locations(cs, h, &a->u.ifthenelse_statement.thenbody);
+    note_bracebody_var_locations(cs, h, &a->u.ifthenelse_statement.elsebody);
+  } break;
+  case AST_STATEMENT_WHILE: {
+    note_bracebody_var_locations(cs, h, &a->u.while_statement.body);
+  } break;
+  case AST_STATEMENT_FOR: {
+    int32_t initial_stack_offset = frame_save_offset(h);
+    note_statement_var_locations(cs, h, a->u.for_statement.initializer);
+    note_bracebody_var_locations(cs, h, &a->u.for_statement.body);
+    frame_restore_offset(h, initial_stack_offset);
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void note_bracebody_var_locations(struct checkstate *cs, struct frame *h,
+                                  struct ast_bracebody *a) {
+  int32_t initial_stack_offset = frame_save_offset(h);
+
+  for (size_t i = 0, e = a->statements_count; i < e; i++) {
+    note_statement_var_locations(cs, h, &a->statements[i]);
+  }
+
+  frame_restore_offset(h, initial_stack_offset);
+}
+
+void note_var_locations(struct checkstate *cs, struct frame *h,
+                        struct ast_expr *a) {
+  CHECK(a->tag == AST_EXPR_LAMBDA);
+  int32_t initial_stack_offset = h->stack_offset;
+  note_param_locations(cs, h, a);
+  note_bracebody_var_locations(cs, h, &a->u.lambda.bracebody);
+  CHECK(initial_stack_offset == h->stack_offset);
+}
+
 int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
                     struct ast_expr *a) {
   CHECK(a->tag == AST_EXPR_LAMBDA);
@@ -3339,7 +3435,7 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
   frame_init(&h);
 
   gen_function_intro(f, &h);
-  note_param_locations(cs, &h, a);
+  note_var_locations(cs, &h, a);
 
   int res = gen_bracebody(cs, f, &h, &a->u.lambda.bracebody);
 
