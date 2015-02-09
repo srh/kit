@@ -941,20 +941,28 @@ caller assumes it only needs to check the destructor on
 lookup_copy. */
 void deftype_trait_strategies(enum ast_deftype_disposition disposition,
                               int *lookup_move_out,
-                              int *lookup_copy_out) {
+                              int *lookup_copy_out,
+                              int *lookup_init_out) {
   switch (disposition) {
   case AST_DEFTYPE_NOT_CLASS:
+    *lookup_move_out = 0;
+    *lookup_copy_out = 0;
+    *lookup_init_out = 0;
+    break;
   case AST_DEFTYPE_CLASS_DEFAULT_COPY_MOVE_DESTROY:
     *lookup_move_out = 0;
     *lookup_copy_out = 0;
+    *lookup_init_out = 1;
     break;
   case AST_DEFTYPE_CLASS_DEFAULT_MOVE:
     *lookup_move_out = 0;
     *lookup_copy_out = 1;
+    *lookup_init_out = 1;
     break;
   case AST_DEFTYPE_CLASS_NO_DEFAULTS:
     *lookup_move_out = 1;
     *lookup_copy_out = 1;
+    *lookup_init_out = 1;
     break;
   default:
     UNREACHABLE();
@@ -1044,6 +1052,10 @@ int has_explicit_move(struct checkstate *cs, struct ast_typeexpr *a, struct expr
   return has_explicit_movecopydestroy(cs, a, 2, "move", also_typecheck, result_out);
 }
 
+int has_explicit_init(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out) {
+  return has_explicit_movecopydestroy(cs, a, 1, "init", also_typecheck, result_out);
+}
+
 int check_typeexpr_traits(struct checkstate *cs,
                           /* a is a concrete type. */
                           struct ast_typeexpr *a,
@@ -1060,10 +1072,11 @@ int finish_checking_name_traits(struct checkstate *cs,
                                 struct typeexpr_traits *out) {
   int lookup_move;
   int lookup_copy;
-  deftype_trait_strategies(deftype_disposition, &lookup_move, &lookup_copy);
+  int lookup_init;
+  deftype_trait_strategies(deftype_disposition, &lookup_move, &lookup_copy, &lookup_init);
 
   struct typeexpr_traits rhs_traits = { 0 };
-  if (!(lookup_move && lookup_copy)) {
+  if (!(lookup_move && lookup_copy && lookup_init)) {
     if (!check_typeexpr_traits(cs, concrete_deftype_type, also_typecheck, &rhs_traits)) {
       return 0;
     }
@@ -1081,6 +1094,11 @@ int finish_checking_name_traits(struct checkstate *cs,
 
   int explicit_destroy;
   if (!has_explicit_destroy(cs, a, also_typecheck, &explicit_destroy)) {
+    return 0;
+  }
+
+  int explicit_init;
+  if (!has_explicit_init(cs, a, also_typecheck, &explicit_init)) {
     return 0;
   }
 
@@ -1110,6 +1128,15 @@ int finish_checking_name_traits(struct checkstate *cs,
     }
   }
 
+  if (lookup_init) {
+    rhs_traits.inittible = explicit_init ? TRAIT_HAD : TRAIT_LACKED;
+  } else {
+    if (explicit_init) {
+      METERR(*deftype_meta, "Type has both implicit and explicit init.%s", "\n");
+      return 0;
+    }
+  }
+
   *out = rhs_traits;
   return 1;
 }
@@ -1129,6 +1156,7 @@ int check_typeexpr_name_traits(struct checkstate *cs,
   if (ent->is_primitive) {
     out->movable = TRAIT_TRIVIALLY_HAD;
     out->copyable = TRAIT_TRIVIALLY_HAD;
+    out->inittible = TRAIT_TRIVIALLY_HAD;
     return 1;
   }
 
@@ -1155,6 +1183,7 @@ int check_typeexpr_app_traits(struct checkstate *cs,
   if (ent->is_primitive) {
     out->movable = TRAIT_TRIVIALLY_HAD;
     out->copyable = TRAIT_TRIVIALLY_HAD;
+    out->inittible = TRAIT_TRIVIALLY_HAD;
     return 1;
   }
 
@@ -1187,6 +1216,7 @@ int check_typeexpr_structe_traits(struct checkstate *cs,
   struct typeexpr_traits combined;
   combined.movable = TRAIT_TRIVIALLY_HAD;
   combined.copyable = TRAIT_TRIVIALLY_HAD;
+  combined.inittible = TRAIT_TRIVIALLY_HAD;
   for (size_t i = 0, e = a->u.structe.fields_count; i < e; i++) {
     struct typeexpr_traits traits;
     if (!check_typeexpr_traits(cs, &a->u.structe.fields[i].type, also_typecheck, &traits)) {
@@ -1195,6 +1225,7 @@ int check_typeexpr_structe_traits(struct checkstate *cs,
 
     combined.movable = min_typeexpr_trait(combined.movable, traits.movable);
     combined.copyable = min_typeexpr_trait(combined.copyable, traits.copyable);
+    combined.inittible = min_typeexpr_trait(combined.inittible, traits.inittible);
   }
 
   *out = combined;
@@ -1226,10 +1257,16 @@ int check_typeexpr_unione_traits(struct checkstate *cs,
              IM_P(cs->im, a->u.unione.fields[i].name.value));
       return 0;
     }
+
+    if (traits.inittible != TRAIT_TRIVIALLY_HAD) {
+      METERR(a->u.unione.meta, "Unien field %.*s is not trivially initializable.\n",
+             IM_P(cs->im, a->u.unione.fields[i].name.value));
+    }
   }
 
   out->movable = TRAIT_TRIVIALLY_HAD;
   out->copyable = TRAIT_TRIVIALLY_HAD;
+  out->inittible = TRAIT_TRIVIALLY_HAD;
   return 1;
 }
 

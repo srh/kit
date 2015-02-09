@@ -98,6 +98,7 @@ enum typeexpr_trait {
 struct typeexpr_traits {
   enum typeexpr_trait movable;
   enum typeexpr_trait copyable;
+  enum typeexpr_trait inittible;
 };
 
 struct exprscope;
