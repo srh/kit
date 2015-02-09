@@ -293,17 +293,20 @@ void ast_statement_info_destroy(struct ast_statement_info *a) {
 void ast_goto_statement_init(struct ast_goto_statement *a,
                              struct ast_meta meta, struct ast_ident target) {
   a->meta = meta;
+  ast_statement_info_init(&a->goto_info);
   a->target = target;
 }
 
 void ast_goto_statement_init_copy(struct ast_goto_statement *a,
                                   struct ast_goto_statement *c) {
   a->meta = ast_meta_make_copy(&c->meta);
+  ast_statement_info_init_copy(&a->goto_info, &c->goto_info);
   ast_ident_init_copy(&a->target, &c->target);
 }
 
 void ast_goto_statement_destroy(struct ast_goto_statement *a) {
   ast_meta_destroy(&a->meta);
+  ast_statement_info_destroy(&a->goto_info);
   ast_ident_destroy(&a->target);
 }
 

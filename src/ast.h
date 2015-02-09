@@ -206,6 +206,7 @@ void ast_statement_info_set_vars_in_scope(struct ast_statement_info *a,
 
 struct ast_goto_statement {
   struct ast_meta meta;
+  struct ast_statement_info goto_info;
   struct ast_ident target;
 };
 

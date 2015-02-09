@@ -2083,6 +2083,16 @@ int check_statement(struct bodystate *bs,
     bodystate_note_goto(bs, s->u.goto_statement.target.value);
     ast_statement_init_copy(annotated_out, s);
 
+    size_t vars_in_scope_count = bs->es->vars_count;
+    struct varnum *vars_in_scope = malloc_mul(sizeof(*vars_in_scope), vars_in_scope_count);
+    for (size_t i = 0; i < vars_in_scope_count; i++) {
+      vars_in_scope[i] = bs->es->vars[i].varnum;
+    }
+
+    ast_statement_info_set_vars_in_scope(&annotated_out->u.goto_statement.goto_info,
+                                         vars_in_scope,
+                                         vars_in_scope_count);
+
     fallthrough = FALLTHROUGH_NEVER;
   } break;
   case AST_STATEMENT_LABEL: {
@@ -2091,6 +2101,7 @@ int check_statement(struct bodystate *bs,
     }
     ast_statement_init_copy(annotated_out, s);
 
+    /* TODO: Dedup with goto case (and slice-copying in general?) */
     size_t vars_in_scope_count = bs->es->vars_count;
     struct varnum *vars_in_scope = malloc_mul(sizeof(*vars_in_scope), vars_in_scope_count);
     for (size_t i = 0; i < vars_in_scope_count; i++) {
