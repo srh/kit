@@ -18,7 +18,8 @@
 #define CHECK_DBG(...) do { } while (0)
 
 struct exprscope;
-int lookup_global_maybe_typecheck(struct exprscope *es,
+int lookup_global_maybe_typecheck(struct checkstate *cs,
+                                  struct exprscope *also_maybe_typecheck,
                                   struct ast_name_expr *name,
                                   struct ast_typeexpr *partial_type,
                                   int *def_exists_out,
@@ -1014,7 +1015,8 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
       struct ast_typeexpr unified;
       int lvalue_discard;
       struct def_instantiation *inst;
-      if (!lookup_global_maybe_typecheck(also_typecheck,
+      if (!lookup_global_maybe_typecheck(cs,
+                                         also_typecheck,
                                          &func_name,
                                          &func_type,
                                          &def_exists_discard,
@@ -1639,7 +1641,8 @@ int check_expr_with_type(struct exprscope *es,
                          struct ast_typeexpr *type,
                          struct ast_expr *annotated_out);
 
-int lookup_global_maybe_typecheck(struct exprscope *es,
+int lookup_global_maybe_typecheck(struct checkstate *cs,
+                                  struct exprscope *also_maybe_typecheck,
                                   struct ast_name_expr *name,
                                   struct ast_typeexpr *partial_type,
                                   /* Set even if the returns false, it
@@ -1654,7 +1657,7 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
   struct def_entry *ent;
   struct def_instantiation *inst;
   int zero_defs;
-  if (!name_table_match_def(&es->cs->nt,
+  if (!name_table_match_def(&cs->nt,
                             &name->ident,
                             name->has_params ? name->params : NULL,
                             name->has_params ? name->params_count : 0,
@@ -1668,30 +1671,38 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
   }
   *def_exists_out = 1;
 
+  if (!also_maybe_typecheck) {
+    *out = unified;
+    /* Right now, there are no global variables. */
+    *is_lvalue_out = 0;
+    *inst_out = inst;
+    return 1;
+  }
+
   for (size_t i = 0, e = ent->private_to_count; i < e; i++) {
-    if (!is_accessible(es, ent->private_to[i])) {
+    if (!is_accessible(also_maybe_typecheck, ent->private_to[i])) {
       METERR(name->meta, "Access denied.%s", "\n");
       goto fail_unified;
     }
   }
 
-  exprscope_note_static_reference(es, ent);
+  exprscope_note_static_reference(also_maybe_typecheck, ent);
 
   if (!ent->is_primitive && !ent->is_extern
       && ent->generics.has_type_params && !inst->typecheck_started) {
     CHECK(ent->def);
     CHECK(!inst->annotated_rhs_computed);
-    if (es->cs->template_instantiation_recursion_depth
+    if (cs->template_instantiation_recursion_depth
         == MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH) {
       METERR(ent->def->meta, "Max template instantiation recursion depth exceeded.%s", "\n");
       goto fail_unified;
     }
 
-    es->cs->template_instantiation_recursion_depth++;
+    cs->template_instantiation_recursion_depth++;
 
     inst->typecheck_started = 1;
     struct exprscope scope;
-    exprscope_init(&scope, es->cs,
+    exprscope_init(&scope, cs,
                    &ent->def->generics_,
                    inst->substitutions,
                    inst->substitutions_count,
@@ -1704,7 +1715,7 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
     if (!check_expr_with_type(&scope, &ent->def->rhs_, &unified,
                               &annotated_rhs)) {
       exprscope_destroy(&scope);
-      es->cs->template_instantiation_recursion_depth--;
+      cs->template_instantiation_recursion_depth--;
       goto fail_unified;
     }
 
@@ -1716,7 +1727,7 @@ int lookup_global_maybe_typecheck(struct exprscope *es,
     inst->annotated_rhs = annotated_rhs;
 
     exprscope_destroy(&scope);
-    es->cs->template_instantiation_recursion_depth--;
+    cs->template_instantiation_recursion_depth--;
   }
 
   *out = unified;
@@ -1755,7 +1766,7 @@ int exprscope_lookup_name(struct exprscope *es,
 
   /* inst_or_null_out gets initialized to a non-NULL value. */
   int def_exists_discard;
-  return lookup_global_maybe_typecheck(es, name, partial_type, &def_exists_discard,
+  return lookup_global_maybe_typecheck(es->cs, es, name, partial_type, &def_exists_discard,
                                        out, is_lvalue_out, inst_or_null_out);
 }
 

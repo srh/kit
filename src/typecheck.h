@@ -101,6 +101,13 @@ struct typeexpr_traits {
   enum typeexpr_trait inittible;
 };
 
+struct typeexpr_trait_instantiations {
+  struct def_instantiation *move_inst;
+  struct def_instantiation *copy_inst;
+  struct def_instantiation *destroy_inst;
+  struct def_instantiation *init_inst;
+};
+
 struct exprscope;
 int check_typeexpr_traits(struct checkstate *cs,
                           /* a is a concrete type. */

@@ -1180,6 +1180,7 @@ void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
   (void)cs, (void)f, (void)h, (void)loc, (void)type;
   TODO_IMPLEMENT;
 }
+
 void gen_copy(struct checkstate *cs, struct objfile *f, struct frame *h,
               struct loc dest, struct loc src, struct ast_typeexpr *type) {
   (void)cs, (void)f, (void)h, (void)dest, (void)src, (void)type;
