@@ -1122,7 +1122,8 @@ int check_typeexpr_name_traits(struct checkstate *cs,
   if (!name_table_lookup_deftype(&cs->nt, a->u.name.value,
                                  no_param_list_arity(),
                                  &ent)) {
-    CRASH("an invalid type");
+    METERR(*ast_typeexpr_meta(a), "Invalid type name %.*s found.\n", IM_P(cs->im, a->u.name.value));
+    return 0;
   }
 
   if (ent->is_primitive) {
@@ -2064,7 +2065,12 @@ int check_statement(struct bodystate *bs,
     struct ast_typeexpr replaced_type;
     replace_generics(bs->es, &s->u.var_statement.decl.type, &replaced_type);
 
-    struct def_instantiation *init_inst_or_null = NULL;
+    struct typeexpr_traits traits_discard;
+    if (!check_typeexpr_traits(bs->es->cs, &replaced_type, bs->es, &traits_discard)) {
+      ast_typeexpr_destroy(&replaced_type);
+      goto fail;
+    }
+
     int has_rhs = s->u.var_statement.has_rhs;
     struct ast_expr annotated_rhs = { 0 };  /* Initialize to appease cl. */
     if (has_rhs) {
@@ -2072,38 +2078,6 @@ int check_statement(struct bodystate *bs,
         ast_typeexpr_destroy(&replaced_type);
         goto fail;
       }
-    } else {
-      struct ast_typeexpr init_funcexpr;
-      make_pointee_func_lookup_type(bs->es->cs, &replaced_type, 1, &init_funcexpr);
-      struct ast_name_expr init_name;
-      ast_name_expr_init(&init_name, make_ast_ident(identmap_intern_c_str(bs->es->cs->im, "init")));
-
-      int def_exists;
-      struct ast_typeexpr unified;
-      int lvalue_discard;
-      if (!lookup_global_maybe_typecheck(bs->es, &init_name, &init_funcexpr, &def_exists, &unified,
-                                         &lvalue_discard, &init_inst_or_null)) {
-        if (def_exists) {
-          ast_name_expr_destroy(&init_name);
-          ast_typeexpr_destroy(&init_funcexpr);
-          ast_typeexpr_destroy(&replaced_type);
-          goto fail;
-        } else {
-          /* No def found, that's fine. */
-          init_inst_or_null = NULL;
-        }
-      } else {
-        ast_typeexpr_destroy(&unified);
-      }
-
-      ast_name_expr_destroy(&init_name);
-      ast_typeexpr_destroy(&init_funcexpr);
-    }
-
-    struct typeexpr_traits traits_discard;
-    if (!check_typeexpr_traits(bs->es->cs, &replaced_type, bs->es, &traits_discard)) {
-      ast_typeexpr_destroy(&replaced_type);
-      goto fail;
     }
 
     struct ast_ident name;
@@ -2143,8 +2117,7 @@ int check_statement(struct bodystate *bs,
                                          decl);
     }
     ast_var_statement_info_note_type(&annotated_out->u.var_statement.info,
-                                     replaced_type,
-                                     init_inst_or_null);
+                                     replaced_type);
     fallthrough = FALLTHROUGH_FROMTHETOP;
   } break;
   case AST_STATEMENT_IFTHEN: {
@@ -4777,7 +4750,7 @@ int check_file_test_more_12(const uint8_t *name, size_t name_count,
       "foo",
       "deftype vec3 [3]u32;\n"
       "def foo func[[3]u32, vec3] = fn(arr [3]u32) vec3 {\n"
-      "  var vec3 v = arr;\n"
+      "  var v vec3 = arr;\n"
       "  return v;\n"
       "};\n"
     } };
@@ -5235,6 +5208,21 @@ int check_file_test_more_37(const uint8_t *name, size_t name_count,
       "}\n"
       "def foo func[i32] = fn() i32 {\n"
       "  var k ty;\n"
+      "  return 1;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_38(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because blah is not the name of a type. */
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[i32] = fn() i32 {\n"
+      "  var x blah;\n"
       "  return 1;\n"
       "};\n"
     } };
@@ -5727,6 +5715,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_37...\n");
   if (!test_check_module(&im, &check_file_test_more_37, foo)) {
     DBG("check_file_test_more_37 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_38...\n");
+  if (!!test_check_module(&im, &check_file_test_more_38, foo)) {
+    DBG("check_file_test_more_38 fails\n");
     goto cleanup_identmap;
   }
 

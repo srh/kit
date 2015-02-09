@@ -90,7 +90,7 @@ void gen_copy(struct checkstate *cs, struct objfile *f, struct frame *h,
 void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct frame *h,
                              struct loc dest, struct loc src, struct ast_typeexpr *type);
 void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
-                           struct loc dest, struct ast_var_statement_info *vs_info);
+                           struct loc dest, struct ast_typeexpr *var_type);
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg);
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
 
@@ -1191,8 +1191,8 @@ void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct fr
   TODO_IMPLEMENT;
 }
 void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
-                           struct loc loc, struct ast_var_statement_info *vs_info) {
-  (void)cs, (void)f, (void)h, (void)loc, (void)vs_info;
+                           struct loc loc, struct ast_typeexpr *type) {
+  (void)cs, (void)f, (void)h, (void)loc, (void)type;
   TODO_IMPLEMENT;
 }
 
@@ -3075,7 +3075,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       /* Do nothing -- er is var_loc, there is nothing to destroy. */
       frame_restore_offset(h, saved_offset);
     } else {
-      gen_default_construct(cs, f, h, var_loc, &s->u.var_statement.info);
+      gen_default_construct(cs, f, h, var_loc, var_type);
     }
 
     struct vardata vd;
