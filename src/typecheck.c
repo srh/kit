@@ -2110,41 +2110,6 @@ int check_statement(struct bodystate *bs,
         replaced_type);
     fallthrough = FALLTHROUGH_FROMTHETOP;
   } break;
-  case AST_STATEMENT_GOTO: {
-    bodystate_note_goto(bs, s->u.goto_statement.target.value);
-    ast_statement_init_copy(annotated_out, s);
-
-    size_t vars_in_scope_count = bs->es->vars_count;
-    struct varnum *vars_in_scope = malloc_mul(sizeof(*vars_in_scope), vars_in_scope_count);
-    for (size_t i = 0; i < vars_in_scope_count; i++) {
-      vars_in_scope[i] = bs->es->vars[i].varnum;
-    }
-
-    ast_statement_info_set_vars_in_scope(&annotated_out->u.goto_statement.goto_info,
-                                         vars_in_scope,
-                                         vars_in_scope_count);
-
-    fallthrough = FALLTHROUGH_NEVER;
-  } break;
-  case AST_STATEMENT_LABEL: {
-    if (!bodystate_note_label(bs, &s->u.label_statement.label)) {
-      goto fail;
-    }
-    ast_statement_init_copy(annotated_out, s);
-
-    /* TODO: Dedup with goto case (and slice-copying in general?) */
-    size_t vars_in_scope_count = bs->es->vars_count;
-    struct varnum *vars_in_scope = malloc_mul(sizeof(*vars_in_scope), vars_in_scope_count);
-    for (size_t i = 0; i < vars_in_scope_count; i++) {
-      vars_in_scope[i] = bs->es->vars[i].varnum;
-    }
-
-    ast_statement_info_set_vars_in_scope(&annotated_out->u.label_statement.info,
-                                         vars_in_scope,
-                                         vars_in_scope_count);
-
-    fallthrough = FALLTHROUGH_NONLOCAL;
-  } break;
   case AST_STATEMENT_IFTHEN: {
     struct ast_typeexpr boolean;
     init_boolean_typeexpr(bs->es->cs, &boolean);
@@ -2347,6 +2312,7 @@ int check_statement(struct bodystate *bs,
   return 0;
 }
 
+/* TODO: Remove fallthrough, I dropped labels/gotos. */
 /* fallthrough_out says if evaluating the bracebody could "fall off
 the end", i.e. it has a label without a subsequent goto or return
 statement.  This is more conservative than "conservative" analysis,
@@ -4162,47 +4128,6 @@ int check_file_test_lambda_1(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
-int check_file_test_lambda_2(const uint8_t *name, size_t name_count,
-                             uint8_t **data_out, size_t *data_count_out) {
-  struct test_module a[] = { { "foo",
-                               "def x i32 = 3;\n"
-                               "def y func[i32, i32] = fn(z i32)i32 {\n"
-                               "  if (~z) {\n"
-                               "    goto foo;\n"
-                               "    var k i32 = y(x);\n"
-                               "  } else {\n"
-                               "    return x;\n"
-                               "  }\n"
-                               "  label foo;\n"
-                               "  return z;\n"
-                               "};\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_lambda_3(const uint8_t *name, size_t name_count,
-                             uint8_t **data_out, size_t *data_count_out) {
-  /* Fails because there's no label named foo. */
-  struct test_module a[] = { { "foo",
-                               "def x i32 = 3;\n"
-                               "def y func[i32, i32] = fn(z i32)i32 {\n"
-                               "  if (z) {\n"
-                               "    y;\n"
-                               "    goto foo;\n"
-                               "  } else {\n"
-                               "    return x;\n"
-                               "  }\n"
-                               "  return z;\n"
-                               "};\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-
 int check_file_test_lambda_4(const uint8_t *name, size_t name_count,
                              uint8_t **data_out, size_t *data_count_out) {
   /* Fails because k is a u32. */
@@ -5300,18 +5225,6 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_lambda_1...\n");
   if (!test_check_module(&im, &check_file_test_lambda_1, foo)) {
     DBG("check_file_test_lambda_1 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_lambda_2...\n");
-  if (!test_check_module(&im, &check_file_test_lambda_2, foo)) {
-    DBG("check_file_test_lambda_2 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_lambda_3...\n");
-  if (!!test_check_module(&im, &check_file_test_lambda_3, foo)) {
-    DBG("check_file_test_lambda_3 fails\n");
     goto cleanup_identmap;
   }
 

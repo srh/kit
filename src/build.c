@@ -3108,6 +3108,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
 }
 
 void gen_return(struct objfile *f, struct frame *h) {
+  /* TODO: We need to call destructors for vars in scope. */
   if (!h->return_target_valid) {
     h->return_target_valid = 1;
     h->return_target_number = frame_add_target(h);
@@ -3167,21 +3168,6 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
                  var_loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
     (*vars_pushed_ref)++;
-  } break;
-  case AST_STATEMENT_GOTO: {
-    struct labeldata *data = frame_try_find_labeldata(h, s->u.goto_statement.target.value);
-    CHECK(data);
-
-    /* TODO: Call constructors/destructors as appropriate. */
-    /* TODO: Are the constructors/destructors actually type-checked? */
-    /* TODO: Also we must call destructors then constructors, in the right order. */
-
-    gen_placeholder_jmp(f, h, data->target_number);
-  } break;
-  case AST_STATEMENT_LABEL: {
-    struct labeldata *data = frame_try_find_labeldata(h, s->u.label_statement.label.value);
-    CHECK(data);
-    frame_define_target(h, data->target_number, objfile_section_size(objfile_text(f)));
   } break;
   case AST_STATEMENT_IFTHEN: {
     int32_t saved_offset = frame_save_offset(h);
@@ -3376,16 +3362,6 @@ void note_statement_var_locations(struct checkstate *cs, struct frame *h,
     vld.concrete_type = var_type;
     vld.loc = var_loc;
     frame_add_varlocdata(h, ast_var_info_varnum(&a->u.var_statement.decl.var_info), vld);
-  } break;
-  case AST_STATEMENT_GOTO:
-    break;
-  case AST_STATEMENT_LABEL: {
-    size_t target_number = frame_add_target(h);
-    struct labeldata ld;
-    labeldata_init(&ld, a->u.label_statement.label.value,
-                   target_number,
-                   &a->u.label_statement.info);
-    SLICE_PUSH(h->labeldata, h->labeldata_count, h->labeldata_limit, ld);
   } break;
   case AST_STATEMENT_IFTHEN: {
     note_bracebody_var_locations(cs, h, &a->u.ifthen_statement.thenbody);

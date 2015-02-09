@@ -851,34 +851,6 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
   if (try_skip_keyword(p, "var")) {
     out->tag = AST_STATEMENT_VAR;
     return parse_rest_of_var_statement(p, pos_start, &out->u.var_statement);
-  } else if (try_skip_keyword(p, "goto")) {
-    struct ast_ident target;
-    if (!(skip_ws(p) && parse_ident(p, &target))) {
-      return 0;
-    }
-    if (!(skip_ws(p) && try_skip_semicolon(p))) {
-      ast_ident_destroy(&target);
-      return 0;
-    }
-    out->tag = AST_STATEMENT_GOTO;
-    ast_goto_statement_init(&out->u.goto_statement,
-                            ast_meta_make(pos_start, ps_pos(p)),
-                            target);
-    return 1;
-  } else if (try_skip_keyword(p, "label")) {
-    struct ast_ident label;
-    if (!(skip_ws(p) && parse_ident(p, &label))) {
-      return 0;
-    }
-    if (!(skip_ws(p) && try_skip_semicolon(p))) {
-      ast_ident_destroy(&label);
-      return 0;
-    }
-    out->tag = AST_STATEMENT_LABEL;
-    ast_label_statement_init(&out->u.label_statement,
-                             ast_meta_make(pos_start, ps_pos(p)),
-                             label);
-    return 1;
   } else if (try_skip_keyword(p, "return")) {
     struct ast_expr expr;
     if (!(skip_ws(p) && parse_expr(p, &expr, kSemicolonPrecedence))) {
@@ -1957,16 +1929,6 @@ int parse_test_defs(void) {
   pass &= run_count_test("def07", "def foo func[int, int] = \n"
                          "\tfn(x int, y int) int { foo(bar); };\n",
                          26);
-  pass &= run_count_test("def08", "def foo func[int, int] = \n"
-                         "\tfn(x int, y int) int { foo(bar); goto blah; "
-                         "label feh; };\n",
-                         32);
-  pass &= run_count_test("def09",
-                         "def foo func[int, int] = \n"
-                         "\tfn() int { foo(*bar.blah); if (n) { "
-                         "goto blah; } label feh; \n"
-                         "if n { goto blah; } else { &meh; } };\n",
-                         49);
   pass &= run_count_test("def10",
                          "def foo bar = 2 + 3u;",
                          9);

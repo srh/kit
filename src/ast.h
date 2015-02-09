@@ -194,34 +194,6 @@ void ast_var_statement_init_without_rhs(struct ast_var_statement *a, struct ast_
 
 struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a);
 
-struct ast_statement_info {
-  int info_valid;
-  struct varnum *vars_in_scope;
-  size_t vars_in_scope_count;
-};
-
-void ast_statement_info_set_vars_in_scope(struct ast_statement_info *a,
-                                          struct varnum *vars_in_scope,
-                                          size_t vars_in_scope_count);
-
-struct ast_goto_statement {
-  struct ast_meta meta;
-  struct ast_statement_info goto_info;
-  struct ast_ident target;
-};
-
-void ast_goto_statement_init(struct ast_goto_statement *a,
-                             struct ast_meta meta, struct ast_ident target);
-
-struct ast_label_statement {
-  struct ast_meta meta;
-  struct ast_statement_info info;
-  struct ast_ident label;
-};
-
-void ast_label_statement_init(struct ast_label_statement *a,
-                              struct ast_meta meta, struct ast_ident label);
-
 struct ast_ifthen_statement {
   struct ast_meta meta;
   struct ast_expr *condition;
@@ -284,8 +256,6 @@ enum ast_statement_tag {
   AST_STATEMENT_EXPR,
   AST_STATEMENT_RETURN_EXPR,
   AST_STATEMENT_VAR,
-  AST_STATEMENT_GOTO,
-  AST_STATEMENT_LABEL,
   AST_STATEMENT_IFTHEN,
   AST_STATEMENT_IFTHENELSE,
   AST_STATEMENT_WHILE,
@@ -298,8 +268,6 @@ struct ast_statement {
     struct ast_expr *expr;
     struct ast_expr *return_expr;
     struct ast_var_statement var_statement;
-    struct ast_goto_statement goto_statement;
-    struct ast_label_statement label_statement;
     struct ast_ifthen_statement ifthen_statement;
     struct ast_ifthenelse_statement ifthenelse_statement;
     struct ast_while_statement while_statement;
