@@ -3278,6 +3278,34 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
+                   struct def_instantiation *inst, struct expr_return *er) {
+  if (inst->value_computed && inst->value.tag == STATIC_VALUE_PRIMITIVE_OP) {
+    struct immediate imm;
+    imm.tag = IMMEDIATE_PRIMITIVE_OP;
+    imm.u.primitive_op = inst->value.u.primitive_op;
+    expr_return_immediate(f, h, er, imm);
+  } else {
+    CHECK(inst->symbol_table_index_computed);
+    if (typeexpr_is_func_type(cs->im, &inst->type)) {
+      struct immediate imm;
+      imm.tag = IMMEDIATE_FUNC;
+      imm.u.func_sti = inst->symbol_table_index;
+      expr_return_immediate(f, h, er, imm);
+    } else {
+      /* TODO: Support immediate values, distinction between defs
+      of variables and other defs -- only make a symbol for
+      exported defs (if they're small). */
+      uint32_t size = kira_sizeof(&cs->nt, &inst->type);
+      /* TODO: Maybe globals' alignment rules are softer. */
+      uint32_t padded_size = size;
+      struct loc loc = global_loc(size, padded_size,
+                                  inst->symbol_table_index);
+      expr_return_set(cs, f, h, er, loc, &inst->type, temp_none());
+    }
+  }
+}
+
 int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *er) {
@@ -3286,30 +3314,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     CHECK(a->u.name.info.info_valid);
     struct def_instantiation *inst = a->u.name.info.inst_or_null;
     if (inst) {
-      if (inst->value_computed && inst->value.tag == STATIC_VALUE_PRIMITIVE_OP) {
-        struct immediate imm;
-        imm.tag = IMMEDIATE_PRIMITIVE_OP;
-        imm.u.primitive_op = inst->value.u.primitive_op;
-        expr_return_immediate(f, h, er, imm);
-      } else {
-        CHECK(inst->symbol_table_index_computed);
-        if (typeexpr_is_func_type(cs->im, &inst->type)) {
-          struct immediate imm;
-          imm.tag = IMMEDIATE_FUNC;
-          imm.u.func_sti = inst->symbol_table_index;
-          expr_return_immediate(f, h, er, imm);
-        } else {
-          /* TODO: Support immediate values, distinction between defs
-          of variables and other defs -- only make a symbol for
-          exported defs (if they're small). */
-          uint32_t size = kira_sizeof(&cs->nt, &inst->type);
-          /* TODO: Maybe globals' alignment rules are softer. */
-          uint32_t padded_size = size;
-          struct loc loc = global_loc(size, padded_size,
-                                      inst->symbol_table_index);
-          expr_return_set(cs, f, h, er, loc, &inst->type, temp_none());
-        }
-      }
+      gen_inst_value(cs, f, h, inst, er);
     } else {
       /* No template params when looking up a local variable. */
       CHECK(!a->u.name.has_params);
