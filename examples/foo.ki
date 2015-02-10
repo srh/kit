@@ -88,8 +88,17 @@ def try_string func[void] = fn() void {
 };
 
 export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
+  putchar(64);
+  putchar(10);
+  flushstdout();
   try_kla();
+  putchar(64);
+  putchar(10);
+  flushstdout();
   try_string();
+  putchar(64);
+  putchar(10);
+  flushstdout();
   var ret ty;
   p->x = -5;
   p->y = fac(7);

@@ -1,0 +1,83 @@
+import bar;
+
+extern alloc_u8_array func[u32, *u8];
+extern free_u8_array func[*u8, void];
+
+defclass move string struct {
+  size u32;
+  cap u32;
+  buf *u8;
+};
+
+access string {
+  def init func[*string, void] = fn(p *string) void {
+    p->size = 0u;
+    p->cap = 0u;
+    var buf *u8;
+    p->buf = buf;
+    var ret void;
+    return ret;
+  };
+
+  def destroy func[*string, void] = fn(p *string) void {
+    free_u8_array(p->buf);
+    var ret void;
+    return ret;
+  };
+
+  def copy func[*string, *string, void] = fn(p *string, c *string) void {
+    p->size = c->size;
+    p->cap = c->cap;
+    p->buf = alloc_u8_array(p->size);
+    var ret void;
+    return ret;
+  };
+
+  def grow_cap func[*string, u32, void] = fn(p *string, newcap u32) void {
+    var buf *u8 = alloc_u8_array(newcap);
+    var sz u32 = p->size;
+    for var i u32 = 0u; i < sz; i = i + 1u {
+      buf[i] = p->buf[i];
+    }
+
+    free_u8_array(p->buf);
+    p->buf = buf;
+    p->cap = newcap;
+    var ret void;
+    return ret;
+  };
+
+  def append func[*string, u8, void] = fn(p *string, c u8) void {
+    if p->size == p->cap {
+      var new_cap u32;
+      if (p->cap == 0u) {
+        new_cap = 8u;
+      } else {
+        new_cap = p->cap + p->cap;
+      }
+      grow_cap(p, new_cap);
+    }
+
+    p->buf[p->size] = c;
+    p->size = p->size + 1u;
+    var ret void;
+    return ret;
+  };
+
+  def get func[*string, u32, u8] = fn(p *string, i u32) u8 {
+    return p->buf[i];
+  };
+
+  def size func[*string, u32] = fn(p *string) u32 {
+    return p->size;
+  };
+}
+
+def print func[*string, void] = fn(p *string) void {
+  for var i u32 = 0u; i < size(p); i = i + 1u {
+    var ch i32 = ~get(p, i);
+    putchar(ch);
+  }
+  var ret void;
+  return ret;
+};
