@@ -1283,6 +1283,7 @@ int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct fr
     return 1;
   } break;
   case TYPETRAV_FUNC_COPY: {
+    /* TODO: This check can trigger. */
     CHECK(traits->copyable != TRAIT_LACKED);
     if (traits->copyable == TRAIT_TRIVIALLY_HAD) {
       /* Copying a trivial type:  Copy it.. trivially. */

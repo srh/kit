@@ -20,11 +20,36 @@ def[T] getsize func[u32] = fn() u32 {
 };
 
 defclass kla struct {
-  x i32;
-  y i32;
+  x u32;
+  y u32;
 };
 
+access kla {
+  def destroy func[*kla, void] = fn(p *kla) void {
+    p->x = 0u;
+    p->y = 0u;
+    var ret void;
+    return ret;
+  };
+  def init func[*kla, void] = fn(p *kla) void {
+    p->x = 37u;
+    p->y = 47u;
+    var ret void;
+    return ret;
+  };
+
+  def expose func[*kla, struct { x u32; y u32; }] = fn (p *kla) struct { x u32; y u32; } {
+    return ~ *p;
+  };
+}
+
 def try_kla func[void] = fn() void {
+  var k kla;
+  var l struct { x u32; y u32; } = expose(&k);
+  print(l.x);
+  putchar(32);
+  print(l.y);
+  putchar(10);
   var ret void;
   return ret;
 };
