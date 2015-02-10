@@ -114,5 +114,17 @@ int check_typeexpr_traits(struct checkstate *cs,
                           struct ast_typeexpr *a,
                           struct exprscope *also_typecheck,
                           struct typeexpr_traits *out);
+int check_typeexpr_name_traits(struct checkstate *cs,
+                               struct ast_typeexpr *a,
+                               struct exprscope *also_typecheck,
+                               struct typeexpr_traits *out,
+                               struct typeexpr_trait_instantiations *insts_out,
+                               struct ast_typeexpr *concrete_deftype_rhs_type_out_or_null);
+int check_typeexpr_app_traits(struct checkstate *cs,
+                              struct ast_typeexpr *a,
+                              struct exprscope *also_typecheck,
+                              struct typeexpr_traits *out,
+                              struct typeexpr_trait_instantiations *insts_out,
+                              struct ast_typeexpr *concrete_deftype_rhs_type_out_or_null);
 
 #endif /* KIRA_TYPECHECK_H_ */

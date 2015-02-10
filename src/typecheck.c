@@ -1162,7 +1162,9 @@ int check_typeexpr_name_traits(struct checkstate *cs,
                                struct ast_typeexpr *a,
                                struct exprscope *also_typecheck,
                                struct typeexpr_traits *out,
-                               struct typeexpr_trait_instantiations *insts_out) {
+                               struct typeexpr_trait_instantiations *insts_out,
+                               struct ast_typeexpr *concrete_deftype_rhs_type_out_or_null) {
+  CHECK(a->tag == AST_TYPEEXPR_NAME);
   struct deftype_entry *ent;
   if (!name_table_lookup_deftype(&cs->nt, a->u.name.value,
                                  no_param_list_arity(),
@@ -1179,24 +1181,33 @@ int check_typeexpr_name_traits(struct checkstate *cs,
     insts_out->copy_inst = NULL;
     insts_out->destroy_inst = NULL;
     insts_out->init_inst = NULL;
+    if (concrete_deftype_rhs_type_out_or_null) {
+      concrete_deftype_rhs_type_out_or_null->tag = (enum ast_typeexpr_tag)-1;
+    }
     return 1;
   }
 
-  return finish_checking_name_traits(cs,
-                                     a,
-                                     &ent->deftype->meta,
-                                     ent->deftype->disposition,
-                                     &ent->deftype->type,
-                                     also_typecheck,
-                                     out,
-                                     insts_out);
+  int ret = finish_checking_name_traits(cs,
+                                        a,
+                                        &ent->deftype->meta,
+                                        ent->deftype->disposition,
+                                        &ent->deftype->type,
+                                        also_typecheck,
+                                        out,
+                                        insts_out);
+  if (ret && concrete_deftype_rhs_type_out_or_null) {
+    ast_typeexpr_init_copy(concrete_deftype_rhs_type_out_or_null, &ent->deftype->type);
+  }
+  return ret;
 }
 
 int check_typeexpr_app_traits(struct checkstate *cs,
                               struct ast_typeexpr *a,
                               struct exprscope *also_typecheck,
                               struct typeexpr_traits *out,
-                              struct typeexpr_trait_instantiations *insts_out) {
+                              struct typeexpr_trait_instantiations *insts_out,
+                              struct ast_typeexpr *concrete_deftype_rhs_type_out_or_null) {
+  CHECK(a->tag == AST_TYPEEXPR_APP);
   struct deftype_entry *ent;
   if (!name_table_lookup_deftype(&cs->nt, a->u.app.name.value,
                                  param_list_arity(a->u.app.params_count),
@@ -1212,6 +1223,9 @@ int check_typeexpr_app_traits(struct checkstate *cs,
     insts_out->copy_inst = NULL;
     insts_out->destroy_inst = NULL;
     insts_out->init_inst = NULL;
+    if (concrete_deftype_rhs_type_out_or_null) {
+      concrete_deftype_rhs_type_out_or_null->tag = (enum ast_typeexpr_tag)-1;
+    }
     return 1;
   }
 
@@ -1226,7 +1240,7 @@ int check_typeexpr_app_traits(struct checkstate *cs,
                       &deftype->type,
                       &concrete_deftype_type);
 
-  int res = finish_checking_name_traits(cs,
+  int ret = finish_checking_name_traits(cs,
                                         a,
                                         &deftype->meta,
                                         deftype->disposition,
@@ -1234,8 +1248,12 @@ int check_typeexpr_app_traits(struct checkstate *cs,
                                         also_typecheck,
                                         out,
                                         insts_out);
-  ast_typeexpr_destroy(&concrete_deftype_type);
-  return res;
+  if (ret && concrete_deftype_rhs_type_out_or_null) {
+    *concrete_deftype_rhs_type_out_or_null = concrete_deftype_type;
+  } else {
+    ast_typeexpr_destroy(&concrete_deftype_type);
+  }
+  return ret;
 }
 
 int check_typeexpr_structe_traits(struct checkstate *cs,
@@ -1315,11 +1333,11 @@ int check_typeexpr_traits(struct checkstate *cs,
   switch (a->tag) {
   case AST_TYPEEXPR_NAME: {
     struct typeexpr_trait_instantiations insts_discard;
-    return check_typeexpr_name_traits(cs, a, also_typecheck, out, &insts_discard);
+    return check_typeexpr_name_traits(cs, a, also_typecheck, out, &insts_discard, NULL);
   } break;
   case AST_TYPEEXPR_APP: {
     struct typeexpr_trait_instantiations insts_discard;
-    return check_typeexpr_app_traits(cs, a, also_typecheck, out, &insts_discard);
+    return check_typeexpr_app_traits(cs, a, also_typecheck, out, &insts_discard, NULL);
   } break;
   case AST_TYPEEXPR_STRUCTE:
     return check_typeexpr_structe_traits(cs, a, also_typecheck, out);

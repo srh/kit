@@ -80,6 +80,23 @@ int x86_reg_has_lowbyte(enum x86_reg reg) {
   return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
 }
 
+struct loc gen_field_loc(struct checkstate *cs,
+                         struct objfile *f,
+                         struct frame *h,
+                         struct loc lhs_loc,
+                         struct ast_typeexpr *type,
+                         ident_value fieldname);
+
+struct loc gen_array_element_loc(struct checkstate *cs,
+                                 struct objfile *f,
+                                 struct frame *h,
+                                 struct loc src,
+                                 struct ast_typeexpr *elem_type,
+                                 uint32_t index);
+
+void gen_mov(struct objfile *f, struct loc dest, struct loc src);
+void gen_bzero(struct objfile *f, struct loc dest);
+
 /* TODO: gen_destroy and gen_move_or_copydestroy (etc) better damn
 well check that the functions they invoke have been typechecked (by
 checking a field like is_typechecked). */
@@ -1063,6 +1080,18 @@ void x86_gen_mov_mem_imm32(struct objfile *f,
   append_immediate(f, imm);
 }
 
+void x86_gen_mov_mem_imm8(struct objfile *f,
+                          enum x86_reg dest,
+                          int32_t dest_disp,
+                          int8_t imm) {
+  uint8_t b[11];
+  b[0] = 0xC6;
+  size_t count = x86_encode_reg_rm(b + 1, 0, dest, dest_disp);
+  CHECK(count <= 9);
+  b[1 + count] = (uint8_t)imm;
+  objfile_section_append_raw(objfile_text(f), b, 1 + count + 1);
+}
+
 void x86_gen_load32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
                     int32_t src_disp) {
   uint8_t b[10];
@@ -1175,26 +1204,218 @@ void gen_function_intro(struct objfile *f, struct frame *h) {
   gen_placeholder_stack_adjustment(f, h, 1);
 }
 
+enum typetrav_func {
+  TYPETRAV_FUNC_DESTROY,
+  TYPETRAV_FUNC_COPY,
+  TYPETRAV_FUNC_MOVE_OR_COPYDESTROY,
+  TYPETRAV_FUNC_DEFAULT_CONSTRUCT,
+};
+
+void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f, struct frame *h,
+                              struct loc loc, struct def_instantiation *inst) {
+  /* TODO: Definitely share code with gen_funcall. */
+  (void)cs, (void)f, (void)h, (void)loc, (void)inst;
+  TODO_IMPLEMENT;
+}
+
+void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f, struct frame *h,
+                              struct loc dest, struct loc src, struct def_instantiation *inst) {
+  /* TODO: Definitely share code with gen_funcall. */
+  (void)cs, (void)f, (void)h, (void)dest, (void)src, (void)inst;
+  TODO_IMPLEMENT;
+}
+
+int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct frame *h,
+                             enum typetrav_func tf, struct loc dest, struct loc src,
+                             struct typeexpr_traits *traits,
+                             struct typeexpr_trait_instantiations *insts) {
+  switch (tf) {
+  case TYPETRAV_FUNC_DESTROY: {
+    if (traits->copyable == TRAIT_TRIVIALLY_HAD) {
+      /* Destroying a trivial type: Do nothing. */
+      return 1;
+    }
+
+    if (!insts->destroy_inst) {
+      /* No destroy inst.  Therefore, we haven't destroyed the
+      object. */
+      return 0;
+    }
+
+    gen_typetrav_onearg_call(cs, f, h, dest, insts->destroy_inst);
+    return 1;
+  } break;
+  case TYPETRAV_FUNC_COPY: {
+    CHECK(traits->copyable != TRAIT_LACKED);
+    if (traits->copyable == TRAIT_TRIVIALLY_HAD) {
+      /* Copying a trivial type:  Copy it.. trivially. */
+      gen_mov(f, dest, src);
+      return 1;
+    }
+
+    if (!insts->copy_inst) {
+      /* No copy inst.  Therefore, we haven't copied the object. */
+      return 0;
+    }
+
+    gen_typetrav_twoarg_call(cs, f, h, dest, src, insts->copy_inst);
+    return 1;
+  } break;
+  case TYPETRAV_FUNC_MOVE_OR_COPYDESTROY: {
+    if (traits->movable == TRAIT_LACKED) {
+      CHECK(traits->copyable != TRAIT_LACKED);
+      /* Something shouldn't be trivially copyable but not trivially
+      movable. */
+      CHECK(traits->copyable != TRAIT_TRIVIALLY_HAD);
+      CHECK((insts->copy_inst == NULL) == (insts->destroy_inst == NULL));
+
+      if (!(insts->copy_inst && insts->destroy_inst)) {
+        /* No copy or destroy inst.  Therefore, we have not
+        copy/destroyed the object. */
+        return 0;
+      }
+
+      gen_typetrav_twoarg_call(cs, f, h, dest, src, insts->copy_inst);
+      gen_typetrav_onearg_call(cs, f, h, src, insts->destroy_inst);
+      return 1;
+    }
+
+    if (traits->movable == TRAIT_TRIVIALLY_HAD) {
+      /* Moving a trivial type:  Move it.. trivially. */
+      gen_mov(f, dest, src);
+      return 1;
+    }
+
+    if (!insts->move_inst) {
+      /* No move inst.  Therefore, we haven't moved the object. */
+      return 0;
+    }
+
+    gen_typetrav_twoarg_call(cs, f, h, dest, src, insts->move_inst);
+    return 1;
+  } break;
+  case TYPETRAV_FUNC_DEFAULT_CONSTRUCT: {
+    CHECK(traits->inittible != TRAIT_LACKED);
+    if (traits->inittible == TRAIT_TRIVIALLY_HAD) {
+      /* We don't need to zero the variable but it's... polite? */
+      gen_bzero(f, dest);
+      return 1;
+    }
+
+    if (!insts->init_inst) {
+      /* No init inst.  Therefore, we haven't initted the object. */
+      return 0;
+    }
+
+    gen_typetrav_onearg_call(cs, f, h, dest, insts->init_inst);
+    return 1;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
+                       enum typetrav_func tf, struct loc dest, int has_src, struct loc src, struct ast_typeexpr *type) {
+  switch (type->tag) {
+  case AST_TYPEEXPR_NAME: {
+    struct typeexpr_traits traits;
+    struct typeexpr_trait_instantiations insts;
+    struct ast_typeexpr rhs_type;
+    int success = check_typeexpr_name_traits(cs, type, NULL, &traits, &insts, &rhs_type);
+    CHECK(success);
+
+    if (!gen_typetrav_name_direct(cs, f, h, tf, dest, src, &traits, &insts)) {
+      gen_typetrav_func(cs, f, h, tf, dest, has_src, src, &rhs_type);
+    }
+
+    ast_typeexpr_destroy(&rhs_type);
+    return;
+  } break;
+  case AST_TYPEEXPR_APP: {
+    struct typeexpr_traits traits;
+    struct typeexpr_trait_instantiations insts;
+    struct ast_typeexpr rhs_type;
+    int success = check_typeexpr_app_traits(cs, type, NULL, &traits, &insts, &rhs_type);
+    CHECK(success);
+
+    if (!gen_typetrav_name_direct(cs, f, h, tf, dest, src, &traits, &insts)) {
+      gen_typetrav_func(cs, f, h, tf, dest, has_src, src, &rhs_type);
+    }
+
+    ast_typeexpr_destroy(&rhs_type);
+    return;
+  } break;
+  case AST_TYPEEXPR_STRUCTE: {
+    for (size_t i = 0, e = type->u.structe.fields_count; i < e; i++) {
+      int32_t saved_offset = frame_save_offset(h);
+      struct loc dest_field_loc = gen_field_loc(cs, f, h, dest, type, type->u.structe.fields[i].name.value);
+      struct loc src_field_loc;
+      if (has_src) {
+        src_field_loc = gen_field_loc(cs, f, h, src, type, type->u.structe.fields[i].name.value);
+      } else {
+        src_field_loc.tag = (enum loc_tag)-1;
+      }
+
+      gen_typetrav_func(cs, f, h, tf, dest_field_loc, has_src, src_field_loc, &type->u.structe.fields[i].type);
+      frame_restore_offset(h, saved_offset);
+    }
+    return;
+  } break;
+  case AST_TYPEEXPR_UNIONE: {
+    switch (tf) {
+    case TYPETRAV_FUNC_DESTROY:
+      break;
+    case TYPETRAV_FUNC_COPY: /* fallthrough */
+    case TYPETRAV_FUNC_MOVE_OR_COPYDESTROY:
+      gen_mov(f, dest, src);
+      break;
+    case TYPETRAV_FUNC_DEFAULT_CONSTRUCT:
+      gen_bzero(f, dest);
+      break;
+    default:
+      UNREACHABLE();
+    }
+  } break;
+  case AST_TYPEEXPR_ARRAY: {
+    for (uint32_t i = 0, e = type->u.arraytype.count; i < e; i++) {
+      int32_t saved_offset = frame_save_offset(h);
+      struct loc dest_element_loc = gen_array_element_loc(cs, f, h, dest, type->u.arraytype.param, i);
+      struct loc src_element_loc;
+      if (has_src) {
+        src_element_loc = gen_array_element_loc(cs, f, h, src, type->u.arraytype.param, i);
+      } else {
+        src_element_loc.tag = (enum loc_tag)-1;
+      }
+
+      gen_typetrav_func(cs, f, h, tf, dest_element_loc, has_src, src_element_loc, type->u.arraytype.param);
+
+      frame_restore_offset(h, saved_offset);
+    }
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
                  struct loc loc, struct ast_typeexpr *type) {
-  (void)cs, (void)f, (void)h, (void)loc, (void)type;
-  TODO_IMPLEMENT;
+  struct loc ignore = { (enum loc_tag)-1 };
+  gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_DESTROY, loc, 0, ignore, type);
 }
 
 void gen_copy(struct checkstate *cs, struct objfile *f, struct frame *h,
               struct loc dest, struct loc src, struct ast_typeexpr *type) {
-  (void)cs, (void)f, (void)h, (void)dest, (void)src, (void)type;
-  TODO_IMPLEMENT;
+  gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_COPY, dest, 1, src, type);
 }
 void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct frame *h,
                              struct loc dest, struct loc src, struct ast_typeexpr *type) {
-  (void)cs, (void)f, (void)h, (void)dest, (void)src, (void)type;
-  TODO_IMPLEMENT;
+  gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_MOVE_OR_COPYDESTROY, dest, 1, src, type);
 }
 void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
                            struct loc loc, struct ast_typeexpr *type) {
-  (void)cs, (void)f, (void)h, (void)loc, (void)type;
-  TODO_IMPLEMENT;
+  struct loc ignore = { (enum loc_tag)-1 };
+  gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_DEFAULT_CONSTRUCT, loc, 0, ignore, type);
 }
 
 
@@ -1348,6 +1569,32 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   uint32_t padded_size = dest.padded_size < src.padded_size ? dest.padded_size : src.padded_size;
   CHECK(padded_size >= src.size);
   gen_memmem_mov(f, dest_reg, dest_disp, src_reg, src_disp, padded_size);
+}
+
+void gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32_t upadded_size) {
+  struct immediate imm;
+  imm.tag = IMMEDIATE_U32;
+  imm.u.u32 = 0;
+
+  int32_t padded_size = uint32_to_int32(upadded_size);
+  int32_t n = 0;
+  while (n < padded_size) {
+    if (padded_size - n >= DWORD_SIZE) {
+      x86_gen_mov_mem_imm32(f, reg, int32_add(n, disp), imm);
+      n += DWORD_SIZE;
+    } else {
+      x86_gen_mov_mem_imm8(f, reg, int32_add(n, disp), 0);
+      n += 1;
+    }
+  }
+}
+
+void gen_bzero(struct objfile *f, struct loc dest) {
+  enum x86_reg reg;
+  int32_t disp;
+  put_ptr_in_reg(f, dest, X86_EAX, &reg, &disp);
+
+  gen_mem_bzero(f, reg, disp, dest.padded_size);
 }
 
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
@@ -1604,10 +1851,47 @@ void expr_return_set(struct checkstate *cs, struct objfile *f, struct frame *h,
 }
 
 void wipe_temporaries(struct checkstate *cs, struct objfile *f, struct frame *h,
-                      struct expr_return *src, struct loc *dest_out) {
+                      struct expr_return *src, struct ast_typeexpr *value_type, struct loc *dest_out) {
   CHECK(src->tag != EXPR_RETURN_DEMANDED);
-  (void)cs, (void)f, (void)h, (void)src, (void)dest_out;
-  TODO_IMPLEMENT;
+
+  struct loc loc;
+  switch (src->tag) {
+  case EXPR_RETURN_DEMANDED:
+    UNREACHABLE();
+  case EXPR_RETURN_FREE:
+    switch (src->u.free.tag) {
+    case EXPR_RETURN_FREE_LOC:
+      loc = src->u.free.u.loc;
+      break;
+    case EXPR_RETURN_FREE_IMM:
+      UNREACHABLE();
+      break;
+    default:
+      UNREACHABLE();
+    }
+    break;
+  case EXPR_RETURN_OPEN:
+    loc = src->u.loc;
+    break;
+  default:
+    UNREACHABLE();
+  }
+
+  if (!src->tr.exists) {
+    *dest_out = loc;
+    return;
+  }
+
+  if (src->tr.whole_thing) {
+    *dest_out = loc;
+    return;
+  }
+
+  struct loc retloc = frame_push_loc(h, loc.size);
+  gen_copy(cs, f, h, retloc, loc, value_type);
+  gen_destroy(cs, f, h, src->tr.loc, src->tr.temporary_type);
+  *dest_out = retloc;
+  return;
 }
 
 struct expr_return free_expr_return(void) {
@@ -2466,7 +2750,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   } break;
   case EXPR_RETURN_FREE_LOC: {
     struct loc func_loc;
-    wipe_temporaries(cs, f, h, &func_er, &func_loc);
+    wipe_temporaries(cs, f, h, &func_er, ast_expr_type(a->u.funcall.func), &func_loc);
     gen_load_register(f, X86_EAX, func_loc);
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_indirect_call_reg(f, X86_EAX);
@@ -2525,7 +2809,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
     }
 
     struct loc rhs_loc;
-    wipe_temporaries(cs, f, h, &rhs_er, &rhs_loc);
+    wipe_temporaries(cs, f, h, &rhs_er, ast_expr_type(ue->rhs), &rhs_loc);
 
     struct ast_typeexpr *type = ast_expr_type(a);
     uint32_t size = kira_sizeof(&cs->nt, type);
@@ -2573,7 +2857,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
 
   struct loc lhs_loc;
   if (is_ptr) {
-    wipe_temporaries(cs, f, h, &lhs_er, &lhs_loc);
+    wipe_temporaries(cs, f, h, &lhs_er, ast_expr_type(ie->lhs), &lhs_loc);
   } else {
     lhs_loc = lhs_er.u.loc;
   }
@@ -2587,7 +2871,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
     if (!gen_expr(cs, f, h, ie->rhs, &rhs_er)) {
       return 0;
     }
-    wipe_temporaries(cs, f, h, &rhs_er, &rhs_loc);
+    wipe_temporaries(cs, f, h, &rhs_er, ast_expr_type(ie->rhs), &rhs_loc);
   }
 
   if (is_ptr) {
@@ -2705,11 +2989,44 @@ void gen_assignment(struct checkstate *cs, struct objfile *f,
                     struct frame *h, struct loc lhs_loc,
                     struct loc rhs_loc, struct ast_typeexpr *type,
                     struct temp_return rhs_tr) {
-  (void)cs, (void)f, (void)h, (void)lhs_loc, (void)rhs_loc, (void)type, (void)rhs_tr;
-  /* TODO: We need to check for self-assignment, and then destruct
-  lhs, and move-construct lhs from rhs, and then temp_destroy
-  rhs_tr. */
-  TODO_IMPLEMENT;
+  if (loc_equal(lhs_loc, rhs_loc)) {
+    /* Statically equal locs, which means self-assignment, also rhs
+    can't have a temporary. */
+    CHECK(!rhs_tr.exists);
+    return;
+  }
+
+  struct typeexpr_traits traits;
+  int success = check_typeexpr_traits(cs, type, NULL, &traits);
+  CHECK(success);
+
+  /* With something trivially copyable we don't have to worry about
+  self-assignment or destroying the lhs. */
+  if (traits.copyable == TRAIT_TRIVIALLY_HAD) {
+    gen_mov(f, lhs_loc, rhs_loc);
+    if (rhs_tr.exists) {
+      gen_destroy(cs, f, h, rhs_tr.loc, rhs_tr.temporary_type);
+    }
+    return;
+  }
+
+  size_t target_number = frame_add_target(h);
+  gen_load_addressof(f, X86_ECX, lhs_loc);
+  gen_load_addressof(f, X86_EDX, rhs_loc);
+  x86_gen_cmp_w32(f, X86_EDX, X86_ECX);
+  gen_placeholder_jcc(f, h, X86_JCC_Z, target_number);
+
+  /* Okay, memory locations aren't equal. */
+  gen_destroy(cs, f, h, lhs_loc, type);
+  /* Now move and delete temporary. */
+  if (rhs_tr.exists && rhs_tr.whole_thing) {
+    gen_move_or_copydestroy(cs, f, h, lhs_loc, rhs_loc, type);
+  } else {
+    gen_copy(cs, f, h, lhs_loc, rhs_loc, type);
+    if (rhs_tr.exists) {
+      gen_destroy(cs, f, h, rhs_tr.loc, rhs_tr.temporary_type);
+    }
+  }
 }
 
 int gen_binop_expr(struct checkstate *cs, struct objfile *f,
@@ -2747,7 +3064,7 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
         return 0;
       }
 
-      wipe_temporaries(cs, f, h, &lhs_er, &lhs_loc);
+      wipe_temporaries(cs, f, h, &lhs_er, ast_expr_type(be->lhs), &lhs_loc);
     }
 
     struct loc ret = frame_push_loc(h, KIRA_BOOL_SIZE);
@@ -2776,7 +3093,7 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
       if (!gen_expr(cs, f, h, be->lhs, &lhs_er)) {
         return 0;
       }
-      wipe_temporaries(cs, f, h, &lhs_er, &lhs_loc);
+      wipe_temporaries(cs, f, h, &lhs_er, ast_expr_type(be->lhs), &lhs_loc);
     }
 
     struct loc ret = frame_push_loc(h, KIRA_BOOL_SIZE);
@@ -2865,15 +3182,34 @@ int gen_immediate_numeric_literal(struct objfile *f,
   }
 }
 
-void apply_field_access(struct checkstate *cs,
-                        struct objfile *f,
-                        struct frame *h,
-                        struct loc lhs_loc,
-                        struct temp_return lhs_tr,
-                        struct ast_typeexpr *type,
-                        ident_value fieldname,
-                        struct ast_typeexpr *field_type,
-                        struct expr_return *er) {
+struct loc gen_array_element_loc(struct checkstate *cs,
+                                 struct objfile *f,
+                                 struct frame *h,
+                                 struct loc src,
+                                 struct ast_typeexpr *elem_type,
+                                 uint32_t index) {
+  uint32_t elem_size = kira_sizeof(&cs->nt, elem_type);
+  uint32_t elem_offset = uint32_mul(elem_size, index);
+
+  gen_load_addressof(f, X86_EDX, src);
+  struct immediate imm;
+  imm.tag = IMMEDIATE_U32;
+  imm.u.u32 = elem_offset;
+  x86_gen_mov_reg_imm32(f, X86_ECX, imm);
+  x86_gen_add_w32(f, X86_EDX, X86_ECX);
+  struct loc loc = frame_push_loc(h, DWORD_SIZE);
+  gen_store_register(f, loc, X86_EDX);
+
+  struct loc retloc = ebp_indirect_loc(elem_size, elem_size, loc.u.ebp_offset);
+  return retloc;
+}
+
+struct loc gen_field_loc(struct checkstate *cs,
+                         struct objfile *f,
+                         struct frame *h,
+                         struct loc lhs_loc,
+                         struct ast_typeexpr *type,
+                         ident_value fieldname) {
   /* Generally speaking: There's no way the field possibly gets a
   padded_size, because the first N fields of two struct types, if
   identical, need to be accessible when they're in a union without
@@ -2911,6 +3247,19 @@ void apply_field_access(struct checkstate *cs,
     UNREACHABLE();
   }
 
+  return field_loc;
+}
+
+void apply_field_access(struct checkstate *cs,
+                        struct objfile *f,
+                        struct frame *h,
+                        struct loc lhs_loc,
+                        struct temp_return lhs_tr,
+                        struct ast_typeexpr *type,
+                        ident_value fieldname,
+                        struct ast_typeexpr *field_type,
+                        struct expr_return *er) {
+  struct loc field_loc = gen_field_loc(cs, f, h, lhs_loc, type, fieldname);
   expr_return_set(cs, f, h, er, field_loc, field_type, temp_subobject(lhs_tr));
 }
 
@@ -3000,7 +3349,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
       if (!gen_expr(cs, f, h, a->u.deref_field_access.lhs, &lhs_er)) {
         return 0;
       }
-      wipe_temporaries(cs, f, h, &lhs_er, &lhs_loc);
+      wipe_temporaries(cs, f, h, &lhs_er, ast_expr_type(a->u.deref_field_access.lhs), &lhs_loc);
     }
 
     struct ast_typeexpr *ptr_target;
@@ -3096,7 +3445,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       if (!gen_expr(cs, f, h, s->u.ifthen_statement.condition, &cond_er)) {
         return 0;
       }
-      wipe_temporaries(cs, f, h, &cond_er, &cond_loc);
+      wipe_temporaries(cs, f, h, &cond_er, ast_expr_type(s->u.ifthen_statement.condition), &cond_loc);
     }
 
     size_t target_number = frame_add_target(h);
@@ -3116,7 +3465,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       if (!gen_expr(cs, f, h, s->u.ifthenelse_statement.condition, &cond_er)) {
         return 0;
       }
-      wipe_temporaries(cs, f, h, &cond_er, &cond_loc);
+      wipe_temporaries(cs, f, h, &cond_er, ast_expr_type(s->u.ifthenelse_statement.condition), &cond_loc);
     }
 
     size_t target_number = frame_add_target(h);
@@ -3146,7 +3495,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       if (!gen_expr(cs, f, h, s->u.while_statement.condition, &cond_er)) {
         return 0;
       }
-      wipe_temporaries(cs, f, h, &cond_er, &cond_loc);
+      wipe_temporaries(cs, f, h, &cond_er, ast_expr_type(s->u.while_statement.condition), &cond_loc);
     }
 
     size_t bottom_target_number = frame_add_target(h);
@@ -3179,7 +3528,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
         if (!gen_expr(cs, f, h, fs->condition, &cond_er)) {
           return 0;
         }
-        wipe_temporaries(cs, f, h, &cond_er, &cond_loc);
+        wipe_temporaries(cs, f, h, &cond_er, ast_expr_type(fs->condition), &cond_loc);
       }
 
       bottom_target_number = frame_add_target(h);
