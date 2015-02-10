@@ -19,7 +19,18 @@ def[T] getsize func[u32] = fn() u32 {
   return sizeof@[T];
 };
 
+defclass kla struct {
+  x i32;
+  y i32;
+};
+
+def try_kla func[void] = fn() void {
+  var ret void;
+  return ret;
+};
+
 export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
+  try_kla();
   var ret ty;
   p->x = -5;
   p->y = fac(7);
@@ -52,7 +63,7 @@ export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
   naked.x = p->x;
   naked.y = (~getsize@[ty]() :: i32);
 
-  ret = ~naked;
+  ret = (~naked :: ty);
   return ret;
 };
 

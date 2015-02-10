@@ -1182,7 +1182,7 @@ int check_typeexpr_name_traits(struct checkstate *cs,
     insts_out->destroy_inst = NULL;
     insts_out->init_inst = NULL;
     if (concrete_deftype_rhs_type_out_or_null) {
-      concrete_deftype_rhs_type_out_or_null->tag = (enum ast_typeexpr_tag)-1;
+      concrete_deftype_rhs_type_out_or_null->tag = AST_TYPEEXPR_UNKNOWN;
     }
     return 1;
   }
@@ -1224,7 +1224,7 @@ int check_typeexpr_app_traits(struct checkstate *cs,
     insts_out->destroy_inst = NULL;
     insts_out->init_inst = NULL;
     if (concrete_deftype_rhs_type_out_or_null) {
-      concrete_deftype_rhs_type_out_or_null->tag = (enum ast_typeexpr_tag)-1;
+      concrete_deftype_rhs_type_out_or_null->tag = AST_TYPEEXPR_UNKNOWN;
     }
     return 1;
   }

@@ -12,6 +12,7 @@
 #include "win/objfile.h"
 #include "x86.h"
 
+struct expr_return;
 struct loc;
 struct frame;
 
@@ -80,6 +81,9 @@ int x86_reg_has_lowbyte(enum x86_reg reg) {
   return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
 }
 
+void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
+                    struct def_instantiation *inst, struct expr_return *er);
+
 struct loc gen_field_loc(struct checkstate *cs,
                          struct objfile *f,
                          struct frame *h,
@@ -94,6 +98,11 @@ struct loc gen_array_element_loc(struct checkstate *cs,
                                  struct ast_typeexpr *elem_type,
                                  uint32_t index);
 
+void gen_primitive_op_behavior(struct objfile *f,
+                               struct frame *h,
+                               enum primitive_op prim_op);
+void x86_gen_call(struct objfile *f, uint32_t func_sti);
+void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc);
 void gen_mov(struct objfile *f, struct loc dest, struct loc src);
 void gen_bzero(struct objfile *f, struct loc dest);
 
@@ -1211,18 +1220,46 @@ enum typetrav_func {
   TYPETRAV_FUNC_DEFAULT_CONSTRUCT,
 };
 
+void push_address(struct objfile *f, struct frame *h, struct loc loc) {
+  struct loc dest = frame_push_loc(h, DWORD_SIZE);
+  gen_mov_addressof(f, dest, loc);
+}
+
+void gen_call_imm(struct objfile *f, struct frame *h, struct immediate imm) {
+  switch (imm.tag) {
+  case IMMEDIATE_FUNC:
+    gen_placeholder_stack_adjustment(f, h, 0);
+    x86_gen_call(f, imm.u.func_sti);
+    gen_placeholder_stack_adjustment(f, h, 1);
+    break;
+  case IMMEDIATE_PRIMITIVE_OP: {
+    gen_primitive_op_behavior(f, h, imm.u.primitive_op);
+  } break;
+  case IMMEDIATE_U32:
+  case IMMEDIATE_I32:
+  default:
+    UNREACHABLE();
+  }
+}
+
+void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *h,
+                        struct def_instantiation *inst);
+
 void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f, struct frame *h,
                               struct loc loc, struct def_instantiation *inst) {
-  /* TODO: Definitely share code with gen_funcall. */
-  (void)cs, (void)f, (void)h, (void)loc, (void)inst;
-  TODO_IMPLEMENT;
+  int32_t stack_offset = frame_save_offset(h);
+  push_address(f, h, loc);
+  typetrav_call_func(cs, f, h, inst);
+  frame_restore_offset(h, stack_offset);
 }
 
 void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f, struct frame *h,
                               struct loc dest, struct loc src, struct def_instantiation *inst) {
-  /* TODO: Definitely share code with gen_funcall. */
-  (void)cs, (void)f, (void)h, (void)dest, (void)src, (void)inst;
-  TODO_IMPLEMENT;
+  int32_t stack_offset = frame_save_offset(h);
+  push_address(f, h, src);
+  push_address(f, h, dest);
+  typetrav_call_func(cs, f, h, inst);
+  frame_restore_offset(h, stack_offset);
 }
 
 int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct frame *h,
@@ -1437,6 +1474,8 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
     CHECK(h->return_loc.tag == LOC_EBP_INDIRECT);
     CHECK(h->return_loc.u.ebp_indirect == 8);
     x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_indirect);
+  } else if (h->return_loc.size == 0) {
+    x86_gen_xor_w32(f, X86_EAX, X86_EAX);
   } else if (h->return_loc.size <= DWORD_SIZE) {
     CHECK(h->return_loc.tag == LOC_EBP_OFFSET);
     CHECK(h->return_loc.padded_size == DWORD_SIZE);
@@ -1913,6 +1952,16 @@ struct expr_return demand_expr_return(struct loc loc) {
   return ret;
 }
 
+void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *h,
+                        struct def_instantiation *inst) {
+  struct expr_return er = free_expr_return();
+  gen_inst_value(cs, f, h, inst, &er);
+  /* We know we'll get an immediate because of gen_inst_value behavior. */
+  CHECK(er.u.free.tag == EXPR_RETURN_FREE_IMM);
+  gen_call_imm(f, h, er.u.free.u.imm);
+}
+
+
 int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *ret);
@@ -2377,6 +2426,7 @@ void gen_primitive_op_behavior(struct objfile *f,
   } break;
   case PRIMITIVE_OP_EQ_U16: {
     gen_cmp16_behavior(f, off0, off1, X86_SETCC_E);
+
   } break;
   case PRIMITIVE_OP_NE_U16: {
     gen_cmp16_behavior(f, off0, off1, X86_SETCC_NE);
@@ -2733,20 +2783,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
   switch (func_er.u.free.tag) {
   case EXPR_RETURN_FREE_IMM: {
-    switch (func_er.u.free.u.imm.tag) {
-    case IMMEDIATE_FUNC:
-      gen_placeholder_stack_adjustment(f, h, 0);
-      x86_gen_call(f, func_er.u.free.u.imm.u.func_sti);
-      gen_placeholder_stack_adjustment(f, h, 1);
-      break;
-    case IMMEDIATE_PRIMITIVE_OP: {
-      gen_primitive_op_behavior(f, h, func_er.u.free.u.imm.u.primitive_op);
-    } break;
-    case IMMEDIATE_U32:
-    case IMMEDIATE_I32:
-    default:
-      UNREACHABLE();
-    }
+    gen_call_imm(f, h, func_er.u.free.u.imm);
   } break;
   case EXPR_RETURN_FREE_LOC: {
     struct loc func_loc;
@@ -2763,6 +2800,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   if (hidden_return_param) {
     /* Let's just pray that the pointer returned by the callee (in
     EAX) is the same as the hidden return param that we passed! */
+    expr_return_set(cs, f, h, er, return_loc, return_type,
+                    temp_exists(return_loc, return_type, 1));
+  } else if (return_size == 0) {
     expr_return_set(cs, f, h, er, return_loc, return_type,
                     temp_exists(return_loc, return_type, 1));
   } else if (return_size <= DWORD_SIZE) {
@@ -3279,7 +3319,7 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
 }
 
 void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
-                   struct def_instantiation *inst, struct expr_return *er) {
+                    struct def_instantiation *inst, struct expr_return *er) {
   if (inst->value_computed && inst->value.tag == STATIC_VALUE_PRIMITIVE_OP) {
     struct immediate imm;
     imm.tag = IMMEDIATE_PRIMITIVE_OP;
