@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 struct ty {
   int32_t x;
@@ -13,6 +14,14 @@ struct ty showfacs(struct ty *t, uint16_t *num);
 int32_t flushstdout(void) {
   fflush(stdout);
   return 0;
+}
+
+uint8_t *alloc_u8_array(uint32_t size) {
+  return malloc(size);
+}
+
+void free_u8_array(uint8_t *arr) {
+  free(arr);
 }
 
 int main(void) {

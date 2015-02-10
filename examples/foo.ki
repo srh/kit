@@ -1,4 +1,5 @@
 import bar;
+import string;
 
 export def foo i32 = ~(1u);
 
@@ -37,6 +38,12 @@ access kla {
     var ret void;
     return ret;
   };
+  def copy func[*kla, *kla, void] = fn(a *kla, c *kla) void {
+    a->x = c->x;
+    a->y = c->y;
+    var ret void;
+    return ret;
+  };
 
   def expose func[*kla, struct { x u32; y u32; }] = fn (p *kla) struct { x u32; y u32; } {
     return ~ *p;
@@ -54,8 +61,35 @@ def try_kla func[void] = fn() void {
   return ret;
 };
 
+def au8 func[*string, i32, void] = fn(p *string, x i32) void {
+  var y u8 = ~x;
+  return append(p, y);
+};
+
+def try_string func[void] = fn() void {
+  var x string;
+  au8(&x, 72);
+  au8(&x, 101);
+  au8(&x, 108);
+  au8(&x, 108);
+  au8(&x, 111);
+  au8(&x, 44);
+  au8(&x, 32);
+  au8(&x, 119);
+  au8(&x, 111);
+  au8(&x, 114);
+  au8(&x, 108);
+  au8(&x, 100);
+  au8(&x, 33);
+  au8(&x, 10);
+  print(&x);
+  var ret void;
+  return ret;
+};
+
 export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
   try_kla();
+  try_string();
   var ret ty;
   p->x = -5;
   p->y = fac(7);
