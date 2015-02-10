@@ -122,7 +122,7 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
       }
 
       if (max_size < size) {
-        size = max_size;
+        max_size = size;
       }
       if (max_alignment < alignment) {
         max_alignment = alignment;

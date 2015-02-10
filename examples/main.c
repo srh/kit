@@ -16,14 +16,6 @@ int32_t flushstdout(void) {
   return 0;
 }
 
-uint8_t *alloc_u8_array(uint32_t size) {
-  return malloc(size);
-}
-
-void free_u8_array(uint8_t *arr) {
-  free(arr);
-}
-
 int main(void) {
   printf("foo value: %" PRIu32 "\n", foo);
 

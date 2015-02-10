@@ -1,7 +1,21 @@
 import bar;
 
-extern alloc_u8_array func[u32, *u8];
-extern free_u8_array func[*u8, void];
+extern malloc func[u32, *void];
+extern free func[*void, void];
+
+def alloc_u8_array func[u32, *u8] = fn(n u32) *u8 {
+  var u union { vp *void; u8p *u8; };
+  u.vp = malloc(n);
+  return u.u8p;
+};
+
+def free_u8_array func[*u8, void] = fn(p *u8) void {
+  var u union { vp *void; u8p *u8; };
+  u.u8p = p;
+  free(u.vp);
+  var ret void;
+  return ret;
+};
 
 defclass move string struct {
   size u32;
