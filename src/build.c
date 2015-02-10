@@ -1438,7 +1438,8 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
 
 void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
                  struct loc loc, struct ast_typeexpr *type) {
-  struct loc ignore = { (enum loc_tag)-1 };
+  struct loc ignore;
+  ignore.tag = (enum loc_tag)-1;
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_DESTROY, loc, 0, ignore, type);
 }
 
@@ -1452,7 +1453,8 @@ void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct fr
 }
 void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
                            struct loc loc, struct ast_typeexpr *type) {
-  struct loc ignore = { (enum loc_tag)-1 };
+  struct loc ignore;
+  ignore.tag = (enum loc_tag)-1;
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_DEFAULT_CONSTRUCT, loc, 0, ignore, type);
 }
 
