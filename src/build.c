@@ -1803,6 +1803,16 @@ struct temp_return temp_none(void) {
   return ret;
 }
 
+struct temp_return temp_exists_trivial(struct loc loc,
+                                       int whole_thing) {
+  (void)loc, (void)whole_thing;
+  return temp_none();
+}
+
+struct temp_return temp_immediate(void) {
+  return temp_none();
+}
+
 struct temp_return temp_exists(struct loc loc,
                                struct ast_typeexpr *temporary_type,
                                int whole_thing) {
@@ -2913,7 +2923,8 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
 
     struct loc ret = frame_push_loc(h, DWORD_SIZE);
     gen_mov_addressof(f, ret, ero_loc(&rhs_er.u.open));
-    expr_return_set(cs, f, h, er, ret, ast_expr_type(a), temp_none());
+    expr_return_set(cs, f, h, er, ret, ast_expr_type(a),
+                    temp_exists(ret, ast_expr_type(a), 1));
     return 1;
   } break;
   case AST_UNOP_NEGATE:
@@ -3169,7 +3180,8 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
     }
 
     frame_define_target(h, end_target_number, objfile_section_size(objfile_text(f)));
-    expr_return_set(cs, f, h, er, ret, ast_expr_type(a), temp_none());
+    expr_return_set(cs, f, h, er, ret, ast_expr_type(a),
+                    temp_exists(ret, ast_expr_type(a), 1));
     return 1;
   } break;
   case AST_BINOP_LOGICAL_AND: {
@@ -3200,8 +3212,8 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
 
     frame_define_target(h, end_target_number, objfile_section_size(objfile_text(f)));
 
-    /* (Sigh:) We "know" that the type is bool, a trivial type. */
-    expr_return_set(cs, f, h, er, ret, ast_expr_type(a), temp_none());
+    expr_return_set(cs, f, h, er, ret, ast_expr_type(a),
+                    temp_exists(ret, ast_expr_type(a), 1));
     return 1;
   } break;
   default:
@@ -3215,7 +3227,7 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
   switch (er->tag) {
   case EXPR_RETURN_DEMANDED: {
     gen_mov_immediate(f, erd_loc(&er->u.demand), imm);
-    er_set_tr(er, temp_none());
+    er_set_tr(er, temp_exists_trivial(erd_loc(&er->u.demand), 1));
   } break;
   case EXPR_RETURN_OPEN: {
     /* All immediates (right now) are DWORD-sized. */
@@ -3224,12 +3236,12 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
     ero_set_loc(&er->u.open, floc);
     /* TODO: tr crap like this is bad -- it's a temporary, it should
     be treated as such. */
-    er_set_tr(er, temp_none());
+    er_set_tr(er, temp_exists_trivial(floc, 1));
   } break;
   case EXPR_RETURN_FREE: {
     er->u.free.tag = EXPR_RETURN_FREE_IMM;
     er->u.free.u.imm = imm;
-    er_set_tr(er, temp_none());
+    er_set_tr(er, temp_immediate());
   } break;
   default:
     UNREACHABLE();
@@ -3461,7 +3473,8 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     struct expr_return deref_er = open_expr_return();
     apply_dereference(cs, f, h, lhs_loc, full_size, &deref_er, ptr_target);
 
-    /* (We pass deref_er.tr but we know it's temp_none().) */
+    /* An unimportant fact about a check we know. */
+    CHECK(!er_tr(&deref_er)->exists);
     apply_field_access(cs, f, h, ero_loc(&deref_er.u.open), *er_tr(&deref_er), ptr_target,
                        &a->u.deref_field_access.fieldname,
                        ast_expr_type(a), er);
