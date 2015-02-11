@@ -39,7 +39,7 @@ access kla {
     return ret;
   };
 
-  def notcopy func[*kla, *kla, void] = fn(a *kla, c *kla) void {
+  def copy func[*kla, *kla, void] = fn(a *kla, c *kla) void {
     a->x = c->x;
     a->y = c->y;
     var ret void;

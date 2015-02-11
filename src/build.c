@@ -2747,18 +2747,26 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   int hidden_return_param = exists_hidden_return_param(cs, return_type, &return_size);
 
   /* X86 */
-  struct loc return_loc = frame_push_loc(h, return_size);
+  struct loc return_loc;
+  if (er->tag == EXPR_RETURN_DEMANDED) {
+    CHECK(er->u.loc.tag == LOC_EBP_OFFSET);
+    return_loc = er->u.loc;
+  } else {
+    return_loc = frame_push_loc(h, return_size);
+  }
 
-  int32_t return_loc_offset = frame_save_offset(h);
+  int32_t saved_offset = frame_save_offset(h);
 
   for (size_t i = args_count; i > 0;) {
     i--;
 
-    /* TODO: We must use ast_exprcatch information to force the temporary in arg_loc. */
     struct ast_expr *arg = &a->u.funcall.args[i].expr;
 
     struct loc arg_loc = frame_push_loc(h, kira_sizeof(&cs->nt, ast_expr_type(arg)));
 
+    /* TODO: We must use ast_exprcatch information to force the temporary in arg_loc. */
+    /* (Right now, EXPR_RETURN_DEMANDED is known to work this way only
+    when it encounters another funcall.) */
     struct expr_return er = demand_expr_return(arg_loc);
     int32_t saved_offset = frame_save_offset(h);
     if (!gen_expr(cs, f, h, arg, &er)) {
@@ -2789,10 +2797,14 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   }
 
   if (hidden_return_param) {
-    /* Let's just pray that the pointer returned by the callee (in
-    EAX) is the same as the hidden return param that we passed! */
-    expr_return_set(cs, f, h, er, return_loc, return_type,
-                    temp_exists(return_loc, return_type, 1));
+    if (er->tag != EXPR_RETURN_DEMANDED) {
+      /* Let's just pray that the pointer returned by the callee (in
+      EAX) is the same as the hidden return param that we passed! */
+      expr_return_set(cs, f, h, er, return_loc, return_type,
+                      temp_exists(return_loc, return_type, 1));
+    } else {
+      er->tr = temp_exists(er->u.loc, return_type, 1);
+    }
   } else if (return_size == 0) {
     expr_return_set(cs, f, h, er, return_loc, return_type,
                     temp_exists(return_loc, return_type, 1));
@@ -2808,7 +2820,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                     temp_exists(return_loc, return_type, 1));
   }
 
-  frame_restore_offset(h, return_loc_offset);
+  frame_restore_offset(h, saved_offset);
 
   return 1;
 }
