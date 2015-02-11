@@ -3,6 +3,26 @@ import bar;
 extern malloc func[u32, *void];
 extern free func[*void, void];
 
+def[T] alloc_array func[u32, *T] = fn(n u32) *T {
+  var u union { vp *void; tp *T; };
+  u.vp = malloc(n * sizeof@[T]);
+  for var i u32 = 0u; i < n; i = i + 1u {
+    init(&u.tp[i]);
+  }
+  return u.tp;
+};
+
+def[T] delete_array func[u32, *T, void] = fn(n u32, p *T) void {
+  for var i u32 = 0u; i < n; i = i + 1u {
+    destroy(&p[i]);
+  }
+  var u union { vp *void; tp *T; };
+  u.tp = p;
+  free(u.vp);
+  var ret void;
+  return ret;
+};
+
 def alloc_u8_array func[u32, *u8] = fn(n u32) *u8 {
   var u union { vp *void; u8p *u8; };
   u.vp = malloc(n);
@@ -24,7 +44,7 @@ defclass move string struct {
 };
 
 access string {
-  def init func[*string, void] = fn(p *string) void {
+  def do_init func[*string, void] = fn(p *string) void {
     p->size = 0u;
     p->cap = 0u;
     var buf *u8;
@@ -33,28 +53,28 @@ access string {
     return ret;
   };
 
-  def destroy func[*string, void] = fn(p *string) void {
-    free_u8_array(p->buf);
+  def do_destroy func[*string, void] = fn(p *string) void {
+    delete_array(p->cap, p->buf);
     var ret void;
     return ret;
   };
 
-  def copy func[*string, *string, void] = fn(p *string, c *string) void {
+  def do_copy func[*string, *string, void] = fn(p *string, c *string) void {
     p->size = c->size;
     p->cap = c->cap;
-    p->buf = alloc_u8_array(p->size);
+    p->buf = alloc_array@[u8](p->size);
     var ret void;
     return ret;
   };
 
   def grow_cap func[*string, u32, void] = fn(p *string, newcap u32) void {
-    var buf *u8 = alloc_u8_array(newcap);
+    var buf *u8 = alloc_array@[u8](newcap);
     var sz u32 = p->size;
     for var i u32 = 0u; i < sz; i = i + 1u {
       buf[i] = p->buf[i];
     }
 
-    free_u8_array(p->buf);
+    delete_array(p->cap, p->buf);
     p->buf = buf;
     p->cap = newcap;
     var ret void;

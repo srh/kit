@@ -42,7 +42,7 @@ Here's the project timeline:
    5b. Non-redundant function syntax.
    5c. Implicit conversions (for array->ptr, user-defined(?), and literals).
    5i. Analyze label & goto variable scopage. (DONE)
-   5j. Constructors/destructors. (DONE but ICKY)
+   5j. Constructors/destructors. (DONE and not completely ICKY)
    5l. Structure packing. (NO - see NOTE 5l.)
    5m. Tagged unions / enums.
    5n. Sizeof/alignof operator. (DONE)

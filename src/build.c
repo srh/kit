@@ -98,9 +98,11 @@ struct loc gen_array_element_loc(struct checkstate *cs,
                                  struct ast_typeexpr *elem_type,
                                  uint32_t index);
 
-void gen_primitive_op_behavior(struct objfile *f,
+void gen_primitive_op_behavior(struct checkstate *cs,
+                               struct objfile *f,
                                struct frame *h,
-                               enum primitive_op prim_op);
+                               enum primitive_op prim_op,
+                               struct ast_typeexpr *arg0_type_or_null);
 void x86_gen_call(struct objfile *f, uint32_t func_sti);
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc);
 void gen_mov(struct objfile *f, struct loc dest, struct loc src);
@@ -1222,15 +1224,18 @@ void push_address(struct objfile *f, struct frame *h, struct loc loc) {
   gen_mov_addressof(f, dest, loc);
 }
 
-void gen_call_imm(struct objfile *f, struct frame *h, struct immediate imm) {
+void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
+                  struct immediate imm,
+                  struct ast_typeexpr *arg0_type_or_null) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC:
+    /* Dupes code with typetrav_call_func. */
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_call(f, imm.u.func_sti);
     gen_placeholder_stack_adjustment(f, h, 1);
     break;
   case IMMEDIATE_PRIMITIVE_OP: {
-    gen_primitive_op_behavior(f, h, imm.u.primitive_op);
+    gen_primitive_op_behavior(cs, f, h, imm.u.primitive_op, arg0_type_or_null);
   } break;
   case IMMEDIATE_U32:
   case IMMEDIATE_I32:
@@ -2005,11 +2010,15 @@ struct expr_return demand_expr_return(struct loc loc) {
 
 void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                         struct def_instantiation *inst) {
-  struct expr_return er = free_expr_return();
-  gen_inst_value(cs, f, h, inst, &er);
-  /* We know we'll get an immediate because of gen_inst_value behavior. */
-  CHECK(er.u.free.tag == EXPR_RETURN_FREE_IMM);
-  gen_call_imm(f, h, er.u.free.u.imm);
+  /* Dupes checks with gen_inst_value. */
+  CHECK(inst->symbol_table_index_computed);
+  CHECK(inst->owner->is_extern || inst->owner->is_primitive || inst->typecheck_started);
+  CHECK(typeexpr_is_func_type(cs->im, &inst->type));
+
+  /* Dupes code with gen_call_imm. */
+  gen_placeholder_stack_adjustment(f, h, 0);
+  x86_gen_call(f, inst->symbol_table_index);
+  gen_placeholder_stack_adjustment(f, h, 1);
 }
 
 
@@ -2047,12 +2056,49 @@ void gen_cmp8_behavior(struct objfile *f,
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
 
-void gen_primitive_op_behavior(struct objfile *f,
+void gen_primitive_op_behavior(struct checkstate *cs,
+                               struct objfile *f,
                                struct frame *h,
-                               enum primitive_op prim_op) {
+                               enum primitive_op prim_op,
+                               struct ast_typeexpr *arg0_type_or_null) {
   int32_t off0 = h->stack_offset;
   int32_t off1 = int32_add(h->stack_offset, DWORD_SIZE);
   switch (prim_op) {
+  case PRIMITIVE_OP_INIT: {
+    struct ast_typeexpr *target;
+    int success = view_ptr_target(cs->im, arg0_type_or_null, &target);
+    CHECK(success);
+    uint32_t size = kira_sizeof(&cs->nt, target);
+    gen_default_construct(cs, f, h, ebp_indirect_loc(size, size, off0),
+                          target);
+  } break;
+  case PRIMITIVE_OP_COPY: {
+    struct ast_typeexpr *target;
+    int success = view_ptr_target(cs->im, arg0_type_or_null, &target);
+    CHECK(success);
+    uint32_t size = kira_sizeof(&cs->nt, target);
+    gen_copy(cs, f, h, ebp_indirect_loc(size, size, off0),
+             ebp_indirect_loc(size, size, off1),
+             target);
+  } break;
+  case PRIMITIVE_OP_MOVE: {
+    struct ast_typeexpr *target;
+    int success = view_ptr_target(cs->im, arg0_type_or_null, &target);
+    CHECK(success);
+    uint32_t size = kira_sizeof(&cs->nt, target);
+    gen_move_or_copydestroy(cs, f, h, ebp_indirect_loc(size, size, off0),
+                            ebp_indirect_loc(size, size, off1),
+                            target);
+  } break;
+  case PRIMITIVE_OP_DESTROY: {
+    struct ast_typeexpr *target;
+    int success = view_ptr_target(cs->im, arg0_type_or_null, &target);
+    CHECK(success);
+    uint32_t size = kira_sizeof(&cs->nt, target);
+    gen_destroy(cs, f, h, ebp_indirect_loc(size, size, off0),
+                target);
+  } break;
+
   case PRIMITIVE_OP_CONVERT_U8_TO_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
   } break;
@@ -2833,7 +2879,8 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
   switch (func_er.u.free.tag) {
   case EXPR_RETURN_FREE_IMM: {
-    gen_call_imm(f, h, func_er.u.free.u.imm);
+    gen_call_imm(cs, f, h, func_er.u.free.u.imm,
+                 args_count == 0 ? NULL : ast_expr_type(&a->u.funcall.args[0].expr));
   } break;
   case EXPR_RETURN_FREE_LOC: {
     struct loc func_loc;

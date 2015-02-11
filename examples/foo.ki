@@ -26,20 +26,20 @@ defclass kla struct {
 };
 
 access kla {
-  def destroy func[*kla, void] = fn(p *kla) void {
+  def do_destroy func[*kla, void] = fn(p *kla) void {
     p->x = 0u;
     p->y = 0u;
     var ret void;
     return ret;
   };
-  def init func[*kla, void] = fn(p *kla) void {
+  def do_init func[*kla, void] = fn(p *kla) void {
     p->x = 37u;
     p->y = 47u;
     var ret void;
     return ret;
   };
 
-  def copy func[*kla, *kla, void] = fn(a *kla, c *kla) void {
+  def do_copy func[*kla, *kla, void] = fn(a *kla, c *kla) void {
     a->x = c->x;
     a->y = c->y;
     var ret void;
@@ -53,7 +53,9 @@ access kla {
 
 def call_kla func[kla, void] = fn(x kla) void {
   print(expose(&x).x);
+  putchar(32);
   print(expose(&x).y);
+  putchar(10);
   var ret void;
   return ret;
 };
@@ -97,17 +99,8 @@ def try_string func[void] = fn() void {
 };
 
 export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
-  putchar(64);
-  putchar(10);
-  flushstdout();
   try_kla();
-  putchar(64);
-  putchar(10);
-  flushstdout();
   try_string();
-  putchar(64);
-  putchar(10);
-  flushstdout();
   var ret ty;
   p->x = -5;
   p->y = fac(7);

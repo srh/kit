@@ -491,6 +491,75 @@ void import_sizeof_alignof(struct checkstate *cs) {
   ast_generics_destroy(&generics);
 }
 
+void make_ptr_func_type(struct checkstate *cs, struct ast_typeexpr *target, size_t count,
+                        struct ast_typeexpr *out) {
+  size_t params_count = size_add(count, 1);
+  struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
+  for (size_t i = 0; i < count; i++) {
+    wrap_in_ptr(cs->im, target, &params[i]);
+  }
+
+  init_name_type(&params[count], identmap_intern_c_str(cs->im, VOID_TYPE_NAME));
+
+  struct ast_ident name
+    = make_ast_ident(identmap_intern_c_str(cs->im, FUNC_TYPE_NAME));
+  out->tag = AST_TYPEEXPR_APP;
+  ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
+                   name, params, params_count);
+}
+
+void import_constructors(struct checkstate *cs) {
+  ident_value t_ident = identmap_intern_c_str(cs->im, "T");
+  struct ast_generics generics;
+  {
+    struct ast_ident *param = malloc_mul(sizeof(*param), 1);
+    param[0] = make_ast_ident(t_ident);
+    ast_generics_init_has_params(&generics, ast_meta_make_garbage(), param, 1);
+  }
+
+  struct ast_typeexpr target;
+  init_name_type(&target, t_ident);
+
+  {
+    struct ast_typeexpr func1;
+    make_ptr_func_type(cs, &target, 1, &func1);
+
+    name_table_add_primitive_def(&cs->nt,
+                                 identmap_intern_c_str(cs->im, "init"),
+                                 PRIMITIVE_OP_INIT,
+                                 &generics,
+                                 &func1);
+    name_table_add_primitive_def(&cs->nt,
+                                 identmap_intern_c_str(cs->im, "destroy"),
+                                 PRIMITIVE_OP_DESTROY,
+                                 &generics,
+                                 &func1);
+
+    ast_typeexpr_destroy(&func1);
+  }
+
+  {
+    struct ast_typeexpr func2;
+    make_ptr_func_type(cs, &target, 2, &func2);
+
+    name_table_add_primitive_def(&cs->nt,
+                                 identmap_intern_c_str(cs->im, "move"),
+                                 PRIMITIVE_OP_MOVE,
+                                 &generics,
+                                 &func2);
+    name_table_add_primitive_def(&cs->nt,
+                                 identmap_intern_c_str(cs->im, "copy"),
+                                 PRIMITIVE_OP_COPY,
+                                 &generics,
+                                 &func2);
+
+    ast_typeexpr_destroy(&func2);
+  }
+
+  ast_typeexpr_destroy(&target);
+  ast_generics_destroy(&generics);
+}
+
 void checkstate_import_primitive_defs(struct checkstate *cs) {
   import_integer_binops(cs, binop_i32_primitive_ops, I32_TYPE_NAME);
   import_integer_binops(cs, binop_u32_primitive_ops, U32_TYPE_NAME);
@@ -518,6 +587,8 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
   }
 
   import_sizeof_alignof(cs);
+
+  import_constructors(cs);
 }
 
 void checkstate_import_primitives(struct checkstate *cs) {
@@ -962,22 +1033,22 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
 
 int has_explicit_copy(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
                       struct def_instantiation **inst_out) {
-  return has_explicit_movecopydestroy(cs, a, 2, "copy", also_typecheck, result_out, inst_out);
+  return has_explicit_movecopydestroy(cs, a, 2, "do_copy", also_typecheck, result_out, inst_out);
 }
 
 int has_explicit_destroy(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
                          struct def_instantiation **inst_out) {
-  return has_explicit_movecopydestroy(cs, a, 1, "destroy", also_typecheck, result_out, inst_out);
+  return has_explicit_movecopydestroy(cs, a, 1, "do_destroy", also_typecheck, result_out, inst_out);
 }
 
 int has_explicit_move(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
                       struct def_instantiation **inst_out) {
-  return has_explicit_movecopydestroy(cs, a, 2, "move", also_typecheck, result_out, inst_out);
+  return has_explicit_movecopydestroy(cs, a, 2, "do_move", also_typecheck, result_out, inst_out);
 }
 
 int has_explicit_init(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
                       struct def_instantiation **inst_out) {
-  return has_explicit_movecopydestroy(cs, a, 1, "init", also_typecheck, result_out, inst_out);
+  return has_explicit_movecopydestroy(cs, a, 1, "do_init", also_typecheck, result_out, inst_out);
 }
 
 int check_typeexpr_traits(struct checkstate *cs,
@@ -5284,7 +5355,7 @@ int check_file_test_more_37(const uint8_t *name, size_t name_count,
       "foo",
       "defclass copy ty i32;\n"
       "access ty {\n"
-      "def init func[*ty, void] = fn(t *ty) void {\n"
+      "def do_init func[*ty, void] = fn(t *ty) void {\n"
       "  var ret void;\n"
       "  return ret;\n"
       "};\n"
@@ -5336,7 +5407,7 @@ int check_file_test_more_40(const uint8_t *name, size_t name_count,
       "foo",
       "defclass copy ty i32;\n"
       "access ty {\n"
-      "def init func[*ty, void] = fn(t *ty) void {\n"
+      "def do_init func[*ty, void] = fn(t *ty) void {\n"
       "  var ret void;\n"
       "  return ret;\n"
       "};\n"
