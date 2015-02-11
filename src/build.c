@@ -106,9 +106,6 @@ void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc);
 void gen_mov(struct objfile *f, struct loc dest, struct loc src);
 void gen_bzero(struct objfile *f, struct loc dest);
 
-/* TODO: gen_destroy and gen_move_or_copydestroy (etc) better damn
-well check that the functions they invoke have been typechecked (by
-checking a field like is_typechecked). */
 void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
                  struct loc loc, struct ast_typeexpr *type);
 void gen_copy(struct checkstate *cs, struct objfile *f, struct frame *h,
@@ -1467,6 +1464,7 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
     CRASH("return_target_valid false (no return statements?)");
   }
 
+  CHECK(frame_arg_count(h) == h->vardata_count);
   for (size_t i = 0, e = frame_arg_count(h); i < e; i++) {
     struct vardata *vd = &h->vardata[size_sub(h->vardata_count, 1)];
     gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
@@ -1593,7 +1591,6 @@ ebp) are dest or loc.  It's safe to use this if dest and src point to
 the same _exact_ memory location, through different means (or through
 the same means). */
 void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
-  /* TODO: This (or its callee) should invoke copy or move constructors. */
   CHECK(dest.size == src.size);
   if (loc_equal(dest, src)) {
     return;
@@ -3423,12 +3420,19 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
-void gen_return(struct objfile *f, struct frame *h) {
-  /* TODO: We need to call destructors for vars in scope. */
+void gen_return(struct checkstate *cs, struct objfile *f, struct frame *h) {
   if (!h->return_target_valid) {
     h->return_target_valid = 1;
     h->return_target_number = frame_add_target(h);
   }
+
+  CHECK(h->calling_info_valid);
+  for (size_t i = h->vardata_count; i > h->arg_count; ) {
+    i--;
+    struct vardata *vd = &h->vardata[i];
+    gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
+  }
+
   gen_placeholder_jmp(f, h, h->return_target_number);
 }
 
@@ -3455,7 +3459,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    gen_return(f, h);
+    gen_return(cs, f, h);
     frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_VAR: {
