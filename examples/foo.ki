@@ -38,7 +38,8 @@ access kla {
     var ret void;
     return ret;
   };
-  def copy func[*kla, *kla, void] = fn(a *kla, c *kla) void {
+
+  def notcopy func[*kla, *kla, void] = fn(a *kla, c *kla) void {
     a->x = c->x;
     a->y = c->y;
     var ret void;
@@ -50,6 +51,13 @@ access kla {
   };
 }
 
+def call_kla func[kla, void] = fn(x kla) void {
+  print(expose(&x).x);
+  print(expose(&x).y);
+  var ret void;
+  return ret;
+};
+
 def try_kla func[void] = fn() void {
   var k kla;
   var l struct { x u32; y u32; } = expose(&k);
@@ -57,6 +65,7 @@ def try_kla func[void] = fn() void {
   putchar(32);
   print(l.y);
   putchar(10);
+  call_kla(k);
   var ret void;
   return ret;
 };

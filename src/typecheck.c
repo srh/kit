@@ -1862,6 +1862,53 @@ struct ast_expr_info expr_info_typechecked_subobject(
   }
 }
 
+int compute_and_check_exprcatch(struct exprscope *es,
+                                struct ast_expr *annotated_expr,
+                                struct ast_exprcatch *out) {
+  struct ast_expr_info *info = &annotated_expr->info;
+  CHECK(info->is_typechecked);
+  if (info->temporary_exists) {
+    if (info->whole_thing) {
+      ast_exprcatch_init_annotated(out, AST_EXPRCATCH_IN_PLACE);
+      return 1;
+    } else {
+      struct typeexpr_traits traits;
+      if (!check_typeexpr_traits(es->cs, &info->temporary_type, es, &traits)) {
+        return 0;
+      }
+      /* The temporary_type is thus destructable. */
+
+      if (!check_typeexpr_traits(es->cs, ast_expr_type(annotated_expr), es, &traits)) {
+        return 0;
+      }
+
+      /* Oof, there's no copy constructor for the type that we would copy. */
+      if (traits.copyable == TYPEEXPR_TRAIT_LACKED) {
+        METERR(*ast_expr_ast_meta(annotated_expr),
+               "Copy demanded of noncopyable type.%s", "\n");
+        return 0;
+      }
+      ast_exprcatch_init_annotated(out, AST_EXPRCATCH_COPY_AND_DESTROY);
+      return 1;
+    }
+  } else {
+    struct typeexpr_traits traits;
+
+    if (!check_typeexpr_traits(es->cs, ast_expr_type(annotated_expr), es, &traits)) {
+      return 0;
+    }
+
+    /* Oof, there's no copy constructor for the type that we would copy. */
+    if (traits.copyable == TYPEEXPR_TRAIT_LACKED) {
+      METERR(*ast_expr_ast_meta(annotated_expr),
+             "Copy demanded of noncopyable type.%s", "\n");
+      return 0;
+    }
+    ast_exprcatch_init_annotated(out, AST_EXPRCATCH_COPY);
+    return 1;
+  }
+}
+
 int check_expr(struct exprscope *es,
                struct ast_expr *x,
                struct ast_typeexpr *partial_type,
@@ -1875,17 +1922,26 @@ int check_expr_funcall(struct exprscope *es,
   size_t args_types_count = size_add(args_count, 1);
   struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
                                                args_types_count);
-  struct ast_expr *args_annotated = malloc_mul(sizeof(*args_annotated),
-                                               args_count);
+  struct ast_exprcall *args_annotated = malloc_mul(sizeof(*args_annotated),
+                                                   args_count);
   size_t i;
   for (i = 0; i < args_count; i++) {
     struct ast_typeexpr local_partial;
     local_partial.tag = AST_TYPEEXPR_UNKNOWN;
-    if (!check_expr(es, &x->args[i], &local_partial, &args_annotated[i])) {
+    struct ast_expr arg_expr_annotated;
+    if (!check_expr(es, &x->args[i].expr, &local_partial, &arg_expr_annotated)) {
       goto fail_cleanup_args_types_and_annotated;
     }
+
+    struct ast_exprcatch arg_exprcatch;
+    if (!compute_and_check_exprcatch(es, &arg_expr_annotated, &arg_exprcatch)) {
+      goto fail_cleanup_args_types_and_annotated;
+    }
+
+    ast_exprcall_init_annotated(&args_annotated[i], arg_exprcatch, arg_expr_annotated);
+
     ast_typeexpr_init_copy(&args_types[i],
-                           ast_expr_type(&args_annotated[i]));
+                           ast_expr_type(&args_annotated[i].expr));
   }
 
   ast_typeexpr_init_copy(&args_types[args_count], partial_type);
@@ -1910,6 +1966,8 @@ int check_expr_funcall(struct exprscope *es,
   struct ast_typeexpr temporary_type;
   ast_typeexpr_init_copy(&temporary_type, &return_type);
 
+  /* TODO: This'll end up being the wrong place to typecheck this
+  temporary type. */
   struct typeexpr_traits discard;
   if (!check_typeexpr_traits(es->cs, &temporary_type, es, &discard)) {
     goto fail_cleanup_temporary_type;
@@ -1936,12 +1994,12 @@ int check_expr_funcall(struct exprscope *es,
   ast_expr_destroy(&annotated_func);
  fail_cleanup_funcexpr:
   ast_typeexpr_destroy(&funcexpr);
-  SLICE_FREE(args_annotated, args_count, ast_expr_destroy);
+  SLICE_FREE(args_annotated, args_count, ast_exprcall_destroy);
   return 0;
   /* Don't fallthrough -- args_types was moved into funcexpr. */
  fail_cleanup_args_types_and_annotated:
   SLICE_FREE(args_types, i, ast_typeexpr_destroy);
-  SLICE_FREE(args_annotated, i, ast_expr_destroy);
+  SLICE_FREE(args_annotated, i, ast_exprcall_destroy);
   return 0;
 }
 
@@ -3794,7 +3852,7 @@ int eval_static_funcall(struct ast_funcall *funcall,
   struct static_value *params = malloc_mul(sizeof(*params), params_count);
   size_t i = 0;
   for (; i < params_count; i++) {
-    if (!eval_static_value(&funcall->args[i], &params[i])) {
+    if (!eval_static_value(&funcall->args[i].expr, &params[i])) {
       goto cleanup_params;
     }
   }

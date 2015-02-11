@@ -977,9 +977,9 @@ int parse_numeric_literal(struct ps *p, struct ast_numeric_literal *out) {
 }
 
 int parse_rest_of_arglist(struct ps *p,
-                          struct ast_expr **args_out,
+                          struct ast_exprcall **args_out,
                           size_t *args_count_out) {
-  struct ast_expr *args = NULL;
+  struct ast_exprcall *args = NULL;
   size_t args_count = 0;
   size_t args_limit = 0;
 
@@ -1006,11 +1006,14 @@ int parse_rest_of_arglist(struct ps *p,
       goto fail;
     }
 
-    SLICE_PUSH(args, args_count, args_limit, expr);
+    struct ast_exprcall exprcall;
+    ast_exprcall_init(&exprcall, expr);
+
+    SLICE_PUSH(args, args_count, args_limit, exprcall);
   }
 
  fail:
-  SLICE_FREE(args, args_count, ast_expr_destroy);
+  SLICE_FREE(args, args_count, ast_exprcall_destroy);
   return 0;
 }
 
@@ -1028,8 +1031,8 @@ void build_unop_expr(struct ast_meta meta,
     ast_expr_partial_init(&func, AST_EXPR_NAME, ast_expr_info_default());
     ast_name_expr_init(&func.u.name, unop_name);
 
-    struct ast_expr *args = malloc_mul(sizeof(*args), 1);
-    args[0] = rhs;
+    struct ast_exprcall *args = malloc_mul(sizeof(*args), 1);
+    ast_exprcall_init(&args[0], rhs);
 
     ast_expr_partial_init(out, AST_EXPR_FUNCALL, ast_expr_info_default());
     ast_funcall_init(&out->u.funcall, meta,
@@ -1053,9 +1056,9 @@ void build_binop_expr(struct ast_meta meta,
     ast_expr_partial_init(&func, AST_EXPR_NAME, ast_expr_info_default());
     ast_name_expr_init(&func.u.name, binop_name);
 
-    struct ast_expr *args = malloc_mul(sizeof(*args), 2);
-    args[0] = old_lhs;
-    args[1] = rhs;
+    struct ast_exprcall *args = malloc_mul(sizeof(*args), 2);
+    ast_exprcall_init(&args[0], old_lhs);
+    ast_exprcall_init(&args[1], rhs);
 
     ast_expr_partial_init(out, AST_EXPR_FUNCALL, ast_expr_info_default());
     ast_funcall_init(&out->u.funcall, meta,
@@ -1175,7 +1178,7 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
     struct pos pos_fieldname = ps_pos(p);
     if (try_skip_char(p, '(')) {
       PARSE_DBG("parse_expr saw paren\n");
-      struct ast_expr *args;
+      struct ast_exprcall *args;
       size_t args_count;
       if (!parse_rest_of_arglist(p, &args, &args_count)) {
         goto fail;

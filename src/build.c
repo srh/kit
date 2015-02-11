@@ -2754,7 +2754,8 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   for (size_t i = args_count; i > 0;) {
     i--;
 
-    struct ast_expr *arg = &a->u.funcall.args[i];
+    /* TODO: We must use ast_exprcatch information to force the temporary in arg_loc. */
+    struct ast_expr *arg = &a->u.funcall.args[i].expr;
 
     struct loc arg_loc = frame_push_loc(h, kira_sizeof(&cs->nt, ast_expr_type(arg)));
 

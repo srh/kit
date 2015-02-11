@@ -52,13 +52,13 @@ void ast_numeric_literal_init_copy(struct ast_numeric_literal *a,
 struct ast_funcall {
   struct ast_meta meta;
   struct ast_expr *func;
-  struct ast_expr *args;
+  struct ast_exprcall *args;
   size_t args_count;
 };
 
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
                       struct ast_expr func,
-                      struct ast_expr *args, size_t args_count);
+                      struct ast_exprcall *args, size_t args_count);
 
 struct ast_typeexpr;
 
@@ -566,10 +566,20 @@ struct ast_exprcatch {
   enum ast_exprcatch_behavior behavior;
 };
 
+void ast_exprcatch_init_annotated(struct ast_exprcatch *a,
+                                  enum ast_exprcatch_behavior behavior);
+
 struct ast_exprcall {
   struct ast_exprcatch catch;
   struct ast_expr expr;
 };
+
+void ast_exprcall_init(struct ast_exprcall *a, struct ast_expr expr);
+void ast_exprcall_init_annotated(struct ast_exprcall *a,
+                                 struct ast_exprcatch catch,
+                                 struct ast_expr expr);
+void ast_exprcall_init_copy(struct ast_exprcall *a, struct ast_exprcall *c);
+void ast_exprcall_destroy(struct ast_exprcall *a);
 
 struct ast_generics {
   int has_type_params;  /* 0 or 1 -- meta & params is uninitialized if 0. */

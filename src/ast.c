@@ -68,7 +68,7 @@ void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
 
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
                       struct ast_expr func,
-                      struct ast_expr *args, size_t args_count) {
+                      struct ast_exprcall *args, size_t args_count) {
   a->meta = meta;
   ast_expr_alloc_move(func, &a->func);
   a->args = args;
@@ -86,7 +86,7 @@ void ast_funcall_init_copy(struct ast_funcall *a, struct ast_funcall *c) {
   a->meta = ast_meta_make_copy(&c->meta);
   ast_expr_alloc_init_copy(c->func, &a->func);
 
-  SLICE_INIT_COPY(a->args, a->args_count, c->args, c->args_count, ast_expr_init_copy);
+  SLICE_INIT_COPY(a->args, a->args_count, c->args, c->args_count, ast_exprcall_init_copy);
 }
 
 void ast_funcall_destroy(struct ast_funcall *a) {
@@ -94,7 +94,7 @@ void ast_funcall_destroy(struct ast_funcall *a) {
   ast_expr_destroy(a->func);
   free(a->func);
   a->func = NULL;
-  SLICE_FREE(a->args, a->args_count, ast_expr_destroy);
+  SLICE_FREE(a->args, a->args_count, ast_exprcall_destroy);
 }
 
 void ast_var_info_init(struct ast_var_info *a) {
@@ -966,6 +966,22 @@ void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out) {
 
 void ast_exprcatch_init(struct ast_exprcatch *a) {
   a->info_valid = 0;
+  a->behavior = (enum ast_exprcatch_behavior)-1;
+}
+
+void ast_exprcatch_init_annotated(struct ast_exprcatch *a,
+                                  enum ast_exprcatch_behavior behavior) {
+  a->info_valid = 1;
+  a->behavior = behavior;
+}
+
+void ast_exprcatch_init_copy(struct ast_exprcatch *a, struct ast_exprcatch *c) {
+  a->info_valid = c->info_valid;
+  if (c->info_valid) {
+    a->behavior = c->behavior;
+  } else {
+    a->behavior = (enum ast_exprcatch_behavior)-1;
+  }
 }
 
 void ast_exprcatch_destroy(struct ast_exprcatch *a) {
@@ -976,6 +992,18 @@ void ast_exprcatch_destroy(struct ast_exprcatch *a) {
 void ast_exprcall_init(struct ast_exprcall *a, struct ast_expr expr) {
   ast_exprcatch_init(&a->catch);
   a->expr = expr;
+}
+
+void ast_exprcall_init_annotated(struct ast_exprcall *a,
+                                 struct ast_exprcatch catch,
+                                 struct ast_expr expr) {
+  a->catch = catch;
+  a->expr = expr;
+}
+
+void ast_exprcall_init_copy(struct ast_exprcall *a, struct ast_exprcall *c) {
+  ast_exprcatch_init_copy(&a->catch, &c->catch);
+  ast_expr_init_copy(&a->expr, &c->expr);
 }
 
 void ast_exprcall_destroy(struct ast_exprcall *a) {
