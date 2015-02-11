@@ -620,7 +620,6 @@ int add_conversion_operator(struct checkstate *cs,
   return ret;
 }
 
-/* TODO: pass im, not cs. */
 int add_direct_and_ptr_conversion_operator(
     struct checkstate *cs,
     struct defclass_ident *private_to,
@@ -1322,9 +1321,6 @@ int check_typeexpr_unione_traits(struct checkstate *cs,
 are not trivially copyable and movable, or a class type that needs a
 defined destructor, or a type that has multiply defined
 move/copy/destroy operations. */
-/* TODO: It's possible a templated copy/move/destroy operator won't
-get typechecked -- we need some way to force that, someplace where
-there is an exprscope. */
 int check_typeexpr_traits(struct checkstate *cs,
                           /* a is a concrete type. */
                           struct ast_typeexpr *a,
@@ -1683,8 +1679,6 @@ int deftype_is_accessible(struct exprscope *es, struct ast_deftype *deftype) {
   return is_accessible(es, privacy_scope);
 }
 
-/* TODO: Anyplace check_expr is called, we need to analyze how we're
-going to destruct it and typecheck that. */
 int check_expr_with_type(struct exprscope *es,
                          struct ast_expr *x,
                          struct ast_typeexpr *type,
@@ -2062,9 +2056,6 @@ struct bodystate {
   struct ast_typeexpr exact_return_type;
 };
 
-/* TODO: Just asking, do we typecheck var or temporary destruction (or
-gosh, copying or moving?) at any point? */
-
 void bodystate_init(struct bodystate *bs, struct exprscope *es,
                     struct ast_typeexpr *partial_type) {
   bs->es = es;
@@ -2426,11 +2417,8 @@ int check_statement(struct bodystate *bs,
   return 0;
 }
 
-/* TODO: Remove fallthrough, I dropped labels/gotos. */
 /* fallthrough_out says if evaluating the bracebody could "fall off
-the end", i.e. it has a label without a subsequent goto or return
-statement.  This is more conservative than "conservative" analysis,
-because we assume that all labels are reachable. */
+the end", i.e. there isn't a return statement in every branch. */
 int check_expr_bracebody(struct bodystate *bs,
                          struct ast_bracebody *x,
                          struct ast_bracebody *annotated_out,
