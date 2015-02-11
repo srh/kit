@@ -548,6 +548,29 @@ struct ast_meta *ast_expr_ast_meta(struct ast_expr *a);
 struct pos ast_expr_pos_end(struct ast_expr *a);
 void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out);
 
+enum ast_exprcatch_behavior {
+  /* The value an ast_expr returns, which is a whole_thing temporary,
+  should be constructed in-place. */
+  AST_EXPRCATCH_IN_PLACE,
+  /* The value an ast_expr returns, which is a non-whole_thing
+  temporary, should be copied into its place, and the temporary shall
+  be destroyed. */
+  AST_EXPRCATCH_COPY_AND_DESTROY,
+  /* The value an ast_expr returns, which is not a temporary, should
+  be copied into its place. */
+  AST_EXPRCATCH_COPY,
+};
+
+struct ast_exprcatch {
+  int info_valid;
+  enum ast_exprcatch_behavior behavior;
+};
+
+struct ast_exprcall {
+  struct ast_exprcatch catch;
+  struct ast_expr expr;
+};
+
 struct ast_generics {
   int has_type_params;  /* 0 or 1 -- meta & params is uninitialized if 0. */
   struct ast_meta meta;

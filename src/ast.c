@@ -964,6 +964,25 @@ void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out) {
   *out = p;
 }
 
+void ast_exprcatch_init(struct ast_exprcatch *a) {
+  a->info_valid = 0;
+}
+
+void ast_exprcatch_destroy(struct ast_exprcatch *a) {
+  a->info_valid = 0;
+  a->behavior = (enum ast_exprcatch_behavior)-1;
+}
+
+void ast_exprcall_init(struct ast_exprcall *a, struct ast_expr expr) {
+  ast_exprcatch_init(&a->catch);
+  a->expr = expr;
+}
+
+void ast_exprcall_destroy(struct ast_exprcall *a) {
+  ast_exprcatch_destroy(&a->catch);
+  ast_expr_destroy(&a->expr);
+}
+
 void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
                       struct ast_ident name, struct ast_typeexpr *params,
                       size_t params_count) {
