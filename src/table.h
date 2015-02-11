@@ -5,7 +5,6 @@
 #include "arity.h"
 
 enum primitive_op {
-  /* TODO: Implement. */
   PRIMITIVE_OP_REINTERPRET,
 
   PRIMITIVE_OP_CONVERT_U8_TO_U8,
@@ -187,9 +186,7 @@ struct static_value {
     uint32_t u32_value;
     uint8_t u8_value;
     int8_t i8_value;
-    /* An owned ref to the _typechecked_ AST. */
-    /* TODO: Right now this is still just a plain-jane copy of the
-    AST, with generics unreplaced, no annotations.  (TODO: Or is it?) */
+    /* An owned ref to the _typechecked_, annotated AST. */
     struct ast_expr typechecked_lambda;
     enum primitive_op primitive_op;
   } u;
@@ -376,7 +373,6 @@ void deftype_entry_mark_has_been_checked(struct deftype_entry *ent);
 void deftype_entry_mark_generic_flatly_held(struct deftype_entry *ent,
                                             size_t which_generic);
 
-/* TODO: This doesn't really belong here. */
 int typelists_equal(struct ast_typeexpr *a, size_t a_count,
                     struct ast_typeexpr *b, size_t b_count);
 

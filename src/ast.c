@@ -54,12 +54,7 @@ void ast_numeric_literal_init(struct ast_numeric_literal *a,
 void ast_numeric_literal_init_copy(struct ast_numeric_literal *a,
                                    struct ast_numeric_literal *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  int8_t *digits = malloc_mul(sizeof(*digits), c->digits_count);
-  for (size_t i = 0, e = c->digits_count; i < e; i++) {
-    digits[i] = c->digits[i];
-  }
-  a->digits = digits;
-  a->digits_count = c->digits_count;
+  SLICE_INIT_COPY_PRIM(a->digits, a->digits_count, c->digits, c->digits_count);
   a->numeric_type = c->numeric_type;
 }
 
@@ -91,12 +86,7 @@ void ast_funcall_init_copy(struct ast_funcall *a, struct ast_funcall *c) {
   a->meta = ast_meta_make_copy(&c->meta);
   ast_expr_alloc_init_copy(c->func, &a->func);
 
-  struct ast_expr *args = malloc_mul(sizeof(*args), c->args_count);
-  for (size_t i = 0, e = c->args_count; i < e; i++) {
-    ast_expr_init_copy(&args[i], &c->args[i]);
-  }
-  a->args = args;
-  a->args_count = c->args_count;
+  SLICE_INIT_COPY(a->args, a->args_count, c->args, c->args_count, ast_expr_init_copy);
 }
 
 void ast_funcall_destroy(struct ast_funcall *a) {
@@ -164,13 +154,9 @@ void ast_bracebody_init(struct ast_bracebody *a,
 void ast_bracebody_init_copy(struct ast_bracebody *a,
                              struct ast_bracebody *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  struct ast_statement *statements = malloc_mul(sizeof(*statements),
-                                                c->statements_count);
-  for (size_t i = 0, e = c->statements_count; i < e; i++) {
-    ast_statement_init_copy(&statements[i], &c->statements[i]);
-  }
-  a->statements = statements;
-  a->statements_count = c->statements_count;
+  SLICE_INIT_COPY(a->statements, a->statements_count,
+                  c->statements, c->statements_count,
+                  ast_statement_init_copy);
 }
 
 void ast_bracebody_destroy(struct ast_bracebody *a) {
@@ -561,12 +547,8 @@ void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,
 void ast_lambda_init_copy(struct ast_lambda *a, struct ast_lambda *c) {
   a->meta = ast_meta_make_copy(&c->meta);
   ast_lambda_info_init_copy(&a->info, &c->info);
-  struct ast_vardecl *params = malloc_mul(sizeof(*params), c->params_count);
-  for (size_t i = 0, e = c->params_count; i < e; i++) {
-    ast_vardecl_init_copy(&params[i], &c->params[i]);
-  }
-  a->params = params;
-  a->params_count = c->params_count;
+  SLICE_INIT_COPY(a->params, a->params_count, c->params, c->params_count,
+                  ast_vardecl_init_copy);
   ast_typeexpr_init_copy(&a->return_type, &c->return_type);
   ast_bracebody_init_copy(&a->bracebody, &c->bracebody);
 }
@@ -683,13 +665,8 @@ void ast_name_expr_init_copy(struct ast_name_expr *a,
   ast_ident_init_copy(&a->ident, &c->ident);
   a->has_params = c->has_params;
   if (c->has_params) {
-    size_t count = c->params_count;
-    struct ast_typeexpr *params = malloc_mul(sizeof(*params), count);
-    for (size_t i = 0; i < count; i++) {
-      ast_typeexpr_init_copy(&params[i], &c->params[i]);
-    }
-    a->params = params;
-    a->params_count = c->params_count;
+    SLICE_INIT_COPY(a->params, a->params_count, c->params, c->params_count,
+                    ast_typeexpr_init_copy);
   }
 }
 
@@ -968,29 +945,14 @@ void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
 void ast_typeapp_init_copy(struct ast_typeapp *a, struct ast_typeapp *c) {
   a->meta = ast_meta_make_copy(&c->meta);
   ast_ident_init_copy(&a->name, &c->name);
-  size_t params_count = c->params_count;
-  struct ast_typeexpr *params = malloc_mul(params_count, sizeof(*params));
-  for (size_t i = 0; i < params_count; i++) {
-    ast_typeexpr_init_copy(&params[i], &c->params[i]);
-  }
-  a->params = params;
-  a->params_count = params_count;
+  SLICE_INIT_COPY(a->params, a->params_count, c->params, c->params_count,
+                  ast_typeexpr_init_copy);
 }
 
 void ast_typeapp_destroy(struct ast_typeapp *a) {
   ast_meta_destroy(&a->meta);
   ast_ident_destroy(&a->name);
   SLICE_FREE(a->params, a->params_count, ast_typeexpr_destroy);
-}
-
-void ast_fields_alloc_copy(struct ast_vardecl *fields, size_t fields_count,
-                           struct ast_vardecl **p_out, size_t *count_out) {
-  struct ast_vardecl *p = malloc_mul(fields_count, sizeof(*p));
-  for (size_t i = 0; i < fields_count; i++) {
-    ast_vardecl_init_copy(&p[i], &fields[i]);
-  }
-  *p_out = p;
-  *count_out = fields_count;
 }
 
 void ast_structe_init(struct ast_structe *a, struct ast_meta meta,
@@ -1002,8 +964,8 @@ void ast_structe_init(struct ast_structe *a, struct ast_meta meta,
 
 void ast_structe_init_copy(struct ast_structe *a, struct ast_structe *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  ast_fields_alloc_copy(c->fields, c->fields_count,
-                        &a->fields, &a->fields_count);
+  SLICE_INIT_COPY(a->fields, a->fields_count, c->fields, c->fields_count,
+                  ast_vardecl_init_copy);
 }
 
 void ast_structe_destroy(struct ast_structe *a) {
@@ -1020,8 +982,8 @@ void ast_unione_init(struct ast_unione *a, struct ast_meta meta,
 
 void ast_unione_init_copy(struct ast_unione *a, struct ast_unione *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  ast_fields_alloc_copy(c->fields, c->fields_count,
-                        &a->fields, &a->fields_count);
+  SLICE_INIT_COPY(a->fields, a->fields_count, c->fields, c->fields_count,
+                  ast_vardecl_init_copy);
 }
 
 void ast_unione_destroy(struct ast_unione *a) {

@@ -19,7 +19,7 @@
 #define PACK_ATTRIBUTE __attribute__((__packed__))
 #endif /* _WIN32 */
 
-/* TODO: Define this properly somehow. */
+/* TODO: Define LITTLE_ENDIAN properly somehow. */
 #define LITTLE_ENDIAN 1
 
 #define STATIC_CHECK(x) do { enum { assertion = 1/!!(x) }; } while (0)
