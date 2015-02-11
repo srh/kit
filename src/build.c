@@ -89,7 +89,7 @@ struct loc gen_field_loc(struct checkstate *cs,
                          struct frame *h,
                          struct loc lhs_loc,
                          struct ast_typeexpr *type,
-                         ident_value fieldname);
+                         ident_value *fieldname_or_null_for_whole_thing);
 
 struct loc gen_array_element_loc(struct checkstate *cs,
                                  struct objfile *f,
@@ -1384,10 +1384,10 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
   case AST_TYPEEXPR_STRUCTE: {
     for (size_t i = 0, e = type->u.structe.fields_count; i < e; i++) {
       int32_t saved_offset = frame_save_offset(h);
-      struct loc dest_field_loc = gen_field_loc(cs, f, h, dest, type, type->u.structe.fields[i].name.value);
+      struct loc dest_field_loc = gen_field_loc(cs, f, h, dest, type, &type->u.structe.fields[i].name.value);
       struct loc src_field_loc;
       if (has_src) {
-        src_field_loc = gen_field_loc(cs, f, h, src, type, type->u.structe.fields[i].name.value);
+        src_field_loc = gen_field_loc(cs, f, h, src, type, &type->u.structe.fields[i].name.value);
       } else {
         src_field_loc.tag = (enum loc_tag)-1;
       }
@@ -2742,16 +2742,6 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     return 0;
   }
 
-  // As a special case we need to handle the primitive op being
-  // PRIMITIVE_OP_REINTERPRET (and as a general case we might
-  // implement other primitive behaviors this way in the future).
-  if (func_er.u.free.tag == EXPR_RETURN_FREE_IMM
-      && func_er.u.free.u.imm.tag == IMMEDIATE_PRIMITIVE_OP
-      && func_er.u.free.u.imm.u.primitive_op == PRIMITIVE_OP_REINTERPRET) {
-    CHECK(args_count == 1);
-    return gen_expr(cs, f, h, &a->u.funcall.args[0], er);
-  }
-
   struct ast_typeexpr *return_type = ast_expr_type(a);
   uint32_t return_size;
   int hidden_return_param = exists_hidden_return_param(cs, return_type, &return_size);
@@ -3249,15 +3239,20 @@ struct loc gen_field_loc(struct checkstate *cs,
                          struct frame *h,
                          struct loc lhs_loc,
                          struct ast_typeexpr *type,
-                         ident_value fieldname) {
+                         ident_value *fieldname_or_null_for_whole_thing) {
   /* Generally speaking: There's no way the field possibly gets a
   padded_size, because the first N fields of two struct types, if
   identical, need to be accessible when they're in a union without
   touching subsequent fields. */
   uint32_t size;
   uint32_t offset;
-  kira_field_sizeoffset(&cs->nt, type, fieldname,
-                        &size, &offset);
+  if (!fieldname_or_null_for_whole_thing) {
+    size = kira_sizeof(&cs->nt, type);
+    offset = 0;
+  } else {
+    kira_field_sizeoffset(&cs->nt, type, *fieldname_or_null_for_whole_thing,
+                          &size, &offset);
+  }
 
   /* Note: This code needs to preserve lvalues (and it does so). */
 
@@ -3296,10 +3291,11 @@ void apply_field_access(struct checkstate *cs,
                         struct loc lhs_loc,
                         struct temp_return lhs_tr,
                         struct ast_typeexpr *type,
-                        ident_value fieldname,
+                        struct ast_fieldname *fieldname,
                         struct ast_typeexpr *field_type,
                         struct expr_return *er) {
-  struct loc field_loc = gen_field_loc(cs, f, h, lhs_loc, type, fieldname);
+  struct loc field_loc = gen_field_loc(cs, f, h, lhs_loc, type,
+                                       fieldname->whole_field ? NULL : &fieldname->ident.value);
   expr_return_set(cs, f, h, er, field_loc, field_type, temp_subobject(lhs_tr));
 }
 
@@ -3313,7 +3309,7 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
 
   apply_field_access(cs, f, h, lhs_er.u.loc, lhs_er.tr,
                      &a->u.local_field_access.lhs->info.concrete_type,
-                     a->u.local_field_access.fieldname.value,
+                     &a->u.local_field_access.fieldname,
                      ast_expr_type(a), er);
   return 1;
 }
@@ -3409,7 +3405,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
 
     /* (We pass deref_er.tr but we know it's temp_none().) */
     apply_field_access(cs, f, h, deref_er.u.loc, deref_er.tr, ptr_target,
-                       a->u.deref_field_access.fieldname.value,
+                       &a->u.deref_field_access.fieldname,
                        ast_expr_type(a), er);
     return 1;
   } break;

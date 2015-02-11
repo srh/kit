@@ -46,7 +46,7 @@ access kla {
   };
 
   def expose func[*kla, struct { x u32; y u32; }] = fn (p *kla) struct { x u32; y u32; } {
-    return ~ *p;
+    return p->~;
   };
 }
 
@@ -111,9 +111,9 @@ export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
   print(y);
   putchar(10);
 
-  var yptr * i32 = &p->y;
+  var yptr *i32 = &p->y;
   *yptr = 77;
-  var xptr * i32 = &p->x;
+  var xptr *i32 = &p->x;
   xptr[0] = 99;
 
   p[1].x = 33;
@@ -131,7 +131,7 @@ export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
   naked.x = p->x;
   naked.y = @[i32]~getsize@[ty]();
 
-  ret = @[ty]~naked;
+  ret.~ = naked;
   return ret;
 };
 

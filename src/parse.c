@@ -227,7 +227,7 @@ int is_one_of(const char *s, int32_t ch) {
 }
 
 int is_operlike(int32_t ch) {
-  return is_one_of("~!%^&*+=-/?<,>.;:|@", ch);
+  return is_one_of("~!%^&*+=-/?<,>.:;|@", ch);
 }
 
 int is_binop_start(int32_t ch) {
@@ -371,7 +371,7 @@ int skip_oper(struct ps *p, const char *s) {
   if (!skip_string(p, s)) {
     return 0;
   }
-  if (is_operlike(ps_peek(p))) {
+  if (is_operlike(ps_peek(p)) && ps_peek(p) != ';') {
     return 0;
   }
   ps_count_leaf(p);
@@ -1172,6 +1172,7 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       goto fail;
     }
     PARSE_DBG("parse_expr looking for paren\n");
+    struct pos pos_fieldname = ps_pos(p);
     if (try_skip_char(p, '(')) {
       PARSE_DBG("parse_expr saw paren\n");
       struct ast_expr *args;
@@ -1200,11 +1201,9 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       ast_expr_partial_init(&lhs, AST_EXPR_INDEX, ast_expr_info_default());
       ast_index_expr_init(&lhs.u.index_expr, ast_meta_make(pos_start, ps_pos(p)),
                           old_lhs, arg);
-    } else if (try_skip_oper(p, ".")) {
-      struct ast_ident field_name;
-      if (!(skip_ws(p) && parse_ident(p, &field_name))) {
-        goto fail;
-      }
+    } else if (try_skip_oper(p, ".~")) {
+      struct ast_fieldname fieldname;
+      ast_fieldname_init_whole(&fieldname, ast_meta_make(pos_fieldname, ps_pos(p)));
 
       struct ast_expr old_lhs = lhs;
       ast_expr_partial_init(&lhs, AST_EXPR_LOCAL_FIELD_ACCESS,
@@ -1212,12 +1211,27 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       ast_local_field_access_init(&lhs.u.local_field_access,
                                   ast_meta_make(pos_start, ps_pos(p)),
                                   old_lhs,
-                                  field_name);
-    } else if (try_skip_oper(p, "->")) {
-      struct ast_ident field_name;
-      if (!(skip_ws(p) && parse_ident(p, &field_name))) {
+                                  fieldname);
+    } else if (try_skip_oper(p, ".")) {
+      struct ast_ident ident;
+      if (!(skip_ws(p) && parse_ident(p, &ident))) {
         goto fail;
       }
+
+      struct ast_fieldname fieldname;
+      ast_fieldname_init(&fieldname, ast_meta_make(pos_fieldname, ps_pos(p)),
+                         ident);
+
+      struct ast_expr old_lhs = lhs;
+      ast_expr_partial_init(&lhs, AST_EXPR_LOCAL_FIELD_ACCESS,
+                            ast_expr_info_default());
+      ast_local_field_access_init(&lhs.u.local_field_access,
+                                  ast_meta_make(pos_start, ps_pos(p)),
+                                  old_lhs,
+                                  fieldname);
+    } else if (try_skip_oper(p, "->~")) {
+      struct ast_fieldname fieldname;
+      ast_fieldname_init_whole(&fieldname, ast_meta_make(pos_fieldname, ps_pos(p)));
 
       struct ast_expr old_lhs = lhs;
       ast_expr_partial_init(&lhs, AST_EXPR_DEREF_FIELD_ACCESS,
@@ -1225,7 +1239,24 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
       ast_deref_field_access_init(&lhs.u.deref_field_access,
                                   ast_meta_make(pos_start, ps_pos(p)),
                                   old_lhs,
-                                  field_name);
+                                  fieldname);
+    } else if (try_skip_oper(p, "->")) {
+      struct ast_ident ident;
+      if (!(skip_ws(p) && parse_ident(p, &ident))) {
+        goto fail;
+      }
+
+      struct ast_fieldname fieldname;
+      ast_fieldname_init(&fieldname, ast_meta_make(pos_fieldname, ps_pos(p)),
+                         ident);
+
+      struct ast_expr old_lhs = lhs;
+      ast_expr_partial_init(&lhs, AST_EXPR_DEREF_FIELD_ACCESS,
+                            ast_expr_info_default());
+      ast_deref_field_access_init(&lhs.u.deref_field_access,
+                                  ast_meta_make(pos_start, ps_pos(p)),
+                                  old_lhs,
+                                  fieldname);
     } else if (is_binop_start(ps_peek(p))) {
       struct ps_savestate save = ps_save(p);
 

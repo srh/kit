@@ -561,10 +561,41 @@ void ast_lambda_destroy(struct ast_lambda *a) {
   ast_bracebody_destroy(&a->bracebody);
 }
 
+void ast_fieldname_init(struct ast_fieldname *a,
+                        struct ast_meta meta,
+                        struct ast_ident ident) {
+  a->meta = meta;
+  a->whole_field = 0;
+  a->ident = ident;
+}
+
+void ast_fieldname_init_copy(struct ast_fieldname *a,
+                             struct ast_fieldname *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  a->whole_field = c->whole_field;
+  if (!c->whole_field) {
+    ast_ident_init_copy(&a->ident, &c->ident);
+  }
+}
+
+void ast_fieldname_init_whole(struct ast_fieldname *a,
+                              struct ast_meta meta) {
+  a->meta = meta;
+  a->whole_field = 1;
+}
+
+void ast_fieldname_destroy(struct ast_fieldname *a) {
+  ast_meta_destroy(&a->meta);
+  if (!a->whole_field) {
+    ast_ident_destroy(&a->ident);
+  }
+  a->whole_field = 0;
+}
+
 void ast_local_field_access_init(struct ast_local_field_access *a,
                                  struct ast_meta meta,
                                  struct ast_expr lhs,
-                                 struct ast_ident fieldname) {
+                                 struct ast_fieldname fieldname) {
   a->meta = meta;
   ast_expr_alloc_move(lhs, &a->lhs);
   a->fieldname = fieldname;
@@ -574,20 +605,20 @@ void ast_local_field_access_init_copy(struct ast_local_field_access *a,
                                       struct ast_local_field_access *c) {
   a->meta = ast_meta_make_copy(&c->meta);
   ast_expr_alloc_init_copy(c->lhs, &a->lhs);
-  ast_ident_init_copy(&a->fieldname, &c->fieldname);
+  ast_fieldname_init_copy(&a->fieldname, &c->fieldname);
 }
 
 void ast_local_field_access_destroy(struct ast_local_field_access *a) {
   ast_meta_destroy(&a->meta);
   ast_expr_destroy(a->lhs);
   free(a->lhs);
-  ast_ident_destroy(&a->fieldname);
+  ast_fieldname_destroy(&a->fieldname);
 }
 
 void ast_deref_field_access_init(struct ast_deref_field_access *a,
                                  struct ast_meta meta,
                                  struct ast_expr lhs,
-                                 struct ast_ident fieldname) {
+                                 struct ast_fieldname fieldname) {
   a->meta = meta;
   ast_expr_alloc_move(lhs, &a->lhs);
   a->fieldname = fieldname;
@@ -597,14 +628,14 @@ void ast_deref_field_access_init_copy(struct ast_deref_field_access *a,
                                       struct ast_deref_field_access *c) {
   a->meta = ast_meta_make_copy(&c->meta);
   ast_expr_alloc_init_copy(c->lhs, &a->lhs);
-  ast_ident_init_copy(&a->fieldname, &c->fieldname);
+  ast_fieldname_init_copy(&a->fieldname, &c->fieldname);
 }
 
 void ast_deref_field_access_destroy(struct ast_deref_field_access *a) {
   ast_meta_destroy(&a->meta);
   ast_expr_destroy(a->lhs);
   free(a->lhs);
-  ast_ident_destroy(&a->fieldname);
+  ast_fieldname_destroy(&a->fieldname);
 }
 
 void ast_name_expr_info_init(struct ast_name_expr_info *a) {

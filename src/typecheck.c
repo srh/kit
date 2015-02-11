@@ -594,57 +594,6 @@ void copy_make_unary_func_type(struct checkstate *cs,
                    params, 2);
 }
 
-int add_conversion_operator(struct checkstate *cs,
-                            struct defclass_ident *private_to,
-                            size_t private_to_count,
-                            struct ast_generics *generics,
-                            struct ast_typeexpr *arg_type,
-                            struct ast_typeexpr *return_type) {
-  /* This is actually a magical thing, not a function.  It gets
-  treated specially by build.c Maybe we should implement this
-  differently. */
-
-  struct ast_typeexpr func_type;
-  copy_make_unary_func_type(cs, arg_type, return_type, &func_type);
-
-  int ret = name_table_add_private_primitive_def(
-      &cs->nt,
-      identmap_intern_c_str(cs->im, "~"),
-      PRIMITIVE_OP_REINTERPRET,
-      generics,
-      &func_type,
-      private_to,
-      private_to_count);
-
-  ast_typeexpr_destroy(&func_type);
-  return ret;
-}
-
-int add_direct_and_ptr_conversion_operator(
-    struct checkstate *cs,
-    struct defclass_ident *private_to,
-    size_t private_to_count,
-    struct ast_generics *generics,
-    struct ast_typeexpr *arg_type,
-    struct ast_typeexpr *return_type) {
-  if (!add_conversion_operator(cs, private_to, private_to_count, generics,
-                               arg_type, return_type)) {
-    return 0;
-  }
-
-  struct ast_typeexpr ptr_arg;
-  wrap_in_ptr(cs->im, arg_type, &ptr_arg);
-  struct ast_typeexpr ptr_return;
-  wrap_in_ptr(cs->im, return_type, &ptr_return);
-  if (!add_conversion_operator(cs, private_to, private_to_count, generics,
-                               &ptr_arg, &ptr_return)) {
-    return 0;
-  }
-  ast_typeexpr_destroy(&ptr_return);
-  ast_typeexpr_destroy(&ptr_arg);
-  return 1;
-}
-
 int chase_through_toplevels(struct checkstate *cs,
                             struct import_chase_state *ics,
                             struct ast_toplevel *toplevels,
@@ -679,38 +628,6 @@ int chase_through_toplevels(struct checkstate *cs,
       struct ast_deftype *dt = &toplevel->u.deftype;
       struct generics_arity arity = params_arity(&dt->generics);
       if (!name_table_add_deftype(&cs->nt, dt->name.value, arity, dt)) {
-        return 0;
-      }
-
-      struct ast_typeexpr name_type;
-      init_generics_type(&name_type, &dt->name, &dt->generics);
-
-      struct defclass_ident *private_to = NULL;
-      size_t private_to_count = 0;
-      if (dt->disposition != AST_DEFTYPE_NOT_CLASS) {
-        private_to = malloc_mul(sizeof(*private_to), 1);
-        private_to_count = 1;
-        private_to[0].name = dt->name.value;
-        private_to[0].arity = arity;
-      }
-
-      int ret = 0;
-      if (!add_direct_and_ptr_conversion_operator(cs, private_to, private_to_count,
-                                                  &toplevel->u.deftype.generics,
-                                                  &name_type, &toplevel->u.deftype.type)) {
-        goto deftype_fail;
-      }
-      if (!add_direct_and_ptr_conversion_operator(cs, private_to, private_to_count,
-                                                  &toplevel->u.deftype.generics,
-                                                  &toplevel->u.deftype.type, &name_type)) {
-        goto deftype_fail;
-      }
-
-      ret = 1;
-    deftype_fail:
-      free(private_to);
-      ast_typeexpr_destroy(&name_type);
-      if (ret == 0) {
         return 0;
       }
     } break;
@@ -1960,8 +1877,6 @@ int check_expr_funcall(struct exprscope *es,
                                                args_types_count);
   struct ast_expr *args_annotated = malloc_mul(sizeof(*args_annotated),
                                                args_count);
-  /* Used for the case where args_count == 1 and we have
-  PRIMITIVE_OP_REINTERPRET.  FML. */
   size_t i;
   for (i = 0; i < args_count; i++) {
     struct ast_typeexpr local_partial;
@@ -1988,45 +1903,25 @@ int check_expr_funcall(struct exprscope *es,
     goto fail_cleanup_funcexpr;
   }
 
-  /* We need to analyze annotated_func to see if it's a
-  PRIMITIVE_OP_REINTERPRET op, which affects the calculation of
-  whether a temporary object happens. */
-
-  int is_PRIMITIVE_OP_REINTERPRET = 0;
-  if (annotated_func.tag == AST_EXPR_NAME) {
-    CHECK(annotated_func.u.name.info.info_valid);
-    if (annotated_func.u.name.info.inst_or_null
-        && annotated_func.u.name.info.inst_or_null->owner->is_primitive
-        && annotated_func.u.name.info.inst_or_null->owner->primitive_op == PRIMITIVE_OP_REINTERPRET) {
-      is_PRIMITIVE_OP_REINTERPRET = 1;
-    }
-  }
-
   struct ast_typeexpr return_type;
   copy_func_return_type(es->cs->im, ast_expr_type(&annotated_func),
                         args_types_count, &return_type);
 
-  struct ast_expr_info expr_info;
-  if (is_PRIMITIVE_OP_REINTERPRET) {
-    CHECK(args_count == 1);
-    expr_info = expr_info_typechecked_subobject(return_type, &args_annotated[0].info);
-  } else {
-    struct ast_typeexpr temporary_type;
-    ast_typeexpr_init_copy(&temporary_type, &return_type);
+  struct ast_typeexpr temporary_type;
+  ast_typeexpr_init_copy(&temporary_type, &return_type);
 
-    struct typeexpr_traits discard;
-    if (!check_typeexpr_traits(es->cs, &temporary_type, es, &discard)) {
-      ast_typeexpr_destroy(&temporary_type);
-      goto fail_cleanup_return_type;
-    }
-
-    expr_info = ast_expr_info_typechecked_temporary(
-        0,
-        return_type,
-        temporary_type,
-        1,
-        exprscope_temptag(es));
+  struct typeexpr_traits discard;
+  if (!check_typeexpr_traits(es->cs, &temporary_type, es, &discard)) {
+    goto fail_cleanup_temporary_type;
   }
+
+  struct ast_expr_info expr_info;
+  expr_info = ast_expr_info_typechecked_temporary(
+      0,
+      return_type,
+      temporary_type,
+      1,
+      exprscope_temptag(es));
 
   ast_expr_partial_init(annotated_out, AST_EXPR_FUNCALL, expr_info);
   ast_funcall_init(&annotated_out->u.funcall, ast_meta_make_copy(&x->meta),
@@ -2035,7 +1930,8 @@ int check_expr_funcall(struct exprscope *es,
   ast_typeexpr_destroy(&funcexpr);
   return 1;
   /* Don't fallthrough -- args_annotated was moved into annotated_out. */
- fail_cleanup_return_type:
+ fail_cleanup_temporary_type:
+  ast_typeexpr_destroy(&temporary_type);
   ast_typeexpr_destroy(&return_type);
   ast_expr_destroy(&annotated_func);
  fail_cleanup_funcexpr:
@@ -2897,7 +2793,7 @@ int lookup_fields_field_type(struct ast_vardecl *fields,
 
 int lookup_field_type(struct exprscope *es,
                       struct ast_typeexpr *type,
-                      struct ast_ident *field_name,
+                      struct ast_fieldname *fieldname,
                       struct ast_typeexpr *field_type_out) {
   switch (type->tag) {
   case AST_TYPEEXPR_NAME: {
@@ -2908,17 +2804,27 @@ int lookup_field_type(struct exprscope *es,
       CRASH("lookup_field_type sees an invalid type.");
     }
     if (ent->is_primitive) {
-      METERR(field_name->meta, "Looking up field on primitive type.%s", "\n");
+      METERR(fieldname->meta, "Looking up %sfield on primitive type.",
+             fieldname->whole_field ? "whole " : "");
       return 0;
     }
 
     struct ast_deftype *deftype = ent->deftype;
     CHECK(!deftype->generics.has_type_params);
     if (!deftype_is_accessible(es, deftype)) {
-      METERR(field_name->meta, "Looking up field on inaccessible type.%s", "\n");
+      METERR(fieldname->meta, "Looking up field on inaccessible type.%s", "\n");
       return 0;
     }
-    return lookup_field_type(es, &deftype->type, field_name, field_type_out);
+
+    if (fieldname->whole_field) {
+      /* Stop here -- we don't recursively follow deftype chains on
+      whole-field access.  Maybe we shouldn't, for named fields,
+      too, but we do. */
+      ast_typeexpr_init_copy(field_type_out, &deftype->type);
+      return 1;
+    } else {
+      return lookup_field_type(es, &deftype->type, fieldname, field_type_out);
+    }
   } break;
   case AST_TYPEEXPR_APP: {
     struct deftype_entry *ent;
@@ -2928,7 +2834,8 @@ int lookup_field_type(struct exprscope *es,
       CRASH("lookup_field_type sees an invalid generic type.");
     }
     if (ent->is_primitive) {
-      METERR(field_name->meta, "Looking up field on primitive type.%s", "\n");
+      METERR(fieldname->meta, "Looking up %sfield on primitive type.\n",
+             fieldname->whole_field ? "whole " : "");
       return 0;
     }
 
@@ -2936,7 +2843,7 @@ int lookup_field_type(struct exprscope *es,
     CHECK(deftype->generics.has_type_params
           && deftype->generics.params_count == type->u.app.params_count);
     if (!deftype_is_accessible(es, deftype)) {
-      METERR(field_name->meta, "Looking up field on inaccessible type.%s", "\n");
+      METERR(fieldname->meta, "Looking up field on inaccessible type.%s", "\n");
       return 0;
     }
 
@@ -2946,21 +2853,42 @@ int lookup_field_type(struct exprscope *es,
                         &deftype->type,
                         &concrete_deftype_type);
 
-    int ret = lookup_field_type(es, &concrete_deftype_type, field_name,
-                                field_type_out);
-    ast_typeexpr_destroy(&concrete_deftype_type);
-    return ret;
+    if (fieldname->whole_field) {
+      /* Stop here -- we don't recursively follow deftype chains on
+      whole-field access.  Maybe we shouldn't, for named fields,
+      too, but we do. */
+      *field_type_out = concrete_deftype_type;
+      return 1;
+    } else {
+      int ret = lookup_field_type(es, &concrete_deftype_type, fieldname,
+                                  field_type_out);
+      ast_typeexpr_destroy(&concrete_deftype_type);
+      return ret;
+    }
   } break;
-  case AST_TYPEEXPR_STRUCTE:
+  case AST_TYPEEXPR_STRUCTE: {
+    if (fieldname->whole_field) {
+      METERR(fieldname->meta, "Looking up whole field of a naked struct type.%s", "\n");
+      return 0;
+    }
     return lookup_fields_field_type(type->u.structe.fields,
-                                    type->u.structe.fields_count, field_name,
+                                    type->u.structe.fields_count,
+                                    &fieldname->ident,
                                     field_type_out);
-  case AST_TYPEEXPR_UNIONE:
+  } break;
+  case AST_TYPEEXPR_UNIONE: {
+    if (fieldname->whole_field) {
+      METERR(fieldname->meta, "Looking up whole field of a struct type.%s", "\n");
+      return 0;
+    }
     return lookup_fields_field_type(type->u.unione.fields,
-                                    type->u.unione.fields_count, field_name,
+                                    type->u.unione.fields_count,
+                                    &fieldname->ident,
                                     field_type_out);
+  }
   case AST_TYPEEXPR_ARRAY: {
-    METERR(field_name->meta, "Looking up field on array type.%s", "\n");
+    METERR(fieldname->meta, "Looking up %sfield on array type.\n",
+           fieldname->whole_field ? "whole " : "");
     return 0;
   } break;
   default:
@@ -2984,8 +2912,10 @@ int check_expr_local_field_access(
   }
 
   struct ast_typeexpr field_type;
-  if (!lookup_field_type(es, ast_expr_type(&annotated_lhs),
-                         &x->fieldname, &field_type)) {
+  if (!lookup_field_type(es,
+                         ast_expr_type(&annotated_lhs),
+                         &x->fieldname,
+                         &field_type)) {
     goto cleanup_lhs;
   }
 
@@ -2994,8 +2924,8 @@ int check_expr_local_field_access(
   }
 
   *out = field_type;
-  struct ast_ident fieldname;
-  ast_ident_init_copy(&fieldname, &x->fieldname);
+  struct ast_fieldname fieldname;
+  ast_fieldname_init_copy(&fieldname, &x->fieldname);
   ast_local_field_access_init(annotated_out, ast_meta_make_copy(&x->meta),
                               annotated_lhs, fieldname);
   ret = 1;
@@ -3040,7 +2970,10 @@ int check_expr_deref_field_access(
   }
 
   struct ast_typeexpr field_type;
-  if (!lookup_field_type(es, ptr_target, &x->fieldname, &field_type)) {
+  if (!lookup_field_type(es,
+                         ptr_target,
+                         &x->fieldname,
+                         &field_type)) {
     goto cleanup_lhs;
   }
 
@@ -3050,8 +2983,8 @@ int check_expr_deref_field_access(
   }
 
   *out = field_type;
-  struct ast_ident fieldname;
-  ast_ident_init_copy(&fieldname, &x->fieldname);
+  struct ast_fieldname fieldname;
+  ast_fieldname_init_copy(&fieldname, &x->fieldname);
   ast_deref_field_access_init(annotated_out, ast_meta_make_copy(&x->meta),
                               annotated_lhs, fieldname);
   ret = 1;
@@ -5112,7 +5045,7 @@ int check_file_test_more_28(const uint8_t *name, size_t name_count,
       "foo",
       "deftype ty i32;\n"
       "def foo func[ty, i32] = fn(t ty) i32 {\n"
-      "  return ~t;\n"
+      "  return t.~;\n"
       "};\n"
     } };
 
@@ -5128,7 +5061,7 @@ int check_file_test_more_29(const uint8_t *name, size_t name_count,
       "foo",
       "defclass ty i32;\n"
       "def foo func[ty, i32] = fn(t ty) i32 {\n"
-      "  return ~t;\n"
+      "  return t.~;\n"
       "};\n"
     } };
 
@@ -5144,7 +5077,7 @@ int check_file_test_more_30a(const uint8_t *name, size_t name_count,
       "defclass ty i32;\n"
       "access ty {\n"
       "def foo func[ty, i32] = fn(t ty) i32 {\n"
-      "  return ~t;\n"
+      "  return t.~;\n"
       "};\n"
       "}\n"
     } };
@@ -5160,7 +5093,7 @@ int check_file_test_more_30b(const uint8_t *name, size_t name_count,
       "defclass copy ty i32;\n"
       "access ty {\n"
       "def foo func[ty, i32] = fn(t ty) i32 {\n"
-      "  return ~t;\n"
+      "  return t.~;\n"
       "};\n"
       "}\n"
     } };
@@ -5177,7 +5110,7 @@ int check_file_test_more_31(const uint8_t *name, size_t name_count,
       "foo",
       "defclass[T] ty i32;\n"
       "def[T] foo func[ty[T], i32] = fn(t ty[T]) i32 {\n"
-      "  return ~t;\n"
+      "  return t.~;\n"
       "};\n"
       "def bar func[ty[u32], i32] = foo;\n"
     } };
@@ -5194,7 +5127,7 @@ int check_file_test_more_32a(const uint8_t *name, size_t name_count,
       "defclass[T] ty i32;\n"
       "access ty[_] {\n"
       "def[T] foo func[ty[T], i32] = fn(t ty[T]) i32 {\n"
-      "  return ~t;\n"
+      "  return t.~;\n"
       "};\n"
       "}\n"
       "def bar func[ty[u32], i32] = foo;\n"
@@ -5211,7 +5144,7 @@ int check_file_test_more_32b(const uint8_t *name, size_t name_count,
       "defclass[T] copy ty i32;\n"
       "access ty[_] {\n"
       "def[T] foo func[ty[T], i32] = fn(t ty[T]) i32 {\n"
-      "  return ~t;\n"
+      "  return t.~;\n"
       "};\n"
       "}\n"
       "def bar func[ty[u32], i32] = foo;\n"
@@ -5229,7 +5162,7 @@ int check_file_test_more_33(const uint8_t *name, size_t name_count,
       "foo",
       "defclass ty i32;\n"
       "def foo func[*ty, *i32] = fn(t *ty) *i32 {\n"
-      "  return ~t;\n"
+      "  return &t->~;\n"
       "};\n"
     } };
 
@@ -5244,7 +5177,7 @@ int check_file_test_more_34(const uint8_t *name, size_t name_count,
       "defclass ty i32;\n"
       "access ty {\n"
       "def foo func[*ty, *i32] = fn(t *ty) *i32 {\n"
-      "  return ~t;\n"
+      "  return &t->~;\n"
       "};\n"
       "}\n"
     } };
@@ -5261,7 +5194,7 @@ int check_file_test_more_35(const uint8_t *name, size_t name_count,
       "foo",
       "defclass[T] ty i32;\n"
       "def[T] foo func[*ty[T], *i32] = fn(t *ty[T]) *i32 {\n"
-      "  return ~t;\n"
+      "  return &t->~;\n"
       "};\n"
       "def bar func[*ty[u32], *i32] = foo;\n"
     } };
@@ -5277,7 +5210,7 @@ int check_file_test_more_36(const uint8_t *name, size_t name_count,
       "defclass[T] ty i32;\n"
       "access ty[_] {\n"
       "def[T] foo func[*ty[T], *i32] = fn(t *ty[T]) *i32 {\n"
-      "  return ~t;\n"
+      "  return &t->~;\n"
       "};\n"
       "}\n"
       "def bar func[*ty[u32], *i32] = foo;\n"

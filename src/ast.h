@@ -361,27 +361,43 @@ void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
                          enum ast_binop operator, struct ast_expr lhs,
                          struct ast_expr rhs);
 
+struct ast_fieldname {
+  struct ast_meta meta;
+  int whole_field;
+  struct ast_ident ident;
+};
+
+void ast_fieldname_init(struct ast_fieldname *a,
+                        struct ast_meta meta,
+                        struct ast_ident ident);
+
+void ast_fieldname_init_whole(struct ast_fieldname *a,
+                              struct ast_meta meta);
+
+void ast_fieldname_init_copy(struct ast_fieldname *a,
+                             struct ast_fieldname *c);
+
 struct ast_local_field_access {
   struct ast_meta meta;
   struct ast_expr *lhs;
-  struct ast_ident fieldname;
+  struct ast_fieldname fieldname;
 };
 
 void ast_local_field_access_init(struct ast_local_field_access *a,
                                  struct ast_meta meta,
                                  struct ast_expr lhs,
-                                 struct ast_ident fieldname);
+                                 struct ast_fieldname fieldname);
 
 struct ast_deref_field_access {
   struct ast_meta meta;
   struct ast_expr *lhs;
-  struct ast_ident fieldname;
+  struct ast_fieldname fieldname;
 };
 
 void ast_deref_field_access_init(struct ast_deref_field_access *a,
                                  struct ast_meta meta,
                                  struct ast_expr lhs,
-                                 struct ast_ident fieldname);
+                                 struct ast_fieldname fieldname);
 
 struct ast_name_expr_info {
   /* True if typechecking happened and the info means something. */
