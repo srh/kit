@@ -3393,6 +3393,7 @@ void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
     expr_return_immediate(f, h, er, imm);
   } else {
     CHECK(inst->symbol_table_index_computed);
+    CHECK(inst->owner->is_extern || inst->owner->is_primitive || inst->typecheck_started);
     if (typeexpr_is_func_type(cs->im, &inst->type)) {
       struct immediate imm;
       imm.tag = IMMEDIATE_FUNC;
