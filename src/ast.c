@@ -1106,13 +1106,8 @@ void ast_generics_init_copy(struct ast_generics *a,
   } else {
     a->has_type_params = 1;
     a->meta = ast_meta_make_copy(&c->meta);
-    size_t params_count = c->params_count;
-    struct ast_ident *params = malloc_mul(params_count, sizeof(*params));
-    for (size_t i = 0; i < params_count; i++) {
-      ast_ident_init_copy(&params[i], &c->params[i]);
-    }
-    a->params = params;
-    a->params_count = params_count;
+    SLICE_INIT_COPY(a->params, a->params_count, c->params, c->params_count,
+                    ast_ident_init_copy);
   }
 }
 

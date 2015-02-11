@@ -964,11 +964,10 @@ struct def_instantiation *def_entry_insert_instantiation(
     }
   }
 
-  size_t copy_count = materialized_count;
-  struct ast_typeexpr *copy = malloc_mul(sizeof(*copy), copy_count);
-  for (size_t i = 0; i < copy_count; i++) {
-    ast_typeexpr_init_copy(&copy[i], &materialized[i]);
-  }
+  struct ast_typeexpr *copy;
+  size_t copy_count;
+  SLICE_INIT_COPY(copy, copy_count, materialized, materialized_count,
+                  ast_typeexpr_init_copy);
 
   struct def_instantiation *inst = malloc(sizeof(*inst));
   CHECK(inst);
