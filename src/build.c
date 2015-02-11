@@ -1865,8 +1865,20 @@ struct expr_return {
     struct expr_return_free free;
   } u;
   /* gen_expr always writes this value. */
-  struct temp_return tr;
+  int has_tr;
+  struct temp_return tr_;
 };
+
+void er_set_tr(struct expr_return *er, struct temp_return tr) {
+  CHECK(!er->has_tr);
+  er->has_tr = 1;
+  er->tr_ = tr;
+}
+
+struct temp_return *er_tr(struct expr_return *er) {
+  CHECK(er->has_tr);
+  return &er->tr_;
+}
 
 void gen_destroy_temp(struct checkstate *cs, struct objfile *f, struct frame *h,
                       struct temp_return tr) {
@@ -1897,16 +1909,16 @@ void expr_return_set(struct checkstate *cs, struct objfile *f, struct frame *h,
   switch (er->tag) {
   case EXPR_RETURN_DEMANDED: {
     move_or_copy_temporary_into_loc(cs, f, h, erd_loc(&er->u.demand), loc, type, tr);
-    er->tr = temp_exists(erd_loc(&er->u.demand), type, 1);
+    er_set_tr(er, temp_exists(erd_loc(&er->u.demand), type, 1));
   } break;
   case EXPR_RETURN_OPEN: {
     ero_set_loc(&er->u.open, loc);
-    er->tr = tr;
+    er_set_tr(er, tr);
   } break;
   case EXPR_RETURN_FREE: {
     er->u.free.tag = EXPR_RETURN_FREE_LOC;
     er->u.free.u.loc = loc;
-    er->tr = tr;
+    er_set_tr(er, tr);
   } break;
   default:
     UNREACHABLE();
@@ -1940,19 +1952,19 @@ void wipe_temporaries(struct checkstate *cs, struct objfile *f, struct frame *h,
     UNREACHABLE();
   }
 
-  if (!src->tr.exists) {
+  if (!er_tr(src)->exists) {
     *dest_out = loc;
     return;
   }
 
-  if (src->tr.whole_thing) {
+  if (er_tr(src)->whole_thing) {
     *dest_out = loc;
     return;
   }
 
   struct loc retloc = frame_push_loc(h, loc.size);
   gen_copy(cs, f, h, retloc, loc, value_type);
-  gen_destroy(cs, f, h, src->tr.loc, src->tr.temporary_type);
+  gen_destroy(cs, f, h, er_tr(src)->loc, er_tr(src)->temporary_type);
   *dest_out = retloc;
   return;
 }
@@ -1960,6 +1972,7 @@ void wipe_temporaries(struct checkstate *cs, struct objfile *f, struct frame *h,
 struct expr_return free_expr_return(void) {
   struct expr_return ret;
   ret.tag = EXPR_RETURN_FREE;
+  ret.has_tr = 0;
   return ret;
 }
 
@@ -1967,13 +1980,16 @@ struct expr_return open_expr_return(void) {
   struct expr_return ret;
   ret.tag = EXPR_RETURN_OPEN;
   ret.u.open.has_loc = 0;
+  ret.has_tr = 0;
   return ret;
 }
 
 struct expr_return demand_expr_return(struct loc loc) {
+  CHECK(loc.tag == LOC_EBP_OFFSET);
   struct expr_return ret;
   ret.tag = EXPR_RETURN_DEMANDED;
   ret.u.demand.loc_ = loc;
+  ret.has_tr = 0;
   return ret;
 }
 
@@ -2829,7 +2845,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                       temp_exists(return_loc, return_type, 1));
     } else {
       /* TODO: Icky. */
-      er->tr = temp_exists(erd_loc(&er->u.demand), return_type, 1);
+      er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
     }
   } else if (return_size == 0) {
     expr_return_set(cs, f, h, er, return_loc, return_type,
@@ -2893,7 +2909,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
 
     /* There must be no temporary return because then we'd be taking
     the address of a temporary. */
-    CHECK(!rhs_er.tr.exists);
+    CHECK(!er_tr(&rhs_er)->exists);
 
     struct loc ret = frame_push_loc(h, DWORD_SIZE);
     gen_mov_addressof(f, ret, ero_loc(&rhs_er.u.open));
@@ -2979,7 +2995,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   if (is_ptr) {
     expr_return_set(cs, f, h, er, retloc, ast_expr_type(a), temp_none());
   } else {
-    expr_return_set(cs, f, h, er, retloc, ast_expr_type(a), temp_subobject(lhs_er.tr));
+    expr_return_set(cs, f, h, er, retloc, ast_expr_type(a), temp_subobject(*er_tr(&lhs_er)));
   }
   return 1;
 }
@@ -3110,7 +3126,7 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
     }
 
     /* We are assigning to a value, so it can't be a temporary. */
-    CHECK(!lhs_er.tr.exists);
+    CHECK(!er_tr(&lhs_er)->exists);
 
     struct expr_return rhs_er = open_expr_return();
     if (!gen_expr(cs, f, h, be->rhs, &rhs_er)) {
@@ -3118,7 +3134,8 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
     }
 
     struct ast_typeexpr *lhs_type = ast_expr_type(be->lhs);
-    gen_assignment(cs, f, h, ero_loc(&lhs_er.u.open), ero_loc(&rhs_er.u.open), lhs_type, rhs_er.tr);
+    gen_assignment(cs, f, h, ero_loc(&lhs_er.u.open), ero_loc(&rhs_er.u.open),
+                   lhs_type, *er_tr(&rhs_er));
 
     /* We have done our assignment.  Our expression has a return
     value though, expr_return_set does that. */
@@ -3198,7 +3215,7 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
   switch (er->tag) {
   case EXPR_RETURN_DEMANDED: {
     gen_mov_immediate(f, erd_loc(&er->u.demand), imm);
-    er->tr = temp_none();
+    er_set_tr(er, temp_none());
   } break;
   case EXPR_RETURN_OPEN: {
     /* All immediates (right now) are DWORD-sized. */
@@ -3207,12 +3224,12 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
     ero_set_loc(&er->u.open, floc);
     /* TODO: tr crap like this is bad -- it's a temporary, it should
     be treated as such. */
-    er->tr = temp_none();
+    er_set_tr(er, temp_none());
   } break;
   case EXPR_RETURN_FREE: {
     er->u.free.tag = EXPR_RETURN_FREE_IMM;
     er->u.free.u.imm = imm;
-    er->tr = temp_none();
+    er_set_tr(er, temp_none());
   } break;
   default:
     UNREACHABLE();
@@ -3348,7 +3365,7 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
     return 0;
   }
 
-  apply_field_access(cs, f, h, ero_loc(&lhs_er.u.open), lhs_er.tr,
+  apply_field_access(cs, f, h, ero_loc(&lhs_er.u.open), *er_tr(&lhs_er),
                      &a->u.local_field_access.lhs->info.concrete_type,
                      &a->u.local_field_access.fieldname,
                      ast_expr_type(a), er);
@@ -3445,7 +3462,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     apply_dereference(cs, f, h, lhs_loc, full_size, &deref_er, ptr_target);
 
     /* (We pass deref_er.tr but we know it's temp_none().) */
-    apply_field_access(cs, f, h, ero_loc(&deref_er.u.open), deref_er.tr, ptr_target,
+    apply_field_access(cs, f, h, ero_loc(&deref_er.u.open), *er_tr(&deref_er), ptr_target,
                        &a->u.deref_field_access.fieldname,
                        ast_expr_type(a), er);
     return 1;
@@ -3486,7 +3503,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     if (!gen_expr(cs, f, h, s->u.expr, &er)) {
       return 0;
     }
-    gen_destroy_temp(cs, f, h, er.tr);
+    gen_destroy_temp(cs, f, h, *er_tr(&er));
     frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_RETURN_EXPR: {
@@ -3633,7 +3650,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       if (!gen_expr(cs, f, h, fs->increment, &er)) {
         return 0;
       }
-      gen_destroy_temp(cs, f, h, er.tr);
+      gen_destroy_temp(cs, f, h, *er_tr(&er));
       frame_restore_offset(h, saved_offset);
     }
 
