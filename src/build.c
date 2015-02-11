@@ -3414,7 +3414,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_TYPED:
-    return gen_expr(cs, f, h, a->u.typed_expr.lhs, er);
+    return gen_expr(cs, f, h, a->u.typed_expr.expr, er);
   default:
     UNREACHABLE();
   }

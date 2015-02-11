@@ -3258,7 +3258,7 @@ int check_expr(struct exprscope *es,
     replace_generics(es, &x->u.typed_expr.type, &replaced_type);
 
     struct ast_expr annotated_lhs;
-    if (!check_expr(es, x->u.typed_expr.lhs, &replaced_type,
+    if (!check_expr(es, x->u.typed_expr.expr, &replaced_type,
                     &annotated_lhs)) {
       ast_typeexpr_destroy(&replaced_type);
       return 0;
@@ -3272,8 +3272,8 @@ int check_expr(struct exprscope *es,
                               &annotated_lhs.info));
     ast_typed_expr_init(&annotated_out->u.typed_expr,
                         ast_meta_make_copy(&x->u.typed_expr.meta),
-                        annotated_lhs,
-                        old_type_copy);
+                        old_type_copy,
+                        annotated_lhs);
     return 1;
   } break;
   default:
@@ -3926,7 +3926,7 @@ int eval_static_value(struct ast_expr *expr,
           "statically evaluable.\n");
   } break;
   case AST_EXPR_TYPED:
-    return eval_static_value(expr->u.typed_expr.lhs, out);
+    return eval_static_value(expr->u.typed_expr.expr, out);
   default:
     UNREACHABLE();
   }
@@ -4871,7 +4871,7 @@ int check_file_test_more_14(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def foo func[i32] = fn() i32 {\n"
-      "  return 2 + ~3u :: i32;\n"
+      "  return 2 + @[i32](~3u);\n"
       "};\n"
     } };
 
@@ -4955,8 +4955,8 @@ int check_file_test_more_19(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def[T] foo func[i32, T] = fn(x i32) T {\n"
-      "  // Why not test ':: T' works where T is generic.\n"
-      "  var y T = (~x :: T);\n"
+      "  // Why not test '@[T]' works where T is generic.\n"
+      "  var y T = @[T](~x);\n"
       "  return y;\n"
       "};\n"
       "def bar func[func[i32, i16], i32, i16] = fn(x func[i32, i16], y i32) i16 {\n"
@@ -4976,8 +4976,8 @@ int check_file_test_more_20(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def[T] foo func[i32, T] = fn(x i32) T {\n"
-      "  // Why not test ':: T' works where T is generic.\n"
-      "  var y T = (~x :: T);\n"
+      "  // Why not test '@[T]' works where T is generic.\n"
+      "  var y T = @[T]~x;\n"
       "  return y;\n"
       "};\n"
       "def bar func[func[i32, i16], i32, i16] = fn(x func[i32, i16], y i32) i16 {\n"

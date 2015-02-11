@@ -146,6 +146,8 @@ const int kSemicolonPrecedence = 205;
 semicolons. */
 const int kCommaPrecedence = 205;
 
+const int kConversionRightPrecedence = 905;
+
 const struct precedence_pair binop_precedences[] = {
   [AST_BINOP_ASSIGN] = { 306, 304 },
   [AST_BINOP_ADD] = { 504, 506 },
@@ -168,8 +170,6 @@ const struct precedence_pair binop_precedences[] = {
   [AST_BINOP_BIT_RIGHTSHIFT] = { 405, 405 },
   [AST_BINOP_LOGICAL_OR] = { 356, 354 },
   [AST_BINOP_LOGICAL_AND] = { 376, 374 },
-  /* Not really a binary operator at all, but is parsed like one. */
-  [AST_BINOP_TYPE_SPECIFIER] = { 805, 805 },
 };
 
 struct precedence_pair binop_precedence(enum ast_binop op) {
@@ -490,13 +490,6 @@ int parse_binop(struct ps *p, enum ast_binop *out,
     }
     op = AST_BINOP_BIT_AND;
     goto done;
-  case ':':
-    if (ps_peek(p) == ':') {
-      ps_step(p);
-      op = AST_BINOP_TYPE_SPECIFIER;
-      goto done;
-    }
-    return 0;
   default:
     return 0;
   }
@@ -1086,6 +1079,31 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     return parse_numeric_literal(p, &out->u.numeric_literal);
   }
 
+  if (try_skip_char(p, '@')) {
+    if (!try_skip_char(p, '[')) {
+      return 0;
+    }
+
+    struct ast_typeexpr type;
+    if (!(skip_ws(p) && parse_typeexpr(p, &type))) {
+      return 0;
+    }
+
+    struct ast_expr expr;
+    if (!(skip_ws(p) && try_skip_char(p, ']') && skip_ws(p)
+          && parse_expr(p, &expr, kConversionRightPrecedence))) {
+      ast_typeexpr_destroy(&type);
+      return 0;
+    }
+
+    ast_expr_partial_init(out, AST_EXPR_TYPED, ast_expr_info_default());
+    ast_typed_expr_init(&out->u.typed_expr,
+                        ast_meta_make(pos_start, ast_expr_pos_end(&expr)),
+                        type,
+                        expr);
+    return 1;
+  }
+
   if (is_ident_firstchar(ps_peek(p))) {
     ast_expr_partial_init(out, AST_EXPR_NAME, ast_expr_info_default());
     struct ast_ident ident;
@@ -1128,9 +1146,8 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
   struct ast_ident unop_name;
   enum ast_unop unop;
   if (try_parse_unop(p, &unop, &unop_name)) {
-    skip_ws(p);
     struct ast_expr rhs;
-    if (!parse_expr(p, &rhs, unop_right_precedence(unop))) {
+    if (!(skip_ws(p) && parse_expr(p, &rhs, unop_right_precedence(unop)))) {
       ast_ident_destroy(&unop_name);
       return 0;
     }
@@ -1238,34 +1255,16 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
         UNREACHABLE();
       }
 
-      if (op == AST_BINOP_TYPE_SPECIFIER) {
+      struct ast_expr rhs;
+      if (!(skip_ws(p)
+            && parse_expr(p, &rhs, op_precedence.right_precedence))) {
         ast_ident_destroy(&op_name);
-
-        struct ast_typeexpr rhs;
-        if (!(skip_ws(p)
-              && parse_typeexpr(p, &rhs))) {
-          goto fail;
-        }
-
-        struct ast_expr old_lhs = lhs;
-        ast_expr_partial_init(&lhs, AST_EXPR_TYPED,
-                              ast_expr_info_default());
-        ast_typed_expr_init(&lhs.u.typed_expr,
-                            ast_meta_make(pos_start, ps_pos(p)),
-                            old_lhs,
-                            rhs);
-      } else {
-        struct ast_expr rhs;
-        if (!(skip_ws(p)
-              && parse_expr(p, &rhs, op_precedence.right_precedence))) {
-          ast_ident_destroy(&op_name);
-          goto fail;
-        }
-
-        struct ast_expr old_lhs = lhs;
-        build_binop_expr(ast_meta_make(pos_start, ast_expr_pos_end(&rhs)),
-                         op_name, op, old_lhs, rhs, &lhs);
+        goto fail;
       }
+
+      struct ast_expr old_lhs = lhs;
+      build_binop_expr(ast_meta_make(pos_start, ast_expr_pos_end(&rhs)),
+                       op_name, op, old_lhs, rhs, &lhs);
     } else {
       PARSE_DBG("parse_expr done\n");
       *out = lhs;

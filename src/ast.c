@@ -708,26 +708,26 @@ void ast_index_expr_destroy(struct ast_index_expr *a) {
 
 void ast_typed_expr_init(struct ast_typed_expr *a,
                          struct ast_meta meta,
-                         struct ast_expr lhs,
-                         struct ast_typeexpr type) {
+                         struct ast_typeexpr type,
+                         struct ast_expr expr) {
   a->meta = meta;
-  ast_expr_alloc_move(lhs, &a->lhs);
   a->type = type;
+  ast_expr_alloc_move(expr, &a->expr);
 }
 
 void ast_typed_expr_init_copy(struct ast_typed_expr *a,
                               struct ast_typed_expr *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  ast_expr_alloc_init_copy(c->lhs, &a->lhs);
   ast_typeexpr_init_copy(&a->type, &c->type);
+  ast_expr_alloc_init_copy(c->expr, &a->expr);
 }
 
 void ast_typed_expr_destroy(struct ast_typed_expr *a) {
   ast_meta_destroy(&a->meta);
-  ast_expr_destroy(a->lhs);
-  free(a->lhs);
-  a->lhs = NULL;
   ast_typeexpr_destroy(&a->type);
+  ast_expr_destroy(a->expr);
+  free(a->expr);
+  a->expr = NULL;
 }
 
 

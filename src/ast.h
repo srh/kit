@@ -346,8 +346,6 @@ enum ast_binop {
   AST_BINOP_BIT_RIGHTSHIFT,
   AST_BINOP_LOGICAL_OR,
   AST_BINOP_LOGICAL_AND,
-  /* This is just seen during parsing. */
-  AST_BINOP_TYPE_SPECIFIER,
 };
 
 int is_magic_binop(enum ast_binop binop);
@@ -438,14 +436,14 @@ void ast_index_expr_destroy(struct ast_index_expr *a);
 
 struct ast_typed_expr {
   struct ast_meta meta;
-  struct ast_expr *lhs;
   struct ast_typeexpr type;
+  struct ast_expr *expr;
 };
 
 void ast_typed_expr_init(struct ast_typed_expr *a,
                          struct ast_meta meta,
-                         struct ast_expr lhs,
-                         struct ast_typeexpr type);
+                         struct ast_typeexpr type,
+                         struct ast_expr expr);
 
 void ast_typed_expr_init_copy(struct ast_typed_expr *a,
                               struct ast_typed_expr *c);
