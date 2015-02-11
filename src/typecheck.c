@@ -1115,7 +1115,7 @@ int finish_checking_name_traits(struct checkstate *cs,
   }
 
   if (lookup_move) {
-    rhs_traits.movable = explicit_move ? TRAIT_HAD : TRAIT_LACKED;
+    rhs_traits.movable = explicit_move ? TYPEEXPR_TRAIT_HAD : TYPEEXPR_TRAIT_LACKED;
   } else {
     if (explicit_move) {
       METERR(*deftype_meta, "Type has both implicit and explicit move.%s", "\n");
@@ -1124,7 +1124,7 @@ int finish_checking_name_traits(struct checkstate *cs,
   }
 
   if (lookup_copy) {
-    rhs_traits.copyable = explicit_copy ? TRAIT_HAD : TRAIT_LACKED;
+    rhs_traits.copyable = explicit_copy ? TYPEEXPR_TRAIT_HAD : TYPEEXPR_TRAIT_LACKED;
     if (!explicit_destroy) {
       METERR(*deftype_meta, "Type lacks explicit destructor.%s", "\n");
       return 0;
@@ -1141,7 +1141,7 @@ int finish_checking_name_traits(struct checkstate *cs,
   }
 
   if (lookup_init) {
-    rhs_traits.inittible = explicit_init ? TRAIT_HAD : TRAIT_LACKED;
+    rhs_traits.inittible = explicit_init ? TYPEEXPR_TRAIT_HAD : TYPEEXPR_TRAIT_LACKED;
   } else {
     if (explicit_init) {
       METERR(*deftype_meta, "Type has both implicit and explicit init.%s", "\n");
@@ -1173,9 +1173,9 @@ int check_typeexpr_name_traits(struct checkstate *cs,
   }
 
   if (ent->is_primitive) {
-    out->movable = TRAIT_TRIVIALLY_HAD;
-    out->copyable = TRAIT_TRIVIALLY_HAD;
-    out->inittible = TRAIT_TRIVIALLY_HAD;
+    out->movable = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
+    out->copyable = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
+    out->inittible = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
     insts_out->move_inst = NULL;
     insts_out->copy_inst = NULL;
     insts_out->destroy_inst = NULL;
@@ -1215,9 +1215,9 @@ int check_typeexpr_app_traits(struct checkstate *cs,
   }
 
   if (ent->is_primitive) {
-    out->movable = TRAIT_TRIVIALLY_HAD;
-    out->copyable = TRAIT_TRIVIALLY_HAD;
-    out->inittible = TRAIT_TRIVIALLY_HAD;
+    out->movable = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
+    out->copyable = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
+    out->inittible = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
     insts_out->move_inst = NULL;
     insts_out->copy_inst = NULL;
     insts_out->destroy_inst = NULL;
@@ -1260,9 +1260,9 @@ int check_typeexpr_structe_traits(struct checkstate *cs,
                                   struct exprscope *also_typecheck,
                                   struct typeexpr_traits *out) {
   struct typeexpr_traits combined;
-  combined.movable = TRAIT_TRIVIALLY_HAD;
-  combined.copyable = TRAIT_TRIVIALLY_HAD;
-  combined.inittible = TRAIT_TRIVIALLY_HAD;
+  combined.movable = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
+  combined.copyable = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
+  combined.inittible = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
   for (size_t i = 0, e = a->u.structe.fields_count; i < e; i++) {
     struct typeexpr_traits traits;
     if (!check_typeexpr_traits(cs, &a->u.structe.fields[i].type, also_typecheck, &traits)) {
@@ -1292,27 +1292,27 @@ int check_typeexpr_unione_traits(struct checkstate *cs,
       return 0;
     }
 
-    if (traits.movable != TRAIT_TRIVIALLY_HAD) {
+    if (traits.movable != TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
       METERR(a->u.unione.meta, "Union field %.*s is not trivially movable.\n",
              IM_P(cs->im, a->u.unione.fields[i].name.value));
       return 0;
     }
 
-    if (traits.copyable != TRAIT_TRIVIALLY_HAD) {
+    if (traits.copyable != TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
       METERR(a->u.unione.meta, "Union field %.*s is not trivially copyable.\n",
              IM_P(cs->im, a->u.unione.fields[i].name.value));
       return 0;
     }
 
-    if (traits.inittible != TRAIT_TRIVIALLY_HAD) {
+    if (traits.inittible != TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
       METERR(a->u.unione.meta, "Unien field %.*s is not trivially initializable.\n",
              IM_P(cs->im, a->u.unione.fields[i].name.value));
     }
   }
 
-  out->movable = TRAIT_TRIVIALLY_HAD;
-  out->copyable = TRAIT_TRIVIALLY_HAD;
-  out->inittible = TRAIT_TRIVIALLY_HAD;
+  out->movable = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
+  out->copyable = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
+  out->inittible = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
   return 1;
 }
 

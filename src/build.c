@@ -535,7 +535,7 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
     CHECK(success);
     /* WINDOWS: This ain't C++, and this ain't consistent with the
     Windows calling convention regarding non-pod (for C++03) types. */
-    return traits.movable != TRAIT_TRIVIALLY_HAD;
+    return traits.movable != TYPEEXPR_TRAIT_TRIVIALLY_HAD;
   }
 }
 
@@ -1265,7 +1265,7 @@ int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct fr
                              struct typeexpr_trait_instantiations *insts) {
   switch (tf) {
   case TYPETRAV_FUNC_DESTROY: {
-    if (traits->copyable == TRAIT_TRIVIALLY_HAD) {
+    if (traits->copyable == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
       /* Destroying a trivial type: Do nothing. */
       return 1;
     }
@@ -1281,8 +1281,8 @@ int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct fr
   } break;
   case TYPETRAV_FUNC_COPY: {
     /* TODO: This check can trigger. */
-    CHECK(traits->copyable != TRAIT_LACKED);
-    if (traits->copyable == TRAIT_TRIVIALLY_HAD) {
+    CHECK(traits->copyable != TYPEEXPR_TRAIT_LACKED);
+    if (traits->copyable == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
       /* Copying a trivial type:  Copy it.. trivially. */
       gen_mov(f, dest, src);
       return 1;
@@ -1297,11 +1297,11 @@ int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct fr
     return 1;
   } break;
   case TYPETRAV_FUNC_MOVE_OR_COPYDESTROY: {
-    if (traits->movable == TRAIT_LACKED) {
-      CHECK(traits->copyable != TRAIT_LACKED);
+    if (traits->movable == TYPEEXPR_TRAIT_LACKED) {
+      CHECK(traits->copyable != TYPEEXPR_TRAIT_LACKED);
       /* Something shouldn't be trivially copyable but not trivially
       movable. */
-      CHECK(traits->copyable != TRAIT_TRIVIALLY_HAD);
+      CHECK(traits->copyable != TYPEEXPR_TRAIT_TRIVIALLY_HAD);
       CHECK((insts->copy_inst == NULL) == (insts->destroy_inst == NULL));
 
       if (!(insts->copy_inst && insts->destroy_inst)) {
@@ -1315,7 +1315,7 @@ int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct fr
       return 1;
     }
 
-    if (traits->movable == TRAIT_TRIVIALLY_HAD) {
+    if (traits->movable == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
       /* Moving a trivial type:  Move it.. trivially. */
       gen_mov(f, dest, src);
       return 1;
@@ -1330,8 +1330,8 @@ int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct fr
     return 1;
   } break;
   case TYPETRAV_FUNC_DEFAULT_CONSTRUCT: {
-    CHECK(traits->inittible != TRAIT_LACKED);
-    if (traits->inittible == TRAIT_TRIVIALLY_HAD) {
+    CHECK(traits->inittible != TYPEEXPR_TRAIT_LACKED);
+    if (traits->inittible == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
       /* We don't need to zero the variable but it's... polite? */
       gen_bzero(f, dest);
       return 1;
@@ -3042,7 +3042,7 @@ void gen_assignment(struct checkstate *cs, struct objfile *f,
 
   /* With something trivially copyable we don't have to worry about
   self-assignment or destroying the lhs. */
-  if (traits.copyable == TRAIT_TRIVIALLY_HAD) {
+  if (traits.copyable == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
     gen_mov(f, lhs_loc, rhs_loc);
     if (rhs_tr.exists) {
       gen_destroy(cs, f, h, rhs_tr.loc, rhs_tr.temporary_type);

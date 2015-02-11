@@ -57,7 +57,6 @@ int read_module_file(const uint8_t *module_name,
                      uint8_t **data_out,
                      size_t *data_size_out);
 
-/* TODO: Move these functions elsewhere. */
 int unify_directionally(struct ast_typeexpr *partial_type,
                         struct ast_typeexpr *complete_type);
 int generics_lookup_name(struct ast_generics *a,
@@ -88,11 +87,10 @@ int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
 int numeric_literal_to_i32(int8_t *digits, size_t digits_count,
                            int32_t *out);
 
-/* TODO: Rename enum values to TYPEEXPR_TRAIT_... */
 enum typeexpr_trait {
-  TRAIT_LACKED,
-  TRAIT_HAD,
-  TRAIT_TRIVIALLY_HAD,
+  TYPEEXPR_TRAIT_LACKED,
+  TYPEEXPR_TRAIT_HAD,
+  TYPEEXPR_TRAIT_TRIVIALLY_HAD,
 };
 
 struct typeexpr_traits {
