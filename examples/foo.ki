@@ -79,20 +79,20 @@ def au8 func[*string, i32, void] = fn(p *string, x i32) void {
 
 def try_string func[void] = fn() void {
   var x string;
-  au8(&x, 72);
-  au8(&x, 101);
-  au8(&x, 108);
-  au8(&x, 108);
-  au8(&x, 111);
-  au8(&x, 44);
-  au8(&x, 32);
-  au8(&x, 119);
-  au8(&x, 111);
-  au8(&x, 114);
-  au8(&x, 108);
-  au8(&x, 100);
-  au8(&x, 33);
-  au8(&x, 10);
+  au8(&x, 'H');
+  au8(&x, 'e');
+  au8(&x, 'l');
+  au8(&x, 'l');
+  au8(&x, 'o');
+  au8(&x, ',');
+  au8(&x, ' ');
+  au8(&x, 'w');
+  au8(&x, 'o');
+  au8(&x, 'r');
+  au8(&x, 'l');
+  au8(&x, 'd');
+  au8(&x, '!');
+  au8(&x, '\n');
   print(&x);
   var ret void;
   return ret;

@@ -241,8 +241,10 @@ enum immediate_tag {
   IMMEDIATE_PRIMITIVE_OP,
   IMMEDIATE_U32,
   IMMEDIATE_I32,
+  IMMEDIATE_U8,
 };
 
+/* TODO: Ugh primitive_op shouldn't be part of this. */
 struct immediate {
   enum immediate_tag tag;
   union {
@@ -250,8 +252,25 @@ struct immediate {
     enum primitive_op primitive_op;
     uint32_t u32;
     int32_t i32;
+    uint8_t u8;
   } u;
 };
+
+uint32_t immediate_size(struct immediate imm) {
+  switch (imm.tag) {
+  case IMMEDIATE_FUNC:
+    return DWORD_SIZE;
+  case IMMEDIATE_PRIMITIVE_OP:
+    CRASH("immediate_size on primitive op.");
+  case IMMEDIATE_U32:
+  case IMMEDIATE_I32:
+    return DWORD_SIZE;
+  case IMMEDIATE_U8:
+    return 1;
+  default:
+    UNREACHABLE();
+  }
+}
 
 enum loc_tag {
   LOC_EBP_OFFSET,
@@ -1176,7 +1195,7 @@ void x86_gen_load8(struct objfile *f, enum x86_reg8 dest, enum x86_reg src_addr,
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
-void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, uint32_t dest_disp,
+void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
                      enum x86_reg src) {
   uint8_t b[10];
   b[0] = 0x89;
@@ -1185,7 +1204,7 @@ void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, uint32_t dest_di
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
-void x86_gen_store16(struct objfile *f, enum x86_reg dest_addr, uint32_t dest_disp,
+void x86_gen_store16(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
                      enum x86_reg16 src) {
   uint8_t b[11];
   b[0] = 0x66;
@@ -1195,7 +1214,7 @@ void x86_gen_store16(struct objfile *f, enum x86_reg dest_addr, uint32_t dest_di
   objfile_section_append_raw(objfile_text(f), b, count + 2);
 }
 
-void x86_gen_store8(struct objfile *f, enum x86_reg dest_addr, uint32_t dest_disp,
+void x86_gen_store8(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
                     enum x86_reg src) {
   CHECK(x86_reg_has_lowbyte(src));
   uint8_t b[10];
@@ -1744,16 +1763,31 @@ void gen_store_biregister(struct objfile *f, struct loc dest, enum x86_reg lo, e
   }
 }
 
+void gen_mov_mem_imm(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
+                     struct immediate src) {
+  switch (immediate_size(src)) {
+  case DWORD_SIZE:
+    x86_gen_mov_mem_imm32(f, dest_addr, dest_disp, src);
+    break;
+  case 1:
+    CHECK(src.tag == IMMEDIATE_U8);
+    x86_gen_mov_mem_imm8(f, dest_addr, dest_disp, (int8_t)src.u.u8);
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src) {
-  CHECK(dest.size == DWORD_SIZE);
+  CHECK(dest.size == immediate_size(src));
 
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
-    x86_gen_mov_mem_imm32(f, X86_EBP, dest.u.ebp_offset, src);
+    gen_mov_mem_imm(f, X86_EBP, dest.u.ebp_offset, src);
     break;
   case LOC_EBP_INDIRECT:
     x86_gen_load32(f, X86_EAX, X86_EBP, dest.u.ebp_indirect);
-    x86_gen_mov_mem_imm32(f, X86_EAX, 0, src);
+    gen_mov_mem_imm(f, X86_EAX, 0, src);
     break;
   case LOC_GLOBAL:
     CRASH("Global mutation should be impossible.");
@@ -3277,8 +3311,7 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
     er_set_tr(er, temp_exists_trivial(erd_loc(&er->u.demand), 1));
   } break;
   case EXPR_RETURN_OPEN: {
-    /* All immediates (right now) are DWORD-sized. */
-    struct loc floc = frame_push_loc(h, DWORD_SIZE);
+    struct loc floc = frame_push_loc(h, immediate_size(imm));
     gen_mov_immediate(f, floc, imm);
     ero_set_loc(&er->u.open, floc);
     /* TODO: tr crap like this is bad -- it's a temporary, it should
@@ -3479,8 +3512,15 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     }
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL: {
+  case AST_EXPR_NUMERIC_LITERAL_: {
     return gen_immediate_numeric_literal(f, h, &a->u.numeric_literal, er);
+  } break;
+  case AST_EXPR_CHAR_LITERAL: {
+    struct immediate imm;
+    imm.tag = IMMEDIATE_U8;
+    imm.u.u8 = a->u.char_literal.value;
+    expr_return_immediate(f, h, er, imm);
+    return 1;
   } break;
   case AST_EXPR_FUNCALL: {
     return gen_funcall_expr(cs, f, h, a, er);

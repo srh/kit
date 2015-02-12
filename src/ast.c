@@ -66,6 +66,23 @@ void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
   a->numeric_type = (enum ast_numeric_type)-1;
 }
 
+void ast_char_literal_init(struct ast_char_literal *a,
+                           struct ast_meta meta, uint8_t value) {
+  a->meta = meta;
+  a->value = value;
+}
+
+void ast_char_literal_init_copy(struct ast_char_literal *a,
+                                struct ast_char_literal *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  a->value = c->value;
+}
+
+void ast_char_literal_destroy(struct ast_char_literal *a) {
+  ast_meta_destroy(&a->meta);
+  a->value = 0;
+}
+
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
                       struct ast_expr func,
                       struct ast_exprcall *args, size_t args_count) {
@@ -847,7 +864,8 @@ void ast_expr_info_destroy(struct ast_expr_info *m) {
 struct ast_meta *ast_expr_ast_meta(struct ast_expr *a) {
   switch (a->tag) {
   case AST_EXPR_NAME: return &a->u.name.meta;
-  case AST_EXPR_NUMERIC_LITERAL: return &a->u.numeric_literal.meta;
+  case AST_EXPR_NUMERIC_LITERAL_: return &a->u.numeric_literal.meta;
+  case AST_EXPR_CHAR_LITERAL: return &a->u.char_literal.meta;
   case AST_EXPR_FUNCALL: return &a->u.funcall.meta;
   case AST_EXPR_INDEX: return &a->u.index_expr.meta;
   case AST_EXPR_UNOP: return &a->u.unop_expr.meta;
@@ -878,9 +896,13 @@ void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c) {
   case AST_EXPR_NAME:
     ast_name_expr_init_copy(&a->u.name, &c->u.name);
     break;
-  case AST_EXPR_NUMERIC_LITERAL:
+  case AST_EXPR_NUMERIC_LITERAL_:
     ast_numeric_literal_init_copy(&a->u.numeric_literal,
                                   &c->u.numeric_literal);
+    break;
+  case AST_EXPR_CHAR_LITERAL:
+    ast_char_literal_init_copy(&a->u.char_literal,
+                               &c->u.char_literal);
     break;
   case AST_EXPR_FUNCALL:
     ast_funcall_init_copy(&a->u.funcall, &c->u.funcall);
@@ -918,8 +940,11 @@ void ast_expr_destroy(struct ast_expr *a) {
   case AST_EXPR_NAME:
     ast_name_expr_destroy(&a->u.name);
     break;
-  case AST_EXPR_NUMERIC_LITERAL:
+  case AST_EXPR_NUMERIC_LITERAL_:
     ast_numeric_literal_destroy(&a->u.numeric_literal);
+    break;
+  case AST_EXPR_CHAR_LITERAL:
+    ast_char_literal_destroy(&a->u.char_literal);
     break;
   case AST_EXPR_FUNCALL:
     ast_funcall_destroy(&a->u.funcall);

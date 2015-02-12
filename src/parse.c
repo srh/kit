@@ -253,6 +253,23 @@ int is_decimal_digit(int32_t ch, int8_t *digit_value_out) {
   }
 }
 
+int is_hex_digit(int32_t ch, int8_t *digit_value_out) {
+  STATIC_CHECK('F' == 'A' + 5);
+  STATIC_CHECK('f' == 'a' + 5);
+  if (is_decimal_digit(ch, digit_value_out)) {
+    return 1;
+  }
+  if ('a' <= ch && ch <= 'f') {
+    *digit_value_out = (int8_t)((ch - 'a') + 10);
+    return 1;
+  } else if ('A' <= ch && ch <= 'F') {
+    *digit_value_out = (int8_t)((ch - 'A') + 10);
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
 int is_ident_firstchar(int32_t ch) {
   return is_alpha(ch) || ch == '_';
 }
@@ -1066,19 +1083,112 @@ void build_binop_expr(struct ast_meta meta,
   }
 }
 
+int parse_string_char(struct ps *p, uint8_t *out) {
+  int32_t ch = ps_peek(p);
+
+  STATIC_CHECK(' ' == 32 && '~' == 126);
+  if (ch < ' ' || ch > '~') {
+    return 0;
+  }
+
+  ps_step(p);
+  if (ch != '\\') {
+    *out = (uint8_t)ch;
+    ps_count_leaf(p);
+    return 1;
+  }
+
+  int32_t dh = ps_peek(p);
+  switch (dh) {
+  case 'n':
+    ps_step(p);
+    *out = '\n';
+    break;
+  case 't':
+    ps_step(p);
+    *out = '\t';
+    break;
+  case '\'':
+    ps_step(p);
+    *out = '\'';
+    break;
+  case '\"':
+    ps_step(p);
+    *out = '\"';
+    break;
+  case '\\':
+    ps_step(p);
+    *out = '\\';
+    break;
+  case 'r':
+    ps_step(p);
+    *out = '\r';
+    break;
+  case '0':
+    ps_step(p);
+    *out = 0;
+    break;
+  case 'x': {
+    ps_step(p);
+    int8_t v1;
+    if (!is_hex_digit(ps_peek(p), &v1)) {
+      return 0;
+    }
+    ps_step(p);
+    int8_t v2;
+    if (!is_hex_digit(ps_peek(p), &v2)) {
+      return 0;
+    }
+    ps_step(p);
+
+    uint8_t combined = (16 * (uint8_t)v1) + (uint8_t)v2;;
+    *out = combined;
+  } break;
+  default:
+    return 0;
+  }
+  ps_count_leaf(p);
+  return 1;
+}
+
+int parse_rest_of_char_literal(struct ps *p, struct pos pos_start,
+                               struct ast_char_literal *out) {
+  if (ps_peek(p) == '\'') {
+    return 0;
+  }
+
+  uint8_t value;
+  if (!parse_string_char(p, &value)) {
+    return 0;
+  }
+
+  if (!try_skip_char(p, '\'')) {
+    return 0;
+  }
+
+  ast_char_literal_init(out, ast_meta_make(pos_start, ps_pos(p)), value);
+  return 1;
+}
+
 int parse_rest_of_type_param_list(struct ps *p, struct ast_typeexpr **params_out,
                                   size_t *params_count_out);
 
 int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
+  /* TODO: Parse char literals. */
   struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "fn")) {
     ast_expr_partial_init(out, AST_EXPR_LAMBDA, ast_expr_info_default());
     return parse_rest_of_lambda(p, pos_start, &out->u.lambda);
   }
 
+  if (try_skip_char(p, '\'')) {
+    ast_expr_partial_init(out, AST_EXPR_CHAR_LITERAL, ast_expr_info_default());
+    return parse_rest_of_char_literal(p, pos_start, &out->u.char_literal);
+  }
+
   int8_t digit_value_discard;
   if (is_decimal_digit(ps_peek(p), &digit_value_discard)) {
-    ast_expr_partial_init(out, AST_EXPR_NUMERIC_LITERAL, ast_expr_info_default());
+    ast_expr_partial_init(out, AST_EXPR_NUMERIC_LITERAL_, ast_expr_info_default());
     return parse_numeric_literal(p, &out->u.numeric_literal);
   }
 
@@ -2017,6 +2127,15 @@ int parse_test_defs(void) {
   pass &= run_count_test("def20",
                          "def foo bar = baz@[a, b](1, 2, 3);\n",
                          19);
+  pass &= run_count_test("def21",
+                         "def foo u8 = 'a';\n",
+                         8);
+  pass &= run_count_test("def22",
+                         "def foo u8 = '\\n';\n",
+                         8);
+  pass &= run_count_test("def23",
+                         "def foo u8 = '\\x2A';\n",
+                         8);
   return pass;
 }
 

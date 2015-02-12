@@ -3240,7 +3240,7 @@ int check_expr(struct exprscope *es,
     ast_name_expr_info_mark_inst(&annotated_out->u.name.info, inst_or_null);
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL: {
+  case AST_EXPR_NUMERIC_LITERAL_: {
     struct ast_typeexpr num_type;
     numeric_literal_type(es->cs->im, &x->u.numeric_literal, &num_type);
     if (!unify_directionally(partial_type, &num_type)) {
@@ -3248,10 +3248,24 @@ int check_expr(struct exprscope *es,
       ast_typeexpr_destroy(&num_type);
       return 0;
     }
-    ast_expr_partial_init(annotated_out, AST_EXPR_NUMERIC_LITERAL,
+    ast_expr_partial_init(annotated_out, AST_EXPR_NUMERIC_LITERAL_,
                           ast_expr_info_typechecked_no_temporary(0, num_type));
     ast_numeric_literal_init_copy(&annotated_out->u.numeric_literal,
                                   &x->u.numeric_literal);
+    return 1;
+  } break;
+  case AST_EXPR_CHAR_LITERAL: {
+    struct ast_typeexpr num_type;
+    init_name_type(&num_type, identmap_intern_c_str(es->cs->im, CHAR_STANDIN_TYPE_NAME));
+    if (!unify_directionally(partial_type, &num_type)) {
+      METERR(x->u.char_literal.meta, "Character literal in bad place.%s", "\n");
+      ast_typeexpr_destroy(&num_type);
+      return 0;
+    }
+    ast_expr_partial_init(annotated_out, AST_EXPR_CHAR_LITERAL,
+                          ast_expr_info_typechecked_no_temporary(0, num_type));
+    ast_char_literal_init_copy(&annotated_out->u.char_literal,
+                               &x->u.char_literal);
     return 1;
   } break;
   case AST_EXPR_FUNCALL: {
@@ -3955,8 +3969,11 @@ int eval_static_value(struct ast_expr *expr,
     static_value_init_copy(out, &inst_or_null->value);
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL:
+  case AST_EXPR_NUMERIC_LITERAL_:
     return eval_static_numeric_literal(&expr->u.numeric_literal, out);
+  case AST_EXPR_CHAR_LITERAL:
+    static_value_init_u8(out, expr->u.char_literal.value);
+    return 1;
   case AST_EXPR_FUNCALL:
     return eval_static_funcall(&expr->u.funcall, out);
   case AST_EXPR_INDEX: {
@@ -5440,6 +5457,29 @@ int check_file_test_more_41(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_42(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def x u8 = '\\x12';\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_43(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because the character literal is of the wrong type. */
+  struct test_module a[] = { {
+      "foo",
+      "def x i8 = '\\x12';\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -5948,6 +5988,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_41...\n");
   if (!!test_check_module(&im, &check_file_test_more_41, foo)) {
     DBG("check_file_test_more_41 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_42...\n");
+  if (!test_check_module(&im, &check_file_test_more_42, foo)) {
+    DBG("check_file_test_more_42 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_43...\n");
+  if (!!test_check_module(&im, &check_file_test_more_43, foo)) {
+    DBG("check_file_test_more_43 fails\n");
     goto cleanup_identmap;
   }
 
