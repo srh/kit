@@ -60,6 +60,18 @@ void ast_char_literal_init(struct ast_char_literal *a,
 void ast_char_literal_init_copy(struct ast_char_literal *a,
                                 struct ast_char_literal *c);
 
+struct ast_string_literal {
+  struct ast_meta meta;
+  uint8_t *values;
+  size_t values_count;
+};
+
+void ast_string_literal_init(struct ast_string_literal *a,
+                             struct ast_meta meta,
+                             uint8_t *values, size_t values_count);
+void ast_string_literal_init_copy(struct ast_string_literal *a,
+                                  struct ast_string_literal *c);
+
 struct ast_funcall {
   struct ast_meta meta;
   struct ast_expr *func;
@@ -478,8 +490,9 @@ void ast_typed_expr_init_copy(struct ast_typed_expr *a,
 
 enum ast_expr_tag {
   AST_EXPR_NAME,
-  AST_EXPR_NUMERIC_LITERAL_,
+  AST_EXPR_NUMERIC_LITERAL,
   AST_EXPR_CHAR_LITERAL,
+  AST_EXPR_STRING_LITERAL,
   AST_EXPR_FUNCALL,
   AST_EXPR_INDEX,
   AST_EXPR_UNOP,
@@ -538,6 +551,7 @@ struct ast_expr {
     struct ast_name_expr name;
     struct ast_numeric_literal numeric_literal;
     struct ast_char_literal char_literal;
+    struct ast_string_literal string_literal;
     struct ast_funcall funcall;
     struct ast_index_expr index_expr;
     struct ast_unop_expr unop_expr;

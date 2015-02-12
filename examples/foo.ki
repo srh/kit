@@ -72,27 +72,12 @@ def try_kla func[void] = fn() void {
   return ret;
 };
 
-def au8 func[*string, i32, void] = fn(p *string, x i32) void {
-  var y u8 = ~x;
-  return append(p, y);
+def au8 func[*string, u8, void] = fn(p *string, x u8) void {
+  return append(p, x);
 };
 
 def try_string func[void] = fn() void {
-  var x string;
-  au8(&x, 'H');
-  au8(&x, 'e');
-  au8(&x, 'l');
-  au8(&x, 'l');
-  au8(&x, 'o');
-  au8(&x, ',');
-  au8(&x, ' ');
-  au8(&x, 'w');
-  au8(&x, 'o');
-  au8(&x, 'r');
-  au8(&x, 'l');
-  au8(&x, 'd');
-  au8(&x, '!');
-  au8(&x, '\n');
+  var x string = lits("Hello, World!\n");
   print(&x);
   var ret void;
   return ret;

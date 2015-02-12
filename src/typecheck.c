@@ -3240,7 +3240,7 @@ int check_expr(struct exprscope *es,
     ast_name_expr_info_mark_inst(&annotated_out->u.name.info, inst_or_null);
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL_: {
+  case AST_EXPR_NUMERIC_LITERAL: {
     struct ast_typeexpr num_type;
     numeric_literal_type(es->cs->im, &x->u.numeric_literal, &num_type);
     if (!unify_directionally(partial_type, &num_type)) {
@@ -3248,24 +3248,49 @@ int check_expr(struct exprscope *es,
       ast_typeexpr_destroy(&num_type);
       return 0;
     }
-    ast_expr_partial_init(annotated_out, AST_EXPR_NUMERIC_LITERAL_,
+    ast_expr_partial_init(annotated_out, AST_EXPR_NUMERIC_LITERAL,
                           ast_expr_info_typechecked_no_temporary(0, num_type));
     ast_numeric_literal_init_copy(&annotated_out->u.numeric_literal,
                                   &x->u.numeric_literal);
     return 1;
   } break;
   case AST_EXPR_CHAR_LITERAL: {
-    struct ast_typeexpr num_type;
-    init_name_type(&num_type, identmap_intern_c_str(es->cs->im, CHAR_STANDIN_TYPE_NAME));
-    if (!unify_directionally(partial_type, &num_type)) {
+    struct ast_typeexpr char_type;
+    init_name_type(&char_type, identmap_intern_c_str(es->cs->im, CHAR_STANDIN_TYPE_NAME));
+    if (!unify_directionally(partial_type, &char_type)) {
       METERR(x->u.char_literal.meta, "Character literal in bad place.%s", "\n");
-      ast_typeexpr_destroy(&num_type);
+      ast_typeexpr_destroy(&char_type);
       return 0;
     }
     ast_expr_partial_init(annotated_out, AST_EXPR_CHAR_LITERAL,
-                          ast_expr_info_typechecked_no_temporary(0, num_type));
+                          ast_expr_info_typechecked_no_temporary(0, char_type));
     ast_char_literal_init_copy(&annotated_out->u.char_literal,
                                &x->u.char_literal);
+    return 1;
+  } break;
+  case AST_EXPR_STRING_LITERAL: {
+    if (es->computation == STATIC_COMPUTATION_YES) {
+      METERR(*ast_expr_ast_meta(x), "String literals disallowed in static computation.%s", "\n");
+      return 0;
+    }
+    uint32_t array_size = size_to_uint32(x->u.string_literal.values_count);
+    struct ast_typeexpr array_type;
+    {
+      struct ast_typeexpr char_type;
+      init_name_type(&char_type, identmap_intern_c_str(es->cs->im, CHAR_STANDIN_TYPE_NAME));
+      array_type.tag = AST_TYPEEXPR_ARRAY;
+      ast_arraytype_init(&array_type.u.arraytype, ast_meta_make_garbage(), array_size, char_type);
+    }
+    if (!unify_directionally(partial_type, &array_type)) {
+      METERR(x->u.string_literal.meta, "Character literal in bad place.%s", "\n");
+      ast_typeexpr_destroy(&array_type);
+      return 0;
+    }
+
+    ast_expr_partial_init(annotated_out, AST_EXPR_STRING_LITERAL,
+                          ast_expr_info_typechecked_no_temporary(0, array_type));
+    ast_string_literal_init_copy(&annotated_out->u.string_literal,
+                                 &x->u.string_literal);
     return 1;
   } break;
   case AST_EXPR_FUNCALL: {
@@ -3969,11 +3994,13 @@ int eval_static_value(struct ast_expr *expr,
     static_value_init_copy(out, &inst_or_null->value);
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL_:
+  case AST_EXPR_NUMERIC_LITERAL:
     return eval_static_numeric_literal(&expr->u.numeric_literal, out);
   case AST_EXPR_CHAR_LITERAL:
     static_value_init_u8(out, expr->u.char_literal.value);
     return 1;
+  case AST_EXPR_STRING_LITERAL:
+    CRASH("String literal static value evaluation is not supported.\n");
   case AST_EXPR_FUNCALL:
     return eval_static_funcall(&expr->u.funcall, out);
   case AST_EXPR_INDEX: {
@@ -5480,6 +5507,31 @@ int check_file_test_more_43(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_44(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because string literals not allowed in static evaluation. */
+  /* TODO: String literals should be allowed, this should pass. */
+  struct test_module a[] = { {
+      "foo",
+      "def x [5]u8 = \"pq\\x12rs\";\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_45(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because the array size is wrong. */
+  struct test_module a[] = { {
+      "foo",
+      "def x [6]u8 = \"pq\\x12rs\";\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -6000,6 +6052,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_43...\n");
   if (!!test_check_module(&im, &check_file_test_more_43, foo)) {
     DBG("check_file_test_more_43 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_44...\n");
+  if (!!test_check_module(&im, &check_file_test_more_44, foo)) {
+    DBG("check_file_test_more_44 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_45...\n");
+  if (!!test_check_module(&im, &check_file_test_more_45, foo)) {
+    DBG("check_file_test_more_45 fails\n");
     goto cleanup_identmap;
   }
 

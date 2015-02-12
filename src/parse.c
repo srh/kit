@@ -1170,6 +1170,28 @@ int parse_rest_of_char_literal(struct ps *p, struct pos pos_start,
   return 1;
 }
 
+
+int parse_rest_of_string_literal(struct ps *p, struct pos pos_start,
+                                 struct ast_string_literal *out) {
+  uint8_t *values = NULL;
+  size_t values_count = 0;
+  size_t values_limit = 0;
+
+  while (ps_peek(p) != '\"') {
+    uint8_t value;
+    if (!parse_string_char(p, &value)) {
+      return 0;
+    }
+    SLICE_PUSH(values, values_count, values_limit, value);
+  }
+
+  ps_step(p);
+  ast_string_literal_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                          values, values_count);
+  return 1;
+}
+
+
 int parse_rest_of_type_param_list(struct ps *p, struct ast_typeexpr **params_out,
                                   size_t *params_count_out);
 
@@ -1186,9 +1208,14 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     return parse_rest_of_char_literal(p, pos_start, &out->u.char_literal);
   }
 
+  if (try_skip_char(p, '\"')) {
+    ast_expr_partial_init(out, AST_EXPR_STRING_LITERAL, ast_expr_info_default());
+    return parse_rest_of_string_literal(p, pos_start, &out->u.string_literal);
+  }
+
   int8_t digit_value_discard;
   if (is_decimal_digit(ps_peek(p), &digit_value_discard)) {
-    ast_expr_partial_init(out, AST_EXPR_NUMERIC_LITERAL_, ast_expr_info_default());
+    ast_expr_partial_init(out, AST_EXPR_NUMERIC_LITERAL, ast_expr_info_default());
     return parse_numeric_literal(p, &out->u.numeric_literal);
   }
 
@@ -2136,6 +2163,9 @@ int parse_test_defs(void) {
   pass &= run_count_test("def23",
                          "def foo u8 = '\\x2A';\n",
                          8);
+  pass &= run_count_test("def24",
+                         "def foo [1]u8 = \"\\x2Abcdef\";\n",
+                         15);
   return pass;
 }
 

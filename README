@@ -48,7 +48,7 @@ Here's the project timeline:
    5n. Sizeof/alignof operator. (DONE)
    5q. Better void support, pointer arithmetic, proper treatment of zero-size entities.
    5r. Partial type syntax (var x = ...;  and  var x blah[_] = ...;  and  x :: foo[_])
-   5u. String literal and character literal syntax.
+   5u. String literal and character literal syntax. (DONE)
    5v. Structure / array initialization syntax.
    5w. Explicit template param syntax in exprs. (DONE)
    5x. defclass, explicit conversions, access blocks. (DONE)

@@ -166,6 +166,36 @@ int is_primitive_but_not_sizeof_alignof(struct def_entry *ent) {
     && ent->primitive_op != PRIMITIVE_OP_ALIGNOF;
 }
 
+/* TODO: Put string literals in rdata (add section number to loc_global). */
+uint32_t add_data_string(struct checkstate *cs, struct objfile *f,
+                         const void *data, uint32_t length) {
+  ident_value index = identmap_intern(&cs->sli_values, data, length);
+  CHECK(index <= cs->sli_symbol_table_indexes_count);
+  if (index == cs->sli_symbol_table_indexes_count) {
+    char name[] = "$string_literal";
+    void *gen_name;
+    size_t gen_name_count;
+    if (!generate_kira_name(cs, name, strlen(name),
+                            0, &gen_name, &gen_name_count)) {
+      return 0;
+    }
+
+    uint32_t symbol_table_index
+      = objfile_add_local_symbol(f, gen_name, gen_name_count,
+                                 objfile_section_size(objfile_data(f)),
+                                 SECTION_DATA,
+                                 IS_STATIC_YES);
+
+    objfile_section_append_raw(objfile_data(f), data, length);
+    SLICE_PUSH(cs->sli_symbol_table_indexes,
+               cs->sli_symbol_table_indexes_count,
+               cs->sli_symbol_table_indexes_limit,
+               symbol_table_index);
+  }
+
+  return cs->sli_symbol_table_indexes[index];
+}
+
 int add_def_symbols(struct checkstate *cs, struct objfile *f,
                     struct def_entry *ent) {
   /* TODO: I'd actually like to not define symbols for sizeof and
@@ -2034,7 +2064,6 @@ struct expr_return open_expr_return(void) {
 }
 
 struct expr_return demand_expr_return(struct loc loc) {
-  CHECK(loc.tag == LOC_EBP_OFFSET);
   struct expr_return ret;
   ret.tag = EXPR_RETURN_DEMANDED;
   ret.u.demand.loc_ = loc;
@@ -3493,6 +3522,18 @@ void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
   }
 }
 
+int gen_string_literal(struct checkstate *cs, struct objfile *f,
+                       struct frame *h, struct ast_expr *a,
+                       struct expr_return *er) {
+  uint32_t size = size_to_uint32(a->u.string_literal.values_count);
+  uint32_t symbol_table_index
+    = add_data_string(cs, f, a->u.string_literal.values, size);
+
+  struct loc loc = global_loc(size, size, symbol_table_index);
+  expr_return_set(cs, f, h, er, loc, ast_expr_type(a), temp_none());
+  return 1;
+}
+
 int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *er) {
@@ -3512,7 +3553,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     }
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL_: {
+  case AST_EXPR_NUMERIC_LITERAL: {
     return gen_immediate_numeric_literal(f, h, &a->u.numeric_literal, er);
   } break;
   case AST_EXPR_CHAR_LITERAL: {
@@ -3521,6 +3562,9 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     imm.u.u8 = a->u.char_literal.value;
     expr_return_immediate(f, h, er, imm);
     return 1;
+  } break;
+  case AST_EXPR_STRING_LITERAL: {
+    return gen_string_literal(cs, f, h, a, er);
   } break;
   case AST_EXPR_FUNCALL: {
     return gen_funcall_expr(cs, f, h, a, er);

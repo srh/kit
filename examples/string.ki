@@ -63,6 +63,9 @@ access string {
     p->size = c->size;
     p->cap = c->cap;
     p->buf = alloc_array@[u8](p->size);
+    for var i u32 = 0u; i < c->size; i = i + 1u {
+      p->buf[i] = c->buf[i];
+    }
     var ret void;
     return ret;
   };
@@ -104,6 +107,16 @@ access string {
 
   def size func[*string, u32] = fn(p *string) u32 {
     return p->size;
+  };
+
+  def[T] lits func[T, string] = fn(arr T) string {
+    var ret string;
+    // Such a ghetto hack.
+    var sz u32 = sizeof@[T];
+    for var i u32 = 0u; i < sz; i = i + 1u {
+      append(&ret, arr[i]);
+    }
+    return ret;
   };
 }
 

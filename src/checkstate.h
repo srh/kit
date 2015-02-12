@@ -26,6 +26,13 @@ struct checkstate {
   uint32_t kira_name_counter;
 
   struct name_table nt;
+
+  /* sli = string literal */
+  struct identmap sli_values;
+
+  uint32_t *sli_symbol_table_indexes;
+  size_t sli_symbol_table_indexes_count;
+  size_t sli_symbol_table_indexes_limit;
 };
 
 void checkstate_init(struct checkstate *cs, struct identmap *im);
