@@ -203,6 +203,7 @@ void static_value_init_typechecked_lambda(struct static_value *a,
 void static_value_init_primitive_op(struct static_value *a,
                                     enum primitive_op primitive_op);
 void static_value_init_copy(struct static_value *a, struct static_value *c);
+void static_value_init_move(struct static_value *a, struct static_value *m);
 void static_value_destroy(struct static_value *a);
 
 struct def_instantiation {
@@ -223,15 +224,22 @@ struct def_instantiation {
   struct ast_expr annotated_rhs_;
 
   int value_computed;
-  struct static_value value;
+  struct static_value value_;
 
-  int symbol_table_index_computed;
-  uint32_t symbol_table_index;
+  int symbol_table_index_computed_;
+  uint32_t symbol_table_index_;
 };
 
 struct ast_expr *di_annotated_rhs(struct def_instantiation *inst);
 void di_set_annotated_rhs(struct def_instantiation *inst,
                           struct ast_expr annotated_rhs);
+
+struct static_value *di_value(struct def_instantiation *inst);
+struct static_value *di_value_for_set(struct def_instantiation *inst);
+
+uint32_t di_symbol_table_index(struct def_instantiation *inst);
+void di_set_symbol_table_index(struct def_instantiation *inst,
+                               uint32_t symbol_table_index);
 
 struct defclass_ident {
   ident_value name;

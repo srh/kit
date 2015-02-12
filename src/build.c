@@ -227,9 +227,7 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
 
       CHECK(ent->instantiations_count == 1);
       struct def_instantiation *inst = ent->instantiations[0];
-      CHECK(!inst->symbol_table_index_computed);
-      inst->symbol_table_index_computed = 1;
-      inst->symbol_table_index = symbol_table_index;
+      di_set_symbol_table_index(inst, symbol_table_index);
     }
 
     return 1;
@@ -258,9 +256,7 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
                                  IS_STATIC_NO);
     free(gen_name);
 
-    CHECK(!inst->symbol_table_index_computed);
-    inst->symbol_table_index_computed = 1;
-    inst->symbol_table_index = symbol_table_index;
+    di_set_symbol_table_index(inst, symbol_table_index);
   }
 
   return 1;
@@ -2074,13 +2070,12 @@ struct expr_return demand_expr_return(struct loc loc) {
 void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                         struct def_instantiation *inst) {
   /* Dupes checks with gen_inst_value. */
-  CHECK(inst->symbol_table_index_computed);
   CHECK(inst->owner->is_extern || inst->owner->is_primitive || inst->typecheck_started);
   CHECK(typeexpr_is_func_type(cs->im, &inst->type));
 
   /* Dupes code with gen_call_imm. */
   gen_placeholder_stack_adjustment(f, h, 0);
-  x86_gen_call(f, inst->symbol_table_index);
+  x86_gen_call(f, di_symbol_table_index(inst));
   gen_placeholder_stack_adjustment(f, h, 1);
 }
 
@@ -3495,18 +3490,17 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
 
 void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
                     struct def_instantiation *inst, struct expr_return *er) {
-  if (inst->value_computed && inst->value.tag == STATIC_VALUE_PRIMITIVE_OP) {
+  if (inst->value_computed && di_value(inst)->tag == STATIC_VALUE_PRIMITIVE_OP) {
     struct immediate imm;
     imm.tag = IMMEDIATE_PRIMITIVE_OP;
-    imm.u.primitive_op = inst->value.u.primitive_op;
+    imm.u.primitive_op = di_value(inst)->u.primitive_op;
     expr_return_immediate(f, h, er, imm);
   } else {
-    CHECK(inst->symbol_table_index_computed);
     CHECK(inst->owner->is_extern || inst->owner->is_primitive || inst->typecheck_started);
     if (typeexpr_is_func_type(cs->im, &inst->type)) {
       struct immediate imm;
       imm.tag = IMMEDIATE_FUNC;
-      imm.u.func_sti = inst->symbol_table_index;
+      imm.u.func_sti = di_symbol_table_index(inst);
       expr_return_immediate(f, h, er, imm);
     } else {
       /* TODO: Support immediate values, distinction between defs
@@ -3516,7 +3510,7 @@ void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
       /* TODO: Maybe globals' alignment rules are softer. */
       uint32_t padded_size = size;
       struct loc loc = global_loc(size, padded_size,
-                                  inst->symbol_table_index);
+                                  di_symbol_table_index(inst));
       expr_return_set(cs, f, h, er, loc, &inst->type, temp_none());
     }
   }
@@ -3886,45 +3880,44 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
 
 int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_instantiation *inst) {
-  switch (inst->value.tag) {
+  struct static_value *value = di_value(inst);
+  switch (value->tag) {
   case STATIC_VALUE_I32: {
-    STATIC_CHECK(sizeof(inst->value.u.i32_value) == 4);
-    CHECK(inst->symbol_table_index_computed);
+    STATIC_CHECK(sizeof(value->u.i32_value) == 4);
     objfile_section_align_dword(objfile_data(f));
-    objfile_set_symbol_Value(f, inst->symbol_table_index,
+    objfile_set_symbol_Value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
     objfile_section_append_raw(objfile_data(f),
-                               &inst->value.u.i32_value,
-                               sizeof(inst->value.u.i32_value));
+                               &value->u.i32_value,
+                               sizeof(value->u.i32_value));
     return 1;
   } break;
   case STATIC_VALUE_U32: {
-    STATIC_CHECK(sizeof(inst->value.u.u32_value) == 4);
-    CHECK(inst->symbol_table_index_computed);
+    STATIC_CHECK(sizeof(value->u.u32_value) == 4);
     objfile_section_align_dword(objfile_data(f));
-    objfile_set_symbol_Value(f, inst->symbol_table_index,
+    objfile_set_symbol_Value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
     objfile_section_append_raw(objfile_data(f),
-                               &inst->value.u.u32_value,
-                               sizeof(inst->value.u.u32_value));
+                               &value->u.u32_value,
+                               sizeof(value->u.u32_value));
     return 1;
   } break;
   case STATIC_VALUE_U8: {
     /* TODO: How should we align our global bytes? */
     objfile_section_align_dword(objfile_data(f));
-    objfile_set_symbol_Value(f, inst->symbol_table_index,
+    objfile_set_symbol_Value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
     uint8_t bytes[4] = { 0 };
-    bytes[0] = inst->value.u.u8_value;
+    bytes[0] = value->u.u8_value;
     objfile_section_append_raw(objfile_data(f), bytes, 4);
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {
     objfile_fillercode_align_double_quadword(f);
-    objfile_set_symbol_Value(f, inst->symbol_table_index,
+    objfile_set_symbol_Value(f, di_symbol_table_index(inst),
                             objfile_section_size(objfile_text(f)));
 
-    gen_lambda_expr(cs, f, &inst->value.u.typechecked_lambda);
+    gen_lambda_expr(cs, f, &value->u.typechecked_lambda);
     return 1;
   } break;
   default:

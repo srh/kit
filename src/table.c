@@ -68,6 +68,29 @@ void static_value_init_copy(struct static_value *a, struct static_value *c) {
   }
 }
 
+void static_value_init_move(struct static_value *a, struct static_value *m) {
+  a->tag = m->tag;
+  switch (m->tag) {
+  case STATIC_VALUE_I32:
+    a->u.i32_value = m->u.i32_value;
+    break;
+  case STATIC_VALUE_U32:
+    a->u.u32_value = m->u.u32_value;
+    break;
+  case STATIC_VALUE_U8:
+    a->u.u8_value = m->u.u8_value;
+    break;
+  case STATIC_VALUE_LAMBDA:
+    a->u.typechecked_lambda = m->u.typechecked_lambda;
+    break;
+  case STATIC_VALUE_PRIMITIVE_OP:
+    a->u.primitive_op = m->u.primitive_op;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void static_value_destroy(struct static_value *sv) {
   switch (sv->tag) {
   case STATIC_VALUE_I32:  /* fallthrough */
@@ -97,7 +120,7 @@ void def_instantiation_init(struct def_instantiation *a,
   ast_typeexpr_init_copy(&a->type, concrete_type);
   a->annotated_rhs_computed = 0;
   a->value_computed = 0;
-  a->symbol_table_index_computed = 0;
+  a->symbol_table_index_computed_ = 0;
   *substitutions = NULL;
   *substitutions_count = 0;
 }
@@ -112,7 +135,7 @@ void def_instantiation_destroy(struct def_instantiation *a) {
     a->annotated_rhs_computed = 0;
   }
   if (a->value_computed) {
-    static_value_destroy(&a->value);
+    static_value_destroy(&a->value_);
     a->value_computed = 0;
   }
 }
@@ -132,6 +155,25 @@ void di_set_annotated_rhs(struct def_instantiation *inst,
   CHECK(!inst->annotated_rhs_computed);
   inst->annotated_rhs_computed = 1;
   inst->annotated_rhs_ = annotated_rhs;
+}
+struct static_value *di_value(struct def_instantiation *inst) {
+  CHECK(inst->value_computed);
+  return &inst->value_;
+}
+struct static_value *di_value_for_set(struct def_instantiation *inst) {
+  CHECK(!inst->value_computed);
+  inst->value_computed = 1;
+  return &inst->value_;
+}
+uint32_t di_symbol_table_index(struct def_instantiation *inst) {
+  CHECK(inst->symbol_table_index_computed_);
+  return inst->symbol_table_index_;
+}
+void di_set_symbol_table_index(struct def_instantiation *inst,
+                               uint32_t symbol_table_index) {
+  CHECK(!inst->symbol_table_index_computed_);
+  inst->symbol_table_index_computed_ = 1;
+  inst->symbol_table_index_ = symbol_table_index;
 }
 
 void defclass_ident_init_copy(struct defclass_ident *a, struct defclass_ident *c) {

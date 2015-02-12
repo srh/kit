@@ -3987,7 +3987,7 @@ int eval_static_value(struct ast_expr *expr,
     }
     CHECK(inst_or_null);
     CHECK(inst_or_null->value_computed);
-    static_value_init_copy(out, &inst_or_null->value);
+    static_value_init_copy(out, di_value(inst_or_null));
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL:
@@ -4046,24 +4046,24 @@ int compute_static_values(struct name_table *nt, struct def_entry *ent) {
       case PRIMITIVE_OP_SIZEOF: {
         CHECK(inst->substitutions_count == 1);
         uint32_t size = kira_sizeof(nt, &inst->substitutions[0]);
-        static_value_init_u32(&inst->value, size);
+        static_value_init_u32(di_value_for_set(inst), size);
       } break;
       case PRIMITIVE_OP_ALIGNOF: {
         CHECK(inst->substitutions_count == 1);
         uint32_t alignment = kira_alignof(nt, &inst->substitutions[0]);
-        static_value_init_u32(&inst->value, alignment);
+        static_value_init_u32(di_value_for_set(inst), alignment);
       } break;
       default:
-        static_value_init_primitive_op(&inst->value, ent->primitive_op);
+        static_value_init_primitive_op(di_value_for_set(inst), ent->primitive_op);
         break;
       }
-      inst->value_computed = 1;
     } else {
       CHECK(inst->annotated_rhs_computed);
-      if (!eval_static_value(di_annotated_rhs(inst), &inst->value)) {
+      struct static_value value;
+      if (!eval_static_value(di_annotated_rhs(inst), &value)) {
         return 0;
       }
-      inst->value_computed = 1;
+      static_value_init_move(di_value_for_set(inst), &value);
     }
   }
 
