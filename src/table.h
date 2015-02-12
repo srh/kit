@@ -221,13 +221,13 @@ struct def_instantiation {
   struct ast_typeexpr type;
 
   int annotated_rhs_computed;
-  struct ast_expr annotated_rhs_;
+  struct ast_expr annotated_rhs;
 
   int value_computed;
-  struct static_value value_;
+  struct static_value value;
 
-  int symbol_table_index_computed_;
-  uint32_t symbol_table_index_;
+  int symbol_table_index_computed;
+  uint32_t symbol_table_index;
 };
 
 struct ast_expr *di_annotated_rhs(struct def_instantiation *inst);

@@ -120,7 +120,7 @@ void def_instantiation_init(struct def_instantiation *a,
   ast_typeexpr_init_copy(&a->type, concrete_type);
   a->annotated_rhs_computed = 0;
   a->value_computed = 0;
-  a->symbol_table_index_computed_ = 0;
+  a->symbol_table_index_computed = 0;
   *substitutions = NULL;
   *substitutions_count = 0;
 }
@@ -131,11 +131,11 @@ void def_instantiation_destroy(struct def_instantiation *a) {
   SLICE_FREE(a->substitutions, a->substitutions_count, ast_typeexpr_destroy);
   ast_typeexpr_destroy(&a->type);
   if (a->annotated_rhs_computed) {
-    ast_expr_destroy(&a->annotated_rhs_);
+    ast_expr_destroy(&a->annotated_rhs);
     a->annotated_rhs_computed = 0;
   }
   if (a->value_computed) {
-    static_value_destroy(&a->value_);
+    static_value_destroy(&a->value);
     a->value_computed = 0;
   }
 }
@@ -148,32 +148,32 @@ void def_instantiation_free(struct def_instantiation **p) {
 
 struct ast_expr *di_annotated_rhs(struct def_instantiation *inst) {
   CHECK(inst->annotated_rhs_computed);
-  return &inst->annotated_rhs_;
+  return &inst->annotated_rhs;
 }
 void di_set_annotated_rhs(struct def_instantiation *inst,
                           struct ast_expr annotated_rhs) {
   CHECK(!inst->annotated_rhs_computed);
   inst->annotated_rhs_computed = 1;
-  inst->annotated_rhs_ = annotated_rhs;
+  inst->annotated_rhs = annotated_rhs;
 }
 struct static_value *di_value(struct def_instantiation *inst) {
   CHECK(inst->value_computed);
-  return &inst->value_;
+  return &inst->value;
 }
 struct static_value *di_value_for_set(struct def_instantiation *inst) {
   CHECK(!inst->value_computed);
   inst->value_computed = 1;
-  return &inst->value_;
+  return &inst->value;
 }
 uint32_t di_symbol_table_index(struct def_instantiation *inst) {
-  CHECK(inst->symbol_table_index_computed_);
-  return inst->symbol_table_index_;
+  CHECK(inst->symbol_table_index_computed);
+  return inst->symbol_table_index;
 }
 void di_set_symbol_table_index(struct def_instantiation *inst,
                                uint32_t symbol_table_index) {
-  CHECK(!inst->symbol_table_index_computed_);
-  inst->symbol_table_index_computed_ = 1;
-  inst->symbol_table_index_ = symbol_table_index;
+  CHECK(!inst->symbol_table_index_computed);
+  inst->symbol_table_index_computed = 1;
+  inst->symbol_table_index = symbol_table_index;
 }
 
 void defclass_ident_init_copy(struct defclass_ident *a, struct defclass_ident *c) {
