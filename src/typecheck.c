@@ -3986,7 +3986,6 @@ int eval_static_value(struct ast_expr *expr,
       CRASH("Could not lookup instantation.");
     }
     CHECK(inst_or_null);
-    CHECK(inst_or_null->value_computed);
     static_value_init_copy(out, di_value(inst_or_null));
     return 1;
   } break;
@@ -4039,7 +4038,6 @@ int compute_static_values(struct name_table *nt, struct def_entry *ent) {
   CHECK(is_primitive || ent->def != NULL);
   for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
     struct def_instantiation *inst = ent->instantiations[i];
-    CHECK(!inst->value_computed);
 
     if (is_primitive) {
       switch (ent->primitive_op) {
@@ -4058,7 +4056,6 @@ int compute_static_values(struct name_table *nt, struct def_entry *ent) {
         break;
       }
     } else {
-      CHECK(inst->annotated_rhs_computed);
       struct static_value value;
       if (!eval_static_value(di_annotated_rhs(inst), &value)) {
         return 0;
