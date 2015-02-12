@@ -1753,9 +1753,7 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
     /* We just assume there's no temporaries, no constructors or
     destructors, because the expression was statically computable. */
 
-    CHECK(!inst->annotated_rhs_computed);
-    inst->annotated_rhs_computed = 1;
-    inst->annotated_rhs = annotated_rhs;
+    di_set_annotated_rhs(inst, annotated_rhs);
 
     exprscope_destroy(&scope);
     cs->template_instantiation_recursion_depth--;
@@ -3433,9 +3431,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
       struct ast_expr annotated_rhs;
       ret = check_expr_with_type(&es, &a->rhs_, &a->type_, &annotated_rhs);
       if (ret) {
-        CHECK(!inst->annotated_rhs_computed);
-        inst->annotated_rhs_computed = 1;
-        inst->annotated_rhs = annotated_rhs;
+        di_set_annotated_rhs(inst, annotated_rhs);
       }
       exprscope_destroy(&es);
     } else {
@@ -4064,7 +4060,7 @@ int compute_static_values(struct name_table *nt, struct def_entry *ent) {
       inst->value_computed = 1;
     } else {
       CHECK(inst->annotated_rhs_computed);
-      if (!eval_static_value(&inst->annotated_rhs, &inst->value)) {
+      if (!eval_static_value(di_annotated_rhs(inst), &inst->value)) {
         return 0;
       }
       inst->value_computed = 1;

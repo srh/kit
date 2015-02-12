@@ -108,7 +108,7 @@ void def_instantiation_destroy(struct def_instantiation *a) {
   SLICE_FREE(a->substitutions, a->substitutions_count, ast_typeexpr_destroy);
   ast_typeexpr_destroy(&a->type);
   if (a->annotated_rhs_computed) {
-    ast_expr_destroy(&a->annotated_rhs);
+    ast_expr_destroy(&a->annotated_rhs_);
     a->annotated_rhs_computed = 0;
   }
   if (a->value_computed) {
@@ -121,6 +121,17 @@ void def_instantiation_free(struct def_instantiation **p) {
   def_instantiation_destroy(*p);
   free(*p);
   *p = NULL;
+}
+
+struct ast_expr *di_annotated_rhs(struct def_instantiation *inst) {
+  CHECK(inst->annotated_rhs_computed);
+  return &inst->annotated_rhs_;
+}
+void di_set_annotated_rhs(struct def_instantiation *inst,
+                          struct ast_expr annotated_rhs) {
+  CHECK(!inst->annotated_rhs_computed);
+  inst->annotated_rhs_computed = 1;
+  inst->annotated_rhs_ = annotated_rhs;
 }
 
 void defclass_ident_init_copy(struct defclass_ident *a, struct defclass_ident *c) {

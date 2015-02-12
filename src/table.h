@@ -210,12 +210,17 @@ struct def_instantiation {
   struct def_entry *owner;
 
   int typecheck_started;
+
+  /* The types used to substitute the respective def_entry generics
+  params. */
   struct ast_typeexpr *substitutions;
   size_t substitutions_count;
+
+  /* The concrete type of this instantiation. */
   struct ast_typeexpr type;
 
   int annotated_rhs_computed;
-  struct ast_expr annotated_rhs;
+  struct ast_expr annotated_rhs_;
 
   int value_computed;
   struct static_value value;
@@ -223,6 +228,10 @@ struct def_instantiation {
   int symbol_table_index_computed;
   uint32_t symbol_table_index;
 };
+
+struct ast_expr *di_annotated_rhs(struct def_instantiation *inst);
+void di_set_annotated_rhs(struct def_instantiation *inst,
+                          struct ast_expr annotated_rhs);
 
 struct defclass_ident {
   ident_value name;
