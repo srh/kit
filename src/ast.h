@@ -662,6 +662,11 @@ struct ast_import {
 void ast_import_init(struct ast_import *a, struct ast_meta meta,
                      struct ast_ident name);
 
+/* TODO: Mass rename to ast_deftype_rhs. */
+struct ast_rhs {
+  struct ast_typeexpr type;
+};
+
 enum ast_deftype_disposition {
   AST_DEFTYPE_NOT_CLASS,
   AST_DEFTYPE_CLASS_DEFAULT_COPY_MOVE_DESTROY,
@@ -674,7 +679,7 @@ struct ast_deftype {
   enum ast_deftype_disposition disposition;
   struct ast_generics generics;
   struct ast_ident name;
-  struct ast_typeexpr type;
+  struct ast_rhs rhs;
 };
 
 void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,

@@ -37,7 +37,7 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     } else {
       struct ast_deftype *deftype = ent->deftype;
       CHECK(!deftype->generics.has_type_params);
-      return help_sizealignof(nt, &deftype->type, fieldstop,
+      return help_sizealignof(nt, &deftype->rhs.type, fieldstop,
                               offsetof_out, sizeof_out, alignof_out);
     }
   } break;
@@ -62,7 +62,7 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
       struct ast_typeexpr substituted;
       do_replace_generics(&deftype->generics,
                           type->u.app.params,
-                          &deftype->type,
+                          &deftype->rhs.type,
                           &substituted);
       int ret = help_sizealignof(nt, &substituted, fieldstop,
                                  offsetof_out, sizeof_out, alignof_out);

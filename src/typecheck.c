@@ -1178,12 +1178,13 @@ int check_typeexpr_name_traits(struct checkstate *cs,
                                         a,
                                         &ent->deftype->meta,
                                         ent->deftype->disposition,
-                                        &ent->deftype->type,
+                                        &ent->deftype->rhs.type,
                                         also_typecheck,
                                         out,
                                         insts_out);
   if (ret && concrete_deftype_rhs_type_out_or_null) {
-    ast_typeexpr_init_copy(concrete_deftype_rhs_type_out_or_null, &ent->deftype->type);
+    ast_typeexpr_init_copy(concrete_deftype_rhs_type_out_or_null,
+                           &ent->deftype->rhs.type);
   }
   return ret;
 }
@@ -1224,7 +1225,7 @@ int check_typeexpr_app_traits(struct checkstate *cs,
   struct ast_typeexpr concrete_deftype_type;
   do_replace_generics(&deftype->generics,
                       a->u.app.params,
-                      &deftype->type,
+                      &deftype->rhs.type,
                       &concrete_deftype_type);
 
   int ret = finish_checking_name_traits(cs,
@@ -1387,7 +1388,7 @@ int check_deftype(struct checkstate *cs, struct deftype_entry *ent) {
     return 0;
   }
 
-  if (!check_typeexpr(cs, &a->generics, &a->type, ent)) {
+  if (!check_typeexpr(cs, &a->generics, &a->rhs.type, ent)) {
     return 0;
   }
 
@@ -2941,10 +2942,10 @@ int lookup_field_type(struct exprscope *es,
       /* Stop here -- we don't recursively follow deftype chains on
       whole-field access.  Maybe we shouldn't, for named fields,
       too, but we do. */
-      ast_typeexpr_init_copy(field_type_out, &deftype->type);
+      ast_typeexpr_init_copy(field_type_out, &deftype->rhs.type);
       return 1;
     } else {
-      return lookup_field_type(es, &deftype->type, fieldname, field_type_out);
+      return lookup_field_type(es, &deftype->rhs.type, fieldname, field_type_out);
     }
   } break;
   case AST_TYPEEXPR_APP: {
@@ -2971,7 +2972,7 @@ int lookup_field_type(struct exprscope *es,
     struct ast_typeexpr concrete_deftype_type;
     do_replace_generics(&deftype->generics,
                         type->u.app.params,
-                        &deftype->type,
+                        &deftype->rhs.type,
                         &concrete_deftype_type);
 
     if (fieldname->whole_field) {
