@@ -1306,12 +1306,47 @@ void ast_import_destroy(struct ast_import *a) {
   ast_ident_destroy(&a->name);
 }
 
-void ast_rhs_init(struct ast_rhs *a, struct ast_typeexpr type) {
-  a->type = type;
+void ast_enumspec_init_copy(struct ast_enumspec *a, struct ast_enumspec *c) {
+  SLICE_INIT_COPY(a->enumfields, a->enumfields_count,
+                  c->enumfields, c->enumfields_count,
+                  ast_vardecl_init_copy);
+}
+
+void ast_enumspec_destroy(struct ast_enumspec *a) {
+  SLICE_FREE(a->enumfields, a->enumfields_count, ast_vardecl_destroy);
+}
+
+void ast_rhs_init_type(struct ast_rhs *a, struct ast_typeexpr type) {
+  a->tag = AST_RHS_TYPE;
+  a->u.type = type;
+}
+
+void ast_rhs_init_copy(struct ast_rhs *a, struct ast_rhs *c) {
+  a->tag = c->tag;
+  switch (c->tag) {
+  case AST_RHS_TYPE:
+    ast_typeexpr_init_copy(&a->u.type, &c->u.type);
+    break;
+  case AST_RHS_ENUMSPEC:
+    ast_enumspec_init_copy(&a->u.enumspec, &c->u.enumspec);
+    break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void ast_rhs_destroy(struct ast_rhs *a) {
-  ast_typeexpr_destroy(&a->type);
+  switch (a->tag) {
+  case AST_RHS_TYPE:
+    ast_typeexpr_destroy(&a->u.type);
+    break;
+  case AST_RHS_ENUMSPEC:
+    ast_enumspec_destroy(&a->u.enumspec);
+    break;
+  default:
+    UNREACHABLE();
+  }
+  a->tag = (enum ast_rhs_tag)-1;
 }
 
 void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
@@ -1322,7 +1357,7 @@ void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
   a->disposition = disposition;
   a->generics = generics;
   a->name = name;
-  ast_rhs_init(&a->rhs, type);
+  ast_rhs_init_type(&a->rhs, type);
 }
 
 void ast_deftype_destroy(struct ast_deftype *a) {

@@ -1401,34 +1401,63 @@ int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct fr
 }
 
 void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
-                       enum typetrav_func tf, struct loc dest, int has_src, struct loc src, struct ast_typeexpr *type) {
+                       enum typetrav_func tf, struct loc dest, int has_src,
+                       struct loc src, struct ast_typeexpr *type);
+
+void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct frame *h,
+                           enum typetrav_func tf, struct loc dest, int has_src,
+                           struct loc src, struct ast_rhs *rhs) {
+  switch (rhs->tag) {
+  case AST_RHS_TYPE:
+    gen_typetrav_func(cs, f, h, tf, dest, has_src, src, &rhs->u.type);
+    break;
+  case AST_RHS_ENUMSPEC:
+    TODO_IMPLEMENT;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
+                       enum typetrav_func tf, struct loc dest, int has_src,
+                       struct loc src, struct ast_typeexpr *type) {
   switch (type->tag) {
   case AST_TYPEEXPR_NAME: {
     struct typeexpr_traits traits;
     struct typeexpr_trait_instantiations insts;
-    struct ast_typeexpr rhs_type;
-    int success = check_typeexpr_name_traits(cs, type, NULL, &traits, &insts, &rhs_type);
+    int has_rhs;
+    struct ast_rhs rhs;
+    int success = check_typeexpr_name_traits(cs, type, NULL, &traits, &insts,
+                                             &has_rhs, &rhs);
     CHECK(success);
 
     if (!gen_typetrav_name_direct(cs, f, h, tf, dest, src, &traits, &insts)) {
-      gen_typetrav_func(cs, f, h, tf, dest, has_src, src, &rhs_type);
+      CHECK(has_rhs);
+      gen_typetrav_rhs_func(cs, f, h, tf, dest, has_src, src, &rhs);
     }
 
-    ast_typeexpr_destroy(&rhs_type);
+    if (has_rhs) {
+      ast_rhs_destroy(&rhs);
+    }
     return;
   } break;
   case AST_TYPEEXPR_APP: {
     struct typeexpr_traits traits;
     struct typeexpr_trait_instantiations insts;
-    struct ast_typeexpr rhs_type;
-    int success = check_typeexpr_app_traits(cs, type, NULL, &traits, &insts, &rhs_type);
+    int has_rhs;
+    struct ast_rhs rhs;
+    int success = check_typeexpr_app_traits(cs, type, NULL, &traits, &insts,
+                                            &has_rhs, &rhs);
     CHECK(success);
 
     if (!gen_typetrav_name_direct(cs, f, h, tf, dest, src, &traits, &insts)) {
-      gen_typetrav_func(cs, f, h, tf, dest, has_src, src, &rhs_type);
+      CHECK(has_rhs);
+      gen_typetrav_rhs_func(cs, f, h, tf, dest, has_src, src, &rhs);
     }
 
-    ast_typeexpr_destroy(&rhs_type);
+    if (has_rhs) {
+      ast_rhs_destroy(&rhs);
+    }
     return;
   } break;
   case AST_TYPEEXPR_STRUCTE: {

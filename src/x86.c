@@ -9,6 +9,11 @@
 #include "typecheck.h"
 #include "win/objfile.h"
 
+
+int help_rhs_sizealignof(struct name_table *nt, struct ast_rhs *rhs,
+                         ident_value fieldstop, uint32_t *offsetof_out,
+                         uint32_t *sizeof_out, uint32_t *alignof_out);
+
 /* X86 WINDOWS */
 /* This is a bi-use function -- if fieldstop is IDENT_VALUE_INVALID,
 then *sizeof_out and *alignof_out are initialized with the size and
@@ -37,8 +42,8 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     } else {
       struct ast_deftype *deftype = ent->deftype;
       CHECK(!deftype->generics.has_type_params);
-      return help_sizealignof(nt, &deftype->rhs.type, fieldstop,
-                              offsetof_out, sizeof_out, alignof_out);
+      return help_rhs_sizealignof(nt, &deftype->rhs, fieldstop,
+                                  offsetof_out, sizeof_out, alignof_out);
     }
   } break;
   case AST_TYPEEXPR_APP: {
@@ -59,14 +64,14 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
       struct ast_deftype *deftype = ent->deftype;
       CHECK(deftype->generics.has_type_params
             && deftype->generics.params_count == type->u.app.params_count);
-      struct ast_typeexpr substituted;
-      do_replace_generics(&deftype->generics,
-                          type->u.app.params,
-                          &deftype->rhs.type,
-                          &substituted);
-      int ret = help_sizealignof(nt, &substituted, fieldstop,
-                                 offsetof_out, sizeof_out, alignof_out);
-      ast_typeexpr_destroy(&substituted);
+      struct ast_rhs substituted;
+      do_replace_rhs_generics(&deftype->generics,
+                              type->u.app.params,
+                              &deftype->rhs,
+                              &substituted);
+      int ret = help_rhs_sizealignof(nt, &substituted, fieldstop,
+                                     offsetof_out, sizeof_out, alignof_out);
+      ast_rhs_destroy(&substituted);
       return ret;
     }
   } break;
@@ -150,6 +155,20 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     return 0;
   } break;
   case AST_TYPEEXPR_UNKNOWN:
+  default:
+    UNREACHABLE();
+  }
+}
+
+int help_rhs_sizealignof(struct name_table *nt, struct ast_rhs *rhs,
+                         ident_value fieldstop, uint32_t *offsetof_out,
+                         uint32_t *sizeof_out, uint32_t *alignof_out) {
+  switch (rhs->tag) {
+  case AST_RHS_TYPE:
+    return help_sizealignof(nt, &rhs->u.type, fieldstop, offsetof_out,
+                            sizeof_out, alignof_out);
+  case AST_RHS_ENUMSPEC:
+    TODO_IMPLEMENT;
   default:
     UNREACHABLE();
   }

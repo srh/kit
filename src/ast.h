@@ -662,10 +662,29 @@ struct ast_import {
 void ast_import_init(struct ast_import *a, struct ast_meta meta,
                      struct ast_ident name);
 
+struct ast_enumspec {
+  struct ast_vardecl *enumfields;
+  size_t enumfields_count;
+};
+
+/* TODO: Mass rename this too. */
+enum ast_rhs_tag {
+  AST_RHS_TYPE,
+  AST_RHS_ENUMSPEC,
+};
+
 /* TODO: Mass rename to ast_deftype_rhs. */
 struct ast_rhs {
-  struct ast_typeexpr type;
+  enum ast_rhs_tag tag;
+  union {
+    struct ast_typeexpr type;
+    struct ast_enumspec enumspec;
+  } u;
 };
+
+void ast_rhs_destroy(struct ast_rhs *a);
+void ast_rhs_init_copy(struct ast_rhs *a, struct ast_rhs *c);
+void ast_rhs_init_type(struct ast_rhs *a, struct ast_typeexpr type);
 
 enum ast_deftype_disposition {
   AST_DEFTYPE_NOT_CLASS,
