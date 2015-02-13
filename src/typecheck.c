@@ -665,6 +665,51 @@ void copy_make_unary_func_type(struct checkstate *cs,
                    params, 2);
 }
 
+int add_enum_constructors(struct checkstate *cs,
+                          struct ast_generics *generics,
+                          struct ast_ident *name,
+                          struct ast_enumspec *enumspec) {
+  for (size_t i = 0, e = enumspec->enumfields_count; i < e; i++) {
+    struct ast_vardecl *f = &enumspec->enumfields[i];
+    struct ast_typeexpr *params = malloc_mul(sizeof(*params), 2);
+    ast_typeexpr_init_copy(&params[0], &f->type);
+
+    if (!generics->has_type_params) {
+      params[1].tag = AST_TYPEEXPR_NAME;
+      ast_ident_init_copy(&params[1].u.name, name);
+    } else {
+      struct ast_typeexpr *app_params = malloc_mul(sizeof(*app_params), generics->params_count);
+      for (size_t j = 0, je = generics->params_count; j < je; j++) {
+        app_params[i].tag = AST_TYPEEXPR_NAME;
+        ast_ident_init_copy(&app_params[i].u.name, &generics->params[i]);
+      }
+      struct ast_ident name_copy;
+      ast_ident_init_copy(&name_copy, name);
+      params[1].tag = AST_TYPEEXPR_APP;
+      ast_typeapp_init(&params[1].u.app, ast_meta_make_garbage(),
+                       name_copy, app_params, generics->params_count);
+    }
+
+    struct ast_typeexpr func_type;
+    func_type.tag = AST_TYPEEXPR_APP;
+    ast_typeapp_init(&func_type.u.app, ast_meta_make_garbage(),
+                     make_ast_ident(identmap_intern_c_str(cs->im, FUNC_TYPE_NAME)),
+                     params, 2);
+
+    int success = name_table_add_primitive_def(&cs->nt,
+                                               f->name.value,
+                                               PRIMITIVE_OP_ENUMCONSTRUCT,
+                                               generics,
+                                               &func_type);
+    ast_typeexpr_destroy(&func_type);
+    if (!success) {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
 int chase_through_toplevels(struct checkstate *cs,
                             struct import_chase_state *ics,
                             struct ast_toplevel *toplevels,
@@ -700,6 +745,17 @@ int chase_through_toplevels(struct checkstate *cs,
       struct generics_arity arity = params_arity(&dt->generics);
       if (!name_table_add_deftype(&cs->nt, dt->name.value, arity, dt)) {
         return 0;
+      }
+      switch (dt->rhs.tag) {
+      case AST_RHS_TYPE:
+        break;
+      case AST_RHS_ENUMSPEC: {
+        if (!add_enum_constructors(cs, &dt->generics, &dt->name, &dt->rhs.u.enumspec)) {
+          return 0;
+        }
+      } break;
+      default:
+        UNREACHABLE();
       }
     } break;
     case AST_TOPLEVEL_ACCESS: {

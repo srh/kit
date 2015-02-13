@@ -5,6 +5,9 @@
 #include "arity.h"
 
 enum primitive_op {
+  /* TODO: Implement (or change what primitive_ops generally are...) */
+  PRIMITIVE_OP_ENUMCONSTRUCT,
+
   PRIMITIVE_OP_INIT,
   PRIMITIVE_OP_COPY,
   PRIMITIVE_OP_MOVE,
