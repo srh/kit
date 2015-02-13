@@ -2728,11 +2728,12 @@ int check_statement(struct bodystate *bs,
         goto switch_fail_annotated_cased_statements;
       }
 
+      struct ast_typeexpr replaced_decl_type;
+      replace_generics(bs->es, &cas->pattern.decl.type, &replaced_decl_type);
+
+      struct varnum varnum;
       struct ast_vardecl *replaced_decl;
       {
-        struct ast_typeexpr replaced_decl_type;
-        replace_generics(bs->es, &cas->pattern.decl.type, &replaced_decl_type);
-
         if (!exact_typeexprs_equal(&replaced_decl_type,
                                    &concrete_enumspec.enumfields[constructor_num].type)) {
           ast_typeexpr_destroy(&replaced_decl_type);
@@ -2743,14 +2744,17 @@ int check_statement(struct bodystate *bs,
         struct ast_ident replaced_decl_name;
         ast_ident_init_copy(&replaced_decl_name, &cas->pattern.decl.name);
 
+        struct ast_typeexpr replaced_decl_type_copy;
+        ast_typeexpr_init_copy(&replaced_decl_type_copy, &replaced_decl_type);
+
         replaced_decl = malloc(sizeof(*replaced_decl));
         CHECK(replaced_decl);
         ast_vardecl_init(replaced_decl, ast_meta_make_copy(&cas->pattern.decl.meta),
-                         replaced_decl_name, replaced_decl_type);
+                         replaced_decl_name, replaced_decl_type_copy);
 
-        struct varnum varnum;
         if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
           free_ast_vardecl(&replaced_decl);
+          ast_typeexpr_destroy(&replaced_decl_type);
           goto switch_fail_annotated_cased_statements;
         }
       }
@@ -2760,6 +2764,7 @@ int check_statement(struct bodystate *bs,
       if (!check_expr_bracebody(bs, &cas->body, &cas_annotated_body,
                                 &cas_fallthrough)) {
         free_ast_vardecl(&replaced_decl);
+        ast_typeexpr_destroy(&replaced_decl_type);
         goto switch_fail_annotated_cased_statements;
       }
 
@@ -2769,7 +2774,14 @@ int check_statement(struct bodystate *bs,
       free_ast_vardecl(&replaced_decl);
 
       struct ast_case_pattern pattern_copy;
+      /* TODO: Don't use ast_case_pattern_init_copy -- construct its
+      fields and init from scratch -- it's really ghetto if we add new
+      info fields, for grepping. */
       ast_case_pattern_init_copy(&pattern_copy, &cas->pattern);
+      ast_var_info_specify_varnum(&pattern_copy.decl.var_info, varnum);
+      ast_case_pattern_info_specify(&pattern_copy.info,
+                                    constructor_num,
+                                    replaced_decl_type);
 
       ast_cased_statement_init(&annotated_cased_statements[i],
                                ast_meta_make_copy(&cas->meta),

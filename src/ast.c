@@ -535,15 +535,57 @@ void ast_statement_alloc_move(struct ast_statement movee,
   *out = p;
 }
 
+void ast_case_pattern_info_init(struct ast_case_pattern_info *a) {
+  a->info_valid = 0;
+}
+
+void ast_case_pattern_info_init_copy(struct ast_case_pattern_info *a,
+                                     struct ast_case_pattern_info *c) {
+  a->info_valid = c->info_valid;
+  if (c->info_valid) {
+    a->constructor_number = c->constructor_number;
+    ast_typeexpr_init_copy(&a->var_type, &c->var_type);
+  }
+}
+
+void ast_case_pattern_info_destroy(struct ast_case_pattern_info *a) {
+  if (a->info_valid) {
+    a->info_valid = 0;
+    a->constructor_number = 0;
+    ast_typeexpr_destroy(&a->var_type);
+  }
+}
+
+size_t ast_case_pattern_info_constructor_number(struct ast_case_pattern_info *a) {
+  CHECK(a->info_valid);
+  return a->constructor_number;
+}
+
+struct ast_typeexpr *ast_case_pattern_info_var_type(struct ast_case_pattern_info *a) {
+  CHECK(a->info_valid);
+  return &a->var_type;
+}
+
+void ast_case_pattern_info_specify(struct ast_case_pattern_info *a,
+                                   size_t constructor_number,
+                                   struct ast_typeexpr var_type) {
+  CHECK(!a->info_valid);
+  a->info_valid = 1;
+  a->constructor_number = constructor_number;
+  a->var_type = var_type;
+}
+
 void ast_case_pattern_init_copy(struct ast_case_pattern *a,
                                 struct ast_case_pattern *c) {
   a->meta = ast_meta_make_copy(&c->meta);
+  ast_case_pattern_info_init_copy(&a->info, &c->info);
   ast_ident_init_copy(&a->constructor_name, &c->constructor_name);
   ast_vardecl_init_copy(&a->decl, &c->decl);
 }
 
 void ast_case_pattern_destroy(struct ast_case_pattern *a) {
   ast_meta_destroy(&a->meta);
+  ast_case_pattern_info_destroy(&a->info);
   ast_ident_destroy(&a->constructor_name);
   ast_vardecl_destroy(&a->decl);
 }

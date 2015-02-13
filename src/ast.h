@@ -322,8 +322,22 @@ void ast_statement_destroy(struct ast_statement *a);
 void ast_statement_alloc_move(struct ast_statement movee,
                               struct ast_statement **out);
 
+struct ast_case_pattern_info {
+  int info_valid;
+  size_t constructor_number;
+  struct ast_typeexpr var_type;
+};
+
+size_t ast_case_pattern_info_constructor_number(struct ast_case_pattern_info *a);
+struct ast_typeexpr *ast_case_pattern_info_var_type(struct ast_case_pattern_info *a);
+
+void ast_case_pattern_info_specify(struct ast_case_pattern_info *a,
+                                   size_t constructor_number,
+                                   struct ast_typeexpr var_type);
+
 struct ast_case_pattern {
   struct ast_meta meta;
+  struct ast_case_pattern_info info;
   struct ast_ident constructor_name;
   struct ast_vardecl decl;
 };

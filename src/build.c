@@ -4002,8 +4002,62 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
     }
   } break;
-  case AST_STATEMENT_SWITCH:
-    TODO_IMPLEMENT;
+  case AST_STATEMENT_SWITCH: {
+    struct ast_switch_statement *ss = &s->u.switch_statement;
+    int32_t saved_offset = frame_save_offset(h);
+
+    struct ast_typeexpr *swartch_type = ast_expr_type(ss->swartch);
+    struct loc swartch_loc = frame_push_loc(h, kira_sizeof(&cs->nt, swartch_type));
+
+    {
+      int32_t swartch_saved_offset = frame_save_offset(h);
+      struct expr_return swartch_er = demand_expr_return(swartch_loc);
+      if (!gen_expr(cs, f, h, ss->swartch, &swartch_er)) {
+        return 0;
+      }
+      frame_restore_offset(h, swartch_saved_offset);
+    }
+
+    struct loc swartch_num_loc = make_enum_num_loc(f, h, swartch_loc);
+
+    gen_load_register(f, X86_EAX, swartch_num_loc);
+
+    size_t end_target = frame_add_target(h);
+    size_t next_target = frame_add_target(h);
+
+    for (size_t i = 0, e = ss->cased_statements_count; i < e; i++) {
+      int32_t switchcase_saved_offset = frame_save_offset(h);
+      struct ast_cased_statement *cas = &ss->cased_statements[i];
+      x86_gen_cmp_imm32(f, X86_EAX,
+                        size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.info)));
+      gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
+
+      struct ast_typeexpr *var_type = ast_case_pattern_info_var_type(&cas->pattern.info);
+      struct loc var_loc = make_enum_body_loc(f, h, swartch_loc,
+                                              kira_sizeof(&cs->nt, var_type));
+
+      struct vardata vd;
+      struct varnum varnum = ast_var_info_varnum(&cas->pattern.decl.var_info);
+      vardata_init(&vd, cas->pattern.decl.name.value, varnum, var_type, var_loc);
+      SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+
+      gen_bracebody(cs, f, h, &cas->body);
+
+      SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+
+      gen_placeholder_jmp(f, h, end_target);
+      frame_define_target(h, next_target, objfile_section_size(objfile_text(f)));
+      next_target = frame_add_target(h);
+      frame_restore_offset(h, switchcase_saved_offset);
+    }
+
+    gen_crash_jmp(f, h);
+
+    frame_define_target(h, end_target, objfile_section_size(objfile_text(f)));
+    gen_destroy(cs, f, h, swartch_loc, swartch_type);
+
+    frame_restore_offset(h, saved_offset);
+  } break;
   default:
     UNREACHABLE();
   }
