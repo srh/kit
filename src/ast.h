@@ -667,6 +667,10 @@ struct ast_enumspec {
   size_t enumfields_count;
 };
 
+void ast_enumspec_init(struct ast_enumspec *a,
+                       struct ast_vardecl *enumfields,
+                       size_t enumfields_count);
+
 /* TODO: Mass rename this too. */
 enum ast_rhs_tag {
   AST_RHS_TYPE,
@@ -682,9 +686,10 @@ struct ast_rhs {
   } u;
 };
 
-void ast_rhs_destroy(struct ast_rhs *a);
 void ast_rhs_init_copy(struct ast_rhs *a, struct ast_rhs *c);
 void ast_rhs_init_type(struct ast_rhs *a, struct ast_typeexpr type);
+void ast_rhs_init_enumspec(struct ast_rhs *a, struct ast_enumspec enumspec);
+void ast_rhs_destroy(struct ast_rhs *a);
 
 enum ast_deftype_disposition {
   AST_DEFTYPE_NOT_CLASS,

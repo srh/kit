@@ -1306,6 +1306,13 @@ void ast_import_destroy(struct ast_import *a) {
   ast_ident_destroy(&a->name);
 }
 
+void ast_enumspec_init(struct ast_enumspec *a,
+                       struct ast_vardecl *enumfields,
+                       size_t enumfields_count) {
+  a->enumfields = enumfields;
+  a->enumfields_count = enumfields_count;
+}
+
 void ast_enumspec_init_copy(struct ast_enumspec *a, struct ast_enumspec *c) {
   SLICE_INIT_COPY(a->enumfields, a->enumfields_count,
                   c->enumfields, c->enumfields_count,
@@ -1319,6 +1326,11 @@ void ast_enumspec_destroy(struct ast_enumspec *a) {
 void ast_rhs_init_type(struct ast_rhs *a, struct ast_typeexpr type) {
   a->tag = AST_RHS_TYPE;
   a->u.type = type;
+}
+
+void ast_rhs_init_enumspec(struct ast_rhs *a, struct ast_enumspec enumspec) {
+  a->tag = AST_RHS_ENUMSPEC;
+  a->u.enumspec = enumspec;
 }
 
 void ast_rhs_init_copy(struct ast_rhs *a, struct ast_rhs *c) {

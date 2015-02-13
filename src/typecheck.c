@@ -2002,8 +2002,17 @@ void do_replace_rhs_generics(struct ast_generics *generics,
     do_replace_generics(generics, generics_substitutions, &a->u.type, &type);
     ast_rhs_init_type(out, type);
   } break;
-  case AST_RHS_ENUMSPEC:
-    TODO_IMPLEMENT;
+  case AST_RHS_ENUMSPEC: {
+    struct ast_vardecl *enumfields;
+    size_t enumfields_count;
+    do_replace_generics_in_fields(generics, generics_substitutions,
+                                  a->u.enumspec.enumfields,
+                                  a->u.enumspec.enumfields_count,
+                                  &enumfields, &enumfields_count);
+    struct ast_enumspec enumspec;
+    ast_enumspec_init(&enumspec, enumfields, enumfields_count);
+    ast_rhs_init_enumspec(out, enumspec);
+  } break;
   default:
     UNREACHABLE();
   }
