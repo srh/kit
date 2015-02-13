@@ -75,6 +75,7 @@ def try_kla func[void] = fn() void {
 defenum enty {
   c1 void;
   c2 struct { p i32; q i32; };
+  c3 string;
 };
 
 def blah_enty func[enty, enty] = fn(x enty) enty {
@@ -94,6 +95,9 @@ def blah_enty func[enty, enty] = fn(x enty) enty {
       putchar(32);
       print(@[u32]~a.q);
       putchar(10);
+    }
+    case c3(a string): {
+      print(&a);
     }
   }
   return y;
@@ -120,6 +124,7 @@ export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
   vz.p = 125;
   vz.q = 343;
   blah_enty(c2(vz));
+  blah_enty(c3(lits("just another string\n")));
 
   var ret ty;
   p->x = -5;

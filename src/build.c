@@ -3415,6 +3415,8 @@ void gen_assignment(struct checkstate *cs, struct objfile *f,
       gen_destroy(cs, f, h, rhs_tr.loc, rhs_tr.temporary_type);
     }
   }
+
+  frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
 }
 
 int gen_binop_expr(struct checkstate *cs, struct objfile *f,
