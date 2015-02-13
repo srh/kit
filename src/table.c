@@ -962,7 +962,7 @@ int unify_with_parameterized_type(
   size_t materialized_count = g->params_count;
   struct ast_typeexpr *materialized = malloc_mul(sizeof(*materialized),
                                                  materialized_count);
-  for (size_t i = 0, e = g->params_count; i < e; i++) {
+  for (size_t i = 0; i < materialized_count; i++) {
     materialized[i].tag = AST_TYPEEXPR_UNKNOWN;
   }
 
@@ -970,16 +970,16 @@ int unify_with_parameterized_type(
     goto fail;
   }
 
-  for (size_t i = 0, e = g->params_count; i < e; i++) {
+  for (size_t i = 0; i < materialized_count; i++) {
     if (!is_concrete(&materialized[i])) {
       goto fail;
     }
   }
 
-  substitute_generics(type, g, materialized, g->params_count,
+  substitute_generics(type, g, materialized, materialized_count,
                       concrete_type_out);
   *materialized_params_out = materialized;
-  *materialized_params_count_out = g->params_count;
+  *materialized_params_count_out = materialized_count;
   return 1;
 
  fail:
