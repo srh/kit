@@ -920,6 +920,17 @@ int check_typeexpr(struct checkstate *cs,
   }
 }
 
+int check_enumspec(struct checkstate *cs,
+                   struct ast_generics *generics,
+                   struct ast_enumspec *a,
+                   struct deftype_entry *flat_typeexpr) {
+  CHECK_DBG("check_enumspec\n");
+  return check_typeexpr_fields(cs, generics,
+                               a->enumfields,
+                               a->enumfields_count,
+                               flat_typeexpr);
+}
+
 enum typeexpr_trait min_typeexpr_trait(enum typeexpr_trait a, enum typeexpr_trait b) {
   return a < b ? a : b;
 }
@@ -1452,7 +1463,10 @@ int check_deftype(struct checkstate *cs, struct deftype_entry *ent) {
     }
     break;
   case AST_RHS_ENUMSPEC:
-    TODO_IMPLEMENT;
+    if (!check_enumspec(cs, &a->generics, &a->rhs.u.enumspec, ent)) {
+      return 0;
+    }
+    break;
   default:
     UNREACHABLE();
   }
