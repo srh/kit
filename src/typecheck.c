@@ -1667,10 +1667,10 @@ int deftype_is_accessible(struct exprscope *es, struct ast_deftype *deftype) {
   return is_accessible(es, privacy_scope);
 }
 
-int check_expr_with_type(struct exprscope *es,
-                         struct ast_expr *x,
-                         struct ast_typeexpr *type,
-                         struct ast_expr *annotated_out);
+int check_expr(struct exprscope *es,
+               struct ast_expr *x,
+               struct ast_typeexpr *partial_type,
+               struct ast_expr *annotated_out);
 
 int lookup_global_maybe_typecheck(struct checkstate *cs,
                                   struct exprscope *also_maybe_typecheck,
@@ -1743,8 +1743,7 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
                    ent);
 
     struct ast_expr annotated_rhs;
-    if (!check_expr_with_type(&scope, &ent->def->rhs_, &unified,
-                              &annotated_rhs)) {
+    if (!check_expr(&scope, &ent->def->rhs_, &unified, &annotated_rhs)) {
       exprscope_destroy(&scope);
       cs->template_instantiation_recursion_depth--;
       goto fail_unified;
@@ -1977,11 +1976,6 @@ int compute_and_check_exprcatch(struct exprscope *es,
     return 1;
   }
 }
-
-int check_expr(struct exprscope *es,
-               struct ast_expr *x,
-               struct ast_typeexpr *partial_type,
-               struct ast_expr *annotated_out);
 
 int check_expr_funcall(struct exprscope *es,
                        struct ast_funcall *x,
@@ -3380,16 +3374,6 @@ int check_expr(struct exprscope *es,
   }
 }
 
-/* Checks an expr, given that we know the type of expr. */
-int check_expr_with_type(struct exprscope *es,
-                         struct ast_expr *x,
-                         struct ast_typeexpr *type,
-                         struct ast_expr *annotated_out) {
-  CHECK_DBG("check_expr_with_type\n");
-  int ret = check_expr(es, x, type, annotated_out);
-  return ret;
-}
-
 int check_def(struct checkstate *cs, struct ast_def *a) {
   if (!check_generics_shadowing(cs, &a->generics_)) {
     return 0;
@@ -3429,7 +3413,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
                      ent->accessible, ent->accessible_count,
                      STATIC_COMPUTATION_YES, ent);
       struct ast_expr annotated_rhs;
-      ret = check_expr_with_type(&es, &a->rhs_, &a->type_, &annotated_rhs);
+      ret = check_expr(&es, &a->rhs_, &a->type_, &annotated_rhs);
       if (ret) {
         di_set_annotated_rhs(inst, annotated_rhs);
       }
