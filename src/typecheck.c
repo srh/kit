@@ -694,8 +694,8 @@ int add_enum_constructors(struct checkstate *cs,
     } else {
       struct ast_typeexpr *app_params = malloc_mul(sizeof(*app_params), generics->params_count);
       for (size_t j = 0, je = generics->params_count; j < je; j++) {
-        app_params[i].tag = AST_TYPEEXPR_NAME;
-        ast_ident_init_copy(&app_params[i].u.name, &generics->params[i]);
+        app_params[j].tag = AST_TYPEEXPR_NAME;
+        ast_ident_init_copy(&app_params[j].u.name, &generics->params[j]);
       }
       struct ast_ident name_copy;
       ast_ident_init_copy(&name_copy, name);
@@ -5750,6 +5750,50 @@ int check_file_test_more_47(const uint8_t *name, size_t name_count,
 }
 
 
+int check_file_test_more_48(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defenum[T] ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p T; q T; };\n"
+      "};\n"
+      "def foo func[ty[i32], ty[i32]] = fn(x ty[i32]) ty[i32] {\n"
+      "  var v void;\n"
+      "  var y ty[i32] = c1(v);\n"
+      "  var u struct { p i32; q i32; };\n"
+      "  y = c2(u);\n"
+      "  return y;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_49(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because c2 returns wrong type. */
+  struct test_module a[] = { {
+      "foo",
+      "defenum[T] ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p T; q T; };\n"
+      "};\n"
+      "def foo func[ty[i32], ty[i32]] = fn(x ty[i32]) ty[i32] {\n"
+      "  var v void;\n"
+      "  var y ty[i32] = c1(v);\n"
+      "  var u struct { p u32; q u32; };\n"
+      "  y = c2(u);\n"
+      "  return y;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+
 
 int test_check_file(void) {
   int ret = 0;
@@ -6294,6 +6338,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_47...\n");
   if (!!test_check_module(&im, &check_file_test_more_47, foo)) {
     DBG("check_file_test_more_47 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_48...\n");
+  if (!test_check_module(&im, &check_file_test_more_48, foo)) {
+    DBG("check_file_test_more_48 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_49...\n");
+  if (!!test_check_module(&im, &check_file_test_more_49, foo)) {
+    DBG("check_file_test_more_49 fails\n");
     goto cleanup_identmap;
   }
 
