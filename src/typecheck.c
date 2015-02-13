@@ -1056,6 +1056,11 @@ int check_typeexpr_traits(struct checkstate *cs,
                           struct ast_typeexpr *a,
                           struct exprscope *also_typecheck,
                           struct typeexpr_traits *out);
+int check_enumspec_traits(struct checkstate *cs,
+                          /* a is a concrete enumspec. */
+                          struct ast_enumspec *a,
+                          struct exprscope *also_typecheck,
+                          struct typeexpr_traits *out);
 
 int finish_checking_name_traits(struct checkstate *cs,
                                 /* The original concrete name/app type we are checking traits for. */
@@ -1081,7 +1086,11 @@ int finish_checking_name_traits(struct checkstate *cs,
       }
       break;
     case AST_RHS_ENUMSPEC:
-      TODO_IMPLEMENT;
+      if (!check_enumspec_traits(cs, &concrete_deftype_rhs->u.enumspec,
+                                 also_typecheck, &rhs_traits)) {
+        return 0;
+      }
+      break;
     default:
       UNREACHABLE();
     }
@@ -1262,17 +1271,24 @@ int check_typeexpr_app_traits(struct checkstate *cs,
   return ret;
 }
 
-int check_typeexpr_structe_traits(struct checkstate *cs,
-                                  struct ast_typeexpr *a,
-                                  struct exprscope *also_typecheck,
-                                  struct typeexpr_traits *out) {
+/* The composability of traits of struct and enumspec fields are the
+same -- the thing's trivially copyable if all the fields are trivially
+copyable, and the thing's copyable if all the fields are copyable.
+Likewise for move.  But not so for init: enum types are not
+default-inittable. */
+int check_typeexpr_structe_enumspec_fields_traits(
+    struct checkstate *cs,
+    struct ast_vardecl *fields,
+    size_t fields_count,
+    struct exprscope *also_typecheck,
+    struct typeexpr_traits *out) {
   struct typeexpr_traits combined;
   combined.movable = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
   combined.copyable = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
   combined.inittible = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
-  for (size_t i = 0, e = a->u.structe.fields_count; i < e; i++) {
+  for (size_t i = 0; i < fields_count; i++) {
     struct typeexpr_traits traits;
-    if (!check_typeexpr_traits(cs, &a->u.structe.fields[i].type, also_typecheck, &traits)) {
+    if (!check_typeexpr_traits(cs, &fields[i].type, also_typecheck, &traits)) {
       return 0;
     }
 
@@ -1283,6 +1299,14 @@ int check_typeexpr_structe_traits(struct checkstate *cs,
 
   *out = combined;
   return 1;
+}
+
+int check_typeexpr_structe_traits(struct checkstate *cs,
+                                  struct ast_typeexpr *a,
+                                  struct exprscope *also_typecheck,
+                                  struct typeexpr_traits *out) {
+  return check_typeexpr_structe_enumspec_fields_traits(
+      cs, a->u.structe.fields, a->u.structe.fields_count, also_typecheck, out);
 }
 
 int check_typeexpr_unione_traits(struct checkstate *cs,
@@ -1353,6 +1377,19 @@ int check_typeexpr_traits(struct checkstate *cs,
   default:
     UNREACHABLE();
   }
+}
+
+int check_enumspec_traits(struct checkstate *cs,
+                          /* a is a concrete enumspec. */
+                          struct ast_enumspec *a,
+                          struct exprscope *also_typecheck,
+                          struct typeexpr_traits *out) {
+  int ret = check_typeexpr_structe_enumspec_fields_traits(
+      cs, a->enumfields, a->enumfields_count, also_typecheck, out);
+  if (ret) {
+    out->inittible = TYPEEXPR_TRAIT_LACKED;
+  }
+  return ret;
 }
 
 
