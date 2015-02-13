@@ -68,6 +68,7 @@ enum x86_setcc {
 enum x86_jcc {
   X86_JCC_O = 0x80,
   X86_JCC_Z = 0x84,
+  X86_JCC_NE = 0x85,
   X86_JCC_S = 0x88,
   X86_JCC_A = 0x87,
   X86_JCC_C = 0x82,
@@ -118,7 +119,10 @@ void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct fr
 void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
                            struct loc dest, struct ast_typeexpr *var_type);
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg);
+void gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src);
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
+void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number);
+void gen_crash_jmp(struct objfile *f, struct frame *h);
 
 /* Right now we don't worry about generating multiple objfiles, so we
 just blithely attach a serial number to each name to make them
@@ -1403,6 +1407,29 @@ int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct fr
   }
 }
 
+struct loc gen_subobject_loc(struct objfile *f,
+                             struct frame *h,
+                             struct loc loc,
+                             uint32_t size,
+                             uint32_t offset);
+
+struct loc make_enum_num_loc(struct objfile *f,
+                             struct frame *h,
+                             struct loc loc) {
+  CHECK(loc.size >= DWORD_SIZE);
+  /* All enums start with a DWORD-sized tag. */
+  return gen_subobject_loc(f, h, loc, DWORD_SIZE, 0);
+}
+
+struct loc make_enum_body_loc(struct objfile *f,
+                              struct frame *h,
+                              struct loc loc,
+                              uint32_t body_size) {
+  CHECK(loc.size >= uint32_add(DWORD_SIZE, body_size));
+  /* All enums start with a DWORD-sized tag. */
+  return gen_subobject_loc(f, h, loc, body_size, DWORD_SIZE);
+}
+
 void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                        enum typetrav_func tf, struct loc dest, int has_src,
                        struct loc src, struct ast_typeexpr *type);
@@ -1414,8 +1441,69 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
   case AST_RHS_TYPE:
     gen_typetrav_func(cs, f, h, tf, dest, has_src, src, &rhs->u.type);
     break;
-  case AST_RHS_ENUMSPEC:
-    TODO_IMPLEMENT;
+  case AST_RHS_ENUMSPEC: {
+    /* TODO: Instead of duplicating this code everywhere, enums should
+    have their do_construct, do_copy, do_move functions defined in one
+    place and called. */
+    int32_t saved_offset = frame_save_offset(h);
+    CHECK(tf != TYPETRAV_FUNC_DEFAULT_CONSTRUCT);
+    struct loc enum_num_loc;
+    struct loc dest_num_loc;
+    if (has_src) {
+      enum_num_loc = make_enum_num_loc(f, h, src);
+      dest_num_loc = make_enum_num_loc(f, h, dest);
+    } else {
+      enum_num_loc = make_enum_num_loc(f, h, dest);
+      dest_num_loc.tag = (enum loc_tag)-1;
+    }
+
+    gen_load_register(f, X86_EAX, enum_num_loc);
+
+    /* TODO: This is inefficient if the enum has no types or is
+    trivially copyable. */
+
+    size_t end_target = frame_add_target(h);
+    size_t next_target = frame_add_target(h);
+    for (size_t i = 0, e = rhs->u.enumspec.enumfields_count; i < e; i++) {
+      x86_gen_cmp_imm32(f, X86_EAX, size_to_int32(i));
+      gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
+      switch (tf) {
+      case TYPETRAV_FUNC_DESTROY:
+        /* Do nothing. */
+        break;
+      case TYPETRAV_FUNC_COPY: /* fallthrough */
+      case TYPETRAV_FUNC_MOVE_OR_COPYDESTROY:
+        gen_store_register(f, dest_num_loc, X86_EAX);
+        break;
+      case TYPETRAV_FUNC_DEFAULT_CONSTRUCT:
+        UNREACHABLE();
+      default:
+        UNREACHABLE();
+      }
+
+      uint32_t field_size = kira_sizeof(&cs->nt, &rhs->u.enumspec.enumfields[i].type);
+      struct loc dest_body_loc = make_enum_body_loc(f, h, dest, field_size);
+      struct loc src_body_loc;
+      if (has_src) {
+        src_body_loc = make_enum_body_loc(f, h, src, field_size);
+      } else {
+        src_body_loc.tag = (enum loc_tag)-1;
+      }
+
+      gen_typetrav_func(cs, f, h, tf, dest_body_loc, has_src,
+                        src_body_loc, &rhs->u.enumspec.enumfields[i].type);
+
+      gen_placeholder_jmp(f, h, end_target);
+      frame_define_target(h, next_target, objfile_section_size(objfile_text(f)));
+      next_target = frame_add_target(h);
+    }
+
+    gen_crash_jmp(f, h);
+
+    frame_define_target(h, end_target, objfile_section_size(objfile_text(f)));
+
+    frame_restore_offset(h, saved_offset);
+  } break;
   default:
     UNREACHABLE();
   }
@@ -2151,29 +2239,6 @@ void gen_cmp8_behavior(struct objfile *f,
   x86_gen_cmp_w32(f, X86_EDX, X86_ECX);
   x86_gen_setcc_b8(f, X86_AL, setcc_code);
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
-}
-
-struct loc gen_subobject_loc(struct objfile *f,
-                             struct frame *h,
-                             struct loc loc,
-                             uint32_t size,
-                             uint32_t offset);
-
-struct loc make_enum_num_loc(struct objfile *f,
-                             struct frame *h,
-                             struct loc loc) {
-  CHECK(loc.size >= DWORD_SIZE);
-  /* All enums start with a DWORD-sized tag. */
-  return gen_subobject_loc(f, h, loc, DWORD_SIZE, 0);
-}
-
-struct loc make_enum_body_loc(struct objfile *f,
-                              struct frame *h,
-                              struct loc loc,
-                              uint32_t body_size) {
-  CHECK(loc.size >= uint32_add(DWORD_SIZE, body_size));
-  /* All enums start with a DWORD-sized tag. */
-  return gen_subobject_loc(f, h, loc, body_size, DWORD_SIZE);
 }
 
 void gen_enumconstruct_behavior(struct checkstate *cs,
@@ -3242,15 +3307,22 @@ void gen_placeholder_jmp_if_false(struct objfile *f, struct frame *h,
   gen_placeholder_jcc(f, h, X86_JCC_Z, target_number);
 }
 
-void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code) {
+size_t frame_crash_target_number(struct frame *h) {
   /* The crash target code gets generated (at the end) only if we call
   this function -- only if h->crash_target_exists is true. */
   if (!h->crash_target_exists) {
     h->crash_target_number = frame_add_target(h);
     h->crash_target_exists = 1;
   }
+  return h->crash_target_number;
+}
 
-  gen_placeholder_jcc(f, h, code, h->crash_target_number);
+void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code) {
+  gen_placeholder_jcc(f, h, code, frame_crash_target_number(h));
+}
+
+void gen_crash_jmp(struct objfile *f, struct frame *h) {
+  gen_placeholder_jmp(f, h, frame_crash_target_number(h));
 }
 
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number) {
