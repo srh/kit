@@ -22,7 +22,7 @@ struct static_value {
     int8_t i8_value;
     /* An owned ref to the _typechecked_, annotated AST. */
     struct ast_expr typechecked_lambda;
-    enum primitive_op primitive_op;
+    struct primitive_op primitive_op;
   } u;
 };
 
@@ -32,7 +32,7 @@ void static_value_init_u8(struct static_value *a, uint8_t u8_value);
 void static_value_init_typechecked_lambda(struct static_value *a,
                                           struct ast_expr lambda);
 void static_value_init_primitive_op(struct static_value *a,
-                                    enum primitive_op primitive_op);
+                                    struct primitive_op primitive_op);
 void static_value_init_copy(struct static_value *a, struct static_value *c);
 void static_value_init_move(struct static_value *a, struct static_value *m);
 void static_value_destroy(struct static_value *a);
@@ -91,7 +91,7 @@ struct def_entry {
   size_t private_to_count;
 
   int is_primitive;
-  enum primitive_op primitive_op;
+  struct primitive_op primitive_op;
   int is_extern;
   int is_export;
   struct ast_def *def;
@@ -166,14 +166,14 @@ int name_table_add_def(struct name_table *t,
 int name_table_add_primitive_def(
     struct name_table *t,
     ident_value name,
-    enum primitive_op primitive_op,
+    struct primitive_op primitive_op,
     struct ast_generics *generics,
     struct ast_typeexpr *type);
 /* private_to_count is how many access scopes you need to get access
 to the type.  So if it's zero, this is a public def. */
 int name_table_add_private_primitive_def(struct name_table *t,
                                          ident_value name,
-                                         enum primitive_op primitive_op,
+                                         struct primitive_op primitive_op,
                                          struct ast_generics *generics,
                                          struct ast_typeexpr *type,
                                          struct defclass_ident *private_to,

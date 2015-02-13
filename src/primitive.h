@@ -1,7 +1,7 @@
 #ifndef KIRA_PRIMITIVE_H_
 #define KIRA_PRIMITIVE_H_
 
-enum primitive_op {
+enum primitive_op_tag {
   /* TODO: Implement (or change what primitive_ops generally are...) */
   PRIMITIVE_OP_ENUMCONSTRUCT,
 
@@ -172,6 +172,12 @@ enum primitive_op {
   PRIMITIVE_OP_BIT_RIGHTSHIFT_I32,
 };
 
-#define PRIMITIVE_OP_INVALID ((enum primitive_op)-1)
+#define PRIMITIVE_OP_INVALID ((enum primitive_op_tag)-1)
+
+struct primitive_op {
+  enum primitive_op_tag tag;
+};
+
+struct primitive_op make_primop(enum primitive_op_tag tag);
 
 #endif /* KIRA_PRIMITIVE_H_ */

@@ -101,7 +101,7 @@ struct loc gen_array_element_loc(struct checkstate *cs,
 void gen_primitive_op_behavior(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
-                               enum primitive_op prim_op,
+                               struct primitive_op prim_op,
                                struct ast_typeexpr *arg0_type_or_null);
 void x86_gen_call(struct objfile *f, uint32_t func_sti);
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc);
@@ -162,8 +162,8 @@ int generate_kira_name(struct checkstate *cs,
 }
 
 int is_primitive_but_not_sizeof_alignof(struct def_entry *ent) {
-  return ent->is_primitive && ent->primitive_op != PRIMITIVE_OP_SIZEOF
-    && ent->primitive_op != PRIMITIVE_OP_ALIGNOF;
+  return ent->is_primitive && ent->primitive_op.tag != PRIMITIVE_OP_SIZEOF
+    && ent->primitive_op.tag != PRIMITIVE_OP_ALIGNOF;
 }
 
 /* TODO: Put string literals in rdata (add section number to loc_global). */
@@ -275,7 +275,7 @@ struct immediate {
   enum immediate_tag tag;
   union {
     uint32_t func_sti;
-    enum primitive_op primitive_op;
+    struct primitive_op primitive_op;
     uint32_t u32;
     int32_t i32;
     uint8_t u8;
@@ -2146,11 +2146,11 @@ void gen_cmp8_behavior(struct objfile *f,
 void gen_primitive_op_behavior(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
-                               enum primitive_op prim_op,
+                               struct primitive_op prim_op,
                                struct ast_typeexpr *arg0_type_or_null) {
   int32_t off0 = h->stack_offset;
   int32_t off1 = int32_add(h->stack_offset, DWORD_SIZE);
-  switch (prim_op) {
+  switch (prim_op.tag) {
   case PRIMITIVE_OP_INIT: {
     struct ast_typeexpr *target;
     int success = view_ptr_target(cs->im, arg0_type_or_null, &target);

@@ -39,7 +39,7 @@ void static_value_init_typechecked_lambda(struct static_value *a,
 }
 
 void static_value_init_primitive_op(struct static_value *a,
-                                    enum primitive_op primitive_op) {
+                                    struct primitive_op primitive_op) {
   a->tag = STATIC_VALUE_PRIMITIVE_OP;
   a->u.primitive_op = primitive_op;
 }
@@ -188,7 +188,7 @@ void def_entry_init(struct def_entry *e, ident_value name,
                     struct defclass_ident *private_to,
                     size_t private_to_count,
                     int is_primitive,
-                    enum primitive_op primitive_op,
+                    struct primitive_op primitive_op,
                     int is_extern,
                     int is_export,
                     struct ast_def *def) {
@@ -236,7 +236,7 @@ void def_entry_destroy(struct def_entry *e) {
   e->private_to_count = 0;
 
   e->is_primitive = 0;
-  e->primitive_op = PRIMITIVE_OP_INVALID;
+  e->primitive_op = make_primop(PRIMITIVE_OP_INVALID);
   e->is_extern = 0;
   e->def = NULL;
 
@@ -419,7 +419,7 @@ int name_table_help_add_def(struct name_table *t,
                             struct defclass_ident *private_to,
                             size_t private_to_count,
                             int is_primitive,
-                            enum primitive_op primitive_op,
+                            struct primitive_op primitive_op,
                             int is_extern,
                             int is_export,
                             struct ast_def *def) {
@@ -479,13 +479,13 @@ int name_table_add_def(struct name_table *t,
   return name_table_help_add_def(t, name, generics, type,
                                  accessible, accessible_count,
                                  NULL, 0,  /* Not private to anything. */
-                                 0, PRIMITIVE_OP_INVALID,
+                                 0, make_primop(PRIMITIVE_OP_INVALID),
                                  0, is_export, def);
 }
 
 int name_table_add_private_primitive_def(struct name_table *t,
                                          ident_value name,
-                                         enum primitive_op primitive_op,
+                                         struct primitive_op primitive_op,
                                          struct ast_generics *generics,
                                          struct ast_typeexpr *type,
                                          struct defclass_ident *private_to,
@@ -499,7 +499,7 @@ int name_table_add_private_primitive_def(struct name_table *t,
 
 int name_table_add_primitive_def(struct name_table *t,
                                  ident_value name,
-                                 enum primitive_op primitive_op,
+                                 struct primitive_op primitive_op,
                                  struct ast_generics *generics,
                                  struct ast_typeexpr *type) {
   return name_table_help_add_def(t, name, generics, type,
@@ -517,7 +517,7 @@ int name_table_add_extern_def(struct name_table *t,
   return name_table_help_add_def(t, name, &generics, type,
                                  NULL, 0, /* Needs no special access. */
                                  NULL, 0, /* Not private to anything. */
-                                 0, PRIMITIVE_OP_INVALID,
+                                 0, make_primop(PRIMITIVE_OP_INVALID),
                                  1, 0, NULL);
 }
 

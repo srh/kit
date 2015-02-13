@@ -89,7 +89,7 @@ const char *binop_name(enum ast_binop binop) {
   return binop_names[binop];
 }
 
-static const enum primitive_op binop_i32_primitive_ops[] = {
+static const enum primitive_op_tag binop_i32_primitive_ops[] = {
   [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
   [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_I32,
   [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_I32,
@@ -111,7 +111,7 @@ static const enum primitive_op binop_i32_primitive_ops[] = {
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
 
-static const enum primitive_op binop_u32_primitive_ops[] = {
+static const enum primitive_op_tag binop_u32_primitive_ops[] = {
   [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
   [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_U32,
   [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_U32,
@@ -133,7 +133,7 @@ static const enum primitive_op binop_u32_primitive_ops[] = {
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
 
-static const enum primitive_op binop_u8_primitive_ops[] = {
+static const enum primitive_op_tag binop_u8_primitive_ops[] = {
   [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
   [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_U8,
   [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_U8,
@@ -155,7 +155,7 @@ static const enum primitive_op binop_u8_primitive_ops[] = {
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
 
-static const enum primitive_op binop_i8_primitive_ops[] = {
+static const enum primitive_op_tag binop_i8_primitive_ops[] = {
   [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
   [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_I8,
   [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_I8,
@@ -177,7 +177,7 @@ static const enum primitive_op binop_i8_primitive_ops[] = {
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
 
-static const enum primitive_op binop_u16_primitive_ops[] = {
+static const enum primitive_op_tag binop_u16_primitive_ops[] = {
   [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
   [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_U16,
   [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_U16,
@@ -199,7 +199,7 @@ static const enum primitive_op binop_u16_primitive_ops[] = {
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
 
-static const enum primitive_op binop_i16_primitive_ops[] = {
+static const enum primitive_op_tag binop_i16_primitive_ops[] = {
   [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
   [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_I16,
   [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_I16,
@@ -226,14 +226,13 @@ static const enum primitive_op binop_i16_primitive_ops[] = {
 
 void intern_binop(struct checkstate *cs,
                   enum ast_binop binop,
-                  const enum primitive_op *primop_array,
+                  const enum primitive_op_tag *primop_array,
                   struct ast_generics *generics,
                   struct ast_typeexpr *type) {
-
   name_table_add_primitive_def(
       &cs->nt,
       identmap_intern_c_str(cs->im, binop_name(binop)),
-      primop_array[binop],
+      make_primop(primop_array[binop]),
       generics,
       type);
 }
@@ -342,7 +341,7 @@ void init_binop_compare_type(struct ast_typeexpr *a, struct identmap *im,
 }
 
 void import_integer_binops(struct checkstate *cs,
-                           const enum primitive_op *primop_array,
+                           const enum primitive_op_tag *primop_array,
                            const char *type_name) {
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
@@ -379,7 +378,7 @@ void import_integer_conversions(struct checkstate *cs) {
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
 
-  enum primitive_op conversions[6][6] = {
+  enum primitive_op_tag conversions[6][6] = {
     {
       PRIMITIVE_OP_CONVERT_U8_TO_U8,
       PRIMITIVE_OP_CONVERT_U8_TO_I8,
@@ -434,7 +433,7 @@ void import_integer_conversions(struct checkstate *cs) {
       init_func_type(&func_type, cs->im, names, 2);
       name_table_add_primitive_def(&cs->nt,
                                    convert,
-                                   conversions[i][j],
+                                   make_primop(conversions[i][j]),
                                    &generics,
                                    &func_type);
       ast_typeexpr_destroy(&func_type);
@@ -443,7 +442,7 @@ void import_integer_conversions(struct checkstate *cs) {
 }
 
 void import_unop(struct checkstate *cs,
-                 enum primitive_op primitive_op,
+                 enum primitive_op_tag primitive_op,
                  const char *op_name,
                  const char *type_name) {
   struct ast_generics generics;
@@ -456,7 +455,7 @@ void import_unop(struct checkstate *cs,
   name_table_add_primitive_def(
       &cs->nt,
       identmap_intern_c_str(cs->im, op_name),
-      primitive_op,
+      make_primop(primitive_op),
       &generics,
       &type);
   ast_typeexpr_destroy(&type);
@@ -476,14 +475,14 @@ void import_sizeof_alignof(struct checkstate *cs) {
   name_table_add_primitive_def(
       &cs->nt,
       identmap_intern_c_str(cs->im, "sizeof"),
-      PRIMITIVE_OP_SIZEOF,
+      make_primop(PRIMITIVE_OP_SIZEOF),
       &generics,
       &type);
 
   name_table_add_primitive_def(
       &cs->nt,
       identmap_intern_c_str(cs->im, "alignof"),
-      PRIMITIVE_OP_ALIGNOF,
+      make_primop(PRIMITIVE_OP_ALIGNOF),
       &generics,
       &type);
 
@@ -526,12 +525,12 @@ void import_constructors(struct checkstate *cs) {
 
     name_table_add_primitive_def(&cs->nt,
                                  identmap_intern_c_str(cs->im, "init"),
-                                 PRIMITIVE_OP_INIT,
+                                 make_primop(PRIMITIVE_OP_INIT),
                                  &generics,
                                  &func1);
     name_table_add_primitive_def(&cs->nt,
                                  identmap_intern_c_str(cs->im, "destroy"),
-                                 PRIMITIVE_OP_DESTROY,
+                                 make_primop(PRIMITIVE_OP_DESTROY),
                                  &generics,
                                  &func1);
 
@@ -544,12 +543,12 @@ void import_constructors(struct checkstate *cs) {
 
     name_table_add_primitive_def(&cs->nt,
                                  identmap_intern_c_str(cs->im, "move"),
-                                 PRIMITIVE_OP_MOVE,
+                                 make_primop(PRIMITIVE_OP_MOVE),
                                  &generics,
                                  &func2);
     name_table_add_primitive_def(&cs->nt,
                                  identmap_intern_c_str(cs->im, "copy"),
-                                 PRIMITIVE_OP_COPY,
+                                 make_primop(PRIMITIVE_OP_COPY),
                                  &generics,
                                  &func2);
 
@@ -696,9 +695,10 @@ int add_enum_constructors(struct checkstate *cs,
                      make_ast_ident(identmap_intern_c_str(cs->im, FUNC_TYPE_NAME)),
                      params, 2);
 
+    /* TODO: Use of make_primop here is invalid. */
     int success = name_table_add_primitive_def(&cs->nt,
                                                f->name.value,
-                                               PRIMITIVE_OP_ENUMCONSTRUCT,
+                                               make_primop(PRIMITIVE_OP_ENUMCONSTRUCT),
                                                generics,
                                                &func_type);
     ast_typeexpr_destroy(&func_type);
@@ -3754,7 +3754,7 @@ int apply_static_funcall(struct static_value *func,
   those which... are needed. */
   switch (params_count) {
   case 1:
-    switch (func->u.primitive_op) {
+    switch (func->u.primitive_op.tag) {
     case PRIMITIVE_OP_CONVERT_U8_TO_U8: {
       CHECK(params[0].tag == STATIC_VALUE_U8);
       static_value_init_u8(out, params[0].u.u8_value);
@@ -3846,7 +3846,7 @@ int apply_static_funcall(struct static_value *func,
     int32_t val_i32 = 0; /* Initialized to make cl shut up. */
     uint32_t val_u32 = 0; /* Initialized to make cl shut up. */
     uint8_t val_u8 = 0; /* Initialized to make cl shut up. */
-    switch (func->u.primitive_op) {
+    switch (func->u.primitive_op.tag) {
     case PRIMITIVE_OP_ADD_I32:
       succ_i32 = try_int32_add(st_i32(&params[0]), st_i32(&params[1]), &val_i32);
       break;
@@ -4206,7 +4206,7 @@ int compute_static_values(struct name_table *nt, struct def_entry *ent) {
     struct def_instantiation *inst = ent->instantiations[i];
 
     if (is_primitive) {
-      switch (ent->primitive_op) {
+      switch (ent->primitive_op.tag) {
       case PRIMITIVE_OP_SIZEOF: {
         CHECK(inst->substitutions_count == 1);
         uint32_t size = kira_sizeof(nt, &inst->substitutions[0]);
