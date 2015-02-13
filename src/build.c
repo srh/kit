@@ -1537,6 +1537,28 @@ void gen_default_construct(struct checkstate *cs, struct objfile *f, struct fram
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_DEFAULT_CONSTRUCT, loc, 0, ignore, type);
 }
 
+void gen_returnloc_funcreturn_convention(struct objfile *f,
+                                         int hidden_return_param,
+                                         struct loc return_loc) {
+  /* return_loc is always in the stack frame (and padded to
+  DWORD_SIZE) or via a hidden return param. */
+  if (hidden_return_param) {
+    CHECK(return_loc.tag == LOC_EBP_INDIRECT);
+    x86_gen_load32(f, X86_EAX, X86_EBP, return_loc.u.ebp_indirect);
+  } else if (return_loc.size == 0) {
+    x86_gen_xor_w32(f, X86_EAX, X86_EAX);
+  } else if (return_loc.size <= DWORD_SIZE) {
+    CHECK(return_loc.tag == LOC_EBP_OFFSET);
+    CHECK(return_loc.padded_size == DWORD_SIZE);
+    x86_gen_load32(f, X86_EAX, X86_EBP, return_loc.u.ebp_offset);
+  } else {
+    CHECK(return_loc.size == 2 * DWORD_SIZE);
+    CHECK(return_loc.tag == LOC_EBP_OFFSET);
+    CHECK(return_loc.padded_size == 2 * DWORD_SIZE);
+    x86_gen_load32(f, X86_EAX, X86_EBP, return_loc.u.ebp_offset);
+    x86_gen_load32(f, X86_EDX, X86_EBP, int32_add(return_loc.u.ebp_offset, DWORD_SIZE));
+  }
+}
 
 void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h) {
   if (h->return_target_valid) {
@@ -1553,23 +1575,8 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
     SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
   }
 
-  if (frame_hidden_return_param(h)) {
-    CHECK(h->return_loc.tag == LOC_EBP_INDIRECT);
-    CHECK(h->return_loc.u.ebp_indirect == 8);
-    x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_indirect);
-  } else if (h->return_loc.size == 0) {
-    x86_gen_xor_w32(f, X86_EAX, X86_EAX);
-  } else if (h->return_loc.size <= DWORD_SIZE) {
-    CHECK(h->return_loc.tag == LOC_EBP_OFFSET);
-    CHECK(h->return_loc.padded_size == DWORD_SIZE);
-    x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset);
-  } else {
-    CHECK(h->return_loc.size == 2 * DWORD_SIZE);
-    CHECK(h->return_loc.tag == LOC_EBP_OFFSET);
-    CHECK(h->return_loc.padded_size == 2 * DWORD_SIZE);
-    x86_gen_load32(f, X86_EAX, X86_EBP, h->return_loc.u.ebp_offset);
-    x86_gen_load32(f, X86_EDX, X86_EBP, int32_add(h->return_loc.u.ebp_offset, DWORD_SIZE));
-  }
+  gen_returnloc_funcreturn_convention(f, frame_hidden_return_param(h),
+                                      h->return_loc);
 
   x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
   x86_gen_pop32(f, X86_EBP);
@@ -2146,6 +2153,70 @@ void gen_cmp8_behavior(struct objfile *f,
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
 
+struct loc gen_subobject_loc(struct objfile *f,
+                             struct frame *h,
+                             struct loc loc,
+                             uint32_t size,
+                             uint32_t offset);
+
+struct loc make_enum_num_loc(struct objfile *f,
+                             struct frame *h,
+                             struct loc loc) {
+  CHECK(loc.size >= DWORD_SIZE);
+  /* All enums start with a DWORD-sized tag. */
+  return gen_subobject_loc(f, h, loc, DWORD_SIZE, 0);
+}
+
+struct loc make_enum_body_loc(struct objfile *f,
+                              struct frame *h,
+                              struct loc loc,
+                              uint32_t body_size) {
+  CHECK(loc.size >= uint32_add(DWORD_SIZE, body_size));
+  /* All enums start with a DWORD-sized tag. */
+  return gen_subobject_loc(f, h, loc, body_size, DWORD_SIZE);
+}
+
+void gen_enumconstruct_behavior(struct checkstate *cs,
+                                struct objfile *f,
+                                struct frame *h,
+                                size_t enumconstruct_number,
+                                struct ast_typeexpr *arg0_type,
+                                struct ast_typeexpr *return_type) {
+  CHECK(arg0_type);
+  /* We have to actually figure out the calling convention and
+  arg/return locations and sizes for this op. */
+  int32_t saved_stack_offset = frame_save_offset(h);
+
+  uint32_t arg_size = kira_sizeof(&cs->nt, arg0_type);
+
+  uint32_t return_size;
+  int hidden_return_param = exists_hidden_return_param(cs, return_type, &return_size);
+
+  struct loc arg_loc = ebp_loc(arg_size, arg_size,
+                               h->stack_offset + (hidden_return_param ? DWORD_SIZE : 0));
+
+  struct loc return_loc;
+  if (hidden_return_param) {
+    return_loc = ebp_indirect_loc(return_size, return_size, h->stack_offset);
+  } else {
+    return_loc = frame_push_loc(h, return_size);
+  }
+
+  struct loc return_enum_num_loc = make_enum_num_loc(f, h, return_loc);
+  struct loc return_enum_body_loc = make_enum_body_loc(f, h, return_loc, arg_size);
+
+  struct immediate enum_num_imm;
+  enum_num_imm.tag = IMMEDIATE_U32;
+  enum_num_imm.u.u32 = size_to_uint32(enumconstruct_number);
+  x86_gen_mov_reg_imm32(f, X86_EAX, enum_num_imm);
+  gen_store_register(f, return_enum_num_loc, X86_EAX);
+
+  gen_move_or_copydestroy(cs, f, h, return_enum_body_loc, arg_loc, arg0_type);
+
+  gen_returnloc_funcreturn_convention(f, hidden_return_param, return_loc);
+  frame_restore_offset(h, saved_stack_offset);
+}
+
 void gen_primitive_op_behavior(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
@@ -2156,8 +2227,14 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   int32_t off1 = int32_add(h->stack_offset, DWORD_SIZE);
   switch (prim_op.tag) {
   case PRIMITIVE_OP_ENUMCONSTRUCT: {
-    (void)return_type;
-    TODO_IMPLEMENT;
+    CHECK(arg0_type_or_null);
+    /* Unlike with other ops, our calling convention doesn't involve
+    one parameter at off0 and another at off1 (and a return value, if
+    any, in registers).  We actually have to figure out whether a
+    hidden return parameter is involved. */
+    gen_enumconstruct_behavior(cs, f, h, prim_op.u.enumconstruct_number,
+                               arg0_type_or_null,
+                               return_type);
   } break;
   case PRIMITIVE_OP_INIT: {
     struct ast_typeexpr *target;
@@ -3466,35 +3543,44 @@ struct loc gen_field_loc(struct checkstate *cs,
                           &size, &offset);
   }
 
+  return gen_subobject_loc(f, h, lhs_loc, size, offset);
+}
+
+struct loc gen_subobject_loc(struct objfile *f,
+                             struct frame *h,
+                             struct loc loc,
+                             uint32_t size,
+                             uint32_t offset) {
+  CHECK(uint32_add(size, offset) <= loc.size);
   /* Note: This code needs to preserve lvalues (and it does so). */
 
-  struct loc field_loc;
-  switch (lhs_loc.tag) {
+  struct loc ret;
+  switch (loc.tag) {
   case LOC_EBP_OFFSET: {
-    field_loc = ebp_loc(size, size, int32_add(lhs_loc.u.ebp_offset,
-                                              uint32_to_int32(offset)));
+    ret = ebp_loc(size, size, int32_add(loc.u.ebp_offset,
+                                        uint32_to_int32(offset)));
   } break;
   case LOC_GLOBAL: {
     /* This could probably be implemented more smartly, with advanced
     symbol-making, but who cares. */
     struct loc field_ptr_loc = frame_push_loc(h, DWORD_SIZE);
-    x86_gen_mov_reg_stiptr(f, X86_EAX, lhs_loc.u.global_sti);
+    x86_gen_mov_reg_stiptr(f, X86_EAX, loc.u.global_sti);
     x86_gen_lea32(f, X86_EAX, X86_EAX, uint32_to_int32(offset));
     x86_gen_store32(f, X86_EBP, field_ptr_loc.u.ebp_offset, X86_EAX);
-    field_loc = ebp_indirect_loc(size, size, field_ptr_loc.u.ebp_offset);
+    ret = ebp_indirect_loc(size, size, field_ptr_loc.u.ebp_offset);
   } break;
   case LOC_EBP_INDIRECT: {
     struct loc field_ptr_loc = frame_push_loc(h, DWORD_SIZE);
-    x86_gen_load32(f, X86_EAX, X86_EBP, lhs_loc.u.ebp_indirect);
+    x86_gen_load32(f, X86_EAX, X86_EBP, loc.u.ebp_indirect);
     x86_gen_lea32(f, X86_EAX, X86_EAX, uint32_to_int32(offset));
     x86_gen_store32(f, X86_EBP, field_ptr_loc.u.ebp_offset, X86_EAX);
-    field_loc = ebp_indirect_loc(size, size, field_ptr_loc.u.ebp_offset);
+    ret = ebp_indirect_loc(size, size, field_ptr_loc.u.ebp_offset);
   } break;
   default:
     UNREACHABLE();
   }
 
-  return field_loc;
+  return ret;
 }
 
 void apply_field_access(struct checkstate *cs,
