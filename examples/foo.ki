@@ -72,6 +72,19 @@ def try_kla func[void] = fn() void {
   return ret;
 };
 
+defenum enty {
+  c1 void;
+  c2 struct { p i32; q i32; };
+};
+
+def blah_enty func[enty, enty] = fn(x enty) enty {
+  var v void;
+  var y enty = c1(v);
+  var u struct { p i32; q i32; };
+  y = c2(u);
+  return y;
+};
+
 def au8 func[*string, u8, void] = fn(p *string, x u8) void {
   return append(p, x);
 };
@@ -86,6 +99,10 @@ def try_string func[void] = fn() void {
 export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
   try_kla();
   try_string();
+
+  var v void;
+  var k enty = blah_enty(c1(v));
+
   var ret ty;
   p->x = -5;
   p->y = fac(7);

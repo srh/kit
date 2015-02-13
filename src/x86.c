@@ -10,9 +10,52 @@
 #include "win/objfile.h"
 
 
+int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
+                     ident_value fieldstop, uint32_t *offsetof_out,
+                     uint32_t *sizeof_out, uint32_t *alignof_out);
 int help_rhs_sizealignof(struct name_table *nt, struct ast_rhs *rhs,
                          ident_value fieldstop, uint32_t *offsetof_out,
                          uint32_t *sizeof_out, uint32_t *alignof_out);
+
+int unionfields_sizealignof(struct name_table *nt,
+                            struct ast_vardecl *fields,
+                            size_t fields_count,
+                            ident_value fieldstop,
+                            uint32_t *offsetof_out,
+                            uint32_t *sizeof_out,
+                            uint32_t *alignof_out) {
+  uint32_t max_size = 0;
+  uint32_t max_alignment = 1;
+  for (size_t i = 0; i < fields_count; i++) {
+    uint32_t invalid_offsetof_param;
+    uint32_t size;
+    uint32_t alignment;
+    help_sizealignof(nt, &fields[i].type,
+                     IDENT_VALUE_INVALID,
+                     &invalid_offsetof_param, &size, &alignment);
+
+    if (fields[i].name.value == fieldstop) {
+      CHECK(fieldstop != IDENT_VALUE_INVALID);
+      *offsetof_out = 0;
+      *sizeof_out = size;
+      *alignof_out = 0;
+      return 1;
+    }
+
+    if (max_size < size) {
+      max_size = size;
+    }
+    if (max_alignment < alignment) {
+      max_alignment = alignment;
+    }
+  }
+  CHECK(fieldstop == IDENT_VALUE_INVALID);
+  uint32_t final_size = uint32_ceil_aligned(max_size, max_alignment);
+  *offsetof_out = 0;
+  *sizeof_out = final_size;
+  *alignof_out = max_alignment;
+  return 0;
+}
 
 /* X86 WINDOWS */
 /* This is a bi-use function -- if fieldstop is IDENT_VALUE_INVALID,
@@ -21,6 +64,7 @@ alignment of the type, and zero is returned.  Otherwise, *offsetof_out
 and *sizeof_out are initialized with the offset and size of the type's
 field named fieldstop, and 1 is returned.  If the field name is not
 found, crashes. */
+/* TODO: This return code is fucking stupid. */
 int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                      ident_value fieldstop, uint32_t *offsetof_out,
                      uint32_t *sizeof_out, uint32_t *alignof_out) {
@@ -108,37 +152,13 @@ int help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     return 0;
   } break;
   case AST_TYPEEXPR_UNIONE: {
-    uint32_t max_size = 0;
-    uint32_t max_alignment = 1;
-    for (size_t i = 0, e = type->u.unione.fields_count; i < e; i++) {
-      uint32_t invalid_offsetof_param;
-      uint32_t size;
-      uint32_t alignment;
-      help_sizealignof(nt, &type->u.unione.fields[i].type,
-                       IDENT_VALUE_INVALID,
-                       &invalid_offsetof_param, &size, &alignment);
-
-      if (type->u.structe.fields[i].name.value == fieldstop) {
-        CHECK(fieldstop != IDENT_VALUE_INVALID);
-        *offsetof_out = 0;
-        *sizeof_out = size;
-        *alignof_out = 0;
-        return 1;
-      }
-
-      if (max_size < size) {
-        max_size = size;
-      }
-      if (max_alignment < alignment) {
-        max_alignment = alignment;
-      }
-    }
-    CHECK(fieldstop == IDENT_VALUE_INVALID);
-    uint32_t final_size = uint32_ceil_aligned(max_size, max_alignment);
-    *offsetof_out = 0;
-    *sizeof_out = final_size;
-    *alignof_out = max_alignment;
-    return 0;
+    return unionfields_sizealignof(nt,
+                                   type->u.unione.fields,
+                                   type->u.unione.fields_count,
+                                   fieldstop,
+                                   offsetof_out,
+                                   sizeof_out,
+                                   alignof_out);
   } break;
   case AST_TYPEEXPR_ARRAY: {
     CHECK(fieldstop == IDENT_VALUE_INVALID);
@@ -167,8 +187,27 @@ int help_rhs_sizealignof(struct name_table *nt, struct ast_rhs *rhs,
   case AST_RHS_TYPE:
     return help_sizealignof(nt, &rhs->u.type, fieldstop, offsetof_out,
                             sizeof_out, alignof_out);
-  case AST_RHS_ENUMSPEC:
-    TODO_IMPLEMENT;
+  case AST_RHS_ENUMSPEC: {
+    CHECK(fieldstop == IDENT_VALUE_INVALID);
+    uint32_t body_offset_discard;
+    uint32_t body_size;
+    uint32_t body_align;
+    int res = unionfields_sizealignof(nt,
+                                      rhs->u.enumspec.enumfields,
+                                      rhs->u.enumspec.enumfields_count,
+                                      fieldstop,
+                                      &body_offset_discard,
+                                      &body_size,
+                                      &body_align);
+
+    /* Other code expects enum nums to be dword-sized, the body offset
+    likewise. */
+    CHECK(body_align <= DWORD_SIZE);
+    *offsetof_out = 0;
+    *sizeof_out = uint32_add(body_size, DWORD_SIZE);
+    *alignof_out = DWORD_SIZE;
+    return res;
+  } break;
   default:
     UNREACHABLE();
   }
