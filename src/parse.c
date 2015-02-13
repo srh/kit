@@ -882,6 +882,8 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
   } else if (try_skip_keyword(p, "for")) {
     out->tag = AST_STATEMENT_FOR;
     return parse_rest_of_for_statement(p, pos_start, &out->u.for_statement);
+  } else if (try_skip_keyword(p, "switch")) {
+    TODO_IMPLEMENT;
   } else {
     out->tag = AST_STATEMENT_EXPR;
     return parse_rest_of_expr_statement(p, &out->u.expr);

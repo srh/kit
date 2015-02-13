@@ -2600,6 +2600,8 @@ int check_statement(struct bodystate *bs,
   for_fail:
     goto fail;
   } break;
+  case AST_STATEMENT_SWITCH:
+    TODO_IMPLEMENT;
   default:
     UNREACHABLE();
   }

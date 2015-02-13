@@ -4002,6 +4002,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
     }
   } break;
+  case AST_STATEMENT_SWITCH:
+    TODO_IMPLEMENT;
   default:
     UNREACHABLE();
   }

@@ -424,6 +424,35 @@ void ast_for_statement_destroy(struct ast_for_statement *a) {
   ast_bracebody_destroy(&a->body);
 }
 
+void ast_switch_statement_init(struct ast_switch_statement *a,
+                               struct ast_meta meta,
+                               struct ast_expr swartch,
+                               struct ast_cased_statement *cased_statements,
+                               size_t cased_statements_count) {
+  a->meta = meta;
+  ast_expr_alloc_move(swartch, &a->swartch);
+  a->cased_statements = cased_statements;
+  a->cased_statements_count = cased_statements_count;
+}
+
+void ast_switch_statement_init_copy(struct ast_switch_statement *a,
+                                    struct ast_switch_statement *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_expr_alloc_init_copy(c->swartch, &a->swartch);
+  SLICE_INIT_COPY(a->cased_statements, a->cased_statements_count,
+                  c->cased_statements, c->cased_statements_count,
+                  ast_cased_statement_init_copy);
+}
+
+void ast_switch_statement_destroy(struct ast_switch_statement *a) {
+  ast_meta_destroy(&a->meta);
+  ast_expr_destroy(a->swartch);
+  free(a->swartch);
+  a->swartch = NULL;
+  SLICE_FREE(a->cased_statements, a->cased_statements_count,
+             ast_cased_statement_destroy);
+}
+
 void ast_statement_init_copy(struct ast_statement *a,
                              struct ast_statement *c) {
   a->tag = c->tag;
@@ -452,6 +481,10 @@ void ast_statement_init_copy(struct ast_statement *a,
   case AST_STATEMENT_FOR:
     ast_for_statement_init_copy(&a->u.for_statement,
                                 &c->u.for_statement);
+    break;
+  case AST_STATEMENT_SWITCH:
+    ast_switch_statement_init_copy(&a->u.switch_statement,
+                                   &c->u.switch_statement);
     break;
   default:
     UNREACHABLE();
@@ -485,6 +518,9 @@ void ast_statement_destroy(struct ast_statement *a) {
   case AST_STATEMENT_FOR:
     ast_for_statement_destroy(&a->u.for_statement);
     break;
+  case AST_STATEMENT_SWITCH:
+    ast_switch_statement_destroy(&a->u.switch_statement);
+    break;
   default:
     UNREACHABLE();
   }
@@ -498,6 +534,33 @@ void ast_statement_alloc_move(struct ast_statement movee,
   *p = movee;
   *out = p;
 }
+
+void ast_case_pattern_init_copy(struct ast_case_pattern *a,
+                                struct ast_case_pattern *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_ident_init_copy(&a->constructor_name, &c->constructor_name);
+  ast_vardecl_init_copy(&a->decl, &c->decl);
+}
+
+void ast_case_pattern_destroy(struct ast_case_pattern *a) {
+  ast_meta_destroy(&a->meta);
+  ast_ident_destroy(&a->constructor_name);
+  ast_vardecl_destroy(&a->decl);
+}
+
+void ast_cased_statement_init_copy(struct ast_cased_statement *a,
+                                   struct ast_cased_statement *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  ast_case_pattern_init_copy(&a->pattern, &c->pattern);
+  ast_statement_init_copy(&a->statement, &c->statement);
+}
+
+void ast_cased_statement_destroy(struct ast_cased_statement *a) {
+  ast_meta_destroy(&a->meta);
+  ast_case_pattern_destroy(&a->pattern);
+  ast_statement_destroy(&a->statement);
+}
+
 
 int is_magic_unop(enum ast_unop unop) {
   return unop == AST_UNOP_DEREFERENCE || unop == AST_UNOP_ADDRESSOF;

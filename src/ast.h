@@ -275,6 +275,15 @@ void ast_for_statement_init(struct ast_for_statement *a,
                             struct ast_expr *expr,
                             struct ast_bracebody body);
 
+struct ast_cased_statement;
+
+struct ast_switch_statement {
+  struct ast_meta meta;
+  struct ast_expr *swartch;
+  struct ast_cased_statement *cased_statements;
+  size_t cased_statements_count;
+};
+
 enum ast_statement_tag {
   AST_STATEMENT_EXPR,
   AST_STATEMENT_RETURN_EXPR,
@@ -283,6 +292,7 @@ enum ast_statement_tag {
   AST_STATEMENT_IFTHENELSE,
   AST_STATEMENT_WHILE,
   AST_STATEMENT_FOR,
+  AST_STATEMENT_SWITCH,
 };
 
 struct ast_statement {
@@ -295,6 +305,7 @@ struct ast_statement {
     struct ast_ifthenelse_statement ifthenelse_statement;
     struct ast_while_statement while_statement;
     struct ast_for_statement for_statement;
+    struct ast_switch_statement switch_statement;
   } u;
 };
 
@@ -304,6 +315,22 @@ void ast_statement_destroy(struct ast_statement *a);
 
 void ast_statement_alloc_move(struct ast_statement movee,
                               struct ast_statement **out);
+
+struct ast_case_pattern {
+  struct ast_meta meta;
+  struct ast_ident constructor_name;
+  struct ast_vardecl decl;
+};
+
+struct ast_cased_statement {
+  struct ast_meta meta;
+  struct ast_case_pattern pattern;
+  struct ast_statement statement;
+};
+
+void ast_cased_statement_init_copy(struct ast_cased_statement *a,
+                                   struct ast_cased_statement *c);
+void ast_cased_statement_destroy(struct ast_cased_statement *a);
 
 /* TODO: This info is empty and unused.  We don't even set info_valid = 1. */
 struct ast_lambda_info {
