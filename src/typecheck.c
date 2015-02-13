@@ -2063,6 +2063,19 @@ void replace_generics(struct exprscope *es,
   }
 }
 
+void do_replace_enumspec_generics(struct ast_generics *generics,
+                                  struct ast_typeexpr *generics_substitutions,
+                                  struct ast_enumspec *a,
+                                  struct ast_enumspec *out) {
+  struct ast_vardecl *enumfields;
+  size_t enumfields_count;
+  do_replace_generics_in_fields(generics, generics_substitutions,
+                                a->enumfields,
+                                a->enumfields_count,
+                                &enumfields, &enumfields_count);
+  ast_enumspec_init(out, enumfields, enumfields_count);
+}
+
 void do_replace_rhs_generics(struct ast_generics *generics,
                              struct ast_typeexpr *generics_substitutions,
                              struct ast_rhs *a,
@@ -2074,14 +2087,9 @@ void do_replace_rhs_generics(struct ast_generics *generics,
     ast_rhs_init_type(out, type);
   } break;
   case AST_RHS_ENUMSPEC: {
-    struct ast_vardecl *enumfields;
-    size_t enumfields_count;
-    do_replace_generics_in_fields(generics, generics_substitutions,
-                                  a->u.enumspec.enumfields,
-                                  a->u.enumspec.enumfields_count,
-                                  &enumfields, &enumfields_count);
     struct ast_enumspec enumspec;
-    ast_enumspec_init(&enumspec, enumfields, enumfields_count);
+    do_replace_enumspec_generics(generics, generics_substitutions, &a->u.enumspec,
+                                 &enumspec);
     ast_rhs_init_enumspec(out, enumspec);
   } break;
   default:
@@ -2300,8 +2308,67 @@ enum fallthrough compose_fallthrough(enum fallthrough top_reachability,
 int is_enum_type(struct checkstate *cs,
                  struct ast_typeexpr *concrete_type,
                  struct ast_enumspec *concrete_enumspec_out) {
-  (void)cs, (void)concrete_type, (void)concrete_enumspec_out;
-  TODO_IMPLEMENT;
+  switch (concrete_type->tag) {
+  case AST_TYPEEXPR_NAME: {
+    struct deftype_entry *ent;
+    if (!name_table_lookup_deftype(&cs->nt, concrete_type->u.name.value,
+                                   no_param_list_arity(),
+                                   &ent)) {
+      return 0;
+    }
+
+    if (ent->is_primitive) {
+      return 0;
+    }
+
+    struct ast_deftype *deftype = ent->deftype;
+    CHECK(deftype);
+    switch (deftype->rhs.tag) {
+    case AST_RHS_TYPE:
+      return 0;
+    case AST_RHS_ENUMSPEC: {
+      ast_enumspec_init_copy(concrete_enumspec_out, &deftype->rhs.u.enumspec);
+      return 1;
+    } break;
+    default:
+      UNREACHABLE();
+    }
+  } break;
+  case AST_TYPEEXPR_APP: {
+    struct deftype_entry *ent;
+    if (!name_table_lookup_deftype(&cs->nt, concrete_type->u.app.name.value,
+                                   param_list_arity(concrete_type->u.app.params_count),
+                                   &ent)) {
+      return 0;
+    }
+
+    if (ent->is_primitive) {
+      return 0;
+    }
+
+    struct ast_deftype *deftype = ent->deftype;
+    CHECK(deftype);
+    switch (deftype->rhs.tag) {
+    case AST_RHS_TYPE:
+      return 0;
+    case AST_RHS_ENUMSPEC: {
+      do_replace_enumspec_generics(&deftype->generics,
+                                   concrete_type->u.app.params,
+                                   &deftype->rhs.u.enumspec,
+                                   concrete_enumspec_out);
+      return 1;
+    } break;
+    default:
+      UNREACHABLE();
+    }
+  } break;
+  case AST_TYPEEXPR_STRUCTE:
+  case AST_TYPEEXPR_UNIONE:
+  case AST_TYPEEXPR_ARRAY:
+    return 0;
+  default:
+    UNREACHABLE();
+  }
 }
 
 

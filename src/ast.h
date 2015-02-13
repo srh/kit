@@ -712,6 +712,7 @@ struct ast_enumspec {
 void ast_enumspec_init(struct ast_enumspec *a,
                        struct ast_vardecl *enumfields,
                        size_t enumfields_count);
+void ast_enumspec_init_copy(struct ast_enumspec *a, struct ast_enumspec *c);
 void ast_enumspec_destroy(struct ast_enumspec *a);
 
 /* TODO: Mass rename this too. */
