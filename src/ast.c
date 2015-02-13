@@ -548,17 +548,26 @@ void ast_case_pattern_destroy(struct ast_case_pattern *a) {
   ast_vardecl_destroy(&a->decl);
 }
 
+void ast_cased_statement_init(struct ast_cased_statement *a,
+                              struct ast_meta meta,
+                              struct ast_case_pattern pattern,
+                              struct ast_bracebody body) {
+  a->meta = meta;
+  a->pattern = pattern;
+  a->body = body;
+}
+
 void ast_cased_statement_init_copy(struct ast_cased_statement *a,
                                    struct ast_cased_statement *c) {
   a->meta = ast_meta_make_copy(&c->meta);
   ast_case_pattern_init_copy(&a->pattern, &c->pattern);
-  ast_statement_init_copy(&a->statement, &c->statement);
+  ast_bracebody_init_copy(&a->body, &c->body);
 }
 
 void ast_cased_statement_destroy(struct ast_cased_statement *a) {
   ast_meta_destroy(&a->meta);
   ast_case_pattern_destroy(&a->pattern);
-  ast_statement_destroy(&a->statement);
+  ast_bracebody_destroy(&a->body);
 }
 
 

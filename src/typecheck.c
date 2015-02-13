@@ -2297,6 +2297,14 @@ enum fallthrough compose_fallthrough(enum fallthrough top_reachability,
   }
 }
 
+int is_enum_type(struct checkstate *cs,
+                 struct ast_typeexpr *concrete_type,
+                 struct ast_enumspec *concrete_enumspec_out) {
+  (void)cs, (void)concrete_type, (void)concrete_enumspec_out;
+  TODO_IMPLEMENT;
+}
+
+
 int check_expr_bracebody(struct bodystate *bs,
                          struct ast_bracebody *x,
                          struct ast_bracebody *annotated_out,
@@ -2377,8 +2385,8 @@ int check_statement(struct bodystate *bs,
 
     struct ast_vardecl *replaced_decl = malloc(sizeof(*replaced_decl));
     CHECK(replaced_decl);
-    ast_vardecl_init(replaced_decl, ast_meta_make_copy(&s->u.var_statement.decl.meta), name,
-                     replaced_type_copy);
+    ast_vardecl_init(replaced_decl, ast_meta_make_copy(&s->u.var_statement.decl.meta),
+                     name, replaced_type_copy);
 
     struct varnum varnum;
     if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
@@ -2600,8 +2608,122 @@ int check_statement(struct bodystate *bs,
   for_fail:
     goto fail;
   } break;
-  case AST_STATEMENT_SWITCH:
-    TODO_IMPLEMENT;
+  case AST_STATEMENT_SWITCH: {
+    struct ast_switch_statement *ss = &s->u.switch_statement;
+    struct ast_typeexpr partial;
+    partial.tag = AST_TYPEEXPR_UNKNOWN;
+    struct ast_expr annotated_swartch;
+    if (!check_expr(bs->es, ss->swartch, &partial, &annotated_swartch)) {
+      goto fail;
+    }
+
+    struct ast_enumspec concrete_enumspec;
+    if (!is_enum_type(bs->es->cs, ast_expr_type(&annotated_swartch), &concrete_enumspec)) {
+      METERR(*ast_expr_ast_meta(ss->swartch),
+             "Switching over non-enum type.%s", "\n");
+      goto switch_fail_annotated_swartch;
+    }
+
+    fallthrough = FALLTHROUGH_NEVER;
+
+    struct ast_cased_statement *annotated_cased_statements
+      = malloc_mul(sizeof(*annotated_cased_statements), ss->cased_statements_count);
+
+    size_t i = 0;
+    for (size_t e = ss->cased_statements_count; i < e; i++) {
+      struct ast_cased_statement *cas = &ss->cased_statements[i];
+      for (size_t j = 0; j < i; j++) {
+        if (ss->cased_statements[j].pattern.constructor_name.value
+            == cas->pattern.constructor_name.value) {
+          METERR(cas->meta, "Overlapping (duplicate) switch cases.%s", "\n");
+          goto switch_fail_annotated_cased_statements;
+        }
+      }
+
+      int constructor_found = 0;
+      size_t constructor_num = SIZE_MAX;  /* Initialized to appease cl. */
+      for (size_t j = 0, je = concrete_enumspec.enumfields_count; j < je; j++) {
+        if (concrete_enumspec.enumfields[j].name.value
+            == cas->pattern.constructor_name.value) {
+          constructor_found = 1;
+          constructor_num = j;
+          break;
+        }
+      }
+
+      if (!constructor_found) {
+        METERR(cas->meta, "Unrecognized constructor in switch case.%s", "\n");
+        goto switch_fail_annotated_cased_statements;
+      }
+
+      struct typeexpr_traits discard;
+      if (!check_typeexpr_traits(bs->es->cs, &concrete_enumspec.enumfields[constructor_num].type, bs->es, &discard)) {
+        goto switch_fail_annotated_cased_statements;
+      }
+
+      struct ast_vardecl *replaced_decl;
+      {
+        struct ast_typeexpr replaced_decl_type;
+        replace_generics(bs->es, &cas->pattern.decl.type, &replaced_decl_type);
+
+        if (!exact_typeexprs_equal(&replaced_decl_type,
+                                   &concrete_enumspec.enumfields[constructor_num].type)) {
+          ast_typeexpr_destroy(&replaced_decl_type);
+          METERR(cas->meta, "Switch case decl type mismatch.%s", "\n");
+          goto switch_fail_annotated_cased_statements;
+        }
+
+        struct ast_ident replaced_decl_name;
+        ast_ident_init_copy(&replaced_decl_name, &cas->pattern.decl.name);
+
+        replaced_decl = malloc(sizeof(*replaced_decl));
+        CHECK(replaced_decl);
+        ast_vardecl_init(replaced_decl, ast_meta_make_copy(&cas->pattern.decl.meta),
+                         replaced_decl_name, replaced_decl_type);
+
+        struct varnum varnum;
+        if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
+          free_ast_vardecl(&replaced_decl);
+          goto switch_fail_annotated_cased_statements;
+        }
+      }
+
+      enum fallthrough cas_fallthrough;
+      struct ast_bracebody cas_annotated_body;
+      if (!check_expr_bracebody(bs, &cas->body, &cas_annotated_body,
+                                &cas_fallthrough)) {
+        free_ast_vardecl(&replaced_decl);
+        goto switch_fail_annotated_cased_statements;
+      }
+
+      fallthrough = max_fallthrough(fallthrough, cas_fallthrough);
+
+      exprscope_pop_var(bs->es);
+      free_ast_vardecl(&replaced_decl);
+
+      struct ast_case_pattern pattern_copy;
+      ast_case_pattern_init_copy(&pattern_copy, &cas->pattern);
+
+      ast_cased_statement_init(&annotated_cased_statements[i],
+                               ast_meta_make_copy(&cas->meta),
+                               pattern_copy,
+                               cas_annotated_body);
+    }
+
+    annotated_out->tag = AST_STATEMENT_SWITCH;
+    ast_switch_statement_init(&annotated_out->u.switch_statement,
+                              ast_meta_make_copy(&ss->meta),
+                              annotated_swartch,
+                              annotated_cased_statements,
+                              ss->cased_statements_count);
+    break;
+  switch_fail_annotated_cased_statements:
+    SLICE_FREE(annotated_cased_statements, i, ast_cased_statement_destroy);
+    ast_enumspec_destroy(&concrete_enumspec);
+  switch_fail_annotated_swartch:
+    ast_expr_destroy(&annotated_swartch);
+    goto fail;
+  } break;
   default:
     UNREACHABLE();
   }

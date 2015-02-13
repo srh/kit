@@ -284,6 +284,12 @@ struct ast_switch_statement {
   size_t cased_statements_count;
 };
 
+void ast_switch_statement_init(struct ast_switch_statement *a,
+                               struct ast_meta meta,
+                               struct ast_expr swartch,
+                               struct ast_cased_statement *cased_statements,
+                               size_t cased_statements_count);
+
 enum ast_statement_tag {
   AST_STATEMENT_EXPR,
   AST_STATEMENT_RETURN_EXPR,
@@ -322,11 +328,20 @@ struct ast_case_pattern {
   struct ast_vardecl decl;
 };
 
+void ast_case_pattern_init_copy(struct ast_case_pattern *a,
+                                struct ast_case_pattern *c);
+
+/* TODO: Rename. */
 struct ast_cased_statement {
   struct ast_meta meta;
   struct ast_case_pattern pattern;
-  struct ast_statement statement;
+  struct ast_bracebody body;
 };
+
+void ast_cased_statement_init(struct ast_cased_statement *a,
+                              struct ast_meta meta,
+                              struct ast_case_pattern pattern,
+                              struct ast_bracebody body);
 
 void ast_cased_statement_init_copy(struct ast_cased_statement *a,
                                    struct ast_cased_statement *c);
@@ -697,6 +712,7 @@ struct ast_enumspec {
 void ast_enumspec_init(struct ast_enumspec *a,
                        struct ast_vardecl *enumfields,
                        size_t enumfields_count);
+void ast_enumspec_destroy(struct ast_enumspec *a);
 
 /* TODO: Mass rename this too. */
 enum ast_rhs_tag {
