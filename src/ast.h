@@ -342,8 +342,13 @@ struct ast_case_pattern {
   struct ast_vardecl decl;
 };
 
+void ast_case_pattern_init(struct ast_case_pattern *a,
+                           struct ast_meta meta,
+                           struct ast_ident constructor_name,
+                           struct ast_vardecl decl);
 void ast_case_pattern_init_copy(struct ast_case_pattern *a,
                                 struct ast_case_pattern *c);
+void ast_case_pattern_destroy(struct ast_case_pattern *a);
 
 /* TODO: Rename. */
 struct ast_cased_statement {

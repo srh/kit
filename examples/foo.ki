@@ -82,6 +82,20 @@ def blah_enty func[enty, enty] = fn(x enty) enty {
   var y enty = c1(v);
   var u struct { p i32; q i32; };
   y = c2(u);
+  switch x {
+    case c1(a void): {
+      var s string = lits("c1 (void)\n");
+      print(&s);
+    }
+    case c2(a struct { p i32; q i32; }): {
+      var s string = lits("c2 ... ");
+      print(&s);
+      print(@[u32]~a.p);
+      putchar(32);
+      print(@[u32]~a.q);
+      putchar(10);
+    }
+  }
   return y;
 };
 
@@ -102,6 +116,10 @@ export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {
 
   var v void;
   var k enty = blah_enty(c1(v));
+  var vz struct { p i32; q i32; };
+  vz.p = 125;
+  vz.q = 343;
+  blah_enty(c2(vz));
 
   var ret ty;
   p->x = -5;

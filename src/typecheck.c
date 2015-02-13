@@ -5996,6 +5996,52 @@ int check_file_test_more_49(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_50(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defenum ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p i32; q i32; };\n"
+      "};\n"
+      "def foo func[ty, i32] = fn(x ty) i32 {\n"
+      "  switch x {\n"
+      "    case c1(v void): { return -1; }\n"
+      "    case c2(s struct { p i32; q i32; }): {\n"
+      "      return s.p + s.q;\n"
+      "    }\n"
+      "  }\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+
+int check_file_test_more_51(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because a control path in the switch does not return a value. */
+  struct test_module a[] = { {
+      "foo",
+      "defenum ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p i32; q i32; };\n"
+      "};\n"
+      "def foo func[ty, i32] = fn(x ty) i32 {\n"
+      "  switch x {\n"
+      "    case c1(v void): { return -1; }\n"
+      "    case c2(s struct { p i32; q i32; }): {\n"
+      "      s.p + s.q;\n"
+      "    }\n"
+      "  }\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 int test_check_file(void) {
@@ -6553,6 +6599,18 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_49...\n");
   if (!!test_check_module(&im, &check_file_test_more_49, foo)) {
     DBG("check_file_test_more_49 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_50...\n");
+  if (!test_check_module(&im, &check_file_test_more_50, foo)) {
+    DBG("check_file_test_more_50 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_51...\n");
+  if (!!test_check_module(&im, &check_file_test_more_51, foo)) {
+    DBG("check_file_test_more_51 fails\n");
     goto cleanup_identmap;
   }
 

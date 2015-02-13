@@ -575,6 +575,16 @@ void ast_case_pattern_info_specify(struct ast_case_pattern_info *a,
   a->var_type = var_type;
 }
 
+void ast_case_pattern_init(struct ast_case_pattern *a,
+                           struct ast_meta meta,
+                           struct ast_ident constructor_name,
+                           struct ast_vardecl decl) {
+  a->meta = meta;
+  ast_case_pattern_info_init(&a->info);
+  a->constructor_name = constructor_name;
+  a->decl = decl;
+}
+
 void ast_case_pattern_init_copy(struct ast_case_pattern *a,
                                 struct ast_case_pattern *c) {
   a->meta = ast_meta_make_copy(&c->meta);

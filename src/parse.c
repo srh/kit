@@ -855,6 +855,98 @@ int parse_rest_of_for_statement(struct ps *p, struct pos pos_start,
   return 0;
 }
 
+int parse_case_pattern(struct ps *p, struct ast_case_pattern *out) {
+  struct pos pos_start = ps_pos(p);
+  struct ast_ident constructor_name;
+  if (!parse_ident(p, &constructor_name)) {
+    goto fail;
+  }
+
+  struct ast_vardecl decl;
+  if (!(skip_ws(p) && try_skip_char(p, '(')
+        && skip_ws(p) && parse_vardecl(p, &decl))) {
+    goto fail_constructor_name;
+  }
+
+  if (!(skip_ws(p) && try_skip_char(p, ')'))) {
+    goto fail_decl;
+  }
+
+  ast_case_pattern_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                        constructor_name, decl);
+  return 1;
+
+ fail_decl:
+  ast_vardecl_destroy(&decl);
+ fail_constructor_name:
+  ast_ident_destroy(&constructor_name);
+ fail:
+  return 0;
+}
+
+int parse_cased_statement(struct ps *p, struct ast_cased_statement *out) {
+  struct pos pos_start = ps_pos(p);
+  if (!try_skip_keyword(p, "case")) {
+    goto fail;
+  }
+
+  struct ast_case_pattern pattern;
+  if (!(skip_ws(p) && parse_case_pattern(p, &pattern))) {
+    goto fail;
+  }
+  struct ast_bracebody body;
+  if (!(skip_ws(p) && try_skip_char(p, ':') && skip_ws(p) && parse_bracebody(p, &body))) {
+    goto fail_pattern;
+  }
+
+  ast_cased_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                           pattern, body);
+  return 1;
+
+ fail_pattern:
+  ast_case_pattern_destroy(&pattern);
+ fail:
+  return 0;
+}
+
+int parse_rest_of_switch_statement(struct ps *p, struct pos pos_start,
+                                   struct ast_switch_statement *out) {
+  struct ast_expr swartch;
+  if (!(skip_ws(p) && parse_expr(p, &swartch, kSemicolonPrecedence))) {
+    goto fail;
+  }
+
+  if (!(skip_ws(p) && try_skip_char(p, '{'))) {
+    goto fail_swartch;
+  }
+
+  struct ast_cased_statement *cases = NULL;
+  size_t cases_count = 0;
+  size_t cases_limit = 0;
+
+  for (;;) {
+    if (!skip_ws(p)) {
+      goto fail_cases;
+    }
+    if (try_skip_char(p, '}')) {
+      ast_switch_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                                swartch, cases, cases_count);
+      return 1;
+    }
+    struct ast_cased_statement cas;
+    if (!parse_cased_statement(p, &cas)) {
+      goto fail_cases;
+    }
+    SLICE_PUSH(cases, cases_count, cases_limit, cas);
+  }
+
+ fail_cases:
+  SLICE_FREE(cases, cases_count, ast_cased_statement_destroy);
+ fail_swartch:
+  ast_expr_destroy(&swartch);
+ fail:
+  return 0;
+}
 
 int parse_statement(struct ps *p, struct ast_statement *out) {
   struct pos pos_start = ps_pos(p);
@@ -883,7 +975,8 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
     out->tag = AST_STATEMENT_FOR;
     return parse_rest_of_for_statement(p, pos_start, &out->u.for_statement);
   } else if (try_skip_keyword(p, "switch")) {
-    TODO_IMPLEMENT;
+    out->tag = AST_STATEMENT_SWITCH;
+    return parse_rest_of_switch_statement(p, pos_start, &out->u.switch_statement);
   } else {
     out->tag = AST_STATEMENT_EXPR;
     return parse_rest_of_expr_statement(p, &out->u.expr);
@@ -2204,6 +2297,14 @@ int parse_test_defs(void) {
   pass &= run_count_test("def24",
                          "def foo [1]u8 = \"\\x2Abcdef\";\n",
                          15);
+  pass &= run_count_test("def24",
+                         "def a b = fn() c {\n"
+                         "  switch d {\n"
+                         "    case e(f g): { }\n"
+                         "    case h(i j): { k; }\n"
+                         "  }\n"
+                         "};\n",
+                         35);
   return pass;
 }
 
