@@ -1861,6 +1861,39 @@ int parse_rest_of_deftype(struct ps *p, struct pos pos_start,
   return 0;
 }
 
+int parse_rest_of_defenum(struct ps *p, struct pos pos_start,
+                          struct ast_deftype *out) {
+  PARSE_DBG("parse_rest_of_defenum");
+  struct ast_generics generics;
+  if (!(skip_ws(p) && parse_type_params_if_present(p, &generics))) {
+    goto fail;
+  }
+  struct ast_ident name;
+  if (!(skip_ws(p) && parse_ident(p, &name))) {
+    goto fail_generics;
+  }
+  struct ast_vardecl *enumfields;
+  size_t enumfields_count;
+  if (!(skip_ws(p) && parse_braced_fields(p, &enumfields, &enumfields_count))) {
+    goto fail_name;
+  }
+  if (!(skip_ws(p) && try_skip_semicolon(p))) {
+    goto fail_enumfields;
+  }
+  ast_deftype_init_enum(out, ast_meta_make(pos_start, ps_pos(p)),
+                        generics, name, enumfields, enumfields_count);
+  return 1;
+
+ fail_enumfields:
+  SLICE_FREE(enumfields, enumfields_count, ast_vardecl_destroy);
+ fail_name:
+  ast_ident_destroy(&name);
+ fail_generics:
+  ast_generics_destroy(&generics);
+ fail:
+  return 0;
+}
+
 int parse_toplevels(struct ps *p, int32_t until_ch,
                     struct ast_toplevel **toplevels_out,
                     size_t *toplevels_count_out) {
@@ -1981,6 +2014,9 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   } else if (try_skip_keyword(p, "defclass")) {
     out->tag = AST_TOPLEVEL_DEFTYPE;
     return parse_rest_of_deftype(p, pos_start, 1, &out->u.deftype);
+  } else if (try_skip_keyword(p, "defenum")) {
+    out->tag = AST_TOPLEVEL_DEFTYPE;
+    return parse_rest_of_defenum(p, pos_start, &out->u.deftype);
   } else if (try_skip_keyword(p, "access")) {
     out->tag = AST_TOPLEVEL_ACCESS;
     return parse_rest_of_access(p, pos_start, &out->u.access);

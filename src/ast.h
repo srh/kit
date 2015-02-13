@@ -710,6 +710,11 @@ void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
                       enum ast_deftype_disposition disposition,
                       struct ast_generics generics,
                       struct ast_ident name, struct ast_typeexpr type);
+void ast_deftype_init_enum(struct ast_deftype *a, struct ast_meta meta,
+                           struct ast_generics generics,
+                           struct ast_ident name,
+                           struct ast_vardecl *enumfields,
+                           size_t enumfields_count);
 
 struct ast_access {
   struct ast_meta meta;

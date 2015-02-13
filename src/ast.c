@@ -1372,6 +1372,20 @@ void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
   ast_rhs_init_type(&a->rhs, type);
 }
 
+void ast_deftype_init_enum(struct ast_deftype *a, struct ast_meta meta,
+                           struct ast_generics generics,
+                           struct ast_ident name,
+                           struct ast_vardecl *enumfields,
+                           size_t enumfields_count) {
+  a->meta = meta;
+  a->disposition = AST_DEFTYPE_NOT_CLASS;
+  a->generics = generics;
+  a->name = name;
+  struct ast_enumspec enumspec;
+  ast_enumspec_init(&enumspec, enumfields, enumfields_count);
+  ast_rhs_init_enumspec(&a->rhs, enumspec);
+}
+
 void ast_deftype_destroy(struct ast_deftype *a) {
   ast_meta_destroy(&a->meta);
   a->disposition = (enum ast_deftype_disposition)-1;
