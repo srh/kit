@@ -670,6 +670,21 @@ int add_enum_constructors(struct checkstate *cs,
                           struct ast_enumspec *enumspec) {
   for (size_t i = 0, e = enumspec->enumfields_count; i < e; i++) {
     struct ast_vardecl *f = &enumspec->enumfields[i];
+
+    if (f->name.value == name->value) {
+      METERR(f->name.meta, "enum constructor %.*s matches enum name\n",
+             IM_P(cs->im, f->name.value));
+      return 0;
+    }
+
+    for (size_t j = 0; j < i; j++) {
+      if (f->name.value == enumspec->enumfields[j].name.value) {
+        METERR(f->name.meta, "enum constructor %.*s with duplicate name.\n",
+               IM_P(cs->im, f->name.value));
+        return 0;
+      }
+    }
+
     struct ast_typeexpr *params = malloc_mul(sizeof(*params), 2);
     ast_typeexpr_init_copy(&params[0], &f->type);
 
@@ -695,12 +710,12 @@ int add_enum_constructors(struct checkstate *cs,
                      make_ast_ident(identmap_intern_c_str(cs->im, FUNC_TYPE_NAME)),
                      params, 2);
 
-    /* TODO: Use of make_primop here is invalid. */
-    int success = name_table_add_primitive_def(&cs->nt,
-                                               f->name.value,
-                                               make_primop(PRIMITIVE_OP_ENUMCONSTRUCT),
-                                               generics,
-                                               &func_type);
+    int success = name_table_add_primitive_def(
+        &cs->nt,
+        f->name.value,
+        make_enumconstruct_op(i),
+        generics,
+        &func_type);
     ast_typeexpr_destroy(&func_type);
     if (!success) {
       return 0;

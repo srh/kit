@@ -1,6 +1,8 @@
 #ifndef KIRA_PRIMITIVE_H_
 #define KIRA_PRIMITIVE_H_
 
+#include <stddef.h>
+
 enum primitive_op_tag {
   /* TODO: Implement (or change what primitive_ops generally are...) */
   PRIMITIVE_OP_ENUMCONSTRUCT,
@@ -174,10 +176,15 @@ enum primitive_op_tag {
 
 #define PRIMITIVE_OP_INVALID ((enum primitive_op_tag)-1)
 
+/* This is a POD-like native-copyable type. */
 struct primitive_op {
   enum primitive_op_tag tag;
+  union {
+    size_t enumconstruct_number;
+  } u;
 };
 
 struct primitive_op make_primop(enum primitive_op_tag tag);
+struct primitive_op make_enumconstruct_op(size_t enumconstruct_number);
 
 #endif /* KIRA_PRIMITIVE_H_ */

@@ -102,7 +102,8 @@ void gen_primitive_op_behavior(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
                                struct primitive_op prim_op,
-                               struct ast_typeexpr *arg0_type_or_null);
+                               struct ast_typeexpr *arg0_type_or_null,
+                               struct ast_typeexpr *return_type);
 void x86_gen_call(struct objfile *f, uint32_t func_sti);
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc);
 void gen_mov(struct objfile *f, struct loc dest, struct loc src);
@@ -1271,7 +1272,8 @@ void push_address(struct objfile *f, struct frame *h, struct loc loc) {
 
 void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
                   struct immediate imm,
-                  struct ast_typeexpr *arg0_type_or_null) {
+                  struct ast_typeexpr *arg0_type_or_null,
+                  struct ast_typeexpr *return_type) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC:
     /* Dupes code with typetrav_call_func. */
@@ -1280,7 +1282,8 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
     gen_placeholder_stack_adjustment(f, h, 1);
     break;
   case IMMEDIATE_PRIMITIVE_OP: {
-    gen_primitive_op_behavior(cs, f, h, imm.u.primitive_op, arg0_type_or_null);
+    gen_primitive_op_behavior(cs, f, h, imm.u.primitive_op, arg0_type_or_null,
+                              return_type);
   } break;
   case IMMEDIATE_U32:
   case IMMEDIATE_I32:
@@ -2147,10 +2150,15 @@ void gen_primitive_op_behavior(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
                                struct primitive_op prim_op,
-                               struct ast_typeexpr *arg0_type_or_null) {
+                               struct ast_typeexpr *arg0_type_or_null,
+                               struct ast_typeexpr *return_type) {
   int32_t off0 = h->stack_offset;
   int32_t off1 = int32_add(h->stack_offset, DWORD_SIZE);
   switch (prim_op.tag) {
+  case PRIMITIVE_OP_ENUMCONSTRUCT: {
+    (void)return_type;
+    TODO_IMPLEMENT;
+  } break;
   case PRIMITIVE_OP_INIT: {
     struct ast_typeexpr *target;
     int success = view_ptr_target(cs->im, arg0_type_or_null, &target);
@@ -2967,7 +2975,8 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   switch (func_er.u.free.tag) {
   case EXPR_RETURN_FREE_IMM: {
     gen_call_imm(cs, f, h, func_er.u.free.u.imm,
-                 args_count == 0 ? NULL : ast_expr_type(&a->u.funcall.args[0].expr));
+                 args_count == 0 ? NULL : ast_expr_type(&a->u.funcall.args[0].expr),
+                 return_type);
   } break;
   case EXPR_RETURN_FREE_LOC: {
     struct loc func_loc;
