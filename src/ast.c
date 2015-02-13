@@ -867,18 +867,17 @@ struct ast_expr_info ast_expr_info_typechecked_identical(
   return ret;
 }
 
-/* TODO: Rename m -> a */
-void ast_expr_info_destroy(struct ast_expr_info *m) {
-  if (m->is_typechecked) {
-    m->is_lvalue = 0;
-    ast_typeexpr_destroy(&m->concrete_type);
-    if (m->temporary_exists) {
-      ast_typeexpr_destroy(&m->temporary_type);
-      m->whole_thing = 0;
-      m->temptag = 0;
-      m->temporary_exists = 0;
+void ast_expr_info_destroy(struct ast_expr_info *a) {
+  if (a->is_typechecked) {
+    a->is_lvalue = 0;
+    ast_typeexpr_destroy(&a->concrete_type);
+    if (a->temporary_exists) {
+      ast_typeexpr_destroy(&a->temporary_type);
+      a->whole_thing = 0;
+      a->temptag = 0;
+      a->temporary_exists = 0;
     }
-    m->is_typechecked = 0;
+    a->is_typechecked = 0;
   }
 }
 
