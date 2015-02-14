@@ -817,8 +817,6 @@ int learn_materializations(struct ast_generics *g,
   }
 }
 
-int is_concrete(struct ast_typeexpr *type);
-
 int is_fields_concrete(struct ast_vardecl *fields, size_t fields_count) {
   for (size_t i = 0; i < fields_count; i++) {
     if (!is_concrete(&fields[i].type)) {
@@ -829,9 +827,6 @@ int is_fields_concrete(struct ast_vardecl *fields, size_t fields_count) {
 }
 
 int is_concrete(struct ast_typeexpr *type) {
-  if (type->tag == AST_TYPEEXPR_UNKNOWN) {
-    return 0;
-  }
   switch (type->tag) {
   case AST_TYPEEXPR_NAME:
     return 1;
@@ -851,6 +846,8 @@ int is_concrete(struct ast_typeexpr *type) {
                               type->u.unione.fields_count);
   case AST_TYPEEXPR_ARRAY:
     return is_concrete(type->u.arraytype.param);
+  case AST_TYPEEXPR_UNKNOWN:
+    return 0;
   default:
     UNREACHABLE();
   }

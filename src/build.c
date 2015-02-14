@@ -3872,8 +3872,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     }
 
     struct vardata vd;
-    struct varnum varnum = ast_var_info_varnum(&s->u.var_statement.decl.var_info);
-    vardata_init(&vd, s->u.var_statement.decl.name.value,
+    struct varnum varnum = ast_var_info_varnum(&s->u.var_statement.decl_.var_info);
+    vardata_init(&vd, s->u.var_statement.decl_.name.value,
                  varnum,
                  ast_var_statement_type(&s->u.var_statement),
                  var_loc);

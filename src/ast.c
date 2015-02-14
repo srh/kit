@@ -220,7 +220,7 @@ void ast_bracebody_destroy(struct ast_bracebody *a) {
 void ast_var_statement_init_with_rhs(struct ast_var_statement *a, struct ast_meta meta,
                                      struct ast_vardecl decl, struct ast_expr rhs) {
   a->meta = meta;
-  a->decl = decl;
+  a->decl_ = decl;
   a->has_rhs = 1;
   ast_expr_alloc_move(rhs, &a->rhs);
 }
@@ -228,19 +228,19 @@ void ast_var_statement_init_with_rhs(struct ast_var_statement *a, struct ast_met
 void ast_var_statement_init_without_rhs(struct ast_var_statement *a, struct ast_meta meta,
                                         struct ast_vardecl decl) {
   a->meta = meta;
-  a->decl = decl;
+  a->decl_ = decl;
   a->has_rhs = 0;
   a->rhs = NULL;
 }
 
 struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a) {
-  return ast_var_info_type(&a->decl.var_info);
+  return ast_var_info_type(&a->decl_.var_info);
 }
 
 void ast_var_statement_init_copy(struct ast_var_statement *a,
                                  struct ast_var_statement *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  ast_vardecl_init_copy(&a->decl, &c->decl);
+  ast_vardecl_init_copy(&a->decl_, &c->decl_);
   a->has_rhs = c->has_rhs;
   if (c->has_rhs) {
     ast_expr_alloc_init_copy(c->rhs, &a->rhs);
@@ -251,7 +251,7 @@ void ast_var_statement_init_copy(struct ast_var_statement *a,
 
 void ast_var_statement_destroy(struct ast_var_statement *a) {
   ast_meta_destroy(&a->meta);
-  ast_vardecl_destroy(&a->decl);
+  ast_vardecl_destroy(&a->decl_);
   if (a->has_rhs) {
     a->has_rhs = 0;
     ast_expr_destroy(a->rhs);
@@ -1303,8 +1303,11 @@ struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a) {
   case AST_TYPEEXPR_STRUCTE: return &a->u.structe.meta;
   case AST_TYPEEXPR_UNIONE: return &a->u.unione.meta;
   case AST_TYPEEXPR_ARRAY: return &a->u.arraytype.meta;
-  case AST_TYPEEXPR_UNKNOWN:
-    CRASH("No meta data for \"unknown\" typeexpr.");
+  case AST_TYPEEXPR_UNKNOWN: {
+    /* TODO: Implement this for real. */
+    static struct ast_meta unknown_meta;
+    return &unknown_meta;
+  }
   default:
     UNREACHABLE();
   }

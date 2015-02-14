@@ -199,7 +199,7 @@ void ast_bracebody_destroy(struct ast_bracebody *a);
 
 struct ast_var_statement {
   struct ast_meta meta;
-  struct ast_vardecl decl;
+  struct ast_vardecl decl_;
   int has_rhs;
   struct ast_expr *rhs;
 };

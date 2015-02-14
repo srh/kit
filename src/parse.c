@@ -560,16 +560,22 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
   return 1;
 }
 
+enum allow_blanks {
+  ALLOW_BLANKS_NO,
+  ALLOW_BLANKS_YES,
+};
+
+int help_parse_typeexpr(struct ps *p, enum allow_blanks allow_blanks, struct ast_typeexpr *out);
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out);
 
-int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
+int help_parse_vardecl(struct ps *p, enum allow_blanks allow_blanks, struct ast_vardecl *out) {
   struct pos pos_start = ps_pos(p);
   struct ast_ident name;
   if (!parse_ident(p, &name)) {
     goto fail;
   }
   struct ast_typeexpr type;
-  if (!(skip_ws(p) && parse_typeexpr(p, &type))) {
+  if (!(skip_ws(p) && help_parse_typeexpr(p, allow_blanks, &type))) {
     goto fail_name;
   }
 
@@ -584,6 +590,10 @@ int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
   ast_ident_destroy(&name);
  fail:
   return 0;
+}
+
+int parse_vardecl(struct ps *p, struct ast_vardecl *out) {
+  return help_parse_vardecl(p, ALLOW_BLANKS_NO, out);
 }
 
 int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context);
@@ -679,7 +689,7 @@ int parse_rest_of_if_statement(struct ps *p, struct pos pos_start,
 int parse_rest_of_var_statement(struct ps *p, struct pos pos_start,
                                 struct ast_var_statement *out) {
   struct ast_vardecl decl;
-  if (!(skip_ws(p) && parse_vardecl(p, &decl))) {
+  if (!(skip_ws(p) && help_parse_vardecl(p, ALLOW_BLANKS_YES, &decl))) {
     goto fail;
   }
 
@@ -1287,7 +1297,7 @@ int parse_rest_of_string_literal(struct ps *p, struct pos pos_start,
 }
 
 
-int parse_rest_of_type_param_list(struct ps *p, struct ast_typeexpr **params_out,
+int parse_rest_of_type_param_list(struct ps *p, enum allow_blanks allow_blanks, struct ast_typeexpr **params_out,
                                   size_t *params_count_out);
 
 int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
@@ -1355,7 +1365,7 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     struct ast_typeexpr *params;
     size_t params_count;
     if (!(try_skip_char(p, '[')
-          && parse_rest_of_type_param_list(p, &params, &params_count))) {
+          && parse_rest_of_type_param_list(p, ALLOW_BLANKS_NO, &params, &params_count))) {
       ast_ident_destroy(&ident);
       return 0;
     }
@@ -1544,6 +1554,7 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
 }
 
 int parse_braced_fields(struct ps *p,
+                        enum allow_blanks allow_blanks,
                         struct ast_vardecl **fields_out,
                         size_t *fields_count_out) {
   if (!try_skip_char(p, '{')) {
@@ -1563,7 +1574,7 @@ int parse_braced_fields(struct ps *p,
     }
 
     struct ast_vardecl field;
-    if (!parse_vardecl(p, &field)) {
+    if (!help_parse_vardecl(p, allow_blanks, &field)) {
       goto fail;
     }
 
@@ -1580,11 +1591,11 @@ int parse_braced_fields(struct ps *p,
   return 0;
 }
 
-int parse_rest_of_structe(struct ps *p, struct pos pos_start,
+int parse_rest_of_structe(struct ps *p, enum allow_blanks allow_blanks, struct pos pos_start,
                           struct ast_structe *out) {
   struct ast_vardecl *fields;
   size_t fields_count;
-  if (!(skip_ws(p) && parse_braced_fields(p, &fields, &fields_count))) {
+  if (!(skip_ws(p) && parse_braced_fields(p, allow_blanks, &fields, &fields_count))) {
     return 0;
   }
   ast_structe_init(out, ast_meta_make(pos_start, ps_pos(p)),
@@ -1592,11 +1603,13 @@ int parse_rest_of_structe(struct ps *p, struct pos pos_start,
   return 1;
 }
 
-int parse_rest_of_unione(struct ps *p, struct pos pos_start,
+int parse_rest_of_unione(struct ps *p,
+                         enum allow_blanks allow_blanks,
+                         struct pos pos_start,
                          struct ast_unione *out) {
   struct ast_vardecl *fields;
   size_t fields_count;
-  if (!(skip_ws(p) && parse_braced_fields(p, &fields, &fields_count))) {
+  if (!(skip_ws(p) && parse_braced_fields(p, allow_blanks, &fields, &fields_count))) {
     return 0;
   }
   ast_unione_init(out, ast_meta_make(pos_start, ps_pos(p)),
@@ -1604,7 +1617,8 @@ int parse_rest_of_unione(struct ps *p, struct pos pos_start,
   return 1;
 }
 
-int parse_rest_of_arraytype(struct ps *p, struct pos pos_start,
+int parse_rest_of_arraytype(struct ps *p, enum allow_blanks allow_blanks,
+                            struct pos pos_start,
                             struct ast_arraytype *out) {
   if (!skip_ws(p)) {
     return 0;
@@ -1634,7 +1648,7 @@ int parse_rest_of_arraytype(struct ps *p, struct pos pos_start,
   }
 
   struct ast_typeexpr param;
-  if (!parse_typeexpr(p, &param)) {
+  if (!help_parse_typeexpr(p, allow_blanks, &param)) {
     return 0;
   }
 
@@ -1644,13 +1658,14 @@ int parse_rest_of_arraytype(struct ps *p, struct pos pos_start,
 }
 
 int parse_rest_of_pointer(struct ps *p, struct ast_meta star_operator_meta,
+                          enum allow_blanks allow_blanks,
                           struct ast_typeexpr *out) {
   if (!skip_ws(p)) {
     goto fail;
   }
 
   struct ast_typeexpr param;
-  if (!parse_typeexpr(p, &param)) {
+  if (!help_parse_typeexpr(p, allow_blanks, &param)) {
     goto fail;
   }
 
@@ -1673,7 +1688,9 @@ int parse_rest_of_pointer(struct ps *p, struct ast_meta star_operator_meta,
   return 0;
 }
 
-int parse_rest_of_type_param_list(struct ps *p, struct ast_typeexpr **params_out,
+int parse_rest_of_type_param_list(struct ps *p,
+                                  enum allow_blanks allow_blanks,
+                                  struct ast_typeexpr **params_out,
                                   size_t *params_count_out) {
   struct ast_typeexpr *params = NULL;
   size_t params_count = 0;
@@ -1699,7 +1716,7 @@ int parse_rest_of_type_param_list(struct ps *p, struct ast_typeexpr **params_out
     }
 
     struct ast_typeexpr typeexpr;
-    if (!parse_typeexpr(p, &typeexpr)) {
+    if (!help_parse_typeexpr(p, allow_blanks, &typeexpr)) {
       goto fail;
     }
     SLICE_PUSH(params, params_count, params_limit, typeexpr);
@@ -1710,25 +1727,37 @@ int parse_rest_of_type_param_list(struct ps *p, struct ast_typeexpr **params_out
   return 0;
 }
 
-int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
+int help_parse_typeexpr(struct ps *p, enum allow_blanks allow_blanks, struct ast_typeexpr *out) {
   struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "struct")) {
     out->tag = AST_TYPEEXPR_STRUCTE;
-    return parse_rest_of_structe(p, pos_start, &out->u.structe);
+    return parse_rest_of_structe(p, allow_blanks, pos_start, &out->u.structe);
   }
 
   if (try_skip_keyword(p, "union")) {
     out->tag = AST_TYPEEXPR_UNIONE;
-    return parse_rest_of_unione(p, pos_start, &out->u.unione);
+    return parse_rest_of_unione(p, allow_blanks, pos_start, &out->u.unione);
   }
 
   if (try_skip_char(p, '[')) {
     out->tag = AST_TYPEEXPR_ARRAY;
-    return parse_rest_of_arraytype(p, pos_start, &out->u.arraytype);
+    return parse_rest_of_arraytype(p, allow_blanks, pos_start, &out->u.arraytype);
   }
 
   if (try_skip_char(p, '*')) {
-    return parse_rest_of_pointer(p, ast_meta_make(pos_start, ps_pos(p)), out);
+    return parse_rest_of_pointer(p, ast_meta_make(pos_start, ps_pos(p)), allow_blanks, out);
+  }
+
+  struct ps_savestate before_underscore = ps_save(p);
+  if (try_skip_keyword(p, "_")) {
+    if (allow_blanks) {
+      /* TODO: add struct with meta to the ast_typeexpr.u union. */
+      out->tag = AST_TYPEEXPR_UNKNOWN;
+      return 1;
+    } else {
+      ps_restore(p, before_underscore);
+      return 0;
+    }
   }
 
   struct ast_ident name;
@@ -1748,7 +1777,7 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
 
   struct ast_typeexpr *params = NULL;
   size_t params_count = 0;
-  if (!parse_rest_of_type_param_list(p, &params, &params_count)) {
+  if (!parse_rest_of_type_param_list(p, allow_blanks, &params, &params_count)) {
     goto fail_ident;
   }
 
@@ -1761,6 +1790,10 @@ int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
   ast_ident_destroy(&name);
  fail:
   return 0;
+}
+
+int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
+  return help_parse_typeexpr(p, ALLOW_BLANKS_NO, out);
 }
 
 int parse_type_params_if_present(struct ps *p,
@@ -1969,7 +2002,7 @@ int parse_rest_of_defenum(struct ps *p, struct pos pos_start,
   }
   struct ast_vardecl *enumfields;
   size_t enumfields_count;
-  if (!(skip_ws(p) && parse_braced_fields(p, &enumfields, &enumfields_count))) {
+  if (!(skip_ws(p) && parse_braced_fields(p, ALLOW_BLANKS_NO, &enumfields, &enumfields_count))) {
     goto fail_name;
   }
   if (!(skip_ws(p) && try_skip_semicolon(p))) {

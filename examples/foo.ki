@@ -108,7 +108,7 @@ def au8 func[*string, u8, void] = fn(p *string, x u8) void {
 };
 
 def try_string func[void] = fn() void {
-  var x string = lits("Hello, world!\n");
+  var x _ = lits("Hello, world!\n");
   print(&x);
   var ret void;
   return ret;

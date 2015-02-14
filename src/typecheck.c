@@ -1457,6 +1457,10 @@ int check_typeexpr_traits(struct checkstate *cs,
     return check_typeexpr_unione_traits(cs, a, also_typecheck, out);
   case AST_TYPEEXPR_ARRAY:
     return check_typeexpr_traits(cs, a->u.arraytype.param, also_typecheck, out);
+  case AST_TYPEEXPR_UNKNOWN: {
+    METERR(*ast_typeexpr_meta(a), "Incomplete type in bad place.%s", "\n");
+    return 0;
+  } break;
   default:
     UNREACHABLE();
   }
@@ -2438,46 +2442,57 @@ int check_statement(struct bodystate *bs,
     fallthrough = FALLTHROUGH_NEVER;
   } break;
   case AST_STATEMENT_VAR: {
-    struct ast_typeexpr replaced_type;
-    replace_generics(bs->es, &s->u.var_statement.decl.type, &replaced_type);
+    struct ast_typeexpr replaced_incomplete_type;
+    replace_generics(bs->es, &s->u.var_statement.decl_.type, &replaced_incomplete_type);
 
-    struct typeexpr_traits traits;
-    if (!check_typeexpr_traits(bs->es->cs, &replaced_type, bs->es, &traits)) {
-      ast_typeexpr_destroy(&replaced_type);
-      goto fail;
-    }
+    struct ast_typeexpr concrete_type;
 
     int has_rhs = s->u.var_statement.has_rhs;
     struct ast_expr annotated_rhs = { 0 };  /* Initialize to appease cl. */
     if (has_rhs) {
-      if (!check_expr(bs->es, s->u.var_statement.rhs, &replaced_type, &annotated_rhs)) {
-        ast_typeexpr_destroy(&replaced_type);
+      if (!check_expr(bs->es, s->u.var_statement.rhs, &replaced_incomplete_type, &annotated_rhs)) {
+        ast_typeexpr_destroy(&replaced_incomplete_type);
         goto fail;
       }
+      ast_typeexpr_destroy(&replaced_incomplete_type);
+      ast_typeexpr_init_copy(&concrete_type, ast_expr_type(&annotated_rhs));
     } else {
-      if (!traits.inittible) {
-        METERR(s->u.var_statement.meta, "Variable %.*s not default-initializable.\n",
-               IM_P(bs->es->cs->im, s->u.var_statement.decl.name.value));
-        ast_typeexpr_destroy(&replaced_type);
+      if (!is_concrete(&replaced_incomplete_type)) {
+        METERR(s->u.var_statement.decl_.meta, "Var statement without initializer has incomplete type.%s", "\n");
         goto fail;
       }
+
+      concrete_type = replaced_incomplete_type;
+    }
+
+    struct typeexpr_traits traits;
+    if (!check_typeexpr_traits(bs->es->cs, &concrete_type, bs->es, &traits)) {
+      ast_typeexpr_destroy(&concrete_type);
+      goto fail;
+    }
+
+    if (!has_rhs && traits.inittible == TYPEEXPR_TRAIT_LACKED) {
+        METERR(s->u.var_statement.meta, "Variable %.*s not default-initializable.\n",
+               IM_P(bs->es->cs->im, s->u.var_statement.decl_.name.value));
+        ast_typeexpr_destroy(&concrete_type);
+        goto fail;
     }
 
     struct ast_ident name;
-    ast_ident_init_copy(&name, &s->u.var_statement.decl.name);
+    ast_ident_init_copy(&name, &s->u.var_statement.decl_.name);
 
-    struct ast_typeexpr replaced_type_copy;
-    ast_typeexpr_init_copy(&replaced_type_copy, &replaced_type);
+    struct ast_typeexpr concrete_type_copy;
+    ast_typeexpr_init_copy(&concrete_type_copy, &concrete_type);
 
     struct ast_vardecl *replaced_decl = malloc(sizeof(*replaced_decl));
     CHECK(replaced_decl);
-    ast_vardecl_init(replaced_decl, ast_meta_make_copy(&s->u.var_statement.decl.meta),
-                     name, replaced_type_copy);
+    ast_vardecl_init(replaced_decl, ast_meta_make_copy(&s->u.var_statement.decl_.meta),
+                     name, concrete_type_copy);
 
     struct varnum varnum;
     if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
       free_ast_vardecl(&replaced_decl);
-      ast_typeexpr_destroy(&replaced_type);
+      ast_typeexpr_destroy(&concrete_type);
       if (has_rhs) {
         ast_expr_destroy(&annotated_rhs);
       }
@@ -2487,8 +2502,8 @@ int check_statement(struct bodystate *bs,
     vardecl_to_push = replaced_decl;
 
     struct ast_vardecl decl;
-    ast_vardecl_init_copy(&decl, &s->u.var_statement.decl);
-    ast_var_info_specify(&decl.var_info, varnum, replaced_type);
+    ast_vardecl_init_copy(&decl, &s->u.var_statement.decl_);
+    ast_var_info_specify(&decl.var_info, varnum, concrete_type);
     annotated_out->tag = AST_STATEMENT_VAR;
     if (has_rhs) {
       ast_var_statement_init_with_rhs(&annotated_out->u.var_statement,
@@ -6042,7 +6057,6 @@ int check_file_test_more_50(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
-
 int check_file_test_more_51(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because a control path in the switch does not return a value. */
@@ -6059,6 +6073,22 @@ int check_file_test_more_51(const uint8_t *name, size_t name_count,
       "      s.p + s.q;\n"
       "    }\n"
       "  }\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_52(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[i32, void] = fn(x i32) void {\n"
+      "  var p *_ = &x;\n"
+      "  var q i32 = *p;\n"
+      "  var ret void;\n"
+      "  return ret;\n"
       "};\n"
     } };
 
@@ -6635,6 +6665,12 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_51...\n");
   if (!!test_check_module(&im, &check_file_test_more_51, foo)) {
     DBG("check_file_test_more_51 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_52...\n");
+  if (!test_check_module(&im, &check_file_test_more_52, foo)) {
+    DBG("check_file_test_more_52 fails\n");
     goto cleanup_identmap;
   }
 
