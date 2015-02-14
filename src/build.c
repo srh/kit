@@ -3895,7 +3895,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     gen_placeholder_jmp_if_false(f, h, cond_loc, target_number);
     frame_restore_offset(h, saved_offset);
 
-    gen_bracebody(cs, f, h, &s->u.ifthen_statement.thenbody);
+    gen_bracebody(cs, f, h, &s->u.ifthen_statement.body);
 
     frame_define_target(h, target_number,
                         objfile_section_size(objfile_text(f)));

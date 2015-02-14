@@ -220,14 +220,13 @@ struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a);
 struct ast_ifthen_statement {
   struct ast_meta meta;
   struct ast_expr *condition;
-  /* TODO: Rename to body, it's safer not to share same name as ifthenelse_statement. */
-  struct ast_bracebody thenbody;
+  struct ast_bracebody body;
 };
 
 void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
                                struct ast_meta meta,
                                struct ast_expr condition,
-                               struct ast_bracebody thenbody);
+                               struct ast_bracebody body);
 
 struct ast_ifthenelse_statement {
   struct ast_meta meta;

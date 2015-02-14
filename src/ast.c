@@ -280,17 +280,17 @@ void ast_var_statement_destroy(struct ast_var_statement *a) {
 void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
                                struct ast_meta meta,
                                struct ast_expr condition,
-                               struct ast_bracebody thenbody) {
+                               struct ast_bracebody body) {
   a->meta = meta;
   ast_expr_alloc_move(condition, &a->condition);
-  a->thenbody = thenbody;
+  a->body = body;
 }
 
 void ast_ifthen_statement_init_copy(struct ast_ifthen_statement *a,
                                     struct ast_ifthen_statement *c) {
   a->meta = ast_meta_make_copy(&c->meta);
   ast_expr_alloc_init_copy(c->condition, &a->condition);
-  ast_bracebody_init_copy(&a->thenbody, &c->thenbody);
+  ast_bracebody_init_copy(&a->body, &c->body);
 }
 
 void ast_ifthen_statement_destroy(struct ast_ifthen_statement *a) {
@@ -298,7 +298,7 @@ void ast_ifthen_statement_destroy(struct ast_ifthen_statement *a) {
   ast_expr_destroy(a->condition);
   free(a->condition);
   a->condition = NULL;
-  ast_bracebody_destroy(&a->thenbody);
+  ast_bracebody_destroy(&a->body);
 }
 
 void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,

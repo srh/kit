@@ -2495,10 +2495,10 @@ int check_statement(struct bodystate *bs,
     }
     ast_typeexpr_destroy(&boolean);
 
-    struct ast_bracebody annotated_thenbody;
-    enum fallthrough thenbody_fallthrough;
-    if (!check_expr_bracebody(bs, &s->u.ifthen_statement.thenbody,
-                              &annotated_thenbody, &thenbody_fallthrough)) {
+    struct ast_bracebody annotated_body;
+    enum fallthrough body_fallthrough;
+    if (!check_expr_bracebody(bs, &s->u.ifthen_statement.body,
+                              &annotated_body, &body_fallthrough)) {
       ast_expr_destroy(&annotated_condition);
       goto fail;
     }
@@ -2508,8 +2508,8 @@ int check_statement(struct bodystate *bs,
         &annotated_out->u.ifthen_statement,
         ast_meta_make_copy(&s->u.ifthen_statement.meta),
         annotated_condition,
-        annotated_thenbody);
-    fallthrough = max_fallthrough(FALLTHROUGH_FROMTHETOP, thenbody_fallthrough);
+        annotated_body);
+    fallthrough = max_fallthrough(FALLTHROUGH_FROMTHETOP, body_fallthrough);
   } break;
   case AST_STATEMENT_IFTHENELSE: {
     struct ast_typeexpr boolean;
