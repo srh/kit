@@ -1245,6 +1245,18 @@ void ast_arraytype_destroy(struct ast_arraytype *a) {
   a->param = NULL;
 }
 
+void ast_unknown_init(struct ast_unknown *a, struct ast_meta meta) {
+  a->meta = meta;
+}
+
+void ast_unknown_init_copy(struct ast_unknown *a, struct ast_unknown *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+}
+
+void ast_unknown_destroy(struct ast_unknown *a) {
+  ast_meta_destroy(&a->meta);
+}
+
 void ast_typeexpr_init_copy(struct ast_typeexpr *a,
                             struct ast_typeexpr *c) {
   a->tag = c->tag;
@@ -1265,6 +1277,7 @@ void ast_typeexpr_init_copy(struct ast_typeexpr *a,
     ast_arraytype_init_copy(&a->u.arraytype, &c->u.arraytype);
     break;
   case AST_TYPEEXPR_UNKNOWN:
+    ast_unknown_init_copy(&a->u.unknown, &c->u.unknown);
     break;
   default:
     UNREACHABLE();
@@ -1289,6 +1302,7 @@ void ast_typeexpr_destroy(struct ast_typeexpr *a) {
     ast_arraytype_destroy(&a->u.arraytype);
     break;
   case AST_TYPEEXPR_UNKNOWN:
+    ast_unknown_destroy(&a->u.unknown);
     break;
   default:
     UNREACHABLE();
@@ -1303,14 +1317,17 @@ struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a) {
   case AST_TYPEEXPR_STRUCTE: return &a->u.structe.meta;
   case AST_TYPEEXPR_UNIONE: return &a->u.unione.meta;
   case AST_TYPEEXPR_ARRAY: return &a->u.arraytype.meta;
-  case AST_TYPEEXPR_UNKNOWN: {
-    /* TODO: Implement this for real. */
-    static struct ast_meta unknown_meta;
-    return &unknown_meta;
-  }
+  case AST_TYPEEXPR_UNKNOWN: return &a->u.unknown.meta;
   default:
     UNREACHABLE();
   }
+}
+
+struct ast_typeexpr ast_unknown_garbage(void) {
+  struct ast_typeexpr ret;
+  ret.tag = AST_TYPEEXPR_UNKNOWN;
+  ast_unknown_init(&ret.u.unknown, ast_meta_make_garbage());
+  return ret;
 }
 
 void ast_generics_init_no_params(struct ast_generics *a) {

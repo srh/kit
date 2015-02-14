@@ -126,14 +126,20 @@ struct ast_arraytype {
 void ast_arraytype_init(struct ast_arraytype *a, struct ast_meta meta,
                         uint32_t count, struct ast_typeexpr param);
 
+struct ast_unknown {
+  struct ast_meta meta;
+};
+
+void ast_unknown_init(struct ast_unknown *a, struct ast_meta meta);
+
 enum ast_typeexpr_tag {
   AST_TYPEEXPR_NAME,
   AST_TYPEEXPR_APP,
   AST_TYPEEXPR_STRUCTE,
   AST_TYPEEXPR_UNIONE,
   AST_TYPEEXPR_ARRAY,
-
-  /* Used in type checking.  Is never parsed. */
+  /* "Concrete" types don't have this field.  (Maybe they don't have
+  generic names either, idk.) */
   AST_TYPEEXPR_UNKNOWN,
 };
 
@@ -145,6 +151,7 @@ struct ast_typeexpr {
     struct ast_structe structe;
     struct ast_unione unione;
     struct ast_arraytype arraytype;
+    struct ast_unknown unknown;
   } u;
 };
 
@@ -152,6 +159,8 @@ void ast_typeexpr_init_copy(struct ast_typeexpr *a,
                             struct ast_typeexpr *c);
 void ast_typeexpr_destroy(struct ast_typeexpr *a);
 struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a);
+
+struct ast_typeexpr ast_unknown_garbage(void);
 
 struct varnum {
   size_t value;

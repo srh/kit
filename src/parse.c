@@ -579,19 +579,18 @@ int help_parse_vardecl(struct ps *p, enum allow_blanks allow_blanks, struct ast_
   }
 
   struct ast_typeexpr type;
-  struct ast_meta meta;
   /* Oh god the parsing horrors. */
   if (allow_blanks == ALLOW_BLANKS_YES && (ps_peek(p) == '=' || ps_peek(p) == ')')) {
     type.tag = AST_TYPEEXPR_UNKNOWN;
-    meta = ast_meta_make(pos_start, name.meta.pos_end);
+    ast_unknown_init(&type.u.unknown, ast_meta_make(name.meta.pos_end, name.meta.pos_end));
   } else {
     if (!help_parse_typeexpr(p, allow_blanks, &type)) {
       goto fail_name;
     }
-    meta = ast_meta_make(pos_start, ast_typeexpr_meta(&type)->pos_end);
   }
 
-  ast_vardecl_init(out, meta, name, type);
+  ast_vardecl_init(out, ast_meta_make(pos_start, ast_typeexpr_meta(&type)->pos_end),
+                   name, type);
   return 1;
 
  fail_name:
@@ -1759,8 +1758,8 @@ int help_parse_typeexpr(struct ps *p, enum allow_blanks allow_blanks, struct ast
   struct ps_savestate before_underscore = ps_save(p);
   if (try_skip_keyword(p, "_")) {
     if (allow_blanks) {
-      /* TODO: add struct with meta to the ast_typeexpr.u union. */
       out->tag = AST_TYPEEXPR_UNKNOWN;
+      ast_unknown_init(&out->u.unknown, ast_meta_make(pos_start, ps_pos(p)));
       return 1;
     } else {
       ps_restore(p, before_underscore);

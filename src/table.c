@@ -865,7 +865,7 @@ int unify_with_parameterized_type(
   struct ast_typeexpr *materialized = malloc_mul(sizeof(*materialized),
                                                  materialized_count);
   for (size_t i = 0; i < materialized_count; i++) {
-    materialized[i].tag = AST_TYPEEXPR_UNKNOWN;
+    materialized[i] = ast_unknown_garbage();
   }
 
   if (!learn_materializations(g, materialized, type, partial_type)) {

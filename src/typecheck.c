@@ -1050,7 +1050,7 @@ void make_pointee_func_lookup_type(struct checkstate *cs,
   }
   /* Unknown return type -- we'll match anything named
   "copy"/"move"/"destroy" with any return type. */
-  params[count].tag = AST_TYPEEXPR_UNKNOWN;
+  params[count] = ast_unknown_garbage();
 
   struct ast_ident func_name = make_ast_ident(identmap_intern_c_str(cs->im, FUNC_TYPE_NAME));
 
@@ -2065,6 +2065,7 @@ void do_replace_generics(struct ast_generics *generics,
   } break;
   case AST_TYPEEXPR_UNKNOWN: {
     out->tag = AST_TYPEEXPR_UNKNOWN;
+    ast_unknown_init(&out->u.unknown, ast_meta_make_copy(&a->u.unknown.meta));
   } break;
   default:
     UNREACHABLE();
@@ -2199,12 +2200,13 @@ int check_expr_funcall(struct exprscope *es,
                                                    args_count);
   size_t i;
   for (i = 0; i < args_count; i++) {
-    struct ast_typeexpr local_partial;
-    local_partial.tag = AST_TYPEEXPR_UNKNOWN;
+    struct ast_typeexpr local_partial = ast_unknown_garbage();
     struct ast_expr arg_expr_annotated;
     if (!check_expr(es, &x->args[i].expr, &local_partial, &arg_expr_annotated)) {
+      ast_typeexpr_destroy(&local_partial);
       goto fail_cleanup_args_types_and_annotated;
     }
+    ast_typeexpr_destroy(&local_partial);
 
     struct ast_exprcatch arg_exprcatch;
     if (!compute_and_check_exprcatch(es, &arg_expr_annotated, &arg_exprcatch)) {
@@ -2413,12 +2415,13 @@ int check_statement(struct bodystate *bs,
 
   switch (s->tag) {
   case AST_STATEMENT_EXPR: {
-    struct ast_typeexpr anything;
-    anything.tag = AST_TYPEEXPR_UNKNOWN;
+    struct ast_typeexpr anything = ast_unknown_garbage();;
     struct ast_expr annotated_expr;
     if (!check_expr(bs->es, s->u.expr, &anything, &annotated_expr)) {
+      ast_typeexpr_destroy(&anything);
       goto fail;
     }
+    ast_typeexpr_destroy(&anything);
     annotated_out->tag = AST_STATEMENT_EXPR;
     ast_expr_alloc_move(annotated_expr, &annotated_out->u.expr);
     fallthrough = FALLTHROUGH_FROMTHETOP;
@@ -2649,11 +2652,12 @@ int check_statement(struct bodystate *bs,
 
     struct ast_expr annotated_increment = { 0 };
     if (fs->has_increment) {
-      struct ast_typeexpr anything;
-      anything.tag = AST_TYPEEXPR_UNKNOWN;
+      struct ast_typeexpr anything = ast_unknown_garbage();
       if (!check_expr(bs->es, fs->increment, &anything, &annotated_increment)) {
+        ast_typeexpr_destroy(&anything);
         goto for_fail_annotated_condition;
       }
+      ast_typeexpr_destroy(&anything);
     }
 
     enum fallthrough body_fallthrough;
@@ -2712,12 +2716,13 @@ int check_statement(struct bodystate *bs,
   } break;
   case AST_STATEMENT_SWITCH: {
     struct ast_switch_statement *ss = &s->u.switch_statement;
-    struct ast_typeexpr partial;
-    partial.tag = AST_TYPEEXPR_UNKNOWN;
+    struct ast_typeexpr partial = ast_unknown_garbage();;
     struct ast_expr annotated_swartch;
     if (!check_expr(bs->es, ss->swartch, &partial, &annotated_swartch)) {
+      ast_typeexpr_destroy(&partial);
       goto fail;
     }
+    ast_typeexpr_destroy(&partial);
 
     struct ast_enumspec concrete_enumspec;
     if (!is_enum_type(bs->es->cs, ast_expr_type(&annotated_swartch), &concrete_enumspec)) {
@@ -3091,8 +3096,7 @@ int check_expr_magic_binop(struct exprscope *es,
                            int *is_lvalue_out,
                            struct ast_binop_expr *annotated_out) {
   int ret = 0;
-  struct ast_typeexpr no_partial;
-  no_partial.tag = AST_TYPEEXPR_UNKNOWN;
+  struct ast_typeexpr no_partial = ast_unknown_garbage();
 
   struct ast_expr annotated_lhs;
   if (!check_expr(es, x->lhs, &no_partial, &annotated_lhs)) {
@@ -3189,6 +3193,7 @@ int check_expr_magic_binop(struct exprscope *es,
     ast_expr_destroy(&annotated_lhs);
   }
  cleanup:
+  ast_typeexpr_destroy(&no_partial);
   return ret;
 }
 
@@ -3244,12 +3249,11 @@ int check_expr_magic_unop(struct exprscope *es,
   }
 
   int ret = 0;
-  struct ast_typeexpr no_partial;
-  no_partial.tag = AST_TYPEEXPR_UNKNOWN;
+  struct ast_typeexpr no_partial = ast_unknown_garbage();
 
   struct ast_expr annotated_rhs;
   if (!check_expr(es, x->rhs, &no_partial, &annotated_rhs)) {
-    return 0;
+    goto cleanup;
   }
 
   switch (x->operator) {
@@ -3310,6 +3314,8 @@ int check_expr_magic_unop(struct exprscope *es,
   if (!ret) {
     ast_expr_destroy(&annotated_rhs);
   }
+ cleanup:
+  ast_typeexpr_destroy(&no_partial);
   return ret;
 }
 
@@ -3469,8 +3475,7 @@ int check_expr_local_field_access(
     struct ast_typeexpr *out,
     struct ast_local_field_access *annotated_out) {
   int ret = 0;
-  struct ast_typeexpr lhs_partial_type;
-  lhs_partial_type.tag = AST_TYPEEXPR_UNKNOWN;
+  struct ast_typeexpr lhs_partial_type = ast_unknown_garbage();
 
   struct ast_expr annotated_lhs;
   if (!check_expr(es, x->lhs, &lhs_partial_type, &annotated_lhs)) {
@@ -3504,6 +3509,7 @@ int check_expr_local_field_access(
     ast_expr_destroy(&annotated_lhs);
   }
  cleanup:
+  ast_typeexpr_destroy(&lhs_partial_type);
   return ret;
 }
 
@@ -3520,8 +3526,7 @@ int check_expr_deref_field_access(
   int ret = 0;
   /* Even though we know the lhs is supposed to be a ptr, we shouldn't
   put that info into the context when type checking it. */
-  struct ast_typeexpr lhs_partial_type;
-  lhs_partial_type.tag = AST_TYPEEXPR_UNKNOWN;
+  struct ast_typeexpr lhs_partial_type = ast_unknown_garbage();
 
   struct ast_expr annotated_lhs;
   if (!check_expr(es, x->lhs, &lhs_partial_type, &annotated_lhs)) {
@@ -3563,6 +3568,7 @@ int check_expr_deref_field_access(
     ast_expr_destroy(&annotated_lhs);
   }
  cleanup:
+  ast_typeexpr_destroy(&lhs_partial_type);
   return ret;
 }
 
@@ -3576,8 +3582,7 @@ int check_index_expr(struct exprscope *es,
                      struct ast_index_expr *a,
                      struct ast_typeexpr *partial_type,
                      struct ast_expr *annotated_out) {
-  struct ast_typeexpr no_partial_type;
-  no_partial_type.tag = AST_TYPEEXPR_UNKNOWN;
+  struct ast_typeexpr no_partial_type = ast_unknown_garbage();;
 
   struct ast_expr lhs_annotated;
   if (!check_expr(es, a->lhs, &no_partial_type, &lhs_annotated)) {
@@ -3621,6 +3626,8 @@ int check_index_expr(struct exprscope *es,
     expr_info = ast_expr_info_typechecked_no_temporary(1, return_type);
   }
 
+  ast_typeexpr_destroy(&no_partial_type);
+
   ast_expr_partial_init(annotated_out, AST_EXPR_INDEX, expr_info);
   ast_index_expr_init(&annotated_out->u.index_expr,
                       ast_meta_make_copy(&a->meta),
@@ -3633,6 +3640,7 @@ int check_index_expr(struct exprscope *es,
  fail_lhs_annotated:
   ast_expr_destroy(&lhs_annotated);
  fail:
+  ast_typeexpr_destroy(&no_partial_type);
   return 0;
 }
 

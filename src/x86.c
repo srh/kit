@@ -175,6 +175,7 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     return;
   } break;
   case AST_TYPEEXPR_UNKNOWN:
+    UNREACHABLE();
   default:
     UNREACHABLE();
   }
