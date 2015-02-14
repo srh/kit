@@ -110,6 +110,7 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
       struct ast_rhs substituted;
       do_replace_rhs_generics(&deftype->generics,
                               type->u.app.params,
+                              type->u.app.params_count,
                               &deftype->rhs,
                               &substituted);
       help_rhs_sizealignof(nt, &substituted, fieldstop,

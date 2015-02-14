@@ -76,10 +76,12 @@ void wrap_in_ptr(struct identmap *im,
                  struct ast_typeexpr *ptr_out);
 void do_replace_generics(struct ast_generics *generics,
                          struct ast_typeexpr *generics_substitutions,
+                         size_t generics_substitutions_count,
                          struct ast_typeexpr *a,
                          struct ast_typeexpr *out);
 void do_replace_rhs_generics(struct ast_generics *generics,
                              struct ast_typeexpr *generics_substitutions,
+                             size_t generics_substitutions_count,
                              struct ast_rhs *a,
                              struct ast_rhs *out);
 struct ast_typeexpr *expose_func_return_type(struct identmap *im,

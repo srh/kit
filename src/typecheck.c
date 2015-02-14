@@ -1333,6 +1333,7 @@ int check_typeexpr_app_traits(struct checkstate *cs,
   struct ast_rhs concrete_deftype_rhs;
   do_replace_rhs_generics(&deftype->generics,
                           a->u.app.params,
+                          a->u.app.params_count,
                           &deftype->rhs,
                           &concrete_deftype_rhs);
 
@@ -1969,6 +1970,7 @@ void numeric_literal_type(struct identmap *im,
 
 void do_replace_generics_in_fields(struct ast_generics *generics,
                                    struct ast_typeexpr *generics_substitutions,
+                                   size_t generics_substitutions_count,
                                    struct ast_vardecl *fields,
                                    size_t fields_count,
                                    struct ast_vardecl **fields_out,
@@ -1978,9 +1980,12 @@ void do_replace_generics_in_fields(struct ast_generics *generics,
     struct ast_ident name;
     ast_ident_init_copy(&name, &fields[i].name);
     struct ast_typeexpr type;
-    do_replace_generics(generics, generics_substitutions, &fields[i].type,
+    do_replace_generics(generics,
+                        generics_substitutions,
+                        generics_substitutions_count,
+                        &fields[i].type,
                         &type);
-    ast_vardecl_init(&f[i], ast_meta_make_garbage(),
+    ast_vardecl_init(&f[i], ast_meta_make_copy(&fields[i].meta),
                      name, type);
   }
   *fields_out = f;
@@ -1989,9 +1994,11 @@ void do_replace_generics_in_fields(struct ast_generics *generics,
 
 void do_replace_generics(struct ast_generics *generics,
                          struct ast_typeexpr *generics_substitutions,
+                         size_t generics_substitutions_count,
                          struct ast_typeexpr *a,
                          struct ast_typeexpr *out) {
   CHECK(generics->has_type_params);
+  CHECK(generics->params_count == generics_substitutions_count);
   switch (a->tag) {
   case AST_TYPEEXPR_NAME: {
     size_t which_generic;
@@ -2009,6 +2016,7 @@ void do_replace_generics(struct ast_generics *generics,
 
     for (size_t i = 0, e = params_count; i < e; i++) {
       do_replace_generics(generics, generics_substitutions,
+                          generics_substitutions_count,
                           &app->params[i], &params[i]);
     }
 
@@ -2023,6 +2031,7 @@ void do_replace_generics(struct ast_generics *generics,
     struct ast_vardecl *fields;
     size_t fields_count;
     do_replace_generics_in_fields(generics, generics_substitutions,
+                                  generics_substitutions_count,
                                   a->u.structe.fields,
                                   a->u.structe.fields_count,
                                   &fields, &fields_count);
@@ -2034,6 +2043,7 @@ void do_replace_generics(struct ast_generics *generics,
     struct ast_vardecl *fields;
     size_t fields_count;
     do_replace_generics_in_fields(generics, generics_substitutions,
+                                  generics_substitutions_count,
                                   a->u.unione.fields, a->u.unione.fields_count,
                                   &fields, &fields_count);
     out->tag = AST_TYPEEXPR_UNIONE;
@@ -2042,8 +2052,9 @@ void do_replace_generics(struct ast_generics *generics,
   } break;
   case AST_TYPEEXPR_ARRAY: {
     struct ast_typeexpr param;
-    do_replace_generics(generics, generics_substitutions, a->u.arraytype.param,
-                        &param);
+    do_replace_generics(generics, generics_substitutions,
+                        generics_substitutions_count,
+                        a->u.arraytype.param, &param);
     out->tag = AST_TYPEEXPR_ARRAY;
     ast_arraytype_init(&out->u.arraytype, ast_meta_make_copy(&a->u.arraytype.meta),
                        a->u.arraytype.count, param);
@@ -2059,18 +2070,21 @@ void replace_generics(struct exprscope *es,
   if (!es->generics->has_type_params) {
     ast_typeexpr_init_copy(out, a);
   } else {
-    CHECK(es->generics->params_count == es->generics_substitutions_count);
-    do_replace_generics(es->generics, es->generics_substitutions, a, out);
+    do_replace_generics(es->generics, es->generics_substitutions, es->generics_substitutions_count, a, out);
   }
 }
 
 void do_replace_enumspec_generics(struct ast_generics *generics,
                                   struct ast_typeexpr *generics_substitutions,
+                                  size_t generics_substitutions_count,
                                   struct ast_enumspec *a,
                                   struct ast_enumspec *out) {
+  CHECK(generics->has_type_params);
+  CHECK(generics->params_count == generics_substitutions_count);
   struct ast_vardecl *enumfields;
   size_t enumfields_count;
   do_replace_generics_in_fields(generics, generics_substitutions,
+                                generics_substitutions_count,
                                 a->enumfields,
                                 a->enumfields_count,
                                 &enumfields, &enumfields_count);
@@ -2079,18 +2093,21 @@ void do_replace_enumspec_generics(struct ast_generics *generics,
 
 void do_replace_rhs_generics(struct ast_generics *generics,
                              struct ast_typeexpr *generics_substitutions,
+                             size_t generics_substitutions_count,
                              struct ast_rhs *a,
                              struct ast_rhs *out) {
   switch (a->tag) {
   case AST_RHS_TYPE: {
     struct ast_typeexpr type;
-    do_replace_generics(generics, generics_substitutions, &a->u.type, &type);
+    do_replace_generics(generics, generics_substitutions,
+                        generics_substitutions_count, &a->u.type, &type);
     ast_rhs_init_type(out, type);
   } break;
   case AST_RHS_ENUMSPEC: {
     struct ast_enumspec enumspec;
-    do_replace_enumspec_generics(generics, generics_substitutions, &a->u.enumspec,
-                                 &enumspec);
+    do_replace_enumspec_generics(generics, generics_substitutions,
+                                 generics_substitutions_count,
+                                 &a->u.enumspec, &enumspec);
     ast_rhs_init_enumspec(out, enumspec);
   } break;
   default:
@@ -2355,6 +2372,7 @@ int is_enum_type(struct checkstate *cs,
     case AST_RHS_ENUMSPEC: {
       do_replace_enumspec_generics(&deftype->generics,
                                    concrete_type->u.app.params,
+                                   concrete_type->u.app.params_count,
                                    &deftype->rhs.u.enumspec,
                                    concrete_enumspec_out);
       return 1;
@@ -3368,6 +3386,7 @@ int lookup_field_type(struct exprscope *es,
       struct ast_typeexpr concrete_deftype_type;
       do_replace_generics(&deftype->generics,
                           type->u.app.params,
+                          type->u.app.params_count,
                           &deftype->rhs.u.type,
                           &concrete_deftype_type);
 
