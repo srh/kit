@@ -605,7 +605,7 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
   size_t vars_pushed = 0;
 
   for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
-    struct ast_typeexpr *param_type = &type->u.app.params[i];
+    struct ast_typeexpr *param_type = ast_var_info_type(&expr->u.lambda.params[i].var_info);
 
     uint32_t size = kira_sizeof(&cs->nt, param_type);
     uint32_t padded_size = uint32_ceil_aligned(size, DWORD_SIZE);
@@ -4034,7 +4034,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
                         size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.info)));
       gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
 
-      struct ast_typeexpr *var_type = ast_case_pattern_info_var_type(&cas->pattern.info);
+      struct ast_typeexpr *var_type = ast_var_info_type(&cas->pattern.decl.var_info);
       struct loc var_loc = make_enum_body_loc(f, h, swartch_loc,
                                               kira_sizeof(&cs->nt, var_type));
 

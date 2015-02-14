@@ -2469,7 +2469,7 @@ int check_statement(struct bodystate *bs,
 
     struct ast_vardecl decl;
     ast_vardecl_init_copy(&decl, &s->u.var_statement.decl);
-    ast_var_info_specify_varnum(&decl.var_info, varnum);
+    ast_var_info_specify(&decl.var_info, varnum, replaced_type);
     annotated_out->tag = AST_STATEMENT_VAR;
     if (has_rhs) {
       ast_var_statement_init_with_rhs(&annotated_out->u.var_statement,
@@ -2480,8 +2480,6 @@ int check_statement(struct bodystate *bs,
                                          ast_meta_make_copy(&s->u.var_statement.meta),
                                          decl);
     }
-    ast_var_statement_info_note_type(&annotated_out->u.var_statement.info,
-                                     replaced_type);
     fallthrough = FALLTHROUGH_FROMTHETOP;
   } break;
   case AST_STATEMENT_IFTHEN: {
@@ -2779,14 +2777,12 @@ int check_statement(struct bodystate *bs,
         ast_ident_init_copy(&constructor_name, &cas->pattern.constructor_name);
         struct ast_vardecl decl;
         ast_vardecl_init_copy(&decl, &cas->pattern.decl);
-        ast_var_info_specify_varnum(&decl.var_info, varnum);
+        ast_var_info_specify(&decl.var_info, varnum, replaced_decl_type);
         ast_case_pattern_init(&pattern_copy,
                               ast_meta_make_copy(&cas->pattern.meta),
                               constructor_name,
                               decl);
-        ast_case_pattern_info_specify(&pattern_copy.info,
-                                      constructor_num,
-                                      replaced_decl_type);
+        ast_case_pattern_info_specify(&pattern_copy.info, constructor_num);
       }
 
       ast_cased_statement_init(&annotated_cased_statements[i],
@@ -3019,12 +3015,13 @@ int check_expr_lambda(struct exprscope *es,
   ast_typeexpr_destroy(&computed_return_type);
   exprscope_destroy(&bb_es);
   SLICE_FREE(replaced_vardecls, replaced_vardecls_size, ast_vardecl_destroy);
-  *out = funcexpr;
   {
     struct ast_vardecl *params = malloc_mul(sizeof(*params), x->params_count);
     for (size_t i = 0, e = x->params_count; i < e; i++) {
       ast_vardecl_init_copy(&params[i], &x->params[i]);
-      ast_var_info_specify_varnum(&params[i].var_info, varnums[i]);
+      struct ast_typeexpr concrete_param_type;
+      ast_typeexpr_init_copy(&concrete_param_type, &funcexpr.u.app.params[i]);
+      ast_var_info_specify(&params[i].var_info, varnums[i], concrete_param_type);
     }
     free(varnums);
     struct ast_typeexpr return_type;
@@ -3034,6 +3031,7 @@ int check_expr_lambda(struct exprscope *es,
                     params, x->params_count,
                     return_type, annotated_bracebody);
   }
+  *out = funcexpr;
   CHECK_DBG("check_expr_lambda succeeds\n");
   return 1;
 

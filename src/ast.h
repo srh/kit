@@ -161,10 +161,13 @@ struct varnum {
 struct ast_var_info {
   int info_valid;
   struct varnum varnum;
+  struct ast_typeexpr concrete_type;
 };
 
-void ast_var_info_specify_varnum(struct ast_var_info *a, struct varnum varnum);
+void ast_var_info_specify(struct ast_var_info *a, struct varnum varnum,
+                          struct ast_typeexpr concrete_type);
 struct varnum ast_var_info_varnum(struct ast_var_info *a);
+struct ast_typeexpr *ast_var_info_type(struct ast_var_info *a);
 
 struct ast_vardecl {
   struct ast_meta meta;
@@ -194,17 +197,8 @@ void ast_bracebody_init(struct ast_bracebody *a,
                         size_t statements_count);
 void ast_bracebody_destroy(struct ast_bracebody *a);
 
-struct ast_var_statement_info {
-  int info_valid;
-  struct ast_typeexpr concrete_type;
-};
-
-void ast_var_statement_info_note_type(struct ast_var_statement_info *a,
-                                      struct ast_typeexpr concrete_type);
-
 struct ast_var_statement {
   struct ast_meta meta;
-  struct ast_var_statement_info info;
   struct ast_vardecl decl;
   int has_rhs;
   struct ast_expr *rhs;
@@ -324,15 +318,12 @@ void ast_statement_alloc_move(struct ast_statement movee,
 struct ast_case_pattern_info {
   int info_valid;
   size_t constructor_number;
-  struct ast_typeexpr var_type;
 };
 
 size_t ast_case_pattern_info_constructor_number(struct ast_case_pattern_info *a);
-struct ast_typeexpr *ast_case_pattern_info_var_type(struct ast_case_pattern_info *a);
 
 void ast_case_pattern_info_specify(struct ast_case_pattern_info *a,
-                                   size_t constructor_number,
-                                   struct ast_typeexpr var_type);
+                                   size_t constructor_number);
 
 struct ast_case_pattern {
   struct ast_meta meta;

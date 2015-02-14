@@ -140,22 +140,37 @@ void ast_var_info_init(struct ast_var_info *a) {
 }
 
 void ast_var_info_init_copy(struct ast_var_info *a, struct ast_var_info *c) {
-  *a = *c;
+  a->info_valid = c->info_valid;
+  if (c->info_valid) {
+    a->varnum = c->varnum;
+    ast_typeexpr_init_copy(&a->concrete_type, &c->concrete_type);
+  }
 }
 
 void ast_var_info_destroy(struct ast_var_info *a) {
-  a->info_valid = 0;
+  if (a->info_valid) {
+    a->varnum.value = SIZE_MAX;
+    ast_typeexpr_destroy(&a->concrete_type);
+    a->info_valid = 0;
+  }
 }
 
-void ast_var_info_specify_varnum(struct ast_var_info *a, struct varnum varnum) {
+void ast_var_info_specify(struct ast_var_info *a, struct varnum varnum,
+                          struct ast_typeexpr concrete_type) {
   CHECK(!a->info_valid);
   a->info_valid = 1;
   a->varnum = varnum;
+  a->concrete_type = concrete_type;
 }
 
 struct varnum ast_var_info_varnum(struct ast_var_info *a) {
   CHECK(a->info_valid);
   return a->varnum;
+}
+
+struct ast_typeexpr *ast_var_info_type(struct ast_var_info *a) {
+  CHECK(a->info_valid);
+  return &a->concrete_type;
 }
 
 void ast_vardecl_init(struct ast_vardecl *a, struct ast_meta meta,
@@ -202,37 +217,9 @@ void ast_bracebody_destroy(struct ast_bracebody *a) {
   SLICE_FREE(a->statements, a->statements_count, ast_statement_destroy);
 }
 
-void ast_var_statement_info_init(struct ast_var_statement_info *a) {
-  a->info_valid = 0;
-}
-
-void ast_var_statement_info_init_copy(struct ast_var_statement_info *a,
-                                      struct ast_var_statement_info *c) {
-  a->info_valid = c->info_valid;
-  if (c->info_valid) {
-    ast_typeexpr_init_copy(&a->concrete_type, &c->concrete_type);
-  }
-}
-
-void ast_var_statement_info_destroy(struct ast_var_statement_info *a) {
-  if (a->info_valid) {
-    ast_typeexpr_destroy(&a->concrete_type);
-    a->info_valid = 0;
-  }
-}
-
-void ast_var_statement_info_note_type(struct ast_var_statement_info *a,
-                                      struct ast_typeexpr concrete_type) {
-  CHECK(!a->info_valid);
-  a->info_valid = 1;
-  a->concrete_type = concrete_type;
-}
-
-
 void ast_var_statement_init_with_rhs(struct ast_var_statement *a, struct ast_meta meta,
                                      struct ast_vardecl decl, struct ast_expr rhs) {
   a->meta = meta;
-  ast_var_statement_info_init(&a->info);
   a->decl = decl;
   a->has_rhs = 1;
   ast_expr_alloc_move(rhs, &a->rhs);
@@ -241,21 +228,18 @@ void ast_var_statement_init_with_rhs(struct ast_var_statement *a, struct ast_met
 void ast_var_statement_init_without_rhs(struct ast_var_statement *a, struct ast_meta meta,
                                         struct ast_vardecl decl) {
   a->meta = meta;
-  ast_var_statement_info_init(&a->info);
   a->decl = decl;
   a->has_rhs = 0;
   a->rhs = NULL;
 }
 
 struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a) {
-  CHECK(a->info.info_valid);
-  return &a->info.concrete_type;
+  return ast_var_info_type(&a->decl.var_info);
 }
 
 void ast_var_statement_init_copy(struct ast_var_statement *a,
                                  struct ast_var_statement *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  ast_var_statement_info_init_copy(&a->info, &c->info);
   ast_vardecl_init_copy(&a->decl, &c->decl);
   a->has_rhs = c->has_rhs;
   if (c->has_rhs) {
@@ -267,7 +251,6 @@ void ast_var_statement_init_copy(struct ast_var_statement *a,
 
 void ast_var_statement_destroy(struct ast_var_statement *a) {
   ast_meta_destroy(&a->meta);
-  ast_var_statement_info_destroy(&a->info);
   ast_vardecl_destroy(&a->decl);
   if (a->has_rhs) {
     a->has_rhs = 0;
@@ -544,7 +527,6 @@ void ast_case_pattern_info_init_copy(struct ast_case_pattern_info *a,
   a->info_valid = c->info_valid;
   if (c->info_valid) {
     a->constructor_number = c->constructor_number;
-    ast_typeexpr_init_copy(&a->var_type, &c->var_type);
   }
 }
 
@@ -552,7 +534,6 @@ void ast_case_pattern_info_destroy(struct ast_case_pattern_info *a) {
   if (a->info_valid) {
     a->info_valid = 0;
     a->constructor_number = 0;
-    ast_typeexpr_destroy(&a->var_type);
   }
 }
 
@@ -561,18 +542,11 @@ size_t ast_case_pattern_info_constructor_number(struct ast_case_pattern_info *a)
   return a->constructor_number;
 }
 
-struct ast_typeexpr *ast_case_pattern_info_var_type(struct ast_case_pattern_info *a) {
-  CHECK(a->info_valid);
-  return &a->var_type;
-}
-
 void ast_case_pattern_info_specify(struct ast_case_pattern_info *a,
-                                   size_t constructor_number,
-                                   struct ast_typeexpr var_type) {
+                                   size_t constructor_number) {
   CHECK(!a->info_valid);
   a->info_valid = 1;
   a->constructor_number = constructor_number;
-  a->var_type = var_type;
 }
 
 void ast_case_pattern_init(struct ast_case_pattern *a,
