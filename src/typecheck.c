@@ -3474,8 +3474,7 @@ int check_expr_local_field_access(
     struct exprscope *es,
     struct ast_local_field_access *x,
     struct ast_typeexpr *partial_type,
-    struct ast_typeexpr *out,
-    struct ast_local_field_access *annotated_out) {
+    struct ast_expr *annotated_out) {
   int ret = 0;
   struct ast_typeexpr lhs_partial_type = ast_unknown_garbage();
 
@@ -3496,11 +3495,16 @@ int check_expr_local_field_access(
     goto cleanup_field_type;
   }
 
-  *out = field_type;
   struct ast_fieldname fieldname;
   ast_fieldname_init_copy(&fieldname, &x->fieldname);
-  ast_local_field_access_init(annotated_out, ast_meta_make_copy(&x->meta),
+  ast_local_field_access_init(&annotated_out->u.local_field_access,
+                              ast_meta_make_copy(&x->meta),
                               annotated_lhs, fieldname);
+  ast_expr_partial_init(annotated_out,
+                        AST_EXPR_LOCAL_FIELD_ACCESS,
+                        expr_info_typechecked_subobject(
+                            field_type,
+                            &annotated_out->u.local_field_access.lhs->info));
   ret = 1;
   goto cleanup_lhs;
 
@@ -3775,18 +3779,9 @@ int check_expr(struct exprscope *es,
     return 1;
   } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
-    struct ast_typeexpr type;
-    if (!check_expr_local_field_access(es, &x->u.local_field_access,
-                                       partial_type, &type,
-                                       &annotated_out->u.local_field_access)) {
-      return 0;
-    }
-    ast_expr_partial_init(annotated_out,
-                          AST_EXPR_LOCAL_FIELD_ACCESS,
-                          expr_info_typechecked_subobject(
-                              type,
-                              &annotated_out->u.local_field_access.lhs->info));
-    return 1;
+    return check_expr_local_field_access(es, &x->u.local_field_access,
+                                         partial_type,
+                                         annotated_out);
   } break;
   case AST_EXPR_DEREF_FIELD_ACCESS: {
     struct ast_typeexpr type;
