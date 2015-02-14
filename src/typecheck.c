@@ -3356,9 +3356,11 @@ int lookup_field_type(struct exprscope *es,
                                    &ent)) {
       CRASH("lookup_field_type sees an invalid type.");
     }
+
     if (ent->is_primitive) {
-      METERR(fieldname->meta, "Looking up %sfield on primitive type.",
-             fieldname->whole_field ? "whole " : "");
+      METERR(fieldname->meta, "Looking up %sfield on primitive type %.*s.",
+             fieldname->whole_field ? "whole " : "",
+             IM_P(es->cs->im, type->u.name.value));
       return 0;
     }
 

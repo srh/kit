@@ -2,13 +2,13 @@
 #include <stdint.h>
 #include <time.h>
 
-int32_t kira_runloop1(void);
+int32_t runloop(void);
 
 int main(void) {
   clock_t c = clock();
 
 #if 0
-  size_t acc = kira_runloop1();
+  size_t acc = runloop();
 #else
   size_t acc = 0;
   for (size_t i = 0; i < 1000000000; i++) {

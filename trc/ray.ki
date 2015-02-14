@@ -1,0 +1,41 @@
+import stdlib;
+
+defclass[T] move ray struct {
+  size size;
+  cap size;
+  ptr *T;
+};
+
+access ray[_] {
+  def[T] do_init func[*ray[T], void] = fn(r *ray[T]) void {
+    r->size = 0u;
+    r->cap = 0u;
+    var null *T;
+    r->ptr = null;
+    return Void();
+  };
+
+  def[T] do_copy func[*ray[T], *ray[T], void] = fn(dest *ray[T], src *ray[T]) void {
+    dest->size = src->size;
+    dest->cap = src->cap;
+    var s size;
+    s.~ = src->size.~ * sizeof@[T];
+    dest->ptr = @[*T] cast(malloc(s));
+    return Void();
+  };
+
+  def[T] do_destroy func[*ray[T], void] = fn(r *ray[T]) void {
+    for var i size = r->size; i.~ > 0u; {
+      i.~ = i.~ - 1u;
+      destroy(&r->ptr[i]);
+    }
+    free(@[*void] cast(r->ptr));
+    return Void();
+  };
+}
+
+def foo func[void] = fn() void {
+  var v ray[ray[i32]];
+  var u = v;
+  return Void();
+};
