@@ -619,6 +619,7 @@ void substitute_generics_fields(struct ast_vardecl *fields,
   *concrete_fields_count_out = fields_count;
 }
 
+/* TODO: WTF, is this the same as do_replace_generics? */
 void substitute_generics(struct ast_typeexpr *type,
                          struct ast_generics *g,
                          struct ast_typeexpr *args,
