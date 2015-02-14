@@ -581,7 +581,7 @@ int help_parse_vardecl(struct ps *p, enum allow_blanks allow_blanks, struct ast_
   struct ast_typeexpr type;
   struct ast_meta meta;
   /* Oh god the parsing horrors. */
-  if (ps_peek(p) == '=' || ps_peek(p) == ')') {
+  if (allow_blanks == ALLOW_BLANKS_YES && (ps_peek(p) == '=' || ps_peek(p) == ')')) {
     type.tag = AST_TYPEEXPR_UNKNOWN;
     meta = ast_meta_make(pos_start, name.meta.pos_end);
   } else {
@@ -882,7 +882,7 @@ int parse_case_pattern(struct ps *p, struct ast_case_pattern *out) {
 
   struct ast_vardecl decl;
   if (!(skip_ws(p) && try_skip_char(p, '(')
-        && skip_ws(p) && parse_vardecl(p, &decl))) {
+        && skip_ws(p) && help_parse_vardecl(p, ALLOW_BLANKS_NO, &decl))) {
     goto fail_constructor_name;
   }
 
