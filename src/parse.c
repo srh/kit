@@ -1338,7 +1338,7 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     }
 
     struct ast_typeexpr type;
-    if (!(skip_ws(p) && parse_typeexpr(p, &type))) {
+    if (!(skip_ws(p) && help_parse_typeexpr(p, ALLOW_BLANKS_YES, &type))) {
       return 0;
     }
 

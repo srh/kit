@@ -3792,16 +3792,16 @@ int check_expr(struct exprscope *es,
     return 1;
   } break;
   case AST_EXPR_TYPED: {
-    struct ast_typeexpr replaced_type;
-    replace_generics(es, &x->u.typed_expr.type, &replaced_type);
+    struct ast_typeexpr replaced_partial_type;
+    replace_generics(es, &x->u.typed_expr.type, &replaced_partial_type);
 
     struct ast_expr annotated_lhs;
-    if (!check_expr(es, x->u.typed_expr.expr, &replaced_type,
+    if (!check_expr(es, x->u.typed_expr.expr, &replaced_partial_type,
                     &annotated_lhs)) {
-      ast_typeexpr_destroy(&replaced_type);
+      ast_typeexpr_destroy(&replaced_partial_type);
       return 0;
     }
-    ast_typeexpr_destroy(&replaced_type);
+    ast_typeexpr_destroy(&replaced_partial_type);
 
     struct ast_typeexpr old_type_copy;
     ast_typeexpr_init_copy(&old_type_copy, &x->u.typed_expr.type);
