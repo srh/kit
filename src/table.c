@@ -591,14 +591,6 @@ int name_table_add_primitive_type(struct name_table *t,
   return name_table_help_add_deftype_entry(t, &new_entry);
 }
 
-void substitute_generics(struct ast_typeexpr *type,
-                         struct ast_generics *g,
-                         struct ast_typeexpr *args,
-                         size_t args_count,
-                         struct ast_typeexpr *concrete_type_out) {
-  do_replace_generics(g, args, args_count, type, concrete_type_out);
-}
-
 int combine_partial_types(struct ast_typeexpr *a,
                           struct ast_typeexpr *b,
                           struct ast_typeexpr *out);
@@ -889,7 +881,7 @@ int unify_with_parameterized_type(
     }
   }
 
-  substitute_generics(type, g, materialized, materialized_count,
+  do_replace_generics(g, materialized, materialized_count, type,
                       concrete_type_out);
   *materialized_params_out = materialized;
   *materialized_params_count_out = materialized_count;
@@ -970,9 +962,8 @@ int def_entry_matches(struct def_entry *ent,
     }
 
     struct ast_typeexpr ent_concrete_type;
-    substitute_generics(&ent->type, &ent->generics,
-                        generics_or_null, generics_count,
-                        &ent_concrete_type);
+    do_replace_generics(&ent->generics, generics_or_null, generics_count,
+                        &ent->type, &ent_concrete_type);
 
     int ret = 0;
     if (!unify_directionally(partial_type, &ent_concrete_type)) {
