@@ -21,6 +21,8 @@
 #define PTR_TYPE_NAME "ptr"
 #define FUNC_TYPE_NAME "func"
 
+#define ARRAY_LENGTH_FIELDNAME "length"
+
 /* TODO: Later add a distinct bool type. */
 #define BOOLEAN_STANDIN_TYPE_NAME I8_TYPE_NAME
 #define KIRA_BOOL_SIZE 1

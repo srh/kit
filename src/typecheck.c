@@ -3483,6 +3483,25 @@ int check_expr_local_field_access(
     goto cleanup;
   }
 
+  if (ast_expr_type(&annotated_lhs)->tag == AST_TYPEEXPR_ARRAY
+      && !x->fieldname.whole_field
+      && x->fieldname.ident.value == identmap_intern_c_str(es->cs->im, ARRAY_LENGTH_FIELDNAME)) {
+    struct ast_fieldname fieldname;
+    ast_fieldname_init_copy(&fieldname, &x->fieldname);
+    ast_local_field_access_init(&annotated_out->u.local_field_access,
+                                ast_meta_make_copy(&x->meta),
+                                annotated_lhs, fieldname);
+    struct ast_typeexpr u32_type;
+    init_name_type(&u32_type, identmap_intern_c_str(es->cs->im, U32_TYPE_NAME));
+    ast_expr_partial_init(annotated_out,
+                          AST_EXPR_LOCAL_FIELD_ACCESS,
+                          ast_expr_info_typechecked_trivial_temporary(
+                              0, u32_type));
+    ret = 1;
+    goto cleanup;
+  }
+
+
   struct ast_typeexpr field_type;
   if (!lookup_field_type(es,
                          ast_expr_type(&annotated_lhs),
@@ -3506,14 +3525,12 @@ int check_expr_local_field_access(
                             field_type,
                             &annotated_out->u.local_field_access.lhs->info));
   ret = 1;
-  goto cleanup_lhs;
+  goto cleanup;
 
  cleanup_field_type:
   ast_typeexpr_destroy(&field_type);
  cleanup_lhs:
-  if (!ret) {
-    ast_expr_destroy(&annotated_lhs);
-  }
+  ast_expr_destroy(&annotated_lhs);
  cleanup:
   ast_typeexpr_destroy(&lhs_partial_type);
   return ret;

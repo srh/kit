@@ -3677,11 +3677,22 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
   if (!gen_expr(cs, f, h, a->u.local_field_access.lhs, &lhs_er)) {
     return 0;
   }
-
-  apply_field_access(cs, f, h, ero_loc(&lhs_er.u.open), *er_tr(&lhs_er),
-                     &a->u.local_field_access.lhs->info.concrete_type,
-                     &a->u.local_field_access.fieldname,
-                     ast_expr_type(a), er);
+  struct ast_typeexpr *lhs_type = ast_expr_type(a->u.local_field_access.lhs);
+  if (lhs_type->tag == AST_TYPEEXPR_ARRAY) {
+    CHECK(!a->u.local_field_access.fieldname.whole_field);
+    CHECK(a->u.local_field_access.fieldname.ident.value
+          == identmap_intern_c_str(cs->im, ARRAY_LENGTH_FIELDNAME));
+    gen_destroy_temp(cs, f, h, *er_tr(&lhs_er));
+    struct immediate imm;
+    imm.tag = IMMEDIATE_U32;
+    imm.u.u32 = lhs_type->u.arraytype.count;
+    expr_return_immediate(f, h, er, imm);
+  } else {
+    apply_field_access(cs, f, h, ero_loc(&lhs_er.u.open), *er_tr(&lhs_er),
+                       lhs_type,
+                       &a->u.local_field_access.fieldname,
+                       ast_expr_type(a), er);
+  }
   return 1;
 }
 

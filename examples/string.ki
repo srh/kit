@@ -111,10 +111,9 @@ access string {
 
   def[T] lits func[T, string] = fn(arr T) string {
     var ret string;
-    // Such a ghetto hack.
-    var sz u32 = sizeof@[T];
+    var sz u32 = arr.length;
     for var i u32 = 0u; i < sz; i = i + 1u {
-      append(&ret, arr[i]);
+      append(&ret, @[u8] arr[i]);
     }
     return ret;
   };
