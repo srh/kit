@@ -2774,14 +2774,20 @@ int check_statement(struct bodystate *bs,
       free_ast_vardecl(&replaced_decl);
 
       struct ast_case_pattern pattern_copy;
-      /* TODO: Don't use ast_case_pattern_init_copy -- construct its
-      fields and init from scratch -- it's really ghetto if we add new
-      info fields, for grepping. */
-      ast_case_pattern_init_copy(&pattern_copy, &cas->pattern);
-      ast_var_info_specify_varnum(&pattern_copy.decl.var_info, varnum);
-      ast_case_pattern_info_specify(&pattern_copy.info,
-                                    constructor_num,
-                                    replaced_decl_type);
+      {
+        struct ast_ident constructor_name;
+        ast_ident_init_copy(&constructor_name, &cas->pattern.constructor_name);
+        struct ast_vardecl decl;
+        ast_vardecl_init_copy(&decl, &cas->pattern.decl);
+        ast_var_info_specify_varnum(&decl.var_info, varnum);
+        ast_case_pattern_init(&pattern_copy,
+                              ast_meta_make_copy(&cas->pattern.meta),
+                              constructor_name,
+                              decl);
+        ast_case_pattern_info_specify(&pattern_copy.info,
+                                      constructor_num,
+                                      replaced_decl_type);
+      }
 
       ast_cased_statement_init(&annotated_cased_statements[i],
                                ast_meta_make_copy(&cas->meta),
