@@ -8,7 +8,7 @@
 #include "identmap.h"
 
 #define METERR(loc, fmt, ...) ERR("At %"PRIz":%"PRIz": " fmt, (loc).pos_start.line, (loc).pos_start.column, __VA_ARGS__)
-/* TODO: QMETERR statements are... questionable. */
+/* TODO: QMETERR statements are some which could be made better. */
 #define QMETERR(loc, fmt, ...) ERR("At %"PRIz":%"PRIz": " fmt, (loc).pos_start.line, (loc).pos_start.column, __VA_ARGS__)
 
 #define VOID_TYPE_NAME "void"

@@ -38,7 +38,7 @@ void static_value_init_move(struct static_value *a, struct static_value *m);
 void static_value_destroy(struct static_value *a);
 
 struct def_instantiation {
-  /* TODO: Sigh, backpointers. */
+  /* Sigh, backpointers. */
   struct def_entry *owner;
 
   int typecheck_started;

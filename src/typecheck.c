@@ -1594,7 +1594,9 @@ struct exprscope {
   struct def_entry *entry_or_null;
 
   /* A stack of variables that are in scope. */
-  /* TODO: We could probably have a stack of varnums that are in scope instead. */
+  /* TODO: We could probably have a stack of varnums that are in scope
+  instead.  Edit: Or get rid of varnums?  They lost their luster when
+  we got rid of labels and gotos. */
   struct varpair *vars;
   size_t vars_count;
   size_t vars_limit;
