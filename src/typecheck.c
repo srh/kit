@@ -1991,6 +1991,7 @@ void do_replace_generics(struct ast_generics *generics,
                          struct ast_typeexpr *generics_substitutions,
                          struct ast_typeexpr *a,
                          struct ast_typeexpr *out) {
+  CHECK(generics->has_type_params);
   switch (a->tag) {
   case AST_TYPEEXPR_NAME: {
     size_t which_generic;
