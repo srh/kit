@@ -556,7 +556,7 @@ void ast_case_pattern_init(struct ast_case_pattern *a,
   a->meta = meta;
   ast_case_pattern_info_init(&a->info);
   a->constructor_name = constructor_name;
-  a->decl = decl;
+  a->decl_ = decl;
 }
 
 void ast_case_pattern_init_copy(struct ast_case_pattern *a,
@@ -564,14 +564,14 @@ void ast_case_pattern_init_copy(struct ast_case_pattern *a,
   a->meta = ast_meta_make_copy(&c->meta);
   ast_case_pattern_info_init_copy(&a->info, &c->info);
   ast_ident_init_copy(&a->constructor_name, &c->constructor_name);
-  ast_vardecl_init_copy(&a->decl, &c->decl);
+  ast_vardecl_init_copy(&a->decl_, &c->decl_);
 }
 
 void ast_case_pattern_destroy(struct ast_case_pattern *a) {
   ast_meta_destroy(&a->meta);
   ast_case_pattern_info_destroy(&a->info);
   ast_ident_destroy(&a->constructor_name);
-  ast_vardecl_destroy(&a->decl);
+  ast_vardecl_destroy(&a->decl_);
 }
 
 void ast_cased_statement_init(struct ast_cased_statement *a,

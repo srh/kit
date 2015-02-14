@@ -882,7 +882,7 @@ int parse_case_pattern(struct ps *p, struct ast_case_pattern *out) {
 
   struct ast_vardecl decl;
   if (!(skip_ws(p) && try_skip_char(p, '(')
-        && skip_ws(p) && help_parse_vardecl(p, ALLOW_BLANKS_NO, &decl))) {
+        && skip_ws(p) && help_parse_vardecl(p, ALLOW_BLANKS_YES, &decl))) {
     goto fail_constructor_name;
   }
 

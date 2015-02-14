@@ -88,7 +88,7 @@ def blah_enty func[enty, enty] = fn(x enty) enty {
       var s string = lits("c1 (void)\n");
       print(&s);
     }
-    case c2(a struct { p i32; q i32; }): {
+    case c2(a): {
       var s string = lits("c2 ... ");
       print(&s);
       print(@[u32]~a.p);

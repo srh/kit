@@ -2763,33 +2763,33 @@ int check_statement(struct bodystate *bs,
         goto switch_fail_annotated_cased_statements;
       }
 
-      struct ast_typeexpr replaced_decl_type;
-      replace_generics(bs->es, &cas->pattern.decl.type, &replaced_decl_type);
+      struct ast_typeexpr replaced_incomplete_type;
+      replace_generics(bs->es, &cas->pattern.decl_.type, &replaced_incomplete_type);
 
       struct varnum varnum;
       struct ast_vardecl *replaced_decl;
       {
-        if (!exact_typeexprs_equal(&replaced_decl_type,
-                                   &concrete_enumspec.enumfields[constructor_num].type)) {
-          ast_typeexpr_destroy(&replaced_decl_type);
+        if (!unify_directionally(&replaced_incomplete_type,
+                                 &concrete_enumspec.enumfields[constructor_num].type)) {
+          ast_typeexpr_destroy(&replaced_incomplete_type);
           METERR(cas->meta, "Switch case decl type mismatch.%s", "\n");
           goto switch_fail_annotated_cased_statements;
         }
+        ast_typeexpr_destroy(&replaced_incomplete_type);
 
         struct ast_ident replaced_decl_name;
-        ast_ident_init_copy(&replaced_decl_name, &cas->pattern.decl.name);
+        ast_ident_init_copy(&replaced_decl_name, &cas->pattern.decl_.name);
 
-        struct ast_typeexpr replaced_decl_type_copy;
-        ast_typeexpr_init_copy(&replaced_decl_type_copy, &replaced_decl_type);
+        struct ast_typeexpr concrete_type_copy;
+        ast_typeexpr_init_copy(&concrete_type_copy, &concrete_enumspec.enumfields[constructor_num].type);
 
         replaced_decl = malloc(sizeof(*replaced_decl));
         CHECK(replaced_decl);
-        ast_vardecl_init(replaced_decl, ast_meta_make_copy(&cas->pattern.decl.meta),
-                         replaced_decl_name, replaced_decl_type_copy);
+        ast_vardecl_init(replaced_decl, ast_meta_make_copy(&cas->pattern.decl_.meta),
+                         replaced_decl_name, concrete_type_copy);
 
         if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
           free_ast_vardecl(&replaced_decl);
-          ast_typeexpr_destroy(&replaced_decl_type);
           goto switch_fail_annotated_cased_statements;
         }
       }
@@ -2799,7 +2799,6 @@ int check_statement(struct bodystate *bs,
       if (!check_expr_bracebody(bs, &cas->body, &cas_annotated_body,
                                 &cas_fallthrough)) {
         free_ast_vardecl(&replaced_decl);
-        ast_typeexpr_destroy(&replaced_decl_type);
         goto switch_fail_annotated_cased_statements;
       }
 
@@ -2813,8 +2812,12 @@ int check_statement(struct bodystate *bs,
         struct ast_ident constructor_name;
         ast_ident_init_copy(&constructor_name, &cas->pattern.constructor_name);
         struct ast_vardecl decl;
-        ast_vardecl_init_copy(&decl, &cas->pattern.decl);
-        ast_var_info_specify(&decl.var_info, varnum, replaced_decl_type);
+        ast_vardecl_init_copy(&decl, &cas->pattern.decl_);
+        {
+          struct ast_typeexpr concrete_type_copy;
+          ast_typeexpr_init_copy(&concrete_type_copy, &concrete_enumspec.enumfields[constructor_num].type);
+          ast_var_info_specify(&decl.var_info, varnum, concrete_type_copy);
+        }
         ast_case_pattern_init(&pattern_copy,
                               ast_meta_make_copy(&cas->pattern.meta),
                               constructor_name,
@@ -6101,6 +6104,28 @@ int check_file_test_more_52(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_53(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defenum ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p i32; q i32; };\n"
+      "};\n"
+      "def foo func[ty, i32] = fn(x ty) i32 {\n"
+      "  switch x {\n"
+      "    case c1(v void): { return -1; }\n"
+      "    case c2(s): {\n"
+      "      return s.p + s.q;\n"
+      "    }\n"
+      "  }\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 int test_check_file(void) {
@@ -6676,6 +6701,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_52...\n");
   if (!test_check_module(&im, &check_file_test_more_52, foo)) {
     DBG("check_file_test_more_52 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_53...\n");
+  if (!test_check_module(&im, &check_file_test_more_53, foo)) {
+    DBG("check_file_test_more_53 fails\n");
     goto cleanup_identmap;
   }
 
