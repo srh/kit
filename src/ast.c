@@ -1,7 +1,6 @@
 #include "ast.h"
 
 #include "slice.h"
-#include "table.h"  /* TODO: For typelists_equal.  Reorganize locations. */
 
 struct ast_meta ast_meta_make(struct pos pos_start, struct pos pos_end) {
   struct ast_meta ret;
