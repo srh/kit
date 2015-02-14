@@ -2063,6 +2063,9 @@ void do_replace_generics(struct ast_generics *generics,
     ast_arraytype_init(&out->u.arraytype, ast_meta_make_copy(&a->u.arraytype.meta),
                        a->u.arraytype.count, param);
   } break;
+  case AST_TYPEEXPR_UNKNOWN: {
+    out->tag = AST_TYPEEXPR_UNKNOWN;
+  } break;
   default:
     UNREACHABLE();
   }
@@ -6086,7 +6089,9 @@ int check_file_test_more_52(const uint8_t *name, size_t name_count,
       "foo",
       "def foo func[i32, void] = fn(x i32) void {\n"
       "  var p *_ = &x;\n"
-      "  var q i32 = *p;\n"
+      "  var q _ = *p;\n"
+      "  var r = q;\n"
+      "  var s i32 = r;\n"
       "  var ret void;\n"
       "  return ret;\n"
       "};\n"

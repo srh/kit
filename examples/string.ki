@@ -71,7 +71,7 @@ access string {
   };
 
   def grow_cap func[*string, u32, void] = fn(p *string, newcap u32) void {
-    var buf *u8 = alloc_array@[u8](newcap);
+    var buf = alloc_array@[u8](newcap);
     var sz u32 = p->size;
     for var i u32 = 0u; i < sz; i = i + 1u {
       buf[i] = p->buf[i];

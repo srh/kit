@@ -574,16 +574,24 @@ int help_parse_vardecl(struct ps *p, enum allow_blanks allow_blanks, struct ast_
   if (!parse_ident(p, &name)) {
     goto fail;
   }
-  struct ast_typeexpr type;
-  if (!(skip_ws(p) && help_parse_typeexpr(p, allow_blanks, &type))) {
+  if (!skip_ws(p)) {
     goto fail_name;
   }
 
-  ast_vardecl_init(out,
-                   ast_meta_make(pos_start,
-                                 ast_typeexpr_meta(&type)->pos_end),
-                   name,
-                   type);
+  struct ast_typeexpr type;
+  struct ast_meta meta;
+  /* Oh god the parsing horrors. */
+  if (ps_peek(p) == '=' || ps_peek(p) == ')') {
+    type.tag = AST_TYPEEXPR_UNKNOWN;
+    meta = ast_meta_make(pos_start, name.meta.pos_end);
+  } else {
+    if (!help_parse_typeexpr(p, allow_blanks, &type)) {
+      goto fail_name;
+    }
+    meta = ast_meta_make(pos_start, ast_typeexpr_meta(&type)->pos_end);
+  }
+
+  ast_vardecl_init(out, meta, name, type);
   return 1;
 
  fail_name:
