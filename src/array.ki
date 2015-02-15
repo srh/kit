@@ -7,22 +7,22 @@ defclass[T] move array struct {
 };
 
 access array[_] {
-  def[T] do_init = func(r *array[T]) void {
+  func[T] do_init(r *array[T]) void {
     r->size = 0u;
     r->cap = 0u;
     var null *T;
     r->ptr = null;
-  };
+  }
 
-  def[T] do_copy = func(dest *array[T], src *array[T]) void {
+  func[T] do_copy(dest *array[T], src *array[T]) void {
     dest->size = src->size;
     dest->cap = src->cap;
     var s size;
     s.~ = src->size.~ * sizeof@[T];
     dest->ptr = @[*T] cast(malloc(s));
-  };
+  }
 
-  def[T] do_destroy = func(r *array[T]) void {
+  func[T] do_destroy(r *array[T]) void {
     for var i size = r->size; i.~ > 0u; {
       i.~ = i.~ - 1u;
       destroy(&r->ptr[i]);
@@ -31,7 +31,7 @@ access array[_] {
   };
 }
 
-def foo = func() void {
+func foo() void {
   var v array[array[i32]];
   var u = v;
 };
