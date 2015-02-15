@@ -1862,7 +1862,9 @@ int parse_type_params_if_present(struct ps *p,
 int parse_rest_of_def(struct ps *p, struct pos pos_start,
                       int is_export, struct ast_def *out) {
   struct ast_generics generics = { 0 };
-  if (!is_export) {
+  if (is_export) {
+    ast_generics_init_no_params(&generics);
+  } else {
     if (!(skip_ws(p) && parse_type_params_if_present(p, &generics))) {
       goto fail;
     }
@@ -1892,11 +1894,7 @@ int parse_rest_of_def(struct ps *p, struct pos pos_start,
   }
 
   struct ast_meta meta = ast_meta_make(pos_start, ps_pos(p));
-  if (is_export) {
-    ast_def_export_init(out, meta, name, type, rhs);
-  } else {
-    ast_def_init(out, meta, generics, name, type, rhs);
-  }
+  ast_def_init(out, meta, is_export, generics, name, type, rhs);
   return 1;
 
  fail_rhs:

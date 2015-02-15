@@ -1400,23 +1400,16 @@ void ast_generics_destroy(struct ast_generics *a) {
 }
 
 void ast_def_init(struct ast_def *a, struct ast_meta meta,
+                  int is_export,
                   struct ast_generics generics,
                   struct ast_ident name, struct ast_typeexpr type,
                   struct ast_expr rhs) {
+  if (is_export) {
+    CHECK(!generics.has_type_params);
+  }
   a->meta = meta;
-  a->is_export = 0;
+  a->is_export = is_export;
   a->generics_ = generics;
-  a->name_ = name;
-  a->type_ = type;
-  a->rhs_ = rhs;
-}
-
-void ast_def_export_init(struct ast_def *a, struct ast_meta meta,
-                         struct ast_ident name, struct ast_typeexpr type,
-                         struct ast_expr rhs) {
-  a->meta = meta;
-  a->is_export = 1;
-  ast_generics_init_no_params(&a->generics_);
   a->name_ = name;
   a->type_ = type;
   a->rhs_ = rhs;
