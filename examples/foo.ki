@@ -3,22 +3,22 @@ import string;
 
 export def foo i32 = ~(1u);
 
-def fac = func(x i32) i32 {
+func fac(x i32) i32 {
   var acc i32 = 1;
   for var i i32 = x; i > 0; i = i - 1 {
     acc = acc * i;
   }
   return acc;
-};
+}
 
 deftype ty struct {
   x i32;
   y i32;
 };
 
-def[T] getsize = func() u32 {
+func[T] getsize() u32 {
   return sizeof@[T];
-};
+}
 
 defclass kla struct {
   x u32;
@@ -26,33 +26,33 @@ defclass kla struct {
 };
 
 access kla {
-  def do_destroy = func(p *kla) void {
+  func do_destroy(p *kla) void {
     p->x = 0u;
     p->y = 0u;
-  };
-  def do_init = func(p *kla) void {
+  }
+  func do_init(p *kla) void {
     p->x = 37u;
     p->y = 47u;
-  };
+  }
 
-  def do_copy = func(a *kla, c *kla) void {
+  func do_copy(a *kla, c *kla) void {
     a->x = c->x;
     a->y = c->y;
-  };
+  }
 
-  def expose = func(p *kla) struct { x u32; y u32; } {
+  func expose(p *kla) struct { x u32; y u32; } {
     return p->~;
-  };
+  }
 }
 
-def call_kla = func(x kla) void {
+func call_kla(x kla) void {
   print(expose(&x).x);
   putchar(32);
   print(expose(&x).y);
   putchar(10);
 };
 
-def try_kla = func() void {
+func try_kla() void {
   var k kla;
   var l struct { x u32; y u32; } = expose(&k);
   print(l.x);

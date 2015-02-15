@@ -1046,30 +1046,33 @@ int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
   return 0;
 }
 
-int parse_rest_of_lambda(struct ps *p, struct pos pos_start,
-                         struct ast_lambda *out) {
-  PARSE_DBG("parse_rest_of_lambda\n");
+int parse_lambdaspec(struct ps *p,
+                     struct ast_vardecl **params_out,
+                     size_t *params_count_out,
+                     struct ast_typeexpr *return_type_out,
+                     struct ast_bracebody *bracebody_out) {
   struct ast_vardecl *params;
   size_t params_count;
   if (!(skip_ws(p) && parse_params_list(p, &params, &params_count))) {
     goto fail;
   }
 
-  PARSE_DBG("parse_rest_of_lambda parsing return type\n");
+  PARSE_DBG("parse_lambdaspec parsing return type\n");
   struct ast_typeexpr return_type;
   if (!(skip_ws(p) && parse_typeexpr(p, &return_type))) {
     goto fail_params;
   }
 
-  PARSE_DBG("parse_rest_of_lambda parsing body\n");
+  PARSE_DBG("parse_lambdaspec parsing body\n");
   struct ast_bracebody bracebody;
   if (!(skip_ws(p) && parse_bracebody(p, &bracebody))) {
     goto fail_return_type;
   }
 
-  PARSE_DBG("parse_rest_of_lambda success\n");
-  ast_lambda_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                  params, params_count, return_type, bracebody);
+  *params_out = params;
+  *params_count_out = params_count;
+  *return_type_out = return_type;
+  *bracebody_out = bracebody;
   return 1;
 
  fail_return_type:
@@ -1078,6 +1081,23 @@ int parse_rest_of_lambda(struct ps *p, struct pos pos_start,
   SLICE_FREE(params, params_count, ast_vardecl_destroy);
  fail:
   return 0;
+}
+
+int parse_rest_of_lambda(struct ps *p, struct pos pos_start,
+                         struct ast_lambda *out) {
+  PARSE_DBG("parse_rest_of_lambda\n");
+  struct ast_vardecl *params;
+  size_t params_count;
+  struct ast_typeexpr return_type;
+  struct ast_bracebody bracebody;
+  if (!parse_lambdaspec(p, &params, &params_count, &return_type, &bracebody)) {
+    return 0;
+  }
+
+  PARSE_DBG("parse_rest_of_lambda success\n");
+  ast_lambda_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                  params, params_count, return_type, bracebody);
+  return 1;
 }
 
 int parse_numeric_literal(struct ps *p, struct ast_numeric_literal *out) {
@@ -1322,7 +1342,6 @@ int parse_rest_of_type_param_list(struct ps *p, enum allow_blanks allow_blanks, 
                                   size_t *params_count_out);
 
 int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
-  /* TODO: Parse char literals. */
   struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "func")) {
     ast_expr_partial_init(out, AST_EXPR_LAMBDA, ast_expr_info_default());
@@ -1859,8 +1878,10 @@ int parse_type_params_if_present(struct ps *p,
   return 0;
 }
 
-int parse_rest_of_def(struct ps *p, struct pos pos_start,
-                      int is_export, struct ast_def *out) {
+int parse_def_generics_and_name(struct ps *p,
+                                int is_export,
+                                struct ast_generics *generics_out,
+                                struct ast_ident *name_out) {
   struct ast_generics generics = { 0 };
   if (is_export) {
     ast_generics_init_no_params(&generics);
@@ -1873,6 +1894,24 @@ int parse_rest_of_def(struct ps *p, struct pos pos_start,
   struct ast_ident name;
   if (!(skip_ws(p) && parse_ident(p, &name))) {
     goto fail_generics;
+  }
+
+  *generics_out = generics;
+  *name_out = name;
+  return 1;
+
+ fail_generics:
+  ast_generics_destroy(&generics);
+ fail:
+  return 0;
+}
+
+int parse_rest_of_def(struct ps *p, struct pos pos_start,
+                      int is_export, struct ast_def *out) {
+  struct ast_generics generics;
+  struct ast_ident name;
+  if (!parse_def_generics_and_name(p, is_export, &generics, &name)) {
+    goto fail;
   }
 
   if (!skip_ws(p)) {
@@ -1918,10 +1957,43 @@ int parse_rest_of_def(struct ps *p, struct pos pos_start,
   }
  fail_ident:
   ast_ident_destroy(&name);
- fail_generics:
-  if (!is_export) {
-    ast_generics_destroy(&generics);
+  ast_generics_destroy(&generics);
+ fail:
+  return 0;
+}
+
+int parse_rest_of_func(struct ps *p, struct pos pos_start,
+                       int is_export, struct ast_def *out) {
+  struct ast_generics generics;
+  struct ast_ident name;
+  if (!parse_def_generics_and_name(p, is_export, &generics, &name)) {
+    goto fail;
   }
+
+  struct pos lambda_start = ps_pos(p);
+
+  struct ast_vardecl *params;
+  size_t params_count;
+  struct ast_typeexpr return_type;
+  struct ast_bracebody bracebody;
+  if (!parse_lambdaspec(p, &params, &params_count, &return_type, &bracebody)) {
+    goto fail_name;
+  }
+
+  struct pos pos_end = ps_pos(p);
+
+  struct ast_expr rhs;
+  ast_expr_partial_init(&rhs, AST_EXPR_LAMBDA, ast_expr_info_default());
+  ast_lambda_init(&rhs.u.lambda, ast_meta_make(lambda_start, pos_end),
+                  params, params_count, return_type, bracebody);
+
+  struct ast_meta meta = ast_meta_make(pos_start, ps_pos(p));
+  ast_def_init_no_type(out, meta, is_export, generics, name, rhs);
+  return 1;
+
+ fail_name:
+  ast_ident_destroy(&name);
+  ast_generics_destroy(&generics);
  fail:
   return 0;
 }
@@ -2155,11 +2227,21 @@ int parse_rest_of_access(struct ps *p, struct pos pos_start, struct ast_access *
 int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   PARSE_DBG("parse_toplevel\n");
   struct pos pos_start = ps_pos(p);
-  if (try_skip_keyword(p, "def")) {
+  if (try_skip_keyword(p, "func")) {
+    out->tag = AST_TOPLEVEL_DEF;
+    return parse_rest_of_func(p, pos_start, 0, &out->u.def);
+  } else if (try_skip_keyword(p, "def")) {
     out->tag = AST_TOPLEVEL_DEF;
     return parse_rest_of_def(p, pos_start, 0, &out->u.def);
   } else if (try_skip_keyword(p, "export")) {
-    if (!(skip_ws(p) && try_skip_keyword(p, "def"))) {
+    if (!skip_ws(p)) {
+      return 0;
+    }
+    if (try_skip_keyword(p, "func")) {
+      out->tag = AST_TOPLEVEL_DEF;
+      return parse_rest_of_func(p, pos_start, 1, &out->u.def);
+    }
+    if (!try_skip_keyword(p, "def")) {
       return 0;
     }
     out->tag = AST_TOPLEVEL_DEF;
@@ -2364,7 +2446,7 @@ int parse_test_defs(void) {
   pass &= run_count_test("def24",
                          "def foo [1]u8 = \"\\x2Abcdef\";\n",
                          15);
-  pass &= run_count_test("def24",
+  pass &= run_count_test("def25",
                          "def a b = func() c {\n"
                          "  switch d {\n"
                          "    case e(f g): { }\n"
@@ -2372,6 +2454,20 @@ int parse_test_defs(void) {
                          "  }\n"
                          "};\n",
                          35);
+  pass &= run_count_test("def26",
+                         "func a() c {\n"
+                         "  switch d {\n"
+                         "    case e(f g): { }\n"
+                         "    case h(i j): { k; }\n"
+                         "  }\n"
+                         "}\n"
+                         "func b() c {\n"
+                         "  switch d {\n"
+                         "    case e(f g): { }\n"
+                         "    case h(i j): { k; }\n"
+                         "  }\n"
+                         "}\n",
+                         62);
   return pass;
 }
 
