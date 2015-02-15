@@ -1,15 +1,15 @@
 deftype size u32;
 
-extern malloc func[size, *void];
-extern free func[*void, void];
+extern malloc fn[size, *void];
+extern free fn[*void, void];
 
-def[S, T] cast func[*S, *T] = fn(p *S) *T {
+def[S, T] cast fn[*S, *T] = func(p *S) *T {
   var u union { p *S; q *T; };
   u.p = p;
   return u.q;
 };
 
-def[S, T] up func[S, T] = fn(s S) T {
+def[S, T] up fn[S, T] = func(s S) T {
   var ret T;
   ret.~ = s;
   return ret;

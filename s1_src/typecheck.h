@@ -19,7 +19,7 @@
 #define I32_TYPE_NAME "i32"
 #define U32_TYPE_NAME "u32"
 #define PTR_TYPE_NAME "ptr"
-#define FUNC_TYPE_NAME "func"
+#define FUNC_TYPE_NAME "fn"
 
 #define ARRAY_LENGTH_FIELDNAME "length"
 

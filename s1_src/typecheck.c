@@ -4842,7 +4842,7 @@ int check_file_test_lambda_1(const uint8_t *name, size_t name_count,
                              uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
-                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "def y fn[i32, i32] = func(z i32)i32 {\n"
                                "  return x;\n"
                                "};\n"
     } };
@@ -4857,7 +4857,7 @@ int check_file_test_lambda_4(const uint8_t *name, size_t name_count,
   struct test_module a[] = { { "foo",
                                "def k u32 = k;\n"
                                "def x i32 = 3;\n"
-                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "def y fn[i32, i32] = func(z i32)i32 {\n"
                                "  return k;\n"
                                "};\n"
     } };
@@ -4871,7 +4871,7 @@ int check_file_test_lambda_5(const uint8_t *name, size_t name_count,
   /* Fails because x shadows a global. */
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
-                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "def y fn[i32, i32] = func(z i32)i32 {\n"
                                "  var x i32 = 4;\n"
                                "  return z;\n"
                                "};\n"
@@ -4886,7 +4886,7 @@ int check_file_test_lambda_6(const uint8_t *name, size_t name_count,
   /* Fails because z shadows a local. */
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
-                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "def y fn[i32, i32] = func(z i32)i32 {\n"
                                "  var z i32 = 4;\n"
                                "  return x;\n"
                                "};\n"
@@ -4900,7 +4900,7 @@ int check_file_test_lambda_7(const uint8_t *name, size_t name_count,
                              uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
-                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "def y fn[i32, i32] = func(z i32)i32 {\n"
                                "  return x + z + 5;\n"
                                "};\n"
     } };
@@ -4914,7 +4914,7 @@ int check_file_test_lambda_8(const uint8_t *name, size_t name_count,
   /* Fails because x is a u32. */
   struct test_module a[] = { { "foo",
                                "def x u32 = x;\n"
-                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "def y fn[i32, i32] = func(z i32)i32 {\n"
                                "  return x + z + 5;\n"
                                "};\n"
     } };
@@ -4927,7 +4927,7 @@ int check_file_test_lambda_9(const uint8_t *name, size_t name_count,
                              uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
-                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "def y fn[i32, i32] = func(z i32)i32 {\n"
                                "  return -x + z + -5;\n"
                                "};\n"
     } };
@@ -4941,7 +4941,7 @@ int check_file_test_lambda_10(const uint8_t *name, size_t name_count,
   /* Fails because you can't negate a u32. */
   struct test_module a[] = { { "foo",
                                "def x u32 = 3;\n"
-                               "def y func[i32, i32] = fn(z i32)i32 {\n"
+                               "def y fn[i32, i32] = func(z i32)i32 {\n"
                                "  return -x;\n"
                                "};\n"
     } };
@@ -4954,7 +4954,7 @@ int check_file_test_lambda_11(const uint8_t *name, size_t name_count,
                               uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
                                "deftype foo struct { x i32; y i32; };\n"
-                               "def y func[foo, i32] = fn(z foo) i32 {\n"
+                               "def y fn[foo, i32] = func(z foo) i32 {\n"
                                "  return z.x;\n"
                                "};\n"
     } };
@@ -4968,7 +4968,7 @@ int check_file_test_lambda_12(const uint8_t *name, size_t name_count,
   /* Fails because the field x has type u32. */
   struct test_module a[] = { { "foo",
                                "deftype foo struct { x u32; y i32; };\n"
-                               "def y func[foo, i32] = fn(z foo) i32 {\n"
+                               "def y fn[foo, i32] = func(z foo) i32 {\n"
                                "  return z.x;\n"
                                "};\n"
     } };
@@ -4982,7 +4982,7 @@ int check_file_test_lambda_13(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x T; y i32; };\n"
-      "def y func[foo[i32], i32] = fn(z foo[i32]) i32 {\n"
+      "def y fn[foo[i32], i32] = func(z foo[i32]) i32 {\n"
       "  return z.x + z.y;\n"
       "};\n"
     } };
@@ -4997,7 +4997,7 @@ int check_file_test_lambda_14(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x T; y i32; };\n"
-      "def y func[foo[u32], i32] = fn(z foo[u32]) i32 {\n"
+      "def y fn[foo[u32], i32] = func(z foo[u32]) i32 {\n"
       "  return z.x + z.y;\n"
       "};\n"
     } };
@@ -5009,8 +5009,8 @@ int check_file_test_lambda_14(const uint8_t *name, size_t name_count,
 int check_file_test_lambda_15(const uint8_t *name, size_t name_count,
                               uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { { "foo",
-                               "def y func[i32, i32] = fn(z i32) i32 {\n"
-                               "  var k func[i32, i32] = fn(m i32) i32 {\n"
+                               "def y fn[i32, i32] = func(z i32) i32 {\n"
+                               "  var k fn[i32, i32] = func(m i32) i32 {\n"
                                "    return m + m;\n"
                                "  };\n"
                                "  return k(z) + k(z);\n"
@@ -5025,8 +5025,8 @@ int check_file_test_lambda_16(const uint8_t *name, size_t name_count,
                               uint8_t **data_out, size_t *data_count_out) {
   /* Fails because the inner lambda tries to capture "z". */
   struct test_module a[] = { { "foo",
-                               "def y func[i32, i32] = fn(z i32) i32 {\n"
-                               "  var k func[i32, i32] = fn(m i32) i32 {\n"
+                               "def y fn[i32, i32] = func(z i32) i32 {\n"
+                               "  var k fn[i32, i32] = func(m i32) i32 {\n"
                                "    return m + z;\n"
                                "  };\n"
                                "  return k(z) + k(z);\n"
@@ -5042,7 +5042,7 @@ int check_file_test_lambda_17(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "deftype foo struct { x i32; y i32; };\n"
-      "def y func[ptr[foo], i32] = fn(z ptr[foo]) i32 {\n"
+      "def y fn[ptr[foo], i32] = func(z ptr[foo]) i32 {\n"
       "  return z->x;\n"
       "};\n"
     } };
@@ -5056,7 +5056,7 @@ int check_file_test_lambda_18(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x T; y i32; };\n"
-      "def y func[ptr[foo[i32]], i32] = fn(z ptr[foo[i32]]) i32 {\n"
+      "def y fn[ptr[foo[i32]], i32] = func(z ptr[foo[i32]]) i32 {\n"
       "  return z->x + z->y;\n"
       "};\n"
     } };
@@ -5070,7 +5070,7 @@ int check_file_test_lambda_19(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x T; y i32; };\n"
-      "def y func[ptr[foo[i32]], i32] = fn(z ptr[foo[i32]]) i32 {\n"
+      "def y fn[ptr[foo[i32]], i32] = func(z ptr[foo[i32]]) i32 {\n"
       "  return (*z).x + (&(*z))->y;\n"
       "};\n"
     } };
@@ -5084,7 +5084,7 @@ int check_file_test_lambda_20(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x T; y i32; };\n"
-      "def y func[ptr[foo[i32]], i32] = fn(z ptr[foo[i32]]) i32 {\n"
+      "def y fn[ptr[foo[i32]], i32] = func(z ptr[foo[i32]]) i32 {\n"
       "  if (z->x < 3 && z->y > 19) {\n"
       "    z->x = (*z).y + 5;\n"
       "  }\n"
@@ -5102,7 +5102,7 @@ int check_file_test_lambda_21(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x T; y i32; };\n"
-      "def y func[ptr[foo[i32]], i32] = fn(z ptr[foo[i32]]) i32 {\n"
+      "def y fn[ptr[foo[i32]], i32] = func(z ptr[foo[i32]]) i32 {\n"
       "  if (z->x < 3 && z->y > 19) {\n"
       "    z->x = z;\n"
       "  }\n"
@@ -5118,8 +5118,8 @@ int check_file_test_lambda_22(const uint8_t *name, size_t name_count,
                               uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def[T] foo func[ptr[T], T] = fn(x ptr[T]) T { return *x; };\n"
-      "def bar func[i32] = fn() i32 {\n"
+      "def[T] foo fn[ptr[T], T] = func(x ptr[T]) T { return *x; };\n"
+      "def bar fn[i32] = func() i32 {\n"
       "  var x i32 = 3;\n"
       "  return foo(&x);\n"
       "};\n"
@@ -5134,8 +5134,8 @@ int check_file_test_lambda_23(const uint8_t *name, size_t name_count,
   /* Fails because the def does not match. */
   struct test_module a[] = { {
       "foo",
-      "def[T] foo func[ptr[T], T] = fn(x ptr[T]) T { return *x; };\n"
-      "def bar func[i32] = fn() i32 {\n"
+      "def[T] foo fn[ptr[T], T] = func(x ptr[T]) T { return *x; };\n"
+      "def bar fn[i32] = func() i32 {\n"
       "  var x i32 = 3;\n"
       "  return foo(x);\n"
       "};\n"
@@ -5149,14 +5149,14 @@ int check_file_test_lambda_24(const uint8_t *name, size_t name_count,
                               uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def[T] fac func[T, T] = fn(x T) T {\n"
+      "def[T] fac fn[T, T] = func(x T) T {\n"
       "  if (x == 0) {\n"
       "    return 1;\n"
       "  } else {\n"
       "    return x * fac(x - 1);\n"
       "  }\n"
       "};\n"
-      "def bar func[i32] = fn() i32 {\n"
+      "def bar fn[i32] = func() i32 {\n"
       "  var x i32 = 5;\n"
       "  return fac(x);\n"
       "};\n"
@@ -5172,13 +5172,13 @@ int check_file_test_lambda_25(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x i32; };\n"
-      "def[T] biggefy func[T, foo[T]] = fn(x T) foo[T] {\n"
+      "def[T] biggefy fn[T, foo[T]] = func(x T) foo[T] {\n"
       "  return biggefy(x);\n"
       "};\n"
-      "def[T] rec func[T, i32] = fn(x T) i32 {\n"
+      "def[T] rec fn[T, i32] = func(x T) i32 {\n"
       "  return rec(biggefy(x));\n"
       "};\n"
-      "def bar func[i32] = fn() i32 {\n"
+      "def bar fn[i32] = func() i32 {\n"
       "  var x u32 = 5u;\n"
       "  return rec(x);\n"
       "};\n"
@@ -5194,7 +5194,7 @@ int check_file_test_lambda_26(const uint8_t *name, size_t name_count,
       "foo",
       "def x i32 = 3;\n"
       "def y u32 = 3u + 4u;\n"
-      "def z func[i32, i32] = fn(k i32) i32 { return k + 1; };\n"
+      "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -5207,7 +5207,7 @@ int check_file_test_lambda_27(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def x i32 = z(3);\n"
-      "def z func[i32, i32] = fn(k i32) i32 { return k + 1; };\n"
+      "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -5243,8 +5243,8 @@ int check_file_test_extern_1(const uint8_t *name, size_t name_count,
                              uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "extern putchar func[i32, i32];\n"
-      "def foo func[i32] = fn()i32 {\n"
+      "extern putchar fn[i32, i32];\n"
+      "def foo fn[i32] = func()i32 {\n"
       "  putchar(65);\n"
       "  putchar(10);\n"
       "  return 1;\n"
@@ -5260,8 +5260,8 @@ int check_file_test_extern_2(const uint8_t *name, size_t name_count,
   /* Fails because putchar is called with the wrong type. */
   struct test_module a[] = { {
       "foo",
-      "extern putchar func[i32, i32];\n"
-      "def foo func[i32] = fn()i32 {\n"
+      "extern putchar fn[i32, i32];\n"
+      "def foo fn[i32] = func()i32 {\n"
       "  putchar(65u);\n"
       "  putchar(10);\n"
       "  return 1;\n"
@@ -5277,8 +5277,8 @@ int check_file_test_extern_3(const uint8_t *name, size_t name_count,
   /* Fails because putchar has a nonsense return type. */
   struct test_module a[] = { {
       "foo",
-      "extern putchar func[i32, quack];\n"
-      "def foo func[i32] = fn()i32 {\n"
+      "extern putchar fn[i32, quack];\n"
+      "def foo fn[i32] = func()i32 {\n"
       "  putchar(65);\n"
       "  putchar(10);\n"
       "  return 1;\n"
@@ -5293,11 +5293,11 @@ int check_file_test_more_1(const uint8_t *name, size_t name_count,
                            uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def foo func[u32, u32] = fn(x u32) u32 {\n"
+      "def foo fn[u32, u32] = func(x u32) u32 {\n"
       "  return x + 4u;\n"
       "};"
-      "def bar func[i32, i32] = foo;\n"
-      "def foo func[i32, i32] = fn(x i32) i32 {\n"
+      "def bar fn[i32, i32] = foo;\n"
+      "def foo fn[i32, i32] = func(x i32) i32 {\n"
       "  return x + 3;\n"
       "};\n"
     } };
@@ -5310,11 +5310,11 @@ int check_file_test_more_2(const uint8_t *name, size_t name_count,
                            uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def foo func[u32, u32] = fn(x u32) u32 {\n"
+      "def foo fn[u32, u32] = func(x u32) u32 {\n"
       "  return x + 4u;\n"
       "};"
-      "def bar func[i32, i32] = foo;\n"
-      "def[T] foo func[T, i32] = fn(x T) i32 {\n"
+      "def bar fn[i32, i32] = foo;\n"
+      "def[T] foo fn[T, i32] = func(x T) i32 {\n"
       "  return x + 3;\n"
       "};\n"
     } };
@@ -5328,11 +5328,11 @@ int check_file_test_more_3(const uint8_t *name, size_t name_count,
   /* Fails because foo's instatiation won't typecheck. */
   struct test_module a[] = { {
       "foo",
-      "def foo func[u32, u32] = fn(x u32) u32 {\n"
+      "def foo fn[u32, u32] = func(x u32) u32 {\n"
       "  return x + 4u;\n"
       "};"
-      "def bar func[u32, i32] = foo;\n"
-      "def[T] foo func[T, i32] = fn(x T) i32 {\n"
+      "def bar fn[u32, i32] = foo;\n"
+      "def[T] foo fn[T, i32] = func(x T) i32 {\n"
       "  return x + 3;\n"
       "};\n"
     } };
@@ -5347,7 +5347,7 @@ int check_file_test_more_4(const uint8_t *name, size_t name_count,
   /* Unfortunately we don't check (yet) that _all_ paths return. */
   struct test_module a[] = { {
       "foo",
-      "def foo func[u32, u32] = fn(x u32) u32 {\n"
+      "def foo fn[u32, u32] = func(x u32) u32 {\n"
       "  x + x;\n"
       "};"
     } };
@@ -5385,11 +5385,11 @@ int check_file_test_more_7(const uint8_t *name, size_t name_count,
                            uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def[T] foo func[T, T] = fn(x T) T {\n"
+      "def[T] foo fn[T, T] = func(x T) T {\n"
       "  var y T = x;\n"
       "  return y;\n"
       "};\n"
-      "def bar func[i32] = fn() i32 {\n"
+      "def bar fn[i32] = func() i32 {\n"
       "  return foo(3);\n"
       "};\n"
     } };
@@ -5402,11 +5402,11 @@ int check_file_test_more_8(const uint8_t *name, size_t name_count,
                            uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def[T] add32 func[i32, T, i32] = fn(x i32, y T) i32 {\n"
+      "def[T] add32 fn[i32, T, i32] = func(x i32, y T) i32 {\n"
       "  var z i32 = ~4;\n"
       "  return x + z;\n"
       "};\n"
-      "def bar func[i32] = fn() i32 {\n"
+      "def bar fn[i32] = func() i32 {\n"
       "  return add32(3, 4u);\n"
       "};\n"
     } };
@@ -5420,7 +5420,7 @@ int check_file_test_more_9(const uint8_t *name, size_t name_count,
   /* Fails because return type in return expression is wrong. */
   struct test_module a[] = { {
       "foo",
-      "def foo func[i32] = fn() i32 {\n"
+      "def foo fn[i32] = func() i32 {\n"
       "  return 4u;\n"
       "};\n"
     } };
@@ -5444,7 +5444,7 @@ int check_file_test_more_11(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def[T] foo func[ptr[T], i32, T] = fn(p ptr[T], i i32) T {\n"
+      "def[T] foo fn[ptr[T], i32, T] = func(p ptr[T], i i32) T {\n"
       "  var ret T = p[i];\n"
       "  p[i] = p[i + 1];\n"
       "  return ret;\n"
@@ -5461,7 +5461,7 @@ int check_file_test_more_12(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "deftype vec3 [3]u32;\n"
-      "def foo func[[3]u32, vec3] = fn(arr [3]u32) vec3 {\n"
+      "def foo fn[[3]u32, vec3] = func(arr [3]u32) vec3 {\n"
       "  var v vec3 = arr;\n"
       "  return v;\n"
       "};\n"
@@ -5477,7 +5477,7 @@ int check_file_test_more_13(const uint8_t *name, size_t name_count,
      check_file_test_more_14.) */
   struct test_module a[] = { {
       "foo",
-      "def foo func[i32] = fn() i32 {\n"
+      "def foo fn[i32] = func() i32 {\n"
       "  return 2 + ~3u;\n"
       "};\n"
     } };
@@ -5490,7 +5490,7 @@ int check_file_test_more_14(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def foo func[i32] = fn() i32 {\n"
+      "def foo fn[i32] = func() i32 {\n"
       "  return 2 + @[i32](~3u);\n"
       "};\n"
     } };
@@ -5503,7 +5503,7 @@ int check_file_test_more_15(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def foo func[i32] = fn() i32 {\n"
+      "def foo fn[i32] = func() i32 {\n"
       "  var x i32 = 5;\n"
       "  while (x > 3) {\n"
       "    x = x + 1;\n"
@@ -5520,7 +5520,7 @@ int check_file_test_more_16(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def foo func[i32] = fn() i32 {\n"
+      "def foo fn[i32] = func() i32 {\n"
       "  var x i32 = 5;\n"
       "  while !(x > 3) {\n"
       "    x = x + 1;\n"
@@ -5538,7 +5538,7 @@ int check_file_test_more_17(const uint8_t *name, size_t name_count,
   /* Fails because some control paths don't return a value. */
   struct test_module a[] = { {
       "foo",
-      "def foo func[i32] = fn() i32 {\n"
+      "def foo fn[i32] = func() i32 {\n"
       "  var x i32 = 2;\n"
       "  if (x < 3) {\n"
       "    x = x + 1;\n"
@@ -5556,7 +5556,7 @@ int check_file_test_more_18(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def foo func[i32] = fn() i32 {\n"
+      "def foo fn[i32] = func() i32 {\n"
       "  var acc u32 = 0u;\n"
       "  for var i u32 = 0u; i < 10u; i = i + 1u {\n"
       "    acc = acc + i;\n"
@@ -5574,15 +5574,15 @@ int check_file_test_more_19(const uint8_t *name, size_t name_count,
   /* Fails because in baz, we can't figure out type of foo instantiation. */
   struct test_module a[] = { {
       "foo",
-      "def[T] foo func[i32, T] = fn(x i32) T {\n"
+      "def[T] foo fn[i32, T] = func(x i32) T {\n"
       "  // Why not test '@[T]' works where T is generic.\n"
       "  var y T = @[T](~x);\n"
       "  return y;\n"
       "};\n"
-      "def bar func[func[i32, i16], i32, i16] = fn(x func[i32, i16], y i32) i16 {\n"
+      "def bar fn[fn[i32, i16], i32, i16] = func(x fn[i32, i16], y i32) i16 {\n"
       "  return x(y);\n"
       "};\n"
-      "def baz func[i16] = fn() i16 {\n"
+      "def baz fn[i16] = func() i16 {\n"
       "  return bar(foo, 4);\n"
       "};\n"
     } };
@@ -5595,15 +5595,15 @@ int check_file_test_more_20(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def[T] foo func[i32, T] = fn(x i32) T {\n"
+      "def[T] foo fn[i32, T] = func(x i32) T {\n"
       "  // Why not test '@[T]' works where T is generic.\n"
       "  var y T = @[T]~x;\n"
       "  return y;\n"
       "};\n"
-      "def bar func[func[i32, i16], i32, i16] = fn(x func[i32, i16], y i32) i16 {\n"
+      "def bar fn[fn[i32, i16], i32, i16] = func(x fn[i32, i16], y i32) i16 {\n"
       "  return x(y);\n"
       "};\n"
-      "def baz func[i16] = fn() i16 {\n"
+      "def baz fn[i16] = func() i16 {\n"
       "  return bar(foo@[i16], 4);\n"
       "};\n"
     } };
@@ -5617,7 +5617,7 @@ int check_file_test_more_21(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "deftype ty struct { x i32; y i32; };\n"
-      "def foo func[u32] = fn() u32 {\n"
+      "def foo fn[u32] = func() u32 {\n"
       "  return sizeof@[ty];\n"
       "};\n"
     } };
@@ -5633,7 +5633,7 @@ int check_file_test_more_22(const uint8_t *name, size_t name_count,
       "foo",
       "defclass ty struct { x i32; y i32; };\n"
       "access whatever {\n"
-      "def foo func[*ty, i32] = fn(t *ty) i32 {\n"
+      "def foo fn[*ty, i32] = func(t *ty) i32 {\n"
       "  return t->x;\n"
       "};\n"
       "}\n"
@@ -5650,7 +5650,7 @@ int check_file_test_more_23(const uint8_t *name, size_t name_count,
       "foo",
       "defclass ty struct { x i32; y i32; };\n"
       "access ty[] {\n"
-      "def foo func[*ty, i32] = fn(t *ty) i32 {\n"
+      "def foo fn[*ty, i32] = func(t *ty) i32 {\n"
       "  return t->x;\n"
       "};\n"
       "}\n"
@@ -5667,7 +5667,7 @@ int check_file_test_more_24(const uint8_t *name, size_t name_count,
       "foo",
       "defclass ty struct { x i32; y i32; };\n"
       "access ty[_, _] {\n"
-      "def foo func[*ty, i32] = fn(t *ty) i32 {\n"
+      "def foo fn[*ty, i32] = func(t *ty) i32 {\n"
       "  return t->x;\n"
       "};\n"
       "}\n"
@@ -5683,7 +5683,7 @@ int check_file_test_more_25(const uint8_t *name, size_t name_count,
       "foo",
       "defclass ty struct { x i32; y i32; };\n"
       "access ty {\n"
-      "def foo func[*ty, i32] = fn(t *ty) i32 {\n"
+      "def foo fn[*ty, i32] = func(t *ty) i32 {\n"
       "  return t->x;\n"
       "};\n"
       "}\n"
@@ -5699,11 +5699,11 @@ int check_file_test_more_26(const uint8_t *name, size_t name_count,
       "foo",
       "defclass[T] ty struct { x T; y T; };\n"
       "access ty[_] {\n"
-      "def[T] foo func[*ty[T], T] = fn(t *ty[T]) T {\n"
+      "def[T] foo fn[*ty[T], T] = func(t *ty[T]) T {\n"
       "  return t->x;\n"
       "};\n"
       "}\n"
-      "def bar func[*ty[i32], i32] = foo;\n"
+      "def bar fn[*ty[i32], i32] = foo;\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -5716,10 +5716,10 @@ int check_file_test_more_27(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "defclass[T] ty struct { x T; y T; };\n"
-      "def[T] foo func[*ty[T], T] = fn(t *ty[T]) T {\n"
+      "def[T] foo fn[*ty[T], T] = func(t *ty[T]) T {\n"
       "  return t->x;\n"
       "};\n"
-      "def bar func[*ty[i32], i32] = foo;\n"
+      "def bar fn[*ty[i32], i32] = foo;\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -5731,7 +5731,7 @@ int check_file_test_more_28(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "deftype ty i32;\n"
-      "def foo func[ty, i32] = fn(t ty) i32 {\n"
+      "def foo fn[ty, i32] = func(t ty) i32 {\n"
       "  return t.~;\n"
       "};\n"
     } };
@@ -5747,7 +5747,7 @@ int check_file_test_more_29(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "defclass ty i32;\n"
-      "def foo func[ty, i32] = fn(t ty) i32 {\n"
+      "def foo fn[ty, i32] = func(t ty) i32 {\n"
       "  return t.~;\n"
       "};\n"
     } };
@@ -5763,7 +5763,7 @@ int check_file_test_more_30a(const uint8_t *name, size_t name_count,
       "foo",
       "defclass ty i32;\n"
       "access ty {\n"
-      "def foo func[ty, i32] = fn(t ty) i32 {\n"
+      "def foo fn[ty, i32] = func(t ty) i32 {\n"
       "  return t.~;\n"
       "};\n"
       "}\n"
@@ -5779,7 +5779,7 @@ int check_file_test_more_30b(const uint8_t *name, size_t name_count,
       "foo",
       "defclass copy ty i32;\n"
       "access ty {\n"
-      "def foo func[ty, i32] = fn(t ty) i32 {\n"
+      "def foo fn[ty, i32] = func(t ty) i32 {\n"
       "  return t.~;\n"
       "};\n"
       "}\n"
@@ -5796,10 +5796,10 @@ int check_file_test_more_31(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "defclass[T] ty i32;\n"
-      "def[T] foo func[ty[T], i32] = fn(t ty[T]) i32 {\n"
+      "def[T] foo fn[ty[T], i32] = func(t ty[T]) i32 {\n"
       "  return t.~;\n"
       "};\n"
-      "def bar func[ty[u32], i32] = foo;\n"
+      "def bar fn[ty[u32], i32] = foo;\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -5813,11 +5813,11 @@ int check_file_test_more_32a(const uint8_t *name, size_t name_count,
       "foo",
       "defclass[T] ty i32;\n"
       "access ty[_] {\n"
-      "def[T] foo func[ty[T], i32] = fn(t ty[T]) i32 {\n"
+      "def[T] foo fn[ty[T], i32] = func(t ty[T]) i32 {\n"
       "  return t.~;\n"
       "};\n"
       "}\n"
-      "def bar func[ty[u32], i32] = foo;\n"
+      "def bar fn[ty[u32], i32] = foo;\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -5830,11 +5830,11 @@ int check_file_test_more_32b(const uint8_t *name, size_t name_count,
       "foo",
       "defclass[T] copy ty i32;\n"
       "access ty[_] {\n"
-      "def[T] foo func[ty[T], i32] = fn(t ty[T]) i32 {\n"
+      "def[T] foo fn[ty[T], i32] = func(t ty[T]) i32 {\n"
       "  return t.~;\n"
       "};\n"
       "}\n"
-      "def bar func[ty[u32], i32] = foo;\n"
+      "def bar fn[ty[u32], i32] = foo;\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -5848,7 +5848,7 @@ int check_file_test_more_33(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "defclass ty i32;\n"
-      "def foo func[*ty, *i32] = fn(t *ty) *i32 {\n"
+      "def foo fn[*ty, *i32] = func(t *ty) *i32 {\n"
       "  return &t->~;\n"
       "};\n"
     } };
@@ -5863,7 +5863,7 @@ int check_file_test_more_34(const uint8_t *name, size_t name_count,
       "foo",
       "defclass ty i32;\n"
       "access ty {\n"
-      "def foo func[*ty, *i32] = fn(t *ty) *i32 {\n"
+      "def foo fn[*ty, *i32] = func(t *ty) *i32 {\n"
       "  return &t->~;\n"
       "};\n"
       "}\n"
@@ -5880,10 +5880,10 @@ int check_file_test_more_35(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "defclass[T] ty i32;\n"
-      "def[T] foo func[*ty[T], *i32] = fn(t *ty[T]) *i32 {\n"
+      "def[T] foo fn[*ty[T], *i32] = func(t *ty[T]) *i32 {\n"
       "  return &t->~;\n"
       "};\n"
-      "def bar func[*ty[u32], *i32] = foo;\n"
+      "def bar fn[*ty[u32], *i32] = foo;\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -5896,11 +5896,11 @@ int check_file_test_more_36(const uint8_t *name, size_t name_count,
       "foo",
       "defclass[T] ty i32;\n"
       "access ty[_] {\n"
-      "def[T] foo func[*ty[T], *i32] = fn(t *ty[T]) *i32 {\n"
+      "def[T] foo fn[*ty[T], *i32] = func(t *ty[T]) *i32 {\n"
       "  return &t->~;\n"
       "};\n"
       "}\n"
-      "def bar func[*ty[u32], *i32] = foo;\n"
+      "def bar fn[*ty[u32], *i32] = foo;\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -5913,12 +5913,12 @@ int check_file_test_more_37(const uint8_t *name, size_t name_count,
       "foo",
       "defclass copy ty i32;\n"
       "access ty {\n"
-      "def do_init func[*ty, void] = fn(t *ty) void {\n"
+      "def do_init fn[*ty, void] = func(t *ty) void {\n"
       "  var ret void;\n"
       "  return ret;\n"
       "};\n"
       "}\n"
-      "def foo func[i32] = fn() i32 {\n"
+      "def foo fn[i32] = func() i32 {\n"
       "  var k ty;\n"
       "  return 1;\n"
       "};\n"
@@ -5933,7 +5933,7 @@ int check_file_test_more_38(const uint8_t *name, size_t name_count,
   /* Fails because blah is not the name of a type. */
   struct test_module a[] = { {
       "foo",
-      "def foo func[i32] = fn() i32 {\n"
+      "def foo fn[i32] = func() i32 {\n"
       "  var x blah;\n"
       "  return 1;\n"
       "};\n"
@@ -5949,7 +5949,7 @@ int check_file_test_more_39(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "defclass copy ty i32;\n"
-      "def foo func[i32] = fn() i32 {\n"
+      "def foo fn[i32] = func() i32 {\n"
       "  var k ty;\n"
       "  return 1;\n"
       "};\n"
@@ -5965,13 +5965,13 @@ int check_file_test_more_40(const uint8_t *name, size_t name_count,
       "foo",
       "defclass copy ty i32;\n"
       "access ty {\n"
-      "def do_init func[*ty, void] = fn(t *ty) void {\n"
+      "def do_init fn[*ty, void] = func(t *ty) void {\n"
       "  var ret void;\n"
       "  return ret;\n"
       "};\n"
       "}\n"
       "deftype ty2 struct { x i32; y ty; };\n"
-      "def foo func[i32] = fn() i32 {\n"
+      "def foo fn[i32] = func() i32 {\n"
       "  var k ty2;\n"
       "  return 1;\n"
       "};\n"
@@ -5988,7 +5988,7 @@ int check_file_test_more_41(const uint8_t *name, size_t name_count,
       "foo",
       "defclass copy ty i32;\n"
       "deftype ty2 struct { x i32; y ty; };\n"
-      "def foo func[i32] = fn() i32 {\n"
+      "def foo fn[i32] = func() i32 {\n"
       "  var k ty2;\n"
       "  return 1;\n"
       "};\n"
@@ -6054,7 +6054,7 @@ int check_file_test_more_46(const uint8_t *name, size_t name_count,
       "  c1 void;\n"
       "  c2 struct { p i32; q i32; };\n"
       "};\n"
-      "def foo func[ty, ty] = fn(x ty) ty {\n"
+      "def foo fn[ty, ty] = func(x ty) ty {\n"
       "  var v void;\n"
       "  var y ty = c1(v);\n"
       "  var u struct { p i32; q i32; };\n"
@@ -6076,7 +6076,7 @@ int check_file_test_more_47(const uint8_t *name, size_t name_count,
       "  c1 void;\n"
       "  c2 struct { p i32; q i32; };\n"
       "};\n"
-      "def foo func[ty, ty] = fn(x ty) ty {\n"
+      "def foo fn[ty, ty] = func(x ty) ty {\n"
       "  var v void;\n"
       "  var y ty = c1(v);\n"
       "  var u struct { p i32; q u32; };\n"
@@ -6098,7 +6098,7 @@ int check_file_test_more_48(const uint8_t *name, size_t name_count,
       "  c1 void;\n"
       "  c2 struct { p T; q T; };\n"
       "};\n"
-      "def foo func[ty[i32], ty[i32]] = fn(x ty[i32]) ty[i32] {\n"
+      "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
       "  var v void;\n"
       "  var y ty[i32] = c1(v);\n"
       "  var u struct { p i32; q i32; };\n"
@@ -6120,7 +6120,7 @@ int check_file_test_more_49(const uint8_t *name, size_t name_count,
       "  c1 void;\n"
       "  c2 struct { p T; q T; };\n"
       "};\n"
-      "def foo func[ty[i32], ty[i32]] = fn(x ty[i32]) ty[i32] {\n"
+      "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
       "  var v void;\n"
       "  var y ty[i32] = c1(v);\n"
       "  var u struct { p u32; q u32; };\n"
@@ -6141,7 +6141,7 @@ int check_file_test_more_50(const uint8_t *name, size_t name_count,
       "  c1 void;\n"
       "  c2 struct { p i32; q i32; };\n"
       "};\n"
-      "def foo func[ty, i32] = fn(x ty) i32 {\n"
+      "def foo fn[ty, i32] = func(x ty) i32 {\n"
       "  switch x {\n"
       "    case c1(v void): { return -1; }\n"
       "    case c2(s struct { p i32; q i32; }): {\n"
@@ -6164,7 +6164,7 @@ int check_file_test_more_51(const uint8_t *name, size_t name_count,
       "  c1 void;\n"
       "  c2 struct { p i32; q i32; };\n"
       "};\n"
-      "def foo func[ty, i32] = fn(x ty) i32 {\n"
+      "def foo fn[ty, i32] = func(x ty) i32 {\n"
       "  switch x {\n"
       "    case c1(v void): { return -1; }\n"
       "    case c2(s struct { p i32; q i32; }): {\n"
@@ -6182,7 +6182,7 @@ int check_file_test_more_52(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def foo func[i32, void] = fn(x i32) void {\n"
+      "def foo fn[i32, void] = func(x i32) void {\n"
       "  var p *_ = &x;\n"
       "  var q _ = *p;\n"
       "  var r = q;\n"
@@ -6204,7 +6204,7 @@ int check_file_test_more_53(const uint8_t *name, size_t name_count,
       "  c1 void;\n"
       "  c2 struct { p i32; q i32; };\n"
       "};\n"
-      "def foo func[ty, i32] = fn(x ty) i32 {\n"
+      "def foo fn[ty, i32] = func(x ty) i32 {\n"
       "  switch x {\n"
       "    case c1(v void): { return -1; }\n"
       "    case c2(s): {\n"
@@ -6222,7 +6222,7 @@ int check_file_test_more_54(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def foo func[i32, void] = fn(x i32) void {\n"
+      "def foo fn[i32, void] = func(x i32) void {\n"
       "  var p *_ = &x;\n"
       "  var q _ = *p;\n"
       "  if (x == 3) {\n"
@@ -6241,7 +6241,7 @@ int check_file_test_more_55(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def foo = fn(x i32, y u32) void {\n"
+      "def foo = func(x i32, y u32) void {\n"
       "  1;\n"
       "};\n"
     } };

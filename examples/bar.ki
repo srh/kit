@@ -1,7 +1,7 @@
-extern putchar func[i32, i32];
-extern flushstdout func[i32];
+extern putchar fn[i32, i32];
+extern flushstdout fn[i32];
 
-def print func[u32, u32] = fn(x u32) u32 {
+def print = func(x u32) u32 {
   var printed u32 = 0u;
   if (x == 0u) {
     putchar(48);

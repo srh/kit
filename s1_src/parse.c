@@ -1324,7 +1324,7 @@ int parse_rest_of_type_param_list(struct ps *p, enum allow_blanks allow_blanks, 
 int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
   /* TODO: Parse char literals. */
   struct pos pos_start = ps_pos(p);
-  if (try_skip_keyword(p, "fn")) {
+  if (try_skip_keyword(p, "func")) {
     ast_expr_partial_init(out, AST_EXPR_LAMBDA, ast_expr_info_default());
     return parse_rest_of_lambda(p, pos_start, &out->u.lambda);
   }
@@ -2289,13 +2289,13 @@ int parse_test_defs(void) {
   pass &= run_count_test("def02", "def b int = 1;", 6);
   pass &= run_count_test("def03", "def a int =0   ;  ", 6);
   pass &= run_count_test("def04", "def abc_def int = 12345;", 6);
-  pass &= run_count_test("def05", "def foo func[int, int] = 1;", 11);
+  pass &= run_count_test("def05", "def foo fn[int, int] = 1;", 11);
   pass &= run_count_test("def06",
-                         "def foo func[int, int] = "
-                         "fn(x int, y int) int { 3; };",
+                         "def foo fn[int, int] = "
+                         "func(x int, y int) int { 3; };",
                          23);
-  pass &= run_count_test("def07", "def foo func[int, int] = \n"
-                         "\tfn(x int, y int) int { foo(bar); };\n",
+  pass &= run_count_test("def07", "def foo fn[int, int] = \n"
+                         "\tfunc(x int, y int) int { foo(bar); };\n",
                          26);
   pass &= run_count_test("def10",
                          "def foo bar = 2 + 3u;",
@@ -2307,13 +2307,13 @@ int parse_test_defs(void) {
                          "def foo bar = (2 ^ 3) - 4 && x -> quux;",
                          16);
   pass &= run_count_test("def13",
-                         "def[] foo func[int] = fn() int {\n"
+                         "def[] foo fn[int] = func() int {\n"
                          "   var x int = 3;\n"
                          "   return x;\n"
                          "};\n",
                          25);
   pass &= run_count_test("def14",
-                         "def[a,b] foo/*heh*/func[int] = fn() int {"
+                         "def[a,b] foo/*heh*/fn[int] = func() int {"
                          "//blah blah blah\n"
                          "   var x int = -3;\n"
                          "   return x;\n"
@@ -2326,24 +2326,24 @@ int parse_test_defs(void) {
                          "def foo i32 = 1 + - 1;\n",
                          9);
   pass &= run_count_test("def17",
-                         "def foo func[int] = fn() int {\n"
+                         "def foo fn[int] = func() int {\n"
                          "  var x int;\n"
                          "};\n",
                          18);
   pass &= run_count_test("def18",
-                         "def foo bar = fn() void {\n"
+                         "def foo bar = func() void {\n"
                          "  (x+3)[y(z)] = 3;\n"
                          "  return x[y];\n"
                          "};\n",
                          31);
   pass &= run_count_test("def19",
-                         "def foo bar = fn() void {\n"
+                         "def foo bar = func() void {\n"
                          "  for var i i32 = 3; i < 3; i = i + 1 {\n"
                          "  }\n"
                          "};\n",
                          29);
   pass &= run_count_test("def20",
-                         "def foo bar = fn() void {\n"
+                         "def foo bar = func() void {\n"
                          "  for var i i32 = 3; i < 3; i = i + 1 {\n"
                          "    x = 2;\n"
                          "  }\n"
@@ -2365,7 +2365,7 @@ int parse_test_defs(void) {
                          "def foo [1]u8 = \"\\x2Abcdef\";\n",
                          15);
   pass &= run_count_test("def24",
-                         "def a b = fn() c {\n"
+                         "def a b = func() c {\n"
                          "  switch d {\n"
                          "    case e(f g): { }\n"
                          "    case h(i j): { k; }\n"
@@ -2381,10 +2381,10 @@ int parse_test_deftypes(void) {
                          " deftype foo bar;",
                          4);
   pass &= run_count_test("deftype2",
-                         "deftype foo func[int, int] ; ",
+                         "deftype foo fn[int, int] ; ",
                          9);
   pass &= run_count_test("deftype3",
-                         "deftype foo struct { x y; z int; t func[beh]; };\n"
+                         "deftype foo struct { x y; z int; t fn[beh]; };\n"
                          "deftype [ c, d ]  bar union{a b;c d[e,f];};",
                          40);
   pass &= run_count_test("deftype4",
@@ -2415,8 +2415,8 @@ int parse_test_deftypes(void) {
 int parse_test_externs(void) {
   int pass = 1;
   pass &= run_count_test("externs1",
-                         "extern putchar func[i32, i32];\n"
-                         "def blah func[i32, i32] = 3;\n",
+                         "extern putchar fn[i32, i32];\n"
+                         "def blah fn[i32, i32] = 3;\n",
                          20);
   return pass;
 }
@@ -2424,7 +2424,7 @@ int parse_test_externs(void) {
 int parse_test_exports(void) {
   int pass = 1;
   pass &= run_count_test("externs1",
-                         "export def blah func[i32, i32] = 3;\n",
+                         "export def blah fn[i32, i32] = 3;\n",
                          12);
   return pass;
 }

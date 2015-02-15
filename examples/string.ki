@@ -1,9 +1,9 @@
 import bar;
 
-extern malloc func[u32, *void];
-extern free func[*void, void];
+extern malloc fn[u32, *void];
+extern free fn[*void, void];
 
-def[T] alloc_array = fn(n u32) *T {
+def[T] alloc_array = func(n u32) *T {
   var u union { vp *void; tp *T; };
   u.vp = malloc(n * sizeof@[T]);
   for var i u32 = 0u; i < n; i = i + 1u {
@@ -12,7 +12,7 @@ def[T] alloc_array = fn(n u32) *T {
   return u.tp;
 };
 
-def[T] delete_array = fn(n u32, p *T) void {
+def[T] delete_array = func(n u32, p *T) void {
   for var i u32 = 0u; i < n; i = i + 1u {
     destroy(&p[i]);
   }
@@ -21,13 +21,13 @@ def[T] delete_array = fn(n u32, p *T) void {
   free(u.vp);
 };
 
-def alloc_u8_array = fn(n u32) *u8 {
+def alloc_u8_array = func(n u32) *u8 {
   var u union { vp *void; u8p *u8; };
   u.vp = malloc(n);
   return u.u8p;
 };
 
-def free_u8_array = fn(p *u8) void {
+def free_u8_array = func(p *u8) void {
   var u union { vp *void; u8p *u8; };
   u.u8p = p;
   free(u.vp);
@@ -40,18 +40,18 @@ defclass move string struct {
 };
 
 access string {
-  def do_init = fn(p *string) void {
+  def do_init = func(p *string) void {
     p->size = 0u;
     p->cap = 0u;
     var buf *u8;
     p->buf = buf;
   };
 
-  def do_destroy = fn(p *string) void {
+  def do_destroy = func(p *string) void {
     delete_array(p->cap, p->buf);
   };
 
-  def do_copy = fn(p *string, c *string) void {
+  def do_copy = func(p *string, c *string) void {
     p->size = c->size;
     p->cap = c->cap;
     p->buf = alloc_array@[u8](p->size);
@@ -60,7 +60,7 @@ access string {
     }
   };
 
-  def grow_cap = fn(p *string, newcap u32) void {
+  def grow_cap = func(p *string, newcap u32) void {
     var buf = alloc_array@[u8](newcap);
     var sz u32 = p->size;
     for var i u32 = 0u; i < sz; i = i + 1u {
@@ -72,7 +72,7 @@ access string {
     p->cap = newcap;
   };
 
-  def append = fn(p *string, c u8) void {
+  def append = func(p *string, c u8) void {
     if p->size == p->cap {
       var new_cap u32;
       if (p->cap == 0u) {
@@ -87,15 +87,15 @@ access string {
     p->size = p->size + 1u;
   };
 
-  def get = fn(p *string, i u32) u8 {
+  def get = func(p *string, i u32) u8 {
     return p->buf[i];
   };
 
-  def size = fn(p *string) u32 {
+  def size = func(p *string) u32 {
     return p->size;
   };
 
-  def[T] lits = fn(arr T) string {
+  def[T] lits = func(arr T) string {
     var ret string;
     var sz u32 = arr.length;
     for var i u32 = 0u; i < sz; i = i + 1u {
@@ -105,7 +105,7 @@ access string {
   };
 }
 
-def print = fn(p *string) void {
+def print = func(p *string) void {
   for var i u32 = 0u; i < size(p); i = i + 1u {
     var ch i32 = ~get(p, i);
     putchar(ch);
