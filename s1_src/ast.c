@@ -435,6 +435,39 @@ void ast_switch_statement_destroy(struct ast_switch_statement *a) {
              ast_cased_statement_destroy);
 }
 
+void ast_return_statement_init(struct ast_return_statement *a,
+                               struct ast_meta meta,
+                               struct ast_expr expr) {
+  a->meta = meta;
+  a->has_expr = 1;
+  ast_expr_alloc_move(expr, &a->expr);
+}
+
+void ast_return_statement_init_no_expr(struct ast_return_statement *a,
+                                       struct ast_meta meta) {
+  a->meta = meta;
+  a->has_expr = 0;
+}
+
+void ast_return_statement_init_copy(struct ast_return_statement *a,
+                                    struct ast_return_statement *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  a->has_expr = c->has_expr;
+  if (c->has_expr) {
+    ast_expr_alloc_init_copy(c->expr, &a->expr);
+  }
+}
+
+void ast_return_statement_destroy(struct ast_return_statement *a) {
+  ast_meta_destroy(&a->meta);
+  if (a->has_expr) {
+    a->has_expr = 0;
+    ast_expr_destroy(a->expr);
+    free(a->expr);
+    a->expr = NULL;
+  }
+}
+
 void ast_statement_init_copy(struct ast_statement *a,
                              struct ast_statement *c) {
   a->tag = c->tag;
@@ -442,8 +475,9 @@ void ast_statement_init_copy(struct ast_statement *a,
   case AST_STATEMENT_EXPR:
     ast_expr_alloc_init_copy(c->u.expr, &a->u.expr);
     break;
-  case AST_STATEMENT_RETURN_EXPR:
-    ast_expr_alloc_init_copy(c->u.return_expr, &a->u.return_expr);
+  case AST_STATEMENT_RETURN:
+    ast_return_statement_init_copy(&a->u.return_statement,
+                                   &c->u.return_statement);
     break;
   case AST_STATEMENT_VAR:
     ast_var_statement_init_copy(&a->u.var_statement, &c->u.var_statement);
@@ -480,10 +514,8 @@ void ast_statement_destroy(struct ast_statement *a) {
     free(a->u.expr);
     a->u.expr = NULL;
     break;
-  case AST_STATEMENT_RETURN_EXPR:
-    ast_expr_destroy(a->u.return_expr);
-    free(a->u.return_expr);
-    a->u.return_expr = NULL;
+  case AST_STATEMENT_RETURN:
+    ast_return_statement_destroy(&a->u.return_statement);
     break;
   case AST_STATEMENT_VAR:
     ast_var_statement_destroy(&a->u.var_statement);

@@ -3851,12 +3851,16 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     gen_destroy_temp(cs, f, h, *er_tr(&er));
     frame_restore_offset(h, saved_offset);
   } break;
-  case AST_STATEMENT_RETURN_EXPR: {
+  case AST_STATEMENT_RETURN: {
     int32_t saved_offset = frame_save_offset(h);
     struct expr_return er = demand_expr_return(frame_return_loc(h));
-    if (!gen_expr(cs, f, h, s->u.return_expr, &er)) {
-      return 0;
+    if (s->u.return_statement.has_expr) {
+      if (!gen_expr(cs, f, h, s->u.return_statement.expr, &er)) {
+        return 0;
+      }
     }
+    /* No need to generate anything (that assigns to er) for void
+    exprs -- the void value is zero-size. */
 
     gen_return(cs, f, h);
     frame_restore_offset(h, saved_offset);

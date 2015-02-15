@@ -2422,25 +2422,56 @@ int check_statement(struct bodystate *bs,
     ast_expr_alloc_move(annotated_expr, &annotated_out->u.expr);
     fallthrough = FALLTHROUGH_FROMTHETOP;
   } break;
-  case AST_STATEMENT_RETURN_EXPR: {
-    struct ast_expr annotated_expr;
-    if (!check_expr(bs->es, s->u.return_expr, bs->partial_type, &annotated_expr)) {
-      goto fail;
-    }
-    if (!bs->have_exact_return_type) {
-      bs->have_exact_return_type = 1;
-      ast_typeexpr_init_copy(&bs->exact_return_type,
-                             ast_expr_type(&annotated_expr));
-    } else {
-      if (!exact_typeexprs_equal(&bs->exact_return_type,
-                                 ast_expr_type(&annotated_expr))) {
-        METERR(*ast_expr_ast_meta(s->u.return_expr), "Return statements with conflicting return types.%s", "\n");
-        ast_expr_destroy(&annotated_expr);
+  case AST_STATEMENT_RETURN: {
+    int has_expr = s->u.return_statement.has_expr;
+    struct ast_expr annotated_expr = { 0 };
+    struct ast_typeexpr void_type = { 0 };
+    struct ast_typeexpr *expr_type;
+    if (has_expr) {
+      if (!check_expr(bs->es, s->u.return_statement.expr, bs->partial_type,
+                      &annotated_expr)) {
         goto fail;
       }
+      expr_type = ast_expr_type(&annotated_expr);
+    } else {
+      init_name_type(&void_type,
+                     identmap_intern_c_str(bs->es->cs->im, VOID_TYPE_NAME));
+      expr_type = &void_type;
     }
-    annotated_out->tag = AST_STATEMENT_RETURN_EXPR;
-    ast_expr_alloc_move(annotated_expr, &annotated_out->u.return_expr);
+
+    if (!bs->have_exact_return_type) {
+      bs->have_exact_return_type = 1;
+      if (has_expr) {
+        ast_typeexpr_init_copy(&bs->exact_return_type, expr_type);
+      } else {
+        bs->exact_return_type = void_type;
+      }
+    } else {
+      if (!exact_typeexprs_equal(&bs->exact_return_type, expr_type)) {
+        METERR(s->u.return_statement.meta,
+               "Return statements with conflicting return types.%s", "\n");
+        if (has_expr) {
+          ast_expr_destroy(&annotated_expr);
+        } else {
+          ast_typeexpr_destroy(&void_type);
+        }
+        goto fail;
+      }
+      if (!has_expr) {
+        ast_typeexpr_destroy(&void_type);
+      }
+    }
+    annotated_out->tag = AST_STATEMENT_RETURN;
+    if (has_expr) {
+      ast_return_statement_init(&annotated_out->u.return_statement,
+                                ast_meta_make_copy(&s->u.return_statement.meta),
+                                annotated_expr);
+    } else {
+      ast_return_statement_init_no_expr(
+          &annotated_out->u.return_statement,
+          ast_meta_make_copy(&s->u.return_statement.meta));
+
+    }
     fallthrough = FALLTHROUGH_NEVER;
   } break;
   case AST_STATEMENT_VAR: {
@@ -6162,6 +6193,9 @@ int check_file_test_more_54(const uint8_t *name, size_t name_count,
       "def foo func[i32, void] = fn(x i32) void {\n"
       "  var p *_ = &x;\n"
       "  var q _ = *p;\n"
+      "  if (x == 3) {\n"
+      "    return;\n"
+      "  }\n"
       "  var r = q;\n"
       "  var s i32 = r;\n"
       "};\n"

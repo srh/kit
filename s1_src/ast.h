@@ -292,9 +292,22 @@ void ast_switch_statement_init(struct ast_switch_statement *a,
                                struct ast_cased_statement *cased_statements,
                                size_t cased_statements_count);
 
+struct ast_return_statement {
+  struct ast_meta meta;
+  /* If no expr, it returns void. */
+  int has_expr;
+  struct ast_expr *expr;
+};
+
+void ast_return_statement_init(struct ast_return_statement *a,
+                               struct ast_meta meta,
+                               struct ast_expr expr);
+void ast_return_statement_init_no_expr(struct ast_return_statement *a,
+                                       struct ast_meta meta);
+
 enum ast_statement_tag {
   AST_STATEMENT_EXPR,
-  AST_STATEMENT_RETURN_EXPR,
+  AST_STATEMENT_RETURN,
   AST_STATEMENT_VAR,
   AST_STATEMENT_IFTHEN,
   AST_STATEMENT_IFTHENELSE,
@@ -307,7 +320,7 @@ struct ast_statement {
   enum ast_statement_tag tag;
   union {
     struct ast_expr *expr;
-    struct ast_expr *return_expr;
+    struct ast_return_statement return_statement;
     struct ast_var_statement var_statement;
     struct ast_ifthen_statement ifthen_statement;
     struct ast_ifthenelse_statement ifthenelse_statement;

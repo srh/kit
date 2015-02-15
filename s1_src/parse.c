@@ -971,17 +971,31 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
     out->tag = AST_STATEMENT_VAR;
     return parse_rest_of_var_statement(p, pos_start, &out->u.var_statement);
   } else if (try_skip_keyword(p, "return")) {
-    struct ast_expr expr;
-    if (!(skip_ws(p) && parse_expr(p, &expr, kSemicolonPrecedence))) {
+    if (!skip_ws(p)) {
       return 0;
     }
+
+    if (try_skip_semicolon(p)) {
+      out->tag = AST_STATEMENT_RETURN;
+      ast_return_statement_init_no_expr(&out->u.return_statement,
+                                        ast_meta_make(pos_start, ps_pos(p)));
+      return 1;
+    }
+
+    struct ast_expr expr;
+    if (!parse_expr(p, &expr, kSemicolonPrecedence)) {
+      return 0;
+    }
+
     if (!try_skip_semicolon(p)) {
       ast_expr_destroy(&expr);
       return 0;
     }
 
-    out->tag = AST_STATEMENT_RETURN_EXPR;
-    ast_expr_alloc_move(expr, &out->u.return_expr);
+    out->tag = AST_STATEMENT_RETURN;
+    ast_return_statement_init(&out->u.return_statement,
+                              ast_meta_make(pos_start, ps_pos(p)),
+                              expr);
     return 1;
   } else if (try_skip_keyword(p, "if")) {
     return parse_rest_of_if_statement(p, pos_start, out);

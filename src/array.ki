@@ -12,7 +12,6 @@ access array[_] {
     r->cap = 0u;
     var null *T;
     r->ptr = null;
-    return Void();
   };
 
   def[T] do_copy func[*array[T], *array[T], void] = fn(dest *array[T], src *array[T]) void {
@@ -21,7 +20,6 @@ access array[_] {
     var s size;
     s.~ = src->size.~ * sizeof@[T];
     dest->ptr = @[*T] cast(malloc(s));
-    return Void();
   };
 
   def[T] do_destroy func[*array[T], void] = fn(r *array[T]) void {
@@ -30,12 +28,10 @@ access array[_] {
       destroy(&r->ptr[i]);
     }
     free(@[*void] cast(r->ptr));
-    return Void();
   };
 }
 
 def foo func[void] = fn() void {
   var v array[array[i32]];
   var u = v;
-  return Void();
 };

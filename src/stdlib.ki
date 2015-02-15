@@ -3,11 +3,6 @@ deftype size u32;
 extern malloc func[size, *void];
 extern free func[*void, void];
 
-def Void func[void] = fn() void {
-  var ret void;
-  return ret;
-};
-
 def[S, T] cast func[*S, *T] = fn(p *S) *T {
   var u union { p *S; q *T; };
   u.p = p;
