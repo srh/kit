@@ -2324,14 +2324,8 @@ enum fallthrough max_fallthrough(enum fallthrough x, enum fallthrough y) {
 
 enum fallthrough compose_fallthrough(enum fallthrough top_reachability,
                                      enum fallthrough statement_fallthrough) {
-  switch (statement_fallthrough) {
-  case FALLTHROUGH_NEVER:
-    return FALLTHROUGH_NEVER;
-  case FALLTHROUGH_FROMTHETOP:
-    return top_reachability;
-  default:
-    UNREACHABLE();
-  }
+  return top_reachability < statement_fallthrough
+    ? top_reachability : statement_fallthrough;
 }
 
 int is_enum_type(struct checkstate *cs,
