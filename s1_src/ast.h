@@ -378,14 +378,8 @@ void ast_cased_statement_init_copy(struct ast_cased_statement *a,
                                    struct ast_cased_statement *c);
 void ast_cased_statement_destroy(struct ast_cased_statement *a);
 
-/* TODO: This info is empty and unused.  We don't even set info_valid = 1. */
-struct ast_lambda_info {
-  int info_valid;
-};
-
 struct ast_lambda {
   struct ast_meta meta;
-  struct ast_lambda_info info;
   struct ast_vardecl *params;
   size_t params_count;
   struct ast_typeexpr return_type;
