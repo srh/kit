@@ -761,17 +761,17 @@ int chase_through_toplevels(struct checkstate *cs,
     } break;
     case AST_TOPLEVEL_DEF: {
       if (!toplevel->u.def.has_typeexpr) {
-        if (!make_complete_lambda_typeexpr(cs->im, &toplevel->u.def.rhs_, &toplevel->u.def.typeexpr)) {
+        if (!make_complete_lambda_typeexpr(cs->im, &toplevel->u.def.rhs, &toplevel->u.def.typeexpr)) {
           METERR(toplevel->u.def.meta, "Incomplete type for def %.*s\n",
-                 IM_P(cs->im, toplevel->u.def.name_.value));
+                 IM_P(cs->im, toplevel->u.def.name.value));
           return 0;
         }
         toplevel->u.def.has_typeexpr = 1;
       }
 
       if (!name_table_add_def(&cs->nt,
-                              toplevel->u.def.name_.value,
-                              &toplevel->u.def.generics_,
+                              toplevel->u.def.name.value,
+                              &toplevel->u.def.generics,
                               ast_def_typeexpr(&toplevel->u.def),
                               ics->accessible,
                               ics->accessible_count,
@@ -1924,7 +1924,7 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
     inst->typecheck_started = 1;
     struct exprscope scope;
     exprscope_init(&scope, cs,
-                   &ent->def->generics_,
+                   &ent->def->generics,
                    inst->substitutions,
                    inst->substitutions_count,
                    ent->accessible,
@@ -1933,7 +1933,7 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
                    ent);
 
     struct ast_expr annotated_rhs;
-    if (!check_expr(&scope, &ent->def->rhs_, &unified, &annotated_rhs)) {
+    if (!check_expr(&scope, &ent->def->rhs, &unified, &annotated_rhs)) {
       exprscope_destroy(&scope);
       cs->template_instantiation_recursion_depth--;
       goto fail_unified;
@@ -3912,23 +3912,23 @@ int check_expr(struct exprscope *es,
 }
 
 int check_def(struct checkstate *cs, struct ast_def *a) {
-  if (!check_generics_shadowing(cs, &a->generics_)) {
+  if (!check_generics_shadowing(cs, &a->generics)) {
     return 0;
   }
 
-  if (!check_typeexpr(cs, &a->generics_, ast_def_typeexpr(a), NULL)) {
+  if (!check_typeexpr(cs, &a->generics, ast_def_typeexpr(a), NULL)) {
     return 0;
   }
 
   /* We can only typecheck the def by instantiating it -- so we check
   the ones with no template params. */
-  if (!a->generics_.has_type_params) {
+  if (!a->generics.has_type_params) {
     int zero_defs_discard;
     struct ast_typeexpr unified;
     struct def_entry *ent;
     struct def_instantiation *inst;
     int success = name_table_match_def(&cs->nt,
-                                       &a->name_,
+                                       &a->name,
                                        NULL, 0, /* (no generics) */
                                        ast_def_typeexpr(a),
                                        &zero_defs_discard,
@@ -3946,11 +3946,11 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
       CHECK(!inst->annotated_rhs_computed);
       inst->typecheck_started = 1;
       struct exprscope es;
-      exprscope_init(&es, cs, &a->generics_, NULL, 0,
+      exprscope_init(&es, cs, &a->generics, NULL, 0,
                      ent->accessible, ent->accessible_count,
                      STATIC_COMPUTATION_YES, ent);
       struct ast_expr annotated_rhs;
-      ret = check_expr(&es, &a->rhs_, ast_def_typeexpr(a), &annotated_rhs);
+      ret = check_expr(&es, &a->rhs, ast_def_typeexpr(a), &annotated_rhs);
       if (ret) {
         di_set_annotated_rhs(inst, annotated_rhs);
       }
