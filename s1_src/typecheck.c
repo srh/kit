@@ -725,6 +725,29 @@ int add_enum_constructors(struct checkstate *cs,
   return 1;
 }
 
+int make_complete_lambda_typeexpr(struct identmap *im, struct ast_expr *a, struct ast_typeexpr *out) {
+  switch (a->tag) {
+  case AST_EXPR_LAMBDA: {
+    struct ast_lambda *lam = &a->u.lambda;
+
+    size_t args_count = size_add(lam->params_count, 1);
+    struct ast_typeexpr *args = malloc_mul(sizeof(*args), args_count);
+    for (size_t i = 0, e = lam->params_count; i < e; i++) {
+      ast_typeexpr_init_copy(&args[i], &lam->params[i].type);
+    }
+    ast_typeexpr_init_copy(&args[lam->params_count], &lam->return_type);
+
+    out->tag = AST_TYPEEXPR_APP;
+    ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
+                     make_ast_ident(identmap_intern_c_str(im, FUNC_TYPE_NAME)),
+                     args, args_count);
+    return 1;
+  } break;
+  default:
+    return 0;
+  }
+}
+
 int chase_through_toplevels(struct checkstate *cs,
                             struct import_chase_state *ics,
                             struct ast_toplevel *toplevels,
@@ -737,10 +760,19 @@ int chase_through_toplevels(struct checkstate *cs,
                  toplevel->u.import.name.value);
     } break;
     case AST_TOPLEVEL_DEF: {
+      if (!toplevel->u.def.has_typeexpr) {
+        if (!make_complete_lambda_typeexpr(cs->im, &toplevel->u.def.rhs_, &toplevel->u.def.typeexpr)) {
+          METERR(toplevel->u.def.meta, "Incomplete type for def %.*s\n",
+                 IM_P(cs->im, toplevel->u.def.name_.value));
+          return 0;
+        }
+        toplevel->u.def.has_typeexpr = 1;
+      }
+
       if (!name_table_add_def(&cs->nt,
                               toplevel->u.def.name_.value,
                               &toplevel->u.def.generics_,
-                              &toplevel->u.def.type_,
+                              ast_def_typeexpr(&toplevel->u.def),
                               ics->accessible,
                               ics->accessible_count,
                               toplevel->u.def.is_export,
@@ -3884,7 +3916,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
     return 0;
   }
 
-  if (!check_typeexpr(cs, &a->generics_, &a->type_, NULL)) {
+  if (!check_typeexpr(cs, &a->generics_, ast_def_typeexpr(a), NULL)) {
     return 0;
   }
 
@@ -3898,13 +3930,13 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
     int success = name_table_match_def(&cs->nt,
                                        &a->name_,
                                        NULL, 0, /* (no generics) */
-                                       &a->type_,
+                                       ast_def_typeexpr(a),
                                        &zero_defs_discard,
                                        &unified,
                                        &ent,
                                        &inst);
     CHECK(success);
-    CHECK(exact_typeexprs_equal(&unified, &a->type_));
+    CHECK(exact_typeexprs_equal(&unified, ast_def_typeexpr(a)));
     CHECK(!ent->is_primitive);
 
     ast_typeexpr_destroy(&unified);
@@ -3918,7 +3950,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
                      ent->accessible, ent->accessible_count,
                      STATIC_COMPUTATION_YES, ent);
       struct ast_expr annotated_rhs;
-      ret = check_expr(&es, &a->rhs_, &a->type_, &annotated_rhs);
+      ret = check_expr(&es, &a->rhs_, ast_def_typeexpr(a), &annotated_rhs);
       if (ret) {
         di_set_annotated_rhs(inst, annotated_rhs);
       }
@@ -6205,6 +6237,19 @@ int check_file_test_more_54(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_55(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def foo = fn(x i32, y u32) void {\n"
+      "  1;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 int test_check_file(void) {
@@ -6792,6 +6837,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_54...\n");
   if (!test_check_module(&im, &check_file_test_more_54, foo)) {
     DBG("check_file_test_more_54 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_55...\n");
+  if (!test_check_module(&im, &check_file_test_more_55, foo)) {
+    DBG("check_file_test_more_55 fails\n");
     goto cleanup_identmap;
   }
 

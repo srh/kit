@@ -1875,13 +1875,22 @@ int parse_rest_of_def(struct ps *p, struct pos pos_start,
     goto fail_generics;
   }
 
-  struct ast_typeexpr type;
-  if (!(skip_ws(p) && parse_typeexpr(p, &type))) {
+  if (!skip_ws(p)) {
     goto fail_ident;
   }
 
-  if (!(skip_ws(p) && skip_oper(p, "="))) {
-    goto fail_typeexpr;
+  int has_typeexpr;
+  struct ast_typeexpr typeexpr = { 0 };
+  if (try_skip_oper(p, "=")) {
+    has_typeexpr = 0;
+  } else {
+    if (!parse_typeexpr(p, &typeexpr)) {
+      goto fail_ident;
+    }
+    has_typeexpr = 1;
+    if (!(skip_ws(p) && skip_oper(p, "="))) {
+      goto fail_typeexpr;
+    }
   }
 
   struct ast_expr rhs;
@@ -1894,13 +1903,19 @@ int parse_rest_of_def(struct ps *p, struct pos pos_start,
   }
 
   struct ast_meta meta = ast_meta_make(pos_start, ps_pos(p));
-  ast_def_init(out, meta, is_export, generics, name, type, rhs);
+  if (has_typeexpr) {
+    ast_def_init(out, meta, is_export, generics, name, typeexpr, rhs);
+  } else {
+    ast_def_init_no_type(out, meta, is_export, generics, name, rhs);
+  }
   return 1;
 
  fail_rhs:
   ast_expr_destroy(&rhs);
  fail_typeexpr:
-  ast_typeexpr_destroy(&type);
+  if (has_typeexpr) {
+    ast_typeexpr_destroy(&typeexpr);
+  }
  fail_ident:
   ast_ident_destroy(&name);
  fail_generics:

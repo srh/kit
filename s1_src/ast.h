@@ -704,15 +704,21 @@ struct ast_def {
   int is_export;
   struct ast_generics generics_;
   struct ast_ident name_;
-  struct ast_typeexpr type_;
+  int has_typeexpr;
+  struct ast_typeexpr typeexpr;
   struct ast_expr rhs_;
 };
 
 void ast_def_init(struct ast_def *a, struct ast_meta meta,
-                  int is_export,
-                  struct ast_generics generics,
-                  struct ast_ident name, struct ast_typeexpr type,
+                  int is_export, struct ast_generics generics,
+                  struct ast_ident name, struct ast_typeexpr typeexpr,
                   struct ast_expr rhs);
+
+void ast_def_init_no_type(struct ast_def *a, struct ast_meta meta,
+                          int is_export, struct ast_generics generics,
+                          struct ast_ident name, struct ast_expr rhs);
+
+struct ast_typeexpr *ast_def_typeexpr(struct ast_def *a);
 
 struct ast_extern_def {
   struct ast_meta meta;

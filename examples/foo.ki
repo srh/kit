@@ -3,7 +3,7 @@ import string;
 
 export def foo i32 = ~(1u);
 
-def fac func[i32, i32] = fn(x i32) i32 {
+def fac = fn(x i32) i32 {
   var acc i32 = 1;
   for var i i32 = x; i > 0; i = i - 1 {
     acc = acc * i;
@@ -16,7 +16,7 @@ deftype ty struct {
   y i32;
 };
 
-def[T] getsize func[u32] = fn() u32 {
+def[T] getsize = fn() u32 {
   return sizeof@[T];
 };
 
@@ -26,33 +26,33 @@ defclass kla struct {
 };
 
 access kla {
-  def do_destroy func[*kla, void] = fn(p *kla) void {
+  def do_destroy = fn(p *kla) void {
     p->x = 0u;
     p->y = 0u;
   };
-  def do_init func[*kla, void] = fn(p *kla) void {
+  def do_init = fn(p *kla) void {
     p->x = 37u;
     p->y = 47u;
   };
 
-  def do_copy func[*kla, *kla, void] = fn(a *kla, c *kla) void {
+  def do_copy = fn(a *kla, c *kla) void {
     a->x = c->x;
     a->y = c->y;
   };
 
-  def expose func[*kla, struct { x u32; y u32; }] = fn (p *kla) struct { x u32; y u32; } {
+  def expose = fn (p *kla) struct { x u32; y u32; } {
     return p->~;
   };
 }
 
-def call_kla func[kla, void] = fn(x kla) void {
+def call_kla = fn(x kla) void {
   print(expose(&x).x);
   putchar(32);
   print(expose(&x).y);
   putchar(10);
 };
 
-def try_kla func[void] = fn() void {
+def try_kla = fn() void {
   var k kla;
   var l struct { x u32; y u32; } = expose(&k);
   print(l.x);
@@ -68,7 +68,7 @@ defenum enty {
   c3 string;
 };
 
-def blah_enty func[enty, enty] = fn(x enty) enty {
+def blah_enty = fn(x enty) enty {
   var v void;
   var y enty = c1(v);
   var u struct { p i32; q i32; };
@@ -97,7 +97,7 @@ def au8 func[*string, u8, void] = fn(p *string, x u8) void {
   return append(p, x);
 };
 
-def try_string func[void] = fn() void {
+def try_string = fn() void {
   var x = lits("Hello, world!\n");
   print(&x);
 };
