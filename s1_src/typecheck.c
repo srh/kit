@@ -2921,15 +2921,26 @@ int check_expr_funcbody(struct exprscope *es,
     goto fail;
   }
 
-  if (fallthrough != FALLTHROUGH_NEVER) {
-    METERR(x->meta, "not all control paths return a value.%s", "\n");
-    goto fail_annotated_bracebody;
+  ident_value void_ident = identmap_intern_c_str(es->cs->im, VOID_TYPE_NAME);
+  if (partial_type->tag == AST_TYPEEXPR_NAME
+      && partial_type->u.name.value == void_ident) {
+    if (!bs.have_exact_return_type) {
+      bs.have_exact_return_type = 1;
+      ast_typeexpr_init_copy(&bs.exact_return_type, partial_type);
+    } else {
+      CHECK(bs.exact_return_type.tag == AST_TYPEEXPR_NAME
+            && bs.exact_return_type.u.name.value == void_ident);
+    }
+  } else {
+    if (fallthrough != FALLTHROUGH_NEVER) {
+      METERR(x->meta, "not all control paths return a value.%s", "\n");
+      goto fail_annotated_bracebody;
+    }
   }
 
-  if (!bs.have_exact_return_type) {
-    METERR(x->meta, "Missing a return statement.%s", "\n");
-    goto fail_annotated_bracebody;
-  }
+  /* We should have an exact return type because we didn't fallthrough
+  (or the type was void and have_exact_return_type has been set). */
+  CHECK(bs.have_exact_return_type);
 
   struct typeexpr_traits discard;
   if (!check_typeexpr_traits(es->cs, &bs.exact_return_type, es, &discard)) {
@@ -6144,6 +6155,22 @@ int check_file_test_more_53(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_54(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "def foo func[i32, void] = fn(x i32) void {\n"
+      "  var p *_ = &x;\n"
+      "  var q _ = *p;\n"
+      "  var r = q;\n"
+      "  var s i32 = r;\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 int test_check_file(void) {
@@ -6725,6 +6752,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_53...\n");
   if (!test_check_module(&im, &check_file_test_more_53, foo)) {
     DBG("check_file_test_more_53 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_54...\n");
+  if (!test_check_module(&im, &check_file_test_more_54, foo)) {
+    DBG("check_file_test_more_54 fails\n");
     goto cleanup_identmap;
   }
 

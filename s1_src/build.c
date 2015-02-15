@@ -1651,8 +1651,6 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
   if (h->return_target_valid) {
     frame_define_target(h, h->return_target_number,
                         objfile_section_size(objfile_text(f)));
-  } else {
-    CRASH("return_target_valid false (no return statements?)");
   }
 
   CHECK(frame_arg_count(h) == h->vardata_count);

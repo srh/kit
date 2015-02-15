@@ -29,21 +29,15 @@ access kla {
   def do_destroy func[*kla, void] = fn(p *kla) void {
     p->x = 0u;
     p->y = 0u;
-    var ret void;
-    return ret;
   };
   def do_init func[*kla, void] = fn(p *kla) void {
     p->x = 37u;
     p->y = 47u;
-    var ret void;
-    return ret;
   };
 
   def do_copy func[*kla, *kla, void] = fn(a *kla, c *kla) void {
     a->x = c->x;
     a->y = c->y;
-    var ret void;
-    return ret;
   };
 
   def expose func[*kla, struct { x u32; y u32; }] = fn (p *kla) struct { x u32; y u32; } {
@@ -56,8 +50,6 @@ def call_kla func[kla, void] = fn(x kla) void {
   putchar(32);
   print(expose(&x).y);
   putchar(10);
-  var ret void;
-  return ret;
 };
 
 def try_kla func[void] = fn() void {
@@ -68,8 +60,6 @@ def try_kla func[void] = fn() void {
   print(l.y);
   putchar(10);
   call_kla(k);
-  var ret void;
-  return ret;
 };
 
 defenum enty {
@@ -110,8 +100,6 @@ def au8 func[*string, u8, void] = fn(p *string, x u8) void {
 def try_string func[void] = fn() void {
   var x = lits("Hello, world!\n");
   print(&x);
-  var ret void;
-  return ret;
 };
 
 export def showfacs func[*ty, *u16, ty] = fn(p *ty, num *u16) ty {

@@ -19,8 +19,6 @@ def[T] delete_array func[u32, *T, void] = fn(n u32, p *T) void {
   var u union { vp *void; tp *T; };
   u.tp = p;
   free(u.vp);
-  var ret void;
-  return ret;
 };
 
 def alloc_u8_array func[u32, *u8] = fn(n u32) *u8 {
@@ -33,8 +31,6 @@ def free_u8_array func[*u8, void] = fn(p *u8) void {
   var u union { vp *void; u8p *u8; };
   u.u8p = p;
   free(u.vp);
-  var ret void;
-  return ret;
 };
 
 defclass move string struct {
@@ -49,14 +45,10 @@ access string {
     p->cap = 0u;
     var buf *u8;
     p->buf = buf;
-    var ret void;
-    return ret;
   };
 
   def do_destroy func[*string, void] = fn(p *string) void {
     delete_array(p->cap, p->buf);
-    var ret void;
-    return ret;
   };
 
   def do_copy func[*string, *string, void] = fn(p *string, c *string) void {
@@ -66,8 +58,6 @@ access string {
     for var i u32 = 0u; i < c->size; i = i + 1u {
       p->buf[i] = c->buf[i];
     }
-    var ret void;
-    return ret;
   };
 
   def grow_cap func[*string, u32, void] = fn(p *string, newcap u32) void {
@@ -80,8 +70,6 @@ access string {
     delete_array(p->cap, p->buf);
     p->buf = buf;
     p->cap = newcap;
-    var ret void;
-    return ret;
   };
 
   def append func[*string, u8, void] = fn(p *string, c u8) void {
@@ -97,8 +85,6 @@ access string {
 
     p->buf[p->size] = c;
     p->size = p->size + 1u;
-    var ret void;
-    return ret;
   };
 
   def get func[*string, u32, u8] = fn(p *string, i u32) u8 {
@@ -124,6 +110,4 @@ def print func[*string, void] = fn(p *string) void {
     var ch i32 = ~get(p, i);
     putchar(ch);
   }
-  var ret void;
-  return ret;
 };
