@@ -3,14 +3,14 @@ import bar;
 extern malloc fn[u32, *void];
 extern free fn[*void, void];
 
-def[T] alloc_array = func(n u32) *T {
+func[T] alloc_array(n u32) *T {
   var u union { vp *void; tp *T; };
   u.vp = malloc(n * sizeof@[T]);
   for var i u32 = 0u; i < n; i = i + 1u {
     init(&u.tp[i]);
   }
   return u.tp;
-};
+}
 
 def[T] delete_array = func(n u32, p *T) void {
   for var i u32 = 0u; i < n; i = i + 1u {

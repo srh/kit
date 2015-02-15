@@ -50,7 +50,7 @@ func call_kla(x kla) void {
   putchar(32);
   print(expose(&x).y);
   putchar(10);
-};
+}
 
 func try_kla() void {
   var k kla;
@@ -60,7 +60,7 @@ func try_kla() void {
   print(l.y);
   putchar(10);
   call_kla(k);
-};
+}
 
 defenum enty {
   c1 void;
@@ -93,6 +93,8 @@ def blah_enty = func(x enty) enty {
   return y;
 };
 
+// This could be func au8(p *string, x u8) void but
+// we demo statically evaluated lambdas.
 def au8 fn[*string, u8, void] = func(p *string, x u8) void {
   return append(p, x);
 };
@@ -102,7 +104,7 @@ def try_string = func() void {
   print(&x);
 };
 
-export def showfacs fn[*ty, *u16, ty] = func(p *ty, num *u16) ty {
+export func showfacs(p *ty, num *u16) ty {
   try_kla();
   try_string();
 
@@ -148,6 +150,6 @@ export def showfacs fn[*ty, *u16, ty] = func(p *ty, num *u16) ty {
 
   ret.~ = naked;
   return ret;
-};
+}
 
 def u8_value u8 = ~3;
