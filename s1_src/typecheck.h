@@ -84,8 +84,8 @@ void do_replace_generics(struct ast_generics *generics,
 void do_replace_rhs_generics(struct ast_generics *generics,
                              struct ast_typeexpr *generics_substitutions,
                              size_t generics_substitutions_count,
-                             struct ast_rhs *a,
-                             struct ast_rhs *out);
+                             struct ast_deftype_rhs *a,
+                             struct ast_deftype_rhs *out);
 struct ast_typeexpr *expose_func_return_type(struct identmap *im,
                                              struct ast_typeexpr *func,
                                              size_t expected_params_count);
@@ -128,13 +128,13 @@ int check_typeexpr_name_traits(struct checkstate *cs,
                                struct typeexpr_traits *out,
                                struct typeexpr_trait_instantiations *insts_out,
                                int *has_concrete_deftype_rhs_out_or_null,
-                               struct ast_rhs *concrete_deftype_rhs_out_or_null);
+                               struct ast_deftype_rhs *concrete_deftype_rhs_out_or_null);
 int check_typeexpr_app_traits(struct checkstate *cs,
                               struct ast_typeexpr *a,
                               struct exprscope *also_typecheck,
                               struct typeexpr_traits *out,
                               struct typeexpr_trait_instantiations *insts_out,
                               int *has_concrete_deftype_rhs_out_or_null,
-                              struct ast_rhs *concrete_deftype_rhs_out_or_null);
+                              struct ast_deftype_rhs *concrete_deftype_rhs_out_or_null);
 
 #endif /* KIRA_TYPECHECK_H_ */

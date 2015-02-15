@@ -1472,23 +1472,23 @@ void ast_enumspec_destroy(struct ast_enumspec *a) {
   SLICE_FREE(a->enumfields, a->enumfields_count, ast_vardecl_destroy);
 }
 
-void ast_rhs_init_type(struct ast_rhs *a, struct ast_typeexpr type) {
-  a->tag = AST_RHS_TYPE;
+void ast_deftype_rhs_init_type(struct ast_deftype_rhs *a, struct ast_typeexpr type) {
+  a->tag = AST_DEFTYPE_RHS_TYPE;
   a->u.type = type;
 }
 
-void ast_rhs_init_enumspec(struct ast_rhs *a, struct ast_enumspec enumspec) {
-  a->tag = AST_RHS_ENUMSPEC;
+void ast_deftype_rhs_init_enumspec(struct ast_deftype_rhs *a, struct ast_enumspec enumspec) {
+  a->tag = AST_DEFTYPE_RHS_ENUMSPEC;
   a->u.enumspec = enumspec;
 }
 
-void ast_rhs_init_copy(struct ast_rhs *a, struct ast_rhs *c) {
+void ast_deftype_rhs_init_copy(struct ast_deftype_rhs *a, struct ast_deftype_rhs *c) {
   a->tag = c->tag;
   switch (c->tag) {
-  case AST_RHS_TYPE:
+  case AST_DEFTYPE_RHS_TYPE:
     ast_typeexpr_init_copy(&a->u.type, &c->u.type);
     break;
-  case AST_RHS_ENUMSPEC:
+  case AST_DEFTYPE_RHS_ENUMSPEC:
     ast_enumspec_init_copy(&a->u.enumspec, &c->u.enumspec);
     break;
   default:
@@ -1496,18 +1496,18 @@ void ast_rhs_init_copy(struct ast_rhs *a, struct ast_rhs *c) {
   }
 }
 
-void ast_rhs_destroy(struct ast_rhs *a) {
+void ast_deftype_rhs_destroy(struct ast_deftype_rhs *a) {
   switch (a->tag) {
-  case AST_RHS_TYPE:
+  case AST_DEFTYPE_RHS_TYPE:
     ast_typeexpr_destroy(&a->u.type);
     break;
-  case AST_RHS_ENUMSPEC:
+  case AST_DEFTYPE_RHS_ENUMSPEC:
     ast_enumspec_destroy(&a->u.enumspec);
     break;
   default:
     UNREACHABLE();
   }
-  a->tag = (enum ast_rhs_tag)-1;
+  a->tag = (enum ast_deftype_rhs_tag)-1;
 }
 
 void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
@@ -1518,7 +1518,7 @@ void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
   a->disposition = disposition;
   a->generics = generics;
   a->name = name;
-  ast_rhs_init_type(&a->rhs, type);
+  ast_deftype_rhs_init_type(&a->rhs, type);
 }
 
 void ast_deftype_init_enum(struct ast_deftype *a, struct ast_meta meta,
@@ -1532,7 +1532,7 @@ void ast_deftype_init_enum(struct ast_deftype *a, struct ast_meta meta,
   a->name = name;
   struct ast_enumspec enumspec;
   ast_enumspec_init(&enumspec, enumfields, enumfields_count);
-  ast_rhs_init_enumspec(&a->rhs, enumspec);
+  ast_deftype_rhs_init_enumspec(&a->rhs, enumspec);
 }
 
 void ast_deftype_destroy(struct ast_deftype *a) {
@@ -1540,7 +1540,7 @@ void ast_deftype_destroy(struct ast_deftype *a) {
   a->disposition = (enum ast_deftype_disposition)-1;
   ast_generics_destroy(&a->generics);
   ast_ident_destroy(&a->name);
-  ast_rhs_destroy(&a->rhs);
+  ast_deftype_rhs_destroy(&a->rhs);
 }
 
 

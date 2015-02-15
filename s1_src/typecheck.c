@@ -794,9 +794,9 @@ int chase_through_toplevels(struct checkstate *cs,
         return 0;
       }
       switch (dt->rhs.tag) {
-      case AST_RHS_TYPE:
+      case AST_DEFTYPE_RHS_TYPE:
         break;
-      case AST_RHS_ENUMSPEC: {
+      case AST_DEFTYPE_RHS_ENUMSPEC: {
         if (!add_enum_constructors(cs, &dt->generics, &dt->name, &dt->rhs.u.enumspec)) {
           return 0;
         }
@@ -1181,7 +1181,7 @@ int finish_checking_name_traits(struct checkstate *cs,
                                 struct ast_typeexpr *a,
                                 struct ast_meta *deftype_meta,
                                 enum ast_deftype_disposition deftype_disposition,
-                                struct ast_rhs *concrete_deftype_rhs,
+                                struct ast_deftype_rhs *concrete_deftype_rhs,
                                 struct exprscope *also_typecheck,
                                 struct typeexpr_traits *out,
                                 struct typeexpr_trait_instantiations *insts_out) {
@@ -1193,13 +1193,13 @@ int finish_checking_name_traits(struct checkstate *cs,
   struct typeexpr_traits rhs_traits = { 0 };
   if (!(lookup_move && lookup_copy && lookup_init)) {
     switch (concrete_deftype_rhs->tag) {
-    case AST_RHS_TYPE:
+    case AST_DEFTYPE_RHS_TYPE:
       if (!check_typeexpr_traits(cs, &concrete_deftype_rhs->u.type,
                                  also_typecheck, &rhs_traits)) {
         return 0;
       }
       break;
-    case AST_RHS_ENUMSPEC:
+    case AST_DEFTYPE_RHS_ENUMSPEC:
       if (!check_enumspec_traits(cs, &concrete_deftype_rhs->u.enumspec,
                                  also_typecheck, &rhs_traits)) {
         return 0;
@@ -1283,7 +1283,7 @@ int check_typeexpr_name_traits(struct checkstate *cs,
                                struct typeexpr_traits *out,
                                struct typeexpr_trait_instantiations *insts_out,
                                int *has_concrete_deftype_rhs_out_or_null,
-                               struct ast_rhs *concrete_deftype_rhs_out_or_null) {
+                               struct ast_deftype_rhs *concrete_deftype_rhs_out_or_null) {
   CHECK((has_concrete_deftype_rhs_out_or_null == NULL)
         == (concrete_deftype_rhs_out_or_null == NULL));
   CHECK(a->tag == AST_TYPEEXPR_NAME);
@@ -1305,7 +1305,7 @@ int check_typeexpr_name_traits(struct checkstate *cs,
     insts_out->init_inst = NULL;
     if (concrete_deftype_rhs_out_or_null) {
       *has_concrete_deftype_rhs_out_or_null = 0;
-      concrete_deftype_rhs_out_or_null->tag = (enum ast_rhs_tag)-1;
+      concrete_deftype_rhs_out_or_null->tag = (enum ast_deftype_rhs_tag)-1;
     }
     return 1;
   }
@@ -1320,7 +1320,7 @@ int check_typeexpr_name_traits(struct checkstate *cs,
                                         insts_out);
   if (ret && concrete_deftype_rhs_out_or_null) {
     *has_concrete_deftype_rhs_out_or_null = 1;
-    ast_rhs_init_copy(concrete_deftype_rhs_out_or_null, &ent->deftype->rhs);
+    ast_deftype_rhs_init_copy(concrete_deftype_rhs_out_or_null, &ent->deftype->rhs);
   }
   return ret;
 }
@@ -1331,7 +1331,7 @@ int check_typeexpr_app_traits(struct checkstate *cs,
                               struct typeexpr_traits *out,
                               struct typeexpr_trait_instantiations *insts_out,
                               int *has_concrete_deftype_rhs_out_or_null,
-                              struct ast_rhs *concrete_deftype_rhs_out_or_null) {
+                              struct ast_deftype_rhs *concrete_deftype_rhs_out_or_null) {
   CHECK((has_concrete_deftype_rhs_out_or_null == NULL)
         == (concrete_deftype_rhs_out_or_null == NULL));
   CHECK(a->tag == AST_TYPEEXPR_APP);
@@ -1352,7 +1352,7 @@ int check_typeexpr_app_traits(struct checkstate *cs,
     insts_out->init_inst = NULL;
     if (concrete_deftype_rhs_out_or_null) {
       *has_concrete_deftype_rhs_out_or_null = 0;
-      concrete_deftype_rhs_out_or_null->tag = (enum ast_rhs_tag)-1;
+      concrete_deftype_rhs_out_or_null->tag = (enum ast_deftype_rhs_tag)-1;
     }
     return 1;
   }
@@ -1362,7 +1362,7 @@ int check_typeexpr_app_traits(struct checkstate *cs,
   CHECK(deftype->generics.has_type_params
         && deftype->generics.params_count == a->u.app.params_count);
 
-  struct ast_rhs concrete_deftype_rhs;
+  struct ast_deftype_rhs concrete_deftype_rhs;
   do_replace_rhs_generics(&deftype->generics,
                           a->u.app.params,
                           a->u.app.params_count,
@@ -1381,7 +1381,7 @@ int check_typeexpr_app_traits(struct checkstate *cs,
     *has_concrete_deftype_rhs_out_or_null = 1;
     *concrete_deftype_rhs_out_or_null = concrete_deftype_rhs;
   } else {
-    ast_rhs_destroy(&concrete_deftype_rhs);
+    ast_deftype_rhs_destroy(&concrete_deftype_rhs);
   }
   return ret;
 }
@@ -1565,12 +1565,12 @@ int check_deftype(struct checkstate *cs, struct deftype_entry *ent) {
   }
 
   switch (a->rhs.tag) {
-  case AST_RHS_TYPE:
+  case AST_DEFTYPE_RHS_TYPE:
     if (!check_typeexpr(cs, &a->generics, &a->rhs.u.type, ent)) {
       return 0;
     }
     break;
-  case AST_RHS_ENUMSPEC:
+  case AST_DEFTYPE_RHS_ENUMSPEC:
     if (!check_enumspec(cs, &a->generics, &a->rhs.u.enumspec, ent)) {
       return 0;
     }
@@ -2136,21 +2136,21 @@ void do_replace_enumspec_generics(struct ast_generics *generics,
 void do_replace_rhs_generics(struct ast_generics *generics,
                              struct ast_typeexpr *generics_substitutions,
                              size_t generics_substitutions_count,
-                             struct ast_rhs *a,
-                             struct ast_rhs *out) {
+                             struct ast_deftype_rhs *a,
+                             struct ast_deftype_rhs *out) {
   switch (a->tag) {
-  case AST_RHS_TYPE: {
+  case AST_DEFTYPE_RHS_TYPE: {
     struct ast_typeexpr type;
     do_replace_generics(generics, generics_substitutions,
                         generics_substitutions_count, &a->u.type, &type);
-    ast_rhs_init_type(out, type);
+    ast_deftype_rhs_init_type(out, type);
   } break;
-  case AST_RHS_ENUMSPEC: {
+  case AST_DEFTYPE_RHS_ENUMSPEC: {
     struct ast_enumspec enumspec;
     do_replace_enumspec_generics(generics, generics_substitutions,
                                  generics_substitutions_count,
                                  &a->u.enumspec, &enumspec);
-    ast_rhs_init_enumspec(out, enumspec);
+    ast_deftype_rhs_init_enumspec(out, enumspec);
   } break;
   default:
     UNREACHABLE();
@@ -2379,9 +2379,9 @@ int is_enum_type(struct checkstate *cs,
     struct ast_deftype *deftype = ent->deftype;
     CHECK(deftype);
     switch (deftype->rhs.tag) {
-    case AST_RHS_TYPE:
+    case AST_DEFTYPE_RHS_TYPE:
       return 0;
-    case AST_RHS_ENUMSPEC: {
+    case AST_DEFTYPE_RHS_ENUMSPEC: {
       ast_enumspec_init_copy(concrete_enumspec_out, &deftype->rhs.u.enumspec);
       return 1;
     } break;
@@ -2404,9 +2404,9 @@ int is_enum_type(struct checkstate *cs,
     struct ast_deftype *deftype = ent->deftype;
     CHECK(deftype);
     switch (deftype->rhs.tag) {
-    case AST_RHS_TYPE:
+    case AST_DEFTYPE_RHS_TYPE:
       return 0;
-    case AST_RHS_ENUMSPEC: {
+    case AST_DEFTYPE_RHS_ENUMSPEC: {
       do_replace_enumspec_generics(&deftype->generics,
                                    concrete_type->u.app.params,
                                    concrete_type->u.app.params_count,
@@ -3440,7 +3440,7 @@ int lookup_field_type(struct exprscope *es,
     }
 
     switch (deftype->rhs.tag) {
-    case AST_RHS_TYPE: {
+    case AST_DEFTYPE_RHS_TYPE: {
       if (fieldname->whole_field) {
         /* Stop here -- we don't recursively follow deftype chains on
         whole-field access.  Maybe we shouldn't, for named fields,
@@ -3451,7 +3451,7 @@ int lookup_field_type(struct exprscope *es,
         return lookup_field_type(es, &deftype->rhs.u.type, fieldname, field_type_out);
       }
     } break;
-    case AST_RHS_ENUMSPEC:
+    case AST_DEFTYPE_RHS_ENUMSPEC:
       METERR(fieldname->meta, "Looking up %sfield on enumspec type.\n",
              fieldname->whole_field ? "whole " : "");
       return 0;
@@ -3481,7 +3481,7 @@ int lookup_field_type(struct exprscope *es,
     }
 
     switch (deftype->rhs.tag) {
-    case AST_RHS_TYPE: {
+    case AST_DEFTYPE_RHS_TYPE: {
       struct ast_typeexpr concrete_deftype_type;
       do_replace_generics(&deftype->generics,
                           type->u.app.params,
@@ -3502,7 +3502,7 @@ int lookup_field_type(struct exprscope *es,
         return ret;
       }
     } break;
-    case AST_RHS_ENUMSPEC:
+    case AST_DEFTYPE_RHS_ENUMSPEC:
       METERR(fieldname->meta, "Looking up %sfield on enumspec type.\n",
              fieldname->whole_field ? "whole " : "");
       return 0;

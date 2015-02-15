@@ -1436,12 +1436,12 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
 
 void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                            enum typetrav_func tf, struct loc dest, int has_src,
-                           struct loc src, struct ast_rhs *rhs) {
+                           struct loc src, struct ast_deftype_rhs *rhs) {
   switch (rhs->tag) {
-  case AST_RHS_TYPE:
+  case AST_DEFTYPE_RHS_TYPE:
     gen_typetrav_func(cs, f, h, tf, dest, has_src, src, &rhs->u.type);
     break;
-  case AST_RHS_ENUMSPEC: {
+  case AST_DEFTYPE_RHS_ENUMSPEC: {
     /* TODO: Instead of duplicating this code everywhere, enums should
     have their do_construct, do_copy, do_move functions defined in one
     place and called. */
@@ -1516,7 +1516,7 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
     struct typeexpr_traits traits;
     struct typeexpr_trait_instantiations insts;
     int has_rhs;
-    struct ast_rhs rhs;
+    struct ast_deftype_rhs rhs;
     int success = check_typeexpr_name_traits(cs, type, NULL, &traits, &insts,
                                              &has_rhs, &rhs);
     CHECK(success);
@@ -1527,7 +1527,7 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
     }
 
     if (has_rhs) {
-      ast_rhs_destroy(&rhs);
+      ast_deftype_rhs_destroy(&rhs);
     }
     return;
   } break;
@@ -1535,7 +1535,7 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
     struct typeexpr_traits traits;
     struct typeexpr_trait_instantiations insts;
     int has_rhs;
-    struct ast_rhs rhs;
+    struct ast_deftype_rhs rhs;
     int success = check_typeexpr_app_traits(cs, type, NULL, &traits, &insts,
                                             &has_rhs, &rhs);
     CHECK(success);
@@ -1546,7 +1546,7 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
     }
 
     if (has_rhs) {
-      ast_rhs_destroy(&rhs);
+      ast_deftype_rhs_destroy(&rhs);
     }
     return;
   } break;

@@ -13,7 +13,7 @@
 void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                       ident_value fieldstop, uint32_t *offsetof_out,
                       uint32_t *sizeof_out, uint32_t *alignof_out);
-void help_rhs_sizealignof(struct name_table *nt, struct ast_rhs *rhs,
+void help_rhs_sizealignof(struct name_table *nt, struct ast_deftype_rhs *rhs,
                           ident_value fieldstop, uint32_t *offsetof_out,
                           uint32_t *sizeof_out, uint32_t *alignof_out);
 
@@ -107,7 +107,7 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
       struct ast_deftype *deftype = ent->deftype;
       CHECK(deftype->generics.has_type_params
             && deftype->generics.params_count == type->u.app.params_count);
-      struct ast_rhs substituted;
+      struct ast_deftype_rhs substituted;
       do_replace_rhs_generics(&deftype->generics,
                               type->u.app.params,
                               type->u.app.params_count,
@@ -115,7 +115,7 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                               &substituted);
       help_rhs_sizealignof(nt, &substituted, fieldstop,
                            offsetof_out, sizeof_out, alignof_out);
-      ast_rhs_destroy(&substituted);
+      ast_deftype_rhs_destroy(&substituted);
       return;
     }
   } break;
@@ -181,15 +181,15 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
   }
 }
 
-void help_rhs_sizealignof(struct name_table *nt, struct ast_rhs *rhs,
+void help_rhs_sizealignof(struct name_table *nt, struct ast_deftype_rhs *rhs,
                           ident_value fieldstop, uint32_t *offsetof_out,
                           uint32_t *sizeof_out, uint32_t *alignof_out) {
   switch (rhs->tag) {
-  case AST_RHS_TYPE:
+  case AST_DEFTYPE_RHS_TYPE:
     help_sizealignof(nt, &rhs->u.type, fieldstop, offsetof_out,
                      sizeof_out, alignof_out);
     return;
-  case AST_RHS_ENUMSPEC: {
+  case AST_DEFTYPE_RHS_ENUMSPEC: {
     CHECK(fieldstop == IDENT_VALUE_INVALID);
     uint32_t body_offset_discard;
     uint32_t body_size;

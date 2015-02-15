@@ -743,25 +743,23 @@ void ast_enumspec_init(struct ast_enumspec *a,
 void ast_enumspec_init_copy(struct ast_enumspec *a, struct ast_enumspec *c);
 void ast_enumspec_destroy(struct ast_enumspec *a);
 
-/* TODO: Mass rename this too. */
-enum ast_rhs_tag {
-  AST_RHS_TYPE,
-  AST_RHS_ENUMSPEC,
+enum ast_deftype_rhs_tag {
+  AST_DEFTYPE_RHS_TYPE,
+  AST_DEFTYPE_RHS_ENUMSPEC,
 };
 
-/* TODO: Mass rename to ast_deftype_rhs. */
-struct ast_rhs {
-  enum ast_rhs_tag tag;
+struct ast_deftype_rhs {
+  enum ast_deftype_rhs_tag tag;
   union {
     struct ast_typeexpr type;
     struct ast_enumspec enumspec;
   } u;
 };
 
-void ast_rhs_init_copy(struct ast_rhs *a, struct ast_rhs *c);
-void ast_rhs_init_type(struct ast_rhs *a, struct ast_typeexpr type);
-void ast_rhs_init_enumspec(struct ast_rhs *a, struct ast_enumspec enumspec);
-void ast_rhs_destroy(struct ast_rhs *a);
+void ast_deftype_rhs_init_copy(struct ast_deftype_rhs *a, struct ast_deftype_rhs *c);
+void ast_deftype_rhs_init_type(struct ast_deftype_rhs *a, struct ast_typeexpr type);
+void ast_deftype_rhs_init_enumspec(struct ast_deftype_rhs *a, struct ast_enumspec enumspec);
+void ast_deftype_rhs_destroy(struct ast_deftype_rhs *a);
 
 enum ast_deftype_disposition {
   AST_DEFTYPE_NOT_CLASS,
@@ -775,7 +773,7 @@ struct ast_deftype {
   enum ast_deftype_disposition disposition;
   struct ast_generics generics;
   struct ast_ident name;
-  struct ast_rhs rhs;
+  struct ast_deftype_rhs rhs;
 };
 
 void ast_deftype_init(struct ast_deftype *a, struct ast_meta meta,
