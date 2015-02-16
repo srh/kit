@@ -2353,11 +2353,34 @@ int check_expr_funcall(struct exprscope *es,
   }
 
   size_t args_types_count = size_add(args_count, 1);
-  struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
+  struct ast_typeexpr funcexpr;
+  {
+    struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
                                                args_types_count);
+
+    for (size_t i = 0; i < args_count; i++) {
+      ast_typeexpr_init_copy(&args_types[i], ast_expr_type(&exprs_annotated[i]));
+    }
+    ast_typeexpr_init_copy(&args_types[args_count], partial_type);
+
+    ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
+
+    funcexpr.tag = AST_TYPEEXPR_APP;
+    ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
+                     make_ast_ident(func_ident),
+                     args_types, args_types_count);
+  }
+
+  struct ast_expr annotated_func;
+  if (!check_expr(es, x->func, &funcexpr, &annotated_func)) {
+    goto fail_cleanup_funcexpr;
+  }
 
   struct ast_exprcall *args_annotated = malloc_mul(sizeof(*args_annotated),
                                                    args_count);
+  /* Tells fail_cleanup_args_types_and_annotated which exprs in
+  exprs_annotated are still there (those in [exprs_annotated_offset,
+  args_count)). */
   size_t exprs_annotated_offset = 0;
   size_t i;
   for (i = 0; i < args_count; i++) {
@@ -2367,30 +2390,13 @@ int check_expr_funcall(struct exprscope *es,
     struct ast_exprcatch arg_exprcatch;
     if (!compute_and_check_exprcatch(es, &arg_expr_annotated, &arg_exprcatch)) {
       ast_expr_destroy(&arg_expr_annotated);
-      goto fail_cleanup_args_types_and_annotated;
+      goto fail_cleanup_annotated;
     }
 
     ast_exprcall_init_annotated(&args_annotated[i], arg_exprcatch, arg_expr_annotated);
-
-    ast_typeexpr_init_copy(&args_types[i],
-                           ast_expr_type(&args_annotated[i].expr));
   }
   free(exprs_annotated);
   exprs_annotated = NULL;
-  ast_typeexpr_init_copy(&args_types[args_count], partial_type);
-
-  ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
-
-  struct ast_typeexpr funcexpr;
-  funcexpr.tag = AST_TYPEEXPR_APP;
-  ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
-                   make_ast_ident(func_ident),
-                   args_types, args_types_count);
-
-  struct ast_expr annotated_func;
-  if (!check_expr(es, x->func, &funcexpr, &annotated_func)) {
-    goto fail_cleanup_funcexpr;
-  }
 
   struct ast_typeexpr return_type;
   copy_func_return_type(es->cs->im, ast_expr_type(&annotated_func),
@@ -2425,21 +2431,18 @@ int check_expr_funcall(struct exprscope *es,
   ast_typeexpr_destroy(&temporary_type);
   ast_typeexpr_destroy(&return_type);
   ast_expr_destroy(&annotated_func);
- fail_cleanup_funcexpr:
-  ast_typeexpr_destroy(&funcexpr);
   SLICE_FREE(args_annotated, args_count, ast_exprcall_destroy);
   return 0;
   /* Don't fallthrough -- args_types was moved into funcexpr. */
- fail_cleanup_args_types_and_annotated:
-  SLICE_FREE(args_types, i, ast_typeexpr_destroy);
+ fail_cleanup_annotated:
   SLICE_FREE(args_annotated, i, ast_exprcall_destroy);
   for (size_t k = exprs_annotated_offset; k < args_count; k++) {
     ast_expr_destroy(&exprs_annotated[k]);
   }
   free(exprs_annotated);
   return 0;
-  /* Don't fallthrough -- some exprs_annotated were gone, we treated
-  differently. */
+ fail_cleanup_funcexpr:
+  ast_typeexpr_destroy(&funcexpr);
  fail:
   return 0;
 }
