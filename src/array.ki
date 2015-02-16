@@ -8,8 +8,8 @@ defclass[T] move array struct {
 
 access array[_] {
   func[T] do_init(r *array[T]) void {
-    r->count = @[size]~0u;
-    r->cap = @[size]~0u;
+    r->count = ~0u;
+    r->cap = ~0u;
     var null *T;
     r->ptr = null;
   }
@@ -17,7 +17,7 @@ access array[_] {
   func[T] do_copy(dest *array[T], src *array[T]) void {
     dest->count = src->count;
     dest->cap = src->cap;
-    dest->ptr = @[*T] cast(malloc(src->count * sizeof@[T]));
+    dest->ptr = cast(malloc(src->count * sizeof@[T]));
     var e size = src->count;
     for var i size = ~0u; i < e; i = i + 1u {
       dest->ptr[i.~] = src->ptr[i.~];
@@ -48,7 +48,7 @@ access array[_] {
 
   func[T] change_cap_(r *array[T], newcap size) void {
     check(newcap >= r->count);
-    var p *T = @[*T] cast(malloc(newcap * sizeof@[T]));
+    var p *T = cast(malloc(newcap * sizeof@[T]));
     var e size = r->count;
     for var i size = ~0u; i < e; i = i + 1u {
       move(&p[i.~], &r->ptr[i.~]);

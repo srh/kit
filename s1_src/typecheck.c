@@ -3221,31 +3221,30 @@ int check_expr_magic_binop(struct exprscope *es,
     goto cleanup;
   }
 
-  struct ast_expr annotated_rhs;
-  if (!check_expr(es, x->rhs, &no_partial, &annotated_rhs)) {
-    goto cleanup_lhs;
-  }
-
   switch (x->operator) {
   case AST_BINOP_ASSIGN: {
+    struct ast_expr annotated_rhs;
+    if (!check_expr(es, x->rhs, ast_expr_type(&annotated_lhs), &annotated_rhs)) {
+      goto cleanup_lhs;
+    }
     if (es->computation == STATIC_COMPUTATION_YES) {
       METERR(x->meta, "Assignment within statically evaluated expression.%s", "\n");
-      goto cleanup_both;
+      goto assign_cleanup_rhs;
     }
     if (!annotated_lhs.info.is_lvalue) {
       METERR(x->meta, "Trying to assign to non-lvalue.%s", "\n");
-      goto cleanup_both;
+      goto assign_cleanup_rhs;
     }
     if (!exact_typeexprs_equal(ast_expr_type(&annotated_lhs),
                                ast_expr_type(&annotated_rhs))) {
       METERR(x->meta, "Assignment with non-matching types.%s", "\n");
-      goto cleanup_both;
+      goto assign_cleanup_rhs;
     }
 
     if (!unify_directionally(partial_type,
                              ast_expr_type(&annotated_lhs))) {
       METERR(x->meta, "LHS type of assignment does not match contextual type.%s", "\n");
-      goto cleanup_both;
+      goto assign_cleanup_rhs;
     }
 
     ast_typeexpr_init_copy(out, ast_expr_type(&annotated_lhs));
@@ -3255,33 +3254,35 @@ int check_expr_magic_binop(struct exprscope *es,
                         x->operator, annotated_lhs, annotated_rhs);
 
     ret = 1;
-    goto cleanup_just_rhs;
+    goto cleanup;
+  assign_cleanup_rhs:
+    ast_expr_destroy(&annotated_rhs);
+    goto cleanup_lhs;
   } break;
   case AST_BINOP_LOGICAL_OR:
   case AST_BINOP_LOGICAL_AND: {
+    struct ast_expr annotated_rhs;
+    if (!check_expr(es, x->rhs, &no_partial, &annotated_rhs)) {
+      goto cleanup_lhs;
+    }
     struct ast_typeexpr boolean;
-    boolean.tag = AST_TYPEEXPR_NAME;
-    boolean.u.name = make_ast_ident(
-        identmap_intern_c_str(es->cs->im, BOOL_TYPE_NAME));
+    init_name_type(&boolean, identmap_intern_c_str(es->cs->im, BOOL_TYPE_NAME));
 
     if (!unify_directionally(&boolean,
                              ast_expr_type(&annotated_lhs))) {
       METERR(x->meta, "LHS of and/or is non-boolean.%s", "\n");
-      ast_typeexpr_destroy(&boolean);
-      goto cleanup_both;
+      goto logical_cleanup_boolean;
     }
 
     if (!unify_directionally(&boolean,
                              ast_expr_type(&annotated_rhs))) {
       METERR(x->meta, "RHS of and/or is non-boolean.%s", "\n");
-      ast_typeexpr_destroy(&boolean);
-      goto cleanup_both;
+      goto logical_cleanup_boolean;
     }
 
     if (!unify_directionally(partial_type, &boolean)) {
       METERR(x->meta, "And/or expression in non-boolean context.%s", "\n");
-      ast_typeexpr_destroy(&boolean);
-      goto cleanup_both;
+      goto logical_cleanup_boolean;
     }
 
     *out = boolean;
@@ -3291,25 +3292,19 @@ int check_expr_magic_binop(struct exprscope *es,
                         x->operator, annotated_lhs, annotated_rhs);
 
     ret = 1;
-    goto cleanup_both;
+    goto cleanup;
+  logical_cleanup_boolean:
+    ast_typeexpr_destroy(&boolean);
+    ast_expr_destroy(&annotated_rhs);
+    goto cleanup_lhs;
   } break;
   default:
     UNREACHABLE();
   }
 
- cleanup_just_rhs:
-  if (!ret) {
-    ast_expr_destroy(&annotated_rhs);
-  }
-  goto cleanup;
- cleanup_both:
-  if (!ret) {
-    ast_expr_destroy(&annotated_rhs);
-  }
  cleanup_lhs:
-  if (!ret) {
-    ast_expr_destroy(&annotated_lhs);
-  }
+  CHECK(!ret);
+  ast_expr_destroy(&annotated_lhs);
  cleanup:
   ast_typeexpr_destroy(&no_partial);
   return ret;
