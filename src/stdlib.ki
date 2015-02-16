@@ -27,6 +27,7 @@ func to_size(x u32) size {
 func `+`(x size, y size) size { return ~(x.~ + y.~); }
 func `+`(x size, y u32) size { return ~(x.~ + y); }
 func `-`(x size, y size) size { return ~(x.~ - y.~); }
+func `-`(x size, y u32) size { return ~(x.~ - y); }
 func `*`(x size, y size) size { return ~(x.~ * y.~); }
 func `*`(x size, y u32) size { return ~(x.~ * y); }
 func `/`(x size, y size) size { return ~(x.~ / y.~); }

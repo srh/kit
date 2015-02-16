@@ -17,16 +17,16 @@ access array[_] {
   func[T] do_copy(dest *array[T], src *array[T]) void {
     dest->count = src->count;
     dest->cap = src->cap;
-    dest->ptr = @[*T] (cast(malloc(src->count * @[size]~sizeof@[T])));
+    dest->ptr = @[*T] cast(malloc(src->count * sizeof@[T]));
     var e size = src->count;
-    for var i size = ~0u; i < e; i = i + @[size]~1u {
+    for var i size = ~0u; i < e; i = i + 1u {
       dest->ptr[i.~] = src->ptr[i.~];
     }
   }
 
   func[T] do_destroy(r *array[T]) void {
     for var i size = r->count; i.~ > 0u; {
-      i.~ = i.~ - 1u;
+      i = i - 1u;
       destroy(&r->ptr[i.~]);
     }
     free(@[*void] (cast(r->ptr)));
@@ -48,24 +48,24 @@ access array[_] {
 
   func[T] change_cap_(r *array[T], newcap size) void {
     check(newcap >= r->count);
-    var p *T = @[*T](cast(malloc(newcap * @[size]~sizeof@[T])));
+    var p *T = @[*T] cast(malloc(newcap * sizeof@[T]));
     var e size = r->count;
-    for var i size = ~0u; i < e; i = i + @[size]~1u {
-      move(&p[i], &r->ptr[i.~]);
+    for var i size = ~0u; i < e; i = i + 1u {
+      move(&p[i.~], &r->ptr[i.~]);
     }
-    free(@[*void](cast(r->ptr)));
+    free(@[*void] cast(r->ptr));
     r->ptr = p;
     r->cap = newcap;
   }
 
   func[T] append(r *array[T], value T) void {
     if (r->count == r->cap) {
-      change_cap_(r, max(@[size]~4u, r->cap * @[size]~2u));
+      change_cap_(r, max(@[size]~4u, r->cap * 2u));
     }
     // The reason we use copy, not move, here, is because value's
     // destructor will get called when we exit this function.
     copy(&r->ptr[r->count.~], &value);
-    r->count = r->count + @[size]~1u;
+    r->count = r->count + 1u;
   }
 }
 

@@ -3713,11 +3713,12 @@ int check_expr_deref_field_access(
   return ret;
 }
 
-int check_is_index_rhs_type(struct checkstate *cs, struct ast_typeexpr *type) {
+int check_is_index_rhs_type(struct checkstate *cs, struct ast_meta *expr_meta,
+                            struct ast_typeexpr *type) {
   if (!(type->tag == AST_TYPEEXPR_NAME
         && (type->u.name.value == identmap_intern_c_str(cs->im, I32_TYPE_NAME)
             || type->u.name.value == identmap_intern_c_str(cs->im, U32_TYPE_NAME)))) {
-    METERR(*ast_typeexpr_meta(type), "Invalid index expr rhs type.%s", "\n");
+    METERR(*expr_meta, "Invalid index expr rhs type.%s", "\n");
     return 0;
   }
   return 1;
@@ -3739,7 +3740,7 @@ int check_index_expr(struct exprscope *es,
     goto fail_lhs_annotated;
   }
 
-  if (!check_is_index_rhs_type(es->cs, ast_expr_type(&rhs_annotated))) {
+  if (!check_is_index_rhs_type(es->cs, &a->meta, ast_expr_type(&rhs_annotated))) {
     goto fail_rhs_annotated;
   }
 
