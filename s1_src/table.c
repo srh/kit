@@ -33,7 +33,7 @@ void static_value_init_u8(struct static_value *a, uint8_t u8_value) {
 
 void static_value_init_typechecked_lambda(struct static_value *a,
                                           struct ast_expr lambda) {
-  CHECK(lambda.info.is_typechecked);
+  CHECK(lambda.info.typechecked == AST_TYPECHECKED_YES);
   a->tag = STATIC_VALUE_LAMBDA;
   a->u.typechecked_lambda = lambda;
 }

@@ -570,8 +570,13 @@ enum ast_expr_tag {
   AST_EXPR_TYPED,
 };
 
+enum ast_typechecked {
+  AST_TYPECHECKED_NO,
+  AST_TYPECHECKED_YES,
+};
+
 struct ast_expr_info {
-  int is_typechecked;
+  enum typechecked typechecked;
   int is_lvalue;
   struct ast_typeexpr concrete_type;
 

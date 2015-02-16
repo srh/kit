@@ -2255,7 +2255,7 @@ void do_replace_rhs_generics(struct ast_generics *generics,
 struct ast_expr_info expr_info_typechecked_subobject(
     struct ast_typeexpr concrete_type,
     struct ast_expr_info *info) {
-  CHECK(info->is_typechecked);
+  CHECK(info->typechecked == AST_TYPECHECKED_YES);
   if (!info->temporary_exists) {
     return ast_expr_info_typechecked_no_temporary(info->is_lvalue, concrete_type);
   } else {
@@ -2274,7 +2274,7 @@ int compute_and_check_exprcatch(struct exprscope *es,
                                 struct ast_expr *annotated_expr,
                                 struct ast_exprcatch *out) {
   struct ast_expr_info *info = &annotated_expr->info;
-  CHECK(info->is_typechecked);
+  CHECK(info->typechecked == AST_TYPECHECKED_YES);
   if (info->temporary_exists) {
     if (info->whole_thing) {
       ast_exprcatch_init_annotated(out, AST_EXPRCATCH_IN_PLACE);

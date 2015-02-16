@@ -916,7 +916,7 @@ void ast_typed_expr_destroy(struct ast_typed_expr *a) {
 
 struct ast_expr_info ast_expr_info_default(void) {
   struct ast_expr_info ret;
-  ret.is_typechecked = 0;
+  ret.typechecked = AST_TYPECHECKED_NO;
   return ret;
 }
 
@@ -924,7 +924,7 @@ struct ast_expr_info ast_expr_info_typechecked_no_temporary(
     int is_lvalue,
     struct ast_typeexpr concrete_type) {
   struct ast_expr_info ret;
-  ret.is_typechecked = 1;
+  ret.typechecked = AST_TYPECHECKED_YES;
   ret.is_lvalue = is_lvalue;
   ret.concrete_type = concrete_type;
   ret.temporary_exists = 0;
@@ -950,7 +950,7 @@ struct ast_expr_info ast_expr_info_typechecked_temporary(
     int whole_thing,
     size_t temptag) {
   struct ast_expr_info ret;
-  ret.is_typechecked = 1;
+  ret.typechecked = AST_TYPECHECKED_YES;
   ret.is_lvalue = is_lvalue;
   ret.concrete_type = concrete_type;
   ret.temporary_exists = 1;
@@ -961,8 +961,11 @@ struct ast_expr_info ast_expr_info_typechecked_temporary(
 }
 
 void ast_expr_info_init_copy(struct ast_expr_info *a, struct ast_expr_info *c) {
-  a->is_typechecked = c->is_typechecked;
-  if (c->is_typechecked) {
+  a->typechecked = c->typechecked;
+  switch (c->typechecked) {
+  case AST_TYPECHECKED_NO:
+    break;
+  case AST_TYPECHECKED_YES: {
     a->is_lvalue = c->is_lvalue;
     ast_typeexpr_init_copy(&a->concrete_type, &c->concrete_type);
     a->temporary_exists = c->temporary_exists;
@@ -971,6 +974,9 @@ void ast_expr_info_init_copy(struct ast_expr_info *a, struct ast_expr_info *c) {
       a->whole_thing = c->whole_thing;
       a->temptag = c->temptag;
     }
+  } break;
+  default:
+    UNREACHABLE();
   }
 }
 
@@ -982,7 +988,10 @@ struct ast_expr_info ast_expr_info_typechecked_identical(
 }
 
 void ast_expr_info_destroy(struct ast_expr_info *a) {
-  if (a->is_typechecked) {
+  switch (a->typechecked) {
+  case AST_TYPECHECKED_NO:
+    break;
+  case AST_TYPECHECKED_YES: {
     a->is_lvalue = 0;
     ast_typeexpr_destroy(&a->concrete_type);
     if (a->temporary_exists) {
@@ -991,7 +1000,10 @@ void ast_expr_info_destroy(struct ast_expr_info *a) {
       a->temptag = 0;
       a->temporary_exists = 0;
     }
-    a->is_typechecked = 0;
+    a->typechecked = AST_TYPECHECKED_NO;
+  } break;
+  default:
+    UNREACHABLE();
   }
 }
 
@@ -1120,7 +1132,7 @@ void ast_expr_destroy(struct ast_expr *a) {
 }
 
 struct ast_typeexpr *ast_expr_type(struct ast_expr *a) {
-  CHECK(a->info.is_typechecked);
+  CHECK(a->info.typechecked == AST_TYPECHECKED_YES);
   return &a->info.concrete_type;
 }
 
