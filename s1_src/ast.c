@@ -975,7 +975,7 @@ void ast_expr_info_init_copy(struct ast_expr_info *a, struct ast_expr_info *c) {
       a->temptag = c->temptag;
     }
   } break;
-  case AST_TYPECHECKED_INCOMPLETE_NUMERIC:
+  case AST_TYPECHECKED_INCOMPLETE:
     break;
   default:
     UNREACHABLE();
@@ -1004,7 +1004,7 @@ void ast_expr_info_destroy(struct ast_expr_info *a) {
     }
     a->typechecked = AST_TYPECHECKED_NO;
   } break;
-  case AST_TYPECHECKED_INCOMPLETE_NUMERIC:
+  case AST_TYPECHECKED_INCOMPLETE:
     break;
   default:
     UNREACHABLE();
