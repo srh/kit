@@ -41,6 +41,32 @@ access array[_] {
     check(i < r->count);
     return (*r)[i];
   }
+
+  func[T] count(r *array[T]) size {
+    return r->size;
+  }
+
+  func[T] change_cap_(r *array[T], newcap size) void {
+    check(newcap >= r->count);
+    var ptr *T = @[*T] cast(malloc(newcap * @[size]~sizeof@[T]));
+    var e size = r->count;
+    for var i size = ~0u; i < e; i = i + @[size]~1u {
+      move(&ptr[i], &r->ptr[i]);
+    }
+    free(@[*void] cast(r->ptr));
+    r->ptr = ptr;
+    r->cap = newcap;
+  }
+
+  func[T] append(r *array[T], value T) void {
+    if (r->count == r->cap) {
+      change_cap_(r, max(@[size]~4u, r->cap * @[size]~2u));
+    }
+    // The reason we use copy, not move, here, is because value's
+    // destructor will get called when we exit this function.
+    copy(&r->ptr[r->count], &value);
+    r->count = r->count + 1;
+  }
 }
 
 func foo() void {

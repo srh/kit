@@ -958,7 +958,7 @@ int check_typeexpr_name(struct checkstate *cs,
     struct deftype_entry *ent;
     if (!name_table_lookup_deftype(&cs->nt, name, no_param_list_arity(),
                                    &ent)) {
-      QMETERR(a->meta, "Unrecognized type name %.*s.\n", IM_P(cs->im, name));
+      QMETERR(a->meta, "Unrecognized type name '%.*s'.\n", IM_P(cs->im, name));
       return 0;
     }
 
@@ -1904,6 +1904,7 @@ int check_expr(struct exprscope *es,
                struct ast_typeexpr *partial_type,
                struct ast_expr *annotated_out);
 
+/* TODO: Right now still nothing uses def_exists. */
 int lookup_global_maybe_typecheck(struct checkstate *cs,
                                   struct exprscope *also_maybe_typecheck,
                                   struct ast_name_expr *name,
