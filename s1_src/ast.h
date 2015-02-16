@@ -675,9 +675,8 @@ struct ast_exprcall {
 };
 
 void ast_exprcall_init(struct ast_exprcall *a, struct ast_expr expr);
-void ast_exprcall_init_annotated(struct ast_exprcall *a,
-                                 struct ast_exprcatch catch,
-                                 struct ast_expr expr);
+void ast_exprcall_annotate(struct ast_exprcall *a,
+                           struct ast_exprcatch catch);
 void ast_exprcall_init_copy(struct ast_exprcall *a, struct ast_exprcall *c);
 void ast_exprcall_destroy(struct ast_exprcall *a);
 

@@ -1177,11 +1177,12 @@ void ast_exprcall_init(struct ast_exprcall *a, struct ast_expr expr) {
   a->expr = expr;
 }
 
-void ast_exprcall_init_annotated(struct ast_exprcall *a,
-                                 struct ast_exprcatch catch,
-                                 struct ast_expr expr) {
+void ast_exprcall_annotate(struct ast_exprcall *a,
+                           struct ast_exprcatch catch) {
+  CHECK(!a->catch.info_valid);
+  CHECK(catch.info_valid);
+  ast_exprcatch_destroy(&a->catch);
   a->catch = catch;
-  a->expr = expr;
 }
 
 void ast_exprcall_init_copy(struct ast_exprcall *a, struct ast_exprcall *c) {

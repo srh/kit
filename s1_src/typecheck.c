@@ -2420,7 +2420,8 @@ int check_expr_funcall(struct exprscope *es,
       goto fail_cleanup_args_annotated;
     }
 
-    ast_exprcall_init_annotated(&args_annotated[i], arg_exprcatch, arg_expr_annotated);
+    ast_exprcall_init(&args_annotated[i], arg_expr_annotated);
+    ast_exprcall_annotate(&args_annotated[i], arg_exprcatch);
   }
   free(exprs_annotated);
   exprs_annotated = NULL;
