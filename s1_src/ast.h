@@ -573,6 +573,7 @@ enum ast_expr_tag {
 enum ast_typechecked {
   AST_TYPECHECKED_NO,
   AST_TYPECHECKED_YES,
+  AST_TYPECHECKED_INCOMPLETE_NUMERIC,
 };
 
 struct ast_expr_info {

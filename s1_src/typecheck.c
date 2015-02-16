@@ -2317,28 +2317,56 @@ int compute_and_check_exprcatch(struct exprscope *es,
   }
 }
 
+int check_funcall_args_firstcheck(struct exprscope *es,
+                                  struct ast_exprcall *args,
+                                  size_t args_count,
+                                  struct ast_expr **exprs_annotated_out) {
+  struct ast_typeexpr local_partial = ast_unknown_garbage();
+  struct ast_expr *exprs_annotated = malloc_mul(sizeof(*exprs_annotated),
+                                                args_count);
+  size_t i;
+  for (i = 0; i < args_count; i++) {
+    struct ast_expr arg_expr_annotated;
+    if (!check_expr(es, &args[i].expr, &local_partial, &arg_expr_annotated)) {
+      goto fail_exprs_annotated;
+    }
+    exprs_annotated[i] = arg_expr_annotated;
+  }
+
+  *exprs_annotated_out = exprs_annotated;
+  ast_typeexpr_destroy(&local_partial);
+  return 1;
+ fail_exprs_annotated:
+  SLICE_FREE(exprs_annotated, i, ast_expr_destroy);
+  ast_typeexpr_destroy(&local_partial);
+  return 0;
+}
+
 int check_expr_funcall(struct exprscope *es,
                        struct ast_funcall *x,
                        struct ast_typeexpr *partial_type,
                        struct ast_expr *annotated_out) {
   size_t args_count = x->args_count;
+  struct ast_expr *exprs_annotated;
+  if (!check_funcall_args_firstcheck(es, x->args, args_count, &exprs_annotated)) {
+    goto fail;
+  }
+
   size_t args_types_count = size_add(args_count, 1);
   struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
                                                args_types_count);
+
   struct ast_exprcall *args_annotated = malloc_mul(sizeof(*args_annotated),
                                                    args_count);
+  size_t exprs_annotated_offset = 0;
   size_t i;
   for (i = 0; i < args_count; i++) {
-    struct ast_typeexpr local_partial = ast_unknown_garbage();
-    struct ast_expr arg_expr_annotated;
-    if (!check_expr(es, &x->args[i].expr, &local_partial, &arg_expr_annotated)) {
-      ast_typeexpr_destroy(&local_partial);
-      goto fail_cleanup_args_types_and_annotated;
-    }
-    ast_typeexpr_destroy(&local_partial);
+    struct ast_expr arg_expr_annotated = exprs_annotated[i];
+    exprs_annotated_offset = i + 1;
 
     struct ast_exprcatch arg_exprcatch;
     if (!compute_and_check_exprcatch(es, &arg_expr_annotated, &arg_exprcatch)) {
+      ast_expr_destroy(&arg_expr_annotated);
       goto fail_cleanup_args_types_and_annotated;
     }
 
@@ -2347,7 +2375,8 @@ int check_expr_funcall(struct exprscope *es,
     ast_typeexpr_init_copy(&args_types[i],
                            ast_expr_type(&args_annotated[i].expr));
   }
-
+  free(exprs_annotated);
+  exprs_annotated = NULL;
   ast_typeexpr_init_copy(&args_types[args_count], partial_type);
 
   ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
@@ -2404,6 +2433,14 @@ int check_expr_funcall(struct exprscope *es,
  fail_cleanup_args_types_and_annotated:
   SLICE_FREE(args_types, i, ast_typeexpr_destroy);
   SLICE_FREE(args_annotated, i, ast_exprcall_destroy);
+  for (size_t k = exprs_annotated_offset; k < args_count; k++) {
+    ast_expr_destroy(&exprs_annotated[k]);
+  }
+  free(exprs_annotated);
+  return 0;
+  /* Don't fallthrough -- some exprs_annotated were gone, we treated
+  differently. */
+ fail:
   return 0;
 }
 
@@ -2538,7 +2575,7 @@ int check_statement(struct bodystate *bs,
 
   switch (s->tag) {
   case AST_STATEMENT_EXPR: {
-    struct ast_typeexpr anything = ast_unknown_garbage();;
+    struct ast_typeexpr anything = ast_unknown_garbage();
     struct ast_expr annotated_expr;
     if (!check_expr(bs->es, s->u.expr, &anything, &annotated_expr)) {
       ast_typeexpr_destroy(&anything);
