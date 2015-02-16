@@ -356,7 +356,7 @@ void init_binop_func_type(struct ast_typeexpr *a, struct identmap *im,
 void init_binop_compare_type(struct ast_typeexpr *a, struct identmap *im,
                              const char *type_name) {
   ident_value name = identmap_intern_c_str(im, type_name);
-  ident_value bool_name = identmap_intern_c_str(im, BOOLEAN_STANDIN_TYPE_NAME);
+  ident_value bool_name = identmap_intern_c_str(im, BOOL_TYPE_NAME);
   ident_value names[3];
   names[0] = names[1] = name;
   names[2] = bool_name;
@@ -617,7 +617,7 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
     import_unop(cs, PRIMITIVE_OP_NEGATE_I16, "-", I16_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_NEGATE_I32, "-", I32_TYPE_NAME);
 
-    import_unop(cs, PRIMITIVE_OP_LOGICAL_NOT, "!", BOOLEAN_STANDIN_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_LOGICAL_NOT, "!", BOOL_TYPE_NAME);
 
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_I8, "^", I8_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_U8, "^", U8_TYPE_NAME);
@@ -639,7 +639,7 @@ void checkstate_import_primitives(struct checkstate *cs) {
 
 void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
   a->tag = AST_TYPEEXPR_NAME;
-  a->u.name = make_ast_ident(identmap_intern_c_str(cs->im, BOOLEAN_STANDIN_TYPE_NAME));
+  a->u.name = make_ast_ident(identmap_intern_c_str(cs->im, BOOL_TYPE_NAME));
 }
 
 int resolve_import_filename_and_parse(struct checkstate *cs,
@@ -3256,7 +3256,7 @@ int check_expr_magic_binop(struct exprscope *es,
     struct ast_typeexpr boolean;
     boolean.tag = AST_TYPEEXPR_NAME;
     boolean.u.name = make_ast_ident(
-        identmap_intern_c_str(es->cs->im, BOOLEAN_STANDIN_TYPE_NAME));
+        identmap_intern_c_str(es->cs->im, BOOL_TYPE_NAME));
 
     if (!unify_directionally(&boolean,
                              ast_expr_type(&annotated_lhs))) {

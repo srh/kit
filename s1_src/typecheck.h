@@ -16,16 +16,14 @@
 #define I8_TYPE_NAME "i8"
 #define U16_TYPE_NAME "u16"
 #define I16_TYPE_NAME "i16"
-#define I32_TYPE_NAME "i32"
 #define U32_TYPE_NAME "u32"
+#define I32_TYPE_NAME "i32"
 #define PTR_TYPE_NAME "ptr"
 #define FUNC_TYPE_NAME "fn"
 #define BOOL_TYPE_NAME "bool"
 
 #define ARRAY_LENGTH_FIELDNAME "length"
 
-/* TODO: Later add a distinct bool type. */
-#define BOOLEAN_STANDIN_TYPE_NAME BOOL_TYPE_NAME
 #define KIRA_BOOL_SIZE 1
 
 #define CHAR_STANDIN_TYPE_NAME U8_TYPE_NAME
