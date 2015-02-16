@@ -3353,32 +3353,6 @@ void replace_placeholder_jump(struct objfile *f, size_t jmp_location,
                                 sizeof(diff));
 }
 
-enum numeric_type get_numeric_type(struct identmap *im, struct ast_typeexpr *a) {
-  CHECK(a->tag == AST_TYPEEXPR_NAME);
-  const void *buf;
-  size_t count;
-  identmap_lookup(im, a->u.name.value, &buf, &count);
-  if (count == strlen(U8_TYPE_NAME) && 0 == memcmp(buf, U8_TYPE_NAME, count)) {
-    return NUMERIC_TYPE_U8;
-  }
-  if (count == strlen(I8_TYPE_NAME) && 0 == memcmp(buf, I8_TYPE_NAME, count)) {
-    return NUMERIC_TYPE_I8;
-  }
-  if (count == strlen(U16_TYPE_NAME) && 0 == memcmp(buf, U16_TYPE_NAME, count)) {
-    return NUMERIC_TYPE_U16;
-  }
-  if (count == strlen(I16_TYPE_NAME) && 0 == memcmp(buf, I16_TYPE_NAME, count)) {
-    return NUMERIC_TYPE_I16;
-  }
-  if (count == strlen(I32_TYPE_NAME) && 0 == memcmp(buf, I32_TYPE_NAME, count)) {
-    return NUMERIC_TYPE_I32;
-  }
-  if (count == strlen(U32_TYPE_NAME) && 0 == memcmp(buf, U32_TYPE_NAME, count)) {
-    return NUMERIC_TYPE_U32;
-  }
-  CRASH("Expected a numeric type.");
-}
-
 void gen_assignment(struct checkstate *cs, struct objfile *f,
                     struct frame *h, struct loc lhs_loc,
                     struct loc rhs_loc, struct ast_typeexpr *type,

@@ -29,18 +29,6 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
 
 const int MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH = 50;
 
-uint32_t numeric_type_size(enum numeric_type t) {
-  switch (t) {
-  case NUMERIC_TYPE_U8: return 1;
-  case NUMERIC_TYPE_I8: return 1;
-  case NUMERIC_TYPE_U16: return 2;
-  case NUMERIC_TYPE_I16: return 2;
-  case NUMERIC_TYPE_I32: return 4;
-  case NUMERIC_TYPE_U32: return 4;
-  default: UNREACHABLE();
-  }
-}
-
 struct ast_ident make_ast_ident(ident_value ident) {
   struct ast_ident ret;
   ast_ident_init(&ret, ast_meta_make_garbage(), ident);
