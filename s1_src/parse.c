@@ -541,6 +541,24 @@ int try_skip_keyword(struct ps *p, const char *kw) {
 int parse_ident(struct ps *p, struct ast_ident *out) {
   PARSE_DBG("parse_ident\n");
   struct pos pos_start = ps_pos(p);
+  if (try_skip_char(p, '`')) {
+    enum ast_unop unop;
+    struct ast_ident name;
+    if (!try_parse_unop(p, &unop, &name)) {
+      enum ast_binop binop;
+      if (!parse_binop(p, &binop, &name)) {
+        return 0;
+      }
+    }
+
+    if (!try_skip_char(p, '`')) {
+      ast_ident_destroy(&name);
+      return 0;
+    }
+    *out = name;
+    return 1;
+  }
+  
   if (!is_ident_firstchar(ps_peek(p))) {
     return 0;
   }
@@ -2468,6 +2486,9 @@ int parse_test_defs(void) {
                          "  }\n"
                          "}\n",
                          62);
+  pass &= run_count_test("def27",
+                         "func `~`(x u32) size { }\n",
+                         11);
   return pass;
 }
 

@@ -89,46 +89,24 @@ const char *binop_name(enum ast_binop binop) {
   return binop_names[binop];
 }
 
-static const enum primitive_op_tag binop_i32_primitive_ops[] = {
+static const enum primitive_op_tag binop_bool_primitive_ops[] = {
   [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
-  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_I32,
-  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_I32,
-  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_I32,
-  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_I32,
-  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_I32,
-  [AST_BINOP_LT] = PRIMITIVE_OP_LT_I32,
-  [AST_BINOP_LE] = PRIMITIVE_OP_LE_I32,
-  [AST_BINOP_GT] = PRIMITIVE_OP_GT_I32,
-  [AST_BINOP_GE] = PRIMITIVE_OP_GE_I32,
-  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_I32,
-  [AST_BINOP_NE] = PRIMITIVE_OP_NE_I32,
-  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_I32,
-  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_I32,
-  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_I32,
-  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_I32,
-  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_I32,
-  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
-  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
-};
-
-static const enum primitive_op_tag binop_u32_primitive_ops[] = {
-  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
-  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_U32,
-  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_U32,
-  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_U32,
-  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_U32,
-  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_U32,
-  [AST_BINOP_LT] = PRIMITIVE_OP_LT_U32,
-  [AST_BINOP_LE] = PRIMITIVE_OP_LE_U32,
-  [AST_BINOP_GT] = PRIMITIVE_OP_GT_U32,
-  [AST_BINOP_GE] = PRIMITIVE_OP_GE_U32,
-  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_U32,
-  [AST_BINOP_NE] = PRIMITIVE_OP_NE_U32,
-  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_U32,
-  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_U32,
-  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_U32,
-  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_U32,
-  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_U32,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_BOOL,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_BOOL,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_BOOL,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_BOOL,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_BOOL,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_BOOL,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_BOOL,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_BOOL,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_BOOL,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_INVALID,
   [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
@@ -221,6 +199,50 @@ static const enum primitive_op_tag binop_i16_primitive_ops[] = {
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
 
+static const enum primitive_op_tag binop_u32_primitive_ops[] = {
+  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_U32,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_U32,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_U32,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_U32,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_U32,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_U32,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_U32,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_U32,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_U32,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_U32,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_U32,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_U32,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_U32,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_U32,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_U32,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_U32,
+  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
+};
+
+static const enum primitive_op_tag binop_i32_primitive_ops[] = {
+  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_I32,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_I32,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_I32,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_I32,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_I32,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_I32,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_I32,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_I32,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_I32,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_I32,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_I32,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_I32,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_I32,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_I32,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_I32,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_I32,
+  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
+};
+
 
 
 
@@ -247,6 +269,7 @@ int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x) {
 
 void checkstate_import_primitive_types(struct checkstate *cs) {
   intern_primitive_type(cs, VOID_TYPE_NAME, NULL, 0, 0, 1);
+  intern_primitive_type(cs, BOOL_TYPE_NAME, NULL, 0, 1, 1);
   intern_primitive_type(cs, U8_TYPE_NAME, NULL, 0, 1, 1);
   intern_primitive_type(cs, I8_TYPE_NAME, NULL, 0, 1, 1);
   intern_primitive_type(cs, U16_TYPE_NAME, NULL, 0, 2, 2);
@@ -359,6 +382,25 @@ void import_integer_binops(struct checkstate *cs,
   init_binop_compare_type(&binop_type, cs->im, type_name);
   for (enum ast_binop op = AST_BINOP_LT; op < AST_BINOP_BIT_XOR; op++) {
     intern_binop(cs, op, primop_array, &generics, &binop_type);
+  }
+  ast_typeexpr_destroy(&binop_type);
+  ast_generics_destroy(&generics);
+}
+
+void import_bool_binops(struct checkstate *cs) {
+  struct ast_generics generics;
+  ast_generics_init_no_params(&generics);
+  struct ast_typeexpr binop_type;
+  init_binop_func_type(&binop_type, cs->im, BOOL_TYPE_NAME);
+  for (enum ast_binop op = AST_BINOP_BIT_XOR;
+       op < AST_BINOP_BIT_LEFTSHIFT;
+       op++) {
+    intern_binop(cs, op, binop_bool_primitive_ops, &generics, &binop_type);
+  }
+  ast_typeexpr_destroy(&binop_type);
+  init_binop_compare_type(&binop_type, cs->im, BOOL_TYPE_NAME);
+  for (enum ast_binop op = AST_BINOP_LT; op < AST_BINOP_BIT_XOR; op++) {
+    intern_binop(cs, op, binop_bool_primitive_ops, &generics, &binop_type);
   }
   ast_typeexpr_destroy(&binop_type);
   ast_generics_destroy(&generics);
@@ -6263,6 +6305,26 @@ int check_file_test_more_56(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_57(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "deftype size u32;\n"
+      "func `~`(x u32) size {\n"
+      "  var ret size;\n"
+      "  ret.~ = x;\n"
+      "  return ret;\n"
+      "}\n"
+      "func foo(x u32) size {\n"
+      "  return ~(x + 1u);\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+
 
 
 int test_check_file(void) {
@@ -6862,6 +6924,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_56...\n");
   if (!test_check_module(&im, &check_file_test_more_56, foo)) {
     DBG("check_file_test_more_56 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_57...\n");
+  if (!test_check_module(&im, &check_file_test_more_57, foo)) {
+    DBG("check_file_test_more_57 fails\n");
     goto cleanup_identmap;
   }
 

@@ -95,14 +95,14 @@ access string {
     return p->size;
   };
 
-  def[T] lits = func(arr T) string {
+  func[T] lits(arr T) string {
     var ret string;
     var sz u32 = arr.length;
     for var i u32 = 0u; i < sz; i = i + 1u {
       append(&ret, @[u8] arr[i]);
     }
     return ret;
-  };
+  }
 }
 
 def print = func(p *string) void {

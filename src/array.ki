@@ -1,37 +1,50 @@
 import stdlib;
 
 defclass[T] move array struct {
-  size size;
+  count size;
   cap size;
   ptr *T;
 };
 
 access array[_] {
   func[T] do_init(r *array[T]) void {
-    r->size = 0u;
+    r->count = 0u;
     r->cap = 0u;
     var null *T;
     r->ptr = null;
   }
 
   func[T] do_copy(dest *array[T], src *array[T]) void {
-    dest->size = src->size;
+    dest->count = src->count;
     dest->cap = src->cap;
-    var s size;
-    s.~ = src->size.~ * sizeof@[T];
-    dest->ptr = @[*T] cast(malloc(s));
+    dest->ptr = @[*T] cast(malloc(src->count * @[size]~sizeof@[T]));
+    var e size = src->count;
+    for var i size = ~0u; i < e; i = i + @[size]~1u {
+      dest->ptr[i] = src->ptr[i];
+    }
   }
 
   func[T] do_destroy(r *array[T]) void {
-    for var i size = r->size; i.~ > 0u; {
+    for var i size = r->count; i.~ > 0u; {
       i.~ = i.~ - 1u;
       destroy(&r->ptr[i]);
     }
     free(@[*void] cast(r->ptr));
-  };
+  }
+
+  func[T] set(r *array[T], i size, val T) void {
+    check(i < r->count);
+    (*r)[i] = val;
+  }
+
+  func[T] get(r *array[T], i size) T {
+    check(i < r->count);
+    return (*r)[i];
+  }
 }
 
 func foo() void {
   var v array[array[i32]];
   var u = v;
-};
+}
+

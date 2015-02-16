@@ -2569,34 +2569,43 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     /* Divide by zero will produce #DE. (I guess.) */
     x86_gen_mov_reg8(f, X86_AL, X86_AH);
   } break;
+  case PRIMITIVE_OP_LT_BOOL: /* fallthrough */
   case PRIMITIVE_OP_LT_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_B);
   } break;
+  case PRIMITIVE_OP_LE_BOOL: /* fallthrough */
   case PRIMITIVE_OP_LE_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_BE);
   } break;
+  case PRIMITIVE_OP_GT_BOOL: /* fallthrough */
   case PRIMITIVE_OP_GT_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_A);
   } break;
+  case PRIMITIVE_OP_GE_BOOL: /* fallthrough */
   case PRIMITIVE_OP_GE_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_AE);
   } break;
+  case PRIMITIVE_OP_EQ_BOOL: /* fallthrough */
   case PRIMITIVE_OP_EQ_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_E);
   } break;
+  case PRIMITIVE_OP_NE_BOOL: /* fallthrough */
   case PRIMITIVE_OP_NE_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_NE);
   } break;
+  case PRIMITIVE_OP_BIT_XOR_BOOL: /* fallthrough */
   case PRIMITIVE_OP_BIT_XOR_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_xor_w32(f, X86_EAX, X86_ECX);
   } break;
+  case PRIMITIVE_OP_BIT_OR_BOOL: /* fallthrough */
   case PRIMITIVE_OP_BIT_OR_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
     x86_gen_or_w32(f, X86_EAX, X86_ECX);
   } break;
+  case PRIMITIVE_OP_BIT_AND_BOOL: /* fallthrough */
   case PRIMITIVE_OP_BIT_AND_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);

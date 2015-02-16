@@ -1,16 +1,51 @@
-deftype size u32;
-
 extern malloc fn[size, *void];
 extern free fn[*void, void];
+extern abort fn[void];
+
+func check(x i8) void {
+  if x { abort(); }
+}
+
+deftype size u32;
+
+
+
+def `~` fn[u32, size] = to_size;
+
+func to_size(x u32) size {
+  var ret size;
+  ret.~ = x;
+  return ret;
+}
+
+func `+`(x size, y size) size {
+  return ~(x.~ + y.~);
+}
+
+func `-`(x size, y size) size {
+  return ~(x.~ - y.~);
+}
+
+func `*`(x size, y size) size {
+  return ~(x.~ * y.~);
+}
+
+func `/`(x size, y size) size {
+  return ~(x.~ / y.~);
+}
+
+func `<`(x size, y size) bool {
+  return ~(x.~ < y.~);
+}
 
 func[S, T] cast(p *S) *T {
   var u union { p *S; q *T; };
   u.p = p;
   return u.q;
-};
+}
 
 func[S, T] up(s S) T {
   var ret T;
   ret.~ = s;
   return ret;
-};
+}
