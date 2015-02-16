@@ -2,13 +2,19 @@ extern malloc fn[size, *void];
 extern free fn[*void, void];
 extern abort fn[void];
 
-func check(x i8) void {
+func check(x bool) void {
   if x { abort(); }
 }
 
+func[T] max(x T, y T) T {
+  if (x < y) {
+    return y;
+  } else {
+    return x;
+  }
+}
+
 deftype size u32;
-
-
 
 def `~` fn[u32, size] = to_size;
 
@@ -18,25 +24,18 @@ func to_size(x u32) size {
   return ret;
 }
 
-func `+`(x size, y size) size {
-  return ~(x.~ + y.~);
-}
-
-func `-`(x size, y size) size {
-  return ~(x.~ - y.~);
-}
-
-func `*`(x size, y size) size {
-  return ~(x.~ * y.~);
-}
-
-func `/`(x size, y size) size {
-  return ~(x.~ / y.~);
-}
-
-func `<`(x size, y size) bool {
-  return ~(x.~ < y.~);
-}
+func `+`(x size, y size) size { return ~(x.~ + y.~); }
+func `+`(x size, y u32) size { return ~(x.~ + y); }
+func `-`(x size, y size) size { return ~(x.~ - y.~); }
+func `*`(x size, y size) size { return ~(x.~ * y.~); }
+func `*`(x size, y u32) size { return ~(x.~ * y); }
+func `/`(x size, y size) size { return ~(x.~ / y.~); }
+func `<`(x size, y size) bool { return x.~ < y.~; }
+func `<=`(x size, y size) bool { return x.~ <= y.~; }
+func `>`(x size, y size) bool { return x.~ > y.~; }
+func `>=`(x size, y size) bool { return x.~ >= y.~; }
+func `==`(x size, y size) bool { return x.~ == y.~; }
+func `!=`(x size, y size) bool { return x.~ != y.~; }
 
 func[S, T] cast(p *S) *T {
   var u union { p *S; q *T; };

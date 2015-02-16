@@ -193,7 +193,8 @@ int name_table_add_primitive_type(struct name_table *t,
                                   uint32_t primitive_sizeof,
                                   uint32_t primitive_alignof);
 
-int name_table_match_def(struct name_table *t,
+int name_table_match_def(struct identmap *im,
+                         struct name_table *t,
                          struct ast_ident *name,
                          struct ast_typeexpr *generics_or_null,
                          size_t generics_count,

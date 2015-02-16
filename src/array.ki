@@ -8,8 +8,8 @@ defclass[T] move array struct {
 
 access array[_] {
   func[T] do_init(r *array[T]) void {
-    r->count = 0u;
-    r->cap = 0u;
+    r->count = @[size]~0u;
+    r->cap = @[size]~0u;
     var null *T;
     r->ptr = null;
   }
@@ -17,19 +17,19 @@ access array[_] {
   func[T] do_copy(dest *array[T], src *array[T]) void {
     dest->count = src->count;
     dest->cap = src->cap;
-    dest->ptr = @[*T] cast(malloc(src->count * @[size]~sizeof@[T]));
+    dest->ptr = @[*T] (cast(malloc(src->count * @[size]~sizeof@[T])));
     var e size = src->count;
     for var i size = ~0u; i < e; i = i + @[size]~1u {
-      dest->ptr[i] = src->ptr[i];
+      dest->ptr[i.~] = src->ptr[i.~];
     }
   }
 
   func[T] do_destroy(r *array[T]) void {
     for var i size = r->count; i.~ > 0u; {
       i.~ = i.~ - 1u;
-      destroy(&r->ptr[i]);
+      destroy(&r->ptr[i.~]);
     }
-    free(@[*void] cast(r->ptr));
+    free(@[*void] (cast(r->ptr)));
   }
 
   func[T] set(r *array[T], i size, val T) void {
@@ -48,13 +48,13 @@ access array[_] {
 
   func[T] change_cap_(r *array[T], newcap size) void {
     check(newcap >= r->count);
-    var ptr *T = @[*T] cast(malloc(newcap * @[size]~sizeof@[T]));
+    var p *T = @[*T](cast(malloc(newcap * @[size]~sizeof@[T])));
     var e size = r->count;
     for var i size = ~0u; i < e; i = i + @[size]~1u {
-      move(&ptr[i], &r->ptr[i]);
+      move(&p[i], &r->ptr[i.~]);
     }
-    free(@[*void] cast(r->ptr));
-    r->ptr = ptr;
+    free(@[*void](cast(r->ptr)));
+    r->ptr = p;
     r->cap = newcap;
   }
 
@@ -64,13 +64,14 @@ access array[_] {
     }
     // The reason we use copy, not move, here, is because value's
     // destructor will get called when we exit this function.
-    copy(&r->ptr[r->count], &value);
-    r->count = r->count + 1;
+    copy(&r->ptr[r->count.~], &value);
+    r->count = r->count + @[size]~1u;
   }
 }
 
 func foo() void {
-  var v array[array[i32]];
+  var v array[i32];
   var u = v;
+  append(&u, 7);
 }
 

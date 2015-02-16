@@ -958,7 +958,7 @@ int check_typeexpr_name(struct checkstate *cs,
     struct deftype_entry *ent;
     if (!name_table_lookup_deftype(&cs->nt, name, no_param_list_arity(),
                                    &ent)) {
-      QMETERR(a->meta, "Unrecognized type name '%.*s'.\n", IM_P(cs->im, name));
+      METERR(a->meta, "Unrecognized type name '%.*s'.\n", IM_P(cs->im, name));
       return 0;
     }
 
@@ -981,8 +981,8 @@ int check_typeexpr_app(struct checkstate *cs,
   if (!name_table_lookup_deftype(&cs->nt, a->name.value,
                                  param_list_arity(a->params_count),
                                  &ent)) {
-    QMETERR(a->meta, "Type lookup fail for %.*s, arity %"PRIz"\n",
-            IM_P(cs->im, a->name.value), a->params_count);
+    METERR(a->meta, "Type lookup fail for %.*s, arity %"PRIz"\n",
+           IM_P(cs->im, a->name.value), a->params_count);
     return 0;
   }
 
@@ -1012,8 +1012,8 @@ int check_typeexpr_fields(struct checkstate *cs,
     struct ast_vardecl *field = &fields[i];
     for (size_t j = 0; j < i; j++) {
       if (field->name.value == fields[j].name.value) {
-        QMETERR(field->meta, "struct/union fields have duplicate name %.*s\n",
-                IM_P(cs->im, field->name.value));
+        METERR(field->meta, "struct/union fields have duplicate name %.*s\n",
+               IM_P(cs->im, field->name.value));
         return 0;
       }
     }
@@ -1021,10 +1021,10 @@ int check_typeexpr_fields(struct checkstate *cs,
     {
       size_t which_generic;
       if (generics_lookup_name(generics, field->name.value, &which_generic)) {
-        QMETERR(field->meta,
-                "struct/union field shadows template parameter %.*s, "
-                "which is gauche.\n",
-                IM_P(cs->im, field->name.value));
+        METERR(field->meta,
+               "struct/union field shadows template parameter %.*s, "
+               "which is gauche.\n",
+               IM_P(cs->im, field->name.value));
         return 0;
       }
     }
@@ -1167,6 +1167,8 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
                                          &unified,
                                          &lvalue_discard,
                                          &inst)) {
+        METERR(*ast_typeexpr_meta(a), "Typecheck failed(?) when looking up %s definition.\n",
+               name);
         goto fail;
       }
       ast_typeexpr_destroy(&unified);
@@ -1180,7 +1182,7 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
     return 1;
   }
 
-  METERR(*ast_typeexpr_meta(a), "Multiple matching %s definitions\n", name);
+  METERR(*ast_typeexpr_meta(a), "Multiple matching '%s' definitions\n", name);
  fail:
   ast_name_expr_destroy(&func_name);
   ast_typeexpr_destroy(&func_type);
@@ -1493,8 +1495,9 @@ int check_typeexpr_unione_traits(struct checkstate *cs,
     }
 
     if (traits.inittible != TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
-      METERR(a->u.unione.meta, "Unien field %.*s is not trivially initializable.\n",
+      METERR(a->u.unione.meta, "Union field %.*s is not trivially initializable.\n",
              IM_P(cs->im, a->u.unione.fields[i].name.value));
+      return 0;
     }
   }
 
@@ -1565,15 +1568,15 @@ int check_generics_shadowing(struct checkstate *cs,
     ident_value name = a->params[i].value;
     for (size_t j = 0; j < i; j++) {
       if (name == a->params[j].value) {
-        QMETERR(a->meta, "duplicate param names %.*s within same generics list.\n",
-                IM_P(cs->im, name));
+        METERR(a->meta, "duplicate param names %.*s within same generics list.\n",
+               IM_P(cs->im, name));
         return 0;
       }
     }
 
     if (name_table_shadowed(&cs->nt, name)) {
-      QMETERR(a->meta, "generics list shadows global name %.*s.\n",
-              IM_P(cs->im, name));
+      METERR(a->meta, "generics list shadows global name %.*s.\n",
+             IM_P(cs->im, name));
       return 0;
     }
   }
@@ -1921,7 +1924,8 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
   struct def_entry *ent;
   struct def_instantiation *inst;
   int zero_defs;
-  if (!name_table_match_def(&cs->nt,
+  if (!name_table_match_def(cs->im,
+                            &cs->nt,
                             &name->ident,
                             name->has_params ? name->params : NULL,
                             name->has_params ? name->params_count : 0,
@@ -1979,6 +1983,7 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
     if (!check_expr(&scope, &ent->def->rhs, &unified, &annotated_rhs)) {
       exprscope_destroy(&scope);
       cs->template_instantiation_recursion_depth--;
+      DBG("... when instantiating '%.*s'.\n", IM_P(cs->im, ent->name));
       goto fail_unified;
     }
 
@@ -3709,9 +3714,13 @@ int check_expr_deref_field_access(
 }
 
 int check_is_index_rhs_type(struct checkstate *cs, struct ast_typeexpr *type) {
-  return type->tag == AST_TYPEEXPR_NAME
-    && (type->u.name.value == identmap_intern_c_str(cs->im, I32_TYPE_NAME)
-        || type->u.name.value == identmap_intern_c_str(cs->im, U32_TYPE_NAME));
+  if (!(type->tag == AST_TYPEEXPR_NAME
+        && (type->u.name.value == identmap_intern_c_str(cs->im, I32_TYPE_NAME)
+            || type->u.name.value == identmap_intern_c_str(cs->im, U32_TYPE_NAME)))) {
+    METERR(*ast_typeexpr_meta(type), "Invalid index expr rhs type.%s", "\n");
+    return 0;
+  }
+  return 1;
 }
 
 int check_index_expr(struct exprscope *es,
@@ -3970,7 +3979,8 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
     struct ast_typeexpr unified;
     struct def_entry *ent;
     struct def_instantiation *inst;
-    int success = name_table_match_def(&cs->nt,
+    int success = name_table_match_def(cs->im,
+                                       &cs->nt,
                                        &a->name,
                                        NULL, 0, /* (no generics) */
                                        ast_def_typeexpr(a),

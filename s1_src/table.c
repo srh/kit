@@ -1042,7 +1042,8 @@ size_t name_table_count_matching_defs(struct name_table *t,
   return num_matched;
 }
 
-int name_table_match_def(struct name_table *t,
+int name_table_match_def(struct identmap *im,
+                         struct name_table *t,
                          struct ast_ident *ident,
                          struct ast_typeexpr *generics_or_null,
                          size_t generics_count,
@@ -1080,7 +1081,8 @@ int name_table_match_def(struct name_table *t,
       *zero_defs_out = 0;
       if (matched_ent) {
         ast_typeexpr_destroy(&unified);
-        METERR(ident->meta, "multiple matching definitions%s", "\n");
+        METERR(ident->meta, "multiple matching '%.*s' definitions\n",
+               IM_P(im, ident->value));
         goto fail_multiple_matching;
       } else {
         matched_type = unified;
@@ -1091,7 +1093,8 @@ int name_table_match_def(struct name_table *t,
   }
 
   if (!matched_ent) {
-    METERR(ident->meta, "no matching definition%s", "\n");
+    METERR(ident->meta, "no matching '%.*s' definition\n",
+           IM_P(im, ident->value));
     *zero_defs_out = 1;
     goto fail;
   }

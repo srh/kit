@@ -4226,6 +4226,7 @@ int build_module(struct identmap *im, module_loader *loader,
   checkstate_init(&cs, im);
 
   if (!chase_modules_and_typecheck(&cs, loader, name)) {
+    DBG("(Typecheck failed.)\n");
     goto cleanup_checkstate;
   }
 
@@ -4234,12 +4235,14 @@ int build_module(struct identmap *im, module_loader *loader,
 
   for (size_t i = 0, e = cs.nt.defs_count; i < e; i++) {
     if (!add_def_symbols(&cs, objfile, cs.nt.defs[i])) {
+      DBG("(Adding def symbol failed.)\n");
       goto cleanup_objfile;
     }
   }
 
   for (size_t i = 0, e = cs.nt.defs_count; i < e; i++) {
     if (!build_def(&cs, objfile, cs.nt.defs[i])) {
+      DBG("(Building def failed.)\n");
       goto cleanup_objfile;
     }
   }
