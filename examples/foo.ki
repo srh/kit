@@ -17,7 +17,7 @@ deftype ty struct {
 };
 
 func[T] getsize() u32 {
-  return sizeof@[T];
+  return ~sizeof@[T];
 }
 
 defclass kla struct {

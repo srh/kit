@@ -16,6 +16,7 @@
 #define I16_TYPE_NAME "i16"
 #define U32_TYPE_NAME "u32"
 #define I32_TYPE_NAME "i32"
+#define SIZE_TYPE_NAME "size"
 #define PTR_TYPE_NAME "ptr"
 #define FUNC_TYPE_NAME "fn"
 #define BOOL_TYPE_NAME "bool"
@@ -25,8 +26,6 @@
 #define KIRA_BOOL_SIZE 1
 
 #define CHAR_STANDIN_TYPE_NAME U8_TYPE_NAME
-
-#define SIZE_STANDIN_TYPE_NAME U32_TYPE_NAME
 
 struct ast_generics;
 struct ast_typeexpr;

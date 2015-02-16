@@ -14,29 +14,12 @@ func[T] max(x T, y T) T {
   }
 }
 
-deftype size u32;
-
-def `~` fn[u32, size] = to_size;
-
-func to_size(x u32) size {
-  var ret size;
-  ret.~ = x;
-  return ret;
-}
-
-func `+`(x size, y size) size { return ~(x.~ + y.~); }
-func `+`(x size, y u32) size { return ~(x.~ + y); }
-func `-`(x size, y size) size { return ~(x.~ - y.~); }
-func `-`(x size, y u32) size { return ~(x.~ - y); }
-func `*`(x size, y size) size { return ~(x.~ * y.~); }
-func `*`(x size, y u32) size { return ~(x.~ * y); }
-func `/`(x size, y size) size { return ~(x.~ / y.~); }
-func `<`(x size, y size) bool { return x.~ < y.~; }
-func `<=`(x size, y size) bool { return x.~ <= y.~; }
-func `>`(x size, y size) bool { return x.~ > y.~; }
-func `>=`(x size, y size) bool { return x.~ >= y.~; }
-func `==`(x size, y size) bool { return x.~ == y.~; }
-func `!=`(x size, y size) bool { return x.~ != y.~; }
+// Ideally we'd convert whichever one is smaller.
+func `+`(x size, y u32) size { return x + @[size]~y; }
+func `-`(x size, y u32) size { return x - @[size]~y; }
+func `*`(x size, y u32) size { return x * @[size]~y; }
+func `<`(x size, y u32) bool { return x < @[size]~y; }
+func `>`(x size, y u32) bool { return x > @[size]~y; }
 
 func[S, T] cast(p *S) *T {
   var u union { p *S; q *T; };

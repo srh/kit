@@ -155,7 +155,8 @@ struct name_table {
 void name_table_init(struct name_table *t);
 void name_table_destroy(struct name_table *t);
 
-int name_table_add_def(struct name_table *t,
+int name_table_add_def(struct identmap *im,
+                       struct name_table *t,
                        ident_value name,
                        struct ast_generics *generics,
                        struct ast_typeexpr *type,
@@ -164,6 +165,7 @@ int name_table_add_def(struct name_table *t,
                        int is_export,
                        struct ast_def *def);
 int name_table_add_primitive_def(
+    struct identmap *im,
     struct name_table *t,
     ident_value name,
     struct primitive_op primitive_op,
@@ -171,7 +173,8 @@ int name_table_add_primitive_def(
     struct ast_typeexpr *type);
 /* private_to_count is how many access scopes you need to get access
 to the type.  So if it's zero, this is a public def. */
-int name_table_add_private_primitive_def(struct name_table *t,
+int name_table_add_private_primitive_def(struct identmap *im,
+                                         struct name_table *t,
                                          ident_value name,
                                          struct primitive_op primitive_op,
                                          struct ast_generics *generics,
@@ -179,14 +182,17 @@ int name_table_add_private_primitive_def(struct name_table *t,
                                          struct defclass_ident *private_to,
                                          size_t private_to_count);
 
-int name_table_add_extern_def(struct name_table *t,
+int name_table_add_extern_def(struct identmap *im,
+                              struct name_table *t,
                               ident_value name,
                               struct ast_typeexpr *type);
-int name_table_add_deftype(struct name_table *t,
+int name_table_add_deftype(struct identmap *im,
+                           struct name_table *t,
                            ident_value name,
                            struct generics_arity arity,
                            struct ast_deftype *deftype);
-int name_table_add_primitive_type(struct name_table *t,
+int name_table_add_primitive_type(struct identmap *im,
+                                  struct name_table *t,
                                   ident_value name,
                                   int *flatly_held,
                                   size_t flatly_held_count,

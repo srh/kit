@@ -410,7 +410,8 @@ int name_table_shadowed(struct name_table *t, ident_value name) {
   return deftype_shadowed(t, name) || def_shadowed(t, name);
 }
 
-int name_table_help_add_def(struct name_table *t,
+int name_table_help_add_def(struct identmap *im,
+                            struct name_table *t,
                             ident_value name,
                             struct ast_generics *generics,
                             struct ast_typeexpr *type,
@@ -424,7 +425,7 @@ int name_table_help_add_def(struct name_table *t,
                             int is_export,
                             struct ast_def *def) {
   if (deftype_shadowed(t, name)) {
-    ERR_DBG("def name shadows deftype name.\n");
+    ERR_DBG("def name '%.*s' shadows deftype name.\n", IM_P(im, name));
     return 0;
   }
 
@@ -467,7 +468,8 @@ int name_table_help_add_def(struct name_table *t,
   return 1;
 }
 
-int name_table_add_def(struct name_table *t,
+int name_table_add_def(struct identmap *im,
+                       struct name_table *t,
                        ident_value name,
                        struct ast_generics *generics,
                        struct ast_typeexpr *type,
@@ -476,59 +478,63 @@ int name_table_add_def(struct name_table *t,
                        int is_export,
                        struct ast_def *def) {
   CHECK(!(is_export && generics->has_type_params));
-  return name_table_help_add_def(t, name, generics, type,
+  return name_table_help_add_def(im, t, name, generics, type,
                                  accessible, accessible_count,
                                  NULL, 0,  /* Not private to anything. */
                                  0, make_primop(PRIMITIVE_OP_INVALID),
                                  0, is_export, def);
 }
 
-int name_table_add_private_primitive_def(struct name_table *t,
+int name_table_add_private_primitive_def(struct identmap *im,
+                                         struct name_table *t,
                                          ident_value name,
                                          struct primitive_op primitive_op,
                                          struct ast_generics *generics,
                                          struct ast_typeexpr *type,
                                          struct defclass_ident *private_to,
                                          size_t private_to_count) {
-  return name_table_help_add_def(t, name, generics, type,
+  return name_table_help_add_def(im, t, name, generics, type,
                                  NULL, 0, /* Needs no special access. */
                                  private_to, private_to_count,
                                  1, primitive_op,
                                  0, 0, NULL);
 }
 
-int name_table_add_primitive_def(struct name_table *t,
+int name_table_add_primitive_def(struct identmap *im,
+                                 struct name_table *t,
                                  ident_value name,
                                  struct primitive_op primitive_op,
                                  struct ast_generics *generics,
                                  struct ast_typeexpr *type) {
-  return name_table_help_add_def(t, name, generics, type,
+  return name_table_help_add_def(im, t, name, generics, type,
                                  NULL, 0, /* Needs no special access. */
                                  NULL, 0, /* Not private to anything. */
                                  1, primitive_op,
                                  0, 0, NULL);
 }
 
-int name_table_add_extern_def(struct name_table *t,
+int name_table_add_extern_def(struct identmap *im,
+                              struct name_table *t,
                               ident_value name,
                               struct ast_typeexpr *type) {
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
-  return name_table_help_add_def(t, name, &generics, type,
+  return name_table_help_add_def(im, t, name, &generics, type,
                                  NULL, 0, /* Needs no special access. */
                                  NULL, 0, /* Not private to anything. */
                                  0, make_primop(PRIMITIVE_OP_INVALID),
                                  1, 0, NULL);
 }
 
-int name_table_help_add_deftype_entry(struct name_table *t,
+int name_table_help_add_deftype_entry(struct identmap *im,
+                                      struct name_table *t,
                                       struct deftype_entry **entry_ptr) {
   struct deftype_entry *entry = *entry_ptr;
   ident_value name = entry->name;
   *entry_ptr = NULL;
 
   if (def_shadowed(t, name)) {
-    ERR_DBG("deftype name shadows def name.\n");
+    ERR_DBG("deftype name '%.*s' shadows def name.\n", IM_P(im, name));
     goto fail_cleanup_entry;
   }
 
@@ -544,12 +550,12 @@ int name_table_help_add_deftype_entry(struct name_table *t,
     CHECK(ent->name == name);
 
     if (arity_no_paramlist(ent->arity) || arity_no_paramlist(entry->arity)) {
-      ERR_DBG("untemplated deftype name clash.\n");
+      ERR_DBG("untemplated deftype name clash for '%.*s'.\n", IM_P(im, name));
       goto fail_cleanup_entry;
     }
 
     if (ent->arity.value == entry->arity.value) {
-      ERR_DBG("templated deftypes have same arity.\n");
+      ERR_DBG("templated deftypes for '%.*s' have same arity.\n", IM_P(im, name));
       goto fail_cleanup_entry;
     }
   }
@@ -567,17 +573,19 @@ int name_table_help_add_deftype_entry(struct name_table *t,
   return 0;
 }
 
-int name_table_add_deftype(struct name_table *t,
+int name_table_add_deftype(struct identmap *im,
+                           struct name_table *t,
                            ident_value name,
                            struct generics_arity arity,
                            struct ast_deftype *deftype) {
   struct deftype_entry *new_entry = malloc(sizeof(*new_entry));
   CHECK(new_entry);
   deftype_entry_init(new_entry, name, arity, deftype);
-  return name_table_help_add_deftype_entry(t, &new_entry);
+  return name_table_help_add_deftype_entry(im, t, &new_entry);
 }
 
-int name_table_add_primitive_type(struct name_table *t,
+int name_table_add_primitive_type(struct identmap *im,
+                                  struct name_table *t,
                                   ident_value name,
                                   int *flatly_held,
                                   size_t flatly_held_count,
@@ -588,7 +596,7 @@ int name_table_add_primitive_type(struct name_table *t,
   deftype_entry_init_primitive(new_entry, name,
                                flatly_held, flatly_held_count,
                                primitive_sizeof, primitive_alignof);
-  return name_table_help_add_deftype_entry(t, &new_entry);
+  return name_table_help_add_deftype_entry(im, t, &new_entry);
 }
 
 int combine_partial_types(struct ast_typeexpr *a,

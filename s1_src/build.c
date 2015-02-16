@@ -2343,6 +2343,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_CONVERT_U8_TO_U16: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U8_TO_I16: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_U8_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U8_TO_U32: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U8_TO_I32: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
@@ -2364,6 +2365,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_CONVERT_I8_TO_I16: {
     x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
   } break;
+  case PRIMITIVE_OP_CONVERT_I8_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I8_TO_U32: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_test_regs8(f, X86_AL, X86_AL);
@@ -2391,6 +2393,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_cmp_imm32(f, X86_EAX, 0x7FFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
+  case PRIMITIVE_OP_CONVERT_U16_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U16_TO_U32: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U16_TO_I32: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
@@ -2416,6 +2419,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_CONVERT_I16_TO_I16: {
     x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
   } break;
+  case PRIMITIVE_OP_CONVERT_I16_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I16_TO_U32: {
     x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_test_regs32(f, X86_EAX, X86_EAX);
@@ -2425,29 +2429,37 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
   } break;
 
+  case PRIMITIVE_OP_CONVERT_SIZE_TO_U8: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U32_TO_U8: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
+  case PRIMITIVE_OP_CONVERT_SIZE_TO_I8: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U32_TO_I8: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_cmp_imm32(f, X86_EAX, 0x7F);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
+  case PRIMITIVE_OP_CONVERT_SIZE_TO_U16: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U32_TO_U16: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_cmp_imm32(f, X86_EAX, 0xFFFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
+  case PRIMITIVE_OP_CONVERT_SIZE_TO_I16: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U32_TO_I16: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_cmp_imm32(f, X86_EAX, 0x7FFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
+  case PRIMITIVE_OP_CONVERT_SIZE_TO_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_SIZE_TO_U32: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_U32_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
   } break;
+  case PRIMITIVE_OP_CONVERT_SIZE_TO_I32: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_test_regs32(f, X86_EAX, X86_EAX);
@@ -2478,6 +2490,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_cmp_imm32(f, X86_EAX, -0x8000);
     gen_crash_jcc(f, h, X86_JCC_L);
   } break;
+  case PRIMITIVE_OP_CONVERT_I32_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I32_TO_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_test_regs32(f, X86_EAX, X86_EAX);
@@ -2520,17 +2533,18 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_setcc_b8(f, X86_AL, X86_SETCC_Z);
   } break;
 
-  case PRIMITIVE_OP_BIT_NOT_I8:
+  case PRIMITIVE_OP_BIT_NOT_I8: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_not_w8(f, X86_AL);
   } break;
-  case PRIMITIVE_OP_BIT_NOT_I16:
+  case PRIMITIVE_OP_BIT_NOT_I16: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_U16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_not_w16(f, X86_AX);
   } break;
-  case PRIMITIVE_OP_BIT_NOT_I32:
+  case PRIMITIVE_OP_BIT_NOT_I32: /* fallthrough */
+  case PRIMITIVE_OP_BIT_NOT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_not_w32(f, X86_EAX);
@@ -2893,24 +2907,28 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_sar_cl_w16(f, X86_AX);
   } break;
 
+  case PRIMITIVE_OP_ADD_SIZE: /* fallthrough */
   case PRIMITIVE_OP_ADD_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_add_w32(f, X86_EAX, X86_ECX);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
+  case PRIMITIVE_OP_SUB_SIZE: /* fallthrough */
   case PRIMITIVE_OP_SUB_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_sub_w32(f, X86_EAX, X86_ECX);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
+  case PRIMITIVE_OP_MUL_SIZE: /* fallthrough */
   case PRIMITIVE_OP_MUL_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_eaxedx_mul_w32(f, X86_ECX);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
+  case PRIMITIVE_OP_DIV_SIZE: /* fallthrough */
   case PRIMITIVE_OP_DIV_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
@@ -2918,6 +2936,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_eaxedx_div_w32(f, X86_ECX);
     /* Divide by zero will produce #DE. (I guess.) */
   } break;
+  case PRIMITIVE_OP_MOD_SIZE: /* fallthrough */
   case PRIMITIVE_OP_MOD_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
@@ -2926,39 +2945,49 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
     /* Modulus by zero will produce #DE. (I guess.) */
   } break;
+  case PRIMITIVE_OP_LT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_LT_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_B);
   } break;
+  case PRIMITIVE_OP_LE_SIZE: /* fallthrough */
   case PRIMITIVE_OP_LE_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_BE);
   } break;
+  case PRIMITIVE_OP_GT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_GT_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_A);
   } break;
+  case PRIMITIVE_OP_GE_SIZE: /* fallthrough */
   case PRIMITIVE_OP_GE_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_AE);
   } break;
+  case PRIMITIVE_OP_EQ_SIZE: /* fallthrough */
   case PRIMITIVE_OP_EQ_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
   } break;
+  case PRIMITIVE_OP_NE_SIZE: /* fallthrough */
   case PRIMITIVE_OP_NE_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
   } break;
+  case PRIMITIVE_OP_BIT_XOR_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_XOR_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_xor_w32(f, X86_EAX, X86_ECX);
   } break;
+  case PRIMITIVE_OP_BIT_OR_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_OR_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_or_w32(f, X86_EAX, X86_ECX);
   } break;
+  case PRIMITIVE_OP_BIT_AND_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_AND_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_and_w32(f, X86_EAX, X86_ECX);
   } break;
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
@@ -2969,6 +2998,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
 
     x86_gen_shl_cl_w32(f, X86_EAX);
   } break;
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);

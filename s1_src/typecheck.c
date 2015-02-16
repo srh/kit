@@ -42,7 +42,7 @@ void intern_primitive_type(struct checkstate *cs,
                            uint32_t primitive_sizeof,
                            uint32_t primitive_alignof) {
   ident_value ident = identmap_intern_c_str(cs->im, name);
-  int res = name_table_add_primitive_type(&cs->nt, ident,
+  int res = name_table_add_primitive_type(cs->im, &cs->nt, ident,
                                           flatly_held, flatly_held_count,
                                           primitive_sizeof,
                                           primitive_alignof);
@@ -231,6 +231,28 @@ static const enum primitive_op_tag binop_i32_primitive_ops[] = {
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
 
+static const enum primitive_op_tag binop_size_primitive_ops[] = {
+  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_SIZE,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_SIZE,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_SIZE,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_SIZE,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_SIZE,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_SIZE,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_SIZE,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_SIZE,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_SIZE,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_SIZE,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_SIZE,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_SIZE,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_SIZE,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_SIZE,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_SIZE,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_SIZE,
+  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
+};
+
 
 
 
@@ -240,6 +262,7 @@ void intern_binop(struct checkstate *cs,
                   struct ast_generics *generics,
                   struct ast_typeexpr *type) {
   name_table_add_primitive_def(
+      cs->im,
       &cs->nt,
       identmap_intern_c_str(cs->im, binop_name(binop)),
       make_primop(primop_array[binop]),
@@ -264,6 +287,8 @@ void checkstate_import_primitive_types(struct checkstate *cs) {
   intern_primitive_type(cs, I16_TYPE_NAME, NULL, 0, 2, 2);
   intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0, 4, 4);
   intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0, 4, 4);
+  /* X86 -- 32-bit sizes */
+  intern_primitive_type(cs, SIZE_TYPE_NAME, NULL, 0, 4, 4);
 
   int not_flatly_held[20] = { 0 };
   /* X86 -- 32-bit pointers */
@@ -395,20 +420,22 @@ void import_bool_binops(struct checkstate *cs) {
 }
 
 void import_integer_conversions(struct checkstate *cs) {
-  ident_value types[6];
+  const size_t num_types = 7;
+  ident_value types[7];
   types[0] = identmap_intern_c_str(cs->im, U8_TYPE_NAME);
   types[1] = identmap_intern_c_str(cs->im, I8_TYPE_NAME);
   types[2] = identmap_intern_c_str(cs->im, U16_TYPE_NAME);
   types[3] = identmap_intern_c_str(cs->im, I16_TYPE_NAME);
   types[4] = identmap_intern_c_str(cs->im, U32_TYPE_NAME);
   types[5] = identmap_intern_c_str(cs->im, I32_TYPE_NAME);
+  types[6] = identmap_intern_c_str(cs->im, SIZE_TYPE_NAME);
 
   ident_value convert = identmap_intern_c_str(cs->im, CONVERT_FUNCTION_NAME);
 
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
 
-  enum primitive_op_tag conversions[6][6] = {
+  enum primitive_op_tag conversions[7][7] = {
     {
       PRIMITIVE_OP_CONVERT_U8_TO_U8,
       PRIMITIVE_OP_CONVERT_U8_TO_I8,
@@ -416,6 +443,7 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_U8_TO_I16,
       PRIMITIVE_OP_CONVERT_U8_TO_U32,
       PRIMITIVE_OP_CONVERT_U8_TO_I32,
+      PRIMITIVE_OP_CONVERT_U8_TO_SIZE,
     }, {
       PRIMITIVE_OP_CONVERT_I8_TO_U8,
       PRIMITIVE_OP_CONVERT_I8_TO_I8,
@@ -423,6 +451,7 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_I8_TO_I16,
       PRIMITIVE_OP_CONVERT_I8_TO_U32,
       PRIMITIVE_OP_CONVERT_I8_TO_I32,
+      PRIMITIVE_OP_CONVERT_I8_TO_SIZE,
     }, {
       PRIMITIVE_OP_CONVERT_U16_TO_U8,
       PRIMITIVE_OP_CONVERT_U16_TO_I8,
@@ -430,6 +459,7 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_U16_TO_I16,
       PRIMITIVE_OP_CONVERT_U16_TO_U32,
       PRIMITIVE_OP_CONVERT_U16_TO_I32,
+      PRIMITIVE_OP_CONVERT_U16_TO_SIZE,
     }, {
       PRIMITIVE_OP_CONVERT_I16_TO_U8,
       PRIMITIVE_OP_CONVERT_I16_TO_I8,
@@ -437,6 +467,7 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_I16_TO_I16,
       PRIMITIVE_OP_CONVERT_I16_TO_U32,
       PRIMITIVE_OP_CONVERT_I16_TO_I32,
+      PRIMITIVE_OP_CONVERT_I16_TO_SIZE,
     }, {
       PRIMITIVE_OP_CONVERT_U32_TO_U8,
       PRIMITIVE_OP_CONVERT_U32_TO_I8,
@@ -444,6 +475,7 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_U32_TO_I16,
       PRIMITIVE_OP_CONVERT_U32_TO_U32,
       PRIMITIVE_OP_CONVERT_U32_TO_I32,
+      PRIMITIVE_OP_CONVERT_U32_TO_SIZE,
     }, {
       PRIMITIVE_OP_CONVERT_I32_TO_U8,
       PRIMITIVE_OP_CONVERT_I32_TO_I8,
@@ -451,17 +483,27 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_I32_TO_I16,
       PRIMITIVE_OP_CONVERT_I32_TO_U32,
       PRIMITIVE_OP_CONVERT_I32_TO_I32,
+      PRIMITIVE_OP_CONVERT_I32_TO_SIZE,
+    }, {
+      PRIMITIVE_OP_CONVERT_SIZE_TO_U8,
+      PRIMITIVE_OP_CONVERT_SIZE_TO_I8,
+      PRIMITIVE_OP_CONVERT_SIZE_TO_U16,
+      PRIMITIVE_OP_CONVERT_SIZE_TO_I16,
+      PRIMITIVE_OP_CONVERT_SIZE_TO_U32,
+      PRIMITIVE_OP_CONVERT_SIZE_TO_I32,
+      PRIMITIVE_OP_CONVERT_SIZE_TO_SIZE,
     },
   };
 
-  for (size_t i = 0; i < 6; i++) {
-    for (size_t j = 0; j < 6; j++) {
+  for (size_t i = 0; i < num_types; i++) {
+    for (size_t j = 0; j < num_types; j++) {
       struct ast_typeexpr func_type;
       ident_value names[2];
       names[0] = types[i];
       names[1] = types[j];
       init_func_type(&func_type, cs->im, names, 2);
-      name_table_add_primitive_def(&cs->nt,
+      name_table_add_primitive_def(cs->im,
+                                   &cs->nt,
                                    convert,
                                    make_primop(conversions[i][j]),
                                    &generics,
@@ -483,6 +525,7 @@ void import_unop(struct checkstate *cs,
   args[0] = args[1] = identmap_intern_c_str(cs->im, type_name);
   init_func_type(&type, cs->im, args, 2);
   name_table_add_primitive_def(
+      cs->im,
       &cs->nt,
       identmap_intern_c_str(cs->im, op_name),
       make_primop(primitive_op),
@@ -500,9 +543,10 @@ void import_sizeof_alignof(struct checkstate *cs) {
   struct ast_generics generics;
   ast_generics_init_has_params(&generics, ast_meta_make_garbage(), param, 1);
   struct ast_typeexpr type;
-  init_name_type(&type, identmap_intern_c_str(cs->im, SIZE_STANDIN_TYPE_NAME));
+  init_name_type(&type, identmap_intern_c_str(cs->im, SIZE_TYPE_NAME));
 
   name_table_add_primitive_def(
+      cs->im,
       &cs->nt,
       identmap_intern_c_str(cs->im, "sizeof"),
       make_primop(PRIMITIVE_OP_SIZEOF),
@@ -510,6 +554,7 @@ void import_sizeof_alignof(struct checkstate *cs) {
       &type);
 
   name_table_add_primitive_def(
+      cs->im,
       &cs->nt,
       identmap_intern_c_str(cs->im, "alignof"),
       make_primop(PRIMITIVE_OP_ALIGNOF),
@@ -553,12 +598,14 @@ void import_constructors(struct checkstate *cs) {
     struct ast_typeexpr func1;
     make_ptr_func_type(cs, &target, 1, &func1);
 
-    name_table_add_primitive_def(&cs->nt,
+    name_table_add_primitive_def(cs->im,
+                                 &cs->nt,
                                  identmap_intern_c_str(cs->im, "init"),
                                  make_primop(PRIMITIVE_OP_INIT),
                                  &generics,
                                  &func1);
-    name_table_add_primitive_def(&cs->nt,
+    name_table_add_primitive_def(cs->im,
+                                 &cs->nt,
                                  identmap_intern_c_str(cs->im, "destroy"),
                                  make_primop(PRIMITIVE_OP_DESTROY),
                                  &generics,
@@ -571,12 +618,14 @@ void import_constructors(struct checkstate *cs) {
     struct ast_typeexpr func2;
     make_ptr_func_type(cs, &target, 2, &func2);
 
-    name_table_add_primitive_def(&cs->nt,
+    name_table_add_primitive_def(cs->im,
+                                 &cs->nt,
                                  identmap_intern_c_str(cs->im, "move"),
                                  make_primop(PRIMITIVE_OP_MOVE),
                                  &generics,
                                  &func2);
-    name_table_add_primitive_def(&cs->nt,
+    name_table_add_primitive_def(cs->im,
+                                 &cs->nt,
                                  identmap_intern_c_str(cs->im, "copy"),
                                  make_primop(PRIMITIVE_OP_COPY),
                                  &generics,
@@ -590,12 +639,13 @@ void import_constructors(struct checkstate *cs) {
 }
 
 void checkstate_import_primitive_defs(struct checkstate *cs) {
-  import_integer_binops(cs, binop_i32_primitive_ops, I32_TYPE_NAME);
-  import_integer_binops(cs, binop_u32_primitive_ops, U32_TYPE_NAME);
   import_integer_binops(cs, binop_u8_primitive_ops, U8_TYPE_NAME);
   import_integer_binops(cs, binop_i8_primitive_ops, I8_TYPE_NAME);
   import_integer_binops(cs, binop_u16_primitive_ops, U16_TYPE_NAME);
   import_integer_binops(cs, binop_i16_primitive_ops, I16_TYPE_NAME);
+  import_integer_binops(cs, binop_u32_primitive_ops, U32_TYPE_NAME);
+  import_integer_binops(cs, binop_i32_primitive_ops, I32_TYPE_NAME);
+  import_integer_binops(cs, binop_size_primitive_ops, SIZE_TYPE_NAME);
 
   import_integer_conversions(cs);
 
@@ -613,6 +663,7 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_U16, "^", U16_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_I32, "^", I32_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_U32, "^", U32_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_BIT_NOT_SIZE, "^", SIZE_TYPE_NAME);
   }
 
   import_sizeof_alignof(cs);
@@ -741,6 +792,7 @@ int add_enum_constructors(struct checkstate *cs,
                      params, 2);
 
     int success = name_table_add_primitive_def(
+        cs->im,
         &cs->nt,
         f->name.value,
         make_enumconstruct_op(i),
@@ -799,7 +851,8 @@ int chase_through_toplevels(struct checkstate *cs,
         toplevel->u.def.has_typeexpr = 1;
       }
 
-      if (!name_table_add_def(&cs->nt,
+      if (!name_table_add_def(cs->im,
+                              &cs->nt,
                               toplevel->u.def.name.value,
                               &toplevel->u.def.generics,
                               ast_def_typeexpr(&toplevel->u.def),
@@ -811,7 +864,8 @@ int chase_through_toplevels(struct checkstate *cs,
       }
     } break;
     case AST_TOPLEVEL_EXTERN_DEF: {
-      if (!name_table_add_extern_def(&cs->nt,
+      if (!name_table_add_extern_def(cs->im,
+                                     &cs->nt,
                                      toplevel->u.extern_def.name.value,
                                      &toplevel->u.extern_def.type)) {
         return 0;
@@ -820,7 +874,7 @@ int chase_through_toplevels(struct checkstate *cs,
     case AST_TOPLEVEL_DEFTYPE: {
       struct ast_deftype *dt = &toplevel->u.deftype;
       struct generics_arity arity = params_arity(&dt->generics);
-      if (!name_table_add_deftype(&cs->nt, dt->name.value, arity, dt)) {
+      if (!name_table_add_deftype(cs->im, &cs->nt, dt->name.value, arity, dt)) {
         return 0;
       }
       switch (dt->rhs.tag) {
@@ -885,7 +939,9 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
     imp.file = heap_file;
     SLICE_PUSH(cs->imports, cs->imports_count, cs->imports_limit, imp);
 
-    chase_through_toplevels(cs, &ics, heap_file->toplevels, heap_file->toplevels_count);
+    if (!chase_through_toplevels(cs, &ics, heap_file->toplevels, heap_file->toplevels_count)) {
+      goto cleanup;
+    }
 
   continue_outer:
     continue;
@@ -1754,11 +1810,14 @@ int check_var_shadowing(struct exprscope *es, struct ast_ident *name) {
     }
   }
 
+  /* TODO: Decide whether to get rid of this. */
+#if 0
   if (name_table_shadowed(&es->cs->nt, name->value)) {
     METERR(name->meta, "Variable name %.*s shadows a global def or type.\n",
            IM_P(es->cs->im, name->value));
     return 0;
   }
+#endif
 
   return 1;
 }
@@ -3700,7 +3759,8 @@ int check_is_index_rhs_type(struct checkstate *cs, struct ast_meta *expr_meta,
                             struct ast_typeexpr *type) {
   if (!(type->tag == AST_TYPEEXPR_NAME
         && (type->u.name.value == identmap_intern_c_str(cs->im, I32_TYPE_NAME)
-            || type->u.name.value == identmap_intern_c_str(cs->im, U32_TYPE_NAME)))) {
+            || type->u.name.value == identmap_intern_c_str(cs->im, U32_TYPE_NAME)
+            || type->u.name.value == identmap_intern_c_str(cs->im, SIZE_TYPE_NAME)))) {
     METERR(*expr_meta, "Invalid index expr rhs type.%s", "\n");
     return 0;
   }
@@ -4905,7 +4965,6 @@ int check_file_test_lambda_4(const uint8_t *name, size_t name_count,
 
 int check_file_test_lambda_5(const uint8_t *name, size_t name_count,
                              uint8_t **data_out, size_t *data_count_out) {
-  /* Fails because x shadows a global. */
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
                                "def y fn[i32, i32] = func(z i32)i32 {\n"
@@ -4913,6 +4972,7 @@ int check_file_test_lambda_5(const uint8_t *name, size_t name_count,
                                "  return z;\n"
                                "};\n"
     } };
+  /* Passes despite x shadowing a global, because that's allowed.. */
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);
@@ -5654,7 +5714,7 @@ int check_file_test_more_21(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "deftype ty struct { x i32; y i32; };\n"
-      "def foo fn[u32] = func() u32 {\n"
+      "def foo fn[size] = func() size {\n"
       "  return sizeof@[ty];\n"
       "};\n"
     } };
@@ -6304,13 +6364,13 @@ int check_file_test_more_57(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "deftype size u32;\n"
-      "func `~`(x u32) size {\n"
-      "  var ret size;\n"
+      "deftype notsize u32;\n"
+      "func `~`(x u32) notsize {\n"
+      "  var ret notsize;\n"
       "  ret.~ = x;\n"
       "  return ret;\n"
       "}\n"
-      "func foo(x u32) size {\n"
+      "func foo(x u32) notsize {\n"
       "  return ~(x + 1u);\n"
       "}\n"
     } };
@@ -6406,8 +6466,8 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file !check_file_test_lambda_5...\n");
-  if (!!test_check_module(&im, &check_file_test_lambda_5, foo)) {
+  DBG("test_check_file check_file_test_lambda_5...\n");
+  if (!test_check_module(&im, &check_file_test_lambda_5, foo)) {
     DBG("check_file_test_lambda_5 fails\n");
     goto cleanup_identmap;
   }
