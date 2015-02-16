@@ -1949,10 +1949,21 @@ int deftype_is_accessible(struct exprscope *es, struct ast_deftype *deftype) {
   return is_accessible(es, privacy_scope);
 }
 
+enum allow_incomplete {
+  ALLOW_INCOMPLETE_YES,
+  ALLOW_INCOMPLETE_NO,
+};
+
 int check_expr(struct exprscope *es,
                struct ast_expr *x,
                struct ast_typeexpr *partial_type,
                struct ast_expr *annotated_out);
+
+int check_expr_ai(struct exprscope *es,
+                  enum allow_incomplete ai,
+                  struct ast_expr *x,
+                  struct ast_typeexpr *partial_type,
+                  struct ast_expr *annotated_out);
 
 /* TODO: Right now still nothing uses def_exists. */
 int lookup_global_maybe_typecheck(struct checkstate *cs,
@@ -3904,10 +3915,12 @@ void replace_name_expr_params(struct exprscope *es,
   *out = copy;
 }
 
-int check_expr(struct exprscope *es,
-               struct ast_expr *x,
-               struct ast_typeexpr *partial_type,
-               struct ast_expr *annotated_out) {
+int check_expr_ai(struct exprscope *es,
+                  enum allow_incomplete ai,
+                  struct ast_expr *x,
+                  struct ast_typeexpr *partial_type,
+                  struct ast_expr *annotated_out) {
+  (void)ai;  /* TODO: Use ai. */
   switch (x->tag) {
   case AST_EXPR_NAME: {
     struct ast_name_expr replaced_name;
@@ -4058,6 +4071,13 @@ int check_expr(struct exprscope *es,
   default:
     UNREACHABLE();
   }
+}
+
+int check_expr(struct exprscope *es,
+               struct ast_expr *x,
+               struct ast_typeexpr *partial_type,
+               struct ast_expr *annotated_out) {
+  return check_expr_ai(es, ALLOW_INCOMPLETE_NO, x, partial_type, annotated_out);
 }
 
 int check_def(struct checkstate *cs, struct ast_def *a) {
