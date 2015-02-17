@@ -2603,7 +2603,7 @@ int check_statement(struct bodystate *bs,
   } break;
   case AST_STATEMENT_VAR: {
     struct ast_typeexpr replaced_incomplete_type;
-    replace_generics(bs->es, &s->u.var_statement.decl_.type, &replaced_incomplete_type);
+    replace_generics(bs->es, &s->u.var_statement.decl.type, &replaced_incomplete_type);
 
     struct ast_typeexpr concrete_type;
 
@@ -2617,7 +2617,7 @@ int check_statement(struct bodystate *bs,
       ast_typeexpr_init_copy(&concrete_type, ast_expr_type(s->u.var_statement.rhs));
     } else {
       if (!is_concrete(&replaced_incomplete_type)) {
-        METERR(s->u.var_statement.decl_.meta, "Var statement without initializer has incomplete type.%s", "\n");
+        METERR(s->u.var_statement.decl.meta, "Var statement without initializer has incomplete type.%s", "\n");
         goto fail;
       }
 
@@ -2632,7 +2632,7 @@ int check_statement(struct bodystate *bs,
 
     if (!has_rhs && traits.inittible == TYPEEXPR_TRAIT_LACKED) {
         METERR(s->u.var_statement.meta, "Variable %.*s not default-initializable.\n",
-               IM_P(bs->es->cs->im, s->u.var_statement.decl_.name.value));
+               IM_P(bs->es->cs->im, s->u.var_statement.decl.name.value));
         ast_typeexpr_destroy(&concrete_type);
         goto fail;
     }
@@ -2640,13 +2640,13 @@ int check_statement(struct bodystate *bs,
     struct ast_vardecl *replaced_decl = malloc(sizeof(*replaced_decl));
     {
       struct ast_ident name;
-      ast_ident_init_copy(&name, &s->u.var_statement.decl_.name);
+      ast_ident_init_copy(&name, &s->u.var_statement.decl.name);
 
       struct ast_typeexpr concrete_type_copy;
       ast_typeexpr_init_copy(&concrete_type_copy, &concrete_type);
 
       CHECK(replaced_decl);
-      ast_vardecl_init(replaced_decl, ast_meta_make_copy(&s->u.var_statement.decl_.meta),
+      ast_vardecl_init(replaced_decl, ast_meta_make_copy(&s->u.var_statement.decl.meta),
                        name, concrete_type_copy);
     }
 
@@ -2658,7 +2658,7 @@ int check_statement(struct bodystate *bs,
     }
 
     vardecl_to_push = replaced_decl;
-    ast_var_info_specify(&s->u.var_statement.decl_.var_info, varnum, concrete_type);
+    ast_var_info_specify(&s->u.var_statement.decl.var_info, varnum, concrete_type);
     fallthrough = FALLTHROUGH_FROMTHETOP;
   } break;
   case AST_STATEMENT_IFTHEN: {
@@ -2830,7 +2830,7 @@ int check_statement(struct bodystate *bs,
       }
 
       struct ast_typeexpr replaced_incomplete_type;
-      replace_generics(bs->es, &cas->pattern.decl_.type, &replaced_incomplete_type);
+      replace_generics(bs->es, &cas->pattern.decl.type, &replaced_incomplete_type);
 
       struct varnum varnum;
       struct ast_vardecl *replaced_decl;
@@ -2844,14 +2844,14 @@ int check_statement(struct bodystate *bs,
         ast_typeexpr_destroy(&replaced_incomplete_type);
 
         struct ast_ident replaced_decl_name;
-        ast_ident_init_copy(&replaced_decl_name, &cas->pattern.decl_.name);
+        ast_ident_init_copy(&replaced_decl_name, &cas->pattern.decl.name);
 
         struct ast_typeexpr concrete_type_copy;
         ast_typeexpr_init_copy(&concrete_type_copy, &concrete_enumspec.enumfields[constructor_num].type);
 
         replaced_decl = malloc(sizeof(*replaced_decl));
         CHECK(replaced_decl);
-        ast_vardecl_init(replaced_decl, ast_meta_make_copy(&cas->pattern.decl_.meta),
+        ast_vardecl_init(replaced_decl, ast_meta_make_copy(&cas->pattern.decl.meta),
                          replaced_decl_name, concrete_type_copy);
 
         if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
@@ -2874,7 +2874,7 @@ int check_statement(struct bodystate *bs,
       {
         struct ast_typeexpr concrete_type_copy;
         ast_typeexpr_init_copy(&concrete_type_copy, &concrete_enumspec.enumfields[constructor_num].type);
-        ast_var_info_specify(&cas->pattern.decl_.var_info, varnum, concrete_type_copy);
+        ast_var_info_specify(&cas->pattern.decl.var_info, varnum, concrete_type_copy);
       }
       ast_case_pattern_info_specify(&cas->pattern.info, constructor_num);
     }
@@ -3128,7 +3128,7 @@ int check_expr_magic_binop(struct exprscope *es,
       METERR(x->meta, "Assignment within statically evaluated expression.%s", "\n");
       goto cleanup;
     }
-    if (!x->lhs->info.is_lvalue) {
+    if (!ast_expr_is_lvalue(x->lhs)) {
       METERR(x->meta, "Trying to assign to non-lvalue.%s", "\n");
       goto cleanup;
     }
@@ -3264,7 +3264,7 @@ int check_expr_magic_unop(struct exprscope *es,
     ret = 1;
   } break;
   case AST_UNOP_ADDRESSOF: {
-    if (!x->rhs->info.is_lvalue) {  /* TODO: Direct access... */
+    if (!ast_expr_is_lvalue(x->rhs)) {
       METERR(x->meta, "Trying to take the address of a non-lvalue.%s", "\n");
       goto cleanup;
     }

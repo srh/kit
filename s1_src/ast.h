@@ -208,7 +208,7 @@ void ast_bracebody_destroy(struct ast_bracebody *a);
 
 struct ast_var_statement {
   struct ast_meta meta;
-  struct ast_vardecl decl_;
+  struct ast_vardecl decl;
   int has_rhs;
   struct ast_expr *rhs;
 };
@@ -351,7 +351,7 @@ struct ast_case_pattern {
   struct ast_meta meta;
   struct ast_case_pattern_info info;
   struct ast_ident constructor_name;
-  struct ast_vardecl decl_;
+  struct ast_vardecl decl;
 };
 
 void ast_case_pattern_init(struct ast_case_pattern *a,
@@ -649,6 +649,7 @@ void ast_expr_update(struct ast_expr *a,
 
 struct ast_typeexpr *ast_expr_type(struct ast_expr *a);
 int ast_expr_incomplete(struct ast_expr *a);
+int ast_expr_is_lvalue(struct ast_expr *a);
 struct ast_meta *ast_expr_ast_meta(struct ast_expr *a);
 struct pos ast_expr_pos_end(struct ast_expr *a);
 void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out);

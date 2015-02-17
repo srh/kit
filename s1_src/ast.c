@@ -219,7 +219,7 @@ void ast_bracebody_destroy(struct ast_bracebody *a) {
 void ast_var_statement_init_with_rhs(struct ast_var_statement *a, struct ast_meta meta,
                                      struct ast_vardecl decl, struct ast_expr rhs) {
   a->meta = meta;
-  a->decl_ = decl;
+  a->decl = decl;
   a->has_rhs = 1;
   ast_expr_alloc_move(rhs, &a->rhs);
 }
@@ -227,19 +227,19 @@ void ast_var_statement_init_with_rhs(struct ast_var_statement *a, struct ast_met
 void ast_var_statement_init_without_rhs(struct ast_var_statement *a, struct ast_meta meta,
                                         struct ast_vardecl decl) {
   a->meta = meta;
-  a->decl_ = decl;
+  a->decl = decl;
   a->has_rhs = 0;
   a->rhs = NULL;
 }
 
 struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a) {
-  return ast_var_info_type(&a->decl_.var_info);
+  return ast_var_info_type(&a->decl.var_info);
 }
 
 void ast_var_statement_init_copy(struct ast_var_statement *a,
                                  struct ast_var_statement *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  ast_vardecl_init_copy(&a->decl_, &c->decl_);
+  ast_vardecl_init_copy(&a->decl, &c->decl);
   a->has_rhs = c->has_rhs;
   if (c->has_rhs) {
     ast_expr_alloc_init_copy(c->rhs, &a->rhs);
@@ -250,7 +250,7 @@ void ast_var_statement_init_copy(struct ast_var_statement *a,
 
 void ast_var_statement_destroy(struct ast_var_statement *a) {
   ast_meta_destroy(&a->meta);
-  ast_vardecl_destroy(&a->decl_);
+  ast_vardecl_destroy(&a->decl);
   if (a->has_rhs) {
     a->has_rhs = 0;
     ast_expr_destroy(a->rhs);
@@ -587,7 +587,7 @@ void ast_case_pattern_init(struct ast_case_pattern *a,
   a->meta = meta;
   ast_case_pattern_info_init(&a->info);
   a->constructor_name = constructor_name;
-  a->decl_ = decl;
+  a->decl = decl;
 }
 
 void ast_case_pattern_init_copy(struct ast_case_pattern *a,
@@ -595,14 +595,14 @@ void ast_case_pattern_init_copy(struct ast_case_pattern *a,
   a->meta = ast_meta_make_copy(&c->meta);
   ast_case_pattern_info_init_copy(&a->info, &c->info);
   ast_ident_init_copy(&a->constructor_name, &c->constructor_name);
-  ast_vardecl_init_copy(&a->decl_, &c->decl_);
+  ast_vardecl_init_copy(&a->decl, &c->decl);
 }
 
 void ast_case_pattern_destroy(struct ast_case_pattern *a) {
   ast_meta_destroy(&a->meta);
   ast_case_pattern_info_destroy(&a->info);
   ast_ident_destroy(&a->constructor_name);
-  ast_vardecl_destroy(&a->decl_);
+  ast_vardecl_destroy(&a->decl);
 }
 
 void ast_cased_statement_init(struct ast_cased_statement *a,
@@ -1155,6 +1155,11 @@ struct ast_typeexpr *ast_expr_type(struct ast_expr *a) {
 int ast_expr_incomplete(struct ast_expr *a) {
   CHECK(a->info.typechecked != AST_TYPECHECKED_NO);
   return a->info.typechecked == AST_TYPECHECKED_INCOMPLETE;
+}
+
+int ast_expr_is_lvalue(struct ast_expr *a) {
+  CHECK(a->info.typechecked == AST_TYPECHECKED_YES);
+  return a->info.is_lvalue;
 }
 
 void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out) {

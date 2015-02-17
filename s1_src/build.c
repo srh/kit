@@ -3897,8 +3897,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     }
 
     struct vardata vd;
-    struct varnum varnum = ast_var_info_varnum(&s->u.var_statement.decl_.var_info);
-    vardata_init(&vd, s->u.var_statement.decl_.name.value,
+    struct varnum varnum = ast_var_info_varnum(&s->u.var_statement.decl.var_info);
+    vardata_init(&vd, s->u.var_statement.decl.name.value,
                  varnum,
                  ast_var_statement_type(&s->u.var_statement),
                  var_loc);
@@ -4059,13 +4059,13 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
                         size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.info)));
       gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
 
-      struct ast_typeexpr *var_type = ast_var_info_type(&cas->pattern.decl_.var_info);
+      struct ast_typeexpr *var_type = ast_var_info_type(&cas->pattern.decl.var_info);
       struct loc var_loc = make_enum_body_loc(f, h, swartch_loc,
                                               kira_sizeof(&cs->nt, var_type));
 
       struct vardata vd;
-      struct varnum varnum = ast_var_info_varnum(&cas->pattern.decl_.var_info);
-      vardata_init(&vd, cas->pattern.decl_.name.value, varnum, var_type, var_loc);
+      struct varnum varnum = ast_var_info_varnum(&cas->pattern.decl.var_info);
+      vardata_init(&vd, cas->pattern.decl.name.value, varnum, var_type, var_loc);
       SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
       gen_bracebody(cs, f, h, &cas->body);
