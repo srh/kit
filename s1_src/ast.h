@@ -649,6 +649,7 @@ void ast_expr_update(struct ast_expr *a,
 
 struct ast_typeexpr *ast_expr_type(struct ast_expr *a);
 int ast_expr_incomplete(struct ast_expr *a);
+int ast_expr_not_incomplete(struct ast_expr *a);
 int ast_expr_is_lvalue(struct ast_expr *a);
 struct ast_meta *ast_expr_ast_meta(struct ast_expr *a);
 struct pos ast_expr_pos_end(struct ast_expr *a);

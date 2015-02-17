@@ -1958,6 +1958,10 @@ int check_expr(struct exprscope *es,
                struct ast_expr *x,
                struct ast_typeexpr *partial_type);
 
+int second_check_expr(struct exprscope *es,
+                      struct ast_expr *x,
+                      struct ast_typeexpr *partial_type);
+
 int check_expr_ai(struct exprscope *es,
                   enum allow_incomplete ai,
                   struct ast_expr *x,
@@ -2330,19 +2334,39 @@ int compute_and_check_exprcatch(struct exprscope *es,
 
 int check_funcall_args_firstcheck(struct exprscope *es,
                                   struct ast_exprcall *args,
-                                  size_t args_count) {
+                                  size_t args_count,
+                                  int *an_arg_incomplete_out) {
   int ret = 0;
   struct ast_typeexpr local_partial = ast_unknown_garbage();
+  int an_arg_incomplete = 0;
   for (size_t i = 0; i < args_count; i++) {
-    if (!check_expr(es, &args[i].expr, &local_partial)) {
+    if (!check_expr_ai(es, ALLOW_INCOMPLETE_YES, &args[i].expr, &local_partial)) {
       goto fail;
     }
+    an_arg_incomplete |= ast_expr_incomplete(&args[i].expr);
   }
 
+  *an_arg_incomplete_out = an_arg_incomplete;
   ret = 1;
  fail:
   ast_typeexpr_destroy(&local_partial);
   return ret;
+}
+
+int check_funcall_args_secondcheck(struct exprscope *es,
+                                   struct ast_typeexpr *func_type,
+                                   struct ast_exprcall *args,
+                                   size_t args_count) {
+  CHECK(typeexpr_is_func_type(es->cs->im, func_type));
+  CHECK(func_type->u.app.params_count == size_add(args_count, 1));
+
+  for (size_t i = 0; i < args_count; i++) {
+    if (!second_check_expr(es, &args[i].expr, &func_type->u.app.params[i])) {
+      return 0;
+    }
+  }
+
+  return 1;
 }
 
 int check_funcall_funcexpr(struct exprscope *es,
@@ -2379,12 +2403,20 @@ int check_expr_funcall(struct exprscope *es,
                        struct ast_typeexpr *partial_type) {
   struct ast_funcall *x = &y->u.funcall;
   size_t args_count = x->args_count;
-  if (!check_funcall_args_firstcheck(es, x->args, args_count)) {
+  int an_arg_incomplete;
+  if (!check_funcall_args_firstcheck(es, x->args, args_count, &an_arg_incomplete)) {
     goto fail;
   }
 
   if (!check_funcall_funcexpr(es, x->args, args_count, partial_type, x->func)) {
     goto fail;
+  }
+
+  if (an_arg_incomplete) {
+    struct ast_typeexpr *func_type = ast_expr_type(x->func);
+    if (!check_funcall_args_secondcheck(es, func_type, x->args, args_count)) {
+      goto fail;
+    }
   }
 
   for (size_t i = 0; i < args_count; i++) {
@@ -2411,11 +2443,7 @@ int check_expr_funcall(struct exprscope *es,
   }
 
   struct ast_expr_info expr_info = ast_expr_info_typechecked_temporary(
-      0,
-      return_type,
-      temporary_type,
-      1,
-      exprscope_temptag(es));
+      0, return_type, temporary_type, 1, exprscope_temptag(es));
 
   ast_expr_update(y, expr_info);
 
@@ -3759,6 +3787,20 @@ int check_expr(struct exprscope *es,
                struct ast_expr *x,
                struct ast_typeexpr *partial_type) {
   return check_expr_ai(es, ALLOW_INCOMPLETE_NO, x, partial_type);
+}
+
+int second_check_expr(struct exprscope *es,
+                      struct ast_expr *x,
+                      struct ast_typeexpr *partial_type) {
+  (void)es, (void)partial_type; /* TODO: Use. */
+  if (ast_expr_not_incomplete(x)) {
+    return 1;
+  }
+  switch (x->tag) {
+  default:
+    METERR(*ast_expr_ast_meta(x), "Expression has ambiguous type.%s", "\n");
+    return 0;
+  }
 }
 
 int check_def(struct checkstate *cs, struct ast_def *a) {

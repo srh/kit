@@ -1152,6 +1152,11 @@ struct ast_typeexpr *ast_expr_type(struct ast_expr *a) {
   return &a->info.concrete_type;
 }
 
+int ast_expr_not_incomplete(struct ast_expr *a) {
+  CHECK(a->info.typechecked != AST_TYPECHECKED_NO);
+  return a->info.typechecked == AST_TYPECHECKED_YES;
+}
+
 int ast_expr_incomplete(struct ast_expr *a) {
   CHECK(a->info.typechecked != AST_TYPECHECKED_NO);
   return a->info.typechecked == AST_TYPECHECKED_INCOMPLETE;
