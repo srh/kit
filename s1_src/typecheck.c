@@ -2377,7 +2377,6 @@ int check_funcall_funcexpr(struct exprscope *es,
 int check_expr_funcall(struct exprscope *es,
                        struct ast_expr *y,
                        struct ast_typeexpr *partial_type) {
-  /* TODO: Get rid of x, rename y to x? */
   struct ast_funcall *x = &y->u.funcall;
   size_t args_count = x->args_count;
   if (!check_funcall_args_firstcheck(es, x->args, args_count)) {
@@ -2558,11 +2557,11 @@ int check_statement(struct bodystate *bs,
   switch (s->tag) {
   case AST_STATEMENT_EXPR: {
     struct ast_typeexpr anything = ast_unknown_garbage();
-    if (!check_expr(bs->es, s->u.expr, &anything)) {
-      ast_typeexpr_destroy(&anything); /* TODO */
+    int check_result = check_expr(bs->es, s->u.expr, &anything);
+    ast_typeexpr_destroy(&anything);
+    if (!check_result) {
       goto fail;
     }
-    ast_typeexpr_destroy(&anything);
     fallthrough = FALLTHROUGH_FROMTHETOP;
   } break;
   case AST_STATEMENT_RETURN: {
@@ -2610,11 +2609,11 @@ int check_statement(struct bodystate *bs,
 
     int has_rhs = s->u.var_statement.has_rhs;
     if (has_rhs) {
-      if (!check_expr(bs->es, s->u.var_statement.rhs, &replaced_incomplete_type)) {
-        ast_typeexpr_destroy(&replaced_incomplete_type); /* TODO */
+      int check_result = check_expr(bs->es, s->u.var_statement.rhs, &replaced_incomplete_type);
+      ast_typeexpr_destroy(&replaced_incomplete_type);
+      if (!check_result) {
         goto fail;
       }
-      ast_typeexpr_destroy(&replaced_incomplete_type);
       ast_typeexpr_init_copy(&concrete_type, ast_expr_type(s->u.var_statement.rhs));
     } else {
       if (!is_concrete(&replaced_incomplete_type)) {
@@ -2666,11 +2665,11 @@ int check_statement(struct bodystate *bs,
     struct ast_typeexpr boolean;
     init_boolean_typeexpr(bs->es->cs, &boolean);
 
-    if (!check_expr(bs->es, s->u.ifthen_statement.condition, &boolean)) {
-      ast_typeexpr_destroy(&boolean); /* TODO */
+    int condition_result = check_expr(bs->es, s->u.ifthen_statement.condition, &boolean);
+    ast_typeexpr_destroy(&boolean);
+    if (!condition_result) {
       goto fail;
     }
-    ast_typeexpr_destroy(&boolean);
 
     enum fallthrough body_fallthrough;
     if (!check_expr_bracebody(bs, &s->u.ifthen_statement.body,
@@ -2684,11 +2683,11 @@ int check_statement(struct bodystate *bs,
     struct ast_typeexpr boolean;
     init_boolean_typeexpr(bs->es->cs, &boolean);
 
-    if (!check_expr(bs->es, s->u.ifthenelse_statement.condition, &boolean)) {
-      ast_typeexpr_destroy(&boolean); /* TODO */
+    int condition_result = check_expr(bs->es, s->u.ifthenelse_statement.condition, &boolean);
+    ast_typeexpr_destroy(&boolean);
+    if (!condition_result) {
       goto fail;
     }
-    ast_typeexpr_destroy(&boolean);
 
     enum fallthrough thenbody_fallthrough;
     if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.thenbody,
@@ -2708,11 +2707,11 @@ int check_statement(struct bodystate *bs,
     struct ast_typeexpr boolean;
     init_boolean_typeexpr(bs->es->cs, &boolean);
 
-    if (!check_expr(bs->es, s->u.while_statement.condition, &boolean)) {
-      ast_typeexpr_destroy(&boolean); /* TODO */
+    int condition_result = check_expr(bs->es, s->u.while_statement.condition, &boolean);
+    ast_typeexpr_destroy(&boolean);
+    if (!condition_result) {
       goto fail;
     }
-    ast_typeexpr_destroy(&boolean);
 
     enum fallthrough body_fallthrough;
     if (!check_expr_bracebody(bs, &s->u.while_statement.body,
@@ -2733,7 +2732,7 @@ int check_statement(struct bodystate *bs,
       enum fallthrough initializer_fallthrough;
       if (!check_statement(bs, fs->initializer, &initializer_fallthrough,
                            &vardecl_to_push_or_null)) {
-        goto for_fail;
+        goto fail;
       }
 
       CHECK(initializer_fallthrough == FALLTHROUGH_FROMTHETOP);
@@ -2746,25 +2745,25 @@ int check_statement(struct bodystate *bs,
       struct ast_typeexpr boolean;
       init_boolean_typeexpr(bs->es->cs, &boolean);
 
-      if (!check_expr(bs->es, fs->condition, &boolean)) {
-        ast_typeexpr_destroy(&boolean); /* TODO */
-        goto for_fail_annotated_initializer;
-      }
+      int condition_result = check_expr(bs->es, fs->condition, &boolean);
       ast_typeexpr_destroy(&boolean);
+      if (!condition_result) {
+        goto fail;
+      }
     }
 
     if (fs->has_increment) {
       struct ast_typeexpr anything = ast_unknown_garbage();
-      if (!check_expr(bs->es, fs->increment, &anything)) {
-        ast_typeexpr_destroy(&anything); /* TODO */
-        goto for_fail_annotated_condition;
-      }
+      int increment_result = check_expr(bs->es, fs->increment, &anything);
       ast_typeexpr_destroy(&anything);
+      if (!increment_result) {
+        goto fail;
+      }
     }
 
     enum fallthrough body_fallthrough;
     if (!check_expr_bracebody(bs, &fs->body, &body_fallthrough)) {
-      goto for_fail_annotated_increment;
+      goto fail;
     }
 
     if (fs->has_condition) {
@@ -2779,28 +2778,21 @@ int check_statement(struct bodystate *bs,
     }
     CHECK(vardecl_to_push_or_null == NULL);
 
-    break;
-    /* TODO: remove these labels. */
-  for_fail_annotated_increment:
-  for_fail_annotated_condition:
-  for_fail_annotated_initializer:
-  for_fail:
-    goto fail;
   } break;
   case AST_STATEMENT_SWITCH: {
     struct ast_switch_statement *ss = &s->u.switch_statement;
     struct ast_typeexpr partial = ast_unknown_garbage();
-    if (!check_expr(bs->es, ss->swartch, &partial)) {
-      ast_typeexpr_destroy(&partial); /* TODO */
-      goto fail;
-    }
+    int swartch_result = check_expr(bs->es, ss->swartch, &partial);
     ast_typeexpr_destroy(&partial);
+    if (!swartch_result) {
+      goto switch_fail;
+    }
 
     struct ast_enumspec concrete_enumspec;
     if (!is_enum_type(bs->es->cs, ast_expr_type(ss->swartch), &concrete_enumspec)) {
       METERR(*ast_expr_ast_meta(ss->swartch),
              "Switching over non-enum type.%s", "\n");
-      goto switch_fail_annotated_swartch;
+      goto switch_fail;
     }
 
     fallthrough = FALLTHROUGH_NEVER;
@@ -2812,7 +2804,7 @@ int check_statement(struct bodystate *bs,
         if (ss->cased_statements[j].pattern.constructor_name.value
             == cas->pattern.constructor_name.value) {
           METERR(cas->meta, "Overlapping (duplicate) switch cases.%s", "\n");
-          goto switch_fail_annotated_cased_statements;
+          goto switch_fail_concrete_enumspec;
         }
       }
 
@@ -2829,12 +2821,12 @@ int check_statement(struct bodystate *bs,
 
       if (!constructor_found) {
         METERR(cas->meta, "Unrecognized constructor in switch case.%s", "\n");
-        goto switch_fail_annotated_cased_statements;
+        goto switch_fail_concrete_enumspec;
       }
 
       struct typeexpr_traits discard;
       if (!check_typeexpr_traits(bs->es->cs, &concrete_enumspec.enumfields[constructor_num].type, bs->es, &discard)) {
-        goto switch_fail_annotated_cased_statements;
+        goto switch_fail_concrete_enumspec;
       }
 
       struct ast_typeexpr replaced_incomplete_type;
@@ -2847,7 +2839,7 @@ int check_statement(struct bodystate *bs,
                                  &concrete_enumspec.enumfields[constructor_num].type)) {
           ast_typeexpr_destroy(&replaced_incomplete_type);
           METERR(cas->meta, "Switch case decl type mismatch.%s", "\n");
-          goto switch_fail_annotated_cased_statements;
+          goto switch_fail_concrete_enumspec;
         }
         ast_typeexpr_destroy(&replaced_incomplete_type);
 
@@ -2864,14 +2856,14 @@ int check_statement(struct bodystate *bs,
 
         if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
           free_ast_vardecl(&replaced_decl);
-          goto switch_fail_annotated_cased_statements;
+          goto switch_fail_concrete_enumspec;
         }
       }
 
       enum fallthrough cas_fallthrough;
       if (!check_expr_bracebody(bs, &cas->body, &cas_fallthrough)) {
         free_ast_vardecl(&replaced_decl);
-        goto switch_fail_annotated_cased_statements;
+        goto switch_fail_concrete_enumspec;
       }
 
       fallthrough = max_fallthrough(fallthrough, cas_fallthrough);
@@ -2888,10 +2880,9 @@ int check_statement(struct bodystate *bs,
     }
 
     break;
-    /* TODO: rename/remove labels */
-  switch_fail_annotated_cased_statements:
+  switch_fail_concrete_enumspec:
     ast_enumspec_destroy(&concrete_enumspec);
-  switch_fail_annotated_swartch:
+  switch_fail:
     goto fail;
   } break;
   default:
@@ -2917,8 +2908,7 @@ int check_expr_bracebody(struct bodystate *bs,
 
   enum fallthrough reachable = FALLTHROUGH_FROMTHETOP;
 
-  size_t i = 0; /* TODO */
-  for (size_t e = x->statements_count; i < e; i++) {
+  for (size_t i = 0, e = x->statements_count; i < e; i++) {
     struct ast_statement *s = &x->statements[i];
     enum fallthrough fallthrough;
     struct ast_vardecl *vardecl_to_push_or_null;
@@ -2937,7 +2927,7 @@ int check_expr_bracebody(struct bodystate *bs,
   *fallthrough_out = reachable;
   ret = 1;
  fail:
-  for (size_t j = 0; j < vardecls_pushed_count; j++) {
+  for (size_t i = 0; i < vardecls_pushed_count; i++) {
     exprscope_pop_var(bs->es);
   }
   SLICE_FREE(vardecls_pushed, vardecls_pushed_count, free_ast_vardecl);
@@ -2971,7 +2961,7 @@ int check_expr_funcbody(struct exprscope *es,
   } else {
     if (fallthrough != FALLTHROUGH_NEVER) {
       METERR(x->meta, "not all control paths return a value.%s", "\n");
-      goto fail_annotated_bracebody;
+      goto fail;
     }
   }
 
@@ -2981,14 +2971,13 @@ int check_expr_funcbody(struct exprscope *es,
 
   struct typeexpr_traits discard;
   if (!check_typeexpr_traits(es->cs, &bs.exact_return_type, es, &discard)) {
-    goto fail_annotated_bracebody;
+    goto fail;
   }
 
   *out = bs.exact_return_type;
   bs.have_exact_return_type = 0;
 
   ret = 1;
- fail_annotated_bracebody: /* TODO: remove. */
  fail:
   bodystate_destroy(&bs);
   return ret;
@@ -3133,38 +3122,35 @@ int check_expr_magic_binop(struct exprscope *es,
   switch (x->operator) {
   case AST_BINOP_ASSIGN: {
     if (!check_expr(es, x->rhs, ast_expr_type(x->lhs))) {
-      goto cleanup_lhs;
+      goto cleanup;
     }
     if (es->computation == STATIC_COMPUTATION_YES) {
       METERR(x->meta, "Assignment within statically evaluated expression.%s", "\n");
-      goto assign_cleanup_rhs;
+      goto cleanup;
     }
     if (!x->lhs->info.is_lvalue) {
       METERR(x->meta, "Trying to assign to non-lvalue.%s", "\n");
-      goto assign_cleanup_rhs;
+      goto cleanup;
     }
     if (!exact_typeexprs_equal(ast_expr_type(x->lhs), ast_expr_type(x->rhs))) {
       METERR(x->meta, "Assignment with non-matching types.%s", "\n");
-      goto assign_cleanup_rhs;
+      goto cleanup;
     }
 
     if (!unify_directionally(partial_type, ast_expr_type(x->lhs))) {
       METERR(x->meta, "LHS type of assignment does not match contextual type.%s", "\n");
-      goto assign_cleanup_rhs;
+      goto cleanup;
     }
 
     ast_typeexpr_init_copy(out, ast_expr_type(x->lhs));
     *is_lvalue_out = 1;
 
     ret = 1;
-    goto cleanup;
-  assign_cleanup_rhs: /* TODO labels */
-    goto cleanup_lhs;
   } break;
   case AST_BINOP_LOGICAL_OR:
   case AST_BINOP_LOGICAL_AND: {
     if (!check_expr(es, x->rhs, &no_partial)) {
-      goto cleanup_lhs;
+      goto cleanup;
     }
     struct ast_typeexpr boolean;
     init_name_type(&boolean, identmap_intern_c_str(es->cs->im, BOOL_TYPE_NAME));
@@ -3191,15 +3177,12 @@ int check_expr_magic_binop(struct exprscope *es,
     goto cleanup;
   logical_cleanup_boolean:
     ast_typeexpr_destroy(&boolean);
-    goto cleanup_lhs;
+    goto cleanup;
   } break;
   default:
     UNREACHABLE();
   }
 
-  /* TODO: this label */
- cleanup_lhs:
-  CHECK(!ret);
  cleanup:
   ast_typeexpr_destroy(&no_partial);
   return ret;
@@ -3267,12 +3250,12 @@ int check_expr_magic_unop(struct exprscope *es,
     struct ast_typeexpr *rhs_target;
     if (!view_ptr_target(es->cs->im, ast_expr_type(x->rhs), &rhs_target)) {
       METERR(x->meta, "Trying to dereference a non-pointer.%s", "\n");
-      goto cleanup_rhs;
+      goto cleanup;
     }
 
     if (!unify_directionally(partial_type, rhs_target)) {
       METERR(x->meta, "Pointer dereference results in wrong type.%s", "\n");
-      goto cleanup_rhs;
+      goto cleanup;
     }
 
     struct ast_typeexpr return_type;
@@ -3283,7 +3266,7 @@ int check_expr_magic_unop(struct exprscope *es,
   case AST_UNOP_ADDRESSOF: {
     if (!x->rhs->info.is_lvalue) {  /* TODO: Direct access... */
       METERR(x->meta, "Trying to take the address of a non-lvalue.%s", "\n");
-      goto cleanup_rhs;
+      goto cleanup;
     }
 
     struct ast_typeexpr pointer_type;
@@ -3293,7 +3276,7 @@ int check_expr_magic_unop(struct exprscope *es,
     if (!unify_directionally(partial_type, &pointer_type)) {
       METERR(x->meta, "Addressof results in wrong type.%s", "\n");
       ast_typeexpr_destroy(&pointer_type);
-      goto cleanup_rhs;
+      goto cleanup;
     }
 
     /* addressof returns a pointer, which is a temporary though it is also trivial. */
@@ -3308,8 +3291,6 @@ int check_expr_magic_unop(struct exprscope *es,
     UNREACHABLE();
   }
 
-  /* TODO: This label. */
- cleanup_rhs:
  cleanup:
   ast_typeexpr_destroy(&no_partial);
   return ret;
@@ -3493,7 +3474,7 @@ int check_expr_local_field_access(
                          ast_expr_type(x->lhs),
                          &x->fieldname,
                          &field_type)) {
-    goto cleanup_lhs;
+    goto cleanup;
   }
 
   if (!unify_directionally(partial_type, &field_type)) {
@@ -3506,7 +3487,6 @@ int check_expr_local_field_access(
 
  cleanup_field_type:
   ast_typeexpr_destroy(&field_type);
- cleanup_lhs: /* TODO */
  cleanup:
   ast_typeexpr_destroy(&lhs_partial_type);
   return ret;
@@ -3533,7 +3513,7 @@ int check_expr_deref_field_access(
   struct ast_typeexpr *ptr_target;
   if (!view_ptr_target(es->cs->im, ast_expr_type(x->lhs), &ptr_target)) {
     METERR(x->meta, "Dereferencing field access expects ptr type.%s", "\n");
-    goto cleanup_lhs;
+    goto cleanup;
   }
 
   struct ast_typeexpr field_type;
@@ -3541,7 +3521,7 @@ int check_expr_deref_field_access(
                          ptr_target,
                          &x->fieldname,
                          &field_type)) {
-    goto cleanup_lhs;
+    goto cleanup;
   }
 
   if (!unify_directionally(partial_type, &field_type)) {
@@ -3551,11 +3531,10 @@ int check_expr_deref_field_access(
 
   *out = field_type;
   ret = 1;
-  goto cleanup_lhs;
+  goto cleanup;
 
  cleanup_field_type:
   ast_typeexpr_destroy(&field_type);
- cleanup_lhs: /* TODO: Label. */
  cleanup:
   ast_typeexpr_destroy(&lhs_partial_type);
   return ret;
@@ -3584,11 +3563,11 @@ int check_index_expr(struct exprscope *es,
   }
 
   if (!check_expr(es, a->rhs, &no_partial_type)) {
-    goto fail_lhs_annotated;
+    goto fail;
   }
 
   if (!check_is_index_rhs_type(es->cs, &a->meta, ast_expr_type(a->rhs))) {
-    goto fail_rhs_annotated;
+    goto fail;
   }
 
   struct ast_typeexpr *lhs_type = ast_expr_type(a->lhs);
@@ -3597,7 +3576,7 @@ int check_index_expr(struct exprscope *es,
   if (!view_ptr_target(es->cs->im, lhs_type, &lhs_target)) {
     if (lhs_type->tag != AST_TYPEEXPR_ARRAY) {
       METERR(a->meta, "Indexing into a non-pointer, non-array type.%s", "\n");
-      goto fail_rhs_annotated;
+      goto fail;
     }
 
     lhs_target = lhs_type->u.arraytype.param;
@@ -3605,7 +3584,7 @@ int check_index_expr(struct exprscope *es,
 
   if (!unify_directionally(partial_type, lhs_target)) {
     METERR(a->meta, "Indexing returns wrong type.%s", "\n");
-    goto fail_rhs_annotated;
+    goto fail;
   }
 
   struct ast_typeexpr return_type;
@@ -3624,9 +3603,6 @@ int check_index_expr(struct exprscope *es,
   ast_expr_update(y, expr_info);
   return 1;
 
-  /* TODO: These labels. */
- fail_rhs_annotated:
- fail_lhs_annotated:
  fail:
   ast_typeexpr_destroy(&no_partial_type);
   return 0;
@@ -3764,11 +3740,11 @@ int check_expr_ai(struct exprscope *es,
     struct ast_typeexpr replaced_partial_type;
     replace_generics(es, &x->u.typed_expr.type, &replaced_partial_type);
 
-    if (!check_expr(es, x->u.typed_expr.expr, &replaced_partial_type)) {
-      ast_typeexpr_destroy(&replaced_partial_type); /* TODO */
+    int check_result = check_expr(es, x->u.typed_expr.expr, &replaced_partial_type);
+    ast_typeexpr_destroy(&replaced_partial_type);
+    if (!check_result) {
       return 0;
     }
-    ast_typeexpr_destroy(&replaced_partial_type);
 
     ast_expr_update(x, ast_expr_info_typechecked_identical(
                         &x->u.typed_expr.expr->info));
