@@ -66,6 +66,4 @@ NOTE 5l.  Because types like "struct { fieldlist... }" can just
 thrown around willy-nilly, everywhere, it would be kind of annoying
 and dangerous to add structure packing now, because type checking
 code would need to be adjusted.  So I won't add packing (to this
-bootstrap compiler) until it's necessary.  (Edit: Typechecking code
-has been adjusted, on its way to allowing relatively general
-"second chance" lookups.)
+bootstrap compiler) until it's necessary.
