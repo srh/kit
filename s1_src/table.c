@@ -1056,7 +1056,8 @@ int name_table_match_def(struct identmap *im,
                          struct ast_typeexpr *generics_or_null,
                          size_t generics_count,
                          struct ast_typeexpr *partial_type,
-                         int *zero_defs_out,
+                         int report_multi_match,
+                         int *multi_match_out,
                          struct ast_typeexpr *unified_type_out,
                          struct def_entry **entry_out,
                          struct def_instantiation **instantiation_out) {
@@ -1086,11 +1087,16 @@ int name_table_match_def(struct identmap *im,
     struct def_instantiation *instantiation;
     if (def_entry_matches(ent, generics_or_null, generics_count,
                           partial_type, &unified, &instantiation)) {
-      *zero_defs_out = 0;
       if (matched_ent) {
         ast_typeexpr_destroy(&unified);
-        METERR(ident->meta, "multiple matching '%.*s' definitions\n",
-               IM_P(im, ident->value));
+        /* TODO: This error message should not be here, since matching
+        multiple defs could be valid thanks to second-chance
+        typechecking. */
+        if (report_multi_match) {
+          METERR(ident->meta, "multiple matching '%.*s' definitions\n",
+                 IM_P(im, ident->value));
+        }
+        *multi_match_out = 1;
         goto fail_multiple_matching;
       } else {
         matched_type = unified;
@@ -1103,14 +1109,14 @@ int name_table_match_def(struct identmap *im,
   if (!matched_ent) {
     METERR(ident->meta, "no matching '%.*s' definition\n",
            IM_P(im, ident->value));
-    *zero_defs_out = 1;
+    *multi_match_out = 0;
     goto fail;
   }
 
   *unified_type_out = matched_type;
   *entry_out = matched_ent;
   *instantiation_out = matched_instantiation;
-  *zero_defs_out = 0;
+  *multi_match_out = 0;
   return 1;
 
  fail_multiple_matching:

@@ -648,6 +648,7 @@ void ast_expr_update(struct ast_expr *a,
                      struct ast_expr_info expr_info);
 
 struct ast_typeexpr *ast_expr_type(struct ast_expr *a);
+int ast_expr_checked_and_complete(struct ast_expr *a);
 int ast_expr_incomplete(struct ast_expr *a);
 int ast_expr_not_incomplete(struct ast_expr *a);
 int ast_expr_is_lvalue(struct ast_expr *a);

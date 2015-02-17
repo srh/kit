@@ -22,7 +22,8 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
                                   struct exprscope *also_maybe_typecheck,
                                   struct ast_name_expr *name,
                                   struct ast_typeexpr *partial_type,
-                                  int *def_exists_out,
+                                  int report_multi_match,
+                                  int *multi_match_out,
                                   struct ast_typeexpr *out,
                                   int *is_lvalue_out,
                                   struct def_instantiation **inst_out);
@@ -1200,14 +1201,15 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
   if (matching_defs < 2) {
     struct def_instantiation *inst = NULL;
     if (matching_defs == 1) {
-      int def_exists_discard;
+      int multi_match_discard;
       struct ast_typeexpr unified;
       int lvalue_discard;
       if (!lookup_global_maybe_typecheck(cs,
                                          also_typecheck,
                                          &func_name,
                                          &func_type,
-                                         &def_exists_discard,
+                                         1,
+                                         &multi_match_discard,
                                          &unified,
                                          &lvalue_discard,
                                          &inst)) {
@@ -1954,50 +1956,42 @@ enum allow_incomplete {
   ALLOW_INCOMPLETE_NO,
 };
 
-int check_expr(struct exprscope *es,
-               struct ast_expr *x,
+int check_expr(struct exprscope *es, struct ast_expr *x,
                struct ast_typeexpr *partial_type);
-
-int second_check_expr(struct exprscope *es,
-                      struct ast_expr *x,
-                      struct ast_typeexpr *partial_type);
 
 int check_expr_ai(struct exprscope *es,
                   enum allow_incomplete ai,
                   struct ast_expr *x,
                   struct ast_typeexpr *partial_type);
 
-/* TODO: Right now still nothing uses def_exists. */
 int lookup_global_maybe_typecheck(struct checkstate *cs,
                                   struct exprscope *also_maybe_typecheck,
                                   struct ast_name_expr *name,
                                   struct ast_typeexpr *partial_type,
-                                  /* Set even if the returns false, it
-                                  means the def existed but failed
-                                  access/typechecking.  Otherwise,
-                                  means the def doesn't exist. */
-                                  int *def_exists_out,
+                                  int report_multi_match,
+                                  int *multi_match_out,
                                   struct ast_typeexpr *out,
                                   int *is_lvalue_out,
                                   struct def_instantiation **inst_out) {
   struct ast_typeexpr unified;
   struct def_entry *ent;
   struct def_instantiation *inst;
-  int zero_defs;
+  int multi_match;
   if (!name_table_match_def(cs->im,
                             &cs->nt,
                             &name->ident,
                             name->has_params ? name->params : NULL,
                             name->has_params ? name->params_count : 0,
                             partial_type,
-                            &zero_defs,
+                            report_multi_match,
+                            &multi_match,
                             &unified,
                             &ent,
                             &inst)) {
-    *def_exists_out = !zero_defs;
+    *multi_match_out = multi_match;
     return 0;
   }
-  *def_exists_out = 1;
+  *multi_match_out = 0;
 
   if (!also_maybe_typecheck) {
     *out = unified;
@@ -2073,8 +2067,11 @@ int exprscope_lookup_name(struct exprscope *es,
                           struct ast_typeexpr *partial_type,
                           struct ast_typeexpr *out,
                           int *is_lvalue_out,
-                          struct def_instantiation **inst_or_null_out) {
-  for (size_t i = es->vars_count; i-- > 0; ) {
+                          struct def_instantiation **inst_or_null_out,
+                          int report_multi_match,
+                          int *multi_match_out) {
+  for (size_t i = es->vars_count; i > 0; ) {
+    i--;
     struct ast_vardecl *decl = es->vars[i].decl;
     if (decl->name.value != name->ident.value) {
       continue;
@@ -2083,18 +2080,21 @@ int exprscope_lookup_name(struct exprscope *es,
     if (!unify_directionally(partial_type, &decl->type)) {
       METERR(name->meta, "Type mismatch for vardecl %.*s lookup.\n",
              IM_P(es->cs->im, name->ident.value));
+      *multi_match_out = 0;
       return 0;
     }
 
     ast_typeexpr_init_copy(out, &decl->type);
+    *multi_match_out = 0;
     *is_lvalue_out = 1;
     *inst_or_null_out = NULL;  /* NULL because it's a local. */
     return 1;
   }
 
   /* inst_or_null_out gets initialized to a non-NULL value. */
-  int def_exists_discard;
-  return lookup_global_maybe_typecheck(es->cs, es, name, partial_type, &def_exists_discard,
+  return lookup_global_maybe_typecheck(es->cs, es, name, partial_type,
+                                       report_multi_match,
+                                       multi_match_out,
                                        out, is_lvalue_out, inst_or_null_out);
 }
 
@@ -2361,7 +2361,7 @@ int check_funcall_args_secondcheck(struct exprscope *es,
   CHECK(func_type->u.app.params_count == size_add(args_count, 1));
 
   for (size_t i = 0; i < args_count; i++) {
-    if (!second_check_expr(es, &args[i].expr, &func_type->u.app.params[i])) {
+    if (!check_expr(es, &args[i].expr, &func_type->u.app.params[i])) {
       return 0;
     }
   }
@@ -2369,11 +2369,12 @@ int check_funcall_args_secondcheck(struct exprscope *es,
   return 1;
 }
 
-int check_funcall_funcexpr(struct exprscope *es,
-                           struct ast_exprcall *args,
-                           size_t args_count,
-                           struct ast_typeexpr *partial_type,
-                           struct ast_expr *func) {
+int check_funcall_funcexpr_ai(struct exprscope *es,
+                              enum allow_incomplete ai,
+                              struct ast_exprcall *args,
+                              size_t args_count,
+                              struct ast_typeexpr *partial_type,
+                              struct ast_expr *func) {
   struct ast_typeexpr funcexpr;
   {
     size_t args_types_count = size_add(args_count, 1);
@@ -2381,7 +2382,11 @@ int check_funcall_funcexpr(struct exprscope *es,
                                                  args_types_count);
 
     for (size_t i = 0; i < args_count; i++) {
-      ast_typeexpr_init_copy(&args_types[i], ast_expr_type(&args[i].expr));
+      if (ast_expr_not_incomplete(&args[i].expr)) {
+        ast_typeexpr_init_copy(&args_types[i], ast_expr_type(&args[i].expr));
+      } else {
+        args_types[i] = ast_unknown_garbage();
+      }
     }
     ast_typeexpr_init_copy(&args_types[args_count], partial_type);
 
@@ -2393,12 +2398,13 @@ int check_funcall_funcexpr(struct exprscope *es,
                      args_types, args_types_count);
   }
 
-  int ret = check_expr(es, func, &funcexpr);
+  int ret = check_expr_ai(es, ai, func, &funcexpr);
   ast_typeexpr_destroy(&funcexpr);
   return ret;
 }
 
 int check_expr_funcall(struct exprscope *es,
+                       enum allow_incomplete ai,
                        struct ast_expr *y,
                        struct ast_typeexpr *partial_type) {
   struct ast_funcall *x = &y->u.funcall;
@@ -2408,8 +2414,16 @@ int check_expr_funcall(struct exprscope *es,
     goto fail;
   }
 
-  if (!check_funcall_funcexpr(es, x->args, args_count, partial_type, x->func)) {
+  if (!check_funcall_funcexpr_ai(
+          es, an_arg_incomplete ? ALLOW_INCOMPLETE_NO : ai,
+          x->args, args_count, partial_type, x->func)) {
     goto fail;
+  }
+
+  if (ast_expr_incomplete(x->func)) {
+    ast_expr_update(y, ast_expr_info_incomplete());
+    CHECK(ai == ALLOW_INCOMPLETE_YES);
+    return 1;
   }
 
   if (an_arg_incomplete) {
@@ -3658,19 +3672,30 @@ int check_expr_ai(struct exprscope *es,
                   enum allow_incomplete ai,
                   struct ast_expr *x,
                   struct ast_typeexpr *partial_type) {
-  (void)ai;  /* TODO: Use ai. */
+  if (ast_expr_checked_and_complete(x)) {
+    return 1;
+  }
   switch (x->tag) {
   case AST_EXPR_NAME: {
     struct ast_name_expr replaced_name;
     replace_name_expr_params(es, &x->u.name, &replaced_name);
 
+    int multi_match;
     struct ast_typeexpr name_type;
     int is_lvalue;
     struct def_instantiation *inst_or_null;
-    if (!exprscope_lookup_name(es, &replaced_name, partial_type,
-                               &name_type, &is_lvalue, &inst_or_null)) {
-      ast_name_expr_destroy(&replaced_name);
-      return 0;
+    int lookup_result = exprscope_lookup_name(es, &replaced_name, partial_type,
+                                              &name_type, &is_lvalue, &inst_or_null,
+                                              ai == ALLOW_INCOMPLETE_NO,
+                                              &multi_match);
+    ast_name_expr_destroy(&replaced_name);
+    if (!lookup_result) {
+      if (multi_match && ai == ALLOW_INCOMPLETE_YES) {
+        ast_expr_update(x, ast_expr_info_incomplete());
+        return 1;
+      } else {
+        return 0;
+      }
     }
     ast_expr_update(x, ast_expr_info_typechecked_no_temporary(is_lvalue, name_type));
     ast_name_expr_info_mark_inst(&x->u.name.info, inst_or_null);
@@ -3721,7 +3746,7 @@ int check_expr_ai(struct exprscope *es,
     return 1;
   } break;
   case AST_EXPR_FUNCALL: {
-    return check_expr_funcall(es, x, partial_type);
+    return check_expr_funcall(es, ai, x, partial_type);
   } break;
   case AST_EXPR_INDEX: {
     return check_index_expr(es, x, partial_type);
@@ -3789,20 +3814,6 @@ int check_expr(struct exprscope *es,
   return check_expr_ai(es, ALLOW_INCOMPLETE_NO, x, partial_type);
 }
 
-int second_check_expr(struct exprscope *es,
-                      struct ast_expr *x,
-                      struct ast_typeexpr *partial_type) {
-  (void)es, (void)partial_type; /* TODO: Use. */
-  if (ast_expr_not_incomplete(x)) {
-    return 1;
-  }
-  switch (x->tag) {
-  default:
-    METERR(*ast_expr_ast_meta(x), "Expression has ambiguous type.%s", "\n");
-    return 0;
-  }
-}
-
 int check_def(struct checkstate *cs, struct ast_def *a) {
   if (!check_generics_shadowing(cs, &a->generics)) {
     return 0;
@@ -3815,7 +3826,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
   /* We can only typecheck the def by instantiating it -- so we check
   the ones with no template params. */
   if (!a->generics.has_type_params) {
-    int zero_defs_discard;
+    int multi_match_discard;
     struct ast_typeexpr unified;
     struct def_entry *ent;
     struct def_instantiation *inst;
@@ -3824,7 +3835,8 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
                                        &a->name,
                                        NULL, 0, /* (no generics) */
                                        ast_def_typeexpr(a),
-                                       &zero_defs_discard,
+                                       1,
+                                       &multi_match_discard,
                                        &unified,
                                        &ent,
                                        &inst);
@@ -5369,14 +5381,13 @@ int check_file_test_more_12(const uint8_t *name, size_t name_count,
 
 int check_file_test_more_13(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
-  /* Fails because convert doesn't have a type in context.  (See
-     check_file_test_more_14.) */
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
       "  return 2 + ~3u;\n"
       "};\n"
     } };
+  /* Passes because the conversion of ~3u can be inferred. */
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);
@@ -6505,8 +6516,8 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file !check_file_test_more_13...\n");
-  if (!!test_check_module(&im, &check_file_test_more_13, foo)) {
+  DBG("test_check_file check_file_test_more_13...\n");
+  if (!test_check_module(&im, &check_file_test_more_13, foo)) {
     DBG("check_file_test_more_13 fails\n");
     goto cleanup_identmap;
   }

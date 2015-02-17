@@ -41,7 +41,7 @@ Here's the project timeline:
    5f. Bitwise not operator. (DONE) but ugh, ^.
    5i. Analyze label & goto variable scopage. (DONE)
    5j. Constructors/destructors. (DONE and not completely ICKY)
-   5l. Structure packing. (NO - see NOTE 5l.)
+   5l. Structure packing. (NO? - see NOTE 5l.)
    5m. Tagged unions / enums. (DONE)
    5n. Sizeof/alignof operator. (DONE)
    5q. Better void support, pointer arithmetic, proper treatment of zero-size entities. (DONE)
@@ -66,4 +66,6 @@ NOTE 5l.  Because types like "struct { fieldlist... }" can just
 thrown around willy-nilly, everywhere, it would be kind of annoying
 and dangerous to add structure packing now, because type checking
 code would need to be adjusted.  So I won't add packing (to this
-bootstrap compiler) until it's necessary.
+bootstrap compiler) until it's necessary.  (Edit: Typechecking code
+has been adjusted, on its way to allowing relatively general
+"second chance" lookups.)
