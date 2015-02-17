@@ -431,7 +431,8 @@ int name_table_help_add_def(struct identmap *im,
 
   if (is_extern || is_export) {
     if (def_shadowed(t, name)) {
-      ERR_DBG("extern or exported def name shadows fellow def name.\n");
+      ERR_DBG("extern or exported def name '%.*s' shadows fellow def name.\n",
+              IM_P(im, name));
       return 0;
     }
   } else {
@@ -442,7 +443,8 @@ int name_table_help_add_def(struct identmap *im,
         = identmap_get_user_value(&t->defs_by_name, dbn_id);
       CHECK(node);
       if (node->ent->is_extern || node->ent->is_export) {
-        ERR_DBG("def name shadows extern or exported def name.\n");
+        ERR_DBG("def name '%.*s' shadows extern or exported def name.\n",
+                IM_P(im, name));
         return 0;
       }
       /* (We only need to check the first node, because extern/export

@@ -67,11 +67,23 @@ access array[_] {
     copy(&r->ptr[r->count], &value);
     r->count = r->count + ~1u;
   }
+
+  func[T] append(r *array[T], s *array[T]) void {
+    for var i size = ~0u; i < s->count; i = i + ~1u {
+      append(r, s->ptr[i]);
+    }
+  }
+
+  func[T] data(r *array[T]) *T {
+    return r->ptr;
+  }
 }
 
 func foo() void {
   var v array[i32];
   var u = v;
   append(&u, 7);
+  append(&u, &v);
+  data(&u);
 }
 
