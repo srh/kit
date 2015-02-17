@@ -920,6 +920,12 @@ struct ast_expr_info ast_expr_info_default(void) {
   return ret;
 }
 
+struct ast_expr_info ast_expr_info_incomplete(void) {
+  struct ast_expr_info ret;
+  ret.typechecked = AST_TYPECHECKED_INCOMPLETE;
+  return ret;
+}
+
 struct ast_expr_info ast_expr_info_typechecked_no_temporary(
     int is_lvalue,
     struct ast_typeexpr concrete_type) {
@@ -1135,9 +1141,20 @@ void ast_expr_destroy(struct ast_expr *a) {
   a->tag = (enum ast_expr_tag)-1;
 }
 
+void ast_expr_update(struct ast_expr *a,
+                     struct ast_expr_info expr_info) {
+  ast_expr_info_destroy(&a->info);
+  a->info = expr_info;
+}
+
 struct ast_typeexpr *ast_expr_type(struct ast_expr *a) {
   CHECK(a->info.typechecked == AST_TYPECHECKED_YES);
   return &a->info.concrete_type;
+}
+
+int ast_expr_incomplete(struct ast_expr *a) {
+  CHECK(a->info.typechecked != AST_TYPECHECKED_NO);
+  return a->info.typechecked == AST_TYPECHECKED_INCOMPLETE;
 }
 
 void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out) {

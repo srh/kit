@@ -599,6 +599,7 @@ struct ast_expr_info {
 };
 
 struct ast_expr_info ast_expr_info_default(void);
+struct ast_expr_info ast_expr_info_incomplete(void);
 struct ast_expr_info ast_expr_info_typechecked_no_temporary(
     int is_lvalue,
     struct ast_typeexpr concrete_type);
@@ -643,7 +644,11 @@ void ast_expr_partial_init(struct ast_expr *a,
 void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c);
 void ast_expr_destroy(struct ast_expr *a);
 
+void ast_expr_update(struct ast_expr *a,
+                     struct ast_expr_info expr_info);
+
 struct ast_typeexpr *ast_expr_type(struct ast_expr *a);
+int ast_expr_incomplete(struct ast_expr *a);
 struct ast_meta *ast_expr_ast_meta(struct ast_expr *a);
 struct pos ast_expr_pos_end(struct ast_expr *a);
 void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out);

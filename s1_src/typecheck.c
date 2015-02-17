@@ -2398,15 +2398,21 @@ int check_expr_funcall(struct exprscope *es,
   }
 
   struct ast_expr annotated_func;
-  if (!check_funcall_funcexpr(es, args_annotated, args_count, partial_type,
+  if (!check_funcall_funcexpr(es,
+                              args_annotated, args_count, partial_type,
                               x->func, &annotated_func)) {
     goto fail_cleanup_args_annotated;
   }
 
+  struct ast_expr funcall_expr;
+  ast_expr_partial_init(&funcall_expr, AST_EXPR_FUNCALL, ast_expr_info_default());
+  ast_funcall_init(&funcall_expr.u.funcall, ast_meta_make_copy(&x->meta),
+                   annotated_func, args_annotated, args_count);
+
   for (size_t i = 0; i < args_count; i++) {
     struct ast_exprcatch arg_exprcatch;
     if (!compute_and_check_exprcatch(es, &args_annotated[i].expr, &arg_exprcatch)) {
-      goto fail_cleanup_args_annotated;
+      goto fail_cleanup_funcall;
     }
 
     ast_exprcall_annotate(&args_annotated[i], arg_exprcatch);
@@ -2426,27 +2432,25 @@ int check_expr_funcall(struct exprscope *es,
     goto fail_cleanup_temporary_type;
   }
 
-  struct ast_expr_info expr_info;
-  expr_info = ast_expr_info_typechecked_temporary(
+  struct ast_expr_info expr_info = ast_expr_info_typechecked_temporary(
       0,
       return_type,
       temporary_type,
       1,
       exprscope_temptag(es));
 
-  ast_expr_partial_init(annotated_out, AST_EXPR_FUNCALL, expr_info);
-  ast_funcall_init(&annotated_out->u.funcall, ast_meta_make_copy(&x->meta),
-                   annotated_func, args_annotated, args_count);
+  ast_expr_update(&funcall_expr, expr_info);
+  *annotated_out = funcall_expr;
 
   return 1;
   /* Don't fallthrough -- args_annotated was moved into annotated_out. */
  fail_cleanup_temporary_type:
   ast_typeexpr_destroy(&temporary_type);
   ast_typeexpr_destroy(&return_type);
-  ast_expr_destroy(&annotated_func);
-  SLICE_FREE(args_annotated, args_count, ast_exprcall_destroy);
+ fail_cleanup_funcall:
+  ast_expr_destroy(&funcall_expr);
   return 0;
-  /* Don't fallthrough -- args_types was moved into funcexpr. */
+  /* Don't fallthrough -- args_annotated was moved into funcall_expr. */
  fail_cleanup_args_annotated:
   SLICE_FREE(args_annotated, args_count, ast_exprcall_destroy);
  fail:
