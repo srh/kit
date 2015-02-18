@@ -78,8 +78,28 @@ access array[_] {
     }
   }
 
+  func[T] append_raw(r *array[T], p *T, n size) void {
+    for i size = 0; i < n; i = i + 1 {
+      append(r, p[i]);
+    }
+  }
+
   func[T] data(r *array[T]) *T {
     return r->ptr;
+  }
+
+  func[T, U] make(raw_arr U) array[T] {
+    ret array[T];
+    append_raw(&ret, &raw_arr[0], raw_arr.length);
+    return ret;
+  }
+
+  func[T] repeat(value T, n size) array[T] {
+    ret array[T];
+    for i size = 0; i < n; i = i + 1 {
+      append(&ret, value);
+    }
+    return ret;
   }
 }
 

@@ -319,6 +319,7 @@ void init_name_type(struct ast_typeexpr *a, ident_value name) {
   a->u.name = make_ast_ident(name);
 }
 
+/* TODO: No callers of this. */
 void init_generics_type(struct ast_typeexpr *a,
                         struct ast_ident *name,
                         struct ast_generics *generics) {
@@ -537,12 +538,17 @@ void import_unop(struct checkstate *cs,
   ast_generics_destroy(&generics);
 }
 
-void import_sizeof_alignof(struct checkstate *cs) {
+struct ast_generics one_param_generics(struct checkstate *cs, const char *name) {
   struct ast_ident *param = malloc_mul(sizeof(*param), 1);
-  param[0] = make_ast_ident(identmap_intern_c_str(cs->im, "T"));
+  param[0] = make_ast_ident(identmap_intern_c_str(cs->im, name));
 
   struct ast_generics generics;
   ast_generics_init_has_params(&generics, ast_meta_make_garbage(), param, 1);
+  return generics;
+}
+
+void import_sizeof_alignof(struct checkstate *cs) {
+  struct ast_generics generics = one_param_generics(cs, "T");
   struct ast_typeexpr type;
   init_name_type(&type, identmap_intern_c_str(cs->im, SIZE_TYPE_NAME));
 
@@ -567,20 +573,41 @@ void import_sizeof_alignof(struct checkstate *cs) {
 }
 
 void make_ptr_func_type(struct checkstate *cs, struct ast_typeexpr *target, size_t count,
-                        struct ast_typeexpr *out) {
+                        const char *return_type_name, struct ast_typeexpr *out) {
   size_t params_count = size_add(count, 1);
   struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
   for (size_t i = 0; i < count; i++) {
     wrap_in_ptr(cs->im, target, &params[i]);
   }
 
-  init_name_type(&params[count], identmap_intern_c_str(cs->im, VOID_TYPE_NAME));
+  init_name_type(&params[count], identmap_intern_c_str(cs->im, return_type_name));
 
   struct ast_ident name
     = make_ast_ident(identmap_intern_c_str(cs->im, FUNC_TYPE_NAME));
   out->tag = AST_TYPEEXPR_APP;
   ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
                    name, params, params_count);
+}
+
+void import_ptr_binops(struct checkstate *cs) {
+  struct ast_generics generics = one_param_generics(cs, "T");
+  struct ast_typeexpr target;
+  init_name_type(&target, identmap_intern_c_str(cs->im, "T"));
+  struct ast_typeexpr type;
+  make_ptr_func_type(cs, &target, 2, BOOL_TYPE_NAME, &type);
+  name_table_add_primitive_def(cs->im, &cs->nt,
+                               identmap_intern_c_str(cs->im, binop_name(AST_BINOP_EQ)),
+                               make_primop(PRIMITIVE_OP_EQ_PTR),
+                               &generics,
+                               &type);
+  name_table_add_primitive_def(cs->im, &cs->nt,
+                               identmap_intern_c_str(cs->im, binop_name(AST_BINOP_NE)),
+                               make_primop(PRIMITIVE_OP_NE_PTR),
+                               &generics,
+                               &type);
+  ast_typeexpr_destroy(&type);
+  ast_typeexpr_destroy(&target);
+  ast_generics_destroy(&generics);
 }
 
 void import_constructors(struct checkstate *cs) {
@@ -597,7 +624,7 @@ void import_constructors(struct checkstate *cs) {
 
   {
     struct ast_typeexpr func1;
-    make_ptr_func_type(cs, &target, 1, &func1);
+    make_ptr_func_type(cs, &target, 1, VOID_TYPE_NAME, &func1);
 
     name_table_add_primitive_def(cs->im,
                                  &cs->nt,
@@ -617,7 +644,7 @@ void import_constructors(struct checkstate *cs) {
 
   {
     struct ast_typeexpr func2;
-    make_ptr_func_type(cs, &target, 2, &func2);
+    make_ptr_func_type(cs, &target, 2, VOID_TYPE_NAME, &func2);
 
     name_table_add_primitive_def(cs->im,
                                  &cs->nt,
@@ -640,6 +667,7 @@ void import_constructors(struct checkstate *cs) {
 }
 
 void checkstate_import_primitive_defs(struct checkstate *cs) {
+  import_ptr_binops(cs);
   import_integer_binops(cs, binop_u8_primitive_ops, U8_TYPE_NAME);
   import_integer_binops(cs, binop_i8_primitive_ops, I8_TYPE_NAME);
   import_integer_binops(cs, binop_u16_primitive_ops, U16_TYPE_NAME);
@@ -6231,6 +6259,50 @@ int check_file_test_more_57(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_58(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because x[0] is of wrong type. */
+  struct test_module a[] = { {
+      "foo",
+      "func foo() i32 {\n"
+      "  var x [3]u32;\n"
+      "  return x[0];\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_59(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "func foo() bool {\n"
+      "  var x [3]u32;\n"
+      "  return &x[0] == &x[1];\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_60(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because ptr types don't match. */
+  struct test_module a[] = { {
+      "foo",
+      "func foo() bool {\n"
+      "  var x [3]u32;\n"
+      "  return &x[0] == &x;\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 
@@ -6837,6 +6909,24 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_57...\n");
   if (!test_check_module(&im, &check_file_test_more_57, foo)) {
     DBG("check_file_test_more_57 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_58...\n");
+  if (!!test_check_module(&im, &check_file_test_more_58, foo)) {
+    DBG("check_file_test_more_58 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_59...\n");
+  if (!test_check_module(&im, &check_file_test_more_59, foo)) {
+    DBG("check_file_test_more_59 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_60...\n");
+  if (!!test_check_module(&im, &check_file_test_more_60, foo)) {
+    DBG("check_file_test_more_60 fails\n");
     goto cleanup_identmap;
   }
 

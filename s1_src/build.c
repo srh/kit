@@ -2550,6 +2550,13 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_not_w32(f, X86_EAX);
   } break;
 
+  case PRIMITIVE_OP_EQ_PTR: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
+  } break;
+  case PRIMITIVE_OP_NE_PTR: {
+    gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
+  } break;
+
   case PRIMITIVE_OP_ADD_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);

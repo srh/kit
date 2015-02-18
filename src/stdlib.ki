@@ -10,12 +10,18 @@ extern fread fn[*void, size, size, *FILE, size];
 extern fwrite fn[*void, size, size, *FILE, size];
 // TODO: Add "int" as a built-in?  "c_int"?
 extern fclose fn[*FILE, i32];  // TODO: actually returns "int"
+extern feof fn[*FILE, i32];  // TODO: actually returns "int"
 // TODO: Add "char" as a built-in?
 extern fopen fn[*u8, *u8, *FILE];
 extern fflush fn[*FILE, i32];   // TODO: actually returns "int"
 // TODO: Add platform-specific tests for stuff like "is EOF -1"
-def EOF i32 = -1;
+def EOF i32 = -1;  // TODO: is actually "int"
 // TODO: fseek takes a "long".
+
+defenum[T] opt {
+  None void;
+  Has T;
+};
 
 
 
