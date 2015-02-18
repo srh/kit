@@ -575,7 +575,7 @@ enum ast_typechecked {
 };
 
 struct ast_expr_info {
-  enum typechecked typechecked;
+  enum ast_typechecked typechecked;
   int is_lvalue;
   struct ast_typeexpr type;
 
