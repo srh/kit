@@ -923,6 +923,7 @@ struct ast_expr_info ast_expr_info_default(void) {
 struct ast_expr_info ast_expr_info_incomplete(void) {
   struct ast_expr_info ret;
   ret.typechecked = AST_TYPECHECKED_INCOMPLETE;
+  ret.type = ast_unknown_garbage();
   return ret;
 }
 
@@ -932,7 +933,7 @@ struct ast_expr_info ast_expr_info_typechecked_no_temporary(
   struct ast_expr_info ret;
   ret.typechecked = AST_TYPECHECKED_YES;
   ret.is_lvalue = is_lvalue;
-  ret.concrete_type = concrete_type;
+  ret.type = concrete_type;
   ret.temporary_exists = 0;
   return ret;
 }
@@ -958,7 +959,7 @@ struct ast_expr_info ast_expr_info_typechecked_temporary(
   struct ast_expr_info ret;
   ret.typechecked = AST_TYPECHECKED_YES;
   ret.is_lvalue = is_lvalue;
-  ret.concrete_type = concrete_type;
+  ret.type = concrete_type;
   ret.temporary_exists = 1;
   ret.temporary_type = temporary_type;
   ret.whole_thing = whole_thing;
@@ -973,7 +974,7 @@ void ast_expr_info_init_copy(struct ast_expr_info *a, struct ast_expr_info *c) {
     break;
   case AST_TYPECHECKED_YES: {
     a->is_lvalue = c->is_lvalue;
-    ast_typeexpr_init_copy(&a->concrete_type, &c->concrete_type);
+    ast_typeexpr_init_copy(&a->type, &c->type);
     a->temporary_exists = c->temporary_exists;
     if (c->temporary_exists) {
       ast_typeexpr_init_copy(&a->temporary_type, &c->temporary_type);
@@ -982,6 +983,7 @@ void ast_expr_info_init_copy(struct ast_expr_info *a, struct ast_expr_info *c) {
     }
   } break;
   case AST_TYPECHECKED_INCOMPLETE:
+    ast_typeexpr_init_copy(&a->type, &c->type);
     break;
   default:
     UNREACHABLE();
@@ -1001,7 +1003,7 @@ void ast_expr_info_destroy(struct ast_expr_info *a) {
     break;
   case AST_TYPECHECKED_YES: {
     a->is_lvalue = 0;
-    ast_typeexpr_destroy(&a->concrete_type);
+    ast_typeexpr_destroy(&a->type);
     if (a->temporary_exists) {
       ast_typeexpr_destroy(&a->temporary_type);
       a->whole_thing = 0;
@@ -1011,6 +1013,7 @@ void ast_expr_info_destroy(struct ast_expr_info *a) {
     a->typechecked = AST_TYPECHECKED_NO;
   } break;
   case AST_TYPECHECKED_INCOMPLETE:
+    ast_typeexpr_destroy(&a->type);
     break;
   default:
     UNREACHABLE();
@@ -1150,8 +1153,14 @@ void ast_expr_update(struct ast_expr *a,
 
 struct ast_typeexpr *ast_expr_type(struct ast_expr *a) {
   CHECK(a->info.typechecked == AST_TYPECHECKED_YES);
-  return &a->info.concrete_type;
+  return &a->info.type;
 }
+
+struct ast_typeexpr *ast_expr_partial_type(struct ast_expr *a) {
+  CHECK(a->info.typechecked != AST_TYPECHECKED_NO);
+  return &a->info.type;
+}
+
 
 int ast_expr_checked_and_complete(struct ast_expr *a) {
   return a->info.typechecked == AST_TYPECHECKED_YES;

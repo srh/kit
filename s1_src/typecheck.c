@@ -2382,11 +2382,7 @@ int check_funcall_funcexpr_ai(struct exprscope *es,
                                                  args_types_count);
 
     for (size_t i = 0; i < args_count; i++) {
-      if (ast_expr_not_incomplete(&args[i].expr)) {
-        ast_typeexpr_init_copy(&args_types[i], ast_expr_type(&args[i].expr));
-      } else {
-        args_types[i] = ast_unknown_garbage();
-      }
+      ast_typeexpr_init_copy(&args_types[i], ast_expr_partial_type(&args[i].expr));
     }
     ast_typeexpr_init_copy(&args_types[args_count], partial_type);
 
