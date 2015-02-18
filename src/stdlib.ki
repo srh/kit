@@ -23,6 +23,11 @@ defenum[T] opt {
   Has T;
 };
 
+func[T] None() opt[T] {
+  var v void;
+  return None(v);
+}
+
 
 
 func check(x bool) void {

@@ -47,7 +47,7 @@ access array[_] {
   }
 
   func[T] count(r *array[T]) size {
-    return r->size;
+    return r->count;
   }
 
   func[T] change_cap_(r *array[T], newcap size) void {

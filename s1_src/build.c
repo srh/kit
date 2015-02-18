@@ -3126,7 +3126,12 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   /* X86 */
   struct loc return_loc;
   if (er->tag == EXPR_RETURN_DEMANDED) {
-    CHECK(erd_loc(&er->u.demand).tag == LOC_EBP_OFFSET);
+    /* Return locations perhaps must be non-aliasable locations on the
+    stack -- this checks that it's a stack location or our callee's
+    hidden return param pointer. */
+    CHECK(erd_loc(&er->u.demand).tag == LOC_EBP_OFFSET
+          || (erd_loc(&er->u.demand).tag == LOC_EBP_INDIRECT
+              && erd_loc(&er->u.demand).u.ebp_indirect == 2 * DWORD_SIZE));
     return_loc = erd_loc(&er->u.demand);
   } else {
     return_loc = frame_push_loc(h, return_size);
