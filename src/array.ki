@@ -42,6 +42,10 @@ access array[_] {
     return (*r)[i];
   }
 
+  func[T] ref(r *array[T], i size) *T {
+    return &(*r)[i];
+  }
+
   func[T] count(r *array[T]) size {
     return r->size;
   }

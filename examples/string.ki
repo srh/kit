@@ -98,7 +98,7 @@ access string {
   func[T] lits(arr T) string {
     var ret string;
     var sz size = arr.length;
-    for var i size = 0; @[size]i < @[size]sz; i = i + 1 {
+    for var i size = 0; i < sz; i = i + 1 {
       append(&ret, @[u8] arr[i]);
     }
     return ret;
