@@ -558,7 +558,7 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
     *out = name;
     return 1;
   }
-  
+
   if (!is_ident_firstchar(ps_peek(p))) {
     return 0;
   }
@@ -774,7 +774,7 @@ int parse_rest_of_while_statement(struct ps *p, struct pos pos_start,
   return 0;
 }
 
-int parse_rest_of_expr_statement(struct ps *p, struct ast_expr **out) {
+int parse_expr_statement(struct ps *p, struct ast_expr **out) {
   struct ast_expr expr;
   if (!parse_expr(p, &expr, kSemicolonPrecedence)) {
     return 0;
@@ -788,6 +788,9 @@ int parse_rest_of_expr_statement(struct ps *p, struct ast_expr **out) {
   ast_expr_alloc_move(expr, out);
   return 1;
 }
+
+int parse_naked_var_or_expr_statement(struct ps *p, int force_assignment,
+                                      struct ast_statement *out);
 
 int parse_rest_of_for_statement(struct ps *p, struct pos pos_start,
                                 struct ast_for_statement *out) {
@@ -808,8 +811,7 @@ int parse_rest_of_for_statement(struct ps *p, struct pos pos_start,
         goto fail;
       }
     } else {
-      initializer.tag = AST_STATEMENT_EXPR;
-      if (!parse_rest_of_expr_statement(p, &initializer.u.expr)) {
+      if (!parse_naked_var_or_expr_statement(p, 1, &initializer)) {
         goto fail;
       }
     }
@@ -983,6 +985,102 @@ int parse_rest_of_switch_statement(struct ps *p, struct pos pos_start,
   return 0;
 }
 
+enum triparse_result {
+  TRIPARSE_SUCCESS,
+  TRIPARSE_QUICKFAIL,
+  TRIPARSE_ERROR,
+};
+
+enum triparse_result triparse_naked_var_statement(
+    struct ps *p, int force_assignment, struct ast_var_statement *out) {
+  struct pos pos_start = ps_pos(p);
+  struct ps_savestate save = ps_save(p);
+  struct ast_ident name;
+  if (!parse_ident(p, &name)) {
+    goto quickfail;
+  }
+
+  if (!skip_ws(p)) {
+    goto error_name;
+  }
+
+  struct ast_vardecl decl;
+  {
+    struct ast_typeexpr type;
+    /* TODO: We could be more fine-grained and quickfail on a subset
+    of what we do here. */
+    if (!help_parse_typeexpr(p, ALLOW_BLANKS_YES, &type)) {
+      goto quickfail_name;
+    }
+    ast_vardecl_init(&decl, ast_meta_make(pos_start, ast_typeexpr_meta(&type)->pos_end),
+                     name, type);
+  }
+
+  if (!skip_ws(p)) {
+    goto error_decl;
+  }
+
+  if (ps_peek(p) == ';') {
+    if (force_assignment) {
+      goto error_decl;
+    } else {
+      ps_step(p);
+      ps_count_leaf(p);
+      ast_var_statement_init_without_rhs(out, ast_meta_make(pos_start, ps_pos(p)),
+                                         decl);
+      return TRIPARSE_SUCCESS;
+    }
+  }
+
+  if (!try_skip_oper(p, "=")) {
+    goto error_decl;
+  }
+  struct ast_expr rhs;
+  if (!(skip_ws(p) && parse_expr(p, &rhs, kSemicolonPrecedence))) {
+    goto error_decl;
+  }
+
+  if (!try_skip_semicolon(p)) {
+    goto error_rhs;
+  }
+
+  ast_var_statement_init_with_rhs(out, ast_meta_make(pos_start, ps_pos(p)),
+                                  decl, rhs);
+  return TRIPARSE_SUCCESS;
+
+ error_rhs:
+  ast_expr_destroy(&rhs);
+ error_decl:
+  ast_vardecl_destroy(&decl);
+ error_name:
+  ast_ident_destroy(&name);
+  return TRIPARSE_ERROR;
+ quickfail_name:
+  ast_ident_destroy(&name);
+ quickfail:
+  ps_restore(p, save);
+  return TRIPARSE_QUICKFAIL;
+}
+
+int parse_naked_var_or_expr_statement(struct ps *p, int force_assignment,
+                                      struct ast_statement *out) {
+  struct ast_var_statement vs;
+  enum triparse_result res = triparse_naked_var_statement(p, force_assignment, &vs);
+  switch (res) {
+  case TRIPARSE_SUCCESS:
+    out->tag = AST_STATEMENT_VAR;
+    out->u.var_statement = vs;
+    return 1;
+  case TRIPARSE_QUICKFAIL:
+    out->tag = AST_STATEMENT_EXPR;
+    return parse_expr_statement(p, &out->u.expr);
+  case TRIPARSE_ERROR:
+    return 0;
+  default:
+    UNREACHABLE();
+  }
+}
+
 int parse_statement(struct ps *p, struct ast_statement *out) {
   struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "var")) {
@@ -1027,8 +1125,7 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
     out->tag = AST_STATEMENT_SWITCH;
     return parse_rest_of_switch_statement(p, pos_start, &out->u.switch_statement);
   } else {
-    out->tag = AST_STATEMENT_EXPR;
-    return parse_rest_of_expr_statement(p, &out->u.expr);
+    return parse_naked_var_or_expr_statement(p, 0, out);
   }
 }
 
@@ -2482,6 +2579,22 @@ int parse_test_defs(void) {
   pass &= run_count_test("def27",
                          "func `~`(x u32) size { }\n",
                          11);
+  pass &= run_count_test("def28",
+                         "def foo fn[int] = func() int {\n"
+                         "  x int;\n"
+                         "};\n",
+                         17);
+  pass &= run_count_test("def29",
+                         "def foo fn[int] = func() int {\n"
+                         "  x int = 3;\n"
+                         "};\n",
+                         19);
+  pass &= run_count_test("def30",
+                         "def foo bar = func() void {\n"
+                         "  for i i32 = 3; i < 3; i = i + 1 {\n"
+                         "  }\n"
+                         "};\n",
+                         28);
   return pass;
 }
 

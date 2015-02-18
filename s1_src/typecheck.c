@@ -5507,7 +5507,7 @@ int check_file_test_more_18(const uint8_t *name, size_t name_count,
       "foo",
       "def foo fn[i32] = func() i32 {\n"
       "  var acc u32 = 0;\n"
-      "  for var i u32 = 0; i < 10; i = i + 1 {\n"
+      "  for i u32 = 0; i < 10; i = i + 1 {\n"
       "    acc = acc + i;\n"
       "  }\n"
       "  return ~acc;\n"

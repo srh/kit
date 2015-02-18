@@ -4,8 +4,8 @@ import string;
 export def foo i32 = 1;
 
 func fac(x i32) i32 {
-  var acc i32 = 1;
-  for var i i32 = x; i > 0; i = i - 1 {
+  acc i32 = 1;
+  for i i32 = x; i > 0; i = i - 1 {
     acc = acc * i;
   }
   return acc;
@@ -53,8 +53,8 @@ func call_kla(x kla) void {
 }
 
 func try_kla() void {
-  var k kla;
-  var l struct { x u32; y u32; } = expose(&k);
+  k kla;
+  l struct { x u32; y u32; } = expose(&k);
   print(l.x);
   putchar(32);
   print(l.y);
@@ -69,17 +69,17 @@ defenum enty {
 };
 
 def blah_enty = func(x enty) enty {
-  var v void;
-  var y enty = c1(v);
-  var u struct { p i32; q i32; };
+  v void;
+  y enty = c1(v);
+  u struct { p i32; q i32; };
   y = c2(u);
   switch x {
     case c1(a void): {
-      var s string = lits("c1 (void)\n");
+      s string = lits("c1 (void)\n");
       print(&s);
     }
     case c2(a): {
-      var s string = lits("c2 ... ");
+      s string = lits("c2 ... ");
       print(&s);
       print(@[u32]~a.p);
       putchar(32);
@@ -108,27 +108,27 @@ export func showfacs(p *ty, num *u16) ty {
   try_kla();
   try_string();
 
-  var v void;
-  var k enty = blah_enty(c1(v));
-  var vz struct { p i32; q i32; };
+  v void;
+  k enty = blah_enty(c1(v));
+  vz struct { p i32; q i32; };
   vz.p = 125;
   vz.q = 343;
   blah_enty(c2(vz));
   blah_enty(c3(lits("just another string\n")));
 
-  var ret ty;
+  ret ty;
   p->x = -5;
   p->y = fac(7);
   p->x = -p->x;
 
-  var tmp u32 = ~fac(p->x);
+  tmp u32 = ~fac(p->x);
   var y u32 = ~(*p).y;
   print(tmp);
   putchar(10);
   print(y);
   putchar(10);
 
-  var yptr *i32 = &p->y;
+  yptr *i32 = &p->y;
   *yptr = 77;
   var xptr *i32 = &p->x;
   xptr[0] = 99;
