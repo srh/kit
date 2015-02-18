@@ -211,7 +211,8 @@ int name_table_match_def(struct identmap *im,
                          struct def_entry **entry_out,
                          struct def_instantiation **instantiation_out);
 
-size_t name_table_count_matching_defs(struct name_table *t,
+size_t name_table_count_matching_defs(struct identmap *im,
+                                      struct name_table *t,
                                       struct ast_ident *name,
                                       struct ast_typeexpr *generics_or_null,
                                       size_t generics_count,
@@ -232,9 +233,15 @@ void deftype_entry_mark_has_been_checked(struct deftype_entry *ent);
 void deftype_entry_mark_generic_flatly_held(struct deftype_entry *ent,
                                             size_t which_generic);
 
-int typelists_equal(struct ast_typeexpr *a, size_t a_count,
+int typelists_equal(struct identmap *im, struct ast_typeexpr *a, size_t a_count,
                     struct ast_typeexpr *b, size_t b_count);
 
 int is_concrete(struct ast_typeexpr *type);
+int is_numeric_type(struct identmap *im, struct ast_typeexpr *a);
+int combine_partial_types(struct identmap *im,
+                          struct ast_typeexpr *a,
+                          struct ast_typeexpr *b,
+                          struct ast_typeexpr *out);
+
 
 #endif /* KIRA_TABLE_H_ */

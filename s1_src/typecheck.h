@@ -46,14 +46,16 @@ int read_module_file(const uint8_t *module_name,
                      uint8_t **data_out,
                      size_t *data_size_out);
 
-int unify_directionally(struct ast_typeexpr *partial_type,
+int unify_directionally(struct identmap *im,
+                        struct ast_typeexpr *partial_type,
                         struct ast_typeexpr *complete_type);
 int generics_lookup_name(struct ast_generics *a,
                          ident_value name,
                          size_t *index_out);
 struct ast_ident make_ast_ident(ident_value ident);
 void init_name_type(struct ast_typeexpr *a, ident_value name);
-int exact_typeexprs_equal(struct ast_typeexpr *a, struct ast_typeexpr *b);
+int exact_typeexprs_equal(struct identmap *im, struct ast_typeexpr *a,
+                          struct ast_typeexpr *b);
 int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x);
 int view_ptr_target(struct identmap *im,
                     struct ast_typeexpr *ptr_type,
@@ -81,6 +83,8 @@ int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
                            uint32_t *out);
 int numeric_literal_to_i32(int8_t *digits, size_t digits_count,
                            int32_t *out);
+int numeric_literal_to_u8(int8_t *digits, size_t digits_count,
+                          uint8_t *out);
 
 enum typeexpr_trait {
   TYPEEXPR_TRAIT_LACKED,

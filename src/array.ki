@@ -8,8 +8,8 @@ defclass[T] move array struct {
 
 access array[_] {
   func[T] do_init(r *array[T]) void {
-    r->count = ~0u;
-    r->cap = ~0u;
+    r->count = 0;
+    r->cap = 0;
     var null *T;
     r->ptr = null;
   }
@@ -19,14 +19,14 @@ access array[_] {
     dest->cap = src->cap;
     dest->ptr = cast(malloc(src->count * sizeof@[T]));
     var e size = src->count;
-    for var i size = ~0u; i < e; i = i + ~1u {
+    for var i size = 0; i < e; i = i + 1 {
       dest->ptr[i] = src->ptr[i];
     }
   }
 
   func[T] do_destroy(r *array[T]) void {
-    for var i size = r->count; i > ~0u; {
-      i = i - ~1u;
+    for var i size = r->count; i > 0; {
+      i = i - 1;
       destroy(&r->ptr[i]);
     }
     free(@[*void] cast(r->ptr));
@@ -50,7 +50,7 @@ access array[_] {
     check(newcap >= r->count);
     var p *T = cast(malloc(newcap * sizeof@[T]));
     var e size = r->count;
-    for var i size = ~0u; i < e; i = i + ~1u {
+    for var i size = 0; i < e; i = i + 1 {
       move(&p[i], &r->ptr[i]);
     }
     free(@[*void] cast(r->ptr));
@@ -60,16 +60,16 @@ access array[_] {
 
   func[T] append(r *array[T], value T) void {
     if (r->count == r->cap) {
-      change_cap_(r, max(@[size]~4u, r->cap * ~2u));
+      change_cap_(r, max(4, r->cap * 2));
     }
     // The reason we use copy, not move, here, is because value's
     // destructor will get called when we exit this function.
     copy(&r->ptr[r->count], &value);
-    r->count = r->count + ~1u;
+    r->count = r->count + 1;
   }
 
   func[T] append(r *array[T], s *array[T]) void {
-    for var i size = ~0u; i < s->count; i = i + ~1u {
+    for var i size = 0; i < s->count; i = i + 1 {
       append(r, s->ptr[i]);
     }
   }

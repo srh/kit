@@ -1192,7 +1192,8 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
   struct ast_name_expr func_name;
   ast_name_expr_init(&func_name, make_ast_ident(identmap_intern_c_str(cs->im, name)));
 
-  size_t matching_defs = name_table_count_matching_defs(&cs->nt,
+  size_t matching_defs = name_table_count_matching_defs(cs->im,
+                                                        &cs->nt,
                                                         &func_name.ident,
                                                         NULL,
                                                         0,
@@ -1584,6 +1585,10 @@ int check_typeexpr_traits(struct checkstate *cs,
     METERR(*ast_typeexpr_meta(a), "Incomplete type in bad place.%s", "\n");
     return 0;
   } break;
+  case AST_TYPEEXPR_NUMERIC: {
+    METERR(*ast_typeexpr_meta(a), "Incomplete numeric type in bad place.%s", "\n");
+    return 0;
+  }
   default:
     UNREACHABLE();
   }
@@ -1856,7 +1861,8 @@ void exprscope_pop_var(struct exprscope *es) {
   es->vars[es->vars_count].varnum.value = SIZE_MAX;
 }
 
-int unify_fields_directionally(struct ast_vardecl *partial_fields,
+int unify_fields_directionally(struct identmap *im,
+                               struct ast_vardecl *partial_fields,
                                size_t partial_fields_count,
                                struct ast_vardecl *complete_fields,
                                size_t complete_fields_count) {
@@ -1866,7 +1872,8 @@ int unify_fields_directionally(struct ast_vardecl *partial_fields,
 
   for (size_t i = 0; i < partial_fields_count; i++) {
     if (partial_fields[i].name.value != complete_fields[i].name.value
-        || !unify_directionally(&partial_fields[i].type,
+        || !unify_directionally(im,
+                                &partial_fields[i].type,
                                 &complete_fields[i].type)) {
       return 0;
     }
@@ -1875,11 +1882,16 @@ int unify_fields_directionally(struct ast_vardecl *partial_fields,
   return 1;
 }
 
-int unify_directionally(struct ast_typeexpr *partial_type,
+int unify_directionally(struct identmap *im,
+                        struct ast_typeexpr *partial_type,
                         struct ast_typeexpr *complete_type) {
   CHECK(complete_type->tag != AST_TYPEEXPR_UNKNOWN);
   if (partial_type->tag == AST_TYPEEXPR_UNKNOWN) {
     return 1;
+  }
+
+  if (partial_type->tag == AST_TYPEEXPR_NUMERIC) {
+    return is_numeric_type(im, complete_type);
   }
 
   if (partial_type->tag != complete_type->tag) {
@@ -1898,19 +1910,19 @@ int unify_directionally(struct ast_typeexpr *partial_type,
       return 0;
     }
     for (size_t i = 0, e = p_app->params_count; i < e; i++) {
-      if (!unify_directionally(&p_app->params[i], &c_app->params[i])) {
+      if (!unify_directionally(im, &p_app->params[i], &c_app->params[i])) {
         return 0;
       }
     }
     return 1;
   } break;
   case AST_TYPEEXPR_STRUCTE:
-    return unify_fields_directionally(partial_type->u.structe.fields,
+    return unify_fields_directionally(im, partial_type->u.structe.fields,
                                       partial_type->u.structe.fields_count,
                                       complete_type->u.structe.fields,
                                       complete_type->u.structe.fields_count);
   case AST_TYPEEXPR_UNIONE:
-    return unify_fields_directionally(partial_type->u.unione.fields,
+    return unify_fields_directionally(im, partial_type->u.unione.fields,
                                       partial_type->u.unione.fields_count,
                                       complete_type->u.unione.fields,
                                       complete_type->u.unione.fields_count);
@@ -1918,7 +1930,7 @@ int unify_directionally(struct ast_typeexpr *partial_type,
     if (partial_type->u.arraytype.count != complete_type->u.arraytype.count) {
       return 0;
     }
-    return unify_directionally(partial_type->u.arraytype.param,
+    return unify_directionally(im, partial_type->u.arraytype.param,
                                complete_type->u.arraytype.param);
   } break;
   default:
@@ -1926,8 +1938,10 @@ int unify_directionally(struct ast_typeexpr *partial_type,
   }
 }
 
-int exact_typeexprs_equal(struct ast_typeexpr *a, struct ast_typeexpr *b) {
-  return unify_directionally(a, b) && unify_directionally(b, a);
+/* im is only necessary because it's a param for unify_directionally. */
+int exact_typeexprs_equal(struct identmap *im, struct ast_typeexpr *a,
+                          struct ast_typeexpr *b) {
+  return unify_directionally(im, a, b) && unify_directionally(im, b, a);
 }
 
 int is_accessible(struct exprscope *es, struct defclass_ident accessee_privacy_scope) {
@@ -2077,7 +2091,7 @@ int exprscope_lookup_name(struct exprscope *es,
       continue;
     }
 
-    if (!unify_directionally(partial_type, &decl->type)) {
+    if (!unify_directionally(es->cs->im, partial_type, &decl->type)) {
       METERR(name->meta, "Type mismatch for vardecl %.*s lookup.\n",
              IM_P(es->cs->im, name->ident.value));
       *multi_match_out = 0;
@@ -2096,24 +2110,6 @@ int exprscope_lookup_name(struct exprscope *es,
                                        report_multi_match,
                                        multi_match_out,
                                        out, is_lvalue_out, inst_or_null_out);
-}
-
-void numeric_literal_type(struct identmap *im,
-                          struct ast_numeric_literal *a,
-                          struct ast_typeexpr *out) {
-  out->tag = AST_TYPEEXPR_NAME;
-  const char *type_name;
-  switch (a->numeric_type) {
-  case AST_NUMERIC_TYPE_SIGNED:
-    type_name = I32_TYPE_NAME;
-    break;
-  case AST_NUMERIC_TYPE_UNSIGNED:
-    type_name = U32_TYPE_NAME;
-    break;
-  default:
-    UNREACHABLE();
-  }
-  out->u.name = make_ast_ident(identmap_intern_c_str(im, type_name));
 }
 
 void do_replace_generics_in_fields(struct ast_generics *generics,
@@ -2210,6 +2206,10 @@ void do_replace_generics(struct ast_generics *generics,
   case AST_TYPEEXPR_UNKNOWN: {
     out->tag = AST_TYPEEXPR_UNKNOWN;
     ast_unknown_init(&out->u.unknown, ast_meta_make_copy(&a->u.unknown.meta));
+  } break;
+  case AST_TYPEEXPR_NUMERIC: {
+    out->tag = AST_TYPEEXPR_NUMERIC;
+    ast_unknown_init(&out->u.numeric, ast_meta_make_copy(&a->u.numeric.meta));
   } break;
   default:
     UNREACHABLE();
@@ -2625,7 +2625,7 @@ int check_statement(struct bodystate *bs,
         bs->exact_return_type = void_type;
       }
     } else {
-      if (!exact_typeexprs_equal(&bs->exact_return_type, expr_type)) {
+      if (!exact_typeexprs_equal(bs->es->cs->im, &bs->exact_return_type, expr_type)) {
         METERR(s->u.return_statement.meta,
                "Return statements with conflicting return types.%s", "\n");
         if (!has_expr) {
@@ -2873,7 +2873,7 @@ int check_statement(struct bodystate *bs,
       struct varnum varnum;
       struct ast_vardecl *replaced_decl;
       {
-        if (!unify_directionally(&replaced_incomplete_type,
+        if (!unify_directionally(bs->es->cs->im, &replaced_incomplete_type,
                                  &concrete_enumspec.enumfields[constructor_num].type)) {
           ast_typeexpr_destroy(&replaced_incomplete_type);
           METERR(cas->meta, "Switch case decl type mismatch.%s", "\n");
@@ -3072,7 +3072,7 @@ int check_expr_lambda(struct exprscope *es,
                      make_ast_ident(func_ident), args, args_count);
   }
 
-  if (!unify_directionally(partial_type, &funcexpr)) {
+  if (!unify_directionally(es->cs->im, partial_type, &funcexpr)) {
     METERR(x->meta, "lambda type does not match expression type.%s", "\n");
     goto fail_funcexpr;
   }
@@ -3170,12 +3170,12 @@ int check_expr_magic_binop(struct exprscope *es,
       METERR(x->meta, "Trying to assign to non-lvalue.%s", "\n");
       goto cleanup;
     }
-    if (!exact_typeexprs_equal(ast_expr_type(x->lhs), ast_expr_type(x->rhs))) {
+    if (!exact_typeexprs_equal(es->cs->im, ast_expr_type(x->lhs), ast_expr_type(x->rhs))) {
       METERR(x->meta, "Assignment with non-matching types.%s", "\n");
       goto cleanup;
     }
 
-    if (!unify_directionally(partial_type, ast_expr_type(x->lhs))) {
+    if (!unify_directionally(es->cs->im, partial_type, ast_expr_type(x->lhs))) {
       METERR(x->meta, "LHS type of assignment does not match contextual type.%s", "\n");
       goto cleanup;
     }
@@ -3193,17 +3193,17 @@ int check_expr_magic_binop(struct exprscope *es,
     struct ast_typeexpr boolean;
     init_name_type(&boolean, identmap_intern_c_str(es->cs->im, BOOL_TYPE_NAME));
 
-    if (!unify_directionally(&boolean, ast_expr_type(x->lhs))) {
+    if (!unify_directionally(es->cs->im, &boolean, ast_expr_type(x->lhs))) {
       METERR(x->meta, "LHS of and/or is non-boolean.%s", "\n");
       goto logical_cleanup_boolean;
     }
 
-    if (!unify_directionally(&boolean, ast_expr_type(x->rhs))) {
+    if (!unify_directionally(es->cs->im, &boolean, ast_expr_type(x->rhs))) {
       METERR(x->meta, "RHS of and/or is non-boolean.%s", "\n");
       goto logical_cleanup_boolean;
     }
 
-    if (!unify_directionally(partial_type, &boolean)) {
+    if (!unify_directionally(es->cs->im, partial_type, &boolean)) {
       METERR(x->meta, "And/or expression in non-boolean context.%s", "\n");
       goto logical_cleanup_boolean;
     }
@@ -3291,7 +3291,7 @@ int check_expr_magic_unop(struct exprscope *es,
       goto cleanup;
     }
 
-    if (!unify_directionally(partial_type, rhs_target)) {
+    if (!unify_directionally(es->cs->im, partial_type, rhs_target)) {
       METERR(x->meta, "Pointer dereference results in wrong type.%s", "\n");
       goto cleanup;
     }
@@ -3311,7 +3311,7 @@ int check_expr_magic_unop(struct exprscope *es,
     wrap_in_ptr(es->cs->im, ast_expr_type(x->rhs),
                 &pointer_type);
 
-    if (!unify_directionally(partial_type, &pointer_type)) {
+    if (!unify_directionally(es->cs->im, partial_type, &pointer_type)) {
       METERR(x->meta, "Addressof results in wrong type.%s", "\n");
       ast_typeexpr_destroy(&pointer_type);
       goto cleanup;
@@ -3499,9 +3499,15 @@ int check_expr_local_field_access(
   if (ast_expr_type(x->lhs)->tag == AST_TYPEEXPR_ARRAY
       && !x->fieldname.whole_field
       && x->fieldname.ident.value == identmap_intern_c_str(es->cs->im, ARRAY_LENGTH_FIELDNAME)) {
-    struct ast_typeexpr u32_type;
-    init_name_type(&u32_type, identmap_intern_c_str(es->cs->im, U32_TYPE_NAME));
-    ast_expr_update(y, ast_expr_info_typechecked_trivial_temporary(0, u32_type));
+    struct ast_typeexpr size_type;
+    init_name_type(&size_type, identmap_intern_c_str(es->cs->im, SIZE_TYPE_NAME));
+
+    if (!unify_directionally(es->cs->im, partial_type, &size_type)) {
+      ast_typeexpr_destroy(&size_type);
+      goto cleanup;
+    }
+
+    ast_expr_update(y, ast_expr_info_typechecked_trivial_temporary(0, size_type));
     ret = 1;
     goto cleanup;
   }
@@ -3515,7 +3521,7 @@ int check_expr_local_field_access(
     goto cleanup;
   }
 
-  if (!unify_directionally(partial_type, &field_type)) {
+  if (!unify_directionally(es->cs->im, partial_type, &field_type)) {
     goto cleanup_field_type;
   }
 
@@ -3562,7 +3568,7 @@ int check_expr_deref_field_access(
     goto cleanup;
   }
 
-  if (!unify_directionally(partial_type, &field_type)) {
+  if (!unify_directionally(es->cs->im, partial_type, &field_type)) {
     METERR(x->meta, "Dereferencing field access results in wrong type.%s", "\n");
     goto cleanup_field_type;
   }
@@ -3578,18 +3584,6 @@ int check_expr_deref_field_access(
   return ret;
 }
 
-int check_is_index_rhs_type(struct checkstate *cs, struct ast_meta *expr_meta,
-                            struct ast_typeexpr *type) {
-  if (!(type->tag == AST_TYPEEXPR_NAME
-        && (type->u.name.value == identmap_intern_c_str(cs->im, I32_TYPE_NAME)
-            || type->u.name.value == identmap_intern_c_str(cs->im, U32_TYPE_NAME)
-            || type->u.name.value == identmap_intern_c_str(cs->im, SIZE_TYPE_NAME)))) {
-    METERR(*expr_meta, "Invalid index expr rhs type.%s", "\n");
-    return 0;
-  }
-  return 1;
-}
-
 int check_index_expr(struct exprscope *es,
                      struct ast_expr *y,
                      struct ast_typeexpr *partial_type) {
@@ -3600,11 +3594,11 @@ int check_index_expr(struct exprscope *es,
     goto fail;
   }
 
-  if (!check_expr(es, a->rhs, &no_partial_type)) {
-    goto fail;
-  }
-
-  if (!check_is_index_rhs_type(es->cs, &a->meta, ast_expr_type(a->rhs))) {
+  struct ast_typeexpr rhs_partial_type;
+  init_name_type(&rhs_partial_type, identmap_intern_c_str(es->cs->im, SIZE_TYPE_NAME));
+  int check_rhs_result = check_expr(es, a->rhs, &rhs_partial_type);
+  ast_typeexpr_destroy(&rhs_partial_type);
+  if (!check_rhs_result) {
     goto fail;
   }
 
@@ -3620,7 +3614,7 @@ int check_index_expr(struct exprscope *es,
     lhs_target = lhs_type->u.arraytype.param;
   }
 
-  if (!unify_directionally(partial_type, lhs_target)) {
+  if (!unify_directionally(es->cs->im, partial_type, lhs_target)) {
     METERR(a->meta, "Indexing returns wrong type.%s", "\n");
     goto fail;
   }
@@ -3698,20 +3692,31 @@ int check_expr_ai(struct exprscope *es,
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
-    struct ast_typeexpr num_type;
-    numeric_literal_type(es->cs->im, &x->u.numeric_literal, &num_type);
-    if (!unify_directionally(partial_type, &num_type)) {
+    struct ast_typeexpr num_type = ast_numeric_garbage();
+    struct ast_typeexpr combined_type;
+    if (!combine_partial_types(es->cs->im, partial_type, &num_type, &combined_type)) {
       METERR(x->u.numeric_literal.meta, "Numeric literal in bad place.%s", "\n");
-      ast_typeexpr_destroy(&num_type);
+      ast_typeexpr_destroy(&num_type);  /* TODO */
       return 0;
     }
-    ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, num_type));
+    ast_typeexpr_destroy(&num_type);
+    if (is_concrete(&combined_type)) {
+      ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, combined_type));
+    } else {
+      if (ai == ALLOW_INCOMPLETE_YES) {
+        ast_expr_update(x, ast_expr_info_incomplete_typed(combined_type));
+      } else {
+        ast_typeexpr_destroy(&combined_type);
+        METERR(x->u.numeric_literal.meta, "Numeric literal used ambiguously.%s", "\n");
+        return 0;
+      }
+    }
     return 1;
   } break;
   case AST_EXPR_CHAR_LITERAL: {
     struct ast_typeexpr char_type;
     init_name_type(&char_type, identmap_intern_c_str(es->cs->im, CHAR_STANDIN_TYPE_NAME));
-    if (!unify_directionally(partial_type, &char_type)) {
+    if (!unify_directionally(es->cs->im, partial_type, &char_type)) {
       METERR(x->u.char_literal.meta, "Character literal in bad place.%s", "\n");
       ast_typeexpr_destroy(&char_type);
       return 0;
@@ -3732,7 +3737,7 @@ int check_expr_ai(struct exprscope *es,
       array_type.tag = AST_TYPEEXPR_ARRAY;
       ast_arraytype_init(&array_type.u.arraytype, ast_meta_make_garbage(), array_size, char_type);
     }
-    if (!unify_directionally(partial_type, &array_type)) {
+    if (!unify_directionally(es->cs->im, partial_type, &array_type)) {
       METERR(x->u.string_literal.meta, "Character literal in bad place.%s", "\n");
       ast_typeexpr_destroy(&array_type);
       return 0;
@@ -3789,8 +3794,15 @@ int check_expr_ai(struct exprscope *es,
     struct ast_typeexpr replaced_partial_type;
     replace_generics(es, &x->u.typed_expr.type, &replaced_partial_type);
 
-    int check_result = check_expr(es, x->u.typed_expr.expr, &replaced_partial_type);
-    ast_typeexpr_destroy(&replaced_partial_type);
+    struct ast_typeexpr combined_partial_type;
+    if (!combine_partial_types(es->cs->im, partial_type, &replaced_partial_type,
+                               &combined_partial_type)) {
+      ast_typeexpr_destroy(&replaced_partial_type);
+      return 0;
+    }
+
+    int check_result = check_expr(es, x->u.typed_expr.expr, &combined_partial_type);
+    ast_typeexpr_destroy(&combined_partial_type);
     if (!check_result) {
       return 0;
     }
@@ -3837,7 +3849,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
                                        &ent,
                                        &inst);
     CHECK(success);
-    CHECK(exact_typeexprs_equal(&unified, ast_def_typeexpr(a)));
+    CHECK(exact_typeexprs_equal(cs->im, &unified, ast_def_typeexpr(a)));
     CHECK(!ent->is_primitive);
 
     ast_typeexpr_destroy(&unified);
@@ -3959,31 +3971,59 @@ int numeric_literal_to_i32(int8_t *digits, size_t digits_count,
   return 1;
 }
 
-int eval_static_numeric_literal(struct ast_numeric_literal *a,
+int numeric_literal_to_u8(int8_t *digits, size_t digits_count,
+                          uint8_t *out) {
+  uint32_t value;
+  if (!numeric_literal_to_u32(digits, digits_count, &value)) {
+    return 0;
+  }
+  if (value > 0xFF) {
+    ERR_DBG(NUMERIC_LITERAL_OOR);
+    return 0;
+  }
+  CHECK(value <= UINT8_MAX);
+  *out = (uint8_t)value;
+  return 1;
+}
+
+int eval_static_numeric_literal(struct identmap *im,
+                                struct ast_typeexpr *type,
+                                struct ast_numeric_literal *a,
                                 struct static_value *out) {
-  switch (a->numeric_type) {
-  case AST_NUMERIC_TYPE_SIGNED: {
+  CHECK(type->tag == AST_TYPEEXPR_NAME);
+  CHECK(is_numeric_type(im, type));
+
+  if (type->u.name.value == identmap_intern_c_str(im, I32_TYPE_NAME)) {
     int32_t value;
     if (!numeric_literal_to_i32(a->digits, a->digits_count, &value)) {
       return 0;
     }
     static_value_init_i32(out, value);
     return 1;
-  } break;
-  case AST_NUMERIC_TYPE_UNSIGNED: {
+  } else if (type->u.name.value == identmap_intern_c_str(im, U32_TYPE_NAME)) {
     uint32_t value;
     if (!numeric_literal_to_u32(a->digits, a->digits_count, &value)) {
       return 0;
     }
     static_value_init_u32(out, value);
     return 1;
-  } break;
-  default:
-    UNREACHABLE();
+  } else if (type->u.name.value == identmap_intern_c_str(im, U8_TYPE_NAME)) {
+    uint8_t value;
+    if (!numeric_literal_to_u8(a->digits, a->digits_count, &value)) {
+      return 0;
+    }
+    static_value_init_u8(out, value);
+    return 1;
+  } else {
+    METERR(a->meta, "Compiler incomplete: Numeric literal resolves to type '%.*s', "
+           "which this lame compiler cannot statically evaluate.\n",
+           IM_P(im, type->u.name.value));
+    return 0;
   }
 }
 
-int eval_static_value(struct ast_expr *expr, struct static_value *out);
+int eval_static_value(struct identmap *im, struct ast_expr *expr,
+                      struct static_value *out);
 
 int32_t st_i32(struct static_value *value) {
   CHECK(value->tag == STATIC_VALUE_I32);
@@ -4371,11 +4411,12 @@ int apply_static_funcall(struct static_value *func,
   }
 }
 
-int eval_static_funcall(struct ast_funcall *funcall,
+int eval_static_funcall(struct identmap *im,
+                        struct ast_funcall *funcall,
                         struct static_value *out) {
   int ret = 0;
   struct static_value func_value;
-  if (!eval_static_value(funcall->func, &func_value)) {
+  if (!eval_static_value(im, funcall->func, &func_value)) {
     goto cleanup;
   }
 
@@ -4383,7 +4424,7 @@ int eval_static_funcall(struct ast_funcall *funcall,
   struct static_value *params = malloc_mul(sizeof(*params), params_count);
   size_t i = 0;
   for (; i < params_count; i++) {
-    if (!eval_static_value(&funcall->args[i].expr, &params[i])) {
+    if (!eval_static_value(im, &funcall->args[i].expr, &params[i])) {
       goto cleanup_params;
     }
   }
@@ -4402,7 +4443,8 @@ int eval_static_funcall(struct ast_funcall *funcall,
 }
 
 /* expr must have been annotated by typechecking. */
-int eval_static_value(struct ast_expr *expr,
+int eval_static_value(struct identmap *im,
+                      struct ast_expr *expr,
                       struct static_value *out) {
   switch (expr->tag) {
   case AST_EXPR_NAME: {
@@ -4415,14 +4457,16 @@ int eval_static_value(struct ast_expr *expr,
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL:
-    return eval_static_numeric_literal(&expr->u.numeric_literal, out);
+    return eval_static_numeric_literal(im,
+                                       ast_expr_type(expr),
+                                       &expr->u.numeric_literal, out);
   case AST_EXPR_CHAR_LITERAL:
     static_value_init_u8(out, expr->u.char_literal.value);
     return 1;
   case AST_EXPR_STRING_LITERAL:
     CRASH("String literal static value evaluation is not supported.\n");
   case AST_EXPR_FUNCALL:
-    return eval_static_funcall(&expr->u.funcall, out);
+    return eval_static_funcall(im, &expr->u.funcall, out);
   case AST_EXPR_INDEX: {
     /* Array indexing might be deemed such, but right now non-integer,
     non-lambda types are not deemed statically evaluable. */
@@ -4452,13 +4496,13 @@ int eval_static_value(struct ast_expr *expr,
           "statically evaluable.\n");
   } break;
   case AST_EXPR_TYPED:
-    return eval_static_value(expr->u.typed_expr.expr, out);
+    return eval_static_value(im, expr->u.typed_expr.expr, out);
   default:
     UNREACHABLE();
   }
 }
 
-int compute_static_values(struct name_table *nt, struct def_entry *ent) {
+int compute_static_values(struct identmap *im, struct name_table *nt, struct def_entry *ent) {
   int is_primitive = ent->is_primitive;
   CHECK(is_primitive || ent->def != NULL);
   for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
@@ -4482,7 +4526,7 @@ int compute_static_values(struct name_table *nt, struct def_entry *ent) {
       }
     } else {
       struct static_value value;
-      if (!eval_static_value(di_annotated_rhs(inst), &value)) {
+      if (!eval_static_value(im, di_annotated_rhs(inst), &value)) {
         return 0;
       }
       static_value_init_move(di_value_for_set(inst), &value);
@@ -4492,7 +4536,8 @@ int compute_static_values(struct name_table *nt, struct def_entry *ent) {
   return 1;
 }
 
-int chase_def_entry_acyclicity(struct name_table *nt, struct def_entry *ent) {
+int chase_def_entry_acyclicity(struct identmap *im, struct name_table *nt,
+                               struct def_entry *ent) {
   if (ent->known_acyclic) {
     return 1;
   }
@@ -4503,7 +4548,7 @@ int chase_def_entry_acyclicity(struct name_table *nt, struct def_entry *ent) {
   }
   ent->acyclicity_being_chased = 1;
   for (size_t i = 0, e = ent->static_references_count; i < e; i++) {
-    if (!chase_def_entry_acyclicity(nt, ent->static_references[i])) {
+    if (!chase_def_entry_acyclicity(im, nt, ent->static_references[i])) {
       return 0;
     }
   }
@@ -4513,7 +4558,7 @@ int chase_def_entry_acyclicity(struct name_table *nt, struct def_entry *ent) {
   ent->known_acyclic = 1;
 
   if (!ent->is_extern) {
-    if (!compute_static_values(nt, ent)) {
+    if (!compute_static_values(im, nt, ent)) {
       return 0;
     }
   }
@@ -4524,7 +4569,7 @@ int chase_def_entry_acyclicity(struct name_table *nt, struct def_entry *ent) {
 int check_def_acyclicity(struct checkstate *cs) {
   for (size_t i = 0, e = cs->nt.defs_count; i < e; i++) {
     struct def_entry *ent = cs->nt.defs[i];
-    if (!chase_def_entry_acyclicity(&cs->nt, ent)) {
+    if (!chase_def_entry_acyclicity(cs->im, &cs->nt, ent)) {
       return 0;
     }
   }
@@ -4723,9 +4768,9 @@ int check_file_test_def_1(const uint8_t *name, size_t name_count,
 
 int check_file_test_def_2(const uint8_t *name, size_t name_count,
                           uint8_t **data_out, size_t *data_count_out) {
-  /* Fails because numeric literals are dumb and have type i32. */
   struct test_module a[] = { { "foo",
                                "def x u32 = 3;\n" } };
+  /* Passes because numeric literals ain't so dumb anymore. */
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);
@@ -4829,6 +4874,7 @@ int check_file_test_lambda_8(const uint8_t *name, size_t name_count,
 
 int check_file_test_lambda_9(const uint8_t *name, size_t name_count,
                              uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because typechecking can't see that 5 is an i32. */
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
                                "def y fn[i32, i32] = func(z i32)i32 {\n"
@@ -5166,7 +5212,7 @@ int check_file_test_extern_2(const uint8_t *name, size_t name_count,
       "foo",
       "extern putchar fn[i32, i32];\n"
       "def foo fn[i32] = func()i32 {\n"
-      "  putchar(65u);\n"
+      "  putchar(@[u32]65);\n"
       "  putchar(10);\n"
       "  return 1;\n"
       "};\n"
@@ -5307,11 +5353,11 @@ int check_file_test_more_8(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def[T] add32 fn[i32, T, i32] = func(x i32, y T) i32 {\n"
-      "  var z i32 = ~4;\n"
+      "  var z i32 = 4;\n"
       "  return x + z;\n"
       "};\n"
       "def bar fn[i32] = func() i32 {\n"
-      "  return add32(3, 4u);\n"
+      "  return add32(3, @[u32]4);\n"
       "};\n"
     } };
 
@@ -5325,7 +5371,7 @@ int check_file_test_more_9(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
-      "  return 4u;\n"
+      "  return @[u32] 4;\n"
       "};\n"
     } };
 
@@ -5337,7 +5383,7 @@ int check_file_test_more_10(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
-      "def x i32 = ~4u;\n"
+      "def x i32 = ~ @[u32]4;\n"
     } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
@@ -5380,7 +5426,7 @@ int check_file_test_more_13(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
-      "  return 2 + ~3u;\n"
+      "  return 2 + ~ @[u32]3;\n"
       "};\n"
     } };
   /* Passes because the conversion of ~3u can be inferred. */
@@ -5394,7 +5440,7 @@ int check_file_test_more_14(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
-      "  return 2 + @[i32](~3u);\n"
+      "  return 2 + @[i32](~ @[u32]3);\n"
       "};\n"
     } };
 
@@ -6145,7 +6191,7 @@ int check_file_test_more_55(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def foo = func(x i32, y u32) void {\n"
-      "  1;\n"
+      "  @[i32] 1;\n"
       "};\n"
     } };
 
@@ -6158,7 +6204,7 @@ int check_file_test_more_56(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "func foo(x i32, y u32) void {\n"
-      "  1;\n"
+      "  @[i32] 1;\n"
       "}\n"
     } };
 
@@ -6248,8 +6294,8 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file !check_file_test_def_2...\n");
-  if (!!test_check_module(&im, &check_file_test_def_2, foo)) {
+  DBG("test_check_file check_file_test_def_2...\n");
+  if (!test_check_module(&im, &check_file_test_def_2, foo)) {
     DBG("check_file_test_def_2 fails\n");
     goto cleanup_identmap;
   }
@@ -6296,8 +6342,8 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file check_file_test_lambda_9...\n");
-  if (!test_check_module(&im, &check_file_test_lambda_9, foo)) {
+  DBG("test_check_file !check_file_test_lambda_9...\n");
+  if (!!test_check_module(&im, &check_file_test_lambda_9, foo)) {
     DBG("check_file_test_lambda_9 fails\n");
     goto cleanup_identmap;
   }

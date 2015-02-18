@@ -1,7 +1,7 @@
 import bar;
 import string;
 
-export def foo i32 = ~(1u);
+export def foo i32 = 1;
 
 func fac(x i32) i32 {
   var acc i32 = 1;
@@ -134,8 +134,8 @@ export func showfacs(p *ty, num *u16) ty {
   xptr[0] = 99;
 
   p[1].x = 33;
-  *num = ~29;
-  p[1].y = ~(@[u16]~22 + @[u16]~44);
+  *num = ~ @[u32]29;
+  p[1].y = ~(@[u16]~ @[u32] 22 + @[u16]~ @[u32]44);
 
   var heh [2]ty;
   heh[0] = p[1];
@@ -152,4 +152,4 @@ export func showfacs(p *ty, num *u16) ty {
   return ret;
 }
 
-def u8_value u8 = ~3;
+def u8_value u8 = 3;

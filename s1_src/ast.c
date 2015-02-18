@@ -920,11 +920,15 @@ struct ast_expr_info ast_expr_info_default(void) {
   return ret;
 }
 
-struct ast_expr_info ast_expr_info_incomplete(void) {
+struct ast_expr_info ast_expr_info_incomplete_typed(struct ast_typeexpr partial_type) {
   struct ast_expr_info ret;
   ret.typechecked = AST_TYPECHECKED_INCOMPLETE;
-  ret.type = ast_unknown_garbage();
+  ret.type = partial_type;
   return ret;
+}
+
+struct ast_expr_info ast_expr_info_incomplete(void) {
+  return ast_expr_info_incomplete_typed(ast_unknown_garbage());
 }
 
 struct ast_expr_info ast_expr_info_typechecked_no_temporary(
@@ -1353,6 +1357,9 @@ void ast_typeexpr_init_copy(struct ast_typeexpr *a,
   case AST_TYPEEXPR_UNKNOWN:
     ast_unknown_init_copy(&a->u.unknown, &c->u.unknown);
     break;
+  case AST_TYPEEXPR_NUMERIC:
+    ast_unknown_init_copy(&a->u.numeric, &c->u.numeric);
+    break;
   default:
     UNREACHABLE();
   }
@@ -1378,6 +1385,9 @@ void ast_typeexpr_destroy(struct ast_typeexpr *a) {
   case AST_TYPEEXPR_UNKNOWN:
     ast_unknown_destroy(&a->u.unknown);
     break;
+  case AST_TYPEEXPR_NUMERIC:
+    ast_unknown_destroy(&a->u.numeric);
+    break;
   default:
     UNREACHABLE();
   }
@@ -1392,6 +1402,7 @@ struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a) {
   case AST_TYPEEXPR_UNIONE: return &a->u.unione.meta;
   case AST_TYPEEXPR_ARRAY: return &a->u.arraytype.meta;
   case AST_TYPEEXPR_UNKNOWN: return &a->u.unknown.meta;
+  case AST_TYPEEXPR_NUMERIC: return &a->u.numeric.meta;
   default:
     UNREACHABLE();
   }
@@ -1401,6 +1412,13 @@ struct ast_typeexpr ast_unknown_garbage(void) {
   struct ast_typeexpr ret;
   ret.tag = AST_TYPEEXPR_UNKNOWN;
   ast_unknown_init(&ret.u.unknown, ast_meta_make_garbage());
+  return ret;
+}
+
+struct ast_typeexpr ast_numeric_garbage(void) {
+  struct ast_typeexpr ret;
+  ret.tag = AST_TYPEEXPR_NUMERIC;
+  ast_unknown_init(&ret.u.numeric, ast_meta_make_garbage());
   return ret;
 }
 

@@ -141,6 +141,7 @@ enum ast_typeexpr_tag {
   /* "Concrete" types don't have this field.  (Maybe they don't have
   generic names either, idk.) */
   AST_TYPEEXPR_UNKNOWN,
+  AST_TYPEEXPR_NUMERIC,
 };
 
 struct ast_typeexpr {
@@ -152,6 +153,9 @@ struct ast_typeexpr {
     struct ast_unione unione;
     struct ast_arraytype arraytype;
     struct ast_unknown unknown;
+    /* TODO: We have an ast_unknown field because...?  We have no
+    metadata, there are no numeric expressions. */
+    struct ast_unknown numeric;
   } u;
 };
 
@@ -161,6 +165,7 @@ void ast_typeexpr_destroy(struct ast_typeexpr *a);
 struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a);
 
 struct ast_typeexpr ast_unknown_garbage(void);
+struct ast_typeexpr ast_numeric_garbage(void);
 
 struct varnum {
   size_t value;
@@ -599,6 +604,7 @@ struct ast_expr_info {
 };
 
 struct ast_expr_info ast_expr_info_default(void);
+struct ast_expr_info ast_expr_info_incomplete_typed(struct ast_typeexpr partial_type);
 struct ast_expr_info ast_expr_info_incomplete(void);
 struct ast_expr_info ast_expr_info_typechecked_no_temporary(
     int is_lvalue,

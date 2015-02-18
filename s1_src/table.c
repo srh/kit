@@ -601,11 +601,13 @@ int name_table_add_primitive_type(struct identmap *im,
   return name_table_help_add_deftype_entry(im, t, &new_entry);
 }
 
-int combine_partial_types(struct ast_typeexpr *a,
+int combine_partial_types(struct identmap *im,
+                          struct ast_typeexpr *a,
                           struct ast_typeexpr *b,
                           struct ast_typeexpr *out);
 
-int combine_fields_partial_types(struct ast_vardecl *a_fields,
+int combine_fields_partial_types(struct identmap *im,
+                                 struct ast_vardecl *a_fields,
                                  size_t a_fields_count,
                                  struct ast_vardecl *b_fields,
                                  size_t b_fields_count,
@@ -622,7 +624,7 @@ int combine_fields_partial_types(struct ast_vardecl *a_fields,
       goto fail;
     }
     struct ast_typeexpr type;
-    if (!combine_partial_types(&a_fields[i].type, &b_fields[i].type,
+    if (!combine_partial_types(im, &a_fields[i].type, &b_fields[i].type,
                                &type)) {
       goto fail;
     }
@@ -640,7 +642,25 @@ int combine_fields_partial_types(struct ast_vardecl *a_fields,
   return 1;
 }
 
-int combine_partial_types(struct ast_typeexpr *a,
+int is_numeric_type(struct identmap *im, struct ast_typeexpr *a) {
+  if (!a->tag == AST_TYPEEXPR_NAME) {
+    return 0;
+  }
+
+  ident_value val = a->u.name.value;
+  const char *names[7] = { U8_TYPE_NAME, I8_TYPE_NAME, U16_TYPE_NAME,
+                          I16_TYPE_NAME, U32_TYPE_NAME, I32_TYPE_NAME,
+                          SIZE_TYPE_NAME };
+  for (size_t i = 0; i < (sizeof(names) / sizeof(names[0])); i++) {
+    if (val == identmap_intern_c_str(im, names[i])) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+int combine_partial_types(struct identmap *im,
+                          struct ast_typeexpr *a,
                           struct ast_typeexpr *b,
                           struct ast_typeexpr *out) {
   if (a->tag == AST_TYPEEXPR_UNKNOWN) {
@@ -651,6 +671,24 @@ int combine_partial_types(struct ast_typeexpr *a,
   if (b->tag == AST_TYPEEXPR_UNKNOWN) {
     ast_typeexpr_init_copy(out, a);
     return 1;
+  }
+
+  if (a->tag == AST_TYPEEXPR_NUMERIC) {
+    if (b->tag == AST_TYPEEXPR_NUMERIC || is_numeric_type(im, b)) {
+      ast_typeexpr_init_copy(out, b);
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
+  if (b->tag == AST_TYPEEXPR_NUMERIC) {
+    if (is_numeric_type(im, a)) {
+      ast_typeexpr_init_copy(out, a);
+      return 1;
+    } else {
+      return 0;
+    }
   }
 
   if (a->tag != b->tag) {
@@ -673,7 +711,7 @@ int combine_partial_types(struct ast_typeexpr *a,
     size_t params_count = a->u.app.params_count;
     struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
     for (size_t i = 0; i < params_count; i++) {
-      if (!combine_partial_types(&a->u.app.params[i], &b->u.app.params[i],
+      if (!combine_partial_types(im, &a->u.app.params[i], &b->u.app.params[i],
                                  &params[i])) {
         SLICE_FREE(params, i, ast_typeexpr_destroy);
         return 0;
@@ -689,6 +727,7 @@ int combine_partial_types(struct ast_typeexpr *a,
     struct ast_vardecl *fields;
     size_t fields_count;
     if (!combine_fields_partial_types(
+            im,
             a->u.structe.fields, a->u.structe.fields_count,
             b->u.structe.fields, b->u.structe.fields_count,
             &fields, &fields_count)) {
@@ -703,6 +742,7 @@ int combine_partial_types(struct ast_typeexpr *a,
     struct ast_vardecl *fields;
     size_t fields_count;
     if (!combine_fields_partial_types(
+            im,
             a->u.unione.fields, a->u.unione.fields_count,
             b->u.unione.fields, b->u.unione.fields_count,
             &fields, &fields_count)) {
@@ -718,7 +758,7 @@ int combine_partial_types(struct ast_typeexpr *a,
       return 0;
     }
     struct ast_typeexpr param;
-    if (!combine_partial_types(a->u.arraytype.param, b->u.arraytype.param, &param)) {
+    if (!combine_partial_types(im, a->u.arraytype.param, b->u.arraytype.param, &param)) {
       return 0;
     }
     out->tag = AST_TYPEEXPR_ARRAY;
@@ -731,12 +771,14 @@ int combine_partial_types(struct ast_typeexpr *a,
   }
 }
 
-int learn_materializations(struct ast_generics *g,
+int learn_materializations(struct identmap *im,
+                           struct ast_generics *g,
                            struct ast_typeexpr *materialized,
                            struct ast_typeexpr *type,
                            struct ast_typeexpr *partial_type);
 
-int learn_fields_materializations(struct ast_generics *g,
+int learn_fields_materializations(struct identmap *im,
+                                  struct ast_generics *g,
                                   struct ast_typeexpr *materialized,
                                   struct ast_vardecl *fields,
                                   size_t fields_count,
@@ -750,7 +792,7 @@ int learn_fields_materializations(struct ast_generics *g,
     if (fields[i].name.value != partial_fields[i].name.value) {
       return 0;
     }
-    if (!learn_materializations(g, materialized,
+    if (!learn_materializations(im, g, materialized,
                                 &fields[i].type,
                                 &partial_fields[i].type)) {
       return 0;
@@ -759,11 +801,15 @@ int learn_fields_materializations(struct ast_generics *g,
   return 1;
 }
 
-int learn_materializations(struct ast_generics *g,
+/* type is a complete type with generics in it, partial_type is a
+concrete partial type, generics/materialized is a mapping from generic
+names to concrete partial types. */
+int learn_materializations(struct identmap *im,
+                           struct ast_generics *g,
                            struct ast_typeexpr *materialized,
                            struct ast_typeexpr *type,
                            struct ast_typeexpr *partial_type) {
-  CHECK(type->tag != AST_TYPEEXPR_UNKNOWN);
+  CHECK(type->tag != AST_TYPEEXPR_UNKNOWN && type->tag != AST_TYPEEXPR_NUMERIC);
   if (partial_type->tag == AST_TYPEEXPR_UNKNOWN) {
     return 1;
   }
@@ -771,13 +817,17 @@ int learn_materializations(struct ast_generics *g,
   if (type->tag == AST_TYPEEXPR_NAME
       && generics_lookup_name(g, type->u.name.value, &which_generic)) {
     struct ast_typeexpr combined;
-    if (!combine_partial_types(&materialized[which_generic], partial_type,
+    if (!combine_partial_types(im, &materialized[which_generic], partial_type,
                                &combined)) {
       return 0;
     }
     ast_typeexpr_destroy(&materialized[which_generic]);
     materialized[which_generic] = combined;
     return 1;
+  }
+
+  if (partial_type->tag == AST_TYPEEXPR_NUMERIC) {
+    return is_numeric_type(im, type);
   }
 
   if (type->tag != partial_type->tag) {
@@ -793,7 +843,7 @@ int learn_materializations(struct ast_generics *g,
       return 0;
     }
     for (size_t i = 0, e = type->u.app.params_count; i < e; i++) {
-      if (!learn_materializations(g, materialized,
+      if (!learn_materializations(im, g, materialized,
                                   &type->u.app.params[i],
                                   &partial_type->u.app.params[i])) {
         return 0;
@@ -802,14 +852,14 @@ int learn_materializations(struct ast_generics *g,
     return 1;
   } break;
   case AST_TYPEEXPR_STRUCTE: {
-    return learn_fields_materializations(g, materialized,
+    return learn_fields_materializations(im, g, materialized,
                                          type->u.structe.fields,
                                          type->u.structe.fields_count,
                                          partial_type->u.structe.fields,
                                          partial_type->u.structe.fields_count);
   } break;
   case AST_TYPEEXPR_UNIONE: {
-    return learn_fields_materializations(g, materialized,
+    return learn_fields_materializations(im, g, materialized,
                                          type->u.unione.fields,
                                          type->u.unione.fields_count,
                                          partial_type->u.unione.fields,
@@ -819,7 +869,7 @@ int learn_materializations(struct ast_generics *g,
     if (type->u.arraytype.count != partial_type->u.arraytype.count) {
       return 0;
     }
-    return learn_materializations(g, materialized, type->u.arraytype.param,
+    return learn_materializations(im, g, materialized, type->u.arraytype.param,
                                   partial_type->u.arraytype.param);
   } break;
   default:
@@ -836,6 +886,7 @@ int is_fields_concrete(struct ast_vardecl *fields, size_t fields_count) {
   return 1;
 }
 
+/* TODO: Rename to "is_complete". */
 int is_concrete(struct ast_typeexpr *type) {
   switch (type->tag) {
   case AST_TYPEEXPR_NAME:
@@ -858,12 +909,15 @@ int is_concrete(struct ast_typeexpr *type) {
     return is_concrete(type->u.arraytype.param);
   case AST_TYPEEXPR_UNKNOWN:
     return 0;
+  case AST_TYPEEXPR_NUMERIC:
+    return 0;
   default:
     UNREACHABLE();
   }
 }
 
 int unify_with_parameterized_type(
+    struct identmap *im,
     struct ast_generics *g,
     struct ast_typeexpr *type,
     struct ast_typeexpr *partial_type,
@@ -878,7 +932,7 @@ int unify_with_parameterized_type(
     materialized[i] = ast_unknown_garbage();
   }
 
-  if (!learn_materializations(g, materialized, type, partial_type)) {
+  if (!learn_materializations(im, g, materialized, type, partial_type)) {
     goto fail;
   }
 
@@ -899,14 +953,14 @@ int unify_with_parameterized_type(
   return 0;
 }
 
-int typelists_equal(struct ast_typeexpr *a, size_t a_count,
+int typelists_equal(struct identmap *im, struct ast_typeexpr *a, size_t a_count,
                     struct ast_typeexpr *b, size_t b_count) {
   if (a_count != b_count) {
     return 0;
   }
 
   for (size_t i = 0; i < a_count; i++) {
-    if (!exact_typeexprs_equal(a, b)) {
+    if (!exact_typeexprs_equal(im, a, b)) {
       return 0;
     }
   }
@@ -915,6 +969,7 @@ int typelists_equal(struct ast_typeexpr *a, size_t a_count,
 }
 
 struct def_instantiation *def_entry_insert_instantiation(
+    struct identmap *im,
     struct def_entry *ent,
     struct ast_typeexpr *materialized,
     size_t materialized_count,
@@ -923,7 +978,7 @@ struct def_instantiation *def_entry_insert_instantiation(
                                ent->generics.params_count : 0));
   for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
     struct def_instantiation *inst = ent->instantiations[i];
-    if (typelists_equal(inst->substitutions, inst->substitutions_count,
+    if (typelists_equal(im, inst->substitutions, inst->substitutions_count,
                         materialized, materialized_count)) {
       return inst;
     }
@@ -942,7 +997,8 @@ struct def_instantiation *def_entry_insert_instantiation(
   return inst;
 }
 
-int def_entry_matches(struct def_entry *ent,
+int def_entry_matches(struct identmap *im,
+                      struct def_entry *ent,
                       struct ast_typeexpr *generics_or_null,
                       size_t generics_count,
                       struct ast_typeexpr *partial_type,
@@ -953,12 +1009,12 @@ int def_entry_matches(struct def_entry *ent,
       return 0;
     }
 
-    if (!unify_directionally(partial_type, &ent->type)) {
+    if (!unify_directionally(im, partial_type, &ent->type)) {
       return 0;
     }
 
     ast_typeexpr_init_copy(unified_type_out, &ent->type);
-    *instantiation_out = def_entry_insert_instantiation(ent, NULL, 0,
+    *instantiation_out = def_entry_insert_instantiation(im, ent, NULL, 0,
                                                         &ent->type);
     return 1;
   }
@@ -973,13 +1029,13 @@ int def_entry_matches(struct def_entry *ent,
                         &ent->type, &ent_concrete_type);
 
     int ret = 0;
-    if (!unify_directionally(partial_type, &ent_concrete_type)) {
+    if (!unify_directionally(im, partial_type, &ent_concrete_type)) {
       goto cleanup_concrete_type;
     }
 
     ret = 1;
     ast_typeexpr_init_copy(unified_type_out, &ent_concrete_type);
-    *instantiation_out = def_entry_insert_instantiation(ent,
+    *instantiation_out = def_entry_insert_instantiation(im, ent,
                                                         generics_or_null,
                                                         generics_count,
                                                         &ent_concrete_type);
@@ -995,7 +1051,8 @@ int def_entry_matches(struct def_entry *ent,
   struct ast_typeexpr *materialized_params;
   size_t materialized_params_count;
   struct ast_typeexpr concrete_type;
-  if (!unify_with_parameterized_type(&ent->generics,
+  if (!unify_with_parameterized_type(im,
+                                     &ent->generics,
                                      &ent->type,
                                      partial_type,
                                      &materialized_params,
@@ -1006,7 +1063,7 @@ int def_entry_matches(struct def_entry *ent,
 
   *unified_type_out = concrete_type;
   *instantiation_out
-    = def_entry_insert_instantiation(ent,
+    = def_entry_insert_instantiation(im, ent,
                                      materialized_params,
                                      materialized_params_count,
                                      unified_type_out);
@@ -1016,7 +1073,8 @@ int def_entry_matches(struct def_entry *ent,
 }
 
 /* TODO: Dedup this with name_table_match_def, this is a copy/paste job. */
-size_t name_table_count_matching_defs(struct name_table *t,
+size_t name_table_count_matching_defs(struct identmap *im,
+                                      struct name_table *t,
                                       struct ast_ident *ident,
                                       struct ast_typeexpr *generics_or_null,
                                       size_t generics_count,
@@ -1042,7 +1100,7 @@ size_t name_table_count_matching_defs(struct name_table *t,
 
     struct ast_typeexpr unified;
     struct def_instantiation *instantiation;
-    if (def_entry_matches(ent, generics_or_null, generics_count,
+    if (def_entry_matches(im, ent, generics_or_null, generics_count,
                           partial_type, &unified, &instantiation)) {
       num_matched = size_add(num_matched, 1);
       ast_typeexpr_destroy(&unified);
@@ -1087,7 +1145,7 @@ int name_table_match_def(struct identmap *im,
 
     struct ast_typeexpr unified;
     struct def_instantiation *instantiation;
-    if (def_entry_matches(ent, generics_or_null, generics_count,
+    if (def_entry_matches(im, ent, generics_or_null, generics_count,
                           partial_type, &unified, &instantiation)) {
       if (matched_ent) {
         ast_typeexpr_destroy(&unified);

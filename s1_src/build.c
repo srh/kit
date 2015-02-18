@@ -3551,12 +3551,16 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
   }
 }
 
-int gen_immediate_numeric_literal(struct objfile *f,
+int gen_immediate_numeric_literal(struct identmap *im,
+                                  struct objfile *f,
                                   struct frame *h,
+                                  struct ast_typeexpr *type,
                                   struct ast_numeric_literal *a,
                                   struct expr_return *er) {
-  switch (a->numeric_type) {
-  case AST_NUMERIC_TYPE_SIGNED: {
+  CHECK(type->tag == AST_TYPEEXPR_NAME);
+  CHECK(is_numeric_type(im, type));
+
+  if (type->u.name.value == identmap_intern_c_str(im, I32_TYPE_NAME)) {
     int32_t value;
     if (!numeric_literal_to_i32(a->digits, a->digits_count, &value)) {
       return 0;
@@ -3567,8 +3571,8 @@ int gen_immediate_numeric_literal(struct objfile *f,
     imm.u.i32 = value;
     expr_return_immediate(f, h, er, imm);
     return 1;
-  } break;
-  case AST_NUMERIC_TYPE_UNSIGNED: {
+  } else if (type->u.name.value == identmap_intern_c_str(im, U32_TYPE_NAME)
+             || type->u.name.value == identmap_intern_c_str(im, SIZE_TYPE_NAME)) {
     uint32_t value;
     if (!numeric_literal_to_u32(a->digits, a->digits_count, &value)) {
       return 0;
@@ -3579,9 +3583,21 @@ int gen_immediate_numeric_literal(struct objfile *f,
     imm.u.u32 = value;
     expr_return_immediate(f, h, er, imm);
     return 1;
-  } break;
-  default:
-    UNREACHABLE();
+  } else if (type->u.name.value == identmap_intern_c_str(im, U8_TYPE_NAME)) {
+    uint8_t value;
+    if (!numeric_literal_to_u8(a->digits, a->digits_count, &value)) {
+      return 0;
+    }
+    struct immediate imm;
+    imm.tag = IMMEDIATE_U8;
+    imm.u.u8 = value;
+    expr_return_immediate(f, h, er, imm);
+    return 1;
+  } else {
+    METERR(a->meta, "Compiler incomplete: Numeric literal resolves to type '%.*s', "
+           "which this lame compiler cannot codegen for literals.\n",
+           IM_P(im, type->u.name.value));
+    return 0;
   }
 }
 
@@ -3695,6 +3711,7 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
           == identmap_intern_c_str(cs->im, ARRAY_LENGTH_FIELDNAME));
     gen_destroy_temp(cs, f, h, *er_tr(&lhs_er));
     struct immediate imm;
+    /* X86 32-bit size specific. */
     imm.tag = IMMEDIATE_U32;
     imm.u.u32 = lhs_type->u.arraytype.count;
     expr_return_immediate(f, h, er, imm);
@@ -3767,7 +3784,8 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
-    return gen_immediate_numeric_literal(f, h, &a->u.numeric_literal, er);
+    return gen_immediate_numeric_literal(cs->im, f, h, ast_expr_type(a),
+                                         &a->u.numeric_literal, er);
   } break;
   case AST_EXPR_CHAR_LITERAL: {
     struct immediate imm;
@@ -3920,7 +3938,9 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     gen_placeholder_jmp_if_false(f, h, cond_loc, target_number);
     frame_restore_offset(h, saved_offset);
 
-    gen_bracebody(cs, f, h, &s->u.ifthen_statement.body);
+    if (!gen_bracebody(cs, f, h, &s->u.ifthen_statement.body)) {
+      return 0;
+    }
 
     frame_define_target(h, target_number,
                         objfile_section_size(objfile_text(f)));
@@ -3940,14 +3960,18 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     gen_placeholder_jmp_if_false(f, h, cond_loc, target_number);
     frame_restore_offset(h, saved_offset);
 
-    gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.thenbody);
+    if (!gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.thenbody)) {
+      return 0;
+    }
 
     size_t end_target_number = frame_add_target(h);
     gen_placeholder_jmp(f, h, end_target_number);
 
     frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
 
-    gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.elsebody);
+    if (!gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.elsebody)) {
+      return 0;
+    }
 
     frame_define_target(h, end_target_number,
                         objfile_section_size(objfile_text(f)));
@@ -3970,7 +3994,9 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     gen_placeholder_jmp_if_false(f, h, cond_loc, bottom_target_number);
     frame_restore_offset(h, saved_offset);
 
-    gen_bracebody(cs, f, h, &s->u.while_statement.body);
+    if (!gen_bracebody(cs, f, h, &s->u.while_statement.body)) {
+      return 0;
+    }
 
     gen_placeholder_jmp(f, h, top_target_number);
     frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
@@ -4004,7 +4030,9 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       frame_restore_offset(h, saved_offset);
     }
 
-    gen_bracebody(cs, f, h, &fs->body);
+    if (!gen_bracebody(cs, f, h, &fs->body)) {
+      return 0;
+    }
 
     if (fs->has_increment) {
       int32_t saved_offset = frame_save_offset(h);
@@ -4068,7 +4096,9 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       vardata_init(&vd, cas->pattern.decl.name.value, varnum, var_type, var_loc);
       SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
-      gen_bracebody(cs, f, h, &cas->body);
+      if (!gen_bracebody(cs, f, h, &cas->body)) {
+        return 0;
+      }
 
       SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
 
@@ -4196,8 +4226,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     objfile_set_symbol_Value(f, di_symbol_table_index(inst),
                             objfile_section_size(objfile_text(f)));
 
-    gen_lambda_expr(cs, f, &value->u.typechecked_lambda);
-    return 1;
+    return gen_lambda_expr(cs, f, &value->u.typechecked_lambda);
   } break;
   default:
     UNREACHABLE();
