@@ -27,12 +27,12 @@ defclass kla struct {
 
 access kla {
   func do_destroy(p *kla) void {
-    p->x = 0u;
-    p->y = 0u;
+    p->x = 0;
+    p->y = 0;
   }
   func do_init(p *kla) void {
-    p->x = 37u;
-    p->y = 47u;
+    p->x = 37;
+    p->y = 47;
   }
 
   func do_copy(a *kla, c *kla) void {

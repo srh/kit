@@ -4668,7 +4668,7 @@ int check_file_test_1(const uint8_t *name, size_t name_count,
                              { "bar",
                                "import foo;\n"
                                "\n"
-                               "def y u32 = 5u;\n" } };
+                               "def y u32 = 5;\n" } };
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);
@@ -5129,7 +5129,7 @@ int check_file_test_lambda_25(const uint8_t *name, size_t name_count,
       "  return rec(biggefy(x));\n"
       "};\n"
       "def bar fn[i32] = func() i32 {\n"
-      "  var x u32 = 5u;\n"
+      "  var x u32 = 5;\n"
       "  return rec(x);\n"
       "};\n"
     } };
@@ -5143,7 +5143,7 @@ int check_file_test_lambda_26(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def x i32 = 3;\n"
-      "def y u32 = 3u + 4u;\n"
+      "def y u32 = 3 + 4;\n"
       "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"
     } };
 
@@ -5244,7 +5244,7 @@ int check_file_test_more_1(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def foo fn[u32, u32] = func(x u32) u32 {\n"
-      "  return x + 4u;\n"
+      "  return x + 4;\n"
       "};"
       "def bar fn[i32, i32] = foo;\n"
       "def foo fn[i32, i32] = func(x i32) i32 {\n"
@@ -5261,7 +5261,7 @@ int check_file_test_more_2(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def foo fn[u32, u32] = func(x u32) u32 {\n"
-      "  return x + 4u;\n"
+      "  return x + 4;\n"
       "};"
       "def bar fn[i32, i32] = foo;\n"
       "def[T] foo fn[T, i32] = func(x T) i32 {\n"
@@ -5279,7 +5279,7 @@ int check_file_test_more_3(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def foo fn[u32, u32] = func(x u32) u32 {\n"
-      "  return x + 4u;\n"
+      "  return x + 4;\n"
       "};"
       "def bar fn[u32, i32] = foo;\n"
       "def[T] foo fn[T, i32] = func(x T) i32 {\n"
@@ -5429,7 +5429,7 @@ int check_file_test_more_13(const uint8_t *name, size_t name_count,
       "  return 2 + ~ @[u32]3;\n"
       "};\n"
     } };
-  /* Passes because the conversion of ~3u can be inferred. */
+  /* Passes because the conversion of ~@[u32]3 can be inferred. */
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);
@@ -5506,8 +5506,8 @@ int check_file_test_more_18(const uint8_t *name, size_t name_count,
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
-      "  var acc u32 = 0u;\n"
-      "  for var i u32 = 0u; i < 10u; i = i + 1u {\n"
+      "  var acc u32 = 0;\n"
+      "  for var i u32 = 0; i < 10; i = i + 1 {\n"
       "    acc = acc + i;\n"
       "  }\n"
       "  return ~acc;\n"
@@ -6223,7 +6223,7 @@ int check_file_test_more_57(const uint8_t *name, size_t name_count,
       "  return ret;\n"
       "}\n"
       "func foo(x u32) notsize {\n"
-      "  return ~(x + 1u);\n"
+      "  return ~(x + 1);\n"
       "}\n"
     } };
 

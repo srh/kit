@@ -2,23 +2,23 @@ extern putchar fn[i32, i32];
 extern flushstdout fn[i32];
 
 def print = func(x u32) u32 {
-  var printed u32 = 0u;
-  if (x == 0u) {
+  var printed u32 = 0;
+  if (x == 0) {
     putchar(48);
-    return 1u;
+    return 1;
   } else {
-    var acc u32 = 0u;
-    var count u32 = 0u;
-    while (x > 0u) {
-      acc = acc * 10u + x % 10u;
-      x = x / 10u;
-      count = count + 1u;
+    var acc u32 = 0;
+    var count u32 = 0;
+    while (x > 0) {
+      acc = acc * 10 + x % 10;
+      x = x / 10;
+      count = count + 1;
     }
     while (printed < count) {
-      var ch i32 = ~(48u | (acc % 10u));
+      var ch i32 = ~(48 | (acc % 10));
       putchar(ch);
-      acc = acc / 10u;
-      printed = printed + 1u;
+      acc = acc / 10;
+      printed = printed + 1;
     }
     return printed;
   }

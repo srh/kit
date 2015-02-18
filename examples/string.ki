@@ -6,14 +6,14 @@ extern free fn[*void, void];
 func[T] alloc_array(n size) *T {
   var u union { vp *void; tp *T; };
   u.vp = malloc(n * sizeof@[T]);
-  for var i size = 0; i < n; i = i + 1u {
+  for var i size = 0; i < n; i = i + 1 {
     init(&u.tp[i]);
   }
   return u.tp;
 }
 
 def[T] delete_array = func(n size, p *T) void {
-  for var i size = 0; i < n; i = i + 1u {
+  for var i size = 0; i < n; i = i + 1 {
     destroy(&p[i]);
   }
   var u union { vp *void; tp *T; };
@@ -41,8 +41,8 @@ defclass move string struct {
 
 access string {
   def do_init = func(p *string) void {
-    p->size = 0u;
-    p->cap = 0u;
+    p->size = 0;
+    p->cap = 0;
     var buf *u8;
     p->buf = buf;
   };
@@ -63,7 +63,7 @@ access string {
   def grow_cap = func(p *string, newcap size) void {
     var buf = alloc_array@[u8](newcap);
     var sz size = p->size;
-    for var i size = 0u; i < sz; i = i + 1u {
+    for var i size = 0; i < sz; i = i + 1 {
       buf[i] = p->buf[i];
     }
 
@@ -75,8 +75,8 @@ access string {
   def append = func(p *string, c u8) void {
     if p->size == p->cap {
       var new_cap size;
-      if (p->cap == 0u) {
-        new_cap = 8u;
+      if (p->cap == 0) {
+        new_cap = 8;
       } else {
         new_cap = p->cap + p->cap;
       }
@@ -84,7 +84,7 @@ access string {
     }
 
     p->buf[p->size] = c;
-    p->size = p->size + 1u;
+    p->size = p->size + 1;
   };
 
   def get = func(p *string, i size) u8 {
@@ -106,7 +106,7 @@ access string {
 }
 
 def print = func(p *string) void {
-  for var i size = 0u; i < count(p); i = i + 1u {
+  for var i size = 0; i < count(p); i = i + 1 {
     var ch i32 = ~get(p, i);
     putchar(ch);
   }
