@@ -10,7 +10,8 @@ extern fread fn[*void, size, size, *FILE, size];
 extern fwrite fn[*void, size, size, *FILE, size];
 // TODO: Add "int" as a built-in?  "c_int"?
 extern fclose fn[*FILE, i32];  // TODO: actually returns "int"
-extern fopen fn[*FILE, i32];  // TODO: actually returns "int"
+// TODO: Add "char" as a built-in?
+extern fopen fn[*u8, *u8, *FILE];
 extern fflush fn[*FILE, i32];   // TODO: actually returns "int"
 // TODO: Add platform-specific tests for stuff like "is EOF -1"
 def EOF i32 = -1;
@@ -31,13 +32,13 @@ func[T] max(x T, y T) T {
 }
 
 func[S, T] cast(p *S) *T {
-  var u union { p *S; q *T; };
+  u union { p *S; q *T; };
   u.p = p;
   return u.q;
 }
 
 func[S, T] up(s S) T {
-  var ret T;
+  ret T;
   ret.~ = s;
   return ret;
 }

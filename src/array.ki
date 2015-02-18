@@ -10,7 +10,7 @@ access array[_] {
   func[T] do_init(r *array[T]) void {
     r->count = 0;
     r->cap = 0;
-    var null *T;
+    null *T;
     r->ptr = null;
   }
 
@@ -18,14 +18,14 @@ access array[_] {
     dest->count = src->count;
     dest->cap = src->cap;
     dest->ptr = cast(malloc(src->count * sizeof@[T]));
-    var e size = src->count;
-    for var i size = 0; i < e; i = i + 1 {
+    e size = src->count;
+    for i size = 0; i < e; i = i + 1 {
       dest->ptr[i] = src->ptr[i];
     }
   }
 
   func[T] do_destroy(r *array[T]) void {
-    for var i size = r->count; i > 0; {
+    for i size = r->count; i > 0; {
       i = i - 1;
       destroy(&r->ptr[i]);
     }
@@ -52,9 +52,9 @@ access array[_] {
 
   func[T] change_cap_(r *array[T], newcap size) void {
     check(newcap >= r->count);
-    var p *T = cast(malloc(newcap * sizeof@[T]));
-    var e size = r->count;
-    for var i size = 0; i < e; i = i + 1 {
+    p *T = cast(malloc(newcap * sizeof@[T]));
+    e size = r->count;
+    for i size = 0; i < e; i = i + 1 {
       move(&p[i], &r->ptr[i]);
     }
     free(@[*void] cast(r->ptr));
@@ -73,7 +73,7 @@ access array[_] {
   }
 
   func[T] append(r *array[T], s *array[T]) void {
-    for var i size = 0; i < s->count; i = i + 1 {
+    for i size = 0; i < s->count; i = i + 1 {
       append(r, s->ptr[i]);
     }
   }
@@ -84,7 +84,7 @@ access array[_] {
 }
 
 func foo() void {
-  var v array[i32];
+  v array[i32];
   var u = v;
   append(&u, 7);
   append(&u, &v);
