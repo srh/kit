@@ -12,14 +12,14 @@ func read_file(path array[u8]) opt[array[u8]] {
 
   dat array[u8];
   buf array[u8] = repeat(0, 16384);
-  done bool = (@[i32]0 == 1);  // TODO: FFS
+  done bool = false;
   while !done {
     nread size = fread(@[*void]cast(data(&buf)), 1, count(&buf), fp);
     check(nread <= count(&buf));
     append_raw(&dat, data(&buf), nread);
     if nread < count(&buf) {
       if 0 != feof(fp) {
-        done = (@[i32]0 == 0);  // TODO: FFS
+        done = true;
       } else {
         fclose(fp);
         return None();

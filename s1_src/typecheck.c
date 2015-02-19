@@ -3741,6 +3741,17 @@ int check_expr_ai(struct exprscope *es,
     }
     return 1;
   } break;
+  case AST_EXPR_BOOL_LITERAL: {
+    struct ast_typeexpr bool_type;
+    init_name_type(&bool_type, identmap_intern_c_str(es->cs->im, BOOL_TYPE_NAME));
+    if (!unify_directionally(es->cs->im, partial_type, &bool_type)) {
+      METERR(x->u.bool_literal.meta, "Bool literal in bad place.%s", "\n");
+      ast_typeexpr_destroy(&bool_type);
+      return 0;
+    }
+    ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, bool_type));
+    return 1;
+  } break;
   case AST_EXPR_CHAR_LITERAL: {
     struct ast_typeexpr char_type;
     init_name_type(&char_type, identmap_intern_c_str(es->cs->im, CHAR_STANDIN_TYPE_NAME));
@@ -4066,6 +4077,12 @@ uint32_t st_u32(struct static_value *value) {
 uint8_t st_u8(struct static_value *value) {
   CHECK(value->tag == STATIC_VALUE_U8);
   return value->u.u8_value;
+}
+
+int st_bool(struct static_value *value) {
+  CHECK(value->tag == STATIC_VALUE_BOOL);
+  CHECK(value->u.bool_value == 0 || value->u.bool_value == 1);
+  return value->u.bool_value;
 }
 
 int apply_static_funcall(struct static_value *func,
@@ -4488,6 +4505,9 @@ int eval_static_value(struct identmap *im,
     return eval_static_numeric_literal(im,
                                        ast_expr_type(expr),
                                        &expr->u.numeric_literal, out);
+  case AST_EXPR_BOOL_LITERAL:
+    static_value_init_bool(out, expr->u.bool_literal.value);
+    return 1;
   case AST_EXPR_CHAR_LITERAL:
     static_value_init_u8(out, expr->u.char_literal.value);
     return 1;

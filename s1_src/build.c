@@ -3799,6 +3799,14 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return gen_immediate_numeric_literal(cs->im, f, h, ast_expr_type(a),
                                          &a->u.numeric_literal, er);
   } break;
+  case AST_EXPR_BOOL_LITERAL: {
+    CHECK(a->u.bool_literal.value == 0 || a->u.bool_literal.value == 1);
+    struct immediate imm;
+    imm.tag = IMMEDIATE_U8;
+    imm.u.u8 = (uint8_t)a->u.bool_literal.value;
+    expr_return_immediate(f, h, er, imm);
+    return 1;
+  } break;
   case AST_EXPR_CHAR_LITERAL: {
     struct immediate imm;
     imm.tag = IMMEDIATE_U8;
@@ -4230,6 +4238,17 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
                              objfile_section_size(objfile_data(f)));
     uint8_t bytes[4] = { 0 };
     bytes[0] = value->u.u8_value;
+    objfile_section_append_raw(objfile_data(f), bytes, 4);
+    return 1;
+  } break;
+  case STATIC_VALUE_BOOL: {
+    /* TODO: How should we align our global bytes? */
+    objfile_section_align_dword(objfile_data(f));
+    objfile_set_symbol_Value(f, di_symbol_table_index(inst),
+                             objfile_section_size(objfile_data(f)));
+    uint8_t bytes[4] = { 0 };
+    CHECK(value->u.bool_value == 0 || value->u.bool_value == 1);
+    bytes[0] = (uint8_t)value->u.bool_value;
     objfile_section_append_raw(objfile_data(f), bytes, 4);
     return 1;
   } break;

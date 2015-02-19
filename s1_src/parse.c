@@ -1455,12 +1455,10 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     ast_expr_partial_init(out, AST_EXPR_LAMBDA, ast_expr_info_default());
     return parse_rest_of_lambda(p, pos_start, &out->u.lambda);
   }
-
   if (try_skip_char(p, '\'')) {
     ast_expr_partial_init(out, AST_EXPR_CHAR_LITERAL, ast_expr_info_default());
     return parse_rest_of_char_literal(p, pos_start, &out->u.char_literal);
   }
-
   if (try_skip_char(p, '\"')) {
     ast_expr_partial_init(out, AST_EXPR_STRING_LITERAL, ast_expr_info_default());
     return parse_rest_of_string_literal(p, pos_start, &out->u.string_literal);
@@ -1471,17 +1469,25 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     ast_expr_partial_init(out, AST_EXPR_NUMERIC_LITERAL, ast_expr_info_default());
     return parse_numeric_literal(p, &out->u.numeric_literal);
   }
+  if (try_skip_keyword(p, "true")) {
+    ast_expr_partial_init(out, AST_EXPR_BOOL_LITERAL, ast_expr_info_default());
+    ast_bool_literal_init(&out->u.bool_literal, ast_meta_make(pos_start, ps_pos(p)), 1);
+    return 1;
+  }
+  if (try_skip_keyword(p, "false")) {
+    ast_expr_partial_init(out, AST_EXPR_BOOL_LITERAL, ast_expr_info_default());
+    ast_bool_literal_init(&out->u.bool_literal, ast_meta_make(pos_start, ps_pos(p)), 0);
+    return 1;
+  }
 
   if (try_skip_char(p, '@')) {
     if (!try_skip_char(p, '[')) {
       return 0;
     }
-
     struct ast_typeexpr type;
     if (!(skip_ws(p) && help_parse_typeexpr(p, ALLOW_BLANKS_YES, &type))) {
       return 0;
     }
-
     struct ast_expr expr;
     if (!(skip_ws(p) && try_skip_char(p, ']') && skip_ws(p)
           && parse_expr(p, &expr, kConversionRightPrecedence))) {
