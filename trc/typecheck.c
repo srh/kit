@@ -2094,46 +2094,92 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
 
   exprscope_note_static_reference(also_maybe_typecheck, ent);
 
-  if (!ent->is_primitive && !ent->is_extern
-      && ent->generics.has_type_params && !inst->typecheck_started) {
-    CHECK(ent->def);
-    CHECK(!inst->annotated_rhs_computed);
-    if (cs->template_instantiation_recursion_depth
-        == MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH) {
-      METERR(ent->def->meta, "Max template instantiation recursion depth exceeded.%s", "\n");
-      goto fail_unified;
+  if (ent->is_primitive) {
+    /* We want to force typechecking of do_copy, do_init, do_move,
+    do_destroy instantiations to happen, if real ones are going to get
+    called here.  (This is real ghetto shit, yeah, because we don't
+    then generate info for build.c to use, it re-figures out all this
+    shit all over again.) */
+
+    /* TODO: avoid this string duping. */
+    if (name->ident.value == identmap_intern_c_str(cs->im, "copy")
+        || name->ident.value == identmap_intern_c_str(cs->im, "move")
+        || name->ident.value == identmap_intern_c_str(cs->im, "destroy")
+        || name->ident.value == identmap_intern_c_str(cs->im, "init")) {
+      CHECK(unified.tag == AST_TYPEEXPR_APP
+            && (unified.u.app.params_count == 2
+                || unified.u.app.params_count == 3));
+      struct ast_typeexpr *optype;
+      if (!view_ptr_target(cs->im, &unified.u.app.params[0], &optype)) {
+        CRASH("Expected copy/move/init/destroy lookup to match pointer type.\n");
+      }
+
+      struct typeexpr_traits traits;
+      if (!check_typeexpr_traits(cs, optype, also_maybe_typecheck, &traits)) {
+        goto fail_unified;
+      }
+
+      if (name->ident.value == identmap_intern_c_str(cs->im, "copy")) {
+        if (traits.copyable == TYPEEXPR_TRAIT_LACKED) {
+          METERR(name->meta, "Copy trait lacked.%s", "\n");
+          goto fail_unified;
+        }
+      } else if (name->ident.value == identmap_intern_c_str(cs->im, "move")) {
+        if (traits.movable == TYPEEXPR_TRAIT_LACKED) {
+          METERR(name->meta, "Copy trait lacked.%s", "\n");
+          goto fail_unified;
+        }
+      } else if (name->ident.value == identmap_intern_c_str(cs->im, "init")) {
+        if (traits.inittible == TYPEEXPR_TRAIT_LACKED) {
+          METERR(name->meta, "Init trait lacked.%s", "\n");
+          goto fail_unified;
+        }
+      }
+      // else: Everything is destroyable, that was already checked by
+      // check_typeexpr_traits.
     }
+  } else {
+    if (!ent->is_extern && ent->generics.has_type_params
+        && !inst->typecheck_started) {
+      CHECK(ent->def);
+      CHECK(!inst->annotated_rhs_computed);
+      if (cs->template_instantiation_recursion_depth
+          == MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH) {
+        METERR(ent->def->meta, "Max template instantiation recursion depth exceeded.%s", "\n");
+        goto fail_unified;
+      }
 
-    cs->template_instantiation_recursion_depth++;
+      cs->template_instantiation_recursion_depth++;
 
-    inst->typecheck_started = 1;
-    struct exprscope scope;
-    exprscope_init(&scope, cs,
-                   &ent->def->generics,
-                   inst->substitutions,
-                   inst->substitutions_count,
-                   ent->accessible,
-                   ent->accessible_count,
-                   STATIC_COMPUTATION_YES,
-                   ent);
+      inst->typecheck_started = 1;
+      struct exprscope scope;
+      exprscope_init(&scope, cs,
+                     &ent->def->generics,
+                     inst->substitutions,
+                     inst->substitutions_count,
+                     ent->accessible,
+                     ent->accessible_count,
+                     STATIC_COMPUTATION_YES,
+                     ent);
 
-    struct ast_expr annotated_rhs;
-    ast_expr_init_copy(&annotated_rhs, &ent->def->rhs);
-    if (!check_expr(&scope, &annotated_rhs, &unified)) {
-      ast_expr_destroy(&annotated_rhs);
+      struct ast_expr annotated_rhs;
+      ast_expr_init_copy(&annotated_rhs, &ent->def->rhs);
+      if (!check_expr(&scope, &annotated_rhs, &unified)) {
+        ast_expr_destroy(&annotated_rhs);
+        exprscope_destroy(&scope);
+        cs->template_instantiation_recursion_depth--;
+        DBG("... when instantiating '%.*s'.\n", IM_P(cs->im, ent->name));
+        goto fail_unified;
+      }
+
+      /* We just assume there's no temporaries, no constructors or
+      destructors, because the expression was statically computable. */
+
+      di_set_annotated_rhs(inst, annotated_rhs);
+
       exprscope_destroy(&scope);
       cs->template_instantiation_recursion_depth--;
-      DBG("... when instantiating '%.*s'.\n", IM_P(cs->im, ent->name));
-      goto fail_unified;
     }
-
-    /* We just assume there's no temporaries, no constructors or
-    destructors, because the expression was statically computable. */
-
-    di_set_annotated_rhs(inst, annotated_rhs);
-
-    exprscope_destroy(&scope);
-    cs->template_instantiation_recursion_depth--;
   }
 
   *out = unified;
@@ -4639,6 +4685,7 @@ int compute_static_values(struct identmap *im, struct name_table *nt, struct def
         break;
       }
     } else {
+      CHECK(inst->typecheck_started);
       struct static_value value;
       if (!eval_static_value(im, di_annotated_rhs(inst), &value)) {
         return 0;

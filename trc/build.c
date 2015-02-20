@@ -2193,7 +2193,10 @@ struct expr_return demand_expr_return(struct loc loc) {
 
 void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                         struct def_instantiation *inst) {
+  /* This would just be crazy. */
+  CHECK(!inst->owner->is_primitive);
   /* Dupes checks with gen_inst_value. */
+  CHECK(inst->value_computed);
   CHECK(inst->owner->is_extern || inst->owner->is_primitive || inst->typecheck_started);
   CHECK(typeexpr_is_func_type(cs->im, &inst->type));
 

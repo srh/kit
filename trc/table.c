@@ -1015,6 +1015,10 @@ int def_entry_matches(struct identmap *im,
                       struct ast_typeexpr *generics_or_null,
                       size_t generics_count,
                       struct ast_typeexpr *partial_type,
+                      /* In particular, this affects whether we create
+                      an instantiation or not, which the caller would
+                      be responsible for typechecking. */
+                      int build_return_values,
                       struct ast_typeexpr *unified_type_out,
                       struct def_instantiation **instantiation_out) {
   if (!ent->generics.has_type_params) {
@@ -1026,10 +1030,12 @@ int def_entry_matches(struct identmap *im,
       return 0;
     }
 
-    ast_typeexpr_init_copy(unified_type_out, &ent->type);
-    *instantiation_out = def_entry_insert_instantiation(im, ent, NULL, 0,
-                                                        &ent->type);
-    return 1;
+    if (build_return_values) {
+      ast_typeexpr_init_copy(unified_type_out, &ent->type);
+      *instantiation_out = def_entry_insert_instantiation(im, ent, NULL, 0,
+                                                          &ent->type);
+      return 1;
+    }
   }
 
   if (generics_or_null) {
@@ -1047,11 +1053,13 @@ int def_entry_matches(struct identmap *im,
     }
 
     ret = 1;
-    ast_typeexpr_init_copy(unified_type_out, &ent_concrete_type);
-    *instantiation_out = def_entry_insert_instantiation(im, ent,
-                                                        generics_or_null,
-                                                        generics_count,
-                                                        &ent_concrete_type);
+    if (build_return_values) {
+      ast_typeexpr_init_copy(unified_type_out, &ent_concrete_type);
+      *instantiation_out = def_entry_insert_instantiation(im, ent,
+                                                          generics_or_null,
+                                                          generics_count,
+                                                          &ent_concrete_type);
+    }
   cleanup_concrete_type:
     ast_typeexpr_destroy(&ent_concrete_type);
     return ret;
@@ -1074,12 +1082,16 @@ int def_entry_matches(struct identmap *im,
     return 0;
   }
 
-  *unified_type_out = concrete_type;
-  *instantiation_out
-    = def_entry_insert_instantiation(im, ent,
-                                     materialized_params,
-                                     materialized_params_count,
-                                     unified_type_out);
+  if (build_return_values) {
+    *unified_type_out = concrete_type;
+    *instantiation_out
+      = def_entry_insert_instantiation(im, ent,
+                                       materialized_params,
+                                       materialized_params_count,
+                                       unified_type_out);
+  } else {
+    ast_typeexpr_destroy(&concrete_type);
+  }
   SLICE_FREE(materialized_params, materialized_params_count,
              ast_typeexpr_destroy);
   return 1;
@@ -1111,12 +1123,10 @@ size_t name_table_count_matching_defs(struct identmap *im,
     struct def_entry *ent = node->ent;
     CHECK(ent->name == name);
 
-    struct ast_typeexpr unified;
-    struct def_instantiation *instantiation;
     if (def_entry_matches(im, ent, generics_or_null, generics_count,
-                          partial_type, &unified, &instantiation)) {
+                          partial_type,
+                          0, NULL, NULL)) {
       num_matched = size_add(num_matched, 1);
-      ast_typeexpr_destroy(&unified);
     }
   }
 
@@ -1159,7 +1169,7 @@ int name_table_match_def(struct identmap *im,
     struct ast_typeexpr unified;
     struct def_instantiation *instantiation;
     if (def_entry_matches(im, ent, generics_or_null, generics_count,
-                          partial_type, &unified, &instantiation)) {
+                          partial_type, 1, &unified, &instantiation)) {
       if (matched_ent) {
         ast_typeexpr_destroy(&unified);
         /* TODO: This error message should not be here, since matching

@@ -13,15 +13,19 @@ deftype ast_ident struct {
   value ident_value;
 };
 
-defenum ast_numeric_literal_tag {
-  AST_NUMERIC_LITERAL_DEC void;
-  AST_NUMERIC_LITERAL_HEX void;
+deftype ast_hex_literal struct {
+  meta ast_meta;
+  digits array[i8];
 };
 
-deftype ast_numeric_literal struct {
+deftype ast_dec_literal struct {
   meta ast_meta;
-  tag ast_numeric_literal_tag;
   digits array[i8];
+};
+
+defenum ast_numeric_literal {
+  HexLiteral ast_hex_literal;
+  DecLiteral ast_dec_literal;
 };
 
 deftype ast_bool_literal struct {
@@ -29,14 +33,19 @@ deftype ast_bool_literal struct {
   value bool;
 };
 
-deftype ast_char_literal struct {
+deftype ast_charspec struct {
   meta ast_meta;
   value u8;
 };
 
+deftype ast_char_literal struct {
+  meta ast_meta;
+  charspec ast_charspec;
+};
+
 deftype ast_string_literal struct {
   meta ast_meta;
-  values array[u8];
+  charspecs array[ast_charspec];
 };
 
 deftype ast_funcall struct {
@@ -63,10 +72,7 @@ deftype ast_unione struct {
 
 deftype ast_arraytype struct {
   meta ast_meta;
-  /* TODO: This should be a (statically evaluable) expr.  But such an
-  expr would need to be analyzed for sizeof and alignof expressions
-  when seen in another type. */
-  count u32;
+  count uniq[ast_expr];
   param uniq[ast_typeexpr];
 };
 
