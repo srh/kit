@@ -1,3 +1,4 @@
+import arity;
 import identmap;
 import pos;
 import uniq;
@@ -98,16 +99,8 @@ func ast_typeexpr_meta(a ast_typeexpr) ast_meta {
   }
 }
 
-deftype varnum size;
-
-deftype ast_var_info struct {
-  varnum varnum;
-  concrete_type ast_typeexpr;
-};
-
 deftype ast_vardecl struct {
   meta ast_meta;
-  var_info opt[ast_var_info];
   name ast_ident;
   type ast_typeexpr;
 };
@@ -147,7 +140,7 @@ deftype ast_for_statement struct {
   // Can only be an ast_expr or ast_statement_var. */
   initializer opt[uniq[ast_statement]];
   condition opt[uniq[ast_expr]];
-  increment opt[uniq[ast_increment]];
+  increment opt[uniq[ast_expr]];
   body ast_bracebody;
 };
 
@@ -174,14 +167,8 @@ defenum ast_statement {
   Switch ast_switch_statement;
 };
 
-deftype ast_case_pattern_info struct {
-  // TODO: Wrap in a wrapper type.
-  constructor_number size;
-};
-
 deftype ast_case_pattern struct {
   meta ast_meta;
-  info opt[ast_case_pattern_info];
   constructor_name ast_ident;
   decl ast_vardecl;
 };
@@ -204,12 +191,6 @@ deftype ast_lambda struct {
 defenum ast_unop {
   UnopDereference void;
   UnopAddressof void;
-  // Ops below are seen while parsing, but don't show up in
-  // ast_unop_expr.
-  UnopNegate void;
-  UnopConvert void;
-  UnopLogicalNot void;
-  UnopBitwiseNot void;
 };
 
 deftype ast_unop_expr struct {
@@ -220,22 +201,134 @@ deftype ast_unop_expr struct {
 
 defenum ast_binop {
   BinopAssign void;
-  BinopAdd void;
-  BinopSub void;
-  BinopMul void;
-  BinopDiv void;
-  BinopMod void;
-  BinopLt void;
-  BinopLe void;
-  BinopGt void;
-  BinopGe void;
-  BinopEq void;
-  BinopNe void;
-  BinopBitXor void;
-  BinopBitAnd void;
-  BinopBitLeftshift void;
-  BinopBitRightshift void;
   BinopLogicalOr void;
   BinopLogicalAnd void;
+};
+
+deftype ast_binop_expr struct {
+  meta ast_meta;
+  operator ast_binop;
+  lhs uniq[ast_expr];
+  rhs uniq[ast_expr];
+};
+
+defenum ast_fieldname {
+  WholeField void;
+  NameField ast_ident;
+};
+
+deftype ast_local_field struct {
+  meta ast_meta;
+  lhs uniq[ast_expr];
+  fieldname ast_fieldname;
+};
+
+deftype ast_deref_field struct {
+  meta ast_meta;
+  lhs uniq[ast_expr];
+  fieldname ast_fieldname;
+};
+
+deftype ast_name_expr struct {
+  meta ast_meta;
+  ident ast_ident;
+  generic_params opt[array[ast_typeexpr]];
+};
+
+deftype ast_index_expr struct {
+  meta ast_meta;
+  lhs uniq[ast_expr];
+  rhs uniq[ast_expr];
+};
+
+deftype ast_typed_expr struct {
+  meta ast_meta;
+  type ast_typeexpr;
+  expr uniq[ast_expr];
+};
+
+defenum ast_expr {
+  NameExpr ast_name_expr;
+  NumericLiteral ast_numeric_literal;
+  BoolLiteral ast_bool_literal;
+  CharLiteral ast_char_literal;
+  StringLiteral ast_string_literal;
+  Funcall ast_funcall;
+  IndexExpr ast_index_expr;
+  UnopExpr ast_unop_expr;
+  BinopExpr ast_binop_expr;
+  Lambda ast_lambda;
+  LocalField ast_local_field;
+  DerefField ast_deref_field;
+  TypedExpr ast_typed_expr;
+};
+
+defenum ast_generics {
+  NoGenerics void;
+  HasGenerics array[ast_ident];
+};
+
+deftype ast_def struct {
+  meta ast_meta;
+  is_export bool;
+  generics ast_generics;
+  name ast_ident;
+  typeexpr opt[ast_typeexpr];
+  rhs ast_expr;
+};
+
+deftype ast_extern_def struct {
+  meta ast_meta;
+  name ast_ident;
+  type ast_typeexpr;
+};
+
+deftype ast_import struct {
+  meta ast_meta;
+  name ast_ident;
+};
+
+deftype ast_enumspec struct {
+  enumfields array[ast_vardecl];
+};
+
+defenum ast_deftype_rhs {
+  TypeexprRhs ast_typeexpr;
+  EnumSpecRhs ast_enumspec;
+};
+
+defenum ast_deftype_disposition {
+  DispositionNotClass void;
+  DispositionClassDefaultCopyMoveDestroy void;
+  DispositionClassDefaultMove void;
+  DispositionClassNoDefaults void;
+};
+
+// TODO: This is gross.
+deftype ast_deftype struct {
+  meta ast_meta;
+  disposition ast_deftype_disposition;
+  generics ast_generics;
+  name ast_ident;
+  rhs ast_deftype_rhs;
+};
+
+deftype ast_access struct {
+  meta ast_meta;
+  name ast_ident;
+  arity generics_arity;
+  toplevels array[ast_toplevel];
+};
+
+defenum ast_toplevel {
+  import ast_import;
+  def ast_def;
+  extern_def ast_extern_def;
+  deftype ast_deftype;
+  access ast_access;
+};
+
+deftype ast_file struct {
+  toplevels array[ast_toplevel];
 };
 

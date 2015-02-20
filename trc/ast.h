@@ -578,22 +578,6 @@ void ast_typed_expr_init_copy(struct ast_typed_expr *a,
                               struct ast_typed_expr *c);
 
 
-enum ast_expr_tag {
-  AST_EXPR_NAME,
-  AST_EXPR_NUMERIC_LITERAL,
-  AST_EXPR_BOOL_LITERAL,
-  AST_EXPR_CHAR_LITERAL,
-  AST_EXPR_STRING_LITERAL,
-  AST_EXPR_FUNCALL,
-  AST_EXPR_INDEX,
-  AST_EXPR_UNOP,
-  AST_EXPR_BINOP,
-  AST_EXPR_LAMBDA,
-  AST_EXPR_LOCAL_FIELD_ACCESS,
-  AST_EXPR_DEREF_FIELD_ACCESS,
-  AST_EXPR_TYPED,
-};
-
 enum ast_typechecked {
   AST_TYPECHECKED_NO,
   AST_TYPECHECKED_YES,
@@ -642,6 +626,22 @@ struct ast_expr_info ast_expr_info_typechecked_temporary(
     size_t temptag);
 struct ast_expr_info ast_expr_info_typechecked_identical(
     struct ast_expr_info *info);
+
+enum ast_expr_tag {
+  AST_EXPR_NAME,
+  AST_EXPR_NUMERIC_LITERAL,
+  AST_EXPR_BOOL_LITERAL,
+  AST_EXPR_CHAR_LITERAL,
+  AST_EXPR_STRING_LITERAL,
+  AST_EXPR_FUNCALL,
+  AST_EXPR_INDEX,
+  AST_EXPR_UNOP,
+  AST_EXPR_BINOP,
+  AST_EXPR_LAMBDA,
+  AST_EXPR_LOCAL_FIELD_ACCESS,
+  AST_EXPR_DEREF_FIELD_ACCESS,
+  AST_EXPR_TYPED,
+};
 
 struct ast_expr {
   enum ast_expr_tag tag;
