@@ -2,7 +2,7 @@ import array;
 import stdlib;
 
 // The type K must have the following functions implemented:
-// func hash_compute_hash(K *x) size;
+// func hash_compute_hash(K *x) osize;
 // func hash_equal(K *x, K *y) bool;
 
 defclass[K, V] copy hash struct {
@@ -24,48 +24,47 @@ access hash[_, _] {
     check(h->count * 2 < new_limit);
 
     new_array array[opt[pair[K, V]]] = repeat(None@[pair[K, V]](), new_limit);
-    old_limit = count(h->arr);
+    old_limit size = count(&h->arr);
     for i size = 0; i < old_limit; i = i + 1 {
-      switch h->arr[i] {
+      switch get(&h->arr, i) {
         case None(v): { }
         case Has(p): {
-          offset size = hash_compute_hash(&p.car) & new_mask;
+          offset size = ~hash_compute_hash(&p.car) & new_mask;
           step size = 1;
           done bool = false;
           while !done {
-            switch new_array[offset] {
+            switch get(&new_array, offset) {
               case None(v): { done = true; }
-              case Has(p): {
+              case Has(new_p): {
                 offset = (offset + step) & new_mask;
                 step = step + 1;
               }
             }
           }
 
-          new_array[offset] = h->arr[i];
+          set(&new_array, offset, get(&h->arr, i));
         }
       }
     }
 
-    m->arr = new_array;
+    h->arr = new_array;
   }
 
-  func[K, V] insert(h *hash[K, V], key K, value V) bool {
-    if count(h->arr) == 0 {
+  func[K, V] try_insert(h *hash[K, V], key K, value V) bool {
+    if count(&h->arr) == 0 {
       rebuild_(h, 8);
     }
 
-    mask size = count(h->arr) - 1;
-    offset size = hash_compute_hash(&key) & mask;
+    mask size = count(&h->arr) - 1;
+    offset size = ~hash_compute_hash(&key) & mask;
     step size = 1;
-    done bool = false;
-    while !done {
-      switch h->arr[offset] {
+    for ;; {
+      switch get(&h->arr, offset) {
         case None(v): {
-          h->arr[offset] = Has(cons(key, value));
+          set(&h->arr, offset, Has(cons(key, value)));
           h->count = h->count + 1;
-          if h->count * 2 >= count(h->arr) {
-            rebuild_(h, count(h->arr) * 2);
+          if h->count * 2 >= count(&h->arr) {
+            rebuild_(h, count(&h->arr) * 2);
           }
           return true;
         }
@@ -81,11 +80,11 @@ access hash[_, _] {
   }
 
   func[K, V] lookup(h *hash[K, V], key K) opt[V] {
-    mask size = count(h->arr) - 1;
-    offset size = hash_compute_hash(&key) & mask;
+    mask size = count(&h->arr) - 1;
+    offset size = ~hash_compute_hash(&key) & mask;
     step size = 1;
     for ;; {
-      switch h->arr[offset] {
+      switch get(&h->arr, offset) {
         case None(v): {
           return None();
         }
@@ -100,4 +99,3 @@ access hash[_, _] {
     }
   }
 }
-

@@ -40,7 +40,11 @@ func[S, T] cons(s S, t T) pair[S, T] {
   return ret;
 }
 
-
+func[S, T] wrapconvert(x T) S {
+  ret S;
+  ret.~ = x;
+  return ret;
+}
 
 func check(x bool) void {
   if x { abort(); }

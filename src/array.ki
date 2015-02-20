@@ -34,7 +34,7 @@ access array[_] {
 
   func[T] set(r *array[T], i size, val T) void {
     check(i < r->count);
-    (*r)[i] = val;
+    r->ptr[i] = val;
   }
 
   func[T] get(r *array[T], i size) T {

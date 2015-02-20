@@ -2,11 +2,7 @@ import array;
 
 deftype string array[u8];
 
-func `~`(x array[u8]) string {
-  ret string;
-  ret.~ = x;
-  return ret;
-}
+def `~` fn[array[u8], string] = wrapconvert;
 
 func[T] make(raw_arr T) string {
   return ~make@[array[u8], T](raw_arr);
@@ -24,12 +20,11 @@ func count(s *string) size {
   return count(&s->~);
 }
 
-// TODO: Return msize.
-func hash_compute_hash(x *string) size {
+func hash_compute_hash(x *string) osize {
   p *u8 = data(x);
-  accum size = 12345;  // TODO: 0x123456789, msize
+  accum osize = 0x12345679;
   for i size = 0; i < count(x); i = i + 1 {
-    accum = ((accum * 33) ^ ~p[i]) & 65535;
+    accum = (accum * 33) ^ ~p[i];
   }
   return accum;
 }
