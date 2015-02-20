@@ -656,14 +656,14 @@ int combine_fields_partial_types(struct identmap *im,
 }
 
 int is_numeric_type(struct identmap *im, struct ast_typeexpr *a) {
-  if (!a->tag == AST_TYPEEXPR_NAME) {
+  if (a->tag != AST_TYPEEXPR_NAME) {
     return 0;
   }
 
   ident_value val = a->u.name.value;
-  const char *names[7] = { U8_TYPE_NAME, I8_TYPE_NAME, U16_TYPE_NAME,
-                          I16_TYPE_NAME, U32_TYPE_NAME, I32_TYPE_NAME,
-                          SIZE_TYPE_NAME };
+  const char *names[8] = { U8_TYPE_NAME, I8_TYPE_NAME, U16_TYPE_NAME,
+                           I16_TYPE_NAME, U32_TYPE_NAME, I32_TYPE_NAME,
+                           SIZE_TYPE_NAME, OSIZE_TYPE_NAME };
   for (size_t i = 0; i < (sizeof(names) / sizeof(names[0])); i++) {
     if (val == identmap_intern_c_str(im, names[i])) {
       return 1;

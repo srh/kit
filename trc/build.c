@@ -2344,6 +2344,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_CONVERT_U8_TO_U16: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U8_TO_I16: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U8_TO_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_U8_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U8_TO_U32: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U8_TO_I32: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
@@ -2371,6 +2372,12 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_test_regs8(f, X86_AL, X86_AL);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
+    /* I haven't thought hard about how converting to osize should
+    work, but I think sign extending and not failing is the right
+    thing.  My opinion might change if we add a signed osize type, in
+    which u32 -> osize -> sosize -> i32 might be the unchecking
+    conversion (but isn't that gross). */
+  case PRIMITIVE_OP_CONVERT_I8_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I8_TO_I32: {
     x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
   } break;
@@ -2394,6 +2401,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U16_TO_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_U16_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U16_TO_U32: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U16_TO_I32: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
@@ -2425,11 +2433,16 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_test_regs32(f, X86_EAX, X86_EAX);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
+  case PRIMITIVE_OP_CONVERT_I16_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I16_TO_I32: {
     x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
   } break;
 
   case PRIMITIVE_OP_CONVERT_SIZE_TO_U8: /* fallthrough */
+    /* I think (without having thought hard) that converting _from_
+    osize should fail if data is _lost_ but not if the osize variable,
+    intepreted with the same signedness, has the same value. */
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_U8: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U32_TO_U8: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
@@ -2442,6 +2455,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_U16: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_U16: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U32_TO_U16: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_cmp_imm32(f, X86_EAX, 0xFFFF);
@@ -2454,8 +2468,13 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_SIZE_TO_U32: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_U32: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U32_TO_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_U32_TO_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_SIZE_TO_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
   } break;
@@ -2471,6 +2490,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_I8: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I32_TO_I8: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_cmp_imm32(f, X86_EAX, 0x7F);
@@ -2483,6 +2503,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_cmp_imm32(f, X86_EAX, 0xFFFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_I16: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I32_TO_I16: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_cmp_imm32(f, X86_EAX, 0x7FFF);
@@ -2496,6 +2517,8 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_test_regs32(f, X86_EAX, X86_EAX);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_I32: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_I32_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
   } break;
@@ -2545,6 +2568,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_BIT_NOT_I32: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_BIT_NOT_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_not_w32(f, X86_EAX);
@@ -2936,6 +2960,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_DIV_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_DIV_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_DIV_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
@@ -2944,6 +2969,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     /* Divide by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_MOD_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_MOD_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_MOD_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
@@ -2953,48 +2979,58 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     /* Modulus by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_LT_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_LT_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_LT_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_B);
   } break;
   case PRIMITIVE_OP_LE_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_LE_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_LE_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_BE);
   } break;
   case PRIMITIVE_OP_GT_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_GT_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_GT_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_A);
   } break;
   case PRIMITIVE_OP_GE_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_GE_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_GE_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_AE);
   } break;
   case PRIMITIVE_OP_EQ_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_EQ_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_EQ_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
   } break;
   case PRIMITIVE_OP_NE_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_NE_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_NE_U32: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
   } break;
   case PRIMITIVE_OP_BIT_XOR_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_BIT_XOR_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_XOR_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_xor_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_OR_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_BIT_OR_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_OR_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_or_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_AND_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_BIT_AND_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_AND_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
     x86_gen_and_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
@@ -3006,6 +3042,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_shl_cl_w32(f, X86_EAX);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
@@ -3102,6 +3139,22 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_sar_cl_w32(f, X86_EAX);
+  } break;
+
+  case PRIMITIVE_OP_ADD_OSIZE: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_add_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_SUB_OSIZE: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_sub_w32(f, X86_EAX, X86_ECX);
+  } break;
+  case PRIMITIVE_OP_MUL_OSIZE: {
+    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    x86_gen_eaxedx_mul_w32(f, X86_ECX);
   } break;
 
   default:
@@ -3584,7 +3637,8 @@ int gen_immediate_numeric_literal(struct identmap *im,
     expr_return_immediate(f, h, er, imm);
     return 1;
   } else if (type->u.name.value == identmap_intern_c_str(im, U32_TYPE_NAME)
-             || type->u.name.value == identmap_intern_c_str(im, SIZE_TYPE_NAME)) {
+             || type->u.name.value == identmap_intern_c_str(im, SIZE_TYPE_NAME)
+             || type->u.name.value == identmap_intern_c_str(im, OSIZE_TYPE_NAME)) {
     uint32_t value;
     if (!numeric_literal_to_u32(a, &value)) {
       return 0;

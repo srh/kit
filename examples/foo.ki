@@ -104,6 +104,13 @@ def try_string = func() void {
   print(&x);
 };
 
+func try_osize() void {
+  ox osize = 1;
+  var oy = ox - 2;
+  print(@[u32]~oy);
+  putchar(10);
+}
+
 export func showfacs(p *ty, num *u16) ty {
   try_kla();
   try_string();
@@ -141,6 +148,8 @@ export func showfacs(p *ty, num *u16) ty {
   heh[0] = p[1];
   heh[0].x = ^34;
   p[1] = heh[0];
+
+  try_osize();
 
   var void_value void;
 

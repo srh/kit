@@ -21,6 +21,8 @@ struct ast_numeric_literal;
 #define U32_TYPE_NAME "u32"
 #define I32_TYPE_NAME "i32"
 #define SIZE_TYPE_NAME "size"
+/* osize arithmetic doesn't check overflow. */
+#define OSIZE_TYPE_NAME "osize"
 #define PTR_TYPE_NAME "ptr"
 #define FUNC_TYPE_NAME "fn"
 #define BOOL_TYPE_NAME "bool"

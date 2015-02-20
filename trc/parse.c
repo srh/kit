@@ -1824,6 +1824,7 @@ int parse_rest_of_arraytype(struct ps *p, enum allow_blanks allow_blanks,
     if (!try_uint32_add(count, (uint32_t)ch_value, &count)) {
       return 0;
     }
+    ps_step(p);
   }
 
   ps_count_leaf(p);
@@ -2590,7 +2591,7 @@ int parse_test_defs(void) {
                          "def foo u8 = '\\x2A';\n",
                          8);
   pass &= run_count_test("def24",
-                         "def foo [1]u8 = \"\\x2Abcdef\";\n",
+                         "def foo [11]u8 = \"\\x2Abcdef\";\n",
                          15);
   pass &= run_count_test("def25",
                          "def a b = func() c {\n"

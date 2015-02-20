@@ -254,6 +254,28 @@ static const enum primitive_op_tag binop_size_primitive_ops[] = {
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
 
+static const enum primitive_op_tag binop_osize_primitive_ops[] = {
+  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_OSIZE,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_OSIZE,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_OSIZE,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_OSIZE,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_OSIZE,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_OSIZE,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_OSIZE,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_OSIZE,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_OSIZE,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_OSIZE,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_OSIZE,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_OSIZE,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_OSIZE,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_OSIZE,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_OSIZE,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_OSIZE,
+  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
+};
+
 
 
 
@@ -290,6 +312,7 @@ void checkstate_import_primitive_types(struct checkstate *cs) {
   intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0, 4, 4);
   /* X86 -- 32-bit sizes */
   intern_primitive_type(cs, SIZE_TYPE_NAME, NULL, 0, 4, 4);
+  intern_primitive_type(cs, OSIZE_TYPE_NAME, NULL, 0, 4, 4);
 
   int not_flatly_held[20] = { 0 };
   /* X86 -- 32-bit pointers */
@@ -422,8 +445,8 @@ void import_bool_binops(struct checkstate *cs) {
 }
 
 void import_integer_conversions(struct checkstate *cs) {
-  const size_t num_types = 7;
-  ident_value types[7];
+  const size_t num_types = 8;
+  ident_value types[8];
   types[0] = identmap_intern_c_str(cs->im, U8_TYPE_NAME);
   types[1] = identmap_intern_c_str(cs->im, I8_TYPE_NAME);
   types[2] = identmap_intern_c_str(cs->im, U16_TYPE_NAME);
@@ -431,13 +454,14 @@ void import_integer_conversions(struct checkstate *cs) {
   types[4] = identmap_intern_c_str(cs->im, U32_TYPE_NAME);
   types[5] = identmap_intern_c_str(cs->im, I32_TYPE_NAME);
   types[6] = identmap_intern_c_str(cs->im, SIZE_TYPE_NAME);
+  types[7] = identmap_intern_c_str(cs->im, OSIZE_TYPE_NAME);
 
   ident_value convert = identmap_intern_c_str(cs->im, CONVERT_FUNCTION_NAME);
 
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
 
-  enum primitive_op_tag conversions[7][7] = {
+  enum primitive_op_tag conversions[8][8] = {
     {
       PRIMITIVE_OP_CONVERT_U8_TO_U8,
       PRIMITIVE_OP_CONVERT_U8_TO_I8,
@@ -446,6 +470,7 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_U8_TO_U32,
       PRIMITIVE_OP_CONVERT_U8_TO_I32,
       PRIMITIVE_OP_CONVERT_U8_TO_SIZE,
+      PRIMITIVE_OP_CONVERT_U8_TO_OSIZE,
     }, {
       PRIMITIVE_OP_CONVERT_I8_TO_U8,
       PRIMITIVE_OP_CONVERT_I8_TO_I8,
@@ -454,6 +479,7 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_I8_TO_U32,
       PRIMITIVE_OP_CONVERT_I8_TO_I32,
       PRIMITIVE_OP_CONVERT_I8_TO_SIZE,
+      PRIMITIVE_OP_CONVERT_I8_TO_OSIZE,
     }, {
       PRIMITIVE_OP_CONVERT_U16_TO_U8,
       PRIMITIVE_OP_CONVERT_U16_TO_I8,
@@ -462,6 +488,7 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_U16_TO_U32,
       PRIMITIVE_OP_CONVERT_U16_TO_I32,
       PRIMITIVE_OP_CONVERT_U16_TO_SIZE,
+      PRIMITIVE_OP_CONVERT_U16_TO_OSIZE,
     }, {
       PRIMITIVE_OP_CONVERT_I16_TO_U8,
       PRIMITIVE_OP_CONVERT_I16_TO_I8,
@@ -470,6 +497,7 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_I16_TO_U32,
       PRIMITIVE_OP_CONVERT_I16_TO_I32,
       PRIMITIVE_OP_CONVERT_I16_TO_SIZE,
+      PRIMITIVE_OP_CONVERT_I16_TO_OSIZE,
     }, {
       PRIMITIVE_OP_CONVERT_U32_TO_U8,
       PRIMITIVE_OP_CONVERT_U32_TO_I8,
@@ -478,6 +506,7 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_U32_TO_U32,
       PRIMITIVE_OP_CONVERT_U32_TO_I32,
       PRIMITIVE_OP_CONVERT_U32_TO_SIZE,
+      PRIMITIVE_OP_CONVERT_U32_TO_OSIZE,
     }, {
       PRIMITIVE_OP_CONVERT_I32_TO_U8,
       PRIMITIVE_OP_CONVERT_I32_TO_I8,
@@ -486,6 +515,7 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_I32_TO_U32,
       PRIMITIVE_OP_CONVERT_I32_TO_I32,
       PRIMITIVE_OP_CONVERT_I32_TO_SIZE,
+      PRIMITIVE_OP_CONVERT_I32_TO_OSIZE,
     }, {
       PRIMITIVE_OP_CONVERT_SIZE_TO_U8,
       PRIMITIVE_OP_CONVERT_SIZE_TO_I8,
@@ -494,6 +524,16 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_SIZE_TO_U32,
       PRIMITIVE_OP_CONVERT_SIZE_TO_I32,
       PRIMITIVE_OP_CONVERT_SIZE_TO_SIZE,
+      PRIMITIVE_OP_CONVERT_SIZE_TO_OSIZE,
+    }, {
+      PRIMITIVE_OP_CONVERT_OSIZE_TO_U8,
+      PRIMITIVE_OP_CONVERT_OSIZE_TO_I8,
+      PRIMITIVE_OP_CONVERT_OSIZE_TO_U16,
+      PRIMITIVE_OP_CONVERT_OSIZE_TO_I16,
+      PRIMITIVE_OP_CONVERT_OSIZE_TO_U32,
+      PRIMITIVE_OP_CONVERT_OSIZE_TO_I32,
+      PRIMITIVE_OP_CONVERT_OSIZE_TO_SIZE,
+      PRIMITIVE_OP_CONVERT_OSIZE_TO_OSIZE,
     },
   };
 
@@ -675,6 +715,7 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
   import_integer_binops(cs, binop_u32_primitive_ops, U32_TYPE_NAME);
   import_integer_binops(cs, binop_i32_primitive_ops, I32_TYPE_NAME);
   import_integer_binops(cs, binop_size_primitive_ops, SIZE_TYPE_NAME);
+  import_integer_binops(cs, binop_osize_primitive_ops, OSIZE_TYPE_NAME);
 
   import_integer_conversions(cs);
 
@@ -693,6 +734,7 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_I32, "^", I32_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_U32, "^", U32_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_SIZE, "^", SIZE_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_BIT_NOT_OSIZE, "^", OSIZE_TYPE_NAME);
   }
 
   import_sizeof_alignof(cs);
@@ -6332,6 +6374,20 @@ int check_file_test_more_60(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_61(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "func foo(x osize, y size) osize {\n"
+      "  return x + ~y;\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+
 
 
 
@@ -6956,6 +7012,12 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_60...\n");
   if (!!test_check_module(&im, &check_file_test_more_60, foo)) {
     DBG("check_file_test_more_60 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_61...\n");
+  if (!test_check_module(&im, &check_file_test_more_61, foo)) {
+    DBG("check_file_test_more_61 fails\n");
     goto cleanup_identmap;
   }
 
