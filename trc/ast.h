@@ -86,13 +86,13 @@ void ast_string_literal_init_copy(struct ast_string_literal *a,
 
 struct ast_funcall {
   struct ast_meta meta;
-  struct ast_expr *func;
+  struct ast_exprcall *func;
   struct ast_exprcall *args;
   size_t args_count;
 };
 
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
-                      struct ast_expr func,
+                      struct ast_exprcall func,
                       struct ast_exprcall *args, size_t args_count);
 
 struct ast_typeexpr;
@@ -150,7 +150,7 @@ enum ast_typeexpr_tag {
   AST_TYPEEXPR_STRUCTE,
   AST_TYPEEXPR_UNIONE,
   AST_TYPEEXPR_ARRAY,
-  /* "Concrete" types don't have this field.  (Maybe they don't have
+  /* "Complete" types don't have these fields.  (Maybe they don't have
   generic names either, idk.) */
   AST_TYPEEXPR_UNKNOWN,
   AST_TYPEEXPR_NUMERIC,
@@ -356,6 +356,7 @@ void ast_statement_alloc_move(struct ast_statement movee,
 
 struct ast_case_pattern_info {
   int info_valid;
+  /* TODO: Wrap in a wrapper type. */
   size_t constructor_number;
 };
 
@@ -400,6 +401,7 @@ struct ast_lambda {
   struct ast_vardecl *params;
   size_t params_count;
   struct ast_typeexpr return_type;
+  /* TODO: Rename field to body. */
   struct ast_bracebody bracebody;
 };
 
@@ -676,6 +678,7 @@ int ast_expr_is_lvalue(struct ast_expr *a);
 struct ast_meta *ast_expr_ast_meta(struct ast_expr *a);
 struct pos ast_expr_pos_end(struct ast_expr *a);
 void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out);
+void ast_expr_alloc_init_copy(struct ast_expr *c, struct ast_expr **out);
 
 enum ast_exprcatch_behavior {
   /* The value an ast_expr returns, which is a whole_thing temporary,
@@ -708,6 +711,10 @@ void ast_exprcall_annotate(struct ast_exprcall *a,
                            struct ast_exprcatch catch);
 void ast_exprcall_init_copy(struct ast_exprcall *a, struct ast_exprcall *c);
 void ast_exprcall_destroy(struct ast_exprcall *a);
+void ast_exprcall_alloc_move(struct ast_exprcall a,
+                             struct ast_exprcall **out);
+void ast_exprcall_alloc_init_copy(struct ast_exprcall *c,
+                                  struct ast_exprcall **out);
 
 struct ast_generics {
   int has_type_params;  /* 0 or 1 -- meta & params is uninitialized if 0. */

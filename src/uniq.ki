@@ -1,0 +1,32 @@
+import stdlib;
+
+defclass[T] move uniq *T;
+
+access uniq[_] {
+  func[T] do_init(u *uniq[T]) void {
+    nullp *T;
+    u->~ = nullp;
+  }
+
+  func[T] do_copy(dest *uniq[T], src *uniq[T]) void {
+    nullp *T;
+    if src->~ == nullp {
+      dest->~ = nullp;
+    } else {
+      dest->~ = @[*T]cast(checkmalloc(sizeof@[T]));
+      copy(dest->~, src->~);
+    }
+  }
+
+  func[T] do_destroy(u *uniq[T]) void {
+    nullp *T;
+    if u->~ == nullp {
+      destroy(u->~);
+    }
+    free(@[*void]cast(u->~));
+  }
+
+  func[T] oo(x *uniq[T]) *T {
+    return x->~;
+  }
+}

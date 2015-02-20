@@ -123,31 +123,24 @@ void ast_string_literal_destroy(struct ast_string_literal *a) {
 }
 
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
-                      struct ast_expr func,
+                      struct ast_exprcall func,
                       struct ast_exprcall *args, size_t args_count) {
   a->meta = meta;
-  ast_expr_alloc_move(func, &a->func);
+  ast_exprcall_alloc_move(func, &a->func);
   a->args = args;
   a->args_count = args_count;
 }
 
-void ast_expr_alloc_init_copy(struct ast_expr *c, struct ast_expr **out) {
-  struct ast_expr *a = malloc(sizeof(*a));
-  CHECK(a);
-  ast_expr_init_copy(a, c);
-  *out = a;
-}
-
 void ast_funcall_init_copy(struct ast_funcall *a, struct ast_funcall *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  ast_expr_alloc_init_copy(c->func, &a->func);
+  ast_exprcall_alloc_init_copy(c->func, &a->func);
 
   SLICE_INIT_COPY(a->args, a->args_count, c->args, c->args_count, ast_exprcall_init_copy);
 }
 
 void ast_funcall_destroy(struct ast_funcall *a) {
   ast_meta_destroy(&a->meta);
-  ast_expr_destroy(a->func);
+  ast_exprcall_destroy(a->func);
   free(a->func);
   a->func = NULL;
   SLICE_FREE(a->args, a->args_count, ast_exprcall_destroy);
@@ -1219,6 +1212,13 @@ void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out) {
   *out = p;
 }
 
+void ast_expr_alloc_init_copy(struct ast_expr *c, struct ast_expr **out) {
+  struct ast_expr *a = malloc(sizeof(*a));
+  CHECK(a);
+  ast_expr_init_copy(a, c);
+  *out = a;
+}
+
 void ast_exprcatch_init(struct ast_exprcatch *a) {
   a->info_valid = 0;
   a->behavior = (enum ast_exprcatch_behavior)-1;
@@ -1265,6 +1265,22 @@ void ast_exprcall_init_copy(struct ast_exprcall *a, struct ast_exprcall *c) {
 void ast_exprcall_destroy(struct ast_exprcall *a) {
   ast_exprcatch_destroy(&a->catch);
   ast_expr_destroy(&a->expr);
+}
+
+void ast_exprcall_alloc_move(struct ast_exprcall a,
+                             struct ast_exprcall **out) {
+  struct ast_exprcall *p = malloc(sizeof(*p));
+  CHECK(p);
+  *p = a;
+  *out = p;
+}
+
+void ast_exprcall_alloc_init_copy(struct ast_exprcall *c,
+                                  struct ast_exprcall **out) {
+  struct ast_exprcall *a = malloc(sizeof(*a));
+  CHECK(a);
+  ast_exprcall_init_copy(a, c);
+  *out = a;
 }
 
 void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,

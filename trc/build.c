@@ -3168,7 +3168,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   size_t args_count = a->u.funcall.args_count;
 
   struct expr_return func_er = free_expr_return();
-  if (!gen_expr(cs, f, h, a->u.funcall.func, &func_er)) {
+  /* TODO: We must use exprcatch information to see if we should free
+  a temporary. */
+  if (!gen_expr(cs, f, h, &a->u.funcall.func->expr, &func_er)) {
     return 0;
   }
 
@@ -3223,7 +3225,8 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   } break;
   case EXPR_RETURN_FREE_LOC: {
     struct loc func_loc;
-    wipe_temporaries(cs, f, h, &func_er, ast_expr_type(a->u.funcall.func), &func_loc);
+    wipe_temporaries(cs, f, h, &func_er,
+                     ast_expr_type(&a->u.funcall.func->expr), &func_loc);
     gen_load_register(f, X86_EAX, func_loc);
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_indirect_call_reg(f, X86_EAX);

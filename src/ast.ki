@@ -1,5 +1,6 @@
-import pos;
 import identmap;
+import pos;
+import uniq;
 
 deftype ast_meta struct {
   pos_start pos;
@@ -10,3 +11,231 @@ deftype ast_ident struct {
   meta ast_meta;
   value ident_value;
 };
+
+defenum ast_numeric_literal_tag {
+  AST_NUMERIC_LITERAL_DEC void;
+  AST_NUMERIC_LITERAL_HEX void;
+};
+
+deftype ast_numeric_literal struct {
+  meta ast_meta;
+  tag ast_numeric_literal_tag;
+  digits array[i8];
+};
+
+deftype ast_bool_literal struct {
+  meta ast_meta;
+  value bool;
+};
+
+deftype ast_char_literal struct {
+  meta ast_meta;
+  value u8;
+};
+
+deftype ast_string_literal struct {
+  meta ast_meta;
+  values array[u8];
+};
+
+deftype ast_funcall struct {
+  meta ast_meta;
+  func uniq[ast_expr];
+  args array[ast_expr];
+};
+
+deftype ast_typeapp struct {
+  meta ast_meta;
+  name ast_ident;
+  params array[ast_typeexpr];
+};
+
+deftype ast_structe struct {
+  meta ast_meta;
+  fields array[ast_vardecl];
+};
+
+deftype ast_unione struct {
+  meta ast_meta;
+  fields array[ast_vardecl];
+};
+
+deftype ast_arraytype struct {
+  meta ast_meta;
+  /* TODO: This should be a (statically evaluable) expr.  But such an
+  expr would need to be analyzed for sizeof and alignof expressions
+  when seen in another type. */
+  count u32;
+  param uniq[ast_typeexpr];
+};
+
+deftype ast_unknown struct {
+  meta ast_meta;
+};
+
+defenum ast_typeexpr {
+  Name ast_ident;
+  App ast_typeapp;
+  Structe ast_structe;
+  Unione ast_unione;
+  Arraytype ast_arraytype;
+  // "Complete" types don't have these fields.
+  Unknown ast_unknown;
+  /* TODO: We have an ast_unknown field because...?  We have no
+  metadata, there are no numeric expressions. */
+  Numeric ast_unknown;
+};
+
+func ast_typeexpr_meta(a ast_typeexpr) ast_meta {
+  switch a {
+    case Name(v): { return v.meta; }
+    case App(v): { return v.meta; }
+    case Structe(v): { return v.meta; }
+    case Unione(v): { return v.meta; }
+    case Arraytype(v): { return v.meta; }
+    case Unknown(v): { return v.meta; }
+    case Numeric(v): { return v.meta; }
+  }
+}
+
+deftype varnum size;
+
+deftype ast_var_info struct {
+  varnum varnum;
+  concrete_type ast_typeexpr;
+};
+
+deftype ast_vardecl struct {
+  meta ast_meta;
+  var_info opt[ast_var_info];
+  name ast_ident;
+  type ast_typeexpr;
+};
+
+deftype ast_bracebody struct {
+  meta ast_meta;
+  statements array[ast_statement];
+};
+
+deftype ast_var_statement struct {
+  meta ast_meta;
+  decl ast_vardecl;
+  rhs opt[uniq[ast_expr]];
+};
+
+deftype ast_ifthen_statement struct {
+  meta ast_meta;
+  condition uniq[ast_expr];
+  body ast_bracebody;
+};
+
+deftype ast_ifthenelse_statement struct {
+  meta ast_meta;
+  condition uniq[ast_expr];
+  thenbody ast_bracebody;
+  elsebody ast_bracebody;
+};
+
+deftype ast_while_statement struct {
+  meta ast_meta;
+  condition uniq[ast_expr];
+  body ast_bracebody;
+};
+
+deftype ast_for_statement struct {
+  meta ast_meta;
+  // Can only be an ast_expr or ast_statement_var. */
+  initializer opt[uniq[ast_statement]];
+  condition opt[uniq[ast_expr]];
+  increment opt[uniq[ast_increment]];
+  body ast_bracebody;
+};
+
+deftype ast_switch_statement struct {
+  meta ast_meta;
+  swartch uniq[ast_expr];
+  cased_statements array[ast_cased_statement];
+};
+
+deftype ast_return_statement struct {
+  meta ast_meta;
+  // If no expr, it returns void.
+  expr opt[uniq[ast_expr]];
+};
+
+defenum ast_statement {
+  Expr ast_expr;
+  Return ast_return_statement;
+  Var ast_var_statement;
+  IfThen ast_ifthen_statement;
+  IfThenElse ast_ifthenelse_statement;
+  While ast_while_statement;
+  For ast_for_statement;
+  Switch ast_switch_statement;
+};
+
+deftype ast_case_pattern_info struct {
+  // TODO: Wrap in a wrapper type.
+  constructor_number size;
+};
+
+deftype ast_case_pattern struct {
+  meta ast_meta;
+  info opt[ast_case_pattern_info];
+  constructor_name ast_ident;
+  decl ast_vardecl;
+};
+
+// TODO: Rename.
+deftype ast_cased_statement struct {
+  meta ast_meta;
+  pattern ast_case_pattern;
+  body ast_bracebody;
+};
+
+deftype ast_lambda struct {
+  meta ast_meta;
+  params array[ast_vardecl];
+  return_type ast_typeexpr;
+  // TODO: Rename field to body.
+  bracebody ast_bracebody;
+};
+
+defenum ast_unop {
+  UnopDereference void;
+  UnopAddressof void;
+  // Ops below are seen while parsing, but don't show up in
+  // ast_unop_expr.
+  UnopNegate void;
+  UnopConvert void;
+  UnopLogicalNot void;
+  UnopBitwiseNot void;
+};
+
+deftype ast_unop_expr struct {
+  meta ast_meta;
+  operator ast_unop;
+  rhs uniq[ast_expr];
+};
+
+defenum ast_binop {
+  BinopAssign void;
+  BinopAdd void;
+  BinopSub void;
+  BinopMul void;
+  BinopDiv void;
+  BinopMod void;
+  BinopLt void;
+  BinopLe void;
+  BinopGt void;
+  BinopGe void;
+  BinopEq void;
+  BinopNe void;
+  BinopBitXor void;
+  BinopBitAnd void;
+  BinopBitLeftshift void;
+  BinopBitRightshift void;
+  BinopLogicalOr void;
+  BinopLogicalAnd void;
+};
+

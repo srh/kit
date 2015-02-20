@@ -2444,7 +2444,7 @@ int check_funcall_funcexpr_ai(struct exprscope *es,
                               struct ast_exprcall *args,
                               size_t args_count,
                               struct ast_typeexpr *partial_type,
-                              struct ast_expr *func) {
+                              struct ast_exprcall *func) {
   struct ast_typeexpr funcexpr;
   {
     size_t args_types_count = size_add(args_count, 1);
@@ -2464,7 +2464,7 @@ int check_funcall_funcexpr_ai(struct exprscope *es,
                      args_types, args_types_count);
   }
 
-  int ret = check_expr_ai(es, ai, func, &funcexpr);
+  int ret = check_expr_ai(es, ai, &func->expr, &funcexpr);
   ast_typeexpr_destroy(&funcexpr);
   return ret;
 }
@@ -2486,14 +2486,14 @@ int check_expr_funcall(struct exprscope *es,
     goto fail;
   }
 
-  if (ast_expr_incomplete(x->func)) {
+  if (ast_expr_incomplete(&x->func->expr)) {
     ast_expr_update(y, ast_expr_info_incomplete());
     CHECK(ai == ALLOW_INCOMPLETE_YES);
     return 1;
   }
 
   if (an_arg_incomplete) {
-    struct ast_typeexpr *func_type = ast_expr_type(x->func);
+    struct ast_typeexpr *func_type = ast_expr_type(&x->func->expr);
     if (!check_funcall_args_secondcheck(es, func_type, x->args, args_count)) {
       goto fail;
     }
@@ -2508,8 +2508,14 @@ int check_expr_funcall(struct exprscope *es,
     ast_exprcall_annotate(&x->args[i], arg_exprcatch);
   }
 
+  struct ast_exprcatch func_exprcatch;
+  if (!compute_and_check_exprcatch(es, &x->func->expr, &func_exprcatch)) {
+    goto fail;
+  }
+  ast_exprcall_annotate(x->func, func_exprcatch);
+
   struct ast_typeexpr return_type;
-  copy_func_return_type(es->cs->im, ast_expr_type(x->func),
+  copy_func_return_type(es->cs->im, ast_expr_type(&x->func->expr),
                         size_add(args_count, 1), &return_type);
 
   struct ast_typeexpr temporary_type;
@@ -4512,7 +4518,7 @@ int eval_static_funcall(struct identmap *im,
                         struct static_value *out) {
   int ret = 0;
   struct static_value func_value;
-  if (!eval_static_value(im, funcall->func, &func_value)) {
+  if (!eval_static_value(im, &funcall->func->expr, &func_value)) {
     goto cleanup;
   }
 
