@@ -228,16 +228,18 @@ void ast_bracebody_destroy(struct ast_bracebody *a) {
   SLICE_FREE(a->statements, a->statements_count, ast_statement_destroy);
 }
 
-void ast_var_statement_init_with_rhs(struct ast_var_statement *a, struct ast_meta meta,
-                                     struct ast_vardecl decl, struct ast_expr rhs) {
+void ast_var_statement_init_with_rhs(
+    struct ast_var_statement *a, struct ast_meta meta,
+    struct ast_vardecl decl, struct ast_exprcall rhs) {
   a->meta = meta;
   a->decl = decl;
   a->has_rhs = 1;
-  ast_expr_alloc_move(rhs, &a->rhs);
+  ast_exprcall_alloc_move(rhs, &a->rhs);
 }
 
-void ast_var_statement_init_without_rhs(struct ast_var_statement *a, struct ast_meta meta,
-                                        struct ast_vardecl decl) {
+void ast_var_statement_init_without_rhs(
+    struct ast_var_statement *a, struct ast_meta meta,
+    struct ast_vardecl decl) {
   a->meta = meta;
   a->decl = decl;
   a->has_rhs = 0;
@@ -254,7 +256,7 @@ void ast_var_statement_init_copy(struct ast_var_statement *a,
   ast_vardecl_init_copy(&a->decl, &c->decl);
   a->has_rhs = c->has_rhs;
   if (c->has_rhs) {
-    ast_expr_alloc_init_copy(c->rhs, &a->rhs);
+    ast_exprcall_alloc_init_copy(c->rhs, &a->rhs);
   } else {
     c->rhs = NULL;
   }
@@ -265,7 +267,7 @@ void ast_var_statement_destroy(struct ast_var_statement *a) {
   ast_vardecl_destroy(&a->decl);
   if (a->has_rhs) {
     a->has_rhs = 0;
-    ast_expr_destroy(a->rhs);
+    ast_exprcall_destroy(a->rhs);
     free(a->rhs);
     a->rhs = NULL;
   }
@@ -1251,6 +1253,7 @@ void ast_exprcall_init(struct ast_exprcall *a, struct ast_expr expr) {
 
 void ast_exprcall_annotate(struct ast_exprcall *a,
                            struct ast_exprcatch catch) {
+  CHECK(ast_expr_checked_and_complete(&a->expr));
   CHECK(!a->catch.info_valid);
   CHECK(catch.info_valid);
   ast_exprcatch_destroy(&a->catch);
@@ -1265,6 +1268,12 @@ void ast_exprcall_init_copy(struct ast_exprcall *a, struct ast_exprcall *c) {
 void ast_exprcall_destroy(struct ast_exprcall *a) {
   ast_exprcatch_destroy(&a->catch);
   ast_expr_destroy(&a->expr);
+}
+
+struct ast_exprcall ast_exprcall_make(struct ast_expr expr) {
+  struct ast_exprcall ret;
+  ast_exprcall_init(&ret, expr);
+  return ret;
 }
 
 void ast_exprcall_alloc_move(struct ast_exprcall a,

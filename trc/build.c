@@ -3982,12 +3982,15 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       int32_t saved_offset = frame_save_offset(h);
 
       struct expr_return er = demand_expr_return(var_loc);
-      if (!gen_expr(cs, f, h, s->u.var_statement.rhs, &er)) {
+      /* TODO: Exprcatch information must be used. */
+      if (!gen_expr(cs, f, h, &s->u.var_statement.rhs->expr, &er)) {
         return 0;
       }
       /* Do nothing -- er is var_loc, there is nothing to destroy. */
       frame_restore_offset(h, saved_offset);
     } else {
+      /* TODO: Var statement explicit initialization instructions must
+      be used. */
       gen_default_construct(cs, f, h, var_loc, var_type);
     }
 

@@ -741,7 +741,7 @@ int parse_rest_of_var_statement(struct ps *p, struct pos pos_start,
   }
 
   ast_var_statement_init_with_rhs(out, ast_meta_make(pos_start, ps_pos(p)),
-                                  decl, rhs);
+                                  decl, ast_exprcall_make(rhs));
   return 1;
 
  fail_rhs:
@@ -1045,7 +1045,7 @@ enum triparse_result triparse_naked_var_statement(
   }
 
   ast_var_statement_init_with_rhs(out, ast_meta_make(pos_start, ps_pos(p)),
-                                  decl, rhs);
+                                  decl, ast_exprcall_make(rhs));
   return TRIPARSE_SUCCESS;
 
  error_rhs:
@@ -1330,11 +1330,9 @@ void build_unop_expr(struct ast_meta meta,
     ast_expr_partial_init(out, AST_EXPR_UNOP, ast_expr_info_default());
     ast_unop_expr_init(&out->u.unop_expr, meta, unop, rhs);
   } else {
-    struct ast_expr func_expr;
-    ast_expr_partial_init(&func_expr, AST_EXPR_NAME, ast_expr_info_default());
-    ast_name_expr_init(&func_expr.u.name, unop_name);
-    struct ast_exprcall func;
-    ast_exprcall_init(&func, func_expr);
+    struct ast_expr func;
+    ast_expr_partial_init(&func, AST_EXPR_NAME, ast_expr_info_default());
+    ast_name_expr_init(&func.u.name, unop_name);
 
     struct ast_exprcall *args = malloc_mul(sizeof(*args), 1);
     ast_exprcall_init(&args[0], rhs);
@@ -1342,7 +1340,7 @@ void build_unop_expr(struct ast_meta meta,
     ast_expr_partial_init(out, AST_EXPR_FUNCALL, ast_expr_info_default());
 
     ast_funcall_init(&out->u.funcall, meta,
-                     func, args, 1);
+                     ast_exprcall_make(func), args, 1);
   }
 }
 
@@ -1358,11 +1356,9 @@ void build_binop_expr(struct ast_meta meta,
     ast_binop_expr_init(&out->u.binop_expr,
                         meta, binop, old_lhs, rhs);
   } else {
-    struct ast_expr func_expr;
-    ast_expr_partial_init(&func_expr, AST_EXPR_NAME, ast_expr_info_default());
-    ast_name_expr_init(&func_expr.u.name, binop_name);
-    struct ast_exprcall func;
-    ast_exprcall_init(&func, func_expr);
+    struct ast_expr func;
+    ast_expr_partial_init(&func, AST_EXPR_NAME, ast_expr_info_default());
+    ast_name_expr_init(&func.u.name, binop_name);
 
     struct ast_exprcall *args = malloc_mul(sizeof(*args), 2);
     ast_exprcall_init(&args[0], old_lhs);
@@ -1370,7 +1366,7 @@ void build_binop_expr(struct ast_meta meta,
 
     ast_expr_partial_init(out, AST_EXPR_FUNCALL, ast_expr_info_default());
     ast_funcall_init(&out->u.funcall, meta,
-                     func, args, 2);
+                     ast_exprcall_make(func), args, 2);
   }
 }
 
@@ -1617,12 +1613,10 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
         goto fail;
       }
       struct ast_expr old_lhs = lhs;
-      struct ast_exprcall old_lhscall;
-      ast_exprcall_init(&old_lhscall, old_lhs);
       ast_expr_partial_init(&lhs, AST_EXPR_FUNCALL, ast_expr_info_default());
       ast_funcall_init(&lhs.u.funcall,
                        ast_meta_make(pos_start, ps_pos(p)),
-                       old_lhscall,
+                       ast_exprcall_make(old_lhs),
                        args,
                        args_count);
     } else if (try_skip_char(p, '[')) {

@@ -226,14 +226,18 @@ void ast_bracebody_destroy(struct ast_bracebody *a);
 struct ast_var_statement {
   struct ast_meta meta;
   struct ast_vardecl decl;
+  /* TODO: In the case of no RHS, there must be explicit
+  initialization instructions. */
   int has_rhs;
-  struct ast_expr *rhs;
+  struct ast_exprcall *rhs;
 };
 
-void ast_var_statement_init_with_rhs(struct ast_var_statement *a, struct ast_meta meta,
-                                     struct ast_vardecl decl, struct ast_expr rhs);
-void ast_var_statement_init_without_rhs(struct ast_var_statement *a, struct ast_meta meta,
-                                        struct ast_vardecl decl);
+void ast_var_statement_init_with_rhs(
+    struct ast_var_statement *a, struct ast_meta meta,
+    struct ast_vardecl decl, struct ast_exprcall rhs);
+void ast_var_statement_init_without_rhs(
+    struct ast_var_statement *a, struct ast_meta meta,
+    struct ast_vardecl decl);
 
 struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a);
 
@@ -711,6 +715,7 @@ void ast_exprcall_annotate(struct ast_exprcall *a,
                            struct ast_exprcatch catch);
 void ast_exprcall_init_copy(struct ast_exprcall *a, struct ast_exprcall *c);
 void ast_exprcall_destroy(struct ast_exprcall *a);
+struct ast_exprcall ast_exprcall_make(struct ast_expr expr);
 void ast_exprcall_alloc_move(struct ast_exprcall a,
                              struct ast_exprcall **out);
 void ast_exprcall_alloc_init_copy(struct ast_exprcall *c,

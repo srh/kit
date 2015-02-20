@@ -2723,18 +2723,27 @@ int check_statement(struct bodystate *bs,
 
     int has_rhs = s->u.var_statement.has_rhs;
     if (has_rhs) {
-      int check_result = check_expr(bs->es, s->u.var_statement.rhs, &replaced_incomplete_type);
+      int check_result = check_expr(bs->es, &s->u.var_statement.rhs->expr,
+                                    &replaced_incomplete_type);
       ast_typeexpr_destroy(&replaced_incomplete_type);
       if (!check_result) {
         goto fail;
       }
-      ast_typeexpr_init_copy(&concrete_type, ast_expr_type(s->u.var_statement.rhs));
+      struct ast_exprcatch rhs_exprcatch;
+      if (!compute_and_check_exprcatch(bs->es, &s->u.var_statement.rhs->expr,
+                                       &rhs_exprcatch)) {
+        goto fail;
+      }
+      ast_exprcall_annotate(s->u.var_statement.rhs, rhs_exprcatch);
+      ast_typeexpr_init_copy(&concrete_type,
+                             ast_expr_type(&s->u.var_statement.rhs->expr));
     } else {
       if (!is_concrete(&replaced_incomplete_type)) {
         METERR(s->u.var_statement.decl.meta, "Var statement without initializer has incomplete type.%s", "\n");
         goto fail;
       }
 
+      /* TODO: Initialization info must be computed. */
       concrete_type = replaced_incomplete_type;
     }
 
