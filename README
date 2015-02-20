@@ -1,9 +1,10 @@
         Kira v0.0000...1A.x
 
 At some future date, Kira will be a programming language.  Right
-now, it's a work in progress.  Use build_windows.bat or
-build_linux.sh to build it, or just pass *.c to your C compiler.
-Then I recommend running
+now, it's a work in progress.  Use build_windows_trc.bat or
+build_linux_trc.sh to build it, or just manually invoke your C
+compiler (look inside those scripts for an example, they're
+one-liners).  Then (if you built trc) I recommend running
 
    out --test
 
@@ -18,12 +19,16 @@ Then, try running,
 
 to see things actually working.  The current directory structure is:
 
-   s1_src - stage 1 compiler, written in C, compiled by invoking
+   trc - 1st stage compiler, written in C, compiled by invoking
    build_windows.bat.
 
-   src - someday, a self-hosting compiler buildable by s1_src
+   [u-z]rc - future locations of the current "src" directory, when
+   it's no longer the tip of the bootstrap chain, compilable using
+   the compiler defined in [t-y]rc.
 
-   examples - examples for s1_src to run, etc
+   src - someday, a self-hosting compiler buildable by trc.
+
+   examples - examples for trc to run and other junk.
 
 Here's the project timeline:
 
@@ -42,7 +47,7 @@ Here's the project timeline:
       fixes to the C implementation when useful).
    8. ...
 
-The language implemented in s1_src is merely "C, with templates,
+The language implemented in trc is merely "C, with templates,
 constructors/destructors, elementary encapsulation, and tagged enum
 types."  Future versions of the language will be more advanced.
 s1_src is a trade-off between the convenience of implementing
