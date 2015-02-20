@@ -31,3 +31,23 @@ func read_file(path array[u8]) opt[array[u8]] {
   return Has(dat);
 }
 
+func write_file(path array[u8],
+                buf *array[u8]) bool {
+  append(&path, '\0');
+  wb0 array[u8] = make("wb\0");
+  fp *FILE = fopen(data(&path), data(&wb0));
+  nullf *FILE;
+  if fp == nullf {
+    return false;
+  }
+
+  nwrite size = fwrite(@[*void]cast(data(buf)), 1, count(buf), fp);
+  if (0 != fclose(fp)) {
+    return false;
+  }
+  if nwrite != count(buf) {
+    return false;
+  } else {
+    return true;
+  }
+}
