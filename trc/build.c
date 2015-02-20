@@ -3574,7 +3574,7 @@ int gen_immediate_numeric_literal(struct identmap *im,
 
   if (type->u.name.value == identmap_intern_c_str(im, I32_TYPE_NAME)) {
     int32_t value;
-    if (!numeric_literal_to_i32(a->digits, a->digits_count, &value)) {
+    if (!numeric_literal_to_i32(a, &value)) {
       return 0;
     }
 
@@ -3586,7 +3586,7 @@ int gen_immediate_numeric_literal(struct identmap *im,
   } else if (type->u.name.value == identmap_intern_c_str(im, U32_TYPE_NAME)
              || type->u.name.value == identmap_intern_c_str(im, SIZE_TYPE_NAME)) {
     uint32_t value;
-    if (!numeric_literal_to_u32(a->digits, a->digits_count, &value)) {
+    if (!numeric_literal_to_u32(a, &value)) {
       return 0;
     }
 
@@ -3597,7 +3597,7 @@ int gen_immediate_numeric_literal(struct identmap *im,
     return 1;
   } else if (type->u.name.value == identmap_intern_c_str(im, U8_TYPE_NAME)) {
     uint8_t value;
-    if (!numeric_literal_to_u8(a->digits, a->digits_count, &value)) {
+    if (!numeric_literal_to_u8(a, &value)) {
       return 0;
     }
     struct immediate imm;

@@ -1224,27 +1224,59 @@ int parse_numeric_literal(struct ps *p, struct ast_numeric_literal *out) {
   int32_t first_digit = ps_peek(p);
   int8_t first_digit_value;
   if (!is_decimal_digit(first_digit, &first_digit_value)) {
-    return 0;
+    goto fail;
   }
   ps_step(p);
 
-  SLICE_PUSH(digits, digits_count, digits_limit, first_digit_value);
-  int32_t ch;
-  int8_t ch_value;
-  while ((ch = ps_peek(p)), is_decimal_digit(ch, &ch_value)) {
-    SLICE_PUSH(digits, digits_count, digits_limit, ch_value);
-    ps_step(p);
+  enum ast_numeric_literal_tag tag;
+  if (first_digit == '0') {
+    if (ps_peek(p) == 'x') {
+      /* We peek and step to avoid calling ps_leaf_count, because I
+      think the tests make more sense if a whole hex literal counts as
+      a leaf. */
+      ps_step(p);
+      tag = AST_NUMERIC_LITERAL_HEX;
+
+      int32_t ch;
+      int8_t ch_value;
+      while ((ch = ps_peek(p)), is_hex_digit(ch, &ch_value)) {
+        SLICE_PUSH(digits, digits_count, digits_limit, ch_value);
+        ps_step(p);
+      }
+    } else {
+      SLICE_PUSH(digits, digits_count, digits_limit, first_digit_value);
+      tag = AST_NUMERIC_LITERAL_DEC;
+
+      int8_t ch_value_discard;
+      if (is_decimal_digit(ps_peek(p), &ch_value_discard)) {
+        /* Octalesque constant. */
+        goto fail;
+      }
+    }
+  } else {
+    SLICE_PUSH(digits, digits_count, digits_limit, first_digit_value);
+    tag = AST_NUMERIC_LITERAL_DEC;
+
+    int32_t ch;
+    int8_t ch_value;
+    while ((ch = ps_peek(p)), is_decimal_digit(ch, &ch_value)) {
+      SLICE_PUSH(digits, digits_count, digits_limit, ch_value);
+      ps_step(p);
+    }
   }
 
-  if (!is_numeric_postchar(ch)) {
-    free(digits);
-    return 0;
+  if (!is_numeric_postchar(ps_peek(p))) {
+    goto fail;
   }
 
   ast_numeric_literal_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                           digits, digits_count);
+                           tag, digits, digits_count);
   ps_count_leaf(p);
   return 1;
+
+ fail:
+  free(digits);
+  return 0;
 }
 
 int parse_rest_of_arglist(struct ps *p,
@@ -2598,6 +2630,12 @@ int parse_test_defs(void) {
   pass &= run_count_test("def30",
                          "def foo bar = func() void {\n"
                          "  for i i32 = 3; i < 3; i = i + 1 {\n"
+                         "  }\n"
+                         "};\n",
+                         28);
+  pass &= run_count_test("def31",
+                         "def foo bar = func() void {\n"
+                         "  for i i32 = 0x3a; i < 3; i = i + 1 {\n"
                          "  }\n"
                          "};\n",
                          28);

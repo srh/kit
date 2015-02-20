@@ -3973,16 +3973,27 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
 
 #define NUMERIC_LITERAL_OOR "Numeric literal out of range.\n"
 
-int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
-                           uint32_t *out) {
-  CHECK(digits_count > 0);
+int numeric_literal_to_u32(struct ast_numeric_literal *a, uint32_t *out) {
+  CHECK(a->digits_count > 0);
+  uint32_t base;
+  switch (a->tag) {
+  case AST_NUMERIC_LITERAL_DEC:
+    base = 10;
+    break;
+  case AST_NUMERIC_LITERAL_HEX:
+    base = 16;
+    break;
+  default:
+    UNREACHABLE();
+  }
+
   uint32_t built_value = 0;
-  for (size_t i = 0; i < digits_count; i++) {
-    if (!try_uint32_mul(built_value, 10, &built_value)) {
+  for (size_t i = 0, e = a->digits_count; i < e; i++) {
+    if (!try_uint32_mul(built_value, base, &built_value)) {
       ERR_DBG(NUMERIC_LITERAL_OOR);
       return 0;
     }
-    if (!try_uint32_add(built_value, digits[i], &built_value)) {
+    if (!try_uint32_add(built_value, a->digits[i], &built_value)) {
       ERR_DBG(NUMERIC_LITERAL_OOR);
       return 0;
     }
@@ -3992,13 +4003,12 @@ int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
   return 1;
 }
 
-int numeric_literal_to_i32(int8_t *digits, size_t digits_count,
-                           int32_t *out) {
+int numeric_literal_to_i32(struct ast_numeric_literal *a, int32_t *out) {
   /* TODO: There's no way to plainly represent INT32_MIN.  We should
   get static evaluation of "arbitrary numeric constants"
   implemented. */
   uint32_t value;
-  if (!numeric_literal_to_u32(digits, digits_count, &value)) {
+  if (!numeric_literal_to_u32(a, &value)) {
     return 0;
   }
   if (value > 0x7FFFFFFFul) {
@@ -4010,10 +4020,9 @@ int numeric_literal_to_i32(int8_t *digits, size_t digits_count,
   return 1;
 }
 
-int numeric_literal_to_u8(int8_t *digits, size_t digits_count,
-                          uint8_t *out) {
+int numeric_literal_to_u8(struct ast_numeric_literal *a, uint8_t *out) {
   uint32_t value;
-  if (!numeric_literal_to_u32(digits, digits_count, &value)) {
+  if (!numeric_literal_to_u32(a, &value)) {
     return 0;
   }
   if (value > 0xFF) {
@@ -4034,21 +4043,21 @@ int eval_static_numeric_literal(struct identmap *im,
 
   if (type->u.name.value == identmap_intern_c_str(im, I32_TYPE_NAME)) {
     int32_t value;
-    if (!numeric_literal_to_i32(a->digits, a->digits_count, &value)) {
+    if (!numeric_literal_to_i32(a, &value)) {
       return 0;
     }
     static_value_init_i32(out, value);
     return 1;
   } else if (type->u.name.value == identmap_intern_c_str(im, U32_TYPE_NAME)) {
     uint32_t value;
-    if (!numeric_literal_to_u32(a->digits, a->digits_count, &value)) {
+    if (!numeric_literal_to_u32(a, &value)) {
       return 0;
     }
     static_value_init_u32(out, value);
     return 1;
   } else if (type->u.name.value == identmap_intern_c_str(im, U8_TYPE_NAME)) {
     uint8_t value;
-    if (!numeric_literal_to_u8(a->digits, a->digits_count, &value)) {
+    if (!numeric_literal_to_u8(a, &value)) {
       return 0;
     }
     static_value_init_u8(out, value);

@@ -30,14 +30,22 @@ void ast_ident_init(struct ast_ident *a, struct ast_meta meta,
 void ast_ident_init_copy(struct ast_ident *a, struct ast_ident *c);
 void ast_ident_destroy(struct ast_ident *a);
 
+enum ast_numeric_literal_tag {
+  AST_NUMERIC_LITERAL_DEC,
+  AST_NUMERIC_LITERAL_HEX,
+};
+
 struct ast_numeric_literal {
   struct ast_meta meta;
+  enum ast_numeric_literal_tag tag;
   int8_t *digits;
   size_t digits_count;
 };
 
 void ast_numeric_literal_init(struct ast_numeric_literal *a,
-                              struct ast_meta meta, int8_t *digits,
+                              struct ast_meta meta,
+                              enum ast_numeric_literal_tag tag,
+                              int8_t *digits,
                               size_t digits_count);
 void ast_numeric_literal_init_copy(struct ast_numeric_literal *a,
                                    struct ast_numeric_literal *c);

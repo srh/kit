@@ -41,9 +41,12 @@ void ast_ident_destroy(struct ast_ident *a) {
 
 
 void ast_numeric_literal_init(struct ast_numeric_literal *a,
-                              struct ast_meta meta, int8_t *digits,
+                              struct ast_meta meta,
+                              enum ast_numeric_literal_tag tag,
+                              int8_t *digits,
                               size_t digits_count) {
   a->meta = meta;
+  a->tag = tag;
   a->digits = digits;
   a->digits_count = digits_count;
 }
@@ -51,11 +54,13 @@ void ast_numeric_literal_init(struct ast_numeric_literal *a,
 void ast_numeric_literal_init_copy(struct ast_numeric_literal *a,
                                    struct ast_numeric_literal *c) {
   a->meta = ast_meta_make_copy(&c->meta);
+  a->tag = c->tag;
   SLICE_INIT_COPY_PRIM(a->digits, a->digits_count, c->digits, c->digits_count);
 }
 
 void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
   ast_meta_destroy(&a->meta);
+  a->tag = (enum ast_numeric_literal_tag)-1;
   free(a->digits);
   a->digits = NULL;
   a->digits_count = 0;

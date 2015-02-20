@@ -7,6 +7,10 @@
 #include "checkstate.h"
 #include "identmap.h"
 
+struct ast_generics;
+struct ast_typeexpr;
+struct ast_numeric_literal;
+
 #define METERR(loc, fmt, ...) ERR("At %"PRIz":%"PRIz": " fmt, (loc).pos_start.line, (loc).pos_start.column, __VA_ARGS__)
 
 #define VOID_TYPE_NAME "void"
@@ -26,9 +30,6 @@
 #define KIRA_BOOL_SIZE 1
 
 #define CHAR_STANDIN_TYPE_NAME U8_TYPE_NAME
-
-struct ast_generics;
-struct ast_typeexpr;
 
 typedef int module_loader(const uint8_t *module_name,
                           size_t module_name_count,
@@ -76,15 +77,9 @@ void do_replace_rhs_generics(struct ast_generics *generics,
 struct ast_typeexpr *expose_func_return_type(struct identmap *im,
                                              struct ast_typeexpr *func,
                                              size_t expected_params_count);
-void numeric_literal_type(struct identmap *im,
-                          struct ast_numeric_literal *a,
-                          struct ast_typeexpr *out);
-int numeric_literal_to_u32(int8_t *digits, size_t digits_count,
-                           uint32_t *out);
-int numeric_literal_to_i32(int8_t *digits, size_t digits_count,
-                           int32_t *out);
-int numeric_literal_to_u8(int8_t *digits, size_t digits_count,
-                          uint8_t *out);
+int numeric_literal_to_u32(struct ast_numeric_literal *a, uint32_t *out);
+int numeric_literal_to_i32(struct ast_numeric_literal *a, int32_t *out);
+int numeric_literal_to_u8(struct ast_numeric_literal *a, uint8_t *out);
 
 enum typeexpr_trait {
   TYPEEXPR_TRAIT_LACKED,
