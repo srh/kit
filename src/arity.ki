@@ -1,0 +1,6 @@
+defenum generics_arity {
+  no_param_list_arity void;
+  param_list_arity size;
+};
+
+// TODO: Implement params_arity (which uses ast_generics).

@@ -1,0 +1,12 @@
+import pos;
+import identmap;
+
+deftype ast_meta struct {
+  pos_start pos;
+  pos_end pos;
+};
+
+deftype ast_ident struct {
+  meta ast_meta;
+  value ident_value;
+};

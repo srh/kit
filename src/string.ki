@@ -1,0 +1,50 @@
+import array;
+
+deftype string array[u8];
+
+func `~`(x array[u8]) string {
+  ret string;
+  ret.~ = x;
+  return ret;
+}
+
+func[T] make(raw_arr T) string {
+  return ~make@[array[u8], T](raw_arr);
+}
+
+func data(s *string) *u8 {
+  return data(&s->~);
+}
+
+func get(s *string, i size) u8 {
+  return get(&s->~ , i);
+}
+
+func count(s *string) size {
+  return count(&s->~);
+}
+
+// TODO: Return msize.
+func hash_compute_hash(x *string) size {
+  p *u8 = data(x);
+  accum size = 12345;  // TODO: 0x123456789, msize
+  for i size = 0; i < count(x); i = i + 1 {
+    accum = ((accum * 33) ^ ~p[i]) & 65535;
+  }
+  return accum;
+}
+
+func hash_equal(x *string, y *string) bool {
+  if count(x) != count(y) {
+    return false;
+  }
+  px *u8 = data(x);
+  py *u8 = data(y);
+  n size = count(x);
+  for i size = 0; i < n; i = i + 1 {
+    if px[i] != py[i] {
+      return false;
+    }
+  }
+  return true;
+}

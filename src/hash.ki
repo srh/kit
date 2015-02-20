@@ -1,0 +1,103 @@
+import array;
+import stdlib;
+
+// The type K must have the following functions implemented:
+// func hash_compute_hash(K *x) size;
+// func hash_equal(K *x, K *y) bool;
+
+defclass[K, V] copy hash struct {
+  // count(&arr) is zero or a power of two.
+  arr array[opt[pair[K, V]]];
+  // count is less than half count(&arr);
+  count size;
+};
+
+access hash[_, _] {
+  func[K, V] do_init(h *hash[K, V]) void {
+    init(&h->arr);
+    h->count = 0;
+  }
+
+  func[K, V] rebuild_(h *hash[K, V], new_limit size) void {
+    new_mask size = new_limit - 1;
+    check(0 == (new_limit & new_mask));
+    check(h->count * 2 < new_limit);
+
+    new_array array[opt[pair[K, V]]] = repeat(None@[pair[K, V]](), new_limit);
+    old_limit = count(h->arr);
+    for i size = 0; i < old_limit; i = i + 1 {
+      switch h->arr[i] {
+        case None(v): { }
+        case Has(p): {
+          offset size = hash_compute_hash(&p.car) & new_mask;
+          step size = 1;
+          done bool = false;
+          while !done {
+            switch new_array[offset] {
+              case None(v): { done = true; }
+              case Has(p): {
+                offset = (offset + step) & new_mask;
+                step = step + 1;
+              }
+            }
+          }
+
+          new_array[offset] = h->arr[i];
+        }
+      }
+    }
+
+    m->arr = new_array;
+  }
+
+  func[K, V] insert(h *hash[K, V], key K, value V) bool {
+    if count(h->arr) == 0 {
+      rebuild_(h, 8);
+    }
+
+    mask size = count(h->arr) - 1;
+    offset size = hash_compute_hash(&key) & mask;
+    step size = 1;
+    done bool = false;
+    while !done {
+      switch h->arr[offset] {
+        case None(v): {
+          h->arr[offset] = Has(cons(key, value));
+          h->count = h->count + 1;
+          if h->count * 2 >= count(h->arr) {
+            rebuild_(h, count(h->arr) * 2);
+          }
+          return true;
+        }
+        case Has(p): {
+          if hash_equal(&p.car, &key) {
+            return false;
+          }
+          offset = (offset + step) & mask;
+          step = step + 1;
+        }
+      }
+    }
+  }
+
+  func[K, V] lookup(h *hash[K, V], key K) opt[V] {
+    mask size = count(h->arr) - 1;
+    offset size = hash_compute_hash(&key) & mask;
+    step size = 1;
+    for ;; {
+      switch h->arr[offset] {
+        case None(v): {
+          return None();
+        }
+        case Has(p): {
+          if hash_equal(&p.car, &key) {
+            return Has(p.cdr);
+          }
+          offset = (offset + step) & mask;
+          step = step + 1;
+        }
+      }
+    }
+  }
+}
+

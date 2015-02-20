@@ -1,0 +1,19 @@
+import hash;
+import string;
+
+deftype ident_value size;
+
+func `==`(x ident_value, y ident_value) bool {
+  return x.~ == y.~;
+}
+func `!=`(x ident_value, y ident_value) bool {
+  return x.~ != y.~;
+}
+
+defclass copy identmap struct {
+  // A map from strings to ident values.
+  table hash[string, ident_value];
+  // A map from ident values to strings.
+  reverse array[string];
+};
+

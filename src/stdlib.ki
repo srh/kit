@@ -28,6 +28,18 @@ func[T] None() opt[T] {
   return None(v);
 }
 
+deftype[S, T] pair struct {
+  car S;
+  cdr T;
+};
+
+func[S, T] cons(s S, t T) pair[S, T] {
+  ret pair[S, T];
+  ret.car = s;
+  ret.cdr = t;
+  return ret;
+}
+
 
 
 func check(x bool) void {
