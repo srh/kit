@@ -292,6 +292,10 @@ int is_ok_in_comment(int32_t ch) {
   return is_ws(ch) || (' ' <= ch && ch <= '~');
 }
 
+int is_typeexpr_firstchar(int32_t ch) {
+  return is_ident_firstchar(ch) || ch == '[' || ch == '*';
+}
+
 /* Skips whitespace... including comments. */
 int skip_ws(struct ps *p) {
  top:
@@ -597,8 +601,7 @@ int help_parse_vardecl(struct ps *p, enum allow_blanks allow_blanks, struct ast_
   }
 
   struct ast_typeexpr type;
-  /* Oh god the parsing horrors. */
-  if (allow_blanks == ALLOW_BLANKS_YES && (ps_peek(p) == '=' || ps_peek(p) == ')')) {
+  if (allow_blanks == ALLOW_BLANKS_YES && !is_typeexpr_firstchar(ps_peek(p))) {
     type.tag = AST_TYPEEXPR_UNKNOWN;
     ast_unknown_init(&type.u.unknown, ast_meta_make(name.meta.pos_end, name.meta.pos_end));
   } else {
