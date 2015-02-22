@@ -2,11 +2,10 @@ import stdlib;
 import array;
 
 func read_file(path array[u8]) opt[array[u8]] {
-  nullf *FILE;
   append(&path, '\0');
   rb0 array[u8] = make("rb\0");
   fp *FILE = fopen(data(&path), data(&rb0));
-  if fp == nullf {
+  if fp == null {
     return None();
   }
 
@@ -36,8 +35,7 @@ func write_file(path array[u8],
   append(&path, '\0');
   wb0 array[u8] = make("wb\0");
   fp *FILE = fopen(data(&path), data(&wb0));
-  nullf *FILE;
-  if fp == nullf {
+  if fp == null {
     return false;
   }
 

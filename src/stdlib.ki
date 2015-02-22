@@ -21,8 +21,7 @@ def EOF i32 = -1;  // TODO: is actually "int"
 func checkmalloc(n size) *void {
   n = max(n, 1);
   ret *void = malloc(n);
-  nullp *void;
-  check(ret != nullp);
+  check(ret != null);
   return ret;
 }
 

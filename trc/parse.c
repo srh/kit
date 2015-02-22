@@ -542,6 +542,8 @@ int try_skip_keyword(struct ps *p, const char *kw) {
   return 1;
 }
 
+/* TODO: Don't parse keywords.  (For example, don't let a variable be
+named "true" or "false".) */
 int parse_ident(struct ps *p, struct ast_ident *out) {
   PARSE_DBG("parse_ident\n");
   struct pos pos_start = ps_pos(p);

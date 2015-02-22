@@ -10,7 +10,6 @@ access array[_] {
   func[T] do_init(r *array[T]) void {
     r->count = 0;
     r->cap = 0;
-    null *T;
     r->ptr = null;
   }
 
