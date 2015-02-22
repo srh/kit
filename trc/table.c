@@ -1034,8 +1034,8 @@ int def_entry_matches(struct identmap *im,
       ast_typeexpr_init_copy(unified_type_out, &ent->type);
       *instantiation_out = def_entry_insert_instantiation(im, ent, NULL, 0,
                                                           &ent->type);
-      return 1;
     }
+    return 1;
   }
 
   if (generics_or_null) {
