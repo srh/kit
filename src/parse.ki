@@ -2,7 +2,7 @@ import ast;
 import identmap;
 import pos;
 
-deftype ps_interval {
+deftype ps_interval struct {
   left size;
   right size;
 };
@@ -20,7 +20,7 @@ deftype ps struct {
   stack array[ptree];
 };
 
-func make_ps(im *identmap, data *u8, length size) p {
+func make_ps(im *identmap, data *u8, length size) ps {
   p ps;
   p.data = data;
   p.length = length;
@@ -106,8 +106,19 @@ defenum treesym {
   Token tok;
 };
 
-deftype ptree {
+deftype ptree struct {
   sym treesym;
-  array[uniq[ptree]] childs;
+  childs array[uniq[ptree]];
 };
 
+defenum grab_tok_res {
+  IncompleteToken interval;
+  EofToken void;
+  TokToken tok;
+};
+
+func grab_tok(p *ps) grab_tok_res {
+  // TODO: Implement.
+  var v void;
+  return EofToken(v);
+}
