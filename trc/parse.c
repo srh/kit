@@ -542,6 +542,43 @@ int try_skip_keyword(struct ps *p, const char *kw) {
   return 1;
 }
 
+/* This doesn't really catch all keywords, for example, really "copy"
+and "move" as used in defclass should be keywords?  We really have
+valid typenames and valid expression literals and valid variable
+names.  For example, "void" isn't here because it's a type name and
+gets parsed by typechecking code, too.  But it should not be allowed
+as the name of a variable.  TODO: Do more specific name-checking
+instead. */
+int is_ident_keyword(struct ps *p, size_t begin, size_t end) {
+  CHECK(begin < end);
+  CHECK(end <= p->length);
+  size_t count = end - begin;
+  const uint8_t *ptr = p->data + begin;
+  switch (count) {
+  case 3:
+    return 0 == memcmp(ptr, "def", count);
+  case 4:
+    return 0 == memcmp(ptr, "true", count)
+      || 0 == memcmp(ptr, "null", count)
+      || 0 == memcmp(ptr, "else", count)
+      || 0 == memcmp(ptr, "func", count);
+  case 5:
+    return 0 == memcmp(ptr, "while", count)
+      || 0 == memcmp(ptr, "false", count)
+      || 0 == memcmp(ptr, "union", count);
+  case 6:
+    return 0 == memcmp(ptr, "switch", count)
+      || 0 == memcmp(ptr, "struct", count);
+  case 7:
+    return 0 == memcmp(ptr, "deftype", count)
+      || 0 == memcmp(ptr, "defenum", count);
+  case 8:
+    return 0 == memcmp(ptr, "defclass", count);
+  default:
+    return 0;
+  }
+}
+
 /* TODO: Don't parse keywords.  (For example, don't let a variable be
 named "true" or "false".) */
 int parse_ident(struct ps *p, struct ast_ident *out) {
@@ -578,6 +615,10 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
   }
 
   struct pos pos_end = ps_pos(p);
+  if (is_ident_keyword(p, pos_start.offset, pos_end.offset)) {
+    return 0;
+  }
+
   ast_ident_init(out, ast_meta_make(pos_start, pos_end),
                  ps_intern_ident(p, pos_start.offset, pos_end.offset));
   ps_count_leaf(p);

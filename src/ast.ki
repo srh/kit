@@ -61,7 +61,7 @@ deftype ast_string_literal struct {
 
 deftype ast_funcall struct {
   meta ast_meta;
-  func uniq[ast_expr];
+  fun uniq[ast_expr];
   args array[ast_expr];
 };
 
