@@ -1,0 +1,113 @@
+import ast;
+import identmap;
+import pos;
+
+deftype ps_interval {
+  left size;
+  right size;
+};
+
+deftype ps struct {
+  data *u8;
+  length size;
+  pos size;
+
+  line size;
+  column size;
+
+  im *identmap;
+
+  stack array[ptree];
+};
+
+func make_ps(im *identmap, data *u8, length size) p {
+  p ps;
+  p.data = data;
+  p.length = length;
+  p.pos = 0;
+  p.line = 1;
+  p.column = 0;
+  p.im = im;
+  return p;
+}
+
+func ps_peek(p *ps) i32 {
+  check(p->pos <= p->length);
+  if p->pos == p->length {
+    return -1;
+  }
+  return ~p->data[p->pos];
+}
+
+func ps_step(p *ps) void {
+  check(p->pos < p->length);
+  ch u8 = p->data[p->pos];
+  if ch == '\n' {
+    p->line = p->line + 1;
+    p->column = 0;
+  } else {
+    if ch == '\t' {
+      p->column = (p->column | 7) + 1;
+    } else {
+      p->column = p->column + 1;
+    }
+  }
+
+  p->pos = p->pos + 1;
+}
+
+defenum keyw {
+  Return void;
+  While void;
+  For void;
+  If void;
+  Else void;
+  Switch void;
+  Case void;
+  Def void;
+  Func void;
+  Deftype void;
+  Defenum void;
+  Defclass void;
+  Struct void;
+  Var void;
+  Union void;
+  Underscore void;
+};
+
+defenum numlit {
+  DecNum array[i8];
+  HexNum array[i8];
+};
+
+defenum grouper {
+  LParen void;
+  RParen void;
+  LBracket void;
+  RBracket void;
+  LBrace void;
+  RBrace void;
+};
+
+defenum tokval {
+  Keyw keyw;
+  Num numlit;
+  Oper string;
+  Ident string;
+  Grouper grouper;
+};
+
+deftype tok struct {
+  val tokval;
+  interval ps_interval;
+};
+
+defenum treesym {
+  Token tok;
+};
+
+deftype ptree {
+  sym treesym;
+  array[uniq[ptree]] childs;
+};
+

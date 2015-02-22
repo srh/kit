@@ -3,9 +3,20 @@ import identmap;
 import pos;
 import uniq;
 
+deftype interval struct {
+  start pos;
+  end pos;
+};
+
+defenum ast_syntax {
+  SingleLineComment interval;
+  MultiLineComment interval;
+  Token interval;
+};
+
 deftype ast_meta struct {
-  pos_start pos;
-  pos_end pos;
+  interval interval;
+  syntaxes array[ast_syntax];
 };
 
 deftype ast_ident struct {
@@ -86,11 +97,7 @@ defenum ast_typeexpr {
   Structe ast_structe;
   Unione ast_unione;
   Arraytype ast_arraytype;
-  // "Complete" types don't have these fields.
   Unknown ast_unknown;
-  /* TODO: We have an ast_unknown field because...?  We have no
-  metadata, there are no numeric expressions. */
-  Numeric ast_unknown;
 };
 
 func ast_typeexpr_meta(a ast_typeexpr) ast_meta {
@@ -101,7 +108,6 @@ func ast_typeexpr_meta(a ast_typeexpr) ast_meta {
     case Unione(v): { return v.meta; }
     case Arraytype(v): { return v.meta; }
     case Unknown(v): { return v.meta; }
-    case Numeric(v): { return v.meta; }
   }
 }
 
@@ -143,7 +149,7 @@ deftype ast_while_statement struct {
 
 deftype ast_for_statement struct {
   meta ast_meta;
-  // Can only be an ast_expr or ast_statement_var. */
+  // Can only be an ast_expr or ast_statement_var.
   initializer opt[uniq[ast_statement]];
   condition opt[uniq[ast_expr]];
   increment opt[uniq[ast_expr]];
@@ -153,7 +159,7 @@ deftype ast_for_statement struct {
 deftype ast_switch_statement struct {
   meta ast_meta;
   swartch uniq[ast_expr];
-  cased_statements array[ast_cased_statement];
+  cases array[ast_switch_case];
 };
 
 deftype ast_return_statement struct {
@@ -179,8 +185,7 @@ deftype ast_case_pattern struct {
   decl ast_vardecl;
 };
 
-// TODO: Rename.
-deftype ast_cased_statement struct {
+deftype ast_switch_case struct {
   meta ast_meta;
   pattern ast_case_pattern;
   body ast_bracebody;
@@ -190,8 +195,7 @@ deftype ast_lambda struct {
   meta ast_meta;
   params array[ast_vardecl];
   return_type ast_typeexpr;
-  // TODO: Rename field to body.
-  bracebody ast_bracebody;
+  body ast_bracebody;
 };
 
 defenum ast_unop {
@@ -298,25 +302,26 @@ deftype ast_enumspec struct {
   enumfields array[ast_vardecl];
 };
 
-defenum ast_deftype_rhs {
-  TypeexprRhs ast_typeexpr;
-  EnumSpecRhs ast_enumspec;
-};
-
-defenum ast_deftype_disposition {
-  DispositionNotClass void;
+defenum ast_defclass_disposition {
   DispositionClassDefaultCopyMoveDestroy void;
   DispositionClassDefaultMove void;
   DispositionClassNoDefaults void;
 };
 
-// TODO: This is gross.
-deftype ast_deftype struct {
+defenum ast_type_def_rhs {
+  TypeexprRhs ast_typeexpr;
+  ClassexprRhs struct {
+    disposition ast_defclass_disposition;
+    rhs_type ast_typeexpr;
+  };
+  EnumSpecRhs ast_enumspec;
+};
+
+deftype ast_type_def struct {
   meta ast_meta;
-  disposition ast_deftype_disposition;
   generics ast_generics;
   name ast_ident;
-  rhs ast_deftype_rhs;
+  rhs ast_type_def_rhs;
 };
 
 deftype ast_access struct {
@@ -327,11 +332,11 @@ deftype ast_access struct {
 };
 
 defenum ast_toplevel {
-  import ast_import;
-  def ast_def;
-  extern_def ast_extern_def;
-  deftype ast_deftype;
-  access ast_access;
+  Import ast_import;
+  Def ast_def;
+  ExternDef ast_extern_def;
+  TypeDef ast_type_def;
+  Access ast_access;
 };
 
 deftype ast_file struct {
