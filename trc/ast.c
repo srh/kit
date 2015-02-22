@@ -84,6 +84,20 @@ void ast_bool_literal_destroy(struct ast_bool_literal *a) {
   a->value = 0;
 }
 
+void ast_void_literal_init(struct ast_void_literal *a,
+                           struct ast_meta meta) {
+  a->meta = meta;
+}
+
+void ast_void_literal_init_copy(struct ast_void_literal *a,
+                                struct ast_void_literal *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+}
+
+void ast_void_literal_destroy(struct ast_void_literal *a) {
+  ast_meta_destroy(&a->meta);
+}
+
 void ast_char_literal_init(struct ast_char_literal *a,
                            struct ast_meta meta, uint8_t value) {
   a->meta = meta;
@@ -1042,7 +1056,8 @@ struct ast_meta *ast_expr_ast_meta(struct ast_expr *a) {
   switch (a->tag) {
   case AST_EXPR_NAME: return &a->u.name.meta;
   case AST_EXPR_NUMERIC_LITERAL: return &a->u.numeric_literal.meta;
-  case AST_EXPR_BOOL_LITERAL: return &a->u.bool_literal.meta;
+  case AST_EXPR_BOOL_LITERAL_: return &a->u.bool_literal.meta;
+  case AST_EXPR_VOID_LITERAL: return &a->u.void_literal.meta;
   case AST_EXPR_CHAR_LITERAL: return &a->u.char_literal.meta;
   case AST_EXPR_STRING_LITERAL: return &a->u.string_literal.meta;
   case AST_EXPR_FUNCALL: return &a->u.funcall.meta;
@@ -1079,9 +1094,13 @@ void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c) {
     ast_numeric_literal_init_copy(&a->u.numeric_literal,
                                   &c->u.numeric_literal);
     break;
-  case AST_EXPR_BOOL_LITERAL:
+  case AST_EXPR_BOOL_LITERAL_:
     ast_bool_literal_init_copy(&a->u.bool_literal,
                                &c->u.bool_literal);
+    break;
+  case AST_EXPR_VOID_LITERAL:
+    ast_void_literal_init_copy(&a->u.void_literal,
+                               &c->u.void_literal);
     break;
   case AST_EXPR_CHAR_LITERAL:
     ast_char_literal_init_copy(&a->u.char_literal,
@@ -1130,8 +1149,11 @@ void ast_expr_destroy(struct ast_expr *a) {
   case AST_EXPR_NUMERIC_LITERAL:
     ast_numeric_literal_destroy(&a->u.numeric_literal);
     break;
-  case AST_EXPR_BOOL_LITERAL:
+  case AST_EXPR_BOOL_LITERAL_:
     ast_bool_literal_destroy(&a->u.bool_literal);
+    break;
+  case AST_EXPR_VOID_LITERAL:
+    ast_void_literal_destroy(&a->u.void_literal);
     break;
   case AST_EXPR_CHAR_LITERAL:
     ast_char_literal_destroy(&a->u.char_literal);

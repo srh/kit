@@ -32,8 +32,7 @@ defenum[T] opt {
 };
 
 func[T] None() opt[T] {
-  var v void;
-  return None(v);
+  return None(void);
 }
 
 deftype[S, T] pair struct {

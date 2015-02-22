@@ -273,6 +273,7 @@ enum immediate_tag {
   IMMEDIATE_U32,
   IMMEDIATE_I32,
   IMMEDIATE_U8,
+  IMMEDIATE_VOID,
 };
 
 /* TODO: Ugh primitive_op shouldn't be part of this. */
@@ -298,6 +299,8 @@ uint32_t immediate_size(struct immediate imm) {
     return DWORD_SIZE;
   case IMMEDIATE_U8:
     return 1;
+  case IMMEDIATE_VOID:
+    return 0;
   default:
     UNREACHABLE();
   }
@@ -716,6 +719,10 @@ void append_immediate(struct objfile *f, struct immediate imm) {
     /* LITTLEENDIAN etc. */
     objfile_section_append_raw(objfile_text(f), &imm.u.i32, sizeof(int32_t));
   } break;
+  case IMMEDIATE_U8:
+    UNREACHABLE();
+  case IMMEDIATE_VOID:
+    UNREACHABLE();
   default:
     UNREACHABLE();
   }
@@ -1290,7 +1297,13 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
                               return_type);
   } break;
   case IMMEDIATE_U32:
+    UNREACHABLE();
   case IMMEDIATE_I32:
+    UNREACHABLE();
+  case IMMEDIATE_U8:
+    UNREACHABLE();
+  case IMMEDIATE_VOID:
+    UNREACHABLE();
   default:
     UNREACHABLE();
   }
@@ -1922,6 +1935,9 @@ void gen_mov_mem_imm(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
   case 1:
     CHECK(src.tag == IMMEDIATE_U8);
     x86_gen_mov_mem_imm8(f, dest_addr, dest_disp, (int8_t)src.u.u8);
+    break;
+  case 0:
+    CHECK(src.tag == IMMEDIATE_VOID);
     break;
   default:
     UNREACHABLE();
@@ -3859,11 +3875,17 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return gen_immediate_numeric_literal(cs->im, f, h, ast_expr_type(a),
                                          &a->u.numeric_literal, er);
   } break;
-  case AST_EXPR_BOOL_LITERAL: {
+  case AST_EXPR_BOOL_LITERAL_: {
     CHECK(a->u.bool_literal.value == 0 || a->u.bool_literal.value == 1);
     struct immediate imm;
     imm.tag = IMMEDIATE_U8;
     imm.u.u8 = (uint8_t)a->u.bool_literal.value;
+    expr_return_immediate(f, h, er, imm);
+    return 1;
+  } break;
+  case AST_EXPR_VOID_LITERAL: {
+    struct immediate imm;
+    imm.tag = IMMEDIATE_VOID;
     expr_return_immediate(f, h, er, imm);
     return 1;
   } break;

@@ -3844,7 +3844,7 @@ int check_expr_ai(struct exprscope *es,
     }
     return 1;
   } break;
-  case AST_EXPR_BOOL_LITERAL: {
+  case AST_EXPR_BOOL_LITERAL_: {
     struct ast_typeexpr bool_type;
     init_name_type(&bool_type, identmap_intern_c_str(es->cs->im, BOOL_TYPE_NAME));
     if (!unify_directionally(es->cs->im, partial_type, &bool_type)) {
@@ -3853,6 +3853,17 @@ int check_expr_ai(struct exprscope *es,
       return 0;
     }
     ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, bool_type));
+    return 1;
+  } break;
+  case AST_EXPR_VOID_LITERAL: {
+    struct ast_typeexpr void_type;
+    init_name_type(&void_type, identmap_intern_c_str(es->cs->im, VOID_TYPE_NAME));
+    if (!unify_directionally(es->cs->im, partial_type, &void_type)) {
+      METERR(x->u.void_literal.meta, "Void literal in bad place.%s", "\n");
+      ast_typeexpr_destroy(&void_type);
+      return 0;
+    }
+    ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, void_type));
     return 1;
   } break;
   case AST_EXPR_CHAR_LITERAL: {
@@ -4617,9 +4628,11 @@ int eval_static_value(struct identmap *im,
     return eval_static_numeric_literal(im,
                                        ast_expr_type(expr),
                                        &expr->u.numeric_literal, out);
-  case AST_EXPR_BOOL_LITERAL:
+  case AST_EXPR_BOOL_LITERAL_:
     static_value_init_bool(out, expr->u.bool_literal.value);
     return 1;
+  case AST_EXPR_VOID_LITERAL:
+    CRASH("Void literal static value evaluation is not supported.\n");
   case AST_EXPR_CHAR_LITERAL:
     static_value_init_u8(out, expr->u.char_literal.value);
     return 1;

@@ -69,8 +69,7 @@ defenum enty {
 };
 
 def blah_enty = func(x enty) enty {
-  v void;
-  y enty = c1(v);
+  y enty = c1(void);
   u struct { p i32; q i32; };
   y = c2(u);
   switch x {
@@ -115,8 +114,7 @@ export func showfacs(p *ty, num *u16) ty {
   try_kla();
   try_string();
 
-  v void;
-  k enty = blah_enty(c1(v));
+  k enty = blah_enty(c1(void));
   vz struct { p i32; q i32; };
   vz.p = 125;
   vz.q = 343;
