@@ -16,6 +16,8 @@ struct expr_return;
 struct loc;
 struct frame;
 
+#define FIRST_ENUM_TAG_NUMBER 1
+
 enum x86_reg {
   X86_EAX,
   X86_ECX,
@@ -273,6 +275,7 @@ enum immediate_tag {
   IMMEDIATE_U32,
   IMMEDIATE_I32,
   IMMEDIATE_U8,
+  IMMEDIATE_I8,
   IMMEDIATE_VOID,
 };
 
@@ -285,6 +288,7 @@ struct immediate {
     uint32_t u32;
     int32_t i32;
     uint8_t u8;
+    int8_t i8;
   } u;
 };
 
@@ -298,6 +302,7 @@ uint32_t immediate_size(struct immediate imm) {
   case IMMEDIATE_I32:
     return DWORD_SIZE;
   case IMMEDIATE_U8:
+  case IMMEDIATE_I8:
     return 1;
   case IMMEDIATE_VOID:
     return 0;
@@ -720,6 +725,8 @@ void append_immediate(struct objfile *f, struct immediate imm) {
     objfile_section_append_raw(objfile_text(f), &imm.u.i32, sizeof(int32_t));
   } break;
   case IMMEDIATE_U8:
+    UNREACHABLE();
+  case IMMEDIATE_I8:
     UNREACHABLE();
   case IMMEDIATE_VOID:
     UNREACHABLE();
@@ -1302,6 +1309,8 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
     UNREACHABLE();
   case IMMEDIATE_U8:
     UNREACHABLE();
+  case IMMEDIATE_I8:
+    UNREACHABLE();
   case IMMEDIATE_VOID:
     UNREACHABLE();
   default:
@@ -1476,8 +1485,11 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
 
     size_t end_target = frame_add_target(h);
     size_t next_target = frame_add_target(h);
-    for (size_t i = 0, e = rhs->u.enumspec.enumfields_count; i < e; i++) {
-      x86_gen_cmp_imm32(f, X86_EAX, size_to_int32(i));
+
+    STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
+    for (size_t tagnum = 0, e = size_add(1, rhs->u.enumspec.enumfields_count);
+         tagnum < e; tagnum++) {
+      x86_gen_cmp_imm32(f, X86_EAX, size_to_int32(tagnum));
       gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
       switch (tf) {
       case TYPETRAV_FUNC_DESTROY:
@@ -1488,22 +1500,26 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
         gen_store_register(f, dest_num_loc, X86_EAX);
         break;
       case TYPETRAV_FUNC_DEFAULT_CONSTRUCT:
+        /* Unreachable because default construction is a trivial
+        operation. */
         UNREACHABLE();
       default:
         UNREACHABLE();
       }
 
-      uint32_t field_size = kira_sizeof(&cs->nt, &rhs->u.enumspec.enumfields[i].type);
-      struct loc dest_body_loc = make_enum_body_loc(f, h, dest, field_size);
-      struct loc src_body_loc;
-      if (has_src) {
-        src_body_loc = make_enum_body_loc(f, h, src, field_size);
-      } else {
-        src_body_loc.tag = (enum loc_tag)-1;
-      }
+      if (tagnum != 0) {
+        uint32_t field_size = kira_sizeof(&cs->nt, &rhs->u.enumspec.enumfields[tagnum - FIRST_ENUM_TAG_NUMBER].type);
+        struct loc dest_body_loc = make_enum_body_loc(f, h, dest, field_size);
+        struct loc src_body_loc;
+        if (has_src) {
+          src_body_loc = make_enum_body_loc(f, h, src, field_size);
+        } else {
+          src_body_loc.tag = (enum loc_tag)-1;
+        }
 
-      gen_typetrav_func(cs, f, h, tf, dest_body_loc, has_src,
-                        src_body_loc, &rhs->u.enumspec.enumfields[i].type);
+        gen_typetrav_func(cs, f, h, tf, dest_body_loc, has_src,
+                          src_body_loc, &rhs->u.enumspec.enumfields[tagnum - FIRST_ENUM_TAG_NUMBER].type);
+      }
 
       gen_placeholder_jmp(f, h, end_target);
       frame_define_target(h, next_target, objfile_section_size(objfile_text(f)));
@@ -1933,8 +1949,16 @@ void gen_mov_mem_imm(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
     x86_gen_mov_mem_imm32(f, dest_addr, dest_disp, src);
     break;
   case 1:
-    CHECK(src.tag == IMMEDIATE_U8);
-    x86_gen_mov_mem_imm8(f, dest_addr, dest_disp, (int8_t)src.u.u8);
+    switch (src.tag) {
+    case IMMEDIATE_U8:
+      x86_gen_mov_mem_imm8(f, dest_addr, dest_disp, (int8_t)src.u.u8);
+      break;
+    case IMMEDIATE_I8:
+      x86_gen_mov_mem_imm8(f, dest_addr, dest_disp, src.u.i8);
+      break;
+    default:
+      UNREACHABLE();
+    }
     break;
   case 0:
     CHECK(src.tag == IMMEDIATE_VOID);
@@ -2288,7 +2312,8 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
 
   struct immediate enum_num_imm;
   enum_num_imm.tag = IMMEDIATE_U32;
-  enum_num_imm.u.u32 = size_to_uint32(enumconstruct_number);
+  enum_num_imm.u.u32 = uint32_add(FIRST_ENUM_TAG_NUMBER,
+                                  size_to_uint32(enumconstruct_number));
   x86_gen_mov_reg_imm32(f, X86_EAX, enum_num_imm);
   gen_store_register(f, return_enum_num_loc, X86_EAX);
 
@@ -3681,6 +3706,16 @@ int gen_immediate_numeric_literal(struct identmap *im,
     imm.u.u8 = value;
     expr_return_immediate(f, h, er, imm);
     return 1;
+  } else if (type->u.name.value == identmap_intern_c_str(im, I8_TYPE_NAME)) {
+    int8_t value;
+    if (!numeric_literal_to_i8(a, &value)) {
+      return 0;
+    }
+    struct immediate imm;
+    imm.tag = IMMEDIATE_I8;
+    imm.u.i8 = value;
+    expr_return_immediate(f, h, er, imm);
+    return 1;
   } else {
     METERR(a->meta, "Compiler incomplete: Numeric literal resolves to type '%.*s', "
            "which this lame compiler cannot codegen for literals.\n",
@@ -4199,7 +4234,10 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       int32_t switchcase_saved_offset = frame_save_offset(h);
       struct ast_cased_statement *cas = &ss->cased_statements[i];
       x86_gen_cmp_imm32(f, X86_EAX,
-                        size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.info)));
+                        int32_add(
+                            size_to_int32(
+                                ast_case_pattern_info_constructor_number(&cas->pattern.info)),
+                            FIRST_ENUM_TAG_NUMBER));
       gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
 
       struct ast_typeexpr *var_type = ast_var_info_type(&cas->pattern.decl.var_info);

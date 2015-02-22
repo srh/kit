@@ -2,18 +2,6 @@ import ast;
 import identmap;
 import pos;
 
-deftype ps_interval struct {
-  left pos;
-  right pos;
-};
-
-func mk_ps_interval(left pos, right pos) ps_interval {
-  ret ps_interval;
-  ret.left = left;
-  ret.right = right;
-  return ret;
-}
-
 deftype ps struct {
   data *u8;
   length size;
@@ -36,6 +24,12 @@ func make_ps(im *identmap, data *u8, length size) ps {
   p.column = 0;
   p.im = im;
   return p;
+}
+
+func ps_pos(p *ps) pos {
+  ret pos;
+  ret.~ = p->pos;
+  return ret;
 }
 
 func ps_peek(p *ps) i32 {
@@ -103,14 +97,14 @@ defenum tokval {
 };
 
 deftype tok struct {
-  interval ps_interval;
+  interval interval;
   val tokval;
 };
 
 func mk_tok(left pos, right pos, val tokval) tok {
   ret tok;
   ret.val = val;
-  ret.interval = mk_ps_interval(start, end);
+  ret.interval = mk_interval(left, right);
   return ret;
 }
 
@@ -124,7 +118,7 @@ deftype ptree struct {
 };
 
 defenum grab_tok_res {
-  BadToken ps_interval;
+  BadToken interval;
   EofToken void;
   TokToken tok;
 };
@@ -148,21 +142,30 @@ func is_digit(x i32) bool {
   return x >= ~'0' && x <= ~'9';
 }
 
+func is_alnum(x i32) bool {
+  return is_alpha(x) || is_digit(x);
+}
+
 func is_hexdigit(x i32, val_out *i8) bool {
   // TODO: Statically assert 'f' - 'a', 'F' - 'A', '9' - '0'.
   if is_digit(x) {
-    *val_out = x - ~'0';
+    *val_out = ~(x - ~'0');
     return true;
   }
   if ~'A' <= x && x <= ~'F' {
-    *val_out = x - ~'A';
+    *val_out = ~(x - ~'A');
     return true;
   }
   if ~'a' <= x && x <= ~'f' {
-    *val_out = x - ~'a';
+    *val_out = ~(x - ~'a');
     return true;
   }
   return false;
+}
+
+func is_numeric_postchar(x i32) bool {
+  // TODO: Implement for real.
+  return !is_alnum(x);
 }
 
 func grab_tok(p *ps) grab_tok_res {
@@ -186,22 +189,22 @@ func grab_tok(p *ps) grab_tok_res {
       }
 
       if is_numeric_postchar(ch) {
-        return TokToken(Token(mk_tok(left, ps_pos(p), Num(HexNum(digits)))));
+        return TokToken(mk_tok(left, ps_pos(p), Num(HexNum(digits))));
       } else {
-        return BadToken(mk_ps_interval(left, ps_pos(p)));
+        return BadToken(mk_interval(left, ps_pos(p)));
       }
     } else {
       if is_numeric_postchar(ch) {
         digits array[i8];
         append(&digits, 0);
-        return TokToken(Token(mk_tok(left, ps_pos(p), Num(DecNum(digits)))));
+        return TokToken(mk_tok(left, ps_pos(p), Num(DecNum(digits))));
       } else {
-        return BadToken(mk_ps_interval(left, ps_pos(p)));
+        return BadToken(mk_interval(left, ps_pos(p)));
       }
     }
   } else {
     // TODO: Implement.
     check(false);
-    return BadToken(mk_ps_interval(left, left));
+    return EofToken(void);  // TODO: No.
   }
 }

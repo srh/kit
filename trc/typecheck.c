@@ -1672,7 +1672,7 @@ int check_enumspec_traits(struct checkstate *cs,
   int ret = check_typeexpr_structe_enumspec_fields_traits(
       cs, a->enumfields, a->enumfields_count, also_typecheck, out);
   if (ret) {
-    out->inittible = TYPEEXPR_TRAIT_LACKED;
+    out->inittible = TYPEEXPR_TRAIT_TRIVIALLY_HAD;
   }
   return ret;
 }
@@ -4172,6 +4172,20 @@ int numeric_literal_to_u8(struct ast_numeric_literal *a, uint8_t *out) {
   }
   CHECK(value <= UINT8_MAX);
   *out = (uint8_t)value;
+  return 1;
+}
+
+int numeric_literal_to_i8(struct ast_numeric_literal *a, int8_t *out) {
+  uint32_t value;
+  if (!numeric_literal_to_u32(a, &value)) {
+    return 0;
+  }
+  if (value > 0x7F) {
+    ERR_DBG(NUMERIC_LITERAL_OOR);
+    return 0;
+  }
+  CHECK(value <= INT8_MAX);
+  *out = (int8_t)value;
   return 1;
 }
 

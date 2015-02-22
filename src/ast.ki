@@ -4,9 +4,16 @@ import pos;
 import uniq;
 
 deftype interval struct {
-  start pos;
-  end pos;
+  left pos;
+  right pos;
 };
+
+func mk_interval(left pos, right pos) interval {
+  ret interval;
+  ret.left = left;
+  ret.right = right;
+  return ret;
+}
 
 defenum ast_syntax {
   SingleLineComment interval;

@@ -69,6 +69,7 @@ defenum enty {
 };
 
 def blah_enty = func(x enty) enty {
+  kraw enty;
   y enty = c1(void);
   u struct { p i32; q i32; };
   y = c2(u);
@@ -89,6 +90,9 @@ def blah_enty = func(x enty) enty {
       print(&a);
     }
   }
+  daw enty = y;
+  y = kraw;
+  y = daw;
   return y;
 };
 
