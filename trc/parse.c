@@ -736,9 +736,27 @@ int parse_rest_of_if_statement(struct ps *p, struct pos pos_start,
     return 1;
   }
 
-  struct ast_bracebody elsebody;
-  if (!(skip_ws(p) && parse_bracebody(p, &elsebody))) {
+  if (!skip_ws(p)) {
     goto fail_thenbody;
+  }
+
+  struct ast_bracebody elsebody;
+  struct pos if_pos = ps_pos(p);
+  if (try_skip_keyword(p, "if")) {
+    struct ast_statement elseif_statement;
+    if (!parse_rest_of_if_statement(p, if_pos, &elseif_statement)) {
+      goto fail_thenbody;
+    }
+    struct ast_statement *statements = malloc_mul(sizeof(*statements), 1);
+    statements[0] = elseif_statement;
+    ast_bracebody_init(&elsebody,
+                       ast_meta_make(if_pos, ps_pos(p)), /* TODO: Inaccurate end pos. */
+                       statements,
+                       1);
+  } else {
+    if (!parse_bracebody(p, &elsebody)) {
+      goto fail_thenbody;
+    }
   }
 
   out->tag = AST_STATEMENT_IFTHENELSE;
@@ -2700,6 +2718,11 @@ int parse_test_defs(void) {
                          "  }\n"
                          "};\n",
                          28);
+  pass &= run_count_test("def32",
+                         "func foo() void {\n"
+                         "  if x { } else if y { } else { }\n"
+                         "}\n",
+                         19);
   return pass;
 }
 

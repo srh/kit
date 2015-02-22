@@ -1,13 +1,1 @@
-deftype pos struct {
-  offset size;
-  line size;
-  column size;
-};
-
-func make_pos(offset size, line size, column size) pos {
-  ret pos;
-  ret.offset = offset;
-  ret.line = line;
-  ret.column = column;
-  return ret;
-}
+deftype pos size;
