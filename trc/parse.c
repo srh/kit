@@ -1506,17 +1506,24 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     return parse_numeric_literal(p, &out->u.numeric_literal);
   }
   if (try_skip_keyword(p, "true")) {
-    ast_expr_partial_init(out, AST_EXPR_BOOL_LITERAL_, ast_expr_info_default());
+    ast_expr_partial_init(out, AST_EXPR_BOOL_LITERAL, ast_expr_info_default());
     ast_bool_literal_init(&out->u.bool_literal, ast_meta_make(pos_start, ps_pos(p)), 1);
     return 1;
   }
   if (try_skip_keyword(p, "false")) {
-    ast_expr_partial_init(out, AST_EXPR_BOOL_LITERAL_, ast_expr_info_default());
+    ast_expr_partial_init(out, AST_EXPR_BOOL_LITERAL, ast_expr_info_default());
     ast_bool_literal_init(&out->u.bool_literal, ast_meta_make(pos_start, ps_pos(p)), 0);
     return 1;
   }
   if (try_skip_keyword(p, "void")) {
     ast_expr_partial_init(out, AST_EXPR_VOID_LITERAL, ast_expr_info_default());
+    ast_void_literal_init(&out->u.void_literal,
+                          ast_meta_make(pos_start, ps_pos(p)));
+    return 1;
+  }
+  if (try_skip_keyword(p, "null")) {
+    ast_expr_partial_init(out, AST_EXPR_NULL_LITERAL,
+                          ast_expr_info_default());
     ast_void_literal_init(&out->u.void_literal,
                           ast_meta_make(pos_start, ps_pos(p)));
     return 1;

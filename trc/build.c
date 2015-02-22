@@ -3875,11 +3875,21 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return gen_immediate_numeric_literal(cs->im, f, h, ast_expr_type(a),
                                          &a->u.numeric_literal, er);
   } break;
-  case AST_EXPR_BOOL_LITERAL_: {
+  case AST_EXPR_BOOL_LITERAL: {
     CHECK(a->u.bool_literal.value == 0 || a->u.bool_literal.value == 1);
     struct immediate imm;
     imm.tag = IMMEDIATE_U8;
     imm.u.u8 = (uint8_t)a->u.bool_literal.value;
+    expr_return_immediate(f, h, er, imm);
+    return 1;
+  } break;
+  case AST_EXPR_NULL_LITERAL: {
+    /* Returns an immediate DWORD_SIZE sized value zero for a null
+    pointer. */
+    STATIC_CHECK(DWORD_SIZE == 4);
+    struct immediate imm;
+    imm.tag = IMMEDIATE_U32;
+    imm.u.u32 = 0;
     expr_return_immediate(f, h, er, imm);
     return 1;
   } break;

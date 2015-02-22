@@ -3844,7 +3844,7 @@ int check_expr_ai(struct exprscope *es,
     }
     return 1;
   } break;
-  case AST_EXPR_BOOL_LITERAL_: {
+  case AST_EXPR_BOOL_LITERAL: {
     struct ast_typeexpr bool_type;
     init_name_type(&bool_type, identmap_intern_c_str(es->cs->im, BOOL_TYPE_NAME));
     if (!unify_directionally(es->cs->im, partial_type, &bool_type)) {
@@ -3853,6 +3853,33 @@ int check_expr_ai(struct exprscope *es,
       return 0;
     }
     ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, bool_type));
+    return 1;
+  } break;
+  case AST_EXPR_NULL_LITERAL: {
+    struct ast_typeexpr unknown = ast_unknown_garbage();
+    struct ast_typeexpr ptr_type;
+    wrap_in_ptr(es->cs->im, &unknown, &ptr_type);
+    ast_typeexpr_destroy(&unknown);
+
+    struct ast_typeexpr combined_type;
+    if (!combine_partial_types(es->cs->im, partial_type, &ptr_type,
+                               &combined_type)) {
+      METERR(x->u.null_literal.meta, "Null literal in bad place.%s", "\n");
+      ast_typeexpr_destroy(&ptr_type);  /* TODO */
+      return 0;
+    }
+    ast_typeexpr_destroy(&ptr_type);
+    if (is_concrete(&combined_type)) {
+      ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, combined_type));
+    } else {
+      if (ai == ALLOW_INCOMPLETE_YES) {
+        ast_expr_update(x, ast_expr_info_incomplete_typed(combined_type));
+      } else {
+        ast_typeexpr_destroy(&combined_type);
+        METERR(x->u.null_literal.meta, "Null literal used ambiguously.%s", "\n");
+        return 0;
+      }
+    }
     return 1;
   } break;
   case AST_EXPR_VOID_LITERAL: {
@@ -4628,9 +4655,11 @@ int eval_static_value(struct identmap *im,
     return eval_static_numeric_literal(im,
                                        ast_expr_type(expr),
                                        &expr->u.numeric_literal, out);
-  case AST_EXPR_BOOL_LITERAL_:
+  case AST_EXPR_BOOL_LITERAL:
     static_value_init_bool(out, expr->u.bool_literal.value);
     return 1;
+  case AST_EXPR_NULL_LITERAL:
+    CRASH("Null literal static value evaluation is not supported.\n");
   case AST_EXPR_VOID_LITERAL:
     CRASH("Void literal static value evaluation is not supported.\n");
   case AST_EXPR_CHAR_LITERAL:
@@ -6462,6 +6491,33 @@ int check_file_test_more_61(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_62(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "func foo(x ptr[i32]) bool {\n"
+      "  return x == null;\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_63(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because size is not a ptr[_]. */
+  struct test_module a[] = { {
+      "foo",
+      "func foo(x size) bool {\n"
+      "  return x == null;\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 
@@ -7095,6 +7151,19 @@ int test_check_file(void) {
     DBG("check_file_test_more_61 fails\n");
     goto cleanup_identmap;
   }
+
+  DBG("test_check_file check_file_test_more_62...\n");
+  if (!test_check_module(&im, &check_file_test_more_62, foo)) {
+    DBG("check_file_test_more_62 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_63...\n");
+  if (!!test_check_module(&im, &check_file_test_more_63, foo)) {
+    DBG("check_file_test_more_63 fails\n");
+    goto cleanup_identmap;
+  }
+
 
   ret = 1;
  cleanup_identmap:

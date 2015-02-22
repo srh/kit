@@ -69,6 +69,15 @@ void ast_void_literal_init(struct ast_void_literal *a,
 void ast_void_literal_init_copy(struct ast_void_literal *a,
                                 struct ast_void_literal *c);
 
+struct ast_null_literal {
+  struct ast_meta meta;
+};
+
+void ast_null_literal_init(struct ast_null_literal *a,
+                           struct ast_meta meta);
+void ast_null_literal_init_copy(struct ast_null_literal *a,
+                                struct ast_null_literal *c);
+
 
 
 struct ast_char_literal {
@@ -640,7 +649,8 @@ struct ast_expr_info ast_expr_info_typechecked_identical(
 enum ast_expr_tag {
   AST_EXPR_NAME,
   AST_EXPR_NUMERIC_LITERAL,
-  AST_EXPR_BOOL_LITERAL_,
+  AST_EXPR_BOOL_LITERAL,
+  AST_EXPR_NULL_LITERAL,
   AST_EXPR_VOID_LITERAL,
   AST_EXPR_CHAR_LITERAL,
   AST_EXPR_STRING_LITERAL,
@@ -661,6 +671,7 @@ struct ast_expr {
     struct ast_name_expr name;
     struct ast_numeric_literal numeric_literal;
     struct ast_bool_literal bool_literal;
+    struct ast_null_literal null_literal;
     struct ast_void_literal void_literal;
     struct ast_char_literal char_literal;
     struct ast_string_literal string_literal;
