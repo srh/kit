@@ -91,8 +91,8 @@ defenum grouper {
 defenum tokval {
   Keyw keyw;
   Num numlit;
-  Oper string;
-  Ident string;
+  Oper array[i32];
+  Ident array[i32];
   Grouper grouper;
 };
 
@@ -168,6 +168,10 @@ func is_numeric_postchar(x i32) bool {
   return !is_alnum(x);
 }
 
+func is_ident_firstchar(x i32) bool {
+  return is_alnum(x) || x == ~'_';
+}
+
 func grab_tok(p *ps) grab_tok_res {
   left pos = ps_pos(p);
   ch i32 = ps_peek(p);
@@ -202,9 +206,26 @@ func grab_tok(p *ps) grab_tok_res {
         return BadToken(mk_interval(left, ps_pos(p)));
       }
     }
+  } else if is_digit(ch) {
+    digits array[i8];
+    append(&digits, @[i8]~(ch - ~'0'));
+    ps_step(p);
+    ch = ps_peek(p);
+    while is_digit(ch) {
+      append(&digits, @[i8]~(ch - ~'0'));
+      ps_step(p);
+      ch = ps_peek(p);
+    }
+    if is_numeric_postchar(ch) {
+      return TokToken(mk_tok(left, ps_pos(p), Num(DecNum(digits))));
+    } else {
+      return BadToken(mk_interval(left, ps_pos(p)));
+    }
+  } else if is_ident_firstchar(ch) {
+    // TODO: Implement.
+    return BadToken(mk_interval(left, ps_pos(p)));
   } else {
     // TODO: Implement.
-    check(false);
-    return EofToken(void);  // TODO: No.
+    return BadToken(mk_interval(left, ps_pos(p)));
   }
 }
