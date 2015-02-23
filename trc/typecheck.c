@@ -3894,14 +3894,27 @@ int check_expr_ai(struct exprscope *es,
     return 1;
   } break;
   case AST_EXPR_CHAR_LITERAL: {
-    struct ast_typeexpr char_type;
-    init_name_type(&char_type, identmap_intern_c_str(es->cs->im, CHAR_STANDIN_TYPE_NAME));
-    if (!unify_directionally(es->cs->im, partial_type, &char_type)) {
-      METERR(x->u.char_literal.meta, "Character literal in bad place.%s", "\n");
-      ast_typeexpr_destroy(&char_type);
+    /* TODO: This is an exact copy/paste of the
+    AST_EXPR_NUMERIC_LITERAL case except for error messages. */
+    struct ast_typeexpr num_type = ast_numeric_garbage();
+    struct ast_typeexpr combined_type;
+    if (!combine_partial_types(es->cs->im, partial_type, &num_type, &combined_type)) {
+      METERR(x->u.char_literal.meta, "Char literal in bad place.%s", "\n");
+      ast_typeexpr_destroy(&num_type);  /* TODO */
       return 0;
     }
-    ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, char_type));
+    ast_typeexpr_destroy(&num_type);
+    if (is_concrete(&combined_type)) {
+      ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, combined_type));
+    } else {
+      if (ai == ALLOW_INCOMPLETE_YES) {
+        ast_expr_update(x, ast_expr_info_incomplete_typed(combined_type));
+      } else {
+        ast_typeexpr_destroy(&combined_type);
+        METERR(x->u.char_literal.meta, "Char literal used ambiguously.%s", "\n");
+        return 0;
+      }
+    }
     return 1;
   } break;
   case AST_EXPR_STRING_LITERAL: {
@@ -4144,14 +4157,7 @@ int numeric_literal_to_u32(struct ast_numeric_literal *a, uint32_t *out) {
   return 1;
 }
 
-int numeric_literal_to_i32(struct ast_numeric_literal *a, int32_t *out) {
-  /* TODO: There's no way to plainly represent INT32_MIN.  We should
-  get static evaluation of "arbitrary numeric constants"
-  implemented. */
-  uint32_t value;
-  if (!numeric_literal_to_u32(a, &value)) {
-    return 0;
-  }
+int squash_u32_to_i32(uint32_t value, int32_t *out) {
   if (value > 0x7FFFFFFFul) {
     ERR_DBG(NUMERIC_LITERAL_OOR);
     return 0;
@@ -4161,11 +4167,18 @@ int numeric_literal_to_i32(struct ast_numeric_literal *a, int32_t *out) {
   return 1;
 }
 
-int numeric_literal_to_u8(struct ast_numeric_literal *a, uint8_t *out) {
+int numeric_literal_to_i32(struct ast_numeric_literal *a, int32_t *out) {
+  /* TODO: There's no way to plainly represent INT32_MIN.  We should
+  get static evaluation of "arbitrary numeric constants"
+  implemented. */
   uint32_t value;
   if (!numeric_literal_to_u32(a, &value)) {
     return 0;
   }
+  return squash_u32_to_i32(value, out);
+}
+
+int squash_u32_to_u8(uint32_t value, uint8_t *out) {
   if (value > 0xFF) {
     ERR_DBG(NUMERIC_LITERAL_OOR);
     return 0;
@@ -4175,11 +4188,15 @@ int numeric_literal_to_u8(struct ast_numeric_literal *a, uint8_t *out) {
   return 1;
 }
 
-int numeric_literal_to_i8(struct ast_numeric_literal *a, int8_t *out) {
+int numeric_literal_to_u8(struct ast_numeric_literal *a, uint8_t *out) {
   uint32_t value;
   if (!numeric_literal_to_u32(a, &value)) {
     return 0;
   }
+  return squash_u32_to_u8(value, out);
+}
+
+int squash_u32_to_i8(uint32_t value, int8_t *out) {
   if (value > 0x7F) {
     ERR_DBG(NUMERIC_LITERAL_OOR);
     return 0;
@@ -4187,6 +4204,14 @@ int numeric_literal_to_i8(struct ast_numeric_literal *a, int8_t *out) {
   CHECK(value <= INT8_MAX);
   *out = (int8_t)value;
   return 1;
+}
+
+int numeric_literal_to_i8(struct ast_numeric_literal *a, int8_t *out) {
+  uint32_t value;
+  if (!numeric_literal_to_u32(a, &value)) {
+    return 0;
+  }
+  return squash_u32_to_i8(value, out);
 }
 
 int eval_static_numeric_literal(struct identmap *im,
@@ -6177,11 +6202,11 @@ int check_file_test_more_42(const uint8_t *name, size_t name_count,
 
 int check_file_test_more_43(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
-  /* Fails because the character literal is of the wrong type. */
   struct test_module a[] = { {
       "foo",
       "def x i8 = '\\x12';\n"
     } };
+  /* Passes because the char literal value is in range for an i8. */
 
   return load_test_module(a, sizeof(a) / sizeof(a[0]),
                           name, name_count, data_out, data_count_out);
@@ -7052,8 +7077,8 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file !check_file_test_more_43...\n");
-  if (!!test_check_module(&im, &check_file_test_more_43, foo)) {
+  DBG("test_check_file check_file_test_more_43...\n");
+  if (!test_check_module(&im, &check_file_test_more_43, foo)) {
     DBG("check_file_test_more_43 fails\n");
     goto cleanup_identmap;
   }

@@ -138,7 +138,7 @@ export func showfacs(p *ty, num *u16) ty {
   putchar(10);
 
   yptr *i32 = &p->y;
-  *yptr = 77;
+  *yptr = 'M';  // 'M' is 77
   var xptr *i32 = &p->x;
   xptr[0] = 99;
 

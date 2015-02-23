@@ -119,12 +119,12 @@ defenum grab_tok_res {
 
 func is_lower(x i32) bool {
   // TODO: Statically assert 'z' - 'a' == 25.
-  return x >= ~'a' && x <= ~'z';
+  return x >= 'a' && x <= 'z';
 }
 
 func is_upper(x i32) bool {
   // TODO: Statically assert 'Z' - 'A' == 25.
-  return x >= ~'A' && x <= ~'Z';
+  return x >= 'A' && x <= 'Z';
 }
 
 func is_alpha(x i32) bool {
@@ -133,7 +133,7 @@ func is_alpha(x i32) bool {
 
 func is_digit(x i32) bool {
   // TODO: Statically assert '9' - '0' == 9.
-  return x >= ~'0' && x <= ~'9';
+  return x >= '0' && x <= '9';
 }
 
 func is_alnum(x i32) bool {
@@ -143,15 +143,15 @@ func is_alnum(x i32) bool {
 func is_hexdigit(x i32, val_out *i8) bool {
   // TODO: Statically assert 'f' - 'a', 'F' - 'A', '9' - '0'.
   if is_digit(x) {
-    *val_out = ~(x - ~'0');
+    *val_out = ~(x - '0');
     return true;
   }
-  if ~'A' <= x && x <= ~'F' {
-    *val_out = ~(x - ~'A');
+  if 'A' <= x && x <= 'F' {
+    *val_out = ~(x - 'A');
     return true;
   }
-  if ~'a' <= x && x <= ~'f' {
-    *val_out = ~(x - ~'a');
+  if 'a' <= x && x <= 'f' {
+    *val_out = ~(x - 'a');
     return true;
   }
   return false;
@@ -163,7 +163,7 @@ func is_numeric_postchar(x i32) bool {
 }
 
 func is_ident_firstchar(x i32) bool {
-  return is_alpha(x) || x == ~'_';
+  return is_alpha(x) || x == '_';
 }
 
 func is_ident_midchar(x i32) bool {
@@ -181,10 +181,10 @@ func grab_tok(p *ps) grab_tok_res {
   if ch == @[i32]-1 {
     return EofToken(void);
   }
-  if ch == ~'0' {
+  if ch == '0' {
     ps_step(p);
     ch = ps_peek(p);
-    if ch == ~'x' {
+    if ch == 'x' {
       ps_step(p);
       ch = ps_peek(p);
       digits array[i8];
@@ -211,11 +211,11 @@ func grab_tok(p *ps) grab_tok_res {
     }
   } else if is_digit(ch) {
     digits array[i8];
-    append(&digits, @[i8]~(ch - ~'0'));
+    append(&digits, @[i8]~(ch - '0'));
     ps_step(p);
     ch = ps_peek(p);
     while is_digit(ch) {
-      append(&digits, @[i8]~(ch - ~'0'));
+      append(&digits, @[i8]~(ch - '0'));
       ps_step(p);
       ch = ps_peek(p);
     }
@@ -261,30 +261,30 @@ func grab_tok(p *ps) grab_tok_res {
       return BadToken(mk_interval(left, ps_pos(p)));
     }
     return TokToken(mk_tok(left, ps_pos(p), Ident(arr)));
-  } else if ch == ~'(' {
+  } else if ch == '(' {
     ps_step(p);
     return TokToken(mk_tok(left, ps_pos(p), Grouper(LParen(void))));
-  } else if ch == ~')' {
+  } else if ch == ')' {
     ps_step(p);
     return TokToken(mk_tok(left, ps_pos(p), Grouper(RParen(void))));
-  } else if ch == ~'[' {
+  } else if ch == '[' {
     ps_step(p);
     return TokToken(mk_tok(left, ps_pos(p), Grouper(LBracket(void))));
-  } else if ch == ~']' {
+  } else if ch == ']' {
     ps_step(p);
     return TokToken(mk_tok(left, ps_pos(p), Grouper(RBracket(void))));
-  } else if ch == ~'{' {
+  } else if ch == '{' {
     ps_step(p);
     return TokToken(mk_tok(left, ps_pos(p), Grouper(LBrace(void))));
-  } else if ch == ~'}' {
+  } else if ch == '}' {
     ps_step(p);
     return TokToken(mk_tok(left, ps_pos(p), Grouper(RBrace(void))));
-  } else if ch == ~'!' {
+  } else if ch == '!' {
     arr array[i32];
     append(&arr, ch);
     ps_step(p);
     ch = ps_peek(p);
-    if ch == ~'=' {
+    if ch == '=' {
       append(&arr, ch);
       ps_step(p);
     }

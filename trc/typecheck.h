@@ -80,9 +80,9 @@ struct ast_typeexpr *expose_func_return_type(struct identmap *im,
                                              struct ast_typeexpr *func,
                                              size_t expected_params_count);
 int numeric_literal_to_u32(struct ast_numeric_literal *a, uint32_t *out);
-int numeric_literal_to_i32(struct ast_numeric_literal *a, int32_t *out);
-int numeric_literal_to_u8(struct ast_numeric_literal *a, uint8_t *out);
-int numeric_literal_to_i8(struct ast_numeric_literal *a, int8_t *out);
+int squash_u32_to_i32(uint32_t value, int32_t *out);
+int squash_u32_to_u8(uint32_t value, uint8_t *out);
+int squash_u32_to_i8(uint32_t value, int8_t *out);
 
 enum typeexpr_trait {
   TYPEEXPR_TRAIT_LACKED,

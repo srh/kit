@@ -3663,18 +3663,19 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
   }
 }
 
-int gen_immediate_numeric_literal(struct identmap *im,
-                                  struct objfile *f,
-                                  struct frame *h,
-                                  struct ast_typeexpr *type,
-                                  struct ast_numeric_literal *a,
-                                  struct expr_return *er) {
+int help_gen_immediate_numeric(struct identmap *im,
+                               struct objfile *f,
+                               struct frame *h,
+                               struct ast_typeexpr *type,
+                               struct ast_meta *meta,
+                               uint32_t numeric_literal_value,
+                               struct expr_return *er) {
   CHECK(type->tag == AST_TYPEEXPR_NAME);
   CHECK(is_numeric_type(im, type));
 
   if (type->u.name.value == identmap_intern_c_str(im, I32_TYPE_NAME)) {
     int32_t value;
-    if (!numeric_literal_to_i32(a, &value)) {
+    if (!squash_u32_to_i32(numeric_literal_value, &value)) {
       return 0;
     }
 
@@ -3686,19 +3687,14 @@ int gen_immediate_numeric_literal(struct identmap *im,
   } else if (type->u.name.value == identmap_intern_c_str(im, U32_TYPE_NAME)
              || type->u.name.value == identmap_intern_c_str(im, SIZE_TYPE_NAME)
              || type->u.name.value == identmap_intern_c_str(im, OSIZE_TYPE_NAME)) {
-    uint32_t value;
-    if (!numeric_literal_to_u32(a, &value)) {
-      return 0;
-    }
-
     struct immediate imm;
     imm.tag = IMMEDIATE_U32;
-    imm.u.u32 = value;
+    imm.u.u32 = numeric_literal_value;
     expr_return_immediate(f, h, er, imm);
     return 1;
   } else if (type->u.name.value == identmap_intern_c_str(im, U8_TYPE_NAME)) {
     uint8_t value;
-    if (!numeric_literal_to_u8(a, &value)) {
+    if (!squash_u32_to_u8(numeric_literal_value, &value)) {
       return 0;
     }
     struct immediate imm;
@@ -3708,7 +3704,7 @@ int gen_immediate_numeric_literal(struct identmap *im,
     return 1;
   } else if (type->u.name.value == identmap_intern_c_str(im, I8_TYPE_NAME)) {
     int8_t value;
-    if (!numeric_literal_to_i8(a, &value)) {
+    if (!squash_u32_to_i8(numeric_literal_value, &value)) {
       return 0;
     }
     struct immediate imm;
@@ -3717,11 +3713,29 @@ int gen_immediate_numeric_literal(struct identmap *im,
     expr_return_immediate(f, h, er, imm);
     return 1;
   } else {
-    METERR(a->meta, "Compiler incomplete: Numeric literal resolves to type '%.*s', "
+    METERR(*meta, "Compiler incomplete: Numeric literal resolves to type '%.*s', "
            "which this lame compiler cannot codegen for literals.\n",
            IM_P(im, type->u.name.value));
     return 0;
   }
+}
+
+int gen_immediate_numeric_literal(struct identmap *im,
+                                  struct objfile *f,
+                                  struct frame *h,
+                                  struct ast_typeexpr *type,
+                                  struct ast_numeric_literal *a,
+                                  struct expr_return *er) {
+  CHECK(type->tag == AST_TYPEEXPR_NAME);
+  CHECK(is_numeric_type(im, type));
+
+  uint32_t numeric_literal_value;
+  if (!numeric_literal_to_u32(a, &numeric_literal_value)) {
+    return 0;
+  }
+
+  return help_gen_immediate_numeric(im, f, h, type, &a->meta,
+                                    numeric_literal_value, er);
 }
 
 struct loc gen_array_element_loc(struct checkstate *cs,
@@ -3935,11 +3949,10 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_CHAR_LITERAL: {
-    struct immediate imm;
-    imm.tag = IMMEDIATE_U8;
-    imm.u.u8 = a->u.char_literal.value;
-    expr_return_immediate(f, h, er, imm);
-    return 1;
+    return help_gen_immediate_numeric(cs->im, f, h, ast_expr_type(a),
+                                      &a->u.char_literal.meta,
+                                      (uint32_t)a->u.char_literal.value,
+                                      er);
   } break;
   case AST_EXPR_STRING_LITERAL: {
     return gen_string_literal(cs, f, h, a, er);
