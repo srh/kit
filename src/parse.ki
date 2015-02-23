@@ -196,7 +196,7 @@ func grab_tok(p *ps) grab_tok_res {
       }
 
       if is_numeric_postchar(ch) {
-        return TokToken(mk_tok(left, ps_pos(p), Num(HexNum(digits))));
+        return mk_res(p, left, Num(HexNum(digits)));
       } else {
         return BadToken(mk_interval(left, ps_pos(p)));
       }
@@ -204,7 +204,7 @@ func grab_tok(p *ps) grab_tok_res {
       if is_numeric_postchar(ch) {
         digits array[i8];
         append(&digits, 0);
-        return TokToken(mk_tok(left, ps_pos(p), Num(DecNum(digits))));
+        return mk_res(p, left, Num(DecNum(digits)));
       } else {
         return BadToken(mk_interval(left, ps_pos(p)));
       }
@@ -220,7 +220,7 @@ func grab_tok(p *ps) grab_tok_res {
       ch = ps_peek(p);
     }
     if is_numeric_postchar(ch) {
-      return TokToken(mk_tok(left, ps_pos(p), Num(DecNum(digits))));
+      return mk_res(p, left, Num(DecNum(digits)));
     } else {
       return BadToken(mk_interval(left, ps_pos(p)));
     }
@@ -260,39 +260,112 @@ func grab_tok(p *ps) grab_tok_res {
     if !is_ident_postchar(ch) {
       return BadToken(mk_interval(left, ps_pos(p)));
     }
-    return TokToken(mk_tok(left, ps_pos(p), Ident(arr)));
+    return mk_res(p, left, Ident(arr));
   } else if ch == '(' {
     ps_step(p);
-    return TokToken(mk_tok(left, ps_pos(p), Grouper(LParen(void))));
+    return mk_res(p, left, Grouper(LParen(void)));
   } else if ch == ')' {
     ps_step(p);
-    return TokToken(mk_tok(left, ps_pos(p), Grouper(RParen(void))));
+    return mk_res(p, left, Grouper(RParen(void)));
   } else if ch == '[' {
     ps_step(p);
-    return TokToken(mk_tok(left, ps_pos(p), Grouper(LBracket(void))));
+    return mk_res(p, left, Grouper(LBracket(void)));
   } else if ch == ']' {
     ps_step(p);
-    return TokToken(mk_tok(left, ps_pos(p), Grouper(RBracket(void))));
+    return mk_res(p, left, Grouper(RBracket(void)));
   } else if ch == '{' {
     ps_step(p);
-    return TokToken(mk_tok(left, ps_pos(p), Grouper(LBrace(void))));
+    return mk_res(p, left, Grouper(LBrace(void)));
   } else if ch == '}' {
     ps_step(p);
-    return TokToken(mk_tok(left, ps_pos(p), Grouper(RBrace(void))));
-  } else if ch == '!' {
-    arr array[i32];
-    append(&arr, ch);
+    return mk_res(p, left, Grouper(RBrace(void)));
+  } else if ch == '~' {
     ps_step(p);
-    ch = ps_peek(p);
-    if ch == '=' {
-      append(&arr, ch);
-      ps_step(p);
-    }
-    return TokToken(mk_tok(left, ps_pos(p), Oper(arr)));
+    return mk_res(p, left, Oper(mk_array(ch)));
+  } else if ch == '!' {
+    return grab_oper2(p, left, ch, '=');
+  } else if ch == '%' {
+    return grab_oper2(p, left, ch, '=');
+  } else if ch == '^' {
+    return grab_oper2(p, left, ch, '=');
+  } else if ch == '&' {
+    return grab_oper2(p, left, ch, '=', '&');
+  } else if ch == '*' {
+    return grab_oper2(p, left, ch, '=');
+  } else if ch == '-' {
+    return grab_oper2(p, left, ch, '=', '-', '>');
+  } else if ch == '=' {
+    return grab_oper2(p, left, ch, '=');
+  } else if ch == '+' {
+    return grab_oper2(p, left, ch, '=', '+');
+  } else if ch == '|' {
+    return grab_oper2(p, left, ch, '=', '|');
+  } else if ch == ':' {
+    ps_step(p);
+    return mk_res(p, left, Oper(mk_array(ch)));
+  } else if ch == ';' {
+    ps_step(p);
+    return mk_res(p, left, Oper(mk_array(ch)));
+  } else if ch == ',' {
+    ps_step(p);
+    return mk_res(p, left, Oper(mk_array(ch)));
+  } else if ch == '<' {
+    return grab_angly(p, left, ch);
+  } else if ch == '.' {
+    ps_step(p);
+    return mk_res(p, left, Oper(mk_array(ch)));
+  } else if ch == '>' {
+    return grab_angly(p, left, ch);
+  } else if ch == '/' {
+    return grab_oper2(p, left, ch, '=');
   } else {
-    // TODO: Implement.
     return BadToken(mk_interval(left, ps_pos(p)));
   }
+}
+
+func grab_angly(p *ps, left pos, ch i32) grab_tok_res {
+  arr array[i32] = mk_array(ch);
+  ps_step(p);
+  dh i32 = ps_peek(p);
+  if dh == ch {
+    append(&arr, dh);
+    ps_step(p);
+    dh = ps_peek(p);
+  }
+  if dh == '=' {
+    append(&arr, dh);
+    ps_step(p);
+  }
+  return mk_res(p, left, Oper(arr));
+}
+
+func grab_oper2(p *ps, left pos, ch i32, n0 i32) grab_tok_res {
+  return grab_oper2(p, left, ch, n0, n0, n0);
+}
+
+func grab_oper2(p *ps, left pos, ch i32, n0 i32, n1 i32) grab_tok_res {
+  return grab_oper2(p, left, ch, n0, n1, n1);
+}
+
+func grab_oper2(p *ps, left pos, ch i32, n0 i32, n1 i32, n2 i32) grab_tok_res {
+  arr array[i32] = mk_array(ch);
+  ps_step(p);
+  ch = ps_peek(p);
+  if ch == n0 || ch == n1 || ch == n2 {
+    append(&arr, ch);
+    ps_step(p);
+  }
+  return mk_res(p, left, Oper(arr));
+}
+
+func mk_res(p *ps, left pos, v tokval) grab_tok_res {
+  return TokToken(mk_tok(left, ps_pos(p), v));
+}
+
+func[T] mk_array(x0 T) array[T] {
+  ret array[T];
+  append(&ret, x0);
+  return ret;
 }
 
 func[String] grab_keyword(p *ps, s String, k keyw, out *tok) bool {
