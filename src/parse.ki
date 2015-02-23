@@ -7,9 +7,6 @@ deftype ps struct {
   length size;
   pos size;
 
-  line size;
-  column size;
-
   im *identmap;
 
   stack array[ptree];
@@ -20,8 +17,6 @@ func make_ps(im *identmap, data *u8, length size) ps {
   p.data = data;
   p.length = length;
   p.pos = 0;
-  p.line = 1;
-  p.column = 0;
   p.im = im;
   return p;
 }
@@ -30,6 +25,10 @@ func ps_pos(p *ps) pos {
   ret pos;
   ret.~ = p->pos;
   return ret;
+}
+
+func ps_restore_pos(p *ps, pos pos) void {
+  p->pos = pos.~;
 }
 
 func ps_peek(p *ps) i32 {
@@ -42,36 +41,31 @@ func ps_peek(p *ps) i32 {
 
 func ps_step(p *ps) void {
   check(p->pos < p->length);
-  ch u8 = p->data[p->pos];
-  if ch == '\n' {
-    p->line = p->line + 1;
-    p->column = 0;
-  } else if ch == '\t' {
-    p->column = (p->column | 7) + 1;
-  } else {
-    p->column = p->column + 1;
-  }
-
   p->pos = p->pos + 1;
 }
 
+
+
 defenum keyw {
-  Return void;
-  While void;
-  For void;
-  If void;
-  Else void;
-  Switch void;
   Case void;
   Def void;
-  Func void;
-  Deftype void;
-  Defenum void;
   Defclass void;
+  Defenum void;
+  Deftype void;
+  Else void;
+  False void;
+  For void;
+  Func void;
+  If void;
+  Null void;
+  Return void;
   Struct void;
-  Var void;
-  Union void;
+  Switch void;
+  True void;
   Underscore void;
+  Union void;
+  Var void;
+  While void;
 };
 
 defenum numlit {
@@ -169,7 +163,16 @@ func is_numeric_postchar(x i32) bool {
 }
 
 func is_ident_firstchar(x i32) bool {
-  return is_alnum(x) || x == ~'_';
+  return is_alpha(x) || x == ~'_';
+}
+
+func is_ident_midchar(x i32) bool {
+  return is_ident_firstchar(x) || is_digit(x);
+}
+
+func is_ident_postchar(x i32) bool {
+  // TODO: Implement for real.
+  return !is_ident_midchar(x);
 }
 
 func grab_tok(p *ps) grab_tok_res {
@@ -222,10 +225,91 @@ func grab_tok(p *ps) grab_tok_res {
       return BadToken(mk_interval(left, ps_pos(p)));
     }
   } else if is_ident_firstchar(ch) {
-    // TODO: Implement.
-    return BadToken(mk_interval(left, ps_pos(p)));
+    ret tok;
+    if (grab_keyword(p, "case", Case(void), &ret)
+        || grab_keyword(p, "def", Def(void), &ret)
+        || grab_keyword(p, "defclass", Defclass(void), &ret)
+        || grab_keyword(p, "defenum", Defenum(void), &ret)
+        || grab_keyword(p, "deftype", Deftype(void), &ret)
+        || grab_keyword(p, "else", Else(void), &ret)
+        || grab_keyword(p, "false", False(void), &ret)
+        || grab_keyword(p, "for", For(void), &ret)
+        || grab_keyword(p, "func", Func(void), &ret)
+        || grab_keyword(p, "if", If(void), &ret)
+        || grab_keyword(p, "null", Null(void), &ret)
+        || grab_keyword(p, "return", Return(void), &ret)
+        || grab_keyword(p, "struct", Struct(void), &ret)
+        || grab_keyword(p, "switch", Switch(void), &ret)
+        || grab_keyword(p, "true", True(void), &ret)
+        || grab_keyword(p, "_", Underscore(void), &ret)
+        || grab_keyword(p, "union", Union(void), &ret)
+        || grab_keyword(p, "var", Var(void), &ret)
+        || grab_keyword(p, "while", While(void), &ret)) {
+      return TokToken(ret);
+    }
+
+    arr array[i32];
+    append(&arr, ch);
+    ps_step(p);
+    ch = ps_peek(p);
+    while is_ident_midchar(ch) {
+      append(&arr, ch);
+      ps_step(p);
+      ch = ps_peek(p);
+    }
+    if !is_ident_postchar(ch) {
+      return BadToken(mk_interval(left, ps_pos(p)));
+    }
+    return TokToken(mk_tok(left, ps_pos(p), Ident(arr)));
+  } else if ch == ~'(' {
+    ps_step(p);
+    return TokToken(mk_tok(left, ps_pos(p), Grouper(LParen(void))));
+  } else if ch == ~')' {
+    ps_step(p);
+    return TokToken(mk_tok(left, ps_pos(p), Grouper(RParen(void))));
+  } else if ch == ~'[' {
+    ps_step(p);
+    return TokToken(mk_tok(left, ps_pos(p), Grouper(LBracket(void))));
+  } else if ch == ~']' {
+    ps_step(p);
+    return TokToken(mk_tok(left, ps_pos(p), Grouper(RBracket(void))));
+  } else if ch == ~'{' {
+    ps_step(p);
+    return TokToken(mk_tok(left, ps_pos(p), Grouper(LBrace(void))));
+  } else if ch == ~'}' {
+    ps_step(p);
+    return TokToken(mk_tok(left, ps_pos(p), Grouper(RBrace(void))));
+  } else if ch == ~'!' {
+    arr array[i32];
+    append(&arr, ch);
+    ps_step(p);
+    ch = ps_peek(p);
+    if ch == ~'=' {
+      append(&arr, ch);
+      ps_step(p);
+    }
+    return TokToken(mk_tok(left, ps_pos(p), Oper(arr)));
   } else {
     // TODO: Implement.
     return BadToken(mk_interval(left, ps_pos(p)));
   }
+}
+
+func[String] grab_keyword(p *ps, s String, k keyw, out *tok) bool {
+  left pos = ps_pos(p);
+  for i size = 0; i < s.length; i = i + 1 {
+    si u8 = s[i];
+    if ps_peek(p) != ~si {
+      ps_restore_pos(p, left);
+      return false;
+    }
+    ps_step(p);
+  }
+
+  if !is_ident_postchar(ps_peek(p)) {
+    return false;
+  }
+
+  *out = mk_tok(left, ps_pos(p), Keyw(k));
+  return true;
 }
