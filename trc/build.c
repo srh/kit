@@ -73,6 +73,7 @@ enum x86_jcc {
   X86_JCC_NE = 0x85,
   X86_JCC_S = 0x88,
   X86_JCC_A = 0x87,
+  X86_JCC_AE = 0x83,
   X86_JCC_C = 0x82,
   X86_JCC_G = 0x8F,
   X86_JCC_L = 0x8C,
@@ -4243,9 +4244,20 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     size_t end_target = frame_add_target(h);
     size_t next_target = frame_add_target(h);
 
+    int has_default = 0;
+    size_t default_case_num = 0;
+
     for (size_t i = 0, e = ss->cased_statements_count; i < e; i++) {
       int32_t switchcase_saved_offset = frame_save_offset(h);
       struct ast_cased_statement *cas = &ss->cased_statements[i];
+
+      if (cas->pattern.is_default) {
+        CHECK(!has_default);
+        has_default = 1;
+        default_case_num = i;
+        continue;
+      }
+
       x86_gen_cmp_imm32(f, X86_EAX,
                         int32_add(
                             size_to_int32(
@@ -4272,6 +4284,29 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       frame_define_target(h, next_target, objfile_section_size(objfile_text(f)));
       next_target = frame_add_target(h);
       frame_restore_offset(h, switchcase_saved_offset);
+    }
+
+    if (has_default) {
+      struct ast_cased_statement *cas = &ss->cased_statements[default_case_num];
+      STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
+      /* We carefully make the 0 tag and nonsense tag values redirect
+      to the crash branch. */
+      struct immediate imm;
+      imm.tag = IMMEDIATE_U32;
+      imm.u.u32 = FIRST_ENUM_TAG_NUMBER;
+      x86_gen_mov_reg_imm32(f, X86_ECX, imm);
+      x86_gen_sub_w32(f, X86_EAX, X86_ECX);
+      x86_gen_cmp_imm32(f, X86_EAX,
+                        size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.info)));
+      gen_placeholder_jcc(f, h, X86_JCC_AE, next_target);
+
+      if (!gen_bracebody(cs, f, h,
+                         &ss->cased_statements[default_case_num].body)) {
+        return 0;
+      }
+
+      gen_placeholder_jmp(f, h, end_target);
+      frame_define_target(h, next_target, objfile_section_size(objfile_text(f)));
     }
 
     gen_crash_jmp(f, h);

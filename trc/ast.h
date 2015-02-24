@@ -380,6 +380,8 @@ void ast_statement_alloc_move(struct ast_statement movee,
 struct ast_case_pattern_info {
   int info_valid;
   /* TODO: Wrap in a wrapper type. */
+  /* This contains number of constructors (in the enum type) if the
+  pattern is a default pattern. */
   size_t constructor_number;
 };
 
@@ -391,6 +393,7 @@ void ast_case_pattern_info_specify(struct ast_case_pattern_info *a,
 struct ast_case_pattern {
   struct ast_meta meta;
   struct ast_case_pattern_info info;
+  int is_default;
   struct ast_ident constructor_name;
   struct ast_vardecl decl;
 };
@@ -399,6 +402,8 @@ void ast_case_pattern_init(struct ast_case_pattern *a,
                            struct ast_meta meta,
                            struct ast_ident constructor_name,
                            struct ast_vardecl decl);
+void ast_case_pattern_init_default(struct ast_case_pattern *a,
+                                   struct ast_meta meta);
 void ast_case_pattern_init_copy(struct ast_case_pattern *a,
                                 struct ast_case_pattern *c);
 void ast_case_pattern_destroy(struct ast_case_pattern *a);

@@ -987,14 +987,20 @@ int parse_case_pattern(struct ps *p, struct ast_case_pattern *out) {
 
 int parse_cased_statement(struct ps *p, struct ast_cased_statement *out) {
   struct pos pos_start = ps_pos(p);
-  if (!try_skip_keyword(p, "case")) {
-    goto fail;
+  struct ast_case_pattern pattern;
+  if (try_skip_keyword(p, "default")) {
+    /* TODO: The meta field is kind of different for a default ast_case_pattern. */
+    ast_case_pattern_init_default(&pattern, ast_meta_make(pos_start, ps_pos(p)));
+  } else {
+    if (!try_skip_keyword(p, "case")) {
+      goto fail;
+    }
+
+    if (!(skip_ws(p) && parse_case_pattern(p, &pattern))) {
+      goto fail;
+    }
   }
 
-  struct ast_case_pattern pattern;
-  if (!(skip_ws(p) && parse_case_pattern(p, &pattern))) {
-    goto fail;
-  }
   struct ast_bracebody body;
   if (!(skip_ws(p) && try_skip_char(p, ':') && skip_ws(p) && parse_bracebody(p, &body))) {
     goto fail_pattern;

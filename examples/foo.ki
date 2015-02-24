@@ -86,8 +86,9 @@ def blah_enty = func(x enty) enty {
       print(@[u32]~a.q);
       putchar(10);
     }
-    case c3(a string): {
-      print(&a);
+    default: {
+      s string = lits("a default case\n");
+      print(&s);
     }
   }
   daw enty = y;

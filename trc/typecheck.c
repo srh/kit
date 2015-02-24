@@ -2970,82 +2970,97 @@ int check_statement(struct bodystate *bs,
     for (size_t e = ss->cased_statements_count; i < e; i++) {
       struct ast_cased_statement *cas = &ss->cased_statements[i];
       for (size_t j = 0; j < i; j++) {
-        if (ss->cased_statements[j].pattern.constructor_name.value
-            == cas->pattern.constructor_name.value) {
-          METERR(cas->meta, "Overlapping (duplicate) switch cases.%s", "\n");
-          goto switch_fail_concrete_enumspec;
-        }
-      }
-
-      int constructor_found = 0;
-      size_t constructor_num = SIZE_MAX;  /* Initialized to appease cl. */
-      for (size_t j = 0, je = concrete_enumspec.enumfields_count; j < je; j++) {
-        if (concrete_enumspec.enumfields[j].name.value
-            == cas->pattern.constructor_name.value) {
-          constructor_found = 1;
-          constructor_num = j;
-          break;
-        }
-      }
-
-      if (!constructor_found) {
-        METERR(cas->meta, "Unrecognized constructor in switch case.%s", "\n");
-        goto switch_fail_concrete_enumspec;
-      }
-
-      struct typeexpr_traits discard;
-      if (!check_typeexpr_traits(bs->es->cs, &concrete_enumspec.enumfields[constructor_num].type, bs->es, &discard)) {
-        goto switch_fail_concrete_enumspec;
-      }
-
-      struct ast_typeexpr replaced_incomplete_type;
-      replace_generics(bs->es, &cas->pattern.decl.type, &replaced_incomplete_type);
-
-      struct varnum varnum;
-      struct ast_vardecl *replaced_decl;
-      {
-        if (!unify_directionally(bs->es->cs->im, &replaced_incomplete_type,
-                                 &concrete_enumspec.enumfields[constructor_num].type)) {
-          ast_typeexpr_destroy(&replaced_incomplete_type);
-          METERR(cas->meta, "Switch case decl type mismatch.%s", "\n");
-          goto switch_fail_concrete_enumspec;
-        }
-        ast_typeexpr_destroy(&replaced_incomplete_type);
-
-        struct ast_ident replaced_decl_name;
-        ast_ident_init_copy(&replaced_decl_name, &cas->pattern.decl.name);
-
-        struct ast_typeexpr concrete_type_copy;
-        ast_typeexpr_init_copy(&concrete_type_copy, &concrete_enumspec.enumfields[constructor_num].type);
-
-        replaced_decl = malloc(sizeof(*replaced_decl));
-        CHECK(replaced_decl);
-        ast_vardecl_init(replaced_decl, ast_meta_make_copy(&cas->pattern.decl.meta),
-                         replaced_decl_name, concrete_type_copy);
-
-        if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
-          free_ast_vardecl(&replaced_decl);
-          goto switch_fail_concrete_enumspec;
+        if (cas->pattern.is_default) {
+          if (ss->cased_statements[j].pattern.is_default) {
+            METERR(cas->meta, "Overlapping default switch cases.%s", "\n");
+            goto switch_fail_concrete_enumspec;
+          }
+        } else {
+          if (!ss->cased_statements[j].pattern.is_default
+              && ss->cased_statements[j].pattern.constructor_name.value
+              == cas->pattern.constructor_name.value) {
+            METERR(cas->meta, "Overlapping (duplicate) switch cases.%s", "\n");
+            goto switch_fail_concrete_enumspec;
+          }
         }
       }
 
       enum fallthrough cas_fallthrough;
-      if (!check_expr_bracebody(bs, &cas->body, &cas_fallthrough)) {
+      if (cas->pattern.is_default) {
+        if (!check_expr_bracebody(bs, &cas->body, &cas_fallthrough)) {
+          goto switch_fail_concrete_enumspec;
+        }
+        ast_case_pattern_info_specify(&cas->pattern.info,
+                                      concrete_enumspec.enumfields_count);
+      } else {
+        size_t constructor_num = SIZE_MAX;  /* Initialized to appease cl. */
+        int constructor_found = 0;
+        for (size_t j = 0, je = concrete_enumspec.enumfields_count; j < je; j++) {
+          if (concrete_enumspec.enumfields[j].name.value
+              == cas->pattern.constructor_name.value) {
+            constructor_found = 1;
+            constructor_num = j;
+            break;
+          }
+        }
+
+        if (!constructor_found) {
+          METERR(cas->meta, "Unrecognized constructor in switch case.%s", "\n");
+          goto switch_fail_concrete_enumspec;
+        }
+
+        struct typeexpr_traits discard;
+        if (!check_typeexpr_traits(bs->es->cs, &concrete_enumspec.enumfields[constructor_num].type, bs->es, &discard)) {
+          goto switch_fail_concrete_enumspec;
+        }
+
+        struct ast_typeexpr replaced_incomplete_type;
+        replace_generics(bs->es, &cas->pattern.decl.type, &replaced_incomplete_type);
+
+        struct varnum varnum;
+        struct ast_vardecl *replaced_decl = NULL;
+        {
+          if (!unify_directionally(bs->es->cs->im, &replaced_incomplete_type,
+                                   &concrete_enumspec.enumfields[constructor_num].type)) {
+            ast_typeexpr_destroy(&replaced_incomplete_type);
+            METERR(cas->meta, "Switch case decl type mismatch.%s", "\n");
+            goto switch_fail_concrete_enumspec;
+          }
+          ast_typeexpr_destroy(&replaced_incomplete_type);
+
+          struct ast_ident replaced_decl_name;
+          ast_ident_init_copy(&replaced_decl_name, &cas->pattern.decl.name);
+
+          struct ast_typeexpr concrete_type_copy;
+          ast_typeexpr_init_copy(&concrete_type_copy,
+                                 &concrete_enumspec.enumfields[constructor_num].type);
+
+          replaced_decl = malloc(sizeof(*replaced_decl));
+          CHECK(replaced_decl);
+          ast_vardecl_init(replaced_decl, ast_meta_make_copy(&cas->pattern.decl.meta),
+                           replaced_decl_name, concrete_type_copy);
+
+          if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
+            free_ast_vardecl(&replaced_decl);
+            goto switch_fail_concrete_enumspec;
+          }
+        }
+
+        if (!check_expr_bracebody(bs, &cas->body, &cas_fallthrough)) {
+          free_ast_vardecl(&replaced_decl);
+          goto switch_fail_concrete_enumspec;
+        }
+
+        exprscope_pop_var(bs->es);
         free_ast_vardecl(&replaced_decl);
-        goto switch_fail_concrete_enumspec;
-      }
 
-      fallthrough = max_fallthrough(fallthrough, cas_fallthrough);
-
-      exprscope_pop_var(bs->es);
-      free_ast_vardecl(&replaced_decl);
-
-      {
         struct ast_typeexpr concrete_type_copy;
-        ast_typeexpr_init_copy(&concrete_type_copy, &concrete_enumspec.enumfields[constructor_num].type);
+        ast_typeexpr_init_copy(&concrete_type_copy,
+                               &concrete_enumspec.enumfields[constructor_num].type);
         ast_var_info_specify(&cas->pattern.decl.var_info, varnum, concrete_type_copy);
+        ast_case_pattern_info_specify(&cas->pattern.info, constructor_num);
       }
-      ast_case_pattern_info_specify(&cas->pattern.info, constructor_num);
+      fallthrough = max_fallthrough(fallthrough, cas_fallthrough);
     }
 
     break;
@@ -6557,6 +6572,52 @@ int check_file_test_more_63(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_64(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defenum ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p i32; q i32; };\n"
+      "};\n"
+      "def foo fn[ty, i32] = func(x ty) i32 {\n"
+      "  switch x {\n"
+      "    default: { return -1; }\n"
+      "    case c2(s): {\n"
+      "      return s.p + s.q;\n"
+      "    }\n"
+      "  }\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_65(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because of overlapping default cases. */
+  struct test_module a[] = { {
+      "foo",
+      "defenum ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p i32; q i32; };\n"
+      "};\n"
+      "def foo fn[ty, i32] = func(x ty) i32 {\n"
+      "  switch x {\n"
+      "    default: { return -1; }\n"
+      "    default: { return -2; }\n"
+      "    case c2(s): {\n"
+      "      return s.p + s.q;\n"
+      "    }\n"
+      "  }\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 
@@ -7202,6 +7263,20 @@ int test_check_file(void) {
     DBG("check_file_test_more_63 fails\n");
     goto cleanup_identmap;
   }
+
+  DBG("test_check_file check_file_test_more_64...\n");
+  if (!test_check_module(&im, &check_file_test_more_64, foo)) {
+    DBG("check_file_test_more_64 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_65...\n");
+  if (!!test_check_module(&im, &check_file_test_more_65, foo)) {
+    DBG("check_file_test_more_65 fails\n");
+    goto cleanup_identmap;
+  }
+
+
 
 
   ret = 1;
