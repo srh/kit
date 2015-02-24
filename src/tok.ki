@@ -8,8 +8,6 @@ deftype ps struct {
   pos size;
 
   im *identmap;
-
-  stack array[ptree];
 };
 
 func make_ps(im *identmap, data *u8, length size) ps {
@@ -166,9 +164,17 @@ func is_ident_postchar(x i32) bool {
   return !is_ident_midchar(x);
 }
 
+func is_ws(x i32) bool {
+  return x == ' ' || x == '\n' || x == '\t' || x == '\r';
+}
+
 func grab_tok(p *ps) grab_tok_res {
   left pos = ps_pos(p);
   ch i32 = ps_peek(p);
+  while is_ws(ch) {
+    ps_step(p);
+    ch = ps_peek(p);
+  }
   if ch == @[i32]-1 {
     return EofToken(void);
   }

@@ -2,6 +2,7 @@ import tok;
 
 defenum treesym {
   Token tok;
+  BadToken interval;
 };
 
 deftype ptree struct {
@@ -9,3 +10,74 @@ deftype ptree struct {
   childs array[uniq[ptree]];
 };
 
+func mk_ptree(sym treesym) ptree {
+  ret ptree;
+  ret.sym = sym;
+  return ret;
+}
+
+defenum pattag {
+};
+
+defenum pattom {
+  Pattag pattag;
+  Keyw keyw;
+  Num void;
+  Oper array[i32];
+  Ident void;
+  Grouper grouper;
+};
+
+func parse_loop(p *ps, stack *array[ptree]) bool {
+  seen_error bool = false;
+  for ;; {
+    switch grab_tok(p) {
+      case TokToken(t tok): {
+        append(stack, mk_ptree(Token(t)));
+        while collapse(stack) { }
+      }
+      case BadToken(i interval): {
+        append(stack, mk_ptree(BadToken(i)));
+        seen_error = true;
+      }
+      case EofToken(v): {
+        return seen_error;
+      }
+    }
+  }
+}
+
+func collapse(stack *array[ptree]) bool {
+  c size = count(stack);
+  if c == 0 {
+    return false;
+  }
+
+  bot *ptree = ref(stack, c);
+
+  switch bot->sym {
+  case BadToken(i): { return false; }
+  case Token(t): {
+    switch t.val {
+    case Keyw(a): {
+      // TODO: Implement.
+    }
+    case Num(a): {
+      // TODO: Implement.
+    }
+    case Oper(a): {
+      // TODO: Implement.
+    }
+    case Ident(a): {
+      // TODO: Implement.
+    }
+    case Grouper(g): {
+      // TODO: Implement.
+    }
+    }
+  }
+  }
+
+  check(false);
+  return false;
+}
