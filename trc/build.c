@@ -312,6 +312,13 @@ uint32_t immediate_size(struct immediate imm) {
   }
 }
 
+struct immediate imm_u32(uint32_t u32) {
+  struct immediate imm;
+  imm.tag = IMMEDIATE_U32;
+  imm.u.u32 = u32;
+  return imm;
+}
+
 enum loc_tag {
   LOC_EBP_OFFSET,
   LOC_GLOBAL,
@@ -1815,15 +1822,11 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
 }
 
 void gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32_t upadded_size) {
-  struct immediate imm;
-  imm.tag = IMMEDIATE_U32;
-  imm.u.u32 = 0;
-
   int32_t padded_size = uint32_to_int32(upadded_size);
   int32_t n = 0;
   while (n < padded_size) {
     if (padded_size - n >= DWORD_SIZE) {
-      x86_gen_mov_mem_imm32(f, reg, int32_add(n, disp), imm);
+      x86_gen_mov_mem_imm32(f, reg, int32_add(n, disp), imm_u32(0));
       n += DWORD_SIZE;
     } else {
       x86_gen_mov_mem_imm8(f, reg, int32_add(n, disp), 0);
@@ -2311,10 +2314,9 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   struct loc return_enum_num_loc = make_enum_num_loc(f, h, return_loc);
   struct loc return_enum_body_loc = make_enum_body_loc(f, h, return_loc, arg_size);
 
-  struct immediate enum_num_imm;
-  enum_num_imm.tag = IMMEDIATE_U32;
-  enum_num_imm.u.u32 = uint32_add(FIRST_ENUM_TAG_NUMBER,
-                                  size_to_uint32(enumconstruct_number));
+  struct immediate enum_num_imm
+    = imm_u32(uint32_add(FIRST_ENUM_TAG_NUMBER,
+                         size_to_uint32(enumconstruct_number)));
   x86_gen_mov_reg_imm32(f, X86_EAX, enum_num_imm);
   gen_store_register(f, return_enum_num_loc, X86_EAX);
 
@@ -3424,10 +3426,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
 
   gen_load_register(f, X86_EAX, rhs_loc);
 
-  struct immediate imm;
-  imm.tag = IMMEDIATE_U32;
-  imm.u.u32 = elem_size;
-  x86_gen_mov_reg_imm32(f, X86_ECX, imm);
+  x86_gen_mov_reg_imm32(f, X86_ECX, imm_u32(elem_size));
   x86_gen_imul_w32(f, X86_EAX, X86_ECX);
   gen_crash_jcc(f, h, X86_JCC_O);
 
@@ -3688,10 +3687,7 @@ int help_gen_immediate_numeric(struct identmap *im,
   } else if (type->u.name.value == identmap_intern_c_str(im, U32_TYPE_NAME)
              || type->u.name.value == identmap_intern_c_str(im, SIZE_TYPE_NAME)
              || type->u.name.value == identmap_intern_c_str(im, OSIZE_TYPE_NAME)) {
-    struct immediate imm;
-    imm.tag = IMMEDIATE_U32;
-    imm.u.u32 = numeric_literal_value;
-    expr_return_immediate(f, h, er, imm);
+    expr_return_immediate(f, h, er, imm_u32(numeric_literal_value));
     return 1;
   } else if (type->u.name.value == identmap_intern_c_str(im, U8_TYPE_NAME)) {
     uint8_t value;
@@ -3749,10 +3745,7 @@ struct loc gen_array_element_loc(struct checkstate *cs,
   uint32_t elem_offset = uint32_mul(elem_size, index);
 
   gen_load_addressof(f, X86_EDX, src);
-  struct immediate imm;
-  imm.tag = IMMEDIATE_U32;
-  imm.u.u32 = elem_offset;
-  x86_gen_mov_reg_imm32(f, X86_ECX, imm);
+  x86_gen_mov_reg_imm32(f, X86_ECX, imm_u32(elem_offset));
   x86_gen_add_w32(f, X86_EDX, X86_ECX);
   struct loc loc = frame_push_loc(h, DWORD_SIZE);
   gen_store_register(f, loc, X86_EDX);
@@ -3848,11 +3841,8 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
     CHECK(a->u.local_field_access.fieldname.ident.value
           == identmap_intern_c_str(cs->im, ARRAY_LENGTH_FIELDNAME));
     gen_destroy_temp(cs, f, h, *er_tr(&lhs_er));
-    struct immediate imm;
     /* X86 32-bit size specific. */
-    imm.tag = IMMEDIATE_U32;
-    imm.u.u32 = lhs_type->u.arraytype.count;
-    expr_return_immediate(f, h, er, imm);
+    expr_return_immediate(f, h, er, imm_u32(lhs_type->u.arraytype.count));
   } else {
     apply_field_access(cs, f, h, ero_loc(&lhs_er.u.open), *er_tr(&lhs_er),
                        lhs_type,
@@ -3937,10 +3927,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     /* Returns an immediate DWORD_SIZE sized value zero for a null
     pointer. */
     STATIC_CHECK(DWORD_SIZE == 4);
-    struct immediate imm;
-    imm.tag = IMMEDIATE_U32;
-    imm.u.u32 = 0;
-    expr_return_immediate(f, h, er, imm);
+    expr_return_immediate(f, h, er, imm_u32(0));
     return 1;
   } break;
   case AST_EXPR_VOID_LITERAL: {
@@ -4291,10 +4278,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
       /* We carefully make the 0 tag and nonsense tag values redirect
       to the crash branch. */
-      struct immediate imm;
-      imm.tag = IMMEDIATE_U32;
-      imm.u.u32 = FIRST_ENUM_TAG_NUMBER;
-      x86_gen_mov_reg_imm32(f, X86_ECX, imm);
+      x86_gen_mov_reg_imm32(f, X86_ECX, imm_u32(FIRST_ENUM_TAG_NUMBER));
       x86_gen_sub_w32(f, X86_EAX, X86_ECX);
       x86_gen_cmp_imm32(f, X86_EAX,
                         size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.info)));
