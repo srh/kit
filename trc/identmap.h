@@ -47,7 +47,7 @@ void identmap_lookup(struct identmap *m, ident_value ident,
 const char *im_s(struct identmap *m, ident_value ident);
 int im_i(struct identmap *m, ident_value ident);
 
-#define IM_P(im, iv) im_i((im), (iv)), im_s((im), (iv))
+#define IM_P(im, iv) ((iv) == IDENT_VALUE_INVALID ? 6 : im_i((im), (iv))), ((iv) == IDENT_VALUE_INVALID ? "(none)" : im_s((im), (iv)))
 
 void identmap_set_user_value(struct identmap *m, ident_value ident,
                              void *user_value);

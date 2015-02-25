@@ -771,7 +771,7 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
   }
 
   struct error_info error_info;
-  if (!parse_buf_file(cs->im, data, data_size, file_out, &error_info)) {
+  if (!parse_buf_file(cs->im, data, data_size, name, file_out, &error_info)) {
     ERR("Parse error in module %.*s at %"PRIz":%"PRIz".\n",
         size_to_int(module_name_count), (const char *)module_name,
         error_info.pos.line, error_info.pos.column);
@@ -824,14 +824,14 @@ int add_enum_constructors(struct checkstate *cs,
     struct ast_vardecl *f = &enumspec->enumfields[i];
 
     if (f->name.value == name->value) {
-      METERR(f->name.meta, "enum constructor %.*s matches enum name\n",
+      METERR(cs->im, f->name.meta, "enum constructor %.*s matches enum name\n",
              IM_P(cs->im, f->name.value));
       return 0;
     }
 
     for (size_t j = 0; j < i; j++) {
       if (f->name.value == enumspec->enumfields[j].name.value) {
-        METERR(f->name.meta, "enum constructor %.*s with duplicate name.\n",
+        METERR(cs->im, f->name.meta, "enum constructor %.*s with duplicate name.\n",
                IM_P(cs->im, f->name.value));
         return 0;
       }
@@ -915,7 +915,7 @@ int chase_through_toplevels(struct checkstate *cs,
     case AST_TOPLEVEL_DEF: {
       if (!toplevel->u.def.has_typeexpr) {
         if (!make_complete_lambda_typeexpr(cs->im, &toplevel->u.def.rhs, &toplevel->u.def.typeexpr)) {
-          METERR(toplevel->u.def.meta, "Incomplete type for def %.*s\n",
+          METERR(cs->im, toplevel->u.def.meta, "Incomplete type for def %.*s\n",
                  IM_P(cs->im, toplevel->u.def.name.value));
           return 0;
         }
@@ -1073,7 +1073,7 @@ int check_typeexpr_name(struct checkstate *cs,
     struct deftype_entry *ent;
     if (!name_table_lookup_deftype(&cs->nt, name, no_param_list_arity(),
                                    &ent)) {
-      METERR(a->meta, "Unrecognized type name '%.*s'.\n", IM_P(cs->im, name));
+      METERR(cs->im, a->meta, "Unrecognized type name '%.*s'.\n", IM_P(cs->im, name));
       return 0;
     }
 
@@ -1096,7 +1096,7 @@ int check_typeexpr_app(struct checkstate *cs,
   if (!name_table_lookup_deftype(&cs->nt, a->name.value,
                                  param_list_arity(a->params_count),
                                  &ent)) {
-    METERR(a->meta, "Type lookup fail for %.*s, arity %"PRIz"\n",
+    METERR(cs->im, a->meta, "Type lookup fail for %.*s, arity %"PRIz"\n",
            IM_P(cs->im, a->name.value), a->params_count);
     return 0;
   }
@@ -1127,7 +1127,7 @@ int check_typeexpr_fields(struct checkstate *cs,
     struct ast_vardecl *field = &fields[i];
     for (size_t j = 0; j < i; j++) {
       if (field->name.value == fields[j].name.value) {
-        METERR(field->meta, "struct/union fields have duplicate name %.*s\n",
+        METERR(cs->im, field->meta, "struct/union fields have duplicate name %.*s\n",
                IM_P(cs->im, field->name.value));
         return 0;
       }
@@ -1136,7 +1136,7 @@ int check_typeexpr_fields(struct checkstate *cs,
     {
       size_t which_generic;
       if (generics_lookup_name(generics, field->name.value, &which_generic)) {
-        METERR(field->meta,
+        METERR(cs->im, field->meta,
                "struct/union field shadows template parameter %.*s, "
                "which is gauche.\n",
                IM_P(cs->im, field->name.value));
@@ -1284,7 +1284,7 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
                                          &unified,
                                          &lvalue_discard,
                                          &inst)) {
-        METERR(*ast_typeexpr_meta(a), "Typecheck failed(?) when looking up %s definition.\n",
+        METERR(cs->im, *ast_typeexpr_meta(a), "Typecheck failed(?) when looking up %s definition.\n",
                name);
         goto fail;
       }
@@ -1299,7 +1299,7 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
     return 1;
   }
 
-  METERR(*ast_typeexpr_meta(a), "Multiple matching '%s' definitions\n", name);
+  METERR(cs->im, *ast_typeexpr_meta(a), "Multiple matching '%s' definitions\n", name);
  fail:
   ast_name_expr_destroy(&func_name);
   ast_typeexpr_destroy(&func_type);
@@ -1399,7 +1399,7 @@ int finish_checking_name_traits(struct checkstate *cs,
     rhs_traits.movable = explicit_move ? TYPEEXPR_TRAIT_HAD : TYPEEXPR_TRAIT_LACKED;
   } else {
     if (explicit_move) {
-      METERR(*deftype_meta, "Type has both implicit and explicit move.%s", "\n");
+      METERR(cs->im, *deftype_meta, "Type has both implicit and explicit move.%s", "\n");
       return 0;
     }
   }
@@ -1407,16 +1407,16 @@ int finish_checking_name_traits(struct checkstate *cs,
   if (lookup_copy) {
     rhs_traits.copyable = explicit_copy ? TYPEEXPR_TRAIT_HAD : TYPEEXPR_TRAIT_LACKED;
     if (!explicit_destroy) {
-      METERR(*deftype_meta, "Type lacks explicit destructor.%s", "\n");
+      METERR(cs->im, *deftype_meta, "Type lacks explicit destructor.%s", "\n");
       return 0;
     }
   } else {
     if (explicit_copy) {
-      METERR(*deftype_meta, "Type has both implicit and explicit copy.%s", "\n");
+      METERR(cs->im, *deftype_meta, "Type has both implicit and explicit copy.%s", "\n");
       return 0;
     }
     if (explicit_destroy) {
-      METERR(*deftype_meta, "Type has both implicit and explicit destroy.%s", "\n");
+      METERR(cs->im, *deftype_meta, "Type has both implicit and explicit destroy.%s", "\n");
       return 0;
     }
   }
@@ -1425,7 +1425,7 @@ int finish_checking_name_traits(struct checkstate *cs,
     rhs_traits.inittible = explicit_init ? TYPEEXPR_TRAIT_HAD : TYPEEXPR_TRAIT_LACKED;
   } else {
     if (explicit_init) {
-      METERR(*deftype_meta, "Type has both implicit and explicit init.%s", "\n");
+      METERR(cs->im, *deftype_meta, "Type has both implicit and explicit init.%s", "\n");
       return 0;
     }
   }
@@ -1452,7 +1452,7 @@ int check_typeexpr_name_traits(struct checkstate *cs,
   if (!name_table_lookup_deftype(&cs->nt, a->u.name.value,
                                  no_param_list_arity(),
                                  &ent)) {
-    METERR(*ast_typeexpr_meta(a), "Invalid type name %.*s found.\n", IM_P(cs->im, a->u.name.value));
+    METERR(cs->im, *ast_typeexpr_meta(a), "Invalid type name %.*s found.\n", IM_P(cs->im, a->u.name.value));
     return 0;
   }
 
@@ -1600,19 +1600,19 @@ int check_typeexpr_unione_traits(struct checkstate *cs,
     }
 
     if (traits.movable != TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
-      METERR(a->u.unione.meta, "Union field %.*s is not trivially movable.\n",
+      METERR(cs->im, a->u.unione.meta, "Union field %.*s is not trivially movable.\n",
              IM_P(cs->im, a->u.unione.fields[i].name.value));
       return 0;
     }
 
     if (traits.copyable != TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
-      METERR(a->u.unione.meta, "Union field %.*s is not trivially copyable.\n",
+      METERR(cs->im, a->u.unione.meta, "Union field %.*s is not trivially copyable.\n",
              IM_P(cs->im, a->u.unione.fields[i].name.value));
       return 0;
     }
 
     if (traits.inittible != TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
-      METERR(a->u.unione.meta, "Union field %.*s is not trivially initializable.\n",
+      METERR(cs->im, a->u.unione.meta, "Union field %.*s is not trivially initializable.\n",
              IM_P(cs->im, a->u.unione.fields[i].name.value));
       return 0;
     }
@@ -1652,11 +1652,11 @@ int check_typeexpr_traits(struct checkstate *cs,
   case AST_TYPEEXPR_ARRAY:
     return check_typeexpr_traits(cs, a->u.arraytype.param, also_typecheck, out);
   case AST_TYPEEXPR_UNKNOWN: {
-    METERR(*ast_typeexpr_meta(a), "Incomplete type in bad place.%s", "\n");
+    METERR(cs->im, *ast_typeexpr_meta(a), "Incomplete type in bad place.%s", "\n");
     return 0;
   } break;
   case AST_TYPEEXPR_NUMERIC: {
-    METERR(*ast_typeexpr_meta(a), "Incomplete numeric type in bad place.%s", "\n");
+    METERR(cs->im, *ast_typeexpr_meta(a), "Incomplete numeric type in bad place.%s", "\n");
     return 0;
   }
   default:
@@ -1689,14 +1689,14 @@ int check_generics_shadowing(struct checkstate *cs,
     ident_value name = a->params[i].value;
     for (size_t j = 0; j < i; j++) {
       if (name == a->params[j].value) {
-        METERR(a->meta, "duplicate param names %.*s within same generics list.\n",
+        METERR(cs->im, a->meta, "duplicate param names %.*s within same generics list.\n",
                IM_P(cs->im, name));
         return 0;
       }
     }
 
     if (name_table_shadowed(&cs->nt, name)) {
-      METERR(a->meta, "generics list shadows global name %.*s.\n",
+      METERR(cs->im, a->meta, "generics list shadows global name %.*s.\n",
              IM_P(cs->im, name));
       return 0;
     }
@@ -1718,7 +1718,7 @@ int check_deftype(struct checkstate *cs, struct deftype_entry *ent) {
   CHECK(a);  /* Must be non-null, because ent->is_primitive is false. */
 
   if (ent->is_being_checked) {
-    METERR(a->meta, "deftype %.*s recursively held.\n",
+    METERR(cs->im, a->meta, "deftype %.*s recursively held.\n",
            IM_P(cs->im, ent->name));
     return 0;
   }
@@ -1872,7 +1872,7 @@ void exprscope_note_static_reference(struct exprscope *es,
 int check_var_shadowing(struct exprscope *es, struct ast_ident *name) {
   for (size_t i = 0, e = es->vars_count; i < e; i++) {
     if (es->vars[i].decl->name.value == name->value) {
-      METERR(name->meta, "Variable name %.*s shadows local.\n",
+      METERR(es->cs->im, name->meta, "Variable name %.*s shadows local.\n",
              IM_P(es->cs->im, name->value));
       return 0;
     }
@@ -1881,7 +1881,7 @@ int check_var_shadowing(struct exprscope *es, struct ast_ident *name) {
   {
     size_t which_generic;
     if (generics_lookup_name(es->generics, name->value, &which_generic)) {
-      METERR(name->meta, "Variable name %.*s shadows template parameter, which is gauche.\n",
+      METERR(es->cs->im, name->meta, "Variable name %.*s shadows template parameter, which is gauche.\n",
              IM_P(es->cs->im, name->value));
       return 0;
     }
@@ -1890,7 +1890,7 @@ int check_var_shadowing(struct exprscope *es, struct ast_ident *name) {
   /* TODO: Decide whether to get rid of this. */
 #if 0
   if (name_table_shadowed(&es->cs->nt, name->value)) {
-    METERR(name->meta, "Variable name %.*s shadows a global def or type.\n",
+    METERR(es->cs->im, name->meta, "Variable name %.*s shadows a global def or type.\n",
            IM_P(es->cs->im, name->value));
     return 0;
   }
@@ -2087,7 +2087,7 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
 
   for (size_t i = 0, e = ent->private_to_count; i < e; i++) {
     if (!is_accessible(also_maybe_typecheck, ent->private_to[i])) {
-      METERR(name->meta, "Access denied.%s", "\n");
+      METERR(cs->im, name->meta, "Access denied.%s", "\n");
       goto fail_unified;
     }
   }
@@ -2121,17 +2121,17 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
 
       if (name->ident.value == identmap_intern_c_str(cs->im, "copy")) {
         if (traits.copyable == TYPEEXPR_TRAIT_LACKED) {
-          METERR(name->meta, "Copy trait lacked.%s", "\n");
+          METERR(cs->im, name->meta, "Copy trait lacked.%s", "\n");
           goto fail_unified;
         }
       } else if (name->ident.value == identmap_intern_c_str(cs->im, "move")) {
         if (traits.movable == TYPEEXPR_TRAIT_LACKED) {
-          METERR(name->meta, "Copy trait lacked.%s", "\n");
+          METERR(cs->im, name->meta, "Copy trait lacked.%s", "\n");
           goto fail_unified;
         }
       } else if (name->ident.value == identmap_intern_c_str(cs->im, "init")) {
         if (traits.inittible == TYPEEXPR_TRAIT_LACKED) {
-          METERR(name->meta, "Init trait lacked.%s", "\n");
+          METERR(cs->im, name->meta, "Init trait lacked.%s", "\n");
           goto fail_unified;
         }
       }
@@ -2145,7 +2145,7 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
       CHECK(!inst->annotated_rhs_computed);
       if (cs->template_instantiation_recursion_depth
           == MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH) {
-        METERR(ent->def->meta, "Max template instantiation recursion depth exceeded.%s", "\n");
+        METERR(cs->im, ent->def->meta, "Max template instantiation recursion depth exceeded.%s", "\n");
         goto fail_unified;
       }
 
@@ -2208,7 +2208,7 @@ int exprscope_lookup_name(struct exprscope *es,
     }
 
     if (!unify_directionally(es->cs->im, partial_type, &decl->type)) {
-      METERR(name->meta, "Type mismatch for vardecl %.*s lookup.\n",
+      METERR(es->cs->im, name->meta, "Type mismatch for vardecl %.*s lookup.\n",
              IM_P(es->cs->im, name->ident.value));
       *multi_match_out = 0;
       return 0;
@@ -2423,7 +2423,7 @@ int compute_and_check_exprcatch(struct exprscope *es,
 
       /* Oof, there's no copy constructor for the type that we would copy. */
       if (traits.copyable == TYPEEXPR_TRAIT_LACKED) {
-        METERR(*ast_expr_ast_meta(annotated_expr),
+        METERR(es->cs->im, *ast_expr_ast_meta(annotated_expr),
                "Copy demanded of noncopyable type.%s", "\n");
         return 0;
       }
@@ -2439,7 +2439,7 @@ int compute_and_check_exprcatch(struct exprscope *es,
 
     /* Oof, there's no copy constructor for the type that we would copy. */
     if (traits.copyable == TYPEEXPR_TRAIT_LACKED) {
-      METERR(*ast_expr_ast_meta(annotated_expr),
+      METERR(es->cs->im, *ast_expr_ast_meta(annotated_expr),
              "Copy demanded of noncopyable type.%s", "\n");
       return 0;
     }
@@ -2748,7 +2748,7 @@ int check_statement(struct bodystate *bs,
       }
     } else {
       if (!exact_typeexprs_equal(bs->es->cs->im, &bs->exact_return_type, expr_type)) {
-        METERR(s->u.return_statement.meta,
+        METERR(bs->es->cs->im, s->u.return_statement.meta,
                "Return statements with conflicting return types.%s", "\n");
         if (!has_expr) {
           ast_typeexpr_destroy(&void_type);
@@ -2785,7 +2785,7 @@ int check_statement(struct bodystate *bs,
                              ast_expr_type(&s->u.var_statement.rhs->expr));
     } else {
       if (!is_concrete(&replaced_incomplete_type)) {
-        METERR(s->u.var_statement.decl.meta, "Var statement without initializer has incomplete type.%s", "\n");
+        METERR(bs->es->cs->im, s->u.var_statement.decl.meta, "Var statement without initializer has incomplete type.%s", "\n");
         goto fail;
       }
 
@@ -2800,7 +2800,7 @@ int check_statement(struct bodystate *bs,
     }
 
     if (!has_rhs && traits.inittible == TYPEEXPR_TRAIT_LACKED) {
-        METERR(s->u.var_statement.meta, "Variable %.*s not default-initializable.\n",
+        METERR(bs->es->cs->im, s->u.var_statement.meta, "Variable %.*s not default-initializable.\n",
                IM_P(bs->es->cs->im, s->u.var_statement.decl.name.value));
         ast_typeexpr_destroy(&concrete_type);
         goto fail;
@@ -2959,7 +2959,7 @@ int check_statement(struct bodystate *bs,
 
     struct ast_enumspec concrete_enumspec;
     if (!is_enum_type(bs->es->cs, ast_expr_type(ss->swartch), &concrete_enumspec)) {
-      METERR(*ast_expr_ast_meta(ss->swartch),
+      METERR(bs->es->cs->im, *ast_expr_ast_meta(ss->swartch),
              "Switching over non-enum type.%s", "\n");
       goto switch_fail;
     }
@@ -2972,14 +2972,14 @@ int check_statement(struct bodystate *bs,
       for (size_t j = 0; j < i; j++) {
         if (cas->pattern.is_default) {
           if (ss->cased_statements[j].pattern.is_default) {
-            METERR(cas->meta, "Overlapping default switch cases.%s", "\n");
+            METERR(bs->es->cs->im, cas->meta, "Overlapping default switch cases.%s", "\n");
             goto switch_fail_concrete_enumspec;
           }
         } else {
           if (!ss->cased_statements[j].pattern.is_default
               && ss->cased_statements[j].pattern.constructor_name.value
               == cas->pattern.constructor_name.value) {
-            METERR(cas->meta, "Overlapping (duplicate) switch cases.%s", "\n");
+            METERR(bs->es->cs->im, cas->meta, "Overlapping (duplicate) switch cases.%s", "\n");
             goto switch_fail_concrete_enumspec;
           }
         }
@@ -3005,7 +3005,7 @@ int check_statement(struct bodystate *bs,
         }
 
         if (!constructor_found) {
-          METERR(cas->meta, "Unrecognized constructor in switch case.%s", "\n");
+          METERR(bs->es->cs->im, cas->meta, "Unrecognized constructor in switch case.%s", "\n");
           goto switch_fail_concrete_enumspec;
         }
 
@@ -3023,7 +3023,7 @@ int check_statement(struct bodystate *bs,
           if (!unify_directionally(bs->es->cs->im, &replaced_incomplete_type,
                                    &concrete_enumspec.enumfields[constructor_num].type)) {
             ast_typeexpr_destroy(&replaced_incomplete_type);
-            METERR(cas->meta, "Switch case decl type mismatch.%s", "\n");
+            METERR(bs->es->cs->im, cas->meta, "Switch case decl type mismatch.%s", "\n");
             goto switch_fail_concrete_enumspec;
           }
           ast_typeexpr_destroy(&replaced_incomplete_type);
@@ -3144,7 +3144,7 @@ int check_expr_funcbody(struct exprscope *es,
     }
   } else {
     if (fallthrough != FALLTHROUGH_NEVER) {
-      METERR(x->meta, "not all control paths return a value.%s", "\n");
+      METERR(es->cs->im, x->meta, "not all control paths return a value.%s", "\n");
       goto fail;
     }
   }
@@ -3183,7 +3183,7 @@ int check_expr_lambda(struct exprscope *es,
     for (i = 0; i < func_params_count; i++) {
       for (size_t j = 0; j < i; j++) {
         if (x->params[i].name.value == x->params[j].name.value) {
-          METERR(x->params[i].meta, "Duplicate lambda parameter name %.*s.\n",
+          METERR(es->cs->im, x->params[i].meta, "Duplicate lambda parameter name %.*s.\n",
                  IM_P(es->cs->im, x->params[i].name.value));
           goto fail_args_up_to_i;
         }
@@ -3219,7 +3219,7 @@ int check_expr_lambda(struct exprscope *es,
   }
 
   if (!unify_directionally(es->cs->im, partial_type, &funcexpr)) {
-    METERR(x->meta, "lambda type does not match expression type.%s", "\n");
+    METERR(es->cs->im, x->meta, "lambda type does not match expression type.%s", "\n");
     goto fail_funcexpr;
   }
 
@@ -3309,20 +3309,20 @@ int check_expr_magic_binop(struct exprscope *es,
       goto cleanup;
     }
     if (es->computation == STATIC_COMPUTATION_YES) {
-      METERR(x->meta, "Assignment within statically evaluated expression.%s", "\n");
+      METERR(es->cs->im, x->meta, "Assignment within statically evaluated expression.%s", "\n");
       goto cleanup;
     }
     if (!ast_expr_is_lvalue(x->lhs)) {
-      METERR(x->meta, "Trying to assign to non-lvalue.%s", "\n");
+      METERR(es->cs->im, x->meta, "Trying to assign to non-lvalue.%s", "\n");
       goto cleanup;
     }
     if (!exact_typeexprs_equal(es->cs->im, ast_expr_type(x->lhs), ast_expr_type(x->rhs))) {
-      METERR(x->meta, "Assignment with non-matching types.%s", "\n");
+      METERR(es->cs->im, x->meta, "Assignment with non-matching types.%s", "\n");
       goto cleanup;
     }
 
     if (!unify_directionally(es->cs->im, partial_type, ast_expr_type(x->lhs))) {
-      METERR(x->meta, "LHS type of assignment does not match contextual type.%s", "\n");
+      METERR(es->cs->im, x->meta, "LHS type of assignment does not match contextual type.%s", "\n");
       goto cleanup;
     }
 
@@ -3340,17 +3340,17 @@ int check_expr_magic_binop(struct exprscope *es,
     init_name_type(&boolean, identmap_intern_c_str(es->cs->im, BOOL_TYPE_NAME));
 
     if (!unify_directionally(es->cs->im, &boolean, ast_expr_type(x->lhs))) {
-      METERR(x->meta, "LHS of and/or is non-boolean.%s", "\n");
+      METERR(es->cs->im, x->meta, "LHS of and/or is non-boolean.%s", "\n");
       goto logical_cleanup_boolean;
     }
 
     if (!unify_directionally(es->cs->im, &boolean, ast_expr_type(x->rhs))) {
-      METERR(x->meta, "RHS of and/or is non-boolean.%s", "\n");
+      METERR(es->cs->im, x->meta, "RHS of and/or is non-boolean.%s", "\n");
       goto logical_cleanup_boolean;
     }
 
     if (!unify_directionally(es->cs->im, partial_type, &boolean)) {
-      METERR(x->meta, "And/or expression in non-boolean context.%s", "\n");
+      METERR(es->cs->im, x->meta, "And/or expression in non-boolean context.%s", "\n");
       goto logical_cleanup_boolean;
     }
 
@@ -3418,7 +3418,7 @@ int check_expr_magic_unop(struct exprscope *es,
   CHECK(y->tag == AST_EXPR_UNOP);
   struct ast_unop_expr *x = &y->u.unop_expr;
   if (es->computation == STATIC_COMPUTATION_YES) {
-    METERR(x->meta, "Magic unops not allowed in static expressions.%s", "\n");
+    METERR(es->cs->im, x->meta, "Magic unops not allowed in static expressions.%s", "\n");
     return 0;
   }
 
@@ -3433,12 +3433,12 @@ int check_expr_magic_unop(struct exprscope *es,
   case AST_UNOP_DEREFERENCE: {
     struct ast_typeexpr *rhs_target;
     if (!view_ptr_target(es->cs->im, ast_expr_type(x->rhs), &rhs_target)) {
-      METERR(x->meta, "Trying to dereference a non-pointer.%s", "\n");
+      METERR(es->cs->im, x->meta, "Trying to dereference a non-pointer.%s", "\n");
       goto cleanup;
     }
 
     if (!unify_directionally(es->cs->im, partial_type, rhs_target)) {
-      METERR(x->meta, "Pointer dereference results in wrong type.%s", "\n");
+      METERR(es->cs->im, x->meta, "Pointer dereference results in wrong type.%s", "\n");
       goto cleanup;
     }
 
@@ -3449,7 +3449,7 @@ int check_expr_magic_unop(struct exprscope *es,
   } break;
   case AST_UNOP_ADDRESSOF: {
     if (!ast_expr_is_lvalue(x->rhs)) {
-      METERR(x->meta, "Trying to take the address of a non-lvalue.%s", "\n");
+      METERR(es->cs->im, x->meta, "Trying to take the address of a non-lvalue.%s", "\n");
       goto cleanup;
     }
 
@@ -3458,7 +3458,7 @@ int check_expr_magic_unop(struct exprscope *es,
                 &pointer_type);
 
     if (!unify_directionally(es->cs->im, partial_type, &pointer_type)) {
-      METERR(x->meta, "Addressof results in wrong type.%s", "\n");
+      METERR(es->cs->im, x->meta, "Addressof results in wrong type.%s", "\n");
       ast_typeexpr_destroy(&pointer_type);
       goto cleanup;
     }
@@ -3487,7 +3487,8 @@ int check_expr_unop(struct exprscope *es,
   return check_expr_magic_unop(es, x, partial_type);
 }
 
-int lookup_fields_field_type(struct ast_vardecl *fields,
+int lookup_fields_field_type(struct identmap *im,
+                             struct ast_vardecl *fields,
                              size_t fields_count,
                              struct ast_ident *field_name,
                              struct ast_typeexpr *field_type_out) {
@@ -3498,7 +3499,7 @@ int lookup_fields_field_type(struct ast_vardecl *fields,
     }
   }
 
-  METERR(field_name->meta, "Field name not found.%s", "\n");
+  METERR(im, field_name->meta, "Field name not found.%s", "\n");
   return 0;
 }
 
@@ -3516,7 +3517,7 @@ int lookup_field_type(struct exprscope *es,
     }
 
     if (ent->is_primitive) {
-      METERR(fieldname->meta, "Looking up %sfield on primitive type %.*s.",
+      METERR(es->cs->im, fieldname->meta, "Looking up %sfield on primitive type %.*s.",
              fieldname->whole_field ? "whole " : "",
              IM_P(es->cs->im, type->u.name.value));
       return 0;
@@ -3525,7 +3526,7 @@ int lookup_field_type(struct exprscope *es,
     struct ast_deftype *deftype = ent->deftype;
     CHECK(!deftype->generics.has_type_params);
     if (!deftype_is_accessible(es, deftype)) {
-      METERR(fieldname->meta, "Looking up field on inaccessible type.%s", "\n");
+      METERR(es->cs->im, fieldname->meta, "Looking up field on inaccessible type.%s", "\n");
       return 0;
     }
 
@@ -3542,7 +3543,7 @@ int lookup_field_type(struct exprscope *es,
       }
     } break;
     case AST_DEFTYPE_RHS_ENUMSPEC:
-      METERR(fieldname->meta, "Looking up %sfield on enumspec type.\n",
+      METERR(es->cs->im, fieldname->meta, "Looking up %sfield on enumspec type.\n",
              fieldname->whole_field ? "whole " : "");
       return 0;
     default:
@@ -3557,7 +3558,7 @@ int lookup_field_type(struct exprscope *es,
       CRASH("lookup_field_type sees an invalid generic type.");
     }
     if (ent->is_primitive) {
-      METERR(fieldname->meta, "Looking up %sfield on primitive type.\n",
+      METERR(es->cs->im, fieldname->meta, "Looking up %sfield on primitive type.\n",
              fieldname->whole_field ? "whole " : "");
       return 0;
     }
@@ -3566,7 +3567,7 @@ int lookup_field_type(struct exprscope *es,
     CHECK(deftype->generics.has_type_params
           && deftype->generics.params_count == type->u.app.params_count);
     if (!deftype_is_accessible(es, deftype)) {
-      METERR(fieldname->meta, "Looking up field on inaccessible type.%s", "\n");
+      METERR(es->cs->im, fieldname->meta, "Looking up field on inaccessible type.%s", "\n");
       return 0;
     }
 
@@ -3593,7 +3594,7 @@ int lookup_field_type(struct exprscope *es,
       }
     } break;
     case AST_DEFTYPE_RHS_ENUMSPEC:
-      METERR(fieldname->meta, "Looking up %sfield on enumspec type.\n",
+      METERR(es->cs->im, fieldname->meta, "Looking up %sfield on enumspec type.\n",
              fieldname->whole_field ? "whole " : "");
       return 0;
     default:
@@ -3602,26 +3603,28 @@ int lookup_field_type(struct exprscope *es,
   } break;
   case AST_TYPEEXPR_STRUCTE: {
     if (fieldname->whole_field) {
-      METERR(fieldname->meta, "Looking up whole field of a naked struct type.%s", "\n");
+      METERR(es->cs->im, fieldname->meta, "Looking up whole field of a naked struct type.%s", "\n");
       return 0;
     }
-    return lookup_fields_field_type(type->u.structe.fields,
+    return lookup_fields_field_type(es->cs->im,
+                                    type->u.structe.fields,
                                     type->u.structe.fields_count,
                                     &fieldname->ident,
                                     field_type_out);
   } break;
   case AST_TYPEEXPR_UNIONE: {
     if (fieldname->whole_field) {
-      METERR(fieldname->meta, "Looking up whole field of a struct type.%s", "\n");
+      METERR(es->cs->im, fieldname->meta, "Looking up whole field of a struct type.%s", "\n");
       return 0;
     }
-    return lookup_fields_field_type(type->u.unione.fields,
+    return lookup_fields_field_type(es->cs->im,
+                                    type->u.unione.fields,
                                     type->u.unione.fields_count,
                                     &fieldname->ident,
                                     field_type_out);
   }
   case AST_TYPEEXPR_ARRAY: {
-    METERR(fieldname->meta, "Looking up %sfield on array type.\n",
+    METERR(es->cs->im, fieldname->meta, "Looking up %sfield on array type.\n",
            fieldname->whole_field ? "whole " : "");
     return 0;
   } break;
@@ -3688,7 +3691,7 @@ int check_expr_deref_field_access(
     struct ast_typeexpr *partial_type,
     struct ast_typeexpr *out) {
   if (es->computation == STATIC_COMPUTATION_YES) {
-    METERR(x->meta, "Dereferencing field access disallowed in static computation.%s", "\n");
+    METERR(es->cs->im, x->meta, "Dereferencing field access disallowed in static computation.%s", "\n");
     return 0;
   }
   int ret = 0;
@@ -3702,7 +3705,7 @@ int check_expr_deref_field_access(
 
   struct ast_typeexpr *ptr_target;
   if (!view_ptr_target(es->cs->im, ast_expr_type(x->lhs), &ptr_target)) {
-    METERR(x->meta, "Dereferencing field access expects ptr type.%s", "\n");
+    METERR(es->cs->im, x->meta, "Dereferencing field access expects ptr type.%s", "\n");
     goto cleanup;
   }
 
@@ -3715,7 +3718,7 @@ int check_expr_deref_field_access(
   }
 
   if (!unify_directionally(es->cs->im, partial_type, &field_type)) {
-    METERR(x->meta, "Dereferencing field access results in wrong type.%s", "\n");
+    METERR(es->cs->im, x->meta, "Dereferencing field access results in wrong type.%s", "\n");
     goto cleanup_field_type;
   }
 
@@ -3753,7 +3756,7 @@ int check_index_expr(struct exprscope *es,
   struct ast_typeexpr *lhs_target;
   if (!view_ptr_target(es->cs->im, lhs_type, &lhs_target)) {
     if (lhs_type->tag != AST_TYPEEXPR_ARRAY) {
-      METERR(a->meta, "Indexing into a non-pointer, non-array type.%s", "\n");
+      METERR(es->cs->im, a->meta, "Indexing into a non-pointer, non-array type.%s", "\n");
       goto fail;
     }
 
@@ -3761,7 +3764,7 @@ int check_index_expr(struct exprscope *es,
   }
 
   if (!unify_directionally(es->cs->im, partial_type, lhs_target)) {
-    METERR(a->meta, "Indexing returns wrong type.%s", "\n");
+    METERR(es->cs->im, a->meta, "Indexing returns wrong type.%s", "\n");
     goto fail;
   }
 
@@ -3841,7 +3844,7 @@ int check_expr_ai(struct exprscope *es,
     struct ast_typeexpr num_type = ast_numeric_garbage();
     struct ast_typeexpr combined_type;
     if (!combine_partial_types(es->cs->im, partial_type, &num_type, &combined_type)) {
-      METERR(x->u.numeric_literal.meta, "Numeric literal in bad place.%s", "\n");
+      METERR(es->cs->im, x->u.numeric_literal.meta, "Numeric literal in bad place.%s", "\n");
       ast_typeexpr_destroy(&num_type);  /* TODO */
       return 0;
     }
@@ -3853,7 +3856,7 @@ int check_expr_ai(struct exprscope *es,
         ast_expr_update(x, ast_expr_info_incomplete_typed(combined_type));
       } else {
         ast_typeexpr_destroy(&combined_type);
-        METERR(x->u.numeric_literal.meta, "Numeric literal used ambiguously.%s", "\n");
+        METERR(es->cs->im, x->u.numeric_literal.meta, "Numeric literal used ambiguously.%s", "\n");
         return 0;
       }
     }
@@ -3863,7 +3866,7 @@ int check_expr_ai(struct exprscope *es,
     struct ast_typeexpr bool_type;
     init_name_type(&bool_type, identmap_intern_c_str(es->cs->im, BOOL_TYPE_NAME));
     if (!unify_directionally(es->cs->im, partial_type, &bool_type)) {
-      METERR(x->u.bool_literal.meta, "Bool literal in bad place.%s", "\n");
+      METERR(es->cs->im, x->u.bool_literal.meta, "Bool literal in bad place.%s", "\n");
       ast_typeexpr_destroy(&bool_type);
       return 0;
     }
@@ -3879,7 +3882,7 @@ int check_expr_ai(struct exprscope *es,
     struct ast_typeexpr combined_type;
     if (!combine_partial_types(es->cs->im, partial_type, &ptr_type,
                                &combined_type)) {
-      METERR(x->u.null_literal.meta, "Null literal in bad place.%s", "\n");
+      METERR(es->cs->im, x->u.null_literal.meta, "Null literal in bad place.%s", "\n");
       ast_typeexpr_destroy(&ptr_type);  /* TODO */
       return 0;
     }
@@ -3891,7 +3894,7 @@ int check_expr_ai(struct exprscope *es,
         ast_expr_update(x, ast_expr_info_incomplete_typed(combined_type));
       } else {
         ast_typeexpr_destroy(&combined_type);
-        METERR(x->u.null_literal.meta, "Null literal used ambiguously.%s", "\n");
+        METERR(es->cs->im, x->u.null_literal.meta, "Null literal used ambiguously.%s", "\n");
         return 0;
       }
     }
@@ -3901,7 +3904,7 @@ int check_expr_ai(struct exprscope *es,
     struct ast_typeexpr void_type;
     init_name_type(&void_type, identmap_intern_c_str(es->cs->im, VOID_TYPE_NAME));
     if (!unify_directionally(es->cs->im, partial_type, &void_type)) {
-      METERR(x->u.void_literal.meta, "Void literal in bad place.%s", "\n");
+      METERR(es->cs->im, x->u.void_literal.meta, "Void literal in bad place.%s", "\n");
       ast_typeexpr_destroy(&void_type);
       return 0;
     }
@@ -3914,7 +3917,7 @@ int check_expr_ai(struct exprscope *es,
     struct ast_typeexpr num_type = ast_numeric_garbage();
     struct ast_typeexpr combined_type;
     if (!combine_partial_types(es->cs->im, partial_type, &num_type, &combined_type)) {
-      METERR(x->u.char_literal.meta, "Char literal in bad place.%s", "\n");
+      METERR(es->cs->im, x->u.char_literal.meta, "Char literal in bad place.%s", "\n");
       ast_typeexpr_destroy(&num_type);  /* TODO */
       return 0;
     }
@@ -3926,7 +3929,7 @@ int check_expr_ai(struct exprscope *es,
         ast_expr_update(x, ast_expr_info_incomplete_typed(combined_type));
       } else {
         ast_typeexpr_destroy(&combined_type);
-        METERR(x->u.char_literal.meta, "Char literal used ambiguously.%s", "\n");
+        METERR(es->cs->im, x->u.char_literal.meta, "Char literal used ambiguously.%s", "\n");
         return 0;
       }
     }
@@ -3934,7 +3937,7 @@ int check_expr_ai(struct exprscope *es,
   } break;
   case AST_EXPR_STRING_LITERAL: {
     if (es->computation == STATIC_COMPUTATION_YES) {
-      METERR(*ast_expr_ast_meta(x), "String literals disallowed in static computation.%s", "\n");
+      METERR(es->cs->im, *ast_expr_ast_meta(x), "String literals disallowed in static computation.%s", "\n");
       return 0;
     }
     uint32_t array_size = size_to_uint32(x->u.string_literal.values_count);
@@ -3946,7 +3949,7 @@ int check_expr_ai(struct exprscope *es,
       ast_arraytype_init(&array_type.u.arraytype, ast_meta_make_garbage(), array_size, char_type);
     }
     if (!unify_directionally(es->cs->im, partial_type, &array_type)) {
-      METERR(x->u.string_literal.meta, "Character literal in bad place.%s", "\n");
+      METERR(es->cs->im, x->u.string_literal.meta, "Character literal in bad place.%s", "\n");
       ast_typeexpr_destroy(&array_type);
       return 0;
     }
@@ -4126,11 +4129,11 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
     struct deftype_entry *ent;
     if (!name_table_lookup_deftype(&cs->nt, a->u.access.name.value, a->u.access.arity,
                                    &ent)) {
-      METERR(a->u.access.meta, "access block refers to non-existant type.%s", "\n");
+      METERR(cs->im, a->u.access.meta, "access block refers to non-existant type.%s", "\n");
       return 0;
     }
     if (ent->is_primitive || ent->deftype->disposition == AST_DEFTYPE_NOT_CLASS) {
-      METERR(a->u.access.meta, "access block refers to non-class type.%s", "\n");
+      METERR(cs->im, a->u.access.meta, "access block refers to non-class type.%s", "\n");
       return 0;
     }
     return check_toplevels(cs, a->u.access.toplevels, a->u.access.toplevels_count);
@@ -4258,7 +4261,7 @@ int eval_static_numeric_literal(struct identmap *im,
     static_value_init_u8(out, value);
     return 1;
   } else {
-    METERR(a->meta, "Compiler incomplete: Numeric literal resolves to type '%.*s', "
+    METERR(im, a->meta, "Compiler incomplete: Numeric literal resolves to type '%.*s', "
            "which this lame compiler cannot statically evaluate.\n",
            IM_P(im, type->u.name.value));
     return 0;
@@ -4800,7 +4803,7 @@ int chase_def_entry_acyclicity(struct identmap *im, struct name_table *nt,
   }
   if (ent->acyclicity_being_chased) {
     CHECK(ent->def);
-    METERR(ent->def->meta, "Cyclic reference in static expressions.%s", "\n");
+    METERR(im, ent->def->meta, "Cyclic reference in static expressions.%s", "\n");
     return 0;
   }
   ent->acyclicity_being_chased = 1;

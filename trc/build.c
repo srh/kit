@@ -3710,7 +3710,7 @@ int help_gen_immediate_numeric(struct identmap *im,
     expr_return_immediate(f, h, er, imm);
     return 1;
   } else {
-    METERR(*meta, "Compiler incomplete: Numeric literal resolves to type '%.*s', "
+    METERR(im, *meta, "Compiler incomplete: Numeric literal resolves to type '%.*s', "
            "which this lame compiler cannot codegen for literals.\n",
            IM_P(im, type->u.name.value));
     return 0;

@@ -1176,7 +1176,7 @@ int name_table_match_def(struct identmap *im,
         multiple defs could be valid thanks to second-chance
         typechecking. */
         if (report_multi_match) {
-          METERR(ident->meta, "multiple matching '%.*s' definitions\n",
+          METERR(im, ident->meta, "multiple matching '%.*s' definitions\n",
                  IM_P(im, ident->value));
         }
         *multi_match_out = 1;
@@ -1190,7 +1190,7 @@ int name_table_match_def(struct identmap *im,
   }
 
   if (!matched_ent) {
-    METERR(ident->meta, "no matching '%.*s' definition\n",
+    METERR(im, ident->meta, "no matching '%.*s' definition\n",
            IM_P(im, ident->value));
     *multi_match_out = 0;
     goto fail;

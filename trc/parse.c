@@ -19,6 +19,8 @@ struct ps {
   size_t line;
   size_t column;
 
+  ident_value filename;
+
   struct identmap im;
   size_t leafcount;
 };
@@ -30,13 +32,16 @@ struct ps_savestate {
   size_t leafcount;
 };
 
-void ps_init(struct ps *p, const uint8_t *data, size_t length) {
+void ps_init(struct ps *p, const uint8_t *data, size_t length,
+             ident_value filename) {
   p->data = data;
   p->length = length;
   p->pos = 0;
 
   p->line = 1;
   p->column = 0;
+
+  p->filename = filename;
 
   identmap_init(&p->im);
   p->leafcount = 0;
@@ -45,13 +50,16 @@ void ps_init(struct ps *p, const uint8_t *data, size_t length) {
 /* Takes ownership of the ident table -- use ps_remove_identmap to get
 it back. */
 void ps_init_with_identmap(struct ps *p, struct identmap *im,
-                           const uint8_t *data, size_t length) {
+                           const uint8_t *data, size_t length,
+                           ident_value filename) {
   p->data = data;
   p->length = length;
   p->pos = 0;
 
   p->line = 1;
   p->column = 0;
+
+  p->filename = filename;
 
   identmap_init_move(&p->im, im);
   p->leafcount = 0;
@@ -105,11 +113,7 @@ struct ps_savestate ps_save(struct ps *p) {
 }
 
 struct pos ps_pos(struct ps *p) {
-  struct pos ret;
-  ret.offset = p->pos;
-  ret.line = p->line;
-  ret.column = p->column;
-  return ret;
+  return make_pos(p->pos, p->line, p->column, p->filename);
 }
 
 void ps_restore(struct ps *p, struct ps_savestate save) {
@@ -2510,29 +2514,31 @@ int parse_file(struct ps *p, struct ast_file *out) {
   return 1;
 }
 
-void error_info_init(struct error_info *ei, size_t offset, size_t line, size_t column) {
-  ei->pos = make_pos(offset, line, column);
+void error_info_init(struct error_info *ei, size_t offset, size_t line, size_t column,
+                     ident_value filename) {
+  ei->pos = make_pos(offset, line, column, filename);
   databuf_init(&ei->message);
 }
 
 void error_info_destroy(struct error_info *ei) {
-  ei->pos = make_pos(SIZE_MAX, SIZE_MAX, SIZE_MAX);
+  ei->pos = make_pos(SIZE_MAX, SIZE_MAX, SIZE_MAX, IDENT_VALUE_INVALID);
   databuf_destroy(&ei->message);
 }
 
 int parse_buf_file(struct identmap *im,
                    const uint8_t *buf, size_t length,
+                   ident_value filename,
                    struct ast_file *file_out,
                    struct error_info *error_info_out) {
   struct ps p;
-  ps_init_with_identmap(&p, im, buf, length);
+  ps_init_with_identmap(&p, im, buf, length, filename);
 
-  struct ast_file file;
-  int ret = parse_file(&p, &file);
+  struct ast_file a;
+  int ret = parse_file(&p, &a);
   if (ret) {
-    *file_out = file;
+    *file_out = a;
   } else {
-    error_info_init(error_info_out, p.pos, p.line, p.column);
+    error_info_init(error_info_out, p.pos, p.line, p.column, filename);
   }
   ps_remove_identmap(&p, im);
   ps_destroy(&p);
@@ -2542,7 +2548,7 @@ int parse_buf_file(struct identmap *im,
 int count_parse_buf(const uint8_t *buf, size_t length,
                     size_t *leafcount_out, struct pos *error_pos_out) {
   struct ps p;
-  ps_init(&p, buf, length);
+  ps_init(&p, buf, length, IDENT_VALUE_INVALID);
 
   struct ast_file file;
   PARSE_DBG("parse_file...\n");
