@@ -7,7 +7,7 @@ import stdlib;
 
 defclass[K, V] copy hash struct {
   // count(&arr) is zero or a power of two.
-  arr array[opt[pair[K, V]]];
+  arr array[opt[tup[K, V]]];
   // count is less than half count(&arr);
   count size;
 };
@@ -23,7 +23,7 @@ access hash[_, _] {
     check(0 == (new_limit & new_mask));
     check(h->count * 2 < new_limit);
 
-    new_array array[opt[pair[K, V]]] = repeat(None@[pair[K, V]](), new_limit);
+    new_array array[opt[tup[K, V]]] = repeat(None@[tup[K, V]](), new_limit);
     old_limit size = count(&h->arr);
     for i size = 0; i < old_limit; i = i + 1 {
       switch get(&h->arr, i) {

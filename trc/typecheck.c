@@ -1500,7 +1500,9 @@ int check_typeexpr_app_traits(struct checkstate *cs,
   if (!name_table_lookup_deftype(&cs->nt, a->u.app.name.value,
                                  param_list_arity(a->u.app.params_count),
                                  &ent)) {
-    CRASH("an invalid generic type");
+    METERR(cs->im, *ast_typeexpr_meta(a), "An invalid generic type '%.*s'\n",
+           IM_P(cs->im, a->u.app.name.value));
+    return 0;
   }
 
   if (ent->is_primitive) {
@@ -2200,25 +2202,27 @@ int exprscope_lookup_name(struct exprscope *es,
                           struct def_instantiation **inst_or_null_out,
                           int report_multi_match,
                           int *multi_match_out) {
-  for (size_t i = es->vars_count; i > 0; ) {
-    i--;
-    struct ast_vardecl *decl = es->vars[i].decl;
-    if (decl->name.value != name->ident.value) {
-      continue;
-    }
+  if (!name->has_params) {
+    for (size_t i = es->vars_count; i > 0; ) {
+      i--;
+      struct ast_vardecl *decl = es->vars[i].decl;
+      if (decl->name.value != name->ident.value) {
+        continue;
+      }
 
-    if (!unify_directionally(es->cs->im, partial_type, &decl->type)) {
-      METERR(es->cs->im, name->meta, "Type mismatch for vardecl %.*s lookup.\n",
-             IM_P(es->cs->im, name->ident.value));
+      if (!unify_directionally(es->cs->im, partial_type, &decl->type)) {
+        METERR(es->cs->im, name->meta, "Type mismatch for vardecl %.*s lookup.\n",
+               IM_P(es->cs->im, name->ident.value));
+        *multi_match_out = 0;
+        return 0;
+      }
+
+      ast_typeexpr_init_copy(out, &decl->type);
       *multi_match_out = 0;
-      return 0;
+      *is_lvalue_out = 1;
+      *inst_or_null_out = NULL;  /* NULL because it's a local. */
+      return 1;
     }
-
-    ast_typeexpr_init_copy(out, &decl->type);
-    *multi_match_out = 0;
-    *is_lvalue_out = 1;
-    *inst_or_null_out = NULL;  /* NULL because it's a local. */
-    return 1;
   }
 
   /* inst_or_null_out gets initialized to a non-NULL value. */

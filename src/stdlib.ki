@@ -34,13 +34,13 @@ func[T] None() opt[T] {
   return None(void);
 }
 
-deftype[S, T] pair struct {
+deftype[S, T] tup struct {
   car S;
   cdr T;
 };
 
-func[S, T] cons(s S, t T) pair[S, T] {
-  ret pair[S, T];
+func[S, T] cons(s S, t T) tup[S, T] {
+  ret tup[S, T];
   ret.car = s;
   ret.cdr = t;
   return ret;

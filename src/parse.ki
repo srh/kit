@@ -28,16 +28,24 @@ defenum pattom {
   Grouper grouper;
 };
 
-func parse_loop(p *ps, stack *array[ptree]) bool {
+deftype cs struct {
+  stack array[ptree];
+};
+
+func append(c *cs, tr ptree) void {
+  append(&c->stack, tr);
+}
+
+func parse_loop(p *ps, c *cs) bool {
   seen_error bool = false;
   for ;; {
     switch grab_tok(p) {
       case TokToken(t tok): {
-        append(stack, mk_ptree(Token(t)));
-        while collapse(stack) { }
+        append(c, mk_ptree(Token(t)));
+        while collapse(c) { }
       }
       case BadToken(i interval): {
-        append(stack, mk_ptree(BadToken(i)));
+        append(c, mk_ptree(BadToken(i)));
         seen_error = true;
       }
       case EofToken(v): {
@@ -47,13 +55,13 @@ func parse_loop(p *ps, stack *array[ptree]) bool {
   }
 }
 
-func collapse(stack *array[ptree]) bool {
-  c size = count(stack);
-  if c == 0 {
+func collapse(c *cs) bool {
+  length size = count(&c->stack);
+  if length == 0 || length == 1 {
     return false;
   }
 
-  bot *ptree = ref(stack, c);
+  bot *ptree = ref(&c->stack, length - 1);
 
   switch bot->sym {
   case BadToken(i): { return false; }
