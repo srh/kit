@@ -74,14 +74,11 @@ func parse_toplevel(p *ps, out *ast_toplevel) bool {
 func parse_rest_of_func(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
   generics ast_generics;
   name ast_ident;
-  if !parse_def_generics_and_name(p, is_export, &generics, &name) {
-    return Fail;
-  }
-
   params array[ast_vardecl];
   return_type ast_typeexpr;
   body ast_bracebody;
-  if !parse_lambdaspec(p, &params, &return_type, &body) {
+  if !(parse_def_generics_and_name(p, is_export, &generics, &name)
+       && parse_lambdaspec(p, &params, &return_type, &body)) {
     return Fail;
   }
 
@@ -108,11 +105,8 @@ func parse_rest_of_def(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
   }
 
   rhs ast_expr;
-  if !parse_expr(p, kSemicolonPrecedence, &rhs) {
-    return Fail;
-  }
-
-  if !try_skip_token(p, mk_oper(';')) {
+  if !(parse_expr(p, kSemicolonPrecedence, &rhs)
+       && try_skip_token(p, mk_oper(';'))) {
     return Fail;
   }
 
@@ -122,14 +116,10 @@ func parse_rest_of_def(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
 
 func parse_rest_of_extern_def(p *ps, out *ast_toplevel) bool {
   name ast_ident;
-  if !parse_ident(p, &name) {
-    return Fail;
-  }
   type ast_typeexpr;
-  if !parse_typeexpr(p, &type) {
-    return Fail;
-  }
-  if !try_skip_token(p, mk_oper(';')) {
+  if !(parse_ident(p, &name)
+       && parse_typeexpr(p, &type)
+       && try_skip_token(p, mk_oper(';'))) {
     return Fail;
   }
   *out = ExternDef({name, type});
@@ -138,10 +128,7 @@ func parse_rest_of_extern_def(p *ps, out *ast_toplevel) bool {
 
 func parse_rest_of_import(p *ps, out *ast_toplevel) bool {
   name ast_ident;
-  if !parse_ident(p, &name) {
-    return Fail;
-  }
-  if !try_skip_token(p, mk_oper(';')) {
+  if !(parse_ident(p, &name) && try_skip_token(p, mk_oper(';'))) {
     return Fail;
   }
   *out = Import({name});
@@ -150,18 +137,12 @@ func parse_rest_of_import(p *ps, out *ast_toplevel) bool {
 
 func parse_rest_of_deftype(p *ps, out *ast_toplevel) bool {
   generics ast_generics;
-  if !parse_generics_if_present(p, &generics) {
-    return Fail;
-  }
   name ast_ident;
-  if !parse_ident(p, &name) {
-    return Fail;
-  }
   type ast_typeexpr;
-  if !parse_typeexpr(p, &type) {
-    return Fail;
-  }
-  if !try_skip_token(p, mk_oper(';')) {
+  if !(parse_generics_if_present(p, &generics)
+       && parse_ident(p, &name)
+       && parse_typeexpr(p, &type)
+       && try_skip_token(p, mk_oper(';'))) {
     return Fail;
   }
   *out = TypeDef({generics, name, TypeexprRhs(type)});
@@ -182,14 +163,9 @@ func parse_rest_of_defclass(p *ps, out *ast_toplevel) bool {
     disposition = NoDefaults(void);
   }
   name ast_ident;
-  if !parse_ident(p, &name) {
-    return Fail;
-  }
   type ast_typeexpr;
-  if !parse_typeexpr(p, &type) {
-    return Fail;
-  }
-  if !try_skip_token(p, mk_oper(';')) {
+  if !(parse_ident(p, &name) && parse_typeexpr(p, &type)
+       && try_skip_token(p, mk_oper(';'))) {
     return Fail;
   }
   *out = TypeDef({generics, name, ClassexprRhs({disposition, type})});
@@ -224,16 +200,9 @@ func parse_def_generics_and_name(p *ps, is_export ast_isexport,
 
 func parse_lambdaspec(p *ps, params_out *array[ast_vardecl],
                       return_type_out *ast_typeexpr, body_out *ast_bracebody) bool {
-  if !parse_params_list(p, params_out) {
-    return Fail;
-  }
-  if !parse_typeexpr(p, return_type_out) {
-    return Fail;
-  }
-  if !parse_bracebody(p, body_out) {
-    return Fail;
-  }
-  return true;
+  return parse_params_list(p, params_out)
+    && parse_typeexpr(p, return_type_out)
+    && parse_bracebody(p, body_out);
 }
 
 func parse_typeexpr(p *ps, out *ast_typeexpr) bool {
