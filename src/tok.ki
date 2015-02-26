@@ -94,10 +94,7 @@ deftype tok struct {
 };
 
 func mk_tok(left pos, right pos, val tokval) tok {
-  ret tok;
-  ret.val = val;
-  ret.interval = mk_interval(left, right);
-  return ret;
+  return {{left, right}, val};
 }
 
 defenum grab_tok_res {
@@ -195,7 +192,7 @@ func grab_tok(p *ps) grab_tok_res {
       if is_numeric_postchar(ch) {
         return mk_res(p, left, Num(HexNum(digits)));
       } else {
-        return BadToken(mk_interval(left, ps_pos(p)));
+        return BadToken({left, ps_pos(p)});
       }
     } else {
       if is_numeric_postchar(ch) {
@@ -203,7 +200,7 @@ func grab_tok(p *ps) grab_tok_res {
         push(&digits, 0);
         return mk_res(p, left, Num(DecNum(digits)));
       } else {
-        return BadToken(mk_interval(left, ps_pos(p)));
+        return BadToken({left, ps_pos(p)});
       }
     }
   } else if is_digit(ch) {
@@ -219,7 +216,7 @@ func grab_tok(p *ps) grab_tok_res {
     if is_numeric_postchar(ch) {
       return mk_res(p, left, Num(DecNum(digits)));
     } else {
-      return BadToken(mk_interval(left, ps_pos(p)));
+      return BadToken({left, ps_pos(p)});
     }
   } else if is_ident_firstchar(ch) {
     ret tok;
@@ -255,7 +252,7 @@ func grab_tok(p *ps) grab_tok_res {
       ch = ps_peek(p);
     }
     if !is_ident_postchar(ch) {
-      return BadToken(mk_interval(left, ps_pos(p)));
+      return BadToken({left, ps_pos(p)});
     }
     return mk_res(p, left, Ident(arr));
   } else if ch == '(' {
@@ -316,7 +313,7 @@ func grab_tok(p *ps) grab_tok_res {
   } else if ch == '/' {
     return grab_oper2(p, left, ch, '=');
   } else {
-    return BadToken(mk_interval(left, ps_pos(p)));
+    return BadToken({left, ps_pos(p)});
   }
 }
 

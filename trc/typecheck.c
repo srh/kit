@@ -3923,12 +3923,18 @@ int chase_struct_field_types(struct checkstate *cs,
 }
 
 int check_expr_strinit(struct exprscope *es,
+                       enum allow_incomplete ai,
                        struct ast_expr *x,
                        struct ast_typeexpr *partial_type) {
   if (!is_concrete(partial_type)) {
-    METERR(es->cs->im, x->u.strinit.meta,
-           "Structure literal used without explicit return type.%s", "\n");
-    goto fail;
+    if (ai == ALLOW_INCOMPLETE_YES) {
+      ast_expr_update(x, ast_expr_info_incomplete());
+      return 1;
+    } else {
+      METERR(es->cs->im, x->u.strinit.meta,
+             "Structure literal used ambiguously.%s", "\n");
+      goto fail;
+    }
   }
 
   struct ast_typeexpr structe_type;
@@ -4202,7 +4208,7 @@ int check_expr_ai(struct exprscope *es,
     return 1;
   } break;
   case AST_EXPR_STRINIT: {
-    return check_expr_strinit(es, x, partial_type);
+    return check_expr_strinit(es, ai, x, partial_type);
   } break;
   default:
     UNREACHABLE();
@@ -6893,6 +6899,26 @@ int check_file_test_more_70(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_71(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "deftype foo struct {\n"
+      "  x i32;\n"
+      "  y u32;\n"
+      "};\n"
+      "func bar(x i32) foo {\n"
+      "  return quux({ x, 7 });\n"
+      "}\n"
+      "func quux(x foo) foo {\n"
+      "  return {99, ~x.x};\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 
@@ -7578,6 +7604,12 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_70...\n");
   if (!test_check_module(&im, &check_file_test_more_70, foo)) {
     DBG("check_file_test_more_70 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_71...\n");
+  if (!test_check_module(&im, &check_file_test_more_71, foo)) {
+    DBG("check_file_test_more_71 fails\n");
     goto cleanup_identmap;
   }
 
