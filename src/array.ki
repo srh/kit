@@ -68,7 +68,7 @@ access array[_] {
     destroy(&r->ptr[r->count]);
   }
 
-  func[T] append(r *array[T], value T) void {
+  func[T] push(r *array[T], value T) void {
     if (r->count == r->cap) {
       change_cap_(r, max(4, r->cap * 2));
     }
@@ -80,13 +80,13 @@ access array[_] {
 
   func[T] append(r *array[T], s *array[T]) void {
     for i size = 0; i < s->count; i = i + 1 {
-      append(r, s->ptr[i]);
+      push(r, s->ptr[i]);
     }
   }
 
   func[T] append_raw(r *array[T], p *T, n size) void {
     for i size = 0; i < n; i = i + 1 {
-      append(r, p[i]);
+      push(r, p[i]);
     }
   }
 
@@ -103,7 +103,7 @@ access array[_] {
   func[T] repeat(value T, n size) array[T] {
     ret array[T];
     for i size = 0; i < n; i = i + 1 {
-      append(&ret, value);
+      push(&ret, value);
     }
     return ret;
   }
@@ -112,7 +112,7 @@ access array[_] {
 func foo() void {
   v array[i32];
   var u = v;
-  append(&u, 7);
+  push(&u, 7);
   append(&u, &v);
   data(&u);
 }

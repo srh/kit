@@ -23,7 +23,7 @@ access identmap {
   func intern(im *identmap, s string) ident_value {
     val size = count(&im->backmap);
     if try_insert(&im->table, s, ~val) {
-      append(&im->backmap, s);
+      push(&im->backmap, s);
       return ~val;
     } else {
       switch lookup(&im->table, s) {

@@ -187,7 +187,7 @@ func grab_tok(p *ps) grab_tok_res {
       digits array[i8];
       val i8;
       while is_hexdigit(ch, &val) {
-        append(&digits, val);
+        push(&digits, val);
         ps_step(p);
         ch = ps_peek(p);
       }
@@ -200,7 +200,7 @@ func grab_tok(p *ps) grab_tok_res {
     } else {
       if is_numeric_postchar(ch) {
         digits array[i8];
-        append(&digits, 0);
+        push(&digits, 0);
         return mk_res(p, left, Num(DecNum(digits)));
       } else {
         return BadToken(mk_interval(left, ps_pos(p)));
@@ -208,11 +208,11 @@ func grab_tok(p *ps) grab_tok_res {
     }
   } else if is_digit(ch) {
     digits array[i8];
-    append(&digits, @[i8]~(ch - '0'));
+    push(&digits, @[i8]~(ch - '0'));
     ps_step(p);
     ch = ps_peek(p);
     while is_digit(ch) {
-      append(&digits, @[i8]~(ch - '0'));
+      push(&digits, @[i8]~(ch - '0'));
       ps_step(p);
       ch = ps_peek(p);
     }
@@ -246,11 +246,11 @@ func grab_tok(p *ps) grab_tok_res {
     }
 
     arr array[i32];
-    append(&arr, ch);
+    push(&arr, ch);
     ps_step(p);
     ch = ps_peek(p);
     while is_ident_midchar(ch) {
-      append(&arr, ch);
+      push(&arr, ch);
       ps_step(p);
       ch = ps_peek(p);
     }
@@ -325,12 +325,12 @@ func grab_angly(p *ps, left pos, ch i32) grab_tok_res {
   ps_step(p);
   dh i32 = ps_peek(p);
   if dh == ch {
-    append(&arr, dh);
+    push(&arr, dh);
     ps_step(p);
     dh = ps_peek(p);
   }
   if dh == '=' {
-    append(&arr, dh);
+    push(&arr, dh);
     ps_step(p);
   }
   return mk_res(p, left, Oper(arr));
@@ -349,7 +349,7 @@ func grab_oper2(p *ps, left pos, ch i32, n0 i32, n1 i32, n2 i32) grab_tok_res {
   ps_step(p);
   ch = ps_peek(p);
   if ch == n0 || ch == n1 || ch == n2 {
-    append(&arr, ch);
+    push(&arr, ch);
     ps_step(p);
   }
   return mk_res(p, left, Oper(arr));
@@ -361,7 +361,7 @@ func mk_res(p *ps, left pos, v tokval) grab_tok_res {
 
 func[T] mk_array(x0 T) array[T] {
   ret array[T];
-  append(&ret, x0);
+  push(&ret, x0);
   return ret;
 }
 
