@@ -109,6 +109,20 @@ access array[_] {
   }
 }
 
+
+func[T] array_equal(a *array[T], b *array[T]) bool {
+  e size = count(a);
+  if e != count(b) {
+    return false;
+  }
+  for i size = 0; i < e; i = i + 1 {
+    if get(a, i) != get(b, i) {
+      return false;
+    }
+  }
+  return true;
+}
+
 func foo() void {
   v array[i32];
   var u = v;

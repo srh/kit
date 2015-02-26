@@ -1,91 +1,265 @@
 import tok;
 
-defenum treesym {
-  Token tok;
-  BadToken interval;
+defenum allow_blanks {
+  AllowBlanksNo void;
+  AllowBlanksYes void;
 };
 
-deftype ptree struct {
-  sym treesym;
-  childs array[uniq[ptree]];
-};
+def Fail bool = false;
 
-func mk_ptree(sym treesym) ptree {
-  ret ptree;
-  ret.sym = sym;
-  return ret;
+def kSemicolonPrecedence i32 = 205;
+
+func parse_file(p *ps, out *ast_file) bool {
+  arr array[ast_toplevel];
+  if !parse_toplevels(p, Eof(void), &arr) {
+    return Fail;
+  }
+  *out = {arr};
+  return true;
 }
 
-defenum pattag {
-};
-
-defenum pattom {
-  Pattag pattag;
-  Keyw keyw;
-  Num void;
-  Oper array[i32];
-  Ident void;
-  Grouper grouper;
-};
-
-deftype cs struct {
-  stack array[ptree];
-};
-
-func push(c *cs, tr ptree) void {
-  push(&c->stack, tr);
-}
-
-func parse_loop(p *ps, c *cs) bool {
-  seen_error bool = false;
+func parse_toplevels(p *ps, stop tokval, out *array[ast_toplevel]) bool {
+  ret array[ast_toplevel];
   for ;; {
-    switch grab_tok(p) {
-      case TokToken(t tok): {
-        push(c, mk_ptree(Token(t)));
-        while collapse(c) { }
-      }
-      case BadToken(i interval): {
-        push(c, mk_ptree(BadToken(i)));
-        seen_error = true;
-      }
-      case EofToken(v): {
-        return seen_error;
-      }
+    if peek(p).val == stop {
+      *out = ret;
+      return true;
     }
+    top ast_toplevel;
+    if !parse_toplevel(p, &top) {
+      return Fail;
+    }
+    push(&ret, top);
   }
 }
 
-func collapse(c *cs) bool {
-  length size = count(&c->stack);
-  if length == 0 || length == 1 {
-    return false;
+func try_skip_token(p *ps, expected tokval) bool {
+  if peek(p).val == expected {
+    step(p);
+    return true;
+  }
+  return Fail;
+}
+
+func parse_toplevel(p *ps, out *ast_toplevel) bool {
+  if try_skip_token(p, Keyw(Func(void))) {
+    return parse_rest_of_func(p, IsNotExport(void), out);
+  } else if try_skip_token(p, Keyw(Def(void))) {
+    return parse_rest_of_def(p, IsNotExport(void), out);
+  } else if try_skip_token(p, Keyw(Export(void))) {
+    if try_skip_token(p, Keyw(Func(void))) {
+      return parse_rest_of_func(p, IsExport(void), out);
+    }
+    if try_skip_token(p, Keyw(Def(void))) {
+      return parse_rest_of_def(p, IsExport(void), out);
+    }
+    return Fail;
+  } else if try_skip_token(p, Keyw(Extern(void))) {
+    return parse_rest_of_extern_def(p, out);
+  } else if try_skip_token(p, Keyw(Import(void))) {
+    return parse_rest_of_import(p, out);
+  } else if try_skip_token(p, Keyw(Deftype(void))) {
+    return parse_rest_of_deftype(p, out);
+  } else if try_skip_token(p, Keyw(Defclass(void))) {
+    return parse_rest_of_defclass(p, out);
+  } else if try_skip_token(p, Keyw(Defenum(void))) {
+    return parse_rest_of_defenum(p, out);
+  } else if try_skip_token(p, Keyw(Access(void))) {
+    return parse_rest_of_access(p, out);
+  } else {
+    return Fail;
+  }
+}
+
+func parse_rest_of_func(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
+  generics ast_generics;
+  name ast_ident;
+  if !parse_def_generics_and_name(p, is_export, &generics, &name) {
+    return Fail;
   }
 
-  bot *ptree = ref(&c->stack, length - 1);
-
-  switch bot->sym {
-  case BadToken(i): { return false; }
-  case Token(t): {
-    switch t.val {
-    case Keyw(a): {
-      // TODO: Implement.
-    }
-    case Num(a): {
-      // TODO: Implement.
-    }
-    case Oper(a): {
-      // TODO: Implement.
-    }
-    case Ident(a): {
-      // TODO: Implement.
-    }
-    case Grouper(g): {
-      // TODO: Implement.
-    }
-    }
-  }
+  params array[ast_vardecl];
+  return_type ast_typeexpr;
+  body ast_bracebody;
+  if !parse_lambdaspec(p, &params, &return_type, &body) {
+    return Fail;
   }
 
-  check(false);
-  return false;
+  *out = Def({is_export, generics, name, None(), Lambda({params, return_type, body})});
+  return true;
+}
+
+func parse_rest_of_def(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
+  generics ast_generics;
+  name ast_ident;
+  if !parse_def_generics_and_name(p, is_export, &generics, &name) {
+    return Fail;
+  }
+
+  typeexpr opt[ast_typeexpr];
+  if try_skip_token(p, mk_oper('=')) {
+    typeexpr = None();
+  } else {
+    t ast_typeexpr;
+    if !parse_typeexpr(p, &t) {
+      return Fail;
+    }
+    typeexpr = Has(t);
+  }
+
+  rhs ast_expr;
+  if !parse_expr(p, kSemicolonPrecedence, &rhs) {
+    return Fail;
+  }
+
+  if !try_skip_token(p, mk_oper(';')) {
+    return Fail;
+  }
+
+  *out = Def({is_export, generics, name, typeexpr, rhs});
+  return true;
+}
+
+func parse_rest_of_extern_def(p *ps, out *ast_toplevel) bool {
+  name ast_ident;
+  if !parse_ident(p, &name) {
+    return Fail;
+  }
+  type ast_typeexpr;
+  if !parse_typeexpr(p, &type) {
+    return Fail;
+  }
+  if !try_skip_token(p, mk_oper(';')) {
+    return Fail;
+  }
+  *out = ExternDef({name, type});
+  return true;
+}
+
+func parse_rest_of_import(p *ps, out *ast_toplevel) bool {
+  name ast_ident;
+  if !parse_ident(p, &name) {
+    return Fail;
+  }
+  if !try_skip_token(p, mk_oper(';')) {
+    return Fail;
+  }
+  *out = Import({name});
+  return true;
+}
+
+func parse_rest_of_deftype(p *ps, out *ast_toplevel) bool {
+  generics ast_generics;
+  if !parse_generics_if_present(p, &generics) {
+    return Fail;
+  }
+  name ast_ident;
+  if !parse_ident(p, &name) {
+    return Fail;
+  }
+  type ast_typeexpr;
+  if !parse_typeexpr(p, &type) {
+    return Fail;
+  }
+  if !try_skip_token(p, mk_oper(';')) {
+    return Fail;
+  }
+  *out = TypeDef({generics, name, TypeexprRhs(type)});
+  return true;
+}
+
+func parse_rest_of_defclass(p *ps, out *ast_toplevel) bool {
+  generics ast_generics;
+  if !parse_generics_if_present(p, &generics) {
+    return Fail;
+  }
+  disposition ast_defclass_disposition;
+  if try_skip_token(p, Keyw(Copy(void))) {
+    disposition = DefaultCopyMoveDestroy(void);
+  } else if try_skip_token(p, Keyw(Move(void))) {
+    disposition = DefaultMove(void);
+  } else {
+    disposition = NoDefaults(void);
+  }
+  name ast_ident;
+  if !parse_ident(p, &name) {
+    return Fail;
+  }
+  type ast_typeexpr;
+  if !parse_typeexpr(p, &type) {
+    return Fail;
+  }
+  if !try_skip_token(p, mk_oper(';')) {
+    return Fail;
+  }
+  *out = TypeDef({generics, name, ClassexprRhs({disposition, type})});
+  return true;
+}
+
+func parse_rest_of_defenum(p *ps, out *ast_toplevel) bool {
+  return Fail;  // TODO
+}
+
+func parse_rest_of_access(p *ps, out *ast_toplevel) bool {
+  return Fail;  // TODO
+}
+
+func parse_def_generics_and_name(p *ps, is_export ast_isexport,
+                                 generics_out *ast_generics, name_out *ast_ident) bool {
+  switch is_export {
+    case IsExport(v): {
+      *generics_out = NoGenerics(void);
+    }
+    case IsNotExport(v): {
+      if !parse_generics_if_present(p, generics_out) {
+        return Fail;
+      }
+    }
+  }
+  if !parse_ident(p, name_out) {
+    return Fail;
+  }
+  return true;
+}
+
+func parse_lambdaspec(p *ps, params_out *array[ast_vardecl],
+                      return_type_out *ast_typeexpr, body_out *ast_bracebody) bool {
+  if !parse_params_list(p, params_out) {
+    return Fail;
+  }
+  if !parse_typeexpr(p, return_type_out) {
+    return Fail;
+  }
+  if !parse_bracebody(p, body_out) {
+    return Fail;
+  }
+  return true;
+}
+
+func parse_typeexpr(p *ps, out *ast_typeexpr) bool {
+  return help_parse_typeexpr(p, AllowBlanksNo(void), out);
+}
+
+func parse_expr(p *ps, prec_ctx i32, out *ast_expr) bool {
+  return Fail;  // TODO
+}
+
+func parse_ident(p *ps, out *ast_ident) bool {
+  return Fail;  // TODO
+}
+
+func parse_generics_if_present(p *ps, out *ast_generics) bool {
+  return Fail;  // TODO
+}
+
+func parse_params_list(p *ps, out *array[ast_vardecl]) bool {
+  return Fail;  // TODO
+}
+
+func parse_bracebody(p *ps, out *ast_bracebody) bool {
+  return Fail;  // TODO
+}
+
+func help_parse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
+  return Fail;  // TODO
 }

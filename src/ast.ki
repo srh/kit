@@ -192,7 +192,6 @@ deftype ast_switch_case struct {
 };
 
 deftype ast_lambda struct {
-  meta ast_meta;
   params array[ast_vardecl];
   return_type ast_typeexpr;
   body ast_bracebody;
@@ -278,9 +277,13 @@ defenum ast_generics {
   HasGenerics array[ast_ident];
 };
 
+defenum ast_isexport {
+  IsExport void;
+  IsNotExport void;
+};
+
 deftype ast_def struct {
-  meta ast_meta;
-  is_export bool;
+  is_export ast_isexport;
   generics ast_generics;
   name ast_ident;
   typeexpr opt[ast_typeexpr];
@@ -288,13 +291,11 @@ deftype ast_def struct {
 };
 
 deftype ast_extern_def struct {
-  meta ast_meta;
   name ast_ident;
   type ast_typeexpr;
 };
 
 deftype ast_import struct {
-  meta ast_meta;
   name ast_ident;
 };
 
@@ -303,9 +304,9 @@ deftype ast_enumspec struct {
 };
 
 defenum ast_defclass_disposition {
-  DispositionClassDefaultCopyMoveDestroy void;
-  DispositionClassDefaultMove void;
-  DispositionClassNoDefaults void;
+  DefaultCopyMoveDestroy void;
+  DefaultMove void;
+  NoDefaults void;
 };
 
 defenum ast_type_def_rhs {
@@ -318,7 +319,6 @@ defenum ast_type_def_rhs {
 };
 
 deftype ast_type_def struct {
-  meta ast_meta;
   generics ast_generics;
   name ast_ident;
   rhs ast_type_def_rhs;

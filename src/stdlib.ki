@@ -75,3 +75,8 @@ func[S, T] up(s S) T {
   ret.~ = s;
   return ret;
 }
+
+// TODO: This is... platform-specific.
+func[T] enumnum(x *T) u32 {
+  return * @[*u32]cast(x);
+}

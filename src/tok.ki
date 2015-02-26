@@ -7,6 +7,8 @@ deftype ps struct {
   length size;
   pos size;
 
+  current tok;
+
   im *identmap;
 };
 
@@ -16,6 +18,7 @@ func make_ps(im *identmap, data *u8, length size) ps {
   p.length = length;
   p.pos = 0;
   p.im = im;
+  step(&p);
   return p;
 }
 
@@ -45,16 +48,22 @@ func ps_step(p *ps) void {
 
 
 defenum keyw {
+  Access void;
   Case void;
+  Copy void;
   Def void;
   Defclass void;
   Defenum void;
   Deftype void;
   Else void;
+  Export void;
+  Extern void;
   False void;
   For void;
   Func void;
   If void;
+  Import void;
+  Move void;
   Null void;
   Return void;
   Struct void;
@@ -86,7 +95,42 @@ defenum tokval {
   Oper array[i32];
   Ident array[i32];
   Grouper grouper;
+  Bad void;
+  Eof void;
 };
+
+func `==`(a keyw, b keyw) bool {
+  return enumnum(&a) == enumnum(&b);
+}
+
+func `==`(a numlit, b numlit) bool {
+  if enumnum(&a) != enumnum(&b) { return false; }
+  switch a {
+  case DecNum(j): { switch b { case DecNum(k): { return array_equal(&j, &k); } } }
+  case HexNum(j): { switch b { case HexNum(k): { return array_equal(&j, &k); } } }
+  }
+}
+
+func `==`(a grouper, b grouper) bool {
+  return enumnum(&a) == enumnum(&b);
+}
+
+func `==`(a tokval, b tokval) bool {
+  if enumnum(&a) != enumnum(&b) { return false; }
+  switch a {
+  case Keyw(j): { switch b { case Keyw(k): { return j == k; } } }
+  case Num(j): { switch b { case Num(k): { return j == k; } } }
+  case Oper(j): { switch b { case Oper(k): { return array_equal(&j, &k); } } }
+  case Ident(j): { switch b { case Ident(k): { return array_equal(&j, &k); } } }
+  case Grouper(j): { switch b { case Grouper(k): { return j == k; } } }
+  case Bad(j): { return true; }
+  case Eof(j): { return true; }
+  }
+}
+
+func `!=`(a tokval, b tokval) bool {
+  return !(a == b);
+}
 
 deftype tok struct {
   interval interval;
@@ -96,12 +140,6 @@ deftype tok struct {
 func mk_tok(left pos, right pos, val tokval) tok {
   return {{left, right}, val};
 }
-
-defenum grab_tok_res {
-  BadToken interval;
-  EofToken void;
-  TokToken tok;
-};
 
 func is_lower(x i32) bool {
   // TODO: Statically assert 'z' - 'a' == 25.
@@ -165,15 +203,23 @@ func is_ws(x i32) bool {
   return x == ' ' || x == '\n' || x == '\t' || x == '\r';
 }
 
-func grab_tok(p *ps) grab_tok_res {
-  left pos = ps_pos(p);
+func step(p *ps) void {
+  p->current = grab_tok(p);
+}
+
+func peek(p *ps) tok {
+  return p->current;
+}
+
+func grab_tok(p *ps) tok {
   ch i32 = ps_peek(p);
   while is_ws(ch) {
     ps_step(p);
     ch = ps_peek(p);
   }
+  left pos = ps_pos(p);
   if ch == @[i32]-1 {
-    return EofToken(void);
+    return {{left, left}, Eof(void)};
   }
   if ch == '0' {
     ps_step(p);
@@ -192,7 +238,7 @@ func grab_tok(p *ps) grab_tok_res {
       if is_numeric_postchar(ch) {
         return mk_res(p, left, Num(HexNum(digits)));
       } else {
-        return BadToken({left, ps_pos(p)});
+        return {{left, ps_pos(p)}, Bad(void)};
       }
     } else {
       if is_numeric_postchar(ch) {
@@ -200,7 +246,7 @@ func grab_tok(p *ps) grab_tok_res {
         push(&digits, 0);
         return mk_res(p, left, Num(DecNum(digits)));
       } else {
-        return BadToken({left, ps_pos(p)});
+        return {{left, ps_pos(p)}, Bad(void)};
       }
     }
   } else if is_digit(ch) {
@@ -216,7 +262,7 @@ func grab_tok(p *ps) grab_tok_res {
     if is_numeric_postchar(ch) {
       return mk_res(p, left, Num(DecNum(digits)));
     } else {
-      return BadToken({left, ps_pos(p)});
+      return {{left, ps_pos(p)}, Bad(void)};
     }
   } else if is_ident_firstchar(ch) {
     ret tok;
@@ -239,7 +285,7 @@ func grab_tok(p *ps) grab_tok_res {
         || grab_keyword(p, "union", Union(void), &ret)
         || grab_keyword(p, "var", Var(void), &ret)
         || grab_keyword(p, "while", While(void), &ret)) {
-      return TokToken(ret);
+      return ret;
     }
 
     arr array[i32];
@@ -252,7 +298,7 @@ func grab_tok(p *ps) grab_tok_res {
       ch = ps_peek(p);
     }
     if !is_ident_postchar(ch) {
-      return BadToken({left, ps_pos(p)});
+      return {{left, ps_pos(p)}, Bad(void)};
     }
     return mk_res(p, left, Ident(arr));
   } else if ch == '(' {
@@ -313,11 +359,11 @@ func grab_tok(p *ps) grab_tok_res {
   } else if ch == '/' {
     return grab_oper2(p, left, ch, '=');
   } else {
-    return BadToken({left, ps_pos(p)});
+    return {{left, ps_pos(p)}, Bad(void)};
   }
 }
 
-func grab_angly(p *ps, left pos, ch i32) grab_tok_res {
+func grab_angly(p *ps, left pos, ch i32) tok {
   arr array[i32] = mk_array(ch);
   ps_step(p);
   dh i32 = ps_peek(p);
@@ -333,15 +379,15 @@ func grab_angly(p *ps, left pos, ch i32) grab_tok_res {
   return mk_res(p, left, Oper(arr));
 }
 
-func grab_oper2(p *ps, left pos, ch i32, n0 i32) grab_tok_res {
+func grab_oper2(p *ps, left pos, ch i32, n0 i32) tok {
   return grab_oper2(p, left, ch, n0, n0, n0);
 }
 
-func grab_oper2(p *ps, left pos, ch i32, n0 i32, n1 i32) grab_tok_res {
+func grab_oper2(p *ps, left pos, ch i32, n0 i32, n1 i32) tok {
   return grab_oper2(p, left, ch, n0, n1, n1);
 }
 
-func grab_oper2(p *ps, left pos, ch i32, n0 i32, n1 i32, n2 i32) grab_tok_res {
+func grab_oper2(p *ps, left pos, ch i32, n0 i32, n1 i32, n2 i32) tok {
   arr array[i32] = mk_array(ch);
   ps_step(p);
   ch = ps_peek(p);
@@ -352,14 +398,18 @@ func grab_oper2(p *ps, left pos, ch i32, n0 i32, n1 i32, n2 i32) grab_tok_res {
   return mk_res(p, left, Oper(arr));
 }
 
-func mk_res(p *ps, left pos, v tokval) grab_tok_res {
-  return TokToken(mk_tok(left, ps_pos(p), v));
+func mk_res(p *ps, left pos, v tokval) tok {
+  return mk_tok(left, ps_pos(p), v);
 }
 
 func[T] mk_array(x0 T) array[T] {
   ret array[T];
   push(&ret, x0);
   return ret;
+}
+
+func mk_oper(ch0 i32) tokval {
+  return Oper(mk_array(ch0));
 }
 
 func[String] grab_keyword(p *ps, s String, k keyw, out *tok) bool {
