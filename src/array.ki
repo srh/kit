@@ -62,6 +62,12 @@ access array[_] {
     r->cap = newcap;
   }
 
+  func[T] pop(r *array[T]) void {
+    check(r->count > 0);
+    r->count = r->count - 1;
+    destroy(&r->ptr[r->count]);
+  }
+
   func[T] append(r *array[T], value T) void {
     if (r->count == r->cap) {
       change_cap_(r, max(4, r->cap * 2));
