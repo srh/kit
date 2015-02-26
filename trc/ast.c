@@ -969,6 +969,50 @@ void ast_typed_expr_destroy(struct ast_typed_expr *a) {
   a->expr = NULL;
 }
 
+void ast_strinit_init(struct ast_strinit *a,
+                      struct ast_meta meta,
+                      struct ast_expr *exprs,
+                      size_t exprs_count) {
+  a->meta = meta;
+  a->info.info_valid = 0;
+  a->exprs = exprs;
+  a->exprs_count = exprs_count;
+}
+
+void ast_strinit_init_copy(struct ast_strinit *a,
+                           struct ast_strinit *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  a->info.info_valid = c->info.info_valid;
+  if (c->info.info_valid) {
+    ast_typeexpr_init_copy(&a->info.concrete_structe_type,
+                           &c->info.concrete_structe_type);
+  }
+  SLICE_INIT_COPY(a->exprs, a->exprs_count, c->exprs, c->exprs_count,
+                  ast_expr_init_copy);
+}
+
+void ast_strinit_destroy(struct ast_strinit *a) {
+  ast_meta_destroy(&a->meta);
+  if (a->info.info_valid) {
+    ast_typeexpr_destroy(&a->info.concrete_structe_type);
+    a->info.info_valid = 0;
+  }
+  SLICE_FREE(a->exprs, a->exprs_count, ast_expr_destroy);
+}
+
+struct ast_typeexpr *ast_strinit_struct_type(struct ast_strinit *a) {
+  CHECK(a->info.info_valid);
+  return &a->info.concrete_structe_type;
+}
+
+void ast_strinit_set_struct_type(struct ast_strinit *a,
+                                 struct ast_typeexpr struct_type) {
+  CHECK(struct_type.tag == AST_TYPEEXPR_STRUCTE);
+  CHECK(struct_type.u.structe.fields_count == a->exprs_count);
+  CHECK(!a->info.info_valid);
+  a->info.info_valid = 1;
+  a->info.concrete_structe_type = struct_type;
+}
 
 struct ast_expr_info ast_expr_info_default(void) {
   struct ast_expr_info ret;
@@ -1083,7 +1127,7 @@ void ast_expr_info_destroy(struct ast_expr_info *a) {
 struct ast_meta *ast_expr_ast_meta(struct ast_expr *a) {
   switch (a->tag) {
   case AST_EXPR_NAME: return &a->u.name.meta;
-  case AST_EXPR_NUMERIC_LITERAL: return &a->u.numeric_literal.meta;
+  case AST_EXPR_NUMERIC_LITERAL_: return &a->u.numeric_literal.meta;
   case AST_EXPR_BOOL_LITERAL: return &a->u.bool_literal.meta;
   case AST_EXPR_NULL_LITERAL: return &a->u.null_literal.meta;
   case AST_EXPR_VOID_LITERAL: return &a->u.void_literal.meta;
@@ -1097,6 +1141,7 @@ struct ast_meta *ast_expr_ast_meta(struct ast_expr *a) {
   case AST_EXPR_LOCAL_FIELD_ACCESS: return &a->u.local_field_access.meta;
   case AST_EXPR_DEREF_FIELD_ACCESS: return &a->u.deref_field_access.meta;
   case AST_EXPR_TYPED: return &a->u.typed_expr.meta;
+  case AST_EXPR_STRINIT: return &a->u.strinit.meta;
   default: UNREACHABLE();
   }
 }
@@ -1119,7 +1164,7 @@ void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c) {
   case AST_EXPR_NAME:
     ast_name_expr_init_copy(&a->u.name, &c->u.name);
     break;
-  case AST_EXPR_NUMERIC_LITERAL:
+  case AST_EXPR_NUMERIC_LITERAL_:
     ast_numeric_literal_init_copy(&a->u.numeric_literal,
                                   &c->u.numeric_literal);
     break;
@@ -1169,6 +1214,9 @@ void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c) {
   case AST_EXPR_TYPED:
     ast_typed_expr_init_copy(&a->u.typed_expr, &c->u.typed_expr);
     break;
+  case AST_EXPR_STRINIT:
+    ast_strinit_init_copy(&a->u.strinit, &c->u.strinit);
+    break;
   default:
     UNREACHABLE();
   }
@@ -1179,7 +1227,7 @@ void ast_expr_destroy(struct ast_expr *a) {
   case AST_EXPR_NAME:
     ast_name_expr_destroy(&a->u.name);
     break;
-  case AST_EXPR_NUMERIC_LITERAL:
+  case AST_EXPR_NUMERIC_LITERAL_:
     ast_numeric_literal_destroy(&a->u.numeric_literal);
     break;
   case AST_EXPR_BOOL_LITERAL:
@@ -1220,6 +1268,9 @@ void ast_expr_destroy(struct ast_expr *a) {
     break;
   case AST_EXPR_TYPED:
     ast_typed_expr_destroy(&a->u.typed_expr);
+    break;
+  case AST_EXPR_STRINIT:
+    ast_strinit_destroy(&a->u.strinit);
     break;
   default:
     UNREACHABLE();

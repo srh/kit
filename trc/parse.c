@@ -1552,6 +1552,44 @@ int parse_rest_of_string_literal(struct ps *p, struct pos pos_start,
   return 1;
 }
 
+int parse_rest_of_strinit(struct ps *p, struct pos pos_start,
+                          struct ast_strinit *out) {
+  /* TODO: This is a copy/paste of parse_rest_of_arglist, except it
+  uses exprcall and ')'. */
+  struct ast_expr *args = NULL;
+  size_t args_count = 0;
+  size_t args_limit = 0;
+
+  for (;;) {
+    if (!skip_ws(p)) {
+      goto fail;
+    }
+    if (try_skip_char(p, '}')) {
+      ast_strinit_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                       args, args_count);
+      return 1;
+    }
+    if (args_count != 0) {
+      if (!try_skip_char(p, ',')) {
+        goto fail;
+      }
+      if (!skip_ws(p)) {
+        goto fail;
+      }
+    }
+
+    struct ast_expr expr;
+    if (!parse_expr(p, &expr, kCommaPrecedence)) {
+      goto fail;
+    }
+
+    SLICE_PUSH(args, args_count, args_limit, expr);
+  }
+
+ fail:
+  SLICE_FREE(args, args_count, ast_expr_destroy);
+  return 0;
+}
 
 int parse_rest_of_type_param_list(struct ps *p, enum allow_blanks allow_blanks, struct ast_typeexpr **params_out,
                                   size_t *params_count_out);
@@ -1573,7 +1611,7 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
 
   int8_t digit_value_discard;
   if (is_decimal_digit(ps_peek(p), &digit_value_discard)) {
-    ast_expr_partial_init(out, AST_EXPR_NUMERIC_LITERAL, ast_expr_info_default());
+    ast_expr_partial_init(out, AST_EXPR_NUMERIC_LITERAL_, ast_expr_info_default());
     return parse_numeric_literal(p, &out->u.numeric_literal);
   }
   if (try_skip_keyword(p, "true")) {
@@ -1660,6 +1698,11 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     }
     *out = expr;
     return 1;
+  }
+
+  if (try_skip_char(p, '{')) {
+    ast_expr_partial_init(out, AST_EXPR_STRINIT, ast_expr_info_default());
+    return parse_rest_of_strinit(p, pos_start, &out->u.strinit);
   }
 
   struct ast_ident unop_name;

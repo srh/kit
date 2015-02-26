@@ -3793,6 +3793,181 @@ int check_index_expr(struct exprscope *es,
   return 0;
 }
 
+int chase_struct_field_types(struct checkstate *cs,
+                             struct ast_meta *meta,
+                             struct ast_typeexpr *type,
+                             size_t expected_field_count,
+                             struct ast_typeexpr *structe_type_out) {
+  switch (type->tag) {
+  case AST_TYPEEXPR_NAME: {
+    struct deftype_entry *ent;
+    if (!name_table_lookup_deftype(&cs->nt, type->u.name.value,
+                                   no_param_list_arity(),
+                                   &ent)) {
+      METERR(cs->im, *meta, "ICE?  Type '%.*s' not found when checking for struct fields.\n",
+             IM_P(cs->im, type->u.name.value));
+      return 0;
+    }
+
+    if (ent->is_primitive) {
+      METERR(cs->im, *meta, "Using a struct initializer on primitive type '%.*s'\n",
+             IM_P(cs->im, type->u.name.value));
+      return 0;
+    }
+
+    struct ast_deftype *deftype = ent->deftype;
+    CHECK(deftype);
+    switch (deftype->disposition) {
+    case AST_DEFTYPE_NOT_CLASS: {
+      switch (deftype->rhs.tag) {
+      case AST_DEFTYPE_RHS_TYPE: {
+        return chase_struct_field_types(cs, meta, &deftype->rhs.u.type,
+                                        expected_field_count,
+                                        structe_type_out);
+      } break;
+      case AST_DEFTYPE_RHS_ENUMSPEC: {
+        METERR(cs->im, *meta, "Using a struct initializer on enum type '%.*s'\n",
+               IM_P(cs->im, type->u.name.value));
+        return 0;
+      } break;
+      default:
+        UNREACHABLE();
+      }
+    } break;
+    case AST_DEFTYPE_CLASS_DEFAULT_COPY_MOVE_DESTROY: /* fallthrough */
+    case AST_DEFTYPE_CLASS_DEFAULT_MOVE: /* fallthrough */
+    case AST_DEFTYPE_CLASS_NO_DEFAULTS: {
+      METERR(cs->im, *meta, "Using a struct initializer on class type '%.*s'\n",
+             IM_P(cs->im, type->u.name.value));
+      return 0;
+    } break;
+    default:
+      UNREACHABLE();
+    }
+  } break;
+  case AST_TYPEEXPR_APP: {
+    struct deftype_entry *ent;
+    if (!name_table_lookup_deftype(&cs->nt, type->u.app.name.value,
+                                   param_list_arity(type->u.app.params_count),
+                                   &ent)) {
+      return 0;
+    }
+
+    /* TODO: So much fucking copying and pasting. */
+
+    if (ent->is_primitive) {
+      METERR(cs->im, *meta, "Using a struct initializer on primitive type '%.*s'\n",
+             IM_P(cs->im, type->u.name.value));
+      return 0;
+    }
+
+    struct ast_deftype *deftype = ent->deftype;
+    CHECK(deftype);
+    switch (deftype->disposition) {
+    case AST_DEFTYPE_NOT_CLASS: {
+      switch (deftype->rhs.tag) {
+      case AST_DEFTYPE_RHS_TYPE: {
+        struct ast_typeexpr replaced_type;
+        do_replace_generics(&deftype->generics,
+                            type->u.app.params,
+                            type->u.app.params_count,
+                            &deftype->rhs.u.type,
+                            &replaced_type);
+
+        int ret = chase_struct_field_types(cs, meta, &replaced_type,
+                                           expected_field_count,
+                                           structe_type_out);
+        ast_typeexpr_destroy(&replaced_type);
+        return ret;
+      } break;
+      case AST_DEFTYPE_RHS_ENUMSPEC: {
+        METERR(cs->im, *meta, "Using a struct initializer on enum type '%.*s'\n",
+               IM_P(cs->im, type->u.name.value));
+        return 0;
+      } break;
+      default:
+        UNREACHABLE();
+      }
+    } break;
+    case AST_DEFTYPE_CLASS_DEFAULT_COPY_MOVE_DESTROY: /* fallthrough */
+    case AST_DEFTYPE_CLASS_DEFAULT_MOVE: /* fallthrough */
+    case AST_DEFTYPE_CLASS_NO_DEFAULTS: {
+      METERR(cs->im, *meta, "Using a struct initializer on class type '%.*s'\n",
+             IM_P(cs->im, type->u.name.value));
+      return 0;
+    } break;
+    default:
+      UNREACHABLE();
+    }
+  } break;
+  case AST_TYPEEXPR_STRUCTE: {
+    if (type->u.structe.fields_count != expected_field_count) {
+      METERR(cs->im, *meta, "Struct initializer has wrong number of fields.%s", "\n");
+      return 0;
+    }
+
+    ast_typeexpr_init_copy(structe_type_out, type);
+    return 1;
+  } break;
+  case AST_TYPEEXPR_UNIONE: {
+    METERR(cs->im, *meta, "Using a struct initializer on a union type.%s", "\n");
+    return 0;
+  } break;
+  case AST_TYPEEXPR_ARRAY: {
+    METERR(cs->im, *meta, "Using a struct initializer on an array type (which would make sense, but it's not supported.%s", "\n");
+    return 0;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+int check_expr_strinit(struct exprscope *es,
+                       struct ast_expr *x,
+                       struct ast_typeexpr *partial_type) {
+  if (!is_concrete(partial_type)) {
+    METERR(es->cs->im, x->u.strinit.meta,
+           "Structure literal used without explicit return type.%s", "\n");
+    goto fail;
+  }
+
+  struct ast_typeexpr structe_type;
+  if (!chase_struct_field_types(es->cs,
+                                &x->u.strinit.meta, partial_type,
+                                x->u.strinit.exprs_count,
+                                &structe_type)) {
+    goto fail;
+  }
+
+  CHECK(structe_type.tag == AST_TYPEEXPR_STRUCTE);
+  CHECK(structe_type.u.structe.fields_count == x->u.strinit.exprs_count);
+
+  for (size_t i = 0, e = x->u.strinit.exprs_count; i < e; i++) {
+    if (!check_expr(es, &x->u.strinit.exprs[i],
+                    &structe_type.u.structe.fields[i].type)) {
+      goto fail_structe_type;
+    }
+  }
+
+  struct ast_typeexpr concrete_type;
+  ast_typeexpr_init_copy(&concrete_type, partial_type);
+  struct ast_typeexpr temporary_type;
+  ast_typeexpr_init_copy(&temporary_type, &concrete_type);
+  ast_strinit_set_struct_type(&x->u.strinit, structe_type);
+  ast_expr_update(x,
+                  ast_expr_info_typechecked_temporary(
+                      0,
+                      concrete_type,
+                      temporary_type,
+                      1,
+                      exprscope_temptag(es)));
+  return 1;
+ fail_structe_type:
+  ast_typeexpr_destroy(&structe_type);
+ fail:
+  return 0;
+}
+
 void replace_name_expr_params(struct exprscope *es,
                               struct ast_name_expr *x,
                               struct ast_name_expr *out) {
@@ -3844,7 +4019,7 @@ int check_expr_ai(struct exprscope *es,
     ast_name_expr_info_mark_inst(&x->u.name.info, inst_or_null);
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL: {
+  case AST_EXPR_NUMERIC_LITERAL_: {
     struct ast_typeexpr num_type = ast_numeric_garbage();
     struct ast_typeexpr combined_type;
     if (!combine_partial_types(es->cs->im, partial_type, &num_type, &combined_type)) {
@@ -4025,6 +4200,9 @@ int check_expr_ai(struct exprscope *es,
     ast_expr_update(x, ast_expr_info_typechecked_identical(
                         &x->u.typed_expr.expr->info));
     return 1;
+  } break;
+  case AST_EXPR_STRINIT: {
+    return check_expr_strinit(es, x, partial_type);
   } break;
   default:
     UNREACHABLE();
@@ -4712,7 +4890,7 @@ int eval_static_value(struct identmap *im,
     static_value_init_copy(out, di_value(inst_or_null));
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL:
+  case AST_EXPR_NUMERIC_LITERAL_:
     return eval_static_numeric_literal(im,
                                        ast_expr_type(expr),
                                        &expr->u.numeric_literal, out);
@@ -4760,6 +4938,8 @@ int eval_static_value(struct identmap *im,
   } break;
   case AST_EXPR_TYPED:
     return eval_static_value(im, expr->u.typed_expr.expr, out);
+  case AST_EXPR_STRINIT:
+    CRASH("No struct literal should have been deemed statically evaluable.\n");
   default:
     UNREACHABLE();
   }
@@ -6625,6 +6805,94 @@ int check_file_test_more_65(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_66(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "deftype foo struct {\n"
+      "  x i32;\n"
+      "  y i32;\n"
+      "};\n"
+      "func bar(x i32) foo {\n"
+      "  return { x, x };\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_67(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because struct expr has wrong count. */
+  struct test_module a[] = { {
+      "foo",
+      "deftype foo struct {\n"
+      "  x i32;\n"
+      "  y i32;\n"
+      "};\n"
+      "func bar(x i32) foo {\n"
+      "  return { x, x, x };\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_68(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because struct expr has wrong type. */
+  struct test_module a[] = { {
+      "foo",
+      "deftype foo struct {\n"
+      "  x i32;\n"
+      "  y i32;\n"
+      "};\n"
+      "func bar(x i32, y u32) foo {\n"
+      "  return { x, y };\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_69(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "deftype foo struct {\n"
+      "  x i32;\n"
+      "  y i32;\n"
+      "};\n"
+      "func bar(x i32) foo {\n"
+      "  return { x, 5 };\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_70(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "deftype foo struct {\n"
+      "  x i32;\n"
+      "  y u32;\n"
+      "};\n"
+      "func bar(x i32) foo {\n"
+      "  ret foo = { x, 7 };\n"
+      "  return ret;\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 
@@ -7280,6 +7548,36 @@ int test_check_file(void) {
   DBG("test_check_file !check_file_test_more_65...\n");
   if (!!test_check_module(&im, &check_file_test_more_65, foo)) {
     DBG("check_file_test_more_65 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_66...\n");
+  if (!test_check_module(&im, &check_file_test_more_66, foo)) {
+    DBG("check_file_test_more_66 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_67...\n");
+  if (!!test_check_module(&im, &check_file_test_more_67, foo)) {
+    DBG("check_file_test_more_67 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_68...\n");
+  if (!!test_check_module(&im, &check_file_test_more_68, foo)) {
+    DBG("check_file_test_more_68 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_69...\n");
+  if (!test_check_module(&im, &check_file_test_more_69, foo)) {
+    DBG("check_file_test_more_69 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_70...\n");
+  if (!test_check_module(&im, &check_file_test_more_70, foo)) {
+    DBG("check_file_test_more_70 fails\n");
     goto cleanup_identmap;
   }
 

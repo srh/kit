@@ -3880,6 +3880,31 @@ void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
   }
 }
 
+int gen_strinit_expr(struct checkstate *cs, struct objfile *f,
+                     struct frame *h, struct ast_expr *a,
+                     struct expr_return *er) {
+  struct ast_typeexpr *stype = ast_strinit_struct_type(&a->u.strinit);
+  CHECK(stype->tag == AST_TYPEEXPR_STRUCTE);
+  CHECK(stype->u.structe.fields_count == a->u.strinit.exprs_count);
+  uint32_t size = kira_sizeof(&cs->nt, stype);
+  struct loc loc = frame_push_loc(h, size);
+
+  for (size_t i = 0, e = a->u.strinit.exprs_count; i < e; i++) {
+    int32_t saved_offset = frame_save_offset(h);
+    struct loc field_loc = gen_field_loc(cs, f, h, loc, stype,
+                                         &stype->u.structe.fields[i].name.value);
+    struct expr_return field_er = demand_expr_return(field_loc);
+    if (!gen_expr(cs, f, h, &a->u.strinit.exprs[i], &field_er)) {
+      return 0;
+    }
+    frame_restore_offset(h, saved_offset);
+  }
+
+  expr_return_set(cs, f, h, er, loc, stype,
+                  temp_exists(loc, stype, 1));
+  return 1;
+}
+
 int gen_string_literal(struct checkstate *cs, struct objfile *f,
                        struct frame *h, struct ast_expr *a,
                        struct expr_return *er) {
@@ -3911,7 +3936,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     }
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL: {
+  case AST_EXPR_NUMERIC_LITERAL_: {
     return gen_immediate_numeric_literal(cs->im, f, h, ast_expr_type(a),
                                          &a->u.numeric_literal, er);
   } break;
@@ -3993,6 +4018,8 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
   } break;
   case AST_EXPR_TYPED:
     return gen_expr(cs, f, h, a->u.typed_expr.expr, er);
+  case AST_EXPR_STRINIT:
+    return gen_strinit_expr(cs, f, h, a, er);
   default:
     UNREACHABLE();
   }

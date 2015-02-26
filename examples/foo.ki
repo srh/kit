@@ -143,9 +143,8 @@ export func showfacs(p *ty, num *u16) ty {
   var xptr *i32 = &p->x;
   xptr[0] = 99;
 
-  p[1].x = 33;
+  p[1] = { 33, ~(@[u16]~ @[u32] 22 + @[u16]~ @[u32]44) };
   *num = ~ @[u32]29;
-  p[1].y = ~(@[u16]~ @[u32] 22 + @[u16]~ @[u32]44);
 
   var heh [2]ty;
   heh[0] = p[1];

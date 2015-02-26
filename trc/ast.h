@@ -197,6 +197,7 @@ struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a);
 
 struct ast_typeexpr ast_unknown_garbage(void);
 struct ast_typeexpr ast_numeric_garbage(void);
+struct ast_typeexpr ast_strinit_garbage(size_t exprs_count);
 
 struct varnum {
   size_t value;
@@ -601,6 +602,29 @@ void ast_typed_expr_init(struct ast_typed_expr *a,
 void ast_typed_expr_init_copy(struct ast_typed_expr *a,
                               struct ast_typed_expr *c);
 
+struct ast_strinit_info {
+  int info_valid;
+  struct ast_typeexpr concrete_structe_type;
+};
+
+/* TODO: Rename strinit to struct_initializer. */
+struct ast_strinit {
+  struct ast_meta meta;
+  struct ast_strinit_info info;
+  struct ast_expr *exprs;
+  size_t exprs_count;
+};
+
+void ast_strinit_init(struct ast_strinit *a,
+                      struct ast_meta meta,
+                      struct ast_expr *exprs,
+                      size_t exprs_count);
+void ast_strinit_init_copy(struct ast_strinit *a,
+                           struct ast_strinit *c);
+
+void ast_strinit_set_struct_type(struct ast_strinit *a,
+                                 struct ast_typeexpr struct_type);
+struct ast_typeexpr *ast_strinit_struct_type(struct ast_strinit *a);
 
 enum ast_typechecked {
   AST_TYPECHECKED_NO,
@@ -653,7 +677,8 @@ struct ast_expr_info ast_expr_info_typechecked_identical(
 
 enum ast_expr_tag {
   AST_EXPR_NAME,
-  AST_EXPR_NUMERIC_LITERAL,
+  /* TODO: Remove underscore. */
+  AST_EXPR_NUMERIC_LITERAL_,
   AST_EXPR_BOOL_LITERAL,
   AST_EXPR_NULL_LITERAL,
   AST_EXPR_VOID_LITERAL,
@@ -667,6 +692,7 @@ enum ast_expr_tag {
   AST_EXPR_LOCAL_FIELD_ACCESS,
   AST_EXPR_DEREF_FIELD_ACCESS,
   AST_EXPR_TYPED,
+  AST_EXPR_STRINIT,
 };
 
 struct ast_expr {
@@ -688,6 +714,7 @@ struct ast_expr {
     struct ast_local_field_access local_field_access;
     struct ast_deref_field_access deref_field_access;
     struct ast_typed_expr typed_expr;
+    struct ast_strinit strinit;
   } u;
 };
 
