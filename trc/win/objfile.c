@@ -368,6 +368,7 @@ void objfile_alloc(struct objfile **p_out) {
 void objfile_free(struct objfile **p_ref) {
   CHECK(*p_ref);
   objfile_destroy(*p_ref);
+  free(*p_ref);
   *p_ref = NULL;
 }
 
