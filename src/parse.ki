@@ -20,6 +20,7 @@ defenum prec_cmp {
 
 def kSemicolonPrec i32 = 205;
 def kCommaPrec i32 = 205;
+def kConversionRightPrec i32 = 905;
 
 func parse_file(p *ps, out *ast_file) bool {
   arr array[ast_toplevel];
@@ -350,10 +351,10 @@ func try_underscore_if_allowed(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
         *out = Unknown({});
         return true;
       }
-      return false;
+      return Fail;
     }
     case AllowBlanksNo(v): {
-      return false;
+      return Fail;
     }
   }
 }
@@ -385,7 +386,7 @@ func help_parse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
     return true;
   }
   args array[ast_typeexpr];
-  if !parse_rest_of_type_arglist(p, ab, &args) {
+  if !parse_rest_of_type_param_list(p, ab, &args) {
     return Fail;
   }
   // TODO: Allow arbitrarily many type applications?
@@ -447,7 +448,7 @@ func parse_rest_of_pointer(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
   return true;
 }
 
-func parse_rest_of_type_arglist(p *ps, ab allow_blanks, out *array[ast_typeexpr]) bool {
+func parse_rest_of_type_param_list(p *ps, ab allow_blanks, out *array[ast_typeexpr]) bool {
   args array[ast_typeexpr];
   for ;; {
     if try_skip_token(p, Grouper(RBracket(void))) {
@@ -510,7 +511,7 @@ func parse_expr(p *ps, prec_ctx i32, out *ast_expr) bool {
   for ;; {
     if try_skip_token(p, Grouper(LParen(void))) {
       params array[ast_expr];
-      if !parse_rest_of_arglist(p, &params) {
+      if !parse_rest_of_param_list(p, &params) {
         return Fail;
       }
       lhs = Funcall({embox(lhs), params});
@@ -644,11 +645,179 @@ func build_binop_expr(im *identmap, op tok, lhs ast_expr, rhs ast_expr) ast_expr
 
 
 func parse_atomic_expr(p *ps, out *ast_expr) bool {
+  switch peek(p).val {
+    case Keyw(k): {
+      switch k {
+        case Func(v): {
+          step(p);
+          return parse_rest_of_lambda(p, out);
+        }
+        case True(v): {
+          step(p);
+          *out = BoolLiteral({true});
+          return true;
+        }
+        case False(v): {
+          step(p);
+          *out = BoolLiteral({false});
+          return true;
+        }
+        case Void(v): {
+          step(p);
+          *out = VoidLiteral({});
+          return true;
+        }
+        case Null(v): {
+          step(p);
+          *out = NullLiteral({});
+          return true;
+        }
+        default: {
+          return Fail;
+        }
+      }
+    }
+    case Num(n numlit): {
+      switch n {
+        case DecNum(arr array[i8]): {
+          step(p);
+          *out = NumericLiteral(DecLiteral({arr}));
+          return true;
+        }
+        case HexNum(arr array[i8]): {
+          step(p);
+          *out = NumericLiteral(HexLiteral({arr}));
+          return true;
+        }
+      }
+    }
+    case Grouper(g grouper): {
+      switch g {
+        case LParen(v): {
+          step(p);
+          expr ast_expr;
+          if !(parse_expr(p, kSemicolonPrec, &expr)
+               && try_skip_token(p, Grouper(RParen(void)))) {
+            return Fail;
+          }
+          *out = ParenExpr({embox(expr)});
+          return true;
+        }
+        case LBrace(v): {
+          step(p);
+          return parse_rest_of_strinit(p, out);
+        }
+        default: { return Fail; }
+      }
+    }
+    case Ident(identch array[i32]): {
+      step(p);
+      switch peek(p).val {
+        case Oper(operch array[i32]): {
+          if is_at_sign(&operch) {
+            step(p);
+            args array[ast_typeexpr];
+            if !(try_skip_token(p, Grouper(LBracket(void)))
+                 && parse_rest_of_type_param_list(p, AllowBlanksNo(void), &args)) {
+              return Fail;
+            }
+            *out = NameExpr({{intern(p->im, ~identch)}, Has(args)});
+            return true;
+          }
+        }
+        default: { }
+      }
+      *out = NameExpr({{intern(p->im, ~identch)}, None()});
+      return true;
+    }
+    case Oper(operch array[i32]): {
+      if is_at_sign(&operch) {
+        step(p);
+        type ast_typeexpr;
+        expr ast_expr;
+        if !(try_skip_token(p, Grouper(LBracket(void)))
+             && help_parse_typeexpr(p, AllowBlanksYes(void), &type)
+             && try_skip_token(p, Grouper(RBracket(void)))
+             && parse_expr(p, kConversionRightPrec, &expr)) {
+          return Fail;
+        }
+        *out = TypedExpr({type, embox(expr)});
+        return true;
+      } else {
+        switch unop_info(&operch) {
+          case None(v): { return Fail; }
+          case Has(rightprec i32): {
+            step(p);
+            rhs ast_expr;
+            if !parse_expr(p, rightprec, &rhs) {
+              return Fail;
+            }
+            *out = Funcall({embox(NameExpr({{intern(p->im, ~operch)}, None()})),
+                            mk_array(rhs)});
+            return true;
+          }
+        }
+      }
+    }
+  }
+    // TODO: Char literals, string literals.
+}
+
+func unop_info(operch *array[i32]) opt[i32] {
+  if count(operch) != 1 {
+    return None();
+  }
+  ch0 i32 = get(operch, 0);
+  if ch0 == '~' || ch0 == '*' || ch0 == '&'
+     || ch0 == '-' || ch0 == '!' || ch0 == '^' {
+    return Has(905);
+  }
+  return None();
+}
+
+func is_equal(arr *array[i32], v0 i32) bool {
+  return count(arr) == 1 && get(arr, 0) == v0;
+}
+
+func is_at_sign(operch *array[i32]) bool {
+  return is_equal(operch, '@');
+}
+
+func parse_rest_of_lambda(p *ps, out *ast_expr) bool {
   return Fail;  // TODO
 }
 
-func parse_rest_of_arglist(p *ps, params *array[ast_expr]) bool {
-  return Fail;  // TODO
+func parse_rest_of_strinit(p *ps, out *ast_expr) bool {
+  params array[ast_expr];
+  if !parse_rest_of_expr_list(p, RBrace(void), &params) {
+    return Fail;
+  }
+  *out = Strinit({params});
+  return true;
+}
+
+func parse_rest_of_param_list(p *ps, out *array[ast_expr]) bool {
+  return parse_rest_of_expr_list(p, RParen(void), out);
+}
+
+func parse_rest_of_expr_list(p *ps, stop grouper, out *array[ast_expr]) bool {
+  exprs array[ast_expr];
+  for ;; {
+    if try_skip_token(p, Grouper(stop)) {
+      *out = exprs;
+      return true;
+    }
+    if count(&exprs) != 0 {
+      if !try_skip_token(p, mk_oper(',')) {
+        return Fail;
+      }
+    }
+    expr ast_expr;
+    if !parse_expr(p, kCommaPrec, &expr) {
+      return Fail;
+    }
+    push(&exprs, expr);
+  }
 }
 
 func parse_statement(p *ps, out *ast_statement) bool {

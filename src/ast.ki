@@ -40,8 +40,14 @@ deftype ast_bool_literal struct {
   value bool;
 };
 
+deftype ast_void_literal struct {
+};
+
+deftype ast_null_literal struct {
+};
+
 deftype ast_charspec struct {
-  value u8;
+  value i32;
 };
 
 deftype ast_char_literal struct {
@@ -192,6 +198,10 @@ deftype ast_name_expr struct {
   generic_params opt[array[ast_typeexpr]];
 };
 
+deftype ast_paren_expr struct {
+  expr box[ast_expr];
+};
+
 deftype ast_index_expr struct {
   lhs box[ast_expr];
   rhs box[ast_expr];
@@ -202,10 +212,17 @@ deftype ast_typed_expr struct {
   expr box[ast_expr];
 };
 
+deftype ast_strinit struct {
+  exprs array[ast_expr];
+};
+
 defenum ast_expr {
   NameExpr ast_name_expr;
+  ParenExpr ast_paren_expr;
   NumericLiteral ast_numeric_literal;
   BoolLiteral ast_bool_literal;
+  VoidLiteral ast_void_literal;
+  NullLiteral ast_null_literal;
   CharLiteral ast_char_literal;
   StringLiteral ast_string_literal;
   Funcall ast_funcall;
@@ -215,6 +232,7 @@ defenum ast_expr {
   LocalField ast_local_field;
   DerefField ast_deref_field;
   TypedExpr ast_typed_expr;
+  Strinit ast_strinit;
 };
 
 defenum ast_generics {

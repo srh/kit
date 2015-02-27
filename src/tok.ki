@@ -72,6 +72,7 @@ defenum keyw {
   Underscore void;
   Union void;
   Var void;
+  Void void;
   While void;
 };
 
@@ -320,6 +321,9 @@ func grab_tok(p *ps) tok {
     ps_step(p);
     return mk_res(p, left, Grouper(RBrace(void)));
   } else if ch == '~' {
+    ps_step(p);
+    return mk_res(p, left, Oper(mk_array(ch)));
+  } else if ch == '@' {
     ps_step(p);
     return mk_res(p, left, Oper(mk_array(ch)));
   } else if ch == '!' {
