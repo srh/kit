@@ -172,18 +172,6 @@ deftype ast_unop_expr struct {
   rhs box[ast_expr];
 };
 
-defenum ast_binop {
-  BinopAssign void;
-  BinopLogicalOr void;
-  BinopLogicalAnd void;
-};
-
-deftype ast_binop_expr struct {
-  operator ast_binop;
-  lhs box[ast_expr];
-  rhs box[ast_expr];
-};
-
 defenum ast_fieldname {
   WholeField void;
   NameField ast_ident;
@@ -223,7 +211,6 @@ defenum ast_expr {
   Funcall ast_funcall;
   IndexExpr ast_index_expr;
   UnopExpr ast_unop_expr;
-  BinopExpr ast_binop_expr;
   Lambda ast_lambda;
   LocalField ast_local_field;
   DerefField ast_deref_field;

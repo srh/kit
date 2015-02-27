@@ -554,7 +554,7 @@ func parse_expr(p *ps, prec_ctx i32, out *ast_expr) bool {
           if !parse_expr(p, op_prec.right, &rhs) {
             return Fail;
           }
-          lhs = build_binop_expr(op, lhs, rhs);
+          lhs = build_binop_expr(p->im, op, lhs, rhs);
         }
       }
     } else {
@@ -623,15 +623,23 @@ func binop_info(t tokval) opt[prec_pair] {
 }
 
 func compare_prec(left i32, right i32) prec_cmp {
-  // TODO
-  ret prec_cmp;
-  return ret;
+  if left + 1 < right { return PullsRight(void); }
+  if right + 1 < left { return PullsLeft(void); }
+  return Conflicts(void);
 }
 
-func build_binop_expr(op tok, lhs ast_expr, rhs ast_expr) ast_expr {
-  // TODO
-  ret ast_expr;
-  return ret;
+func op_name(im *identmap, op tok) ast_ident {
+  switch op.val {
+    case Oper(arr array[i32]): {
+      return {intern(im, ~arr)};
+    }
+    default: { check(false); return fake(); }
+  }
+}
+
+func build_binop_expr(im *identmap, op tok, lhs ast_expr, rhs ast_expr) ast_expr {
+  return Funcall({embox(NameExpr({op_name(im, op), None()})),
+                  mk_array(lhs, rhs)});
 }
 
 
