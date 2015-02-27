@@ -54,7 +54,7 @@ deftype ast_string_literal struct {
 
 deftype ast_funcall struct {
   fun box[ast_expr];
-  args array[ast_expr];
+  params array[ast_expr];
 };
 
 deftype ast_typeapp struct {
@@ -157,7 +157,7 @@ deftype ast_switch_case struct {
 };
 
 deftype ast_lambda struct {
-  params array[ast_vardecl];
+  args array[ast_vardecl];
   return_type ast_typeexpr;
   body ast_bracebody;
 };

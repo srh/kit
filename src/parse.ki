@@ -8,6 +8,7 @@ defenum allow_blanks {
 def Fail bool = false;
 
 def kSemicolonPrecedence i32 = 205;
+def kCommaPrecedence i32 = 205;
 
 func parse_file(p *ps, out *ast_file) bool {
   arr array[ast_toplevel];
@@ -489,8 +490,55 @@ func parse_vardecl(p *ps, out *ast_vardecl) bool {
   return true;
 }
 
-
 func parse_expr(p *ps, prec_ctx i32, out *ast_expr) bool {
+  lhs ast_expr;
+  if !parse_atomic_expr(p, &lhs) {
+    return Fail;
+  }
+
+  for ;; {
+    if try_skip_token(p, Grouper(LParen(void))) {
+      params array[ast_expr];
+      if !parse_rest_of_arglist(p, &params) {
+        return Fail;
+      }
+      lhs = Funcall({embox(lhs), params});
+    } else if try_skip_token(p, Grouper(LBracket(void))) {
+      arg box[ast_expr];
+      if !(parse_expr(p, kCommaPrecedence, oo(&arg))
+           && try_skip_token(p, Grouper(RBracket(void)))) {
+        return Fail;
+      }
+      lhs = IndexExpr({embox(lhs), arg});
+    } else if try_skip_token(p, mk_oper('.', '~')) {
+      lhs = LocalField({embox(lhs), WholeField(void)});
+    } else if try_skip_token(p, mk_oper('.')) {
+      fieldname ast_ident;
+      if !parse_ident(p, &fieldname) {
+        return Fail;
+      }
+      lhs = LocalField({embox(lhs), NameField(fieldname)});
+    } else if try_skip_token(p, mk_oper('-', '>', '~')) {
+      lhs = DerefField({embox(lhs), WholeField(void)});
+    } else if try_skip_token(p, mk_oper('-', '>')) {
+      fieldname ast_ident;
+      if !parse_ident(p, &fieldname) {
+        return Fail;
+      }
+      lhs = DerefField({embox(lhs), NameField(fieldname)});
+    } else {
+      // TODO
+      *out = lhs;
+      return true;
+    }
+  }
+}
+
+func parse_atomic_expr(p *ps, out *ast_expr) bool {
+  return Fail;  // TODO
+}
+
+func parse_rest_of_arglist(p *ps, params *array[ast_expr]) bool {
   return Fail;  // TODO
 }
 

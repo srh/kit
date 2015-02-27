@@ -408,8 +408,31 @@ func[T] mk_array(x0 T) array[T] {
   return ret;
 }
 
+func[T] mk_array(x0 T, x1 T) array[T] {
+  ret array[T];
+  push(&ret, x0);
+  push(&ret, x1);
+  return ret;
+}
+
+func[T] mk_array(x0 T, x1 T, x2 T) array[T] {
+  ret array[T];
+  push(&ret, x0);
+  push(&ret, x1);
+  push(&ret, x2);
+  return ret;
+}
+
 func mk_oper(ch0 i32) tokval {
   return Oper(mk_array(ch0));
+}
+
+func mk_oper(ch0 i32, ch1 i32) tokval {
+  return Oper(mk_array(ch0, ch1));
+}
+
+func mk_oper(ch0 i32, ch1 i32, ch2 i32) tokval {
+  return Oper(mk_array(ch0, ch1, ch2));
 }
 
 func[String] grab_keyword(p *ps, s String, k keyw, out *tok) bool {
