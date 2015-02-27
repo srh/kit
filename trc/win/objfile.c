@@ -556,7 +556,8 @@ void objfile_write_section_symbol(
     memcpy(u.standard.Name.ShortName, s, 8);
     u.standard.Value = 0;
     u.standard.SectionNumber = SectionNumber;
-    u.standard.Type = IMAGE_SYM_CLASS_STATIC;
+    u.standard.Type = 0;
+    u.standard.StorageClass = IMAGE_SYM_CLASS_STATIC;
     u.standard.NumberOfAuxSymbols = 1;
     SLICE_PUSH(f->symbol_table, f->symbol_table_count,
                f->symbol_table_limit, u);
