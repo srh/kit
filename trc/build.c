@@ -193,6 +193,7 @@ uint32_t add_data_string(struct checkstate *cs, struct objfile *f,
                                  objfile_section_size(objfile_data(f)),
                                  SECTION_DATA,
                                  IS_STATIC_YES);
+    free(gen_name);
 
     objfile_section_append_raw(objfile_data(f), data, length);
     SLICE_PUSH(cs->sli_symbol_table_indexes,
