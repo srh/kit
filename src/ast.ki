@@ -152,9 +152,12 @@ defenum ast_statement {
   Switch ast_switch_statement;
 };
 
-deftype ast_case_pattern struct {
-  constructor_name ast_ident;
-  decl ast_vardecl;
+defenum ast_case_pattern {
+  Case struct {
+    constructor_name ast_ident;
+    decl ast_vardecl;
+  };
+  Default void;
 };
 
 deftype ast_switch_case struct {

@@ -52,6 +52,7 @@ defenum keyw {
   Case void;
   Copy void;
   Def void;
+  Default void;
   Defclass void;
   Defenum void;
   Deftype void;
@@ -267,16 +268,23 @@ func grab_tok(p *ps) tok {
     }
   } else if is_ident_firstchar(ch) {
     ret tok;
-    if (grab_keyword(p, "case", Case(void), &ret)
+    if (grab_keyword(p, "access", Access(void), &ret)
+        || grab_keyword(p, "case", Case(void), &ret)
+        || grab_keyword(p, "copy", Copy(void), &ret)
         || grab_keyword(p, "def", Def(void), &ret)
+        || grab_keyword(p, "default", Default(void), &ret)
         || grab_keyword(p, "defclass", Defclass(void), &ret)
         || grab_keyword(p, "defenum", Defenum(void), &ret)
         || grab_keyword(p, "deftype", Deftype(void), &ret)
         || grab_keyword(p, "else", Else(void), &ret)
+        || grab_keyword(p, "export", Export(void), &ret)
+        || grab_keyword(p, "extern", Extern(void), &ret)
         || grab_keyword(p, "false", False(void), &ret)
         || grab_keyword(p, "for", For(void), &ret)
         || grab_keyword(p, "func", Func(void), &ret)
         || grab_keyword(p, "if", If(void), &ret)
+        || grab_keyword(p, "import", Import(void), &ret)
+        || grab_keyword(p, "move", Move(void), &ret)
         || grab_keyword(p, "null", Null(void), &ret)
         || grab_keyword(p, "return", Return(void), &ret)
         || grab_keyword(p, "struct", Struct(void), &ret)
@@ -285,6 +293,7 @@ func grab_tok(p *ps) tok {
         || grab_keyword(p, "_", Underscore(void), &ret)
         || grab_keyword(p, "union", Union(void), &ret)
         || grab_keyword(p, "var", Var(void), &ret)
+        || grab_keyword(p, "void", Void(void), &ret)
         || grab_keyword(p, "while", While(void), &ret)) {
       return ret;
     }

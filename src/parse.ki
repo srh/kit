@@ -5,6 +5,11 @@ defenum allow_blanks {
   AllowBlanksYes void;
 };
 
+defenum force_assignment {
+  ForceAssignmentNo void;
+  ForceAssignmentYes void;
+};
+
 def Fail bool = false;
 
 deftype prec_pair struct {
@@ -20,6 +25,8 @@ defenum prec_cmp {
 
 def kSemicolonPrec i32 = 205;
 def kCommaPrec i32 = 205;
+// Just enough to force assignment in conditionals to be parenthesized.
+def kConditionPrec i32 = 305;
 def kConversionRightPrec i32 = 905;
 
 func parse_file(p *ps, out *ast_file) bool {
@@ -319,7 +326,7 @@ func parse_args_list(p *ps, out *array[ast_vardecl]) bool {
       }
     }
     decl ast_vardecl;
-    if !parse_vardecl(p, &decl) {
+    if !parse_vardecl(p, AllowBlanksNo(void), &decl) {
       return Fail;
     }
     push(&args, decl);
@@ -483,7 +490,7 @@ func parse_braced_fields(p *ps, out *array[ast_vardecl]) bool {
     }
 
     field ast_vardecl;
-    if !(parse_vardecl(p, &field)
+    if !(parse_vardecl(p, AllowBlanksNo(void), &field)
          && try_skip_token(p, mk_oper(';'))) {
       return Fail;
     }
@@ -491,11 +498,24 @@ func parse_braced_fields(p *ps, out *array[ast_vardecl]) bool {
   }
 }
 
-func parse_vardecl(p *ps, out *ast_vardecl) bool {
+func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) bool {
   name ast_ident;
+  if !parse_ident(p, &name) {
+    return Fail;
+  }
+
+  switch ab {
+    case AllowBlanksYes(v): {
+      if peek(p).val == mk_oper('=') || peek(p).val == mk_oper(';') {
+        *out = {name, Unknown({})};
+        return true;
+      }
+    }
+    default: { }
+  }
+
   type ast_typeexpr;
-  if !(parse_ident(p, &name)
-       && parse_typeexpr(p, &type)) {
+  if !help_parse_typeexpr(p, ab, &type) {
     return Fail;
   }
   *out = {name, type};
@@ -705,6 +725,7 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
         }
         case LBrace(v): {
           step(p);
+          // TODO: Have some way to prevent naked struct initializers in a condition expression.
           return parse_rest_of_strinit(p, out);
         }
         default: { return Fail; }
@@ -784,7 +805,14 @@ func is_at_sign(operch *array[i32]) bool {
 }
 
 func parse_rest_of_lambda(p *ps, out *ast_expr) bool {
-  return Fail;  // TODO
+  args array[ast_vardecl];
+  return_type ast_typeexpr;
+  body ast_bracebody;
+  if !parse_lambdaspec(p, &args, &return_type, &body) {
+    return Fail;
+  }
+  *out = Lambda({args, return_type, body});
+  return true;
 }
 
 func parse_rest_of_strinit(p *ps, out *ast_expr) bool {
@@ -821,6 +849,217 @@ func parse_rest_of_expr_list(p *ps, stop grouper, out *array[ast_expr]) bool {
 }
 
 func parse_statement(p *ps, out *ast_statement) bool {
-  return Fail;  // TODO
+  switch peek(p).val {
+    case Keyw(k): {
+      switch k {
+        case Var(v): {
+          step(p);
+          return parse_rest_of_var_statement(p, out);
+        }
+        case Return(v): {
+          step(p);
+          return parse_rest_of_return_statement(p, out);
+        }
+        case If(v): {
+          step(p);
+          return parse_rest_of_if_statement(p, out);
+        }
+        case While(v): {
+          step(p);
+          return parse_rest_of_while_statement(p, out);
+        }
+        case For(v): {
+          step(p);
+          return parse_rest_of_for_statement(p, out);
+        }
+        case Switch(v): {
+          step(p);
+          return parse_rest_of_switch_statement(p, out);
+        }
+        default: { }
+      }
+    }
+    default: { }
+  }
+  return parse_naked_var_or_expr_statement(p, ForceAssignmentNo(void), out);
 }
 
+func parse_rest_of_var_statement(p *ps, out *ast_statement) bool {
+  decl ast_vardecl;
+  if !parse_vardecl(p, AllowBlanksYes(void), &decl) {
+    return Fail;
+  }
+
+  if try_skip_token(p, mk_oper(';')) {
+    *out = Var({decl, None()});
+    return true;
+  }
+
+  rhs box[ast_expr];
+  if !(try_skip_token(p, mk_oper('='))
+       && parse_expr(p, kSemicolonPrec, oo(&rhs))
+       && try_skip_token(p, mk_oper(';'))) {
+    return Fail;
+  }
+
+  *out = Var({decl, Has(rhs)});
+  return true;
+}
+
+func parse_rest_of_return_statement(p *ps, out *ast_statement) bool {
+  if try_skip_token(p, mk_oper(';')) {
+    *out = Return({None()});
+    return true;
+  }
+  expr box[ast_expr];
+  if !(parse_expr(p, kSemicolonPrec, oo(&expr))
+       && try_skip_token(p, mk_oper(';'))) {
+    return Fail;
+  }
+  *out = Return({Has(expr)});
+  return true;
+}
+
+func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
+  condition box[ast_expr];
+  thenbody ast_bracebody;
+  if !(parse_expr(p, kConditionPrec, oo(&condition))
+       && parse_bracebody(p, &thenbody)) {
+    return Fail;
+  }
+
+  if !try_skip_token(p, Keyw(Else(void))) {
+    *out = IfThen({condition, thenbody});
+    return true;
+  }
+
+  if try_skip_token(p, Keyw(If(void))) {
+    elseif ast_statement;
+    if !parse_rest_of_if_statement(p, &elseif) {
+      return Fail;
+    }
+    *out = IfThenElse({condition, thenbody, {mk_array(elseif)}});
+    return true;
+  }
+  elsebody ast_bracebody;
+  if !parse_bracebody(p, &elsebody) {
+    return Fail;
+  }
+  *out = IfThenElse({condition, thenbody, elsebody});
+  return true;
+}
+
+func parse_rest_of_while_statement(p *ps, out *ast_statement) bool {
+  condition box[ast_expr];
+  body ast_bracebody;
+  if !(parse_expr(p, kConditionPrec, oo(&condition))
+       && parse_bracebody(p, &body)) {
+    return Fail;
+  }
+  *out = While({condition, body});
+  return true;
+}
+
+func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
+  initializer opt[box[ast_statement]];
+  if try_skip_token(p, mk_oper(';')) {
+    initializer = None();
+  } else {
+    statement box[ast_statement];
+    if try_skip_token(p, Keyw(Var(void))) {
+      if !parse_rest_of_var_statement(p, oo(&statement)) {
+        return Fail;
+      }
+    } else {
+      if !parse_naked_var_or_expr_statement(p, ForceAssignmentYes(void), oo(&statement)) {
+        return Fail;
+      }
+    }
+    initializer = Has(statement);
+  }
+  condition opt[box[ast_expr]];
+  if try_skip_token(p, mk_oper(';')) {
+    condition = None();
+  } else {
+    expr box[ast_expr];
+    if !(parse_expr(p, kConditionPrec, oo(&expr))
+         && try_skip_token(p, mk_oper(';'))) {
+      return Fail;
+    }
+    condition = Has(expr);
+  }
+  increment opt[box[ast_expr]];
+  if peek(p).val == Grouper(LBrace(void)) {
+    increment = None();
+  } else {
+    expr box[ast_expr];
+    if !parse_expr(p, kSemicolonPrec, oo(&expr)) {
+      return Fail;
+    }
+    increment = Has(expr);
+  }
+
+  body ast_bracebody;
+  if !parse_bracebody(p, &body) {
+    return Fail;
+  }
+  *out = For({initializer, condition, increment, body});
+  return true;
+}
+
+func parse_rest_of_switch_statement(p *ps, out *ast_statement) bool {
+  swartch box[ast_expr];
+  if !(parse_expr(p, kConditionPrec, oo(&swartch))
+       && try_skip_token(p, Grouper(LBrace(void)))) {
+    return Fail;
+  }
+
+  cases array[ast_switch_case];
+  for ;; {
+    if try_skip_token(p, Grouper(RBrace(void))) {
+      *out = Switch({swartch, cases});
+      return true;
+    }
+    cas ast_switch_case;
+    if !parse_switch_case(p, &cas) {
+      return Fail;
+    }
+    push(&cases, cas);
+  }
+}
+
+func parse_switch_case(p *ps, out *ast_switch_case) bool {
+  pattern ast_case_pattern;
+  body ast_bracebody;
+  if !(parse_case_pattern(p, &pattern)
+       && try_skip_token(p, mk_oper(':'))
+       && parse_bracebody(p, &body)) {
+    return Fail;
+  }
+  *out = {pattern, body};
+  return true;
+}
+
+func parse_case_pattern(p *ps, out *ast_case_pattern) bool {
+  if try_skip_token(p, Keyw(Default(void))) {
+    *out = Default(void);
+    return true;
+  }
+  if !try_skip_token(p, Keyw(Case(void))) {
+    return Fail;
+  }
+  constructor_name ast_ident;
+  decl ast_vardecl;
+  if !(parse_ident(p, &constructor_name)
+       && try_skip_token(p, Grouper(LParen(void)))
+       && parse_vardecl(p, AllowBlanksYes(void), &decl)
+       && try_skip_token(p, Grouper(RParen(void)))) {
+    return Fail;
+  }
+  *out = Case({constructor_name, decl});
+  return true;
+}
+
+func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_statement) bool {
+  return Fail;  // TODO
+}
