@@ -3067,6 +3067,7 @@ int check_statement(struct bodystate *bs,
       fallthrough = max_fallthrough(fallthrough, cas_fallthrough);
     }
 
+    ast_enumspec_destroy(&concrete_enumspec);
     break;
   switch_fail_concrete_enumspec:
     ast_enumspec_destroy(&concrete_enumspec);
