@@ -25,6 +25,12 @@ func checkmalloc(n size) *void {
   return ret;
 }
 
+// TODO: We should not need uses of this.
+func[T] fake() T {
+  ret T;
+  return ret;
+}
+
 defenum[T] opt {
   None void;
   Has T;
