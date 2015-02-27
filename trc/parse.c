@@ -2437,6 +2437,7 @@ int parse_rest_of_access(struct ps *p, struct pos pos_start, struct ast_access *
   /* This is weird: We require exactly one space between the keyword
   "access" and the type being accessed.  This way, you can grep
   "access typename" */
+  /* TODO: This is stupid, and s2 doesn't behave this way. */
   if (ps_peek(p) != ' ') {
     goto fail;
   }

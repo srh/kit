@@ -173,11 +173,56 @@ func parse_rest_of_defclass(p *ps, out *ast_toplevel) bool {
 }
 
 func parse_rest_of_defenum(p *ps, out *ast_toplevel) bool {
-  return Fail;  // TODO
+  generics ast_generics;
+  name ast_ident;
+  enumfields array[ast_vardecl];
+  if !(parse_generics_if_present(p, &generics)
+       && parse_ident(p, &name)
+       && parse_braced_fields(p, &enumfields)
+       && try_skip_token(p, mk_oper(';'))) {
+    return Fail;
+  }
+  *out = TypeDef({generics, name, EnumSpecRhs({enumfields})});
+  return true;
 }
 
 func parse_rest_of_access(p *ps, out *ast_toplevel) bool {
-  return Fail;  // TODO
+  name ast_ident;
+  if !parse_ident(p, &name) {
+    return Fail;
+  }
+  arity generics_arity;
+  if !try_skip_token(p, Grouper(LBracket(void))) {
+    arity = NoParamsArity(void);
+  } else {
+    counter u32 = 0;
+    done bool = false;
+    while !done {
+      if try_skip_token(p, Grouper(RBracket(void))) {
+        done = true;
+      } else {
+        if counter != 0 {
+          if !try_skip_token(p, mk_oper(',')) {
+            return Fail;
+          }
+        }
+        if !try_skip_token(p, Keyw(Underscore(void))) {
+          return Fail;
+        }
+        counter = counter + 1;
+      }
+    }
+    arity = FiniteArity(counter);
+  }
+
+  toplevels array[ast_toplevel];
+  if !(try_skip_token(p, Grouper(LBrace(void)))
+       && parse_toplevels(p, Grouper(RBrace(void)), &toplevels)
+       && try_skip_token(p, Grouper(RBrace(void)))) {
+    return Fail;
+  }
+  *out = Access({name, arity, toplevels});
+  return true;
 }
 
 func parse_def_generics_and_name(p *ps, is_export ast_isexport,
@@ -200,7 +245,7 @@ func parse_def_generics_and_name(p *ps, is_export ast_isexport,
 
 func parse_lambdaspec(p *ps, params_out *array[ast_vardecl],
                       return_type_out *ast_typeexpr, body_out *ast_bracebody) bool {
-  return parse_params_list(p, params_out)
+  return parse_args_list(p, params_out)
     && parse_typeexpr(p, return_type_out)
     && parse_bracebody(p, body_out);
 }
@@ -209,26 +254,247 @@ func parse_typeexpr(p *ps, out *ast_typeexpr) bool {
   return help_parse_typeexpr(p, AllowBlanksNo(void), out);
 }
 
+func parse_ident(p *ps, out *ast_ident) bool {
+  switch peek(p).val {
+    case Ident(text array[i32]): {
+      *out = {intern(p->im, ~text)};
+      return true;
+    }
+    default: {
+      return Fail;
+    }
+  }
+}
+
+func parse_generics_if_present(p *ps, out *ast_generics) bool {
+  args array[ast_ident];
+  if !try_skip_token(p, Grouper(LBracket(void))) {
+    *out = NoGenerics(void);
+    return true;
+  }
+  for ;; {
+    if try_skip_token(p, Grouper(RBracket(void))) {
+      *out = HasGenerics(args);
+      return true;
+    }
+    if count(&args) != 0 {
+      if !try_skip_token(p, mk_oper(',')) {
+        return Fail;
+      }
+    }
+    arg ast_ident;
+    if !parse_ident(p, &arg) {
+      return Fail;
+    }
+    push(&args, arg);
+  }
+}
+
+func parse_args_list(p *ps, out *array[ast_vardecl]) bool {
+  if !try_skip_token(p, Grouper(LParen(void))) {
+    return Fail;
+  }
+  args array[ast_vardecl];
+  for ;; {
+    if try_skip_token(p, Grouper(RParen(void))) {
+      *out = args;
+      return true;
+    }
+    if count(&args) != 0 {
+      if !try_skip_token(p, mk_oper(',')) {
+        return Fail;
+      }
+    }
+    decl ast_vardecl;
+    if !parse_vardecl(p, &decl) {
+      return Fail;
+    }
+    push(&args, decl);
+  }
+}
+
+func parse_bracebody(p *ps, out *ast_bracebody) bool {
+  if !try_skip_token(p, Grouper(LBrace(void))) {
+    return Fail;
+  }
+  statements array[ast_statement];
+  for ;; {
+    if try_skip_token(p, Grouper(RBrace(void))) {
+      *out = {statements};
+      return true;
+    }
+    statement ast_statement;
+    if !parse_statement(p, &statement) {
+      return Fail;
+    }
+    push(&statements, statement);
+  }
+}
+
+func try_underscore_if_allowed(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
+  switch ab {
+    case AllowBlanksYes(v): {
+      if try_skip_token(p, Keyw(Underscore(void))) {
+        *out = Unknown({});
+        return true;
+      }
+      return false;
+    }
+    case AllowBlanksNo(v): {
+      return false;
+    }
+  }
+}
+
+func help_parse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
+  if try_skip_token(p, Keyw(Struct(void))) {
+    return parse_rest_of_struct(p, out);
+  }
+  if try_skip_token(p, Keyw(Union(void))) {
+    return parse_rest_of_union(p, out);
+  }
+  if try_skip_token(p, Grouper(LBracket(void))) {
+    return parse_rest_of_arraytype(p, ab, out);
+  }
+  if try_skip_token(p, mk_oper('*')) {
+    return parse_rest_of_pointer(p, ab, out);
+  }
+
+  lhs ast_typeexpr;
+  if !try_underscore_if_allowed(p, ab, &lhs) {
+    name ast_ident;
+    if !parse_ident(p, &name) {
+      return Fail;
+    }
+    lhs = Name(name);
+  }
+  if !try_skip_token(p, Grouper(LBracket(void))) {
+    *out = lhs;
+    return true;
+  }
+  args array[ast_typeexpr];
+  if !parse_rest_of_type_arglist(p, ab, &args) {
+    return Fail;
+  }
+  // TODO: Allow arbitrarily many type applications?
+  *out = App({embox(lhs), args});
+  return true;
+}
+
+func parse_rest_of_struct(p *ps, out *ast_typeexpr) bool {
+  fields array[ast_vardecl];
+  if !parse_braced_fields(p, &fields) {
+    return Fail;
+  }
+  *out = Struct({fields});
+  return true;
+}
+
+func parse_rest_of_union(p *ps, out *ast_typeexpr) bool {
+  fields array[ast_vardecl];
+  if !parse_braced_fields(p, &fields) {
+    return Fail;
+  }
+  *out = Union({fields});
+  return true;
+}
+
+func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
+  switch ab {
+    case AllowBlanksYes(v): {
+      if try_skip_token(p, Keyw(Underscore(void))) {
+        if !try_skip_token(p, Grouper(RBracket(void))) {
+          return Fail;
+        }
+        *out = Unknown({});
+        return true;
+      }
+    }
+    default: { }
+  }
+
+  count box[ast_expr];
+  param box[ast_typeexpr];
+  if !(parse_expr(p, kSemicolonPrecedence, oo(&count))
+       && try_skip_token(p, Grouper(RBracket(void)))
+       && parse_typeexpr(p, oo(&param))) {
+    return Fail;
+  }
+
+  *out = Arraytype({count, param});
+  return true;
+}
+
+func parse_rest_of_pointer(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
+  arg ast_typeexpr;
+  if !help_parse_typeexpr(p, ab, &arg) {
+    return Fail;
+  }
+  *out = App({embox(Name({intern(p->im, ~mk_array(@[i32]'*'))})),
+              mk_array(arg)});
+  return true;
+}
+
+func parse_rest_of_type_arglist(p *ps, ab allow_blanks, out *array[ast_typeexpr]) bool {
+  args array[ast_typeexpr];
+  for ;; {
+    if try_skip_token(p, Grouper(RBracket(void))) {
+      *out = args;
+      return true;
+    }
+
+    if count(&args) != 0 {
+      if !try_skip_token(p, mk_oper(',')) {
+        return Fail;
+      }
+    }
+
+    typeexpr ast_typeexpr;
+    if !help_parse_typeexpr(p, ab, &typeexpr) {
+      return Fail;
+    }
+    push(&args, typeexpr);
+  }
+}
+
+
+func parse_braced_fields(p *ps, out *array[ast_vardecl]) bool {
+  if !try_skip_token(p, Grouper(LBrace(void))) {
+    return Fail;
+  }
+  fields array[ast_vardecl];
+  for ;; {
+    if try_skip_token(p, Grouper(RBrace(void))) {
+      *out = fields;
+      return true;
+    }
+
+    field ast_vardecl;
+    if !(parse_vardecl(p, &field)
+         && try_skip_token(p, mk_oper(';'))) {
+      return Fail;
+    }
+    push(&fields, field);
+  }
+}
+
+func parse_vardecl(p *ps, out *ast_vardecl) bool {
+  name ast_ident;
+  type ast_typeexpr;
+  if !(parse_ident(p, &name)
+       && parse_typeexpr(p, &type)) {
+    return Fail;
+  }
+  *out = {name, type};
+  return true;
+}
+
+
 func parse_expr(p *ps, prec_ctx i32, out *ast_expr) bool {
   return Fail;  // TODO
 }
 
-func parse_ident(p *ps, out *ast_ident) bool {
+func parse_statement(p *ps, out *ast_statement) bool {
   return Fail;  // TODO
 }
 
-func parse_generics_if_present(p *ps, out *ast_generics) bool {
-  return Fail;  // TODO
-}
-
-func parse_params_list(p *ps, out *array[ast_vardecl]) bool {
-  return Fail;  // TODO
-}
-
-func parse_bracebody(p *ps, out *ast_bracebody) bool {
-  return Fail;  // TODO
-}
-
-func help_parse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
-  return Fail;  // TODO
-}

@@ -1,7 +1,7 @@
 import arity;
 import identmap;
 import pos;
-import uniq;
+import box;
 
 deftype interval struct {
   left pos;
@@ -20,17 +20,14 @@ deftype ast_meta struct {
 };
 
 deftype ast_ident struct {
-  meta ast_meta;
   value ident_value;
 };
 
 deftype ast_hex_literal struct {
-  meta ast_meta;
   digits array[i8];
 };
 
 deftype ast_dec_literal struct {
-  meta ast_meta;
   digits array[i8];
 };
 
@@ -40,132 +37,102 @@ defenum ast_numeric_literal {
 };
 
 deftype ast_bool_literal struct {
-  meta ast_meta;
   value bool;
 };
 
 deftype ast_charspec struct {
-  meta ast_meta;
   value u8;
 };
 
 deftype ast_char_literal struct {
-  meta ast_meta;
   charspec ast_charspec;
 };
 
 deftype ast_string_literal struct {
-  meta ast_meta;
   charspecs array[ast_charspec];
 };
 
 deftype ast_funcall struct {
-  meta ast_meta;
-  fun uniq[ast_expr];
+  fun box[ast_expr];
   args array[ast_expr];
 };
 
 deftype ast_typeapp struct {
-  meta ast_meta;
-  name ast_ident;
+  typefunc box[ast_typeexpr];
   params array[ast_typeexpr];
 };
 
-deftype ast_structe struct {
-  meta ast_meta;
+deftype ast_struct struct {
   fields array[ast_vardecl];
 };
 
-deftype ast_unione struct {
-  meta ast_meta;
+deftype ast_union struct {
   fields array[ast_vardecl];
 };
 
 deftype ast_arraytype struct {
-  meta ast_meta;
-  count uniq[ast_expr];
-  param uniq[ast_typeexpr];
+  count box[ast_expr];
+  param box[ast_typeexpr];
 };
 
 deftype ast_unknown struct {
-  meta ast_meta;
 };
 
 defenum ast_typeexpr {
   Name ast_ident;
   App ast_typeapp;
-  Structe ast_structe;
-  Unione ast_unione;
+  Struct ast_struct;
+  Union ast_union;
   Arraytype ast_arraytype;
   Unknown ast_unknown;
 };
 
-func ast_typeexpr_meta(a ast_typeexpr) ast_meta {
-  switch a {
-    case Name(v): { return v.meta; }
-    case App(v): { return v.meta; }
-    case Structe(v): { return v.meta; }
-    case Unione(v): { return v.meta; }
-    case Arraytype(v): { return v.meta; }
-    case Unknown(v): { return v.meta; }
-  }
-}
-
 deftype ast_vardecl struct {
-  meta ast_meta;
   name ast_ident;
   type ast_typeexpr;
 };
 
 deftype ast_bracebody struct {
-  meta ast_meta;
   statements array[ast_statement];
 };
 
 deftype ast_var_statement struct {
-  meta ast_meta;
   decl ast_vardecl;
-  rhs opt[uniq[ast_expr]];
+  rhs opt[box[ast_expr]];
 };
 
 deftype ast_ifthen_statement struct {
-  meta ast_meta;
-  condition uniq[ast_expr];
+  condition box[ast_expr];
   body ast_bracebody;
 };
 
 deftype ast_ifthenelse_statement struct {
-  meta ast_meta;
-  condition uniq[ast_expr];
+  condition box[ast_expr];
   thenbody ast_bracebody;
   elsebody ast_bracebody;
 };
 
 deftype ast_while_statement struct {
-  meta ast_meta;
-  condition uniq[ast_expr];
+  condition box[ast_expr];
   body ast_bracebody;
 };
 
 deftype ast_for_statement struct {
-  meta ast_meta;
   // Can only be an ast_expr or ast_statement_var.
-  initializer opt[uniq[ast_statement]];
-  condition opt[uniq[ast_expr]];
-  increment opt[uniq[ast_expr]];
+  initializer opt[box[ast_statement]];
+  condition opt[box[ast_expr]];
+  increment opt[box[ast_expr]];
   body ast_bracebody;
 };
 
 deftype ast_switch_statement struct {
-  meta ast_meta;
-  swartch uniq[ast_expr];
+  swartch box[ast_expr];
   cases array[ast_switch_case];
 };
 
 deftype ast_return_statement struct {
-  meta ast_meta;
   // If no expr, it returns void.
-  expr opt[uniq[ast_expr]];
+  expr opt[box[ast_expr]];
 };
 
 defenum ast_statement {
@@ -180,13 +147,11 @@ defenum ast_statement {
 };
 
 deftype ast_case_pattern struct {
-  meta ast_meta;
   constructor_name ast_ident;
   decl ast_vardecl;
 };
 
 deftype ast_switch_case struct {
-  meta ast_meta;
   pattern ast_case_pattern;
   body ast_bracebody;
 };
@@ -203,9 +168,8 @@ defenum ast_unop {
 };
 
 deftype ast_unop_expr struct {
-  meta ast_meta;
   operator ast_unop;
-  rhs uniq[ast_expr];
+  rhs box[ast_expr];
 };
 
 defenum ast_binop {
@@ -215,10 +179,9 @@ defenum ast_binop {
 };
 
 deftype ast_binop_expr struct {
-  meta ast_meta;
   operator ast_binop;
-  lhs uniq[ast_expr];
-  rhs uniq[ast_expr];
+  lhs box[ast_expr];
+  rhs box[ast_expr];
 };
 
 defenum ast_fieldname {
@@ -227,33 +190,28 @@ defenum ast_fieldname {
 };
 
 deftype ast_local_field struct {
-  meta ast_meta;
-  lhs uniq[ast_expr];
+  lhs box[ast_expr];
   fieldname ast_fieldname;
 };
 
 deftype ast_deref_field struct {
-  meta ast_meta;
-  lhs uniq[ast_expr];
+  lhs box[ast_expr];
   fieldname ast_fieldname;
 };
 
 deftype ast_name_expr struct {
-  meta ast_meta;
   ident ast_ident;
   generic_params opt[array[ast_typeexpr]];
 };
 
 deftype ast_index_expr struct {
-  meta ast_meta;
-  lhs uniq[ast_expr];
-  rhs uniq[ast_expr];
+  lhs box[ast_expr];
+  rhs box[ast_expr];
 };
 
 deftype ast_typed_expr struct {
-  meta ast_meta;
   type ast_typeexpr;
-  expr uniq[ast_expr];
+  expr box[ast_expr];
 };
 
 defenum ast_expr {
@@ -325,7 +283,6 @@ deftype ast_type_def struct {
 };
 
 deftype ast_access struct {
-  meta ast_meta;
   name ast_ident;
   arity generics_arity;
   toplevels array[ast_toplevel];

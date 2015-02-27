@@ -1,18 +1,18 @@
 import array;
 
-deftype string array[u8];
+deftype string array[i32];
 
-def `~` fn[array[u8], string] = wrapconvert;
+def `~` fn[array[i32], string] = wrapconvert;
 
 func[T] make(raw_arr T) string {
-  return ~make@[array[u8], T](raw_arr);
+  return ~make@[array[i32], T](raw_arr);
 }
 
-func data(s *string) *u8 {
+func data(s *string) *i32 {
   return data(&s->~);
 }
 
-func get(s *string, i size) u8 {
+func get(s *string, i size) i32 {
   return get(&s->~ , i);
 }
 
@@ -21,7 +21,7 @@ func count(s *string) size {
 }
 
 func hash_compute_hash(x *string) osize {
-  p *u8 = data(x);
+  p *i32 = data(x);
   accum osize = 0x12345679;
   for i size = 0; i < count(x); i = i + 1 {
     accum = (accum * 33) ^ ~p[i];
@@ -33,8 +33,8 @@ func hash_equal(x *string, y *string) bool {
   if count(x) != count(y) {
     return false;
   }
-  px *u8 = data(x);
-  py *u8 = data(y);
+  px *i32 = data(x);
+  py *i32 = data(y);
   n size = count(x);
   for i size = 0; i < n; i = i + 1 {
     if px[i] != py[i] {
