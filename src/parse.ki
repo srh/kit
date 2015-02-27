@@ -7,8 +7,19 @@ defenum allow_blanks {
 
 def Fail bool = false;
 
-def kSemicolonPrecedence i32 = 205;
-def kCommaPrecedence i32 = 205;
+deftype prec_pair struct {
+  left i32;
+  right i32;
+};
+
+defenum prec_cmp {
+  Conflicts void;
+  PullsLeft void;
+  PullsRight void;
+};
+
+def kSemicolonPrec i32 = 205;
+def kCommaPrec i32 = 205;
 
 func parse_file(p *ps, out *ast_file) bool {
   arr array[ast_toplevel];
@@ -106,7 +117,7 @@ func parse_rest_of_def(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
   }
 
   rhs ast_expr;
-  if !(parse_expr(p, kSemicolonPrecedence, &rhs)
+  if !(parse_expr(p, kSemicolonPrec, &rhs)
        && try_skip_token(p, mk_oper(';'))) {
     return Fail;
   }
@@ -416,7 +427,7 @@ func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
 
   count box[ast_expr];
   param box[ast_typeexpr];
-  if !(parse_expr(p, kSemicolonPrecedence, oo(&count))
+  if !(parse_expr(p, kSemicolonPrec, oo(&count))
        && try_skip_token(p, Grouper(RBracket(void)))
        && parse_typeexpr(p, oo(&param))) {
     return Fail;
@@ -505,7 +516,7 @@ func parse_expr(p *ps, prec_ctx i32, out *ast_expr) bool {
       lhs = Funcall({embox(lhs), params});
     } else if try_skip_token(p, Grouper(LBracket(void))) {
       arg box[ast_expr];
-      if !(parse_expr(p, kCommaPrecedence, oo(&arg))
+      if !(parse_expr(p, kCommaPrec, oo(&arg))
            && try_skip_token(p, Grouper(RBracket(void)))) {
         return Fail;
       }
@@ -526,13 +537,53 @@ func parse_expr(p *ps, prec_ctx i32, out *ast_expr) bool {
         return Fail;
       }
       lhs = DerefField({embox(lhs), NameField(fieldname)});
+    } else if is_binop(peek(p).val) {
+      op tok = peek(p);
+      op_prec prec_pair = binop_prec(op.val);
+      switch compare_prec(prec_ctx, op_prec.left) {
+        case Conflicts(v): {
+          return Fail;
+        }
+        case PullsLeft(v): {
+          *out = lhs;
+          return true;
+        }
+        case PullsRight(v): {
+          step(p);
+          rhs ast_expr;
+          if !parse_expr(p, op_prec.right, &rhs) {
+            return Fail;
+          }
+          lhs = build_binop_expr(op, lhs, rhs);
+        }
+      }
     } else {
-      // TODO
       *out = lhs;
       return true;
     }
   }
 }
+
+func is_binop(t tokval) bool {
+  return false;  // TODO
+}
+
+func binop_prec(t tokval) prec_pair {
+  return {0, 0};  // TODO
+}
+
+func compare_prec(left i32, right i32) prec_cmp {
+  // TODO
+  ret prec_cmp;
+  return ret;
+}
+
+func build_binop_expr(op tok, lhs ast_expr, rhs ast_expr) ast_expr {
+  // TODO
+  ret ast_expr;
+  return ret;
+}
+
 
 func parse_atomic_expr(p *ps, out *ast_expr) bool {
   return Fail;  // TODO
