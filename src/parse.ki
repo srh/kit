@@ -1061,5 +1061,58 @@ func parse_case_pattern(p *ps, out *ast_case_pattern) bool {
 }
 
 func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_statement) bool {
-  return Fail;  // TODO
+  save ps_savestate = ps_save(p);
+  switch triparse_naked_var_statement(p, fa, out) {
+    case Success(v): { return true; }
+    case Quickfail(v): {
+      ps_restore(p, save);
+      expr ast_expr;
+      if !(parse_expr(p, kSemicolonPrec, &expr)
+           && try_skip_token(p, mk_oper(';'))) {
+        return Fail;
+      }
+      *out = Expr(expr);
+      return true;
+    }
+    case Error(v): { return false; }
+  }
+}
+
+defenum triparse_result {
+  Success void;
+  Quickfail void;
+  Error void;
+};
+
+func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement) triparse_result {
+  name ast_ident;
+  if !parse_ident(p, &name) {
+    return Quickfail(void);
+  }
+  type ast_typeexpr;
+  if !help_parse_typeexpr(p, AllowBlanksYes(void), &type) {
+    return Quickfail(void);
+  }
+
+  decl ast_vardecl = {name, type};
+
+  if peek(p).val == mk_oper(';') {
+    switch fa {
+      case ForceAssignmentYes(v): { return Error(void); }
+      case ForceAssignmentNo(v): {
+        step(p);
+        *out = Var({decl, None()});
+        return Success(void);
+      }
+    }
+  }
+
+  rhs box[ast_expr];
+  if !(try_skip_token(p, mk_oper('='))
+       && parse_expr(p, kSemicolonPrec, oo(&rhs))
+       && try_skip_token(p, mk_oper(';'))) {
+    return Error(void);
+  }
+  *out = Var({decl, Has(rhs)});
+  return Success(void);
 }

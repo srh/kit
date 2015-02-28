@@ -12,6 +12,11 @@ deftype ps struct {
   im *identmap;
 };
 
+deftype ps_savestate struct {
+  pos size;
+  current tok;
+};
+
 func make_ps(im *identmap, data *u8, length size) ps {
   p ps;
   p.data = data;
@@ -20,6 +25,15 @@ func make_ps(im *identmap, data *u8, length size) ps {
   p.im = im;
   step(&p);
   return p;
+}
+
+func ps_save(p *ps) ps_savestate {
+  return {p->pos, p->current};
+}
+
+func ps_restore(p *ps, save ps_savestate) void {
+  p->pos = save.pos;
+  p->current = save.current;
 }
 
 func ps_pos(p *ps) pos {

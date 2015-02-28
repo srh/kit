@@ -1126,6 +1126,7 @@ enum triparse_result triparse_naked_var_statement(
   ast_expr_destroy(&rhs);
  error_decl:
   ast_vardecl_destroy(&decl);
+  return TRIPARSE_ERROR;
  error_name:
   ast_ident_destroy(&name);
   return TRIPARSE_ERROR;
