@@ -3994,14 +3994,16 @@ int check_expr_ai(struct exprscope *es,
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL_: {
-    struct ast_typeexpr num_type = ast_numeric_garbage();
     struct ast_typeexpr combined_type;
-    if (!combine_partial_types(es->cs->im, partial_type, &num_type, &combined_type)) {
-      METERR(es->cs->im, x->u.numeric_literal.meta, "Numeric literal in bad place.%s", "\n");
-      ast_typeexpr_destroy(&num_type);  /* TODO */
-      return 0;
+    {
+      struct ast_typeexpr num_type = ast_numeric_garbage();
+      int res = combine_partial_types(es->cs->im, partial_type, &num_type, &combined_type);
+      ast_typeexpr_destroy(&num_type);
+      if (!res) {
+        METERR(es->cs->im, x->u.numeric_literal.meta, "Numeric literal in bad place.%s", "\n");
+        return 0;
+      }
     }
-    ast_typeexpr_destroy(&num_type);
     if (is_concrete(&combined_type)) {
       ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, combined_type));
     } else {
@@ -4028,18 +4030,20 @@ int check_expr_ai(struct exprscope *es,
   } break;
   case AST_EXPR_NULL_LITERAL: {
     struct ast_typeexpr unknown = ast_unknown_garbage();
-    struct ast_typeexpr ptr_type;
-    wrap_in_ptr(es->cs->im, &unknown, &ptr_type);
-    ast_typeexpr_destroy(&unknown);
-
     struct ast_typeexpr combined_type;
-    if (!combine_partial_types(es->cs->im, partial_type, &ptr_type,
-                               &combined_type)) {
-      METERR(es->cs->im, x->u.null_literal.meta, "Null literal in bad place.%s", "\n");
-      ast_typeexpr_destroy(&ptr_type);  /* TODO */
-      return 0;
+    {
+      struct ast_typeexpr ptr_type;
+      wrap_in_ptr(es->cs->im, &unknown, &ptr_type);
+      ast_typeexpr_destroy(&unknown);
+
+      int res = combine_partial_types(es->cs->im, partial_type, &ptr_type,
+                                      &combined_type);
+      ast_typeexpr_destroy(&ptr_type);
+      if (!res) {
+        METERR(es->cs->im, x->u.null_literal.meta, "Null literal in bad place.%s", "\n");
+        return 0;
+      }
     }
-    ast_typeexpr_destroy(&ptr_type);
     if (is_concrete(&combined_type)) {
       ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, combined_type));
     } else {
@@ -4067,14 +4071,16 @@ int check_expr_ai(struct exprscope *es,
   case AST_EXPR_CHAR_LITERAL: {
     /* TODO: This is an exact copy/paste of the
     AST_EXPR_NUMERIC_LITERAL case except for error messages. */
-    struct ast_typeexpr num_type = ast_numeric_garbage();
     struct ast_typeexpr combined_type;
-    if (!combine_partial_types(es->cs->im, partial_type, &num_type, &combined_type)) {
-      METERR(es->cs->im, x->u.char_literal.meta, "Char literal in bad place.%s", "\n");
-      ast_typeexpr_destroy(&num_type);  /* TODO */
-      return 0;
+    {
+      struct ast_typeexpr num_type = ast_numeric_garbage();
+      int res = combine_partial_types(es->cs->im, partial_type, &num_type, &combined_type);
+      ast_typeexpr_destroy(&num_type);
+      if (!res) {
+        METERR(es->cs->im, x->u.char_literal.meta, "Char literal in bad place.%s", "\n");
+        return 0;
+      }
     }
-    ast_typeexpr_destroy(&num_type);
     if (is_concrete(&combined_type)) {
       ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, combined_type));
     } else {
@@ -4155,16 +4161,18 @@ int check_expr_ai(struct exprscope *es,
     return 1;
   } break;
   case AST_EXPR_TYPED: {
-    struct ast_typeexpr replaced_partial_type;
-    replace_generics(es, &x->u.typed_expr.type, &replaced_partial_type);
-
     struct ast_typeexpr combined_partial_type;
-    if (!combine_partial_types(es->cs->im, partial_type, &replaced_partial_type,
-                               &combined_partial_type)) {
-      ast_typeexpr_destroy(&replaced_partial_type); /* TODO */
-      return 0;
+    {
+      struct ast_typeexpr replaced_partial_type;
+      replace_generics(es, &x->u.typed_expr.type, &replaced_partial_type);
+
+      int res = combine_partial_types(es->cs->im, partial_type, &replaced_partial_type,
+                                      &combined_partial_type);
+      ast_typeexpr_destroy(&replaced_partial_type);
+      if (!res) {
+        return 0;
+      }
     }
-    ast_typeexpr_destroy(&replaced_partial_type);
 
     int check_result = check_expr(es, x->u.typed_expr.expr, &combined_partial_type);
     ast_typeexpr_destroy(&combined_partial_type);
