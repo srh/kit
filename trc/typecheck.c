@@ -4194,9 +4194,10 @@ int check_expr_ai(struct exprscope *es,
     struct ast_typeexpr combined_partial_type;
     if (!combine_partial_types(es->cs->im, partial_type, &replaced_partial_type,
                                &combined_partial_type)) {
-      ast_typeexpr_destroy(&replaced_partial_type);
+      ast_typeexpr_destroy(&replaced_partial_type); /* TODO */
       return 0;
     }
+    ast_typeexpr_destroy(&replaced_partial_type);
 
     int check_result = check_expr(es, x->u.typed_expr.expr, &combined_partial_type);
     ast_typeexpr_destroy(&combined_partial_type);
