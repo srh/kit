@@ -1865,15 +1865,6 @@ int check_var_shadowing(struct exprscope *es, struct ast_ident *name) {
     }
   }
 
-  /* TODO: Decide whether to get rid of this. */
-#if 0
-  if (name_table_shadowed(&es->cs->nt, name->value)) {
-    METERR(es->cs->im, name->meta, "Variable name %.*s shadows a global def or type.\n",
-           IM_P(es->cs->im, name->value));
-    return 0;
-  }
-#endif
-
   return 1;
 }
 
