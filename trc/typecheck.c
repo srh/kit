@@ -3993,7 +3993,7 @@ int check_expr_ai(struct exprscope *es,
     ast_name_expr_info_mark_inst(&x->u.name.info, inst_or_null);
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL_: {
+  case AST_EXPR_NUMERIC_LITERAL: {
     struct ast_typeexpr combined_type;
     {
       struct ast_typeexpr num_type = ast_numeric_garbage();
@@ -4873,7 +4873,7 @@ int eval_static_value(struct identmap *im,
     static_value_init_copy(out, di_value(inst_or_null));
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL_:
+  case AST_EXPR_NUMERIC_LITERAL:
     return eval_static_numeric_literal(im,
                                        ast_expr_type(expr),
                                        &expr->u.numeric_literal, out);

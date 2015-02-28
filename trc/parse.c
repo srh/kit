@@ -1612,7 +1612,7 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
 
   int8_t digit_value_discard;
   if (is_decimal_digit(ps_peek(p), &digit_value_discard)) {
-    ast_expr_partial_init(out, AST_EXPR_NUMERIC_LITERAL_, ast_expr_info_default());
+    ast_expr_partial_init(out, AST_EXPR_NUMERIC_LITERAL, ast_expr_info_default());
     return parse_numeric_literal(p, &out->u.numeric_literal);
   }
   if (try_skip_keyword(p, "true")) {

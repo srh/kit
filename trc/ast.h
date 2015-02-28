@@ -607,7 +607,6 @@ struct ast_strinit_info {
   struct ast_typeexpr concrete_structe_type;
 };
 
-/* TODO: Rename strinit to struct_initializer. */
 struct ast_strinit {
   struct ast_meta meta;
   struct ast_strinit_info info;
@@ -677,8 +676,7 @@ struct ast_expr_info ast_expr_info_typechecked_identical(
 
 enum ast_expr_tag {
   AST_EXPR_NAME,
-  /* TODO: Remove underscore. */
-  AST_EXPR_NUMERIC_LITERAL_,
+  AST_EXPR_NUMERIC_LITERAL,
   AST_EXPR_BOOL_LITERAL,
   AST_EXPR_NULL_LITERAL,
   AST_EXPR_VOID_LITERAL,

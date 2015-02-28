@@ -1127,7 +1127,7 @@ void ast_expr_info_destroy(struct ast_expr_info *a) {
 struct ast_meta *ast_expr_ast_meta(struct ast_expr *a) {
   switch (a->tag) {
   case AST_EXPR_NAME: return &a->u.name.meta;
-  case AST_EXPR_NUMERIC_LITERAL_: return &a->u.numeric_literal.meta;
+  case AST_EXPR_NUMERIC_LITERAL: return &a->u.numeric_literal.meta;
   case AST_EXPR_BOOL_LITERAL: return &a->u.bool_literal.meta;
   case AST_EXPR_NULL_LITERAL: return &a->u.null_literal.meta;
   case AST_EXPR_VOID_LITERAL: return &a->u.void_literal.meta;
@@ -1164,7 +1164,7 @@ void ast_expr_init_copy(struct ast_expr *a, struct ast_expr *c) {
   case AST_EXPR_NAME:
     ast_name_expr_init_copy(&a->u.name, &c->u.name);
     break;
-  case AST_EXPR_NUMERIC_LITERAL_:
+  case AST_EXPR_NUMERIC_LITERAL:
     ast_numeric_literal_init_copy(&a->u.numeric_literal,
                                   &c->u.numeric_literal);
     break;
@@ -1227,7 +1227,7 @@ void ast_expr_destroy(struct ast_expr *a) {
   case AST_EXPR_NAME:
     ast_name_expr_destroy(&a->u.name);
     break;
-  case AST_EXPR_NUMERIC_LITERAL_:
+  case AST_EXPR_NUMERIC_LITERAL:
     ast_numeric_literal_destroy(&a->u.numeric_literal);
     break;
   case AST_EXPR_BOOL_LITERAL:

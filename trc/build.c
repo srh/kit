@@ -3937,7 +3937,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     }
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL_: {
+  case AST_EXPR_NUMERIC_LITERAL: {
     return gen_immediate_numeric_literal(cs->im, f, h, ast_expr_type(a),
                                          &a->u.numeric_literal, er);
   } break;
