@@ -2755,7 +2755,7 @@ int check_statement(struct bodystate *bs,
       ast_typeexpr_init_copy(&concrete_type,
                              ast_expr_type(&s->u.var_statement.rhs->expr));
     } else {
-      if (!is_concrete(&replaced_incomplete_type)) {
+      if (!is_complete(&replaced_incomplete_type)) {
         METERR(bs->es->cs->im, s->u.var_statement.decl.meta, "Var statement without initializer has incomplete type.%s", "\n");
         goto fail;
       }
@@ -3894,7 +3894,7 @@ int check_expr_strinit(struct exprscope *es,
                        enum allow_incomplete ai,
                        struct ast_expr *x,
                        struct ast_typeexpr *partial_type) {
-  if (!is_concrete(partial_type)) {
+  if (!is_complete(partial_type)) {
     if (ai == ALLOW_INCOMPLETE_YES) {
       ast_expr_update(x, ast_expr_info_incomplete());
       return 1;
@@ -4004,7 +4004,7 @@ int check_expr_ai(struct exprscope *es,
         return 0;
       }
     }
-    if (is_concrete(&combined_type)) {
+    if (is_complete(&combined_type)) {
       ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, combined_type));
     } else {
       if (ai == ALLOW_INCOMPLETE_YES) {
@@ -4044,7 +4044,7 @@ int check_expr_ai(struct exprscope *es,
         return 0;
       }
     }
-    if (is_concrete(&combined_type)) {
+    if (is_complete(&combined_type)) {
       ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, combined_type));
     } else {
       if (ai == ALLOW_INCOMPLETE_YES) {
@@ -4081,7 +4081,7 @@ int check_expr_ai(struct exprscope *es,
         return 0;
       }
     }
-    if (is_concrete(&combined_type)) {
+    if (is_complete(&combined_type)) {
       ast_expr_update(x, ast_expr_info_typechecked_no_temporary(0, combined_type));
     } else {
       if (ai == ALLOW_INCOMPLETE_YES) {

@@ -890,36 +890,35 @@ int learn_materializations(struct identmap *im,
   }
 }
 
-int is_fields_concrete(struct ast_vardecl *fields, size_t fields_count) {
+int is_fields_complete(struct ast_vardecl *fields, size_t fields_count) {
   for (size_t i = 0; i < fields_count; i++) {
-    if (!is_concrete(&fields[i].type)) {
+    if (!is_complete(&fields[i].type)) {
       return 0;
     }
   }
   return 1;
 }
 
-/* TODO: Rename to "is_complete". */
-int is_concrete(struct ast_typeexpr *type) {
+int is_complete(struct ast_typeexpr *type) {
   switch (type->tag) {
   case AST_TYPEEXPR_NAME:
     return 1;
   case AST_TYPEEXPR_APP: {
     for (size_t i = 0, e = type->u.app.params_count; i < e; i++) {
-      if (!is_concrete(&type->u.app.params[i])) {
+      if (!is_complete(&type->u.app.params[i])) {
         return 0;
       }
     }
     return 1;
   } break;
   case AST_TYPEEXPR_STRUCTE:
-    return is_fields_concrete(type->u.structe.fields,
+    return is_fields_complete(type->u.structe.fields,
                               type->u.structe.fields_count);
   case AST_TYPEEXPR_UNIONE:
-    return is_fields_concrete(type->u.unione.fields,
+    return is_fields_complete(type->u.unione.fields,
                               type->u.unione.fields_count);
   case AST_TYPEEXPR_ARRAY:
-    return is_concrete(type->u.arraytype.param);
+    return is_complete(type->u.arraytype.param);
   case AST_TYPEEXPR_UNKNOWN:
     return 0;
   case AST_TYPEEXPR_NUMERIC:
@@ -950,7 +949,7 @@ int unify_with_parameterized_type(
   }
 
   for (size_t i = 0; i < materialized_count; i++) {
-    if (!is_concrete(&materialized[i])) {
+    if (!is_complete(&materialized[i])) {
       goto fail;
     }
   }

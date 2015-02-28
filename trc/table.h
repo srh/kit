@@ -238,7 +238,7 @@ void deftype_entry_mark_generic_flatly_held(struct deftype_entry *ent,
 int typelists_equal(struct identmap *im, struct ast_typeexpr *a, size_t a_count,
                     struct ast_typeexpr *b, size_t b_count);
 
-int is_concrete(struct ast_typeexpr *type);
+int is_complete(struct ast_typeexpr *type);
 int is_numeric_type(struct identmap *im, struct ast_typeexpr *a);
 int combine_partial_types(struct identmap *im,
                           struct ast_typeexpr *a,
