@@ -342,30 +342,6 @@ void init_name_type(struct ast_typeexpr *a, ident_value name) {
   a->u.name = make_ast_ident(name);
 }
 
-/* TODO: No callers of this. */
-void init_generics_type(struct ast_typeexpr *a,
-                        struct ast_ident *name,
-                        struct ast_generics *generics) {
-  if (!generics->has_type_params) {
-    a->tag = AST_TYPEEXPR_NAME;
-    ast_ident_init_copy(&a->u.name, name);
-  } else {
-    struct ast_ident name_copy;
-    ast_ident_init_copy(&name_copy, name);
-
-    size_t params_count = generics->params_count;
-    struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
-
-    for (size_t i = 0; i < params_count; i++) {
-      init_name_type(&params[i], generics->params[i].value);
-    }
-
-    a->tag = AST_TYPEEXPR_APP;
-    ast_typeapp_init(&a->u.app, ast_meta_make_garbage(),
-                     name_copy, params, params_count);
-  }
-}
-
 struct ast_typeexpr *expose_func_return_type(struct identmap *im,
                                              struct ast_typeexpr *func,
                                              size_t expected_params_count) {
