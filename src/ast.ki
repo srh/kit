@@ -171,16 +171,6 @@ deftype ast_lambda struct {
   body ast_bracebody;
 };
 
-defenum ast_unop {
-  UnopDereference void;
-  UnopAddressof void;
-};
-
-deftype ast_unop_expr struct {
-  operator ast_unop;
-  rhs box[ast_expr];
-};
-
 defenum ast_fieldname {
   WholeField void;
   NameField ast_ident;
@@ -230,7 +220,6 @@ defenum ast_expr {
   StringLiteral ast_string_literal;
   Funcall ast_funcall;
   IndexExpr ast_index_expr;
-  UnopExpr ast_unop_expr;
   Lambda ast_lambda;
   LocalField ast_local_field;
   DerefField ast_deref_field;
