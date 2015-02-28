@@ -1503,7 +1503,7 @@ int parse_string_char(struct ps *p, uint8_t *out) {
     }
     ps_step(p);
 
-    uint8_t combined = (16 * (uint8_t)v1) + (uint8_t)v2;;
+    uint8_t combined = (16 * (uint8_t)v1) + (uint8_t)v2;
     *out = combined;
   } break;
   default:

@@ -111,6 +111,8 @@ defenum tokval {
   Oper array[i32];
   Ident array[i32];
   Grouper grouper;
+  StringChar i32;
+  StringDelim i32;
   Bad void;
   Eof void;
 };
@@ -479,4 +481,69 @@ func[String] grab_keyword(p *ps, s String, k keyw, out *tok) bool {
 
   *out = mk_tok(left, ps_pos(p), Keyw(k));
   return true;
+}
+
+// stop is either '\'' or '\"'.
+func string_step(p *ps, stop i32) void {
+  p->current = string_grab_tok(p, stop);
+}
+
+func string_grab_tok(p *ps, stop i32) tok {
+  left pos = ps_pos(p);
+  ch i32 = ps_peek(p);
+
+  if ch == @[i32]-1 {
+    return {{left, left}, Eof(void)};
+  }
+
+  // TODO: ASCII static assertions.
+  if ch < ' ' || ch > '~' {
+    return {{left, left}, Bad(void)};
+  }
+
+  ps_step(p);
+  if ch != '\\' {
+    if ch != stop {
+      return {{left, ps_pos(p)}, StringChar(ch)};
+    } else {
+      return {{left, ps_pos(p)}, StringDelim(ch)};
+    }
+  }
+
+  ch = ps_peek(p);
+  if ch == 'n' {
+    ps_step(p);
+    return {{left, ps_pos(p)}, StringChar('\n')};
+  } else if ch == 't' {
+    ps_step(p);
+    return {{left, ps_pos(p)}, StringChar('\t')};
+  } else if ch == '\'' || ch == '\"' || ch == '\\' {
+    ps_step(p);
+    return {{left, ps_pos(p)}, StringChar(ch)};
+  } else if ch == 'r' {
+    ps_step(p);
+    return {{left, ps_pos(p)}, StringChar('\r')};
+  } else if ch == '0' {
+    ps_step(p);
+    return {{left, ps_pos(p)}, StringChar(0)};
+  } else if ch == 'x' {
+    ps_step(p);
+    ch = ps_peek(p);
+    sixteens_value i8;
+    if !is_hexdigit(ch, &sixteens_value) {
+      return {{left, ps_pos(p)}, Bad(void)};
+    }
+    ps_step(p);
+    ch = ps_peek(p);
+    units_value i8;
+    if !is_hexdigit(ch, &units_value) {
+      return {{left, ps_pos(p)}, Bad(void)};
+    }
+    ps_step(p);
+
+    combined i32 = 16 * (@[i32]~sixteens_value) + @[i32]~units_value;
+    return {{left, ps_pos(p)}, StringChar(combined)};
+  } else {
+    return {{left, ps_pos(p)}, Bad(void)};
+  }
 }

@@ -780,8 +780,25 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
         }
       }
     }
+    case StringDelim(ch i32): {
+      if ch == '\"' {
+        string_step(p, '\"');
+        return parse_rest_of_string_literal(p, out);
+      } else if ch == '\'' {
+        string_step(p, '\'');
+        return parse_rest_of_char_literal(p, out);
+      } else {
+        check(false);
+        return fake();
+      }
+    }
+    case Bad(v): {
+      return Fail;
+    }
+    case Eof(v): {
+      return Fail;
+    }
   }
-    // TODO: Char literals, string literals.
 }
 
 func unop_info(operch *array[i32]) opt[i32] {
@@ -1115,4 +1132,49 @@ func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement
   }
   *out = Var({decl, Has(rhs)});
   return Success(void);
+}
+
+func parse_rest_of_string_literal(p *ps, out *ast_expr) bool {
+  specs array[ast_charspec];
+  for ;; {
+    switch peek(p).val {
+      case StringDelim(ch i32): {
+        check(ch == '\"');
+        step(p);
+        *out = StringLiteral({specs});
+        return true;
+      }
+      case StringChar(ch i32): {
+        push(&specs, {ch});
+        string_step(p, '\"');
+      }
+      default: {
+        return Fail;
+      }
+    }
+  }
+}
+
+func parse_rest_of_char_literal(p *ps, out *ast_expr) bool {
+  value i32;
+  switch peek(p).val {
+    case StringChar(ch i32): {
+      value = ch;
+      string_step(p, '\'');
+    }
+    default: {
+      return Fail;
+    }
+  }
+  switch peek(p).val {
+    case StringDelim(ch i32): {
+      check(ch == '\'');
+      step(p);
+      *out = CharLiteral({{value}});
+      return true;
+    }
+    default: {
+      return Fail;
+    }
+  }
 }
