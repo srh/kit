@@ -1368,7 +1368,6 @@ int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct fr
     return 1;
   } break;
   case TYPETRAV_FUNC_COPY: {
-    /* TODO: This check can trigger.  Edit: Can it now? */
     CHECK(traits->copyable != TYPEEXPR_TRAIT_LACKED);
     if (traits->copyable == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
       /* Copying a trivial type:  Copy it.. trivially. */
@@ -1489,8 +1488,6 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
     }
 
     gen_load_register(f, X86_EAX, enum_num_loc);
-
-    /* TODO: This is inefficient if the enum is trivially copyable. */
 
     size_t end_target = frame_add_target(h);
     size_t next_target = frame_add_target(h);
