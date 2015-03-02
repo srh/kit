@@ -2078,6 +2078,33 @@ int parse_rest_of_type_param_list(struct ps *p,
   return 0;
 }
 
+int continue_ident_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
+                            struct ast_ident name, struct ast_typeexpr *out) {
+  if (!skip_ws(p)) {
+    goto fail_ident;
+  }
+
+  if (!try_skip_char(p, '[')) {
+    out->tag = AST_TYPEEXPR_NAME;
+    out->u.name = name;
+    return 1;
+  }
+
+  struct ast_typeexpr *params = NULL;
+  size_t params_count = 0;
+  if (!parse_rest_of_type_param_list(p, allow_blanks, &params, &params_count)) {
+    goto fail_ident;
+  }
+
+  out->tag = AST_TYPEEXPR_APP;
+  ast_typeapp_init(&out->u.app, ast_meta_make(name.meta.pos_start, ps_pos(p)),
+                   name, params, params_count);
+  return 1;
+ fail_ident:
+  ast_ident_destroy(&name);
+  return 0;
+}
+
 int help_parse_typeexpr(struct ps *p, enum allow_blanks allow_blanks, struct ast_typeexpr *out) {
   struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "struct")) {
@@ -2113,34 +2140,10 @@ int help_parse_typeexpr(struct ps *p, enum allow_blanks allow_blanks, struct ast
 
   struct ast_ident name;
   if (!parse_ident(p, &name)) {
-    goto fail;
+    return 0;
   }
 
-  if (!skip_ws(p)) {
-    goto fail_ident;
-  }
-
-  if (!try_skip_char(p, '[')) {
-    out->tag = AST_TYPEEXPR_NAME;
-    out->u.name = name;
-    return 1;
-  }
-
-  struct ast_typeexpr *params = NULL;
-  size_t params_count = 0;
-  if (!parse_rest_of_type_param_list(p, allow_blanks, &params, &params_count)) {
-    goto fail_ident;
-  }
-
-  out->tag = AST_TYPEEXPR_APP;
-  ast_typeapp_init(&out->u.app, ast_meta_make(pos_start, ps_pos(p)),
-                   name, params, params_count);
-  return 1;
-
- fail_ident:
-  ast_ident_destroy(&name);
- fail:
-  return 0;
+  return continue_ident_typeexpr(p, allow_blanks, name, out);
 }
 
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
