@@ -1743,6 +1743,22 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
   return 0;
 }
 
+int parse_rest_of_index_param(struct ps *p, struct ast_expr *out) {
+  struct ast_expr arg;
+  if (!parse_expr(p, &arg, kCommaPrecedence)) {
+    goto fail;
+  }
+  if (!try_skip_char(p, ']')) {
+    goto fail_arg;
+  }
+  *out = arg;
+  return 1;
+ fail_arg:
+  ast_expr_destroy(&arg);
+ fail:
+  return 0;
+}
+
 int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
   struct pos pos_start = ps_pos(p);
   struct ast_expr lhs;
@@ -1774,11 +1790,7 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
     } else if (try_skip_char(p, '[')) {
       PARSE_DBG("parse_expr saw bracket\n");
       struct ast_expr arg;
-      if (!parse_expr(p, &arg, kCommaPrecedence)) {
-        goto fail;
-      }
-      if (!try_skip_char(p, ']')) {
-        ast_expr_destroy(&arg);
+      if (!parse_rest_of_index_param(p, &arg)) {
         goto fail;
       }
       struct ast_expr old_lhs = lhs;
