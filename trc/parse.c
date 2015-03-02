@@ -1076,7 +1076,7 @@ int parse_rest_of_switch_statement(struct ps *p, struct pos pos_start,
 }
 
 enum tri triparse_naked_var_statement(
-    struct ps *p, int force_assignment, struct ast_var_statement *out) {
+    struct ps *p, int force_assignment, struct ast_statement *out) {
   struct pos pos_start = ps_pos(p);
   struct ps_savestate save = ps_save(p);
   struct ast_ident name;
@@ -1118,7 +1118,9 @@ enum tri triparse_naked_var_statement(
     } else {
       ps_step(p);
       ps_count_leaf(p);
-      ast_var_statement_init_without_rhs(out, ast_meta_make(pos_start, ps_pos(p)),
+      out->tag = AST_STATEMENT_VAR;
+      ast_var_statement_init_without_rhs(&out->u.var_statement,
+                                         ast_meta_make(pos_start, ps_pos(p)),
                                          decl);
       return TRI_SUCCESS;
     }
@@ -1136,7 +1138,8 @@ enum tri triparse_naked_var_statement(
     goto error_rhs;
   }
 
-  ast_var_statement_init_with_rhs(out, ast_meta_make(pos_start, ps_pos(p)),
+  out->tag = AST_STATEMENT_VAR;
+  ast_var_statement_init_with_rhs(&out->u.var_statement, ast_meta_make(pos_start, ps_pos(p)),
                                   decl, ast_exprcall_make(rhs));
   return TRI_SUCCESS;
 
@@ -1158,12 +1161,9 @@ enum tri triparse_naked_var_statement(
 
 int parse_naked_var_or_expr_statement(struct ps *p, int force_assignment,
                                       struct ast_statement *out) {
-  struct ast_var_statement vs;
-  enum tri res = triparse_naked_var_statement(p, force_assignment, &vs);
+  enum tri res = triparse_naked_var_statement(p, force_assignment, out);
   switch (res) {
   case TRI_SUCCESS:
-    out->tag = AST_STATEMENT_VAR;
-    out->u.var_statement = vs;
     return 1;
   case TRI_QUICKFAIL:
     out->tag = AST_STATEMENT_EXPR;
