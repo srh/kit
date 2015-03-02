@@ -728,6 +728,13 @@ void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
   a->u.name = make_ast_ident(identmap_intern_c_str(cs->im, BOOL_TYPE_NAME));
 }
 
+void stderr_errmsg(struct error_dump *ctx, struct identmap *im,
+                   struct pos pos, const char *msg, size_t msglen) {
+  (void)ctx;
+  ERR("Parse error at %.*s:%"PRIz":%"PRIz": %.*s\n",
+      IM_P(im, pos.filename), pos.line, pos.column, size_to_int(msglen), msg);
+}
+
 int resolve_import_filename_and_parse(struct checkstate *cs,
                                       module_loader *loader,
                                       ident_value name,
@@ -746,12 +753,9 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
     goto fail;
   }
 
-  struct error_info error_info;
-  if (!parse_buf_file(cs->im, data, data_size, name, file_out, &error_info)) {
-    ERR("Parse error in module %.*s at %"PRIz":%"PRIz".\n",
-        size_to_int(module_name_count), (const char *)module_name,
-        error_info.pos.line, error_info.pos.column);
-    error_info_destroy(&error_info);
+  struct error_dump error_dump;
+  error_dump.dumper = &stderr_errmsg;
+  if (!parse_buf_file(cs->im, data, data_size, name, file_out, &error_dump)) {
     goto fail_data;
   }
 

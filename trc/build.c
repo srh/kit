@@ -4480,7 +4480,7 @@ int build_module(struct identmap *im, module_loader *loader,
   checkstate_init(&cs, im);
 
   if (!chase_modules_and_typecheck(&cs, loader, name)) {
-    DBG("(Typecheck failed.)\n");
+    DBG("(Fail.)\n");
     goto cleanup_checkstate;
   }
 
