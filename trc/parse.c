@@ -134,6 +134,12 @@ void ps_count_leaf(struct ps *p) {
   p->leafcount++;
 }
 
+enum tri {
+  TRI_SUCCESS,
+  TRI_QUICKFAIL,
+  TRI_ERROR,
+};
+
 ident_value ps_intern_ident(struct ps *p,
                             size_t begin_pos,
                             size_t end_pos) {
@@ -587,9 +593,7 @@ int is_ident_keyword(struct ps *p, size_t begin, size_t end) {
   }
 }
 
-/* TODO: Don't parse keywords.  (For example, don't let a variable be
-named "true" or "false".) */
-int parse_ident(struct ps *p, struct ast_ident *out) {
+enum tri triparse_ident(struct ps *p, struct ast_ident *out) {
   PARSE_DBG("parse_ident\n");
   struct pos pos_start = ps_pos(p);
   if (try_skip_char(p, '`')) {
@@ -598,24 +602,24 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
     if (!try_parse_unop(p, &unop, &name)) {
       enum ast_binop binop;
       if (!parse_binop(p, &binop, &name)) {
-        return 0;
+        return TRI_ERROR;
       }
     }
 
     if (!try_skip_char(p, '`')) {
       ast_ident_destroy(&name);
-      return 0;
+      return TRI_ERROR;
     }
 
     if (!is_ident_postchar(ps_peek(p))) {
-      return 0;
+      return TRI_ERROR;
     }
     *out = name;
-    return 1;
+    return TRI_SUCCESS;
   }
 
   if (!is_ident_firstchar(ps_peek(p))) {
-    return 0;
+    return TRI_QUICKFAIL;
   }
   ps_step(p);
   while (is_ident_midchar(ps_peek(p))) {
@@ -623,18 +627,22 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
   }
 
   if (!is_ident_postchar(ps_peek(p))) {
-    return 0;
+    return TRI_ERROR;
   }
 
   struct pos pos_end = ps_pos(p);
   if (is_ident_keyword(p, pos_start.offset, pos_end.offset)) {
-    return 0;
+    return TRI_ERROR;
   }
 
   ast_ident_init(out, ast_meta_make(pos_start, pos_end),
                  ps_intern_ident(p, pos_start.offset, pos_end.offset));
   ps_count_leaf(p);
-  return 1;
+  return TRI_SUCCESS;
+}
+
+int parse_ident(struct ps *p, struct ast_ident *out) {
+  return TRI_SUCCESS == triparse_ident(p, out);
 }
 
 enum allow_blanks {
@@ -1067,19 +1075,21 @@ int parse_rest_of_switch_statement(struct ps *p, struct pos pos_start,
   return 0;
 }
 
-enum tri {
-  TRI_SUCCESS,
-  TRI_QUICKFAIL,
-  TRI_ERROR,
-};
-
 enum tri triparse_naked_var_statement(
     struct ps *p, int force_assignment, struct ast_var_statement *out) {
   struct pos pos_start = ps_pos(p);
   struct ps_savestate save = ps_save(p);
   struct ast_ident name;
-  if (!parse_ident(p, &name)) {
-    goto quickfail;
+  enum tri name_res = triparse_ident(p, &name);
+  switch (name_res) {
+  case TRI_ERROR:
+    goto error;
+  case TRI_QUICKFAIL:
+    goto quickfail_norestore;
+  case TRI_SUCCESS:
+    break;
+  default:
+    UNREACHABLE();
   }
 
   if (!skip_ws(p)) {
@@ -1137,11 +1147,12 @@ enum tri triparse_naked_var_statement(
   return TRI_ERROR;
  error_name:
   ast_ident_destroy(&name);
+ error:
   return TRI_ERROR;
  quickfail_name:
   ast_ident_destroy(&name);
- quickfail:
   ps_restore(p, save);
+ quickfail_norestore:
   return TRI_QUICKFAIL;
 }
 
