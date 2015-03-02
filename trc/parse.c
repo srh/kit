@@ -1309,18 +1309,18 @@ int parse_rest_of_lambda(struct ps *p, struct pos pos_start,
   return 1;
 }
 
-int parse_numeric_literal(struct ps *p, struct ast_numeric_literal *out) {
-  int8_t *digits = NULL;
-  size_t digits_count = 0;
-  size_t digits_limit = 0;
-
+enum tri triparse_numeric_literal(struct ps *p, struct ast_numeric_literal *out) {
   struct pos pos_start = ps_pos(p);
   int32_t first_digit = ps_peek(p);
   int8_t first_digit_value;
   if (!is_decimal_digit(first_digit, &first_digit_value)) {
-    goto fail;
+    goto quickfail;
   }
   ps_step(p);
+
+  int8_t *digits = NULL;
+  size_t digits_count = 0;
+  size_t digits_limit = 0;
 
   enum ast_numeric_literal_tag tag;
   if (first_digit == '0') {
@@ -1366,11 +1366,13 @@ int parse_numeric_literal(struct ps *p, struct ast_numeric_literal *out) {
   ast_numeric_literal_init(out, ast_meta_make(pos_start, ps_pos(p)),
                            tag, digits, digits_count);
   ps_count_leaf(p);
-  return 1;
+  return TRI_SUCCESS;
 
  fail:
   free(digits);
-  return 0;
+  return TRI_ERROR;
+ quickfail:
+  return TRI_QUICKFAIL;
 }
 
 int parse_rest_of_arglist(struct ps *p,
@@ -1632,7 +1634,7 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
   int8_t digit_value_discard;
   if (is_decimal_digit(ps_peek(p), &digit_value_discard)) {
     ast_expr_partial_init(out, AST_EXPR_NUMERIC_LITERAL, ast_expr_info_default());
-    return parse_numeric_literal(p, &out->u.numeric_literal);
+    return TRI_SUCCESS == triparse_numeric_literal(p, &out->u.numeric_literal);
   }
   if (try_skip_keyword(p, "true")) {
     ast_expr_partial_init(out, AST_EXPR_BOOL_LITERAL, ast_expr_info_default());
@@ -1961,7 +1963,7 @@ int parse_rest_of_arraytype(struct ps *p, enum allow_blanks allow_blanks,
     return 0;
   }
   struct ast_numeric_literal number;
-  if (!parse_numeric_literal(p, &number)) {
+  if (TRI_SUCCESS != triparse_numeric_literal(p, &number)) {
     return 0;
   }
 
