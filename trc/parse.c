@@ -606,6 +606,10 @@ int parse_ident(struct ps *p, struct ast_ident *out) {
       ast_ident_destroy(&name);
       return 0;
     }
+
+    if (!is_ident_postchar(ps_peek(p))) {
+      return 0;
+    }
     *out = name;
     return 1;
   }
@@ -1063,13 +1067,13 @@ int parse_rest_of_switch_statement(struct ps *p, struct pos pos_start,
   return 0;
 }
 
-enum triparse_result {
-  TRIPARSE_SUCCESS,
-  TRIPARSE_QUICKFAIL,
-  TRIPARSE_ERROR,
+enum tri {
+  TRI_SUCCESS,
+  TRI_QUICKFAIL,
+  TRI_ERROR,
 };
 
-enum triparse_result triparse_naked_var_statement(
+enum tri triparse_naked_var_statement(
     struct ps *p, int force_assignment, struct ast_var_statement *out) {
   struct pos pos_start = ps_pos(p);
   struct ps_savestate save = ps_save(p);
@@ -1106,7 +1110,7 @@ enum triparse_result triparse_naked_var_statement(
       ps_count_leaf(p);
       ast_var_statement_init_without_rhs(out, ast_meta_make(pos_start, ps_pos(p)),
                                          decl);
-      return TRIPARSE_SUCCESS;
+      return TRI_SUCCESS;
     }
   }
 
@@ -1124,36 +1128,36 @@ enum triparse_result triparse_naked_var_statement(
 
   ast_var_statement_init_with_rhs(out, ast_meta_make(pos_start, ps_pos(p)),
                                   decl, ast_exprcall_make(rhs));
-  return TRIPARSE_SUCCESS;
+  return TRI_SUCCESS;
 
  error_rhs:
   ast_expr_destroy(&rhs);
  error_decl:
   ast_vardecl_destroy(&decl);
-  return TRIPARSE_ERROR;
+  return TRI_ERROR;
  error_name:
   ast_ident_destroy(&name);
-  return TRIPARSE_ERROR;
+  return TRI_ERROR;
  quickfail_name:
   ast_ident_destroy(&name);
  quickfail:
   ps_restore(p, save);
-  return TRIPARSE_QUICKFAIL;
+  return TRI_QUICKFAIL;
 }
 
 int parse_naked_var_or_expr_statement(struct ps *p, int force_assignment,
                                       struct ast_statement *out) {
   struct ast_var_statement vs;
-  enum triparse_result res = triparse_naked_var_statement(p, force_assignment, &vs);
+  enum tri res = triparse_naked_var_statement(p, force_assignment, &vs);
   switch (res) {
-  case TRIPARSE_SUCCESS:
+  case TRI_SUCCESS:
     out->tag = AST_STATEMENT_VAR;
     out->u.var_statement = vs;
     return 1;
-  case TRIPARSE_QUICKFAIL:
+  case TRI_QUICKFAIL:
     out->tag = AST_STATEMENT_EXPR;
     return parse_expr_statement(p, &out->u.expr);
-  case TRIPARSE_ERROR:
+  case TRI_ERROR:
     return 0;
   default:
     UNREACHABLE();
