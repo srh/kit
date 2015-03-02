@@ -140,6 +140,10 @@ enum tri {
   TRI_ERROR,
 };
 
+enum tri success_or_fail(int success) {
+  return success ? TRI_SUCCESS : TRI_ERROR;
+}
+
 ident_value ps_intern_ident(struct ps *p,
                             size_t begin_pos,
                             size_t end_pos) {
@@ -1075,17 +1079,93 @@ int parse_rest_of_switch_statement(struct ps *p, struct pos pos_start,
   return 0;
 }
 
-enum tri triparse_naked_var_statement(
+int parse_rest_of_pointer(struct ps *p, struct ast_meta star_operator_meta,
+                          enum allow_blanks allow_blanks,
+                          struct ast_typeexpr *out);
+enum tri triparse_numeric_literal(struct ps *p, struct ast_numeric_literal *out);
+int parse_rest_of_index_param(struct ps *p, struct ast_expr *out);
+int parse_after_atomic(struct ps *p, struct pos pos_start, struct ast_expr lhs,
+                       int precedence_context, struct ast_expr *out);
+int continue_ident_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
+                            struct ast_ident name, struct ast_typeexpr *out);
+enum tri help_triparse_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
+                                struct ast_typeexpr *out);
+
+struct ambig_indexer {
+  struct pos type_start;
+  struct pos expr_end;
+  struct ast_numeric_literal number;
+};
+
+void ambig_indexer_destroy(struct ambig_indexer *ambi) {
+  ast_numeric_literal_destroy(&ambi->number);
+}
+
+void expressionize(struct ast_ident name,
+                   struct ambig_indexer *indexers, size_t indexers_count,
+                   struct ast_expr *out) {
+  struct pos pos_start = name.meta.pos_start;
+  struct ast_expr lhs;
+  ast_expr_partial_init(&lhs, AST_EXPR_NAME, ast_expr_info_default());
+  ast_name_expr_init(&lhs.u.name, name);
+  for (size_t i = 0; i < indexers_count; i++) {
+    struct ast_expr number_expr;
+    ast_expr_partial_init(&number_expr, AST_EXPR_NUMERIC_LITERAL, ast_expr_info_default());
+    number_expr.u.numeric_literal = indexers[i].number;
+    struct ast_expr index_expr;
+    ast_expr_partial_init(&index_expr, AST_EXPR_INDEX, ast_expr_info_default());
+    ast_index_expr_init(&index_expr.u.index_expr, ast_meta_make(pos_start, indexers[i].expr_end),
+                        lhs, number_expr);
+    lhs = index_expr;
+  }
+  free(indexers);
+  *out = lhs;
+}
+
+void collapse_indexers(struct ambig_indexer *indexers, size_t indexers_count,
+                       struct ast_typeexpr param, struct ast_typeexpr *out) {
+  struct pos pos_end = ast_typeexpr_meta(&param)->pos_end;
+  for (size_t i = indexers_count; i > 0;) {
+    i--;
+    struct ast_typeexpr tmp;
+    tmp.tag = AST_TYPEEXPR_ARRAY;
+    ast_arraytype_init(&tmp.u.arraytype, ast_meta_make(indexers[i].type_start, pos_end),
+                       indexers[i].number, param);
+    param = tmp;
+  }
+  free(indexers);
+  *out = param;
+}
+
+int parse_statement_after_atomic(struct ps *p, struct pos pos_start,
+                                 struct ast_expr lhs, struct ast_statement *out) {
+  struct ast_expr whole_expr;
+  if (!parse_after_atomic(p, pos_start, lhs, kSemicolonPrecedence, &whole_expr)) {
+    ast_expr_destroy(&lhs);
+    return 0;
+  }
+  if (!try_skip_semicolon(p)) {
+    ast_expr_destroy(&whole_expr);
+    return 0;
+  }
+  out->tag = AST_STATEMENT_EXPR;
+  ast_expr_alloc_move(whole_expr, &out->u.expr);
+  return 1;
+}
+
+enum tri triparse_naked_var_or_expr_statement(
     struct ps *p, int force_assignment, struct ast_statement *out) {
+  PARSE_DBG("%u:%u: triparse_naked_var\n", p->line, p->column);
   struct pos pos_start = ps_pos(p);
-  struct ps_savestate save = ps_save(p);
   struct ast_ident name;
   enum tri name_res = triparse_ident(p, &name);
   switch (name_res) {
   case TRI_ERROR:
+    PARSE_DBG("%u:%u: triparse_naked_var name error\n", p->line, p->column);
     goto error;
   case TRI_QUICKFAIL:
-    goto quickfail_norestore;
+    out->tag = AST_STATEMENT_EXPR;
+    return success_or_fail(parse_expr_statement(p, &out->u.expr));
   case TRI_SUCCESS:
     break;
   default:
@@ -1098,12 +1178,85 @@ enum tri triparse_naked_var_statement(
 
   struct ast_vardecl decl;
   {
+    struct ambig_indexer *indexers = NULL;
+    size_t indexers_count = 0;
+    size_t indexers_limit = 0;
+
     struct ast_typeexpr type;
-    /* TODO: We could be more fine-grained and quickfail on a subset
-    of what we do here. */
-    if (!help_parse_typeexpr(p, ALLOW_BLANKS_YES, &type)) {
-      goto quickfail_name;
+    for (;;) {
+      struct pos type_start = ps_pos(p);
+      if (try_skip_char(p, '[')) {
+        if (!skip_ws(p)) {
+          goto error_name;
+        }
+        struct ambig_indexer ambi;
+        enum tri numeric_res = triparse_numeric_literal(p, &ambi.number);
+        switch (numeric_res) {
+        case TRI_ERROR:
+          goto error_name;
+        case TRI_QUICKFAIL: {
+          struct ast_expr arg;
+          if (!parse_rest_of_index_param(p, &arg)) {
+            goto error_indexers;
+          }
+          struct ast_expr lhs;
+          expressionize(name, indexers, indexers_count, &lhs);
+          struct ast_expr index_expr;
+          ast_expr_partial_init(&index_expr, AST_EXPR_INDEX, ast_expr_info_default());
+          ast_index_expr_init(&index_expr.u.index_expr, ast_meta_make(pos_start, ps_pos(p)),
+                              lhs, arg);
+          if (!parse_statement_after_atomic(p, pos_start, index_expr, out)) {
+            return TRI_ERROR;
+          } else {
+            return TRI_SUCCESS;
+          }
+        } break;
+        case TRI_SUCCESS:
+          break;
+        default:
+          UNREACHABLE();
+        }
+
+        if (!(skip_ws(p) && try_skip_char(p, ']'))) {
+          goto error_indexers;
+        }
+
+        ambi.type_start = type_start;
+        ambi.expr_end = ps_pos(p);
+        SLICE_PUSH(indexers, indexers_count, indexers_limit, ambi);
+        if (!skip_ws(p)) {
+          goto error_indexers;
+        }
+        continue;
+      } else {
+        struct ast_typeexpr local_type;
+        enum tri local_type_res = help_triparse_typeexpr(p, ALLOW_BLANKS_YES, &local_type);
+        switch (local_type_res) {
+        case TRI_QUICKFAIL: {
+          PARSE_DBG("%u:%u: triparse_naked_var whole expr\n", p->line, p->column);
+          struct ast_expr lhs;
+          expressionize(name, indexers, indexers_count, &lhs);
+          if (!parse_statement_after_atomic(p, pos_start, lhs, out)) {
+            return TRI_ERROR;
+          } else {
+            return TRI_SUCCESS;
+          }
+        } break;
+        case TRI_ERROR:
+          goto error_indexers;
+        case TRI_SUCCESS: {
+          collapse_indexers(indexers, indexers_count, local_type, &type);
+          goto build_vardecl;
+        } break;
+        default:
+          UNREACHABLE();
+        }
+      }
     }
+  error_indexers:
+    SLICE_FREE(indexers, indexers_count, ambig_indexer_destroy);
+    goto error_name;
+  build_vardecl:
     ast_vardecl_init(&decl, ast_meta_make(pos_start, ast_typeexpr_meta(&type)->pos_end),
                      name, type);
   }
@@ -1152,27 +1305,11 @@ enum tri triparse_naked_var_statement(
   ast_ident_destroy(&name);
  error:
   return TRI_ERROR;
- quickfail_name:
-  ast_ident_destroy(&name);
-  ps_restore(p, save);
- quickfail_norestore:
-  return TRI_QUICKFAIL;
 }
 
 int parse_naked_var_or_expr_statement(struct ps *p, int force_assignment,
                                       struct ast_statement *out) {
-  enum tri res = triparse_naked_var_statement(p, force_assignment, out);
-  switch (res) {
-  case TRI_SUCCESS:
-    return 1;
-  case TRI_QUICKFAIL:
-    out->tag = AST_STATEMENT_EXPR;
-    return parse_expr_statement(p, &out->u.expr);
-  case TRI_ERROR:
-    return 0;
-  default:
-    UNREACHABLE();
-  }
+  return success_or_fail(triparse_naked_var_or_expr_statement(p, force_assignment, out));
 }
 
 int parse_statement(struct ps *p, struct ast_statement *out) {
@@ -1759,9 +1896,6 @@ int parse_rest_of_index_param(struct ps *p, struct ast_expr *out) {
   return 0;
 }
 
-int parse_after_atomic(struct ps *p, struct pos pos_start, struct ast_expr lhs,
-                       int precedence_context, struct ast_expr *out);
-
 int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
   struct pos pos_start = ps_pos(p);
   struct ast_expr lhs;
@@ -1976,7 +2110,6 @@ int parse_rest_of_unione(struct ps *p,
   return 1;
 }
 
-
 int continue_parsing_arraytype(struct ps *p, enum allow_blanks allow_blanks,
                                struct pos pos_start, struct ast_numeric_literal number,
                                struct ast_arraytype *out) {
@@ -2105,25 +2238,26 @@ int continue_ident_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
   return 0;
 }
 
-int help_parse_typeexpr(struct ps *p, enum allow_blanks allow_blanks, struct ast_typeexpr *out) {
+enum tri help_triparse_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
+                                struct ast_typeexpr *out) {
   struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "struct")) {
     out->tag = AST_TYPEEXPR_STRUCTE;
-    return parse_rest_of_structe(p, allow_blanks, pos_start, &out->u.structe);
+    return success_or_fail(parse_rest_of_structe(p, allow_blanks, pos_start, &out->u.structe));
   }
 
   if (try_skip_keyword(p, "union")) {
     out->tag = AST_TYPEEXPR_UNIONE;
-    return parse_rest_of_unione(p, allow_blanks, pos_start, &out->u.unione);
+    return success_or_fail(parse_rest_of_unione(p, allow_blanks, pos_start, &out->u.unione));
   }
 
   if (try_skip_char(p, '[')) {
     out->tag = AST_TYPEEXPR_ARRAY;
-    return parse_rest_of_arraytype(p, allow_blanks, pos_start, &out->u.arraytype);
+    return success_or_fail(parse_rest_of_arraytype(p, allow_blanks, pos_start, &out->u.arraytype));
   }
 
   if (try_skip_char(p, '*')) {
-    return parse_rest_of_pointer(p, ast_meta_make(pos_start, ps_pos(p)), allow_blanks, out);
+    return success_or_fail(parse_rest_of_pointer(p, ast_meta_make(pos_start, ps_pos(p)), allow_blanks, out));
   }
 
   struct ps_savestate before_underscore = ps_save(p);
@@ -2131,19 +2265,28 @@ int help_parse_typeexpr(struct ps *p, enum allow_blanks allow_blanks, struct ast
     if (allow_blanks) {
       out->tag = AST_TYPEEXPR_UNKNOWN;
       ast_unknown_init(&out->u.unknown, ast_meta_make(pos_start, ps_pos(p)));
-      return 1;
+      return TRI_SUCCESS;
     } else {
       ps_restore(p, before_underscore);
-      return 0;
+      return TRI_ERROR;
     }
   }
 
   struct ast_ident name;
-  if (!parse_ident(p, &name)) {
-    return 0;
+  switch (triparse_ident(p, &name)) {
+  case TRI_SUCCESS:
+    return success_or_fail(continue_ident_typeexpr(p, allow_blanks, name, out));
+  case TRI_QUICKFAIL:
+    return TRI_QUICKFAIL;
+  case TRI_ERROR:
+    return TRI_ERROR;
+  default:
+    UNREACHABLE();
   }
+}
 
-  return continue_ident_typeexpr(p, allow_blanks, name, out);
+int help_parse_typeexpr(struct ps *p, enum allow_blanks allow_blanks, struct ast_typeexpr *out) {
+  return TRI_SUCCESS == help_triparse_typeexpr(p, allow_blanks, out);
 }
 
 int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
@@ -2814,6 +2957,14 @@ int parse_test_defs(void) {
                          "  if x { } else if y { } else { }\n"
                          "}\n",
                          19);
+  pass &= run_count_test("def33",
+                         "func foo() void {\n"
+                         "  x [3]i32;\n"
+                         "  x [3][4]i32;\n"
+                         "  x[1][y] = z;\n"
+                         "  x struct { };\n"
+                         "}\n",
+                         37);
   return pass;
 }
 
