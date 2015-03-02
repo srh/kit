@@ -1759,6 +1759,9 @@ int parse_rest_of_index_param(struct ps *p, struct ast_expr *out) {
   return 0;
 }
 
+int parse_after_atomic(struct ps *p, struct pos pos_start, struct ast_expr lhs,
+                       int precedence_context, struct ast_expr *out);
+
 int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
   struct pos pos_start = ps_pos(p);
   struct ast_expr lhs;
@@ -1767,6 +1770,11 @@ int parse_expr(struct ps *p, struct ast_expr *out, int precedence_context) {
   }
   PARSE_DBG("parse_expr parsed atomic expr\n");
 
+  return parse_after_atomic(p, pos_start, lhs, precedence_context, out);
+}
+
+int parse_after_atomic(struct ps *p, struct pos pos_start, struct ast_expr lhs,
+                       int precedence_context, struct ast_expr *out) {
   for (;;) {
     if (!skip_ws(p)) {
       goto fail;
