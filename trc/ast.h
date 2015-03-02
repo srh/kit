@@ -49,6 +49,7 @@ void ast_numeric_literal_init(struct ast_numeric_literal *a,
                               size_t digits_count);
 void ast_numeric_literal_init_copy(struct ast_numeric_literal *a,
                                    struct ast_numeric_literal *c);
+void ast_numeric_literal_destroy(struct ast_numeric_literal *a);
 
 struct ast_bool_literal {
   struct ast_meta meta;

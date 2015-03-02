@@ -1976,6 +1976,24 @@ int parse_rest_of_unione(struct ps *p,
   return 1;
 }
 
+
+int continue_parsing_arraytype(struct ps *p, enum allow_blanks allow_blanks,
+                               struct pos pos_start, struct ast_numeric_literal number,
+                               struct ast_arraytype *out) {
+  struct ast_typeexpr param;
+  if (!(skip_ws(p) && try_skip_char(p, ']') && skip_ws(p) &&
+        help_parse_typeexpr(p, allow_blanks, &param))) {
+    goto fail;
+  }
+
+  ast_arraytype_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                     number, param);
+  return 1;
+ fail:
+  ast_numeric_literal_destroy(&number);
+  return 0;
+}
+
 int parse_rest_of_arraytype(struct ps *p, enum allow_blanks allow_blanks,
                             struct pos pos_start,
                             struct ast_arraytype *out) {
@@ -1987,18 +2005,7 @@ int parse_rest_of_arraytype(struct ps *p, enum allow_blanks allow_blanks,
     return 0;
   }
 
-  if (!(skip_ws(p) && try_skip_char(p, ']') && skip_ws(p))) {
-    return 0;
-  }
-
-  struct ast_typeexpr param;
-  if (!help_parse_typeexpr(p, allow_blanks, &param)) {
-    return 0;
-  }
-
-  ast_arraytype_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                     number, param);
-  return 1;
+  return continue_parsing_arraytype(p, allow_blanks, pos_start, number, out);
 }
 
 int parse_rest_of_pointer(struct ps *p, struct ast_meta star_operator_meta,
