@@ -1954,34 +1954,46 @@ int parse_rest_of_unione(struct ps *p,
   return 1;
 }
 
-int parse_rest_of_arraytype(struct ps *p, enum allow_blanks allow_blanks,
-                            struct pos pos_start,
-                            struct ast_arraytype *out) {
-  if (!skip_ws(p)) {
-    return 0;
-  }
+enum tri triparse_arraytype_decimal(struct ps *p, uint32_t *out) {
   int32_t ch = ps_peek(p);
   int8_t ch_value;
   if (!is_decimal_digit(ch, &ch_value)) {
-    return 0;
+    return TRI_QUICKFAIL;
   }
   ps_step(p);
 
   uint32_t count = ch_value;
   while ((ch = ps_peek(p)), is_decimal_digit(ch, &ch_value)) {
     if (!try_uint32_mul(count, 10, &count)) {
-      return 0;
+      return TRI_ERROR;
     }
     if (!try_uint32_add(count, (uint32_t)ch_value, &count)) {
-      return 0;
+      return TRI_ERROR;
     }
     ps_step(p);
   }
 
-  ps_count_leaf(p);
+  if (!is_numeric_postchar(ch)) {
+    return TRI_ERROR;
+  }
 
-  if (!(is_numeric_postchar(ch) && skip_ws(p) && try_skip_char(p, ']')
-        && skip_ws(p))) {
+  ps_count_leaf(p);
+  *out = count;
+  return TRI_SUCCESS;
+}
+
+int parse_rest_of_arraytype(struct ps *p, enum allow_blanks allow_blanks,
+                            struct pos pos_start,
+                            struct ast_arraytype *out) {
+  if (!skip_ws(p)) {
+    return 0;
+  }
+  uint32_t count;
+  if (TRI_SUCCESS != triparse_arraytype_decimal(p, &count)) {
+    return 0;
+  }
+
+  if (!(skip_ws(p) && try_skip_char(p, ']') && skip_ws(p))) {
     return 0;
   }
 
