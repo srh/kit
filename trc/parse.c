@@ -1236,11 +1236,7 @@ enum tri triparse_naked_var_or_expr_statement(
           PARSE_DBG("%u:%u: triparse_naked_var whole expr\n", p->line, p->column);
           struct ast_expr lhs;
           expressionize(name, indexers, indexers_count, &lhs);
-          if (!parse_statement_after_atomic(p, pos_start, lhs, out)) {
-            return TRI_ERROR;
-          } else {
-            return TRI_SUCCESS;
-          }
+          return success_or_fail(parse_statement_after_atomic(p, pos_start, lhs, out));
         } break;
         case TRI_ERROR:
           goto error_indexers;

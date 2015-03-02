@@ -275,6 +275,10 @@ func parse_typeexpr(p *ps, out *ast_typeexpr) bool {
 }
 
 func parse_ident(p *ps, out *ast_ident) bool {
+  return try_parse_ident(p, out);
+}
+
+func try_parse_ident(p *ps, out *ast_ident) bool {
   switch peek(p).val {
     case Ident(text array[i32]): {
       *out = {intern(p->im, ~text)};
@@ -367,38 +371,53 @@ func try_underscore_if_allowed(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
 }
 
 func help_parse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
+  switch help_triparse_typeexpr(p, ab, out) {
+    case Success(v): { return true; }
+    default: { return false; }
+  }
+}
+
+func success_or_fail(res bool) triparse_result {
+  if res {
+    return Success(void);
+  } else {
+    return Error(void);
+  }
+}
+
+func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_result {
   if try_skip_token(p, Keyw(Struct(void))) {
-    return parse_rest_of_struct(p, out);
+    return success_or_fail(parse_rest_of_struct(p, out));
   }
   if try_skip_token(p, Keyw(Union(void))) {
-    return parse_rest_of_union(p, out);
+    return success_or_fail(parse_rest_of_union(p, out));
   }
   if try_skip_token(p, Grouper(LBracket(void))) {
-    return parse_rest_of_arraytype(p, ab, out);
+    return success_or_fail(parse_rest_of_arraytype(p, ab, out));
   }
   if try_skip_token(p, mk_oper('*')) {
-    return parse_rest_of_pointer(p, ab, out);
+    return success_or_fail(parse_rest_of_pointer(p, ab, out));
   }
 
   lhs ast_typeexpr;
   if !try_underscore_if_allowed(p, ab, &lhs) {
     name ast_ident;
-    if !parse_ident(p, &name) {
-      return Fail;
+    if !try_parse_ident(p, &name) {
+      return Quickfail(void);
     }
     lhs = Name(name);
   }
   if !try_skip_token(p, Grouper(LBracket(void))) {
     *out = lhs;
-    return true;
+    return Success(void);
   }
   args array[ast_typeexpr];
   if !parse_rest_of_type_param_list(p, ab, &args) {
-    return Fail;
+    return Error(void);
   }
   // TODO: Allow arbitrarily many type applications?
   *out = App({embox(lhs), args});
-  return true;
+  return Success(void);
 }
 
 func parse_rest_of_struct(p *ps, out *ast_typeexpr) bool {
@@ -528,6 +547,10 @@ func parse_expr(p *ps, prec_ctx i32, out *ast_expr) bool {
     return Fail;
   }
 
+  return parse_after_atomic_expr(p, prec_ctx, lhs, out);
+}
+
+func parse_after_atomic_expr(p *ps, prec_ctx i32, lhs ast_expr, out *ast_expr) bool {
   for ;; {
     if try_skip_token(p, Grouper(LParen(void))) {
       params array[ast_expr];
@@ -1078,20 +1101,9 @@ func parse_case_pattern(p *ps, out *ast_case_pattern) bool {
 }
 
 func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_statement) bool {
-  save ps_savestate = ps_save(p);
   switch triparse_naked_var_statement(p, fa, out) {
     case Success(v): { return true; }
-    case Quickfail(v): {
-      ps_restore(p, save);
-      expr ast_expr;
-      if !(parse_expr(p, kSemicolonPrec, &expr)
-           && try_skip_token(p, mk_oper(';'))) {
-        return Fail;
-      }
-      *out = Expr(expr);
-      return true;
-    }
-    case Error(v): { return false; }
+    default: { return false; }
   }
 }
 
@@ -1103,12 +1115,43 @@ defenum triparse_result {
 
 func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement) triparse_result {
   name ast_ident;
-  if !parse_ident(p, &name) {
+  if !try_parse_ident(p, &name) {
     return Quickfail(void);
   }
+
   type ast_typeexpr;
-  if !help_parse_typeexpr(p, AllowBlanksYes(void), &type) {
-    return Quickfail(void);
+  indexers array[ast_expr];
+  done bool = false;
+  while !done {
+    if try_skip_token(p, Grouper(LBracket(void))) {
+      ambi ast_expr;
+      if !(parse_expr(p, kCommaPrec, &ambi)
+           && try_skip_token(p, Grouper(RBracket(void)))) {
+        return Error(void);
+      }
+      push(&indexers, ambi);
+    } else {
+      local_type ast_typeexpr;
+      switch help_triparse_typeexpr(p, AllowBlanksYes(void), &local_type) {
+        case Quickfail(v): {
+          lhs ast_expr = expressionize(name, indexers);
+          whole_expr ast_expr;
+          if !(parse_after_atomic_expr(p, kSemicolonPrec, lhs, &whole_expr)
+               && try_skip_token(p, mk_oper(';'))) {
+            return Error(void);
+          }
+          *out = Expr(whole_expr);
+          return Success(void);
+        }
+        case Error(v): {
+          return Error(void);
+        }
+        case Success(v): {
+          type = collapse_indexers(indexers, local_type);
+          done = true;
+        }
+      }
+    }
   }
 
   decl ast_vardecl = {name, type};
@@ -1132,6 +1175,23 @@ func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement
   }
   *out = Var({decl, Has(rhs)});
   return Success(void);
+}
+
+func expressionize(name ast_ident, indexers array[ast_expr]) ast_expr {
+  lhs ast_expr = NameExpr({name, None()});
+  e size = count(&indexers);
+  for i size = 0; i < e; i = i + 1 {
+    lhs = IndexExpr({embox(lhs), embox(get(&indexers, i))});
+  }
+  return lhs;
+}
+
+func collapse_indexers(indexers array[ast_expr], param ast_typeexpr) ast_typeexpr {
+  for i size = count(&indexers); i > 0; {
+    i = i - 1;
+    param = Arraytype({embox(get(&indexers, i)), embox(param)});
+  }
+  return param;
 }
 
 func parse_rest_of_string_literal(p *ps, out *ast_expr) bool {
