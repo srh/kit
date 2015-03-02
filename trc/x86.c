@@ -170,7 +170,7 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     help_sizealignof(nt, type->u.arraytype.param, IDENT_VALUE_INVALID,
                      &offsetof_discard, &elem_size, &elem_alignment);
     *offsetof_out = 0;
-    *sizeof_out = uint32_mul(elem_size, type->u.arraytype.count);
+    *sizeof_out = uint32_mul(elem_size, unsafe_numeric_literal_u32(&type->u.arraytype.number));
     *alignof_out = 0;
     return;
   } break;

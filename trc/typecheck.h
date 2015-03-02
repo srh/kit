@@ -79,6 +79,7 @@ void do_replace_rhs_generics(struct ast_generics *generics,
 struct ast_typeexpr *expose_func_return_type(struct identmap *im,
                                              struct ast_typeexpr *func,
                                              size_t expected_params_count);
+uint32_t unsafe_numeric_literal_u32(struct ast_numeric_literal *a);
 int numeric_literal_to_u32(struct ast_numeric_literal *a, uint32_t *out);
 int squash_u32_to_i32(uint32_t value, int32_t *out);
 int squash_u32_to_u8(uint32_t value, uint8_t *out);

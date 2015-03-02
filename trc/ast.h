@@ -150,12 +150,12 @@ struct ast_arraytype {
   /* TODO: This should be a (statically evaluable) expr.  But such an
   expr would need to be analyzed for sizeof and alignof expressions
   when seen in another type. */
-  uint32_t count;
+  struct ast_numeric_literal number;
   struct ast_typeexpr *param;
 };
 
 void ast_arraytype_init(struct ast_arraytype *a, struct ast_meta meta,
-                        uint32_t count, struct ast_typeexpr param);
+                        struct ast_numeric_literal number, struct ast_typeexpr param);
 
 struct ast_unknown {
   struct ast_meta meta;

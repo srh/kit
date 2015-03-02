@@ -1460,9 +1460,9 @@ void ast_unione_destroy(struct ast_unione *a) {
 }
 
 void ast_arraytype_init(struct ast_arraytype *a, struct ast_meta meta,
-                        uint32_t count, struct ast_typeexpr param) {
+                        struct ast_numeric_literal number, struct ast_typeexpr param) {
   a->meta = meta;
-  a->count = count;
+  a->number = number;
   a->param = malloc(sizeof(*a->param));
   CHECK(a->param);
   *a->param = param;
@@ -1470,7 +1470,7 @@ void ast_arraytype_init(struct ast_arraytype *a, struct ast_meta meta,
 
 void ast_arraytype_init_copy(struct ast_arraytype *a, struct ast_arraytype *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  a->count = c->count;
+  ast_numeric_literal_init_copy(&a->number, &c->number);
   a->param = malloc(sizeof(*a->param));
   CHECK(a->param);
   ast_typeexpr_init_copy(a->param, c->param);
@@ -1478,7 +1478,7 @@ void ast_arraytype_init_copy(struct ast_arraytype *a, struct ast_arraytype *c) {
 
 void ast_arraytype_destroy(struct ast_arraytype *a) {
   ast_meta_destroy(&a->meta);
-  a->count = 0;
+  ast_numeric_literal_destroy(&a->number);
   ast_typeexpr_destroy(a->param);
   free(a->param);
   a->param = NULL;

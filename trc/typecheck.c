@@ -1970,7 +1970,8 @@ int unify_directionally(struct identmap *im,
                                       complete_type->u.unione.fields,
                                       complete_type->u.unione.fields_count);
   case AST_TYPEEXPR_ARRAY: {
-    if (partial_type->u.arraytype.count != complete_type->u.arraytype.count) {
+    if (unsafe_numeric_literal_u32(&partial_type->u.arraytype.number)
+        != unsafe_numeric_literal_u32(&complete_type->u.arraytype.number)) {
       return 0;
     }
     return unify_directionally(im, partial_type->u.arraytype.param,
@@ -2291,8 +2292,10 @@ void do_replace_generics(struct ast_generics *generics,
                         generics_substitutions_count,
                         a->u.arraytype.param, &param);
     out->tag = AST_TYPEEXPR_ARRAY;
+    struct ast_numeric_literal number;
+    ast_numeric_literal_init_copy(&number, &a->u.arraytype.number);
     ast_arraytype_init(&out->u.arraytype, ast_meta_make_copy(&a->u.arraytype.meta),
-                       a->u.arraytype.count, param);
+                       number, param);
   } break;
   case AST_TYPEEXPR_UNKNOWN: {
     out->tag = AST_TYPEEXPR_UNKNOWN;
@@ -3964,6 +3967,31 @@ void replace_name_expr_params(struct exprscope *es,
   *out = copy;
 }
 
+struct ast_numeric_literal numeric_literal_from_u32(uint32_t value) {
+  int8_t *digits = NULL;
+  size_t digits_count = 0;
+  size_t digits_limit = 0;
+
+  if (value == 0) {
+    SLICE_PUSH(digits, digits_count, digits_limit, 0);
+  } else {
+    do {
+      int8_t units = value % 10;
+      SLICE_PUSH(digits, digits_count, digits_limit, units);
+      value = value / 10;
+    } while (value != 0);
+    for (size_t i = 0, j = digits_count - 1; i < j; i++, j--) {
+      int8_t tmp = digits[i];
+      digits[i] = digits[j];
+      digits[j] = tmp;
+    }
+  }
+  struct ast_numeric_literal ret;
+  ast_numeric_literal_init(&ret, ast_meta_make_garbage(), AST_NUMERIC_LITERAL_DEC,
+                           digits, digits_count);
+  return ret;
+}
+
 int check_expr_ai(struct exprscope *es,
                   enum allow_incomplete ai,
                   struct ast_expr *x,
@@ -4109,7 +4137,8 @@ int check_expr_ai(struct exprscope *es,
       struct ast_typeexpr char_type;
       init_name_type(&char_type, identmap_intern_c_str(es->cs->im, CHAR_STANDIN_TYPE_NAME));
       array_type.tag = AST_TYPEEXPR_ARRAY;
-      ast_arraytype_init(&array_type.u.arraytype, ast_meta_make_garbage(), array_size, char_type);
+      struct ast_numeric_literal number = numeric_literal_from_u32(array_size);
+      ast_arraytype_init(&array_type.u.arraytype, ast_meta_make_garbage(), number, char_type);
     }
     if (!unify_directionally(es->cs->im, partial_type, &array_type)) {
       METERR(es->cs->im, x->u.string_literal.meta, "Character literal in bad place.%s", "\n");
@@ -4310,6 +4339,14 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
   default:
     UNREACHABLE();
   }
+}
+
+uint32_t unsafe_numeric_literal_u32(struct ast_numeric_literal *a) {
+  uint32_t ret;
+  /* TODO: This check depends on user-supplied value. */
+  int success = numeric_literal_to_u32(a, &ret);
+  CHECK(success);
+  return ret;
 }
 
 #define NUMERIC_LITERAL_OOR "Numeric literal out of range.\n"

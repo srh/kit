@@ -1617,7 +1617,8 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
     }
   } break;
   case AST_TYPEEXPR_ARRAY: {
-    for (uint32_t i = 0, e = type->u.arraytype.count; i < e; i++) {
+    uint32_t arraytype_count = unsafe_numeric_literal_u32(&type->u.arraytype.number);
+    for (uint32_t i = 0; i < arraytype_count; i++) {
       int32_t saved_offset = frame_save_offset(h);
       struct loc dest_element_loc = gen_array_element_loc(cs, f, h, dest, type->u.arraytype.param, i);
       struct loc src_element_loc;
@@ -3416,7 +3417,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
     CHECK(lhs_type->tag == AST_TYPEEXPR_ARRAY);
     elem_size = kira_sizeof(&cs->nt, lhs_type->u.arraytype.param);
 
-    CHECK(lhs_loc.size == uint32_mul(elem_size, lhs_type->u.arraytype.count));
+    CHECK(lhs_loc.size == uint32_mul(elem_size, unsafe_numeric_literal_u32(&lhs_type->u.arraytype.number)));
     CHECK(rhs_loc.size == DWORD_SIZE);
 
     gen_load_addressof(f, X86_EDX, lhs_loc);
@@ -3839,8 +3840,9 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
     CHECK(a->u.local_field_access.fieldname.ident.value
           == identmap_intern_c_str(cs->im, ARRAY_LENGTH_FIELDNAME));
     gen_destroy_temp(cs, f, h, *er_tr(&lhs_er));
+    uint32_t lhs_arraytype_count = unsafe_numeric_literal_u32(&lhs_type->u.arraytype.number);
     /* X86 32-bit size specific. */
-    expr_return_immediate(f, h, er, imm_u32(lhs_type->u.arraytype.count));
+    expr_return_immediate(f, h, er, imm_u32(lhs_arraytype_count));
   } else {
     apply_field_access(cs, f, h, ero_loc(&lhs_er.u.open), *er_tr(&lhs_er),
                        lhs_type,

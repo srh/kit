@@ -767,16 +767,22 @@ int combine_partial_types(struct identmap *im,
     return 1;
   } break;
   case AST_TYPEEXPR_ARRAY: {
-    if (a->u.arraytype.count != b->u.arraytype.count) {
-      return 0;
+    uint32_t a_count = unsafe_numeric_literal_u32(&a->u.arraytype.number);
+    {
+      uint32_t b_count = unsafe_numeric_literal_u32(&b->u.arraytype.number);
+      if (a_count != b_count) {
+        return 0;
+      }
     }
     struct ast_typeexpr param;
     if (!combine_partial_types(im, a->u.arraytype.param, b->u.arraytype.param, &param)) {
       return 0;
     }
+    struct ast_numeric_literal a_number;
+    ast_numeric_literal_init_copy(&a_number, &a->u.arraytype.number);
     out->tag = AST_TYPEEXPR_ARRAY;
     ast_arraytype_init(&out->u.arraytype, ast_meta_make_garbage(),
-                       a->u.arraytype.count, param);
+                       a_number, param);
     return 1;
   } break;
   default:
@@ -879,9 +885,14 @@ int learn_materializations(struct identmap *im,
                                          partial_type->u.unione.fields_count);
   } break;
   case AST_TYPEEXPR_ARRAY: {
-    if (type->u.arraytype.count != partial_type->u.arraytype.count) {
-      return 0;
+    {
+      uint32_t type_count = unsafe_numeric_literal_u32(&type->u.arraytype.number);
+      uint32_t pt_count = unsafe_numeric_literal_u32(&partial_type->u.arraytype.number);
+      if (type_count != pt_count) {
+        return 0;
+      }
     }
+
     return learn_materializations(im, g, materialized, type->u.arraytype.param,
                                   partial_type->u.arraytype.param);
   } break;
