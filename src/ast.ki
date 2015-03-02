@@ -77,7 +77,7 @@ deftype ast_union struct {
 };
 
 deftype ast_arraytype struct {
-  count box[ast_expr];
+  count opt[box[ast_expr]];
   param box[ast_typeexpr];
 };
 

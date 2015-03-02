@@ -442,10 +442,13 @@ func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
   switch ab {
     case AllowBlanksYes(v): {
       if try_skip_token(p, Keyw(Underscore(void))) {
-        if !try_skip_token(p, Grouper(RBracket(void))) {
+        param box[ast_typeexpr];
+        if !(try_skip_token(p, Grouper(RBracket(void)))
+             && help_parse_typeexpr(p, ab, oo(&param))) {
           return Fail;
         }
-        *out = Unknown({});
+
+        *out = Arraytype({None(), param});
         return true;
       }
     }
@@ -460,7 +463,7 @@ func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
     return Fail;
   }
 
-  *out = Arraytype({count, param});
+  *out = Arraytype({Has(count), param});
   return true;
 }
 
@@ -1124,12 +1127,23 @@ func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement
   done bool = false;
   while !done {
     if try_skip_token(p, Grouper(LBracket(void))) {
-      ambi ast_expr;
-      if !(parse_expr(p, kCommaPrec, &ambi)
-           && try_skip_token(p, Grouper(RBracket(void)))) {
-        return Error(void);
+      if try_skip_token(p, Keyw(Underscore(void))) {
+        param box[ast_typeexpr];
+        if !(try_skip_token(p, Grouper(RBracket(void)))
+             && parse_typeexpr(p, oo(&param))) {
+          return Error(void);
+        }
+
+        type = collapse_indexers(indexers, Arraytype({None(), param}));
+        done = true;
+      } else {
+        ambi ast_expr;
+        if !(parse_expr(p, kCommaPrec, &ambi)
+             && try_skip_token(p, Grouper(RBracket(void)))) {
+          return Error(void);
+        }
+        push(&indexers, ambi);
       }
-      push(&indexers, ambi);
     } else {
       local_type ast_typeexpr;
       switch help_triparse_typeexpr(p, AllowBlanksYes(void), &local_type) {
@@ -1189,7 +1203,7 @@ func expressionize(name ast_ident, indexers array[ast_expr]) ast_expr {
 func collapse_indexers(indexers array[ast_expr], param ast_typeexpr) ast_typeexpr {
   for i size = count(&indexers); i > 0; {
     i = i - 1;
-    param = Arraytype({embox(get(&indexers, i)), embox(param)});
+    param = Arraytype({Has(embox(get(&indexers, i))), embox(param)});
   }
   return param;
 }
