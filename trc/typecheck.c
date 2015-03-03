@@ -3618,6 +3618,8 @@ int check_expr_local_field_access(
 
     if (!unify_directionally(es->cs->im, partial_type, &size_type)) {
       ast_typeexpr_destroy(&size_type);
+      METERR(es->cs->im, x->meta, "Array .%s field used in place with bad type.\n",
+             ARRAY_LENGTH_FIELDNAME);
       goto cleanup;
     }
 
@@ -3636,6 +3638,12 @@ int check_expr_local_field_access(
   }
 
   if (!unify_directionally(es->cs->im, partial_type, &field_type)) {
+    if (x->fieldname.whole_field) {
+      METERR(es->cs->im, x->meta, "'Whole field' has wrong type for expression context.%s", "\n");
+    } else {
+      METERR(es->cs->im, x->meta, "Field '%.*s' has wrong type for expression context.\n",
+             IM_P(es->cs->im, x->fieldname.ident.value));
+    }
     goto cleanup_field_type;
   }
 
@@ -3811,6 +3819,8 @@ int chase_struct_field_types(struct checkstate *cs,
     if (!name_table_lookup_deftype(&cs->nt, type->u.app.name.value,
                                    param_list_arity(type->u.app.params_count),
                                    &ent)) {
+      METERR(cs->im, *meta, "ICE?  Type '%.*s[...]' not found when checking for struct fields.\n",
+             IM_P(cs->im, type->u.app.name.value));
       return 0;
     }
 
@@ -4189,6 +4199,7 @@ int check_expr_ai(struct exprscope *es,
                                       &combined_partial_type);
       ast_typeexpr_destroy(&replaced_partial_type);
       if (!res) {
+        METERR(es->cs->im, x->u.typed_expr.meta, "Typed expr specified type does not match context.%s", "\n");
         return 0;
       }
     }
