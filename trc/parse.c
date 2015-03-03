@@ -675,6 +675,7 @@ int help_parse_vardecl(struct ps *p, enum allow_blanks allow_blanks, struct ast_
   if (allow_blanks == ALLOW_BLANKS_YES && !is_typeexpr_firstchar(ps_peek(p))) {
     type.tag = AST_TYPEEXPR_UNKNOWN;
     ast_unknown_init(&type.u.unknown, ast_meta_make(name.meta.pos_end, name.meta.pos_end));
+    type_pos_end = ps_pos(p);
   } else {
     if (!help_parse_typeexpr(p, allow_blanks, &type, &type_pos_end)) {
       goto fail_name;
