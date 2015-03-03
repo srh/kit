@@ -613,7 +613,7 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
   struct ast_typeexpr *type = ast_expr_type(expr);
   size_t args_count = expr->u.lambda.params_count;
   struct ast_typeexpr *return_type
-    = expose_func_return_type(cs->im, type, size_add(args_count, 1));
+    = expose_func_return_type(&cs->cm, type, size_add(args_count, 1));
 
   uint32_t return_type_size;
   int is_return_hidden = exists_hidden_return_param(cs, return_type, &return_type_size);
@@ -2346,7 +2346,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_INIT: {
     struct ast_typeexpr *target;
-    int success = view_ptr_target(cs->im, arg0_type_or_null, &target);
+    int success = view_ptr_target(&cs->cm, arg0_type_or_null, &target);
     CHECK(success);
     uint32_t size = kira_sizeof(&cs->nt, target);
     gen_default_construct(cs, f, h, ebp_indirect_loc(size, size, off0),
@@ -2354,7 +2354,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_COPY: {
     struct ast_typeexpr *target;
-    int success = view_ptr_target(cs->im, arg0_type_or_null, &target);
+    int success = view_ptr_target(&cs->cm, arg0_type_or_null, &target);
     CHECK(success);
     uint32_t size = kira_sizeof(&cs->nt, target);
     gen_copy(cs, f, h, ebp_indirect_loc(size, size, off0),
@@ -2363,7 +2363,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_MOVE: {
     struct ast_typeexpr *target;
-    int success = view_ptr_target(cs->im, arg0_type_or_null, &target);
+    int success = view_ptr_target(&cs->cm, arg0_type_or_null, &target);
     CHECK(success);
     uint32_t size = kira_sizeof(&cs->nt, target);
     gen_move_or_copydestroy(cs, f, h, ebp_indirect_loc(size, size, off0),
@@ -2372,7 +2372,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_DESTROY: {
     struct ast_typeexpr *target;
-    int success = view_ptr_target(cs->im, arg0_type_or_null, &target);
+    int success = view_ptr_target(&cs->cm, arg0_type_or_null, &target);
     CHECK(success);
     uint32_t size = kira_sizeof(&cs->nt, target);
     gen_destroy(cs, f, h, ebp_indirect_loc(size, size, off0),
@@ -3377,7 +3377,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   struct ast_index_expr *ie = &a->u.index_expr;
 
   struct ast_typeexpr *ptr_target = NULL;
-  int is_ptr = view_ptr_target(cs->im, ast_expr_type(ie->lhs), &ptr_target);
+  int is_ptr = view_ptr_target(&cs->cm, ast_expr_type(ie->lhs), &ptr_target);
 
   uint32_t elem_size;
   /* Soon becomes dead/alive depending on is_ptr value. */
@@ -3663,6 +3663,7 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
 }
 
 int help_gen_immediate_numeric(struct identmap *im,
+                               struct common_idents *cm,
                                struct objfile *f,
                                struct frame *h,
                                struct ast_typeexpr *type,
@@ -3672,7 +3673,7 @@ int help_gen_immediate_numeric(struct identmap *im,
   CHECK(type->tag == AST_TYPEEXPR_NAME);
   CHECK(is_numeric_type(im, type));
 
-  if (type->u.name.value == identmap_intern_c_str(im, I32_TYPE_NAME)) {
+  if (type->u.name.value == cm->i32_type_name) {
     int32_t value;
     if (!squash_u32_to_i32(numeric_literal_value, &value)) {
       return 0;
@@ -3683,12 +3684,12 @@ int help_gen_immediate_numeric(struct identmap *im,
     imm.u.i32 = value;
     expr_return_immediate(f, h, er, imm);
     return 1;
-  } else if (type->u.name.value == identmap_intern_c_str(im, U32_TYPE_NAME)
-             || type->u.name.value == identmap_intern_c_str(im, SIZE_TYPE_NAME)
-             || type->u.name.value == identmap_intern_c_str(im, OSIZE_TYPE_NAME)) {
+  } else if (type->u.name.value == cm->u32_type_name
+             || type->u.name.value == cm->size_type_name
+             || type->u.name.value == cm->osize_type_name) {
     expr_return_immediate(f, h, er, imm_u32(numeric_literal_value));
     return 1;
-  } else if (type->u.name.value == identmap_intern_c_str(im, U8_TYPE_NAME)) {
+  } else if (type->u.name.value == cm->u8_type_name) {
     uint8_t value;
     if (!squash_u32_to_u8(numeric_literal_value, &value)) {
       return 0;
@@ -3698,7 +3699,7 @@ int help_gen_immediate_numeric(struct identmap *im,
     imm.u.u8 = value;
     expr_return_immediate(f, h, er, imm);
     return 1;
-  } else if (type->u.name.value == identmap_intern_c_str(im, I8_TYPE_NAME)) {
+  } else if (type->u.name.value == cm->i8_type_name) {
     int8_t value;
     if (!squash_u32_to_i8(numeric_literal_value, &value)) {
       return 0;
@@ -3717,6 +3718,7 @@ int help_gen_immediate_numeric(struct identmap *im,
 }
 
 int gen_immediate_numeric_literal(struct identmap *im,
+                                  struct common_idents *cm,
                                   struct objfile *f,
                                   struct frame *h,
                                   struct ast_typeexpr *type,
@@ -3730,7 +3732,7 @@ int gen_immediate_numeric_literal(struct identmap *im,
     return 0;
   }
 
-  return help_gen_immediate_numeric(im, f, h, type, &a->meta,
+  return help_gen_immediate_numeric(im, cm, f, h, type, &a->meta,
                                     numeric_literal_value, er);
 }
 
@@ -3837,8 +3839,7 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
   struct ast_typeexpr *lhs_type = ast_expr_type(a->u.local_field_access.lhs);
   if (lhs_type->tag == AST_TYPEEXPR_ARRAY) {
     CHECK(!a->u.local_field_access.fieldname.whole_field);
-    CHECK(a->u.local_field_access.fieldname.ident.value
-          == identmap_intern_c_str(cs->im, ARRAY_LENGTH_FIELDNAME));
+    CHECK(a->u.local_field_access.fieldname.ident.value == cs->cm.array_length_fieldname);
     gen_destroy_temp(cs, f, h, *er_tr(&lhs_er));
     uint32_t lhs_arraytype_count = unsafe_numeric_literal_u32(&lhs_type->u.arraytype.number);
     /* X86 32-bit size specific. */
@@ -3937,7 +3938,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
-    return gen_immediate_numeric_literal(cs->im, f, h, ast_expr_type(a),
+    return gen_immediate_numeric_literal(cs->im, &cs->cm, f, h, ast_expr_type(a),
                                          &a->u.numeric_literal, er);
   } break;
   case AST_EXPR_BOOL_LITERAL: {
@@ -3962,7 +3963,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_CHAR_LITERAL: {
-    return help_gen_immediate_numeric(cs->im, f, h, ast_expr_type(a),
+    return help_gen_immediate_numeric(cs->im, &cs->cm, f, h, ast_expr_type(a),
                                       &a->u.char_literal.meta,
                                       (uint32_t)a->u.char_literal.value,
                                       er);
@@ -4000,7 +4001,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     }
 
     struct ast_typeexpr *ptr_target;
-    if (!view_ptr_target(cs->im, ast_expr_type(a->u.deref_field_access.lhs),
+    if (!view_ptr_target(&cs->cm, ast_expr_type(a->u.deref_field_access.lhs),
                          &ptr_target)) {
       CRASH("deref field access typechecked on a non-pointer.");
     }

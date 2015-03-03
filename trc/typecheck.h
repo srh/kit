@@ -60,12 +60,9 @@ void init_name_type(struct ast_typeexpr *a, ident_value name);
 int exact_typeexprs_equal(struct identmap *im, struct ast_typeexpr *a,
                           struct ast_typeexpr *b);
 int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x);
-int view_ptr_target(struct identmap *im,
+int view_ptr_target(struct common_idents *cm,
                     struct ast_typeexpr *ptr_type,
                     struct ast_typeexpr **target_out);
-void wrap_in_ptr(struct identmap *im,
-                 struct ast_typeexpr *target,
-                 struct ast_typeexpr *ptr_out);
 void do_replace_generics(struct ast_generics *generics,
                          struct ast_typeexpr *generics_substitutions,
                          size_t generics_substitutions_count,
@@ -76,7 +73,7 @@ void do_replace_rhs_generics(struct ast_generics *generics,
                              size_t generics_substitutions_count,
                              struct ast_deftype_rhs *a,
                              struct ast_deftype_rhs *out);
-struct ast_typeexpr *expose_func_return_type(struct identmap *im,
+struct ast_typeexpr *expose_func_return_type(struct common_idents *cm,
                                              struct ast_typeexpr *func,
                                              size_t expected_params_count);
 uint32_t unsafe_numeric_literal_u32(struct ast_numeric_literal *a);

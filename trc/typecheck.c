@@ -27,6 +27,9 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
                                   struct ast_typeexpr *out,
                                   int *is_lvalue_out,
                                   struct def_instantiation **inst_out);
+void wrap_in_ptr(struct common_idents *cm,
+                 struct ast_typeexpr *target,
+                 struct ast_typeexpr *ptr_out);
 
 const int MAX_TEMPLATE_INSTANTIATION_RECURSION_DEPTH = 50;
 
@@ -323,18 +326,16 @@ void checkstate_import_primitive_types(struct checkstate *cs) {
   }
 }
 
-void init_func_type(struct ast_typeexpr *a, struct identmap *im,
+void init_func_type(struct ast_typeexpr *a, struct common_idents *cm,
                     ident_value *args, size_t args_count) {
   a->tag = AST_TYPEEXPR_APP;
-  struct ast_ident name
-    = make_ast_ident(identmap_intern_c_str(im, FUNC_TYPE_NAME));
   struct ast_typeexpr *params = malloc_mul(sizeof(*params), args_count);
   for (size_t i = 0; i < args_count; i++) {
     params[i].tag = AST_TYPEEXPR_NAME;
     params[i].u.name = make_ast_ident(args[i]);
   }
   ast_typeapp_init(&a->u.app, ast_meta_make_garbage(),
-                   name, params, args_count);
+                   make_ast_ident(cm->func), params, args_count);
 }
 
 void init_name_type(struct ast_typeexpr *a, ident_value name) {
@@ -342,39 +343,37 @@ void init_name_type(struct ast_typeexpr *a, ident_value name) {
   a->u.name = make_ast_ident(name);
 }
 
-struct ast_typeexpr *expose_func_return_type(struct identmap *im,
+struct ast_typeexpr *expose_func_return_type(struct common_idents *cm,
                                              struct ast_typeexpr *func,
                                              size_t expected_params_count) {
   CHECK(func->tag == AST_TYPEEXPR_APP);
-  CHECK(func->u.app.name.value == identmap_intern_c_str(im, FUNC_TYPE_NAME));
+  CHECK(func->u.app.name.value == cm->func);
   CHECK(func->u.app.params_count == expected_params_count);
   return &func->u.app.params[size_sub(expected_params_count, 1)];
 }
 
-void copy_func_return_type(struct identmap *im,
+void copy_func_return_type(struct common_idents *cm,
                            struct ast_typeexpr *func,
                            size_t expected_params_count,
                            struct ast_typeexpr *out) {
-  ast_typeexpr_init_copy(
-      out, expose_func_return_type(im, func, expected_params_count));
+  ast_typeexpr_init_copy(out, expose_func_return_type(cm, func, expected_params_count));
 }
 
-void init_binop_func_type(struct ast_typeexpr *a, struct identmap *im,
+void init_binop_func_type(struct ast_typeexpr *a, struct checkstate *cs,
                           const char *type_name) {
-  ident_value name = identmap_intern_c_str(im, type_name);
+  ident_value name = identmap_intern_c_str(cs->im, type_name);
   ident_value names[3];
   names[0] = names[1] = names[2] = name;
-  init_func_type(a, im, names, 3);
+  init_func_type(a, &cs->cm, names, 3);
 }
 
-void init_binop_compare_type(struct ast_typeexpr *a, struct identmap *im,
+void init_binop_compare_type(struct ast_typeexpr *a, struct checkstate *cs,
                              const char *type_name) {
-  ident_value name = identmap_intern_c_str(im, type_name);
-  ident_value bool_name = identmap_intern_c_str(im, BOOL_TYPE_NAME);
+  ident_value name = identmap_intern_c_str(cs->im, type_name);
   ident_value names[3];
   names[0] = names[1] = name;
-  names[2] = bool_name;
-  init_func_type(a, im, names, 3);
+  names[2] = cs->cm.boole;
+  init_func_type(a, &cs->cm, names, 3);
 }
 
 void import_integer_binops(struct checkstate *cs,
@@ -383,7 +382,7 @@ void import_integer_binops(struct checkstate *cs,
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
   struct ast_typeexpr binop_type;
-  init_binop_func_type(&binop_type, cs->im, type_name);
+  init_binop_func_type(&binop_type, cs, type_name);
   for (enum ast_binop op = AST_BINOP_ADD; op < AST_BINOP_LT; op++) {
     intern_binop(cs, op, primop_array, &generics, &binop_type);
   }
@@ -393,7 +392,7 @@ void import_integer_binops(struct checkstate *cs,
     intern_binop(cs, op, primop_array, &generics, &binop_type);
   }
   ast_typeexpr_destroy(&binop_type);
-  init_binop_compare_type(&binop_type, cs->im, type_name);
+  init_binop_compare_type(&binop_type, cs, type_name);
   for (enum ast_binop op = AST_BINOP_LT; op < AST_BINOP_BIT_XOR; op++) {
     intern_binop(cs, op, primop_array, &generics, &binop_type);
   }
@@ -405,14 +404,14 @@ void import_bool_binops(struct checkstate *cs) {
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
   struct ast_typeexpr binop_type;
-  init_binop_func_type(&binop_type, cs->im, BOOL_TYPE_NAME);
+  init_binop_func_type(&binop_type, cs, BOOL_TYPE_NAME);
   for (enum ast_binop op = AST_BINOP_BIT_XOR;
        op < AST_BINOP_BIT_LEFTSHIFT;
        op++) {
     intern_binop(cs, op, binop_bool_primitive_ops, &generics, &binop_type);
   }
   ast_typeexpr_destroy(&binop_type);
-  init_binop_compare_type(&binop_type, cs->im, BOOL_TYPE_NAME);
+  init_binop_compare_type(&binop_type, cs, BOOL_TYPE_NAME);
   for (enum ast_binop op = AST_BINOP_LT; op < AST_BINOP_BIT_XOR; op++) {
     intern_binop(cs, op, binop_bool_primitive_ops, &generics, &binop_type);
   }
@@ -423,14 +422,14 @@ void import_bool_binops(struct checkstate *cs) {
 void import_integer_conversions(struct checkstate *cs) {
   const size_t num_types = 8;
   ident_value types[8];
-  types[0] = identmap_intern_c_str(cs->im, U8_TYPE_NAME);
-  types[1] = identmap_intern_c_str(cs->im, I8_TYPE_NAME);
-  types[2] = identmap_intern_c_str(cs->im, U16_TYPE_NAME);
-  types[3] = identmap_intern_c_str(cs->im, I16_TYPE_NAME);
-  types[4] = identmap_intern_c_str(cs->im, U32_TYPE_NAME);
-  types[5] = identmap_intern_c_str(cs->im, I32_TYPE_NAME);
-  types[6] = identmap_intern_c_str(cs->im, SIZE_TYPE_NAME);
-  types[7] = identmap_intern_c_str(cs->im, OSIZE_TYPE_NAME);
+  types[0] = cs->cm.u8_type_name;
+  types[1] = cs->cm.i8_type_name;
+  types[2] = cs->cm.u16_type_name;
+  types[3] = cs->cm.i16_type_name;
+  types[4] = cs->cm.u32_type_name;
+  types[5] = cs->cm.i32_type_name;
+  types[6] = cs->cm.size_type_name;
+  types[7] = cs->cm.osize_type_name;
 
   ident_value convert = identmap_intern_c_str(cs->im, CONVERT_FUNCTION_NAME);
 
@@ -519,7 +518,7 @@ void import_integer_conversions(struct checkstate *cs) {
       ident_value names[2];
       names[0] = types[i];
       names[1] = types[j];
-      init_func_type(&func_type, cs->im, names, 2);
+      init_func_type(&func_type, &cs->cm, names, 2);
       name_table_add_primitive_def(cs->im,
                                    &cs->nt,
                                    convert,
@@ -541,7 +540,7 @@ void import_unop(struct checkstate *cs,
   struct ast_typeexpr type;
   ident_value args[2];
   args[0] = args[1] = identmap_intern_c_str(cs->im, type_name);
-  init_func_type(&type, cs->im, args, 2);
+  init_func_type(&type, &cs->cm, args, 2);
   name_table_add_primitive_def(
       cs->im,
       &cs->nt,
@@ -566,7 +565,7 @@ struct ast_generics one_param_generics(struct checkstate *cs, const char *name) 
 void import_sizeof_alignof(struct checkstate *cs) {
   struct ast_generics generics = one_param_generics(cs, "T");
   struct ast_typeexpr type;
-  init_name_type(&type, identmap_intern_c_str(cs->im, SIZE_TYPE_NAME));
+  init_name_type(&type, cs->cm.size_type_name);
 
   name_table_add_primitive_def(
       cs->im,
@@ -593,16 +592,14 @@ void make_ptr_func_type(struct checkstate *cs, struct ast_typeexpr *target, size
   size_t params_count = size_add(count, 1);
   struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
   for (size_t i = 0; i < count; i++) {
-    wrap_in_ptr(cs->im, target, &params[i]);
+    wrap_in_ptr(&cs->cm, target, &params[i]);
   }
 
   init_name_type(&params[count], identmap_intern_c_str(cs->im, return_type_name));
 
-  struct ast_ident name
-    = make_ast_ident(identmap_intern_c_str(cs->im, FUNC_TYPE_NAME));
   out->tag = AST_TYPEEXPR_APP;
   ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
-                   name, params, params_count);
+                   make_ast_ident(cs->cm.func), params, params_count);
 }
 
 void import_ptr_binops(struct checkstate *cs) {
@@ -644,13 +641,13 @@ void import_constructors(struct checkstate *cs) {
 
     name_table_add_primitive_def(cs->im,
                                  &cs->nt,
-                                 identmap_intern_c_str(cs->im, "init"),
+                                 cs->cm.init,
                                  make_primop(PRIMITIVE_OP_INIT),
                                  &generics,
                                  &func1);
     name_table_add_primitive_def(cs->im,
                                  &cs->nt,
-                                 identmap_intern_c_str(cs->im, "destroy"),
+                                 cs->cm.destroy,
                                  make_primop(PRIMITIVE_OP_DESTROY),
                                  &generics,
                                  &func1);
@@ -664,13 +661,13 @@ void import_constructors(struct checkstate *cs) {
 
     name_table_add_primitive_def(cs->im,
                                  &cs->nt,
-                                 identmap_intern_c_str(cs->im, "move"),
+                                 cs->cm.move,
                                  make_primop(PRIMITIVE_OP_MOVE),
                                  &generics,
                                  &func2);
     name_table_add_primitive_def(cs->im,
                                  &cs->nt,
-                                 identmap_intern_c_str(cs->im, "copy"),
+                                 cs->cm.copy,
                                  make_primop(PRIMITIVE_OP_COPY),
                                  &generics,
                                  &func2);
@@ -724,8 +721,7 @@ void checkstate_import_primitives(struct checkstate *cs) {
 }
 
 void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
-  a->tag = AST_TYPEEXPR_NAME;
-  a->u.name = make_ast_ident(identmap_intern_c_str(cs->im, BOOL_TYPE_NAME));
+  init_name_type(a, cs->cm.boole);
 }
 
 void stderr_errmsg(struct error_dump *ctx, struct identmap *im,
@@ -785,14 +781,12 @@ void copy_make_unary_func_type(struct checkstate *cs,
                                struct ast_typeexpr *arg_type,
                                struct ast_typeexpr *return_type,
                                struct ast_typeexpr *out) {
-
-  struct ast_ident name = make_ast_ident(identmap_intern_c_str(cs->im, FUNC_TYPE_NAME));
   struct ast_typeexpr *params = malloc_mul(sizeof(*params), 2);
   ast_typeexpr_init_copy(&params[0], arg_type);
   ast_typeexpr_init_copy(&params[1], return_type);
 
   out->tag = AST_TYPEEXPR_APP;
-  ast_typeapp_init(&out->u.app, ast_meta_make_garbage(), name,
+  ast_typeapp_init(&out->u.app, ast_meta_make_garbage(), make_ast_ident(cs->cm.func),
                    params, 2);
 }
 
@@ -839,8 +833,7 @@ int add_enum_constructors(struct checkstate *cs,
     struct ast_typeexpr func_type;
     func_type.tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&func_type.u.app, ast_meta_make_garbage(),
-                     make_ast_ident(identmap_intern_c_str(cs->im, FUNC_TYPE_NAME)),
-                     params, 2);
+                     make_ast_ident(cs->cm.func), params, 2);
 
     int success = name_table_add_primitive_def(
         cs->im,
@@ -858,7 +851,7 @@ int add_enum_constructors(struct checkstate *cs,
   return 1;
 }
 
-int make_complete_lambda_typeexpr(struct identmap *im, struct ast_expr *a, struct ast_typeexpr *out) {
+int make_complete_lambda_typeexpr(struct common_idents *cm, struct ast_expr *a, struct ast_typeexpr *out) {
   switch (a->tag) {
   case AST_EXPR_LAMBDA: {
     struct ast_lambda *lam = &a->u.lambda;
@@ -872,8 +865,7 @@ int make_complete_lambda_typeexpr(struct identmap *im, struct ast_expr *a, struc
 
     out->tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
-                     make_ast_ident(identmap_intern_c_str(im, FUNC_TYPE_NAME)),
-                     args, args_count);
+                     make_ast_ident(cm->func), args, args_count);
     return 1;
   } break;
   default:
@@ -894,7 +886,7 @@ int chase_through_toplevels(struct checkstate *cs,
     } break;
     case AST_TOPLEVEL_DEF: {
       if (!toplevel->u.def.has_typeexpr) {
-        if (!make_complete_lambda_typeexpr(cs->im, &toplevel->u.def.rhs, &toplevel->u.def.typeexpr)) {
+        if (!make_complete_lambda_typeexpr(&cs->cm, &toplevel->u.def.rhs, &toplevel->u.def.typeexpr)) {
           METERR(cs->im, toplevel->u.def.meta, "Incomplete type for def %.*s\n",
                  IM_P(cs->im, toplevel->u.def.name.value));
           return 0;
@@ -1215,13 +1207,13 @@ void make_pointee_func_lookup_type(struct checkstate *cs,
   size_t params_count = size_add(count, 1);
   struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
   for (size_t i = 0; i < count; i++) {
-    wrap_in_ptr(cs->im, a, &params[i]);
+    wrap_in_ptr(&cs->cm, a, &params[i]);
   }
   /* Unknown return type -- we'll match anything named
   "copy"/"move"/"destroy" with any return type. */
   params[count] = ast_unknown_garbage();
 
-  struct ast_ident func_name = make_ast_ident(identmap_intern_c_str(cs->im, FUNC_TYPE_NAME));
+  struct ast_ident func_name = make_ast_ident(cs->cm.func);
 
   out->tag = AST_TYPEEXPR_APP;
   ast_typeapp_init(&out->u.app, ast_meta_make_garbage(), func_name, params, params_count);
@@ -1232,7 +1224,7 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
                                  struct ast_typeexpr *a,
                                  /* copy/move takes 2, destroy takes 1. */
                                  size_t argdupes,
-                                 const char *name,
+                                 ident_value name,
                                  struct exprscope *also_typecheck,
                                  int *result_out,
                                  struct def_instantiation **inst_out) {
@@ -1240,7 +1232,7 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
   make_pointee_func_lookup_type(cs, a, argdupes, &func_type);
 
   struct ast_name_expr func_name;
-  ast_name_expr_init(&func_name, make_ast_ident(identmap_intern_c_str(cs->im, name)));
+  ast_name_expr_init(&func_name, make_ast_ident(name));
 
   size_t matching_defs = name_table_count_matching_defs(cs->im,
                                                         &cs->nt,
@@ -1264,8 +1256,8 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
                                          &unified,
                                          &lvalue_discard,
                                          &inst)) {
-        METERR(cs->im, *ast_typeexpr_meta(a), "Typecheck failed(?) when looking up %s definition.\n",
-               name);
+        METERR(cs->im, *ast_typeexpr_meta(a), "Typecheck failed(?) when looking up %.*s definition.\n",
+               IM_P(cs->im, name));
         goto fail;
       }
       ast_typeexpr_destroy(&unified);
@@ -1279,7 +1271,7 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
     return 1;
   }
 
-  METERR(cs->im, *ast_typeexpr_meta(a), "Multiple matching '%s' definitions\n", name);
+  METERR(cs->im, *ast_typeexpr_meta(a), "Multiple matching '%.*s' definitions\n", IM_P(cs->im, name));
  fail:
   ast_name_expr_destroy(&func_name);
   ast_typeexpr_destroy(&func_type);
@@ -1288,22 +1280,22 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
 
 int has_explicit_copy(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
                       struct def_instantiation **inst_out) {
-  return has_explicit_movecopydestroy(cs, a, 2, "do_copy", also_typecheck, result_out, inst_out);
+  return has_explicit_movecopydestroy(cs, a, 2, cs->cm.do_copy, also_typecheck, result_out, inst_out);
 }
 
 int has_explicit_destroy(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
                          struct def_instantiation **inst_out) {
-  return has_explicit_movecopydestroy(cs, a, 1, "do_destroy", also_typecheck, result_out, inst_out);
+  return has_explicit_movecopydestroy(cs, a, 1, cs->cm.do_destroy, also_typecheck, result_out, inst_out);
 }
 
 int has_explicit_move(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
                       struct def_instantiation **inst_out) {
-  return has_explicit_movecopydestroy(cs, a, 2, "do_move", also_typecheck, result_out, inst_out);
+  return has_explicit_movecopydestroy(cs, a, 2, cs->cm.do_move, also_typecheck, result_out, inst_out);
 }
 
 int has_explicit_init(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
                       struct def_instantiation **inst_out) {
-  return has_explicit_movecopydestroy(cs, a, 1, "do_init", also_typecheck, result_out, inst_out);
+  return has_explicit_movecopydestroy(cs, a, 1, cs->cm.do_init, also_typecheck, result_out, inst_out);
 }
 
 int check_typeexpr_traits(struct checkstate *cs,
@@ -2076,15 +2068,15 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
     shit all over again.) */
 
     /* TODO: avoid this string duping. */
-    if (name->ident.value == identmap_intern_c_str(cs->im, "copy")
-        || name->ident.value == identmap_intern_c_str(cs->im, "move")
-        || name->ident.value == identmap_intern_c_str(cs->im, "destroy")
-        || name->ident.value == identmap_intern_c_str(cs->im, "init")) {
+    if (name->ident.value == cs->cm.copy
+        || name->ident.value == cs->cm.move
+        || name->ident.value == cs->cm.destroy
+        || name->ident.value == cs->cm.init) {
       CHECK(unified.tag == AST_TYPEEXPR_APP
             && (unified.u.app.params_count == 2
                 || unified.u.app.params_count == 3));
       struct ast_typeexpr *optype;
-      if (!view_ptr_target(cs->im, &unified.u.app.params[0], &optype)) {
+      if (!view_ptr_target(&cs->cm, &unified.u.app.params[0], &optype)) {
         CRASH("Expected copy/move/init/destroy lookup to match pointer type.\n");
       }
 
@@ -2093,17 +2085,17 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
         goto fail_unified;
       }
 
-      if (name->ident.value == identmap_intern_c_str(cs->im, "copy")) {
+      if (name->ident.value == cs->cm.copy) {
         if (traits.copyable == TYPEEXPR_TRAIT_LACKED) {
           METERR(cs->im, name->meta, "Copy trait lacked.%s", "\n");
           goto fail_unified;
         }
-      } else if (name->ident.value == identmap_intern_c_str(cs->im, "move")) {
+      } else if (name->ident.value == cs->cm.move) {
         if (traits.movable == TYPEEXPR_TRAIT_LACKED) {
           METERR(cs->im, name->meta, "Copy trait lacked.%s", "\n");
           goto fail_unified;
         }
-      } else if (name->ident.value == identmap_intern_c_str(cs->im, "init")) {
+      } else if (name->ident.value == cs->cm.init) {
         if (traits.inittible == TYPEEXPR_TRAIT_LACKED) {
           METERR(cs->im, name->meta, "Init trait lacked.%s", "\n");
           goto fail_unified;
@@ -2480,11 +2472,9 @@ int check_funcall_funcexpr_ai(struct exprscope *es,
     }
     ast_typeexpr_init_copy(&args_types[args_count], partial_type);
 
-    ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
-
     funcexpr.tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
-                     make_ast_ident(func_ident),
+                     make_ast_ident(es->cs->cm.func),
                      args_types, args_types_count);
   }
 
@@ -2539,7 +2529,7 @@ int check_expr_funcall(struct exprscope *es,
   ast_exprcall_annotate(x->func, func_exprcatch);
 
   struct ast_typeexpr return_type;
-  copy_func_return_type(es->cs->im, ast_expr_type(&x->func->expr),
+  copy_func_return_type(&es->cs->cm, ast_expr_type(&x->func->expr),
                         size_add(args_count, 1), &return_type);
 
   struct ast_typeexpr temporary_type;
@@ -2712,8 +2702,7 @@ int check_statement(struct bodystate *bs,
       }
       expr_type = ast_expr_type(s->u.return_statement.expr);
     } else {
-      init_name_type(&void_type,
-                     identmap_intern_c_str(bs->es->cs->im, VOID_TYPE_NAME));
+      init_name_type(&void_type, bs->es->cs->cm.voide);
       expr_type = &void_type;
     }
 
@@ -2810,7 +2799,7 @@ int check_statement(struct bodystate *bs,
   } break;
   case AST_STATEMENT_IFTHEN: {
     struct ast_typeexpr boolean;
-    init_boolean_typeexpr(bs->es->cs, &boolean);
+    init_name_type(&boolean, bs->es->cs->cm.boole);
 
     int condition_result = check_expr(bs->es, s->u.ifthen_statement.condition, &boolean);
     ast_typeexpr_destroy(&boolean);
@@ -2828,7 +2817,7 @@ int check_statement(struct bodystate *bs,
   } break;
   case AST_STATEMENT_IFTHENELSE: {
     struct ast_typeexpr boolean;
-    init_boolean_typeexpr(bs->es->cs, &boolean);
+    init_name_type(&boolean, bs->es->cs->cm.boole);
 
     int condition_result = check_expr(bs->es, s->u.ifthenelse_statement.condition, &boolean);
     ast_typeexpr_destroy(&boolean);
@@ -2852,7 +2841,7 @@ int check_statement(struct bodystate *bs,
   } break;
   case AST_STATEMENT_WHILE: {
     struct ast_typeexpr boolean;
-    init_boolean_typeexpr(bs->es->cs, &boolean);
+    init_name_type(&boolean, bs->es->cs->cm.boole);
 
     int condition_result = check_expr(bs->es, s->u.while_statement.condition, &boolean);
     ast_typeexpr_destroy(&boolean);
@@ -2890,7 +2879,7 @@ int check_statement(struct bodystate *bs,
 
     if (fs->has_condition) {
       struct ast_typeexpr boolean;
-      init_boolean_typeexpr(bs->es->cs, &boolean);
+      init_name_type(&boolean, bs->es->cs->cm.boole);
 
       int condition_result = check_expr(bs->es, fs->condition, &boolean);
       ast_typeexpr_destroy(&boolean);
@@ -3111,7 +3100,7 @@ int check_expr_funcbody(struct exprscope *es,
     goto fail;
   }
 
-  ident_value void_ident = identmap_intern_c_str(es->cs->im, VOID_TYPE_NAME);
+  ident_value void_ident = es->cs->cm.voide;
   if (partial_type->tag == AST_TYPEEXPR_NAME
       && partial_type->u.name.value == void_ident) {
     if (!bs.have_exact_return_type) {
@@ -3151,7 +3140,6 @@ int check_expr_lambda(struct exprscope *es,
                       struct ast_typeexpr *partial_type,
                       struct ast_typeexpr *out) {
   CHECK_DBG("check_expr_lambda\n");
-  ident_value func_ident = identmap_intern_c_str(es->cs->im, FUNC_TYPE_NAME);
   size_t func_params_count = x->params_count;
   size_t args_count = size_add(func_params_count, 1);
 
@@ -3194,7 +3182,7 @@ int check_expr_lambda(struct exprscope *es,
 
     funcexpr.tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
-                     make_ast_ident(func_ident), args, args_count);
+                     make_ast_ident(es->cs->cm.func), args, args_count);
   }
 
   if (!unify_directionally(es->cs->im, partial_type, &funcexpr)) {
@@ -3316,7 +3304,7 @@ int check_expr_magic_binop(struct exprscope *es,
       goto cleanup;
     }
     struct ast_typeexpr boolean;
-    init_name_type(&boolean, identmap_intern_c_str(es->cs->im, BOOL_TYPE_NAME));
+    init_name_type(&boolean, es->cs->cm.boole);
 
     if (!unify_directionally(es->cs->im, &boolean, ast_expr_type(x->lhs))) {
       METERR(es->cs->im, x->meta, "LHS of and/or is non-boolean.%s", "\n");
@@ -3360,15 +3348,14 @@ int check_expr_binop(struct exprscope *es,
   return check_expr_magic_binop(es, x, partial_type, out, is_lvalue_out);
 }
 
-int view_ptr_target(struct identmap *im,
+int view_ptr_target(struct common_idents *cm,
                     struct ast_typeexpr *ptr_type,
                     struct ast_typeexpr **target_out) {
   if (ptr_type->tag != AST_TYPEEXPR_APP) {
     return 0;
   }
 
-  ident_value ptr_ident = identmap_intern_c_str(im, PTR_TYPE_NAME);
-  if (ptr_type->u.app.name.value != ptr_ident) {
+  if (ptr_type->u.app.name.value != cm->ptr) {
     return 0;
   }
 
@@ -3380,15 +3367,14 @@ int view_ptr_target(struct identmap *im,
   return 1;
 }
 
-void wrap_in_ptr(struct identmap *im,
+void wrap_in_ptr(struct common_idents *cm,
                  struct ast_typeexpr *target,
                  struct ast_typeexpr *ptr_out) {
   ptr_out->tag = AST_TYPEEXPR_APP;
   struct ast_typeexpr *params = malloc_mul(sizeof(*params), 1);
   ast_typeexpr_init_copy(&params[0], target);
   ast_typeapp_init(&ptr_out->u.app, ast_meta_make_garbage(),
-                   make_ast_ident(identmap_intern_c_str(im, PTR_TYPE_NAME)),
-                   params, 1);
+                   make_ast_ident(cm->ptr), params, 1);
 }
 
 int check_expr_magic_unop(struct exprscope *es,
@@ -3411,7 +3397,7 @@ int check_expr_magic_unop(struct exprscope *es,
   switch (x->operator) {
   case AST_UNOP_DEREFERENCE: {
     struct ast_typeexpr *rhs_target;
-    if (!view_ptr_target(es->cs->im, ast_expr_type(x->rhs), &rhs_target)) {
+    if (!view_ptr_target(&es->cs->cm, ast_expr_type(x->rhs), &rhs_target)) {
       METERR(es->cs->im, x->meta, "Trying to dereference a non-pointer.%s", "\n");
       goto cleanup;
     }
@@ -3433,8 +3419,7 @@ int check_expr_magic_unop(struct exprscope *es,
     }
 
     struct ast_typeexpr pointer_type;
-    wrap_in_ptr(es->cs->im, ast_expr_type(x->rhs),
-                &pointer_type);
+    wrap_in_ptr(&es->cs->cm, ast_expr_type(x->rhs), &pointer_type);
 
     if (!unify_directionally(es->cs->im, partial_type, &pointer_type)) {
       METERR(es->cs->im, x->meta, "Addressof results in wrong type.%s", "\n");
@@ -3626,9 +3611,9 @@ int check_expr_local_field_access(
 
   if (ast_expr_type(x->lhs)->tag == AST_TYPEEXPR_ARRAY
       && !x->fieldname.whole_field
-      && x->fieldname.ident.value == identmap_intern_c_str(es->cs->im, ARRAY_LENGTH_FIELDNAME)) {
+      && x->fieldname.ident.value == es->cs->cm.array_length_fieldname) {
     struct ast_typeexpr size_type;
-    init_name_type(&size_type, identmap_intern_c_str(es->cs->im, SIZE_TYPE_NAME));
+    init_name_type(&size_type, es->cs->cm.size_type_name);
 
     if (!unify_directionally(es->cs->im, partial_type, &size_type)) {
       ast_typeexpr_destroy(&size_type);
@@ -3683,7 +3668,7 @@ int check_expr_deref_field_access(
   }
 
   struct ast_typeexpr *ptr_target;
-  if (!view_ptr_target(es->cs->im, ast_expr_type(x->lhs), &ptr_target)) {
+  if (!view_ptr_target(&es->cs->cm, ast_expr_type(x->lhs), &ptr_target)) {
     METERR(es->cs->im, x->meta, "Dereferencing field access expects ptr type.%s", "\n");
     goto cleanup;
   }
@@ -3723,7 +3708,7 @@ int check_index_expr(struct exprscope *es,
   }
 
   struct ast_typeexpr rhs_partial_type;
-  init_name_type(&rhs_partial_type, identmap_intern_c_str(es->cs->im, SIZE_TYPE_NAME));
+  init_name_type(&rhs_partial_type, es->cs->cm.size_type_name);
   int check_rhs_result = check_expr(es, a->rhs, &rhs_partial_type);
   ast_typeexpr_destroy(&rhs_partial_type);
   if (!check_rhs_result) {
@@ -3733,7 +3718,7 @@ int check_index_expr(struct exprscope *es,
   struct ast_typeexpr *lhs_type = ast_expr_type(a->lhs);
 
   struct ast_typeexpr *lhs_target;
-  if (!view_ptr_target(es->cs->im, lhs_type, &lhs_target)) {
+  if (!view_ptr_target(&es->cs->cm, lhs_type, &lhs_target)) {
     if (lhs_type->tag != AST_TYPEEXPR_ARRAY) {
       METERR(es->cs->im, a->meta, "Indexing into a non-pointer, non-array type.%s", "\n");
       goto fail;
@@ -4051,7 +4036,7 @@ int check_expr_ai(struct exprscope *es,
   } break;
   case AST_EXPR_BOOL_LITERAL: {
     struct ast_typeexpr bool_type;
-    init_name_type(&bool_type, identmap_intern_c_str(es->cs->im, BOOL_TYPE_NAME));
+    init_name_type(&bool_type, es->cs->cm.boole);
     if (!unify_directionally(es->cs->im, partial_type, &bool_type)) {
       METERR(es->cs->im, x->u.bool_literal.meta, "Bool literal in bad place.%s", "\n");
       ast_typeexpr_destroy(&bool_type);
@@ -4065,7 +4050,7 @@ int check_expr_ai(struct exprscope *es,
     struct ast_typeexpr combined_type;
     {
       struct ast_typeexpr ptr_type;
-      wrap_in_ptr(es->cs->im, &unknown, &ptr_type);
+      wrap_in_ptr(&es->cs->cm, &unknown, &ptr_type);
       ast_typeexpr_destroy(&unknown);
 
       int res = combine_partial_types(es->cs->im, partial_type, &ptr_type,
@@ -4091,7 +4076,7 @@ int check_expr_ai(struct exprscope *es,
   } break;
   case AST_EXPR_VOID_LITERAL: {
     struct ast_typeexpr void_type;
-    init_name_type(&void_type, identmap_intern_c_str(es->cs->im, VOID_TYPE_NAME));
+    init_name_type(&void_type, es->cs->cm.voide);
     if (!unify_directionally(es->cs->im, partial_type, &void_type)) {
       METERR(es->cs->im, x->u.void_literal.meta, "Void literal in bad place.%s", "\n");
       ast_typeexpr_destroy(&void_type);
@@ -4135,7 +4120,7 @@ int check_expr_ai(struct exprscope *es,
     struct ast_typeexpr array_type;
     {
       struct ast_typeexpr char_type;
-      init_name_type(&char_type, identmap_intern_c_str(es->cs->im, CHAR_STANDIN_TYPE_NAME));
+      init_name_type(&char_type, es->cs->cm.char_standin_type_name);
       array_type.tag = AST_TYPEEXPR_ARRAY;
       struct ast_numeric_literal number = numeric_literal_from_u32(array_size);
       ast_arraytype_init(&array_type.u.arraytype, ast_meta_make_garbage(), number, char_type);
@@ -4439,27 +4424,28 @@ int numeric_literal_to_i8(struct ast_numeric_literal *a, int8_t *out) {
 }
 
 int eval_static_numeric_literal(struct identmap *im,
+                                struct common_idents *cm,
                                 struct ast_typeexpr *type,
                                 struct ast_numeric_literal *a,
                                 struct static_value *out) {
   CHECK(type->tag == AST_TYPEEXPR_NAME);
   CHECK(is_numeric_type(im, type));
 
-  if (type->u.name.value == identmap_intern_c_str(im, I32_TYPE_NAME)) {
+  if (type->u.name.value == cm->i32_type_name) {
     int32_t value;
     if (!numeric_literal_to_i32(a, &value)) {
       return 0;
     }
     static_value_init_i32(out, value);
     return 1;
-  } else if (type->u.name.value == identmap_intern_c_str(im, U32_TYPE_NAME)) {
+  } else if (type->u.name.value == cm->u32_type_name) {
     uint32_t value;
     if (!numeric_literal_to_u32(a, &value)) {
       return 0;
     }
     static_value_init_u32(out, value);
     return 1;
-  } else if (type->u.name.value == identmap_intern_c_str(im, U8_TYPE_NAME)) {
+  } else if (type->u.name.value == cm->u8_type_name) {
     uint8_t value;
     if (!numeric_literal_to_u8(a, &value)) {
       return 0;
@@ -4474,8 +4460,8 @@ int eval_static_numeric_literal(struct identmap *im,
   }
 }
 
-int eval_static_value(struct identmap *im, struct ast_expr *expr,
-                      struct static_value *out);
+int eval_static_value(struct identmap *im, struct common_idents *cm,
+                      struct ast_expr *expr, struct static_value *out);
 
 int32_t st_i32(struct static_value *value) {
   CHECK(value->tag == STATIC_VALUE_I32);
@@ -4870,11 +4856,12 @@ int apply_static_funcall(struct static_value *func,
 }
 
 int eval_static_funcall(struct identmap *im,
+                        struct common_idents *cm,
                         struct ast_funcall *funcall,
                         struct static_value *out) {
   int ret = 0;
   struct static_value func_value;
-  if (!eval_static_value(im, &funcall->func->expr, &func_value)) {
+  if (!eval_static_value(im, cm, &funcall->func->expr, &func_value)) {
     goto cleanup;
   }
 
@@ -4882,7 +4869,7 @@ int eval_static_funcall(struct identmap *im,
   struct static_value *params = malloc_mul(sizeof(*params), params_count);
   size_t i = 0;
   for (; i < params_count; i++) {
-    if (!eval_static_value(im, &funcall->args[i].expr, &params[i])) {
+    if (!eval_static_value(im, cm, &funcall->args[i].expr, &params[i])) {
       goto cleanup_params;
     }
   }
@@ -4902,6 +4889,7 @@ int eval_static_funcall(struct identmap *im,
 
 /* expr must have been annotated by typechecking. */
 int eval_static_value(struct identmap *im,
+                      struct common_idents *cm,
                       struct ast_expr *expr,
                       struct static_value *out) {
   switch (expr->tag) {
@@ -4915,7 +4903,7 @@ int eval_static_value(struct identmap *im,
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL:
-    return eval_static_numeric_literal(im,
+    return eval_static_numeric_literal(im, cm,
                                        ast_expr_type(expr),
                                        &expr->u.numeric_literal, out);
   case AST_EXPR_BOOL_LITERAL:
@@ -4931,7 +4919,7 @@ int eval_static_value(struct identmap *im,
   case AST_EXPR_STRING_LITERAL:
     CRASH("String literal static value evaluation is not supported.\n");
   case AST_EXPR_FUNCALL:
-    return eval_static_funcall(im, &expr->u.funcall, out);
+    return eval_static_funcall(im, cm, &expr->u.funcall, out);
   case AST_EXPR_INDEX: {
     /* Array indexing might be deemed such, but right now non-integer,
     non-lambda types are not deemed statically evaluable. */
@@ -4961,7 +4949,7 @@ int eval_static_value(struct identmap *im,
           "statically evaluable.\n");
   } break;
   case AST_EXPR_TYPED:
-    return eval_static_value(im, expr->u.typed_expr.expr, out);
+    return eval_static_value(im, cm, expr->u.typed_expr.expr, out);
   case AST_EXPR_STRINIT:
     CRASH("No struct literal should have been deemed statically evaluable.\n");
   default:
@@ -4969,7 +4957,8 @@ int eval_static_value(struct identmap *im,
   }
 }
 
-int compute_static_values(struct identmap *im, struct name_table *nt, struct def_entry *ent) {
+int compute_static_values(struct identmap *im, struct common_idents *cm, struct name_table *nt,
+                          struct def_entry *ent) {
   int is_primitive = ent->is_primitive;
   CHECK(is_primitive || ent->def != NULL);
   for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
@@ -4994,7 +4983,7 @@ int compute_static_values(struct identmap *im, struct name_table *nt, struct def
     } else {
       CHECK(inst->typecheck_started);
       struct static_value value;
-      if (!eval_static_value(im, di_annotated_rhs(inst), &value)) {
+      if (!eval_static_value(im, cm, di_annotated_rhs(inst), &value)) {
         return 0;
       }
       static_value_init_move(di_value_for_set(inst), &value);
@@ -5004,7 +4993,7 @@ int compute_static_values(struct identmap *im, struct name_table *nt, struct def
   return 1;
 }
 
-int chase_def_entry_acyclicity(struct identmap *im, struct name_table *nt,
+int chase_def_entry_acyclicity(struct identmap *im, struct common_idents *cm, struct name_table *nt,
                                struct def_entry *ent) {
   if (ent->known_acyclic) {
     return 1;
@@ -5016,7 +5005,7 @@ int chase_def_entry_acyclicity(struct identmap *im, struct name_table *nt,
   }
   ent->acyclicity_being_chased = 1;
   for (size_t i = 0, e = ent->static_references_count; i < e; i++) {
-    if (!chase_def_entry_acyclicity(im, nt, ent->static_references[i])) {
+    if (!chase_def_entry_acyclicity(im, cm, nt, ent->static_references[i])) {
       return 0;
     }
   }
@@ -5026,7 +5015,7 @@ int chase_def_entry_acyclicity(struct identmap *im, struct name_table *nt,
   ent->known_acyclic = 1;
 
   if (!ent->is_extern) {
-    if (!compute_static_values(im, nt, ent)) {
+    if (!compute_static_values(im, cm, nt, ent)) {
       return 0;
     }
   }
@@ -5037,7 +5026,7 @@ int chase_def_entry_acyclicity(struct identmap *im, struct name_table *nt,
 int check_def_acyclicity(struct checkstate *cs) {
   for (size_t i = 0, e = cs->nt.defs_count; i < e; i++) {
     struct def_entry *ent = cs->nt.defs[i];
-    if (!chase_def_entry_acyclicity(cs->im, &cs->nt, ent)) {
+    if (!chase_def_entry_acyclicity(cs->im, &cs->cm, &cs->nt, ent)) {
       return 0;
     }
   }

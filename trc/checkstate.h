@@ -14,8 +14,35 @@ struct import {
   struct ast_file *file;
 };
 
+struct common_idents {
+  ident_value ptr;
+  ident_value func;
+  ident_value boole;
+  ident_value voide;
+  ident_value size;
+  ident_value init;
+  ident_value destroy;
+  ident_value move;
+  ident_value copy;
+  ident_value do_init;
+  ident_value do_destroy;
+  ident_value do_move;
+  ident_value do_copy;
+  ident_value array_length_fieldname;
+  ident_value u32_type_name;
+  ident_value i32_type_name;
+  ident_value u16_type_name;
+  ident_value i16_type_name;
+  ident_value u8_type_name;
+  ident_value i8_type_name;
+  ident_value size_type_name;
+  ident_value osize_type_name;
+  ident_value char_standin_type_name;
+};
+
 struct checkstate {
   struct identmap *im;
+  struct common_idents cm;
 
   struct import *imports;
   size_t imports_count;
