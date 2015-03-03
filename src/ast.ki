@@ -141,6 +141,14 @@ deftype ast_return_statement struct {
   expr opt[box[ast_expr]];
 };
 
+deftype ast_label_statement struct {
+  name ast_ident;
+};
+
+deftype ast_goto_statement struct {
+  target ast_ident;
+};
+
 defenum ast_statement {
   Expr ast_expr;
   Return ast_return_statement;
@@ -150,6 +158,8 @@ defenum ast_statement {
   While ast_while_statement;
   For ast_for_statement;
   Switch ast_switch_statement;
+  Label ast_label_statement;
+  Goto ast_goto_statement;
 };
 
 defenum ast_case_pattern {

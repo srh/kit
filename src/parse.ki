@@ -919,12 +919,38 @@ func parse_statement(p *ps, out *ast_statement) bool {
           step(p);
           return parse_rest_of_switch_statement(p, out);
         }
+        case Label(v): {
+          step(p);
+          return parse_rest_of_label_statement(p, out);
+        }
+        case Goto(v): {
+          step(p);
+          return parse_rest_of_goto_statement(p, out);
+        }
         default: { }
       }
     }
     default: { }
   }
   return parse_naked_var_or_expr_statement(p, ForceAssignmentNo(void), out);
+}
+
+func parse_rest_of_label_statement(p *ps, out *ast_statement) bool {
+  name ast_ident;
+  if !(parse_ident(p, &name) && try_skip_token(p, mk_oper(';'))) {
+    return Fail;
+  }
+  *out = Label({name});
+  return true;
+}
+
+func parse_rest_of_goto_statement(p *ps, out *ast_statement) bool {
+  target ast_ident;
+  if !(parse_ident(p, &target) && try_skip_token(p, mk_oper(';'))) {
+    return Fail;
+  }
+  *out = Goto({target});
+  return true;
 }
 
 func parse_rest_of_var_statement(p *ps, out *ast_statement) bool {
