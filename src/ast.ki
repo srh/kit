@@ -8,20 +8,11 @@ deftype interval struct {
   right pos;
 };
 
-defenum ast_syntax {
-  SingleLineComment interval;
-  MultiLineComment interval;
-  Token interval;
-};
-
-deftype ast_meta struct {
-  interval interval;
-  syntaxes array[ast_syntax];
-};
-
 deftype ast_ident struct {
   value ident_value;
 };
+
+// Add pos info below.
 
 deftype ast_hex_literal struct {
   digits array[i8];

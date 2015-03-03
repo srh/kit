@@ -1,1 +1,3 @@
 deftype pos size;
+
+def `~` fn[size, pos] = wrapconvert@[pos, size];
