@@ -1221,6 +1221,7 @@ void make_pointee_func_lookup_type(struct checkstate *cs,
 
 /* Returns false if multiple matching definitions. */
 int has_explicit_movecopydestroy(struct checkstate *cs,
+                                 struct ast_meta *meta,
                                  struct ast_typeexpr *a,
                                  /* copy/move takes 2, destroy takes 1. */
                                  size_t argdupes,
@@ -1256,7 +1257,7 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
                                          &unified,
                                          &lvalue_discard,
                                          &inst)) {
-        METERR(cs->im, *ast_typeexpr_meta(a), "Typecheck failed(?) when looking up %.*s definition.\n",
+        METERR(cs->im, *meta, "Typecheck failed(?) when looking up %.*s definition.\n",
                IM_P(cs->im, name));
         goto fail;
       }
@@ -1271,31 +1272,31 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
     return 1;
   }
 
-  METERR(cs->im, *ast_typeexpr_meta(a), "Multiple matching '%.*s' definitions\n", IM_P(cs->im, name));
+  METERR(cs->im, *meta, "Multiple matching '%.*s' definitions\n", IM_P(cs->im, name));
  fail:
   ast_name_expr_destroy(&func_name);
   ast_typeexpr_destroy(&func_type);
   return 0;
 }
 
-int has_explicit_copy(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
+int has_explicit_copy(struct checkstate *cs, struct ast_meta *meta, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
                       struct def_instantiation **inst_out) {
-  return has_explicit_movecopydestroy(cs, a, 2, cs->cm.do_copy, also_typecheck, result_out, inst_out);
+  return has_explicit_movecopydestroy(cs, meta, a, 2, cs->cm.do_copy, also_typecheck, result_out, inst_out);
 }
 
-int has_explicit_destroy(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
+int has_explicit_destroy(struct checkstate *cs, struct ast_meta *meta, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
                          struct def_instantiation **inst_out) {
-  return has_explicit_movecopydestroy(cs, a, 1, cs->cm.do_destroy, also_typecheck, result_out, inst_out);
+  return has_explicit_movecopydestroy(cs, meta, a, 1, cs->cm.do_destroy, also_typecheck, result_out, inst_out);
 }
 
-int has_explicit_move(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
+int has_explicit_move(struct checkstate *cs, struct ast_meta *meta, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
                       struct def_instantiation **inst_out) {
-  return has_explicit_movecopydestroy(cs, a, 2, cs->cm.do_move, also_typecheck, result_out, inst_out);
+  return has_explicit_movecopydestroy(cs, meta, a, 2, cs->cm.do_move, also_typecheck, result_out, inst_out);
 }
 
-int has_explicit_init(struct checkstate *cs, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
+int has_explicit_init(struct checkstate *cs, struct ast_meta *meta, struct ast_typeexpr *a, struct exprscope *also_typecheck, int *result_out,
                       struct def_instantiation **inst_out) {
-  return has_explicit_movecopydestroy(cs, a, 1, cs->cm.do_init, also_typecheck, result_out, inst_out);
+  return has_explicit_movecopydestroy(cs, meta, a, 1, cs->cm.do_init, also_typecheck, result_out, inst_out);
 }
 
 int check_typeexpr_traits(struct checkstate *cs,
@@ -1345,25 +1346,25 @@ int finish_checking_name_traits(struct checkstate *cs,
 
   int explicit_move;
   struct def_instantiation *move_inst;
-  if (!has_explicit_move(cs, a, also_typecheck, &explicit_move, &move_inst)) {
+  if (!has_explicit_move(cs, deftype_meta, a, also_typecheck, &explicit_move, &move_inst)) {
     return 0;
   }
 
   int explicit_copy;
   struct def_instantiation *copy_inst;
-  if (!has_explicit_copy(cs, a, also_typecheck, &explicit_copy, &copy_inst)) {
+  if (!has_explicit_copy(cs, deftype_meta, a, also_typecheck, &explicit_copy, &copy_inst)) {
     return 0;
   }
 
   int explicit_destroy;
   struct def_instantiation *destroy_inst;
-  if (!has_explicit_destroy(cs, a, also_typecheck, &explicit_destroy, &destroy_inst)) {
+  if (!has_explicit_destroy(cs, deftype_meta, a, also_typecheck, &explicit_destroy, &destroy_inst)) {
     return 0;
   }
 
   int explicit_init;
   struct def_instantiation *init_inst;
-  if (!has_explicit_init(cs, a, also_typecheck, &explicit_init, &init_inst)) {
+  if (!has_explicit_init(cs, deftype_meta, a, also_typecheck, &explicit_init, &init_inst)) {
     return 0;
   }
 
