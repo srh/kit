@@ -654,8 +654,11 @@ enum allow_blanks {
   ALLOW_BLANKS_YES,
 };
 
-int help_parse_typeexpr(struct ps *p, enum allow_blanks allow_blanks, struct ast_typeexpr *out);
-int parse_typeexpr(struct ps *p, struct ast_typeexpr *out);
+int help_parse_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
+                        struct ast_typeexpr *out,
+                        struct pos *pos_end_out);
+int parse_typeexpr(struct ps *p, struct ast_typeexpr *out,
+                   struct pos *pos_end_out);
 
 int help_parse_vardecl(struct ps *p, enum allow_blanks allow_blanks, struct ast_vardecl *out) {
   struct pos pos_start = ps_pos(p);
@@ -667,17 +670,18 @@ int help_parse_vardecl(struct ps *p, enum allow_blanks allow_blanks, struct ast_
     goto fail_name;
   }
 
+  struct pos type_pos_end;
   struct ast_typeexpr type;
   if (allow_blanks == ALLOW_BLANKS_YES && !is_typeexpr_firstchar(ps_peek(p))) {
     type.tag = AST_TYPEEXPR_UNKNOWN;
     ast_unknown_init(&type.u.unknown, ast_meta_make(name.meta.pos_end, name.meta.pos_end));
   } else {
-    if (!help_parse_typeexpr(p, allow_blanks, &type)) {
+    if (!help_parse_typeexpr(p, allow_blanks, &type, &type_pos_end)) {
       goto fail_name;
     }
   }
 
-  ast_vardecl_init(out, ast_meta_make(pos_start, ast_typeexpr_meta(&type)->pos_end),
+  ast_vardecl_init(out, ast_meta_make(pos_start, type_pos_end),
                    name, type);
   return 1;
 
@@ -1079,17 +1083,12 @@ int parse_rest_of_switch_statement(struct ps *p, struct pos pos_start,
   return 0;
 }
 
-int parse_rest_of_pointer(struct ps *p, struct ast_meta star_operator_meta,
-                          enum allow_blanks allow_blanks,
-                          struct ast_typeexpr *out);
 enum tri triparse_numeric_literal(struct ps *p, struct ast_numeric_literal *out);
 int parse_rest_of_index_param(struct ps *p, struct ast_expr *out);
 int parse_after_atomic(struct ps *p, struct pos pos_start, struct ast_expr lhs,
                        int precedence_context, struct ast_expr *out);
-int continue_ident_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
-                            struct ast_ident name, struct ast_typeexpr *out);
 enum tri help_triparse_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
-                                struct ast_typeexpr *out);
+                                struct ast_typeexpr *out, struct pos *pos_end_out);
 
 struct ambig_indexer {
   struct pos type_start;
@@ -1123,13 +1122,13 @@ void expressionize(struct ast_ident name,
 }
 
 void collapse_indexers(struct ambig_indexer *indexers, size_t indexers_count,
-                       struct ast_typeexpr param, struct ast_typeexpr *out) {
-  struct pos pos_end = ast_typeexpr_meta(&param)->pos_end;
+                       struct ast_typeexpr param, struct pos param_pos_end,
+                       struct ast_typeexpr *out) {
   for (size_t i = indexers_count; i > 0;) {
     i--;
     struct ast_typeexpr tmp;
     tmp.tag = AST_TYPEEXPR_ARRAY;
-    ast_arraytype_init(&tmp.u.arraytype, ast_meta_make(indexers[i].type_start, pos_end),
+    ast_arraytype_init(&tmp.u.arraytype, ast_meta_make(indexers[i].type_start, param_pos_end),
                        indexers[i].number, param);
     param = tmp;
   }
@@ -1183,6 +1182,7 @@ enum tri triparse_naked_var_or_expr_statement(
     size_t indexers_limit = 0;
 
     struct ast_typeexpr type;
+    struct pos type_pos_end;
     for (;;) {
       struct pos type_start = ps_pos(p);
       if (try_skip_char(p, '[')) {
@@ -1230,7 +1230,9 @@ enum tri triparse_naked_var_or_expr_statement(
         continue;
       } else {
         struct ast_typeexpr local_type;
-        enum tri local_type_res = help_triparse_typeexpr(p, ALLOW_BLANKS_YES, &local_type);
+        struct pos local_type_pos_end;
+        enum tri local_type_res = help_triparse_typeexpr(p, ALLOW_BLANKS_YES, &local_type,
+                                                         &local_type_pos_end);
         switch (local_type_res) {
         case TRI_QUICKFAIL: {
           PARSE_DBG("%u:%u: triparse_naked_var whole expr\n", p->line, p->column);
@@ -1241,7 +1243,8 @@ enum tri triparse_naked_var_or_expr_statement(
         case TRI_ERROR:
           goto error_indexers;
         case TRI_SUCCESS: {
-          collapse_indexers(indexers, indexers_count, local_type, &type);
+          collapse_indexers(indexers, indexers_count, local_type, local_type_pos_end, &type);
+          type_pos_end = local_type_pos_end;
           goto build_vardecl;
         } break;
         default:
@@ -1253,8 +1256,7 @@ enum tri triparse_naked_var_or_expr_statement(
     SLICE_FREE(indexers, indexers_count, ambig_indexer_destroy);
     goto error_name;
   build_vardecl:
-    ast_vardecl_init(&decl, ast_meta_make(pos_start, ast_typeexpr_meta(&type)->pos_end),
-                     name, type);
+    ast_vardecl_init(&decl, ast_meta_make(pos_start, type_pos_end), name, type);
   }
 
   if (!skip_ws(p)) {
@@ -1400,8 +1402,9 @@ int parse_lambdaspec(struct ps *p,
   }
 
   PARSE_DBG("parse_lambdaspec parsing return type\n");
+  struct pos return_type_pos_end_discard;
   struct ast_typeexpr return_type;
-  if (!(skip_ws(p) && parse_typeexpr(p, &return_type))) {
+  if (!(skip_ws(p) && parse_typeexpr(p, &return_type, &return_type_pos_end_discard))) {
     goto fail_params;
   }
 
@@ -1798,7 +1801,9 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
       return 0;
     }
     struct ast_typeexpr type;
-    if (!(skip_ws(p) && help_parse_typeexpr(p, ALLOW_BLANKS_YES, &type))) {
+    struct pos type_pos_end_discard;
+    if (!(skip_ws(p) && help_parse_typeexpr(p, ALLOW_BLANKS_YES, &type,
+                                            &type_pos_end_discard))) {
       return 0;
     }
     struct ast_expr expr;
@@ -2081,13 +2086,15 @@ int parse_braced_fields(struct ps *p,
 }
 
 int parse_rest_of_structe(struct ps *p, enum allow_blanks allow_blanks, struct pos pos_start,
-                          struct ast_structe *out) {
+                          struct ast_structe *out, struct pos *pos_end_out) {
   struct ast_vardecl *fields;
   size_t fields_count;
   if (!(skip_ws(p) && parse_braced_fields(p, allow_blanks, &fields, &fields_count))) {
     return 0;
   }
-  ast_structe_init(out, ast_meta_make(pos_start, ps_pos(p)),
+  struct pos pos_end = ps_pos(p);
+  *pos_end_out = pos_end;
+  ast_structe_init(out, ast_meta_make(pos_start, pos_end),
                    fields, fields_count);
   return 1;
 }
@@ -2095,23 +2102,26 @@ int parse_rest_of_structe(struct ps *p, enum allow_blanks allow_blanks, struct p
 int parse_rest_of_unione(struct ps *p,
                          enum allow_blanks allow_blanks,
                          struct pos pos_start,
-                         struct ast_unione *out) {
+                         struct ast_unione *out,
+                         struct pos *pos_end_out) {
   struct ast_vardecl *fields;
   size_t fields_count;
   if (!(skip_ws(p) && parse_braced_fields(p, allow_blanks, &fields, &fields_count))) {
     return 0;
   }
-  ast_unione_init(out, ast_meta_make(pos_start, ps_pos(p)),
+  struct pos pos_end = ps_pos(p);
+  *pos_end_out = pos_end;
+  ast_unione_init(out, ast_meta_make(pos_start, pos_end),
                   fields, fields_count);
   return 1;
 }
 
 int continue_parsing_arraytype(struct ps *p, enum allow_blanks allow_blanks,
                                struct pos pos_start, struct ast_numeric_literal number,
-                               struct ast_arraytype *out) {
+                               struct ast_arraytype *out, struct pos *pos_end_out) {
   struct ast_typeexpr param;
   if (!(skip_ws(p) && try_skip_char(p, ']') && skip_ws(p) &&
-        help_parse_typeexpr(p, allow_blanks, &param))) {
+        help_parse_typeexpr(p, allow_blanks, &param, pos_end_out))) {
     goto fail;
   }
 
@@ -2125,7 +2135,8 @@ int continue_parsing_arraytype(struct ps *p, enum allow_blanks allow_blanks,
 
 int parse_rest_of_arraytype(struct ps *p, enum allow_blanks allow_blanks,
                             struct pos pos_start,
-                            struct ast_arraytype *out) {
+                            struct ast_arraytype *out,
+                            struct pos *pos_end_out) {
   if (!skip_ws(p)) {
     return 0;
   }
@@ -2134,18 +2145,20 @@ int parse_rest_of_arraytype(struct ps *p, enum allow_blanks allow_blanks,
     return 0;
   }
 
-  return continue_parsing_arraytype(p, allow_blanks, pos_start, number, out);
+  return continue_parsing_arraytype(p, allow_blanks, pos_start, number, out, pos_end_out);
 }
 
 int parse_rest_of_pointer(struct ps *p, struct ast_meta star_operator_meta,
                           enum allow_blanks allow_blanks,
-                          struct ast_typeexpr *out) {
+                          struct ast_typeexpr *out,
+                          struct pos *pos_end_out) {
   if (!skip_ws(p)) {
     goto fail;
   }
 
   struct ast_typeexpr param;
-  if (!help_parse_typeexpr(p, allow_blanks, &param)) {
+  struct pos param_pos_end;
+  if (!help_parse_typeexpr(p, allow_blanks, &param, &param_pos_end)) {
     goto fail;
   }
 
@@ -2159,8 +2172,9 @@ int parse_rest_of_pointer(struct ps *p, struct ast_meta star_operator_meta,
   params[0] = param;
 
   out->tag = AST_TYPEEXPR_APP;
-  ast_typeapp_init(&out->u.app, ast_meta_make(pos_start, ps_pos(p)),
+  ast_typeapp_init(&out->u.app, ast_meta_make(pos_start, param_pos_end),
                    star_name, params, 1);
+  *pos_end_out = param_pos_end;
   return 1;
 
  fail:
@@ -2196,7 +2210,8 @@ int parse_rest_of_type_param_list(struct ps *p,
     }
 
     struct ast_typeexpr typeexpr;
-    if (!help_parse_typeexpr(p, allow_blanks, &typeexpr)) {
+    struct pos pos_end_discard;
+    if (!help_parse_typeexpr(p, allow_blanks, &typeexpr, &pos_end_discard)) {
       goto fail;
     }
     SLICE_PUSH(params, params_count, params_limit, typeexpr);
@@ -2208,7 +2223,9 @@ int parse_rest_of_type_param_list(struct ps *p,
 }
 
 int continue_ident_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
-                            struct ast_ident name, struct ast_typeexpr *out) {
+                            struct ast_ident name, struct ast_typeexpr *out,
+                            struct pos *pos_end_out) {
+  struct pos after_ident = ps_pos(p);
   if (!skip_ws(p)) {
     goto fail_ident;
   }
@@ -2216,6 +2233,7 @@ int continue_ident_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
   if (!try_skip_char(p, '[')) {
     out->tag = AST_TYPEEXPR_NAME;
     out->u.name = name;
+    *pos_end_out = after_ident;
     return 1;
   }
 
@@ -2225,8 +2243,10 @@ int continue_ident_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
     goto fail_ident;
   }
 
+  struct pos pos_end = ps_pos(p);
+  *pos_end_out = pos_end;
   out->tag = AST_TYPEEXPR_APP;
-  ast_typeapp_init(&out->u.app, ast_meta_make(name.meta.pos_start, ps_pos(p)),
+  ast_typeapp_init(&out->u.app, ast_meta_make(name.meta.pos_start, pos_end),
                    name, params, params_count);
   return 1;
  fail_ident:
@@ -2235,25 +2255,25 @@ int continue_ident_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
 }
 
 enum tri help_triparse_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
-                                struct ast_typeexpr *out) {
+                                struct ast_typeexpr *out, struct pos *pos_end_out) {
   struct pos pos_start = ps_pos(p);
   if (try_skip_keyword(p, "struct")) {
     out->tag = AST_TYPEEXPR_STRUCTE;
-    return success_or_fail(parse_rest_of_structe(p, allow_blanks, pos_start, &out->u.structe));
+    return success_or_fail(parse_rest_of_structe(p, allow_blanks, pos_start, &out->u.structe, pos_end_out));
   }
 
   if (try_skip_keyword(p, "union")) {
     out->tag = AST_TYPEEXPR_UNIONE;
-    return success_or_fail(parse_rest_of_unione(p, allow_blanks, pos_start, &out->u.unione));
+    return success_or_fail(parse_rest_of_unione(p, allow_blanks, pos_start, &out->u.unione, pos_end_out));
   }
 
   if (try_skip_char(p, '[')) {
     out->tag = AST_TYPEEXPR_ARRAY;
-    return success_or_fail(parse_rest_of_arraytype(p, allow_blanks, pos_start, &out->u.arraytype));
+    return success_or_fail(parse_rest_of_arraytype(p, allow_blanks, pos_start, &out->u.arraytype, pos_end_out));
   }
 
   if (try_skip_char(p, '*')) {
-    return success_or_fail(parse_rest_of_pointer(p, ast_meta_make(pos_start, ps_pos(p)), allow_blanks, out));
+    return success_or_fail(parse_rest_of_pointer(p, ast_meta_make(pos_start, ps_pos(p)), allow_blanks, out, pos_end_out));
   }
 
   struct ps_savestate before_underscore = ps_save(p);
@@ -2261,6 +2281,7 @@ enum tri help_triparse_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
     if (allow_blanks) {
       out->tag = AST_TYPEEXPR_UNKNOWN;
       ast_unknown_init(&out->u.unknown, ast_meta_make(pos_start, ps_pos(p)));
+      *pos_end_out = ps_pos(p);
       return TRI_SUCCESS;
     } else {
       ps_restore(p, before_underscore);
@@ -2271,7 +2292,7 @@ enum tri help_triparse_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
   struct ast_ident name;
   switch (triparse_ident(p, &name)) {
   case TRI_SUCCESS:
-    return success_or_fail(continue_ident_typeexpr(p, allow_blanks, name, out));
+    return success_or_fail(continue_ident_typeexpr(p, allow_blanks, name, out, pos_end_out));
   case TRI_QUICKFAIL:
     return TRI_QUICKFAIL;
   case TRI_ERROR:
@@ -2281,12 +2302,13 @@ enum tri help_triparse_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
   }
 }
 
-int help_parse_typeexpr(struct ps *p, enum allow_blanks allow_blanks, struct ast_typeexpr *out) {
-  return TRI_SUCCESS == help_triparse_typeexpr(p, allow_blanks, out);
+int help_parse_typeexpr(struct ps *p, enum allow_blanks allow_blanks, struct ast_typeexpr *out,
+                        struct pos *pos_end_out) {
+  return TRI_SUCCESS == help_triparse_typeexpr(p, allow_blanks, out, pos_end_out);
 }
 
-int parse_typeexpr(struct ps *p, struct ast_typeexpr *out) {
-  return help_parse_typeexpr(p, ALLOW_BLANKS_NO, out);
+int parse_typeexpr(struct ps *p, struct ast_typeexpr *out, struct pos *pos_end_out) {
+  return help_parse_typeexpr(p, ALLOW_BLANKS_NO, out, pos_end_out);
 }
 
 int parse_type_params_if_present(struct ps *p,
@@ -2376,7 +2398,8 @@ int parse_rest_of_def(struct ps *p, struct pos pos_start,
   if (try_skip_oper(p, "=")) {
     has_typeexpr = 0;
   } else {
-    if (!parse_typeexpr(p, &typeexpr)) {
+    struct pos pos_end_discard;
+    if (!parse_typeexpr(p, &typeexpr, &pos_end_discard)) {
       goto fail_ident;
     }
     has_typeexpr = 1;
@@ -2459,7 +2482,8 @@ int parse_rest_of_extern_def(struct ps *p, struct pos pos_start,
   }
 
   struct ast_typeexpr type;
-  if (!(skip_ws(p) && parse_typeexpr(p, &type))) {
+  struct pos type_pos_end_discard;
+  if (!(skip_ws(p) && parse_typeexpr(p, &type, &type_pos_end_discard))) {
     goto fail_ident;
   }
 
@@ -2528,7 +2552,8 @@ int parse_rest_of_deftype(struct ps *p, struct pos pos_start,
     goto fail_generics;
   }
   struct ast_typeexpr type;
-  if (!(skip_ws(p) && parse_typeexpr(p, &type))) {
+  struct pos type_pos_end_discard;
+  if (!(skip_ws(p) && parse_typeexpr(p, &type, &type_pos_end_discard))) {
     goto fail_ident;
   }
   if (!(skip_ws(p) && try_skip_semicolon(p))) {
