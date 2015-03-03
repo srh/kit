@@ -9,6 +9,8 @@ deftype ps struct {
 
   current tok;
 
+  comments array[interval];
+
   im *identmap;
 };
 
@@ -115,6 +117,7 @@ defenum tokval {
   StringDelim i32;
   Bad void;
   Eof void;
+  Comment void;
 };
 
 func `==`(a keyw, b keyw) bool {
@@ -143,6 +146,7 @@ func `==`(a tokval, b tokval) bool {
   case Grouper(j): { switch b { case Grouper(k): { return j == k; } } }
   case Bad(j): { return true; }
   case Eof(j): { return true; }
+  case Comment(v): { return true; }
   }
 }
 
@@ -222,7 +226,18 @@ func is_ws(x i32) bool {
 }
 
 func step(p *ps) void {
-  p->current = grab_tok(p);
+  for ;; {
+    t tok = grab_tok(p);
+    switch t.val {
+      case Comment(v): {
+        push(&p->comments, t.interval);
+      }
+      default: {
+        p->current = t;
+        return;
+      }
+    }
+  }
 }
 
 func peek(p *ps) tok {
@@ -386,7 +401,38 @@ func grab_tok(p *ps) tok {
   } else if ch == '>' {
     return grab_angly(p, left, ch);
   } else if ch == '/' {
-    return grab_oper2(p, left, ch, '=');
+    ps_step(p);
+    ch = ps_peek(p);
+    if ch == '/' {
+      ps_step(p);
+      ch = ps_peek(p);
+      while ch != '\n' {
+        ps_step(p);
+        ch = ps_peek(p);
+      }
+      ps_step(p);
+      return mk_res(p, left, Comment(void));
+    } else if ch == '*' {
+      ps_step(p);
+      ch = ps_peek(p);
+      for ;; {
+        while ch != '*' {
+          ps_step(p);
+          ch = ps_peek(p);
+        }
+        ps_step(p);
+        ch = ps_peek(p);
+        if ch == '/' {
+          ps_step(p);
+          return mk_res(p, left, Comment(void));
+        }
+      }
+    } else if ch == '=' {
+      ps_step(p);
+      return mk_res(p, left, mk_oper('/', '='));
+    } else {
+      return mk_res(p, left, mk_oper('/'));
+    }
   } else {
     return {{left, ps_pos(p)}, Bad(void)};
   }
