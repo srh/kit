@@ -1,0 +1,16 @@
+import array;
+import parse;
+import stdlib;
+import string;
+
+func print(fp *FILE, arr array[u8]) void {
+  fwrite(@[*void]cast(data(&arr)), 1, count(&arr), fp);
+}
+
+// TODO: c_int
+export func main(argc i32, argv **u8) i32 {
+  arr array[u8] = make("Hello, world!\n");
+  print(Stdout(), arr);
+  return 0;
+}
+

@@ -2,9 +2,10 @@ extern malloc fn[size, *void];
 extern free fn[*void, void];
 extern abort fn[void];
 defclass FILE void;
-extern stdout *FILE;
-extern stdin *FILE;
-extern stderr *FILE;
+extern Stdout fn[*FILE];
+extern Stdin fn[*FILE];
+extern Stderr fn[*FILE];
+extern putchar fn[i32, i32];
 // buffer, size, count, stream
 extern fread fn[*void, size, size, *FILE, size];
 extern fwrite fn[*void, size, size, *FILE, size];
@@ -17,6 +18,12 @@ extern fflush fn[*FILE, i32];   // TODO: actually returns "int"
 // TODO: Add platform-specific tests for stuff like "is EOF -1"
 def EOF i32 = -1;  // TODO: is actually "int"
 // TODO: fseek takes a "long".
+
+func debugchar(ch u8) void {
+  putchar(~ch);
+  putchar('\n');
+  fflush(Stdout());
+}
 
 func checkmalloc(n size) *void {
   n = max(n, 1);
@@ -59,7 +66,7 @@ func[S, T] wrapconvert(x T) S {
 }
 
 func check(x bool) void {
-  if x { abort(); }
+  if !x { abort(); }
 }
 
 func[T] max(x T, y T) T {
