@@ -61,6 +61,17 @@ func try_skip_token(p *ps, expected tokval) bool {
   return Fail;
 }
 
+func try_skip_oper(p *ps, expected i32) bool {
+  return try_skip_token(p, mk_oper(expected));
+}
+
+func try_skip_oper(p *ps, exp0 i32, exp1 i32) bool {
+  return try_skip_token(p, mk_oper(exp0, exp1));
+}
+func try_skip_oper(p *ps, exp0 i32, exp1 i32, exp2 i32) bool {
+  return try_skip_token(p, mk_oper(exp0, exp1, exp2));
+}
+
 func parse_toplevel(p *ps, out *ast_toplevel) bool {
   if try_skip_token(p, Keyw(Func(void))) {
     return parse_rest_of_func(p, IsNotExport(void), out);
@@ -114,7 +125,7 @@ func parse_rest_of_def(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
   }
 
   typeexpr opt[ast_typeexpr];
-  if try_skip_token(p, mk_oper('=')) {
+  if try_skip_oper(p, '=') {
     typeexpr = None();
   } else {
     t ast_typeexpr;
@@ -126,7 +137,7 @@ func parse_rest_of_def(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
 
   rhs ast_expr;
   if !(parse_expr(p, kSemicolonPrec, &rhs)
-       && try_skip_token(p, mk_oper(';'))) {
+       && try_skip_oper(p, ';')) {
     return Fail;
   }
 
@@ -139,7 +150,7 @@ func parse_rest_of_extern_def(p *ps, out *ast_toplevel) bool {
   type ast_typeexpr;
   if !(parse_ident(p, &name)
        && parse_typeexpr(p, &type)
-       && try_skip_token(p, mk_oper(';'))) {
+       && try_skip_oper(p, ';')) {
     return Fail;
   }
   *out = ExternDef({name, type});
@@ -148,7 +159,7 @@ func parse_rest_of_extern_def(p *ps, out *ast_toplevel) bool {
 
 func parse_rest_of_import(p *ps, out *ast_toplevel) bool {
   name ast_ident;
-  if !(parse_ident(p, &name) && try_skip_token(p, mk_oper(';'))) {
+  if !(parse_ident(p, &name) && try_skip_oper(p, ';')) {
     return Fail;
   }
   *out = Import({name});
@@ -162,7 +173,7 @@ func parse_rest_of_deftype(p *ps, out *ast_toplevel) bool {
   if !(parse_generics_if_present(p, &generics)
        && parse_ident(p, &name)
        && parse_typeexpr(p, &type)
-       && try_skip_token(p, mk_oper(';'))) {
+       && try_skip_oper(p, ';')) {
     return Fail;
   }
   *out = TypeDef({generics, name, TypeexprRhs(type)});
@@ -185,7 +196,7 @@ func parse_rest_of_defclass(p *ps, out *ast_toplevel) bool {
   name ast_ident;
   type ast_typeexpr;
   if !(parse_ident(p, &name) && parse_typeexpr(p, &type)
-       && try_skip_token(p, mk_oper(';'))) {
+       && try_skip_oper(p, ';')) {
     return Fail;
   }
   *out = TypeDef({generics, name, ClassexprRhs({disposition, type})});
@@ -199,7 +210,7 @@ func parse_rest_of_defenum(p *ps, out *ast_toplevel) bool {
   if !(parse_generics_if_present(p, &generics)
        && parse_ident(p, &name)
        && parse_braced_fields(p, &enumfields)
-       && try_skip_token(p, mk_oper(';'))) {
+       && try_skip_oper(p, ';')) {
     return Fail;
   }
   *out = TypeDef({generics, name, EnumSpecRhs({enumfields})});
@@ -222,7 +233,7 @@ func parse_rest_of_access(p *ps, out *ast_toplevel) bool {
         done = true;
       } else {
         if counter != 0 {
-          if !try_skip_token(p, mk_oper(',')) {
+          if !try_skip_oper(p, ',') {
             return Fail;
           }
         }
@@ -303,7 +314,7 @@ func parse_generics_if_present(p *ps, out *ast_generics) bool {
       return true;
     }
     if count(&args) != 0 {
-      if !try_skip_token(p, mk_oper(',')) {
+      if !try_skip_oper(p, ',') {
         return Fail;
       }
     }
@@ -326,7 +337,7 @@ func parse_args_list(p *ps, out *array[ast_vardecl]) bool {
       return true;
     }
     if count(&args) != 0 {
-      if !try_skip_token(p, mk_oper(',')) {
+      if !try_skip_oper(p, ',') {
         return Fail;
       }
     }
@@ -396,7 +407,7 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_
   if try_skip_token(p, Grouper(LBracket(void))) {
     return success_or_fail(parse_rest_of_arraytype(p, ab, out));
   }
-  if try_skip_token(p, mk_oper('*')) {
+  if try_skip_oper(p, '*') {
     return success_or_fail(parse_rest_of_pointer(p, ab, out));
   }
 
@@ -487,7 +498,7 @@ func parse_rest_of_type_param_list(p *ps, ab allow_blanks, out *array[ast_typeex
     }
 
     if count(&args) != 0 {
-      if !try_skip_token(p, mk_oper(',')) {
+      if !try_skip_oper(p, ',') {
         return Fail;
       }
     }
@@ -514,7 +525,7 @@ func parse_braced_fields(p *ps, out *array[ast_vardecl]) bool {
 
     field ast_vardecl;
     if !(parse_vardecl(p, AllowBlanksNo(void), &field)
-         && try_skip_token(p, mk_oper(';'))) {
+         && try_skip_oper(p, ';')) {
       return Fail;
     }
     push(&fields, field);
@@ -569,17 +580,17 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, lhs ast_expr, out *ast_expr) b
         return Fail;
       }
       lhs = IndexExpr({embox(lhs), arg});
-    } else if try_skip_token(p, mk_oper('.', '~')) {
+    } else if try_skip_oper(p, '.', '~') {
       lhs = LocalField({embox(lhs), WholeField(void)});
-    } else if try_skip_token(p, mk_oper('.')) {
+    } else if try_skip_oper(p, '.') {
       fieldname ast_ident;
       if !parse_ident(p, &fieldname) {
         return Fail;
       }
       lhs = LocalField({embox(lhs), NameField(fieldname)});
-    } else if try_skip_token(p, mk_oper('-', '>', '~')) {
+    } else if try_skip_oper(p, '-', '>', '~') {
       lhs = DerefField({embox(lhs), WholeField(void)});
-    } else if try_skip_token(p, mk_oper('-', '>')) {
+    } else if try_skip_oper(p, '-', '>') {
       fieldname ast_ident;
       if !parse_ident(p, &fieldname) {
         return Fail;
@@ -880,7 +891,7 @@ func parse_rest_of_expr_list(p *ps, stop grouper, out *array[ast_expr]) bool {
       return true;
     }
     if count(&exprs) != 0 {
-      if !try_skip_token(p, mk_oper(',')) {
+      if !try_skip_oper(p, ',') {
         return Fail;
       }
     }
@@ -938,7 +949,7 @@ func parse_statement(p *ps, out *ast_statement) bool {
 
 func parse_rest_of_label_statement(p *ps, out *ast_statement) bool {
   name ast_ident;
-  if !(parse_ident(p, &name) && try_skip_token(p, mk_oper(';'))) {
+  if !(parse_ident(p, &name) && try_skip_oper(p, ';')) {
     return Fail;
   }
   *out = Label({name});
@@ -947,7 +958,7 @@ func parse_rest_of_label_statement(p *ps, out *ast_statement) bool {
 
 func parse_rest_of_goto_statement(p *ps, out *ast_statement) bool {
   target ast_ident;
-  if !(parse_ident(p, &target) && try_skip_token(p, mk_oper(';'))) {
+  if !(parse_ident(p, &target) && try_skip_oper(p, ';')) {
     return Fail;
   }
   *out = Goto({target});
@@ -960,15 +971,15 @@ func parse_rest_of_var_statement(p *ps, out *ast_statement) bool {
     return Fail;
   }
 
-  if try_skip_token(p, mk_oper(';')) {
+  if try_skip_oper(p, ';') {
     *out = Var({decl, None()});
     return true;
   }
 
   rhs box[ast_expr];
-  if !(try_skip_token(p, mk_oper('='))
+  if !(try_skip_oper(p, '=')
        && parse_expr(p, kSemicolonPrec, oo(&rhs))
-       && try_skip_token(p, mk_oper(';'))) {
+       && try_skip_oper(p, ';')) {
     return Fail;
   }
 
@@ -977,13 +988,13 @@ func parse_rest_of_var_statement(p *ps, out *ast_statement) bool {
 }
 
 func parse_rest_of_return_statement(p *ps, out *ast_statement) bool {
-  if try_skip_token(p, mk_oper(';')) {
+  if try_skip_oper(p, ';') {
     *out = Return({None()});
     return true;
   }
   expr box[ast_expr];
   if !(parse_expr(p, kSemicolonPrec, oo(&expr))
-       && try_skip_token(p, mk_oper(';'))) {
+       && try_skip_oper(p, ';')) {
     return Fail;
   }
   *out = Return({Has(expr)});
@@ -1032,7 +1043,7 @@ func parse_rest_of_while_statement(p *ps, out *ast_statement) bool {
 
 func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
   initializer opt[box[ast_statement]];
-  if try_skip_token(p, mk_oper(';')) {
+  if try_skip_oper(p, ';') {
     initializer = None();
   } else {
     statement box[ast_statement];
@@ -1048,12 +1059,12 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
     initializer = Has(statement);
   }
   condition opt[box[ast_expr]];
-  if try_skip_token(p, mk_oper(';')) {
+  if try_skip_oper(p, ';') {
     condition = None();
   } else {
     expr box[ast_expr];
     if !(parse_expr(p, kConditionPrec, oo(&expr))
-         && try_skip_token(p, mk_oper(';'))) {
+         && try_skip_oper(p, ';')) {
       return Fail;
     }
     condition = Has(expr);
@@ -1102,7 +1113,7 @@ func parse_switch_case(p *ps, out *ast_switch_case) bool {
   pattern ast_case_pattern;
   body ast_bracebody;
   if !(parse_case_pattern(p, &pattern)
-       && try_skip_token(p, mk_oper(':'))
+       && try_skip_oper(p, ':')
        && parse_bracebody(p, &body)) {
     return Fail;
   }
@@ -1178,7 +1189,7 @@ func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement
           lhs ast_expr = expressionize(name, indexers);
           whole_expr ast_expr;
           if !(parse_after_atomic_expr(p, kSemicolonPrec, lhs, &whole_expr)
-               && try_skip_token(p, mk_oper(';'))) {
+               && try_skip_oper(p, ';')) {
             return Error(void);
           }
           *out = Expr(whole_expr);
@@ -1209,9 +1220,9 @@ func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement
   }
 
   rhs box[ast_expr];
-  if !(try_skip_token(p, mk_oper('='))
+  if !(try_skip_oper(p, '=')
        && parse_expr(p, kSemicolonPrec, oo(&rhs))
-       && try_skip_token(p, mk_oper(';'))) {
+       && try_skip_oper(p, ';')) {
     return Error(void);
   }
   *out = Var({decl, Has(rhs)});
