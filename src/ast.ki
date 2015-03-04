@@ -3,12 +3,18 @@ import identmap;
 import pos;
 import box;
 
+// This is an index into some ps-specific structure.
+deftype ast_meta size;
+
+def `~` fn[size, ast_meta] = wrapconvert;
+
 deftype interval struct {
   left pos;
   right pos;
 };
 
 deftype ast_ident struct {
+  meta ast_meta;
   value ident_value;
 };
 

@@ -2,14 +2,24 @@ import ast;
 import identmap;
 import pos;
 
+deftype meta_datum struct {
+  left opt[pos];
+  right opt[pos];
+};
+
 deftype ps struct {
   data *u8;
   length size;
   pos size;
 
   current tok;
+  // The previous value of pos, the same as the previous value of tok.interval.right,
+  // or 0 if we're at the beginning of the stream.
+  prev_right size;
 
   comments array[interval];
+  // ast_meta values are indices into this array.
+  metas array[meta_datum];
 
   im *identmap;
 };
@@ -47,7 +57,28 @@ func ps_step(p *ps) void {
   p->pos = p->pos + 1;
 }
 
+func startend(p *ps) ast_meta {
+  ret ast_meta = ~count(&p->metas);
+  push(&p->metas, {Has(p->current.interval.left), Has(p->current.interval.right)});
+  return ret;
+}
 
+func start(p *ps) ast_meta {
+  ret ast_meta = ~count(&p->metas);
+  push(&p->metas, {Has(p->current.interval.left), None()});
+  return ret;
+}
+
+func end(p *ps, meta ast_meta) void {
+  switch ref(&p->metas, meta.~)->right {
+    case Has(right_pos pos): {
+      check(false);
+    }
+    case None(v): {
+      ref(&p->metas, meta.~)->right = Has(~p->prev_right);
+    }
+  }
+}
 
 defenum keyw {
   Access void;
@@ -214,6 +245,7 @@ func is_ws(x i32) bool {
 }
 
 func step(p *ps) void {
+  right size = p->pos;
   for ;; {
     t tok = grab_tok(p);
     switch t.val {
@@ -222,6 +254,7 @@ func step(p *ps) void {
       }
       default: {
         p->current = t;
+        p->prev_right = right;
         return;
       }
     }

@@ -61,10 +61,19 @@ func try_skip_token(p *ps, expected tokval) bool {
   return Fail;
 }
 
+func try_skip_oper(p *ps, expected i32, out *ast_ident) bool {
+  if peek(p).val == mk_oper(expected) {
+    m ast_meta = startend(p);
+    *out = {m, intern(p->im, ~mk_array(expected))};
+    step(p);
+    return true;
+  } else {
+    return Fail;
+  }
+}
 func try_skip_oper(p *ps, expected i32) bool {
   return try_skip_token(p, mk_oper(expected));
 }
-
 func try_skip_oper(p *ps, exp0 i32, exp1 i32) bool {
   return try_skip_token(p, mk_oper(exp0, exp1));
 }
@@ -292,7 +301,8 @@ func parse_ident(p *ps, out *ast_ident) bool {
 func try_parse_ident(p *ps, out *ast_ident) bool {
   switch peek(p).val {
     case Ident(text array[i32]): {
-      *out = {intern(p->im, ~text)};
+      m ast_meta = startend(p);
+      *out = {m, intern(p->im, ~text)};
       step(p);
       return true;
     }
@@ -407,8 +417,9 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_
   if try_skip_token(p, Grouper(LBracket(void))) {
     return success_or_fail(parse_rest_of_arraytype(p, ab, out));
   }
-  if try_skip_oper(p, '*') {
-    return success_or_fail(parse_rest_of_pointer(p, ab, out));
+  oper ast_ident;
+  if try_skip_oper(p, '*', &oper) {
+    return success_or_fail(parse_rest_of_pointer(p, ab, oper, out));
   }
 
   lhs ast_typeexpr;
@@ -479,12 +490,12 @@ func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
   return true;
 }
 
-func parse_rest_of_pointer(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
+func parse_rest_of_pointer(p *ps, ab allow_blanks, oper ast_ident, out *ast_typeexpr) bool {
   arg ast_typeexpr;
   if !help_parse_typeexpr(p, ab, &arg) {
     return Fail;
   }
-  *out = App({embox(Name({intern(p->im, ~mk_array(@[i32]'*'))})),
+  *out = App({embox(Name(oper)),
               mk_array(arg)});
   return true;
 }
@@ -608,12 +619,13 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, lhs ast_expr, out *ast_expr) b
           return true;
         }
         case PullsRight(v): {
+          oper ast_ident = {startend(p), intern(p->im, ~oper_arr(op.val))};
           step(p);
           rhs ast_expr;
           if !parse_expr(p, op_prec.right, &rhs) {
             return Fail;
           }
-          lhs = build_binop_expr(p->im, op, lhs, rhs);
+          lhs = build_binop_expr(p->im, oper, lhs, rhs);
         }
       }
     } else {
@@ -687,17 +699,15 @@ func compare_prec(left i32, right i32) prec_cmp {
   return Conflicts(void);
 }
 
-func op_name(im *identmap, op tok) ast_ident {
-  switch op.val {
-    case Oper(arr array[i32]): {
-      return {intern(im, ~arr)};
-    }
+func oper_arr(tv tokval) array[i32] {
+  switch tv {
+    case Oper(arr array[i32]): { return arr; }
     default: { check(false); return fake(); }
   }
 }
 
-func build_binop_expr(im *identmap, op tok, lhs ast_expr, rhs ast_expr) ast_expr {
-  return Funcall({embox(NameExpr({op_name(im, op), None()})),
+func build_binop_expr(im *identmap, op ast_ident, lhs ast_expr, rhs ast_expr) ast_expr {
+  return Funcall({embox(NameExpr({op, None()})),
                   mk_array(lhs, rhs)});
 }
 
@@ -770,6 +780,7 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
       }
     }
     case Ident(identch array[i32]): {
+      ident_meta ast_meta = startend(p);
       step(p);
       switch peek(p).val {
         case Oper(operch array[i32]): {
@@ -780,13 +791,13 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
                  && parse_rest_of_type_param_list(p, AllowBlanksNo(void), &args)) {
               return Fail;
             }
-            *out = NameExpr({{intern(p->im, ~identch)}, Has(args)});
+            *out = NameExpr({{ident_meta, intern(p->im, ~identch)}, Has(args)});
             return true;
           }
         }
         default: { }
       }
-      *out = NameExpr({{intern(p->im, ~identch)}, None()});
+      *out = NameExpr({{ident_meta, intern(p->im, ~identch)}, None()});
       return true;
     }
     case Oper(operch array[i32]): {
@@ -806,12 +817,13 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
         switch unop_info(&operch) {
           case None(v): { return Fail; }
           case Has(rightprec i32): {
+            oper_meta ast_meta = startend(p);
             step(p);
             rhs ast_expr;
             if !parse_expr(p, rightprec, &rhs) {
               return Fail;
             }
-            *out = Funcall({embox(NameExpr({{intern(p->im, ~operch)}, None()})),
+            *out = Funcall({embox(NameExpr({{oper_meta, intern(p->im, ~operch)}, None()})),
                             mk_array(rhs)});
             return true;
           }
