@@ -7651,7 +7651,7 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  /* TODO: This test fails.  Enable this test. */
+  /* TODO: Enable this test and make it pass. */
 #if 0
   DBG("test_check_file check_file_test_more_72...\n");
   if (!test_check_module(&im, &check_file_test_more_72, foo)) {

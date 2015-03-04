@@ -148,7 +148,7 @@ int generate_kira_name(struct checkstate *cs,
 
     /* I just don't want to lookup the stdarg documentation and
     implement databuf_appendf. */
-    char buf[20] = { 0 };
+    char buf[30] = { 0 };
     size_t i = 0;
     CHECK(number_append > 0);
     while (number_append > 0) {

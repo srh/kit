@@ -5,6 +5,7 @@
 
 #include "slice.h"
 #include "typecheck.h"
+#include "typeexpr.h"
 
 struct defs_by_name_node {
   struct def_entry *ent;
@@ -1200,8 +1201,12 @@ int name_table_match_def(struct identmap *im,
   }
 
   if (!matched_ent) {
-    METERR(im, ident->meta, "no matching '%.*s' definition\n",
-           IM_P(im, ident->value));
+    struct databuf buf;
+    databuf_init(&buf);
+    sprint_typeexpr(&buf, im, partial_type);
+    METERR(im, ident->meta, "no definition of '%.*s' matches type '%.*s'\n",
+           IM_P(im, ident->value), size_to_int(buf.count), buf.buf);
+    databuf_destroy(&buf);
     *multi_match_out = 0;
     goto fail;
   }
