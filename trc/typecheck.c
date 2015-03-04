@@ -1236,44 +1236,52 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
   struct ast_name_expr func_name;
   ast_name_expr_init(&func_name, make_ast_ident(name));
 
-  size_t matching_defs = name_table_count_matching_defs(cs->im,
-                                                        &cs->nt,
-                                                        &func_name.ident,
-                                                        NULL,
-                                                        0,
-                                                        &func_type);
-
-  if (matching_defs < 2) {
-    struct def_instantiation *inst = NULL;
-    if (matching_defs == 1) {
-      int multi_match_discard;
-      struct ast_typeexpr unified;
-      int lvalue_discard;
-      if (!lookup_global_maybe_typecheck(cs,
-                                         also_typecheck,
-                                         &func_name,
-                                         &func_type,
-                                         1,
-                                         &multi_match_discard,
-                                         &unified,
-                                         &lvalue_discard,
-                                         &inst)) {
-        METERR(cs->im, *meta, "Typecheck failed(?) when looking up %.*s definition.\n",
-               IM_P(cs->im, name));
-        goto fail;
-      }
-      ast_typeexpr_destroy(&unified);
+  enum match_result res = name_table_count_matching_defs(
+      cs->im,
+      &cs->nt,
+      &func_name.ident,
+      NULL,
+      0,
+      &func_type);
+  struct def_instantiation *inst = NULL;
+  switch (res) {
+  case MATCH_SUCCESS: {
+    /* TODO: We should be able to do this with one call to
+    name_table_match_def, I think. */
+    int multi_match_discard;
+    struct ast_typeexpr unified;
+    int lvalue_discard;
+    if (!lookup_global_maybe_typecheck(cs,
+                                       also_typecheck,
+                                       &func_name,
+                                       &func_type,
+                                       1,
+                                       &multi_match_discard,
+                                       &unified,
+                                       &lvalue_discard,
+                                       &inst)) {
+      METERR(cs->im, *meta, "Typecheck failed(?) when looking up %.*s definition.\n",
+             IM_P(cs->im, name));
+      goto fail;
     }
-
+    ast_typeexpr_destroy(&unified);
+  }  /* fallthrough */
+  case MATCH_NONE: {
     ast_name_expr_destroy(&func_name);
     ast_typeexpr_destroy(&func_type);
 
-    *result_out = (matching_defs == 1);
+    *result_out = (res == MATCH_SUCCESS);
     *inst_out = inst;
     return 1;
+  } break;
+  case MATCH_AMBIGUOUSLY: {
+    METERR(cs->im, *meta, "Multiple matching '%.*s' definitions\n", IM_P(cs->im, name));
+    goto fail;
+  } break;
+  default:
+    UNREACHABLE();
   }
 
-  METERR(cs->im, *meta, "Multiple matching '%.*s' definitions\n", IM_P(cs->im, name));
  fail:
   ast_name_expr_destroy(&func_name);
   ast_typeexpr_destroy(&func_type);
@@ -2029,17 +2037,19 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
   struct def_entry *ent;
   struct def_instantiation *inst;
   int multi_match;
-  if (!name_table_match_def(cs->im,
-                            &cs->nt,
-                            &name->ident,
-                            name->has_params ? name->params : NULL,
-                            name->has_params ? name->params_count : 0,
-                            partial_type,
-                            report_multi_match,
-                            &multi_match,
-                            &unified,
-                            &ent,
-                            &inst)) {
+  enum match_result res = name_table_match_def(
+      cs->im,
+      &cs->nt,
+      &name->ident,
+      name->has_params ? name->params : NULL,
+      name->has_params ? name->params_count : 0,
+      partial_type,
+      report_multi_match,
+      &multi_match,
+      &unified,
+      &ent,
+      &inst);
+  if (res != MATCH_SUCCESS) {
     *multi_match_out = multi_match;
     return 0;
   }
@@ -4245,17 +4255,18 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
     struct ast_typeexpr unified;
     struct def_entry *ent;
     struct def_instantiation *inst;
-    int success = name_table_match_def(cs->im,
-                                       &cs->nt,
-                                       &a->name,
-                                       NULL, 0, /* (no generics) */
-                                       ast_def_typeexpr(a),
-                                       1,
-                                       &multi_match_discard,
-                                       &unified,
-                                       &ent,
-                                       &inst);
-    CHECK(success);
+    enum match_result res = name_table_match_def(
+        cs->im,
+        &cs->nt,
+        &a->name,
+        NULL, 0, /* (no generics) */
+        ast_def_typeexpr(a),
+        1,
+        &multi_match_discard,
+        &unified,
+        &ent,
+        &inst);
+    CHECK(res == MATCH_SUCCESS);
     CHECK(exact_typeexprs_equal(cs->im, &unified, ast_def_typeexpr(a)));
     CHECK(!ent->is_primitive);
 
@@ -5990,7 +6001,6 @@ int check_file_test_more_18(const uint8_t *name, size_t name_count,
 
 int check_file_test_more_19(const uint8_t *name, size_t name_count,
                             uint8_t **data_out, size_t *data_count_out) {
-  /* Fails because in baz, we can't figure out type of foo instantiation. */
   struct test_module a[] = { {
       "foo",
       "def[T] foo fn[i32, T] = func(x i32) T {\n"
@@ -6949,7 +6959,7 @@ int check_file_test_more_72(const uint8_t *name, size_t name_count,
       "}\n"
       "func zed(blah foo[i32]) bool { return true; }\n"
       "func bar() bool {\n"
-      "  return blah(make(\"test\"));\n"
+      "  return zed(make(\"test\"));\n"
       "}\n"
     } };
 
@@ -7321,8 +7331,8 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file !check_file_test_more_19...\n");
-  if (!!test_check_module(&im, &check_file_test_more_19, foo)) {
+  DBG("test_check_file check_file_test_more_19...\n");
+  if (!test_check_module(&im, &check_file_test_more_19, foo)) {
     DBG("check_file_test_more_19 fails\n");
     goto cleanup_identmap;
   }
@@ -7651,14 +7661,11 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  /* TODO: Enable this test and make it pass. */
-#if 0
   DBG("test_check_file check_file_test_more_72...\n");
   if (!test_check_module(&im, &check_file_test_more_72, foo)) {
     DBG("check_file_test_more_72 fails\n");
     goto cleanup_identmap;
   }
-#endif
 
 
 

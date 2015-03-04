@@ -940,7 +940,7 @@ int is_complete(struct ast_typeexpr *type) {
   }
 }
 
-int unify_with_parameterized_type(
+enum match_result unify_with_parameterized_type(
     struct identmap *im,
     struct ast_generics *g,
     struct ast_typeexpr *type,
@@ -948,6 +948,7 @@ int unify_with_parameterized_type(
     struct ast_typeexpr **materialized_params_out,
     size_t *materialized_params_count_out,
     struct ast_typeexpr *concrete_type_out) {
+  enum match_result fail_ret;
   CHECK(g->has_type_params);
   size_t materialized_count = g->params_count;
   struct ast_typeexpr *materialized = malloc_mul(sizeof(*materialized),
@@ -957,11 +958,13 @@ int unify_with_parameterized_type(
   }
 
   if (!learn_materializations(im, g, materialized, type, partial_type)) {
+    fail_ret = MATCH_NONE;
     goto fail;
   }
 
   for (size_t i = 0; i < materialized_count; i++) {
     if (!is_complete(&materialized[i])) {
+      fail_ret = MATCH_AMBIGUOUSLY;
       goto fail;
     }
   }
@@ -970,11 +973,11 @@ int unify_with_parameterized_type(
                       concrete_type_out);
   *materialized_params_out = materialized;
   *materialized_params_count_out = materialized_count;
-  return 1;
+  return MATCH_SUCCESS;
 
  fail:
   SLICE_FREE(materialized, materialized_count, ast_typeexpr_destroy);
-  return 0;
+  return fail_ret;
 }
 
 int typelists_equal(struct identmap *im, struct ast_typeexpr *a, size_t a_count,
@@ -1021,24 +1024,25 @@ struct def_instantiation *def_entry_insert_instantiation(
   return inst;
 }
 
-int def_entry_matches(struct identmap *im,
-                      struct def_entry *ent,
-                      struct ast_typeexpr *generics_or_null,
-                      size_t generics_count,
-                      struct ast_typeexpr *partial_type,
-                      /* In particular, this affects whether we create
-                      an instantiation or not, which the caller would
-                      be responsible for typechecking. */
-                      int build_return_values,
-                      struct ast_typeexpr *unified_type_out,
-                      struct def_instantiation **instantiation_out) {
+enum match_result def_entry_matches(
+    struct identmap *im,
+    struct def_entry *ent,
+    struct ast_typeexpr *generics_or_null,
+    size_t generics_count,
+    struct ast_typeexpr *partial_type,
+    /* In particular, this affects whether we create
+    an instantiation or not, which the caller would
+    be responsible for typechecking. */
+    int build_return_values,
+    struct ast_typeexpr *unified_type_out,
+    struct def_instantiation **instantiation_out) {
   if (!ent->generics.has_type_params) {
     if (generics_or_null) {
-      return 0;
+      return MATCH_NONE;
     }
 
     if (!unify_directionally(im, partial_type, &ent->type)) {
-      return 0;
+      return MATCH_NONE;
     }
 
     if (build_return_values) {
@@ -1046,24 +1050,24 @@ int def_entry_matches(struct identmap *im,
       *instantiation_out = def_entry_insert_instantiation(im, ent, NULL, 0,
                                                           &ent->type);
     }
-    return 1;
+    return MATCH_SUCCESS;
   }
 
   if (generics_or_null) {
     if (ent->generics.params_count != generics_count) {
-      return 0;
+      return MATCH_NONE;
     }
 
     struct ast_typeexpr ent_concrete_type;
     do_replace_generics(&ent->generics, generics_or_null, generics_count,
                         &ent->type, &ent_concrete_type);
 
-    int ret = 0;
+    enum match_result ret = MATCH_NONE;
     if (!unify_directionally(im, partial_type, &ent_concrete_type)) {
       goto cleanup_concrete_type;
     }
 
-    ret = 1;
+    ret = MATCH_SUCCESS;
     if (build_return_values) {
       ast_typeexpr_init_copy(unified_type_out, &ent_concrete_type);
       *instantiation_out = def_entry_insert_instantiation(im, ent,
@@ -1083,14 +1087,22 @@ int def_entry_matches(struct identmap *im,
   struct ast_typeexpr *materialized_params;
   size_t materialized_params_count;
   struct ast_typeexpr concrete_type;
-  if (!unify_with_parameterized_type(im,
-                                     &ent->generics,
-                                     &ent->type,
-                                     partial_type,
-                                     &materialized_params,
-                                     &materialized_params_count,
-                                     &concrete_type)) {
-    return 0;
+  enum match_result unify_res = unify_with_parameterized_type(
+      im,
+      &ent->generics,
+      &ent->type,
+      partial_type,
+      &materialized_params,
+      &materialized_params_count,
+      &concrete_type);
+  switch (unify_res) {
+  case MATCH_SUCCESS:
+    break;
+  case MATCH_AMBIGUOUSLY:
+  case MATCH_NONE:
+    return unify_res;
+  default:
+    UNREACHABLE();
   }
 
   if (build_return_values) {
@@ -1105,16 +1117,17 @@ int def_entry_matches(struct identmap *im,
   }
   SLICE_FREE(materialized_params, materialized_params_count,
              ast_typeexpr_destroy);
-  return 1;
+  return MATCH_SUCCESS;
 }
 
 /* TODO: Dedup this with name_table_match_def, this is a copy/paste job. */
-size_t name_table_count_matching_defs(struct identmap *im,
-                                      struct name_table *t,
-                                      struct ast_ident *ident,
-                                      struct ast_typeexpr *generics_or_null,
-                                      size_t generics_count,
-                                      struct ast_typeexpr *partial_type) {
+enum match_result name_table_count_matching_defs(
+    struct identmap *im,
+    struct name_table *t,
+    struct ast_ident *ident,
+    struct ast_typeexpr *generics_or_null,
+    size_t generics_count,
+    struct ast_typeexpr *partial_type) {
   size_t num_matched = 0;
 
   ident_value name = ident->value;
@@ -1134,27 +1147,40 @@ size_t name_table_count_matching_defs(struct identmap *im,
     struct def_entry *ent = node->ent;
     CHECK(ent->name == name);
 
-    if (def_entry_matches(im, ent, generics_or_null, generics_count,
-                          partial_type,
-                          0, NULL, NULL)) {
+    enum match_result res = def_entry_matches(
+        im, ent, generics_or_null, generics_count,
+        partial_type, 0, NULL, NULL);
+    switch (res) {
+    case MATCH_SUCCESS:
       num_matched = size_add(num_matched, 1);
+      if (num_matched > 1) {
+        return MATCH_AMBIGUOUSLY;
+      }
+      break;
+    case MATCH_AMBIGUOUSLY:
+      return MATCH_AMBIGUOUSLY;
+    case MATCH_NONE:
+      break;
+    default:
+      UNREACHABLE();
     }
   }
 
-  return num_matched;
+  return num_matched == 1 ? MATCH_SUCCESS : MATCH_NONE;
 }
 
-int name_table_match_def(struct identmap *im,
-                         struct name_table *t,
-                         struct ast_ident *ident,
-                         struct ast_typeexpr *generics_or_null,
-                         size_t generics_count,
-                         struct ast_typeexpr *partial_type,
-                         int report_multi_match,
-                         int *multi_match_out,
-                         struct ast_typeexpr *unified_type_out,
-                         struct def_entry **entry_out,
-                         struct def_instantiation **instantiation_out) {
+enum match_result name_table_match_def(
+    struct identmap *im,
+    struct name_table *t,
+    struct ast_ident *ident,
+    struct ast_typeexpr *generics_or_null,
+    size_t generics_count,
+    struct ast_typeexpr *partial_type,
+    int report_multi_match,
+    int *multi_match_out,
+    struct ast_typeexpr *unified_type_out,
+    struct def_entry **entry_out,
+    struct def_instantiation **instantiation_out) {
   /* matched_type is initialized if matched_ent is non-null. */
   struct ast_typeexpr matched_type = { 0 };  /* Initialized to appease cl. */
   struct def_instantiation *matched_instantiation = NULL;
@@ -1179,24 +1205,42 @@ int name_table_match_def(struct identmap *im,
 
     struct ast_typeexpr unified;
     struct def_instantiation *instantiation;
-    if (def_entry_matches(im, ent, generics_or_null, generics_count,
-                          partial_type, 1, &unified, &instantiation)) {
+    enum match_result res = def_entry_matches(
+        im, ent, generics_or_null, generics_count,
+        partial_type, 1, &unified, &instantiation);
+    switch (res) {
+    case MATCH_SUCCESS: {
       if (matched_ent) {
         ast_typeexpr_destroy(&unified);
-        /* TODO: This error message should not be here, since matching
-        multiple defs could be valid thanks to second-chance
-        typechecking. */
         if (report_multi_match) {
           METERR(im, ident->meta, "multiple matching '%.*s' definitions\n",
                  IM_P(im, ident->value));
         }
         *multi_match_out = 1;
-        goto fail_multiple_matching;
+        ast_typeexpr_destroy(&matched_type);
+        return MATCH_AMBIGUOUSLY;
       } else {
         matched_type = unified;
         matched_instantiation = instantiation;
         matched_ent = ent;
       }
+    } break;
+    case MATCH_AMBIGUOUSLY: {
+      if (report_multi_match) {
+        METERR(im, ident->meta, "ambiguously matching '%.*s' definition\n",
+               IM_P(im, ident->value));
+      }
+      *multi_match_out = 1;
+      if (matched_ent) {
+        ast_typeexpr_destroy(&matched_type);
+      }
+      return MATCH_AMBIGUOUSLY;
+    } break;
+    case MATCH_NONE:
+      /* Do nothing, move on to next entry. */
+      break;
+    default:
+      UNREACHABLE();
     }
   }
 
@@ -1208,19 +1252,14 @@ int name_table_match_def(struct identmap *im,
            IM_P(im, ident->value), size_to_int(buf.count), buf.buf);
     databuf_destroy(&buf);
     *multi_match_out = 0;
-    goto fail;
+    return MATCH_NONE;
   }
 
   *unified_type_out = matched_type;
   *entry_out = matched_ent;
   *instantiation_out = matched_instantiation;
   *multi_match_out = 0;
-  return 1;
-
- fail_multiple_matching:
-  ast_typeexpr_destroy(&matched_type);
- fail:
-  return 0;
+  return MATCH_SUCCESS;
 }
 
 int name_table_lookup_deftype(struct name_table *t,
