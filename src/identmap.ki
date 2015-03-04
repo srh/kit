@@ -20,6 +20,11 @@ defclass copy identmap struct {
 };
 
 access identmap {
+  func do_init(im *identmap) void {
+    init(&im->table);
+    init(&im->backmap);
+  }
+
   func intern(im *identmap, s string) ident_value {
     val size = count(&im->backmap);
     if try_insert(&im->table, s, ~val) {

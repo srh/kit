@@ -987,7 +987,7 @@ int typelists_equal(struct identmap *im, struct ast_typeexpr *a, size_t a_count,
   }
 
   for (size_t i = 0; i < a_count; i++) {
-    if (!exact_typeexprs_equal(im, a, b)) {
+    if (!exact_typeexprs_equal(im, &a[i], &b[i])) {
       return 0;
     }
   }

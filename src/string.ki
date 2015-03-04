@@ -4,10 +4,6 @@ deftype string array[i32];
 
 def `~` fn[array[i32], string] = wrapconvert;
 
-func[T] make(raw_arr T) string {
-  return ~make@[array[i32], T](raw_arr);
-}
-
 func data(s *string) *i32 {
   return data(&s->~);
 }

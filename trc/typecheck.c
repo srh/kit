@@ -6970,7 +6970,6 @@ int check_file_test_more_72(const uint8_t *name, size_t name_count,
 
 
 
-
 int test_check_file(void) {
   int ret = 0;
   struct identmap im;

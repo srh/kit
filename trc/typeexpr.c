@@ -1,5 +1,8 @@
 #include "typeexpr.h"
 
+#include <stdio.h>
+
+#include "arith.h"
 #include "ast.h"
 #include "databuf.h"
 #include "identmap.h"
@@ -91,4 +94,12 @@ void sprint_typeexpr(struct databuf *b, struct identmap *im, struct ast_typeexpr
     databuf_append_c_str(b, "?" "?" "?typeexpr");
     break;
   }
+}
+
+void DBG_typeexpr(const char *msg, struct identmap *im, struct ast_typeexpr *a) {
+  struct databuf b;
+  databuf_init(&b);
+  sprint_typeexpr(&b, im, a);
+  DBG("%s %.*s\n", msg, size_to_int(b.count), b.buf);
+  databuf_destroy(&b);
 }

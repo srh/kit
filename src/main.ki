@@ -4,13 +4,48 @@ import stdlib;
 import string;
 
 func print(fp *FILE, arr array[u8]) void {
-  fwrite(@[*void]cast(data(&arr)), 1, count(&arr), fp);
+  c size = count(&arr);
+  debugchar('@' + @[u8]~c);
+  fwrite(@[*void]cast(data(&arr)), sizeof@[u8], count(&arr), fp);
 }
 
 // TODO: c_int
 export func main(argc i32, argv **u8) i32 {
-  arr array[u8] = make("Hello, world!\n");
-  print(Stdout(), arr);
+  print(Stdout(), make("Hello, world!\n"));
+  if test_parse() {
+    print(Stdout(), make("parse_test passes\n"));
+  } else {
+    print(Stdout(), make("parse_test FAIL\n"));
+  }
   return 0;
 }
 
+func see_if_parse(file array[u8]) bool {
+  im identmap;
+  p ps = make_ps(&im, data(&file), count(&file));
+  out ast_file;
+  return parse_file(&p, &out);
+}
+
+func run_parse_test(test_name array[u8], file array[u8]) bool {
+  print(Stdout(), @[array[u8]]make("test "));
+  c size = count(&test_name);
+  debugchar('Z');
+  debugchar('@' + @[u8]~c);
+  print(Stdout(), test_name);
+  print(Stdout(), @[array[u8]]make("...\n"));
+  fflush(Stdout());
+  if !see_if_parse(file) {
+    print(Stdout(), @[array[u8]]make("FAIL\n"));
+    fflush(Stdout());
+    return false;
+  }
+  return true;
+}
+
+func test_parse() bool {
+  pass bool = true;
+  res bool = run_parse_test(@[array[u8]]make("p01"), make("import foo;\n"));
+  pass = (pass & res);
+  return pass;
+}
