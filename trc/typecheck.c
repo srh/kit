@@ -689,6 +689,7 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
   import_integer_binops(cs, binop_i32_primitive_ops, I32_TYPE_NAME);
   import_integer_binops(cs, binop_size_primitive_ops, SIZE_TYPE_NAME);
   import_integer_binops(cs, binop_osize_primitive_ops, OSIZE_TYPE_NAME);
+  import_bool_binops(cs);
 
   import_integer_conversions(cs);
 
@@ -2003,8 +2004,8 @@ int deftype_is_accessible(struct exprscope *es, struct ast_deftype *deftype) {
 }
 
 enum allow_incomplete {
-  ALLOW_INCOMPLETE_YES,
   ALLOW_INCOMPLETE_NO,
+  ALLOW_INCOMPLETE_YES,
 };
 
 int check_expr(struct exprscope *es, struct ast_expr *x,
@@ -2135,7 +2136,7 @@ int lookup_global_maybe_typecheck(struct checkstate *cs,
         ast_expr_destroy(&annotated_rhs);
         exprscope_destroy(&scope);
         cs->template_instantiation_recursion_depth--;
-        DBG("... when instantiating '%.*s'.\n", IM_P(cs->im, ent->name));
+        METERR(cs->im, name->meta, "... when instantiating '%.*s'.\n", IM_P(cs->im, ent->name));
         goto fail_unified;
       }
 
@@ -6938,6 +6939,24 @@ int check_file_test_more_71(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_72(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "deftype[T] foo struct { };\n"
+      "func[T, U] make(arr U) foo[T] {\n"
+      "  return {};\n"
+      "}\n"
+      "func zed(blah foo[i32]) bool { return true; }\n"
+      "func bar() bool {\n"
+      "  return blah(make(\"test\"));\n"
+      "}\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
 
 
 
@@ -7632,6 +7651,14 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
+  /* TODO: This test fails.  Enable this test. */
+#if 0
+  DBG("test_check_file check_file_test_more_72...\n");
+  if (!test_check_module(&im, &check_file_test_more_72, foo)) {
+    DBG("check_file_test_more_72 fails\n");
+    goto cleanup_identmap;
+  }
+#endif
 
 
 
