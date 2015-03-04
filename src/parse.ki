@@ -282,6 +282,7 @@ func try_parse_ident(p *ps, out *ast_ident) bool {
   switch peek(p).val {
     case Ident(text array[i32]): {
       *out = {intern(p->im, ~text)};
+      step(p);
       return true;
     }
     default: {
