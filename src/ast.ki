@@ -21,10 +21,12 @@ deftype ast_ident struct {
 // Add pos info below.
 
 deftype ast_hex_literal struct {
+  meta ast_meta;
   digits array[i8];
 };
 
 deftype ast_dec_literal struct {
+  meta ast_meta;
   digits array[i8];
 };
 

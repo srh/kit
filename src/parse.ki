@@ -746,15 +746,16 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
       }
     }
     case Num(n numlit): {
+      num_meta ast_meta = startend(p);
       switch n {
         case DecNum(arr array[i8]): {
           step(p);
-          *out = NumericLiteral(DecLiteral({arr}));
+          *out = NumericLiteral(DecLiteral({num_meta, arr}));
           return true;
         }
         case HexNum(arr array[i8]): {
           step(p);
-          *out = NumericLiteral(HexLiteral({arr}));
+          *out = NumericLiteral(HexLiteral({num_meta, arr}));
           return true;
         }
       }
