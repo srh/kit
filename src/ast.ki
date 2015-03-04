@@ -36,13 +36,16 @@ defenum ast_numeric_literal {
 };
 
 deftype ast_bool_literal struct {
+  meta ast_meta;
   value bool;
 };
 
 deftype ast_void_literal struct {
+  meta ast_meta;
 };
 
 deftype ast_null_literal struct {
+  meta ast_meta;
 };
 
 deftype ast_charspec struct {

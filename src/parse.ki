@@ -721,23 +721,27 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
           return parse_rest_of_lambda(p, out);
         }
         case True(v): {
+          m ast_meta = startend(p);
           step(p);
-          *out = BoolLiteral({true});
+          *out = BoolLiteral({m, true});
           return true;
         }
         case False(v): {
+          m ast_meta = startend(p);
           step(p);
-          *out = BoolLiteral({false});
+          *out = BoolLiteral({m, false});
           return true;
         }
         case Void(v): {
+          m ast_meta = startend(p);
           step(p);
-          *out = VoidLiteral({});
+          *out = VoidLiteral({m});
           return true;
         }
         case Null(v): {
+          m ast_meta = startend(p);
           step(p);
-          *out = NullLiteral({});
+          *out = NullLiteral({m});
           return true;
         }
         default: {
