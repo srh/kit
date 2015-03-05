@@ -561,20 +561,30 @@ func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) bool {
 
   switch ab {
     case AllowBlanksYes(v): {
-      if peek(p).val == mk_oper('=') || peek(p).val == mk_oper(';') {
-        *out = {name, Unknown({})};
-        return true;
+      type ast_typeexpr;
+      switch help_triparse_typeexpr(p, ab, &type) {
+        case Success(v2): {
+          *out = {name, type};
+          return true;
+        }
+        case Quickfail(v2): {
+          *out = {name, Unknown({})};
+          return true;
+        }
+        case Error(v2): {
+          return Fail;
+        }
       }
     }
-    default: { }
+    case AllowBlanksNo(v): {
+      type ast_typeexpr;
+      if !help_parse_typeexpr(p, ab, &type) {
+        return Fail;
+      }
+      *out = {name, type};
+      return true;
+    }
   }
-
-  type ast_typeexpr;
-  if !help_parse_typeexpr(p, ab, &type) {
-    return Fail;
-  }
-  *out = {name, type};
-  return true;
 }
 
 func parse_expr(p *ps, prec_ctx i32, out *ast_expr) bool {
@@ -856,6 +866,10 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
         check(false);
         return fake();
       }
+    }
+    case Backtick(v): {
+      // TODO: treat like Ident(..) is treated.
+      return Fail;
     }
     case Bad(v): {
       return Fail;
@@ -1390,5 +1404,94 @@ func test_parse() bool {
                                make("def a =\n\tfunc(x int, y int) int { *x; };"));
   pass = pass & run_parse_test(make("p012"),
                                make("def foo bar = 2 + 3;"));
+  pass = pass & run_parse_test(make("p013"),
+                               make("def foo bar = 2+*3-4;"));
+  pass = pass & run_parse_test(make("p014"),
+                               make("def foo bar = (2 ^ 3) - 4 && x -> quux;"));
+  pass = pass & run_parse_test(make("p015"),
+                               make("def[] foo fn[int] = func() int {\n  var x int = 3;\n  return x;};"));
+  pass = pass & run_parse_test(make("p016"),
+                               make("def[] foo/*heh*/fn[int] = func() int {\n//blah blah\n  var x int =-3;return x;};"));
+  pass = pass & run_parse_test(make("p017"),
+                               make("def a b = 1 == 1 || 2 == 1;\n"));
+  pass = pass & run_parse_test(make("p018"),
+                               make("def a b = 1 + - 1;"));
+  pass = pass & run_parse_test(make("p019"),
+                               make("def a b = 1 + -1;"));
+  pass = pass & run_parse_test(make("p020"),
+                               make("def a b = 1 +- 1;"));
+  pass = pass & run_parse_test(make("p021"),
+                               make("def a b = 1 +-1;"));
+  pass = pass & run_parse_test(make("p022"),
+                               make("func a() int {var x int;}"));
+  pass = pass & run_parse_test(make("p023"),
+                               make("func a() int {\n  (x+3)[y(z)] = 3;\n  return x[y];  }"));
+  pass = pass & run_parse_test(make("p024"),
+                               make("func a() int {\n  x[y(z)] = 3;\n  return x[y];  }"));
+  pass = pass & run_parse_test(make("p025"),
+                               make("func a() int {\n  x *[y(z)]t = 3;\n  return x[y]; }"));
+  pass = pass & run_parse_test(make("p026"),
+                               make("func a() int {\n  x [y(z)][1][2]t = 3;\n  return x[y]; }"));
+  pass = pass & run_parse_test(make("p027"),
+                               make("func a() int {\n  x [y(z)][1][2] = 3;\n  return x[y]; }"));
+  pass = pass & run_parse_test(make("p028"),
+                               make("func a() int {\n  x [y(z)][1][2];\n  return x[y];  }"));
+  pass = pass & run_parse_test(make("p029"),
+                               make("func a() int {\n  for var i i32 = 3; i < 3; i = i + 1 {}}"));
+  pass = pass & run_parse_test(make("p030"),
+                               make("func a() int {\n  for var i i32 = 3; i < 3; i = i + 1 { x = 2; }}"));
+  pass = pass & run_parse_test(make("p031"),
+                               make("def foo = baz@[a, b](1, 2, 3);"));
+  pass = pass & run_parse_test(make("p032"),
+                               make("def foo u8 = 'a';\n"));
+  pass = pass & run_parse_test(make("p033"),
+                               make("def foo u8 = '\\n';\n"));
+  pass = pass & run_parse_test(make("p034"),
+                               make("def foo u8 = '\\x2A';\n"));
+  pass = pass & run_parse_test(make("p035-a"),
+                               make("def foo u8 = \"\\x2Azq\";\n"));
+  pass = pass & run_parse_test(make("p035-b"),
+                               make("def foo u8 = \"\";\n"));
+  pass = pass & run_parse_test(make("p036"),
+                               make("func a() b { switch c { case e(f g): { } case h(i): { j; } default: { } } }"));
+  pass = pass & run_parse_test(make("p037"),
+                               make("func `~`(x u32) size { }"));
+  pass = pass & run_parse_test(make("p038"),
+                               make("func foo() a { x int; }"));
+  pass = pass & run_parse_test(make("p039"),
+                               make("func foo() a { x int = 3; }"));
+  pass = pass & run_parse_test(make("p040"),
+                               make("func foo() a { for i i32 = 3; i < 3; i = i + 1 { } }"));
+  pass = pass & run_parse_test(make("p041"),
+                               make("func foo() a { if x { } else if y { } else { } }"));
+  pass = pass & run_parse_test(make("p042"),
+                               make("func foo() a { label foo; goto bar; }"));
+  pass = pass & run_parse_test(make("p043"),
+                               make("func foo() a { x struct { }; y union { }; }"));
+  pass = pass & run_parse_test(make("p044"),
+                               make(" deftype foo bar;"));
+  pass = pass & run_parse_test(make("p045"),
+                               make("deftype foo fn[int, int] ;"));
+  pass = pass & run_parse_test(make("p046"),
+                               make("deftype foo struct { x y; z int; t fn[beh]; };"));
+  pass = pass & run_parse_test(make("p047"),
+                               make("deftype[] foo bar;\n"));
+  pass = pass & run_parse_test(make("p048"),
+                               make("deftype[] foo struct {x bar [quux]; };\n"));
+  pass = pass & run_parse_test(make("p049"),
+                               make("deftype[] foo struct {x [2 + 3]bar; };\n"));
+  pass = pass & run_parse_test(make("p050"),
+                               make("defclass move foo [7]bar;\ndeftype[T] foo struct { count u32; p [3]T; };\n"));
+  pass = pass & run_parse_test(make("p051"),
+                               make("defclass copy foo bar;"));
+  pass = pass & run_parse_test(make("p052"),
+                               make("extern putchar fn[i32, i32];"));
+  pass = pass & run_parse_test(make("p053"),
+                               make("export def blah fn[i32, i32] = 3;"));
+  pass = pass & run_parse_test(make("p054"),
+                               make("access string { def foo i32 = 3; }\n"));
+  pass = pass & run_parse_test(make("p054"),
+                               make("access vec[_] { def foo i32 = 3; }\n"));
   return pass;
 }
+

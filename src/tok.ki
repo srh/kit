@@ -133,7 +133,9 @@ defenum tokval {
   Ident array[i32];
   Grouper grouper;
   StringChar i32;
+  // TODO: Just make StringDelim and Backtick be Groupers.
   StringDelim i32;
+  Backtick void;
   Bad void;
   Eof void;
   Comment void;
@@ -163,6 +165,9 @@ func `==`(a tokval, b tokval) bool {
   case Oper(j): { switch b { case Oper(k): { return array_equal(&j, &k); } } }
   case Ident(j): { switch b { case Ident(k): { return array_equal(&j, &k); } } }
   case Grouper(j): { switch b { case Grouper(k): { return j == k; } } }
+  case StringChar(j): { switch b { case StringChar(k): { return j == k; } } }
+  case StringDelim(j): { switch b { case StringDelim(k): { return j == k; } } }
+  case Backtick(j): { return true; }
   case Bad(j): { return true; }
   case Eof(j): { return true; }
   case Comment(v): { return true; }
@@ -383,6 +388,12 @@ func grab_tok(p *ps) tok {
   } else if ch == '}' {
     ps_step(p);
     return mk_res(p, left, Grouper(RBrace(void)));
+  } else if ch == '\"' || ch == '\'' {
+    ps_step(p);
+    return mk_res(p, left, StringDelim(ch));
+  } else if ch == '`' {
+    ps_step(p);
+    return mk_res(p, left, Backtick(void));
   } else if ch == '~' {
     ps_step(p);
     return mk_res(p, left, Oper(mk_array(ch)));
