@@ -144,7 +144,7 @@ func parse_rest_of_def(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
     typeexpr = None();
   } else {
     t ast_typeexpr;
-    if !parse_typeexpr(p, &t) {
+    if !(parse_typeexpr(p, &t) && try_skip_oper(p, '=')) {
       return Fail;
     }
     typeexpr = Has(t);
@@ -1316,4 +1316,70 @@ func parse_rest_of_char_literal(p *ps, out *ast_expr) bool {
       return Fail;
     }
   }
+}
+
+
+
+func showu8(x size) array[u8] {
+  ret array[u8];
+  if x == 0 {
+    push(&ret, '0');
+    return ret;
+  }
+  while x != 0 {
+    push(&ret, @[u8]'0' + ~(x % 10));
+    x = x / 10;
+  }
+  j size = count(&ret);
+  d *u8 = data(&ret);
+  for i size = 0; i < j; {
+    j = j - 1;
+    tmp u8 = d[i];
+    d[i] = d[j];
+    d[j] = tmp;
+    i = i + 1;
+  }
+  return ret;
+}
+
+func see_if_parse(file array[u8]) bool {
+  im identmap;
+  p ps = make_ps(&im, data(&file), count(&file));
+  out ast_file;
+  ret bool = parse_file(&p, &out);
+  if !ret {
+    print(Stdout(), make("at offset "));
+    print(Stdout(), showu8(peek(&p).interval.left.~));
+    print(Stdout(), make("..."));
+    fflush(Stdout());
+  }
+  return ret;
+}
+
+func run_parse_test(test_name array[u8], file array[u8]) bool {
+  print(Stdout(), make("test "));
+  print(Stdout(), test_name);
+  print(Stdout(), make("..."));
+  fflush(Stdout());
+  if !see_if_parse(file) {
+    print(Stdout(), make("FAIL\n"));
+    fflush(Stdout());
+    return false;
+  } else {
+    print(Stdout(), make("PASS\n"));
+    fflush(Stdout());
+    return true;
+  }
+}
+
+func test_parse() bool {
+  pass bool = true;
+  pass = pass & run_parse_test(make("p001"), make("import foo;\n"));
+  pass = pass & run_parse_test(make("p002"), make("def a int = 0;\n"));
+  pass = pass & run_parse_test(make("p003"), make("def abc int = 1;\n"));
+  pass = pass & run_parse_test(make("p004"), make("def _ab int = 0x1;\n"));
+  pass = pass & run_parse_test(make("p005"), make("def ab_ int = 0x1AF2;\n"));
+  pass = pass & run_parse_test(make("p006"), make("def a_b int=0x1AF2 ;\n"));
+  pass = pass & run_parse_test(make("p007"), make("def a int=0x1AF2 ;\n"));
+  return pass;
 }
