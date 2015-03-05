@@ -1168,23 +1168,23 @@ func parse_case_pattern(p *ps, out *ast_case_pattern) bool {
   return true;
 }
 
-func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_statement) bool {
-  switch triparse_naked_var_statement(p, fa, out) {
-    case Success(v): { return true; }
-    default: { return false; }
-  }
-}
-
 defenum triparse_result {
   Success void;
   Quickfail void;
   Error void;
 };
 
-func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement) triparse_result {
+func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_statement) bool {
   name ast_ident;
   if !try_parse_ident(p, &name) {
-    return Quickfail(void);
+    // (The force_assignment argument only matters for var statements.)
+    expr ast_expr;
+    if !(parse_expr(p, kSemicolonPrec, &expr)
+         && try_skip_oper(p, ';')) {
+      return Fail;
+    }
+    *out = Expr(expr);
+    return true;
   }
 
   type ast_typeexpr;
@@ -1196,7 +1196,7 @@ func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement
         param box[ast_typeexpr];
         if !(try_skip_token(p, Grouper(RBracket(void)))
              && parse_typeexpr(p, oo(&param))) {
-          return Error(void);
+          return Fail;
         }
 
         type = collapse_indexers(indexers, Arraytype({None(), param}));
@@ -1205,7 +1205,7 @@ func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement
         ambi ast_expr;
         if !(parse_expr(p, kCommaPrec, &ambi)
              && try_skip_token(p, Grouper(RBracket(void)))) {
-          return Error(void);
+          return Fail;
         }
         push(&indexers, ambi);
       }
@@ -1217,13 +1217,13 @@ func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement
           whole_expr ast_expr;
           if !(parse_after_atomic_expr(p, kSemicolonPrec, lhs, &whole_expr)
                && try_skip_oper(p, ';')) {
-            return Error(void);
+            return Fail;
           }
           *out = Expr(whole_expr);
-          return Success(void);
+          return true;
         }
         case Error(v): {
-          return Error(void);
+          return Fail;
         }
         case Success(v): {
           type = collapse_indexers(indexers, local_type);
@@ -1237,11 +1237,11 @@ func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement
 
   if peek(p).val == mk_oper(';') {
     switch fa {
-      case ForceAssignmentYes(v): { return Error(void); }
+      case ForceAssignmentYes(v): { return Fail; }
       case ForceAssignmentNo(v): {
         step(p);
         *out = Var({decl, None()});
-        return Success(void);
+        return true;
       }
     }
   }
@@ -1250,10 +1250,10 @@ func triparse_naked_var_statement(p *ps, fa force_assignment, out *ast_statement
   if !(try_skip_oper(p, '=')
        && parse_expr(p, kSemicolonPrec, oo(&rhs))
        && try_skip_oper(p, ';')) {
-    return Error(void);
+    return Fail;
   }
   *out = Var({decl, Has(rhs)});
-  return Success(void);
+  return true;
 }
 
 func expressionize(name ast_ident, indexers array[ast_expr]) ast_expr {
@@ -1374,12 +1374,21 @@ func run_parse_test(test_name array[u8], file array[u8]) bool {
 
 func test_parse() bool {
   pass bool = true;
-  pass = pass & run_parse_test(make("p001"), make("import foo;\n"));
-  pass = pass & run_parse_test(make("p002"), make("def a int = 0;\n"));
+  pass = pass & run_parse_test(make("p001"), make("import foo;"));
+  pass = pass & run_parse_test(make("p002"), make("def a int = 0;"));
   pass = pass & run_parse_test(make("p003"), make("def abc int = 1;\n"));
-  pass = pass & run_parse_test(make("p004"), make("def _ab int = 0x1;\n"));
+  pass = pass & run_parse_test(make("p004"), make("def _ab int =0x1;\n"));
   pass = pass & run_parse_test(make("p005"), make("def ab_ int = 0x1AF2;\n"));
-  pass = pass & run_parse_test(make("p006"), make("def a_b int=0x1AF2 ;\n"));
-  pass = pass & run_parse_test(make("p007"), make("def a int=0x1AF2 ;\n"));
+  pass = pass & run_parse_test(make("p006"), make("def a_b int=\n0x1AF2 ;\n"));
+  pass = pass & run_parse_test(make("p007"), make("def a int=0x1AF2 ;"));
+  pass = pass & run_parse_test(make("p008"), make("def a fn[int, int] = 1;"));
+  pass = pass & run_parse_test(make("p009"),
+                               make("def a b = func(x int, y int) int { 3; };"));
+  pass = pass & run_parse_test(make("p010"),
+                               make("def a = func(x int, y int) int { return 3; };"));
+  pass = pass & run_parse_test(make("p011"),
+                               make("def a =\n\tfunc(x int, y int) int { *x; };"));
+  pass = pass & run_parse_test(make("p012"),
+                               make("def foo bar = 2 + 3;"));
   return pass;
 }
