@@ -19,7 +19,7 @@ access array[_] {
     dest->ptr = cast(checkmalloc(src->count * sizeof@[T]));
     e size = src->count;
     for i size = 0; i < e; i = i + 1 {
-      dest->ptr[i] = src->ptr[i];
+      copy(&dest->ptr[i], &src->ptr[i]);
     }
   }
 

@@ -23,6 +23,9 @@ defenum prec_cmp {
   PullsRight void;
 };
 
+// def[T] dbgparse fn[T, void] = debugstr;
+func[T] dbgparse(x T) void { }
+
 def kSemicolonPrec i32 = 205;
 def kCommaPrec i32 = 205;
 // Just enough to force assignment in conditionals to be parenthesized.
@@ -30,6 +33,7 @@ def kConditionPrec i32 = 305;
 def kConversionRightPrec i32 = 905;
 
 func parse_file(p *ps, out *ast_file) bool {
+  dbgparse("parse_file\n");
   arr array[ast_toplevel];
   if !parse_toplevels(p, Eof(void), &arr) {
     return Fail;
@@ -39,6 +43,7 @@ func parse_file(p *ps, out *ast_file) bool {
 }
 
 func parse_toplevels(p *ps, stop tokval, out *array[ast_toplevel]) bool {
+  dbgparse("parse_toplevels\n");
   ret array[ast_toplevel];
   for ;; {
     if peek(p).val == stop {
@@ -82,6 +87,7 @@ func try_skip_oper(p *ps, exp0 i32, exp1 i32, exp2 i32) bool {
 }
 
 func parse_toplevel(p *ps, out *ast_toplevel) bool {
+  dbgparse("parse_toplevel\n");
   if try_skip_token(p, Keyw(Func(void))) {
     return parse_rest_of_func(p, IsNotExport(void), out);
   } else if try_skip_token(p, Keyw(Def(void))) {
@@ -167,6 +173,7 @@ func parse_rest_of_extern_def(p *ps, out *ast_toplevel) bool {
 }
 
 func parse_rest_of_import(p *ps, out *ast_toplevel) bool {
+  dbgparse("parse_rest_of_import\n");
   name ast_ident;
   if !(parse_ident(p, &name) && try_skip_oper(p, ';')) {
     return Fail;
@@ -299,10 +306,13 @@ func parse_ident(p *ps, out *ast_ident) bool {
 }
 
 func try_parse_ident(p *ps, out *ast_ident) bool {
+  dbgparse("try_parse_ident\n");
   switch peek(p).val {
     case Ident(text array[i32]): {
       m ast_meta = startend(p);
+      dbgparse("try_parse_ident startended\n");
       *out = {m, intern(p->im, ~text)};
+      dbgparse("try_parse_ident interned\n");
       step(p);
       return true;
     }

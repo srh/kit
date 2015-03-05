@@ -1,5 +1,6 @@
 import hash;
 import string;
+import stdlib;
 
 deftype ident_value size;
 

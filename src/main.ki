@@ -5,7 +5,6 @@ import string;
 
 func print(fp *FILE, arr array[u8]) void {
   c size = count(&arr);
-  debugchar('@' + @[u8]~c);
   fwrite(@[*void]cast(data(&arr)), sizeof@[u8], count(&arr), fp);
 }
 
@@ -28,15 +27,12 @@ func see_if_parse(file array[u8]) bool {
 }
 
 func run_parse_test(test_name array[u8], file array[u8]) bool {
-  print(Stdout(), @[array[u8]]make("test "));
-  c size = count(&test_name);
-  debugchar('Z');
-  debugchar('@' + @[u8]~c);
+  print(Stdout(), make("test "));
   print(Stdout(), test_name);
-  print(Stdout(), @[array[u8]]make("...\n"));
+  print(Stdout(), make("...\n"));
   fflush(Stdout());
   if !see_if_parse(file) {
-    print(Stdout(), @[array[u8]]make("FAIL\n"));
+    print(Stdout(), make("FAIL\n"));
     fflush(Stdout());
     return false;
   }

@@ -19,10 +19,9 @@ extern fflush fn[*FILE, i32];   // TODO: actually returns "int"
 def EOF i32 = -1;  // TODO: is actually "int"
 // TODO: fseek takes a "long".
 
-func debugchar(ch u8) void {
-  putchar(~ch);
-  putchar('\n');
-  fflush(Stdout());
+func[T] debugstr(arr T) void {
+  fwrite(cast(@[*u8]&arr[0]), sizeof@[u8], arr.length, Stderr());
+  fflush(Stderr());
 }
 
 func checkmalloc(n size) *void {
