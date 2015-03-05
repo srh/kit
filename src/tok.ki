@@ -545,6 +545,7 @@ func[String] grab_keyword(p *ps, s String, k keyw, out *tok) bool {
   }
 
   if !is_ident_postchar(ps_peek(p)) {
+    ps_restore_pos(p, left);
     return false;
   }
 
