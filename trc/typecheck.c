@@ -1906,20 +1906,26 @@ void exprscope_pop_var(struct exprscope *es) {
   es->vars[es->vars_count].varnum.value = SIZE_MAX;
 }
 
-int unify_fields_directionally(struct identmap *im,
-                               struct ast_vardecl *partial_fields,
-                               size_t partial_fields_count,
-                               struct ast_vardecl *complete_fields,
-                               size_t complete_fields_count) {
+int help_unify_directionally(struct identmap *im,
+                             int exact,
+                             struct ast_typeexpr *partial_type,
+                             struct ast_typeexpr *complete_type);
+
+int help_unify_fields_directionally(struct identmap *im,
+                                    int exact,
+                                    struct ast_vardecl *partial_fields,
+                                    size_t partial_fields_count,
+                                    struct ast_vardecl *complete_fields,
+                                    size_t complete_fields_count) {
   if (partial_fields_count != complete_fields_count) {
     return 0;
   }
 
   for (size_t i = 0; i < partial_fields_count; i++) {
     if (partial_fields[i].name.value != complete_fields[i].name.value
-        || !unify_directionally(im,
-                                &partial_fields[i].type,
-                                &complete_fields[i].type)) {
+        || !help_unify_directionally(im, exact,
+                                     &partial_fields[i].type,
+                                     &complete_fields[i].type)) {
       return 0;
     }
   }
@@ -1927,15 +1933,18 @@ int unify_fields_directionally(struct identmap *im,
   return 1;
 }
 
-int unify_directionally(struct identmap *im,
-                        struct ast_typeexpr *partial_type,
-                        struct ast_typeexpr *complete_type) {
+int help_unify_directionally(struct identmap *im,
+                             int exact,
+                             struct ast_typeexpr *partial_type,
+                             struct ast_typeexpr *complete_type) {
   CHECK(complete_type->tag != AST_TYPEEXPR_UNKNOWN);
   if (partial_type->tag == AST_TYPEEXPR_UNKNOWN) {
+    CHECK(!exact);
     return 1;
   }
 
   if (partial_type->tag == AST_TYPEEXPR_NUMERIC) {
+    CHECK(!exact);
     return is_numeric_type(im, complete_type);
   }
 
@@ -1955,39 +1964,43 @@ int unify_directionally(struct identmap *im,
       return 0;
     }
     for (size_t i = 0, e = p_app->params_count; i < e; i++) {
-      if (!unify_directionally(im, &p_app->params[i], &c_app->params[i])) {
+      if (!help_unify_directionally(im, exact, &p_app->params[i], &c_app->params[i])) {
         return 0;
       }
     }
     return 1;
   } break;
   case AST_TYPEEXPR_STRUCTE:
-    return unify_fields_directionally(im, partial_type->u.structe.fields,
-                                      partial_type->u.structe.fields_count,
-                                      complete_type->u.structe.fields,
-                                      complete_type->u.structe.fields_count);
+    return help_unify_fields_directionally(im, exact, partial_type->u.structe.fields,
+                                           partial_type->u.structe.fields_count,
+                                           complete_type->u.structe.fields,
+                                           complete_type->u.structe.fields_count);
   case AST_TYPEEXPR_UNIONE:
-    return unify_fields_directionally(im, partial_type->u.unione.fields,
-                                      partial_type->u.unione.fields_count,
-                                      complete_type->u.unione.fields,
-                                      complete_type->u.unione.fields_count);
+    return help_unify_fields_directionally(im, exact, partial_type->u.unione.fields,
+                                           partial_type->u.unione.fields_count,
+                                           complete_type->u.unione.fields,
+                                           complete_type->u.unione.fields_count);
   case AST_TYPEEXPR_ARRAY: {
     if (unsafe_numeric_literal_u32(&partial_type->u.arraytype.number)
         != unsafe_numeric_literal_u32(&complete_type->u.arraytype.number)) {
       return 0;
     }
-    return unify_directionally(im, partial_type->u.arraytype.param,
-                               complete_type->u.arraytype.param);
+    return help_unify_directionally(im, exact, partial_type->u.arraytype.param,
+                                    complete_type->u.arraytype.param);
   } break;
   default:
     UNREACHABLE();
   }
 }
 
-/* im is only necessary because it's a param for unify_directionally. */
+int unify_directionally(struct identmap *im, struct ast_typeexpr *a,
+                        struct ast_typeexpr *b) {
+  return help_unify_directionally(im, 0, a, b);
+}
+
 int exact_typeexprs_equal(struct identmap *im, struct ast_typeexpr *a,
                           struct ast_typeexpr *b) {
-  return unify_directionally(im, a, b) && unify_directionally(im, b, a);
+  return help_unify_directionally(im, 1, a, b);
 }
 
 int is_accessible(struct exprscope *es, struct defclass_ident accessee_privacy_scope) {
