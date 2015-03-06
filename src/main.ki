@@ -3,11 +3,6 @@ import parse;
 import stdlib;
 import string;
 
-func print(fp *FILE, arr array[u8]) void {
-  c size = count(&arr);
-  fwrite(@[*void]cast(data(&arr)), sizeof@[u8], count(&arr), fp);
-}
-
 // TODO: c_int
 export func main(argc i32, argv **u8) i32 {
   print(Stdout(), make("Hello, world!\n"));
