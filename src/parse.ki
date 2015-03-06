@@ -305,16 +305,38 @@ func parse_ident(p *ps, out *ast_ident) bool {
   return try_parse_ident(p, out);
 }
 
+func parse_rest_of_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) bool {
+  switch peek(p).val {
+    default: {
+      return Fail;
+    }
+    // TODO: "Opers" such as "@" or maybe even "=" shouldn't really be allowed here -- only functional opers allowed.
+    // TODO: We probably should not allow "` + `" to parse -- require tight quoting, do this at tokenization.
+    case Oper(operch array[i32]): {
+      step(p);
+      if !try_skip_token(p, Backtick(void)) {
+        return Fail;
+      }
+      end(p, ident_meta);
+      *out = {ident_meta, intern(p->im, ~operch)};
+      return true;
+    }
+  }
+}
+
 func try_parse_ident(p *ps, out *ast_ident) bool {
   dbgparse("try_parse_ident\n");
   switch peek(p).val {
     case Ident(text array[i32]): {
       m ast_meta = startend(p);
-      dbgparse("try_parse_ident startended\n");
-      *out = {m, intern(p->im, ~text)};
-      dbgparse("try_parse_ident interned\n");
       step(p);
+      *out = {m, intern(p->im, ~text)};
       return true;
+    }
+    case Backtick(v): {
+      ident_meta ast_meta = start(p);
+      step(p);
+      return parse_rest_of_backtick_ident(p, ident_meta, out);
     }
     default: {
       return Fail;
@@ -731,6 +753,25 @@ func build_binop_expr(im *identmap, op ast_ident, lhs ast_expr, rhs ast_expr) as
                   mk_array(lhs, rhs)});
 }
 
+func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) bool {
+  switch peek(p).val {
+    case Oper(operch array[i32]): {
+      if is_at_sign(&operch) {
+        step(p);
+        args array[ast_typeexpr];
+        if !(try_skip_token(p, Grouper(LBracket(void)))
+             && parse_rest_of_type_param_list(p, AllowBlanksNo(void), &args)) {
+          return Fail;
+        }
+        *out = NameExpr({ident, Has(args)});
+        return true;
+      }
+    }
+    default: { }
+  }
+  *out = NameExpr({ident, None()});
+  return true;
+}
 
 func parse_atomic_expr(p *ps, out *ast_expr) bool {
   switch peek(p).val {
@@ -807,23 +848,7 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
     case Ident(identch array[i32]): {
       ident_meta ast_meta = startend(p);
       step(p);
-      switch peek(p).val {
-        case Oper(operch array[i32]): {
-          if is_at_sign(&operch) {
-            step(p);
-            args array[ast_typeexpr];
-            if !(try_skip_token(p, Grouper(LBracket(void)))
-                 && parse_rest_of_type_param_list(p, AllowBlanksNo(void), &args)) {
-              return Fail;
-            }
-            *out = NameExpr({{ident_meta, intern(p->im, ~identch)}, Has(args)});
-            return true;
-          }
-        }
-        default: { }
-      }
-      *out = NameExpr({{ident_meta, intern(p->im, ~identch)}, None()});
-      return true;
+      return parse_finish_name_expr(p, {ident_meta, intern(p->im, ~identch)}, out);
     }
     case Oper(operch array[i32]): {
       if is_at_sign(&operch) {
@@ -868,8 +893,13 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
       }
     }
     case Backtick(v): {
-      // TODO: treat like Ident(..) is treated.
-      return Fail;
+      ident_meta ast_meta = start(p);
+      step(p);
+      ident ast_ident;
+      if !parse_rest_of_backtick_ident(p, ident_meta, &ident) {
+        return Fail;
+      }
+      return parse_finish_name_expr(p, ident, out);
     }
     case Bad(v): {
       return Fail;

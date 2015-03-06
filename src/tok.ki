@@ -342,7 +342,7 @@ func grab_tok(p *ps) tok {
         || grab_keyword(p, "goto", Goto(void), &ret)
         || grab_keyword(p, "if", If(void), &ret)
         || grab_keyword(p, "import", Import(void), &ret)
-        || grab_keyword(p, "label", Import(void), &ret)
+        || grab_keyword(p, "label", Label(void), &ret)
         || grab_keyword(p, "move", Move(void), &ret)
         || grab_keyword(p, "null", Null(void), &ret)
         || grab_keyword(p, "return", Return(void), &ret)
