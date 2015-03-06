@@ -1,5 +1,5 @@
-#ifndef KIRA_TYPEEXPR_H_
-#define KIRA_TYPEEXPR_H_
+#ifndef KIRA_PRINT_H_
+#define KIRA_PRINT_H_
 
 struct ast_typeexpr;
 struct databuf;
@@ -9,5 +9,5 @@ void sprint_typeexpr(struct databuf *buf, struct identmap *im, struct ast_typeex
 
 void DBG_typeexpr(const char *msg, struct identmap *im, struct ast_typeexpr *a);
 
-#endif /* KIRA_TYPEEXPR_H_ */
+#endif /* KIRA_PRINT_H_ */
 

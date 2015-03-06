@@ -4,8 +4,8 @@
 #include <string.h>
 
 #include "slice.h"
+#include "print.h"
 #include "typecheck.h"
-#include "typeexpr.h"
 
 struct defs_by_name_node {
   struct def_entry *ent;
