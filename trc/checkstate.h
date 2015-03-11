@@ -49,6 +49,7 @@ struct checkstate {
   size_t imports_count;
   size_t imports_limit;
 
+  /* TODO: Rename this, it adds 1 for every file. */
   size_t total_filesize;
 
   int template_instantiation_recursion_depth;
@@ -68,5 +69,9 @@ struct checkstate {
 void checkstate_init(struct checkstate *cs, struct identmap *im);
 
 void checkstate_destroy(struct checkstate *cs);
+
+ident_value checkstate_g_o_import_name(struct checkstate *cs, size_t global_offset);
+size_t checkstate_g_o_line(struct checkstate *cs, size_t global_offset);
+size_t checkstate_g_o_column(struct checkstate *cs, size_t global_offset);
 
 #endif /* KIRA_CHECKSTATE_H_ */

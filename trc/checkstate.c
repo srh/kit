@@ -69,3 +69,29 @@ void checkstate_init(struct checkstate *cs, struct identmap *im) {
   cs->sli_symbol_table_indexes_limit = 0;
 }
 
+size_t checkstate_find_g_o_import(struct checkstate *cs, size_t global_offset) {
+  CHECK(cs->imports_count > 0);
+  /* b->global_offset_base <= global_offset, and e->global_offset_base
+  > global_offset (if e is in range. */
+  size_t b = 0;
+  size_t e = cs->imports_count;
+
+  for (;;) {
+    size_t m = b + (e - b) / 2;
+    if (m == b) {
+      return b;
+    }
+    if (cs->imports[m].global_offset_base <= global_offset) {
+      b = m;
+    } else {
+      e = m;
+    }
+  }
+}
+
+ident_value checkstate_g_o_import_name(struct checkstate *cs, size_t global_offset) {
+  size_t ix = checkstate_find_g_o_import(cs, global_offset);
+  CHECK(ix < cs->imports_count);
+  CHECK(global_offset >= cs->imports[ix].global_offset_base);
+  return cs->imports[ix].import_name;
+}

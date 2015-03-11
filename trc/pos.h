@@ -10,12 +10,10 @@ struct pos {
   size_t global_offset;
   size_t line;
   size_t column;
-  ident_value filename;
 };
 
 struct pos make_pos(size_t global_offset,
                     size_t line,
-                    size_t column,
-                    ident_value filename);
+                    size_t column);
 
 #endif /* KIRA_POS_H_ */

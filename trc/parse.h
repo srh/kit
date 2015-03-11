@@ -11,6 +11,7 @@ struct ast_file;
 struct identmap;
 
 struct error_dump {
+  ident_value filename;
   void (*dumper)(struct error_dump *ctx, struct identmap *im,
                  struct pos pos, const char *msg, size_t msglen);
 };
@@ -19,7 +20,6 @@ int parse_test(void);
 int parse_buf_file(struct identmap *im,
                    const uint8_t *buf, size_t length,
                    size_t global_offset,
-                   ident_value filename,
                    struct ast_file *file_out,
                    struct error_dump *error_dump);
 

@@ -10,8 +10,8 @@ struct ast_meta ast_meta_make(struct pos pos_start, struct pos pos_end) {
 }
 
 struct ast_meta ast_meta_make_garbage(void) {
-  return ast_meta_make(make_pos(0, 0, 0, IDENT_VALUE_INVALID),
-                       make_pos(0, 0, 0, IDENT_VALUE_INVALID));
+  return ast_meta_make(make_pos(0, 0, 0),
+                       make_pos(0, 0, 0));
 }
 
 struct ast_meta ast_meta_make_copy(struct ast_meta *c) {
@@ -19,7 +19,7 @@ struct ast_meta ast_meta_make_copy(struct ast_meta *c) {
 }
 
 void ast_meta_destroy(struct ast_meta *a) {
-  a->pos_start = make_pos(SIZE_MAX, SIZE_MAX, SIZE_MAX, IDENT_VALUE_INVALID);
+  a->pos_start = make_pos(SIZE_MAX, SIZE_MAX, SIZE_MAX);
   a->pos_end = a->pos_start;
   /* Do nothing useful. */
 }

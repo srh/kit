@@ -730,7 +730,7 @@ void stderr_errmsg(struct error_dump *ctx, struct identmap *im,
                    struct pos pos, const char *msg, size_t msglen) {
   (void)ctx;
   ERR("Parse error at %.*s:%"PRIz":%"PRIz": %.*s\n",
-      IM_P(im, pos.filename), pos.line, pos.column, size_to_int(msglen), msg);
+      IM_P(im, ctx->filename), pos.line, pos.column, size_to_int(msglen), msg);
 }
 
 int resolve_import_filename_and_parse(struct checkstate *cs,
@@ -753,11 +753,12 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
   }
 
   size_t global_offset_base = cs->total_filesize;
-  cs->total_filesize = size_add(cs->total_filesize, data_size);
+  cs->total_filesize = size_add(1, size_add(cs->total_filesize, data_size));
 
   struct error_dump error_dump;
+  error_dump.filename = name;
   error_dump.dumper = &stderr_errmsg;
-  if (!parse_buf_file(cs->im, data, data_size, global_offset_base, name,
+  if (!parse_buf_file(cs->im, data, data_size, global_offset_base,
                       file_out, &error_dump)) {
     goto fail_data;
   }
