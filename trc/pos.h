@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "identmap.h"
-
 struct pos {
   size_t global_offset;
 };

@@ -5,10 +5,10 @@
 #include <stdint.h>
 
 #include "databuf.h"
+#include "identmap.h"
 #include "pos.h"
 
 struct ast_file;
-struct identmap;
 
 struct error_dump {
   ident_value filename;
