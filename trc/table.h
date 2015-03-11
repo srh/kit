@@ -148,6 +148,7 @@ struct deftype_instantiation {
   int has_typeexpr_traits;
   struct typeexpr_traits typeexpr_traits;
   struct typeexpr_trait_instantiations explicit_trait_instantiations;
+  struct ast_deftype_rhs concrete_rhs;
 };
 
 struct deftype_entry {

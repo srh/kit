@@ -1478,6 +1478,7 @@ int check_typeexpr_name_traits(struct checkstate *cs,
       inst->has_typeexpr_traits = 1;
       inst->typeexpr_traits = traits;
       inst->explicit_trait_instantiations = trait_insts;
+      ast_deftype_rhs_init_copy(&inst->concrete_rhs, &ent->deftype->rhs);
       *out = traits;
       *insts_out = trait_insts;
     }
@@ -1486,7 +1487,7 @@ int check_typeexpr_name_traits(struct checkstate *cs,
     *has_concrete_deftype_rhs_out_or_null = 1;
     /* (Yes, this _is_ a concrete RHS -- because there's no generic
        param list when looking up a name.) */
-    ast_deftype_rhs_init_copy(concrete_deftype_rhs_out_or_null, &ent->deftype->rhs);
+    ast_deftype_rhs_init_copy(concrete_deftype_rhs_out_or_null, &inst->concrete_rhs);
   }
   return ret;
 }
