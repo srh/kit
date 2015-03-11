@@ -1484,7 +1484,8 @@ int check_typeexpr_name_traits(struct checkstate *cs,
   }
   if (ret && concrete_deftype_rhs_out_or_null) {
     *has_concrete_deftype_rhs_out_or_null = 1;
-    /* TODO: What the fuck?? This isn't a concrete rhs. */
+    /* (Yes, this _is_ a concrete RHS -- because there's no generic
+       param list when looking up a name.) */
     ast_deftype_rhs_init_copy(concrete_deftype_rhs_out_or_null, &ent->deftype->rhs);
   }
   return ret;
