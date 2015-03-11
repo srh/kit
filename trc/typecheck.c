@@ -1503,9 +1503,11 @@ int check_typeexpr_app_traits(struct checkstate *cs,
         == (concrete_deftype_rhs_out_or_null == NULL));
   CHECK(a->tag == AST_TYPEEXPR_APP);
   struct deftype_entry *ent;
-  if (!name_table_lookup_deftype(&cs->nt, a->u.app.name.value,
-                                 param_list_arity(a->u.app.params_count),
-                                 &ent)) {
+  struct deftype_instantiation *inst;
+  if (!name_table_lookup_deftype_inst(cs->im, &cs->nt, a->u.app.name.value,
+                                      a->u.app.params,
+                                      a->u.app.params_count,
+                                      &ent, &inst)) {
     METERR(cs, *ast_typeexpr_meta(a), "An invalid generic type '%.*s'\n",
            IM_P(cs->im, a->u.app.name.value));
     return 0;
@@ -1526,31 +1528,50 @@ int check_typeexpr_app_traits(struct checkstate *cs,
     return 1;
   }
 
-  struct ast_deftype *deftype = ent->deftype;
+  int ret;
+  if (inst->has_typeexpr_traits) {
+    *out = inst->typeexpr_traits;
+    *insts_out = inst->explicit_trait_instantiations;
+    ret = 1;
+  } else {
+    CHECK(also_typecheck);
+    struct ast_deftype *deftype = ent->deftype;
 
-  CHECK(deftype->generics.has_type_params
-        && deftype->generics.params_count == a->u.app.params_count);
+    CHECK(deftype->generics.has_type_params
+          && deftype->generics.params_count == a->u.app.params_count);
 
-  struct ast_deftype_rhs concrete_deftype_rhs;
-  do_replace_rhs_generics(&deftype->generics,
-                          a->u.app.params,
-                          a->u.app.params_count,
-                          &deftype->rhs,
-                          &concrete_deftype_rhs);
+    struct ast_deftype_rhs concrete_deftype_rhs;
+    do_replace_rhs_generics(&deftype->generics,
+                            a->u.app.params,
+                            a->u.app.params_count,
+                            &deftype->rhs,
+                            &concrete_deftype_rhs);
 
-  int ret = finish_checking_name_traits(cs,
-                                        a,
-                                        &deftype->meta,
-                                        deftype->disposition,
-                                        &concrete_deftype_rhs,
-                                        also_typecheck,
-                                        out,
-                                        insts_out);
+    struct typeexpr_traits traits;
+    struct typeexpr_trait_instantiations trait_insts;
+    ret = finish_checking_name_traits(cs,
+                                      a,
+                                      &deftype->meta,
+                                      deftype->disposition,
+                                      &concrete_deftype_rhs,
+                                      also_typecheck,
+                                      &traits,
+                                      &trait_insts);
+    if (ret) {
+      inst->has_typeexpr_traits = 1;
+      inst->typeexpr_traits = traits;
+      inst->explicit_trait_instantiations = trait_insts;
+      inst->concrete_rhs = concrete_deftype_rhs;
+      *out = traits;
+      *insts_out = trait_insts;
+    } else {
+      ast_deftype_rhs_destroy(&concrete_deftype_rhs);
+    }
+  }
+
   if (ret && concrete_deftype_rhs_out_or_null) {
     *has_concrete_deftype_rhs_out_or_null = 1;
-    *concrete_deftype_rhs_out_or_null = concrete_deftype_rhs;
-  } else {
-    ast_deftype_rhs_destroy(&concrete_deftype_rhs);
+    ast_deftype_rhs_init_copy(concrete_deftype_rhs_out_or_null, &inst->concrete_rhs);
   }
   return ret;
 }
