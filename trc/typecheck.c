@@ -18,15 +18,16 @@
 #define CHECK_DBG(...) do { } while (0)
 
 struct exprscope;
-int lookup_global_maybe_typecheck(struct checkstate *cs,
-                                  struct exprscope *also_maybe_typecheck,
-                                  struct ast_name_expr *name,
-                                  struct ast_typeexpr *partial_type,
-                                  int report_multi_match,
-                                  int *multi_match_out,
-                                  struct ast_typeexpr *out,
-                                  int *is_lvalue_out,
-                                  struct def_instantiation **inst_out);
+int lookup_global_maybe_typecheck(
+    struct checkstate *cs,
+    struct exprscope *also_maybe_typecheck,
+    struct ast_name_expr *name,
+    struct ast_typeexpr *partial_type,
+    int report_multi_match,
+    int *multi_match_out,
+    struct ast_typeexpr *out,
+    int *is_lvalue_out,
+    struct def_instantiation **inst_out);
 void wrap_in_ptr(struct common_idents *cm,
                  struct ast_typeexpr *target,
                  struct ast_typeexpr *ptr_out);
@@ -2037,15 +2038,16 @@ int check_expr_ai(struct exprscope *es,
                   struct ast_expr *x,
                   struct ast_typeexpr *partial_type);
 
-int lookup_global_maybe_typecheck(struct checkstate *cs,
-                                  struct exprscope *also_maybe_typecheck,
-                                  struct ast_name_expr *name,
-                                  struct ast_typeexpr *partial_type,
-                                  int report_multi_match,
-                                  int *multi_match_out,
-                                  struct ast_typeexpr *out,
-                                  int *is_lvalue_out,
-                                  struct def_instantiation **inst_out) {
+int lookup_global_maybe_typecheck(
+    struct checkstate *cs,
+    struct exprscope *also_maybe_typecheck,
+    struct ast_name_expr *name,
+    struct ast_typeexpr *partial_type,
+    int report_multi_match,
+    int *multi_match_out,
+    struct ast_typeexpr *out,
+    int *is_lvalue_out,
+    struct def_instantiation **inst_out) {
   struct ast_typeexpr unified;
   struct def_entry *ent;
   struct def_instantiation *inst;
