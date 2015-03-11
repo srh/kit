@@ -201,6 +201,13 @@ int name_table_add_primitive_type(struct identmap *im,
                                   uint32_t primitive_sizeof,
                                   uint32_t primitive_alignof);
 
+enum report_mode {
+  REPORT_MODE_MULTI_MATCH = 1,
+  REPORT_MODE_NO_MATCH = 2,
+  REPORT_MODE_ALL = REPORT_MODE_MULTI_MATCH | REPORT_MODE_NO_MATCH,
+  REPORT_MODE_NONE = 0,
+};
+
 enum match_result {
   MATCH_SUCCESS,
   MATCH_AMBIGUOUSLY,
@@ -214,18 +221,10 @@ enum match_result name_table_match_def(
     struct ast_typeexpr *generics_or_null,
     size_t generics_count,
     struct ast_typeexpr *partial_type,
-    int report_multi_match,
+    enum report_mode report_mode,
     struct ast_typeexpr *unified_type_out,
     struct def_entry **entry_out,
     struct def_instantiation **instantiation_out);
-
-enum match_result name_table_count_matching_defs(
-    struct identmap *im,
-    struct name_table *t,
-    struct ast_ident *name,
-    struct ast_typeexpr *generics_or_null,
-    size_t generics_count,
-    struct ast_typeexpr *partial_type);
 
 int name_table_lookup_deftype(struct name_table *t,
                               ident_value name,

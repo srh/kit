@@ -23,7 +23,7 @@ int lookup_global_maybe_typecheck(
     struct exprscope *also_maybe_typecheck,
     struct ast_name_expr *name,
     struct ast_typeexpr *partial_type,
-    int report_multi_match,
+    enum report_mode report_mode,
     enum match_result *match_result_out,
     struct ast_typeexpr *out,
     int *is_lvalue_out,
@@ -1231,57 +1231,43 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
                                  struct exprscope *also_typecheck,
                                  int *result_out,
                                  struct def_instantiation **inst_out) {
+  /* TODO: Pass meta to lookup_global_maybe_typecheck or make_ast_ident or something. */
+  (void)meta;
+
   struct ast_typeexpr func_type;
   make_pointee_func_lookup_type(cs, a, argdupes, &func_type);
 
   struct ast_name_expr func_name;
   ast_name_expr_init(&func_name, make_ast_ident(name));
 
-  enum match_result res = name_table_count_matching_defs(
-      cs->im,
-      &cs->nt,
-      &func_name.ident,
-      NULL,
-      0,
-      &func_type);
-  struct def_instantiation *inst = NULL;
-  switch (res) {
-  case MATCH_SUCCESS: {
-    /* TODO: We should be able to do this with one call to
-    name_table_match_def, I think. */
-    enum match_result match_result_discard;
-    struct ast_typeexpr unified;
-    int lvalue_discard;
-    if (!lookup_global_maybe_typecheck(cs,
-                                       also_typecheck,
-                                       &func_name,
-                                       &func_type,
-                                       1,
-                                       &match_result_discard,
-                                       &unified,
-                                       &lvalue_discard,
-                                       &inst)) {
-      METERR(cs->im, *meta, "Typecheck failed(?) when looking up %.*s definition.\n",
-             IM_P(cs->im, name));
-      goto fail;
+  enum match_result match_result;
+  struct ast_typeexpr unified;
+  int lvalue_discard;
+  struct def_instantiation *inst;
+  if (!lookup_global_maybe_typecheck(
+          cs,
+          also_typecheck,
+          &func_name,
+          &func_type,
+          REPORT_MODE_MULTI_MATCH,
+          &match_result,
+          &unified,
+          &lvalue_discard,
+          &inst)) {
+    if (match_result == MATCH_NONE) {
+      inst = NULL;
+      goto success;
     }
-    ast_typeexpr_destroy(&unified);
-  }  /* fallthrough */
-  case MATCH_NONE: {
-    ast_name_expr_destroy(&func_name);
-    ast_typeexpr_destroy(&func_type);
-
-    *result_out = (res == MATCH_SUCCESS);
-    *inst_out = inst;
-    return 1;
-  } break;
-  case MATCH_AMBIGUOUSLY: {
-    METERR(cs->im, *meta, "Multiple matching '%.*s' definitions\n", IM_P(cs->im, name));
     goto fail;
-  } break;
-  default:
-    UNREACHABLE();
   }
+  ast_typeexpr_destroy(&unified);
+
+ success:
+  ast_name_expr_destroy(&func_name);
+  ast_typeexpr_destroy(&func_type);
+  *result_out = (match_result == MATCH_SUCCESS);
+  *inst_out = inst;
+  return 1;
 
  fail:
   ast_name_expr_destroy(&func_name);
@@ -2043,7 +2029,7 @@ int lookup_global_maybe_typecheck(
     struct exprscope *also_maybe_typecheck,
     struct ast_name_expr *name,
     struct ast_typeexpr *partial_type,
-    int report_multi_match,
+    enum report_mode report_mode,
     enum match_result *match_result_out,
     struct ast_typeexpr *out,
     int *is_lvalue_out,
@@ -2058,7 +2044,7 @@ int lookup_global_maybe_typecheck(
       name->has_params ? name->params : NULL,
       name->has_params ? name->params_count : 0,
       partial_type,
-      report_multi_match,
+      report_mode,
       &unified,
       &ent,
       &inst);
@@ -2214,10 +2200,11 @@ int exprscope_lookup_name(struct exprscope *es,
   }
 
   /* inst_or_null_out gets initialized to a non-NULL value. */
-  return lookup_global_maybe_typecheck(es->cs, es, name, partial_type,
-                                       report_multi_match,
-                                       match_result_out,
-                                       out, is_lvalue_out, inst_or_null_out);
+  return lookup_global_maybe_typecheck(
+      es->cs, es, name, partial_type,
+      REPORT_MODE_NO_MATCH | (report_multi_match ? REPORT_MODE_MULTI_MATCH : 0),
+      match_result_out,
+      out, is_lvalue_out, inst_or_null_out);
 }
 
 void do_replace_generics_in_fields(struct ast_generics *generics,
@@ -4272,7 +4259,7 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
         &a->name,
         NULL, 0, /* (no generics) */
         ast_def_typeexpr(a),
-        1,
+        REPORT_MODE_ALL,
         &unified,
         &ent,
         &inst);

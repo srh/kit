@@ -1120,55 +1120,6 @@ enum match_result def_entry_matches(
   return MATCH_SUCCESS;
 }
 
-/* TODO: Dedup this with name_table_match_def, this is a copy/paste job. */
-enum match_result name_table_count_matching_defs(
-    struct identmap *im,
-    struct name_table *t,
-    struct ast_ident *ident,
-    struct ast_typeexpr *generics_or_null,
-    size_t generics_count,
-    struct ast_typeexpr *partial_type) {
-  size_t num_matched = 0;
-
-  ident_value name = ident->value;
-  struct defs_by_name_node *node;
-  {
-    ident_value dbn_id;
-    if (identmap_is_interned(&t->defs_by_name, &name, sizeof(name),
-                             &dbn_id)) {
-      node = identmap_get_user_value(&t->defs_by_name, dbn_id);
-      CHECK(node);
-    } else {
-      node = NULL;
-    }
-  }
-
-  for (; node; node = node->next) {
-    struct def_entry *ent = node->ent;
-    CHECK(ent->name == name);
-
-    enum match_result res = def_entry_matches(
-        im, ent, generics_or_null, generics_count,
-        partial_type, 0, NULL, NULL);
-    switch (res) {
-    case MATCH_SUCCESS:
-      num_matched = size_add(num_matched, 1);
-      if (num_matched > 1) {
-        return MATCH_AMBIGUOUSLY;
-      }
-      break;
-    case MATCH_AMBIGUOUSLY:
-      return MATCH_AMBIGUOUSLY;
-    case MATCH_NONE:
-      break;
-    default:
-      UNREACHABLE();
-    }
-  }
-
-  return num_matched == 1 ? MATCH_SUCCESS : MATCH_NONE;
-}
-
 enum match_result name_table_match_def(
     struct identmap *im,
     struct name_table *t,
@@ -1176,7 +1127,7 @@ enum match_result name_table_match_def(
     struct ast_typeexpr *generics_or_null,
     size_t generics_count,
     struct ast_typeexpr *partial_type,
-    int report_multi_match,
+    enum report_mode report_mode,
     struct ast_typeexpr *unified_type_out,
     struct def_entry **entry_out,
     struct def_instantiation **instantiation_out) {
@@ -1211,7 +1162,7 @@ enum match_result name_table_match_def(
     case MATCH_SUCCESS: {
       if (matched_ent) {
         ast_typeexpr_destroy(&unified);
-        if (report_multi_match) {
+        if (report_mode & REPORT_MODE_MULTI_MATCH) {
           METERR(im, ident->meta, "multiple matching '%.*s' definitions\n",
                  IM_P(im, ident->value));
         }
@@ -1224,7 +1175,7 @@ enum match_result name_table_match_def(
       }
     } break;
     case MATCH_AMBIGUOUSLY: {
-      if (report_multi_match) {
+      if (report_mode & REPORT_MODE_MULTI_MATCH) {
         METERR(im, ident->meta, "ambiguously matching '%.*s' definition\n",
                IM_P(im, ident->value));
       }
@@ -1245,8 +1196,10 @@ enum match_result name_table_match_def(
     struct databuf buf;
     databuf_init(&buf);
     sprint_typeexpr(&buf, im, partial_type);
-    METERR(im, ident->meta, "no definition of '%.*s' matches type '%.*s'\n",
-           IM_P(im, ident->value), size_to_int(buf.count), buf.buf);
+    if (report_mode & REPORT_MODE_NO_MATCH) {
+      METERR(im, ident->meta, "no definition of '%.*s' matches type '%.*s'\n",
+             IM_P(im, ident->value), size_to_int(buf.count), buf.buf);
+    }
     databuf_destroy(&buf);
     return MATCH_NONE;
   }
