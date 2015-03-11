@@ -19,6 +19,7 @@ struct ps {
   size_t line;
   size_t column;
 
+  size_t global_offset_base;
   ident_value filename;
 
   struct identmap im;
@@ -33,7 +34,9 @@ struct ps_savestate {
   size_t leafcount;
 };
 
-void ps_init(struct ps *p, struct error_dump *error_dump, const uint8_t *data, size_t length,
+void ps_init(struct ps *p, struct error_dump *error_dump, const uint8_t *data,
+             size_t length,
+             size_t global_offset_base,
              ident_value filename) {
   p->data = data;
   p->length = length;
@@ -42,6 +45,7 @@ void ps_init(struct ps *p, struct error_dump *error_dump, const uint8_t *data, s
   p->line = 1;
   p->column = 0;
 
+  p->global_offset_base = global_offset_base;
   p->filename = filename;
 
   identmap_init(&p->im);
@@ -54,6 +58,7 @@ it back. */
 void ps_init_with_identmap(struct ps *p, struct identmap *im,
                            struct error_dump *error_dump,
                            const uint8_t *data, size_t length,
+                           size_t global_offset_base,
                            ident_value filename) {
   p->data = data;
   p->length = length;
@@ -62,6 +67,7 @@ void ps_init_with_identmap(struct ps *p, struct identmap *im,
   p->line = 1;
   p->column = 0;
 
+  p->global_offset_base = global_offset_base;
   p->filename = filename;
 
   identmap_init_move(&p->im, im);
@@ -117,7 +123,7 @@ struct ps_savestate ps_save(struct ps *p) {
 }
 
 struct pos ps_pos(struct ps *p) {
-  return make_pos(p->pos, p->line, p->column, p->filename);
+  return make_pos(size_add(p->pos, p->global_offset_base), p->line, p->column, p->filename);
 }
 
 void ps_restore(struct ps *p, struct ps_savestate save) {
@@ -145,8 +151,10 @@ enum tri success_or_fail(int success) {
 }
 
 ident_value ps_intern_ident(struct ps *p,
-                            size_t begin_pos,
-                            size_t end_pos) {
+                            size_t begin_global_offset,
+                            size_t end_global_offset) {
+  size_t begin_pos = size_sub(begin_global_offset, p->global_offset_base);
+  size_t end_pos = size_sub(end_global_offset, p->global_offset_base);
   CHECK(end_pos <= p->length);
   CHECK(begin_pos <= end_pos);
   return identmap_intern(&p->im,
@@ -541,7 +549,7 @@ int parse_binop(struct ps *p, enum ast_binop *out,
     *out = op;
     struct pos pos_end = ps_pos(p);
     ast_ident_init(name_out, ast_meta_make(pos_start, pos_end),
-                   ps_intern_ident(p, pos_start.offset, pos_end.offset));
+                   ps_intern_ident(p, pos_start.global_offset, pos_end.global_offset));
     return 1;
   }
 }
@@ -567,7 +575,9 @@ names.  For example, "void" isn't here because it's a type name and
 gets parsed by typechecking code, too.  But it should not be allowed
 as the name of a variable.  TODO: Do more specific name-checking
 instead. */
-int is_ident_keyword(struct ps *p, size_t begin, size_t end) {
+int is_ident_keyword(struct ps *p, size_t global_offset_begin, size_t global_offset_end) {
+  size_t begin = size_sub(global_offset_begin, p->global_offset_base);
+  size_t end = size_sub(global_offset_end, p->global_offset_base);
   CHECK(begin < end);
   CHECK(end <= p->length);
   size_t count = end - begin;
@@ -635,12 +645,12 @@ enum tri triparse_ident(struct ps *p, struct ast_ident *out) {
   }
 
   struct pos pos_end = ps_pos(p);
-  if (is_ident_keyword(p, pos_start.offset, pos_end.offset)) {
+  if (is_ident_keyword(p, pos_start.global_offset, pos_end.global_offset)) {
     return TRI_ERROR;
   }
 
   ast_ident_init(out, ast_meta_make(pos_start, pos_end),
-                 ps_intern_ident(p, pos_start.offset, pos_end.offset));
+                 ps_intern_ident(p, pos_start.global_offset, pos_end.global_offset));
   ps_count_leaf(p);
   return TRI_SUCCESS;
 }
@@ -2761,11 +2771,12 @@ int parse_file(struct ps *p, struct ast_file *out) {
 
 int parse_buf_file(struct identmap *im,
                    const uint8_t *buf, size_t length,
+                   size_t global_offset,
                    ident_value filename,
                    struct ast_file *file_out,
                    struct error_dump *error_dump) {
   struct ps p;
-  ps_init_with_identmap(&p, im, error_dump, buf, length, filename);
+  ps_init_with_identmap(&p, im, error_dump, buf, length, global_offset, filename);
 
   struct ast_file a;
   int ret = parse_file(&p, &a);
@@ -2792,7 +2803,7 @@ int count_parse_buf(const uint8_t *buf, size_t length,
   dump.dumper = &silent_error;
 
   struct ps p;
-  ps_init(&p, &dump, buf, length, IDENT_VALUE_INVALID);
+  ps_init(&p, &dump, buf, length, 0, IDENT_VALUE_INVALID);
 
   struct ast_file file;
   PARSE_DBG("parse_file...\n");

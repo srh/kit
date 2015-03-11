@@ -18,6 +18,7 @@ struct error_dump {
 int parse_test(void);
 int parse_buf_file(struct identmap *im,
                    const uint8_t *buf, size_t length,
+                   size_t global_offset,
                    ident_value filename,
                    struct ast_file *file_out,
                    struct error_dump *error_dump);

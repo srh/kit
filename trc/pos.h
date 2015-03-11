@@ -7,13 +7,13 @@
 #include "identmap.h"
 
 struct pos {
-  size_t offset;
+  size_t global_offset;
   size_t line;
   size_t column;
   ident_value filename;
 };
 
-struct pos make_pos(size_t offset,
+struct pos make_pos(size_t global_offset,
                     size_t line,
                     size_t column,
                     ident_value filename);

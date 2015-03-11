@@ -11,6 +11,7 @@ struct import;
 
 struct import {
   ident_value import_name;
+  size_t global_offset_base;
   struct ast_file *file;
 };
 
@@ -47,6 +48,8 @@ struct checkstate {
   struct import *imports;
   size_t imports_count;
   size_t imports_limit;
+
+  size_t total_filesize;
 
   int template_instantiation_recursion_depth;
 

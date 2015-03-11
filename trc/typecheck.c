@@ -736,6 +736,7 @@ void stderr_errmsg(struct error_dump *ctx, struct identmap *im,
 int resolve_import_filename_and_parse(struct checkstate *cs,
                                       module_loader *loader,
                                       ident_value name,
+                                      size_t *global_offset_base_out,
                                       struct ast_file *file_out) {
   int ret = 0;
 
@@ -751,12 +752,17 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
     goto fail;
   }
 
+  size_t global_offset_base = cs->total_filesize;
+  cs->total_filesize = size_add(cs->total_filesize, data_size);
+
   struct error_dump error_dump;
   error_dump.dumper = &stderr_errmsg;
-  if (!parse_buf_file(cs->im, data, data_size, name, file_out, &error_dump)) {
+  if (!parse_buf_file(cs->im, data, data_size, global_offset_base, name,
+                      file_out, &error_dump)) {
     goto fail_data;
   }
 
+  *global_offset_base_out = global_offset_base;
   ret = 1;
  fail_data:
   free(data);
@@ -971,8 +977,10 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
       }
     }
 
+    size_t global_offset_base;
     struct ast_file file;
-    if (!resolve_import_filename_and_parse(cs, loader, name, &file)) {
+    if (!resolve_import_filename_and_parse(cs, loader, name, &global_offset_base,
+                                           &file)) {
       goto cleanup;
     }
 
@@ -981,6 +989,7 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
     *heap_file = file;
     struct import imp;
     imp.import_name = name;
+    imp.global_offset_base = global_offset_base;
     imp.file = heap_file;
     SLICE_PUSH(cs->imports, cs->imports_count, cs->imports_limit, imp);
 
