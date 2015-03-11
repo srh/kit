@@ -8,7 +8,7 @@
 #include "identmap.h"
 
 void sprint_ident(struct databuf *b, struct identmap *im, struct ast_ident *a) {
-  void *buf;
+  const void *buf;
   size_t count;
   identmap_lookup(im, a->value, &buf, &count);
   databuf_append(b, buf, count);
