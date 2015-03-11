@@ -293,6 +293,7 @@ void deftype_instantiation_init(struct deftype_instantiation *inst,
 
 void deftype_instantiation_destroy(struct deftype_instantiation *inst) {
   SLICE_FREE(inst->substitutions, inst->substitutions_count, ast_typeexpr_destroy);
+  inst->has_typeexpr_traits = 0;
 }
 
 void deftype_instantiation_free(struct deftype_instantiation **p) {
