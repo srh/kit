@@ -2,12 +2,6 @@
 
 #include "arith.h"
 
-struct pos make_pos(size_t global_offset) {
-  struct pos ret;
-  ret.global_offset = global_offset;
-  return ret;
-}
-
 size_t compute_line(const uint8_t *buf, size_t offset) {
   size_t newlines = 0;
   for (size_t i = 0; i < offset; i++) {

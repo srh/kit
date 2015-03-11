@@ -36,6 +36,8 @@ struct ps_savestate {
 void ps_init(struct ps *p, struct error_dump *error_dump, const uint8_t *data,
              size_t length,
              size_t global_offset_base) {
+  /* This check lets ps_pos avoid a check. */
+  CHECK(SIZE_MAX - length >= global_offset_base);
   p->data = data;
   p->length = length;
   p->pos = 0;
@@ -56,6 +58,8 @@ void ps_init_with_identmap(struct ps *p, struct identmap *im,
                            struct error_dump *error_dump,
                            const uint8_t *data, size_t length,
                            size_t global_offset_base) {
+  /* This check lets ps_pos avoid a check. */
+  CHECK(SIZE_MAX - length >= global_offset_base);
   p->data = data;
   p->length = length;
   p->pos = 0;
@@ -118,7 +122,11 @@ struct ps_savestate ps_save(struct ps *p) {
 }
 
 struct pos ps_pos(struct ps *p) {
-  return make_pos(size_add(p->pos, p->global_offset_base));
+  struct pos ret;
+  /* We could safely do raw addition here because of the check in
+  ps_init that p->length + p->global_offset_base won't overflow. */
+  ret.global_offset = size_add(p->pos, p->global_offset_base);
+  return ret;
 }
 
 void ps_restore(struct ps *p, struct ps_savestate save) {

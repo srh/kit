@@ -10,8 +10,6 @@ struct pos {
   size_t global_offset;
 };
 
-struct pos make_pos(size_t global_offset);
-
 size_t compute_line(const uint8_t *buf, size_t offset);
 size_t compute_column(const uint8_t *buf, size_t offset);
 
