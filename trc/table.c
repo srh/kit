@@ -1121,7 +1121,7 @@ enum match_result def_entry_matches(
 }
 
 enum match_result name_table_match_def(
-    struct identmap *im,
+    struct checkstate *cs,
     struct name_table *t,
     struct ast_ident *ident,
     struct ast_typeexpr *generics_or_null,
@@ -1156,15 +1156,15 @@ enum match_result name_table_match_def(
     struct ast_typeexpr unified;
     struct def_instantiation *instantiation;
     enum match_result res = def_entry_matches(
-        im, ent, generics_or_null, generics_count,
+        cs->im, ent, generics_or_null, generics_count,
         partial_type, 1, &unified, &instantiation);
     switch (res) {
     case MATCH_SUCCESS: {
       if (matched_ent) {
         ast_typeexpr_destroy(&unified);
         if (report_mode & REPORT_MODE_MULTI_MATCH) {
-          METERR(im, ident->meta, "multiple matching '%.*s' definitions\n",
-                 IM_P(im, ident->value));
+          METERR(cs, ident->meta, "multiple matching '%.*s' definitions\n",
+                 IM_P(cs->im, ident->value));
         }
         ast_typeexpr_destroy(&matched_type);
         return MATCH_AMBIGUOUSLY;
@@ -1176,8 +1176,8 @@ enum match_result name_table_match_def(
     } break;
     case MATCH_AMBIGUOUSLY: {
       if (report_mode & REPORT_MODE_MULTI_MATCH) {
-        METERR(im, ident->meta, "ambiguously matching '%.*s' definition\n",
-               IM_P(im, ident->value));
+        METERR(cs, ident->meta, "ambiguously matching '%.*s' definition\n",
+               IM_P(cs->im, ident->value));
       }
       if (matched_ent) {
         ast_typeexpr_destroy(&matched_type);
@@ -1195,10 +1195,10 @@ enum match_result name_table_match_def(
   if (!matched_ent) {
     struct databuf buf;
     databuf_init(&buf);
-    sprint_typeexpr(&buf, im, partial_type);
+    sprint_typeexpr(&buf, cs->im, partial_type);
     if (report_mode & REPORT_MODE_NO_MATCH) {
-      METERR(im, ident->meta, "no definition of '%.*s' matches type '%.*s'\n",
-             IM_P(im, ident->value), size_to_int(buf.count), buf.buf);
+      METERR(cs, ident->meta, "no definition of '%.*s' matches type '%.*s'\n",
+             IM_P(cs->im, ident->value), size_to_int(buf.count), buf.buf);
     }
     databuf_destroy(&buf);
     return MATCH_NONE;

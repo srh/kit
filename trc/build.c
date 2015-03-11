@@ -3662,8 +3662,7 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
   }
 }
 
-int help_gen_immediate_numeric(struct identmap *im,
-                               struct common_idents *cm,
+int help_gen_immediate_numeric(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
                                struct ast_typeexpr *type,
@@ -3671,9 +3670,9 @@ int help_gen_immediate_numeric(struct identmap *im,
                                uint32_t numeric_literal_value,
                                struct expr_return *er) {
   CHECK(type->tag == AST_TYPEEXPR_NAME);
-  CHECK(is_numeric_type(im, type));
+  CHECK(is_numeric_type(cs->im, type));
 
-  if (type->u.name.value == cm->i32_type_name) {
+  if (type->u.name.value == cs->cm.i32_type_name) {
     int32_t value;
     if (!squash_u32_to_i32(numeric_literal_value, &value)) {
       return 0;
@@ -3684,12 +3683,12 @@ int help_gen_immediate_numeric(struct identmap *im,
     imm.u.i32 = value;
     expr_return_immediate(f, h, er, imm);
     return 1;
-  } else if (type->u.name.value == cm->u32_type_name
-             || type->u.name.value == cm->size_type_name
-             || type->u.name.value == cm->osize_type_name) {
+  } else if (type->u.name.value == cs->cm.u32_type_name
+             || type->u.name.value == cs->cm.size_type_name
+             || type->u.name.value == cs->cm.osize_type_name) {
     expr_return_immediate(f, h, er, imm_u32(numeric_literal_value));
     return 1;
-  } else if (type->u.name.value == cm->u8_type_name) {
+  } else if (type->u.name.value == cs->cm.u8_type_name) {
     uint8_t value;
     if (!squash_u32_to_u8(numeric_literal_value, &value)) {
       return 0;
@@ -3699,7 +3698,7 @@ int help_gen_immediate_numeric(struct identmap *im,
     imm.u.u8 = value;
     expr_return_immediate(f, h, er, imm);
     return 1;
-  } else if (type->u.name.value == cm->i8_type_name) {
+  } else if (type->u.name.value == cs->cm.i8_type_name) {
     int8_t value;
     if (!squash_u32_to_i8(numeric_literal_value, &value)) {
       return 0;
@@ -3710,29 +3709,28 @@ int help_gen_immediate_numeric(struct identmap *im,
     expr_return_immediate(f, h, er, imm);
     return 1;
   } else {
-    METERR(im, *meta, "Compiler incomplete: Numeric literal resolves to type '%.*s', "
+    METERR(cs, *meta, "Compiler incomplete: Numeric literal resolves to type '%.*s', "
            "which this lame compiler cannot codegen for literals.\n",
-           IM_P(im, type->u.name.value));
+           IM_P(cs->im, type->u.name.value));
     return 0;
   }
 }
 
-int gen_immediate_numeric_literal(struct identmap *im,
-                                  struct common_idents *cm,
+int gen_immediate_numeric_literal(struct checkstate *cs,
                                   struct objfile *f,
                                   struct frame *h,
                                   struct ast_typeexpr *type,
                                   struct ast_numeric_literal *a,
                                   struct expr_return *er) {
   CHECK(type->tag == AST_TYPEEXPR_NAME);
-  CHECK(is_numeric_type(im, type));
+  CHECK(is_numeric_type(cs->im, type));
 
   uint32_t numeric_literal_value;
   if (!numeric_literal_to_u32(a, &numeric_literal_value)) {
     return 0;
   }
 
-  return help_gen_immediate_numeric(im, cm, f, h, type, &a->meta,
+  return help_gen_immediate_numeric(cs, f, h, type, &a->meta,
                                     numeric_literal_value, er);
 }
 
@@ -3938,7 +3936,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_NUMERIC_LITERAL: {
-    return gen_immediate_numeric_literal(cs->im, &cs->cm, f, h, ast_expr_type(a),
+    return gen_immediate_numeric_literal(cs, f, h, ast_expr_type(a),
                                          &a->u.numeric_literal, er);
   } break;
   case AST_EXPR_BOOL_LITERAL: {
@@ -3963,7 +3961,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_CHAR_LITERAL: {
-    return help_gen_immediate_numeric(cs->im, &cs->cm, f, h, ast_expr_type(a),
+    return help_gen_immediate_numeric(cs, f, h, ast_expr_type(a),
                                       &a->u.char_literal.meta,
                                       (uint32_t)a->u.char_literal.value,
                                       er);

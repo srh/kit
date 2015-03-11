@@ -5,6 +5,8 @@
 #include "arity.h"
 #include "primitive.h"
 
+struct checkstate;
+
 enum static_value_tag {
   STATIC_VALUE_I32,
   STATIC_VALUE_U32,
@@ -215,7 +217,7 @@ enum match_result {
 };
 
 enum match_result name_table_match_def(
-    struct identmap *im,
+    struct checkstate *cs,
     struct name_table *t,
     struct ast_ident *name,
     struct ast_typeexpr *generics_or_null,
