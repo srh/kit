@@ -284,6 +284,23 @@ void def_entry_note_static_reference(struct def_entry *ent,
              ent->static_references_limit, reference);
 }
 
+void deftype_instantiation_init(struct deftype_instantiation *inst,
+                                struct ast_typeexpr *substs, size_t substs_count) {
+  inst->substitutions = substs;
+  inst->substitutions_count = substs_count;
+  inst->has_typeexpr_traits = 0;
+}
+
+void deftype_instantiation_destroy(struct deftype_instantiation *inst) {
+  SLICE_FREE(inst->substitutions, inst->substitutions_count, ast_typeexpr_destroy);
+}
+
+void deftype_instantiation_free(struct deftype_instantiation **p) {
+  deftype_instantiation_destroy(*p);
+  free(*p);
+  *p = NULL;
+}
+
 void deftype_entry_init(struct deftype_entry *e,
                         ident_value name,
                         struct generics_arity arity,
@@ -301,6 +318,10 @@ void deftype_entry_init(struct deftype_entry *e,
     }
     e->flatly_held_count = arity.value;
   }
+
+  e->instantiations = NULL;
+  e->instantiations_count = 0;
+  e->instantiations_limit = 0;
 
   e->has_been_checked = 0;
   e->is_being_checked = 0;
@@ -333,6 +354,10 @@ void deftype_entry_init_primitive(struct deftype_entry *e,
     e->flatly_held_count = 0;
   }
 
+  e->instantiations = NULL;
+  e->instantiations_count = 0;
+  e->instantiations_limit = 0;
+
   e->has_been_checked = 1;
   e->is_being_checked = 0;
 
@@ -356,6 +381,9 @@ void deftype_entry_destroy(struct deftype_entry *e) {
   free(e->flatly_held);
   e->flatly_held = NULL;
   e->flatly_held_count = 0;
+
+  SLICE_FREE(e->instantiations, e->instantiations_count, deftype_instantiation_free);
+  e->instantiations_limit = 0;
 
   e->has_been_checked = 0;
   e->is_being_checked = 0;
@@ -1233,6 +1261,43 @@ int name_table_lookup_deftype(struct name_table *t,
   }
 
   return 0;
+}
+
+int name_table_lookup_deftype_inst(struct identmap *im,
+                                   struct name_table *t,
+                                   ident_value name,
+                                   struct ast_typeexpr *generics_or_null,
+                                   size_t generics_count,
+                                   struct deftype_entry **ent_out,
+                                   struct deftype_instantiation **inst_out) {
+  struct generics_arity arity = generics_or_null ? param_list_arity(generics_count) : no_param_list_arity();
+  struct deftype_entry *ent;
+  if (!name_table_lookup_deftype(t, name, arity, &ent)) {
+    return 0;
+  }
+
+  for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
+    struct deftype_instantiation *inst = ent->instantiations[i];
+    if (typelists_equal(im, inst->substitutions, inst->substitutions_count,
+                        generics_or_null, generics_count)) {
+      *ent_out = ent;
+      *inst_out = inst;
+      return 1;
+    }
+  }
+
+  struct ast_typeexpr *copy;
+  size_t copy_count;
+  SLICE_INIT_COPY(copy, copy_count, generics_or_null, generics_count, ast_typeexpr_init_copy);
+
+  struct deftype_instantiation *inst = malloc(sizeof(*inst));
+  CHECK(inst);
+  deftype_instantiation_init(inst, copy, copy_count);
+  SLICE_PUSH(ent->instantiations, ent->instantiations_count, ent->instantiations_limit, inst);
+
+  *ent_out = ent;
+  *inst_out = inst;
+  return 1;
 }
 
 struct deftype_entry *lookup_deftype(struct name_table *t,

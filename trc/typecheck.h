@@ -82,18 +82,6 @@ int squash_u32_to_i32(uint32_t value, int32_t *out);
 int squash_u32_to_u8(uint32_t value, uint8_t *out);
 int squash_u32_to_i8(uint32_t value, int8_t *out);
 
-enum typeexpr_trait {
-  TYPEEXPR_TRAIT_LACKED,
-  TYPEEXPR_TRAIT_HAD,
-  TYPEEXPR_TRAIT_TRIVIALLY_HAD,
-};
-
-struct typeexpr_traits {
-  enum typeexpr_trait movable;
-  enum typeexpr_trait copyable;
-  enum typeexpr_trait inittible;
-};
-
 struct typeexpr_trait_instantiations {
   struct def_instantiation *move_inst;
   struct def_instantiation *copy_inst;

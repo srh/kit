@@ -41,6 +41,18 @@ void static_value_init_copy(struct static_value *a, struct static_value *c);
 void static_value_init_move(struct static_value *a, struct static_value *m);
 void static_value_destroy(struct static_value *a);
 
+enum typeexpr_trait {
+  TYPEEXPR_TRAIT_LACKED,
+  TYPEEXPR_TRAIT_HAD,
+  TYPEEXPR_TRAIT_TRIVIALLY_HAD,
+};
+
+struct typeexpr_traits {
+  enum typeexpr_trait movable;
+  enum typeexpr_trait copyable;
+  enum typeexpr_trait inittible;
+};
+
 struct def_instantiation {
   /* Sigh, backpointers. */
   struct def_entry *owner;
@@ -119,6 +131,17 @@ struct def_entry {
 void def_entry_note_static_reference(struct def_entry *ent,
                                      struct def_entry *referent);
 
+struct deftype_instantiation {
+  /* The types used to substitute the respective deftype_entry generics
+  params. */
+  struct ast_typeexpr *substitutions;
+  size_t substitutions_count;
+
+  int has_typeexpr_traits;
+  struct typeexpr_traits typeexpr_traits;
+  int typechecked_typeexpr_traits;
+};
+
 struct deftype_entry {
   ident_value name;
   struct generics_arity arity;
@@ -127,6 +150,10 @@ struct deftype_entry {
   int *flatly_held;
   /* Equal to arity.value, if it has a value. */
   size_t flatly_held_count;
+
+  struct deftype_instantiation **instantiations;
+  size_t instantiations_count;
+  size_t instantiations_limit;
 
   int has_been_checked;
   int is_being_checked;
@@ -232,6 +259,13 @@ int name_table_lookup_deftype(struct name_table *t,
                               ident_value name,
                               struct generics_arity arity,
                               struct deftype_entry **out);
+int name_table_lookup_deftype_inst(struct identmap *im,
+                                   struct name_table *t,
+                                   ident_value name,
+                                   struct ast_typeexpr *generics_or_null,
+                                   size_t generics_count,
+                                   struct deftype_entry **ent_out,
+                                   struct deftype_instantiation **inst_out);
 
 int name_table_shadowed(struct name_table *t, ident_value name);
 
