@@ -24,7 +24,7 @@ int lookup_global_maybe_typecheck(
     struct ast_name_expr *name,
     struct ast_typeexpr *partial_type,
     int report_multi_match,
-    int *multi_match_out,
+    enum match_result *match_result_out,
     struct ast_typeexpr *out,
     int *is_lvalue_out,
     struct def_instantiation **inst_out);
@@ -1249,7 +1249,7 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
   case MATCH_SUCCESS: {
     /* TODO: We should be able to do this with one call to
     name_table_match_def, I think. */
-    int multi_match_discard;
+    enum match_result match_result_discard;
     struct ast_typeexpr unified;
     int lvalue_discard;
     if (!lookup_global_maybe_typecheck(cs,
@@ -1257,7 +1257,7 @@ int has_explicit_movecopydestroy(struct checkstate *cs,
                                        &func_name,
                                        &func_type,
                                        1,
-                                       &multi_match_discard,
+                                       &match_result_discard,
                                        &unified,
                                        &lvalue_discard,
                                        &inst)) {
@@ -2044,7 +2044,7 @@ int lookup_global_maybe_typecheck(
     struct ast_name_expr *name,
     struct ast_typeexpr *partial_type,
     int report_multi_match,
-    int *multi_match_out,
+    enum match_result *match_result_out,
     struct ast_typeexpr *out,
     int *is_lvalue_out,
     struct def_instantiation **inst_out) {
@@ -2062,11 +2062,10 @@ int lookup_global_maybe_typecheck(
       &unified,
       &ent,
       &inst);
+  *match_result_out = res;
   if (res != MATCH_SUCCESS) {
-    *multi_match_out = (res == MATCH_AMBIGUOUSLY);
     return 0;
   }
-  *multi_match_out = 0;
 
   if (!also_maybe_typecheck) {
     *out = unified;
@@ -2190,7 +2189,7 @@ int exprscope_lookup_name(struct exprscope *es,
                           int *is_lvalue_out,
                           struct def_instantiation **inst_or_null_out,
                           int report_multi_match,
-                          int *multi_match_out) {
+                          enum match_result *match_result_out) {
   if (!name->has_params) {
     for (size_t i = es->vars_count; i > 0; ) {
       i--;
@@ -2199,15 +2198,15 @@ int exprscope_lookup_name(struct exprscope *es,
         continue;
       }
 
+      *match_result_out = MATCH_SUCCESS;
+
       if (!unify_directionally(es->cs->im, partial_type, &decl->type)) {
         METERR(es->cs->im, name->meta, "Type mismatch for vardecl %.*s lookup.\n",
                IM_P(es->cs->im, name->ident.value));
-        *multi_match_out = 0;
         return 0;
       }
 
       ast_typeexpr_init_copy(out, &decl->type);
-      *multi_match_out = 0;
       *is_lvalue_out = 1;
       *inst_or_null_out = NULL;  /* NULL because it's a local. */
       return 1;
@@ -2217,7 +2216,7 @@ int exprscope_lookup_name(struct exprscope *es,
   /* inst_or_null_out gets initialized to a non-NULL value. */
   return lookup_global_maybe_typecheck(es->cs, es, name, partial_type,
                                        report_multi_match,
-                                       multi_match_out,
+                                       match_result_out,
                                        out, is_lvalue_out, inst_or_null_out);
 }
 
@@ -4024,17 +4023,17 @@ int check_expr_ai(struct exprscope *es,
     struct ast_name_expr replaced_name;
     replace_name_expr_params(es, &x->u.name, &replaced_name);
 
-    int multi_match;
+    enum match_result match_result;
     struct ast_typeexpr name_type;
     int is_lvalue;
     struct def_instantiation *inst_or_null;
     int lookup_result = exprscope_lookup_name(es, &replaced_name, partial_type,
                                               &name_type, &is_lvalue, &inst_or_null,
                                               ai == ALLOW_INCOMPLETE_NO,
-                                              &multi_match);
+                                              &match_result);
     ast_name_expr_destroy(&replaced_name);
     if (!lookup_result) {
-      if (multi_match && ai == ALLOW_INCOMPLETE_YES) {
+      if (match_result == MATCH_AMBIGUOUSLY && ai == ALLOW_INCOMPLETE_YES) {
         ast_expr_update(x, ast_expr_info_incomplete());
         return 1;
       } else {
