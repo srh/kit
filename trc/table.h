@@ -41,18 +41,6 @@ void static_value_init_copy(struct static_value *a, struct static_value *c);
 void static_value_init_move(struct static_value *a, struct static_value *m);
 void static_value_destroy(struct static_value *a);
 
-enum typeexpr_trait {
-  TYPEEXPR_TRAIT_LACKED,
-  TYPEEXPR_TRAIT_HAD,
-  TYPEEXPR_TRAIT_TRIVIALLY_HAD,
-};
-
-struct typeexpr_traits {
-  enum typeexpr_trait movable;
-  enum typeexpr_trait copyable;
-  enum typeexpr_trait inittible;
-};
-
 struct def_instantiation {
   /* Sigh, backpointers. */
   struct def_entry *owner;
@@ -131,6 +119,26 @@ struct def_entry {
 void def_entry_note_static_reference(struct def_entry *ent,
                                      struct def_entry *referent);
 
+
+enum typeexpr_trait {
+  TYPEEXPR_TRAIT_LACKED,
+  TYPEEXPR_TRAIT_HAD,
+  TYPEEXPR_TRAIT_TRIVIALLY_HAD,
+};
+
+struct typeexpr_traits {
+  enum typeexpr_trait movable;
+  enum typeexpr_trait copyable;
+  enum typeexpr_trait inittible;
+};
+
+struct typeexpr_trait_instantiations {
+  struct def_instantiation *move_inst;
+  struct def_instantiation *copy_inst;
+  struct def_instantiation *destroy_inst;
+  struct def_instantiation *init_inst;
+};
+
 struct deftype_instantiation {
   /* The types used to substitute the respective deftype_entry generics
   params. */
@@ -139,7 +147,7 @@ struct deftype_instantiation {
 
   int has_typeexpr_traits;
   struct typeexpr_traits typeexpr_traits;
-  int typechecked_typeexpr_traits;
+  struct typeexpr_trait_instantiations explicit_trait_instantiations;
 };
 
 struct deftype_entry {

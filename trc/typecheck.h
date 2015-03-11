@@ -82,13 +82,6 @@ int squash_u32_to_i32(uint32_t value, int32_t *out);
 int squash_u32_to_u8(uint32_t value, uint8_t *out);
 int squash_u32_to_i8(uint32_t value, int8_t *out);
 
-struct typeexpr_trait_instantiations {
-  struct def_instantiation *move_inst;
-  struct def_instantiation *copy_inst;
-  struct def_instantiation *destroy_inst;
-  struct def_instantiation *init_inst;
-};
-
 struct exprscope;
 int check_typeexpr_traits(struct checkstate *cs,
                           /* a is a concrete type. */

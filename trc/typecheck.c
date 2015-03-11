@@ -1433,9 +1433,10 @@ int check_typeexpr_name_traits(struct checkstate *cs,
         == (concrete_deftype_rhs_out_or_null == NULL));
   CHECK(a->tag == AST_TYPEEXPR_NAME);
   struct deftype_entry *ent;
-  if (!name_table_lookup_deftype(&cs->nt, a->u.name.value,
-                                 no_param_list_arity(),
-                                 &ent)) {
+  struct deftype_instantiation *inst;
+  if (!name_table_lookup_deftype_inst(cs->im, &cs->nt, a->u.name.value,
+                                      NULL, 0,
+                                      &ent, &inst)) {
     METERR(cs, *ast_typeexpr_meta(a), "Invalid type name %.*s found.\n", IM_P(cs->im, a->u.name.value));
     return 0;
   }
@@ -1455,16 +1456,35 @@ int check_typeexpr_name_traits(struct checkstate *cs,
     return 1;
   }
 
-  int ret = finish_checking_name_traits(cs,
-                                        a,
-                                        &ent->deftype->meta,
-                                        ent->deftype->disposition,
-                                        &ent->deftype->rhs,
-                                        also_typecheck,
-                                        out,
-                                        insts_out);
+  int ret;
+  if (inst->has_typeexpr_traits) {
+    *out = inst->typeexpr_traits;
+    *insts_out = inst->explicit_trait_instantiations;
+    ret = 1;
+  } else {
+    /* We should have already typechecked the insts at typechecking time. */
+    CHECK(also_typecheck);
+    struct typeexpr_traits traits;
+    struct typeexpr_trait_instantiations trait_insts;
+    ret = finish_checking_name_traits(cs,
+                                      a,
+                                      &ent->deftype->meta,
+                                      ent->deftype->disposition,
+                                      &ent->deftype->rhs,
+                                      also_typecheck,
+                                      &traits,
+                                      &trait_insts);
+    if (ret) {
+      inst->has_typeexpr_traits = 1;
+      inst->typeexpr_traits = traits;
+      inst->explicit_trait_instantiations = trait_insts;
+      *out = traits;
+      *insts_out = trait_insts;
+    }
+  }
   if (ret && concrete_deftype_rhs_out_or_null) {
     *has_concrete_deftype_rhs_out_or_null = 1;
+    /* TODO: What the fuck?? This isn't a concrete rhs. */
     ast_deftype_rhs_init_copy(concrete_deftype_rhs_out_or_null, &ent->deftype->rhs);
   }
   return ret;
