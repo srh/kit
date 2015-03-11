@@ -13,6 +13,8 @@ struct import {
   ident_value import_name;
   size_t global_offset_base;
   struct ast_file *file;
+  uint8_t *buf;
+  size_t buf_count;
 };
 
 struct common_idents {

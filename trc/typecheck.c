@@ -727,19 +727,18 @@ void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
 }
 
 void stderr_errmsg(struct error_dump *ctx, struct identmap *im,
-                   struct pos pos, const char *msg, size_t msglen) {
-  (void)ctx;
+                   size_t line, size_t column, const char *msg, size_t msglen) {
   ERR("Parse error at %.*s:%"PRIz":%"PRIz": %.*s\n",
-      IM_P(im, ctx->filename), pos.line, pos.column, size_to_int(msglen), msg);
+      IM_P(im, ctx->filename), line, column, size_to_int(msglen), msg);
 }
 
 int resolve_import_filename_and_parse(struct checkstate *cs,
                                       module_loader *loader,
                                       ident_value name,
                                       size_t *global_offset_base_out,
-                                      struct ast_file *file_out) {
-  int ret = 0;
-
+                                      struct ast_file *file_out,
+                                      uint8_t **buf_out,
+                                      size_t *buf_count_out) {
   const void *module_name;
   size_t module_name_count;
   identmap_lookup(cs->im, name, &module_name, &module_name_count);
@@ -764,11 +763,13 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
   }
 
   *global_offset_base_out = global_offset_base;
-  ret = 1;
+  *buf_out = data;
+  *buf_count_out = data_size;
+  return 1;
  fail_data:
   free(data);
  fail:
-  return ret;
+  return 0;
 }
 
 struct import_chase_state {
@@ -980,8 +981,10 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
 
     size_t global_offset_base;
     struct ast_file file;
+    uint8_t *buf;
+    size_t buf_count;
     if (!resolve_import_filename_and_parse(cs, loader, name, &global_offset_base,
-                                           &file)) {
+                                           &file, &buf, &buf_count)) {
       goto cleanup;
     }
 
@@ -992,6 +995,8 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
     imp.import_name = name;
     imp.global_offset_base = global_offset_base;
     imp.file = heap_file;
+    imp.buf = buf;
+    imp.buf_count = buf_count;
     SLICE_PUSH(cs->imports, cs->imports_count, cs->imports_limit, imp);
 
     if (!chase_through_toplevels(cs, &ics, heap_file->toplevels, heap_file->toplevels_count)) {

@@ -13,7 +13,7 @@ struct identmap;
 struct error_dump {
   ident_value filename;
   void (*dumper)(struct error_dump *ctx, struct identmap *im,
-                 struct pos pos, const char *msg, size_t msglen);
+                 size_t line, size_t column, const char *msg, size_t msglen);
 };
 
 int parse_test(void);

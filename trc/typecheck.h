@@ -11,7 +11,7 @@ struct ast_generics;
 struct ast_typeexpr;
 struct ast_numeric_literal;
 
-#define METERR(cs, loc, fmt, ...) ERR("At %.*s:%"PRIz":%"PRIz": " fmt, IM_P((cs)->im, checkstate_g_o_import_name((cs), (loc).pos_start.global_offset)), (loc).pos_start.line, (loc).pos_start.column, __VA_ARGS__)
+#define METERR(cs, loc, fmt, ...) ERR("At %.*s:%"PRIz":%"PRIz": " fmt, IM_P((cs)->im, checkstate_g_o_import_name((cs), (loc).pos_start.global_offset)), checkstate_g_o_line((cs), (loc).pos_start.global_offset), checkstate_g_o_column((cs), (loc).pos_start.global_offset), __VA_ARGS__)
 
 #define VOID_TYPE_NAME "void"
 #define U8_TYPE_NAME "u8"

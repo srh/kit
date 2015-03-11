@@ -118,7 +118,7 @@ struct ps_savestate ps_save(struct ps *p) {
 }
 
 struct pos ps_pos(struct ps *p) {
-  return make_pos(size_add(p->pos, p->global_offset_base), p->line, p->column);
+  return make_pos(size_add(p->pos, p->global_offset_base));
 }
 
 void ps_restore(struct ps *p, struct ps_savestate save) {
@@ -2778,7 +2778,7 @@ int parse_buf_file(struct identmap *im,
     *file_out = a;
   } else {
     const char *msg = "Parse abandoned.";
-    (*error_dump->dumper)(error_dump, &p.im, ps_pos(&p), msg, strlen(msg));
+    (*error_dump->dumper)(error_dump, &p.im, p.line, p.column, msg, strlen(msg));
   }
   ps_remove_identmap(&p, im);
   ps_destroy(&p);
@@ -2786,8 +2786,8 @@ int parse_buf_file(struct identmap *im,
 }
 
 void silent_error(struct error_dump *ctx, struct identmap *im,
-                  struct pos pos, const char *msg, size_t msglen) {
-  (void)ctx, (void)im, (void)pos, (void)msg, (void)msglen;
+                  size_t line, size_t column, const char *msg, size_t msglen) {
+  (void)ctx, (void)im, (void)line, (void)column, (void)msg, (void)msglen;
 }
 
 int count_parse_buf(const uint8_t *buf, size_t length,
@@ -2824,8 +2824,8 @@ int run_count_test(const char *name, const char *str, size_t expected) {
   struct pos pos;
   int res = count_parse(str, &count, &pos);
   if (!res) {
-    DBG("run_count_test %s FAIL: parse failed at %"PRIz":%"PRIz"\n",
-        name, pos.line, pos.column);
+    DBG("run_count_test %s FAIL: parse failed at offset %"PRIz"\n",
+        name, pos.global_offset);
     return 0;
   }
   if (count != expected) {

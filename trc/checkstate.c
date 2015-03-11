@@ -7,6 +7,10 @@ void import_destroy(struct import *imp) {
   imp->global_offset_base = 0;
   ast_file_destroy(imp->file);
   free(imp->file);
+  imp->file = NULL;
+  free(imp->buf);
+  imp->buf = NULL;
+  imp->buf_count = 0;
 }
 
 struct common_idents compute_common_idents(struct identmap *im) {
@@ -91,7 +95,23 @@ size_t checkstate_find_g_o_import(struct checkstate *cs, size_t global_offset) {
 
 ident_value checkstate_g_o_import_name(struct checkstate *cs, size_t global_offset) {
   size_t ix = checkstate_find_g_o_import(cs, global_offset);
-  CHECK(ix < cs->imports_count);
-  CHECK(global_offset >= cs->imports[ix].global_offset_base);
   return cs->imports[ix].import_name;
+}
+
+size_t checkstate_g_o_line(struct checkstate *cs, size_t global_offset) {
+  size_t ix = checkstate_find_g_o_import(cs, global_offset);
+  struct import *imp = &cs->imports[ix];
+  size_t offset = size_sub(global_offset, imp->global_offset_base);
+
+  CHECK(offset <= imp->buf_count);
+  return compute_line(imp->buf, offset);
+}
+
+size_t checkstate_g_o_column(struct checkstate *cs, size_t global_offset) {
+  size_t ix = checkstate_find_g_o_import(cs, global_offset);
+  struct import *imp = &cs->imports[ix];
+  size_t offset = size_sub(global_offset, imp->global_offset_base);
+
+  CHECK(offset <= imp->buf_count);
+  return compute_column(imp->buf, offset);
 }
