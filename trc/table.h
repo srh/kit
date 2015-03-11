@@ -215,7 +215,6 @@ enum match_result name_table_match_def(
     size_t generics_count,
     struct ast_typeexpr *partial_type,
     int report_multi_match,
-    int *multi_match_out,
     struct ast_typeexpr *unified_type_out,
     struct def_entry **entry_out,
     struct def_instantiation **instantiation_out);

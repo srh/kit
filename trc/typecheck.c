@@ -2051,7 +2051,6 @@ int lookup_global_maybe_typecheck(
   struct ast_typeexpr unified;
   struct def_entry *ent;
   struct def_instantiation *inst;
-  int multi_match;
   enum match_result res = name_table_match_def(
       cs->im,
       &cs->nt,
@@ -2060,12 +2059,11 @@ int lookup_global_maybe_typecheck(
       name->has_params ? name->params_count : 0,
       partial_type,
       report_multi_match,
-      &multi_match,
       &unified,
       &ent,
       &inst);
   if (res != MATCH_SUCCESS) {
-    *multi_match_out = multi_match;
+    *multi_match_out = (res == MATCH_AMBIGUOUSLY);
     return 0;
   }
   *multi_match_out = 0;
@@ -4266,7 +4264,6 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
   /* We can only typecheck the def by instantiating it -- so we check
   the ones with no template params. */
   if (!a->generics.has_type_params) {
-    int multi_match_discard;
     struct ast_typeexpr unified;
     struct def_entry *ent;
     struct def_instantiation *inst;
@@ -4277,7 +4274,6 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
         NULL, 0, /* (no generics) */
         ast_def_typeexpr(a),
         1,
-        &multi_match_discard,
         &unified,
         &ent,
         &inst);

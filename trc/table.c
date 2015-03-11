@@ -1177,7 +1177,6 @@ enum match_result name_table_match_def(
     size_t generics_count,
     struct ast_typeexpr *partial_type,
     int report_multi_match,
-    int *multi_match_out,
     struct ast_typeexpr *unified_type_out,
     struct def_entry **entry_out,
     struct def_instantiation **instantiation_out) {
@@ -1216,7 +1215,6 @@ enum match_result name_table_match_def(
           METERR(im, ident->meta, "multiple matching '%.*s' definitions\n",
                  IM_P(im, ident->value));
         }
-        *multi_match_out = 1;
         ast_typeexpr_destroy(&matched_type);
         return MATCH_AMBIGUOUSLY;
       } else {
@@ -1230,7 +1228,6 @@ enum match_result name_table_match_def(
         METERR(im, ident->meta, "ambiguously matching '%.*s' definition\n",
                IM_P(im, ident->value));
       }
-      *multi_match_out = 1;
       if (matched_ent) {
         ast_typeexpr_destroy(&matched_type);
       }
@@ -1251,14 +1248,12 @@ enum match_result name_table_match_def(
     METERR(im, ident->meta, "no definition of '%.*s' matches type '%.*s'\n",
            IM_P(im, ident->value), size_to_int(buf.count), buf.buf);
     databuf_destroy(&buf);
-    *multi_match_out = 0;
     return MATCH_NONE;
   }
 
   *unified_type_out = matched_type;
   *entry_out = matched_ent;
   *instantiation_out = matched_instantiation;
-  *multi_match_out = 0;
   return MATCH_SUCCESS;
 }
 
