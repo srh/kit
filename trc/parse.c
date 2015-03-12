@@ -22,6 +22,8 @@ struct ps {
   size_t global_offset_base;
 
   struct identmap im;
+  ident_value ptr_ident;
+
   size_t leafcount;
   struct error_dump *error_dump;
 };
@@ -48,6 +50,7 @@ void ps_init(struct ps *p, struct error_dump *error_dump, const uint8_t *data,
   p->global_offset_base = global_offset_base;
 
   identmap_init(&p->im);
+  p->ptr_ident = identmap_intern_c_str(&p->im, PTR_TYPE_NAME);
   p->leafcount = 0;
   p->error_dump = error_dump;
 }
@@ -70,6 +73,7 @@ void ps_init_with_identmap(struct ps *p, struct identmap *im,
   p->global_offset_base = global_offset_base;
 
   identmap_init_move(&p->im, im);
+  p->ptr_ident = identmap_intern_c_str(&p->im, PTR_TYPE_NAME);
   p->leafcount = 0;
   p->error_dump = error_dump;
 }
@@ -2179,8 +2183,7 @@ int parse_rest_of_pointer(struct ps *p, struct ast_meta star_operator_meta,
   struct pos pos_start = star_operator_meta.pos_start;
 
   struct ast_ident star_name;
-  ast_ident_init(&star_name, star_operator_meta,
-                 identmap_intern_c_str(&p->im, PTR_TYPE_NAME));
+  ast_ident_init(&star_name, star_operator_meta, p->ptr_ident);
 
   struct ast_typeexpr *params = malloc_mul(sizeof(*params), 1);
   params[0] = param;
