@@ -12,15 +12,16 @@ to see if the tests pass.
 
 Then, try running,
 
-   cd examples
-   ..\out foo
-   cl main.c foo.obj
+   cd src
+   ..\out main
+   cl main.obj dummy.c
    main
 
-to see things actually working.  The current directory structure is:
+to see a parsing test, written in proto-Kira, actually working.
+The current directory structure is:
 
    trc - 1st stage compiler, written in C, compiled by invoking
-   build_windows.bat.
+   build_windows_trc.bat.
 
    [u-z]rc - future locations of the current "src" directory, when
    it's no longer the tip of the bootstrap chain, compilable using
@@ -38,7 +39,7 @@ Here's the project timeline:
    4. Cleanup error messages to have useful source information. (BETTER)
    5. Cleanup the language to make it more usable. (GOOD ENOUGH)
       Wishlist (waiting for these features specifically needed):
-       A. Structure / array initialization syntax.
+       A. Structure / array initialization syntax. (DONE)
        B. Packed struct types.
        C. Destructuring assignment.
        D. Incr/decr and "+="-type operators.
@@ -50,5 +51,5 @@ Here's the project timeline:
 The language implemented in trc is merely "C, with templates,
 constructors/destructors, elementary encapsulation, and tagged enum
 types."  Future versions of the language will be more advanced.
-s1_src is a trade-off between the convenience of implementing
-s1_src and the convenience of implementing src.
+trc is a trade-off between the convenience of implementing trc and
+the convenience of implementing src.
