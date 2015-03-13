@@ -443,6 +443,9 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_
   if try_skip_token(p, Keyw(Struct(void))) {
     return success_or_fail(parse_rest_of_struct(p, out));
   }
+  if try_skip_token(p, Keyw(Enum(void))) {
+    return success_or_fail(parse_rest_of_enum(p, out));
+  }
   if try_skip_token(p, Keyw(Union(void))) {
     return success_or_fail(parse_rest_of_union(p, out));
   }
@@ -481,6 +484,15 @@ func parse_rest_of_struct(p *ps, out *ast_typeexpr) bool {
     return Fail;
   }
   *out = Struct({fields});
+  return true;
+}
+
+func parse_rest_of_enum(p *ps, out *ast_typeexpr) bool {
+  fields array[ast_vardecl];
+  if !parse_braced_fields(p, &fields) {
+    return Fail;
+  }
+  *out = Enum({fields});
   return true;
 }
 
@@ -1497,13 +1509,17 @@ func test_parse() bool {
   pass = pass & run_parse_test(make("p042"),
                                make("func foo() a { label foo; goto bar; }"));
   pass = pass & run_parse_test(make("p043"),
-                               make("func foo() a { x struct { }; y union { }; }"));
+                               make("func foo() a { x struct { }; y union { }; z enum { }; }"));
   pass = pass & run_parse_test(make("p044"),
                                make(" deftype foo bar;"));
   pass = pass & run_parse_test(make("p045"),
                                make("deftype foo fn[int, int] ;"));
-  pass = pass & run_parse_test(make("p046"),
+  pass = pass & run_parse_test(make("p046-a"),
                                make("deftype foo struct { x y; z int; t fn[beh]; };"));
+  pass = pass & run_parse_test(make("p046-b"),
+                               make("deftype foo enum { x y; z int; t fn[beh]; };"));
+  pass = pass & run_parse_test(make("p046-c"),
+                               make("defenum foo { x y; z int; t fn[beh]; };"));
   pass = pass & run_parse_test(make("p047"),
                                make("deftype[] foo bar;\n"));
   pass = pass & run_parse_test(make("p048"),

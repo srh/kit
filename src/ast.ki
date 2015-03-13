@@ -74,6 +74,10 @@ deftype ast_struct struct {
   fields array[ast_vardecl];
 };
 
+deftype ast_enum struct {
+  constructors array[ast_vardecl];
+};
+
 deftype ast_union struct {
   fields array[ast_vardecl];
 };
@@ -90,6 +94,7 @@ defenum ast_typeexpr {
   Name ast_ident;
   App ast_typeapp;
   Struct ast_struct;
+  Enum ast_enum;
   Union ast_union;
   Arraytype ast_arraytype;
   Unknown ast_unknown;

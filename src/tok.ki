@@ -90,6 +90,7 @@ defenum keyw {
   Defenum void;
   Deftype void;
   Else void;
+  Enum void;
   Export void;
   Extern void;
   False void;
@@ -334,6 +335,7 @@ func grab_tok(p *ps) tok {
         || grab_keyword(p, "defenum", Defenum(void), &ret)
         || grab_keyword(p, "deftype", Deftype(void), &ret)
         || grab_keyword(p, "else", Else(void), &ret)
+        || grab_keyword(p, "enum", Enum(void), &ret)
         || grab_keyword(p, "export", Export(void), &ret)
         || grab_keyword(p, "extern", Extern(void), &ret)
         || grab_keyword(p, "false", False(void), &ret)
