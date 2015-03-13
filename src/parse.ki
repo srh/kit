@@ -91,13 +91,16 @@ func parse_toplevel(p *ps, out *ast_toplevel) bool {
   if try_skip_token(p, Keyw(Func(void))) {
     return parse_rest_of_func(p, IsNotExport(void), out);
   } else if try_skip_token(p, Keyw(Def(void))) {
-    return parse_rest_of_def(p, IsNotExport(void), out);
+    return parse_rest_of_def(p, IsNotExport(void), IsNotVar(void), out);
+  } else if try_skip_token(p, Keyw(Var(void))) {
+    return parse_rest_of_def(p, IsNotExport(void), IsVar(void), out);
   } else if try_skip_token(p, Keyw(Export(void))) {
     if try_skip_token(p, Keyw(Func(void))) {
       return parse_rest_of_func(p, IsExport(void), out);
-    }
-    if try_skip_token(p, Keyw(Def(void))) {
-      return parse_rest_of_def(p, IsExport(void), out);
+    } else if try_skip_token(p, Keyw(Var(void))) {
+      return parse_rest_of_def(p, IsExport(void), IsVar(void), out);
+    } else if try_skip_token(p, Keyw(Def(void))) {
+      return parse_rest_of_def(p, IsExport(void), IsNotVar(void), out);
     }
     return Fail;
   } else if try_skip_token(p, Keyw(Extern(void))) {
@@ -123,19 +126,20 @@ func parse_rest_of_func(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
   params array[ast_vardecl];
   return_type ast_typeexpr;
   body ast_bracebody;
-  if !(parse_def_generics_and_name(p, is_export, &generics, &name)
+  if !(parse_def_generics_and_name(p, is_export, IsNotVar(void), &generics, &name)
        && parse_lambdaspec(p, &params, &return_type, &body)) {
     return Fail;
   }
 
-  *out = Def({is_export, generics, name, None(), Lambda({params, return_type, body})});
+  *out = Def({is_export, IsNotVar(void), generics, name, None(),
+              Lambda({params, return_type, body})});
   return true;
 }
 
-func parse_rest_of_def(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
+func parse_rest_of_def(p *ps, is_export ast_isexport, is_var ast_isvar, out *ast_toplevel) bool {
   generics ast_generics;
   name ast_ident;
-  if !parse_def_generics_and_name(p, is_export, &generics, &name) {
+  if !parse_def_generics_and_name(p, is_export, is_var, &generics, &name) {
     return Fail;
   }
 
@@ -156,7 +160,7 @@ func parse_rest_of_def(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
     return Fail;
   }
 
-  *out = Def({is_export, generics, name, typeexpr, rhs});
+  *out = Def({is_export, is_var, generics, name, typeexpr, rhs});
   return true;
 }
 
@@ -273,15 +277,22 @@ func parse_rest_of_access(p *ps, out *ast_toplevel) bool {
   return true;
 }
 
-func parse_def_generics_and_name(p *ps, is_export ast_isexport,
+func parse_def_generics_and_name(p *ps, is_export ast_isexport, is_var ast_isvar,
                                  generics_out *ast_generics, name_out *ast_ident) bool {
   switch is_export {
     case IsExport(v): {
       *generics_out = NoGenerics(void);
     }
     case IsNotExport(v): {
-      if !parse_generics_if_present(p, generics_out) {
-        return Fail;
+      switch is_var {
+        case IsVar(v2): {
+          *generics_out = NoGenerics(void);
+        }
+        case IsNotVar(v2): {
+          if !parse_generics_if_present(p, generics_out) {
+            return Fail;
+          }
+        }
       }
     }
   }
@@ -1485,8 +1496,10 @@ func test_parse() bool {
                                make("func a() int {\n  for var i i32 = 3; i < 3; i = i + 1 { x = 2; }}"));
   pass = pass & run_parse_test(make("p031"),
                                make("def foo = baz@[a, b](1, 2, 3);"));
-  pass = pass & run_parse_test(make("p032"),
+  pass = pass & run_parse_test(make("p032-a"),
                                make("def foo u8 = 'a';\n"));
+  pass = pass & run_parse_test(make("p032-b"),
+                               make("var foo u8 = 'a';\n"));
   pass = pass & run_parse_test(make("p033"),
                                make("def foo u8 = '\\n';\n"));
   pass = pass & run_parse_test(make("p034"),
@@ -1533,8 +1546,10 @@ func test_parse() bool {
                                make("defclass copy foo bar;"));
   pass = pass & run_parse_test(make("p052"),
                                make("extern putchar fn[i32, i32];"));
-  pass = pass & run_parse_test(make("p053"),
+  pass = pass & run_parse_test(make("p053-a"),
                                make("export def blah fn[i32, i32] = 3;"));
+  pass = pass & run_parse_test(make("p053-b"),
+                               make("export var blah fn[i32, i32] = 3;"));
   pass = pass & run_parse_test(make("p054"),
                                make("access string { def foo i32 = 3; }\n"));
   pass = pass & run_parse_test(make("p054"),

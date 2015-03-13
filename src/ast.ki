@@ -254,8 +254,14 @@ defenum ast_isexport {
   IsNotExport void;
 };
 
+defenum ast_isvar {
+  IsVar void;
+  IsNotVar void;
+};
+
 deftype ast_def struct {
   is_export ast_isexport;
+  is_var ast_isvar;
   generics ast_generics;
   name ast_ident;
   typeexpr opt[ast_typeexpr];
