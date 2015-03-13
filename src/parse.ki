@@ -229,7 +229,8 @@ func parse_rest_of_defenum(p *ps, out *ast_toplevel) bool {
        && try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = TypeDef({generics, name, EnumSpecRhs({enumfields})});
+  *out = TypeDef({generics, name,
+                  TypeexprRhs(@[ast_typeexpr]Enum({enumfields}))});
   return true;
 }
 
