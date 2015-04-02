@@ -5043,12 +5043,12 @@ int compute_static_values(struct checkstate *cs, struct def_entry *ent) {
       switch (ent->primitive_op.tag) {
       case PRIMITIVE_OP_SIZEOF: {
         CHECK(inst->substitutions_count == 1);
-        uint32_t size = kira_sizeof(&cs->nt, &inst->substitutions[0]);
+        uint32_t size = x86_sizeof(&cs->nt, &inst->substitutions[0]);
         static_value_init_u32(di_value_for_set(inst), size);
       } break;
       case PRIMITIVE_OP_ALIGNOF: {
         CHECK(inst->substitutions_count == 1);
-        uint32_t alignment = kira_alignof(&cs->nt, &inst->substitutions[0]);
+        uint32_t alignment = x86_alignof(&cs->nt, &inst->substitutions[0]);
         static_value_init_u32(di_value_for_set(inst), alignment);
       } break;
       default:

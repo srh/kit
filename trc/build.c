@@ -130,20 +130,20 @@ void gen_crash_jmp(struct objfile *f, struct frame *h);
 /* Right now we don't worry about generating multiple objfiles, so we
 just blithely attach a serial number to each name to make them
 unique. */
-int generate_kira_name(struct checkstate *cs,
-                       const void *name, size_t name_count,
-                       int is_export,
-                       void **gen_name_out, size_t *gen_name_count_out) {
-  CHECK(cs->kira_name_counter != UINT32_MAX);
-  cs->kira_name_counter++;
-  uint32_t number_append = cs->kira_name_counter;
+int generate_kit_name(struct checkstate *cs,
+                      const void *name, size_t name_count,
+                      int is_export,
+                      void **gen_name_out, size_t *gen_name_count_out) {
+  CHECK(cs->kit_name_counter != UINT32_MAX);
+  cs->kit_name_counter++;
+  uint32_t number_append = cs->kit_name_counter;
   struct databuf b;
   databuf_init(&b);
   if (is_export) {
     databuf_append(&b, "_", 1);
     databuf_append(&b, name, name_count);
   } else {
-    databuf_append(&b, "_kira_", 6);
+    databuf_append(&b, "_kit_", 5);
     databuf_append(&b, name, name_count);
 
     /* I just don't want to lookup the stdarg documentation and
@@ -183,8 +183,8 @@ uint32_t add_data_string(struct checkstate *cs, struct objfile *f,
     char name[] = "$string_literal";
     void *gen_name;
     size_t gen_name_count;
-    if (!generate_kira_name(cs, name, strlen(name),
-                            0, &gen_name, &gen_name_count)) {
+    if (!generate_kit_name(cs, name, strlen(name),
+                           0, &gen_name, &gen_name_count)) {
       return 0;
     }
 
@@ -249,9 +249,9 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
 
     void *gen_name;
     size_t gen_name_count;
-    if (!generate_kira_name(cs, name, name_count,
-                            ent->is_export,
-                            &gen_name, &gen_name_count)) {
+    if (!generate_kit_name(cs, name, name_count,
+                           ent->is_export,
+                           &gen_name, &gen_name_count)) {
       return 0;
     }
 
@@ -593,7 +593,7 @@ void frame_pop(struct frame *h, uint32_t size) {
 
 int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *return_type,
                                uint32_t *return_type_size_out) {
-  uint32_t return_type_size = kira_sizeof(&cs->nt, return_type);
+  uint32_t return_type_size = x86_sizeof(&cs->nt, return_type);
   *return_type_size_out = return_type_size;
   if (!(return_type_size <= 2 || return_type_size == DWORD_SIZE
         || return_type_size == 2 * DWORD_SIZE)) {
@@ -624,7 +624,7 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
   for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
     struct ast_typeexpr *param_type = ast_var_info_type(&expr->u.lambda.params[i].var_info);
 
-    uint32_t size = kira_sizeof(&cs->nt, param_type);
+    uint32_t size = x86_sizeof(&cs->nt, param_type);
     uint32_t padded_size = uint32_ceil_aligned(size, DWORD_SIZE);
 
     struct loc loc = ebp_loc(size, padded_size, offset);
@@ -1514,7 +1514,7 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
       }
 
       if (tagnum != 0) {
-        uint32_t field_size = kira_sizeof(&cs->nt, &rhs->u.enumspec.enumfields[tagnum - FIRST_ENUM_TAG_NUMBER].type);
+        uint32_t field_size = x86_sizeof(&cs->nt, &rhs->u.enumspec.enumfields[tagnum - FIRST_ENUM_TAG_NUMBER].type);
         struct loc dest_body_loc = make_enum_body_loc(f, h, dest, field_size);
         struct loc src_body_loc;
         if (has_src) {
@@ -2295,7 +2295,7 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   arg/return locations and sizes for this op. */
   int32_t saved_stack_offset = frame_save_offset(h);
 
-  uint32_t arg_size = kira_sizeof(&cs->nt, arg0_type);
+  uint32_t arg_size = x86_sizeof(&cs->nt, arg0_type);
 
   uint32_t return_size;
   int hidden_return_param = exists_hidden_return_param(cs, return_type, &return_size);
@@ -2348,7 +2348,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     struct ast_typeexpr *target;
     int success = view_ptr_target(&cs->cm, arg0_type_or_null, &target);
     CHECK(success);
-    uint32_t size = kira_sizeof(&cs->nt, target);
+    uint32_t size = x86_sizeof(&cs->nt, target);
     gen_default_construct(cs, f, h, ebp_indirect_loc(size, size, off0),
                           target);
   } break;
@@ -2356,7 +2356,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     struct ast_typeexpr *target;
     int success = view_ptr_target(&cs->cm, arg0_type_or_null, &target);
     CHECK(success);
-    uint32_t size = kira_sizeof(&cs->nt, target);
+    uint32_t size = x86_sizeof(&cs->nt, target);
     gen_copy(cs, f, h, ebp_indirect_loc(size, size, off0),
              ebp_indirect_loc(size, size, off1),
              target);
@@ -2365,7 +2365,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     struct ast_typeexpr *target;
     int success = view_ptr_target(&cs->cm, arg0_type_or_null, &target);
     CHECK(success);
-    uint32_t size = kira_sizeof(&cs->nt, target);
+    uint32_t size = x86_sizeof(&cs->nt, target);
     gen_move_or_copydestroy(cs, f, h, ebp_indirect_loc(size, size, off0),
                             ebp_indirect_loc(size, size, off1),
                             target);
@@ -2374,7 +2374,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     struct ast_typeexpr *target;
     int success = view_ptr_target(&cs->cm, arg0_type_or_null, &target);
     CHECK(success);
-    uint32_t size = kira_sizeof(&cs->nt, target);
+    uint32_t size = x86_sizeof(&cs->nt, target);
     gen_destroy(cs, f, h, ebp_indirect_loc(size, size, off0),
                 target);
   } break;
@@ -3245,7 +3245,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
     struct ast_expr *arg = &a->u.funcall.args[i].expr;
 
-    struct loc arg_loc = frame_push_loc(h, kira_sizeof(&cs->nt, ast_expr_type(arg)));
+    struct loc arg_loc = frame_push_loc(h, x86_sizeof(&cs->nt, ast_expr_type(arg)));
 
     /* TODO: We must use ast_exprcatch information to force the temporary in arg_loc. */
     /* (Right now, EXPR_RETURN_DEMANDED is known to work this way only
@@ -3342,7 +3342,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
     wipe_temporaries(cs, f, h, &rhs_er, ast_expr_type(ue->rhs), &rhs_loc);
 
     struct ast_typeexpr *type = ast_expr_type(a);
-    uint32_t size = kira_sizeof(&cs->nt, type);
+    uint32_t size = x86_sizeof(&cs->nt, type);
     apply_dereference(cs, f, h, rhs_loc, size, er, type);
     return 1;
   } break;
@@ -3406,7 +3406,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   }
 
   if (is_ptr) {
-    elem_size = kira_sizeof(&cs->nt, ptr_target);
+    elem_size = x86_sizeof(&cs->nt, ptr_target);
 
     CHECK(lhs_loc.size == DWORD_SIZE);
     CHECK(rhs_loc.size == DWORD_SIZE);
@@ -3415,7 +3415,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   } else {
     struct ast_typeexpr *lhs_type = ast_expr_type(ie->lhs);
     CHECK(lhs_type->tag == AST_TYPEEXPR_ARRAY);
-    elem_size = kira_sizeof(&cs->nt, lhs_type->u.arraytype.param);
+    elem_size = x86_sizeof(&cs->nt, lhs_type->u.arraytype.param);
 
     CHECK(lhs_loc.size == uint32_mul(elem_size, unsafe_numeric_literal_u32(&lhs_type->u.arraytype.number)));
     CHECK(rhs_loc.size == DWORD_SIZE);
@@ -3445,7 +3445,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
 
 void gen_placeholder_jmp_if_false(struct objfile *f, struct frame *h,
                                   struct loc loc, size_t target_number) {
-  CHECK(loc.size == KIRA_BOOL_SIZE);
+  CHECK(loc.size == KIT_BOOL_SIZE);
 
   gen_load_register(f, X86_EAX, loc);
 
@@ -3579,7 +3579,7 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
       wipe_temporaries(cs, f, h, &lhs_er, ast_expr_type(be->lhs), &lhs_loc);
     }
 
-    struct loc ret = frame_push_loc(h, KIRA_BOOL_SIZE);
+    struct loc ret = frame_push_loc(h, KIT_BOOL_SIZE);
 
     size_t target_number = frame_add_target(h);
     gen_placeholder_jmp_if_false(f, h, lhs_loc, target_number);
@@ -3609,7 +3609,7 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
       wipe_temporaries(cs, f, h, &lhs_er, ast_expr_type(be->lhs), &lhs_loc);
     }
 
-    struct loc ret = frame_push_loc(h, KIRA_BOOL_SIZE);
+    struct loc ret = frame_push_loc(h, KIT_BOOL_SIZE);
 
     size_t target_number = frame_add_target(h);
     gen_placeholder_jmp_if_false(f, h, lhs_loc, target_number);
@@ -3740,7 +3740,7 @@ struct loc gen_array_element_loc(struct checkstate *cs,
                                  struct loc src,
                                  struct ast_typeexpr *elem_type,
                                  uint32_t index) {
-  uint32_t elem_size = kira_sizeof(&cs->nt, elem_type);
+  uint32_t elem_size = x86_sizeof(&cs->nt, elem_type);
   uint32_t elem_offset = uint32_mul(elem_size, index);
 
   gen_load_addressof(f, X86_EDX, src);
@@ -3766,11 +3766,11 @@ struct loc gen_field_loc(struct checkstate *cs,
   uint32_t size;
   uint32_t offset;
   if (!fieldname_or_null_for_whole_thing) {
-    size = kira_sizeof(&cs->nt, type);
+    size = x86_sizeof(&cs->nt, type);
     offset = 0;
   } else {
-    kira_field_sizeoffset(&cs->nt, type, *fieldname_or_null_for_whole_thing,
-                          &size, &offset);
+    x86_field_sizeoffset(&cs->nt, type, *fieldname_or_null_for_whole_thing,
+                         &size, &offset);
   }
 
   return gen_subobject_loc(f, h, lhs_loc, size, offset);
@@ -3869,7 +3869,7 @@ void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
       /* TODO: Support immediate values, distinction between defs
       of variables and other defs -- only make a symbol for
       exported defs (if they're small). */
-      uint32_t size = kira_sizeof(&cs->nt, &inst->type);
+      uint32_t size = x86_sizeof(&cs->nt, &inst->type);
       /* TODO: Maybe globals' alignment rules are softer. */
       uint32_t padded_size = size;
       struct loc loc = global_loc(size, padded_size,
@@ -3885,7 +3885,7 @@ int gen_strinit_expr(struct checkstate *cs, struct objfile *f,
   struct ast_typeexpr *stype = ast_strinit_struct_type(&a->u.strinit);
   CHECK(stype->tag == AST_TYPEEXPR_STRUCTE);
   CHECK(stype->u.structe.fields_count == a->u.strinit.exprs_count);
-  uint32_t size = kira_sizeof(&cs->nt, stype);
+  uint32_t size = x86_sizeof(&cs->nt, stype);
   struct loc loc = frame_push_loc(h, size);
 
   for (size_t i = 0, e = a->u.strinit.exprs_count; i < e; i++) {
@@ -4004,7 +4004,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
       CRASH("deref field access typechecked on a non-pointer.");
     }
 
-    uint32_t full_size = kira_sizeof(&cs->nt, ptr_target);
+    uint32_t full_size = x86_sizeof(&cs->nt, ptr_target);
     struct expr_return deref_er = open_expr_return();
     apply_dereference(cs, f, h, lhs_loc, full_size, &deref_er, ptr_target);
 
@@ -4072,7 +4072,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   } break;
   case AST_STATEMENT_VAR: {
     struct ast_typeexpr *var_type = ast_var_statement_type(&s->u.var_statement);
-    uint32_t var_size = kira_sizeof(&cs->nt, var_type);
+    uint32_t var_size = x86_sizeof(&cs->nt, var_type);
     struct loc var_loc = frame_push_loc(h, var_size);
 
     if (s->u.var_statement.has_rhs) {
@@ -4239,7 +4239,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     int32_t saved_offset = frame_save_offset(h);
 
     struct ast_typeexpr *swartch_type = ast_expr_type(ss->swartch);
-    struct loc swartch_loc = frame_push_loc(h, kira_sizeof(&cs->nt, swartch_type));
+    struct loc swartch_loc = frame_push_loc(h, x86_sizeof(&cs->nt, swartch_type));
 
     {
       int32_t swartch_saved_offset = frame_save_offset(h);
@@ -4280,7 +4280,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
       struct ast_typeexpr *var_type = ast_var_info_type(&cas->pattern.decl.var_info);
       struct loc var_loc = make_enum_body_loc(f, h, swartch_loc,
-                                              kira_sizeof(&cs->nt, var_type));
+                                              x86_sizeof(&cs->nt, var_type));
 
       struct vardata vd;
       struct varnum varnum = ast_var_info_varnum(&cas->pattern.decl.var_info);

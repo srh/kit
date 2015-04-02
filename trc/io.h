@@ -1,5 +1,5 @@
-#ifndef KIRA_IO_H_
-#define KIRA_IO_H_
+#ifndef KIT_IO_H_
+#define KIT_IO_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -12,4 +12,4 @@ int write_file(const char *path,
                const void *buf,
                size_t buf_size);
 
-#endif /* KIRA_IO_H_ */
+#endif /* KIT_IO_H_ */

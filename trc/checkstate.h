@@ -1,5 +1,5 @@
-#ifndef KIRA_CHECKSTATE_H_
-#define KIRA_CHECKSTATE_H_
+#ifndef KIT_CHECKSTATE_H_
+#define KIT_CHECKSTATE_H_
 
 #include <stddef.h>
 
@@ -56,7 +56,7 @@ struct checkstate {
 
   int template_instantiation_recursion_depth;
 
-  uint32_t kira_name_counter;
+  uint32_t kit_name_counter;
 
   struct name_table nt;
 
@@ -76,4 +76,4 @@ ident_value checkstate_g_o_import_name(struct checkstate *cs, size_t global_offs
 size_t checkstate_g_o_line(struct checkstate *cs, size_t global_offset);
 size_t checkstate_g_o_column(struct checkstate *cs, size_t global_offset);
 
-#endif /* KIRA_CHECKSTATE_H_ */
+#endif /* KIT_CHECKSTATE_H_ */

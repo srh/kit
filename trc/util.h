@@ -1,5 +1,5 @@
-#ifndef KIRA_UTIL_H_
-#define KIRA_UTIL_H_
+#ifndef KIT_UTIL_H_
+#define KIT_UTIL_H_
 
 #include <stddef.h>
 
@@ -73,4 +73,4 @@ void alloc_half_strcat(const void *lbuf, size_t lcount,
 undefined behavior. */
 void ok_memcpy(void *dest, const void *src, size_t n);
 
-#endif /* KIRA_UTIL_H_ */
+#endif /* KIT_UTIL_H_ */

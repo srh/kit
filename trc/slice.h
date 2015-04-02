@@ -1,5 +1,5 @@
-#ifndef KIRA_SLICE_H_
-#define KIRA_SLICE_H_
+#ifndef KIT_SLICE_H_
+#define KIT_SLICE_H_
 
 #include <stdlib.h>
 
@@ -53,4 +53,4 @@
     } \
   } while (0)
 
-#endif /* KIRA_SLICE_H_ */
+#endif /* KIT_SLICE_H_ */

@@ -1,5 +1,5 @@
-#ifndef KIRA_WIN_OBJFILE_H_
-#define KIRA_WIN_OBJFILE_H_
+#ifndef KIT_WIN_OBJFILE_H_
+#define KIT_WIN_OBJFILE_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -77,4 +77,4 @@ int objfile_c_symbol_name(const void *name, size_t name_count,
 
 int make_almost_blank_objfile(void **buf_out, size_t *count_out);
 
-#endif /* KIRA_WIN_OBJFILE_H_ */
+#endif /* KIT_WIN_OBJFILE_H_ */

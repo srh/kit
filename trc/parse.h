@@ -1,5 +1,5 @@
-#ifndef KIRA_PARSE_H_
-#define KIRA_PARSE_H_
+#ifndef KIT_PARSE_H_
+#define KIT_PARSE_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -23,4 +23,4 @@ int parse_buf_file(struct identmap *im,
                    struct ast_file *file_out,
                    struct error_dump *error_dump);
 
-#endif /* KIRA_PARSE_H_ */
+#endif /* KIT_PARSE_H_ */

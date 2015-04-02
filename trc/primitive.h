@@ -1,5 +1,5 @@
-#ifndef KIRA_PRIMITIVE_H_
-#define KIRA_PRIMITIVE_H_
+#ifndef KIT_PRIMITIVE_H_
+#define KIT_PRIMITIVE_H_
 
 #include <stddef.h>
 
@@ -266,4 +266,4 @@ struct primitive_op {
 struct primitive_op make_primop(enum primitive_op_tag tag);
 struct primitive_op make_enumconstruct_op(size_t enumconstruct_number);
 
-#endif /* KIRA_PRIMITIVE_H_ */
+#endif /* KIT_PRIMITIVE_H_ */

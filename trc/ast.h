@@ -1,5 +1,5 @@
-#ifndef KIRA_AST_H_
-#define KIRA_AST_H_
+#ifndef KIT_AST_H_
+#define KIT_AST_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -930,4 +930,4 @@ void ast_file_init(struct ast_file *a,
 
 void ast_file_destroy(struct ast_file *a);
 
-#endif /* KIRA_AST_H_ */
+#endif /* KIT_AST_H_ */

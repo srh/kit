@@ -1,5 +1,5 @@
-#ifndef KIRA_TYPECHECK_H_
-#define KIRA_TYPECHECK_H_
+#ifndef KIT_TYPECHECK_H_
+#define KIT_TYPECHECK_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -29,7 +29,7 @@ struct ast_numeric_literal;
 
 #define ARRAY_LENGTH_FIELDNAME "length"
 
-#define KIRA_BOOL_SIZE 1
+#define KIT_BOOL_SIZE 1
 
 #define CHAR_STANDIN_TYPE_NAME U8_TYPE_NAME
 
@@ -103,4 +103,4 @@ int check_typeexpr_app_traits(struct checkstate *cs,
                               int *has_concrete_deftype_rhs_out_or_null,
                               struct ast_deftype_rhs *concrete_deftype_rhs_out_or_null);
 
-#endif /* KIRA_TYPECHECK_H_ */
+#endif /* KIT_TYPECHECK_H_ */

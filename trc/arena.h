@@ -1,5 +1,5 @@
-#ifndef KIRA_ARENA_H_
-#define KIRA_ARENA_H_
+#ifndef KIT_ARENA_H_
+#define KIT_ARENA_H_
 
 #include <stddef.h>
 
@@ -23,4 +23,4 @@ void *arena_small_aligned(struct arena *a, size_t count, size_t alignment);
   ((type *)arena_small_aligned((a), sizeof(type), ALIGNOF(type)))
 
 
-#endif /* KIRA_ARENA_H_ */
+#endif /* KIT_ARENA_H_ */

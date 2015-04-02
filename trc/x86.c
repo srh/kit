@@ -217,9 +217,9 @@ void help_rhs_sizealignof(struct name_table *nt, struct ast_deftype_rhs *rhs,
   }
 }
 
-void kira_field_sizeoffset(struct name_table *nt, struct ast_typeexpr *type,
-                           ident_value field_name, uint32_t *sizeof_out,
-                           uint32_t *offsetof_out) {
+void x86_field_sizeoffset(struct name_table *nt, struct ast_typeexpr *type,
+                          ident_value field_name, uint32_t *sizeof_out,
+                          uint32_t *offsetof_out) {
   CHECK(field_name != IDENT_VALUE_INVALID);
   uint32_t offset;
   uint32_t size;
@@ -230,24 +230,24 @@ void kira_field_sizeoffset(struct name_table *nt, struct ast_typeexpr *type,
   *offsetof_out = offset;
 }
 
-void kira_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
-                      uint32_t *sizeof_out, uint32_t *alignof_out) {
+void x86_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
+                     uint32_t *sizeof_out, uint32_t *alignof_out) {
   uint32_t invalid_offsetof_param;
   help_sizealignof(nt, type, IDENT_VALUE_INVALID,
                    &invalid_offsetof_param, sizeof_out, alignof_out);
 }
 
-uint32_t kira_sizeof(struct name_table *nt, struct ast_typeexpr *type) {
+uint32_t x86_sizeof(struct name_table *nt, struct ast_typeexpr *type) {
   uint32_t size;
   uint32_t alignment;
-  kira_sizealignof(nt, type, &size, &alignment);
+  x86_sizealignof(nt, type, &size, &alignment);
   return size;
 }
 
-uint32_t kira_alignof(struct name_table *nt, struct ast_typeexpr *type) {
+uint32_t x86_alignof(struct name_table *nt, struct ast_typeexpr *type) {
   uint32_t size;
   uint32_t alignment;
-  kira_sizealignof(nt, type, &size, &alignment);
+  x86_sizealignof(nt, type, &size, &alignment);
   return alignment;
 }
 

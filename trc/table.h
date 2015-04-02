@@ -1,5 +1,5 @@
-#ifndef KIRA_TABLE_H_
-#define KIRA_TABLE_H_
+#ifndef KIT_TABLE_H_
+#define KIT_TABLE_H_
 
 #include "ast.h"
 #include "arity.h"
@@ -297,4 +297,4 @@ int combine_partial_types(struct identmap *im,
                           struct ast_typeexpr *out);
 
 
-#endif /* KIRA_TABLE_H_ */
+#endif /* KIT_TABLE_H_ */

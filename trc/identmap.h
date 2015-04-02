@@ -1,5 +1,5 @@
-#ifndef KIRA_IDENTMAP_H_
-#define KIRA_IDENTMAP_H_
+#ifndef KIT_IDENTMAP_H_
+#define KIT_IDENTMAP_H_
 
 #include <stddef.h>
 
@@ -54,4 +54,4 @@ void identmap_set_user_value(struct identmap *m, ident_value ident,
 void *identmap_get_user_value(struct identmap *m, ident_value ident);
 
 
-#endif /* KIRA_IDENTMAP_H_ */
+#endif /* KIT_IDENTMAP_H_ */

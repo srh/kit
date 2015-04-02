@@ -1,7 +1,7 @@
-        Kira v0.0000...1A.x
+        Kit v0.0000...1A.x
 
-At some future date, Kira will be a programming language.  Right
-now, it's a work in progress.  Use build_windows_trc.bat or
+At some future date, Kit will be a programming language.  Right now,
+it's a work in progress.  Use build_windows_trc.bat or
 build_linux_trc.sh to build it, or just manually invoke your C
 compiler (look inside those scripts for an example, they're
 one-liners).  Then (if you built trc) I recommend running
@@ -17,8 +17,8 @@ Then, try running,
    cl main.obj dummy.c
    main
 
-to see a parsing test, written in proto-Kira, actually working.
-The current directory structure is:
+to see a parsing test, written in proto-Kit, actually working.  The
+current directory structure is:
 
    trc - 1st stage compiler, written in C, compiled by invoking
    build_windows_trc.bat.

@@ -1,5 +1,5 @@
-#ifndef KIRA_ARITH_H_
-#define KIRA_ARITH_H_
+#ifndef KIT_ARITH_H_
+#define KIT_ARITH_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -43,4 +43,4 @@ int try_uint32_to_uint8(uint32_t x, uint8_t *out);
 
 int32_t uint32_to_int32(uint32_t x);
 
-#endif /* KIRA_ARITH_H_ */
+#endif /* KIT_ARITH_H_ */

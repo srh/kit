@@ -1,5 +1,5 @@
-#ifndef KIRA_DATABUF_H_
-#define KIRA_DATABUF_H_
+#ifndef KIT_DATABUF_H_
+#define KIT_DATABUF_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -19,4 +19,4 @@ void databuf_append_c_str(struct databuf *b, const char *s);
 void databuf_overwrite(struct databuf *b, size_t offset,
                        const void *p, size_t count);
 
-#endif /* KIRA_DATABUF_H_ */
+#endif /* KIT_DATABUF_H_ */

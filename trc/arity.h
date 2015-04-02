@@ -1,5 +1,5 @@
-#ifndef KIRA_ARITY_H_
-#define KIRA_ARITY_H_
+#ifndef KIT_ARITY_H_
+#define KIT_ARITY_H_
 
 #include <stddef.h>
 
@@ -18,4 +18,4 @@ struct generics_arity no_param_list_arity(void);
 struct generics_arity param_list_arity(size_t arity);
 int arity_no_paramlist(struct generics_arity arity);
 
-#endif /* KIRA_ARITY_H_ */
+#endif /* KIT_ARITY_H_ */
