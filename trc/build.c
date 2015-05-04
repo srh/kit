@@ -9,7 +9,7 @@
 #include "databuf.h"
 #include "io.h"
 #include "slice.h"
-#include "win/objfile.h"
+#include "objfile/objfile.h"
 #include "x86.h"
 
 struct expr_return;
