@@ -171,9 +171,6 @@ union name_eight {
 } PACK_ATTRIBUTE;
 PACK_POP
 
-static const uint16_t kNullSymType = 0;
-static const uint16_t kFunctionSymType = 0x20;
-
 PACK_PUSH
 struct objfile_symbol_standard_record {
   union name_eight Name;
@@ -254,6 +251,26 @@ struct COFF_Relocation {
 } PACK_ATTRIBUTE;
 PACK_POP
 
+static const uint16_t kNullSymType = 0;
+static const uint16_t kFunctionSymType = 0x20;
+
+enum objfile_relocation_type {
+  OBJFILE_RELOCATION_TYPE_DIR32,
+  OBJFILE_RELOCATION_TYPE_DIR32NB,
+  OBJFILE_RELOCATION_TYPE_REL32,
+};
+
+static const size_t OBJFILE_RELOCATION_TYPE_COUNT = 3;
+
+struct objfile_relocation {
+  /* Offset from beginning of section. */
+  uint32_t virtual_address;
+  /* Index into the symbol table. */
+  uint32_t symbol_table_index;
+  /* What kind of relocation should be performed? */
+  enum objfile_relocation_type type;
+};
+
 struct objfile_section {
   char Name[8];
   struct databuf raw;
@@ -262,7 +279,7 @@ struct objfile_section {
   which just uses 16. */
   size_t max_requested_alignment;
 
-  struct COFF_Relocation *relocs;
+  struct objfile_relocation *relocs;
   size_t relocs_count;
   size_t relocs_limit;
 };
@@ -586,6 +603,27 @@ void objfile_flatten_write_section_symbols(struct objfile *f) {
   f->wrote_section_symbols = 1;
 }
 
+#define IMAGE_REL_I386_DIR32 0x0006
+#define IMAGE_REL_I386_DIR32NB 0x0007
+#define IMAGE_REL_I386_REL32 0x0014
+
+void win_append_relocs(struct databuf *d, struct objfile_relocation *relocs,
+                       size_t relocs_count) {
+  static const uint16_t win_Type[] = {
+    [OBJFILE_RELOCATION_TYPE_DIR32] = IMAGE_REL_I386_DIR32,
+    [OBJFILE_RELOCATION_TYPE_DIR32NB] = IMAGE_REL_I386_DIR32NB,
+    [OBJFILE_RELOCATION_TYPE_REL32] = IMAGE_REL_I386_REL32,
+  };
+
+  for (size_t i = 0; i < relocs_count; i++) {
+    struct COFF_Relocation coff_reloc;
+    coff_reloc.VirtualAddress = relocs[i].virtual_address;
+    coff_reloc.SymbolTableIndex = relocs[i].symbol_table_index;
+    coff_reloc.Type = win_Type[relocs[i].type];
+    databuf_append(d, &coff_reloc, sizeof(coff_reloc));
+  }
+}
+
 void objfile_flatten(struct objfile *f, struct databuf **out) {
   STATIC_CHECK(LITTLE_ENDIAN);
   objfile_flatten_write_section_symbols(f);
@@ -678,8 +716,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
   append_zeros_to_align(d, 2);
   CHECK(d->count == start_of_data_relocs);
 
-  databuf_append(d, f->data.relocs, size_mul(f->data.relocs_count,
-                                             sizeof(struct COFF_Relocation)));
+  win_append_relocs(d, f->data.relocs, f->data.relocs_count);
   CHECK(d->count == end_of_data_relocs);
 
   append_zeros_to_align(d, SECTION_ALIGNMENT);
@@ -689,8 +726,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
   append_zeros_to_align(d, 2);
   CHECK(d->count == start_of_read_data_relocs);
 
-  databuf_append(d, f->rdata.relocs, size_mul(f->rdata.relocs_count,
-                                              sizeof(struct COFF_Relocation)));
+  win_append_relocs(d, f->rdata.relocs, f->rdata.relocs_count);
   CHECK(d->count == end_of_read_data_relocs);
 
   append_zeros_to_align(d, SECTION_ALIGNMENT);
@@ -700,8 +736,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
   append_zeros_to_align(d, 2);
   CHECK(d->count == start_of_text_relocs);
 
-  databuf_append(d, f->text.relocs, size_mul(f->text.relocs_count,
-                                             sizeof(struct COFF_Relocation)));
+  win_append_relocs(d, f->text.relocs, f->text.relocs_count);
   CHECK(d->count == end_of_text_relocs);
 
   *out = d;
@@ -739,39 +774,34 @@ void objfile_set_symbol_Value(struct objfile *f,
   f->symbol_table[SymbolTableIndex].standard.Value = Value;
 }
 
-
-#define IMAGE_REL_I386_DIR32 0x0006
-#define IMAGE_REL_I386_DIR32NB 0x0007
-#define IMAGE_REL_I386_REL32 0x0014
-
 void objfile_section_append_32bit_reloc(struct objfile_section *s,
-                                        uint32_t SymbolTableIndex,
-                                        uint16_t Type) {
-  struct COFF_Relocation reloc;
-  reloc.VirtualAddress = s->raw.count;
-  reloc.SymbolTableIndex = SymbolTableIndex;
-  reloc.Type = Type;
+                                        uint32_t symbol_table_index,
+                                        enum objfile_relocation_type type) {
+  struct objfile_relocation reloc;
+  reloc.virtual_address = s->raw.count;
+  reloc.symbol_table_index = symbol_table_index;
+  reloc.type = type;
   SLICE_PUSH(s->relocs, s->relocs_count, s->relocs_limit, reloc);
   uint32_t zero = 0;
   objfile_section_append_raw(s, &zero, sizeof(zero));
 }
 
 void objfile_section_append_dir32(struct objfile_section *s,
-                                  uint32_t SymbolTableIndex) {
-  objfile_section_append_32bit_reloc(s, SymbolTableIndex,
-                                     IMAGE_REL_I386_DIR32);
+                                  uint32_t symbol_table_index) {
+  objfile_section_append_32bit_reloc(s, symbol_table_index,
+                                     OBJFILE_RELOCATION_TYPE_DIR32);
 }
 
 void objfile_section_append_dir32nb(struct objfile_section *s,
-                                    uint32_t SymbolTableIndex) {
-  objfile_section_append_32bit_reloc(s, SymbolTableIndex,
-                                     IMAGE_REL_I386_DIR32NB);
+                                    uint32_t symbol_table_index) {
+  objfile_section_append_32bit_reloc(s, symbol_table_index,
+                                     OBJFILE_RELOCATION_TYPE_DIR32NB);
 }
 
 void objfile_section_append_rel32(struct objfile_section *s,
-                                  uint32_t SymbolTableIndex) {
-  objfile_section_append_32bit_reloc(s, SymbolTableIndex,
-                                     IMAGE_REL_I386_REL32);
+                                  uint32_t symbol_table_index) {
+  objfile_section_append_32bit_reloc(s, symbol_table_index,
+                                     OBJFILE_RELOCATION_TYPE_REL32);
 }
 
 int objfile_c_symbol_name(const void *name, size_t name_count,
