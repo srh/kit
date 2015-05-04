@@ -783,21 +783,6 @@ int objfile_c_symbol_name(const void *name, size_t name_count,
   return 1;
 }
 
-int make_almost_blank_objfile(void **buf_out, size_t *count_out) {
-  STATIC_CHECK(LITTLE_ENDIAN);
-  struct objfile f;
-  objfile_init(&f);
-  objfile_section_append_raw(&f.text, "abcdefghij", 10);
-
-  struct databuf *d;
-  objfile_flatten(&f, &d);
-  databuf_move_destroy(d, buf_out, count_out);
-  free(d);
-
-  objfile_destroy(&f);
-  return 1;
-}
-
 struct objfile_section *objfile_data(struct objfile *f) {
   return &f->data;
 }
