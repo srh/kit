@@ -689,7 +689,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
   append_zeros_to_align(d, 2);
   CHECK(d->count == start_of_read_data_relocs);
 
-  databuf_append(d, f->rdata.relocs, size_mul(f->data.relocs_count,
+  databuf_append(d, f->rdata.relocs, size_mul(f->rdata.relocs_count,
                                               sizeof(struct COFF_Relocation)));
   CHECK(d->count == end_of_read_data_relocs);
 
