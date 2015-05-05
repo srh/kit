@@ -74,4 +74,7 @@ uint32_t objfile_add_remote_symbol(struct objfile *f,
 int objfile_c_symbol_name(const void *name, size_t name_count,
                           void **c_name_out, size_t *c_name_count_out);
 
+/* Utility. */
+void append_zeros_to_align(struct databuf *d, size_t alignment);
+
 #endif /* KIT_OBJFILE_OBJFILE_H_ */

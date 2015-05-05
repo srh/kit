@@ -1,10 +1,166 @@
 #include "objfile/win.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "arith.h"
 #include "objfile/structs.h"
 #include "util.h"
+
+#define IMAGE_FILE_MACHINE_I386 0x14c
+#define kFakeTimeDateStamp 12345
+
+PACK_PUSH
+struct COFF_Header {
+  uint16_t Machine;
+  uint16_t NumberOfSections;
+  uint32_t TimeDateStamp;
+  uint32_t PointerToSymbolTable;
+  uint32_t NumberOfSymbols;
+  uint16_t SizeOfOptionalHeader;
+  uint16_t Characteristics;
+} PACK_ATTRIBUTE;
+PACK_POP
+
+#define COFF_Header_EXPECTED_SIZE 20
+
+
+/* TODO: Section_Header ought to be removed from the header. */
+PACK_PUSH
+struct Section_Header {
+  char Name[8];
+  uint32_t VirtualSize;
+  uint32_t VirtualAddress;
+  uint32_t SizeOfRawData;
+  uint32_t PointerToRawData;
+  uint32_t PointerToRelocations;
+  uint32_t PointerToLineNumbers;
+  uint16_t NumberOfRelocations;
+  uint16_t NumberOfLineNumbers;
+  uint32_t Characteristics;
+} PACK_ATTRIBUTE;
+PACK_POP
+
+#define Section_Header_EXPECTED_SIZE 40
+
+/* All section beginnings are aligned to 16 bytes.  I forget if
+there's a reason. */
+#define WIN_SECTION_ALIGNMENT 16
+
+
+uint16_t real_file_characteristics(void) {
+  /*
+  0x0001 IMAGE_FILE_RELOCS_STRIPPED: image only.
+  0x0002 IMAGE_FILE_EXECUTABLE_IMAGE: image only.
+  0x0004 IMAGE_FILE_LINE_NUMS_STRIPPED: deprecated, should be zero.
+  0x0008 IMAGE_FILE_LOCAL_SYMS_STRIPPED: deprecated, should be zero.
+  0x0010 IMAGE_FILE_AGGRESSIVE_WS_TRIM: deprecated, must be zero.
+  0x0020 IMAGE_FILE_LARGE_ADDRESS_AWARE:
+             Presumably zero, unaware, for 32-bit progs.
+  0x0040 reserved
+  0x0080 IMAGE_FILE_BYTES_REVERSED_LO: deprecated, should be zero.
+  0x0100 IMAGE_FILE_32BIT_MACHINE:
+             Machine is 32-bit. (As opposed to 16-bit?  Or 64-bit?
+             cl is outputting 0 for 32-bit obj files.)
+  0x0200 IMAGE_FILE_DEBUG_STRIPPED:
+             Debugging information is removed from the image file.
+             (Irrelevant for obj files?  cl is outputting 0.)
+  0x0400 IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP:
+             for if the image is on removable media... I say, set to zero.
+  0x0800 IMAGE_FILE_NET_RUN_FROM_SWAP:
+             for if the image is on network-mounted media... I say,
+             set to zero.
+  0x1000 IMAGE_FILE_SYSTEM: a system file, not a user program
+  0x2000 IMAGE_FILE_DLL: The image file is a DLL.
+  0x4000 IMAGE_FILE_UP_SYSTEM_ONLY: Only run file on a uniprocessor machine.
+  0x8000 IMAGE_FILE_BYTES_REVERSED_HI: deprecated, should be zero.
+  */
+
+  /* cl outputs 0 for a general .obj file too. */
+  return 0;
+}
+
+static const uint32_t IMAGE_SCN_CNT_CODE = (1 << 5);
+static const uint32_t IMAGE_SCN_CNT_INITIALIZED_DATA = (1 << 6);
+static const uint32_t IMAGE_SCN_ALIGN_4_BYTES = (3ul << 20);
+static const uint32_t IMAGE_SCN_ALIGN_8_BYTES = (4ul << 20);
+static const uint32_t IMAGE_SCN_ALIGN_16_BYTES = (5ul << 20);
+static const uint32_t IMAGE_SCN_MEM_EXECUTE = (1ul << 29);
+static const uint32_t IMAGE_SCN_MEM_READ = (1ul << 30);
+static const uint32_t IMAGE_SCN_MEM_WRITE = (1ul << 31);
+
+uint32_t text_section_characteristics(void) {
+  /*
+  bit  0. Reserved.
+  bit  1. Reserved.
+  bit  2. Reserved.
+  bit  3. IMAGE_SCN_TYPE_NO_PAD.
+          Obsolete, replaced by IMAGE_SCN_ALIGN_1BYTES.
+  bit  4. Reserved.
+  bit  5. IMAGE_SCN_CNT_CODE. The section contains executable code.
+  bit  6. IMAGE_SCN_CNT_INITIALIZED_DATA.
+          The section contains initialized data.
+  bit  7. IMAGE_SCN_CNT_UNINITIALIZED_DATA.
+          The section contains uninitialized data.
+  bit  8. IMAGE_SCN_LNK_OTHER. Reserved.
+  bit  9. IMAGE_SCN_LINK_INFO. The section contains comments or other
+          information. The .drectve section has this type. Object files only.
+  bit 10. Reserved.
+  bit 11. IMAGE_SCN_LNK_REMOVE. The section will not become part of
+          the image. Object files only.
+  bit 12. IMAGE_SCN_LNK_COMDAT. The section contains COMDAT
+          data. Object files only.
+  bit 13. Undocumented.
+  bit 14. Undocumented.
+  bit 15. IMAGE_SCN_GPREL.
+      The section contains data referenced through the global pointer (GP).
+  bit 16. IMAGE_SCN_MEM_PURGEABLE (reserved)? Or undocumented?
+  bit 17. IMAGE_SCN_MEM_PURGEABLE (reserved)? Or undocumented?
+          IMAGE_SCN_MEM_16BIT for ARM, section contains Thumb code.
+  bit 18. IMAGE_SCN_MEM_LOCKED. Reserved.
+  bit 19. IMAGE_SCN_MEM_PRELOAD. Reserved.
+  bits 20:23. IMAGE_SCN_ALIGN_ ## n ## BYTES. Align data on a 2^(k-1)
+              boundary. Valid only for object files.
+  bit 24. IMAGE_SCN_LNK_NRELOC_OVFL. The section contains extended
+          relocations. (We don't support that yet.)
+  bit 25. IMAGE_SCN_MEM_DISCARDABLE. The section can be discarded
+          as needed. (I guess ours can't be.)
+  bit 26. IMAGE_SCN_MEM_NOT_CACHED. The section cannot be cached.
+          (Who knows.)
+  bit 27. IMAGE_SCN_MEM_NOT_PAGED. The section is not pageable. (Ours are.)
+  bit 28. IMAGE_SCN_MEM_SHARED. The section can be shared in memory. (Ok...)
+  bit 29. IMAGE_SCN_MEM_EXECUTE. The section can be executed as code.
+  bit 30. IMAGE_SCN_MEM_READ. The section can be read.
+  bit 31. IMAGE_SCN_MEM_WRITE. The section can be written to.
+  */
+  /* This value is also that produced by cl for its .text sections. */
+  return IMAGE_SCN_CNT_CODE | IMAGE_SCN_ALIGN_16_BYTES | IMAGE_SCN_MEM_EXECUTE
+    | IMAGE_SCN_MEM_READ;
+}
+
+uint32_t section_alignment_characteristic(size_t max_requested_alignment) {
+ switch (max_requested_alignment) {
+ case 4: return IMAGE_SCN_ALIGN_4_BYTES;
+ case 8: return IMAGE_SCN_ALIGN_8_BYTES;
+ case 16: return IMAGE_SCN_ALIGN_16_BYTES;
+ default:
+   CRASH("max_requested_alignment has a weird value.");
+ }
+}
+
+uint32_t rdata_section_characteristics(size_t max_requested_alignment) {
+  return IMAGE_SCN_CNT_INITIALIZED_DATA
+    | section_alignment_characteristic(max_requested_alignment)
+    | IMAGE_SCN_MEM_READ;
+}
+
+uint32_t data_section_characteristics(size_t max_requested_alignment) {
+  /* cl uses 8 bytes if there's a double, by the way. */
+  return IMAGE_SCN_CNT_INITIALIZED_DATA
+    | section_alignment_characteristic(max_requested_alignment)
+    | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE;
+}
+
 
 PACK_PUSH
 struct COFF_Relocation {
@@ -219,3 +375,118 @@ void win_write_section_header(
   databuf_append(d, &h, sizeof(h));
 }
 
+void win_flatten(struct objfile *f, struct databuf **out) {
+  STATIC_CHECK(LITTLE_ENDIAN);
+  struct databuf *d = malloc(sizeof(*d));
+  CHECK(d);
+  databuf_init(d);
+
+  /* Right now we have .data, .rdata, and .text sections. */
+  const uint32_t end_of_section_headers
+    = uint32_add(sizeof(struct COFF_Header),
+                 uint32_mul(kNumberOfSections,
+                            sizeof(struct Section_Header)));
+
+  const uint32_t end_of_symbols
+    = uint32_add(end_of_section_headers, win_symbols_filesize(f));
+  const uint32_t strings_size
+    = uint32_add(size_to_uint32(f->strings.count), 4);
+  STATIC_CHECK(sizeof(strings_size) == 4);
+  const uint32_t end_of_strings = uint32_add(end_of_symbols, strings_size);
+  const uint32_t ceil_end_of_strings
+    = uint32_ceil_aligned(end_of_strings, WIN_SECTION_ALIGNMENT);
+
+  const uint32_t start_of_data_raw = ceil_end_of_strings;
+  uint32_t start_of_data_relocs;
+  uint32_t end_of_data_relocs;
+  win_compute_section_dimensions(&f->data, start_of_data_raw,
+                                 &start_of_data_relocs, &end_of_data_relocs);
+  const uint32_t ceil_end_of_data_relocs
+    = uint32_ceil_aligned(end_of_data_relocs, WIN_SECTION_ALIGNMENT);
+
+  const uint32_t start_of_read_data_raw = ceil_end_of_data_relocs;
+  uint32_t start_of_read_data_relocs;
+  uint32_t end_of_read_data_relocs;
+  win_compute_section_dimensions(&f->rdata, start_of_read_data_raw,
+                                 &start_of_read_data_relocs,
+                                 &end_of_read_data_relocs);
+  const uint32_t ceil_end_of_read_data_relocs
+    = uint32_ceil_aligned(end_of_read_data_relocs, WIN_SECTION_ALIGNMENT);
+
+  const uint32_t start_of_text_raw = ceil_end_of_read_data_relocs;
+  uint32_t start_of_text_relocs;
+  uint32_t end_of_text_relocs;
+  win_compute_section_dimensions(&f->text, start_of_text_raw,
+                                 &start_of_text_relocs, &end_of_text_relocs);
+
+
+  {
+    struct COFF_Header h;
+    STATIC_CHECK(sizeof(h) == COFF_Header_EXPECTED_SIZE);
+    h.Machine = IMAGE_FILE_MACHINE_I386;
+    h.NumberOfSections = kNumberOfSections;
+    h.TimeDateStamp = kFakeTimeDateStamp;
+    h.PointerToSymbolTable = end_of_section_headers;
+    h.NumberOfSymbols = win_symbols_to_write(f);
+    /* Should be zero for an object file. */
+    h.SizeOfOptionalHeader = 0;
+    h.Characteristics = real_file_characteristics();
+
+    databuf_append(d, &h, sizeof(h));
+  }
+
+  /* Right now we've got 3 sections. */
+  /* TODO: STATIC_CHECK? */
+  CHECK(kNumberOfSections == 3);
+  win_write_section_header(
+      d, &f->data, start_of_data_raw,
+      data_section_characteristics(f->data.max_requested_alignment));
+  win_write_section_header(
+      d, &f->rdata, start_of_read_data_raw,
+      rdata_section_characteristics(f->rdata.max_requested_alignment));
+  win_write_section_header(d, &f->text, start_of_text_raw,
+                           text_section_characteristics());
+  CHECK(d->count == end_of_section_headers);
+
+  win_append_symbols(d, f->symbol_table, f->symbol_table_count);
+  win_append_all_section_symbols(d, f);
+
+
+  CHECK(d->count == end_of_symbols);
+  STATIC_CHECK(sizeof(strings_size) == 4);
+  databuf_append(d, &strings_size, sizeof(strings_size));
+  databuf_append(d, f->strings.buf, f->strings.count);
+  CHECK(d->count == end_of_strings);
+
+  append_zeros_to_align(d, WIN_SECTION_ALIGNMENT);
+  CHECK(d->count == ceil_end_of_strings);
+
+  databuf_append(d, f->data.raw.buf, f->data.raw.count);
+  append_zeros_to_align(d, 2);
+  CHECK(d->count == start_of_data_relocs);
+
+  win_append_relocs(d, f->data.relocs, f->data.relocs_count);
+  CHECK(d->count == end_of_data_relocs);
+
+  append_zeros_to_align(d, WIN_SECTION_ALIGNMENT);
+  CHECK(d->count == ceil_end_of_data_relocs);
+
+  databuf_append(d, f->rdata.raw.buf, f->rdata.raw.count);
+  append_zeros_to_align(d, 2);
+  CHECK(d->count == start_of_read_data_relocs);
+
+  win_append_relocs(d, f->rdata.relocs, f->rdata.relocs_count);
+  CHECK(d->count == end_of_read_data_relocs);
+
+  append_zeros_to_align(d, WIN_SECTION_ALIGNMENT);
+  CHECK(d->count == ceil_end_of_read_data_relocs);
+
+  databuf_append(d, f->text.raw.buf, f->text.raw.count);
+  append_zeros_to_align(d, 2);
+  CHECK(d->count == start_of_text_relocs);
+
+  win_append_relocs(d, f->text.relocs, f->text.relocs_count);
+  CHECK(d->count == end_of_text_relocs);
+
+  *out = d;
+}
