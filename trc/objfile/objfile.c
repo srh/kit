@@ -253,10 +253,6 @@ struct objfile {
   it accounts for its own size usage).  Following the size field is a
   concatenation of null-terminated strings. */
   struct databuf strings;
-
-  /* Says that we wrote section symbols.  Makes sure that we can only
-  call objfile_flatten once. */
-  int wrote_section_symbols;
 };
 
 void objfile_init(struct objfile *f) {
@@ -272,8 +268,6 @@ void objfile_init(struct objfile *f) {
   f->symbol_table_limit = 0;
 
   databuf_init(&f->strings);
-
-  f->wrote_section_symbols = 0;
 }
 
 void objfile_destroy(struct objfile *f) {
@@ -429,10 +423,10 @@ uint32_t objfile_add_remote_symbol(struct objfile *f,
   return ret;
 }
 
+const uint32_t kNumSectionSymbolsPerSection = 2;
 
-
-void objfile_write_section_symbol(
-    struct objfile *f,
+void win_append_section_symbols(
+    struct databuf *d,
     struct objfile_section *s,
     uint16_t SectionNumber) {
   {
@@ -444,8 +438,7 @@ void objfile_write_section_symbol(
     u.standard.Type = 0;
     u.standard.StorageClass = IMAGE_SYM_CLASS_STATIC;
     u.standard.NumberOfAuxSymbols = 1;
-    SLICE_PUSH(f->symbol_table, f->symbol_table_count,
-               f->symbol_table_limit, u);
+    databuf_append(d, &u, sizeof(u));
   }
   {
     union COFF_symbol_record u;
@@ -458,37 +451,41 @@ void objfile_write_section_symbol(
     u.aux_sectiondef.Selection = 0;
     STATIC_CHECK(sizeof(u.aux_sectiondef.Unused) == 3);
     memset(u.aux_sectiondef.Unused, 0, 3);
-    SLICE_PUSH(f->symbol_table, f->symbol_table_count,
-               f->symbol_table_limit, u);
+    databuf_append(d, &u, sizeof(u));
   }
 }
 
-void objfile_flatten_write_section_symbols(struct objfile *f) {
-  CHECK(f->wrote_section_symbols == 0);
-  objfile_write_section_symbol(f, &f->data, 1);
-  objfile_write_section_symbol(f, &f->rdata, 2);
-  objfile_write_section_symbol(f, &f->text, 3);
-  f->wrote_section_symbols = 1;
+const uint32_t kNumberOfSections = 3;
+
+/* TODO: Rename with "win". */
+void objfile_flatten_append_all_section_symbols(struct databuf *d,
+                                                struct objfile *f) {
+  win_append_section_symbols(d, &f->data, 1);
+  win_append_section_symbols(d, &f->rdata, 2);
+  win_append_section_symbols(d, &f->text, 3);
+}
+
+uint32_t win_symbols_to_write(struct objfile *f) {
+  return uint32_add(uint32_mul(kNumSectionSymbolsPerSection, kNumberOfSections),
+                    size_to_uint32(f->symbol_table_count));
 }
 
 /* TODO: Rename with "win". */
 void objfile_flatten(struct objfile *f, struct databuf **out) {
   STATIC_CHECK(LITTLE_ENDIAN);
-  objfile_flatten_write_section_symbols(f);
   struct databuf *d = malloc(sizeof(*d));
   CHECK(d);
   databuf_init(d);
 
   /* Right now we have .data, .rdata, and .text sections. */
-  const uint16_t number_of_sections = 3;
   const uint32_t end_of_section_headers
     = uint32_add(sizeof(struct COFF_Header),
-                 uint32_mul(number_of_sections,
+                 uint32_mul(kNumberOfSections,
                             sizeof(struct Section_Header)));
 
   const uint32_t end_of_symbols
     = uint32_add(end_of_section_headers,
-                 uint32_mul(size_to_uint32(f->symbol_table_count),
+                 uint32_mul(win_symbols_to_write(f),
                             sizeof(union COFF_symbol_record)));
   const uint32_t strings_size
     = uint32_add(size_to_uint32(f->strings.count), 4);
@@ -525,10 +522,10 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
     struct COFF_Header h;
     STATIC_CHECK(sizeof(h) == COFF_Header_EXPECTED_SIZE);
     h.Machine = IMAGE_FILE_MACHINE_I386;
-    h.NumberOfSections = number_of_sections;
+    h.NumberOfSections = kNumberOfSections;
     h.TimeDateStamp = kFakeTimeDateStamp;
     h.PointerToSymbolTable = end_of_section_headers;
-    h.NumberOfSymbols = f->symbol_table_count;
+    h.NumberOfSymbols = win_symbols_to_write(f);
     /* Should be zero for an object file. */
     h.SizeOfOptionalHeader = 0;
     h.Characteristics = real_file_characteristics();
@@ -537,7 +534,8 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
   }
 
   /* Right now we've got 3 sections. */
-  CHECK(number_of_sections == 3);
+  /* TODO: STATIC_CHECK? */
+  CHECK(kNumberOfSections == 3);
   win_write_section_header(
       d, &f->data, start_of_data_raw,
       data_section_characteristics(f->data.max_requested_alignment));
@@ -551,6 +549,9 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
   databuf_append(d, f->symbol_table,
                  size_mul(f->symbol_table_count,
                           sizeof(union COFF_symbol_record)));
+  objfile_flatten_append_all_section_symbols(d, f);
+
+
   CHECK(d->count == end_of_symbols);
   STATIC_CHECK(sizeof(strings_size) == 4);
   databuf_append(d, &strings_size, sizeof(strings_size));
