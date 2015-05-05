@@ -196,7 +196,7 @@ uint32_t objfile_add_remote_symbol(struct objfile *f,
   return ret;
 }
 
-/* TODO: Remove -- somewher we decide whether to call win_flatten or
+/* TODO: Remove -- somewhere we decide whether to call win_flatten or
    whatnot. */
 void objfile_flatten(struct objfile *f, struct databuf **out) {
   win_flatten(f, out);
