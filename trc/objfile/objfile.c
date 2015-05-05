@@ -199,13 +199,6 @@ struct COFF_symbol_aux_sectiondef {
 } PACK_ATTRIBUTE;
 PACK_POP
 
-PACK_PUSH
-union COFF_symbol_record {
-  struct COFF_symbol_standard_record standard;
-  struct COFF_symbol_aux_sectiondef aux_sectiondef;
-} PACK_ATTRIBUTE;
-PACK_POP
-
 static const uint16_t kNullSymType = 0;
 static const uint16_t kFunctionSymType = 0x20;
 
@@ -243,7 +236,7 @@ struct objfile {
   struct objfile_section rdata;
   struct objfile_section text;
 
-  union COFF_symbol_record *symbol_table;
+  struct COFF_symbol_standard_record *symbol_table;
   size_t symbol_table_count;
   size_t symbol_table_limit;
 
@@ -388,18 +381,18 @@ uint32_t objfile_add_local_symbol(struct objfile *f,
                                   enum section section,
                                   enum is_static is_static) {
   uint32_t ret = size_to_uint32(f->symbol_table_count);
-  union COFF_symbol_record u;
-  munge_to_Name(f, name, name_count, &u.standard.Name);
-  u.standard.Value = Value;
-  u.standard.SectionNumber = section_to_SectionNumber(section);
-  u.standard.Type = section == SECTION_TEXT ? kFunctionSymType : kNullSymType;
+  struct COFF_symbol_standard_record standard;
+  munge_to_Name(f, name, name_count, &standard.Name);
+  standard.Value = Value;
+  standard.SectionNumber = section_to_SectionNumber(section);
+  standard.Type = section == SECTION_TEXT ? kFunctionSymType : kNullSymType;
   /* At some point we might want to support... static functions or
   external or something, idk. */
-  u.standard.StorageClass = is_static == IS_STATIC_NO
+  standard.StorageClass = is_static == IS_STATIC_NO
     ? IMAGE_SYM_CLASS_EXTERNAL
     : IMAGE_SYM_CLASS_STATIC;
-  u.standard.NumberOfAuxSymbols = 0;
-  SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, u);
+  standard.NumberOfAuxSymbols = 0;
+  SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, standard);
   return ret;
 }
 
@@ -410,16 +403,16 @@ uint32_t objfile_add_remote_symbol(struct objfile *f,
                                    size_t name_count,
                                    enum is_function is_function) {
   uint32_t ret = size_to_uint32(f->symbol_table_count);
-  union COFF_symbol_record u;
-  munge_to_Name(f, name, name_count, &u.standard.Name);
-  u.standard.Value = 0;
-  u.standard.SectionNumber = IMAGE_SYM_UNDEFINED;
-  u.standard.Type = is_function == IS_FUNCTION_NO
+  struct COFF_symbol_standard_record standard;
+  munge_to_Name(f, name, name_count, &standard.Name);
+  standard.Value = 0;
+  standard.SectionNumber = IMAGE_SYM_UNDEFINED;
+  standard.Type = is_function == IS_FUNCTION_NO
     ? kNullSymType
     : kFunctionSymType;
-  u.standard.StorageClass = IMAGE_SYM_CLASS_EXTERNAL;
-  u.standard.NumberOfAuxSymbols = 0;
-  SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, u);
+  standard.StorageClass = IMAGE_SYM_CLASS_EXTERNAL;
+  standard.NumberOfAuxSymbols = 0;
+  SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, standard);
   return ret;
 }
 
@@ -430,28 +423,28 @@ void win_append_section_symbols(
     struct objfile_section *s,
     uint16_t SectionNumber) {
   {
-    union COFF_symbol_record u;
-    STATIC_CHECK(sizeof(u.standard.Name.ShortName) == 8);
-    memcpy(u.standard.Name.ShortName, s, 8);
-    u.standard.Value = 0;
-    u.standard.SectionNumber = SectionNumber;
-    u.standard.Type = 0;
-    u.standard.StorageClass = IMAGE_SYM_CLASS_STATIC;
-    u.standard.NumberOfAuxSymbols = 1;
-    databuf_append(d, &u, sizeof(u));
+    struct COFF_symbol_standard_record standard;
+    STATIC_CHECK(sizeof(standard.Name.ShortName) == 8);
+    memcpy(standard.Name.ShortName, s, 8);
+    standard.Value = 0;
+    standard.SectionNumber = SectionNumber;
+    standard.Type = 0;
+    standard.StorageClass = IMAGE_SYM_CLASS_STATIC;
+    standard.NumberOfAuxSymbols = 1;
+    databuf_append(d, &standard, sizeof(standard));
   }
   {
-    union COFF_symbol_record u;
-    u.aux_sectiondef.Length = size_to_uint32(objfile_section_raw_size(s));
-    u.aux_sectiondef.NumberOfRelocations
+    struct COFF_symbol_aux_sectiondef aux_sectiondef;
+    aux_sectiondef.Length = size_to_uint32(objfile_section_raw_size(s));
+    aux_sectiondef.NumberOfRelocations
       = objfile_section_small_relocations_count(s);
-    u.aux_sectiondef.NumberOfLineNumbers = 0;
-    u.aux_sectiondef.CheckSum = 0;
-    u.aux_sectiondef.Number = 0;
-    u.aux_sectiondef.Selection = 0;
-    STATIC_CHECK(sizeof(u.aux_sectiondef.Unused) == 3);
-    memset(u.aux_sectiondef.Unused, 0, 3);
-    databuf_append(d, &u, sizeof(u));
+    aux_sectiondef.NumberOfLineNumbers = 0;
+    aux_sectiondef.CheckSum = 0;
+    aux_sectiondef.Number = 0;
+    aux_sectiondef.Selection = 0;
+    STATIC_CHECK(sizeof(aux_sectiondef.Unused) == 3);
+    memset(aux_sectiondef.Unused, 0, 3);
+    databuf_append(d, &aux_sectiondef, sizeof(aux_sectiondef));
   }
 }
 
@@ -486,7 +479,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
   const uint32_t end_of_symbols
     = uint32_add(end_of_section_headers,
                  uint32_mul(win_symbols_to_write(f),
-                            sizeof(union COFF_symbol_record)));
+                            sizeof(struct COFF_symbol_standard_record)));
   const uint32_t strings_size
     = uint32_add(size_to_uint32(f->strings.count), 4);
   STATIC_CHECK(sizeof(strings_size) == 4);
@@ -548,7 +541,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
 
   databuf_append(d, f->symbol_table,
                  size_mul(f->symbol_table_count,
-                          sizeof(union COFF_symbol_record)));
+                          sizeof(struct COFF_symbol_standard_record)));
   objfile_flatten_append_all_section_symbols(d, f);
 
 
@@ -619,8 +612,8 @@ void objfile_set_symbol_Value(struct objfile *f,
   CHECK(SymbolTableIndex < f->symbol_table_count);
   /* We should only be assigning this once, I think -- and we set it
   to zero before assigning it. */
-  CHECK(f->symbol_table[SymbolTableIndex].standard.Value == 0);
-  f->symbol_table[SymbolTableIndex].standard.Value = Value;
+  CHECK(f->symbol_table[SymbolTableIndex].Value == 0);
+  f->symbol_table[SymbolTableIndex].Value = Value;
 }
 
 void objfile_section_append_32bit_reloc(struct objfile_section *s,
