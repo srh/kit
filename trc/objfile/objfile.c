@@ -35,11 +35,6 @@ void objfile_section_destroy(struct objfile_section *s) {
   s->relocs_limit = 0;
 }
 
-uint16_t section_to_SectionNumber(enum section section) {
-  CHECK(section >= SECTION_DATA && section <= SECTION_TEXT);
-  return section;
-}
-
 void objfile_init(struct objfile *f) {
   static const char DataName[8] = ".data";
   objfile_section_init(&f->data, DataName);
