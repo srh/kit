@@ -143,8 +143,6 @@ uint32_t data_section_characteristics(size_t max_requested_alignment) {
 
 static const uint8_t IMAGE_SYM_CLASS_EXTERNAL = 2;
 static const uint8_t IMAGE_SYM_CLASS_STATIC = 3;
-static const uint8_t IMAGE_SYM_CLASS_FUNCTION = 101;
-static const uint8_t IMAGE_SYM_CLASS_FILE = 103;
 
 PACK_PUSH
 union name_eight {
