@@ -145,16 +145,6 @@ static const uint8_t IMAGE_SYM_CLASS_EXTERNAL = 2;
 static const uint8_t IMAGE_SYM_CLASS_STATIC = 3;
 
 PACK_PUSH
-union name_eight {
-  uint8_t ShortName[8];
-  struct {
-    uint32_t Zeroes;
-    uint32_t Offset;
-  } LongName;
-} PACK_ATTRIBUTE;
-PACK_POP
-
-PACK_PUSH
 struct COFF_symbol_standard_record {
   union name_eight Name;
   uint32_t Value;
@@ -174,7 +164,7 @@ struct COFF_symbol_standard_record {
   name the file.  There's also a 'weak external' storage class, which
   is mentioned.  Note: I don't see FILE used in a .obj file.  Also
   FUNCTION is used for .bf and .ef records, which I don't see
-  either. */
+  either.  We only use EXTERNAL and STATIC. */
   uint8_t StorageClass;
   /* How many aux records follow this record. */
   uint8_t NumberOfAuxSymbols;
@@ -234,7 +224,7 @@ struct objfile {
   struct objfile_section rdata;
   struct objfile_section text;
 
-  struct COFF_symbol_standard_record *symbol_table;
+  struct objfile_symbol_record *symbol_table;
   size_t symbol_table_count;
   size_t symbol_table_limit;
 
@@ -379,38 +369,33 @@ uint32_t objfile_add_local_symbol(struct objfile *f,
                                   enum section section,
                                   enum is_static is_static) {
   uint32_t ret = size_to_uint32(f->symbol_table_count);
-  struct COFF_symbol_standard_record standard;
-  munge_to_Name(f, name, name_count, &standard.Name);
-  standard.Value = Value;
-  standard.SectionNumber = section_to_SectionNumber(section);
-  standard.Type = section == SECTION_TEXT ? kFunctionSymType : kNullSymType;
-  /* At some point we might want to support... static functions or
-  external or something, idk. */
-  standard.StorageClass = is_static == IS_STATIC_NO
-    ? IMAGE_SYM_CLASS_EXTERNAL
-    : IMAGE_SYM_CLASS_STATIC;
-  standard.NumberOfAuxSymbols = 0;
-  SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, standard);
+  struct objfile_symbol_record rec;
+  munge_to_Name(f, name, name_count, &rec.Name);
+  rec.Value = Value;
+  STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_DATA == (int)SECTION_DATA);
+  STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_RDATA == (int)SECTION_RDATA);
+  STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_TEXT == (int)SECTION_TEXT);
+  rec.section = (enum objfile_symbol_section)section;
+  rec.is_function = section == SECTION_TEXT ? IS_FUNCTION_YES : IS_FUNCTION_NO;
+  rec.is_static = is_static;
+  SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, rec);
   return ret;
 }
 
-static const uint16_t IMAGE_SYM_UNDEFINED = 0;
+enum { IMAGE_SYM_UNDEFINED = 0 };
 
 uint32_t objfile_add_remote_symbol(struct objfile *f,
                                    const uint8_t *name,
                                    size_t name_count,
                                    enum is_function is_function) {
   uint32_t ret = size_to_uint32(f->symbol_table_count);
-  struct COFF_symbol_standard_record standard;
-  munge_to_Name(f, name, name_count, &standard.Name);
-  standard.Value = 0;
-  standard.SectionNumber = IMAGE_SYM_UNDEFINED;
-  standard.Type = is_function == IS_FUNCTION_NO
-    ? kNullSymType
-    : kFunctionSymType;
-  standard.StorageClass = IMAGE_SYM_CLASS_EXTERNAL;
-  standard.NumberOfAuxSymbols = 0;
-  SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, standard);
+  struct objfile_symbol_record rec;
+  munge_to_Name(f, name, name_count, &rec.Name);
+  rec.Value = 0;
+  rec.section = OBJFILE_SYMBOL_SECTION_UNDEFINED;
+  rec.is_function = is_function;
+  rec.is_static = IS_STATIC_NO;
+  SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, rec);
   return ret;
 }
 
@@ -459,6 +444,24 @@ void objfile_flatten_append_all_section_symbols(struct databuf *d,
 uint32_t win_symbols_to_write(struct objfile *f) {
   return uint32_add(uint32_mul(kNumSectionSymbolsPerSection, kNumberOfSections),
                     size_to_uint32(f->symbol_table_count));
+}
+
+void win_append_symbols(struct databuf *d,
+                        struct objfile_symbol_record *symbol_table,
+                        size_t symbol_table_count) {
+  for (size_t i = 0; i < symbol_table_count; i++) {
+    struct COFF_symbol_standard_record standard;
+    standard.Name = symbol_table[i].Name;
+    standard.Value = symbol_table[i].Value;
+    STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_UNDEFINED == (int)IMAGE_SYM_UNDEFINED);
+    standard.SectionNumber = symbol_table[i].section;
+    standard.Type = symbol_table[i].is_function == IS_FUNCTION_YES ?
+      kFunctionSymType : kNullSymType;
+    standard.StorageClass = symbol_table[i].is_static == IS_STATIC_YES ?
+      IMAGE_SYM_CLASS_STATIC : IMAGE_SYM_CLASS_EXTERNAL;
+    standard.NumberOfAuxSymbols = 0;
+    databuf_append(d, &standard, sizeof(standard));
+  }
 }
 
 /* TODO: Rename with "win". */
@@ -537,9 +540,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
                            text_section_characteristics());
   CHECK(d->count == end_of_section_headers);
 
-  databuf_append(d, f->symbol_table,
-                 size_mul(f->symbol_table_count,
-                          sizeof(struct COFF_symbol_standard_record)));
+  win_append_symbols(d, f->symbol_table, f->symbol_table_count);
   objfile_flatten_append_all_section_symbols(d, f);
 
 

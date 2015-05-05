@@ -5,6 +5,8 @@
 #include <stdint.h>
 
 #include "databuf.h"
+#include "objfile/objfile.h"
+#include "util.h"
 
 enum objfile_relocation_type {
   OBJFILE_RELOCATION_TYPE_DIR32,
@@ -34,6 +36,36 @@ struct objfile_section {
   struct objfile_relocation *relocs;
   size_t relocs_count;
   size_t relocs_limit;
+};
+
+enum objfile_symbol_section {
+  /* For external symbols. WINDOWS: Conveniently this value zero means
+  undefined on windows. */
+  OBJFILE_SYMBOL_SECTION_UNDEFINED = 0,
+  /* For non-external symbols. */
+  OBJFILE_SYMBOL_SECTION_DATA = 1,
+  OBJFILE_SYMBOL_SECTION_RDATA = 2,
+  OBJFILE_SYMBOL_SECTION_TEXT = 3,
+};
+
+PACK_PUSH
+union name_eight {
+  uint8_t ShortName[8];
+  struct {
+    uint32_t Zeroes;
+    uint32_t Offset;
+  } LongName;
+} PACK_ATTRIBUTE;
+PACK_POP
+
+struct objfile_symbol_record {
+  /* WINDOWS-specific?  Either a short name or an offset into a
+  strings table. */
+  union name_eight Name;
+  uint32_t Value;
+  enum objfile_symbol_section section;
+  enum is_function is_function;
+  enum is_static is_static;
 };
 
 size_t objfile_section_raw_size(struct objfile_section *s);
