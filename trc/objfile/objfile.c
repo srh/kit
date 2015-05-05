@@ -157,7 +157,7 @@ union name_eight {
 PACK_POP
 
 PACK_PUSH
-struct objfile_symbol_standard_record {
+struct COFF_symbol_standard_record {
   union name_eight Name;
   uint32_t Value;
   /* Uses a 1-based index into the section table.  Special values:
@@ -184,7 +184,7 @@ struct objfile_symbol_standard_record {
 PACK_POP
 
 PACK_PUSH
-struct objfile_symbol_aux_sectiondef {
+struct COFF_symbol_aux_sectiondef {
   uint32_t Length;
   uint16_t NumberOfRelocations;
   uint16_t NumberOfLineNumbers;
@@ -200,9 +200,9 @@ struct objfile_symbol_aux_sectiondef {
 PACK_POP
 
 PACK_PUSH
-union objfile_symbol_record {
-  struct objfile_symbol_standard_record standard;
-  struct objfile_symbol_aux_sectiondef aux_sectiondef;
+union COFF_symbol_record {
+  struct COFF_symbol_standard_record standard;
+  struct COFF_symbol_aux_sectiondef aux_sectiondef;
 } PACK_ATTRIBUTE;
 PACK_POP
 
@@ -243,7 +243,7 @@ struct objfile {
   struct objfile_section rdata;
   struct objfile_section text;
 
-  union objfile_symbol_record *symbol_table;
+  union COFF_symbol_record *symbol_table;
   size_t symbol_table_count;
   size_t symbol_table_limit;
 
@@ -394,7 +394,7 @@ uint32_t objfile_add_local_symbol(struct objfile *f,
                                   enum section section,
                                   enum is_static is_static) {
   uint32_t ret = size_to_uint32(f->symbol_table_count);
-  union objfile_symbol_record u;
+  union COFF_symbol_record u;
   munge_to_Name(f, name, name_count, &u.standard.Name);
   u.standard.Value = Value;
   u.standard.SectionNumber = section_to_SectionNumber(section);
@@ -416,7 +416,7 @@ uint32_t objfile_add_remote_symbol(struct objfile *f,
                                    size_t name_count,
                                    enum is_function is_function) {
   uint32_t ret = size_to_uint32(f->symbol_table_count);
-  union objfile_symbol_record u;
+  union COFF_symbol_record u;
   munge_to_Name(f, name, name_count, &u.standard.Name);
   u.standard.Value = 0;
   u.standard.SectionNumber = IMAGE_SYM_UNDEFINED;
@@ -436,7 +436,7 @@ void objfile_write_section_symbol(
     struct objfile_section *s,
     uint16_t SectionNumber) {
   {
-    union objfile_symbol_record u;
+    union COFF_symbol_record u;
     STATIC_CHECK(sizeof(u.standard.Name.ShortName) == 8);
     memcpy(u.standard.Name.ShortName, s, 8);
     u.standard.Value = 0;
@@ -448,7 +448,7 @@ void objfile_write_section_symbol(
                f->symbol_table_limit, u);
   }
   {
-    union objfile_symbol_record u;
+    union COFF_symbol_record u;
     u.aux_sectiondef.Length = size_to_uint32(objfile_section_raw_size(s));
     u.aux_sectiondef.NumberOfRelocations
       = objfile_section_small_relocations_count(s);
@@ -489,7 +489,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
   const uint32_t end_of_symbols
     = uint32_add(end_of_section_headers,
                  uint32_mul(size_to_uint32(f->symbol_table_count),
-                            sizeof(union objfile_symbol_record)));
+                            sizeof(union COFF_symbol_record)));
   const uint32_t strings_size
     = uint32_add(size_to_uint32(f->strings.count), 4);
   STATIC_CHECK(sizeof(strings_size) == 4);
@@ -550,7 +550,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
 
   databuf_append(d, f->symbol_table,
                  size_mul(f->symbol_table_count,
-                          sizeof(union objfile_symbol_record)));
+                          sizeof(union COFF_symbol_record)));
   CHECK(d->count == end_of_symbols);
   STATIC_CHECK(sizeof(strings_size) == 4);
   databuf_append(d, &strings_size, sizeof(strings_size));
