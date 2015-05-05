@@ -36,4 +36,7 @@ struct objfile_section {
   size_t relocs_limit;
 };
 
+size_t objfile_section_raw_size(struct objfile_section *s);
+uint16_t objfile_section_small_relocations_count(struct objfile_section *s);
+
 #endif /* OBJFILE_STRUCTS_H_ */

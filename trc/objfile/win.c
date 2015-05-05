@@ -1,5 +1,7 @@
 #include "objfile/win.h"
 
+#include <string.h>
+
 #include "arith.h"
 #include "objfile/structs.h"
 #include "util.h"
@@ -68,4 +70,33 @@ void win_append_relocs(struct databuf *d, struct objfile_relocation *relocs,
     coff_reloc.Type = win_Type[relocs[i].type];
     databuf_append(d, &coff_reloc, sizeof(coff_reloc));
   }
+}
+
+void win_write_section_header(
+    struct databuf *d, struct objfile_section *s,
+    uint32_t start_of_raw, uint32_t Characteristics) {
+  uint32_t PointerToRelocations;
+  uint32_t pointer_to_end;
+  win_compute_section_dimensions(s, start_of_raw,
+                                 &PointerToRelocations, &pointer_to_end);
+
+  struct Section_Header h;
+  STATIC_CHECK(sizeof(h) == Section_Header_EXPECTED_SIZE);
+  STATIC_CHECK(sizeof(h.Name) == 8 && sizeof(h.Name[0]) == 1);
+  STATIC_CHECK(sizeof(s->Name) == 8);
+  memcpy(h.Name, s->Name, 8);
+  /* Should be set to zero for object files. */
+  h.VirtualSize = 0;
+  /* For simplicity, should be set to zero for object files. */
+  h.VirtualAddress = 0;
+  h.SizeOfRawData = objfile_section_raw_size(s);
+  h.PointerToRawData = start_of_raw;
+  h.PointerToRelocations = PointerToRelocations;
+  /* We output no COFF line numbers. */
+  h.PointerToLineNumbers = 0;
+  h.NumberOfRelocations = objfile_section_small_relocations_count(s);
+  h.NumberOfLineNumbers = 0;
+  h.Characteristics = Characteristics;
+
+  databuf_append(d, &h, sizeof(h));
 }
