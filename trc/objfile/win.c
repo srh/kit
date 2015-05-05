@@ -243,8 +243,8 @@ static const uint16_t kFunctionSymType = 0x20;
 
 enum { IMAGE_SYM_UNDEFINED = 0 };
 
-
-const uint32_t kNumSectionSymbolsPerSection = 2;
+enum { kNumberOfSections = 3 };
+enum { kNumSectionSymbolsPerSection = 2 };
 
 void win_append_section_symbols(
     struct databuf *d,
@@ -436,8 +436,7 @@ void win_flatten(struct objfile *f, struct databuf **out) {
   }
 
   /* Right now we've got 3 sections. */
-  /* TODO: STATIC_CHECK? */
-  CHECK(kNumberOfSections == 3);
+  STATIC_CHECK(kNumberOfSections == 3);
   win_write_section_header(
       d, &f->data, start_of_data_raw,
       data_section_characteristics(f->data.max_requested_alignment));
