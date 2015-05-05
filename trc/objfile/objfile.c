@@ -141,55 +141,6 @@ uint32_t data_section_characteristics(size_t max_requested_alignment) {
     | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE;
 }
 
-static const uint8_t IMAGE_SYM_CLASS_EXTERNAL = 2;
-static const uint8_t IMAGE_SYM_CLASS_STATIC = 3;
-
-PACK_PUSH
-struct COFF_symbol_standard_record {
-  union name_eight Name;
-  uint32_t Value;
-  /* Uses a 1-based index into the section table.  Special values:
-  IMAGE_SYM_UNDEFINED (0).  Section not yet defined, e.g. for an
-  external symbol.
-  IMAGE_SYM_ABSOLUTE (0xFFFF).  The symbol has an absolute value,
-  not an address relative to some section.
-  IMAGE_SYM_DEBUG (0xFFFE).  Some debuggery. */
-  uint16_t SectionNumber;
-  /* MS tools set this field to 0x20 (function) or 0x0 (not a
-  function).  I.e. kFunctionSymType or kNullSymType. */
-  uint16_t Type;
-  /* MS tools generally only use IMAGE_SYM_CLASS_EXTERNAL (2),
-  IMAGE_SYM_CLASS_STATIC (3), IMAGE_SYM_CLASS_FUNCTION (101), and
-  IMAGE_SYM_CLASS_FILE (103) which is followed by aux records that
-  name the file.  There's also a 'weak external' storage class, which
-  is mentioned.  Note: I don't see FILE used in a .obj file.  Also
-  FUNCTION is used for .bf and .ef records, which I don't see
-  either.  We only use EXTERNAL and STATIC. */
-  uint8_t StorageClass;
-  /* How many aux records follow this record. */
-  uint8_t NumberOfAuxSymbols;
-} PACK_ATTRIBUTE;
-PACK_POP
-
-PACK_PUSH
-struct COFF_symbol_aux_sectiondef {
-  uint32_t Length;
-  uint16_t NumberOfRelocations;
-  uint16_t NumberOfLineNumbers;
-  /* COMDAT-only, set to zero. */
-  /* I don't know if this is really COMDAT-only, I see it being used... */
-  uint32_t CheckSum;
-  /* COMDAT-only, set to zero. */
-  uint16_t Number;
-  /* COMDAT selection number, set to zero. */
-  uint8_t Selection;
-  uint8_t Unused[3];
-} PACK_ATTRIBUTE;
-PACK_POP
-
-static const uint16_t kNullSymType = 0;
-static const uint16_t kFunctionSymType = 0x20;
-
 void objfile_section_init(struct objfile_section *s, const char Name[8]) {
   memcpy(s->Name, Name, 8);
 
@@ -218,23 +169,6 @@ uint16_t section_to_SectionNumber(enum section section) {
   CHECK(section >= SECTION_DATA && section <= SECTION_TEXT);
   return section;
 }
-
-struct objfile {
-  struct objfile_section data;
-  struct objfile_section rdata;
-  struct objfile_section text;
-
-  struct objfile_symbol_record *symbol_table;
-  size_t symbol_table_count;
-  size_t symbol_table_limit;
-
-  /* strings does not include the 4-byte size field that would exist
-  at the beginning of the strings table (which immediately follows the
-  symbol table on disk).  Its value will be strings.count + 4 (because
-  it accounts for its own size usage).  Following the size field is a
-  concatenation of null-terminated strings. */
-  struct databuf strings;
-};
 
 void objfile_init(struct objfile *f) {
   static const char DataName[8] = ".data";
@@ -382,8 +316,6 @@ uint32_t objfile_add_local_symbol(struct objfile *f,
   return ret;
 }
 
-enum { IMAGE_SYM_UNDEFINED = 0 };
-
 uint32_t objfile_add_remote_symbol(struct objfile *f,
                                    const uint8_t *name,
                                    size_t name_count,
@@ -397,71 +329,6 @@ uint32_t objfile_add_remote_symbol(struct objfile *f,
   rec.is_static = IS_STATIC_NO;
   SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, rec);
   return ret;
-}
-
-const uint32_t kNumSectionSymbolsPerSection = 2;
-
-void win_append_section_symbols(
-    struct databuf *d,
-    struct objfile_section *s,
-    uint16_t SectionNumber) {
-  {
-    struct COFF_symbol_standard_record standard;
-    STATIC_CHECK(sizeof(standard.Name.ShortName) == 8);
-    memcpy(standard.Name.ShortName, s, 8);
-    standard.Value = 0;
-    standard.SectionNumber = SectionNumber;
-    standard.Type = 0;
-    standard.StorageClass = IMAGE_SYM_CLASS_STATIC;
-    standard.NumberOfAuxSymbols = 1;
-    databuf_append(d, &standard, sizeof(standard));
-  }
-  {
-    struct COFF_symbol_aux_sectiondef aux_sectiondef;
-    aux_sectiondef.Length = size_to_uint32(objfile_section_raw_size(s));
-    aux_sectiondef.NumberOfRelocations
-      = objfile_section_small_relocations_count(s);
-    aux_sectiondef.NumberOfLineNumbers = 0;
-    aux_sectiondef.CheckSum = 0;
-    aux_sectiondef.Number = 0;
-    aux_sectiondef.Selection = 0;
-    STATIC_CHECK(sizeof(aux_sectiondef.Unused) == 3);
-    memset(aux_sectiondef.Unused, 0, 3);
-    databuf_append(d, &aux_sectiondef, sizeof(aux_sectiondef));
-  }
-}
-
-const uint32_t kNumberOfSections = 3;
-
-/* TODO: Rename with "win". */
-void objfile_flatten_append_all_section_symbols(struct databuf *d,
-                                                struct objfile *f) {
-  win_append_section_symbols(d, &f->data, 1);
-  win_append_section_symbols(d, &f->rdata, 2);
-  win_append_section_symbols(d, &f->text, 3);
-}
-
-uint32_t win_symbols_to_write(struct objfile *f) {
-  return uint32_add(uint32_mul(kNumSectionSymbolsPerSection, kNumberOfSections),
-                    size_to_uint32(f->symbol_table_count));
-}
-
-void win_append_symbols(struct databuf *d,
-                        struct objfile_symbol_record *symbol_table,
-                        size_t symbol_table_count) {
-  for (size_t i = 0; i < symbol_table_count; i++) {
-    struct COFF_symbol_standard_record standard;
-    standard.Name = symbol_table[i].Name;
-    standard.Value = symbol_table[i].Value;
-    STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_UNDEFINED == (int)IMAGE_SYM_UNDEFINED);
-    standard.SectionNumber = symbol_table[i].section;
-    standard.Type = symbol_table[i].is_function == IS_FUNCTION_YES ?
-      kFunctionSymType : kNullSymType;
-    standard.StorageClass = symbol_table[i].is_static == IS_STATIC_YES ?
-      IMAGE_SYM_CLASS_STATIC : IMAGE_SYM_CLASS_EXTERNAL;
-    standard.NumberOfAuxSymbols = 0;
-    databuf_append(d, &standard, sizeof(standard));
-  }
 }
 
 /* TODO: Rename with "win". */
@@ -478,9 +345,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
                             sizeof(struct Section_Header)));
 
   const uint32_t end_of_symbols
-    = uint32_add(end_of_section_headers,
-                 uint32_mul(win_symbols_to_write(f),
-                            sizeof(struct COFF_symbol_standard_record)));
+    = uint32_add(end_of_section_headers, win_symbols_filesize(f));
   const uint32_t strings_size
     = uint32_add(size_to_uint32(f->strings.count), 4);
   STATIC_CHECK(sizeof(strings_size) == 4);
@@ -541,7 +406,7 @@ void objfile_flatten(struct objfile *f, struct databuf **out) {
   CHECK(d->count == end_of_section_headers);
 
   win_append_symbols(d, f->symbol_table, f->symbol_table_count);
-  objfile_flatten_append_all_section_symbols(d, f);
+  win_append_all_section_symbols(d, f);
 
 
   CHECK(d->count == end_of_symbols);

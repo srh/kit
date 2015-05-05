@@ -7,8 +7,10 @@
 #include "util.h"
 
 struct databuf;
+struct objfile;
 struct objfile_relocation;
 struct objfile_section;
+struct objfile_symbol_record;
 
 /* TODO: Section_Header ought to be removed from the header. */
 PACK_PUSH
@@ -45,5 +47,14 @@ void win_append_relocs(struct databuf *d, struct objfile_relocation *relocs,
 void win_write_section_header(
     struct databuf *d, struct objfile_section *s,
     uint32_t start_of_raw, uint32_t Characteristics);
+
+uint32_t win_symbols_to_write(struct objfile *f);
+uint32_t win_symbols_filesize(struct objfile *f);
+void win_append_all_section_symbols(struct databuf *d,
+                                    struct objfile *f);
+
+void win_append_symbols(struct databuf *d,
+                        struct objfile_symbol_record *symbol_table,
+                        size_t symbol_table_count);
 
 #endif /* KIT_OBJFILE_WIN_H_ */

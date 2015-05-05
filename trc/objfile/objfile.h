@@ -25,6 +25,9 @@ enum section {
   SECTION_TEXT = 3,
 };
 
+static const uint32_t kNumberOfSections = 3;
+
+
 void objfile_alloc(struct objfile **p_out);
 void objfile_flatten(struct objfile *f, struct databuf **p_out);
 void objfile_free(struct objfile **p_ref);

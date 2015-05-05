@@ -68,6 +68,23 @@ struct objfile_symbol_record {
   enum is_static is_static;
 };
 
+struct objfile {
+  struct objfile_section data;
+  struct objfile_section rdata;
+  struct objfile_section text;
+
+  struct objfile_symbol_record *symbol_table;
+  size_t symbol_table_count;
+  size_t symbol_table_limit;
+
+  /* strings does not include the 4-byte size field that would exist
+  at the beginning of the strings table (which immediately follows the
+  symbol table on disk).  Its value will be strings.count + 4 (because
+  it accounts for its own size usage).  Following the size field is a
+  concatenation of null-terminated strings. */
+  struct databuf strings;
+};
+
 size_t objfile_section_raw_size(struct objfile_section *s);
 uint16_t objfile_section_small_relocations_count(struct objfile_section *s);
 
