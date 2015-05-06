@@ -4407,7 +4407,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
   case STATIC_VALUE_I32: {
     STATIC_CHECK(sizeof(value->u.i32_value) == 4);
     objfile_section_align_dword(objfile_data(f));
-    objfile_set_symbol_Value(f, di_symbol_table_index(inst),
+    objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
     objfile_section_append_raw(objfile_data(f),
                                &value->u.i32_value,
@@ -4417,7 +4417,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
   case STATIC_VALUE_U32: {
     STATIC_CHECK(sizeof(value->u.u32_value) == 4);
     objfile_section_align_dword(objfile_data(f));
-    objfile_set_symbol_Value(f, di_symbol_table_index(inst),
+    objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
     objfile_section_append_raw(objfile_data(f),
                                &value->u.u32_value,
@@ -4427,7 +4427,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
   case STATIC_VALUE_U8: {
     /* TODO: How should we align our global bytes? */
     objfile_section_align_dword(objfile_data(f));
-    objfile_set_symbol_Value(f, di_symbol_table_index(inst),
+    objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
     uint8_t bytes[4] = { 0 };
     bytes[0] = value->u.u8_value;
@@ -4437,7 +4437,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
   case STATIC_VALUE_BOOL: {
     /* TODO: How should we align our global bytes? */
     objfile_section_align_dword(objfile_data(f));
-    objfile_set_symbol_Value(f, di_symbol_table_index(inst),
+    objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
     uint8_t bytes[4] = { 0 };
     CHECK(value->u.bool_value == 0 || value->u.bool_value == 1);
@@ -4447,8 +4447,8 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
   } break;
   case STATIC_VALUE_LAMBDA: {
     objfile_fillercode_align_double_quadword(f);
-    objfile_set_symbol_Value(f, di_symbol_table_index(inst),
-                            objfile_section_size(objfile_text(f)));
+    objfile_set_symbol_value(f, di_symbol_table_index(inst),
+                             objfile_section_size(objfile_text(f)));
 
     return gen_lambda_expr(cs, f, &value->u.typechecked_lambda);
   } break;

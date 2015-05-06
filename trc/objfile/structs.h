@@ -62,7 +62,7 @@ struct objfile_symbol_record {
   /* WINDOWS-specific?  Either a short name or an offset into a
   strings table. */
   union name_eight Name;
-  uint32_t Value;
+  uint32_t value;
   enum objfile_symbol_section section;
   enum is_function is_function;
   enum is_static is_static;

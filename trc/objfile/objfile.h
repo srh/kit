@@ -51,14 +51,14 @@ void objfile_section_overwrite_raw(struct objfile_section *s,
 void objfile_section_align_dword(struct objfile_section *s);
 void objfile_fillercode_align_double_quadword(struct objfile *f);
 
-void objfile_set_symbol_Value(struct objfile *f,
+void objfile_set_symbol_value(struct objfile *f,
                               uint32_t SymbolTableIndex,
-                              uint32_t Value);
+                              uint32_t value);
 
 uint32_t objfile_add_local_symbol(struct objfile *f,
                                   const uint8_t *name,
                                   size_t name_count,
-                                  uint32_t Value,
+                                  uint32_t value,
                                   enum section section,
                                   enum is_static is_static);
 

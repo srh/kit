@@ -164,13 +164,13 @@ void munge_to_Name(struct objfile *f,
 uint32_t objfile_add_local_symbol(struct objfile *f,
                                   const uint8_t *name,
                                   size_t name_count,
-                                  uint32_t Value,
+                                  uint32_t value,
                                   enum section section,
                                   enum is_static is_static) {
   uint32_t ret = size_to_uint32(f->symbol_table_count);
   struct objfile_symbol_record rec;
   munge_to_Name(f, name, name_count, &rec.Name);
-  rec.Value = Value;
+  rec.value = value;
   STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_DATA == (int)SECTION_DATA);
   STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_RDATA == (int)SECTION_RDATA);
   STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_TEXT == (int)SECTION_TEXT);
@@ -188,7 +188,7 @@ uint32_t objfile_add_remote_symbol(struct objfile *f,
   uint32_t ret = size_to_uint32(f->symbol_table_count);
   struct objfile_symbol_record rec;
   munge_to_Name(f, name, name_count, &rec.Name);
-  rec.Value = 0;
+  rec.value = 0;
   rec.section = OBJFILE_SYMBOL_SECTION_UNDEFINED;
   rec.is_function = is_function;
   rec.is_static = IS_STATIC_NO;
@@ -218,14 +218,14 @@ void objfile_fillercode_align_double_quadword(struct objfile *f) {
   append_fillercode_to_align(&f->text.raw, 16);
 }
 
-void objfile_set_symbol_Value(struct objfile *f,
+void objfile_set_symbol_value(struct objfile *f,
                               uint32_t SymbolTableIndex,
-                              uint32_t Value) {
+                              uint32_t value) {
   CHECK(SymbolTableIndex < f->symbol_table_count);
   /* We should only be assigning this once, I think -- and we set it
   to zero before assigning it. */
-  CHECK(f->symbol_table[SymbolTableIndex].Value == 0);
-  f->symbol_table[SymbolTableIndex].Value = Value;
+  CHECK(f->symbol_table[SymbolTableIndex].value == 0);
+  f->symbol_table[SymbolTableIndex].value = value;
 }
 
 void objfile_section_append_32bit_reloc(struct objfile_section *s,

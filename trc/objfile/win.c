@@ -292,7 +292,7 @@ void win_append_symbols(struct databuf *d,
   for (size_t i = 0; i < symbol_table_count; i++) {
     struct COFF_symbol_standard_record standard;
     standard.Name = symbol_table[i].Name;
-    standard.Value = symbol_table[i].Value;
+    standard.Value = symbol_table[i].value;
     STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_UNDEFINED == (int)IMAGE_SYM_UNDEFINED);
     standard.SectionNumber = symbol_table[i].section;
     standard.Type = symbol_table[i].is_function == IS_FUNCTION_YES ?
