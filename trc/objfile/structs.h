@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "databuf.h"
+#include "identmap.h"
 #include "objfile/objfile.h"
 #include "util.h"
 
@@ -59,9 +60,7 @@ union name_eight {
 PACK_POP
 
 struct objfile_symbol_record {
-  /* WINDOWS-specific?  Either a short name or an offset into a
-  strings table. */
-  union name_eight Name;
+  ident_value name;
   uint32_t value;
   enum objfile_symbol_section section;
   enum is_function is_function;
@@ -76,14 +75,6 @@ struct objfile {
   struct objfile_symbol_record *symbol_table;
   size_t symbol_table_count;
   size_t symbol_table_limit;
-
-  /* strings does not include the 4-byte size field (WINDOWS) or the
-  null byte (LINUX) that would exist at the beginning of the strings
-  table (which immediately follows the symbol table on disk).  Its
-  value will be strings.count + 4 (because it accounts for its own
-  size usage).  Following the size field is a concatenation of
-  null-terminated strings. */
-  struct databuf strings;
 };
 
 size_t objfile_section_raw_size(struct objfile_section *s);

@@ -108,6 +108,19 @@ uint32_t strtab_append_c_str(struct databuf *d, const char *s) {
   return ret;
 }
 
+uint32_t strtab_add(struct databuf *d, const void *buf, size_t count) {
+  const uint8_t *ch = buf;
+  STATIC_CHECK(sizeof(uint8_t) == 1);
+  for (size_t i = 0; i < count; i++) {
+    CHECK(ch[i] != 0);
+  }
+  uint32_t ret = size_to_uint32(d->count);
+  databuf_append(d, buf, count);
+  databuf_append(d, "\0", 1);
+  return ret;
+}
+
+/* TODO: No, use append_zeros_to_align. */
 void pad_to_size(struct databuf *d, uint8_t value, size_t size) {
   CHECK(d->count <= size);
   while (d->count < size) {
@@ -143,7 +156,7 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
     = uint32_add(sh_strtab_offset, sh_strtab.count);
 
   /* Add 1 for leading, 1 for trailing nul. */
-  const uint32_t sym_strtab_size = uint32_add(f->strings.count, 2);
+  const uint32_t sym_strtab_size = 0;  /* TODO: uint32_add(f->strings.count, 2); */
   const uint32_t sym_strtab_end = uint32_add(sym_strtab_offset, sym_strtab_size);
 
   /* I don't know, align it to 8. */
@@ -256,11 +269,14 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
   databuf_destroy(&sh_strtab);
 
   /* Append symbol string table. */
+  /* TODO */
+#if 0
   CHECK(d->count == sym_strtab_offset);
   databuf_append(d, "\0", 1);
   databuf_append(d, f->strings.buf, f->strings.count);
   databuf_append(d, "\0", 1);
   CHECK(d->count == sym_strtab_end);
+#endif /* 0 */
 
   pad_to_size(d, 0, uint32_to_size(symtab_offset));
 

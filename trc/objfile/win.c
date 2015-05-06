@@ -286,24 +286,6 @@ uint32_t win_symbols_filesize(struct objfile *f) {
                     sizeof(struct COFF_symbol_standard_record));
 }
 
-void win_append_symbols(struct databuf *d,
-                        struct objfile_symbol_record *symbol_table,
-                        size_t symbol_table_count) {
-  for (size_t i = 0; i < symbol_table_count; i++) {
-    struct COFF_symbol_standard_record standard;
-    standard.Name = symbol_table[i].Name;
-    standard.Value = symbol_table[i].value;
-    STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_UNDEFINED == (int)IMAGE_SYM_UNDEFINED);
-    standard.SectionNumber = symbol_table[i].section;
-    standard.Type = symbol_table[i].is_function == IS_FUNCTION_YES ?
-      kFunctionSymType : kNullSymType;
-    standard.StorageClass = symbol_table[i].is_static == IS_STATIC_YES ?
-      IMAGE_SYM_CLASS_STATIC : IMAGE_SYM_CLASS_EXTERNAL;
-    standard.NumberOfAuxSymbols = 0;
-    databuf_append(d, &standard, sizeof(standard));
-  }
-}
-
 void win_append_all_section_symbols(struct databuf *d,
                                     struct objfile *f) {
   win_append_section_symbols(d, &f->data, 1);
@@ -375,7 +357,79 @@ void win_write_section_header(
   databuf_append(d, &h, sizeof(h));
 }
 
-void win_flatten(struct objfile *f, struct databuf **out) {
+/* Checks that name doesn't have any null characters (it must be
+null-terminatable), and that it's non-empty (the first four bytes of a
+Name field can't be zero). */
+int is_valid_for_Name(const uint8_t *name, size_t name_count) {
+  if (name_count == 0) {
+    return 0;
+  }
+  for (size_t i = 0; i < name_count; i++) {
+    if (name[i] == 0) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+void win_write_symbols_and_strings(struct identmap *im,
+                                   struct objfile *f,
+                                   struct databuf **symbols_out,
+                                   struct databuf **strings_out) {
+  struct databuf *symbols = malloc(sizeof(*symbols));
+  CHECK(symbols);
+  databuf_init(symbols);
+  struct databuf *strings = malloc(sizeof(*strings));
+  CHECK(strings);
+  databuf_init(strings);
+
+  /* We start off with a 32-bit size field. */
+  databuf_append(strings, "\0\0\0\0", 4);
+
+  struct objfile_symbol_record *symbol_table = f->symbol_table;
+
+  for (size_t i = 0, e = f->symbol_table_count; i < e; i++) {
+    struct COFF_symbol_standard_record standard;
+    ident_value name = symbol_table[i].name;
+    const void *name_buf;
+    size_t name_count;
+    identmap_lookup(im, name, &name_buf, &name_count);
+
+    CHECK(is_valid_for_Name(name_buf, name_count));
+    if (name_count <= 8) {
+      STATIC_CHECK(sizeof(standard.Name.ShortName) == 8);
+      memset(standard.Name.ShortName, 0, 8);
+      memcpy(standard.Name.ShortName, name_buf, name_count);
+    } else {
+      /* The offset includes the leading 4 bytes -- the minimimum
+         possible offset is 4. */
+      uint32_t offset = strtab_add(strings, name_buf, name_count);
+      standard.Name.LongName.Zeroes = 0;
+      standard.Name.LongName.Offset = offset;
+    }
+
+    standard.Value = symbol_table[i].value;
+    STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_UNDEFINED == (int)IMAGE_SYM_UNDEFINED);
+    standard.SectionNumber = symbol_table[i].section;
+    standard.Type = symbol_table[i].is_function == IS_FUNCTION_YES ?
+      kFunctionSymType : kNullSymType;
+    standard.StorageClass = symbol_table[i].is_static == IS_STATIC_YES ?
+      IMAGE_SYM_CLASS_STATIC : IMAGE_SYM_CLASS_EXTERNAL;
+    standard.NumberOfAuxSymbols = 0;
+    databuf_append(symbols, &standard, sizeof(standard));
+  }
+
+  win_append_all_section_symbols(symbols, f);
+
+  const uint32_t strings_size = size_to_uint32(strings->count);
+  STATIC_CHECK(sizeof(strings_size) == 4);
+  databuf_overwrite(strings, 0, &strings_size, 4);
+
+  *symbols_out = symbols;
+  *strings_out = strings;
+}
+
+void win_flatten(struct identmap *im, struct objfile *f, struct databuf **out) {
   STATIC_CHECK(LITTLE_ENDIAN);
   struct databuf *d = malloc(sizeof(*d));
   CHECK(d);
@@ -387,12 +441,13 @@ void win_flatten(struct objfile *f, struct databuf **out) {
                  uint32_mul(kNumberOfSections,
                             sizeof(struct Section_Header)));
 
+  struct databuf *symbols;
+  struct databuf *strings;
+  win_write_symbols_and_strings(im, f, &symbols, &strings);
+
   const uint32_t end_of_symbols
-    = uint32_add(end_of_section_headers, win_symbols_filesize(f));
-  const uint32_t strings_size
-    = uint32_add(size_to_uint32(f->strings.count), 4);
-  STATIC_CHECK(sizeof(strings_size) == 4);
-  const uint32_t end_of_strings = uint32_add(end_of_symbols, strings_size);
+    = uint32_add(end_of_section_headers, symbols->count);
+  const uint32_t end_of_strings = uint32_add(end_of_symbols, strings->count);
   const uint32_t ceil_end_of_strings
     = uint32_ceil_aligned(end_of_strings, WIN_SECTION_ALIGNMENT);
 
@@ -447,14 +502,15 @@ void win_flatten(struct objfile *f, struct databuf **out) {
                            text_section_characteristics());
   CHECK(d->count == end_of_section_headers);
 
-  win_append_symbols(d, f->symbol_table, f->symbol_table_count);
-  win_append_all_section_symbols(d, f);
-
+  databuf_append(d, symbols->buf, symbols->count);
+  databuf_destroy(symbols);
+  free(symbols);
 
   CHECK(d->count == end_of_symbols);
-  STATIC_CHECK(sizeof(strings_size) == 4);
-  databuf_append(d, &strings_size, sizeof(strings_size));
-  databuf_append(d, f->strings.buf, f->strings.count);
+
+  databuf_append(d, strings->buf, strings->count);
+  databuf_destroy(strings);
+  free(strings);
   CHECK(d->count == end_of_strings);
 
   append_zeros_to_align(d, WIN_SECTION_ALIGNMENT);

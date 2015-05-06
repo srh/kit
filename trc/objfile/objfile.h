@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "identmap.h"
+
 struct databuf;
 struct objfile;
 struct objfile_section;
@@ -34,9 +36,6 @@ struct objfile_section *objfile_text(struct objfile *f);
 
 uint32_t objfile_section_size(struct objfile_section *s);
 
-uint32_t objfile_add_string(struct objfile *f,
-                            const void *string, size_t string_size);
-
 void objfile_section_append_dir32(struct objfile_section *s,
                                   uint32_t SymbolTableIndex);
 void objfile_section_append_dir32nb(struct objfile_section *s,
@@ -56,15 +55,13 @@ void objfile_set_symbol_value(struct objfile *f,
                               uint32_t value);
 
 uint32_t objfile_add_local_symbol(struct objfile *f,
-                                  const uint8_t *name,
-                                  size_t name_count,
+                                  ident_value name,
                                   uint32_t value,
                                   enum section section,
                                   enum is_static is_static);
 
 uint32_t objfile_add_remote_symbol(struct objfile *f,
-                                   const uint8_t *name,
-                                   size_t name_count,
+                                   ident_value name,
                                    enum is_function is_function);
 
 int objfile_c_symbol_name(const void *name, size_t name_count,
@@ -72,5 +69,7 @@ int objfile_c_symbol_name(const void *name, size_t name_count,
 
 /* Utility. */
 void append_zeros_to_align(struct databuf *d, size_t alignment);
+/* TODO: Move impl from linux.c. */
+uint32_t strtab_add(struct databuf *d, const void *buf, size_t count);
 
 #endif /* KIT_OBJFILE_OBJFILE_H_ */

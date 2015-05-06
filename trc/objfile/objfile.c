@@ -46,8 +46,6 @@ void objfile_init(struct objfile *f) {
   f->symbol_table = NULL;
   f->symbol_table_count = 0;
   f->symbol_table_limit = 0;
-
-  databuf_init(&f->strings);
 }
 
 void objfile_destroy(struct objfile *f) {
@@ -59,8 +57,6 @@ void objfile_destroy(struct objfile *f) {
   f->symbol_table = NULL;
   f->symbol_table_count = 0;
   f->symbol_table_limit = 0;
-
-  databuf_destroy(&f->strings);
 }
 
 void objfile_alloc(struct objfile **p_out) {
@@ -114,62 +110,14 @@ void append_zeros_to_align(struct databuf *d, size_t alignment) {
   }
 }
 
-/* Checks that name doesn't have any null characters (it must be
-null-terminatable), and that it's non-empty (the first four bytes of a
-Name field can't be zero). */
-int is_valid_for_Name(const uint8_t *name, size_t name_count) {
-  if (name_count == 0) {
-    return 0;
-  }
-  for (size_t i = 0; i < name_count; i++) {
-    if (name[i] == 0) {
-      return 0;
-    }
-  }
-  return 1;
-}
-
-uint32_t objfile_add_string(struct objfile *f,
-                            const void *string, size_t string_count) {
-  const uint8_t *ch = string;
-  STATIC_CHECK(sizeof(uint8_t) == 1);
-  for (size_t i = 0; i < string_count; i++) {
-    CHECK(ch[i] != 0);
-  }
-  /* The docs say we want an offset into the strings table -- that
-  offset includes the leading 4 size bytes, which means the minimum
-  possible offset is 4. */
-  uint32_t ret = uint32_add(size_to_uint32(f->strings.count), 4);
-  databuf_append(&f->strings, string, string_count);
-  databuf_append(&f->strings, "\0", 1);
-  return ret;
-}
-
-void munge_to_Name(struct objfile *f,
-                   const uint8_t *name,
-                   size_t name_count,
-                   union name_eight *Name_out) {
-  CHECK(is_valid_for_Name(name, name_count));
-  if (name_count <= 8) {
-    STATIC_CHECK(sizeof(Name_out->ShortName) == 8);
-    memset(Name_out->ShortName, 0, 8);
-    memcpy(Name_out->ShortName, name, name_count);
-  } else {
-    uint32_t offset = objfile_add_string(f, name, name_count);
-    Name_out->LongName.Zeroes = 0;
-    Name_out->LongName.Offset = offset;
-  }
-}
-
 uint32_t objfile_add_local_symbol(struct objfile *f,
-                                  const uint8_t *name,
-                                  size_t name_count,
+                                  ident_value name,
                                   uint32_t value,
                                   enum section section,
                                   enum is_static is_static) {
   uint32_t ret = size_to_uint32(f->symbol_table_count);
   struct objfile_symbol_record rec;
-  munge_to_Name(f, name, name_count, &rec.Name);
+  rec.name = name;
   rec.value = value;
   STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_DATA == (int)SECTION_DATA);
   STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_RDATA == (int)SECTION_RDATA);
@@ -182,12 +130,11 @@ uint32_t objfile_add_local_symbol(struct objfile *f,
 }
 
 uint32_t objfile_add_remote_symbol(struct objfile *f,
-                                   const uint8_t *name,
-                                   size_t name_count,
+                                   ident_value name,
                                    enum is_function is_function) {
   uint32_t ret = size_to_uint32(f->symbol_table_count);
   struct objfile_symbol_record rec;
-  munge_to_Name(f, name, name_count, &rec.Name);
+  rec.name = name;
   rec.value = 0;
   rec.section = OBJFILE_SYMBOL_SECTION_UNDEFINED;
   rec.is_function = is_function;

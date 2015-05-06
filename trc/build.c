@@ -191,7 +191,8 @@ uint32_t add_data_string(struct checkstate *cs, struct objfile *f,
     }
 
     uint32_t symbol_table_index
-      = objfile_add_local_symbol(f, gen_name, gen_name_count,
+      = objfile_add_local_symbol(f,
+                                 identmap_intern(cs->im, gen_name, gen_name_count),
                                  objfile_section_size(objfile_data(f)),
                                  SECTION_DATA,
                                  IS_STATIC_YES);
@@ -231,7 +232,7 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
       }
 
       uint32_t symbol_table_index
-        = objfile_add_remote_symbol(f, c_name, c_name_count,
+        = objfile_add_remote_symbol(f, identmap_intern(cs->im, c_name, c_name_count),
                                     typeexpr_is_func_type(cs->im, &ent->type) ?
                                     IS_FUNCTION_YES : IS_FUNCTION_NO);
       free(c_name);
@@ -260,7 +261,7 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
     /* We later overwrite the symbol's value (we write zero here). */
     /* No defs are put in a read-only section... for now. */
     uint32_t symbol_table_index
-      = objfile_add_local_symbol(f, gen_name, gen_name_count,
+      = objfile_add_local_symbol(f, identmap_intern(cs->im, gen_name, gen_name_count),
                                  0 /* We'll overwrite the value later. */,
                                  typeexpr_is_func_type(cs->im, &ent->type) ?
                                  SECTION_TEXT : SECTION_DATA,
@@ -4510,7 +4511,7 @@ int build_module(struct identmap *im,
   if (target_linux32) {
     linux32_flatten(objfile, &databuf);
   } else {
-    win_flatten(objfile, &databuf);
+    win_flatten(cs.im, objfile, &databuf);
   }
 
   void *buf;
