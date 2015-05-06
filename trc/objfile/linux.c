@@ -245,8 +245,7 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
     /* TODO: one greater than the symbol table index of the last local symbol. */
     sh.sh_info = 0;
     sh.sh_addralign = 0;
-    /* TODO: entsize. */
-    sh.sh_entsize = 0;
+    sh.sh_entsize = sizeof(struct elf32_Symtab_Entry);
     databuf_append(d, &sh, sizeof(sh));
   }
 
