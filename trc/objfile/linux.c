@@ -4,14 +4,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arith.h"
 #include "databuf.h"
 #include "util.h"
 
-enum { ELF_NIDENT = 16 };
+enum { kEI_NIDENT = 16 };
 
 PACK_PUSH
 struct elf32_Header {
-  uint8_t e_ident[ELF_NIDENT];
+  uint8_t e_ident[kEI_NIDENT];
   /* Type: Relocatable, executable, etc. */
   uint16_t e_type;
   /* Machine: 386, amd64, etc. */
@@ -85,7 +86,14 @@ enum {
   kET_REL = 1,
   kEM_386 = 3,
   kSHT_NULL = 0,
+  kSHT_STRTAB = 3,
 };
+
+uint32_t strtab_append_c_str(struct databuf *d, const char *s) {
+  uint32_t ret = size_to_uint32(d->count);
+  databuf_append(d, s, strlen(s) + 1);
+  return ret;
+}
 
 void linux32_flatten(struct objfile *f, struct databuf **out) {
   (void)f;  /* TODO */
@@ -93,7 +101,19 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
   CHECK(d);
   databuf_init(d);
 
-  uint32_t section_header_offset = sizeof(struct elf32_Header);
+  const uint32_t section_header_offset = sizeof(struct elf32_Header);
+  const uint32_t kNumSectionHeaders = 2;
+  const uint32_t end_of_section_headers
+    = uint32_add(section_header_offset,
+                 kNumSectionHeaders * sizeof(struct elf32_Section_Header));
+  const uint32_t sh_string_table_offset = end_of_section_headers;
+
+  struct databuf sh_strtab;
+  databuf_init(&sh_strtab);
+  strtab_append_c_str(&sh_strtab, "");
+  const uint32_t dot_shstrtab_index = strtab_append_c_str(&sh_strtab,
+                                                          ".shstrtab");
+  strtab_append_c_str(&sh_strtab, "");
 
   {
     struct elf32_Header h;
@@ -107,7 +127,7 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
     h.e_ident[7] = 0;  /* kELFOSABI_LINUX; */
     h.e_ident[8] = 0;  /* EI_ABIVERSION (= 8): must use zero. */
     /* padding */
-    memset(h.e_ident + 9, 0, ELF_NIDENT - 9);
+    memset(h.e_ident + 9, 0, kEI_NIDENT - 9);
 
     h.e_type = kET_REL;
     h.e_machine = kEM_386;
@@ -120,18 +140,15 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
     h.e_phentsize = 0;
     h.e_phnum = 0;
     h.e_shentsize = sizeof(struct elf32_Section_Header);
-    /* TODO: The number of entries in the secton header table. */
-    h.e_shnum = 1;
-    /* TODO: Section header table index of the entry associated with
-    the section name string table.  (What's a section name string
-    table?  Just for section names?) */
-    h.e_shstrndx = 0;
+    h.e_shnum = kNumSectionHeaders;
+    /* String table section header is at index 1. */
+    h.e_shstrndx = 1;
 
     databuf_append(d, &h, sizeof(h));
   }
 
   {
-    /* Null section header. */
+    /* Null section header (for index 0). */
     struct elf32_Section_Header sh;
     sh.sh_name = 0;
     sh.sh_type = kSHT_NULL;
@@ -145,6 +162,28 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
     sh.sh_entsize = 0;
     databuf_append(d, &sh, sizeof(sh));
   }
+
+  {
+    /* Strings table section header -- index 1. */
+    struct elf32_Section_Header sh;
+    sh.sh_name = dot_shstrtab_index;
+    sh.sh_type = kSHT_STRTAB;
+    sh.sh_flags = 0;
+    sh.sh_addr = 0;
+    sh.sh_offset = sh_string_table_offset;
+    sh.sh_size = sh_strtab.count;
+    sh.sh_link = 0;
+    sh.sh_info = 0;
+    sh.sh_addralign = 0;
+    sh.sh_entsize = 0;
+    databuf_append(d, &sh, sizeof(sh));
+  }
+
+  /* Section headers done -- append string table. */
+  CHECK(d->count == sh_string_table_offset);
+  databuf_append(d, sh_strtab.buf, sh_strtab.count);
+
+  databuf_destroy(&sh_strtab);
 
   *out = d;
 }

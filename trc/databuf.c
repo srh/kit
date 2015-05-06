@@ -49,6 +49,7 @@ void databuf_append_c_str(struct databuf *b, const char *s) {
   databuf_append(b, s, strlen(s));
 }
 
+
 void databuf_overwrite(struct databuf *b, size_t offset,
                        const void *p, size_t count) {
   CHECK(size_add(offset, count) <= b->count);

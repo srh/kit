@@ -77,11 +77,12 @@ struct objfile {
   size_t symbol_table_count;
   size_t symbol_table_limit;
 
-  /* strings does not include the 4-byte size field that would exist
-  at the beginning of the strings table (which immediately follows the
-  symbol table on disk).  Its value will be strings.count + 4 (because
-  it accounts for its own size usage).  Following the size field is a
-  concatenation of null-terminated strings. */
+  /* strings does not include the 4-byte size field (WINDOWS) or the
+  null byte (LINUX) that would exist at the beginning of the strings
+  table (which immediately follows the symbol table on disk).  Its
+  value will be strings.count + 4 (because it accounts for its own
+  size usage).  Following the size field is a concatenation of
+  null-terminated strings. */
   struct databuf strings;
 };
 
