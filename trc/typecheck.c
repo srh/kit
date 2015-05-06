@@ -1475,10 +1475,13 @@ int check_typeexpr_name_traits(struct checkstate *cs,
                                       &traits,
                                       &trait_insts);
     if (ret) {
-      inst->has_typeexpr_traits = 1;
-      inst->typeexpr_traits = traits;
-      inst->explicit_trait_instantiations = trait_insts;
-      ast_deftype_rhs_init_copy(&inst->concrete_rhs, &ent->deftype->rhs);
+      /* Maybe recursive typechecking already cached the traits... */
+      if (!inst->has_typeexpr_traits) {
+        inst->has_typeexpr_traits = 1;
+        inst->typeexpr_traits = traits;
+        inst->explicit_trait_instantiations = trait_insts;
+        ast_deftype_rhs_init_copy(&inst->concrete_rhs, &ent->deftype->rhs);
+      }
       *out = traits;
       *insts_out = trait_insts;
     }
@@ -1558,10 +1561,15 @@ int check_typeexpr_app_traits(struct checkstate *cs,
                                       &traits,
                                       &trait_insts);
     if (ret) {
-      inst->has_typeexpr_traits = 1;
-      inst->typeexpr_traits = traits;
-      inst->explicit_trait_instantiations = trait_insts;
-      inst->concrete_rhs = concrete_deftype_rhs;
+      if (inst->has_typeexpr_traits) {
+        /* Recursive typechecking already applied the traits... */
+        ast_deftype_rhs_destroy(&concrete_deftype_rhs);
+      } else {
+        inst->has_typeexpr_traits = 1;
+        inst->typeexpr_traits = traits;
+        inst->explicit_trait_instantiations = trait_insts;
+        inst->concrete_rhs = concrete_deftype_rhs;
+      }
       *out = traits;
       *insts_out = trait_insts;
     } else {
