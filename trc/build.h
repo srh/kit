@@ -3,7 +3,7 @@
 
 #include "typecheck.h"
 
-int build_module(struct identmap *im, module_loader *loader,
-                 ident_value name);
+int build_module(struct identmap *im, int target_linux32,
+                 module_loader *loader, ident_value name);
 
 #endif /* KIT_BUILD_H_ */

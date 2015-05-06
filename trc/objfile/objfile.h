@@ -26,7 +26,6 @@ enum section {
 };
 
 void objfile_alloc(struct objfile **p_out);
-void objfile_flatten(struct objfile *f, struct databuf **p_out);
 void objfile_free(struct objfile **p_ref);
 
 struct objfile_section *objfile_data(struct objfile *f);

@@ -196,12 +196,6 @@ uint32_t objfile_add_remote_symbol(struct objfile *f,
   return ret;
 }
 
-/* TODO: Remove -- somewhere we decide whether to call win_flatten or
-   whatnot. */
-void objfile_flatten(struct objfile *f, struct databuf **out) {
-  win_flatten(f, out);
-}
-
 void objfile_section_append_raw(struct objfile_section *s,
                                 const void *buf, size_t n) {
   databuf_append(&s->raw, buf, n);

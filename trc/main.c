@@ -25,16 +25,30 @@ int run_tests(void) {
   return ret && ret2;
 }
 
+void print_usage(const char *arg0) {
+  fprintf(stderr, "Usage: %s <filename>\n", arg0);
+  fflush(stderr);
+}
+
 int main(int argc, char **argv) {
-  if (argc != 2) {
-    fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
-    fflush(stderr);
-    return EXIT_FAILURE;
+  int test = 0;
+  int linux = 0;
+  const char *module = NULL;
+  for (int i = 1; i < argc; i++) {
+    if (test || module) {
+      print_usage(argv[0]);
+      return EXIT_FAILURE;
+    }
+    if (0 == strcmp(argv[i], "--test")) {
+      test = 1;
+    } else if (0 == strcmp(argv[i], "--linux")) {
+      linux = 1;
+    } else {
+      module = argv[i];
+    }
   }
 
-  const char *module = argv[1];
-
-  if (0 == strcmp(module, "--test")) {
+  if (test) {
     return run_tests();
   }
 
@@ -43,7 +57,7 @@ int main(int argc, char **argv) {
   struct identmap im;
   identmap_init(&im);
   ident_value ident_module = identmap_intern(&im, module, strlen(module));
-  if (!build_module(&im, &read_module_file, ident_module)) {
+  if (!build_module(&im, linux, &read_module_file, ident_module)) {
     goto cleanup_im;
   }
 

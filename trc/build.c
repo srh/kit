@@ -10,6 +10,8 @@
 #include "io.h"
 #include "slice.h"
 #include "objfile/objfile.h"
+#include "objfile/linux.h"
+#include "objfile/win.h"
 #include "x86.h"
 
 struct expr_return;
@@ -4474,7 +4476,9 @@ int build_def(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-int build_module(struct identmap *im, module_loader *loader,
+int build_module(struct identmap *im,
+                 int target_linux32,
+                 module_loader *loader,
                  ident_value name) {
   int ret = 0;
   struct checkstate cs;
@@ -4503,7 +4507,11 @@ int build_module(struct identmap *im, module_loader *loader,
   }
 
   struct databuf *databuf = NULL;
-  objfile_flatten(objfile, &databuf);
+  if (target_linux32) {
+    linux32_flatten(objfile, &databuf);
+  } else {
+    win_flatten(objfile, &databuf);
+  }
 
   void *buf;
   size_t buf_size;
@@ -4515,7 +4523,7 @@ int build_module(struct identmap *im, module_loader *loader,
   identmap_lookup(im, name, &name_buf, &name_count);
   char *path;
   size_t path_count;
-  alloc_half_strcat(name_buf, name_count, ".obj",
+  alloc_half_strcat(name_buf, name_count, target_linux32 ? ".o" : ".obj",
                     &path, &path_count);
   if (!write_file(path, buf, buf_size)) {
     goto cleanup_path_and_buf;
