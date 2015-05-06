@@ -84,6 +84,7 @@ enum {
   kELFOSABI_LINUX = 3,
   kET_REL = 1,
   kEM_386 = 3,
+  kSHT_NULL = 0,
 };
 
 void linux32_flatten(struct objfile *f, struct databuf **out) {
@@ -92,7 +93,7 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
   CHECK(d);
   databuf_init(d);
 
-  /* TODO: uint32_t section_header_offset = sizeof(struct elf32_Header); */
+  uint32_t section_header_offset = sizeof(struct elf32_Header);
 
   {
     struct elf32_Header h;
@@ -113,15 +114,14 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
     h.e_version = kEV_CURRENT;
     h.e_entry = 0;
     h.e_phoff = 0;
-    h.e_shoff = 0; /* TODO: section_header_offset; */
+    h.e_shoff = section_header_offset;
     h.e_flags = 0;
     h.e_ehsize = sizeof(h);
     h.e_phentsize = 0;
     h.e_phnum = 0;
-    /* TODO: This should be the size of a section header. */
-    h.e_shentsize = 0;
+    h.e_shentsize = sizeof(struct elf32_Section_Header);
     /* TODO: The number of entries in the secton header table. */
-    h.e_shnum = 0;
+    h.e_shnum = 1;
     /* TODO: Section header table index of the entry associated with
     the section name string table.  (What's a section name string
     table?  Just for section names?) */
@@ -130,7 +130,21 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
     databuf_append(d, &h, sizeof(h));
   }
 
-  /* Section header goes here. */
+  {
+    /* Null section header. */
+    struct elf32_Section_Header sh;
+    sh.sh_name = 0;
+    sh.sh_type = kSHT_NULL;
+    sh.sh_flags = 0;
+    sh.sh_addr = 0;
+    sh.sh_offset = 0;
+    sh.sh_size = 0;
+    sh.sh_link = 0;
+    sh.sh_info = 0;
+    sh.sh_addralign = 0;
+    sh.sh_entsize = 0;
+    databuf_append(d, &sh, sizeof(sh));
+  }
 
   *out = d;
 }
