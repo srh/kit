@@ -6,6 +6,7 @@
 
 #include "arith.h"
 #include "databuf.h"
+#include "objfile/structs.h"
 #include "util.h"
 
 enum { kEI_NIDENT = 16 };
@@ -78,6 +79,17 @@ struct elf32_Section_Header {
 };
 PACK_POP
 
+PACK_PUSH
+struct elf32_Symtab_Entry {
+  uint32_t st_name;
+  uint32_t st_value;
+  uint32_t st_size;
+  uint8_t st_info;
+  uint8_t st_other;
+  uint16_t st_shndx;
+};
+PACK_POP
+
 enum {
   kELFCLASS32 = 1,
   kELFDATA2LSB = 1,
@@ -87,12 +99,20 @@ enum {
   kEM_386 = 3,
   kSHT_NULL = 0,
   kSHT_STRTAB = 3,
+  kSHT_SYMTAB = 2,
 };
 
 uint32_t strtab_append_c_str(struct databuf *d, const char *s) {
   uint32_t ret = size_to_uint32(d->count);
   databuf_append(d, s, strlen(s) + 1);
   return ret;
+}
+
+void pad_to_size(struct databuf *d, uint8_t value, size_t size) {
+  CHECK(d->count <= size);
+  while (d->count < size) {
+    databuf_append(d, &value, 1);
+  }
 }
 
 void linux32_flatten(struct objfile *f, struct databuf **out) {
@@ -102,18 +122,35 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
   databuf_init(d);
 
   const uint32_t section_header_offset = sizeof(struct elf32_Header);
-  const uint32_t kNumSectionHeaders = 2;
+  const uint32_t kNumSectionHeaders = 4;
   const uint32_t end_of_section_headers
     = uint32_add(section_header_offset,
                  kNumSectionHeaders * sizeof(struct elf32_Section_Header));
-  const uint32_t sh_string_table_offset = end_of_section_headers;
+  const uint32_t sh_strtab_offset = end_of_section_headers;
 
   struct databuf sh_strtab;
   databuf_init(&sh_strtab);
   strtab_append_c_str(&sh_strtab, "");
-  const uint32_t dot_shstrtab_index = strtab_append_c_str(&sh_strtab,
-                                                          ".shstrtab");
+  const uint32_t dot_shstrtab_index
+    = strtab_append_c_str(&sh_strtab, ".shstrtab");
+  const uint32_t dot_strtab_index
+    = strtab_append_c_str(&sh_strtab, ".strtab");
+  const uint32_t dot_symtab_index
+    = strtab_append_c_str(&sh_strtab, ".symtab");
   strtab_append_c_str(&sh_strtab, "");
+
+  const uint32_t sym_strtab_offset
+    = uint32_add(sh_strtab_offset, sh_strtab.count);
+
+  /* Add 1 for leading, 1 for trailing nul. */
+  const uint32_t sym_strtab_size = uint32_add(f->strings.count, 2);
+  const uint32_t sym_strtab_end = uint32_add(sym_strtab_offset, sym_strtab_size);
+
+  /* I don't know, align it to 8. */
+  const uint32_t symtab_offset = uint32_ceil_aligned(sym_strtab_end, 8);
+  /* TODO: Compute symbol table size. */
+  const uint32_t symtab_size = 0;
+
 
   {
     struct elf32_Header h;
@@ -170,7 +207,7 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
     sh.sh_type = kSHT_STRTAB;
     sh.sh_flags = 0;
     sh.sh_addr = 0;
-    sh.sh_offset = sh_string_table_offset;
+    sh.sh_offset = sh_strtab_offset;
     sh.sh_size = sh_strtab.count;
     sh.sh_link = 0;
     sh.sh_info = 0;
@@ -179,11 +216,54 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
     databuf_append(d, &sh, sizeof(sh));
   }
 
+  {
+    /* Symbol table strings section header -- index 2. */
+    struct elf32_Section_Header sh;
+    sh.sh_name = dot_strtab_index;
+    sh.sh_type = kSHT_STRTAB;
+    sh.sh_flags = 0;
+    sh.sh_addr = 0;
+    sh.sh_offset = sym_strtab_offset;
+    sh.sh_size = sym_strtab_size;
+    sh.sh_link = 0;
+    sh.sh_info = 0;
+    sh.sh_addralign = 0;
+    sh.sh_entsize = 0;
+    databuf_append(d, &sh, sizeof(sh));
+  }
+
+  {
+    /* Symbol table section header -- index 3. */
+    struct elf32_Section_Header sh;
+    sh.sh_name = dot_symtab_index;
+    sh.sh_type = kSHT_SYMTAB;
+    sh.sh_flags = 0;
+    sh.sh_addr = 0;
+    sh.sh_offset = symtab_offset;
+    sh.sh_size = symtab_size;
+    sh.sh_link = 2;  /* The associated string table's section header index. */
+    /* TODO: one greater than the symbol table index of the last local symbol. */
+    sh.sh_info = 0;
+    sh.sh_addralign = 0;
+    /* TODO: entsize. */
+    sh.sh_entsize = 0;
+    databuf_append(d, &sh, sizeof(sh));
+  }
+
   /* Section headers done -- append string table. */
-  CHECK(d->count == sh_string_table_offset);
+  CHECK(d->count == sh_strtab_offset);
   databuf_append(d, sh_strtab.buf, sh_strtab.count);
 
   databuf_destroy(&sh_strtab);
+
+  /* Append symbol string table. */
+  CHECK(d->count == sym_strtab_offset);
+  databuf_append(d, "\0", 1);
+  databuf_append(d, f->strings.buf, f->strings.count);
+  databuf_append(d, "\0", 1);
+  CHECK(d->count == sym_strtab_end);
+
+  pad_to_size(d, 0, uint32_to_size(symtab_offset));
 
   *out = d;
 }

@@ -101,6 +101,12 @@ uint32_t size_to_uint32(size_t x) {
   return x;
 }
 
+size_t uint32_to_size(uint32_t x) {
+  CHECK(x <= SIZE_MAX);
+  return x;
+}
+
+
 int try_uint8_add(uint8_t x, uint8_t y, uint8_t *out) {
   if (x > UINT8_MAX - y) {
     return 0;
