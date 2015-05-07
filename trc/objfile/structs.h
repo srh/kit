@@ -27,7 +27,6 @@ struct objfile_relocation {
 };
 
 struct objfile_section {
-  char Name[8];
   struct databuf raw;
 
   /* Relavant for .data and .rdata sections.  Not relevant for .text,

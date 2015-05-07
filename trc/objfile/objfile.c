@@ -11,9 +11,7 @@
 #include "slice.h"
 #include "util.h"
 
-void objfile_section_init(struct objfile_section *s, const char Name[8]) {
-  memcpy(s->Name, Name, 8);
-
+void objfile_section_init(struct objfile_section *s) {
   databuf_init(&s->raw);
 
   /* Just start it off with 4, that's good. */
@@ -25,8 +23,6 @@ void objfile_section_init(struct objfile_section *s, const char Name[8]) {
 }
 
 void objfile_section_destroy(struct objfile_section *s) {
-  STATIC_CHECK(sizeof(s->Name) == 8);
-  memset(s->Name, 0, sizeof(s->Name));
   databuf_destroy(&s->raw);
   s->max_requested_alignment = 0;
   free(s->relocs);
@@ -36,12 +32,9 @@ void objfile_section_destroy(struct objfile_section *s) {
 }
 
 void objfile_init(struct objfile *f) {
-  static const char DataName[8] = ".data";
-  objfile_section_init(&f->data, DataName);
-  static const char ReadDataName[8] = ".rdata";
-  objfile_section_init(&f->rdata, ReadDataName);
-  static const char TextName[8] = ".text";
-  objfile_section_init(&f->text, TextName);
+  objfile_section_init(&f->data);
+  objfile_section_init(&f->rdata);
+  objfile_section_init(&f->text);
 
   f->symbol_table = NULL;
   f->symbol_table_count = 0;
