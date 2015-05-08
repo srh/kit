@@ -186,12 +186,6 @@ void objfile_section_append_dir32(struct objfile_section *s,
                                      OBJFILE_RELOCATION_TYPE_DIR32);
 }
 
-void objfile_section_append_dir32nb(struct objfile_section *s,
-                                    uint32_t symbol_table_index) {
-  objfile_section_append_32bit_reloc(s, symbol_table_index,
-                                     OBJFILE_RELOCATION_TYPE_DIR32NB);
-}
-
 void objfile_section_append_rel32(struct objfile_section *s,
                                   uint32_t symbol_table_index) {
   objfile_section_append_32bit_reloc(s, symbol_table_index,

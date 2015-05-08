@@ -90,6 +90,17 @@ struct elf32_Symtab_Entry {
 };
 PACK_POP
 
+PACK_PUSH
+struct elf32_Rela {
+  uint32_t r_offset;
+  uint32_t r_info;
+  int32_t r_addend;
+};
+PACK_POP
+
+/* Seems like a good idea. */
+enum { kRela_Section_Alignment = 4 };
+
 enum {
   kELFCLASS32 = 1,
   kELFDATA2LSB = 1,
@@ -98,8 +109,10 @@ enum {
   kET_REL = 1,
   kEM_386 = 3,
   kSHT_NULL = 0,
-  kSHT_STRTAB = 3,
+  kSHT_PROGBITS = 1,
   kSHT_SYMTAB = 2,
+  kSHT_STRTAB = 3,
+  kSHT_RELA = 4,
   kSTT_OBJECT = 1,
   kSTT_FUNC = 2,
   kSTB_LOCAL = 0,
@@ -108,6 +121,11 @@ enum {
   kLinux32DataSectionNumber = 0, /* TODO */
   kLinux32RodataSectionNumber = 0, /* TODO */
   kLinux32TextSectionNumber = 0, /* TODO */
+  kSHF_WRITE = 1,
+  kSHF_ALLOC = 2,
+  kSHF_EXEC = 4,
+  kR_386_32 = 1,
+  kR_386_PC32 = 2,
 };
 
 uint32_t strtab_append_c_str(struct databuf *d, const char *s) {
@@ -170,7 +188,8 @@ void push_symbol(struct identmap *im, struct objfile_symbol_record *symbol,
 void linux32_write_symbols_and_strings(struct identmap *im, struct objfile *f,
                                        struct databuf **symbols_out,
                                        struct databuf **strings_out,
-                                       uint32_t **sti_map_out) {
+                                       uint32_t **sti_map_out,
+                                       uint32_t *end_locals_out) {
   struct databuf *symbols = malloc(sizeof(*symbols));
   CHECK(symbols);
   databuf_init(symbols);
@@ -207,6 +226,8 @@ void linux32_write_symbols_and_strings(struct identmap *im, struct objfile *f,
     }
   }
 
+  const uint32_t end_locals = symbols_count;
+
   for (size_t i = 0, e = f->symbol_table_count; i < e; i++) {
     if (!symbol_table[i].is_static) {
       push_symbol(im, &symbol_table[i], symbols, strings);
@@ -220,6 +241,72 @@ void linux32_write_symbols_and_strings(struct identmap *im, struct objfile *f,
   *symbols_out = symbols;
   *strings_out = strings;
   *sti_map_out = sti_map;
+  *end_locals_out = end_locals;
+}
+
+enum { kSymTabSectionNumber = 3 };
+
+void linux32_section_headers(uint32_t prev_end_offset,
+                             int sh_out_index,
+                             struct objfile_section *s,
+                             uint32_t sh_strtab_index, uint32_t sh_strtab_rela_index,
+                             uint32_t sh_flags,
+                             struct elf32_Section_Header *sh_out,
+                             struct elf32_Section_Header *rela_out,
+                             uint32_t *end_out) {
+  uint32_t alignment = s->max_requested_alignment;
+  uint32_t sh_offset = uint32_ceil_aligned(prev_end_offset, alignment);
+  uint32_t sh_size = s->raw.count;
+  uint32_t sh_end = uint32_add(sh_offset, sh_size);
+  uint32_t rela_offset = uint32_ceil_aligned(sh_end, kRela_Section_Alignment);
+  uint32_t rela_size = uint32_mul(s->relocs_count, sizeof(struct elf32_Rela));
+  uint32_t rela_end = uint32_add(rela_offset, rela_size);
+
+  sh_out->sh_name = sh_strtab_index;
+  sh_out->sh_type = kSHT_PROGBITS;
+  sh_out->sh_flags = kSHF_ALLOC | sh_flags;
+  sh_out->sh_addr = 0;
+  sh_out->sh_offset = sh_offset;
+  sh_out->sh_size = sh_size;
+  sh_out->sh_link = kSHN_UNDEF;
+  sh_out->sh_info = 0;
+  sh_out->sh_addralign = alignment;
+  sh_out->sh_entsize = 0;
+
+  rela_out->sh_name = sh_strtab_rela_index;
+  rela_out->sh_type = kSHT_RELA;
+  rela_out->sh_flags = 0;
+  rela_out->sh_addr = 0;
+  rela_out->sh_offset = rela_offset;
+  rela_out->sh_size = rela_size;
+  rela_out->sh_link = kSymTabSectionNumber;
+  rela_out->sh_info = sh_out_index;
+  rela_out->sh_addralign = 0;
+  rela_out->sh_entsize = sizeof(struct elf32_Rela);
+
+  *end_out = rela_end;
+}
+
+void linux32_append_relocations(uint32_t *sti_map, size_t sti_map_count,
+                                struct databuf *d, struct objfile_section *s) {
+  struct objfile_relocation *relocs = s->relocs;
+  for (size_t i = 0, e = s->relocs_count; i < e; i++) {
+    struct elf32_Rela rela;
+    rela.r_offset = relocs[i].virtual_address;
+    uint32_t sti = relocs[i].symbol_table_index;
+    CHECK(sti < sti_map_count);
+    uint32_t new_sti = sti_map[sti];
+    CHECK(new_sti <= (UINT32_MAX >> 8));
+    uint32_t rela_types[] = {
+      [OBJFILE_RELOCATION_TYPE_DIR32] = kR_386_32,
+      [OBJFILE_RELOCATION_TYPE_REL32] = kR_386_PC32,
+    };
+
+    uint32_t rela_type = rela_types[relocs[i].type];
+    rela.r_info = (new_sti << 8) | rela_type;
+    rela.r_addend = 0;
+    databuf_append(d, &rela, sizeof(rela));
+  }
 }
 
 void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **out) {
@@ -229,7 +316,7 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   databuf_init(d);
 
   const uint32_t section_header_offset = sizeof(struct elf32_Header);
-  const uint32_t kNumSectionHeaders = 4;
+  const uint32_t kNumSectionHeaders = 10;
   const uint32_t end_of_section_headers
     = uint32_add(section_header_offset,
                  kNumSectionHeaders * sizeof(struct elf32_Section_Header));
@@ -244,16 +331,29 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     = strtab_append_c_str(&sh_strtab, ".strtab");
   const uint32_t dot_symtab_index
     = strtab_append_c_str(&sh_strtab, ".symtab");
+  const uint32_t dot_data_index
+    = strtab_append_c_str(&sh_strtab, ".data");
+  const uint32_t dot_rela_data_index
+    = strtab_append_c_str(&sh_strtab, ".rela.data");
+  const uint32_t dot_rodata_index
+    = strtab_append_c_str(&sh_strtab, ".rodata");
+  const uint32_t dot_rela_rodata_index
+    = strtab_append_c_str(&sh_strtab, ".rela.rodata");
+  const uint32_t dot_text_index
+    = strtab_append_c_str(&sh_strtab, ".text");
+  const uint32_t dot_rela_text_index
+    = strtab_append_c_str(&sh_strtab, ".rela.text");
   strtab_append_c_str(&sh_strtab, "");
 
   const uint32_t sym_strtab_offset
     = uint32_add(sh_strtab_offset, sh_strtab.count);
 
-  /* TODO: Make sure sti_map gets deallocated. */
   struct databuf *symbols;
   struct databuf *strings;
   uint32_t *sti_map;
-  linux32_write_symbols_and_strings(im, f, &symbols, &strings, &sti_map);
+  uint32_t end_local_symbols;
+  linux32_write_symbols_and_strings(im, f, &symbols, &strings, &sti_map,
+                                    &end_local_symbols);
 
   const uint32_t sym_strtab_size = size_to_uint32(strings->count);
   const uint32_t sym_strtab_end
@@ -263,8 +363,36 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   const uint32_t kSymtabAlignment = 16;
   const uint32_t symtab_offset = uint32_ceil_aligned(sym_strtab_end,
                                                      kSymtabAlignment);
-  const uint32_t symtab_size
-    = uint32_add(symtab_offset, size_to_uint32(symbols->count));
+  const uint32_t symtab_size = size_to_uint32(symbols->count);
+
+  const uint32_t symtab_end = uint32_add(symtab_offset, symtab_size);
+
+  struct elf32_Section_Header sh_data;
+  struct elf32_Section_Header sh_rela_data;
+  uint32_t rela_data_end;
+  linux32_section_headers(symtab_end, 4, &f->data,
+                          dot_data_index, dot_rela_data_index,
+                          kSHF_WRITE,
+                          &sh_data, &sh_rela_data,
+                          &rela_data_end);
+
+  struct elf32_Section_Header sh_rodata;
+  struct elf32_Section_Header sh_rela_rodata;
+  uint32_t rela_rodata_end;
+  linux32_section_headers(rela_data_end, 6, &f->rdata,
+                          dot_rodata_index, dot_rela_rodata_index,
+                          0,
+                          &sh_rodata, &sh_rela_rodata,
+                          &rela_rodata_end);
+
+  struct elf32_Section_Header sh_text;
+  struct elf32_Section_Header sh_rela_text;
+  uint32_t rela_text_end;
+  linux32_section_headers(rela_rodata_end, 8, &f->text,
+                          dot_text_index, dot_rela_text_index,
+                          kSHF_EXEC,
+                          &sh_text, &sh_rela_text,
+                          &rela_text_end);
 
   {
     struct elf32_Header h;
@@ -347,6 +475,7 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   }
 
   {
+    STATIC_CHECK(kSymTabSectionNumber == 3);
     /* Symbol table section header -- index 3. */
     struct elf32_Section_Header sh;
     sh.sh_name = dot_symtab_index;
@@ -356,12 +485,18 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     sh.sh_offset = symtab_offset;
     sh.sh_size = symtab_size;
     sh.sh_link = 2;  /* The associated string table's section header index. */
-    /* TODO: one greater than the symbol table index of the last local symbol. */
-    sh.sh_info = 0;
+    sh.sh_info = end_local_symbols;
     sh.sh_addralign = 0;
     sh.sh_entsize = sizeof(struct elf32_Symtab_Entry);
     databuf_append(d, &sh, sizeof(sh));
   }
+
+  databuf_append(d, &sh_data, sizeof(sh_data));
+  databuf_append(d, &sh_rela_data, sizeof(sh_rela_data));
+  databuf_append(d, &sh_rodata, sizeof(sh_rodata));
+  databuf_append(d, &sh_rela_rodata, sizeof(sh_rela_rodata));
+  databuf_append(d, &sh_text, sizeof(sh_text));
+  databuf_append(d, &sh_rela_text, sizeof(sh_rela_text));
 
   /* Section headers done -- append string table. */
   CHECK(d->count == sh_strtab_offset);
@@ -379,6 +514,28 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   databuf_append(d, symbols->buf, symbols->count);
   databuf_destroy(symbols);
   free(symbols);
+
+  CHECK(d->count == symtab_end);
+  append_zeros_to_align(d, f->data.max_requested_alignment);
+  CHECK(d->count == sh_data.sh_offset);
+  databuf_append(d, f->data.raw.buf, f->data.raw.count);
+  append_zeros_to_align(d, kRela_Section_Alignment);
+  CHECK(d->count == sh_rela_data.sh_offset);
+  linux32_append_relocations(sti_map, f->symbol_table_count, d, &f->data);
+
+  append_zeros_to_align(d, f->rdata.max_requested_alignment);
+  CHECK(d->count == sh_rodata.sh_offset);
+  databuf_append(d, f->rdata.raw.buf, f->rdata.raw.count);
+  append_zeros_to_align(d, kRela_Section_Alignment);
+  CHECK(d->count == sh_rela_rodata.sh_offset);
+  linux32_append_relocations(sti_map, f->symbol_table_count, d, &f->rdata);
+
+  append_zeros_to_align(d, f->text.max_requested_alignment);
+  CHECK(d->count == sh_text.sh_offset);
+  databuf_append(d, f->text.raw.buf, f->text.raw.count);
+  append_zeros_to_align(d, kRela_Section_Alignment);
+  CHECK(d->count == sh_rela_text.sh_offset);
+  linux32_append_relocations(sti_map, f->symbol_table_count, d, &f->text);
 
   *out = d;
   free(sti_map);

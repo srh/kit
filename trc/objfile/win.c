@@ -313,14 +313,12 @@ void win_compute_section_dimensions(struct objfile_section *s,
 }
 
 #define IMAGE_REL_I386_DIR32 0x0006
-#define IMAGE_REL_I386_DIR32NB 0x0007
 #define IMAGE_REL_I386_REL32 0x0014
 
 void win_append_relocs(struct databuf *d, struct objfile_relocation *relocs,
                        size_t relocs_count) {
   static const uint16_t win_Type[] = {
     [OBJFILE_RELOCATION_TYPE_DIR32] = IMAGE_REL_I386_DIR32,
-    [OBJFILE_RELOCATION_TYPE_DIR32NB] = IMAGE_REL_I386_DIR32NB,
     [OBJFILE_RELOCATION_TYPE_REL32] = IMAGE_REL_I386_REL32,
   };
 

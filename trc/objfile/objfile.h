@@ -38,8 +38,6 @@ uint32_t objfile_section_size(struct objfile_section *s);
 
 void objfile_section_append_dir32(struct objfile_section *s,
                                   uint32_t SymbolTableIndex);
-void objfile_section_append_dir32nb(struct objfile_section *s,
-                                    uint32_t SymbolTableIndex);
 void objfile_section_append_rel32(struct objfile_section *s,
                                   uint32_t SymbolTableIndex);
 void objfile_section_append_raw(struct objfile_section *s,
