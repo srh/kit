@@ -197,6 +197,16 @@ static const uint8_t IMAGE_SYM_CLASS_EXTERNAL = 2;
 static const uint8_t IMAGE_SYM_CLASS_STATIC = 3;
 
 PACK_PUSH
+union name_eight {
+  uint8_t ShortName[8];
+  struct {
+    uint32_t Zeroes;
+    uint32_t Offset;
+  } LongName;
+} PACK_ATTRIBUTE;
+PACK_POP
+
+PACK_PUSH
 struct COFF_symbol_standard_record {
   union name_eight Name;
   uint32_t Value;

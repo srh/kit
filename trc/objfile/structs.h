@@ -47,16 +47,6 @@ enum objfile_symbol_section {
   OBJFILE_SYMBOL_SECTION_TEXT = 3,
 };
 
-PACK_PUSH
-union name_eight {
-  uint8_t ShortName[8];
-  struct {
-    uint32_t Zeroes;
-    uint32_t Offset;
-  } LongName;
-} PACK_ATTRIBUTE;
-PACK_POP
-
 struct objfile_symbol_record {
   ident_value name;
   uint32_t value;
