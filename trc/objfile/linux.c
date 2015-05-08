@@ -100,6 +100,14 @@ enum {
   kSHT_NULL = 0,
   kSHT_STRTAB = 3,
   kSHT_SYMTAB = 2,
+  kSTT_OBJECT = 1,
+  kSTT_FUNC = 2,
+  kSTB_LOCAL = 0,
+  kSTB_GLOBAL = 1,
+  kSHN_UNDEF = 0,
+  kLinux32DataSectionNumber = 0, /* TODO */
+  kLinux32RodataSectionNumber = 0, /* TODO */
+  kLinux32TextSectionNumber = 0, /* TODO */
 };
 
 uint32_t strtab_append_c_str(struct databuf *d, const char *s) {
@@ -120,15 +128,101 @@ uint32_t strtab_add(struct databuf *d, const void *buf, size_t count) {
   return ret;
 }
 
-/* TODO: No, use append_zeros_to_align. */
-void pad_to_size(struct databuf *d, uint8_t value, size_t size) {
-  CHECK(d->count <= size);
-  while (d->count < size) {
-    databuf_append(d, &value, 1);
+void push_symbol(struct identmap *im, struct objfile_symbol_record *symbol,
+                 struct databuf *symbols, struct databuf *strings) {
+  /* TODO: This and the for loop below is just a copy/paste job. */
+  struct elf32_Symtab_Entry ent;
+  ident_value name = symbol->name;
+  const void *name_buf;
+  size_t name_count;
+  identmap_lookup(im, name, &name_buf, &name_count);
+
+  uint32_t offset = strtab_add(strings, name_buf, name_count);
+  ent.st_name = offset;
+  ent.st_value = symbol->value;
+  /* TODO: It's OK to just use zero for everything? */
+  ent.st_size = 0;
+  ent.st_info = (symbol->is_function == IS_FUNCTION_YES ?
+                 kSTT_FUNC : kSTT_OBJECT) | ((symbol->is_static ?
+                                              kSTB_LOCAL : kSTB_GLOBAL) << 4);
+  ent.st_other = 0;
+  switch (symbol->section) {
+  case OBJFILE_SYMBOL_SECTION_UNDEFINED:
+    ent.st_shndx = kSHN_UNDEF;
+    break;
+  case OBJFILE_SYMBOL_SECTION_DATA:
+    ent.st_shndx = kLinux32DataSectionNumber;
+    break;
+  case OBJFILE_SYMBOL_SECTION_RDATA:
+    ent.st_shndx = kLinux32RodataSectionNumber;
+    break;
+  case OBJFILE_SYMBOL_SECTION_TEXT:
+    ent.st_shndx = kLinux32TextSectionNumber;
+    break;
+  default:
+    UNREACHABLE();
   }
+
+  databuf_append(symbols, &ent, sizeof(ent));
 }
 
-void linux32_flatten(struct objfile *f, struct databuf **out) {
+
+void linux32_write_symbols_and_strings(struct identmap *im, struct objfile *f,
+                                       struct databuf **symbols_out,
+                                       struct databuf **strings_out,
+                                       uint32_t **sti_map_out) {
+  struct databuf *symbols = malloc(sizeof(*symbols));
+  CHECK(symbols);
+  databuf_init(symbols);
+  uint32_t symbols_count = 0;
+  struct databuf *strings = malloc(sizeof(*strings));
+  CHECK(strings);
+  databuf_init(strings);
+
+  strtab_add(strings, "", 0);
+
+  /* Maps from f->symbol_table's indexes to symbols indexes, because
+  they get reordered (and index zero cannot be used). */
+  uint32_t *sti_map = malloc_mul(sizeof(*sti_map), f->symbol_table_count);
+
+  {
+    /* Add index zero symbol entry. */
+    struct elf32_Symtab_Entry ent;
+    ent.st_name = 0;
+    ent.st_value = 0;
+    ent.st_size = 0;
+    ent.st_info = 0;
+    ent.st_other = 0;
+    ent.st_shndx = kSHN_UNDEF;
+    databuf_append(symbols, &ent, sizeof(ent));
+    symbols_count = uint32_add(symbols_count, 1);
+  }
+
+  struct objfile_symbol_record *symbol_table = f->symbol_table;
+  for (size_t i = 0, e = f->symbol_table_count; i < e; i++) {
+    if (symbol_table[i].is_static) {
+      push_symbol(im, &symbol_table[i], symbols, strings);
+      sti_map[i] = symbols_count;
+      symbols_count = uint32_add(symbols_count, 1);
+    }
+  }
+
+  for (size_t i = 0, e = f->symbol_table_count; i < e; i++) {
+    if (!symbol_table[i].is_static) {
+      push_symbol(im, &symbol_table[i], symbols, strings);
+      sti_map[i] = symbols_count;
+      symbols_count = uint32_add(symbols_count, 1);
+    }
+  }
+
+  strtab_add(strings, "", 0);
+
+  *symbols_out = symbols;
+  *strings_out = strings;
+  *sti_map_out = sti_map;
+}
+
+void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **out) {
   (void)f;  /* TODO */
   struct databuf *d = malloc(sizeof(*d));
   CHECK(d);
@@ -155,15 +249,22 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
   const uint32_t sym_strtab_offset
     = uint32_add(sh_strtab_offset, sh_strtab.count);
 
-  /* Add 1 for leading, 1 for trailing nul. */
-  const uint32_t sym_strtab_size = 0;  /* TODO: uint32_add(f->strings.count, 2); */
-  const uint32_t sym_strtab_end = uint32_add(sym_strtab_offset, sym_strtab_size);
+  /* TODO: Make sure sti_map gets deallocated. */
+  struct databuf *symbols;
+  struct databuf *strings;
+  uint32_t *sti_map;
+  linux32_write_symbols_and_strings(im, f, &symbols, &strings, &sti_map);
 
-  /* I don't know, align it to 8. */
-  const uint32_t symtab_offset = uint32_ceil_aligned(sym_strtab_end, 8);
-  /* TODO: Compute symbol table size. */
-  const uint32_t symtab_size = 0;
+  const uint32_t sym_strtab_size = size_to_uint32(strings->count);
+  const uint32_t sym_strtab_end
+    = uint32_add(sym_strtab_offset, sym_strtab_size);
 
+  /* I don't know, align it to 16 (that's its entry size). */
+  const uint32_t kSymtabAlignment = 16;
+  const uint32_t symtab_offset = uint32_ceil_aligned(sym_strtab_end,
+                                                     kSymtabAlignment);
+  const uint32_t symtab_size
+    = uint32_add(symtab_offset, size_to_uint32(symbols->count));
 
   {
     struct elf32_Header h;
@@ -265,20 +366,20 @@ void linux32_flatten(struct objfile *f, struct databuf **out) {
   /* Section headers done -- append string table. */
   CHECK(d->count == sh_strtab_offset);
   databuf_append(d, sh_strtab.buf, sh_strtab.count);
-
   databuf_destroy(&sh_strtab);
 
-  /* Append symbol string table. */
-  /* TODO */
-#if 0
   CHECK(d->count == sym_strtab_offset);
-  databuf_append(d, "\0", 1);
-  databuf_append(d, f->strings.buf, f->strings.count);
-  databuf_append(d, "\0", 1);
+  databuf_append(d, strings->buf, strings->count);
+  databuf_destroy(strings);
+  free(strings);
   CHECK(d->count == sym_strtab_end);
-#endif /* 0 */
 
-  pad_to_size(d, 0, uint32_to_size(symtab_offset));
+  append_zeros_to_align(d, kSymtabAlignment);
+  CHECK(d->count == symtab_offset);
+  databuf_append(d, symbols->buf, symbols->count);
+  databuf_destroy(symbols);
+  free(symbols);
 
   *out = d;
+  free(sti_map);
 }

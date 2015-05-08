@@ -4509,7 +4509,7 @@ int build_module(struct identmap *im,
 
   struct databuf *databuf = NULL;
   if (target_linux32) {
-    linux32_flatten(objfile, &databuf);
+    linux32_flatten(cs.im, objfile, &databuf);
   } else {
     win_flatten(cs.im, objfile, &databuf);
   }
