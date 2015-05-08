@@ -192,11 +192,16 @@ void objfile_section_append_rel32(struct objfile_section *s,
                                      OBJFILE_RELOCATION_TYPE_REL32);
 }
 
-int objfile_c_symbol_name(const void *name, size_t name_count,
+int objfile_c_symbol_name(int target_linux32, const void *name, size_t name_count,
                           void **c_name_out, size_t *c_name_count_out) {
   char *c_name;
-  alloc_memcat("_", 1, name, name_count,
-               &c_name, c_name_count_out);
+  if (target_linux32) {
+    alloc_memcat("", 0, name, name_count,
+                 &c_name, c_name_count_out);
+  } else {
+    alloc_memcat("_", 1, name, name_count,
+                 &c_name, c_name_count_out);
+  }
   *c_name_out = c_name;
   return 1;
 }

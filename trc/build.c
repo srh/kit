@@ -142,10 +142,16 @@ int generate_kit_name(struct checkstate *cs,
   struct databuf b;
   databuf_init(&b);
   if (is_export) {
-    databuf_append(&b, "_", 1);
+    if (!cs->target_linux32) {
+      databuf_append(&b, "_", 1);
+    }
     databuf_append(&b, name, name_count);
   } else {
-    databuf_append(&b, "_kit_", 5);
+    if (cs->target_linux32) {
+      databuf_append(&b, "kit_", 4);
+    } else {
+      databuf_append(&b, "_kit_", 5);
+    }
     databuf_append(&b, name, name_count);
 
     /* I just don't want to lookup the stdarg documentation and
@@ -227,7 +233,8 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
 
       void *c_name;
       size_t c_name_count;
-      if (!objfile_c_symbol_name(name, name_count, &c_name, &c_name_count)) {
+      if (!objfile_c_symbol_name(cs->target_linux32, name, name_count,
+                                 &c_name, &c_name_count)) {
         return 0;
       }
 
@@ -4483,7 +4490,7 @@ int build_module(struct identmap *im,
                  ident_value name) {
   int ret = 0;
   struct checkstate cs;
-  checkstate_init(&cs, im);
+  checkstate_init(&cs, im, target_linux32);
 
   if (!chase_modules_and_typecheck(&cs, loader, name)) {
     DBG("(Fail.)\n");

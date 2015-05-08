@@ -56,9 +56,11 @@ void checkstate_destroy(struct checkstate *cs) {
   cs->im = NULL;
 }
 
-void checkstate_init(struct checkstate *cs, struct identmap *im) {
+void checkstate_init(struct checkstate *cs, struct identmap *im,
+                     int target_linux32) {
   cs->im = im;
   cs->cm = compute_common_idents(im);
+  cs->target_linux32 = target_linux32;
   cs->imports = NULL;
   cs->imports_count = 0;
   cs->imports_limit = 0;

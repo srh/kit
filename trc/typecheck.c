@@ -5143,8 +5143,9 @@ int chase_modules_and_typecheck(struct checkstate *cs,
 
 int test_check_module(struct identmap *im, module_loader *loader,
                       ident_value name) {
+  int target_linux32 = 0;
   struct checkstate cs;
-  checkstate_init(&cs, im);
+  checkstate_init(&cs, im, target_linux32);
 
   int ret = chase_modules_and_typecheck(&cs, loader, name);
 

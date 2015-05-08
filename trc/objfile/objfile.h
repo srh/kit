@@ -62,7 +62,8 @@ uint32_t objfile_add_remote_symbol(struct objfile *f,
                                    ident_value name,
                                    enum is_function is_function);
 
-int objfile_c_symbol_name(const void *name, size_t name_count,
+int objfile_c_symbol_name(int target_linux32,
+                          const void *name, size_t name_count,
                           void **c_name_out, size_t *c_name_count_out);
 
 /* Utility. */

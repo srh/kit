@@ -118,9 +118,9 @@ enum {
   kSTB_LOCAL = 0,
   kSTB_GLOBAL = 1,
   kSHN_UNDEF = 0,
-  kLinux32DataSectionNumber = 0, /* TODO */
-  kLinux32RodataSectionNumber = 0, /* TODO */
-  kLinux32TextSectionNumber = 0, /* TODO */
+  kLinux32DataSectionNumber = 4,
+  kLinux32RodataSectionNumber = 6,
+  kLinux32TextSectionNumber = 8,
   kSHF_WRITE = 1,
   kSHF_ALLOC = 2,
   kSHF_EXEC = 4,
@@ -370,7 +370,7 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   struct elf32_Section_Header sh_data;
   struct elf32_Section_Header sh_rela_data;
   uint32_t rela_data_end;
-  linux32_section_headers(symtab_end, 4, &f->data,
+  linux32_section_headers(symtab_end, kLinux32DataSectionNumber, &f->data,
                           dot_data_index, dot_rela_data_index,
                           kSHF_WRITE,
                           &sh_data, &sh_rela_data,
@@ -379,7 +379,7 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   struct elf32_Section_Header sh_rodata;
   struct elf32_Section_Header sh_rela_rodata;
   uint32_t rela_rodata_end;
-  linux32_section_headers(rela_data_end, 6, &f->rdata,
+  linux32_section_headers(rela_data_end, kLinux32RodataSectionNumber, &f->rdata,
                           dot_rodata_index, dot_rela_rodata_index,
                           0,
                           &sh_rodata, &sh_rela_rodata,
@@ -388,7 +388,7 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   struct elf32_Section_Header sh_text;
   struct elf32_Section_Header sh_rela_text;
   uint32_t rela_text_end;
-  linux32_section_headers(rela_rodata_end, 8, &f->text,
+  linux32_section_headers(rela_rodata_end, kLinux32TextSectionNumber, &f->text,
                           dot_text_index, dot_rela_text_index,
                           kSHF_EXEC,
                           &sh_text, &sh_rela_text,
@@ -491,10 +491,13 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     databuf_append(d, &sh, sizeof(sh));
   }
 
+  STATIC_CHECK(kLinux32DataSectionNumber == 4);
   databuf_append(d, &sh_data, sizeof(sh_data));
   databuf_append(d, &sh_rela_data, sizeof(sh_rela_data));
+  STATIC_CHECK(kLinux32RodataSectionNumber == 6);
   databuf_append(d, &sh_rodata, sizeof(sh_rodata));
   databuf_append(d, &sh_rela_rodata, sizeof(sh_rela_rodata));
+  STATIC_CHECK(kLinux32TextSectionNumber == 8);
   databuf_append(d, &sh_text, sizeof(sh_text));
   databuf_append(d, &sh_rela_text, sizeof(sh_rela_text));
 

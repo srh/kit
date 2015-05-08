@@ -47,6 +47,8 @@ struct checkstate {
   struct identmap *im;
   struct common_idents cm;
 
+  int target_linux32;
+
   struct import *imports;
   size_t imports_count;
   size_t imports_limit;
@@ -68,7 +70,7 @@ struct checkstate {
   size_t sli_symbol_table_indexes_limit;
 };
 
-void checkstate_init(struct checkstate *cs, struct identmap *im);
+void checkstate_init(struct checkstate *cs, struct identmap *im, int target_linux32);
 
 void checkstate_destroy(struct checkstate *cs);
 
