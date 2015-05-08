@@ -1,3 +1,14 @@
+#ifdef _WIN32
+#define PACK_PUSH __pragma(pack(push, 1))
+#define PACK_POP __pragma(pack(pop))
+#define PACK_ATTRIBUTE
+#else /* _WIN32 */
+#define PACK_PUSH
+#define PACK_POP
+#define PACK_ATTRIBUTE __attribute__((__packed__))
+#endif /* _WIN32 */
+
+
 #define WRAP(n) stc_val_ ## n
 #define STATIC_CHECK(x) do { enum { assertion = 1/!!(x) }; } while (0)
 
@@ -25,12 +36,14 @@ struct i3 { int x[3]; };
 struct b_s { char x; short y; };
 struct bbbbs { char x; char y; char t; char u; short z; };
 
-__pragma(pack(push, 1))
-struct bs { char x; short y; };
-struct sb { short x; char y; };
-struct bsb { char x; short y; char z; };
-struct b3sb3 { char x[3]; short y; char z[3]; };
-__pragma(pack(pop))
+PACK_PUSH
+struct bs { char x; short y; } PACK_ATTRIBUTE;
+struct sb { short x; char y; } PACK_ATTRIBUTE;
+struct bsb { char x; short y; char z; } PACK_ATTRIBUTE;
+struct b3sb3 { char x[3]; short y; char z[3]; } PACK_ATTRIBUTE;
+PACK_POP
+
+/* These comments are about WINDOWS behavior. */
 
 /* The "hidden return pointer" functions take a pointer to struct in
    [ebp+8] and when they return put that pointer's value in eax. */
@@ -119,7 +132,8 @@ struct b10 b10_declared(void);
 /* Allocates a spot on its own stack frame, and then copies to its
    return pointer, under any optimization setting I've tried.  I don't
    know if there's a reason why it can't just pass its return pointer
-   upward. */
+   upward.  LINUX: It passes the hidden param to the callee, but
+   doesn't assume the callee returns the right return value. */
 struct b10 b10_call_declared(void) {
   return b10_declared();
 }
