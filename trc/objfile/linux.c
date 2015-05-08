@@ -43,7 +43,7 @@ struct elf32_Header {
   name string table.  Must be less than SHN_LORESERVE (0xff00),
   otherwise the value is stored elsewhere.*/
   uint16_t e_shstrndx;
-};
+} PACK_ATTRIBUTE;
 PACK_POP
 
 PACK_PUSH
@@ -76,7 +76,7 @@ struct elf32_Section_Header {
   /* For sections that hold a table of fixed-size entries: The size in
   bytes for each entry. */
   uint32_t sh_entsize;
-};
+} PACK_ATTRIBUTE;
 PACK_POP
 
 PACK_PUSH
@@ -87,14 +87,14 @@ struct elf32_Symtab_Entry {
   uint8_t st_info;
   uint8_t st_other;
   uint16_t st_shndx;
-};
+} PACK_ATTRIBUTE;
 PACK_POP
 
 PACK_PUSH
 struct elf32_Rel {
   uint32_t r_offset;
   uint32_t r_info;
-};
+} PACK_ATTRIBUTE;
 PACK_POP
 
 /* Seems like a good idea. */
