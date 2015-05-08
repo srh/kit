@@ -91,15 +91,14 @@ struct elf32_Symtab_Entry {
 PACK_POP
 
 PACK_PUSH
-struct elf32_Rela {
+struct elf32_Rel {
   uint32_t r_offset;
   uint32_t r_info;
-  int32_t r_addend;
 };
 PACK_POP
 
 /* Seems like a good idea. */
-enum { kRela_Section_Alignment = 4 };
+enum { kRel_Section_Alignment = 8 };
 
 enum {
   kELFCLASS32 = 1,
@@ -112,15 +111,15 @@ enum {
   kSHT_PROGBITS = 1,
   kSHT_SYMTAB = 2,
   kSHT_STRTAB = 3,
-  kSHT_RELA = 4,
+  kSHT_REL = 9,
   kSTT_OBJECT = 1,
   kSTT_FUNC = 2,
   kSTB_LOCAL = 0,
   kSTB_GLOBAL = 1,
   kSHN_UNDEF = 0,
-  kLinux32DataSectionNumber = 4,
-  kLinux32RodataSectionNumber = 6,
-  kLinux32TextSectionNumber = 8,
+  kLinux32DataSectionNumber = 5,
+  kLinux32RodataSectionNumber = 7,
+  kLinux32TextSectionNumber = 9,
   kSHF_WRITE = 1,
   kSHF_ALLOC = 2,
   kSHF_EXEC = 4,
@@ -249,18 +248,29 @@ enum { kSymTabSectionNumber = 3 };
 void linux32_section_headers(uint32_t prev_end_offset,
                              int sh_out_index,
                              struct objfile_section *s,
-                             uint32_t sh_strtab_index, uint32_t sh_strtab_rela_index,
+                             uint32_t sh_strtab_rel_index, uint32_t sh_strtab_index,
                              uint32_t sh_flags,
+                             struct elf32_Section_Header *rel_out,
                              struct elf32_Section_Header *sh_out,
-                             struct elf32_Section_Header *rela_out,
                              uint32_t *end_out) {
-  uint32_t alignment = s->max_requested_alignment;
-  uint32_t sh_offset = uint32_ceil_aligned(prev_end_offset, alignment);
+  uint32_t rel_offset = uint32_ceil_aligned(prev_end_offset, kRel_Section_Alignment);
+  uint32_t rel_size = uint32_mul(s->relocs_count, sizeof(struct elf32_Rel));
+  uint32_t rel_end = uint32_add(rel_offset, rel_size);
+  uint32_t sh_alignment = s->max_requested_alignment;
+  uint32_t sh_offset = uint32_ceil_aligned(rel_end, sh_alignment);
   uint32_t sh_size = s->raw.count;
   uint32_t sh_end = uint32_add(sh_offset, sh_size);
-  uint32_t rela_offset = uint32_ceil_aligned(sh_end, kRela_Section_Alignment);
-  uint32_t rela_size = uint32_mul(s->relocs_count, sizeof(struct elf32_Rela));
-  uint32_t rela_end = uint32_add(rela_offset, rela_size);
+
+  rel_out->sh_name = sh_strtab_rel_index;
+  rel_out->sh_type = kSHT_REL;
+  rel_out->sh_flags = 0;
+  rel_out->sh_addr = 0;
+  rel_out->sh_offset = rel_offset;
+  rel_out->sh_size = rel_size;
+  rel_out->sh_link = kSymTabSectionNumber;
+  rel_out->sh_info = sh_out_index;
+  rel_out->sh_addralign = 0;
+  rel_out->sh_entsize = sizeof(struct elf32_Rel);
 
   sh_out->sh_name = sh_strtab_index;
   sh_out->sh_type = kSHT_PROGBITS;
@@ -270,47 +280,43 @@ void linux32_section_headers(uint32_t prev_end_offset,
   sh_out->sh_size = sh_size;
   sh_out->sh_link = kSHN_UNDEF;
   sh_out->sh_info = 0;
-  sh_out->sh_addralign = alignment;
+  sh_out->sh_addralign = sh_alignment;
   sh_out->sh_entsize = 0;
 
-  rela_out->sh_name = sh_strtab_rela_index;
-  rela_out->sh_type = kSHT_RELA;
-  rela_out->sh_flags = 0;
-  rela_out->sh_addr = 0;
-  rela_out->sh_offset = rela_offset;
-  rela_out->sh_size = rela_size;
-  rela_out->sh_link = kSymTabSectionNumber;
-  rela_out->sh_info = sh_out_index;
-  rela_out->sh_addralign = 0;
-  rela_out->sh_entsize = sizeof(struct elf32_Rela);
-
-  *end_out = rela_end;
+  *end_out = sh_end;
 }
 
-void linux32_append_relocations(uint32_t *sti_map, size_t sti_map_count,
-                                struct databuf *d, struct objfile_section *s) {
+/* TODO: Don't mutate the section, plz.  Thanks. */
+void linux32_append_relocations_and_mutate_section(
+    uint32_t *sti_map, size_t sti_map_count,
+    struct databuf *d, struct objfile_section *s) {
   struct objfile_relocation *relocs = s->relocs;
   for (size_t i = 0, e = s->relocs_count; i < e; i++) {
-    struct elf32_Rela rela;
-    rela.r_offset = relocs[i].virtual_address;
+    struct elf32_Rel rel;
+    rel.r_offset = relocs[i].virtual_address;
     uint32_t sti = relocs[i].symbol_table_index;
     CHECK(sti < sti_map_count);
     uint32_t new_sti = sti_map[sti];
     CHECK(new_sti <= (UINT32_MAX >> 8));
-    uint32_t rela_types[] = {
+    static const uint32_t rel_types[] = {
       [OBJFILE_RELOCATION_TYPE_DIR32] = kR_386_32,
       [OBJFILE_RELOCATION_TYPE_REL32] = kR_386_PC32,
     };
 
-    uint32_t rela_type = rela_types[relocs[i].type];
-    rela.r_info = (new_sti << 8) | rela_type;
-    rela.r_addend = 0;
-    databuf_append(d, &rela, sizeof(rela));
+    uint32_t rel_type = rel_types[relocs[i].type];
+    rel.r_info = (new_sti << 8) | rel_type;
+    databuf_append(d, &rel, sizeof(rel));
+
+    static const int32_t rel_addends[] = {
+      [OBJFILE_RELOCATION_TYPE_DIR32] = 0,
+      [OBJFILE_RELOCATION_TYPE_REL32] = -4,
+    };
+    uint32_t addend = (uint32_t)rel_addends[relocs[i].type];
+    databuf_overwrite(&s->raw, rel.r_offset, &addend, sizeof(addend));
   }
 }
 
 void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **out) {
-  (void)f;  /* TODO */
   struct databuf *d = malloc(sizeof(*d));
   CHECK(d);
   databuf_init(d);
@@ -331,18 +337,18 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     = strtab_append_c_str(&sh_strtab, ".strtab");
   const uint32_t dot_symtab_index
     = strtab_append_c_str(&sh_strtab, ".symtab");
+  const uint32_t dot_rel_data_index
+    = strtab_append_c_str(&sh_strtab, ".rel.data");
   const uint32_t dot_data_index
     = strtab_append_c_str(&sh_strtab, ".data");
-  const uint32_t dot_rela_data_index
-    = strtab_append_c_str(&sh_strtab, ".rela.data");
+  const uint32_t dot_rel_rodata_index
+    = strtab_append_c_str(&sh_strtab, ".rel.rodata");
   const uint32_t dot_rodata_index
     = strtab_append_c_str(&sh_strtab, ".rodata");
-  const uint32_t dot_rela_rodata_index
-    = strtab_append_c_str(&sh_strtab, ".rela.rodata");
+  const uint32_t dot_rel_text_index
+    = strtab_append_c_str(&sh_strtab, ".rel.text");
   const uint32_t dot_text_index
     = strtab_append_c_str(&sh_strtab, ".text");
-  const uint32_t dot_rela_text_index
-    = strtab_append_c_str(&sh_strtab, ".rela.text");
   strtab_append_c_str(&sh_strtab, "");
 
   const uint32_t sym_strtab_offset
@@ -367,32 +373,32 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
 
   const uint32_t symtab_end = uint32_add(symtab_offset, symtab_size);
 
+  struct elf32_Section_Header sh_rel_data;
   struct elf32_Section_Header sh_data;
-  struct elf32_Section_Header sh_rela_data;
-  uint32_t rela_data_end;
+  uint32_t data_end;
   linux32_section_headers(symtab_end, kLinux32DataSectionNumber, &f->data,
-                          dot_data_index, dot_rela_data_index,
+                          dot_rel_data_index, dot_data_index,
                           kSHF_WRITE,
-                          &sh_data, &sh_rela_data,
-                          &rela_data_end);
+                          &sh_rel_data, &sh_data,
+                          &data_end);
 
+  struct elf32_Section_Header sh_rel_rodata;
   struct elf32_Section_Header sh_rodata;
-  struct elf32_Section_Header sh_rela_rodata;
-  uint32_t rela_rodata_end;
-  linux32_section_headers(rela_data_end, kLinux32RodataSectionNumber, &f->rdata,
-                          dot_rodata_index, dot_rela_rodata_index,
+  uint32_t rodata_end;
+  linux32_section_headers(data_end, kLinux32RodataSectionNumber, &f->rdata,
+                          dot_rel_rodata_index, dot_rodata_index,
                           0,
-                          &sh_rodata, &sh_rela_rodata,
-                          &rela_rodata_end);
+                          &sh_rel_rodata, &sh_rodata,
+                          &rodata_end);
 
+  struct elf32_Section_Header sh_rel_text;
   struct elf32_Section_Header sh_text;
-  struct elf32_Section_Header sh_rela_text;
-  uint32_t rela_text_end;
-  linux32_section_headers(rela_rodata_end, kLinux32TextSectionNumber, &f->text,
-                          dot_text_index, dot_rela_text_index,
+  uint32_t text_end;
+  linux32_section_headers(rodata_end, kLinux32TextSectionNumber, &f->text,
+                          dot_rel_text_index, dot_text_index,
                           kSHF_EXEC,
-                          &sh_text, &sh_rela_text,
-                          &rela_text_end);
+                          &sh_rel_text, &sh_text,
+                          &text_end);
 
   {
     struct elf32_Header h;
@@ -491,15 +497,15 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     databuf_append(d, &sh, sizeof(sh));
   }
 
-  STATIC_CHECK(kLinux32DataSectionNumber == 4);
+  STATIC_CHECK(kLinux32DataSectionNumber == 5);
+  databuf_append(d, &sh_rel_data, sizeof(sh_rel_data));
   databuf_append(d, &sh_data, sizeof(sh_data));
-  databuf_append(d, &sh_rela_data, sizeof(sh_rela_data));
-  STATIC_CHECK(kLinux32RodataSectionNumber == 6);
+  STATIC_CHECK(kLinux32RodataSectionNumber == 7);
+  databuf_append(d, &sh_rel_rodata, sizeof(sh_rel_rodata));
   databuf_append(d, &sh_rodata, sizeof(sh_rodata));
-  databuf_append(d, &sh_rela_rodata, sizeof(sh_rela_rodata));
-  STATIC_CHECK(kLinux32TextSectionNumber == 8);
+  STATIC_CHECK(kLinux32TextSectionNumber == 9);
+  databuf_append(d, &sh_rel_text, sizeof(sh_rel_text));
   databuf_append(d, &sh_text, sizeof(sh_text));
-  databuf_append(d, &sh_rela_text, sizeof(sh_rela_text));
 
   /* Section headers done -- append string table. */
   CHECK(d->count == sh_strtab_offset);
@@ -519,26 +525,30 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   free(symbols);
 
   CHECK(d->count == symtab_end);
+
+  append_zeros_to_align(d, kRel_Section_Alignment);
+  CHECK(d->count == sh_rel_data.sh_offset);
+  linux32_append_relocations_and_mutate_section(
+      sti_map, f->symbol_table_count, d, &f->data);
   append_zeros_to_align(d, f->data.max_requested_alignment);
   CHECK(d->count == sh_data.sh_offset);
   databuf_append(d, f->data.raw.buf, f->data.raw.count);
-  append_zeros_to_align(d, kRela_Section_Alignment);
-  CHECK(d->count == sh_rela_data.sh_offset);
-  linux32_append_relocations(sti_map, f->symbol_table_count, d, &f->data);
 
+  append_zeros_to_align(d, kRel_Section_Alignment);
+  CHECK(d->count == sh_rel_rodata.sh_offset);
+  linux32_append_relocations_and_mutate_section(
+      sti_map, f->symbol_table_count, d, &f->rdata);
   append_zeros_to_align(d, f->rdata.max_requested_alignment);
   CHECK(d->count == sh_rodata.sh_offset);
   databuf_append(d, f->rdata.raw.buf, f->rdata.raw.count);
-  append_zeros_to_align(d, kRela_Section_Alignment);
-  CHECK(d->count == sh_rela_rodata.sh_offset);
-  linux32_append_relocations(sti_map, f->symbol_table_count, d, &f->rdata);
 
+  append_zeros_to_align(d, kRel_Section_Alignment);
+  CHECK(d->count == sh_rel_text.sh_offset);
+  linux32_append_relocations_and_mutate_section(
+      sti_map, f->symbol_table_count, d, &f->text);
   append_zeros_to_align(d, f->text.max_requested_alignment);
   CHECK(d->count == sh_text.sh_offset);
   databuf_append(d, f->text.raw.buf, f->text.raw.count);
-  append_zeros_to_align(d, kRela_Section_Alignment);
-  CHECK(d->count == sh_rela_text.sh_offset);
-  linux32_append_relocations(sti_map, f->symbol_table_count, d, &f->text);
 
   *out = d;
   free(sti_map);
