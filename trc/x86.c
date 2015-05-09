@@ -12,60 +12,62 @@
 
 void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                       ident_value fieldstop, uint32_t *offsetof_out,
-                      uint32_t *sizeof_out, uint32_t *alignof_out);
+                      struct type_attrs *attrs_out);
 void help_rhs_sizealignof(struct name_table *nt, struct ast_deftype_rhs *rhs,
                           ident_value fieldstop, uint32_t *offsetof_out,
-                          uint32_t *sizeof_out, uint32_t *alignof_out);
+                          struct type_attrs *attrs_out);
 
 void unionfields_sizealignof(struct name_table *nt,
                              struct ast_vardecl *fields,
                              size_t fields_count,
                              ident_value fieldstop,
                              uint32_t *offsetof_out,
-                             uint32_t *sizeof_out,
-                             uint32_t *alignof_out) {
+                             struct type_attrs *attrs_out) {
   uint32_t max_size = 0;
   uint32_t max_alignment = 1;
   for (size_t i = 0; i < fields_count; i++) {
     uint32_t invalid_offsetof_param;
-    uint32_t size;
-    uint32_t alignment;
+    struct type_attrs attrs;
     help_sizealignof(nt, &fields[i].type,
                      IDENT_VALUE_INVALID,
-                     &invalid_offsetof_param, &size, &alignment);
+                     &invalid_offsetof_param, &attrs);
 
     if (fields[i].name.value == fieldstop) {
       CHECK(fieldstop != IDENT_VALUE_INVALID);
       *offsetof_out = 0;
-      *sizeof_out = size;
-      *alignof_out = 0;
+      attrs_out->size = attrs.size;
+      /* Garbage fields. */
+      attrs_out->align = 0;
+      attrs_out->is_primitive = 0;
       return;
     }
 
-    if (max_size < size) {
-      max_size = size;
+    if (max_size < attrs.size) {
+      max_size = attrs.size;
     }
-    if (max_alignment < alignment) {
-      max_alignment = alignment;
+    if (max_alignment < attrs.align) {
+      max_alignment = attrs.align;
     }
   }
   CHECK(fieldstop == IDENT_VALUE_INVALID);
   uint32_t final_size = uint32_ceil_aligned(max_size, max_alignment);
   *offsetof_out = 0;
-  *sizeof_out = final_size;
-  *alignof_out = max_alignment;
+  attrs_out->size = final_size;
+  attrs_out->align = max_alignment;
+  /* Not primitive, it's a union type. */
+  attrs_out->is_primitive = 0;
   return;
 }
 
 /* X86 WINDOWS */
 /* This is a bi-use function -- if fieldstop is IDENT_VALUE_INVALID,
-then *sizeof_out and *alignof_out are initialized with the size and
-alignment of the type.  Otherwise, *offsetof_out and *sizeof_out are
-initialized with the offset and size of the type's field named
+then *attrs_out is initialized with the size and alignment (and other
+attributes) of the type.  Otherwise, *offsetof_out and attrs_out->size
+are initialized with the offset and size of the type's field named
 fieldstop.  If the field name is not found, crashes. */
 void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                       ident_value fieldstop, uint32_t *offsetof_out,
-                      uint32_t *sizeof_out, uint32_t *alignof_out) {
+                      struct type_attrs *attrs_out) {
   switch (type->tag) {
   case AST_TYPEEXPR_NAME: {
     struct deftype_entry *ent;
@@ -78,14 +80,15 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     if (ent->is_primitive) {
       CHECK(fieldstop == IDENT_VALUE_INVALID);
       *offsetof_out = 0;
-      *sizeof_out = ent->primitive_sizeof;
-      *alignof_out = ent->primitive_alignof;
+      attrs_out->size = ent->primitive_sizeof;
+      attrs_out->align = ent->primitive_alignof;
+      attrs_out->is_primitive = 1;
       return;
     } else {
       struct ast_deftype *deftype = ent->deftype;
       CHECK(!deftype->generics.has_type_params);
       help_rhs_sizealignof(nt, &deftype->rhs, fieldstop,
-                           offsetof_out, sizeof_out, alignof_out);
+                           offsetof_out, attrs_out);
       return;
     }
   } break;
@@ -100,8 +103,9 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     if (ent->is_primitive) {
       CHECK(fieldstop == IDENT_VALUE_INVALID);
       *offsetof_out = 0;
-      *sizeof_out = ent->primitive_sizeof;
-      *alignof_out = ent->primitive_alignof;
+      attrs_out->size = ent->primitive_sizeof;
+      attrs_out->align = ent->primitive_alignof;
+      attrs_out->is_primitive = 1;
       return;
     } else {
       struct ast_deftype *deftype = ent->deftype;
@@ -114,7 +118,7 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                               &deftype->rhs,
                               &substituted);
       help_rhs_sizealignof(nt, &substituted, fieldstop,
-                           offsetof_out, sizeof_out, alignof_out);
+                           offsetof_out, attrs_out);
       ast_deftype_rhs_destroy(&substituted);
       return;
     }
@@ -124,31 +128,34 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     uint32_t max_alignment = 1;
     for (size_t i = 0, e = type->u.structe.fields_count; i < e; i++) {
       uint32_t invalid_offsetof_param;
-      uint32_t size;
-      uint32_t alignment;
+      struct type_attrs attrs;
       help_sizealignof(nt, &type->u.structe.fields[i].type,
                        IDENT_VALUE_INVALID,
-                       &invalid_offsetof_param, &size, &alignment);
-      count = uint32_ceil_aligned(count, alignment);
+                       &invalid_offsetof_param, &attrs);
+      count = uint32_ceil_aligned(count, attrs.align);
 
       if (type->u.structe.fields[i].name.value == fieldstop) {
         CHECK(fieldstop != IDENT_VALUE_INVALID);
         *offsetof_out = count;
-        *sizeof_out = size;
-        *alignof_out = 0;
+        attrs_out->size = attrs.size;
+        /* Garbage fields. */
+        attrs_out->align = 0;
+        attrs_out->is_primitive = 0;
         return;
       }
 
-      if (max_alignment < alignment) {
-        max_alignment = alignment;
+      if (max_alignment < attrs.align) {
+        max_alignment = attrs.align;
       }
-      count = uint32_add(count, size);
+      count = uint32_add(count, attrs.size);
     }
     CHECK(fieldstop == IDENT_VALUE_INVALID);
     count = uint32_ceil_aligned(count, max_alignment);
     *offsetof_out = 0;
-    *sizeof_out = count;
-    *alignof_out = max_alignment;
+    attrs_out->size = count;
+    attrs_out->align = max_alignment;
+    /* Not primitive: it's a struct! */
+    attrs_out->is_primitive = 0;
     return;
   } break;
   case AST_TYPEEXPR_UNIONE: {
@@ -157,21 +164,22 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                             type->u.unione.fields_count,
                             fieldstop,
                             offsetof_out,
-                            sizeof_out,
-                            alignof_out);
+                            attrs_out);
     return;
   } break;
   case AST_TYPEEXPR_ARRAY: {
     CHECK(fieldstop == IDENT_VALUE_INVALID);
 
     uint32_t offsetof_discard;
-    uint32_t elem_size;
-    uint32_t elem_alignment;
+    struct type_attrs elem_attrs;
     help_sizealignof(nt, type->u.arraytype.param, IDENT_VALUE_INVALID,
-                     &offsetof_discard, &elem_size, &elem_alignment);
+                     &offsetof_discard, &elem_attrs);
     *offsetof_out = 0;
-    *sizeof_out = uint32_mul(elem_size, unsafe_numeric_literal_u32(&type->u.arraytype.number));
-    *alignof_out = 0;
+    attrs_out->size = uint32_mul(elem_attrs.size,
+                                 unsafe_numeric_literal_u32(&type->u.arraytype.number));
+    attrs_out->align = elem_attrs.align;
+    /* Arrays are not primitive. */
+    attrs_out->is_primitive = 0;
     return;
   } break;
   case AST_TYPEEXPR_UNKNOWN:
@@ -185,31 +193,29 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
 
 void help_rhs_sizealignof(struct name_table *nt, struct ast_deftype_rhs *rhs,
                           ident_value fieldstop, uint32_t *offsetof_out,
-                          uint32_t *sizeof_out, uint32_t *alignof_out) {
+                          struct type_attrs *attrs_out) {
   switch (rhs->tag) {
   case AST_DEFTYPE_RHS_TYPE:
-    help_sizealignof(nt, &rhs->u.type, fieldstop, offsetof_out,
-                     sizeof_out, alignof_out);
+    help_sizealignof(nt, &rhs->u.type, fieldstop, offsetof_out, attrs_out);
     return;
   case AST_DEFTYPE_RHS_ENUMSPEC: {
     CHECK(fieldstop == IDENT_VALUE_INVALID);
     uint32_t body_offset_discard;
-    uint32_t body_size;
-    uint32_t body_align;
+    struct type_attrs body_attrs;
     unionfields_sizealignof(nt,
                             rhs->u.enumspec.enumfields,
                             rhs->u.enumspec.enumfields_count,
                             fieldstop,
                             &body_offset_discard,
-                            &body_size,
-                            &body_align);
+                            &body_attrs);
 
     /* Other code expects enum nums to be dword-sized, the body offset
     likewise. */
-    CHECK(body_align <= DWORD_SIZE);
+    CHECK(body_attrs.align <= DWORD_SIZE);
     *offsetof_out = 0;
-    *sizeof_out = uint32_add(body_size, DWORD_SIZE);
-    *alignof_out = DWORD_SIZE;
+    attrs_out->size = uint32_add(body_attrs.size, DWORD_SIZE);
+    attrs_out->align = DWORD_SIZE;
+    attrs_out->is_primitive = 0;
     return;
   } break;
   default:
@@ -222,19 +228,20 @@ void x86_field_sizeoffset(struct name_table *nt, struct ast_typeexpr *type,
                           uint32_t *offsetof_out) {
   CHECK(field_name != IDENT_VALUE_INVALID);
   uint32_t offset;
-  uint32_t size;
-  uint32_t invalid_alignment_param;
-  help_sizealignof(nt, type, field_name,
-                   &offset, &size, &invalid_alignment_param);
-  *sizeof_out = size;
+  struct type_attrs attrs;
+  help_sizealignof(nt, type, field_name, &offset, &attrs);
+  *sizeof_out = attrs.size;
   *offsetof_out = offset;
 }
 
 void x86_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                      uint32_t *sizeof_out, uint32_t *alignof_out) {
+  struct type_attrs attrs;
   uint32_t invalid_offsetof_param;
   help_sizealignof(nt, type, IDENT_VALUE_INVALID,
-                   &invalid_offsetof_param, sizeof_out, alignof_out);
+                   &invalid_offsetof_param, &attrs);
+  *sizeof_out = attrs.size;
+  *alignof_out = attrs.align;
 }
 
 uint32_t x86_sizeof(struct name_table *nt, struct ast_typeexpr *type) {
@@ -251,3 +258,10 @@ uint32_t x86_alignof(struct name_table *nt, struct ast_typeexpr *type) {
   return alignment;
 }
 
+struct type_attrs x86_attrsof(struct name_table *nt, struct ast_typeexpr *type) {
+  struct type_attrs attrs;
+  uint32_t invalid_offsetof_param;
+  help_sizealignof(nt, type, IDENT_VALUE_INVALID,
+                   &invalid_offsetof_param, &attrs);
+  return attrs;
+}
