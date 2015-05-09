@@ -603,18 +603,24 @@ void frame_pop(struct frame *h, uint32_t size) {
 
 int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *return_type,
                                uint32_t *return_type_size_out) {
-  uint32_t return_type_size = x86_sizeof(&cs->nt, return_type);
-  *return_type_size_out = return_type_size;
-  if (!(return_type_size <= 2 || return_type_size == DWORD_SIZE
-        || return_type_size == 2 * DWORD_SIZE)) {
-    return 1;
+  struct type_attrs return_type_attrs = x86_attrsof(&cs->nt, return_type);
+  if (cs->target_linux32) {
+    *return_type_size_out = return_type_attrs.size;
+    return !return_type_attrs.is_primitive;
   } else {
-    struct typeexpr_traits traits;
-    int success = check_typeexpr_traits(cs, return_type, NULL, &traits);
-    CHECK(success);
-    /* WINDOWS: This ain't C++, and this ain't consistent with the
-    Windows calling convention regarding non-pod (for C++03) types. */
-    return traits.movable != TYPEEXPR_TRAIT_TRIVIALLY_HAD;
+    uint32_t return_type_size = return_type_attrs.size;
+    *return_type_size_out = return_type_size;
+    if (!(return_type_size <= 2 || return_type_size == DWORD_SIZE
+          || return_type_size == 2 * DWORD_SIZE)) {
+      return 1;
+    } else {
+      struct typeexpr_traits traits;
+      int success = check_typeexpr_traits(cs, return_type, NULL, &traits);
+      CHECK(success);
+      /* WINDOWS: This ain't C++, and this ain't consistent with the
+      Windows calling convention regarding non-pod (for C++03) types. */
+      return traits.movable != TYPEEXPR_TRAIT_TRIVIALLY_HAD;
+    }
   }
 }
 
@@ -652,7 +658,7 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
   }
 
   if (is_return_hidden) {
-    /* I don't know yet if WINDOWS promises padding, so we assume none. */
+    /* I don't know if anybody promises padding, so we assume none. */
     struct loc loc = ebp_indirect_loc(return_type_size,
                                       return_type_size,
                                       2 * DWORD_SIZE);
@@ -695,6 +701,13 @@ void x86_gen_pop32(struct objfile *f, enum x86_reg reg) {
 void x86_gen_ret(struct objfile *f) {
   uint8_t b = 0xC3;
   objfile_section_append_raw(objfile_text(f), &b, 1);
+}
+
+void x86_gen_retn(struct objfile *f, uint16_t imm16) {
+  uint8_t b[3];
+  b[0] = 0xC2;
+  memcpy(b + 1, &imm16, sizeof(imm16));
+  objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
 void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
@@ -1310,12 +1323,18 @@ void push_address(struct objfile *f, struct frame *h, struct loc loc) {
 void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
                   struct immediate imm,
                   struct ast_typeexpr *arg0_type_or_null,
-                  struct ast_typeexpr *return_type) {
+                  struct ast_typeexpr *return_type,
+                  int hidden_return_param) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC:
     /* Dupes code with typetrav_call_func. */
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_call(f, imm.u.func_sti);
+    if (hidden_return_param && cs->target_linux32) {
+      /* TODO: We could do this more elegantly, but right now undo the
+      callee's pop of esp. */
+      x86_gen_add_esp_i32(f, -4);
+    }
     gen_placeholder_stack_adjustment(f, h, 1);
     break;
   case IMMEDIATE_PRIMITIVE_OP: {
@@ -1685,6 +1704,7 @@ void gen_returnloc_funcreturn_convention(struct objfile *f,
     CHECK(return_loc.padded_size == DWORD_SIZE);
     x86_gen_load32(f, X86_EAX, X86_EBP, return_loc.u.ebp_offset);
   } else {
+    /* TODO: This should not even be theoretically reachable on (LINUX) linux32. */
     CHECK(return_loc.size == 2 * DWORD_SIZE);
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
     CHECK(return_loc.padded_size == 2 * DWORD_SIZE);
@@ -1706,12 +1726,21 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
     SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
   }
 
-  gen_returnloc_funcreturn_convention(f, frame_hidden_return_param(h),
+  int hidden_return_param = frame_hidden_return_param(h);
+  gen_returnloc_funcreturn_convention(f, hidden_return_param,
                                       h->return_loc);
 
   x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
   x86_gen_pop32(f, X86_EBP);
-  x86_gen_ret(f);
+  if (cs->target_linux32) {
+    if (hidden_return_param) {
+      x86_gen_retn(f, 4);
+    } else {
+      x86_gen_ret(f);
+    }
+  } else {
+    x86_gen_ret(f);
+  }
 
   if (h->crash_target_exists) {
     frame_define_target(h, h->crash_target_number,
@@ -3277,7 +3306,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   case EXPR_RETURN_FREE_IMM: {
     gen_call_imm(cs, f, h, func_er.u.free.u.imm,
                  args_count == 0 ? NULL : ast_expr_type(&a->u.funcall.args[0].expr),
-                 return_type);
+                 return_type, hidden_return_param);
   } break;
   case EXPR_RETURN_FREE_LOC: {
     struct loc func_loc;
@@ -3286,6 +3315,11 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     gen_load_register(f, X86_EAX, func_loc);
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_indirect_call_reg(f, X86_EAX);
+    if (hidden_return_param && cs->target_linux32) {
+      /* TODO: We could do this more elegantly, but right now undo the
+      callee's pop of esp. */
+      x86_gen_add_esp_i32(f, -4);
+    }
     gen_placeholder_stack_adjustment(f, h, 1);
   } break;
   default:
@@ -3311,6 +3345,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     expr_return_set(cs, f, h, er, return_loc, return_type,
                     temp_exists(return_loc, return_type, 1));
   } else {
+    CHECK(!cs->target_linux32);
     CHECK(return_size == 2 * DWORD_SIZE);
     gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
     expr_return_set(cs, f, h, er, return_loc, return_type,
