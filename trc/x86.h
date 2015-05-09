@@ -10,10 +10,6 @@ struct name_table;
 
 #define DWORD_SIZE 4
 
-/* TODO: Just remove this function. */
-void x86_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
-                     uint32_t *sizeof_out, uint32_t *alignof_out);
-
 struct type_attrs {
   uint32_t size;
   uint32_t align;
