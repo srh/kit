@@ -81,6 +81,7 @@ func end(p *ps, meta ast_meta) void {
 }
 
 defenum keyw {
+  Alias void;
   Access void;
   Case void;
   Copy void;
@@ -327,6 +328,7 @@ func grab_tok(p *ps) tok {
   } else if is_ident_firstchar(ch) {
     ret tok;
     if (grab_keyword(p, "access", Access(void), &ret)
+        || grab_keyword(p, "alias", Alias(void), &ret)
         || grab_keyword(p, "case", Case(void), &ret)
         || grab_keyword(p, "copy", Copy(void), &ret)
         || grab_keyword(p, "def", Def(void), &ret)
