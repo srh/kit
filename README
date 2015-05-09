@@ -43,7 +43,7 @@ Here's the project timeline:
        B. Packed struct types.
        C. Destructuring assignment.
        D. Incr/decr and "+="-type operators.
-   6. Linux support.
+   6. Linux support. (DONE)
    7. Make a self-hosted implementation (adding improvements and
       fixes to the C implementation when useful).
    8. ...
