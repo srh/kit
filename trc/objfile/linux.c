@@ -322,7 +322,7 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   databuf_init(d);
 
   const uint32_t section_header_offset = sizeof(struct elf32_Header);
-  const uint32_t kNumSectionHeaders = 10;
+  const uint16_t kNumSectionHeaders = 10;
   const uint32_t end_of_section_headers
     = uint32_add(section_header_offset,
                  kNumSectionHeaders * sizeof(struct elf32_Section_Header));
