@@ -1540,23 +1540,39 @@ func test_parse() bool {
                                make("func foo() a { label foo; goto bar; }"));
   pass = pass & run_parse_test(make("p043"),
                                make("func foo() a { x struct { }; y union { }; z enum { }; }"));
-  pass = pass & run_parse_test(make("p044"),
-                               make(" deftype foo bar;"));
-  pass = pass & run_parse_test(make("p045"),
+  pass = pass & run_parse_test(make("p044-a"),
+                               make(" deftype foo bar ;"));
+  pass = pass & run_parse_test(make("p044-b"),
+                               make(" alias foo bar ;"));
+  pass = pass & run_parse_test(make("p045-a"),
+                               make("deftype foo fn[int, int] ;"));
+  pass = pass & run_parse_test(make("p045-b"),
                                make("deftype foo fn[int, int] ;"));
   pass = pass & run_parse_test(make("p046-a"),
                                make("deftype foo struct { x y; z int; t fn[beh]; };"));
   pass = pass & run_parse_test(make("p046-b"),
                                make("deftype foo enum { x y; z int; t fn[beh]; };"));
   pass = pass & run_parse_test(make("p046-c"),
+                               make("alias foo enum { x y; z int; t fn[beh]; };"));
+  pass = pass & run_parse_test(make("p046-c"),
                                make("defenum foo { x y; z int; t fn[beh]; };"));
-  pass = pass & run_parse_test(make("p047"),
+  pass = pass & run_parse_test(make("p047-a"),
                                make("deftype[] foo bar;\n"));
-  pass = pass & run_parse_test(make("p048"),
+  pass = pass & run_parse_test(make("p047-b"),
+                               make("alias[] foo bar;\n"));
+  pass = pass & run_parse_test(make("p048-a"),
                                make("deftype[] foo struct {x bar [quux]; };\n"));
-  pass = pass & run_parse_test(make("p049"),
+  pass = pass & run_parse_test(make("p048-b"),
+                               make("alias[] foo struct {x bar [quux]; };\n"));
+  pass = pass & run_parse_test(make("p049-a"),
                                make("deftype[] foo struct {x [2 + 3]bar; };\n"));
-  pass = pass & run_parse_test(make("p050"),
+  pass = pass & run_parse_test(make("p049-b"),
+                               make("alias[] foo struct {x [2 + 3]bar; };\n"));
+  pass = pass & run_parse_test(make("p049-c"),
+                               make("deftype[T, U] foo struct {x [2 + 3]bar; };\n"));
+  pass = pass & run_parse_test(make("p049-d"),
+                               make("alias[T, U] foo struct {x [2 + 3]bar; };\n"));
+pass = pass & run_parse_test(make("p050"),
                                make("defclass move foo [7]bar;\ndeftype[T] foo struct { count u32; p [3]T; };\n"));
   pass = pass & run_parse_test(make("p051"),
                                make("defclass copy foo bar;"));
