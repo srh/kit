@@ -1572,7 +1572,7 @@ func test_parse() bool {
                                make("deftype[T, U] foo struct {x [2 + 3]bar; };\n"));
   pass = pass & run_parse_test(make("p049-d"),
                                make("alias[T, U] foo struct {x [2 + 3]bar; };\n"));
-pass = pass & run_parse_test(make("p050"),
+  pass = pass & run_parse_test(make("p050"),
                                make("defclass move foo [7]bar;\ndeftype[T] foo struct { count u32; p [3]T; };\n"));
   pass = pass & run_parse_test(make("p051"),
                                make("defclass copy foo bar;"));
