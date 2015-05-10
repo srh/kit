@@ -13,20 +13,20 @@ func `!=`(x ident_value, y ident_value) bool {
   return x.~ != y.~;
 }
 
-defclass copy identmap struct {
-  // A map from strings to ident values.
-  table hash[string, ident_value];
-  // A map from ident values to strings.
-  backmap array[string];
+defclass[T] copy symmap struct {
+  // A map from T's to ident values.
+  table hash[T, ident_value];
+  // A map from ident values to T's.
+  backmap array[T];
 };
 
-access identmap {
-  func do_init(im *identmap) void {
+access symmap[_] {
+  func[T] do_init(im *symmap[T]) void {
     init(&im->table);
     init(&im->backmap);
   }
 
-  func intern(im *identmap, s string) ident_value {
+  func[T] intern(im *symmap[T], s T) ident_value {
     val size = count(&im->backmap);
     if try_insert(&im->table, s, ~val) {
       push(&im->backmap, s);
@@ -40,13 +40,25 @@ access identmap {
     }
   }
 
-  func is_interned(im *identmap, s string) opt[ident_value] {
+  func[T] is_interned(im *symmap[T], s T) opt[ident_value] {
     return lookup(&im->table, s);
   }
 
-  func lookup(im *identmap, ident ident_value) string {
+  func[T] lookup(im *symmap[T], ident ident_value) T {
     return get(&im->backmap, ident.~);
   }
 }
 
+deftype identmap symmap[string];
 
+func intern(im *identmap, s string) ident_value {
+  return intern(&im->~, s);
+}
+
+func is_interned(im *identmap, s string) opt[ident_value] {
+  return is_interned(&im->~, s);
+}
+
+func lookup(im *identmap, ident ident_value) string {
+  return lookup(&im->~, ident);
+}
