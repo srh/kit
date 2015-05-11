@@ -13,6 +13,14 @@ func `!=`(x ident_value, y ident_value) bool {
   return x.~ != y.~;
 }
 
+func hash_compute_hash(x *ident_value) osize {
+  return ~x->~;
+}
+
+func hash_equal(x *ident_value, y *ident_value) bool {
+  return *x == *y;
+}
+
 defclass[T] copy symmap struct {
   // A map from T's to ident values.
   table hash[T, ident_value];

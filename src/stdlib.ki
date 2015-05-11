@@ -29,6 +29,12 @@ func[T] debugstr(arr T) void {
   fflush(Stderr());
 }
 
+func[T] printerr(x array[u8], y T) void {
+  print(Stderr(), x);
+  print(Stderr(), to_u8str(y));
+  print(Stderr(), make("\n"));
+}
+
 func checkmalloc(n size) *void {
   n = max(n, 1);
   ret *void = malloc(n);

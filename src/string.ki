@@ -39,3 +39,12 @@ func hash_equal(x *string, y *string) bool {
   }
   return true;
 }
+
+func to_u8str(x string) array[u8] {
+  ret array[u8];
+  for i size = 0; i < count(&x); i = i + 1 {
+    push(&ret, ~get(&x.~, i));
+  }
+  return ret;
+}
+

@@ -29,7 +29,7 @@ access hash[_, _] {
       switch get(&h->arr, i) {
         case None(v): { }
         case Has(p): {
-          offset size = ~hash_compute_hash(&p.car) & new_mask;
+          offset size = ~ @[osize]hash_compute_hash(&p.car) & new_mask;
           step size = 1;
           done bool = false;
           while !done {
@@ -56,7 +56,7 @@ access hash[_, _] {
     }
 
     mask size = count(&h->arr) - 1;
-    offset size = ~hash_compute_hash(&key) & mask;
+    offset size = ~ @[osize]hash_compute_hash(&key) & mask;
     step size = 1;
     for ;; {
       switch get(&h->arr, offset) {
@@ -81,7 +81,7 @@ access hash[_, _] {
 
   func[K, V] lookup(h *hash[K, V], key K) opt[V] {
     mask size = count(&h->arr) - 1;
-    offset size = ~hash_compute_hash(&key) & mask;
+    offset size = ~ @[osize]hash_compute_hash(&key) & mask;
     step size = 1;
     for ;; {
       switch get(&h->arr, offset) {
@@ -97,5 +97,9 @@ access hash[_, _] {
         }
       }
     }
+  }
+
+  func[K, V] count(h *hash[K, V]) size {
+    return h->count;
   }
 }
