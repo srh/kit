@@ -6640,8 +6640,8 @@ int check_file_test_more_49(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
-int check_file_test_more_50(const uint8_t *name, size_t name_count,
-                            uint8_t **data_out, size_t *data_count_out) {
+int check_file_test_more_50a(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
@@ -6652,6 +6652,28 @@ int check_file_test_more_50(const uint8_t *name, size_t name_count,
       "  switch x {\n"
       "    case c1(v void): { return -1; }\n"
       "    case c2(s struct { p i32; q i32; }): {\n"
+      "      return s.p + s.q;\n"
+      "    }\n"
+      "  }\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_50b(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defenum ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p i32; q i32; };\n"
+      "};\n"
+      "def foo fn[ty, i32] = func(x ty) i32 {\n"
+      "  switch &x {\n"
+      "    case &c1(v void): { return -1; }\n"
+      "    case &c2(s struct { p i32; q i32; }): {\n"
       "      return s.p + s.q;\n"
       "    }\n"
       "  }\n"
@@ -6895,8 +6917,8 @@ int check_file_test_more_64(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
-int check_file_test_more_65(const uint8_t *name, size_t name_count,
-                            uint8_t **data_out, size_t *data_count_out) {
+int check_file_test_more_65a(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because of overlapping default cases. */
   struct test_module a[] = { {
       "foo",
@@ -6909,6 +6931,31 @@ int check_file_test_more_65(const uint8_t *name, size_t name_count,
       "    default: { return -1; }\n"
       "    default: { return -2; }\n"
       "    case c2(s): {\n"
+      "      return s.p + s.q;\n"
+      "    }\n"
+      "  }\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+
+int check_file_test_more_65b(const uint8_t *name, size_t name_count,
+                             uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because of overlapping default cases. */
+  struct test_module a[] = { {
+      "foo",
+      "defenum ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p i32; q i32; };\n"
+      "};\n"
+      "def foo fn[ty, i32] = func(x ty) i32 {\n"
+      "  switch &x {\n"
+      "    default: { return -1; }\n"
+      "    default: { return -2; }\n"
+      "    case &c2(s): {\n"
       "      return s.p + s.q;\n"
       "    }\n"
       "  }\n"
@@ -7606,9 +7653,15 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file check_file_test_more_50...\n");
-  if (!test_check_module(&im, &check_file_test_more_50, foo)) {
-    DBG("check_file_test_more_50 fails\n");
+  DBG("test_check_file check_file_test_more_50a...\n");
+  if (!test_check_module(&im, &check_file_test_more_50a, foo)) {
+    DBG("check_file_test_more_50a fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_50b...\n");
+  if (!test_check_module(&im, &check_file_test_more_50b, foo)) {
+    DBG("check_file_test_more_50b fails\n");
     goto cleanup_identmap;
   }
 
@@ -7696,9 +7749,15 @@ int test_check_file(void) {
     goto cleanup_identmap;
   }
 
-  DBG("test_check_file !check_file_test_more_65...\n");
-  if (!!test_check_module(&im, &check_file_test_more_65, foo)) {
-    DBG("check_file_test_more_65 fails\n");
+  DBG("test_check_file !check_file_test_more_65a...\n");
+  if (!!test_check_module(&im, &check_file_test_more_65a, foo)) {
+    DBG("check_file_test_more_65a fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_65b...\n");
+  if (!!test_check_module(&im, &check_file_test_more_65b, foo)) {
+    DBG("check_file_test_more_65b fails\n");
     goto cleanup_identmap;
   }
 
