@@ -1004,6 +1004,14 @@ int parse_rest_of_for_statement(struct ps *p, struct pos pos_start,
 
 int parse_case_pattern(struct ps *p, struct ast_case_pattern *out) {
   struct pos pos_start = ps_pos(p);
+  int addressof_constructor = try_skip_oper(p, "&");
+
+  if (addressof_constructor) {
+    if (!skip_ws(p)) {
+      goto fail;
+    }
+  }
+
   struct ast_ident constructor_name;
   if (!parse_ident(p, &constructor_name)) {
     goto fail;
@@ -1020,6 +1028,7 @@ int parse_case_pattern(struct ps *p, struct ast_case_pattern *out) {
   }
 
   ast_case_pattern_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                        addressof_constructor,
                         constructor_name, decl);
   return 1;
 

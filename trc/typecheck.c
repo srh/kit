@@ -3001,11 +3001,25 @@ int check_statement(struct bodystate *bs,
       goto switch_fail;
     }
 
+    int swartch_is_ptr;
     struct ast_enumspec concrete_enumspec;
-    if (!is_enum_type(bs->es->cs, ast_expr_type(ss->swartch), &concrete_enumspec)) {
-      METERR(bs->es->cs, *ast_expr_ast_meta(ss->swartch),
-             "Switching over non-enum type.%s", "\n");
-      goto switch_fail;
+    if (is_enum_type(bs->es->cs, ast_expr_type(ss->swartch), &concrete_enumspec)) {
+      swartch_is_ptr = 0;
+    } else {
+      struct ast_typeexpr *ptr_target;
+      if (view_ptr_target(&bs->es->cs->cm, ast_expr_type(ss->swartch), &ptr_target)) {
+        if (is_enum_type(bs->es->cs, ptr_target, &concrete_enumspec)) {
+          swartch_is_ptr = 1;
+        } else {
+          METERR(bs->es->cs, *ast_expr_ast_meta(ss->swartch),
+                 "Switching over pointer to non-enum type.%s", "\n");
+          goto switch_fail;
+        }
+      } else {
+        METERR(bs->es->cs, *ast_expr_ast_meta(ss->swartch),
+             "Switching over non-enum, non-pointer type.%s", "\n");
+        goto switch_fail;
+      }
     }
 
     fallthrough = FALLTHROUGH_NEVER;
@@ -3037,6 +3051,11 @@ int check_statement(struct bodystate *bs,
         ast_case_pattern_info_specify(&cas->pattern.info,
                                       concrete_enumspec.enumfields_count);
       } else {
+        if (!swartch_is_ptr != !cas->pattern.addressof_constructor) {
+          METERR(bs->es->cs, cas->meta, "Constructor pointeriness mismatches swartch.%s", "\n");
+          goto switch_fail_concrete_enumspec;
+        }
+
         size_t constructor_num = SIZE_MAX;  /* Initialized to appease cl. */
         int constructor_found = 0;
         for (size_t j = 0, je = concrete_enumspec.enumfields_count; j < je; j++) {

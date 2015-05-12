@@ -4295,7 +4295,19 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       frame_restore_offset(h, swartch_saved_offset);
     }
 
-    struct loc swartch_num_loc = make_enum_num_loc(f, h, swartch_loc);
+    struct loc swartch_enum_loc;
+    {
+      struct ast_typeexpr *swartch_target;
+      if (view_ptr_target(&cs->cm, swartch_type, &swartch_target)) {
+        CHECK(swartch_loc.tag == LOC_EBP_OFFSET);
+        uint32_t size = x86_sizeof(&cs->nt, swartch_target);
+        swartch_enum_loc = ebp_indirect_loc(size, size, swartch_loc.u.ebp_offset);
+      } else {
+        swartch_enum_loc = swartch_loc;
+      }
+    }
+
+    struct loc swartch_num_loc = make_enum_num_loc(f, h, swartch_enum_loc);
 
     gen_load_register(f, X86_EAX, swartch_num_loc);
 
@@ -4324,7 +4336,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
 
       struct ast_typeexpr *var_type = ast_var_info_type(&cas->pattern.decl.var_info);
-      struct loc var_loc = make_enum_body_loc(f, h, swartch_loc,
+      struct loc var_loc = make_enum_body_loc(f, h, swartch_enum_loc,
                                               x86_sizeof(&cs->nt, var_type));
 
       struct vardata vd;

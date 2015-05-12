@@ -73,12 +73,12 @@ def blah_enty = func(x enty) enty {
   y enty = c1(void);
   u struct { p i32; q i32; };
   y = c2(u);
-  switch x {
-    case c1(a void): {
+  switch &x {
+    case &c1(a void): {
       s string = lits("c1 (void)\n");
       print(&s);
     }
-    case c2(a): {
+    case &c2(a): {
       s string = lits("c2 ... ");
       print(&s);
       print(@[u32]~a.p);

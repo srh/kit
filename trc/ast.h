@@ -396,12 +396,14 @@ struct ast_case_pattern {
   struct ast_meta meta;
   struct ast_case_pattern_info info;
   int is_default;
+  int addressof_constructor;
   struct ast_ident constructor_name;
   struct ast_vardecl decl;
 };
 
 void ast_case_pattern_init(struct ast_case_pattern *a,
                            struct ast_meta meta,
+                           int addressof_constructor,
                            struct ast_ident constructor_name,
                            struct ast_vardecl decl);
 void ast_case_pattern_init_default(struct ast_case_pattern *a,
