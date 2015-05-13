@@ -14,18 +14,18 @@ defclass[T] move shp *shp_pointee[T];
 access shp[_] {
   func[T] do_init(u *shp[T]) void {
     u->~ = @[*shp_pointee[T]]cast(checkmalloc(sizeof@[shp_pointee[T]]));
-    init(&u->~ ->value);
-    u->~ ->refcount = 1;
+    init(&u->~->value);
+    u->~->refcount = 1;
   }
 
   func[T] do_copy(dest *shp[T], src *shp[T]) void {
-    src->~ ->refcount = src->~ ->refcount + 1;
+    src->~->refcount = src->~->refcount + 1;
     dest->~ = src->~;
   }
 
   func[T] do_destroy(u *shp[T]) void {
-    rc size = u->~ ->refcount - 1;
-    u->~ ->refcount = rc;
+    rc size = u->~->refcount - 1;
+    u->~->refcount = rc;
     if rc == 0 {
       destroy(u->~);
       free(@[*void]cast(u->~));
@@ -33,11 +33,11 @@ access shp[_] {
   }
 
   func[T] oo(x *shp[T]) *T {
-    return &x->~ ->value;
+    return &x->~->value;
   }
 
   func[T] oo(x shp[T]) *T {
-    return &x.~ ->value;
+    return &x.~->value;
   }
 }
 
