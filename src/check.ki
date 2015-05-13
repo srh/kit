@@ -1,6 +1,7 @@
 import ast;
 import parse;
 import tok;
+import shp;
 
 /* Ultimately, we want to convert a module into byte code.  The code
 calculates what the program specifically does -- the
@@ -13,7 +14,7 @@ deftype module_loader struct {
 };
 
 deftype modules struct {
-  by_name hash[ident_value, box[ast_file]];
+  by_name hash[ident_value, shp[ast_file]];
 };
 
 deftype checkstate struct {
@@ -23,7 +24,7 @@ deftype checkstate struct {
 };
 
 func check_module(cs *checkstate, name ident_value) bool {
-  f ast_file;
+  f *ast_file;
   switch lookup_ref(&cs->mods.by_name, name) {
     case None(v): {
       switch (cs->loader.loadfn)(name) {
@@ -33,20 +34,20 @@ func check_module(cs *checkstate, name ident_value) bool {
         }
         case Has(s array[u8]): {
           p ps = make_ps(cs->im, data(&s), count(&s));
-          file box[ast_file];
+          file shp[ast_file];
           if !parse_file(&p, oo(&file)) {
             printerr(make("Parse error in "), lookup(cs->im, name));
             return false;
           }
-          f = *oo(&file);
+          f = oo(&file);
           res bool = try_insert(&cs->mods.by_name, name, file);
           check(res);
 
         }
       }
     }
-    case Has(b *box[ast_file]): {
-      f = *oo(b);
+    case Has(b *shp[ast_file]): {
+      f = oo(b);
     }
   }
 
