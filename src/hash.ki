@@ -79,23 +79,31 @@ access hash[_, _] {
     }
   }
 
-  func[K, V] lookup(h *hash[K, V], key K) opt[V] {
+  // Return value's invalidated by any modification to the hash.
+  func[K, V] lookup_ref(h *hash[K, V], key K) opt[*V] {
     mask size = count(&h->arr) - 1;
     offset size = ~ @[osize]hash_compute_hash(&key) & mask;
     step size = 1;
     for ;; {
-      switch get(&h->arr, offset) {
-        case None(v): {
+      switch ref(&h->arr, offset) {
+        case &None(v): {
           return None();
         }
-        case Has(p): {
+        case &Has(p): {
           if hash_equal(&p.car, &key) {
-            return Has(p.cdr);
+            return Has(&p.cdr);
           }
           offset = (offset + step) & mask;
           step = step + 1;
         }
       }
+    }
+  }
+
+  func[K, V] lookup(h *hash[K, V], key K) opt[V] {
+    switch lookup_ref(h, key) {
+      case None(v): { return None(); }
+      case Has(p *V): { return Has(*p); }
     }
   }
 

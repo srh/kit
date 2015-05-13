@@ -24,14 +24,14 @@ deftype checkstate struct {
 
 func check_module(cs *checkstate, name ident_value) bool {
   f ast_file;
-  switch lookup(&cs->mods.by_name, name) {
+  switch lookup_ref(&cs->mods.by_name, name) {
     case None(v): {
       switch (cs->loader.loadfn)(name) {
         case None(v2): {
           printerr(make("Could not load file "), lookup(cs->im, name));
           return false;
         }
-        case Has(s): {
+        case Has(s array[u8]): {
           p ps = make_ps(cs->im, data(&s), count(&s));
           file box[ast_file];
           if !parse_file(&p, oo(&file)) {
@@ -41,11 +41,12 @@ func check_module(cs *checkstate, name ident_value) bool {
           f = *oo(&file);
           res bool = try_insert(&cs->mods.by_name, name, file);
           check(res);
+
         }
       }
     }
-    case Has(b): {
-      f = *oo(&b);
+    case Has(b *box[ast_file]): {
+      f = *oo(b);
     }
   }
 
