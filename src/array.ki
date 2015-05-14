@@ -131,3 +131,12 @@ func foo() void {
   data(&u);
 }
 
+func[T] reverse(a *array[T]) array[T] {
+  n size = count(a);
+  ret array[T];
+  while n > 0 {
+    n = n - 1;
+    push(&ret, get(a, n));
+  }
+  return ret;
+}

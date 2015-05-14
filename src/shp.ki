@@ -2,7 +2,7 @@ import stdlib;
 
 // Shared pointers.  Right now many users of these just don't want to
 // copy, the way box does, because non-copying movable types are not
-// possible yet.
+// practical yet.
 
 deftype[T] shp_pointee struct {
   refcount size;

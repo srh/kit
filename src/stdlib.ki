@@ -29,10 +29,45 @@ func[T] debugstr(arr T) void {
   fflush(Stderr());
 }
 
+func[T] to_u8str(x *T) array[u8] {
+  u union { p *void; x size; };
+  u.p = cast(x);
+  return as_hex(u.x);
+}
+
+func to_u8str(x bool) array[u8] {
+  if x {
+    return make("true");
+  } else {
+    return make("false");
+  }
+}
+
+func as_hex(x size) array[u8] {
+  arr array[u8];
+  if x == 0 {
+    push(&arr, '0');
+    return arr;
+  }
+  while x != 0 {
+    units size = x % 16;
+    ch u8;
+    if units < 10 {
+      ch = ~(units + '0');
+    } else {
+      ch = ~((units - 10) + 'a');
+    }
+    push(&arr, ch);
+    x = x / 16;
+  }
+  return reverse(&arr);
+}
+
 func[T] printerr(x array[u8], y T) void {
   print(Stderr(), x);
   print(Stderr(), to_u8str(y));
   print(Stderr(), make("\n"));
+  fflush(Stderr());
 }
 
 func checkmalloc(n size) *void {

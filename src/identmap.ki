@@ -4,6 +4,10 @@ import stdlib;
 
 deftype ident_value size;
 
+func to_u8str(v ident_value) array[u8] {
+  return as_hex(v.~);
+}
+
 def `~` fn[size, ident_value] = wrapconvert;
 
 func `==`(x ident_value, y ident_value) bool {

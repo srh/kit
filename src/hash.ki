@@ -102,8 +102,12 @@ access hash[_, _] {
 
   func[K, V] lookup(h *hash[K, V], key K) opt[V] {
     switch lookup_ref(h, key) {
-      case None(v): { return None(); }
-      case Has(p *V): { return Has(*p); }
+      case None(v): {
+        return None();
+      }
+      case Has(p *V): {
+        return Has(*p);
+      }
     }
   }
 

@@ -3,55 +3,29 @@ import parse;
 import tok;
 import shp;
 
-/* Ultimately, we want to convert a module into byte code.  The code
-calculates what the program specifically does -- the
-constructor/destructor calls, etc.  It also verifies that the code
-typechecks.  It puts the information into the "checkstate" object. */
-
-
-deftype module_loader struct {
-  loadfn fn[ident_value, opt[array[u8]]];
-};
-
-deftype modules struct {
-  by_name hash[ident_value, shp[ast_file]];
-};
-
 deftype checkstate struct {
-  im *identmap;
-  loader module_loader;
-  mods modules;
+  modules array[shp[module]];
+  instantiations array[shp[def_inst]];
+  defs array[shp[def_entry]];
 };
 
-func check_module(cs *checkstate, name ident_value) bool {
-  f *ast_file;
-  switch lookup_ref(&cs->mods.by_name, name) {
-    case None(v): {
-      switch (cs->loader.loadfn)(name) {
-        case None(v2): {
-          printerr(make("Could not load file "), lookup(cs->im, name));
-          return false;
-        }
-        case Has(s array[u8]): {
-          p ps = make_ps(cs->im, data(&s), count(&s));
-          file shp[ast_file];
-          if !parse_file(&p, oo(&file)) {
-            printerr(make("Parse error in "), lookup(cs->im, name));
-            return false;
-          }
-          f = oo(&file);
-          res bool = try_insert(&cs->mods.by_name, name, file);
-          check(res);
+deftype module struct {
+  module_name ident_value;
+  file ast_file;
+  buf array[u8];
+};
 
-        }
-      }
-    }
-    case Has(b *shp[ast_file]): {
-      f = oo(b);
-    }
-  }
+deftype def_inst struct {
 
-  // TODO: We've got an ast_file, now actually typecheck it.
 
-  return false;
-}
+};
+
+deftype def_entry struct {
+
+};
+
+// An index into checkstate's instantiations array.
+deftype def_inst_id size;
+
+// An index into checkstate's defs array.
+deftype def_entry_id size;

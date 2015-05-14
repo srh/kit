@@ -399,6 +399,10 @@ struct vardata {
   gone. */
   struct varnum varnum;
 
+  /* Variables bound when switching over a pointer-to-enum do not get
+  destroyed when unwinding from a return statement. */
+  int destroy_when_unwound;
+
   /* A non-owned reference to the type. */
   struct ast_typeexpr *concrete_type;
   struct loc loc;
@@ -407,10 +411,12 @@ struct vardata {
 void vardata_init(struct vardata *vd,
                   ident_value name,
                   struct varnum varnum,
+                  int destroy_when_unwound,
                   struct ast_typeexpr *concrete_type,
                   struct loc loc) {
   vd->name = name;
   vd->varnum = varnum;
+  vd->destroy_when_unwound = destroy_when_unwound;
   vd->concrete_type = concrete_type;
   vd->loc = loc;
 }
@@ -649,7 +655,7 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
 
     struct vardata vd;
     vardata_init(&vd, expr->u.lambda.params[i].name.value,
-                 varnum, param_type, loc);
+                 varnum, 1, param_type, loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
     vars_pushed = size_add(vars_pushed, 1);
@@ -4079,7 +4085,9 @@ void gen_return(struct checkstate *cs, struct objfile *f, struct frame *h) {
   for (size_t i = h->vardata_count; i > h->arg_count; ) {
     i--;
     struct vardata *vd = &h->vardata[i];
-    gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
+    if (vd->destroy_when_unwound) {
+      gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
+    }
   }
 
   gen_placeholder_jmp(f, h, h->return_target_number);
@@ -4139,7 +4147,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     struct vardata vd;
     struct varnum varnum = ast_var_info_varnum(&s->u.var_statement.decl.var_info);
     vardata_init(&vd, s->u.var_statement.decl.name.value,
-                 varnum,
+                 varnum, 1,
                  ast_var_statement_type(&s->u.var_statement),
                  var_loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
@@ -4295,14 +4303,17 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       frame_restore_offset(h, swartch_saved_offset);
     }
 
+    int swartch_is_ptr;
     struct loc swartch_enum_loc;
     {
       struct ast_typeexpr *swartch_target;
       if (view_ptr_target(&cs->cm, swartch_type, &swartch_target)) {
+        swartch_is_ptr = 1;
         CHECK(swartch_loc.tag == LOC_EBP_OFFSET);
         uint32_t size = x86_sizeof(&cs->nt, swartch_target);
         swartch_enum_loc = ebp_indirect_loc(size, size, swartch_loc.u.ebp_offset);
       } else {
+        swartch_is_ptr = 0;
         swartch_enum_loc = swartch_loc;
       }
     }
@@ -4341,7 +4352,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
       struct vardata vd;
       struct varnum varnum = ast_var_info_varnum(&cas->pattern.decl.var_info);
-      vardata_init(&vd, cas->pattern.decl.name.value, varnum, var_type, var_loc);
+      /* We don't destroy the variable when unwinding, if we're switching over a pointer-to-enum. */
+      vardata_init(&vd, cas->pattern.decl.name.value, varnum, !swartch_is_ptr, var_type, var_loc);
       SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
       if (!gen_bracebody(cs, f, h, &cas->body)) {
