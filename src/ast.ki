@@ -15,7 +15,7 @@ deftype interval struct {
 
 deftype ast_ident struct {
   meta ast_meta;
-  value ident_value;
+  value sym;
 };
 
 // Add pos info below.

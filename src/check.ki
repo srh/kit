@@ -10,7 +10,7 @@ deftype checkstate struct {
 };
 
 deftype module struct {
-  module_name ident_value;
+  module_name sym;
   file ast_file;
   buf array[u8];
 };
