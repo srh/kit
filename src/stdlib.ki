@@ -104,6 +104,13 @@ func[S, T] cons(s S, t T) tup[S, T] {
   return ret;
 }
 
+func[S, T] to_u8str(p tup[S, T]) array[u8] {
+  left array[u8] = to_u8str(p.car);
+  right array[u8] = to_u8str(p.cdr);
+  append(&left, &right);
+  return left;
+}
+
 func[S, T] wrapconvert(x T) S {
   ret S;
   ret.~ = x;

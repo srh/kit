@@ -4,10 +4,23 @@ import tok;
 import shp;
 
 deftype checkstate struct {
+  im *identmap;
+  loader fn[sym, opt[array[u8]]];
+
   modules array[shp[module]];
+  modules_by_name hash[sym, module_id];
+
   instantiations array[shp[def_inst]];
   defs array[shp[def_entry]];
 };
+
+// An index into checkstate's modules array.
+deftype module_id size;
+def `~` fn[size, module_id] = wrapconvert;
+// An index into checkstate's instantiations array.
+deftype def_inst_id size;
+// An index into checkstate's defs array.
+deftype def_entry_id size;
 
 deftype module struct {
   module_name sym;
@@ -21,11 +34,62 @@ deftype def_inst struct {
 };
 
 deftype def_entry struct {
-
+  module_name sym;
+  def_name sym;
+  is_checked bool;
 };
 
-// An index into checkstate's instantiations array.
-deftype def_inst_id size;
+func check_module(cs *checkstate, mod_name sym) bool {
+  switch load_module(cs, mod_name) {
+    case None(v): {
+      return false;
+    }
+    case Has(id module_id): {
+      // TODO: Implement.
+      return false;
+    }
+  }
+}
 
-// An index into checkstate's defs array.
-deftype def_entry_id size;
+func load_module(cs *checkstate, mod_name sym) opt[module_id] {
+  switch lookup(&cs->modules_by_name, mod_name) {
+    case Has(id module_id): {
+      return Has(id);
+    }
+    case None(v): {
+      switch (cs->loader)(mod_name) {
+        case None(v2): {
+          ERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
+          return None();
+        }
+        case Has(arr array[u8]): {
+          mod shp[module];
+          oo(&mod)->module_name = mod_name;
+          oo(&mod)->buf = arr;
+          p ps = make_ps(cs->im, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
+          if !parse_file(&p, &oo(&mod)->file) {
+            ERR(_u8("Trouble parsing module "), lookup(cs->im, mod_name));
+            return None();
+          }
+          mod_id module_id = ~count(&cs->modules);
+          push(&cs->modules, mod);
+          if !try_insert(&cs->modules_by_name, mod_name, mod_id) {
+            ERR(_u8("ICE: modules_by_name already has name "), lookup(cs->im, mod_name));
+            return None();
+          }
+          return Has(mod_id);
+        }
+      }
+    }
+  }
+}
+
+func[T, U] ERR(x T, y U) void {
+  ERR(cons(x, y));
+}
+
+func[T] ERR(x T) void {
+  print(Stderr(), to_u8str(x));
+  print(Stderr(), _u8("\n"));
+  fflush(Stderr());
+}

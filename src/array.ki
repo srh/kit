@@ -109,7 +109,6 @@ access array[_] {
   }
 }
 
-
 func[T] array_equal(a *array[T], b *array[T]) bool {
   e size = count(a);
   if e != count(b) {
@@ -140,3 +139,24 @@ func[T] reverse(a *array[T]) array[T] {
   }
   return ret;
 }
+
+func[T] empty(a *array[T]) bool {
+  return count(a) == 0;
+}
+
+func[T] popval(a *array[T], val_out *T) bool {
+  n size = count(a);
+  if n == 0 {
+    return false;
+  }
+  *val_out = get(a, n - 1);
+  pop(a);
+  return true;
+}
+
+func to_u8str(a array[u8]) array[u8] {
+  return a;
+}
+
+// Heh.
+def[T] _u8 fn[T, array[u8]] = make;

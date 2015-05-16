@@ -10,6 +10,7 @@ defenum force_assignment {
   ForceAssignmentYes void;
 };
 
+// Used to indicate a "parse failure", grepabbly in case we want fancier handling later.
 def Fail bool = false;
 
 deftype prec_pair struct {
