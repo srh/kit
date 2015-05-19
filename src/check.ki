@@ -14,6 +14,8 @@ deftype checkstate struct {
 
   defs array[shp[def_entry]];
   defs_by_name hash[sym, array[def_entry_id]];
+
+  aliases array[shp[alias_entry]];
 };
 
 // An index into checkstate's modules array.
@@ -52,6 +54,13 @@ deftype def_entry struct {
   def_name sym;
   is_checked bool;
 };
+
+deftype alias_entry struct {
+  module_name sym;
+  defined_name sym;
+};
+
+
 
 func process_module(cs *checkstate, mod_name sym) opt[module_id] {
   switch load_module(cs, mod_name) {
@@ -125,6 +134,16 @@ func process_defs(cs *checkstate, mod *module) bool {
   return true;
 }
 
+func add_def_entry(cs *checkstate,
+                   module_name sym,
+                   ent shp[def_entry]) void {
+  id def_entry_id = ~count(&cs->defs);
+  push(&cs->defs, ent);
+  arr *array[def_entry_id] = try_insert_lookup(
+    &cs->defs_by_name, oo(ent)->def_name, default());
+  push(arr, id);
+}
+
 func process_toplevels(cs *checkstate,
                        module_name sym,
                        toplevels *array[ast_toplevel]) bool {
@@ -141,28 +160,25 @@ func process_toplevels(cs *checkstate,
         }
       }
       case &Def(a ast_def): {
-        ent shp[def_entry];
-        oo(&ent)->module_name = module_name;
-        oo(&ent)->def_name = a.name.value;
-        oo(&ent)->is_checked = false;
-        id def_entry_id = ~count(&cs->defs);
-        push(&cs->defs, ent);
-        arr *array[def_entry_id] = try_insert_lookup(
-          &cs->defs_by_name, a.name.value, default());
-        push(arr, id);
+        ent shp[def_entry] = emshp({module_name, a.name.value, false});
+        add_def_entry(cs, module_name, ent);
       }
       case &ExternDef(a ast_extern_def): {
-        return false;
+        ent shp[def_entry] = emshp({module_name, a.name.value, false});
+        add_def_entry(cs, module_name, ent);
       }
       case &TypeDef(a ast_type_def): {
-        return false;
+        ent shp[def_entry] = emshp({module_name, a.name.value, false});
+        add_def_entry(cs, module_name, ent);
       }
       case &TypeAlias(a ast_type_alias): {
-        return false;
+        ent shp[alias_entry] = emshp({module_name, a.name.value});
+        push(&cs->aliases, ent);
       }
       case &Access(a ast_access): {
-        // TODO: Implement.
-        return false;
+        if !process_toplevels(cs, module_name, &a.toplevels) {
+          return false;
+        }
       }
     }
   }
