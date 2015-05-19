@@ -26,16 +26,16 @@ access hash[_, _] {
     new_array array[opt[tup[K, V]]] = repeat(None@[tup[K, V]](), new_limit);
     old_limit size = count(&h->arr);
     for i size = 0; i < old_limit; i = i + 1 {
-      switch get(&h->arr, i) {
-        case None(v): { }
-        case Has(p): {
+      switch ref(&h->arr, i) {
+        case &None(v): { }
+        case &Has(p tup[K, V]): {
           offset size = ~ @[osize]hash_compute_hash(&p.car) & new_mask;
           step size = 1;
           done bool = false;
           while !done {
-            switch get(&new_array, offset) {
-              case None(v): { done = true; }
-              case Has(new_p): {
+            switch ref(&new_array, offset) {
+              case &None(v): { done = true; }
+              case &Has(new_p): {
                 offset = (offset + step) & new_mask;
                 step = step + 1;
               }
@@ -59,8 +59,8 @@ access hash[_, _] {
     offset size = ~ @[osize]hash_compute_hash(&key) & mask;
     step size = 1;
     for ;; {
-      switch get(&h->arr, offset) {
-        case None(v): {
+      switch ref(&h->arr, offset) {
+        case &None(v): {
           set(&h->arr, offset, Has(cons(key, value)));
           h->count = h->count + 1;
           if h->count * 2 >= count(&h->arr) {
@@ -68,7 +68,7 @@ access hash[_, _] {
           }
           return true;
         }
-        case Has(p): {
+        case &Has(p tup[K, V]): {
           if hash_equal(&p.car, &key) {
             return false;
           }
