@@ -11,7 +11,9 @@ deftype checkstate struct {
   modules_by_name hash[sym, module_id];
 
   instantiations array[shp[def_inst]];
+
   defs array[shp[def_entry]];
+  defs_by_name hash[sym, array[def_entry_id]];
 };
 
 // An index into checkstate's modules array.
@@ -21,15 +23,27 @@ def `~` fn[size, module_id] = wrapconvert;
 deftype def_inst_id size;
 // An index into checkstate's defs array.
 deftype def_entry_id size;
+def `~` fn[size, def_entry_id] = wrapconvert;
+
+defenum module_process_state {
+  Unprocessed void;
+  Processing void;
+  DoneProcessing void;
+};
+
+func `==`(a module_process_state, b module_process_state) bool {
+  return enumnum(&a) == enumnum(&b);
+}
 
 deftype module struct {
   module_name sym;
   file ast_file;
   buf array[u8];
+  process_state module_process_state;
 };
 
 deftype def_inst struct {
-
+  
 
 };
 
@@ -39,8 +53,25 @@ deftype def_entry struct {
   is_checked bool;
 };
 
-func check_module(cs *checkstate, mod_name sym) bool {
+func process_module(cs *checkstate, mod_name sym) opt[module_id] {
   switch load_module(cs, mod_name) {
+    case None(v): {
+      return None();
+    }
+    case Has(id module_id): {
+      mod *module = oo(get(&cs->modules, id.~));
+      if mod->process_state == Unprocessed(void) {
+         if !process_defs(cs, mod) {
+           return None();
+         }
+      }
+      return Has(id);
+    }
+  }
+}
+
+func check_module(cs *checkstate, mod_name sym) bool {
+  switch process_module(cs, mod_name) {
     case None(v): {
       return false;
     }
@@ -64,6 +95,7 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
         }
         case Has(arr array[u8]): {
           mod shp[module];
+          oo(&mod)->process_state = Unprocessed(void);
           oo(&mod)->module_name = mod_name;
           oo(&mod)->buf = arr;
           p ps = make_ps(cs->im, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
@@ -82,6 +114,59 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
       }
     }
   }
+}
+
+func process_defs(cs *checkstate, mod *module) bool {
+  check_mutate(&mod->process_state, Unprocessed(void), Processing(void));
+  if !process_toplevels(cs, mod->module_name, &mod->file.toplevels) {
+    return false;
+  }
+  check_mutate(&mod->process_state, Processing(void), DoneProcessing(void));
+  return true;
+}
+
+func process_toplevels(cs *checkstate,
+                       module_name sym,
+                       toplevels *array[ast_toplevel]) bool {
+  for i size = 0; i < count(toplevels); i = i + 1 {
+    switch ref(toplevels, i) {
+      case &Import(a ast_import): {
+        switch process_module(cs, a.name.value) {
+          case None(v): {
+            return false;
+          }
+          case Has(id module_id): {
+            // Do nothing!  We've processed the module successfully.
+          }
+        }
+      }
+      case &Def(a ast_def): {
+        ent shp[def_entry];
+        oo(&ent)->module_name = module_name;
+        oo(&ent)->def_name = a.name.value;
+        oo(&ent)->is_checked = false;
+        id def_entry_id = ~count(&cs->defs);
+        push(&cs->defs, ent);
+        arr *array[def_entry_id] = try_insert_lookup(
+          &cs->defs_by_name, a.name.value, default());
+        push(arr, id);
+      }
+      case &ExternDef(a ast_extern_def): {
+        return false;
+      }
+      case &TypeDef(a ast_type_def): {
+        return false;
+      }
+      case &TypeAlias(a ast_type_alias): {
+        return false;
+      }
+      case &Access(a ast_access): {
+        // TODO: Implement.
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 func[T, U] ERR(x T, y U) void {
