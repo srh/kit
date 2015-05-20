@@ -52,21 +52,26 @@ int main(int argc, char **argv) {
     return run_tests();
   }
 
-  int ret = EXIT_FAILURE;
+  if (module) {
+    int ret = EXIT_FAILURE;
 
-  struct identmap im;
-  identmap_init(&im);
-  ident_value ident_module = identmap_intern(&im, module, strlen(module));
-  if (!build_module(&im, linux, &read_module_file, ident_module)) {
-    goto cleanup_im;
+    struct identmap im;
+    identmap_init(&im);
+    ident_value ident_module = identmap_intern(&im, module, strlen(module));
+    if (!build_module(&im, linux, &read_module_file, ident_module)) {
+      goto cleanup_im;
+    }
+
+
+    DBG("Success?\n");
+    ret = EXIT_SUCCESS;
+
+  cleanup_im:
+    identmap_destroy(&im);
+    return ret;
   }
 
-
-  DBG("Success?\n");
-  ret = EXIT_SUCCESS;
-
- cleanup_im:
-  identmap_destroy(&im);
-  return ret;
+  print_usage(argv[0]);
+  return EXIT_FAILURE;
 }
 
