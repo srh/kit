@@ -45,7 +45,6 @@ deftype module struct {
 };
 
 deftype def_inst struct {
-  
 
 };
 
@@ -61,23 +60,6 @@ deftype alias_entry struct {
 };
 
 
-
-func process_module(cs *checkstate, mod_name sym) opt[module_id] {
-  switch load_module(cs, mod_name) {
-    case None(v): {
-      return None();
-    }
-    case Has(id module_id): {
-      mod *module = oo(get(&cs->modules, id.~));
-      if mod->process_state == Unprocessed(void) {
-         if !process_defs(cs, mod) {
-           return None();
-         }
-      }
-      return Has(id);
-    }
-  }
-}
 
 func check_module(cs *checkstate, mod_name sym) bool {
   switch process_module(cs, mod_name) {
@@ -121,6 +103,23 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
           return Has(mod_id);
         }
       }
+    }
+  }
+}
+
+func process_module(cs *checkstate, mod_name sym) opt[module_id] {
+  switch load_module(cs, mod_name) {
+    case None(v): {
+      return None();
+    }
+    case Has(id module_id): {
+      mod *module = oo(get(&cs->modules, id.~));
+      if mod->process_state == Unprocessed(void) {
+         if !process_defs(cs, mod) {
+           return None();
+         }
+      }
+      return Has(id);
     }
   }
 }
