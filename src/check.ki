@@ -21,11 +21,17 @@ deftype checkstate struct {
 // An index into checkstate's modules array.
 deftype module_id size;
 def `~` fn[size, module_id] = wrapconvert;
+
 // An index into checkstate's instantiations array.
 deftype def_inst_id size;
+
 // An index into checkstate's defs array.
 deftype def_entry_id size;
 def `~` fn[size, def_entry_id] = wrapconvert;
+
+// An index into checkstate's aliases array.
+deftype alias_entry_id size;
+def `~` fn[size, alias_entry_id] = wrapconvert;
 
 defenum module_process_state {
   Unprocessed void;
@@ -42,6 +48,9 @@ deftype module struct {
   file ast_file;
   buf array[u8];
   process_state module_process_state;
+  // vvv  Valid when process_state == DoneProcessing.  vvv
+  defs array[def_entry_id];
+  aliases array[alias_entry_id];
 };
 
 deftype def_inst struct {
@@ -126,7 +135,7 @@ func process_module(cs *checkstate, mod_name sym) opt[module_id] {
 
 func process_defs(cs *checkstate, mod *module) bool {
   check_mutate(&mod->process_state, Unprocessed(void), Processing(void));
-  if !process_toplevels(cs, mod->module_name, &mod->file.toplevels) {
+  if !process_toplevels(cs, mod, &mod->file.toplevels) {
     return false;
   }
   check_mutate(&mod->process_state, Processing(void), DoneProcessing(void));
@@ -135,16 +144,18 @@ func process_defs(cs *checkstate, mod *module) bool {
 
 func add_def_entry(cs *checkstate,
                    module_name sym,
+                   module_defs *array[def_entry_id],
                    ent shp[def_entry]) void {
   id def_entry_id = ~count(&cs->defs);
   push(&cs->defs, ent);
   arr *array[def_entry_id] = try_insert_lookup(
     &cs->defs_by_name, oo(ent)->def_name, default());
   push(arr, id);
+  push(module_defs, id);
 }
 
 func process_toplevels(cs *checkstate,
-                       module_name sym,
+                       mod *module,
                        toplevels *array[ast_toplevel]) bool {
   for i size = 0; i < count(toplevels); i = i + 1 {
     switch ref(toplevels, i) {
@@ -159,23 +170,25 @@ func process_toplevels(cs *checkstate,
         }
       }
       case &Def(a ast_def): {
-        ent shp[def_entry] = emshp({module_name, a.name.value, false});
-        add_def_entry(cs, module_name, ent);
+        ent shp[def_entry] = emshp({mod->module_name, a.name.value, false});
+        add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &ExternDef(a ast_extern_def): {
-        ent shp[def_entry] = emshp({module_name, a.name.value, false});
-        add_def_entry(cs, module_name, ent);
+        ent shp[def_entry] = emshp({mod->module_name, a.name.value, false});
+        add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &TypeDef(a ast_type_def): {
-        ent shp[def_entry] = emshp({module_name, a.name.value, false});
-        add_def_entry(cs, module_name, ent);
+        ent shp[def_entry] = emshp({mod->module_name, a.name.value, false});
+        add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &TypeAlias(a ast_type_alias): {
-        ent shp[alias_entry] = emshp({module_name, a.name.value});
+        ent shp[alias_entry] = emshp({mod->module_name, a.name.value});
+        id alias_entry_id = ~count(&cs->aliases);
         push(&cs->aliases, ent);
+        push(&mod->aliases, id);
       }
       case &Access(a ast_access): {
-        if !process_toplevels(cs, module_name, &a.toplevels) {
+        if !process_toplevels(cs, mod, &a.toplevels) {
           return false;
         }
       }
