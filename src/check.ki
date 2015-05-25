@@ -76,7 +76,14 @@ func check_module(cs *checkstate, mod_name sym) bool {
       return false;
     }
     case Has(id module_id): {
-      // TODO: Implement.
+      mod *module = oo(ref(&cs->modules, id.~));
+      for i size = 0; i < count(&mod->defs); i = i + 1 {
+        ent *def_entry = oo(ref(&cs->defs, get(&mod->defs, i).~));
+        if !check_def(cs, ent) {
+          return false;
+        }
+      }
+      // TODO: Check aliases too?  Or would they have been checked when we put them in a big table?
       return false;
     }
   }
@@ -195,6 +202,11 @@ func process_toplevels(cs *checkstate,
     }
   }
   return true;
+}
+
+func check_def(cs *checkstate, ent *def_entry) bool {
+  // TODO: Implement.
+  return false;
 }
 
 func[T, U] ERR(x T, y U) void {
