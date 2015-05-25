@@ -60,6 +60,9 @@ deftype def_inst struct {
 deftype def_entry struct {
   module_name sym;
   def_name sym;
+  tl *ast_toplevel;
+
+
   is_checked bool;
 };
 
@@ -165,7 +168,8 @@ func process_toplevels(cs *checkstate,
                        mod *module,
                        toplevels *array[ast_toplevel]) bool {
   for i size = 0; i < count(toplevels); i = i + 1 {
-    switch ref(toplevels, i) {
+    toplevel *ast_toplevel = ref(toplevels, i);
+    switch toplevel {
       case &Import(a ast_import): {
         switch process_module(cs, a.name.value) {
           case None(v): {
@@ -177,15 +181,15 @@ func process_toplevels(cs *checkstate,
         }
       }
       case &Def(a ast_def): {
-        ent shp[def_entry] = emshp({mod->module_name, a.name.value, false});
+        ent shp[def_entry] = emshp({mod->module_name, a.name.value, toplevel, false});
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &ExternDef(a ast_extern_def): {
-        ent shp[def_entry] = emshp({mod->module_name, a.name.value, false});
+        ent shp[def_entry] = emshp({mod->module_name, a.name.value, toplevel, false});
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &TypeDef(a ast_type_def): {
-        ent shp[def_entry] = emshp({mod->module_name, a.name.value, false});
+        ent shp[def_entry] = emshp({mod->module_name, a.name.value, toplevel, false});
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &TypeAlias(a ast_type_alias): {
@@ -205,6 +209,24 @@ func process_toplevels(cs *checkstate,
 }
 
 func check_def(cs *checkstate, ent *def_entry) bool {
+  
+
+  // TODO: Finish implementing:
+  //   - check uniqueness of generic variable names
+  //   - check that name/arity combination is unique
+  // For ast_def:
+  //   - check sanity of typeexpr.
+  //   - check rhs expr.
+  //   - check that rhs expr can be statically evaled?
+  //   - compute static eval dependency relationships?
+  // For ast_extern_def:
+  //   - check sanity of typeexpr.
+  // For ast_type_def:
+  //   - check rhs "type expr".
+  //   - check that rhs "type expr" can be statically evaled.
+  //   - compute static eval dependency relationships?
+
+
   // TODO: Implement.
   return false;
 }
