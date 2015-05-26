@@ -2795,24 +2795,23 @@ int check_swartch(struct exprscope *es, struct ast_expr *swartch,
   }
 }
 
-struct constructor_check_state {
+struct varwind {
   struct ast_vardecl *replaced_decl;
 };
 
-void constructor_check_state_destroy(struct constructor_check_state *a) {
+void varwind_destroy(struct varwind *a) {
   free_ast_vardecl(&a->replaced_decl);
 }
 
-void constructor_check_state_unwind_destroy(struct exprscope *es,
-                                            struct constructor_check_state *a) {
+void varwind_unwind_destroy(struct exprscope *es, struct varwind *a) {
   exprscope_pop_var(es);
-  constructor_check_state_destroy(a);
+  varwind_destroy(a);
 }
 
 int check_constructor(struct exprscope *es,
                       struct swartchspec *spec,
                       struct ast_constructor_pattern *constructor,
-                      struct constructor_check_state *out) {
+                      struct varwind *out) {
   if (spec->is_ptr != constructor->addressof_constructor) {
     METERR(es->cs, constructor->meta, "Constructor pointeriness mismatches swartch.%s", "\n");
     return 0;
@@ -2881,7 +2880,6 @@ int check_constructor(struct exprscope *es,
   out->replaced_decl = replaced_decl;
   return 1;
 }
-
 
 int check_condition(struct bodystate *bs, struct ast_condition *a) {
   switch (a->tag) {
@@ -3174,17 +3172,17 @@ int check_statement(struct bodystate *bs,
                                       spec.concrete_enumspec.enumfields_count);
       } else {
         struct ast_constructor_pattern *constructor = &cas->pattern.u.constructor;
-        struct constructor_check_state cons_state;
-        if (!check_constructor(bs->es, &spec, constructor, &cons_state)) {
+        struct varwind varwind;
+        if (!check_constructor(bs->es, &spec, constructor, &varwind)) {
           goto switch_fail_spec;
         }
 
         if (!check_expr_bracebody(bs, &cas->body, &cas_fallthrough)) {
-          constructor_check_state_destroy(&cons_state);
+          varwind_destroy(&varwind);
           goto switch_fail_spec;
         }
 
-        constructor_check_state_unwind_destroy(bs->es, &cons_state);
+        varwind_unwind_destroy(bs->es, &varwind);
       }
       fallthrough = max_fallthrough(fallthrough, cas_fallthrough);
     }
