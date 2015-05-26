@@ -308,12 +308,25 @@ void ast_condition_init(struct ast_condition *a,
   a->tag = AST_CONDITION_EXPR;
   ast_expr_alloc_move(expr, &a->u.expr);
 }
+
+void ast_condition_init_pattern(struct ast_condition *a,
+                                struct ast_case_pattern pattern,
+                                struct ast_expr rhs) {
+  a->tag = AST_CONDITION_PATTERN;
+  a->u.pa.pattern = pattern;
+  ast_expr_alloc_move(rhs, &a->u.pa.rhs);
+}
+
 void ast_condition_init_copy(struct ast_condition *a,
                              struct ast_condition *c) {
   a->tag = c->tag;
   switch (c->tag) {
   case AST_CONDITION_EXPR:
     ast_expr_alloc_init_copy(c->u.expr, &a->u.expr);
+    break;
+  case AST_CONDITION_PATTERN:
+    ast_case_pattern_init_copy(&a->u.pa.pattern, &c->u.pa.pattern);
+    ast_expr_alloc_init_copy(c->u.pa.rhs, &a->u.pa.rhs);
     break;
   default:
     UNREACHABLE();
@@ -326,6 +339,12 @@ void ast_condition_destroy(struct ast_condition *a) {
     free(a->u.expr);
     a->u.expr = NULL;
   } break;
+  case AST_CONDITION_PATTERN:
+    ast_case_pattern_destroy(&a->u.pa.pattern);
+    ast_expr_destroy(a->u.pa.rhs);
+    free(a->u.pa.rhs);
+    a->u.pa.rhs = NULL;
+    break;
   default:
     UNREACHABLE();
   }
@@ -334,10 +353,10 @@ void ast_condition_destroy(struct ast_condition *a) {
 
 void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
                                struct ast_meta meta,
-                               struct ast_expr expr_condition,
+                               struct ast_condition condition,
                                struct ast_bracebody body) {
   a->meta = meta;
-  ast_condition_init(&a->condition, expr_condition);
+  a->condition = condition;
   a->body = body;
 }
 
@@ -356,11 +375,11 @@ void ast_ifthen_statement_destroy(struct ast_ifthen_statement *a) {
 
 void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,
                                    struct ast_meta meta,
-                                   struct ast_expr expr_condition,
+                                   struct ast_condition condition,
                                    struct ast_bracebody thenbody,
                                    struct ast_bracebody elsebody) {
   a->meta = meta;
-  ast_condition_init(&a->condition, expr_condition);
+  a->condition = condition;
   a->thenbody = thenbody;
   a->elsebody = elsebody;
 }
@@ -382,10 +401,10 @@ void ast_ifthenelse_statement_destroy(struct ast_ifthenelse_statement *a) {
 
 void ast_while_statement_init(struct ast_while_statement *a,
                               struct ast_meta meta,
-                              struct ast_expr expr_condition,
+                              struct ast_condition condition,
                               struct ast_bracebody body) {
   a->meta = meta;
-  ast_condition_init(&a->condition, expr_condition);
+  a->condition = condition;
   a->body = body;
 }
 

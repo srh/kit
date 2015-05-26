@@ -767,11 +767,38 @@ int parse_params_list(struct ps *p,
 }
 
 int parse_bracebody(struct ps *p, struct ast_bracebody *out);
+int parse_case_pattern(struct ps *p, struct ast_case_pattern *out);
+
+int parse_condition(struct ps *p, struct ast_condition *out) {
+  if (try_skip_keyword(p, "case")) {
+    struct ast_case_pattern pattern;
+    if (!(skip_ws(p) && parse_case_pattern(p, &pattern))) {
+      return 0;
+    }
+    struct ast_expr rhs;
+    if (!(skip_ws(p) && try_skip_oper(p, "=") &&
+          skip_ws(p) && parse_expr(p, &rhs, kSemicolonPrecedence))) {
+      goto fail_pattern;
+    }
+    ast_condition_init_pattern(out, pattern, rhs);
+    return 1;
+  fail_pattern:
+    ast_case_pattern_destroy(&pattern);
+    return 0;
+  }
+
+  struct ast_expr expr;
+  if (!parse_expr(p, &expr, kSemicolonPrecedence)) {
+    return 0;
+  }
+  ast_condition_init(out, expr);
+  return 1;
+}
 
 int parse_rest_of_if_statement(struct ps *p, struct pos pos_start,
                                struct ast_statement *out) {
-  struct ast_expr condition;
-  if (!(skip_ws(p) && parse_expr(p, &condition, kSemicolonPrecedence))) {
+  struct ast_condition condition;
+  if (!(skip_ws(p) && parse_condition(p, &condition))) {
     goto fail;
   }
 
@@ -828,7 +855,7 @@ int parse_rest_of_if_statement(struct ps *p, struct pos pos_start,
  fail_thenbody:
   ast_bracebody_destroy(&thenbody);
  fail_condition:
-  ast_expr_destroy(&condition);
+  ast_condition_destroy(&condition);
  fail:
   return 0;
 }
@@ -876,8 +903,8 @@ int parse_rest_of_var_statement(struct ps *p, struct pos pos_start,
 
 int parse_rest_of_while_statement(struct ps *p, struct pos pos_start,
                                   struct ast_while_statement *out) {
-  struct ast_expr condition;
-  if (!(skip_ws(p) && parse_expr(p, &condition, kSemicolonPrecedence))) {
+  struct ast_condition condition;
+  if (!(skip_ws(p) && parse_condition(p, &condition))) {
     goto fail;
   }
 
@@ -891,7 +918,7 @@ int parse_rest_of_while_statement(struct ps *p, struct pos pos_start,
   return 1;
 
  fail_condition:
-  ast_expr_destroy(&condition);
+  ast_condition_destroy(&condition);
  fail:
   return 0;
 }

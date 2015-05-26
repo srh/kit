@@ -297,17 +297,27 @@ void ast_case_pattern_destroy(struct ast_case_pattern *a);
 
 enum ast_condition_tag {
   AST_CONDITION_EXPR,
+  AST_CONDITION_PATTERN,
+};
+
+struct ast_pattern_assign {
+  struct ast_case_pattern pattern;
+  struct ast_expr *rhs;
 };
 
 struct ast_condition {
   enum ast_condition_tag tag;
   union {
     struct ast_expr *expr;
+    struct ast_pattern_assign pa;
   } u;
 };
 
 void ast_condition_init(struct ast_condition *a,
                         struct ast_expr expr);
+void ast_condition_init_pattern(struct ast_condition *a,
+                                struct ast_case_pattern pattern,
+                                struct ast_expr rhs);
 void ast_condition_destroy(struct ast_condition *a);
 
 struct ast_ifthen_statement {
@@ -318,7 +328,7 @@ struct ast_ifthen_statement {
 
 void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
                                struct ast_meta meta,
-                               struct ast_expr expr_condition,
+                               struct ast_condition condition,
                                struct ast_bracebody body);
 
 struct ast_ifthenelse_statement {
@@ -330,7 +340,7 @@ struct ast_ifthenelse_statement {
 
 void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,
                                    struct ast_meta meta,
-                                   struct ast_expr expr_condition,
+                                   struct ast_condition condition,
                                    struct ast_bracebody thenbody,
                                    struct ast_bracebody elsebody);
 
@@ -342,7 +352,7 @@ struct ast_while_statement {
 
 void ast_while_statement_init(struct ast_while_statement *a,
                               struct ast_meta meta,
-                              struct ast_expr expr_condition,
+                              struct ast_condition condition,
                               struct ast_bracebody body);
 
 struct ast_for_statement {
