@@ -635,6 +635,46 @@ void ast_statement_alloc_move(struct ast_statement movee,
   *out = p;
 }
 
+void ast_default_pattern_init(struct ast_default_pattern *a,
+                              struct ast_meta meta) {
+  a->meta = meta;
+}
+
+void ast_default_pattern_init_copy(struct ast_default_pattern *a,
+                                   struct ast_default_pattern *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+}
+
+void ast_default_pattern_destroy(struct ast_default_pattern *a) {
+  ast_meta_destroy(&a->meta);
+}
+
+
+void ast_constructor_pattern_init(struct ast_constructor_pattern *a,
+                                  struct ast_meta meta,
+                                  int addressof_constructor,
+                                  struct ast_ident constructor_name,
+                                  struct ast_vardecl decl) {
+  a->meta = meta;
+  a->addressof_constructor = addressof_constructor;
+  a->constructor_name = constructor_name;
+  a->decl = decl;
+}
+void ast_constructor_pattern_init_copy(struct ast_constructor_pattern *a,
+                                       struct ast_constructor_pattern *c) {
+  a->meta = ast_meta_make_copy(&c->meta);
+  a->addressof_constructor = c->addressof_constructor;
+  ast_ident_init_copy(&a->constructor_name, &c->constructor_name);
+  ast_vardecl_init_copy(&a->decl, &c->decl);
+}
+void ast_constructor_pattern_destroy(struct ast_constructor_pattern *a) {
+  ast_meta_destroy(&a->meta);
+  a->addressof_constructor = 0;
+  ast_ident_destroy(&a->constructor_name);
+  ast_vardecl_destroy(&a->decl);
+}
+
+
 void ast_case_pattern_info_init(struct ast_case_pattern_info *a) {
   a->info_valid = 0;
 }
@@ -671,40 +711,37 @@ void ast_case_pattern_init(struct ast_case_pattern *a,
                            int addressof_constructor,
                            struct ast_ident constructor_name,
                            struct ast_vardecl decl) {
-  a->meta = meta;
   ast_case_pattern_info_init(&a->info);
   a->is_default = 0;
-  a->addressof_constructor = addressof_constructor;
-  a->constructor_name = constructor_name;
-  a->decl = decl;
+  ast_constructor_pattern_init(&a->u.constructor, meta, addressof_constructor,
+                               constructor_name, decl);
 }
 
 void ast_case_pattern_init_default(struct ast_case_pattern *a,
                                    struct ast_meta meta) {
-  a->meta = meta;
   ast_case_pattern_info_init(&a->info);
   a->is_default = 1;
+  ast_default_pattern_init(&a->u.default_pattern, meta);
 }
 
 void ast_case_pattern_init_copy(struct ast_case_pattern *a,
                                 struct ast_case_pattern *c) {
-  a->meta = ast_meta_make_copy(&c->meta);
   ast_case_pattern_info_init_copy(&a->info, &c->info);
   a->is_default = c->is_default;
-  if (!c->is_default) {
-    a->addressof_constructor = c->addressof_constructor;
-    ast_ident_init_copy(&a->constructor_name, &c->constructor_name);
-    ast_vardecl_init_copy(&a->decl, &c->decl);
+  if (c->is_default) {
+    ast_default_pattern_init_copy(&a->u.default_pattern,
+                                  &c->u.default_pattern);
+  } else {
+    ast_constructor_pattern_init_copy(&a->u.constructor, &c->u.constructor);
   }
 }
 
 void ast_case_pattern_destroy(struct ast_case_pattern *a) {
-  ast_meta_destroy(&a->meta);
   ast_case_pattern_info_destroy(&a->info);
-  if (!a->is_default) {
-    a->addressof_constructor = 0;
-    ast_ident_destroy(&a->constructor_name);
-    ast_vardecl_destroy(&a->decl);
+  if (a->is_default) {
+    ast_default_pattern_destroy(&a->u.default_pattern);
+  } else {
+    ast_constructor_pattern_destroy(&a->u.constructor);
   }
 }
 

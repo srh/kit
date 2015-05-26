@@ -4353,14 +4353,14 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
                             FIRST_ENUM_TAG_NUMBER));
       gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
 
-      struct ast_typeexpr *var_type = ast_var_info_type(&cas->pattern.decl.var_info);
+      struct ast_typeexpr *var_type = ast_var_info_type(&cas->pattern.u.constructor.decl.var_info);
       struct loc var_loc = make_enum_body_loc(f, h, swartch_enum_loc,
                                               x86_sizeof(&cs->nt, var_type));
 
       struct vardata vd;
-      struct varnum varnum = ast_var_info_varnum(&cas->pattern.decl.var_info);
+      struct varnum varnum = ast_var_info_varnum(&cas->pattern.u.constructor.decl.var_info);
       /* We don't destroy the variable when unwinding, if we're switching over a pointer-to-enum. */
-      vardata_init(&vd, cas->pattern.decl.name.value, varnum, !swartch_is_ptr, var_type, var_loc);
+      vardata_init(&vd, cas->pattern.u.constructor.decl.name.value, varnum, !swartch_is_ptr, var_type, var_loc);
       SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
       if (!gen_bracebody(cs, f, h, &cas->body)) {

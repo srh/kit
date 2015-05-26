@@ -275,13 +275,40 @@ size_t ast_case_pattern_info_constructor_number(struct ast_case_pattern_info *a)
 void ast_case_pattern_info_specify(struct ast_case_pattern_info *a,
                                    size_t constructor_number);
 
-struct ast_case_pattern {
+struct ast_default_pattern {
   struct ast_meta meta;
-  struct ast_case_pattern_info info;
-  int is_default;
+};
+
+void ast_default_pattern_init(struct ast_default_pattern *a,
+                              struct ast_meta meta);
+void ast_default_pattern_init_copy(struct ast_default_pattern *a,
+                                   struct ast_default_pattern *c);
+void ast_default_pattern_destroy(struct ast_default_pattern *a);
+
+struct ast_constructor_pattern {
+  struct ast_meta meta;
   int addressof_constructor;
   struct ast_ident constructor_name;
   struct ast_vardecl decl;
+};
+
+void ast_constructor_pattern_init(struct ast_constructor_pattern *a,
+                                  struct ast_meta meta,
+                                  int addressof_constructor,
+                                  struct ast_ident constructor_name,
+                                  struct ast_vardecl decl);
+void ast_constructor_pattern_init_copy(struct ast_constructor_pattern *a,
+                                       struct ast_constructor_pattern *c);
+void ast_constructor_pattern_destroy(struct ast_constructor_pattern *a);
+
+
+struct ast_case_pattern {
+  struct ast_case_pattern_info info;
+  int is_default;
+  union {
+    struct ast_default_pattern default_pattern;
+    struct ast_constructor_pattern constructor;
+  } u;
 };
 
 void ast_case_pattern_init(struct ast_case_pattern *a,

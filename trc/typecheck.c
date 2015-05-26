@@ -3072,8 +3072,8 @@ int check_statement(struct bodystate *bs,
           }
         } else {
           if (!ss->cased_statements[j].pattern.is_default
-              && ss->cased_statements[j].pattern.constructor_name.value
-              == cas->pattern.constructor_name.value) {
+              && ss->cased_statements[j].pattern.u.constructor.constructor_name.value
+              == cas->pattern.u.constructor.constructor_name.value) {
             METERR(bs->es->cs, cas->meta, "Overlapping (duplicate) switch cases.%s", "\n");
             goto switch_fail_spec;
           }
@@ -3088,7 +3088,8 @@ int check_statement(struct bodystate *bs,
         ast_case_pattern_info_specify(&cas->pattern.info,
                                       spec.concrete_enumspec.enumfields_count);
       } else {
-        if (!spec.is_ptr != !cas->pattern.addressof_constructor) {
+        struct ast_constructor_pattern *constructor = &cas->pattern.u.constructor;
+        if (!spec.is_ptr != !constructor->addressof_constructor) {
           METERR(bs->es->cs, cas->meta, "Constructor pointeriness mismatches swartch.%s", "\n");
           goto switch_fail_spec;
         }
@@ -3097,7 +3098,7 @@ int check_statement(struct bodystate *bs,
         int constructor_found = 0;
         for (size_t j = 0, je = spec.concrete_enumspec.enumfields_count; j < je; j++) {
           if (spec.concrete_enumspec.enumfields[j].name.value
-              == cas->pattern.constructor_name.value) {
+              == constructor->constructor_name.value) {
             constructor_found = 1;
             constructor_num = j;
             break;
@@ -3115,7 +3116,7 @@ int check_statement(struct bodystate *bs,
         }
 
         struct ast_typeexpr replaced_incomplete_type;
-        replace_generics(bs->es, &cas->pattern.decl.type, &replaced_incomplete_type);
+        replace_generics(bs->es, &constructor->decl.type, &replaced_incomplete_type);
 
         struct varnum varnum;
         struct ast_vardecl *replaced_decl = NULL;
@@ -3129,7 +3130,7 @@ int check_statement(struct bodystate *bs,
           ast_typeexpr_destroy(&replaced_incomplete_type);
 
           struct ast_ident replaced_decl_name;
-          ast_ident_init_copy(&replaced_decl_name, &cas->pattern.decl.name);
+          ast_ident_init_copy(&replaced_decl_name, &constructor->decl.name);
 
           struct ast_typeexpr concrete_type_copy;
           ast_typeexpr_init_copy(&concrete_type_copy,
@@ -3137,7 +3138,7 @@ int check_statement(struct bodystate *bs,
 
           replaced_decl = malloc(sizeof(*replaced_decl));
           CHECK(replaced_decl);
-          ast_vardecl_init(replaced_decl, ast_meta_make_copy(&cas->pattern.decl.meta),
+          ast_vardecl_init(replaced_decl, ast_meta_make_copy(&constructor->decl.meta),
                            replaced_decl_name, concrete_type_copy);
 
           if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
@@ -3157,7 +3158,7 @@ int check_statement(struct bodystate *bs,
         struct ast_typeexpr concrete_type_copy;
         ast_typeexpr_init_copy(&concrete_type_copy,
                                &spec.concrete_enumspec.enumfields[constructor_num].type);
-        ast_var_info_specify(&cas->pattern.decl.var_info, varnum, concrete_type_copy);
+        ast_var_info_specify(&constructor->decl.var_info, varnum, concrete_type_copy);
         ast_case_pattern_info_specify(&cas->pattern.info, constructor_num);
       }
       fallthrough = max_fallthrough(fallthrough, cas_fallthrough);
