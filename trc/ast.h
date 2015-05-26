@@ -262,6 +262,39 @@ void ast_var_statement_init_without_rhs(
 
 struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a);
 
+struct ast_case_pattern_info {
+  int info_valid;
+  /* TODO: Wrap in a wrapper type. */
+  /* This contains number of constructors (in the enum type) if the
+  pattern is a default pattern. */
+  size_t constructor_number;
+};
+
+size_t ast_case_pattern_info_constructor_number(struct ast_case_pattern_info *a);
+
+void ast_case_pattern_info_specify(struct ast_case_pattern_info *a,
+                                   size_t constructor_number);
+
+struct ast_case_pattern {
+  struct ast_meta meta;
+  struct ast_case_pattern_info info;
+  int is_default;
+  int addressof_constructor;
+  struct ast_ident constructor_name;
+  struct ast_vardecl decl;
+};
+
+void ast_case_pattern_init(struct ast_case_pattern *a,
+                           struct ast_meta meta,
+                           int addressof_constructor,
+                           struct ast_ident constructor_name,
+                           struct ast_vardecl decl);
+void ast_case_pattern_init_default(struct ast_case_pattern *a,
+                                   struct ast_meta meta);
+void ast_case_pattern_init_copy(struct ast_case_pattern *a,
+                                struct ast_case_pattern *c);
+void ast_case_pattern_destroy(struct ast_case_pattern *a);
+
 enum ast_condition_tag {
   AST_CONDITION_EXPR,
 };
@@ -393,39 +426,6 @@ void ast_statement_destroy(struct ast_statement *a);
 
 void ast_statement_alloc_move(struct ast_statement movee,
                               struct ast_statement **out);
-
-struct ast_case_pattern_info {
-  int info_valid;
-  /* TODO: Wrap in a wrapper type. */
-  /* This contains number of constructors (in the enum type) if the
-  pattern is a default pattern. */
-  size_t constructor_number;
-};
-
-size_t ast_case_pattern_info_constructor_number(struct ast_case_pattern_info *a);
-
-void ast_case_pattern_info_specify(struct ast_case_pattern_info *a,
-                                   size_t constructor_number);
-
-struct ast_case_pattern {
-  struct ast_meta meta;
-  struct ast_case_pattern_info info;
-  int is_default;
-  int addressof_constructor;
-  struct ast_ident constructor_name;
-  struct ast_vardecl decl;
-};
-
-void ast_case_pattern_init(struct ast_case_pattern *a,
-                           struct ast_meta meta,
-                           int addressof_constructor,
-                           struct ast_ident constructor_name,
-                           struct ast_vardecl decl);
-void ast_case_pattern_init_default(struct ast_case_pattern *a,
-                                   struct ast_meta meta);
-void ast_case_pattern_init_copy(struct ast_case_pattern *a,
-                                struct ast_case_pattern *c);
-void ast_case_pattern_destroy(struct ast_case_pattern *a);
 
 /* TODO: Rename. */
 struct ast_cased_statement {
