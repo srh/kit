@@ -24,6 +24,11 @@ func print(fp *FILE, arr array[u8]) void {
   fwrite(@[*void]cast(data(&arr)), sizeof@[u8], count(&arr), fp);
 }
 
+func print(fp *FILE, arr1 array[u8], arr2 array[u8]) void {
+  print(fp, arr1);
+  print(fp, arr2);
+}
+
 func[T] debugstr(arr T) void {
   fwrite(cast(@[*u8]&arr[0]), sizeof@[u8], arr.length, Stderr());
   fflush(Stderr());
@@ -124,6 +129,12 @@ func[T] default() T {
 
 func check(x bool) void {
   if !x { abort(); }
+}
+
+func crash(msg array[u8]) void {
+  print(Stderr(), msg, make("\n"));
+  fflush(Stderr());
+  abort();
 }
 
 func[T] check_mutate(p *T, old T, new T) void {

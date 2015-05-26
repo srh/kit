@@ -209,26 +209,64 @@ func process_toplevels(cs *checkstate,
 }
 
 func check_def(cs *checkstate, ent *def_entry) bool {
-  
-
   // TODO: Finish implementing:
+  //   - check def for name conflicts (if that's not handled elsehow)
   //   - check uniqueness of generic variable names
   //   - check that name/arity combination is unique
-  // For ast_def:
-  //   - check sanity of typeexpr.
-  //   - check rhs expr.
-  //   - check that rhs expr can be statically evaled?
-  //   - compute static eval dependency relationships?
-  // For ast_extern_def:
-  //   - check sanity of typeexpr.
-  // For ast_type_def:
-  //   - check rhs "type expr".
-  //   - check that rhs "type expr" can be statically evaled.
-  //   - compute static eval dependency relationships?
 
+  switch ent->tl {
+    case &Def(a ast_def): {
+      if !check_generics(cs, &a.generics) {
+        return false;
+      }
 
-  // TODO: Implement.
-  return false;
+      // TODO: Implement.
+      //   - check sanity of typeexpr.
+      //   - check rhs expr.
+      //   - check that rhs expr can be statically evaled?
+      //   - compute static eval dependency relationships?
+      return false;
+    }
+    case &ExternDef(a ast_extern_def): {
+      // TODO: Implement.
+      //   - Check sanity of typeexpr.
+      return false;
+    }
+    case &TypeDef(a ast_type_def): {
+      if !check_generics(cs, &a.generics) {
+        return false;
+      }
+
+      // TODO: Implement.
+      //   - check rhs "type expr".
+      //   - check that rhs "type expr" can be statically evaled.
+      //   - compute static eval dependency relationships?
+      return false;
+    }
+    default: {
+      crash(_u8("check_def sees unexpected toplevel in def_entry."));
+      return fake();
+    }
+  }
+}
+
+func check_generics(cs *checkstate, g *ast_generics) bool {
+  // TODO: Should we check generics for external name shadowing?
+  switch g {
+    case &NoGenerics(v): { return true; }
+    case &HasGenerics(a array[ast_ident]): {
+      for i size = 0; i < count(&a); i = i + 1 {
+        ival sym = ref(&a, i)->value;
+        for j size = 0; j < i; j = j + 1 {
+          if ival == ref(&a, j)->value {
+            ERR(_u8("Generics have duplicate name "), ival);
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+  }
 }
 
 func[T, U] ERR(x T, y U) void {
