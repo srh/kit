@@ -2752,14 +2752,19 @@ int check_expr_bracebody(struct bodystate *bs,
                          struct ast_bracebody *x,
                          enum fallthrough *fallthrough_out);
 
-int check_condition(struct bodystate *bs,
-                    struct ast_condition *a) {
-  struct ast_typeexpr boolean;
-  init_name_type(&boolean, bs->es->cs->cm.boole);
+int check_condition(struct bodystate *bs, struct ast_condition *a) {
+  switch (a->tag) {
+  case AST_CONDITION_EXPR: {
+    struct ast_typeexpr boolean;
+    init_name_type(&boolean, bs->es->cs->cm.boole);
 
-  int res = check_expr(bs->es, a->expr, &boolean);
-  ast_typeexpr_destroy(&boolean);
-  return res;
+    int res = check_expr(bs->es, a->u.expr, &boolean);
+    ast_typeexpr_destroy(&boolean);
+    return res;
+  } break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 int check_statement(struct bodystate *bs,

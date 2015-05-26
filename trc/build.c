@@ -4099,14 +4099,20 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
 int gen_condition(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_condition *a,
                   struct loc *cond_loc_out) {
-  struct expr_return cond_er = open_expr_return();
-  if (!gen_expr(cs, f, h, a->expr, &cond_er)) {
-    return 0;
+  switch (a->tag) {
+  case AST_CONDITION_EXPR: {
+    struct ast_expr *expr = a->u.expr;
+    struct expr_return cond_er = open_expr_return();
+    if (!gen_expr(cs, f, h, expr, &cond_er)) {
+      return 0;
+    }
+    wipe_temporaries(cs, f, h, &cond_er, ast_expr_type(expr),
+                     cond_loc_out);
+    return 1;
+  } break;
+  default:
+    UNREACHABLE();
   }
-  wipe_temporaries(cs, f, h, &cond_er,
-                   ast_expr_type(a->expr),
-                   cond_loc_out);
-  return 1;
 }
 
 int gen_statement(struct checkstate *cs, struct objfile *f,

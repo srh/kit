@@ -262,8 +262,15 @@ void ast_var_statement_init_without_rhs(
 
 struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a);
 
+enum ast_condition_tag {
+  AST_CONDITION_EXPR,
+};
+
 struct ast_condition {
-  struct ast_expr *expr;
+  enum ast_condition_tag tag;
+  union {
+    struct ast_expr *expr;
+  } u;
 };
 
 void ast_condition_init(struct ast_condition *a,

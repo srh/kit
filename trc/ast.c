@@ -305,16 +305,31 @@ void ast_var_statement_destroy(struct ast_var_statement *a) {
 
 void ast_condition_init(struct ast_condition *a,
                         struct ast_expr expr) {
-  ast_expr_alloc_move(expr, &a->expr);
+  a->tag = AST_CONDITION_EXPR;
+  ast_expr_alloc_move(expr, &a->u.expr);
 }
 void ast_condition_init_copy(struct ast_condition *a,
                              struct ast_condition *c) {
-  ast_expr_alloc_init_copy(c->expr, &a->expr);
+  a->tag = c->tag;
+  switch (c->tag) {
+  case AST_CONDITION_EXPR:
+    ast_expr_alloc_init_copy(c->u.expr, &a->u.expr);
+    break;
+  default:
+    UNREACHABLE();
+  }
 }
 void ast_condition_destroy(struct ast_condition *a) {
-  ast_expr_destroy(a->expr);
-  free(a->expr);
-  a->expr = NULL;
+  switch (a->tag) {
+  case AST_CONDITION_EXPR: {
+    ast_expr_destroy(a->u.expr);
+    free(a->u.expr);
+    a->u.expr = NULL;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+  a->tag = (enum ast_condition_tag)-1;
 }
 
 void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
