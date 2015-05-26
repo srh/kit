@@ -313,10 +313,7 @@ struct ast_case_pattern {
 };
 
 void ast_case_pattern_init(struct ast_case_pattern *a,
-                           struct ast_meta meta,
-                           int addressof_constructor,
-                           struct ast_ident constructor_name,
-                           struct ast_vardecl decl);
+                           struct ast_constructor_pattern constructor);
 void ast_case_pattern_init_default(struct ast_case_pattern *a,
                                    struct ast_meta meta);
 void ast_case_pattern_init_copy(struct ast_case_pattern *a,
@@ -329,7 +326,7 @@ enum ast_condition_tag {
 };
 
 struct ast_pattern_assign {
-  struct ast_case_pattern pattern;
+  struct ast_constructor_pattern pattern;
   struct ast_expr *rhs;
 };
 
@@ -344,7 +341,7 @@ struct ast_condition {
 void ast_condition_init(struct ast_condition *a,
                         struct ast_expr expr);
 void ast_condition_init_pattern(struct ast_condition *a,
-                                struct ast_case_pattern pattern,
+                                struct ast_constructor_pattern pattern,
                                 struct ast_expr rhs);
 void ast_condition_destroy(struct ast_condition *a);
 

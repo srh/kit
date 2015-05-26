@@ -310,7 +310,7 @@ void ast_condition_init(struct ast_condition *a,
 }
 
 void ast_condition_init_pattern(struct ast_condition *a,
-                                struct ast_case_pattern pattern,
+                                struct ast_constructor_pattern pattern,
                                 struct ast_expr rhs) {
   a->tag = AST_CONDITION_PATTERN;
   a->u.pa.pattern = pattern;
@@ -325,7 +325,7 @@ void ast_condition_init_copy(struct ast_condition *a,
     ast_expr_alloc_init_copy(c->u.expr, &a->u.expr);
     break;
   case AST_CONDITION_PATTERN:
-    ast_case_pattern_init_copy(&a->u.pa.pattern, &c->u.pa.pattern);
+    ast_constructor_pattern_init_copy(&a->u.pa.pattern, &c->u.pa.pattern);
     ast_expr_alloc_init_copy(c->u.pa.rhs, &a->u.pa.rhs);
     break;
   default:
@@ -340,7 +340,7 @@ void ast_condition_destroy(struct ast_condition *a) {
     a->u.expr = NULL;
   } break;
   case AST_CONDITION_PATTERN:
-    ast_case_pattern_destroy(&a->u.pa.pattern);
+    ast_constructor_pattern_destroy(&a->u.pa.pattern);
     ast_expr_destroy(a->u.pa.rhs);
     free(a->u.pa.rhs);
     a->u.pa.rhs = NULL;
@@ -713,13 +713,9 @@ void ast_constructor_pattern_destroy(struct ast_constructor_pattern *a) {
 
 
 void ast_case_pattern_init(struct ast_case_pattern *a,
-                           struct ast_meta meta,
-                           int addressof_constructor,
-                           struct ast_ident constructor_name,
-                           struct ast_vardecl decl) {
+                           struct ast_constructor_pattern constructor) {
   a->is_default = 0;
-  ast_constructor_pattern_init(&a->u.constructor, meta, addressof_constructor,
-                               constructor_name, decl);
+  a->u.constructor = constructor;
 }
 
 void ast_case_pattern_init_default(struct ast_case_pattern *a,

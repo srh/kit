@@ -767,12 +767,12 @@ int parse_params_list(struct ps *p,
 }
 
 int parse_bracebody(struct ps *p, struct ast_bracebody *out);
-int parse_case_pattern(struct ps *p, struct ast_case_pattern *out);
+int parse_constructor_pattern(struct ps *p, struct ast_constructor_pattern *out);
 
 int parse_condition(struct ps *p, struct ast_condition *out) {
   if (try_skip_keyword(p, "case")) {
-    struct ast_case_pattern pattern;
-    if (!(skip_ws(p) && parse_case_pattern(p, &pattern))) {
+    struct ast_constructor_pattern pattern;
+    if (!(skip_ws(p) && parse_constructor_pattern(p, &pattern))) {
       return 0;
     }
     struct ast_expr rhs;
@@ -783,7 +783,7 @@ int parse_condition(struct ps *p, struct ast_condition *out) {
     ast_condition_init_pattern(out, pattern, rhs);
     return 1;
   fail_pattern:
-    ast_case_pattern_destroy(&pattern);
+    ast_constructor_pattern_destroy(&pattern);
     return 0;
   }
 
@@ -1041,7 +1041,7 @@ int parse_rest_of_for_statement(struct ps *p, struct pos pos_start,
   return 0;
 }
 
-int parse_case_pattern(struct ps *p, struct ast_case_pattern *out) {
+int parse_constructor_pattern(struct ps *p, struct ast_constructor_pattern *out) {
   struct pos pos_start = ps_pos(p);
   int addressof_constructor = try_skip_oper(p, "&");
 
@@ -1066,9 +1066,9 @@ int parse_case_pattern(struct ps *p, struct ast_case_pattern *out) {
     goto fail_decl;
   }
 
-  ast_case_pattern_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                        addressof_constructor,
-                        constructor_name, decl);
+  ast_constructor_pattern_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                               addressof_constructor,
+                               constructor_name, decl);
   return 1;
 
  fail_decl:
@@ -1090,9 +1090,12 @@ int parse_cased_statement(struct ps *p, struct ast_cased_statement *out) {
       goto fail;
     }
 
-    if (!(skip_ws(p) && parse_case_pattern(p, &pattern))) {
+    struct ast_constructor_pattern constructor_pattern;
+    if (!(skip_ws(p) && parse_constructor_pattern(p, &constructor_pattern))) {
       goto fail;
     }
+
+    ast_case_pattern_init(&pattern, constructor_pattern);
   }
 
   struct ast_bracebody body;
@@ -3055,6 +3058,18 @@ int parse_test_defs(void) {
                          "  return x->~.~->~;\n"
                          "}\n",
                          13);
+  pass &= run_count_test("def35",
+                         "func foo() void {\n"
+                         "  if case Foo(x) = y {\n"
+                         "  }\n"
+                         "}\n",
+                         17);
+  pass &= run_count_test("def36",
+                         "func foo() void {\n"
+                         "  if case Foo(x) = y {\n"
+                         "  } else { }\n"
+                         "}\n",
+                         20);
   return pass;
 }
 
