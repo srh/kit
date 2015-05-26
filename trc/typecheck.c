@@ -3085,7 +3085,7 @@ int check_statement(struct bodystate *bs,
         if (!check_expr_bracebody(bs, &cas->body, &cas_fallthrough)) {
           goto switch_fail_spec;
         }
-        ast_case_pattern_info_specify(&cas->pattern.info,
+        ast_case_pattern_info_specify(&cas->pattern.u.default_pattern.info,
                                       spec.concrete_enumspec.enumfields_count);
       } else {
         struct ast_constructor_pattern *constructor = &cas->pattern.u.constructor;
@@ -3159,7 +3159,7 @@ int check_statement(struct bodystate *bs,
         ast_typeexpr_init_copy(&concrete_type_copy,
                                &spec.concrete_enumspec.enumfields[constructor_num].type);
         ast_var_info_specify(&constructor->decl.var_info, varnum, concrete_type_copy);
-        ast_case_pattern_info_specify(&cas->pattern.info, constructor_num);
+        ast_case_pattern_info_specify(&constructor->info, constructor_num);
       }
       fallthrough = max_fallthrough(fallthrough, cas_fallthrough);
     }

@@ -4346,21 +4346,23 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
         continue;
       }
 
+      struct ast_constructor_pattern *constructor = &cas->pattern.u.constructor;
+
       x86_gen_cmp_imm32(f, X86_EAX,
                         int32_add(
                             size_to_int32(
-                                ast_case_pattern_info_constructor_number(&cas->pattern.info)),
+                                ast_case_pattern_info_constructor_number(&constructor->info)),
                             FIRST_ENUM_TAG_NUMBER));
       gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
 
-      struct ast_typeexpr *var_type = ast_var_info_type(&cas->pattern.u.constructor.decl.var_info);
+      struct ast_typeexpr *var_type = ast_var_info_type(&constructor->decl.var_info);
       struct loc var_loc = make_enum_body_loc(f, h, swartch_enum_loc,
                                               x86_sizeof(&cs->nt, var_type));
 
       struct vardata vd;
-      struct varnum varnum = ast_var_info_varnum(&cas->pattern.u.constructor.decl.var_info);
+      struct varnum varnum = ast_var_info_varnum(&constructor->decl.var_info);
       /* We don't destroy the variable when unwinding, if we're switching over a pointer-to-enum. */
-      vardata_init(&vd, cas->pattern.u.constructor.decl.name.value, varnum, !swartch_is_ptr, var_type, var_loc);
+      vardata_init(&vd, constructor->decl.name.value, varnum, !swartch_is_ptr, var_type, var_loc);
       SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
       if (!gen_bracebody(cs, f, h, &cas->body)) {
@@ -4383,7 +4385,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       x86_gen_mov_reg_imm32(f, X86_ECX, imm_u32(FIRST_ENUM_TAG_NUMBER));
       x86_gen_sub_w32(f, X86_EAX, X86_ECX);
       x86_gen_cmp_imm32(f, X86_EAX,
-                        size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.info)));
+                        size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.u.default_pattern.info)));
       gen_placeholder_jcc(f, h, X86_JCC_AE, next_target);
 
       if (!gen_bracebody(cs, f, h,
