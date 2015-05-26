@@ -2752,6 +2752,52 @@ int check_expr_bracebody(struct bodystate *bs,
                          struct ast_bracebody *x,
                          enum fallthrough *fallthrough_out);
 
+/* This type is not wrapped up tight -- check_swartch touches its
+fields directly. */
+struct swartchspec {
+  int is_ptr;
+  struct ast_enumspec concrete_enumspec;
+};
+
+void swartchspec_destroy(struct swartchspec *spec) {
+  spec->is_ptr = 0;
+  ast_enumspec_destroy(&spec->concrete_enumspec);
+}
+
+int check_swartch(struct exprscope *es, struct ast_expr *swartch,
+                  struct swartchspec *out) {
+  struct ast_typeexpr partial = ast_unknown_garbage();
+  int swartch_result = check_expr(es, swartch, &partial);
+  ast_typeexpr_destroy(&partial);
+  if (!swartch_result) {
+    return 0;
+  }
+
+  if (is_enum_type(es->cs, ast_expr_type(swartch), &out->concrete_enumspec)) {
+    out->is_ptr = 0;
+    return 1;
+  } else {
+    struct ast_typeexpr *ptr_target;
+    if (view_ptr_target(&es->cs->cm, ast_expr_type(swartch), &ptr_target)) {
+      if (is_enum_type(es->cs, ptr_target, &out->concrete_enumspec)) {
+        out->is_ptr = 1;
+        return 1;
+      } else {
+        METERR(es->cs, *ast_expr_ast_meta(swartch),
+               "Pattern matching over pointer to non-enum type.%s", "\n");
+        return 0;
+      }
+    } else {
+      METERR(es->cs, *ast_expr_ast_meta(swartch),
+             "Pattern matching over non-enum, non-pointer type.%s", "\n");
+      return 0;
+    }
+  }
+}
+
+
+
+
 int check_condition(struct bodystate *bs, struct ast_condition *a) {
   switch (a->tag) {
   case AST_CONDITION_EXPR: {
@@ -2761,6 +2807,20 @@ int check_condition(struct bodystate *bs, struct ast_condition *a) {
     int res = check_expr(bs->es, a->u.expr, &boolean);
     ast_typeexpr_destroy(&boolean);
     return res;
+  } break;
+  case AST_CONDITION_PATTERN: {
+    struct swartchspec spec;
+    if (!check_swartch(bs->es, a->u.pa.rhs, &spec)) {
+      return 0;
+    }
+
+    swartchspec_destroy(&spec);
+
+    /* struct ast_typeexpr *rhs_type = ast_expr_type(a->u.pa.rhs); */
+
+    /* TODO: Implement. */
+    ERR_DBG("Condition pattern typechecked.\n");
+    return 0;
   } break;
   default:
     UNREACHABLE();
@@ -2994,32 +3054,9 @@ int check_statement(struct bodystate *bs,
   } break;
   case AST_STATEMENT_SWITCH: {
     struct ast_switch_statement *ss = &s->u.switch_statement;
-    struct ast_typeexpr partial = ast_unknown_garbage();
-    int swartch_result = check_expr(bs->es, ss->swartch, &partial);
-    ast_typeexpr_destroy(&partial);
-    if (!swartch_result) {
+    struct swartchspec spec;
+    if (!check_swartch(bs->es, ss->swartch, &spec)) {
       goto switch_fail;
-    }
-
-    int swartch_is_ptr;
-    struct ast_enumspec concrete_enumspec;
-    if (is_enum_type(bs->es->cs, ast_expr_type(ss->swartch), &concrete_enumspec)) {
-      swartch_is_ptr = 0;
-    } else {
-      struct ast_typeexpr *ptr_target;
-      if (view_ptr_target(&bs->es->cs->cm, ast_expr_type(ss->swartch), &ptr_target)) {
-        if (is_enum_type(bs->es->cs, ptr_target, &concrete_enumspec)) {
-          swartch_is_ptr = 1;
-        } else {
-          METERR(bs->es->cs, *ast_expr_ast_meta(ss->swartch),
-                 "Switching over pointer to non-enum type.%s", "\n");
-          goto switch_fail;
-        }
-      } else {
-        METERR(bs->es->cs, *ast_expr_ast_meta(ss->swartch),
-             "Switching over non-enum, non-pointer type.%s", "\n");
-        goto switch_fail;
-      }
     }
 
     fallthrough = FALLTHROUGH_NEVER;
@@ -3031,14 +3068,14 @@ int check_statement(struct bodystate *bs,
         if (cas->pattern.is_default) {
           if (ss->cased_statements[j].pattern.is_default) {
             METERR(bs->es->cs, cas->meta, "Overlapping default switch cases.%s", "\n");
-            goto switch_fail_concrete_enumspec;
+            goto switch_fail_spec;
           }
         } else {
           if (!ss->cased_statements[j].pattern.is_default
               && ss->cased_statements[j].pattern.constructor_name.value
               == cas->pattern.constructor_name.value) {
             METERR(bs->es->cs, cas->meta, "Overlapping (duplicate) switch cases.%s", "\n");
-            goto switch_fail_concrete_enumspec;
+            goto switch_fail_spec;
           }
         }
       }
@@ -3046,20 +3083,20 @@ int check_statement(struct bodystate *bs,
       enum fallthrough cas_fallthrough;
       if (cas->pattern.is_default) {
         if (!check_expr_bracebody(bs, &cas->body, &cas_fallthrough)) {
-          goto switch_fail_concrete_enumspec;
+          goto switch_fail_spec;
         }
         ast_case_pattern_info_specify(&cas->pattern.info,
-                                      concrete_enumspec.enumfields_count);
+                                      spec.concrete_enumspec.enumfields_count);
       } else {
-        if (!swartch_is_ptr != !cas->pattern.addressof_constructor) {
+        if (!spec.is_ptr != !cas->pattern.addressof_constructor) {
           METERR(bs->es->cs, cas->meta, "Constructor pointeriness mismatches swartch.%s", "\n");
-          goto switch_fail_concrete_enumspec;
+          goto switch_fail_spec;
         }
 
         size_t constructor_num = SIZE_MAX;  /* Initialized to appease cl. */
         int constructor_found = 0;
-        for (size_t j = 0, je = concrete_enumspec.enumfields_count; j < je; j++) {
-          if (concrete_enumspec.enumfields[j].name.value
+        for (size_t j = 0, je = spec.concrete_enumspec.enumfields_count; j < je; j++) {
+          if (spec.concrete_enumspec.enumfields[j].name.value
               == cas->pattern.constructor_name.value) {
             constructor_found = 1;
             constructor_num = j;
@@ -3069,12 +3106,12 @@ int check_statement(struct bodystate *bs,
 
         if (!constructor_found) {
           METERR(bs->es->cs, cas->meta, "Unrecognized constructor in switch case.%s", "\n");
-          goto switch_fail_concrete_enumspec;
+          goto switch_fail_spec;
         }
 
         struct typeexpr_traits discard;
-        if (!check_typeexpr_traits(bs->es->cs, &concrete_enumspec.enumfields[constructor_num].type, bs->es, &discard)) {
-          goto switch_fail_concrete_enumspec;
+        if (!check_typeexpr_traits(bs->es->cs, &spec.concrete_enumspec.enumfields[constructor_num].type, bs->es, &discard)) {
+          goto switch_fail_spec;
         }
 
         struct ast_typeexpr replaced_incomplete_type;
@@ -3084,10 +3121,10 @@ int check_statement(struct bodystate *bs,
         struct ast_vardecl *replaced_decl = NULL;
         {
           if (!unify_directionally(bs->es->cs->im, &replaced_incomplete_type,
-                                   &concrete_enumspec.enumfields[constructor_num].type)) {
+                                   &spec.concrete_enumspec.enumfields[constructor_num].type)) {
             ast_typeexpr_destroy(&replaced_incomplete_type);
             METERR(bs->es->cs, cas->meta, "Switch case decl type mismatch.%s", "\n");
-            goto switch_fail_concrete_enumspec;
+            goto switch_fail_spec;
           }
           ast_typeexpr_destroy(&replaced_incomplete_type);
 
@@ -3096,7 +3133,7 @@ int check_statement(struct bodystate *bs,
 
           struct ast_typeexpr concrete_type_copy;
           ast_typeexpr_init_copy(&concrete_type_copy,
-                                 &concrete_enumspec.enumfields[constructor_num].type);
+                                 &spec.concrete_enumspec.enumfields[constructor_num].type);
 
           replaced_decl = malloc(sizeof(*replaced_decl));
           CHECK(replaced_decl);
@@ -3105,13 +3142,13 @@ int check_statement(struct bodystate *bs,
 
           if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
             free_ast_vardecl(&replaced_decl);
-            goto switch_fail_concrete_enumspec;
+            goto switch_fail_spec;
           }
         }
 
         if (!check_expr_bracebody(bs, &cas->body, &cas_fallthrough)) {
           free_ast_vardecl(&replaced_decl);
-          goto switch_fail_concrete_enumspec;
+          goto switch_fail_spec;
         }
 
         exprscope_pop_var(bs->es);
@@ -3119,17 +3156,17 @@ int check_statement(struct bodystate *bs,
 
         struct ast_typeexpr concrete_type_copy;
         ast_typeexpr_init_copy(&concrete_type_copy,
-                               &concrete_enumspec.enumfields[constructor_num].type);
+                               &spec.concrete_enumspec.enumfields[constructor_num].type);
         ast_var_info_specify(&cas->pattern.decl.var_info, varnum, concrete_type_copy);
         ast_case_pattern_info_specify(&cas->pattern.info, constructor_num);
       }
       fallthrough = max_fallthrough(fallthrough, cas_fallthrough);
     }
 
-    ast_enumspec_destroy(&concrete_enumspec);
+    swartchspec_destroy(&spec);
     break;
-  switch_fail_concrete_enumspec:
-    ast_enumspec_destroy(&concrete_enumspec);
+  switch_fail_spec:
+    swartchspec_destroy(&spec);
   switch_fail:
     goto fail;
   } break;
