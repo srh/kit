@@ -2797,13 +2797,10 @@ int check_swartch(struct exprscope *es, struct ast_expr *swartch,
 
 struct constructor_check_state {
   struct ast_vardecl *replaced_decl;
-  struct varnum varnum;
-  size_t constructor_num;
 };
 
 void constructor_check_state_destroy(struct constructor_check_state *a) {
   free_ast_vardecl(&a->replaced_decl);
-  a->constructor_num = (size_t)-1;
 }
 
 void constructor_check_state_unwind_destroy(struct exprscope *es,
@@ -2874,9 +2871,14 @@ int check_constructor(struct exprscope *es,
     free_ast_vardecl(&replaced_decl);
     return 0;
   }
+
+  struct ast_typeexpr concrete_type_copy;
+  ast_typeexpr_init_copy(&concrete_type_copy,
+                         &spec->concrete_enumspec.enumfields[constructor_num].type);
+  ast_var_info_specify(&constructor->decl.var_info, varnum, concrete_type_copy);
+  ast_case_pattern_info_specify(&constructor->info, constructor_num);
+
   out->replaced_decl = replaced_decl;
-  out->varnum = varnum;
-  out->constructor_num = constructor_num;
   return 1;
 }
 
@@ -3181,12 +3183,6 @@ int check_statement(struct bodystate *bs,
           constructor_check_state_destroy(&cons_state);
           goto switch_fail_spec;
         }
-
-        struct ast_typeexpr concrete_type_copy;
-        ast_typeexpr_init_copy(&concrete_type_copy,
-                               &spec.concrete_enumspec.enumfields[cons_state.constructor_num].type);
-        ast_var_info_specify(&constructor->decl.var_info, cons_state.varnum, concrete_type_copy);
-        ast_case_pattern_info_specify(&constructor->info, cons_state.constructor_num);
 
         constructor_check_state_unwind_destroy(bs->es, &cons_state);
       }
