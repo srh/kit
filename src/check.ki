@@ -16,6 +16,7 @@ deftype checkstate struct {
   defs_by_name hash[sym, array[def_entry_id]];
 
   aliases array[shp[alias_entry]];
+  aliases_by_name hash[sym, array[alias_entry_id]];
 };
 
 // An index into checkstate's modules array.
@@ -196,6 +197,9 @@ func process_toplevels(cs *checkstate,
         ent shp[alias_entry] = emshp({mod->module_name, a.name.value});
         id alias_entry_id = ~count(&cs->aliases);
         push(&cs->aliases, ent);
+        arr *array[alias_entry_id] = try_insert_lookup(
+          &cs->aliases_by_name, oo(ent)->defined_name, default());
+        push(arr, id);
         push(&mod->aliases, id);
       }
       case &Access(a ast_access): {
@@ -216,7 +220,7 @@ func check_def(cs *checkstate, ent *def_entry) bool {
 
   switch ent->tl {
     case &Def(a ast_def): {
-      if !check_generics(cs, &a.generics) {
+      if !check_generics_shadowing(cs, &a.generics) {
         return false;
       }
 
@@ -233,7 +237,7 @@ func check_def(cs *checkstate, ent *def_entry) bool {
       return faketrue;
     }
     case &TypeDef(a ast_type_def): {
-      if !check_generics(cs, &a.generics) {
+      if !check_generics_shadowing(cs, &a.generics) {
         return false;
       }
 
@@ -250,8 +254,7 @@ func check_def(cs *checkstate, ent *def_entry) bool {
   }
 }
 
-func check_generics(cs *checkstate, g *ast_generics) bool {
-  // TODO: Should we check generics for external name shadowing?
+func check_generics_shadowing(cs *checkstate, g *ast_generics) bool {
   switch g {
     case &NoGenerics(v): { return true; }
     case &HasGenerics(a array[ast_ident]): {
@@ -259,14 +262,21 @@ func check_generics(cs *checkstate, g *ast_generics) bool {
         ival sym = ref(&a, i)->value;
         for j size = 0; j < i; j = j + 1 {
           if ival == ref(&a, j)->value {
-            ERR(_u8("Generics have duplicate name "), ival);
+            ERR(_u8("Generic params have duplicate name "), ival);
             return false;
           }
+        }
+        if scope_shadows(cs, ival) {
+          ERR(_u8("Generic param externally shadows "), ival);
         }
       }
       return true;
     }
   }
+}
+
+func scope_shadows(cs *checkstate, name sym) bool {
+  return has_key(&cs->defs_by_name, name) || has_key(&cs->aliases_by_name, name);
 }
 
 // TODO: Remove faketrue.

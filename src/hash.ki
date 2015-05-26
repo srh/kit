@@ -132,3 +132,10 @@ func[K, V] try_insert_lookup(h *hash[K, V], key K, value V) *V {
     }
   }
 }
+
+func[K, V] has_key(h *hash[K, V], key K) bool {
+  switch lookup_ref(h, key) {
+    case Has(p *V): { return true; }
+    case None(v): { return false; }
+  }
+}
