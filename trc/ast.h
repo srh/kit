@@ -278,7 +278,7 @@ struct ast_ifthen_statement {
 
 void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
                                struct ast_meta meta,
-                               struct ast_expr condition,
+                               struct ast_expr expr_condition,
                                struct ast_bracebody body);
 
 struct ast_ifthenelse_statement {
@@ -290,19 +290,19 @@ struct ast_ifthenelse_statement {
 
 void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,
                                    struct ast_meta meta,
-                                   struct ast_expr condition,
+                                   struct ast_expr expr_condition,
                                    struct ast_bracebody thenbody,
                                    struct ast_bracebody elsebody);
 
 struct ast_while_statement {
   struct ast_meta meta;
-  struct ast_expr *condition;
+  struct ast_condition condition;
   struct ast_bracebody body;
 };
 
 void ast_while_statement_init(struct ast_while_statement *a,
                               struct ast_meta meta,
-                              struct ast_expr condition,
+                              struct ast_expr expr_condition,
                               struct ast_bracebody body);
 
 struct ast_for_statement {
