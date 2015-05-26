@@ -2881,7 +2881,25 @@ int check_constructor(struct exprscope *es,
   return 1;
 }
 
-int check_condition(struct bodystate *bs, struct ast_condition *a) {
+struct maybe_varwind {
+  int has_varwind;
+  struct varwind varwind;
+};
+
+void maybe_varwind_destroy(struct maybe_varwind *a) {
+  if (a->has_varwind) {
+    varwind_destroy(&a->varwind);
+  }
+}
+
+void maybe_varwind_unwind_destroy(struct exprscope *es, struct maybe_varwind *a) {
+  if (a->has_varwind) {
+    varwind_unwind_destroy(es, &a->varwind);
+  }
+}
+
+int check_condition(struct bodystate *bs, struct ast_condition *a,
+                    struct maybe_varwind *out) {
   switch (a->tag) {
   case AST_CONDITION_EXPR: {
     struct ast_typeexpr boolean;
@@ -2889,7 +2907,11 @@ int check_condition(struct bodystate *bs, struct ast_condition *a) {
 
     int res = check_expr(bs->es, a->u.expr, &boolean);
     ast_typeexpr_destroy(&boolean);
-    return res;
+    if (!res) {
+      return 0;
+    }
+    out->has_varwind = 0;
+    return 1;
   } break;
   case AST_CONDITION_PATTERN: {
     struct swartchspec spec;
@@ -2897,13 +2919,13 @@ int check_condition(struct bodystate *bs, struct ast_condition *a) {
       return 0;
     }
 
+    int res = check_constructor(bs->es, &spec, &a->u.pa.pattern, &out->varwind);
     swartchspec_destroy(&spec);
-
-    /* struct ast_typeexpr *rhs_type = ast_expr_type(a->u.pa.rhs); */
-
-    /* TODO: Implement. */
-    ERR_DBG("Condition pattern typechecked.\n");
-    return 0;
+    if (!res) {
+      return 0;
+    }
+    out->has_varwind = 1;
+    return 1;
   } break;
   default:
     UNREACHABLE();
@@ -3033,28 +3055,36 @@ int check_statement(struct bodystate *bs,
     fallthrough = FALLTHROUGH_FROMTHETOP;
   } break;
   case AST_STATEMENT_IFTHEN: {
-    if (!check_condition(bs, &s->u.ifthen_statement.condition)) {
+    struct maybe_varwind varwind;
+    if (!check_condition(bs, &s->u.ifthen_statement.condition, &varwind)) {
       goto fail;
     }
 
     enum fallthrough body_fallthrough;
     if (!check_expr_bracebody(bs, &s->u.ifthen_statement.body,
                               &body_fallthrough)) {
+      maybe_varwind_destroy(&varwind);
       goto fail;
     }
+
+    maybe_varwind_unwind_destroy(bs->es, &varwind);
 
     fallthrough = max_fallthrough(FALLTHROUGH_FROMTHETOP, body_fallthrough);
   } break;
   case AST_STATEMENT_IFTHENELSE: {
-    if (!check_condition(bs, &s->u.ifthenelse_statement.condition)) {
+    struct maybe_varwind varwind;
+    if (!check_condition(bs, &s->u.ifthenelse_statement.condition, &varwind)) {
       goto fail;
     }
 
     enum fallthrough thenbody_fallthrough;
     if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.thenbody,
                               &thenbody_fallthrough)) {
+      maybe_varwind_destroy(&varwind);
       goto fail;
     }
+
+    maybe_varwind_unwind_destroy(bs->es, &varwind);
 
     enum fallthrough elsebody_fallthrough;
     if (!check_expr_bracebody(bs, &s->u.ifthenelse_statement.elsebody,
@@ -3065,15 +3095,19 @@ int check_statement(struct bodystate *bs,
     fallthrough = max_fallthrough(thenbody_fallthrough, elsebody_fallthrough);
   } break;
   case AST_STATEMENT_WHILE: {
-    if (!check_condition(bs, &s->u.while_statement.condition)) {
+    struct maybe_varwind varwind;
+    if (!check_condition(bs, &s->u.while_statement.condition, &varwind)) {
       goto fail;
     }
 
     enum fallthrough body_fallthrough;
     if (!check_expr_bracebody(bs, &s->u.while_statement.body,
                               &body_fallthrough)) {
+      maybe_varwind_destroy(&varwind);
       goto fail;
     }
+
+    maybe_varwind_unwind_destroy(bs->es, &varwind);
 
     fallthrough = max_fallthrough(FALLTHROUGH_FROMTHETOP, body_fallthrough);
   } break;
@@ -7153,7 +7187,68 @@ int check_file_test_more_72(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
+int check_file_test_more_73(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defenum ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p i32; q i32; };\n"
+      "};\n"
+      "def foo fn[ty, i32] = func(x ty) i32 {\n"
+      "  if case c2(s struct { p i32; q i32; }) = x {\n"
+      "    return s.p + s.q;\n"
+      "  }\n"
+      "  return -1;\n"
+      "};\n"
+    } };
 
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_74(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  struct test_module a[] = { {
+      "foo",
+      "defenum ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p i32; q i32; };\n"
+      "};\n"
+      "def foo fn[ty, i32] = func(x ty) i32 {\n"
+      "  if case c2(s struct { p i32; q i32; }) = x {\n"
+      "    return s.p + s.q;\n"
+      "  } else {\n"
+      "    return -1;\n"
+      "  }\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
+
+int check_file_test_more_75(const uint8_t *name, size_t name_count,
+                            uint8_t **data_out, size_t *data_count_out) {
+  /* Fails because pattern mismatch. */
+  struct test_module a[] = { {
+      "foo",
+      "defenum ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p i32; q i32; };\n"
+      "};\n"
+      "def foo fn[ty, i32] = func(x ty) i32 {\n"
+      "  if case c2(s struct { p u32; q i32; }) = x {\n"
+      "    return s.p + s.q;\n"
+      "  } else {\n"
+      "    return -1;\n"
+      "  }\n"
+      "};\n"
+    } };
+
+  return load_test_module(a, sizeof(a) / sizeof(a[0]),
+                          name, name_count, data_out, data_count_out);
+}
 
 
 int test_check_file(void) {
@@ -7861,6 +7956,24 @@ int test_check_file(void) {
   DBG("test_check_file check_file_test_more_72...\n");
   if (!test_check_module(&im, &check_file_test_more_72, foo)) {
     DBG("check_file_test_more_72 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_73...\n");
+  if (!test_check_module(&im, &check_file_test_more_73, foo)) {
+    DBG("check_file_test_more_73 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file check_file_test_more_74...\n");
+  if (!test_check_module(&im, &check_file_test_more_74, foo)) {
+    DBG("check_file_test_more_74 fails\n");
+    goto cleanup_identmap;
+  }
+
+  DBG("test_check_file !check_file_test_more_75...\n");
+  if (!!test_check_module(&im, &check_file_test_more_75, foo)) {
+    DBG("check_file_test_more_75 fails\n");
     goto cleanup_identmap;
   }
 
