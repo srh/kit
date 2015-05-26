@@ -2752,6 +2752,16 @@ int check_expr_bracebody(struct bodystate *bs,
                          struct ast_bracebody *x,
                          enum fallthrough *fallthrough_out);
 
+int check_condition(struct bodystate *bs,
+                    struct ast_condition *a) {
+  struct ast_typeexpr boolean;
+  init_name_type(&boolean, bs->es->cs->cm.boole);
+
+  int res = check_expr(bs->es, a->expr, &boolean);
+  ast_typeexpr_destroy(&boolean);
+  return res;
+}
+
 int check_statement(struct bodystate *bs,
                     struct ast_statement *s,
                     enum fallthrough *fallthrough_out,
@@ -2875,13 +2885,7 @@ int check_statement(struct bodystate *bs,
     fallthrough = FALLTHROUGH_FROMTHETOP;
   } break;
   case AST_STATEMENT_IFTHEN: {
-    struct ast_typeexpr boolean;
-    init_name_type(&boolean, bs->es->cs->cm.boole);
-
-    int condition_result
-      = check_expr(bs->es, s->u.ifthen_statement.condition.expr, &boolean);
-    ast_typeexpr_destroy(&boolean);
-    if (!condition_result) {
+    if (!check_condition(bs, &s->u.ifthen_statement.condition)) {
       goto fail;
     }
 
@@ -2894,13 +2898,7 @@ int check_statement(struct bodystate *bs,
     fallthrough = max_fallthrough(FALLTHROUGH_FROMTHETOP, body_fallthrough);
   } break;
   case AST_STATEMENT_IFTHENELSE: {
-    struct ast_typeexpr boolean;
-    init_name_type(&boolean, bs->es->cs->cm.boole);
-
-    int condition_result
-      = check_expr(bs->es, s->u.ifthenelse_statement.condition.expr, &boolean);
-    ast_typeexpr_destroy(&boolean);
-    if (!condition_result) {
+    if (!check_condition(bs, &s->u.ifthenelse_statement.condition)) {
       goto fail;
     }
 
@@ -2919,13 +2917,7 @@ int check_statement(struct bodystate *bs,
     fallthrough = max_fallthrough(thenbody_fallthrough, elsebody_fallthrough);
   } break;
   case AST_STATEMENT_WHILE: {
-    struct ast_typeexpr boolean;
-    init_name_type(&boolean, bs->es->cs->cm.boole);
-
-    int condition_result = check_expr(bs->es, s->u.while_statement.condition.expr,
-                                      &boolean);
-    ast_typeexpr_destroy(&boolean);
-    if (!condition_result) {
+    if (!check_condition(bs, &s->u.while_statement.condition)) {
       goto fail;
     }
 
