@@ -4158,10 +4158,12 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     struct loc cond_loc;
     {
       struct expr_return cond_er = open_expr_return();
-      if (!gen_expr(cs, f, h, s->u.ifthen_statement.condition, &cond_er)) {
+      if (!gen_expr(cs, f, h, s->u.ifthen_statement.condition.expr, &cond_er)) {
         return 0;
       }
-      wipe_temporaries(cs, f, h, &cond_er, ast_expr_type(s->u.ifthen_statement.condition), &cond_loc);
+      wipe_temporaries(cs, f, h, &cond_er,
+                       ast_expr_type(s->u.ifthen_statement.condition.expr),
+                       &cond_loc);
     }
 
     size_t target_number = frame_add_target(h);
@@ -4180,10 +4182,13 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     struct loc cond_loc;
     {
       struct expr_return cond_er = open_expr_return();
-      if (!gen_expr(cs, f, h, s->u.ifthenelse_statement.condition, &cond_er)) {
+      if (!gen_expr(cs, f, h, s->u.ifthenelse_statement.condition.expr,
+                    &cond_er)) {
         return 0;
       }
-      wipe_temporaries(cs, f, h, &cond_er, ast_expr_type(s->u.ifthenelse_statement.condition), &cond_loc);
+      wipe_temporaries(cs, f, h, &cond_er,
+                       ast_expr_type(s->u.ifthenelse_statement.condition.expr),
+                       &cond_loc);
     }
 
     size_t target_number = frame_add_target(h);

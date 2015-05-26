@@ -262,9 +262,17 @@ void ast_var_statement_init_without_rhs(
 
 struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a);
 
+struct ast_condition {
+  struct ast_expr *expr;
+};
+
+void ast_condition_init(struct ast_condition *a,
+                        struct ast_expr expr);
+void ast_condition_destroy(struct ast_condition *a);
+
 struct ast_ifthen_statement {
   struct ast_meta meta;
-  struct ast_expr *condition;
+  struct ast_condition condition;
   struct ast_bracebody body;
 };
 
@@ -275,7 +283,7 @@ void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
 
 struct ast_ifthenelse_statement {
   struct ast_meta meta;
-  struct ast_expr *condition;
+  struct ast_condition condition;
   struct ast_bracebody thenbody;
   struct ast_bracebody elsebody;
 };

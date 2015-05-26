@@ -303,37 +303,49 @@ void ast_var_statement_destroy(struct ast_var_statement *a) {
   }
 }
 
+void ast_condition_init(struct ast_condition *a,
+                        struct ast_expr expr) {
+  ast_expr_alloc_move(expr, &a->expr);
+}
+void ast_condition_init_copy(struct ast_condition *a,
+                             struct ast_condition *c) {
+  ast_expr_alloc_init_copy(c->expr, &a->expr);
+}
+void ast_condition_destroy(struct ast_condition *a) {
+  ast_expr_destroy(a->expr);
+  free(a->expr);
+  a->expr = NULL;
+}
+
 void ast_ifthen_statement_init(struct ast_ifthen_statement *a,
                                struct ast_meta meta,
-                               struct ast_expr condition,
+                               struct ast_expr expr_condition,
                                struct ast_bracebody body) {
   a->meta = meta;
-  ast_expr_alloc_move(condition, &a->condition);
+  ast_condition_init(&a->condition, expr_condition);
   a->body = body;
 }
 
 void ast_ifthen_statement_init_copy(struct ast_ifthen_statement *a,
                                     struct ast_ifthen_statement *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  ast_expr_alloc_init_copy(c->condition, &a->condition);
+  ast_condition_init_copy(&a->condition, &c->condition);
   ast_bracebody_init_copy(&a->body, &c->body);
 }
 
 void ast_ifthen_statement_destroy(struct ast_ifthen_statement *a) {
   ast_meta_destroy(&a->meta);
-  ast_expr_destroy(a->condition);
-  free(a->condition);
-  a->condition = NULL;
+  ast_condition_destroy(&a->condition);
   ast_bracebody_destroy(&a->body);
 }
 
 void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,
                                    struct ast_meta meta,
-                                   struct ast_expr condition,
+                                   struct ast_expr expr_condition,
                                    struct ast_bracebody thenbody,
                                    struct ast_bracebody elsebody) {
   a->meta = meta;
-  ast_expr_alloc_move(condition, &a->condition);
+  ast_condition_init(&a->condition, expr_condition);
   a->thenbody = thenbody;
   a->elsebody = elsebody;
 }
@@ -341,16 +353,14 @@ void ast_ifthenelse_statement_init(struct ast_ifthenelse_statement *a,
 void ast_ifthenelse_statement_init_copy(struct ast_ifthenelse_statement *a,
                                         struct ast_ifthenelse_statement *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  ast_expr_alloc_init_copy(c->condition, &a->condition);
+  ast_condition_init_copy(&a->condition, &c->condition);
   ast_bracebody_init_copy(&a->thenbody, &c->thenbody);
   ast_bracebody_init_copy(&a->elsebody, &c->elsebody);
 }
 
 void ast_ifthenelse_statement_destroy(struct ast_ifthenelse_statement *a) {
   ast_meta_destroy(&a->meta);
-  ast_expr_destroy(a->condition);
-  free(a->condition);
-  a->condition = NULL;
+  ast_condition_destroy(&a->condition);
   ast_bracebody_destroy(&a->thenbody);
   ast_bracebody_destroy(&a->elsebody);
 }

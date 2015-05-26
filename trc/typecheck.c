@@ -2878,7 +2878,8 @@ int check_statement(struct bodystate *bs,
     struct ast_typeexpr boolean;
     init_name_type(&boolean, bs->es->cs->cm.boole);
 
-    int condition_result = check_expr(bs->es, s->u.ifthen_statement.condition, &boolean);
+    int condition_result
+      = check_expr(bs->es, s->u.ifthen_statement.condition.expr, &boolean);
     ast_typeexpr_destroy(&boolean);
     if (!condition_result) {
       goto fail;
@@ -2896,7 +2897,8 @@ int check_statement(struct bodystate *bs,
     struct ast_typeexpr boolean;
     init_name_type(&boolean, bs->es->cs->cm.boole);
 
-    int condition_result = check_expr(bs->es, s->u.ifthenelse_statement.condition, &boolean);
+    int condition_result
+      = check_expr(bs->es, s->u.ifthenelse_statement.condition.expr, &boolean);
     ast_typeexpr_destroy(&boolean);
     if (!condition_result) {
       goto fail;
