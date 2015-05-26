@@ -4096,6 +4096,19 @@ void gen_return(struct checkstate *cs, struct objfile *f, struct frame *h) {
 int gen_bracebody(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_bracebody *a);
 
+int gen_condition(struct checkstate *cs, struct objfile *f,
+                  struct frame *h, struct ast_condition *a,
+                  struct loc *cond_loc_out) {
+  struct expr_return cond_er = open_expr_return();
+  if (!gen_expr(cs, f, h, a->expr, &cond_er)) {
+    return 0;
+  }
+  wipe_temporaries(cs, f, h, &cond_er,
+                   ast_expr_type(a->expr),
+                   cond_loc_out);
+  return 1;
+}
+
 int gen_statement(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_statement *s,
                   size_t *vars_pushed_ref) {
@@ -4156,14 +4169,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   case AST_STATEMENT_IFTHEN: {
     int32_t saved_offset = frame_save_offset(h);
     struct loc cond_loc;
-    {
-      struct expr_return cond_er = open_expr_return();
-      if (!gen_expr(cs, f, h, s->u.ifthen_statement.condition.expr, &cond_er)) {
-        return 0;
-      }
-      wipe_temporaries(cs, f, h, &cond_er,
-                       ast_expr_type(s->u.ifthen_statement.condition.expr),
-                       &cond_loc);
+    if (!gen_condition(cs, f, h, &s->u.ifthen_statement.condition, &cond_loc)) {
+      return 0;
     }
 
     size_t target_number = frame_add_target(h);
@@ -4180,15 +4187,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   case AST_STATEMENT_IFTHENELSE: {
     int32_t saved_offset = frame_save_offset(h);
     struct loc cond_loc;
-    {
-      struct expr_return cond_er = open_expr_return();
-      if (!gen_expr(cs, f, h, s->u.ifthenelse_statement.condition.expr,
-                    &cond_er)) {
-        return 0;
-      }
-      wipe_temporaries(cs, f, h, &cond_er,
-                       ast_expr_type(s->u.ifthenelse_statement.condition.expr),
-                       &cond_loc);
+    if (!gen_condition(cs, f, h, &s->u.ifthenelse_statement.condition, &cond_loc)) {
+      return 0;
     }
 
     size_t target_number = frame_add_target(h);
@@ -4217,14 +4217,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
     int32_t saved_offset = frame_save_offset(h);
     struct loc cond_loc;
-    {
-      struct expr_return cond_er = open_expr_return();
-      if (!gen_expr(cs, f, h, s->u.while_statement.condition.expr, &cond_er)) {
-        return 0;
-      }
-      wipe_temporaries(cs, f, h, &cond_er,
-                       ast_expr_type(s->u.while_statement.condition.expr),
-                       &cond_loc);
+    if (!gen_condition(cs, f, h, &s->u.while_statement.condition, &cond_loc)) {
+      return 0;
     }
 
     size_t bottom_target_number = frame_add_target(h);
