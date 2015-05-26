@@ -2795,7 +2795,90 @@ int check_swartch(struct exprscope *es, struct ast_expr *swartch,
   }
 }
 
+struct constructor_check_state {
+  struct ast_vardecl *replaced_decl;
+  struct varnum varnum;
+  size_t constructor_num;
+};
 
+void constructor_check_state_destroy(struct constructor_check_state *a) {
+  free_ast_vardecl(&a->replaced_decl);
+  a->constructor_num = (size_t)-1;
+}
+
+void constructor_check_state_unwind_destroy(struct exprscope *es,
+                                            struct constructor_check_state *a) {
+  exprscope_pop_var(es);
+  constructor_check_state_destroy(a);
+}
+
+int check_constructor(struct exprscope *es,
+                      struct swartchspec *spec,
+                      struct ast_constructor_pattern *constructor,
+                      struct constructor_check_state *out) {
+  if (spec->is_ptr != constructor->addressof_constructor) {
+    METERR(es->cs, constructor->meta, "Constructor pointeriness mismatches swartch.%s", "\n");
+    return 0;
+  }
+
+  size_t constructor_num = SIZE_MAX;  /* Initialized to appease cl. */
+  int constructor_found = 0;
+  for (size_t i = 0, e = spec->concrete_enumspec.enumfields_count; i < e; i++) {
+    if (spec->concrete_enumspec.enumfields[i].name.value
+        == constructor->constructor_name.value) {
+      constructor_found = 1;
+      constructor_num = i;
+      break;
+    }
+  }
+
+  if (!constructor_found) {
+    METERR(es->cs, constructor->meta, "Unrecognized constructor in switch case.%s", "\n");
+    return 0;
+  }
+
+  struct typeexpr_traits discard;
+  if (!check_typeexpr_traits(
+          es->cs, &spec->concrete_enumspec.enumfields[constructor_num].type,
+          es, &discard)) {
+    return 0;
+  }
+
+  struct varnum varnum;
+  struct ast_vardecl *replaced_decl = NULL;
+  {
+    struct ast_typeexpr replaced_incomplete_type;
+    replace_generics(es, &constructor->decl.type, &replaced_incomplete_type);
+
+    int unify_res = unify_directionally(
+        es->cs->im, &replaced_incomplete_type,
+        &spec->concrete_enumspec.enumfields[constructor_num].type);
+    ast_typeexpr_destroy(&replaced_incomplete_type);
+    if (!unify_res) {
+      METERR(es->cs, constructor->meta, "Case decl type mismatch.%s", "\n");
+      return 0;
+    }
+
+    struct ast_ident replaced_decl_name;
+    ast_ident_init_copy(&replaced_decl_name, &constructor->decl.name);
+    struct ast_typeexpr concrete_type_copy;
+    ast_typeexpr_init_copy(&concrete_type_copy,
+                           &spec->concrete_enumspec.enumfields[constructor_num].type);
+    replaced_decl = malloc(sizeof(*replaced_decl));
+    CHECK(replaced_decl);
+    ast_vardecl_init(replaced_decl, ast_meta_make_copy(&constructor->decl.meta),
+                     replaced_decl_name, concrete_type_copy);
+  }
+
+  if (!exprscope_push_var(es, replaced_decl, &varnum)) {
+    free_ast_vardecl(&replaced_decl);
+    return 0;
+  }
+  out->replaced_decl = replaced_decl;
+  out->varnum = varnum;
+  out->constructor_num = constructor_num;
+  return 1;
+}
 
 
 int check_condition(struct bodystate *bs, struct ast_condition *a) {
@@ -3089,77 +3172,23 @@ int check_statement(struct bodystate *bs,
                                       spec.concrete_enumspec.enumfields_count);
       } else {
         struct ast_constructor_pattern *constructor = &cas->pattern.u.constructor;
-        if (!spec.is_ptr != !constructor->addressof_constructor) {
-          METERR(bs->es->cs, cas->meta, "Constructor pointeriness mismatches swartch.%s", "\n");
+        struct constructor_check_state cons_state;
+        if (!check_constructor(bs->es, &spec, constructor, &cons_state)) {
           goto switch_fail_spec;
-        }
-
-        size_t constructor_num = SIZE_MAX;  /* Initialized to appease cl. */
-        int constructor_found = 0;
-        for (size_t j = 0, je = spec.concrete_enumspec.enumfields_count; j < je; j++) {
-          if (spec.concrete_enumspec.enumfields[j].name.value
-              == constructor->constructor_name.value) {
-            constructor_found = 1;
-            constructor_num = j;
-            break;
-          }
-        }
-
-        if (!constructor_found) {
-          METERR(bs->es->cs, cas->meta, "Unrecognized constructor in switch case.%s", "\n");
-          goto switch_fail_spec;
-        }
-
-        struct typeexpr_traits discard;
-        if (!check_typeexpr_traits(bs->es->cs, &spec.concrete_enumspec.enumfields[constructor_num].type, bs->es, &discard)) {
-          goto switch_fail_spec;
-        }
-
-        struct ast_typeexpr replaced_incomplete_type;
-        replace_generics(bs->es, &constructor->decl.type, &replaced_incomplete_type);
-
-        struct varnum varnum;
-        struct ast_vardecl *replaced_decl = NULL;
-        {
-          if (!unify_directionally(bs->es->cs->im, &replaced_incomplete_type,
-                                   &spec.concrete_enumspec.enumfields[constructor_num].type)) {
-            ast_typeexpr_destroy(&replaced_incomplete_type);
-            METERR(bs->es->cs, cas->meta, "Switch case decl type mismatch.%s", "\n");
-            goto switch_fail_spec;
-          }
-          ast_typeexpr_destroy(&replaced_incomplete_type);
-
-          struct ast_ident replaced_decl_name;
-          ast_ident_init_copy(&replaced_decl_name, &constructor->decl.name);
-
-          struct ast_typeexpr concrete_type_copy;
-          ast_typeexpr_init_copy(&concrete_type_copy,
-                                 &spec.concrete_enumspec.enumfields[constructor_num].type);
-
-          replaced_decl = malloc(sizeof(*replaced_decl));
-          CHECK(replaced_decl);
-          ast_vardecl_init(replaced_decl, ast_meta_make_copy(&constructor->decl.meta),
-                           replaced_decl_name, concrete_type_copy);
-
-          if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
-            free_ast_vardecl(&replaced_decl);
-            goto switch_fail_spec;
-          }
         }
 
         if (!check_expr_bracebody(bs, &cas->body, &cas_fallthrough)) {
-          free_ast_vardecl(&replaced_decl);
+          constructor_check_state_destroy(&cons_state);
           goto switch_fail_spec;
         }
 
-        exprscope_pop_var(bs->es);
-        free_ast_vardecl(&replaced_decl);
-
         struct ast_typeexpr concrete_type_copy;
         ast_typeexpr_init_copy(&concrete_type_copy,
-                               &spec.concrete_enumspec.enumfields[constructor_num].type);
-        ast_var_info_specify(&constructor->decl.var_info, varnum, concrete_type_copy);
-        ast_case_pattern_info_specify(&constructor->info, constructor_num);
+                               &spec.concrete_enumspec.enumfields[cons_state.constructor_num].type);
+        ast_var_info_specify(&constructor->decl.var_info, cons_state.varnum, concrete_type_copy);
+        ast_case_pattern_info_specify(&constructor->info, cons_state.constructor_num);
+
+        constructor_check_state_unwind_destroy(bs->es, &cons_state);
       }
       fallthrough = max_fallthrough(fallthrough, cas_fallthrough);
     }
