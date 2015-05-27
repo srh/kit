@@ -4141,10 +4141,40 @@ int gen_swartch(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+int gen_casebody(struct checkstate *cs, struct objfile *f,
+                 struct frame *h, struct swartch_facts *facts,
+                 struct ast_constructor_pattern *constructor,
+                 struct ast_bracebody *body,
+                 size_t fail_target_number) {
+  x86_gen_cmp_imm32(f, X86_EAX,
+                    int32_add(
+                        size_to_int32(
+                            ast_case_pattern_info_constructor_number(&constructor->info)),
+                        FIRST_ENUM_TAG_NUMBER));
+  gen_placeholder_jcc(f, h, X86_JCC_NE, fail_target_number);
+  struct ast_typeexpr *var_type = ast_var_info_type(&constructor->decl.var_info);
+  struct loc var_loc = make_enum_body_loc(f, h, facts->enum_loc,
+                                          x86_sizeof(&cs->nt, var_type));
+
+  struct vardata vd;
+  struct varnum varnum = ast_var_info_varnum(&constructor->decl.var_info);
+  /* We don't destroy the variable when unwinding, if we're switching over a pointer-to-enum. */
+  vardata_init(&vd, constructor->decl.name.value, varnum, !facts->is_ptr, var_type, var_loc);
+  SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+
+  if (!gen_bracebody(cs, f, h, body)) {
+    return 0;
+  }
+
+  SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+  return 1;
+}
+
 struct condition_state {
   enum ast_condition_tag tag;
   union {
     struct loc expr_cond_loc;
+    struct swartch_facts pattern_facts;
   } u;
 };
 
@@ -4169,10 +4199,9 @@ int gen_condition(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    /* struct ast_constructor_pattern *constructor = &a->u.pa.pattern; */
-
-    ERR_DBG("gen_condition not implemented for patterns.\n");
-    return 0;
+    out->tag = AST_CONDITION_PATTERN;
+    out->u.pattern_facts = facts;
+    return 1;
   } break;
   default:
     UNREACHABLE();
@@ -4404,28 +4433,10 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
       struct ast_constructor_pattern *constructor = &cas->pattern.u.constructor;
 
-      x86_gen_cmp_imm32(f, X86_EAX,
-                        int32_add(
-                            size_to_int32(
-                                ast_case_pattern_info_constructor_number(&constructor->info)),
-                            FIRST_ENUM_TAG_NUMBER));
-      gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
-
-      struct ast_typeexpr *var_type = ast_var_info_type(&constructor->decl.var_info);
-      struct loc var_loc = make_enum_body_loc(f, h, facts.enum_loc,
-                                              x86_sizeof(&cs->nt, var_type));
-
-      struct vardata vd;
-      struct varnum varnum = ast_var_info_varnum(&constructor->decl.var_info);
-      /* We don't destroy the variable when unwinding, if we're switching over a pointer-to-enum. */
-      vardata_init(&vd, constructor->decl.name.value, varnum, !facts.is_ptr, var_type, var_loc);
-      SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
-
-      if (!gen_bracebody(cs, f, h, &cas->body)) {
+      if (!gen_casebody(cs, f, h, &facts, constructor, &cas->body,
+                        next_target)) {
         return 0;
       }
-
-      SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
 
       gen_placeholder_jmp(f, h, end_target);
       frame_define_target(h, next_target, objfile_section_size(objfile_text(f)));
