@@ -4105,7 +4105,6 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
 struct swartch_facts {
   struct ast_typeexpr *type;
   struct loc loc;
-  int is_ptr;
   struct loc enum_loc;
 };
 
@@ -4125,17 +4124,14 @@ int gen_swartch(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, swartch_saved_offset);
   }
 
-  int is_ptr;
   struct loc enum_loc;
   {
     struct ast_typeexpr *target;
     if (view_ptr_target(&cs->cm, swartch_type, &target)) {
-      is_ptr = 1;
       CHECK(swartch_loc.tag == LOC_EBP_OFFSET);
       uint32_t size = x86_sizeof(&cs->nt, target);
       enum_loc = ebp_indirect_loc(size, size, swartch_loc.u.ebp_offset);
     } else {
-      is_ptr = 0;
       enum_loc = swartch_loc;
     }
   }
@@ -4150,7 +4146,6 @@ int gen_swartch(struct checkstate *cs, struct objfile *f,
 
   out->type = swartch_type;
   out->loc = swartch_loc;
-  out->is_ptr = is_ptr;
   out->enum_loc = enum_loc;
   return 1;
 }
