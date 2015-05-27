@@ -4174,7 +4174,10 @@ struct condition_state {
   enum ast_condition_tag tag;
   union {
     struct loc expr_cond_loc;
-    struct swartch_facts pattern_facts;
+    struct {
+      struct swartch_facts facts;
+      struct ast_constructor_pattern *constructor;
+    } pattern;
   } u;
 };
 
@@ -4200,7 +4203,8 @@ int gen_condition(struct checkstate *cs, struct objfile *f,
     }
 
     out->tag = AST_CONDITION_PATTERN;
-    out->u.pattern_facts = facts;
+    out->u.pattern.facts = facts;
+    out->u.pattern.constructor = &a->u.pa.pattern;
     return 1;
   } break;
   default:
@@ -4212,7 +4216,8 @@ int gen_successbody(struct checkstate *cs, struct objfile *f,
                     struct frame *h, struct condition_state *cstate,
                     struct ast_bracebody *body,
                     int32_t before_condition_saved_offset,
-                    size_t fail_target_number) {
+                    size_t fail_target_number,
+                    size_t end_target_number) {
   switch (cstate->tag) {
   case AST_CONDITION_EXPR: {
     gen_placeholder_jmp_if_false(f, h, cstate->u.expr_cond_loc, fail_target_number);
@@ -4220,11 +4225,32 @@ int gen_successbody(struct checkstate *cs, struct objfile *f,
     return gen_bracebody(cs, f, h, body);
   } break;
   case AST_CONDITION_PATTERN: {
-    ERR_DBG("gen_successbody not implemented for patterns.\n");
-    return 0;
+    if (!gen_casebody(cs, f, h, &cstate->u.pattern.facts,
+                      cstate->u.pattern.constructor, body,
+                      fail_target_number)) {
+      return 0;
+    }
+    gen_destroy(cs, f, h, cstate->u.pattern.facts.loc, cstate->u.pattern.facts.type);
+    frame_restore_offset(h, before_condition_saved_offset);
+    gen_placeholder_jmp(f, h, end_target_number);
+    return 1;
   } break;
   default:
     UNREACHABLE();
+  }
+}
+
+void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
+                                     struct frame *h, struct condition_state *cstate,
+                                     int32_t before_condition_saved_offset) {
+  switch (cstate->tag) {
+  case AST_CONDITION_EXPR: {
+    /* No cleanup. */
+  } break;
+  case AST_CONDITION_PATTERN: {
+    gen_destroy(cs, f, h, cstate->u.pattern.facts.loc, cstate->u.pattern.facts.type);
+    frame_restore_offset(h, before_condition_saved_offset);
+  } break;
   }
 }
 
@@ -4293,12 +4319,16 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     }
 
     size_t target_number = frame_add_target(h);
+    size_t end_target_number = frame_add_target(h);
     if (!gen_successbody(cs, f, h, &cstate, &s->u.ifthen_statement.body,
-                         saved_offset, target_number)) {
+                         saved_offset, target_number, end_target_number)) {
       return 0;
     }
 
     frame_define_target(h, target_number,
+                        objfile_section_size(objfile_text(f)));
+    gen_afterfail_condition_cleanup(cs, f, h, &cstate, saved_offset);
+    frame_define_target(h, end_target_number,
                         objfile_section_size(objfile_text(f)));
   } break;
   case AST_STATEMENT_IFTHENELSE: {
@@ -4309,12 +4339,12 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     }
 
     size_t target_number = frame_add_target(h);
+    size_t end_target_number = frame_add_target(h);
     if (!gen_successbody(cs, f, h, &cstate, &s->u.ifthenelse_statement.thenbody,
-                         saved_offset, target_number)) {
+                         saved_offset, target_number, end_target_number)) {
       return 0;
     }
 
-    size_t end_target_number = frame_add_target(h);
     gen_placeholder_jmp(f, h, end_target_number);
 
     frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
@@ -4323,6 +4353,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
+    gen_afterfail_condition_cleanup(cs, f, h, &cstate, saved_offset);
     frame_define_target(h, end_target_number,
                         objfile_section_size(objfile_text(f)));
   } break;
@@ -4337,13 +4368,17 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     }
 
     size_t bottom_target_number = frame_add_target(h);
+    size_t end_target_number = frame_add_target(h);
     if (!gen_successbody(cs, f, h, &cstate, &s->u.while_statement.body,
-                         saved_offset, bottom_target_number)) {
+                         saved_offset, bottom_target_number, end_target_number)) {
       return 0;
     }
 
     gen_placeholder_jmp(f, h, top_target_number);
     frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
+    gen_afterfail_condition_cleanup(cs, f, h, &cstate, saved_offset);
+    frame_define_target(h, end_target_number,
+                        objfile_section_size(objfile_text(f)));
   } break;
   case AST_STATEMENT_FOR: {
     struct ast_for_statement *fs = &s->u.for_statement;
@@ -4445,6 +4480,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     }
 
     if (has_default) {
+      /* TODO: A return statement in the default case will not destroy the swartch. */
+
       struct ast_cased_statement *cas = &ss->cased_statements[default_case_num];
       STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
       /* We carefully make the 0 tag and nonsense tag values redirect
