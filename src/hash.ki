@@ -26,24 +26,21 @@ access hash[_, _] {
     new_array array[opt[tup[K, V]]] = repeat(None@[tup[K, V]](), new_limit);
     old_limit size = count(&h->arr);
     for i size = 0; i < old_limit; i = i + 1 {
-      switch ref(&h->arr, i) {
-        case &None(v): { }
-        case &Has(p tup[K, V]): {
-          offset size = ~ @[osize]hash_compute_hash(&p.car) & new_mask;
-          step size = 1;
-          done bool = false;
-          while !done {
-            switch ref(&new_array, offset) {
-              case &None(v): { done = true; }
-              case &Has(new_p): {
-                offset = (offset + step) & new_mask;
-                step = step + 1;
-              }
+      if case &Has(p tup[K, V]) = ref(&h->arr, i) {
+        offset size = ~ @[osize]hash_compute_hash(&p.car) & new_mask;
+        step size = 1;
+        done bool = false;
+        while !done {
+          switch ref(&new_array, offset) {
+            case &None(v): { done = true; }
+            case &Has(new_p): {
+              offset = (offset + step) & new_mask;
+              step = step + 1;
             }
           }
-
-          set(&new_array, offset, get(&h->arr, i));
         }
+
+        set(&new_array, offset, get(&h->arr, i));
       }
     }
 
@@ -101,14 +98,10 @@ access hash[_, _] {
   }
 
   func[K, V] lookup(h *hash[K, V], key K) opt[V] {
-    switch lookup_ref(h, key) {
-      case None(v): {
-        return None();
-      }
-      case Has(p *V): {
-        return Has(*p);
-      }
+    if case Has(p *V) = lookup_ref(h, key) {
+      return Has(*p);
     }
+    return None();
   }
 
   func[K, V] count(h *hash[K, V]) size {
