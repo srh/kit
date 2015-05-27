@@ -4096,9 +4096,61 @@ void gen_return(struct checkstate *cs, struct objfile *f, struct frame *h) {
 int gen_bracebody(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_bracebody *a);
 
+struct swartch_facts {
+  struct ast_typeexpr *type;
+  struct loc loc;
+  int is_ptr;
+  struct loc enum_loc;
+};
+
+int gen_swartch(struct checkstate *cs, struct objfile *f,
+                struct frame *h, struct ast_expr *swartch,
+                struct swartch_facts *out) {
+  struct ast_typeexpr *swartch_type = ast_expr_type(swartch);
+  struct loc swartch_loc = frame_push_loc(h, x86_sizeof(&cs->nt, swartch_type));
+
+  {
+    int32_t swartch_saved_offset = frame_save_offset(h);
+    struct expr_return swartch_er = demand_expr_return(swartch_loc);
+
+    if (!gen_expr(cs, f, h, swartch, &swartch_er)) {
+      return 0;
+    }
+    frame_restore_offset(h, swartch_saved_offset);
+  }
+
+  int is_ptr;
+  struct loc enum_loc;
+  {
+    struct ast_typeexpr *target;
+    if (view_ptr_target(&cs->cm, swartch_type, &target)) {
+      is_ptr = 1;
+      CHECK(swartch_loc.tag == LOC_EBP_OFFSET);
+      uint32_t size = x86_sizeof(&cs->nt, target);
+      enum_loc = ebp_indirect_loc(size, size, swartch_loc.u.ebp_offset);
+    } else {
+      is_ptr = 0;
+      enum_loc = swartch_loc;
+    }
+  }
+
+  out->type = swartch_type;
+  out->loc = swartch_loc;
+  out->is_ptr = is_ptr;
+  out->enum_loc = enum_loc;
+  return 1;
+}
+
+struct condition_state {
+  enum ast_condition_tag tag;
+  union {
+    struct loc expr_cond_loc;
+  } u;
+};
+
 int gen_condition(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_condition *a,
-                  struct loc *cond_loc_out) {
+                  struct condition_state *out) {
   switch (a->tag) {
   case AST_CONDITION_EXPR: {
     struct ast_expr *expr = a->u.expr;
@@ -4106,9 +4158,41 @@ int gen_condition(struct checkstate *cs, struct objfile *f,
     if (!gen_expr(cs, f, h, expr, &cond_er)) {
       return 0;
     }
+    out->tag = AST_CONDITION_EXPR;
     wipe_temporaries(cs, f, h, &cond_er, ast_expr_type(expr),
-                     cond_loc_out);
+                     &out->u.expr_cond_loc);
     return 1;
+  } break;
+  case AST_CONDITION_PATTERN: {
+    struct swartch_facts facts;
+    if (!gen_swartch(cs, f, h, a->u.pa.rhs, &facts)) {
+      return 0;
+    }
+
+    /* struct ast_constructor_pattern *constructor = &a->u.pa.pattern; */
+
+    ERR_DBG("gen_condition not implemented for patterns.\n");
+    return 0;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+int gen_successbody(struct checkstate *cs, struct objfile *f,
+                    struct frame *h, struct condition_state *cstate,
+                    struct ast_bracebody *body,
+                    int32_t before_condition_saved_offset,
+                    size_t fail_target_number) {
+  switch (cstate->tag) {
+  case AST_CONDITION_EXPR: {
+    gen_placeholder_jmp_if_false(f, h, cstate->u.expr_cond_loc, fail_target_number);
+    frame_restore_offset(h, before_condition_saved_offset);
+    return gen_bracebody(cs, f, h, body);
+  } break;
+  case AST_CONDITION_PATTERN: {
+    ERR_DBG("gen_successbody not implemented for patterns.\n");
+    return 0;
   } break;
   default:
     UNREACHABLE();
@@ -4174,16 +4258,14 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   } break;
   case AST_STATEMENT_IFTHEN: {
     int32_t saved_offset = frame_save_offset(h);
-    struct loc cond_loc;
-    if (!gen_condition(cs, f, h, &s->u.ifthen_statement.condition, &cond_loc)) {
+    struct condition_state cstate;
+    if (!gen_condition(cs, f, h, &s->u.ifthen_statement.condition, &cstate)) {
       return 0;
     }
 
     size_t target_number = frame_add_target(h);
-    gen_placeholder_jmp_if_false(f, h, cond_loc, target_number);
-    frame_restore_offset(h, saved_offset);
-
-    if (!gen_bracebody(cs, f, h, &s->u.ifthen_statement.body)) {
+    if (!gen_successbody(cs, f, h, &cstate, &s->u.ifthen_statement.body,
+                         saved_offset, target_number)) {
       return 0;
     }
 
@@ -4192,16 +4274,14 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   } break;
   case AST_STATEMENT_IFTHENELSE: {
     int32_t saved_offset = frame_save_offset(h);
-    struct loc cond_loc;
-    if (!gen_condition(cs, f, h, &s->u.ifthenelse_statement.condition, &cond_loc)) {
+    struct condition_state cstate;
+    if (!gen_condition(cs, f, h, &s->u.ifthenelse_statement.condition, &cstate)) {
       return 0;
     }
 
     size_t target_number = frame_add_target(h);
-    gen_placeholder_jmp_if_false(f, h, cond_loc, target_number);
-    frame_restore_offset(h, saved_offset);
-
-    if (!gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.thenbody)) {
+    if (!gen_successbody(cs, f, h, &cstate, &s->u.ifthenelse_statement.thenbody,
+                         saved_offset, target_number)) {
       return 0;
     }
 
@@ -4222,16 +4302,14 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     frame_define_target(h, top_target_number, objfile_section_size(objfile_text(f)));
 
     int32_t saved_offset = frame_save_offset(h);
-    struct loc cond_loc;
-    if (!gen_condition(cs, f, h, &s->u.while_statement.condition, &cond_loc)) {
+    struct condition_state cstate;
+    if (!gen_condition(cs, f, h, &s->u.while_statement.condition, &cstate)) {
       return 0;
     }
 
     size_t bottom_target_number = frame_add_target(h);
-    gen_placeholder_jmp_if_false(f, h, cond_loc, bottom_target_number);
-    frame_restore_offset(h, saved_offset);
-
-    if (!gen_bracebody(cs, f, h, &s->u.while_statement.body)) {
+    if (!gen_successbody(cs, f, h, &cstate, &s->u.while_statement.body,
+                         saved_offset, bottom_target_number)) {
       return 0;
     }
 
@@ -4298,34 +4376,12 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     struct ast_switch_statement *ss = &s->u.switch_statement;
     int32_t saved_offset = frame_save_offset(h);
 
-    struct ast_typeexpr *swartch_type = ast_expr_type(ss->swartch);
-    struct loc swartch_loc = frame_push_loc(h, x86_sizeof(&cs->nt, swartch_type));
-
-    {
-      int32_t swartch_saved_offset = frame_save_offset(h);
-      struct expr_return swartch_er = demand_expr_return(swartch_loc);
-      if (!gen_expr(cs, f, h, ss->swartch, &swartch_er)) {
-        return 0;
-      }
-      frame_restore_offset(h, swartch_saved_offset);
+    struct swartch_facts facts;
+    if (!gen_swartch(cs, f, h, ss->swartch, &facts)) {
+      return 0;
     }
 
-    int swartch_is_ptr;
-    struct loc swartch_enum_loc;
-    {
-      struct ast_typeexpr *swartch_target;
-      if (view_ptr_target(&cs->cm, swartch_type, &swartch_target)) {
-        swartch_is_ptr = 1;
-        CHECK(swartch_loc.tag == LOC_EBP_OFFSET);
-        uint32_t size = x86_sizeof(&cs->nt, swartch_target);
-        swartch_enum_loc = ebp_indirect_loc(size, size, swartch_loc.u.ebp_offset);
-      } else {
-        swartch_is_ptr = 0;
-        swartch_enum_loc = swartch_loc;
-      }
-    }
-
-    struct loc swartch_num_loc = make_enum_num_loc(f, h, swartch_enum_loc);
+    struct loc swartch_num_loc = make_enum_num_loc(f, h, facts.enum_loc);
 
     gen_load_register(f, X86_EAX, swartch_num_loc);
 
@@ -4356,13 +4412,13 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
 
       struct ast_typeexpr *var_type = ast_var_info_type(&constructor->decl.var_info);
-      struct loc var_loc = make_enum_body_loc(f, h, swartch_enum_loc,
+      struct loc var_loc = make_enum_body_loc(f, h, facts.enum_loc,
                                               x86_sizeof(&cs->nt, var_type));
 
       struct vardata vd;
       struct varnum varnum = ast_var_info_varnum(&constructor->decl.var_info);
       /* We don't destroy the variable when unwinding, if we're switching over a pointer-to-enum. */
-      vardata_init(&vd, constructor->decl.name.value, varnum, !swartch_is_ptr, var_type, var_loc);
+      vardata_init(&vd, constructor->decl.name.value, varnum, !facts.is_ptr, var_type, var_loc);
       SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
       if (!gen_bracebody(cs, f, h, &cas->body)) {
@@ -4400,7 +4456,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     gen_crash_jmp(f, h);
 
     frame_define_target(h, end_target, objfile_section_size(objfile_text(f)));
-    gen_destroy(cs, f, h, swartch_loc, swartch_type);
+    gen_destroy(cs, f, h, facts.loc, facts.type);
 
     frame_restore_offset(h, saved_offset);
   } break;
