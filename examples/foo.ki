@@ -91,6 +91,23 @@ def blah_enty = func(x enty) enty {
       print(&s);
     }
   }
+  if case &c1(a void) = &x {
+    s string = lits("c1 (void) yet again\n");
+    print(&s);
+  }
+  if case c1(a void) = x {
+    s string = lits("c1 (void) third time\n");
+    print(&s);
+  } else {
+    s string = lits("not c1 this time\n");
+    print(&s);
+  }
+  while case c1(a void) = x {
+    s string = lits("c1 (void) while looped\n");
+    print(&s);
+    x = c3(s);
+  }
+
   daw enty = y;
   y = kraw;
   y = daw;

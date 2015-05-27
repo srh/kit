@@ -394,7 +394,7 @@ int loc_equal(struct loc a, struct loc b) {
 }
 
 struct vardata {
-  ident_value name;
+  ident_value name_if_valid;
   /* TODO: Probably we can just remove varnum, now that label/goto is
   gone. */
   struct varnum varnum;
@@ -409,12 +409,12 @@ struct vardata {
 };
 
 void vardata_init(struct vardata *vd,
-                  ident_value name,
+                  ident_value name_if_valid,
                   struct varnum varnum,
                   int destroy_when_unwound,
                   struct ast_typeexpr *concrete_type,
                   struct loc loc) {
-  vd->name = name;
+  vd->name_if_valid = name_if_valid;
   vd->varnum = varnum;
   vd->destroy_when_unwound = destroy_when_unwound;
   vd->concrete_type = concrete_type;
@@ -427,7 +427,7 @@ void vardata_init_copy(struct vardata *vd,
 }
 
 void vardata_destroy(struct vardata *vd) {
-  vd->name = IDENT_VALUE_INVALID;
+  vd->name_if_valid = IDENT_VALUE_INVALID;
   vd->concrete_type = NULL;
   vd->loc.tag = (enum loc_tag)-1;
 }
@@ -676,8 +676,12 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
 }
 
 int lookup_vardata_by_name(struct frame *h, ident_value name, size_t *index_out) {
+  /* "Invalid" entries are for unnamed temporaries that need to be
+  destroyed when returning -- they aren't unique so it would not make
+  sense to look for their name. */
+  CHECK(name != IDENT_VALUE_INVALID);
   for (size_t i = 0, e = h->vardata_count; i < e; i++) {
-    if (h->vardata[i].name == name) {
+    if (h->vardata[i].name_if_valid == name) {
       *index_out = i;
       return 1;
     }
@@ -1728,7 +1732,9 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
   CHECK(frame_arg_count(h) == h->vardata_count);
   for (size_t i = 0, e = frame_arg_count(h); i < e; i++) {
     struct vardata *vd = &h->vardata[size_sub(h->vardata_count, 1)];
-    gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
+    if (vd->destroy_when_unwound) {
+      gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
+    }
     SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
   }
 
@@ -4134,11 +4140,24 @@ int gen_swartch(struct checkstate *cs, struct objfile *f,
     }
   }
 
+  {
+    struct vardata vd;
+    struct varnum bogus_varnum = { SIZE_MAX };  /* TODO: Get rid of varnum. */
+    vardata_init(&vd, IDENT_VALUE_INVALID,
+                 bogus_varnum, 1, swartch_type, swartch_loc);
+    SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+  }
+
   out->type = swartch_type;
   out->loc = swartch_loc;
   out->is_ptr = is_ptr;
   out->enum_loc = enum_loc;
   return 1;
+}
+
+void ungen_swartch(struct checkstate *cs, struct objfile *f,
+                   struct frame *h, struct swartch_facts *facts) {
+  gen_destroy(cs, f, h, facts->loc, facts->type);
 }
 
 int gen_casebody(struct checkstate *cs, struct objfile *f,
@@ -4158,8 +4177,8 @@ int gen_casebody(struct checkstate *cs, struct objfile *f,
 
   struct vardata vd;
   struct varnum varnum = ast_var_info_varnum(&constructor->decl.var_info);
-  /* We don't destroy the variable when unwinding, if we're switching over a pointer-to-enum. */
-  vardata_init(&vd, constructor->decl.name.value, varnum, !facts->is_ptr, var_type, var_loc);
+  /* We don't destroy the variable -- the swartch gets push/popped instead. */
+  vardata_init(&vd, constructor->decl.name.value, varnum, 0, var_type, var_loc);
   SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
   if (!gen_bracebody(cs, f, h, body)) {
@@ -4212,6 +4231,17 @@ int gen_condition(struct checkstate *cs, struct objfile *f,
   }
 }
 
+void pop_cstate_vardata(struct frame *h, struct condition_state *cstate) {
+  switch (cstate->tag) {
+  case AST_CONDITION_EXPR: {
+    /* No vardata. */
+  } break;
+  case AST_CONDITION_PATTERN: {
+    SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+  } break;
+  }
+}
+
 int gen_successbody(struct checkstate *cs, struct objfile *f,
                     struct frame *h, struct condition_state *cstate,
                     struct ast_bracebody *body,
@@ -4225,13 +4255,14 @@ int gen_successbody(struct checkstate *cs, struct objfile *f,
     return gen_bracebody(cs, f, h, body);
   } break;
   case AST_CONDITION_PATTERN: {
+    struct loc swartch_num_loc = make_enum_num_loc(f, h, cstate->u.pattern.facts.enum_loc);
+    gen_load_register(f, X86_EAX, swartch_num_loc);
     if (!gen_casebody(cs, f, h, &cstate->u.pattern.facts,
                       cstate->u.pattern.constructor, body,
                       fail_target_number)) {
       return 0;
     }
-    gen_destroy(cs, f, h, cstate->u.pattern.facts.loc, cstate->u.pattern.facts.type);
-    frame_restore_offset(h, before_condition_saved_offset);
+    ungen_swartch(cs, f, h, &cstate->u.pattern.facts);
     gen_placeholder_jmp(f, h, end_target_number);
     return 1;
   } break;
@@ -4241,15 +4272,13 @@ int gen_successbody(struct checkstate *cs, struct objfile *f,
 }
 
 void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
-                                     struct frame *h, struct condition_state *cstate,
-                                     int32_t before_condition_saved_offset) {
+                                     struct frame *h, struct condition_state *cstate) {
   switch (cstate->tag) {
   case AST_CONDITION_EXPR: {
     /* No cleanup. */
   } break;
   case AST_CONDITION_PATTERN: {
-    gen_destroy(cs, f, h, cstate->u.pattern.facts.loc, cstate->u.pattern.facts.type);
-    frame_restore_offset(h, before_condition_saved_offset);
+    ungen_swartch(cs, f, h, &cstate->u.pattern.facts);
   } break;
   }
 }
@@ -4327,9 +4356,11 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
     frame_define_target(h, target_number,
                         objfile_section_size(objfile_text(f)));
-    gen_afterfail_condition_cleanup(cs, f, h, &cstate, saved_offset);
+    gen_afterfail_condition_cleanup(cs, f, h, &cstate);
     frame_define_target(h, end_target_number,
                         objfile_section_size(objfile_text(f)));
+    pop_cstate_vardata(h, &cstate);
+    frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_IFTHENELSE: {
     int32_t saved_offset = frame_save_offset(h);
@@ -4353,9 +4384,11 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    gen_afterfail_condition_cleanup(cs, f, h, &cstate, saved_offset);
+    gen_afterfail_condition_cleanup(cs, f, h, &cstate);
     frame_define_target(h, end_target_number,
                         objfile_section_size(objfile_text(f)));
+    pop_cstate_vardata(h, &cstate);
+    frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_WHILE: {
     size_t top_target_number = frame_add_target(h);
@@ -4376,9 +4409,11 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
     gen_placeholder_jmp(f, h, top_target_number);
     frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
-    gen_afterfail_condition_cleanup(cs, f, h, &cstate, saved_offset);
+    gen_afterfail_condition_cleanup(cs, f, h, &cstate);
     frame_define_target(h, end_target_number,
                         objfile_section_size(objfile_text(f)));
+    pop_cstate_vardata(h, &cstate);
+    frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_FOR: {
     struct ast_for_statement *fs = &s->u.for_statement;
@@ -4480,8 +4515,6 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     }
 
     if (has_default) {
-      /* TODO: A return statement in the default case will not destroy the swartch. */
-
       struct ast_cased_statement *cas = &ss->cased_statements[default_case_num];
       STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
       /* We carefully make the 0 tag and nonsense tag values redirect
@@ -4504,8 +4537,10 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     gen_crash_jmp(f, h);
 
     frame_define_target(h, end_target, objfile_section_size(objfile_text(f)));
-    gen_destroy(cs, f, h, facts.loc, facts.type);
+    ungen_swartch(cs, f, h, &facts);
 
+    /* Pop swartch vardata. */
+    SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
     frame_restore_offset(h, saved_offset);
   } break;
   default:
