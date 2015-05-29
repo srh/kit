@@ -1114,12 +1114,24 @@ func parse_rest_of_return_statement(p *ps, out *ast_statement) bool {
 }
 
 func parse_condition(p *ps, out *ast_condition) bool {
-  condition box[ast_expr];
-  if !parse_expr(p, kConditionPrec, oo(&condition)) {
-    return Fail;
+  if try_skip_token(p, Keyw(Case(void))) {
+    conspatt ast_constructor_pattern;
+    rhs box[ast_expr];
+    if !(parse_rest_of_constructor_pattern(p, &conspatt)
+         && try_skip_oper(p, '=')
+         && parse_expr(p, kConditionPrec, oo(&rhs))) {
+      return Fail;
+    }
+    *out = PatternCondition({conspatt, rhs});
+    return true;
+  } else {
+    condition box[ast_expr];
+    if !parse_expr(p, kConditionPrec, oo(&condition)) {
+      return Fail;
+    }
+    *out = ExprCondition(condition);
+    return true;
   }
-  *out = ExprCondition(condition);
-  return true;
 }
 
 func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
@@ -1242,14 +1254,8 @@ func parse_switch_case(p *ps, out *ast_switch_case) bool {
   return true;
 }
 
-func parse_case_pattern(p *ps, out *ast_case_pattern) bool {
-  if try_skip_token(p, Keyw(Default(void))) {
-    *out = Default(void);
-    return true;
-  }
-  if !try_skip_token(p, Keyw(Case(void))) {
-    return Fail;
-  }
+func parse_rest_of_constructor_pattern(p *ps,
+                                       out *ast_constructor_pattern) bool {
   constructor_name ast_ident;
   decl ast_vardecl;
   if !(parse_ident(p, &constructor_name)
@@ -1258,7 +1264,21 @@ func parse_case_pattern(p *ps, out *ast_case_pattern) bool {
        && try_skip_token(p, Grouper(RParen(void)))) {
     return Fail;
   }
-  *out = Case({constructor_name, decl});
+  *out = {constructor_name, decl};
+  return true;
+}
+
+func parse_case_pattern(p *ps, out *ast_case_pattern) bool {
+  if try_skip_token(p, Keyw(Default(void))) {
+    *out = Default(void);
+    return true;
+  }
+  conspatt ast_constructor_pattern;
+  if !(try_skip_token(p, Keyw(Case(void)))
+       && parse_rest_of_constructor_pattern(p, &conspatt)) {
+    return Fail;
+  }
+  *out = Case(conspatt);
   return true;
 }
 
@@ -1596,6 +1616,8 @@ func test_parse() bool {
                                make("access string { def foo i32 = 3; }\n"));
   pass = pass & run_parse_test(make("p054"),
                                make("access vec[_] { def foo i32 = 3; }\n"));
+  pass = pass & run_parse_test(make("p055"),
+                               make("func foo() a { if case foo(x) = bar { } else if y { } else { } }"));
   return pass;
 }
 
