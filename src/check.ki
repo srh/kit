@@ -224,6 +224,9 @@ func check_def(cs *checkstate, ent *def_entry) bool {
         return false;
       }
 
+      /* TODO: Check for perfect def shadowing... _after_ we typecheck
+      the rhs, because the type signature of the def is optional. */
+
       // TODO: Implement.
       //   - check sanity of typeexpr.
       //   - check rhs expr.
