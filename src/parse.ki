@@ -1113,10 +1113,19 @@ func parse_rest_of_return_statement(p *ps, out *ast_statement) bool {
   return true;
 }
 
-func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
+func parse_condition(p *ps, out *ast_condition) bool {
   condition box[ast_expr];
+  if !parse_expr(p, kConditionPrec, oo(&condition)) {
+    return Fail;
+  }
+  *out = ExprCondition(condition);
+  return true;
+}
+
+func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
+  condition ast_condition;
   thenbody ast_bracebody;
-  if !(parse_expr(p, kConditionPrec, oo(&condition))
+  if !(parse_condition(p, &condition)
        && parse_bracebody(p, &thenbody)) {
     return Fail;
   }
@@ -1149,7 +1158,7 @@ func parse_rest_of_while_statement(p *ps, out *ast_statement) bool {
        && parse_bracebody(p, &body)) {
     return Fail;
   }
-  *out = While({condition, body});
+  *out = While({ExprCondition(condition), body});
   return true;
 }
 

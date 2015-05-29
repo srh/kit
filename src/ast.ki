@@ -114,19 +114,29 @@ deftype ast_var_statement struct {
   rhs opt[box[ast_expr]];
 };
 
+deftype ast_pattern_assign struct {
+  pattern ast_constructor_pattern;
+  rhs box[ast_expr];
+};
+
+defenum ast_condition {
+  ExprCondition box[ast_expr];
+  PatternCondition ast_pattern_assign;
+};
+
 deftype ast_ifthen_statement struct {
-  condition box[ast_expr];
+  condition ast_condition;
   body ast_bracebody;
 };
 
 deftype ast_ifthenelse_statement struct {
-  condition box[ast_expr];
+  condition ast_condition;
   thenbody ast_bracebody;
   elsebody ast_bracebody;
 };
 
 deftype ast_while_statement struct {
-  condition box[ast_expr];
+  condition ast_condition;
   body ast_bracebody;
 };
 
@@ -169,11 +179,14 @@ defenum ast_statement {
   Goto ast_goto_statement;
 };
 
+// TODO: addressof_constructor.
+deftype ast_constructor_pattern struct {
+  constructor_name ast_ident;
+  decl ast_vardecl;
+};
+
 defenum ast_case_pattern {
-  Case struct {
-    constructor_name ast_ident;
-    decl ast_vardecl;
-  };
+  Case ast_constructor_pattern;
   Default void;
 };
 
