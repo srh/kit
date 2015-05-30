@@ -17,6 +17,9 @@ deftype checkstate struct {
 
   deftypes array[shp[deftype_entry]];
   deftypes_by_name hash[sym, array[deftype_entry_id]];
+
+  aliases array[shp[alias_entry]];
+  aliases_by_name hash[sym, array[alias_entry_id]];
 };
 
 // An index into checkstate's modules array.
@@ -30,8 +33,13 @@ deftype def_inst_id size;
 deftype def_entry_id size;
 def `~` fn[size, def_entry_id] = wrapconvert;
 
+// An index into checkstate's deftypes array.
 deftype deftype_entry_id size;
 def `~` fn[size, deftype_entry_id] = wrapconvert;
+
+// An index into checkstate's aliases array.
+deftype alias_entry_id size;
+def `~` fn[size, alias_entry_id] = wrapconvert;
 
 defenum module_process_state {
   Unprocessed void;
@@ -50,6 +58,8 @@ deftype module struct {
   process_state module_process_state;
   // vvv  Valid when process_state == DoneProcessing.  vvv
   defs array[def_entry_id];
+  deftypes array[deftype_entry_id];
+  aliases array[alias_entry_id];
 };
 
 deftype def_inst struct {
@@ -60,12 +70,19 @@ deftype def_entry struct {
   module_name sym;
   def_name sym;
   tl *ast_toplevel;
-
-
-  is_checked bool;
 };
 
+deftype deftype_entry struct {
+  module_name sym;
+  deftype_name sym;
+  tl *ast_toplevel;
+};
 
+deftype alias_entry struct {
+  module_name sym;
+  alias_name sym;
+  tl *ast_toplevel;
+};
 
 func check_module(cs *checkstate, mod_name sym) bool {
   switch process_module(cs, mod_name) {
@@ -175,20 +192,30 @@ func process_toplevels(cs *checkstate,
         }
       }
       case &Def(a ast_def): {
-        ent shp[def_entry] = emshp({mod->module_name, a.name.value, toplevel, false});
+        ent shp[def_entry] = emshp({mod->module_name, a.name.value, toplevel});
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &ExternDef(a ast_extern_def): {
-        ent shp[def_entry] = emshp({mod->module_name, a.name.value, toplevel, false});
+        ent shp[def_entry] = emshp({mod->module_name, a.name.value, toplevel});
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &TypeDef(a ast_type_def): {
-        ent shp[def_entry] = emshp({mod->module_name, a.name.value, toplevel, false});
-        add_def_entry(cs, mod->module_name, &mod->defs, ent);
+        ent shp[deftype_entry] = emshp({mod->module_name, a.name.value, toplevel});
+        id deftype_entry_id = ~count(&cs->deftypes);
+        push(&cs->deftypes, ent);
+        arr *array[deftype_entry_id] = try_insert_lookup(
+          &cs->deftypes_by_name, oo(ent)->deftype_name, default());
+        push(arr, id);
+        push(&mod->deftypes, id);
       }
       case &TypeAlias(a ast_type_alias): {
-        ERR(_u8("type aliases not supported yet"));
-        return false;
+        ent shp[alias_entry] = emshp({mod->module_name, a.name.value, toplevel});
+        id alias_entry_id = ~count(&cs->aliases);
+        push(&cs->aliases, ent);
+        arr *array[alias_entry_id] = try_insert_lookup(
+          &cs->aliases_by_name, oo(ent)->alias_name, default());
+        push(arr, id);
+        push(&mod->aliases, id);
       }
       case &Access(a ast_access): {
         if !process_toplevels(cs, mod, &a.toplevels) {
@@ -227,17 +254,6 @@ func check_def(cs *checkstate, ent *def_entry) bool {
       //   - Check sanity of typeexpr.
       return faketrue;
     }
-    case &TypeDef(a ast_type_def): {
-      if !check_generics_shadowing(cs, &a.generics) {
-        return false;
-      }
-
-      // TODO: Implement.
-      //   - check rhs "type expr".
-      //   - check that rhs "type expr" can be statically evaled.
-      //   - compute static eval dependency relationships?
-      return faketrue;
-    }
     default: {
       crash(_u8("check_def sees unexpected toplevel in def_entry."));
       return fake();
@@ -267,7 +283,7 @@ func check_generics_shadowing(cs *checkstate, g *ast_generics) bool {
 }
 
 func scope_shadows(cs *checkstate, name sym) bool {
-  return has_key(&cs->defs_by_name, name) || has_key(&cs->aliases_by_name, name);
+  return has_key(&cs->defs_by_name, name) || has_key(&cs->deftypes_by_name, name);
 }
 
 // TODO: Remove faketrue.
