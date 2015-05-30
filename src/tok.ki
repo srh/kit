@@ -30,6 +30,9 @@ func make_ps(im *identmap, data *u8, length size) ps {
   p.length = length;
   p.pos = 0;
   p.im = im;
+  // Add an unused entry so that the zero ast_meta value is "invalid."
+  nilmeta meta_datum;
+  push(&p.metas, nilmeta);
   step(&p);
   return p;
 }
