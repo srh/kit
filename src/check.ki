@@ -91,14 +91,25 @@ func check_module(cs *checkstate, mod_name sym) bool {
     }
     case Has(id module_id): {
       mod *module = oo(ref(&cs->modules, id.~));
+      for i size = 0; i < count(&mod->deftypes); i = i + 1 {
+        ent *deftype_entry = oo(ref(&cs->deftypes, get(&mod->deftypes, i).~));
+        if !check_deftype(cs, ent) {
+          return false;
+        }
+      }
+      for i size = 0; i < count(&mod->aliases); i = i + 1 {
+        ent *alias_entry = oo(ref(&cs->aliases, get(&mod->aliases, i).~));
+        if !check_alias(cs, ent) {
+          return false;
+        }
+      }
       for i size = 0; i < count(&mod->defs); i = i + 1 {
         ent *def_entry = oo(ref(&cs->defs, get(&mod->defs, i).~));
         if !check_def(cs, ent) {
           return false;
         }
       }
-      // TODO: Return true?
-      return false;
+      return true;
     }
   }
 }
@@ -227,6 +238,16 @@ func process_toplevels(cs *checkstate,
   return true;
 }
 
+func check_deftype(cs *checkstate, ent *deftype_entry) bool {
+  // TODO: Everything, flatness.
+  return faketrue;
+}
+
+func check_alias(cs *checkstate, ent *alias_entry) bool {
+  // TODO: Everything.
+  return faketrue;
+}
+
 func check_def(cs *checkstate, ent *def_entry) bool {
   // TODO: Finish implementing:
   //   - check def for name conflicts (if that's not handled elsehow)
@@ -252,6 +273,7 @@ func check_def(cs *checkstate, ent *def_entry) bool {
     case &ExternDef(a ast_extern_def): {
       // TODO: Implement.
       //   - Check sanity of typeexpr.
+      //   - Check for shadowing.
       return faketrue;
     }
     default: {
