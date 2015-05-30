@@ -15,8 +15,8 @@ deftype checkstate struct {
   defs array[shp[def_entry]];
   defs_by_name hash[sym, array[def_entry_id]];
 
-  aliases array[shp[alias_entry]];
-  aliases_by_name hash[sym, array[alias_entry_id]];
+  deftypes array[shp[deftype_entry]];
+  deftypes_by_name hash[sym, array[deftype_entry_id]];
 };
 
 // An index into checkstate's modules array.
@@ -30,9 +30,8 @@ deftype def_inst_id size;
 deftype def_entry_id size;
 def `~` fn[size, def_entry_id] = wrapconvert;
 
-// An index into checkstate's aliases array.
-deftype alias_entry_id size;
-def `~` fn[size, alias_entry_id] = wrapconvert;
+deftype deftype_entry_id size;
+def `~` fn[size, deftype_entry_id] = wrapconvert;
 
 defenum module_process_state {
   Unprocessed void;
@@ -51,7 +50,6 @@ deftype module struct {
   process_state module_process_state;
   // vvv  Valid when process_state == DoneProcessing.  vvv
   defs array[def_entry_id];
-  aliases array[alias_entry_id];
 };
 
 deftype def_inst struct {
@@ -65,11 +63,6 @@ deftype def_entry struct {
 
 
   is_checked bool;
-};
-
-deftype alias_entry struct {
-  module_name sym;
-  defined_name sym;
 };
 
 
@@ -87,7 +80,7 @@ func check_module(cs *checkstate, mod_name sym) bool {
           return false;
         }
       }
-      // TODO: Check aliases too?  Or would they have been checked when we put them in a big table?
+      // TODO: Return true?
       return false;
     }
   }
@@ -194,13 +187,8 @@ func process_toplevels(cs *checkstate,
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &TypeAlias(a ast_type_alias): {
-        ent shp[alias_entry] = emshp({mod->module_name, a.name.value});
-        id alias_entry_id = ~count(&cs->aliases);
-        push(&cs->aliases, ent);
-        arr *array[alias_entry_id] = try_insert_lookup(
-          &cs->aliases_by_name, oo(ent)->defined_name, default());
-        push(arr, id);
-        push(&mod->aliases, id);
+        ERR(_u8("type aliases not supported yet"));
+        return false;
       }
       case &Access(a ast_access): {
         if !process_toplevels(cs, mod, &a.toplevels) {
