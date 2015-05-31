@@ -10,12 +10,26 @@ one-liners).  Then (if you built trc) I recommend running
 
 to see if the tests pass.
 
-Then, try running,
+Then, try running (on Windows),
 
    cd src
    ..\out main
    cl main.obj dummy.c
    main
+
+or, try running (on 32-bit Linux),
+
+   cd src
+   ../out --linux main
+   gcc main.o dummy.c
+   ./a.out
+
+or, try running (on 64-bit Linux with multilib set up),
+
+   cd src
+   ../out --linux main
+   gcc -m32 main.o dummy.c
+   ./a.out
 
 to see a parsing test, written in proto-Kit, actually working.  The
 current directory structure is:
@@ -27,7 +41,7 @@ current directory structure is:
    it's no longer the tip of the bootstrap chain, compilable using
    the compiler defined in [t-y]rc.
 
-   src - someday, a self-hosting compiler buildable by trc.
+   src - someday, a self-hosting compiler buildable by max{[t-z]rc}.
 
    examples - examples for trc to run and other junk.
 
@@ -52,4 +66,4 @@ The language implemented in trc is merely "C, with templates,
 constructors/destructors, elementary encapsulation, and tagged enum
 types."  Future versions of the language will be more advanced.
 trc is a trade-off between the convenience of implementing trc and
-the convenience of implementing src.
+the convenience of implementing its successor.
