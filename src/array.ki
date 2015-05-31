@@ -79,7 +79,8 @@ access array[_] {
   }
 
   func[T] append(r *array[T], s *array[T]) void {
-    for i size = 0; i < s->count; i = i + 1 {
+    n size = s->count;
+    for i size = 0; i < n; i = i + 1 {
       push(r, s->ptr[i]);
     }
   }
@@ -120,6 +121,10 @@ func[T] array_equal(a *array[T], b *array[T]) bool {
     }
   }
   return true;
+}
+
+func[T] append(a *array[T], b array[T]) void {
+  return append(a, &b);
 }
 
 func foo() void {
