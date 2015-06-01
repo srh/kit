@@ -2,6 +2,7 @@ import ast;
 import parse;
 import tok;
 import shp;
+import u8ast;
 
 deftype checkstate struct {
   im *identmap;
@@ -299,11 +300,6 @@ func to_u8str(g genparms) array[u8] {
       return ret;
     }
   }
-}
-
-func to_u8str(a ast_typeexpr) array[u8] {
-  // TODO: Implement.
-  return default();
 }
 
 func genparms_eq(cs *checkstate, x *genparms, y *genparms) bool {
