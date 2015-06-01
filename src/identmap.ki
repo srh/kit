@@ -4,8 +4,8 @@ import stdlib;
 
 deftype sym size;
 
-func to_u8str(v sym) array[u8] {
-  return as_hex(v.~);
+func build_u8str(r *array[u8], v *sym) void {
+  append(r, as_hex(v->~));
 }
 
 def `~` fn[size, sym] = wrapconvert;

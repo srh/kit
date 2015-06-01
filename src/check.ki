@@ -281,23 +281,15 @@ defenum genparms {
   HasParms array[ast_typeexpr];
 };
 
-func to_u8str(g genparms) array[u8] {
+func build_u8str(r *array[u8], g *genparms) void {
   switch g {
-    case NoParms(v): {
-      return _u8("NoParms()");
+    case &NoParms(v): {
+      append(r, _u8("NoParms()"));
     }
-    case HasParms(a array[ast_typeexpr]): {
-      var ret = _u8("HasParms([");
-      e size = count(&a);
-      for i size = 0; i < e; i = i + 1 {
-        if i != 0 {
-          append(&ret, _u8(", "));
-        }
-        var tmp = to_u8str(get(&a, i));
-        append(&ret, &tmp);
-      }
-      append(&ret, _u8("])"));
-      return ret;
+    case &HasParms(a array[ast_typeexpr]): {
+      append(r, _u8("HasParms("));
+      build_array_u8str(r, &a);
+      push(r, ')');
     }
   }
 }

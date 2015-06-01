@@ -47,15 +47,16 @@ func build_u8str(r *array[u8], a *ast_typeexpr) void {
 
 func build_u8str(r *array[u8], a *ast_ident) void {
   append(r, _u8("{value:"));
-  append(r, to_u8str(a->value));
+  build_u8str(r, &a->value);
   append(r, _u8("}"));
 }
 
 func build_u8str(r *array[u8], a *ast_typeapp) void {
   append(r, _u8("{typefunc:"));
-  append(r, to_u8str(oo(&a->typefunc)));
+  build_u8str(r, &a->typefunc);
   append(r, _u8(",params:"));
-  append(r, to_u8str(&a->params));
+  build_array_u8str(r, &a->params);
+  push(r, '}');
 }
 
 func build_u8str(r *array[u8], a *ast_struct) void {
@@ -117,11 +118,5 @@ func[T] build_u8str(r *array[u8], a *box[T]) void {
 func build_u8str(r *array[u8], a *ast_expr) void {
   // TODO: Really implement.
   append(r, _u8("ast_expr"));
-}
-
-func to_u8str(a ast_typeexpr) array[u8] {
-  ret array[u8];
-  build_u8str(&ret, &a);
-  return ret;
 }
 

@@ -159,8 +159,8 @@ func[T] popval(a *array[T], val_out *T) bool {
   return true;
 }
 
-func to_u8str(a array[u8]) array[u8] {
-  return a;
+func build_u8str(r *array[u8], a *array[u8]) void {
+  append(r, a);
 }
 
 // Heh.
