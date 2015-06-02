@@ -451,7 +451,8 @@ func check_generics_shadowing(cs *checkstate, g *ast_generics) bool {
 }
 
 func scope_shadows(cs *checkstate, name sym) bool {
-  return has_key(&cs->defs_by_name, name) || has_key(&cs->deftypes_by_name, name);
+  return has_key(&cs->defs_by_name, name) || has_key(&cs->deftypes_by_name, name)
+    || has_key(&cs->aliases_by_name, name);
 }
 
 // TODO: Remove faketrue.
