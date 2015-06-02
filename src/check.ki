@@ -1,5 +1,6 @@
 import ast;
 import parse;
+import replacegenerics;
 import tok;
 import shp;
 import u8ast;
@@ -371,9 +372,21 @@ func check_deftype_with_genparms(cs *checkstate, ent *deftype_entry,
   }
 }
 
-func replace_generics(g *ast_generics, parms *genparms, rhs *ast_type_def_rhs) ast_type_def_rhs {
-  // TODO: Everything.
-  return default();
+func generics_match_parms(g *ast_generics, parms *genparms) bool {
+  switch g {
+    case &NoGenerics(v): {
+      switch parms {
+        case &NoParms(u): { return true; }
+        default: { return false; }
+      }
+    }
+    case &HasGenerics(a): {
+      switch parms {
+        case &HasParms(b): { return count(&a) == count(&b); }
+        default: { return false; }
+      }
+    }
+  }
 }
 
 func check_alias(cs *checkstate, ent *alias_entry) bool {

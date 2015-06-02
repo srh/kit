@@ -1,0 +1,258 @@
+func replace_generics(g *ast_generics, parms *genparms, rhs *ast_type_def_rhs)
+    ast_type_def_rhs {
+  check(generics_match_parms(g, parms));
+  switch rhs {
+    case &TypeexprRhs(a ast_typeexpr): {
+      return TypeexprRhs(replace_generics(g, parms, &a));
+    }
+    case &ClassexprRhs(a): {
+      return ClassexprRhs({a.disposition, replace_generics(g, parms, &a.rhs_type)});
+    }
+  }
+}
+
+func find_generic(g *ast_generics, name sym) opt[size] {
+  switch g {
+    case &NoGenerics(v): {
+      return None();
+    }
+    case &HasGenerics(a array[ast_ident]): {
+      return find_name(&a, name);
+    }
+  }
+}
+
+func find_name(a *array[ast_ident], name sym) opt[size] {
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    if ref(a, i)->value == name {
+      return Has(i);
+    }
+  }
+  return None();
+}
+
+func get_parm(parms *genparms, ix size) ast_typeexpr {
+  if case &HasParms(a) = parms {
+    return get(&a, ix);
+  } else {
+    crash(_u8("getting parm from NoParms"));
+    return fake();
+  }
+}
+
+func replace_generics(g *ast_generics, parms *genparms, a *ast_typeexpr) ast_typeexpr {
+  switch a {
+    case &Name(b ast_ident): {
+      if case Has(ix size) = find_generic(g, b.value) {
+        return get_parm(parms, ix);
+      } else {
+        return Name(b);
+      }
+    }
+    case &App(b ast_typeapp): {
+      return App({replace_generics(g, parms, &b.typefunc),
+                  replace_generics(g, parms, &b.params)});
+    }
+    case &Struct(b ast_struct): {
+      return Struct({replace_generics(g, parms, &b.fields)});
+    }
+    case &Enum(b ast_enum): {
+      return Enum({replace_generics(g, parms, &b.constructors)});
+    }
+    case &Union(b ast_union): {
+      return Union({replace_generics(g, parms, &b.fields)});
+    }
+    case &Arraytype(b ast_arraytype): {
+      return Arraytype({replace_generics(g, parms, &b.count),
+                        replace_generics(g, parms, &b.param)});
+    }
+    case &Unknown(b ast_unknown): {
+      return Unknown({});
+    }
+  }
+}
+
+func[T] replace_generics(g *ast_generics, parms *genparms, a *box[T])
+    box[T] {
+  return embox(replace_generics(g, parms, oo(a)));
+}
+
+func[T] replace_generics(g *ast_generics, parms *genparms, a *array[T])
+    array[T] {
+  n size = count(a);
+  ret array[T];
+  for i size = 0; i < n; i = i + 1 {
+    push(&ret, replace_generics(g, parms, ref(a, i)));
+  }
+  return ret;
+}
+
+func[T] replace_generics(g *ast_generics, parms *genparms, a *opt[T]) opt[T] {
+  if case &Has(x T) = a {
+    return Has(replace_generics(g, parms, &x));
+  }
+  return None();
+}
+
+func replace_generics(g *ast_generics, parms *genparms, a *ast_vardecl)
+    ast_vardecl {
+  // We _don't_ replace generics in the variable name.
+  return {a->name, replace_generics(g, parms, &a->type)};
+}
+
+func replace_generics(g *ast_generics, parms *genparms, a *ast_expr) ast_expr {
+  switch a {
+    case &NameExpr(b ast_name_expr): {
+      return NameExpr({b.ident, replace_generics(g, parms, &b.generic_params)});
+    }
+    case &ParenExpr(b ast_paren_expr): {
+      return ParenExpr({replace_generics(g, parms, &b.expr)});
+    }
+    case &NumericLiteral(b ast_numeric_literal): {
+      return NumericLiteral(b);
+    }
+    case &BoolLiteral(b ast_bool_literal): {
+      return BoolLiteral(b);
+    }
+    case &VoidLiteral(b ast_void_literal): {
+      return VoidLiteral(b);
+    }
+    case &NullLiteral(b ast_null_literal): {
+      return NullLiteral(b);
+    }
+    case &CharLiteral(b ast_char_literal): {
+      return CharLiteral(b);
+    }
+    case &StringLiteral(b ast_string_literal): {
+      return StringLiteral({b.charspecs});
+    }
+    case &Funcall(b ast_funcall): {
+      return Funcall({replace_generics(g, parms, &b.fun),
+                      replace_generics(g, parms, &b.params)});
+    }
+    case &IndexExpr(b ast_index_expr): {
+      return IndexExpr({replace_generics(g, parms, &b.lhs),
+                        replace_generics(g, parms, &b.rhs)});
+    }
+    case &Lambda(b ast_lambda): {
+      return Lambda({replace_generics(g, parms, &b.args),
+                     replace_generics(g, parms, &b.return_type),
+                     replace_generics(g, parms, &b.body)});
+    }
+    case &LocalField(b ast_local_field): {
+      return LocalField({replace_generics(g, parms, &b.lhs),
+                         replace_generics(g, parms, &b.fieldname)});
+    }
+    case &DerefField(b ast_deref_field): {
+      return DerefField({replace_generics(g, parms, &b.lhs),
+                         replace_generics(g, parms, &b.fieldname)});
+    }
+    case &TypedExpr(b ast_typed_expr): {
+      return TypedExpr({replace_generics(g, parms, &b.type),
+                        replace_generics(g, parms, &b.expr)});
+    }
+    case &Strinit(b ast_strinit): {
+      return Strinit({replace_generics(g, parms, &b.exprs)});
+    }
+  }
+}
+
+func replace_generics(g *ast_generics, parms *genparms, a *ast_fieldname)
+    ast_fieldname {
+  switch a {
+    case &WholeField(v): {
+      return WholeField(void);
+    }
+    case &NameField(b ast_ident): {
+      return NameField(b);
+    }
+  }
+}
+
+func replace_generics(g *ast_generics, parms *genparms, a *ast_bracebody)
+    ast_bracebody {
+  return {replace_generics(g, parms, &a->statements)};
+}
+
+
+func replace_generics(g *ast_generics, parms *genparms, a *ast_statement)
+    ast_statement {
+  switch a {
+    case &Expr(b ast_expr): {
+      return Expr(replace_generics(g, parms, &b));
+    }
+    case &Return(b ast_return_statement): {
+      return Return({replace_generics(g, parms, &b.expr)});
+    }
+    case &Var(b ast_var_statement): {
+      return Var({replace_generics(g, parms, &b.decl),
+                  replace_generics(g, parms, &b.rhs)});
+    }
+    case &IfThen(b ast_ifthen_statement): {
+      return IfThen({replace_generics(g, parms, &b.condition),
+                     replace_generics(g, parms, &b.body)});
+    }
+    case &IfThenElse(b ast_ifthenelse_statement): {
+      return IfThenElse({replace_generics(g, parms, &b.condition),
+                         replace_generics(g, parms, &b.thenbody),
+                         replace_generics(g, parms, &b.elsebody)});
+    }
+    case &While(b ast_while_statement): {
+      return While({replace_generics(g, parms, &b.condition),
+                    replace_generics(g, parms, &b.body)});
+    }
+    case &For(b ast_for_statement): {
+      return For({replace_generics(g, parms, &b.initializer),
+                  replace_generics(g, parms, &b.condition),
+                  replace_generics(g, parms, &b.increment),
+                  replace_generics(g, parms, &b.body)});
+    }
+    case &Switch(b ast_switch_statement): {
+      return Switch({replace_generics(g, parms, &b.swartch),
+                     replace_generics(g, parms, &b.cases)});
+    }
+    case &Label(b ast_label_statement): {
+      return Label({b.name});
+    }
+    case &Goto(b ast_goto_statement): {
+      return Goto({b.target});
+    }
+  }
+}
+
+func replace_generics(g *ast_generics, parms *genparms, a *ast_condition)
+    ast_condition {
+  switch a {
+    case &ExprCondition(b box[ast_expr]): {
+      return ExprCondition(replace_generics(g, parms, &b));
+    }
+    case &PatternCondition(b ast_pattern_assign): {
+      return PatternCondition({replace_generics(g, parms, &b.pattern),
+                               replace_generics(g, parms, &b.rhs)});
+    }
+  }
+}
+
+func replace_generics(g *ast_generics, parms *genparms, a *ast_switch_case)
+    ast_switch_case {
+  return {replace_generics(g, parms, &a->pattern),
+          replace_generics(g, parms, &a->body)};
+}
+
+func replace_generics(g *ast_generics, parms *genparms, a *ast_case_pattern)
+    ast_case_pattern {
+  switch a {
+    case &Case(b ast_constructor_pattern): {
+      return Case(replace_generics(g, parms, &b));
+    }
+    case &Default(v): {
+      return Default(void);
+    }
+  }
+}
+
+func replace_generics(g *ast_generics, parms *genparms, a *ast_constructor_pattern)
+    ast_constructor_pattern {
+  return {a->constructor_name, replace_generics(g, parms, &a->decl)};
+}
