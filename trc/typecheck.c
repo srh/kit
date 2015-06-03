@@ -10,6 +10,7 @@
 #include "identmap.h"
 #include "io.h"
 #include "parse.h"
+#include "print.h"
 #include "slice.h"
 #include "table.h"
 #include "util.h"
@@ -3668,7 +3669,13 @@ int lookup_field_type(struct exprscope *es,
     if (!name_table_lookup_deftype(&es->cs->nt, type->u.name.value,
                                    no_param_list_arity(),
                                    &ent)) {
-      CRASH("lookup_field_type sees an invalid type.");
+      struct databuf buf;
+      databuf_init(&buf);
+      sprint_typeexpr(&buf, es->cs->im, type);
+      METERR(es->cs, fieldname->meta,
+             "ICE: lookup_field_type cannot find type, '%*s'.\n",
+             size_to_int(buf.count), buf.buf);
+      CRASH("Crashing.");
     }
 
     if (ent->is_primitive) {
