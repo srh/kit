@@ -1,3 +1,29 @@
+// TODO: All of this code is, at one point in time, unused.
+
+defenum genparms {
+  NoParms void;
+  HasParms array[ast_typeexpr];
+};
+
+
+// TODO: Implement arity_of for both of these and check that the arity matches.
+func generics_match_parms(g *ast_generics, parms *genparms) bool {
+  switch g {
+    case &NoGenerics(v): {
+      switch parms {
+        case &NoParms(u): { return true; }
+        default: { return false; }
+      }
+    }
+    case &HasGenerics(a): {
+      switch parms {
+        case &HasParms(b): { return count(&a) == count(&b); }
+        default: { return false; }
+      }
+    }
+  }
+}
+
 func replace_generics(g *ast_generics, parms *genparms, rhs *ast_type_def_rhs)
     ast_type_def_rhs {
   check(generics_match_parms(g, parms));

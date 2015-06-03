@@ -70,12 +70,6 @@ deftype module struct {
 };
 
 deftype deftype_inst struct {
-  parms genparms;
-  concrete_rhs ast_type_def_rhs;
-  // Did we start checking the type?  Whether we find this recursively or not, we don't need to re-enter the type, or recheck the type.
-  started_checking bool;
-  // If we're recursively checking this type, we increment a number every time there's a pointer indirection, so we can recognize if the type recursively holds itself.
-  flatness_depth i32;
 };
 
 deftype deftype_entry struct {
@@ -111,26 +105,8 @@ func check_module(cs *checkstate, mod_name sym) bool {
       return false;
     }
     case Has(id module_id): {
-      mod *module = oo(ref(&cs->modules, id.~));
-      for i size = 0; i < count(&mod->deftypes); i = i + 1 {
-        ent *deftype_entry = oo(ref(&cs->deftypes, get(&mod->deftypes, i).~));
-        if !check_deftype(cs, ent) {
-          return false;
-        }
-      }
-      for i size = 0; i < count(&mod->aliases); i = i + 1 {
-        ent *alias_entry = oo(ref(&cs->aliases, get(&mod->aliases, i).~));
-        if !check_alias(cs, ent) {
-          return false;
-        }
-      }
-      for i size = 0; i < count(&mod->defs); i = i + 1 {
-        ent *def_entry = oo(ref(&cs->defs, get(&mod->defs, i).~));
-        if !check_def(cs, ent) {
-          return false;
-        }
-      }
-      return true;
+      // We've loaded the module.  Now what?
+      return faketrue;
     }
   }
 }
@@ -257,136 +233,6 @@ func process_toplevels(cs *checkstate,
     }
   }
   return true;
-}
-
-func check_deftype(cs *checkstate, ent *deftype_entry) bool {
-  a *ast_type_def = ent->tl;
-  if !check_generics_shadowing(cs, &a->generics) {
-    return false;
-  }
-
-  switch &a->generics {
-    case &NoGenerics(v): {
-      return check_deftype_with_genparms(cs, ent, NoParms(void), 1);
-    }
-    case &HasGenerics(args array[ast_ident]): {
-      // TODO: Are there any aspects of a generic type decl that we should check up-front?  Such as uniqueness of field names?
-    }
-  }
-  // TODO: Everything, flatness.
-  return faketrue;
-}
-
-defenum genparms {
-  NoParms void;
-  HasParms array[ast_typeexpr];
-};
-
-func build_u8str(r *array[u8], g *genparms) void {
-  switch g {
-    case &NoParms(v): {
-      append(r, _u8("NoParms()"));
-    }
-    case &HasParms(a array[ast_typeexpr]): {
-      append(r, _u8("HasParms("));
-      build_array_u8str(r, &a);
-      push(r, ')');
-    }
-  }
-}
-
-func genparms_eq(cs *checkstate, x *genparms, y *genparms) bool {
-  if enumnum(x) != enumnum(y) {
-    return false;
-  }
-  switch x {
-    case &NoParms(v): { return true; }
-    case &HasParms(xa array[ast_typeexpr]): {
-      switch y {
-        case &HasParms(ya array[ast_typeexpr]): {
-          return typelists_eq(cs, &xa, &ya);
-        }
-      }
-    }
-  }
-}
-
-func typelists_eq(cs *checkstate, x *array[ast_typeexpr], y *array[ast_typeexpr]) bool {
-  n size = count(x);
-  if n != count(y) {
-    return false;
-  }
-  for i size = 0; i < n; i = i + 1 {
-    if !types_eq(cs, ref(x, i), ref(y, i)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-// This is somewhat "interesting" because it has to expand aliases.
-func types_eq(cs *checkstate, x *ast_typeexpr, y *ast_typeexpr) bool {
-  // TODO: Implement.
-  return false;
-}
-
-func find_inst(cs *checkstate, ent *deftype_entry, parms *genparms)
-    opt[deftype_inst_id] {
-  e size = count(&ent->insts);
-  for i size = 0; i < e; i = i + 1 {
-    id deftype_inst_id = get(&ent->insts, i);
-    inst *deftype_inst = oo(ref(&cs->type_instantiations, id.~));
-    if genparms_eq(cs, parms, &inst->parms) {
-      return Has(id);
-    }
-  }
-  return None();
-}
-
-func check_deftype_with_genparms(cs *checkstate, ent *deftype_entry,
-                                 parms genparms, flatness_depth i32) bool {
-  if case Has(id deftype_inst_id) = find_inst(cs, ent, &parms) {
-    inst *deftype_inst = oo(ref(&cs->type_instantiations, id.~));
-    if inst->started_checking {
-      if inst->flatness_depth == flatness_depth {
-        ERR(_u8("type recursively contains itself (has infinite size): "),
-            lookup(cs->im, ent->name), _u8(" "), parms);
-        return false;
-      }
-      return true;
-    } else {
-      ERR(_u8("ICE: a deftype_inst we didn't immediately start typechecking: "),
-          lookup(cs->im, ent->name), _u8(" "), parms);
-      return false;
-    }
-  } else {
-    a *ast_type_def = ent->tl;
-    conc_rhs ast_type_def_rhs = replace_generics(&a->generics, &parms, &a->rhs);
-    inst shp[deftype_inst] = emshp({parms, conc_rhs, true, flatness_depth});
-    id deftype_inst_id = ~count(&cs->type_instantiations);
-    push(&cs->type_instantiations, inst);
-    push(&ent->insts, id);
-
-    // TODO: Recursively check the type rhs -- and compute how to init/copy/move/destroy?
-    return false;
-  }
-}
-
-func generics_match_parms(g *ast_generics, parms *genparms) bool {
-  switch g {
-    case &NoGenerics(v): {
-      switch parms {
-        case &NoParms(u): { return true; }
-        default: { return false; }
-      }
-    }
-    case &HasGenerics(a): {
-      switch parms {
-        case &HasParms(b): { return count(&a) == count(&b); }
-        default: { return false; }
-      }
-    }
-  }
 }
 
 func check_alias(cs *checkstate, ent *alias_entry) bool {
