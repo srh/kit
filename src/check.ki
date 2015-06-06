@@ -31,6 +31,7 @@ def `~` fn[size, module_id] = wrapconvert;
 
 // An index into checkstate's instantiations array.
 deftype def_inst_id size;
+def `~` fn[size, def_inst_id] = wrapconvert;
 
 // An index into checkstate's type_instantiations array.
 deftype deftype_inst_id size;
@@ -66,6 +67,12 @@ func ref_alias_entry(cs *checkstate, id alias_entry_id) *alias_entry {
 
 func ref_inst(cs *checkstate, id def_inst_id) *def_inst {
   return oo(ref(&cs->instantiations, id.~));
+}
+
+func add_inst(cs *checkstate, val def_inst) def_inst_id {
+  id def_inst_id = ~count(&cs->instantiations);
+  push(&cs->instantiations, emshp(val));
+  return id;
 }
 
 defenum module_process_state {
@@ -117,7 +124,13 @@ defenum genparms {
 
 deftype def_inst struct {
   parms genparms;
+  // Our own copy of the def, which we can annotate.  It does not have its generics replaced.
+  ast ast_def;
 };
+
+func mk(parms genparms, a ast_def) def_inst {
+  return {parms, a};
+}
 
 deftype def_entry struct {
   module_name sym;
@@ -194,12 +207,28 @@ func parms_equal(cs *checkstate, a *genparms, b *genparms) bool {
   }
 }
 
-func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, parms genparms) bool {
-  if case Has(id) = find_matching_inst(cs, &ent->insts, &parms) {
-    return TODO();
-  } else {
-    return TODO();
+func arity(parms *genparms) generics_arity {
+  switch parms {
+    case &NoParms(v void): { return NoParamsArity(void); }
+    case &HasParms(arr array[te_typeexpr]): { return FiniteArity(~count(&arr)); }
   }
+}
+
+func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, parms genparms) bool {
+  check(arity(&a->generics) == arity(&parms));
+
+  if case Has(id) = find_matching_inst(cs, &ent->insts, &parms) {
+    // If we already have an inst, I believe that means we began type-checking the def.
+    // TODO: What if we recurse to here while evaluating the def's type?
+    return true;
+  }
+
+  id def_inst_id = add_inst(cs, mk(parms, *a));
+  inst *def_inst = ref_inst(cs, id);
+  // TODO: We ignore is_export entirely.  Is it relevant at all?
+  a = &inst->ast;
+
+  return TODO();
 }
 
 func ensure_def_checked(cs *checkstate, id def_entry_id) bool {

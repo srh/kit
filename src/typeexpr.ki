@@ -29,6 +29,7 @@ deftype te_union struct {
 };
 
 deftype te_arraytype struct {
+  // TODO: Make this be u32.
   count size;
   param box[te_typeexpr];
 };

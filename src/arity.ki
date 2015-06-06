@@ -1,6 +1,25 @@
+import ast;
+
 defenum generics_arity {
   NoParamsArity void;
   FiniteArity u32;
 };
 
-// TODO: Implement params_arity (which uses ast_generics).
+func arity(a *ast_generics) generics_arity {
+  switch a {
+    case &NoGenerics(v void): { return NoParamsArity(void); }
+    case &HasGenerics(arr array[ast_ident]): { return FiniteArity(~count(&arr)); }
+  }
+}
+
+func `==`(a generics_arity, b generics_arity) bool {
+  switch a {
+    case NoParamsArity(v void): {
+      if case NoParamsArity(u) = b { return true; }
+    }
+    case FiniteArity(x u32): {
+      if case FiniteArity(y u32) = b { return x == y; }
+    }
+  }
+  return false;
+}
