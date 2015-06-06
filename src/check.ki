@@ -48,6 +48,26 @@ def `~` fn[size, deftype_entry_id] = wrapconvert;
 deftype alias_entry_id size;
 def `~` fn[size, alias_entry_id] = wrapconvert;
 
+func ref_module(cs *checkstate, id module_id) *module {
+  return oo(ref(&cs->modules, id.~));
+}
+
+func ref_def_entry(cs *checkstate, id def_entry_id) *def_entry {
+  return oo(ref(&cs->defs, id.~));
+}
+
+func ref_deftype_entry(cs *checkstate, id deftype_entry_id) *deftype_entry {
+  return oo(ref(&cs->deftypes, id.~));
+}
+
+func ref_alias_entry(cs *checkstate, id alias_entry_id) *alias_entry {
+  return oo(ref(&cs->aliases, id.~));
+}
+
+func ref_inst(cs *checkstate, id def_inst_id) *def_inst {
+  return oo(ref(&cs->instantiations, id.~));
+}
+
 defenum module_process_state {
   Unprocessed void;
   Processing void;
@@ -91,13 +111,20 @@ deftype alias_entry struct {
 };
 
 deftype def_inst struct {
+  parms genparms;
 };
 
 deftype def_entry struct {
   module_name sym;
   def_name sym;
   tl *ast_toplevel;
+
+  insts array[def_inst_id];
 };
+
+func mk(module_name sym, def_name sym, tl *ast_toplevel) def_entry {
+  return {module_name, def_name, tl, default()};
+}
 
 func check_module(cs *checkstate, mod_name sym) bool {
   switch process_module(cs, mod_name) {
@@ -105,10 +132,89 @@ func check_module(cs *checkstate, mod_name sym) bool {
       return false;
     }
     case Has(id module_id): {
-      // We've loaded the module.  Now what?
-      return faketrue;
+      mod *module = ref_module(cs, id);
+      ndefs size = count(&mod->defs);
+      for i size = 0; i < ndefs; i = i + 1 {
+        if !ensure_def_checked(cs, get(&mod->defs, i)) {
+          return false;
+        }
+      }
+
+      ndeftypes size = count(&mod->deftypes);
+      for i size = 0; i < ndeftypes; i = i + 1 {
+        if !ensure_deftype_checked(cs, get(&mod->deftypes, i)) {
+          return false;
+        }
+      }
+
+      naliases size = count(&mod->aliases);
+      for i size = 0; i < naliases; i = i + 1 {
+        if !ensure_alias_checked(cs, get(&mod->aliases, i)) {
+          return false;
+        }
+      }
+
+      // I guess that's everything.
+      // TODO: Check that access blocks point to an actual type?
+      return true;
     }
   }
+}
+
+func find_matching_inst(cs *checkstate, insts *array[def_inst_id], parms *genparms) opt[def_inst_id] {
+  n size = count(insts);
+  for i size = 0; i < n; i = i + 1 {
+    id def_inst_id = get(insts, i);
+    inst *def_inst = ref_inst(cs, id);
+    if parms_equal(cs, parms, &inst->parms) {
+      return Has(id);
+    }
+  }
+  return None();
+}
+
+func parms_equal(cs *checkstate, a *genparms, b *genparms) bool {
+  return TODO();
+}
+
+func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, parms genparms) bool {
+  if case Has(id) = find_matching_inst(cs, &ent->insts, &parms) {
+    return TODO();
+  } else {
+    return TODO();
+  }
+}
+
+func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
+  ent *def_entry = ref_def_entry(cs, id);
+  switch ent->tl {
+    case &Def(a ast_def): {
+      switch &a.generics {
+        case &NoGenerics(v): {
+          return ensure_def_checked_with_parms(cs, ent, &a, NoParms(void));
+        }
+        case &HasGenerics(v): {
+          // We declare success -- we check non-generic defs.
+          return true;
+        }
+      }
+    }
+    case &ExternDef(a ast_extern_def): {
+      return TODO();
+    }
+    default: {
+      ice(_u8("def_entry has invalid toplevel\n"));
+      return fake();
+    }
+  }
+}
+
+func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
+  return TODO();
+}
+
+func ensure_alias_checked(cs *checkstate, id alias_entry_id) bool {
+  return TODO();
 }
 
 func load_module(cs *checkstate, mod_name sym) opt[module_id] {
@@ -151,7 +257,7 @@ func process_module(cs *checkstate, mod_name sym) opt[module_id] {
       return None();
     }
     case Has(id module_id): {
-      mod *module = oo(get(&cs->modules, id.~));
+      mod *module = ref_module(cs, id);
       if mod->process_state == Unprocessed(void) {
          if !process_defs(cs, mod) {
            return None();
@@ -200,11 +306,11 @@ func process_toplevels(cs *checkstate,
         }
       }
       case &Def(a ast_def): {
-        ent shp[def_entry] = emshp({mod->module_name, a.name.value, toplevel});
+        ent shp[def_entry] = emshp(mk(mod->module_name, a.name.value, toplevel));
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &ExternDef(a ast_extern_def): {
-        ent shp[def_entry] = emshp({mod->module_name, a.name.value, toplevel});
+        ent shp[def_entry] = emshp(mk(mod->module_name, a.name.value, toplevel));
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &TypeDef(a ast_type_def): {
@@ -320,4 +426,10 @@ func[T] ERR(x T) void {
   print(Stderr(), to_u8str(x));
   print(Stderr(), _u8("\n"));
   fflush(Stderr());
+}
+
+func ice(msg array[u8]) void {
+  x _ = _u8("ICE: ");
+  append(&x, &msg);
+  crash(x);
 }

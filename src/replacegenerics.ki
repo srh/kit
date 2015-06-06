@@ -2,6 +2,7 @@
 
 defenum genparms {
   NoParms void;
+  // TODO: Make a typeexpr type.
   HasParms array[ast_typeexpr];
 };
 

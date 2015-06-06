@@ -131,6 +131,10 @@ func[T] default() T {
   return ret;
 }
 
+func[T] TODO() T {
+  return default();
+}
+
 func check(x bool) void {
   if !x { abort(); }
 }
