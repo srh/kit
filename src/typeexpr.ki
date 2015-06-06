@@ -1,0 +1,106 @@
+import identmap;
+
+// TODO: Might this still exist in a particular scope?
+// This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics replaced consistently.
+defenum te_typeexpr {
+  TeName sym;
+  TeApp te_typeapp;
+  TeStruct te_struct;
+  TeEnum te_enum;
+  TeUnion te_union;
+  TeArraytype te_arraytype;
+};
+
+deftype te_typeapp struct {
+  typefunc box[te_typeexpr];
+  params array[te_typeexpr];
+};
+
+deftype te_struct struct {
+  fields array[te_vardecl];
+};
+
+deftype te_enum struct {
+  constructors array[te_vardecl];
+};
+
+deftype te_union struct {
+  fields array[te_vardecl];
+};
+
+deftype te_arraytype struct {
+  count size;
+  param box[te_typeexpr];
+};
+
+deftype te_vardecl struct {
+  name sym;
+  type te_typeexpr;
+};
+
+func typeexpr_list_equal(cs *checkstate, a *array[te_typeexpr], b *array[te_typeexpr]) bool {
+  n size = count(a);
+  if n != count(b) {
+    return false;
+  }
+  for i size = 0; i < n; i = i + 1 {
+    if !typeexpr_equal(cs, ref(a, i), ref(b, i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+func typeexpr_equal(cs *checkstate, a *te_typeexpr, b *te_typeexpr) bool {
+  switch a {
+    case &TeName(ax sym): {
+      if case &TeName(bx sym) = b {
+        return ax == bx;
+      }
+    }
+    case &TeApp(ax te_typeapp): {
+      if case &TeApp(bx te_typeapp) = b {
+        return typeexpr_equal(cs, oo(&ax.typefunc), oo(&bx.typefunc))
+          && typeexpr_list_equal(cs, &ax.params, &bx.params);
+      }
+    }
+    case &TeStruct(ax te_struct): {
+      if case &TeStruct(bx te_struct) = b {
+        return te_vardecl_list_equal(cs, &ax.fields, &bx.fields);
+      }
+    }
+    case &TeEnum(ax te_enum): {
+      if case &TeEnum(bx te_enum) = b {
+        return te_vardecl_list_equal(cs, &ax.constructors, &bx.constructors);
+      }
+    }
+    case &TeUnion(ax te_union): {
+      if case &TeUnion(bx te_union) = b {
+        return te_vardecl_list_equal(cs, &ax.fields, &bx.fields);
+      }
+    }
+    case &TeArraytype(ax te_arraytype): {
+      if case &TeArraytype(bx te_arraytype) = b {
+        return ax.count == bx.count && typeexpr_equal(cs, oo(&ax.param), oo(&bx.param));
+      }
+    }
+  }
+
+  return false;
+}
+
+func te_vardecl_list_equal(cs *checkstate, a *array[te_vardecl], b *array[te_vardecl]) bool {
+  n size = count(a);
+  if n != count(b) {
+    return false;
+  }
+  for i size = 0; i < n; i = i + 1 {
+    adecl *te_vardecl = ref(a, i);
+    bdecl *te_vardecl = ref(b, i);
+    if !(adecl->name == bdecl->name && typeexpr_equal(cs, &adecl->type, &bdecl->type)) {
+      return false;
+    }
+  }
+  return true;
+}
+

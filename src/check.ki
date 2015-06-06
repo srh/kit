@@ -1,7 +1,7 @@
 import ast;
 import parse;
-import replacegenerics;
 import tok;
+import typeexpr;
 import shp;
 import u8ast;
 
@@ -110,6 +110,11 @@ deftype alias_entry struct {
   tl *ast_toplevel;
 };
 
+defenum genparms {
+  NoParms void;
+  HasParms array[te_typeexpr];
+};
+
 deftype def_inst struct {
   parms genparms;
 };
@@ -174,7 +179,19 @@ func find_matching_inst(cs *checkstate, insts *array[def_inst_id], parms *genpar
 }
 
 func parms_equal(cs *checkstate, a *genparms, b *genparms) bool {
-  return TODO();
+  if enumnum(a) != enumnum(b) {
+    return false;
+  }
+  switch a {
+    case &NoParms(v void): { return true; }
+    case &HasParms(ah array[te_typeexpr]): {
+      switch b {
+        case &HasParms(bh array[te_typeexpr]): {
+          return typeexpr_list_equal(cs, &ah, &bh);
+        }
+      }
+    }
+  }
 }
 
 func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, parms genparms) bool {
@@ -340,75 +357,6 @@ func process_toplevels(cs *checkstate,
   }
   return true;
 }
-
-func check_alias(cs *checkstate, ent *alias_entry) bool {
-  // TODO: Everything.
-  return faketrue;
-}
-
-func check_def(cs *checkstate, ent *def_entry) bool {
-  // TODO: Finish implementing:
-  //   - check def for name conflicts (if that's not handled elsehow)
-  //   - check uniqueness of generic variable names
-  //   - check that name/arity combination is unique
-
-  switch ent->tl {
-    case &Def(a ast_def): {
-      if !check_generics_shadowing(cs, &a.generics) {
-        return false;
-      }
-
-      /* TODO: Check for perfect def shadowing... _after_ we typecheck
-      the rhs, because the type signature of the def is optional. */
-
-      // TODO: Implement.
-      //   - check sanity of typeexpr.
-      //   - check rhs expr.
-      //   - check that rhs expr can be statically evaled?
-      //   - compute static eval dependency relationships?
-      return faketrue;
-    }
-    case &ExternDef(a ast_extern_def): {
-      // TODO: Implement.
-      //   - Check sanity of typeexpr.
-      //   - Check for shadowing.
-      return faketrue;
-    }
-    default: {
-      crash(_u8("check_def sees unexpected toplevel in def_entry."));
-      return fake();
-    }
-  }
-}
-
-func check_generics_shadowing(cs *checkstate, g *ast_generics) bool {
-  switch g {
-    case &NoGenerics(v): { return true; }
-    case &HasGenerics(a array[ast_ident]): {
-      for i size = 0; i < count(&a); i = i + 1 {
-        ival sym = ref(&a, i)->value;
-        for j size = 0; j < i; j = j + 1 {
-          if ival == ref(&a, j)->value {
-            ERR(_u8("Generic params have duplicate name "), ival);
-            return false;
-          }
-        }
-        if scope_shadows(cs, ival) {
-          ERR(_u8("Generic param externally shadows "), ival);
-        }
-      }
-      return true;
-    }
-  }
-}
-
-func scope_shadows(cs *checkstate, name sym) bool {
-  return has_key(&cs->defs_by_name, name) || has_key(&cs->deftypes_by_name, name)
-    || has_key(&cs->aliases_by_name, name);
-}
-
-// TODO: Remove faketrue.
-def faketrue bool = true;
 
 func[T, U, V, W] ERR(x T, y U, z V, p W) void {
   ERR(cons(cons(x, y), cons(z, p)));
