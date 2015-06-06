@@ -126,10 +126,12 @@ deftype def_inst struct {
   parms genparms;
   // Our own copy of the def, which we can annotate.  It does not have its generics replaced.
   ast ast_def;
+  // Becomes the concrete type (with generics replaced) once we've computed it and checked it.
+  computed_type opt[te_typeexpr];
 };
 
 func mk(parms genparms, a ast_def) def_inst {
-  return {parms, a};
+  return {parms, a, None()};
 }
 
 deftype def_entry struct {
@@ -218,8 +220,14 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
   check(arity(&a->generics) == arity(&parms));
 
   if case Has(id) = find_matching_inst(cs, &ent->insts, &parms) {
-    // If we already have an inst, I believe that means we began type-checking the def.
-    // TODO: What if we recurse to here while evaluating the def's type?
+    // If we already have an inst, that means we made an inst.
+
+    inst *def_inst = ref_inst(cs, id);
+    if case &None(v) = &inst->computed_type {
+      ERR(_u8("computing def's type arouses cyclic dependency"));
+      return false;
+    }
+
     return true;
   }
 
@@ -228,6 +236,26 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
   // TODO: We ignore is_export entirely.  Is it relevant at all?
   a = &inst->ast;
 
+  // TODO: We need to check exact name shadowing(?), typeexpr, and rhs.
+
+  // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
+  if case &Has(t ast_typeexpr) = &a->typeexpr {
+    computed te_typeexpr;
+    if !check_and_compute_typeexpr(cs, &a->generics, &inst->parms, &t, &computed) {
+      return false;
+    }
+    check(!isHas(&inst->computed_type));
+    inst->computed_type = Has(computed);
+
+    // TODO: Check RHS.
+    return TODO();
+
+  } else {
+    return TODO();
+  }
+}
+
+func check_and_compute_typeexpr(cs *checkstate, g *ast_generics, parms *genparms, t *ast_typeexpr, computed_out *te_typeexpr) bool {
   return TODO();
 }
 
