@@ -97,6 +97,7 @@ deftype module struct {
 };
 
 deftype deftype_inst struct {
+  parms genparms;
 };
 
 deftype deftype_entry struct {
@@ -217,10 +218,10 @@ func arity(parms *genparms) generics_arity {
   }
 }
 
-func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, parms genparms) bool {
-  check(arity(&a->generics) == arity(&parms));
+func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, parms *genparms) bool {
+  check(arity(&a->generics) == arity(parms));
 
-  if case Has(id) = find_matching_inst(cs, &ent->insts, &parms) {
+  if case Has(id) = find_matching_inst(cs, &ent->insts, parms) {
     // If we already have an inst, that means we made an inst.
 
     inst *def_inst = ref_inst(cs, id);
@@ -232,7 +233,7 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
     return true;
   }
 
-  id def_inst_id = add_inst(cs, mk(parms, *a));
+  id def_inst_id = add_inst(cs, mk(*parms, *a));
   inst *def_inst = ref_inst(cs, id);
   // TODO: We ignore is_export entirely.  Is it relevant at all?
   a = &inst->ast;
@@ -255,7 +256,7 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
 
   // TODO: How do we know that a->generics doesn't shadow, doesn't self-shadow?
   complete_type te_typeexpr;
-  if !check_expr(cs, &a->generics, &parms, &inst->computed_type, &a->rhs, &complete_type) {
+  if !check_expr(cs, &a->generics, &inst->parms, &inst->computed_type, &a->rhs, &complete_type) {
     return false;
   }
   inst->computed_type_complete = true;
@@ -264,6 +265,73 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
 }
 
 func check_and_compute_typeexpr(cs *checkstate, g *ast_generics, parms *genparms, t *ast_typeexpr, computed_out *te_typeexpr, computed_complete_out *bool) bool {
+  // TODO: We need some kind of proper flatness checking.
+  switch t {
+    case &Name(a ast_ident): {
+      if !check_and_compute_name_type(cs, g, parms, &a, computed_out) {
+        return false;
+      }
+      *computed_complete_out = true;
+      return true;
+    }
+    case &App(a ast_typeapp): {
+      return check_and_compute_app_type(cs, g, parms, &a, computed_out, computed_complete_out);
+    }
+    case &Struct(a ast_struct): { return TODO(); }
+    case &Enum(a ast_enum): { return TODO(); }
+    case &Union(a ast_union): { return TODO(); }
+    case &Arraytype(a ast_arraytype): { return TODO(); }
+    case &Unknown(a ast_unknown): { return TODO(); }
+  }
+}
+
+func check_and_compute_name_type(cs *checkstate, g *ast_generics, parms *genparms, a *ast_ident, computed_out *te_typeexpr) bool {
+  // Generic parameters have already been checked.  (I hope so.)
+  if lookup_generic(g, parms, a->value, computed_out) {
+    return true;
+  }
+
+  matching_alias opt[alias_entry_id];
+  if !match_alias_by_name(cs, a->value, &matching_alias) {
+    // An error happened when looking up an alias (multiple matches?).
+    return false;
+  }
+  matching_deftype opt[deftype_entry_id];
+  if !match_deftype_by_name(cs, a->value, &matching_deftype) {
+    // An error happened when looking up a deftype (multiple matches?).
+    return false;
+  }
+
+  if case Has(id) = matching_alias {
+    if case Has(deftype_id) = matching_deftype {
+      ERR(_u8("Both an alias and deftype match for name "), lookup(cs->im, a->value));
+      return false;
+    }
+    return TODO();
+  } else {
+    if case Has(id) = matching_deftype {
+      np genparms = NoParms(void);
+      return ensure_deftype_checked_with_parms(cs, ref_deftype_entry(cs, id), &np);
+    } else {
+      ERR(_u8("type name has no match "), lookup(cs->im, a->value));
+      return false;
+    }
+  }
+}
+
+func match_deftype_by_name(cs *checkstate, name sym, out *opt[deftype_entry_id]) bool {
+  return TODO();
+}
+
+func match_alias_by_name(cs *checkstate, name sym, out *opt[alias_entry_id]) bool {
+  return TODO();
+}
+
+func lookup_generic(g *ast_generics, parms *genparms, name sym, out *te_typeexpr) bool {
+  return TODO();
+}
+
+func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms, a *ast_typeapp, computed_out *te_typeexpr, computed_complete_out *bool) bool {
   return TODO();
 }
 
@@ -277,7 +345,8 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
     case &Def(a ast_def): {
       switch &a.generics {
         case &NoGenerics(v): {
-          return ensure_def_checked_with_parms(cs, ent, &a, NoParms(void));
+          parms genparms = NoParms(void);
+          return ensure_def_checked_with_parms(cs, ent, &a, &parms);
         }
         case &HasGenerics(v): {
           // We declare success -- we check non-generic defs.
@@ -293,6 +362,10 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
       return fake();
     }
   }
+}
+
+func ensure_deftype_checked_with_parms(cs *checkstate, ent *deftype_entry, parms *genparms) bool {
+  return TODO();
 }
 
 func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
