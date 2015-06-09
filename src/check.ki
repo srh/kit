@@ -126,12 +126,13 @@ deftype def_inst struct {
   parms genparms;
   // Our own copy of the def, which we can annotate.  It does not have its generics replaced.
   ast ast_def;
+  computed_type_complete bool;
   // Becomes the concrete type (with generics replaced) once we've computed it and checked it.
-  computed_type opt[te_typeexpr];
+  computed_type te_typeexpr;
 };
 
 func mk(parms genparms, a ast_def) def_inst {
-  return {parms, a, None()};
+  return {parms, a, false, default()};
 }
 
 deftype def_entry struct {
@@ -223,7 +224,7 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
     // If we already have an inst, that means we made an inst.
 
     inst *def_inst = ref_inst(cs, id);
-    if case &None(v) = &inst->computed_type {
+    if !inst->computed_type_complete {
       ERR(_u8("computing def's type arouses cyclic dependency"));
       return false;
     }
@@ -240,22 +241,34 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
 
   // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
   if case &Has(t ast_typeexpr) = &a->typeexpr {
+    computed_complete bool;
     computed te_typeexpr;
-    if !check_and_compute_typeexpr(cs, &a->generics, &inst->parms, &t, &computed) {
+    if !check_and_compute_typeexpr(cs, &a->generics, &inst->parms, &t, &computed, &computed_complete) {
       return false;
     }
-    check(!isHas(&inst->computed_type));
-    inst->computed_type = Has(computed);
-
-    // TODO: Check RHS.
-    return TODO();
-
+    inst->computed_type_complete = computed_complete;
+    inst->computed_type = computed;
   } else {
-    return TODO();
+    inst->computed_type_complete = false;
+    inst->computed_type = TeUnknown(void);
   }
+
+  // TODO: How do we know that a->generics doesn't shadow, doesn't self-shadow?
+  complete_type te_typeexpr;
+  if !check_expr(cs, &a->generics, &parms, &inst->computed_type, &a->rhs, &complete_type) {
+    return false;
+  }
+  inst->computed_type_complete = true;
+  inst->computed_type = complete_type;
+  return true;
 }
 
-func check_and_compute_typeexpr(cs *checkstate, g *ast_generics, parms *genparms, t *ast_typeexpr, computed_out *te_typeexpr) bool {
+func check_and_compute_typeexpr(cs *checkstate, g *ast_generics, parms *genparms, t *ast_typeexpr, computed_out *te_typeexpr, computed_complete_out *bool) bool {
+  return TODO();
+}
+
+func check_expr(cs *checkstate, g *ast_generics, parms *genparms, pt *te_typeexpr,
+                x *ast_expr, computed_out *te_typeexpr) bool {
   return TODO();
 }
 
