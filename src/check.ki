@@ -267,8 +267,7 @@ func check_and_compute_typeexpr(cs *checkstate, g *ast_generics, parms *genparms
   return TODO();
 }
 
-func check_expr(cs *checkstate, g *ast_generics, parms *genparms, pt *te_typeexpr,
-                x *ast_expr, computed_out *te_typeexpr) bool {
+func check_expr(cs *checkstate, g *ast_generics, parms *genparms, pt *te_typeexpr, x *ast_expr, computed_out *te_typeexpr) bool {
   return TODO();
 }
 
