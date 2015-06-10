@@ -153,6 +153,8 @@ func[T] default() T {
 }
 
 func[T] TODO() T {
+  print(Stderr(), _u8("TODO()\n"));
+  fflush(Stderr());
   return default();
 }
 
