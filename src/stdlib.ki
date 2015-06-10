@@ -110,6 +110,13 @@ func[T] isHas(p *opt[T]) bool {
   return false;
 }
 
+func[T] isNone(p *opt[T]) bool {
+  if case &None(v void) = p {
+    return true;
+  }
+  return false;
+}
+
 func[T] `==`(x opt[T], y opt[T]) bool {
   switch &x {
     case &None(v): {

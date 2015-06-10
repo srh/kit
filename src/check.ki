@@ -14,6 +14,7 @@ deftype checkstate struct {
 
   instantiations array[shp[def_inst]];
   type_instantiations array[shp[deftype_inst]];
+  alias_instantiations array[shp[alias_inst]];
 
   deftypes array[shp[deftype_entry]];
   deftypes_by_name hash[sym, array[deftype_entry_id]];
@@ -36,6 +37,10 @@ def `~` fn[size, def_inst_id] = wrapconvert;
 // An index into checkstate's type_instantiations array.
 deftype deftype_inst_id size;
 def `~` fn[size, deftype_inst_id] = wrapconvert;
+
+// An index into checkstat's alias_instantiations array.
+deftype alias_inst_id size;
+def `~` fn[size, alias_inst_id] = wrapconvert;
 
 // An index into checkstate's defs array.
 deftype def_entry_id size;
@@ -69,9 +74,19 @@ func ref_inst(cs *checkstate, id def_inst_id) *def_inst {
   return oo(ref(&cs->instantiations, id.~));
 }
 
+func ref_alias_inst(cs *checkstate, id alias_inst_id) *alias_inst {
+  return oo(ref(&cs->alias_instantiations, id.~));
+}
+
 func add_inst(cs *checkstate, val def_inst) def_inst_id {
   id def_inst_id = ~count(&cs->instantiations);
   push(&cs->instantiations, emshp(val));
+  return id;
+}
+
+func add_alias_inst(cs *checkstate, val alias_inst) alias_inst_id {
+  id alias_inst_id = ~count(&cs->alias_instantiations);
+  push(&cs->alias_instantiations, emshp(val));
   return id;
 }
 
@@ -112,11 +127,23 @@ func mk(module_name sym, name sym, tl *ast_type_def) deftype_entry {
   return {module_name, name, tl, default()};
 }
 
+deftype alias_inst struct {
+  parms genparms;
+  // Is None() while we're in the process of expansion -- seeing None() means you're recursively expanding.
+  expanded opt[te_typeexpr];
+};
+
 deftype alias_entry struct {
   module_name sym;
   alias_name sym;
   tl *ast_type_alias;
+
+  insts array[alias_inst_id];
 };
+
+func mk(module_name sym, alias_name sym, tl *ast_type_alias) alias_entry {
+  return {module_name, alias_name, tl, default()};
+}
 
 defenum genparms {
   NoParms void;
@@ -219,6 +246,7 @@ func arity(parms *genparms) generics_arity {
 }
 
 func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, parms *genparms) bool {
+  // TODO: Do we know that the def's generics don't shadow something?
   check(arity(&a->generics) == arity(parms));
 
   if case Has(id) = find_matching_inst(cs, &ent->insts, parms) {
@@ -226,7 +254,7 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
 
     inst *def_inst = ref_inst(cs, id);
     if !inst->computed_type_complete {
-      ERR(_u8("computing def's type arouses cyclic dependency"));
+      ERR(_u8("computing def's type arouses cyclic dependency"), lookup(cs->im, ent->def_name));
       return false;
     }
 
@@ -520,8 +548,49 @@ func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms
   }
 }
 
+func find_matching_alias_inst(cs *checkstate, insts *array[alias_inst_id], parms *genparms) opt[alias_inst_id] {
+  n size = count(insts);
+  for i size = 0; i < n; i = i + 1 {
+    id alias_inst_id = get(insts, i);
+    inst *alias_inst = ref_alias_inst(cs, id);
+    if parms_equal(cs, parms, &inst->parms) {
+      return Has(id);
+    }
+  }
+  return None();
+}
+
 func check_and_compute_alias_with_parms(cs *checkstate, ent *alias_entry, parms *genparms, computed_out *te_typeexpr) bool {
-  return TODO();
+  // TODO: How do we know the alias's generic parameters don't self-shadow, or shadow something else?
+
+  if case Has(id) = find_matching_alias_inst(cs, &ent->insts, parms) {
+    inst *alias_inst = ref_alias_inst(cs, id);
+    // If we already have an inst, that means we made an inst.
+    if case &Has(computed te_typeexpr) = &inst->expanded {
+      // We already computed the expansion for these types!
+      *computed_out = computed;
+      return true;
+    } else {
+      // We're in the process of expanding this type.  We recursively expanded.
+      ERR(_u8("Recursively expanding alias "), lookup(cs->im, ent->alias_name));
+      return false;
+    }
+  }
+
+  id alias_inst_id = add_alias_inst(cs, {*parms, None()});
+  inst *alias_inst = ref_alias_inst(cs, id);
+
+  complete bool;
+  computed te_typeexpr;
+  if !check_and_compute_typeexpr(cs, &ent->tl->generics, &inst->parms, &ent->tl->rhs, &computed, &complete) {
+    return false;
+  }
+  // There's no way an alias expansion can't be complete, because ast_unknown is disallowed when parsing its RHS (and the parms must be complete).
+  check(complete);
+  check(isNone(&inst->expanded));
+  inst->expanded = Has(computed);
+  *computed_out = computed;
+  return true;
 }
 
 func match_deftype_by_name(cs *checkstate, name sym, out *opt[deftype_entry_id]) bool {
@@ -707,7 +776,7 @@ func process_toplevels(cs *checkstate,
         push(&mod->deftypes, id);
       }
       case &TypeAlias(a ast_type_alias): {
-        ent shp[alias_entry] = emshp({mod->module_name, a.name.value, &a});
+        ent shp[alias_entry] = emshp(mk(mod->module_name, a.name.value, &a));
         id alias_entry_id = ~count(&cs->aliases);
         push(&cs->aliases, ent);
         arr *array[alias_entry_id] = try_insert_lookup(
