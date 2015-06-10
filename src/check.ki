@@ -593,12 +593,67 @@ func check_and_compute_alias_with_parms(cs *checkstate, ent *alias_entry, parms 
   return true;
 }
 
+func arity_matches(a *ast_generics, params opt[*array[te_typeexpr]]) bool {
+  ar generics_arity;
+  if case Has(p) = params {
+    ar = FiniteArity(~count(p));
+  } else {
+    ar = NoParamsArity(void);
+  }
+  lhs_arity generics_arity = arity(a);
+  return lhs_arity == ar;
+}
+
 func match_deftype(cs *checkstate, name sym, params opt[*array[te_typeexpr]], out *opt[deftype_entry_id]) bool {
-  return TODO();
+  if case Has(arr *array[deftype_entry_id]) = lookup_ref(&cs->deftypes_by_name, name) {
+    n size = count(arr);
+    match opt[deftype_entry_id];
+    for i size = 0; i < n; i = i + 1 {
+      id deftype_entry_id = get(arr, i);
+      ent *_ = ref_deftype_entry(cs, id);
+      if arity_matches(&ent->tl->generics, params) {
+        if case Has(alt_id) = match {
+          ERR(_u8("Multiple deftypes named '"), lookup(cs->im, name), _u8("' match arity"));
+          return false;
+        }
+        match = Has(id);
+      }
+    }
+    if case Has(id) = match {
+      *out = match;
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    return false;
+  }
 }
 
 func match_alias(cs *checkstate, name sym, params opt[*array[te_typeexpr]], out *opt[alias_entry_id]) bool {
-  return TODO();
+  if case Has(arr *array[alias_entry_id]) = lookup_ref(&cs->aliases_by_name, name) {
+    n size = count(arr);
+    match opt[alias_entry_id];
+    for i size = 0; i < n; i = i + 1 {
+      id alias_entry_id = get(arr, i);
+      ent *_ = ref_alias_entry(cs, id);
+      if arity_matches(&ent->tl->generics, params) {
+        if case Has(alt_id) = match {
+          ERR(_u8("Multiple aliases named '"), lookup(cs->im, name), _u8("' match arity"));
+          return false;
+        }
+        match = Has(id);
+      }
+    }
+    if case Has(id) = match {
+      *out = match;
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    return false;
+  }
 }
 
 func lookup_generic(g *ast_generics, parms *genparms, name sym, out *te_typeexpr) bool {
