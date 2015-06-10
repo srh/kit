@@ -379,7 +379,28 @@ func fake_eval_arraytype_count(x *ast_expr, count_out *u32) bool {
 }
 
 func help_check_fields(cs *checkstate, g *ast_generics, parms *genparms, a *array[ast_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) bool {
-  return TODO();
+  n size = count(a);
+  all_complete bool = true;
+  all_computed array[te_vardecl];
+  for i size = 0; i < n; i = i + 1 {
+    decl *ast_vardecl = ref(a, i);
+    for j size = 0; j < i; j = j + 1 {
+      if ref(a, j)->name.value == decl->name.value {
+        ERR(_u8("Duplicate field name "), lookup(cs->im, decl->name.value));
+        return false;
+      }
+    }
+    complete bool;
+    computed te_typeexpr;
+    if !check_and_compute_typeexpr(cs, g, parms, &decl->type, &computed, &complete) {
+      return false;
+    }
+    all_complete = all_complete & complete;
+    push(&all_computed, {decl->name.value, computed});
+  }
+  *computed_fields_out = all_computed;
+  *computed_fields_complete_out = all_complete;
+  return true;
 }
 
 func check_and_compute_name_type(cs *checkstate, g *ast_generics, parms *genparms, a *ast_ident, computed_out *te_typeexpr) bool {
