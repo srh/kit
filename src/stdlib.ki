@@ -110,6 +110,20 @@ func[T] isHas(p *opt[T]) bool {
   return false;
 }
 
+func[T] `==`(x opt[T], y opt[T]) bool {
+  switch &x {
+    case &None(v): {
+      if case &None(u) = &y { return true; }
+    }
+    case &Has(a T): {
+      if case &Has(b T) = &y {
+        return a == b;
+      }
+    }
+  }
+  return false;
+}
+
 deftype[S, T] tup struct {
   car S;
   cdr T;

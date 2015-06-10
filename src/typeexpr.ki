@@ -30,7 +30,7 @@ deftype te_union struct {
 };
 
 deftype te_arraytype struct {
-  count u32;
+  count opt[u32];
   param box[te_typeexpr];
 };
 
