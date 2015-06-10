@@ -446,7 +446,23 @@ func match_alias_by_name(cs *checkstate, name sym, out *opt[alias_entry_id]) boo
 }
 
 func lookup_generic(g *ast_generics, parms *genparms, name sym, out *te_typeexpr) bool {
-  return TODO();
+  switch g {
+    case &NoGenerics(v): { return false; }
+    case &HasGenerics(a array[ast_ident]): {
+      n size = count(&a);
+      for i size = 0; i < n; i = i + 1 {
+        if ref(&a, i)->value == name {
+          if case &HasParms(ps) = parms {
+            *out = *ref(&ps, i);
+            return true;
+          } else {
+            crash(_u8("non-matching parms"));
+          }
+        }
+      }
+      return false;
+    }
+  }
 }
 
 func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms, a *ast_typeapp, computed_out *te_typeexpr, computed_complete_out *bool) bool {
