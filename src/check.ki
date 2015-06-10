@@ -438,12 +438,12 @@ func check_and_compute_name_type(cs *checkstate, g *ast_generics, parms *genparm
   }
 
   matching_alias opt[alias_entry_id];
-  if !match_alias_by_name(cs, a->value, &matching_alias) {
+  if !match_alias(cs, a->value, None(), &matching_alias) {
     // An error happened when looking up an alias (multiple matches?).
     return false;
   }
   matching_deftype opt[deftype_entry_id];
-  if !match_deftype_by_name(cs, a->value, &matching_deftype) {
+  if !match_deftype(cs, a->value, None(), &matching_deftype) {
     // An error happened when looking up a deftype (multiple matches?).
     return false;
   }
@@ -497,11 +497,11 @@ func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms
 
   if case &Name(f ast_ident) = oo(&a->typefunc) {
     matching_alias opt[alias_entry_id];
-    if !match_alias(cs, f.value, &params, &matching_alias) {
+    if !match_alias(cs, f.value, Has(&params), &matching_alias) {
       return false;
     }
     matching_deftype opt[deftype_entry_id];
-    if !match_deftype(cs, f.value, &params, &matching_deftype) {
+    if !match_deftype(cs, f.value, Has(&params), &matching_deftype) {
       return false;
     }
 
@@ -593,19 +593,11 @@ func check_and_compute_alias_with_parms(cs *checkstate, ent *alias_entry, parms 
   return true;
 }
 
-func match_deftype_by_name(cs *checkstate, name sym, out *opt[deftype_entry_id]) bool {
+func match_deftype(cs *checkstate, name sym, params opt[*array[te_typeexpr]], out *opt[deftype_entry_id]) bool {
   return TODO();
 }
 
-func match_deftype(cs *checkstate, name sym, params *array[te_typeexpr], out *opt[deftype_entry_id]) bool {
-  return TODO();
-}
-
-func match_alias_by_name(cs *checkstate, name sym, out *opt[alias_entry_id]) bool {
-  return TODO();
-}
-
-func match_alias(cs *checkstate, name sym, params *array[te_typeexpr], out *opt[alias_entry_id]) bool {
+func match_alias(cs *checkstate, name sym, params opt[*array[te_typeexpr]], out *opt[alias_entry_id]) bool {
   return TODO();
 }
 
