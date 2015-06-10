@@ -115,7 +115,7 @@ func mk(module_name sym, name sym, tl *ast_type_def) deftype_entry {
 deftype alias_entry struct {
   module_name sym;
   alias_name sym;
-  tl *ast_toplevel;
+  tl *ast_type_alias;
 };
 
 defenum genparms {
@@ -691,7 +691,7 @@ func process_toplevels(cs *checkstate,
         push(&mod->deftypes, id);
       }
       case &TypeAlias(a ast_type_alias): {
-        ent shp[alias_entry] = emshp({mod->module_name, a.name.value, toplevel});
+        ent shp[alias_entry] = emshp({mod->module_name, a.name.value, &a});
         id alias_entry_id = ~count(&cs->aliases);
         push(&cs->aliases, ent);
         arr *array[alias_entry_id] = try_insert_lookup(
@@ -732,3 +732,4 @@ func ice(msg array[u8]) void {
   append(&x, &msg);
   crash(x);
 }
+
