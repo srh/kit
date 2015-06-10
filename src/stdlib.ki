@@ -191,7 +191,27 @@ func[S, T] up(s S) T {
   return ret;
 }
 
+def U32_MAX u32 = ^(@[u32]0);
+
+func try_mul(x u32, y u32, out *u32) bool {
+  if y != 0 && U32_MAX / y < x {
+    return false;
+  }
+  *out = x * y;
+  return true;
+}
+
+func try_add(x u32, y u32, out *u32) bool {
+  if U32_MAX - y < x {
+    return false;
+  }
+  *out = x + y;
+  return true;
+}
+
+
 // TODO: This is... platform-specific.
 func[T] enumnum(x *T) u32 {
   return * @[*u32]cast(x);
 }
+

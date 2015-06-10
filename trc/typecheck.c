@@ -4785,8 +4785,26 @@ int apply_static_funcall(struct static_value *func,
       static_value_init_i32(out, result);
       return 1;
     } break;
+    case PRIMITIVE_OP_BIT_NOT_U8: {
+      CHECK(params[0].tag == STATIC_VALUE_U8);
+      uint8_t val = params[0].u.u8_value;
+      static_value_init_u8(out, ~val);
+      return 1;
+    } break;
+    case PRIMITIVE_OP_BIT_NOT_I32: {
+      CHECK(params[0].tag == STATIC_VALUE_I32);
+      int32_t val = params[0].u.i32_value;
+      static_value_init_i32(out, ~val);
+      return 1;
+    } break;
+    case PRIMITIVE_OP_BIT_NOT_U32: {
+      CHECK(params[0].tag == STATIC_VALUE_U32);
+      uint32_t val = params[0].u.u32_value;
+      static_value_init_u32(out, ~val);
+      return 1;
+    } break;
     default:
-      UNREACHABLE();
+      CRASH("Primitive op not implemented for static eval.");
     }
     break;
   case 2: {

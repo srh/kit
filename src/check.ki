@@ -338,9 +338,44 @@ func check_and_compute_typeexpr(cs *checkstate, g *ast_generics, parms *genparms
   }
 }
 
+func numeric_literal_to_u32(x *ast_numeric_literal, out *u32) bool {
+  switch x {
+    case &HexLiteral(a ast_hex_literal): {
+      return convert_to_u32(16, &a.digits, out);
+    }
+    case &DecLiteral(a ast_dec_literal): {
+      return convert_to_u32(10, &a.digits, out);
+    }
+  }
+}
+
+func convert_to_u32(base i8, digits *array[i8], out *u32) bool {
+  check(base > 0);
+  acc u32 = 0;
+  n size = count(digits);
+  for i size = 0; i < n; i = i + 1 {
+    if !try_mul(acc, @[u32]~base, &acc) {
+      return false;
+    }
+    if !try_add(acc, @[u32]~get(digits, i), &acc) {
+      return false;
+    }
+  }
+  *out = acc;
+  return true;
+}
+
 func fake_eval_arraytype_count(x *ast_expr, count_out *u32) bool {
   // TODO: Remove this function and really evaluate an array's count expression.
-  return TODO();
+  switch x {
+    case &NumericLiteral(a ast_numeric_literal): {
+      return numeric_literal_to_u32(&a, count_out);
+    }
+    default: {
+      ERR(_u8("Array types (for now) must have a numeric literal for length (or _)."));
+      return false;
+    }
+  }
 }
 
 func help_check_fields(cs *checkstate, g *ast_generics, parms *genparms, a *array[ast_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) bool {
