@@ -689,8 +689,9 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
           parms genparms = NoParms(void);
           return ensure_def_checked_with_parms(cs, ent, &a, &parms);
         }
-        case &HasGenerics(v): {
+        case &HasGenerics(ig): {
           // We declare success -- we check non-generic defs.
+          // TODO: Somewhere we have to check def generics shadowing.
           return true;
         }
       }
@@ -710,7 +711,18 @@ func ensure_deftype_checked_with_parms(cs *checkstate, ent *deftype_entry, parms
 }
 
 func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
-  return TODO();
+  ent *deftype_entry = ref_deftype_entry(cs, id);
+  switch &ent->tl->generics {
+    case &NoGenerics(v): {
+      parms genparms = NoParms(void);
+      return ensure_deftype_checked_with_parms(cs, ent, &parms);
+    }
+    case &HasGenerics(ig): {
+      // We declare success -- we check non-generic defs.
+      // TODO: Somewhere we have to check deftype generics shadowing.
+      return true;
+    }
+  }
 }
 
 func ensure_alias_checked(cs *checkstate, id alias_entry_id) bool {
