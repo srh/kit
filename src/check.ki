@@ -726,7 +726,19 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
 }
 
 func ensure_alias_checked(cs *checkstate, id alias_entry_id) bool {
-  return TODO();
+  ent *alias_entry = ref_alias_entry(cs, id);
+  switch &ent->tl->generics {
+    case &NoGenerics(v): {
+      np genparms = NoParms(void);
+      computed te_typeexpr;
+      return check_and_compute_alias_with_parms(cs, ent, &np, &computed);
+    }
+    case &HasGenerics(ig): {
+      // We declare success -- we check non-generic defs.
+      // TODO: Somewhere we have to check alias generics shadowing.
+      return true;
+    }
+  }
 }
 
 func load_module(cs *checkstate, mod_name sym) opt[module_id] {
