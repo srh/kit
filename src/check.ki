@@ -425,7 +425,8 @@ func check_and_compute_name_type(cs *checkstate, g *ast_generics, parms *genparm
       ERR(_u8("Both an alias and deftype match for name "), lookup(cs->im, a->value));
       return false;
     }
-    return TODO();
+    np genparms = NoParms(void);
+    return check_and_compute_alias_with_parms(cs, ref_alias_entry(cs, id), &np, computed_out);
   } else {
     if case Has(id) = matching_deftype {
       np genparms = NoParms(void);
@@ -481,7 +482,18 @@ func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms
         ERR(_u8("Both an alias and deftype match for name/params "), lookup(cs->im, f.value));
         return false;
       }
-      return TODO();
+      if params_complete {
+        hp genparms = HasParms(params);
+        if !check_and_compute_alias_with_parms(cs, ref_alias_entry(cs, id), &hp, computed_out) {
+          return false;
+        }
+        *computed_complete_out = true;
+        return true;
+      } else {
+        *computed_out = TeApp({embox(TeName(f.value)), params});
+        *computed_complete_out = false;
+        return true;
+      }
     } else {
       if case Has(id) = matching_deftype {
         if params_complete {
@@ -506,6 +518,10 @@ func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms
     ERR(_u8("Fancy type expression '"), to_u8str(*oo(&a->typefunc)), _u8("' in typefunc position."));
     return false;
   }
+}
+
+func check_and_compute_alias_with_parms(cs *checkstate, ent *alias_entry, parms *genparms, computed_out *te_typeexpr) bool {
+  return TODO();
 }
 
 func match_deftype_by_name(cs *checkstate, name sym, out *opt[deftype_entry_id]) bool {
