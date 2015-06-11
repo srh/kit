@@ -697,7 +697,18 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
       }
     }
     case &ExternDef(a ast_extern_def): {
-      return TODO();
+      // TODO: We could check that function args for C calling convention functions are primitively copyable.
+      // TODO: It is unclear that ast_extern_def defs should have a def_entry.
+      np genparms = NoParms(void);
+      ng ast_generics = NoGenerics(void);
+      computed_complete bool;
+      computed te_typeexpr;
+      if !check_and_compute_typeexpr(cs, &ng, &np, &a.type, &computed, &computed_complete) {
+        return false;
+      }
+      // The parser shouldn't allow incomplete types.
+      check(computed_complete);
+      return true;
     }
     default: {
       ice(_u8("def_entry has invalid toplevel\n"));
