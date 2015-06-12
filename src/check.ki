@@ -74,6 +74,10 @@ func ref_inst(cs *checkstate, id def_inst_id) *def_inst {
   return oo(ref(&cs->instantiations, id.~));
 }
 
+func ref_deftype_inst(cs *checkstate, id deftype_inst_id) *deftype_inst {
+  return oo(ref(&cs->type_instantiations, id.~));
+}
+
 func ref_alias_inst(cs *checkstate, id alias_inst_id) *alias_inst {
   return oo(ref(&cs->alias_instantiations, id.~));
 }
@@ -81,6 +85,12 @@ func ref_alias_inst(cs *checkstate, id alias_inst_id) *alias_inst {
 func add_inst(cs *checkstate, val def_inst) def_inst_id {
   id def_inst_id = ~count(&cs->instantiations);
   push(&cs->instantiations, emshp(val));
+  return id;
+}
+
+func add_deftype_inst(cs *checkstate, val deftype_inst) deftype_inst_id {
+  id deftype_inst_id = ~count(&cs->type_instantiations);
+  push(&cs->type_instantiations, emshp(val));
   return id;
 }
 
@@ -112,6 +122,7 @@ deftype module struct {
 };
 
 defenum deftype_inst_status {
+  DidNotStart void;
   StartedChecking void;
   FinishedChecking void;
 };
@@ -132,6 +143,15 @@ deftype deftype_entry struct {
 func mk(module_name sym, name sym, tl *ast_type_def) deftype_entry {
   return {module_name, name, tl, default()};
 }
+
+deftype check_deftype_later_entry struct {
+  ent *deftype_entry;
+  inst *deftype_inst;
+};
+
+deftype check_later_queue struct {
+  arr array[check_deftype_later_entry];
+};
 
 deftype alias_inst struct {
   parms genparms;
@@ -251,7 +271,7 @@ func arity(parms *genparms) generics_arity {
   }
 }
 
-func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, parms *genparms) bool {
+func ensure_def_checked_with_parms(cs *checkstate, clq *check_later_queue, ent *def_entry, a *ast_def, parms *genparms) bool {
   // TODO: Do we know that the def's generics don't shadow something?
   check(arity(&a->generics) == arity(parms));
 
@@ -278,7 +298,7 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
   if case &Has(t ast_typeexpr) = &a->typeexpr {
     computed_complete bool;
     computed te_typeexpr;
-    if !check_and_compute_typeexpr(cs, &a->generics, &inst->parms, &t, &computed, &computed_complete) {
+    if !check_and_compute_typeexpr(cs, clq, &a->generics, &inst->parms, &t, &computed, &computed_complete) {
       return false;
     }
     inst->computed_type_complete = computed_complete;
@@ -298,23 +318,24 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
   return true;
 }
 
-func check_and_compute_typeexpr(cs *checkstate, g *ast_generics, parms *genparms, t *ast_typeexpr, computed_out *te_typeexpr, computed_complete_out *bool) bool {
+func check_and_compute_typeexpr(cs *checkstate, clq *check_later_queue, g *ast_generics, parms *genparms, t *ast_typeexpr, computed_out *te_typeexpr, computed_complete_out *bool) bool {
   // TODO: We need some kind of proper flatness checking.
   switch t {
     case &Name(a ast_ident): {
-      if !check_and_compute_name_type(cs, g, parms, &a, computed_out) {
+      if !check_and_compute_name_type(cs, clq, g, parms, &a, computed_out) {
         return false;
       }
       *computed_complete_out = true;
       return true;
     }
     case &App(a ast_typeapp): {
-      return check_and_compute_app_type(cs, g, parms, &a, computed_out, computed_complete_out);
+      // TODO: Pointer indirection is where we'll want to take advantage of clq.
+      return check_and_compute_app_type(cs, clq, g, parms, &a, computed_out, computed_complete_out);
     }
     case &Struct(a ast_struct): {
       computed_fields_complete bool;
       computed_fields array[te_vardecl];
-      if !help_check_fields(cs, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
+      if !help_check_fields(cs, clq, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
         return false;
       }
       *computed_out = TeStruct({computed_fields});
@@ -325,7 +346,7 @@ func check_and_compute_typeexpr(cs *checkstate, g *ast_generics, parms *genparms
       // TODO: For enums, field names are constructors.  Check shadowing?
       computed_constructors_complete bool;
       computed_constructors array[te_vardecl];
-      if !help_check_fields(cs, g, parms, &a.constructors, &computed_constructors, &computed_constructors_complete) {
+      if !help_check_fields(cs, clq, g, parms, &a.constructors, &computed_constructors, &computed_constructors_complete) {
         return false;
       }
       *computed_out = TeEnum({computed_constructors});
@@ -336,7 +357,7 @@ func check_and_compute_typeexpr(cs *checkstate, g *ast_generics, parms *genparms
       // TODO: Unions will need to enforce that they have "primitive" types, no classes.
       computed_fields_complete bool;
       computed_fields array[te_vardecl];
-      if !help_check_fields(cs, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
+      if !help_check_fields(cs, clq, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
         return false;
       }
       *computed_out = TeUnion({computed_fields});
@@ -346,7 +367,7 @@ func check_and_compute_typeexpr(cs *checkstate, g *ast_generics, parms *genparms
     case &Arraytype(a ast_arraytype): {
       param box[te_typeexpr];
       param_complete bool;
-      if !check_and_compute_typeexpr(cs, g, parms, oo(&a.param), oo(&param), &param_complete) {
+      if !check_and_compute_typeexpr(cs, clq, g, parms, oo(&a.param), oo(&param), &param_complete) {
         return false;
       }
       if case &Has(b box[ast_expr]) = &a.count {
@@ -412,7 +433,7 @@ func fake_eval_arraytype_count(x *ast_expr, count_out *u32) bool {
   }
 }
 
-func help_check_fields(cs *checkstate, g *ast_generics, parms *genparms, a *array[ast_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) bool {
+func help_check_fields(cs *checkstate, clq *check_later_queue, g *ast_generics, parms *genparms, a *array[ast_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) bool {
   n size = count(a);
   all_complete bool = true;
   all_computed array[te_vardecl];
@@ -426,7 +447,7 @@ func help_check_fields(cs *checkstate, g *ast_generics, parms *genparms, a *arra
     }
     complete bool;
     computed te_typeexpr;
-    if !check_and_compute_typeexpr(cs, g, parms, &decl->type, &computed, &complete) {
+    if !check_and_compute_typeexpr(cs, clq, g, parms, &decl->type, &computed, &complete) {
       return false;
     }
     all_complete = all_complete & complete;
@@ -437,7 +458,7 @@ func help_check_fields(cs *checkstate, g *ast_generics, parms *genparms, a *arra
   return true;
 }
 
-func check_and_compute_name_type(cs *checkstate, g *ast_generics, parms *genparms, a *ast_ident, computed_out *te_typeexpr) bool {
+func check_and_compute_name_type(cs *checkstate, clq *check_later_queue, g *ast_generics, parms *genparms, a *ast_ident, computed_out *te_typeexpr) bool {
   // Generic parameters have already been checked.  (I hope so.)
   if lookup_generic(g, parms, a->value, computed_out) {
     return true;
@@ -460,11 +481,11 @@ func check_and_compute_name_type(cs *checkstate, g *ast_generics, parms *genparm
       return false;
     }
     np genparms = NoParms(void);
-    return check_and_compute_alias_with_parms(cs, ref_alias_entry(cs, id), &np, computed_out);
+    return check_and_compute_alias_with_parms(cs, clq, ref_alias_entry(cs, id), &np, computed_out);
   } else {
     if case Has(id) = matching_deftype {
       np genparms = NoParms(void);
-      if !ensure_deftype_checked_with_parms(cs, ref_deftype_entry(cs, id), &np) {
+      if !ensure_deftype_checked_with_parms(cs, clq, ref_deftype_entry(cs, id), &np) {
         return false;
       }
       *computed_out = TeName(a->value);
@@ -476,14 +497,14 @@ func check_and_compute_name_type(cs *checkstate, g *ast_generics, parms *genparm
   }
 }
 
-func check_and_compute_typeexpr_array(cs *checkstate, g *ast_generics, parms *genparms, t *array[ast_typeexpr], computed_out *array[te_typeexpr], computed_complete_out *bool) bool {
+func check_and_compute_typeexpr_array(cs *checkstate, clq *check_later_queue, g *ast_generics, parms *genparms, t *array[ast_typeexpr], computed_out *array[te_typeexpr], computed_complete_out *bool) bool {
   complete bool = true;
   computed array[te_typeexpr];
   n size = count(t);
   for i size = 0; i < n; i = i + 1 {
     c te_typeexpr;
     c_complete bool;
-    if !check_and_compute_typeexpr(cs, g, parms, ref(t, i), &c, &c_complete) {
+    if !check_and_compute_typeexpr(cs, clq, g, parms, ref(t, i), &c, &c_complete) {
       return false;
     }
     push(&computed, c);
@@ -494,10 +515,10 @@ func check_and_compute_typeexpr_array(cs *checkstate, g *ast_generics, parms *ge
   return true;
 }
 
-func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms, a *ast_typeapp, computed_out *te_typeexpr, computed_complete_out *bool) bool {
+func check_and_compute_app_type(cs *checkstate, clq *check_later_queue, g *ast_generics, parms *genparms, a *ast_typeapp, computed_out *te_typeexpr, computed_complete_out *bool) bool {
   params_complete bool;
   params array[te_typeexpr];
-  if !check_and_compute_typeexpr_array(cs, g, parms, &a->params, &params, &params_complete) {
+  if !check_and_compute_typeexpr_array(cs, clq, g, parms, &a->params, &params, &params_complete) {
     return false;
   }
 
@@ -518,7 +539,7 @@ func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms
       }
       if params_complete {
         hp genparms = HasParms(params);
-        if !check_and_compute_alias_with_parms(cs, ref_alias_entry(cs, id), &hp, computed_out) {
+        if !check_and_compute_alias_with_parms(cs, clq, ref_alias_entry(cs, id), &hp, computed_out) {
           return false;
         }
         *computed_complete_out = true;
@@ -532,7 +553,7 @@ func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms
       if case Has(id) = matching_deftype {
         if params_complete {
           hp genparms = HasParms(params);
-          if !ensure_deftype_checked_with_parms(cs, ref_deftype_entry(cs, id), &hp) {
+          if !ensure_deftype_checked_with_parms(cs, clq, ref_deftype_entry(cs, id), &hp) {
             return false;
           }
         }
@@ -566,7 +587,7 @@ func find_matching_alias_inst(cs *checkstate, insts *array[alias_inst_id], parms
   return None();
 }
 
-func check_and_compute_alias_with_parms(cs *checkstate, ent *alias_entry, parms *genparms, computed_out *te_typeexpr) bool {
+func check_and_compute_alias_with_parms(cs *checkstate, clq *check_later_queue, ent *alias_entry, parms *genparms, computed_out *te_typeexpr) bool {
   // TODO: How do we know the alias's generic parameters don't self-shadow, or shadow something else?
 
   if case Has(id) = find_matching_alias_inst(cs, &ent->insts, parms) {
@@ -588,7 +609,7 @@ func check_and_compute_alias_with_parms(cs *checkstate, ent *alias_entry, parms 
 
   complete bool;
   computed te_typeexpr;
-  if !check_and_compute_typeexpr(cs, &ent->tl->generics, &inst->parms, &ent->tl->rhs, &computed, &complete) {
+  if !check_and_compute_typeexpr(cs, clq, &ent->tl->generics, &inst->parms, &ent->tl->rhs, &computed, &complete) {
     return false;
   }
   // There's no way an alias expansion can't be complete, because ast_unknown is disallowed when parsing its RHS (and the parms must be complete).
@@ -686,6 +707,26 @@ func check_expr(cs *checkstate, g *ast_generics, parms *genparms, pt *te_typeexp
   return TODO();
 }
 
+func finish_clq(cs *checkstate, clq *check_later_queue) bool {
+  while case Has(clq_entry check_deftype_later_entry) = popval(&clq->arr) {
+    switch clq_entry.inst->status {
+      case DidNotStart(v void): {
+        // TODO: DidNotStart will imminently become possible.
+        ice(_u8("At this moment, DidNotStart deftype_inst status is not possible."));
+        return fake();
+      }
+      case StartedChecking(v void): {
+        ice(_u8("clq entry in StartedChecking state."));
+        return fake();
+      }
+      case FinishedChecking(v void): {
+        // Do nothing.
+      }
+    }
+  }
+  return true;
+}
+
 func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
   ent *def_entry = ref_def_entry(cs, id);
   switch ent->tl {
@@ -693,7 +734,11 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
       switch &a.generics {
         case &NoGenerics(v): {
           parms genparms = NoParms(void);
-          return ensure_def_checked_with_parms(cs, ent, &a, &parms);
+          clq check_later_queue;
+          if !ensure_def_checked_with_parms(cs, &clq, ent, &a, &parms) {
+            return false;
+          }
+          return finish_clq(cs, &clq);
         }
         case &HasGenerics(ig): {
           // We declare success -- we check non-generic defs.
@@ -703,18 +748,19 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
       }
     }
     case &ExternDef(a ast_extern_def): {
+      clq check_later_queue;
       // TODO: We could check that function args for C calling convention functions are primitively copyable.
       // TODO: It is unclear that ast_extern_def defs should have a def_entry.
       np genparms = NoParms(void);
       ng ast_generics = NoGenerics(void);
       computed_complete bool;
       computed te_typeexpr;
-      if !check_and_compute_typeexpr(cs, &ng, &np, &a.type, &computed, &computed_complete) {
+      if !check_and_compute_typeexpr(cs, &clq, &ng, &np, &a.type, &computed, &computed_complete) {
         return false;
       }
       // The parser shouldn't allow incomplete types.
       check(computed_complete);
-      return true;
+      return finish_clq(cs, &clq);
     }
     default: {
       ice(_u8("def_entry has invalid toplevel\n"));
@@ -723,7 +769,26 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
   }
 }
 
-func ensure_deftype_checked_with_parms(cs *checkstate, ent *deftype_entry, parms *genparms) bool {
+func find_matching_deftype_inst(cs *checkstate, insts *array[deftype_inst_id], parms *genparms) opt[deftype_inst_id] {
+  n size = count(insts);
+  for i size = 0; i < n; i = i + 1 {
+    id deftype_inst_id = get(insts, i);
+    inst *deftype_inst = ref_deftype_inst(cs, id);
+    if parms_equal(cs, parms, &inst->parms) {
+      return Has(id);
+    }
+  }
+  return None();
+}
+
+func deftype_rhs_type(rhs *ast_type_def_rhs) *ast_typeexpr {
+  switch rhs {
+    case &TypeexprRhs(a): { return &a; }
+    case &ClassexprRhs(a): { return &a.rhs_type; }
+  }
+}
+
+func ensure_deftype_checked_with_parms(cs *checkstate, clq *check_later_queue, ent *deftype_entry, parms *genparms) bool {
   check(arity(&ent->tl->generics) == arity(parms));
 
   if case Has(id) = find_matching_deftype_inst(cs, &ent->insts, parms) {
@@ -733,7 +798,7 @@ func ensure_deftype_checked_with_parms(cs *checkstate, ent *deftype_entry, parms
 
     switch inst->status {
       case StartedChecking(v): {
-        ERR(_u8("deftype for '"), ent->deftype_name, _u8(" recursively checking"));
+        ERR(_u8("deftype for '"), ent->name, _u8(" recursively checking"));
         return false;
       }
       case FinishedChecking(v): {
@@ -742,12 +807,12 @@ func ensure_deftype_checked_with_parms(cs *checkstate, ent *deftype_entry, parms
     }
   }
 
-  id deftype_inst_id = add_deftype_inst(cs, {*parms, StartedChecking()})
+  id deftype_inst_id = add_deftype_inst(cs, {*parms, StartedChecking(void)});
   inst *deftype_inst = ref_deftype_inst(cs, id);
 
   rhs_computed te_typeexpr;
   rhs_complete bool;
-  if !check_and_compute_typeexpr(cs, &ent->tl->generics, parms, deftype_rhs_type(ent->tl), &rhs_computed, &rhs_complete) {
+  if !check_and_compute_typeexpr(cs, clq, &ent->tl->generics, parms, deftype_rhs_type(&ent->tl->rhs), &rhs_computed, &rhs_complete) {
     return false;
   }
   check(rhs_complete);
@@ -759,7 +824,11 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
   switch &ent->tl->generics {
     case &NoGenerics(v): {
       parms genparms = NoParms(void);
-      return ensure_deftype_checked_with_parms(cs, ent, &parms);
+      clq check_later_queue;
+      if !ensure_deftype_checked_with_parms(cs, &clq, ent, &parms) {
+        return false;
+      }
+      return finish_clq(cs, &clq);
     }
     case &HasGenerics(ig): {
       // We declare success -- we check non-generic defs.
@@ -775,7 +844,11 @@ func ensure_alias_checked(cs *checkstate, id alias_entry_id) bool {
     case &NoGenerics(v): {
       np genparms = NoParms(void);
       computed te_typeexpr;
-      return check_and_compute_alias_with_parms(cs, ent, &np, &computed);
+      clq check_later_queue;
+      if !check_and_compute_alias_with_parms(cs, &clq, ent, &np, &computed) {
+        return false;
+      }
+      return finish_clq(cs, &clq);
     }
     case &HasGenerics(ig): {
       // We declare success -- we check non-generic defs.

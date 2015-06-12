@@ -159,6 +159,15 @@ func[T] popval(a *array[T], val_out *T) bool {
   return true;
 }
 
+func[T] popval(a *array[T]) opt[T] {
+  val T;
+  if popval(a, &val) {
+    return Has(val);
+  } else {
+    return None();
+  }
+}
+
 func build_u8str(r *array[u8], a *array[u8]) void {
   append(r, a);
 }
