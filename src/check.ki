@@ -111,9 +111,14 @@ deftype module struct {
   aliases array[alias_entry_id];
 };
 
+defenum deftype_inst_status {
+  StartedChecking void;
+  FinishedChecking void;
+};
+
 deftype deftype_inst struct {
   parms genparms;
-  recursion_level opt[u32];
+  status deftype_inst_status;
 };
 
 deftype deftype_entry struct {
@@ -726,11 +731,18 @@ func ensure_deftype_checked_with_parms(cs *checkstate, ent *deftype_entry, parms
 
     inst *deftype_inst = ref_deftype_inst(cs, id);
 
-    return TODO();
+    switch inst->status {
+      case StartedChecking(v): {
+        ERR(_u8("deftype for '"), ent->deftype_name, _u8(" recursively checking"));
+        return false;
+      }
+      case FinishedChecking(v): {
+        return true;
+      }
+    }
   }
 
-  // TODO: make with proper flatness setting, instead of None().
-  id deftype_inst_id = add_deftype_inst(cs, {*parms, None()})
+  id deftype_inst_id = add_deftype_inst(cs, {*parms, StartedChecking()})
   inst *deftype_inst = ref_deftype_inst(cs, id);
 
   rhs_computed te_typeexpr;
