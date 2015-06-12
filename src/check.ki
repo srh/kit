@@ -113,6 +113,7 @@ deftype module struct {
 
 deftype deftype_inst struct {
   parms genparms;
+  recursion_level opt[u32];
 };
 
 deftype deftype_entry struct {
@@ -718,7 +719,27 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
 }
 
 func ensure_deftype_checked_with_parms(cs *checkstate, ent *deftype_entry, parms *genparms) bool {
-  return TODO();
+  check(arity(&ent->tl->generics) == arity(parms));
+
+  if case Has(id) = find_matching_deftype_inst(cs, &ent->insts, parms) {
+    // If we already have an inst, that means we made an inst.
+
+    inst *deftype_inst = ref_deftype_inst(cs, id);
+
+    return TODO();
+  }
+
+  // TODO: make with proper flatness setting, instead of None().
+  id deftype_inst_id = add_deftype_inst(cs, {*parms, None()})
+  inst *deftype_inst = ref_deftype_inst(cs, id);
+
+  rhs_computed te_typeexpr;
+  rhs_complete bool;
+  if !check_and_compute_typeexpr(cs, &ent->tl->generics, parms, deftype_rhs_type(ent->tl), &rhs_computed, &rhs_complete) {
+    return false;
+  }
+  check(rhs_complete);
+  return true;
 }
 
 func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
