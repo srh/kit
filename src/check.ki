@@ -145,8 +145,9 @@ func mk(module_name sym, name sym, tl *ast_type_def) deftype_entry {
 }
 
 deftype check_deftype_later_entry struct {
-  ent *deftype_entry;
-  inst *deftype_inst;
+  generics *ast_generics;
+  parms genparms;
+  typeexpr *ast_typeexpr;
 };
 
 deftype check_later_queue struct {
@@ -709,6 +710,7 @@ func check_expr(cs *checkstate, g *ast_generics, parms *genparms, pt *te_typeexp
 
 func finish_clq(cs *checkstate, clq *check_later_queue) bool {
   while case Has(clq_entry check_deftype_later_entry) = popval(&clq->arr) {
+    // TODO: Store template instantiation depth in clq_entry, pass it through.
     switch clq_entry.inst->status {
       case DidNotStart(v void): {
         // TODO: DidNotStart will imminently become possible.
