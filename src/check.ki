@@ -125,6 +125,12 @@ defenum deftype_inst_status {
   DidNotStartChecking void;
   StartedChecking void;
   FinishedChecking void;
+  FailedChecking void;
+};
+
+deftype type_properties struct {
+  flat_size size;
+  flat_alignment size;
 };
 
 deftype deftype_inst struct {
@@ -760,6 +766,32 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *genparms) de
   return add_deftype_inst(cs, {*parms, DidNotStartChecking(void)});
 }
 
+func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_properties) bool {
+  switch t {
+    case &TeName(a sym): {
+      return TODO();
+    }
+    case &TeApp(a te_typeapp): {
+      return TODO();
+    }
+    case &TeStruct(a te_struct): {
+      return TODO();
+    }
+    case &TeEnum(a te_enum): {
+      return TODO();
+    }
+    case &TeUnion(a te_union): {
+      return TODO();
+    }
+    case &TeArraytype(a te_arraytype): {
+      return TODO();
+    }
+    case &TeUnknown(a void): {
+      return TODO();
+    }
+  }
+}
+
 func ensure_deftype_checked_with_parms(cs *checkstate, ent *deftype_entry, parms *genparms) bool {
   check(arity(&ent->tl->generics) == arity(parms));
 
@@ -771,22 +803,32 @@ func ensure_deftype_checked_with_parms(cs *checkstate, ent *deftype_entry, parms
       inst->status = StartedChecking(void);
       rhs_computed te_typeexpr;
       rhs_complete bool;
-      if !check_and_compute_typeexpr(cs, &ent->tl->generics, parms, deftype_rhs_type(&ent->tl->rhs), &rhs_computed, &rhs_complete) {
+      if !check_and_compute_typeexpr(cs, &ent->tl->generics, &inst->parms, deftype_rhs_type(&ent->tl->rhs), &rhs_computed, &rhs_complete) {
+        inst->status = FailedChecking(void);
         return false;
       }
       check(rhs_complete);
 
-      // TODO: Check for flatness.
+      // TODO: For defclasses, we'll want to compute its class-specific properties.
+      properties type_properties;
+      if !compute_type_properties(cs, &rhs_computed, &properties) {
+        inst->status = FailedChecking(void);
+        return false;
+      }
 
       inst->status = FinishedChecking(void);
       return true;
     }
     case StartedChecking(v): {
-      ERR(_u8("deftype for '"), ent->name, _u8(" recursively checking"));
+      ERR(_u8("deftype for '"), lookup(cs->im, ent->name), _u8(" recursively checking"));
       return false;
     }
     case FinishedChecking(v): {
       return true;
+    }
+    case FailedChecking(v): {
+      ERR(_u8("deftype for '"), lookup(cs->im, ent->name), _u8(" already failed checking"));
+      return false;
     }
   }
 }
