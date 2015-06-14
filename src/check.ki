@@ -37,6 +37,7 @@ def `~` fn[size, def_inst_id] = wrapconvert;
 // An index into checkstate's type_instantiations array.
 deftype deftype_inst_id size;
 def `~` fn[size, deftype_inst_id] = wrapconvert;
+def `==` fn[deftype_inst_id, deftype_inst_id, bool] = wrapequate;
 
 // An index into checkstat's alias_instantiations array.
 deftype alias_inst_id size;
@@ -481,9 +482,8 @@ func check_and_compute_name_type(cs *checkstate, g *ast_generics, parms *genparm
   } else {
     if case Has(id) = matching_deftype {
       np genparms = NoParms(void);
-      // TODO: We'll probably want to do something with inst_id, at some point.
       inst_id deftype_inst_id = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), &np);
-      *computed_out = TeName(a->value);
+      *computed_out = TeName({a->value, inst_id});
       return true;
     } else {
       ERR(_u8("type name has no match "), lookup(cs->im, a->value));
@@ -766,9 +766,11 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *genparms) de
   return add_deftype_inst(cs, {*parms, DidNotStartChecking(void)});
 }
 
+// t had better be complete, or else this returns false.
 func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_properties) bool {
   switch t {
-    case &TeName(a sym): {
+    case &TeName(a te_name): {
+      
       return TODO();
     }
     case &TeApp(a te_typeapp): {
@@ -787,7 +789,8 @@ func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_propertie
       return TODO();
     }
     case &TeUnknown(a void): {
-      return TODO();
+      ice(_u8("compute_type_properties called on incomplete type."));
+      return fake();
     }
   }
 }
@@ -796,6 +799,10 @@ func ensure_deftype_checked_with_parms(cs *checkstate, ent *deftype_entry, parms
   check(arity(&ent->tl->generics) == arity(parms));
 
   id deftype_inst_id = ensure_deftype_inst(cs, ent, parms);
+  return ensure_deftype_inst_checked(cs, ent, id);
+}
+
+func ensure_deftype_inst_checked(cs *checkstate, ent *deftype_entry, id deftype_inst_id) bool {
   inst *deftype_inst = ref_deftype_inst(cs, id);
 
   switch inst->status {

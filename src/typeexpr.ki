@@ -3,7 +3,7 @@ import identmap;
 // TODO: Might this still exist in a particular scope?
 // This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics replaced consistently.
 defenum te_typeexpr {
-  TeName sym;
+  TeName te_name;
   TeApp te_typeapp;
   TeStruct te_struct;
   TeEnum te_enum;
@@ -15,6 +15,11 @@ defenum te_typeexpr {
 defenum te_puretype {
   TePureName sym;
   TePureUnknown void;
+};
+
+deftype te_name struct {
+  value sym;
+  inst_id deftype_inst_id;
 };
 
 deftype te_typeapp struct {
@@ -59,9 +64,9 @@ func typeexpr_list_equal(cs *checkstate, a *array[te_typeexpr], b *array[te_type
 
 func typeexpr_equal(cs *checkstate, a *te_typeexpr, b *te_typeexpr) bool {
   switch a {
-    case &TeName(ax sym): {
-      if case &TeName(bx sym) = b {
-        return ax == bx;
+    case &TeName(ax te_name): {
+      if case &TeName(bx te_name) = b {
+        return ax.inst_id == bx.inst_id;
       }
     }
     case &TeApp(ax te_typeapp): {

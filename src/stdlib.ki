@@ -154,6 +154,10 @@ func[S, T] wrapconvert(x T) S {
   return ret;
 }
 
+func[S, T] wrapequate(x S, y T) bool {
+  return x.~ == y.~;
+}
+
 func[T] default() T {
   ret T;
   return ret;
