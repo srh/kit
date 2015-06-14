@@ -485,9 +485,8 @@ func check_and_compute_name_type(cs *checkstate, clq *check_later_queue, g *ast_
   } else {
     if case Has(id) = matching_deftype {
       np genparms = NoParms(void);
-      if !ensure_deftype_checked_with_parms(cs, clq, ref_deftype_entry(cs, id), &np) {
-        return false;
-      }
+      // TODO: We'll probably want to do something with inst_id, at some point.
+      inst_id deftype_inst_id = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), &np);
       *computed_out = TeName(a->value);
       return true;
     } else {
@@ -553,9 +552,8 @@ func check_and_compute_app_type(cs *checkstate, clq *check_later_queue, g *ast_g
       if case Has(id) = matching_deftype {
         if params_complete {
           hp genparms = HasParms(params);
-          if !ensure_deftype_checked_with_parms(cs, clq, ref_deftype_entry(cs, id), &hp) {
-            return false;
-          }
+          // TODO: Presumably we'd want to do something with this id.
+          inst_id deftype_inst_id = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), &hp);
         }
         *computed_out = TeApp({embox(TeName(f.value)), params});
         *computed_complete_out = params_complete;
