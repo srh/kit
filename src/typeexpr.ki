@@ -12,8 +12,13 @@ defenum te_typeexpr {
   TeUnknown void;
 };
 
+defenum te_puretype {
+  TePureName sym;
+  TePureUnknown void;
+};
+
 deftype te_typeapp struct {
-  typefunc box[te_typeexpr];
+  typefunc box[te_puretype];
   params array[te_typeexpr];
 };
 
@@ -61,7 +66,7 @@ func typeexpr_equal(cs *checkstate, a *te_typeexpr, b *te_typeexpr) bool {
     }
     case &TeApp(ax te_typeapp): {
       if case &TeApp(bx te_typeapp) = b {
-        return typeexpr_equal(cs, oo(&ax.typefunc), oo(&bx.typefunc))
+        return te_puretype_equal(cs, oo(&ax.typefunc), oo(&bx.typefunc))
           && typeexpr_list_equal(cs, &ax.params, &bx.params);
       }
     }
@@ -90,6 +95,22 @@ func typeexpr_equal(cs *checkstate, a *te_typeexpr, b *te_typeexpr) bool {
     }
   }
 
+  return false;
+}
+
+func te_puretype_equal(cs *checkstate, a *te_puretype, b *te_puretype) bool {
+  switch a {
+    case &TePureName(an sym): {
+      if case &TePureName(bn sym) = b {
+        return an == bn;
+      }
+    }
+    case &TePureUnknown(u void): {
+      if case &TePureUnknown(v void) = b {
+        return true;
+      }
+    }
+  }
   return false;
 }
 
