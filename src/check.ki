@@ -122,7 +122,7 @@ deftype module struct {
 };
 
 defenum deftype_inst_status {
-  DidNotStart void;
+  DidNotStartChecking void;
   StartedChecking void;
   FinishedChecking void;
 };
@@ -711,8 +711,8 @@ func finish_clq(cs *checkstate, clq *check_later_queue) bool {
   while case Has(clq_entry check_deftype_later_entry) = popval(&clq->arr) {
     // TODO: Store template instantiation depth in clq_entry, pass it through.
     switch clq_entry.inst->status {
-      case DidNotStart(v void): {
-        // TODO: DidNotStart will imminently become possible.
+      case DidNotStartChecking(v void): {
+        // TODO: DidNotStartChecking will imminently become possible.
         ice(_u8("At this moment, DidNotStart deftype_inst status is not possible."));
         return fake();
       }
@@ -789,35 +789,39 @@ func deftype_rhs_type(rhs *ast_type_def_rhs) *ast_typeexpr {
   }
 }
 
+func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *genparms) deftype_inst_id {
+  check(arity(&ent->tl->generics) == arity(parms));
+  if case Has(id) = find_matching_deftype_inst(cs, &ent->insts, parms) {
+    return id;
+  }
+  // We're only going to chase down the actual type if we use it.
+  return add_deftype_inst(cs, {*parms, DidNotStartChecking(void)});
+}
+
 func ensure_deftype_checked_with_parms(cs *checkstate, clq *check_later_queue, ent *deftype_entry, parms *genparms) bool {
   check(arity(&ent->tl->generics) == arity(parms));
 
-  if case Has(id) = find_matching_deftype_inst(cs, &ent->insts, parms) {
-    // If we already have an inst, that means we made an inst.
-
-    inst *deftype_inst = ref_deftype_inst(cs, id);
-
-    switch inst->status {
-      case StartedChecking(v): {
-        ERR(_u8("deftype for '"), ent->name, _u8(" recursively checking"));
-        return false;
-      }
-      case FinishedChecking(v): {
-        return true;
-      }
-    }
-  }
-
-  id deftype_inst_id = add_deftype_inst(cs, {*parms, StartedChecking(void)});
+  id deftype_inst_id = ensure_deftype_inst(cs, ent, parms);
   inst *deftype_inst = ref_deftype_inst(cs, id);
 
-  rhs_computed te_typeexpr;
-  rhs_complete bool;
-  if !check_and_compute_typeexpr(cs, clq, &ent->tl->generics, parms, deftype_rhs_type(&ent->tl->rhs), &rhs_computed, &rhs_complete) {
-    return false;
+  switch inst->status {
+    case DidNotStartChecking(v): {
+      rhs_computed te_typeexpr;
+      rhs_complete bool;
+      if !check_and_compute_typeexpr(cs, clq, &ent->tl->generics, parms, deftype_rhs_type(&ent->tl->rhs), &rhs_computed, &rhs_complete) {
+        return false;
+      }
+      check(rhs_complete);
+      return true;
+    }
+    case StartedChecking(v): {
+      ERR(_u8("deftype for '"), ent->name, _u8(" recursively checking"));
+      return false;
+    }
+    case FinishedChecking(v): {
+      return true;
+    }
   }
-  check(rhs_complete);
-  return true;
 }
 
 func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
