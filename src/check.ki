@@ -182,10 +182,12 @@ deftype def_inst struct {
   computed_type_complete bool;
   // Becomes the concrete type (with generics replaced) once we've computed it and checked it.
   computed_type te_typeexpr;
+  // Valid only if computed_type_complete.
+  computed_type_properties opt[type_properties];
 };
 
 func mk(parms genparms, a ast_def) def_inst {
-  return {parms, a, false, default()};
+  return {parms, a, false, default(), None()};
 }
 
 deftype def_entry struct {
@@ -293,6 +295,8 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
 
   // TODO: We need to check exact name shadowing(?), typeexpr, and rhs.
 
+  // TODO: We need some way to stop recursive checking.
+
   // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
   if case &Has(t ast_typeexpr) = &a->typeexpr {
     computed_complete bool;
@@ -300,11 +304,23 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
     if !check_and_compute_typeexpr(cs, &a->generics, &inst->parms, &t, &computed, &computed_complete) {
       return false;
     }
-    inst->computed_type_complete = computed_complete;
-    inst->computed_type = computed;
+    if computed_complete {
+      props type_properties;
+      if !compute_type_properties(cs, &computed, &props) {
+        return false;
+      }
+      inst->computed_type_complete = true;
+      inst->computed_type = computed;
+      inst->computed_type_properties = Has(props);
+    } else {
+      inst->computed_type_complete = computed_complete;
+      inst->computed_type = computed;
+      inst->computed_type_properties = None();
+    }
   } else {
     inst->computed_type_complete = false;
     inst->computed_type = TeUnknown(void);
+    inst->computed_type_properties = None();
   }
 
   // TODO: How do we know that a->generics doesn't shadow, doesn't self-shadow?
@@ -312,8 +328,15 @@ func ensure_def_checked_with_parms(cs *checkstate, ent *def_entry, a *ast_def, p
   if !check_expr(cs, &a->generics, &inst->parms, &inst->computed_type, &a->rhs, &complete_type) {
     return false;
   }
-  inst->computed_type_complete = true;
-  inst->computed_type = complete_type;
+  if !inst->computed_type_complete {
+    props type_properties;
+    if !compute_type_properties(cs, &complete_type, &props) {
+      return false;
+    }
+    inst->computed_type_complete = true;
+    inst->computed_type = complete_type;
+    inst->computed_type_properties = Has(props);
+  }
   return true;
 }
 
