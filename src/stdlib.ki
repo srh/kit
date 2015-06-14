@@ -222,6 +222,12 @@ func try_add(x u32, y u32, out *u32) bool {
   return true;
 }
 
+func ceil_aligned(x u32, y u32) u32 {
+  if x % y == 0 {
+    return x;
+  }
+  return x + (y - x % y);
+}
 
 // TODO: This is... platform-specific.
 func[T] enumnum(x *T) u32 {

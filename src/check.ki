@@ -130,8 +130,8 @@ defenum deftype_inst_status {
 };
 
 deftype type_properties struct {
-  flat_size size;
-  flat_alignment size;
+  flat_size u32;
+  flat_alignment u32;
 };
 
 deftype deftype_inst struct {
@@ -807,16 +807,74 @@ func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_propertie
       }
     }
     case &TeStruct(a te_struct): {
-      return TODO();
+      offset u32 = 0;
+      max_alignment u32 = 1;
+      n size = count(&a.fields);
+      for i size = 0; i < n; i = i + 1 {
+        props type_properties;
+        if !compute_type_properties(cs, &ref(&a.fields, i)->type, &props) {
+          return false;
+        }
+        offset = ceil_aligned(offset, props.flat_alignment);
+        offset = offset + props.flat_size;
+        max_alignment = max(max_alignment, props.flat_alignment);
+      }
+      check(offset % max_alignment == 0);
+      *out = {offset, max_alignment};
+      return true;
     }
     case &TeEnum(a te_enum): {
-      return TODO();
+      // TODO: This is deeply married to implementation-specific behavior.
+      tag_size u32 = 4;
+      max_size u32 = tag_size;
+      max_alignment u32 = tag_size;
+      n size = count(&a.constructors);
+      for i size = 0; i < n; i = i + 1 {
+        props type_properties;
+        if !compute_type_properties(cs, &ref(&a.constructors, i)->type, &props) {
+          return false;
+        }
+        tagged_size u32 = ceil_aligned(tag_size, props.flat_alignment) + props.flat_size;
+        max_size = max(max_size, tagged_size);
+        max_alignment = max(max_alignment, props.flat_alignment);
+      }
+      // See TeUnion for explanation of final_size.
+      final_size u32 = ceil_aligned(max_size, max_alignment);
+      *out = {final_size, max_alignment};
+      return true;
     }
     case &TeUnion(a te_union): {
-      return TODO();
+      // This is very similar to TeEnum, but TeEnum will change and this will not.
+      max_size u32 = 0;
+      max_alignment u32 = 1;
+      n size = count(&a.fields);
+      for i size = 0; i < n; i = i + 1 {
+        props type_properties;
+        if !compute_type_properties(cs, &ref(&a.fields, i)->type, &props) {
+          return false;
+        }
+        max_size = max(max_size, props.flat_size);
+        max_alignment = max(max_alignment, props.flat_alignment);
+      }
+      // Consider the case where you have a union of {uint32_t, uint32_t, uint32_t} and {uint64_t}.  We have alignment 8, thus we need size 16.
+      final_size u32 = ceil_aligned(max_size, max_alignment);
+      *out = {final_size, max_alignment};
+      return true;
     }
     case &TeArraytype(a te_arraytype): {
-      return TODO();
+      if case Has(c u32) = a.count {
+        props type_properties;
+        if !compute_type_properties(cs, oo(&a.param), &props) {
+          return false;
+        }
+
+        // We _should_ maintain alignment for a zero-element array because the pointer to such an array might hack in tag-bit logic.
+        *out = {props.flat_size * c, props.flat_alignment};
+        return true;
+      } else {
+        ice(_u8("compute_type_properties called on incomplete arraytype."));
+        return fake();
+      }
     }
     case &TeUnknown(a void): {
       ice(_u8("compute_type_properties called on incomplete type."));
