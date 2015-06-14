@@ -787,7 +787,24 @@ func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_propertie
       }
     }
     case &TeApp(a te_typeapp): {
-      return TODO();
+      if case &Has(pack te_instpack) = &a.pack {
+        // TODO: This is a copy/paste of the TeName block above.
+        if !ensure_deftype_inst_checked(cs, ref_deftype_entry(cs, pack.ent_id), pack.inst_id){
+          return false;
+        }
+        inst *deftype_inst = ref_deftype_inst(cs, pack.inst_id);
+        // TODO: We must use the correct _defclass_ properties, not th rhs properties.
+        if case &Has(props) = &inst->rhs_properties {
+          *out = props;
+          return true;
+        } else {
+          ice(_u8("ensure_deftype_inst_checked did not compute properties."));
+          return fake();
+        }
+      } else {
+        ice(_u8("compute_type_properties called on incomplete app type."));
+        return fake();
+      }
     }
     case &TeStruct(a te_struct): {
       return TODO();
