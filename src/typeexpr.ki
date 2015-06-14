@@ -17,9 +17,14 @@ defenum te_puretype {
   TePureUnknown void;
 };
 
+deftype te_instpack struct {
+  ent_id deftype_entry_id;
+  inst_id deftype_inst_id;
+};
+
 deftype te_name struct {
   value sym;
-  inst_id deftype_inst_id;
+  pack te_instpack;
 };
 
 deftype te_typeapp struct {
@@ -66,7 +71,7 @@ func typeexpr_equal(cs *checkstate, a *te_typeexpr, b *te_typeexpr) bool {
   switch a {
     case &TeName(ax te_name): {
       if case &TeName(bx te_name) = b {
-        return ax.inst_id == bx.inst_id;
+        return ax.pack.inst_id == bx.pack.inst_id;
       }
     }
     case &TeApp(ax te_typeapp): {

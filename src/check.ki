@@ -137,6 +137,7 @@ deftype type_properties struct {
 deftype deftype_inst struct {
   parms genparms;
   status deftype_inst_status;
+  rhs_properties opt[type_properties];
 };
 
 deftype deftype_entry struct {
@@ -483,7 +484,7 @@ func check_and_compute_name_type(cs *checkstate, g *ast_generics, parms *genparm
     if case Has(id) = matching_deftype {
       np genparms = NoParms(void);
       inst_id deftype_inst_id = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), &np);
-      *computed_out = TeName({a->value, inst_id});
+      *computed_out = TeName({a->value, {id, inst_id}});
       return true;
     } else {
       ERR(_u8("type name has no match "), lookup(cs->im, a->value));
@@ -763,15 +764,25 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *genparms) de
     return id;
   }
   // We're only going to chase down the actual type if we use it.
-  return add_deftype_inst(cs, {*parms, DidNotStartChecking(void)});
+  return add_deftype_inst(cs, {*parms, DidNotStartChecking(void), None()});
 }
 
-// t had better be complete, or else this returns false.
+// t had better be complete.
 func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_properties) bool {
   switch t {
     case &TeName(a te_name): {
-      
-      return TODO();
+      if !ensure_deftype_inst_checked(cs, ref_deftype_entry(cs, a.pack.ent_id), a.pack.inst_id) {
+        return false;
+      }
+      inst *deftype_inst = ref_deftype_inst(cs, a.pack.inst_id);
+      // TODO: We must use the correct _defclass_ properties, not the rhs properties.
+      if case &Has(props) = &inst->rhs_properties {
+        *out = props;
+        return true;
+      } else {
+        ice(_u8("ensure_deftype_inst_checked did not compute properties."));
+        return fake();
+      }
     }
     case &TeApp(a te_typeapp): {
       return TODO();
@@ -816,13 +827,15 @@ func ensure_deftype_inst_checked(cs *checkstate, ent *deftype_entry, id deftype_
       }
       check(rhs_complete);
 
+      check(isNone(&inst->rhs_properties));
       // TODO: For defclasses, we'll want to compute its class-specific properties.
       properties type_properties;
       if !compute_type_properties(cs, &rhs_computed, &properties) {
         inst->status = FailedChecking(void);
         return false;
       }
-
+      check(isNone(&inst->rhs_properties));
+      inst->rhs_properties = Has(properties);
       inst->status = FinishedChecking(void);
       return true;
     }
@@ -831,6 +844,7 @@ func ensure_deftype_inst_checked(cs *checkstate, ent *deftype_entry, id deftype_
       return false;
     }
     case FinishedChecking(v): {
+      check(isHas(&inst->rhs_properties));
       return true;
     }
     case FailedChecking(v): {
