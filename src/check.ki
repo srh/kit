@@ -145,9 +145,8 @@ func mk(module_name sym, name sym, tl *ast_type_def) deftype_entry {
 }
 
 deftype check_deftype_later_entry struct {
-  generics *ast_generics;
-  parms genparms;
-  typeexpr *ast_typeexpr;
+  ent *deftype_entry;
+  inst *deftype_inst;
 };
 
 deftype check_later_queue struct {
