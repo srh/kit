@@ -541,7 +541,7 @@ func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms
         *computed_complete_out = true;
         return true;
       } else {
-        *computed_out = TeApp({embox(TePureName(f.value)), params});
+        *computed_out = TeApp({embox(TePureName(f.value)), params, None()});
         *computed_complete_out = false;
         return true;
       }
@@ -551,8 +551,10 @@ func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms
           hp genparms = HasParms(params);
           // TODO: Presumably we'd want to do something with this id.
           inst_id deftype_inst_id = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), &hp);
+          *computed_out = TeApp({embox(TePureName(f.value)), params, Has({id, inst_id})});
+        } else {
+          *computed_out = TeApp({embox(TePureName(f.value)), params, None()});
         }
-        *computed_out = TeApp({embox(TePureName(f.value)), params});
         *computed_complete_out = params_complete;
         return true;
       } else {
@@ -561,7 +563,7 @@ func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms
       }
     }
   } else if case &Unknown(u ast_unknown) = oo(&a->typefunc) {
-    *computed_out = TeApp({embox(TePureUnknown(void)), params});
+    *computed_out = TeApp({embox(TePureUnknown(void)), params, None()});
     *computed_complete_out = false;
     return true;
   } else {

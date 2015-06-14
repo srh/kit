@@ -30,6 +30,8 @@ deftype te_name struct {
 deftype te_typeapp struct {
   typefunc box[te_puretype];
   params array[te_typeexpr];
+  // Only supplied if the type is complete.
+  pack opt[te_instpack];
 };
 
 deftype te_struct struct {
