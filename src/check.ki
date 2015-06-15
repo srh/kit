@@ -129,12 +129,42 @@ defenum deftype_inst_status {
   FailedChecking void;
 };
 
+// Describes the behavior of init/copy/move/destroy methods.
+defenum derived_method_behavior {
+  // Behavior's explicitly defined by a method.
+  DerivedMethodExplicit def_inst_id;
+  // Behavior's derived structurally, and one of its fields/constructors has an explicit method call.
+  // TODO: This should be defined in one place by a method, and should have a def_inst_id.
+  DerivedMethodNontrivial void;
+  // Behavior's derived from the type definition (or it's primitive) and it's trivial. init: Fills with zero.  copy/move: memcpy.  destroy: no-op.
+  DerivedMethodTrivial void;
+};
+
+func isTrivial(behav derived_method_behavior) bool {
+  if case DerivedMethodTrivial(v void) = behav {
+    return true;
+  }
+  return false;
+}
+
+func trivialOrNot(is_trivial bool) derived_method_behavior {
+  if is_trivial {
+    return DerivedMethodTrivial(void);
+  } else {
+    return DerivedMethodNontrivial(void);
+  }
+}
+
 deftype type_properties struct {
   flat_size u32;
   flat_alignment u32;
+  init_behavior derived_method_behavior;
+  move_behavior derived_method_behavior;
+  copy_behavior derived_method_behavior;
+  destroy_behavior derived_method_behavior;
 };
 
-// TODO: This function is BS, once type_properties gets more fields.  Fix its callers.
+// TODO: This function is BS, now that type_properties has behavior fields.
 func to_defclass_properties(props type_properties) type_properties {
   return props;
 }
@@ -835,6 +865,10 @@ func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_propertie
     case &TeStruct(a te_struct): {
       offset u32 = 0;
       max_alignment u32 = 1;
+      init_trivial bool = true;
+      move_trivial bool = true;
+      copy_trivial bool = true;
+      destroy_trivial bool = true;
       n size = count(&a.fields);
       for i size = 0; i < n; i = i + 1 {
         props type_properties;
@@ -844,9 +878,15 @@ func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_propertie
         offset = ceil_aligned(offset, props.flat_alignment);
         offset = offset + props.flat_size;
         max_alignment = max(max_alignment, props.flat_alignment);
+        init_trivial = init_trivial & isTrivial(props.init_behavior);
+        move_trivial = move_trivial & isTrivial(props.move_behavior);
+        copy_trivial = copy_trivial & isTrivial(props.copy_behavior);
+        destroy_trivial = destroy_trivial & isTrivial(props.destroy_behavior);
       }
       check(offset % max_alignment == 0);
-      *out = {offset, max_alignment};
+      *out = {offset, max_alignment, trivialOrNot(init_trivial),
+              trivialOrNot(move_trivial), trivialOrNot(copy_trivial),
+              trivialOrNot(destroy_trivial)};
       return true;
     }
     case &TeEnum(a te_enum): {
@@ -854,6 +894,10 @@ func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_propertie
       tag_size u32 = 4;
       max_size u32 = tag_size;
       max_alignment u32 = tag_size;
+      init_trivial bool = true;
+      move_trivial bool = true;
+      copy_trivial bool = true;
+      destroy_trivial bool = true;
       n size = count(&a.constructors);
       for i size = 0; i < n; i = i + 1 {
         props type_properties;
@@ -863,10 +907,16 @@ func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_propertie
         tagged_size u32 = ceil_aligned(tag_size, props.flat_alignment) + props.flat_size;
         max_size = max(max_size, tagged_size);
         max_alignment = max(max_alignment, props.flat_alignment);
+        init_trivial = init_trivial & isTrivial(props.init_behavior);
+        move_trivial = move_trivial & isTrivial(props.move_behavior);
+        copy_trivial = copy_trivial & isTrivial(props.copy_behavior);
+        destroy_trivial = destroy_trivial & isTrivial(props.destroy_behavior);
       }
       // See TeUnion for explanation of final_size.
       final_size u32 = ceil_aligned(max_size, max_alignment);
-      *out = {final_size, max_alignment};
+      *out = {final_size, max_alignment, trivialOrNot(init_trivial),
+              trivialOrNot(move_trivial), trivialOrNot(copy_trivial),
+              trivialOrNot(destroy_trivial)};
       return true;
     }
     case &TeUnion(a te_union): {
@@ -881,10 +931,16 @@ func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_propertie
         }
         max_size = max(max_size, props.flat_size);
         max_alignment = max(max_alignment, props.flat_alignment);
+        if !(isTrivial(props.init_behavior) && isTrivial(props.move_behavior) && isTrivial(props.copy_behavior) && isTrivial(props.destroy_behavior)) {
+          ERR(_u8("union type has non-trivial field"));
+          return false;
+        }
       }
       // Consider the case where you have a union of {uint32_t, uint32_t, uint32_t} and {uint64_t}.  We have alignment 8, thus we need size 16.
       final_size u32 = ceil_aligned(max_size, max_alignment);
-      *out = {final_size, max_alignment};
+      *out = {final_size, max_alignment, DerivedMethodTrivial(void),
+              DerivedMethodTrivial(void), DerivedMethodTrivial(void),
+              DerivedMethodTrivial(void)};
       return true;
     }
     case &TeArraytype(a te_arraytype): {
@@ -895,7 +951,11 @@ func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_propertie
         }
 
         // We _should_ maintain alignment for a zero-element array because the pointer to such an array might hack in tag-bit logic.
-        *out = {props.flat_size * c, props.flat_alignment};
+        *out = {props.flat_size * c, props.flat_alignment,
+                trivialOrNot(isTrivial(props.init_behavior)),
+                trivialOrNot(isTrivial(props.move_behavior)),
+                trivialOrNot(isTrivial(props.copy_behavior)),
+                trivialOrNot(isTrivial(props.destroy_behavior))};
         return true;
       } else {
         ice(_u8("compute_type_properties called on incomplete arraytype."));
