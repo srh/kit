@@ -134,10 +134,15 @@ deftype type_properties struct {
   flat_alignment u32;
 };
 
+// TODO: This function is BS, once type_properties gets more fields.  Fix its callers.
+func to_defclass_properties(props type_properties) type_properties {
+  return props;
+}
+
 deftype deftype_inst struct {
   parms genparms;
   status deftype_inst_status;
-  rhs_properties opt[type_properties];
+  properties opt[type_properties];
 };
 
 deftype deftype_entry struct {
@@ -800,8 +805,7 @@ func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_propertie
         return false;
       }
       inst *deftype_inst = ref_deftype_inst(cs, a.pack.inst_id);
-      // TODO: We must use the correct _defclass_ properties, not the rhs properties.
-      if case &Has(props) = &inst->rhs_properties {
+      if case &Has(props) = &inst->properties {
         *out = props;
         return true;
       } else {
@@ -816,8 +820,7 @@ func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_propertie
           return false;
         }
         inst *deftype_inst = ref_deftype_inst(cs, pack.inst_id);
-        // TODO: We must use the correct _defclass_ properties, not th rhs properties.
-        if case &Has(props) = &inst->rhs_properties {
+        if case &Has(props) = &inst->properties {
           *out = props;
           return true;
         } else {
@@ -927,15 +930,21 @@ func ensure_deftype_inst_checked(cs *checkstate, ent *deftype_entry, id deftype_
       }
       check(rhs_complete);
 
-      check(isNone(&inst->rhs_properties));
-      // TODO: For defclasses, we'll want to compute its class-specific properties.
+      check(isNone(&inst->properties));
       properties type_properties;
       if !compute_type_properties(cs, &rhs_computed, &properties) {
         inst->status = FailedChecking(void);
         return false;
       }
-      check(isNone(&inst->rhs_properties));
-      inst->rhs_properties = Has(properties);
+      check(isNone(&inst->properties));
+      switch &ent->tl->rhs {
+        case &TypeexprRhs(a): {
+          inst->properties = Has(properties);
+        }
+        case &ClassexprRhs(a): {
+          inst->properties = Has(to_defclass_properties(properties));
+        }
+      }
       inst->status = FinishedChecking(void);
       return true;
     }
@@ -944,7 +953,7 @@ func ensure_deftype_inst_checked(cs *checkstate, ent *deftype_entry, id deftype_
       return false;
     }
     case FinishedChecking(v): {
-      check(isHas(&inst->rhs_properties));
+      check(isHas(&inst->properties));
       return true;
     }
     case FailedChecking(v): {
