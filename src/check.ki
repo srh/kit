@@ -824,36 +824,29 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *genparms) de
   return add_deftype_inst(cs, {*parms, DidNotStartChecking(void), None()});
 }
 
+func compute_pack_properties(cs *checkstate, pack *te_instpack, out *type_properties) bool {
+  if !ensure_deftype_inst_checked(cs, ref_deftype_entry(cs, pack->ent_id), pack->inst_id) {
+    return false;
+  }
+  inst *deftype_inst = ref_deftype_inst(cs, pack->inst_id);
+  if case &Has(props) = &inst->properties {
+    *out = props;
+    return true;
+  } else {
+    ice(_u8("ensure_deftype_inst_checked did not compute properties."));
+    return fake();
+  }
+}
+
 // t had better be complete.
 func compute_type_properties(cs *checkstate, t *te_typeexpr, out *type_properties) bool {
   switch t {
     case &TeName(a te_name): {
-      if !ensure_deftype_inst_checked(cs, ref_deftype_entry(cs, a.pack.ent_id), a.pack.inst_id) {
-        return false;
-      }
-      inst *deftype_inst = ref_deftype_inst(cs, a.pack.inst_id);
-      if case &Has(props) = &inst->properties {
-        *out = props;
-        return true;
-      } else {
-        ice(_u8("ensure_deftype_inst_checked did not compute properties."));
-        return fake();
-      }
+      return compute_pack_properties(cs, &a.pack, out);
     }
     case &TeApp(a te_typeapp): {
       if case &Has(pack te_instpack) = &a.pack {
-        // TODO: This is a copy/paste of the TeName block above.
-        if !ensure_deftype_inst_checked(cs, ref_deftype_entry(cs, pack.ent_id), pack.inst_id){
-          return false;
-        }
-        inst *deftype_inst = ref_deftype_inst(cs, pack.inst_id);
-        if case &Has(props) = &inst->properties {
-          *out = props;
-          return true;
-        } else {
-          ice(_u8("ensure_deftype_inst_checked did not compute properties."));
-          return fake();
-        }
+        return compute_pack_properties(cs, &pack, out);
       } else {
         ice(_u8("compute_type_properties called on incomplete app type."));
         return fake();
