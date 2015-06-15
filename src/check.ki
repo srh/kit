@@ -410,7 +410,6 @@ func check_and_compute_typeexpr(cs *checkstate, g *ast_generics, parms *genparms
       return true;
     }
     case &Union(a ast_union): {
-      // TODO: Unions will need to enforce that they have "primitive" types, no classes.
       computed_fields_complete bool;
       computed_fields array[te_vardecl];
       if !help_check_fields(cs, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
@@ -427,7 +426,6 @@ func check_and_compute_typeexpr(cs *checkstate, g *ast_generics, parms *genparms
         return false;
       }
       if case &Has(b box[ast_expr]) = &a.count {
-        // TODO: _really_ typecheck and statically eval count.
         count u32;
         if !fake_eval_arraytype_count(oo(&b), &count) {
           return false;
@@ -607,7 +605,6 @@ func check_and_compute_app_type(cs *checkstate, g *ast_generics, parms *genparms
       if case Has(id) = matching_deftype {
         if params_complete {
           hp genparms = HasParms(params);
-          // TODO: Presumably we'd want to do something with this id.
           inst_id deftype_inst_id = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), &hp);
           *computed_out = TeApp({embox(TePureName(f.value)), params, Has({id, inst_id})});
         } else {
