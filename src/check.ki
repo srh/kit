@@ -1203,6 +1203,40 @@ func process_toplevels(cs *checkstate,
   return true;
 }
 
+defenum match_def_res {
+  NoMatch void;
+  MultiMatch void;
+  OneMatch struct { ent def_entry_id; inst def_inst_id; };
+};
+
+func match_def(cs *checkstate, name sym, gp opt[*genparms], pt *te_typeexpr,
+               res_out *match_def_res) bool {
+  // TODO: What about defenum constructors?
+  if case Has(arr *array[def_entry_id]) = lookup_ref(&cs->defs_by_name, name) {
+    n size = count(arr);
+    for i size = 0; i < n; i = i + 1 {
+      id def_entry_id = get(arr, i);
+      ent *def_entry = ref_def_entry(cs, id);
+      switch ent->tl {
+        case &Def(a ast_def): {
+          return TODO();
+        }
+        case &ExternDef(a ast_extern_def): {
+          return TODO();
+        }
+        default: {
+          ice(_u8("def_entry seen in match_def has invalid toplevel\n"));
+          return fake();
+        }
+      }
+    }
+    return TODO();
+  } else {
+    *res_out = NoMatch(void);
+    return true;
+  }
+}
+
 func[T, U, V, W] ERR(x T, y U, z V, p W) void {
   ERR(cons(cons(x, y), cons(z, p)));
 }
