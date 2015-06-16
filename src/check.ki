@@ -237,9 +237,13 @@ func mk(module_name sym, def_name sym, tl *ast_toplevel) def_entry {
   return {module_name, def_name, tl, default()};
 }
 
-deftype clqueue_entry struct {
+deftype clqueue_deftype_entry struct {
   ent_id deftype_entry_id;
   inst_id deftype_inst_id;
+};
+
+defenum clqueue_entry {
+  ClqDeftypeEntry clqueue_deftype_entry;
 };
 
 deftype clqueue struct {
@@ -248,8 +252,12 @@ deftype clqueue struct {
 
 func finish_checking(cs *checkstate, clq *clqueue) bool {
   while case Has(entry clqueue_entry) = popval(&clq->entries) {
-    if !ensure_deftype_inst_checked(cs, clq, ref_deftype_entry(cs, entry.ent_id), entry.inst_id) {
-      return false;
+    switch &entry {
+      case &ClqDeftypeEntry(e clqueue_deftype_entry): {
+        if !ensure_deftype_inst_checked(cs, clq, ref_deftype_entry(cs, e.ent_id), e.inst_id) {
+          return false;
+        }
+      }
     }
   }
   return true;
@@ -841,7 +849,7 @@ func deftype_rhs_type(rhs *ast_type_def_rhs) *ast_typeexpr {
 func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, parms *genparms) deftype_inst_id {
   var res = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
   if res.created {
-    push(&clq->entries, {id, res.id});
+    push(&clq->entries, ClqDeftypeEntry({id, res.id}));
   }
   return res.id;
 }
