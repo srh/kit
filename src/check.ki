@@ -356,8 +356,6 @@ func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry,
 
   // TODO: We need to check exact name shadowing(?), typeexpr, and rhs.
 
-  // TODO: We need some way to stop recursive checking.
-
   // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
   if case &Has(t ast_typeexpr) = &a->typeexpr {
     computed_complete bool;
@@ -402,7 +400,6 @@ func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry,
 }
 
 func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, parms *genparms, t *ast_typeexpr, computed_out *te_typeexpr, computed_complete_out *bool) bool {
-  // TODO: We need some kind of proper flatness checking.
   switch t {
     case &Name(a ast_ident): {
       if !check_and_compute_name_type(cs, clq, g, parms, &a, computed_out) {
