@@ -272,17 +272,7 @@ defenum ast_isvar {
   IsNotVar void;
 };
 
-deftype ast_def_info struct {
-  computed_quick_typeexpr bool;
-  quick_typeexpr opt[ast_typeexpr];
-};
-
-func mk_ast_def_info() ast_def_info {
-  return {false, default()};
-}
-
 deftype ast_def struct {
-  info ast_def_info;
   is_export ast_isexport;
   is_var ast_isvar;
   generics ast_generics;

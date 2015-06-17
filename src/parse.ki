@@ -123,6 +123,7 @@ func parse_toplevel(p *ps, out *ast_toplevel) bool {
   }
 }
 
+// TODO: Have a specific AST datatype for funcs instead of munging them into ast_def.
 func parse_rest_of_func(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
   generics ast_generics;
   name ast_ident;
@@ -134,7 +135,7 @@ func parse_rest_of_func(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
     return Fail;
   }
 
-  *out = Def({mk_ast_def_info(), is_export, IsNotVar(void), generics, name, None(),
+  *out = Def({is_export, IsNotVar(void), generics, name, None(),
               Lambda({params, return_type, body})});
   return true;
 }
@@ -163,7 +164,7 @@ func parse_rest_of_def(p *ps, is_export ast_isexport, is_var ast_isvar, out *ast
     return Fail;
   }
 
-  *out = Def({mk_ast_def_info(), is_export, is_var, generics, name, typeexpr, rhs});
+  *out = Def({is_export, is_var, generics, name, typeexpr, rhs});
   return true;
 }
 
