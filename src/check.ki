@@ -5,8 +5,13 @@ import typeexpr;
 import shp;
 import u8ast;
 
+deftype common_syms struct {
+  fn sym;
+};
+
 deftype checkstate struct {
   im *identmap;
+  cym common_syms;
   loader fn[sym, opt[array[u8]]];
 
   modules array[shp[module]];
@@ -333,6 +338,32 @@ func arity(parms *genparms) generics_arity {
   }
 }
 
+func quick_typeexpr(cym *common_syms, a *ast_def) *opt[ast_typeexpr] {
+  if !a->info.computed_quick_typeexpr {
+    // TODO: We could permit _merging_ partial typeexpr with the rhs.  Or we could just get rid of this entirely.
+    if case &Has(s ast_typeexpr) = &a->syntactic_typeexpr {
+      a->info.quick_typeexpr = a->syntactic_typeexpr;
+    } else {
+      switch &a->rhs {
+        case &Lambda(b ast_lambda): {
+          type_params array[ast_typeexpr];
+          n size = count(&b.args);
+          for i size = 0; i < n; i = i + 1 {
+            push(&type_params, ref(&b.args, i)->type);
+          }
+          push(&type_params, b.return_type);
+          a->info.quick_typeexpr = Has(App({embox(Name({@[ast_meta]~0, cym->fn})), type_params}));
+        }
+        default: {
+          a->info.quick_typeexpr = None();
+        }
+      }
+    }
+    a->info.computed_quick_typeexpr = true;
+  }
+  return &a->info.quick_typeexpr;
+}
+
 func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, a *ast_def, parms *genparms) bool {
   // TODO: Do we know that the def's generics don't shadow something?
   check(arity(&a->generics) == arity(parms));
@@ -357,7 +388,7 @@ func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry,
   // TODO: We need to check exact name shadowing(?), typeexpr, and rhs.
 
   // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
-  if case &Has(t ast_typeexpr) = &a->typeexpr {
+  if case &Has(t ast_typeexpr) = quick_typeexpr(&cs->cym, a) {
     computed_complete bool;
     computed te_typeexpr;
     if !check_and_compute_typeexpr(cs, clq, &a->generics, &inst->parms, &t, &computed, &computed_complete) {
@@ -1209,6 +1240,22 @@ defenum match_def_res {
   OneMatch struct { ent def_entry_id; inst def_inst_id; };
 };
 
+// TODO: Copying the whole thing seems unperformant.
+func def_entry_generics(ent *def_entry) ast_generics {
+  switch ent->tl {
+    case &Def(a ast_def): {
+      return a.generics;
+    }
+    case &ExternDef(a ast_extern_def): {
+      return NoGenerics(void);
+    }
+    default: {
+      ice(_u8("def_entry has bad toplevel"));
+      return fake();
+    }
+  }
+}
+
 func match_def(cs *checkstate, name sym, gp opt[*genparms], pt *te_typeexpr,
                res_out *match_def_res) bool {
   // TODO: What about defenum constructors?
@@ -1217,18 +1264,7 @@ func match_def(cs *checkstate, name sym, gp opt[*genparms], pt *te_typeexpr,
     for i size = 0; i < n; i = i + 1 {
       id def_entry_id = get(arr, i);
       ent *def_entry = ref_def_entry(cs, id);
-      switch ent->tl {
-        case &Def(a ast_def): {
-          return TODO();
-        }
-        case &ExternDef(a ast_extern_def): {
-          return TODO();
-        }
-        default: {
-          ice(_u8("def_entry seen in match_def has invalid toplevel\n"));
-          return fake();
-        }
-      }
+      generics ast_generics = def_entry_generics(ent);
     }
     return TODO();
   } else {
