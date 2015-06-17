@@ -233,13 +233,15 @@ func mk(parms genparms, a ast_def) def_inst {
 deftype def_entry struct {
   module_name sym;
   def_name sym;
+  // A copy of the ast_def's generics field -- if it's an ast_extern_def, this is NoGenerics.
+  generics ast_generics;
   tl *ast_toplevel;
 
   insts array[def_inst_id];
 };
 
-func mk(module_name sym, def_name sym, tl *ast_toplevel) def_entry {
-  return {module_name, def_name, tl, default()};
+func mk(module_name sym, def_name sym, generics ast_generics, tl *ast_toplevel) def_entry {
+  return {module_name, def_name, generics, tl, default()};
 }
 
 deftype clqueue_deftype_entry struct {
@@ -1199,11 +1201,11 @@ func process_toplevels(cs *checkstate,
         }
       }
       case &Def(a ast_def): {
-        ent shp[def_entry] = emshp(mk(mod->module_name, a.name.value, toplevel));
+        ent shp[def_entry] = emshp(mk(mod->module_name, a.name.value, a.generics, toplevel));
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &ExternDef(a ast_extern_def): {
-        ent shp[def_entry] = emshp(mk(mod->module_name, a.name.value, toplevel));
+        ent shp[def_entry] = emshp(mk(mod->module_name, a.name.value, NoGenerics(void), toplevel));
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &TypeDef(a ast_type_def): {
@@ -1240,22 +1242,6 @@ defenum match_def_res {
   OneMatch struct { ent def_entry_id; inst def_inst_id; };
 };
 
-// TODO: Copying the whole thing seems unperformant.
-func def_entry_generics(ent *def_entry) ast_generics {
-  switch ent->tl {
-    case &Def(a ast_def): {
-      return a.generics;
-    }
-    case &ExternDef(a ast_extern_def): {
-      return NoGenerics(void);
-    }
-    default: {
-      ice(_u8("def_entry has bad toplevel"));
-      return fake();
-    }
-  }
-}
-
 func match_def(cs *checkstate, name sym, gp opt[*genparms], pt *te_typeexpr,
                res_out *match_def_res) bool {
   // TODO: What about defenum constructors?
@@ -1264,7 +1250,6 @@ func match_def(cs *checkstate, name sym, gp opt[*genparms], pt *te_typeexpr,
     for i size = 0; i < n; i = i + 1 {
       id def_entry_id = get(arr, i);
       ent *def_entry = ref_def_entry(cs, id);
-      generics ast_generics = def_entry_generics(ent);
     }
     return TODO();
   } else {
