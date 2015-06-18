@@ -93,8 +93,62 @@ func arity(parms *genparms) generics_arity {
   }
 }
 
+func convert_typeexpr(cs *checkstate, generics *ast_generics, a *ast_typeexpr, out *te_typeexpr) bool {
+  switch a {
+    case &Name(b ast_ident): {
+      return TODO();
+    }
+    case &App(b ast_typeapp): {
+      return TODO();
+    }
+    case &Struct(b ast_struct): {
+      return TODO();
+    }
+    case &Enum(b ast_enum): {
+      return TODO();
+    }
+    case &Union(b ast_union): {
+      return TODO();
+    }
+    case &Arraytype(b ast_arraytype): {
+      return TODO();
+    }
+    case &Unknown(b ast_unknown): {
+      return TODO();
+    }
+  }
+}
+
 func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) bool {
-  return TODO();
+  switch &ent->converted_typeexpr {
+    case &NotComputed(v void): {
+      ent->converted_typeexpr = BeganComputing();
+      converted te_typeexpr;
+      if !convert_typeexpr(cs, &ent->generics, &ent->quick_typeexpr, &converted) {
+        ent->converted_typeexpr = FailedComputation();
+        return false;
+      }
+      ent->converted_typeexpr = Computed(converted);
+      if case &Computed(te te_typeexpr) = &ent->converted_typeexpr {
+        *out = &te;
+      } else {
+        crash(_u8("impossible converted_typeexpr"));
+      }
+      return true;
+    }
+    case &BeganComputing(v void): {
+      ERR(_u8("recursively computing def's typeexpr"));
+      return false;
+    }
+    case &FailedComputation(v void): {
+      ERR(_u8("repeat of error"));
+      return false;
+    }
+    case &Computed(x te_typeexpr): {
+      *out = &x;
+      return true;
+    }
+  }
 }
 
 func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr) bool {

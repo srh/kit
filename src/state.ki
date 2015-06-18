@@ -244,12 +244,13 @@ deftype def_entry struct {
   // This is either the syntactic typeexpr (converted to te_typeexpr) or converted from a shallow look at the RHS.
   quick_typeexpr ast_typeexpr;
   tl *ast_toplevel;
+  converted_typeexpr nbfc[te_typeexpr];
 
   insts array[def_inst_id];
 };
 
 func mk(module_name sym, def_name sym, generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
-  return {module_name, def_name, generics, quick_typeexpr, tl, default()};
+  return {module_name, def_name, generics, quick_typeexpr, tl, NotComputed(), default@[array[def_inst_id]]()};
 }
 
 deftype clqueue_deftype_entry struct {
