@@ -1,3 +1,5 @@
+import array;
+
 extern malloc fn[size, *void];
 extern free fn[*void, void];
 extern abort fn[void];

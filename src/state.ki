@@ -1,0 +1,266 @@
+import ast;
+import box;
+import deferred;
+import identmap;
+import kitutil;
+import shp;
+import typeexpr;
+import u8ast;
+
+deftype common_syms struct {
+  fn sym;
+};
+
+deftype checkstate struct {
+  im *identmap;
+  cym common_syms;
+  loader fn[sym, opt[array[u8]]];
+
+  modules array[shp[module]];
+  modules_by_name hash[sym, module_id];
+
+  instantiations array[shp[def_inst]];
+  type_instantiations array[shp[deftype_inst]];
+  alias_instantiations array[shp[alias_inst]];
+
+  deftypes array[shp[deftype_entry]];
+  deftypes_by_name hash[sym, array[deftype_entry_id]];
+
+  aliases array[shp[alias_entry]];
+  aliases_by_name hash[sym, array[alias_entry_id]];
+
+  defs array[shp[def_entry]];
+  defs_by_name hash[sym, array[def_entry_id]];
+};
+
+// An index into checkstate's modules array.
+deftype module_id size;
+def `~` fn[size, module_id] = wrapconvert;
+
+// An index into checkstate's instantiations array.
+deftype def_inst_id size;
+def `~` fn[size, def_inst_id] = wrapconvert;
+
+// An index into checkstate's type_instantiations array.
+deftype deftype_inst_id size;
+def `~` fn[size, deftype_inst_id] = wrapconvert;
+def `==` fn[deftype_inst_id, deftype_inst_id, bool] = wrapequate;
+
+// An index into checkstat's alias_instantiations array.
+deftype alias_inst_id size;
+def `~` fn[size, alias_inst_id] = wrapconvert;
+
+// An index into checkstate's defs array.
+deftype def_entry_id size;
+def `~` fn[size, def_entry_id] = wrapconvert;
+
+// An index into checkstate's deftypes array.
+deftype deftype_entry_id size;
+def `~` fn[size, deftype_entry_id] = wrapconvert;
+
+// An index into checkstate's aliases array.
+deftype alias_entry_id size;
+def `~` fn[size, alias_entry_id] = wrapconvert;
+
+func ref_module(cs *checkstate, id module_id) *module {
+  return oo(ref(&cs->modules, id.~));
+}
+
+func ref_def_entry(cs *checkstate, id def_entry_id) *def_entry {
+  return oo(ref(&cs->defs, id.~));
+}
+
+func ref_deftype_entry(cs *checkstate, id deftype_entry_id) *deftype_entry {
+  return oo(ref(&cs->deftypes, id.~));
+}
+
+func ref_alias_entry(cs *checkstate, id alias_entry_id) *alias_entry {
+  return oo(ref(&cs->aliases, id.~));
+}
+
+func ref_inst(cs *checkstate, id def_inst_id) *def_inst {
+  return oo(ref(&cs->instantiations, id.~));
+}
+
+func ref_deftype_inst(cs *checkstate, id deftype_inst_id) *deftype_inst {
+  return oo(ref(&cs->type_instantiations, id.~));
+}
+
+func ref_alias_inst(cs *checkstate, id alias_inst_id) *alias_inst {
+  return oo(ref(&cs->alias_instantiations, id.~));
+}
+
+func add_inst(cs *checkstate, val def_inst) def_inst_id {
+  id def_inst_id = ~count(&cs->instantiations);
+  push(&cs->instantiations, emshp(val));
+  return id;
+}
+
+func add_deftype_inst(cs *checkstate, val deftype_inst) deftype_inst_id {
+  id deftype_inst_id = ~count(&cs->type_instantiations);
+  push(&cs->type_instantiations, emshp(val));
+  return id;
+}
+
+func add_alias_inst(cs *checkstate, val alias_inst) alias_inst_id {
+  id alias_inst_id = ~count(&cs->alias_instantiations);
+  push(&cs->alias_instantiations, emshp(val));
+  return id;
+}
+
+defenum module_process_state {
+  Unprocessed void;
+  Processing void;
+  DoneProcessing void;
+};
+
+func `==`(a module_process_state, b module_process_state) bool {
+  return enumnum(&a) == enumnum(&b);
+}
+
+deftype module struct {
+  module_name sym;
+  file ast_file;
+  buf array[u8];
+  process_state module_process_state;
+  // vvv  Valid when process_state == DoneProcessing.  vvv
+  defs array[def_entry_id];
+  deftypes array[deftype_entry_id];
+  aliases array[alias_entry_id];
+};
+
+defenum deftype_inst_status {
+  DidNotStartChecking void;
+  StartedChecking void;
+  FinishedChecking void;
+  FailedChecking void;
+};
+
+// Describes the behavior of init/copy/move/destroy methods.
+defenum derived_method_behavior {
+  // Behavior's explicitly defined by a method.
+  DerivedMethodExplicit def_inst_id;
+  // Behavior's derived structurally, and one of its fields/constructors has an explicit method call.
+  // TODO: This should be defined in one place by a method, and should have a def_inst_id.
+  DerivedMethodNontrivial void;
+  // Behavior's derived from the type definition (or it's primitive) and it's trivial. init: Fills with zero.  copy/move: memcpy.  destroy: no-op.
+  DerivedMethodTrivial void;
+};
+
+func isTrivial(behav derived_method_behavior) bool {
+  if case DerivedMethodTrivial(v void) = behav {
+    return true;
+  }
+  return false;
+}
+
+func trivialOrNot(is_trivial bool) derived_method_behavior {
+  if is_trivial {
+    return DerivedMethodTrivial(void);
+  } else {
+    return DerivedMethodNontrivial(void);
+  }
+}
+
+deftype type_properties struct {
+  flat_size u32;
+  flat_alignment u32;
+  init_behavior derived_method_behavior;
+  move_behavior derived_method_behavior;
+  copy_behavior derived_method_behavior;
+  destroy_behavior derived_method_behavior;
+};
+
+// TODO: This function is BS, now that type_properties has behavior fields.
+func to_defclass_properties(props type_properties) type_properties {
+  return props;
+}
+
+deftype deftype_inst struct {
+  parms genparms;
+  status deftype_inst_status;
+  properties opt[type_properties];
+};
+
+deftype deftype_entry struct {
+  module_name sym;
+  name sym;
+  tl *ast_type_def;
+
+  // The RHS typeexpr, if computed, without generics replaced, of course.
+  rhs nbfc[te_typeexpr];
+  insts array[deftype_inst_id];
+};
+
+func mk(module_name sym, name sym, tl *ast_type_def) deftype_entry {
+  return {module_name, name, tl, NotComputed(), default@[array[deftype_inst_id]]()};
+}
+
+deftype alias_inst struct {
+  parms genparms;
+  // Is None() while we're in the process of expansion -- seeing None() means you're recursively expanding.
+  expanded opt[te_typeexpr];
+};
+
+deftype alias_entry struct {
+  module_name sym;
+  alias_name sym;
+  tl *ast_type_alias;
+  // The RHS typeexpr, if computed, without generics replaced, of course.
+  rhs opt[te_typeexpr];
+
+  insts array[alias_inst_id];
+};
+
+func mk(module_name sym, alias_name sym, tl *ast_type_alias) alias_entry {
+  return {module_name, alias_name, tl, None(), default@[array[alias_inst_id]]()};
+}
+
+defenum genparms {
+  NoParms void;
+  HasParms array[te_typeexpr];
+};
+
+deftype def_inst struct {
+  parms genparms;
+  // Our own copy of the def, which we can annotate.  It does not have its generics replaced.
+  ast ast_def;
+  computed_type_computed bool;
+  // Valid only if computed_type_computed.
+  // Becomes the concrete type (with generics replaced) once we've computed it and checked it.
+  computed_type te_typeexpr;
+  computed_type_properties opt[type_properties];
+};
+
+func mk(parms genparms, a ast_def) def_inst {
+  return {parms, a, false, default(), None()};
+}
+
+deftype def_entry struct {
+  module_name sym;
+  def_name sym;
+  // A copy of the ast_def's generics field -- if it's an ast_extern_def, this is NoGenerics.
+  generics ast_generics;
+  // This is either the syntactic typeexpr (converted to te_typeexpr) or converted from a shallow look at the RHS.
+  quick_typeexpr ast_typeexpr;
+  tl *ast_toplevel;
+
+  insts array[def_inst_id];
+};
+
+func mk(module_name sym, def_name sym, generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
+  return {module_name, def_name, generics, quick_typeexpr, tl, default()};
+}
+
+deftype clqueue_deftype_entry struct {
+  ent_id deftype_entry_id;
+  inst_id deftype_inst_id;
+};
+
+defenum clqueue_entry {
+  ClqDeftypeEntry clqueue_deftype_entry;
+};
+
+deftype clqueue struct {
+  entries array[clqueue_entry];
+};

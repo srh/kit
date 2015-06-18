@@ -1,4 +1,5 @@
 import identmap;
+import state;
 
 // TODO: Might this still exist in a particular scope?
 // This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics replaced consistently.

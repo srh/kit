@@ -1,0 +1,25 @@
+import stdlib;
+
+func[T, U, V, W] ERR(x T, y U, z V, p W) void {
+  ERR(cons(cons(x, y), cons(z, p)));
+}
+
+func[T, U, V] ERR(x T, y U, z V) void {
+  ERR(cons(cons(x, y), z));
+}
+
+func[T, U] ERR(x T, y U) void {
+  ERR(cons(x, y));
+}
+
+func[T] ERR(x T) void {
+  print(Stderr(), to_u8str(x));
+  print(Stderr(), _u8("\n"));
+  fflush(Stderr());
+}
+
+func ice(msg array[u8]) void {
+  x _ = _u8("ICE: ");
+  append(&x, &msg);
+  crash(x);
+}
