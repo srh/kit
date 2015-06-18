@@ -1,0 +1,18 @@
+defenum[T] nbf {
+  NotComputed void;
+  BeganComputing void;
+  FailedComputation void;
+  Computed T;
+};
+
+func[T] NotComputed() nbf[T] {
+  return NotComputed(void);
+}
+
+func[T] BeganComputing() nbf[T] {
+  return BeganComputing(void);
+}
+
+func[T] FailedComputation() nbf[T] {
+  return NotComputed(void);
+}

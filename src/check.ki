@@ -1,4 +1,5 @@
 import ast;
+import deferred;
 import parse;
 import tok;
 import typeexpr;
@@ -186,12 +187,12 @@ deftype deftype_entry struct {
   tl *ast_type_def;
 
   // The RHS typeexpr, if computed, without generics replaced, of course.
-  rhs opt[te_typeexpr];
+  rhs nbf[te_typeexpr];
   insts array[deftype_inst_id];
 };
 
 func mk(module_name sym, name sym, tl *ast_type_def) deftype_entry {
-  return {module_name, name, tl, None(), default@[array[deftype_inst_id]]()};
+  return {module_name, name, tl, NotComputed(), default@[array[deftype_inst_id]]()};
 }
 
 deftype alias_inst struct {
