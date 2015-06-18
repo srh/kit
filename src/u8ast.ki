@@ -91,7 +91,7 @@ func build_u8str(r *array[u8], a *ast_unknown) void {
 }
 
 func build_u8str(r *array[u8], a *ast_vardecl) void {
-  append(r, _u8("vardecl{name:"));
+  append(r, _u8("{name:"));
   build_u8str(r, &a->name);
   append(r, _u8(",type:"));
   build_u8str(r, &a->type);

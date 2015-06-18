@@ -141,3 +141,89 @@ func te_vardecl_list_equal(cs *checkstate, a *array[te_vardecl], b *array[te_var
   return true;
 }
 
+func build_u8str(r *array[u8], a *te_typeexpr) void {
+  switch a {
+    case &TeName(b te_name): {
+      wrap_u8str(r, _u8("TeName"), &b);
+    }
+    case &TeApp(b te_typeapp): {
+      wrap_u8str(r, _u8("TeApp"), &b);
+    }
+    case &TeStruct(b te_struct): {
+      wrap_u8str(r, _u8("TeStruct"), &b);
+    }
+    case &TeEnum(b te_enum): {
+      wrap_u8str(r, _u8("TeEnum"), &b);
+    }
+    case &TeUnion(b te_union): {
+      wrap_u8str(r, _u8("TeUnion"), &b);
+    }
+    case &TeArraytype(b te_arraytype): {
+      wrap_u8str(r, _u8("TeArraytype"), &b);
+    }
+    case &TeUnknown(v void): {
+      append(r, _u8("TeUnknown"));
+    }
+  }
+}
+
+func build_u8str(r *array[u8], a *te_name) void {
+  append(r, _u8("{value:"));
+  build_u8str(r, &a->value);
+  append(r, _u8("}"));
+}
+
+func build_u8str(r *array[u8], a *te_typeapp) void {
+  append(r, _u8("{typefunc:"));
+  build_u8str(r, &a->typefunc);
+  append(r, _u8(",params:"));
+  build_array_u8str(r, &a->params);
+  push(r, '}');
+}
+
+func build_u8str(r *array[u8], a *te_struct) void {
+  append(r, _u8("{fields:"));
+  build_array_u8str(r, &a->fields);
+  push(r, '}');
+}
+
+func build_u8str(r *array[u8], a *te_enum) void {
+  append(r, _u8("{constructors:"));
+  build_array_u8str(r, &a->constructors);
+  push(r, '}');
+}
+
+func build_u8str(r *array[u8], a *te_union) void {
+  append(r, _u8("{fields:"));
+  build_array_u8str(r, &a->fields);
+  push(r, '}');
+}
+
+func build_u8str(r *array[u8], a *te_arraytype) void {
+  append(r, _u8("{count:"));
+  build_u8str(r, &a->count);
+  append(r, _u8(",param:"));
+  build_u8str(r, &a->param);
+  push(r, '}');
+}
+
+func build_u8str(r *array[u8], a *te_vardecl) void {
+  append(r, _u8("{name:"));
+  build_u8str(r, &a->name);
+  append(r, _u8(",type:"));
+  build_u8str(r, &a->type);
+  push(r, '}');
+}
+
+func build_u8str(r *array[u8], a *te_puretype) void {
+  switch a {
+    case &TePureName(s sym): {
+      append(r, _u8("TePureName("));
+      build_u8str(r, &s);
+      push(r, ')');
+    }
+    case &TePureUnknown(v void): {
+      append(r, _u8("TePureUnknown"));
+    }
+  }
+}

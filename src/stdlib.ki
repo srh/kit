@@ -48,6 +48,10 @@ func build_u8str(r *array[u8], x *bool) void {
   }
 }
 
+func build_u8str(r *array[u8], x *u32) void {
+  append(r, unsigned_as_dec(*x));
+}
+
 func as_hex(x size) array[u8] {
   arr array[u8];
   if x == 0 {
@@ -64,6 +68,21 @@ func as_hex(x size) array[u8] {
     }
     push(&arr, ch);
     x = x / 16;
+  }
+  return reverse(&arr);
+}
+
+func[T] unsigned_as_dec(x T) array[u8] {
+  arr array[u8];
+  if x == 0 {
+    push(&arr, '0');
+    return arr;
+  }
+  while x != 0 {
+    units T = x % 10;
+    ch u8 = ~(units + '0');
+    push(&arr, ch);
+    x = x / 10;
   }
   return reverse(&arr);
 }
