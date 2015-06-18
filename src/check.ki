@@ -183,15 +183,15 @@ deftype deftype_inst struct {
 deftype deftype_entry struct {
   module_name sym;
   name sym;
-  // The RHS typeexpr, without generics replaced, of course.
-  rhs te_typeexpr;
   tl *ast_type_def;
 
+  // The RHS typeexpr, if computed, without generics replaced, of course.
+  rhs opt[te_typeexpr];
   insts array[deftype_inst_id];
 };
 
-func mk(module_name sym, name sym, rhs te_typeexpr, tl *ast_type_def) deftype_entry {
-  return {module_name, name, rhs, tl, default()};
+func mk(module_name sym, name sym, tl *ast_type_def) deftype_entry {
+  return {module_name, name, tl, None(), default@[array[deftype_inst_id]]()};
 }
 
 deftype alias_inst struct {
@@ -203,15 +203,15 @@ deftype alias_inst struct {
 deftype alias_entry struct {
   module_name sym;
   alias_name sym;
-  // The rhs of the type alias, converted to a te_typeexpr.
-  rhs te_typeexpr;
   tl *ast_type_alias;
+  // The RHS typeexpr, if computed, without generics replaced, of course.
+  rhs opt[te_typeexpr];
 
   insts array[alias_inst_id];
 };
 
-func mk(module_name sym, alias_name sym, rhs te_typeexpr, tl *ast_type_alias) alias_entry {
-  return {module_name, alias_name, rhs, tl, default()};
+func mk(module_name sym, alias_name sym, tl *ast_type_alias) alias_entry {
+  return {module_name, alias_name, tl, None(), default@[array[alias_inst_id]]()};
 }
 
 defenum genparms {
@@ -240,14 +240,14 @@ deftype def_entry struct {
   // A copy of the ast_def's generics field -- if it's an ast_extern_def, this is NoGenerics.
   generics ast_generics;
   // This is either the syntactic typeexpr (converted to te_typeexpr) or converted from a shallow look at the RHS.
-  typeexpr te_typeexpr;
+  quick_typeexpr ast_typeexpr;
   tl *ast_toplevel;
 
   insts array[def_inst_id];
 };
 
-func mk(module_name sym, def_name sym, generics ast_generics, typeexpr te_typeexpr, tl *ast_toplevel) def_entry {
-  return {module_name, def_name, generics, typeexpr, tl, default()};
+func mk(module_name sym, def_name sym, generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
+  return {module_name, def_name, generics, quick_typeexpr, tl, default()};
 }
 
 deftype clqueue_deftype_entry struct {
@@ -346,6 +346,18 @@ func arity(parms *genparms) generics_arity {
   }
 }
 
+func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) bool {
+  return TODO();
+}
+
+func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr) bool {
+  return TODO();
+}
+
+func alias_converted_rhs(cs *checkstate, ent *alias_entry, out **te_typeexpr) bool {
+  return TODO();
+}
+
 func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, a *ast_def, parms *genparms) bool {
   // TODO: Do we know that the def's generics don't shadow something?
   check(arity(&a->generics) == arity(parms));
@@ -367,12 +379,16 @@ func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry,
   // TODO: We ignore is_export entirely.  Is it relevant at all?
   a = &inst->ast;
 
+  ent_typeexpr *te_typeexpr;
+  if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
+    return false;
+  }
   // TODO: We need to check exact name shadowing(?), typeexpr, and rhs.
 
   // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
   computed_complete bool;
   computed te_typeexpr;
-  if !check_and_compute_typeexpr(cs, clq, &a->generics, &inst->parms, &ent->typeexpr, &computed, &computed_complete) {
+  if !check_and_compute_typeexpr(cs, clq, &a->generics, &inst->parms, ent_typeexpr, &computed, &computed_complete) {
     return false;
   }
   check(computed_complete);
@@ -671,9 +687,14 @@ func check_and_compute_alias_with_parms(cs *checkstate, clq *clqueue, ent *alias
   id alias_inst_id = add_alias_inst(cs, {*parms, None()});
   inst *alias_inst = ref_alias_inst(cs, id);
 
+  ent_rhs *te_typeexpr;
+  if !alias_converted_rhs(cs, ent, &ent_rhs) {
+    return false;
+  }
+
   complete bool;
   computed te_typeexpr;
-  if !check_and_compute_typeexpr(cs, clq, &ent->tl->generics, &inst->parms, &ent->rhs, &computed, &complete) {
+  if !check_and_compute_typeexpr(cs, clq, &ent->tl->generics, &inst->parms, ent_rhs, &computed, &complete) {
     return false;
   }
   // There's no way an alias expansion can't be complete, because ast_unknown is disallowed when parsing its RHS (and the parms must be complete).
@@ -792,6 +813,10 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
       }
     }
     case &ExternDef(a ast_extern_def): {
+      ent_typeexpr *te_typeexpr;
+      if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
+        return false;
+      }
       // TODO: We could check that function args for C calling convention functions are primitively copyable.
       // TODO: It is unclear that ast_extern_def defs should have a def_entry.
       np genparms = NoParms(void);
@@ -799,7 +824,7 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
       clq clqueue;
       computed_complete bool;
       computed te_typeexpr;
-      if !check_and_compute_typeexpr(cs, &clq, &ng, &np, &ent->typeexpr, &computed, &computed_complete) {
+      if !check_and_compute_typeexpr(cs, &clq, &ng, &np, ent_typeexpr, &computed, &computed_complete) {
         return false;
       }
       // The parser shouldn't allow incomplete types.
@@ -1015,9 +1040,15 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent *deftype_entr
   switch inst->status {
     case DidNotStartChecking(v): {
       inst->status = StartedChecking(void);
+
+      ent_rhs *te_typeexpr;
+      if !deftype_converted_rhs(cs, ent, &ent_rhs) {
+        return false;
+      }
+
       rhs_computed te_typeexpr;
       rhs_complete bool;
-      if !check_and_compute_typeexpr(cs, clq, &ent->tl->generics, &inst->parms, &ent->rhs, &rhs_computed, &rhs_complete) {
+      if !check_and_compute_typeexpr(cs, clq, &ent->tl->generics, &inst->parms, ent_rhs, &rhs_computed, &rhs_complete) {
         inst->status = FailedChecking(void);
         return false;
       }
@@ -1165,10 +1196,6 @@ func add_def_entry(cs *checkstate,
   push(module_defs, id);
 }
 
-func convert_to_te(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
-  return TODO();
-}
-
 func process_toplevels(cs *checkstate,
                        mod *module,
                        toplevels *array[ast_toplevel]) bool {
@@ -1190,27 +1217,15 @@ func process_toplevels(cs *checkstate,
         if !quick_typeexpr(&cs->cym, &a, &quick_te) {
           return false;
         }
-        typeexpr te_typeexpr;
-        if !convert_to_te(cs, &quick_te, &typeexpr) {
-          return false;
-        }
-        ent shp[def_entry] = emshp(mk(mod->module_name, a.name.value, a.generics, typeexpr, toplevel));
+        ent shp[def_entry] = emshp(mk(mod->module_name, a.name.value, a.generics, quick_te, toplevel));
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &ExternDef(a ast_extern_def): {
-        typeexpr te_typeexpr;
-        if !convert_to_te(cs, &a.type, &typeexpr) {
-          return false;
-        }
-        ent shp[def_entry] = emshp(mk(mod->module_name, a.name.value, NoGenerics(void), typeexpr, toplevel));
+        ent shp[def_entry] = emshp(mk(mod->module_name, a.name.value, NoGenerics(void), a.type, toplevel));
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &TypeDef(a ast_type_def): {
-        rhs te_typeexpr;
-        if !convert_to_te(cs, deftype_rhs_type(&a.rhs), &rhs) {
-          return false;
-        }
-        ent shp[deftype_entry] = emshp(mk(mod->module_name, a.name.value, rhs, &a));
+        ent shp[deftype_entry] = emshp(mk(mod->module_name, a.name.value, &a));
         id deftype_entry_id = ~count(&cs->deftypes);
         push(&cs->deftypes, ent);
         arr *array[deftype_entry_id] = try_insert_lookup(
@@ -1219,11 +1234,7 @@ func process_toplevels(cs *checkstate,
         push(&mod->deftypes, id);
       }
       case &TypeAlias(a ast_type_alias): {
-        rhs te_typeexpr;
-        if !convert_to_te(cs, &a.rhs, &rhs) {
-          return false;
-        }
-        ent shp[alias_entry] = emshp(mk(mod->module_name, a.name.value, rhs, &a));
+        ent shp[alias_entry] = emshp(mk(mod->module_name, a.name.value, &a));
         id alias_entry_id = ~count(&cs->aliases);
         push(&cs->aliases, ent);
         arr *array[alias_entry_id] = try_insert_lookup(
@@ -1258,8 +1269,12 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
     for i size = 0; i < n; i = i + 1 {
       id def_entry_id = get(arr, i);
       ent *def_entry = ref_def_entry(cs, id);
+      ent_typeexpr *te_typeexpr;
+      if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
+        return false;
+      }
       match_result bool;
-      if !entry_matches(cs, &ent->generics, gp, pt, &ent->typeexpr, &match_result) {
+      if !entry_matches(cs, &ent->generics, gp, pt, ent_typeexpr, &match_result) {
         return false;
       }
       if match_result {
