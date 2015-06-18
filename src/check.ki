@@ -1167,7 +1167,7 @@ func process_module(cs *checkstate, mod_name sym) opt[module_id] {
     case Has(id module_id): {
       mod *module = ref_module(cs, id);
       if mod->process_state == Unprocessed(void) {
-         if !process_defs(cs, mod) {
+         if !process_module_toplevels(cs, mod) {
            return None();
          }
       }
@@ -1176,7 +1176,7 @@ func process_module(cs *checkstate, mod_name sym) opt[module_id] {
   }
 }
 
-func process_defs(cs *checkstate, mod *module) bool {
+func process_module_toplevels(cs *checkstate, mod *module) bool {
   check_mutate(&mod->process_state, Unprocessed(void), Processing(void));
   if !process_toplevels(cs, mod, &mod->file.toplevels) {
     return false;
