@@ -1,18 +1,18 @@
-defenum[T] nbf {
+defenum[T] nbfc {
   NotComputed void;
   BeganComputing void;
   FailedComputation void;
   Computed T;
 };
 
-func[T] NotComputed() nbf[T] {
+func[T] NotComputed() nbfc[T] {
   return NotComputed(void);
 }
 
-func[T] BeganComputing() nbf[T] {
+func[T] BeganComputing() nbfc[T] {
   return BeganComputing(void);
 }
 
-func[T] FailedComputation() nbf[T] {
+func[T] FailedComputation() nbfc[T] {
   return NotComputed(void);
 }

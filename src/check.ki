@@ -187,7 +187,7 @@ deftype deftype_entry struct {
   tl *ast_type_def;
 
   // The RHS typeexpr, if computed, without generics replaced, of course.
-  rhs nbf[te_typeexpr];
+  rhs nbfc[te_typeexpr];
   insts array[deftype_inst_id];
 };
 
