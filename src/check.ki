@@ -1224,23 +1224,95 @@ func process_toplevels(cs *checkstate,
 defenum match_def_res {
   NoMatch void;
   MultiMatch void;
-  OneMatch struct { ent def_entry_id; inst def_inst_id; };
+  // TODO: We'll want to include any simplification of the instantiated parms, or other type information, that we can get.
+  OneMatch struct { ent def_entry_id; };
 };
 
-func match_def(cs *checkstate, name sym, gp opt[*genparms], pt *te_typeexpr,
+// Note that gp could be incomplete.
+func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
                res_out *match_def_res) bool {
   // TODO: What about defenum constructors?
   if case Has(arr *array[def_entry_id]) = lookup_ref(&cs->defs_by_name, name) {
     n size = count(arr);
+    matches array[def_entry_id];
     for i size = 0; i < n; i = i + 1 {
       id def_entry_id = get(arr, i);
       ent *def_entry = ref_def_entry(cs, id);
+      match_result bool;
+      if !entry_matches(cs, &ent->generics, gp, pt, &ent->typeexpr, &match_result) {
+        return false;
+      }
+      if match_result {
+        push(&matches, id);
+      }
     }
-    return TODO();
+    num_matches size = count(&matches);
+    if num_matches == 0 {
+      *res_out = NoMatch(void);
+      return true;
+    } else if num_matches == 1 {
+      *res_out = OneMatch({get(&matches, 0)});
+      return true;
+    } else {
+      *res_out = MultiMatch(void);
+      return true;
+    }
   } else {
     *res_out = NoMatch(void);
     return true;
   }
+}
+
+func entry_matches(cs *checkstate, generics *ast_generics, gp *genparms, pt *te_typeexpr, typeexpr *ast_typeexpr, matches_out *bool) bool {
+  switch generics {
+    case &NoGenerics(v void): {
+      switch gp {
+        case &HasParms(arr array[te_typeexpr]): {
+          *matches_out = false;
+          return true;
+        }
+        case &NoParms(u void): {
+          if !unify_directionally(cs->im, pt, typeexpr) {
+            *matches_out = false;
+            return true;
+          } else {
+            *matches_out = true;
+            return true;
+          }
+        }
+      }
+    }
+    case &HasGenerics(names array[ast_ident]): {
+      return TODO();
+    }
+  }
+}
+
+func unify_directionally(im *identmap, pt *te_typeexpr, t *ast_typeexpr) bool {
+  switch pt {
+    case &TeName(pta te_name): {
+      return TODO();
+    }
+    case &TeApp(pta te_typeapp): {
+      return TODO();
+    }
+    case &TeStruct(pta te_struct): {
+      return TODO();
+    }
+    case &TeEnum(pta te_enum): {
+      return TODO();
+    }
+    case &TeUnion(pta te_union): {
+      return TODO();
+    }
+    case &TeArraytype(pta te_arraytype): {
+      return TODO();
+    }
+    case &TeUnknown(v void): {
+      return true;
+    }
+  }
+  return false;
 }
 
 func[T, U, V, W] ERR(x T, y U, z V, p W) void {
