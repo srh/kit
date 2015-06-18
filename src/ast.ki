@@ -179,8 +179,8 @@ defenum ast_statement {
   Goto ast_goto_statement;
 };
 
-// TODO: addressof_constructor.
 deftype ast_constructor_pattern struct {
+  addressof_constructor opt[ast_ident];
   constructor_name ast_ident;
   decl ast_vardecl;
 };
