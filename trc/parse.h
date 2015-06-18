@@ -11,7 +11,7 @@
 struct ast_file;
 
 struct error_dump {
-  ident_value filename;
+  ident_value filepath;
   void (*dumper)(struct error_dump *ctx, struct identmap *im,
                  size_t line, size_t column, const char *msg, size_t msglen);
 };

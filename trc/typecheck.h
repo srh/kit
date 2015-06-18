@@ -11,7 +11,7 @@ struct ast_generics;
 struct ast_typeexpr;
 struct ast_numeric_literal;
 
-#define METERR(cs, loc, fmt, ...) ERR("At %.*s:%"PRIz":%"PRIz": " fmt, IM_P((cs)->im, checkstate_g_o_import_name((cs), (loc).pos_start.global_offset)), checkstate_g_o_line((cs), (loc).pos_start.global_offset), checkstate_g_o_column((cs), (loc).pos_start.global_offset), __VA_ARGS__)
+#define METERR(cs, loc, fmt, ...) ERR("%.*s:%"PRIz":%"PRIz": " fmt, IM_P((cs)->im, checkstate_g_o_import_filepath((cs), (loc).pos_start.global_offset)), checkstate_g_o_line((cs), (loc).pos_start.global_offset), checkstate_g_o_column((cs), (loc).pos_start.global_offset), __VA_ARGS__)
 
 #define VOID_TYPE_NAME "void"
 #define U8_TYPE_NAME "u8"
@@ -35,6 +35,8 @@ struct ast_numeric_literal;
 
 typedef int module_loader(const uint8_t *module_name,
                           size_t module_name_count,
+                          char **filepath_out,
+                          size_t *filepath_count_out,
                           uint8_t **data_out,
                           size_t *data_count_out);
 
@@ -46,6 +48,8 @@ int test_check_file(void);
 
 int read_module_file(const uint8_t *module_name,
                      size_t module_name_count,
+                     char **filepath_out,
+                     size_t *filepath_count_out,
                      uint8_t **data_out,
                      size_t *data_size_out);
 

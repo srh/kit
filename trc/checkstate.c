@@ -95,9 +95,16 @@ size_t checkstate_find_g_o_import(struct checkstate *cs, size_t global_offset) {
   }
 }
 
-ident_value checkstate_g_o_import_name(struct checkstate *cs, size_t global_offset) {
+ident_value checkstate_g_o_import_name(struct checkstate *cs,
+                                       size_t global_offset) {
   size_t ix = checkstate_find_g_o_import(cs, global_offset);
   return cs->imports[ix].import_name;
+}
+
+ident_value checkstate_g_o_import_filepath(struct checkstate *cs,
+                                           size_t global_offset) {
+  size_t ix = checkstate_find_g_o_import(cs, global_offset);
+  return cs->imports[ix].import_filepath;
 }
 
 size_t checkstate_g_o_line(struct checkstate *cs, size_t global_offset) {

@@ -11,6 +11,7 @@ struct import;
 
 struct import {
   ident_value import_name;
+  ident_value import_filepath;
   size_t global_offset_base;
   struct ast_file *file;
   uint8_t *buf;
@@ -75,6 +76,7 @@ void checkstate_init(struct checkstate *cs, struct identmap *im, int target_linu
 void checkstate_destroy(struct checkstate *cs);
 
 ident_value checkstate_g_o_import_name(struct checkstate *cs, size_t global_offset);
+ident_value checkstate_g_o_import_filepath(struct checkstate *cs, size_t global_offset);
 size_t checkstate_g_o_line(struct checkstate *cs, size_t global_offset);
 size_t checkstate_g_o_column(struct checkstate *cs, size_t global_offset);
 

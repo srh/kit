@@ -729,8 +729,8 @@ void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
 
 void stderr_errmsg(struct error_dump *ctx, struct identmap *im,
                    size_t line, size_t column, const char *msg, size_t msglen) {
-  ERR("Parse error at %.*s:%"PRIz":%"PRIz": %.*s\n",
-      IM_P(im, ctx->filename), line, column, size_to_int(msglen), msg);
+  ERR("%.*s:%"PRIz":%"PRIz": Parse error: %.*s\n",
+      IM_P(im, ctx->filepath), line, column, size_to_int(msglen), msg);
 }
 
 int resolve_import_filename_and_parse(struct checkstate *cs,
@@ -738,25 +738,38 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
                                       ident_value name,
                                       size_t *global_offset_base_out,
                                       struct ast_file *file_out,
+                                      ident_value *filepath_out,
                                       uint8_t **buf_out,
                                       size_t *buf_count_out) {
   const void *module_name;
   size_t module_name_count;
   identmap_lookup(cs->im, name, &module_name, &module_name_count);
 
+  char *filepath = NULL;
+  size_t filepath_size = 0;
   uint8_t *data;
   size_t data_size;
-  if (!(*loader)(module_name, module_name_count, &data, &data_size)) {
-    ERR("Could not read file for module %.*s.\n",
+  if (!(*loader)(module_name, module_name_count,
+                 &filepath, &filepath_size, &data, &data_size)) {
+    ERR("Could not read file '%.*s' for module %.*s.\n",
+        size_to_int(filepath_size), filepath,
         size_to_int(module_name_count), (const char *)module_name);
     goto fail;
   }
+
+  ident_value filepath_ident;
+  if (filepath) {
+    filepath_ident = identmap_intern(cs->im, filepath, filepath_size);
+  } else {
+    filepath_ident = identmap_intern_c_str(cs->im, "(no filepath)");
+  }
+  free(filepath);
 
   size_t global_offset_base = cs->total_filesize;
   cs->total_filesize = size_add(1, size_add(cs->total_filesize, data_size));
 
   struct error_dump error_dump;
-  error_dump.filename = name;
+  error_dump.filepath = filepath_ident;
   error_dump.dumper = &stderr_errmsg;
   if (!parse_buf_file(cs->im, data, data_size, global_offset_base,
                       file_out, &error_dump)) {
@@ -764,6 +777,7 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
   }
 
   *global_offset_base_out = global_offset_base;
+  *filepath_out = filepath_ident;
   *buf_out = data;
   *buf_count_out = data_size;
   return 1;
@@ -982,10 +996,11 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
 
     size_t global_offset_base;
     struct ast_file file;
+    ident_value filepath;
     uint8_t *buf;
     size_t buf_count;
     if (!resolve_import_filename_and_parse(cs, loader, name, &global_offset_base,
-                                           &file, &buf, &buf_count)) {
+                                           &file, &filepath, &buf, &buf_count)) {
       goto cleanup;
     }
 
@@ -994,6 +1009,7 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
     *heap_file = file;
     struct import imp;
     imp.import_name = name;
+    imp.import_filepath = filepath;
     imp.global_offset_base = global_offset_base;
     imp.file = heap_file;
     imp.buf = buf;
@@ -5294,9 +5310,10 @@ int test_check_module(struct identmap *im, module_loader *loader,
 
 int read_module_file(const uint8_t *module_name,
                      size_t module_name_count,
+                     char **filepath_out,
+                     size_t *filepath_size_out,
                      uint8_t **data_out,
                      size_t *data_size_out) {
-  int ret = 0;
   char *filename;
   size_t filename_count;
   alloc_half_strcat(module_name, module_name_count,
@@ -5306,12 +5323,13 @@ int read_module_file(const uint8_t *module_name,
   if (!read_file(filename, data_out, data_size_out)) {
     ERR("Could not read file %.*s.\n",
         size_to_int(filename_count), filename);
+    free(filename);
+    return 0;
   } else {
-    ret = 1;
+    *filepath_out = filename;
+    *filepath_size_out = filename_count;
+    return 1;
   }
-
-  free(filename);
-  return ret;
 }
 
 struct test_module {
@@ -5338,7 +5356,9 @@ int load_test_module(struct test_module *a, size_t a_count,
 }
 
 int check_file_test_1(const uint8_t *name, size_t name_count,
+                      char **filepath_out, size_t *filepath_count_out,
                       uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "import bar;\n"
                                "\n"
@@ -5355,7 +5375,9 @@ int check_file_test_1(const uint8_t *name, size_t name_count,
 
 
 int check_file_test_2(const uint8_t *name, size_t name_count,
+                      char **filepath_out, size_t *filepath_count_out,
                       uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;"
                                "deftype dword u32;\n"
@@ -5368,8 +5390,10 @@ int check_file_test_2(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_3(const uint8_t *name, size_t name_count,
+                      char **filepath_out, size_t *filepath_count_out,
                       uint8_t **data_out, size_t *data_count_out) {
   /* An invalid file: bar and foo recursively hold each other. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;"
                                "deftype foo bar;\n"
@@ -5380,7 +5404,9 @@ int check_file_test_3(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_4(const uint8_t *name, size_t name_count,
+                      char **filepath_out, size_t *filepath_count_out,
                       uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;"
                                "deftype foo struct { "
@@ -5391,7 +5417,9 @@ int check_file_test_4(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_5(const uint8_t *name, size_t name_count,
+                      char **filepath_out, size_t *filepath_count_out,
                       uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;"
                                "deftype[T] foo T;" } };
@@ -5401,7 +5429,9 @@ int check_file_test_5(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_6(const uint8_t *name, size_t name_count,
+                      char **filepath_out, size_t *filepath_count_out,
                       uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;"
                                "deftype[T] foo struct { "
@@ -5412,9 +5442,11 @@ int check_file_test_6(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_7(const uint8_t *name, size_t name_count,
+                      char **filepath_out, size_t *filepath_count_out,
                       uint8_t **data_out, size_t *data_count_out) {
   /* This fails because bar recursively holds itself through a
   template parameter. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
                                "deftype bar struct { z foo[u32, bar]; };\n" }
@@ -5425,8 +5457,10 @@ int check_file_test_7(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_8(const uint8_t *name, size_t name_count,
+                      char **filepath_out, size_t *filepath_count_out,
                       uint8_t **data_out, size_t *data_count_out) {
   /* But here bar holds itself indirectly. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
                                "deftype bar struct { z foo[bar, u32]; };\n" }
@@ -5437,7 +5471,9 @@ int check_file_test_8(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_def_1(const uint8_t *name, size_t name_count,
+                          char **filepath_out, size_t *filepath_count_out,
                           uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n" } };
 
@@ -5446,7 +5482,9 @@ int check_file_test_def_1(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_def_2(const uint8_t *name, size_t name_count,
+                          char **filepath_out, size_t *filepath_count_out,
                           uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x u32 = 3;\n" } };
   /* Passes because numeric literals ain't so dumb anymore. */
@@ -5456,7 +5494,9 @@ int check_file_test_def_2(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_def_3(const uint8_t *name, size_t name_count,
+                          char **filepath_out, size_t *filepath_count_out,
                           uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def[] x i32 = 3;\n"
                                "def y i32 = x;\n"
@@ -5467,7 +5507,9 @@ int check_file_test_def_3(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_1(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
                                "def y fn[i32, i32] = func(z i32)i32 {\n"
@@ -5480,8 +5522,10 @@ int check_file_test_lambda_1(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_4(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
   /* Fails because k is a u32. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def k u32 = k;\n"
                                "def x i32 = 3;\n"
@@ -5495,7 +5539,9 @@ int check_file_test_lambda_4(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_5(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
                                "def y fn[i32, i32] = func(z i32)i32 {\n"
@@ -5510,8 +5556,10 @@ int check_file_test_lambda_5(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_6(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
   /* Fails because z shadows a local. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
                                "def y fn[i32, i32] = func(z i32)i32 {\n"
@@ -5525,7 +5573,9 @@ int check_file_test_lambda_6(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_7(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
                                "def y fn[i32, i32] = func(z i32)i32 {\n"
@@ -5538,8 +5588,10 @@ int check_file_test_lambda_7(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_8(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
   /* Fails because x is a u32. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x u32 = x;\n"
                                "def y fn[i32, i32] = func(z i32)i32 {\n"
@@ -5552,8 +5604,10 @@ int check_file_test_lambda_8(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_9(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
   /* Fails because typechecking can't see that 5 is an i32. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x i32 = 3;\n"
                                "def y fn[i32, i32] = func(z i32)i32 {\n"
@@ -5566,8 +5620,10 @@ int check_file_test_lambda_9(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_10(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
   /* Fails because you can't negate a u32. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def x u32 = 3;\n"
                                "def y fn[i32, i32] = func(z i32)i32 {\n"
@@ -5580,7 +5636,9 @@ int check_file_test_lambda_10(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_11(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "deftype foo struct { x i32; y i32; };\n"
                                "def y fn[foo, i32] = func(z foo) i32 {\n"
@@ -5593,8 +5651,10 @@ int check_file_test_lambda_11(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_12(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
   /* Fails because the field x has type u32. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "deftype foo struct { x u32; y i32; };\n"
                                "def y fn[foo, i32] = func(z foo) i32 {\n"
@@ -5607,7 +5667,9 @@ int check_file_test_lambda_12(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_13(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x T; y i32; };\n"
@@ -5621,8 +5683,10 @@ int check_file_test_lambda_13(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_14(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
   /* Fails because z.x is a u32. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x T; y i32; };\n"
@@ -5636,7 +5700,9 @@ int check_file_test_lambda_14(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_15(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def y fn[i32, i32] = func(z i32) i32 {\n"
                                "  var k fn[i32, i32] = func(m i32) i32 {\n"
@@ -5651,8 +5717,10 @@ int check_file_test_lambda_15(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_16(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
   /* Fails because the inner lambda tries to capture "z". */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { { "foo",
                                "def y fn[i32, i32] = func(z i32) i32 {\n"
                                "  var k fn[i32, i32] = func(m i32) i32 {\n"
@@ -5667,7 +5735,9 @@ int check_file_test_lambda_16(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_17(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype foo struct { x i32; y i32; };\n"
@@ -5681,7 +5751,9 @@ int check_file_test_lambda_17(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_18(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x T; y i32; };\n"
@@ -5695,7 +5767,9 @@ int check_file_test_lambda_18(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_19(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x T; y i32; };\n"
@@ -5709,7 +5783,9 @@ int check_file_test_lambda_19(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_20(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x T; y i32; };\n"
@@ -5726,8 +5802,10 @@ int check_file_test_lambda_20(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_21(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
   /* Fails because assignment mismatches types. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x T; y i32; };\n"
@@ -5744,7 +5822,9 @@ int check_file_test_lambda_21(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_22(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def[T] foo fn[ptr[T], T] = func(x ptr[T]) T { return *x; };\n"
@@ -5759,8 +5839,10 @@ int check_file_test_lambda_22(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_23(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
   /* Fails because the def does not match. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def[T] foo fn[ptr[T], T] = func(x ptr[T]) T { return *x; };\n"
@@ -5775,7 +5857,9 @@ int check_file_test_lambda_23(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_24(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def[T] fac fn[T, T] = func(x T) T {\n"
@@ -5796,8 +5880,10 @@ int check_file_test_lambda_24(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_25(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
   /* Fails because of recursive template instantiation. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { x i32; };\n"
@@ -5818,7 +5904,9 @@ int check_file_test_lambda_25(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_26(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def x i32 = 3;\n"
@@ -5831,8 +5919,10 @@ int check_file_test_lambda_26(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_27(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
   /* Fails because you can't evaluate z(3) statically. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def x i32 = z(3);\n"
@@ -5844,7 +5934,9 @@ int check_file_test_lambda_27(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_28(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def y i32 = -x;\n"
@@ -5856,8 +5948,10 @@ int check_file_test_lambda_28(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_lambda_29(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                               uint8_t **data_out, size_t *data_count_out) {
   /* Fails because of cyclic reference. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def y i32 = -x;\n"
@@ -5869,7 +5963,9 @@ int check_file_test_lambda_29(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_extern_1(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "extern putchar fn[i32, i32];\n"
@@ -5885,8 +5981,10 @@ int check_file_test_extern_1(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_extern_2(const uint8_t *name, size_t name_count,
+                              char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
   /* Fails because putchar is called with the wrong type. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "extern putchar fn[i32, i32];\n"
@@ -5902,8 +6000,10 @@ int check_file_test_extern_2(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_extern_3(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
   /* Fails because putchar has a nonsense return type. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "extern putchar fn[i32, quack];\n"
@@ -5919,7 +6019,9 @@ int check_file_test_extern_3(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_1(const uint8_t *name, size_t name_count,
+                           char **filepath_out, size_t *filepath_count_out,
                            uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[u32, u32] = func(x u32) u32 {\n"
@@ -5936,7 +6038,9 @@ int check_file_test_more_1(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_2(const uint8_t *name, size_t name_count,
+                           char **filepath_out, size_t *filepath_count_out,
                            uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[u32, u32] = func(x u32) u32 {\n"
@@ -5953,8 +6057,10 @@ int check_file_test_more_2(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_3(const uint8_t *name, size_t name_count,
+                           char **filepath_out, size_t *filepath_count_out,
                            uint8_t **data_out, size_t *data_count_out) {
   /* Fails because foo's instatiation won't typecheck. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[u32, u32] = func(x u32) u32 {\n"
@@ -5971,9 +6077,11 @@ int check_file_test_more_3(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_4(const uint8_t *name, size_t name_count,
+                           char **filepath_out, size_t *filepath_count_out,
                            uint8_t **data_out, size_t *data_count_out) {
   /* Fails because foo lacks a return statement. */
   /* Unfortunately we don't check (yet) that _all_ paths return. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[u32, u32] = func(x u32) u32 {\n"
@@ -5986,7 +6094,9 @@ int check_file_test_more_4(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_5(const uint8_t *name, size_t name_count,
+                           char **filepath_out, size_t *filepath_count_out,
                            uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo i32 = 7;\n"
@@ -5998,8 +6108,10 @@ int check_file_test_more_5(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_6(const uint8_t *name, size_t name_count,
+                           char **filepath_out, size_t *filepath_count_out,
                            uint8_t **data_out, size_t *data_count_out) {
   /* Fails because shift overflows. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo i32 = 30;\n"
@@ -6011,7 +6123,9 @@ int check_file_test_more_6(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_7(const uint8_t *name, size_t name_count,
+                           char **filepath_out, size_t *filepath_count_out,
                            uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def[T] foo fn[T, T] = func(x T) T {\n"
@@ -6028,7 +6142,9 @@ int check_file_test_more_7(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_8(const uint8_t *name, size_t name_count,
+                           char **filepath_out, size_t *filepath_count_out,
                            uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def[T] add32 fn[i32, T, i32] = func(x i32, y T) i32 {\n"
@@ -6045,8 +6161,10 @@ int check_file_test_more_8(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_9(const uint8_t *name, size_t name_count,
+                           char **filepath_out, size_t *filepath_count_out,
                            uint8_t **data_out, size_t *data_count_out) {
   /* Fails because return type in return expression is wrong. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
@@ -6059,7 +6177,9 @@ int check_file_test_more_9(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_10(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def x i32 = ~ @[u32]4;\n"
@@ -6070,7 +6190,9 @@ int check_file_test_more_10(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_11(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def[T] foo fn[ptr[T], i32, T] = func(p ptr[T], i i32) T {\n"
@@ -6085,8 +6207,10 @@ int check_file_test_more_11(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_12(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because vec3 and [3]u32 are different types. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype vec3 [3]u32;\n"
@@ -6101,7 +6225,9 @@ int check_file_test_more_12(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_13(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
@@ -6115,7 +6241,9 @@ int check_file_test_more_13(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_14(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
@@ -6128,7 +6256,9 @@ int check_file_test_more_14(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_15(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
@@ -6145,7 +6275,9 @@ int check_file_test_more_15(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_16(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
@@ -6162,8 +6294,10 @@ int check_file_test_more_16(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_17(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because some control paths don't return a value. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
@@ -6181,7 +6315,9 @@ int check_file_test_more_17(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_18(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
@@ -6198,7 +6334,9 @@ int check_file_test_more_18(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_19(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def[T] foo fn[i32, T] = func(x i32) T {\n"
@@ -6219,7 +6357,9 @@ int check_file_test_more_19(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_20(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def[T] foo fn[i32, T] = func(x i32) T {\n"
@@ -6240,7 +6380,9 @@ int check_file_test_more_20(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_21(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype ty struct { x i32; y i32; };\n"
@@ -6254,8 +6396,10 @@ int check_file_test_more_21(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_22(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because whatever is not the name of a defclass type. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass ty struct { x i32; y i32; };\n"
@@ -6271,8 +6415,10 @@ int check_file_test_more_22(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_23(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because ty[] has bad arity. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass ty struct { x i32; y i32; };\n"
@@ -6288,8 +6434,10 @@ int check_file_test_more_23(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_24(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because ty[_, _] has bad arity. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass ty struct { x i32; y i32; };\n"
@@ -6305,7 +6453,9 @@ int check_file_test_more_24(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_25(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass ty struct { x i32; y i32; };\n"
@@ -6321,7 +6471,9 @@ int check_file_test_more_25(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_26(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass[T] ty struct { x T; y T; };\n"
@@ -6338,8 +6490,10 @@ int check_file_test_more_26(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_27(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because we try to access a field of a defclass type. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass[T] ty struct { x T; y T; };\n"
@@ -6354,7 +6508,9 @@ int check_file_test_more_27(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_28(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype ty i32;\n"
@@ -6368,9 +6524,11 @@ int check_file_test_more_28(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_29(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails (unlike more_28) because ty is defclass, and the conversion
   operator is private. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass ty i32;\n"
@@ -6384,8 +6542,10 @@ int check_file_test_more_29(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_30a(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
   /* Fails because the type ty lacks an explicit destructor. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass ty i32;\n"
@@ -6401,7 +6561,9 @@ int check_file_test_more_30a(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_30b(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass copy ty i32;\n"
@@ -6417,9 +6579,11 @@ int check_file_test_more_30b(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_31(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails (like more_29) because ty is defclass, and the conversion
   operator is private. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass[T] ty i32;\n"
@@ -6434,8 +6598,10 @@ int check_file_test_more_31(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_32a(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
   /* Fails because ty[u32] lacks an explicit destructor. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass[T] ty i32;\n"
@@ -6452,7 +6618,9 @@ int check_file_test_more_32a(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_32b(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass[T] copy ty i32;\n"
@@ -6469,9 +6637,11 @@ int check_file_test_more_32b(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_33(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails (unlike more_28) because ty is defclass, and the conversion
   operator is private. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass ty i32;\n"
@@ -6485,7 +6655,9 @@ int check_file_test_more_33(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_34(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass ty i32;\n"
@@ -6501,9 +6673,11 @@ int check_file_test_more_34(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_35(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails (like more_29) because ty is defclass, and the conversion
   operator is private. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass[T] ty i32;\n"
@@ -6518,7 +6692,9 @@ int check_file_test_more_35(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_36(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass[T] ty i32;\n"
@@ -6535,7 +6711,9 @@ int check_file_test_more_36(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_37(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass copy ty i32;\n"
@@ -6556,8 +6734,10 @@ int check_file_test_more_37(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_38(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because blah is not the name of a type. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32] = func() i32 {\n"
@@ -6571,8 +6751,10 @@ int check_file_test_more_38(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_39(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because k is not default-initializable. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass copy ty i32;\n"
@@ -6587,7 +6769,9 @@ int check_file_test_more_39(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_40(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass copy ty i32;\n"
@@ -6609,8 +6793,10 @@ int check_file_test_more_40(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_41(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because k is not default-initializable. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defclass copy ty i32;\n"
@@ -6626,7 +6812,9 @@ int check_file_test_more_41(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_42(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def x u8 = '\\x12';\n"
@@ -6637,7 +6825,9 @@ int check_file_test_more_42(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_43(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def x i8 = '\\x12';\n"
@@ -6649,9 +6839,11 @@ int check_file_test_more_43(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_44(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because string literals not allowed in static evaluation. */
   /* TODO: String literals should be allowed, this should pass. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def x [5]u8 = \"pq\\x12rs\";\n"
@@ -6662,8 +6854,10 @@ int check_file_test_more_44(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_45(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because the array size is wrong. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def x [6]u8 = \"pq\\x12rs\";\n"
@@ -6674,7 +6868,9 @@ int check_file_test_more_45(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_46(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
@@ -6695,8 +6891,10 @@ int check_file_test_more_46(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_47(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because c2 passed wrong type. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
@@ -6716,9 +6914,10 @@ int check_file_test_more_47(const uint8_t *name, size_t name_count,
                           name, name_count, data_out, data_count_out);
 }
 
-
 int check_file_test_more_48(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum[T] ty {\n"
@@ -6739,8 +6938,10 @@ int check_file_test_more_48(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_49(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because c2 returns wrong type. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum[T] ty {\n"
@@ -6761,7 +6962,9 @@ int check_file_test_more_49(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_50a(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
@@ -6783,7 +6986,9 @@ int check_file_test_more_50a(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_50b(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
@@ -6805,8 +7010,10 @@ int check_file_test_more_50b(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_51(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because a control path in the switch does not return a value. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
@@ -6828,7 +7035,9 @@ int check_file_test_more_51(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_52(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32, void] = func(x i32) void {\n"
@@ -6846,7 +7055,9 @@ int check_file_test_more_52(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_53(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
@@ -6868,7 +7079,9 @@ int check_file_test_more_53(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_54(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo fn[i32, void] = func(x i32) void {\n"
@@ -6887,7 +7100,9 @@ int check_file_test_more_54(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_55(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "def foo = func(x i32, y u32) void {\n"
@@ -6900,7 +7115,9 @@ int check_file_test_more_55(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_56(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "func foo(x i32, y u32) void {\n"
@@ -6913,7 +7130,9 @@ int check_file_test_more_56(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_57(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype notsize u32;\n"
@@ -6932,8 +7151,10 @@ int check_file_test_more_57(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_58(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because x[0] is of wrong type. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "func foo() i32 {\n"
@@ -6947,7 +7168,9 @@ int check_file_test_more_58(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_59(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "func foo() bool {\n"
@@ -6961,8 +7184,10 @@ int check_file_test_more_59(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_60(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because ptr types don't match. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "func foo() bool {\n"
@@ -6976,7 +7201,9 @@ int check_file_test_more_60(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_61(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "func foo(x osize, y size) osize {\n"
@@ -6989,7 +7216,9 @@ int check_file_test_more_61(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_62(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "func foo(x ptr[i32]) bool {\n"
@@ -7002,8 +7231,10 @@ int check_file_test_more_62(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_63(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because size is not a ptr[_]. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "func foo(x size) bool {\n"
@@ -7016,7 +7247,9 @@ int check_file_test_more_63(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_64(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
@@ -7038,8 +7271,10 @@ int check_file_test_more_64(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_65a(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
   /* Fails because of overlapping default cases. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
@@ -7063,8 +7298,10 @@ int check_file_test_more_65a(const uint8_t *name, size_t name_count,
 
 
 int check_file_test_more_65b(const uint8_t *name, size_t name_count,
+                             char **filepath_out, size_t *filepath_count_out,
                              uint8_t **data_out, size_t *data_count_out) {
   /* Fails because of overlapping default cases. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
@@ -7087,7 +7324,9 @@ int check_file_test_more_65b(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_66(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype foo struct {\n"
@@ -7104,8 +7343,10 @@ int check_file_test_more_66(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_67(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because struct expr has wrong count. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype foo struct {\n"
@@ -7122,8 +7363,10 @@ int check_file_test_more_67(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_68(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because struct expr has wrong type. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype foo struct {\n"
@@ -7140,7 +7383,9 @@ int check_file_test_more_68(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_69(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype foo struct {\n"
@@ -7157,7 +7402,9 @@ int check_file_test_more_69(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_70(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype foo struct {\n"
@@ -7175,7 +7422,9 @@ int check_file_test_more_70(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_71(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype foo struct {\n"
@@ -7195,7 +7444,9 @@ int check_file_test_more_71(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_72(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "deftype[T] foo struct { };\n"
@@ -7213,7 +7464,9 @@ int check_file_test_more_72(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_73(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
@@ -7233,7 +7486,9 @@ int check_file_test_more_73(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_74(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
@@ -7254,8 +7509,10 @@ int check_file_test_more_74(const uint8_t *name, size_t name_count,
 }
 
 int check_file_test_more_75(const uint8_t *name, size_t name_count,
+                            char **filepath_out, size_t *filepath_count_out,
                             uint8_t **data_out, size_t *data_count_out) {
   /* Fails because pattern mismatch. */
+  (void)filepath_out, (void)filepath_count_out;
   struct test_module a[] = { {
       "foo",
       "defenum ty {\n"
