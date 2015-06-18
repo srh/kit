@@ -807,6 +807,10 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
           return finish_checking(cs, &clq);
         }
         case &HasGenerics(ig): {
+          discard *te_typeexpr;
+          if !def_converted_typeexpr(cs, ent, &discard) {
+            return false;
+          }
           // We declare success -- we check non-generic defs.
           // TODO: Somewhere we have to check def generics shadowing.
           return true;
@@ -1090,11 +1094,15 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent *deftype_entr
 
 func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
   ent *deftype_entry = ref_deftype_entry(cs, id);
+  discard *te_typeexpr;
+  if !deftype_converted_rhs(cs, ent, &discard) {
+    return false;
+  }
   switch &ent->tl->generics {
     case &NoGenerics(v): {
       parms genparms = NoParms(void);
       clq clqueue;
-      discard deftype_inst_id = enqueue_deftype_inst(cs, &clq, id, &parms);
+      discard_id deftype_inst_id = enqueue_deftype_inst(cs, &clq, id, &parms);
       return finish_checking(cs, &clq);
     }
     case &HasGenerics(ig): {
@@ -1107,6 +1115,10 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
 
 func ensure_alias_checked(cs *checkstate, id alias_entry_id) bool {
   ent *alias_entry = ref_alias_entry(cs, id);
+  discard *te_typeexpr;
+  if !alias_converted_rhs(cs, ent, &discard) {
+    return false;
+  }
   switch &ent->tl->generics {
     case &NoGenerics(v): {
       np genparms = NoParms(void);
