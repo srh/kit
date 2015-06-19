@@ -4066,7 +4066,7 @@ int chase_struct_field_types(struct checkstate *cs,
       } break;
       case AST_DEFTYPE_RHS_ENUMSPEC: {
         METERR(cs, *meta, "Using a struct initializer on enum type '%.*s'\n",
-               IM_P(cs->im, type->u.name.value));
+               IM_P(cs->im, type->u.app.name.value));
         return 0;
       } break;
       default:
