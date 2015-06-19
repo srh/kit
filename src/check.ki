@@ -93,7 +93,7 @@ func arity(parms *genparms) generics_arity {
   }
 }
 
-func convert_typeexpr(cs *checkstate, generics *ast_generics, a *ast_typeexpr, out *te_typeexpr) bool {
+func convert_typeexpr(cs *checkstate, g *ast_generics, a *ast_typeexpr, out *te_typeexpr) bool {
   switch a {
     case &Name(b ast_ident): {
       return TODO();
@@ -369,7 +369,7 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
     if case Has(id) = matching_deftype {
       np genparms = NoParms(void);
       inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &np);
-      *computed_out = TeName({a->value, {id, inst_id}});
+      *computed_out = TeName({a->value, Has({id, inst_id})});
       return true;
     } else {
       ERR(_u8("type name has no match "), lookup(cs->im, a->value));
@@ -569,6 +569,22 @@ func match_alias(cs *checkstate, name sym, params opt[*array[te_typeexpr]], out 
   }
 }
 
+func find_generic(g *ast_generics, name sym) opt[size] {
+  switch g {
+    case &NoGenerics(v void): { return None(); }
+    case &HasGenerics(a array[ast_ident]): {
+      n size = count(&a);
+      for i size = 0; i < n; i = i + 1 {
+        if ref(&a, i)->value == name {
+          return Has(i);
+        }
+      }
+      return None();
+    }
+  }
+}
+
+// TODO: Does anybody use this?
 func lookup_generic(g *ast_generics, parms *genparms, name sym, out *te_typeexpr) bool {
   switch g {
     case &NoGenerics(v): { return false; }
@@ -697,13 +713,18 @@ func compute_pack_properties(cs *checkstate, clq *clqueue, pack *te_instpack, ou
 func compute_type_properties(cs *checkstate, clq *clqueue, t *te_typeexpr, out *type_properties) bool {
   switch t {
     case &TeName(a te_name): {
-      return compute_pack_properties(cs, clq, &a.pack, out);
+      if case &Has(p te_instpack) = &a.pack {
+        return compute_pack_properties(cs, clq, &p, out);
+      } else {
+        crash(_u8("compute_type_properties called on packless name type."));
+        return fake();
+      }
     }
     case &TeApp(a te_typeapp): {
       if case &Has(pack te_instpack) = &a.pack {
         return compute_pack_properties(cs, clq, &pack, out);
       } else {
-        ice(_u8("compute_type_properties called on incomplete app type."));
+        ice(_u8("compute_type_properties called on packless app type."));
         return fake();
       }
     }

@@ -25,13 +25,14 @@ deftype te_instpack struct {
 
 deftype te_name struct {
   value sym;
-  pack te_instpack;
+  // Only supplied if the type is complete, the lookup actually happened.
+  pack opt[te_instpack];
 };
 
 deftype te_typeapp struct {
   typefunc box[te_puretype];
   params array[te_typeexpr];
-  // Only supplied if the type is complete.
+  // Only supplied if the type is complete, the lookup actually happened.
   pack opt[te_instpack];
 };
 
@@ -70,17 +71,27 @@ func typeexpr_list_equal(cs *checkstate, a *array[te_typeexpr], b *array[te_type
   return true;
 }
 
+// Must be called on alias-expanded, complete, concrete types.
 func typeexpr_equal(cs *checkstate, a *te_typeexpr, b *te_typeexpr) bool {
   switch a {
     case &TeName(ax te_name): {
       if case &TeName(bx te_name) = b {
-        return ax.pack.inst_id == bx.pack.inst_id;
+        if case &Has(p te_instpack) = &ax.pack {
+          if case &Has(q te_instpack) = &bx.pack {
+            return p.inst_id == q.inst_id;
+          }
+        }
+        crash(_u8("typeexpr_equal on a non-pack-having name typeexpr"));
       }
     }
     case &TeApp(ax te_typeapp): {
       if case &TeApp(bx te_typeapp) = b {
-        return te_puretype_equal(cs, oo(&ax.typefunc), oo(&bx.typefunc))
-          && typeexpr_list_equal(cs, &ax.params, &bx.params);
+        if case &Has(p te_instpack) = &ax.pack {
+          if case &Has(q te_instpack) = &bx.pack {
+            return p.inst_id == q.inst_id;
+          }
+        }
+        crash(_u8("typeexpr_equal on non-pack-having app typeexpr"));
       }
     }
     case &TeStruct(ax te_struct): {
