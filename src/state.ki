@@ -207,13 +207,13 @@ deftype alias_entry struct {
   alias_name sym;
   tl *ast_type_alias;
   // The RHS typeexpr, if computed, without generics replaced, of course.
-  rhs opt[te_typeexpr];
+  rhs nbfc[te_typeexpr];
 
   insts array[alias_inst_id];
 };
 
 func mk(module_name sym, alias_name sym, tl *ast_type_alias) alias_entry {
-  return {module_name, alias_name, tl, None(), default@[array[alias_inst_id]]()};
+  return {module_name, alias_name, tl, NotComputed(), default@[array[alias_inst_id]]()};
 }
 
 defenum genparms {
