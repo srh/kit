@@ -497,57 +497,56 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
     return false;
   }
 
-  // TODO: Use a switch statement, or crash in the else clause, since we now have te_puretype.
-  if case &TePureName(value sym) = oo(&a->typefunc) {
-    matching_alias opt[alias_entry_id];
-    if !match_alias(cs, value, Has(&params), &matching_alias) {
-      return false;
-    }
-    matching_deftype opt[deftype_entry_id];
-    if !match_deftype(cs, value, Has(&params), &matching_deftype) {
-      return false;
-    }
-
-    if case Has(id) = matching_alias {
-      if case Has(deftype_id) = matching_deftype {
-        ERR(_u8("Both an alias and deftype match for name/params "), lookup(cs->im, value));
+  switch oo(&a->typefunc) {
+    case &TePureName(value sym): {
+      matching_alias opt[alias_entry_id];
+      if !match_alias(cs, value, Has(&params), &matching_alias) {
         return false;
       }
-      if params_complete {
-        hp genparms = HasParms(params);
-        if !check_and_compute_alias_with_parms(cs, clq, ref_alias_entry(cs, id), &hp, computed_out) {
+      matching_deftype opt[deftype_entry_id];
+      if !match_deftype(cs, value, Has(&params), &matching_deftype) {
+        return false;
+      }
+
+      if case Has(id) = matching_alias {
+        if case Has(deftype_id) = matching_deftype {
+          ERR(_u8("Both an alias and deftype match for name/params "), lookup(cs->im, value));
           return false;
         }
-        *computed_complete_out = true;
-        return true;
-      } else {
-        *computed_out = TeApp({embox(TePureName(value)), params, None()});
-        *computed_complete_out = false;
-        return true;
-      }
-    } else {
-      if case Has(id) = matching_deftype {
         if params_complete {
           hp genparms = HasParms(params);
-          inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
-          *computed_out = TeApp({embox(TePureName(value)), params, Has({id, inst_id})});
+          if !check_and_compute_alias_with_parms(cs, clq, ref_alias_entry(cs, id), &hp, computed_out) {
+            return false;
+          }
+          *computed_complete_out = true;
+          return true;
         } else {
           *computed_out = TeApp({embox(TePureName(value)), params, None()});
+          *computed_complete_out = false;
+          return true;
         }
-        *computed_complete_out = params_complete;
-        return true;
       } else {
-        ERR(_u8("type name/params has no match "), lookup(cs->im, value));
-        return false;
+        if case Has(id) = matching_deftype {
+          if params_complete {
+            hp genparms = HasParms(params);
+            inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
+            *computed_out = TeApp({embox(TePureName(value)), params, Has({id, inst_id})});
+          } else {
+            *computed_out = TeApp({embox(TePureName(value)), params, None()});
+          }
+          *computed_complete_out = params_complete;
+          return true;
+        } else {
+          ERR(_u8("type name/params has no match "), lookup(cs->im, value));
+          return false;
+        }
       }
     }
-  } else if case &TePureUnknown(v void) = oo(&a->typefunc) {
-    *computed_out = TeApp({embox(TePureUnknown(void)), params, None()});
-    *computed_complete_out = false;
-    return true;
-  } else {
-    ERR(_u8("Fancy type expression '"), to_u8str(*oo(&a->typefunc)), _u8("' in typefunc position."));
-    return false;
+    case &TePureUnknown(v void): {
+      *computed_out = TeApp({embox(TePureUnknown(void)), params, None()});
+      *computed_complete_out = false;
+      return true;
+    }
   }
 }
 
