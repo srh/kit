@@ -93,28 +93,122 @@ func arity(parms *genparms) generics_arity {
   }
 }
 
-func convert_typeexpr(cs *checkstate, g *ast_generics, a *ast_typeexpr, out *te_typeexpr) bool {
+func convert_typefunc(cs *checkstate, a *ast_typeexpr, out *te_puretype) bool {
   switch a {
     case &Name(b ast_ident): {
-      return TODO();
-    }
-    case &App(b ast_typeapp): {
-      return TODO();
-    }
-    case &Struct(b ast_struct): {
-      return TODO();
-    }
-    case &Enum(b ast_enum): {
-      return TODO();
-    }
-    case &Union(b ast_union): {
-      return TODO();
-    }
-    case &Arraytype(b ast_arraytype): {
-      return TODO();
+      *out = TePureName(b.value);
+      return true;
     }
     case &Unknown(b ast_unknown): {
-      return TODO();
+      *out = TePureUnknown(void);
+      return true;
+    }
+    default: {
+      ERR(_u8("Fancy type expression '"), to_u8str(a), _u8("' in typefunc"));
+      return false;
+    }
+  }
+}
+
+func convert_typeexpr_list(cs *checkstate, arr *array[ast_typeexpr], out *array[te_typeexpr]) bool {
+  build array[te_typeexpr];
+  n size = count(arr);
+  for i size = 0; i < n; i = i + 1 {
+    t te_typeexpr;
+    if !convert_typeexpr(cs, ref(arr, i), &t) {
+      return false;
+    }
+    push(&build, t);
+  }
+  *out = build;
+  return true;
+}
+
+func convert_vardecl_list(cs *checkstate, arr *array[ast_vardecl], out *array[te_vardecl]) bool {
+  build array[te_vardecl];
+  n size = count(arr);
+  for i size = 0; i < n; i = i + 1 {
+    vd te_vardecl;
+    if !convert_vardecl(cs, ref(arr, i), &vd) {
+      return false;
+    }
+    push(&build, vd);
+  }
+  *out = build;
+  return true;
+}
+
+func convert_vardecl(cs *checkstate, a *ast_vardecl, out *te_vardecl) bool {
+  type te_typeexpr;
+  if !convert_typeexpr(cs, &a->type, &type) {
+    return false;
+  }
+  *out = {a->name.value, type};
+  return true;
+}
+
+// TODO: Callers of this might expect this function to also lookup names, check arity, etc.  Or they need to do such things themselves.
+func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
+  switch a {
+    case &Name(b ast_ident): {
+      *out = TeName({b.value, None()});
+      return true;
+    }
+    case &App(b ast_typeapp): {
+      typefunc te_puretype;
+      params array[te_typeexpr];
+      if !(convert_typefunc(cs, oo(&b.typefunc), &typefunc)
+           && convert_typeexpr_list(cs, &b.params, &params)) {
+        return false;
+      }
+      *out = TeApp({embox(typefunc), params, None()});
+      return true;
+    }
+    case &Struct(b ast_struct): {
+      fields array[te_vardecl];
+      if !convert_vardecl_list(cs, &b.fields, &fields) {
+        return false;
+      }
+      *out = TeStruct({fields});
+      return true;
+    }
+    case &Enum(b ast_enum): {
+      constructors array[te_vardecl];
+      if !convert_vardecl_list(cs, &b.constructors, &constructors) {
+        return false;
+      }
+      *out = TeEnum({constructors});
+      return true;
+    }
+    case &Union(b ast_union): {
+      fields array[te_vardecl];
+      if !convert_vardecl_list(cs, &b.fields, &fields) {
+        return false;
+      }
+      *out = TeUnion({fields});
+      return true;
+    }
+    case &Arraytype(b ast_arraytype): {
+      count opt[u32];
+      if case &Has(bo box[ast_expr]) = &b.count {
+        num u32;
+        if !fake_eval_arraytype_count(oo(&bo), &num) {
+          return false;
+        }
+        count = Has(num);
+      } else {
+        count = None();
+      }
+      param box[te_typeexpr];
+      if !convert_typeexpr(cs, oo(&b.param), oo(&param)) {
+        return false;
+      }
+      *out = TeArraytype({count, param});
+      return true;
+    }
+    case &Unknown(b ast_unknown): {
+      *out = TeUnknown(void);
+      return true;
     }
   }
 }
@@ -124,7 +218,7 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) b
     case &NotComputed(v void): {
       ent->converted_typeexpr = BeganComputing();
       converted te_typeexpr;
-      if !convert_typeexpr(cs, &ent->generics, &ent->quick_typeexpr, &converted) {
+      if !convert_typeexpr(cs, &ent->quick_typeexpr, &converted) {
         ent->converted_typeexpr = FailedComputation();
         return false;
       }
@@ -403,6 +497,7 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
     return false;
   }
 
+  // TODO: Use a switch statement, or crash in the else clause, since we now have te_puretype.
   if case &TePureName(value sym) = oo(&a->typefunc) {
     matching_alias opt[alias_entry_id];
     if !match_alias(cs, value, Has(&params), &matching_alias) {
