@@ -168,6 +168,14 @@ func[T] popval(a *array[T]) opt[T] {
   }
 }
 
+func[T] repeat(n size, value T) array[T] {
+  ret array[T];
+  for i size = 0; i < n; i = i + 1 {
+    push(&ret, value);
+  }
+  return ret;
+}
+
 func build_u8str(r *array[u8], a *array[u8]) void {
   append(r, a);
 }

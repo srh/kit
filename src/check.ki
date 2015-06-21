@@ -1287,12 +1287,14 @@ func entry_matches(cs *checkstate, generics *ast_generics, gp *genparms, pt *te_
   switch generics {
     case &NoGenerics(v void): {
       switch gp {
-        case &HasParms(arr array[te_typeexpr]): {
+        case &HasParms(parms array[te_typeexpr]): {
           *matches_out = false;
           return true;
         }
         case &NoParms(u void): {
-          if !unify_directionally(cs->im, pt, typeexpr) {
+          names array[ast_ident];
+          parms array[te_typeexpr];
+          if !type_matches(cs->im, &names, &parms, pt, typeexpr) {
             *matches_out = false;
             return true;
           } else {
@@ -1303,12 +1305,37 @@ func entry_matches(cs *checkstate, generics *ast_generics, gp *genparms, pt *te_
       }
     }
     case &HasGenerics(names array[ast_ident]): {
-      return TODO();
+      switch gp {
+        case &HasParms(parms array[te_typeexpr]): {
+          if count(&parms) != count(&names) {
+            *matches_out = false;
+            return true;
+          }
+          if !type_matches(cs->im, &names, &parms, pt, typeexpr) {
+            *matches_out = false;
+            return true;
+          } else {
+            *matches_out = true;
+            return true;
+          }
+        }
+        case &NoParms(u void): {
+          parms array[te_typeexpr] = repeat(count(&names), TeUnknown(void));
+          if !type_matches(cs->im, &names, &parms, pt, typeexpr) {
+            *matches_out = false;
+            return true;
+          } else {
+            *matches_out = true;
+            return true;
+          }
+        }
+      }
     }
   }
 }
 
-func unify_directionally(im *identmap, pt *te_typeexpr, t *te_typeexpr) bool {
+func type_matches(im *identmap, names *array[ast_ident], parms *array[te_typeexpr],
+                  pt *te_typeexpr, t *te_typeexpr) bool {
   switch pt {
     case &TeName(pta te_name): {
       return TODO();
