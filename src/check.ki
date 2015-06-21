@@ -44,13 +44,6 @@ func check_module(cs *checkstate, mod_name sym) bool {
         }
       }
 
-      naliases size = count(&mod->aliases);
-      for i size = 0; i < naliases; i = i + 1 {
-        if !ensure_alias_checked(cs, get(&mod->aliases, i)) {
-          return false;
-        }
-      }
-
       // I guess that's everything.
       // TODO: Check that access blocks point to an actual type?
       return true;
@@ -278,38 +271,6 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
   }
 }
 
-func alias_converted_rhs(cs *checkstate, ent *alias_entry, out **te_typeexpr) bool {
-  switch &ent->rhs {
-    case &NotComputed(v void): {
-      ent->rhs = BeganComputing();
-      converted te_typeexpr;
-      if !convert_typeexpr(cs, &ent->tl->rhs, &converted) {
-        ent->rhs = FailedComputation();
-        return false;
-      }
-      ent->rhs = Computed(converted);
-      if case &Computed(te te_typeexpr) = &ent->rhs {
-        *out = &te;
-      } else {
-        crash(_u8("impossible rhs"));
-      }
-      return true;
-    }
-    case &BeganComputing(v void): {
-      ERR(_u8("recursively computing alias's rhs"));
-      return false;
-    }
-    case &FailedComputation(v void): {
-      ERR(_u8("repeat of error in alias_converted_rhs"));
-      return false;
-    }
-    case &Computed(x te_typeexpr): {
-      *out = &x;
-      return true;
-    }
-  }
-}
-
 func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, a *ast_def, parms *genparms) bool {
   // TODO: Do we know that the def's generics don't shadow something?
   check(arity(&a->generics) == arity(parms));
@@ -498,34 +459,20 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
     return true;
   }
 
-  matching_alias opt[alias_entry_id];
-  if !match_alias(cs, a->value, None(), &matching_alias) {
-    // An error happened when looking up an alias (multiple matches?).
-    return false;
-  }
   matching_deftype opt[deftype_entry_id];
   if !match_deftype(cs, a->value, None(), &matching_deftype) {
     // An error happened when looking up a deftype (multiple matches?).
     return false;
   }
 
-  if case Has(id) = matching_alias {
-    if case Has(deftype_id) = matching_deftype {
-      ERR(_u8("Both an alias and deftype match for name "), lookup(cs->im, a->value));
-      return false;
-    }
+  if case Has(id) = matching_deftype {
     np genparms = NoParms(void);
-    return check_and_compute_alias_with_parms(cs, clq, ref_alias_entry(cs, id), &np, computed_out);
+    inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &np);
+    *computed_out = TeName({a->value, Has({id, inst_id})});
+    return true;
   } else {
-    if case Has(id) = matching_deftype {
-      np genparms = NoParms(void);
-      inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &np);
-      *computed_out = TeName({a->value, Has({id, inst_id})});
-      return true;
-    } else {
-      ERR(_u8("type name has no match "), lookup(cs->im, a->value));
-      return false;
-    }
+    ERR(_u8("type name has no match "), lookup(cs->im, a->value));
+    return false;
   }
 }
 
@@ -556,47 +503,24 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
 
   switch oo(&a->typefunc) {
     case &TePureName(value sym): {
-      matching_alias opt[alias_entry_id];
-      if !match_alias(cs, value, Has(&params), &matching_alias) {
-        return false;
-      }
       matching_deftype opt[deftype_entry_id];
       if !match_deftype(cs, value, Has(&params), &matching_deftype) {
         return false;
       }
 
-      if case Has(id) = matching_alias {
-        if case Has(deftype_id) = matching_deftype {
-          ERR(_u8("Both an alias and deftype match for name/params "), lookup(cs->im, value));
-          return false;
-        }
+      if case Has(id) = matching_deftype {
         if params_complete {
           hp genparms = HasParms(params);
-          if !check_and_compute_alias_with_parms(cs, clq, ref_alias_entry(cs, id), &hp, computed_out) {
-            return false;
-          }
-          *computed_complete_out = true;
-          return true;
+          inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
+          *computed_out = TeApp({embox(TePureName(value)), params, Has({id, inst_id})});
         } else {
           *computed_out = TeApp({embox(TePureName(value)), params, None()});
-          *computed_complete_out = false;
-          return true;
         }
+        *computed_complete_out = params_complete;
+        return true;
       } else {
-        if case Has(id) = matching_deftype {
-          if params_complete {
-            hp genparms = HasParms(params);
-            inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
-            *computed_out = TeApp({embox(TePureName(value)), params, Has({id, inst_id})});
-          } else {
-            *computed_out = TeApp({embox(TePureName(value)), params, None()});
-          }
-          *computed_complete_out = params_complete;
-          return true;
-        } else {
-          ERR(_u8("type name/params has no match "), lookup(cs->im, value));
-          return false;
-        }
+        ERR(_u8("type name/params has no match "), lookup(cs->im, value));
+        return false;
       }
     }
     case &TePureUnknown(v void): {
@@ -605,56 +529,6 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
       return true;
     }
   }
-}
-
-func find_matching_alias_inst(cs *checkstate, insts *array[alias_inst_id], parms *genparms) opt[alias_inst_id] {
-  n size = count(insts);
-  for i size = 0; i < n; i = i + 1 {
-    id alias_inst_id = get(insts, i);
-    inst *alias_inst = ref_alias_inst(cs, id);
-    if parms_equal(cs, parms, &inst->parms) {
-      return Has(id);
-    }
-  }
-  return None();
-}
-
-func check_and_compute_alias_with_parms(cs *checkstate, clq *clqueue, ent *alias_entry, parms *genparms, computed_out *te_typeexpr) bool {
-  // TODO: How do we know the alias's generic parameters don't self-shadow, or shadow something else?
-
-  if case Has(id) = find_matching_alias_inst(cs, &ent->insts, parms) {
-    inst *alias_inst = ref_alias_inst(cs, id);
-    // If we already have an inst, that means we made an inst.
-    if case &Has(computed te_typeexpr) = &inst->expanded {
-      // We already computed the expansion for these types!
-      *computed_out = computed;
-      return true;
-    } else {
-      // We're in the process of expanding this type.  We recursively expanded.
-      ERR(_u8("Recursively expanding alias "), lookup(cs->im, ent->alias_name));
-      return false;
-    }
-  }
-
-  id alias_inst_id = add_alias_inst(cs, {*parms, None()});
-  inst *alias_inst = ref_alias_inst(cs, id);
-
-  ent_rhs *te_typeexpr;
-  if !alias_converted_rhs(cs, ent, &ent_rhs) {
-    return false;
-  }
-
-  complete bool;
-  computed te_typeexpr;
-  if !check_and_compute_typeexpr(cs, clq, &ent->tl->generics, &inst->parms, ent_rhs, &computed, &complete) {
-    return false;
-  }
-  // There's no way an alias expansion can't be complete, because ast_unknown is disallowed when parsing its RHS (and the parms must be complete).
-  check(complete);
-  check(isNone(&inst->expanded));
-  inst->expanded = Has(computed);
-  *computed_out = computed;
-  return true;
 }
 
 func arity_matches(a *ast_generics, params opt[*array[te_typeexpr]]) bool {
@@ -678,32 +552,6 @@ func match_deftype(cs *checkstate, name sym, params opt[*array[te_typeexpr]], ou
       if arity_matches(&ent->tl->generics, params) {
         if case Has(alt_id) = match {
           ERR(_u8("Multiple deftypes named '"), lookup(cs->im, name), _u8("' match arity"));
-          return false;
-        }
-        match = Has(id);
-      }
-    }
-    if case Has(id) = match {
-      *out = match;
-      return true;
-    } else {
-      return false;
-    }
-  } else {
-    return false;
-  }
-}
-
-func match_alias(cs *checkstate, name sym, params opt[*array[te_typeexpr]], out *opt[alias_entry_id]) bool {
-  if case Has(arr *array[alias_entry_id]) = lookup_ref(&cs->aliases_by_name, name) {
-    n size = count(arr);
-    match opt[alias_entry_id];
-    for i size = 0; i < n; i = i + 1 {
-      id alias_entry_id = get(arr, i);
-      ent *_ = ref_alias_entry(cs, id);
-      if arity_matches(&ent->tl->generics, params) {
-        if case Has(alt_id) = match {
-          ERR(_u8("Multiple aliases named '"), lookup(cs->im, name), _u8("' match arity"));
           return false;
         }
         match = Has(id);
@@ -1085,30 +933,6 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
   }
 }
 
-func ensure_alias_checked(cs *checkstate, id alias_entry_id) bool {
-  ent *alias_entry = ref_alias_entry(cs, id);
-  discard *te_typeexpr;
-  if !alias_converted_rhs(cs, ent, &discard) {
-    return false;
-  }
-  switch &ent->tl->generics {
-    case &NoGenerics(v): {
-      np genparms = NoParms(void);
-      clq clqueue;
-      computed te_typeexpr;
-      if !check_and_compute_alias_with_parms(cs, &clq, ent, &np, &computed) {
-        return false;
-      }
-      return finish_checking(cs, &clq);
-    }
-    case &HasGenerics(ig): {
-      // We declare success -- we check non-generic defs.
-      // TODO: Somewhere we have to check alias generics shadowing.
-      return true;
-    }
-  }
-}
-
 func load_module(cs *checkstate, mod_name sym) opt[module_id] {
   switch lookup(&cs->modules_by_name, mod_name) {
     case Has(id module_id): {
@@ -1217,15 +1041,6 @@ func process_toplevels(cs *checkstate,
           &cs->deftypes_by_name, oo(ent)->name, default());
         push(arr, id);
         push(&mod->deftypes, id);
-      }
-      case &TypeAlias(a ast_type_alias): {
-        ent shp[alias_entry] = emshp(mk(mod->module_name, a.name.value, &a));
-        id alias_entry_id = ~count(&cs->aliases);
-        push(&cs->aliases, ent);
-        arr *array[alias_entry_id] = try_insert_lookup(
-          &cs->aliases_by_name, oo(ent)->alias_name, default());
-        push(arr, id);
-        push(&mod->aliases, id);
       }
       case &Access(a ast_access): {
         if !process_toplevels(cs, mod, &a.toplevels) {

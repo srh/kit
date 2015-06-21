@@ -310,12 +310,6 @@ deftype ast_type_def struct {
   rhs ast_type_def_rhs;
 };
 
-deftype ast_type_alias struct {
-  generics ast_generics;
-  name ast_ident;
-  rhs ast_typeexpr;
-};
-
 deftype ast_access struct {
   name ast_ident;
   arity generics_arity;
@@ -327,7 +321,6 @@ defenum ast_toplevel {
   Def ast_def;
   ExternDef ast_extern_def;
   TypeDef ast_type_def;
-  TypeAlias ast_type_alias;
   Access ast_access;
 };
 

@@ -21,13 +21,9 @@ deftype checkstate struct {
 
   instantiations array[shp[def_inst]];
   type_instantiations array[shp[deftype_inst]];
-  alias_instantiations array[shp[alias_inst]];
 
   deftypes array[shp[deftype_entry]];
   deftypes_by_name hash[sym, array[deftype_entry_id]];
-
-  aliases array[shp[alias_entry]];
-  aliases_by_name hash[sym, array[alias_entry_id]];
 
   defs array[shp[def_entry]];
   defs_by_name hash[sym, array[def_entry_id]];
@@ -46,10 +42,6 @@ deftype deftype_inst_id size;
 def `~` fn[size, deftype_inst_id] = wrapconvert;
 def `==` fn[deftype_inst_id, deftype_inst_id, bool] = wrapequate;
 
-// An index into checkstat's alias_instantiations array.
-deftype alias_inst_id size;
-def `~` fn[size, alias_inst_id] = wrapconvert;
-
 // An index into checkstate's defs array.
 deftype def_entry_id size;
 def `~` fn[size, def_entry_id] = wrapconvert;
@@ -57,10 +49,6 @@ def `~` fn[size, def_entry_id] = wrapconvert;
 // An index into checkstate's deftypes array.
 deftype deftype_entry_id size;
 def `~` fn[size, deftype_entry_id] = wrapconvert;
-
-// An index into checkstate's aliases array.
-deftype alias_entry_id size;
-def `~` fn[size, alias_entry_id] = wrapconvert;
 
 func ref_module(cs *checkstate, id module_id) *module {
   return oo(ref(&cs->modules, id.~));
@@ -74,20 +62,12 @@ func ref_deftype_entry(cs *checkstate, id deftype_entry_id) *deftype_entry {
   return oo(ref(&cs->deftypes, id.~));
 }
 
-func ref_alias_entry(cs *checkstate, id alias_entry_id) *alias_entry {
-  return oo(ref(&cs->aliases, id.~));
-}
-
 func ref_inst(cs *checkstate, id def_inst_id) *def_inst {
   return oo(ref(&cs->instantiations, id.~));
 }
 
 func ref_deftype_inst(cs *checkstate, id deftype_inst_id) *deftype_inst {
   return oo(ref(&cs->type_instantiations, id.~));
-}
-
-func ref_alias_inst(cs *checkstate, id alias_inst_id) *alias_inst {
-  return oo(ref(&cs->alias_instantiations, id.~));
 }
 
 func add_inst(cs *checkstate, val def_inst) def_inst_id {
@@ -99,12 +79,6 @@ func add_inst(cs *checkstate, val def_inst) def_inst_id {
 func add_deftype_inst(cs *checkstate, val deftype_inst) deftype_inst_id {
   id deftype_inst_id = ~count(&cs->type_instantiations);
   push(&cs->type_instantiations, emshp(val));
-  return id;
-}
-
-func add_alias_inst(cs *checkstate, val alias_inst) alias_inst_id {
-  id alias_inst_id = ~count(&cs->alias_instantiations);
-  push(&cs->alias_instantiations, emshp(val));
   return id;
 }
 
@@ -126,7 +100,6 @@ deftype module struct {
   // vvv  Valid when process_state == DoneProcessing.  vvv
   defs array[def_entry_id];
   deftypes array[deftype_entry_id];
-  aliases array[alias_entry_id];
 };
 
 defenum deftype_inst_status {
@@ -194,26 +167,6 @@ deftype deftype_entry struct {
 
 func mk(module_name sym, name sym, tl *ast_type_def) deftype_entry {
   return {module_name, name, tl, NotComputed(), default@[array[deftype_inst_id]]()};
-}
-
-deftype alias_inst struct {
-  parms genparms;
-  // Is None() while we're in the process of expansion -- seeing None() means you're recursively expanding.
-  expanded opt[te_typeexpr];
-};
-
-deftype alias_entry struct {
-  module_name sym;
-  alias_name sym;
-  tl *ast_type_alias;
-  // The RHS typeexpr, if computed, without generics replaced, of course.
-  rhs nbfc[te_typeexpr];
-
-  insts array[alias_inst_id];
-};
-
-func mk(module_name sym, alias_name sym, tl *ast_type_alias) alias_entry {
-  return {module_name, alias_name, tl, NotComputed(), default@[array[alias_inst_id]]()};
 }
 
 defenum genparms {

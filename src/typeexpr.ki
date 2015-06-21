@@ -71,7 +71,7 @@ func typeexpr_list_equal(cs *checkstate, a *array[te_typeexpr], b *array[te_type
   return true;
 }
 
-// Must be called on alias-expanded, complete, concrete types.
+// Must be called on complete, concrete types.
 func typeexpr_equal(cs *checkstate, a *te_typeexpr, b *te_typeexpr) bool {
   switch a {
     case &TeName(ax te_name): {
