@@ -235,7 +235,7 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) b
       return false;
     }
     case &FailedComputation(v void): {
-      ERR(_u8("repeat of error"));
+      ERR(_u8("repeat of error in def_converted_typeexpr"));
       return false;
     }
     case &Computed(x te_typeexpr): {
@@ -246,7 +246,36 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) b
 }
 
 func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr) bool {
-  return TODO();
+  switch &ent->rhs {
+    case &NotComputed(v void): {
+      ent->rhs = BeganComputing();
+      a *ast_typeexpr = deftype_rhs_type(&ent->tl->rhs);
+      converted te_typeexpr;
+      if !convert_typeexpr(cs, a, &converted) {
+        ent->rhs = FailedComputation();
+        return false;
+      }
+      ent->rhs = Computed(converted);
+      if case &Computed(te te_typeexpr) = &ent->rhs {
+        *out = &te;
+      } else {
+        crash(_u8("impossible rhs"));
+      }
+      return true;
+    }
+    case &BeganComputing(v void): {
+      ERR(_u8("recursively computing deftype's rhs"));
+      return false;
+    }
+    case &FailedComputation(v void): {
+      ERR(_u8("repeat of error in deftype_converted_rhs"));
+      return false;
+    }
+    case &Computed(x te_typeexpr): {
+      *out = &x;
+      return true;
+    }
+  }
 }
 
 func alias_converted_rhs(cs *checkstate, ent *alias_entry, out **te_typeexpr) bool {
