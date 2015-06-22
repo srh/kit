@@ -1320,7 +1320,28 @@ func lookup_name(arr *array[ast_ident], x sym) opt[size] {
 }
 
 func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) bool {
-  return TODO();
+  switch ppta {
+    case &TePureName(as sym): {
+      switch pptb {
+        case &TePureName(bs sym): {
+          if as == bs {
+            *out = TePureName(as);
+            return true;
+          } else {
+            return false;
+          }
+        }
+        case &TePureUnknown(v void): {
+          *out = *ppta;
+          return true;
+        }
+      }
+    }
+    case &TePureUnknown(v void): {
+      *out = *pptb;
+      return true;
+    }
+  }
 }
 
 func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
