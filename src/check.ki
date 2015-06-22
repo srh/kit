@@ -315,8 +315,7 @@ func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry,
   inst->computed_type_properties = Has(props);
 
   // TODO: How do we know that a->generics doesn't shadow, doesn't self-shadow?
-  complete_type te_typeexpr;
-  if !check_expr(cs, &a->generics, &inst->parms, &inst->computed_type, &a->rhs, &complete_type) {
+  if !check_expr(cs, &a->generics, &inst->parms, &a->rhs, &inst->computed_type) {
     return false;
   }
   return true;
