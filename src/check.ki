@@ -1172,11 +1172,17 @@ func help_type_matches(im *identmap, pt *te_typeexpr,
         set(unif_parms, ix, unified);
         return true;
       } else {
-        unified te_typeexpr;
-        if !unify_types(t, pt, &unified) {
+        if case &TeName(pa te_name) = pt {
+          // TODO: Naturally, at some point scopage might be a factor.
+          if a.value != pa.value {
+            return false;
+          }
+          return true;
+        } else if case &TeUnknown(v void) = pt {
+          return true;
+        } else {
           return false;
         }
-        return true;
       }
     }
 
