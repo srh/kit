@@ -1149,10 +1149,174 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
   }
 }
 
-// t is supposed to be complete, but it references the generic names in "names". pt is the partial type.
+// t is complete, but it references the generic names in "names", whose corresponding values in "parms" could be incomplete.  pt is the partial type of an expression we're matching against this generic definition.  count(parms) == count(names).
 func type_matches(im *identmap, pt *te_typeexpr,
                   names *array[ast_ident], parms *array[te_typeexpr],
                   t *te_typeexpr) bool {
+  check(count(names) == count(parms));
+  // We need to retain all new information we gain about the value of the generic param typeexprs as we compare the whole type, in order to make sure we don't match conflicting information about a generic parameter.  (TODO:  We'll probably need to check that unif_parms is made complete and unambiguous too...)
+  unif_parms array[te_typeexpr] = *parms;
+  return help_type_matches(im, pt, names, &unif_parms, t);
+}
+
+func help_type_matches(im *identmap, pt *te_typeexpr,
+                       names *array[ast_ident], unif_parms *array[te_typeexpr],
+                       t *te_typeexpr) bool {
+  switch t {
+    case &TeName(a te_name): {
+      if case Has(ix size) = lookup_name(names, a.value) {
+        unified te_typeexpr;
+        if !unify_types(ref(unif_parms, ix), pt, &unified) {
+          return false;
+        }
+        set(unif_parms, ix, unified);
+        return true;
+      } else {
+        unified te_typeexpr;
+        if !unify_types(t, pt, &unified) {
+          return false;
+        }
+        return true;
+      }
+    }
+
+    case &TeApp(a te_typeapp): {
+      // Generics can't be type constructors (yet).
+      if case &TeApp(pa te_typeapp) = pt {
+        unified_typefunc te_puretype;
+        if !unify_puretypes(oo(&a.typefunc), oo(&pa.typefunc), &unified_typefunc) {
+          return false;
+        }
+        n size = count(&a.params);
+        if n != count(&pa.params) {
+          return false;
+        }
+        for i size = 0; i < n; i = i + 1 {
+          if !help_type_matches(im, ref(&pa.params, i), names, unif_parms, ref(&a.params, i)) {
+            return false;
+          }
+        }
+        return true;
+      } else if case &TeUnknown(v void) = pt {
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    case &TeStruct(a te_struct): {
+      if case &TeStruct(pa te_struct) = pt {
+        n size = count(&a.fields);
+        if n != count(&pa.fields) {
+          return false;
+        }
+        for i size = 0; i < n; i = i + 1 {
+          pd *te_vardecl = ref(&pa.fields, i);
+          d *te_vardecl = ref(&a.fields, i);
+          if pd->name != d->name {
+            return false;
+          }
+          if !help_type_matches(im, &pd->type, names, unif_parms, &d->type) {
+            return false;
+          }
+        }
+        return true;
+      } else if case &TeUnknown(v void) = pt {
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    case &TeEnum(a te_enum): {
+      if case &TeEnum(pa te_enum) = pt {
+        n size = count(&a.constructors);
+        if n != count(&pa.constructors) {
+          return false;
+        }
+        for i size = 0; i < n; i = i + 1 {
+          pd *te_vardecl = ref(&pa.constructors, i);
+          d *te_vardecl = ref(&a.constructors, i);
+          if pd->name != d->name {
+            return false;
+          }
+          if !help_type_matches(im, &pd->type, names, unif_parms, &d->type) {
+            return false;
+          }
+        }
+        return true;
+      } else if case &TeUnknown(v void) = pt {
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    case &TeUnion(a te_union): {
+      if case &TeUnion(pa te_union) = pt {
+        n size = count(&a.fields);
+        if n != count(&pa.fields) {
+          return false;
+        }
+        for i size = 0; i < n; i = i + 1 {
+          pd *te_vardecl = ref(&pa.fields, i);
+          d *te_vardecl = ref(&a.fields, i);
+          if pd->name != d->name {
+            return false;
+          }
+          if !help_type_matches(im, &pd->type, names, unif_parms, &d->type) {
+            return false;
+          }
+        }
+        return true;
+      } else if case &TeUnknown(v void) = pt {
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    case &TeArraytype(a te_arraytype): {
+      if case &TeArraytype(pa te_arraytype) = pt {
+        if case Has(ac u32) = a.count {
+          if case Has(pac u32) = pa.count {
+            if ac != pac {
+              return false;
+            }
+          }
+        }
+        if !help_type_matches(im, oo(&pa.param), names, unif_parms, oo(&a.param)) {
+          return false;
+        }
+        return true;
+      } else if case &TeUnknown(v void) = pt {
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    case &TeUnknown(v void): {
+      ice(_u8("help_type_matches sees incomplete type, expects complete"));
+      return fake();
+    }
+  }
+}
+
+func lookup_name(arr *array[ast_ident], x sym) opt[size] {
+  n size = count(arr);
+  for i size = 0; i < n; i = i + 1 {
+    if ref(arr, i)->value == x {
+      return Has(i);
+    }
+  }
+  return None();
+}
+
+func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) bool {
   return TODO();
 }
 
+func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
+  return TODO();
+}
