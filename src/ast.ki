@@ -239,7 +239,11 @@ deftype ast_strinit struct {
   exprs array[ast_expr];
 };
 
-defenum ast_expr {
+deftype ast_expr struct {
+  u ast_expr_enum;
+};
+
+defenum ast_expr_enum {
   NameExpr ast_name_expr;
   ParenExpr ast_paren_expr;
   NumericLiteral ast_numeric_literal;
@@ -256,6 +260,11 @@ defenum ast_expr {
   TypedExpr ast_typed_expr;
   Strinit ast_strinit;
 };
+
+func mk(x ast_expr_enum) ast_expr {
+  return {x};
+}
+
 
 defenum ast_generics {
   NoGenerics void;

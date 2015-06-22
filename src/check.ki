@@ -417,7 +417,7 @@ func convert_to_u32(base i8, digits *array[i8], out *u32) bool {
 
 func fake_eval_arraytype_count(x *ast_expr, count_out *u32) bool {
   // TODO: Remove this function and really evaluate an array's count expression.
-  switch x {
+  switch &x->u {
     case &NumericLiteral(a ast_numeric_literal): {
       return numeric_literal_to_u32(&a, count_out);
     }
@@ -835,7 +835,7 @@ func quick_typeexpr(cym *common_syms, a *ast_def, out *ast_typeexpr) bool {
     *out = s;
     return true;
   } else {
-    switch &a->rhs {
+    switch &a->rhs.u {
       case &Lambda(b ast_lambda): {
         type_params array[ast_typeexpr];
         n size = count(&b.args);

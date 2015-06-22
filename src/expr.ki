@@ -57,7 +57,7 @@ deftype es_match_res struct {
 };
 
 func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
-  switch x {
+  switch &x->u {
     case &NameExpr(a ast_name_expr): {
       return TODO();
     }
