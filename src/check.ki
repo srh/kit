@@ -1,5 +1,6 @@
 import ast;
 import deferred;
+import expr;
 import kitutil;
 import parse;
 import tok;
@@ -602,10 +603,6 @@ func lookup_generic(g *ast_generics, parms *genparms, name sym, out *te_typeexpr
       return false;
     }
   }
-}
-
-func check_expr(cs *checkstate, g *ast_generics, parms *genparms, pt *te_typeexpr, x *ast_expr, computed_out *te_typeexpr) bool {
-  return TODO();
 }
 
 func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
@@ -1377,3 +1374,4 @@ func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
   unif_parms array[te_typeexpr];
   return unify_under_generics(pta, &names, &unif_parms, ptb, out);
 }
+

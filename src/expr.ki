@@ -1,0 +1,51 @@
+import state;
+
+func check_expr(cs *checkstate, g *ast_generics, parms *genparms, pt *te_typeexpr, x *ast_expr, computed_out *te_typeexpr) bool {
+  switch x {
+    case &NameExpr(a ast_name_expr): {
+      return TODO();
+    }
+    case &ParenExpr(a ast_paren_expr): {
+      return TODO();
+    }
+    case &NumericLiteral(a ast_numeric_literal): {
+      return TODO();
+    }
+    case &BoolLiteral(a ast_bool_literal): {
+      return TODO();
+    }
+    case &VoidLiteral(a ast_void_literal): {
+      return TODO();
+    }
+    case &NullLiteral(a ast_null_literal): {
+      return TODO();
+    }
+    case &CharLiteral(a ast_char_literal): {
+      return TODO();
+    }
+    case &StringLiteral(a ast_string_literal): {
+      return TODO();
+    }
+    case &Funcall(a ast_funcall): {
+      return TODO();
+    }
+    case &IndexExpr(a ast_index_expr): {
+      return TODO();
+    }
+    case &Lambda(a ast_lambda): {
+      return TODO();
+    }
+    case &LocalField(a ast_local_field): {
+      return TODO();
+    }
+    case &DerefField(a ast_deref_field): {
+      return TODO();
+    }
+    case &TypedExpr(a ast_typed_expr): {
+      return TODO();
+    }
+    case &Strinit(a ast_strinit): {
+      return TODO();
+    }
+  }
+}
