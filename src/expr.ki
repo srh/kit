@@ -220,10 +220,26 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       return TODO();
     }
     case &LocalField(a ast_local_field): {
-      return TODO();
+      unknown te_typeexpr = TeUnknown(void);
+      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), &unknown) {
+        return false;
+      }
+      type *te_typeexpr = expr_complete_type(oo(&a.lhs));
+      return check_field(es->cs, type, &a.fieldname, pt);
     }
     case &DerefField(a ast_deref_field): {
-      return TODO();
+      // The fact that our partial type isn't a pointer type is deliberate.
+      unknown te_typeexpr = TeUnknown(void);
+      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), &unknown) {
+        return false;
+      }
+      type *te_typeexpr = expr_complete_type(oo(&a.lhs));
+      param *te_typeexpr;
+      if !decompose_typeapp(type, pointer_puretype(es->cs), &param) {
+        ERR(_u8("Expected pointer for lhs of deref field"));
+        return false;
+      }
+      return check_field(es->cs, param, &a.fieldname, pt);
     }
     case &TypedExpr(a ast_typed_expr): {
       return TODO();
@@ -232,6 +248,14 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       return TODO();
     }
   }
+}
+
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr) bool {
+  return TODO();
+}
+
+func check_field(cs *checkstate, t *te_typeexpr, a *ast_fieldname, pt *te_typeexpr) bool {
+  return TODO();
 }
 
 func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_funcall, pt *te_typeexpr) bool {
