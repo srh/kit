@@ -1,4 +1,5 @@
 import state;
+import array;
 
 deftype exprscope struct {
   cs *checkstate;
@@ -8,6 +9,14 @@ deftype exprscope struct {
   // Generics and their _complete_ replacements.
   generics *ast_generics;
   parms *genparms;
+
+  local_vars array[var_info];
+};
+
+deftype var_info struct {
+  name sym;
+  // A complete, checked, type, with generics replaced.
+  type te_typeexpr;
 };
 
 defenum allow_incomplete {
@@ -20,13 +29,17 @@ func `==`(x allow_incomplete, y allow_incomplete) bool {
 }
 
 func check_expr(cs *checkstate, clq *clqueue, g *ast_generics, parms *genparms, x *ast_expr, pt *te_typeexpr) bool {
-  es exprscope = {cs, cs->im, clq, g, parms};
+  es exprscope = {cs, cs->im, clq, g, parms, default@[array[var_info]]()};
   return check_expr_ai(&es, AllowIncompleteNo(void), x, pt);
 }
 
 deftype global_info struct {
   ent def_entry_id;
   inst def_inst_id;
+};
+
+deftype local_info struct {
+  varinfo_ix size;
 };
 
 defenum name_info {
@@ -38,7 +51,7 @@ defenum es_match_res {
   NoMatch void;
   AmbigGlobalMatch void;
   OneGlobalMatch global_info;
-  OneLocalMatch void;
+  OneLocalMatch local_info;
 };
 
 func replaced_name_parms(es *exprscope, a *ast_name_expr, out *opt[array[te_typeexpr]]) bool {
@@ -65,7 +78,22 @@ func replaced_name_parms(es *exprscope, a *ast_name_expr, out *opt[array[te_type
   }
 }
 
-func es_lookup_name(es *exprscope, name sym, params *opt[array[te_typeexpr]], res_out *es_match_res) bool {
+func es_lookup_name(es *exprscope, name sym, params *opt[array[te_typeexpr]], pt *te_typeexpr, res_out *es_match_res) bool {
+  if isNone(params) {
+    n size = count(&es->local_vars);
+    for i size = 0; i < n; i = i + 1 {
+      inf *var_info = ref(&es->local_vars, i);
+      if inf->name == name {
+        type te_typeexpr;
+        if !unify_types(pt, &inf->type, &type) {
+          return false;
+        }
+        *res_out = OneLocalMatch({i});
+        return true;
+      }
+    }
+  }
+
   return TODO();
 }
 
@@ -78,7 +106,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         return false;
       }
       match_res es_match_res;
-      if !es_lookup_name(es, a.ident.value, &parms, &match_res) {
+      if !es_lookup_name(es, a.ident.value, &parms, pt, &match_res) {
         return false;
       }
       switch &match_res {
@@ -97,7 +125,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         case &OneGlobalMatch(gi global_info): {
           return TODO();
         }
-        case &OneLocalMatch(v void): {
+        case &OneLocalMatch(v local_info): {
           return TODO();
         }
       }
