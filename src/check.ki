@@ -273,22 +273,20 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
 }
 
 func ensure_def_inst(cs *checkstate, ent *def_entry, a *ast_def, parms *genparms) struct { id def_inst_id; created bool; } {
-  check(arity(&a->generics) == arity(parms));
+  check(arity(&ent->generics) == arity(parms));
   if case Has(id) = find_matching_inst(cs, &ent->insts, parms) {
     return {id, false};
   }
-  var id = add_inst(cs, mk(*parms, *a));
+  var id = add_inst(cs, mk(*parms, a->rhs));
   return {id, true};
 }
 
-func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, a *ast_def, parms *genparms) bool {
-  var res = ensure_def_inst(cs, ent, a, parms);
+func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, ad *ast_def, parms *genparms) bool {
+  var res = ensure_def_inst(cs, ent, ad, parms);
   inst *def_inst = ref_inst(cs, res.id);
   switch inst->status {
     case DidNotStartComputingType(v): {
       inst->status = BeganComputingType(void);
-      // TODO: We ignore is_export entirely.  Is it relevant at all?
-      a = &inst->ast;
 
       ent_typeexpr *te_typeexpr;
       if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
@@ -299,7 +297,7 @@ func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry,
       // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
       computed_complete bool;
       computed te_typeexpr;
-      if !check_and_compute_typeexpr(cs, clq, &a->generics, &inst->parms, ent_typeexpr, &computed, &computed_complete) {
+      if !check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_typeexpr, &computed, &computed_complete) {
         return false;
       }
       check(computed_complete);
@@ -311,8 +309,8 @@ func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry,
       inst->computed_type = computed;
       inst->computed_type_properties = Has(props);
 
-      // TODO: How do we know that a->generics doesn't shadow, doesn't self-shadow?
-      if !check_expr(cs, clq, &a->generics, &inst->parms, &a->rhs, &inst->computed_type) {
+      // TODO: How do we know that ent->generics doesn't shadow, doesn't self-shadow?
+      if !check_expr(cs, clq, &ent->generics, &inst->parms, &inst->rhs, &inst->computed_type) {
         return false;
       }
       return true;

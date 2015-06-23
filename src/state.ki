@@ -182,8 +182,8 @@ defenum def_inst_status {
 
 deftype def_inst struct {
   parms genparms;
-  // Our own copy of the def, which we can annotate.  It does not have its generics replaced.
-  ast ast_def;
+  // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.
+  rhs ast_expr;
   status def_inst_status;
   // Valid only if computed_type_computed.
   // Becomes the concrete type (with generics replaced) once we've computed it and checked it.
@@ -191,8 +191,8 @@ deftype def_inst struct {
   computed_type_properties opt[type_properties];
 };
 
-func mk(parms genparms, a ast_def) def_inst {
-  return {parms, a, DidNotStartComputingType(void), default(), None()};
+func mk(parms genparms, rhs ast_expr) def_inst {
+  return {parms, rhs, DidNotStartComputingType(void), default(), None()};
 }
 
 deftype def_entry struct {
