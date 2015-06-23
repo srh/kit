@@ -4357,7 +4357,7 @@ int check_expr_ai(struct exprscope *es,
       ast_arraytype_init(&array_type.u.arraytype, ast_meta_make_garbage(), number, char_type);
     }
     if (!unify_directionally(es->cs->im, partial_type, &array_type)) {
-      METERR(es->cs, x->u.string_literal.meta, "Character literal in bad place.%s", "\n");
+      METERR(es->cs, x->u.string_literal.meta, "String literal in bad place.%s", "\n");
       ast_typeexpr_destroy(&array_type);
       return 0;
     }
