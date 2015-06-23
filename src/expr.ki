@@ -4,9 +4,10 @@ deftype exprscope struct {
   cs *checkstate;
   // Same as cs->im.
   im *identmap;
+  clq *clqueue;
   // Generics and their _complete_ replacements.
-  generics *array[ast_ident];
-  generic_replacements *array[te_typeexpr];
+  generics *ast_generics;
+  parms *genparms;
 };
 
 defenum allow_incomplete {
@@ -14,28 +15,12 @@ defenum allow_incomplete {
   AllowIncompleteYes void;
 };
 
-func check_expr(cs *checkstate, g *ast_generics, parms *genparms, x *ast_expr, pt *te_typeexpr) bool {
-  empty_generics array[ast_ident];
-  g_ptr *array[ast_ident];
-  switch g {
-    case &NoGenerics(v void): {
-      g_ptr = &empty_generics;
-    }
-    case &HasGenerics(a array[ast_ident]): {
-      g_ptr = &a;
-    }
-  }
-  empty_parms array[te_typeexpr];
-  p_ptr *array[te_typeexpr];
-  switch parms {
-    case &NoParms(v void): {
-      p_ptr = &empty_parms;
-    }
-    case &HasParms(a array[te_typeexpr]): {
-      p_ptr = &a;
-    }
-  }
-  es exprscope = {cs, cs->im, g_ptr, p_ptr};
+func `==`(x allow_incomplete, y allow_incomplete) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+
+func check_expr(cs *checkstate, clq *clqueue, g *ast_generics, parms *genparms, x *ast_expr, pt *te_typeexpr) bool {
+  es exprscope = {cs, cs->im, clq, g, parms};
   return check_expr_ai(&es, AllowIncompleteNo(void), x, pt);
 }
 
@@ -49,16 +34,73 @@ defenum name_info {
   Global global_info;
 };
 
-deftype es_match_res struct {
+defenum es_match_res {
   NoMatch void;
   AmbigGlobalMatch void;
   OneGlobalMatch global_info;
   OneLocalMatch void;
 };
 
+func replaced_name_parms(es *exprscope, a *ast_name_expr, out *opt[array[te_typeexpr]]) bool {
+  if case &Has(arr array[ast_typeexpr]) = &a->generic_params {
+    replaced array[te_typeexpr];
+    n size = count(&arr);
+    for i size = 0; i < n; i = i + 1 {
+      converted te_typeexpr;
+      if !convert_typeexpr(es->cs, ref(&arr, i), &converted) {
+        return false;
+      }
+      computed te_typeexpr;
+      computed_complete bool;
+      if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed, &computed_complete) {
+        return false;
+      }
+      push(&replaced, computed);
+    }
+    *out = Has(replaced);
+    return true;
+  } else {
+    *out = None();
+    return true;
+  }
+}
+
+func es_lookup_name(es *exprscope, name sym, params *opt[array[te_typeexpr]], res_out *es_match_res) bool {
+  return TODO();
+}
+
+
 func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
   switch &x->u {
     case &NameExpr(a ast_name_expr): {
+      parms opt[array[te_typeexpr]];
+      if !replaced_name_parms(es, &a, &parms) {
+        return false;
+      }
+      match_res es_match_res;
+      if !es_lookup_name(es, a.ident.value, &parms, &match_res) {
+        return false;
+      }
+      switch &match_res {
+        case &NoMatch(v void): {
+          ERR(_u8("Name lookup for '"), lookup(es->im, a.ident.value), _u8("', maybe with parms, not found."));
+          return false;
+        }
+        case &AmbigGlobalMatch(v void): {
+          if ai == AllowIncompleteYes(void) {
+            return TODO();
+          } else {
+            ERR(_u8("Name lookup for '"), lookup(es->im, a.ident.value), _u8("', maybe with parms, matches ambiguously."));
+            return false;
+          }
+        }
+        case &OneGlobalMatch(gi global_info): {
+          return TODO();
+        }
+        case &OneLocalMatch(v void): {
+          return TODO();
+        }
+      }
       return TODO();
     }
     case &ParenExpr(a ast_paren_expr): {
