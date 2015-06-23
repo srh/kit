@@ -30,6 +30,7 @@ deftype te_name struct {
 };
 
 deftype te_typeapp struct {
+  // TODO: typefunc doesn't need to be boxed (as long as it's a puretype).
   typefunc box[te_puretype];
   params array[te_typeexpr];
   // Only supplied if the type is complete, the lookup actually happened.
