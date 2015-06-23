@@ -1,5 +1,4 @@
-import state;
-import array;
+import check;
 
 deftype exprscope struct {
   cs *checkstate;
@@ -54,7 +53,7 @@ defenum es_match_res {
   OneLocalMatch local_info;
 };
 
-func replaced_name_parms(es *exprscope, a *ast_name_expr, out *opt[array[te_typeexpr]]) bool {
+func replaced_name_parms(es *exprscope, a *ast_name_expr, out *genparms) bool {
   if case &Has(arr array[ast_typeexpr]) = &a->generic_params {
     replaced array[te_typeexpr];
     n size = count(&arr);
@@ -70,16 +69,16 @@ func replaced_name_parms(es *exprscope, a *ast_name_expr, out *opt[array[te_type
       }
       push(&replaced, computed);
     }
-    *out = Has(replaced);
+    *out = HasParms(replaced);
     return true;
   } else {
-    *out = None();
+    *out = NoParms(void);
     return true;
   }
 }
 
-func es_lookup_name(es *exprscope, name sym, params *opt[array[te_typeexpr]], pt *te_typeexpr, res_out *es_match_res) bool {
-  if isNone(params) {
+func es_lookup_name(es *exprscope, name sym, parms *genparms, pt *te_typeexpr, res_out *es_match_res) bool {
+  if case &NoParms(v void) = parms {
     n size = count(&es->local_vars);
     for i size = 0; i < n; i = i + 1 {
       inf *var_info = ref(&es->local_vars, i);
@@ -101,7 +100,7 @@ func es_lookup_name(es *exprscope, name sym, params *opt[array[te_typeexpr]], pt
 func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
   switch &x->u {
     case &NameExpr(a ast_name_expr): {
-      parms opt[array[te_typeexpr]];
+      parms genparms;
       if !replaced_name_parms(es, &a, &parms) {
         return false;
       }
