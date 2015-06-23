@@ -618,39 +618,31 @@ func lookup_generic(g *ast_generics, parms *genparms, name sym, out *te_typeexpr
 
 func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
   ent *def_entry = ref_def_entry(cs, id);
-  switch ent->tl {
-    case &Def(a ast_def): {
-      switch &ent->generics {
-        case &NoGenerics(v): {
-          parms genparms = NoParms(void);
-          clq clqueue;
-          if !ensure_def_checked_with_parms(cs, &clq, ent, Has(a.rhs), &parms) {
-            return false;
-          }
-          return finish_checking(cs, &clq);
-        }
-        case &HasGenerics(ig): {
-          discard *te_typeexpr;
-          if !def_converted_typeexpr(cs, ent, &discard) {
-            return false;
-          }
-          // We declare success -- we check non-generic defs.
-          // TODO: Somewhere we have to check def generics shadowing.
-          return true;
+  switch &ent->generics {
+    case &NoGenerics(v): {
+      rhs opt[ast_expr];
+      switch ent->tl {
+        case &Def(a ast_def): { rhs = Has(a.rhs); }
+        case &ExternDef(a ast_extern_def): { rhs = None(); }
+        default: {
+          ice(_u8("def_entry has invalid toplevel\n"));
         }
       }
-    }
-    case &ExternDef(a ast_extern_def): {
       parms genparms = NoParms(void);
       clq clqueue;
-      if !ensure_def_checked_with_parms(cs, &clq, ent, None(), &parms) {
+      if !ensure_def_checked_with_parms(cs, &clq, ent, rhs, &parms) {
         return false;
       }
       return finish_checking(cs, &clq);
     }
-    default: {
-      ice(_u8("def_entry has invalid toplevel\n"));
-      return fake();
+    case &HasGenerics(ig): {
+      discard *te_typeexpr;
+      if !def_converted_typeexpr(cs, ent, &discard) {
+        return false;
+      }
+      // We declare success -- we check non-generic defs.
+      // TODO: Somewhere we have to check def generics shadowing.
+      return true;
     }
   }
 }
