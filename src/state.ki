@@ -102,13 +102,6 @@ deftype module struct {
   deftypes array[deftype_entry_id];
 };
 
-defenum deftype_inst_status {
-  DidNotStartChecking void;
-  StartedChecking void;
-  FinishedChecking void;
-  FailedChecking void;
-};
-
 // Describes the behavior of init/copy/move/destroy methods.
 defenum derived_method_behavior {
   // Behavior's explicitly defined by a method.
@@ -148,6 +141,13 @@ deftype type_properties struct {
 func to_defclass_properties(props type_properties) type_properties {
   return props;
 }
+
+defenum deftype_inst_status {
+  DidNotStartChecking void;
+  StartedChecking void;
+  FinishedChecking void;
+  FailedChecking void;
+};
 
 deftype deftype_inst struct {
   parms genparms;
