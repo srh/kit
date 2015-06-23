@@ -272,17 +272,18 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
   }
 }
 
-func ensure_def_inst(cs *checkstate, ent *def_entry, a *ast_def, parms *genparms) struct { id def_inst_id; created bool; } {
+// rhs is "None()" for extern defs.
+func ensure_def_inst(cs *checkstate, ent *def_entry, rhs opt[ast_expr], parms *genparms) struct { id def_inst_id; created bool; } {
   check(arity(&ent->generics) == arity(parms));
   if case Has(id) = find_matching_inst(cs, &ent->insts, parms) {
     return {id, false};
   }
-  var id = add_inst(cs, mk(*parms, Has(a->rhs)));
+  var id = add_inst(cs, mk(*parms, rhs));
   return {id, true};
 }
 
-func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, ad *ast_def, parms *genparms) bool {
-  var res = ensure_def_inst(cs, ent, ad, parms);
+func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, rhs opt[ast_expr], parms *genparms) bool {
+  var res = ensure_def_inst(cs, ent, rhs, parms);
   return ensure_def_inst_checked(cs, clq, ent, res.id);
 }
 
@@ -623,7 +624,7 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
         case &NoGenerics(v): {
           parms genparms = NoParms(void);
           clq clqueue;
-          if !ensure_def_checked_with_parms(cs, &clq, ent, &a, &parms) {
+          if !ensure_def_checked_with_parms(cs, &clq, ent, Has(a.rhs), &parms) {
             return false;
           }
           return finish_checking(cs, &clq);
@@ -640,22 +641,11 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
       }
     }
     case &ExternDef(a ast_extern_def): {
-      ent_typeexpr *te_typeexpr;
-      if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
-        return false;
-      }
-      // TODO: We could check that function args for C calling convention functions are primitively copyable.
-      // TODO: It is unclear that ast_extern_def defs should have a def_entry.
-      np genparms = NoParms(void);
-      ng ast_generics = NoGenerics(void);
+      parms genparms = NoParms(void);
       clq clqueue;
-      computed_complete bool;
-      computed te_typeexpr;
-      if !check_and_compute_typeexpr(cs, &clq, &ng, &np, ent_typeexpr, &computed, &computed_complete) {
+      if !ensure_def_checked_with_parms(cs, &clq, ent, None(), &parms) {
         return false;
       }
-      // The parser shouldn't allow incomplete types.
-      check(computed_complete);
       return finish_checking(cs, &clq);
     }
     default: {
