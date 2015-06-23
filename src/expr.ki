@@ -110,7 +110,15 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
       return true;
     }
     case OneMatch(m struct { ent def_entry_id; parms genparms; }): {
-      return TODO();
+      computed_type *te_typeexpr;
+      props *type_properties;
+      inst_id def_inst_id;
+      if !enqueue_def_inst_compute_type(es->cs, es->clq, m.ent, &m.parms, &computed_type, &props, &inst_id) {
+        return false;
+      }
+      // TODO: Maybe the caller should be the one to force the type to be computed, organizationally.
+      *res_out = OneGlobalMatch({m.ent, inst_id});
+      return true;
     }
   }
 }

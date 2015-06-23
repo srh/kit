@@ -191,11 +191,11 @@ deftype def_inst struct {
   // Valid only if computed_type_computed.
   // Becomes the concrete type (with generics replaced) once we've computed it and checked it.
   computed_type te_typeexpr;
-  computed_type_properties opt[type_properties];
+  computed_type_properties type_properties;
 };
 
 func mk(parms genparms, rhs opt[ast_expr]) def_inst {
-  return {parms, rhs, DidNotStartComputingType(void), default(), None()};
+  return {parms, rhs, DidNotStartComputingType(void), default@[te_typeexpr](), default@[type_properties]()};
 }
 
 deftype def_entry struct {

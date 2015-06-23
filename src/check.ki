@@ -272,6 +272,18 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
   }
 }
 
+func enqueue_def_inst_compute_type(cs *checkstate, clq *clqueue, id def_entry_id, parms *genparms, computed_type_out **te_typeexpr, computed_type_properties_out **type_properties, inst_id_out *def_inst_id) bool {
+  inst_id def_inst_id = enqueue_def_inst(cs, clq, id, parms);
+  if !ensure_def_inst_type_computed(cs, clq, ref_def_entry(cs, id), inst_id) {
+    return false;
+  }
+  inst *def_inst = ref_inst(cs, inst_id);
+  *computed_type_out = &inst->computed_type;
+  *computed_type_properties_out = &inst->computed_type_properties;
+  *inst_id_out = inst_id;
+  return true;
+}
+
 func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *genparms) def_inst_id {
   var res = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
   if res.created {
@@ -328,7 +340,7 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       }
       inst->status = FinishedComputingType(void);
       inst->computed_type = computed;
-      inst->computed_type_properties = Has(props);
+      inst->computed_type_properties = props;
       return true;
     }
     case BeganComputingType(v): {
@@ -336,15 +348,12 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       return false;
     }
     case FinishedComputingType(v): {
-      check(isHas(&inst->computed_type_properties));
       return true;
     }
     case BeganCheckingRhs(v): {
-      check(isHas(&inst->computed_type_properties));
       return true;
     }
     case FinishedCheckingRhs(v): {
-      check(isHas(&inst->computed_type_properties));
       return true;
     }
   }
