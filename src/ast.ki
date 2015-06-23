@@ -239,9 +239,35 @@ deftype ast_strinit struct {
   exprs array[ast_expr];
 };
 
+defenum ast_expr_info {
+  NoInfo void;
+  IncompleteCheck void;
+  CompleteCheck te_typeexpr;
+};
+
 deftype ast_expr struct {
+  info ast_expr_info;
   u ast_expr_enum;
 };
+
+func annotate_info(a *ast_expr, info ast_expr_info) void {
+  switch &a->info {
+    case &CompleteCheck(t te_typeexpr): {
+      ice(_u8("expr already completely annotated"));
+    }
+    case &IncompleteCheck(v void): {
+      switch &info {
+        case &CompleteCheck(t te_typeexpr): { /* Do nothing. */ }
+        default: {
+          ice(_u8("expr already incompletely annotated"));
+        }
+      }
+    }
+    case &NoInfo(v void): { }
+  }
+
+  a->info = info;
+}
 
 defenum ast_expr_enum {
   NameExpr ast_name_expr;
@@ -262,7 +288,7 @@ defenum ast_expr_enum {
 };
 
 func mk(x ast_expr_enum) ast_expr {
-  return {x};
+  return {NoInfo(void), x};
 }
 
 

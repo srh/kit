@@ -136,7 +136,8 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         }
         case &AmbigGlobalMatch(v void): {
           if ai == AllowIncompleteYes(void) {
-            return TODO();
+            annotate_info(x, IncompleteCheck(void));
+            return true;
           } else {
             ERR(_u8("Name lookup for '"), lookup(es->im, a.ident.value), _u8("', maybe with parms, matches ambiguously."));
             return false;
@@ -146,11 +147,13 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
           if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, gi.ent), gi.inst) {
             return false;
           }
-          // TODO: Actually annotate the expr with this information we've discovered.
+          inst *def_inst = ref_inst(es->cs, gi.inst);
+          annotate_info(x, CompleteCheck(inst->computed_type));
           return true;
         }
         case &OneLocalMatch(v local_info): {
-          // TODO: Actually annotate the expr with this information we've discovered.
+          vi *var_info = ref(&es->local_vars, v.varinfo_ix);
+          annotate_info(x, CompleteCheck(vi->type));
           return true;
         }
       }
