@@ -85,6 +85,7 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
       if inf->name == name {
         type te_typeexpr;
         if !unify_types(pt, &inf->type, &type) {
+          ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type"));
           return false;
         }
         *res_out = OneLocalMatch({i});
@@ -100,6 +101,7 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
 
   switch res {
     case NoMatch(v void): {
+      // TODO: Is in not weird that we return NoMatch + true, instead of false, in this failure case?
       *res_out = NoMatch(void);
       return true;
     }
@@ -107,7 +109,7 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
       *res_out = AmbigGlobalMatch(void);
       return true;
     }
-    case OneMatch(m struct { ent def_entry_id; }): {
+    case OneMatch(m struct { ent def_entry_id; parms genparms; }): {
       return TODO();
     }
   }

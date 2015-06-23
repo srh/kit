@@ -1052,7 +1052,7 @@ defenum match_def_res {
   NoMatch void;
   MultiMatch void;
   // TODO: We'll want to include any simplification of the instantiated parms, or other type information, that we can get.
-  OneMatch struct { ent def_entry_id; };
+  OneMatch struct { ent def_entry_id; parms genparms; };
 };
 
 // Note that gp could be incomplete.
@@ -1061,7 +1061,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
   // TODO: What about defenum constructors?
   if case Has(arr *array[def_entry_id]) = lookup_ref(&cs->defs_by_name, name) {
     n size = count(arr);
-    matches array[def_entry_id];
+    matches array[struct { ent def_entry_id; parms genparms; }];
     for i size = 0; i < n; i = i + 1 {
       id def_entry_id = get(arr, i);
       ent *def_entry = ref_def_entry(cs, id);
@@ -1079,11 +1079,12 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
         }
         case EntryMatchesAmbigously(v void): {
           // TODO: We could see if we have _one_ ambiguously matching entry, and extract any type information that we learned, to help the next match attempt (see check_expr and its allow_ambiguous parameter).  (Maybe we should, but maybe we shouldn't to keep the type checking algorithm simple and describable.)
+          // Certainly the error message (somewhere) could be improved.
           *res_out = MultiMatch(void);
           return true;
         }
-        case EntryMatchesPrecisely(v void): {
-          push(&matches, id);
+        case EntryMatchesPrecisely(complete_parms genparms): {
+          push(&matches, {id, complete_parms});
         }
       }
     }
@@ -1092,7 +1093,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
       *res_out = NoMatch(void);
       return true;
     } else if num_matches == 1 {
-      *res_out = OneMatch({get(&matches, 0)});
+      *res_out = OneMatch(get(&matches, 0));
       return true;
     } else {
       *res_out = MultiMatch(void);
@@ -1107,10 +1108,10 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
 defenum entry_matches_res {
   EntryDoesNotMatch void;
   EntryMatchesAmbigously void;
-  EntryMatchesPrecisely void;
+  EntryMatchesPrecisely genparms;
 };
 
-func from_type_matches_res(x type_matches_res) entry_matches_res {
+func from_type_matches_res(hasparms bool, x type_matches_res) entry_matches_res {
   switch x {
     case TypeDoesNotMatch(v void): {
       return EntryDoesNotMatch(void);
@@ -1118,8 +1119,13 @@ func from_type_matches_res(x type_matches_res) entry_matches_res {
     case TypeMatchesAmbiguously(a): {
       return EntryMatchesAmbigously(void);
     }
-    case TypeMatchesPrecisely(a): {
-      return EntryMatchesPrecisely(void);
+    case TypeMatchesPrecisely(a array[te_typeexpr]): {
+      if hasparms {
+        return EntryMatchesPrecisely(HasParms(a));
+      } else {
+        check(count(&a) == 0);
+        return EntryMatchesPrecisely(NoParms(void));
+      }
     }
   }
 }
@@ -1136,7 +1142,7 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
         case &NoParms(u void): {
           names array[ast_ident];
           parms array[te_typeexpr];
-          *matches_out = from_type_matches_res(type_matches(pt, &names, &parms, typeexpr));
+          *matches_out = from_type_matches_res(false, type_matches(pt, &names, &parms, typeexpr));
           return true;
         }
       }
@@ -1148,12 +1154,12 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
             *matches_out = EntryDoesNotMatch(void);
             return true;
           }
-          *matches_out = from_type_matches_res(type_matches(pt, &names, &parms, typeexpr));
+          *matches_out = from_type_matches_res(true, type_matches(pt, &names, &parms, typeexpr));
           return true;
         }
         case &NoParms(u void): {
           parms array[te_typeexpr] = repeat(count(&names), TeUnknown(void));
-          *matches_out = from_type_matches_res(type_matches(pt, &names, &parms, typeexpr));
+          *matches_out = from_type_matches_res(false, type_matches(pt, &names, &parms, typeexpr));
           return true;
         }
       }
