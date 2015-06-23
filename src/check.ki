@@ -1069,12 +1069,22 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
       if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
         return false;
       }
-      match_result bool;
+      match_result entry_matches_res;
       if !entry_matches(cs, pt, &ent->generics, gp, ent_typeexpr, &match_result) {
         return false;
       }
-      if match_result {
-        push(&matches, id);
+      switch match_result {
+        case EntryDoesNotMatch(v void): {
+          // Do nothing.
+        }
+        case EntryMatchesAmbigously(v void): {
+          // TODO: We could see if we have _one_ ambiguously matching entry, and extract any type information that we learned, to help the next match attempt (see check_expr and its allow_ambiguous parameter).  (Maybe we should, but maybe we shouldn't to keep the type checking algorithm simple and describable.)
+          *res_out = MultiMatch(void);
+          return true;
+        }
+        case EntryMatchesPrecisely(v void): {
+          push(&matches, id);
+        }
       }
     }
     num_matches size = count(&matches);
@@ -1094,24 +1104,40 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
   }
 }
 
-func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *genparms, typeexpr *te_typeexpr, matches_out *bool) bool {
+defenum entry_matches_res {
+  EntryDoesNotMatch void;
+  EntryMatchesAmbigously void;
+  EntryMatchesPrecisely void;
+};
+
+func from_type_matches_res(x type_matches_res) entry_matches_res {
+  switch x {
+    case TypeDoesNotMatch(v void): {
+      return EntryDoesNotMatch(void);
+    }
+    case TypeMatchesAmbiguously(a): {
+      return EntryMatchesAmbigously(void);
+    }
+    case TypeMatchesPrecisely(a): {
+      return EntryMatchesPrecisely(void);
+    }
+  }
+}
+
+// TODO: This function always returns true.
+func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *genparms, typeexpr *te_typeexpr, matches_out *entry_matches_res) bool {
   switch generics {
     case &NoGenerics(v void): {
       switch gp {
         case &HasParms(parms array[te_typeexpr]): {
-          *matches_out = false;
+          *matches_out = EntryDoesNotMatch(void);
           return true;
         }
         case &NoParms(u void): {
           names array[ast_ident];
           parms array[te_typeexpr];
-          if !type_matches(pt, &names, &parms, typeexpr) {
-            *matches_out = false;
-            return true;
-          } else {
-            *matches_out = true;
-            return true;
-          }
+          *matches_out = from_type_matches_res(type_matches(pt, &names, &parms, typeexpr));
+          return true;
         }
       }
     }
@@ -1119,41 +1145,87 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
       switch gp {
         case &HasParms(parms array[te_typeexpr]): {
           if count(&parms) != count(&names) {
-            *matches_out = false;
+            *matches_out = EntryDoesNotMatch(void);
             return true;
           }
-          if !type_matches(pt, &names, &parms, typeexpr) {
-            *matches_out = false;
-            return true;
-          } else {
-            *matches_out = true;
-            return true;
-          }
+          *matches_out = from_type_matches_res(type_matches(pt, &names, &parms, typeexpr));
+          return true;
         }
         case &NoParms(u void): {
           parms array[te_typeexpr] = repeat(count(&names), TeUnknown(void));
-          if !type_matches(pt, &names, &parms, typeexpr) {
-            *matches_out = false;
-            return true;
-          } else {
-            *matches_out = true;
-            return true;
-          }
+          *matches_out = from_type_matches_res(type_matches(pt, &names, &parms, typeexpr));
+          return true;
         }
       }
     }
   }
 }
 
+defenum type_matches_res {
+  TypeDoesNotMatch void;
+  // Provides partial types of some generic names.
+  TypeMatchesAmbiguously array[te_typeexpr];
+  // Provides complete types of all generic names.
+  TypeMatchesPrecisely array[te_typeexpr];
+};
+
 // t is complete, but it references the generic names in "names", whose corresponding values in "parms" could be incomplete.  pt is the partial type of an expression we're matching against this generic definition.  count(parms) == count(names).
 func type_matches(pt *te_typeexpr, names *array[ast_ident], parms *array[te_typeexpr],
-                  t *te_typeexpr) bool {
+                  t *te_typeexpr) type_matches_res {
   check(count(names) == count(parms));
   // We need to retain all new information we gain about the value of the generic param typeexprs as we compare the whole type, in order to make sure we don't match conflicting information about a generic parameter.  (TODO:  We'll probably need to check that unif_parms is made complete and unambiguous too...)
   unif_parms array[te_typeexpr] = *parms;
   // Since t is complete, discard_unified is irrelevant and must be identical to t.
-  discard_unified te_typeexpr;
-  return unify_under_generics(pt, names, &unif_parms, t, &discard_unified);
+  unified te_typeexpr;
+  if !unify_under_generics(pt, names, &unif_parms, t, &unified) {
+    return TypeDoesNotMatch(void);
+  }
+  if all_complete(&unif_parms) {
+    return TypeMatchesPrecisely(unif_parms);
+  } else {
+    return TypeMatchesAmbiguously(unif_parms);
+  }
+}
+
+func all_complete(types *array[te_typeexpr]) bool {
+  n size = count(types);
+  for i size = 0; i < n; i = i + 1 {
+    if !is_complete(ref(types, i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+func all_complete(decls *array[te_vardecl]) bool {
+  n size = count(decls);
+  for i size = 0; i < n; i = i + 1 {
+    if !is_complete(&ref(decls, i)->type) {
+      return false;
+    }
+  }
+  return true;
+}
+
+func is_complete(t *te_typeexpr) bool {
+  switch t {
+    case &TeName(a te_name): { return true; }
+    case &TeApp(a te_typeapp): {
+      if case &TePureUnknown(v void) = oo(&a.typefunc) {
+        return false;
+      }
+      return all_complete(&a.params);
+    }
+    case &TeStruct(a te_struct): { return all_complete(&a.fields); }
+    case &TeEnum(a te_enum): { return all_complete(&a.constructors);    }
+    case &TeUnion(a te_union): { return all_complete(&a.fields); }
+    case &TeArraytype(a te_arraytype): {
+      return isHas(&a.count) && is_complete(oo(&a.param));
+    }
+    case &TeUnknown(v void): {
+      return false;
+    }
+  }
 }
 
 // t references the generic names in "names", whose corresponding values in "unif_parms" might be incomplete.  We update the values in unif_parms when necessary.  t does not need to be complete -- this code is also used by unify_types.

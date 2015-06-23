@@ -77,8 +77,8 @@ func replaced_name_parms(es *exprscope, a *ast_name_expr, out *genparms) bool {
   }
 }
 
-func es_lookup_name(es *exprscope, name sym, parms *genparms, pt *te_typeexpr, res_out *es_match_res) bool {
-  if case &NoParms(v void) = parms {
+func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_match_res) bool {
+  if case &NoParms(v void) = gp {
     n size = count(&es->local_vars);
     for i size = 0; i < n; i = i + 1 {
       inf *var_info = ref(&es->local_vars, i);
@@ -93,7 +93,26 @@ func es_lookup_name(es *exprscope, name sym, parms *genparms, pt *te_typeexpr, r
     }
   }
 
-  return TODO();
+  res match_def_res;
+  if !match_def(es->cs, name, gp, pt, &res) {
+    return false;
+  }
+
+  // TODO: match_def can only return a multi-match when it has multiple defs matched.  It needs to be able to return a multi-match when it has one match, with ambiguous type resolution.  (See the TODO in type_matches, it's about this.)
+
+  switch res {
+    case NoMatch(v void): {
+      *res_out = NoMatch(void);
+      return true;
+    }
+    case MultiMatch(void): {
+      *res_out = AmbigGlobalMatch(void);
+      return true;
+    }
+    case OneMatch(m struct { ent def_entry_id; }): {
+      return TODO();
+    }
+  }
 }
 
 
