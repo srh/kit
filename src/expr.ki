@@ -225,7 +225,12 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         return false;
       }
       type *te_typeexpr = expr_complete_type(oo(&a.lhs));
-      return check_field(es->cs, type, &a.fieldname, pt);
+      fieldtype te_typeexpr;
+      if !check_field(es->cs, type, &a.fieldname, pt, &fieldtype) {
+        return false;
+      }
+      annotate_info(x, CompleteCheck(fieldtype));
+      return true;
     }
     case &DerefField(a ast_deref_field): {
       // The fact that our partial type isn't a pointer type is deliberate.
@@ -239,10 +244,34 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         ERR(_u8("Expected pointer for lhs of deref field"));
         return false;
       }
-      return check_field(es->cs, param, &a.fieldname, pt);
+      fieldtype te_typeexpr;
+      if !check_field(es->cs, param, &a.fieldname, pt, &fieldtype) {
+        return false;
+      }
+      annotate_info(x, CompleteCheck(fieldtype));
+      return true;
     }
     case &TypedExpr(a ast_typed_expr): {
-      return TODO();
+      // TODO: Cache converted.
+      converted te_typeexpr;
+      if !convert_typeexpr(es->cs, &a.type, &converted) {
+        return false;
+      }
+      computed_complete bool;
+      computed te_typeexpr;
+      if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed, &computed_complete) {
+        return false;
+      }
+      unified te_typeexpr;
+      if !unify_types(pt, &computed, &unified) {
+        ERR(_u8("TypedExpr is incompatible with contextual type."));
+        return false;
+      }
+      if !check_expr_ai(es, ai, oo(&a.expr), &unified) {
+        return false;
+      }
+      annotate_info(x, oo(&a.expr)->info);
+      return true;
     }
     case &Strinit(a ast_strinit): {
       return TODO();
@@ -267,7 +296,7 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
   }
 }
 
-func check_field(cs *checkstate, t *te_typeexpr, a *ast_fieldname, pt *te_typeexpr) bool {
+func check_field(cs *checkstate, t *te_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *te_typeexpr) bool {
   return TODO();
 }
 
