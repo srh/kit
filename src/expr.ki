@@ -251,7 +251,20 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
 }
 
 func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr) bool {
-  return TODO();
+  // This could be implemented in terms of unify_under_generics, you know.
+  if case &TeApp(app te_typeapp) = t {
+    unified te_puretype;
+    if !unify_puretypes(oo(&app.typefunc), &expected_puretype, &unified) {
+      return false;
+    }
+    if count(&app.params) != 1 {
+      return false;
+    }
+    *oneparam_out = ref(&app.params, 0);
+    return true;
+  } else {
+    return false;
+  }
 }
 
 func check_field(cs *checkstate, t *te_typeexpr, a *ast_fieldname, pt *te_typeexpr) bool {
