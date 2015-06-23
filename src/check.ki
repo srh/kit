@@ -620,7 +620,7 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
   ent *def_entry = ref_def_entry(cs, id);
   switch ent->tl {
     case &Def(a ast_def): {
-      switch &a.generics {
+      switch &ent->generics {
         case &NoGenerics(v): {
           parms genparms = NoParms(void);
           clq clqueue;
