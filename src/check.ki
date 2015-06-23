@@ -283,7 +283,11 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, a *ast_def, parms *genparms
 
 func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, ad *ast_def, parms *genparms) bool {
   var res = ensure_def_inst(cs, ent, ad, parms);
-  inst *def_inst = ref_inst(cs, res.id);
+  return ensure_def_inst_checked(cs, clq, ent, res.id);
+}
+
+func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
+  inst *def_inst = ref_inst(cs, inst_id);
   switch inst->status {
     case DidNotStartComputingType(v): {
       inst->status = BeganComputingType(void);
