@@ -1,0 +1,21 @@
+import state;
+
+func primitive_numeric_literal_type(cs *checkstate) te_typeexpr {
+  return TODO();
+}
+
+func primitive_bool_type(cs *checkstate) te_typeexpr {
+  return TODO();
+}
+
+func primitive_void_type(cs *checkstate) te_typeexpr {
+  return TODO();
+}
+
+func primitive_null_type(cs *checkstate) te_typeexpr {
+  return TODO();
+}
+
+func primitive_string_literal_type(cs *checkstate, n size) te_typeexpr {
+  return TODO();
+}

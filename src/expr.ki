@@ -1,4 +1,5 @@
 import check;
+import primitives;
 
 deftype exprscope struct {
   cs *checkstate;
@@ -117,6 +118,15 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
   }
 }
 
+func help_check_simple_literal(pt *te_typeexpr, type te_typeexpr, errmsg_name array[u8], x *ast_expr) bool {
+  unified te_typeexpr;
+  if !unify_types(pt, &type, &unified) {
+    ERR(errmsg_name, _u8(" literal in bad place"));
+    return false;
+  }
+  annotate_info(x, CompleteCheck(type));
+  return true;
+}
 
 func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
   switch &x->u {
@@ -158,6 +168,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         }
       }
     }
+
     case &ParenExpr(a ast_paren_expr): {
       if !check_expr_ai(es, ai, oo(&a.expr), pt) {
         return false;
@@ -165,23 +176,39 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       annotate_info(x, oo(&a.expr)->info);
       return true;
     }
+
     case &NumericLiteral(a ast_numeric_literal): {
+      // TODO: At some point we'll want implicit conversions (seen with co/contra-variant types in match_def), compile-time evaluated numeric literal functions.
       return TODO();
     }
+
     case &BoolLiteral(a ast_bool_literal): {
-      return TODO();
+      return help_check_simple_literal(pt, primitive_bool_type(es->cs), _u8("bool"), x);
     }
+
     case &VoidLiteral(a ast_void_literal): {
-      return TODO();
+      return help_check_simple_literal(pt, primitive_void_type(es->cs), _u8("void"), x);
     }
+
     case &NullLiteral(a ast_null_literal): {
-      return TODO();
+      return help_check_simple_literal(pt, primitive_null_type(es->cs), _u8("null"), x);
     }
+
     case &CharLiteral(a ast_char_literal): {
+      // See NumericLiteral case.
       return TODO();
     }
+
     case &StringLiteral(a ast_string_literal): {
-      return TODO();
+      // TODO: At some point we'll want string literals to be more compile-time-magical.  Right now they're of type [N]u8.
+      type te_typeexpr = primitive_string_literal_type(es->cs, count(&a.charspecs));
+      unified te_typeexpr;
+      if !unify_types(pt, &type, &unified) {
+        ERR(_u8("string literal in bad place"));
+        return false;
+      }
+      annotate_info(x, CompleteCheck(type));
+      return true;
     }
     case &Funcall(a ast_funcall): {
       return TODO();
