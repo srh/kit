@@ -2846,7 +2846,14 @@ int check_constructor(struct exprscope *es,
   }
 
   if (!constructor_found) {
-    METERR(es->cs, constructor->meta, "Unrecognized constructor in switch case.%s", "\n");
+    METERR(es->cs, constructor->meta, "Unrecognized constructor '%.*s' in switch case.\n", IM_P(es->cs->im, constructor->constructor_name.value));
+    METMORE("Valid constructors are: ");
+    for (size_t i = 0, e = spec->concrete_enumspec.enumfields_count; i < e; i++) {
+      METMORE("%s'%.*s'",
+              i ? ", " : "",
+              IM_P(es->cs->im, spec->concrete_enumspec.enumfields[i].name.value));
+    }
+    METMORE("\n");
     return 0;
   }
 
