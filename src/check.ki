@@ -272,6 +272,14 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
   }
 }
 
+func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *genparms) def_inst_id {
+  var res = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
+  if res.created {
+    push(&clq->entries, ClqDefEntry({id, res.id}));
+  }
+  return res.id;
+}
+
 // rhs is "None()" for extern defs.
 func ensure_def_inst(cs *checkstate, ent *def_entry, parms *genparms) struct { id def_inst_id; created bool; } {
   check(arity(&ent->generics) == arity(parms));
@@ -295,7 +303,7 @@ func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry,
   return ensure_def_inst_checked(cs, clq, ent, res.id);
 }
 
-func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
+func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
   inst *def_inst = ref_inst(cs, inst_id);
   switch inst->status {
     case DidNotStartComputingType(v): {
@@ -321,13 +329,6 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_
       inst->status = FinishedComputingType(void);
       inst->computed_type = computed;
       inst->computed_type_properties = Has(props);
-
-      if case &Has(rhs ast_expr) = &inst->rhs {
-        // TODO: How do we know that ent->generics doesn't shadow, doesn't self-shadow?
-        if !check_expr(cs, clq, &ent->generics, &inst->parms, &rhs, &inst->computed_type) {
-          return false;
-        }
-      }
       return true;
     }
     case BeganComputingType(v): {
@@ -336,6 +337,48 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_
     }
     case FinishedComputingType(v): {
       check(isHas(&inst->computed_type_properties));
+      return true;
+    }
+    case BeganCheckingRhs(v): {
+      check(isHas(&inst->computed_type_properties));
+      return true;
+    }
+    case FinishedCheckingRhs(v): {
+      check(isHas(&inst->computed_type_properties));
+      return true;
+    }
+  }
+}
+
+func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
+  if !ensure_def_inst_type_computed(cs, clq, ent, inst_id) {
+    return false;
+  }
+  inst *def_inst = ref_inst(cs, inst_id);
+  switch inst->status {
+    case DidNotStartComputingType(v): {
+      ice(_u8("unexpected DidNotStartComputingType status"));
+      return fake();
+    }
+    case BeganComputingType(v): {
+      ice(_u8("unexpected BeganComputingType status"));
+      return fake();
+    }
+    case FinishedComputingType(v): {
+      inst->status = BeganCheckingRhs(void);
+      if case &Has(rhs ast_expr) = &inst->rhs {
+        // TODO: How do we know that ent->generics doesn't shadow, doesn't self-shadow?
+        if !check_expr(cs, clq, &ent->generics, &inst->parms, &rhs, &inst->computed_type) {
+          return false;
+        }
+      }
+      inst->status = FinishedCheckingRhs(void);
+      return true;
+    }
+    case BeganCheckingRhs(v): {
+      return true;
+    }
+    case FinishedCheckingRhs(v): {
       return true;
     }
   }

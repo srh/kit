@@ -178,6 +178,9 @@ defenum def_inst_status {
   DidNotStartComputingType void;
   BeganComputingType void;
   FinishedComputingType void;
+  // The following are OK, if the def_inst's rhs is None().  (Non-ephemerally, you'll only see FinishedCheckingRhs.)
+  BeganCheckingRhs void;
+  FinishedCheckingRhs void;
 };
 
 deftype def_inst struct {
@@ -217,8 +220,14 @@ deftype clqueue_deftype_entry struct {
   inst_id deftype_inst_id;
 };
 
+deftype clqueue_def_entry struct {
+  ent_id def_entry_id;
+  inst_id def_inst_id;
+};
+
 defenum clqueue_entry {
   ClqDeftypeEntry clqueue_deftype_entry;
+  ClqDefEntry clqueue_def_entry;
 };
 
 deftype clqueue struct {
