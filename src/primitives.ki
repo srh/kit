@@ -19,3 +19,7 @@ func primitive_null_type(cs *checkstate) te_typeexpr {
 func primitive_string_literal_type(cs *checkstate, n size) te_typeexpr {
   return TODO();
 }
+
+func function_puretype(cs *checkstate) te_puretype {
+  return TODO();
+}

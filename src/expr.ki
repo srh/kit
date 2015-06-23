@@ -146,7 +146,8 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         }
         case &AmbigGlobalMatch(v void): {
           if ai == AllowIncompleteYes(void) {
-            annotate_info(x, IncompleteCheck(void));
+            // TODO: We could annotate this more precisely in ambiguous-single-match cases.
+            annotate_info(x, IncompleteCheck(TeUnknown(void)));
             return true;
           } else {
             ERR(_u8("Name lookup for '"), lookup(es->im, a.ident.value), _u8("', maybe with parms, matches ambiguously."));
@@ -178,7 +179,6 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &NumericLiteral(a ast_numeric_literal): {
-      // TODO: At some point we'll want implicit conversions (seen with co/contra-variant types in match_def), compile-time evaluated numeric literal functions.
       return TODO();
     }
 
@@ -200,7 +200,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &StringLiteral(a ast_string_literal): {
-      // TODO: At some point we'll want string literals to be more compile-time-magical.  Right now they're of type [N]u8.
+      // TODO: At some point we'll want string literals to be more compile-time-magical.  Right now they're of type [N]u8.  And we really want [N]<numeric>?
       type te_typeexpr = primitive_string_literal_type(es->cs, count(&a.charspecs));
       unified te_typeexpr;
       if !unify_types(pt, &type, &unified) {
@@ -211,7 +211,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       return true;
     }
     case &Funcall(a ast_funcall): {
-      return TODO();
+      return check_expr_funcall(es, ai, x, &a, pt);
     }
     case &IndexExpr(a ast_index_expr): {
       return TODO();
@@ -232,4 +232,69 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       return TODO();
     }
   }
+}
+
+func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_funcall, pt *te_typeexpr) bool {
+  a_param_incomplete bool;
+  if !check_funcall_params_firsttime(es, &a->params, &a_param_incomplete) {
+    return false;
+  }
+
+  func_pt te_typeexpr = make_fn_partial_type(es->cs, pt, &a->params);
+  if !check_expr_ai(es, AllowIncompleteNo(void) /* TODO What */, oo(&a->fun), &func_pt) {
+    return false;
+  }
+
+  return TODO();
+}
+
+func check_funcall_params_firsttime(es *exprscope, params *array[ast_expr], a_param_incomplete_out *bool) bool {
+  n size = count(params);
+  unknown te_typeexpr = TeUnknown(void);
+  all_params_complete bool = true;
+  for i size = 0; i < n; i = i + 1 {
+    expr *ast_expr = ref(params, i);
+    if !check_expr_ai(es, AllowIncompleteYes(void), expr, &unknown) {
+      return false;
+    }
+    all_params_complete = all_params_complete & expr_type_complete(expr);
+  }
+  *a_param_incomplete_out = !all_params_complete;
+  return true;
+}
+
+func expr_type(a *ast_expr) te_typeexpr {
+  switch &a->info {
+    case &NoInfo(v void): {
+      ice(_u8("expr_type sees NoInfo"));
+      return fake();
+    }
+    case &IncompleteCheck(t te_typeexpr): {
+      return t;
+    }
+    case &CompleteCheck(t te_typeexpr): {
+      return t;
+    }
+  }
+}
+
+func expr_type_complete(a *ast_expr) bool {
+  switch &a->info {
+    case &NoInfo(v void): {
+      ice(_u8("expr_type_complete sees NoInfo"));
+      return fake();
+    }
+    case &IncompleteCheck(t te_typeexpr): { return false; }
+    case &CompleteCheck(t te_typeexpr): { return true; }
+  }
+}
+
+func make_fn_partial_type(cs *checkstate, return_type *te_typeexpr, params *array[ast_expr]) te_typeexpr {
+  type_params array[te_typeexpr];
+  n size = count(params);
+  for i size = 0; i < n; i = i + 1 {
+    push(&type_params, expr_type(ref(params, i)));
+  }
+  push(&type_params, *return_type);
+  return TeApp({embox(function_puretype(cs)), type_params, None()});
 }
