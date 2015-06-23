@@ -1173,7 +1173,7 @@ defenum type_matches_res {
 func type_matches(pt *te_typeexpr, names *array[ast_ident], parms *array[te_typeexpr],
                   t *te_typeexpr) type_matches_res {
   check(count(names) == count(parms));
-  // We need to retain all new information we gain about the value of the generic param typeexprs as we compare the whole type, in order to make sure we don't match conflicting information about a generic parameter.  (TODO:  We'll probably need to check that unif_parms is made complete and unambiguous too...)
+  // We need to retain all new information we gain about the value of the generic param typeexprs as we compare the whole type, in order to make sure we don't match conflicting information about a generic parameter.
   unif_parms array[te_typeexpr] = *parms;
   // Since t is complete, discard_unified is irrelevant and must be identical to t.
   unified te_typeexpr;

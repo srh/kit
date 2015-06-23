@@ -98,8 +98,6 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
     return false;
   }
 
-  // TODO: match_def can only return a multi-match when it has multiple defs matched.  It needs to be able to return a multi-match when it has one match, with ambiguous type resolution.  (See the TODO in type_matches, it's about this.)
-
   switch res {
     case NoMatch(v void): {
       *res_out = NoMatch(void);
