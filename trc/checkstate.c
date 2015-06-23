@@ -124,3 +124,8 @@ size_t checkstate_g_o_column(struct checkstate *cs, size_t global_offset) {
   CHECK(offset <= imp->buf_count);
   return compute_column(imp->buf, offset);
 }
+
+/* Compiler error messages (going by emacs *Compilation* behavior) are supposed to use 1-based column indexes, apparently. */
+size_t checkstate_g_o_printed_column(struct checkstate *cs, size_t global_offset) {
+  return size_add(1, checkstate_g_o_column(cs, global_offset));
+}

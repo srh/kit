@@ -79,5 +79,6 @@ ident_value checkstate_g_o_import_name(struct checkstate *cs, size_t global_offs
 ident_value checkstate_g_o_import_filepath(struct checkstate *cs, size_t global_offset);
 size_t checkstate_g_o_line(struct checkstate *cs, size_t global_offset);
 size_t checkstate_g_o_column(struct checkstate *cs, size_t global_offset);
+size_t checkstate_g_o_printed_column(struct checkstate *cs, size_t global_offset);
 
 #endif /* KIT_CHECKSTATE_H_ */

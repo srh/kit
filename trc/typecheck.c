@@ -730,7 +730,7 @@ void init_boolean_typeexpr(struct checkstate *cs, struct ast_typeexpr *a) {
 void stderr_errmsg(struct error_dump *ctx, struct identmap *im,
                    size_t line, size_t column, const char *msg, size_t msglen) {
   ERR("%.*s:%"PRIz":%"PRIz": Parse error: %.*s\n",
-      IM_P(im, ctx->filepath), line, column, size_to_int(msglen), msg);
+      IM_P(im, ctx->filepath), line, size_add(column, 1), size_to_int(msglen), msg);
 }
 
 int resolve_import_filename_and_parse(struct checkstate *cs,
