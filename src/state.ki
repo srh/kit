@@ -174,11 +174,17 @@ defenum genparms {
   HasParms array[te_typeexpr];
 };
 
+defenum def_inst_status {
+  DidNotStartComputingType void;
+  BeganComputingType void;
+  FinishedComputingType void;
+};
+
 deftype def_inst struct {
   parms genparms;
   // Our own copy of the def, which we can annotate.  It does not have its generics replaced.
   ast ast_def;
-  computed_type_computed bool;
+  status def_inst_status;
   // Valid only if computed_type_computed.
   // Becomes the concrete type (with generics replaced) once we've computed it and checked it.
   computed_type te_typeexpr;
@@ -186,7 +192,7 @@ deftype def_inst struct {
 };
 
 func mk(parms genparms, a ast_def) def_inst {
-  return {parms, a, false, default(), None()};
+  return {parms, a, DidNotStartComputingType(void), default(), None()};
 }
 
 deftype def_entry struct {

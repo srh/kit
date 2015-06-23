@@ -283,46 +283,49 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, a *ast_def, parms *genparms
 
 func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, a *ast_def, parms *genparms) bool {
   var res = ensure_def_inst(cs, ent, a, parms);
-  if !res.created {
-    inst *def_inst = ref_inst(cs, res.id);
-    if !inst->computed_type_computed {
+  inst *def_inst = ref_inst(cs, res.id);
+  switch inst->status {
+    case DidNotStartComputingType(v): {
+      inst->status = BeganComputingType(void);
+      // TODO: We ignore is_export entirely.  Is it relevant at all?
+      a = &inst->ast;
+
+      ent_typeexpr *te_typeexpr;
+      if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
+        return false;
+      }
+      // TODO: We need to check exact name shadowing(?), typeexpr, and rhs.
+
+      // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
+      computed_complete bool;
+      computed te_typeexpr;
+      if !check_and_compute_typeexpr(cs, clq, &a->generics, &inst->parms, ent_typeexpr, &computed, &computed_complete) {
+        return false;
+      }
+      check(computed_complete);
+      props type_properties;
+      if !compute_type_properties(cs, clq, &computed, &props) {
+        return false;
+      }
+      inst->status = FinishedComputingType(void);
+      inst->computed_type = computed;
+      inst->computed_type_properties = Has(props);
+
+      // TODO: How do we know that a->generics doesn't shadow, doesn't self-shadow?
+      if !check_expr(cs, clq, &a->generics, &inst->parms, &a->rhs, &inst->computed_type) {
+        return false;
+      }
+      return true;
+    }
+    case BeganComputingType(v): {
       ERR(_u8("computing def's type arouses cyclic dependency"), lookup(cs->im, ent->def_name));
       return false;
     }
-
-    return true;
+    case FinishedComputingType(v): {
+      check(isHas(&inst->computed_type_properties));
+      return true;
+    }
   }
-
-  inst *def_inst = ref_inst(cs, res.id);
-  // TODO: We ignore is_export entirely.  Is it relevant at all?
-  a = &inst->ast;
-
-  ent_typeexpr *te_typeexpr;
-  if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
-    return false;
-  }
-  // TODO: We need to check exact name shadowing(?), typeexpr, and rhs.
-
-  // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
-  computed_complete bool;
-  computed te_typeexpr;
-  if !check_and_compute_typeexpr(cs, clq, &a->generics, &inst->parms, ent_typeexpr, &computed, &computed_complete) {
-    return false;
-  }
-  check(computed_complete);
-  props type_properties;
-  if !compute_type_properties(cs, clq, &computed, &props) {
-    return false;
-  }
-  inst->computed_type_computed = true;
-  inst->computed_type = computed;
-  inst->computed_type_properties = Has(props);
-
-  // TODO: How do we know that a->generics doesn't shadow, doesn't self-shadow?
-  if !check_expr(cs, clq, &a->generics, &inst->parms, &a->rhs, &inst->computed_type) {
-    return false;
-  }
-  return true;
 }
 
 func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, parms *genparms, t *te_typeexpr, computed_out *te_typeexpr, computed_complete_out *bool) bool {
