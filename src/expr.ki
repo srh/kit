@@ -159,7 +159,11 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       }
     }
     case &ParenExpr(a ast_paren_expr): {
-      return TODO();
+      if !check_expr_ai(es, ai, oo(&a.expr), pt) {
+        return false;
+      }
+      annotate_info(x, oo(&a.expr)->info);
+      return true;
     }
     case &NumericLiteral(a ast_numeric_literal): {
       return TODO();
