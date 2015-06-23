@@ -277,7 +277,7 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, a *ast_def, parms *genparms
   if case Has(id) = find_matching_inst(cs, &ent->insts, parms) {
     return {id, false};
   }
-  var id = add_inst(cs, mk(*parms, a->rhs));
+  var id = add_inst(cs, mk(*parms, Has(a->rhs)));
   return {id, true};
 }
 
@@ -309,9 +309,11 @@ func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry,
       inst->computed_type = computed;
       inst->computed_type_properties = Has(props);
 
-      // TODO: How do we know that ent->generics doesn't shadow, doesn't self-shadow?
-      if !check_expr(cs, clq, &ent->generics, &inst->parms, &inst->rhs, &inst->computed_type) {
-        return false;
+      if case &Has(rhs ast_expr) = &inst->rhs {
+        // TODO: How do we know that ent->generics doesn't shadow, doesn't self-shadow?
+        if !check_expr(cs, clq, &ent->generics, &inst->parms, &rhs, &inst->computed_type) {
+          return false;
+        }
       }
       return true;
     }
