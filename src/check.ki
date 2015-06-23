@@ -273,17 +273,25 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
 }
 
 // rhs is "None()" for extern defs.
-func ensure_def_inst(cs *checkstate, ent *def_entry, rhs opt[ast_expr], parms *genparms) struct { id def_inst_id; created bool; } {
+func ensure_def_inst(cs *checkstate, ent *def_entry, parms *genparms) struct { id def_inst_id; created bool; } {
   check(arity(&ent->generics) == arity(parms));
   if case Has(id) = find_matching_inst(cs, &ent->insts, parms) {
     return {id, false};
+  }
+  rhs opt[ast_expr];
+  switch ent->tl {
+    case &Def(a ast_def): { rhs = Has(a.rhs); }
+    case &ExternDef(a ast_extern_def): { rhs = None(); }
+    default: {
+      ice(_u8("def_entry has invalid toplevel\n"));
+    }
   }
   var id = add_inst(cs, mk(*parms, rhs));
   return {id, true};
 }
 
-func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, rhs opt[ast_expr], parms *genparms) bool {
-  var res = ensure_def_inst(cs, ent, rhs, parms);
+func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, parms *genparms) bool {
+  var res = ensure_def_inst(cs, ent, parms);
   return ensure_def_inst_checked(cs, clq, ent, res.id);
 }
 
@@ -620,17 +628,9 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
   ent *def_entry = ref_def_entry(cs, id);
   switch &ent->generics {
     case &NoGenerics(v): {
-      rhs opt[ast_expr];
-      switch ent->tl {
-        case &Def(a ast_def): { rhs = Has(a.rhs); }
-        case &ExternDef(a ast_extern_def): { rhs = None(); }
-        default: {
-          ice(_u8("def_entry has invalid toplevel\n"));
-        }
-      }
       parms genparms = NoParms(void);
       clq clqueue;
-      if !ensure_def_checked_with_parms(cs, &clq, ent, rhs, &parms) {
+      if !ensure_def_checked_with_parms(cs, &clq, ent, &parms) {
         return false;
       }
       return finish_checking(cs, &clq);
