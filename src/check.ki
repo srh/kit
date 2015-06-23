@@ -272,14 +272,19 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
   }
 }
 
-func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, a *ast_def, parms *genparms) bool {
-  // TODO: Do we know that the def's generics don't shadow something?
+func ensure_def_inst(cs *checkstate, ent *def_entry, a *ast_def, parms *genparms) struct { id def_inst_id; created bool; } {
   check(arity(&a->generics) == arity(parms));
-
   if case Has(id) = find_matching_inst(cs, &ent->insts, parms) {
-    // If we already have an inst, that means we made an inst.
+    return {id, false};
+  }
+  var id = add_inst(cs, mk(*parms, *a));
+  return {id, true};
+}
 
-    inst *def_inst = ref_inst(cs, id);
+func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, a *ast_def, parms *genparms) bool {
+  var res = ensure_def_inst(cs, ent, a, parms);
+  if !res.created {
+    inst *def_inst = ref_inst(cs, res.id);
     if !inst->computed_type_computed {
       ERR(_u8("computing def's type arouses cyclic dependency"), lookup(cs->im, ent->def_name));
       return false;
@@ -288,8 +293,7 @@ func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry,
     return true;
   }
 
-  id def_inst_id = add_inst(cs, mk(*parms, *a));
-  inst *def_inst = ref_inst(cs, id);
+  inst *def_inst = ref_inst(cs, res.id);
   // TODO: We ignore is_export entirely.  Is it relevant at all?
   a = &inst->ast;
 
