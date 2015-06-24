@@ -1454,25 +1454,25 @@ func see_if_parse(file array[u8]) bool {
   out ast_file;
   ret bool = parse_file(&p, &out);
   if !ret {
-    print(Stdout(), make("at offset "));
+    print(Stdout(), _u8("at offset "));
     print(Stdout(), showu8(peek(&p).interval.left.~));
-    print(Stdout(), make("..."));
+    print(Stdout(), _u8("..."));
     fflush(Stdout());
   }
   return ret;
 }
 
 func run_parse_test(test_name array[u8], file array[u8]) bool {
-  print(Stdout(), make("test "));
+  print(Stdout(), _u8("test "));
   print(Stdout(), test_name);
-  print(Stdout(), make("..."));
+  print(Stdout(), _u8("..."));
   fflush(Stdout());
   if !see_if_parse(file) {
-    print(Stdout(), make("FAIL\n"));
+    print(Stdout(), _u8("FAIL\n"));
     fflush(Stdout());
     return false;
   } else {
-    print(Stdout(), make("PASS\n"));
+    print(Stdout(), _u8("PASS\n"));
     fflush(Stdout());
     return true;
   }
@@ -1480,126 +1480,126 @@ func run_parse_test(test_name array[u8], file array[u8]) bool {
 
 func test_parse() bool {
   pass bool = true;
-  pass = pass & run_parse_test(make("p001"), make("import foo;"));
-  pass = pass & run_parse_test(make("p002"), make("def a int = 0;"));
-  pass = pass & run_parse_test(make("p003"), make("def abc int = 1;\n"));
-  pass = pass & run_parse_test(make("p004"), make("def _ab int =0x1;\n"));
-  pass = pass & run_parse_test(make("p005"), make("def ab_ int = 0x1AF2;\n"));
-  pass = pass & run_parse_test(make("p006"), make("def a_b int=\n0x1AF2 ;\n"));
-  pass = pass & run_parse_test(make("p007"), make("def a int=0x1AF2 ;"));
-  pass = pass & run_parse_test(make("p008"), make("def a fn[int, int] = 1;"));
-  pass = pass & run_parse_test(make("p009"),
-                               make("def a b = func(x int, y int) int { 3; };"));
-  pass = pass & run_parse_test(make("p010"),
-                               make("def a = func(x int, y int) int { return 3; };"));
-  pass = pass & run_parse_test(make("p011"),
-                               make("def a =\n\tfunc(x int, y int) int { *x; };"));
-  pass = pass & run_parse_test(make("p012"),
-                               make("def foo bar = 2 + 3;"));
-  pass = pass & run_parse_test(make("p013"),
-                               make("def foo bar = 2+*3-4;"));
-  pass = pass & run_parse_test(make("p014"),
-                               make("def foo bar = (2 ^ 3) - 4 && x -> quux;"));
-  pass = pass & run_parse_test(make("p015"),
-                               make("def[] foo fn[int] = func() int {\n  var x int = 3;\n  return x;};"));
-  pass = pass & run_parse_test(make("p016"),
-                               make("def[] foo/*heh*/fn[int] = func() int {\n//blah blah\n  var x int =-3;return x;};"));
-  pass = pass & run_parse_test(make("p017"),
-                               make("def a b = 1 == 1 || 2 == 1;\n"));
-  pass = pass & run_parse_test(make("p018"),
-                               make("def a b = 1 + - 1;"));
-  pass = pass & run_parse_test(make("p019"),
-                               make("def a b = 1 + -1;"));
-  pass = pass & run_parse_test(make("p020"),
-                               make("def a b = 1 +- 1;"));
-  pass = pass & run_parse_test(make("p021"),
-                               make("def a b = 1 +-1;"));
-  pass = pass & run_parse_test(make("p022"),
-                               make("func a() int {var x int;}"));
-  pass = pass & run_parse_test(make("p023"),
-                               make("func a() int {\n  (x+3)[y(z)] = 3;\n  return x[y];  }"));
-  pass = pass & run_parse_test(make("p024"),
-                               make("func a() int {\n  x[y(z)] = 3;\n  return x[y];  }"));
-  pass = pass & run_parse_test(make("p025"),
-                               make("func a() int {\n  x *[y(z)]t = 3;\n  return x[y]; }"));
-  pass = pass & run_parse_test(make("p026"),
-                               make("func a() int {\n  x [y(z)][1][2]t = 3;\n  return x[y]; }"));
-  pass = pass & run_parse_test(make("p027"),
-                               make("func a() int {\n  x [y(z)][1][2] = 3;\n  return x[y]; }"));
-  pass = pass & run_parse_test(make("p028"),
-                               make("func a() int {\n  x [y(z)][1][2];\n  return x[y];  }"));
-  pass = pass & run_parse_test(make("p029"),
-                               make("func a() int {\n  for var i i32 = 3; i < 3; i = i + 1 {}}"));
-  pass = pass & run_parse_test(make("p030"),
-                               make("func a() int {\n  for var i i32 = 3; i < 3; i = i + 1 { x = 2; }}"));
-  pass = pass & run_parse_test(make("p031"),
-                               make("def foo = baz@[a, b](1, 2, 3);"));
-  pass = pass & run_parse_test(make("p032-a"),
-                               make("def foo u8 = 'a';\n"));
-  pass = pass & run_parse_test(make("p032-b"),
-                               make("var foo u8 = 'a';\n"));
-  pass = pass & run_parse_test(make("p033"),
-                               make("def foo u8 = '\\n';\n"));
-  pass = pass & run_parse_test(make("p034"),
-                               make("def foo u8 = '\\x2A';\n"));
-  pass = pass & run_parse_test(make("p035-a"),
-                               make("def foo u8 = \"\\x2Azq\";\n"));
-  pass = pass & run_parse_test(make("p035-b"),
-                               make("def foo u8 = \"\";\n"));
-  pass = pass & run_parse_test(make("p036-a"),
-                               make("func a() b { switch c { case e(f g): { } case h(i): { j; } default: { } } }"));
-  pass = pass & run_parse_test(make("p036-b"),
-                               make("func a() b { switch c { case &e(f g): { } case h(i): { j; } default: { } } }"));
-  pass = pass & run_parse_test(make("p037"),
-                               make("func `~`(x u32) size { }"));
-  pass = pass & run_parse_test(make("p038"),
-                               make("func foo() a { x int; }"));
-  pass = pass & run_parse_test(make("p039"),
-                               make("func foo() a { x int = 3; }"));
-  pass = pass & run_parse_test(make("p040"),
-                               make("func foo() a { for i i32 = 3; i < 3; i = i + 1 { } }"));
-  pass = pass & run_parse_test(make("p041"),
-                               make("func foo() a { if x { } else if y { } else { } }"));
-  pass = pass & run_parse_test(make("p042"),
-                               make("func foo() a { label foo; goto bar; }"));
-  pass = pass & run_parse_test(make("p043"),
-                               make("func foo() a { x struct { }; y union { }; z enum { }; }"));
-  pass = pass & run_parse_test(make("p044"),
-                               make(" deftype foo bar ;"));
-  pass = pass & run_parse_test(make("p045-a"),
-                               make("deftype foo fn[int, int] ;"));
-  pass = pass & run_parse_test(make("p045-b"),
-                               make("deftype foo fn[int, int] ;"));
-  pass = pass & run_parse_test(make("p046-a"),
-                               make("deftype foo struct { x y; z int; t fn[beh]; };"));
-  pass = pass & run_parse_test(make("p046-b"),
-                               make("deftype foo enum { x y; z int; t fn[beh]; };"));
-  pass = pass & run_parse_test(make("p046-c"),
-                               make("defenum foo { x y; z int; t fn[beh]; };"));
-  pass = pass & run_parse_test(make("p047"),
-                               make("deftype[] foo bar;\n"));
-  pass = pass & run_parse_test(make("p048"),
-                               make("deftype[] foo struct {x bar [quux]; };\n"));
-  pass = pass & run_parse_test(make("p049-a"),
-                               make("deftype[] foo struct {x [2 + 3]bar; };\n"));
-  pass = pass & run_parse_test(make("p049-b"),
-                               make("deftype[T, U] foo struct {x [2 + 3]bar; };\n"));
-  pass = pass & run_parse_test(make("p050"),
-                               make("defclass move foo [7]bar;\ndeftype[T] foo struct { count u32; p [3]T; };\n"));
-  pass = pass & run_parse_test(make("p051"),
-                               make("defclass copy foo bar;"));
-  pass = pass & run_parse_test(make("p052"),
-                               make("extern putchar fn[i32, i32];"));
-  pass = pass & run_parse_test(make("p053-a"),
-                               make("export def blah fn[i32, i32] = 3;"));
-  pass = pass & run_parse_test(make("p053-b"),
-                               make("export var blah fn[i32, i32] = 3;"));
-  pass = pass & run_parse_test(make("p054"),
-                               make("access string { def foo i32 = 3; }\n"));
-  pass = pass & run_parse_test(make("p054"),
-                               make("access vec[_] { def foo i32 = 3; }\n"));
-  pass = pass & run_parse_test(make("p055"),
-                               make("func foo() a { if case foo(x) = bar { } else if y { } else { } }"));
+  pass = pass & run_parse_test(_u8("p001"), _u8("import foo;"));
+  pass = pass & run_parse_test(_u8("p002"), _u8("def a int = 0;"));
+  pass = pass & run_parse_test(_u8("p003"), _u8("def abc int = 1;\n"));
+  pass = pass & run_parse_test(_u8("p004"), _u8("def _ab int =0x1;\n"));
+  pass = pass & run_parse_test(_u8("p005"), _u8("def ab_ int = 0x1AF2;\n"));
+  pass = pass & run_parse_test(_u8("p006"), _u8("def a_b int=\n0x1AF2 ;\n"));
+  pass = pass & run_parse_test(_u8("p007"), _u8("def a int=0x1AF2 ;"));
+  pass = pass & run_parse_test(_u8("p008"), _u8("def a fn[int, int] = 1;"));
+  pass = pass & run_parse_test(_u8("p009"),
+                               _u8("def a b = func(x int, y int) int { 3; };"));
+  pass = pass & run_parse_test(_u8("p010"),
+                               _u8("def a = func(x int, y int) int { return 3; };"));
+  pass = pass & run_parse_test(_u8("p011"),
+                               _u8("def a =\n\tfunc(x int, y int) int { *x; };"));
+  pass = pass & run_parse_test(_u8("p012"),
+                               _u8("def foo bar = 2 + 3;"));
+  pass = pass & run_parse_test(_u8("p013"),
+                               _u8("def foo bar = 2+*3-4;"));
+  pass = pass & run_parse_test(_u8("p014"),
+                               _u8("def foo bar = (2 ^ 3) - 4 && x -> quux;"));
+  pass = pass & run_parse_test(_u8("p015"),
+                               _u8("def[] foo fn[int] = func() int {\n  var x int = 3;\n  return x;};"));
+  pass = pass & run_parse_test(_u8("p016"),
+                               _u8("def[] foo/*heh*/fn[int] = func() int {\n//blah blah\n  var x int =-3;return x;};"));
+  pass = pass & run_parse_test(_u8("p017"),
+                               _u8("def a b = 1 == 1 || 2 == 1;\n"));
+  pass = pass & run_parse_test(_u8("p018"),
+                               _u8("def a b = 1 + - 1;"));
+  pass = pass & run_parse_test(_u8("p019"),
+                               _u8("def a b = 1 + -1;"));
+  pass = pass & run_parse_test(_u8("p020"),
+                               _u8("def a b = 1 +- 1;"));
+  pass = pass & run_parse_test(_u8("p021"),
+                               _u8("def a b = 1 +-1;"));
+  pass = pass & run_parse_test(_u8("p022"),
+                               _u8("func a() int {var x int;}"));
+  pass = pass & run_parse_test(_u8("p023"),
+                               _u8("func a() int {\n  (x+3)[y(z)] = 3;\n  return x[y];  }"));
+  pass = pass & run_parse_test(_u8("p024"),
+                               _u8("func a() int {\n  x[y(z)] = 3;\n  return x[y];  }"));
+  pass = pass & run_parse_test(_u8("p025"),
+                               _u8("func a() int {\n  x *[y(z)]t = 3;\n  return x[y]; }"));
+  pass = pass & run_parse_test(_u8("p026"),
+                               _u8("func a() int {\n  x [y(z)][1][2]t = 3;\n  return x[y]; }"));
+  pass = pass & run_parse_test(_u8("p027"),
+                               _u8("func a() int {\n  x [y(z)][1][2] = 3;\n  return x[y]; }"));
+  pass = pass & run_parse_test(_u8("p028"),
+                               _u8("func a() int {\n  x [y(z)][1][2];\n  return x[y];  }"));
+  pass = pass & run_parse_test(_u8("p029"),
+                               _u8("func a() int {\n  for var i i32 = 3; i < 3; i = i + 1 {}}"));
+  pass = pass & run_parse_test(_u8("p030"),
+                               _u8("func a() int {\n  for var i i32 = 3; i < 3; i = i + 1 { x = 2; }}"));
+  pass = pass & run_parse_test(_u8("p031"),
+                               _u8("def foo = baz@[a, b](1, 2, 3);"));
+  pass = pass & run_parse_test(_u8("p032-a"),
+                               _u8("def foo u8 = 'a';\n"));
+  pass = pass & run_parse_test(_u8("p032-b"),
+                               _u8("var foo u8 = 'a';\n"));
+  pass = pass & run_parse_test(_u8("p033"),
+                               _u8("def foo u8 = '\\n';\n"));
+  pass = pass & run_parse_test(_u8("p034"),
+                               _u8("def foo u8 = '\\x2A';\n"));
+  pass = pass & run_parse_test(_u8("p035-a"),
+                               _u8("def foo u8 = \"\\x2Azq\";\n"));
+  pass = pass & run_parse_test(_u8("p035-b"),
+                               _u8("def foo u8 = \"\";\n"));
+  pass = pass & run_parse_test(_u8("p036-a"),
+                               _u8("func a() b { switch c { case e(f g): { } case h(i): { j; } default: { } } }"));
+  pass = pass & run_parse_test(_u8("p036-b"),
+                               _u8("func a() b { switch c { case &e(f g): { } case h(i): { j; } default: { } } }"));
+  pass = pass & run_parse_test(_u8("p037"),
+                               _u8("func `~`(x u32) size { }"));
+  pass = pass & run_parse_test(_u8("p038"),
+                               _u8("func foo() a { x int; }"));
+  pass = pass & run_parse_test(_u8("p039"),
+                               _u8("func foo() a { x int = 3; }"));
+  pass = pass & run_parse_test(_u8("p040"),
+                               _u8("func foo() a { for i i32 = 3; i < 3; i = i + 1 { } }"));
+  pass = pass & run_parse_test(_u8("p041"),
+                               _u8("func foo() a { if x { } else if y { } else { } }"));
+  pass = pass & run_parse_test(_u8("p042"),
+                               _u8("func foo() a { label foo; goto bar; }"));
+  pass = pass & run_parse_test(_u8("p043"),
+                               _u8("func foo() a { x struct { }; y union { }; z enum { }; }"));
+  pass = pass & run_parse_test(_u8("p044"),
+                               _u8(" deftype foo bar ;"));
+  pass = pass & run_parse_test(_u8("p045-a"),
+                               _u8("deftype foo fn[int, int] ;"));
+  pass = pass & run_parse_test(_u8("p045-b"),
+                               _u8("deftype foo fn[int, int] ;"));
+  pass = pass & run_parse_test(_u8("p046-a"),
+                               _u8("deftype foo struct { x y; z int; t fn[beh]; };"));
+  pass = pass & run_parse_test(_u8("p046-b"),
+                               _u8("deftype foo enum { x y; z int; t fn[beh]; };"));
+  pass = pass & run_parse_test(_u8("p046-c"),
+                               _u8("defenum foo { x y; z int; t fn[beh]; };"));
+  pass = pass & run_parse_test(_u8("p047"),
+                               _u8("deftype[] foo bar;\n"));
+  pass = pass & run_parse_test(_u8("p048"),
+                               _u8("deftype[] foo struct {x bar [quux]; };\n"));
+  pass = pass & run_parse_test(_u8("p049-a"),
+                               _u8("deftype[] foo struct {x [2 + 3]bar; };\n"));
+  pass = pass & run_parse_test(_u8("p049-b"),
+                               _u8("deftype[T, U] foo struct {x [2 + 3]bar; };\n"));
+  pass = pass & run_parse_test(_u8("p050"),
+                               _u8("defclass move foo [7]bar;\ndeftype[T] foo struct { count u32; p [3]T; };\n"));
+  pass = pass & run_parse_test(_u8("p051"),
+                               _u8("defclass copy foo bar;"));
+  pass = pass & run_parse_test(_u8("p052"),
+                               _u8("extern putchar fn[i32, i32];"));
+  pass = pass & run_parse_test(_u8("p053-a"),
+                               _u8("export def blah fn[i32, i32] = 3;"));
+  pass = pass & run_parse_test(_u8("p053-b"),
+                               _u8("export var blah fn[i32, i32] = 3;"));
+  pass = pass & run_parse_test(_u8("p054"),
+                               _u8("access string { def foo i32 = 3; }\n"));
+  pass = pass & run_parse_test(_u8("p054"),
+                               _u8("access vec[_] { def foo i32 = 3; }\n"));
+  pass = pass & run_parse_test(_u8("p055"),
+                               _u8("func foo() a { if case foo(x) = bar { } else if y { } else { } }"));
   return pass;
 }
 
