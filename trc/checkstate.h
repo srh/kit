@@ -44,9 +44,17 @@ struct common_idents {
   ident_value char_standin_type_name;
 };
 
+typedef int module_loader(const uint8_t *module_name,
+                          size_t module_name_count,
+                          char **filepath_out,
+                          size_t *filepath_count_out,
+                          uint8_t **data_out,
+                          size_t *data_count_out);
+
 struct checkstate {
   struct identmap *im;
   struct common_idents cm;
+  module_loader *loader;
 
   int target_linux32;
 
@@ -71,7 +79,7 @@ struct checkstate {
   size_t sli_symbol_table_indexes_limit;
 };
 
-void checkstate_init(struct checkstate *cs, struct identmap *im, int target_linux32);
+void checkstate_init(struct checkstate *cs, struct identmap *im, module_loader *loader, int target_linux32);
 
 void checkstate_destroy(struct checkstate *cs);
 

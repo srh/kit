@@ -734,7 +734,6 @@ void stderr_errmsg(struct error_dump *ctx, struct identmap *im,
 }
 
 int resolve_import_filename_and_parse(struct checkstate *cs,
-                                      module_loader *loader,
                                       ident_value name,
                                       size_t *global_offset_base_out,
                                       struct ast_file *file_out,
@@ -749,8 +748,8 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
   size_t filepath_size = 0;
   uint8_t *data;
   size_t data_size;
-  if (!(*loader)(module_name, module_name_count,
-                 &filepath, &filepath_size, &data, &data_size)) {
+  if (!(*cs->loader)(module_name, module_name_count,
+                     &filepath, &filepath_size, &data, &data_size)) {
     ERR("Could not read file '%.*s' for module %.*s.\n",
         size_to_int(filepath_size), filepath,
         size_to_int(module_name_count), (const char *)module_name);
@@ -978,8 +977,7 @@ int chase_through_toplevels(struct checkstate *cs,
   return 1;
 }
 
-int chase_imports(struct checkstate *cs, module_loader *loader,
-                  ident_value name) {
+int chase_imports(struct checkstate *cs, ident_value name) {
   int ret = 0;
   struct import_chase_state ics = { NULL, 0, 0, NULL, 0, 0 };
 
@@ -999,7 +997,7 @@ int chase_imports(struct checkstate *cs, module_loader *loader,
     ident_value filepath;
     uint8_t *buf;
     size_t buf_count;
-    if (!resolve_import_filename_and_parse(cs, loader, name, &global_offset_base,
+    if (!resolve_import_filename_and_parse(cs, name, &global_offset_base,
                                            &file, &filepath, &buf, &buf_count)) {
       goto cleanup;
     }
@@ -5278,12 +5276,11 @@ int check_def_acyclicity(struct checkstate *cs) {
 }
 
 int chase_modules_and_typecheck(struct checkstate *cs,
-                                module_loader *loader,
                                 ident_value first_module) {
   checkstate_import_primitives(cs);
 
   int ret = 0;
-  if (!chase_imports(cs, loader, first_module)) {
+  if (!chase_imports(cs, first_module)) {
     goto fail;
   }
 
@@ -5307,9 +5304,9 @@ int test_check_module(struct identmap *im, module_loader *loader,
                       ident_value name) {
   int target_linux32 = 0;
   struct checkstate cs;
-  checkstate_init(&cs, im, target_linux32);
+  checkstate_init(&cs, im, loader, target_linux32);
 
-  int ret = chase_modules_and_typecheck(&cs, loader, name);
+  int ret = chase_modules_and_typecheck(&cs, name);
 
   checkstate_destroy(&cs);
   return ret;

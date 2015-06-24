@@ -34,15 +34,7 @@ struct ast_numeric_literal;
 
 #define CHAR_STANDIN_TYPE_NAME U8_TYPE_NAME
 
-typedef int module_loader(const uint8_t *module_name,
-                          size_t module_name_count,
-                          char **filepath_out,
-                          size_t *filepath_count_out,
-                          uint8_t **data_out,
-                          size_t *data_count_out);
-
 int chase_modules_and_typecheck(struct checkstate *cs,
-                                module_loader *loader,
                                 ident_value first_module);
 
 int test_check_file(void);
