@@ -4688,11 +4688,12 @@ int build_def(struct checkstate *cs, struct objfile *f,
 
 int build_module(struct identmap *im,
                  int target_linux32,
+                 void *loader_ctx,
                  module_loader *loader,
                  ident_value name) {
   int ret = 0;
   struct checkstate cs;
-  checkstate_init(&cs, im, loader, target_linux32);
+  checkstate_init(&cs, im, loader_ctx, loader, target_linux32);
 
   if (!chase_modules_and_typecheck(&cs, name)) {
     DBG("(Fail.)\n");

@@ -39,7 +39,8 @@ int chase_modules_and_typecheck(struct checkstate *cs,
 
 int test_check_file(void);
 
-int read_module_file(const uint8_t *module_name,
+int read_module_file(void *ctx,
+                     const uint8_t *module_name,
                      size_t module_name_count,
                      char **filepath_out,
                      size_t *filepath_count_out,

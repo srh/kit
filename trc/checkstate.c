@@ -57,10 +57,11 @@ void checkstate_destroy(struct checkstate *cs) {
 }
 
 void checkstate_init(struct checkstate *cs, struct identmap *im,
-                     module_loader *loader,
+                     void *loader_ctx, module_loader *loader,
                      int target_linux32) {
   cs->im = im;
   cs->cm = compute_common_idents(im);
+  cs->loader_ctx = loader_ctx;
   cs->loader = loader;
   cs->target_linux32 = target_linux32;
   cs->imports = NULL;
