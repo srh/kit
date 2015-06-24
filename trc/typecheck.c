@@ -5300,17 +5300,25 @@ int chase_modules_and_typecheck(struct checkstate *cs,
   return ret;
 }
 
-int test_check_module(struct identmap *im,
-                      module_loader *loader,
-                      ident_value name) {
+int test_check_module_with_ctx(struct identmap *im,
+                               void *loader_ctx,
+                               module_loader *loader,
+                               ident_value name) {
   int target_linux32 = 0;
   struct checkstate cs;
-  checkstate_init(&cs, im, NULL, loader, target_linux32);
+  checkstate_init(&cs, im, loader_ctx, loader, target_linux32);
 
   int ret = chase_modules_and_typecheck(&cs, name);
 
   checkstate_destroy(&cs);
   return ret;
+}
+
+/* TODO: Remove this. */
+int test_check_module(struct identmap *im,
+                      module_loader *loader,
+                      ident_value name) {
+  return test_check_module_with_ctx(im, NULL, loader, name);
 }
 
 int read_module_file(void *ctx,
@@ -5362,64 +5370,85 @@ int load_test_module(struct test_module *a, size_t a_count,
   return 0;
 }
 
-int check_file_test_1(void *ctx, const uint8_t *name, size_t name_count,
-                      char **filepath_out, size_t *filepath_count_out,
-                      uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { { "foo",
-                               "import bar;\n"
-                               "\n"
-                               "def x i32 = 3;"
-                               "deftype dword u32;\n" },
-                             { "bar",
-                               "import foo;\n"
-                               "\n"
-                               "def y u32 = 5;\n" } };
+struct test_case {
+  struct test_module *modules;
+  size_t num_modules;
+};
 
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
+int testcase_module_loader(void *ctx,
+                           const uint8_t *name, size_t name_count,
+                           char **filepath_out, size_t *filepath_count_out,
+                           uint8_t **data_out, size_t *data_count_out) {
+  (void)ctx, (void)filepath_out, (void)filepath_count_out;
+  struct test_case *tc = ctx;
+  return load_test_module(tc->modules, tc->num_modules, name, name_count,
+                          data_out, data_count_out);
 }
 
-int check_file_test_2(void *ctx, const uint8_t *name, size_t name_count,
-                      char **filepath_out, size_t *filepath_count_out,
-                      uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { { "foo",
-                               "def x i32 = 3;"
-                               "deftype dword u32;\n"
-                               "deftype blah dword;\n"
-                               "deftype feh ptr[blah];\n"
-                               "deftype quux ptr[quux];\n" } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
+int check_testcase(struct identmap *im, const char *name, struct test_case cas) {
+  ident_value foo = identmap_intern_c_str(im, "foo");
+  DBG("check_testcase %s...\n", name);
+  if (!test_check_module_with_ctx(im, &cas, &testcase_module_loader, foo)) {
+    DBG("%s fails\n", name);
+    return 0;
+  }
+  return 1;
 }
 
-int check_file_test_3(void *ctx, const uint8_t *name, size_t name_count,
-                      char **filepath_out, size_t *filepath_count_out,
-                      uint8_t **data_out, size_t *data_count_out) {
-  /* An invalid file: bar and foo recursively hold each other. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { { "foo",
-                               "def x i32 = 3;"
-                               "deftype foo bar;\n"
-                               "deftype bar foo;\n" } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
+int check_foocase(struct identmap *im, const char *name, const char *data) {
+  struct test_module mod = { "foo", NULL };
+  mod.data = data;
+  struct test_case cas;
+  cas.modules = &mod;
+  cas.num_modules = 1;
+  return check_testcase(im, name, cas);
 }
 
-int check_file_test_4(void *ctx, const uint8_t *name, size_t name_count,
-                      char **filepath_out, size_t *filepath_count_out,
-                      uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { { "foo",
-                               "def x i32 = 3;"
-                               "deftype foo struct { "
-                               "x u32; y i32; z ptr[foo]; };\n" } };
+int check_negcase(struct identmap *im, const char *name, const char *data) {
+  ident_value foo = identmap_intern_c_str(im, "foo");
+  DBG("check_testcase !%s...\n", name);
+  struct test_module mod = { "foo", NULL };
+  mod.data = data;
+  struct test_case cas;
+  cas.modules = &mod;
+  cas.num_modules = 1;
+  if (test_check_module_with_ctx(im, &cas, &testcase_module_loader, foo)) {
+    DBG("!%s fails\n", name);
+    return 0;
+  }
+  return 1;
+}
 
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
+int check_testcases(struct identmap *im) {
+  struct test_module mods1[] = { { "foo",
+                                   "import bar;\n"
+                                   "\n"
+                                   "def x i32 = 3;"
+                                   "deftype dword u32;\n" },
+                                 { "bar",
+                                   "import foo;\n"
+                                   "\n"
+                                   "def y u32 = 5;\n" } };
+  struct test_case case1;
+  case1.modules = mods1;
+  case1.num_modules = 2;
+  int pass = 1;
+  pass &= check_testcase(im, "check_file_test_1", case1);
+  pass &= check_foocase(im, "check_file_test_2",
+                        "def x i32 = 3;"
+                        "deftype dword u32;\n"
+                        "deftype blah dword;\n"
+                        "deftype feh ptr[blah];\n"
+                        "deftype quux ptr[quux];\n");
+  pass &= check_negcase(im, "check_file_test_3",
+                        "def x i32 = 3;"
+                        "deftype foo bar;\n"
+                        "deftype bar foo;\n");
+  pass &= check_foocase(im, "check_file_test_4",
+                        "def x i32 = 3;"
+                        "deftype foo struct { "
+                        "x u32; y i32; z ptr[foo]; };\n");
+  return pass;
 }
 
 int check_file_test_5(void *ctx, const uint8_t *name, size_t name_count,
@@ -7545,27 +7574,7 @@ int test_check_file(void) {
   identmap_init(&im);
   ident_value foo = identmap_intern_c_str(&im, "foo");
 
-  DBG("test_check_file check_file_test_1...\n");
-  if (!test_check_module(&im, &check_file_test_1, foo)) {
-    DBG("check_file_test_1 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_2...\n");
-  if (!test_check_module(&im, &check_file_test_2, foo)) {
-    DBG("check_file_test_2 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_3...\n");
-  if (!!test_check_module(&im, &check_file_test_3, foo)) {
-    DBG("!check_file_test_3 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_4...\n");
-  if (!test_check_module(&im, &check_file_test_4, foo)) {
-    DBG("check_file_test_4 fails\n");
+  if (!check_testcases(&im)) {
     goto cleanup_identmap;
   }
 
