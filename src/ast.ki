@@ -1,7 +1,8 @@
 import arity;
+import box;
 import identmap;
 import pos;
-import box;
+import typeexpr;
 
 // This is an index into some ps-specific structure.
 deftype ast_meta size;
