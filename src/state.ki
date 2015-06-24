@@ -94,6 +94,15 @@ func ref_deftype_inst(cs *checkstate, id deftype_inst_id) *deftype_inst {
   return oo(ref(&cs->type_instantiations, id.~));
 }
 
+func add_deftype_entry(cs *checkstate, ent deftype_entry) deftype_entry_id {
+  shent shp[deftype_entry] = emshp(ent);
+  id deftype_entry_id = ~count(&cs->deftypes);
+  push(&cs->deftypes, shent);
+  arr *array[deftype_entry_id] = try_insert_lookup(&cs->deftypes_by_name, oo(&shent)->name, default());
+  push(arr, id);
+  return id;
+}
+
 func add_inst(cs *checkstate, val def_inst) def_inst_id {
   id def_inst_id = ~count(&cs->instantiations);
   push(&cs->instantiations, emshp(val));
@@ -179,18 +188,22 @@ deftype deftype_inst struct {
   properties opt[type_properties];
 };
 
+deftype deftype_nonprim struct {
+  tl *ast_type_def;
+  // The RHS typeexpr, if computed, without generics replaced, of course.
+  rhs nbfc[te_typeexpr];
+};
+
 deftype deftype_entry struct {
   module_name sym;
   name sym;
-  tl *ast_type_def;
-
-  // The RHS typeexpr, if computed, without generics replaced, of course.
-  rhs nbfc[te_typeexpr];
+  generics ast_generics;
+  nonprim opt[deftype_nonprim];
   insts array[deftype_inst_id];
 };
 
-func mk(module_name sym, name sym, tl *ast_type_def) deftype_entry {
-  return {module_name, name, tl, NotComputed(), default@[array[deftype_inst_id]]()};
+func mk(module_name sym, name sym, g ast_generics, tl *ast_type_def) deftype_entry {
+  return {module_name, name, g, Has({tl, NotComputed()}), default@[array[deftype_inst_id]]()};
 }
 
 defenum genparms {
