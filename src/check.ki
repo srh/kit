@@ -11,7 +11,12 @@ import u8ast;
 
 // This code does some typechecking.  See state.ki for types that maintain typechecking state.
 
+// func[T] dbgcheck(x T) void { DBG(x); }
+// func[T, U] dbgcheck(x T, y U) void { DBG(x, y); }
+// func[T, U, V] dbgcheck(x T, y U, z V) void { DBG(x, y, z); }
 func[T] dbgcheck(x T) void { }
+func[T, U] dbgcheck(x T, y U) void { }
+func[T, U, V] dbgcheck(x T, y U, z V) void { }
 
 func finish_checking(cs *checkstate, clq *clqueue) bool {
   while case Has(entry clqueue_entry) = popval(&clq->entries) {
@@ -39,6 +44,7 @@ func check_module(cs *checkstate, mod_name sym) bool {
       ndefs size = count(&mod->defs);
       for i size = 0; i < ndefs; i = i + 1 {
         if !ensure_def_checked(cs, get(&mod->defs, i)) {
+          dbgcheck(_u8("ensure_def_checked failed"));
           return false;
         }
       }
@@ -46,6 +52,7 @@ func check_module(cs *checkstate, mod_name sym) bool {
       ndeftypes size = count(&mod->deftypes);
       for i size = 0; i < ndeftypes; i = i + 1 {
         if !ensure_deftype_checked(cs, get(&mod->deftypes, i)) {
+          dbgcheck(_u8("ensure_deftype_checked failed"));
           return false;
         }
       }
@@ -316,18 +323,22 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *genparms) struct { i
 }
 
 func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, parms *genparms) bool {
+  dbgcheck(_u8("ensure_def_checked_with_parms"));
   var res = ensure_def_inst(cs, ent, parms);
   return ensure_def_inst_checked(cs, clq, ent, res.id);
 }
 
 func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
+  dbgcheck(_u8("ensure_def_inst_type_computed"));
   inst *def_inst = ref_inst(cs, inst_id);
   switch inst->status {
     case DidNotStartComputingType(v): {
+      dbgcheck(_u8("ensure_def_inst_type_computed DidNotStartComputingType"));
       inst->status = BeganComputingType(void);
 
       ent_typeexpr *te_typeexpr;
       if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
+        dbgcheck(_u8("def_converted_typeexpr failed"));
         return false;
       }
       // TODO: We need to check exact name shadowing(?), typeexpr, and rhs.
@@ -336,11 +347,13 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       computed_complete bool;
       computed te_typeexpr;
       if !check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_typeexpr, &computed, &computed_complete) {
+        dbgcheck(_u8("check_and_compute_typeexpr failed"));
         return false;
       }
       check(computed_complete);
       props type_properties;
       if !compute_type_properties(cs, clq, &computed, &props) {
+        dbgcheck(_u8("compute_type_properties failed"));
         return false;
       }
       inst->status = FinishedComputingType(void);
@@ -365,7 +378,9 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
 }
 
 func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
+  dbgcheck(_u8("ensure_def_inst_checked"));
   if !ensure_def_inst_type_computed(cs, clq, ent, inst_id) {
+    dbgcheck(_u8("ensure_def_inst_type_computed failed"));
     return false;
   }
   inst *def_inst = ref_inst(cs, inst_id);
@@ -399,9 +414,11 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_
 }
 
 func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, parms *genparms, t *te_typeexpr, computed_out *te_typeexpr, computed_complete_out *bool) bool {
+  dbgcheck(_u8("check_and_compute_typeexpr"));
   switch t {
     case &TeName(a te_name): {
       if !check_and_compute_name_type(cs, clq, g, parms, &a, computed_out) {
+        dbgcheck(_u8("check_and_compute_name_type failed"));
         return false;
       }
       *computed_complete_out = true;
@@ -531,6 +548,7 @@ func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *gen
 }
 
 func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *genparms, a *te_name, computed_out *te_typeexpr) bool {
+  dbgcheck(_u8("check_and_compute_name_type"));
   // Generic parameters have already been checked.  (I hope so.)
   if lookup_generic(g, parms, a->value, computed_out) {
     return true;
@@ -538,6 +556,7 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
 
   matching_deftype opt[deftype_entry_id];
   if !match_deftype(cs, a->value, None(), &matching_deftype) {
+    dbgcheck(_u8("match_deftype failed"));
     // An error happened when looking up a deftype (multiple matches?).
     return false;
   }
@@ -619,6 +638,10 @@ func arity_matches(a *ast_generics, params opt[*array[te_typeexpr]]) bool {
   return lhs_arity == ar;
 }
 
+func ERR_no_match(im *identmap, name sym, params opt[*array[te_typeexpr]]) void {
+  ERR(_u8("No match for type with name '"), lookup(im, name), _u8("' and maybe some params"));
+}
+
 func match_deftype(cs *checkstate, name sym, params opt[*array[te_typeexpr]], out *opt[deftype_entry_id]) bool {
   if case Has(arr *array[deftype_entry_id]) = lookup_ref(&cs->deftypes_by_name, name) {
     n size = count(arr);
@@ -638,9 +661,11 @@ func match_deftype(cs *checkstate, name sym, params opt[*array[te_typeexpr]], ou
       *out = match;
       return true;
     } else {
+      ERR_no_match(cs->im, name, params);
       return false;
     }
   } else {
+    ERR_no_match(cs->im, name, params);
     return false;
   }
 }
