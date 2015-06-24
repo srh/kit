@@ -1,23 +1,29 @@
 import state;
 
+// TODO: Should the primitive types returned here include their deftype_inst info?
+
 func primitive_numeric_literal_type(cs *checkstate) te_typeexpr {
   return TODO();
 }
 
 func primitive_bool_type(cs *checkstate) te_typeexpr {
-  return TODO();
+  return TeName({cs->cym.boolsym, None()});
 }
 
 func primitive_void_type(cs *checkstate) te_typeexpr {
-  return TODO();
+  return TeName({cs->cym.voidsym, None()});
 }
 
 func primitive_null_type(cs *checkstate) te_typeexpr {
   return TODO();
 }
 
+func primitive_u8_type(cs *checkstate) te_typeexpr {
+  return TeName({cs->cym.u8sym, None()});
+}
+
 func primitive_string_literal_type(cs *checkstate, n size) te_typeexpr {
-  return TODO();
+  return TeArraytype({Has(~n), embox(primitive_u8_type(cs))});
 }
 
 func function_puretype(cs *checkstate) te_puretype {
@@ -25,5 +31,13 @@ func function_puretype(cs *checkstate) te_puretype {
 }
 
 func pointer_puretype(cs *checkstate) te_puretype {
+  return TODO();
+}
+
+func add_primitives(cs *checkstate) void {
+  add_simple_primitive(cs, cs->cym.boolsym, 1, 1);
+}
+
+func add_simple_primitive(cs *checkstate, name sym, sizeof_value size, alignof_value size) void {
   return TODO();
 }

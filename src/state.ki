@@ -8,7 +8,11 @@ import typeexpr;
 import u8ast;
 
 deftype common_syms struct {
-  fn sym;
+  fnsym sym;
+  boolsym sym;
+  voidsym sym;
+  u8sym sym;
+  primitive_module_sym sym;
 };
 
 deftype checkstate struct {
@@ -41,7 +45,11 @@ func make_checkstate(im *identmap, loader_ctx *void, loader fn[*checkstate, sym,
 
 func make_common_syms(im *identmap) common_syms {
   ret common_syms;
-  ret.fn = intern(im, from_u8(_u8("fn")));
+  ret.fnsym = intern(im, from_u8(_u8("fn")));
+  ret.boolsym = intern(im, from_u8(_u8("bool")));
+  ret.voidsym = intern(im, from_u8(_u8("void")));
+  ret.u8sym = intern(im, from_u8(_u8("u8")));
+  ret.primitive_module_sym = intern(im, from_u8(_u8("<primitive>")));
   return ret;
 }
 
