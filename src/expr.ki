@@ -124,7 +124,11 @@ func help_check_simple_literal(pt *te_typeexpr, type te_typeexpr, errmsg_name ar
     ERR(errmsg_name, _u8(" literal in bad place"));
     return false;
   }
-  annotate_info(x, CompleteCheck(type));
+  if is_complete(&unified) {
+    annotate_info(x, CompleteCheck(type));
+  } else {
+    annotate_info(x, IncompleteCheck(type));
+  }
   return true;
 }
 
@@ -191,7 +195,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &NullLiteral(a ast_null_literal): {
-      return help_check_simple_literal(pt, primitive_null_type(es->cs), _u8("null"), x);
+      return help_check_simple_literal(pt, pointer_to(es->cs, TeUnknown(void)), _u8("null"), x);
     }
 
     case &CharLiteral(a ast_char_literal): {
@@ -240,7 +244,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       }
       type *te_typeexpr = expr_complete_type(oo(&a.lhs));
       param *te_typeexpr;
-      if !decompose_typeapp(type, pointer_puretype(es->cs), &param) {
+      if !decompose_typeapp(type, primitive_pointer_puretype(es->cs), &param) {
         ERR(_u8("Expected pointer for lhs of deref field"));
         return false;
       }
@@ -418,7 +422,7 @@ func make_fn_partial_type(cs *checkstate, return_type *te_typeexpr, params *arra
     push(&type_params, expr_type(ref(params, i)));
   }
   push(&type_params, *return_type);
-  return TeApp({embox(function_puretype(cs)), type_params, None()});
+  return TeApp({embox(primitive_function_puretype(cs)), type_params, None()});
 }
 
 func fn_return_type(func_type *te_typeexpr) *te_typeexpr {

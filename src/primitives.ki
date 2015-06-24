@@ -14,10 +14,6 @@ func primitive_void_type(cs *checkstate) te_typeexpr {
   return TeName({cs->cym.voidsym, None()});
 }
 
-func primitive_null_type(cs *checkstate) te_typeexpr {
-  return TODO();
-}
-
 func primitive_u8_type(cs *checkstate) te_typeexpr {
   return TeName({cs->cym.u8sym, None()});
 }
@@ -26,12 +22,18 @@ func primitive_string_literal_type(cs *checkstate, n size) te_typeexpr {
   return TeArraytype({Has(~n), embox(primitive_u8_type(cs))});
 }
 
-func function_puretype(cs *checkstate) te_puretype {
+func primitive_function_puretype(cs *checkstate) te_puretype {
   return TODO();
 }
 
-func pointer_puretype(cs *checkstate) te_puretype {
-  return TODO();
+func primitive_pointer_puretype(cs *checkstate) te_puretype {
+  return TePureName(cs->cym.ptrtype_sym);
+}
+
+func pointer_to(cs *checkstate, t te_typeexpr) te_typeexpr {
+  params array[te_typeexpr];
+  push(&params, t);
+  return TeApp({embox(primitive_pointer_puretype(cs)), params, None()});
 }
 
 func add_primitives(cs *checkstate) void {

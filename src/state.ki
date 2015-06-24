@@ -13,6 +13,7 @@ deftype common_syms struct {
   voidsym sym;
   u8sym sym;
   primitive_module_sym sym;
+  ptrtype_sym sym;
 };
 
 deftype checkstate struct {
@@ -50,6 +51,7 @@ func make_common_syms(im *identmap) common_syms {
   ret.voidsym = intern(im, from_u8(_u8("void")));
   ret.u8sym = intern(im, from_u8(_u8("u8")));
   ret.primitive_module_sym = intern(im, from_u8(_u8("<primitive>")));
+  ret.ptrtype_sym = intern(im, from_u8(_u8("*")));
   return ret;
 }
 
