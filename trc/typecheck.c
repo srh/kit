@@ -5448,19 +5448,14 @@ int check_testcases(struct identmap *im) {
                         "def x i32 = 3;"
                         "deftype foo struct { "
                         "x u32; y i32; z ptr[foo]; };\n");
+  pass &= check_foocase(im, "check_file_test_4",
+                        "def x i32 = 3;"
+                        "deftype foo struct { "
+                        "x u32; y i32; z ptr[foo]; };\n");
+  pass &= check_foocase(im, "check_file_test_5",
+                        "def x i32 = 3;"
+                        "deftype[T] foo T;");
   return pass;
-}
-
-int check_file_test_5(void *ctx, const uint8_t *name, size_t name_count,
-                      char **filepath_out, size_t *filepath_count_out,
-                      uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { { "foo",
-                               "def x i32 = 3;"
-                               "deftype[T] foo T;" } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
 }
 
 int check_file_test_6(void *ctx, const uint8_t *name, size_t name_count,
@@ -7575,12 +7570,6 @@ int test_check_file(void) {
   ident_value foo = identmap_intern_c_str(&im, "foo");
 
   if (!check_testcases(&im)) {
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_5...\n");
-  if (!test_check_module(&im, &check_file_test_5, foo)) {
-    DBG("check_file_test_5 fails\n");
     goto cleanup_identmap;
   }
 
