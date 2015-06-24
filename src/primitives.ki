@@ -18,6 +18,10 @@ func primitive_u8_type(cs *checkstate) te_typeexpr {
   return TeName({cs->cym.u8sym, None()});
 }
 
+func primitive_size_type(cs *checkstate) te_typeexpr {
+  return TeName({cs->cym.sizesym, None()});
+}
+
 func primitive_string_literal_type(cs *checkstate, n size) te_typeexpr {
   return TeArraytype({Has(~n), embox(primitive_u8_type(cs))});
 }
