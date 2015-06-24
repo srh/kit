@@ -980,7 +980,7 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
       return Has(id);
     }
     case None(v): {
-      switch (cs->loader)(mod_name) {
+      switch (cs->loader)(cs, mod_name) {
         case None(v2): {
           ERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
           return None();
@@ -1495,4 +1495,28 @@ func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
   names array[ast_ident];
   unif_parms array[te_typeexpr];
   return unify_under_generics(pta, &names, &unif_parms, ptb, out);
+}
+
+func testmodule_name() string {
+  return from_u8(_u8("testmodule"));
+}
+
+func test_loader(cs *checkstate, name sym) opt[array[u8]] {
+  if name == intern(cs->im, testmodule_name()) {
+    return Has(* @[*array[u8]]cast(cs->loader_ctx));
+  } else {
+    return None();
+  }
+}
+
+func run_check_test(name array[u8], file array[u8]) bool {
+  im identmap;
+  cs checkstate = make_checkstate(&im, @[*void]cast(&file), test_loader);
+  return check_module(&cs, intern(&im, testmodule_name()));
+}
+
+func test_check() bool {
+  pass bool = true;
+  pass = pass & run_check_test(_u8("c001"), _u8("def x bool = true;"));
+  return pass;
 }

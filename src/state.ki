@@ -14,7 +14,8 @@ deftype common_syms struct {
 deftype checkstate struct {
   im *identmap;
   cym common_syms;
-  loader fn[sym, opt[array[u8]]];
+  loader_ctx *void;
+  loader fn[*checkstate, sym, opt[array[u8]]];
 
   modules array[shp[module]];
   modules_by_name hash[sym, module_id];
@@ -28,6 +29,21 @@ deftype checkstate struct {
   defs array[shp[def_entry]];
   defs_by_name hash[sym, array[def_entry_id]];
 };
+
+func make_checkstate(im *identmap, loader_ctx *void, loader fn[*checkstate, sym, opt[array[u8]]]) checkstate {
+  ret checkstate;
+  ret.im = im;
+  ret.cym = make_common_syms(im);
+  ret.loader_ctx = loader_ctx;
+  ret.loader = loader;
+  return ret;
+}
+
+func make_common_syms(im *identmap) common_syms {
+  ret common_syms;
+  ret.fn = intern(im, from_u8(_u8("fn")));
+  return ret;
+}
 
 // An index into checkstate's modules array.
 deftype module_id size;
