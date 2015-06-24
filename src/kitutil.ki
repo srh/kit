@@ -1,5 +1,11 @@
 import stdlib;
 
+func[T] DBG(x T) void { ERR(x); }
+func[T, U] DBG(x T, y U) void { ERR(x, y); }
+func[T, U, V] DBG(x T, y U, z V) void { ERR(x, y, z); }
+func[T, U, V, W] DBG(x T, y U, z V, p W) void { ERR(x, y, z, p); }
+
+
 func[T, U, V, W] ERR(x T, y U, z V, p W) void {
   ERR(cons(cons(x, y), cons(z, p)));
 }

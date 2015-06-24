@@ -78,7 +78,11 @@ access hash[_, _] {
 
   // Return value's invalidated by any modification to the hash.
   func[K, V] lookup_ref(h *hash[K, V], key K) opt[*V] {
-    mask size = count(&h->arr) - 1;
+    hash_count size = count(&h->arr);
+    if hash_count == 0 {
+      return None();
+    }
+    mask size = hash_count - 1;
     offset size = ~ @[osize]hash_compute_hash(&key) & mask;
     step size = 1;
     for ;; {

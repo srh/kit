@@ -11,6 +11,8 @@ import u8ast;
 
 // This code does some typechecking.  See state.ki for types that maintain typechecking state.
 
+func[T] dbgcheck(x T) void { }
+
 func finish_checking(cs *checkstate, clq *clqueue) bool {
   while case Has(entry clqueue_entry) = popval(&clq->entries) {
     switch &entry {
@@ -25,11 +27,14 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
 }
 
 func check_module(cs *checkstate, mod_name sym) bool {
+  dbgcheck(_u8("check_module"));
   switch process_module(cs, mod_name) {
     case None(v): {
+      dbgcheck(_u8("process_module None"));
       return false;
     }
     case Has(id module_id): {
+      dbgcheck(_u8("process_module Has"));
       mod *module = ref_module(cs, id);
       ndefs size = count(&mod->defs);
       for i size = 0; i < ndefs; i = i + 1 {
@@ -975,17 +980,22 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
 }
 
 func load_module(cs *checkstate, mod_name sym) opt[module_id] {
+  dbgcheck(_u8("load_module"));
   switch lookup(&cs->modules_by_name, mod_name) {
     case Has(id module_id): {
+      dbgcheck(_u8("load_module lookup Has"));
       return Has(id);
     }
     case None(v): {
+      dbgcheck(_u8("load_module lookup None"));
       switch (cs->loader)(cs, mod_name) {
         case None(v2): {
+          dbgcheck(_u8("load_module loader None"));
           ERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
           return None();
         }
         case Has(arr array[u8]): {
+          dbgcheck(_u8("load_module loader Has"));
           mod shp[module];
           oo(&mod)->process_state = Unprocessed(void);
           oo(&mod)->module_name = mod_name;
@@ -1009,11 +1019,14 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
 }
 
 func process_module(cs *checkstate, mod_name sym) opt[module_id] {
+  dbgcheck(_u8("process_module"));
   switch load_module(cs, mod_name) {
     case None(v): {
+      dbgcheck(_u8("load_module None"));
       return None();
     }
     case Has(id module_id): {
+      dbgcheck(_u8("load_module Has"));
       mod *module = ref_module(cs, id);
       if mod->process_state == Unprocessed(void) {
          if !process_module_toplevels(cs, mod) {

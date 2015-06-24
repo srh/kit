@@ -54,6 +54,10 @@ func build_u8str(r *array[u8], x *u32) void {
   append(r, unsigned_as_dec(*x));
 }
 
+func build_u8str(r *array[u8], x *size) void {
+  append(r, unsigned_as_dec(*x));
+}
+
 func as_hex(x size) array[u8] {
   arr array[u8];
   if x == 0 {
