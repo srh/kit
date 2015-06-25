@@ -5419,7 +5419,7 @@ int check_negcase(struct identmap *im, const char *name, const char *data) {
   return 1;
 }
 
-int check_testcases(struct identmap *im) {
+int check_file_testcases(struct identmap *im) {
   struct test_module mods1[] = { { "foo",
                                    "import bar;\n"
                                    "\n"
@@ -5469,6 +5469,11 @@ int check_testcases(struct identmap *im) {
                         "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
                         "deftype bar struct { z foo[bar, u32]; };\n");
 
+  return pass;
+}
+
+int check_def_testcases(struct identmap *im) {
+  int pass = 1;
   pass &= check_foocase(im, "check_file_test_def_1",
                         "def x i32 = 3;\n");
   /* Passes now because numeric literals are flexible. */
@@ -5477,7 +5482,11 @@ int check_testcases(struct identmap *im) {
   pass &= check_foocase(im, "check_file_test_def_3",
                         "def[] x i32 = 3;\n"
                         "def y i32 = x;\n");
+  return pass;
+}
 
+int check_lambda_testcases(struct identmap *im) {
+  int pass = 1;
   pass &= check_foocase(im, "check_file_test_lambda_1",
                         "def x i32 = 3;\n"
                         "def y fn[i32, i32] = func(z i32)i32 {\n"
@@ -5663,7 +5672,11 @@ int check_testcases(struct identmap *im) {
       im, "check_file_test_lambda_29",
       "def y i32 = -x;\n"
       "def x i32 = -y;\n");
+  return pass;
+}
 
+int check_extern_testcases(struct identmap *im) {
+  int pass = 1;
   pass &= check_foocase(
       im, "check_file_test_extern_1",
       "extern putchar fn[i32, i32];\n"
@@ -5690,7 +5703,17 @@ int check_testcases(struct identmap *im) {
       "  putchar(10);\n"
       "  return 1;\n"
       "};\n");
+  return pass;
+}
 
+int check_testcases(struct identmap *im) {
+  /* The way these tests are divided up is nonsense, e.g. 'lambda'
+  includes many non-lambda-related test cases. */
+  int pass = 1;
+  pass &= check_file_testcases(im);
+  pass &= check_def_testcases(im);
+  pass &= check_lambda_testcases(im);
+  pass &= check_extern_testcases(im);
 
   return pass;
 }
