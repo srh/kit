@@ -1381,23 +1381,36 @@ func collapse_indexers(indexers array[ast_expr], param ast_typeexpr) ast_typeexp
 
 func parse_rest_of_string_literal(p *ps, out *ast_expr) bool {
   specs array[ast_charspec];
-  for ;; {
-    switch peek(p).val {
-      case StringDelim(ch i32): {
-        check(ch == '\"');
-        step(p);
-        *out = mk(StringLiteral({specs}));
-        return true;
+  again bool = true;
+  while again {
+    done bool = false;
+    while !done {
+      switch peek(p).val {
+        case StringDelim(ch i32): {
+          check(ch == '\"');
+          step(p);
+          done = true;
+        }
+        case StringChar(ch i32): {
+          push(&specs, {ch});
+          string_step(p, '\"');
+        }
+        default: {
+          return Fail;
+        }
       }
-      case StringChar(ch i32): {
-        push(&specs, {ch});
+    }
+
+    again = false;
+    if case StringDelim(ch i32) = peek(p).val {
+      if ch == '\"' {
         string_step(p, '\"');
-      }
-      default: {
-        return Fail;
+        again = true;
       }
     }
   }
+  *out = mk(StringLiteral({specs}));
+  return true;
 }
 
 func parse_rest_of_char_literal(p *ps, out *ast_expr) bool {
@@ -1546,6 +1559,8 @@ func test_parse() bool {
                                _u8("def foo u8 = \"\\x2Azq\";\n"));
   pass = pass & run_parse_test(_u8("p035-b"),
                                _u8("def foo u8 = \"\";\n"));
+  pass = pass & run_parse_test(_u8("p035-c"),
+                               _u8("def foo u8 = \"abc\" \"def\";\n"));
   pass = pass & run_parse_test(_u8("p036-a"),
                                _u8("func a() b { switch c { case e(f g): { } case h(i): { j; } default: { } } }"));
   pass = pass & run_parse_test(_u8("p036-b"),

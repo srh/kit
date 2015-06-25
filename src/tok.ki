@@ -249,6 +249,11 @@ func is_ident_postchar(x i32) bool {
   return !is_ident_midchar(x);
 }
 
+func is_string_postchar(x i32) bool {
+  // TODO: Implement for real.
+  return x != '\'' && x != '\"';
+}
+
 func is_ws(x i32) bool {
   return x == ' ' || x == '\n' || x == '\t' || x == '\r';
 }
@@ -592,7 +597,12 @@ func string_grab_tok(p *ps, stop i32) tok {
     if ch != stop {
       return {{left, ps_pos(p)}, StringChar(ch)};
     } else {
-      return {{left, ps_pos(p)}, StringDelim(ch)};
+      dh i32 = ps_peek(p);
+      if is_string_postchar(dh) {
+        return {{left, ps_pos(p)}, StringDelim(ch)};
+      } else {
+        return {{left, ps_pos(p)}, Bad(void)};
+      }
     }
   }
 
