@@ -6275,64 +6275,24 @@ int check_testcases(struct identmap *im) {
       "  return &x[0] == &x;\n"
       "}\n");
 
-
-
-  return pass;
-}
-
-
-int check_file_test_more_61(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_foocase(
+      im, "check_file_test_more_61",
       "func foo(x osize, y size) osize {\n"
       "  return x + ~y;\n"
-      "}\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_62(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+      "}\n");
+  pass &= check_foocase(
+      im, "check_file_test_more_62",
       "func foo(x ptr[i32]) bool {\n"
       "  return x == null;\n"
-      "}\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_63(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
+      "}\n");
   /* Fails because size is not a ptr[_]. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_negcase(
+      im, "check_file_test_more_63",
       "func foo(x size) bool {\n"
       "  return x == null;\n"
-      "}\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_64(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+      "}\n");
+  pass &= check_foocase(
+      im, "check_file_test_more_64",
       "defenum ty {\n"
       "  c1 void;\n"
       "  c2 struct { p i32; q i32; };\n"
@@ -6344,20 +6304,10 @@ int check_file_test_more_64(void *ctx, const uint8_t *name, size_t name_count,
       "      return s.p + s.q;\n"
       "    }\n"
       "  }\n"
-      "};\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_65a(void *ctx, const uint8_t *name, size_t name_count,
-                             char **filepath_out, size_t *filepath_count_out,
-                             uint8_t **data_out, size_t *data_count_out) {
+      "};\n");
   /* Fails because of overlapping default cases. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_negcase(
+      im, "check_file_test_more_65a",
       "defenum ty {\n"
       "  c1 void;\n"
       "  c2 struct { p i32; q i32; };\n"
@@ -6370,21 +6320,10 @@ int check_file_test_more_65a(void *ctx, const uint8_t *name, size_t name_count,
       "      return s.p + s.q;\n"
       "    }\n"
       "  }\n"
-      "};\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-
-int check_file_test_more_65b(void *ctx, const uint8_t *name, size_t name_count,
-                             char **filepath_out, size_t *filepath_count_out,
-                             uint8_t **data_out, size_t *data_count_out) {
+      "};\n");
   /* Fails because of overlapping default cases. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_negcase(
+      im, "check_file_test_more_65b",
       "defenum ty {\n"
       "  c1 void;\n"
       "  c2 struct { p i32; q i32; };\n"
@@ -6397,12 +6336,13 @@ int check_file_test_more_65b(void *ctx, const uint8_t *name, size_t name_count,
       "      return s.p + s.q;\n"
       "    }\n"
       "  }\n"
-      "};\n"
-    } };
+      "};\n");
 
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
+
+  return pass;
 }
+
+
 
 int check_file_test_more_66(void *ctx, const uint8_t *name, size_t name_count,
                             char **filepath_out, size_t *filepath_count_out,
@@ -6621,42 +6561,6 @@ int test_check_file(void) {
   ident_value foo = identmap_intern_c_str(&im, "foo");
 
   if (!check_testcases(&im)) {
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_more_61...\n");
-  if (!test_check_module(&im, &check_file_test_more_61, foo)) {
-    DBG("check_file_test_more_61 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_more_62...\n");
-  if (!test_check_module(&im, &check_file_test_more_62, foo)) {
-    DBG("check_file_test_more_62 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_more_63...\n");
-  if (!!test_check_module(&im, &check_file_test_more_63, foo)) {
-    DBG("check_file_test_more_63 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_more_64...\n");
-  if (!test_check_module(&im, &check_file_test_more_64, foo)) {
-    DBG("check_file_test_more_64 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_more_65a...\n");
-  if (!!test_check_module(&im, &check_file_test_more_65a, foo)) {
-    DBG("check_file_test_more_65a fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_more_65b...\n");
-  if (!!test_check_module(&im, &check_file_test_more_65b, foo)) {
-    DBG("check_file_test_more_65b fails\n");
     goto cleanup_identmap;
   }
 
