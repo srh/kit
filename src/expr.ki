@@ -223,6 +223,27 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       return check_expr_index(es, x, &a, pt);
     }
     case &Lambda(a ast_lambda): {
+      // TODO: Cache type.
+      type ast_typeexpr = lambda_declared_type(&es->cs->cym, &a);
+      // TODO: Cache converted.
+      converted te_typeexpr;
+      if !convert_typeexpr(es->cs, &type, &converted) {
+        return false;
+      }
+      // TODO: I see some duplicated logic with the TypedExpr case.
+      computed_complete bool;
+      computed te_typeexpr;
+      if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed, &computed_complete) {
+        return false;
+      }
+      // Lambda exprs can't have partial types (yet!).
+      check(computed_complete);
+      unified te_typeexpr;
+      if !unify_types(pt, &computed, &unified) {
+        ERR(_u8("Lambda is incompatible with contextual type."));
+        return false;
+      }
+      // TODO: We need to check that the parameter names are unique, and check the body.
       return TODO();
     }
     case &LocalField(a ast_local_field): {
