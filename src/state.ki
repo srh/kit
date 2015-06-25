@@ -192,6 +192,11 @@ func trivialOrNot(is_trivial bool) derived_method_behavior {
   }
 }
 
+deftype numeric_type_properties struct {
+  minval bigint;
+  maxval bigint;
+};
+
 deftype type_properties struct {
   flat_size u32;
   flat_alignment u32;

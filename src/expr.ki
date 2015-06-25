@@ -184,7 +184,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &NumericLiteral(a ast_numeric_literal): {
-      return check_numeric_literal(es->cs, pt, numeric_literal_value(&a), x);
+      return check_numeric_literal(es->cs, ai, pt, numeric_literal_value(&a), x);
     }
 
     case &BoolLiteral(a ast_bool_literal): {
@@ -316,8 +316,28 @@ func numeric_literal_value(a *ast_numeric_literal) bigint {
   }
 }
 
-func check_numeric_literal(cs *checkstate, pt *te_typeexpr, n bigint, x *ast_expr) bool {
-  return TODO();
+func check_numeric_literal(cs *checkstate, ai allow_incomplete, pt *te_typeexpr, n bigint, x *ast_expr) bool {
+  if case &TeUnknown(v void) = pt {
+    if ai == AllowIncompleteYes(void) {
+      annotate_info(x, IncompleteCheck(TeUnknown(void)));
+      return true;
+    } else {
+      ERR(_u8("Numeric literal usage is ambiguous."));
+      return false;
+    }
+  }
+
+  facts numeric_type_properties;
+  if !is_numeric_type(cs, pt, &facts) {
+    ERR(_u8("Numeric literal in bad place."));
+    return false;
+  }
+  if n < facts.minval || n > facts.maxval {
+    ERR(_u8("Numeric literal out of range."));
+    return false;
+  }
+  annotate_info(x, CompleteCheck(*pt));
+  return true;
 }
 
 func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr) bool {

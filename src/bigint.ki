@@ -21,8 +21,20 @@ access bigint {
 
   func `~`(x u32) bigint {
     parts array[u32];
-    push(&parts, x);
+    if x != 0 {
+      push(&parts, x);
+    }
     return mk(false, parts);
+  }
+
+  func `~`(x i32) bigint {
+    if x >= 0 {
+      return ~(@[u32]~x);
+    } else {
+      y bigint = ~(@[u32]~((x + 0x40000000) + 0x40000000));
+      z bigint = ~(@[u32]0x40000000);
+      return (y - z) - z;
+    }
   }
 
   func `+`(x bigint, y bigint) bigint {
@@ -197,6 +209,62 @@ access bigint {
 
   func `==`(x bigint, y bigint) bool {
     return x.negative == y.negative && array_equal(&x.parts, &y.parts);
+  }
+  func `!=`(x bigint, y bigint) bool {
+    return !(x == y);
+  }
+
+  func backwards_lexicographic_less(x *u32, y *u32, n size) bool {
+    while n > 0 {
+      n = n - 1;
+      if x[n] < y[n] {
+        return true;
+      } else if x[n] > y[n] {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  func `<`(x bigint, y bigint) bool {
+    if x.negative {
+      if y.negative {
+        xn size = count(&x.parts);
+        yn size = count(&y.parts);
+        if xn == yn {
+          return backwards_lexicographic_less(data(&x.parts), data(&y.parts), xn);
+        } else if xn < yn {
+          return false;
+        } else {
+          return true;
+        }
+      } else {
+        return true;
+      }
+    } else {
+      if y.negative {
+        return false;
+      } else {
+        xn size = count(&x.parts);
+        yn size = count(&y.parts);
+        if xn == yn {
+          return backwards_lexicographic_less(data(&x.parts), data(&y.parts), xn);
+        } else if xn < yn {
+          return true;
+        } else {
+          return false;
+        }
+      }
+    }
+  }
+  func `<=`(x bigint, y bigint) bool {
+    return !(y < x);
+  }
+  func `>`(x bigint, y bigint) bool {
+    return y < x;
+  }
+  func `>=`(x bigint, y bigint) bool {
+    return !(x < y);
   }
 }
 

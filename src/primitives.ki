@@ -50,6 +50,24 @@ func add_primitives(cs *checkstate) void {
   add_simple_primitive(cs, cs->cym.u32sym, cs->platform.u32size, cs->platform.u32align);
 }
 
+func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_type_properties) bool {
+  // TODO: This implementation is completely bogus.
+  if case &TeName(a te_name) = pt {
+    if a.value == cs->cym.i32sym {
+      m bigint = ~ @[u32]0x7FFFFFFF;
+      *out = {-(m + ~ @[u32]1), m};
+      return true;
+    } else if a.value == cs->cym.u32sym {
+      m bigint = ~ @[u32]0xFFFFFFFF;
+      *out = {~ @[u32]0, m};
+      return true;
+    } else {
+      return false;
+    }
+  }
+  return false;
+}
+
 func add_simple_primitive(cs *checkstate, name sym, flat_size u32, flat_alignment u32) void {
   inst_id deftype_inst_id
       = add_deftype_inst(cs, {NoParms(void),
@@ -67,3 +85,4 @@ func add_simple_primitive(cs *checkstate, name sym, flat_size u32, flat_alignmen
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" module.
 }
+
