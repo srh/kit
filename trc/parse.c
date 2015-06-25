@@ -1765,16 +1765,40 @@ int parse_rest_of_string_literal(struct ps *p, struct pos pos_start,
   size_t values_count = 0;
   size_t values_limit = 0;
 
-  while (ps_peek(p) != '\"') {
-    uint8_t value;
-    if (!parse_string_char(p, &value)) {
+  struct pos pos_end;
+
+  for (;;) {
+    while (ps_peek(p) != '\"') {
+      uint8_t value;
+      if (!parse_string_char(p, &value)) {
+        return 0;
+      }
+      SLICE_PUSH(values, values_count, values_limit, value);
+    }
+
+    ps_step(p);
+    /* We count the terminating double-quote character (try_skip_char
+    counts the opining double-quote character). */
+    ps_count_leaf(p);
+
+    pos_end = ps_pos(p);
+
+    /* Prevents concatenated string literals from being _too_ close. */
+    if (ps_peek(p) == '\"') {
       return 0;
     }
-    SLICE_PUSH(values, values_count, values_limit, value);
+
+    if (!skip_ws(p)) {
+      return 0;
+    }
+
+    /* You can concat string literals like in C. */
+    if (!try_skip_char(p, '\"')) {
+      break;
+    }
   }
 
-  ps_step(p);
-  ast_string_literal_init(out, ast_meta_make(pos_start, ps_pos(p)),
+  ast_string_literal_init(out, ast_meta_make(pos_start, pos_end),
                           values, values_count);
   return 1;
 }
@@ -2990,9 +3014,13 @@ int parse_test_defs(void) {
   pass &= run_count_test("def23",
                          "def foo u8 = '\\x2A';\n",
                          8);
-  pass &= run_count_test("def24",
+  pass &= run_count_test("def24-a",
                          "def foo [11]u8 = \"\\x2Abcdef\";\n",
-                         15);
+                         16);
+  pass &= run_count_test("def24-b",
+                         "def foo [21]u8 = \"\\x2Abcdef\"\n"
+                         "  \"abcdefghi\\\"\";\n",
+                         28);
   pass &= run_count_test("def25",
                          "def a b = func() c {\n"
                          "  switch d {\n"
