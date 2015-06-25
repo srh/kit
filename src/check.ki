@@ -1562,11 +1562,16 @@ func test_loader(cs *checkstate, name sym) opt[array[u8]] {
   }
 }
 
+func test_platform() platform_info {
+  ret platform_info = {1, 1, 1, 1, 2, 2, 4, 4, 4, 4};
+  return ret;
+}
+
 func[T] run_check_test(name T, file array[u8]) bool {
   print(Stdout(), _u8("test "), _u8(name), _u8("..."));
   fflush(Stdout());
   im identmap;
-  cs checkstate = make_checkstate(&im, @[*void]cast(&file), test_loader);
+  cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
   add_primitives(&cs);
   if !check_module(&cs, intern(&im, testmodule_name())) {
     print(Stdout(), _u8("FAIL\n"));

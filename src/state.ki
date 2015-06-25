@@ -7,6 +7,19 @@ import shp;
 import typeexpr;
 import u8ast;
 
+deftype platform_info struct {
+  boolsize u32;
+  boolalign u32;
+  u8size u32;
+  u8align u32;
+  u16size u32;
+  u16align u32;
+  u32size u32;
+  u32align u32;
+  ptrsize u32;
+  ptralign u32;
+};
+
 deftype common_syms struct {
   fnsym sym;
   boolsym sym;
@@ -24,6 +37,7 @@ deftype common_syms struct {
 
 deftype checkstate struct {
   im *identmap;
+  platform platform_info;
   cym common_syms;
   loader_ctx *void;
   loader fn[*checkstate, sym, opt[array[u8]]];
@@ -41,9 +55,10 @@ deftype checkstate struct {
   defs_by_name hash[sym, array[def_entry_id]];
 };
 
-func make_checkstate(im *identmap, loader_ctx *void, loader fn[*checkstate, sym, opt[array[u8]]]) checkstate {
+func make_checkstate(im *identmap, platform platform_info, loader_ctx *void, loader fn[*checkstate, sym, opt[array[u8]]]) checkstate {
   ret checkstate;
   ret.im = im;
+  ret.platform = platform;
   ret.cym = make_common_syms(im);
   ret.loader_ctx = loader_ctx;
   ret.loader = loader;

@@ -45,10 +45,9 @@ func pointer_to(cs *checkstate, t te_typeexpr) te_typeexpr {
 }
 
 func add_primitives(cs *checkstate) void {
-  // TODO: The size and alignment of these values is platform-dependent.
-  add_simple_primitive(cs, cs->cym.boolsym, 1, 1);
-  add_simple_primitive(cs, cs->cym.i32sym, 4, 4);
-  add_simple_primitive(cs, cs->cym.u32sym, 4, 4);
+  add_simple_primitive(cs, cs->cym.boolsym, cs->platform.boolsize, cs->platform.boolalign);
+  add_simple_primitive(cs, cs->cym.i32sym, cs->platform.u32size, cs->platform.u32align);
+  add_simple_primitive(cs, cs->cym.u32sym, cs->platform.u32size, cs->platform.u32align);
 }
 
 func add_simple_primitive(cs *checkstate, name sym, flat_size u32, flat_alignment u32) void {
