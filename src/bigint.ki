@@ -1,0 +1,244 @@
+import array;
+
+defclass copy bigint struct {
+  negative bool;
+  // We use a 2's complement representation.  (So -2 is represented by [0xFFFFFFFE], -1 is represented by [].)
+  parts array[u32];
+};
+
+access bigint {
+  func do_init(b *bigint) void {
+    init(&b->negative);
+    init(&b->parts);
+  }
+
+  func mk(negative bool, parts array[u32]) bigint {
+    ret bigint;
+    ret.negative = negative;
+    ret.parts = parts;
+    return ret;
+  }
+
+  func `~`(x u32) bigint {
+    parts array[u32];
+    push(&parts, x);
+    return mk(false, parts);
+  }
+
+  func `+`(x bigint, y bigint) bigint {
+    xn size = count(&x.parts);
+    yn size = count(&y.parts);
+    maxn size = max(xn, yn);
+    build array[u32];
+    carry u32 = 0;
+    for i size = 0; i < maxn; i = i + 1 {
+      xval u32 = getbigdigit(&x, i);
+      yval u32 = getbigdigit(&y, i);
+      oflow1 u32;
+      sum u32;
+      add_oflow(xval, yval, &sum, &oflow1);
+      oflow2 u32;
+      add_oflow(carry, sum, &sum, &oflow2);
+      carry = oflow1 + oflow2;
+      push(&build, sum);
+    }
+    if x.negative != y.negative {
+      return squash(carry == 0, &build);
+    } else if x.negative {
+      // Both negative.
+      if carry == 0 {
+        push(&build, 0xFFFFFFFE);
+      }
+      return squash(true, &build);
+    } else {
+      // Both positive;
+      if carry == 1 {
+        push(&build, 1);
+      }
+      return squash(false, &build);
+    }
+  }
+
+  func getbigdigit(x *bigint, i size) u32 {
+    if i < count(&x->parts) {
+      return get(&x->parts, i);
+    } else {
+      if x->negative {
+        return ^ @[u32] 0;
+      } else {
+        return 0;
+      }
+    }
+  }
+
+  func squash(negative bool, build *array[u32]) bigint {
+    val u32;
+    if negative {
+      val = ^ @[u32] 0;
+    } else {
+      val = 0;
+    }
+    n size = count(build);
+    while n > 0 {
+      n = n - 1;
+      if get(build, n) != val {
+        return mk(negative, *build);
+      }
+      pop(build);
+    }
+    return mk(negative, *build);
+  }
+
+  func add_to_array(x *array[u32], ix size, val u32) void {
+    n size = count(x);
+    while ix < n && val != 0 {
+      add_oflow(get(x, ix), val, ref(x, ix), &val);
+      ix = ix + 1;
+    }
+  }
+
+  func `*`(x bigint, y bigint) bigint {
+    xn size = count(&x.parts);
+    yn size = count(&y.parts);
+    ressize size = xn + yn + 3;
+    build array[u32] = repeat(0, ressize + 1);
+    carry u32 = 0;
+    for i size = 0; i < ressize; i = i + 1 {
+      for j size = 0; j < ressize - i; j = j + 1 {
+        lo u32;
+        hi u32;
+        multiply_oflow(getbigdigit(&x, i), getbigdigit(&y, j), &lo, &hi);
+        add_to_array(&build, i + j + 1, hi);
+        add_to_array(&build, i + j, lo);
+      }
+    }
+    signword u32 = get(&build, ressize - 2);
+    if signword == 0 {
+      pop(&build);
+      return squash(false, &build);
+    } else if signword == ^ @[u32] 0 {
+      pop(&build);
+      return squash(true, &build);
+    } else {
+      crash(_u8("bigint multiplication algorithm fail"));
+      return fake();
+    }
+  }
+
+  func add_oflow(x u32, y u32, sum_out *u32, carry_out *u32) void {
+    xl u32 = (x & 0xFFFF);
+    xh u32 = (x >> 16);
+    yl u32 = (y & 0xFFFF);
+    yh u32 = (y >> 16);
+    q0 u32 = xl + yl;
+    q1 u32 = xh + yh + (q0 >> 16);
+    *sum_out = (((q1 & 0xFFFF) << 16) | (q0 & 0xFFFF));
+    *carry_out = (q1 >> 16);
+  }
+
+  func multiply_oflow(x u32, y u32, lo_out *u32, hi_out *u32) void {
+    xl u32 = (x & 0xFFFF);
+    xh u32 = (x >> 16);
+    yl u32 = (y & 0xFFFF);
+    yh u32 = (y >> 16);
+    p00 u32 = xl * yl;
+    p01 u32 = xl * yh;
+    p10 u32 = xh * yl;
+    p11 u32 = xh * yh;
+
+    q0 u32 = (p00 & 0xFFFF);
+    q1 u32 = (p00 >> 16) + (p01 & 0xFFFF) + (p10 & 0xFFFF);
+    q2 u32 = (p01 >> 16) + (p10 >> 16) + (p11 & 0xFFFF);
+    q3 u32 = (p11 >> 16);
+
+    q1 = q1 + (q0 >> 16);
+    q2 = q2 + (q1 >> 16);
+    q3 = q3 + (q2 >> 16);
+
+    *lo_out = (((q1 & 0xFFFF) << 16) | (q0 & 0xFFFF));
+    *hi_out = (((q3 & 0xFFFF) << 16) | (q2 & 0xFFFF));
+  }
+
+  func `^`(x bigint) bigint {
+    n size = count(&x.parts);
+    for i size = 0; i < n; i = i + 1 {
+      p *u32 = ref(&x.parts, i);
+      *p = ^ *p;
+    }
+    x.negative = !x.negative;
+    return x;
+  }
+
+  func incr(x bigint) bigint {
+    carry u32 = 1;
+    n size = count(&x.parts);
+    for i size = 0; carry != 0 && i < n; i = i + 1 {
+      p *u32 = ref(&x.parts, i);
+      add_oflow(carry, *p, p, &carry);
+    }
+    if x.negative {
+      return squash(carry == 0, &x.parts);
+    } else {
+      if carry != 0 {
+        push(&x.parts, carry);
+      }
+      return x;
+    }
+  }
+
+  func `-`(x bigint) bigint {
+    y bigint = ^x;
+    return incr(y);
+  }
+
+  func `-`(x bigint, y bigint) bigint {
+    return x + - y;
+  }
+
+  func `==`(x bigint, y bigint) bool {
+    return x.negative == y.negative && array_equal(&x.parts, &y.parts);
+  }
+}
+
+func `~`(x i8) bigint {
+  if x < 0 {
+    x32 i32 = ~x;
+    xu32 u32 = ~ (-x32);
+    positive bigint = ~xu32;
+    return -positive;
+  } else {
+    return ~ @[u32] ~x;
+  }
+}
+
+func convert_to_bigint(base u32, digits *array[i8]) bigint {
+  acc bigint;
+  bigbase bigint = ~base;
+  n size = count(digits);
+  for i size = 0; i < n; i = i + 1 {
+    x i8 = get(digits, i);
+    check(x >= 0 && @[u32]~x < base);
+    acc = acc * bigbase + ~x;
+  }
+  return acc;
+}
+
+func[T] big(arr T) bigint {
+  b array[i8];
+  for i size = 0; i < arr.length; i = i + 1 {
+    val i8 = ~(@[u8] arr[i] - '0');
+    check(val < 10);
+    push(&b, val);
+  }
+  return convert_to_bigint(10, &b);
+}
+
+func test_bigint() bool {
+  pass bool = true;
+  pass = pass & (big("1") + big("2") == big("3"));
+  pass = pass & (big("20") + big("30") == big("50"));
+  pass = pass & (big("2000000000") + big("3000000000") == big("5000000000"));
+  pass = pass & (big("2000000000") - big("3000000000") == - big("1000000000"));
+  pass = pass & ((-big("10000000000")) * (-big("17")) == big("170000000000"));
+  return pass;
+}

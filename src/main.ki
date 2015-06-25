@@ -21,7 +21,14 @@ export func main(argc i32, argv **u8) i32 {
     print(Stdout(), _u8("check_test FAIL\n"));
   }
   fflush(Stdout());
-  if test_parse_passed && test_check_passed {
+  test_bigint_passed bool = test_bigint();
+  if test_bigint_passed {
+    print(Stdout(), _u8("check_bigint passes\n"));
+  } else {
+    print(Stdout(), _u8("check_bigint FAIL\n"));
+  }
+  fflush(Stdout());
+  if test_parse_passed && test_check_passed && test_bigint_passed {
     print(Stdout(), _u8("All tests PASS!\n"));
   } else {
     print(Stdout(), _u8("FAIL FAIL FAIL\n"));

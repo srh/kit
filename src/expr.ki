@@ -1,3 +1,4 @@
+import bigint;
 import check;
 import primitives;
 
@@ -183,9 +184,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &NumericLiteral(a ast_numeric_literal): {
-      // TODO: Make this actually be an abstract numeric type.  (This is a temporary implementation so I can write some type-checking tests conveniently.)
-      // TODO: The numeric value will need to be shown to be in range, too.
-      return help_check_simple_literal(pt, primitive_i32_type(es->cs), _u8("numeric"), x);
+      return check_numeric_literal(es->cs, pt, numeric_literal_value(&a), x);
     }
 
     case &BoolLiteral(a ast_bool_literal): {
@@ -304,6 +303,21 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       return TODO();
     }
   }
+}
+
+func numeric_literal_value(a *ast_numeric_literal) bigint {
+  switch a {
+    case &HexLiteral(b ast_hex_literal): {
+      return convert_to_bigint(16, &b.digits);
+    }
+    case &DecLiteral(b ast_dec_literal): {
+      return convert_to_bigint(10, &b.digits);
+    }
+  }
+}
+
+func check_numeric_literal(cs *checkstate, pt *te_typeexpr, n bigint, x *ast_expr) bool {
+  return TODO();
 }
 
 func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr) bool {
