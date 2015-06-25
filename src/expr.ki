@@ -324,6 +324,20 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
 }
 
 func check_field(cs *checkstate, t *te_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *te_typeexpr) bool {
+  fieldtype te_typeexpr;
+  if !lookup_field(cs, t, a, &fieldtype) {
+    return false;
+  }
+  unified te_typeexpr;
+  if !unify_types(pt, &fieldtype, &unified) {
+    ERR(_u8("field has wrong type."));
+    return false;
+  }
+  *fieldtype_out = fieldtype;
+  return true;
+}
+
+func lookup_field(cs *checkstate, t *te_typeexpr, a *ast_fieldname, fieldtype_out *te_typeexpr) bool {
   return TODO();
 }
 
