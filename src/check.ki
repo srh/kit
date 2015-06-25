@@ -911,6 +911,17 @@ func compute_type_properties(cs *checkstate, clq *clqueue, t *te_typeexpr, out *
   }
 }
 
+func lambda_declared_type(cym *common_syms, a *ast_lambda) ast_typeexpr {
+  type_params array[ast_typeexpr];
+  n size = count(&a->args);
+  for i size = 0; i < n; i = i + 1 {
+    push(&type_params, ref(&a->args, i)->type);
+  }
+  push(&type_params, a->return_type);
+  // TODO: Something about the meta value and zero literal.
+  return App({embox(Name({@[ast_meta]~0, cym->fnsym})), type_params});
+}
+
 func quick_typeexpr(cym *common_syms, a *ast_def, out *ast_typeexpr) bool {
   if case &Has(s ast_typeexpr) = &a->syntactic_typeexpr {
     *out = s;
@@ -918,14 +929,7 @@ func quick_typeexpr(cym *common_syms, a *ast_def, out *ast_typeexpr) bool {
   } else {
     switch &a->rhs.u {
       case &Lambda(b ast_lambda): {
-        type_params array[ast_typeexpr];
-        n size = count(&b.args);
-        for i size = 0; i < n; i = i + 1 {
-          push(&type_params, ref(&b.args, i)->type);
-        }
-        push(&type_params, b.return_type);
-        // TODO: Something about the meta value and zero literal.
-        *out = App({embox(Name({@[ast_meta]~0, cym->fnsym})), type_params});
+        *out = lambda_declared_type(cym, &b);
         return true;
       }
       default: {
