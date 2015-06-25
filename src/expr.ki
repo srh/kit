@@ -337,8 +337,72 @@ func check_field(cs *checkstate, t *te_typeexpr, a *ast_fieldname, pt *te_typeex
   return true;
 }
 
-func lookup_field(cs *checkstate, t *te_typeexpr, a *ast_fieldname, fieldtype_out *te_typeexpr) bool {
-  return TODO();
+func lookup_field(cs *checkstate, t *te_typeexpr, f *ast_fieldname, fieldtype_out *te_typeexpr) bool {
+  switch f {
+    case &WholeField(v void): {
+      switch t {
+        case &TeName(a te_name): {
+          return TODO();
+        }
+        case &TeApp(a te_typeapp): {
+          return TODO();
+        }
+        default: {
+          ERR(_u8("whole field lookup on 'bare' type"));
+          return false;
+        }
+        case &TeUnknown(u void): {
+          ice(_u8("lookup_field sees incomplete type."));
+          return fake();
+        }
+      }
+    }
+    case &NameField(b ast_ident): {
+      switch t {
+        case &TeName(a te_name): {
+          return TODO();
+        }
+        case &TeApp(a te_typeapp): {
+          return TODO();
+        }
+        case &TeStruct(a te_struct): {
+          return lookup_field_from_list(cs, &a.fields, b.value, fieldtype_out);
+        }
+        case &TeEnum(a te_enum): {
+          ERR(_u8("field lookup on an enum type"));
+          return false;
+        }
+        case &TeUnion(a te_union): {
+          return lookup_field_from_list(cs, &a.fields, b.value, fieldtype_out);
+        }
+        case &TeArraytype(a te_arraytype): {
+          if b.value != cs->cym.lengthsym {
+            ERR(_u8("field lookup (not .length) on array type"));
+            return false;
+          }
+          *fieldtype_out = primitive_size_type(cs);
+          return true;
+        }
+        case &TeUnknown(v void): {
+          ice(_u8("lookup_field sees incomplete type"));
+          return fake();
+        }
+      }
+    }
+  }
+}
+
+func lookup_field_from_list(cs *checkstate, fields *array[te_vardecl], fieldname sym, fieldtype_out *te_typeexpr) bool {
+  n size = count(fields);
+  for i size = 0; i < n; i = i + 1 {
+    d *te_vardecl = ref(fields, i);
+    if d->name == fieldname {
+      *fieldtype_out = d->type;
+      return true;
+    }
+  }
+  ERR(_u8("fieldname '"), lookup(cs->im, fieldname), _u8("' not found"));
+  return false;
 }
 
 func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_funcall, pt *te_typeexpr) bool {

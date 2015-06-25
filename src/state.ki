@@ -33,6 +33,7 @@ deftype common_syms struct {
   sizesym sym;
   primitive_module_sym sym;
   ptrtype_sym sym;
+  lengthsym sym;
 };
 
 deftype checkstate struct {
@@ -79,6 +80,7 @@ func make_common_syms(im *identmap) common_syms {
   ret.sizesym = intern(im, from_u8(_u8("size")));
   ret.primitive_module_sym = intern(im, from_u8(_u8("<primitive>")));
   ret.ptrtype_sym = intern(im, from_u8(_u8("*")));
+  ret.lengthsym = intern(im, from_u8(_u8("length")));
   return ret;
 }
 
