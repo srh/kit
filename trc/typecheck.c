@@ -5706,14 +5706,8 @@ int check_extern_testcases(struct identmap *im) {
   return pass;
 }
 
-int check_testcases(struct identmap *im) {
-  /* The way these tests are divided up is nonsense, e.g. 'lambda'
-  includes many non-lambda-related test cases. */
+int check_more_testcases(struct identmap *im) {
   int pass = 1;
-  pass &= check_file_testcases(im);
-  pass &= check_def_testcases(im);
-  pass &= check_lambda_testcases(im);
-  pass &= check_extern_testcases(im);
 
   pass &= check_foocase(
       im, "check_file_test_more_1",
@@ -6338,96 +6332,46 @@ int check_testcases(struct identmap *im) {
       "  }\n"
       "};\n");
 
-
-  return pass;
-}
-
-
-
-int check_file_test_more_66(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_foocase(
+      im, "check_file_test_more_66",
       "deftype foo struct {\n"
       "  x i32;\n"
       "  y i32;\n"
       "};\n"
       "func bar(x i32) foo {\n"
       "  return { x, x };\n"
-      "}\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_67(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
+      "}\n");
   /* Fails because struct expr has wrong count. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_negcase(
+      im, "check_file_test_more_67",
       "deftype foo struct {\n"
       "  x i32;\n"
       "  y i32;\n"
       "};\n"
       "func bar(x i32) foo {\n"
       "  return { x, x, x };\n"
-      "}\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_68(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
+      "}\n");
   /* Fails because struct expr has wrong type. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_negcase(
+      im, "check_file_test_more_68",
       "deftype foo struct {\n"
       "  x i32;\n"
       "  y i32;\n"
       "};\n"
       "func bar(x i32, y u32) foo {\n"
       "  return { x, y };\n"
-      "}\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_69(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+      "}\n");
+  pass &= check_foocase(
+      im, "check_file_test_more_69",
       "deftype foo struct {\n"
       "  x i32;\n"
       "  y i32;\n"
       "};\n"
       "func bar(x i32) foo {\n"
       "  return { x, 5 };\n"
-      "}\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_70(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+      "}\n");
+  pass &= check_foocase(
+      im, "check_file_test_more_70",
       "deftype foo struct {\n"
       "  x i32;\n"
       "  y u32;\n"
@@ -6435,20 +6379,10 @@ int check_file_test_more_70(void *ctx, const uint8_t *name, size_t name_count,
       "func bar(x i32) foo {\n"
       "  ret foo = { x, 7 };\n"
       "  return ret;\n"
-      "}\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_71(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
-      "deftype foo struct {\n"
+      "}\n");
+  pass &= check_foocase(
+      im, "check_file_test_more_71",
+     "deftype foo struct {\n"
       "  x i32;\n"
       "  y u32;\n"
       "};\n"
@@ -6457,19 +6391,9 @@ int check_file_test_more_71(void *ctx, const uint8_t *name, size_t name_count,
       "}\n"
       "func quux(x foo) foo {\n"
       "  return {99, ~x.x};\n"
-      "}\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_72(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+      "}\n");
+  pass &= check_foocase(
+      im, "check_file_test_more_72",
       "deftype[T] foo struct { };\n"
       "func[T, U] make(arr U) foo[T] {\n"
       "  return {};\n"
@@ -6477,19 +6401,9 @@ int check_file_test_more_72(void *ctx, const uint8_t *name, size_t name_count,
       "func zed(blah foo[i32]) bool { return true; }\n"
       "func bar() bool {\n"
       "  return zed(make(\"test\"));\n"
-      "}\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_73(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+      "}\n");
+  pass &= check_foocase(
+      im, "check_file_test_more_73",
       "defenum ty {\n"
       "  c1 void;\n"
       "  c2 struct { p i32; q i32; };\n"
@@ -6499,19 +6413,9 @@ int check_file_test_more_73(void *ctx, const uint8_t *name, size_t name_count,
       "    return s.p + s.q;\n"
       "  }\n"
       "  return -1;\n"
-      "};\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_74(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+      "};\n");
+  pass &= check_foocase(
+      im, "check_file_test_more_74",
       "defenum ty {\n"
       "  c1 void;\n"
       "  c2 struct { p i32; q i32; };\n"
@@ -6522,20 +6426,10 @@ int check_file_test_more_74(void *ctx, const uint8_t *name, size_t name_count,
       "  } else {\n"
       "    return -1;\n"
       "  }\n"
-      "};\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_more_75(void *ctx, const uint8_t *name, size_t name_count,
-                            char **filepath_out, size_t *filepath_count_out,
-                            uint8_t **data_out, size_t *data_count_out) {
+      "};\n");
   /* Fails because pattern mismatch. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_negcase(
+      im, "check_file_test_more_75",
       "defenum ty {\n"
       "  c1 void;\n"
       "  c2 struct { p i32; q i32; };\n"
@@ -6546,88 +6440,24 @@ int check_file_test_more_75(void *ctx, const uint8_t *name, size_t name_count,
       "  } else {\n"
       "    return -1;\n"
       "  }\n"
-      "};\n"
-    } };
+      "};\n");
 
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
+  return pass;
 }
 
-
 int test_check_file(void) {
-  int ret = 0;
+  /* The way these tests are divided up is nonsense, e.g. 'lambda'
+  includes many non-lambda-related test cases. */
   struct identmap im;
   identmap_init(&im);
-  ident_value foo = identmap_intern_c_str(&im, "foo");
 
-  if (!check_testcases(&im)) {
-    goto cleanup_identmap;
-  }
+  int pass = 1;
+  pass &= check_file_testcases(&im);
+  pass &= check_def_testcases(&im);
+  pass &= check_lambda_testcases(&im);
+  pass &= check_extern_testcases(&im);
+  pass &= check_more_testcases(&im);
 
-  DBG("test_check_file check_file_test_more_66...\n");
-  if (!test_check_module(&im, &check_file_test_more_66, foo)) {
-    DBG("check_file_test_more_66 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_more_67...\n");
-  if (!!test_check_module(&im, &check_file_test_more_67, foo)) {
-    DBG("check_file_test_more_67 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_more_68...\n");
-  if (!!test_check_module(&im, &check_file_test_more_68, foo)) {
-    DBG("check_file_test_more_68 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_more_69...\n");
-  if (!test_check_module(&im, &check_file_test_more_69, foo)) {
-    DBG("check_file_test_more_69 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_more_70...\n");
-  if (!test_check_module(&im, &check_file_test_more_70, foo)) {
-    DBG("check_file_test_more_70 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_more_71...\n");
-  if (!test_check_module(&im, &check_file_test_more_71, foo)) {
-    DBG("check_file_test_more_71 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_more_72...\n");
-  if (!test_check_module(&im, &check_file_test_more_72, foo)) {
-    DBG("check_file_test_more_72 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_more_73...\n");
-  if (!test_check_module(&im, &check_file_test_more_73, foo)) {
-    DBG("check_file_test_more_73 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_more_74...\n");
-  if (!test_check_module(&im, &check_file_test_more_74, foo)) {
-    DBG("check_file_test_more_74 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_more_75...\n");
-  if (!!test_check_module(&im, &check_file_test_more_75, foo)) {
-    DBG("check_file_test_more_75 fails\n");
-    goto cleanup_identmap;
-  }
-
-
-
-  ret = 1;
- cleanup_identmap:
   identmap_destroy(&im);
-  return ret;
+  return pass;
 }
