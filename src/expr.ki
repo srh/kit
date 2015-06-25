@@ -200,8 +200,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &CharLiteral(a ast_char_literal): {
-      // See NumericLiteral case.
-      return TODO();
+      return check_numeric_literal(es->cs, ai, pt, ~a.charspec.value, x);
     }
 
     case &StringLiteral(a ast_string_literal): {
