@@ -5440,6 +5440,7 @@ int check_testcases(struct identmap *im) {
                         "deftype blah dword;\n"
                         "deftype feh ptr[blah];\n"
                         "deftype quux ptr[quux];\n");
+  /* Fails because foo holds itself flatly. */
   pass &= check_negcase(im, "check_file_test_3",
                         "def x i32 = 3;"
                         "deftype foo bar;\n"
@@ -5455,72 +5456,22 @@ int check_testcases(struct identmap *im) {
   pass &= check_foocase(im, "check_file_test_5",
                         "def x i32 = 3;"
                         "deftype[T] foo T;");
+  pass &= check_foocase(im, "check_file_test_6",
+                        "def x i32 = 3;"
+                        "deftype[T] foo struct { "
+                        "count u32; p ptr[T]; };\n");
+  /* Fails because bar recursively holds itself through a template parameter. */
+  pass &= check_negcase(im, "check_file_test_7",
+                        "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
+                        "deftype bar struct { z foo[u32, bar]; };\n");
+  pass &= check_foocase(im, "check_file_test_8",
+                        "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
+                        "deftype bar struct { z foo[bar, u32]; };\n");
+  pass &= check_foocase(im, "check_file_test_def_1",
+                        "def x i32 = 3;\n");
+  pass &= check_foocase(im, "check_file_test_def_2",
+                        "def x u32 = 3;\n");
   return pass;
-}
-
-int check_file_test_6(void *ctx, const uint8_t *name, size_t name_count,
-                      char **filepath_out, size_t *filepath_count_out,
-                      uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { { "foo",
-                               "def x i32 = 3;"
-                               "deftype[T] foo struct { "
-                               "count u32; p ptr[T]; };\n" } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_7(void *ctx, const uint8_t *name, size_t name_count,
-                      char **filepath_out, size_t *filepath_count_out,
-                      uint8_t **data_out, size_t *data_count_out) {
-  /* This fails because bar recursively holds itself through a
-  template parameter. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { { "foo",
-                               "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
-                               "deftype bar struct { z foo[u32, bar]; };\n" }
-  };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_8(void *ctx, const uint8_t *name, size_t name_count,
-                      char **filepath_out, size_t *filepath_count_out,
-                      uint8_t **data_out, size_t *data_count_out) {
-  /* But here bar holds itself indirectly. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { { "foo",
-                               "deftype[T, U] foo struct { x ptr[T]; y U; };\n"
-                               "deftype bar struct { z foo[bar, u32]; };\n" }
-  };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_def_1(void *ctx, const uint8_t *name, size_t name_count,
-                          char **filepath_out, size_t *filepath_count_out,
-                          uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { { "foo",
-                               "def x i32 = 3;\n" } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_def_2(void *ctx, const uint8_t *name, size_t name_count,
-                          char **filepath_out, size_t *filepath_count_out,
-                          uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { { "foo",
-                               "def x u32 = 3;\n" } };
-  /* Passes because numeric literals ain't so dumb anymore. */
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
 }
 
 int check_file_test_def_3(void *ctx, const uint8_t *name, size_t name_count,
@@ -7570,36 +7521,6 @@ int test_check_file(void) {
   ident_value foo = identmap_intern_c_str(&im, "foo");
 
   if (!check_testcases(&im)) {
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_6...\n");
-  if (!test_check_module(&im, &check_file_test_6, foo)) {
-    DBG("check_file_test_6 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_7...\n");
-  if (!!test_check_module(&im, &check_file_test_7, foo)) {
-    DBG("!check_file_test_7 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_8...\n");
-  if (!test_check_module(&im, &check_file_test_8, foo)) {
-    DBG("check_file_test_8 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_def_1...\n");
-  if (!test_check_module(&im, &check_file_test_def_1, foo)) {
-    DBG("check_file_test_def_1 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_def_2...\n");
-  if (!test_check_module(&im, &check_file_test_def_2, foo)) {
-    DBG("check_file_test_def_2 fails\n");
     goto cleanup_identmap;
   }
 
