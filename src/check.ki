@@ -1558,15 +1558,28 @@ func test_loader(cs *checkstate, name sym) opt[array[u8]] {
   }
 }
 
-func run_check_test(name array[u8], file array[u8]) bool {
+func[T] run_check_test(name T, file array[u8]) bool {
+  print(Stdout(), _u8("test "), _u8(name), _u8("..."));
+  fflush(Stdout());
   im identmap;
   cs checkstate = make_checkstate(&im, @[*void]cast(&file), test_loader);
   add_primitives(&cs);
-  return check_module(&cs, intern(&im, testmodule_name()));
+  if !check_module(&cs, intern(&im, testmodule_name())) {
+    print(Stdout(), _u8("FAIL\n"));
+    fflush(Stdout());
+    return false;
+  } else {
+    print(Stdout(), _u8("PASS\n"));
+    fflush(Stdout());
+    return true;
+  }
 }
 
 func test_check() bool {
   pass bool = true;
-  pass = pass & run_check_test(_u8("c001"), _u8("def x bool = true;"));
+  pass = pass & run_check_test("c001",
+       _u8("def x bool = true;"));
+  pass = pass & run_check_test("c002",
+       _u8("def x i32 = 3;\n deftype dword u32;\n deftype blah dword;\n"));
   return pass;
 }

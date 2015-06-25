@@ -11,10 +11,15 @@ deftype common_syms struct {
   fnsym sym;
   boolsym sym;
   voidsym sym;
+  i8sym sym;
   u8sym sym;
+  i16sym sym;
+  u16sym sym;
+  i32sym sym;
+  u32sym sym;
+  sizesym sym;
   primitive_module_sym sym;
   ptrtype_sym sym;
-  sizesym sym;
 };
 
 deftype checkstate struct {
@@ -50,10 +55,15 @@ func make_common_syms(im *identmap) common_syms {
   ret.fnsym = intern(im, from_u8(_u8("fn")));
   ret.boolsym = intern(im, from_u8(_u8("bool")));
   ret.voidsym = intern(im, from_u8(_u8("void")));
+  ret.i8sym = intern(im, from_u8(_u8("i8")));
   ret.u8sym = intern(im, from_u8(_u8("u8")));
+  ret.i16sym = intern(im, from_u8(_u8("i16")));
+  ret.u16sym = intern(im, from_u8(_u8("u16")));
+  ret.i32sym = intern(im, from_u8(_u8("i32")));
+  ret.u32sym = intern(im, from_u8(_u8("u32")));
+  ret.sizesym = intern(im, from_u8(_u8("size")));
   ret.primitive_module_sym = intern(im, from_u8(_u8("<primitive>")));
   ret.ptrtype_sym = intern(im, from_u8(_u8("*")));
-  ret.sizesym = intern(im, from_u8(_u8("size")));
   return ret;
 }
 

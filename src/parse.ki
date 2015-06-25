@@ -1425,7 +1425,7 @@ func parse_rest_of_char_literal(p *ps, out *ast_expr) bool {
 }
 
 
-
+// TODO: This is redundant with some stdlib function.
 func showu8(x size) array[u8] {
   ret array[u8];
   if x == 0 {

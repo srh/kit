@@ -31,6 +31,12 @@ func print(fp *FILE, arr1 array[u8], arr2 array[u8]) void {
   print(fp, arr2);
 }
 
+func print(fp *FILE, arr1 array[u8], arr2 array[u8], arr3 array[u8]) void {
+  print(fp, arr1);
+  print(fp, arr2);
+  print(fp, arr3);
+}
+
 func[T] debugstr(arr T) void {
   fwrite(cast(@[*u8]&arr[0]), sizeof@[u8], arr.length, Stderr());
   fflush(Stderr());

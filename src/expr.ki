@@ -183,7 +183,9 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &NumericLiteral(a ast_numeric_literal): {
-      return TODO();
+      // TODO: Make this actually be an abstract numeric type.  (This is a temporary implementation so I can write some type-checking tests conveniently.)
+      // TODO: The numeric value will need to be shown to be in range, too.
+      return help_check_simple_literal(pt, primitive_i32_type(es->cs), _u8("numeric"), x);
     }
 
     case &BoolLiteral(a ast_bool_literal): {

@@ -18,6 +18,10 @@ func primitive_u8_type(cs *checkstate) te_typeexpr {
   return TeName({cs->cym.u8sym, None()});
 }
 
+func primitive_i32_type(cs *checkstate) te_typeexpr {
+  return TeName({cs->cym.i32sym, None()});
+}
+
 func primitive_size_type(cs *checkstate) te_typeexpr {
   return TeName({cs->cym.sizesym, None()});
 }
@@ -41,7 +45,10 @@ func pointer_to(cs *checkstate, t te_typeexpr) te_typeexpr {
 }
 
 func add_primitives(cs *checkstate) void {
+  // TODO: The size and alignment of these values is platform-dependent.
   add_simple_primitive(cs, cs->cym.boolsym, 1, 1);
+  add_simple_primitive(cs, cs->cym.i32sym, 4, 4);
+  add_simple_primitive(cs, cs->cym.u32sym, 4, 4);
 }
 
 func add_simple_primitive(cs *checkstate, name sym, flat_size u32, flat_alignment u32) void {
