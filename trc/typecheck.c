@@ -5601,51 +5601,23 @@ int check_testcases(struct identmap *im) {
       "  }\n"
       "  return (*z).x + (&(*z))->y;\n"
       "};\n");
-
-  return pass;
-}
-
-int check_file_test_lambda_22(void *ctx, const uint8_t *name, size_t name_count,
-                              char **filepath_out, size_t *filepath_count_out,
-                              uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_foocase(
+      im, "check_file_test_lambda_22",
       "def[T] foo fn[ptr[T], T] = func(x ptr[T]) T { return *x; };\n"
       "def bar fn[i32] = func() i32 {\n"
       "  var x i32 = 3;\n"
       "  return foo(&x);\n"
-      "};\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_lambda_23(void *ctx, const uint8_t *name, size_t name_count,
-                              char **filepath_out, size_t *filepath_count_out,
-                              uint8_t **data_out, size_t *data_count_out) {
+      "};\n");
   /* Fails because the def does not match. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_negcase(
+      im, "check_file_test_lambda_23",
       "def[T] foo fn[ptr[T], T] = func(x ptr[T]) T { return *x; };\n"
       "def bar fn[i32] = func() i32 {\n"
       "  var x i32 = 3;\n"
       "  return foo(x);\n"
-      "};\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_lambda_24(void *ctx, const uint8_t *name, size_t name_count,
-                              char **filepath_out, size_t *filepath_count_out,
-                              uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+      "};\n");
+  pass &= check_foocase(
+      im, "check_file_test_lambda_24",
       "def[T] fac fn[T, T] = func(x T) T {\n"
       "  if (x == 0) {\n"
       "    return 1;\n"
@@ -5656,20 +5628,10 @@ int check_file_test_lambda_24(void *ctx, const uint8_t *name, size_t name_count,
       "def bar fn[i32] = func() i32 {\n"
       "  var x i32 = 5;\n"
       "  return fac(x);\n"
-      "};\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_lambda_25(void *ctx, const uint8_t *name, size_t name_count,
-                              char **filepath_out, size_t *filepath_count_out,
-                              uint8_t **data_out, size_t *data_count_out) {
+      "};\n");
   /* Fails because of recursive template instantiation. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_negcase(
+      im, "check_file_test_lambda_25",
       "deftype[T] foo struct { x i32; };\n"
       "def[T] biggefy fn[T, foo[T]] = func(x T) foo[T] {\n"
       "  return biggefy(x);\n"
@@ -5680,127 +5642,60 @@ int check_file_test_lambda_25(void *ctx, const uint8_t *name, size_t name_count,
       "def bar fn[i32] = func() i32 {\n"
       "  var x u32 = 5;\n"
       "  return rec(x);\n"
-      "};\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_lambda_26(void *ctx, const uint8_t *name, size_t name_count,
-                              char **filepath_out, size_t *filepath_count_out,
-                              uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+      "};\n");
+  pass &= check_foocase(
+      im, "check_file_test_lambda_26",
       "def x i32 = 3;\n"
       "def y u32 = 3 + 4;\n"
-      "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"
-    } };
+      "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n");
 
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_lambda_27(void *ctx, const uint8_t *name, size_t name_count,
-                              char **filepath_out, size_t *filepath_count_out,
-                              uint8_t **data_out, size_t *data_count_out) {
   /* Fails because you can't evaluate z(3) statically. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_negcase(
+      im, "check_file_test_lambda_27",
       "def x i32 = z(3);\n"
-      "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_lambda_28(void *ctx, const uint8_t *name, size_t name_count,
-                              char **filepath_out, size_t *filepath_count_out,
-                              uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+      "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n");
+  pass &= check_foocase(
+      im, "check_file_test_lambda_28",
       "def y i32 = -x;\n"
-      "def x i32 = -3;\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_lambda_29(void *ctx, const uint8_t *name, size_t name_count,
-                              char **filepath_out, size_t *filepath_count_out,
-                              uint8_t **data_out, size_t *data_count_out) {
+      "def x i32 = -3;\n");
   /* Fails because of cyclic reference. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_negcase(
+      im, "check_file_test_lambda_29",
       "def y i32 = -x;\n"
-      "def x i32 = -y;\n"
-    } };
+      "def x i32 = -y;\n");
 
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_extern_1(void *ctx, const uint8_t *name, size_t name_count,
-                              char **filepath_out, size_t *filepath_count_out,
-                             uint8_t **data_out, size_t *data_count_out) {
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_foocase(
+      im, "check_file_test_extern_1",
       "extern putchar fn[i32, i32];\n"
       "def foo fn[i32] = func()i32 {\n"
       "  putchar(65);\n"
       "  putchar(10);\n"
       "  return 1;\n"
-      "};\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_extern_2(void *ctx, const uint8_t *name, size_t name_count,
-                              char **filepath_out, size_t *filepath_count_out,
-                             uint8_t **data_out, size_t *data_count_out) {
+      "};\n");
   /* Fails because putchar is called with the wrong type. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_negcase(
+      im, "check_file_test_extern_2",
       "extern putchar fn[i32, i32];\n"
       "def foo fn[i32] = func()i32 {\n"
       "  putchar(@[u32]65);\n"
       "  putchar(10);\n"
       "  return 1;\n"
-      "};\n"
-    } };
-
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
-}
-
-int check_file_test_extern_3(void *ctx, const uint8_t *name, size_t name_count,
-                             char **filepath_out, size_t *filepath_count_out,
-                             uint8_t **data_out, size_t *data_count_out) {
+      "};\n");
   /* Fails because putchar has a nonsense return type. */
-  (void)ctx, (void)filepath_out, (void)filepath_count_out;
-  struct test_module a[] = { {
-      "foo",
+  pass &= check_negcase(
+      im, "check_file_test_extern_3",
       "extern putchar fn[i32, quack];\n"
       "def foo fn[i32] = func()i32 {\n"
       "  putchar(65);\n"
       "  putchar(10);\n"
       "  return 1;\n"
-      "};\n"
-    } };
+      "};\n");
 
-  return load_test_module(a, sizeof(a) / sizeof(a[0]),
-                          name, name_count, data_out, data_count_out);
+
+  return pass;
 }
+
+
 
 int check_file_test_more_1(void *ctx, const uint8_t *name, size_t name_count,
                            char **filepath_out, size_t *filepath_count_out,
@@ -7324,72 +7219,6 @@ int test_check_file(void) {
   ident_value foo = identmap_intern_c_str(&im, "foo");
 
   if (!check_testcases(&im)) {
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_lambda_22...\n");
-  if (!test_check_module(&im, &check_file_test_lambda_22, foo)) {
-    DBG("check_file_test_lambda_22 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_lambda_23...\n");
-  if (!!test_check_module(&im, &check_file_test_lambda_23, foo)) {
-    DBG("check_file_test_lambda_23 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_lambda_24...\n");
-  if (!test_check_module(&im, &check_file_test_lambda_24, foo)) {
-    DBG("check_file_test_lambda_24 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_lambda_25...\n");
-  if (!!test_check_module(&im, &check_file_test_lambda_25, foo)) {
-    DBG("check_file_test_lambda_25 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_lambda_26...\n");
-  if (!test_check_module(&im, &check_file_test_lambda_26, foo)) {
-    DBG("check_file_test_lambda_26 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_lambda_27...\n");
-  if (!!test_check_module(&im, &check_file_test_lambda_27, foo)) {
-    DBG("check_file_test_lambda_27 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_lambda_28...\n");
-  if (!test_check_module(&im, &check_file_test_lambda_28, foo)) {
-    DBG("check_file_test_lambda_28 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_lambda_29...\n");
-  if (!!test_check_module(&im, &check_file_test_lambda_29, foo)) {
-    DBG("check_file_test_lambda_29 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file check_file_test_extern_1...\n");
-  if (!test_check_module(&im, &check_file_test_extern_1, foo)) {
-    DBG("check_file_test_extern_1 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_extern_2...\n");
-  if (!!test_check_module(&im, &check_file_test_extern_2, foo)) {
-    DBG("check_file_test_extern_2 fails\n");
-    goto cleanup_identmap;
-  }
-
-  DBG("test_check_file !check_file_test_extern_3...\n");
-  if (!!test_check_module(&im, &check_file_test_extern_3, foo)) {
-    DBG("check_file_test_extern_3 fails\n");
     goto cleanup_identmap;
   }
 
