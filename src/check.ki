@@ -28,6 +28,11 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
           return false;
         }
       }
+      case &ClqDefEntry(e clqueue_def_entry): {
+        if !ensure_def_inst_checked(cs, clq, ref_def_entry(cs, e.ent_id), e.inst_id) {
+          return false;
+        }
+      }
     }
   }
   return true;
