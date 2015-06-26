@@ -219,6 +219,8 @@ defenum deftype_inst_status {
 };
 
 deftype deftype_inst_info struct {
+  // This is None() if the type doesn't have a visible rhs (it's primitive or a class).
+  rhs opt[te_typeexpr];
   props type_properties;
 };
 

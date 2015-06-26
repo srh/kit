@@ -68,7 +68,8 @@ func add_simple_primitive(cs *checkstate, name sym, flat_size u32, flat_alignmen
   inst_id deftype_inst_id
       = add_deftype_inst(cs, {NoParms(void),
                               FinishedChecking(void),
-                              Has({@[type_properties]{
+                              Has({None(),
+                                   @[type_properties]{
                                    flat_size,
                                    flat_alignment,
                                    DerivedMethodTrivial(void),

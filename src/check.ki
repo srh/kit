@@ -970,10 +970,10 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent *deftype_entr
       if case &Has(np deftype_nonprim) = &ent->nonprim {
         switch &np.tl->rhs {
           case &TypeexprRhs(a): {
-            inst->info = Has({properties});
+            inst->info = Has({Has(rhs_computed), properties});
           }
           case &ClassexprRhs(a): {
-            inst->info = Has({to_defclass_properties(properties)});
+            inst->info = Has({None(), to_defclass_properties(properties)});
           }
         }
       } else {
