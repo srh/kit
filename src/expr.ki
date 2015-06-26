@@ -370,7 +370,7 @@ func check_field(es *exprscope, t *te_typeexpr, a *ast_fieldname, pt *te_typeexp
   return true;
 }
 
-func lookup_whole_field(es *exprscope, mbpack *opt[te_instpack], fieldtype_out *te_typeexpr) bool {
+func type_rhs_for_field(es *exprscope, mbpack *opt[te_instpack], rhs_type_out **te_typeexpr) bool {
   if case &Has(pack te_instpack) = mbpack {
     if !ensure_deftype_inst_checked(es->cs, es->clq, ref_deftype_entry(es->cs, pack.ent_id), pack.inst_id) {
       return false;
@@ -378,10 +378,11 @@ func lookup_whole_field(es *exprscope, mbpack *opt[te_instpack], fieldtype_out *
     inst *deftype_inst = ref_deftype_inst(es->cs, pack.inst_id);
     if case &Has(info deftype_inst_info) = &inst->info {
       if case &Has(t te_typeexpr) = &info.rhs {
-        // TODO: We need to prohibit access to classes except in access blocks.        *field_type_out = t;
+        // TODO: We need to prohibit access to classes except in access blocks.
+        *rhs_type_out = &t;
         return true;
       } else {
-        ERR(_u8("Looking up whole field on primitive type."));
+        ERR(_u8("Looking up field on primitive type."));
         return false;
       }
     } else {
@@ -394,30 +395,21 @@ func lookup_whole_field(es *exprscope, mbpack *opt[te_instpack], fieldtype_out *
   }
 }
 
-// TODO: This should use access information.
-func lookup_name_field(es *exprscope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *te_typeexpr) bool {
-  // TODO: This is a bit of a copy/paste of lookup_whole_field.
-  if case &Has(pack te_instpack) = mbpack {
-    if !ensure_deftype_inst_checked(es->cs, es->clq, ref_deftype_entry(es->cs, pack.ent_id), pack.inst_id) {
-      return false;
-    }
-    inst *deftype_inst = ref_deftype_inst(es->cs, pack.inst_id);
-    if case &Has(info deftype_inst_info) = &inst->info {
-      if case &Has(t te_typeexpr) = &info.rhs {
-        // TODO: We need to prohibit access to classes except in access blocks.
-        return help_lookup_name_field(es, &t, fieldname, fieldtype_out);
-      } else {
-        ERR(_u8("Looking up whole field on primitive type."));
-        return false;
-      }
-    } else {
-      ice(_u8("inst checked, info still None()"));
-      return fake();
-    }
-  } else {
-    ice(_u8("lhs type in named field lookup is not computed."));
-    return fake();
+func lookup_whole_field(es *exprscope, mbpack *opt[te_instpack], fieldtype_out *te_typeexpr) bool {
+  p *te_typeexpr;
+  if !type_rhs_for_field(es, mbpack, &p) {
+    return false;
   }
+  *fieldtype_out = *p;
+  return true;
+}
+
+func lookup_name_field(es *exprscope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *te_typeexpr) bool {
+  p *te_typeexpr;
+  if !type_rhs_for_field(es, mbpack, &p) {
+    return false;
+  }
+  return help_lookup_name_field(es, p, fieldname, fieldtype_out);
 }
 
 func help_lookup_name_field(es *exprscope, t *te_typeexpr, fieldname *ast_ident, fieldtype_out *te_typeexpr) bool {
