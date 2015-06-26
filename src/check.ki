@@ -24,7 +24,7 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
   while case Has(entry clqueue_entry) = popval(&clq->entries) {
     switch &entry {
       case &ClqDeftypeEntry(e clqueue_deftype_entry): {
-        if !ensure_deftype_inst_checked(cs, clq, ref_deftype_entry(cs, e.ent_id), e.inst_id) {
+        if !ensure_deftype_inst_checked(cs, clq, e.ent_id, e.inst_id) {
           return false;
         }
       }
@@ -797,7 +797,7 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *genparms) st
 }
 
 func compute_pack_properties(cs *checkstate, clq *clqueue, pack *te_instpack, out *type_properties) bool {
-  if !ensure_deftype_inst_checked(cs, clq, ref_deftype_entry(cs, pack->ent_id), pack->inst_id) {
+  if !ensure_deftype_inst_checked(cs, clq, pack->ent_id, pack->inst_id) {
     return false;
   }
   inst *deftype_inst = ref_deftype_inst(cs, pack->inst_id);
@@ -963,9 +963,9 @@ func quick_typeexpr(cym *common_syms, a *ast_def, out *ast_typeexpr) bool {
   }
 }
 
-// TODO: Make this take a deftype_entry_id, it'd be cleaner.
-func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent *deftype_entry, id deftype_inst_id) bool {
+func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_entry_id, id deftype_inst_id) bool {
   dbgcheck(_u8("ensure_deftype_inst_checked for inst '"), id.~, _u8("'"));
+  ent *deftype_entry = ref_deftype_entry(cs, ent_id);
   inst *deftype_inst = ref_deftype_inst(cs, id);
 
   switch inst->status {

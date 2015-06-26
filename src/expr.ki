@@ -473,7 +473,7 @@ func type_rhs_for_field(es *exprscope, mbpack *opt[te_instpack], rhs_type_out **
     if !accessible_result {
       ERR(_u8("Looking up field on primitive or inaccessible defclass type"));
     }
-    if !ensure_deftype_inst_checked(es->cs, es->clq, ref_deftype_entry(es->cs, pack.ent_id), pack.inst_id) {
+    if !ensure_deftype_inst_checked(es->cs, es->clq, pack.ent_id, pack.inst_id) {
       return false;
     }
     inst *deftype_inst = ref_deftype_inst(es->cs, pack.inst_id);
