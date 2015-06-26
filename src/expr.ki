@@ -7,6 +7,7 @@ deftype exprscope struct {
   // Same as cs->im.
   im *identmap;
   clq *clqueue;
+  accessible array[access_entry_id];
   // Generics and their _complete_ replacements.
   generics *ast_generics;
   parms *genparms;
@@ -29,8 +30,8 @@ func `==`(x allow_incomplete, y allow_incomplete) bool {
   return enumnum(&x) == enumnum(&y);
 }
 
-func check_expr(cs *checkstate, clq *clqueue, g *ast_generics, parms *genparms, x *ast_expr, pt *te_typeexpr) bool {
-  es exprscope = {cs, cs->im, clq, g, parms, default@[array[var_info]]()};
+func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *genparms, x *ast_expr, pt *te_typeexpr) bool {
+  es exprscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]]()};
   return check_expr_ai(&es, AllowIncompleteNo(void), x, pt);
 }
 
@@ -370,19 +371,55 @@ func check_field(es *exprscope, t *te_typeexpr, a *ast_fieldname, pt *te_typeexp
   return true;
 }
 
+func deftype_rhs_accessible(es *exprscope, id deftype_entry_id, result_out *bool) bool {
+  ent *deftype_entry = ref_deftype_entry(es->cs, id);
+  switch ent->accessibility {
+    case RhsPublic(v void): {
+      *result_out = true;
+      return true;
+    }
+    case RhsPrivate(v void): {
+      n size = count(&es->accessible);
+      for i size = 0; i < n; i = i + 1 {
+        aid access_entry_id = get(&es->accessible, i);
+        dti deftype_entry_id;
+        if !get_accessible_deftype(es->cs, aid, &dti) {
+          return false;
+        }
+        if dti == id {
+          *result_out = true;
+          return true;
+        }
+      }
+      *result_out = false;
+      return true;
+    }
+    case RhsImpossible(v void): {
+      *result_out = false;
+      return true;
+    }
+  }
+}
+
 func type_rhs_for_field(es *exprscope, mbpack *opt[te_instpack], rhs_type_out **te_typeexpr) bool {
   if case &Has(pack te_instpack) = mbpack {
+    accessible_result bool;
+    if !deftype_rhs_accessible(es, pack.ent_id, &accessible_result) {
+      return false;
+    }
+    if !accessible_result {
+      ERR(_u8("Looking up field on primitive or inaccessible defclass type"));
+    }
     if !ensure_deftype_inst_checked(es->cs, es->clq, ref_deftype_entry(es->cs, pack.ent_id), pack.inst_id) {
       return false;
     }
     inst *deftype_inst = ref_deftype_inst(es->cs, pack.inst_id);
     if case &Has(info deftype_inst_info) = &inst->info {
       if case &Has(t te_typeexpr) = &info.rhs {
-        // TODO: We need to prohibit access to classes except in access blocks.
         *rhs_type_out = &t;
         return true;
       } else {
-        ERR(_u8("Looking up field on primitive type."));
+        ice(_u8("deftype_rhs_accessible permitted a primitive type."));
         return false;
       }
     } else {

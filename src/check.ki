@@ -41,6 +41,15 @@ func check_module(cs *checkstate, mod_name sym) bool {
     case Has(id module_id): {
       dbgcheck(_u8("process_module Has"));
       mod *module = ref_module(cs, id);
+
+      naccess_blocks size = count(&mod->access_blocks);
+      for i size = 0; i < naccess_blocks; i = i + 1 {
+        dti deftype_entry_id;
+        if !get_accessible_deftype(cs, get(&mod->access_blocks, i), &dti) {
+          return false;
+        }
+      }
+
       ndefs size = count(&mod->defs);
       for i size = 0; i < ndefs; i = i + 1 {
         if !ensure_def_checked(cs, get(&mod->defs, i)) {
@@ -58,7 +67,6 @@ func check_module(cs *checkstate, mod_name sym) bool {
       }
 
       // I guess that's everything.
-      // TODO: Check that access blocks point to an actual type?
       return true;
     }
   }
@@ -403,7 +411,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_
       inst->status = BeganCheckingRhs(void);
       if case &Has(rhs ast_expr) = &inst->rhs {
         // TODO: How do we know that ent->generics doesn't shadow, doesn't self-shadow?
-        if !check_expr(cs, clq, &ent->generics, &inst->parms, &rhs, &inst->computed_type) {
+        if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs, &inst->computed_type) {
           return false;
         }
       }
@@ -1138,11 +1146,12 @@ func process_toplevels(cs *checkstate,
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &TypeDef(a ast_type_def): {
-        id deftype_entry_id = add_deftype_entry(cs, mk(mod->module_name, a.name.value, access_scope, a.generics, &a));
+        id deftype_entry_id = add_deftype_entry(cs, mk(mod->module_name, a.name.value, access_scope, is_public(&a.rhs), a.generics, &a));
         push(&mod->deftypes, id);
       }
       case &Access(a ast_access): {
         access_id access_entry_id = add_access_entry(cs, mk(a.name.value, a.arity));
+        push(&mod->access_blocks, access_id);
         push(&access_scope, access_id);
         if !process_toplevels(cs, access_scope, mod, &a.toplevels) {
           return false;
@@ -1154,21 +1163,32 @@ func process_toplevels(cs *checkstate,
   return true;
 }
 
+func is_public(a *ast_type_def_rhs) rhs_accessibility {
+  switch a {
+    case &TypeexprRhs(b ast_typeexpr): { return RhsPublic(void); }
+    case &ClassexprRhs(b): { return RhsPrivate(void); }
+  }
+}
+
 func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_entry_id) bool {
   ent *access_entry = ref_access_entry(cs, aid);
   switch ent->ent_id {
     case NotComputed(v void): {
+      ent->ent_id = BeganComputing();
       switch ent->arity {
         case NoParamsArity(u void): {
           match opt[deftype_entry_id];
           if !match_deftype(cs, ent->name, None(), &match) {
+            ent->ent_id = FailedComputation();
             return false;
           }
           if case Has(id) = match {
             *out = id;
+            ent->ent_id = Computed(id);
             return true;
           } else {
             ERR(_u8("Access block matches nothing"));
+            ent->ent_id = FailedComputation();
             return false;
           }
         }
@@ -1176,13 +1196,16 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
           params array[te_typeexpr] = repeat(TeUnknown(void), ~n);
           match opt[deftype_entry_id];
           if !match_deftype(cs, ent->name, Has(&params), &match) {
+            ent->ent_id = FailedComputation();
             return false;
           }
           if case Has(id) = match {
             *out = id;
+            ent->ent_id = Computed(id);
             return true;
           } else {
             ERR(_u8("Access block matches nothing"));
+            ent->ent_id = FailedComputation();
             return false;
           }
         }
