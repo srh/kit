@@ -940,6 +940,7 @@ func quick_typeexpr(cym *common_syms, a *ast_def, out *ast_typeexpr) bool {
   }
 }
 
+// TODO: Make this take a deftype_entry_id, it'd be cleaner.
 func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent *deftype_entry, id deftype_inst_id) bool {
   inst *deftype_inst = ref_deftype_inst(cs, id);
 
@@ -973,7 +974,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent *deftype_entr
             inst->info = Has({Has(rhs_computed), properties});
           }
           case &ClassexprRhs(a): {
-            inst->info = Has({None(), to_defclass_properties(properties)});
+            inst->info = Has({Has(rhs_computed), to_defclass_properties(properties)});
           }
         }
       } else {

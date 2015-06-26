@@ -251,7 +251,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       }
       type *te_typeexpr = expr_complete_type(oo(&a.lhs));
       fieldtype te_typeexpr;
-      if !check_field(es->cs, type, &a.fieldname, pt, &fieldtype) {
+      if !check_field(es, type, &a.fieldname, pt, &fieldtype) {
         return false;
       }
       annotate_info(x, CompleteCheck(fieldtype));
@@ -270,7 +270,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         return false;
       }
       fieldtype te_typeexpr;
-      if !check_field(es->cs, param, &a.fieldname, pt, &fieldtype) {
+      if !check_field(es, param, &a.fieldname, pt, &fieldtype) {
         return false;
       }
       annotate_info(x, CompleteCheck(fieldtype));
@@ -356,9 +356,9 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
   }
 }
 
-func check_field(cs *checkstate, t *te_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *te_typeexpr) bool {
+func check_field(es *exprscope, t *te_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *te_typeexpr) bool {
   fieldtype te_typeexpr;
-  if !lookup_field(cs, t, a, &fieldtype) {
+  if !lookup_field(es, t, a, &fieldtype) {
     return false;
   }
   unified te_typeexpr;
@@ -370,25 +370,98 @@ func check_field(cs *checkstate, t *te_typeexpr, a *ast_fieldname, pt *te_typeex
   return true;
 }
 
-func lookup_field(cs *checkstate, t *te_typeexpr, f *ast_fieldname, fieldtype_out *te_typeexpr) bool {
+func lookup_whole_field(es *exprscope, mbpack *opt[te_instpack], fieldtype_out *te_typeexpr) bool {
+  if case &Has(pack te_instpack) = mbpack {
+    if !ensure_deftype_inst_checked(es->cs, es->clq, ref_deftype_entry(es->cs, pack.ent_id), pack.inst_id) {
+      return false;
+    }
+    inst *deftype_inst = ref_deftype_inst(es->cs, pack.inst_id);
+    if case &Has(info deftype_inst_info) = &inst->info {
+      if case &Has(t te_typeexpr) = &info.rhs {
+        // TODO: We need to prohibit access to classes except in access blocks.        *field_type_out = t;
+        return true;
+      } else {
+        ERR(_u8("Looking up whole field on primitive type."));
+        return false;
+      }
+    } else {
+      ice(_u8("inst checked, info still None()"));
+      return fake();
+    }
+  } else {
+    ice(_u8("lhs type in whole field lookup is not computed."));
+    return fake();
+  }
+}
+
+// TODO: This should use access information.
+func lookup_name_field(es *exprscope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *te_typeexpr) bool {
+  // TODO: This is a bit of a copy/paste of lookup_whole_field.
+  if case &Has(pack te_instpack) = mbpack {
+    if !ensure_deftype_inst_checked(es->cs, es->clq, ref_deftype_entry(es->cs, pack.ent_id), pack.inst_id) {
+      return false;
+    }
+    inst *deftype_inst = ref_deftype_inst(es->cs, pack.inst_id);
+    if case &Has(info deftype_inst_info) = &inst->info {
+      if case &Has(t te_typeexpr) = &info.rhs {
+        // TODO: We need to prohibit access to classes except in access blocks.
+        return help_lookup_name_field(es, &t, fieldname, fieldtype_out);
+      } else {
+        ERR(_u8("Looking up whole field on primitive type."));
+        return false;
+      }
+    } else {
+      ice(_u8("inst checked, info still None()"));
+      return fake();
+    }
+  } else {
+    ice(_u8("lhs type in named field lookup is not computed."));
+    return fake();
+  }
+}
+
+func help_lookup_name_field(es *exprscope, t *te_typeexpr, fieldname *ast_ident, fieldtype_out *te_typeexpr) bool {
+  switch t {
+    case &TeName(a te_name): {
+      return lookup_name_field(es, &a.pack, fieldname, fieldtype_out);
+    }
+    case &TeApp(a te_typeapp): {
+      return lookup_name_field(es, &a.pack, fieldname, fieldtype_out);
+    }
+    case &TeStruct(a te_struct): {
+      return lookup_field_from_list(es->cs, &a.fields, fieldname->value, fieldtype_out);
+    }
+    case &TeEnum(a te_enum): {
+      ERR(_u8("field lookup on an enum type"));
+      return false;
+    }
+    case &TeUnion(a te_union): {
+      return lookup_field_from_list(es->cs, &a.fields, fieldname->value, fieldtype_out);
+    }
+    case &TeArraytype(a te_arraytype): {
+      if fieldname->value != es->cs->cym.lengthsym {
+        ERR(_u8("field lookup (not .length) on array type"));
+        return false;
+      }
+      *fieldtype_out = primitive_size_type(es->cs);
+      return true;
+    }
+    case &TeUnknown(v void): {
+      ice(_u8("lookup_field sees incomplete type"));
+      return fake();
+    }
+  }
+}
+
+func lookup_field(es *exprscope, t *te_typeexpr, f *ast_fieldname, fieldtype_out *te_typeexpr) bool {
   switch f {
     case &WholeField(v void): {
       switch t {
         case &TeName(a te_name): {
-          if case &Has(pack te_instpack) = &a.pack {
-            return TODO();
-          } else {
-            ice(_u8("lhs type in whole field lookup is not computed."));
-            return fake();
-          }
+          return lookup_whole_field(es, &a.pack, fieldtype_out);
         }
         case &TeApp(a te_typeapp): {
-          if case &Has(pack te_instpack) = &a.pack {
-            return TODO();
-          } else {
-            ice(_u8("lhs type in whole field lookup is not computed."));
-            return fake();
-          }
+          return lookup_whole_field(es, &a.pack, fieldtype_out);
         }
         default: {
           ERR(_u8("whole field lookup on 'bare' type"));
@@ -401,46 +474,7 @@ func lookup_field(cs *checkstate, t *te_typeexpr, f *ast_fieldname, fieldtype_ou
       }
     }
     case &NameField(b ast_ident): {
-      switch t {
-        case &TeName(a te_name): {
-          if case &Has(pack te_instpack) = &a.pack {
-            return TODO();
-          } else {
-            ice(_u8("lhs type in field lookup is not computed."));
-            return fake();
-          }
-        }
-        case &TeApp(a te_typeapp): {
-          if case &Has(pack te_instpack) = &a.pack {
-            return TODO();
-          } else {
-            ice(_u8("lhs type in field lookup is not computed."));
-            return fake();
-          }
-        }
-        case &TeStruct(a te_struct): {
-          return lookup_field_from_list(cs, &a.fields, b.value, fieldtype_out);
-        }
-        case &TeEnum(a te_enum): {
-          ERR(_u8("field lookup on an enum type"));
-          return false;
-        }
-        case &TeUnion(a te_union): {
-          return lookup_field_from_list(cs, &a.fields, b.value, fieldtype_out);
-        }
-        case &TeArraytype(a te_arraytype): {
-          if b.value != cs->cym.lengthsym {
-            ERR(_u8("field lookup (not .length) on array type"));
-            return false;
-          }
-          *fieldtype_out = primitive_size_type(cs);
-          return true;
-        }
-        case &TeUnknown(v void): {
-          ice(_u8("lookup_field sees incomplete type"));
-          return fake();
-        }
-      }
+      return help_lookup_name_field(es, t, &b, fieldtype_out);
     }
   }
 }
