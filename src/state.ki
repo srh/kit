@@ -218,10 +218,14 @@ defenum deftype_inst_status {
   FailedChecking void;
 };
 
+deftype deftype_inst_info struct {
+  props type_properties;
+};
+
 deftype deftype_inst struct {
   parms genparms;
   status deftype_inst_status;
-  properties opt[type_properties];
+  info opt[deftype_inst_info];
 };
 
 deftype deftype_nonprim struct {

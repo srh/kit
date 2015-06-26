@@ -776,8 +776,8 @@ func compute_pack_properties(cs *checkstate, clq *clqueue, pack *te_instpack, ou
     return false;
   }
   inst *deftype_inst = ref_deftype_inst(cs, pack->inst_id);
-  if case &Has(props) = &inst->properties {
-    *out = props;
+  if case &Has(info deftype_inst_info) = &inst->info {
+    *out = info.props;
     return true;
   } else {
     ice(_u8("ensure_deftype_inst_checked did not compute properties."));
@@ -960,20 +960,20 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent *deftype_entr
       }
       check(rhs_complete);
 
-      check(isNone(&inst->properties));
+      check(isNone(&inst->info));
       properties type_properties;
       if !compute_type_properties(cs, clq, &rhs_computed, &properties) {
         inst->status = FailedChecking(void);
         return false;
       }
-      check(isNone(&inst->properties));
+      check(isNone(&inst->info));
       if case &Has(np deftype_nonprim) = &ent->nonprim {
         switch &np.tl->rhs {
           case &TypeexprRhs(a): {
-            inst->properties = Has(properties);
+            inst->info = Has({properties});
           }
           case &ClassexprRhs(a): {
-            inst->properties = Has(to_defclass_properties(properties));
+            inst->info = Has({to_defclass_properties(properties)});
           }
         }
       } else {
@@ -988,7 +988,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent *deftype_entr
       return false;
     }
     case FinishedChecking(v): {
-      check(isHas(&inst->properties));
+      check(isHas(&inst->info));
       return true;
     }
     case FailedChecking(v): {

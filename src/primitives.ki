@@ -68,13 +68,13 @@ func add_simple_primitive(cs *checkstate, name sym, flat_size u32, flat_alignmen
   inst_id deftype_inst_id
       = add_deftype_inst(cs, {NoParms(void),
                               FinishedChecking(void),
-                              Has(@[type_properties]{
-                                  flat_size,
-                                  flat_alignment,
-                                  DerivedMethodTrivial(void),
-                                  DerivedMethodTrivial(void),
-                                  DerivedMethodTrivial(void),
-                                  DerivedMethodTrivial(void)})});
+                              Has({@[type_properties]{
+                                   flat_size,
+                                   flat_alignment,
+                                   DerivedMethodTrivial(void),
+                                   DerivedMethodTrivial(void),
+                                   DerivedMethodTrivial(void),
+                                   DerivedMethodTrivial(void)}})});
   insts array[deftype_inst_id];
   push(&insts, inst_id);
   ent deftype_entry = {cs->cym.primitive_module_sym, name, NoGenerics(void), None(), insts};
