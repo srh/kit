@@ -1730,5 +1730,15 @@ func test_check() bool {
   pass = pass & run_check_test("c006-b",
     _u8("def x i32 = 3;"
         "deftype[T] foo struct { count u32; p *T; };\n"));
-  return pass;
+  // Fails because bar recursively holds itself through a template parameter.
+  pass = pass & run_check_negtest("c007",
+    _u8("deftype[T, U] foo struct { x *T; y U; };\n"
+        "deftype bar struct { z foo[u32, bar]; };\n"));
+  pass = pass & run_check_test("c008",
+    _u8("deftype[T, U] foo struct { x *T; y U; };\n"
+        "deftype bar struct { z foo[bar, u32]; };\n"));
+
+
+
+return pass;
 }
