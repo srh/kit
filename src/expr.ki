@@ -119,7 +119,6 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
 
   switch res {
     case NoMatch(v void): {
-      // TODO: Is in not weird that we return NoMatch + true, instead of false, in this failure case?
       *res_out = NoMatch(void);
       return true;
     }
@@ -178,7 +177,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         }
         case &AmbigGlobalMatch(v void): {
           if ai == AllowIncompleteYes(void) {
-            // TODO: We could annotate this more precisely in ambiguous-single-match cases.
+            // NOTE: We could annotate this more precisely in ambiguous-single-match cases.
             annotate_info(x, IncompleteCheck(TeUnknown(void)));
             return true;
           } else {
