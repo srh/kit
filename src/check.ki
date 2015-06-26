@@ -857,8 +857,7 @@ func compute_type_properties(cs *checkstate, clq *clqueue, t *te_typeexpr, out *
       return true;
     }
     case &TeEnum(a te_enum): {
-      // TODO: This is deeply married to implementation-specific behavior.
-      tag_size u32 = 4;
+      tag_size u32 = cs->platform.enum_tag_size;
       max_size u32 = tag_size;
       max_alignment u32 = tag_size;
       init_trivial bool = true;
@@ -1661,6 +1660,7 @@ func test_loader(cs *checkstate, name sym) opt[array[u8]] {
 
 func test_platform() platform_info {
   ret platform_info = {
+    4,
     {1, 1},
     {{1, 1}, {-big("128"), big("127")}},
     {{1, 1}, {big("0"), big("255")}},
