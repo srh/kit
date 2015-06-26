@@ -1684,6 +1684,10 @@ func test_check() bool {
   pass = pass & run_check_test("c001",
        _u8("def x bool = true;"));
   pass = pass & run_check_test("c002",
-       _u8("def x i32 = 3;\n deftype dword u32;\n deftype blah dword;\n deftype feh *blah; deftype quux *quux;"));
+       _u8("def x i32 = 3;\n"
+           "deftype dword u32;\n"
+           "deftype blah dword;\n"
+           "deftype feh *blah;\n"
+           "deftype quux *quux;\n"));
   return pass;
 }
