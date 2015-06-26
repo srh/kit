@@ -23,3 +23,8 @@ func `==`(a generics_arity, b generics_arity) bool {
   }
   return false;
 }
+
+func `!=`(a generics_arity, b generics_arity) bool {
+  return !(a == b);
+}
+

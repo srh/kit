@@ -54,6 +54,8 @@ deftype checkstate struct {
 
   defs array[shp[def_entry]];
   defs_by_name hash[sym, array[def_entry_id]];
+
+  access_blocks array[shp[access_entry]];
 };
 
 func make_checkstate(im *identmap, platform platform_info, loader_ctx *void, loader fn[*checkstate, sym, opt[array[u8]]]) checkstate {
@@ -105,6 +107,10 @@ def `~` fn[size, def_entry_id] = wrapconvert;
 deftype deftype_entry_id size;
 def `~` fn[size, deftype_entry_id] = wrapconvert;
 
+// An index into checkstate's access_blocks array.
+deftype access_entry_id size;
+def `~` fn[size, access_entry_id] = wrapconvert;
+
 func ref_module(cs *checkstate, id module_id) *module {
   return oo(ref(&cs->modules, id.~));
 }
@@ -131,6 +137,13 @@ func add_deftype_entry(cs *checkstate, ent deftype_entry) deftype_entry_id {
   push(&cs->deftypes, shent);
   arr *array[deftype_entry_id] = try_insert_lookup(&cs->deftypes_by_name, oo(&shent)->name, default());
   push(arr, id);
+  return id;
+}
+
+func add_access_entry(cs *checkstate, ent access_entry) access_entry_id {
+  shent shp[access_entry] = emshp(ent);
+  id access_entry_id = ~count(&cs->access_blocks);
+  push(&cs->access_blocks, shent);
   return id;
 }
 
@@ -239,14 +252,20 @@ deftype deftype_nonprim struct {
 deftype deftype_entry struct {
   module_name sym;
   name sym;
+  accessible array[access_entry_id];
   generics ast_generics;
   nonprim opt[deftype_nonprim];
   insts array[deftype_inst_id];
 };
 
-func mk(module_name sym, name sym, g ast_generics, tl *ast_type_def) deftype_entry {
-  return {module_name, name, g, Has({tl, NotComputed()}), default@[array[deftype_inst_id]]()};
+func mk(module_name sym, name sym, accessible array[access_entry_id], g ast_generics, tl *ast_type_def) deftype_entry {
+  return {module_name, name, accessible, g, Has({tl, NotComputed()}), default@[array[deftype_inst_id]]()};
 }
+
+deftype access_entry struct {
+  name sym;
+  arity generics_arity;
+};
 
 defenum genparms {
   NoParms void;
@@ -280,6 +299,7 @@ func mk(parms genparms, rhs opt[ast_expr]) def_inst {
 deftype def_entry struct {
   module_name sym;
   def_name sym;
+  accessible array[access_entry_id];
   // A copy of the ast_def's generics field -- if it's an ast_extern_def, this is NoGenerics.
   generics ast_generics;
   // This is either the syntactic typeexpr (converted to te_typeexpr) or converted from a shallow look at the RHS.
@@ -290,8 +310,8 @@ deftype def_entry struct {
   insts array[def_inst_id];
 };
 
-func mk(module_name sym, def_name sym, generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
-  return {module_name, def_name, generics, quick_typeexpr, tl, NotComputed(), default@[array[def_inst_id]]()};
+func mk(module_name sym, def_name sym, accessible array[access_entry_id], generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
+  return {module_name, def_name, accessible, generics, quick_typeexpr, tl, NotComputed(), default@[array[def_inst_id]]()};
 }
 
 deftype clqueue_deftype_entry struct {
