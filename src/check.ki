@@ -1706,15 +1706,29 @@ func[T] run_check_negtest(name T, file array[u8]) bool {
 func test_check() bool {
   pass bool = true;
   pass = pass & run_check_test("c001",
-       _u8("def x bool = true;"));
+    _u8("def x bool = true;"));
   pass = pass & run_check_test("c002",
-       _u8("def x i32 = 3;\n"
-           "deftype dword u32;\n"
-           "deftype blah dword;\n"
-           "deftype feh *blah;\n"
-           "deftype quux *quux;\n"));
+    _u8("def x i32 = 3;\n"
+        "deftype dword u32;\n"
+        "deftype blah dword;\n"
+        "deftype feh *blah;\n"
+        "deftype quux *quux;\n"));
+  // Fails because foo holds itself flatly.
   pass = pass & run_check_negtest("c003",
-       _u8("deftype foo bar;\n"
-           "deftype bar foo;\n"));
+    _u8("deftype foo bar;\n"
+        "deftype bar foo;\n"));
+  pass = pass & run_check_test("c004",
+    _u8("def x i32 = 3;\n"
+        "deftype foo struct { x u32; y i32; z *foo; };\n"));
+  pass = pass & run_check_test("c005",
+    _u8("def x i32 = 3;"
+        "deftype foo struct { x u32; y i32; z *foo; };\n"));
+  // TODO: This should fail, because "whatever[_]" is not in scope.
+  pass = pass & run_check_test("c006-a",
+    _u8("def x i32 = 3;"
+        "deftype[T] foo struct { count u32; p whatever[T]; };\n"));
+  pass = pass & run_check_test("c006-b",
+    _u8("def x i32 = 3;"
+        "deftype[T] foo struct { count u32; p *T; };\n"));
   return pass;
 }
