@@ -48,6 +48,7 @@ func add_primitives(cs *checkstate) void {
   add_simple_primitive(cs, cs->cym.u16sym, cs->platform.u16traits.flat);
   add_simple_primitive(cs, cs->cym.i32sym, cs->platform.i32traits.flat);
   add_simple_primitive(cs, cs->cym.u32sym, cs->platform.u32traits.flat);
+  add_pointer_primitive(cs);
 }
 
 func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool {
@@ -74,23 +75,53 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool 
 }
 
 func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) void {
+  info opt[deftype_inst_info] = Has({
+    None(),
+    @[type_properties]{
+      flat_traits.size,
+      flat_traits.alignment,
+      DerivedMethodTrivial(void),
+      DerivedMethodTrivial(void),
+      DerivedMethodTrivial(void),
+      DerivedMethodTrivial(void)
+    }
+  });
   inst_id deftype_inst_id
       = add_deftype_inst(cs, {NoParms(void),
                               FinishedChecking(void),
-                              Has({None(),
-                                   @[type_properties]{
-                                   flat_traits.size,
-                                   flat_traits.alignment,
-                                   DerivedMethodTrivial(void),
-                                   DerivedMethodTrivial(void),
-                                   DerivedMethodTrivial(void),
-                                   DerivedMethodTrivial(void)}})});
+                              info});
   insts array[deftype_inst_id];
   push(&insts, inst_id);
   // TODO: access_scope is not relevant to a primitive def.
   access_scope array[access_entry_id];
-  ent deftype_entry = {cs->cym.primitive_module_sym, name, access_scope, RhsImpossible(void), NoGenerics(void), None(), insts};
+  ent deftype_entry = {cs->cym.primitive_module_sym, name, access_scope, RhsImpossible(void), NoGenerics(void), None(), info, insts};
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" module.
 }
 
+func add_pointer_primitive(cs *checkstate) void {
+  one_generic array[ast_ident];
+  // TODO: Something about the meta value and zero literal.
+  push(&one_generic, {@[ast_meta]~0, cs->cym.tee_sym});
+  // It's as if pointers belong is an even _more_ primitive module than integer/bool types.
+  ent deftype_entry = {
+    cs->cym.primitive_module_sym,
+    cs->cym.ptrtype_sym,
+    default@[array[access_entry_id]](),
+    RhsImpossible(void),
+    HasGenerics(one_generic),
+    None(),
+    Has({None(),
+         @[type_properties]{
+           cs->platform.ptrtraits.size,
+           cs->platform.ptrtraits.alignment,
+           DerivedMethodTrivial(void),
+           DerivedMethodTrivial(void),
+           DerivedMethodTrivial(void),
+           DerivedMethodTrivial(void)
+         }}),
+    default@[array[deftype_inst_id]]()
+  };
+  id deftype_entry_id = add_deftype_entry(cs, ent);
+  // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.
+}

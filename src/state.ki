@@ -47,6 +47,7 @@ deftype common_syms struct {
   primitive_module_sym sym;
   ptrtype_sym sym;
   lengthsym sym;
+  tee_sym sym;
 };
 
 deftype checkstate struct {
@@ -96,6 +97,7 @@ func make_common_syms(im *identmap) common_syms {
   ret.primitive_module_sym = intern(im, from_u8(_u8("<primitive>")));
   ret.ptrtype_sym = intern(im, from_u8(_u8("*")));
   ret.lengthsym = intern(im, from_u8(_u8("length")));
+  ret.tee_sym = intern(im, from_u8(_u8("T")));
   return ret;
 }
 
@@ -253,6 +255,7 @@ deftype deftype_inst_info struct {
 
 deftype deftype_inst struct {
   parms genparms;
+  // TODO: should status+info be nfbc[deftype_inst_info]?
   status deftype_inst_status;
   info opt[deftype_inst_info];
 };
@@ -275,12 +278,16 @@ deftype deftype_entry struct {
   accessible array[access_entry_id];
   accessibility rhs_accessibility;
   generics ast_generics;
+  // nonprim/default_info are mutually exclusive Has-havers.
+  // Info relevant for non-primitive types.
   nonprim opt[deftype_nonprim];
+  // Info for primitive types.
+  default_info opt[deftype_inst_info];
   insts array[deftype_inst_id];
 };
 
 func mk(module_name sym, name sym, accessible array[access_entry_id], accessibility rhs_accessibility, g ast_generics, tl *ast_type_def) deftype_entry {
-  return {module_name, name, accessible, accessibility, g, Has({tl, NotComputed()}), default@[array[deftype_inst_id]]()};
+  return {module_name, name, accessible, accessibility, g, Has({tl, NotComputed()}), None(), default@[array[deftype_inst_id]]()};
 }
 
 deftype access_entry struct {

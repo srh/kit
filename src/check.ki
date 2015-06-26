@@ -776,7 +776,13 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *genparms) st
   if case Has(id) = find_matching_deftype_inst(cs, &ent->insts, parms) {
     return {id, false};
   }
-  var id = add_deftype_inst(cs, {*parms, DidNotStartChecking(void), None()});
+  inst deftype_inst;
+  if case &Has(info deftype_inst_info) = &ent->default_info {
+    inst = {*parms, FinishedChecking(void), Has(info)};
+  } else {
+    inst = {*parms, DidNotStartChecking(void), None()};
+  }
+  var id = add_deftype_inst(cs, inst);
   return {id, true};
 }
 
@@ -1678,6 +1684,6 @@ func test_check() bool {
   pass = pass & run_check_test("c001",
        _u8("def x bool = true;"));
   pass = pass & run_check_test("c002",
-       _u8("def x i32 = 3;\n deftype dword u32;\n deftype blah dword;\n"));
+       _u8("def x i32 = 3;\n deftype dword u32;\n deftype blah dword;\n deftype feh *blah; deftype quux *quux;"));
   return pass;
 }
