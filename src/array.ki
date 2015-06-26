@@ -101,6 +101,7 @@ access array[_] {
     return ret;
   }
 
+  // TODO: Remove one of these repeat functions.
   func[T] repeat(value T, n size) array[T] {
     ret array[T];
     for i size = 0; i < n; i = i + 1 {

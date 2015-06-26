@@ -123,6 +123,10 @@ func ref_deftype_entry(cs *checkstate, id deftype_entry_id) *deftype_entry {
   return oo(ref(&cs->deftypes, id.~));
 }
 
+func ref_access_entry(cs *checkstate, id access_entry_id) *access_entry {
+  return oo(ref(&cs->access_blocks, id.~));
+}
+
 func ref_inst(cs *checkstate, id def_inst_id) *def_inst {
   return oo(ref(&cs->instantiations, id.~));
 }

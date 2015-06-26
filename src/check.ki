@@ -648,6 +648,7 @@ func ERR_no_match(im *identmap, name sym, params opt[*array[te_typeexpr]]) void 
   ERR(_u8("No match for type with name '"), lookup(im, name), _u8("' and maybe some params"));
 }
 
+// TODO: Why does out point to an opt?
 func match_deftype(cs *checkstate, name sym, params opt[*array[te_typeexpr]], out *opt[deftype_entry_id]) bool {
   if case Has(arr *array[deftype_entry_id]) = lookup_ref(&cs->deftypes_by_name, name) {
     n size = count(arr);
@@ -1151,6 +1152,55 @@ func process_toplevels(cs *checkstate,
     }
   }
   return true;
+}
+
+func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_entry_id) bool {
+  ent *access_entry = ref_access_entry(cs, aid);
+  switch ent->ent_id {
+    case NotComputed(v void): {
+      switch ent->arity {
+        case NoParamsArity(u void): {
+          match opt[deftype_entry_id];
+          if !match_deftype(cs, ent->name, None(), &match) {
+            return false;
+          }
+          if case Has(id) = match {
+            *out = id;
+            return true;
+          } else {
+            ERR(_u8("Access block matches nothing"));
+            return false;
+          }
+        }
+        case FiniteArity(n u32): {
+          params array[te_typeexpr] = repeat(TeUnknown(void), ~n);
+          match opt[deftype_entry_id];
+          if !match_deftype(cs, ent->name, Has(&params), &match) {
+            return false;
+          }
+          if case Has(id) = match {
+            *out = id;
+            return true;
+          } else {
+            ERR(_u8("Access block matches nothing"));
+            return false;
+          }
+        }
+      }
+    }
+    case BeganComputing(v void): {
+      ERR(_u8("Recursively computing access block reference"));
+      return false;
+    }
+    case FailedComputation(v void): {
+      ERR(_u8("Repeated get_accessible_deftype error"));
+      return false;
+    }
+    case Computed(x deftype_entry_id): {
+      *out = x;
+      return true;
+    }
+  }
 }
 
 defenum match_def_res {
