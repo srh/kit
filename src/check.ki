@@ -942,8 +942,7 @@ func lambda_declared_type(cym *common_syms, a *ast_lambda) ast_typeexpr {
     push(&type_params, ref(&a->args, i)->type);
   }
   push(&type_params, a->return_type);
-  // TODO: Something about the meta value and zero literal.
-  return App({embox(Name({@[ast_meta]~0, cym->fnsym})), type_params});
+  return App({embox(Name({fake_ast_meta(), cym->fnsym})), type_params});
 }
 
 func quick_typeexpr(cym *common_syms, a *ast_def, out *ast_typeexpr) bool {

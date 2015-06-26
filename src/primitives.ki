@@ -101,8 +101,7 @@ func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
 
 func add_pointer_primitive(cs *checkstate) void {
   one_generic array[ast_ident];
-  // TODO: Something about the meta value and zero literal.
-  push(&one_generic, {@[ast_meta]~0, cs->cym.tee_sym});
+  push(&one_generic, {fake_ast_meta(), cs->cym.tee_sym});
   // It's as if pointers belong is an even _more_ primitive module than integer/bool types.
   ent deftype_entry = {
     cs->cym.primitive_module_sym,
