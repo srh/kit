@@ -39,6 +39,16 @@ func es_push_var(es *exprscope, name *ast_ident, computed_type *te_typeexpr) boo
   return true;
 }
 
+func es_pop_var(es *exprscope, name *ast_ident) void {
+  info var_info;
+  if !popval(&es->local_vars, &info) {
+    ice(_u8("es_pop_var sees empty local_vars"));
+  }
+  if info.name != name->value {
+    ice(_u8("es_pop_var sees mismatching name"));
+  }
+}
+
 func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *genparms, x *ast_expr, pt *te_typeexpr) bool {
   es exprscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]]()};
   return check_expr_ai(&es, AllowIncompleteNo(void), x, pt);
@@ -333,7 +343,19 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
     }
   }
 
-  // TODO: We need to check the body... and pop parameter names.
+  return_type *te_typeexpr = ref(computed_params, nargs);
+  body_res bool = check_body(es, &a->body, return_type);
+
+  for i size = nargs; i > 0; {
+    i = i - 1;
+    es_pop_var(es, &ref(&a->args, i)->name);
+  }
+
+  annotate_info(x, CompleteCheck(*return_type));
+  return body_res;
+}
+
+func check_body(es *exprscope, a *ast_bracebody, return_type *te_typeexpr) bool {
   return TODO();
 }
 
