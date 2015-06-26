@@ -375,10 +375,20 @@ func lookup_field(cs *checkstate, t *te_typeexpr, f *ast_fieldname, fieldtype_ou
     case &WholeField(v void): {
       switch t {
         case &TeName(a te_name): {
-          return TODO();
+          if case &Has(pack te_instpack) = &a.pack {
+            return TODO();
+          } else {
+            ice(_u8("lhs type in whole field lookup is not computed."));
+            return fake();
+          }
         }
         case &TeApp(a te_typeapp): {
-          return TODO();
+          if case &Has(pack te_instpack) = &a.pack {
+            return TODO();
+          } else {
+            ice(_u8("lhs type in whole field lookup is not computed."));
+            return fake();
+          }
         }
         default: {
           ERR(_u8("whole field lookup on 'bare' type"));
@@ -393,10 +403,20 @@ func lookup_field(cs *checkstate, t *te_typeexpr, f *ast_fieldname, fieldtype_ou
     case &NameField(b ast_ident): {
       switch t {
         case &TeName(a te_name): {
-          return TODO();
+          if case &Has(pack te_instpack) = &a.pack {
+            return TODO();
+          } else {
+            ice(_u8("lhs type in field lookup is not computed."));
+            return fake();
+          }
         }
         case &TeApp(a te_typeapp): {
-          return TODO();
+          if case &Has(pack te_instpack) = &a.pack {
+            return TODO();
+          } else {
+            ice(_u8("lhs type in field lookup is not computed."));
+            return fake();
+          }
         }
         case &TeStruct(a te_struct): {
           return lookup_field_from_list(cs, &a.fields, b.value, fieldtype_out);
