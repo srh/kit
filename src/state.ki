@@ -50,6 +50,8 @@ deftype common_syms struct {
   tee_sym sym;
 };
 
+// TODO: Prevent unbounded recursive template instantiation.
+
 deftype checkstate struct {
   im *identmap;
   platform platform_info;

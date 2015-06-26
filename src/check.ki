@@ -11,9 +11,11 @@ import u8ast;
 
 // This code does some typechecking.  See state.ki for types that maintain typechecking state.
 
-// func[T] dbgcheck(x T) void { DBG(x); }
-// func[T, U] dbgcheck(x T, y U) void { DBG(x, y); }
-// func[T, U, V] dbgcheck(x T, y U, z V) void { DBG(x, y, z); }
+/*
+func[T] dbgcheck(x T) void { DBG(x); }
+func[T, U] dbgcheck(x T, y U) void { DBG(x, y); }
+func[T, U, V] dbgcheck(x T, y U, z V) void { DBG(x, y, z); }
+*/
 func[T] dbgcheck(x T) void { }
 func[T, U] dbgcheck(x T, y U) void { }
 func[T, U, V] dbgcheck(x T, y U, z V) void { }
@@ -333,6 +335,7 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *genparms) struct { i
     }
   }
   var id = add_inst(cs, mk(*parms, rhs));
+  push(&ent->insts, id);
   return {id, true};
 }
 
@@ -764,6 +767,7 @@ func deftype_rhs_type(rhs *ast_type_def_rhs) *ast_typeexpr {
 }
 
 func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, parms *genparms) deftype_inst_id {
+  dbgcheck(_u8("enqueue_deftype_inst"));
   var res = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
   if res.created {
     push(&clq->entries, ClqDeftypeEntry({id, res.id}));
@@ -783,6 +787,7 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *genparms) st
     inst = {*parms, DidNotStartChecking(void), None()};
   }
   var id = add_deftype_inst(cs, inst);
+  push(&ent->insts, id);
   return {id, true};
 }
 
@@ -957,6 +962,7 @@ func quick_typeexpr(cym *common_syms, a *ast_def, out *ast_typeexpr) bool {
 
 // TODO: Make this take a deftype_entry_id, it'd be cleaner.
 func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent *deftype_entry, id deftype_inst_id) bool {
+  dbgcheck(_u8("ensure_deftype_inst_checked for inst '"), id.~, _u8("'"));
   inst *deftype_inst = ref_deftype_inst(cs, id);
 
   switch inst->status {
@@ -1679,6 +1685,24 @@ func[T] run_check_test(name T, file array[u8]) bool {
   }
 }
 
+func[T] run_check_negtest(name T, file array[u8]) bool {
+  print(Stdout(), _u8("test !"), _u8(name), _u8("..."));
+  fflush(Stdout());
+  im identmap;
+  cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
+  add_primitives(&cs);
+  if check_module(&cs, intern(&im, testmodule_name())) {
+    print(Stdout(), _u8("FAIL\n"));
+    fflush(Stdout());
+    return false;
+  } else {
+    print(Stdout(), _u8("PASS\n"));
+    fflush(Stdout());
+    return true;
+  }
+}
+
+// TODO: Make test output not go directly to stdout/stderr.
 func test_check() bool {
   pass bool = true;
   pass = pass & run_check_test("c001",
@@ -1689,5 +1713,8 @@ func test_check() bool {
            "deftype blah dword;\n"
            "deftype feh *blah;\n"
            "deftype quux *quux;\n"));
+  pass = pass & run_check_negtest("c003",
+       _u8("deftype foo bar;\n"
+           "deftype bar foo;\n"));
   return pass;
 }
