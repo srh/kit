@@ -41,9 +41,13 @@ func pointer_to(cs *checkstate, t te_typeexpr) te_typeexpr {
 }
 
 func add_primitives(cs *checkstate) void {
-  add_simple_primitive(cs, cs->cym.boolsym, cs->platform.boolsize, cs->platform.boolalign);
-  add_simple_primitive(cs, cs->cym.i32sym, cs->platform.u32size, cs->platform.u32align);
-  add_simple_primitive(cs, cs->cym.u32sym, cs->platform.u32size, cs->platform.u32align);
+  add_simple_primitive(cs, cs->cym.boolsym, cs->platform.booltraits);
+  add_simple_primitive(cs, cs->cym.i8sym, cs->platform.i8traits);
+  add_simple_primitive(cs, cs->cym.u8sym, cs->platform.u8traits);
+  add_simple_primitive(cs, cs->cym.i16sym, cs->platform.i16traits);
+  add_simple_primitive(cs, cs->cym.u16sym, cs->platform.u16traits);
+  add_simple_primitive(cs, cs->cym.i32sym, cs->platform.i32traits);
+  add_simple_primitive(cs, cs->cym.u32sym, cs->platform.u32traits);
 }
 
 func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_type_properties) bool {
@@ -64,14 +68,14 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_type_properti
   return false;
 }
 
-func add_simple_primitive(cs *checkstate, name sym, flat_size u32, flat_alignment u32) void {
+func add_simple_primitive(cs *checkstate, name sym, flat_traits primitive_traits) void {
   inst_id deftype_inst_id
       = add_deftype_inst(cs, {NoParms(void),
                               FinishedChecking(void),
                               Has({None(),
                                    @[type_properties]{
-                                   flat_size,
-                                   flat_alignment,
+                                   flat_traits.flat_size,
+                                   flat_traits.flat_alignment,
                                    DerivedMethodTrivial(void),
                                    DerivedMethodTrivial(void),
                                    DerivedMethodTrivial(void),

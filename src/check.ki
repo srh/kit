@@ -1643,7 +1643,12 @@ func test_loader(cs *checkstate, name sym) opt[array[u8]] {
 }
 
 func test_platform() platform_info {
-  ret platform_info = {1, 1, 1, 1, 2, 2, 4, 4, 4, 4};
+  ret platform_info = {
+    {1, 1},
+    {1, 1}, {1, 1},
+    {2, 2}, {2, 2},
+    {4, 4}, {4, 4},
+    {4, 4}};
   return ret;
 }
 

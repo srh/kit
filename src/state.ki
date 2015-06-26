@@ -7,17 +7,20 @@ import shp;
 import typeexpr;
 import u8ast;
 
+deftype primitive_traits struct {
+  flat_size u32;
+  flat_alignment u32;
+};
+
 deftype platform_info struct {
-  boolsize u32;
-  boolalign u32;
-  u8size u32;
-  u8align u32;
-  u16size u32;
-  u16align u32;
-  u32size u32;
-  u32align u32;
-  ptrsize u32;
-  ptralign u32;
+  booltraits primitive_traits;
+  i8traits primitive_traits;
+  u8traits primitive_traits;
+  i16traits primitive_traits;
+  u16traits primitive_traits;
+  i32traits primitive_traits;
+  u32traits primitive_traits;
+  ptrtraits primitive_traits;
 };
 
 deftype common_syms struct {
