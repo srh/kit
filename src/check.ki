@@ -1645,10 +1645,14 @@ func test_loader(cs *checkstate, name sym) opt[array[u8]] {
 func test_platform() platform_info {
   ret platform_info = {
     {1, 1},
-    {1, 1}, {1, 1},
-    {2, 2}, {2, 2},
-    {4, 4}, {4, 4},
-    {4, 4}};
+    {{1, 1}, {-big("128"), big("127")}},
+    {{1, 1}, {big("0"), big("255")}},
+    {{2, 2}, {-big("32768"), big("32767")}},
+    {{2, 2}, {big("0"), big("65536")}},
+    {{4, 4}, {-big("2147483648"), big("2147483647")}},
+    {{4, 4}, {big("0"), big("4294967296")}},
+    {4, 4}
+  };
   return ret;
 }
 

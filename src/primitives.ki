@@ -42,40 +42,45 @@ func pointer_to(cs *checkstate, t te_typeexpr) te_typeexpr {
 
 func add_primitives(cs *checkstate) void {
   add_simple_primitive(cs, cs->cym.boolsym, cs->platform.booltraits);
-  add_simple_primitive(cs, cs->cym.i8sym, cs->platform.i8traits);
-  add_simple_primitive(cs, cs->cym.u8sym, cs->platform.u8traits);
-  add_simple_primitive(cs, cs->cym.i16sym, cs->platform.i16traits);
-  add_simple_primitive(cs, cs->cym.u16sym, cs->platform.u16traits);
-  add_simple_primitive(cs, cs->cym.i32sym, cs->platform.i32traits);
-  add_simple_primitive(cs, cs->cym.u32sym, cs->platform.u32traits);
+  add_simple_primitive(cs, cs->cym.i8sym, cs->platform.i8traits.flat);
+  add_simple_primitive(cs, cs->cym.u8sym, cs->platform.u8traits.flat);
+  add_simple_primitive(cs, cs->cym.i16sym, cs->platform.i16traits.flat);
+  add_simple_primitive(cs, cs->cym.u16sym, cs->platform.u16traits.flat);
+  add_simple_primitive(cs, cs->cym.i32sym, cs->platform.i32traits.flat);
+  add_simple_primitive(cs, cs->cym.u32sym, cs->platform.u32traits.flat);
 }
 
-func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_type_properties) bool {
-  // TODO: This implementation is completely bogus.
+func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool {
+  // TODO: This implementation should work on complete types, use proper scoping rules (once we get scoping rules).
   if case &TeName(a te_name) = pt {
-    if a.value == cs->cym.i32sym {
-      m bigint = ~ @[u32]0x7FFFFFFF;
-      *out = {-(m + ~ @[u32]1), m};
-      return true;
+    if a.value == cs->cym.i8sym {
+      *out = cs->platform.i8traits.numeric;
+    } else if a.value == cs->cym.u8sym {
+      *out = cs->platform.u8traits.numeric;
+    } else if a.value == cs->cym.i16sym {
+      *out = cs->platform.i16traits.numeric;
+    } else if a.value == cs->cym.u16sym {
+      *out = cs->platform.u16traits.numeric;
+    } else if a.value == cs->cym.i32sym {
+      *out = cs->platform.i32traits.numeric;
     } else if a.value == cs->cym.u32sym {
-      m bigint = ~ @[u32]0xFFFFFFFF;
-      *out = {~ @[u32]0, m};
-      return true;
+      *out = cs->platform.u32traits.numeric;
     } else {
       return false;
     }
+    return true;
   }
   return false;
 }
 
-func add_simple_primitive(cs *checkstate, name sym, flat_traits primitive_traits) void {
+func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) void {
   inst_id deftype_inst_id
       = add_deftype_inst(cs, {NoParms(void),
                               FinishedChecking(void),
                               Has({None(),
                                    @[type_properties]{
-                                   flat_traits.flat_size,
-                                   flat_traits.flat_alignment,
+                                   flat_traits.size,
+                                   flat_traits.alignment,
                                    DerivedMethodTrivial(void),
                                    DerivedMethodTrivial(void),
                                    DerivedMethodTrivial(void),

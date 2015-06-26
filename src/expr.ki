@@ -381,7 +381,7 @@ func check_numeric_literal(cs *checkstate, ai allow_incomplete, pt *te_typeexpr,
     }
   }
 
-  facts numeric_type_properties;
+  facts numeric_traits;
   if !is_numeric_type(cs, pt, &facts) {
     ERR(_u8("Numeric literal in bad place."));
     return false;
