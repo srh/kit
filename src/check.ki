@@ -1323,7 +1323,6 @@ func from_type_matches_res(hasparms bool, x type_matches_res) entry_matches_res 
   }
 }
 
-// TODO: This function always returns true.
 func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *genparms, typeexpr *te_typeexpr, matches_out *entry_matches_res) bool {
   switch generics {
     case &NoGenerics(v void): {
