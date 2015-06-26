@@ -1141,7 +1141,7 @@ func process_toplevels(cs *checkstate,
         push(&mod->deftypes, id);
       }
       case &Access(a ast_access): {
-        access_id access_entry_id = add_access_entry(cs, {a.name.value, a.arity});
+        access_id access_entry_id = add_access_entry(cs, mk(a.name.value, a.arity));
         push(&access_scope, access_id);
         if !process_toplevels(cs, access_scope, mod, &a.toplevels) {
           return false;
