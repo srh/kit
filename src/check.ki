@@ -1349,7 +1349,7 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
         }
         case &NoParms(u void): {
           parms array[te_typeexpr] = repeat(count(&names), TeUnknown(void));
-          *matches_out = from_type_matches_res(false, type_matches(pt, &names, &parms, typeexpr));
+          *matches_out = from_type_matches_res(true, type_matches(pt, &names, &parms, typeexpr));
           return true;
         }
       }
@@ -1738,6 +1738,16 @@ func test_check_basic_cases() bool {
   pass = pass & run_check_test("c008",
     _u8("deftype[T, U] foo struct { x *T; y U; };\n"
         "deftype bar struct { z foo[bar, u32]; };\n"));
+  pass = pass & run_check_test("c009",
+    _u8("def x i32 = 3;\n"));
+  pass = pass & run_check_test("c010",
+    _u8("def x u32 = 3;\n"));
+  pass = pass & run_check_test("c011-a",
+    _u8("def[] x i32 = 3;\n"));
+  pass = pass & run_check_test("c011-b",
+    _u8("def[] x i32 = 3;\n"
+        "def y i32 = x;\n"));
+
   return pass;
 }
 

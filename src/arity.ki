@@ -28,3 +28,15 @@ func `!=`(a generics_arity, b generics_arity) bool {
   return !(a == b);
 }
 
+func build_u8str(r *array[u8], a *generics_arity) void {
+  switch a {
+    case &NoParamsArity(v void): {
+      append(r, _u8("NoParamsArity"));
+    }
+    case &FiniteArity(n u32): {
+      append(r, _u8("FiniteArity("));
+      build_u8str(r, &n);
+      push(r, ')');
+    }
+  }
+}
