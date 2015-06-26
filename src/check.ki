@@ -1703,7 +1703,8 @@ func[T] run_check_negtest(name T, file array[u8]) bool {
 }
 
 // TODO: Make test output not go directly to stdout/stderr.
-func test_check() bool {
+
+func test_check_basic_cases() bool {
   pass bool = true;
   pass = pass & run_check_test("c001",
     _u8("def x bool = true;"));
@@ -1737,8 +1738,11 @@ func test_check() bool {
   pass = pass & run_check_test("c008",
     _u8("deftype[T, U] foo struct { x *T; y U; };\n"
         "deftype bar struct { z foo[bar, u32]; };\n"));
+  return pass;
+}
 
-
-
-return pass;
+func test_check() bool {
+  pass bool = true;
+  pass = pass & test_check_basic_cases();
+  return pass;
 }
