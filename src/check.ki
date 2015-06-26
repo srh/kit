@@ -1673,7 +1673,7 @@ func test_platform() platform_info {
   return ret;
 }
 
-func[T] run_check_test(name T, file array[u8]) bool {
+func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
   print(Stdout(), _u8("test "), _u8(name), _u8("..."));
   fflush(Stdout());
   im identmap;
@@ -1682,15 +1682,14 @@ func[T] run_check_test(name T, file array[u8]) bool {
   if !check_module(&cs, intern(&im, testmodule_name())) {
     print(Stdout(), _u8("FAIL\n"));
     fflush(Stdout());
-    return false;
+    ctx->fail = true;
   } else {
     print(Stdout(), _u8("PASS\n"));
     fflush(Stdout());
-    return true;
   }
 }
 
-func[T] run_check_negtest(name T, file array[u8]) bool {
+func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
   print(Stdout(), _u8("test !"), _u8(name), _u8("..."));
   fflush(Stdout());
   im identmap;
@@ -1699,61 +1698,65 @@ func[T] run_check_negtest(name T, file array[u8]) bool {
   if check_module(&cs, intern(&im, testmodule_name())) {
     print(Stdout(), _u8("FAIL\n"));
     fflush(Stdout());
-    return false;
+    ctx->fail = true;
   } else {
     print(Stdout(), _u8("PASS\n"));
     fflush(Stdout());
-    return true;
   }
 }
 
 // TODO: Make test output not go directly to stdout/stderr.
 
+deftype check_ctx struct {
+  fail bool;
+};
+
+
 func test_check_basic_cases() bool {
-  pass bool = true;
-  pass = pass & run_check_test("c001",
+  ctx check_ctx;
+  run_check_test(&ctx, "c001",
     _u8("def x bool = true;"));
-  pass = pass & run_check_test("c002",
+  run_check_test(&ctx, "c002",
     _u8("def x i32 = 3;\n"
         "deftype dword u32;\n"
         "deftype blah dword;\n"
         "deftype feh *blah;\n"
         "deftype quux *quux;\n"));
   // Fails because foo holds itself flatly.
-  pass = pass & run_check_negtest("c003",
+  run_check_negtest(&ctx, "c003",
     _u8("deftype foo bar;\n"
         "deftype bar foo;\n"));
-  pass = pass & run_check_test("c004",
+  run_check_test(&ctx, "c004",
     _u8("def x i32 = 3;\n"
         "deftype foo struct { x u32; y i32; z *foo; };\n"));
-  pass = pass & run_check_test("c005",
+  run_check_test(&ctx, "c005",
     _u8("def x i32 = 3;"
         "deftype foo struct { x u32; y i32; z *foo; };\n"));
   // TODO: This should fail, because "whatever[_]" is not in scope.
-  pass = pass & run_check_test("c006-a",
+  run_check_test(&ctx, "c006-a",
     _u8("def x i32 = 3;"
         "deftype[T] foo struct { count u32; p whatever[T]; };\n"));
-  pass = pass & run_check_test("c006-b",
+  run_check_test(&ctx, "c006-b",
     _u8("def x i32 = 3;"
         "deftype[T] foo struct { count u32; p *T; };\n"));
   // Fails because bar recursively holds itself through a template parameter.
-  pass = pass & run_check_negtest("c007",
+  run_check_negtest(&ctx, "c007",
     _u8("deftype[T, U] foo struct { x *T; y U; };\n"
         "deftype bar struct { z foo[u32, bar]; };\n"));
-  pass = pass & run_check_test("c008",
+  run_check_test(&ctx, "c008",
     _u8("deftype[T, U] foo struct { x *T; y U; };\n"
         "deftype bar struct { z foo[bar, u32]; };\n"));
-  pass = pass & run_check_test("c009",
+  run_check_test(&ctx, "c009",
     _u8("def x i32 = 3;\n"));
-  pass = pass & run_check_test("c010",
+  run_check_test(&ctx, "c010",
     _u8("def x u32 = 3;\n"));
-  pass = pass & run_check_test("c011-a",
+  run_check_test(&ctx, "c011-a",
     _u8("def[] x i32 = 3;\n"));
-  pass = pass & run_check_test("c011-b",
+  run_check_test(&ctx, "c011-b",
     _u8("def[] x i32 = 3;\n"
         "def y i32 = x;\n"));
 
-  return pass;
+  return !ctx.fail;
 }
 
 func test_check() bool {
