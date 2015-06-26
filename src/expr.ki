@@ -30,6 +30,15 @@ func `==`(x allow_incomplete, y allow_incomplete) bool {
   return enumnum(&x) == enumnum(&y);
 }
 
+func es_push_var(es *exprscope, name *ast_ident, computed_type *te_typeexpr) bool {
+  if case Has(ix size) = es_find_local(es, name->value) {
+    ERR(_u8("Local variable '"), lookup(es->im, name->value), _u8("' shadows another"));
+    return false;
+  }
+  push(&es->local_vars, {name->value, *computed_type});
+  return true;
+}
+
 func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *genparms, x *ast_expr, pt *te_typeexpr) bool {
   es exprscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]]()};
   return check_expr_ai(&es, AllowIncompleteNo(void), x, pt);
@@ -82,18 +91,14 @@ defenum es_match_res {
 
 func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_match_res) bool {
   if case &NoParms(v void) = gp {
-    n size = count(&es->local_vars);
-    for i size = 0; i < n; i = i + 1 {
-      inf *var_info = ref(&es->local_vars, i);
-      if inf->name == name {
-        type te_typeexpr;
-        if !unify_types(pt, &inf->type, &type) {
-          ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type"));
-          return false;
-        }
-        *res_out = OneLocalMatch({i});
-        return true;
+    if case Has(ix size) = es_find_local(es, name) {
+      type te_typeexpr;
+      if !unify_types(pt, &ref(&es->local_vars, ix)->type, &type) {
+        ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type"));
+        return false;
       }
+      *res_out = OneLocalMatch({ix});
+      return true;
     }
   }
 
@@ -118,6 +123,17 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
       return true;
     }
   }
+}
+
+func es_find_local(es *exprscope, name sym) opt[size] {
+  n size = count(&es->local_vars);
+  for i size = 0; i < n; i = i + 1 {
+    inf *var_info = ref(&es->local_vars, i);
+    if inf->name == name {
+      return Has(i);
+    }
+  }
+  return None();
 }
 
 func help_check_simple_literal(pt *te_typeexpr, type te_typeexpr, errmsg_name array[u8], x *ast_expr) bool {
@@ -306,10 +322,18 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
     return false;
   }
 
+  computed_params *array[te_typeexpr];
+  if !decompose_typeapp(&computed, primitive_function_puretype(es->cs), &computed_params) {
+    ice(_u8("lambda type is not a function type"));
+  }
+  nargs size = count(&a->args);
+  for i size = 0; i < nargs; i = i + 1 {
+    if !es_push_var(es, &ref(&a->args, i)->name, ref(computed_params, i)) {
+      return false;
+    }
+  }
 
-
-
-  // TODO: We need to check that the parameter names are unique, and check the body.
+  // TODO: We need to check the body... and pop parameter names.
   return TODO();
 }
 
@@ -348,21 +372,30 @@ func check_numeric_literal(cs *checkstate, ai allow_incomplete, pt *te_typeexpr,
   return true;
 }
 
-func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr) bool {
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, params_out **array[te_typeexpr]) bool {
   // This could be implemented in terms of unify_under_generics, you know.
   if case &TeApp(app te_typeapp) = t {
     unified te_puretype;
     if !unify_puretypes(oo(&app.typefunc), &expected_puretype, &unified) {
       return false;
     }
-    if count(&app.params) != 1 {
-      return false;
-    }
-    *oneparam_out = ref(&app.params, 0);
+    *params_out = &app.params;
     return true;
   } else {
     return false;
   }
+}
+
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr) bool {
+  params *array[te_typeexpr];
+  if !decompose_typeapp(t, expected_puretype, &params) {
+    return false;
+  }
+  if count(params) != 1 {
+    return false;
+  }
+  *oneparam_out = ref(params, 0);
+  return true;
 }
 
 func check_field(es *exprscope, t *te_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *te_typeexpr) bool {
