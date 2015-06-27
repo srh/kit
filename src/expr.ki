@@ -460,14 +460,15 @@ func deftype_rhs_accessible(es *exprscope, id deftype_entry_id, result_out *bool
   }
 }
 
-func type_rhs_for_field(es *exprscope, mbpack *opt[te_instpack], rhs_type_out **te_typeexpr) bool {
+func type_structural_rhs(es *exprscope, mbpack *opt[te_instpack], rhs_type_out **te_typeexpr) bool {
   if case &Has(pack te_instpack) = mbpack {
     accessible_result bool;
     if !deftype_rhs_accessible(es, pack.ent_id, &accessible_result) {
       return false;
     }
     if !accessible_result {
-      ERR(_u8("Looking up field on primitive or inaccessible defclass type"));
+      ERR(_u8("Looking for structural type information on inaccessible defclass type"));
+      return false;
     }
     if !ensure_deftype_inst_checked(es->cs, es->clq, pack.ent_id, pack.inst_id) {
       return false;
@@ -486,14 +487,14 @@ func type_rhs_for_field(es *exprscope, mbpack *opt[te_instpack], rhs_type_out **
       return fake();
     }
   } else {
-    ice(_u8("lhs type in whole field lookup is not computed."));
+    ice(_u8("lhs type in type_structural_rhs is not computed."));
     return fake();
   }
 }
 
 func lookup_whole_field(es *exprscope, mbpack *opt[te_instpack], fieldtype_out *te_typeexpr) bool {
   p *te_typeexpr;
-  if !type_rhs_for_field(es, mbpack, &p) {
+  if !type_structural_rhs(es, mbpack, &p) {
     return false;
   }
   *fieldtype_out = *p;
@@ -502,7 +503,7 @@ func lookup_whole_field(es *exprscope, mbpack *opt[te_instpack], fieldtype_out *
 
 func lookup_name_field(es *exprscope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *te_typeexpr) bool {
   p *te_typeexpr;
-  if !type_rhs_for_field(es, mbpack, &p) {
+  if !type_structural_rhs(es, mbpack, &p) {
     return false;
   }
   return help_lookup_name_field(es, p, fieldname, fieldtype_out);
