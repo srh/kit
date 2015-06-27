@@ -100,6 +100,31 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
         return false;
       }
     }
+    case &For(b ast_for_statement): {
+      initter_vp varpopper;
+      init_vp(&initter_vp, es);
+      if case &Has(initter box[ast_statement]) = &b.initializer {
+        // NOTE: return_type is irrelevant for now, because initter can only be a var or expr statement.
+        if !check_statement(es, &initter_vp, oo(&initter), return_type) {
+          return false;
+        }
+      }
+      if case &Has(cond box[ast_expr]) = &b.condition {
+        boolean te_typeexpr = primitive_bool_type(es->cs);
+        if !check_expr_ai(es, AllowIncompleteNo(void), oo(&cond), &boolean) {
+          return false;
+        }
+      }
+      if case &Has(incr box[ast_expr]) = &b.increment {
+        unknown te_typeexpr = TeUnknown(void);
+        if !check_expr_ai(es, AllowIncompleteNo(void), oo(&incr), &unknown) {
+          return false;
+        }
+      }
+      if !check_body(es, &b.body, return_type) {
+        return false;
+      }
+    }
     default: {
       return TODO();
     }
