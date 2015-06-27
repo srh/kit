@@ -704,6 +704,7 @@ func match_deftype(cs *checkstate, name sym, params opt[*array[te_typeexpr]], ou
   }
 }
 
+// Returns an index into the HasGenerics array.
 func find_generic(g *ast_generics, name sym) opt[size] {
   switch g {
     case &NoGenerics(v void): { return None(); }
@@ -716,28 +717,24 @@ func find_generic(g *ast_generics, name sym) opt[size] {
       }
       return None();
     }
+    case &VariadicGenerics(a ast_variadic_generics): {
+      // We can't see variadic generics because there's no "RHS type" of a fn.
+      ice(_u8("find_generic sees variadic generic."));
+      return fake();
+    }
   }
 }
 
-// TODO: Does anybody use this?
 func lookup_generic(g *ast_generics, parms *genparms, name sym, out *te_typeexpr) bool {
-  switch g {
-    case &NoGenerics(v): { return false; }
-    case &HasGenerics(a array[ast_ident]): {
-      n size = count(&a);
-      for i size = 0; i < n; i = i + 1 {
-        if ref(&a, i)->value == name {
-          if case &HasParms(ps) = parms {
-            *out = *ref(&ps, i);
-            return true;
-          } else {
-            crash(_u8("non-matching parms"));
-          }
-        }
-      }
-      return false;
+  if case Has(ix size) = find_generic(g, name) {
+    if case &HasParms(ps) = parms {
+      *out = *ref(&ps, ix);
+      return true;
+    } else {
+      ice(_u8("lookup_generic with non-matching parms"));
     }
   }
+  return false;
 }
 
 func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
