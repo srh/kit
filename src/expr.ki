@@ -305,8 +305,48 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       return true;
     }
     case &Strinit(a ast_strinit): {
-      return TODO();
+      return check_expr_strinit(es, ai, &a, pt, x);
     }
+  }
+}
+
+func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *te_typeexpr, x *ast_expr) bool {
+  if !is_complete(pt) {
+    if ai == AllowIncompleteYes(void) {
+      // NOTE: We could have more specific info, like number of fields and their incomplete types.
+      annotate_info(x, IncompleteCheck(TeUnknown(void)));
+      return true;
+    } else {
+      ERR(_u8("Structure literal used ambiguously."));
+      return false;
+    }
+  }
+
+  // Since pt is complete, it's computed.
+  structural_type *te_typeexpr;
+  if !structural_rhs(es, pt, &structural_type) {
+    return false;
+  }
+
+  // NOTE: We could allow arrays, especially if ambig matching returns number of fields and their type.
+  if case &TeStruct(b te_struct) = structural_type {
+    n size = count(&b.fields);
+    if n != count(&a->exprs) {
+      ERR(_u8("Structure literal has wrong number of fields."));
+      return false;
+    }
+
+    for i size = 0; i < n; i = i + 1 {
+      if !check_expr_ai(es, AllowIncompleteNo(void), ref(&a->exprs, i), &ref(&b.fields, i)->type) {
+        return false;
+      }
+    }
+
+    annotate_info(x, CompleteCheck(*pt));
+    return true;
+  } else {
+    ERR(_u8("Structure literal used on non-struct type."));
+    return false;
   }
 }
 
