@@ -1,4 +1,5 @@
 import bigint;
+import body;
 import check;
 import primitives;
 
@@ -352,10 +353,6 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
 
   annotate_info(x, CompleteCheck(*return_type));
   return body_res;
-}
-
-func check_body(es *exprscope, a *ast_bracebody, return_type *te_typeexpr) bool {
-  return TODO();
 }
 
 func numeric_literal_value(a *ast_numeric_literal) bigint {
