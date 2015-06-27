@@ -23,6 +23,7 @@ func test_platform() platform_info {
     {{2, 2}, {big("0"), big("65536")}},
     {{4, 4}, {-big("2147483648"), big("2147483647")}},
     {{4, 4}, {big("0"), big("4294967296")}},
+    {4, 4},
     {4, 4}
   };
   return ret;
@@ -112,6 +113,11 @@ func test_check_basic_cases(ctx *check_ctx) void {
 }
 
 func test_check_lambda_cases(ctx *check_ctx) void {
+  run_check_test(ctx, "c012",
+    _u8("def x i32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  return x;\n"
+        "};\n"));
 }
 
 func test_check() bool {

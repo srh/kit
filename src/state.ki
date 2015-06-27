@@ -32,6 +32,7 @@ deftype platform_info struct {
   i32traits integral_traits;
   u32traits integral_traits;
   ptrtraits flat_traits;
+  fntraits flat_traits;
 };
 
 deftype common_syms struct {
