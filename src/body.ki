@@ -58,6 +58,40 @@ func check_body(es *exprscope, a *ast_bracebody, return_type *te_typeexpr) bool 
           return false;
         }
       }
+      case &IfThen(b ast_ifthen_statement): {
+        cond_vp varpopper;
+        init_vp(&cond_vp, es);
+        if !check_condition(es, &cond_vp, &b.condition) {
+          return false;
+        }
+        if !check_body(es, &b.body, return_type) {
+          return false;
+        }
+      }
+      case &IfThenElse(b ast_ifthenelse_statement): {
+        cond_vp varpopper;
+        init_vp(&cond_vp, es);
+        if !check_condition(es, &cond_vp, &b.condition) {
+          return false;
+        }
+        if !check_body(es, &b.thenbody, return_type) {
+          return false;
+        }
+        descope_vars(&cond_vp);
+        if !check_body(es, &b.elsebody, return_type) {
+          return false;
+        }
+      }
+      case &While(b ast_while_statement): {
+        cond_vp varpopper;
+        init_vp(&cond_vp, es);
+        if !check_condition(es, &cond_vp, &b.condition) {
+          return false;
+        }
+        if !check_body(es, &b.body, return_type) {
+          return false;
+        }
+      }
       default: {
         return TODO();
       }
@@ -66,3 +100,6 @@ func check_body(es *exprscope, a *ast_bracebody, return_type *te_typeexpr) bool 
   return true;
 }
 
+func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
+  return TODO();
+}

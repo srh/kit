@@ -49,17 +49,8 @@ func init_vp(vp *varpopper, es *exprscope) void {
 }
 
 func do_destroy(vp *varpopper) void {
-  es *exprscope = vp->es;
-  if es != null {
-    while case Has(expected sym) = popval(&vp->names) {
-      info var_info;
-      if !popval(&es->local_vars, &info) {
-        ice(_u8("varpopper sees empty local_vars"));
-      }
-      if info.name != expected {
-        ice(_u8("varpopper sees mismatching name"));
-      }
-    }
+  if vp->es != null {
+    descope_vars(vp);
   }
   destroy(&vp->names);
   vp->es = null;
@@ -73,6 +64,20 @@ func es_push_var(es *exprscope, vp *varpopper, name *ast_ident, computed_type *t
   push(&es->local_vars, {name->value, *computed_type});
   push(&vp->names, name->value);
   return true;
+}
+
+func descope_vars(vp *varpopper) void {
+  es *exprscope = vp->es;
+  check(es != null);
+  while case Has(expected sym) = popval(&vp->names) {
+    info var_info;
+    if !popval(&es->local_vars, &info) {
+      ice(_u8("varpopper sees empty local_vars"));
+    }
+    if info.name != expected {
+      ice(_u8("varpopper sees mismatching name"));
+    }
+  }
 }
 
 }  // access varpopper
