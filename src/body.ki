@@ -1,6 +1,67 @@
 import expr;
 
+// TODO: This should actually pay attention to gotos and labels, variable lifetimes, variable initialization.
 func check_body(es *exprscope, a *ast_bracebody, return_type *te_typeexpr) bool {
-  return TODO();
+  nstatements size = count(&a->statements);
+  for i size = 0; i < nstatements; i = i + 1 {
+    s *ast_statement = ref(&a->statements, i);
+    switch s {
+      case &Expr(b ast_expr): {
+        pt te_typeexpr = TeUnknown(void);
+        if !check_expr_ai(es, AllowIncompleteNo(void), &b, &pt) {
+          return false;
+        }
+      }
+      case &Return(b ast_return_statement): {
+        if case &Has(c box[ast_expr]) = &b.expr {
+          if !check_expr_ai(es, AllowIncompleteNo(void), oo(&c), return_type) {
+            return false;
+          }
+        } else {
+          void_type te_typeexpr = primitive_void_type(es->cs);
+          unified te_typeexpr;
+          if !unify_types(&void_type, return_type, &unified) {
+            ERR(_u8("Empty return statement with non-void return value."));
+            return false;
+          }
+        }
+      }
+      case &Var(b ast_var_statement): {
+        // TODO: Cache converted... or something.
+        converted te_typeexpr;
+        if !convert_typeexpr(es->cs, &b.decl.type, &converted) {
+          return false;
+        }
+
+        computed_complete bool;
+        computed te_typeexpr;
+        if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed, &computed_complete) {
+          return false;
+        }
+        complete_type *te_typeexpr;
+        if case &Has(x box[ast_expr]) = &b.rhs {
+          if !check_expr_ai(es, AllowIncompleteNo(void), oo(&x), &computed) {
+            return false;
+          }
+          complete_type = expr_complete_type(oo(&x));
+        } else {
+          if !computed_complete {
+            ERR(_u8("Variable declaration with no rhs, incomplete type"));
+            return false;
+          }
+          // NOTE: The object must be default-constructible.
+          complete_type = &computed;
+        }
+
+        if !es_push_var(es, &b.decl.name, complete_type) {
+          return false;
+        }
+      }
+      default: {
+        return TODO();
+      }
+    }
+  }
+  return true;
 }
 

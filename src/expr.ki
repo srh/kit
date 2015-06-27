@@ -639,21 +639,22 @@ func lookup_field_from_list(cs *checkstate, fields *array[te_vardecl], fieldname
   return false;
 }
 
+func ai_incomplete(yes bool) allow_incomplete {
+  if yes {
+    return AllowIncompleteYes(void);
+  } else {
+    return AllowIncompleteNo(void);
+  }
+}
+
 func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_funcall, pt *te_typeexpr) bool {
   a_param_incomplete bool;
   if !check_funcall_params_firsttime(es, &a->params, &a_param_incomplete) {
     return false;
   }
 
-  funcexpr_ai allow_incomplete;
-  if a_param_incomplete {
-    funcexpr_ai = AllowIncompleteNo(void);
-  } else {
-    funcexpr_ai = AllowIncompleteYes(void);
-  }
-
   func_pt te_typeexpr = make_fn_partial_type(es->cs, pt, &a->params);
-  if !check_expr_ai(es, funcexpr_ai, oo(&a->fun), &func_pt) {
+  if !check_expr_ai(es, ai_incomplete(!a_param_incomplete), oo(&a->fun), &func_pt) {
     return false;
   }
 
