@@ -133,6 +133,14 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "  var x i32 = 4;\n"
         "  return z;\n"
         "};\n"));
+  // Fails because z shadows a local.
+  run_check_negtest(ctx, "c016",
+    _u8("def x i32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  var z i32 = 4;\n"
+        "  return x;\n"
+        "};\n"));
+
 }
 
 func test_check() bool {
