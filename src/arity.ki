@@ -10,24 +10,13 @@ defenum generics_arity {
 func arity(a *ast_generics) generics_arity {
   switch a {
     case &NoGenerics(v void): { return NoParamsArity(void); }
-    case &HasGenerics(arr array[ast_ident]): { return FiniteArity(~count(&arr)); }
-  }
-}
-
-// TODO: Who uses this function?  Is it right?  Rename and chase down.
-func arity_identical(a generics_arity, b generics_arity) bool {
-  switch a {
-    case NoParamsArity(v void): {
-      if case NoParamsArity(u) = b { return true; }
+    case &HasGenerics(arr array[ast_ident]): {
+      return FiniteArity(~count(&arr));
     }
-    case FiniteArity(x u32): {
-      if case FiniteArity(y u32) = b { return x == y; }
-    }
-    case VariadicArity(x u32): {
-      if case VariadicArity(y u32) = b { return x == y; }
+    case &VariadicGenerics(b ast_variadic_generics): {
+      return VariadicArity(~count(&b.names));
     }
   }
-  return false;
 }
 
 func build_u8str(r *array[u8], a *generics_arity) void {

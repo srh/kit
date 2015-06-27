@@ -294,10 +294,16 @@ func mk(x ast_expr_enum) ast_expr {
   return {NoInfo(void), x};
 }
 
+deftype ast_variadic_generics struct {
+  names array[ast_ident];
+  variadic_name ast_ident;
+};
 
 defenum ast_generics {
   NoGenerics void;
   HasGenerics array[ast_ident];
+  // Right now VariadicGenerics can't be parsed.
+  VariadicGenerics ast_variadic_generics;
 };
 
 defenum ast_isexport {
