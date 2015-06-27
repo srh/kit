@@ -67,55 +67,52 @@ deftype check_ctx struct {
 };
 
 
-func test_check_basic_cases() bool {
-  ctx check_ctx;
-  run_check_test(&ctx, "c001",
+func test_check_basic_cases(ctx *check_ctx) void {
+  run_check_test(ctx, "c001",
     _u8("def x bool = true;"));
-  run_check_test(&ctx, "c002",
+  run_check_test(ctx, "c002",
     _u8("def x i32 = 3;\n"
         "deftype dword u32;\n"
         "deftype blah dword;\n"
         "deftype feh *blah;\n"
         "deftype quux *quux;\n"));
   // Fails because foo holds itself flatly.
-  run_check_negtest(&ctx, "c003",
+  run_check_negtest(ctx, "c003",
     _u8("deftype foo bar;\n"
         "deftype bar foo;\n"));
-  run_check_test(&ctx, "c004",
+  run_check_test(ctx, "c004",
     _u8("def x i32 = 3;\n"
         "deftype foo struct { x u32; y i32; z *foo; };\n"));
-  run_check_test(&ctx, "c005",
+  run_check_test(ctx, "c005",
     _u8("def x i32 = 3;"
         "deftype foo struct { x u32; y i32; z *foo; };\n"));
   // TODO: This should fail, because "whatever[_]" is not in scope.
-  run_check_test(&ctx, "c006-a",
+  run_check_test(ctx, "c006-a",
     _u8("def x i32 = 3;"
         "deftype[T] foo struct { count u32; p whatever[T]; };\n"));
-  run_check_test(&ctx, "c006-b",
+  run_check_test(ctx, "c006-b",
     _u8("def x i32 = 3;"
         "deftype[T] foo struct { count u32; p *T; };\n"));
   // Fails because bar recursively holds itself through a template parameter.
-  run_check_negtest(&ctx, "c007",
+  run_check_negtest(ctx, "c007",
     _u8("deftype[T, U] foo struct { x *T; y U; };\n"
         "deftype bar struct { z foo[u32, bar]; };\n"));
-  run_check_test(&ctx, "c008",
+  run_check_test(ctx, "c008",
     _u8("deftype[T, U] foo struct { x *T; y U; };\n"
         "deftype bar struct { z foo[bar, u32]; };\n"));
-  run_check_test(&ctx, "c009",
+  run_check_test(ctx, "c009",
     _u8("def x i32 = 3;\n"));
-  run_check_test(&ctx, "c010",
+  run_check_test(ctx, "c010",
     _u8("def x u32 = 3;\n"));
-  run_check_test(&ctx, "c011-a",
+  run_check_test(ctx, "c011-a",
     _u8("def[] x i32 = 3;\n"));
-  run_check_test(&ctx, "c011-b",
+  run_check_test(ctx, "c011-b",
     _u8("def[] x i32 = 3;\n"
         "def y i32 = x;\n"));
-
-  return !ctx.fail;
 }
 
 func test_check() bool {
-  pass bool = true;
-  pass = pass & test_check_basic_cases();
-  return pass;
+  ctx check_ctx;
+  test_check_basic_cases(&ctx);
+  return !ctx.fail;
 }
