@@ -107,13 +107,6 @@ func parms_equal(cs *checkstate, a *genparms, b *genparms) bool {
   }
 }
 
-func arity(parms *genparms) generics_arity {
-  switch parms {
-    case &NoParms(v void): { return NoParamsArity(void); }
-    case &HasParms(arr array[te_typeexpr]): { return FiniteArity(~count(&arr)); }
-  }
-}
-
 func convert_typefunc(cs *checkstate, a *ast_typeexpr, out *te_puretype) bool {
   switch a {
     case &Name(b ast_ident): {
@@ -327,7 +320,7 @@ func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *genp
 
 // rhs is "None()" for extern defs.
 func ensure_def_inst(cs *checkstate, ent *def_entry, parms *genparms) struct { id def_inst_id; created bool; } {
-  check(arity(&ent->generics) == arity(parms));
+  check(arity_matches(&ent->generics, parms));
   if case Has(id) = find_matching_inst(cs, &ent->insts, parms) {
     return {id, false};
   }
@@ -657,7 +650,15 @@ func arity_matches(a *ast_generics, params opt[*array[te_typeexpr]]) bool {
     ar = NoParamsArity(void);
   }
   lhs_arity generics_arity = arity(a);
-  return lhs_arity == ar;
+  return arity_identical(lhs_arity, ar);
+}
+
+func arity_matches(a *ast_generics, parms *genparms) bool {
+  if case &HasParms(ps array[te_typeexpr]) = parms {
+    return arity_matches(a, Has(&ps));
+  } else {
+    return arity_matches(a, @[opt[*array[te_typeexpr]]] None());
+  }
 }
 
 func ERR_no_match(im *identmap, name sym, params opt[*array[te_typeexpr]]) void {
@@ -781,7 +782,7 @@ func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, par
 }
 
 func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *genparms) struct { id deftype_inst_id; created bool; } {
-  check(arity(&ent->generics) == arity(parms));
+  check(arity_matches(&ent->generics, parms));
   if case Has(id) = find_matching_deftype_inst(cs, &ent->insts, parms) {
     return {id, false};
   }

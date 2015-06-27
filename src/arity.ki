@@ -3,6 +3,8 @@ import ast;
 defenum generics_arity {
   NoParamsArity void;
   FiniteArity u32;
+  // The number's the minimal arity, variadics always go at the end.
+  VariadicArity u32;
 };
 
 func arity(a *ast_generics) generics_arity {
@@ -12,7 +14,8 @@ func arity(a *ast_generics) generics_arity {
   }
 }
 
-func `==`(a generics_arity, b generics_arity) bool {
+// TODO: Who uses this function?  Is it right?  Rename and chase down.
+func arity_identical(a generics_arity, b generics_arity) bool {
   switch a {
     case NoParamsArity(v void): {
       if case NoParamsArity(u) = b { return true; }
@@ -20,12 +23,11 @@ func `==`(a generics_arity, b generics_arity) bool {
     case FiniteArity(x u32): {
       if case FiniteArity(y u32) = b { return x == y; }
     }
+    case VariadicArity(x u32): {
+      if case VariadicArity(y u32) = b { return x == y; }
+    }
   }
   return false;
-}
-
-func `!=`(a generics_arity, b generics_arity) bool {
-  return !(a == b);
 }
 
 func build_u8str(r *array[u8], a *generics_arity) void {
@@ -35,6 +37,11 @@ func build_u8str(r *array[u8], a *generics_arity) void {
     }
     case &FiniteArity(n u32): {
       append(r, _u8("FiniteArity("));
+      build_u8str(r, &n);
+      push(r, ')');
+    }
+    case &VariadicArity(n u32): {
+      append(r, _u8("VariadicArity("));
       build_u8str(r, &n);
       push(r, ')');
     }
