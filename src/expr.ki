@@ -31,24 +31,51 @@ func `==`(x allow_incomplete, y allow_incomplete) bool {
   return enumnum(&x) == enumnum(&y);
 }
 
-func es_push_var(es *exprscope, name *ast_ident, computed_type *te_typeexpr) bool {
+defclass move varpopper struct {
+  es *exprscope;
+  names array[sym];
+};
+
+access varpopper {
+
+func do_init(vp *varpopper) void {
+  init(&vp->es);
+  init(&vp->names);
+}
+
+func init_vp(vp *varpopper, es *exprscope) void {
+  check(vp->es == null);
+  vp->es = es;
+}
+
+func do_destroy(vp *varpopper) void {
+  es *exprscope = vp->es;
+  if es != null {
+    while case Has(expected sym) = popval(&vp->names) {
+      info var_info;
+      if !popval(&es->local_vars, &info) {
+        ice(_u8("varpopper sees empty local_vars"));
+      }
+      if info.name != expected {
+        ice(_u8("varpopper sees mismatching name"));
+      }
+    }
+  }
+  destroy(&vp->names);
+  vp->es = null;
+}
+
+func es_push_var(es *exprscope, vp *varpopper, name *ast_ident, computed_type *te_typeexpr) bool {
   if case Has(ix size) = es_find_local(es, name->value) {
     ERR(_u8("Local variable '"), lookup(es->im, name->value), _u8("' shadows another"));
     return false;
   }
   push(&es->local_vars, {name->value, *computed_type});
+  push(&vp->names, name->value);
   return true;
 }
 
-func es_pop_var(es *exprscope, name *ast_ident) void {
-  info var_info;
-  if !popval(&es->local_vars, &info) {
-    ice(_u8("es_pop_var sees empty local_vars"));
-  }
-  if info.name != name->value {
-    ice(_u8("es_pop_var sees mismatching name"));
-  }
-}
+}  // access varpopper
 
 func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *genparms, x *ast_expr, pt *te_typeexpr) bool {
   es exprscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]]()};
@@ -376,23 +403,21 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
   if !decompose_typeapp(&computed, primitive_function_puretype(es->cs), &computed_params) {
     ice(_u8("lambda type is not a function type"));
   }
+  vp varpopper;
   nargs size = count(&a->args);
   for i size = 0; i < nargs; i = i + 1 {
-    if !es_push_var(es, &ref(&a->args, i)->name, ref(computed_params, i)) {
+    if !es_push_var(es, &vp, &ref(&a->args, i)->name, ref(computed_params, i)) {
       return false;
     }
   }
 
   return_type *te_typeexpr = ref(computed_params, nargs);
-  body_res bool = check_body(es, &a->body, return_type);
-
-  for i size = nargs; i > 0; {
-    i = i - 1;
-    es_pop_var(es, &ref(&a->args, i)->name);
+  if !check_body(es, &a->body, return_type) {
+    return false;
   }
 
   annotate_info(x, CompleteCheck(*return_type));
-  return body_res;
+  return true;
 }
 
 func numeric_literal_value(a *ast_numeric_literal) bigint {

@@ -118,6 +118,21 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "def y fn[i32, i32] = func(z i32)i32 {\n"
         "  return x;\n"
         "};\n"));
+  // Fails because k is a u32.
+  run_check_negtest(ctx, "c013",
+    _u8("def x i32 = 3;\n"
+        "def k u32 = k;\n"
+        "def x i32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  return k;\n"
+        "};\n"));
+  // Passes despite x shadowing a global, because that's allowed.
+  run_check_test(ctx, "c014",
+    _u8("def x i32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  var x i32 = 4;\n"
+        "  return z;\n"
+        "};\n"));
 }
 
 func test_check() bool {

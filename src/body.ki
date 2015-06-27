@@ -3,6 +3,7 @@ import expr;
 // TODO: This should actually pay attention to gotos and labels, variable lifetimes, variable initialization.
 func check_body(es *exprscope, a *ast_bracebody, return_type *te_typeexpr) bool {
   nstatements size = count(&a->statements);
+  vp varpopper;
   for i size = 0; i < nstatements; i = i + 1 {
     s *ast_statement = ref(&a->statements, i);
     switch s {
@@ -53,7 +54,7 @@ func check_body(es *exprscope, a *ast_bracebody, return_type *te_typeexpr) bool 
           complete_type = &computed;
         }
 
-        if !es_push_var(es, &b.decl.name, complete_type) {
+        if !es_push_var(es, &vp, &b.decl.name, complete_type) {
           return false;
         }
       }
