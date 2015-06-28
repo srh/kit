@@ -656,17 +656,26 @@ func lookup_field(es *exprscope, t *te_typeexpr, f *ast_fieldname, fieldtype_out
   }
 }
 
-func lookup_field_from_list(cs *checkstate, fields *array[te_vardecl], fieldname sym, fieldtype_out *te_typeexpr) bool {
-  n size = count(fields);
+func find_vardecl(a *array[te_vardecl], name sym, out **te_typeexpr) bool {
+  n size = count(a);
   for i size = 0; i < n; i = i + 1 {
-    d *te_vardecl = ref(fields, i);
-    if d->name == fieldname {
-      *fieldtype_out = d->type;
+    d *te_vardecl = ref(a, i);
+    if d->name == name {
+      *out = &d->type;
       return true;
     }
   }
-  ERR(_u8("fieldname '"), lookup(cs->im, fieldname), _u8("' not found"));
   return false;
+}
+
+func lookup_field_from_list(cs *checkstate, fields *array[te_vardecl], fieldname sym, fieldtype_out *te_typeexpr) bool {
+  fieldtype *te_typeexpr;
+  if !find_vardecl(fields, fieldname, &fieldtype) {
+    ERR(_u8("fieldname '"), lookup(cs->im, fieldname), _u8("' not found"));
+    return false;
+  }
+  *fieldtype_out = *fieldtype;
+  return true;
 }
 
 func ai_incomplete(yes bool) allow_incomplete {

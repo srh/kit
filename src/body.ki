@@ -125,11 +125,104 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
         return false;
       }
     }
+    case &Switch(b ast_switch_statement): {
+      unknown te_typeexpr = TeUnknown(void);
+      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&b.swartch), &unknown) {
+        return false;
+      }
+
+      swartch_type *te_typeexpr = expr_complete_type(oo(&b.swartch));
+
+      switchable_type *te_typeexpr;
+      is_ptr bool = decompose_typeapp(swartch_type, primitive_pointer_puretype(es->cs), &switchable_type);
+
+      enum_type *te_typeexpr;
+      if !structural_rhs(es, switchable_type, &enum_type) {
+        return false;
+      }
+
+      if case &TeEnum(et te_enum) = enum_type {
+        ncases size = count(&b.cases);
+        for i size = 0; i < ncases; i = i + 1 {
+          cas *ast_switch_case = ref(&b.cases, i);
+          for j size = 0; j < i; j = j + 1 {
+            if duped_patterns(&cas->pattern, &ref(&b.cases, j)->pattern) {
+              ERR(_u8("duplicate patterns"));
+              return false;
+            }
+          }
+
+          switch &cas->pattern {
+            case &Case(patt ast_constructor_pattern): {
+              if isHas(&patt.addressof_constructor) != is_ptr {
+                ERR(_u8("swartch/pattern pointeriness mismatch"));
+                return false;
+              }
+
+              expected_type *te_typeexpr;
+              if !find_vardecl(&et.constructors, patt.constructor_name.value, &expected_type) {
+                ERR(_u8("constructor not found"));
+                return false;
+              }
+
+              // TODO: Cache converted?
+              converted te_typeexpr;
+              if !convert_typeexpr(es->cs, &patt.decl.type, &converted) {
+                return false;
+              }
+
+              unified te_typeexpr;
+              if !unify_types(&converted, expected_type, &unified) {
+                ERR(_u8("constructor variable type mismatch"));
+              }
+
+              case_vp varpopper;
+              init_vp(&case_vp, es);
+              if !es_push_var(es, &case_vp, &patt.decl.name, expected_type) {
+                return false;
+              }
+
+              if !check_body(es, &cas->body, return_type) {
+                return false;
+              }
+            }
+            case &Default(v void): {
+              if !check_body(es, &cas->body, return_type) {
+                return false;
+              }
+            }
+          }
+        }
+        if ncases > count(&et.constructors) {
+          check(ncases == 1 + count(&et.constructors));
+          ERR(_u8("Unnecessary default case."));
+          return false;
+        }
+      } else {
+        ERR(_u8("Switching over non-switchable type."));
+      }
+    }
     default: {
       return TODO();
     }
   }
   return true;
+}
+
+func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
+  switch a {
+    case &Case(ac ast_constructor_pattern): {
+      if case &Case(bc ast_constructor_pattern) = b {
+        return ac.constructor_name.value == bc.constructor_name.value;
+      }
+    }
+    case &Default(v void): {
+      if case &Default(u void) = b {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
