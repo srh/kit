@@ -155,6 +155,15 @@ func ref_deftype_inst(cs *checkstate, id deftype_inst_id) *deftype_inst {
   return oo(ref(&cs->type_instantiations, id.~));
 }
 
+func add_def_entry(cs *checkstate, ent def_entry) def_entry_id {
+  shent shp[def_entry] = emshp(ent);
+  id def_entry_id = ~count(&cs->defs);
+  push(&cs->defs, shent);
+  arr *array[def_entry_id] = try_insert_lookup(&cs->defs_by_name, oo(&shent)->def_name, default());
+  push(arr, id);
+  return id;
+}
+
 func add_deftype_entry(cs *checkstate, ent deftype_entry) deftype_entry_id {
   shent shp[deftype_entry] = emshp(ent);
   id deftype_entry_id = ~count(&cs->deftypes);
@@ -323,8 +332,8 @@ deftype def_inst struct {
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None() if we have an extern def.
   rhs opt[ast_expr];
   status def_inst_status;
-  // Valid only if computed_type_computed.
-  // Becomes the concrete type (with generics replaced) once we've computed it and checked it.
+  // TODO: Use nbfc or something.
+  // Becomes the concrete type (with generics replaced) once we've computed it and checked it (see status).
   computed_type te_typeexpr;
   computed_type_properties type_properties;
 };

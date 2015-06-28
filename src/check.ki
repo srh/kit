@@ -1139,12 +1139,8 @@ func process_module_toplevels(cs *checkstate, mod *module) bool {
 func add_def_entry(cs *checkstate,
                    module_name sym,
                    module_defs *array[def_entry_id],
-                   ent shp[def_entry]) void {
-  id def_entry_id = ~count(&cs->defs);
-  push(&cs->defs, ent);
-  arr *array[def_entry_id] = try_insert_lookup(
-    &cs->defs_by_name, oo(ent)->def_name, default());
-  push(arr, id);
+                   ent def_entry) void {
+  id def_entry_id = add_def_entry(cs, ent);
   push(module_defs, id);
 }
 
@@ -1170,11 +1166,11 @@ func process_toplevels(cs *checkstate,
         if !quick_typeexpr(&cs->cym, &a, &quick_te) {
           return false;
         }
-        ent shp[def_entry] = emshp(mk(mod->module_name, a.name.value, access_scope, a.generics, quick_te, toplevel));
+        ent def_entry = mk(mod->module_name, a.name.value, access_scope, a.generics, quick_te, toplevel);
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &ExternDef(a ast_extern_def): {
-        ent shp[def_entry] = emshp(mk(mod->module_name, a.name.value, access_scope, NoGenerics(void), a.type, toplevel));
+        ent def_entry = mk(mod->module_name, a.name.value, access_scope, NoGenerics(void), a.type, toplevel);
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &TypeDef(a ast_type_def): {
