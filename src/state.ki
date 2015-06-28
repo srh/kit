@@ -333,22 +333,26 @@ func mk(parms genparms, rhs opt[ast_expr]) def_inst {
   return {parms, rhs, DidNotStartComputingType(void), default@[te_typeexpr](), default@[type_properties]()};
 }
 
+deftype def_nonprim struct {
+  // This is either the syntactic typeexpr (converted to te_typeexpr) or converted from a shallow look at the RHS.
+  quick_typeexpr ast_typeexpr;
+  tl *ast_toplevel;
+};
+
 deftype def_entry struct {
   module_name sym;
   def_name sym;
   accessible array[access_entry_id];
   // A copy of the ast_def's generics field -- if it's an ast_extern_def, this is NoGenerics.
   generics ast_generics;
-  // This is either the syntactic typeexpr (converted to te_typeexpr) or converted from a shallow look at the RHS.
-  quick_typeexpr ast_typeexpr;
-  tl *ast_toplevel;
+  nonprim opt[def_nonprim];
   converted_typeexpr nbfc[te_typeexpr];
 
   insts array[def_inst_id];
 };
 
 func mk(module_name sym, def_name sym, accessible array[access_entry_id], generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
-  return {module_name, def_name, accessible, generics, quick_typeexpr, tl, NotComputed(), default@[array[def_inst_id]]()};
+  return {module_name, def_name, accessible, generics, Has({quick_typeexpr, tl}), NotComputed(), default@[array[def_inst_id]]()};
 }
 
 deftype clqueue_deftype_entry struct {
