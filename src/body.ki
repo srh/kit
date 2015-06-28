@@ -174,6 +174,7 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
               unified te_typeexpr;
               if !unify_types(&converted, expected_type, &unified) {
                 ERR(_u8("constructor variable type mismatch"));
+                return false;
               }
 
               case_vp varpopper;
@@ -226,5 +227,63 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
 }
 
 func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
-  return TODO();
+  switch a {
+    case &ExprCondition(b box[ast_expr]): {
+      booltype te_typeexpr = primitive_bool_type(es->cs);
+      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&b), &booltype) {
+        return false;
+      }
+      return true;
+    }
+    case &PatternCondition(b ast_pattern_assign): {
+      unknown te_typeexpr = TeUnknown(void);
+      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&b.rhs), &unknown) {
+        return false;
+      }
+
+      // TODO: vv Some of this code is redundant with switch statement code.
+      swartch_type *te_typeexpr = expr_complete_type(oo(&b.rhs));
+      switchable_type *te_typeexpr;
+      is_ptr bool = decompose_typeapp(swartch_type, primitive_pointer_puretype(es->cs), &switchable_type);
+
+      enum_type *te_typeexpr;
+      if !structural_rhs(es, switchable_type, &enum_type) {
+        return false;
+      }
+
+      if case &TeEnum(et te_enum) = enum_type {
+        if isHas(&b.pattern.addressof_constructor) != is_ptr {
+          ERR(_u8("condition pattern pointeriness mismatch"));
+          return false;
+        }
+
+        expected_type *te_typeexpr;
+        if !find_vardecl(&et.constructors, b.pattern.constructor_name.value, &expected_type) {
+          ERR(_u8("constructor not found in condition pattern"));
+          return false;
+        }
+
+        // TODO: Cache converted?
+        converted te_typeexpr;
+        if !convert_typeexpr(es->cs, &b.pattern.decl.type, &converted) {
+          return false;
+        }
+
+        unified te_typeexpr;
+        if !unify_types(&converted, expected_type, &unified) {
+          ERR(_u8("constructor variable type mismatch"));
+          return false;
+        }
+
+        if !es_push_var(es, cond_vp, &b.pattern.decl.name, expected_type) {
+          return false;
+        }
+
+        return true;
+      } else {
+        ERR(_u8("Condition pattern over non-switchable type."));
+        return false;
+      }
+    }
+  }
 }
