@@ -203,7 +203,10 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
         ERR(_u8("Switching over non-switchable type."));
       }
     }
-    default: {
+    case &Label(b ast_label_statement): {
+      return TODO();
+    }
+    case &Goto(b ast_goto_statement): {
       return TODO();
     }
   }
