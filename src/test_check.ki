@@ -170,6 +170,29 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "def y fn[i32, i32] = func(z i32)i32 {\n"
         "  return -x;\n"
         "};\n"));
+  run_check_test(ctx, "c021",
+    _u8("deftype foo struct { x i32; y i32; };\n"
+        "def y fn[foo, i32] = func(z foo) i32 {\n"
+        "  return z.x;\n"
+        "};\n"));
+  // Fails because the field x has type u32.
+  run_check_negtest(ctx, "c022",
+    _u8("deftype foo struct { x u32; y i32; };\n"
+        "def y fn[foo, i32] = func(z foo) i32 {\n"
+        "  return z.x;\n"
+        "};\n"));
+  run_check_test(ctx, "c023",
+    _u8("deftype[T] foo struct { x T; y i32; };\n"
+        "def y fn[foo[i32], i32] = func(z foo[i32]) i32 {\n"
+        "  return z.x + z.y;\n"
+        "};\n"));
+  // Fails because z.x is a u32.
+  run_check_negtest(ctx, "c024",
+    _u8("deftype[T] foo struct { x T; y i32; };\n"
+        "def y fn[foo[u32], i32] = func(z foo[u32]) i32 {\n"
+        "  return z.x + z.y;\n"
+        "};\n"));
+
 }
 
 func test_check() bool {
