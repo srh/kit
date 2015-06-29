@@ -76,13 +76,7 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool 
 }
 
 func add_def_primitive(cs *checkstate, name sym, type te_typeexpr) void {
-  inst_id def_inst_id = add_inst(cs, {NoParms(void),
-                                      None(),
-                                      DidNotStartComputingType(void),
-                                      default(),
-                                      default()});
   insts array[def_inst_id];
-  push(&insts, inst_id);
   // access_scope is not relevant to a primitive def.
   access_scope array[access_entry_id];
   ent def_entry = {cs->cym.primitive_module_sym, name, access_scope, NoGenerics(void), None(), Computed(type), insts};
