@@ -31,8 +31,8 @@ or, try running (on 64-bit Linux with multilib set up),
    gcc -m32 main.o dummy.c
    ./a.out
 
-to see a parsing test, written in proto-Kit, actually working.  The
-current directory structure is:
+to see the test suite, written in proto-Kit, for parsing and
+typechecking.  The current directory structure is:
 
    trc - 1st stage compiler, written in C, compiled by invoking
    build_windows_trc.bat.
