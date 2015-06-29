@@ -69,8 +69,15 @@ deftype check_ctx struct {
 
 
 func test_check_basic_cases(ctx *check_ctx) void {
-  run_check_test(ctx, "c001",
+  run_check_test(ctx, "c001-a",
     _u8("def x bool = true;"));
+  run_check_test(ctx, "c001-b",
+    _u8("def x u32 = 3;"));
+  run_check_test(ctx, "c001-c",
+    _u8("def x i32 = -3;"));
+  // Fails because unsigned negation is not permitted.
+  run_check_negtest(ctx, "c001-d",
+    _u8("def x u32 = -3;"));
   run_check_test(ctx, "c002",
     _u8("def x i32 = 3;\n"
         "deftype dword u32;\n"
@@ -144,6 +151,24 @@ func test_check_lambda_cases(ctx *check_ctx) void {
     _u8("def x i32 = 3;\n"
         "def y fn[i32, i32] = func(z i32)i32 {\n"
         "  return x + z + 5;\n"
+        "};\n"));
+  // Fails because x is a u32.
+  run_check_negtest(ctx, "c018",
+    _u8("def x u32 = x;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  return x + z + 5;\n"
+        "};\n"));
+  // Fails because typechecking can't see that 5 is an i32.
+  run_check_negtest(ctx, "c019",
+    _u8("def x i32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  return -x + z + -5;\n"
+        "};\n"));
+  // Fails because you can't negate a u32.
+  run_check_negtest(ctx, "c020",
+    _u8("def x u32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  return -x;\n"
         "};\n"));
 }
 
