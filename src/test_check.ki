@@ -199,7 +199,25 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "  };\n"
         "  return k(z) + k(z);\n"
         "};\n"));
-
+  // Passes!  Because, according to the type checker, lambdas can capture.
+  // TODO: Make a decision about capturing.
+  run_check_test(ctx, "c026",
+    _u8("def y fn[i32, i32] = func(z i32) i32 {\n"
+        "  var k fn[i32, i32] = func(m i32) i32 {\n"
+        "    return m + z;\n"
+        "  };\n"
+        "  return k(z) + k(z);\n"
+        "};\n"));
+  run_check_test(ctx, "c027",
+    _u8("deftype foo struct { x i32; y i32; };\n"
+        "def y fn[*foo, i32] = func(z *foo) i32 {\n"
+        "  return z->x;\n"
+        "};\n"));
+  run_check_test(ctx, "c028",
+    _u8("deftype[T] foo struct { x T; y i32; };\n"
+        "def y fn[*foo[i32], i32] = func(z *foo[i32]) i32 {\n"
+        "  return z->x + z->y;\n"
+        "};\n"));
 
 }
 

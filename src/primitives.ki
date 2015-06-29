@@ -75,7 +75,7 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool 
   return false;
 }
 
-func add_op_primitive(cs *checkstate, oper sym, typename sym, arity size) void {
+func add_def_primitive(cs *checkstate, name sym, type te_typeexpr) void {
   inst_id def_inst_id = add_inst(cs, {NoParms(void),
                                       None(),
                                       DidNotStartComputingType(void),
@@ -85,10 +85,14 @@ func add_op_primitive(cs *checkstate, oper sym, typename sym, arity size) void {
   push(&insts, inst_id);
   // access_scope is not relevant to a primitive def.
   access_scope array[access_entry_id];
-  type te_typeexpr = TeApp({embox(primitive_function_puretype(cs)), repeat(arity + 1, TeName({typename, None()})), None()});
-  ent def_entry = {cs->cym.primitive_module_sym, oper, access_scope, NoGenerics(void), None(), Computed(type), insts};
+  ent def_entry = {cs->cym.primitive_module_sym, name, access_scope, NoGenerics(void), None(), Computed(type), insts};
   id def_entry_id = add_def_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" module.
+}
+
+func add_op_primitive(cs *checkstate, oper sym, typename sym, arity size) void {
+  type te_typeexpr = TeApp({embox(primitive_function_puretype(cs)), repeat(arity + 1, TeName({typename, None()})), None()});
+  add_def_primitive(cs, oper, type);
 }
 
 func add_binop_primitive(cs *checkstate, oper sym, typename sym) void {
@@ -133,6 +137,10 @@ func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
 }
 
 func add_pointer_primitive(cs *checkstate) void {
+  add_pointer_primitive_type(cs);
+}
+
+func add_pointer_primitive_type(cs *checkstate) void {
   one_generic array[ast_ident];
   push(&one_generic, {fake_ast_meta(), cs->cym.tee_sym});
   // It's as if pointers belong is an even _more_ primitive module than integer/bool types.
