@@ -1,6 +1,17 @@
 import identmap;
 import state;
 
+// A "computed" typeexpr, which is complete, and which has isHas instpacks.
+deftype cu_typeexpr te_typeexpr;
+
+def `~` fn[te_typeexpr, cu_typeexpr] = wrapconvert;
+
+// A "check and computed" typeexpr -- if it's not complete, it should not be converted to a cu_typeexpr.
+deftype cac_typeexpr struct {
+  complete bool;
+  te te_typeexpr;
+};
+
 // TODO: Might this still exist in a particular scope?
 // This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics replaced consistently.
 defenum te_typeexpr {
@@ -59,7 +70,7 @@ deftype te_vardecl struct {
   type te_typeexpr;
 };
 
-func typeexpr_list_equal(cs *checkstate, a *array[te_typeexpr], b *array[te_typeexpr]) bool {
+func typeexpr_list_equal(cs *checkstate, a *array[cu_typeexpr], b *array[cu_typeexpr]) bool {
   n size = count(a);
   if n != count(b) {
     return false;
@@ -72,8 +83,12 @@ func typeexpr_list_equal(cs *checkstate, a *array[te_typeexpr], b *array[te_type
   return true;
 }
 
+func typeexpr_equal(cs *checkstate, a *cu_typeexpr, b *cu_typeexpr) bool {
+  return help_typeexpr_equal(cs, &a->~, &b->~);
+}
+
 // Must be called on complete, concrete types.
-func typeexpr_equal(cs *checkstate, a *te_typeexpr, b *te_typeexpr) bool {
+func help_typeexpr_equal(cs *checkstate, a *te_typeexpr, b *te_typeexpr) bool {
   switch a {
     case &TeName(ax te_name): {
       if case &TeName(bx te_name) = b {
@@ -97,22 +112,22 @@ func typeexpr_equal(cs *checkstate, a *te_typeexpr, b *te_typeexpr) bool {
     }
     case &TeStruct(ax te_struct): {
       if case &TeStruct(bx te_struct) = b {
-        return te_vardecl_list_equal(cs, &ax.fields, &bx.fields);
+        return help_te_vardecl_list_equal(cs, &ax.fields, &bx.fields);
       }
     }
     case &TeEnum(ax te_enum): {
       if case &TeEnum(bx te_enum) = b {
-        return te_vardecl_list_equal(cs, &ax.constructors, &bx.constructors);
+        return help_te_vardecl_list_equal(cs, &ax.constructors, &bx.constructors);
       }
     }
     case &TeUnion(ax te_union): {
       if case &TeUnion(bx te_union) = b {
-        return te_vardecl_list_equal(cs, &ax.fields, &bx.fields);
+        return help_te_vardecl_list_equal(cs, &ax.fields, &bx.fields);
       }
     }
     case &TeArraytype(ax te_arraytype): {
       if case &TeArraytype(bx te_arraytype) = b {
-        return ax.count == bx.count && typeexpr_equal(cs, oo(&ax.param), oo(&bx.param));
+        return ax.count == bx.count && help_typeexpr_equal(cs, oo(&ax.param), oo(&bx.param));
       }
     }
     case &TeUnknown(v void): {
@@ -139,7 +154,7 @@ func te_puretype_equal(cs *checkstate, a *te_puretype, b *te_puretype) bool {
   return false;
 }
 
-func te_vardecl_list_equal(cs *checkstate, a *array[te_vardecl], b *array[te_vardecl]) bool {
+func help_te_vardecl_list_equal(cs *checkstate, a *array[te_vardecl], b *array[te_vardecl]) bool {
   n size = count(a);
   if n != count(b) {
     return false;
@@ -147,11 +162,15 @@ func te_vardecl_list_equal(cs *checkstate, a *array[te_vardecl], b *array[te_var
   for i size = 0; i < n; i = i + 1 {
     adecl *te_vardecl = ref(a, i);
     bdecl *te_vardecl = ref(b, i);
-    if !(adecl->name == bdecl->name && typeexpr_equal(cs, &adecl->type, &bdecl->type)) {
+    if !(adecl->name == bdecl->name && help_typeexpr_equal(cs, &adecl->type, &bdecl->type)) {
       return false;
     }
   }
   return true;
+}
+
+func[H] build_u8str(help H, r *array[u8], a *cu_typeexpr) void {
+  return build_u8str(help, r, &a->~);
 }
 
 func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {

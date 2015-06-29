@@ -181,5 +181,14 @@ func build_u8str(r *array[u8], a *array[u8]) void {
   append(r, a);
 }
 
+func[U, T] mapconvert(x array[T]) array[U] {
+  build array[U];
+  n size = count(&x);
+  for i size = 0; i < n; i = i + 1 {
+    push(&build, @[U]~get(&x, i));
+  }
+  return build;
+}
+
 // Heh.
 def[T] _u8 fn[T, array[u8]] = make;

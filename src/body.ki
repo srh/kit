@@ -42,24 +42,25 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
         return false;
       }
 
-      computed_complete bool;
-      computed te_typeexpr;
-      if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed, &computed_complete) {
+      computed cac_typeexpr;
+      if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed) {
         return false;
       }
-      complete_type *te_typeexpr;
+      cu_computed cu_typeexpr;
+      complete_type *cu_typeexpr;
       if case &Has(x box[ast_expr]) = &b.rhs {
-        if !check_expr_ai(es, AllowIncompleteNo(void), oo(&x), &computed) {
+        if !check_expr_ai(es, AllowIncompleteNo(void), oo(&x), &computed.te) {
           return false;
         }
         complete_type = expr_complete_type(oo(&x));
       } else {
-        if !computed_complete {
+        if !computed.complete {
           ERR(_u8("Variable declaration with no rhs, incomplete type"));
           return false;
         }
         // NOTE: The object must be default-constructible.
-        complete_type = &computed;
+        cu_computed = ~computed.te;
+        complete_type = &cu_computed;
       }
 
       if !es_push_var(es, vp, &b.decl.name, complete_type) {
@@ -131,15 +132,21 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
         return false;
       }
 
-      swartch_type *te_typeexpr = expr_complete_type(oo(&b.swartch));
+      swartch_type *cu_typeexpr = expr_complete_type(oo(&b.swartch));
 
       switchable_type *te_typeexpr;
-      is_ptr bool = decompose_typeapp(swartch_type, primitive_pointer_puretype(es->cs), &switchable_type);
+      is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(es->cs), &switchable_type);
+      if !is_ptr {
+        switchable_type = &swartch_type->~;
+      }
+
+      // switchable_type is complete, because swartch_type was.
 
       enum_type *te_typeexpr;
-      if !structural_rhs(es, switchable_type, &enum_type) {
+      if !complete_structural_rhs(es, switchable_type, &enum_type) {
         return false;
       }
+      // enum_type is complete, because complete_structural_rhs does that.
 
       if case &TeEnum(et te_enum) = enum_type {
         ncases size = count(&b.cases);
@@ -164,6 +171,7 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
                 ERR(_u8("constructor not found"));
                 return false;
               }
+              // expected_type is complete, because enum_type was.
 
               // TODO: Cache converted?
               converted te_typeexpr;
@@ -179,7 +187,8 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
 
               case_vp varpopper;
               init_vp(&case_vp, es);
-              if !es_push_var(es, &case_vp, &patt.decl.name, expected_type) {
+              cu_expected_type cu_typeexpr = ~ *expected_type;
+              if !es_push_var(es, &case_vp, &patt.decl.name, &cu_expected_type) {
                 return false;
               }
 
@@ -245,14 +254,19 @@ func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
       }
 
       // TODO: vv Some of this code is redundant with switch statement code.
-      swartch_type *te_typeexpr = expr_complete_type(oo(&b.rhs));
+      swartch_type *cu_typeexpr = expr_complete_type(oo(&b.rhs));
       switchable_type *te_typeexpr;
-      is_ptr bool = decompose_typeapp(swartch_type, primitive_pointer_puretype(es->cs), &switchable_type);
+      is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(es->cs), &switchable_type);
+      if !is_ptr {
+        switchable_type = &swartch_type->~;
+      }
+      // switchable_type is complete, because swartch_type is.
 
       enum_type *te_typeexpr;
-      if !structural_rhs(es, switchable_type, &enum_type) {
+      if !complete_structural_rhs(es, switchable_type, &enum_type) {
         return false;
       }
+      // enum_type is complete, because complete_structural_rhs.
 
       if case &TeEnum(et te_enum) = enum_type {
         if isHas(&b.pattern.addressof_constructor) != is_ptr {
@@ -265,6 +279,7 @@ func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
           ERR(_u8("constructor not found in condition pattern"));
           return false;
         }
+        // expected_type is complete because enum_type is.
 
         // TODO: Cache converted?
         converted te_typeexpr;
@@ -278,7 +293,8 @@ func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
           return false;
         }
 
-        if !es_push_var(es, cond_vp, &b.pattern.decl.name, expected_type) {
+        cu_expected_type cu_typeexpr = ~ *expected_type;
+        if !es_push_var(es, cond_vp, &b.pattern.decl.name, &cu_expected_type) {
           return false;
         }
 

@@ -266,12 +266,12 @@ defenum deftype_inst_status {
 
 deftype deftype_inst_info struct {
   // This is None() if the type is primitive.
-  rhs opt[te_typeexpr];
+  rhs opt[cu_typeexpr];
   props type_properties;
 };
 
 deftype deftype_inst struct {
-  parms genparms;
+  parms cu_genparms;
   // TODO: should status+info be nfbc[deftype_inst_info]?
   status deftype_inst_status;
   info opt[deftype_inst_info];
@@ -322,6 +322,11 @@ defenum genparms {
   HasParms array[te_typeexpr];
 };
 
+defenum cu_genparms {
+  NoParms void;
+  HasParms array[cu_typeexpr];
+};
+
 defenum def_inst_status {
   DidNotStartComputingType void;
   BeganComputingType void;
@@ -332,18 +337,18 @@ defenum def_inst_status {
 };
 
 deftype def_inst struct {
-  parms genparms;
+  parms cu_genparms;
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None() if we have an extern def.
   rhs opt[ast_expr];
   status def_inst_status;
   // TODO: Use nbfc or something.
   // Becomes the concrete type (with generics replaced) once we've computed it and checked it (see status).
-  computed_type te_typeexpr;
+  computed_type cu_typeexpr;
   computed_type_properties type_properties;
 };
 
-func mk(parms genparms, rhs opt[ast_expr]) def_inst {
-  return {parms, rhs, DidNotStartComputingType(void), default@[te_typeexpr](), default@[type_properties]()};
+func mk(parms cu_genparms, rhs opt[ast_expr]) def_inst {
+  return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties]()};
 }
 
 deftype def_nonprim struct {

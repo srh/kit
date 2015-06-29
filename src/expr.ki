@@ -11,7 +11,7 @@ deftype exprscope struct {
   accessible array[access_entry_id];
   // Generics and their _complete_ replacements.
   generics *ast_generics;
-  parms *genparms;
+  parms *cu_genparms;
 
   local_vars array[var_info];
 };
@@ -19,7 +19,7 @@ deftype exprscope struct {
 deftype var_info struct {
   name sym;
   // A complete, checked, type, with generics replaced.
-  type te_typeexpr;
+  type cu_typeexpr;
 };
 
 defenum allow_incomplete {
@@ -56,7 +56,7 @@ func do_destroy(vp *varpopper) void {
   vp->es = null;
 }
 
-func es_push_var(es *exprscope, vp *varpopper, name *ast_ident, computed_type *te_typeexpr) bool {
+func es_push_var(es *exprscope, vp *varpopper, name *ast_ident, computed_type *cu_typeexpr) bool {
   if case Has(ix size) = es_find_local(es, name->value) {
     ERR(_u8("Local variable '"), lookup(es->im, name->value), _u8("' shadows another"));
     return false;
@@ -82,7 +82,7 @@ func descope_vars(vp *varpopper) void {
 
 }  // access varpopper
 
-func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *genparms, x *ast_expr, pt *te_typeexpr) bool {
+func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr) bool {
   es exprscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]]()};
   return check_expr_ai(&es, AllowIncompleteNo(void), x, pt);
 }
@@ -96,12 +96,11 @@ func replaced_name_parms(es *exprscope, a *ast_name_expr, out *genparms) bool {
       if !convert_typeexpr(es->cs, ref(&arr, i), &converted) {
         return false;
       }
-      computed te_typeexpr;
-      computed_complete bool;
-      if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed, &computed_complete) {
+      computed cac_typeexpr;
+      if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed) {
         return false;
       }
-      push(&replaced, computed);
+      push(&replaced, computed.te);
     }
     *out = HasParms(replaced);
     return true;
@@ -136,8 +135,8 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
   if case &NoParms(v void) = gp {
     if case Has(ix size) = es_find_local(es, name) {
       type te_typeexpr;
-      vartype *te_typeexpr = &ref(&es->local_vars, ix)->type;
-      if !unify_types(pt, vartype, &type) {
+      vartype *cu_typeexpr = &ref(&es->local_vars, ix)->type;
+      if !unify_types(pt, &vartype->~, &type) {
         ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"), to_u8str(es->im, *vartype), _u8("' where '"), to_u8str(es->im, *pt), _u8("' expected"));
         return false;
       }
@@ -161,7 +160,11 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
       return true;
     }
     case OneMatch(m struct { ent def_entry_id; parms genparms; }): {
-      inst_id def_inst_id = enqueue_def_inst(es->cs, es->clq, m.ent, &m.parms);
+      cu_parms cu_genparms;
+      if !check_and_compute_parms(es->cs, es->clq, &m.parms, &cu_parms) {
+        return false;
+      }
+      inst_id def_inst_id = enqueue_def_inst(es->cs, es->clq, m.ent, &cu_parms);
       *res_out = OneGlobalMatch({m.ent, inst_id});
       return true;
     }
@@ -179,14 +182,20 @@ func es_find_local(es *exprscope, name sym) opt[size] {
   return None();
 }
 
-func help_check_simple_literal(pt *te_typeexpr, type te_typeexpr, errmsg_name array[u8], x *ast_expr) bool {
+func help_check_simple_literal(es *exprscope, pt *te_typeexpr, type te_typeexpr, errmsg_name array[u8], x *ast_expr) bool {
   unified te_typeexpr;
   if !unify_types(pt, &type, &unified) {
     ERR(errmsg_name, _u8(" literal in bad place"));
     return false;
   }
   if is_complete(&unified) {
-    annotate_info(x, CompleteCheck(type));
+    c cac_typeexpr;
+    if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &c) {
+      ice(_u8("help_check_simple_literal passed bad type"));
+    }
+    check(c.complete);
+
+    annotate_info(x, CompleteCheck(~c.te));
   } else {
     annotate_info(x, IncompleteCheck(type));
   }
@@ -194,7 +203,7 @@ func help_check_simple_literal(pt *te_typeexpr, type te_typeexpr, errmsg_name ar
 }
 
 func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
-  if case &CompleteCheck(t te_typeexpr) = &x->info {
+  if case &CompleteCheck(t cu_typeexpr) = &x->info {
     return true;
   }
 
@@ -252,15 +261,15 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &BoolLiteral(a ast_bool_literal): {
-      return help_check_simple_literal(pt, primitive_bool_type(es->cs), _u8("bool"), x);
+      return help_check_simple_literal(es, pt, primitive_bool_type(es->cs), _u8("bool"), x);
     }
 
     case &VoidLiteral(a ast_void_literal): {
-      return help_check_simple_literal(pt, primitive_void_type(es->cs), _u8("void"), x);
+      return help_check_simple_literal(es, pt, primitive_void_type(es->cs), _u8("void"), x);
     }
 
     case &NullLiteral(a ast_null_literal): {
-      return help_check_simple_literal(pt, pointer_to(es->cs, TeUnknown(void)), _u8("null"), x);
+      return help_check_simple_literal(es, pt, pointer_to(es->cs, TeUnknown(void)), _u8("null"), x);
     }
 
     case &CharLiteral(a ast_char_literal): {
@@ -275,7 +284,12 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         ERR(_u8("string literal in bad place"));
         return false;
       }
-      annotate_info(x, CompleteCheck(type));
+      c cac_typeexpr;
+      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &type, &c) {
+        ice(_u8("primitive_string_literal_type not computed"));
+      }
+      check(c.complete);
+      annotate_info(x, CompleteCheck(~c.te));
       return true;
     }
     case &Funcall(a ast_funcall): {
@@ -292,8 +306,8 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), &unknown) {
         return false;
       }
-      type *te_typeexpr = expr_complete_type(oo(&a.lhs));
-      fieldtype te_typeexpr;
+      type *cu_typeexpr = expr_complete_type(oo(&a.lhs));
+      fieldtype cu_typeexpr;
       if !check_field(es, type, &a.fieldname, pt, &fieldtype) {
         return false;
       }
@@ -306,14 +320,15 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), &unknown) {
         return false;
       }
-      type *te_typeexpr = expr_complete_type(oo(&a.lhs));
+      type *cu_typeexpr = expr_complete_type(oo(&a.lhs));
       param *te_typeexpr;
-      if !decompose_typeapp(type, primitive_pointer_puretype(es->cs), &param) {
+      if !decompose_typeapp(&type->~, primitive_pointer_puretype(es->cs), &param) {
         ERR(_u8("Expected pointer for lhs of deref field"));
         return false;
       }
-      fieldtype te_typeexpr;
-      if !check_field(es, param, &a.fieldname, pt, &fieldtype) {
+      cu_param cu_typeexpr = ~ *param;
+      fieldtype cu_typeexpr;
+      if !check_field(es, &cu_param, &a.fieldname, pt, &fieldtype) {
         return false;
       }
       annotate_info(x, CompleteCheck(fieldtype));
@@ -325,13 +340,13 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !convert_typeexpr(es->cs, &a.type, &converted) {
         return false;
       }
-      computed_complete bool;
-      computed te_typeexpr;
-      if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed, &computed_complete) {
+      // We call check_and_compute_typeexpr to disallow totally bogus typeexprs more directly than the eventual type error that would happen.
+      computed cac_typeexpr;
+      if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed) {
         return false;
       }
       unified te_typeexpr;
-      if !unify_types(pt, &computed, &unified) {
+      if !unify_types(pt, &computed.te, &unified) {
         ERR(_u8("TypedExpr is incompatible with contextual type."));
         return false;
       }
@@ -359,14 +374,18 @@ func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *
     }
   }
 
-  // Since pt is complete, it's computed.
-  structural_type *te_typeexpr;
-  if !structural_rhs(es, pt, &structural_type) {
+  // Since pt is complete, and since it's a pt, it's computed.
+  if !is_complete_computed(pt).computed {
+    ice(_u8("check_expr_strinit has non-computed pt"));
+  }
+  cu_pt cu_typeexpr = ~ *pt;
+  structural_type *cu_typeexpr;
+  if !structural_rhs(es, &cu_pt, &structural_type) {
     return false;
   }
 
   // NOTE: We could allow arrays, especially if ambig matching returns number of fields and their type.
-  if case &TeStruct(b te_struct) = structural_type {
+  if case &TeStruct(b te_struct) = &structural_type->~ {
     n size = count(&b.fields);
     if n != count(&a->exprs) {
       ERR(_u8("Structure literal has wrong number of fields."));
@@ -379,7 +398,8 @@ func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *
       }
     }
 
-    annotate_info(x, CompleteCheck(*pt));
+    // We checked is_computed(pt).
+    annotate_info(x, CompleteCheck(~ *pt));
     return true;
   } else {
     ERR(_u8("Structure literal used on non-struct type."));
@@ -396,27 +416,27 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
     return false;
   }
   // TODO: I see some duplicated logic with the TypedExpr case.
-  computed_complete bool;
-  computed te_typeexpr;
-  if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed, &computed_complete) {
+  computed cac_typeexpr;
+  if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed) {
     return false;
   }
   // Lambda exprs can't have partial types (yet!).
-  check(computed_complete);
+  check(computed.complete);
   unified te_typeexpr;
-  if !unify_types(pt, &computed, &unified) {
+  if !unify_types(pt, &computed.te, &unified) {
     ERR(_u8("Lambda is incompatible with contextual type."));
     return false;
   }
 
   computed_params *array[te_typeexpr];
-  if !decompose_typeapp(&computed, primitive_function_puretype(es->cs), &computed_params) {
+  if !decompose_typeapp(&computed.te, primitive_function_puretype(es->cs), &computed_params) {
     ice(_u8("lambda type is not a function type"));
   }
   vp varpopper;
   nargs size = count(&a->args);
   for i size = 0; i < nargs; i = i + 1 {
-    if !es_push_var(es, &vp, &ref(&a->args, i)->name, ref(computed_params, i)) {
+    cu_param cu_typeexpr = ~get(computed_params, i);
+    if !es_push_var(es, &vp, &ref(&a->args, i)->name, &cu_param) {
       return false;
     }
   }
@@ -426,7 +446,7 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
     return false;
   }
 
-  annotate_info(x, CompleteCheck(computed));
+  annotate_info(x, CompleteCheck(~computed.te));
   return true;
 }
 
@@ -461,7 +481,9 @@ func check_numeric_literal(cs *checkstate, ai allow_incomplete, pt *te_typeexpr,
     ERR(_u8("Numeric literal out of range."));
     return false;
   }
-  annotate_info(x, CompleteCheck(*pt));
+  // It's a pt, and it's a numeric type, which means it must be a complete pt, which means it's computed.
+  check(is_complete_computed(pt).computed);
+  annotate_info(x, CompleteCheck(~ *pt));
   return true;
 }
 
@@ -491,13 +513,13 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
   return true;
 }
 
-func check_field(es *exprscope, t *te_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *te_typeexpr) bool {
-  fieldtype te_typeexpr;
+func check_field(es *exprscope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *cu_typeexpr) bool {
+  fieldtype cu_typeexpr;
   if !lookup_field(es, t, a, &fieldtype) {
     return false;
   }
   unified te_typeexpr;
-  if !unify_types(pt, &fieldtype, &unified) {
+  if !unify_types(pt, &fieldtype.~, &unified) {
     ERR(_u8("field has wrong type."));
     return false;
   }
@@ -535,13 +557,24 @@ func deftype_rhs_accessible(es *exprscope, id deftype_entry_id, result_out *bool
   }
 }
 
-func structural_rhs(es *exprscope, t *te_typeexpr, rhs_type_out **te_typeexpr) bool {
+// t must be complete.
+func complete_structural_rhs(es *exprscope, t *te_typeexpr, rhs_type_out **te_typeexpr) bool {
   switch t {
     case &TeName(a te_name): {
-      return help_structural_rhs(es, &a.pack, rhs_type_out);
+      cu_rhs *cu_typeexpr;
+      if !help_structural_rhs(es, &a.pack, &cu_rhs) {
+        return false;
+      }
+      *rhs_type_out = &cu_rhs->~;
+      return true;
     }
     case &TeApp(a te_typeapp): {
-      return help_structural_rhs(es, &a.pack, rhs_type_out);
+      cu_rhs *cu_typeexpr;
+      if !help_structural_rhs(es, &a.pack, &cu_rhs) {
+        return false;
+      }
+      *rhs_type_out = &cu_rhs->~;
+      return true;
     }
     default: {
       if case &TeUnknown(v void) = t {
@@ -553,7 +586,25 @@ func structural_rhs(es *exprscope, t *te_typeexpr, rhs_type_out **te_typeexpr) b
   }
 }
 
-func help_structural_rhs(es *exprscope, mbpack *opt[te_instpack], rhs_type_out **te_typeexpr) bool {
+func structural_rhs(es *exprscope, t *cu_typeexpr, rhs_type_out **cu_typeexpr) bool {
+  switch &t->~ {
+    case &TeName(a te_name): {
+      return help_structural_rhs(es, &a.pack, rhs_type_out);
+    }
+    case &TeApp(a te_typeapp): {
+      return help_structural_rhs(es, &a.pack, rhs_type_out);
+    }
+    default: {
+      if case &TeUnknown(v void) = &t->~ {
+        ice(_u8("structural_rhs called on incomplete type"));
+      }
+      *rhs_type_out = t;
+      return true;
+    }
+  }
+}
+
+func help_structural_rhs(es *exprscope, mbpack *opt[te_instpack], rhs_type_out **cu_typeexpr) bool {
   if case &Has(pack te_instpack) = mbpack {
     accessible_result bool;
     if !deftype_rhs_accessible(es, pack.ent_id, &accessible_result) {
@@ -568,7 +619,7 @@ func help_structural_rhs(es *exprscope, mbpack *opt[te_instpack], rhs_type_out *
     }
     inst *deftype_inst = ref_deftype_inst(es->cs, pack.inst_id);
     if case &Has(info deftype_inst_info) = &inst->info {
-      if case &Has(t te_typeexpr) = &info.rhs {
+      if case &Has(t cu_typeexpr) = &info.rhs {
         *rhs_type_out = &t;
         return true;
       } else {
@@ -585,8 +636,8 @@ func help_structural_rhs(es *exprscope, mbpack *opt[te_instpack], rhs_type_out *
   }
 }
 
-func lookup_whole_field(es *exprscope, mbpack *opt[te_instpack], fieldtype_out *te_typeexpr) bool {
-  p *te_typeexpr;
+func lookup_whole_field(es *exprscope, mbpack *opt[te_instpack], fieldtype_out *cu_typeexpr) bool {
+  p *cu_typeexpr;
   if !help_structural_rhs(es, mbpack, &p) {
     return false;
   }
@@ -594,16 +645,16 @@ func lookup_whole_field(es *exprscope, mbpack *opt[te_instpack], fieldtype_out *
   return true;
 }
 
-func lookup_name_field(es *exprscope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *te_typeexpr) bool {
-  p *te_typeexpr;
+func lookup_name_field(es *exprscope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *cu_typeexpr) bool {
+  p *cu_typeexpr;
   if !help_structural_rhs(es, mbpack, &p) {
     return false;
   }
   return help_lookup_name_field(es, p, fieldname, fieldtype_out);
 }
 
-func help_lookup_name_field(es *exprscope, t *te_typeexpr, fieldname *ast_ident, fieldtype_out *te_typeexpr) bool {
-  switch t {
+func help_lookup_name_field(es *exprscope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr) bool {
+  switch &t->~ {
     case &TeName(a te_name): {
       return lookup_name_field(es, &a.pack, fieldname, fieldtype_out);
     }
@@ -625,7 +676,15 @@ func help_lookup_name_field(es *exprscope, t *te_typeexpr, fieldname *ast_ident,
         ERR(_u8("field lookup (not .length) on array type"));
         return false;
       }
-      *fieldtype_out = primitive_size_type(es->cs);
+      sizetype te_typeexpr = primitive_size_type(es->cs);
+      c cac_typeexpr;
+      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &sizetype, &c) {
+        ice(_u8("primitive_size_type failed check"));
+      }
+      if !c.complete {
+        ice(_u8("primitive_size_type was incomplete"));
+      }
+      *fieldtype_out = ~ c.te;
       return true;
     }
     case &TeUnknown(v void): {
@@ -635,10 +694,10 @@ func help_lookup_name_field(es *exprscope, t *te_typeexpr, fieldname *ast_ident,
   }
 }
 
-func lookup_field(es *exprscope, t *te_typeexpr, f *ast_fieldname, fieldtype_out *te_typeexpr) bool {
+func lookup_field(es *exprscope, t *cu_typeexpr, f *ast_fieldname, fieldtype_out *cu_typeexpr) bool {
   switch f {
     case &WholeField(v void): {
-      switch t {
+      switch &t->~ {
         case &TeName(a te_name): {
           return lookup_whole_field(es, &a.pack, fieldtype_out);
         }
@@ -673,13 +732,14 @@ func find_vardecl(a *array[te_vardecl], name sym, out **te_typeexpr) bool {
   return false;
 }
 
-func lookup_field_from_list(cs *checkstate, fields *array[te_vardecl], fieldname sym, fieldtype_out *te_typeexpr) bool {
+// fields is supposed to be complete.
+func lookup_field_from_list(cs *checkstate, fields *array[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr) bool {
   fieldtype *te_typeexpr;
   if !find_vardecl(fields, fieldname, &fieldtype) {
     ERR(_u8("fieldname '"), lookup(cs->im, fieldname), _u8("' not found"));
     return false;
   }
-  *fieldtype_out = *fieldtype;
+  *fieldtype_out = ~ *fieldtype;
   return true;
 }
 
@@ -714,8 +774,8 @@ func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_
     }
   }
 
-  return_type *te_typeexpr = fn_return_type(expr_complete_type(oo(&a->fun)));
-  annotate_info(x, CompleteCheck(*return_type));
+  return_type *te_typeexpr = fn_return_type(&expr_complete_type(oo(&a->fun))->~);
+  annotate_info(x, CompleteCheck(~ *return_type));
   return true;
 }
 
@@ -734,11 +794,11 @@ func check_funcall_params_firsttime(es *exprscope, params *array[ast_expr], a_pa
   return true;
 }
 
-func check_funcall_params_secondtime(es *exprscope, functype *te_typeexpr, params *array[ast_expr]) bool {
+func check_funcall_params_secondtime(es *exprscope, functype *cu_typeexpr, params *array[ast_expr]) bool {
   n size = count(params);
 
   type_params *array[te_typeexpr];
-  if case &TeApp(app te_typeapp) = functype {
+  if case &TeApp(app te_typeapp) = &functype->~ {
     // TODO: Assert fn-type.
     type_params = &app.params;
     check(count(type_params) == n + 1);
@@ -766,19 +826,17 @@ func check_expr_index(es *exprscope, x *ast_expr, a *ast_index_expr, pt *te_type
   }
 
   ixtype *te_typeexpr;
-  if !decompose_indexable(es->cs, expr_complete_type(oo(&a->lhs)), &ixtype) {
+  if !decompose_indexable(es->cs, &expr_complete_type(oo(&a->lhs))->~, &ixtype) {
     ERR(_u8("indexing on non-indexable type"));
     return false;
   }
-  // We passed AllowIncompleteNo for the lhs.
-  check(is_complete(ixtype));
 
   unified te_typeexpr;
   if !unify_types(pt, ixtype, &unified) {
     ERR(_u8("index expr returns wrong type"));
   }
 
-  annotate_info(x, CompleteCheck(unified));
+  annotate_info(x, CompleteCheck(~ *ixtype));
   return true;
 }
 
@@ -810,14 +868,14 @@ func expr_type(a *ast_expr) te_typeexpr {
     case &IncompleteCheck(t te_typeexpr): {
       return t;
     }
-    case &CompleteCheck(t te_typeexpr): {
-      return t;
+    case &CompleteCheck(t cu_typeexpr): {
+      return t.~;
     }
   }
 }
 
-func expr_complete_type(a *ast_expr) *te_typeexpr {
-  if case &CompleteCheck(t te_typeexpr) = &a->info {
+func expr_complete_type(a *ast_expr) *cu_typeexpr {
+  if case &CompleteCheck(t cu_typeexpr) = &a->info {
     return &t;
   } else {
     ice(_u8("expr_complete_type sees... not a complete type"));
@@ -832,7 +890,7 @@ func expr_type_complete(a *ast_expr) bool {
       return fake();
     }
     case &IncompleteCheck(t te_typeexpr): { return false; }
-    case &CompleteCheck(t te_typeexpr): { return true; }
+    case &CompleteCheck(t cu_typeexpr): { return true; }
   }
 }
 
