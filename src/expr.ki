@@ -426,7 +426,7 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
     return false;
   }
 
-  annotate_info(x, CompleteCheck(*return_type));
+  annotate_info(x, CompleteCheck(computed));
   return true;
 }
 

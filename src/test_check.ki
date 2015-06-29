@@ -192,6 +192,14 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "def y fn[foo[u32], i32] = func(z foo[u32]) i32 {\n"
         "  return z.x + z.y;\n"
         "};\n"));
+  run_check_test(ctx, "c025",
+    _u8("def y fn[i32, i32] = func(z i32) i32 {\n"
+        "  var k fn[i32, i32] = func(m i32) i32 {\n"
+        "    return m + m;\n"
+        "  };\n"
+        "  return k(z) + k(z);\n"
+        "};\n"));
+
 
 }
 
