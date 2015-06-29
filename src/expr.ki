@@ -193,6 +193,10 @@ func help_check_simple_literal(pt *te_typeexpr, type te_typeexpr, errmsg_name ar
 }
 
 func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
+  if case &CompleteCheck(t te_typeexpr) = &x->info {
+    return true;
+  }
+
   switch &x->u {
     case &NameExpr(a ast_name_expr): {
       parms genparms;
