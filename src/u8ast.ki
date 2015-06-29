@@ -12,10 +12,29 @@ func[T] build_array_u8str(r *array[u8], arr *array[T]) void {
   push(r, ']');
 }
 
+func[H, T] build_array_u8str(help H, r *array[u8], arr *array[T]) void {
+  push(r, '[');
+  n size = count(arr);
+  for i size = 0; i < n; i = i + 1 {
+    if i != 0 {
+      push(r, ',');
+    }
+    build_u8str(help, r, ref(arr, i));
+  }
+  push(r, ']');
+}
+
 func[T] wrap_u8str(r *array[u8], x array[u8], y *T) void {
   append(r, &x);
   push(r, '(');
   build_u8str(r, y);
+  push(r, ')');
+}
+
+func[H, T] wrap_u8str(help H, r *array[u8], x array[u8], y *T) void {
+  append(r, &x);
+  push(r, '(');
+  build_u8str(help, r, y);
   push(r, ')');
 }
 
@@ -113,6 +132,10 @@ func[T] build_u8str(r *array[u8], a *opt[T]) void {
 
 func[T] build_u8str(r *array[u8], a *box[T]) void {
   build_u8str(r, oo(a));
+}
+
+func[H, T] build_u8str(help H, r *array[u8], a *box[T]) void {
+  build_u8str(help, r, oo(a));
 }
 
 func build_u8str(r *array[u8], a *ast_expr) void {

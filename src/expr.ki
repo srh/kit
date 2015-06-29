@@ -136,8 +136,9 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
   if case &NoParms(v void) = gp {
     if case Has(ix size) = es_find_local(es, name) {
       type te_typeexpr;
-      if !unify_types(pt, &ref(&es->local_vars, ix)->type, &type) {
-        ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type"));
+      vartype *te_typeexpr = &ref(&es->local_vars, ix)->type;
+      if !unify_types(pt, vartype, &type) {
+        ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"), to_u8str(es->im, *vartype), _u8("' where '"), to_u8str(es->im, *pt), _u8("' expected"));
         return false;
       }
       *res_out = OneLocalMatch({ix});

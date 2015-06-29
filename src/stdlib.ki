@@ -112,6 +112,12 @@ func[T] to_u8str(x T) array[u8] {
   return ret;
 }
 
+func[H, T] to_u8str(help H, x T) array[u8] {
+  ret array[u8];
+  build_u8str(help, &ret, &x);
+  return ret;
+}
+
 func checkmalloc(n size) *void {
   n = max(n, 1);
   ret *void = malloc(n);
