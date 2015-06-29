@@ -210,7 +210,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       }
       switch &match_res {
         case &NoMatch(v void): {
-          ERR(_u8("Name lookup for '"), lookup(es->im, a.ident.value), _u8("', maybe with parms, not found."));
+          ERR(_u8("Name lookup for '"), lookup(es->im, a.ident.value), _u8("', maybe with parms, not found, matching type '"), to_u8str(es->im, *pt), _u8("'"));
           return false;
         }
         case &AmbigGlobalMatch(v void): {

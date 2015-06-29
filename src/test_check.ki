@@ -219,6 +219,25 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "  return z->x + z->y;\n"
         "};\n"));
 
+  run_check_test(ctx, "c029-a",
+    _u8("func foo(z *i32) i32 {\n"
+        "  return *z;\n"
+        "}\n"));
+  run_check_test(ctx, "c029-b",
+    _u8("deftype[T] foo struct { x T; y i32; };\n"
+        "def y fn[*foo[i32], i32] = func(z *foo[i32]) i32 {\n"
+        "  return (*z).x + (&(*z))->y;\n"
+        "};\n"));
+
+  run_check_test(ctx, "c030",
+    _u8("deftype[T] foo struct { x T; y i32; };\n"
+        "def y fn[*foo[i32], i32] = func(z *foo[i32]) i32 {\n"
+        "  if (z->x < 3 && z->y > 19) {\n"
+        "    z->x = (*z).y + 5;\n"
+        "  }\n"
+        "  return (*z).x + (&(*z))->y;\n"
+        "};\n"));
+
 }
 
 func test_check() bool {
