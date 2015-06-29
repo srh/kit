@@ -1895,7 +1895,7 @@ void gen_bzero(struct objfile *f, struct loc dest) {
 
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
   CHECK(dest.size <= DWORD_SIZE);
-  CHECK(dest.padded_size == DWORD_SIZE);
+  CHECK(dest.size <= dest.padded_size);
 
   enum x86_reg dest_addr;
   int32_t dest_disp;
