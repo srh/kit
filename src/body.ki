@@ -14,6 +14,15 @@ deftype bodystate struct {
   return_type *te_typeexpr;
 };
 
+func mk(es *exprscope, return_type *te_typeexpr) bodystate {
+  ret bodystate;
+  ret.es = es;
+  ret.cs = es->cs;
+  ret.clq = es->clq;
+  ret.return_type = return_type;
+  return ret;
+}
+
 // TODO: This should actually pay attention to gotos and labels, variable lifetimes, variable initialization.
 func check_body(bs *bodystate, a *ast_bracebody) bool {
   nstatements size = count(&a->statements);

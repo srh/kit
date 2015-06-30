@@ -443,7 +443,7 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
 
   return_type *te_typeexpr = ref(computed_params, nargs);
 
-  bs bodystate = {es, es->cs, es->clq, return_type};
+  bs bodystate = mk(es, return_type);
   if !check_body(&bs, &a->body) {
     return false;
   }
