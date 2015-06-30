@@ -13,14 +13,31 @@ deftype exprscope struct {
   generics *ast_generics;
   parms *cu_genparms;
 
+  var_counter u32;
+
   local_vars array[var_info];
 };
 
+def initial_var_counter u32 = 0;
+
+deftype var_number u32;
+
+def `==` fn[var_number, var_number, bool] = wrapequate;
+func `!=`(x var_number, y var_number) bool { return !(x == y); }
+
 deftype var_info struct {
-  name sym;
+  num var_number;
   // A complete, checked, type, with generics replaced.
   type cu_typeexpr;
+  name sym;
 };
+
+func next_varnum(es *exprscope) var_number {
+  ret var_number;
+  ret.~ = es->var_counter;
+  es->var_counter = es->var_counter + 1;
+  return ret;
+}
 
 defenum allow_incomplete {
   AllowIncompleteNo void;
@@ -33,14 +50,14 @@ func `==`(x allow_incomplete, y allow_incomplete) bool {
 
 defclass move varpopper struct {
   es *exprscope;
-  names array[sym];
+  nums array[var_number];
 };
 
 access varpopper {
 
 func do_init(vp *varpopper) void {
   init(&vp->es);
-  init(&vp->names);
+  init(&vp->nums);
 }
 
 func init_vp(vp *varpopper, es *exprscope) void {
@@ -52,7 +69,7 @@ func do_destroy(vp *varpopper) void {
   if vp->es != null {
     descope_vars(vp);
   }
-  destroy(&vp->names);
+  destroy(&vp->nums);
   vp->es = null;
 }
 
@@ -61,20 +78,21 @@ func es_push_var(es *exprscope, vp *varpopper, name *ast_ident, computed_type *c
     ERR(_u8("Local variable '"), lookup(es->im, name->value), _u8("' shadows another"));
     return false;
   }
-  push(&es->local_vars, {name->value, *computed_type});
-  push(&vp->names, name->value);
+  num var_number = next_varnum(es);
+  push(&es->local_vars, {num, *computed_type, name->value});
+  push(&vp->nums, num);
   return true;
 }
 
 func descope_vars(vp *varpopper) void {
   es *exprscope = vp->es;
   check(es != null);
-  while case Has(expected sym) = popval(&vp->names) {
+  while case Has(expected var_number) = popval(&vp->nums) {
     info var_info;
     if !popval(&es->local_vars, &info) {
       ice(_u8("varpopper sees empty local_vars"));
     }
-    if info.name != expected {
+    if info.num != expected {
       ice(_u8("varpopper sees mismatching name"));
     }
   }
@@ -83,7 +101,7 @@ func descope_vars(vp *varpopper) void {
 }  // access varpopper
 
 func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr) bool {
-  es exprscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]]()};
+  es exprscope = {cs, cs->im, clq, accessible, g, parms, initial_var_counter, default@[array[var_info]]()};
   return check_expr_ai(&es, AllowIncompleteNo(void), x, pt);
 }
 
