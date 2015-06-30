@@ -1,5 +1,12 @@
 import expr;
 
+// What we need to know about bodies:
+//   - that labels have unique names.
+//   - what variables are in scope at each label (beware duplicate variable names).
+//   - what variables need to get init/destroyed for each goto. (Beware case constructor variables that don't get destroyed.  Also, you can't goto into a casebody (because their variables cannot be initialized).)
+//   - that no control path reaches the end of the function without a return statement.
+//   - that there's no dead code after a goto or return statement.
+
 deftype bodystate struct {
   es *exprscope;
   cs *checkstate;
