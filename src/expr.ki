@@ -13,15 +13,15 @@ deftype exprscope struct {
   generics *ast_generics;
   parms *cu_genparms;
 
-  var_counter u32;
+  all_vars array[var_info];
 
-  local_vars array[var_info];
+  // These var_numbers are always in increasing order.
+  current_vars array[var_number];
 };
 
-def initial_var_counter u32 = 0;
+deftype var_number size;
 
-deftype var_number u32;
-
+def `~` fn[size, var_number] = wrapconvert;
 def `==` fn[var_number, var_number, bool] = wrapequate;
 func `!=`(x var_number, y var_number) bool { return !(x == y); }
 
@@ -39,20 +39,12 @@ deftype var_info struct {
   autoinit var_autoinit;
 };
 
-func next_varnum(es *exprscope) var_number {
-  ret var_number;
-  ret.~ = es->var_counter;
-  es->var_counter = es->var_counter + 1;
-  return ret;
+func ref_var(es *exprscope, num var_number) *var_info {
+  return ref(&es->all_vars, num.~);
 }
 
 func vars_in_scope(es *exprscope) array[var_number] {
-  ret array[var_number];
-  nvars size = count(&es->local_vars);
-  for i size = 0; i < nvars; i = i + 1 {
-    push(&ret, ref(&es->local_vars, i)->num);
-  }
-  return ret;
+  return es->current_vars;
 }
 
 
@@ -91,12 +83,13 @@ func do_destroy(vp *varpopper) void {
 }
 
 func es_push_var(es *exprscope, vp *varpopper, name *ast_ident, computed_type *cu_typeexpr, autoinit var_autoinit) bool {
-  if case Has(ix size) = es_find_local(es, name->value) {
+  if case Has(num var_number) = es_find_current_local(es, name->value) {
     ERR(_u8("Local variable '"), lookup(es->im, name->value), _u8("' shadows another"));
     return false;
   }
-  num var_number = next_varnum(es);
-  push(&es->local_vars, {num, *computed_type, name->value, autoinit});
+  num var_number = ~count(&es->all_vars);
+  push(&es->all_vars, {num, *computed_type, name->value, autoinit});
+  push(&es->current_vars, num);
   push(&vp->nums, num);
   return true;
 }
@@ -105,12 +98,12 @@ func descope_vars(vp *varpopper) void {
   es *exprscope = vp->es;
   check(es != null);
   while case Has(expected var_number) = popval(&vp->nums) {
-    info var_info;
-    if !popval(&es->local_vars, &info) {
+    num var_number;
+    if !popval(&es->current_vars, &num) {
       ice(_u8("varpopper sees empty local_vars"));
     }
-    if info.num != expected {
-      ice(_u8("varpopper sees mismatching name"));
+    if num != expected {
+      ice(_u8("varpopper sees mismatch"));
     }
   }
 }
@@ -118,7 +111,7 @@ func descope_vars(vp *varpopper) void {
 }  // access varpopper
 
 func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr) bool {
-  es exprscope = {cs, cs->im, clq, accessible, g, parms, initial_var_counter, default@[array[var_info]]()};
+  es exprscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]](), default@[array[var_number]]()};
   return check_expr_ai(&es, AllowIncompleteNo(void), x, pt);
 }
 
@@ -151,7 +144,7 @@ deftype global_info struct {
 };
 
 deftype local_info struct {
-  varinfo_ix size;
+  varnum var_number;
 };
 
 defenum name_info {
@@ -168,14 +161,14 @@ defenum es_match_res {
 
 func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_match_res) bool {
   if case &NoParms(v void) = gp {
-    if case Has(ix size) = es_find_local(es, name) {
+    if case Has(num var_number) = es_find_current_local(es, name) {
       type te_typeexpr;
-      vartype *cu_typeexpr = &ref(&es->local_vars, ix)->type;
+      vartype *cu_typeexpr = &ref_var(es, num)->type;
       if !unify_types(pt, &vartype->~, &type) {
         ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"), to_u8str(es->im, *vartype), _u8("' where '"), to_u8str(es->im, *pt), _u8("' expected"));
         return false;
       }
-      *res_out = OneLocalMatch({ix});
+      *res_out = OneLocalMatch({num});
       return true;
     }
   }
@@ -206,12 +199,13 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
   }
 }
 
-func es_find_local(es *exprscope, name sym) opt[size] {
-  n size = count(&es->local_vars);
+func es_find_current_local(es *exprscope, name sym) opt[var_number] {
+  n size = count(&es->current_vars);
   for i size = 0; i < n; i = i + 1 {
-    inf *var_info = ref(&es->local_vars, i);
+    num var_number = get(&es->current_vars, i);
+    inf *var_info = ref_var(es, num);
     if inf->name == name {
-      return Has(i);
+      return Has(num);
     }
   }
   return None();
@@ -276,7 +270,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
           return true;
         }
         case &OneLocalMatch(v local_info): {
-          vi *var_info = ref(&es->local_vars, v.varinfo_ix);
+          vi *var_info = ref_var(es, v.varnum);
           annotate_info(x, CompleteCheck(vi->type));
           return true;
         }
