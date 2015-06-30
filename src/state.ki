@@ -59,6 +59,7 @@ deftype common_syms struct {
 
 deftype checkstate struct {
   im *identmap;
+  instantiation_depth u32;
   platform platform_info;
   cym common_syms;
   loader_ctx *void;
@@ -82,6 +83,7 @@ deftype checkstate struct {
 func make_checkstate(im *identmap, platform platform_info, loader_ctx *void, loader fn[*checkstate, sym, opt[array[u8]]]) checkstate {
   ret checkstate;
   ret.im = im;
+  ret.instantiation_depth = 0;
   ret.platform = platform;
   ret.cym = make_common_syms(im);
   ret.loader_ctx = loader_ctx;
@@ -378,11 +380,15 @@ func mk(module_name sym, def_name sym, accessible array[access_entry_id], generi
 deftype clqueue_deftype_entry struct {
   ent_id deftype_entry_id;
   inst_id deftype_inst_id;
+  // The instantiation depth when we _push_ the entry.
+  instantiation_depth u32;
 };
 
 deftype clqueue_def_entry struct {
   ent_id def_entry_id;
   inst_id def_inst_id;
+  // The instantiation depth when we _push_ the entry.
+  instantiation_depth u32;
 };
 
 defenum clqueue_entry {
@@ -394,3 +400,36 @@ deftype clqueue struct {
   entries array[clqueue_entry];
 };
 
+
+defclass move depth_rewinder struct {
+  cs *checkstate;
+  old_depth u32;
+};
+
+def template_instantiation_limit u32 = 50;
+
+access depth_rewinder {
+  func do_init(d *depth_rewinder) void {
+    init(&d->cs);
+    init(&d->old_depth);
+  }
+  func do_destroy(d *depth_rewinder) void {
+    check(d->old_depth <= template_instantiation_limit);
+    if d->cs != null {
+      d->cs->instantiation_depth = d->old_depth;
+    }
+    d->cs = null;
+    d->old_depth = 0;
+  }
+  func set_instantiation_depth(cs *checkstate, depth u32, rw *depth_rewinder) bool {
+    check(rw->cs == null);
+    if depth > template_instantiation_limit {
+      ERR(_u8("Instantiation depth too deep."));
+      return false;
+    }
+    rw->cs = cs;
+    rw->old_depth = cs->instantiation_depth;
+    cs->instantiation_depth = depth;
+    return true;
+  }
+}
