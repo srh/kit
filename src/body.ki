@@ -1,35 +1,42 @@
 import expr;
 
+deftype bodystate struct {
+  es *exprscope;
+  cs *checkstate;
+  clq *clqueue;
+  return_type *te_typeexpr;
+};
+
 // TODO: This should actually pay attention to gotos and labels, variable lifetimes, variable initialization.
-func check_body(es *exprscope, a *ast_bracebody, return_type *te_typeexpr) bool {
+func check_body(bs *bodystate, a *ast_bracebody) bool {
   nstatements size = count(&a->statements);
   vp varpopper;
   for i size = 0; i < nstatements; i = i + 1 {
     s *ast_statement = ref(&a->statements, i);
-    if !check_statement(es, &vp, s, return_type) {
+    if !check_statement(bs, &vp, s) {
       return false;
     }
   }
   return true;
 }
 
-func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type *te_typeexpr) bool {
+func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
   switch s {
     case &Expr(b ast_expr): {
       pt te_typeexpr = TeUnknown(void);
-      if !check_expr_ai(es, AllowIncompleteNo(void), &b, &pt) {
+      if !check_expr_ai(bs->es, AllowIncompleteNo(void), &b, &pt) {
         return false;
       }
     }
     case &Return(b ast_return_statement): {
       if case &Has(c box[ast_expr]) = &b.expr {
-        if !check_expr_ai(es, AllowIncompleteNo(void), oo(&c), return_type) {
+        if !check_expr_ai(bs->es, AllowIncompleteNo(void), oo(&c), bs->return_type) {
           return false;
         }
       } else {
-        void_type te_typeexpr = primitive_void_type(es->cs);
+        void_type te_typeexpr = primitive_void_type(bs->cs);
         unified te_typeexpr;
-        if !unify_types(&void_type, return_type, &unified) {
+        if !unify_types(&void_type, bs->return_type, &unified) {
           ERR(_u8("Empty return statement with non-void return value."));
           return false;
         }
@@ -38,18 +45,18 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
     case &Var(b ast_var_statement): {
       // TODO: Cache converted... or something.
       converted te_typeexpr;
-      if !convert_typeexpr(es->cs, &b.decl.type, &converted) {
+      if !convert_typeexpr(bs->cs, &b.decl.type, &converted) {
         return false;
       }
 
       computed cac_typeexpr;
-      if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed) {
+      if !check_and_compute_typeexpr(bs->cs, bs->clq, bs->es->generics, bs->es->parms, &converted, &computed) {
         return false;
       }
       cu_computed cu_typeexpr;
       complete_type *cu_typeexpr;
       if case &Has(x box[ast_expr]) = &b.rhs {
-        if !check_expr_ai(es, AllowIncompleteNo(void), oo(&x), &computed.te) {
+        if !check_expr_ai(bs->es, AllowIncompleteNo(void), oo(&x), &computed.te) {
           return false;
         }
         complete_type = expr_complete_type(oo(&x));
@@ -63,79 +70,78 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
         complete_type = &cu_computed;
       }
 
-      if !es_push_var(es, vp, &b.decl.name, complete_type) {
+      if !es_push_var(bs->es, vp, &b.decl.name, complete_type) {
         return false;
       }
     }
     case &IfThen(b ast_ifthen_statement): {
       cond_vp varpopper;
-      init_vp(&cond_vp, es);
-      if !check_condition(es, &cond_vp, &b.condition) {
+      init_vp(&cond_vp, bs->es);
+      if !check_condition(bs->es, &cond_vp, &b.condition) {
         return false;
       }
-      if !check_body(es, &b.body, return_type) {
+      if !check_body(bs, &b.body) {
         return false;
       }
     }
     case &IfThenElse(b ast_ifthenelse_statement): {
       cond_vp varpopper;
-      init_vp(&cond_vp, es);
-      if !check_condition(es, &cond_vp, &b.condition) {
+      init_vp(&cond_vp, bs->es);
+      if !check_condition(bs->es, &cond_vp, &b.condition) {
         return false;
       }
-      if !check_body(es, &b.thenbody, return_type) {
+      if !check_body(bs, &b.thenbody) {
         return false;
       }
       descope_vars(&cond_vp);
-      if !check_body(es, &b.elsebody, return_type) {
+      if !check_body(bs, &b.elsebody) {
         return false;
       }
     }
     case &While(b ast_while_statement): {
       cond_vp varpopper;
-      init_vp(&cond_vp, es);
-      if !check_condition(es, &cond_vp, &b.condition) {
+      init_vp(&cond_vp, bs->es);
+      if !check_condition(bs->es, &cond_vp, &b.condition) {
         return false;
       }
-      if !check_body(es, &b.body, return_type) {
+      if !check_body(bs, &b.body) {
         return false;
       }
     }
     case &For(b ast_for_statement): {
       initter_vp varpopper;
-      init_vp(&initter_vp, es);
+      init_vp(&initter_vp, bs->es);
       if case &Has(initter box[ast_statement]) = &b.initializer {
-        // NOTE: return_type is irrelevant for now, because initter can only be a var or expr statement.
-        if !check_statement(es, &initter_vp, oo(&initter), return_type) {
+        if !check_statement(bs, &initter_vp, oo(&initter)) {
           return false;
         }
       }
       if case &Has(cond box[ast_expr]) = &b.condition {
-        boolean te_typeexpr = primitive_bool_type(es->cs);
-        if !check_expr_ai(es, AllowIncompleteNo(void), oo(&cond), &boolean) {
+        boolean te_typeexpr = primitive_bool_type(bs->cs);
+        if !check_expr_ai(bs->es, AllowIncompleteNo(void), oo(&cond), &boolean) {
           return false;
         }
       }
       if case &Has(incr box[ast_expr]) = &b.increment {
         unknown te_typeexpr = TeUnknown(void);
-        if !check_expr_ai(es, AllowIncompleteNo(void), oo(&incr), &unknown) {
+        if !check_expr_ai(bs->es, AllowIncompleteNo(void), oo(&incr), &unknown) {
           return false;
         }
       }
-      if !check_body(es, &b.body, return_type) {
+      if !check_body(bs, &b.body) {
         return false;
       }
     }
     case &Switch(b ast_switch_statement): {
       unknown te_typeexpr = TeUnknown(void);
-      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&b.swartch), &unknown) {
+      if !check_expr_ai(bs->es, AllowIncompleteNo(void), oo(&b.swartch), &unknown) {
         return false;
       }
 
       swartch_type *cu_typeexpr = expr_complete_type(oo(&b.swartch));
 
       switchable_type *te_typeexpr;
-      is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(es->cs), &switchable_type);
+      is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(bs->cs), &switchable_type);
       if !is_ptr {
         switchable_type = &swartch_type->~;
       }
@@ -143,7 +149,7 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
       // switchable_type is complete, because swartch_type was.
 
       enum_type *te_typeexpr;
-      if !complete_structural_rhs(es, switchable_type, &enum_type) {
+      if !complete_structural_rhs(bs->es, switchable_type, &enum_type) {
         return false;
       }
       // enum_type is complete, because complete_structural_rhs does that.
@@ -175,7 +181,7 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
 
               // TODO: Cache converted?
               converted te_typeexpr;
-              if !convert_typeexpr(es->cs, &patt.decl.type, &converted) {
+              if !convert_typeexpr(bs->cs, &patt.decl.type, &converted) {
                 return false;
               }
 
@@ -186,18 +192,18 @@ func check_statement(es *exprscope, vp *varpopper, s *ast_statement, return_type
               }
 
               case_vp varpopper;
-              init_vp(&case_vp, es);
+              init_vp(&case_vp, bs->es);
               cu_expected_type cu_typeexpr = ~ *expected_type;
-              if !es_push_var(es, &case_vp, &patt.decl.name, &cu_expected_type) {
+              if !es_push_var(bs->es, &case_vp, &patt.decl.name, &cu_expected_type) {
                 return false;
               }
 
-              if !check_body(es, &cas->body, return_type) {
+              if !check_body(bs, &cas->body) {
                 return false;
               }
             }
             case &Default(v void): {
-              if !check_body(es, &cas->body, return_type) {
+              if !check_body(bs, &cas->body) {
                 return false;
               }
             }
