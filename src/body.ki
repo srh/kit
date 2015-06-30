@@ -15,11 +15,13 @@ deftype goto_info struct {
 deftype label_info struct {
   label_name sym;
   in_scope array[var_number];
+  hit bool;
 };
 
 deftype bodystate struct {
   es *exprscope;
   cs *checkstate;
+  im *identmap;
   clq *clqueue;
   return_type *cu_typeexpr;
 
@@ -31,6 +33,7 @@ func mk(es *exprscope, return_type *cu_typeexpr) bodystate {
   ret bodystate;
   ret.es = es;
   ret.cs = es->cs;
+  ret.im = es->im;
   ret.clq = es->clq;
   ret.return_type = return_type;
   return ret;
@@ -253,7 +256,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
         return false;
       }
 
-      push(&bs->labels, {b.name.value, vars_in_scope(bs->es)});
+      push(&bs->labels, {b.name.value, vars_in_scope(bs->es), false});
     }
     case &Goto(b ast_goto_statement): {
       push(&bs->gotos, {b.target.value, vars_in_scope(bs->es)});
@@ -355,4 +358,28 @@ func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
       }
     }
   }
+}
+
+func finish_lambda_body(bs *bodystate) bool {
+  ngotos size = count(&bs->gotos);
+  for i size = 0; i < ngotos; i = i + 1 {
+    g *goto_info = ref(&bs->gotos, i);
+    if case Has(j size) = lookup_label(bs, g->label_name) {
+      ref(&bs->labels, j)->hit = true;
+    } else {
+      ERR(_u8("no label named '"), lookup(bs->im, g->label_name), _u8("'"));
+      return false;
+    }
+  }
+
+  nlabels size = count(&bs->labels);
+  for i size = 0; i < nlabels; i = i + 1 {
+    l *label_info = ref(&bs->labels, i);
+    if !l->hit {
+      ERR(_u8("no gotos for label named '"), lookup(bs->im, l->label_name), _u8("'"));
+      return false;
+    }
+  }
+
+  return true;
 }
