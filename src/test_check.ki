@@ -301,9 +301,40 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "def x i32 = -y;\n"));
 }
 
+func test_check_more_cases(ctx *check_ctx) void {
+  // We skip c040, to keep units digit in alignment with s1 testcases.
+
+  run_check_test(ctx, "c041",
+    _u8("def foo fn[u32, u32] = func(x u32) u32 {\n"
+        "  return x + 4;\n"
+        "};"
+        "def bar fn[i32, i32] = foo;\n"
+        "def foo fn[i32, i32] = func(x i32) i32 {\n"
+        "  return x + 3;\n"
+        "};\n"));
+  run_check_test(ctx, "c042",
+    _u8("def foo fn[u32, u32] = func(x u32) u32 {\n"
+        "  return x + 4;\n"
+        "};"
+        "def bar fn[i32, i32] = foo;\n"
+        "def[T] foo fn[T, i32] = func(x T) i32 {\n"
+        "  return x + 3;\n"
+        "};\n"));
+  // Fails because foo's instatiation won't typecheck.
+  run_check_negtest(ctx, "c043",
+    _u8("def foo fn[u32, u32] = func(x u32) u32 {\n"
+        "  return x + 4;\n"
+        "};"
+        "def bar fn[u32, i32] = foo;\n"
+        "def[T] foo fn[T, i32] = func(x T) i32 {\n"
+        "  return x + 3;\n"
+        "};\n"));
+}
+
 func test_check() bool {
   ctx check_ctx;
   test_check_basic_cases(&ctx);
   test_check_lambda_cases(&ctx);
+  test_check_more_cases(&ctx);
   return !ctx.fail;
 }
