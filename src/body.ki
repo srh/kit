@@ -365,7 +365,21 @@ func finish_lambda_body(bs *bodystate) bool {
   for i size = 0; i < ngotos; i = i + 1 {
     g *goto_info = ref(&bs->gotos, i);
     if case Has(j size) = lookup_label(bs, g->label_name) {
-      ref(&bs->labels, j)->hit = true;
+      l *label_info = ref(&bs->labels, j);
+      destruct array[var_number];
+      construct array[var_number];
+      var_difference(&g->in_scope, &l->in_scope, &destruct, &construct);
+
+      nconstruct size = count(&construct);
+      for k size = 0; k < nconstruct; k = k + 1 {
+        vi *var_info = ref_var(bs->es, get(&construct, k));
+        if vi->autoinit == AutoInitNo(void) {
+          ERR(_u8("goto for label '"), lookup(bs->im, l->label_name), _u8("' enters non-initializable variable's scope"));
+          return false;
+        }
+      }
+
+      l->hit = true;
     } else {
       ERR(_u8("no label named '"), lookup(bs->im, g->label_name), _u8("'"));
       return false;
@@ -383,3 +397,40 @@ func finish_lambda_body(bs *bodystate) bool {
 
   return true;
 }
+
+// g and l are in increasing order.
+func var_difference(g *array[var_number], l *array[var_number], removed_out *array[var_number], added_out *array[var_number]) void {
+  check(is_strictly_increasing(g));
+  check(is_strictly_increasing(l));
+  ng size = count(g);
+  nl size = count(l);
+  i size = 0;
+  j size = 0;
+  removed array[var_number];
+  added array[var_number];
+  while i < ng || j < nl {
+    if i == ng {
+      push(&added, get(l, j));
+      j = j + 1;
+    } else if j == nl {
+      push(&removed, get(g, i));
+      i = i + 1;
+    } else {
+      gnum var_number = get(g, i);
+      lnum var_number = get(l, j);
+      if gnum == lnum {
+        i = i + 1;
+        j = j + 1;
+      } else if gnum < lnum {
+        push(&removed, gnum);
+        i = i + 1;
+      } else {
+        push(&added, lnum);
+        j = j + 1;
+      }
+    }
+  }
+  *removed_out = removed;
+  *added_out = added;
+}
+

@@ -182,5 +182,15 @@ func[U, T] mapconvert(x array[T]) array[U] {
   return build;
 }
 
+func[T] is_strictly_increasing(x *array[T]) bool {
+  n size = count(x);
+  for i size = 1; i < n; i = i + 1 {
+    if !(get(x, i - 1) < get(x, i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Heh.
 def[T] _u8 fn[T, array[u8]] = make;
