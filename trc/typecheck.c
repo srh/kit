@@ -4471,7 +4471,10 @@ int check_def(struct checkstate *cs, struct ast_def *a) {
         &unified,
         &ent,
         &inst);
-    CHECK(res == MATCH_SUCCESS);
+    if (res != MATCH_SUCCESS) {
+      /* Multiple matching, I guess. */
+      return 0;
+    }
     CHECK(exact_typeexprs_equal(cs->im, &unified, ast_def_typeexpr(a)));
     CHECK(!ent->is_primitive);
 
