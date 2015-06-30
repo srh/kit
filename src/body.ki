@@ -11,10 +11,10 @@ deftype bodystate struct {
   es *exprscope;
   cs *checkstate;
   clq *clqueue;
-  return_type *te_typeexpr;
+  return_type *cu_typeexpr;
 };
 
-func mk(es *exprscope, return_type *te_typeexpr) bodystate {
+func mk(es *exprscope, return_type *cu_typeexpr) bodystate {
   ret bodystate;
   ret.es = es;
   ret.cs = es->cs;
@@ -46,13 +46,13 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
     }
     case &Return(b ast_return_statement): {
       if case &Has(c box[ast_expr]) = &b.expr {
-        if !check_expr_ai(bs->es, AllowIncompleteNo(void), oo(&c), bs->return_type) {
+        if !check_expr_ai(bs->es, AllowIncompleteNo(void), oo(&c), &bs->return_type->~) {
           return false;
         }
       } else {
         void_type te_typeexpr = primitive_void_type(bs->cs);
         unified te_typeexpr;
-        if !unify_types(&void_type, bs->return_type, &unified) {
+        if !unify_types(&void_type, &bs->return_type->~, &unified) {
           ERR(_u8("Empty return statement with non-void return value."));
           return false;
         }
