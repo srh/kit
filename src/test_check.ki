@@ -237,7 +237,68 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "  }\n"
         "  return (*z).x + (&(*z))->y;\n"
         "};\n"));
-
+  /* Fails because assignment mismatches types. */
+  run_check_negtest(ctx, "c031",
+    _u8("deftype[T] foo struct { x T; y i32; };\n"
+        "def y fn[ptr[foo[i32]], i32] = func(z ptr[foo[i32]]) i32 {\n"
+        "  if (z->x < 3 && z->y > 19) {\n"
+        "    z->x = z;\n"
+        "  }\n"
+        "  return (*z).x + (&(*z))->y;\n"
+        "};\n"));
+  run_check_test(ctx, "c032",
+    _u8("def[T] foo fn[ptr[T], T] = func(x ptr[T]) T { return *x; };\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  var x i32 = 3;\n"
+        "  return foo(&x);\n"
+        "};\n"));
+  // Fails because the def does not match.
+  run_check_negtest(ctx, "c033",
+    _u8("def[T] foo fn[ptr[T], T] = func(x ptr[T]) T { return *x; };\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  var x i32 = 3;\n"
+        "  return foo(x);\n"
+        "};\n"));
+  run_check_test(ctx, "c034",
+    _u8("def[T] fac fn[T, T] = func(x T) T {\n"
+        "  if (x == 0) {\n"
+        "    return 1;\n"
+        "  } else {\n"
+        "    return x * fac(x - 1);\n"
+        "  }\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  var x i32 = 5;\n"
+        "  return fac(x);\n"
+        "};\n"));
+  // Fails because of recursive template instantiation.
+  run_check_negtest(ctx, "c035",
+    _u8("deftype[T] foo struct { x i32; };\n"
+        "def[T] biggefy fn[T, foo[T]] = func(x T) foo[T] {\n"
+        "  return biggefy(x);\n"
+        "};\n"
+        "def[T] rec fn[T, i32] = func(x T) i32 {\n"
+        "  return rec(biggefy(x));\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  var x u32 = 5;\n"
+        "  return rec(x);\n"
+        "};\n"));
+  run_check_test(ctx, "c036",
+    _u8("def x i32 = 3;\n"
+        "def y u32 = 3 + 4;\n"
+        "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"));
+  // TODO: This should fail because you can't evaluate z(3) statically.
+  run_check_test(ctx, "c037",
+    _u8("def x i32 = z(3);\n"
+        "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"));
+  run_check_test(ctx, "c038",
+    _u8("def y i32 = -x;\n"
+        "def x i32 = -3;\n"));
+  // TODO: This should fail because of cyclic reference.
+  run_check_test(ctx, "c039",
+    _u8("def y i32 = -x;\n"
+        "def x i32 = -y;\n"));
 }
 
 func test_check() bool {
