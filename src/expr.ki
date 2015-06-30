@@ -39,6 +39,16 @@ func next_varnum(es *exprscope) var_number {
   return ret;
 }
 
+func vars_in_scope(es *exprscope) array[var_number] {
+  ret array[var_number];
+  nvars size = count(&es->local_vars);
+  for i size = 0; i < nvars; i = i + 1 {
+    push(&ret, ref(&es->local_vars, i)->num);
+  }
+  return ret;
+}
+
+
 defenum allow_incomplete {
   AllowIncompleteNo void;
   AllowIncompleteYes void;

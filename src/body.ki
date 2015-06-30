@@ -7,11 +7,24 @@ import expr;
 //   - that no control path reaches the end of the function without a return statement.
 //   - that there's no dead code after a goto or return statement.
 
+deftype goto_info struct {
+  label_name sym;
+  in_scope array[var_number];
+};
+
+deftype label_info struct {
+  label_name sym;
+  in_scope array[var_number];
+};
+
 deftype bodystate struct {
   es *exprscope;
   cs *checkstate;
   clq *clqueue;
   return_type *cu_typeexpr;
+
+  gotos array[goto_info];
+  labels array[label_info];
 };
 
 func mk(es *exprscope, return_type *cu_typeexpr) bodystate {
@@ -235,13 +248,28 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
       }
     }
     case &Label(b ast_label_statement): {
-      return TODO();
+      if case Has(ix size) = lookup_label(bs, b.name.value) {
+        ERR(_u8("Duplicate label name."));
+        return false;
+      }
+
+      push(&bs->labels, {b.name.value, vars_in_scope(bs->es)});
     }
     case &Goto(b ast_goto_statement): {
-      return TODO();
+      push(&bs->gotos, {b.target.value, vars_in_scope(bs->es)});
     }
   }
   return true;
+}
+
+func lookup_label(bs *bodystate, label_name sym) opt[size] {
+  nlabels size = count(&bs->labels);
+  for i size = 0; i < nlabels; i = i + 1 {
+    if ref(&bs->labels, i)->label_name == label_name {
+      return Has(i);
+    }
+  }
+  return None();
 }
 
 func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
