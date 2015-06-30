@@ -346,12 +346,6 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
   return {id, true};
 }
 
-func ensure_def_checked_with_parms(cs *checkstate, clq *clqueue, ent *def_entry, parms *cu_genparms) bool {
-  dbgcheck(_u8("ensure_def_checked_with_parms"));
-  var res = ensure_def_inst(cs, ent, parms);
-  return ensure_def_inst_checked(cs, clq, ent, res.id);
-}
-
 func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
   dbgcheck(_u8("ensure_def_inst_type_computed"));
   inst *def_inst = ref_inst(cs, inst_id);
@@ -787,9 +781,7 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
     case &NoGenerics(v): {
       parms cu_genparms = NoParms(void);
       clq clqueue;
-      if !ensure_def_checked_with_parms(cs, &clq, ent, &parms) {
-        return false;
-      }
+      discard_inst_id def_inst_id = enqueue_def_inst(cs, &clq, id, &parms);
       return finish_checking(cs, &clq);
     }
     case &HasGenerics(ig): {
