@@ -4247,7 +4247,11 @@ int gen_successbody(struct checkstate *cs, struct objfile *f,
   case AST_CONDITION_EXPR: {
     gen_placeholder_jmp_if_false(f, h, cstate->u.expr_cond_loc, fail_target_number);
     frame_restore_offset(h, before_condition_saved_offset);
-    return gen_bracebody(cs, f, h, body);
+    if (!gen_bracebody(cs, f, h, body)) {
+      return 0;
+    }
+    gen_placeholder_jmp(f, h, end_target_number);
+    return 1;
   } break;
   case AST_CONDITION_PATTERN: {
     struct loc swartch_num_loc = make_enum_num_loc(f, h, cstate->u.pattern.facts.enum_loc);
@@ -4371,8 +4375,6 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    gen_placeholder_jmp(f, h, end_target_number);
-
     frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
 
     if (!gen_bracebody(cs, f, h, &s->u.ifthenelse_statement.elsebody)) {
@@ -4398,11 +4400,10 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     size_t bottom_target_number = frame_add_target(h);
     size_t end_target_number = frame_add_target(h);
     if (!gen_successbody(cs, f, h, &cstate, &s->u.while_statement.body,
-                         saved_offset, bottom_target_number, end_target_number)) {
+                         saved_offset, bottom_target_number, top_target_number)) {
       return 0;
     }
 
-    gen_placeholder_jmp(f, h, top_target_number);
     frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
     gen_afterfail_condition_cleanup(cs, f, h, &cstate);
     frame_define_target(h, end_target_number,
