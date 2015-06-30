@@ -25,11 +25,18 @@ deftype var_number u32;
 def `==` fn[var_number, var_number, bool] = wrapequate;
 func `!=`(x var_number, y var_number) bool { return !(x == y); }
 
+defenum var_autoinit {
+  AutoInitNo void;
+  AutoInitYes void;
+};
+
 deftype var_info struct {
   num var_number;
   // A complete, checked, type, with generics replaced.
   type cu_typeexpr;
   name sym;
+  // Can a goto statement enter this var's scope and construct the var?  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)
+  autoinit var_autoinit;
 };
 
 func next_varnum(es *exprscope) var_number {
@@ -83,13 +90,13 @@ func do_destroy(vp *varpopper) void {
   vp->es = null;
 }
 
-func es_push_var(es *exprscope, vp *varpopper, name *ast_ident, computed_type *cu_typeexpr) bool {
+func es_push_var(es *exprscope, vp *varpopper, name *ast_ident, computed_type *cu_typeexpr, autoinit var_autoinit) bool {
   if case Has(ix size) = es_find_local(es, name->value) {
     ERR(_u8("Local variable '"), lookup(es->im, name->value), _u8("' shadows another"));
     return false;
   }
   num var_number = next_varnum(es);
-  push(&es->local_vars, {num, *computed_type, name->value});
+  push(&es->local_vars, {num, *computed_type, name->value, autoinit});
   push(&vp->nums, num);
   return true;
 }
@@ -464,7 +471,8 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
   nargs size = count(&a->args);
   for i size = 0; i < nargs; i = i + 1 {
     cu_param cu_typeexpr = ~get(computed_params, i);
-    if !es_push_var(es, &vp, &ref(&a->args, i)->name, &cu_param) {
+    // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
+    if !es_push_var(es, &vp, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void)) {
       return false;
     }
   }

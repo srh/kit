@@ -39,7 +39,6 @@ func mk(es *exprscope, return_type *cu_typeexpr) bodystate {
   return ret;
 }
 
-// TODO: This should actually pay attention to gotos and labels, variable lifetimes, variable initialization.
 func check_body(bs *bodystate, a *ast_bracebody) bool {
   nstatements size = count(&a->statements);
   vp varpopper;
@@ -102,7 +101,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
         complete_type = &cu_computed;
       }
 
-      if !es_push_var(bs->es, vp, &b.decl.name, complete_type) {
+      if !es_push_var(bs->es, vp, &b.decl.name, complete_type, AutoInitYes(void)) {
         return false;
       }
     }
@@ -226,7 +225,8 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
               case_vp varpopper;
               init_vp(&case_vp, bs->es);
               cu_expected_type cu_typeexpr = ~ *expected_type;
-              if !es_push_var(bs->es, &case_vp, &patt.decl.name, &cu_expected_type) {
+              // Can't auto-initialize bound case variables, be the switch be over a pointer or not.
+              if !es_push_var(bs->es, &case_vp, &patt.decl.name, &cu_expected_type, AutoInitNo(void)) {
                 return false;
               }
 
@@ -347,7 +347,7 @@ func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
         }
 
         cu_expected_type cu_typeexpr = ~ *expected_type;
-        if !es_push_var(es, cond_vp, &b.pattern.decl.name, &cu_expected_type) {
+        if !es_push_var(es, cond_vp, &b.pattern.decl.name, &cu_expected_type, AutoInitNo(void)) {
           return false;
         }
 
