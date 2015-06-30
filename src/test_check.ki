@@ -240,21 +240,21 @@ func test_check_lambda_cases(ctx *check_ctx) void {
   /* Fails because assignment mismatches types. */
   run_check_negtest(ctx, "c031",
     _u8("deftype[T] foo struct { x T; y i32; };\n"
-        "def y fn[ptr[foo[i32]], i32] = func(z ptr[foo[i32]]) i32 {\n"
+        "def y fn[*foo[i32], i32] = func(z *foo[i32]) i32 {\n"
         "  if (z->x < 3 && z->y > 19) {\n"
         "    z->x = z;\n"
         "  }\n"
         "  return (*z).x + (&(*z))->y;\n"
         "};\n"));
   run_check_test(ctx, "c032",
-    _u8("def[T] foo fn[ptr[T], T] = func(x ptr[T]) T { return *x; };\n"
+    _u8("def[T] foo fn[*T, T] = func(x *T) T { return *x; };\n"
         "def bar fn[i32] = func() i32 {\n"
         "  var x i32 = 3;\n"
         "  return foo(&x);\n"
         "};\n"));
   // Fails because the def does not match.
   run_check_negtest(ctx, "c033",
-    _u8("def[T] foo fn[ptr[T], T] = func(x ptr[T]) T { return *x; };\n"
+    _u8("def[T] foo fn[*T, T] = func(x *T) T { return *x; };\n"
         "def bar fn[i32] = func() i32 {\n"
         "  var x i32 = 3;\n"
         "  return foo(x);\n"
