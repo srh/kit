@@ -128,14 +128,6 @@ func[T] append(a *array[T], b array[T]) void {
   return append(a, &b);
 }
 
-func foo() void {
-  v array[i32];
-  var u = v;
-  push(&u, 7);
-  append(&u, &v);
-  data(&u);
-}
-
 func[T] reverse(a *array[T]) array[T] {
   n size = count(a);
   ret array[T];
