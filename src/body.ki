@@ -19,7 +19,7 @@ deftype label_info struct {
 };
 
 deftype statement_info struct {
-  st *ast_statement;
+  st opt[*ast_statement];
 };
 
 deftype bodystate struct {
@@ -48,7 +48,7 @@ deftype statement_num size;
 
 def `~` fn[size, statement_num] = wrapconvert;
 
-func add_statement(bs *bodystate, s *ast_statement) statement_num {
+func add_statement(bs *bodystate, s opt[*ast_statement]) statement_num {
   ret size = count(&bs->statements);
   push(&bs->statements, {s});
   return ~ret;
@@ -67,7 +67,7 @@ func check_body(bs *bodystate, a *ast_bracebody) bool {
 }
 
 func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
-  num statement_num = add_statement(bs, s);
+  num statement_num = add_statement(bs, Has(s));
   switch s {
     case &Expr(b ast_expr): {
       pt te_typeexpr = TeUnknown(void);
