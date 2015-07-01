@@ -39,14 +39,14 @@ func pointer_to(cs *checkstate, t te_typeexpr) te_typeexpr {
 }
 
 func add_primitives(cs *checkstate) void {
-  add_integral_primitive(cs, cs->cym.i8sym, cs->platform.i8traits.flat, true);
-  add_integral_primitive(cs, cs->cym.u8sym, cs->platform.u8traits.flat, false);
-  add_integral_primitive(cs, cs->cym.i16sym, cs->platform.i16traits.flat, true);
-  add_integral_primitive(cs, cs->cym.u16sym, cs->platform.u16traits.flat, false);
-  add_integral_primitive(cs, cs->cym.i32sym, cs->platform.i32traits.flat, true);
-  add_integral_primitive(cs, cs->cym.u32sym, cs->platform.u32traits.flat, false);
-  add_integral_primitive(cs, cs->cym.sizesym, cs->platform.sizetraits.flat, false);
-  add_integral_primitive(cs, cs->cym.osizesym, cs->platform.osizetraits.flat, false);
+  add_integral_primitive(cs, cs->cym.i8sym, cs->platform.i8traits);
+  add_integral_primitive(cs, cs->cym.u8sym, cs->platform.u8traits);
+  add_integral_primitive(cs, cs->cym.i16sym, cs->platform.i16traits);
+  add_integral_primitive(cs, cs->cym.u16sym, cs->platform.u16traits);
+  add_integral_primitive(cs, cs->cym.i32sym, cs->platform.i32traits);
+  add_integral_primitive(cs, cs->cym.u32sym, cs->platform.u32traits);
+  add_integral_primitive(cs, cs->cym.sizesym, cs->platform.sizetraits);
+  add_integral_primitive(cs, cs->cym.osizesym, cs->platform.osizetraits);
   add_bool_primitive(cs);
   add_pointer_primitive(cs);
   add_function_primitive(cs);
@@ -108,14 +108,20 @@ func add_unop_primitive(cs *checkstate, oper sym, typename sym) void {
   add_op_primitive(cs, oper, typename, 1);
 }
 
-func add_integral_primitive(cs *checkstate, name sym, flat_traits flat_traits, signed bool) void {
-  add_simple_primitive(cs, name, flat_traits);
+func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) void {
+  add_simple_primitive(cs, name, traits.flat);
   // TODO: Put all uses of intern into cs->cym.
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("+"))), name);
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("-"))), name);
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("*"))), name);
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("/"))), name);
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("%"))), name);
+  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("&"))), name);
+  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("|"))), name);
+  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("^"))), name);
+  add_unop_primitive(cs, intern(cs->im, from_u8(_u8("^"))), name);
+  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("<<"))), name);
+  add_binop_primitive(cs, intern(cs->im, from_u8(_u8(">>"))), name);
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), name);
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), name);
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<"))), name);
@@ -123,7 +129,7 @@ func add_integral_primitive(cs *checkstate, name sym, flat_traits flat_traits, s
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<="))), name);
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">="))), name);
 
-  if signed {
+  if traits.numeric.signed {
     add_unop_primitive(cs, intern(cs->im, from_u8(_u8("-"))), name);
   }
 }

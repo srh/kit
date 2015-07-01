@@ -8,6 +8,7 @@ import typeexpr;
 import u8ast;
 
 deftype numeric_traits struct {
+  signed bool;
   minval bigint;
   maxval bigint;
 };
