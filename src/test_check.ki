@@ -329,6 +329,11 @@ func test_check_more_cases(ctx *check_ctx) void {
         "def[T] foo fn[T, i32] = func(x T) i32 {\n"
         "  return x + 3;\n"
         "};\n"));
+  // Fails because foo lacks a return statement.
+  run_check_negtest(ctx, "c044",
+    _u8("def foo fn[u32, u32] = func(x u32) u32 {\n"
+        "  x + x;\n"
+        "};"));
 }
 
 func test_check() bool {

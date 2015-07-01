@@ -8,11 +8,13 @@ import expr;
 //   - that there's no dead code after a goto or return statement.  (Really?  Maybe let that be a warning.)
 
 deftype goto_info struct {
+  stnum statement_num;
   label_name sym;
   in_scope array[var_number];
 };
 
 deftype label_info struct {
+  stnum statement_num;
   label_name sym;
   in_scope array[var_number];
   hit bool;
@@ -20,6 +22,9 @@ deftype label_info struct {
 
 deftype statement_info struct {
   st opt[*ast_statement];
+  incoming array[statement_num];
+  outgoing array[statement_num];
+  marked_reachable bool;
 };
 
 deftype bodystate struct {
@@ -50,23 +55,39 @@ def `~` fn[size, statement_num] = wrapconvert;
 
 func add_statement(bs *bodystate, s opt[*ast_statement]) statement_num {
   ret size = count(&bs->statements);
-  push(&bs->statements, {s});
+  push(&bs->statements, {s, mk_array(), mk_array(), false});
   return ~ret;
 }
 
-func check_body(bs *bodystate, a *ast_bracebody) bool {
+func connect_statements(bs *bodystate, from statement_num, to statement_num) void {
+  from_inf *statement_info = ref(&bs->statements, from.~);
+  to_inf *statement_info = ref(&bs->statements, to.~);
+  push(&from_inf->outgoing, to);
+  push(&to_inf->incoming, from);
+}
+
+// Returns the fall-through entry node and the fall-through exit node of a body or statement.  A body or statement might not have a fall-through exit, if e.g. it has a return statement.
+deftype entryexit struct { entry statement_num; exit statement_num; };
+
+func check_body(bs *bodystate, a *ast_bracebody, ee_out *entryexit) bool {
   nstatements size = count(&a->statements);
+  entry statement_num = add_statement(bs, None());
+  exit statement_num = entry;
   vp varpopper;
   for i size = 0; i < nstatements; i = i + 1 {
     s *ast_statement = ref(&a->statements, i);
-    if !check_statement(bs, &vp, s) {
+    ee entryexit;
+    if !check_statement(bs, &vp, s, &ee) {
       return false;
     }
+    connect_statements(bs, exit, ee.entry);
+    exit = ee.exit;
   }
+  *ee_out = {entry, exit};
   return true;
 }
 
-func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
+func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *entryexit) bool {
   num statement_num = add_statement(bs, Has(s));
   switch s {
     case &Expr(b ast_expr): {
@@ -74,21 +95,23 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
       if !check_expr_ai(bs->es, AllowIncompleteNo(void), &b, &pt) {
         return false;
       }
+      *ee_out = {num, num};
     }
+
     case &Return(b ast_return_statement): {
       if case &Has(c box[ast_expr]) = &b.expr {
         if !check_expr_ai(bs->es, AllowIncompleteNo(void), oo(&c), &bs->return_type->~) {
           return false;
         }
       } else {
-        void_type te_typeexpr = primitive_void_type(bs->cs);
-        unified te_typeexpr;
-        if !unify_types(&void_type, &bs->return_type->~, &unified) {
+        if !type_is_void(bs->cs, bs->return_type) {
           ERR(_u8("Empty return statement with non-void return value."));
           return false;
         }
       }
+      *ee_out = {num, add_statement(bs, None())};
     }
+
     case &Var(b ast_var_statement): {
       // TODO: Cache converted... or something.
       converted te_typeexpr;
@@ -120,54 +143,86 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
       if !es_push_var(bs->es, vp, &b.decl.name, complete_type, AutoInitYes(void)) {
         return false;
       }
+      *ee_out = {num, num};
     }
+
     case &IfThen(b ast_ifthen_statement): {
       cond_vp varpopper;
       init_vp(&cond_vp, bs->es);
       if !check_condition(bs->es, &cond_vp, &b.condition) {
         return false;
       }
-      if !check_body(bs, &b.body) {
+      body_ee entryexit;
+      if !check_body(bs, &b.body, &body_ee) {
         return false;
       }
+      tailnum statement_num = add_statement(bs, None());
+      connect_statements(bs, num, tailnum);
+      connect_statements(bs, num, body_ee.entry);
+      connect_statements(bs, body_ee.exit, tailnum);
+      *ee_out = {num, tailnum};
     }
+
     case &IfThenElse(b ast_ifthenelse_statement): {
       cond_vp varpopper;
       init_vp(&cond_vp, bs->es);
       if !check_condition(bs->es, &cond_vp, &b.condition) {
         return false;
       }
-      if !check_body(bs, &b.thenbody) {
+      then_ee entryexit;
+      if !check_body(bs, &b.thenbody, &then_ee) {
         return false;
       }
       descope_vars(&cond_vp);
-      if !check_body(bs, &b.elsebody) {
+      else_ee entryexit;
+      if !check_body(bs, &b.elsebody, &else_ee) {
         return false;
       }
+      tailnum statement_num = add_statement(bs, None());
+      connect_statements(bs, num, then_ee.entry);
+      connect_statements(bs, num, else_ee.entry);
+      connect_statements(bs, then_ee.exit, tailnum);
+      connect_statements(bs, else_ee.exit, tailnum);
+      *ee_out = {num, tailnum};
     }
+
     case &While(b ast_while_statement): {
       cond_vp varpopper;
       init_vp(&cond_vp, bs->es);
       if !check_condition(bs->es, &cond_vp, &b.condition) {
         return false;
       }
-      if !check_body(bs, &b.body) {
+      body_ee entryexit;
+      if !check_body(bs, &b.body, &body_ee) {
         return false;
       }
+      connect_statements(bs, num, body_ee.entry);
+      connect_statements(bs, body_ee.exit, num);
+      *ee_out = {num, num};
     }
+
     case &For(b ast_for_statement): {
       initter_vp varpopper;
       init_vp(&initter_vp, bs->es);
+      loopnum statement_num = add_statement(bs, None());
       if case &Has(initter box[ast_statement]) = &b.initializer {
-        if !check_statement(bs, &initter_vp, oo(&initter)) {
+        initter_ee entryexit;
+        if !check_statement(bs, &initter_vp, oo(&initter), &initter_ee) {
           return false;
         }
+        connect_statements(bs, num, initter_ee.entry);
+        connect_statements(bs, initter_ee.exit, loopnum);
+      } else {
+        connect_statements(bs, num, loopnum);
       }
+
+      exitnum statement_num = add_statement(bs, None());
       if case &Has(cond box[ast_expr]) = &b.condition {
         boolean te_typeexpr = primitive_bool_type(bs->cs);
         if !check_expr_ai(bs->es, AllowIncompleteNo(void), oo(&cond), &boolean) {
           return false;
         }
+        connect_statements(bs, loopnum, exitnum);
       }
       if case &Has(incr box[ast_expr]) = &b.increment {
         unknown te_typeexpr = TeUnknown(void);
@@ -175,10 +230,15 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
           return false;
         }
       }
-      if !check_body(bs, &b.body) {
+      body_ee entryexit;
+      if !check_body(bs, &b.body, &body_ee) {
         return false;
       }
+      connect_statements(bs, loopnum, body_ee.entry);
+      connect_statements(bs, body_ee.exit, loopnum);
+      *ee_out = {num, exitnum};
     }
+
     case &Switch(b ast_switch_statement): {
       unknown te_typeexpr = TeUnknown(void);
       if !check_expr_ai(bs->es, AllowIncompleteNo(void), oo(&b.swartch), &unknown) {
@@ -200,6 +260,8 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
         return false;
       }
       // enum_type is complete, because complete_structural_rhs does that.
+
+      exitnum statement_num = add_statement(bs, None());
 
       if case &TeEnum(et te_enum) = enum_type {
         ncases size = count(&b.cases);
@@ -246,14 +308,20 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
                 return false;
               }
 
-              if !check_body(bs, &cas->body) {
+              body_ee entryexit;
+              if !check_body(bs, &cas->body, &body_ee) {
                 return false;
               }
+              connect_statements(bs, num, body_ee.entry);
+              connect_statements(bs, body_ee.exit, exitnum);
             }
             case &Default(v void): {
-              if !check_body(bs, &cas->body) {
+              body_ee entryexit;
+              if !check_body(bs, &cas->body, &body_ee) {
                 return false;
               }
+              connect_statements(bs, num, body_ee.entry);
+              connect_statements(bs, body_ee.exit, exitnum);
             }
           }
         }
@@ -265,6 +333,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
       } else {
         ERR(_u8("Switching over non-switchable type."));
       }
+      *ee_out = {num, exitnum};
     }
     case &Label(b ast_label_statement): {
       if case Has(ix size) = lookup_label(bs, b.name.value) {
@@ -272,10 +341,12 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
         return false;
       }
 
-      push(&bs->labels, {b.name.value, vars_in_scope(bs->es), false});
+      push(&bs->labels, {num, b.name.value, vars_in_scope(bs->es), false});
+      *ee_out = {num, num};
     }
     case &Goto(b ast_goto_statement): {
-      push(&bs->gotos, {b.target.value, vars_in_scope(bs->es)});
+      push(&bs->gotos, {num, b.target.value, vars_in_scope(bs->es)});
+      *ee_out = {num, add_statement(bs, None())};
     }
   }
   return true;
@@ -376,7 +447,37 @@ func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
   }
 }
 
-func finish_lambda_body(bs *bodystate) bool {
+func type_is_void(cs *checkstate, t *cu_typeexpr) bool {
+  void_type te_typeexpr = primitive_void_type(cs);
+  unified te_typeexpr;
+  return unify_types(&void_type, &t->~, &unified);
+}
+
+func finish_lambda_body(bs *bodystate, ee entryexit) bool {
+  if !connect_gotos(bs) {
+    return false;
+  }
+  mark_reachable(bs, ee.entry);
+  if ref(&bs->statements, ee.exit.~)->marked_reachable && !type_is_void(bs->cs, bs->return_type) {
+    ERR(_u8("Body can exit without return"));
+    return false;
+  }
+  return true;
+}
+
+func mark_reachable(bs *bodystate, entry statement_num) void {
+  working array[statement_num];
+  push(&working, entry);
+  while case Has(num) = popval(&working) {
+    inf *statement_info = ref(&bs->statements, num.~);
+    if !inf->marked_reachable {
+      inf->marked_reachable = true;
+      append(&working, &inf->outgoing);
+    }
+  }
+}
+
+func connect_gotos(bs *bodystate) bool {
   ngotos size = count(&bs->gotos);
   for i size = 0; i < ngotos; i = i + 1 {
     g *goto_info = ref(&bs->gotos, i);
@@ -396,6 +497,7 @@ func finish_lambda_body(bs *bodystate) bool {
       }
 
       l->hit = true;
+      connect_statements(bs, g->stnum, l->stnum);
     } else {
       ERR(_u8("no label named '"), lookup(bs->im, g->label_name), _u8("'"));
       return false;

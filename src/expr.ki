@@ -481,11 +481,12 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
   return_type cu_typeexpr = ~get(computed_params, nargs);
 
   bs bodystate = mk(es, &return_type);
-  if !check_body(&bs, &a->body) {
+  ee entryexit;
+  if !check_body(&bs, &a->body, &ee) {
     return false;
   }
 
-  if !finish_lambda_body(&bs) {
+  if !finish_lambda_body(&bs, ee) {
     return false;
   }
 
