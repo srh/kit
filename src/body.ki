@@ -5,7 +5,7 @@ import expr;
 //   - what variables are in scope at each label (beware duplicate variable names).
 //   - what variables need to get init/destroyed for each goto. (Beware case constructor variables that don't get destroyed.  Also, you can't goto into a casebody (because their variables cannot be initialized).)
 //   - that no control path reaches the end of the function without a return statement.
-//   - that there's no dead code after a goto or return statement.
+//   - that there's no dead code after a goto or return statement.  (Really?  Maybe let that be a warning.)
 
 deftype goto_info struct {
   label_name sym;
@@ -18,6 +18,10 @@ deftype label_info struct {
   hit bool;
 };
 
+deftype statement_info struct {
+  st *ast_statement;
+};
+
 deftype bodystate struct {
   es *exprscope;
   cs *checkstate;
@@ -27,6 +31,7 @@ deftype bodystate struct {
 
   gotos array[goto_info];
   labels array[label_info];
+  statements array[statement_info];
 };
 
 func mk(es *exprscope, return_type *cu_typeexpr) bodystate {
@@ -37,6 +42,16 @@ func mk(es *exprscope, return_type *cu_typeexpr) bodystate {
   ret.clq = es->clq;
   ret.return_type = return_type;
   return ret;
+}
+
+deftype statement_num size;
+
+def `~` fn[size, statement_num] = wrapconvert;
+
+func add_statement(bs *bodystate, s *ast_statement) statement_num {
+  ret size = count(&bs->statements);
+  push(&bs->statements, {s});
+  return ~ret;
 }
 
 func check_body(bs *bodystate, a *ast_bracebody) bool {
@@ -52,6 +67,7 @@ func check_body(bs *bodystate, a *ast_bracebody) bool {
 }
 
 func check_statement(bs *bodystate, vp *varpopper, s *ast_statement) bool {
+  num statement_num = add_statement(bs, s);
   switch s {
     case &Expr(b ast_expr): {
       pt te_typeexpr = TeUnknown(void);
