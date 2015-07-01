@@ -45,6 +45,8 @@ func add_primitives(cs *checkstate) void {
   add_integral_primitive(cs, cs->cym.u16sym, cs->platform.u16traits.flat, false);
   add_integral_primitive(cs, cs->cym.i32sym, cs->platform.i32traits.flat, true);
   add_integral_primitive(cs, cs->cym.u32sym, cs->platform.u32traits.flat, false);
+  add_integral_primitive(cs, cs->cym.sizesym, cs->platform.sizetraits.flat, false);
+  add_integral_primitive(cs, cs->cym.osizesym, cs->platform.osizetraits.flat, false);
   add_bool_primitive(cs);
   add_pointer_primitive(cs);
   add_function_primitive(cs);

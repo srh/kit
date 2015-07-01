@@ -31,6 +31,8 @@ deftype platform_info struct {
   u16traits integral_traits;
   i32traits integral_traits;
   u32traits integral_traits;
+  sizetraits integral_traits;
+  osizetraits integral_traits;
   ptrtraits flat_traits;
   fntraits flat_traits;
 };
@@ -46,6 +48,7 @@ deftype common_syms struct {
   i32sym sym;
   u32sym sym;
   sizesym sym;
+  osizesym sym;
   primitive_module_sym sym;
   ptrtype_sym sym;
   lengthsym sym;
@@ -101,6 +104,7 @@ func make_common_syms(im *identmap) common_syms {
   ret.i32sym = intern(im, from_u8(_u8("i32")));
   ret.u32sym = intern(im, from_u8(_u8("u32")));
   ret.sizesym = intern(im, from_u8(_u8("size")));
+  ret.osizesym = intern(im, from_u8(_u8("osize")));
   ret.primitive_module_sym = intern(im, from_u8(_u8("<primitive>")));
   ret.ptrtype_sym = intern(im, from_u8(_u8("*")));
   ret.lengthsym = intern(im, from_u8(_u8("length")));
