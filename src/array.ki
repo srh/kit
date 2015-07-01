@@ -192,5 +192,32 @@ func[T] is_strictly_increasing(x *array[T]) bool {
   return true;
 }
 
+func[T] mk_array() array[T] {
+  ret array[T];
+  return ret;
+}
+
+func[T] mk_array(x0 T) array[T] {
+  ret array[T];
+  push(&ret, x0);
+  return ret;
+}
+
+func[T] mk_array(x0 T, x1 T) array[T] {
+  ret array[T];
+  push(&ret, x0);
+  push(&ret, x1);
+  return ret;
+}
+
+func[T] mk_array(x0 T, x1 T, x2 T) array[T] {
+  ret array[T];
+  push(&ret, x0);
+  push(&ret, x1);
+  push(&ret, x2);
+  return ret;
+}
+
+
 // Heh.
 def[T] _u8 fn[T, array[u8]] = make;
