@@ -39,7 +39,7 @@ func pointer_to(cs *checkstate, t te_typeexpr) te_typeexpr {
 }
 
 func add_conversion(cs *checkstate, from sym, to sym) void {
-  type te_typeexpr = fn_type(cs, mk_array(TeName({from, None()}), TeName({to, None()})));
+  type te_typeexpr = fn_type(cs, TeName({from, None()}), TeName({to, None()}));
   add_def_primitive(cs, cs->cym.convertsym, type);
 }
 
