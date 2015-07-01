@@ -1,7 +1,5 @@
 import state;
 
-// TODO: Should the primitive types returned here include their deftype_inst info?
-
 func primitive_bool_type(cs *checkstate) te_typeexpr {
   return TeName({cs->cym.boolsym, None()});
 }

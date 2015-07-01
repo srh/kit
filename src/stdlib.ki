@@ -19,7 +19,6 @@ extern fopen fn[*u8, *u8, *FILE];
 extern fflush fn[*FILE, i32];   // TODO: actually returns "int"
 // TODO: Add platform-specific tests for stuff like "is EOF -1"
 def EOF i32 = -1;  // TODO: is actually "int"
-// TODO: fseek takes a "long".
 
 func print(fp *FILE, arr array[u8]) void {
   c size = count(&arr);

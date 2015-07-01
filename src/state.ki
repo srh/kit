@@ -55,8 +55,6 @@ deftype common_syms struct {
   assignmentsym sym;
 };
 
-// TODO: Prevent unbounded recursive template instantiation.
-
 deftype checkstate struct {
   im *identmap;
   instantiation_depth u32;
