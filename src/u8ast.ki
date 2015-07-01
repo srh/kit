@@ -139,7 +139,6 @@ func[H, T] build_u8str(help H, r *array[u8], a *box[T]) void {
 }
 
 func build_u8str(r *array[u8], a *ast_expr) void {
-  // TODO: Really implement.
   append(r, _u8("ast_expr"));
 }
 

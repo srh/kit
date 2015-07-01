@@ -113,7 +113,7 @@ access bigint {
     xn size = count(&x.parts);
     yn size = count(&y.parts);
     ressize size = xn + yn + 3;
-    build array[u32] = repeat(0, ressize + 1);
+    build array[u32] = repeat(ressize + 1, 0);
     carry u32 = 0;
     for i size = 0; i < ressize; i = i + 1 {
       for j size = 0; j < ressize - i; j = j + 1 {

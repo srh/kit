@@ -1283,7 +1283,7 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
           }
         }
         case FiniteArity(n u32): {
-          params array[te_typeexpr] = repeat(TeUnknown(void), ~n);
+          params array[te_typeexpr] = repeat(~n, TeUnknown(void));
           match opt[deftype_entry_id];
           if !match_deftype(cs, ent->name, Has(&params), &match) {
             ent->ent_id = FailedComputation();
