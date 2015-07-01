@@ -38,7 +38,12 @@ func pointer_to(cs *checkstate, t te_typeexpr) te_typeexpr {
   return TeApp({embox(primitive_pointer_puretype(cs)), params, None()});
 }
 
-func add_primitives(cs *checkstate) void {
+func add_conversion(cs *checkstate, from sym, to sym) void {
+  type te_typeexpr = fn_type(cs, mk_array(TeName({from, None()}), TeName({to, None()})));
+  add_def_primitive(cs, cs->cym.convertsym, type);
+}
+
+func add_integral_primitives(cs *checkstate) void {
   add_integral_primitive(cs, cs->cym.i8sym, cs->platform.i8traits);
   add_integral_primitive(cs, cs->cym.u8sym, cs->platform.u8traits);
   add_integral_primitive(cs, cs->cym.i16sym, cs->platform.i16traits);
@@ -47,6 +52,18 @@ func add_primitives(cs *checkstate) void {
   add_integral_primitive(cs, cs->cym.u32sym, cs->platform.u32traits);
   add_integral_primitive(cs, cs->cym.sizesym, cs->platform.sizetraits);
   add_integral_primitive(cs, cs->cym.osizesym, cs->platform.osizetraits);
+
+  names array[sym] = mk_array(cs->cym.i8sym, cs->cym.u8sym, cs->cym.i16sym, cs->cym.u16sym, cs->cym.i32sym, cs->cym.u32sym, cs->cym.sizesym, cs->cym.osizesym);
+  n size = count(&names);
+  for i size = 0; i < n; i = i + 1 {
+    for j size = 0; j < n; j = j + 1 {
+      add_conversion(cs, get(&names, i), get(&names, j));
+    }
+  }
+}
+
+func add_primitives(cs *checkstate) void {
+  add_integral_primitives(cs);
   add_bool_primitive(cs);
   add_pointer_primitive(cs);
   add_function_primitive(cs);

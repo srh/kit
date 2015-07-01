@@ -209,6 +209,19 @@ func[T] mk_array(x0 T, x1 T, x2 T) array[T] {
   return ret;
 }
 
+func[T] mk_array(x0 T, x1 T, x2 T, x3 T, x4 T, x5 T, x6 T, x7 T) array[T] {
+  ret array[T];
+  push(&ret, x0);
+  push(&ret, x1);
+  push(&ret, x2);
+  push(&ret, x3);
+  push(&ret, x4);
+  push(&ret, x5);
+  push(&ret, x6);
+  push(&ret, x7);
+  return ret;
+}
+
 
 // Heh.
 def[T] _u8 fn[T, array[u8]] = make;

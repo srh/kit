@@ -57,6 +57,7 @@ deftype common_syms struct {
   derefsym sym;
   addressofsym sym;
   assignmentsym sym;
+  convertsym sym;
 };
 
 deftype checkstate struct {
@@ -113,6 +114,7 @@ func make_common_syms(im *identmap) common_syms {
   ret.derefsym = intern(im, from_u8(_u8("*")));
   ret.addressofsym = intern(im, from_u8(_u8("&")));
   ret.assignmentsym = intern(im, from_u8(_u8("=")));
+  ret.convertsym = intern(im, from_u8(_u8("~")));
   return ret;
 }
 
