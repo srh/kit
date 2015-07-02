@@ -336,6 +336,44 @@ func test_check_more_cases(ctx *check_ctx) void {
     _u8("def foo fn[u32, u32] = func(x u32) u32 {\n"
         "  x + x;\n"
         "};"));
+  run_check_test(ctx, "c045",
+    _u8("def foo i32 = 7;\n"
+        "def bar i32 = 5 << foo;\n"));
+  // TODO: Should fail, because the shift overflows.
+  run_check_test(ctx, "c046",
+    _u8("def foo i32 = 30;\n"
+        "def bar i32 = 5 << foo;\n"));
+  run_check_test(ctx, "c047",
+    _u8("def[T] foo fn[T, T] = func(x T) T {\n"
+        "  var y T = x;\n"
+        "  return y;\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  return foo(3);\n"
+        "};\n"));
+  run_check_test(ctx, "c048",
+    _u8("def[T] add32 fn[i32, T, i32] = func(x i32, y T) i32 {\n"
+        "  var z i32 = 4;\n"
+        "  return x + z;\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  return add32(3, @[u32]4);\n"
+        "};\n"));
+  // Fails because return type in return expression is wrong.
+  run_check_negtest(ctx, "c049",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  return @[u32] 4;\n"
+        "};\n"));
+  run_check_test(ctx, "c050",
+    _u8("def x i32 = ~ @[u32]4;\n"));
+  run_check_test(ctx, "c051",
+    _u8("def[T] foo fn[ptr[T], i32, T] = func(p ptr[T], i i32) T {\n"
+        "  var ret T = p[i];\n"
+        "  p[i] = p[i + 1];\n"
+        "  return ret;\n"
+        "};\n"));
+
+
 }
 
 func test_check() bool {
