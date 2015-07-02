@@ -336,6 +336,7 @@ func test_check_more_cases(ctx *check_ctx) void {
     _u8("def foo fn[u32, u32] = func(x u32) u32 {\n"
         "  x + x;\n"
         "};"));
+
   run_check_test(ctx, "c045",
     _u8("def foo i32 = 7;\n"
         "def bar i32 = 5 << foo;\n"));
@@ -366,11 +367,63 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"));
   run_check_test(ctx, "c050",
     _u8("def x i32 = ~ @[u32]4;\n"));
+
   run_check_test(ctx, "c051",
     _u8("def[T] foo fn[ptr[T], i32, T] = func(p ptr[T], i i32) T {\n"
         "  var ret T = p[i];\n"
         "  p[i] = p[i + 1];\n"
         "  return ret;\n"
+        "};\n"));
+  // Fails because vec3 and [3]u32 are different types.
+  run_check_negtest(ctx, "c052",
+    _u8("deftype vec3 [3]u32;\n"
+        "def foo fn[[3]u32, vec3] = func(arr [3]u32) vec3 {\n"
+        "  var v vec3 = arr;\n"
+        "  return v;\n"
+        "};\n"));
+  // Passes because the conversion of ~@[u32]3 can be inferred.
+  run_check_test(ctx, "c053",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  return 2 + ~ @[u32]3;\n"
+        "};\n"));
+  run_check_test(ctx, "c054",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  return 2 + @[i32](~ @[u32]3);\n"
+        "};\n"));
+  run_check_test(ctx, "c055",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  var x i32 = 5;\n"
+        "  while (x > 3) {\n"
+        "    x = x + 1;\n"
+        "  }\n"
+        "  return x;\n"
+        "};\n"));
+
+  run_check_test(ctx, "c056",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  var x i32 = 5;\n"
+        "  while !(x > 3) {\n"
+        "    x = x + 1;\n"
+        "  }\n"
+        "  return x;\n"
+        "};\n"));
+  // Fails because some control paths don't return a value.
+  run_check_negtest(ctx, "c057",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  var x i32 = 2;\n"
+        "  if (x < 3) {\n"
+        "    x = x + 1;\n"
+        "  } else {\n"
+        "    return x;\n"
+        "  }\n"
+        "};\n"));
+  run_check_test(ctx, "c058",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  var acc u32 = 0;\n"
+        "  for i u32 = 0; i < 10; i = i + 1 {\n"
+        "    acc = acc + i;\n"
+        "  }\n"
+        "  return ~acc;\n"
         "};\n"));
 
 
