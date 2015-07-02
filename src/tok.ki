@@ -421,7 +421,22 @@ func grab_tok(p *ps) tok {
   } else if ch == '*' {
     return grab_oper2(p, left, ch, '=');
   } else if ch == '-' {
-    return grab_oper2(p, left, ch, '=', '-', '>');
+    arr array[i32] = mk_array(ch);
+    ps_step(p);
+    ch = ps_peek(p);
+    if ch == '=' || ch == '-' {
+      push(&arr, ch);
+      ps_step(p);
+    } else if ch == '>' {
+      push(&arr, ch);
+      ps_step(p);
+      ch = ps_peek(p);
+      if ch == '~' {
+        push(&arr, ch);
+        ps_step(p);
+      }
+    }
+    return mk_res(p, left, Oper(arr));
   } else if ch == '=' {
     return grab_oper2(p, left, ch, '=');
   } else if ch == '+' {
@@ -440,8 +455,7 @@ func grab_tok(p *ps) tok {
   } else if ch == '<' {
     return grab_angly(p, left, ch);
   } else if ch == '.' {
-    ps_step(p);
-    return mk_res(p, left, Oper(mk_array(ch)));
+    return grab_oper2(p, left, ch, '~');
   } else if ch == '>' {
     return grab_angly(p, left, ch);
   } else if ch == '/' {
