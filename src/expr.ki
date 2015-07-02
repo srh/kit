@@ -145,6 +145,57 @@ func replaced_name_parms(es *exprscope, a *ast_name_expr, out *genparms) bool {
   }
 }
 
+deftype constructor_info struct {
+  type cu_typeexpr;
+};
+
+defenum es_constructor_res {
+  NoMatchConstructor void;
+  AmbigMatchConstructor void;
+  MatchedConstructor constructor_info;
+};
+
+func es_lookup_constructor(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_constructor_res) bool {
+  if case &HasParms(a) = gp {
+    *res_out = NoMatchConstructor(void);
+    return true;
+  }
+  arg_type *te_typeexpr;
+  return_type *te_typeexpr;
+  if !decompose_typeapp(pt, primitive_function_puretype(es->cs), &arg_type, &return_type) {
+    *res_out = NoMatchConstructor(void);
+    return true;
+  }
+  if !is_complete(return_type) {
+    *res_out = AmbigMatchConstructor(void);
+    return true;
+  }
+  // enum_type is complete.
+  enum_type *te_typeexpr;
+  if !complete_structural_rhs(es, return_type, &enum_type) {
+    return false;
+  }
+  if case &TeEnum(et te_enum) = enum_type {
+    rhs_type *te_typeexpr;
+    if !find_vardecl(&et.constructors, name, &rhs_type) {
+      *res_out = NoMatchConstructor(void);
+      return true;
+    }
+    // rhs_type is complete.
+    unified te_typeexpr;
+    if !unify_types(arg_type, rhs_type, &unified) {
+      *res_out = NoMatchConstructor(void);
+      return true;
+    }
+    *res_out = MatchedConstructor({~fn_type(es->cs, *rhs_type, *return_type)});
+    return true;
+  } else {
+    *res_out = NoMatchConstructor(void);
+    return true;
+  }
+}
+
+
 deftype global_info struct {
   ent def_entry_id;
   inst def_inst_id;
@@ -164,6 +215,7 @@ defenum es_match_res {
   AmbigGlobalMatch void;
   OneGlobalMatch global_info;
   OneLocalMatch local_info;
+  OneEnumConstructorMatch constructor_info;
 };
 
 func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_match_res) bool {
@@ -187,7 +239,21 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
 
   switch res {
     case NoMatch(v void): {
-      *res_out = NoMatch(void);
+      constructor_res es_constructor_res;
+      if !es_lookup_constructor(es, name, gp, pt, &constructor_res) {
+        return false;
+      }
+      switch &constructor_res {
+        case &NoMatchConstructor(u void): {
+          *res_out = NoMatch(void);
+        }
+        case &AmbigMatchConstructor(u void): {
+          *res_out = AmbigGlobalMatch(void);
+        }
+        case &MatchedConstructor(inf constructor_info): {
+          *res_out = OneEnumConstructorMatch(inf);
+        }
+      }
       return true;
     }
     case MultiMatch(void): {
@@ -267,6 +333,10 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
             ERR(_u8("Name lookup for '"), lookup(es->im, a.ident.value), _u8("', maybe with parms, matches ambiguously."));
             return false;
           }
+        }
+        case &OneEnumConstructorMatch(ci constructor_info): {
+          annotate_info(x, CompleteCheck(ci.type));
+          return true;
         }
         case &OneGlobalMatch(gi global_info): {
           if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, gi.ent), gi.inst) {
@@ -557,6 +627,19 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
   return true;
 }
 
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr, twoparam_out **te_typeexpr) bool {
+  params *array[te_typeexpr];
+  if !decompose_typeapp(t, expected_puretype, &params) {
+    return false;
+  }
+  if count(params) != 2 {
+    return false;
+  }
+  *oneparam_out = ref(params, 0);
+  *twoparam_out = ref(params, 1);
+  return true;
+}
+
 func check_field(es *exprscope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *cu_typeexpr) bool {
   fieldtype cu_typeexpr;
   if !lookup_field(es, t, a, &fieldtype) {
@@ -668,7 +751,7 @@ func help_structural_rhs(es *exprscope, mbpack *opt[te_instpack], rhs_type_out *
         return true;
       } else {
         ice(_u8("deftype_rhs_accessible permitted a primitive type."));
-        return false;
+        return fake();
       }
     } else {
       ice(_u8("inst checked, info still None()"));
