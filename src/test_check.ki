@@ -370,7 +370,7 @@ func test_check_more_cases(ctx *check_ctx) void {
     _u8("def x i32 = ~ @[u32]4;\n"));
 
   run_check_test(ctx, "c051",
-    _u8("def[T] foo fn[ptr[T], i32, T] = func(p ptr[T], i i32) T {\n"
+    _u8("def[T] foo fn[*T, i32, T] = func(p *T, i i32) T {\n"
         "  var ret T = p[i];\n"
         "  p[i] = p[i + 1];\n"
         "  return ret;\n"
@@ -721,6 +721,190 @@ func test_check_more_cases(ctx *check_ctx) void {
         "    }\n"
         "  }\n"
         "};\n"));
+
+  // Fails because a control path in the switch does not return a value.
+  run_check_negtest(ctx, "c091",
+    _u8("defenum ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p i32; q i32; };\n"
+        "};\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch x {\n"
+        "    case c1(v void): { return -1; }\n"
+        "    case c2(s struct { p i32; q i32; }): {\n"
+        "      s.p + s.q;\n"
+        "    }\n"
+        "  }\n"
+        "};\n"));
+  run_check_test(ctx, "c092",
+    _u8("def foo fn[i32, void] = func(x i32) void {\n"
+        "  var p *_ = &x;\n"
+        "  var q _ = *p;\n"
+        "  var r = q;\n"
+        "  var s i32 = r;\n"
+        "  var ret void;\n"
+        "  return ret;\n"
+        "};\n"));
+  run_check_test(ctx, "c093",
+    _u8("defenum ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p i32; q i32; };\n"
+        "};\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch x {\n"
+        "    case c1(v void): { return -1; }\n"
+        "    case c2(s): {\n"
+        "      return s.p + s.q;\n"
+        "    }\n"
+        "  }\n"
+        "};\n"));
+  run_check_test(ctx, "c094",
+    _u8("def foo fn[i32, void] = func(x i32) void {\n"
+        "  var p *_ = &x;\n"
+        "  var q _ = *p;\n"
+        "  if (x == 3) {\n"
+        "    return;\n"
+        "  }\n"
+        "  var r = q;\n"
+        "  var s i32 = r;\n"
+        "};\n"));
+  run_check_test(ctx, "c095",
+    _u8("def foo = func(x i32, y u32) void {\n"
+        "  @[i32] 1;\n"
+        "};\n"));
+
+  run_check_test(ctx, "c096",
+    _u8("func foo(x i32, y u32) void {\n"
+        "  @[i32] 1;\n"
+        "}\n"));
+  run_check_test(ctx, "c097",
+    _u8("deftype notsize u32;\n"
+        "func `~`(x u32) notsize {\n"
+        "  var ret notsize;\n"
+        "  ret.~ = x;\n"
+        "  return ret;\n"
+        "}\n"
+        "func foo(x u32) notsize {\n"
+        "  return ~(x + 1);\n"
+        "}\n"));
+  // Fails because x[0] is of wrong type.
+  run_check_negtest(ctx, "c098",
+    _u8("func foo() i32 {\n"
+        "  var x [3]u32;\n"
+        "  return x[0];\n"
+        "}\n"));
+  run_check_test(ctx, "c099",
+    _u8("func foo() bool {\n"
+        "  var x [3]u32;\n"
+        "  return &x[0] == &x[1];\n"
+        "}\n"));
+  // Fails because ptr types don't match.
+  run_check_negtest(ctx, "c100",
+    _u8("func foo() bool {\n"
+        "  var x [3]u32;\n"
+        "  return &x[0] == &x;\n"
+        "}\n"));
+
+  run_check_test(ctx, "c101",
+    _u8("func foo(x osize, y size) osize {\n"
+        "  return x + ~y;\n"
+        "}\n"));
+  run_check_test(ctx, "c102",
+    _u8("func foo(x *i32) bool {\n"
+        "  return x == null;\n"
+        "}\n"));
+  // Fails because size is not a *_.
+  run_check_negtest(ctx, "c103",
+    _u8("func foo(x size) bool {\n"
+        "  return x == null;\n"
+        "}\n"));
+  run_check_test(ctx, "c104",
+    _u8("defenum ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p i32; q i32; };\n"
+        "};\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch x {\n"
+        "    default: { return -1; }\n"
+        "    case c2(s): {\n"
+        "      return s.p + s.q;\n"
+        "    }\n"
+        "  }\n"
+        "};\n"));
+  // Fails because of overlapping default cases.
+  run_check_negtest(ctx, "c105a",
+    _u8("defenum ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p i32; q i32; };\n"
+        "};\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch x {\n"
+        "    default: { return -1; }\n"
+        "    default: { return -2; }\n"
+        "    case c2(s): {\n"
+        "      return s.p + s.q;\n"
+        "    }\n"
+        "  }\n"
+        "};\n"));
+  // Fails because of overlapping default cases.
+  run_check_negtest(ctx, "c105b",
+    _u8("defenum ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p i32; q i32; };\n"
+        "};\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch &x {\n"
+        "    default: { return -1; }\n"
+        "    default: { return -2; }\n"
+        "    case &c2(s): {\n"
+        "      return s.p + s.q;\n"
+        "    }\n"
+        "  }\n"
+        "};\n"));
+
+  run_check_test(ctx, "c106",
+    _u8("deftype foo struct {\n"
+        "  x i32;\n"
+        "  y i32;\n"
+        "};\n"
+        "func bar(x i32) foo {\n"
+        "  return { x, x };\n"
+        "}\n"));
+  // Fails because struct expr has wrong count.
+  run_check_negtest(ctx, "c107",
+    _u8("deftype foo struct {\n"
+        "  x i32;\n"
+        "  y i32;\n"
+        "};\n"
+        "func bar(x i32) foo {\n"
+        "  return { x, x, x };\n"
+        "}\n"));
+  // Fails because struct expr has wrong type.
+  run_check_negtest(ctx, "c108",
+    _u8("deftype foo struct {\n"
+        "  x i32;\n"
+        "  y i32;\n"
+        "};\n"
+        "func bar(x i32, y u32) foo {\n"
+        "  return { x, y };\n"
+        "}\n"));
+  run_check_test(ctx, "c109",
+    _u8("deftype foo struct {\n"
+        "  x i32;\n"
+        "  y i32;\n"
+        "};\n"
+        "func bar(x i32) foo {\n"
+        "  return { x, 5 };\n"
+        "}\n"));
+  run_check_test(ctx, "c110",
+    _u8("deftype foo struct {\n"
+        "  x i32;\n"
+        "  y u32;\n"
+        "};\n"
+        "func bar(x i32) foo {\n"
+        "  ret foo = { x, 7 };\n"
+        "  return ret;\n"
+        "}\n"));
 
 }
 
