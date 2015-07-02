@@ -59,6 +59,15 @@ func parse_toplevels(p *ps, stop tokval, out *array[ast_toplevel]) bool {
   }
 }
 
+func try_parse_token(p *ps, expected tokval) opt[ast_meta] {
+  if peek(p).val == expected {
+    meta ast_meta = startend(p);
+    step(p);
+    return Has(meta);
+  }
+  return None();  // Fail
+}
+
 func try_skip_token(p *ps, expected tokval) bool {
   if peek(p).val == expected {
     step(p);
@@ -454,6 +463,12 @@ func success_or_fail(res bool) triparse_result {
 }
 
 func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_result {
+  voidmeta ast_meta;
+  if case Has(m ast_meta) = try_parse_token(p, Keyw(Void(void))) {
+    // TODO: Put this "void" sym pre-interned somewhere.
+    *out = Name({m, intern(p->im, from_u8(_u8("void")))});
+    return Success(void);
+  }
   if try_skip_token(p, Keyw(Struct(void))) {
     return success_or_fail(parse_rest_of_struct(p, out));
   }

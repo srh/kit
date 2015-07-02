@@ -16,6 +16,7 @@ func test_loader(cs *checkstate, name sym) opt[array[u8]] {
 func test_platform() platform_info {
   ret platform_info = {
     4,
+    {0, 1},
     {1, 1},
     {{1, 1}, {true, -big("128"), big("127")}},
     {{1, 1}, {false, big("0"), big("255")}},
@@ -583,6 +584,143 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"
         "}\n"
         "def bar fn[*ty[u32], *i32] = foo;\n"));
+
+  run_check_test(ctx, "c077",
+    _u8("defclass copy ty i32;\n"
+        "access ty {\n"
+        "def do_init fn[*ty, void] = func(t *ty) void {\n"
+        "  var ret void;\n"
+        "  return ret;\n"
+        "};\n"
+        "}\n"
+        "def foo fn[i32] = func() i32 {\n"
+        "  var k ty;\n"
+        "  return 1;\n"
+        "};\n"));
+  // Fails because blah is not the name of a type.
+  run_check_negtest(ctx, "c078",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  var x blah;\n"
+        "  return 1;\n"
+        "};\n"));
+  // Fails because k is not default-initializable.
+  run_check_negtest(ctx, "c079",
+    _u8("defclass copy ty i32;\n"
+        "def foo fn[i32] = func() i32 {\n"
+        "  var k ty;\n"
+        "  return 1;\n"
+        "};\n"));
+  run_check_test(ctx, "c080",
+    _u8("defclass copy ty i32;\n"
+        "access ty {\n"
+        "def do_init fn[*ty, void] = func(t *ty) void {\n"
+        "  var ret void;\n"
+        "  return ret;\n"
+        "};\n"
+        "}\n"
+        "deftype ty2 struct { x i32; y ty; };\n"
+        "def foo fn[i32] = func() i32 {\n"
+        "  var k ty2;\n"
+        "  return 1;\n"
+        "};\n"));
+
+  // Fails because k is not default-initializable.
+  run_check_negtest(ctx, "c081",
+    _u8("defclass copy ty i32;\n"
+        "deftype ty2 struct { x i32; y ty; };\n"
+        "def foo fn[i32] = func() i32 {\n"
+        "  var k ty2;\n"
+        "  return 1;\n"
+        "};\n"));
+  run_check_test(ctx, "c082",
+    _u8("def x u8 = '\\x12';\n"));
+  // Passes because the char literal value is in range for an i8.
+  run_check_test(ctx, "c083",
+    _u8("def x i8 = '\\x12';\n"));
+  // Fails because string literals not allowed in static evaluation.
+  // TODO: String literals should be allowed, this should pass.
+  run_check_negtest(ctx, "c084",
+    _u8("def x [5]u8 = \"pq\\x12rs\";\n"));
+  // Fails because the array size is wrong.
+  run_check_negtest(ctx, "c085",
+    _u8("def x [6]u8 = \"pq\\x12rs\";\n"));
+
+  run_check_test(ctx, "c086",
+    _u8("defenum ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p i32; q i32; };\n"
+        "};\n"
+        "def foo fn[ty, ty] = func(x ty) ty {\n"
+        "  var v void;\n"
+        "  var y ty = c1(v);\n"
+        "  var u struct { p i32; q i32; };\n"
+        "  y = c2(u);\n"
+        "  return y;\n"
+        "};\n"));
+  // Fails because c2 passed wrong type.
+  run_check_negtest(ctx, "c087",
+    _u8("defenum ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p i32; q i32; };\n"
+        "};\n"
+        "def foo fn[ty, ty] = func(x ty) ty {\n"
+        "  var v void;\n"
+        "  var y ty = c1(v);\n"
+        "  var u struct { p i32; q u32; };\n"
+        "  y = c2(u);\n"
+        "  return y;\n"
+        "};\n"));
+  run_check_test(ctx, "c088",
+    _u8("defenum[T] ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p T; q T; };\n"
+        "};\n"
+        "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
+        "  var v void;\n"
+        "  var y ty[i32] = c1(v);\n"
+        "  var u struct { p i32; q i32; };\n"
+        "  y = c2(u);\n"
+        "  return y;\n"
+        "};\n"));
+  // Fails because c2 returns wrong type.
+  run_check_negtest(ctx, "c089",
+    _u8("defenum[T] ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p T; q T; };\n"
+        "};\n"
+        "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
+        "  var v void;\n"
+        "  var y ty[i32] = c1(v);\n"
+        "  var u struct { p u32; q u32; };\n"
+        "  y = c2(u);\n"
+        "  return y;\n"
+        "};\n"));
+  run_check_test(ctx, "c090a",
+    _u8("defenum ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p i32; q i32; };\n"
+        "};\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch x {\n"
+        "    case c1(v void): { return -1; }\n"
+        "    case c2(s struct { p i32; q i32; }): {\n"
+        "      return s.p + s.q;\n"
+        "    }\n"
+        "  }\n"
+        "};\n"));
+  run_check_test(ctx, "c090b",
+    _u8("defenum ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p i32; q i32; };\n"
+        "};\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch &x {\n"
+        "    case &c1(v void): { return -1; }\n"
+        "    case &c2(s struct { p i32; q i32; }): {\n"
+        "      return s.p + s.q;\n"
+        "    }\n"
+        "  }\n"
+        "};\n"));
 
 }
 

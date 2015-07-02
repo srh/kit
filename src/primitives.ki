@@ -64,6 +64,7 @@ func add_integral_primitives(cs *checkstate) void {
 
 func add_primitives(cs *checkstate) void {
   add_integral_primitives(cs);
+  add_void_primitive(cs);
   add_bool_primitive(cs);
   add_pointer_primitive(cs);
   add_function_primitive(cs);
@@ -149,6 +150,10 @@ func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) vo
   if traits.numeric.signed {
     add_unop_primitive(cs, intern(cs->im, from_u8(_u8("-"))), name);
   }
+}
+
+func add_void_primitive(cs *checkstate) void {
+  add_simple_primitive(cs, cs->cym.voidsym, cs->platform.voidtraits);
 }
 
 func add_bool_primitive(cs *checkstate) void {

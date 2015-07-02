@@ -25,6 +25,7 @@ deftype integral_traits struct {
 
 deftype platform_info struct {
   enum_tag_size u32;
+  voidtraits flat_traits;
   booltraits flat_traits;
   i8traits integral_traits;
   u8traits integral_traits;
