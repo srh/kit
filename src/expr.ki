@@ -948,7 +948,13 @@ func check_expr_index(es *exprscope, x *ast_expr, a *ast_index_expr, pt *te_type
     return false;
   }
   sizetype te_typeexpr = primitive_size_type(es->cs);
-  if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), &sizetype) {
+  sizec cac_typeexpr;
+  if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &sizetype, &sizec) {
+    return false;
+  }
+  check(sizec.complete);
+
+  if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), &sizec.te) {
     return false;
   }
 
