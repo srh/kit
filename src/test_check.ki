@@ -969,10 +969,76 @@ func test_check_more_cases(ctx *check_ctx) void {
 
 }
 
+func test_check_flow_cases(ctx *check_ctx) void {
+  // Fails because exit without return.
+  run_check_negtest(ctx, "c116",
+    _u8("func foo(x i32) i32 {\n"
+        "  goto foo;\n"
+        "  label foo;\n"
+        "}\n"));
+  run_check_test(ctx, "c117",
+    _u8("func foo(x i32) i32 {\n"
+        "  label foo;\n"
+        "  goto foo;\n"
+        "}\n"));
+  run_check_test(ctx, "c118",
+    _u8("func foo(x i32) i32 {\n"
+        "  goto foo;\n"
+        "  if true {\n"
+        "    y i32;\n"
+        "    label foo;\n"
+        "    return y;\n"
+        "  }\n"
+        "}\n"));
+  run_check_test(ctx, "c119",
+    _u8("func foo(x i32) i32 {\n"
+        "  if true {\n"
+        "    y i32;\n"
+        "    label foo;\n"
+        "  }\n"
+        "  goto foo;\n"
+        "}\n"));
+  // A control for subsequent tests.
+  run_check_test(ctx, "c120",
+    _u8("defenum ty { c1 i32; };\n"
+        "func foo(x i32) i32 {\n"
+        "  t ty = c1(x);\n"
+        "  if case c1(y i32) = t {\n"
+        "    return y;\n"
+        "  }\n"
+        "  return x;\n"
+        "}\n"));
+
+  // Fails because a goto points into a non-autoinit variable.
+  run_check_negtest(ctx, "c121",
+    _u8("defenum ty { c1 i32; };\n"
+        "func foo(x i32) i32 {\n"
+        "  t ty = c1(x);\n"
+        "  if case c1(y i32) = t {\n"
+        "    label foo;\n"
+        "    return y;\n"
+        "  }\n"
+        "  goto foo;\n"
+        "}\n"));
+  // Fails because a goto points into a non-autoinit variable.
+  run_check_negtest(ctx, "c122",
+    _u8("defenum ty { c1 i32; };\n"
+        "func foo(x i32) i32 {\n"
+        "  t ty = c1(x);\n"
+        "  if case c1(y i32) = t {\n"
+        "    label foo;\n"
+        "    return y;\n"
+        "  }\n"
+        "  goto foo;\n"
+        "}\n"));
+
+}
+
 func test_check() bool {
   ctx check_ctx;
   test_check_basic_cases(&ctx);
   test_check_lambda_cases(&ctx);
   test_check_more_cases(&ctx);
+  test_check_flow_cases(&ctx);
   return !ctx.fail;
 }
