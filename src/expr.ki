@@ -895,7 +895,7 @@ func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_
   }
 
   func_pt te_typeexpr = make_fn_partial_type(es->cs, pt, &a->params);
-  if !check_expr_ai(es, ai_incomplete(!a_param_incomplete), oo(&a->fun), &func_pt) {
+  if !check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes(void)), oo(&a->fun), &func_pt) {
     return false;
   }
 
