@@ -1032,6 +1032,94 @@ func test_check_flow_cases(ctx *check_ctx) void {
         "  goto foo;\n"
         "}\n"));
 
+  // Passes because the loop has no condition.
+  run_check_test(ctx, "c123",
+    _u8("func foo(y i32) i32 {\n"
+        "  for x i32 = 0;; x = x + 1 {\n"
+        "  }\n"
+        "}\n"));
+
+  // Fails because the loop can terminate, no return statement.
+  run_check_negtest(ctx, "c124",
+    _u8("func foo(y i32) i32 {\n"
+        "  for x i32 = 0; true; x = x + 1 {\n"
+        "  }\n"
+        "}\n"));
+
+  // Passes because the goto points back into the loop.
+  run_check_test(ctx, "c125",
+    _u8("func foo(y i32) i32 {\n"
+        "  for x i32 = 0; true; x = x + 1 {\n"
+        "    label foo;\n"
+        "  }\n"
+        "  goto foo;\n"
+        "}\n"));
+
+  // Fails because the goto points into a non-autoinit variable.
+  run_check_negtest(ctx, "c125",
+    _u8("defenum ty { c1 i32; c2 i32; };\n"
+        "func foo(y i32) i32 {\n"
+        "  t ty;\n"
+        "  switch t {\n"
+        "    case c1(x i32): {\n"
+        "      label foo;\n"
+        "      return 5;\n"
+        "    }\n"
+        "    default: {\n"
+        "      goto foo;\n"
+        "    }\n"
+        "  }\n"
+        "}\n"));
+
+  // Passes because the goto points away from a non-autoinit variable.
+  run_check_test(ctx, "c126",
+    _u8("defenum ty { c1 i32; c2 i32; };\n"
+        "func foo(y i32) i32 {\n"
+        "  t ty;\n"
+        "  switch t {\n"
+        "    case c1(x i32): {\n"
+        "      goto foo;\n"
+        "      return 5;\n"
+        "    }\n"
+        "    default: {\n"
+        "      label foo;\n"
+        "      return 5;\n"
+        "    }\n"
+        "  }\n"
+        "}\n"));
+
+  // Fails because control flow falls off the end.
+  run_check_negtest(ctx, "c127",
+    _u8("defenum ty { c1 i32; c2 i32; };\n"
+        "func foo(y i32) i32 {\n"
+        "  t ty;\n"
+        "  switch t {\n"
+        "    case c1(x i32): {\n"
+        "      goto foo;\n"
+        "      return 5;\n"
+        "    }\n"
+        "    default: {\n"
+        "      label foo;\n"
+        "    }\n"
+        "  }\n"
+        "}\n"));
+
+  // Passes because the goto doesn't point from outside the autoinit variable.
+  run_check_test(ctx, "c128",
+    _u8("defenum ty { c1 i32; c2 i32; };\n"
+        "func foo(y i32) i32 {\n"
+        "  t ty;\n"
+        "  switch t {\n"
+        "    case c1(x i32): {\n"
+        "      goto foo;\n"
+        "      label foo;\n"
+        "      return 5;\n"
+        "    }\n"
+        "    default: {\n"
+        "      return 5;\n"
+        "    }\n"
+        "  }\n"
+        "}\n"));
 }
 
 func test_check() bool {
