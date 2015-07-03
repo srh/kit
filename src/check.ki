@@ -372,7 +372,6 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
         dbgcheck(_u8("def_converted_typeexpr failed"));
         return false;
       }
-      // TODO: We need to check exact name shadowing(?), typeexpr, and rhs.
 
       // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
       computed cac_typeexpr;
@@ -431,7 +430,6 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_
       }
       inst->status = BeganCheckingRhs(void);
       if case &Has(rhs ast_expr) = &inst->rhs {
-        // TODO: How do we know that ent->generics doesn't shadow, doesn't self-shadow?
         if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs, & inst->computed_type.~) {
           return false;
         }
@@ -807,7 +805,6 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
         return false;
       }
       // We declare success -- we check non-generic defs.
-      // TODO: Somewhere we have to check def generics shadowing.
       return true;
     }
   }
@@ -1118,7 +1115,6 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
       }
       case &HasGenerics(ig): {
         // We declare success -- we check non-generic defs.
-        // TODO: Somewhere we have to check deftype generics shadowing.
         return true;
       }
     }
@@ -1228,6 +1224,9 @@ func process_toplevels(cs *checkstate,
         if !quick_typeexpr(&cs->cym, &a, &quick_te) {
           return false;
         }
+        if !check_generics_unique(cs, &a.generics) {
+          return false;
+        }
         ent def_entry = mk(mod->module_name, a.name.value, access_scope, a.generics, quick_te, toplevel);
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
@@ -1236,6 +1235,9 @@ func process_toplevels(cs *checkstate,
         add_def_entry(cs, mod->module_name, &mod->defs, ent);
       }
       case &TypeDef(a ast_type_def): {
+        if !check_generics_unique(cs, &a.generics) {
+          return false;
+        }
         id deftype_entry_id = add_deftype_entry(cs, mk(mod->module_name, a.name.value, access_scope, is_public(&a.rhs), a.generics, &a));
         push(&mod->deftypes, id);
       }
@@ -1251,6 +1253,28 @@ func process_toplevels(cs *checkstate,
     }
   }
   return true;
+}
+
+func check_generics_unique(cs *checkstate, a *ast_generics) bool {
+  switch a {
+    case &NoGenerics(v void): {
+      return true;
+    }
+    case &HasGenerics(b array[ast_ident]): {
+      n size = count(&b);
+      for i size = 0; i < n; i = i + 1 {
+        xi sym = ref(&b, i)->value;
+        for j size = 0; j < i; j = j + 1 {
+          yi sym = ref(&b, j)->value;
+          if xi == yi {
+            ERR(_u8("Generic params are self-shadowing."));
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+  }
 }
 
 func is_public(a *ast_type_def_rhs) rhs_accessibility {
@@ -1326,7 +1350,6 @@ defenum match_def_res {
 // Note that gp could be incomplete.
 func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
                res_out *match_def_res) bool {
-  // TODO: What about defenum constructors?
   if case Has(arr *array[def_entry_id]) = lookup_ref(&cs->defs_by_name, name) {
     n size = count(arr);
     matches array[struct { ent def_entry_id; parms genparms; }];
@@ -1539,16 +1562,14 @@ func unify_under_generics(pt *te_typeexpr,
           return false;
         }
         set(unif_parms, ix, unified);
-        // TODO: None()?  So we discard that info?
         *unified_out = TeName({a.value, None()});
         return true;
       } else {
         if case &TeName(pa te_name) = pt {
-          // TODO: Naturally, at some point scopage might be a factor.
+          // NOTE: Naturally, at some point scopage might be a factor.
           if a.value != pa.value {
             return false;
           }
-          // TODO: None()?  So we discard that info?
           *unified_out = TeName({a.value, None()});
           return true;
         } else {
@@ -1576,7 +1597,6 @@ func unify_under_generics(pt *te_typeexpr,
           }
           push(&unified_params, unified);
         }
-        // TODO: None()?  So we discard that info?
         *unified_out = TeApp({embox(unified_typefunc), unified_params, None()});
         return true;
       } else {
