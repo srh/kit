@@ -44,6 +44,7 @@ func add_conversion(cs *checkstate, from sym, to sym) void {
 }
 
 func add_integral_primitives(cs *checkstate) void {
+  // See also is_numeric_type.
   add_integral_primitive(cs, cs->cym.i8sym, cs->platform.i8traits);
   add_integral_primitive(cs, cs->cym.u8sym, cs->platform.u8traits);
   add_integral_primitive(cs, cs->cym.i16sym, cs->platform.i16traits);
@@ -86,6 +87,10 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool 
       *out = cs->platform.i32traits.numeric;
     } else if a.value == cs->cym.u32sym {
       *out = cs->platform.u32traits.numeric;
+    } else if a.value == cs->cym.sizesym {
+      *out = cs->platform.sizetraits.numeric;
+    } else if a.value == cs->cym.osizesym {
+      *out = cs->platform.osizetraits.numeric;
     } else {
       return false;
     }
