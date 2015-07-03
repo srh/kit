@@ -104,6 +104,10 @@ func test_check_basic_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c006-b",
     _u8("def x i32 = 3;"
         "deftype[T] foo struct { count u32; p *T; };\n"));
+  run_check_negtest(ctx, "c006-c",
+    _u8("def x i32 = 3;"
+        "deftype[T] foo struct { count u32; p whatever[T]; };\n"
+        "deftype bar foo[i32];\n"));
   // Fails because bar recursively holds itself through a template parameter.
   run_check_negtest(ctx, "c007",
     _u8("deftype[T, U] foo struct { x *T; y U; };\n"
