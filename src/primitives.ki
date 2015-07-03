@@ -112,10 +112,13 @@ func add_op_primitive(cs *checkstate, oper sym, typename sym, arity size) void {
   add_def_primitive(cs, oper, type);
 }
 
+func add_comparison_primitive(cs *checkstate, oper sym, generics ast_generics, type te_typeexpr) void {
+  f te_typeexpr = fn_type(cs, type, type, primitive_bool_type(cs));
+  add_def_primitive(cs, oper, generics, f);
+}
+
 func add_comparison_primitive(cs *checkstate, oper sym, typename sym) void {
-  name te_typeexpr = TeName({typename, None()});
-  type te_typeexpr = fn_type(cs, mk_array(name, name, primitive_bool_type(cs)));
-  add_def_primitive(cs, oper, type);
+  add_comparison_primitive(cs, oper, NoGenerics(void), TeName({typename, None()}));
 }
 
 func add_binop_primitive(cs *checkstate, oper sym, typename sym) void {
@@ -202,6 +205,10 @@ func fn_type(cs *checkstate, t te_typeexpr, u te_typeexpr) te_typeexpr {
   return fn_type(cs, mk_array(t, u));
 }
 
+func fn_type(cs *checkstate, t te_typeexpr, u te_typeexpr, v te_typeexpr) te_typeexpr {
+  return fn_type(cs, mk_array(t, u, v));
+}
+
 func ptr_type(cs *checkstate, t te_typeexpr) te_typeexpr {
   return TeApp({embox(primitive_pointer_puretype(cs)), mk_array(t), None()});
 }
@@ -211,6 +218,13 @@ func add_pointer_primitive(cs *checkstate) void {
   tee_type te_typeexpr = TeName({cs->cym.tee_sym, None()});
   add_def_primitive(cs, cs->cym.derefsym, tee_generic(cs), fn_type(cs, ptr_type(cs, tee_type), tee_type));
   add_def_primitive(cs, cs->cym.addressofsym, tee_generic(cs), fn_type(cs, tee_type, ptr_type(cs, tee_type)));
+  bool_type te_typeexpr = primitive_bool_type(cs);
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), tee_generic(cs), ptr_type(cs, tee_type));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), tee_generic(cs), ptr_type(cs, tee_type));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<"))), tee_generic(cs), ptr_type(cs, tee_type));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">"))), tee_generic(cs), ptr_type(cs, tee_type));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<="))), tee_generic(cs), ptr_type(cs, tee_type));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">="))), tee_generic(cs), ptr_type(cs, tee_type));
 }
 
 func add_pointer_primitive_type(cs *checkstate) void {
