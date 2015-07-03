@@ -906,6 +906,63 @@ func test_check_more_cases(ctx *check_ctx) void {
         "  return ret;\n"
         "}\n"));
 
+  run_check_test(ctx, "c111",
+    _u8("deftype foo struct {\n"
+        "  x i32;\n"
+        "  y u32;\n"
+        "};\n"
+        "func bar(x i32) foo {\n"
+        "  return quux({ x, 7 });\n"
+        "}\n"
+        "func quux(x foo) foo {\n"
+        "  return {99, ~x.x};\n"
+        "}\n"));
+  run_check_test(ctx, "c112",
+    _u8("deftype[T] foo struct { };\n"
+        "func[T, U] make(arr U) foo[T] {\n"
+        "  return {};\n"
+        "}\n"
+        "func zed(blah foo[i32]) bool { return true; }\n"
+        "func bar() bool {\n"
+        "  return zed(make(\"test\"));\n"
+        "}\n"));
+  run_check_test(ctx, "c113",
+    _u8("defenum ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p i32; q i32; };\n"
+        "};\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  if case c2(s struct { p i32; q i32; }) = x {\n"
+        "    return s.p + s.q;\n"
+        "  }\n"
+        "  return -1;\n"
+        "};\n"));
+  run_check_test(ctx, "c114",
+    _u8("defenum ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p i32; q i32; };\n"
+        "};\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  if case c2(s struct { p i32; q i32; }) = x {\n"
+        "    return s.p + s.q;\n"
+        "  } else {\n"
+        "    return -1;\n"
+        "  }\n"
+        "};\n"));
+  // Fails because pattern mismatch.
+  run_check_negtest(ctx, "c115",
+    _u8("defenum ty {\n"
+        "  c1 void;\n"
+        "  c2 struct { p i32; q i32; };\n"
+        "};\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  if case c2(s struct { p u32; q i32; }) = x {\n"
+        "    return s.p + s.q;\n"
+        "  } else {\n"
+        "    return -1;\n"
+        "  }\n"
+        "};\n"));
+
 }
 
 func test_check() bool {
