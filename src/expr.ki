@@ -952,19 +952,23 @@ func check_funcall_params_secondtime(es *exprscope, functype *cu_typeexpr, param
   return true;
 }
 
+func compute_prim(es *exprscope, t te_typeexpr) cu_typeexpr {
+  cac cac_typeexpr;
+  if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &t, &cac) {
+    ice(_u8("compute_prim encounters uncomputable type"));
+  }
+  check(cac.complete);
+  return ~cac.te;
+}
+
 func check_expr_index(es *exprscope, x *ast_expr, a *ast_index_expr, pt *te_typeexpr) bool {
   unknown te_typeexpr = TeUnknown(void);
   if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), &unknown) {
     return false;
   }
-  sizetype te_typeexpr = primitive_size_type(es->cs);
-  sizec cac_typeexpr;
-  if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &sizetype, &sizec) {
-    return false;
-  }
-  check(sizec.complete);
+  sizetype cu_typeexpr = compute_prim(es, primitive_size_type(es->cs));
 
-  if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), &sizec.te) {
+  if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), &sizetype.~) {
     return false;
   }
 

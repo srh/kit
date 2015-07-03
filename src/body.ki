@@ -218,8 +218,8 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
 
       exitnum statement_num = add_statement(bs, None());
       if case &Has(cond box[ast_expr]) = &b.condition {
-        boolean te_typeexpr = primitive_bool_type(bs->cs);
-        if !check_expr_ai(bs->es, AllowIncompleteNo(void), oo(&cond), &boolean) {
+        boolean cu_typeexpr = compute_prim(bs->es, primitive_bool_type(bs->cs));
+        if !check_expr_ai(bs->es, AllowIncompleteNo(void), oo(&cond), &boolean.~) {
           return false;
         }
         connect_statements(bs, loopnum, exitnum);
@@ -381,8 +381,8 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
 func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
   switch a {
     case &ExprCondition(b box[ast_expr]): {
-      booltype te_typeexpr = primitive_bool_type(es->cs);
-      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&b), &booltype) {
+      booltype cu_typeexpr = compute_prim(es, primitive_bool_type(es->cs));
+      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&b), &booltype.~) {
         return false;
       }
       return true;
