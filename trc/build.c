@@ -395,9 +395,6 @@ int loc_equal(struct loc a, struct loc b) {
 
 struct vardata {
   ident_value name_if_valid;
-  /* TODO: Probably we can just remove varnum, now that label/goto is
-  gone. */
-  struct varnum varnum;
 
   /* Variables bound when switching over a pointer-to-enum do not get
   destroyed when unwinding from a return statement. */
@@ -410,12 +407,10 @@ struct vardata {
 
 void vardata_init(struct vardata *vd,
                   ident_value name_if_valid,
-                  struct varnum varnum,
                   int destroy_when_unwound,
                   struct ast_typeexpr *concrete_type,
                   struct loc loc) {
   vd->name_if_valid = name_if_valid;
-  vd->varnum = varnum;
   vd->destroy_when_unwound = destroy_when_unwound;
   vd->concrete_type = concrete_type;
   vd->loc = loc;
@@ -454,9 +449,7 @@ struct reset_esp_data {
 };
 
 struct frame {
-  /* These are indexed by varnum values, and contain all the variables
-  declared within the function. */
-
+  /* Contains all the variables declared within the function. */
   struct vardata *vardata;
   size_t vardata_count;
   size_t vardata_limit;
@@ -651,11 +644,9 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
 
     struct loc loc = ebp_loc(size, padded_size, offset);
 
-    struct varnum varnum = ast_var_info_varnum(&expr->u.lambda.params[i].var_info);
-
     struct vardata vd;
     vardata_init(&vd, expr->u.lambda.params[i].name.value,
-                 varnum, 1, param_type, loc);
+                 1, param_type, loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
     vars_pushed = size_add(vars_pushed, 1);
@@ -4138,9 +4129,8 @@ int gen_swartch(struct checkstate *cs, struct objfile *f,
 
   {
     struct vardata vd;
-    struct varnum bogus_varnum = { SIZE_MAX };  /* TODO: Get rid of varnum. */
     vardata_init(&vd, IDENT_VALUE_INVALID,
-                 bogus_varnum, 1, swartch_type, swartch_loc);
+                 1, swartch_type, swartch_loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
   }
 
@@ -4171,9 +4161,8 @@ int gen_casebody(struct checkstate *cs, struct objfile *f,
                                           x86_sizeof(&cs->nt, var_type));
 
   struct vardata vd;
-  struct varnum varnum = ast_var_info_varnum(&constructor->decl.var_info);
   /* We don't destroy the variable -- the swartch gets push/popped instead. */
-  vardata_init(&vd, constructor->decl.name.value, varnum, 0, var_type, var_loc);
+  vardata_init(&vd, constructor->decl.name.value, 0, var_type, var_loc);
   SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
   if (!gen_bracebody(cs, f, h, body)) {
@@ -4331,9 +4320,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     }
 
     struct vardata vd;
-    struct varnum varnum = ast_var_info_varnum(&s->u.var_statement.decl.var_info);
     vardata_init(&vd, s->u.var_statement.decl.name.value,
-                 varnum, 1,
+                 1,
                  ast_var_statement_type(&s->u.var_statement),
                  var_loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);

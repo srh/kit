@@ -200,20 +200,13 @@ struct ast_typeexpr ast_unknown_garbage(void);
 struct ast_typeexpr ast_numeric_garbage(void);
 struct ast_typeexpr ast_strinit_garbage(size_t exprs_count);
 
-struct varnum {
-  size_t value;
-};
-
-/* TODO: This varnum info is unused (but should be used soon). */
 struct ast_var_info {
   int info_valid;
-  struct varnum varnum;
   struct ast_typeexpr concrete_type;
 };
 
-void ast_var_info_specify(struct ast_var_info *a, struct varnum varnum,
+void ast_var_info_specify(struct ast_var_info *a,
                           struct ast_typeexpr concrete_type);
-struct varnum ast_var_info_varnum(struct ast_var_info *a);
 struct ast_typeexpr *ast_var_info_type(struct ast_var_info *a);
 
 struct ast_vardecl {

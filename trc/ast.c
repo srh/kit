@@ -183,30 +183,22 @@ void ast_var_info_init(struct ast_var_info *a) {
 void ast_var_info_init_copy(struct ast_var_info *a, struct ast_var_info *c) {
   a->info_valid = c->info_valid;
   if (c->info_valid) {
-    a->varnum = c->varnum;
     ast_typeexpr_init_copy(&a->concrete_type, &c->concrete_type);
   }
 }
 
 void ast_var_info_destroy(struct ast_var_info *a) {
   if (a->info_valid) {
-    a->varnum.value = SIZE_MAX;
     ast_typeexpr_destroy(&a->concrete_type);
     a->info_valid = 0;
   }
 }
 
-void ast_var_info_specify(struct ast_var_info *a, struct varnum varnum,
+void ast_var_info_specify(struct ast_var_info *a,
                           struct ast_typeexpr concrete_type) {
   CHECK(!a->info_valid);
   a->info_valid = 1;
-  a->varnum = varnum;
   a->concrete_type = concrete_type;
-}
-
-struct varnum ast_var_info_varnum(struct ast_var_info *a) {
-  CHECK(a->info_valid);
-  return a->varnum;
 }
 
 struct ast_typeexpr *ast_var_info_type(struct ast_var_info *a) {

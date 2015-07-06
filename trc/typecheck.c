@@ -1808,21 +1808,7 @@ enum static_computation {
 
 struct varpair {
   struct ast_vardecl *decl;
-  struct varnum varnum;
 };
-
-struct var_by_varnum {
-  struct ast_typeexpr concrete_type;
-};
-
-void var_by_varnum_init(struct var_by_varnum *v,
-                        struct ast_typeexpr *concrete_type_copyee) {
-  ast_typeexpr_init_copy(&v->concrete_type, concrete_type_copyee);
-}
-
-void var_by_varnum_destroy(struct var_by_varnum *v) {
-  ast_typeexpr_destroy(&v->concrete_type);
-}
 
 struct exprscope {
   struct checkstate *cs;
@@ -1844,18 +1830,9 @@ struct exprscope {
   struct def_entry *entry_or_null;
 
   /* A stack of variables that are in scope. */
-  /* TODO: We could probably have a stack of varnums that are in scope
-  instead.  Edit: Or get rid of varnums?  They lost their luster when
-  we got rid of labels and gotos. */
   struct varpair *vars;
   size_t vars_count;
   size_t vars_limit;
-
-  size_t varnum_counter;
-
-  struct var_by_varnum *vars_by_varnum;
-  size_t vars_by_varnum_count;
-  size_t vars_by_varnum_limit;
 
   /* A counter for uniquely numbering temporaries. */
   size_t temp_counter;
@@ -1883,10 +1860,6 @@ void exprscope_init(struct exprscope *es,
   es->vars = NULL;
   es->vars_count = 0;
   es->vars_limit = 0;
-  es->varnum_counter = 0;
-  es->vars_by_varnum = NULL;
-  es->vars_by_varnum_count = 0;
-  es->vars_by_varnum_limit = 0;
   es->temp_counter = 0;
 }
 
@@ -1902,9 +1875,6 @@ void exprscope_destroy(struct exprscope *es) {
   es->vars = NULL;
   es->vars_count = 0;
   es->vars_limit = 0;
-  es->varnum_counter = 0;
-  SLICE_FREE(es->vars_by_varnum, es->vars_by_varnum_count, var_by_varnum_destroy);
-  es->vars_by_varnum_limit = 0;
   es->temp_counter = SIZE_MAX;
 }
 
@@ -1942,28 +1912,15 @@ int check_var_shadowing(struct exprscope *es, struct ast_ident *name) {
   return 1;
 }
 
-int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var,
-                       struct varnum *varnum_out) {
+int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var) {
   if (!check_var_shadowing(es, &var->name)) {
     return 0;
   }
 
-  struct varnum varnum;
-  varnum.value = es->varnum_counter;
-  es->varnum_counter = size_add(es->varnum_counter, 1);
-
-
   struct varpair pair;
   pair.decl = var;
-  pair.varnum = varnum;
   SLICE_PUSH(es->vars, es->vars_count, es->vars_limit, pair);
 
-  CHECK(varnum.value == es->vars_by_varnum_count);
-  struct var_by_varnum vbv;
-  var_by_varnum_init(&vbv, &var->type);
-  SLICE_PUSH(es->vars_by_varnum, es->vars_by_varnum_count, es->vars_by_varnum_limit, vbv);
-
-  *varnum_out = varnum;
   return 1;
 }
 
@@ -1971,7 +1928,6 @@ void exprscope_pop_var(struct exprscope *es) {
   CHECK(es->vars_count > 0);
   --es->vars_count;
   es->vars[es->vars_count].decl = NULL;
-  es->vars[es->vars_count].varnum.value = SIZE_MAX;
 }
 
 int help_unify_directionally(struct identmap *im,
@@ -2862,7 +2818,6 @@ int check_constructor(struct exprscope *es,
     return 0;
   }
 
-  struct varnum varnum;
   struct ast_vardecl *replaced_decl = NULL;
   {
     struct ast_typeexpr replaced_incomplete_type;
@@ -2888,7 +2843,7 @@ int check_constructor(struct exprscope *es,
                      replaced_decl_name, concrete_type_copy);
   }
 
-  if (!exprscope_push_var(es, replaced_decl, &varnum)) {
+  if (!exprscope_push_var(es, replaced_decl)) {
     free_ast_vardecl(&replaced_decl);
     return 0;
   }
@@ -2896,7 +2851,7 @@ int check_constructor(struct exprscope *es,
   struct ast_typeexpr concrete_type_copy;
   ast_typeexpr_init_copy(&concrete_type_copy,
                          &spec->concrete_enumspec.enumfields[constructor_num].type);
-  ast_var_info_specify(&constructor->decl.var_info, varnum, concrete_type_copy);
+  ast_var_info_specify(&constructor->decl.var_info, concrete_type_copy);
   ast_case_pattern_info_specify(&constructor->info, constructor_num);
 
   out->replaced_decl = replaced_decl;
@@ -3065,15 +3020,14 @@ int check_statement(struct bodystate *bs,
                        name, concrete_type_copy);
     }
 
-    struct varnum varnum;
-    if (!exprscope_push_var(bs->es, replaced_decl, &varnum)) {
+    if (!exprscope_push_var(bs->es, replaced_decl)) {
       free_ast_vardecl(&replaced_decl);
       ast_typeexpr_destroy(&concrete_type);
       goto fail;
     }
 
     vardecl_to_push = replaced_decl;
-    ast_var_info_specify(&s->u.var_statement.decl.var_info, varnum, concrete_type);
+    ast_var_info_specify(&s->u.var_statement.decl.var_info, concrete_type);
     fallthrough = FALLTHROUGH_FROMTHETOP;
   } break;
   case AST_STATEMENT_IFTHEN: {
@@ -3428,10 +3382,8 @@ int check_expr_lambda(struct exprscope *es,
                  es->accessible, es->accessible_count,
                  STATIC_COMPUTATION_NO, NULL);
 
-  struct varnum *varnums = malloc_mul(sizeof(*varnums), func_params_count);
-
   for (size_t i = 0; i < func_params_count; i++) {
-    int res = exprscope_push_var(&bb_es, &replaced_vardecls[i], &varnums[i]);
+    int res = exprscope_push_var(&bb_es, &replaced_vardecls[i]);
     /* Pushing the var should succeed, because we already called
     check_var_shadowing above. */
     CHECK(res);
@@ -3454,16 +3406,14 @@ int check_expr_lambda(struct exprscope *es,
   for (size_t i = 0, e = x->params_count; i < e; i++) {
     struct ast_typeexpr concrete_param_type;
     ast_typeexpr_init_copy(&concrete_param_type, &funcexpr.u.app.params[i]);
-    ast_var_info_specify(&x->params[i].var_info, varnums[i], concrete_param_type);
+    ast_var_info_specify(&x->params[i].var_info, concrete_param_type);
   }
-  free(varnums);
 
   *out = funcexpr;
   CHECK_DBG("check_expr_lambda succeeds\n");
   return 1;
 
  fail_bb_es:
-  free(varnums);
   exprscope_destroy(&bb_es);
   SLICE_FREE(replaced_vardecls, replaced_vardecls_size, ast_vardecl_destroy);
  fail_funcexpr:
