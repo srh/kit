@@ -4465,6 +4465,21 @@ int check_extern_def(struct checkstate *cs, struct ast_extern_def *a) {
   return ret;
 }
 
+int check_access_sanity(struct checkstate *cs, struct ast_access *a) {
+  /* Check that the type the access block refers to actually exists, and is a class. */
+  struct deftype_entry *ent;
+  if (!name_table_lookup_deftype(&cs->nt, a->name.value, a->arity, &ent)) {
+    METERR(cs, a->meta, "access block refers to non-existant type.%s", "\n");
+    return 0;
+  }
+  if (ent->is_primitive
+      || ent->deftype->disposition == AST_DEFTYPE_NOT_CLASS) {
+    METERR(cs, a->meta, "access block refers to non-class type.%s", "\n");
+    return 0;
+  }
+  return 1;
+}
+
 int check_toplevel_typewise(struct checkstate *cs, struct ast_toplevel *a);
 
 int check_toplevels_typewise(struct checkstate *cs,
@@ -4491,18 +4506,11 @@ int check_toplevel_typewise(struct checkstate *cs, struct ast_toplevel *a) {
   case AST_TOPLEVEL_DEFTYPE:
     return check_deftype(cs, lookup_deftype(&cs->nt, &a->u.deftype));
   case AST_TOPLEVEL_ACCESS: {
-    /* Check that the type the access block refers to actually exists, and is a class. */
-    struct deftype_entry *ent;
-    if (!name_table_lookup_deftype(&cs->nt, a->u.access.name.value, a->u.access.arity,
-                                   &ent)) {
-      METERR(cs, a->u.access.meta, "access block refers to non-existant type.%s", "\n");
+    if (!check_access_sanity(cs, &a->u.access)) {
       return 0;
     }
-    if (ent->is_primitive || ent->deftype->disposition == AST_DEFTYPE_NOT_CLASS) {
-      METERR(cs, a->u.access.meta, "access block refers to non-class type.%s", "\n");
-      return 0;
-    }
-    return check_toplevels_typewise(cs, a->u.access.toplevels, a->u.access.toplevels_count);
+    return check_toplevels_typewise(cs, a->u.access.toplevels,
+                                    a->u.access.toplevels_count);
   } break;
   default:
     UNREACHABLE();
@@ -4535,18 +4543,13 @@ int check_toplevel_defwise(struct checkstate *cs, struct ast_toplevel *a) {
     /* Do nothing, we're checking defs here. */
     return 1;
   case AST_TOPLEVEL_ACCESS: {
-    /* Check that the type the access block refers to actually exists, and is a class. */
-    struct deftype_entry *ent;
-    if (!name_table_lookup_deftype(&cs->nt, a->u.access.name.value, a->u.access.arity,
-                                   &ent)) {
-      METERR(cs, a->u.access.meta, "access block refers to non-existant type.%s", "\n");
+    /* This check is directly redundant because we call
+    check_toplevels_typewise first. */
+    if (!check_access_sanity(cs, &a->u.access)) {
       return 0;
     }
-    if (ent->is_primitive || ent->deftype->disposition == AST_DEFTYPE_NOT_CLASS) {
-      METERR(cs, a->u.access.meta, "access block refers to non-class type.%s", "\n");
-      return 0;
-    }
-    return check_toplevels_defwise(cs, a->u.access.toplevels, a->u.access.toplevels_count);
+    return check_toplevels_defwise(cs, a->u.access.toplevels,
+                                   a->u.access.toplevels_count);
   } break;
   default:
     UNREACHABLE();
