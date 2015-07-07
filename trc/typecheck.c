@@ -4465,28 +4465,29 @@ int check_extern_def(struct checkstate *cs, struct ast_extern_def *a) {
   return ret;
 }
 
-int check_toplevel(struct checkstate *cs, struct ast_toplevel *a);
+int check_toplevel_typewise(struct checkstate *cs, struct ast_toplevel *a);
 
-int check_toplevels(struct checkstate *cs,
-                    struct ast_toplevel *toplevels,
-                    size_t toplevels_count) {
+int check_toplevels_typewise(struct checkstate *cs,
+                             struct ast_toplevel *toplevels,
+                             size_t toplevels_count) {
   for (size_t i = 0; i < toplevels_count; i++) {
-    if (!check_toplevel(cs, &toplevels[i])) {
+    if (!check_toplevel_typewise(cs, &toplevels[i])) {
       return 0;
     }
   }
   return 1;
 }
 
-int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
+int check_toplevel_typewise(struct checkstate *cs, struct ast_toplevel *a) {
   switch (a->tag) {
   case AST_TOPLEVEL_IMPORT:
     /* We already parsed and loaded the import. */
     return 1;
   case AST_TOPLEVEL_DEF:
-    return check_def(cs, &a->u.def);
+    /* We're checking types here, see check_toplevel_defwise for defs. */
+    return 1;
   case AST_TOPLEVEL_EXTERN_DEF:
-    return check_extern_def(cs, &a->u.extern_def);
+    return 1;
   case AST_TOPLEVEL_DEFTYPE:
     return check_deftype(cs, lookup_deftype(&cs->nt, &a->u.deftype));
   case AST_TOPLEVEL_ACCESS: {
@@ -4501,7 +4502,51 @@ int check_toplevel(struct checkstate *cs, struct ast_toplevel *a) {
       METERR(cs, a->u.access.meta, "access block refers to non-class type.%s", "\n");
       return 0;
     }
-    return check_toplevels(cs, a->u.access.toplevels, a->u.access.toplevels_count);
+    return check_toplevels_typewise(cs, a->u.access.toplevels, a->u.access.toplevels_count);
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+int check_toplevel_defwise(struct checkstate *cs, struct ast_toplevel *a);
+
+int check_toplevels_defwise(struct checkstate *cs,
+                            struct ast_toplevel *toplevels,
+                            size_t toplevels_count) {
+  for (size_t i = 0; i < toplevels_count; i++) {
+    if (!check_toplevel_defwise(cs, &toplevels[i])) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+int check_toplevel_defwise(struct checkstate *cs, struct ast_toplevel *a) {
+  switch (a->tag) {
+  case AST_TOPLEVEL_IMPORT:
+    /* We already parsed and loaded the import. */
+    return 1;
+  case AST_TOPLEVEL_DEF:
+    return check_def(cs, &a->u.def);
+  case AST_TOPLEVEL_EXTERN_DEF:
+    return check_extern_def(cs, &a->u.extern_def);
+  case AST_TOPLEVEL_DEFTYPE:
+    /* Do nothing, we're checking defs here. */
+    return 1;
+  case AST_TOPLEVEL_ACCESS: {
+    /* Check that the type the access block refers to actually exists, and is a class. */
+    struct deftype_entry *ent;
+    if (!name_table_lookup_deftype(&cs->nt, a->u.access.name.value, a->u.access.arity,
+                                   &ent)) {
+      METERR(cs, a->u.access.meta, "access block refers to non-existant type.%s", "\n");
+      return 0;
+    }
+    if (ent->is_primitive || ent->deftype->disposition == AST_DEFTYPE_NOT_CLASS) {
+      METERR(cs, a->u.access.meta, "access block refers to non-class type.%s", "\n");
+      return 0;
+    }
+    return check_toplevels_defwise(cs, a->u.access.toplevels, a->u.access.toplevels_count);
   } break;
   default:
     UNREACHABLE();
@@ -5237,9 +5282,17 @@ int chase_modules_and_typecheck(struct checkstate *cs,
     goto fail;
   }
 
+  // We check types first so that we don't go checking their traits (in a def) before we've figured out the type's flatness.
   for (size_t i = 0, e = cs->imports_count; i < e; i++) {
     struct ast_file *file = cs->imports[i].file;
-    if (!check_toplevels(cs, file->toplevels, file->toplevels_count)) {
+    if (!check_toplevels_typewise(cs, file->toplevels, file->toplevels_count)) {
+      goto fail;
+    }
+  }
+
+  for (size_t i = 0, e = cs->imports_count; i < e; i++) {
+    struct ast_file *file = cs->imports[i].file;
+    if (!check_toplevels_defwise(cs, file->toplevels, file->toplevels_count)) {
       goto fail;
     }
   }
