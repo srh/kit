@@ -39,34 +39,10 @@ deftype platform_info struct {
   fntraits flat_traits;
 };
 
-deftype common_syms struct {
-  fnsym sym;
-  boolsym sym;
-  voidsym sym;
-  i8sym sym;
-  u8sym sym;
-  i16sym sym;
-  u16sym sym;
-  i32sym sym;
-  u32sym sym;
-  sizesym sym;
-  osizesym sym;
-  primitive_module_sym sym;
-  ptrtype_sym sym;
-  lengthsym sym;
-  tee_sym sym;
-  uee_sym sym;
-  derefsym sym;
-  addressofsym sym;
-  assignmentsym sym;
-  convertsym sym;
-};
-
 deftype checkstate struct {
   im *identmap;
   instantiation_depth u32;
   platform platform_info;
-  cym common_syms;
   loader_ctx *void;
   loader fn[*checkstate, sym, opt[array[u8]]];
 
@@ -90,34 +66,8 @@ func make_checkstate(im *identmap, platform platform_info, loader_ctx *void, loa
   ret.im = im;
   ret.instantiation_depth = 0;
   ret.platform = platform;
-  ret.cym = make_common_syms(im);
   ret.loader_ctx = loader_ctx;
   ret.loader = loader;
-  return ret;
-}
-
-func make_common_syms(im *identmap) common_syms {
-  ret common_syms;
-  ret.fnsym = intern(im, from_u8(_u8("fn")));
-  ret.boolsym = intern(im, from_u8(_u8("bool")));
-  ret.voidsym = intern(im, from_u8(_u8("void")));
-  ret.i8sym = intern(im, from_u8(_u8("i8")));
-  ret.u8sym = intern(im, from_u8(_u8("u8")));
-  ret.i16sym = intern(im, from_u8(_u8("i16")));
-  ret.u16sym = intern(im, from_u8(_u8("u16")));
-  ret.i32sym = intern(im, from_u8(_u8("i32")));
-  ret.u32sym = intern(im, from_u8(_u8("u32")));
-  ret.sizesym = intern(im, from_u8(_u8("size")));
-  ret.osizesym = intern(im, from_u8(_u8("osize")));
-  ret.primitive_module_sym = intern(im, from_u8(_u8("<primitive>")));
-  ret.ptrtype_sym = intern(im, from_u8(_u8("*")));
-  ret.lengthsym = intern(im, from_u8(_u8("length")));
-  ret.tee_sym = intern(im, from_u8(_u8("T")));
-  ret.uee_sym = intern(im, from_u8(_u8("U")));
-  ret.derefsym = intern(im, from_u8(_u8("*")));
-  ret.addressofsym = intern(im, from_u8(_u8("&")));
-  ret.assignmentsym = intern(im, from_u8(_u8("=")));
-  ret.convertsym = intern(im, from_u8(_u8("~")));
   return ret;
 }
 

@@ -35,7 +35,7 @@ func test_platform() platform_info {
 func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
   print(Stdout(), _u8("test "), _u8(name), _u8("..."));
   fflush(Stdout());
-  im identmap;
+  im identmap = make_im();
   cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
   add_primitives(&cs);
   if !check_module(&cs, intern(&im, testmodule_name())) {
@@ -51,7 +51,7 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
 func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
   print(Stdout(), _u8("test !"), _u8(name), _u8("..."));
   fflush(Stdout());
-  im identmap;
+  im identmap = make_im();
   cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
   add_primitives(&cs);
   if check_module(&cs, intern(&im, testmodule_name())) {

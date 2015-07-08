@@ -1,23 +1,23 @@
 import state;
 
 func primitive_bool_type(cs *checkstate) te_typeexpr {
-  return TeName({cs->cym.boolsym, None()});
+  return TeName({cs->im->cym.boolsym, None()});
 }
 
 func primitive_void_type(cs *checkstate) te_typeexpr {
-  return TeName({cs->cym.voidsym, None()});
+  return TeName({cs->im->cym.voidsym, None()});
 }
 
 func primitive_u8_type(cs *checkstate) te_typeexpr {
-  return TeName({cs->cym.u8sym, None()});
+  return TeName({cs->im->cym.u8sym, None()});
 }
 
 func primitive_i32_type(cs *checkstate) te_typeexpr {
-  return TeName({cs->cym.i32sym, None()});
+  return TeName({cs->im->cym.i32sym, None()});
 }
 
 func primitive_size_type(cs *checkstate) te_typeexpr {
-  return TeName({cs->cym.sizesym, None()});
+  return TeName({cs->im->cym.sizesym, None()});
 }
 
 func primitive_string_literal_type(cs *checkstate, n size) te_typeexpr {
@@ -25,11 +25,11 @@ func primitive_string_literal_type(cs *checkstate, n size) te_typeexpr {
 }
 
 func primitive_function_puretype(cs *checkstate) te_puretype {
-  return TePureName(cs->cym.fnsym);
+  return TePureName(cs->im->cym.fnsym);
 }
 
 func primitive_pointer_puretype(cs *checkstate) te_puretype {
-  return TePureName(cs->cym.ptrtype_sym);
+  return TePureName(cs->im->cym.ptrtype_sym);
 }
 
 func pointer_to(cs *checkstate, t te_typeexpr) te_typeexpr {
@@ -40,21 +40,21 @@ func pointer_to(cs *checkstate, t te_typeexpr) te_typeexpr {
 
 func add_conversion(cs *checkstate, from sym, to sym) void {
   type te_typeexpr = fn_type(cs, TeName({from, None()}), TeName({to, None()}));
-  add_def_primitive(cs, cs->cym.convertsym, type);
+  add_def_primitive(cs, cs->im->cym.convertsym, type);
 }
 
 func add_integral_primitives(cs *checkstate) void {
   // See also is_numeric_type.
-  add_integral_primitive(cs, cs->cym.i8sym, cs->platform.i8traits);
-  add_integral_primitive(cs, cs->cym.u8sym, cs->platform.u8traits);
-  add_integral_primitive(cs, cs->cym.i16sym, cs->platform.i16traits);
-  add_integral_primitive(cs, cs->cym.u16sym, cs->platform.u16traits);
-  add_integral_primitive(cs, cs->cym.i32sym, cs->platform.i32traits);
-  add_integral_primitive(cs, cs->cym.u32sym, cs->platform.u32traits);
-  add_integral_primitive(cs, cs->cym.sizesym, cs->platform.sizetraits);
-  add_integral_primitive(cs, cs->cym.osizesym, cs->platform.osizetraits);
+  add_integral_primitive(cs, cs->im->cym.i8sym, cs->platform.i8traits);
+  add_integral_primitive(cs, cs->im->cym.u8sym, cs->platform.u8traits);
+  add_integral_primitive(cs, cs->im->cym.i16sym, cs->platform.i16traits);
+  add_integral_primitive(cs, cs->im->cym.u16sym, cs->platform.u16traits);
+  add_integral_primitive(cs, cs->im->cym.i32sym, cs->platform.i32traits);
+  add_integral_primitive(cs, cs->im->cym.u32sym, cs->platform.u32traits);
+  add_integral_primitive(cs, cs->im->cym.sizesym, cs->platform.sizetraits);
+  add_integral_primitive(cs, cs->im->cym.osizesym, cs->platform.osizetraits);
 
-  names array[sym] = mk_array(cs->cym.i8sym, cs->cym.u8sym, cs->cym.i16sym, cs->cym.u16sym, cs->cym.i32sym, cs->cym.u32sym, cs->cym.sizesym, cs->cym.osizesym);
+  names array[sym] = mk_array(cs->im->cym.i8sym, cs->im->cym.u8sym, cs->im->cym.i16sym, cs->im->cym.u16sym, cs->im->cym.i32sym, cs->im->cym.u32sym, cs->im->cym.sizesym, cs->im->cym.osizesym);
   n size = count(&names);
   for i size = 0; i < n; i = i + 1 {
     for j size = 0; j < n; j = j + 1 {
@@ -74,21 +74,21 @@ func add_primitives(cs *checkstate) void {
 func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool {
   // TODO: This implementation should work on complete types, use proper scoping rules (once we get scoping rules).
   if case &TeName(a te_name) = pt {
-    if a.value == cs->cym.i8sym {
+    if a.value == cs->im->cym.i8sym {
       *out = cs->platform.i8traits.numeric;
-    } else if a.value == cs->cym.u8sym {
+    } else if a.value == cs->im->cym.u8sym {
       *out = cs->platform.u8traits.numeric;
-    } else if a.value == cs->cym.i16sym {
+    } else if a.value == cs->im->cym.i16sym {
       *out = cs->platform.i16traits.numeric;
-    } else if a.value == cs->cym.u16sym {
+    } else if a.value == cs->im->cym.u16sym {
       *out = cs->platform.u16traits.numeric;
-    } else if a.value == cs->cym.i32sym {
+    } else if a.value == cs->im->cym.i32sym {
       *out = cs->platform.i32traits.numeric;
-    } else if a.value == cs->cym.u32sym {
+    } else if a.value == cs->im->cym.u32sym {
       *out = cs->platform.u32traits.numeric;
-    } else if a.value == cs->cym.sizesym {
+    } else if a.value == cs->im->cym.sizesym {
       *out = cs->platform.sizetraits.numeric;
-    } else if a.value == cs->cym.osizesym {
+    } else if a.value == cs->im->cym.osizesym {
       *out = cs->platform.osizetraits.numeric;
     } else {
       return false;
@@ -101,7 +101,7 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool 
 func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_typeexpr) void {
   // access_scope is not relevant to a primitive def.
   access_scope array[access_entry_id];
-  ent def_entry = {cs->cym.primitive_module_sym, name, access_scope, generics, None(), Computed(type), default@[array[def_inst_id]]()};
+  ent def_entry = {cs->im->cym.primitive_module_sym, name, access_scope, generics, None(), Computed(type), default@[array[def_inst_id]]()};
   id def_entry_id = add_def_entry(cs, ent);
   // DBG(_u8("Added def with name '"), lookup(cs->im, name), _u8("', type = '"), to_u8str(cs->im, type), _u8("'"));
   // TODO: We probably want to put the id in some kind of "primitive" module.
@@ -135,7 +135,7 @@ func add_unop_primitive(cs *checkstate, oper sym, typename sym) void {
 
 func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) void {
   add_simple_primitive(cs, name, traits.flat);
-  // TODO: Put all uses of intern into cs->cym.
+  // TODO: Put all uses of intern into cs->im->cym.
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("+"))), name);
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("-"))), name);
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("*"))), name);
@@ -160,16 +160,16 @@ func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) vo
 }
 
 func add_void_primitive(cs *checkstate) void {
-  add_simple_primitive(cs, cs->cym.voidsym, cs->platform.voidtraits);
+  add_simple_primitive(cs, cs->im->cym.voidsym, cs->platform.voidtraits);
 }
 
 func add_bool_primitive(cs *checkstate) void {
-  add_simple_primitive(cs, cs->cym.boolsym, cs->platform.booltraits);
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("&&"))), cs->cym.boolsym);
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("||"))), cs->cym.boolsym);
-  add_unop_primitive(cs, intern(cs->im, from_u8(_u8("!"))), cs->cym.boolsym);
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), cs->cym.boolsym);
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), cs->cym.boolsym);
+  add_simple_primitive(cs, cs->im->cym.boolsym, cs->platform.booltraits);
+  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("&&"))), cs->im->cym.boolsym);
+  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("||"))), cs->im->cym.boolsym);
+  add_unop_primitive(cs, intern(cs->im, from_u8(_u8("!"))), cs->im->cym.boolsym);
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), cs->im->cym.boolsym);
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), cs->im->cym.boolsym);
 }
 
 func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) void {
@@ -192,13 +192,13 @@ func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
   push(&insts, inst_id);
   // access_scope is not relevant to a primitive deftype.
   access_scope array[access_entry_id];
-  ent deftype_entry = {cs->cym.primitive_module_sym, name, access_scope, RhsImpossible(void), NoGenerics(void), None(), info, insts};
+  ent deftype_entry = {cs->im->cym.primitive_module_sym, name, access_scope, RhsImpossible(void), NoGenerics(void), None(), info, insts};
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" module.
 }
 
 func tee_generic(cs *checkstate) ast_generics {
-  return HasGenerics(mk_array@[ast_ident]({fake_ast_meta(), cs->cym.tee_sym}));
+  return HasGenerics(mk_array@[ast_ident]({fake_ast_meta(), cs->im->cym.tee_sym}));
 }
 
 func fn_type(cs *checkstate, params array[te_typeexpr]) te_typeexpr {
@@ -219,7 +219,7 @@ func ptr_type(cs *checkstate, t te_typeexpr) te_typeexpr {
 
 func add_pointer_primitive(cs *checkstate) void {
   add_pointer_primitive_type(cs);
-  tee_type te_typeexpr = TeName({cs->cym.tee_sym, None()});
+  tee_type te_typeexpr = TeName({cs->im->cym.tee_sym, None()});
   bool_type te_typeexpr = primitive_bool_type(cs);
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), tee_generic(cs), ptr_type(cs, tee_type));
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), tee_generic(cs), ptr_type(cs, tee_type));
@@ -231,11 +231,11 @@ func add_pointer_primitive(cs *checkstate) void {
 
 func add_pointer_primitive_type(cs *checkstate) void {
   one_generic array[ast_ident];
-  push(&one_generic, {fake_ast_meta(), cs->cym.tee_sym});
+  push(&one_generic, {fake_ast_meta(), cs->im->cym.tee_sym});
   // It's as if pointers belong in an even _more_ primitive module than integer/bool types.
   ent deftype_entry = {
-    cs->cym.primitive_module_sym,
-    cs->cym.ptrtype_sym,
+    cs->im->cym.primitive_module_sym,
+    cs->im->cym.ptrtype_sym,
     default@[array[access_entry_id]](),
     RhsImpossible(void),
     HasGenerics(one_generic),
@@ -258,11 +258,11 @@ func add_pointer_primitive_type(cs *checkstate) void {
 func add_function_primitive(cs *checkstate) void {
   // Likewise as pointers, functions are kind of _more_ primitive than integer/bool types.
   ent deftype_entry = {
-    cs->cym.primitive_module_sym,
-    cs->cym.fnsym,
+    cs->im->cym.primitive_module_sym,
+    cs->im->cym.fnsym,
     default@[array[access_entry_id]](),
     RhsImpossible(void),
-    VariadicGenerics({default@[array[ast_ident]](), {fake_ast_meta(), cs->cym.tee_sym}, mk_array({fake_ast_meta(), cs->cym.uee_sym})}),
+    VariadicGenerics({default@[array[ast_ident]](), {fake_ast_meta(), cs->im->cym.tee_sym}, mk_array({fake_ast_meta(), cs->im->cym.uee_sym})}),
     None(),
     Has({None(),
          @[type_properties]{

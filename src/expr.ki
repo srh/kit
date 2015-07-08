@@ -574,7 +574,7 @@ func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *
 
 func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_expr) bool {
   // TODO: Cache type.
-  type ast_typeexpr = lambda_declared_type(&es->cs->cym, a);
+  type ast_typeexpr = lambda_declared_type(es->im, a);
   // TODO: Cache converted.
   converted te_typeexpr;
   if !convert_typeexpr(es->cs, &type, &converted) {
@@ -858,7 +858,7 @@ func help_lookup_name_field(es *exprscope, t *cu_typeexpr, fieldname *ast_ident,
       return lookup_field_from_list(es->cs, &a.fields, fieldname->value, fieldtype_out);
     }
     case &TeArraytype(a te_arraytype): {
-      if fieldname->value != es->cs->cym.lengthsym {
+      if fieldname->value != es->im->cym.lengthsym {
         ERR(_u8("field lookup (not .length) on array type"));
         return false;
       }

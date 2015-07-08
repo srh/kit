@@ -1492,7 +1492,7 @@ func showu8(x size) array[u8] {
 }
 
 func see_if_parse(file array[u8]) bool {
-  im identmap;
+  im identmap = make_im();
   p ps = make_ps(&im, data(&file), count(&file));
   out ast_file;
   ret bool = parse_file(&p, &out);

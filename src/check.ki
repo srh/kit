@@ -1008,24 +1008,24 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
   }
 }
 
-func lambda_declared_type(cym *common_syms, a *ast_lambda) ast_typeexpr {
+func lambda_declared_type(im *identmap, a *ast_lambda) ast_typeexpr {
   type_params array[ast_typeexpr];
   n size = count(&a->args);
   for i size = 0; i < n; i = i + 1 {
     push(&type_params, ref(&a->args, i)->type);
   }
   push(&type_params, a->return_type);
-  return App({embox(Name({fake_ast_meta(), cym->fnsym})), type_params});
+  return App({embox(Name({fake_ast_meta(), im->cym.fnsym})), type_params});
 }
 
-func quick_typeexpr(cym *common_syms, a *ast_def, out *ast_typeexpr) bool {
+func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) bool {
   if case &Has(s ast_typeexpr) = &a->syntactic_typeexpr {
     *out = s;
     return true;
   } else {
     switch &a->rhs.u {
       case &Lambda(b ast_lambda): {
-        *out = lambda_declared_type(cym, &b);
+        *out = lambda_declared_type(im, &b);
         return true;
       }
       default: {
@@ -1221,7 +1221,7 @@ func process_toplevels(cs *checkstate,
       }
       case &Def(a ast_def): {
         quick_te ast_typeexpr;
-        if !quick_typeexpr(&cs->cym, &a, &quick_te) {
+        if !quick_typeexpr(cs->im, &a, &quick_te) {
           return false;
         }
         if !check_generics_unique(cs, &a.generics) {
