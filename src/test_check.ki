@@ -1130,6 +1130,11 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
   // Fails because of duplicate generics.
   run_check_negtest(ctx, "c129-c",
     _u8("deftype[T, T] ty i32;\n"));
+  // Fails because fn type has variadic after-arity of 1.
+  run_check_negtest(ctx, "c130-a",
+    _u8("deftype foo fn[];\n"));
+  run_check_test(ctx, "c130-b",
+    _u8("deftype foo fn[void];\n"));
 }
 
 
