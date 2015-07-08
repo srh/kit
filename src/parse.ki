@@ -790,8 +790,13 @@ func oper_arr(tv tokval) array[i32] {
 }
 
 func build_binop_expr(im *identmap, op ast_ident, lhs ast_expr, rhs ast_expr) ast_expr {
-  return mk(Funcall({embox(mk(NameExpr({op, None()}))),
-                     mk_array(lhs, rhs)}));
+  // TODO: Put this "=" sym pre-interned somewhere.
+  if op.value == intern(im, from_u8(_u8("="))) {
+    return mk(Assignment({embox(lhs), embox(rhs)}));
+  } else {
+    return mk(Funcall({embox(mk(NameExpr({op, None()}))),
+                       mk_array(lhs, rhs)}));
+  }
 }
 
 func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) bool {

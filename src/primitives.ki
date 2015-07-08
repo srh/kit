@@ -69,7 +69,6 @@ func add_primitives(cs *checkstate) void {
   add_bool_primitive(cs);
   add_pointer_primitive(cs);
   add_function_primitive(cs);
-  add_assignment_primitive(cs);
 }
 
 func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool {
@@ -280,11 +279,4 @@ func add_function_primitive(cs *checkstate) void {
   };
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.
-}
-
-// TODO: People should not be able to define their own "assignment functions."
-
-// TODO: This is wrong.  The lhs should be type-checked on its own, and then the rhs should be typechecked with the lhs's type as the partial type.  (There should be no contamination from the rhs when we typecheck the lhs type -- the object we're assigning to should be crystal clear, looking at the lhs without context.)
-func add_assignment_primitive(cs *checkstate) void {
-  add_def_primitive(cs, cs->cym.assignmentsym, tee_generic(cs), fn_type(cs, repeat(3, TeName({cs->cym.tee_sym, None()}))));
 }

@@ -68,6 +68,11 @@ deftype ast_funcall struct {
   params array[ast_expr];
 };
 
+deftype ast_assignment struct {
+  lhs box[ast_expr];
+  rhs box[ast_expr];
+};
+
 deftype ast_typeapp struct {
   typefunc box[ast_typeexpr];
   params array[ast_typeexpr];
@@ -282,6 +287,7 @@ defenum ast_expr_enum {
   CharLiteral ast_char_literal;
   StringLiteral ast_string_literal;
   Funcall ast_funcall;
+  Assignment ast_assignment;
   IndexExpr ast_index_expr;
   Lambda ast_lambda;
   LocalField ast_local_field;
