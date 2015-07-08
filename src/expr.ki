@@ -385,18 +385,13 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
 
     case &StringLiteral(a ast_string_literal): {
       // TODO: At some point we'll want string literals to be more compile-time-magical.  Right now they're of type [N]u8.  And we really want [N]<numeric>?
-      type te_typeexpr = primitive_string_literal_type(es->cs, count(&a.charspecs));
+      type cu_typeexpr = compute_prim(es, primitive_string_literal_type(es->cs, count(&a.charspecs)));
       unified te_typeexpr;
-      if !unify_types(pt, &type, &unified) {
+      if !unify_types(pt, &type.~, &unified) {
         ERR(_u8("string literal in bad place"));
         return false;
       }
-      c cac_typeexpr;
-      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &type, &c) {
-        ice(_u8("primitive_string_literal_type not computed"));
-      }
-      check(c.complete);
-      annotate_info(x, CompleteCheck(~c.te));
+      annotate_info(x, CompleteCheck(type));
       return true;
     }
     case &Funcall(a ast_funcall): {
@@ -825,15 +820,7 @@ func help_lookup_name_field(es *exprscope, t *cu_typeexpr, fieldname *ast_ident,
         ERR(_u8("field lookup (not .length) on array type"));
         return false;
       }
-      sizetype te_typeexpr = primitive_size_type(es->cs);
-      c cac_typeexpr;
-      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &sizetype, &c) {
-        ice(_u8("primitive_size_type failed check"));
-      }
-      if !c.complete {
-        ice(_u8("primitive_size_type was incomplete"));
-      }
-      *fieldtype_out = ~ c.te;
+      *fieldtype_out = compute_prim(es, primitive_size_type(es->cs));
       return true;
     }
     case &TeUnknown(v void): {
