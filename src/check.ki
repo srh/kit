@@ -699,9 +699,9 @@ func[T] help_arity_matches(a *ast_generics, params opt[*array[T]]) bool {
         return n == @[u32]~count(p);
       }
     }
-    case VariadicArity(n u32): {
+    case VariadicArity(ar variadic_arity): {
       if case Has(p) = params {
-        return n <= @[u32]~count(p);
+        return ar.before + ar.after <= @[u32]~count(p);
       }
     }
   }

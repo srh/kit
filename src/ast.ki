@@ -295,8 +295,9 @@ func mk(x ast_expr_enum) ast_expr {
 }
 
 deftype ast_variadic_generics struct {
-  names array[ast_ident];
+  before array[ast_ident];
   variadic_name ast_ident;
+  after array[ast_ident];
 };
 
 defenum ast_generics {

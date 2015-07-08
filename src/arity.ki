@@ -1,10 +1,17 @@
 import ast;
 
+deftype variadic_arity struct {
+  // The variadic param can go "in the middle," so with n varargs, it looks like
+  // foo[a_1, ..., a_before, vararg_1, ..., vararg_n, b_1, ..., b_after].
+  before u32;
+  after u32;
+};
+
 defenum generics_arity {
   NoParamsArity void;
   FiniteArity u32;
   // The number's the minimal arity, variadics always go at the end.
-  VariadicArity u32;
+  VariadicArity variadic_arity;
 };
 
 func arity(a *ast_generics) generics_arity {
@@ -14,7 +21,7 @@ func arity(a *ast_generics) generics_arity {
       return FiniteArity(~count(&arr));
     }
     case &VariadicGenerics(b ast_variadic_generics): {
-      return VariadicArity(~count(&b.names));
+      return VariadicArity({~count(&b.before), ~count(&b.after)});
     }
   }
 }
@@ -29,9 +36,11 @@ func build_u8str(r *array[u8], a *generics_arity) void {
       build_u8str(r, &n);
       push(r, ')');
     }
-    case &VariadicArity(n u32): {
-      append(r, _u8("VariadicArity("));
-      build_u8str(r, &n);
+    case &VariadicArity(ar variadic_arity): {
+      append(r, _u8("VariadicArity(before: "));
+      build_u8str(r, &ar.before);
+      append(r, _u8(", after: "));
+      build_u8str(r, &ar.after);
       push(r, ')');
     }
   }

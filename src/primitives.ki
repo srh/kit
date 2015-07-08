@@ -265,7 +265,7 @@ func add_function_primitive(cs *checkstate) void {
     cs->cym.fnsym,
     default@[array[access_entry_id]](),
     RhsImpossible(void),
-    VariadicGenerics({default@[array[ast_ident]](), {fake_ast_meta(), cs->cym.tee_sym}}),
+    VariadicGenerics({default@[array[ast_ident]](), {fake_ast_meta(), cs->cym.tee_sym}, default@[array[ast_ident]]()}),
     None(),
     Has({None(),
          @[type_properties]{
