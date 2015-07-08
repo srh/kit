@@ -321,11 +321,11 @@ func mk(module_name sym, name sym, accessible array[access_entry_id], accessibil
 
 deftype access_entry struct {
   name sym;
-  arity generics_arity;
+  arity ast_access_arity;
   ent_id nbfc[deftype_entry_id];
 };
 
-func mk(name sym, arity generics_arity) access_entry {
+func mk(name sym, arity ast_access_arity) access_entry {
   return {name, arity, NotComputed()};
 }
 

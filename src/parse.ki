@@ -254,9 +254,9 @@ func parse_rest_of_access(p *ps, out *ast_toplevel) bool {
   if !parse_ident(p, &name) {
     return Fail;
   }
-  arity generics_arity;
+  arity ast_access_arity;
   if !try_skip_token(p, Grouper(LBracket(void))) {
-    arity = NoParamsArity(void);
+    arity = AccessArityNone(void);
   } else {
     counter u32 = 0;
     done bool = false;
@@ -275,7 +275,7 @@ func parse_rest_of_access(p *ps, out *ast_toplevel) bool {
         counter = counter + 1;
       }
     }
-    arity = FiniteArity(counter);
+    arity = AccessArityFinite(counter);
   }
 
   toplevels array[ast_toplevel];

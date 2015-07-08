@@ -355,9 +355,14 @@ deftype ast_type_def struct {
   rhs ast_type_def_rhs;
 };
 
+defenum ast_access_arity {
+  AccessArityNone void;
+  AccessArityFinite u32;
+};
+
 deftype ast_access struct {
   name ast_ident;
-  arity generics_arity;
+  arity ast_access_arity;
   toplevels array[ast_toplevel];
 };
 
