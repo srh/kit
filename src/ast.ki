@@ -73,6 +73,10 @@ deftype ast_assignment struct {
   rhs box[ast_expr];
 };
 
+deftype ast_addressof struct {
+  rhs box[ast_expr];
+};
+
 deftype ast_typeapp struct {
   typefunc box[ast_typeexpr];
   params array[ast_typeexpr];
@@ -288,6 +292,7 @@ defenum ast_expr_enum {
   StringLiteral ast_string_literal;
   Funcall ast_funcall;
   Assignment ast_assignment;
+  AddressOf ast_addressof;
   IndexExpr ast_index_expr;
   Lambda ast_lambda;
   LocalField ast_local_field;

@@ -409,6 +409,29 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       annotate_info(x, CompleteCheck(*lhs_type));
       return true;
     }
+    case &AddressOf(a ast_addressof): {
+      ptr_unknown te_typeexpr = pointer_to(es->cs, TeUnknown(void));
+      unif_pt te_typeexpr;
+      if !unify_types(pt, &ptr_unknown, &unif_pt) {
+        ERR(_u8("AddressOf expr in non-pointer context"));
+      }
+      param *te_typeexpr;
+      if !decompose_typeapp(&unif_pt, primitive_pointer_puretype(es->cs), &param) {
+        ice(_u8("AddressOf sees non-pointer after unifying with pointer."));
+      }
+      // We require complete matching, because, meh, the rhs should be some crystal clear lvalue anyway.
+      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), param) {
+        return false;
+      }
+      ptr_type te_typeexpr = pointer_to(es->cs, expr_complete_type(oo(&a.rhs))->~);
+      ptr_computed cac_typeexpr;
+      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_type, &ptr_computed) {
+        return false;
+      }
+      check(ptr_computed.complete);
+      annotate_info(x, CompleteCheck(~ptr_computed.te));
+      return true;
+    }
     case &IndexExpr(a ast_index_expr): {
       return check_expr_index(es, x, &a, pt);
     }

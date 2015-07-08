@@ -221,7 +221,6 @@ func add_pointer_primitive(cs *checkstate) void {
   add_pointer_primitive_type(cs);
   tee_type te_typeexpr = TeName({cs->cym.tee_sym, None()});
   add_def_primitive(cs, cs->cym.derefsym, tee_generic(cs), fn_type(cs, ptr_type(cs, tee_type), tee_type));
-  add_def_primitive(cs, cs->cym.addressofsym, tee_generic(cs), fn_type(cs, tee_type, ptr_type(cs, tee_type)));
   bool_type te_typeexpr = primitive_bool_type(cs);
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), tee_generic(cs), ptr_type(cs, tee_type));
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), tee_generic(cs), ptr_type(cs, tee_type));
