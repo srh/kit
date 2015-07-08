@@ -790,9 +790,11 @@ func oper_arr(tv tokval) array[i32] {
 }
 
 func build_unop_expr(im *identmap, op ast_ident, rhs ast_expr) ast_expr {
-  // TODO: Put this "&" sym pre-interned somewhere.
+  // TODO: Put these "&" and "*" syms pre-interned somewhere.
   if op.value == intern(im, from_u8(_u8("&"))) {
     return mk(AddressOf({embox(rhs)}));
+  } else if op.value == intern(im, from_u8(_u8("*"))) {
+    return mk(Deref({embox(rhs)}));
   } else {
     return mk(Funcall({embox(mk(NameExpr({op, None()}))), mk_array(rhs)}));
   }

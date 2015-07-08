@@ -432,6 +432,25 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       annotate_info(x, CompleteCheck(~ptr_computed.te));
       return true;
     }
+    case &Deref(a ast_deref): {
+      // TODO: Shouldn't have to do this traversal.  Make pt carry such flags.
+      pt_cc bool = is_complete_computed(pt).computed;
+      ptr_pt te_typeexpr = pointer_to(es->cs, *pt);
+      ptr_cac cac_typeexpr;
+      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_pt, &ptr_cac) {
+        return false;
+      }
+      // Seems like no point to allowing an incomplete rhs.
+      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &ptr_cac.te) {
+        return false;
+      }
+      param *te_typeexpr;
+      if !decompose_typeapp(&expr_complete_type(oo(&a.rhs))->~, primitive_pointer_puretype(es->cs), &param) {
+        ice(_u8("Deref sees rhs type being non-pointer."));
+      }
+      annotate_info(x, CompleteCheck(~ *param));
+      return true;
+    }
     case &IndexExpr(a ast_index_expr): {
       return check_expr_index(es, x, &a, pt);
     }
