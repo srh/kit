@@ -465,8 +465,7 @@ func success_or_fail(res bool) triparse_result {
 func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_result {
   voidmeta ast_meta;
   if case Has(m ast_meta) = try_parse_token(p, Keyw(Void(void))) {
-    // TODO: Put this "void" sym pre-interned somewhere.
-    *out = Name({m, intern(p->im, from_u8(_u8("void")))});
+    *out = Name({m, p->im->cym.voidsym});
     return Success(void);
   }
   if try_skip_token(p, Keyw(Struct(void))) {
@@ -790,10 +789,9 @@ func oper_arr(tv tokval) array[i32] {
 }
 
 func build_unop_expr(im *identmap, op ast_ident, rhs ast_expr) ast_expr {
-  // TODO: Put these "&" and "*" syms pre-interned somewhere.
-  if op.value == intern(im, from_u8(_u8("&"))) {
+  if op.value == im->cym.addressofsym {
     return mk(AddressOf({embox(rhs)}));
-  } else if op.value == intern(im, from_u8(_u8("*"))) {
+  } else if op.value == im->cym.derefsym {
     return mk(Deref({embox(rhs)}));
   } else {
     return mk(Funcall({embox(mk(NameExpr({op, None()}))), mk_array(rhs)}));
@@ -801,8 +799,7 @@ func build_unop_expr(im *identmap, op ast_ident, rhs ast_expr) ast_expr {
 }
 
 func build_binop_expr(im *identmap, op ast_ident, lhs ast_expr, rhs ast_expr) ast_expr {
-  // TODO: Put this "=" sym pre-interned somewhere.
-  if op.value == intern(im, from_u8(_u8("="))) {
+  if op.value == im->cym.assignmentsym {
     return mk(Assignment({embox(lhs), embox(rhs)}));
   } else {
     return mk(Funcall({embox(mk(NameExpr({op, None()}))),
