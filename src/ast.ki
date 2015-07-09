@@ -255,9 +255,20 @@ deftype ast_strinit struct {
   exprs array[ast_expr];
 };
 
+defenum is_lval {
+  IsLvalNo void;
+  IsLvalYes void;
+};
+
 deftype ast_expr_complete_info struct {
+  lval is_lval;
   cu cu_typeexpr;
 };
+
+// TODO: Remove.
+func mk(cu cu_typeexpr) ast_expr_complete_info {
+  return {IsLvalNo(void), cu};
+}
 
 defenum ast_expr_info {
   NoInfo void;
