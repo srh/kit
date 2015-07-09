@@ -255,10 +255,14 @@ deftype ast_strinit struct {
   exprs array[ast_expr];
 };
 
+deftype ast_expr_complete_info struct {
+  cu cu_typeexpr;
+};
+
 defenum ast_expr_info {
   NoInfo void;
   IncompleteCheck te_typeexpr;
-  CompleteCheck cu_typeexpr;
+  CompleteCheck ast_expr_complete_info;
 };
 
 deftype ast_expr struct {
@@ -268,12 +272,12 @@ deftype ast_expr struct {
 
 func annotate_info(a *ast_expr, info ast_expr_info) void {
   switch &a->info {
-    case &CompleteCheck(t cu_typeexpr): {
+    case &CompleteCheck(t ast_expr_complete_info): {
       ice(_u8("expr already completely annotated"));
     }
     case &IncompleteCheck(pt te_typeexpr): {
       switch &info {
-        case &CompleteCheck(t cu_typeexpr): { /* Do nothing. */ }
+        case &CompleteCheck(t ast_expr_complete_info): { /* Do nothing. */ }
         default: {
           ice(_u8("expr already incompletely annotated"));
         }

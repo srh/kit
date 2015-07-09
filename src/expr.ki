@@ -297,7 +297,7 @@ func help_check_simple_literal(es *exprscope, pt *te_typeexpr, type te_typeexpr,
     }
     check(c.complete);
 
-    annotate_info(x, CompleteCheck(~c.te));
+    annotate_info(x, CompleteCheck({~c.te}));
   } else {
     annotate_info(x, IncompleteCheck(type));
   }
@@ -306,7 +306,7 @@ func help_check_simple_literal(es *exprscope, pt *te_typeexpr, type te_typeexpr,
 
 // TODO: Maybe pt should be of some "computed or incomplete" type.
 func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
-  if case &CompleteCheck(t cu_typeexpr) = &x->info {
+  if case &CompleteCheck(t ast_expr_complete_info) = &x->info {
     return true;
   }
 
@@ -336,7 +336,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
           }
         }
         case &OneEnumConstructorMatch(ci constructor_info): {
-          annotate_info(x, CompleteCheck(ci.type));
+          annotate_info(x, CompleteCheck({ci.type}));
           return true;
         }
         case &OneGlobalMatch(gi global_info): {
@@ -344,12 +344,12 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
             return false;
           }
           inst *def_inst = ref_inst(es->cs, gi.inst);
-          annotate_info(x, CompleteCheck(inst->computed_type));
+          annotate_info(x, CompleteCheck({inst->computed_type}));
           return true;
         }
         case &OneLocalMatch(v local_info): {
           vi *var_info = ref_var(es, v.varnum);
-          annotate_info(x, CompleteCheck(vi->type));
+          annotate_info(x, CompleteCheck({vi->type}));
           return true;
         }
       }
@@ -391,7 +391,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         ERR(_u8("string literal in bad place"));
         return false;
       }
-      annotate_info(x, CompleteCheck(type));
+      annotate_info(x, CompleteCheck({type}));
       return true;
     }
     case &Funcall(a ast_funcall): {
@@ -406,7 +406,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &lhs_type->~) {
         return false;
       }
-      annotate_info(x, CompleteCheck(*lhs_type));
+      annotate_info(x, CompleteCheck({*lhs_type}));
       return true;
     }
     case &AddressOf(a ast_addressof): {
@@ -429,7 +429,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         return false;
       }
       check(ptr_computed.complete);
-      annotate_info(x, CompleteCheck(~ptr_computed.te));
+      annotate_info(x, CompleteCheck({~ptr_computed.te}));
       return true;
     }
     case &Deref(a ast_deref): {
@@ -448,7 +448,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !decompose_typeapp(&expr_complete_type(oo(&a.rhs))->~, primitive_pointer_puretype(es->cs), &param) {
         ice(_u8("Deref sees rhs type being non-pointer."));
       }
-      annotate_info(x, CompleteCheck(~ *param));
+      annotate_info(x, CompleteCheck({~ *param}));
       return true;
     }
     case &IndexExpr(a ast_index_expr): {
@@ -467,7 +467,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_field(es, type, &a.fieldname, pt, &fieldtype) {
         return false;
       }
-      annotate_info(x, CompleteCheck(fieldtype));
+      annotate_info(x, CompleteCheck({fieldtype}));
       return true;
     }
     case &DerefField(a ast_deref_field): {
@@ -487,7 +487,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_field(es, &cu_param, &a.fieldname, pt, &fieldtype) {
         return false;
       }
-      annotate_info(x, CompleteCheck(fieldtype));
+      annotate_info(x, CompleteCheck({fieldtype}));
       return true;
     }
     case &TypedExpr(a ast_typed_expr): {
@@ -564,7 +564,7 @@ func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *
     }
 
     // We checked is_computed(pt).
-    annotate_info(x, CompleteCheck(~ *pt));
+    annotate_info(x, CompleteCheck({~ *pt}));
     return true;
   } else {
     ERR(_u8("Structure literal used on non-struct type."));
@@ -619,7 +619,7 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
     return false;
   }
 
-  annotate_info(x, CompleteCheck(~computed.te));
+  annotate_info(x, CompleteCheck({~computed.te}));
   return true;
 }
 
@@ -656,7 +656,7 @@ func check_numeric_literal(cs *checkstate, ai allow_incomplete, pt *te_typeexpr,
   }
   // It's a pt, and it's a numeric type, which means it must be a complete pt, which means it's computed.
   check(is_complete_computed(pt).computed);
-  annotate_info(x, CompleteCheck(~ *pt));
+  annotate_info(x, CompleteCheck({~ *pt}));
   return true;
 }
 
@@ -953,7 +953,7 @@ func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_
   }
 
   return_type *te_typeexpr = fn_return_type(&expr_complete_type(oo(&a->fun))->~);
-  annotate_info(x, CompleteCheck(~ *return_type));
+  annotate_info(x, CompleteCheck({~ *return_type}));
   return true;
 }
 
@@ -1025,7 +1025,7 @@ func check_expr_index(es *exprscope, x *ast_expr, a *ast_index_expr, pt *te_type
     return false;
   }
 
-  annotate_info(x, CompleteCheck(~ *ixtype));
+  annotate_info(x, CompleteCheck({~ *ixtype}));
   return true;
 }
 
@@ -1057,15 +1057,15 @@ func expr_type(a *ast_expr) te_typeexpr {
     case &IncompleteCheck(t te_typeexpr): {
       return t;
     }
-    case &CompleteCheck(t cu_typeexpr): {
-      return t.~;
+    case &CompleteCheck(t ast_expr_complete_info): {
+      return t.cu.~;
     }
   }
 }
 
 func expr_complete_type(a *ast_expr) *cu_typeexpr {
-  if case &CompleteCheck(t cu_typeexpr) = &a->info {
-    return &t;
+  if case &CompleteCheck(t ast_expr_complete_info) = &a->info {
+    return &t.cu;
   } else {
     ice(_u8("expr_complete_type sees... not a complete type"));
     return fake();
@@ -1079,7 +1079,7 @@ func expr_type_complete(a *ast_expr) bool {
       return fake();
     }
     case &IncompleteCheck(t te_typeexpr): { return false; }
-    case &CompleteCheck(t cu_typeexpr): { return true; }
+    case &CompleteCheck(t ast_expr_complete_info): { return true; }
   }
 }
 
