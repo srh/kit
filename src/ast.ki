@@ -260,6 +260,10 @@ defenum is_lval {
   IsLvalYes void;
 };
 
+func `==`(x is_lval, y is_lval) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+
 deftype ast_expr_complete_info struct {
   lval is_lval;
   cu cu_typeexpr;

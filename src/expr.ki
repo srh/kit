@@ -402,11 +402,16 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), pt) {
         return false;
       }
-      lhs_type *cu_typeexpr = expr_complete_type(oo(&a.lhs));
-      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &lhs_type->~) {
+      lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a.lhs));
+      if lhs_info->lval == IsLvalNo(void) {
+        ERR(_u8("Assigning to non-lvalue"));
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(IsLvalYes(void), *lhs_type)));
+      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &lhs_info->cu.~) {
+        return false;
+      }
+      // TODO: Assignment should be a statement or be a non-assignable lvalue or just return void.
+      annotate_info(x, CompleteCheck(*lhs_info));
       return true;
     }
     case &AddressOf(a ast_addressof): {
@@ -423,7 +428,13 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), param) {
         return false;
       }
-      ptr_type te_typeexpr = pointer_to(es->cs, expr_complete_type(oo(&a.rhs))->~);
+      rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a.rhs));
+      if rhs_info->lval == IsLvalNo(void) {
+        ERR(_u8("Taking address of a non-lvalue"));
+        return false;
+      }
+
+      ptr_type te_typeexpr = pointer_to(es->cs, rhs_info->cu.~);
       ptr_computed cac_typeexpr;
       if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_type, &ptr_computed) {
         return false;
