@@ -265,9 +265,8 @@ deftype ast_expr_complete_info struct {
   cu cu_typeexpr;
 };
 
-// TODO: Remove.
-func mk(cu cu_typeexpr) ast_expr_complete_info {
-  return {IsLvalNo(void), cu};
+func mk(lval is_lval, cu cu_typeexpr) ast_expr_complete_info {
+  return {lval, cu};
 }
 
 defenum ast_expr_info {
