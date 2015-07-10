@@ -608,22 +608,17 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
     return true;
   }
 
-  matching_deftype opt[deftype_entry_id];
-  if !match_deftype(cs, a->value, None(), &matching_deftype) {
+  id deftype_entry_id;
+  if !match_deftype(cs, a->value, None(), &id) {
     dbgcheck(_u8("match_deftype failed"));
     // An error happened when looking up a deftype (multiple matches?).
     return false;
   }
 
-  if case Has(id) = matching_deftype {
-    np cu_genparms = NoParms(void);
-    inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &np);
-    *computed_out = ~TeName({a->value, Has({id, inst_id})});
-    return true;
-  } else {
-    ERR(_u8("type name has no match "), lookup(cs->im, a->value));
-    return false;
-  }
+  np cu_genparms = NoParms(void);
+  inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &np);
+  *computed_out = ~TeName({a->value, Has({id, inst_id})});
+  return true;
 }
 
 func check_and_compute_typeexpr_array(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, t *array[te_typeexpr], computed_out *array[te_typeexpr], computed_complete_out *bool) bool {
@@ -652,25 +647,20 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
 
   switch oo(&a->typefunc) {
     case &TePureName(value sym): {
-      matching_deftype opt[deftype_entry_id];
-      if !match_deftype(cs, value, Has(&params), &matching_deftype) {
+      id deftype_entry_id;
+      if !match_deftype(cs, value, Has(&params), &id) {
         return false;
       }
 
-      if case Has(id) = matching_deftype {
-        if params_complete {
-          cu_params array[cu_typeexpr] = mapconvert(params);
-          hp cu_genparms = HasParms(cu_params);
-          inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
-          *out = {true, TeApp({embox(TePureName(value)), params, Has({id, inst_id})})};
-        } else {
-          *out = {false, TeApp({embox(TePureName(value)), params, None()})};
-        }
-        return true;
+      if params_complete {
+        cu_params array[cu_typeexpr] = mapconvert(params);
+        hp cu_genparms = HasParms(cu_params);
+        inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
+        *out = {true, TeApp({embox(TePureName(value)), params, Has({id, inst_id})})};
       } else {
-        ERR(_u8("type name/params has no match "), lookup(cs->im, value));
-        return false;
+        *out = {false, TeApp({embox(TePureName(value)), params, None()})};
       }
+      return true;
     }
     case &TePureUnknown(v void): {
       *out = {false, TeApp({embox(TePureUnknown(void)), params, None()})};
@@ -728,8 +718,7 @@ func ERR_no_match(im *identmap, name sym, params opt[*array[te_typeexpr]]) void 
   ERR(_u8("No match for type with name '"), lookup(im, name), _u8("' and maybe some params"));
 }
 
-// TODO: Why does out point to an opt?
-func match_deftype(cs *checkstate, name sym, params opt[*array[te_typeexpr]], out *opt[deftype_entry_id]) bool {
+func match_deftype(cs *checkstate, name sym, params opt[*array[te_typeexpr]], out *deftype_entry_id) bool {
   if case Has(arr *array[deftype_entry_id]) = lookup_ref(&cs->deftypes_by_name, name) {
     n size = count(arr);
     match opt[deftype_entry_id];
@@ -745,7 +734,7 @@ func match_deftype(cs *checkstate, name sym, params opt[*array[te_typeexpr]], ou
       }
     }
     if case Has(id) = match {
-      *out = match;
+      *out = id;
       return true;
     } else {
       ERR_no_match(cs->im, name, params);
@@ -1291,37 +1280,25 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
       ent->ent_id = BeganComputing();
       switch ent->arity {
         case AccessArityNone(u void): {
-          match opt[deftype_entry_id];
-          if !match_deftype(cs, ent->name, None(), &match) {
+          id deftype_entry_id;
+          if !match_deftype(cs, ent->name, None(), &id) {
             ent->ent_id = FailedComputation();
             return false;
           }
-          if case Has(id) = match {
-            *out = id;
-            ent->ent_id = Computed(id);
-            return true;
-          } else {
-            ERR(_u8("Access block matches nothing"));
-            ent->ent_id = FailedComputation();
-            return false;
-          }
+          *out = id;
+          ent->ent_id = Computed(id);
+          return true;
         }
         case AccessArityFinite(n u32): {
           params array[te_typeexpr] = repeat(~n, TeUnknown(void));
-          match opt[deftype_entry_id];
-          if !match_deftype(cs, ent->name, Has(&params), &match) {
+          id deftype_entry_id;
+          if !match_deftype(cs, ent->name, Has(&params), &id) {
             ent->ent_id = FailedComputation();
             return false;
           }
-          if case Has(id) = match {
-            *out = id;
-            ent->ent_id = Computed(id);
-            return true;
-          } else {
-            ERR(_u8("Access block matches nothing"));
-            ent->ent_id = FailedComputation();
-            return false;
-          }
+          *out = id;
+          ent->ent_id = Computed(id);
+          return true;
         }
       }
     }
