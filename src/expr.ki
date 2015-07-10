@@ -995,7 +995,7 @@ func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_
     }
   }
 
-  return_type *te_typeexpr = fn_return_type(&expr_complete_type(oo(&a->fun))->~);
+  return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(oo(&a->fun))->~);
   annotate_info(x, CompleteCheck(mk(IsLvalNo(void), ~ *return_type)));
   return true;
 }
@@ -1019,13 +1019,10 @@ func check_funcall_params_secondtime(es *exprscope, functype *cu_typeexpr, param
   n size = count(params);
 
   type_params *array[te_typeexpr];
-  if case &TeApp(app te_typeapp) = &functype->~ {
-    // TODO: Assert fn-type.
-    type_params = &app.params;
-    check(count(type_params) == n + 1);
-  } else {
+  if !decompose_typeapp(&functype->~, primitive_function_puretype(es->cs), &type_params) {
     ice(_u8("Expecting a TeApp for fn-type."));
   }
+  check(count(type_params) == n + 1);
 
   for i size = 0; i < n; i = i + 1 {
     expr *ast_expr = ref(params, i);
@@ -1157,14 +1154,12 @@ func make_fn_partial_type(cs *checkstate, return_type *te_typeexpr, params *arra
   return TeApp({embox(primitive_function_puretype(cs)), type_params, None()});
 }
 
-func fn_return_type(func_type *te_typeexpr) *te_typeexpr {
-  if case &TeApp(app te_typeapp) = func_type {
-    // TODO: Assert fn-type.
-    n size = count(&app.params);
-    check(n > 0);
-    return ref(&app.params, n - 1);
-  } else {
+func fn_return_type(cs *checkstate, func_type *te_typeexpr) *te_typeexpr {
+  params *array[te_typeexpr];
+  if !decompose_typeapp(func_type, primitive_function_puretype(cs), &params) {
     ice(_u8("Expected TeApp for fn-type in fn_return_type."));
-    return fake();
   }
+  n size = count(params);
+  check(n > 0);
+  return ref(params, n - 1);
 }
