@@ -504,7 +504,6 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
       return true;
     }
     case &TeEnum(a te_enum): {
-      // TODO: For enums, field names are constructors.  Check shadowing?
       computed_constructors_complete bool;
       computed_constructors array[te_vardecl];
       if !help_check_fields(cs, clq, g, parms, &a.constructors, &computed_constructors, &computed_constructors_complete) {
@@ -1320,7 +1319,6 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
 defenum match_def_res {
   NoMatch void;
   MultiMatch void;
-  // TODO: We'll want to include any simplification of the instantiated parms, or other type information, that we can get.
   OneMatch struct { ent def_entry_id; parms genparms; };
 };
 

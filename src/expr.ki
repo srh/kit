@@ -304,7 +304,7 @@ func help_check_simple_literal(es *exprscope, pt *te_typeexpr, type te_typeexpr,
   return true;
 }
 
-// TODO: Maybe pt should be of some "computed or incomplete" type.
+// pt is either (a) incomplete, or (b) complete and computed.
 func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
   if case &CompleteCheck(t ast_expr_complete_info) = &x->info {
     return true;
@@ -384,7 +384,6 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &StringLiteral(a ast_string_literal): {
-      // TODO: At some point we'll want string literals to be more compile-time-magical.  Right now they're of type [N]u8.  And we really want [N]<numeric>?
       type cu_typeexpr = compute_prim(es, primitive_string_literal_type(es->cs, count(&a.charspecs)));
       unified te_typeexpr;
       if !unify_types(pt, &type.~, &unified) {
@@ -410,7 +409,6 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &lhs_info->cu.~) {
         return false;
       }
-      // TODO: Assignment should be a statement or be a non-assignable lvalue or just return void.
       annotate_info(x, CompleteCheck(*lhs_info));
       return true;
     }
