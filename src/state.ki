@@ -181,8 +181,9 @@ deftype module struct {
 
 // Describes the behavior of init/copy/move/destroy methods.
 defenum derived_method_behavior {
-  // Behavior's explicitly defined by a method.
-  DerivedMethodExplicit def_inst_id;
+  // Behavior's explicitly defined by a method.  Maybe the method doesn't exist!
+  // TODO: Add def entry, def inst id, optional for when it d.n.e.
+  DerivedMethodExplicit void;
   // Behavior's derived structurally, and one of its fields/constructors has an explicit method call.
   // TODO: This should be defined in one place by a method, and should have a def_inst_id.
   DerivedMethodNontrivial void;
@@ -214,9 +215,25 @@ deftype type_properties struct {
   destroy_behavior derived_method_behavior;
 };
 
-// TODO: This function is BS, now that type_properties has behavior fields.
-func to_defclass_properties(props type_properties) type_properties {
-  return props;
+func to_defclass_properties(a ast_defclass_disposition, props type_properties) type_properties {
+  ret type_properties = props;
+  switch a {
+    case DefaultCopyMoveDestroy(v void): {
+      // ret is fine as it is.
+    }
+    case DefaultMove(v void): {
+      ret.init_behavior = DerivedMethodExplicit(void);
+      ret.copy_behavior = DerivedMethodExplicit(void);
+      ret.destroy_behavior = DerivedMethodExplicit(void);
+    }
+    case NoDefaults(v void): {
+      ret.init_behavior = DerivedMethodExplicit(void);
+      ret.move_behavior = DerivedMethodExplicit(void);
+      ret.copy_behavior = DerivedMethodExplicit(void);
+      ret.destroy_behavior = DerivedMethodExplicit(void);
+    }
+  }
+  return ret;
 }
 
 defenum deftype_inst_status {

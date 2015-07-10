@@ -1062,7 +1062,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
             inst->info = Has({Has(~rhs_computed.te), properties});
           }
           case &ClassexprRhs(a): {
-            inst->info = Has({Has(~rhs_computed.te), to_defclass_properties(properties)});
+            inst->info = Has({Has(~rhs_computed.te), to_defclass_properties(a.disposition, properties)});
           }
         }
       } else {
