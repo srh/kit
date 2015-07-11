@@ -13,6 +13,10 @@ deftype exprscope struct {
   clq *clqueue;
 };
 
+func mk(ds *defscope) exprscope {
+  return {ds, ds->cs, ds->im, ds->clq};
+}
+
 deftype defscope struct {
   cs *checkstate;
   // Same as cs->im.
@@ -129,7 +133,11 @@ func descope_vars(vp *varpopper) void {
 
 func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr) bool {
   ds defscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]](), default@[array[var_number]]()};
-  es exprscope = {&ds, cs, cs->im, clq};
+  return check_full_expr(&ds, x, pt);
+}
+
+func check_full_expr(ds *defscope, x *ast_expr, pt *te_typeexpr) bool {
+  es exprscope = mk(ds);
   return check_expr_ai(&es, AllowIncompleteNo(void), x, pt);
 }
 
@@ -395,7 +403,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &StringLiteral(a ast_string_literal): {
-      type cu_typeexpr = compute_prim(es, primitive_string_literal_type(es->cs, count(&a.charspecs)));
+      type cu_typeexpr = compute_prim(es->ds, primitive_string_literal_type(es->cs, count(&a.charspecs)));
       unified te_typeexpr;
       if !unify_types(pt, &type.~, &unified) {
         ERR(_u8("string literal in bad place"));
@@ -644,7 +652,7 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
 
   return_type cu_typeexpr = ~get(computed_params, nargs);
 
-  bs bodystate = mk(es, &return_type);
+  bs bodystate = mk(es->ds, &return_type);
   ee entryexit;
   if !check_body(&bs, &a->body, &ee) {
     return false;
@@ -907,7 +915,7 @@ func help_lookup_name_field(es *exprscope, t *cu_typeexpr, fieldname *ast_ident,
         ERR(_u8("field lookup (not .length) on array type"));
         return false;
       }
-      *fieldtype_out = compute_prim(es, primitive_size_type(es->cs));
+      *fieldtype_out = compute_prim(es->ds, primitive_size_type(es->cs));
       *inherits_lval_out = false;
       return true;
     }
@@ -1044,9 +1052,9 @@ func check_funcall_params_secondtime(es *exprscope, functype *cu_typeexpr, param
   return true;
 }
 
-func compute_prim(es *exprscope, t te_typeexpr) cu_typeexpr {
+func compute_prim(ds *defscope, t te_typeexpr) cu_typeexpr {
   cac cac_typeexpr;
-  if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &t, &cac) {
+  if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &t, &cac) {
     ice(_u8("compute_prim encounters uncomputable type"));
   }
   check(cac.complete);
@@ -1058,7 +1066,7 @@ func check_expr_index(es *exprscope, x *ast_expr, a *ast_index_expr, pt *te_type
   if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), &unknown) {
     return false;
   }
-  sizetype cu_typeexpr = compute_prim(es, primitive_size_type(es->cs));
+  sizetype cu_typeexpr = compute_prim(es->ds, primitive_size_type(es->cs));
 
   if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), &sizetype.~) {
     return false;
