@@ -4,6 +4,16 @@ import check;
 import primitives;
 
 deftype exprscope struct {
+  ds *defscope;
+  // Same as ds->cs.
+  cs *checkstate;
+  // Same as ds->im, same as cs->im.
+  im *identmap;
+  // Same as ds->clq.
+  clq *clqueue;
+};
+
+deftype defscope struct {
   cs *checkstate;
   // Same as cs->im.
   im *identmap;
@@ -47,11 +57,11 @@ deftype var_info struct {
 };
 
 func ref_var(es *exprscope, num var_number) *var_info {
-  return ref(&es->all_vars, num.~);
+  return ref(&es->ds->all_vars, num.~);
 }
 
 func vars_in_scope(es *exprscope) array[var_number] {
-  return es->current_vars;
+  return es->ds->current_vars;
 }
 
 
@@ -94,9 +104,9 @@ func es_push_var(es *exprscope, vp *varpopper, name *ast_ident, computed_type *c
     ERR(_u8("Local variable '"), lookup(es->im, name->value), _u8("' shadows another"));
     return false;
   }
-  num var_number = ~count(&es->all_vars);
-  push(&es->all_vars, {num, *computed_type, name->value, autoinit});
-  push(&es->current_vars, num);
+  num var_number = ~count(&es->ds->all_vars);
+  push(&es->ds->all_vars, {num, *computed_type, name->value, autoinit});
+  push(&es->ds->current_vars, num);
   push(&vp->nums, num);
   return true;
 }
@@ -106,7 +116,7 @@ func descope_vars(vp *varpopper) void {
   check(es != null);
   while case Has(expected var_number) = popval(&vp->nums) {
     num var_number;
-    if !popval(&es->current_vars, &num) {
+    if !popval(&es->ds->current_vars, &num) {
       ice(_u8("varpopper sees empty local_vars"));
     }
     if num != expected {
@@ -118,7 +128,8 @@ func descope_vars(vp *varpopper) void {
 }  // access varpopper
 
 func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr) bool {
-  es exprscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]](), default@[array[var_number]]()};
+  ds defscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]](), default@[array[var_number]]()};
+  es exprscope = {&ds, cs, cs->im, clq};
   return check_expr_ai(&es, AllowIncompleteNo(void), x, pt);
 }
 
@@ -132,7 +143,7 @@ func replaced_name_parms(es *exprscope, a *ast_name_expr, out *genparms) bool {
         return false;
       }
       computed cac_typeexpr;
-      if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed) {
+      if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &computed) {
         return false;
       }
       push(&replaced, computed.te);
@@ -273,9 +284,9 @@ func es_lookup_name(es *exprscope, name sym, gp *genparms, pt *te_typeexpr, res_
 }
 
 func es_find_current_local(es *exprscope, name sym) opt[var_number] {
-  n size = count(&es->current_vars);
+  n size = count(&es->ds->current_vars);
   for i size = 0; i < n; i = i + 1 {
-    num var_number = get(&es->current_vars, i);
+    num var_number = get(&es->ds->current_vars, i);
     inf *var_info = ref_var(es, num);
     if inf->name == name {
       return Has(num);
@@ -522,7 +533,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       }
       // We call check_and_compute_typeexpr to disallow totally bogus typeexprs more directly than the eventual type error that would happen.
       computed cac_typeexpr;
-      if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed) {
+      if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &computed) {
         return false;
       }
       unified te_typeexpr;
@@ -606,7 +617,7 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
   }
   // TODO: I see some duplicated logic with the TypedExpr case.
   computed cac_typeexpr;
-  if !check_and_compute_typeexpr(es->cs, es->clq, es->generics, es->parms, &converted, &computed) {
+  if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &computed) {
     return false;
   }
   // Lambda exprs can't have partial types (yet!).
@@ -747,9 +758,9 @@ func deftype_rhs_accessible(es *exprscope, id deftype_entry_id, result_out *bool
       return true;
     }
     case RhsPrivate(v void): {
-      n size = count(&es->accessible);
+      n size = count(&es->ds->accessible);
       for i size = 0; i < n; i = i + 1 {
-        aid access_entry_id = get(&es->accessible, i);
+        aid access_entry_id = get(&es->ds->accessible, i);
         dti deftype_entry_id;
         if !get_accessible_deftype(es->cs, aid, &dti) {
           return false;
