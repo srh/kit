@@ -280,13 +280,59 @@ func isNo(x is_lval) bool {
   return false;
 }
 
+defenum ast_expr_disposal {
+  // Value doesn't get disposed by this expr.  (E.g. it's an lvalue result of a statement expr, or a field access and the value gets disposed of later, or a ParenExpr, etc.)
+  DisposeIgnore void;
+  // Value gets destroyed (and ignored).  (E.g. it's an rvalue result of a statement expr.)
+  DisposeDestroy void;
+  // Value gets copied... into a function param, or variable, or something.  For lvalues.
+  DisposeCopy void;
+  // Value gets moved.  (E.g. rhs of variable assignment.)
+  DisposeMove void;
+  // Value should get constructed wherever it's supposed to end up, so that it doesn't get moved.  For "whole field" rvalues.
+  DisposeMoveInPlace void;
+  // TODO: Remove uses of this.
+  DisposeTODO void;
+};
+
+func `==`(x ast_expr_disposal, y ast_expr_disposal) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+func `!=`(x ast_expr_disposal, y ast_expr_disposal) bool {
+  return !(x == y);
+}
+
+func build_u8str(r *array[u8], x *ast_expr_disposal) void {
+  switch x {
+    case &DisposeIgnore(v void): {
+      append(r, _u8("DisposeIgnore"));
+    }
+    case &DisposeDestroy(v void): {
+      append(r, _u8("DisposeDestroy"));
+    }
+    case &DisposeCopy(v void): {
+      append(r, _u8("DisposeCopy"));
+    }
+    case &DisposeMove(v void): {
+      append(r, _u8("DisposeMove"));
+    }
+    case &DisposeMoveInPlace(v void): {
+      append(r, _u8("DisposeMoveInPlace"));
+    }
+    case &DisposeTODO(v void): {
+      append(r, _u8("DisposeTODO"));
+    }
+  }
+}
+
 deftype ast_expr_complete_info struct {
   lval is_lval;
   cu cu_typeexpr;
+  disposal opt[ast_expr_disposal];
 };
 
 func mk(lval is_lval, cu cu_typeexpr) ast_expr_complete_info {
-  return {lval, cu};
+  return {lval, cu, None()};
 }
 
 defenum ast_expr_info {
@@ -299,6 +345,20 @@ deftype ast_expr struct {
   info ast_expr_info;
   u ast_expr_enum;
 };
+
+func inner_info(a *ast_expr_info) ast_expr_info {
+  switch a {
+    case &NoInfo(v void): {
+      return NoInfo(void);
+    }
+    case &IncompleteCheck(t te_typeexpr): {
+      return IncompleteCheck(t);
+    }
+    case &CompleteCheck(t ast_expr_complete_info): {
+      return CompleteCheck(mk(t.lval, t.cu));
+    }
+  }
+}
 
 func annotate_info(a *ast_expr, info ast_expr_info) void {
   switch &a->info {
@@ -318,6 +378,24 @@ func annotate_info(a *ast_expr, info ast_expr_info) void {
 
   a->info = info;
 }
+
+func annotate_disposal(a *ast_expr, d ast_expr_disposal) void {
+  switch &a->info {
+    case &CompleteCheck(t ast_expr_complete_info): {
+      if case &Has(d2 ast_expr_disposal) = &t.disposal {
+        if d2 != d {
+          ice(_u8("annotate_disposal with conflicting disposal: "), d, _u8(" on top of "), d2);
+        }
+      } else {
+        t.disposal = Has(d);
+      }
+    }
+    default: {
+      ice(_u8("annotate_disposal for non-completely annotated expr"));
+    }
+  }
+}
+
 
 defenum ast_expr_enum {
   NameExpr ast_name_expr;

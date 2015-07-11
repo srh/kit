@@ -92,7 +92,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
   switch s {
     case &Expr(b ast_expr): {
       pt te_typeexpr = TeUnknown(void);
-      if !check_full_expr(bs->ds, &b, &pt) {
+      if !check_discard_expr(bs->ds, &b, &pt) {
         return false;
       }
       *ee_out = {num, num};
@@ -100,7 +100,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
 
     case &Return(b ast_return_statement): {
       if case &Has(c box[ast_expr]) = &b.expr {
-        if !check_full_expr(bs->ds, oo(&c), &bs->return_type->~) {
+        if !check_consume_expr(bs->ds, oo(&c), &bs->return_type->~) {
           return false;
         }
       } else {
@@ -126,7 +126,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       cu_computed cu_typeexpr;
       complete_type *cu_typeexpr;
       if case &Has(x box[ast_expr]) = &b.rhs {
-        if !check_full_expr(bs->ds, oo(&x), &computed.te) {
+        if !check_consume_expr(bs->ds, oo(&x), &computed.te) {
           return false;
         }
         complete_type = expr_complete_type(oo(&x));
@@ -219,14 +219,14 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       exitnum statement_num = add_statement(bs, None());
       if case &Has(cond box[ast_expr]) = &b.condition {
         boolean cu_typeexpr = compute_prim(bs->ds, primitive_bool_type(bs->cs));
-        if !check_full_expr(bs->ds, oo(&cond), &boolean.~) {
+        if !check_consume_then_discard_expr(bs->ds, oo(&cond), &boolean.~) {
           return false;
         }
         connect_statements(bs, loopnum, exitnum);
       }
       if case &Has(incr box[ast_expr]) = &b.increment {
         unknown te_typeexpr = TeUnknown(void);
-        if !check_full_expr(bs->ds, oo(&incr), &unknown) {
+        if !check_discard_expr(bs->ds, oo(&incr), &unknown) {
           return false;
         }
       }
@@ -241,7 +241,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
 
     case &Switch(b ast_switch_statement): {
       unknown te_typeexpr = TeUnknown(void);
-      if !check_full_expr(bs->ds, oo(&b.swartch), &unknown) {
+      if !check_consume_then_discard_expr(bs->ds, oo(&b.swartch), &unknown) {
         return false;
       }
 
@@ -382,14 +382,14 @@ func check_condition(ds *defscope, cond_vp *varpopper, a *ast_condition) bool {
   switch a {
     case &ExprCondition(b box[ast_expr]): {
       booltype cu_typeexpr = compute_prim(ds, primitive_bool_type(ds->cs));
-      if !check_full_expr(ds, oo(&b), &booltype.~) {
+      if !check_consume_then_discard_expr(ds, oo(&b), &booltype.~) {
         return false;
       }
       return true;
     }
     case &PatternCondition(b ast_pattern_assign): {
       unknown te_typeexpr = TeUnknown(void);
-      if !check_full_expr(ds, oo(&b.rhs), &unknown) {
+      if !check_consume_then_discard_expr(ds, oo(&b.rhs), &unknown) {
         return false;
       }
 

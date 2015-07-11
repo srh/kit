@@ -44,8 +44,22 @@ func[T] ERR(x T) void {
   fflush(Stderr());
 }
 
-func ice(msg array[u8]) void {
-  x _ = _u8("ICE: ");
-  append(&x, &msg);
-  crash(x);
+func[T] ice(x T) void {
+  ERR(_u8("ICE: "), x);
+  abort();
+}
+
+func[T, U] ice(x T, y U) void {
+  ERR(_u8("ICE: "), x, y);
+  abort();
+}
+
+func[T, U, V] ice(x T, y U, z V) void {
+  ERR(_u8("ICE: "), x, y, z);
+  abort();
+}
+
+func[T, U, V, W] ice(x T, y U, z V, p W) void {
+  ERR(_u8("ICE: "), x, y, z, p);
+  abort();
 }
