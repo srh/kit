@@ -29,6 +29,7 @@ deftype statement_info struct {
 
 deftype bodystate struct {
   es *exprscope;
+  ds *defscope;
   cs *checkstate;
   im *identmap;
   clq *clqueue;
@@ -42,6 +43,7 @@ deftype bodystate struct {
 func mk(es *exprscope, return_type *cu_typeexpr) bodystate {
   ret bodystate;
   ret.es = es;
+  ret.ds = es->ds;
   ret.cs = es->cs;
   ret.im = es->im;
   ret.clq = es->clq;
@@ -120,7 +122,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       }
 
       computed cac_typeexpr;
-      if !check_and_compute_typeexpr(bs->cs, bs->clq, bs->es->ds->generics, bs->es->ds->parms, &converted, &computed) {
+      if !check_and_compute_typeexpr(bs->cs, bs->clq, bs->ds->generics, bs->ds->parms, &converted, &computed) {
         return false;
       }
       cu_computed cu_typeexpr;
@@ -140,7 +142,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
         complete_type = &cu_computed;
       }
 
-      if !es_push_var(bs->es, vp, &b.decl.name, complete_type, AutoInitYes(void)) {
+      if !ds_push_var(bs->ds, vp, &b.decl.name, complete_type, AutoInitYes(void)) {
         return false;
       }
       *ee_out = {num, num};
@@ -148,7 +150,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
 
     case &IfThen(b ast_ifthen_statement): {
       cond_vp varpopper;
-      init_vp(&cond_vp, bs->es);
+      init_vp(&cond_vp, bs->ds);
       if !check_condition(bs->es, &cond_vp, &b.condition) {
         return false;
       }
@@ -165,7 +167,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
 
     case &IfThenElse(b ast_ifthenelse_statement): {
       cond_vp varpopper;
-      init_vp(&cond_vp, bs->es);
+      init_vp(&cond_vp, bs->ds);
       if !check_condition(bs->es, &cond_vp, &b.condition) {
         return false;
       }
@@ -188,7 +190,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
 
     case &While(b ast_while_statement): {
       cond_vp varpopper;
-      init_vp(&cond_vp, bs->es);
+      init_vp(&cond_vp, bs->ds);
       if !check_condition(bs->es, &cond_vp, &b.condition) {
         return false;
       }
@@ -203,7 +205,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
 
     case &For(b ast_for_statement): {
       initter_vp varpopper;
-      init_vp(&initter_vp, bs->es);
+      init_vp(&initter_vp, bs->ds);
       loopnum statement_num = add_statement(bs, None());
       if case &Has(initter box[ast_statement]) = &b.initializer {
         initter_ee entryexit;
@@ -256,7 +258,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       // switchable_type is complete, because swartch_type was.
 
       enum_type *te_typeexpr;
-      if !complete_structural_rhs(bs->es, switchable_type, &enum_type) {
+      if !complete_structural_rhs(bs->ds, switchable_type, &enum_type) {
         return false;
       }
       // enum_type is complete, because complete_structural_rhs does that.
@@ -301,10 +303,10 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
               }
 
               case_vp varpopper;
-              init_vp(&case_vp, bs->es);
+              init_vp(&case_vp, bs->ds);
               cu_expected_type cu_typeexpr = ~ *expected_type;
               // Can't auto-initialize bound case variables, be the switch be over a pointer or not.
-              if !es_push_var(bs->es, &case_vp, &patt.decl.name, &cu_expected_type, AutoInitNo(void)) {
+              if !ds_push_var(bs->ds, &case_vp, &patt.decl.name, &cu_expected_type, AutoInitNo(void)) {
                 return false;
               }
 
@@ -341,11 +343,11 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
         return false;
       }
 
-      push(&bs->labels, {num, b.name.value, vars_in_scope(bs->es), false});
+      push(&bs->labels, {num, b.name.value, vars_in_scope(bs->ds), false});
       *ee_out = {num, num};
     }
     case &Goto(b ast_goto_statement): {
-      push(&bs->gotos, {num, b.target.value, vars_in_scope(bs->es)});
+      push(&bs->gotos, {num, b.target.value, vars_in_scope(bs->ds)});
       *ee_out = {num, add_statement(bs, None())};
     }
   }
@@ -403,7 +405,7 @@ func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
       // switchable_type is complete, because swartch_type is.
 
       enum_type *te_typeexpr;
-      if !complete_structural_rhs(es, switchable_type, &enum_type) {
+      if !complete_structural_rhs(es->ds, switchable_type, &enum_type) {
         return false;
       }
       // enum_type is complete, because complete_structural_rhs.
@@ -434,7 +436,7 @@ func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
         }
 
         cu_expected_type cu_typeexpr = ~ *expected_type;
-        if !es_push_var(es, cond_vp, &b.pattern.decl.name, &cu_expected_type, AutoInitNo(void)) {
+        if !ds_push_var(es->ds, cond_vp, &b.pattern.decl.name, &cu_expected_type, AutoInitNo(void)) {
           return false;
         }
 
@@ -489,7 +491,7 @@ func connect_gotos(bs *bodystate) bool {
 
       nconstruct size = count(&construct);
       for k size = 0; k < nconstruct; k = k + 1 {
-        vi *var_info = ref_var(bs->es, get(&construct, k));
+        vi *var_info = ref_var(bs->ds, get(&construct, k));
         if vi->autoinit == AutoInitNo(void) {
           ERR(_u8("goto for label '"), lookup(bs->im, l->label_name), _u8("' enters non-initializable variable's scope"));
           return false;
