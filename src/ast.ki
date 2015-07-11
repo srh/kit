@@ -255,13 +255,26 @@ deftype ast_strinit struct {
   exprs array[ast_expr];
 };
 
+// Is a non-lval an rval?  Okay.
+deftype rval_description struct {
+  // The number of the temporary that this rval is _part of_.
+  num temporary_number;
+
+  // Tells whether the rval would need to get copied out of temporary, or whether the rval _is_ the whole temporary and can get moved.
+  whole_temporary bool;
+};
+
 defenum is_lval {
-  IsLvalNo temporary_number;
+  IsLvalNo rval_description;
   IsLvalYes void;
 };
 
+func wholeRval(num temporary_number) is_lval {
+  return IsLvalNo({num, true});
+}
+
 func isNo(x is_lval) bool {
-  if case IsLvalNo(a temporary_number) = x {
+  if case IsLvalNo(a rval_description) = x {
     return true;
   }
   return false;
