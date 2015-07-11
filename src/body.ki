@@ -55,7 +55,7 @@ def `~` fn[size, statement_num] = wrapconvert;
 
 func add_statement(bs *bodystate, s opt[*ast_statement]) statement_num {
   ret size = count(&bs->statements);
-  push(&bs->statements, {s, mk_array(), mk_array(), false});
+  push(&bs->statements, {s, mk_array@[statement_num](), mk_array@[statement_num](), false});
   return ~ret;
 }
 

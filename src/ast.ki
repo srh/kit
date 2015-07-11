@@ -256,12 +256,15 @@ deftype ast_strinit struct {
 };
 
 defenum is_lval {
-  IsLvalNo void;
+  IsLvalNo opt[temporary_number];
   IsLvalYes void;
 };
 
-func `==`(x is_lval, y is_lval) bool {
-  return enumnum(&x) == enumnum(&y);
+func isNo(x is_lval) bool {
+  if case IsLvalNo(a opt[temporary_number]) = x {
+    return true;
+  }
+  return false;
 }
 
 deftype ast_expr_complete_info struct {

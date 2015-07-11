@@ -3,6 +3,10 @@ import body;
 import check;
 import primitives;
 
+deftype temporary_info struct {
+  type cu_typeexpr;
+};
+
 deftype exprscope struct {
   ds *defscope;
   // Same as ds->cs.
@@ -11,10 +15,23 @@ deftype exprscope struct {
   im *identmap;
   // Same as ds->clq.
   clq *clqueue;
+
+  temporaries array[temporary_info];
 };
 
 func mk(ds *defscope) exprscope {
-  return {ds, ds->cs, ds->im, ds->clq};
+  return {ds, ds->cs, ds->im, ds->clq, mk_array@[temporary_info]()};
+}
+
+deftype temporary_number size;
+
+def `~` fn[size, temporary_number] = wrapconvert;
+def `==` fn[temporary_number, temporary_number, bool] = wrapequate;
+
+func add_temporary(es *exprscope, type cu_typeexpr) temporary_number {
+  ret size = count(&es->temporaries);
+  push(&es->temporaries, {type});
+  return ~ret;
 }
 
 deftype defscope struct {
@@ -316,7 +333,7 @@ func help_check_simple_literal(es *exprscope, pt *te_typeexpr, type te_typeexpr,
     }
     check(c.complete);
 
-    annotate_info(x, CompleteCheck(mk(IsLvalNo(void), ~c.te)));
+    annotate_info(x, CompleteCheck(mk(IsLvalNo(Has(add_temporary(es, ~c.te))), ~c.te)));
   } else {
     annotate_info(x, IncompleteCheck(type));
   }
@@ -355,7 +372,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
           }
         }
         case &OneEnumConstructorMatch(ci constructor_info): {
-          annotate_info(x, CompleteCheck(mk(IsLvalNo(void), ci.type)));
+          annotate_info(x, CompleteCheck(mk(IsLvalNo(Has(add_temporary(es, ci.type))), ci.type)));
           return true;
         }
         case &OneGlobalMatch(gi global_info): {
@@ -363,7 +380,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
             return false;
           }
           inst *def_inst = ref_inst(es->cs, gi.inst);
-          annotate_info(x, CompleteCheck(mk(IsLvalNo(void), inst->computed_type)));
+          annotate_info(x, CompleteCheck(mk(IsLvalNo(None()), inst->computed_type)));
           return true;
         }
         case &OneLocalMatch(v local_info): {
@@ -383,7 +400,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &NumericLiteral(a ast_numeric_literal): {
-      return check_numeric_literal(es->cs, ai, pt, numeric_literal_value(&a), x);
+      return check_numeric_literal(es, ai, pt, numeric_literal_value(&a), x);
     }
 
     case &BoolLiteral(a ast_bool_literal): {
@@ -399,7 +416,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &CharLiteral(a ast_char_literal): {
-      return check_numeric_literal(es->cs, ai, pt, ~a.charspec.value, x);
+      return check_numeric_literal(es, ai, pt, ~a.charspec.value, x);
     }
 
     case &StringLiteral(a ast_string_literal): {
@@ -409,7 +426,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         ERR(_u8("string literal in bad place"));
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(IsLvalNo(void), type)));
+      annotate_info(x, CompleteCheck(mk(IsLvalNo(Has(add_temporary(es, type))), type)));
       return true;
     }
     case &Funcall(a ast_funcall): {
@@ -421,7 +438,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         return false;
       }
       lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a.lhs));
-      if lhs_info->lval == IsLvalNo(void) {
+      if isNo(lhs_info->lval) {
         ERR(_u8("Assigning to non-lvalue"));
         return false;
       }
@@ -446,7 +463,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         return false;
       }
       rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a.rhs));
-      if rhs_info->lval == IsLvalNo(void) {
+      if isNo(rhs_info->lval) {
         ERR(_u8("Taking address of a non-lvalue"));
         return false;
       }
@@ -457,7 +474,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         return false;
       }
       check(ptr_computed.complete);
-      annotate_info(x, CompleteCheck(mk(IsLvalNo(void), ~ptr_computed.te)));
+      annotate_info(x, CompleteCheck(mk(IsLvalNo(Has(add_temporary(es, ~ptr_computed.te))), ~ptr_computed.te)));
       return true;
     }
     case &Deref(a ast_deref): {
@@ -498,9 +515,16 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       }
       lval is_lval;
       if inherits_lval {
-        lval = info->lval;
+        switch &info->lval {
+          case &IsLvalYes(v void): {
+            lval = IsLvalYes(void);
+          }
+          case &IsLvalNo(num opt[temporary_number]): {
+            lval = IsLvalNo(num);
+          }
+        }
       } else {
-        lval = IsLvalNo(void);
+        lval = IsLvalNo(Has(add_temporary(es, fieldtype)));
       }
       annotate_info(x, CompleteCheck(mk(lval, fieldtype)));
       return true;
@@ -528,7 +552,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         // We deref, so it's always an lval.
         lval = IsLvalYes(void);
       } else {
-        lval = IsLvalNo(void);
+        lval = IsLvalNo(Has(add_temporary(es, fieldtype)));
       }
       annotate_info(x, CompleteCheck(mk(lval, fieldtype)));
       return true;
@@ -607,7 +631,7 @@ func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *
     }
 
     // We checked is_computed(pt).
-    annotate_info(x, CompleteCheck(mk(IsLvalNo(void), ~ *pt)));
+    annotate_info(x, CompleteCheck(mk(IsLvalNo(Has(add_temporary(es, ~ *pt))), ~ *pt)));
     return true;
   } else {
     ERR(_u8("Structure literal used on non-struct type."));
@@ -662,7 +686,7 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
     return false;
   }
 
-  annotate_info(x, CompleteCheck(mk(IsLvalNo(void), ~computed.te)));
+  annotate_info(x, CompleteCheck(mk(IsLvalNo(Has(add_temporary(es, ~computed.te))), ~computed.te)));
   return true;
 }
 
@@ -677,7 +701,7 @@ func numeric_literal_value(a *ast_numeric_literal) bigint {
   }
 }
 
-func check_numeric_literal(cs *checkstate, ai allow_incomplete, pt *te_typeexpr, n bigint, x *ast_expr) bool {
+func check_numeric_literal(es *exprscope, ai allow_incomplete, pt *te_typeexpr, n bigint, x *ast_expr) bool {
   if case &TeUnknown(v void) = pt {
     if ai == AllowIncompleteYes(void) {
       annotate_info(x, IncompleteCheck(TeUnknown(void)));
@@ -689,7 +713,7 @@ func check_numeric_literal(cs *checkstate, ai allow_incomplete, pt *te_typeexpr,
   }
 
   facts numeric_traits;
-  if !is_numeric_type(cs, pt, &facts) {
+  if !is_numeric_type(es->cs, pt, &facts) {
     ERR(_u8("Numeric literal in bad place."));
     return false;
   }
@@ -699,7 +723,7 @@ func check_numeric_literal(cs *checkstate, ai allow_incomplete, pt *te_typeexpr,
   }
   // It's a pt, and it's a numeric type, which means it must be a complete pt, which means it's computed.
   check(is_complete_computed(pt).computed);
-  annotate_info(x, CompleteCheck(mk(IsLvalNo(void), ~ *pt)));
+  annotate_info(x, CompleteCheck(mk(IsLvalNo(Has(add_temporary(es, ~ *pt))), ~ *pt)));
   return true;
 }
 
@@ -1015,7 +1039,7 @@ func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_
   }
 
   return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(oo(&a->fun))->~);
-  annotate_info(x, CompleteCheck(mk(IsLvalNo(void), ~ *return_type)));
+  annotate_info(x, CompleteCheck(mk(IsLvalNo(Has(add_temporary(es, ~ *return_type))), ~ *return_type)));
   return true;
 }
 
