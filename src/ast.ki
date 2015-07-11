@@ -256,12 +256,12 @@ deftype ast_strinit struct {
 };
 
 defenum is_lval {
-  IsLvalNo opt[temporary_number];
+  IsLvalNo temporary_number;
   IsLvalYes void;
 };
 
 func isNo(x is_lval) bool {
-  if case IsLvalNo(a opt[temporary_number]) = x {
+  if case IsLvalNo(a temporary_number) = x {
     return true;
   }
   return false;
