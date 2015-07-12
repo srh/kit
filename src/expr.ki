@@ -177,7 +177,7 @@ func check_consume_then_discard_expr(ds *defscope, x *ast_expr, pt *te_typeexpr)
   if !check_expr_ai(&es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
-  annotate_disposal(x, DisposeTODO(void));
+  annotate_disposal_for_consume_then_discard(x);
   return true;
 }
 
@@ -472,7 +472,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &lhs_info->cu.~) {
         return false;
       }
-      annotate_disposal(oo(&a.rhs), DisposeTODO(void));
+      annotate_disposal_for_assignment(oo(&a.rhs));
       annotate_info(x, CompleteCheck(mk(lhs_info->lval, lhs_info->cu)));
       return true;
     }
@@ -631,7 +631,19 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
 
 // Annotates the disposal to "consume" the value -- i.e. what happens if it's a function param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or whatever).
 func annotate_disposal_for_consume(a *ast_expr) void {
-  annotate_disposal(a, DisposeTODO(void));
+  info *ast_expr_complete_info = expr_complete_info(a);
+  switch &info->lval {
+    case &IsLvalNo(desc rval_description): {
+      if desc.whole_temporary {
+        annotate_disposal(a, DisposeMoveInPlace(void));
+      } else {
+        annotate_disposal(a, DisposeCopyAndDestroy(void));
+      }
+    }
+    case &IsLvalYes(v void): {
+      annotate_disposal(a, DisposeCopy(void));
+    }
+  }
 }
 
 // Annotates the disposal of the expr for local field access -- depends on whether it's an lvalue/rvalue.
@@ -641,7 +653,49 @@ func annotate_disposal_for_field(a *ast_expr) void {
 
 // Annotates the disposal of an Expr statement's expr, or some other value we are done using.
 func annotate_disposal_for_discard(a *ast_expr) void {
-  annotate_disposal(a, DisposeTODO(void));
+  info *ast_expr_complete_info = expr_complete_info(a);
+  switch &info->lval {
+    case &IsLvalNo(desc rval_description): {
+      annotate_disposal(a, DisposeDestroy(void));
+    }
+    case &IsLvalYes(v void): {
+      annotate_disposal(a, DisposeIgnore(void));
+    }
+  }
+}
+
+// Annotates the disposal for a value we'll use but then discard.
+func annotate_disposal_for_consume_then_discard(a *ast_expr) void {
+  info *ast_expr_complete_info = expr_complete_info(a);
+  switch &info->lval {
+    case &IsLvalNo(desc rval_description): {
+      if desc.whole_temporary {
+        annotate_disposal(a, DisposeMoveInPlaceThenDestroy(void));
+      } else {
+        annotate_disposal(a, DisposeCopyAndDestroyThenDestroy(void));
+      }
+    }
+    case &IsLvalYes(v void): {
+      annotate_disposal(a, DisposeCopyThenDestroy(void));
+    }
+  }
+}
+
+
+func annotate_disposal_for_assignment(a *ast_expr) void {
+  info *ast_expr_complete_info = expr_complete_info(a);
+  switch &info->lval {
+    case &IsLvalNo(desc rval_description): {
+      if desc.whole_temporary {
+        annotate_disposal(a, DisposeMove(void));
+      } else {
+        annotate_disposal(a, DisposeCopyAndDestroy(void));
+      }
+    }
+    case &IsLvalYes(v void): {
+      annotate_disposal(a, DisposeCopy(void));
+    }
+  }
 }
 
 func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *te_typeexpr, x *ast_expr) bool {

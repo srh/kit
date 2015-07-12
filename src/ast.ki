@@ -287,12 +287,18 @@ defenum ast_expr_disposal {
   DisposeDestroy void;
   // Value gets copied... into a function param, or variable, or something.  For lvalues.
   DisposeCopy void;
+  // Value gets copied... it's an rvalue so the temporary copied from gets destroyed.
+  DisposeCopyAndDestroy void;
   // Value gets moved.  (E.g. rhs of variable assignment.)
   DisposeMove void;
   // Value should get constructed wherever it's supposed to end up, so that it doesn't get moved.  For "whole field" rvalues.
   DisposeMoveInPlace void;
-  // TODO: Remove uses of this.
-  DisposeTODO void;
+  // We copy the object, use it, then destroy the new object we created.
+  DisposeCopyThenDestroy void;
+  // We move-in-place the object... use it, then destroy it.
+  DisposeMoveInPlaceThenDestroy void;
+  // We copy the object and destroy the old temporary... use it, then destroy the new object we created.
+  DisposeCopyAndDestroyThenDestroy void;
 };
 
 func `==`(x ast_expr_disposal, y ast_expr_disposal) bool {
@@ -313,14 +319,23 @@ func build_u8str(r *array[u8], x *ast_expr_disposal) void {
     case &DisposeCopy(v void): {
       append(r, _u8("DisposeCopy"));
     }
+    case &DisposeCopyAndDestroy(v void): {
+      append(r, _u8("DisposeCopyAndDestroy"));
+    }
     case &DisposeMove(v void): {
       append(r, _u8("DisposeMove"));
     }
     case &DisposeMoveInPlace(v void): {
       append(r, _u8("DisposeMoveInPlace"));
     }
-    case &DisposeTODO(v void): {
-      append(r, _u8("DisposeTODO"));
+    case &DisposeCopyThenDestroy(v void): {
+      append(r, _u8("DisposeCopyThenDestroy"));
+    }
+    case &DisposeMoveInPlaceThenDestroy(v void): {
+      append(r, _u8("DisposeMoveInPlaceThenDestroy"));
+    }
+    case &DisposeCopyAndDestroyThenDestroy(v void): {
+      append(r, _u8("DisposeCopyAndDestroyThenDestroy"));
     }
   }
 }
