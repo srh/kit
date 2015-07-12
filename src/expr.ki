@@ -34,6 +34,10 @@ func add_temporary(es *exprscope, type cu_typeexpr) temporary_number {
   return ~ret;
 }
 
+func ref_temporary(es *exprscope, num temporary_number) *temporary_info {
+  return ref(&es->temporaries, num.~);
+}
+
 deftype defscope struct {
   cs *checkstate;
   // Same as cs->im.
@@ -158,7 +162,7 @@ func check_discard_expr(ds *defscope, x *ast_expr, pt *te_typeexpr) bool {
   if !check_expr_ai(&es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
-  if !annotate_disposal_for_discard(x) {
+  if !annotate_disposal_for_discard(&es, x) {
     return false;
   }
   return true;
@@ -169,7 +173,7 @@ func check_consume_expr(ds *defscope, x *ast_expr, pt *te_typeexpr) bool {
   if !check_expr_ai(&es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
-  if !annotate_disposal_for_consume(x) {
+  if !annotate_disposal_for_consume(&es, x) {
     return false;
   }
   return true;
@@ -181,7 +185,7 @@ func check_consume_then_discard_expr(ds *defscope, x *ast_expr, pt *te_typeexpr)
   if !check_expr_ai(&es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
-  if !annotate_disposal_for_consume_then_discard(x) {
+  if !annotate_disposal_for_consume_then_discard(&es, x) {
     return false;
   }
   return true;
@@ -478,7 +482,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &lhs_info->cu.~) {
         return false;
       }
-      if !annotate_disposal_for_assignment(oo(&a.rhs)) {
+      if !annotate_disposal_for_assignment(es, oo(&a.rhs)) {
         return false;
       }
       annotate_info(x, CompleteCheck(mk(lhs_info->lval, lhs_info->cu)));
@@ -526,7 +530,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &ptr_cac.te) {
         return false;
       }
-      if !annotate_disposal_for_consume(oo(&a.rhs)) {
+      if !annotate_disposal_for_consume(es, oo(&a.rhs)) {
         return false;
       }
       param *te_typeexpr;
@@ -576,7 +580,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), &unknown) {
         return false;
       }
-      if !annotate_disposal_for_consume(oo(&a.lhs)) {
+      if !annotate_disposal_for_consume(es, oo(&a.lhs)) {
         return false;
       }
       info *ast_expr_complete_info = expr_complete_info(oo(&a.lhs));
@@ -641,19 +645,47 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
   }
 }
 
+// TODO:  Implement these.
+func get_copy_constructor(ds *defscope, t *cu_typeexpr, out *instpair) bool {
+  return true;
+  return TODO();
+}
+
+func get_move_constructor(ds *defscope, t *cu_typeexpr, out *instpair) bool {
+  return true;
+  return TODO();
+}
+
+func get_destroy_constructor(ds *defscope, t *cu_typeexpr, out *instpair) bool {
+  return true;
+  return TODO();
+}
+
 // Annotates the disposal to "consume" the value -- i.e. what happens if it's a function param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or whatever).
-func annotate_disposal_for_consume(a *ast_expr) bool {
+func annotate_disposal_for_consume(es *exprscope, a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       if desc.whole_temporary {
         annotate_disposal(a, DisposeMoveInPlace(void));
       } else {
-        annotate_disposal(a, DisposeCopyAndDestroy(void));
+        copy instpair;
+        if !get_copy_constructor(es->ds, &info->cu, &copy) {
+          return false;
+        }
+        destroy instpair;
+        if !get_destroy_constructor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
+          return false;
+        }
+        annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}));
       }
     }
     case &IsLvalYes(v void): {
-      annotate_disposal(a, DisposeCopy(void));
+      copy instpair;
+      if !get_copy_constructor(es->ds, &info->cu, &copy) {
+        return false;
+      }
+      annotate_disposal(a, DisposeCopy(copy));
     }
   }
   return true;
@@ -665,11 +697,15 @@ func annotate_disposal_for_field(a *ast_expr) void {
 }
 
 // Annotates the disposal of an Expr statement's expr, or some other value we are done using.
-func annotate_disposal_for_discard(a *ast_expr) bool {
+func annotate_disposal_for_discard(es *exprscope, a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      annotate_disposal(a, DisposeDestroy(void));
+      destroy instpair;
+      if !get_destroy_constructor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
+        return false;
+      }
+      annotate_disposal(a, DisposeDestroy(destroy));
     }
     case &IsLvalYes(v void): {
       annotate_disposal(a, DisposeIgnore(void));
@@ -679,36 +715,73 @@ func annotate_disposal_for_discard(a *ast_expr) bool {
 }
 
 // Annotates the disposal for a value we'll use but then discard.
-func annotate_disposal_for_consume_then_discard(a *ast_expr) bool {
+func annotate_disposal_for_consume_then_discard(es *exprscope, a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
+      destroy instpair;
+      if !get_destroy_constructor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
+        return false;
+      }
       if desc.whole_temporary {
-        annotate_disposal(a, DisposeMoveInPlaceThenDestroy(void));
+        annotate_disposal(a, DisposeMoveInPlaceThenDestroy(destroy));
       } else {
-        annotate_disposal(a, DisposeCopyAndDestroyThenDestroy(void));
+        copy instpair;
+        if !get_copy_constructor(es->ds, &info->cu, &copy) {
+          return false;
+        }
+        destroy_the_copy instpair;
+        if !get_destroy_constructor(es->ds, &info->cu, &destroy_the_copy) {
+          return false;
+        }
+        annotate_disposal(a, DisposeCopyAndDestroyThenDestroy({copy, destroy, destroy_the_copy}));
       }
     }
     case &IsLvalYes(v void): {
-      annotate_disposal(a, DisposeCopyThenDestroy(void));
+      copy instpair;
+      if !get_copy_constructor(es->ds, &info->cu, &copy) {
+        return false;
+      }
+      destroy_the_copy instpair;
+      if !get_destroy_constructor(es->ds, &info->cu, &destroy_the_copy) {
+        return false;
+      }
+      annotate_disposal(a, DisposeCopyThenDestroy({copy, destroy_the_copy}));
     }
   }
   return true;
 }
 
 
-func annotate_disposal_for_assignment(a *ast_expr) bool {
+func annotate_disposal_for_assignment(es *exprscope, a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       if desc.whole_temporary {
-        annotate_disposal(a, DisposeMove(void));
+        move instpair;
+        if !get_move_constructor(es->ds, &info->cu, &move) {
+          return false;
+        }
+        annotate_disposal(a, DisposeMove(move));
       } else {
-        annotate_disposal(a, DisposeCopyAndDestroy(void));
+        // TODO: This dups code with other makers of DisposeCopyAndDestroy.
+        copy instpair;
+        if !get_copy_constructor(es->ds, &info->cu, &copy) {
+          return false;
+        }
+        destroy instpair;
+        if !get_destroy_constructor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
+          return false;
+        }
+        annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}));
       }
     }
     case &IsLvalYes(v void): {
-      annotate_disposal(a, DisposeCopy(void));
+      copy instpair;
+      if !get_copy_constructor(es->ds, &info->cu, &copy) {
+        return false;
+      }
+      annotate_disposal(a, DisposeCopy(copy));
     }
   }
   return true;
@@ -749,7 +822,7 @@ func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *
       if !check_expr_ai(es, AllowIncompleteNo(void), x_i, &ref(&b.fields, i)->type) {
         return false;
       }
-      if !annotate_disposal_for_consume(x_i) {
+      if !annotate_disposal_for_consume(es, x_i) {
         return false;
       }
     }
@@ -763,6 +836,7 @@ func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *
   }
 }
 
+// TODO: Compute destruction of lambda params... not to mention var statement variables (and default-initialization).
 func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_expr) bool {
   // TODO: Cache type.
   type ast_typeexpr = lambda_declared_type(es->im, a);
@@ -1162,7 +1236,7 @@ func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_
     }
   }
 
-  if !annotate_disposal_for_consume(oo(&a->fun)) {
+  if !annotate_disposal_for_consume(es, oo(&a->fun)) {
     return false;
   }
 
@@ -1182,7 +1256,7 @@ func check_funcall_params_firsttime(es *exprscope, params *array[ast_expr], a_pa
     }
     complete bool = expr_type_complete(expr);
     if complete {
-      if !annotate_disposal_for_consume(expr) {
+      if !annotate_disposal_for_consume(es, expr) {
         return false;
       }
     }
@@ -1206,7 +1280,7 @@ func check_funcall_params_secondtime(es *exprscope, functype *cu_typeexpr, param
     if !check_expr_ai(es, AllowIncompleteNo(void), expr, ref(type_params, i)) {
       return false;
     }
-    if !annotate_disposal_for_consume(expr) {
+    if !annotate_disposal_for_consume(es, expr) {
       return false;
     }
   }
@@ -1233,7 +1307,7 @@ func check_expr_index(es *exprscope, x *ast_expr, a *ast_index_expr, pt *te_type
     return false;
   }
 
-  if !annotate_disposal_for_consume(oo(&a->rhs)) {
+  if !annotate_disposal_for_consume(es, oo(&a->rhs)) {
     return false;
   }
 
@@ -1260,7 +1334,7 @@ func check_expr_index(es *exprscope, x *ast_expr, a *ast_index_expr, pt *te_type
   } else {
     // Dereferencing a pointer always makes an lvalue.
     lval = IsLvalYes(void);
-    if !annotate_disposal_for_consume(oo(&a->lhs)) {
+    if !annotate_disposal_for_consume(es, oo(&a->lhs)) {
       return false;
     }
   }

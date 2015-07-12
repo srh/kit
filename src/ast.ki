@@ -280,25 +280,41 @@ func isNo(x is_lval) bool {
   return false;
 }
 
+deftype instpair struct {
+  ent_id def_entry_id;
+  inst_id def_inst_id;
+};
+
+deftype copydestroy struct {
+  copy instpair;
+  destroy instpair;
+};
+
+deftype copydestroydestroy struct {
+  copy instpair;
+  destroy_temporary instpair;
+  destroy instpair;
+};
+
 defenum ast_expr_disposal {
   // Value doesn't get disposed by this expr.  (E.g. it's an lvalue result of a statement expr, or a field access and the value gets disposed of later, or a ParenExpr, etc.)
   DisposeIgnore void;
   // Value gets destroyed (and ignored).  (E.g. it's an rvalue result of a statement expr.)
-  DisposeDestroy void;
+  DisposeDestroy instpair;
   // Value gets copied... into a function param, or variable, or something.  For lvalues.
-  DisposeCopy void;
+  DisposeCopy instpair;
   // Value gets copied... it's an rvalue so the temporary copied from gets destroyed.
-  DisposeCopyAndDestroy void;
+  DisposeCopyAndDestroy copydestroy;
   // Value gets moved.  (E.g. rhs of variable assignment.)
-  DisposeMove void;
+  DisposeMove instpair;
   // Value should get constructed wherever it's supposed to end up, so that it doesn't get moved.  For "whole field" rvalues.
   DisposeMoveInPlace void;
   // We copy the object, use it, then destroy the new object we created.
-  DisposeCopyThenDestroy void;
+  DisposeCopyThenDestroy copydestroy;
   // We move-in-place the object... use it, then destroy it.
-  DisposeMoveInPlaceThenDestroy void;
+  DisposeMoveInPlaceThenDestroy instpair;
   // We copy the object and destroy the old temporary... use it, then destroy the new object we created.
-  DisposeCopyAndDestroyThenDestroy void;
+  DisposeCopyAndDestroyThenDestroy copydestroydestroy;
 };
 
 func `==`(x ast_expr_disposal, y ast_expr_disposal) bool {
@@ -313,28 +329,28 @@ func build_u8str(r *array[u8], x *ast_expr_disposal) void {
     case &DisposeIgnore(v void): {
       append(r, _u8("DisposeIgnore"));
     }
-    case &DisposeDestroy(v void): {
+    case &DisposeDestroy(ip instpair): {
       append(r, _u8("DisposeDestroy"));
     }
-    case &DisposeCopy(v void): {
+    case &DisposeCopy(ip instpair): {
       append(r, _u8("DisposeCopy"));
     }
-    case &DisposeCopyAndDestroy(v void): {
+    case &DisposeCopyAndDestroy(cd copydestroy): {
       append(r, _u8("DisposeCopyAndDestroy"));
     }
-    case &DisposeMove(v void): {
+    case &DisposeMove(ip instpair): {
       append(r, _u8("DisposeMove"));
     }
     case &DisposeMoveInPlace(v void): {
       append(r, _u8("DisposeMoveInPlace"));
     }
-    case &DisposeCopyThenDestroy(v void): {
+    case &DisposeCopyThenDestroy(cd copydestroy): {
       append(r, _u8("DisposeCopyThenDestroy"));
     }
-    case &DisposeMoveInPlaceThenDestroy(v void): {
+    case &DisposeMoveInPlaceThenDestroy(ip instpair): {
       append(r, _u8("DisposeMoveInPlaceThenDestroy"));
     }
-    case &DisposeCopyAndDestroyThenDestroy(v void): {
+    case &DisposeCopyAndDestroyThenDestroy(cdd copydestroydestroy): {
       append(r, _u8("DisposeCopyAndDestroyThenDestroy"));
     }
   }
