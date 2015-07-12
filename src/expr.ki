@@ -158,7 +158,9 @@ func check_discard_expr(ds *defscope, x *ast_expr, pt *te_typeexpr) bool {
   if !check_expr_ai(&es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
-  annotate_disposal_for_discard(x);
+  if !annotate_disposal_for_discard(x) {
+    return false;
+  }
   return true;
 }
 
@@ -167,7 +169,9 @@ func check_consume_expr(ds *defscope, x *ast_expr, pt *te_typeexpr) bool {
   if !check_expr_ai(&es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
-  annotate_disposal_for_consume(x);
+  if !annotate_disposal_for_consume(x) {
+    return false;
+  }
   return true;
 }
 
@@ -177,7 +181,9 @@ func check_consume_then_discard_expr(ds *defscope, x *ast_expr, pt *te_typeexpr)
   if !check_expr_ai(&es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
-  annotate_disposal_for_consume_then_discard(x);
+  if !annotate_disposal_for_consume_then_discard(x) {
+    return false;
+  }
   return true;
 }
 
@@ -472,7 +478,9 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &lhs_info->cu.~) {
         return false;
       }
-      annotate_disposal_for_assignment(oo(&a.rhs));
+      if !annotate_disposal_for_assignment(oo(&a.rhs)) {
+        return false;
+      }
       annotate_info(x, CompleteCheck(mk(lhs_info->lval, lhs_info->cu)));
       return true;
     }
@@ -518,7 +526,9 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &ptr_cac.te) {
         return false;
       }
-      annotate_disposal_for_consume(oo(&a.rhs));
+      if !annotate_disposal_for_consume(oo(&a.rhs)) {
+        return false;
+      }
       param *te_typeexpr;
       if !decompose_typeapp(&expr_complete_type(oo(&a.rhs))->~, primitive_pointer_puretype(es->cs), &param) {
         ice(_u8("Deref sees rhs type being non-pointer."));
@@ -566,7 +576,9 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), &unknown) {
         return false;
       }
-      annotate_disposal_for_consume(oo(&a.lhs));
+      if !annotate_disposal_for_consume(oo(&a.lhs)) {
+        return false;
+      }
       info *ast_expr_complete_info = expr_complete_info(oo(&a.lhs));
       param *te_typeexpr;
       if !decompose_typeapp(&info->cu.~, primitive_pointer_puretype(es->cs), &param) {
@@ -630,7 +642,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
 }
 
 // Annotates the disposal to "consume" the value -- i.e. what happens if it's a function param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or whatever).
-func annotate_disposal_for_consume(a *ast_expr) void {
+func annotate_disposal_for_consume(a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -644,6 +656,7 @@ func annotate_disposal_for_consume(a *ast_expr) void {
       annotate_disposal(a, DisposeCopy(void));
     }
   }
+  return true;
 }
 
 // Annotates the disposal of the expr for local field access -- depends on whether it's an lvalue/rvalue.
@@ -652,7 +665,7 @@ func annotate_disposal_for_field(a *ast_expr) void {
 }
 
 // Annotates the disposal of an Expr statement's expr, or some other value we are done using.
-func annotate_disposal_for_discard(a *ast_expr) void {
+func annotate_disposal_for_discard(a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -662,10 +675,11 @@ func annotate_disposal_for_discard(a *ast_expr) void {
       annotate_disposal(a, DisposeIgnore(void));
     }
   }
+  return true;
 }
 
 // Annotates the disposal for a value we'll use but then discard.
-func annotate_disposal_for_consume_then_discard(a *ast_expr) void {
+func annotate_disposal_for_consume_then_discard(a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -679,10 +693,11 @@ func annotate_disposal_for_consume_then_discard(a *ast_expr) void {
       annotate_disposal(a, DisposeCopyThenDestroy(void));
     }
   }
+  return true;
 }
 
 
-func annotate_disposal_for_assignment(a *ast_expr) void {
+func annotate_disposal_for_assignment(a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -696,6 +711,7 @@ func annotate_disposal_for_assignment(a *ast_expr) void {
       annotate_disposal(a, DisposeCopy(void));
     }
   }
+  return true;
 }
 
 func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *te_typeexpr, x *ast_expr) bool {
@@ -733,7 +749,9 @@ func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *
       if !check_expr_ai(es, AllowIncompleteNo(void), x_i, &ref(&b.fields, i)->type) {
         return false;
       }
-      annotate_disposal_for_consume(x_i);
+      if !annotate_disposal_for_consume(x_i) {
+        return false;
+      }
     }
 
     // We checked is_computed(pt).
@@ -1144,7 +1162,9 @@ func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_
     }
   }
 
-  annotate_disposal_for_consume(oo(&a->fun));
+  if !annotate_disposal_for_consume(oo(&a->fun)) {
+    return false;
+  }
 
   return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(oo(&a->fun))->~);
   annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ *return_type)), ~ *return_type)));
@@ -1162,7 +1182,9 @@ func check_funcall_params_firsttime(es *exprscope, params *array[ast_expr], a_pa
     }
     complete bool = expr_type_complete(expr);
     if complete {
-      annotate_disposal_for_consume(expr);
+      if !annotate_disposal_for_consume(expr) {
+        return false;
+      }
     }
     all_params_complete = all_params_complete & complete;
   }
@@ -1184,7 +1206,9 @@ func check_funcall_params_secondtime(es *exprscope, functype *cu_typeexpr, param
     if !check_expr_ai(es, AllowIncompleteNo(void), expr, ref(type_params, i)) {
       return false;
     }
-    annotate_disposal_for_consume(expr);
+    if !annotate_disposal_for_consume(expr) {
+      return false;
+    }
   }
   return true;
 }
@@ -1209,7 +1233,9 @@ func check_expr_index(es *exprscope, x *ast_expr, a *ast_index_expr, pt *te_type
     return false;
   }
 
-  annotate_disposal_for_consume(oo(&a->rhs));
+  if !annotate_disposal_for_consume(oo(&a->rhs)) {
+    return false;
+  }
 
   lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
 
@@ -1234,7 +1260,9 @@ func check_expr_index(es *exprscope, x *ast_expr, a *ast_index_expr, pt *te_type
   } else {
     // Dereferencing a pointer always makes an lvalue.
     lval = IsLvalYes(void);
-    annotate_disposal_for_consume(oo(&a->lhs));
+    if !annotate_disposal_for_consume(oo(&a->lhs)) {
+      return false;
+    }
   }
   annotate_info(x, CompleteCheck(mk(lval, ~ *ixtype)));
   return true;
