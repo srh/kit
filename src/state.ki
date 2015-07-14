@@ -181,12 +181,10 @@ deftype module struct {
 
 // Describes the behavior of init/copy/move/destroy methods.
 defenum derived_method_behavior {
-  // Behavior's explicitly defined by a method.  Maybe the method doesn't exist!
-  // TODO: Add def entry, def inst id, optional for when it d.n.e.
-  DerivedMethodExplicit void;
-  // Behavior's derived structurally, and one of its fields/constructors has an explicit method call.
-  // TODO: This should be defined in one place by a method, and should have a def_inst_id.
-  DerivedMethodNontrivial void;
+  // Behavior's explicitly defined by a method.  Maybe the method doesn't exist!  This value does not need to be computed, if the method never gets called.
+  DerivedMethodExplicit nbfc[opt[instpair]];
+  // Behavior's derived structurally, and one of its fields/constructors has an explicit method call.  Maybe the method doesn't exist, because one of its fields' doesn't.
+  DerivedMethodNontrivial nbfc[opt[instpair]];
   // Behavior's derived from the type definition (or it's primitive) and it's trivial. init: Fills with zero.  copy/move: memcpy.  destroy: no-op.
   DerivedMethodTrivial void;
 };
@@ -202,7 +200,7 @@ func trivialOrNot(is_trivial bool) derived_method_behavior {
   if is_trivial {
     return DerivedMethodTrivial(void);
   } else {
-    return DerivedMethodNontrivial(void);
+    return DerivedMethodNontrivial(NotComputed());
   }
 }
 
@@ -222,15 +220,15 @@ func to_defclass_properties(a ast_defclass_disposition, props type_properties) t
       // ret is fine as it is.
     }
     case DefaultMove(v void): {
-      ret.init_behavior = DerivedMethodExplicit(void);
-      ret.copy_behavior = DerivedMethodExplicit(void);
-      ret.destroy_behavior = DerivedMethodExplicit(void);
+      ret.init_behavior = DerivedMethodExplicit(NotComputed());
+      ret.copy_behavior = DerivedMethodExplicit(NotComputed());
+      ret.destroy_behavior = DerivedMethodExplicit(NotComputed());
     }
     case NoDefaults(v void): {
-      ret.init_behavior = DerivedMethodExplicit(void);
-      ret.move_behavior = DerivedMethodExplicit(void);
-      ret.copy_behavior = DerivedMethodExplicit(void);
-      ret.destroy_behavior = DerivedMethodExplicit(void);
+      ret.init_behavior = DerivedMethodExplicit(NotComputed());
+      ret.move_behavior = DerivedMethodExplicit(NotComputed());
+      ret.copy_behavior = DerivedMethodExplicit(NotComputed());
+      ret.destroy_behavior = DerivedMethodExplicit(NotComputed());
     }
   }
   return ret;
