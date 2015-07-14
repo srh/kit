@@ -306,8 +306,8 @@ func ds_lookup_name(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_o
     return false;
   }
 
-  switch res {
-    case NoMatch(v void): {
+  switch &res {
+    case &NoMatch(v void): {
       constructor_res ds_constructor_res;
       if !ds_lookup_constructor(ds, name, gp, pt, &constructor_res) {
         return false;
@@ -325,11 +325,12 @@ func ds_lookup_name(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_o
       }
       return true;
     }
-    case MultiMatch(void): {
+    case &MultiMatch(void): {
       *res_out = AmbigGlobalMatch(void);
       return true;
     }
-    case OneMatch(m struct { ent def_entry_id; parms genparms; }): {
+    case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
+      // TODO: This is duplicated with lookup_explicit_method_or_lack_thereof.  Put logic in match_def or a wrapper?
       cu_parms cu_genparms;
       if !check_and_compute_parms(ds->cs, ds->clq, &m.parms, &cu_parms) {
         return false;

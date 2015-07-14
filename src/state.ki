@@ -181,8 +181,10 @@ deftype module struct {
 
 // Describes the behavior of init/copy/move/destroy methods.
 defenum derived_method_behavior {
+  // TODO: Maybe have DerivedMethodAbsent instead of these opt parameters.
+
   // Behavior's explicitly defined by a method.  Maybe the method doesn't exist!  This value does not need to be computed, if the method never gets called.
-  DerivedMethodExplicit nbfc[opt[instpair]];
+  DerivedMethodExplicit opt[instpair];
   // Behavior's derived structurally, and one of its fields/constructors has an explicit method call.  Maybe the method doesn't exist, because one of its fields' doesn't.
   DerivedMethodNontrivial nbfc[opt[instpair]];
   // Behavior's derived from the type definition (or it's primitive) and it's trivial. init: Fills with zero.  copy/move: memcpy.  destroy: no-op.
@@ -213,25 +215,95 @@ deftype type_properties struct {
   destroy_behavior derived_method_behavior;
 };
 
-func to_defclass_properties(a ast_defclass_disposition, props type_properties) type_properties {
+func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
+  name sym = ref_deftype_entry(cs, ent_id)->name;
+  switch &ref_deftype_inst(cs, inst_id)->parms {
+    case &NoParms(v void): {
+      return ~TeName({name, Has({ent_id, inst_id})});
+    }
+    case &HasParms(a array[cu_typeexpr]): {
+      // TODO: Ugh, just get rid of cu_typeexpr?
+      converted array[te_typeexpr];
+      n size = count(&a);
+      for i size = 0; i < n; i = i + 1 {
+        push(&converted, ref(&a, i)->~);
+      }
+      return ~TeApp({embox(TePureName(name)), converted, Has({ent_id, inst_id})});
+    }
+  }
+}
+
+func lookup_explicit_method_or_lack_thereof(cs *checkstate, clq *clqueue, fntype *te_typeexpr, impl_name sym, behavior_out *derived_method_behavior) bool {
+  res match_def_res;
+  gp genparms = NoParms(void);
+  if !match_def(cs, impl_name, &gp, fntype, &res) {
+    return false;
+  }
+
+  switch &res {
+    case &NoMatch(v void): {
+      *behavior_out = DerivedMethodExplicit(None());
+      return true;
+    }
+    case &MultiMatch(v void): {
+      ERR(_u8("Multiple explicit methods '"), lookup(cs->im, impl_name), _u8("'"));
+      return false;
+    }
+    case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
+      // TODO: This is duplicated with ds_lookup_name.  Put logic in match_def or a wrapper?
+      cu_parms cu_genparms;
+      if !check_and_compute_parms(cs, clq, &m.parms, &cu_parms) {
+        return false;
+      }
+      inst_id def_inst_id = enqueue_def_inst(cs, clq, m.ent, &cu_parms);
+      *behavior_out = DerivedMethodExplicit(Has(@[instpair]{m.ent, inst_id}));
+      return true;
+    }
+  }
+}
+
+func to_defclass_properties(cs *checkstate, clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, props type_properties, out *type_properties) bool {
   ret type_properties = props;
   switch a {
     case DefaultCopyMoveDestroy(v void): {
       // ret is fine as it is.
     }
     case DefaultMove(v void): {
-      ret.init_behavior = DerivedMethodExplicit(NotComputed());
-      ret.copy_behavior = DerivedMethodExplicit(NotComputed());
-      ret.destroy_behavior = DerivedMethodExplicit(NotComputed());
+      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      ptrtype te_typeexpr = ptr_type(cs, type.~);
+      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_init"))), &ret.init_behavior) {
+        return false;
+      }
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, from_u8(_u8("do_copy"))), &ret.copy_behavior) {
+        return false;
+      }
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_destroy"))), &ret.destroy_behavior) {
+        return false;
+      }
     }
     case NoDefaults(v void): {
-      ret.init_behavior = DerivedMethodExplicit(NotComputed());
-      ret.move_behavior = DerivedMethodExplicit(NotComputed());
-      ret.copy_behavior = DerivedMethodExplicit(NotComputed());
-      ret.destroy_behavior = DerivedMethodExplicit(NotComputed());
+      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      ptrtype te_typeexpr = ptr_type(cs, type.~);
+      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_init"))), &ret.init_behavior) {
+        return false;
+      }
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, from_u8(_u8("do_move"))), &ret.move_behavior) {
+        return false;
+      }
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, from_u8(_u8("do_copy"))), &ret.copy_behavior) {
+        return false;
+      }
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_destroy"))), &ret.destroy_behavior) {
+        return false;
+      }
     }
   }
-  return ret;
+  *out = ret;
+  return true;
 }
 
 defenum deftype_inst_status {
