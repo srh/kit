@@ -646,25 +646,57 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
   }
 }
 
-// TODO:  Implement these.
+func behavior_to_desc(b *derived_method_behavior, out *ctor_desc) bool {
+  switch b {
+    case &DerivedMethodAbsent(v void): {
+      ERR(_u8("Cannot find derived method."));
+      return false;
+    }
+    case &DerivedMethodExplicit(ip instpair): {
+      *out = FunCtor(ip);
+      return true;
+    }
+    case &DerivedMethodNontrivial(ip instpair): {
+      *out = FunCtor(ip);
+      return true;
+    }
+    case &DerivedMethodTrivial(v void): {
+      *out = TrivialCtor(void);
+      return true;
+    }
+  }
+}
+
 func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
-  return true;
-  return TODO();
+  props type_properties;
+  if !compute_type_properties(ds->cs, ds->clq, t, &props) {
+    return false;
+  }
+  return behavior_to_desc(&props.init_behavior, out);
 }
 
 func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
-  return true;
-  return TODO();
+  props type_properties;
+  if !compute_type_properties(ds->cs, ds->clq, t, &props) {
+    return false;
+  }
+  return behavior_to_desc(&props.copy_behavior, out);
 }
 
 func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
-  return true;
-  return TODO();
+  props type_properties;
+  if !compute_type_properties(ds->cs, ds->clq, t, &props) {
+    return false;
+  }
+  return behavior_to_desc(&props.move_behavior, out);
 }
 
 func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
-  return true;
-  return TODO();
+  props type_properties;
+  if !compute_type_properties(ds->cs, ds->clq, t, &props) {
+    return false;
+  }
+  return behavior_to_desc(&props.destroy_behavior, out);
 }
 
 // Annotates the disposal to "consume" the value -- i.e. what happens if it's a function param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or whatever).
