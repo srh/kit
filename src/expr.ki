@@ -914,7 +914,7 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
 
   bs bodystate = mk(es->ds, &return_type);
   ee entryexit;
-  if !check_body(&bs, &a->body, &ee) {
+  if !check_body(&bs, &a->body.bb, &ee) {
     return false;
   }
 

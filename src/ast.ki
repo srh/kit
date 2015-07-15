@@ -217,10 +217,14 @@ deftype ast_switch_case struct {
   body ast_bracebody;
 };
 
+deftype ast_fullbody struct {
+  bb ast_bracebody;
+};
+
 deftype ast_lambda struct {
   args array[ast_vardecl];
   return_type ast_typeexpr;
-  body ast_bracebody;
+  body ast_fullbody;
 };
 
 defenum ast_fieldname {

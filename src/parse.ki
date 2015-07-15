@@ -143,7 +143,7 @@ func parse_rest_of_func(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
   }
 
   *out = Def({is_export, IsNotVar(void), generics, name, None(),
-              mk(Lambda({params, return_type, body}))});
+              mk(Lambda({params, return_type, {body}}))});
   return true;
 }
 
@@ -990,7 +990,7 @@ func parse_rest_of_lambda(p *ps, out *ast_expr) bool {
   if !parse_lambdaspec(p, &args, &return_type, &body) {
     return Fail;
   }
-  *out = mk(Lambda({args, return_type, body}));
+  *out = mk(Lambda({args, return_type, {body}}));
   return true;
 }
 
