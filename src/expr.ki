@@ -912,17 +912,23 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
 
   return_type cu_typeexpr = ~get(computed_params, nargs);
 
-  bs bodystate = mk(es->ds, &return_type);
-  ee entryexit;
-  if !check_body(&bs, &a->body.bb, &ee) {
-    return false;
-  }
-
-  if !finish_lambda_body(&bs, ee) {
+  if !check_fullbody(es->ds, &a->body, &return_type) {
     return false;
   }
 
   annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~computed.te)), ~computed.te)));
+  return true;
+}
+
+func check_fullbody(ds *defscope, a *ast_fullbody, return_type *cu_typeexpr) bool {
+  bs bodystate = mk(ds, return_type);
+  ee entryexit;
+  if !check_body(&bs, &a->bb, &ee) {
+    return false;
+  }
+  if !finish_lambda_body(&bs, ee) {
+    return false;
+  }
   return true;
 }
 
