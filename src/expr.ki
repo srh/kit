@@ -139,6 +139,22 @@ func ds_push_var(ds *defscope, vp *varpopper, name *ast_ident, computed_type *cu
   return true;
 }
 
+func descope_vars(vp *varpopper) void {
+  ds *defscope = vp->ds;
+  check(ds != null);
+  while case Has(expected var_number) = popval(&vp->nums) {
+    num var_number;
+    if !popval(&ds->current_vars, &num) {
+      ice(_u8("varpopper sees empty local_vars"));
+    }
+    if num != expected {
+      ice(_u8("varpopper sees mismatch"));
+    }
+  }
+}
+
+}  // access varpopper
+
 func ds_note_var_initter(ds *defscope, vn var_number) bool {
   info *var_info = ref_var(ds, vn);
   if case &Has(desc ctor_desc) = &info->initter {
@@ -164,22 +180,6 @@ func ds_note_var_destroyer(ds *defscope, vn var_number) bool {
   info->destroyer = Has(desc);
   return true;
 }
-
-func descope_vars(vp *varpopper) void {
-  ds *defscope = vp->ds;
-  check(ds != null);
-  while case Has(expected var_number) = popval(&vp->nums) {
-    num var_number;
-    if !popval(&ds->current_vars, &num) {
-      ice(_u8("varpopper sees empty local_vars"));
-    }
-    if num != expected {
-      ice(_u8("varpopper sees mismatch"));
-    }
-  }
-}
-
-}  // access varpopper
 
 func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr) bool {
   ds defscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]](), default@[array[var_number]]()};
@@ -930,6 +930,7 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
     ice(_u8("lambda type is not a function type"));
   }
   vp varpopper;
+  init_vp(&vp, es->ds);
   nargs size = count(&a->args);
   for i size = 0; i < nargs; i = i + 1 {
     cu_param cu_typeexpr = ~get(computed_params, i);

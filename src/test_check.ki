@@ -1142,6 +1142,31 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
     _u8("func y(x i32) void {\n"
         "  x = 5;\n"
         "}\n"));
+
+  // Fails because ty doesn't have an init method.
+  run_check_negtest(ctx, "c132-a",
+    _u8("defclass copy ty i32;\n"
+        "func foo() ty { t *ty = null; return *t; }\n"
+        "func f() void {\n"
+        "  if true {\n"
+        "    var k ty = foo();\n"
+        "    label bar;\n"
+        "  }\n"
+        "  goto bar;\n"
+        "}\n"));
+  run_check_test(ctx, "c132-b",
+    _u8("defclass copy ty i32;\n"
+        "access ty {\n"
+        "  func do_init(t *ty) void { }\n"
+        "}\n"
+        "func foo() ty { t *ty = null; return *t; }\n"
+        "func f() void {\n"
+        "  if true {\n"
+        "    var k ty = foo();\n"
+        "    label bar;\n"
+        "  }\n"
+        "  goto bar;\n"
+        "}\n"));
 }
 
 

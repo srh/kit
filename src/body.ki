@@ -74,6 +74,7 @@ func check_body(bs *bodystate, a *ast_bracebody, ee_out *entryexit) bool {
   entry statement_num = add_statement(bs, None());
   exit statement_num = entry;
   vp varpopper;
+  init_vp(&vp, bs->ds);
   for i size = 0; i < nstatements; i = i + 1 {
     s *ast_statement = ref(&a->statements, i);
     ee entryexit;
@@ -503,9 +504,21 @@ func connect_gotos(bs *bodystate) bool {
 
       nconstruct size = count(&construct);
       for k size = 0; k < nconstruct; k = k + 1 {
-        vi *var_info = ref_var(bs->ds, get(&construct, k));
+        vn var_number = get(&construct, k);
+        vi *var_info = ref_var(bs->ds, vn);
         if vi->autoinit == AutoInitNo(void) {
           ERR(_u8("goto for label '"), lookup(bs->im, l->label_name), _u8("' enters non-initializable variable's scope"));
+          return false;
+        }
+        if !ds_note_var_initter(bs->ds, vn) {
+          return false;
+        }
+      }
+
+      ndestruct size = count(&destruct);
+      for k size = 0; k < ndestruct; k = k + 1 {
+        vn var_number = get(&destruct, k);
+        if !ds_note_var_destroyer(bs->ds, vn) {
           return false;
         }
       }
