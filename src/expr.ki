@@ -79,6 +79,8 @@ deftype var_info struct {
   name sym;
   // Can a goto statement enter this var's scope and construct the var?  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)
   autoinit var_autoinit;
+  initter opt[ctor_desc];
+  destroyer opt[ctor_desc];
 };
 
 func ref_var(ds *defscope, num var_number) *var_info {
@@ -124,15 +126,42 @@ func do_destroy(vp *varpopper) void {
   vp->ds = null;
 }
 
-func ds_push_var(ds *defscope, vp *varpopper, name *ast_ident, computed_type *cu_typeexpr, autoinit var_autoinit) bool {
+func ds_push_var(ds *defscope, vp *varpopper, name *ast_ident, computed_type *cu_typeexpr, autoinit var_autoinit, vn_out *var_number) bool {
   if case Has(num var_number) = ds_find_current_local(ds, name->value) {
     ERR(_u8("Local variable '"), lookup(ds->im, name->value), _u8("' shadows another"));
     return false;
   }
   num var_number = ~count(&ds->all_vars);
-  push(&ds->all_vars, {num, *computed_type, name->value, autoinit});
+  push(&ds->all_vars, {num, *computed_type, name->value, autoinit, None(), None()});
   push(&ds->current_vars, num);
   push(&vp->nums, num);
+  *vn_out = num;
+  return true;
+}
+
+func ds_note_var_initter(ds *defscope, vn var_number) bool {
+  info *var_info = ref_var(ds, vn);
+  if case &Has(desc ctor_desc) = &info->initter {
+    return true;
+  }
+  desc ctor_desc;
+  if !get_init_ctor(ds, &info->type, &desc) {
+    return false;
+  }
+  info->initter = Has(desc);
+  return true;
+}
+
+func ds_note_var_destroyer(ds *defscope, vn var_number) bool {
+  info *var_info = ref_var(ds, vn);
+  if case &Has(desc ctor_desc) = &info->destroyer {
+    return true;
+  }
+  desc ctor_desc;
+  if !get_destroy_ctor(ds, &info->type, &desc) {
+    return false;
+  }
+  info->destroyer = Has(desc);
   return true;
 }
 
@@ -904,8 +933,13 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
   nargs size = count(&a->args);
   for i size = 0; i < nargs; i = i + 1 {
     cu_param cu_typeexpr = ~get(computed_params, i);
+    // TODO: Annotate the AST with this var number.
+    vn var_number;
     // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
-    if !ds_push_var(es->ds, &vp, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void)) {
+    if !ds_push_var(es->ds, &vp, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {
+      return false;
+    }
+    if !ds_note_var_destroyer(es->ds, vn) {
       return false;
     }
   }

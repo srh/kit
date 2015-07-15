@@ -126,8 +126,7 @@ deftype ast_bracebody struct {
 };
 
 deftype ast_var_info struct {
-  // This is Has if and only if rhs is None() -- we need to call the init function.
-  init opt[ctor_desc];
+  vn var_number;
 };
 
 deftype ast_var_statement struct {
