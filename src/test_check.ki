@@ -605,8 +605,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "  var x blah;\n"
         "  return 1;\n"
         "};\n"));
-  // TODO: This should fail because k is not default-initializable.
-  run_check_test(ctx, "c079",
+  run_check_negtest(ctx, "c079",
     _u8("defclass copy ty i32;\n"
         "def foo fn[i32] = func() i32 {\n"
         "  var k ty;\n"
@@ -626,8 +625,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "  return 1;\n"
         "};\n"));
 
-  // TODO: This should fail because k is not default-initializable.
-  run_check_test(ctx, "c081",
+  run_check_negtest(ctx, "c081",
     _u8("defclass copy ty i32;\n"
         "deftype ty2 struct { x i32; y ty; };\n"
         "def foo fn[i32] = func() i32 {\n"
