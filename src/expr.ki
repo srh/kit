@@ -647,6 +647,11 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
 }
 
 // TODO:  Implement these.
+func get_init_constructor(ds *defscope, t *cu_typeexpr, out *instpair) bool {
+  return true;
+  return TODO();
+}
+
 func get_copy_constructor(ds *defscope, t *cu_typeexpr, out *instpair) bool {
   return true;
   return TODO();

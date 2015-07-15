@@ -125,7 +125,13 @@ deftype ast_bracebody struct {
   statements array[ast_statement];
 };
 
+deftype ast_var_info struct {
+  // This is Has if rhs is None() -- we need to call the init function.
+  init opt[instpair];
+};
+
 deftype ast_var_statement struct {
+  info opt[ast_var_info];
   decl ast_vardecl;
   rhs opt[box[ast_expr]];
 };

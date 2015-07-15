@@ -1096,7 +1096,7 @@ func parse_rest_of_var_statement(p *ps, out *ast_statement) bool {
   }
 
   if try_skip_oper(p, ';') {
-    *out = Var({decl, None()});
+    *out = Var({None(), decl, None()});
     return true;
   }
 
@@ -1107,7 +1107,7 @@ func parse_rest_of_var_statement(p *ps, out *ast_statement) bool {
     return Fail;
   }
 
-  *out = Var({decl, Has(rhs)});
+  *out = Var({None(), decl, Has(rhs)});
   return true;
 }
 
@@ -1373,7 +1373,7 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
       case ForceAssignmentYes(v): { return Fail; }
       case ForceAssignmentNo(v): {
         step(p);
-        *out = Var({decl, None()});
+        *out = Var({None(), decl, None()});
         return true;
       }
     }
@@ -1385,7 +1385,7 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
        && try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = Var({decl, Has(rhs)});
+  *out = Var({None(), decl, Has(rhs)});
   return true;
 }
 

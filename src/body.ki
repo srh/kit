@@ -130,6 +130,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
           return false;
         }
         complete_type = expr_complete_type(oo(&x));
+        b.info = Has({None()});
       } else {
         if !computed.complete {
           ERR(_u8("Variable declaration with no rhs, incomplete type"));
@@ -138,6 +139,12 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
         // NOTE: The object must be default-constructible.
         cu_computed = ~computed.te;
         complete_type = &cu_computed;
+        check(isNone(&b.info));
+        init_ip instpair;
+        if !get_init_constructor(bs->ds, &cu_computed, &init_ip) {
+          return false;
+        }
+        b.info = Has({Has(init_ip)});
       }
 
       if !ds_push_var(bs->ds, vp, &b.decl.name, complete_type, AutoInitYes(void)) {
