@@ -890,13 +890,14 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
         return fake();
       }
     }
+
     case &TeStruct(a te_struct): {
       offset u32 = 0;
       max_alignment u32 = 1;
-      init_trivial bool = true;
-      move_trivial bool = true;
-      copy_trivial bool = true;
-      destroy_trivial bool = true;
+      init_level u32 = 0;
+      move_level u32 = 0;
+      copy_level u32 = 0;
+      destroy_level u32 = 0;
       n size = count(&a.fields);
       for i size = 0; i < n; i = i + 1 {
         props type_properties;
@@ -906,25 +907,26 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
         offset = ceil_aligned(offset, props.flat_alignment);
         offset = offset + props.flat_size;
         max_alignment = max(max_alignment, props.flat_alignment);
-        init_trivial = init_trivial & isTrivial(props.init_behavior);
-        move_trivial = move_trivial & isTrivial(props.move_behavior);
-        copy_trivial = copy_trivial & isTrivial(props.copy_behavior);
-        destroy_trivial = destroy_trivial & isTrivial(props.destroy_behavior);
+        init_level = max(init_level, behavior_level(&props.init_behavior));
+        move_level = max(move_level, behavior_level(&props.move_behavior));
+        copy_level = max(copy_level, behavior_level(&props.copy_behavior));
+        destroy_level = max(destroy_level, behavior_level(&props.destroy_behavior));
       }
       check(offset % max_alignment == 0);
-      *out = {offset, max_alignment, trivialOrNot(init_trivial),
-              trivialOrNot(move_trivial), trivialOrNot(copy_trivial),
-              trivialOrNot(destroy_trivial)};
+      *out = {offset, max_alignment, level_to_derived(init_level),
+              level_to_derived(move_level), level_to_derived(copy_level),
+              level_to_derived(destroy_level)};
       return true;
     }
+
     case &TeEnum(a te_enum): {
       tag_size u32 = cs->platform.enum_tag_size;
       max_size u32 = tag_size;
       max_alignment u32 = tag_size;
-      init_trivial bool = true;
-      move_trivial bool = true;
-      copy_trivial bool = true;
-      destroy_trivial bool = true;
+      init_level u32 = 0;
+      move_level u32 = 0;
+      copy_level u32 = 0;
+      destroy_level u32 = 0;
       n size = count(&a.constructors);
       for i size = 0; i < n; i = i + 1 {
         props type_properties;
@@ -934,18 +936,20 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
         tagged_size u32 = ceil_aligned(tag_size, props.flat_alignment) + props.flat_size;
         max_size = max(max_size, tagged_size);
         max_alignment = max(max_alignment, props.flat_alignment);
-        init_trivial = init_trivial & isTrivial(props.init_behavior);
-        move_trivial = move_trivial & isTrivial(props.move_behavior);
-        copy_trivial = copy_trivial & isTrivial(props.copy_behavior);
-        destroy_trivial = destroy_trivial & isTrivial(props.destroy_behavior);
+        init_level = max(init_level, behavior_level(&props.init_behavior));
+        move_level = max(move_level, behavior_level(&props.move_behavior));
+        copy_level = max(copy_level, behavior_level(&props.copy_behavior));
+        destroy_level = max(destroy_level, behavior_level(&props.destroy_behavior));
       }
+
       // See TeUnion for explanation of final_size.
       final_size u32 = ceil_aligned(max_size, max_alignment);
-      *out = {final_size, max_alignment, trivialOrNot(init_trivial),
-              trivialOrNot(move_trivial), trivialOrNot(copy_trivial),
-              trivialOrNot(destroy_trivial)};
+      *out = {final_size, max_alignment, level_to_derived(init_level),
+              level_to_derived(move_level), level_to_derived(copy_level),
+              level_to_derived(destroy_level)};
       return true;
     }
+
     case &TeUnion(a te_union): {
       // This is very similar to TeEnum, but TeEnum will change and this will not.
       max_size u32 = 0;
@@ -970,6 +974,7 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
               DerivedMethodTrivial(void)};
       return true;
     }
+
     case &TeArraytype(a te_arraytype): {
       if case Has(c u32) = a.count {
         props type_properties;
@@ -979,22 +984,56 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
 
         // We _should_ maintain alignment for a zero-element array because the pointer to such an array might hack in tag-bit logic.
         *out = {props.flat_size * c, props.flat_alignment,
-                trivialOrNot(isTrivial(props.init_behavior)),
-                trivialOrNot(isTrivial(props.move_behavior)),
-                trivialOrNot(isTrivial(props.copy_behavior)),
-                trivialOrNot(isTrivial(props.destroy_behavior))};
+                level_to_derived(behavior_level(&props.init_behavior)),
+                level_to_derived(behavior_level(&props.move_behavior)),
+                level_to_derived(behavior_level(&props.copy_behavior)),
+                level_to_derived(behavior_level(&props.destroy_behavior))};
         return true;
       } else {
         ice(_u8("compute_type_properties called on incomplete arraytype."));
         return fake();
       }
     }
+
     case &TeUnknown(a void): {
       ice(_u8("compute_type_properties called on incomplete type."));
       return fake();
     }
   }
 }
+
+func behavior_level(b *derived_method_behavior) u32 {
+  switch b {
+    case &DerivedMethodAbsent(v void): {
+      return 2;
+    }
+    case &DerivedMethodExplicit(ip instpair): {
+      return 1;
+    }
+    case &DerivedMethodNontrivial(v nbfc[opt[instpair]]): {
+      return 1;
+    }
+    case &DerivedMethodTrivial(v void): {
+      return 0;
+    }
+  }
+}
+
+func level_to_derived(level u32) derived_method_behavior {
+  if level == 0 {
+    return DerivedMethodTrivial(void);
+  } else if level == 1 {
+    return DerivedMethodNontrivial(NotComputed());
+  } else if level == 2 {
+    return DerivedMethodAbsent(void);
+  } else {
+    ice(_u8("level_to_derived sees impossible level"));
+    return fake();
+  }
+}
+
+
+
 
 func lambda_declared_type(im *identmap, a *ast_lambda) ast_typeexpr {
   type_params array[ast_typeexpr];

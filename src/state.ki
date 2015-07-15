@@ -181,10 +181,10 @@ deftype module struct {
 
 // Describes the behavior of init/copy/move/destroy methods.
 defenum derived_method_behavior {
-  // TODO: Maybe have DerivedMethodAbsent instead of these opt parameters.
-
-  // Behavior's explicitly defined by a method.  Maybe the method doesn't exist!  This value does not need to be computed, if the method never gets called.
-  DerivedMethodExplicit opt[instpair];
+  // Behavior would be explicitly defined by a method, but it doesn't exist -- behavior is not allowed.
+  DerivedMethodAbsent void;
+  // Behavior's explicitly defined by a method.
+  DerivedMethodExplicit instpair;
   // Behavior's derived structurally, and one of its fields/constructors has an explicit method call.  Maybe the method doesn't exist, because one of its fields' doesn't.
   DerivedMethodNontrivial nbfc[opt[instpair]];
   // Behavior's derived from the type definition (or it's primitive) and it's trivial. init: Fills with zero.  copy/move: memcpy.  destroy: no-op.
@@ -196,14 +196,6 @@ func isTrivial(behav derived_method_behavior) bool {
     return true;
   }
   return false;
-}
-
-func trivialOrNot(is_trivial bool) derived_method_behavior {
-  if is_trivial {
-    return DerivedMethodTrivial(void);
-  } else {
-    return DerivedMethodNontrivial(NotComputed());
-  }
 }
 
 deftype type_properties struct {
@@ -242,7 +234,7 @@ func lookup_explicit_method_or_lack_thereof(cs *checkstate, clq *clqueue, fntype
 
   switch &res {
     case &NoMatch(v void): {
-      *behavior_out = DerivedMethodExplicit(None());
+      *behavior_out = DerivedMethodAbsent(void);
       return true;
     }
     case &MultiMatch(v void): {
@@ -256,7 +248,7 @@ func lookup_explicit_method_or_lack_thereof(cs *checkstate, clq *clqueue, fntype
         return false;
       }
       inst_id def_inst_id = enqueue_def_inst(cs, clq, m.ent, &cu_parms);
-      *behavior_out = DerivedMethodExplicit(Has(@[instpair]{m.ent, inst_id}));
+      *behavior_out = DerivedMethodExplicit({m.ent, inst_id});
       return true;
     }
   }
