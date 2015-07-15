@@ -647,22 +647,22 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
 }
 
 // TODO:  Implement these.
-func get_init_constructor(ds *defscope, t *cu_typeexpr, out *instpair) bool {
+func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   return true;
   return TODO();
 }
 
-func get_copy_constructor(ds *defscope, t *cu_typeexpr, out *instpair) bool {
+func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   return true;
   return TODO();
 }
 
-func get_move_constructor(ds *defscope, t *cu_typeexpr, out *instpair) bool {
+func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   return true;
   return TODO();
 }
 
-func get_destroy_constructor(ds *defscope, t *cu_typeexpr, out *instpair) bool {
+func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   return true;
   return TODO();
 }
@@ -675,20 +675,20 @@ func annotate_disposal_for_consume(es *exprscope, a *ast_expr) bool {
       if desc.whole_temporary {
         annotate_disposal(a, DisposeMoveInPlace(void));
       } else {
-        copy instpair;
-        if !get_copy_constructor(es->ds, &info->cu, &copy) {
+        copy ctor_desc;
+        if !get_copy_ctor(es->ds, &info->cu, &copy) {
           return false;
         }
-        destroy instpair;
-        if !get_destroy_constructor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
+        destroy ctor_desc;
+        if !get_destroy_ctor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
           return false;
         }
         annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}));
       }
     }
     case &IsLvalYes(v void): {
-      copy instpair;
-      if !get_copy_constructor(es->ds, &info->cu, &copy) {
+      copy ctor_desc;
+      if !get_copy_ctor(es->ds, &info->cu, &copy) {
         return false;
       }
       annotate_disposal(a, DisposeCopy(copy));
@@ -707,8 +707,8 @@ func annotate_disposal_for_discard(es *exprscope, a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      destroy instpair;
-      if !get_destroy_constructor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
+      destroy ctor_desc;
+      if !get_destroy_ctor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
         return false;
       }
       annotate_disposal(a, DisposeDestroy(destroy));
@@ -725,31 +725,31 @@ func annotate_disposal_for_consume_then_discard(es *exprscope, a *ast_expr) bool
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      destroy instpair;
-      if !get_destroy_constructor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
+      destroy ctor_desc;
+      if !get_destroy_ctor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
         return false;
       }
       if desc.whole_temporary {
         annotate_disposal(a, DisposeMoveInPlaceThenDestroy(destroy));
       } else {
-        copy instpair;
-        if !get_copy_constructor(es->ds, &info->cu, &copy) {
+        copy ctor_desc;
+        if !get_copy_ctor(es->ds, &info->cu, &copy) {
           return false;
         }
-        destroy_the_copy instpair;
-        if !get_destroy_constructor(es->ds, &info->cu, &destroy_the_copy) {
+        destroy_the_copy ctor_desc;
+        if !get_destroy_ctor(es->ds, &info->cu, &destroy_the_copy) {
           return false;
         }
         annotate_disposal(a, DisposeCopyAndDestroyThenDestroy({copy, destroy, destroy_the_copy}));
       }
     }
     case &IsLvalYes(v void): {
-      copy instpair;
-      if !get_copy_constructor(es->ds, &info->cu, &copy) {
+      copy ctor_desc;
+      if !get_copy_ctor(es->ds, &info->cu, &copy) {
         return false;
       }
-      destroy_the_copy instpair;
-      if !get_destroy_constructor(es->ds, &info->cu, &destroy_the_copy) {
+      destroy_the_copy ctor_desc;
+      if !get_destroy_ctor(es->ds, &info->cu, &destroy_the_copy) {
         return false;
       }
       annotate_disposal(a, DisposeCopyThenDestroy({copy, destroy_the_copy}));
@@ -764,27 +764,27 @@ func annotate_disposal_for_assignment(es *exprscope, a *ast_expr) bool {
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       if desc.whole_temporary {
-        move instpair;
-        if !get_move_constructor(es->ds, &info->cu, &move) {
+        move ctor_desc;
+        if !get_move_ctor(es->ds, &info->cu, &move) {
           return false;
         }
         annotate_disposal(a, DisposeMove(move));
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
-        copy instpair;
-        if !get_copy_constructor(es->ds, &info->cu, &copy) {
+        copy ctor_desc;
+        if !get_copy_ctor(es->ds, &info->cu, &copy) {
           return false;
         }
-        destroy instpair;
-        if !get_destroy_constructor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
+        destroy ctor_desc;
+        if !get_destroy_ctor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
           return false;
         }
         annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}));
       }
     }
     case &IsLvalYes(v void): {
-      copy instpair;
-      if !get_copy_constructor(es->ds, &info->cu, &copy) {
+      copy ctor_desc;
+      if !get_copy_ctor(es->ds, &info->cu, &copy) {
         return false;
       }
       annotate_disposal(a, DisposeCopy(copy));
