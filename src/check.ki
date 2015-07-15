@@ -913,9 +913,11 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
         destroy_level = max(destroy_level, behavior_level(&props.destroy_behavior));
       }
       check(offset % max_alignment == 0);
-      *out = {offset, max_alignment, level_to_derived(init_level),
-              level_to_derived(move_level), level_to_derived(copy_level),
-              level_to_derived(destroy_level)};
+      *out = {offset, max_alignment,
+              level_to_derived(cs, clq, cs->im->cym.magic_init, 1, t, init_level),
+              level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, move_level),
+              level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, copy_level),
+              level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, destroy_level)};
       return true;
     }
 
@@ -944,9 +946,11 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
 
       // See TeUnion for explanation of final_size.
       final_size u32 = ceil_aligned(max_size, max_alignment);
-      *out = {final_size, max_alignment, level_to_derived(init_level),
-              level_to_derived(move_level), level_to_derived(copy_level),
-              level_to_derived(destroy_level)};
+      *out = {final_size, max_alignment,
+              level_to_derived(cs, clq, cs->im->cym.magic_init, 1, t, init_level),
+              level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, move_level),
+              level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, copy_level),
+              level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, destroy_level)};
       return true;
     }
 
@@ -984,10 +988,10 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
 
         // We _should_ maintain alignment for a zero-element array because the pointer to such an array might hack in tag-bit logic.
         *out = {props.flat_size * c, props.flat_alignment,
-                level_to_derived(behavior_level(&props.init_behavior)),
-                level_to_derived(behavior_level(&props.move_behavior)),
-                level_to_derived(behavior_level(&props.copy_behavior)),
-                level_to_derived(behavior_level(&props.destroy_behavior))};
+                level_to_derived(cs, clq, cs->im->cym.magic_init, 1, t, behavior_level(&props.init_behavior)),
+                level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, behavior_level(&props.move_behavior)),
+                level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, behavior_level(&props.copy_behavior)),
+                level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, behavior_level(&props.destroy_behavior))};
         return true;
       } else {
         ice(_u8("compute_type_properties called on incomplete arraytype."));
@@ -1010,7 +1014,7 @@ func behavior_level(b *derived_method_behavior) u32 {
     case &DerivedMethodExplicit(ip instpair): {
       return 1;
     }
-    case &DerivedMethodNontrivial(v nbfc[opt[instpair]]): {
+    case &DerivedMethodNontrivial(v instpair): {
       return 1;
     }
     case &DerivedMethodTrivial(v void): {
@@ -1019,11 +1023,45 @@ func behavior_level(b *derived_method_behavior) u32 {
   }
 }
 
-func level_to_derived(level u32) derived_method_behavior {
+func make_nontrivial(cs *checkstate, clq *clqueue, magic_name sym, magic_count size, type *te_typeexpr) derived_method_behavior {
+  params array[te_typeexpr] = repeat(magic_count, ptr_type(cs, *type));
+  push(&params, primitive_void_type(cs));
+  fntype te_typeexpr = fn_type(cs, params);
+
+  parms genparms = HasParms(mk_array(*type));
+
+  res match_def_res;
+  if !match_def(cs, magic_name, &parms, &fntype, &res) {
+    ice(_u8("make_nontrivial seeing error from match_def"));
+  }
+
+  switch &res {
+    case &NoMatch(v void): {
+      ice(_u8("No match for magic def"));
+      return fake();
+    }
+    case &MultiMatch(v void): {
+      // TODO: This should be impossible.
+      ice(_u8("Multiple matches for magic def (is there a user-defined one?"));
+      return fake();
+    }
+    case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
+      // TODO: Duplicated in ds_lookup_name and more.
+      cu_parms cu_genparms;
+      if !check_and_compute_parms(cs, clq, &m.parms, &cu_parms) {
+        ice(_u8("check_and_compute_parms seeing error in match_def"));
+      }
+      inst_id def_inst_id = enqueue_def_inst(cs, clq, m.ent, &cu_parms);
+      return DerivedMethodNontrivial({m.ent, inst_id});
+    }
+  }
+}
+
+func level_to_derived(cs *checkstate, clq *clqueue, magic_name sym, magic_count size, type *te_typeexpr, level u32) derived_method_behavior {
   if level == 0 {
     return DerivedMethodTrivial(void);
   } else if level == 1 {
-    return DerivedMethodNontrivial(NotComputed());
+    return make_nontrivial(cs, clq, magic_name, magic_count, type);
   } else if level == 2 {
     return DerivedMethodAbsent(void);
   } else {

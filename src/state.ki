@@ -186,7 +186,7 @@ defenum derived_method_behavior {
   // Behavior's explicitly defined by a method.
   DerivedMethodExplicit instpair;
   // Behavior's derived structurally, and one of its fields/constructors has an explicit method call.  Maybe the method doesn't exist, because one of its fields' doesn't.
-  DerivedMethodNontrivial nbfc[opt[instpair]];
+  DerivedMethodNontrivial instpair;
   // Behavior's derived from the type definition (or it's primitive) and it's trivial. init: Fills with zero.  copy/move: memcpy.  destroy: no-op.
   DerivedMethodTrivial void;
 };
