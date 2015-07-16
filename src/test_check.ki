@@ -1,5 +1,5 @@
 import check;
-
+import eval;
 
 func testmodule_name() string {
   return from_u8(_u8("testmodule"));

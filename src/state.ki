@@ -382,6 +382,14 @@ defenum def_inst_status {
   FinishedCheckingRhs void;
 };
 
+func `==`(x def_inst_status, y def_inst_status) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+
+func `!=`(x def_inst_status, y def_inst_status) bool {
+  return !(x == y);
+}
+
 deftype def_inst struct {
   parms cu_genparms;
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None() if we have an extern def.
