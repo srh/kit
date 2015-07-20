@@ -206,9 +206,8 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "  };\n"
         "  return k(z) + k(z);\n"
         "};\n"));
-  // Passes!  Because, according to the type checker, lambdas can capture.
-  // TODO: Make a decision about capturing.
-  run_check_test(ctx, "c026",
+  // Fails because lambdas can't capture.
+  run_check_negtest(ctx, "c026",
     _u8("def y fn[i32, i32] = func(z i32) i32 {\n"
         "  var k fn[i32, i32] = func(m i32) i32 {\n"
         "    return m + z;\n"

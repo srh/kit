@@ -155,6 +155,31 @@ func descope_vars(vp *varpopper) void {
 
 }  // access varpopper
 
+defclass varsaver struct {
+  ds *defscope;
+  current_vars array[var_number];
+};
+
+access varsaver {
+func do_init(vp *varsaver) void {
+  init(&vp->ds);
+  init(&vp->current_vars);
+}
+func save_and_wipe_current_vars(vp *varsaver, ds *defscope) void {
+  check(vp->ds == null);
+  vp->ds = ds;
+  vp->current_vars = ds->current_vars;
+  ds->current_vars = mk_array();
+}
+func do_destroy(vp *varsaver) void {
+  if vp->ds != null {
+    vp->ds->current_vars = vp->current_vars;
+  }
+  destroy(&vp->current_vars);
+  vp->ds = null;
+}
+}
+
 func ds_note_var_initter(ds *defscope, vn var_number) bool {
   info *var_info = ref_var(ds, vn);
   if case &Has(desc ctor_desc) = &info->initter {
@@ -929,6 +954,11 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
   if !decompose_typeapp(&computed.te, primitive_function_puretype(es->cs), &computed_params) {
     ice(_u8("lambda type is not a function type"));
   }
+
+  // Lambdas can't capture variables (yet).
+  vs varsaver;
+  save_and_wipe_current_vars(&vs, es->ds);
+
   vp varpopper;
   init_vp(&vp, es->ds);
   nargs size = count(&a->args);
