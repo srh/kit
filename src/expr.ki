@@ -420,52 +420,8 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
   }
 
   switch &x->u {
-    // TODO: Move NameExpr case to separate function.
     case &NameExpr(a ast_name_expr): {
-      parms genparms;
-      if !replaced_name_parms(es->ds, &a, &parms) {
-        return false;
-      }
-      match_res es_match_res;
-      if !ds_lookup_name(es->ds, a.ident.value, &parms, pt, &match_res) {
-        return false;
-      }
-      switch &match_res {
-        case &NoMatch(v void): {
-          ERR(_u8("Name lookup for '"), lookup(es->im, a.ident.value), _u8("', maybe with parms, not found, matching type '"), to_u8str(es->im, *pt), _u8("'"));
-          return false;
-        }
-        case &AmbigGlobalMatch(v void): {
-          if ai == AllowIncompleteYes(void) {
-            // NOTE: We could annotate this more precisely in ambiguous-single-match cases.
-            annotate_info(x, IncompleteCheck(TeUnknown(void)));
-            return true;
-          } else {
-            ERR(_u8("Name lookup for '"), lookup(es->im, a.ident.value), _u8("', maybe with parms, matches ambiguously."));
-            return false;
-          }
-        }
-        case &OneEnumConstructorMatch(ci constructor_info): {
-          annotate_name_info(&a, EnumConstructor(void));
-          annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ci.type)), ci.type)));
-          return true;
-        }
-        case &OneGlobalMatch(gi global_info): {
-          if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, gi.ent), gi.inst) {
-            return false;
-          }
-          annotate_name_info(&a, GlobalResolve({gi.ent, gi.inst}));
-          inst *def_inst = ref_inst(es->cs, gi.inst);
-          annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, inst->computed_type)), inst->computed_type)));
-          return true;
-        }
-        case &OneLocalMatch(v local_info): {
-          annotate_name_info(&a, LocalResolve({v.varnum}));
-          vi *var_info = ref_var(es->ds, v.varnum);
-          annotate_info(x, CompleteCheck(mk(IsLvalYes(void), vi->type)));
-          return true;
-        }
-      }
+      return check_expr_name(es, ai, &a, pt, x);
     }
 
     case &ParenExpr(a ast_paren_expr): {
@@ -866,6 +822,53 @@ func annotate_disposal_for_assignment(es *exprscope, a *ast_expr) bool {
     }
   }
   return true;
+}
+
+func check_expr_name(es *exprscope, ai allow_incomplete, a *ast_name_expr, pt *te_typeexpr, x *ast_expr) bool {
+  parms genparms;
+  if !replaced_name_parms(es->ds, a, &parms) {
+    return false;
+  }
+  match_res es_match_res;
+  if !ds_lookup_name(es->ds, a->ident.value, &parms, pt, &match_res) {
+    return false;
+  }
+  switch &match_res {
+    case &NoMatch(v void): {
+      ERR(_u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, matching type '"), to_u8str(es->im, *pt), _u8("'"));
+      return false;
+    }
+    case &AmbigGlobalMatch(v void): {
+      if ai == AllowIncompleteYes(void) {
+        // NOTE: We could annotate this more precisely in ambiguous-single-match cases.
+        annotate_info(x, IncompleteCheck(TeUnknown(void)));
+        return true;
+      } else {
+        ERR(_u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously."));
+        return false;
+      }
+    }
+    case &OneEnumConstructorMatch(ci constructor_info): {
+      annotate_name_info(a, EnumConstructor(void));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ci.type)), ci.type)));
+      return true;
+    }
+    case &OneGlobalMatch(gi global_info): {
+      if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, gi.ent), gi.inst) {
+        return false;
+      }
+      annotate_name_info(a, GlobalResolve({gi.ent, gi.inst}));
+      inst *def_inst = ref_inst(es->cs, gi.inst);
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, inst->computed_type)), inst->computed_type)));
+      return true;
+    }
+    case &OneLocalMatch(v local_info): {
+      annotate_name_info(a, LocalResolve({v.varnum}));
+      vi *var_info = ref_var(es->ds, v.varnum);
+      annotate_info(x, CompleteCheck(mk(IsLvalYes(void), vi->type)));
+      return true;
+    }
+  }
 }
 
 func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *te_typeexpr, x *ast_expr) bool {
