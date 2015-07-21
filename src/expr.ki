@@ -318,21 +318,6 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   }
 }
 
-
-deftype global_info struct {
-  ent def_entry_id;
-  inst def_inst_id;
-};
-
-deftype local_info struct {
-  varnum var_number;
-};
-
-defenum name_info {
-  Local void;
-  Global global_info;
-};
-
 defenum es_match_res {
   NoMatch void;
   AmbigGlobalMatch void;
@@ -475,7 +460,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
           return true;
         }
         case &OneLocalMatch(v local_info): {
-          annotate_name_info(&a, LocalResolve(v.varnum));
+          annotate_name_info(&a, LocalResolve({v.varnum}));
           vi *var_info = ref_var(es->ds, v.varnum);
           annotate_info(x, CompleteCheck(mk(IsLvalYes(void), vi->type)));
           return true;
