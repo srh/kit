@@ -920,7 +920,6 @@ func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *
   }
 }
 
-// TODO: Compute destruction of lambda params... not to mention var statement variables (and default-initialization).
 func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_expr) bool {
   // TODO: Cache type.
   type ast_typeexpr = lambda_declared_type(es->im, a);
@@ -956,7 +955,6 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
   nargs size = count(&a->args);
   for i size = 0; i < nargs; i = i + 1 {
     cu_param cu_typeexpr = ~get(computed_params, i);
-    // TODO: Annotate the AST with this var number.
     vn var_number;
     // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
     if !ds_push_var(es->ds, &vp, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {

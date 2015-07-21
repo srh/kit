@@ -1041,7 +1041,7 @@ func make_nontrivial(cs *checkstate, clq *clqueue, magic_name sym, magic_count s
       return fake();
     }
     case &MultiMatch(v void): {
-      // TODO: This should be impossible.
+      // TODO: This should be impossible.  Pick a less likely name...
       ice(_u8("Multiple matches for magic def (is there a user-defined one?"));
       return fake();
     }
