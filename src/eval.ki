@@ -64,9 +64,11 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
   }
 }
 
+// TODO: The interface of st_eval_expr is broken.  We need to be able to evaluate to "lvalues."
 func st_eval_expr(cs *checkstate, env *st_env, x *ast_expr, out *st_value) bool {
   switch &x->u {
     case &NameExpr(a ast_name_expr): {
+      // TODO: This is broken, it doesn't eval to an lvalue.
       return st_eval_name_expr(cs, env, &a, out);
     }
     default: {
