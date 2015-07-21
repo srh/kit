@@ -22,7 +22,7 @@ func mk_st_value(size u32) st_value {
   return {repeat(~size, 0), mk_array()};
 }
 
-func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id) bool {
+func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st_value) bool {
   inst *def_inst = ref_inst(cs, inst_id);
   if inst->status != FinishedCheckingRhs(void) {
     ice(_u8("Evaling def we have not finished checking."));
@@ -38,6 +38,11 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id) bool {
           return false;
         }
         inst->evaled_value = Computed(result);
+        if case &Computed(x st_value) = &inst->evaled_value {
+          *out = &x;
+        } else {
+          ice(_u8("locally impossible in st_eval_def"));
+        }
         return true;
       }
       case &BeganComputing(v void): {
@@ -49,6 +54,7 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id) bool {
         return false;
       }
       case &Computed(x st_value): {
+        *out = &x;
         return true;
       }
     }
@@ -61,10 +67,38 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id) bool {
 func st_eval_expr(cs *checkstate, env *st_env, x *ast_expr, out *st_value) bool {
   switch &x->u {
     case &NameExpr(a ast_name_expr): {
-      return TODO();
+      return st_eval_name_expr(cs, env, &a, out);
     }
     default: {
       return TODO();
     }
+  }
+}
+
+func st_eval_name_expr(cs *checkstate, env *st_env, a *ast_name_expr, out *st_value) bool {
+  if case &Has(info ast_name_expr_info) = &a->name_info {
+    switch &info {
+      case &LocalResolve(loc local_info): {
+        // (Right now, there's no way a local variable could come into scope because static eval doesn't support lambda eval.)
+        ice(_u8("st_eval_expr sees local variable reference"));
+        return fake();
+      }
+      case &GlobalResolve(glo global_info): {
+        val *st_value;
+        if !st_eval_def(cs, glo.ent, glo.inst, &val) {
+          return false;
+        }
+        *out = *val;
+        return true;
+      }
+      case &EnumConstructor(v void): {
+        // TODO: This should be supported!
+        ERR(_u8("enum construction not supported in static evaluation"));
+        return false;
+      }
+    }
+  } else {
+    ice(_u8("st_eval_expr seeing name_expr without info"));
+    return fake();
   }
 }
