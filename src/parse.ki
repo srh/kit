@@ -794,7 +794,7 @@ func build_unop_expr(im *identmap, op ast_ident, rhs ast_expr) ast_expr {
   } else if op.value == im->cym.derefsym {
     return mk(Deref({embox(rhs)}));
   } else {
-    return mk(Funcall({embox(mk(NameExpr({op, None()}))), mk_array(rhs)}));
+    return mk(Funcall({embox(mk(NameExpr(mk(op, None())))), mk_array(rhs)}));
   }
 }
 
@@ -802,7 +802,7 @@ func build_binop_expr(im *identmap, op ast_ident, lhs ast_expr, rhs ast_expr) as
   if op.value == im->cym.assignmentsym {
     return mk(Assignment({embox(lhs), embox(rhs)}));
   } else {
-    return mk(Funcall({embox(mk(NameExpr({op, None()}))),
+    return mk(Funcall({embox(mk(NameExpr(mk(op, None())))),
                        mk_array(lhs, rhs)}));
   }
 }
@@ -817,13 +817,13 @@ func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) bool {
              && parse_rest_of_type_param_list(p, AllowBlanksNo(void), &args)) {
           return Fail;
         }
-        *out = mk(NameExpr({ident, Has(args)}));
+        *out = mk(NameExpr(mk(ident, Has(args))));
         return true;
       }
     }
     default: { }
   }
-  *out = mk(NameExpr({ident, None()}));
+  *out = mk(NameExpr(mk(ident, None())));
   return true;
 }
 
@@ -1390,7 +1390,7 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
 }
 
 func expressionize(name ast_ident, indexers array[ast_expr]) ast_expr {
-  lhs ast_expr = mk(NameExpr({name, None()}));
+  lhs ast_expr = mk(NameExpr(mk(name, None())));
   e size = count(&indexers);
   for i size = 0; i < e; i = i + 1 {
     lhs = mk(IndexExpr({embox(lhs), embox(get(&indexers, i))}));

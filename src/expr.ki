@@ -435,6 +435,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
   }
 
   switch &x->u {
+    // TODO: Move NameExpr case to separate function.
     case &NameExpr(a ast_name_expr): {
       parms genparms;
       if !replaced_name_parms(es->ds, &a, &parms) {
@@ -460,6 +461,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
           }
         }
         case &OneEnumConstructorMatch(ci constructor_info): {
+          annotate_name_info(&a, EnumConstructor(void));
           annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ci.type)), ci.type)));
           return true;
         }
@@ -467,11 +469,13 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
           if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, gi.ent), gi.inst) {
             return false;
           }
+          annotate_name_info(&a, GlobalResolve({gi.ent, gi.inst}));
           inst *def_inst = ref_inst(es->cs, gi.inst);
           annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, inst->computed_type)), inst->computed_type)));
           return true;
         }
         case &OneLocalMatch(v local_info): {
+          annotate_name_info(&a, LocalResolve(v.varnum));
           vi *var_info = ref_var(es->ds, v.varnum);
           annotate_info(x, CompleteCheck(mk(IsLvalYes(void), vi->type)));
           return true;

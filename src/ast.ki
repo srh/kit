@@ -241,10 +241,27 @@ deftype ast_deref_field struct {
   fieldname ast_fieldname;
 };
 
+// TODO: Put global_info here, use that instead of a naked struct.  Maybe also local_info.
+defenum ast_name_expr_info {
+  GlobalResolve struct { ent def_entry_id; inst def_inst_id; };
+  EnumConstructor void;
+  LocalResolve var_number;
+};
+
 deftype ast_name_expr struct {
+  name_info opt[ast_name_expr_info];
   ident ast_ident;
   generic_params opt[array[ast_typeexpr]];
 };
+
+func mk(ident ast_ident, generic_params opt[array[ast_typeexpr]]) ast_name_expr {
+  return {None(), ident, generic_params};
+}
+
+func annotate_name_info(a *ast_name_expr, info ast_name_expr_info) void {
+  check(isNone(&a->name_info));
+  a->name_info = Has(info);
+}
 
 deftype ast_paren_expr struct {
   expr box[ast_expr];
