@@ -399,10 +399,11 @@ deftype def_inst struct {
   // Becomes the concrete type (with generics replaced) once we've computed it and checked it (see status).
   computed_type cu_typeexpr;
   computed_type_properties type_properties;
+  evaled_value nbfc[st_value];
 };
 
 func mk(parms cu_genparms, rhs opt[ast_expr]) def_inst {
-  return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties]()};
+  return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties](), NotComputed@[st_value]()};
 }
 
 deftype def_nonprim struct {

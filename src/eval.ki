@@ -22,20 +22,36 @@ func mk_st_value(size u32) st_value {
   return {repeat(~size, 0), mk_array()};
 }
 
-func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out *st_value) bool {
+func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id) bool {
   inst *def_inst = ref_inst(cs, inst_id);
   if inst->status != FinishedCheckingRhs(void) {
     ice(_u8("Evaling def we have not finished checking."));
   }
   if case &Has(e ast_expr) = &inst->rhs {
-    // TODO: Mark that evaluation for this def has begun.
-    env st_env;
-    retvar st_value;
-    if !st_eval_expr(cs, &env, &e, &retvar) {
-      return false;
+    switch &inst->evaled_value {
+      case &NotComputed(v void): {
+        inst->evaled_value = BeganComputing();
+        // TODO: Mark that evaluation for this def has begun.
+        env st_env;
+        result st_value;
+        if !st_eval_expr(cs, &env, &e, &result) {
+          return false;
+        }
+        inst->evaled_value = Computed(result);
+        return true;
+      }
+      case &BeganComputing(v void): {
+        ERR(_u8("recursively computing def inst's value"));
+        return false;
+      }
+      case &FailedComputation(v void): {
+        ERR(_u8("repeat error of st_eval_def"));
+        return false;
+      }
+      case &Computed(x st_value): {
+        return true;
+      }
     }
-    *out = retvar;
-    return true;
   } else {
     ice(_u8("st_eval_def on an extern def."));
     return fake();
