@@ -28,7 +28,7 @@ deftype statement_info struct {
 };
 
 deftype bodystate struct {
-  es exprscope;
+  es framescope;
   ds *defscope;
   cs *checkstate;
   im *identmap;
@@ -90,7 +90,7 @@ func check_body(bs *bodystate, a *ast_bracebody, ee_out *entryexit) bool {
   return true;
 }
 
-func check_discard_expr(es *exprscope, x *ast_expr, pt *te_typeexpr) bool {
+func check_discard_expr(es *framescope, x *ast_expr, pt *te_typeexpr) bool {
   if !check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
@@ -101,7 +101,7 @@ func check_discard_expr(es *exprscope, x *ast_expr, pt *te_typeexpr) bool {
 }
 
 // For exprs that we use, but then discard.  Conditionals... and switches?  Kinda.
-func check_consume_then_discard_expr(es *exprscope, x *ast_expr, pt *te_typeexpr) bool {
+func check_consume_then_discard_expr(es *framescope, x *ast_expr, pt *te_typeexpr) bool {
   if !check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
@@ -415,7 +415,7 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
   return false;
 }
 
-func check_condition(es *exprscope, cond_vp *varpopper, a *ast_condition) bool {
+func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition) bool {
   switch a {
     case &ExprCondition(b box[ast_expr]): {
       booltype cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));

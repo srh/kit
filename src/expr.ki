@@ -7,8 +7,8 @@ deftype temporary_info struct {
   type cu_typeexpr;
 };
 
-// TODO: Rename exprscope to flowscope.
-deftype exprscope struct {
+// Used with the variable name "es" -- its name used to be different.
+deftype framescope struct {
   ds *defscope;
   // Same as ds->cs.
   cs *checkstate;
@@ -20,7 +20,7 @@ deftype exprscope struct {
   temporaries array[temporary_info];
 };
 
-func mk(ds *defscope) exprscope {
+func mk(ds *defscope) framescope {
   return {ds, ds->cs, ds->im, ds->clq, mk_array@[temporary_info]()};
 }
 
@@ -29,13 +29,13 @@ deftype temporary_number size;
 def `~` fn[size, temporary_number] = wrapconvert;
 def `==` fn[temporary_number, temporary_number, bool] = wrapequate;
 
-func add_temporary(es *exprscope, type cu_typeexpr) temporary_number {
+func add_temporary(es *framescope, type cu_typeexpr) temporary_number {
   ret size = count(&es->temporaries);
   push(&es->temporaries, {type});
   return ~ret;
 }
 
-func ref_temporary(es *exprscope, num temporary_number) *temporary_info {
+func ref_temporary(es *framescope, num temporary_number) *temporary_info {
   return ref(&es->temporaries, num.~);
 }
 
@@ -209,11 +209,11 @@ func ds_note_var_destroyer(ds *defscope, vn var_number) bool {
 
 func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr) bool {
   ds defscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]](), default@[array[var_number]]()};
-  es exprscope = mk(&ds);
+  es framescope = mk(&ds);
   return check_consume_expr(&es, x, pt);
 }
 
-func check_consume_expr(es *exprscope, x *ast_expr, pt *te_typeexpr) bool {
+func check_consume_expr(es *framescope, x *ast_expr, pt *te_typeexpr) bool {
   if !check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
@@ -377,7 +377,7 @@ func ds_find_current_local(ds *defscope, name sym) opt[var_number] {
   return None();
 }
 
-func help_check_simple_literal(es *exprscope, pt *te_typeexpr, type te_typeexpr, errmsg_name array[u8], x *ast_expr) bool {
+func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr, errmsg_name array[u8], x *ast_expr) bool {
   unified te_typeexpr;
   if !unify_types(pt, &type, &unified) {
     ERR(errmsg_name, _u8(" literal in bad place"));
@@ -402,7 +402,7 @@ func help_check_simple_literal(es *exprscope, pt *te_typeexpr, type te_typeexpr,
 }
 
 // pt is either (a) incomplete, or (b) complete and computed.
-func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
+func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
   if case &CompleteCheck(t ast_expr_complete_info) = &x->info {
     return true;
   }
@@ -706,7 +706,7 @@ func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
 }
 
 // Annotates the disposal to "consume" the value -- i.e. what happens if it's a function param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or whatever).
-func annotate_disposal_for_consume(es *exprscope, a *ast_expr) bool {
+func annotate_disposal_for_consume(es *framescope, a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -741,7 +741,7 @@ func annotate_disposal_for_field(a *ast_expr) void {
 }
 
 // Annotates the disposal of an Expr statement's expr, or some other value we are done using.
-func annotate_disposal_for_discard(es *exprscope, a *ast_expr) bool {
+func annotate_disposal_for_discard(es *framescope, a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -759,7 +759,7 @@ func annotate_disposal_for_discard(es *exprscope, a *ast_expr) bool {
 }
 
 // Annotates the disposal for a value we'll use but then discard.
-func annotate_disposal_for_consume_then_discard(es *exprscope, a *ast_expr) bool {
+func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -797,7 +797,7 @@ func annotate_disposal_for_consume_then_discard(es *exprscope, a *ast_expr) bool
 }
 
 
-func annotate_disposal_for_assignment(es *exprscope, a *ast_expr) bool {
+func annotate_disposal_for_assignment(es *framescope, a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -831,7 +831,7 @@ func annotate_disposal_for_assignment(es *exprscope, a *ast_expr) bool {
   return true;
 }
 
-func check_expr_name(es *exprscope, ai allow_incomplete, a *ast_name_expr, pt *te_typeexpr, x *ast_expr) bool {
+func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *te_typeexpr, x *ast_expr) bool {
   parms genparms;
   if !replaced_name_parms(es->ds, a, &parms) {
     return false;
@@ -887,7 +887,7 @@ func check_expr_name(es *exprscope, ai allow_incomplete, a *ast_name_expr, pt *t
   }
 }
 
-func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *te_typeexpr, x *ast_expr) bool {
+func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt *te_typeexpr, x *ast_expr) bool {
   if !is_complete(pt) {
     if ai == AllowIncompleteYes(void) {
       // NOTE: We could have more specific info, like number of fields and their incomplete types.
@@ -940,7 +940,7 @@ func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *
   }
 }
 
-func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_expr) bool {
+func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_expr) bool {
   // TODO: Cache type.
   type ast_typeexpr = lambda_declared_type(es->im, a);
   // TODO: Cache converted.
@@ -1022,7 +1022,7 @@ func numeric_literal_value(a *ast_numeric_literal) bigint {
   }
 }
 
-func check_numeric_literal(es *exprscope, ai allow_incomplete, pt *te_typeexpr, n bigint, x *ast_expr) bool {
+func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr, n bigint, x *ast_expr) bool {
   if case &TeUnknown(v void) = pt {
     if ai == AllowIncompleteYes(void) {
       annotate_info(x, IncompleteCheck(TeUnknown(void)));
@@ -1091,7 +1091,7 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
   return true;
 }
 
-func check_field(es *exprscope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *cu_typeexpr, inherits_lval_out *bool) bool {
+func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *cu_typeexpr, inherits_lval_out *bool) bool {
   fieldtype cu_typeexpr;
   inherits_lval bool;
   if !lookup_field(es, t, a, &fieldtype, &inherits_lval) {
@@ -1216,7 +1216,7 @@ func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **
   }
 }
 
-func lookup_whole_field(es *exprscope, mbpack *opt[te_instpack], fieldtype_out *cu_typeexpr) bool {
+func lookup_whole_field(es *framescope, mbpack *opt[te_instpack], fieldtype_out *cu_typeexpr) bool {
   p *cu_typeexpr;
   if !help_structural_rhs(es->ds, mbpack, &p) {
     return false;
@@ -1225,7 +1225,7 @@ func lookup_whole_field(es *exprscope, mbpack *opt[te_instpack], fieldtype_out *
   return true;
 }
 
-func lookup_name_field(es *exprscope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *cu_typeexpr, inherits_lval_out *bool) bool {
+func lookup_name_field(es *framescope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *cu_typeexpr, inherits_lval_out *bool) bool {
   p *cu_typeexpr;
   if !help_structural_rhs(es->ds, mbpack, &p) {
     return false;
@@ -1233,7 +1233,7 @@ func lookup_name_field(es *exprscope, mbpack *opt[te_instpack], fieldname *ast_i
   return help_lookup_name_field(es, p, fieldname, fieldtype_out, inherits_lval_out);
 }
 
-func help_lookup_name_field(es *exprscope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, inherits_lval_out *bool) bool {
+func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, inherits_lval_out *bool) bool {
   switch &t->~ {
     case &TeName(a te_name): {
       return lookup_name_field(es, &a.pack, fieldname, fieldtype_out, inherits_lval_out);
@@ -1275,7 +1275,7 @@ func help_lookup_name_field(es *exprscope, t *cu_typeexpr, fieldname *ast_ident,
   }
 }
 
-func lookup_field(es *exprscope, t *cu_typeexpr, f *ast_fieldname, fieldtype_out *cu_typeexpr, inherits_lval_out *bool) bool {
+func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_out *cu_typeexpr, inherits_lval_out *bool) bool {
   switch f {
     case &WholeField(v void): {
       switch &t->~ {
@@ -1340,7 +1340,7 @@ func ai_incomplete(yes bool) allow_incomplete {
   }
 }
 
-func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_funcall, pt *te_typeexpr) bool {
+func check_expr_funcall(es *framescope, ai allow_incomplete, x *ast_expr, a *ast_funcall, pt *te_typeexpr) bool {
   a_param_incomplete bool;
   if !check_funcall_params_firsttime(es, &a->params, &a_param_incomplete) {
     return false;
@@ -1376,7 +1376,7 @@ func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_
   return true;
 }
 
-func check_funcall_params_firsttime(es *exprscope, params *array[ast_expr], a_param_incomplete_out *bool) bool {
+func check_funcall_params_firsttime(es *framescope, params *array[ast_expr], a_param_incomplete_out *bool) bool {
   n size = count(params);
   unknown te_typeexpr = TeUnknown(void);
   all_params_complete bool = true;
@@ -1397,7 +1397,7 @@ func check_funcall_params_firsttime(es *exprscope, params *array[ast_expr], a_pa
   return true;
 }
 
-func check_funcall_params_secondtime(es *exprscope, functype *cu_typeexpr, params *array[ast_expr]) bool {
+func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, params *array[ast_expr]) bool {
   n size = count(params);
 
   type_params *array[te_typeexpr];
@@ -1436,7 +1436,7 @@ func compute_prim(ds *defscope, t te_typeexpr, out *cu_typeexpr, props_out *type
   *out = type;
 }
 
-func check_expr_index(es *exprscope, x *ast_expr, a *ast_index_expr, pt *te_typeexpr) bool {
+func check_expr_index(es *framescope, x *ast_expr, a *ast_index_expr, pt *te_typeexpr) bool {
   unknown te_typeexpr = TeUnknown(void);
   if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), &unknown) {
     return false;
