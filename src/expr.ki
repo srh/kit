@@ -3,7 +3,7 @@ import body;
 import check;
 import primitives;
 
-deftype temporary_info struct {
+deftype cell_info struct {
   type cu_typeexpr;
 };
 
@@ -17,26 +17,26 @@ deftype framescope struct {
   // Same as ds->clq.
   clq *clqueue;
 
-  temporaries array[temporary_info];
+  cells array[cell_info];
 };
 
 func mk(ds *defscope) framescope {
-  return {ds, ds->cs, ds->im, ds->clq, mk_array@[temporary_info]()};
+  return {ds, ds->cs, ds->im, ds->clq, mk_array@[cell_info]()};
 }
 
-deftype temporary_number size;
+deftype cell_num size;
 
-def `~` fn[size, temporary_number] = wrapconvert;
-def `==` fn[temporary_number, temporary_number, bool] = wrapequate;
+def `~` fn[size, cell_num] = wrapconvert;
+def `==` fn[cell_num, cell_num, bool] = wrapequate;
 
-func add_temporary(es *framescope, type cu_typeexpr) temporary_number {
-  ret size = count(&es->temporaries);
-  push(&es->temporaries, {type});
+func add_cell(es *framescope, type cu_typeexpr) cell_num {
+  ret size = count(&es->cells);
+  push(&es->cells, {type});
   return ~ret;
 }
 
-func ref_temporary(es *framescope, num temporary_number) *temporary_info {
-  return ref(&es->temporaries, num.~);
+func ref_cell(es *framescope, num cell_num) *cell_info {
+  return ref(&es->cells, num.~);
 }
 
 deftype defscope struct {
@@ -394,7 +394,7 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
       ice(_u8("help_check_simple_literal passed type with bad properties"));
     }
 
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~c.te)), ~c.te, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~c.te)), ~c.te, props)));
   } else {
     annotate_info(x, IncompleteCheck(type));
   }
@@ -453,7 +453,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
         ERR(_u8("string literal in bad place"));
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, type)), type, props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, type)), type, props)));
       return true;
     }
     case &Funcall(a ast_funcall): {
@@ -510,7 +510,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       if !compute_complete_type_properties(es->cs, es->clq, &ptr_computed.te, &ptr_props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ptr_computed.te)), ~ptr_computed.te, ptr_props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~ptr_computed.te)), ~ptr_computed.te, ptr_props)));
       return true;
     }
     case &Deref(a ast_deref): {
@@ -568,7 +568,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
           }
         }
       } else {
-        lval = wholeRval(add_temporary(es, fieldtype));
+        lval = wholeRval(add_cell(es, fieldtype));
       }
       props type_properties;
       if !compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
@@ -603,7 +603,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
         // We deref, so it's always an lval.
         lval = IsLvalYes(void);
       } else {
-        lval = wholeRval(add_temporary(es, fieldtype));
+        lval = wholeRval(add_cell(es, fieldtype));
       }
       props type_properties;
       if !compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
@@ -718,7 +718,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr) bool {
           return false;
         }
         destroy ctor_desc;
-        if !get_destroy_ctor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
+        if !get_destroy_ctor(es->ds, &ref_cell(es, desc.num)->type, &destroy) {
           return false;
         }
         annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}));
@@ -746,7 +746,7 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr) bool {
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       destroy ctor_desc;
-      if !get_destroy_ctor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
+      if !get_destroy_ctor(es->ds, &ref_cell(es, desc.num)->type, &destroy) {
         return false;
       }
       annotate_disposal(a, DisposeDestroy(destroy));
@@ -764,7 +764,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr) boo
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       destroy ctor_desc;
-      if !get_destroy_ctor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
+      if !get_destroy_ctor(es->ds, &ref_cell(es, desc.num)->type, &destroy) {
         return false;
       }
       if desc.whole_temporary {
@@ -814,7 +814,7 @@ func annotate_disposal_for_assignment(es *framescope, a *ast_expr) bool {
           return false;
         }
         destroy ctor_desc;
-        if !get_destroy_ctor(es->ds, &ref_temporary(es, desc.num)->type, &destroy) {
+        if !get_destroy_ctor(es->ds, &ref_cell(es, desc.num)->type, &destroy) {
           return false;
         }
         annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}));
@@ -861,7 +861,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       if !compute_type_properties(es->cs, es->clq, &ci.type, &props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ci.type)), ci.type, props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ci.type)), ci.type, props)));
       return true;
     }
     case &OneGlobalMatch(gi global_info): {
@@ -870,7 +870,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       }
       annotate_name_info(a, GlobalResolve({gi.ent, gi.inst}));
       inst *def_inst = ref_inst(es->cs, gi.inst);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, inst->computed_type)), inst->computed_type, inst->computed_type_properties)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, inst->computed_type)), inst->computed_type, inst->computed_type_properties)));
       return true;
     }
     case &OneLocalMatch(v local_info): {
@@ -932,7 +932,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     if !compute_complete_type_properties(es->cs, es->clq, pt, &props) {
       return false;
     }
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ *pt)), ~ *pt, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~ *pt)), ~ *pt, props)));
     return true;
   } else {
     ERR(_u8("Structure literal used on non-struct type."));
@@ -995,7 +995,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   if !compute_complete_type_properties(es->cs, es->clq, &computed.te, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~computed.te)), ~computed.te, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~computed.te)), ~computed.te, props)));
   return true;
 }
 
@@ -1048,7 +1048,7 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   if !compute_complete_type_properties(es->cs, es->clq, pt, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ *pt)), ~ *pt, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~ *pt)), ~ *pt, props)));
   return true;
 }
 
@@ -1372,7 +1372,7 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, x *ast_expr, a *ast
   if !compute_complete_type_properties(es->cs, es->clq, return_type, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ *return_type)), ~ *return_type, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~ *return_type)), ~ *return_type, props)));
   return true;
 }
 
