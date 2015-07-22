@@ -310,7 +310,13 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       *res_out = NoMatchConstructor(void);
       return true;
     }
-    *res_out = MatchedConstructor({~fn_type(ds->cs, *rhs_type, *return_type)});
+    cons_type te_typeexpr = fn_type(ds->cs, *rhs_type, *return_type);
+    cac_cons_type cac_typeexpr;
+    if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &cons_type, &cac_cons_type) {
+      return false;
+    }
+    check(cac_cons_type.complete);
+    *res_out = MatchedConstructor({~cac_cons_type.te});
     return true;
   } else {
     *res_out = NoMatchConstructor(void);
@@ -405,8 +411,12 @@ func help_check_simple_literal(es *exprscope, pt *te_typeexpr, type te_typeexpr,
       ice(_u8("help_check_simple_literal passed bad type"));
     }
     check(c.complete);
+    props type_properties;
+    if !compute_complete_type_properties(es->cs, es->clq, &c.te, &props) {
+      ice(_u8("help_check_simple_literal passed type with bad properties"));
+    }
 
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~c.te)), ~c.te)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~c.te)), ~c.te, props)));
   } else {
     annotate_info(x, IncompleteCheck(type));
   }
@@ -456,13 +466,16 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
     }
 
     case &StringLiteral(a ast_string_literal): {
-      type cu_typeexpr = compute_prim(es->ds, primitive_string_literal_type(es->cs, count(&a.charspecs)));
+      type cu_typeexpr;
+      props type_properties;
+      compute_prim(es->ds, primitive_string_literal_type(es->cs, count(&a.charspecs)),
+                   &type, &props);
       unified te_typeexpr;
       if !unify_types(pt, &type.~, &unified) {
         ERR(_u8("string literal in bad place"));
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, type)), type)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, type)), type, props)));
       return true;
     }
     case &Funcall(a ast_funcall): {
@@ -485,7 +498,7 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !annotate_disposal_for_assignment(es, oo(&a.rhs)) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(lhs_info->lval, lhs_info->cu)));
+      annotate_info(x, CompleteCheck(mk(lhs_info->lval, lhs_info->cu, lhs_info->cu_props)));
       return true;
     }
     case &AddressOf(a ast_addressof): {
@@ -515,7 +528,11 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
         return false;
       }
       check(ptr_computed.complete);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ptr_computed.te)), ~ptr_computed.te)));
+      ptr_props type_properties;
+      if !compute_complete_type_properties(es->cs, es->clq, &ptr_computed.te, &ptr_props) {
+        return false;
+      }
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ptr_computed.te)), ~ptr_computed.te, ptr_props)));
       return true;
     }
     case &Deref(a ast_deref): {
@@ -537,7 +554,11 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       if !decompose_typeapp(&expr_complete_type(oo(&a.rhs))->~, primitive_pointer_puretype(es->cs), &param) {
         ice(_u8("Deref sees rhs type being non-pointer."));
       }
-      annotate_info(x, CompleteCheck(mk(IsLvalYes(void), ~ *param)));
+      props type_properties;
+      if !compute_complete_type_properties(es->cs, es->clq, param, &props) {
+        return false;
+      }
+      annotate_info(x, CompleteCheck(mk(IsLvalYes(void), ~ *param, props)));
       return true;
     }
     case &IndexExpr(a ast_index_expr): {
@@ -571,7 +592,11 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       } else {
         lval = wholeRval(add_temporary(es, fieldtype));
       }
-      annotate_info(x, CompleteCheck(mk(lval, fieldtype)));
+      props type_properties;
+      if !compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
+        return false;
+      }
+      annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
       return true;
     }
     case &DerefField(a ast_deref_field): {
@@ -602,7 +627,11 @@ func check_expr_ai(es *exprscope, ai allow_incomplete, x *ast_expr, pt *te_typee
       } else {
         lval = wholeRval(add_temporary(es, fieldtype));
       }
-      annotate_info(x, CompleteCheck(mk(lval, fieldtype)));
+      props type_properties;
+      if !compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
+        return false;
+      }
+      annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
       return true;
     }
     case &TypedExpr(a ast_typed_expr): {
@@ -850,7 +879,11 @@ func check_expr_name(es *exprscope, ai allow_incomplete, a *ast_name_expr, pt *t
     }
     case &OneEnumConstructorMatch(ci constructor_info): {
       annotate_name_info(a, EnumConstructor(void));
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ci.type)), ci.type)));
+      props type_properties;
+      if !compute_type_properties(es->cs, es->clq, &ci.type, &props) {
+        return false;
+      }
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ci.type)), ci.type, props)));
       return true;
     }
     case &OneGlobalMatch(gi global_info): {
@@ -859,13 +892,18 @@ func check_expr_name(es *exprscope, ai allow_incomplete, a *ast_name_expr, pt *t
       }
       annotate_name_info(a, GlobalResolve({gi.ent, gi.inst}));
       inst *def_inst = ref_inst(es->cs, gi.inst);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, inst->computed_type)), inst->computed_type)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, inst->computed_type)), inst->computed_type, inst->computed_type_properties)));
       return true;
     }
     case &OneLocalMatch(v local_info): {
       annotate_name_info(a, LocalResolve({v.varnum}));
       vi *var_info = ref_var(es->ds, v.varnum);
-      annotate_info(x, CompleteCheck(mk(IsLvalYes(void), vi->type)));
+      // TODO: Put type_properties in var_info.
+      props type_properties;
+      if !compute_type_properties(es->cs, es->clq, &vi->type, &props) {
+        return false;
+      }
+      annotate_info(x, CompleteCheck(mk(IsLvalYes(void), vi->type, props)));
       return true;
     }
   }
@@ -912,7 +950,11 @@ func check_expr_strinit(es *exprscope, ai allow_incomplete, a *ast_strinit, pt *
     }
 
     // We checked is_computed(pt).
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ *pt)), ~ *pt)));
+    props type_properties;
+    if !compute_complete_type_properties(es->cs, es->clq, pt, &props) {
+      return false;
+    }
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ *pt)), ~ *pt, props)));
     return true;
   } else {
     ERR(_u8("Structure literal used on non-struct type."));
@@ -971,7 +1013,11 @@ func check_expr_lambda(es *exprscope, a *ast_lambda, pt *te_typeexpr, x *ast_exp
     return false;
   }
 
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~computed.te)), ~computed.te)));
+  props type_properties;
+  if !compute_complete_type_properties(es->cs, es->clq, &computed.te, &props) {
+    return false;
+  }
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~computed.te)), ~computed.te, props)));
   return true;
 }
 
@@ -1020,7 +1066,11 @@ func check_numeric_literal(es *exprscope, ai allow_incomplete, pt *te_typeexpr, 
   }
   // It's a pt, and it's a numeric type, which means it must be a complete pt, which means it's computed.
   check(is_complete_computed(pt).computed);
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ *pt)), ~ *pt)));
+  props type_properties;
+  if !compute_complete_type_properties(es->cs, es->clq, pt, &props) {
+    return false;
+  }
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ *pt)), ~ *pt, props)));
   return true;
 }
 
@@ -1340,7 +1390,11 @@ func check_expr_funcall(es *exprscope, ai allow_incomplete, x *ast_expr, a *ast_
   }
 
   return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(oo(&a->fun))->~);
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ *return_type)), ~ *return_type)));
+  props type_properties;
+  if !compute_complete_type_properties(es->cs, es->clq, return_type, &props) {
+    return false;
+  }
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_temporary(es, ~ *return_type)), ~ *return_type, props)));
   return true;
 }
 
@@ -1386,6 +1440,7 @@ func check_funcall_params_secondtime(es *exprscope, functype *cu_typeexpr, param
   return true;
 }
 
+// TODO: Remove this?  Or remove this TODO line.
 func compute_prim(ds *defscope, t te_typeexpr) cu_typeexpr {
   cac cac_typeexpr;
   if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &t, &cac) {
@@ -1393,6 +1448,14 @@ func compute_prim(ds *defscope, t te_typeexpr) cu_typeexpr {
   }
   check(cac.complete);
   return ~cac.te;
+}
+
+func compute_prim(ds *defscope, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
+  type cu_typeexpr = compute_prim(ds, t);
+  if !compute_type_properties(ds->cs, ds->clq, &type, props_out) {
+    ice(_u8("compute_prim fails to compute type properties"));
+  }
+  *out = type;
 }
 
 func check_expr_index(es *exprscope, x *ast_expr, a *ast_index_expr, pt *te_typeexpr) bool {
@@ -1437,7 +1500,11 @@ func check_expr_index(es *exprscope, x *ast_expr, a *ast_index_expr, pt *te_type
       return false;
     }
   }
-  annotate_info(x, CompleteCheck(mk(lval, ~ *ixtype)));
+  props type_properties;
+  if !compute_complete_type_properties(es->cs, es->clq, ixtype, &props) {
+    return false;
+  }
+  annotate_info(x, CompleteCheck(mk(lval, ~ *ixtype, props)));
   return true;
 }
 

@@ -399,11 +399,12 @@ func build_u8str(r *array[u8], x *ast_expr_disposal) void {
 deftype ast_expr_complete_info struct {
   lval is_lval;
   cu cu_typeexpr;
+  cu_props type_properties;
   disposal opt[ast_expr_disposal];
 };
 
-func mk(lval is_lval, cu cu_typeexpr) ast_expr_complete_info {
-  return {lval, cu, None()};
+func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties) ast_expr_complete_info {
+  return {lval, cu, cu_props, None()};
 }
 
 defenum ast_expr_info {
@@ -426,7 +427,7 @@ func inner_info(a *ast_expr_info) ast_expr_info {
       return IncompleteCheck(t);
     }
     case &CompleteCheck(t ast_expr_complete_info): {
-      return CompleteCheck(mk(t.lval, t.cu));
+      return CompleteCheck(mk(t.lval, t.cu, t.cu_props));
     }
   }
 }
