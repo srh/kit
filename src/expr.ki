@@ -7,6 +7,7 @@ deftype temporary_info struct {
   type cu_typeexpr;
 };
 
+// TODO: Rename exprscope to flowscope.
 deftype exprscope struct {
   ds *defscope;
   // Same as ds->cs.
@@ -208,38 +209,15 @@ func ds_note_var_destroyer(ds *defscope, vn var_number) bool {
 
 func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr) bool {
   ds defscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]](), default@[array[var_number]]()};
-  return check_consume_expr(&ds, x, pt);
+  es exprscope = mk(&ds);
+  return check_consume_expr(&es, x, pt);
 }
 
-func check_discard_expr(ds *defscope, x *ast_expr, pt *te_typeexpr) bool {
-  es exprscope = mk(ds);
-  if !check_expr_ai(&es, AllowIncompleteNo(void), x, pt) {
+func check_consume_expr(es *exprscope, x *ast_expr, pt *te_typeexpr) bool {
+  if !check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
-  if !annotate_disposal_for_discard(&es, x) {
-    return false;
-  }
-  return true;
-}
-
-func check_consume_expr(ds *defscope, x *ast_expr, pt *te_typeexpr) bool {
-  es exprscope = mk(ds);
-  if !check_expr_ai(&es, AllowIncompleteNo(void), x, pt) {
-    return false;
-  }
-  if !annotate_disposal_for_consume(&es, x) {
-    return false;
-  }
-  return true;
-}
-
-// For exprs that we use, but then discard.  Conditionals... and switches?  Kinda.
-func check_consume_then_discard_expr(ds *defscope, x *ast_expr, pt *te_typeexpr) bool {
-  es exprscope = mk(ds);
-  if !check_expr_ai(&es, AllowIncompleteNo(void), x, pt) {
-    return false;
-  }
-  if !annotate_disposal_for_consume_then_discard(&es, x) {
+  if !annotate_disposal_for_consume(es, x) {
     return false;
   }
   return true;
