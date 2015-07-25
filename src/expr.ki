@@ -991,25 +991,34 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   vs varsaver;
   save_and_wipe_current_vars(&vs, es->ds);
 
-  vp varpopper;
-  init_vp(&vp, es->ds);
-  nargs size = count(&a->args);
-  for i size = 0; i < nargs; i = i + 1 {
-    cu_param cu_typeexpr = ~get(computed_params, i);
-    vn var_number;
-    // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
-    if !ds_push_var(es->ds, &vp, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {
-      return false;
-    }
-    if !ds_note_var_destroyer(es->ds, vn) {
-      return false;
-    }
-  }
+  if true {
+    nargs size = count(&a->args);
+    return_type cu_typeexpr = ~get(computed_params, nargs);
+    bs bodystate = mk(es->ds, &return_type);
 
-  return_type cu_typeexpr = ~get(computed_params, nargs);
+    vp varpopper;
+    init_vp(&vp, es->ds);
+    for i size = 0; i < nargs; i = i + 1 {
+      cu_param cu_typeexpr = ~get(computed_params, i);
+      vn var_number;
+      // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
+      if !ds_push_var(es->ds, &vp, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {
+        return false;
+      }
+      if !ds_note_var_destroyer(es->ds, vn) {
+        return false;
+      }
+    }
 
-  if !check_fullbody(es->ds, &a->body, &return_type) {
-    return false;
+    if true {
+      ee entryexit;
+      if !check_body(&bs, &a->body.bb, &ee) {
+        return false;
+      }
+      if !finish_lambda_body(&bs, ee) {
+        return false;
+      }
+    }
   }
 
   props type_properties;
@@ -1017,18 +1026,6 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
     return false;
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~computed.te)), ~computed.te, props)));
-  return true;
-}
-
-func check_fullbody(ds *defscope, a *ast_fullbody, return_type *cu_typeexpr) bool {
-  bs bodystate = mk(ds, return_type);
-  ee entryexit;
-  if !check_body(&bs, &a->bb, &ee) {
-    return false;
-  }
-  if !finish_lambda_body(&bs, ee) {
-    return false;
-  }
   return true;
 }
 
