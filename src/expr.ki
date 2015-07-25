@@ -3,7 +3,20 @@ import body;
 import check;
 import primitives;
 
+// A cell location is tricky: the location of an expr's return value is defined both by the expr itself and the context it's found in.
+
+defenum cell_location {
+  // The cell is actually caused by dereferencing something, or maybe accessing something's field?
+  LocationVirtual void;
+  // The cell's on the stack, its location flexible.
+  LocationFlex void;
+  // The cell is a function parameter, its location is in a function parameter list.  (Such a cell may only be used once as a function parameter...)
+  LocationFuncParam void;
+};
+
 deftype cell_info struct {
+  // Location must be specified by type-checking, but it spends time in an unspecified state.
+  location opt[cell_location];
   type cu_typeexpr;
 };
 
@@ -31,7 +44,7 @@ def `==` fn[cell_num, cell_num, bool] = wrapequate;
 
 func add_cell(es *framescope, type cu_typeexpr) cell_num {
   ret size = count(&es->cells);
-  push(&es->cells, {type});
+  push(&es->cells, {None(), type});
   return ~ret;
 }
 

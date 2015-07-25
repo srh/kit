@@ -396,15 +396,43 @@ func build_u8str(r *array[u8], x *ast_expr_disposal) void {
   }
 }
 
+deftype copy_action struct {
+  ctor ctor_desc;
+  src cell_num;
+  dest cell_num;
+};
+
+deftype move_action struct {
+  ctor ctor_desc;
+  src cell_num;
+  dest cell_num;
+};
+
+deftype destroy_action struct {
+  ctor ctor_desc;
+  arg cell_num;
+};
+
+defenum after_action {
+  CopyAfter copy_action;
+  MoveAfter move_action;
+  DestroyAfter destroy_action;
+};
+
+deftype ast_expr_after struct {
+  actions array[after_action];
+};
+
 deftype ast_expr_complete_info struct {
   lval is_lval;
   cu cu_typeexpr;
   cu_props type_properties;
   disposal opt[ast_expr_disposal];
+  after opt[ast_expr_after];
 };
 
 func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties) ast_expr_complete_info {
-  return {lval, cu, cu_props, None()};
+  return {lval, cu, cu_props, None(), None()};
 }
 
 defenum ast_expr_info {
