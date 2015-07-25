@@ -10,7 +10,8 @@ defenum cell_location {
   LocationVirtual void;
   // The cell's on the stack, its location flexible.
   LocationFlex void;
-  // The cell is a function parameter, its location is in a function parameter list.  (Such a cell may only be used once as a function parameter...)
+  // The cell is a function parameter, its location is in a function parameter list.
+  // TODO: Rename to LocationRigid or something.
   LocationFuncParam void;
 };
 
@@ -52,8 +53,16 @@ func add_cell(es *framescope, type cu_typeexpr) cell_num {
   return help_add_cell(es, {None(), type});
 }
 
+func add_flex_cell(es *framescope, type cu_typeexpr) cell_num {
+  return help_add_cell(es, {Has(LocationFlex(void)), type});
+}
+
 func add_virtual_cell(es *framescope, type cu_typeexpr) cell_num {
   return help_add_cell(es, {Has(LocationVirtual(void)), type});
+}
+
+func add_funcparam_cell(es *framescope, type cu_typeexpr) cell_num {
+  return help_add_cell(es, {Has(LocationFuncParam(void)), type});
 }
 
 func ref_cell(es *framescope, num cell_num) *cell_info {
@@ -98,6 +107,7 @@ deftype var_info struct {
   num var_number;
   // A complete, checked, type, with generics replaced.
   type cu_typeexpr;
+  cell cell_num;
   name sym;
   // Can a goto statement enter this var's scope and construct the var?  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)
   autoinit var_autoinit;
@@ -148,13 +158,13 @@ func do_destroy(vp *varpopper) void {
   vp->ds = null;
 }
 
-func ds_push_var(ds *defscope, vp *varpopper, name *ast_ident, computed_type *cu_typeexpr, autoinit var_autoinit, vn_out *var_number) bool {
+func ds_push_var(ds *defscope, vp *varpopper, cell cell_num, name *ast_ident, computed_type *cu_typeexpr, autoinit var_autoinit, vn_out *var_number) bool {
   if case Has(num var_number) = ds_find_current_local(ds, name->value) {
     ERR(_u8("Local variable '"), lookup(ds->im, name->value), _u8("' shadows another"));
     return false;
   }
   num var_number = ~count(&ds->all_vars);
-  push(&ds->all_vars, {num, *computed_type, name->value, autoinit, None(), None()});
+  push(&ds->all_vars, {num, *computed_type, cell, name->value, autoinit, None(), None()});
   push(&ds->current_vars, num);
   push(&vp->nums, num);
   *vn_out = num;
@@ -557,7 +567,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       if !compute_complete_type_properties(es->cs, es->clq, param, &props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(IsLvalYes(void), ~ *param, props)));
+      annotate_info(x, CompleteCheck(mk(IsLvalYes({add_virtual_cell(es, ~ *param)}), ~ *param, props)));
       return true;
     }
     case &IndexExpr(a ast_index_expr): {
@@ -581,8 +591,8 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       lval is_lval;
       if inherits_lval {
         switch &info->lval {
-          case &IsLvalYes(v void): {
-            lval = IsLvalYes(void);
+          case &IsLvalYes(desc lval_description): {
+            lval = IsLvalYes({add_virtual_cell(es, fieldtype)});
           }
           case &IsLvalNo(desc rval_description): {
             lval = IsLvalNo({desc.num, add_virtual_cell(es, fieldtype), false});
@@ -622,7 +632,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       lval is_lval;
       if inherits_lval {
         // We deref, so it's always an lval.
-        lval = IsLvalYes(void);
+        lval = IsLvalYes({add_virtual_cell(es, fieldtype)});
       } else {
         lval = wholeRval(add_cell(es, fieldtype));
       }
@@ -745,7 +755,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr) bool {
         annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}));
       }
     }
-    case &IsLvalYes(v void): {
+    case &IsLvalYes(desc lval_description): {
       copy ctor_desc;
       if !get_copy_ctor(es->ds, &info->cu, &copy) {
         return false;
@@ -772,7 +782,7 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr) bool {
       }
       annotate_disposal(a, DisposeDestroy(destroy));
     }
-    case &IsLvalYes(v void): {
+    case &IsLvalYes(desc lval_description): {
       annotate_disposal(a, DisposeIgnore(void));
     }
   }
@@ -802,7 +812,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr) boo
         annotate_disposal(a, DisposeCopyAndDestroyThenDestroy({copy, destroy, destroy_the_copy}));
       }
     }
-    case &IsLvalYes(v void): {
+    case &IsLvalYes(desc lval_description): {
       copy ctor_desc;
       if !get_copy_ctor(es->ds, &info->cu, &copy) {
         return false;
@@ -841,7 +851,7 @@ func annotate_disposal_for_assignment(es *framescope, a *ast_expr) bool {
         annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}));
       }
     }
-    case &IsLvalYes(v void): {
+    case &IsLvalYes(desc lval_description): {
       copy ctor_desc;
       if !get_copy_ctor(es->ds, &info->cu, &copy) {
         return false;
@@ -902,7 +912,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       if !compute_type_properties(es->cs, es->clq, &vi->type, &props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(IsLvalYes(void), vi->type, props)));
+      annotate_info(x, CompleteCheck(mk(IsLvalYes({vi->cell}), vi->type, props)));
       return true;
     }
   }
@@ -1000,9 +1010,10 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
     init_vp(&vp, es->ds);
     for i size = 0; i < nargs; i = i + 1 {
       cu_param cu_typeexpr = ~get(computed_params, i);
+      cell cell_num = add_funcparam_cell(&bs.es, cu_param);
       vn var_number;
       // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
-      if !ds_push_var(es->ds, &vp, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {
+      if !ds_push_var(es->ds, &vp, cell, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {
         return false;
       }
       if !ds_note_var_destroyer(es->ds, vn) {
@@ -1481,8 +1492,8 @@ func check_expr_index(es *framescope, x *ast_expr, a *ast_index_expr, pt *te_typ
   if is_arraytype {
     // TODO: This is totally duplicating field access logic.
     switch &lhs_info->lval {
-      case &IsLvalYes(v void): {
-        lval = IsLvalYes(void);
+      case &IsLvalYes(desc lval_description): {
+        lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype)});
       }
       case &IsLvalNo(desc rval_description): {
         lval = IsLvalNo({desc.num, add_virtual_cell(es, ~ *ixtype), false});
@@ -1492,7 +1503,7 @@ func check_expr_index(es *framescope, x *ast_expr, a *ast_index_expr, pt *te_typ
     annotate_disposal_for_field(oo(&a->lhs));
   } else {
     // Dereferencing a pointer always makes an lvalue.
-    lval = IsLvalYes(void);
+    lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype)});
     if !annotate_disposal_for_consume(es, oo(&a->lhs)) {
       return false;
     }
