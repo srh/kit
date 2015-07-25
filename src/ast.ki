@@ -408,14 +408,14 @@ func build_u8str(r *array[u8], x *ast_expr_disposal) void {
 
 deftype copy_action struct {
   ctor ctor_desc;
-  src cell_num;
   dest cell_num;
+  src cell_num;
 };
 
 deftype move_action struct {
   ctor ctor_desc;
-  src cell_num;
   dest cell_num;
+  src cell_num;
 };
 
 deftype destroy_action struct {
@@ -430,8 +430,21 @@ defenum after_action {
 };
 
 deftype ast_expr_after struct {
+  // The after-actions get evaluated -in order-.  For example, copying a field from a temporary should happen -before- destroying the temporary.
   actions array[after_action];
 };
+
+func mk_after() ast_expr_after {
+  return {mk_array()};
+}
+
+func mk_after(x after_action) ast_expr_after {
+  return {mk_array(x)};
+}
+
+func mk_after(x after_action, y after_action) ast_expr_after {
+  return {mk_array(x, y)};
+}
 
 deftype ast_expr_complete_info struct {
   lval is_lval;
@@ -489,13 +502,19 @@ func annotate_info(a *ast_expr, info ast_expr_info) void {
   a->info = info;
 }
 
-func annotate_disposal(a *ast_expr, d ast_expr_disposal) void {
+func annotate_disposal(a *ast_expr, d ast_expr_disposal, aft ast_expr_after) void {
   switch &a->info {
     case &CompleteCheck(t ast_expr_complete_info): {
       if case &Has(d2 ast_expr_disposal) = &t.disposal {
         ice(_u8("annotate_disposal called twice: "), d, _u8(" on top of "), d2);
       } else {
         t.disposal = Has(d);
+      }
+
+      if case &Has(a2 ast_expr_after) = &t.after {
+        ice(_u8("annotate_disposal impossibly called twice, detected with after"));
+      } else {
+        t.after = Has(aft);
       }
     }
     default: {
