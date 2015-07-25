@@ -455,9 +455,7 @@ func annotate_disposal(a *ast_expr, d ast_expr_disposal) void {
   switch &a->info {
     case &CompleteCheck(t ast_expr_complete_info): {
       if case &Has(d2 ast_expr_disposal) = &t.disposal {
-        if d2 != d {
-          ice(_u8("annotate_disposal with conflicting disposal: "), d, _u8(" on top of "), d2);
-        }
+        ice(_u8("annotate_disposal called twice: "), d, _u8(" on top of "), d2);
       } else {
         t.disposal = Has(d);
       }

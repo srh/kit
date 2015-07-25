@@ -1357,10 +1357,8 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, x *ast_expr, a *ast
     return true;
   }
 
-  if a_param_incomplete {
-    if !check_funcall_params_secondtime(es, expr_complete_type(oo(&a->fun)), &a->params) {
-      return false;
-    }
+  if !check_funcall_params_secondtime(es, expr_complete_type(oo(&a->fun)), &a->params) {
+    return false;
   }
 
   if !annotate_disposal_for_consume(es, oo(&a->fun)) {
@@ -1386,11 +1384,6 @@ func check_funcall_params_firsttime(es *framescope, params *array[ast_expr], a_p
       return false;
     }
     complete bool = expr_type_complete(expr);
-    if complete {
-      if !annotate_disposal_for_consume(es, expr) {
-        return false;
-      }
-    }
     all_params_complete = all_params_complete & complete;
   }
   *a_param_incomplete_out = !all_params_complete;
