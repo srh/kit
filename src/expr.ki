@@ -42,10 +42,18 @@ deftype cell_num size;
 def `~` fn[size, cell_num] = wrapconvert;
 def `==` fn[cell_num, cell_num, bool] = wrapequate;
 
-func add_cell(es *framescope, type cu_typeexpr) cell_num {
+func help_add_cell(es *framescope, info cell_info) cell_num {
   ret size = count(&es->cells);
-  push(&es->cells, {None(), type});
+  push(&es->cells, info);
   return ~ret;
+}
+
+func add_cell(es *framescope, type cu_typeexpr) cell_num {
+  return help_add_cell(es, {None(), type});
+}
+
+func add_virtual_cell(es *framescope, type cu_typeexpr) cell_num {
+  return help_add_cell(es, {Has(LocationVirtual(void)), type});
 }
 
 func ref_cell(es *framescope, num cell_num) *cell_info {
@@ -577,7 +585,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
             lval = IsLvalYes(void);
           }
           case &IsLvalNo(desc rval_description): {
-            lval = IsLvalNo({desc.num, false});
+            lval = IsLvalNo({desc.num, add_virtual_cell(es, fieldtype), false});
           }
         }
       } else {
@@ -1474,7 +1482,15 @@ func check_expr_index(es *framescope, x *ast_expr, a *ast_index_expr, pt *te_typ
 
   lval is_lval;
   if is_arraytype {
-    lval = lhs_info->lval;
+    // TODO: This is totally duplicating field access logic.
+    switch &lhs_info->lval {
+      case &IsLvalYes(v void): {
+        lval = IsLvalYes(void);
+      }
+      case &IsLvalNo(desc rval_description): {
+        lval = IsLvalNo({desc.num, add_virtual_cell(es, ~ *ixtype), false});
+      }
+    }
     // Just like field access.
     annotate_disposal_for_field(oo(&a->lhs));
   } else {
