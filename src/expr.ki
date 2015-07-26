@@ -614,7 +614,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
             lval = IsLvalYes({add_virtual_cell(es, fieldtype)});
           }
           case &IsLvalNo(desc rval_description): {
-            lval = IsLvalNo({desc.num, add_virtual_cell(es, fieldtype), false});
+            lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, fieldtype), false});
           }
         }
       } else {
@@ -763,21 +763,21 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr) bool {
     case &IsLvalNo(desc rval_description): {
       if desc.whole_temporary {
         annotate_disposal(a, DisposeMoveInPlace(void), mk_after());
-        annotate_cell_location(es, desc.num, LocationFuncParam(void));
+        annotate_cell_location(es, desc.whole_num, LocationFuncParam(void));
       } else {
         copy ctor_desc;
         if !get_copy_ctor(es->ds, &info->cu, &copy) {
           return false;
         }
         destroy ctor_desc;
-        if !get_destroy_ctor(es->ds, &ref_cell(es, desc.num)->type, &destroy) {
+        if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
           return false;
         }
         dest cell_num = add_funcparam_cell(es, info->cu);
         annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}),
           mk_after(CopyAfter({copy, dest, desc.partial_num}),
-                   DestroyAfter({destroy, desc.num})));
-        annotate_cell_location(es, desc.num, LocationFlex(void));
+                   DestroyAfter({destroy, desc.whole_num})));
+        annotate_cell_location(es, desc.whole_num, LocationFlex(void));
       }
     }
     case &IsLvalYes(desc lval_description): {
@@ -805,11 +805,11 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr) bool {
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       destroy ctor_desc;
-      if !get_destroy_ctor(es->ds, &ref_cell(es, desc.num)->type, &destroy) {
+      if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
         return false;
       }
-      annotate_disposal(a, DisposeDestroy(destroy), mk_after(DestroyAfter({destroy, desc.num})));
-      annotate_cell_location(es, desc.num, LocationFlex(void));
+      annotate_disposal(a, DisposeDestroy(destroy), mk_after(DestroyAfter({destroy, desc.whole_num})));
+      annotate_cell_location(es, desc.whole_num, LocationFlex(void));
     }
     case &IsLvalYes(desc lval_description): {
       annotate_disposal(a, DisposeIgnore(void), mk_after());
@@ -825,12 +825,12 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr) boo
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       destroy ctor_desc;
-      if !get_destroy_ctor(es->ds, &ref_cell(es, desc.num)->type, &destroy) {
+      if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
         return false;
       }
       if desc.whole_temporary {
         annotate_disposal(a, DisposeMoveInPlaceThenDestroy(destroy), mk_after());
-        annotate_cell_location(es, desc.num, LocationFlex(void));
+        annotate_cell_location(es, desc.whole_num, LocationFlex(void));
       } else {
         copy ctor_desc;
         if !get_copy_ctor(es->ds, &info->cu, &copy) {
@@ -843,8 +843,8 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr) boo
         dest cell_num = add_flex_cell(es, info->cu);
         annotate_disposal(a, DisposeCopyAndDestroyThenDestroy({copy, destroy, destroy_the_copy}),
           mk_after(CopyAfter({copy, dest, desc.partial_num}),
-                   DestroyAfter({destroy, desc.num})));
-        annotate_cell_location(es, desc.num, LocationFlex(void));
+                   DestroyAfter({destroy, desc.whole_num})));
+        annotate_cell_location(es, desc.whole_num, LocationFlex(void));
       }
     }
     case &IsLvalYes(desc lval_description): {
@@ -879,10 +879,10 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
           return false;
         }
         annotate_disposal(a, DisposeMove(move), mk_after());
-        annotate_cell_location(es, desc.num, LocationFlex(void));
+        annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate_assignment(assignment,
           {mk_array(DestroyAfter({destroy, dest}),
-                    MoveAfter({move, dest, desc.num})),
+                    MoveAfter({move, dest, desc.whole_num})),
            mk_array()});
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
@@ -891,7 +891,7 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
           return false;
         }
         destroy ctor_desc;
-        if !get_destroy_ctor(es->ds, &ref_cell(es, desc.num)->type, &destroy) {
+        if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
           return false;
         }
         target_destroy ctor_desc;
@@ -900,11 +900,11 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         }
 
         annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}), mk_after());
-        annotate_cell_location(es, desc.num, LocationFlex(void));
+        annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate_assignment(assignment,
           {mk_array(DestroyAfter({target_destroy, dest}),
                     CopyAfter({copy, dest, desc.partial_num})),
-           mk_array(DestroyAfter({destroy, desc.num}))});
+           mk_array(DestroyAfter({destroy, desc.whole_num}))});
       }
     }
     case &IsLvalYes(desc lval_description): {
@@ -1554,7 +1554,7 @@ func check_expr_index(es *framescope, x *ast_expr, a *ast_index_expr, pt *te_typ
         lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype)});
       }
       case &IsLvalNo(desc rval_description): {
-        lval = IsLvalNo({desc.num, add_virtual_cell(es, ~ *ixtype), false});
+        lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, ~ *ixtype), false});
       }
     }
     // Just like field access.

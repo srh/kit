@@ -311,8 +311,7 @@ deftype ast_strinit struct {
 // Is a non-lval an rval?  Okay.
 deftype rval_description struct {
   // The cell number of the temporary that this rval is _part of_.
-  // TODO: Rename to whole_num.
-  num cell_num;
+  whole_num cell_num;
 
   // The cell number of the field (a virtual cell if different from num).
   partial_num cell_num;
