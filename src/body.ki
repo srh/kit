@@ -101,11 +101,11 @@ func check_discard_expr(es *framescope, x *ast_expr, pt *te_typeexpr) bool {
 }
 
 // For exprs that we use, but then discard.  Conditionals... and switches?  Kinda.
-func check_consume_then_discard_expr(es *framescope, x *ast_expr, pt *te_typeexpr) bool {
+func check_consume_then_discard_expr(es *framescope, x *ast_expr, pt *te_typeexpr, later *ast_later_discard_info) bool {
   if !check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
-  if !annotate_disposal_for_consume_then_discard(es, x) {
+  if !annotate_disposal_for_consume_then_discard(es, x, later) {
     return false;
   }
   return true;
@@ -187,7 +187,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
     case &IfThen(b ast_ifthen_statement): {
       cond_vp varpopper;
       init_vp(&cond_vp, bs->ds);
-      if !check_condition(&bs->es, &cond_vp, &b.condition) {
+      if !check_condition(&bs->es, &cond_vp, &b.condition, &b.condition_discard) {
         return false;
       }
       body_ee entryexit;
@@ -204,7 +204,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
     case &IfThenElse(b ast_ifthenelse_statement): {
       cond_vp varpopper;
       init_vp(&cond_vp, bs->ds);
-      if !check_condition(&bs->es, &cond_vp, &b.condition) {
+      if !check_condition(&bs->es, &cond_vp, &b.condition, &b.condition_discard) {
         return false;
       }
       then_ee entryexit;
@@ -227,7 +227,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
     case &While(b ast_while_statement): {
       cond_vp varpopper;
       init_vp(&cond_vp, bs->ds);
-      if !check_condition(&bs->es, &cond_vp, &b.condition) {
+      if !check_condition(&bs->es, &cond_vp, &b.condition, &b.condition_discard) {
         return false;
       }
       body_ee entryexit;
@@ -257,7 +257,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       exitnum statement_num = add_statement(bs, None());
       if case &Has(cond box[ast_expr]) = &b.condition {
         boolean cu_typeexpr = compute_prim(bs->ds, primitive_bool_type(bs->cs));
-        if !check_consume_then_discard_expr(&bs->es, oo(&cond), &boolean.~) {
+        if !check_consume_then_discard_expr(&bs->es, oo(&cond), &boolean.~, &b.condition_discard) {
           return false;
         }
         connect_statements(bs, loopnum, exitnum);
@@ -279,7 +279,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
 
     case &Switch(b ast_switch_statement): {
       unknown te_typeexpr = TeUnknown(void);
-      if !check_consume_then_discard_expr(&bs->es, oo(&b.swartch), &unknown) {
+      if !check_consume_then_discard_expr(&bs->es, oo(&b.swartch), &unknown, &b.swartch_discard) {
         return false;
       }
 
@@ -418,18 +418,18 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
   return false;
 }
 
-func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition) bool {
+func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later *ast_later_discard_info) bool {
   switch a {
     case &ExprCondition(b box[ast_expr]): {
       booltype cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
-      if !check_consume_then_discard_expr(es, oo(&b), &booltype.~) {
+      if !check_consume_then_discard_expr(es, oo(&b), &booltype.~, later) {
         return false;
       }
       return true;
     }
     case &PatternCondition(b ast_pattern_assign): {
       unknown te_typeexpr = TeUnknown(void);
-      if !check_consume_then_discard_expr(es, oo(&b.rhs), &unknown) {
+      if !check_consume_then_discard_expr(es, oo(&b.rhs), &unknown, later) {
         return false;
       }
 

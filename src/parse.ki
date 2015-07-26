@@ -1155,7 +1155,7 @@ func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
   }
 
   if !try_skip_token(p, Keyw(Else(void))) {
-    *out = IfThen({condition, thenbody});
+    *out = IfThen({mk_later(), condition, thenbody});
     return true;
   }
 
@@ -1164,14 +1164,14 @@ func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
     if !parse_rest_of_if_statement(p, &elseif) {
       return Fail;
     }
-    *out = IfThenElse({condition, thenbody, {mk_array(elseif)}});
+    *out = IfThenElse({mk_later(), condition, thenbody, {mk_array(elseif)}});
     return true;
   }
   elsebody ast_bracebody;
   if !parse_bracebody(p, &elsebody) {
     return Fail;
   }
-  *out = IfThenElse({condition, thenbody, elsebody});
+  *out = IfThenElse({mk_later(), condition, thenbody, elsebody});
   return true;
 }
 
@@ -1182,7 +1182,7 @@ func parse_rest_of_while_statement(p *ps, out *ast_statement) bool {
        && parse_bracebody(p, &body)) {
     return Fail;
   }
-  *out = While({ExprCondition(condition), body});
+  *out = While({mk_later(), ExprCondition(condition), body});
   return true;
 }
 
@@ -1229,7 +1229,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
   if !parse_bracebody(p, &body) {
     return Fail;
   }
-  *out = For({initializer, condition, increment, body});
+  *out = For({initializer, mk_later(), condition, increment, body});
   return true;
 }
 
@@ -1243,7 +1243,7 @@ func parse_rest_of_switch_statement(p *ps, out *ast_statement) bool {
   cases array[ast_switch_case];
   for ;; {
     if try_skip_token(p, Grouper(RBrace(void))) {
-      *out = Switch({swartch, cases});
+      *out = Switch({mk_later(), swartch, cases});
       return true;
     }
     cas ast_switch_case;

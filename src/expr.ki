@@ -819,8 +819,7 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr) bool {
 }
 
 // Annotates the disposal for a value we'll use but then discard.
-// TODO: For this function, we'll need to annotate the "way after" disposal separately from the "after" disposal.
-func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr) bool {
+func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, later *ast_later_discard_info) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -831,6 +830,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr) boo
       if desc.whole_temporary {
         annotate_disposal(a, DisposeMoveInPlaceThenDestroy(destroy), mk_after());
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
+        annotate_later(later, {destroy, desc.whole_num});
       } else {
         copy ctor_desc;
         if !get_copy_ctor(es->ds, &info->cu, &copy) {
@@ -845,6 +845,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr) boo
           mk_after(CopyAfter({copy, dest, desc.partial_num}),
                    DestroyAfter({destroy, desc.whole_num})));
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
+        annotate_later(later, {destroy, dest});
       }
     }
     case &IsLvalYes(desc lval_description): {
@@ -859,6 +860,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr) boo
       dest cell_num = add_flex_cell(es, info->cu);
       annotate_disposal(a, DisposeCopyThenDestroy({copy, destroy_the_copy}),
         mk_after(CopyAfter({copy, dest, desc.num})));
+      annotate_later(later, {destroy_the_copy, dest});
     }
   }
   return true;

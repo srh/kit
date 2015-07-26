@@ -164,17 +164,20 @@ defenum ast_condition {
 };
 
 deftype ast_ifthen_statement struct {
+  condition_discard ast_later_discard_info;
   condition ast_condition;
   body ast_bracebody;
 };
 
 deftype ast_ifthenelse_statement struct {
+  condition_discard ast_later_discard_info;
   condition ast_condition;
   thenbody ast_bracebody;
   elsebody ast_bracebody;
 };
 
 deftype ast_while_statement struct {
+  condition_discard ast_later_discard_info;
   condition ast_condition;
   body ast_bracebody;
 };
@@ -182,12 +185,14 @@ deftype ast_while_statement struct {
 deftype ast_for_statement struct {
   // Can only be an ast_expr or ast_statement_var.
   initializer opt[box[ast_statement]];
+  condition_discard ast_later_discard_info;
   condition opt[box[ast_expr]];
   increment opt[box[ast_expr]];
   body ast_bracebody;
 };
 
 deftype ast_switch_statement struct {
+  swartch_discard ast_later_discard_info;
   swartch box[ast_expr];
   cases array[ast_switch_case];
 };
@@ -340,6 +345,22 @@ func isNo(x is_lval) bool {
     return true;
   }
   return false;
+}
+
+deftype ast_later_discard_info struct {
+  // None() means not-yet-specified, typechecking always leaves this in an isHas state.
+  action opt[destroy_action];
+};
+
+func mk_later() ast_later_discard_info {
+  return {None()};
+}
+
+func annotate_later(a *ast_later_discard_info, action destroy_action) void {
+  if isHas(&a->action) {
+    ice(_u8("ast_later_discard_info already annotated"));
+  }
+  a->action = Has(action);
 }
 
 deftype instpair struct {
