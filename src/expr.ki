@@ -1498,7 +1498,6 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
   return true;
 }
 
-// TODO: Remove this?  Or remove this TODO line.
 func compute_prim(ds *defscope, t te_typeexpr) cu_typeexpr {
   cac cac_typeexpr;
   if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &t, &cac) {
