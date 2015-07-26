@@ -320,11 +320,12 @@ deftype rval_description struct {
 
   // The cell number of the field (a virtual cell if different from num).
   partial_num cell_num;
-
-  // Tells whether the rval would need to get copied out of temporary, or whether the rval _is_ the whole temporary and can get moved.
-  // (TODO: Is this not always the value of partial_num == num?  Can we get rid of this?)
-  whole_temporary bool;
 };
+
+// Tells whether the rval would need to get copied out of the temporary, or whether the rval _is_ the whole temporary and can get moved.
+func whole_temporary(d *rval_description) bool {
+  return d->whole_num == d->partial_num;
+}
 
 deftype lval_description struct {
   // The cell number of the lvalue.  Be it part of a bigger object or not.
@@ -337,7 +338,7 @@ defenum is_lval {
 };
 
 func wholeRval(num cell_num) is_lval {
-  return IsLvalNo({num, num, true});
+  return IsLvalNo({num, num});
 }
 
 func isNo(x is_lval) bool {

@@ -614,7 +614,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
             lval = IsLvalYes({add_virtual_cell(es, fieldtype)});
           }
           case &IsLvalNo(desc rval_description): {
-            lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, fieldtype), false});
+            lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, fieldtype)});
           }
         }
       } else {
@@ -761,7 +761,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      if desc.whole_temporary {
+      if whole_temporary(&desc) {
         annotate_disposal(a, mk_after());
         annotate_cell_location(es, desc.whole_num, LocationFuncParam(void));
       } else {
@@ -826,7 +826,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, lat
       if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
         return false;
       }
-      if desc.whole_temporary {
+      if whole_temporary(&desc) {
         annotate_disposal(a, mk_after());
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate_later(later, {destroy, desc.whole_num});
@@ -870,7 +870,7 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      if desc.whole_temporary {
+      if whole_temporary(&desc) {
         move ctor_desc;
         if !get_move_ctor(es->ds, &ref_cell(es, dest)->type, &move) {
           return false;
@@ -1555,7 +1555,7 @@ func check_expr_index(es *framescope, x *ast_expr, a *ast_index_expr, pt *te_typ
         lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype)});
       }
       case &IsLvalNo(desc rval_description): {
-        lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, ~ *ixtype), false});
+        lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, ~ *ixtype)});
       }
     }
     // Just like field access.
