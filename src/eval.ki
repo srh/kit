@@ -1,8 +1,10 @@
 import check;
 
 deftype st_env struct {
-
+  objects array[opt[st_value]];
 };
+
+deftype st_obj_num size;
 
 deftype st_symbol_name sym;
 
@@ -17,6 +19,23 @@ deftype st_value struct {
   // Values of external symbols.
   symbolrefs array[st_symbolref];
 };
+
+func ref_obj(env *st_env, num st_obj_num, out **st_value) bool {
+  if case &Has(v st_value) = ref(&env->objects, num.~) {
+    *out = &v;
+    return true;
+  } else {
+    ERR(_u8("static evaluation accessing object that has been destroyed"));
+    return false;
+  }
+}
+
+func add_obj(env *st_env, size u32) st_obj_num {
+  ret st_obj_num;
+  ret.~ = count(&env->objects);
+  push(&env->objects, Has(mk_st_value(size)));
+  return ret;
+}
 
 func mk_st_value(size u32) st_value {
   return {repeat(~size, 0), mk_array()};
