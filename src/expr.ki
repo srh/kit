@@ -12,13 +12,12 @@ in. Location should be specified when:
 */
 
 defenum cell_location {
-  // The cell is actually caused by dereferencing something, or maybe accessing something's field?
+  // The "cell" is actually caused by dereferencing something, or maybe accessing something's field?
   LocationVirtual void;
   // The cell's on the stack, its location flexible.
   LocationFlex void;
-  // The cell is a function parameter, its location is in a function parameter list.
-  // TODO: Rename to LocationRigid or something.
-  LocationFuncParam void;
+  // The cell is in a "rigid" location.  Used for function parameters, strinit fields, and the like, what this really says is that the value is used "once."  The only rigid cells that truly must spend their lives in a calculated real-memory location are those without a trivial move constructor.
+  LocationRigid void;
 };
 
 deftype cell_info struct {
@@ -67,8 +66,8 @@ func add_virtual_cell(es *framescope, type cu_typeexpr) cell_num {
   return help_add_cell(es, {Has(LocationVirtual(void)), type});
 }
 
-func add_funcparam_cell(es *framescope, type cu_typeexpr) cell_num {
-  return help_add_cell(es, {Has(LocationFuncParam(void)), type});
+func add_rigid_cell(es *framescope, type cu_typeexpr) cell_num {
+  return help_add_cell(es, {Has(LocationRigid(void)), type});
 }
 
 func ref_cell(es *framescope, num cell_num) *cell_info {
@@ -763,7 +762,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr) bool {
     case &IsLvalNo(desc rval_description): {
       if whole_temporary(&desc) {
         annotate_disposal(a, mk_after());
-        annotate_cell_location(es, desc.whole_num, LocationFuncParam(void));
+        annotate_cell_location(es, desc.whole_num, LocationRigid(void));
       } else {
         copy ctor_desc;
         if !get_copy_ctor(es->ds, &info->cu, &copy) {
@@ -773,7 +772,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr) bool {
         if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
           return false;
         }
-        dest cell_num = add_funcparam_cell(es, info->cu);
+        dest cell_num = add_rigid_cell(es, info->cu);
         annotate_disposal(a,
           mk_after(CopyAfter({copy, dest, desc.partial_num}),
                    DestroyAfter({destroy, desc.whole_num})));
@@ -785,7 +784,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr) bool {
       if !get_copy_ctor(es->ds, &info->cu, &copy) {
         return false;
       }
-      dest cell_num = add_funcparam_cell(es, info->cu);
+      dest cell_num = add_rigid_cell(es, info->cu);
       annotate_disposal(a, mk_after(CopyAfter({copy, dest, desc.num})));
     }
   }
@@ -1069,7 +1068,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
     init_vp(&vp, es->ds);
     for i size = 0; i < nargs; i = i + 1 {
       cu_param cu_typeexpr = ~get(computed_params, i);
-      cell cell_num = add_funcparam_cell(&bs.es, cu_param);
+      cell cell_num = add_rigid_cell(&bs.es, cu_param);
       vn var_number;
       // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
       if !ds_push_var(es->ds, &vp, cell, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {
