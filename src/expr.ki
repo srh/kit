@@ -521,7 +521,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
           if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &lhs_info->cu.~) {
             return false;
           }
-          if !annotate_disposal_for_assignment(es, oo(&a.rhs)) {
+          if !annotate_disposal_for_assignment(es, desc.num, oo(&a.rhs), &a) {
             return false;
           }
           annotate_info(x, CompleteCheck(mk(lhs_info->lval, lhs_info->cu, lhs_info->cu_props)));
@@ -865,37 +865,56 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr) boo
 }
 
 
-func annotate_disposal_for_assignment(es *framescope, a *ast_expr) bool {
+func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr, assignment *ast_assignment) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       if desc.whole_temporary {
         move ctor_desc;
-        if !get_move_ctor(es->ds, &info->cu, &move) {
+        if !get_move_ctor(es->ds, &ref_cell(es, dest)->type, &move) {
           return false;
         }
-        annotate_disposal(a, DisposeMove(move), TODO());
+        destroy ctor_desc;
+        if !get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &destroy) {
+          return false;
+        }
+        annotate_disposal(a, DisposeMove(move), mk_after());
         annotate_cell_location(es, desc.num, LocationFlex(void));
+        annotate_assignment(assignment,
+          {mk_array(DestroyAfter({destroy, dest}),
+                    MoveAfter({move, dest, desc.num})),
+           mk_array()});
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
         copy ctor_desc;
-        if !get_copy_ctor(es->ds, &info->cu, &copy) {
+        if !get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
           return false;
         }
         destroy ctor_desc;
         if !get_destroy_ctor(es->ds, &ref_cell(es, desc.num)->type, &destroy) {
           return false;
         }
-        annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}), TODO());
+        target_destroy ctor_desc;
+        if !get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
+          return false;
+        }
+
+        annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}), mk_after());
         annotate_cell_location(es, desc.num, LocationFlex(void));
+        annotate_assignment(assignment,
+          {mk_array(DestroyAfter({target_destroy, dest}),
+                    CopyAfter({copy, dest, desc.partial_num})),
+           mk_array(DestroyAfter({destroy, desc.num}))});
       }
     }
     case &IsLvalYes(desc lval_description): {
       copy ctor_desc;
-      if !get_copy_ctor(es->ds, &info->cu, &copy) {
+      if !get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
         return false;
       }
-      annotate_disposal(a, DisposeCopy(copy), TODO());
+      annotate_disposal(a, DisposeCopy(copy), mk_after());
+      annotate_assignment(assignment,
+        {mk_array(CopyAfter({copy, dest, desc.num})), mk_array()});
     }
   }
   return true;

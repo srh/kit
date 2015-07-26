@@ -68,10 +68,28 @@ deftype ast_funcall struct {
   params array[ast_expr];
 };
 
+deftype ast_assignment_info struct {
+  /* These actions perform the assignment -- they happen if the
+  assignment isn't self-assignment. */
+  conditional_actions array[after_action];
+
+  /* These unconditionally happen, even if no assignment happens.
+  They happen _after_ the conditional actions. */
+  unconditional_actions array[after_action];
+};
+
 deftype ast_assignment struct {
+  info opt[ast_assignment_info];
   lhs box[ast_expr];
   rhs box[ast_expr];
 };
+
+func annotate_assignment(a *ast_assignment, info ast_assignment_info) void {
+  if case &Has(i ast_assignment_info) = &a->info {
+    ice(_u8("assignment already annotated"));
+  }
+  a->info = Has(info);
+}
 
 deftype ast_addressof struct {
   rhs box[ast_expr];
