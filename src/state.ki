@@ -225,6 +225,11 @@ func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_ins
   }
 }
 
+// True if the type is trivial enough to be used in a def.  In other words, it has trivial copy/move/destroy constructors, but initialization could be non-trivial.  (It could default-initialize to a nonzero value.)
+func is_defwise_trivial(props *type_properties) bool {
+  return isTrivial(props->move_behavior) && isTrivial(props->copy_behavior) && isTrivial(props->destroy_behavior);
+}
+
 func lookup_explicit_method_or_lack_thereof(cs *checkstate, clq *clqueue, fntype *te_typeexpr, impl_name sym, behavior_out *derived_method_behavior) bool {
   res match_def_res;
   gp genparms = NoParms(void);
@@ -398,6 +403,7 @@ deftype def_inst struct {
   // TODO: Use nbfc or something.
   // Becomes the concrete type (with generics replaced) once we've computed it and checked it (see status).
   computed_type cu_typeexpr;
+  // Right now, these type properties _must_ indicate that the type is defwise trivial.
   computed_type_properties type_properties;
   evaled_value nbfc[st_value];
 };

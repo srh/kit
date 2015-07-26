@@ -47,6 +47,7 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
     ice(_u8("Evaling def we have not finished checking."));
   }
   if case &Has(e ast_expr) = &inst->rhs {
+    check(is_defwise_trivial(&inst->computed_type_properties));
     switch &inst->evaled_value {
       case &NotComputed(v void): {
         inst->evaled_value = BeganComputing();

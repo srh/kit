@@ -388,6 +388,12 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       }
       inst->status = FinishedComputingType(void);
       inst->computed_type = cu_computed;
+
+      if !is_defwise_trivial(&props) {
+        ERR(_u8("def (instantiation) has non-trivial type"));
+        return false;
+      }
+
       inst->computed_type_properties = props;
       return true;
     }
