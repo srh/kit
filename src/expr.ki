@@ -463,7 +463,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       }
       // Same annotations as TypedExpr.
       if expr_type_complete(oo(&a.expr)) {
-        annotate_disposal(oo(&a.expr), DisposeIgnore(void), mk_after());
+        annotate_disposal(oo(&a.expr), mk_after());
       }
       annotate_info(x, inner_info(&oo(&a.expr)->info));
       return true;
@@ -517,7 +517,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
           return false;
         }
         case &IsLvalYes(desc lval_description): {
-          annotate_disposal(oo(&a.lhs), DisposeIgnore(void), mk_after());
+          annotate_disposal(oo(&a.lhs), mk_after());
           if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &lhs_info->cu.~) {
             return false;
           }
@@ -548,7 +548,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
         ERR(_u8("Taking address of a non-lvalue"));
         return false;
       }
-      annotate_disposal(oo(&a.rhs), DisposeIgnore(void), mk_after());
+      annotate_disposal(oo(&a.rhs), mk_after());
 
       ptr_type te_typeexpr = pointer_to(es->cs, rhs_info->cu.~);
       ptr_computed cac_typeexpr;
@@ -692,7 +692,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       }
       // Same annotations as ParenExpr.
       if expr_type_complete(oo(&a.expr)) {
-        annotate_disposal(oo(&a.expr), DisposeIgnore(void), mk_after());
+        annotate_disposal(oo(&a.expr), mk_after());
       }
       annotate_info(x, inner_info(&oo(&a.expr)->info));
       return true;
@@ -762,7 +762,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr) bool {
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       if desc.whole_temporary {
-        annotate_disposal(a, DisposeMoveInPlace(void), mk_after());
+        annotate_disposal(a, mk_after());
         annotate_cell_location(es, desc.whole_num, LocationFuncParam(void));
       } else {
         copy ctor_desc;
@@ -774,7 +774,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr) bool {
           return false;
         }
         dest cell_num = add_funcparam_cell(es, info->cu);
-        annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}),
+        annotate_disposal(a,
           mk_after(CopyAfter({copy, dest, desc.partial_num}),
                    DestroyAfter({destroy, desc.whole_num})));
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
@@ -786,8 +786,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr) bool {
         return false;
       }
       dest cell_num = add_funcparam_cell(es, info->cu);
-      annotate_disposal(a, DisposeCopy(copy),
-                        mk_after(CopyAfter({copy, dest, desc.num})));
+      annotate_disposal(a, mk_after(CopyAfter({copy, dest, desc.num})));
     }
   }
   return true;
@@ -796,7 +795,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr) bool {
 // Annotates the disposal of the expr for local field access -- depends on whether it's an lvalue/rvalue.
 func annotate_disposal_for_field(a *ast_expr) void {
   // We don't need to annotate any cell locations.
-  annotate_disposal(a, DisposeIgnore(void), mk_after());
+  annotate_disposal(a, mk_after());
 }
 
 // Annotates the disposal of an Expr statement's expr, or some other value we are done using.
@@ -808,11 +807,11 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr) bool {
       if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
         return false;
       }
-      annotate_disposal(a, DisposeDestroy(destroy), mk_after(DestroyAfter({destroy, desc.whole_num})));
+      annotate_disposal(a, mk_after(DestroyAfter({destroy, desc.whole_num})));
       annotate_cell_location(es, desc.whole_num, LocationFlex(void));
     }
     case &IsLvalYes(desc lval_description): {
-      annotate_disposal(a, DisposeIgnore(void), mk_after());
+      annotate_disposal(a, mk_after());
     }
   }
   return true;
@@ -828,7 +827,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, lat
         return false;
       }
       if desc.whole_temporary {
-        annotate_disposal(a, DisposeMoveInPlaceThenDestroy(destroy), mk_after());
+        annotate_disposal(a, mk_after());
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate_later(later, {destroy, desc.whole_num});
       } else {
@@ -841,7 +840,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, lat
           return false;
         }
         dest cell_num = add_flex_cell(es, info->cu);
-        annotate_disposal(a, DisposeCopyAndDestroyThenDestroy({copy, destroy, destroy_the_copy}),
+        annotate_disposal(a,
           mk_after(CopyAfter({copy, dest, desc.partial_num}),
                    DestroyAfter({destroy, desc.whole_num})));
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
@@ -858,7 +857,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, lat
         return false;
       }
       dest cell_num = add_flex_cell(es, info->cu);
-      annotate_disposal(a, DisposeCopyThenDestroy({copy, destroy_the_copy}),
+      annotate_disposal(a,
         mk_after(CopyAfter({copy, dest, desc.num})));
       annotate_later(later, {destroy_the_copy, dest});
     }
@@ -880,7 +879,7 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         if !get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &destroy) {
           return false;
         }
-        annotate_disposal(a, DisposeMove(move), mk_after());
+        annotate_disposal(a, mk_after());
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate_assignment(assignment,
           {mk_array(DestroyAfter({destroy, dest}),
@@ -901,7 +900,7 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
           return false;
         }
 
-        annotate_disposal(a, DisposeCopyAndDestroy({copy, destroy}), mk_after());
+        annotate_disposal(a, mk_after());
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate_assignment(assignment,
           {mk_array(DestroyAfter({target_destroy, dest}),
@@ -914,7 +913,7 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
       if !get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
         return false;
       }
-      annotate_disposal(a, DisposeCopy(copy), mk_after());
+      annotate_disposal(a, mk_after());
       annotate_assignment(assignment,
         {mk_array(CopyAfter({copy, dest, desc.num})), mk_array()});
     }
