@@ -348,6 +348,18 @@ func isNo(x is_lval) bool {
   return false;
 }
 
+// Where the value of the expr is, _before_ after actions are run.
+func value_cell(x *is_lval) cell_num {
+  switch x {
+    case &IsLvalYes(desc lval_description): { return desc.num; }
+    case &IsLvalNo(desc rval_description): { return desc.partial_num; }
+  }
+}
+
+func value_cell(a *ast_expr) cell_num {
+  return value_cell(&expr_complete_info(a)->lval);
+}
+
 deftype ast_later_discard_info struct {
   // None() means not-yet-specified, typechecking always leaves this in an isHas state.
   action opt[destroy_action];
@@ -400,18 +412,21 @@ defenum after_action {
 deftype ast_expr_after struct {
   // The after-actions get evaluated -in order-.  For example, copying a field from a temporary should happen -before- destroying the temporary.
   actions array[after_action];
+  // The cell the expr's result... goes.  This is really a property of the thing holding the expr, not the expr itself...  If the result is discarded, this is None().
+  // TODO: We should prohibit exprs where a non-whole_field result is discarded.  This will mean we don't need to handle the case where we discard a field lookup without copying it out first.
+  result opt[cell_num];
 };
 
-func mk_after() ast_expr_after {
-  return {mk_array()};
+func mk_after(result opt[cell_num]) ast_expr_after {
+  return {mk_array(), result};
 }
 
-func mk_after(x after_action) ast_expr_after {
-  return {mk_array(x)};
+func mk_after(x after_action, result opt[cell_num]) ast_expr_after {
+  return {mk_array(x), result};
 }
 
-func mk_after(x after_action, y after_action) ast_expr_after {
-  return {mk_array(x, y)};
+func mk_after(x after_action, y after_action, result opt[cell_num]) ast_expr_after {
+  return {mk_array(x, y), result};
 }
 
 deftype ast_expr_complete_info struct {
