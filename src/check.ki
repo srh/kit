@@ -436,9 +436,11 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_
       }
       inst->status = BeganCheckingRhs(void);
       if case &Has(rhs ast_expr) = &inst->rhs {
-        if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs, &inst->computed_type.~) {
+        num_cells frame_cell_count;
+        if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs, &inst->computed_type.~, &num_cells) {
           return false;
         }
+        inst->num_frame_cells = Has(num_cells);
       }
       inst->status = FinishedCheckingRhs(void);
       return true;

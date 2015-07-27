@@ -74,6 +74,15 @@ func ref_cell(es *framescope, num cell_num) *cell_info {
   return ref(&es->cells, num.~);
 }
 
+deftype frame_cell_count size;
+
+func count_cells(es *framescope) frame_cell_count {
+  ret frame_cell_count;
+  ret.~ = count(&es->cells);
+  return ret;
+}
+
+
 func annotate_cell_location(es *framescope, num cell_num, loc cell_location) void {
   info *cell_info = ref_cell(es, num);
   if isHas(&info->location) {
@@ -251,10 +260,14 @@ func ds_note_var_destroyer(ds *defscope, vn var_number) bool {
   return true;
 }
 
-func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr) bool {
+func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr, num_cells_out *frame_cell_count) bool {
   ds defscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]](), default@[array[var_number]]()};
   es framescope = mk(&ds);
-  return check_consume_expr(&es, x, pt);
+  if !check_consume_expr(&es, x, pt) {
+    return false;
+  }
+  *num_cells_out = count_cells(&es);
+  return true;
 }
 
 func check_consume_expr(es *framescope, x *ast_expr, pt *te_typeexpr) bool {
