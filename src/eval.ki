@@ -37,6 +37,19 @@ func ref_obj(env *st_env, num st_obj_num, out **st_value) bool {
   }
 }
 
+func cell_obj(env *st_env, num cell_num) st_obj_num {
+  if case &Has(obj_num st_obj_num) = ref(&env->framecells, num.~) {
+    return obj_num;
+  } else {
+    ice(_u8("static eval accessing inactive cell"));
+    return fake();
+  }
+}
+
+func ref_obj_by_cell(env *st_env, num cell_num, out **st_value) bool {
+  return ref_obj(env, cell_obj(env, num), out);
+}
+
 func add_obj(env *st_env, size u32) st_obj_num {
   ret st_obj_num;
   ret.~ = count(&env->objects);
@@ -46,6 +59,24 @@ func add_obj(env *st_env, size u32) st_obj_num {
 
 func mk_st_value(size u32) st_value {
   return {repeat(~size, 0), mk_array()};
+}
+
+func expr_after(x *ast_expr) *ast_expr_after {
+  if case &Has(aft ast_expr_after) = &expr_complete_info(x)->after {
+    return &aft;
+  } else {
+    ice(_u8("expr_after sees missing after-info"));
+    return fake();
+  }
+}
+
+func expr_result(x *ast_expr) cell_num {
+  if case Has(num cell_num) = expr_after(x)->result {
+    return num;
+  } else {
+    ice(_u8("expr_result called on expr that discards result"));
+    return fake();
+  }
 }
 
 func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st_value) bool {
@@ -64,11 +95,15 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
         } else {
           ice(_u8("st_eval_def sees inst without num_frame_cells."));
         }
-        result st_value;
+        result st_obj_num;
         if !st_eval_expr(cs, &env, &e, &result) {
           return false;
         }
-        inst->evaled_value = Computed(result);
+        value *st_value;
+        if !ref_obj(&env, result, &value) {
+          return false;
+        }
+        inst->evaled_value = Computed(*value);
         if case &Computed(x st_value) = &inst->evaled_value {
           *out = &x;
         } else {
@@ -95,12 +130,11 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
   }
 }
 
-// TODO: The interface of st_eval_expr is broken.  We need to be able to evaluate to "lvalues."
-func st_eval_expr(cs *checkstate, env *st_env, x *ast_expr, out *st_value) bool {
+func st_eval_expr(cs *checkstate, env *st_env, x *ast_expr, result_out *st_obj_num) bool {
   switch &x->u {
     case &NameExpr(a ast_name_expr): {
       // TODO: This is broken, it doesn't eval to an lvalue.
-      return st_eval_name_expr(cs, env, &a, out);
+      return st_eval_name_expr(cs, env, &a, result_out);
     }
     default: {
       return TODO();
@@ -108,7 +142,7 @@ func st_eval_expr(cs *checkstate, env *st_env, x *ast_expr, out *st_value) bool 
   }
 }
 
-func st_eval_name_expr(cs *checkstate, env *st_env, a *ast_name_expr, out *st_value) bool {
+func st_eval_name_expr(cs *checkstate, env *st_env, a *ast_name_expr, result_out *st_obj_num) bool {
   if case &Has(info ast_name_expr_info) = &a->name_info {
     switch &info {
       case &LocalResolve(loc local_info): {
@@ -121,8 +155,7 @@ func st_eval_name_expr(cs *checkstate, env *st_env, a *ast_name_expr, out *st_va
         if !st_eval_def(cs, glo.ent, glo.inst, &val) {
           return false;
         }
-        *out = *val;
-        return true;
+        return TODO();
       }
       case &EnumConstructor(v void): {
         // TODO: This should be supported!
