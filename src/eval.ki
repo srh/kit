@@ -1,5 +1,12 @@
 import check;
 
+/* bnno = b.n.n.o. = "bytes" (not necessarily octets)
+
+"sizes" are in bnno's -- in terms of the minimal addressable unit --
+on the HP Saturn that'd be nibbles, on other systems it might be 16
+bits.  The term "bnno" is used because "byte" is so likely to be
+misinterpreted. */
+
 deftype st_env struct {
   objects array[opt[st_value]];
 
@@ -11,7 +18,10 @@ deftype st_obj_num size;
 
 deftype st_obj_ref struct {
   num st_obj_num;
+  // The offset, in terms of bnnos
   offset size;
+  // The size, in terms of bnnos
+  count size;
 };
 
 func init_env(env *st_env, num_cells frame_cell_count) void {
@@ -27,9 +37,13 @@ deftype st_symbolref struct {
 };
 
 deftype st_value struct {
-  bytes array[u8];
-  // Values of external symbols.
-  symbolrefs array[st_symbolref];
+  words array[u32];
+  // The length of the value in bnnos.
+  length u32;
+  // Values of external symbol references -- they start at a bnno offset, and have some size that depends on what kind of symbolref it is (or what platform, some only have one kind).
+  symbolrefs array[tup[size, st_symbolref]];
+  // Pointers to other objects -- they start at a bnno offset, and have a specific size (on the HP Saturn, 5 bnnos, or 20 bits).
+  objrefs array[tup[size, st_obj_ref]];
 };
 
 func ref_obj(env *st_env, num st_obj_num, out **st_value) bool {
@@ -51,15 +65,15 @@ func cell_obj_ref(env *st_env, num cell_num) st_obj_ref {
   }
 }
 
-func add_obj(env *st_env, size u32) st_obj_num {
+func add_obj(env *st_env, plat *platform_info, size u32) st_obj_num {
   ret st_obj_num;
   ret.~ = count(&env->objects);
-  push(&env->objects, Has(mk_st_value(size)));
+  push(&env->objects, Has(mk_st_value(plat, size)));
   return ret;
 }
 
-func mk_st_value(size u32) st_value {
-  return {repeat(~size, 0), mk_array()};
+func mk_st_value(plat *platform_info, size u32) st_value {
+  return {repeat(~ceil_divide(size, plat->bnno_size), 0), size, mk_array(), mk_array()};
 }
 
 func expr_after(x *ast_expr) *ast_expr_after {
