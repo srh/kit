@@ -76,7 +76,7 @@ func unclean_overlap(beg u32, end u32, innerbeg u32, innerend u32) bool {
   }
 }
 
-func copy_objslice(env *st_env, oref st_obj_ref, out *st_value) bool {
+func obj_read(env *st_env, oref st_obj_ref, out *st_value) bool {
   oref_end u32 = oref.offset + oref.count;
   val *st_value;
   if !ref_obj(env, oref.num, &val) {
@@ -115,6 +115,11 @@ func copy_objslice(env *st_env, oref st_obj_ref, out *st_value) bool {
 
   return TODO();
 }
+
+func obj_write(env *st_env, oref st_obj_ref, in *st_value) bool {
+  return TODO();
+}
+
 
 func cell_obj_ref(env *st_env, num cell_num) st_obj_ref {
   if case &Has(obj_ref st_obj_ref) = ref(&env->framecells, num.~) {
@@ -175,7 +180,7 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
           return false;
         }
         value st_value;
-        if !copy_objslice(&env, result, &value) {
+        if !obj_read(&env, result, &value) {
           return false;
         }
         inst->evaled_value = Computed(value);
@@ -229,7 +234,12 @@ func st_eval_name_expr(cs *checkstate, env *st_env, x *ast_expr, a *ast_name_exp
         if !st_eval_def(cs, glo.ent, glo.inst, &val) {
           return false;
         }
-        return TODO();
+        // Global defs are trivially copyable.
+        num st_obj_num = add_obj(env, val->length);
+        oref st_obj_ref = {num, 0, val->length};
+        obj_write(env, oref, val);
+        *result_out = oref;
+        return true;
       }
       case &EnumConstructor(v void): {
         // TODO: This should be supported!
