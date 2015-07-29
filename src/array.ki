@@ -102,6 +102,15 @@ access array[_] {
   }
 }
 
+func[T] truncate(a *array[T], n size) void {
+  m size = count(a);
+  check(n <= m);
+  while n < m {
+    pop(a);
+    m = m - 1;
+  }
+}
+
 func[T] array_equal(a *array[T], b *array[T]) bool {
   e size = count(a);
   if e != count(b) {

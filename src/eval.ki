@@ -90,8 +90,8 @@ func obj_read(env *st_env, oref st_obj_ref, out *st_value) bool {
   if !ref_obj(env, oref.num, &val) {
     return false;
   }
-  if oref.offset + oref.count > val->length {
-    ice(_u8("static eval accessing object out-of-bounds"));
+  if oref_end > val->length {
+    ice(_u8("static eval reading object out-of-bounds"));
   }
   refs array[tup[u32, st_symbolref]];
   val_nrefs size = count(&val->symbolrefs);
@@ -99,7 +99,7 @@ func obj_read(env *st_env, oref st_obj_ref, out *st_value) bool {
     vref *tup[u32, st_symbolref] = ref(&val->symbolrefs, i);
     vref_offset u32 = vref->car;
     vref_end u32 = vref_offset + symbolref_size(env, &vref->cdr);
-    if oref.offset <= vref_offset && oref_end <= vref_end {
+    if oref.offset <= vref_offset && vref_end <= oref_end {
       push(&refs, cons(vref_offset - oref.offset, vref->cdr));
     }
   }
@@ -110,7 +110,7 @@ func obj_read(env *st_env, oref st_obj_ref, out *st_value) bool {
     vref *tup[u32, st_obj_ref] = ref(&val->objrefs, i);
     vref_offset u32 = vref->car;
     vref_end u32 = vref_offset + objref_size(env, &vref->cdr);
-    if oref.offset <= vref_offset && oref_end <= vref_end {
+    if oref.offset <= vref_offset && vref_end <= oref_end {
       push(&objrefs, cons(vref_offset - oref.offset, vref->cdr));
     }
   }
@@ -126,7 +126,55 @@ func obj_read(env *st_env, oref st_obj_ref, out *st_value) bool {
 }
 
 func obj_write(env *st_env, oref st_obj_ref, in *st_value) bool {
-  return TODO();
+  if oref.count != in->length {
+    ice(_u8("static eval writing object with non-matching length"));
+  }
+  oref_end u32 = oref.offset + oref.count;
+  val *st_value;
+  if !ref_obj(env, oref.num, &val) {
+    return false;
+  }
+  if oref_end > val->length {
+    ice(_u8("static eval writing object out-of-bounds"));
+  }
+
+  w size = 0;
+  val_nrefs size = count(&val->symbolrefs);
+  for i size = 0; i < val_nrefs; i = i + 1 {
+    vref *tup[u32, st_symbolref] = ref(&val->symbolrefs, i);
+    vref_offset u32 = vref->car;
+    vref_end u32 = vref_offset + symbolref_size(env, &vref->cdr);
+    if vref_end <= oref.offset || oref_end <= vref_offset {
+      set(&val->symbolrefs, w, *vref);
+      w = w + 1;
+    }
+  }
+  truncate(&val->symbolrefs, w);
+  for i size = 0; i < count(&in->symbolrefs); i = i + 1 {
+    sref *tup[u32, st_symbolref] = ref(&in->symbolrefs, i);
+    push(&val->symbolrefs, cons(sref->car + oref.offset, sref->cdr));
+  }
+
+  w = 0;
+  val_nobjrefs size = count(&val->objrefs);
+  for i size = 0; i < val_nobjrefs; i = i + 1 {
+    vref *tup[u32, st_obj_ref] = ref(&val->objrefs, i);
+    vref_offset u32 = vref->car;
+    vref_end u32 = vref_offset + objref_size(env, &vref->cdr);
+    if vref_end <= oref.offset || oref_end <= vref_offset {
+      set(&val->objrefs, w, *vref);
+      w = w + 1;
+    }
+  }
+  truncate(&val->objrefs, w);
+  for i size = 0; i < count(&in->objrefs); i = i + 1 {
+    iref *tup[u32, st_obj_ref] = ref(&in->objrefs, i);
+    push(&val->objrefs, cons(iref->car + oref.offset, iref->cdr));
+  }
+
+  copy_bnnos(&env->plat, &in->words, 0, in->length, &val->words, oref.offset);
+  copy_bnnos(&env->plat, &in->datas, 0, in->length, &val->datas, oref.offset);
+  return true;
 }
 
 
