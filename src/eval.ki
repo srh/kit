@@ -76,6 +76,22 @@ func unclean_overlap(beg u32, end u32, innerbeg u32, innerend u32) bool {
   }
 }
 
+func copy_bnnos(plat *platform_info, src *array[u32], offset u32, count u32, dest *array[u32], dest_offset u32) void {
+  bnno_size u32 = plat->bnno_size;
+  mask u32 = (1 << bnno_size) - 1;
+  per_word u32 = 32 / bnno_size;
+  for i u32 = 0; i < count; i = i + 1 {
+    si u32 = offset + i;
+    x u32 = get(src, ~(si / per_word));
+    y u32 = mask & (x >> (bnno_size * (si % per_word)));
+    di u32 = dest_offset + i;
+    d *u32 = ref(dest, ~(di / per_word));
+    sh u32 = bnno_size * (di % per_word);
+    z u32 = *d & ^(mask << sh);
+    *d = z | (y << sh);
+  }
+}
+
 func obj_read(env *st_env, oref st_obj_ref, out *st_value) bool {
   oref_end u32 = oref.offset + oref.count;
   val *st_value;
@@ -113,7 +129,12 @@ func obj_read(env *st_env, oref st_obj_ref, out *st_value) bool {
     }
   }
 
-  return TODO();
+  bnnos_per_word u32 = 32 / env->plat.bnno_size;
+  ws array[u32] = repeat(~ceil_divide(oref.count, bnnos_per_word), 0);
+  copy_bnnos(&env->plat, &val->words, oref.offset, oref.count, &ws, 0);
+
+  *out = {ws, oref.count, refs, objrefs};
+  return true;
 }
 
 func obj_write(env *st_env, oref st_obj_ref, in *st_value) bool {
