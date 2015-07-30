@@ -3292,12 +3292,12 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     /* TODO: We must use ast_exprcatch information to force the temporary in arg_loc. */
     /* (Right now, EXPR_RETURN_DEMANDED is known to work this way only
     when it encounters another funcall.) */
-    struct expr_return er = demand_expr_return(arg_loc);
-    int32_t saved_offset = frame_save_offset(h);
-    if (!gen_expr(cs, f, h, arg, &er)) {
+    struct expr_return arg_er = demand_expr_return(arg_loc);
+    int32_t arg_saved_offset = frame_save_offset(h);
+    if (!gen_expr(cs, f, h, arg, &arg_er)) {
       return 0;
     }
-    frame_restore_offset(h, saved_offset);
+    frame_restore_offset(h, arg_saved_offset);
   }
 
   if (hidden_return_param) {
