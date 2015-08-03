@@ -920,8 +920,8 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
         copy_level = max(copy_level, behavior_level(&props.copy_behavior));
         destroy_level = max(destroy_level, behavior_level(&props.destroy_behavior));
       }
-      check(offset % max_alignment == 0);
-      *out = {offset, max_alignment,
+      final_size u32 = ceil_aligned(offset, max_alignment);
+      *out = {final_size, max_alignment,
               level_to_derived(cs, clq, cs->im->cym.magic_init, 1, t, init_level),
               level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, move_level),
               level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, copy_level),

@@ -1167,6 +1167,17 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  }\n"
         "  goto bar;\n"
         "}\n"));
+
+  // A regression test for struct sizeof computation aborting when size % max_alignment != 0.
+  run_check_test(ctx, "c133",
+    _u8("deftype foo struct {\n"
+        "  x u32;\n"
+        "  y u8;\n"
+        "};\n"
+        "func bar() foo {\n"
+        "  ret foo;\n"
+        "  return ret;\n"
+        "}\n"));
 }
 
 
