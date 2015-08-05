@@ -3996,7 +3996,7 @@ int chase_struct_field_types(struct checkstate *cs,
 
     if (ent->is_primitive) {
       METERR(cs, *meta, "Using a struct initializer on primitive type '%.*s'\n",
-             IM_P(cs->im, type->u.name.value));
+             IM_P(cs->im, type->u.app.name.value));
       return 0;
     }
 
@@ -4032,7 +4032,7 @@ int chase_struct_field_types(struct checkstate *cs,
     case AST_DEFTYPE_CLASS_DEFAULT_MOVE: /* fallthrough */
     case AST_DEFTYPE_CLASS_NO_DEFAULTS: {
       METERR(cs, *meta, "Using a struct initializer on class type '%.*s'\n",
-             IM_P(cs->im, type->u.name.value));
+             IM_P(cs->im, type->u.app.name.value));
       return 0;
     } break;
     default:
