@@ -3659,7 +3659,7 @@ int lookup_field_type(struct exprscope *es,
     struct ast_deftype *deftype = ent->deftype;
     CHECK(!deftype->generics.has_type_params);
     if (!deftype_is_accessible(es, deftype)) {
-      METERR(es->cs, fieldname->meta, "Looking up field on inaccessible type.%s", "\n");
+      METERR(es->cs, fieldname->meta, "Looking up field on inaccessible type '%.*s'.\n", IM_P(es->cs->im, type->u.name.value));
       return 0;
     }
 
@@ -3700,7 +3700,8 @@ int lookup_field_type(struct exprscope *es,
     CHECK(deftype->generics.has_type_params
           && deftype->generics.params_count == type->u.app.params_count);
     if (!deftype_is_accessible(es, deftype)) {
-      METERR(es->cs, fieldname->meta, "Looking up field on inaccessible type.%s", "\n");
+      METERR(es->cs, fieldname->meta, "Looking up field on inaccessible type '%.*s'.",
+             IM_P(es->cs->im, type->u.app.name.value));
       return 0;
     }
 
