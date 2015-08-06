@@ -129,6 +129,7 @@ deftype var_info struct {
   num var_number;
   // A complete, checked, type, with generics replaced.
   type cu_typeexpr;
+  props type_properties;
   cell cell_num;
   name sym;
   // Can a goto statement enter this var's scope and construct the var?  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)
@@ -185,8 +186,12 @@ func ds_push_var(ds *defscope, vp *varpopper, cell cell_num, name *ast_ident, co
     ERR(_u8("Local variable '"), lookup(ds->im, name->value), _u8("' shadows another"));
     return false;
   }
+  props type_properties;
+  if !compute_type_properties(ds->cs, ds->clq, computed_type, &props) {
+    return false;
+  }
   num var_number = ~count(&ds->all_vars);
-  push(&ds->all_vars, {num, *computed_type, cell, name->value, autoinit, None(), None()});
+  push(&ds->all_vars, {num, *computed_type, props, cell, name->value, autoinit, None(), None()});
   push(&ds->current_vars, num);
   push(&vp->nums, num);
   *vn_out = num;
@@ -981,12 +986,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &OneLocalMatch(v local_info): {
       annotate_name_info(a, LocalResolve({v.varnum}));
       vi *var_info = ref_var(es->ds, v.varnum);
-      // TODO: Put type_properties in var_info.
-      props type_properties;
-      if !compute_type_properties(es->cs, es->clq, &vi->type, &props) {
-        return false;
-      }
-      annotate_info(x, CompleteCheck(mk(IsLvalYes({vi->cell}), vi->type, props)));
+      annotate_info(x, CompleteCheck(mk(IsLvalYes({vi->cell}), vi->type, vi->props)));
       return true;
     }
   }
