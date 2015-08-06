@@ -617,7 +617,6 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), &unknown) {
         return false;
       }
-      annotate_disposal_for_field(oo(&a.lhs));
       info *ast_expr_complete_info = expr_complete_info(oo(&a.lhs));
       fieldtype cu_typeexpr;
       inherits_lval bool;
@@ -626,6 +625,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       }
       lval is_lval;
       if inherits_lval {
+        annotate_disposal_for_field(oo(&a.lhs));
         switch &info->lval {
           case &IsLvalYes(desc lval_description): {
             lval = IsLvalYes({add_virtual_cell(es, fieldtype)});
@@ -635,6 +635,9 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
           }
         }
       } else {
+        if !annotate_disposal_for_discard(es, oo(&a.lhs)) {
+          return false;
+        }
         lval = wholeRval(add_cell(es, fieldtype));
       }
       props type_properties;
