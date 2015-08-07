@@ -519,9 +519,11 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, type)), type, props)));
       return true;
     }
+
     case &Funcall(a ast_funcall): {
       return check_expr_funcall(es, ai, x, &a, pt);
     }
+
     case &Assignment(a ast_assignment): {
       // We check the lhs independently of the rhs, deliberately, to ensure clarity.
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), pt) {
@@ -546,6 +548,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
         }
       }
     }
+
     case &AddressOf(a ast_addressof): {
       ptr_unknown te_typeexpr = pointer_to(es->cs, TeUnknown(void));
       unif_pt te_typeexpr;
@@ -606,12 +609,15 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       annotate_info(x, CompleteCheck(mk(IsLvalYes({add_virtual_cell(es, ~ *param)}), ~ *param, props)));
       return true;
     }
+
     case &IndexExpr(a ast_index_expr): {
       return check_expr_index(es, x, &a, pt);
     }
+
     case &Lambda(a ast_lambda): {
       return check_expr_lambda(es, &a, pt, x);
     }
+
     case &LocalField(a ast_local_field): {
       unknown te_typeexpr = TeUnknown(void);
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), &unknown) {
@@ -647,6 +653,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
       return true;
     }
+
     case &DerefField(a ast_deref_field): {
       // The fact that our partial type isn't a pointer type is deliberate.
       unknown te_typeexpr = TeUnknown(void);
@@ -682,6 +689,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
       return true;
     }
+
     case &TypedExpr(a ast_typed_expr): {
       // TODO: Cache converted.
       converted te_typeexpr;
@@ -717,6 +725,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       annotate_info(x, inner_info(&oo(&a.expr)->info));
       return true;
     }
+
     case &Strinit(a ast_strinit): {
       return check_expr_strinit(es, ai, &a, pt, x);
     }
