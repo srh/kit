@@ -613,26 +613,29 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       }
       info *ast_expr_complete_info = expr_complete_info(oo(&a.lhs));
       fieldtype cu_typeexpr;
-      inherits_lval bool;
-      if !check_field(es, &info->cu, &a.fieldname, pt, &fieldtype, &inherits_lval) {
+      cf_res check_field_result;
+      if !check_field(es, &info->cu, &a.fieldname, pt, &fieldtype, &cf_res) {
         return false;
       }
       lval is_lval;
-      if inherits_lval {
-        annotate_disposal_for_field(oo(&a.lhs));
-        switch &info->lval {
-          case &IsLvalYes(desc lval_description): {
-            lval = IsLvalYes({add_virtual_cell(es, fieldtype)});
-          }
-          case &IsLvalNo(desc rval_description): {
-            lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, fieldtype)});
+      switch cf_res {
+        case InheritsLval(offset u32): {
+          annotate_disposal_for_field(oo(&a.lhs));
+          switch &info->lval {
+            case &IsLvalYes(desc lval_description): {
+              lval = IsLvalYes({add_virtual_cell(es, fieldtype)});
+            }
+            case &IsLvalNo(desc rval_description): {
+              lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, fieldtype)});
+            }
           }
         }
-      } else {
-        if !annotate_disposal_for_discard(es, oo(&a.lhs)) {
-          return false;
+        case ConstantField(value u32): {
+          if !annotate_disposal_for_discard(es, oo(&a.lhs)) {
+            return false;
+          }
+          lval = wholeRval(add_cell(es, fieldtype));
         }
-        lval = wholeRval(add_cell(es, fieldtype));
       }
       props type_properties;
       if !compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
@@ -656,22 +659,25 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       }
       cu_param cu_typeexpr = ~ *param;
       fieldtype cu_typeexpr;
-      inherits_lval bool;
-      if !check_field(es, &cu_param, &a.fieldname, pt, &fieldtype, &inherits_lval) {
+      cf_res check_field_result;
+      if !check_field(es, &cu_param, &a.fieldname, pt, &fieldtype, &cf_res) {
         return false;
       }
       lval is_lval;
-      if inherits_lval {
-        if !annotate_disposal_for_consume(es, oo(&a.lhs)) {
-          return false;
+      switch cf_res {
+        case InheritsLval(offset u32): {
+          if !annotate_disposal_for_consume(es, oo(&a.lhs)) {
+            return false;
+          }
+          // We deref, so it's always an lval.
+          lval = IsLvalYes({add_virtual_cell(es, fieldtype)});
         }
-        // We deref, so it's always an lval.
-        lval = IsLvalYes({add_virtual_cell(es, fieldtype)});
-      } else {
-        if !annotate_disposal_for_discard(es, oo(&a.lhs)) {
-          return false;
+        case ConstantField(value u32): {
+          if !annotate_disposal_for_discard(es, oo(&a.lhs)) {
+            return false;
+          }
+          lval = wholeRval(add_cell(es, fieldtype));
         }
-        lval = wholeRval(add_cell(es, fieldtype));
       }
       props type_properties;
       if !compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
@@ -1211,10 +1217,17 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
   return true;
 }
 
-func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *cu_typeexpr, inherits_lval_out *bool) bool {
+defenum check_field_result {
+  // Inherits the lvalue-ness of the thing it's a field of.  Includes the field's offset (in bnnos).
+  InheritsLval u32;
+  // Doesn't inherit the lvalue-ness.  In fact it's a compile-time constant (for the array ".length" field).
+  ConstantField u32;
+};
+
+func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *cu_typeexpr, res_out *check_field_result) bool {
   fieldtype cu_typeexpr;
-  inherits_lval bool;
-  if !lookup_field(es, t, a, &fieldtype, &inherits_lval) {
+  res check_field_result;
+  if !lookup_field(es, t, a, &fieldtype, &res) {
     return false;
   }
   unified te_typeexpr;
@@ -1223,7 +1236,7 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
     return false;
   }
   *fieldtype_out = fieldtype;
-  *inherits_lval_out = inherits_lval;
+  *res_out = res;
   return true;
 }
 
@@ -1345,27 +1358,28 @@ func lookup_whole_field(es *framescope, mbpack *opt[te_instpack], fieldtype_out 
   return true;
 }
 
-func lookup_name_field(es *framescope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *cu_typeexpr, inherits_lval_out *bool) bool {
+func lookup_name_field(es *framescope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) bool {
   p *cu_typeexpr;
   if !help_structural_rhs(es->ds, mbpack, &p) {
     return false;
   }
-  return help_lookup_name_field(es, p, fieldname, fieldtype_out, inherits_lval_out);
+  return help_lookup_name_field(es, p, fieldname, fieldtype_out, res_out);
 }
 
-func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, inherits_lval_out *bool) bool {
+func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) bool {
   switch &t->~ {
     case &TeName(a te_name): {
-      return lookup_name_field(es, &a.pack, fieldname, fieldtype_out, inherits_lval_out);
+      return lookup_name_field(es, &a.pack, fieldname, fieldtype_out, res_out);
     }
     case &TeApp(a te_typeapp): {
-      return lookup_name_field(es, &a.pack, fieldname, fieldtype_out, inherits_lval_out);
+      return lookup_name_field(es, &a.pack, fieldname, fieldtype_out, res_out);
     }
     case &TeStruct(a te_struct): {
-      if !lookup_field_from_list(es->cs, &a.fields, fieldname->value, fieldtype_out) {
+      offset u32;
+      if !lookup_field_from_list(es->cs, es->clq, &a.fields, fieldname->value, fieldtype_out, &offset) {
         return false;
       }
-      *inherits_lval_out = true;
+      *res_out = InheritsLval(offset);
       return true;
     }
     case &TeEnum(a te_enum): {
@@ -1373,10 +1387,13 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
       return false;
     }
     case &TeUnion(a te_union): {
-      if !lookup_field_from_list(es->cs, &a.fields, fieldname->value, fieldtype_out) {
+      // The offset's what it would be for a struct.
+      offset_discard u32;
+      if !lookup_field_from_list(es->cs, es->clq, &a.fields, fieldname->value, fieldtype_out, &offset_discard) {
         return false;
       }
-      *inherits_lval_out = true;
+      // Offset's always 0 for a union.
+      *res_out = InheritsLval(0);
       return true;
     }
     case &TeArraytype(a te_arraytype): {
@@ -1385,7 +1402,11 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
         return false;
       }
       *fieldtype_out = compute_prim(es->ds, primitive_size_type(es->cs));
-      *inherits_lval_out = false;
+      if case Has(n u32) = a.count {
+        *res_out = ConstantField(n);
+      } else {
+        ice(_u8("Complete arraytype has incomplete count"));
+      }
       return true;
     }
     case &TeUnknown(v void): {
@@ -1395,7 +1416,7 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
   }
 }
 
-func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_out *cu_typeexpr, inherits_lval_out *bool) bool {
+func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_out *cu_typeexpr, res_out *check_field_result) bool {
   switch f {
     case &WholeField(v void): {
       switch &t->~ {
@@ -1403,14 +1424,16 @@ func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_ou
           if !lookup_whole_field(es, &a.pack, fieldtype_out) {
             return false;
           }
-          *inherits_lval_out = true;
+          // Whole field has zero offset.
+          *res_out = InheritsLval(0);
           return true;
         }
         case &TeApp(a te_typeapp): {
           if !lookup_whole_field(es, &a.pack, fieldtype_out) {
             return false;
           }
-          *inherits_lval_out = true;
+          // Whole field has zero offset.
+          *res_out = InheritsLval(0);
           return true;
         }
         default: {
@@ -1424,7 +1447,7 @@ func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_ou
       }
     }
     case &NameField(b ast_ident): {
-      return help_lookup_name_field(es, t, &b, fieldtype_out, inherits_lval_out);
+      return help_lookup_name_field(es, t, &b, fieldtype_out, res_out);
     }
   }
 }
@@ -1442,13 +1465,19 @@ func find_vardecl(a *array[te_vardecl], name sym, out **te_typeexpr) bool {
 }
 
 // fields is supposed to be complete.
-func lookup_field_from_list(cs *checkstate, fields *array[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr) bool {
-  fieldtype *te_typeexpr;
-  if !find_vardecl(fields, fieldname, &fieldtype) {
+func lookup_field_from_list(cs *checkstate, clq *clqueue, fields *array[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr, offset_out *u32) bool {
+  psd partial_struct_data;
+  if !compute_partial_struct_data(cs, clq, fields, Has(fieldname), &psd) {
+    return false;
+  }
+
+  if !psd.found_field {
     ERR(_u8("fieldname '"), lookup(cs->im, fieldname), _u8("' not found"));
     return false;
   }
-  *fieldtype_out = ~ *fieldtype;
+
+  *fieldtype_out = ~ ref(fields, psd.index)->type;
+  *offset_out = psd.offset;
   return true;
 }
 

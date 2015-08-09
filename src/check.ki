@@ -879,6 +879,48 @@ func compute_type_properties(cs *checkstate, clq *clqueue, t *cu_typeexpr, out *
   return compute_complete_type_properties(cs, clq, &t->~, out);
 }
 
+deftype partial_struct_data struct {
+  index size;
+  found_field bool;
+  offset u32;
+  max_alignment u32;
+  init_level u32;
+  move_level u32;
+  copy_level u32;
+  destroy_level u32;
+};
+
+// fields had better damn well be complete
+func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *array[te_vardecl], name opt[sym], out *partial_struct_data) bool {
+  ret partial_struct_data = {0, false, 0, 1, 0, 0, 0, 0};
+  n size = count(fields);
+  for ; ret.index < n; ret.index = ret.index + 1 {
+    vd *te_vardecl = ref(fields, ret.index);
+    props type_properties;
+    if !compute_complete_type_properties(cs, clq, &vd->type, &props) {
+      return false;
+    }
+
+    ret.offset = ceil_aligned(ret.offset, props.flat_alignment);
+    if Has(vd->name) == name {
+      ret.found_field = true;
+      *out = ret;
+      return true;
+    }
+    ret.offset = ret.offset + props.flat_size;
+
+    ret.max_alignment = max(ret.max_alignment, props.flat_alignment);
+
+    ret.init_level = max(ret.init_level, behavior_level(&props.init_behavior));
+    ret.move_level = max(ret.move_level, behavior_level(&props.move_behavior));
+    ret.copy_level = max(ret.copy_level, behavior_level(&props.copy_behavior));
+    ret.destroy_level = max(ret.destroy_level, behavior_level(&props.destroy_behavior));
+  }
+  *out = ret;
+  return true;
+}
+
+
 // t had better be complete.
 func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeexpr, out *type_properties) bool {
   switch t {
@@ -900,32 +942,16 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
     }
 
     case &TeStruct(a te_struct): {
-      offset u32 = 0;
-      max_alignment u32 = 1;
-      init_level u32 = 0;
-      move_level u32 = 0;
-      copy_level u32 = 0;
-      destroy_level u32 = 0;
-      n size = count(&a.fields);
-      for i size = 0; i < n; i = i + 1 {
-        props type_properties;
-        if !compute_complete_type_properties(cs, clq, &ref(&a.fields, i)->type, &props) {
-          return false;
-        }
-        offset = ceil_aligned(offset, props.flat_alignment);
-        offset = offset + props.flat_size;
-        max_alignment = max(max_alignment, props.flat_alignment);
-        init_level = max(init_level, behavior_level(&props.init_behavior));
-        move_level = max(move_level, behavior_level(&props.move_behavior));
-        copy_level = max(copy_level, behavior_level(&props.copy_behavior));
-        destroy_level = max(destroy_level, behavior_level(&props.destroy_behavior));
+      psd partial_struct_data;
+      if !compute_partial_struct_data(cs, clq, &a.fields, None(), &psd) {
+        return false;
       }
-      final_size u32 = ceil_aligned(offset, max_alignment);
-      *out = {final_size, max_alignment,
-              level_to_derived(cs, clq, cs->im->cym.magic_init, 1, t, init_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, move_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, copy_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, destroy_level)};
+      final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
+      *out = {final_size, psd.max_alignment,
+              level_to_derived(cs, clq, cs->im->cym.magic_init, 1, t, psd.init_level),
+              level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, psd.move_level),
+              level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, psd.copy_level),
+              level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, psd.destroy_level)};
       return true;
     }
 
