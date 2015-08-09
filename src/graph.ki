@@ -59,8 +59,8 @@ deftype gr_deref struct {
 };
 
 defenum gr_offset {
-  ConstOffset u32;
-  MultipliedOffset tup[u32, cell_num];
+  OffsetConst u32;
+  OffsetComputed tup[u32, cell_num];
 };
 
 deftype gr_writeconst struct {
