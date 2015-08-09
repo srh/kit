@@ -416,17 +416,14 @@ defenum ctor_desc {
   FunCtor instpair;
 };
 
-deftype copy_action struct {
+deftype bi_action struct {
   ctor ctor_desc;
   dest cell_num;
   src cell_num;
 };
 
-deftype move_action struct {
-  ctor ctor_desc;
-  dest cell_num;
-  src cell_num;
-};
+deftype copy_action bi_action;
+deftype move_action bi_action;
 
 deftype destroy_action struct {
   ctor ctor_desc;
