@@ -254,10 +254,27 @@ defenum ast_fieldname {
   NameField ast_ident;
 };
 
+deftype ast_provisional_after struct {
+  // isHas if the lhs needs discarding (for a constant .length field).
+  after opt[ast_expr_after];
+};
+
 deftype ast_local_field struct {
+  info opt[ast_provisional_after];
   lhs box[ast_expr];
   fieldname ast_fieldname;
 };
+
+func mk(lhs box[ast_expr], fieldname ast_fieldname) ast_local_field {
+  return {None@[ast_provisional_after](), lhs, fieldname};
+}
+
+func annotate_local_field(a *ast_local_field, info ast_provisional_after) void {
+  if isHas(&a->info) {
+    ice(_u8("annotate_local_field already annotated"));
+  }
+  a->info = Has(info);
+}
 
 deftype ast_deref_field struct {
   lhs box[ast_expr_consume];
@@ -300,9 +317,22 @@ deftype ast_paren_expr struct {
 };
 
 deftype ast_index_expr struct {
+  info opt[ast_provisional_after];
   lhs box[ast_expr];
   rhs box[ast_expr_consume];
 };
+
+func mk(lhs box[ast_expr], rhs box[ast_expr_consume]) ast_index_expr {
+  return {None@[ast_provisional_after](), lhs, rhs};
+}
+
+func annotate_index_expr(a *ast_index_expr, info ast_provisional_after) void {
+  if isHas(&a->info) {
+    ice(_u8("annotate_index_expr already annotated"));
+  }
+  a->info = Has(info);
+}
+
 
 deftype ast_typed_expr struct {
   type ast_typeexpr;
@@ -433,12 +463,10 @@ deftype ast_expr_complete_info struct {
   lval is_lval;
   cu cu_typeexpr;
   cu_props type_properties;
-  // Sometimes, an expr's cleanup ops will be described by the containing expr -- as is done by ast_assignment, ast_later_discard_info.
-  after opt[ast_expr_after];
 };
 
 func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties) ast_expr_complete_info {
-  return {lval, cu, cu_props, None@[ast_expr_after]()};
+  return {lval, cu, cu_props};
 }
 
 defenum ast_expr_info {
@@ -485,19 +513,20 @@ func annotate_info(a *ast_expr, info ast_expr_info) void {
   a->info = info;
 }
 
-func annotate_disposal(a *ast_expr, aft ast_expr_after) void {
-  switch &a->info {
-    case &CompleteCheck(t ast_expr_complete_info): {
-      if case &Has(a2 ast_expr_after) = &t.after {
-        ice(_u8("annotate_disposal impossibly called twice, detected with after"));
-      } else {
-        t.after = Has(aft);
-      }
-    }
-    default: {
-      ice(_u8("annotate_disposal for non-completely annotated expr"));
-    }
+func annotate_disposal(a *opt[ast_expr_after], aft ast_expr_after) void {
+  if case &Has(a2 ast_expr_after) = a {
+    ice(_u8("annotate_disposal impossibly called twice"));
+  } else {
+    *a = Has(aft);
   }
+}
+
+func annotate_disposal(a *ast_expr_discard, aft ast_expr_after) void {
+  annotate_disposal(&a->after, aft);
+}
+
+func annotate_disposal(a *ast_expr_consume, aft ast_expr_after) void {
+  annotate_disposal(&a->after, aft);
 }
 
 
@@ -527,19 +556,21 @@ func mk(x ast_expr_enum) ast_expr {
 }
 
 deftype ast_expr_consume struct {
+  after opt[ast_expr_after];
   expr ast_expr;
 };
 
 func consume(expr ast_expr) ast_expr_consume {
-  return {expr};
+  return {None@[ast_expr_after](), expr};
 }
 
 deftype ast_expr_discard struct {
+  after opt[ast_expr_after];
   expr ast_expr;
 };
 
 func discard(expr ast_expr) ast_expr_discard {
-  return {expr};
+  return {None@[ast_expr_after](), expr};
 }
 
 deftype ast_variadic_generics struct {

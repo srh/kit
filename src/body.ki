@@ -94,7 +94,7 @@ func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) bo
   if !check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
     return false;
   }
-  if !annotate_disposal_for_discard(es, &x->expr) {
+  if !annotate_disposal_for_discard(es, &x->expr, &x->after) {
     return false;
   }
   return true;
@@ -105,7 +105,7 @@ func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te
   if !check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
     return false;
   }
-  if !annotate_disposal_for_consume_then_discard(es, &x->expr, later) {
+  if !annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later) {
     return false;
   }
   return true;
