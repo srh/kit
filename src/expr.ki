@@ -737,6 +737,15 @@ func behavior_to_desc(b *derived_method_behavior, out *ctor_desc) bool {
   }
 }
 
+func computed_ptr_type(cs *checkstate, clq *clqueue, t *cu_typeexpr) cu_typeexpr {
+  tptr te_typeexpr = ptr_type(cs, t->~);
+  ctptr cac_typeexpr;
+  if !noscoped_check_and_compute_typeexpr(cs, clq, &tptr, &ctptr) {
+    ice(_u8("computed_ptr_type fails to check and compute"));
+  }
+  return ~ctptr.te;
+}
+
 func behavior_to_bi_desc(es *framescope, b *derived_method_behavior, t *cu_typeexpr, out *bi_ctor_desc) bool {
   desc ctor_desc;
   if !behavior_to_desc(b, &desc) {
@@ -748,24 +757,20 @@ func behavior_to_bi_desc(es *framescope, b *derived_method_behavior, t *cu_typee
       return true;
     }
     case FunCtor(ip instpair): {
-      tptr te_typeexpr = ptr_type(es->cs, t->~);
-      ctptr cac_typeexpr;
-      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &tptr, &ctptr) {
-        return false;
-      }
+      cptr cu_typeexpr = computed_ptr_type(es->cs, es->clq, t);
       voidtype cu_typeexpr;
       voidprops type_properties;
       compute_prim(es->ds, primitive_void_type(es->cs), &voidtype, &voidprops);
 
-      fptr te_typeexpr = fn_type(es->cs, ctptr.te, ctptr.te, voidtype.~);
+      fptr te_typeexpr = fn_type(es->cs, cptr.~, cptr.~, voidtype.~);
       cfptr cac_typeexpr;
       if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &fptr, &cfptr) {
         return false;
       }
 
       funcell cell_num = add_rigid_cell(es, ~cfptr.te);
-      destptr cell_num = add_rigid_cell(es, ~ctptr.te);
-      srcptr cell_num = add_rigid_cell(es, ~ctptr.te);
+      destptr cell_num = add_rigid_cell(es, cptr);
+      srcptr cell_num = add_rigid_cell(es, cptr);
       retvoid cell_num = add_rigid_cell(es, voidtype);
 
       *out = BiFunCtor({ip, funcell, destptr, srcptr, retvoid});
@@ -785,23 +790,19 @@ func behavior_to_uni_desc(es *framescope, b *derived_method_behavior, t *cu_type
       return true;
     }
     case FunCtor(ip instpair): {
-      tptr te_typeexpr = ptr_type(es->cs, t->~);
-      ctptr cac_typeexpr;
-      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &tptr, &ctptr) {
-        return false;
-      }
+      cptr cu_typeexpr = computed_ptr_type(es->cs, es->clq, t);
       voidtype cu_typeexpr;
       voidprops type_properties;
       compute_prim(es->ds, primitive_void_type(es->cs), &voidtype, &voidprops);
 
-      fptr te_typeexpr = fn_type(es->cs, ctptr.te, voidtype.~);
+      fptr te_typeexpr = fn_type(es->cs, cptr.~, voidtype.~);
       cfptr cac_typeexpr;
       if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &fptr, &cfptr) {
         return false;
       }
 
       funcell cell_num = add_rigid_cell(es, ~cfptr.te);
-      argptr cell_num = add_rigid_cell(es, ~ctptr.te);
+      argptr cell_num = add_rigid_cell(es, cptr);
       retvoid cell_num = add_rigid_cell(es, voidtype);
 
       *out = UniFunCtor({ip, funcell, argptr, retvoid});
