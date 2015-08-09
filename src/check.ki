@@ -1080,15 +1080,23 @@ func make_nontrivial(cs *checkstate, clq *clqueue, magic_name sym, magic_count s
       return fake();
     }
     case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
-      // TODO: Duplicated in ds_lookup_name and more.
-      cu_parms cu_genparms;
-      if !check_and_compute_parms(cs, clq, &m.parms, &cu_parms) {
-        ice(_u8("check_and_compute_parms seeing error in match_def"));
+      inst_id def_inst_id;
+      if !make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
+        ice(_u8("make_inst (check_and_compute_parms) seeing error in match_def"));
       }
-      inst_id def_inst_id = enqueue_def_inst(cs, clq, m.ent, &cu_parms);
       return DerivedMethodNontrivial({m.ent, inst_id});
     }
   }
+}
+
+func make_inst(cs *checkstate, clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_inst_id) bool {
+  cu_parms cu_genparms;
+  if !check_and_compute_parms(cs, clq, parms, &cu_parms) {
+    return false;
+  }
+  inst_id def_inst_id = enqueue_def_inst(cs, clq, ent, &cu_parms);
+  *inst_out = inst_id;
+  return true;
 }
 
 func level_to_derived(cs *checkstate, clq *clqueue, magic_name sym, magic_count size, type *te_typeexpr, level u32) derived_method_behavior {

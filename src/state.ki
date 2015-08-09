@@ -250,12 +250,10 @@ func lookup_explicit_method_or_lack_thereof(cs *checkstate, clq *clqueue, fntype
       return false;
     }
     case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
-      // TODO: This is duplicated with ds_lookup_name.  Put logic in match_def or a wrapper?
-      cu_parms cu_genparms;
-      if !check_and_compute_parms(cs, clq, &m.parms, &cu_parms) {
+      inst_id def_inst_id;
+      if !make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
         return false;
       }
-      inst_id def_inst_id = enqueue_def_inst(cs, clq, m.ent, &cu_parms);
       *behavior_out = DerivedMethodExplicit({m.ent, inst_id});
       return true;
     }
