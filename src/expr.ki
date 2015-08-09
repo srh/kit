@@ -574,8 +574,6 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       return true;
     }
     case &Deref(a ast_deref): {
-      // TODO: Shouldn't have to do this traversal.  Make pt carry such flags.
-      pt_cc bool = is_complete_computed(pt).computed;
       ptr_pt te_typeexpr = pointer_to(es->cs, *pt);
       ptr_cac cac_typeexpr;
       if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_pt, &ptr_cac) {
