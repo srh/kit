@@ -33,6 +33,7 @@ defenum gr_op {
   GrBranch gr_branch;
   GrSequence gr_sequence;
   GrDead gr_dead;
+  GrNop void;
 };
 
 deftype gr_apply struct {
@@ -111,7 +112,46 @@ func gr_expr_consume(cs *checkstate, gr *frame_graph, x *ast_expr_consume, out *
 }
 
 func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
-  return TODO();
+  switch &x->u {
+    case &NameExpr(a ast_name_expr): {
+      return gr_name_expr(cs, gr, x, &a, out);
+    }
+    default: {
+      return TODO();
+    }
+  }
+}
+
+func gr_name_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_name_expr, out *gr_num) bool {
+  switch name_info(a) {
+    case &LocalResolve(li local_info): {
+      *out = add_node(gr, node(mk_array(), GrNop(void)));
+      return true;
+    }
+    case &GlobalResolve(gi global_info): {
+      *out = add_node(gr, node(mk_array(), GrWriteConst({rval_cell(x), ConstDef({gi.ent, gi.inst})})));
+      return true;
+    }
+    case &EnumConstructor(v void): {
+      return TODO();
+    }
+  }
+}
+
+func rval_cell(x *ast_expr) cell_num {
+  return rval_cell(&expr_complete_info(x)->lval);
+}
+
+func rval_cell(x *is_lval) cell_num {
+  switch x {
+    case &IsLvalNo(desc rval_description): {
+      return desc.whole_num;
+    }
+    case &IsLvalYes(desc lval_description): {
+      ice(_u8("rval_cell sees lvalue"));
+      return fake();
+    }
+  }
 }
 
 func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *array[after_action], out *gr_num) bool {

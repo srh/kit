@@ -322,6 +322,15 @@ func mk(ident ast_ident, generic_params opt[array[ast_typeexpr]]) ast_name_expr 
   return {None(), ident, generic_params};
 }
 
+func name_info(a *ast_name_expr) *ast_name_expr_info {
+  if case &Has(info ast_name_expr_info) = &a->name_info {
+    return &info;
+  } else {
+    ice(_u8("name_info does not see info"));
+    return fake();
+  }
+}
+
 func annotate_name_info(a *ast_name_expr, info ast_name_expr_info) void {
   check(isNone(&a->name_info));
   a->name_info = Has(info);
