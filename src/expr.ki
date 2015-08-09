@@ -979,6 +979,14 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
 
 func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecells {
   ptrtype cu_typeexpr = computed_ptr_type(es->cs, es->clq, &ref_cell(es, dest)->type);
+
+  ip instpair;
+  if case Has(ent def_entry_id) = es->cs->prims.ptr_eq {
+    cu_parms cu_genparms = HasParms(mk_array(ref_cell(es, dest)->type));
+    inst_id def_inst_id = enqueue_def_inst(es->cs, es->clq, ent, &cu_parms);
+    ip = {ent, inst_id};
+  }
+
   booltype cu_typeexpr;
   boolprops type_properties;
   compute_prim(es->ds, primitive_bool_type(es->cs), &booltype, &boolprops);
@@ -993,7 +1001,7 @@ func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecell
   destptr cell_num = add_cell(es, ptrtype);
   srcptr cell_num = add_cell(es, ptrtype);
   cmp_result cell_num = add_cell(es, booltype);
-  return {funcell, destptr, srcptr, cmp_result};
+  return {ip, funcell, destptr, srcptr, cmp_result};
 }
 
 func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr, assignment *ast_assignment) bool {

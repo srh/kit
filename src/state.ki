@@ -42,6 +42,10 @@ deftype platform_info struct {
   fntraits flat_traits;
 };
 
+deftype cs_primitives struct {
+  ptr_eq opt[def_entry_id];
+};
+
 deftype checkstate struct {
   im *identmap;
   instantiation_depth u32;
@@ -62,6 +66,8 @@ deftype checkstate struct {
   defs_by_name hash[sym, array[def_entry_id]];
 
   access_blocks array[shp[access_entry]];
+
+  prims cs_primitives;
 };
 
 func make_checkstate(im *identmap, platform platform_info, loader_ctx *void, loader fn[*checkstate, sym, opt[array[u8]]]) checkstate {

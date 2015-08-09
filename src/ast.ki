@@ -69,6 +69,7 @@ deftype ast_funcall struct {
 };
 
 deftype ast_assignment_comparecells struct {
+  ip instpair;
   funcell cell_num;
   destptr cell_num;
   srcptr cell_num;

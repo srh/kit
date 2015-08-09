@@ -167,6 +167,14 @@ func[T] `==`(x opt[T], y opt[T]) bool {
   return false;
 }
 
+func[T] set(dest *opt[T], y T) void {
+  if case &Has(t T) = dest {
+    print(Stderr(), _u8("set sees Has\n"));
+    abort();
+  }
+  *dest = Has(y);
+}
+
 deftype[S, T] tup struct {
   car S;
   cdr T;
