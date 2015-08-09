@@ -416,8 +416,22 @@ defenum ctor_desc {
   FunCtor instpair;
 };
 
+defenum bi_ctor_desc {
+  BiTrivialCtor void;
+  BiFunCtor bi_fun_ctor_desc;
+};
+
+deftype bi_fun_ctor_desc struct {
+  ip instpair;
+  // Cells for the constructor params and return cell.
+  funcell cell_num;
+  destptr cell_num;
+  srcptr cell_num;
+  retvoid cell_num;
+};
+
 deftype bi_action struct {
-  ctor ctor_desc;
+  ctor bi_ctor_desc;
   dest cell_num;
   src cell_num;
 };
@@ -425,8 +439,20 @@ deftype bi_action struct {
 deftype copy_action bi_action;
 deftype move_action bi_action;
 
+defenum uni_ctor_desc {
+  UniTrivialCtor void;
+  UniFunCtor uni_fun_ctor_desc;
+};
+
+deftype uni_fun_ctor_desc struct {
+  ip instpair;
+  funcell cell_num;
+  argptr cell_num;
+  retvoid cell_num;
+};
+
 deftype destroy_action struct {
-  ctor ctor_desc;
+  ctor uni_ctor_desc;
   arg cell_num;
 };
 
