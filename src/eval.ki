@@ -223,7 +223,7 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
   if inst->status != FinishedCheckingRhs(void) {
     ice(_u8("Evaling def we have not finished checking."));
   }
-  if case &Has(e ast_expr) = &inst->rhs {
+  if case &Has(e ast_expr_consume) = &inst->rhs {
     check(is_defwise_trivial(&inst->computed_type_properties));
     switch &inst->evaled_value {
       case &NotComputed(v void): {
@@ -235,7 +235,7 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
           ice(_u8("st_eval_def sees inst without num_frame_cells."));
         }
         result st_obj_ref;
-        if !st_eval_expr(cs, &env, &e, &result) {
+        if !st_eval_expr(cs, &env, &e.expr, &result) {
           return false;
         }
         value st_value;

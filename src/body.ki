@@ -90,22 +90,22 @@ func check_body(bs *bodystate, a *ast_bracebody, ee_out *entryexit) bool {
   return true;
 }
 
-func check_discard_expr(es *framescope, x *ast_expr, pt *te_typeexpr) bool {
-  if !check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
+func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) bool {
+  if !check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
     return false;
   }
-  if !annotate_disposal_for_discard(es, x) {
+  if !annotate_disposal_for_discard(es, &x->expr) {
     return false;
   }
   return true;
 }
 
 // For exprs that we use, but then discard.  Conditionals... and switches?  Kinda.
-func check_consume_then_discard_expr(es *framescope, x *ast_expr, pt *te_typeexpr, later *ast_later_discard_info) bool {
-  if !check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
+func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info) bool {
+  if !check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
     return false;
   }
-  if !annotate_disposal_for_consume_then_discard(es, x, later) {
+  if !annotate_disposal_for_consume_then_discard(es, &x->expr, later) {
     return false;
   }
   return true;
@@ -114,7 +114,7 @@ func check_consume_then_discard_expr(es *framescope, x *ast_expr, pt *te_typeexp
 func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *entryexit) bool {
   num statement_num = add_statement(bs, Has(s));
   switch s {
-    case &Expr(b ast_expr): {
+    case &Expr(b ast_expr_discard): {
       pt te_typeexpr = TeUnknown(void);
       if !check_discard_expr(&bs->es, &b, &pt) {
         return false;
@@ -123,8 +123,8 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
     }
 
     case &Return(b ast_return_statement): {
-      if case &Has(c box[ast_expr]) = &b.expr {
-        if !check_consume_expr(&bs->es, oo(&c), &bs->return_type->~) {
+      if case &Has(c box[ast_expr_consume]) = &b.expr {
+        if !check_expr_consume(&bs->es, oo(&c), &bs->return_type->~) {
           return false;
         }
       } else {
@@ -150,11 +150,11 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       cu_computed cu_typeexpr;
       complete_type *cu_typeexpr;
       note_initter bool;
-      if case &Has(x box[ast_expr]) = &b.rhs {
-        if !check_consume_expr(&bs->es, oo(&x), &computed.te) {
+      if case &Has(x box[ast_expr_consume]) = &b.rhs {
+        if !check_expr_consume(&bs->es, oo(&x), &computed.te) {
           return false;
         }
-        complete_type = expr_complete_type(oo(&x));
+        complete_type = expr_complete_type(&oo(&x)->expr);
         note_initter = false;
       } else {
         if !computed.complete {
@@ -255,14 +255,14 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       }
 
       exitnum statement_num = add_statement(bs, None());
-      if case &Has(cond box[ast_expr]) = &b.condition {
+      if case &Has(cond box[ast_expr_consume]) = &b.condition {
         boolean cu_typeexpr = compute_prim(bs->ds, primitive_bool_type(bs->cs));
         if !check_consume_then_discard_expr(&bs->es, oo(&cond), &boolean.~, &b.condition_discard) {
           return false;
         }
         connect_statements(bs, loopnum, exitnum);
       }
-      if case &Has(incr box[ast_expr]) = &b.increment {
+      if case &Has(incr box[ast_expr_discard]) = &b.increment {
         unknown te_typeexpr = TeUnknown(void);
         if !check_discard_expr(&bs->es, oo(&incr), &unknown) {
           return false;
@@ -283,7 +283,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
         return false;
       }
 
-      swartch_type *cu_typeexpr = expr_complete_type(oo(&b.swartch));
+      swartch_type *cu_typeexpr = expr_complete_type(&oo(&b.swartch)->expr);
 
       switchable_type *te_typeexpr;
       is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(bs->cs), &switchable_type);
@@ -420,7 +420,7 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
 
 func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later *ast_later_discard_info) bool {
   switch a {
-    case &ExprCondition(b box[ast_expr]): {
+    case &ExprCondition(b box[ast_expr_consume]): {
       booltype cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
       if !check_consume_then_discard_expr(es, oo(&b), &booltype.~, later) {
         return false;
@@ -434,7 +434,7 @@ func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later
       }
 
       // TODO: vv Some of this code is redundant with switch statement code.
-      swartch_type *cu_typeexpr = expr_complete_type(oo(&b.rhs));
+      swartch_type *cu_typeexpr = expr_complete_type(&oo(&b.rhs)->expr);
       switchable_type *te_typeexpr;
       is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(es->cs), &switchable_type);
       if !is_ptr {

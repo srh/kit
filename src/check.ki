@@ -338,7 +338,7 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
   if case Has(id) = find_matching_inst(cs, &ent->insts, parms) {
     return {id, false};
   }
-  rhs opt[ast_expr];
+  rhs opt[ast_expr_consume];
   if case &Has(np def_nonprim) = &ent->nonprim {
     switch np.tl {
       case &Def(a ast_def): { rhs = Has(a.rhs); }
@@ -435,7 +435,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_
         return false;
       }
       inst->status = BeganCheckingRhs(void);
-      if case &Has(rhs ast_expr) = &inst->rhs {
+      if case &Has(rhs ast_expr_consume) = &inst->rhs {
         info frame_info;
         if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs, &inst->computed_type.~, &info) {
           return false;
@@ -1122,7 +1122,7 @@ func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) bool {
     *out = s;
     return true;
   } else {
-    switch &a->rhs.u {
+    switch &a->rhs.expr.u {
       case &Lambda(b ast_lambda): {
         *out = lambda_declared_type(im, &b);
         return true;

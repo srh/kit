@@ -64,8 +64,8 @@ deftype ast_string_literal struct {
 };
 
 deftype ast_funcall struct {
-  fun box[ast_expr];
-  params array[ast_expr];
+  fun box[ast_expr_consume];
+  params array[ast_expr_consume];
 };
 
 deftype ast_assignment_info struct {
@@ -96,7 +96,7 @@ deftype ast_addressof struct {
 };
 
 deftype ast_deref struct {
-  rhs box[ast_expr];
+  rhs box[ast_expr_consume];
 };
 
 deftype ast_typeapp struct {
@@ -150,16 +150,16 @@ deftype ast_var_info struct {
 deftype ast_var_statement struct {
   info opt[ast_var_info];
   decl ast_vardecl;
-  rhs opt[box[ast_expr]];
+  rhs opt[box[ast_expr_consume]];
 };
 
 deftype ast_pattern_assign struct {
   pattern ast_constructor_pattern;
-  rhs box[ast_expr];
+  rhs box[ast_expr_consume];
 };
 
 defenum ast_condition {
-  ExprCondition box[ast_expr];
+  ExprCondition box[ast_expr_consume];
   PatternCondition ast_pattern_assign;
 };
 
@@ -186,20 +186,20 @@ deftype ast_for_statement struct {
   // Can only be an ast_expr or ast_statement_var.
   initializer opt[box[ast_statement]];
   condition_discard ast_later_discard_info;
-  condition opt[box[ast_expr]];
-  increment opt[box[ast_expr]];
+  condition opt[box[ast_expr_consume]];
+  increment opt[box[ast_expr_discard]];
   body ast_bracebody;
 };
 
 deftype ast_switch_statement struct {
   swartch_discard ast_later_discard_info;
-  swartch box[ast_expr];
+  swartch box[ast_expr_consume];
   cases array[ast_switch_case];
 };
 
 deftype ast_return_statement struct {
   // If no expr, it returns void.
-  expr opt[box[ast_expr]];
+  expr opt[box[ast_expr_consume]];
 };
 
 deftype ast_label_statement struct {
@@ -211,7 +211,7 @@ deftype ast_goto_statement struct {
 };
 
 defenum ast_statement {
-  Expr ast_expr;
+  Expr ast_expr_discard;
   Return ast_return_statement;
   Var ast_var_statement;
   IfThen ast_ifthen_statement;
@@ -260,7 +260,7 @@ deftype ast_local_field struct {
 };
 
 deftype ast_deref_field struct {
-  lhs box[ast_expr];
+  lhs box[ast_expr_consume];
   fieldname ast_fieldname;
 };
 
@@ -301,7 +301,7 @@ deftype ast_paren_expr struct {
 
 deftype ast_index_expr struct {
   lhs box[ast_expr];
-  rhs box[ast_expr];
+  rhs box[ast_expr_consume];
 };
 
 deftype ast_typed_expr struct {
@@ -310,7 +310,7 @@ deftype ast_typed_expr struct {
 };
 
 deftype ast_strinit struct {
-  exprs array[ast_expr];
+  exprs array[ast_expr_consume];
 };
 
 // Is a non-lval an rval?  Okay.
@@ -526,6 +526,22 @@ func mk(x ast_expr_enum) ast_expr {
   return {NoInfo(void), x};
 }
 
+deftype ast_expr_consume struct {
+  expr ast_expr;
+};
+
+func consume(expr ast_expr) ast_expr_consume {
+  return {expr};
+}
+
+deftype ast_expr_discard struct {
+  expr ast_expr;
+};
+
+func discard(expr ast_expr) ast_expr_discard {
+  return {expr};
+}
+
 deftype ast_variadic_generics struct {
   before array[ast_ident];
   variadic_name ast_ident;
@@ -555,7 +571,7 @@ deftype ast_def struct {
   generics ast_generics;
   name ast_ident;
   syntactic_typeexpr opt[ast_typeexpr];
-  rhs ast_expr;
+  rhs ast_expr_consume;
 };
 
 deftype ast_extern_def struct {

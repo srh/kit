@@ -405,7 +405,7 @@ deftype frame_info struct {
 deftype def_inst struct {
   parms cu_genparms;
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None() if we have an extern def.
-  rhs opt[ast_expr];
+  rhs opt[ast_expr_consume];
   status def_inst_status;
   // TODO: Use nbfc or something.
   // Becomes the concrete type (with generics replaced) once we've computed it and checked it (see status).
@@ -417,7 +417,7 @@ deftype def_inst struct {
   evaled_value nbfc[st_value];
 };
 
-func mk(parms cu_genparms, rhs opt[ast_expr]) def_inst {
+func mk(parms cu_genparms, rhs opt[ast_expr_consume]) def_inst {
   return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties](), None@[frame_info](), NotComputed@[st_value]()};
 }
 

@@ -265,14 +265,18 @@ func ds_note_var_destroyer(ds *defscope, vn var_number) bool {
   return true;
 }
 
-func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr, frame_info_out *frame_info) bool {
+func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr_consume, pt *te_typeexpr, frame_info_out *frame_info) bool {
   ds defscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]](), default@[array[var_number]]()};
   es framescope = mk(&ds);
-  if !check_consume_expr(&es, x, pt) {
+  if !check_expr_consume(&es, x, pt) {
     return false;
   }
   *frame_info_out = {es.cells};
   return true;
+}
+
+func check_expr_consume(es *framescope, x *ast_expr_consume, pt *te_typeexpr) bool {
+  return check_consume_expr(es, &x->expr, pt);
 }
 
 func check_consume_expr(es *framescope, x *ast_expr, pt *te_typeexpr) bool {
@@ -580,14 +584,11 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
         return false;
       }
       // Seems like no point to allowing an incomplete rhs.
-      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &ptr_cac.te) {
-        return false;
-      }
-      if !annotate_disposal_for_consume(es, oo(&a.rhs)) {
+      if !check_expr_consume(es, oo(&a.rhs), &ptr_cac.te) {
         return false;
       }
       param *te_typeexpr;
-      if !decompose_typeapp(&expr_complete_type(oo(&a.rhs))->~, primitive_pointer_puretype(es->cs), &param) {
+      if !decompose_typeapp(&expr_complete_type(&oo(&a.rhs)->expr)->~, primitive_pointer_puretype(es->cs), &param) {
         ice(_u8("Deref sees rhs type being non-pointer."));
       }
       props type_properties;
@@ -648,13 +649,10 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
     case &DerefField(a ast_deref_field): {
       // The fact that our partial type isn't a pointer type is deliberate.
       unknown te_typeexpr = TeUnknown(void);
-      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), &unknown) {
+      if !check_expr_consume(es, oo(&a.lhs), &unknown) {
         return false;
       }
-      if !annotate_disposal_for_consume(es, oo(&a.lhs)) {
-        return false;
-      }
-      info *ast_expr_complete_info = expr_complete_info(oo(&a.lhs));
+      info *ast_expr_complete_info = expr_complete_info(&oo(&a.lhs)->expr);
       param *te_typeexpr;
       if !decompose_typeapp(&info->cu.~, primitive_pointer_puretype(es->cs), &param) {
         ERR(_u8("Expected pointer for lhs of deref field"));
@@ -1043,11 +1041,8 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     }
 
     for i size = 0; i < n; i = i + 1 {
-      x_i *ast_expr = ref(&a->exprs, i);
-      if !check_expr_ai(es, AllowIncompleteNo(void), x_i, &ref(&b.fields, i)->type) {
-        return false;
-      }
-      if !annotate_disposal_for_consume(es, x_i) {
+      x_i *ast_expr_consume = ref(&a->exprs, i);
+      if !check_expr_consume(es, x_i, &ref(&b.fields, i)->type) {
         return false;
       }
     }
@@ -1493,25 +1488,25 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   }
 
   func_pt te_typeexpr = make_fn_partial_type(es->cs, pt, &a->params);
-  if !check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes(void)), oo(&a->fun), &func_pt) {
+  if !check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes(void)), &oo(&a->fun)->expr, &func_pt) {
     return false;
   }
 
-  if expr_type_incomplete(oo(&a->fun)) {
+  if expr_type_incomplete(&oo(&a->fun)->expr) {
     check(ai == AllowIncompleteYes(void));
     annotate_info(x, IncompleteCheck(TeUnknown(void)));
     return true;
   }
 
-  if !check_funcall_params_secondtime(es, expr_complete_type(oo(&a->fun)), &a->params) {
+  if !check_funcall_params_secondtime(es, expr_complete_type(&oo(&a->fun)->expr), &a->params) {
     return false;
   }
 
-  if !annotate_disposal_for_consume(es, oo(&a->fun)) {
+  if !annotate_disposal_for_consume(es, &oo(&a->fun)->expr) {
     return false;
   }
 
-  return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(oo(&a->fun))->~);
+  return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(&oo(&a->fun)->expr)->~);
   props type_properties;
   if !compute_complete_type_properties(es->cs, es->clq, return_type, &props) {
     return false;
@@ -1520,12 +1515,12 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   return true;
 }
 
-func check_funcall_params_firsttime(es *framescope, params *array[ast_expr], a_param_incomplete_out *bool) bool {
+func check_funcall_params_firsttime(es *framescope, params *array[ast_expr_consume], a_param_incomplete_out *bool) bool {
   n size = count(params);
   unknown te_typeexpr = TeUnknown(void);
   all_params_complete bool = true;
   for i size = 0; i < n; i = i + 1 {
-    expr *ast_expr = ref(params, i);
+    expr *ast_expr = &ref(params, i)->expr;
     if !check_expr_ai(es, AllowIncompleteYes(void), expr, &unknown) {
       return false;
     }
@@ -1536,7 +1531,7 @@ func check_funcall_params_firsttime(es *framescope, params *array[ast_expr], a_p
   return true;
 }
 
-func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, params *array[ast_expr]) bool {
+func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, params *array[ast_expr_consume]) bool {
   n size = count(params);
 
   type_params *array[te_typeexpr];
@@ -1546,11 +1541,8 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
   check(count(type_params) == n + 1);
 
   for i size = 0; i < n; i = i + 1 {
-    expr *ast_expr = ref(params, i);
-    if !check_expr_ai(es, AllowIncompleteNo(void), expr, ref(type_params, i)) {
-      return false;
-    }
-    if !annotate_disposal_for_consume(es, expr) {
+    ec *ast_expr_consume = ref(params, i);
+    if !check_expr_consume(es, ec, ref(type_params, i)) {
       return false;
     }
   }
@@ -1581,11 +1573,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   }
   sizetype cu_typeexpr = compute_prim(es->ds, primitive_size_type(es->cs));
 
-  if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), &sizetype.~) {
-    return false;
-  }
-
-  if !annotate_disposal_for_consume(es, oo(&a->rhs)) {
+  if !check_expr_consume(es, oo(&a->rhs), &sizetype.~) {
     return false;
   }
 
@@ -1697,11 +1685,11 @@ func expr_type_incomplete(a *ast_expr) bool {
   return !expr_type_complete(a);
 }
 
-func make_fn_partial_type(cs *checkstate, return_type *te_typeexpr, params *array[ast_expr]) te_typeexpr {
+func make_fn_partial_type(cs *checkstate, return_type *te_typeexpr, params *array[ast_expr_consume]) te_typeexpr {
   type_params array[te_typeexpr];
   n size = count(params);
   for i size = 0; i < n; i = i + 1 {
-    push(&type_params, expr_type(ref(params, i)));
+    push(&type_params, expr_type(&ref(params, i)->expr));
   }
   push(&type_params, *return_type);
   return TeApp({embox(primitive_function_puretype(cs)), type_params, None()});
