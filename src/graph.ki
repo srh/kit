@@ -120,7 +120,28 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
       return gr_expr(cs, gr, oo(&a.expr), out);
     }
     case &NumericLiteral(a ast_numeric_literal): {
-      return gr_numeric_literal(cs, gr, x, &a, out);
+      return gr_literal(cs, gr, x, numeric_literal_value(&a), out);
+    }
+    case &BoolLiteral(a ast_bool_literal): {
+      value bigint;
+      if a.value {
+        value = ~ @[u32] 1;
+      } else {
+        value = ~ @[u32] 0;
+      }
+      return gr_literal(cs, gr, x, value, out);
+    }
+    case &VoidLiteral(a ast_void_literal): {
+      value bigint = ~ @[u32] 0;
+      return gr_literal(cs, gr, x, value, out);
+    }
+    case &NullLiteral(a ast_null_literal): {
+      value bigint = ~ @[u32] 0;
+      return gr_literal(cs, gr, x, value, out);
+    }
+    case &CharLiteral(a ast_char_literal): {
+      value bigint = ~ a.charspec.value;
+      return gr_literal(cs, gr, x, value, out);
     }
     default: {
       return TODO();
@@ -128,8 +149,7 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
   }
 }
 
-func gr_numeric_literal(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_numeric_literal, out *gr_num) bool {
-  value bigint = numeric_literal_value(a);
+func gr_literal(cs *checkstate, gr *frame_graph, x *ast_expr, value bigint, out *gr_num) bool {
   var gn = add_node(gr, node(mk_array(), GrWriteConst({rval_cell(x), ConstInt(value)})));
   *out = gn;
   return true;
