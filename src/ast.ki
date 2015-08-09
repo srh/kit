@@ -494,6 +494,24 @@ deftype ast_expr_after struct {
   result opt[cell_num];
 };
 
+func result_cell(a *ast_expr_after) cell_num {
+  if case &Has(c cell_num) = &a->result {
+    return c;
+  } else {
+    ice(_u8("result_cell sees None"));
+    return fake();
+  }
+}
+
+func result_cell(a *ast_expr_consume) cell_num {
+  if case &Has(aft ast_expr_after) = &a->after {
+    return result_cell(&aft);
+  } else {
+    ice(_u8("result_cell sees None for after"));
+    return fake();
+  }
+}
+
 func mk_after(result opt[cell_num]) ast_expr_after {
   return {mk_array(), result};
 }

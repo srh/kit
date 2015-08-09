@@ -149,10 +149,36 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
       return gr_string_literal(cs, gr, x, &a, out);
     }
 
+    case &Funcall(a ast_funcall): {
+      return gr_funcall(cs, gr, x, &a, out);
+    }
+
     default: {
       return TODO();
     }
   }
+}
+
+func gr_funcall(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_funcall, out *gr_num) bool {
+  precs array[gr_num];
+  dep gr_num;
+  if !gr_expr_consume(cs, gr, oo(&a->fun), &dep) {
+    return false;
+  }
+  push(&precs, dep);
+  paramcells array[cell_num];
+  nparams size = count(&a->params);
+  for i size = 0; i < nparams; i = i + 1 {
+    param *ast_expr_consume = ref(&a->params, i);
+    if !gr_expr_consume(cs, gr, param, &dep) {
+      return false;
+    }
+    push(&precs, dep);
+    push(&paramcells, result_cell(param));
+  }
+  var ap = add_node(gr, node(precs, GrApply({result_cell(oo(&a->fun)), paramcells, rval_cell(x)})));
+  *out = ap;
+  return true;
 }
 
 func gr_string_literal(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_string_literal, out *gr_num) bool {
