@@ -977,6 +977,24 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
   return true;
 }
 
+func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecells {
+  ptrtype cu_typeexpr = computed_ptr_type(es->cs, es->clq, &ref_cell(es, dest)->type);
+  booltype cu_typeexpr;
+  boolprops type_properties;
+  compute_prim(es->ds, primitive_bool_type(es->cs), &booltype, &boolprops);
+
+  fptr te_typeexpr = fn_type(es->cs, ptrtype.~, ptrtype.~, booltype.~);
+  cfptr cac_typeexpr;
+  if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &fptr, &cfptr) {
+    ice(_u8("fn_type produced non-computable type from computables"));
+  }
+
+  funcell cell_num = add_cell(es, ~cfptr.te);
+  destptr cell_num = add_cell(es, ptrtype);
+  srcptr cell_num = add_cell(es, ptrtype);
+  cmp_result cell_num = add_cell(es, booltype);
+  return {funcell, destptr, srcptr, cmp_result};
+}
 
 func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr, assignment *ast_assignment) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
@@ -993,9 +1011,10 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         }
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate_assignment(assignment,
-          {mk_array(DestroyAfter({destroy, dest}),
-                    MoveAfter({move, dest, desc.whole_num})),
-           mk_array()});
+          ConditionalAssignment({make_comparecells(es, dest),
+                                 mk_array(DestroyAfter({destroy, dest}),
+                                          MoveAfter({move, dest, desc.whole_num})),
+                                 mk_array()}));
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
         copy bi_ctor_desc;
@@ -1013,18 +1032,26 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
 
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate_assignment(assignment,
-          {mk_array(DestroyAfter({target_destroy, dest}),
-                    CopyAfter({copy, dest, desc.partial_num})),
-           mk_array(DestroyAfter({destroy, desc.whole_num}))});
+          ConditionalAssignment({make_comparecells(es, dest),
+                                 mk_array(DestroyAfter({target_destroy, dest}),
+                                          CopyAfter({copy, dest, desc.partial_num})),
+                                 mk_array(DestroyAfter({destroy, desc.whole_num}))}));
       }
     }
     case &IsLvalYes(desc lval_description): {
-      copy bi_ctor_desc;
-      if !get_copy_bi_ctor(es, &ref_cell(es, dest)->type, &copy) {
-        return false;
+      if dest == desc.num {
+        // Static self-assignment!
+        annotate_assignment(assignment, StaticSelfAssignment(void));
+      } else {
+        copy bi_ctor_desc;
+        if !get_copy_bi_ctor(es, &ref_cell(es, dest)->type, &copy) {
+          return false;
+        }
+        annotate_assignment(assignment,
+          ConditionalAssignment({make_comparecells(es, dest),
+                                 mk_array(CopyAfter({copy, dest, desc.num})),
+                                 mk_array()}));
       }
-      annotate_assignment(assignment,
-        {mk_array(CopyAfter({copy, dest, desc.num})), mk_array()});
     }
   }
   return true;

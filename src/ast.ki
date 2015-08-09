@@ -68,7 +68,16 @@ deftype ast_funcall struct {
   params array[ast_expr_consume];
 };
 
-deftype ast_assignment_info struct {
+deftype ast_assignment_comparecells struct {
+  funcell cell_num;
+  destptr cell_num;
+  srcptr cell_num;
+  cmp_result cell_num;
+};
+
+deftype ast_conditional_assignment_info struct {
+  comparecells ast_assignment_comparecells;
+
   /* These actions perform the assignment -- they happen if the
   assignment isn't self-assignment. */
   conditional_actions array[after_action];
@@ -76,6 +85,11 @@ deftype ast_assignment_info struct {
   /* These unconditionally happen, even if no assignment happens.
   They happen _after_ the conditional actions. */
   unconditional_actions array[after_action];
+};
+
+defenum ast_assignment_info {
+  StaticSelfAssignment void;
+  ConditionalAssignment ast_conditional_assignment_info;
 };
 
 deftype ast_assignment struct {
