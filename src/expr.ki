@@ -511,7 +511,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
     }
 
     case &Funcall(a ast_funcall): {
-      return check_expr_funcall(es, ai, x, &a, pt);
+      return check_expr_funcall(es, ai, &a, pt, x);
     }
 
     case &Assignment(a ast_assignment): {
@@ -601,7 +601,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
     }
 
     case &IndexExpr(a ast_index_expr): {
-      return check_expr_index(es, x, &a, pt);
+      return check_expr_index(es, &a, pt, x);
     }
 
     case &Lambda(a ast_lambda): {
@@ -1459,7 +1459,7 @@ func ai_incomplete(yes bool) allow_incomplete {
   }
 }
 
-func check_expr_funcall(es *framescope, ai allow_incomplete, x *ast_expr, a *ast_funcall, pt *te_typeexpr) bool {
+func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt *te_typeexpr, x *ast_expr) bool {
   a_param_incomplete bool;
   if !check_funcall_params_firsttime(es, &a->params, &a_param_incomplete) {
     return false;
@@ -1547,7 +1547,7 @@ func compute_prim(ds *defscope, t te_typeexpr, out *cu_typeexpr, props_out *type
   *out = type;
 }
 
-func check_expr_index(es *framescope, x *ast_expr, a *ast_index_expr, pt *te_typeexpr) bool {
+func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast_expr) bool {
   unknown te_typeexpr = TeUnknown(void);
   if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), &unknown) {
     return false;
