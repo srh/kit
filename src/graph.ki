@@ -1,0 +1,78 @@
+import check;
+
+deftype frame_graph struct {
+  ops array[gr_node];
+};
+
+deftype gr_num size;
+
+// To "evaluate" an op, first we evaluate its precs (in unspecified order), then we ealuate the op.
+deftype gr_node struct { precs array[gr_num]; op gr_op; };
+defenum gr_op {
+  GrApply gr_apply;
+  GrMemCopy gr_memcopy;
+  GrWriteConst gr_writeconst;
+  GrAddressof gr_addressof;
+  GrDeref gr_deref;
+  GrStrinit gr_strinit;
+  GrBranch gr_branch;
+  GrSequence gr_sequence;
+  GrDead gr_dead;
+};
+
+deftype gr_apply struct {
+  funcell cell_num;
+  params array[cell_num];
+  retcell cell_num;
+};
+
+deftype gr_memcopy struct {
+  dest cell_num;
+  src cell_num;
+};
+
+deftype gr_addressof struct {
+  dest cell_num;
+  addressee cell_num;
+};
+
+deftype gr_deref struct {
+  name cell_num;
+  pointer cell_num;
+  offset gr_offset;
+};
+
+defenum gr_offset {
+  ConstOffset u32;
+  MultipliedOffset tup[u32, cell_num];
+};
+
+deftype gr_writeconst struct {
+  dest cell_num;
+  value gr_const;
+};
+
+deftype gr_strinit struct {
+  dest cell_num;
+  parts array[tup[u32, cell_num]];
+};
+
+deftype gr_branch struct {
+  src cell_num;
+  cases array[tup[gr_const, gr_num]];
+  default_case opt[gr_num];
+};
+
+deftype gr_sequence struct {
+  first gr_num;
+  second gr_num;
+};
+
+deftype gr_dead struct {
+  cell cell_num;
+};
+
+defenum gr_const {
+  ConstInt bigint;
+  ConstDef instpair;
+};

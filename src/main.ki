@@ -1,4 +1,5 @@
 import array;
+import graph;
 import test_check;
 import parse;
 import stdlib;
