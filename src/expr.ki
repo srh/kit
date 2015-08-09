@@ -648,9 +648,6 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), &unknown) {
         return false;
       }
-      if !annotate_disposal_for_consume(es, oo(&a.lhs)) {
-        return false;
-      }
       info *ast_expr_complete_info = expr_complete_info(oo(&a.lhs));
       param *te_typeexpr;
       if !decompose_typeapp(&info->cu.~, primitive_pointer_puretype(es->cs), &param) {
@@ -665,9 +662,15 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       }
       lval is_lval;
       if inherits_lval {
+        if !annotate_disposal_for_consume(es, oo(&a.lhs)) {
+          return false;
+        }
         // We deref, so it's always an lval.
         lval = IsLvalYes({add_virtual_cell(es, fieldtype)});
       } else {
+        if !annotate_disposal_for_discard(es, oo(&a.lhs)) {
+          return false;
+        }
         lval = wholeRval(add_cell(es, fieldtype));
       }
       props type_properties;
