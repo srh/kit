@@ -507,17 +507,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
     }
 
     case &StringLiteral(a ast_string_literal): {
-      type cu_typeexpr;
-      props type_properties;
-      compute_prim(es->ds, primitive_string_literal_type(es->cs, count(&a.charspecs)),
-                   &type, &props);
-      unified te_typeexpr;
-      if !unify_types(pt, &type.~, &unified) {
-        ERR(_u8("string literal in bad place"));
-        return false;
-      }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, type)), type, props)));
-      return true;
+      return check_expr_string_literal(es, &a, pt, x);
     }
 
     case &Funcall(a ast_funcall): {
@@ -1002,6 +992,20 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       return true;
     }
   }
+}
+
+func check_expr_string_literal(es *framescope, a *ast_string_literal, pt *te_typeexpr, x *ast_expr) bool {
+  type cu_typeexpr;
+  props type_properties;
+  compute_prim(es->ds, primitive_string_literal_type(es->cs, count(&a->charspecs)),
+               &type, &props);
+  unified te_typeexpr;
+  if !unify_types(pt, &type.~, &unified) {
+    ERR(_u8("string literal in bad place"));
+    return false;
+  }
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, type)), type, props)));
+  return true;
 }
 
 func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt *te_typeexpr, x *ast_expr) bool {
