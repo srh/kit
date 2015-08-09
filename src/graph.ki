@@ -91,6 +91,7 @@ deftype gr_dead struct {
 defenum gr_const {
   ConstInt bigint;
   ConstDef instpair;
+  ConstBytes array[u8];
 };
 
 func gr_expr_consume(cs *checkstate, gr *frame_graph, x *ast_expr_consume, out *gr_num) bool {
@@ -143,10 +144,30 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
       value bigint = ~ a.charspec.value;
       return gr_literal(cs, gr, x, value, out);
     }
+
+    case &StringLiteral(a ast_string_literal): {
+      return gr_string_literal(cs, gr, x, &a, out);
+    }
+
     default: {
       return TODO();
     }
   }
+}
+
+func gr_string_literal(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_string_literal, out *gr_num) bool {
+  bytes array[u8];
+  nchars size = count(&a->charspecs);
+  for i size = 0; i < nchars; i = i + 1 {
+    ch i32 = get(&a->charspecs, i).value;
+    if ch < 0 || ch > 255 {
+      ice(_u8("gr_string_literal char values out of range"));
+    }
+    push(&bytes, ~ch);
+  }
+  var gn = add_node(gr, node(mk_array(), GrWriteConst({rval_cell(x), ConstBytes(bytes)})));
+  *out = gn;
+  return true;
 }
 
 func gr_literal(cs *checkstate, gr *frame_graph, x *ast_expr, value bigint, out *gr_num) bool {
