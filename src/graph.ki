@@ -116,10 +116,23 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
     case &NameExpr(a ast_name_expr): {
       return gr_name_expr(cs, gr, x, &a, out);
     }
+    case &ParenExpr(a ast_paren_expr): {
+      return gr_expr(cs, gr, oo(&a.expr), out);
+    }
+    case &NumericLiteral(a ast_numeric_literal): {
+      return gr_numeric_literal(cs, gr, x, &a, out);
+    }
     default: {
       return TODO();
     }
   }
+}
+
+func gr_numeric_literal(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_numeric_literal, out *gr_num) bool {
+  value bigint = numeric_literal_value(a);
+  var gn = add_node(gr, node(mk_array(), GrWriteConst({rval_cell(x), ConstInt(value)})));
+  *out = gn;
+  return true;
 }
 
 func gr_name_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_name_expr, out *gr_num) bool {
