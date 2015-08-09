@@ -500,7 +500,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
     }
 
     case &NullLiteral(a ast_null_literal): {
-      return help_check_simple_literal(es, pt, pointer_to(es->cs, TeUnknown(void)), _u8("null"), x);
+      return help_check_simple_literal(es, pt, ptr_type(es->cs, TeUnknown(void)), _u8("null"), x);
     }
 
     case &CharLiteral(a ast_char_literal): {
@@ -540,7 +540,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
     }
 
     case &AddressOf(a ast_addressof): {
-      ptr_unknown te_typeexpr = pointer_to(es->cs, TeUnknown(void));
+      ptr_unknown te_typeexpr = ptr_type(es->cs, TeUnknown(void));
       unif_pt te_typeexpr;
       if !unify_types(pt, &ptr_unknown, &unif_pt) {
         ERR(_u8("AddressOf expr in non-pointer context"));
@@ -559,7 +559,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
         return false;
       }
 
-      ptr_type te_typeexpr = pointer_to(es->cs, rhs_info->cu.~);
+      ptr_type te_typeexpr = ptr_type(es->cs, rhs_info->cu.~);
       ptr_computed cac_typeexpr;
       if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_type, &ptr_computed) {
         return false;
@@ -573,7 +573,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       return true;
     }
     case &Deref(a ast_deref): {
-      ptr_pt te_typeexpr = pointer_to(es->cs, *pt);
+      ptr_pt te_typeexpr = ptr_type(es->cs, *pt);
       ptr_cac cac_typeexpr;
       if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_pt, &ptr_cac) {
         return false;

@@ -32,12 +32,6 @@ func primitive_pointer_puretype(cs *checkstate) te_puretype {
   return TePureName(cs->im->cym.ptrtype_sym);
 }
 
-func pointer_to(cs *checkstate, t te_typeexpr) te_typeexpr {
-  params array[te_typeexpr];
-  push(&params, t);
-  return TeApp({embox(primitive_pointer_puretype(cs)), params, None()});
-}
-
 func add_conversion(cs *checkstate, from sym, to sym) void {
   type te_typeexpr = fn_type(cs, TeName({from, None()}), TeName({to, None()}));
   add_def_primitive(cs, cs->im->cym.convertsym, type);
