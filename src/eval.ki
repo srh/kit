@@ -26,8 +26,8 @@ deftype st_obj_ref struct {
   count u32;
 };
 
-func init_env(env *st_env, plat *platform_info, num_cells frame_cell_count) void {
-  *env = {*plat, mk_array@[opt[st_value]](), repeat(num_cells.~, None())};
+func init_env(env *st_env, plat *platform_info, num_cells size) void {
+  *env = {*plat, mk_array@[opt[st_value]](), repeat(num_cells, None())};
 }
 
 deftype st_symbol_name sym;
@@ -229,8 +229,8 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
       case &NotComputed(v void): {
         inst->evaled_value = BeganComputing();
         env st_env;
-        if case Has(num_cells frame_cell_count) = inst->num_frame_cells {
-          init_env(&env, &cs->platform, num_cells);
+        if case Has(info frame_info) = inst->frame_info {
+          init_env(&env, &cs->platform, count(&info.cells));
         } else {
           ice(_u8("st_eval_def sees inst without num_frame_cells."));
         }

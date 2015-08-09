@@ -265,13 +265,13 @@ func ds_note_var_destroyer(ds *defscope, vn var_number) bool {
   return true;
 }
 
-func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr, num_cells_out *frame_cell_count) bool {
+func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr, pt *te_typeexpr, frame_info_out *frame_info) bool {
   ds defscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]](), default@[array[var_number]]()};
   es framescope = mk(&ds);
   if !check_consume_expr(&es, x, pt) {
     return false;
   }
-  *num_cells_out = count_cells(&es);
+  *frame_info_out = {es.cells};
   return true;
 }
 

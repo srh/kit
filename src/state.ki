@@ -398,6 +398,10 @@ func `!=`(x def_inst_status, y def_inst_status) bool {
   return !(x == y);
 }
 
+deftype frame_info struct {
+  cells array[cell_info];
+};
+
 deftype def_inst struct {
   parms cu_genparms;
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None() if we have an extern def.
@@ -409,12 +413,12 @@ deftype def_inst struct {
   // Right now, these type properties _must_ indicate that the type is defwise trivial.
   computed_type_properties type_properties;
   // This becomes Has(...) when status == FinishedCheckingRhs(void), if this is not an extern def.
-  num_frame_cells opt[frame_cell_count];
+  frame_info opt[frame_info];
   evaled_value nbfc[st_value];
 };
 
 func mk(parms cu_genparms, rhs opt[ast_expr]) def_inst {
-  return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties](), None@[frame_cell_count](), NotComputed@[st_value]()};
+  return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties](), None@[frame_info](), NotComputed@[st_value]()};
 }
 
 deftype def_nonprim struct {
