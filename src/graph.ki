@@ -6,8 +6,23 @@ deftype frame_graph struct {
 
 deftype gr_num size;
 
+func add_node(gr *frame_graph, node gr_node) gr_num {
+  ret gr_num;
+  ret.~ = count(&gr->ops);
+  push(&gr->ops, node);
+  return ret;
+}
+
 // To "evaluate" an op, first we evaluate its precs (in unspecified order), then we ealuate the op.
-deftype gr_node struct { precs array[gr_num]; op gr_op; };
+deftype gr_node struct {
+  precs array[gr_num];
+  op gr_op;
+};
+
+func node(precs array[gr_num], op gr_op) gr_node {
+  return {precs, op};
+}
+
 defenum gr_op {
   GrApply gr_apply;
   GrMemCopy gr_memcopy;
@@ -76,3 +91,91 @@ defenum gr_const {
   ConstInt bigint;
   ConstDef instpair;
 };
+
+func gr_expr_consume(cs *checkstate, gr *frame_graph, x *ast_expr_consume, out *gr_num) bool {
+  expr_gn gr_num;
+  if !gr_expr(cs, gr, &x->expr, &expr_gn) {
+    return false;
+  }
+  if case &Has(aft ast_expr_after) = &x->after {
+    after_gn gr_num;
+    if !gr_after_actions(cs, gr, expr_gn, &aft.actions, &after_gn) {
+      return false;
+    }
+    *out = after_gn;
+    return true;
+  } else {
+    ice(_u8("gr_expr_consume missing after"));
+    return fake();
+  }
+}
+
+func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
+  return TODO();
+}
+
+func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *array[after_action], out *gr_num) bool {
+  nacts size = count(x);
+  for i size = 0; i < nacts; i = i + 1 {
+    dep gr_num;
+    if !gr_after_action(cs, gr, ref(x, i), &dep) {
+      return false;
+    }
+    prec = add_node(gr, node(mk_array(), GrSequence({prec, dep})));
+  }
+  *out = prec;
+  return true;
+}
+
+func gr_after_action(cs *checkstate, gr *frame_graph, x *after_action, out *gr_num) bool {
+  switch x {
+    case &CopyAfter(ca copy_action): {
+      return gr_bi_action(cs, gr, &ca.~, out);
+    }
+    case &MoveAfter(ma move_action): {
+      dep gr_num;
+      if !gr_bi_action(cs, gr, &ma.~, &dep) {
+        return false;
+      }
+      *out = add_node(gr, node(mk_array(dep), GrDead({ma.src})));
+      return true;
+    }
+    case &DestroyAfter(da destroy_action): {
+      switch &da.ctor {
+        case &UniTrivialCtor(v void): {
+          var dp = add_node(gr, node(mk_array(), GrDead({da.arg})));
+          *out = dp;
+          return true;
+        }
+        case &UniFunCtor(desc uni_fun_ctor_desc): {
+          var fc = add_node(gr, node(mk_array(), GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
+          var arp = add_node(gr, node(mk_array(), GrAddressof({desc.argptr, da.arg})));
+          var ap = add_node(gr, node(mk_array(fc, arp), GrApply({desc.funcell, mk_array(desc.argptr), desc.retvoid})));
+          var deadret = add_node(gr, node(mk_array(ap), GrDead({desc.retvoid})));
+          var dp = add_node(gr, node(mk_array(deadret), GrDead({da.arg})));
+          *out = dp;
+          return true;
+        }
+      }
+    }
+  }
+}
+
+func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bool {
+  switch &x->ctor {
+    case &BiTrivialCtor(v void): {
+      var cp = add_node(gr, node(mk_array(), GrMemCopy({x->dest, x->src})));
+      *out = cp;
+      return true;
+    }
+    case &BiFunCtor(desc bi_fun_ctor_desc): {
+      var fc = add_node(gr, node(mk_array(), GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
+      var dp = add_node(gr, node(mk_array(), GrAddressof({desc.destptr, x->dest})));
+      var sp = add_node(gr, node(mk_array(), GrAddressof({desc.srcptr, x->src})));
+      var ap = add_node(gr, node(mk_array(fc, dp, sp), GrApply({desc.funcell, mk_array(desc.destptr, desc.srcptr), desc.retvoid})));
+      var deadret = add_node(gr, node(mk_array(ap), GrDead({desc.retvoid})));
+      *out = deadret;
+      return true;
+    }
+  }
+}
