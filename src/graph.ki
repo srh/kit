@@ -194,11 +194,13 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
 
 func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_field, out *gr_num) bool {
   if case &Has(info ast_local_field_info) = &a->info {
-    if case &Has(aft ast_expr_after) = &info.after {
-      // lhs needs discarding...
-      return TODO();
-    } else {
-      return TODO();
+    switch &info {
+      case &ArrayLength(alinfo ast_arraylength_info): {
+        return TODO();
+      }
+      case &FieldName(v void): {
+        return TODO();
+      }
     }
   } else {
     ice(_u8("ast_local_field missing info"));

@@ -628,14 +628,18 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
             }
           }
           // There's no disposal, it's a real field access.
-          annotate_local_field(&a, {None@[ast_expr_after]()});
+          annotate_local_field(&a, FieldName(void));
         }
         case ConstantField(value u32): {
-          lf_info ast_local_field_info = {None()};
-          if !annotate_disposal_for_discard(es, oo(&a.lhs), &lf_info.after) {
+          after opt[ast_expr_after];
+          if !annotate_disposal_for_discard(es, oo(&a.lhs), &after) {
             return false;
           }
-          annotate_local_field(&a, lf_info);
+          if case &Has(aft ast_expr_after) = &after {
+            annotate_local_field(&a, ArrayLength({aft, value}));
+          } else {
+            ice(_u8("after not annotated"));
+          }
           lval = wholeRval(add_cell(es, fieldtype, props));
         }
       }

@@ -278,9 +278,15 @@ defenum ast_fieldname {
   NameField ast_ident;
 };
 
-deftype ast_local_field_info struct {
-  // isHas if the lhs needs discarding (for a constant .length field).
-  after opt[ast_expr_after];
+deftype ast_arraylength_info struct {
+  // After actions to discard the array.
+  after ast_expr_after;
+  count u32;
+};
+
+defenum ast_local_field_info {
+  ArrayLength ast_arraylength_info;
+  FieldName void;
 };
 
 deftype ast_local_field struct {
