@@ -278,22 +278,22 @@ defenum ast_fieldname {
   NameField ast_ident;
 };
 
-deftype ast_provisional_after struct {
-  // isHas if the lhs needs discarding (for a constant .length field in ast_local_field, ptr in ast_index_expr).
+deftype ast_local_field_info struct {
+  // isHas if the lhs needs discarding (for a constant .length field).
   after opt[ast_expr_after];
 };
 
 deftype ast_local_field struct {
-  info opt[ast_provisional_after];
+  info opt[ast_local_field_info];
   lhs box[ast_expr];
   fieldname ast_fieldname;
 };
 
 func mk(lhs box[ast_expr], fieldname ast_fieldname) ast_local_field {
-  return {None@[ast_provisional_after](), lhs, fieldname};
+  return {None@[ast_local_field_info](), lhs, fieldname};
 }
 
-func annotate_local_field(a *ast_local_field, info ast_provisional_after) void {
+func annotate_local_field(a *ast_local_field, info ast_local_field_info) void {
   if isHas(&a->info) {
     ice(_u8("annotate_local_field already annotated"));
   }
@@ -349,17 +349,22 @@ deftype ast_paren_expr struct {
   expr box[ast_expr];
 };
 
+deftype ast_index_expr_info struct {
+  // isHas if the lhs needs discarding (if it's a ptr).
+  after opt[ast_expr_after];
+};
+
 deftype ast_index_expr struct {
-  info opt[ast_provisional_after];
+  info opt[ast_index_expr_info];
   lhs box[ast_expr];
   rhs box[ast_expr_consume];
 };
 
 func mk(lhs box[ast_expr], rhs box[ast_expr_consume]) ast_index_expr {
-  return {None@[ast_provisional_after](), lhs, rhs};
+  return {None@[ast_index_expr_info](), lhs, rhs};
 }
 
-func annotate_index_expr(a *ast_index_expr, info ast_provisional_after) void {
+func annotate_index_expr(a *ast_index_expr, info ast_index_expr_info) void {
   if isHas(&a->info) {
     ice(_u8("annotate_index_expr already annotated"));
   }

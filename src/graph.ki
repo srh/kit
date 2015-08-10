@@ -193,8 +193,8 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
 }
 
 func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_field, out *gr_num) bool {
-  if case &Has(provaft ast_provisional_after) = &a->info {
-    if case &Has(aft ast_expr_after) = &provaft.after {
+  if case &Has(info ast_local_field_info) = &a->info {
+    if case &Has(aft ast_expr_after) = &info.after {
       // lhs needs discarding...
       return TODO();
     } else {
@@ -207,7 +207,7 @@ func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_f
 }
 
 func gr_index_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_index_expr, out *gr_num) bool {
-  if case &Has(provaft ast_provisional_after) = &a->info {
+  if case &Has(info ast_index_expr_info) = &a->info {
     rp gr_num;
     if !gr_expr_consume(cs, gr, oo(&a->rhs), &rp) {
       return false;
@@ -216,7 +216,7 @@ func gr_index_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_index_ex
     if !gr_expr(cs, gr, oo(&a->lhs), &lp) {
       return false;
     }
-    if case &Has(aft ast_expr_after) = &provaft.after {
+    if case &Has(aft ast_expr_after) = &info.after {
       // It's a pointer.
       name cell_num = ellval_cell(x);
       flat_size u32 = ref_cell(gr, name)->props.flat_size;

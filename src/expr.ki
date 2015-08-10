@@ -631,7 +631,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
           annotate_local_field(&a, {None@[ast_expr_after]()});
         }
         case ConstantField(value u32): {
-          lf_info ast_provisional_after = {None()};
+          lf_info ast_local_field_info = {None()};
           if !annotate_disposal_for_discard(es, oo(&a.lhs), &lf_info.after) {
             return false;
           }
@@ -1766,11 +1766,11 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   } else {
     // Dereferencing a pointer always makes an lvalue.
     lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props)});
-    paft ast_provisional_after = {None()};
-    if !annotate_disposal_for_consume(es, oo(&a->lhs), &paft.after) {
+    ie_info ast_index_expr_info = {None()};
+    if !annotate_disposal_for_consume(es, oo(&a->lhs), &ie_info.after) {
       return false;
     }
-    annotate_index_expr(a, paft);
+    annotate_index_expr(a, ie_info);
   }
 
   annotate_info(x, CompleteCheck(mk(lval, ~ *ixtype, props)));
