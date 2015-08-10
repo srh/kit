@@ -188,6 +188,9 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
     case &DerefField(a ast_deref_field): {
       return gr_deref_field(cs, gr, x, &a, out);
     }
+    case &TypedExpr(a ast_typed_expr): {
+      return gr_expr(cs, gr, oo(&a.expr), out);
+    }
 
     default: {
       return TODO();
