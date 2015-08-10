@@ -153,8 +153,52 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
       return gr_funcall(cs, gr, x, &a, out);
     }
 
+    case &Assignment(a ast_assignment): {
+      return gr_assignment(cs, gr, x, &a, out);
+    }
+
     default: {
       return TODO();
+    }
+  }
+}
+
+func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignment, out *gr_num) bool {
+  lp gr_num;
+  if !gr_expr(cs, gr, oo(&a->lhs), &lp) {
+    return false;
+  }
+  rp gr_num;
+  if !gr_expr(cs, gr, oo(&a->rhs), &rp) {
+    return false;
+  }
+  switch assignment_info(a) {
+    case &StaticSelfAssignment(v void): {
+      var nop = add_node(gr, node(mk_array(lp, rp), GrNop(void)));
+      *out = nop;
+      return true;
+    }
+    case &ConditionalAssignment(ci ast_conditional_assignment_info): {
+      var fc = add_node(gr, node(mk_array(), GrWriteConst({ci.comparecells.funcell, ConstDef(ci.comparecells.ip)})));
+      var dp = add_node(gr, node(mk_array(), GrAddressof({ci.comparecells.destptr, value_cell(oo(&a->lhs))})));
+      var sp = add_node(gr, node(mk_array(), GrAddressof({ci.comparecells.srcptr, value_cell(oo(&a->rhs))})));
+      var ap = add_node(gr, node(mk_array(fc, dp, sp), GrApply({ci.comparecells.funcell, mk_array(ci.comparecells.destptr, ci.comparecells.srcptr), ci.comparecells.cmp_result})));
+
+      var nop = add_node(gr, node(mk_array(), GrNop(void)));
+      var assignnop = add_node(gr, node(mk_array(), GrNop(void)));
+      assign gr_num;
+      if !gr_after_actions(cs, gr, assignnop, &ci.conditional_actions, &assign) {
+        return false;
+      }
+      cases array[tup[gr_const, gr_num]] = mk_array(cons(ConstInt(~ @[u32] 0), assign), cons(ConstInt(~ @[u32] 1), nop));
+
+      var br = add_node(gr, node(mk_array(ap), GrBranch({ci.comparecells.cmp_result, cases, None()})));
+      unc gr_num;
+      if !gr_after_actions(cs, gr, br, &ci.unconditional_actions, &unc) {
+        return false;
+      }
+      *out = unc;
+      return true;
     }
   }
 }

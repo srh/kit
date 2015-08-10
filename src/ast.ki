@@ -106,6 +106,15 @@ func annotate_assignment(a *ast_assignment, info ast_assignment_info) void {
   a->info = Has(info);
 }
 
+func assignment_info(a *ast_assignment) *ast_assignment_info {
+  if case &Has(info ast_assignment_info) = &a->info {
+    return &info;
+  } else {
+    ice(_u8("assignment_info not annotated"));
+    return fake();
+  }
+}
+
 deftype ast_addressof struct {
   rhs box[ast_expr];
 };
