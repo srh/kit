@@ -628,7 +628,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
             }
           }
           // There's no disposal, it's a real field access.
-          annotate_local_field(&a, FieldName(void));
+          annotate_local_field(&a, FieldName(offset));
         }
         case ConstantField(value u32): {
           after opt[ast_expr_after];

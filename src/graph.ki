@@ -194,12 +194,25 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
 
 func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_field, out *gr_num) bool {
   if case &Has(info ast_local_field_info) = &a->info {
+    lp gr_num;
+    if !gr_expr(cs, gr, oo(&a->lhs), &lp) {
+      return false;
+    }
     switch &info {
       case &ArrayLength(alinfo ast_arraylength_info): {
-        return TODO();
+        dp gr_num;
+        if !gr_after_actions(cs, gr, lp, &alinfo.after.actions, &dp) {
+          return false;
+        }
+        var cp = add_node(gr, node(mk_array(), GrWriteConst({rval_cell(x), ConstInt(~ alinfo.count)})));
+        var gn = add_node(gr, node(mk_array(dp, cp), GrNop(void)));
+        *out = gn;
+        return true;
       }
-      case &FieldName(v void): {
-        return TODO();
+      case &FieldName(offset u32): {
+        var gn = add_node(gr, node(mk_array(lp), GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst(offset)})));
+        *out = gn;
+        return true;
       }
     }
   } else {

@@ -286,7 +286,8 @@ deftype ast_arraylength_info struct {
 
 defenum ast_local_field_info {
   ArrayLength ast_arraylength_info;
-  FieldName void;
+  // Holds the offset.
+  FieldName u32;
 };
 
 deftype ast_local_field struct {
