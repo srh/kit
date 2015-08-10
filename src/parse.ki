@@ -995,9 +995,14 @@ func parse_rest_of_lambda(p *ps, out *ast_expr) bool {
 }
 
 func parse_rest_of_strinit(p *ps, out *ast_expr) bool {
-  params array[ast_expr_consume];
-  if !parse_rest_of_expr_list(p, RBrace(void), &params) {
+  ecs array[ast_expr_consume];
+  if !parse_rest_of_expr_list(p, RBrace(void), &ecs) {
     return Fail;
+  }
+  params array[ast_strinit_param];
+  necs size = count(&ecs);
+  for i size = 0; i < necs; i = i + 1 {
+    push(&params, {None@[ast_strinit_param_info](), get(&ecs, i)});
   }
   *out = mk(Strinit({params}));
   return true;

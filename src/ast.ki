@@ -400,9 +400,25 @@ deftype ast_typed_expr struct {
   expr box[ast_expr];
 };
 
-deftype ast_strinit struct {
-  exprs array[ast_expr_consume];
+deftype ast_strinit_param_info struct {
+  offset u32;
 };
+
+deftype ast_strinit_param struct {
+  info opt[ast_strinit_param_info];
+  ec ast_expr_consume;
+};
+
+deftype ast_strinit struct {
+  exprs array[ast_strinit_param];
+};
+
+func annotate_strinit_param(a *ast_strinit_param, info ast_strinit_param_info) void {
+  if isHas(&a->info) {
+    ice(_u8("strinit_param already annotated"));
+  }
+  a->info = Has(info);
+}
 
 // Is a non-lval an rval?  Okay.
 deftype rval_description struct {

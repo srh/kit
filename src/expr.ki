@@ -1195,17 +1195,30 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       return false;
     }
 
+    offsets array[u32];
     for i size = 0; i < n; i = i + 1 {
-      x_i *ast_expr_consume = ref(&a->exprs, i);
-      if !check_expr_consume(es, x_i, &ref(&b.fields, i)->type) {
+      x_i *ast_expr_consume = &ref(&a->exprs, i)->ec;
+      field *te_vardecl = ref(&b.fields, i);
+      if !check_expr_consume(es, x_i, &field->type) {
         return false;
       }
+      psd partial_struct_data;
+      if !compute_partial_struct_data(es->cs, es->clq, &b.fields, Has(field->name), &psd) {
+        return false;
+      }
+      check(psd.found_field);
+      push(&offsets, psd.offset);
     }
 
     // We checked is_computed(pt).
     props type_properties;
     if !compute_complete_type_properties(es->cs, es->clq, pt, &props) {
       return false;
+    }
+
+    for i size = 0; i < n; i = i + 1 {
+      p_i *ast_strinit_param = ref(&a->exprs, i);
+      annotate_strinit_param(p_i, {get(&offsets, i)});
     }
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~ *pt, props)), ~ *pt, props)));
     return true;
