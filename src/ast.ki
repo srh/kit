@@ -308,12 +308,26 @@ func annotate_local_field(a *ast_local_field, info ast_local_field_info) void {
   a->info = Has(info);
 }
 
+defenum ast_deref_field_info {
+  // The array's count.
+  DerefArrayLength u32;
+  // The field's offset.
+  DerefFieldName u32;
+};
+
 deftype ast_deref_field struct {
+  info opt[ast_deref_field_info];
   ptr_discard ast_later_discard_info;
   lhs box[ast_expr_consume];
   fieldname ast_fieldname;
 };
 
+func annotate_deref_field(a *ast_deref_field, info ast_deref_field_info) void {
+  if isHas(&a->info) {
+    ice(_u8("annotate_deref_field already annotated"));
+  }
+  a->info = Has(info);
+}
 
 deftype global_info struct {
   ent def_entry_id;

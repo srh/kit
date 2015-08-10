@@ -674,9 +674,11 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
         case InheritsLval(offset u32): {
           // We deref, so it's always an lval.
           lval = IsLvalYes({add_virtual_cell(es, fieldtype, props)});
+          annotate_deref_field(&a, DerefFieldName(offset));
         }
         case ConstantField(value u32): {
           lval = wholeRval(add_cell(es, fieldtype, props));
+          annotate_deref_field(&a, DerefArrayLength(value));
         }
       }
       annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
