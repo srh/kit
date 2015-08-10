@@ -148,19 +148,30 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
     case &StringLiteral(a ast_string_literal): {
       return gr_string_literal(cs, gr, x, &a, out);
     }
-
     case &Funcall(a ast_funcall): {
       return gr_funcall(cs, gr, x, &a, out);
     }
-
     case &Assignment(a ast_assignment): {
       return gr_assignment(cs, gr, x, &a, out);
+    }
+    case &AddressOf(a ast_addressof): {
+      return gr_address_of(cs, gr, x, &a, out);
     }
 
     default: {
       return TODO();
     }
   }
+}
+
+func gr_address_of(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_addressof, out *gr_num) bool {
+  rp gr_num;
+  if !gr_expr(cs, gr, oo(&a->rhs), &rp) {
+    return false;
+  }
+  ap gr_num = add_node(gr, node(mk_array(rp), GrAddressof({value_cell(x), lvalue_value_cell(oo(&a->rhs))})));
+  *out = ap;
+  return true;
 }
 
 func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignment, out *gr_num) bool {

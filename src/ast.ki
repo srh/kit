@@ -411,6 +411,20 @@ func isNo(x is_lval) bool {
   return false;
 }
 
+func lvalue_value_cell(x *is_lval) cell_num {
+  switch x {
+    case &IsLvalYes(desc lval_description): { return desc.num; }
+    case &IsLvalNo(desc rval_description): {
+      ice(_u8("lvalue_value_cell expects lvalue"));
+      return fake();
+    }
+  }
+}
+
+func lvalue_value_cell(a *ast_expr) cell_num {
+  return lvalue_value_cell(&expr_complete_info(a)->lval);
+}
+
 // Where the value of the expr is, _before_ after actions are run.
 func value_cell(x *is_lval) cell_num {
   switch x {
