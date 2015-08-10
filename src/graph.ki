@@ -14,6 +14,10 @@ func add_node(gr *frame_graph, node gr_node) gr_num {
   return ret;
 }
 
+func ref_cell(gr *frame_graph, c cell_num) *cell_info {
+  return ref(&gr->cells, c.~);
+}
+
 // To "evaluate" an op, first we evaluate its precs (in unspecified order), then we ealuate the op.
 deftype gr_node struct {
   precs array[gr_num];
@@ -30,6 +34,7 @@ defenum gr_op {
   GrWriteConst gr_writeconst;
   GrAddressof gr_addressof;
   GrDeref gr_deref;
+  GrSubcell gr_subcell;
   GrStrinit gr_strinit;
   GrBranch gr_branch;
   GrSequence gr_sequence;
@@ -56,6 +61,12 @@ deftype gr_addressof struct {
 deftype gr_deref struct {
   name cell_num;
   pointer cell_num;
+  offset gr_offset;
+};
+
+deftype gr_subcell struct {
+  name cell_num;
+  partof cell_num;
   offset gr_offset;
 };
 
@@ -96,21 +107,25 @@ defenum gr_const {
 };
 
 func gr_expr_consume(cs *checkstate, gr *frame_graph, x *ast_expr_consume, out *gr_num) bool {
-  expr_gn gr_num;
-  if !gr_expr(cs, gr, &x->expr, &expr_gn) {
-    return false;
-  }
   if case &Has(aft ast_expr_after) = &x->after {
-    after_gn gr_num;
-    if !gr_after_actions(cs, gr, expr_gn, &aft.actions, &after_gn) {
-      return false;
-    }
-    *out = after_gn;
-    return true;
+    return gr_expr_and_consume(cs, gr, &x->expr, &aft, out);
   } else {
     ice(_u8("gr_expr_consume missing after"));
     return fake();
   }
+}
+
+func gr_expr_and_consume(cs *checkstate, gr *frame_graph, x *ast_expr, aft *ast_expr_after, out *gr_num) bool {
+  expr_gn gr_num;
+  if !gr_expr(cs, gr, x, &expr_gn) {
+    return false;
+  }
+  after_gn gr_num;
+  if !gr_after_actions(cs, gr, expr_gn, &aft->actions, &after_gn) {
+    return false;
+  }
+  *out = after_gn;
+  return true;
 }
 
 func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
@@ -161,10 +176,67 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
     case &Deref(a ast_deref): {
       return gr_mk_deref(cs, gr, x, &a, out);
     }
+    case &IndexExpr(a ast_index_expr): {
+      return gr_index_expr(cs, gr, x, &a, out);
+    }
+    case &Lambda(a ast_lambda): {
+      return TODO();
+    }
+    case &LocalField(a ast_local_field): {
+      return gr_local_field(cs, gr, x, &a, out);
+    }
 
     default: {
       return TODO();
     }
+  }
+}
+
+func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_field, out *gr_num) bool {
+  if case &Has(provaft ast_provisional_after) = &a->info {
+    if case &Has(aft ast_expr_after) = &provaft.after {
+      // lhs needs discarding...
+      return TODO();
+    } else {
+      return TODO();
+    }
+  } else {
+    ice(_u8("ast_local_field missing info"));
+    return fake();
+  }
+}
+
+func gr_index_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_index_expr, out *gr_num) bool {
+  if case &Has(provaft ast_provisional_after) = &a->info {
+    rp gr_num;
+    if !gr_expr_consume(cs, gr, oo(&a->rhs), &rp) {
+      return false;
+    }
+    lp gr_num;
+    if !gr_expr(cs, gr, oo(&a->lhs), &lp) {
+      return false;
+    }
+    if case &Has(aft ast_expr_after) = &provaft.after {
+      // It's a pointer.
+      name cell_num = ellval_cell(x);
+      flat_size u32 = ref_cell(gr, name)->props.flat_size;
+      var gp = add_node(gr, node(mk_array(rp, lp), GrDeref({name, result_cell(&aft), OffsetComputed(cons(flat_size, result_cell(oo(&a->rhs))))})));
+      gn gr_num;
+      if !gr_after_actions(cs, gr, gp, &aft.actions, &gn) {
+        return false;
+      }
+      *out = gn;
+      return true;
+    } else {
+      name cell_num = value_cell(x);
+      flat_size u32 = ref_cell(gr, name)->props.flat_size;
+      var gp = add_node(gr, node(mk_array(rp, lp), GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed(cons(flat_size, result_cell(oo(&a->rhs))))})));
+      *out = gp;
+      return true;
+    }
+  } else {
+    ice(_u8("gr_index_expr sees unannotated ast_index_expr"));
+    return fake();
   }
 }
 
@@ -173,7 +245,7 @@ func gr_mk_deref(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_deref, out
   if !gr_expr_consume(cs, gr, oo(&a->rhs), &rp) {
     return false;
   }
-  var dp = add_node(gr, node(mk_array(rp), GrDeref({rval_cell(x), result_cell(oo(&a->rhs)), OffsetConst(0)})));
+  var dp = add_node(gr, node(mk_array(rp), GrDeref({ellval_cell(x), result_cell(oo(&a->rhs)), OffsetConst(0)})));
   *out = dp;
   return true;
 }

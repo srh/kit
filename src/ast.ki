@@ -279,7 +279,7 @@ defenum ast_fieldname {
 };
 
 deftype ast_provisional_after struct {
-  // isHas if the lhs needs discarding (for a constant .length field).
+  // isHas if the lhs needs discarding (for a constant .length field in ast_local_field, ptr in ast_index_expr).
   after opt[ast_expr_after];
 };
 
