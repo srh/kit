@@ -1,6 +1,7 @@
 import check;
 
 deftype frame_graph struct {
+  cells array[cell_info];
   ops array[gr_node];
 };
 
