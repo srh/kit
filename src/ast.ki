@@ -413,6 +413,15 @@ deftype ast_strinit struct {
   exprs array[ast_strinit_param];
 };
 
+func strinit_param_info(a *ast_strinit_param) *ast_strinit_param_info {
+  if case &Has(info ast_strinit_param_info) = &a->info {
+    return &info;
+  } else {
+    ice(_u8("ast_strinit_param_info not annotated"));
+    return fake();
+  }
+}
+
 func annotate_strinit_param(a *ast_strinit_param, info ast_strinit_param_info) void {
   if isHas(&a->info) {
     ice(_u8("strinit_param already annotated"));
