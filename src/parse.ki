@@ -682,13 +682,13 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, lhs ast_expr, out *ast_expr) b
       }
       lhs = mk(LocalField(mk(embox(lhs), NameField(fieldname))));
     } else if try_skip_oper(p, '-', '>', '~') {
-      lhs = mk(DerefField({embox(consume(lhs)), WholeField(void)}));
+      lhs = mk(DerefField({mk_later(), embox(consume(lhs)), WholeField(void)}));
     } else if try_skip_oper(p, '-', '>') {
       fieldname ast_ident;
       if !parse_ident(p, &fieldname) {
         return Fail;
       }
-      lhs = mk(DerefField({embox(consume(lhs)), NameField(fieldname)}));
+      lhs = mk(DerefField({mk_later(), embox(consume(lhs)), NameField(fieldname)}));
     } else if is_binop(peek(p).val) {
       op tok = peek(p);
       op_prec prec_pair = binop_prec(op.val);
@@ -792,7 +792,7 @@ func build_unop_expr(im *identmap, op ast_ident, rhs ast_expr) ast_expr {
   if op.value == im->cym.addressofsym {
     return mk(AddressOf({embox(rhs)}));
   } else if op.value == im->cym.derefsym {
-    return mk(Deref({embox(consume(rhs))}));
+    return mk(Deref({mk_later(), embox(consume(rhs))}));
   } else {
     return mk(Funcall({embox(consume(mk(NameExpr(mk(op, None()))))), mk_array(consume(rhs))}));
   }

@@ -578,7 +578,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
         return false;
       }
       // Seems like no point to allowing an incomplete rhs.
-      if !check_expr_consume(es, oo(&a.rhs), &ptr_cac.te) {
+      if !check_consume_then_discard_expr(es, oo(&a.rhs), &ptr_cac.te, &a.ptr_discard) {
         return false;
       }
       param *te_typeexpr;
@@ -650,7 +650,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
     case &DerefField(a ast_deref_field): {
       // The fact that our partial type isn't a pointer type is deliberate.
       unknown te_typeexpr = TeUnknown(void);
-      if !check_expr_consume(es, oo(&a.lhs), &unknown) {
+      if !check_consume_then_discard_expr(es, oo(&a.lhs), &unknown, &a.ptr_discard) {
         return false;
       }
       info *ast_expr_complete_info = expr_complete_info(&oo(&a.lhs)->expr);

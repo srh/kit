@@ -120,6 +120,7 @@ deftype ast_addressof struct {
 };
 
 deftype ast_deref struct {
+  ptr_discard ast_later_discard_info;
   rhs box[ast_expr_consume];
 };
 
@@ -308,6 +309,7 @@ func annotate_local_field(a *ast_local_field, info ast_local_field_info) void {
 }
 
 deftype ast_deref_field struct {
+  ptr_discard ast_later_discard_info;
   lhs box[ast_expr_consume];
   fieldname ast_fieldname;
 };

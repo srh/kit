@@ -185,11 +185,18 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
     case &LocalField(a ast_local_field): {
       return gr_local_field(cs, gr, x, &a, out);
     }
+    case &DerefField(a ast_deref_field): {
+      return gr_deref_field(cs, gr, x, &a, out);
+    }
 
     default: {
       return TODO();
     }
   }
+}
+
+func gr_deref_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_deref_field, out *gr_num) bool {
+  return TODO();
 }
 
 func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_field, out *gr_num) bool {
@@ -261,7 +268,15 @@ func gr_mk_deref(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_deref, out
     return false;
   }
   var dp = add_node(gr, node(mk_array(rp), GrDeref({ellval_cell(x), result_cell(oo(&a->rhs)), OffsetConst(0)})));
-  *out = dp;
+  gn gr_num;
+  if case &Has(da destroy_action) = &a->ptr_discard.action {
+    ap gr_num;
+    if !gr_destroy_action(cs, gr, &da, &ap) {
+      return false;
+    }
+    gn = add_node(gr, node(mk_array(), GrSequence({dp, ap})));
+  }
+  *out = gn;
   return true;
 }
 
@@ -431,22 +446,26 @@ func gr_after_action(cs *checkstate, gr *frame_graph, x *after_action, out *gr_n
       return true;
     }
     case &DestroyAfter(da destroy_action): {
-      switch &da.ctor {
-        case &UniTrivialCtor(v void): {
-          var dp = add_node(gr, node(mk_array(), GrDead({da.arg})));
-          *out = dp;
-          return true;
-        }
-        case &UniFunCtor(desc uni_fun_ctor_desc): {
-          var fc = add_node(gr, node(mk_array(), GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
-          var arp = add_node(gr, node(mk_array(), GrAddressof({desc.argptr, da.arg})));
-          var ap = add_node(gr, node(mk_array(fc, arp), GrApply({desc.funcell, mk_array(desc.argptr), desc.retvoid})));
-          var deadret = add_node(gr, node(mk_array(ap), GrDead({desc.retvoid})));
-          var dp = add_node(gr, node(mk_array(deadret), GrDead({da.arg})));
-          *out = dp;
-          return true;
-        }
-      }
+      return gr_destroy_action(cs, gr, &da, out);
+    }
+  }
+}
+
+func gr_destroy_action(cs *checkstate, gr *frame_graph, x *destroy_action, out *gr_num) bool {
+  switch &x->ctor {
+    case &UniTrivialCtor(v void): {
+      var dp = add_node(gr, node(mk_array(), GrDead({x->arg})));
+      *out = dp;
+      return true;
+    }
+    case &UniFunCtor(desc uni_fun_ctor_desc): {
+      var fc = add_node(gr, node(mk_array(), GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
+      var arp = add_node(gr, node(mk_array(), GrAddressof({desc.argptr, x->arg})));
+      var ap = add_node(gr, node(mk_array(fc, arp), GrApply({desc.funcell, mk_array(desc.argptr), desc.retvoid})));
+      var deadret = add_node(gr, node(mk_array(ap), GrDead({desc.retvoid})));
+      var dp = add_node(gr, node(mk_array(deadret), GrDead({x->arg})));
+      *out = dp;
+      return true;
     }
   }
 }
