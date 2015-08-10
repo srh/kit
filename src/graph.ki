@@ -155,7 +155,10 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
       return gr_assignment(cs, gr, x, &a, out);
     }
     case &AddressOf(a ast_addressof): {
-      return gr_address_of(cs, gr, x, &a, out);
+      return gr_mk_addressof(cs, gr, x, &a, out);
+    }
+    case &Deref(a ast_deref): {
+      return gr_mk_deref(cs, gr, x, &a, out);
     }
 
     default: {
@@ -164,12 +167,22 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
   }
 }
 
-func gr_address_of(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_addressof, out *gr_num) bool {
+func gr_mk_deref(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_deref, out *gr_num) bool {
+  rp gr_num;
+  if !gr_expr_consume(cs, gr, oo(&a->rhs), &rp) {
+    return false;
+  }
+  var dp = add_node(gr, node(mk_array(rp), GrDeref({rval_cell(x), result_cell(oo(&a->rhs)), OffsetConst(0)})));
+  *out = dp;
+  return true;
+}
+
+func gr_mk_addressof(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_addressof, out *gr_num) bool {
   rp gr_num;
   if !gr_expr(cs, gr, oo(&a->rhs), &rp) {
     return false;
   }
-  ap gr_num = add_node(gr, node(mk_array(rp), GrAddressof({value_cell(x), lvalue_value_cell(oo(&a->rhs))})));
+  ap gr_num = add_node(gr, node(mk_array(rp), GrAddressof({rval_cell(x), ellval_cell(oo(&a->rhs))})));
   *out = ap;
   return true;
 }
@@ -271,6 +284,20 @@ func gr_name_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_name_expr
       return TODO();
     }
   }
+}
+
+func ellval_cell(x *is_lval) cell_num {
+  switch x {
+    case &IsLvalYes(desc lval_description): { return desc.num; }
+    case &IsLvalNo(desc rval_description): {
+      ice(_u8("lvalue_value_cell expects lvalue"));
+      return fake();
+    }
+  }
+}
+
+func ellval_cell(a *ast_expr) cell_num {
+  return ellval_cell(&expr_complete_info(a)->lval);
 }
 
 func rval_cell(x *ast_expr) cell_num {
