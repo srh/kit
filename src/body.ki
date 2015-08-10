@@ -148,13 +148,18 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
         return false;
       }
       cu_computed cu_typeexpr;
+      cu_props type_properties;
+
       complete_type *cu_typeexpr;
+      props *type_properties;
       note_initter bool;
       if case &Has(x box[ast_expr_consume]) = &b.rhs {
         if !check_expr_consume(&bs->es, oo(&x), &computed.te) {
           return false;
         }
-        complete_type = expr_complete_type(&oo(&x)->expr);
+        info *ast_expr_complete_info = expr_complete_info(&oo(&x)->expr);
+        complete_type = &info->cu;
+        props = &info->cu_props;
         note_initter = false;
       } else {
         if !computed.complete {
@@ -163,10 +168,14 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
         }
         cu_computed = ~computed.te;
         complete_type = &cu_computed;
+        if !compute_type_properties(bs->cs, bs->clq, complete_type, &cu_props) {
+          return false;
+        }
+        props = &cu_props;
         note_initter = true;
       }
 
-      cell cell_num = add_flex_cell(&bs->es, *complete_type);
+      cell cell_num = add_flex_cell(&bs->es, *complete_type, *props);
 
       vn var_number;
       if !ds_push_var(bs->ds, vp, cell, &b.decl.name, complete_type, AutoInitYes(void), &vn) {
@@ -341,7 +350,11 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
               case_vp varpopper;
               init_vp(&case_vp, bs->ds);
               cu_expected_type cu_typeexpr = ~ *expected_type;
-              cell cell_num = add_virtual_cell(&bs->es, cu_expected_type);
+              expected_type_props type_properties;
+              if !compute_type_properties(bs->cs, bs->clq, &cu_expected_type, &expected_type_props) {
+                return false;
+              }
+              cell cell_num = add_virtual_cell(&bs->es, cu_expected_type, expected_type_props);
               vn var_number;
               // Can't auto-initialize bound case variables, be the switch be over a pointer or not.
               if !ds_push_var(bs->ds, &case_vp, cell, &patt.decl.name, &cu_expected_type, AutoInitNo(void), &vn) {
@@ -474,7 +487,11 @@ func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later
         }
 
         cu_expected_type cu_typeexpr = ~ *expected_type;
-        cell cell_num = add_virtual_cell(es, cu_expected_type);
+        expected_type_props type_properties;
+        if !compute_type_properties(es->cs, es->clq, &cu_expected_type, &expected_type_props) {
+          return false;
+        }
+        cell cell_num = add_virtual_cell(es, cu_expected_type, expected_type_props);
         vn var_number;
         if !ds_push_var(es->ds, cond_vp, cell, &b.pattern.decl.name, &cu_expected_type, AutoInitNo(void), &vn) {
           return false;
