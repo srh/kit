@@ -264,9 +264,23 @@ deftype ast_switch_case struct {
   body ast_bracebody;
 };
 
+deftype ast_fullbody_info struct {
+  gotos array[goto_info];
+  labels array[label_info];
+  statements array[statement_info];
+};
+
 deftype ast_fullbody struct {
+  info opt[ast_fullbody_info];
   bb ast_bracebody;
 };
+
+func annotate_fullbody(a *ast_fullbody, info ast_fullbody_info) void {
+  if isHas(&a->info) {
+    ice(_u8("annotate_fullbody sees already annotated"));
+  }
+  a->info = Has(info);
+}
 
 deftype ast_lambda struct {
   args array[ast_vardecl];

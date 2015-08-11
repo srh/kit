@@ -106,6 +106,60 @@ defenum gr_const {
   ConstBytes array[u8];
 };
 
+func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) bool {
+  if !gr_bracebody(cs, gr, &x->bb, out) {
+    return false;
+  }
+  return true;
+}
+
+func gr_bracebody(cs *checkstate, gr *frame_graph, x *ast_bracebody, out *gr_num) bool {
+  var bn = add_node(gr, node(mk_array(), GrNop(void)));
+  n size = count(&x->statements);
+  for i size = n; i > 0; {
+    i = i - 1;
+    sn gr_num;
+    if !gr_statement(cs, gr, ref(&x->statements, i), &sn) {
+      return false;
+    }
+    bn = add_node(gr, node(mk_array(), GrSequence({sn, bn})));
+  }
+  *out = bn;
+  return true;
+}
+
+func gr_statement(cs *checkstate, gr *frame_graph, x *ast_statement, out *gr_num) bool {
+  switch x {
+    case &Expr(a ast_expr_discard): {
+      return gr_expr_discard(cs, gr, &a, out);
+    }
+    case &Return(a ast_return_statement): {
+      return TODO();
+    }
+    default: {
+      return TODO();
+    }
+  }
+}
+
+func gr_expr_discard(cs *checkstate, gr *frame_graph, x *ast_expr_discard, out *gr_num) bool {
+  if case &Has(aft ast_expr_after) = &x->after {
+    dp gr_num;
+    if !gr_expr(cs, gr, &x->expr, &dp) {
+      return false;
+    }
+    after_gn gr_num;
+    if !gr_after_actions(cs, gr, dp, &aft.actions, &after_gn) {
+      return false;
+    }
+    *out = after_gn;
+    return true;
+  } else {
+    ice(_u8("gr_expr_discard missing annotation"));
+    return fake();
+  }
+}
+
 func gr_expr_consume(cs *checkstate, gr *frame_graph, x *ast_expr_consume, out *gr_num) bool {
   if case &Has(aft ast_expr_after) = &x->after {
     return gr_expr_and_consume(cs, gr, &x->expr, &aft, out);

@@ -1290,6 +1290,8 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
       if !finish_lambda_body(&bs, ee) {
         return false;
       }
+      info ast_fullbody_info = {bs.gotos, bs.labels, bs.statements};
+      annotate_fullbody(&a->body, info);
     }
   }
 

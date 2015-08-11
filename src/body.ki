@@ -21,6 +21,7 @@ deftype label_info struct {
 };
 
 deftype statement_info struct {
+  // TODO: Nobody uses st.
   st opt[*ast_statement];
   incoming array[statement_num];
   outgoing array[statement_num];
