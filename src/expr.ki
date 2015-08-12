@@ -37,11 +37,17 @@ deftype framescope struct {
   // Same as ds->clq.
   clq *clqueue;
 
+  all_vars array[var_info];
+
+  // These var_numbers are always in increasing order.
+  current_vars array[var_number];
+
   cells array[cell_info];
 };
 
 func mk(ds *defscope) framescope {
-  return {ds, ds->cs, ds->im, ds->clq, mk_array@[cell_info]()};
+  return {ds, ds->cs, ds->im, ds->clq,
+          mk_array@[var_info](), mk_array@[var_number](), mk_array@[cell_info]()};
 }
 
 deftype cell_num size;
@@ -101,11 +107,6 @@ deftype defscope struct {
   // Generics and their _complete_ replacements.
   generics *ast_generics;
   parms *cu_genparms;
-
-  all_vars array[var_info];
-
-  // These var_numbers are always in increasing order.
-  current_vars array[var_number];
 };
 
 deftype var_number size;
@@ -139,12 +140,12 @@ deftype var_info struct {
   destroyer opt[ctor_desc];
 };
 
-func ref_var(ds *defscope, num var_number) *var_info {
-  return ref(&ds->all_vars, num.~);
+func ref_var(es *framescope, num var_number) *var_info {
+  return ref(&es->all_vars, num.~);
 }
 
-func vars_in_scope(ds *defscope) array[var_number] {
-  return ds->current_vars;
+func vars_in_scope(es *framescope) array[var_number] {
+  return es->current_vars;
 }
 
 
@@ -158,53 +159,53 @@ func `==`(x allow_incomplete, y allow_incomplete) bool {
 }
 
 defclass move varpopper struct {
-  ds *defscope;
+  es *framescope;
   nums array[var_number];
 };
 
 access varpopper {
 
 func do_init(vp *varpopper) void {
-  init(&vp->ds);
+  init(&vp->es);
   init(&vp->nums);
 }
 
-func init_vp(vp *varpopper, ds *defscope) void {
-  check(vp->ds == null);
-  vp->ds = ds;
+func init_vp(vp *varpopper, es *framescope) void {
+  check(vp->es == null);
+  vp->es = es;
 }
 
 func do_destroy(vp *varpopper) void {
-  if vp->ds != null {
+  if vp->es != null {
     descope_vars(vp);
   }
   destroy(&vp->nums);
-  vp->ds = null;
+  vp->es = null;
 }
 
-func ds_push_var(ds *defscope, vp *varpopper, cell cell_num, name *ast_ident, computed_type *cu_typeexpr, autoinit var_autoinit, vn_out *var_number) bool {
-  if case Has(num var_number) = ds_find_current_local(ds, name->value) {
-    ERR(_u8("Local variable '"), lookup(ds->im, name->value), _u8("' shadows another"));
+func es_push_var(es *framescope, vp *varpopper, cell cell_num, name *ast_ident, computed_type *cu_typeexpr, autoinit var_autoinit, vn_out *var_number) bool {
+  if case Has(num var_number) = es_find_current_local(es, name->value) {
+    ERR(_u8("Local variable '"), lookup(es->im, name->value), _u8("' shadows another"));
     return false;
   }
   props type_properties;
-  if !compute_type_properties(ds->cs, ds->clq, computed_type, &props) {
+  if !compute_type_properties(es->cs, es->clq, computed_type, &props) {
     return false;
   }
-  num var_number = ~count(&ds->all_vars);
-  push(&ds->all_vars, {num, *computed_type, props, cell, name->value, autoinit, None(), None()});
-  push(&ds->current_vars, num);
+  num var_number = ~count(&es->all_vars);
+  push(&es->all_vars, {num, *computed_type, props, cell, name->value, autoinit, None(), None()});
+  push(&es->current_vars, num);
   push(&vp->nums, num);
   *vn_out = num;
   return true;
 }
 
 func descope_vars(vp *varpopper) void {
-  ds *defscope = vp->ds;
-  check(ds != null);
+  es *framescope = vp->es;
+  check(es != null);
   while case Has(expected var_number) = popval(&vp->nums) {
     num var_number;
-    if !popval(&ds->current_vars, &num) {
+    if !popval(&es->current_vars, &num) {
       ice(_u8("varpopper sees empty local_vars"));
     }
     if num != expected {
@@ -216,50 +217,50 @@ func descope_vars(vp *varpopper) void {
 }  // access varpopper
 
 defclass varsaver struct {
-  ds *defscope;
+  es *framescope;
   current_vars array[var_number];
 };
 
 access varsaver {
 func do_init(vp *varsaver) void {
-  init(&vp->ds);
+  init(&vp->es);
   init(&vp->current_vars);
 }
-func save_and_wipe_current_vars(vp *varsaver, ds *defscope) void {
-  check(vp->ds == null);
-  vp->ds = ds;
-  vp->current_vars = ds->current_vars;
-  ds->current_vars = mk_array();
+func save_and_wipe_current_vars(vp *varsaver, es *framescope) void {
+  check(vp->es == null);
+  vp->es = es;
+  vp->current_vars = es->current_vars;
+  es->current_vars = mk_array();
 }
 func do_destroy(vp *varsaver) void {
-  if vp->ds != null {
-    vp->ds->current_vars = vp->current_vars;
+  if vp->es != null {
+    vp->es->current_vars = vp->current_vars;
   }
   destroy(&vp->current_vars);
-  vp->ds = null;
+  vp->es = null;
 }
 }
 
-func ds_note_var_initter(ds *defscope, vn var_number) bool {
-  info *var_info = ref_var(ds, vn);
+func es_note_var_initter(es *framescope, vn var_number) bool {
+  info *var_info = ref_var(es, vn);
   if case &Has(desc ctor_desc) = &info->initter {
     return true;
   }
   desc ctor_desc;
-  if !get_init_ctor(ds, &info->type, &desc) {
+  if !get_init_ctor(es->ds, &info->type, &desc) {
     return false;
   }
   info->initter = Has(desc);
   return true;
 }
 
-func ds_note_var_destroyer(ds *defscope, vn var_number) bool {
-  info *var_info = ref_var(ds, vn);
+func es_note_var_destroyer(es *framescope, vn var_number) bool {
+  info *var_info = ref_var(es, vn);
   if case &Has(desc ctor_desc) = &info->destroyer {
     return true;
   }
   desc ctor_desc;
-  if !get_destroy_ctor(ds, &info->type, &desc) {
+  if !get_destroy_ctor(es->ds, &info->type, &desc) {
     return false;
   }
   info->destroyer = Has(desc);
@@ -267,7 +268,7 @@ func ds_note_var_destroyer(ds *defscope, vn var_number) bool {
 }
 
 func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr_consume, pt *te_typeexpr, frame_info_out *frame_info) bool {
-  ds defscope = {cs, cs->im, clq, accessible, g, parms, default@[array[var_info]](), default@[array[var_number]]()};
+  ds defscope = {cs, cs->im, clq, accessible, g, parms};
   es framescope = mk(&ds);
   if !check_expr_consume(&es, x, pt) {
     return false;
@@ -377,13 +378,13 @@ defenum es_match_res {
   OneEnumConstructorMatch constructor_info;
 };
 
-func ds_lookup_name(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_match_res) bool {
+func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_match_res) bool {
   if case &NoParms(v void) = gp {
-    if case Has(num var_number) = ds_find_current_local(ds, name) {
+    if case Has(num var_number) = es_find_current_local(es, name) {
       type te_typeexpr;
-      vartype *cu_typeexpr = &ref_var(ds, num)->type;
+      vartype *cu_typeexpr = &ref_var(es, num)->type;
       if !unify_types(pt, &vartype->~, &type) {
-        ERR(_u8("local '"), lookup(ds->im, name), _u8("' has wrong type: '"), to_u8str(ds->im, *vartype), _u8("' where '"), to_u8str(ds->im, *pt), _u8("' expected"));
+        ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"), to_u8str(es->im, *vartype), _u8("' where '"), to_u8str(es->im, *pt), _u8("' expected"));
         return false;
       }
       *res_out = OneLocalMatch({num});
@@ -392,14 +393,14 @@ func ds_lookup_name(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_o
   }
 
   res match_def_res;
-  if !match_def(ds->cs, name, gp, pt, &res) {
+  if !match_def(es->cs, name, gp, pt, &res) {
     return false;
   }
 
   switch &res {
     case &NoMatch(v void): {
       constructor_res ds_constructor_res;
-      if !ds_lookup_constructor(ds, name, gp, pt, &constructor_res) {
+      if !ds_lookup_constructor(es->ds, name, gp, pt, &constructor_res) {
         return false;
       }
       switch &constructor_res {
@@ -421,7 +422,7 @@ func ds_lookup_name(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_o
     }
     case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
       inst_id def_inst_id;
-      if !make_inst(ds->cs, ds->clq, m.ent, &m.parms, &inst_id) {
+      if !make_inst(es->cs, es->clq, m.ent, &m.parms, &inst_id) {
         return false;
       }
       *res_out = OneGlobalMatch({m.ent, inst_id});
@@ -430,11 +431,11 @@ func ds_lookup_name(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_o
   }
 }
 
-func ds_find_current_local(ds *defscope, name sym) opt[var_number] {
-  n size = count(&ds->current_vars);
+func es_find_current_local(es *framescope, name sym) opt[var_number] {
+  n size = count(&es->current_vars);
   for i size = 0; i < n; i = i + 1 {
-    num var_number = get(&ds->current_vars, i);
-    inf *var_info = ref_var(ds, num);
+    num var_number = get(&es->current_vars, i);
+    inf *var_info = ref_var(es, num);
     if inf->name == name {
       return Has(num);
     }
@@ -1106,7 +1107,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     return false;
   }
   match_res es_match_res;
-  if !ds_lookup_name(es->ds, a->ident.value, &parms, pt, &match_res) {
+  if !es_lookup_name(es, a->ident.value, &parms, pt, &match_res) {
     return false;
   }
   switch &match_res {
@@ -1144,7 +1145,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     }
     case &OneLocalMatch(v local_info): {
       annotate_name_info(a, LocalResolve({v.varnum}));
-      vi *var_info = ref_var(es->ds, v.varnum);
+      vi *var_info = ref_var(es, v.varnum);
       annotate_info(x, CompleteCheck(mk(IsLvalYes({vi->cell}), vi->type, vi->props)));
       return true;
     }
@@ -1254,17 +1255,13 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
     ice(_u8("lambda type is not a function type"));
   }
 
-  // Lambdas can't capture variables (yet).
-  vs varsaver;
-  save_and_wipe_current_vars(&vs, es->ds);
-
   if true {
     nargs size = count(&a->args);
     return_type cu_typeexpr = ~get(computed_params, nargs);
     bs bodystate = mk(es->ds, &return_type);
 
     vp varpopper;
-    init_vp(&vp, es->ds);
+    init_vp(&vp, &bs.es);
     for i size = 0; i < nargs; i = i + 1 {
       cu_param cu_typeexpr = ~get(computed_params, i);
       cu_param_props type_properties;
@@ -1274,10 +1271,10 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
       cell cell_num = add_rigid_cell(&bs.es, cu_param, cu_param_props);
       vn var_number;
       // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
-      if !ds_push_var(es->ds, &vp, cell, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {
+      if !es_push_var(&bs.es, &vp, cell, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {
         return false;
       }
-      if !ds_note_var_destroyer(es->ds, vn) {
+      if !es_note_var_destroyer(&bs.es, vn) {
         return false;
       }
     }
