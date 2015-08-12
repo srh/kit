@@ -106,20 +106,29 @@ defenum gr_const {
   ConstBytes array[u8];
 };
 
+deftype fullbody_state struct {
+  // TODO: This is disconcerting because fb->info->cells is a copy of gr->cells.
+  info *ast_fullbody_info;
+  exit_node gr_num;
+};
+
 func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) bool {
-  if !gr_bracebody(cs, gr, &x->bb, out) {
+  fb fullbody_state;
+  fb.info = unHas(&x->info);
+  fb.exit_node = add_node(gr, node(mk_array(), GrNop(void)));
+  if !gr_bracebody(cs, gr, &fb, &x->bb, out) {
     return false;
   }
   return true;
 }
 
-func gr_bracebody(cs *checkstate, gr *frame_graph, x *ast_bracebody, out *gr_num) bool {
+func gr_bracebody(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_bracebody, out *gr_num) bool {
   var bn = add_node(gr, node(mk_array(), GrNop(void)));
   n size = count(&x->statements);
   for i size = n; i > 0; {
     i = i - 1;
     sn gr_num;
-    if !gr_statement(cs, gr, ref(&x->statements, i), &sn) {
+    if !gr_statement(cs, gr, fb, ref(&x->statements, i), &sn) {
       return false;
     }
     bn = add_node(gr, node(mk_array(), GrSequence({sn, bn})));
@@ -128,18 +137,49 @@ func gr_bracebody(cs *checkstate, gr *frame_graph, x *ast_bracebody, out *gr_num
   return true;
 }
 
-func gr_statement(cs *checkstate, gr *frame_graph, x *ast_statement, out *gr_num) bool {
+func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_statement, out *gr_num) bool {
   switch x {
     case &Expr(a ast_expr_discard): {
       return gr_expr_discard(cs, gr, &a, out);
     }
     case &Return(a ast_return_statement): {
-      return TODO();
+      // TODO: The return exprs aren't exactly writing to the same return location cell -- a canonical one doesn't exist yet.  (Ternary operators would also have this problem.)
+      gn gr_num;
+      if case &Has(b box[ast_expr_consume]) = &a.expr {
+        if !gr_expr_consume(cs, gr, oo(&b), &gn) {
+          return false;
+        }
+      } else {
+        // TODO: Maybe we'll need to mark the return_cell initialized, when it exists.
+        gn = add_node(gr, node(mk_array(), GrNop(void)));
+      }
+      info *ast_return_statement_info = unHas(&a.info);
+      uw gr_num;
+      if !gr_unwind_vars(cs, gr, fb, &info->destructions, &uw) {
+        return false;
+      }
+      var sn = add_node(gr, node(mk_array(), GrSequence({gn, uw})));
+      *out = sn;
+      return true;
     }
     default: {
       return TODO();
     }
   }
+}
+
+func gr_unwind_vars(cs *checkstate, gr *frame_graph, fb *fullbody_state, destructions *array[destroy_action], out *gr_num) bool {
+  bn gr_num = fb->exit_node;
+  n size = count(destructions);
+  for i size = 0; i < n; i = i + 1 {
+    gn gr_num;
+    if !gr_destroy_action(cs, gr, ref(destructions, i), &gn) {
+      return false;
+    }
+    bn = add_node(gr, node(mk_array(), GrSequence({gn, bn})));
+  }
+  *out = bn;
+  return true;
 }
 
 func gr_expr_discard(cs *checkstate, gr *frame_graph, x *ast_expr_discard, out *gr_num) bool {

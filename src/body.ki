@@ -134,6 +134,19 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
           return false;
         }
       }
+      vars array[var_number] = vars_in_scope(&bs->es);
+      destructions array[destroy_action];
+      nvars size = count(&vars);
+      for i size = 0; i < nvars; i = i + 1 {
+        vi *var_info = ref_var(&bs->es, get(&vars, i));
+        destroy uni_ctor_desc;
+        if !get_destroy_uni_ctor(&bs->es, &vi->type, &destroy) {
+          return false;
+        }
+        da destroy_action = {destroy, vi->cell};
+        push(&destructions, da);
+      }
+      set(&b.info, {vars_in_scope(&bs->es), destructions});
       *ee_out = {num, add_statement(bs, None())};
     }
 

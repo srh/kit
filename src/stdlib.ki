@@ -153,6 +153,15 @@ func[T] isNone(p *opt[T]) bool {
   return false;
 }
 
+// TODO: Replace all uses of this (with better errors).
+func[T] unHas(p *opt[T]) *T {
+  if case &Has(t T) = p {
+    return &t;
+  }
+  crash(_u8("unHas sees None()"));
+  return fake();
+}
+
 func[T] `==`(x opt[T], y opt[T]) bool {
   switch &x {
     case &None(v): {

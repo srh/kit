@@ -1303,7 +1303,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *array
     if !finish_lambda_body(bs, ee) {
       return false;
     }
-    info ast_fullbody_info = {bs->gotos, bs->labels, bs->statements};
+    info ast_fullbody_info = {bs->es.all_vars, bs->es.cells, bs->gotos, bs->labels, bs->statements};
     annotate_fullbody(&a->body, info);
   }
 

@@ -222,7 +222,14 @@ deftype ast_switch_statement struct {
   cases array[ast_switch_case];
 };
 
+deftype ast_return_statement_info struct {
+  // TODO: Nothing uses in_scope.
+  in_scope array[var_number];
+  destructions array[destroy_action];
+};
+
 deftype ast_return_statement struct {
+  info opt[ast_return_statement_info];
   // If no expr, it returns void.
   expr opt[box[ast_expr_consume]];
 };
@@ -265,6 +272,9 @@ deftype ast_switch_case struct {
 };
 
 deftype ast_fullbody_info struct {
+  all_vars array[var_info];
+  cells array[cell_info];
+
   gotos array[goto_info];
   labels array[label_info];
   statements array[statement_info];
