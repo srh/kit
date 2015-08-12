@@ -1259,36 +1259,8 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
     nargs size = count(&a->args);
     return_type cu_typeexpr = ~get(computed_params, nargs);
     bs bodystate = mk(es->ds, &return_type);
-
-    vp varpopper;
-    init_vp(&vp, &bs.es);
-    for i size = 0; i < nargs; i = i + 1 {
-      cu_param cu_typeexpr = ~get(computed_params, i);
-      cu_param_props type_properties;
-      if !compute_type_properties(es->cs, es->clq, &cu_param, &cu_param_props) {
-        return false;
-      }
-      cell cell_num = add_rigid_cell(&bs.es, cu_param, cu_param_props);
-      vn var_number;
-      // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
-      if !es_push_var(&bs.es, &vp, cell, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {
-        return false;
-      }
-      if !es_note_var_destroyer(&bs.es, vn) {
-        return false;
-      }
-    }
-
-    if true {
-      ee entryexit;
-      if !check_body(&bs, &a->body.bb, &ee) {
-        return false;
-      }
-      if !finish_lambda_body(&bs, ee) {
-        return false;
-      }
-      info ast_fullbody_info = {bs.gotos, bs.labels, bs.statements};
-      annotate_fullbody(&a->body, info);
+    if !help_check_lambda_body(&bs, a, computed_params) {
+      return false;
     }
   }
 
@@ -1297,6 +1269,44 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
     return false;
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~computed.te, props)), ~computed.te, props)));
+  return true;
+}
+
+// This helper method shields its code from using the wrong (outer) framescope variable in check_expr_lambda.
+func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *array[te_typeexpr]) bool {
+  vp varpopper;
+  init_vp(&vp, &bs->es);
+  nargs size = count(&a->args);
+  check(nargs + 1 == count(computed_params));
+  for i size = 0; i < nargs; i = i + 1 {
+    cu_param cu_typeexpr = ~get(computed_params, i);
+    cu_param_props type_properties;
+    if !compute_type_properties(bs->cs, bs->clq, &cu_param, &cu_param_props) {
+      return false;
+    }
+    cell cell_num = add_rigid_cell(&bs->es, cu_param, cu_param_props);
+    vn var_number;
+    // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
+    if !es_push_var(&bs->es, &vp, cell, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {
+      return false;
+    }
+    if !es_note_var_destroyer(&bs->es, vn) {
+      return false;
+    }
+  }
+
+  if true {
+    ee entryexit;
+    if !check_body(bs, &a->body.bb, &ee) {
+      return false;
+    }
+    if !finish_lambda_body(bs, ee) {
+      return false;
+    }
+    info ast_fullbody_info = {bs->gotos, bs->labels, bs->statements};
+    annotate_fullbody(&a->body, info);
+  }
+
   return true;
 }
 
