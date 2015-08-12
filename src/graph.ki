@@ -143,29 +143,33 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
       return gr_expr_discard(cs, gr, &a, out);
     }
     case &Return(a ast_return_statement): {
-      // TODO: The return exprs aren't exactly writing to the same return location cell -- a canonical one doesn't exist yet.  (Ternary operators would also have this problem.)
-      gn gr_num;
-      if case &Has(b box[ast_expr_consume]) = &a.expr {
-        if !gr_expr_consume(cs, gr, oo(&b), &gn) {
-          return false;
-        }
-      } else {
-        // TODO: Maybe we'll need to mark the return_cell initialized, when it exists.
-        gn = add_node(gr, node(mk_array(), GrNop(void)));
-      }
-      info *ast_return_statement_info = unHas(&a.info);
-      uw gr_num;
-      if !gr_unwind_vars(cs, gr, fb, &info->destructions, &uw) {
-        return false;
-      }
-      var sn = add_node(gr, node(mk_array(), GrSequence({gn, uw})));
-      *out = sn;
-      return true;
+      return gr_return_statement(cs, gr, fb, &a, out);
     }
     default: {
       return TODO();
     }
   }
+}
+
+func gr_return_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_return_statement, out *gr_num) bool {
+  // TODO: The return exprs aren't exactly writing to the same return location cell -- a canonical one doesn't exist yet.  (Ternary operators would also have this problem.)
+  gn gr_num;
+  if case &Has(b box[ast_expr_consume]) = &a->expr {
+    if !gr_expr_consume(cs, gr, oo(&b), &gn) {
+      return false;
+    }
+  } else {
+    // TODO: Maybe we'll need to mark the return_cell initialized, when it exists.
+    gn = add_node(gr, node(mk_array(), GrNop(void)));
+  }
+  info *ast_return_statement_info = unHas(&a->info);
+  uw gr_num;
+  if !gr_unwind_vars(cs, gr, fb, &info->destructions, &uw) {
+    return false;
+  }
+  var sn = add_node(gr, node(mk_array(), GrSequence({gn, uw})));
+  *out = sn;
+  return true;
 }
 
 func gr_unwind_vars(cs *checkstate, gr *frame_graph, fb *fullbody_state, destructions *array[destroy_action], out *gr_num) bool {

@@ -124,30 +124,11 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
     }
 
     case &Return(b ast_return_statement): {
-      if case &Has(c box[ast_expr_consume]) = &b.expr {
-        if !check_expr_consume(&bs->es, oo(&c), &bs->return_type->~) {
-          return false;
-        }
-      } else {
-        if !type_is_void(bs->cs, bs->return_type) {
-          ERR(_u8("Empty return statement with non-void return value."));
-          return false;
-        }
+      exit_num statement_num;
+      if !check_return_statement(bs, vp, &b, &exit_num) {
+        return false;
       }
-      vars array[var_number] = vars_in_scope(&bs->es);
-      destructions array[destroy_action];
-      nvars size = count(&vars);
-      for i size = 0; i < nvars; i = i + 1 {
-        vi *var_info = ref_var(&bs->es, get(&vars, i));
-        destroy uni_ctor_desc;
-        if !get_destroy_uni_ctor(&bs->es, &vi->type, &destroy) {
-          return false;
-        }
-        da destroy_action = {destroy, vi->cell};
-        push(&destructions, da);
-      }
-      set(&b.info, {vars_in_scope(&bs->es), destructions});
-      *ee_out = {num, add_statement(bs, None())};
+      *ee_out = {num, exit_num};
     }
 
     case &Var(b ast_var_statement): {
@@ -416,6 +397,34 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       *ee_out = {num, add_statement(bs, None())};
     }
   }
+  return true;
+}
+
+func check_return_statement(bs *bodystate, vp *varpopper, a *ast_return_statement, exit_out *statement_num) bool {
+  if case &Has(c box[ast_expr_consume]) = &a->expr {
+    if !check_expr_consume(&bs->es, oo(&c), &bs->return_type->~) {
+      return false;
+    }
+  } else {
+    if !type_is_void(bs->cs, bs->return_type) {
+      ERR(_u8("Empty return statement with non-void return value."));
+      return false;
+    }
+  }
+  vars array[var_number] = vars_in_scope(&bs->es);
+  destructions array[destroy_action];
+  nvars size = count(&vars);
+  for i size = 0; i < nvars; i = i + 1 {
+    vi *var_info = ref_var(&bs->es, get(&vars, i));
+    destroy uni_ctor_desc;
+    if !get_destroy_uni_ctor(&bs->es, &vi->type, &destroy) {
+      return false;
+    }
+    da destroy_action = {destroy, vi->cell};
+    push(&destructions, da);
+  }
+  set(&a->info, {vars_in_scope(&bs->es), destructions});
+  *exit_out = add_statement(bs, None());
   return true;
 }
 
