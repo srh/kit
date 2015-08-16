@@ -172,10 +172,15 @@ deftype ast_var_info struct {
   vn var_number;
 };
 
+defenum ast_var_rhs {
+  HasExpr box[ast_expr_consume];
+  AutoInit opt[init_action];
+};
+
 deftype ast_var_statement struct {
   info opt[ast_var_info];
   decl ast_vardecl;
-  rhs opt[box[ast_expr_consume]];
+  rhs ast_var_rhs;
 };
 
 deftype ast_pattern_assign struct {
@@ -561,7 +566,10 @@ deftype uni_fun_ctor_desc struct {
   retvoid cell_num;
 };
 
-deftype destroy_action struct {
+deftype destroy_action uni_action;
+deftype init_action uni_action;
+
+deftype uni_action struct {
   ctor uni_ctor_desc;
   arg cell_num;
 };

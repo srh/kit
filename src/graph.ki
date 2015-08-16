@@ -145,8 +145,27 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
     case &Return(a ast_return_statement): {
       return gr_return_statement(cs, gr, fb, &a, out);
     }
+    case &Var(a ast_var_statement): {
+      return gr_var_statement(cs, gr, fb, &a, out);
+    }
     default: {
       return TODO();
+    }
+  }
+}
+
+func gr_var_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_var_statement, out *gr_num) bool {
+  switch &a->rhs {
+    case &HasExpr(be box[ast_expr_consume]): {
+      return gr_expr_consume(cs, gr, oo(&be), out);
+    }
+    case &AutoInit(x opt[init_action]): {
+      if case &Has(ia init_action) = &x {
+        return gr_init_action(cs, gr, &ia, out);
+      } else {
+        ice(_u8("AutoInit action not annotated"));
+        return fake();
+      }
     }
   }
 }
@@ -600,6 +619,26 @@ func gr_after_action(cs *checkstate, gr *frame_graph, x *after_action, out *gr_n
     }
     case &DestroyAfter(da destroy_action): {
       return gr_destroy_action(cs, gr, &da, out);
+    }
+  }
+}
+
+
+func gr_init_action(cs *checkstate, gr *frame_graph, x *init_action, out *gr_num) bool {
+  switch &x->ctor {
+    case &UniTrivialCtor(v void): {
+      var dp = add_node(gr, node(mk_array(), GrWriteConst({x->arg, ConstInt(~ @[u32] 0)})));
+      *out = dp;
+      return true;
+    }
+    case &UniFunCtor(desc uni_fun_ctor_desc): {
+      // TODO: This dupes some code of gr_destroy_action.
+      var fc = add_node(gr, node(mk_array(), GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
+      var arp = add_node(gr, node(mk_array(), GrAddressof({desc.argptr, x->arg})));
+      var ap = add_node(gr, node(mk_array(fc, arp), GrApply({desc.funcell, mk_array(desc.argptr), desc.retvoid})));
+      var deadret = add_node(gr, node(mk_array(ap), GrDead({desc.retvoid})));
+      *out = deadret;
+      return true;
     }
   }
 }

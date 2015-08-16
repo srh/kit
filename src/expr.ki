@@ -848,6 +848,14 @@ func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   return behavior_to_desc(&props.init_behavior, out);
 }
 
+func get_init_uni_ctor(es *framescope, t *cu_typeexpr, out *uni_ctor_desc) bool {
+  props type_properties;
+  if !compute_type_properties(es->cs, es->clq, t, &props) {
+    return false;
+  }
+  return behavior_to_uni_desc(es, &props.init_behavior, t, out);
+}
+
 func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   props type_properties;
   if !compute_type_properties(ds->cs, ds->clq, t, &props) {
