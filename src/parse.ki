@@ -1139,7 +1139,7 @@ func parse_condition(p *ps, out *ast_condition) bool {
          && parse_expr(p, kConditionPrec, &rhs)) {
       return Fail;
     }
-    *out = PatternCondition({None@[ast_enum_deconstruction_info](), conspatt, embox(consume(rhs))});
+    *out = PatternCondition({None@[ast_pattern_assign_info](), conspatt, embox(consume(rhs))});
     return true;
   } else {
     condition ast_expr;

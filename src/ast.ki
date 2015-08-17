@@ -183,14 +183,18 @@ deftype ast_var_statement struct {
   rhs ast_var_rhs;
 };
 
+deftype ast_pattern_assign_info struct {
+  deconstruct ast_enum_deconstruction_info;
+  matching_tag_value u32;
+};
+
 deftype ast_enum_deconstruction_info struct {
   tag_cell cell_num;
-  matching_tag_value u32;
-  num_enum_cases u32;
+  num_enum_constructors u32;
 };
 
 deftype ast_pattern_assign struct {
-  info opt[ast_enum_deconstruction_info];
+  info opt[ast_pattern_assign_info];
   pattern ast_constructor_pattern;
   rhs box[ast_expr_consume];
 };

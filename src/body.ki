@@ -534,7 +534,7 @@ func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later
         }
         cell cell_num = add_virtual_cell(es, cu_expected_type, expected_type_props);
         tag_cell cell_num = add_virtual_tag_cell(es, &et);
-        set(&b.info, {tag_cell, enum_tag_min + ~decl_index, ~count(&et.constructors)});
+        set(&b.info, {{tag_cell, ~count(&et.constructors)}, enum_tag_min + ~decl_index});
         vn var_number;
         if !es_push_var(es, cond_vp, cell, &b.pattern.decl.name, &cu_expected_type, AutoInitNo(void), &vn) {
           return false;

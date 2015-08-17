@@ -335,10 +335,10 @@ func gr_condition(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_co
       if !gr_expr_consume(cs, gr, oo(&pa.rhs), &rhs) {
         return false;
       }
-      info *ast_enum_deconstruction_info = unHas(&pa.info);
-      taggn gr_num = add_node(gr, node(mk_array(rhs), GrSubcell({info->tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)})));
+      info *ast_pattern_assign_info = unHas(&pa.info);
+      taggn gr_num = add_node(gr, node(mk_array(rhs), GrSubcell({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)})));
       cases array[tup[gr_const, gr_num]];
-      n u32 = info->num_enum_cases;
+      n u32 = info->deconstruct.num_enum_constructors;
       for i u32 = 0; i < n; i = i + 1 {
         tag u32 = enum_tag_min + i;
         if info->matching_tag_value == tag {
@@ -347,7 +347,7 @@ func gr_condition(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_co
           push(&cases, cons(ConstInt(~tag), elsegn));
         }
       }
-      var br = add_node(gr, node(mk_array(taggn), GrBranch({info->tag_cell, cases, None()})));
+      var br = add_node(gr, node(mk_array(taggn), GrBranch({info->deconstruct.tag_cell, cases, None()})));
 
       *out = br;
       return true;
