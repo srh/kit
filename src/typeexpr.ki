@@ -169,6 +169,22 @@ func help_te_vardecl_list_equal(cs *checkstate, a *array[te_vardecl], b *array[t
   return true;
 }
 
+func enum_tag_type(cs *checkstate, et *te_enum) te_typeexpr {
+  tagsize u32 = cs->platform.enum_tag_size;
+  if tagsize == 1 {
+    return primitive_u8_type(cs);
+  } else if tagsize == 2 {
+    return primitive_u16_type(cs);
+  } else if tagsize == 4 {
+    return primitive_u32_type(cs);
+  } else {
+    ice(_u8("enum_tag_type does not support enum_tag_size value"));
+    return fake();
+  }
+}
+
+
+
 func[H] build_u8str(help H, r *array[u8], a *cu_typeexpr) void {
   return build_u8str(help, r, &a->~);
 }

@@ -340,7 +340,8 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
               }
 
               expected_type *te_typeexpr;
-              if !find_vardecl(&et.constructors, patt.constructor_name.value, &expected_type) {
+              decl_index size;
+              if !find_vardecl(&et.constructors, patt.constructor_name.value, &expected_type, &decl_index) {
                 ERR(_u8("constructor not found"));
                 return false;
               }
@@ -507,7 +508,8 @@ func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later
         }
 
         expected_type *te_typeexpr;
-        if !find_vardecl(&et.constructors, b.pattern.constructor_name.value, &expected_type) {
+        decl_index size;
+        if !find_vardecl(&et.constructors, b.pattern.constructor_name.value, &expected_type, &decl_index) {
           ERR(_u8("constructor not found in condition pattern"));
           return false;
         }
@@ -531,6 +533,8 @@ func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later
           return false;
         }
         cell cell_num = add_virtual_cell(es, cu_expected_type, expected_type_props);
+        tag_cell cell_num = add_virtual_tag_cell(es, &et);
+        set(&b.info, {tag_cell, enum_tag_min + ~decl_index, ~count(&et.constructors)});
         vn var_number;
         if !es_push_var(es, cond_vp, cell, &b.pattern.decl.name, &cu_expected_type, AutoInitNo(void), &vn) {
           return false;

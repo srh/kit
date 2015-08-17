@@ -12,6 +12,14 @@ func primitive_u8_type(cs *checkstate) te_typeexpr {
   return TeName({cs->im->cym.u8sym, None()});
 }
 
+func primitive_u16_type(cs *checkstate) te_typeexpr {
+  return TeName({cs->im->cym.u16sym, None()});
+}
+
+func primitive_u32_type(cs *checkstate) te_typeexpr {
+  return TeName({cs->im->cym.u32sym, None()});
+}
+
 func primitive_i32_type(cs *checkstate) te_typeexpr {
   return TeName({cs->im->cym.i32sym, None()});
 }

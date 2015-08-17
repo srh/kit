@@ -148,8 +148,96 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
     case &Var(a ast_var_statement): {
       return gr_var_statement(cs, gr, fb, &a, out);
     }
+    case &IfThen(a ast_ifthen_statement): {
+      return gr_ifthen_statement(cs, gr, fb, &a, out);
+    }
+    case &IfThenElse(a ast_ifthenelse_statement): {
+      return gr_ifthenelse_statement(cs, gr, fb, &a, out);
+    }
     default: {
       return TODO();
+    }
+  }
+}
+
+func gr_ifthenelse_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_ifthenelse_statement, out *gr_num) bool {
+  thengn gr_num;
+  if !gr_bracebody(cs, gr, fb, &a->thenbody, &thengn) {
+    return false;
+  }
+  elsegn gr_num;
+  if !gr_bracebody(cs, gr, fb, &a->elsebody, &elsegn) {
+    return false;
+  }
+  gn gr_num;
+  if !gr_condition(cs, gr, fb, &a->condition, &a->condition_discard, thengn, elsegn, &gn) {
+    return false;
+  }
+  *out = gn;
+  return true;
+}
+
+func gr_ifthen_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_ifthen_statement, out *gr_num) bool {
+  bodygn gr_num;
+  if !gr_bracebody(cs, gr, fb, &a->body, &bodygn) {
+    return false;
+  }
+  nopgn gr_num = add_node(gr, node(mk_array(), GrNop(void)));
+  gn gr_num;
+  if !gr_condition(cs, gr, fb, &a->condition, &a->condition_discard, bodygn, nopgn, &gn) {
+    return false;
+  }
+  *out = gn;
+  return true;
+}
+
+func gr_condition(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_condition, disc *ast_later_discard_info, thengn gr_num, elsegn gr_num, out *gr_num) bool {
+  switch a {
+    case &ExprCondition(bec box[ast_expr_consume]): {
+      congn gr_num;
+      if !gr_expr_consume(cs, gr, oo(&bec), &congn) {
+        return false;
+      }
+      cases array[tup[gr_const, gr_num]] = mk_array(cons(ConstInt(~ @[u32] 0), elsegn), cons(ConstInt(~ @[u32] 1), thengn));
+      var br = add_node(gr, node(mk_array(congn), GrBranch({result_cell(oo(&bec)), cases, None()})));
+
+      latergn gr_num;
+      if !gr_later_discard(cs, gr, disc, &latergn) {
+        return false;
+      }
+
+      var gn = add_node(gr, node(mk_array(), GrSequence({br, latergn})));
+      *out = gn;
+      return true;
+    }
+
+    case &PatternCondition(pa ast_pattern_assign): {
+      rhs gr_num;
+      if !gr_expr_consume(cs, gr, oo(&pa.rhs), &rhs) {
+        return false;
+      }
+      info *ast_enum_deconstruction_info = unHas(&pa.info);
+      taggn gr_num = add_node(gr, node(mk_array(rhs), GrSubcell({info->tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)})));
+      cases array[tup[gr_const, gr_num]];
+      n u32 = info->num_enum_cases;
+      for i u32 = 0; i < n; i = i + 1 {
+        tag u32 = enum_tag_min + i;
+        if info->matching_tag_value == tag {
+          push(&cases, cons(ConstInt(~tag), thengn));
+        } else {
+          push(&cases, cons(ConstInt(~tag), elsegn));
+        }
+      }
+      var br = add_node(gr, node(mk_array(taggn), GrBranch({info->tag_cell, cases, None()})));
+
+      latergn gr_num;
+      if !gr_later_discard(cs, gr, disc, &latergn) {
+        return false;
+      }
+
+      var gn = add_node(gr, node(mk_array(), GrSequence({br, latergn})));
+      *out = gn;
+      return true;
     }
   }
 }

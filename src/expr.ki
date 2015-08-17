@@ -77,6 +77,13 @@ func add_rigid_cell(es *framescope, type cu_typeexpr, props type_properties) cel
   return help_add_cell(es, {Has(LocationRigid(void)), type, props});
 }
 
+func add_virtual_tag_cell(es *framescope, et *te_enum) cell_num {
+  cu cu_typeexpr;
+  props type_properties;
+  compute_prim(es->ds, enum_tag_type(es->cs, et), &cu, &props);
+  return add_virtual_cell(es, cu, props);
+}
+
 func ref_cell(es *framescope, num cell_num) *cell_info {
   return ref(&es->cells, num.~);
 }
@@ -346,7 +353,8 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   }
   if case &TeEnum(et te_enum) = enum_type {
     rhs_type *te_typeexpr;
-    if !find_vardecl(&et.constructors, name, &rhs_type) {
+    decl_index size;
+    if !find_vardecl(&et.constructors, name, &rhs_type, &decl_index) {
       *res_out = NoMatchConstructor(void);
       return true;
     }
@@ -1633,12 +1641,13 @@ func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_ou
   }
 }
 
-func find_vardecl(a *array[te_vardecl], name sym, out **te_typeexpr) bool {
+func find_vardecl(a *array[te_vardecl], name sym, out **te_typeexpr, index_out *size) bool {
   n size = count(a);
   for i size = 0; i < n; i = i + 1 {
     d *te_vardecl = ref(a, i);
     if d->name == name {
       *out = &d->type;
+      *index_out = i;
       return true;
     }
   }
