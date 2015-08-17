@@ -172,10 +172,70 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
     case &While(a ast_while_statement): {
       return gr_while_statement(cs, gr, fb, &a, out);
     }
+    case &For(a ast_for_statement): {
+      return gr_for_statement(cs, gr, fb, &a, out);
+    }
     default: {
       return TODO();
     }
   }
+}
+
+func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_for_statement, out *gr_num) bool {
+  var topgn = add_node(gr, node(mk_array(), GrNop(void)));
+
+  loopcleanupgn gr_num;
+  if !gr_later_discard(cs, gr, &a->condition_discard, &loopcleanupgn) {
+    return false;
+  }
+
+  continuegn gr_num;
+  if case &Has(increment box[ast_expr_discard]) = &a->increment {
+    incrgn gr_num;
+    if !gr_expr_discard(cs, gr, oo(&increment), &incrgn) {
+      return false;
+    }
+    var totopgn = add_node(gr, node(mk_array(), GrSequence({incrgn, topgn})));
+    continuegn = add_node(gr, node(mk_array(), GrSequence({loopcleanupgn, incrgn})));
+  } else {
+    continuegn = add_node(gr, node(mk_array(), GrSequence({loopcleanupgn, topgn})));
+  }
+
+  bodygn gr_num;
+  if !gr_bracebody(cs, gr, fb, &a->body, &bodygn) {
+    return false;
+  }
+
+  var thengn = add_node(gr, node(mk_array(), GrSequence({bodygn, continuegn})));
+  gn gr_num;
+  if case &Has(bc box[ast_expr_consume]) = &a->condition {
+    // TODO: We might need to cleanup the variable declared in the initializer.
+    loopexitgn gr_num;
+    if !gr_later_discard(cs, gr, &a->condition_discard, &loopexitgn) {
+      return false;
+    }
+
+    if !gr_expr_condition(cs, gr, fb, oo(&bc), thengn, loopexitgn, &gn) {
+      return false;
+    }
+  } else {
+    gn = thengn;
+  }
+
+  mut_nop_node(gr, topgn, node(mk_array(), GrJmp({gn})));
+
+  fingn gr_num;
+  if case &Has(bi box[ast_statement]) = &a->initializer {
+    initgn gr_num;
+    if !gr_statement(cs, gr, fb, oo(&bi), &initgn) {
+      return false;
+    }
+    fingn = add_node(gr, node(mk_array(), GrSequence({initgn, topgn})));
+  } else {
+    fingn = topgn;
+  }
+  *out = fingn;
+  return true;
 }
 
 func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_while_statement, out *gr_num) bool {
@@ -252,18 +312,22 @@ func gr_ifthenelse_condition(cs *checkstate, gr *frame_graph, fb *fullbody_state
   return true;
 }
 
+func gr_expr_condition(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_expr_consume, thengn gr_num, elsegn gr_num, out *gr_num) bool {
+  congn gr_num;
+  if !gr_expr_consume(cs, gr, a, &congn) {
+    return false;
+  }
+  cases array[tup[gr_const, gr_num]] = mk_array(cons(ConstInt(~ @[u32] 0), elsegn), cons(ConstInt(~ @[u32] 1), thengn));
+  var br = add_node(gr, node(mk_array(congn), GrBranch({result_cell(a), cases, None()})));
+
+  *out = br;
+  return true;
+}
+
 func gr_condition(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_condition, thengn gr_num, elsegn gr_num, out *gr_num) bool {
   switch a {
     case &ExprCondition(bec box[ast_expr_consume]): {
-      congn gr_num;
-      if !gr_expr_consume(cs, gr, oo(&bec), &congn) {
-        return false;
-      }
-      cases array[tup[gr_const, gr_num]] = mk_array(cons(ConstInt(~ @[u32] 0), elsegn), cons(ConstInt(~ @[u32] 1), thengn));
-      var br = add_node(gr, node(mk_array(congn), GrBranch({result_cell(oo(&bec)), cases, None()})));
-
-      *out = br;
-      return true;
+      return gr_expr_condition(cs, gr, fb, oo(&bec), thengn, elsegn, out);
     }
 
     case &PatternCondition(pa ast_pattern_assign): {
