@@ -178,7 +178,10 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
     case &Switch(a ast_switch_statement): {
       return gr_switch_statement(cs, gr, fb, &a, out);
     }
-    default: {
+    case &Label(a ast_label_statement): {
+      return TODO();
+    }
+    case &Goto(a ast_goto_statement): {
       return TODO();
     }
   }
