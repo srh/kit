@@ -129,16 +129,17 @@ deftype fullbody_state struct {
 func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) bool {
   fb fullbody_state;
   fb.info = unHas(&x->info);
+  // TODO: What is the exit_node?  What variables are destroyed?  Implement variable destruction... everywhere it's necessary.
   fb.exit_node = add_node(gr, node(mk_array(), GrNop(void)));
-  if !gr_bracebody(cs, gr, &fb, &x->bb, out) {
+  if !gr_bracebody(cs, gr, &fb, &x->bb, fb.exit_node, out) {
     return false;
   }
   return true;
 }
 
-func gr_bracebody(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_bracebody, out *gr_num) bool {
+func gr_bracebody(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_bracebody, outflow gr_num, out *gr_num) bool {
   // TODO: We need to destroy variables at the end of the body.
-  var bn = add_node(gr, node(mk_array(), GrNop(void)));
+  bn gr_num = outflow;
   n size = count(&x->statements);
   for i size = n; i > 0; {
     i = i - 1;
@@ -200,7 +201,7 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
   for i size = 0; i < ncases; i = i + 1 {
     sc *ast_switch_case = ref(&a->cases, i);
     body_gn gr_num;
-    if !gr_bracebody(cs, gr, fb, &sc->body, &body_gn) {
+    if !gr_bracebody(cs, gr, fb, &sc->body, swartch_discard_gn, &body_gn) {
       return false;
     }
 
@@ -227,9 +228,7 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
 
   var br = add_node(gr, node(mk_array(taggn), GrBranch({info->tag_cell, cases, default_case})));
 
-  var gn = add_node(gr, node(mk_array(), GrSequence({br, swartch_discard_gn})));
-
-  *out = gn;
+  *out = br;
   return true;
 }
 
@@ -253,12 +252,11 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
     continuegn = add_node(gr, node(mk_array(), GrSequence({loopcleanupgn, topgn})));
   }
 
-  bodygn gr_num;
-  if !gr_bracebody(cs, gr, fb, &a->body, &bodygn) {
+  thengn gr_num;
+  if !gr_bracebody(cs, gr, fb, &a->body, continuegn, &thengn) {
     return false;
   }
 
-  var thengn = add_node(gr, node(mk_array(), GrSequence({bodygn, continuegn})));
   gn gr_num;
   if case &Has(bc box[ast_expr_consume]) = &a->condition {
     // TODO: We might need to cleanup the variable declared in the initializer.
@@ -291,10 +289,6 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
 }
 
 func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_while_statement, out *gr_num) bool {
-  bodygn gr_num;
-  if !gr_bracebody(cs, gr, fb, &a->body, &bodygn) {
-    return false;
-  }
   var topgn = add_node(gr, node(mk_array(), GrNop(void)));
 
   loopcleanupgn gr_num;
@@ -308,7 +302,10 @@ func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *
   }
 
   var continuegn = add_node(gr, node(mk_array(), GrSequence({loopcleanupgn, topgn})));
-  var thengn = add_node(gr, node(mk_array(), GrSequence({bodygn, continuegn})));
+  thengn gr_num;
+  if !gr_bracebody(cs, gr, fb, &a->body, continuegn, &thengn) {
+    return false;
+  }
   gn gr_num;
   if !gr_condition(cs, gr, fb, &a->condition, thengn, loopexitgn, &gn) {
     return false;
@@ -320,12 +317,15 @@ func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *
 }
 
 func gr_ifthenelse_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_ifthenelse_statement, out *gr_num) bool {
+  // TODO: No nops, do this properly.
+  var thennop = add_node(gr, node(mk_array(), GrNop(void)));
   thengn gr_num;
-  if !gr_bracebody(cs, gr, fb, &a->thenbody, &thengn) {
+  if !gr_bracebody(cs, gr, fb, &a->thenbody, thennop, &thengn) {
     return false;
   }
+  var elsenop = add_node(gr, node(mk_array(), GrNop(void)));
   elsegn gr_num;
-  if !gr_bracebody(cs, gr, fb, &a->elsebody, &elsegn) {
+  if !gr_bracebody(cs, gr, fb, &a->elsebody, elsenop, &elsegn) {
     return false;
   }
   gn gr_num;
@@ -337,8 +337,10 @@ func gr_ifthenelse_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state
 }
 
 func gr_ifthen_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_ifthen_statement, out *gr_num) bool {
+  // TODO: No, do this properly.
+  var bodynop = add_node(gr, node(mk_array(), GrNop(void)));
   bodygn gr_num;
-  if !gr_bracebody(cs, gr, fb, &a->body, &bodygn) {
+  if !gr_bracebody(cs, gr, fb, &a->body, bodynop, &bodygn) {
     return false;
   }
   nopgn gr_num = add_node(gr, node(mk_array(), GrNop(void)));
