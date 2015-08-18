@@ -559,7 +559,6 @@ func gr_deref_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_deref_f
         return true;
       }
     }
-    return TODO();
   } else {
     ice(_u8("gr_deref_field sees ast_deref_field not annotated"));
     return fake();
