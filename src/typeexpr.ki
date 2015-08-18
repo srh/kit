@@ -183,6 +183,11 @@ func enum_tag_type(cs *checkstate, et *te_enum) te_typeexpr {
   }
 }
 
+func enum_field_offset(cs *checkstate, et *te_enum, constructor_tag_value u32) u32 {
+  // Things will get more complicated at some point.
+  return cs->platform.enum_tag_size;
+}
+
 
 
 func[H] build_u8str(help H, r *array[u8], a *cu_typeexpr) void {

@@ -373,6 +373,9 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
                 return false;
               }
 
+              tag_value u32 = enum_tag_min + ~decl_index;
+              set(&patt.cp_info, {vn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
+
               body_ee entryexit;
               if !check_body(bs, &cas->body, &body_ee) {
                 return false;
@@ -395,6 +398,8 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
           ERR(_u8("Unnecessary default case."));
           return false;
         }
+        tag_cell cell_num = add_virtual_tag_cell(&bs->es, &et);
+        set(&b.info, {tag_cell, ~count(&et.constructors)});
       } else {
         ERR(_u8("Switching over non-switchable type."));
       }
@@ -539,6 +544,9 @@ func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later
         if !es_push_var(es, cond_vp, cell, &b.pattern.decl.name, &cu_expected_type, AutoInitNo(void), &vn) {
           return false;
         }
+
+        tag_value u32 = enum_tag_min + ~decl_index;
+        set(&b.pattern.cp_info, {vn, tag_value, enum_field_offset(es->cs, &et, tag_value)});
 
         return true;
       } else {

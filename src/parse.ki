@@ -1248,7 +1248,7 @@ func parse_rest_of_switch_statement(p *ps, out *ast_statement) bool {
   cases array[ast_switch_case];
   for ;; {
     if try_skip_token(p, Grouper(RBrace(void))) {
-      *out = Switch({mk_later(), embox(consume(swartch)), cases});
+      *out = Switch({None@[ast_enum_deconstruction_info](), mk_later(), embox(consume(swartch)), cases});
       return true;
     }
     cas ast_switch_case;
@@ -1288,7 +1288,7 @@ func parse_rest_of_constructor_pattern(p *ps,
        && try_skip_token(p, Grouper(RParen(void)))) {
     return Fail;
   }
-  *out = {addressof_constructor, constructor_name, decl};
+  *out = {None@[ast_cp_info](), addressof_constructor, constructor_name, decl};
   return true;
 }
 

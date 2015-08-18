@@ -175,10 +175,59 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
     case &For(a ast_for_statement): {
       return gr_for_statement(cs, gr, fb, &a, out);
     }
+    case &Switch(a ast_switch_statement): {
+      return gr_switch_statement(cs, gr, fb, &a, out);
+    }
     default: {
       return TODO();
     }
   }
+}
+
+func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_switch_statement, out *gr_num) bool {
+  swartch_discard_gn gr_num;
+  if !gr_later_discard(cs, gr, &a->swartch_discard, &swartch_discard_gn) {
+    return false;
+  }
+
+  info *ast_enum_deconstruction_info = unHas(&a->info);
+  cases array[tup[gr_const, gr_num]];
+  default_case opt[gr_num] = None();
+  ncases size = count(&a->cases);
+  for i size = 0; i < ncases; i = i + 1 {
+    sc *ast_switch_case = ref(&a->cases, i);
+    body_gn gr_num;
+    if !gr_bracebody(cs, gr, fb, &sc->body, &body_gn) {
+      return false;
+    }
+
+    switch &sc->pattern {
+      case &Case(cp ast_constructor_pattern): {
+        cp_info *ast_cp_info = unHas(&cp.cp_info);
+        vi *var_info = ref(&fb->info->all_vars, cp_info->vn.~);
+        var vcgn = add_node(gr, node(mk_array(), GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)})));
+        var gn = add_node(gr, node(mk_array(), GrSequence({vcgn, body_gn})));
+        push(&cases, cons(ConstInt(~cp_info->tag_value), gn));
+      }
+      case &Default(v void): {
+        set(&default_case, body_gn);
+      }
+    }
+  }
+
+  swartch_gn gr_num;
+  if !gr_expr_consume(cs, gr, oo(&a->swartch), &swartch_gn) {
+    return false;
+  }
+
+  var taggn = add_node(gr, node(mk_array(swartch_gn), GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)})));
+
+  var br = add_node(gr, node(mk_array(taggn), GrBranch({info->tag_cell, cases, default_case})));
+
+  var gn = add_node(gr, node(mk_array(), GrSequence({br, swartch_discard_gn})));
+
+  *out = gn;
+  return true;
 }
 
 func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_for_statement, out *gr_num) bool {

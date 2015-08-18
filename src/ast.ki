@@ -233,6 +233,7 @@ deftype ast_for_statement struct {
 };
 
 deftype ast_switch_statement struct {
+  info opt[ast_enum_deconstruction_info];
   swartch_discard ast_later_discard_info;
   swartch box[ast_expr_consume];
   cases array[ast_switch_case];
@@ -271,7 +272,16 @@ defenum ast_statement {
   Goto ast_goto_statement;
 };
 
+deftype ast_cp_info struct {
+  vn var_number;
+  tag_value u32;
+  // enum_field_offset(cs, et, tag_value) -- annotated here because getting a te_enum in graph.ki is needlessly annoying.
+  // TODO: Probably shouldn't be here.
+  field_offset u32;
+};
+
 deftype ast_constructor_pattern struct {
+  cp_info opt[ast_cp_info];
   addressof_constructor opt[ast_ident];
   constructor_name ast_ident;
   decl ast_vardecl;
