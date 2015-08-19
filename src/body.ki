@@ -87,7 +87,37 @@ func check_body(bs *bodystate, a *ast_bracebody, ee_out *entryexit) bool {
     connect_statements(bs, exit, ee.entry);
     exit = ee.exit;
   }
+  destructions array[destroy_action];
+  if !make_destructions(&bs->es, read_nums(&vp), &destructions) {
+    return false;
+  }
+  set(&a->info, {destructions});
   *ee_out = {entry, exit};
+  return true;
+}
+
+func make_destroy_action(es *framescope, vn var_number, out *destroy_action) bool {
+  vi *var_info = ref_var(es, vn);
+  destroy uni_ctor_desc;
+  if !get_destroy_uni_ctor(es, &vi->type, &destroy) {
+    return false;
+  }
+  da destroy_action = {destroy, vi->cell};
+  *out = da;
+  return true;
+}
+
+func make_destructions(es *framescope, vns *array[var_number], out *array[destroy_action]) bool {
+  destructions array[destroy_action];
+  n size = count(vns);
+  for i size = 0; i < n; i = i + 1 {
+    da destroy_action;
+    if !make_destroy_action(es, get(vns, i), &da) {
+      return false;
+    }
+    push(&destructions, da);
+  }
+  *out = destructions;
   return true;
 }
 
@@ -435,15 +465,8 @@ func check_return_statement(bs *bodystate, vp *varpopper, a *ast_return_statemen
   }
   vars array[var_number] = vars_in_scope(&bs->es);
   destructions array[destroy_action];
-  nvars size = count(&vars);
-  for i size = 0; i < nvars; i = i + 1 {
-    vi *var_info = ref_var(&bs->es, get(&vars, i));
-    destroy uni_ctor_desc;
-    if !get_destroy_uni_ctor(&bs->es, &vi->type, &destroy) {
-      return false;
-    }
-    da destroy_action = {destroy, vi->cell};
-    push(&destructions, da);
+  if !make_destructions(&bs->es, &vars, &destructions) {
+    return false;
   }
   set(&a->info, {vars_in_scope(&bs->es), destructions});
   *exit_out = add_statement(bs, None());

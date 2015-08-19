@@ -142,8 +142,10 @@ func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) 
 }
 
 func gr_bracebody(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_bracebody, outflow gr_num, out *gr_num) bool {
-  // TODO: We need to destroy variables at the end of the body.
-  bn gr_num = outflow;
+  bn gr_num;
+  if !gr_unwind_vars(cs, gr, &unHas(&x->info)->destructions, outflow, &bn) {
+    return false;
+  }
   n size = count(&x->statements);
   for i size = n; i > 0; {
     i = i - 1;
@@ -470,7 +472,7 @@ func gr_return_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
   }
   info *ast_return_statement_info = unHas(&a->info);
   uw gr_num;
-  if !gr_unwind_vars(cs, gr, fb, &info->destructions, &uw) {
+  if !gr_unwind_vars(cs, gr, &info->destructions, fb->exit_node, &uw) {
     return false;
   }
   var sn = add_node(gr, node0(GrSequence({gn, uw})));
@@ -478,8 +480,8 @@ func gr_return_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
   return true;
 }
 
-func gr_unwind_vars(cs *checkstate, gr *frame_graph, fb *fullbody_state, destructions *array[destroy_action], out *gr_num) bool {
-  bn gr_num = fb->exit_node;
+func gr_unwind_vars(cs *checkstate, gr *frame_graph, destructions *array[destroy_action], outflow gr_num, out *gr_num) bool {
+  bn gr_num = outflow;
   n size = count(destructions);
   for i size = 0; i < n; i = i + 1 {
     gn gr_num;

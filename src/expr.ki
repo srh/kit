@@ -221,6 +221,10 @@ func descope_vars(vp *varpopper) void {
   }
 }
 
+func read_nums(vp *varpopper) *array[var_number] {
+  return &vp->nums;
+}
+
 }  // access varpopper
 
 defclass varsaver struct {

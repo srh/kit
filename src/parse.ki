@@ -421,7 +421,7 @@ func parse_bracebody(p *ps, out *ast_bracebody) bool {
   statements array[ast_statement];
   for ;; {
     if try_skip_token(p, Grouper(RBrace(void))) {
-      *out = {statements};
+      *out = {None@[ast_bracebody_info](), statements};
       return true;
     }
     statement ast_statement;
@@ -1169,7 +1169,7 @@ func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
     if !parse_rest_of_if_statement(p, &elseif) {
       return Fail;
     }
-    *out = IfThenElse({mk_later(), condition, thenbody, {mk_array(elseif)}});
+    *out = IfThenElse({mk_later(), condition, thenbody, {None@[ast_bracebody_info](), mk_array(elseif)}});
     return true;
   }
   elsebody ast_bracebody;
