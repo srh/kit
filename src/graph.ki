@@ -37,6 +37,10 @@ func node(precs array[gr_num], op gr_op) gr_node {
   return {precs, op};
 }
 
+func node0(op gr_op) gr_node {
+  return node(mk_array(), op);
+}
+
 defenum gr_op {
   GrApply gr_apply;
   GrMemCopy gr_memcopy;
@@ -130,7 +134,7 @@ func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) 
   fb fullbody_state;
   fb.info = unHas(&x->info);
   // TODO: What is the exit_node?  What variables are destroyed?  Implement variable destruction... everywhere it's necessary.
-  fb.exit_node = add_node(gr, node(mk_array(), GrNop(void)));
+  fb.exit_node = add_node(gr, node0(GrNop(void)));
   if !gr_bracebody(cs, gr, &fb, &x->bb, fb.exit_node, out) {
     return false;
   }
@@ -160,7 +164,7 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
       if !gr_expr_discard(cs, gr, &a, &gn) {
         return false;
       }
-      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
+      *out = add_node(gr, node0(GrSequence({gn, outflow})));
       return true;
     }
     case &Return(a ast_return_statement): {
@@ -174,7 +178,7 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
       if !gr_var_statement(cs, gr, fb, &a, &gn) {
         return false;
       }
-      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
+      *out = add_node(gr, node0(GrSequence({gn, outflow})));
       return true;
     }
 
@@ -224,7 +228,7 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
     return false;
   }
 
-  var exitseq = add_node(gr, node(mk_array(), GrSequence({swartch_discard_gn, outflow})));
+  var exitseq = add_node(gr, node0(GrSequence({swartch_discard_gn, outflow})));
 
   info *ast_enum_deconstruction_info = unHas(&a->info);
   cases array[tup[gr_const, gr_num]];
@@ -241,8 +245,8 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
       case &Case(cp ast_constructor_pattern): {
         cp_info *ast_cp_info = unHas(&cp.cp_info);
         vi *var_info = ref(&fb->info->all_vars, cp_info->vn.~);
-        var vcgn = add_node(gr, node(mk_array(), GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)})));
-        var gn = add_node(gr, node(mk_array(), GrSequence({vcgn, body_gn})));
+        var vcgn = add_node(gr, node0(GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)})));
+        var gn = add_node(gr, node0(GrSequence({vcgn, body_gn})));
         push(&cases, cons(ConstInt(~cp_info->tag_value), gn));
       }
       case &Default(v void): {
@@ -265,7 +269,7 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
 }
 
 func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_for_statement, outflow gr_num, out *gr_num) bool {
-  var topgn = add_node(gr, node(mk_array(), GrNop(void)));
+  var topgn = add_node(gr, node0(GrNop(void)));
 
   loopcleanupgn gr_num;
   if !gr_later_discard(cs, gr, &a->condition_discard, &loopcleanupgn) {
@@ -278,10 +282,10 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
     if !gr_expr_discard(cs, gr, oo(&increment), &incrgn) {
       return false;
     }
-    var totopgn = add_node(gr, node(mk_array(), GrSequence({incrgn, topgn})));
-    continuegn = add_node(gr, node(mk_array(), GrSequence({loopcleanupgn, incrgn})));
+    var totopgn = add_node(gr, node0(GrSequence({incrgn, topgn})));
+    continuegn = add_node(gr, node0(GrSequence({loopcleanupgn, incrgn})));
   } else {
-    continuegn = add_node(gr, node(mk_array(), GrSequence({loopcleanupgn, topgn})));
+    continuegn = add_node(gr, node0(GrSequence({loopcleanupgn, topgn})));
   }
 
   thengn gr_num;
@@ -297,7 +301,7 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
       return false;
     }
 
-    var exitseq = add_node(gr, node(mk_array(), GrSequence({loopexitgn, outflow})));
+    var exitseq = add_node(gr, node0(GrSequence({loopexitgn, outflow})));
 
     if !gr_expr_condition(cs, gr, fb, oo(&bc), thengn, exitseq, &gn) {
       return false;
@@ -306,7 +310,7 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
     gn = thengn;
   }
 
-  mut_nop_node(gr, topgn, node(mk_array(), GrJmp({gn})));
+  mut_nop_node(gr, topgn, node0(GrJmp({gn})));
 
   fingn gr_num;
   if case &Has(bi box[ast_statement]) = &a->initializer {
@@ -321,7 +325,7 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
 }
 
 func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_while_statement, outflow gr_num, out *gr_num) bool {
-  var topgn = add_node(gr, node(mk_array(), GrNop(void)));
+  var topgn = add_node(gr, node0(GrNop(void)));
 
   loopcleanupgn gr_num;
   if !gr_later_discard(cs, gr, &a->condition_discard, &loopcleanupgn) {
@@ -333,9 +337,9 @@ func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *
     return false;
   }
 
-  var exitseq = add_node(gr, node(mk_array(), GrSequence({loopexitgn, outflow})));
+  var exitseq = add_node(gr, node0(GrSequence({loopexitgn, outflow})));
 
-  var continuegn = add_node(gr, node(mk_array(), GrSequence({loopcleanupgn, topgn})));
+  var continuegn = add_node(gr, node0(GrSequence({loopcleanupgn, topgn})));
   thengn gr_num;
   if !gr_bracebody(cs, gr, fb, &a->body, continuegn, &thengn) {
     return false;
@@ -345,7 +349,7 @@ func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *
     return false;
   }
 
-  mut_nop_node(gr, topgn, node(mk_array(), GrJmp({gn})));
+  mut_nop_node(gr, topgn, node0(GrJmp({gn})));
   *out = topgn;
   return true;
 }
@@ -356,7 +360,7 @@ func gr_ifthenelse_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state
     return false;
   }
 
-  var latseq = add_node(gr, node(mk_array(), GrSequence({latergn, outflow})));
+  var latseq = add_node(gr, node0(GrSequence({latergn, outflow})));
 
   thengn gr_num;
   if !gr_bracebody(cs, gr, fb, &a->thenbody, latseq, &thengn) {
@@ -380,7 +384,7 @@ func gr_ifthen_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
     return false;
   }
 
-  var latseq = add_node(gr, node(mk_array(), GrSequence({latergn, outflow})));
+  var latseq = add_node(gr, node0(GrSequence({latergn, outflow})));
 
   bodygn gr_num;
   if !gr_bracebody(cs, gr, fb, &a->body, latseq, &bodygn) {
@@ -462,14 +466,14 @@ func gr_return_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
     }
   } else {
     // TODO: Maybe we'll need to mark the return_cell initialized, when it exists.
-    gn = add_node(gr, node(mk_array(), GrNop(void)));
+    gn = add_node(gr, node0(GrNop(void)));
   }
   info *ast_return_statement_info = unHas(&a->info);
   uw gr_num;
   if !gr_unwind_vars(cs, gr, fb, &info->destructions, &uw) {
     return false;
   }
-  var sn = add_node(gr, node(mk_array(), GrSequence({gn, uw})));
+  var sn = add_node(gr, node0(GrSequence({gn, uw})));
   *out = sn;
   return true;
 }
@@ -482,7 +486,7 @@ func gr_unwind_vars(cs *checkstate, gr *frame_graph, fb *fullbody_state, destruc
     if !gr_destroy_action(cs, gr, ref(destructions, i), &gn) {
       return false;
     }
-    bn = add_node(gr, node(mk_array(), GrSequence({gn, bn})));
+    bn = add_node(gr, node0(GrSequence({gn, bn})));
   }
   *out = bn;
   return true;
@@ -627,8 +631,8 @@ func gr_deref_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_deref_f
     }
     switch info {
       case DerefArrayLength(count u32): {
-        var cp = add_node(gr, node(mk_array(), GrWriteConst({rval_cell(x), ConstInt(~count)})));
-        var sp = add_node(gr, node(mk_array(), GrSequence({rp, ap})));
+        var cp = add_node(gr, node0(GrWriteConst({rval_cell(x), ConstInt(~count)})));
+        var sp = add_node(gr, node0(GrSequence({rp, ap})));
         var gn = add_node(gr, node(mk_array(sp, cp), GrNop(void)));
         *out = gn;
         return true;
@@ -636,7 +640,7 @@ func gr_deref_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_deref_f
       case DerefFieldName(offset u32): {
         name cell_num = ellval_cell(x);
         var dp = add_node(gr, node(mk_array(rp), GrDeref({name, result_cell(oo(&a->lhs)), OffsetConst(offset)})));
-        var sp = add_node(gr, node(mk_array(), GrSequence({dp, ap})));
+        var sp = add_node(gr, node0(GrSequence({dp, ap})));
         *out = sp;
         return true;
       }
@@ -659,7 +663,7 @@ func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_f
         if !gr_after_actions(cs, gr, lp, &alinfo.after.actions, &dp) {
           return false;
         }
-        var cp = add_node(gr, node(mk_array(), GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)})));
+        var cp = add_node(gr, node0(GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)})));
         var gn = add_node(gr, node(mk_array(dp, cp), GrNop(void)));
         *out = gn;
         return true;
@@ -729,7 +733,7 @@ func gr_mk_deref(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_deref, out
   if !gr_later_discard(cs, gr, &a->ptr_discard, &ap) {
     return false;
   }
-  var gn = add_node(gr, node(mk_array(), GrSequence({dp, ap})));
+  var gn = add_node(gr, node0(GrSequence({dp, ap})));
   *out = gn;
   return true;
 }
@@ -760,13 +764,13 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       return true;
     }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
-      var fc = add_node(gr, node(mk_array(), GrWriteConst({ci.comparecells.funcell, ConstDef(ci.comparecells.ip)})));
-      var dp = add_node(gr, node(mk_array(), GrAddressof({ci.comparecells.destptr, value_cell(oo(&a->lhs))})));
-      var sp = add_node(gr, node(mk_array(), GrAddressof({ci.comparecells.srcptr, value_cell(oo(&a->rhs))})));
+      var fc = add_node(gr, node0(GrWriteConst({ci.comparecells.funcell, ConstDef(ci.comparecells.ip)})));
+      var dp = add_node(gr, node0(GrAddressof({ci.comparecells.destptr, value_cell(oo(&a->lhs))})));
+      var sp = add_node(gr, node0(GrAddressof({ci.comparecells.srcptr, value_cell(oo(&a->rhs))})));
       var ap = add_node(gr, node(mk_array(fc, dp, sp), GrApply({ci.comparecells.funcell, mk_array(ci.comparecells.destptr, ci.comparecells.srcptr), ci.comparecells.cmp_result})));
 
-      var nop = add_node(gr, node(mk_array(), GrNop(void)));
-      var assignnop = add_node(gr, node(mk_array(), GrNop(void)));
+      var nop = add_node(gr, node0(GrNop(void)));
+      var assignnop = add_node(gr, node0(GrNop(void)));
       assign gr_num;
       if !gr_after_actions(cs, gr, assignnop, &ci.conditional_actions, &assign) {
         return false;
@@ -816,13 +820,13 @@ func gr_string_literal(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_stri
     }
     push(&bytes, ~ch);
   }
-  var gn = add_node(gr, node(mk_array(), GrWriteConst({rval_cell(x), ConstBytes(bytes)})));
+  var gn = add_node(gr, node0(GrWriteConst({rval_cell(x), ConstBytes(bytes)})));
   *out = gn;
   return true;
 }
 
 func gr_literal(cs *checkstate, gr *frame_graph, x *ast_expr, value bigint, out *gr_num) bool {
-  var gn = add_node(gr, node(mk_array(), GrWriteConst({rval_cell(x), ConstInt(value)})));
+  var gn = add_node(gr, node0(GrWriteConst({rval_cell(x), ConstInt(value)})));
   *out = gn;
   return true;
 }
@@ -830,11 +834,11 @@ func gr_literal(cs *checkstate, gr *frame_graph, x *ast_expr, value bigint, out 
 func gr_name_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_name_expr, out *gr_num) bool {
   switch name_info(a) {
     case &LocalResolve(li local_info): {
-      *out = add_node(gr, node(mk_array(), GrNop(void)));
+      *out = add_node(gr, node0(GrNop(void)));
       return true;
     }
     case &GlobalResolve(gi global_info): {
-      *out = add_node(gr, node(mk_array(), GrWriteConst({rval_cell(x), ConstDef({gi.ent, gi.inst})})));
+      *out = add_node(gr, node0(GrWriteConst({rval_cell(x), ConstDef({gi.ent, gi.inst})})));
       return true;
     }
     case &EnumConstructor(v void): {
@@ -880,7 +884,7 @@ func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *array[aft
     if !gr_after_action(cs, gr, ref(x, i), &dep) {
       return false;
     }
-    prec = add_node(gr, node(mk_array(), GrSequence({prec, dep})));
+    prec = add_node(gr, node0(GrSequence({prec, dep})));
   }
   *out = prec;
   return true;
@@ -909,14 +913,14 @@ func gr_after_action(cs *checkstate, gr *frame_graph, x *after_action, out *gr_n
 func gr_init_action(cs *checkstate, gr *frame_graph, x *init_action, out *gr_num) bool {
   switch &x->ctor {
     case &UniTrivialCtor(v void): {
-      var dp = add_node(gr, node(mk_array(), GrWriteConst({x->arg, ConstInt(~ @[u32] 0)})));
+      var dp = add_node(gr, node0(GrWriteConst({x->arg, ConstInt(~ @[u32] 0)})));
       *out = dp;
       return true;
     }
     case &UniFunCtor(desc uni_fun_ctor_desc): {
       // TODO: This dupes some code of gr_destroy_action.
-      var fc = add_node(gr, node(mk_array(), GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
-      var arp = add_node(gr, node(mk_array(), GrAddressof({desc.argptr, x->arg})));
+      var fc = add_node(gr, node0(GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
+      var arp = add_node(gr, node0(GrAddressof({desc.argptr, x->arg})));
       var ap = add_node(gr, node(mk_array(fc, arp), GrApply({desc.funcell, mk_array(desc.argptr), desc.retvoid})));
       var deadret = add_node(gr, node(mk_array(ap), GrDead({desc.retvoid})));
       *out = deadret;
@@ -928,13 +932,13 @@ func gr_init_action(cs *checkstate, gr *frame_graph, x *init_action, out *gr_num
 func gr_destroy_action(cs *checkstate, gr *frame_graph, x *destroy_action, out *gr_num) bool {
   switch &x->ctor {
     case &UniTrivialCtor(v void): {
-      var dp = add_node(gr, node(mk_array(), GrDead({x->arg})));
+      var dp = add_node(gr, node0(GrDead({x->arg})));
       *out = dp;
       return true;
     }
     case &UniFunCtor(desc uni_fun_ctor_desc): {
-      var fc = add_node(gr, node(mk_array(), GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
-      var arp = add_node(gr, node(mk_array(), GrAddressof({desc.argptr, x->arg})));
+      var fc = add_node(gr, node0(GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
+      var arp = add_node(gr, node0(GrAddressof({desc.argptr, x->arg})));
       var ap = add_node(gr, node(mk_array(fc, arp), GrApply({desc.funcell, mk_array(desc.argptr), desc.retvoid})));
       var deadret = add_node(gr, node(mk_array(ap), GrDead({desc.retvoid})));
       var dp = add_node(gr, node(mk_array(deadret), GrDead({x->arg})));
@@ -947,14 +951,14 @@ func gr_destroy_action(cs *checkstate, gr *frame_graph, x *destroy_action, out *
 func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bool {
   switch &x->ctor {
     case &BiTrivialCtor(v void): {
-      var cp = add_node(gr, node(mk_array(), GrMemCopy({x->dest, x->src})));
+      var cp = add_node(gr, node0(GrMemCopy({x->dest, x->src})));
       *out = cp;
       return true;
     }
     case &BiFunCtor(desc bi_fun_ctor_desc): {
-      var fc = add_node(gr, node(mk_array(), GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
-      var dp = add_node(gr, node(mk_array(), GrAddressof({desc.destptr, x->dest})));
-      var sp = add_node(gr, node(mk_array(), GrAddressof({desc.srcptr, x->src})));
+      var fc = add_node(gr, node0(GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
+      var dp = add_node(gr, node0(GrAddressof({desc.destptr, x->dest})));
+      var sp = add_node(gr, node0(GrAddressof({desc.srcptr, x->src})));
       var ap = add_node(gr, node(mk_array(fc, dp, sp), GrApply({desc.funcell, mk_array(desc.destptr, desc.srcptr), desc.retvoid})));
       var deadret = add_node(gr, node(mk_array(ap), GrDead({desc.retvoid})));
       *out = deadret;
