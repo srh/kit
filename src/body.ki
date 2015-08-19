@@ -224,45 +224,10 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
     }
 
     case &For(b ast_for_statement): {
-      initter_vp varpopper;
-      init_vp(&initter_vp, &bs->es);
-      loopnum statement_num = add_statement(bs, None());
-      if case &Has(initter box[ast_statement]) = &b.initializer {
-        initter_ee entryexit;
-        if !check_statement(bs, &initter_vp, oo(&initter), &initter_ee) {
-          return false;
-        }
-        connect_statements(bs, num, initter_ee.entry);
-        connect_statements(bs, initter_ee.exit, loopnum);
-      } else {
-        connect_statements(bs, num, loopnum);
-      }
-
-      exitnum statement_num = add_statement(bs, None());
-      if case &Has(cond box[ast_expr_consume]) = &b.condition {
-        boolean cu_typeexpr = compute_prim(bs->ds, primitive_bool_type(bs->cs));
-        if !check_consume_then_discard_expr(&bs->es, oo(&cond), &boolean.~, &b.condition_discard) {
-          return false;
-        }
-        connect_statements(bs, loopnum, exitnum);
-      }
-      if case &Has(incr box[ast_expr_discard]) = &b.increment {
-        unknown te_typeexpr = TeUnknown(void);
-        if !check_discard_expr(&bs->es, oo(&incr), &unknown) {
-          return false;
-        }
-      }
-      body_ee entryexit;
-      if !check_body(bs, &b.body, &body_ee) {
+      exitnum statement_num;
+      if !check_for_statement(bs, vp, &b, num, &exitnum) {
         return false;
       }
-      connect_statements(bs, loopnum, body_ee.entry);
-      connect_statements(bs, body_ee.exit, loopnum);
-      initter_destructions array[destroy_action];
-      if !make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions) {
-        return false;
-      }
-      set(&b.info, {initter_destructions});
       *ee_out = {num, exitnum};
     }
 
@@ -388,6 +353,50 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       *ee_out = {num, add_statement(bs, None())};
     }
   }
+  return true;
+}
+
+func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num statement_num, exit_out *statement_num) bool {
+  initter_vp varpopper;
+  init_vp(&initter_vp, &bs->es);
+  loopnum statement_num = add_statement(bs, None());
+  if case &Has(initter box[ast_statement]) = &a->initializer {
+    initter_ee entryexit;
+    if !check_statement(bs, &initter_vp, oo(&initter), &initter_ee) {
+      return false;
+    }
+    connect_statements(bs, num, initter_ee.entry);
+    connect_statements(bs, initter_ee.exit, loopnum);
+  } else {
+    connect_statements(bs, num, loopnum);
+  }
+
+  exitnum statement_num = add_statement(bs, None());
+  if case &Has(cond box[ast_expr_consume]) = &a->condition {
+    boolean cu_typeexpr = compute_prim(bs->ds, primitive_bool_type(bs->cs));
+    if !check_consume_then_discard_expr(&bs->es, oo(&cond), &boolean.~, &a->condition_discard) {
+      return false;
+    }
+    connect_statements(bs, loopnum, exitnum);
+  }
+  if case &Has(incr box[ast_expr_discard]) = &a->increment {
+    unknown te_typeexpr = TeUnknown(void);
+    if !check_discard_expr(&bs->es, oo(&incr), &unknown) {
+      return false;
+    }
+  }
+  body_ee entryexit;
+  if !check_body(bs, &a->body, &body_ee) {
+    return false;
+  }
+  connect_statements(bs, loopnum, body_ee.entry);
+  connect_statements(bs, body_ee.exit, loopnum);
+  initter_destructions array[destroy_action];
+  if !make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions) {
+    return false;
+  }
+  set(&a->info, {initter_destructions});
+  *exit_out = exitnum;
   return true;
 }
 
