@@ -1186,7 +1186,13 @@ enum match_result name_table_match_def(
     CHECK(ent->name == name);
 
     struct ast_typeexpr unified;
-    struct def_instantiation *instantiation;
+    /* Initialized to NULL to silence a wrong gcc 4.9.2 warning.  (gcc
+    is not sure instantiation gets initialized on the code path where
+    it gets assigned to matched_instantiation.  (We know it's
+    initialized because we pass 1 right here, for the
+    build_return_values parameter of def_entry_matches, and because
+    the return value is MATCH_SUCCESS.) */
+    struct def_instantiation *instantiation = NULL;
     enum match_result res = def_entry_matches(
         cs->im, ent, generics_or_null, generics_count,
         partial_type, 1, &unified, &instantiation);
