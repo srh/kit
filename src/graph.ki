@@ -198,11 +198,9 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
     }
 
     case &For(a ast_for_statement): {
-      gn gr_num;
-      if !gr_for_statement(cs, gr, fb, &a, &gn) {
+      if !gr_for_statement(cs, gr, fb, &a, outflow, out) {
         return false;
       }
-      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
       return true;
     }
     case &Switch(a ast_switch_statement): {
@@ -266,7 +264,7 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
   return true;
 }
 
-func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_for_statement, out *gr_num) bool {
+func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_for_statement, outflow gr_num, out *gr_num) bool {
   var topgn = add_node(gr, node(mk_array(), GrNop(void)));
 
   loopcleanupgn gr_num;
@@ -299,7 +297,9 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
       return false;
     }
 
-    if !gr_expr_condition(cs, gr, fb, oo(&bc), thengn, loopexitgn, &gn) {
+    var exitseq = add_node(gr, node(mk_array(), GrSequence({loopexitgn, outflow})));
+
+    if !gr_expr_condition(cs, gr, fb, oo(&bc), thengn, exitseq, &gn) {
       return false;
     }
   } else {
