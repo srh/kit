@@ -1234,7 +1234,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
   if !parse_bracebody(p, &body) {
     return Fail;
   }
-  *out = For({initializer, mk_later(), condition, increment, body});
+  *out = For({None@[ast_for_statement_info](), initializer, mk_later(), condition, increment, body});
   return true;
 }
 

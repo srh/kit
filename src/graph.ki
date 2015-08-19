@@ -302,13 +302,17 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
 
   gn gr_num;
   if case &Has(bc box[ast_expr_consume]) = &a->condition {
-    // TODO: We might need to cleanup the variable declared in the initializer.
     loopexitgn gr_num;
     if !gr_later_discard(cs, gr, &a->condition_discard, &loopexitgn) {
       return false;
     }
 
-    var exitseq = add_node(gr, node0(GrSequence({loopexitgn, outflow})));
+    initseq gr_num;
+    if !gr_unwind_vars(cs, gr, &unHas(&a->info)->initter_destructions, outflow, &initseq) {
+      return false;
+    }
+
+    var exitseq = add_node(gr, node0(GrSequence({loopexitgn, initseq})));
 
     if !gr_expr_condition(cs, gr, fb, oo(&bc), thengn, exitseq, &gn) {
       return false;

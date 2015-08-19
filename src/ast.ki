@@ -228,8 +228,13 @@ deftype ast_while_statement struct {
   body ast_bracebody;
 };
 
+deftype ast_for_statement_info struct {
+  initter_destructions array[destroy_action];
+};
+
 deftype ast_for_statement struct {
   // Can only be an ast_expr or ast_statement_var.
+  info opt[ast_for_statement_info];
   initializer opt[box[ast_statement]];
   condition_discard ast_later_discard_info;
   condition opt[box[ast_expr_consume]];
