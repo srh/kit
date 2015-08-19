@@ -191,11 +191,9 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
       return true;
     }
     case &While(a ast_while_statement): {
-      gn gr_num;
-      if !gr_while_statement(cs, gr, fb, &a, &gn) {
+      if !gr_while_statement(cs, gr, fb, &a, outflow, out) {
         return false;
       }
-      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
       return true;
     }
 
@@ -322,7 +320,7 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
   return true;
 }
 
-func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_while_statement, out *gr_num) bool {
+func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_while_statement, outflow gr_num, out *gr_num) bool {
   var topgn = add_node(gr, node(mk_array(), GrNop(void)));
 
   loopcleanupgn gr_num;
@@ -335,13 +333,15 @@ func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *
     return false;
   }
 
+  var exitseq = add_node(gr, node(mk_array(), GrSequence({loopexitgn, outflow})));
+
   var continuegn = add_node(gr, node(mk_array(), GrSequence({loopcleanupgn, topgn})));
   thengn gr_num;
   if !gr_bracebody(cs, gr, fb, &a->body, continuegn, &thengn) {
     return false;
   }
   gn gr_num;
-  if !gr_condition(cs, gr, fb, &a->condition, thengn, loopexitgn, &gn) {
+  if !gr_condition(cs, gr, fb, &a->condition, thengn, exitseq, &gn) {
     return false;
   }
 
