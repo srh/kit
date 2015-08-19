@@ -920,6 +920,13 @@ func gr_after_action(cs *checkstate, gr *frame_graph, x *after_action, out *gr_n
   }
 }
 
+func gr_uni_fun_ctor_desc(cs *checkstate, gr *frame_graph, desc *uni_fun_ctor_desc, arg cell_num) gr_num {
+  var fc = add_node(gr, node0(GrWriteConst({desc->funcell, ConstDef(desc->ip)})));
+  var arp = add_node(gr, node0(GrAddressof({desc->argptr, arg})));
+  var ap = add_node(gr, node(mk_array(fc, arp), GrApply({desc->funcell, mk_array(desc->argptr), desc->retvoid})));
+  var deadret = add_node(gr, node(mk_array(ap), GrDead({desc->retvoid})));
+  return deadret;
+}
 
 func gr_init_action(cs *checkstate, gr *frame_graph, x *init_action, out *gr_num) bool {
   switch &x->ctor {
@@ -929,12 +936,8 @@ func gr_init_action(cs *checkstate, gr *frame_graph, x *init_action, out *gr_num
       return true;
     }
     case &UniFunCtor(desc uni_fun_ctor_desc): {
-      // TODO: This dupes some code of gr_destroy_action.
-      var fc = add_node(gr, node0(GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
-      var arp = add_node(gr, node0(GrAddressof({desc.argptr, x->arg})));
-      var ap = add_node(gr, node(mk_array(fc, arp), GrApply({desc.funcell, mk_array(desc.argptr), desc.retvoid})));
-      var deadret = add_node(gr, node(mk_array(ap), GrDead({desc.retvoid})));
-      *out = deadret;
+      gn gr_num = gr_uni_fun_ctor_desc(cs, gr, &desc, x->arg);
+      *out = gn;
       return true;
     }
   }
@@ -948,11 +951,8 @@ func gr_destroy_action(cs *checkstate, gr *frame_graph, x *destroy_action, out *
       return true;
     }
     case &UniFunCtor(desc uni_fun_ctor_desc): {
-      var fc = add_node(gr, node0(GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
-      var arp = add_node(gr, node0(GrAddressof({desc.argptr, x->arg})));
-      var ap = add_node(gr, node(mk_array(fc, arp), GrApply({desc.funcell, mk_array(desc.argptr), desc.retvoid})));
-      var deadret = add_node(gr, node(mk_array(ap), GrDead({desc.retvoid})));
-      var dp = add_node(gr, node(mk_array(deadret), GrDead({x->arg})));
+      gn gr_num = gr_uni_fun_ctor_desc(cs, gr, &desc, x->arg);
+      var dp = add_node(gr, node(mk_array(gn), GrDead({x->arg})));
       *out = dp;
       return true;
     }
