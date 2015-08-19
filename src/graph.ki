@@ -179,19 +179,15 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
     }
 
     case &IfThen(a ast_ifthen_statement): {
-      gn gr_num;
-      if !gr_ifthen_statement(cs, gr, fb, &a, &gn) {
+      if !gr_ifthen_statement(cs, gr, fb, &a, outflow, out) {
         return false;
       }
-      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
       return true;
     }
     case &IfThenElse(a ast_ifthenelse_statement): {
-      gn gr_num;
-      if !gr_ifthenelse_statement(cs, gr, fb, &a, &gn) {
+      if !gr_ifthenelse_statement(cs, gr, fb, &a, outflow, out) {
         return false;
       }
-      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
       return true;
     }
     case &While(a ast_while_statement): {
@@ -354,52 +350,46 @@ func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *
   return true;
 }
 
-func gr_ifthenelse_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_ifthenelse_statement, out *gr_num) bool {
-  // TODO: No nops, do this properly.
-  var thennop = add_node(gr, node(mk_array(), GrNop(void)));
-  thengn gr_num;
-  if !gr_bracebody(cs, gr, fb, &a->thenbody, thennop, &thengn) {
-    return false;
-  }
-  var elsenop = add_node(gr, node(mk_array(), GrNop(void)));
-  elsegn gr_num;
-  if !gr_bracebody(cs, gr, fb, &a->elsebody, elsenop, &elsegn) {
-    return false;
-  }
-  gn gr_num;
-  if !gr_ifthenelse_condition(cs, gr, fb, &a->condition, &a->condition_discard, thengn, elsegn, &gn) {
-    return false;
-  }
-  *out = gn;
-  return true;
-}
-
-func gr_ifthen_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_ifthen_statement, out *gr_num) bool {
-  // TODO: No, do this properly.
-  var bodynop = add_node(gr, node(mk_array(), GrNop(void)));
-  bodygn gr_num;
-  if !gr_bracebody(cs, gr, fb, &a->body, bodynop, &bodygn) {
-    return false;
-  }
-  nopgn gr_num = add_node(gr, node(mk_array(), GrNop(void)));
-  gn gr_num;
-  if !gr_ifthenelse_condition(cs, gr, fb, &a->condition, &a->condition_discard, bodygn, nopgn, &gn) {
-    return false;
-  }
-  *out = gn;
-  return true;
-}
-
-func gr_ifthenelse_condition(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_condition, disc *ast_later_discard_info, thengn gr_num, elsegn gr_num, out *gr_num) bool {
-  br gr_num;
-  if !gr_condition(cs, gr, fb, a, thengn, elsegn, &br) {
-    return false;
-  }
+func gr_ifthenelse_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_ifthenelse_statement, outflow gr_num, out *gr_num) bool {
   latergn gr_num;
-  if !gr_later_discard(cs, gr, disc, &latergn) {
+  if !gr_later_discard(cs, gr, &a->condition_discard, &latergn) {
     return false;
   }
-  var gn = add_node(gr, node(mk_array(), GrSequence({br, latergn})));
+
+  var latseq = add_node(gr, node(mk_array(), GrSequence({latergn, outflow})));
+
+  thengn gr_num;
+  if !gr_bracebody(cs, gr, fb, &a->thenbody, latseq, &thengn) {
+    return false;
+  }
+  elsegn gr_num;
+  if !gr_bracebody(cs, gr, fb, &a->elsebody, latseq, &elsegn) {
+    return false;
+  }
+  gn gr_num;
+  if !gr_condition(cs, gr, fb, &a->condition, thengn, elsegn, &gn) {
+    return false;
+  }
+  *out = gn;
+  return true;
+}
+
+func gr_ifthen_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_ifthen_statement, outflow gr_num, out *gr_num) bool {
+  latergn gr_num;
+  if !gr_later_discard(cs, gr, &a->condition_discard, &latergn) {
+    return false;
+  }
+
+  var latseq = add_node(gr, node(mk_array(), GrSequence({latergn, outflow})));
+
+  bodygn gr_num;
+  if !gr_bracebody(cs, gr, fb, &a->body, latseq, &bodygn) {
+    return false;
+  }
+  gn gr_num;
+  if !gr_condition(cs, gr, fb, &a->condition, bodygn, latseq, &gn) {
+    return false;
+  }
   *out = gn;
   return true;
 }
