@@ -303,6 +303,8 @@ deftype ast_switch_case struct {
 };
 
 deftype ast_fullbody_info struct {
+  parameter_destructions array[destroy_action];
+
   all_vars array[var_info];
   cells array[cell_info];
 

@@ -127,15 +127,20 @@ defenum gr_const {
 deftype fullbody_state struct {
   // TODO: This is disconcerting because fb->info->cells is a copy of gr->cells.
   info *ast_fullbody_info;
-  exit_node gr_num;
+  final_node gr_num;
 };
 
 func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) bool {
-  fb fullbody_state;
-  fb.info = unHas(&x->info);
-  // TODO: What is the exit_node?  What variables are destroyed?  Implement variable destruction... everywhere it's necessary.
-  fb.exit_node = add_node(gr, node0(GrNop(void)));
-  if !gr_bracebody(cs, gr, &fb, &x->bb, fb.exit_node, out) {
+  var final_node = add_node(gr, node0(GrNop(void)));
+
+  exit_node gr_num;
+  if !gr_unwind_vars(cs, gr, &unHas(&x->info)->parameter_destructions, final_node, &exit_node) {
+    return false;
+  }
+
+  fb fullbody_state = {unHas(&x->info), final_node};
+
+  if !gr_bracebody(cs, gr, &fb, &x->bb, exit_node, out) {
     return false;
   }
   return true;
@@ -472,7 +477,7 @@ func gr_return_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
   }
   info *ast_return_statement_info = unHas(&a->info);
   uw gr_num;
-  if !gr_unwind_vars(cs, gr, &info->destructions, fb->exit_node, &uw) {
+  if !gr_unwind_vars(cs, gr, &info->destructions, fb->final_node, &uw) {
     return false;
   }
   var sn = add_node(gr, node0(GrSequence({gn, uw})));
