@@ -1528,7 +1528,7 @@ func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **
       return false;
     }
     inst *deftype_inst = ref_deftype_inst(ds->cs, pack.inst_id);
-    if case &Has(info deftype_inst_info) = &inst->info {
+    if case &Computed(info deftype_inst_info) = &inst->info {
       if case &Has(t cu_typeexpr) = &info.rhs {
         *rhs_type_out = &t;
         return true;

@@ -226,7 +226,6 @@ func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_ins
       return ~TeName({name, Has({ent_id, inst_id})});
     }
     case &HasParms(a array[cu_typeexpr]): {
-      // TODO: Ugh, just get rid of cu_typeexpr?
       converted array[te_typeexpr];
       n size = count(&a);
       for i size = 0; i < n; i = i + 1 {
@@ -318,13 +317,6 @@ func to_defclass_properties(cs *checkstate, clq *clqueue, ent_id deftype_entry_i
   return true;
 }
 
-defenum deftype_inst_status {
-  DidNotStartChecking void;
-  StartedChecking void;
-  FinishedChecking void;
-  FailedChecking void;
-};
-
 deftype deftype_inst_info struct {
   // This is None() if the type is primitive.
   rhs opt[cu_typeexpr];
@@ -333,9 +325,7 @@ deftype deftype_inst_info struct {
 
 deftype deftype_inst struct {
   parms cu_genparms;
-  // TODO: should status+info be nfbc[deftype_inst_info]?
-  status deftype_inst_status;
-  info opt[deftype_inst_info];
+  info nbfc[deftype_inst_info];
 };
 
 deftype deftype_nonprim struct {

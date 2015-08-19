@@ -16,3 +16,11 @@ func[T] BeganComputing() nbfc[T] {
 func[T] FailedComputation() nbfc[T] {
   return NotComputed(void);
 }
+
+func[T] isBeganComputing(x *nbfc[T]) bool {
+  if case &BeganComputing(v void) = x {
+    return true;
+  } else {
+    return false;
+  }
+}

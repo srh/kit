@@ -177,7 +177,7 @@ func add_bool_primitive(cs *checkstate) void {
 }
 
 func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) void {
-  info opt[deftype_inst_info] = Has({
+  info deftype_inst_info = {
     None(),
     @[type_properties]{
       flat_traits.size,
@@ -187,16 +187,13 @@ func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
       DerivedMethodTrivial(void),
       DerivedMethodTrivial(void)
     }
-  });
-  inst_id deftype_inst_id
-      = add_deftype_inst(cs, {NoParms(void),
-                              FinishedChecking(void),
-                              info});
+  };
+  inst_id deftype_inst_id = add_deftype_inst(cs, {NoParms(void), Computed(info)});
   insts array[deftype_inst_id];
   push(&insts, inst_id);
   // access_scope is not relevant to a primitive deftype.
   access_scope array[access_entry_id];
-  ent deftype_entry = {cs->im->cym.primitive_module_sym, name, access_scope, RhsImpossible(void), NoGenerics(void), None(), info, insts};
+  ent deftype_entry = {cs->im->cym.primitive_module_sym, name, access_scope, RhsImpossible(void), NoGenerics(void), None(), Has(info), insts};
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" module.
 }
