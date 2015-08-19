@@ -1315,23 +1315,21 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *array
     }
   }
 
-  if true {
-    ee entryexit;
-    if !check_body(bs, &a->body.bb, &ee) {
-      return false;
-    }
-    if !finish_lambda_body(bs, ee) {
-      return false;
-    }
-
-    destructions array[destroy_action];
-    if !make_destructions(&bs->es, read_nums(&vp), &destructions) {
-      return false;
-    }
-
-    info ast_fullbody_info = {destructions, bs->es.all_vars, bs->es.cells, bs->gotos, bs->labels, bs->statements};
-    annotate_fullbody(&a->body, info);
+  ee entryexit;
+  if !check_body(bs, &a->body.bb, &ee) {
+    return false;
   }
+  if !finish_lambda_body(bs, ee) {
+    return false;
+  }
+
+  destructions array[destroy_action];
+  if !make_destructions(&bs->es, read_nums(&vp), &destructions) {
+    return false;
+  }
+
+  info ast_fullbody_info = {destructions, bs->es.all_vars, bs->es.cells, bs->gotos, bs->labels, bs->statements};
+  annotate_fullbody(&a->body, info);
 
   return true;
 }
