@@ -237,8 +237,31 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
       return true;
     }
     case &Goto(a ast_goto_statement): {
-      return TODO();
+      if !gr_goto_statement(cs, gr, fb, &a, outflow, out) {
+        return false;
+      }
+      return true;
     }
+  }
+}
+
+func gr_goto_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_goto_statement, outflow gr_num, out *gr_num) bool {
+  if case Has(ix size) = help_lookup_label(&fb->info->labels, a->target.value) {
+    info *ast_goto_statement_info = unHas(&a->info);
+    jmp gr_num = get(&fb->label_gn, ix);
+    wn gr_num;
+    if !gr_wind_vars(cs, gr, &info->initializations, jmp, &wn) {
+      return false;
+    }
+    un gr_num;
+    if !gr_unwind_vars(cs, gr, &info->destructions, wn, &un) {
+      return false;
+    }
+    *out = un;
+    return true;
+  } else {
+    ice(_u8("gr_goto_statement could not find info for label"));
+    return fake();
   }
 }
 
@@ -247,7 +270,7 @@ func gr_label_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *
   if case Has(ix size) = help_lookup_label(&fb->info->labels, a->name.value) {
     gn gr_num = get(&fb->label_gn, ix);
     mut_nop_node(gr, gn, node0(GrJmp({outflow})));
-    // Should we set *out to gn or outflow?  When labels get fancier, the answer will be gn.
+    // Should we set *out to gn or outflow?  When labels get fancier, the answer will matter.
     *out = gn;
     return true;
   } else {
@@ -516,6 +539,23 @@ func gr_return_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
   return true;
 }
 
+// "initializations" is in variable declaration order -- the _same_ order as evaluation.
+func gr_wind_vars(cs *checkstate, gr *frame_graph, initializations *array[init_action], outflow gr_num, out *gr_num) bool {
+  bn gr_num = outflow;
+  n size = count(initializations);
+  for i size = n; i > 0; {
+    i = i - 1;
+    gn gr_num;
+    if !gr_init_action(cs, gr, ref(initializations, i), &gn) {
+      return false;
+    }
+    bn = add_node(gr, node0(GrSequence({gn, bn})));
+  }
+  *out = bn;
+  return true;
+}
+
+// "destructions" is in variable declaration order -- the _opposite_ order of evaluation.
 func gr_unwind_vars(cs *checkstate, gr *frame_graph, destructions *array[destroy_action], outflow gr_num, out *gr_num) bool {
   bn gr_num = outflow;
   n size = count(destructions);

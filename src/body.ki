@@ -9,6 +9,7 @@ import expr;
 
 deftype goto_info struct {
   stnum statement_num;
+  st *ast_goto_statement;
   label_name sym;
   in_scope array[var_number];
 };
@@ -93,6 +94,31 @@ func check_body(bs *bodystate, a *ast_bracebody, ee_out *entryexit) bool {
   }
   set(&a->info, {destructions});
   *ee_out = {entry, exit};
+  return true;
+}
+
+func make_init_action(es *framescope, vn var_number, out *init_action) bool {
+  vi *var_info = ref_var(es, vn);
+  init uni_ctor_desc;
+  if !get_init_uni_ctor(es, &vi->type, &init) {
+    return false;
+  }
+  ia init_action = {init, vi->cell};
+  *out = ia;
+  return true;
+}
+
+func make_initializations(es *framescope, vns *array[var_number], out *array[init_action]) bool {
+  initializations array[init_action];
+  n size = count(vns);
+  for i size = 0; i < n; i = i + 1 {
+    ia init_action;
+    if !make_init_action(es, get(vns, i), &ia) {
+      return false;
+    }
+    push(&initializations, ia);
+  }
+  *out = initializations;
   return true;
 }
 
@@ -248,7 +274,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       *ee_out = {num, num};
     }
     case &Goto(b ast_goto_statement): {
-      push(&bs->gotos, {num, b.target.value, vars_in_scope(&bs->es)});
+      push(&bs->gotos, {num, &b, b.target.value, vars_in_scope(&bs->es)});
       *ee_out = {num, add_statement(bs, None())};
     }
   }
@@ -677,6 +703,18 @@ func connect_gotos(bs *bodystate) bool {
 
       l->hit = true;
       connect_statements(bs, g->stnum, l->stnum);
+
+      destructions array[destroy_action];
+      if !make_destructions(&bs->es, &destruct, &destructions) {
+        return false;
+      }
+
+      initializations array[init_action];
+      if !make_initializations(&bs->es, &construct, &initializations) {
+        return false;
+      }
+
+      set(&g->st->info, {destructions, initializations});
     } else {
       ERR(_u8("no label named '"), lookup(bs->im, g->label_name), _u8("'"));
       return false;

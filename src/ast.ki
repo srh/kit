@@ -265,7 +265,13 @@ deftype ast_label_statement struct {
   name ast_ident;
 };
 
+deftype ast_goto_statement_info struct {
+  destructions array[destroy_action];
+  initializations array[init_action];
+};
+
 deftype ast_goto_statement struct {
+  info opt[ast_goto_statement_info];
   target ast_ident;
 };
 
