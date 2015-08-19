@@ -143,41 +143,83 @@ func gr_bracebody(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_br
   n size = count(&x->statements);
   for i size = n; i > 0; {
     i = i - 1;
-    sn gr_num;
-    if !gr_statement(cs, gr, fb, ref(&x->statements, i), &sn) {
+    gn gr_num;
+    if !gr_statement(cs, gr, fb, ref(&x->statements, i), bn, &gn) {
       return false;
     }
-    bn = add_node(gr, node(mk_array(), GrSequence({sn, bn})));
+    bn = gn;
   }
   *out = bn;
   return true;
 }
 
-func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_statement, out *gr_num) bool {
+func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_statement, outflow gr_num, out *gr_num) bool {
   switch x {
     case &Expr(a ast_expr_discard): {
-      return gr_expr_discard(cs, gr, &a, out);
+      gn gr_num;
+      if !gr_expr_discard(cs, gr, &a, &gn) {
+        return false;
+      }
+      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
+      return true;
     }
     case &Return(a ast_return_statement): {
-      return gr_return_statement(cs, gr, fb, &a, out);
+      gn gr_num;
+      if !gr_return_statement(cs, gr, fb, &a, &gn) {
+        return false;
+      }
+      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
+      return true;
     }
     case &Var(a ast_var_statement): {
-      return gr_var_statement(cs, gr, fb, &a, out);
+      gn gr_num;
+      if !gr_var_statement(cs, gr, fb, &a, &gn) {
+        return false;
+      }
+      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
+      return true;
     }
+
     case &IfThen(a ast_ifthen_statement): {
-      return gr_ifthen_statement(cs, gr, fb, &a, out);
+      gn gr_num;
+      if !gr_ifthen_statement(cs, gr, fb, &a, &gn) {
+        return false;
+      }
+      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
+      return true;
     }
     case &IfThenElse(a ast_ifthenelse_statement): {
-      return gr_ifthenelse_statement(cs, gr, fb, &a, out);
+      gn gr_num;
+      if !gr_ifthenelse_statement(cs, gr, fb, &a, &gn) {
+        return false;
+      }
+      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
+      return true;
     }
     case &While(a ast_while_statement): {
-      return gr_while_statement(cs, gr, fb, &a, out);
+      gn gr_num;
+      if !gr_while_statement(cs, gr, fb, &a, &gn) {
+        return false;
+      }
+      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
+      return true;
     }
+
     case &For(a ast_for_statement): {
-      return gr_for_statement(cs, gr, fb, &a, out);
+      gn gr_num;
+      if !gr_for_statement(cs, gr, fb, &a, &gn) {
+        return false;
+      }
+      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
+      return true;
     }
     case &Switch(a ast_switch_statement): {
-      return gr_switch_statement(cs, gr, fb, &a, out);
+      gn gr_num;
+      if !gr_switch_statement(cs, gr, fb, &a, &gn) {
+        return false;
+      }
+      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
+      return true;
     }
     case &Label(a ast_label_statement): {
       return TODO();
@@ -276,11 +318,9 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
 
   fingn gr_num;
   if case &Has(bi box[ast_statement]) = &a->initializer {
-    initgn gr_num;
-    if !gr_statement(cs, gr, fb, oo(&bi), &initgn) {
+    if !gr_statement(cs, gr, fb, oo(&bi), topgn, &fingn) {
       return false;
     }
-    fingn = add_node(gr, node(mk_array(), GrSequence({initgn, topgn})));
   } else {
     fingn = topgn;
   }
