@@ -204,11 +204,9 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
       return true;
     }
     case &Switch(a ast_switch_statement): {
-      gn gr_num;
-      if !gr_switch_statement(cs, gr, fb, &a, &gn) {
+      if !gr_switch_statement(cs, gr, fb, &a, outflow, out) {
         return false;
       }
-      *out = add_node(gr, node(mk_array(), GrSequence({gn, outflow})));
       return true;
     }
     case &Label(a ast_label_statement): {
@@ -220,11 +218,13 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
   }
 }
 
-func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_switch_statement, out *gr_num) bool {
+func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_switch_statement, outflow gr_num, out *gr_num) bool {
   swartch_discard_gn gr_num;
   if !gr_later_discard(cs, gr, &a->swartch_discard, &swartch_discard_gn) {
     return false;
   }
+
+  var exitseq = add_node(gr, node(mk_array(), GrSequence({swartch_discard_gn, outflow})));
 
   info *ast_enum_deconstruction_info = unHas(&a->info);
   cases array[tup[gr_const, gr_num]];
@@ -233,7 +233,7 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
   for i size = 0; i < ncases; i = i + 1 {
     sc *ast_switch_case = ref(&a->cases, i);
     body_gn gr_num;
-    if !gr_bracebody(cs, gr, fb, &sc->body, swartch_discard_gn, &body_gn) {
+    if !gr_bracebody(cs, gr, fb, &sc->body, exitseq, &body_gn) {
       return false;
     }
 
