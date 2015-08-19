@@ -139,7 +139,6 @@ func add_unop_primitive(cs *checkstate, oper sym, typename sym) void {
 
 func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) void {
   add_simple_primitive(cs, name, traits.flat);
-  // TODO: Put all uses of intern into cs->im->cym.
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("+"))), name);
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("-"))), name);
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("*"))), name);

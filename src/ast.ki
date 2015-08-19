@@ -292,7 +292,6 @@ deftype ast_cp_info struct {
   vn var_number;
   tag_value u32;
   // enum_field_offset(cs, et, tag_value) -- annotated here because getting a te_enum in graph.ki is needlessly annoying.
-  // TODO: Probably shouldn't be here.
   field_offset u32;
 };
 
