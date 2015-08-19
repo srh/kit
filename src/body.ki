@@ -232,110 +232,9 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
     }
 
     case &Switch(b ast_switch_statement): {
-      unknown te_typeexpr = TeUnknown(void);
-      if !check_consume_then_discard_expr(&bs->es, oo(&b.swartch), &unknown, &b.swartch_discard) {
+      exitnum statement_num;
+      if !check_switch_statement(bs, vp, &b, num, &exitnum) {
         return false;
-      }
-
-      swartch_type *cu_typeexpr = expr_complete_type(&oo(&b.swartch)->expr);
-
-      switchable_type *te_typeexpr;
-      is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(bs->cs), &switchable_type);
-      if !is_ptr {
-        switchable_type = &swartch_type->~;
-      }
-
-      // switchable_type is complete, because swartch_type was.
-
-      enum_type *te_typeexpr;
-      if !complete_structural_rhs(bs->ds, switchable_type, &enum_type) {
-        return false;
-      }
-      // enum_type is complete, because complete_structural_rhs does that.
-
-      exitnum statement_num = add_statement(bs, None());
-
-      if case &TeEnum(et te_enum) = enum_type {
-        ncases size = count(&b.cases);
-        for i size = 0; i < ncases; i = i + 1 {
-          cas *ast_switch_case = ref(&b.cases, i);
-          for j size = 0; j < i; j = j + 1 {
-            if duped_patterns(&cas->pattern, &ref(&b.cases, j)->pattern) {
-              ERR(_u8("duplicate patterns"));
-              return false;
-            }
-          }
-
-          switch &cas->pattern {
-            case &Case(patt ast_constructor_pattern): {
-              if isHas(&patt.addressof_constructor) != is_ptr {
-                ERR(_u8("swartch/pattern pointeriness mismatch"));
-                return false;
-              }
-
-              expected_type *te_typeexpr;
-              decl_index size;
-              if !find_vardecl(&et.constructors, patt.constructor_name.value, &expected_type, &decl_index) {
-                ERR(_u8("constructor not found"));
-                return false;
-              }
-              // expected_type is complete, because enum_type was.
-
-              // TODO: Cache converted?
-              converted te_typeexpr;
-              if !convert_typeexpr(bs->cs, &patt.decl.type, &converted) {
-                return false;
-              }
-
-              unified te_typeexpr;
-              if !unify_types(&converted, expected_type, &unified) {
-                ERR(_u8("constructor variable type mismatch"));
-                return false;
-              }
-
-              case_vp varpopper;
-              init_vp(&case_vp, &bs->es);
-              cu_expected_type cu_typeexpr = ~ *expected_type;
-              expected_type_props type_properties;
-              if !compute_type_properties(bs->cs, bs->clq, &cu_expected_type, &expected_type_props) {
-                return false;
-              }
-              cell cell_num = add_virtual_cell(&bs->es, cu_expected_type, expected_type_props);
-              vn var_number;
-              // Can't auto-initialize bound case variables, be the switch be over a pointer or not.
-              if !es_push_var(&bs->es, &case_vp, cell, &patt.decl.name, &cu_expected_type, AutoInitNo(void), &vn) {
-                return false;
-              }
-
-              tag_value u32 = enum_tag_min + ~decl_index;
-              set(&patt.cp_info, {vn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
-
-              body_ee entryexit;
-              if !check_body(bs, &cas->body, &body_ee) {
-                return false;
-              }
-              connect_statements(bs, num, body_ee.entry);
-              connect_statements(bs, body_ee.exit, exitnum);
-            }
-            case &Default(v void): {
-              body_ee entryexit;
-              if !check_body(bs, &cas->body, &body_ee) {
-                return false;
-              }
-              connect_statements(bs, num, body_ee.entry);
-              connect_statements(bs, body_ee.exit, exitnum);
-            }
-          }
-        }
-        if ncases > count(&et.constructors) {
-          check(ncases == 1 + count(&et.constructors));
-          ERR(_u8("Unnecessary default case."));
-          return false;
-        }
-        tag_cell cell_num = add_virtual_tag_cell(&bs->es, &et);
-        set(&b.info, {tag_cell, ~count(&et.constructors)});
-      } else {
-        ERR(_u8("Switching over non-switchable type."));
       }
       *ee_out = {num, exitnum};
     }
@@ -353,6 +252,116 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       *ee_out = {num, add_statement(bs, None())};
     }
   }
+  return true;
+}
+
+func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statement, num statement_num, exit_out *statement_num) bool {
+  unknown te_typeexpr = TeUnknown(void);
+  if !check_consume_then_discard_expr(&bs->es, oo(&a->swartch), &unknown, &a->swartch_discard) {
+    return false;
+  }
+
+  swartch_type *cu_typeexpr = expr_complete_type(&oo(&a->swartch)->expr);
+
+  switchable_type *te_typeexpr;
+  is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(bs->cs), &switchable_type);
+  if !is_ptr {
+    switchable_type = &swartch_type->~;
+  }
+
+  // switchable_type is complete, because swartch_type was.
+
+  enum_type *te_typeexpr;
+  if !complete_structural_rhs(bs->ds, switchable_type, &enum_type) {
+    return false;
+  }
+  // enum_type is complete, because complete_structural_rhs does that.
+
+  exitnum statement_num = add_statement(bs, None());
+
+  if case &TeEnum(et te_enum) = enum_type {
+    ncases size = count(&a->cases);
+    for i size = 0; i < ncases; i = i + 1 {
+      cas *ast_switch_case = ref(&a->cases, i);
+      for j size = 0; j < i; j = j + 1 {
+        if duped_patterns(&cas->pattern, &ref(&a->cases, j)->pattern) {
+          ERR(_u8("duplicate patterns"));
+          return false;
+        }
+      }
+
+      switch &cas->pattern {
+        case &Case(patt ast_constructor_pattern): {
+          if isHas(&patt.addressof_constructor) != is_ptr {
+            ERR(_u8("swartch/pattern pointeriness mismatch"));
+            return false;
+          }
+
+          expected_type *te_typeexpr;
+          decl_index size;
+          if !find_vardecl(&et.constructors, patt.constructor_name.value, &expected_type, &decl_index) {
+            ERR(_u8("constructor not found"));
+            return false;
+          }
+          // expected_type is complete, because enum_type was.
+
+          // TODO: Cache converted?
+          converted te_typeexpr;
+          if !convert_typeexpr(bs->cs, &patt.decl.type, &converted) {
+            return false;
+          }
+
+          unified te_typeexpr;
+          if !unify_types(&converted, expected_type, &unified) {
+            ERR(_u8("constructor variable type mismatch"));
+            return false;
+          }
+
+          case_vp varpopper;
+          init_vp(&case_vp, &bs->es);
+          cu_expected_type cu_typeexpr = ~ *expected_type;
+          expected_type_props type_properties;
+          if !compute_type_properties(bs->cs, bs->clq, &cu_expected_type, &expected_type_props) {
+            return false;
+          }
+          cell cell_num = add_virtual_cell(&bs->es, cu_expected_type, expected_type_props);
+          vn var_number;
+          // Can't auto-initialize bound case variables, be the switch be over a pointer or not.
+          if !es_push_var(&bs->es, &case_vp, cell, &patt.decl.name, &cu_expected_type, AutoInitNo(void), &vn) {
+            return false;
+          }
+
+          tag_value u32 = enum_tag_min + ~decl_index;
+          set(&patt.cp_info, {vn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
+
+          body_ee entryexit;
+          if !check_body(bs, &cas->body, &body_ee) {
+            return false;
+          }
+          connect_statements(bs, num, body_ee.entry);
+          connect_statements(bs, body_ee.exit, exitnum);
+        }
+        case &Default(v void): {
+          body_ee entryexit;
+          if !check_body(bs, &cas->body, &body_ee) {
+            return false;
+          }
+          connect_statements(bs, num, body_ee.entry);
+          connect_statements(bs, body_ee.exit, exitnum);
+        }
+      }
+    }
+    if ncases > count(&et.constructors) {
+      check(ncases == 1 + count(&et.constructors));
+      ERR(_u8("Unnecessary default case."));
+      return false;
+    }
+    tag_cell cell_num = add_virtual_tag_cell(&bs->es, &et);
+    set(&a->info, {tag_cell, ~count(&et.constructors)});
+  } else {
+    ERR(_u8("Switching over non-switchable type."));
+  }
+  *exit_out = exitnum;
   return true;
 }
 
