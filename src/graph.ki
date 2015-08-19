@@ -128,6 +128,8 @@ deftype fullbody_state struct {
   // TODO: This is disconcerting because fb->info->cells is a copy of gr->cells.
   info *ast_fullbody_info;
   final_node gr_num;
+  // count(&label_gn) == count(&info->labels), they start off as nop nodes until we see the label.
+  label_gn array[gr_num];
 };
 
 func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) bool {
@@ -138,7 +140,15 @@ func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) 
     return false;
   }
 
-  fb fullbody_state = {unHas(&x->info), final_node};
+  info *ast_fullbody_info = unHas(&x->info);
+  label_gn array[gr_num];
+  n size = count(&info->labels);
+  for i size = 0; i < n; i = i + 1 {
+    ngn gr_num = add_node(gr, node0(GrNop(void)));
+    push(&label_gn, ngn);
+  }
+
+  fb fullbody_state = {info, final_node, label_gn};
 
   if !gr_bracebody(cs, gr, &fb, &x->bb, exit_node, out) {
     return false;
@@ -221,11 +231,28 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
       return true;
     }
     case &Label(a ast_label_statement): {
-      return TODO();
+      if !gr_label_statement(cs, gr, fb, &a, outflow, out) {
+        return false;
+      }
+      return true;
     }
     case &Goto(a ast_goto_statement): {
       return TODO();
     }
+  }
+}
+
+func gr_label_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_label_statement, outflow gr_num, out *gr_num) bool {
+  // TODO: Would be more rigorous if the ast_label_statement had a label_num.
+  if case Has(ix size) = help_lookup_label(&fb->info->labels, a->name.value) {
+    gn gr_num = get(&fb->label_gn, ix);
+    mut_nop_node(gr, gn, node0(GrJmp({outflow})));
+    // Should we set *out to gn or outflow?  When labels get fancier, the answer will be gn.
+    *out = gn;
+    return true;
+  } else {
+    ice(_u8("gr_label_statement could not find info for label"));
+    return fake();
   }
 }
 

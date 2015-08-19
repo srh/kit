@@ -503,14 +503,18 @@ func check_return_statement(bs *bodystate, vp *varpopper, a *ast_return_statemen
   return true;
 }
 
-func lookup_label(bs *bodystate, label_name sym) opt[size] {
-  nlabels size = count(&bs->labels);
+func help_lookup_label(labels *array[label_info], label_name sym) opt[size] {
+  nlabels size = count(labels);
   for i size = 0; i < nlabels; i = i + 1 {
-    if ref(&bs->labels, i)->label_name == label_name {
+    if ref(labels, i)->label_name == label_name {
       return Has(i);
     }
   }
   return None();
+}
+
+func lookup_label(bs *bodystate, label_name sym) opt[size] {
+  return help_lookup_label(&bs->labels, label_name);
 }
 
 func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
