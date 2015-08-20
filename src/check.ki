@@ -1191,7 +1191,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
         }
       } else {
         // TODO: Figure this shiz out.
-        ice(_u8("Assigning inst properties on non-primitive deftype."));
+        ice(_u8("Assigning inst properties on primitive deftype."));
       }
       return true;
     }
