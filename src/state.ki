@@ -424,20 +424,26 @@ deftype def_nonprim struct {
   tl *ast_toplevel;
 };
 
+defenum def_definition {
+  // The def is a primitive (+, -, etc), has no RHS.
+  DefPrim void;
+  DefHasRhs def_nonprim;
+};
+
 deftype def_entry struct {
   module_name sym;
   def_name sym;
   accessible array[access_entry_id];
   // A copy of the ast_def's generics field -- if it's an ast_extern_def, this is NoGenerics.
   generics ast_generics;
-  nonprim opt[def_nonprim];
+  definition def_definition;
   converted_typeexpr nbfc[te_typeexpr];
 
   insts array[def_inst_id];
 };
 
 func mk(module_name sym, def_name sym, accessible array[access_entry_id], generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
-  return {module_name, def_name, accessible, generics, Has({quick_typeexpr, tl}), NotComputed(), default@[array[def_inst_id]]()};
+  return {module_name, def_name, accessible, generics, DefHasRhs({quick_typeexpr, tl}), NotComputed(), default@[array[def_inst_id]]()};
 }
 
 deftype clqueue_deftype_entry struct {

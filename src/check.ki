@@ -240,22 +240,25 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) b
   switch &ent->converted_typeexpr {
     case &NotComputed(v void): {
       ent->converted_typeexpr = BeganComputing();
-      if case &Has(np def_nonprim) = &ent->nonprim {
-        converted te_typeexpr;
-        if !convert_typeexpr(cs, &np.quick_typeexpr, &converted) {
-          ent->converted_typeexpr = FailedComputation();
-          return false;
+      switch &ent->definition {
+        case &DefHasRhs(np def_nonprim): {
+          converted te_typeexpr;
+          if !convert_typeexpr(cs, &np.quick_typeexpr, &converted) {
+            ent->converted_typeexpr = FailedComputation();
+            return false;
+          }
+          ent->converted_typeexpr = Computed(converted);
+          if case &Computed(te te_typeexpr) = &ent->converted_typeexpr {
+            *out = &te;
+          } else {
+            crash(_u8("impossible converted_typeexpr"));
+          }
+          return true;
         }
-        ent->converted_typeexpr = Computed(converted);
-        if case &Computed(te te_typeexpr) = &ent->converted_typeexpr {
-          *out = &te;
-        } else {
-          crash(_u8("impossible converted_typeexpr"));
+        case &DefPrim(v2 void): {
+          ice(_u8("def_entry for primitive has converted_typeexpr NotComputed."));
+          return fake();
         }
-        return true;
-      } else {
-        ice(_u8("def_entry nonprime has converted_typeexpr NotComputed."));
-        return fake();
       }
     }
     case &BeganComputing(v void): {
@@ -339,16 +342,19 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
     return {id, false};
   }
   rhs opt[ast_expr_consume];
-  if case &Has(np def_nonprim) = &ent->nonprim {
-    switch np.tl {
-      case &Def(a ast_def): { rhs = Has(a.rhs); }
-      case &ExternDef(a ast_extern_def): { rhs = None(); }
-      default: {
-        ice(_u8("def_entry has invalid toplevel\n"));
+  switch &ent->definition {
+    case &DefHasRhs(np def_nonprim): {
+      switch np.tl {
+        case &Def(a ast_def): { rhs = Has(a.rhs); }
+        case &ExternDef(a ast_extern_def): { rhs = None(); }
+        default: {
+          ice(_u8("def_entry has invalid toplevel\n"));
+        }
       }
     }
-  } else {
-    rhs = None();
+    case &DefPrim(v void): {
+      rhs = None();
+    }
   }
   var id = add_inst(cs, mk(*parms, rhs));
   push(&ent->insts, id);

@@ -105,7 +105,7 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool 
 func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_typeexpr) def_entry_id {
   // access_scope is not relevant to a primitive def.
   access_scope array[access_entry_id];
-  ent def_entry = {cs->im->cym.primitive_module_sym, name, access_scope, generics, None(), Computed(type), default@[array[def_inst_id]]()};
+  ent def_entry = {cs->im->cym.primitive_module_sym, name, access_scope, generics, DefPrim(void), Computed(type), default@[array[def_inst_id]]()};
   id def_entry_id = add_def_entry(cs, ent);
   return id;
   // TODO: We probably want to put the id in some kind of "primitive" module.
