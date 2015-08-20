@@ -426,8 +426,9 @@ deftype def_nonprim struct {
 
 defenum def_definition {
   // The def is a primitive (+, -, etc), has no RHS.
-  DefPrim void;
-  DefHasRhs def_nonprim;
+  DefnPrim void;
+  DefnHasRhs def_nonprim;
+  DefnEnumConstructor void;
 };
 
 deftype def_entry struct {
@@ -443,7 +444,7 @@ deftype def_entry struct {
 };
 
 func mk(module_name sym, def_name sym, accessible array[access_entry_id], generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
-  return {module_name, def_name, accessible, generics, DefHasRhs({quick_typeexpr, tl}), NotComputed(), default@[array[def_inst_id]]()};
+  return {module_name, def_name, accessible, generics, DefnHasRhs({quick_typeexpr, tl}), NotComputed(), default@[array[def_inst_id]]()};
 }
 
 deftype clqueue_deftype_entry struct {

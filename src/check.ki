@@ -241,7 +241,11 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) b
     case &NotComputed(v void): {
       ent->converted_typeexpr = BeganComputing();
       switch &ent->definition {
-        case &DefHasRhs(np def_nonprim): {
+        case &DefnPrim(v2 void): {
+          ice(_u8("def_entry for primitive has converted_typeexpr NotComputed."));
+          return fake();
+        }
+        case &DefnHasRhs(np def_nonprim): {
           converted te_typeexpr;
           if !convert_typeexpr(cs, &np.quick_typeexpr, &converted) {
             ent->converted_typeexpr = FailedComputation();
@@ -255,8 +259,8 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) b
           }
           return true;
         }
-        case &DefPrim(v2 void): {
-          ice(_u8("def_entry for primitive has converted_typeexpr NotComputed."));
+        case &DefnEnumConstructor(v2 void): {
+          ice(_u8("def_entry for enum constructor has converted_typeexpr NotComputed."));
           return fake();
         }
       }
@@ -343,7 +347,10 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
   }
   rhs opt[ast_expr_consume];
   switch &ent->definition {
-    case &DefHasRhs(np def_nonprim): {
+    case &DefnPrim(v void): {
+      rhs = None();
+    }
+    case &DefnHasRhs(np def_nonprim): {
       switch np.tl {
         case &Def(a ast_def): { rhs = Has(a.rhs); }
         case &ExternDef(a ast_extern_def): { rhs = None(); }
@@ -352,7 +359,7 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
         }
       }
     }
-    case &DefPrim(v void): {
+    case &DefnEnumConstructor(v void): {
       rhs = None();
     }
   }
