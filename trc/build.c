@@ -1870,14 +1870,17 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
 }
 
 void gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32_t upadded_size) {
+  enum x86_reg zreg = choose_altreg(reg);
+  x86_gen_mov_reg_imm32(f, zreg, 0);
+
   int32_t padded_size = uint32_to_int32(upadded_size);
   int32_t n = 0;
   while (n < padded_size) {
     if (padded_size - n >= DWORD_SIZE) {
-      x86_gen_mov_mem_imm32(f, reg, int32_add(n, disp), imm_u32(0));
+      x86_gen_store32(f, reg, int32_add(n, disp), zreg);
       n += DWORD_SIZE;
     } else {
-      x86_gen_mov_mem_imm8(f, reg, int32_add(n, disp), 0);
+      x86_gen_store8(f, reg, int32_add(n, disp), zreg);
       n += 1;
     }
   }
