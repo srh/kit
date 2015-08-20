@@ -768,11 +768,13 @@ void append_immediate(struct objfile *f, struct immediate imm) {
   }
 }
 
+
 void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
-                           struct immediate imm) {
-  uint8_t b = 0xB8 + (uint8_t)dest;
-  objfile_section_append_raw(objfile_text(f), &b, 1);
-  append_immediate(f, imm);
+                           int32_t imm32) {
+  uint8_t b[5];
+  b[0] = 0xB8 + (uint8_t)dest;
+  memcpy(b + 1, &imm32, sizeof(imm32));
+  objfile_section_append_raw(objfile_text(f), b, 5);
 }
 
 void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
@@ -2355,10 +2357,9 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   struct loc return_enum_num_loc = make_enum_num_loc(f, h, return_loc);
   struct loc return_enum_body_loc = make_enum_body_loc(f, h, return_loc, arg_size);
 
-  struct immediate enum_num_imm
-    = imm_u32(uint32_add(FIRST_ENUM_TAG_NUMBER,
-                         size_to_uint32(enumconstruct_number)));
-  x86_gen_mov_reg_imm32(f, X86_EAX, enum_num_imm);
+  int32_t enum_num_i32
+    = int32_add(FIRST_ENUM_TAG_NUMBER, size_to_int32(enumconstruct_number));
+  x86_gen_mov_reg_imm32(f, X86_EAX, enum_num_i32);
   gen_store_register(f, return_enum_num_loc, X86_EAX);
 
   gen_move_or_copydestroy(cs, f, h, return_enum_body_loc, arg_loc, arg0_type);
@@ -3473,7 +3474,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
 
   gen_load_register(f, X86_EAX, rhs_loc);
 
-  x86_gen_mov_reg_imm32(f, X86_ECX, imm_u32(elem_size));
+  x86_gen_mov_reg_imm32(f, X86_ECX, elem_size);
   x86_gen_imul_w32(f, X86_EAX, X86_ECX);
   gen_crash_jcc(f, h, X86_JCC_O);
 
@@ -3792,7 +3793,7 @@ struct loc gen_array_element_loc(struct checkstate *cs,
   uint32_t elem_offset = uint32_mul(elem_size, index);
 
   gen_load_addressof(f, X86_EDX, src);
-  x86_gen_mov_reg_imm32(f, X86_ECX, imm_u32(elem_offset));
+  x86_gen_mov_reg_imm32(f, X86_ECX, elem_offset);
   x86_gen_add_w32(f, X86_EDX, X86_ECX);
   struct loc loc = frame_push_loc(h, DWORD_SIZE);
   gen_store_register(f, loc, X86_EDX);
@@ -4503,7 +4504,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
       /* We carefully make the 0 tag and nonsense tag values redirect
       to the crash branch. */
-      x86_gen_mov_reg_imm32(f, X86_ECX, imm_u32(FIRST_ENUM_TAG_NUMBER));
+      x86_gen_mov_reg_imm32(f, X86_ECX, FIRST_ENUM_TAG_NUMBER);
       x86_gen_sub_w32(f, X86_EAX, X86_ECX);
       x86_gen_cmp_imm32(f, X86_EAX,
                         size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.u.default_pattern.info)));
