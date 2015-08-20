@@ -768,13 +768,18 @@ void append_immediate(struct objfile *f, struct immediate imm) {
   }
 }
 
+void x86_gen_xor_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src);
 
 void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
                            int32_t imm32) {
-  uint8_t b[5];
-  b[0] = 0xB8 + (uint8_t)dest;
-  memcpy(b + 1, &imm32, sizeof(imm32));
-  objfile_section_append_raw(objfile_text(f), b, 5);
+  if (imm32 == 0) {
+    x86_gen_xor_w32(f, dest, dest);
+  } else {
+    uint8_t b[5];
+    b[0] = 0xB8 + (uint8_t)dest;
+    memcpy(b + 1, &imm32, sizeof(imm32));
+    objfile_section_append_raw(objfile_text(f), b, 5);
+  }
 }
 
 void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
