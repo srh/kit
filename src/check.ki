@@ -1343,7 +1343,8 @@ func process_toplevels(cs *checkstate,
                        access_scope array[access_entry_id],
                        mod *module,
                        toplevels *array[ast_toplevel]) bool {
-  for i size = 0; i < count(toplevels); i = i + 1 {
+  ntoplevels size = count(toplevels);
+  for i size = 0; i < ntoplevels; i = i + 1 {
     toplevel *ast_toplevel = ref(toplevels, i);
     switch toplevel {
       case &Import(a ast_import): {
