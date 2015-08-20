@@ -352,7 +352,9 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
     }
     case &DefnHasRhs(np def_nonprim): {
       switch np.tl {
-        case &Def(a ast_def): { rhs = InstRhsExpr(a.rhs); }
+        case &Def(a ast_def): {
+          rhs = InstRhsExpr({a.rhs});
+        }
         case &ExternDef(a ast_extern_def): { rhs = InstRhsExtern(void); }
         default: {
           ice(_u8("def_entry has invalid toplevel\n"));
@@ -455,9 +457,9 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_
         case &InstRhsExtern(v2 void): {
           // Do nothing.
         }
-        case &InstRhsExpr(rhs ast_expr_consume): {
+        case &InstRhsExpr(rhs def_inst_rhs_expr): {
           info frame_info;
-          if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs, &inst->computed_type.~, &info) {
+          if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs.ec, &inst->computed_type.~, &info) {
             return false;
           }
           inst->frame_info = Has(info);

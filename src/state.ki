@@ -400,12 +400,16 @@ deftype frame_info struct {
   cells array[cell_info];
 };
 
+deftype def_inst_rhs_expr struct {
+  ec ast_expr_consume;
+};
+
 defenum def_inst_rhs {
   // Prim defs... don't have an rhs to check.
   InstRhsPrim void;
   // Extern defs don't have an rhs.
   InstRhsExtern void;
-  InstRhsExpr ast_expr_consume;
+  InstRhsExpr def_inst_rhs_expr;
   InstRhsMagic def_magic;
 };
 

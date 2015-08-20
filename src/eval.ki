@@ -214,7 +214,7 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
       ice(_u8("st_eval_def on an extern def."));
       return fake();
     }
-    case &InstRhsExpr(e ast_expr_consume): {
+    case &InstRhsExpr(e def_inst_rhs_expr): {
       check(is_defwise_trivial(&inst->computed_type_properties));
       switch &inst->evaled_value {
         case &NotComputed(v void): {
@@ -226,7 +226,7 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
             ice(_u8("st_eval_def sees inst without num_frame_cells."));
           }
           result st_obj_ref;
-          if !st_eval_expr(cs, &env, &e.expr, &result) {
+          if !st_eval_expr(cs, &env, &e.ec.expr, &result) {
             return false;
           }
           value st_value;
