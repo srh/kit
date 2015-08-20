@@ -183,12 +183,17 @@ func enum_tag_type(cs *checkstate, et *te_enum) te_typeexpr {
   }
 }
 
-func enum_field_offset(cs *checkstate, et *te_enum, constructor_tag_value u32) u32 {
+deftype enum_tag_value u32;
+def `~` fn[u32, enum_tag_value] = wrapconvert;
+
+func enum_field_offset(cs *checkstate, et *te_enum, tag enum_tag_value) u32 {
   // Things will get more complicated at some point.
   return cs->platform.enum_tag_size;
 }
 
-
+func mk_enum_tag_value(constructor_decl_index size) enum_tag_value {
+  return ~(enum_tag_min + ~constructor_decl_index);
+}
 
 func[H] build_u8str(help H, r *array[u8], a *cu_typeexpr) void {
   return build_u8str(help, r, &a->~);

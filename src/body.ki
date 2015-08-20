@@ -357,7 +357,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statemen
             return false;
           }
 
-          tag_value u32 = enum_tag_min + ~decl_index;
+          tag_value enum_tag_value = mk_enum_tag_value(decl_index);
           set(&patt.cp_info, {vn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
 
           body_ee entryexit;
@@ -622,13 +622,13 @@ func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later
         }
         cell cell_num = add_virtual_cell(es, cu_expected_type, expected_type_props);
         tag_cell cell_num = add_virtual_tag_cell(es, &et);
-        set(&b.info, {{tag_cell, ~count(&et.constructors)}, enum_tag_min + ~decl_index});
+        set(&b.info, {{tag_cell, ~count(&et.constructors)}, mk_enum_tag_value(decl_index)});
         vn var_number;
         if !es_push_var(es, cond_vp, cell, &b.pattern.decl.name, &cu_expected_type, AutoInitNo(void), &vn) {
           return false;
         }
 
-        tag_value u32 = enum_tag_min + ~decl_index;
+        tag_value enum_tag_value = mk_enum_tag_value(decl_index);
         set(&b.pattern.cp_info, {vn, tag_value, enum_field_offset(es->cs, &et, tag_value)});
 
         return true;

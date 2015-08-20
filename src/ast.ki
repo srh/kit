@@ -190,12 +190,12 @@ deftype ast_var_statement struct {
 
 deftype ast_pattern_assign_info struct {
   deconstruct ast_enum_deconstruction_info;
-  matching_tag_value u32;
+  matching_tag_value enum_tag_value;
 };
 
 deftype ast_enum_deconstruction_info struct {
   tag_cell cell_num;
-  num_enum_constructors u32;
+  num_enum_constructors size;
 };
 
 deftype ast_pattern_assign struct {
@@ -290,7 +290,7 @@ defenum ast_statement {
 
 deftype ast_cp_info struct {
   vn var_number;
-  tag_value u32;
+  tag_value enum_tag_value;
   // enum_field_offset(cs, et, tag_value) -- annotated here because getting a te_enum in graph.ki is needlessly annoying.
   field_offset u32;
 };

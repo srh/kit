@@ -327,6 +327,7 @@ func replaced_name_parms(ds *defscope, a *ast_name_expr, out *genparms) bool {
 
 deftype constructor_info struct {
   type cu_typeexpr;
+  constructor_tag enum_tag_value;
 };
 
 defenum ds_constructor_res {
@@ -374,7 +375,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       return false;
     }
     check(cac_cons_type.complete);
-    *res_out = MatchedConstructor({~cac_cons_type.te});
+    *res_out = MatchedConstructor({~cac_cons_type.te, mk_enum_tag_value(decl_index)});
     return true;
   } else {
     *res_out = NoMatchConstructor(void);
