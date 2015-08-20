@@ -419,7 +419,7 @@ func mk(parms cu_genparms, rhs opt[ast_expr_consume]) def_inst {
 }
 
 deftype def_nonprim struct {
-  // This is either the syntactic typeexpr (converted to te_typeexpr) or converted from a shallow look at the RHS.
+  // This is either the syntactic typeexpr or converted from a shallow look at the RHS.
   quick_typeexpr ast_typeexpr;
   tl *ast_toplevel;
 };
