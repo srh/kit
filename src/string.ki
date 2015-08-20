@@ -19,7 +19,8 @@ func count(s *string) size {
 func hash_compute_hash(x *string) osize {
   p *i32 = data(x);
   accum osize = 0x12345679;
-  for i size = 0; i < count(x); i = i + 1 {
+  nx size = count(x);
+  for i size = 0; i < nx; i = i + 1 {
     accum = (accum * 33) ^ ~p[i];
   }
   return accum;
