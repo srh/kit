@@ -282,7 +282,7 @@ func st_eval_name_expr(cs *checkstate, env *st_env, x *ast_expr, a *ast_name_exp
         *result_out = oref;
         return true;
       }
-      case &EnumConstructor(v void): {
+      case &EnumConstructor(ec enum_constructor_info): {
         // TODO: This should be supported!
         ERR(_u8("enum construction not supported in static evaluation"));
         return false;

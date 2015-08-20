@@ -1147,7 +1147,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       }
     }
     case &OneEnumConstructorMatch(ci constructor_info): {
-      annotate_name_info(a, EnumConstructor(void));
+      annotate_name_info(a, EnumConstructor({ci.constructor_tag}));
       props type_properties;
       if !compute_type_properties(es->cs, es->clq, &ci.type, &props) {
         return false;
