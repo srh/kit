@@ -399,10 +399,19 @@ deftype frame_info struct {
   cells array[cell_info];
 };
 
+defenum def_inst_rhs {
+  // Prim defs... don't have an rhs to check.
+  InstRhsPrim void;
+  // Extern defs don't have an rhs.
+  InstRhsExtern void;
+  InstRhsExpr ast_expr_consume;
+  InstRhsMagic def_magic;
+};
+
 deftype def_inst struct {
   parms cu_genparms;
-  // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None() if we have an extern def.
-  rhs opt[ast_expr_consume];
+  // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None() if we have an extern def or primitive def.
+  rhs def_inst_rhs;
   status def_inst_status;
   // TODO: Use nbfc or something.
   // Becomes the concrete type (with generics replaced) once we've computed it and checked it (see status).
@@ -414,7 +423,7 @@ deftype def_inst struct {
   evaled_value nbfc[st_value];
 };
 
-func mk(parms cu_genparms, rhs opt[ast_expr_consume]) def_inst {
+func mk(parms cu_genparms, rhs def_inst_rhs) def_inst {
   return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties](), None@[frame_info](), NotComputed@[st_value]()};
 }
 
@@ -424,8 +433,19 @@ deftype def_nonprim struct {
   tl *ast_toplevel;
 };
 
+deftype magic_uni_ctor struct {
+  type te_typeexpr;
+};
+
+deftype magic_bi_ctor struct {
+  type te_typeexpr;
+};
+
 defenum def_magic {
-  MagicConstructor void;
+  MagicInit magic_uni_ctor;
+  MagicMove magic_bi_ctor;
+  MagicCopy magic_bi_ctor;
+  MagicDestroy magic_uni_ctor;
 };
 
 defenum def_definition {

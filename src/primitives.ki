@@ -102,13 +102,18 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool 
 }
 
 // The caller is welcome to ignore the return value.
-func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_typeexpr) def_entry_id {
+func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_typeexpr, definition def_definition) def_entry_id {
   // access_scope is not relevant to a primitive def.
   access_scope array[access_entry_id];
-  ent def_entry = {cs->im->cym.primitive_module_sym, name, access_scope, generics, DefnPrim(void), Computed(type), default@[array[def_inst_id]]()};
+  ent def_entry = {cs->im->cym.primitive_module_sym, name, access_scope, generics, definition, Computed(type), default@[array[def_inst_id]]()};
   id def_entry_id = add_def_entry(cs, ent);
   return id;
   // TODO: We probably want to put the id in some kind of "primitive" module.
+}
+
+// The caller is welcome to ignore the return value.
+func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_typeexpr) def_entry_id {
+  return add_def_primitive(cs, name, generics, type, DefnPrim(void));
 }
 
 func add_def_primitive(cs *checkstate, name sym, type te_typeexpr) void {
@@ -280,16 +285,17 @@ func add_function_primitive(cs *checkstate) void {
   // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.
 }
 
-func add_magic_constructor_primitive(cs *checkstate, name sym, args size) void {
+func add_magic_constructor_primitive(cs *checkstate, name sym, args size, mag def_magic) void {
   var parms = repeat(args, ptr_type(cs, TeName({cs->im->cym.tee_sym, None()})));
   push(&parms, primitive_void_type(cs));
   type te_typeexpr = fn_type(cs, parms);
-  add_def_primitive(cs, name, tee_generic(cs), type);
+  add_def_primitive(cs, name, tee_generic(cs), type, DefnMagic(mag));
 }
 
 func add_magic_constructor_primitives(cs *checkstate) void {
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_init, 1);
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_copy, 2);
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_move, 2);
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_destroy, 1);
+  teetype te_typeexpr = TeName({cs->im->cym.tee_sym, None()});
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_init, 1, MagicInit({teetype}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_copy, 2, MagicCopy({teetype}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_move, 2, MagicMove({teetype}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_destroy, 1, MagicDestroy({teetype}));
 }

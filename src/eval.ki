@@ -205,49 +205,60 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
   if inst->status != FinishedCheckingRhs(void) {
     ice(_u8("Evaling def we have not finished checking."));
   }
-  if case &Has(e ast_expr_consume) = &inst->rhs {
-    check(is_defwise_trivial(&inst->computed_type_properties));
-    switch &inst->evaled_value {
-      case &NotComputed(v void): {
-        inst->evaled_value = BeganComputing();
-        env st_env;
-        if case Has(info frame_info) = inst->frame_info {
-          init_env(&env, &cs->platform, count(&info.cells));
-        } else {
-          ice(_u8("st_eval_def sees inst without num_frame_cells."));
+  switch &inst->rhs {
+    case &InstRhsPrim(v void): {
+      ice(_u8("st_eval_def on a prim def."));
+      return fake();
+    }
+    case &InstRhsExtern(v void): {
+      ice(_u8("st_eval_def on an extern def."));
+      return fake();
+    }
+    case &InstRhsExpr(e ast_expr_consume): {
+      check(is_defwise_trivial(&inst->computed_type_properties));
+      switch &inst->evaled_value {
+        case &NotComputed(v void): {
+          inst->evaled_value = BeganComputing();
+          env st_env;
+          if case Has(info frame_info) = inst->frame_info {
+            init_env(&env, &cs->platform, count(&info.cells));
+          } else {
+            ice(_u8("st_eval_def sees inst without num_frame_cells."));
+          }
+          result st_obj_ref;
+          if !st_eval_expr(cs, &env, &e.expr, &result) {
+            return false;
+          }
+          value st_value;
+          if !obj_read(&env, result, &value) {
+            return false;
+          }
+          inst->evaled_value = Computed(value);
+          if case &Computed(x st_value) = &inst->evaled_value {
+            *out = &x;
+          } else {
+            ice(_u8("locally impossible in st_eval_def"));
+          }
+          return true;
         }
-        result st_obj_ref;
-        if !st_eval_expr(cs, &env, &e.expr, &result) {
+        case &BeganComputing(v void): {
+          ERR(_u8("recursively computing def inst's value"));
           return false;
         }
-        value st_value;
-        if !obj_read(&env, result, &value) {
+        case &FailedComputation(v void): {
+          ERR(_u8("repeat error of st_eval_def"));
           return false;
         }
-        inst->evaled_value = Computed(value);
-        if case &Computed(x st_value) = &inst->evaled_value {
+        case &Computed(x st_value): {
           *out = &x;
-        } else {
-          ice(_u8("locally impossible in st_eval_def"));
+          return true;
         }
-        return true;
-      }
-      case &BeganComputing(v void): {
-        ERR(_u8("recursively computing def inst's value"));
-        return false;
-      }
-      case &FailedComputation(v void): {
-        ERR(_u8("repeat error of st_eval_def"));
-        return false;
-      }
-      case &Computed(x st_value): {
-        *out = &x;
-        return true;
       }
     }
-  } else {
-    ice(_u8("st_eval_def on an extern def."));
-    return fake();
+    case &InstRhsMagic(mag def_magic): {
+      ice(_u8("st_eval_def exists at all..."));
+      return fake();
+    }
   }
 }
 

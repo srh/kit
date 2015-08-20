@@ -345,22 +345,22 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
   if case Has(id) = find_matching_inst(cs, &ent->insts, parms) {
     return {id, false};
   }
-  rhs opt[ast_expr_consume];
+  rhs def_inst_rhs;
   switch &ent->definition {
     case &DefnPrim(v void): {
-      rhs = None();
+      rhs = InstRhsPrim(void);
     }
     case &DefnHasRhs(np def_nonprim): {
       switch np.tl {
-        case &Def(a ast_def): { rhs = Has(a.rhs); }
-        case &ExternDef(a ast_extern_def): { rhs = None(); }
+        case &Def(a ast_def): { rhs = InstRhsExpr(a.rhs); }
+        case &ExternDef(a ast_extern_def): { rhs = InstRhsExtern(void); }
         default: {
           ice(_u8("def_entry has invalid toplevel\n"));
         }
       }
     }
     case &DefnMagic(mag def_magic): {
-      rhs = None();
+      rhs = InstRhsMagic(mag);
     }
   }
   var id = add_inst(cs, mk(*parms, rhs));
@@ -434,34 +434,46 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_
   }
   inst *def_inst = ref_inst(cs, inst_id);
   switch inst->status {
-    case DidNotStartComputingType(v): {
+    case DidNotStartComputingType(v void): {
       ice(_u8("unexpected DidNotStartComputingType status"));
       return fake();
     }
-    case BeganComputingType(v): {
+    case BeganComputingType(v void): {
       ice(_u8("unexpected BeganComputingType status"));
       return fake();
     }
-    case FinishedComputingType(v): {
+    case FinishedComputingType(v void): {
       rw depth_rewinder;
       if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
         return false;
       }
       inst->status = BeganCheckingRhs(void);
-      if case &Has(rhs ast_expr_consume) = &inst->rhs {
-        info frame_info;
-        if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs, &inst->computed_type.~, &info) {
-          return false;
+      switch &inst->rhs {
+        case &InstRhsPrim(v2 void): {
+          // Do nothing.
         }
-        inst->frame_info = Has(info);
+        case &InstRhsExtern(v2 void): {
+          // Do nothing.
+        }
+        case &InstRhsExpr(rhs ast_expr_consume): {
+          info frame_info;
+          if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs, &inst->computed_type.~, &info) {
+            return false;
+          }
+          inst->frame_info = Has(info);
+        }
+        case &InstRhsMagic(mag def_magic): {
+          // Do nothing.
+          // TODO: We need to check and precisely describe (with instpairs) what the magic object's value is.
+        }
       }
       inst->status = FinishedCheckingRhs(void);
       return true;
     }
-    case BeganCheckingRhs(v): {
+    case BeganCheckingRhs(v void): {
       return true;
     }
-    case FinishedCheckingRhs(v): {
+    case FinishedCheckingRhs(v void): {
       return true;
     }
   }
