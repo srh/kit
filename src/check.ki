@@ -353,7 +353,7 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
     case &DefnHasRhs(np def_nonprim): {
       switch np.tl {
         case &Def(a ast_def): {
-          rhs = InstRhsExpr({a.rhs});
+          rhs = InstRhsExpr({a.rhs, None@[frame_info]()});
         }
         case &ExternDef(a ast_extern_def): { rhs = InstRhsExtern(void); }
         default: {
@@ -462,7 +462,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_
           if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs.ec, &inst->computed_type.~, &info) {
             return false;
           }
-          inst->frame_info = Has(info);
+          rhs.frame_info = Has(info);
         }
         case &InstRhsMagic(mag def_magic): {
           // Do nothing.

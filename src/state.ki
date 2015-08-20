@@ -402,6 +402,8 @@ deftype frame_info struct {
 
 deftype def_inst_rhs_expr struct {
   ec ast_expr_consume;
+  // This becomes Has(...) when the def_inst status == FinishedCheckingRhs(void).
+  frame_info opt[frame_info];
 };
 
 defenum def_inst_rhs {
@@ -423,13 +425,11 @@ deftype def_inst struct {
   computed_type cu_typeexpr;
   // Right now, these type properties _must_ indicate that the type is defwise trivial.
   computed_type_properties type_properties;
-  // This becomes Has(...) when status == FinishedCheckingRhs(void), if this is not an extern def.
-  frame_info opt[frame_info];
   evaled_value nbfc[st_value];
 };
 
 func mk(parms cu_genparms, rhs def_inst_rhs) def_inst {
-  return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties](), None@[frame_info](), NotComputed@[st_value]()};
+  return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties](), NotComputed@[st_value]()};
 }
 
 deftype def_nonprim struct {
