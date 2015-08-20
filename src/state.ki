@@ -3,6 +3,7 @@ import box;
 import deferred;
 import identmap;
 import kitutil;
+import magic;
 import shp;
 import typeexpr;
 import u8ast;
@@ -431,21 +432,6 @@ deftype def_nonprim struct {
   // This is either the syntactic typeexpr or converted from a shallow look at the RHS.
   quick_typeexpr ast_typeexpr;
   tl *ast_toplevel;
-};
-
-deftype magic_uni_ctor struct {
-  type te_typeexpr;
-};
-
-deftype magic_bi_ctor struct {
-  type te_typeexpr;
-};
-
-defenum def_magic {
-  MagicInit magic_uni_ctor;
-  MagicMove magic_bi_ctor;
-  MagicCopy magic_bi_ctor;
-  MagicDestroy magic_uni_ctor;
 };
 
 defenum def_definition {

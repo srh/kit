@@ -1,0 +1,24 @@
+import ast;
+import box;
+import deferred;
+import identmap;
+import kitutil;
+import shp;
+import typeexpr;
+import u8ast;
+
+deftype magic_uni_ctor struct {
+  type te_typeexpr;
+};
+
+deftype magic_bi_ctor struct {
+  type te_typeexpr;
+};
+
+defenum def_magic {
+  MagicInit magic_uni_ctor;
+  MagicMove magic_bi_ctor;
+  MagicCopy magic_bi_ctor;
+  MagicDestroy magic_uni_ctor;
+};
+
