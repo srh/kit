@@ -7,12 +7,28 @@ import shp;
 import typeexpr;
 import u8ast;
 
+defenum magic_uni_ctor_info {
+  MagicUniWholeFieldInfo void;
+  MagicUniStructInfo void;
+  MagicUniEnumInfo void;
+  MagicUniArraytypeInfo void;
+};
+
 deftype magic_uni_ctor struct {
   type te_typeexpr;
+  info opt[magic_uni_ctor_info];
+};
+
+defenum magic_bi_ctor_info {
+  MagicBiWholeFieldInfo void;
+  MagicBiStructInfo void;
+  MagicBiEnumInfo void;
+  MagicBiArraytypeInfo void;
 };
 
 deftype magic_bi_ctor struct {
   type te_typeexpr;
+  info opt[magic_bi_ctor_info];
 };
 
 defenum def_magic {

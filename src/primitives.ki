@@ -294,8 +294,8 @@ func add_magic_constructor_primitive(cs *checkstate, name sym, args size, mag de
 
 func add_magic_constructor_primitives(cs *checkstate) void {
   teetype te_typeexpr = TeName({cs->im->cym.tee_sym, None()});
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_init, 1, MagicInit({teetype}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_copy, 2, MagicCopy({teetype}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_move, 2, MagicMove({teetype}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_destroy, 1, MagicDestroy({teetype}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_init, 1, MagicInit({teetype, None@[magic_uni_ctor_info]()}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_copy, 2, MagicCopy({teetype, None@[magic_bi_ctor_info]()}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_move, 2, MagicMove({teetype, None@[magic_bi_ctor_info]()}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_destroy, 1, MagicDestroy({teetype, None@[magic_uni_ctor_info]()}));
 }
