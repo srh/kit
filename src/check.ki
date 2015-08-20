@@ -259,8 +259,8 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) b
           }
           return true;
         }
-        case &DefnEnumConstructor(v2 void): {
-          ice(_u8("def_entry for enum constructor has converted_typeexpr NotComputed."));
+        case &DefnMagic(mag def_magic): {
+          ice(_u8("def_entry for magic implementation has converted_typeexpr NotComputed."));
           return fake();
         }
       }
@@ -359,7 +359,7 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
         }
       }
     }
-    case &DefnEnumConstructor(v void): {
+    case &DefnMagic(mag def_magic): {
       rhs = None();
     }
   }

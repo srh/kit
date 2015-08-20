@@ -424,11 +424,15 @@ deftype def_nonprim struct {
   tl *ast_toplevel;
 };
 
+defenum def_magic {
+  MagicConstructor void;
+};
+
 defenum def_definition {
   // The def is a primitive (+, -, etc), has no RHS.
   DefnPrim void;
   DefnHasRhs def_nonprim;
-  DefnEnumConstructor void;
+  DefnMagic def_magic;
 };
 
 deftype def_entry struct {
