@@ -396,6 +396,7 @@ func annotate_deref_field(a *ast_deref_field, info ast_deref_field_info) void {
   a->info = Has(info);
 }
 
+// TODO: This could just have an instpair field.
 deftype global_info struct {
   ent def_entry_id;
   inst def_inst_id;
@@ -407,6 +408,7 @@ deftype local_info struct {
 
 deftype enum_constructor_info struct {
   constructor_tag enum_tag_value;
+  ip instpair;
 };
 
 defenum ast_name_expr_info {

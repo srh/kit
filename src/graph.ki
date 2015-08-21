@@ -920,7 +920,8 @@ func gr_name_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_name_expr
       return true;
     }
     case &EnumConstructor(ei enum_constructor_info): {
-      return TODO();
+      *out = add_node(gr, node0(GrWriteConst({rval_cell(x), ConstDef(ei.ip)})));
+      return true;
     }
   }
 }

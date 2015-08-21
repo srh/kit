@@ -20,11 +20,29 @@ deftype magic_ctor struct {
   info opt[magic_ctor_info];
 };
 
+deftype copy_destroy_desc struct {
+  copy_desc ctor_desc;
+  destroy_desc ctor_desc;
+};
+
+// This'll be obsolete as soon as we construct enums inline.
+defenum magic_enum_construct_op {
+  EnumConstructMove ctor_desc;
+  EnumConstructCopyDestroy copy_destroy_desc;
+};
+
+deftype magic_enum_construct struct {
+  enum_type cu_typeexpr;
+  constructor_tag enum_tag_value;
+  operational magic_enum_construct_op;
+};
+
 defenum def_magic {
   MagicInit magic_ctor;
   MagicCopy magic_ctor;
   MagicMove magic_ctor;
   MagicDestroy magic_ctor;
+  MagicEnumConstruct magic_enum_construct;
 };
 
 defenum which_ctor {
@@ -47,6 +65,10 @@ func check_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genpar
     }
     case &MagicDestroy(mc magic_ctor): {
       return check_magic_ctor(cs, clq, g, parms, CtorDestroy(void), &mc);
+    }
+    case &MagicEnumConstruct(me magic_enum_construct): {
+      // Nothing to check.
+      return true;
     }
   }
 }
