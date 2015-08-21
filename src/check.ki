@@ -465,8 +465,9 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_
           rhs.frame_info = Has(info);
         }
         case &InstRhsMagic(mag def_magic): {
-          // Do nothing.
-          // TODO: We need to check and precisely describe (with instpairs) what the magic object's value is.
+          if !check_magic(cs, clq, &ent->generics, &inst->parms, &mag) {
+            return false;
+          }
         }
       }
       inst->status = FinishedCheckingRhs(void);
@@ -888,18 +889,27 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *cu_genparms)
   return {id, true};
 }
 
-func compute_pack_properties(cs *checkstate, clq *clqueue, pack *te_instpack, out *type_properties) bool {
+func compute_pack_info(cs *checkstate, clq *clqueue, pack *te_instpack, out **deftype_inst_info) bool {
   if !ensure_deftype_inst_checked(cs, clq, pack->ent_id, pack->inst_id) {
     return false;
   }
   inst *deftype_inst = ref_deftype_inst(cs, pack->inst_id);
   if case &Computed(info deftype_inst_info) = &inst->info {
-    *out = info.props;
+    *out = &info;
     return true;
   } else {
     ice(_u8("ensure_deftype_inst_checked did not compute properties."));
     return fake();
   }
+}
+
+func compute_pack_properties(cs *checkstate, clq *clqueue, pack *te_instpack, out *type_properties) bool {
+  info *deftype_inst_info;
+  if !compute_pack_info(cs, clq, pack, &info) {
+    return false;
+  }
+  *out = info->props;
+  return true;
 }
 
 func compute_type_properties(cs *checkstate, clq *clqueue, t *cu_typeexpr, out *type_properties) bool {
@@ -955,7 +965,7 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
       if case &Has(p te_instpack) = &a.pack {
         return compute_pack_properties(cs, clq, &p, out);
       } else {
-        crash(_u8("compute_type_properties called on packless name type."));
+        ice(_u8("compute_type_properties called on packless name type."));
         return fake();
       }
     }
@@ -1196,8 +1206,8 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
       check(rhs_computed.complete);
 
       check(isBeganComputing(&inst->info));
-      properties type_properties;
-      if !compute_complete_type_properties(cs, clq, &rhs_computed.te, &properties) {
+      rhs_props type_properties;
+      if !compute_complete_type_properties(cs, clq, &rhs_computed.te, &rhs_props) {
         inst->info = FailedComputation();
         return false;
       }
@@ -1205,15 +1215,15 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
       if case &Has(np deftype_nonprim) = &ent->nonprim {
         switch &np.tl->rhs {
           case &TypeexprRhs(a): {
-            inst->info = Computed({Has(~rhs_computed.te), properties});
+            inst->info = Computed({Has({~rhs_computed.te, rhs_props}), rhs_props});
           }
           case &ClassexprRhs(a): {
             class_props type_properties;
-            if !to_defclass_properties(cs, clq, ent_id, id, a.disposition, properties, &class_props) {
+            if !to_defclass_properties(cs, clq, ent_id, id, a.disposition, rhs_props, &class_props) {
               inst->info = FailedComputation();
               return false;
             }
-            inst->info = Computed({Has(~rhs_computed.te), class_props});
+            inst->info = Computed({Has({~rhs_computed.te, rhs_props}), class_props});
           }
         }
       } else {

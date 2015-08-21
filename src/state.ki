@@ -318,9 +318,14 @@ func to_defclass_properties(cs *checkstate, clq *clqueue, ent_id deftype_entry_i
   return true;
 }
 
+deftype deftype_inst_rhs_info struct {
+  rhs_cu cu_typeexpr;
+  rhs_props type_properties;
+};
+
 deftype deftype_inst_info struct {
   // This is None() if the type is primitive.
-  rhs opt[cu_typeexpr];
+  rhs opt[deftype_inst_rhs_info];
   props type_properties;
 };
 

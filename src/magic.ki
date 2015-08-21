@@ -7,34 +7,176 @@ import shp;
 import typeexpr;
 import u8ast;
 
-defenum magic_uni_ctor_info {
-  MagicUniWholeFieldInfo void;
-  MagicUniStructInfo void;
-  MagicUniEnumInfo void;
-  MagicUniArraytypeInfo void;
+defenum magic_ctor_info {
+  MagicWholeFieldInfo instpair;
+  // These are None() for fields that are trivially constructed.
+  MagicStructInfo array[opt[instpair]];
+  MagicEnumInfo array[opt[instpair]];
+  MagicArraytypeInfo instpair;
 };
 
-deftype magic_uni_ctor struct {
+deftype magic_ctor struct {
   type te_typeexpr;
-  info opt[magic_uni_ctor_info];
-};
-
-defenum magic_bi_ctor_info {
-  MagicBiWholeFieldInfo void;
-  MagicBiStructInfo void;
-  MagicBiEnumInfo void;
-  MagicBiArraytypeInfo void;
-};
-
-deftype magic_bi_ctor struct {
-  type te_typeexpr;
-  info opt[magic_bi_ctor_info];
+  info opt[magic_ctor_info];
 };
 
 defenum def_magic {
-  MagicInit magic_uni_ctor;
-  MagicCopy magic_bi_ctor;
-  MagicMove magic_bi_ctor;
-  MagicDestroy magic_uni_ctor;
+  MagicInit magic_ctor;
+  MagicCopy magic_ctor;
+  MagicMove magic_ctor;
+  MagicDestroy magic_ctor;
 };
 
+defenum which_ctor {
+  CtorInit void;
+  CtorCopy void;
+  CtorMove void;
+  CtorDestroy void;
+};
+
+func check_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, mag *def_magic) bool {
+  switch mag {
+    case &MagicInit(mc magic_ctor): {
+      return check_magic_ctor(cs, clq, g, parms, CtorInit(void), &mc);
+    }
+    case &MagicCopy(mc magic_ctor): {
+      return check_magic_ctor(cs, clq, g, parms, CtorCopy(void), &mc);
+    }
+    case &MagicMove(mc magic_ctor): {
+      return check_magic_ctor(cs, clq, g, parms, CtorMove(void), &mc);
+    }
+    case &MagicDestroy(mc magic_ctor): {
+      return check_magic_ctor(cs, clq, g, parms, CtorDestroy(void), &mc);
+    }
+  }
+}
+
+func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, wc which_ctor, mc *magic_ctor) bool {
+  cac cac_typeexpr;
+  if !check_and_compute_typeexpr(cs, clq, g, parms, &mc->type, &cac) {
+    return false;
+  }
+  check(cac.complete);
+
+  switch &cac.te {
+    case &TeName(a te_name): {
+      if case &Has(p te_instpack) = &a.pack {
+        info magic_ctor_info;
+        if !check_pack_ctor(cs, clq, &p, wc, &info) {
+          return false;
+        }
+        set(&mc->info, info);
+      } else {
+        ice(_u8("check_magic_ctor packless name type"));
+      }
+    }
+    case &TeApp(a te_typeapp): {
+      if case &Has(p te_instpack) = &a.pack {
+        info magic_ctor_info;
+        if !check_pack_ctor(cs, clq, &p, wc, &info) {
+          return false;
+        }
+        set(&mc->info, info);
+      } else {
+        ice(_u8("check_magic_ctor packless app type"));
+      }
+    }
+    case &TeStruct(a te_struct): {
+      field_insts array[opt[instpair]];
+      if !check_vardecl_ctor(cs, clq, &a.fields, wc, &field_insts) {
+        return false;
+      }
+      set(&mc->info, MagicStructInfo(field_insts));
+    }
+    case &TeEnum(a te_enum): {
+      field_insts array[opt[instpair]];
+      if !check_vardecl_ctor(cs, clq, &a.constructors, wc, &field_insts) {
+        return false;
+      }
+      set(&mc->info, MagicEnumInfo(field_insts));
+    }
+    case &TeUnion(a te_union): {
+      ice(_u8("check_magic_ctor seeing TeUnion"));
+    }
+    case &TeArraytype(a te_arraytype): {
+      props type_properties;
+      if !compute_complete_type_properties(cs, clq, oo(&a.param), &props) {
+        return false;
+      }
+      set(&mc->info, MagicArraytypeInfo(instpair_from_behavior(select_behavior(wc, &props))));
+    }
+    case &TeUnknown(v void): {
+      ice(_u8("check_magic_ctor seeing TeUnknown"));
+    }
+  }
+
+  return true;
+}
+
+func check_vardecl_ctor(cs *checkstate, clq *clqueue, ds *array[te_vardecl], wc which_ctor, insts_out *array[opt[instpair]]) bool {
+  insts array[opt[instpair]];
+  nds size = count(ds);
+  for i size = 0; i < nds; i = i + 1 {
+    props type_properties;
+    if !compute_complete_type_properties(cs, clq, &ref(ds, i)->type, &props) {
+      return false;
+    }
+    oip opt[instpair] = instpair_or_trivial_from_behavior(select_behavior(wc, &props));
+    push(&insts, oip);
+  }
+  *insts_out = insts;
+  return true;
+}
+
+func pack_rhs_props(cs *checkstate, clq *clqueue, p *te_instpack, rhs_props_out **type_properties) bool {
+  info *deftype_inst_info;
+  if !compute_pack_info(cs, clq, p, &info) {
+    return false;
+  }
+  if case &Has(rhs_info deftype_inst_rhs_info) = &info->rhs {
+    *rhs_props_out = &rhs_info.rhs_props;
+    return true;
+  } else {
+    ice(_u8("check_pack_ctor on primitive type"));
+    return fake();
+  }
+}
+
+func instpair_from_behavior(b *derived_method_behavior) instpair {
+  if case Has(ip instpair) = instpair_or_trivial_from_behavior(b) {
+    return ip;
+  } else {
+    ice(_u8("instpair_from_behavior sees trivial"));
+    return fake();
+  }
+}
+
+func instpair_or_trivial_from_behavior(b *derived_method_behavior) opt[instpair] {
+  switch b {
+    case &DerivedMethodAbsent(v void): {
+      ice(_u8("instpair_or_trivial_from_behavior sees absent"));
+      return fake();
+    }
+    case &DerivedMethodExplicit(ip instpair): { return Has(ip); }
+    case &DerivedMethodNontrivial(ip instpair): { return Has(ip); }
+    case &DerivedMethodTrivial(v void): { return None(); }
+  }
+}
+
+func check_pack_ctor(cs *checkstate, clq *clqueue, p *te_instpack, wc which_ctor, info_out *magic_ctor_info) bool {
+  rhs_props *type_properties;
+  if !pack_rhs_props(cs, clq, p, &rhs_props) {
+    return false;
+  }
+  *info_out = MagicWholeFieldInfo(instpair_from_behavior(select_behavior(wc, rhs_props)));
+  return true;
+}
+
+func select_behavior(wc which_ctor, props *type_properties) *derived_method_behavior {
+  switch wc {
+    case CtorInit(v void): { return &props->init_behavior; }
+    case CtorCopy(v void): { return &props->copy_behavior; }
+    case CtorMove(v void): { return &props->move_behavior; }
+    case CtorDestroy(v void): { return &props->destroy_behavior; }
+  }
+}

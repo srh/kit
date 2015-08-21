@@ -1530,8 +1530,8 @@ func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **
     }
     inst *deftype_inst = ref_deftype_inst(ds->cs, pack.inst_id);
     if case &Computed(info deftype_inst_info) = &inst->info {
-      if case &Has(t cu_typeexpr) = &info.rhs {
-        *rhs_type_out = &t;
+      if case &Has(rhs_info deftype_inst_rhs_info) = &info.rhs {
+        *rhs_type_out = &rhs_info.rhs_cu;
         return true;
       } else {
         ice(_u8("deftype_rhs_accessible permitted a primitive type."));
