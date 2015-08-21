@@ -369,13 +369,13 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       *res_out = NoMatchConstructor(void);
       return true;
     }
-    cons_type te_typeexpr = fn_type(ds->cs, *rhs_type, *return_type);
-    cac_cons_type cac_typeexpr;
-    if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &cons_type, &cac_cons_type) {
+    ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, *return_type);
+    cac_ctor_type cac_typeexpr;
+    if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &ctor_type, &cac_ctor_type) {
       return false;
     }
-    check(cac_cons_type.complete);
-    *res_out = MatchedConstructor({~cac_cons_type.te, mk_enum_tag_value(decl_index)});
+    check(cac_ctor_type.complete);
+    *res_out = MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index)});
     return true;
   } else {
     *res_out = NoMatchConstructor(void);
