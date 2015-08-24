@@ -176,7 +176,7 @@ void objfile_section_append_32bit_reloc(struct objfile_section *s,
   reloc.symbol_table_index = symbol_table_index;
   reloc.type = type;
   SLICE_PUSH(s->relocs, s->relocs_count, s->relocs_limit, reloc);
-  uint32_t zero = 0;
+  uint32_t zero = swap_le_u32(0);
   objfile_section_append_raw(s, &zero, sizeof(zero));
 }
 

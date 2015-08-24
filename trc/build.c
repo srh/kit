@@ -705,9 +705,11 @@ void x86_gen_ret(struct objfile *f) {
 }
 
 void x86_gen_retn(struct objfile *f, uint16_t imm16) {
+  /* I don't know if the immediate is treated signed or unsigned. */
+  CHECK(imm16 < 32768);
   uint8_t b[3];
   b[0] = 0xC2;
-  memcpy(b + 1, &imm16, sizeof(imm16));
+  write_le_u16(b + 1, imm16);
   objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
@@ -750,12 +752,14 @@ void append_immediate(struct objfile *f, struct immediate imm) {
     CRASH("Trying to put a primitive op immediate in memory.");
   } break;
   case IMMEDIATE_U32: {
-    /* LITTLEENDIAN etc. */
-    objfile_section_append_raw(objfile_text(f), &imm.u.u32, sizeof(uint32_t));
+    char buf[4];
+    write_le_u32(buf, imm.u.u32);
+    objfile_section_append_raw(objfile_text(f), buf, sizeof(buf));
   } break;
   case IMMEDIATE_I32: {
-    /* LITTLEENDIAN etc. */
-    objfile_section_append_raw(objfile_text(f), &imm.u.i32, sizeof(int32_t));
+    char buf[4];
+    write_le_i32(buf, imm.u.i32);
+    objfile_section_append_raw(objfile_text(f), buf, sizeof(buf));
   } break;
   case IMMEDIATE_U8:
     UNREACHABLE();
@@ -777,7 +781,7 @@ void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
   } else {
     uint8_t b[5];
     b[0] = 0xB8 + (uint8_t)dest;
-    memcpy(b + 1, &imm32, sizeof(imm32));
+    write_le_i32(b + 1, imm32);
     objfile_section_append_raw(objfile_text(f), b, 5);
   }
 }
@@ -873,8 +877,7 @@ void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
   uint8_t b[6];
   b[0] = 0x81;
   b[1] = mod_reg_rm(MOD11, 0, X86_ESP);
-  STATIC_CHECK(sizeof(int32_t) == 4);
-  ok_memcpy(b + 2, &x, sizeof(int32_t));
+  write_le_i32(b + 2, x);
   objfile_section_append_raw(objfile_text(f), b, 6);
 }
 
@@ -1020,9 +1023,7 @@ void x86_gen_cmp_imm32(struct objfile *f, enum x86_reg lhs, int32_t imm32) {
   uint8_t b[6];
   b[0] = 0x81;
   b[1] = mod_reg_rm(MOD11, 7, lhs);
-  /* LITTLEENDIAN */
-  CHECK(sizeof(imm32) == 4);
-  memcpy(b + 2, &imm32, sizeof(imm32));
+  write_le_i32(b + 2, imm32);
   objfile_section_append_raw(objfile_text(f), b, 6);
 }
 
@@ -1031,9 +1032,7 @@ void x86_gen_cmp_reg16_imm16(struct objfile *f, enum x86_reg16 lhs, int16_t imm1
   b[0] = 0x66;
   b[1] = 0x81;
   b[2] = mod_reg_rm(MOD11, 7, lhs);
-  /* LITTLEENDIAN */
-  CHECK(sizeof(imm16) == 2);
-  memcpy(b + 3, &imm16, sizeof(imm16));
+  write_le_i16(b + 3, imm16);
   objfile_section_append_raw(objfile_text(f), b, 5);
 }
 
@@ -1154,10 +1153,12 @@ void gen_placeholder_stack_adjustment(struct objfile *f,
 void replace_placeholder_stack_adjustment(struct objfile *f,
                                           size_t location,
                                           int32_t stack_adjustment) {
+  char buf[4];
+  write_le_i32(buf, stack_adjustment);
   objfile_section_overwrite_raw(objfile_text(f),
                                 location + 2,
-                                &stack_adjustment,
-                                sizeof(stack_adjustment));
+                                buf,
+                                sizeof(buf));
 }
 
 /* Check callers if max count returned increases. */
@@ -1174,8 +1175,7 @@ size_t x86_encode_reg_rm(uint8_t *b, int reg, enum x86_reg rm_addr,
     return 2;
   } else {
     b[0] = mod_reg_rm(MOD10, reg, rm_addr);
-    STATIC_CHECK(sizeof(rm_addr_disp) == 4);
-    ok_memcpy(b + 1, &rm_addr_disp, sizeof(rm_addr_disp));
+    write_le_i32(b + 1, rm_addr_disp);
     return 5;
   }
 }
@@ -3545,10 +3545,12 @@ void replace_placeholder_jump(struct objfile *f, size_t jmp_location,
   int32_t target32 = size_to_int32(target_offset);
   int32_t jmp32 = size_to_int32(size_add(jmp_location, 4));
   int32_t diff = int32_sub(target32, jmp32);
+  char buf[4];
+  write_le_i32(buf, diff);
   objfile_section_overwrite_raw(objfile_text(f),
                                 jmp_location,
-                                &diff,
-                                sizeof(diff));
+                                buf,
+                                sizeof(buf));
 }
 
 void gen_assignment(struct checkstate *cs, struct objfile *f,
@@ -4617,9 +4619,9 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     objfile_section_align_dword(objfile_data(f));
     objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
-    objfile_section_append_raw(objfile_data(f),
-                               &value->u.i32_value,
-                               sizeof(value->u.i32_value));
+    char buf[4];
+    write_le_i32(buf, value->u.i32_value);
+    objfile_section_append_raw(objfile_data(f), buf, sizeof(buf));
     return 1;
   } break;
   case STATIC_VALUE_U32: {
@@ -4627,9 +4629,9 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     objfile_section_align_dword(objfile_data(f));
     objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
-    objfile_section_append_raw(objfile_data(f),
-                               &value->u.u32_value,
-                               sizeof(value->u.u32_value));
+    char buf[4];
+    write_le_u32(buf, value->u.u32_value);
+    objfile_section_append_raw(objfile_data(f), buf, sizeof(buf));
     return 1;
   } break;
   case STATIC_VALUE_U8: {

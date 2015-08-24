@@ -75,9 +75,13 @@ void ok_memcpy(void *dest, const void *src, size_t n);
 void write_le_u32(void *dest, uint32_t x);
 uint32_t read_le_u32(const void *src);
 
+#define write_le_i32(dest, x) write_le_u32((dest), (uint32_t)(x))
+
 /* Writes/reads a uint16_t in little-endian. */
 void write_le_u16(void *dest, uint16_t x);
 uint16_t read_le_u16(const void *src);
+
+#define write_le_i16(dest, x) write_le_u16((dest), (uint32_t)(x));
 
 uint32_t swap_le_u32(uint32_t x);
 uint16_t swap_le_u16(uint16_t x);
