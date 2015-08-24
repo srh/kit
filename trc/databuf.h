@@ -19,4 +19,7 @@ void databuf_append_c_str(struct databuf *b, const char *s);
 void databuf_overwrite(struct databuf *b, size_t offset,
                        const void *p, size_t count);
 
+void databuf_append_le_u32(struct databuf *b, uint32_t x);
+void databuf_append_le_u16(struct databuf *b, uint16_t x);
+
 #endif /* KIT_DATABUF_H_ */

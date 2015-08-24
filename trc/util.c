@@ -46,3 +46,51 @@ void ok_memcpy(void *dest, const void *src, size_t n) {
   }
   memcpy(dest, src, n);
 }
+
+void write_le_u32(void *dest, uint32_t x) {
+  uint8_t *d = dest;
+  d[0] = x & 0xFF;
+  d[1] = (x >> 8) & 0xFF;
+  d[2] = (x >> 16) & 0xFF;
+  d[3] = (x >> 24);
+}
+
+uint32_t read_le_u32(const void *src) {
+  const uint8_t *s = src;
+  uint32_t ret = s[0];
+  ret += (((uint32_t)(s[1])) << 8);
+  ret += (((uint32_t)(s[2])) << 16);
+  ret += (((uint32_t)(s[3])) << 24);
+  return ret;
+}
+
+void write_le_u16(void *dest, uint16_t x) {
+  uint8_t *d = dest;
+  d[0] = x & 0xFF;
+  d[1] = (x >> 8) & 0xFF;
+}
+
+uint16_t read_le_u16(const void *src) {
+  const uint8_t *s = src;
+  uint16_t ret = s[0];
+  ret += (((uint32_t)(s[1])) << 8);
+  return ret;
+}
+
+uint32_t swap_le_u32(uint32_t x) {
+  union {
+    uint8_t ch[4];
+    uint32_t y;
+  } u;
+  write_le_u32(u.ch, x);
+  return u.y;
+}
+
+uint16_t swap_le_u16(uint16_t x) {
+  union {
+    uint8_t ch[2];
+    uint16_t y;
+  } u;
+  write_le_u16(u.ch, x);
+  return u.y;
+}

@@ -2,6 +2,7 @@
 #define KIT_UTIL_H_
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef _WIN32
 #define PRIz "Iu"
@@ -18,9 +19,6 @@
 #define PACK_POP
 #define PACK_ATTRIBUTE __attribute__((__packed__))
 #endif /* _WIN32 */
-
-/* TODO: Define LITTLE_ENDIAN properly somehow. */
-#define LITTLE_ENDIAN 1
 
 #define STATIC_CHECK(x) do { enum { assertion = 1/!!(x) }; } while (0)
 
@@ -72,5 +70,16 @@ void alloc_half_strcat(const void *lbuf, size_t lcount,
 /* memcpy, only if n == 0 and dest or src is NULL, you don't have
 undefined behavior. */
 void ok_memcpy(void *dest, const void *src, size_t n);
+
+/* Writes/reads a uint32_t in little-endian. */
+void write_le_u32(void *dest, uint32_t x);
+uint32_t read_le_u32(const void *src);
+
+/* Writes/reads a uint16_t in little-endian. */
+void write_le_u16(void *dest, uint16_t x);
+uint16_t read_le_u16(const void *src);
+
+uint32_t swap_le_u32(uint32_t x);
+uint16_t swap_le_u16(uint16_t x);
 
 #endif /* KIT_UTIL_H_ */

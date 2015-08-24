@@ -269,21 +269,21 @@ void win_append_section_symbols(
     CHECK(name_len <= 8);
     memset(standard.Name.ShortName, 0, 8);
     memcpy(standard.Name.ShortName, name, name_len);
-    standard.Value = 0;
-    standard.SectionNumber = SectionNumber;
-    standard.Type = 0;
+    standard.Value = swap_le_u32(0);
+    standard.SectionNumber = swap_le_u16(SectionNumber);
+    standard.Type = swap_le_u16(0);
     standard.StorageClass = IMAGE_SYM_CLASS_STATIC;
     standard.NumberOfAuxSymbols = 1;
     databuf_append(d, &standard, sizeof(standard));
   }
   {
     struct COFF_symbol_aux_sectiondef aux_sectiondef;
-    aux_sectiondef.Length = size_to_uint32(objfile_section_raw_size(s));
+    aux_sectiondef.Length = swap_le_u32(size_to_uint32(objfile_section_raw_size(s)));
     aux_sectiondef.NumberOfRelocations
-      = objfile_section_small_relocations_count(s);
-    aux_sectiondef.NumberOfLineNumbers = 0;
-    aux_sectiondef.CheckSum = 0;
-    aux_sectiondef.Number = 0;
+      = swap_le_u16(objfile_section_small_relocations_count(s));
+    aux_sectiondef.NumberOfLineNumbers = swap_le_u16(0);
+    aux_sectiondef.CheckSum = swap_le_u32(0);
+    aux_sectiondef.Number = swap_le_u16(0);
     aux_sectiondef.Selection = 0;
     STATIC_CHECK(sizeof(aux_sectiondef.Unused) == 3);
     memset(aux_sectiondef.Unused, 0, 3);
@@ -334,9 +334,9 @@ void win_append_relocs(struct databuf *d, struct objfile_relocation *relocs,
 
   for (size_t i = 0; i < relocs_count; i++) {
     struct COFF_Relocation coff_reloc;
-    coff_reloc.VirtualAddress = relocs[i].virtual_address;
-    coff_reloc.SymbolTableIndex = relocs[i].symbol_table_index;
-    coff_reloc.Type = win_Type[relocs[i].type];
+    coff_reloc.VirtualAddress = swap_le_u32(relocs[i].virtual_address);
+    coff_reloc.SymbolTableIndex = swap_le_u32(relocs[i].symbol_table_index);
+    coff_reloc.Type = swap_le_u16(win_Type[relocs[i].type]);
     databuf_append(d, &coff_reloc, sizeof(coff_reloc));
   }
 }
@@ -357,17 +357,17 @@ void win_write_section_header(
   memset(h.Name, 0, 8);
   memcpy(h.Name, name, name_len);
   /* Should be set to zero for object files. */
-  h.VirtualSize = 0;
+  h.VirtualSize = swap_le_u32(0);
   /* For simplicity, should be set to zero for object files. */
-  h.VirtualAddress = 0;
-  h.SizeOfRawData = objfile_section_raw_size(s);
-  h.PointerToRawData = start_of_raw;
-  h.PointerToRelocations = PointerToRelocations;
+  h.VirtualAddress = swap_le_u32(0);
+  h.SizeOfRawData = swap_le_u32(objfile_section_raw_size(s));
+  h.PointerToRawData = swap_le_u32(start_of_raw);
+  h.PointerToRelocations = swap_le_u32(PointerToRelocations);
   /* We output no COFF line numbers. */
-  h.PointerToLineNumbers = 0;
-  h.NumberOfRelocations = objfile_section_small_relocations_count(s);
-  h.NumberOfLineNumbers = 0;
-  h.Characteristics = Characteristics;
+  h.PointerToLineNumbers = swap_le_u32(0);
+  h.NumberOfRelocations = swap_le_u16(objfile_section_small_relocations_count(s));
+  h.NumberOfLineNumbers = swap_le_u16(0);
+  h.Characteristics = swap_le_u32(Characteristics);
 
   databuf_append(d, &h, sizeof(h));
 }
@@ -419,15 +419,15 @@ void win_write_symbols_and_strings(struct identmap *im,
       /* The offset includes the leading 4 bytes -- the minimimum
          possible offset is 4. */
       uint32_t offset = strtab_add(strings, name_buf, name_count);
-      standard.Name.LongName.Zeroes = 0;
-      standard.Name.LongName.Offset = offset;
+      standard.Name.LongName.Zeroes = swap_le_u32(0);
+      standard.Name.LongName.Offset = swap_le_u32(offset);
     }
 
-    standard.Value = symbol_table[i].value;
+    standard.Value = swap_le_u32(symbol_table[i].value);
     STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_UNDEFINED == (int)IMAGE_SYM_UNDEFINED);
-    standard.SectionNumber = symbol_table[i].section;
-    standard.Type = symbol_table[i].is_function == IS_FUNCTION_YES ?
-      kFunctionSymType : kNullSymType;
+    standard.SectionNumber = swap_le_u16(symbol_table[i].section);
+    standard.Type = swap_le_u16(symbol_table[i].is_function == IS_FUNCTION_YES ?
+                                kFunctionSymType : kNullSymType);
     standard.StorageClass = symbol_table[i].is_static == IS_STATIC_YES ?
       IMAGE_SYM_CLASS_STATIC : IMAGE_SYM_CLASS_EXTERNAL;
     standard.NumberOfAuxSymbols = 0;
@@ -436,16 +436,15 @@ void win_write_symbols_and_strings(struct identmap *im,
 
   win_append_all_section_symbols(symbols, f);
 
-  const uint32_t strings_size = size_to_uint32(strings->count);
-  STATIC_CHECK(sizeof(strings_size) == 4);
-  databuf_overwrite(strings, 0, &strings_size, 4);
+  const uint32_t strings_size_le = swap_le_u32(size_to_uint32(strings->count));
+  STATIC_CHECK(sizeof(strings_size_le) == 4);
+  databuf_overwrite(strings, 0, &strings_size_le, 4);
 
   *symbols_out = symbols;
   *strings_out = strings;
 }
 
 void win_flatten(struct identmap *im, struct objfile *f, struct databuf **out) {
-  STATIC_CHECK(LITTLE_ENDIAN);
   struct databuf *d = malloc(sizeof(*d));
   CHECK(d);
   databuf_init(d);
@@ -493,14 +492,14 @@ void win_flatten(struct identmap *im, struct objfile *f, struct databuf **out) {
   {
     struct COFF_Header h;
     STATIC_CHECK(sizeof(h) == COFF_Header_EXPECTED_SIZE);
-    h.Machine = IMAGE_FILE_MACHINE_I386;
-    h.NumberOfSections = kNumberOfSections;
-    h.TimeDateStamp = kFakeTimeDateStamp;
-    h.PointerToSymbolTable = end_of_section_headers;
-    h.NumberOfSymbols = win_symbols_to_write(f);
+    h.Machine = swap_le_u16(IMAGE_FILE_MACHINE_I386);
+    h.NumberOfSections = swap_le_u16(kNumberOfSections);
+    h.TimeDateStamp = swap_le_u32(kFakeTimeDateStamp);
+    h.PointerToSymbolTable = swap_le_u32(end_of_section_headers);
+    h.NumberOfSymbols = swap_le_u32(win_symbols_to_write(f));
     /* Should be zero for an object file. */
-    h.SizeOfOptionalHeader = 0;
-    h.Characteristics = real_file_characteristics();
+    h.SizeOfOptionalHeader = swap_le_u16(0);
+    h.Characteristics = swap_le_u16(real_file_characteristics());
 
     databuf_append(d, &h, sizeof(h));
   }
