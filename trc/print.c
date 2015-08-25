@@ -6,6 +6,7 @@
 #include "ast.h"
 #include "databuf.h"
 #include "identmap.h"
+#include "typecheck.h"
 
 void sprint_ident(struct databuf *b, struct identmap *im, struct ast_ident *a) {
   const void *buf;
@@ -32,25 +33,24 @@ void help_append_fields(struct databuf *b, struct identmap *im,
 
 void sprint_numeric_literal(struct databuf *b, struct ast_numeric_literal *a) {
   STATIC_CHECK('9' - '0' == 9); /* Shut up, I know. */
-  switch (a->tag) {
-  case AST_NUMERIC_LITERAL_DEC: {
-    for (size_t i = 0, e = a->digits_count; i < e; i++) {
-      char c = '0' + a->digits[i];
-      databuf_append(b, &c, 1);
+  /* We don't print dec/hex versions, so that string equality matches
+  type equality.  We will use these strings for a type identmap. */
+  uint32_t x = unsafe_numeric_literal_u32(a);
+  if (x == 0) {
+    char ch = '0';
+    databuf_append(b, &ch, 1);
+  } else {
+    char buf[50] = { 0 };
+    size_t i = 0;
+    do {
+      buf[i] = '0' + (x % 10);
+      x /= 10;
+      i++;
+    } while (x != 0);
+    while (i > 0) {
+      i--;
+      databuf_append(b, &buf[i], 1);
     }
-  } break;
-  case AST_NUMERIC_LITERAL_HEX: {
-    STATIC_CHECK('F' - 'A' == 5);
-    databuf_append_c_str(b, "0x");
-    for (size_t i = 0, e = a->digits_count; i < e; i++) {
-      int8_t value = a->digits[i];
-      char c = value < 10 ? '0' + value : 'A' + (value - 10);
-      databuf_append(b, &c, 1);
-    }
-  } break;
-  default:
-    databuf_append_c_str(b, "?" "?" "?numeric_literal");
-    break;
   }
 }
 
