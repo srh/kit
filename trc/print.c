@@ -54,6 +54,8 @@ void sprint_numeric_literal(struct databuf *b, struct ast_numeric_literal *a) {
   }
 }
 
+/* This produces equal outputs for equal types -- is used for
+cs->typetrav_symbol_infos. */
 void sprint_typeexpr(struct databuf *b, struct identmap *im, struct ast_typeexpr *a) {
   switch (a->tag) {
   case AST_TYPEEXPR_NAME: {

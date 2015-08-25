@@ -3,6 +3,12 @@
 #include "slice.h"
 #include "typecheck.h"
 
+void typetrav_symbol_info_ptr_destroy(struct typetrav_symbol_info **info) {
+  ast_typeexpr_destroy(&(*info)->type);
+  free(*info);
+  *info = NULL;
+}
+
 void import_destroy(struct import *imp) {
   imp->global_offset_base = 0;
   ast_file_destroy(imp->file);
@@ -42,11 +48,18 @@ struct common_idents compute_common_idents(struct identmap *im) {
 }
 
 void checkstate_destroy(struct checkstate *cs) {
+  cs->typetrav_symbol_infos_first_ungenerated = 0;
+  SLICE_FREE(cs->typetrav_symbol_infos, cs->typetrav_symbol_infos_count,
+             typetrav_symbol_info_ptr_destroy);
+  cs->typetrav_symbol_infos_limit = 0;
+  identmap_destroy(&cs->typetrav_values);
+
   free(cs->sli_symbol_table_indexes);
   cs->sli_symbol_table_indexes = NULL;
   cs->sli_symbol_table_indexes_count = 0;
   cs->sli_symbol_table_indexes_limit = 0;
   identmap_destroy(&cs->sli_values);
+
   name_table_destroy(&cs->nt);
   cs->kit_name_counter = 0;
   CHECK(cs->template_instantiation_recursion_depth == 0);
@@ -76,6 +89,12 @@ void checkstate_init(struct checkstate *cs, struct identmap *im,
   cs->sli_symbol_table_indexes = 0;
   cs->sli_symbol_table_indexes_count = 0;
   cs->sli_symbol_table_indexes_limit = 0;
+
+  identmap_init(&cs->typetrav_values);
+  cs->typetrav_symbol_infos = 0;
+  cs->typetrav_symbol_infos_count = 0;
+  cs->typetrav_symbol_infos_limit = 0;
+  cs->typetrav_symbol_infos_first_ungenerated = 0;
 }
 
 size_t checkstate_find_g_o_import(struct checkstate *cs, size_t global_offset) {

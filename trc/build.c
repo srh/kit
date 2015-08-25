@@ -12,6 +12,7 @@
 #include "objfile/objfile.h"
 #include "objfile/linux.h"
 #include "objfile/win.h"
+#include "print.h"
 #include "x86.h"
 
 struct expr_return;
@@ -1316,13 +1317,6 @@ void gen_function_intro(struct objfile *f, struct frame *h) {
   gen_placeholder_stack_adjustment(f, h, 1);
 }
 
-enum typetrav_func {
-  TYPETRAV_FUNC_DESTROY,
-  TYPETRAV_FUNC_COPY,
-  TYPETRAV_FUNC_MOVE_OR_COPYDESTROY,
-  TYPETRAV_FUNC_DEFAULT_CONSTRUCT,
-};
-
 void push_address(struct objfile *f, struct frame *h, struct loc loc) {
   struct loc dest = frame_push_loc(h, DWORD_SIZE);
   gen_mov_addressof(f, dest, loc);
@@ -1703,13 +1697,82 @@ void really_gen_typetrav_behavior(struct checkstate *cs, struct objfile *f,
   }
 }
 
+void make_typetrav_sti_name(struct identmap *im,
+                            enum typetrav_func tf,
+                            struct ast_typeexpr *type,
+                            struct databuf *out) {
+  struct databuf b;
+  databuf_init(&b);
+  static const char *const names[] = {
+    [TYPETRAV_FUNC_DESTROY] = "destroy:",
+    [TYPETRAV_FUNC_COPY] = "copy:",
+    [TYPETRAV_FUNC_MOVE_OR_COPYDESTROY] = "mocd:",
+    [TYPETRAV_FUNC_DEFAULT_CONSTRUCT] = "init:",
+  };
+  databuf_append_c_str(&b, names[tf]);
+  sprint_typeexpr(&b, im, type);
+  *out = b;
+}
+
+uint32_t lookup_or_make_typetrav_sti(
+    struct objfile *f,
+    struct checkstate *cs, enum typetrav_func tf,
+    struct ast_typeexpr *type) {
+  struct databuf name;
+  make_typetrav_sti_name(cs->im, tf, type, &name);
+  ident_value id = identmap_intern(&cs->typetrav_values, name.buf, name.count);
+  CHECK(id <= cs->typetrav_symbol_infos_count);
+  if (id == cs->typetrav_symbol_infos_count) {
+    char name[] = "$typetrav";
+    void *gen_name;
+    size_t gen_name_count;
+    if (!generate_kit_name(cs, name, strlen(name),
+                           0, &gen_name, &gen_name_count)) {
+      return 0;
+    }
+
+    uint32_t symbol_table_index
+      = objfile_add_local_symbol(f, identmap_intern(cs->im, gen_name, gen_name_count),
+                                 0 /* We'll overwrite the value later. */,
+                                 SECTION_TEXT,
+                                 IS_STATIC_NO);
+    /* TODO: I don't know why we use IS_STATIC_NO here (and in
+    add_def_symbols). */
+    free(gen_name);
+
+    struct typetrav_symbol_info *info = malloc(sizeof(*info));
+    CHECK(info);
+    info->symbol_table_index = symbol_table_index;
+    info->func = tf;
+    ast_typeexpr_init_copy(&info->type, type);
+    SLICE_PUSH(cs->typetrav_symbol_infos, cs->typetrav_symbol_infos_count,
+               cs->typetrav_symbol_infos_limit, info);
+  }
+  databuf_destroy(&name);
+  return cs->typetrav_symbol_infos[id]->symbol_table_index;
+}
+
 void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                        enum typetrav_func tf, struct loc dest, int has_src,
                        struct loc src, struct ast_typeexpr *type) {
   if (try_gen_trivial_typetrav_func(cs, f, tf, dest, src, type)) {
     return;
   }
-  really_gen_typetrav_behavior(cs, f, h, tf, dest, has_src, src, type);
+  /* TODO: Go deeper on names to avoid needless function layers. */
+  uint32_t sti = lookup_or_make_typetrav_sti(f, cs, tf, type);
+
+  int32_t saved_offset = frame_save_offset(h);
+  if (has_src) {
+    push_address(f, h, src);
+  }
+  push_address(f, h, dest);
+  struct immediate imm;
+  imm.tag = IMMEDIATE_FUNC;
+  imm.u.func_sti = sti;
+  struct ast_typeexpr void_type;
+  init_name_type(&void_type, cs->cm.voide);
+  gen_call_imm(cs, f, h, imm, NULL, &void_type, 0);
+  frame_restore_offset(h, saved_offset);
 }
 
 void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
@@ -4629,6 +4692,7 @@ void tie_stack_adjustments(struct objfile *f, struct frame *h) {
 int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
                     struct ast_expr *a) {
   CHECK(a->tag == AST_EXPR_LAMBDA);
+  /* This code is much like build_typetrav_defs. */
   struct frame h;
   frame_init(&h);
 
@@ -4723,6 +4787,49 @@ int build_def(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+void build_typetrav_defs(struct checkstate *cs,
+                         struct objfile *f) {
+  /* cs.typetrav_symbol_infos_count is a moving target -- we see more
+  typetravs to generate when we generate the first. */
+  while (cs->typetrav_symbol_infos_first_ungenerated < cs->typetrav_symbol_infos_count) {
+    struct typetrav_symbol_info *info = cs->typetrav_symbol_infos[cs->typetrav_symbol_infos_first_ungenerated];
+    objfile_fillercode_align_double_quadword(f);
+    objfile_set_symbol_value(f, info->symbol_table_index,
+                             objfile_section_size(objfile_text(f)));
+    /* TODO: frame has vardata, targetdata, jmpdata -- maybe we should
+    decouple the raw codegen stuff. */
+    struct frame h;
+    frame_init(&h);
+
+    gen_function_intro(f, &h);
+    {
+      /* Done by note_param_locations. */
+      struct loc dummy_void_return_loc = frame_push_loc(&h, 0);
+      /* Set 0 for arg_count since we don't put them in vardata. */
+      frame_specify_calling_info(&h, 0, dummy_void_return_loc, 0);
+    }
+
+    uint32_t sz = x86_sizeof(&cs->nt, &info->type);
+
+    /* TODO: This duplicates calling-convention-specific logic of
+    note_param_locations. */
+    int has_src = info->func == TYPETRAV_FUNC_COPY || info->func == TYPETRAV_FUNC_MOVE_OR_COPYDESTROY;
+    struct loc src = ebp_indirect_loc(sz, sz, 3 * DWORD_SIZE);
+    struct loc dest = ebp_indirect_loc(sz, sz, 2 * DWORD_SIZE);
+
+    really_gen_typetrav_behavior(cs, f, &h, info->func, dest, has_src, src, &info->type);
+
+    gen_function_exit(cs, f, &h);
+    tie_jmps(f, &h);
+    tie_stack_adjustments(f, &h);
+
+    frame_destroy(&h);
+
+    cs->typetrav_symbol_infos_first_ungenerated++;
+  }
+}
+
+
 int build_module(struct identmap *im,
                  int target_linux32,
                  void *loader_ctx,
@@ -4753,6 +4860,8 @@ int build_module(struct identmap *im,
       goto cleanup_objfile;
     }
   }
+
+  build_typetrav_defs(&cs, objfile);
 
   struct databuf *databuf = NULL;
   if (target_linux32) {

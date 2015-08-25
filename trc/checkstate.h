@@ -52,6 +52,19 @@ typedef int module_loader(void *ctx,
                           uint8_t **data_out,
                           size_t *data_count_out);
 
+enum typetrav_func {
+  TYPETRAV_FUNC_DESTROY,
+  TYPETRAV_FUNC_COPY,
+  TYPETRAV_FUNC_MOVE_OR_COPYDESTROY,
+  TYPETRAV_FUNC_DEFAULT_CONSTRUCT,
+};
+
+struct typetrav_symbol_info {
+  uint32_t symbol_table_index;
+  enum typetrav_func func;
+  struct ast_typeexpr type;
+};
+
 struct checkstate {
   struct identmap *im;
   struct common_idents cm;
@@ -79,6 +92,17 @@ struct checkstate {
   uint32_t *sli_symbol_table_indexes;
   size_t sli_symbol_table_indexes_count;
   size_t sli_symbol_table_indexes_limit;
+
+  /* Used for type traversal functions.  This is bad. */
+  struct identmap typetrav_values;
+
+  /* TODO: We don't need to keep around the ast_typeexpr for symbol
+  infos that have been generated. */
+  /* This is an array of pointers because we grow it while we use it. */
+  struct typetrav_symbol_info **typetrav_symbol_infos;
+  size_t typetrav_symbol_infos_count;
+  size_t typetrav_symbol_infos_limit;
+  size_t typetrav_symbol_infos_first_ungenerated;
 };
 
 void checkstate_init(struct checkstate *cs, struct identmap *im, void *loader_ctx, module_loader *loader, int target_linux32);
