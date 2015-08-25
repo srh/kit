@@ -1736,8 +1736,6 @@ uint32_t lookup_or_make_typetrav_sti(
                                  0 /* We'll overwrite the value later. */,
                                  SECTION_TEXT,
                                  IS_STATIC_NO);
-    /* TODO: I don't know why we use IS_STATIC_NO here (and in
-    add_def_symbols). */
     free(gen_name);
 
     struct typetrav_symbol_info *info = malloc(sizeof(*info));
