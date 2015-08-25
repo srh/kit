@@ -15,85 +15,85 @@ PACK_PUSH
 struct elf32_Header {
   uint8_t e_ident[kEI_NIDENT];
   /* Type: Relocatable, executable, etc. */
-  uint16_t e_type;
+  struct le_u16 e_type;
   /* Machine: 386, amd64, etc. */
-  uint16_t e_machine;
+  struct le_u16 e_machine;
   /* Version, should be "EV_CURRENT". */
-  uint32_t e_version;
+  struct le_u32 e_version;
   /* Entry point (for executables). */
-  uint32_t e_entry;
+  struct le_u32 e_entry;
   /* Program header offset, zero for .o files. */
-  uint32_t e_phoff;
+  struct le_u32 e_phoff;
   /* Section header offset. */
-  uint32_t e_shoff;
+  struct le_u32 e_shoff;
   /* Flags, none defined. (Zero.) */
-  uint32_t e_flags;
+  struct le_u32 e_flags;
   /* Size of this elf header. */
-  uint16_t e_ehsize;
+  struct le_u16 e_ehsize;
   /* Size of a program header entry.  (Zero for .o files?) */
-  uint16_t e_phentsize;
+  struct le_u16 e_phentsize;
   /* Number of program header entries.  (Zero for .o files.) */
-  uint16_t e_phnum;
+  struct le_u16 e_phnum;
   /* Size of section header entry. */
-  uint16_t e_shentsize;
+  struct le_u16 e_shentsize;
   /* Number of section headers. */
-  uint16_t e_shnum;
+  struct le_u16 e_shnum;
   /* Section header table index of the entry associated with the
   section name string table.  Or SHN_UNDEF, if the file has no section
   name string table.  Must be less than SHN_LORESERVE (0xff00),
   otherwise the value is stored elsewhere.*/
-  uint16_t e_shstrndx;
+  struct le_u16 e_shstrndx;
 } PACK_ATTRIBUTE;
 PACK_POP
 
 PACK_PUSH
 struct elf32_Section_Header {
   /* An index into the section header string table section. */
-  uint32_t sh_name;
+  struct le_u32 sh_name;
   /* SHT_PROGBITS for "information defined by the program", SHT_SYMTAB
   for a symbol table, SHT_STRTAB for a string table, SHT_RELA for
   "relocation entries with explicit addends", SHT_REL for "relocation
   offsets without explicit addends", SHT_NOBITS for .bss section. */
-  uint32_t sh_type;
+  struct le_u32 sh_type;
   /* flags: SHF_WRITE: data that should be writable during process
   execution.  SHF_ALLOC: This secton occupies memory during process
   execution.  SHF_EXECINSTR: This section contains executable machine
   instructions. */
-  uint32_t sh_flags;
+  struct le_u32 sh_flags;
   /* The address at which the section's first byte should reside?  So,
   zero for .o files? */
-  uint32_t sh_addr;
+  struct le_u32 sh_addr;
   /* File offset of the section. */
-  uint32_t sh_offset;
+  struct le_u32 sh_offset;
   /* Section's size in bytes. */
-  uint32_t sh_size;
+  struct le_u32 sh_size;
   /* A "section header table index link." */
-  uint32_t sh_link;
+  struct le_u32 sh_link;
   /* Extra info. */
-  uint32_t sh_info;
+  struct le_u32 sh_info;
   /* Section alignment constraint.  0 means the same as 1. */
-  uint32_t sh_addralign;
+  struct le_u32 sh_addralign;
   /* For sections that hold a table of fixed-size entries: The size in
   bytes for each entry. */
-  uint32_t sh_entsize;
+  struct le_u32 sh_entsize;
 } PACK_ATTRIBUTE;
 PACK_POP
 
 PACK_PUSH
 struct elf32_Symtab_Entry {
-  uint32_t st_name;
-  uint32_t st_value;
-  uint32_t st_size;
+  struct le_u32 st_name;
+  struct le_u32 st_value;
+  struct le_u32 st_size;
   uint8_t st_info;
   uint8_t st_other;
-  uint16_t st_shndx;
+  struct le_u16 st_shndx;
 } PACK_ATTRIBUTE;
 PACK_POP
 
 PACK_PUSH
 struct elf32_Rel {
-  uint32_t r_offset;
-  uint32_t r_info;
+  struct le_u32 r_offset;
+  struct le_u32 r_info;
 } PACK_ATTRIBUTE;
 PACK_POP
 
@@ -155,26 +155,26 @@ void push_symbol(struct identmap *im, struct objfile_symbol_record *symbol,
   identmap_lookup(im, name, &name_buf, &name_count);
 
   uint32_t offset = strtab_add(strings, name_buf, name_count);
-  ent.st_name = swap_le_u32(offset);
-  ent.st_value = swap_le_u32(symbol->value);
+  ent.st_name = to_le_u32(offset);
+  ent.st_value = to_le_u32(symbol->value);
   /* TODO: It's OK to just use zero for everything? */
-  ent.st_size = swap_le_u32(0);
+  ent.st_size = to_le_u32(0);
   ent.st_info = (symbol->is_function == IS_FUNCTION_YES ?
                  kSTT_FUNC : kSTT_OBJECT) | ((symbol->is_static ?
                                               kSTB_LOCAL : kSTB_GLOBAL) << 4);
   ent.st_other = 0;
   switch (symbol->section) {
   case OBJFILE_SYMBOL_SECTION_UNDEFINED:
-    ent.st_shndx = swap_le_u16(kSHN_UNDEF);
+    ent.st_shndx = to_le_u16(kSHN_UNDEF);
     break;
   case OBJFILE_SYMBOL_SECTION_DATA:
-    ent.st_shndx = swap_le_u16(kLinux32DataSectionNumber);
+    ent.st_shndx = to_le_u16(kLinux32DataSectionNumber);
     break;
   case OBJFILE_SYMBOL_SECTION_RDATA:
-    ent.st_shndx = swap_le_u16(kLinux32RodataSectionNumber);
+    ent.st_shndx = to_le_u16(kLinux32RodataSectionNumber);
     break;
   case OBJFILE_SYMBOL_SECTION_TEXT:
-    ent.st_shndx = swap_le_u16(kLinux32TextSectionNumber);
+    ent.st_shndx = to_le_u16(kLinux32TextSectionNumber);
     break;
   default:
     UNREACHABLE();
@@ -206,12 +206,12 @@ void linux32_write_symbols_and_strings(struct identmap *im, struct objfile *f,
   {
     /* Add index zero symbol entry. */
     struct elf32_Symtab_Entry ent;
-    ent.st_name = swap_le_u32(0);
-    ent.st_value = swap_le_u32(0);
-    ent.st_size = swap_le_u32(0);
+    ent.st_name = to_le_u32(0);
+    ent.st_value = to_le_u32(0);
+    ent.st_size = to_le_u32(0);
     ent.st_info = 0;
     ent.st_other = 0;
-    ent.st_shndx = swap_le_u16(kSHN_UNDEF);
+    ent.st_shndx = to_le_u16(kSHN_UNDEF);
     databuf_append(symbols, &ent, sizeof(ent));
     symbols_count = uint32_add(symbols_count, 1);
   }
@@ -261,27 +261,27 @@ void linux32_section_headers(uint32_t prev_end_offset,
   uint32_t sh_size = s->raw.count;
   uint32_t sh_end = uint32_add(sh_offset, sh_size);
 
-  rel_out->sh_name = swap_le_u32(sh_strtab_rel_index);
-  rel_out->sh_type = swap_le_u32(kSHT_REL);
-  rel_out->sh_flags = swap_le_u32(0);
-  rel_out->sh_addr = swap_le_u32(0);
-  rel_out->sh_offset = swap_le_u32(rel_offset);
-  rel_out->sh_size = swap_le_u32(rel_size);
-  rel_out->sh_link = swap_le_u32(kSymTabSectionNumber);
-  rel_out->sh_info = swap_le_u32(sh_out_index);
-  rel_out->sh_addralign = swap_le_u32(0);
-  rel_out->sh_entsize = swap_le_u32(sizeof(struct elf32_Rel));
+  rel_out->sh_name = to_le_u32(sh_strtab_rel_index);
+  rel_out->sh_type = to_le_u32(kSHT_REL);
+  rel_out->sh_flags = to_le_u32(0);
+  rel_out->sh_addr = to_le_u32(0);
+  rel_out->sh_offset = to_le_u32(rel_offset);
+  rel_out->sh_size = to_le_u32(rel_size);
+  rel_out->sh_link = to_le_u32(kSymTabSectionNumber);
+  rel_out->sh_info = to_le_u32(sh_out_index);
+  rel_out->sh_addralign = to_le_u32(0);
+  rel_out->sh_entsize = to_le_u32(sizeof(struct elf32_Rel));
 
-  sh_out->sh_name = swap_le_u32(sh_strtab_index);
-  sh_out->sh_type = swap_le_u32(kSHT_PROGBITS);
-  sh_out->sh_flags = swap_le_u32(kSHF_ALLOC | sh_flags);
-  sh_out->sh_addr = swap_le_u32(0);
-  sh_out->sh_offset = swap_le_u32(sh_offset);
-  sh_out->sh_size = swap_le_u32(sh_size);
-  sh_out->sh_link = swap_le_u32(kSHN_UNDEF);
-  sh_out->sh_info = swap_le_u32(0);
-  sh_out->sh_addralign = swap_le_u32(sh_alignment);
-  sh_out->sh_entsize = swap_le_u32(0);
+  sh_out->sh_name = to_le_u32(sh_strtab_index);
+  sh_out->sh_type = to_le_u32(kSHT_PROGBITS);
+  sh_out->sh_flags = to_le_u32(kSHF_ALLOC | sh_flags);
+  sh_out->sh_addr = to_le_u32(0);
+  sh_out->sh_offset = to_le_u32(sh_offset);
+  sh_out->sh_size = to_le_u32(sh_size);
+  sh_out->sh_link = to_le_u32(kSHN_UNDEF);
+  sh_out->sh_info = to_le_u32(0);
+  sh_out->sh_addralign = to_le_u32(sh_alignment);
+  sh_out->sh_entsize = to_le_u32(0);
 
   *end_out = sh_end;
 }
@@ -293,7 +293,7 @@ void linux32_append_relocations_and_mutate_section(
   struct objfile_relocation *relocs = s->relocs;
   for (size_t i = 0, e = s->relocs_count; i < e; i++) {
     struct elf32_Rel rel;
-    rel.r_offset = swap_le_u32(relocs[i].virtual_address);
+    rel.r_offset = to_le_u32(relocs[i].virtual_address);
     uint32_t sti = relocs[i].symbol_table_index;
     CHECK(sti < sti_map_count);
     uint32_t new_sti = sti_map[sti];
@@ -304,15 +304,15 @@ void linux32_append_relocations_and_mutate_section(
     };
 
     uint32_t rel_type = rel_types[relocs[i].type];
-    rel.r_info = swap_le_u32((new_sti << 8) | rel_type);
+    rel.r_info = to_le_u32((new_sti << 8) | rel_type);
     databuf_append(d, &rel, sizeof(rel));
 
     static const int32_t rel_addends[] = {
       [OBJFILE_RELOCATION_TYPE_DIR32] = 0,
       [OBJFILE_RELOCATION_TYPE_REL32] = -4,
     };
-    uint32_t addend_le = swap_le_u32((uint32_t)rel_addends[relocs[i].type]);
-    databuf_overwrite(&s->raw, swap_le_u32(rel.r_offset), &addend_le, sizeof(addend_le));
+    struct le_u32 addend_le = to_le_u32((uint32_t)rel_addends[relocs[i].type]);
+    databuf_overwrite(&s->raw, from_le_u32(rel.r_offset), &addend_le, sizeof(addend_le));
   }
 }
 
@@ -414,20 +414,20 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     /* padding */
     memset(h.e_ident + 9, 0, kEI_NIDENT - 9);
 
-    h.e_type = swap_le_u16(kET_REL);
-    h.e_machine = swap_le_u16(kEM_386);
-    h.e_version = swap_le_u32(kEV_CURRENT);
-    h.e_entry = swap_le_u32(0);
-    h.e_phoff = swap_le_u32(0);
-    h.e_shoff = swap_le_u32(section_header_offset);
-    h.e_flags = swap_le_u32(0);
-    h.e_ehsize = swap_le_u16(sizeof(h));
-    h.e_phentsize = swap_le_u16(0);
-    h.e_phnum = swap_le_u16(0);
-    h.e_shentsize = swap_le_u16(sizeof(struct elf32_Section_Header));
-    h.e_shnum = swap_le_u16(kNumSectionHeaders);
+    h.e_type = to_le_u16(kET_REL);
+    h.e_machine = to_le_u16(kEM_386);
+    h.e_version = to_le_u32(kEV_CURRENT);
+    h.e_entry = to_le_u32(0);
+    h.e_phoff = to_le_u32(0);
+    h.e_shoff = to_le_u32(section_header_offset);
+    h.e_flags = to_le_u32(0);
+    h.e_ehsize = to_le_u16(sizeof(h));
+    h.e_phentsize = to_le_u16(0);
+    h.e_phnum = to_le_u16(0);
+    h.e_shentsize = to_le_u16(sizeof(struct elf32_Section_Header));
+    h.e_shnum = to_le_u16(kNumSectionHeaders);
     /* String table section header is at index 1. */
-    h.e_shstrndx = swap_le_u16(1);
+    h.e_shstrndx = to_le_u16(1);
 
     databuf_append(d, &h, sizeof(h));
   }
@@ -435,48 +435,48 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   {
     /* Null section header (for index 0). */
     struct elf32_Section_Header sh;
-    sh.sh_name = swap_le_u32(0);
-    sh.sh_type = swap_le_u32(kSHT_NULL);
-    sh.sh_flags = swap_le_u32(0);
-    sh.sh_addr = swap_le_u32(0);
-    sh.sh_offset = swap_le_u32(0);
-    sh.sh_size = swap_le_u32(0);
-    sh.sh_link = swap_le_u32(0);
-    sh.sh_info = swap_le_u32(0);
-    sh.sh_addralign = swap_le_u32(0);
-    sh.sh_entsize = swap_le_u32(0);
+    sh.sh_name = to_le_u32(0);
+    sh.sh_type = to_le_u32(kSHT_NULL);
+    sh.sh_flags = to_le_u32(0);
+    sh.sh_addr = to_le_u32(0);
+    sh.sh_offset = to_le_u32(0);
+    sh.sh_size = to_le_u32(0);
+    sh.sh_link = to_le_u32(0);
+    sh.sh_info = to_le_u32(0);
+    sh.sh_addralign = to_le_u32(0);
+    sh.sh_entsize = to_le_u32(0);
     databuf_append(d, &sh, sizeof(sh));
   }
 
   {
     /* Strings table section header -- index 1. */
     struct elf32_Section_Header sh;
-    sh.sh_name = swap_le_u32(dot_shstrtab_index);
-    sh.sh_type = swap_le_u32(kSHT_STRTAB);
-    sh.sh_flags = swap_le_u32(0);
-    sh.sh_addr = swap_le_u32(0);
-    sh.sh_offset = swap_le_u32(sh_strtab_offset);
-    sh.sh_size = swap_le_u32(sh_strtab.count);
-    sh.sh_link = swap_le_u32(0);
-    sh.sh_info = swap_le_u32(0);
-    sh.sh_addralign = swap_le_u32(0);
-    sh.sh_entsize = swap_le_u32(0);
+    sh.sh_name = to_le_u32(dot_shstrtab_index);
+    sh.sh_type = to_le_u32(kSHT_STRTAB);
+    sh.sh_flags = to_le_u32(0);
+    sh.sh_addr = to_le_u32(0);
+    sh.sh_offset = to_le_u32(sh_strtab_offset);
+    sh.sh_size = to_le_u32(sh_strtab.count);
+    sh.sh_link = to_le_u32(0);
+    sh.sh_info = to_le_u32(0);
+    sh.sh_addralign = to_le_u32(0);
+    sh.sh_entsize = to_le_u32(0);
     databuf_append(d, &sh, sizeof(sh));
   }
 
   {
     /* Symbol table strings section header -- index 2. */
     struct elf32_Section_Header sh;
-    sh.sh_name = swap_le_u32(dot_strtab_index);
-    sh.sh_type = swap_le_u32(kSHT_STRTAB);
-    sh.sh_flags = swap_le_u32(0);
-    sh.sh_addr = swap_le_u32(0);
-    sh.sh_offset = swap_le_u32(sym_strtab_offset);
-    sh.sh_size = swap_le_u32(sym_strtab_size);
-    sh.sh_link = swap_le_u32(0);
-    sh.sh_info = swap_le_u32(0);
-    sh.sh_addralign = swap_le_u32(0);
-    sh.sh_entsize = swap_le_u32(0);
+    sh.sh_name = to_le_u32(dot_strtab_index);
+    sh.sh_type = to_le_u32(kSHT_STRTAB);
+    sh.sh_flags = to_le_u32(0);
+    sh.sh_addr = to_le_u32(0);
+    sh.sh_offset = to_le_u32(sym_strtab_offset);
+    sh.sh_size = to_le_u32(sym_strtab_size);
+    sh.sh_link = to_le_u32(0);
+    sh.sh_info = to_le_u32(0);
+    sh.sh_addralign = to_le_u32(0);
+    sh.sh_entsize = to_le_u32(0);
     databuf_append(d, &sh, sizeof(sh));
   }
 
@@ -484,17 +484,17 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     STATIC_CHECK(kSymTabSectionNumber == 3);
     /* Symbol table section header -- index 3. */
     struct elf32_Section_Header sh;
-    sh.sh_name = swap_le_u32(dot_symtab_index);
-    sh.sh_type = swap_le_u32(kSHT_SYMTAB);
-    sh.sh_flags = swap_le_u32(0);
-    sh.sh_addr = swap_le_u32(0);
-    sh.sh_offset = swap_le_u32(symtab_offset);
-    sh.sh_size = swap_le_u32(symtab_size);
+    sh.sh_name = to_le_u32(dot_symtab_index);
+    sh.sh_type = to_le_u32(kSHT_SYMTAB);
+    sh.sh_flags = to_le_u32(0);
+    sh.sh_addr = to_le_u32(0);
+    sh.sh_offset = to_le_u32(symtab_offset);
+    sh.sh_size = to_le_u32(symtab_size);
     /* The associated string table's section header index. */
-    sh.sh_link = swap_le_u32(2);
-    sh.sh_info = swap_le_u32(end_local_symbols);
-    sh.sh_addralign = swap_le_u32(0);
-    sh.sh_entsize = swap_le_u32(sizeof(struct elf32_Symtab_Entry));
+    sh.sh_link = to_le_u32(2);
+    sh.sh_info = to_le_u32(end_local_symbols);
+    sh.sh_addralign = to_le_u32(0);
+    sh.sh_entsize = to_le_u32(sizeof(struct elf32_Symtab_Entry));
     databuf_append(d, &sh, sizeof(sh));
   }
 
@@ -528,27 +528,27 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   CHECK(d->count == symtab_end);
 
   append_zeros_to_align(d, kRel_Section_Alignment);
-  CHECK(d->count == swap_le_u32(sh_rel_data.sh_offset));
+  CHECK(d->count == from_le_u32(sh_rel_data.sh_offset));
   linux32_append_relocations_and_mutate_section(
       sti_map, f->symbol_table_count, d, &f->data);
   append_zeros_to_align(d, f->data.max_requested_alignment);
-  CHECK(d->count == swap_le_u32(sh_data.sh_offset));
+  CHECK(d->count == from_le_u32(sh_data.sh_offset));
   databuf_append(d, f->data.raw.buf, f->data.raw.count);
 
   append_zeros_to_align(d, kRel_Section_Alignment);
-  CHECK(d->count == swap_le_u32(sh_rel_rodata.sh_offset));
+  CHECK(d->count == from_le_u32(sh_rel_rodata.sh_offset));
   linux32_append_relocations_and_mutate_section(
       sti_map, f->symbol_table_count, d, &f->rdata);
   append_zeros_to_align(d, f->rdata.max_requested_alignment);
-  CHECK(d->count == swap_le_u32(sh_rodata.sh_offset));
+  CHECK(d->count == from_le_u32(sh_rodata.sh_offset));
   databuf_append(d, f->rdata.raw.buf, f->rdata.raw.count);
 
   append_zeros_to_align(d, kRel_Section_Alignment);
-  CHECK(d->count == swap_le_u32(sh_rel_text.sh_offset));
+  CHECK(d->count == from_le_u32(sh_rel_text.sh_offset));
   linux32_append_relocations_and_mutate_section(
       sti_map, f->symbol_table_count, d, &f->text);
   append_zeros_to_align(d, f->text.max_requested_alignment);
-  CHECK(d->count == swap_le_u32(sh_text.sh_offset));
+  CHECK(d->count == from_le_u32(sh_text.sh_offset));
   databuf_append(d, f->text.raw.buf, f->text.raw.count);
 
   *out = d;

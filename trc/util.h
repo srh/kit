@@ -83,7 +83,18 @@ uint16_t read_le_u16(const void *src);
 
 #define write_le_i16(dest, x) write_le_u16((dest), (uint32_t)(x));
 
-uint32_t swap_le_u32(uint32_t x);
-uint16_t swap_le_u16(uint16_t x);
+struct le_u32 {
+  char bytes[4];
+};
+
+struct le_u32 to_le_u32(uint32_t x);
+uint32_t from_le_u32(struct le_u32 x);
+
+struct le_u16 {
+  char bytes[2];
+};
+
+struct le_u16 to_le_u16(uint16_t x);
+uint16_t from_le_u16(struct le_u16 x);
 
 #endif /* KIT_UTIL_H_ */

@@ -77,20 +77,20 @@ uint16_t read_le_u16(const void *src) {
   return ret;
 }
 
-uint32_t swap_le_u32(uint32_t x) {
-  union {
-    uint8_t ch[4];
-    uint32_t y;
-  } u;
-  write_le_u32(u.ch, x);
-  return u.y;
+struct le_u32 to_le_u32(uint32_t x) {
+  struct le_u32 ret;
+  write_le_u32(ret.bytes, x);
+  return ret;
+}
+uint32_t from_le_u32(struct le_u32 x) {
+  return read_le_u32(x.bytes);
 }
 
-uint16_t swap_le_u16(uint16_t x) {
-  union {
-    uint8_t ch[2];
-    uint16_t y;
-  } u;
-  write_le_u16(u.ch, x);
-  return u.y;
+struct le_u16 to_le_u16(uint16_t x) {
+  struct le_u16 ret;
+  write_le_u16(ret.bytes, x);
+  return ret;
+}
+uint16_t from_le_u16(struct le_u16 x) {
+  return read_le_u16(x.bytes);
 }

@@ -13,13 +13,13 @@
 
 PACK_PUSH
 struct COFF_Header {
-  uint16_t Machine;
-  uint16_t NumberOfSections;
-  uint32_t TimeDateStamp;
-  uint32_t PointerToSymbolTable;
-  uint32_t NumberOfSymbols;
-  uint16_t SizeOfOptionalHeader;
-  uint16_t Characteristics;
+  struct le_u16 Machine;
+  struct le_u16 NumberOfSections;
+  struct le_u32 TimeDateStamp;
+  struct le_u32 PointerToSymbolTable;
+  struct le_u32 NumberOfSymbols;
+  struct le_u16 SizeOfOptionalHeader;
+  struct le_u16 Characteristics;
 } PACK_ATTRIBUTE;
 PACK_POP
 
@@ -30,15 +30,15 @@ PACK_POP
 PACK_PUSH
 struct Section_Header {
   char Name[8];
-  uint32_t VirtualSize;
-  uint32_t VirtualAddress;
-  uint32_t SizeOfRawData;
-  uint32_t PointerToRawData;
-  uint32_t PointerToRelocations;
-  uint32_t PointerToLineNumbers;
-  uint16_t NumberOfRelocations;
-  uint16_t NumberOfLineNumbers;
-  uint32_t Characteristics;
+  struct le_u32 VirtualSize;
+  struct le_u32 VirtualAddress;
+  struct le_u32 SizeOfRawData;
+  struct le_u32 PointerToRawData;
+  struct le_u32 PointerToRelocations;
+  struct le_u32 PointerToLineNumbers;
+  struct le_u16 NumberOfRelocations;
+  struct le_u16 NumberOfLineNumbers;
+  struct le_u32 Characteristics;
 } PACK_ATTRIBUTE;
 PACK_POP
 
@@ -167,9 +167,9 @@ PACK_PUSH
 struct COFF_Relocation {
   /* Offset from beginning of section, assuming its section header
   VirtualAddress is zero. */
-  uint32_t VirtualAddress;
+  struct le_u32 VirtualAddress;
   /* Index into the symbol table. */
-  uint32_t SymbolTableIndex;
+  struct le_u32 SymbolTableIndex;
   /* What kind of relocation should be performed?
   IMAGE_REL_I386_ABSOLUTE 0x0000 The relocation is ignored.
   IMAGE_REL_I386_DIR16 0x0001 Not supported.
@@ -189,7 +189,7 @@ struct COFF_Relocation {
   target.  This supports the x86 relative branch and call instructions.
   */
   /* Looking at cl output, I see a bunch of use of 6h and 14h. */
-  uint16_t Type;
+  struct le_u16 Type;
 } PACK_ATTRIBUTE;
 PACK_POP
 
@@ -200,8 +200,8 @@ PACK_PUSH
 union name_eight {
   uint8_t ShortName[8];
   struct {
-    uint32_t Zeroes;
-    uint32_t Offset;
+    struct le_u32 Zeroes;
+    struct le_u32 Offset;
   } LongName;
 } PACK_ATTRIBUTE;
 PACK_POP
@@ -209,17 +209,17 @@ PACK_POP
 PACK_PUSH
 struct COFF_symbol_standard_record {
   union name_eight Name;
-  uint32_t Value;
+  struct le_u32 Value;
   /* Uses a 1-based index into the section table.  Special values:
   IMAGE_SYM_UNDEFINED (0).  Section not yet defined, e.g. for an
   external symbol.
   IMAGE_SYM_ABSOLUTE (0xFFFF).  The symbol has an absolute value,
   not an address relative to some section.
   IMAGE_SYM_DEBUG (0xFFFE).  Some debuggery. */
-  uint16_t SectionNumber;
+  struct le_u16 SectionNumber;
   /* MS tools set this field to 0x20 (function) or 0x0 (not a
   function).  I.e. kFunctionSymType or kNullSymType. */
-  uint16_t Type;
+  struct le_u16 Type;
   /* MS tools generally only use IMAGE_SYM_CLASS_EXTERNAL (2),
   IMAGE_SYM_CLASS_STATIC (3), IMAGE_SYM_CLASS_FUNCTION (101), and
   IMAGE_SYM_CLASS_FILE (103) which is followed by aux records that
@@ -235,14 +235,14 @@ PACK_POP
 
 PACK_PUSH
 struct COFF_symbol_aux_sectiondef {
-  uint32_t Length;
-  uint16_t NumberOfRelocations;
-  uint16_t NumberOfLineNumbers;
+  struct le_u32 Length;
+  struct le_u16 NumberOfRelocations;
+  struct le_u16 NumberOfLineNumbers;
   /* COMDAT-only, set to zero. */
   /* I don't know if this is really COMDAT-only, I see it being used... */
-  uint32_t CheckSum;
+  struct le_u32 CheckSum;
   /* COMDAT-only, set to zero. */
-  uint16_t Number;
+  struct le_u16 Number;
   /* COMDAT selection number, set to zero. */
   uint8_t Selection;
   uint8_t Unused[3];
@@ -269,21 +269,21 @@ void win_append_section_symbols(
     CHECK(name_len <= 8);
     memset(standard.Name.ShortName, 0, 8);
     memcpy(standard.Name.ShortName, name, name_len);
-    standard.Value = swap_le_u32(0);
-    standard.SectionNumber = swap_le_u16(SectionNumber);
-    standard.Type = swap_le_u16(0);
+    standard.Value = to_le_u32(0);
+    standard.SectionNumber = to_le_u16(SectionNumber);
+    standard.Type = to_le_u16(0);
     standard.StorageClass = IMAGE_SYM_CLASS_STATIC;
     standard.NumberOfAuxSymbols = 1;
     databuf_append(d, &standard, sizeof(standard));
   }
   {
     struct COFF_symbol_aux_sectiondef aux_sectiondef;
-    aux_sectiondef.Length = swap_le_u32(size_to_uint32(objfile_section_raw_size(s)));
+    aux_sectiondef.Length = to_le_u32(size_to_uint32(objfile_section_raw_size(s)));
     aux_sectiondef.NumberOfRelocations
-      = swap_le_u16(objfile_section_small_relocations_count(s));
-    aux_sectiondef.NumberOfLineNumbers = swap_le_u16(0);
-    aux_sectiondef.CheckSum = swap_le_u32(0);
-    aux_sectiondef.Number = swap_le_u16(0);
+      = to_le_u16(objfile_section_small_relocations_count(s));
+    aux_sectiondef.NumberOfLineNumbers = to_le_u16(0);
+    aux_sectiondef.CheckSum = to_le_u32(0);
+    aux_sectiondef.Number = to_le_u16(0);
     aux_sectiondef.Selection = 0;
     STATIC_CHECK(sizeof(aux_sectiondef.Unused) == 3);
     memset(aux_sectiondef.Unused, 0, 3);
@@ -334,9 +334,9 @@ void win_append_relocs(struct databuf *d, struct objfile_relocation *relocs,
 
   for (size_t i = 0; i < relocs_count; i++) {
     struct COFF_Relocation coff_reloc;
-    coff_reloc.VirtualAddress = swap_le_u32(relocs[i].virtual_address);
-    coff_reloc.SymbolTableIndex = swap_le_u32(relocs[i].symbol_table_index);
-    coff_reloc.Type = swap_le_u16(win_Type[relocs[i].type]);
+    coff_reloc.VirtualAddress = to_le_u32(relocs[i].virtual_address);
+    coff_reloc.SymbolTableIndex = to_le_u32(relocs[i].symbol_table_index);
+    coff_reloc.Type = to_le_u16(win_Type[relocs[i].type]);
     databuf_append(d, &coff_reloc, sizeof(coff_reloc));
   }
 }
@@ -357,17 +357,17 @@ void win_write_section_header(
   memset(h.Name, 0, 8);
   memcpy(h.Name, name, name_len);
   /* Should be set to zero for object files. */
-  h.VirtualSize = swap_le_u32(0);
+  h.VirtualSize = to_le_u32(0);
   /* For simplicity, should be set to zero for object files. */
-  h.VirtualAddress = swap_le_u32(0);
-  h.SizeOfRawData = swap_le_u32(objfile_section_raw_size(s));
-  h.PointerToRawData = swap_le_u32(start_of_raw);
-  h.PointerToRelocations = swap_le_u32(PointerToRelocations);
+  h.VirtualAddress = to_le_u32(0);
+  h.SizeOfRawData = to_le_u32(objfile_section_raw_size(s));
+  h.PointerToRawData = to_le_u32(start_of_raw);
+  h.PointerToRelocations = to_le_u32(PointerToRelocations);
   /* We output no COFF line numbers. */
-  h.PointerToLineNumbers = swap_le_u32(0);
-  h.NumberOfRelocations = swap_le_u16(objfile_section_small_relocations_count(s));
-  h.NumberOfLineNumbers = swap_le_u16(0);
-  h.Characteristics = swap_le_u32(Characteristics);
+  h.PointerToLineNumbers = to_le_u32(0);
+  h.NumberOfRelocations = to_le_u16(objfile_section_small_relocations_count(s));
+  h.NumberOfLineNumbers = to_le_u16(0);
+  h.Characteristics = to_le_u32(Characteristics);
 
   databuf_append(d, &h, sizeof(h));
 }
@@ -419,15 +419,15 @@ void win_write_symbols_and_strings(struct identmap *im,
       /* The offset includes the leading 4 bytes -- the minimimum
          possible offset is 4. */
       uint32_t offset = strtab_add(strings, name_buf, name_count);
-      standard.Name.LongName.Zeroes = swap_le_u32(0);
-      standard.Name.LongName.Offset = swap_le_u32(offset);
+      standard.Name.LongName.Zeroes = to_le_u32(0);
+      standard.Name.LongName.Offset = to_le_u32(offset);
     }
 
-    standard.Value = swap_le_u32(symbol_table[i].value);
+    standard.Value = to_le_u32(symbol_table[i].value);
     STATIC_CHECK((int)OBJFILE_SYMBOL_SECTION_UNDEFINED == (int)IMAGE_SYM_UNDEFINED);
-    standard.SectionNumber = swap_le_u16(symbol_table[i].section);
-    standard.Type = swap_le_u16(symbol_table[i].is_function == IS_FUNCTION_YES ?
-                                kFunctionSymType : kNullSymType);
+    standard.SectionNumber = to_le_u16(symbol_table[i].section);
+    standard.Type = to_le_u16(symbol_table[i].is_function == IS_FUNCTION_YES ?
+                              kFunctionSymType : kNullSymType);
     standard.StorageClass = symbol_table[i].is_static == IS_STATIC_YES ?
       IMAGE_SYM_CLASS_STATIC : IMAGE_SYM_CLASS_EXTERNAL;
     standard.NumberOfAuxSymbols = 0;
@@ -436,7 +436,7 @@ void win_write_symbols_and_strings(struct identmap *im,
 
   win_append_all_section_symbols(symbols, f);
 
-  const uint32_t strings_size_le = swap_le_u32(size_to_uint32(strings->count));
+  const struct le_u32 strings_size_le = to_le_u32(size_to_uint32(strings->count));
   STATIC_CHECK(sizeof(strings_size_le) == 4);
   databuf_overwrite(strings, 0, &strings_size_le, 4);
 
@@ -492,14 +492,14 @@ void win_flatten(struct identmap *im, struct objfile *f, struct databuf **out) {
   {
     struct COFF_Header h;
     STATIC_CHECK(sizeof(h) == COFF_Header_EXPECTED_SIZE);
-    h.Machine = swap_le_u16(IMAGE_FILE_MACHINE_I386);
-    h.NumberOfSections = swap_le_u16(kNumberOfSections);
-    h.TimeDateStamp = swap_le_u32(kFakeTimeDateStamp);
-    h.PointerToSymbolTable = swap_le_u32(end_of_section_headers);
-    h.NumberOfSymbols = swap_le_u32(win_symbols_to_write(f));
+    h.Machine = to_le_u16(IMAGE_FILE_MACHINE_I386);
+    h.NumberOfSections = to_le_u16(kNumberOfSections);
+    h.TimeDateStamp = to_le_u32(kFakeTimeDateStamp);
+    h.PointerToSymbolTable = to_le_u32(end_of_section_headers);
+    h.NumberOfSymbols = to_le_u32(win_symbols_to_write(f));
     /* Should be zero for an object file. */
-    h.SizeOfOptionalHeader = swap_le_u16(0);
-    h.Characteristics = swap_le_u16(real_file_characteristics());
+    h.SizeOfOptionalHeader = to_le_u16(0);
+    h.Characteristics = to_le_u16(real_file_characteristics());
 
     databuf_append(d, &h, sizeof(h));
   }
