@@ -1,10 +1,10 @@
         Kit v0.0000...1A.x
 
-At some future date, Kit will be a programming language.  Right now,
-it's a work in progress.  Use build_windows_trc.bat or
-build_linux_trc.sh to build it, or just manually invoke your C
-compiler (look inside those scripts for an example, they're
-one-liners).  Then (if you built trc) I recommend running
+At some future date, Kit will be a programming language.  Right
+now, it's a work in progress.  Use windows_build.bat or
+./linux_build.sh to build it, or just manually invoke your C compiler
+(look inside those scripts for an example, they're one-liners).
+Then I recommend running
 
    out --test
 
@@ -35,7 +35,7 @@ to see the test suite, written in proto-Kit, for parsing and
 typechecking.  The current directory structure is:
 
    trc - 1st stage compiler, written in C, compiled by invoking
-   build_windows_trc.bat.
+   windows_build.bat, linux_build.sh, etc.
 
    [u-z]rc - future locations of the current "src" directory, when
    it's no longer the tip of the bootstrap chain, compilable using
