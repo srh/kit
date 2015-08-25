@@ -219,3 +219,16 @@ struct objfile_section *objfile_text(struct objfile *f) {
 uint32_t objfile_section_size(struct objfile_section *s) {
   return size_to_uint32(s->raw.count);
 }
+
+
+uint32_t strtab_add(struct databuf *d, const void *buf, size_t count) {
+  const uint8_t *ch = buf;
+  STATIC_CHECK(sizeof(uint8_t) == 1);
+  for (size_t i = 0; i < count; i++) {
+    CHECK(ch[i] != 0);
+  }
+  uint32_t ret = size_to_uint32(d->count);
+  databuf_append(d, buf, count);
+  databuf_append(d, "\0", 1);
+  return ret;
+}

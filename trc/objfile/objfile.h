@@ -68,7 +68,7 @@ int objfile_c_symbol_name(int target_linux32,
 
 /* Utility. */
 void append_zeros_to_align(struct databuf *d, size_t alignment);
-/* TODO: Move impl from linux.c. */
+
 uint32_t strtab_add(struct databuf *d, const void *buf, size_t count);
 
 #endif /* KIT_OBJFILE_OBJFILE_H_ */

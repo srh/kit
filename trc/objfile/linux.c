@@ -128,21 +128,7 @@ enum {
 };
 
 uint32_t strtab_append_c_str(struct databuf *d, const char *s) {
-  uint32_t ret = size_to_uint32(d->count);
-  databuf_append(d, s, strlen(s) + 1);
-  return ret;
-}
-
-uint32_t strtab_add(struct databuf *d, const void *buf, size_t count) {
-  const uint8_t *ch = buf;
-  STATIC_CHECK(sizeof(uint8_t) == 1);
-  for (size_t i = 0; i < count; i++) {
-    CHECK(ch[i] != 0);
-  }
-  uint32_t ret = size_to_uint32(d->count);
-  databuf_append(d, buf, count);
-  databuf_append(d, "\0", 1);
-  return ret;
+  return strtab_add(d, s, strlen(s));
 }
 
 void push_symbol(struct identmap *im, struct objfile_symbol_record *symbol,
