@@ -1565,46 +1565,52 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
   }
 }
 
-void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
-                       enum typetrav_func tf, struct loc dest, int has_src,
-                       struct loc src, struct ast_typeexpr *type) {
-  {
-    struct typeexpr_traits traits;
-    int success = check_typeexpr_traits(cs, type, NULL, &traits);
-    CHECK(success);
-    switch (tf) {
-    case TYPETRAV_FUNC_DESTROY: {
-      if (traits.copyable == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
-        /* Destroying a trivial type: Do nothing. */
-        return;
-      }
-    } break;
-    case TYPETRAV_FUNC_COPY: {
-      if (traits.copyable == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
-        /* Copying a trivial type:  Copy it.. trivially. */
-        gen_mov(f, dest, src);
-        return;
-      }
-    } break;
-    case TYPETRAV_FUNC_MOVE_OR_COPYDESTROY: {
-      /* Moving trivially is also trivial. */
-      if (traits.movable == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
-        gen_mov(f, dest, src);
-        return;
-      }
-    } break;
-    case TYPETRAV_FUNC_DEFAULT_CONSTRUCT: {
-      if (traits.inittible == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
-        /* A previous comment (in gen_typetrav_name_direct) said we
-        don't need to zero the variable but I don't get what that's
-        about -- AFAICT we do need to zero a variable to
-        default-construct it. */
-        gen_bzero(f, dest);
-        return;
-      }
-    } break;
+int try_gen_trivial_typetrav_func(struct checkstate *cs, struct objfile *f,
+                                  enum typetrav_func tf,
+                                  struct loc dest, struct loc src,
+                                  struct ast_typeexpr *type) {
+  struct typeexpr_traits traits;
+  int success = check_typeexpr_traits(cs, type, NULL, &traits);
+  CHECK(success);
+  switch (tf) {
+  case TYPETRAV_FUNC_DESTROY: {
+    if (traits.copyable == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
+      /* Destroying a trivial type: Do nothing. */
+      return 1;
     }
+  } break;
+  case TYPETRAV_FUNC_COPY: {
+    if (traits.copyable == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
+      /* Copying a trivial type:  Copy it.. trivially. */
+      gen_mov(f, dest, src);
+      return 1;
+    }
+  } break;
+  case TYPETRAV_FUNC_MOVE_OR_COPYDESTROY: {
+    /* Moving trivially is also trivial. */
+    if (traits.movable == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
+      gen_mov(f, dest, src);
+      return 1;
+    }
+  } break;
+  case TYPETRAV_FUNC_DEFAULT_CONSTRUCT: {
+    if (traits.inittible == TYPEEXPR_TRAIT_TRIVIALLY_HAD) {
+      /* A previous comment (in gen_typetrav_name_direct) said we
+      don't need to zero the variable but I don't get what that's
+      about -- AFAICT we do need to zero a variable to
+      default-construct it. */
+      gen_bzero(f, dest);
+      return 1;
+    }
+  } break;
   }
+  return 0;
+}
+
+void really_gen_typetrav_behavior(struct checkstate *cs, struct objfile *f,
+                                  struct frame *h, enum typetrav_func tf,
+                                  struct loc dest, int has_src,
+                                  struct loc src, struct ast_typeexpr *type) {
   switch (type->tag) {
   case AST_TYPEEXPR_NAME: {
     struct typeexpr_traits traits;
@@ -1695,6 +1701,15 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
   default:
     UNREACHABLE();
   }
+}
+
+void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
+                       enum typetrav_func tf, struct loc dest, int has_src,
+                       struct loc src, struct ast_typeexpr *type) {
+  if (try_gen_trivial_typetrav_func(cs, f, tf, dest, src, type)) {
+    return;
+  }
+  really_gen_typetrav_behavior(cs, f, h, tf, dest, has_src, src, type);
 }
 
 void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
