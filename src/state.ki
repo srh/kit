@@ -430,11 +430,12 @@ deftype def_inst struct {
   computed_type cu_typeexpr;
   // Right now, these type properties _must_ indicate that the type is defwise trivial.
   computed_type_properties type_properties;
+  graph nbfc[frame_graph];
   evaled_value nbfc[st_value];
 };
 
 func mk(parms cu_genparms, rhs def_inst_rhs) def_inst {
-  return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties](), NotComputed@[st_value]()};
+  return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties](), NotComputed@[frame_graph](), NotComputed@[st_value]()};
 }
 
 deftype def_nonprim struct {
