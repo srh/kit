@@ -284,7 +284,6 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
 
 enum immediate_tag {
   IMMEDIATE_FUNC,
-  IMMEDIATE_PRIMITIVE_OP,
   IMMEDIATE_U32,
   IMMEDIATE_I32,
   IMMEDIATE_U8,
@@ -292,12 +291,10 @@ enum immediate_tag {
   IMMEDIATE_VOID,
 };
 
-/* TODO: Ugh primitive_op shouldn't be part of this. */
 struct immediate {
   enum immediate_tag tag;
   union {
     uint32_t func_sti;
-    struct primitive_op primitive_op;
     uint32_t u32;
     int32_t i32;
     uint8_t u8;
@@ -309,8 +306,6 @@ uint32_t immediate_size(struct immediate imm) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC:
     return DWORD_SIZE;
-  case IMMEDIATE_PRIMITIVE_OP:
-    CRASH("immediate_size on primitive op.");
   case IMMEDIATE_U32:
   case IMMEDIATE_I32:
     return DWORD_SIZE;
@@ -748,9 +743,6 @@ void append_immediate(struct objfile *f, struct immediate imm) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC: {
     objfile_section_append_dir32(objfile_text(f), imm.u.func_sti);
-  } break;
-  case IMMEDIATE_PRIMITIVE_OP: {
-    CRASH("Trying to put a primitive op immediate in memory.");
   } break;
   case IMMEDIATE_U32: {
     char buf[4];
@@ -1324,8 +1316,6 @@ void push_address(struct objfile *f, struct frame *h, struct loc loc) {
 
 void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
                   struct immediate imm,
-                  struct ast_typeexpr *arg0_type_or_null,
-                  struct ast_typeexpr *return_type,
                   int hidden_return_param) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC:
@@ -1339,10 +1329,6 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
     }
     gen_placeholder_stack_adjustment(f, h, 1);
     break;
-  case IMMEDIATE_PRIMITIVE_OP: {
-    gen_primitive_op_behavior(cs, f, h, imm.u.primitive_op, arg0_type_or_null,
-                              return_type);
-  } break;
   case IMMEDIATE_U32:
     UNREACHABLE();
   case IMMEDIATE_I32:
@@ -1767,9 +1753,7 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
   struct immediate imm;
   imm.tag = IMMEDIATE_FUNC;
   imm.u.func_sti = sti;
-  struct ast_typeexpr void_type;
-  init_name_type(&void_type, cs->cm.voide);
-  gen_call_imm(cs, f, h, imm, NULL, &void_type, 0);
+  gen_call_imm(cs, f, h, imm, 0);
   frame_restore_offset(h, saved_offset);
 }
 
@@ -2156,6 +2140,7 @@ void x86_gen_indirect_call_reg(struct objfile *f, enum x86_reg reg) {
 enum expr_return_free_tag {
   EXPR_RETURN_FREE_LOC,
   EXPR_RETURN_FREE_IMM,
+  EXPR_RETURN_FREE_PRIMITIVE_OP,
 };
 
 struct expr_return_free {
@@ -2163,6 +2148,7 @@ struct expr_return_free {
   union {
     struct loc loc;
     struct immediate imm;
+    struct primitive_op primitive_op;
   } u;
 };
 
@@ -2192,6 +2178,10 @@ struct temp_return temp_exists_trivial(struct loc loc,
 }
 
 struct temp_return temp_immediate(void) {
+  return temp_none();
+}
+
+struct temp_return temp_primitive_op(void) {
   return temp_none();
 }
 
@@ -2331,6 +2321,9 @@ void wipe_temporaries(struct checkstate *cs, struct objfile *f, struct frame *h,
       loc = src->u.free.u.loc;
       break;
     case EXPR_RETURN_FREE_IMM:
+      UNREACHABLE();
+      break;
+    case EXPR_RETURN_FREE_PRIMITIVE_OP:
       UNREACHABLE();
       break;
     default:
@@ -3414,9 +3407,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
   switch (func_er.u.free.tag) {
   case EXPR_RETURN_FREE_IMM: {
-    gen_call_imm(cs, f, h, func_er.u.free.u.imm,
-                 args_count == 0 ? NULL : ast_expr_type(&a->u.funcall.args[0].expr),
-                 return_type, hidden_return_param);
+    gen_call_imm(cs, f, h, func_er.u.free.u.imm, hidden_return_param);
   } break;
   case EXPR_RETURN_FREE_LOC: {
     struct loc func_loc;
@@ -3431,6 +3422,11 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       x86_gen_add_esp_i32(f, -4);
     }
     gen_placeholder_stack_adjustment(f, h, 1);
+  } break;
+  case EXPR_RETURN_FREE_PRIMITIVE_OP: {
+    gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
+                              args_count == 0 ? NULL : ast_expr_type(&a->u.funcall.args[0].expr),
+                              return_type);
   } break;
   default:
     UNREACHABLE();
@@ -3819,6 +3815,25 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
   }
 }
 
+void expr_return_primitive_op(struct expr_return *er,
+                              struct primitive_op primitive_op) {
+  switch (er->tag) {
+  case EXPR_RETURN_DEMANDED: {
+    CRASH("Trying to put primitive op into demanded expr_return.");
+  } break;
+  case EXPR_RETURN_OPEN: {
+    CRASH("Trying to put primitive op into open expr_return.");
+  } break;
+  case EXPR_RETURN_FREE: {
+    er->u.free.tag = EXPR_RETURN_FREE_PRIMITIVE_OP;
+    er->u.free.u.primitive_op = primitive_op;
+    er_set_tr(er, temp_primitive_op());
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 int help_gen_immediate_numeric(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
@@ -4011,10 +4026,7 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
 void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
                     struct def_instantiation *inst, struct expr_return *er) {
   if (inst->value_computed && di_value(inst)->tag == STATIC_VALUE_PRIMITIVE_OP) {
-    struct immediate imm;
-    imm.tag = IMMEDIATE_PRIMITIVE_OP;
-    imm.u.primitive_op = di_value(inst)->u.primitive_op;
-    expr_return_immediate(f, h, er, imm);
+    expr_return_primitive_op(er, di_value(inst)->u.primitive_op);
   } else {
     CHECK(inst->owner->is_extern || inst->owner->is_primitive || inst->typecheck_started);
     if (typeexpr_is_func_type(cs->im, &inst->type)) {
