@@ -5,6 +5,10 @@ deftype frame_graph struct {
   ops array[gr_node];
 };
 
+func init_frame_graph_from_cells(cells *array[cell_info]) frame_graph {
+  return {*cells, mk_array@[gr_node]()};
+}
+
 deftype gr_num size;
 
 func add_node(gr *frame_graph, node gr_node) gr_num {
@@ -1043,6 +1047,51 @@ func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bo
       var ap = add_node(gr, node(mk_array(fc, dp, sp), GrApply({desc.funcell, mk_array(desc.destptr, desc.srcptr), desc.retvoid})));
       var deadret = add_node(gr, node(mk_array(ap), GrDead({desc.retvoid})));
       *out = deadret;
+      return true;
+    }
+  }
+}
+
+func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
+  if !ensure_def_inst_checked(cs, clq, ent_id, inst_id) {
+    return false;
+  }
+
+  inst *def_inst = ref_inst(cs, inst_id);
+  switch &inst->graph {
+    case &NotComputed(v0 void): {
+      inst->graph = BeganComputing();
+      switch &inst->rhs {
+        case &InstRhsPrim(v void): {
+          return TODO();
+        }
+        case &InstRhsExtern(v void): {
+          return TODO();
+        }
+        case &InstRhsExpr(dire def_inst_rhs_expr): {
+          info *frame_info = unHas(&dire.frame_info);
+          gr frame_graph = init_frame_graph_from_cells(&info->cells);
+          gn gr_num;
+          if !gr_expr_consume(cs, &gr, &dire.ec, &gn) {
+            return false;
+          }
+          inst->graph = Computed({gr, gn});
+          return true;
+        }
+        case &InstRhsMagic(mag def_magic): {
+          return TODO();
+        }
+      }
+    }
+    case &BeganComputing(v void): {
+      ice(_u8("ensure_def_inst_graphed recursively computing"));
+      return fake();
+    }
+    case &FailedComputation(v void): {
+      ERR(_u8("ensure_def_inst_graphed fails again on same def"));
+      return false;
+    }
+    case &Computed(dr def_regraphed): {
       return true;
     }
   }
