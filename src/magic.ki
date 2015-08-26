@@ -33,7 +33,9 @@ defenum magic_enum_construct_op {
 
 deftype magic_enum_construct struct {
   enum_type cu_typeexpr;
-  constructor_tag enum_tag_value;
+  enum_type_props type_properties;
+  constructor_index size;
+  rhs_props type_properties;
   operational magic_enum_construct_op;
 };
 

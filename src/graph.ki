@@ -9,6 +9,16 @@ func init_frame_graph_from_cells(cells *array[cell_info]) frame_graph {
   return {*cells, mk_array@[gr_node]()};
 }
 
+func init_frame_graph_empty() frame_graph {
+  return {mk_array@[cell_info](), mk_array@[gr_node]()};
+}
+
+func add_cell(gr *frame_graph, info cell_info) cell_num {
+  num cell_num = ~count(&gr->cells);
+  push(&gr->cells, info);
+  return num;
+}
+
 deftype gr_num size;
 
 func add_node(gr *frame_graph, node gr_node) gr_num {
@@ -1052,9 +1062,82 @@ func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bo
   }
 }
 
-func gr_magic(cs *checkstate, mag *def_magic, gr_out *frame_graph, gn_out *gr_num) bool {
+func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num) bool {
+  switch mag {
+  case &MagicInit(mc magic_ctor):
+    return TODO();
+  case &MagicCopy(mc magic_ctor):
+    return TODO();
+  case &MagicMove(mc magic_ctor):
+    return TODO();
+  case &MagicDestroy(mc magic_ctor):
+    return TODO();
+  case &MagicEnumConstruct(mec magic_enum_construct):
+    return gr_magic_enum_construct(cs, clq, &mec, gr_out, gn_out);
+  }
+}
+
+func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num) bool {
+  gr frame_graph = init_frame_graph_empty();
+  retnum cell_num = add_cell(&gr, {Has(LocationRigid(void)), mec->enum_type, mec->enum_type_props});
+
+  tagval enum_tag_value = mk_enum_tag_value(mec->constructor_index);
+
+  argtype *te_typeexpr;
+  field_offset u32;
+  tag_cell cell_num;
+  if case &TeEnum(et te_enum) = &mec->enum_type.~ {
+    argtype = &ref(&et.constructors, mec->constructor_index)->type;
+    field_offset = enum_field_offset(cs, &et, tagval);
+    cu cu_typeexpr;
+    props type_properties;
+    compute_prim(cs, clq, enum_tag_type(cs, &et), &cu, &props);
+    tag_cell = add_cell(&gr, {Has(LocationVirtual(void)), cu, props});
+  } else {
+    ice(_u8("magic_enum_construct on non-enum type"));
+  }
+
+  argnum cell_num = add_cell(&gr, {Has(LocationRigid(void)), ~ *argtype, mec->rhs_props});
+  retpart cell_num = add_cell(&gr, {Has(LocationVirtual(void)), ~ *argtype, mec->rhs_props});
+
+  var retpart_gn = add_node(&gr, node0(GrSubcell({retpart, retnum, OffsetConst(field_offset)})));
+
+  ctor_gn gr_num;
+  switch &mec->operational {
+  case &EnumConstructMove(cd ctor_desc):
+    if !gr_bi_ctor(cs, clq, &gr, retpart, argnum, &cd, &ctor_gn) {
+      return false;
+    }
+
+  case &EnumConstructCopyDestroy(cdd copy_destroy_desc):
+    cpgn gr_num;
+    if !gr_bi_ctor(cs, clq, &gr, retpart, argnum, &cdd.copy_desc, &cpgn) {
+      return false;
+    }
+    destgn gr_num;
+    if !gr_uni_ctor(cs, clq, &gr, argnum, &cdd.destroy_desc, &destgn) {
+      return false;
+    }
+    ctor_gn = add_node(&gr, node0(GrSequence({cpgn, destgn})));
+  }
+
+  var assign_gn = add_node(&gr, node0(GrSequence({retpart_gn, ctor_gn})));
+
+  var tagcell_gn = add_node(&gr, node0(GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)})));
+  var tag_gn = add_node(&gr, node(mk_array(tagcell_gn), GrWriteConst({tag_cell, ConstInt(~tagval.~)})));
+  var gn = add_node(&gr, node(mk_array(tag_gn, assign_gn), GrNop(void)));
+  *gn_out = gn;
+  return true;
+}
+
+func gr_bi_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, destnum cell_num, srcnum cell_num, cd *ctor_desc, gn_out *gr_num) bool {
   return TODO();
 }
+
+func gr_uni_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, argnum cell_num, cd *ctor_desc, gn_out *gr_num) bool {
+  return TODO();
+}
+
 
 func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
   if !ensure_def_inst_checked(cs, clq, ent_id, inst_id) {
@@ -1088,7 +1171,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         case &InstRhsMagic(mag def_magic): {
           gr frame_graph;
           gn gr_num;
-          if !gr_magic(cs, &mag, &gr, &gn) {
+          if !gr_magic(cs, clq, &mag, &gr, &gn) {
             inst->graph = FailedComputation();
             return false;
           }

@@ -422,20 +422,20 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
 
   // There was no match -- so we make the def ourselves.
   rhs_type *te_typeexpr = &ref(&et->constructors, decl_index)->type;
-  props type_properties;
-  if !compute_complete_type_properties(ds->cs, ds->clq, rhs_type, &props) {
+  rhs_props type_properties;
+  if !compute_complete_type_properties(ds->cs, ds->clq, rhs_type, &rhs_props) {
     return false;
   }
 
   meco magic_enum_construct_op;
-  switch &props.move_behavior {
+  switch &rhs_props.move_behavior {
     case &DerivedMethodAbsent(v void): {
       copy_desc ctor_desc;
-      if !behavior_to_desc(&props.copy_behavior, &copy_desc) {
+      if !behavior_to_desc(&rhs_props.copy_behavior, &copy_desc) {
         return false;
       }
       destroy_desc ctor_desc;
-      if !behavior_to_desc(&props.destroy_behavior, &destroy_desc) {
+      if !behavior_to_desc(&rhs_props.destroy_behavior, &destroy_desc) {
         return false;
       }
       meco = EnumConstructCopyDestroy({copy_desc, destroy_desc});
@@ -451,7 +451,13 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
     }
   }
 
-  mec magic_enum_construct = {~TeEnum(*et), mk_enum_tag_value(decl_index), meco};
+  enum_type cu_typeexpr = ~TeEnum(*et);
+  enum_type_props type_properties;
+  if !compute_type_properties(ds->cs, ds->clq, &enum_type, &enum_type_props) {
+    return false;
+  }
+
+  mec magic_enum_construct = {enum_type, enum_type_props, decl_index, rhs_props, meco};
 
   ent def_entry_id = add_def_primitive(ds->cs, defname, NoGenerics(void), *ctor_type, DefnMagic(MagicEnumConstruct(mec)));
   inst_id def_inst_id;
@@ -1836,21 +1842,29 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
   return true;
 }
 
-func compute_prim(ds *defscope, t te_typeexpr) cu_typeexpr {
+func compute_prim(cs *checkstate, clq *clqueue, t te_typeexpr) cu_typeexpr {
   cac cac_typeexpr;
-  if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &t, &cac) {
+  if !noscoped_check_and_compute_typeexpr(cs, clq, &t, &cac) {
     ice(_u8("compute_prim encounters uncomputable type"));
   }
   check(cac.complete);
   return ~cac.te;
 }
 
-func compute_prim(ds *defscope, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
-  type cu_typeexpr = compute_prim(ds, t);
-  if !compute_type_properties(ds->cs, ds->clq, &type, props_out) {
+func compute_prim(ds *defscope, t te_typeexpr) cu_typeexpr {
+  return compute_prim(ds->cs, ds->clq, t);
+}
+
+func compute_prim(cs *checkstate, clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
+  type cu_typeexpr = compute_prim(cs, clq, t);
+  if !compute_type_properties(cs, clq, &type, props_out) {
     ice(_u8("compute_prim fails to compute type properties"));
   }
   *out = type;
+}
+
+func compute_prim(ds *defscope, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
+  compute_prim(ds->cs, ds->clq, t, out, props_out);
 }
 
 func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast_expr) bool {
