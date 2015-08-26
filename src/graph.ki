@@ -1052,6 +1052,10 @@ func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bo
   }
 }
 
+func gr_magic(cs *checkstate, mag *def_magic, gr_out *frame_graph, gn_out *gr_num) bool {
+  return TODO();
+}
+
 func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
   if !ensure_def_inst_checked(cs, clq, ent_id, inst_id) {
     return false;
@@ -1075,13 +1079,21 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           gr frame_graph = init_frame_graph_from_cells(&info->cells);
           gn gr_num;
           if !gr_expr_consume(cs, &gr, &dire.ec, &gn) {
+            inst->graph = FailedComputation();
             return false;
           }
           inst->graph = Computed(Has(@[def_regraphed]{gr, gn}));
           return true;
         }
         case &InstRhsMagic(mag def_magic): {
-          return TODO();
+          gr frame_graph;
+          gn gr_num;
+          if !gr_magic(cs, &mag, &gr, &gn) {
+            inst->graph = FailedComputation();
+            return false;
+          }
+          inst->graph = Computed(Has(@[def_regraphed]{gr, gn}));
+          return true;
         }
       }
     }
