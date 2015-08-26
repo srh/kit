@@ -291,18 +291,16 @@ func parse_rest_of_access(p *ps, out *ast_toplevel) bool {
 func parse_def_generics_and_name(p *ps, is_export ast_isexport, is_var ast_isvar,
                                  generics_out *ast_generics, name_out *ast_ident) bool {
   switch is_export {
-    case IsExport(v): {
-      *generics_out = NoGenerics(void);
-    }
-    case IsNotExport(v): {
-      switch is_var {
-        case IsVar(v2): {
-          *generics_out = NoGenerics(void);
-        }
-        case IsNotVar(v2): {
-          if !parse_generics_if_present(p, generics_out) {
-            return Fail;
-          }
+  case IsExport(v):
+    *generics_out = NoGenerics(void);
+  case IsNotExport(v):
+    switch is_var {
+      case IsVar(v2): {
+        *generics_out = NoGenerics(void);
+      }
+      case IsNotVar(v2): {
+        if !parse_generics_if_present(p, generics_out) {
+          return Fail;
         }
       }
     }
@@ -330,40 +328,35 @@ func parse_ident(p *ps, out *ast_ident) bool {
 
 func parse_rest_of_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) bool {
   switch peek(p).val {
-    default: {
+  default:
+    return Fail;
+  // TODO: "Opers" such as "@" or maybe even "=" shouldn't really be allowed here -- only functional opers allowed.
+  // TODO: We probably should not allow "` + `" to parse -- require tight quoting, do this at tokenization.
+  case Oper(operch array[i32]):
+    step(p);
+    if !try_skip_token(p, Backtick(void)) {
       return Fail;
     }
-    // TODO: "Opers" such as "@" or maybe even "=" shouldn't really be allowed here -- only functional opers allowed.
-    // TODO: We probably should not allow "` + `" to parse -- require tight quoting, do this at tokenization.
-    case Oper(operch array[i32]): {
-      step(p);
-      if !try_skip_token(p, Backtick(void)) {
-        return Fail;
-      }
-      end(p, ident_meta);
-      *out = {ident_meta, intern(p->im, ~operch)};
-      return true;
-    }
+    end(p, ident_meta);
+    *out = {ident_meta, intern(p->im, ~operch)};
+    return true;
   }
 }
 
 func try_parse_ident(p *ps, out *ast_ident) bool {
   dbgparse("try_parse_ident\n");
   switch peek(p).val {
-    case Ident(text array[i32]): {
-      m ast_meta = startend(p);
-      step(p);
-      *out = {m, intern(p->im, ~text)};
-      return true;
-    }
-    case Backtick(v): {
-      ident_meta ast_meta = start(p);
-      step(p);
-      return parse_rest_of_backtick_ident(p, ident_meta, out);
-    }
-    default: {
-      return Fail;
-    }
+  case Ident(text array[i32]):
+    m ast_meta = startend(p);
+    step(p);
+    *out = {m, intern(p->im, ~text)};
+    return true;
+  case Backtick(v):
+    ident_meta ast_meta = start(p);
+    step(p);
+    return parse_rest_of_backtick_ident(p, ident_meta, out);
+  default:
+    return Fail;
   }
 }
 

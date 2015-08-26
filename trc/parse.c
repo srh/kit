@@ -1079,6 +1079,9 @@ int parse_constructor_pattern(struct ps *p, struct ast_constructor_pattern *out)
   return 0;
 }
 
+int parse_rest_of_bracebody(struct ps *p, struct pos pos_start, struct ast_bracebody *out);
+int parse_statement(struct ps *p, struct ast_statement *out);
+
 int parse_cased_statement(struct ps *p, struct ast_cased_statement *out) {
   struct pos pos_start = ps_pos(p);
   struct ast_case_pattern pattern;
@@ -1098,11 +1101,43 @@ int parse_cased_statement(struct ps *p, struct ast_cased_statement *out) {
     ast_case_pattern_init(&pattern, constructor_pattern);
   }
 
-  struct ast_bracebody body;
-  if (!(skip_ws(p) && try_skip_char(p, ':') && skip_ws(p) && parse_bracebody(p, &body))) {
+  if (!(skip_ws(p) && try_skip_char(p, ':') && skip_ws(p))) {
     goto fail_pattern;
   }
 
+  struct ast_bracebody body;
+  struct pos bracebody_start = ps_pos(p);
+  if (try_skip_char(p, '{')) {
+    if (!parse_rest_of_bracebody(p, bracebody_start, &body)) {
+      goto fail_pattern;
+    }
+  } else {
+    struct ast_statement *statements = NULL;
+    size_t statements_count = 0;
+    size_t statements_limit = 0;
+    for (;;) {
+      struct ps_savestate save = ps_save(p);
+      if (try_skip_keyword(p, "case") || try_skip_keyword(p, "default") || try_skip_char(p, '}')) {
+        ps_restore(p, save);
+        ast_bracebody_init(&body, ast_meta_make(bracebody_start, ps_pos(p)),
+                           statements, statements_count);
+        goto success_body;
+      }
+      struct ast_statement statement;
+      if (!parse_statement(p, &statement)) {
+        goto fail_statements;
+      }
+      SLICE_PUSH(statements, statements_count, statements_limit, statement);
+      if (!skip_ws(p)) {
+        goto fail_statements;
+      }
+    }
+  fail_statements:
+    SLICE_FREE(statements, statements_count, ast_statement_destroy);
+    goto fail_pattern;
+  }
+
+ success_body:
   ast_cased_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
                            pattern, body);
   return 1;
@@ -1427,12 +1462,7 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
   }
 }
 
-int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
-  struct pos pos_start = ps_pos(p);
-  if (!try_skip_char(p, '{')) {
-    return 0;
-  }
-
+int parse_rest_of_bracebody(struct ps *p, struct pos pos_start, struct ast_bracebody *out) {
   struct ast_statement *statements = NULL;
   size_t statements_count = 0;
   size_t statements_limit = 0;
@@ -1457,6 +1487,14 @@ int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
  fail:
   SLICE_FREE(statements, statements_count, ast_statement_destroy);
   return 0;
+}
+
+int parse_bracebody(struct ps *p, struct ast_bracebody *out) {
+  struct pos pos_start = ps_pos(p);
+  if (!try_skip_char(p, '{')) {
+    return 0;
+  }
+  return parse_rest_of_bracebody(p, pos_start, out);
 }
 
 int parse_lambdaspec(struct ps *p,
@@ -3021,7 +3059,7 @@ int parse_test_defs(void) {
                          "def foo [21]u8 = \"\\x2Abcdef\"\n"
                          "  \"abcdefghi\\\"\";\n",
                          28);
-  pass &= run_count_test("def25",
+  pass &= run_count_test("def25-a",
                          "def a b = func() c {\n"
                          "  switch d {\n"
                          "    case e(f g): { }\n"
@@ -3029,6 +3067,14 @@ int parse_test_defs(void) {
                          "  }\n"
                          "};\n",
                          35);
+  pass &= run_count_test("def25-b",
+                         "def a b = func() c {\n"
+                         "  switch d {\n"
+                         "    case e(f g): { }\n"
+                         "    case h(i j): k;\n"
+                         "  }\n"
+                         "};\n",
+                         33);
   pass &= run_count_test("def26",
                          "func a() c {\n"
                          "  switch d {\n"
@@ -3040,6 +3086,20 @@ int parse_test_defs(void) {
                          "  switch d {\n"
                          "    case e(f g): { }\n"
                          "    case h(i j): { k; }\n"
+                         "  }\n"
+                         "}\n",
+                         62);
+  pass &= run_count_test("def26",
+                         "func a() c {\n"
+                         "  switch d {\n"
+                         "    case e(f g):\n"
+                         "    case h(i j): { k; }\n"
+                         "  }\n"
+                         "}\n"
+                         "func b() c {\n"
+                         "  switch d {\n"
+                         "    case e(f g): { }\n"
+                         "    case h(i j): k; l + j;\n"
                          "  }\n"
                          "}\n",
                          62);
