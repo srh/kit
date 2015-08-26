@@ -662,7 +662,9 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
       return gr_index_expr(cs, gr, x, &a, out);
     }
     case &Lambda(a ast_lambda): {
-      return TODO();
+      // TODO: Once real graph building is hooked up, make a way to build the lambda graph "later".
+      ice(_u8("Nested lambda code gen not supported (yet)"));
+      return fake();
     }
     case &LocalField(a ast_local_field): {
       return gr_local_field(cs, gr, x, &a, out);
