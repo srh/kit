@@ -702,10 +702,9 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"
         "def foo fn[ty, i32] = func(x ty) i32 {\n"
         "  switch x {\n"
-        "    case c1(v void): { return -1; }\n"
-        "    case c2(s struct { p i32; q i32; }): {\n"
+        "    case c1(v void): return -1;\n"
+        "    case c2(s struct { p i32; q i32; }):\n"
         "      return s.p + s.q;\n"
-        "    }\n"
         "  }\n"
         "};\n"));
   run_check_test(ctx, "c090b",
@@ -753,9 +752,8 @@ func test_check_more_cases(ctx *check_ctx) void {
         "def foo fn[ty, i32] = func(x ty) i32 {\n"
         "  switch x {\n"
         "    case c1(v void): { return -1; }\n"
-        "    case c2(s): {\n"
+        "    case c2(s):\n"
         "      return s.p + s.q;\n"
-        "    }\n"
         "  }\n"
         "};\n"));
   run_check_test(ctx, "c094",
@@ -1105,11 +1103,10 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "func foo(y i32) i32 {\n"
         "  t ty;\n"
         "  switch t {\n"
-        "    case c1(x i32): {\n"
+        "    case c1(x i32):\n"
         "      goto foo;\n"
         "      label foo;\n"
         "      return 5;\n"
-        "    }\n"
         "    default: {\n"
         "      return 5;\n"
         "    }\n"
