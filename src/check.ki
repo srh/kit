@@ -38,7 +38,7 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
         if !set_instantiation_depth(cs, e.instantiation_depth, &rw) {
           return false;
         }
-        if !ensure_def_inst_checked(cs, clq, ref_def_entry(cs, e.ent_id), e.inst_id) {
+        if !ensure_def_inst_checked(cs, clq, e.ent_id, e.inst_id) {
           return false;
         }
       }
@@ -428,7 +428,8 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
   }
 }
 
-func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
+func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
+  ent *def_entry = ref_def_entry(cs, ent_id);
   dbgcheck(_u8("ensure_def_inst_checked"));
   if !ensure_def_inst_type_computed(cs, clq, ent, inst_id) {
     dbgcheck(_u8("ensure_def_inst_type_computed failed"));
