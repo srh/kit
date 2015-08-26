@@ -1063,10 +1063,12 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
       inst->graph = BeganComputing();
       switch &inst->rhs {
         case &InstRhsPrim(v void): {
-          return TODO();
+          inst->graph = Computed(None());
+          return true;
         }
         case &InstRhsExtern(v void): {
-          return TODO();
+          inst->graph = Computed(None());
+          return true;
         }
         case &InstRhsExpr(dire def_inst_rhs_expr): {
           info *frame_info = unHas(&dire.frame_info);
@@ -1075,7 +1077,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           if !gr_expr_consume(cs, &gr, &dire.ec, &gn) {
             return false;
           }
-          inst->graph = Computed({gr, gn});
+          inst->graph = Computed(Has(@[def_regraphed]{gr, gn}));
           return true;
         }
         case &InstRhsMagic(mag def_magic): {
@@ -1091,7 +1093,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
       ERR(_u8("ensure_def_inst_graphed fails again on same def"));
       return false;
     }
-    case &Computed(dr def_regraphed): {
+    case &Computed(odr opt[def_regraphed]): {
       return true;
     }
   }
