@@ -69,6 +69,8 @@ deftype checkstate struct {
   defs array[shp[def_entry]];
   defs_by_name hash[sym, array[def_entry_id]];
 
+  fn_bodies array[shp[fn_body_entry]];
+
   access_blocks array[shp[access_entry]];
 
   prims cs_primitives;
@@ -106,6 +108,11 @@ deftype deftype_entry_id size;
 def `~` fn[size, deftype_entry_id] = wrapconvert;
 def `==` fn[deftype_entry_id, deftype_entry_id, bool] = wrapequate;
 
+// An index into checkstate's fn_bodies array.
+deftype fn_body_id size;
+def `~` fn[size, fn_body_id] = wrapconvert;
+def `==` fn[fn_body_id, fn_body_id, bool] = wrapequate;
+
 // An index into checkstate's access_blocks array.
 deftype access_entry_id size;
 def `~` fn[size, access_entry_id] = wrapconvert;
@@ -120,6 +127,10 @@ func ref_def_entry(cs *checkstate, id def_entry_id) *def_entry {
 
 func ref_deftype_entry(cs *checkstate, id deftype_entry_id) *deftype_entry {
   return oo(ref(&cs->deftypes, id.~));
+}
+
+func ref_fn_body(cs *checkstate, id fn_body_id) *fn_body_entry {
+  return oo(ref(&cs->fn_bodies, id.~));
 }
 
 func ref_access_entry(cs *checkstate, id access_entry_id) *access_entry {
@@ -168,6 +179,12 @@ func add_inst(cs *checkstate, val def_inst) def_inst_id {
 func add_deftype_inst(cs *checkstate, val deftype_inst) deftype_inst_id {
   id deftype_inst_id = ~count(&cs->type_instantiations);
   push(&cs->type_instantiations, emshp(val));
+  return id;
+}
+
+func add_fn_body(cs *checkstate, ent fn_body_entry) fn_body_id {
+  id fn_body_id = ~count(&cs->fn_bodies);
+  push(&cs->fn_bodies, emshp(ent));
   return id;
 }
 
@@ -363,6 +380,15 @@ deftype deftype_entry struct {
 func mk(module_name sym, name sym, accessible array[access_entry_id], accessibility rhs_accessibility, g ast_generics, tl *ast_type_def) deftype_entry {
   return {module_name, name, accessible, accessibility, g, Has({tl, NotComputed()}), None(), default@[array[deftype_inst_id]]()};
 }
+
+defenum fn_body_spec {
+  FnBodyMagic def_magic;
+  FnBodyLambda ast_lambda;
+};
+
+deftype fn_body_entry struct {
+  spec fn_body_spec;
+};
 
 deftype access_entry struct {
   name sym;
