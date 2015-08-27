@@ -1105,10 +1105,47 @@ func gr_magic_ctor(cs *checkstate, clq *clqueue, wc which_ctor, mc *magic_ctor, 
   info *magic_ctor_info = unHas(&mc->info);
   switch info {
   case &MagicWholeFieldInfo(mwfi magic_whole_field_info):
-    return TODO();
+    return gr_magic_whole_field_info(cs, clq, wc, &mwfi, gr_out, gn_out);
   default:
     return TODO();
   }
+}
+
+func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi *magic_whole_field_info, gr_out *frame_graph, gn_out *gr_num) bool {
+  gr frame_graph = init_frame_graph_empty();
+  argtype cu_typeexpr;
+  argtype_props type_properties;
+  compute_prim(cs, clq, ptr_type(cs, mwfi->cu_type.~), &argtype, &argtype_props);
+
+  fieldptrtype cu_typeexpr;
+  fieldptrtype_props type_properties;
+  compute_prim(cs, clq, ptr_type(cs, mwfi->rhs_type.~), &fieldptrtype, &fieldptrtype_props);
+
+  voidtype cu_typeexpr;
+  voidprops type_properties;
+  compute_prim(cs, clq, primitive_void_type(cs), &voidtype, &voidprops);
+
+  fntype cu_typeexpr;
+  fntype_props type_properties;
+  compute_prim(cs, clq, fn_type(cs, fieldptrtype.~, voidtype.~), &fntype, &fntype_props);
+
+  fncell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
+  argcell cell_num = add_cell(&gr, {Has(LocationRigid(void)), argtype, argtype_props});
+  pointeecell cell_num = add_cell(&gr, {Has(LocationVirtual(void)), mwfi->cu_type, mwfi->cu_props});
+  fieldcell cell_num = add_cell(&gr, {Has(LocationVirtual(void)), mwfi->rhs_type, mwfi->rhs_props});
+  fieldptrcell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fieldptrtype, fieldptrtype_props});
+
+  retcell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtype, voidprops});
+
+  var pointee_gn = add_node(&gr, node0(GrDeref({pointeecell, argcell, OffsetConst(0)})));
+  var fieldcell_gn = add_node(&gr, node(mk_array(pointee_gn), GrSubcell({fieldcell, pointeecell, OffsetConst(0)})));
+  var fieldptr_gn = add_node(&gr, node(mk_array(fieldcell_gn), GrAddressof({fieldptrcell, fieldcell})));
+  var fn_gn = add_node(&gr, node0(GrWriteConst({fncell, ConstDef(mwfi->ip)})));
+  var ap = add_node(&gr, node(mk_array(fn_gn, fieldptr_gn), GrApply({fncell, mk_array(fieldptrcell), retcell})));
+
+  *gr_out = gr;
+  *gn_out = ap;
+  return true;
 }
 
 func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num) bool {

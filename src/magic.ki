@@ -9,6 +9,8 @@ import u8ast;
 
 deftype magic_whole_field_info struct {
   ip instpair;
+  cu_type cu_typeexpr;
+  cu_props type_properties;
   rhs_type cu_typeexpr;
   rhs_props type_properties;
 };
@@ -88,11 +90,16 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_g
   }
   check(cac.complete);
 
+  cac_props type_properties;
+  if !compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
+    return false;
+  }
+
   switch &cac.te {
     case &TeName(a te_name): {
       if case &Has(p te_instpack) = &a.pack {
         info magic_ctor_info;
-        if !check_pack_ctor(cs, clq, &p, wc, &info) {
+        if !check_pack_ctor(cs, clq, &cac.te, &cac_props, &p, wc, &info) {
           return false;
         }
         set(&mc->info, info);
@@ -103,7 +110,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_g
     case &TeApp(a te_typeapp): {
       if case &Has(p te_instpack) = &a.pack {
         info magic_ctor_info;
-        if !check_pack_ctor(cs, clq, &p, wc, &info) {
+        if !check_pack_ctor(cs, clq, &cac.te, &cac_props, &p, wc, &info) {
           return false;
         }
         set(&mc->info, info);
@@ -194,13 +201,13 @@ func instpair_or_trivial_from_behavior(b *derived_method_behavior) opt[instpair]
   }
 }
 
-func check_pack_ctor(cs *checkstate, clq *clqueue, p *te_instpack, wc which_ctor, info_out *magic_ctor_info) bool {
+func check_pack_ctor(cs *checkstate, clq *clqueue, complete_te *te_typeexpr, props *type_properties, p *te_instpack, wc which_ctor, info_out *magic_ctor_info) bool {
   rhs_type *cu_typeexpr;
   rhs_props *type_properties;
   if !pack_rhs_info(cs, clq, p, &rhs_type, &rhs_props) {
     return false;
   }
-  *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, rhs_props)), *rhs_type, *rhs_props});
+  *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, rhs_props)), ~ *complete_te, *props, *rhs_type, *rhs_props});
   return true;
 }
 
