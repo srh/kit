@@ -1208,7 +1208,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
     }
     initializer = Has(statement);
   }
-  condition opt[box[ast_expr_consume]];
+  condition opt[ast_for_condition];
   if try_skip_oper(p, ';') {
     condition = None();
   } else {
@@ -1217,7 +1217,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
          && try_skip_oper(p, ';')) {
       return Fail;
     }
-    condition = Has(embox(consume(expr)));
+    condition = Has({mk_later(), embox(consume(expr))});
   }
   increment opt[box[ast_expr_discard]];
   if peek(p).val == Grouper(LBrace(void)) {
@@ -1234,7 +1234,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
   if !parse_bracebody(p, &body) {
     return Fail;
   }
-  *out = For({None@[ast_for_statement_info](), initializer, mk_later(), condition, increment, body});
+  *out = For({None@[ast_for_statement_info](), initializer, condition, increment, body});
   return true;
 }
 

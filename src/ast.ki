@@ -232,12 +232,16 @@ deftype ast_for_statement_info struct {
   initter_destructions array[destroy_action];
 };
 
+deftype ast_for_condition struct {
+  discard ast_later_discard_info;
+  expr box[ast_expr_consume];
+};
+
 deftype ast_for_statement struct {
   // Can only be an ast_expr or ast_statement_var.
   info opt[ast_for_statement_info];
   initializer opt[box[ast_statement]];
-  condition_discard ast_later_discard_info;
-  condition opt[box[ast_expr_consume]];
+  condition opt[ast_for_condition];
   increment opt[box[ast_expr_discard]];
   body ast_bracebody;
 };

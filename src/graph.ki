@@ -5,6 +5,7 @@ deftype frame_graph struct {
   ops array[gr_node];
 };
 
+// TODO: Srsly, don't make the parameter a pointer.
 func init_frame_graph_from_cells(cells *array[cell_info]) frame_graph {
   return {*cells, mk_array@[gr_node]()};
 }
@@ -344,8 +345,12 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
   var topgn = add_node(gr, node0(GrNop(void)));
 
   loopcleanupgn gr_num;
-  if !gr_later_discard(cs, gr, &a->condition_discard, &loopcleanupgn) {
-    return false;
+  if case &Has(cond ast_for_condition) = &a->condition {
+    if !gr_later_discard(cs, gr, &cond.discard, &loopcleanupgn) {
+      return false;
+    }
+  } else {
+    loopcleanupgn = add_node(gr, node0(GrNop(void)));
   }
 
   continuegn gr_num;
@@ -366,9 +371,9 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
   }
 
   gn gr_num;
-  if case &Has(bc box[ast_expr_consume]) = &a->condition {
+  if case &Has(cond ast_for_condition) = &a->condition {
     loopexitgn gr_num;
-    if !gr_later_discard(cs, gr, &a->condition_discard, &loopexitgn) {
+    if !gr_later_discard(cs, gr, &cond.discard, &loopexitgn) {
       return false;
     }
 
@@ -379,7 +384,7 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
 
     var exitseq = add_node(gr, node0(GrSequence({loopexitgn, initseq})));
 
-    if !gr_expr_condition(cs, gr, fb, oo(&bc), thengn, exitseq, &gn) {
+    if !gr_expr_condition(cs, gr, fb, oo(&cond.expr), thengn, exitseq, &gn) {
       return false;
     }
   } else {
@@ -774,8 +779,14 @@ func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_f
 }
 
 func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda, out *gr_num) bool {
-  // TODO: graph the fn body, too.
-  id fn_body_id = add_fn_body(cs, {FnBodyLambda(a)});
+  info *ast_fullbody_info = unHas(&a->body.info);
+  lambda_gr frame_graph = init_frame_graph_from_cells(&info->cells);
+  fullbody_gn gr_num;
+  if !gr_fullbody(cs, &lambda_gr, &a->body, &fullbody_gn) {
+    return false;
+  }
+
+  id fn_body_id = add_fn_body(cs, {FnBodyLambda(a), {lambda_gr, fullbody_gn}});
   var gn = add_node(gr, node0(GrWriteConst({rval_cell(x), ConstFnBody(id)})));
   *out = gn;
   return true;
@@ -1245,18 +1256,18 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
             inst->graph = FailedComputation();
             return false;
           }
-          inst->graph = Computed(Has(@[def_regraphed]{gr, gn}));
+          inst->graph = Computed(Has(@[frame_regraphed]{gr, gn}));
           return true;
         }
         case &InstRhsMagic(mag def_magic): {
           // TODO: Make the fn body graph.
-          id fn_body_id = add_fn_body(cs, {FnBodyMagic(&mag)});
+          id fn_body_id = add_fn_body(cs, {FnBodyMagic(&mag), TODO()});
 
           gr frame_graph = init_frame_graph_empty();
           cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), inst->computed_type, inst->computed_type_properties});
 
           gn gr_num = add_node(&gr, node0(GrWriteConst({cell, ConstFnBody(id)})));
-          inst->graph = Computed(Has(@[def_regraphed]{gr, gn}));
+          inst->graph = Computed(Has(@[frame_regraphed]{gr, gn}));
           return true;
         }
       }
@@ -1269,7 +1280,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
       ERR(_u8("ensure_def_inst_graphed fails again on same def"));
       return false;
     }
-    case &Computed(odr opt[def_regraphed]): {
+    case &Computed(odr opt[frame_regraphed]): {
       return true;
     }
   }

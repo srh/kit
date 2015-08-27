@@ -390,6 +390,7 @@ defenum fn_body_spec {
 
 deftype fn_body_entry struct {
   spec fn_body_spec;
+  graph frame_regraphed;
 };
 
 deftype access_entry struct {
@@ -448,7 +449,7 @@ defenum def_inst_rhs {
   InstRhsMagic def_magic;
 };
 
-deftype def_regraphed struct {
+deftype frame_regraphed struct {
   fg frame_graph;
   gn gr_num;
 };
@@ -464,12 +465,12 @@ deftype def_inst struct {
   // Right now, these type properties _must_ indicate that the type is defwise trivial.
   computed_type_properties type_properties;
   // This is None() for InstRhsPrim and InstRhsExtern.
-  graph nbfc[opt[def_regraphed]];
+  graph nbfc[opt[frame_regraphed]];
   evaled_value nbfc[st_value];
 };
 
 func mk(parms cu_genparms, rhs def_inst_rhs) def_inst {
-  return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties](), NotComputed@[opt[def_regraphed]](), NotComputed@[st_value]()};
+  return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties](), NotComputed@[opt[frame_regraphed]](), NotComputed@[st_value]()};
 }
 
 deftype def_nonprim struct {

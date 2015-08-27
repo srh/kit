@@ -407,9 +407,9 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   }
 
   exitnum statement_num = add_statement(bs, None());
-  if case &Has(cond box[ast_expr_consume]) = &a->condition {
+  if case &Has(cond ast_for_condition) = &a->condition {
     boolean cu_typeexpr = compute_prim(bs->ds, primitive_bool_type(bs->cs));
-    if !check_consume_then_discard_expr(&bs->es, oo(&cond), &boolean.~, &a->condition_discard) {
+    if !check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.~, &cond.discard) {
       return false;
     }
     connect_statements(bs, loopnum, exitnum);
