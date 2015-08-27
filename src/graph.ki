@@ -1043,6 +1043,15 @@ func gr_destroy_action(cs *checkstate, gr *frame_graph, x *destroy_action, out *
   }
 }
 
+func gr_bi_fun_ctor_desc(cs *checkstate, gr *frame_graph, desc *bi_fun_ctor_desc, dest cell_num, src cell_num) gr_num {
+  var fc = add_node(gr, node0(GrWriteConst({desc->funcell, ConstDef(desc->ip)})));
+  var dp = add_node(gr, node0(GrAddressof({desc->destptr, dest})));
+  var sp = add_node(gr, node0(GrAddressof({desc->srcptr, src})));
+  var ap = add_node(gr, node(mk_array(fc, dp, sp), GrApply({desc->funcell, mk_array(desc->destptr, desc->srcptr), desc->retvoid})));
+  var deadret = add_node(gr, node(mk_array(ap), GrDead({desc->retvoid})));
+  return deadret;
+}
+
 func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bool {
   switch &x->ctor {
     case &BiTrivialCtor(v void): {
@@ -1051,12 +1060,8 @@ func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bo
       return true;
     }
     case &BiFunCtor(desc bi_fun_ctor_desc): {
-      var fc = add_node(gr, node0(GrWriteConst({desc.funcell, ConstDef(desc.ip)})));
-      var dp = add_node(gr, node0(GrAddressof({desc.destptr, x->dest})));
-      var sp = add_node(gr, node0(GrAddressof({desc.srcptr, x->src})));
-      var ap = add_node(gr, node(mk_array(fc, dp, sp), GrApply({desc.funcell, mk_array(desc.destptr, desc.srcptr), desc.retvoid})));
-      var deadret = add_node(gr, node(mk_array(ap), GrDead({desc.retvoid})));
-      *out = deadret;
+      gn gr_num = gr_bi_fun_ctor_desc(cs, gr, &desc, x->dest, x->src);
+      *out = gn;
       return true;
     }
   }
@@ -1105,17 +1110,19 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
   ctor_gn gr_num;
   switch &mec->operational {
   case &EnumConstructMove(cd ctor_desc):
-    if !gr_bi_ctor(cs, clq, &gr, retpart, argnum, &cd, &ctor_gn) {
+    bi_ctor_gn gr_num;
+    if !gr_bi_ctor(cs, clq, &gr, argtype, retpart, argnum, &cd, &bi_ctor_gn) {
       return false;
     }
+    ctor_gn = add_node(&gr, node(mk_array(bi_ctor_gn), GrDead({argnum})));
 
   case &EnumConstructCopyDestroy(cdd copy_destroy_desc):
     cpgn gr_num;
-    if !gr_bi_ctor(cs, clq, &gr, retpart, argnum, &cdd.copy_desc, &cpgn) {
+    if !gr_bi_ctor(cs, clq, &gr, argtype, retpart, argnum, &cdd.copy_desc, &cpgn) {
       return false;
     }
     destgn gr_num;
-    if !gr_uni_ctor(cs, clq, &gr, argnum, &cdd.destroy_desc, &destgn) {
+    if !gr_destroy_ctor(cs, clq, &gr, argtype, argnum, &cdd.destroy_desc, &destgn) {
       return false;
     }
     ctor_gn = add_node(&gr, node0(GrSequence({cpgn, destgn})));
@@ -1130,12 +1137,67 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
   return true;
 }
 
-func gr_bi_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, destnum cell_num, srcnum cell_num, cd *ctor_desc, gn_out *gr_num) bool {
-  return TODO();
+func gr_bi_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, destnum cell_num, srcnum cell_num, cd *ctor_desc, gn_out *gr_num) bool {
+  switch cd {
+  case &TrivialCtor(v void):
+    var gn = add_node(gr, node0(GrMemCopy({destnum, srcnum})));
+    *gn_out = gn;
+  case &FunCtor(ip instpair):
+    pty te_typeexpr = ptr_type(cs, *ty);
+    cu_pty cu_typeexpr;
+    pty_props type_properties;
+    compute_prim(cs, clq, pty, &cu_pty, &pty_props);
+    voidtype cu_typeexpr;
+    voidprops type_properties;
+    compute_prim(cs, clq, primitive_void_type(cs), &voidtype, &voidprops);
+
+    functy te_typeexpr = fn_type(cs, pty, pty, voidtype.~);
+    cu_functy cu_typeexpr;
+    functy_props type_properties;
+    compute_prim(cs, clq, functy, &cu_functy, &functy_props);
+
+    funcptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_functy, functy_props});
+    destptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_pty, pty_props});
+    srcptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_pty, pty_props});
+    return_cell cell_num = add_cell(gr, {Has(LocationFlex(void)), voidtype, voidprops});
+
+    bi_desc bi_fun_ctor_desc = {ip, funcptr_cell, destptr_cell, srcptr_cell, return_cell};
+
+    gn gr_num = gr_bi_fun_ctor_desc(cs, gr, &bi_desc, destnum, srcnum);
+    *gn_out = gn;
+  }
+  return true;
 }
 
-func gr_uni_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, argnum cell_num, cd *ctor_desc, gn_out *gr_num) bool {
-  return TODO();
+func gr_destroy_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, argnum cell_num, cd *ctor_desc, gn_out *gr_num) bool {
+  switch cd {
+  case &TrivialCtor(v void):
+    var dp = add_node(gr, node0(GrDead({argnum})));
+    *gn_out = dp;
+  case &FunCtor(ip instpair):
+    pty te_typeexpr = ptr_type(cs, *ty);
+    cu_pty cu_typeexpr;
+    pty_props type_properties;
+    compute_prim(cs, clq, pty, &cu_pty, &pty_props);
+    voidtype cu_typeexpr;
+    voidprops type_properties;
+    compute_prim(cs, clq, primitive_void_type(cs), &voidtype, &voidprops);
+
+    functy te_typeexpr = fn_type(cs, pty, voidtype.~);
+    cu_functy cu_typeexpr;
+    functy_props type_properties;
+    compute_prim(cs, clq, functy, &cu_functy, &functy_props);
+
+    funcptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_functy, functy_props});
+    argptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_pty, pty_props});
+    return_cell cell_num = add_cell(gr, {Has(LocationFlex(void)), voidtype, voidprops});
+
+    uni_desc uni_fun_ctor_desc = {ip, funcptr_cell, argptr_cell, return_cell};
+    gn gr_num = gr_uni_fun_ctor_desc(cs, gr, &uni_desc, argnum);
+    var dp = add_node(gr, node(mk_array(gn), GrDead({argnum})));
+    *gn_out = dp;
+  }
+  return true;
 }
 
 
