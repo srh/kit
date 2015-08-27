@@ -62,6 +62,15 @@ defenum which_ctor {
   CtorDestroy void;
 };
 
+func num_args(wc which_ctor) size {
+  switch wc {
+  case CtorInit(v void): return 1;
+  case CtorCopy(v void): return 2;
+  case CtorMove(v void): return 2;
+  case CtorDestroy(v void): return 1;
+  }
+}
+
 func check_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, mag *def_magic) bool {
   switch mag {
     case &MagicInit(mc magic_ctor): {
