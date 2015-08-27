@@ -135,6 +135,7 @@ deftype gr_dead struct {
 defenum gr_const {
   ConstInt bigint;
   ConstDef instpair;
+  ConstFnBody fn_body_id;
   ConstBytes array[u8];
 };
 
@@ -676,9 +677,7 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
       return gr_index_expr(cs, gr, x, &a, out);
     }
     case &Lambda(a ast_lambda): {
-      // TODO: Once real graph building is hooked up, make a way to build the lambda graph "later".
-      ice(_u8("Nested lambda code gen not supported (yet)"));
-      return fake();
+      return gr_lambda_expr(cs, gr, x, &a, out);
     }
     case &LocalField(a ast_local_field): {
       return gr_local_field(cs, gr, x, &a, out);
@@ -772,6 +771,14 @@ func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_f
     ice(_u8("ast_local_field missing info"));
     return fake();
   }
+}
+
+func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda, out *gr_num) bool {
+  // TODO: graph the fn body, too.
+  id fn_body_id = add_fn_body(cs, {FnBodyLambda(a)});
+  var gn = add_node(gr, node0(GrWriteConst({rval_cell(x), ConstFnBody(id)})));
+  *out = gn;
+  return true;
 }
 
 func gr_index_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_index_expr, out *gr_num) bool {
@@ -1068,6 +1075,7 @@ func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bo
 }
 
 func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num) bool {
+  // TODO: Make a fn_body, graph the fn_body.
   switch mag {
   case &MagicInit(mc magic_ctor):
     return gr_magic_ctor(cs, clq, CtorInit(void), &mc, gr_out, gn_out);
@@ -1241,12 +1249,13 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           return true;
         }
         case &InstRhsMagic(mag def_magic): {
-          gr frame_graph;
-          gn gr_num;
-          if !gr_magic(cs, clq, &mag, &gr, &gn) {
-            inst->graph = FailedComputation();
-            return false;
-          }
+          // TODO: Make the fn body graph.
+          id fn_body_id = add_fn_body(cs, {FnBodyMagic(&mag)});
+
+          gr frame_graph = init_frame_graph_empty();
+          cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), inst->computed_type, inst->computed_type_properties});
+
+          gn gr_num = add_node(&gr, node0(GrWriteConst({cell, ConstFnBody(id)})));
           inst->graph = Computed(Has(@[def_regraphed]{gr, gn}));
           return true;
         }

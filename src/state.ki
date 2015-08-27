@@ -382,8 +382,10 @@ func mk(module_name sym, name sym, accessible array[access_entry_id], accessibil
 }
 
 defenum fn_body_spec {
-  FnBodyMagic def_magic;
-  FnBodyLambda ast_lambda;
+  // Points to the annotated lambda within the def_inst rhs sub-expr.
+  FnBodyLambda *ast_lambda;
+  // Likewise, points to the checked def_magic within the def_inst definition.
+  FnBodyMagic *def_magic;
 };
 
 deftype fn_body_entry struct {

@@ -38,7 +38,7 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
         if !set_instantiation_depth(cs, e.instantiation_depth, &rw) {
           return false;
         }
-        if !ensure_def_inst_checked(cs, clq, e.ent_id, e.inst_id) {
+        if !ensure_def_inst_graphed(cs, clq, e.ent_id, e.inst_id) {
           return false;
         }
       }
