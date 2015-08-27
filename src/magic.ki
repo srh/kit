@@ -7,9 +7,15 @@ import shp;
 import typeexpr;
 import u8ast;
 
+deftype magic_whole_field_info struct {
+  ip instpair;
+  rhs_type cu_typeexpr;
+  rhs_props type_properties;
+};
+
 defenum magic_ctor_info {
-  MagicWholeFieldInfo instpair;
-  // These are None() for fields that are trivially constructed.
+  MagicWholeFieldInfo magic_whole_field_info;
+  // These are None() for fields that are trivially constructed.  But of course one field is not None().
   MagicStructInfo array[opt[instpair]];
   MagicEnumInfo array[opt[instpair]];
   MagicArraytypeInfo instpair;
@@ -152,12 +158,13 @@ func check_vardecl_ctor(cs *checkstate, clq *clqueue, ds *array[te_vardecl], wc 
   return true;
 }
 
-func pack_rhs_props(cs *checkstate, clq *clqueue, p *te_instpack, rhs_props_out **type_properties) bool {
+func pack_rhs_info(cs *checkstate, clq *clqueue, p *te_instpack, rhs_type_out **cu_typeexpr, rhs_props_out **type_properties) bool {
   info *deftype_inst_info;
   if !compute_pack_info(cs, clq, p, &info) {
     return false;
   }
   if case &Has(rhs_info deftype_inst_rhs_info) = &info->rhs {
+    *rhs_type_out = &rhs_info.rhs_cu;
     *rhs_props_out = &rhs_info.rhs_props;
     return true;
   } else {
@@ -188,11 +195,12 @@ func instpair_or_trivial_from_behavior(b *derived_method_behavior) opt[instpair]
 }
 
 func check_pack_ctor(cs *checkstate, clq *clqueue, p *te_instpack, wc which_ctor, info_out *magic_ctor_info) bool {
+  rhs_type *cu_typeexpr;
   rhs_props *type_properties;
-  if !pack_rhs_props(cs, clq, p, &rhs_props) {
+  if !pack_rhs_info(cs, clq, p, &rhs_type, &rhs_props) {
     return false;
   }
-  *info_out = MagicWholeFieldInfo(instpair_from_behavior(select_behavior(wc, rhs_props)));
+  *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, rhs_props)), *rhs_type, *rhs_props});
   return true;
 }
 

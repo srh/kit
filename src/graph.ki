@@ -1070,15 +1070,25 @@ func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bo
 func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num) bool {
   switch mag {
   case &MagicInit(mc magic_ctor):
-    return TODO();
+    return gr_magic_ctor(cs, clq, CtorInit(void), &mc, gr_out, gn_out);
   case &MagicCopy(mc magic_ctor):
-    return TODO();
+    return gr_magic_ctor(cs, clq, CtorCopy(void), &mc, gr_out, gn_out);
   case &MagicMove(mc magic_ctor):
-    return TODO();
+    return gr_magic_ctor(cs, clq, CtorMove(void), &mc, gr_out, gn_out);
   case &MagicDestroy(mc magic_ctor):
-    return TODO();
+    return gr_magic_ctor(cs, clq, CtorDestroy(void), &mc, gr_out, gn_out);
   case &MagicEnumConstruct(mec magic_enum_construct):
     return gr_magic_enum_construct(cs, clq, &mec, gr_out, gn_out);
+  }
+}
+
+func gr_magic_ctor(cs *checkstate, clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num) bool {
+  info *magic_ctor_info = unHas(&mc->info);
+  switch info {
+  case &MagicWholeFieldInfo(mwfi magic_whole_field_info):
+    return TODO();
+  default:
+    return TODO();
   }
 }
 
