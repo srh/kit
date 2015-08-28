@@ -917,6 +917,11 @@ func compute_type_properties(cs *checkstate, clq *clqueue, t *cu_typeexpr, out *
   return compute_complete_type_properties(cs, clq, &t->~, out);
 }
 
+deftype struct_field_info struct {
+  offset u32;
+  props type_properties;
+};
+
 deftype partial_struct_data struct {
   index size;
   found_field bool;
@@ -926,11 +931,14 @@ deftype partial_struct_data struct {
   move_level u32;
   copy_level u32;
   destroy_level u32;
+
+  // This is of length "index." -- doesn't have all the fields if we stopped early.
+  fields array[struct_field_info];
 };
 
 // fields had better damn well be complete
 func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *array[te_vardecl], name opt[sym], out *partial_struct_data) bool {
-  ret partial_struct_data = {0, false, 0, 1, 0, 0, 0, 0};
+  ret partial_struct_data = {0, false, 0, 1, 0, 0, 0, 0, mk_array@[struct_field_info]()};
   n size = count(fields);
   for ; ret.index < n; ret.index = ret.index + 1 {
     vd *te_vardecl = ref(fields, ret.index);
@@ -945,6 +953,7 @@ func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *array[te_
       *out = ret;
       return true;
     }
+    push(&ret.fields, {ret.offset, props});
     ret.offset = ret.offset + props.flat_size;
 
     ret.max_alignment = max(ret.max_alignment, props.flat_alignment);
