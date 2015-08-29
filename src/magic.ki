@@ -21,11 +21,15 @@ deftype magic_struct_info struct {
   fips array[opt[instpair]];
 };
 
+deftype magic_enum_info struct {
+  cips array[opt[instpair]];
+};
+
 defenum magic_ctor_info {
   MagicWholeFieldInfo magic_whole_field_info;
   // These are None() for fields that are trivially constructed.  But of course one field is not None().
   MagicStructInfo magic_struct_info;
-  MagicEnumInfo array[opt[instpair]];
+  MagicEnumInfo magic_enum_info;
   MagicArraytypeInfo instpair;
 };
 
@@ -145,7 +149,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_g
       if !check_vardecl_ctor(cs, clq, &a.constructors, wc, &field_insts) {
         return false;
       }
-      set(&mc->info, MagicEnumInfo(field_insts));
+      set(&mc->info, MagicEnumInfo({field_insts}));
     }
     case &TeUnion(a te_union): {
       ice(_u8("check_magic_ctor seeing TeUnion"));

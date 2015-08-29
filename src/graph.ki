@@ -1108,9 +1108,16 @@ func gr_magic_ctor(cs *checkstate, clq *clqueue, wc which_ctor, mc *magic_ctor, 
     return gr_magic_whole_field_info(cs, clq, wc, &mwfi, gr_out, gn_out);
   case &MagicStructInfo(msi magic_struct_info):
     return gr_magic_struct_info(cs, clq, wc, &msi, gr_out, gn_out);
+  case &MagicEnumInfo(mei magic_enum_info):
+    return gr_magic_enum_info(cs, clq, wc, &mei, gr_out, gn_out);
   default:
     return TODO();
   }
+}
+
+func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_out *frame_graph, gn_out *gr_num) bool {
+
+  return TODO();
 }
 
 func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magic_struct_info, gr_out *frame_graph, gn_out *gr_num) bool {
