@@ -1229,8 +1229,10 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
     }
   }
 
+  var gn = add_node(&gr, node0(GrSequence({derefgn, bn})));
+
   *gr_out = gr;
-  *gn_out = bn;
+  *gn_out = gn;
   return true;
 }
 
