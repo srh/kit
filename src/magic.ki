@@ -27,12 +27,16 @@ deftype magic_enum_info struct {
   cips array[opt[instpair]];
 };
 
+deftype magic_arraytype_info struct {
+  ip instpair;
+};
+
 defenum magic_ctor_info {
   MagicWholeFieldInfo magic_whole_field_info;
   // These are None() for fields that are trivially constructed.  But of course one field is not None().
   MagicStructInfo magic_struct_info;
   MagicEnumInfo magic_enum_info;
-  MagicArraytypeInfo instpair;
+  MagicArraytypeInfo magic_arraytype_info;
 };
 
 deftype magic_ctor struct {
@@ -161,7 +165,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_g
       if !compute_complete_type_properties(cs, clq, oo(&a.param), &props) {
         return false;
       }
-      set(&mc->info, MagicArraytypeInfo(instpair_from_behavior(select_behavior(wc, &props))));
+      set(&mc->info, MagicArraytypeInfo({instpair_from_behavior(select_behavior(wc, &props))}));
     }
     case &TeUnknown(v void): {
       ice(_u8("check_magic_ctor seeing TeUnknown"));
