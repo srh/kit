@@ -1250,16 +1250,16 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
   voidprops type_properties;
   compute_prim(cs, clq, primitive_void_type(cs), &voidtype, &voidprops);
 
+  nargs size = num_args(wc);
   fntype cu_typeexpr;
   fntype_props type_properties;
-  compute_prim(cs, clq, fn_type(cs, fieldptrtype.~, voidtype.~), &fntype, &fntype_props);
+  compute_prim(cs, clq, fn_type(cs, repeat(nargs, fieldptrtype.~), voidtype.~), &fntype, &fntype_props);
 
   fncell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
   argcells array[cell_num];
   pointeecells array[cell_num];
   fieldcells array[cell_num];
   fieldptrcells array[cell_num];
-  nargs size = num_args(wc);
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = add_cell(&gr, {Has(LocationRigid(void)), argtype, argtype_props});
     push(&argcells, ac);
