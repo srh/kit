@@ -210,6 +210,11 @@ func fn_type(cs *checkstate, params array[te_typeexpr]) te_typeexpr {
   return TeApp({embox(primitive_function_puretype(cs)), params, None()});
 }
 
+func fn_type(cs *checkstate, params array[te_typeexpr], return_type te_typeexpr) te_typeexpr {
+  push(&params, return_type);
+  return fn_type(cs, params);
+}
+
 func fn_type(cs *checkstate, t te_typeexpr, u te_typeexpr) te_typeexpr {
   return fn_type(cs, mk_array(t, u));
 }

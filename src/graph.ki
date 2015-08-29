@@ -1199,7 +1199,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
       fntype cu_typeexpr;
       fntype_props type_properties;
-      compute_prim(cs, clq, fn_type(cs, fieldptrtype.~, fieldptrtype.~, voidtype.~), &fntype, &fntype_props);
+      compute_prim(cs, clq, fn_type(cs, repeat(nargs, fieldptrtype.~), voidtype.~), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
 
