@@ -22,6 +22,8 @@ deftype magic_struct_info struct {
 };
 
 deftype magic_enum_info struct {
+  cu_type cu_typeexpr;
+  cu_props type_properties;
   cips array[opt[instpair]];
 };
 
@@ -149,7 +151,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_g
       if !check_vardecl_ctor(cs, clq, &a.constructors, wc, &field_insts) {
         return false;
       }
-      set(&mc->info, MagicEnumInfo({field_insts}));
+      set(&mc->info, MagicEnumInfo({~cac.te, cac_props, field_insts}));
     }
     case &TeUnion(a te_union): {
       ice(_u8("check_magic_ctor seeing TeUnion"));
