@@ -1106,9 +1106,125 @@ func gr_magic_ctor(cs *checkstate, clq *clqueue, wc which_ctor, mc *magic_ctor, 
   switch info {
   case &MagicWholeFieldInfo(mwfi magic_whole_field_info):
     return gr_magic_whole_field_info(cs, clq, wc, &mwfi, gr_out, gn_out);
+  case &MagicStructInfo(msi magic_struct_info):
+    return gr_magic_struct_info(cs, clq, wc, &msi, gr_out, gn_out);
   default:
     return TODO();
   }
+}
+
+func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magic_struct_info, gr_out *frame_graph, gn_out *gr_num) bool {
+  gr frame_graph = init_frame_graph_empty();
+  argtype cu_typeexpr;
+  argtype_props type_properties;
+  compute_prim(cs, clq, ptr_type(cs, msi->cu_type.~), &argtype, &argtype_props);
+
+  voidtype cu_typeexpr;
+  voidprops type_properties;
+  compute_prim(cs, clq, primitive_void_type(cs), &voidtype, &voidprops);
+
+  st *te_struct;
+  if case &TeStruct(t te_struct) = &msi->cu_type.~ {
+    st = &t;
+  } else {
+    ice(_u8("gr_magic_struct_info called on non-struct"));
+  }
+
+  psd partial_struct_data;
+  if !compute_partial_struct_data(cs, clq, &st->fields, None(), &psd) {
+    return false;
+  }
+
+  argcells array[cell_num];
+  pointeecells array[cell_num];
+  derefgns array[gr_num];
+  nargs size = num_args(wc);
+  for i size = 0; i < nargs; i = i + 1 {
+    ac cell_num = add_cell(&gr, {Has(LocationRigid(void)), argtype, argtype_props});
+    push(&argcells, ac);
+    pc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), msi->cu_type, msi->cu_props});
+    push(&pointeecells, pc);
+
+    gn gr_num = add_node(&gr, node0(GrDeref({pc, ac, OffsetConst(0)})));
+    push(&derefgns, gn);
+  }
+
+  derefgn gr_num = add_node(&gr, node(derefgns, GrNop(void)));
+
+  bn gr_num = add_node(&gr, node0(GrNop(void)));
+
+  nfields size = count(&msi->fips);
+  check(nfields == count(&st->fields));
+  for i2 size = 0; i2 < nfields; i2 = i2 + 1 {
+    i size;
+    // Destructors go in reverse order.
+    if case CtorDestroy(v void) = wc {
+      i = nfields - i2 - 1;
+    } else {
+      i = i2;
+    }
+
+    fieldcella array[cell_num];
+    fieldcellgn array[gr_num];
+    for j size = 0; j < nargs; j = j + 1 {
+      fc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), ~ ref(&st->fields, i)->type, ref(&psd.fields, i)->props});
+      push(&fieldcella, fc);
+
+      gn gr_num = add_node(&gr, node0(GrSubcell({fc, get(&pointeecells, j), OffsetConst(ref(&psd.fields, i)->offset)})));
+      push(&fieldcellgn, gn);
+    }
+
+    if case Has(ip instpair) = get(&msi->fips, i) {
+      fieldptrtype cu_typeexpr;
+      fieldptrtype_props type_properties;
+      compute_prim(cs, clq, ptr_type(cs, ref(&st->fields, i)->type), &fieldptrtype, &fieldptrtype_props);
+
+      fieldptrcella array[cell_num];
+      precs array[gr_num];
+      for j size = 0; j < nargs; j = j + 1 {
+        fpc cell_num = add_cell(&gr, {Has(LocationRigid(void)), fieldptrtype, fieldptrtype_props});
+        push(&fieldptrcella, fpc);
+        gn gr_num = add_node(&gr, node(mk_array(get(&fieldcellgn, j)), GrSubcell({fpc, get(&fieldcella, j), OffsetConst(ref(&psd.fields, i)->offset)})));
+        push(&precs, gn);
+      }
+
+      fieldretcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), voidtype, voidprops});
+
+      fntype cu_typeexpr;
+      fntype_props type_properties;
+      compute_prim(cs, clq, fn_type(cs, fieldptrtype.~, fieldptrtype.~, voidtype.~), &fntype, &fntype_props);
+
+      func_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
+
+      func_gn gr_num = add_node(&gr, node0(GrWriteConst({func_cell, ConstDef(ip)})));
+      push(&precs, func_gn);
+
+      ap gr_num = add_node(&gr, node(precs, GrApply({func_cell, fieldptrcella, fieldretcell})));
+
+      vd gr_num = add_node(&gr, node(mk_array(ap), GrDead({fieldretcell})));
+
+      bn = add_node(&gr, node0(GrSequence({vd, bn})));
+    } else {
+      gn gr_num;
+      switch wc {
+      case CtorInit(v void):
+        // zero-initialize.
+        gn = add_node(&gr, node0(GrWriteConst({get(&fieldcella, 0), ConstInt(~ @[u32] 0)})));
+      case CtorCopy(v void):
+        gn = add_node(&gr, node0(GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)})));
+      case CtorMove(v void):
+        gn = add_node(&gr, node0(GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)})));
+      case CtorDestroy(v void):
+        // do nothing.
+      }
+
+      bn = add_node(&gr, node0(GrSequence({gn, bn})));
+    }
+  }
+
+  *gr_out = gr;
+  *gn_out = bn;
+  return true;
 }
 
 func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi *magic_whole_field_info, gr_out *frame_graph, gn_out *gr_num) bool {

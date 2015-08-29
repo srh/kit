@@ -15,10 +15,16 @@ deftype magic_whole_field_info struct {
   rhs_props type_properties;
 };
 
+deftype magic_struct_info struct {
+  cu_type cu_typeexpr;
+  cu_props type_properties;
+  fips array[opt[instpair]];
+};
+
 defenum magic_ctor_info {
   MagicWholeFieldInfo magic_whole_field_info;
   // These are None() for fields that are trivially constructed.  But of course one field is not None().
-  MagicStructInfo array[opt[instpair]];
+  MagicStructInfo magic_struct_info;
   MagicEnumInfo array[opt[instpair]];
   MagicArraytypeInfo instpair;
 };
@@ -132,7 +138,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_g
       if !check_vardecl_ctor(cs, clq, &a.fields, wc, &field_insts) {
         return false;
       }
-      set(&mc->info, MagicStructInfo(field_insts));
+      set(&mc->info, MagicStructInfo({~cac.te, cac_props, field_insts}));
     }
     case &TeEnum(a te_enum): {
       field_insts array[opt[instpair]];
