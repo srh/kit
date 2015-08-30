@@ -337,6 +337,7 @@ deftype ast_fullbody_info struct {
   statements array[statement_info];
 
   return_cell cell_num;
+  arg_cells array[cell_num];
 };
 
 deftype ast_fullbody struct {

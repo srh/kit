@@ -1387,6 +1387,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *array
   init_vp(&vp, &bs->es);
   nargs size = count(&a->args);
   check(nargs + 1 == count(computed_params));
+  arg_cells array[cell_num];
   for i size = 0; i < nargs; i = i + 1 {
     cu_param cu_typeexpr = ~get(computed_params, i);
     cu_param_props type_properties;
@@ -1394,6 +1395,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *array
       return false;
     }
     cell cell_num = add_rigid_cell(&bs->es, cu_param, cu_param_props);
+    push(&arg_cells, cell);
     vn var_number;
     // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
     if !es_push_var(&bs->es, &vp, cell, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {
@@ -1424,7 +1426,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *array
   }
   return_cell cell_num = add_rigid_cell(&bs->es, ~ *return_type, return_type_props);
 
-  info ast_fullbody_info = {destructions, bs->es.all_vars, bs->es.cells, bs->gotos, bs->labels, bs->statements, return_cell};
+  info ast_fullbody_info = {destructions, bs->es.all_vars, bs->es.cells, bs->gotos, bs->labels, bs->statements, return_cell, arg_cells};
   annotate_fullbody(&a->body, info);
 
   return true;

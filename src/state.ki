@@ -396,6 +396,8 @@ defenum fn_body_spec {
 deftype fn_body_entry struct {
   spec fn_body_spec;
   graph frame_regraphed;
+  // The return cell is graph.cell.
+  argcells array[cell_num];
 };
 
 deftype access_entry struct {
