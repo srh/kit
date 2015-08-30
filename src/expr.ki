@@ -1415,7 +1415,14 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *array
     return false;
   }
 
-  info ast_fullbody_info = {destructions, bs->es.all_vars, bs->es.cells, bs->gotos, bs->labels, bs->statements};
+  return_type *te_typeexpr = ref(computed_params, nargs);
+  return_type_props type_properties;
+  if !compute_complete_type_properties(bs->cs, bs->clq, return_type, &return_type_props) {
+    return false;
+  }
+  return_cell cell_num = add_rigid_cell(&bs->es, ~ *return_type, return_type_props);
+
+  info ast_fullbody_info = {destructions, bs->es.all_vars, bs->es.cells, bs->gotos, bs->labels, bs->statements, return_cell};
   annotate_fullbody(&a->body, info);
 
   return true;

@@ -522,6 +522,7 @@ func check_return_statement(bs *bodystate, vp *varpopper, a *ast_return_statemen
       return false;
     }
   }
+  // Notably, this includes lambda parameter destructions.
   vars array[var_number] = vars_in_scope(&bs->es);
   destructions array[destroy_action];
   if !make_destructions(&bs->es, &vars, &destructions) {

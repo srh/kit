@@ -335,6 +335,8 @@ deftype ast_fullbody_info struct {
   gotos array[goto_info];
   labels array[label_info];
   statements array[statement_info];
+
+  return_cell cell_num;
 };
 
 deftype ast_fullbody struct {

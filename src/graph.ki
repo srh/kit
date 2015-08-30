@@ -147,6 +147,8 @@ deftype fullbody_state struct {
   final_node gr_num;
   // count(&label_gn) == count(&info->labels), they start off as nop nodes until we see the label.
   label_gn array[gr_num];
+  // Cells that are used as return cells.
+  return_cells array[cell_num];
 };
 
 func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) bool {
@@ -165,11 +167,26 @@ func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) 
     push(&label_gn, ngn);
   }
 
-  fb fullbody_state = {info->all_vars, final_node, label_gn};
+  fb fullbody_state = {info->all_vars, final_node, label_gn, mk_array@[cell_num]()};
 
-  if !gr_bracebody(cs, gr, &fb, &x->bb, exit_node, out) {
+  body_gn gr_num;
+  if !gr_bracebody(cs, gr, &fb, &x->bb, exit_node, &body_gn) {
     return false;
   }
+
+  // This assumes it's okay to have a subcell op produce the identical type -- it's the only place we do that.
+  // TODO: This also is the one place where a subcell is "rigid."
+  return_subcell_ops array[gr_num];
+  nreturncells size = count(&fb.return_cells);
+  for i size = 0; i < nreturncells; i = i + 1 {
+    var subn = add_node(gr, node0(GrSubcell({get(&fb.return_cells, i), info->return_cell, OffsetConst(0)})));
+    push(&return_subcell_ops, subn);
+  }
+
+  nopdep gr_num = add_node(gr, node(return_subcell_ops, GrNop(void)));
+  seqop gr_num = add_node(gr, node0(GrSequence({nopdep, body_gn})));
+
+  *out = seqop;
   return true;
 }
 
@@ -529,14 +546,13 @@ func gr_var_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
 }
 
 func gr_return_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_return_statement, out *gr_num) bool {
-  // TODO: The return exprs aren't exactly writing to the same return location cell -- a canonical one doesn't exist yet.  (Ternary operators would also have this problem.)
   gn gr_num;
   if case &Has(b box[ast_expr_consume]) = &a->expr {
     if !gr_expr_consume(cs, gr, oo(&b), &gn) {
       return false;
     }
+    push(&fb->return_cells, result_cell(oo(&b)));
   } else {
-    // TODO: Maybe we'll need to mark the return_cell initialized, when it exists.
     gn = add_node(gr, node0(GrNop(void)));
   }
   info *ast_return_statement_info = unHas(&a->info);
