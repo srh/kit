@@ -1673,8 +1673,15 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           return true;
         }
         case &InstRhsMagic(mag def_magic): {
-          // TODO: Make the fn body graph.
-          id fn_body_id = add_fn_body(cs, {FnBodyMagic(&mag), TODO()});
+          id fn_body_id;
+          if true {
+            body_gr frame_graph;
+            body_gn gr_num;
+            if !gr_magic(cs, clq, &mag, &body_gr, &body_gn) {
+              return false;
+            }
+            id = add_fn_body(cs, {FnBodyMagic(&mag), {body_gr, body_gn}});
+          }
 
           gr frame_graph = init_frame_graph_empty();
           cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), inst->computed_type, inst->computed_type_properties});
