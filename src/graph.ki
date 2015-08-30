@@ -1085,8 +1085,8 @@ func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bo
   }
 }
 
+// TODO: There's a lot of duplicated code in the splay-out of this function.
 func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num) bool {
-  // TODO: Make a fn_body, graph the fn_body.
   switch mag {
   case &MagicInit(mc magic_ctor):
     return gr_magic_ctor(cs, clq, CtorInit(void), &mc, gr_out, gn_out);
