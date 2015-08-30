@@ -1125,9 +1125,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   gr frame_graph = init_frame_graph_empty();
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mai->cu_type.~));
 
-  voidtype cu_typeexpr;
-  voidprops type_properties;
-  compute_prim(cs, clq, primitive_void_type(cs), &voidtype, &voidprops);
+  voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
 
   param *te_typeexpr;
   arraycount u32;
@@ -1151,7 +1149,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 
   fntype cu_typeexpr;
   fntype_props type_properties;
-  compute_prim(cs, clq, fn_type(cs, repeat(nargs, elemptrtype.~), voidtype.~), &fntype, &fntype_props);
+  compute_prim(cs, clq, fn_type(cs, repeat(nargs, elemptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
   size_type cu_typeexpr;
   size_type_props type_properties;
@@ -1204,7 +1202,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
       push(&precs, ptrgn);
     }
 
-    elemretcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), voidtype, voidprops});
+    elemretcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), voidtp.cu, voidtp.props});
     func_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
 
     func_gn gr_num = add_node(&gr, node0(GrWriteConst({func_cell, ConstDef(mai->ip)})));
@@ -1230,9 +1228,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
   gr frame_graph = init_frame_graph_empty();
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mei->cu_type.~));
 
-  voidtype cu_typeexpr;
-  voidprops type_properties;
-  compute_prim(cs, clq, primitive_void_type(cs), &voidtype, &voidprops);
+  voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
 
   et *te_enum;
   if case &TeEnum(t te_enum) = &mei->cu_type.~ {
@@ -1302,11 +1298,11 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
         push(&precs, an);
       }
 
-      fieldretcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), voidtype, voidprops});
+      fieldretcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), voidtp.cu, voidtp.props});
 
       fntype cu_typeexpr;
       fntype_props type_properties;
-      compute_prim(cs, clq, fn_type(cs, repeat(nargs, fieldptrtype.~), voidtype.~), &fntype, &fntype_props);
+      compute_prim(cs, clq, fn_type(cs, repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
       func_gn gr_num = add_node(&gr, node0(GrWriteConst({func_cell, ConstDef(ip)})));
@@ -1358,9 +1354,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
   gr frame_graph = init_frame_graph_empty();
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, msi->cu_type.~));
 
-  voidtype cu_typeexpr;
-  voidprops type_properties;
-  compute_prim(cs, clq, primitive_void_type(cs), &voidtype, &voidprops);
+  voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
 
   st *te_struct;
   if case &TeStruct(t te_struct) = &msi->cu_type.~ {
@@ -1427,11 +1421,11 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
         push(&precs, gn);
       }
 
-      fieldretcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), voidtype, voidprops});
+      fieldretcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), voidtp.cu, voidtp.props});
 
       fntype cu_typeexpr;
       fntype_props type_properties;
-      compute_prim(cs, clq, fn_type(cs, repeat(nargs, fieldptrtype.~), voidtype.~), &fntype, &fntype_props);
+      compute_prim(cs, clq, fn_type(cs, repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
 
@@ -1476,14 +1470,12 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
   fieldptrtype_props type_properties;
   compute_prim(cs, clq, ptr_type(cs, mwfi->rhs_type.~), &fieldptrtype, &fieldptrtype_props);
 
-  voidtype cu_typeexpr;
-  voidprops type_properties;
-  compute_prim(cs, clq, primitive_void_type(cs), &voidtype, &voidprops);
+  voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
 
   nargs size = num_args(wc);
   fntype cu_typeexpr;
   fntype_props type_properties;
-  compute_prim(cs, clq, fn_type(cs, repeat(nargs, fieldptrtype.~), voidtype.~), &fntype, &fntype_props);
+  compute_prim(cs, clq, fn_type(cs, repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
   fncell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
   argcells array[cell_num];
@@ -1501,7 +1493,7 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
     push(&fieldptrcells, fpc);
   }
 
-  retcell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtype, voidprops});
+  retcell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
 
   precs array[gr_num];
   for i size = 0; i < nargs; i = i + 1 {
@@ -1586,11 +1578,9 @@ func gr_bi_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, 
     cu_pty cu_typeexpr;
     pty_props type_properties;
     compute_prim(cs, clq, pty, &cu_pty, &pty_props);
-    voidtype cu_typeexpr;
-    voidprops type_properties;
-    compute_prim(cs, clq, primitive_void_type(cs), &voidtype, &voidprops);
+    voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
 
-    functy te_typeexpr = fn_type(cs, pty, pty, voidtype.~);
+    functy te_typeexpr = fn_type(cs, pty, pty, voidtp.cu.~);
     cu_functy cu_typeexpr;
     functy_props type_properties;
     compute_prim(cs, clq, functy, &cu_functy, &functy_props);
@@ -1598,7 +1588,7 @@ func gr_bi_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, 
     funcptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_functy, functy_props});
     destptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_pty, pty_props});
     srcptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_pty, pty_props});
-    return_cell cell_num = add_cell(gr, {Has(LocationFlex(void)), voidtype, voidprops});
+    return_cell cell_num = add_cell(gr, {Has(LocationFlex(void)), voidtp.cu, voidtp.props});
 
     bi_desc bi_fun_ctor_desc = {ip, funcptr_cell, destptr_cell, srcptr_cell, return_cell};
 
@@ -1618,18 +1608,16 @@ func gr_destroy_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typee
     cu_pty cu_typeexpr;
     pty_props type_properties;
     compute_prim(cs, clq, pty, &cu_pty, &pty_props);
-    voidtype cu_typeexpr;
-    voidprops type_properties;
-    compute_prim(cs, clq, primitive_void_type(cs), &voidtype, &voidprops);
+    voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
 
-    functy te_typeexpr = fn_type(cs, pty, voidtype.~);
+    functy te_typeexpr = fn_type(cs, pty, voidtp.cu.~);
     cu_functy cu_typeexpr;
     functy_props type_properties;
     compute_prim(cs, clq, functy, &cu_functy, &functy_props);
 
     funcptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_functy, functy_props});
     argptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_pty, pty_props});
-    return_cell cell_num = add_cell(gr, {Has(LocationFlex(void)), voidtype, voidprops});
+    return_cell cell_num = add_cell(gr, {Has(LocationFlex(void)), voidtp.cu, voidtp.props});
 
     uni_desc uni_fun_ctor_desc = {ip, funcptr_cell, argptr_cell, return_cell};
     gn gr_num = gr_uni_fun_ctor_desc(cs, gr, &uni_desc, argnum);
