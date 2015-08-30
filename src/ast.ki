@@ -265,11 +265,21 @@ deftype ast_return_statement struct {
   expr opt[box[ast_expr_consume]];
 };
 
+deftype label_num size;
+def `~` fn[size, label_num] = wrapconvert;
+def `==` fn[label_num, label_num, bool] = wrapequate;
+
+deftype ast_label_statement_info struct {
+  label_number label_num;
+};
+
 deftype ast_label_statement struct {
+  info opt[ast_label_statement_info];
   name ast_ident;
 };
 
 deftype ast_goto_statement_info struct {
+  label_number label_num;
   destructions array[destroy_action];
   initializations array[init_action];
 };

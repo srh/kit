@@ -16,6 +16,7 @@ deftype goto_info struct {
 
 deftype label_info struct {
   stnum statement_num;
+  st *ast_label_statement;
   label_name sym;
   in_scope array[var_number];
   hit bool;
@@ -270,7 +271,9 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
         return false;
       }
 
-      push(&bs->labels, {num, b.name.value, vars_in_scope(&bs->es), false});
+      label_number label_num = ~count(&bs->labels);
+      push(&bs->labels, {num, &b, b.name.value, vars_in_scope(&bs->es), false});
+      set(&b.info, {label_number});
       *ee_out = {num, num};
     }
     case &Goto(b ast_goto_statement): {
@@ -714,7 +717,7 @@ func connect_gotos(bs *bodystate) bool {
         return false;
       }
 
-      set(&g->st->info, {destructions, initializations});
+      set(&g->st->info, {unHas(&l->st->info)->label_number, destructions, initializations});
     } else {
       ERR(_u8("no label named '"), lookup(bs->im, g->label_name), _u8("'"));
       return false;
