@@ -151,7 +151,7 @@ deftype fullbody_state struct {
   return_cells array[cell_num];
 };
 
-func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) bool {
+func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num, return_cell_out *cell_num) bool {
   var final_node = add_node(gr, node0(GrNop(void)));
 
   exit_node gr_num;
@@ -187,6 +187,7 @@ func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) 
   seqop gr_num = add_node(gr, node0(GrSequence({nopdep, body_gn})));
 
   *out = seqop;
+  *return_cell_out = info->return_cell;
   return true;
 }
 
@@ -788,11 +789,12 @@ func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda,
   info *ast_fullbody_info = unHas(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_cells(info->cells);
   fullbody_gn gr_num;
-  if !gr_fullbody(cs, &lambda_gr, &a->body, &fullbody_gn) {
+  return_cell cell_num;
+  if !gr_fullbody(cs, &lambda_gr, &a->body, &fullbody_gn, &return_cell) {
     return false;
   }
 
-  id fn_body_id = add_fn_body(cs, {FnBodyLambda(a), {lambda_gr, fullbody_gn}});
+  id fn_body_id = add_fn_body(cs, {FnBodyLambda(a), {lambda_gr, fullbody_gn, return_cell}});
   var gn = add_node(gr, node0(GrWriteConst({rval_cell(x), ConstFnBody(id)})));
   *out = gn;
   return true;
@@ -1092,36 +1094,36 @@ func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bo
 }
 
 // TODO: There's a lot of duplicated code in the splay-out of this function.
-func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num) bool {
+func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num) bool {
   switch mag {
   case &MagicInit(mc magic_ctor):
-    return gr_magic_ctor(cs, clq, CtorInit(void), &mc, gr_out, gn_out);
+    return gr_magic_ctor(cs, clq, CtorInit(void), &mc, gr_out, gn_out, return_cell_out);
   case &MagicCopy(mc magic_ctor):
-    return gr_magic_ctor(cs, clq, CtorCopy(void), &mc, gr_out, gn_out);
+    return gr_magic_ctor(cs, clq, CtorCopy(void), &mc, gr_out, gn_out, return_cell_out);
   case &MagicMove(mc magic_ctor):
-    return gr_magic_ctor(cs, clq, CtorMove(void), &mc, gr_out, gn_out);
+    return gr_magic_ctor(cs, clq, CtorMove(void), &mc, gr_out, gn_out, return_cell_out);
   case &MagicDestroy(mc magic_ctor):
-    return gr_magic_ctor(cs, clq, CtorDestroy(void), &mc, gr_out, gn_out);
+    return gr_magic_ctor(cs, clq, CtorDestroy(void), &mc, gr_out, gn_out, return_cell_out);
   case &MagicEnumConstruct(mec magic_enum_construct):
-    return gr_magic_enum_construct(cs, clq, &mec, gr_out, gn_out);
+    return gr_magic_enum_construct(cs, clq, &mec, gr_out, gn_out, return_cell_out);
   }
 }
 
-func gr_magic_ctor(cs *checkstate, clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num) bool {
+func gr_magic_ctor(cs *checkstate, clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num) bool {
   info *magic_ctor_info = unHas(&mc->info);
   switch info {
   case &MagicWholeFieldInfo(mwfi magic_whole_field_info):
-    return gr_magic_whole_field_info(cs, clq, wc, &mwfi, gr_out, gn_out);
+    return gr_magic_whole_field_info(cs, clq, wc, &mwfi, gr_out, gn_out, return_cell_out);
   case &MagicStructInfo(msi magic_struct_info):
-    return gr_magic_struct_info(cs, clq, wc, &msi, gr_out, gn_out);
+    return gr_magic_struct_info(cs, clq, wc, &msi, gr_out, gn_out, return_cell_out);
   case &MagicEnumInfo(mei magic_enum_info):
-    return gr_magic_enum_info(cs, clq, wc, &mei, gr_out, gn_out);
+    return gr_magic_enum_info(cs, clq, wc, &mei, gr_out, gn_out, return_cell_out);
   case &MagicArraytypeInfo(mai magic_arraytype_info):
-    return gr_magic_arraytype_info(cs, clq, wc, &mai, gr_out, gn_out);
+    return gr_magic_arraytype_info(cs, clq, wc, &mai, gr_out, gn_out, return_cell_out);
   }
 }
 
-func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *magic_arraytype_info, gr_out *frame_graph, gn_out *gr_num) bool {
+func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *magic_arraytype_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num) bool {
   gr frame_graph = init_frame_graph_empty();
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mai->cu_type.~));
 
@@ -1170,7 +1172,8 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 
   derefgn gr_num = add_node(&gr, node(derefgns, GrNop(void)));
 
-  bn gr_num = add_node(&gr, node0(GrNop(void)));
+  return_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
+  bn gr_num = add_node(&gr, node0(GrWriteConst({return_cell, ConstInt(~ @[u32] 0)})));
 
   indexcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), size_type, size_type_props});
 
@@ -1218,10 +1221,11 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   var gn = add_node(&gr, node0(GrSequence({derefgn, bn})));
   *gr_out = gr;
   *gn_out = gn;
+  *return_cell_out = return_cell;
   return true;
 }
 
-func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_out *frame_graph, gn_out *gr_num) bool {
+func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num) bool {
   if case CtorInit(v void) = wc {
     ice(_u8("Magic CtorInit on enum type"));
   }
@@ -1262,6 +1266,9 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
   }
 
   deref_gn gr_num = add_node(&gr, node(tagcell_gns, GrNop(void)));
+
+  return_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
+  setret gr_num = add_node(&gr, node0(GrWriteConst({return_cell, ConstInt(~ @[u32] 0)})));
 
   cases_gn array[tup[gr_const, gr_num]];
   nconstructors size = count(&et->constructors);
@@ -1340,17 +1347,19 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       finalgn = lastgn;
     }
 
-    push(&cases_gn, cons(ConstInt(~ tagval.~), finalgn));
+    finalseqgn gr_num = add_node(&gr, node0(GrSequence({finalgn, setret})));
+    push(&cases_gn, cons(ConstInt(~ tagval.~), finalseqgn));
   }
 
   br gr_num = add_node(&gr, node0(GrBranch({get(&tagcells, nargs - 1), cases_gn, None()})));
   sqr gr_num = add_node(&gr, node0(GrSequence({deref_gn, br})));
   *gr_out = gr;
   *gn_out = sqr;
+  *return_cell_out = return_cell;
   return true;
 }
 
-func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magic_struct_info, gr_out *frame_graph, gn_out *gr_num) bool {
+func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magic_struct_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num) bool {
   gr frame_graph = init_frame_graph_empty();
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, msi->cu_type.~));
 
@@ -1384,7 +1393,8 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
   derefgn gr_num = add_node(&gr, node(derefgns, GrNop(void)));
 
-  bn gr_num = add_node(&gr, node0(GrNop(void)));
+  return_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
+  bn gr_num = add_node(&gr, node0(GrWriteConst({return_cell, ConstInt(~ @[u32] 0)})));
 
   nfields size = count(&msi->fips);
   check(nfields == count(&st->fields));
@@ -1459,10 +1469,11 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
   *gr_out = gr;
   *gn_out = gn;
+  *return_cell_out = return_cell;
   return true;
 }
 
-func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi *magic_whole_field_info, gr_out *frame_graph, gn_out *gr_num) bool {
+func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi *magic_whole_field_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num) bool {
   gr frame_graph = init_frame_graph_empty();
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mwfi->cu_type.~));
 
@@ -1510,10 +1521,12 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
 
   *gr_out = gr;
   *gn_out = ap;
+  // We sort of make this look like a "tail call," informally -- is that bad?
+  *return_cell_out = retcell;
   return true;
 }
 
-func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num) bool {
+func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num) bool {
   gr frame_graph = init_frame_graph_empty();
   retnum cell_num = add_cell(&gr, {Has(LocationRigid(void)), mec->enum_type, mec->enum_type_props});
 
@@ -1564,7 +1577,9 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
   var tagcell_gn = add_node(&gr, node0(GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)})));
   var tag_gn = add_node(&gr, node(mk_array(tagcell_gn), GrWriteConst({tag_cell, ConstInt(~tagval.~)})));
   var gn = add_node(&gr, node(mk_array(tag_gn, assign_gn), GrNop(void)));
+  *gr_out = gr;
   *gn_out = gn;
+  *return_cell_out = retnum;
   return true;
 }
 
@@ -1654,7 +1669,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
             inst->graph = FailedComputation();
             return false;
           }
-          inst->graph = Computed(Has(@[frame_regraphed]{gr, gn}));
+          inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, result_cell(&dire.ec)}));
           return true;
         }
         case &InstRhsMagic(mag def_magic): {
@@ -1662,17 +1677,18 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           if true {
             body_gr frame_graph;
             body_gn gr_num;
-            if !gr_magic(cs, clq, &mag, &body_gr, &body_gn) {
+            return_cell cell_num;
+            if !gr_magic(cs, clq, &mag, &body_gr, &body_gn, &return_cell) {
               return false;
             }
-            id = add_fn_body(cs, {FnBodyMagic(&mag), {body_gr, body_gn}});
+            id = add_fn_body(cs, {FnBodyMagic(&mag), {body_gr, body_gn, return_cell}});
           }
 
           gr frame_graph = init_frame_graph_empty();
           cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), inst->computed_type, inst->computed_type_properties});
 
           gn gr_num = add_node(&gr, node0(GrWriteConst({cell, ConstFnBody(id)})));
-          inst->graph = Computed(Has(@[frame_regraphed]{gr, gn}));
+          inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, cell}));
           return true;
         }
       }
