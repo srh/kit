@@ -69,6 +69,10 @@ func add_flex_cell(es *framescope, type cu_typeexpr, props type_properties) cell
   return help_add_cell(es, {Has(LocationFlex(void)), type, props});
 }
 
+func add_virtual_cell(es *framescope, tp cu_typrop) cell_num {
+  return add_virtual_cell(es, tp.cu, tp.props);
+}
+
 func add_virtual_cell(es *framescope, type cu_typeexpr, props type_properties) cell_num {
   return help_add_cell(es, {Has(LocationVirtual(void)), type, props});
 }
@@ -78,10 +82,8 @@ func add_rigid_cell(es *framescope, type cu_typeexpr, props type_properties) cel
 }
 
 func add_virtual_tag_cell(es *framescope, et *te_enum) cell_num {
-  cu cu_typeexpr;
-  props type_properties;
-  compute_prim(es->ds, enum_tag_type(es->cs, et), &cu, &props);
-  return add_virtual_cell(es, cu, props);
+  tp cu_typrop = compute_prim(es->clq, enum_tag_type(es->cs, et));
+  return add_virtual_cell(es, tp);
 }
 
 func ref_cell(es *framescope, num cell_num) *cell_info {
@@ -1860,6 +1862,12 @@ func compute_prim(cs *checkstate, clq *clqueue, t te_typeexpr) cu_typeexpr {
 
 func compute_prim(ds *defscope, t te_typeexpr) cu_typeexpr {
   return compute_prim(ds->cs, ds->clq, t);
+}
+
+func compute_prim(clq *clqueue, t te_typeexpr) cu_typrop {
+  ret cu_typrop;
+  compute_prim(clq->cs, clq, t, &ret.cu, &ret.props);
+  return ret;
 }
 
 func compute_prim(cs *checkstate, clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
