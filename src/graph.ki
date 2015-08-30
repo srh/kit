@@ -140,8 +140,12 @@ defenum gr_const {
 };
 
 deftype fullbody_state struct {
-  // TODO: This is disconcerting because fb->info->cells is a copy of gr->cells.
-  info *ast_fullbody_info;
+  // all_vars and labels is from the ast_fullbody_info.
+  // We use the cell field, to know the name of the var's cell.
+  all_vars array[var_info];
+  // We just use label names to get the label ix, for indexing label_gn.
+  labels array[label_info];
+
   final_node gr_num;
   // count(&label_gn) == count(&info->labels), they start off as nop nodes until we see the label.
   label_gn array[gr_num];
@@ -163,7 +167,7 @@ func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num) 
     push(&label_gn, ngn);
   }
 
-  fb fullbody_state = {info, final_node, label_gn};
+  fb fullbody_state = {info->all_vars, info->labels, final_node, label_gn};
 
   if !gr_bracebody(cs, gr, &fb, &x->bb, exit_node, out) {
     return false;
@@ -261,7 +265,7 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
 }
 
 func gr_goto_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_goto_statement, outflow gr_num, out *gr_num) bool {
-  if case Has(ix size) = help_lookup_label(&fb->info->labels, a->target.value) {
+  if case Has(ix size) = help_lookup_label(&fb->labels, a->target.value) {
     info *ast_goto_statement_info = unHas(&a->info);
     jmp gr_num = get(&fb->label_gn, ix);
     wn gr_num;
@@ -282,7 +286,7 @@ func gr_goto_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *a
 
 func gr_label_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_label_statement, outflow gr_num, out *gr_num) bool {
   // TODO: Would be more rigorous if the ast_label_statement had a label_num.
-  if case Has(ix size) = help_lookup_label(&fb->info->labels, a->name.value) {
+  if case Has(ix size) = help_lookup_label(&fb->labels, a->name.value) {
     gn gr_num = get(&fb->label_gn, ix);
     mut_nop_node(gr, gn, node0(GrJmp({outflow})));
     // Should we set *out to gn or outflow?  When labels get fancier, the answer will matter.
@@ -316,7 +320,7 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
     switch &sc->pattern {
       case &Case(cp ast_constructor_pattern): {
         cp_info *ast_cp_info = unHas(&cp.cp_info);
-        vi *var_info = ref(&fb->info->all_vars, cp_info->vn.~);
+        vi *var_info = ref(&fb->all_vars, cp_info->vn.~);
         var vcgn = add_node(gr, node0(GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)})));
         var gn = add_node(gr, node0(GrSequence({vcgn, body_gn})));
         push(&cases, cons(ConstInt(~cp_info->tag_value.~), gn));
