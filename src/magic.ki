@@ -28,6 +28,8 @@ deftype magic_enum_info struct {
 };
 
 deftype magic_arraytype_info struct {
+  cu_type cu_typeexpr;
+  cu_props type_properties;
   ip instpair;
 };
 
@@ -165,7 +167,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_g
       if !compute_complete_type_properties(cs, clq, oo(&a.param), &props) {
         return false;
       }
-      set(&mc->info, MagicArraytypeInfo({instpair_from_behavior(select_behavior(wc, &props))}));
+      set(&mc->info, MagicArraytypeInfo({~cac.te, cac_props, instpair_from_behavior(select_behavior(wc, &props))}));
     }
     case &TeUnknown(v void): {
       ice(_u8("check_magic_ctor seeing TeUnknown"));
