@@ -5,9 +5,8 @@ deftype frame_graph struct {
   ops array[gr_node];
 };
 
-// TODO: Srsly, don't make the parameter a pointer.
-func init_frame_graph_from_cells(cells *array[cell_info]) frame_graph {
-  return {*cells, mk_array@[gr_node]()};
+func init_frame_graph_from_cells(cells array[cell_info]) frame_graph {
+  return {cells, mk_array@[gr_node]()};
 }
 
 func init_frame_graph_empty() frame_graph {
@@ -780,7 +779,7 @@ func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_f
 
 func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda, out *gr_num) bool {
   info *ast_fullbody_info = unHas(&a->body.info);
-  lambda_gr frame_graph = init_frame_graph_from_cells(&info->cells);
+  lambda_gr frame_graph = init_frame_graph_from_cells(info->cells);
   fullbody_gn gr_num;
   if !gr_fullbody(cs, &lambda_gr, &a->body, &fullbody_gn) {
     return false;
@@ -1663,7 +1662,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         }
         case &InstRhsExpr(dire def_inst_rhs_expr): {
           info *frame_info = unHas(&dire.frame_info);
-          gr frame_graph = init_frame_graph_from_cells(&info->cells);
+          gr frame_graph = init_frame_graph_from_cells(info->cells);
           gn gr_num;
           if !gr_expr_consume(cs, &gr, &dire.ec, &gn) {
             inst->graph = FailedComputation();
