@@ -1172,7 +1172,6 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
       i = arraycount - i2 - 1;
     }
 
-    // TODO: You'd better not forget this op.
     ixgn gr_num = add_node(&gr, node0(GrWriteConst({indexcell, ConstInt(~ i)})));
 
     elemptrcells array[cell_num];
