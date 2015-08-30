@@ -820,7 +820,7 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
   switch &ent->generics {
     case &NoGenerics(v): {
       parms cu_genparms = NoParms(void);
-      clq clqueue;
+      clq clqueue = mk(cs);
       discard_inst_id def_inst_id = enqueue_def_inst(cs, &clq, id, &parms);
       return finish_checking(cs, &clq);
     }
@@ -1266,7 +1266,7 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
     switch &np.tl->generics {
       case &NoGenerics(v): {
         parms cu_genparms = NoParms(void);
-        clq clqueue;
+        clq clqueue = mk(cs);
         discard_id deftype_inst_id = enqueue_deftype_inst(cs, &clq, id, &parms);
         return finish_checking(cs, &clq);
       }

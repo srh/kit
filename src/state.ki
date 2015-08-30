@@ -522,9 +522,13 @@ defenum clqueue_entry {
 };
 
 deftype clqueue struct {
+  cs *checkstate;
   entries array[clqueue_entry];
 };
 
+func mk(cs *checkstate) clqueue {
+  return {cs, mk_array@[clqueue_entry]()};
+}
 
 defclass move depth_rewinder struct {
   cs *checkstate;
