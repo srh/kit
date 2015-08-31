@@ -16,6 +16,11 @@ deftype st_env struct {
   framecells array[opt[st_obj_ref]];
 };
 
+func mk_env(plat platform_info, num_cells size) st_env {
+  ret st_env = {plat, mk_array(), repeat(num_cells, None())};
+  return ret;
+}
+
 deftype st_obj_num size;
 
 deftype st_obj_ref struct {
@@ -222,7 +227,7 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
   switch &inst->evaled_value {
     case &NotComputed(v void): {
       inst->evaled_value = BeganComputing();
-      env st_env;
+      env st_env = mk_env(cs->platform, count(&fg->gr.cells));
 
       result st_obj_ref;
       if !st_eval_frame_regraphed(cs, &env, fg, &result) {
