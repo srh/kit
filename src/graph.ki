@@ -41,6 +41,10 @@ func ref_cell(gr *frame_graph, c cell_num) *cell_info {
   return ref(&gr->cells, c.~);
 }
 
+func ref_node(gr *frame_graph, gn gr_num) *gr_node {
+  return ref(&gr->ops, gn.~);
+}
+
 // To "evaluate" an op, first we evaluate its precs (in unspecified order), then we ealuate the op.
 deftype gr_node struct {
   precs array[gr_num];

@@ -260,6 +260,58 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
   }
 }
 
+defenum gr_stackent {
+  EvalOpAndPrecs gr_num;
+  EvalOp gr_num;
+};
+
 func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, out *st_obj_ref) bool {
+  // A stack of gr_num's to evaluate, in order.
+  stack array[gr_stackent];
+  push(&stack, EvalOpAndPrecs(fg->gn));
+  while case Has(se gr_stackent) = popval(&stack) {
+    switch se {
+    case EvalOpAndPrecs(gn gr_num):
+      push(&stack, EvalOp(gn));
+      node *gr_node = ref_node(&fg->gr, gn);
+      // Push the stack such that we eval the precs left-to-right in static eval.
+      nprecs size = count(&node->precs);
+      for i size = nprecs; i > 0; {
+        i = i - 1;
+        push(&stack, EvalOpAndPrecs(get(&node->precs, i)));
+      }
+    case EvalOp(gn gr_num):
+      node *gr_node = ref_node(&fg->gr, gn);
+      switch &node->op {
+      case &GrApply(a gr_apply):
+        // TODO: Implement this (for prim ops at least).
+        ERR(_u8("GrApply not implemented yet."));
+        return false;
+      case &GrMemCopy(a gr_memcopy):
+        st_maybe_init_static(&fg->gr, env, a.dest);
+        destref st_obj_ref = cell_obj_ref(env, a.dest);
+        srcref st_obj_ref = cell_obj_ref(env, a.src);
+        value st_value;
+        obj_read(env, srcref, &value);
+        obj_write(env, destref, &value);
+      default:
+        ice(_u8("EvalOp not completely implemented."));
+      }
+    }
+  }
+
   return TODO();
+}
+
+func st_maybe_init_static(gr *frame_graph, env *st_env, cell cell_num) void {
+  if isHas(ref(&env->framecells, cell.~)) {
+    return;
+  }
+  info *cell_info = ref_cell(gr, cell);
+  if !isLocationStatic(*unHas(&info->location)) {
+    ice(_u8("st_maybe_init_static: cell with non-static location"));
+  }
+
+  objnum st_obj_num = add_obj(env, info->props.flat_size);
+  set(&env->framecells, cell.~, Has@[st_obj_ref]({objnum, 0, info->props.flat_size}));
 }

@@ -20,6 +20,15 @@ defenum cell_location {
   LocationRigid void;
 };
 
+func isLocationStatic(location cell_location) bool {
+  switch location {
+  case LocationVirtual(v void): return false;
+  case LocationFlex(v void): return true;
+  case LocationRigid(v void): return true;
+  }
+}
+
+// TODO: Move to graph.ki or something.
 deftype cell_info struct {
   // Location must be specified by type-checking, but it spends time in an unspecified state.
   location opt[cell_location];
