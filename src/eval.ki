@@ -56,6 +56,10 @@ deftype st_value struct {
   objrefs array[tup[u32, st_obj_ref]];
 };
 
+func is_selfcontained(val *st_value) bool {
+  return empty(&val->symbolrefs) && empty(&val->objrefs);
+}
+
 func ref_obj(env *st_env, num st_obj_num, out **st_value) bool {
   if case &Has(v st_value) = ref(&env->objects, num.~) {
     *out = &v;
@@ -266,6 +270,13 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
       if !obj_read(&env, result, &value) {
         return false;
       }
+      if count(&value.symbolrefs) != 0 {
+        ice(_u8("def value has symbolrefs"));
+      }
+      if count(&value.objrefs) != 0 {
+        ice(_u8("def value has objrefs"));
+      }
+
       inst->evaled_value = Computed(value);
       if case &Computed(x st_value) = &inst->evaled_value {
         *out = &x;
@@ -331,7 +342,11 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         case &ConstInt(b bigint):
           value = st_bigint_to_value(&env->plat, destref.count, b);
         case &ConstDef(ip instpair):
-          return TODO();
+          val *st_value;
+          if !st_eval_def(cs, ip.ent_id, ip.inst_id, &val) {
+            return false;
+          }
+          value = *val;
         case &ConstFnBody(fnid fn_body_id):
           return TODO();
         case &ConstBytes(arr array[u8]):
