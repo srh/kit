@@ -90,6 +90,22 @@ access bigint {
     }
   }
 
+  func as_non_negative_u32(x *bigint, out *u32) bool {
+    if x->negative {
+      return false;
+    }
+    n size = count(&x->parts);
+    if n == 0 {
+      *out = 0;
+      return true;
+    } else if n == 1 {
+      *out = get(&x->parts, n);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   func squash(negative bool, build *array[u32]) bigint {
     val u32;
     if negative {

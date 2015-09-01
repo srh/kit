@@ -384,6 +384,46 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         if !obj_write(env, destref, &value) {
           return false;
         }
+      case &GrDeref(a gr_deref):
+        pointer_obj st_obj_ref = cell_obj_ref(env, a.pointer);
+        pointer_value st_value;
+        if !obj_read(env, pointer_obj, &pointer_value) {
+          return false;
+        }
+        pointer st_pointer;
+        if !st_value_as_pointer(&env->plat, &pointer_value, &pointer) {
+          return false;
+        }
+        info *cell_info = ref_cell(&fg->gr, a.name);
+        deref_size u32 = info->props.flat_size;
+        // We add offset to pointer.offset.
+        offset u32;
+        switch &a.offset {
+        case &OffsetConst(o u32):
+          offset = o;
+        case &OffsetComputed(pair tup[u32, cell_num]):
+          index_obj st_obj_ref = cell_obj_ref(env, pair.cdr);
+          index_value st_value;
+          if !obj_read(env, index_obj, &index_value) {
+            return false;
+          }
+          index u32;
+          if !st_value_as_size(&env->plat, &index_value, &index) {
+            return false;
+          }
+          offset = pair.car * index;
+        }
+        new_offset u32 = pointer.offset + offset;
+        if case &Has(referee_val st_value) = ref(&env->objects, pointer.num.~) {
+          if new_offset > referee_val.length {
+            ERR(_u8("Dereferencing pointer out of range"));
+            return false;
+          }
+        } else {
+          ERR(_u8("Dereferencing pointer to dead object"));
+          return false;
+        }
+        set(&env->framecells, a.name.~, Has(@[st_obj_ref]{pointer.num, new_offset, deref_size}));
       default:
         ice(_u8("EvalOp not completely implemented."));
       }
@@ -419,6 +459,49 @@ func st_bigint_to_value(plat *platform_info, length u32, b bigint) st_value {
   }
 
   return ret;
+}
+
+func st_value_unsigned_as_bigint(plat *platform_info, val *st_value, out *bigint) bool {
+  words array[u32];
+  if !st_value_self_contained(plat, val, &words) {
+    return false;
+  }
+
+  check_littleendian(plat);
+  // It's pretty simple when it's little-endian.
+  *out = squash(false, &words);
+  return true;
+}
+
+func st_value_self_contained(plat *platform_info, val *st_value, out *array[u32]) bool {
+  if !is_selfcontained(val) {
+    ERR(_u8("Value is not self-contained, expecting data."));
+    return false;
+  }
+  ret array[u32];
+  bitlength u32 = val->length * plat->bnno_size;
+  n u32 = bitlength / 32;
+  for i u32 = 0; i < n; i = i + 1 {
+    if get(&val->datas, ~i) != ^ @[u32]0 {
+      ERR(_u8("Use of uninitialized value."));
+      return false;
+    }
+    push(&ret, get(&val->words, ~i));
+  }
+  bitrem u32 = bitlength % 32;
+  if bitrem != 0 {
+    lastmask u32 = ((1 << bitrem) - 1);
+    if get(&val->datas, ~n) != lastmask {
+      ERR(_u8("Use of uninitialized value."));
+      return false;
+    }
+    x u32 = get(&val->words, ~n);
+    check((x & (^lastmask)) == 0);
+    push(&ret, x);
+  }
+
+  *out = ret;
+  return true;
 }
 
 func st_u8s_to_value(plat *platform_info, arr *array[u8]) st_value {
@@ -483,4 +566,46 @@ func st_maybe_init_static(gr *frame_graph, env *st_env, cell cell_num) void {
 
   objnum st_obj_num = add_obj(env, info->props.flat_size);
   set(&env->framecells, cell.~, Has@[st_obj_ref]({objnum, 0, info->props.flat_size}));
+}
+
+func err_nonpointer() void {
+  ERR(_u8("Treating non-pointer value as pointer."));
+}
+
+func st_value_as_pointer(plat *platform_info, val *st_value, out *st_pointer) bool {
+  if count(&val->objrefs) != 1 {
+    err_nonpointer();
+    return false;
+  }
+  oref *tup[u32, st_pointer] = ref(&val->objrefs, 0);
+  if oref->car != 0 {
+    err_nonpointer();
+    return false;
+  }
+  expected u32 = st_pointer_size(plat, &oref->cdr);
+  if val->length != expected {
+    err_nonpointer();
+    return false;
+  }
+  *out = oref->cdr;
+  return true;
+}
+
+// Reads a value of the target platform's size type -- but outputs a u32 -- errors if truncation would happen.
+func st_value_as_size(plat *platform_info, val *st_value, out *u32) bool {
+  if val->length != plat->sizetraits.flat.size {
+    ERR(_u8("Treating non-size-sized value as size."));
+    return false;
+  }
+  b bigint;
+  if !st_value_unsigned_as_bigint(plat, val, &b) {
+    return false;
+  }
+  x u32;
+  if !as_non_negative_u32(&b, &x) {
+    ERR(_u8("Size out of range for static evaluation."));
+    return false;
+  }
+  *out = x;
+  return true;
 }
