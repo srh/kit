@@ -233,6 +233,13 @@ func mk_st_value_words(plat *platform_info, words array[u32], length u32) st_val
   return {words, ones, length, mk_array(), mk_array()};
 }
 
+func mk_st_value_objref(plat *platform_info, oref st_obj_ref) st_value {
+  length u32 = objref_size(plat, &oref);
+  ret st_value = mk_st_value(plat, length);
+  push(&ret.objrefs, cons(@[u32] 0, oref));
+  return ret;
+}
+
 func mk_st_value_symbolref(plat *platform_info, fnid fn_body_id) st_value {
   r st_symbolref = {fnid};
   length u32 = symbolref_size(plat, &r);
@@ -336,8 +343,12 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         destref st_obj_ref = cell_obj_ref(env, a.dest);
         srcref st_obj_ref = cell_obj_ref(env, a.src);
         value st_value;
-        obj_read(env, srcref, &value);
-        obj_write(env, destref, &value);
+        if !obj_read(env, srcref, &value) {
+          return false;
+        }
+        if !obj_write(env, destref, &value) {
+          return false;
+        }
       case &GrWriteConst(a gr_writeconst):
         st_maybe_init_static(&fg->gr, env, a.dest);
         destref st_obj_ref = cell_obj_ref(env, a.dest);
@@ -356,6 +367,14 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         case &ConstBytes(arr array[u8]):
           value = st_u8s_to_value(&env->plat, &arr);
         }
+        if !obj_write(env, destref, &value) {
+          return false;
+        }
+      case &GrAddressof(a gr_addressof):
+        st_maybe_init_static(&fg->gr, env, a.dest);
+        destref st_obj_ref = cell_obj_ref(env, a.dest);
+        addressee_ref st_obj_ref = cell_obj_ref(env, a.addressee);
+        value st_value = mk_st_value_objref(&env->plat, addressee_ref);
         if !obj_write(env, destref, &value) {
           return false;
         }
