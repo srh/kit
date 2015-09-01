@@ -326,20 +326,19 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
       case &GrWriteConst(a gr_writeconst):
         st_maybe_init_static(&fg->gr, env, a.dest);
         destref st_obj_ref = cell_obj_ref(env, a.dest);
+        value st_value;
         switch &a.value {
-        case &ConstInt(n bigint):
-          // TODO: This should crash if the constant is out-of-range.
-          return TODO();
+        case &ConstInt(b bigint):
+          value = st_bigint_to_value(&env->plat, destref.count, b);
         case &ConstDef(ip instpair):
           return TODO();
         case &ConstFnBody(fnid fn_body_id):
           return TODO();
-        // TODO: Rename ConstBytes to ConstU8s.
         case &ConstBytes(arr array[u8]):
-          value st_value = st_u8s_to_value(&env->plat, &arr);
-          if !obj_write(env, destref, &value) {
-            return false;
-          }
+          value = st_u8s_to_value(&env->plat, &arr);
+        }
+        if !obj_write(env, destref, &value) {
+          return false;
         }
       default:
         ice(_u8("EvalOp not completely implemented."));
@@ -348,6 +347,34 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
   }
 
   return TODO();
+}
+
+func st_bigint_to_value(plat *platform_info, length u32, b bigint) st_value {
+  check_littleendian(plat);
+  ret st_value = mk_st_value(plat, length);
+  i u32 = 0;
+  for ; i < length; i = i + 1 {
+    bnno u32 = bnno_index_bigint(plat, &b, i);
+    tmp st_value = mk_st_value_bnno(plat, bnno);
+    value_write(plat, &ret, i, 1, &tmp);
+  }
+
+  end u32 = ((~bigdigit_count(&b) * bigdigit_bits) / 32);
+  expected u32;
+  if is_negative(&b) {
+    expected = bnno_mask(plat);
+  } else {
+    expected = 0;
+  }
+
+  for ; i < end; i = i + 1 {
+    bnno u32 = bnno_index_bigint(plat, &b, i);
+    if bnno != expected {
+      ice(_u8("ConstInt too big for type"));
+    }
+  }
+
+  return ret;
 }
 
 func st_u8s_to_value(plat *platform_info, arr *array[u8]) st_value {
@@ -368,8 +395,12 @@ func st_u8s_to_value(plat *platform_info, arr *array[u8]) st_value {
   return ret;
 }
 
+func bnno_mask(plat *platform_info) u32 {
+  return ((@[u32] 1) << plat->bnno_size) - 1;
+}
+
 func mk_st_value_bnno(plat *platform_info, bnno u32) st_value {
-  check(0 == (bnno & ^((1 << plat->bnno_size) - 1)));
+  check(0 == (bnno & ^bnno_mask(plat)));
   return mk_st_value_words(plat, mk_array(bnno), 1);
 }
 
@@ -377,6 +408,7 @@ func bnno_index_u8(plat *platform_info, arr *array[u8], ix u32) u32 {
   if plat->bnno_size == 8 {
     return ~get(arr, ~ix);
   } else if plat->bnno_size == 4 {
+    check_littleendian(plat);
     return ~get(arr, ~((ix / 2) >> (4 * (ix % 2))));
   } else if plat->bnno_size == 16 {
     lo u32 = ~get(arr, ~(ix * 2));
@@ -386,6 +418,14 @@ func bnno_index_u8(plat *platform_info, arr *array[u8], ix u32) u32 {
     ice(_u8("bnno_index_u8 does not support bnno_size"));
     return fake();
   }
+}
+
+func bnno_index_bigint(plat *platform_info, b *bigint, ix u32) u32 {
+  check(32 % plat->bnno_size == 0);
+  bnnos_per u32 = 32 / plat->bnno_size;
+  bigdig u32 = getbigdigit(b, ~ ((ix * plat->bnno_size) / 32));
+  ret u32 = bnno_mask(plat) & (bigdig >> ((ix * plat->bnno_size) % 32));
+  return ret;
 }
 
 func st_maybe_init_static(gr *frame_graph, env *st_env, cell cell_num) void {

@@ -34,6 +34,12 @@ defenum endianness {
 func `==`(x endianness, y endianness) bool { return enumnum(&x) == enumnum(&y); }
 func `!=`(x endianness, y endianness) bool { return enumnum(&x) != enumnum(&y); }
 
+func check_littleendian(plat *platform_info) void {
+  if plat->endian != LittleEndian(void) {
+    ice(_u8("check_littleendian fail"));
+  }
+}
+
 
 deftype platform_info struct {
   endian endianness;

@@ -71,6 +71,13 @@ access bigint {
     }
   }
 
+  func bigdigit_count(x *bigint) size {
+    return count(&x->parts);
+  }
+
+  // 32 bits.  (This is a u32, not a size, because s1 can't statically eval sizes.)
+  def bigdigit_bits u32 = 32;
+
   func getbigdigit(x *bigint, i size) u32 {
     if i < count(&x->parts) {
       return get(&x->parts, i);
@@ -224,6 +231,10 @@ access bigint {
       }
     }
     return false;
+  }
+
+  func is_negative(x *bigint) bool {
+    return x->negative;
   }
 
   func `<`(x bigint, y bigint) bool {
