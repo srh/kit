@@ -424,6 +424,37 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
           return false;
         }
         set(&env->framecells, a.name.~, Has(@[st_obj_ref]{partof_obj.num, new_offset, deref_size}));
+      case &GrBranch(a gr_branch):
+        src_obj st_obj_ref = cell_obj_ref(env, a.src);
+        src_value st_value;
+        if !obj_read(env, src_obj, &src_value) {
+          return false;
+        }
+        ncases size = count(&a.cases);
+        found bool = false;
+        for i size = 0; i < ncases && !found; i = i + 1 {
+          case_i *tup[gr_const, gr_num] = ref(&a.cases, i);
+          case_value st_value;
+          if !st_const_compute(cs, env, &case_i->car, src_obj.count, &case_value) {
+            return false;
+          }
+          case_matches bool;
+          if !st_values_selfcontained_equal(&env->plat, &src_value, &case_value, &case_matches) {
+            return false;
+          }
+          if case_matches {
+            push(&stack, EvalOpAndPrecs(case_i->cdr));
+            found = true;
+          }
+        }
+        if !found {
+          if case Has(default_gn gr_num) = a.default_case {
+            push(&stack, EvalOpAndPrecs(default_gn));
+          } else {
+            ERR(_u8("GrBranch meets unhandled case"));
+            return false;
+          }
+        }
       default:
         ice(_u8("EvalOp not completely implemented."));
       }
@@ -431,6 +462,26 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
   }
 
   return TODO();
+}
+
+func st_values_selfcontained_equal(plat *platform_info, a *st_value, b *st_value, out *bool) bool {
+  check(a != b);
+  if a->length != b->length {
+    ice(_u8("st_values_equal sees non-equal lengths"));
+  }
+  // Right now nothing expects to compare pointer values.
+  if !(is_selfcontained(a) && is_selfcontained(b)) {
+    ERR(_u8("Comparing non-self-contained values"));
+    return false;
+  }
+  expected_datas array[u32] = mk_ones(plat, a->length);
+  if !array_equal(&a->datas, &expected_datas) || !array_equal(&b->datas, &expected_datas) {
+    // Arguably if just one of the initialized bits is different, we could deterministically declare the values non-equal.  But, no.
+    ERR(_u8("Comparing non-initialized values"));
+    return false;
+  }
+
+  return array_equal(&a->words, &b->words);
 }
 
 func st_const_compute(cs *checkstate, env *st_env, c *gr_const, length u32, out *st_value) bool {
