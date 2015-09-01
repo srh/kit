@@ -466,6 +466,9 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         push(&stack, EvalOpAndPrecs(a.second));
         push(&stack, EvalOpAndPrecs(a.first));
 
+      case &GrJmp(a gr_jmp):
+        push(&stack, EvalOpAndPrecs(a.next));
+
       default:
         ice(_u8("EvalOp not completely implemented."));
       }
