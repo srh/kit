@@ -31,6 +31,12 @@ deftype st_obj_ref struct {
   count u32;
 };
 
+deftype st_pointer struct {
+  num st_obj_num;
+  // The offset, in terms of bnnos.
+  offset u32;
+};
+
 func init_env(env *st_env, plat *platform_info, num_cells size) void {
   *env = {*plat, mk_array@[opt[st_value]](), repeat(num_cells, None())};
 }
@@ -49,7 +55,7 @@ deftype st_value struct {
   // Values of external symbol references -- they start at a bnno offset, and have some size that depends on what kind of symbolref it is (or what platform, some only have one kind).
   symbolrefs array[tup[u32, st_symbolref]];
   // Pointers to other objects -- they start at a bnno offset, and have a specific size (on the HP Saturn, 5 bnnos, or 20 bits).
-  objrefs array[tup[u32, st_obj_ref]];
+  objrefs array[tup[u32, st_pointer]];
 };
 
 func is_selfcontained(val *st_value) bool {
@@ -70,7 +76,7 @@ func symbolref_size(plat *platform_info, sref *st_symbolref) u32 {
   return plat->fntraits.size;
 }
 
-func objref_size(plat *platform_info, oref *st_obj_ref) u32 {
+func st_pointer_size(plat *platform_info, p *st_pointer) u32 {
   return plat->ptrtraits.size;
 }
 
@@ -106,12 +112,12 @@ func value_read(plat *platform_info, val *st_value, offset u32, ncount u32, out 
     }
   }
 
-  objrefs array[tup[u32, st_obj_ref]];
+  objrefs array[tup[u32, st_pointer]];
   val_nobjrefs size = count(&val->objrefs);
   for i size = 0; i < val_nobjrefs; i = i + 1 {
-    vref *tup[u32, st_obj_ref] = ref(&val->objrefs, i);
+    vref *tup[u32, st_pointer] = ref(&val->objrefs, i);
     vref_offset u32 = vref->car;
-    vref_end u32 = vref_offset + objref_size(plat, &vref->cdr);
+    vref_end u32 = vref_offset + st_pointer_size(plat, &vref->cdr);
     if offset <= vref_offset && vref_end <= end {
       push(&objrefs, cons(vref_offset - offset, vref->cdr));
     }
@@ -164,9 +170,9 @@ func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in 
   w = 0;
   val_nobjrefs size = count(&val->objrefs);
   for i size = 0; i < val_nobjrefs; i = i + 1 {
-    vref *tup[u32, st_obj_ref] = ref(&val->objrefs, i);
+    vref *tup[u32, st_pointer] = ref(&val->objrefs, i);
     vref_offset u32 = vref->car;
-    vref_end u32 = vref_offset + objref_size(plat, &vref->cdr);
+    vref_end u32 = vref_offset + st_pointer_size(plat, &vref->cdr);
     if vref_end <= offset || end <= vref_offset {
       set(&val->objrefs, w, *vref);
       w = w + 1;
@@ -174,7 +180,7 @@ func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in 
   }
   truncate(&val->objrefs, w);
   for i size = 0; i < count(&in->objrefs); i = i + 1 {
-    iref *tup[u32, st_obj_ref] = ref(&in->objrefs, i);
+    iref *tup[u32, st_pointer] = ref(&in->objrefs, i);
     push(&val->objrefs, cons(iref->car + offset, iref->cdr));
   }
 
@@ -233,10 +239,10 @@ func mk_st_value_words(plat *platform_info, words array[u32], length u32) st_val
   return {words, ones, length, mk_array(), mk_array()};
 }
 
-func mk_st_value_objref(plat *platform_info, oref st_obj_ref) st_value {
-  length u32 = objref_size(plat, &oref);
+func mk_st_value_pointer(plat *platform_info, p st_pointer) st_value {
+  length u32 = st_pointer_size(plat, &p);
   ret st_value = mk_st_value(plat, length);
-  push(&ret.objrefs, cons(@[u32] 0, oref));
+  push(&ret.objrefs, cons(@[u32] 0, p));
   return ret;
 }
 
@@ -374,7 +380,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         st_maybe_init_static(&fg->gr, env, a.dest);
         destref st_obj_ref = cell_obj_ref(env, a.dest);
         addressee_ref st_obj_ref = cell_obj_ref(env, a.addressee);
-        value st_value = mk_st_value_objref(&env->plat, addressee_ref);
+        value st_value = mk_st_value_pointer(&env->plat, {addressee_ref.num, addressee_ref.offset});
         if !obj_write(env, destref, &value) {
           return false;
         }
