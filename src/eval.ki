@@ -469,6 +469,26 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
       case &GrJmp(a gr_jmp):
         push(&stack, EvalOpAndPrecs(a.next));
 
+      case &GrDead(a gr_dead):
+        // We should only be using GrDead for cells that own the whole object.
+        if case &Has(objref st_obj_ref) = ref(&env->framecells, a.cell.~) {
+          if objref.offset != 0 {
+            ice(_u8("GrDead sees cell pointing at sub-object offset."));
+          }
+          if case &Has(val st_value) = ref(&env->objects, objref.num.~) {
+            if val.length < objref.count {
+              ice(_u8("GrDead sees cell pointing at sub-object with short length."));
+            }
+            check(val.length == objref.count);
+          } else {
+            ice(_u8("GrDead sees cell pointing to inactive object"));
+          }
+          set(&env->objects, objref.num.~, None());
+        } else {
+          ice(_u8("GrDead deading inactive cell"));
+        }
+        set(&env->framecells, a.cell.~, None());
+
       default:
         ice(_u8("EvalOp not completely implemented."));
       }
