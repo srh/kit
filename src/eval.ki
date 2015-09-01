@@ -398,20 +398,8 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         deref_size u32 = info->props.flat_size;
         // We add offset to pointer.offset.
         offset u32;
-        switch &a.offset {
-        case &OffsetConst(o u32):
-          offset = o;
-        case &OffsetComputed(pair tup[u32, cell_num]):
-          index_obj st_obj_ref = cell_obj_ref(env, pair.cdr);
-          index_value st_value;
-          if !obj_read(env, index_obj, &index_value) {
-            return false;
-          }
-          index u32;
-          if !st_value_as_size(&env->plat, &index_value, &index) {
-            return false;
-          }
-          offset = pair.car * index;
+        if !st_offset_compute(env, a.offset, &offset) {
+          return false;
         }
         new_offset u32 = pointer.offset + offset;
         if case &Has(referee_val st_value) = ref(&env->objects, pointer.num.~) {
@@ -424,6 +412,8 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
           return false;
         }
         set(&env->framecells, a.name.~, Has(@[st_obj_ref]{pointer.num, new_offset, deref_size}));
+      case &GrSubcell(a gr_subcell):
+        return TODO();
       default:
         ice(_u8("EvalOp not completely implemented."));
       }
@@ -431,6 +421,25 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
   }
 
   return TODO();
+}
+
+func st_offset_compute(env *st_env, gro gr_offset, out *u32) bool {
+  switch gro {
+  case OffsetConst(o u32):
+    *out = o;
+  case OffsetComputed(pair tup[u32, cell_num]):
+    index_obj st_obj_ref = cell_obj_ref(env, pair.cdr);
+    index_value st_value;
+    if !obj_read(env, index_obj, &index_value) {
+      return false;
+    }
+    index u32;
+    if !st_value_as_size(&env->plat, &index_value, &index) {
+      return false;
+    }
+    *out = pair.car * index;
+  }
+  return true;
 }
 
 func st_bigint_to_value(plat *platform_info, length u32, b bigint) st_value {
