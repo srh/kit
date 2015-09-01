@@ -359,19 +359,8 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         st_maybe_init_static(&fg->gr, env, a.dest);
         destref st_obj_ref = cell_obj_ref(env, a.dest);
         value st_value;
-        switch &a.value {
-        case &ConstInt(b bigint):
-          value = st_bigint_to_value(&env->plat, destref.count, b);
-        case &ConstDef(ip instpair):
-          val *st_value;
-          if !st_eval_def(cs, ip.ent_id, ip.inst_id, &val) {
-            return false;
-          }
-          value = *val;
-        case &ConstFnBody(fnid fn_body_id):
-          value = mk_st_value_symbolref(&env->plat, fnid);
-        case &ConstBytes(arr array[u8]):
-          value = st_u8s_to_value(&env->plat, &arr);
+        if !st_const_compute(cs, env, &a.value, destref.count, &value) {
+          return false;
         }
         if !obj_write(env, destref, &value) {
           return false;
@@ -442,6 +431,24 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
   }
 
   return TODO();
+}
+
+func st_const_compute(cs *checkstate, env *st_env, c *gr_const, length u32, out *st_value) bool {
+  switch c {
+  case &ConstInt(b bigint):
+    *out = st_bigint_to_value(&env->plat, length, b);
+  case &ConstDef(ip instpair):
+    val *st_value;
+    if !st_eval_def(cs, ip.ent_id, ip.inst_id, &val) {
+      return false;
+    }
+    *out = *val;
+  case &ConstFnBody(fnid fn_body_id):
+    *out = mk_st_value_symbolref(&env->plat, fnid);
+  case &ConstBytes(arr array[u8]):
+    *out = st_u8s_to_value(&env->plat, &arr);
+  }
+  return true;
 }
 
 func st_offset_compute(env *st_env, gro gr_offset, out *u32) bool {
