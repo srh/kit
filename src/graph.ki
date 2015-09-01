@@ -66,10 +66,10 @@ defenum gr_op {
   GrAddressof gr_addressof;
   GrDeref gr_deref;
   GrSubcell gr_subcell;
-  GrStrinit gr_strinit;
   GrBranch gr_branch;
   GrSequence gr_sequence;
   GrJmp gr_jmp;
+  GrWriteNothing gr_writenothing;
   GrDead gr_dead;
   GrNop void;
 };
@@ -112,9 +112,8 @@ deftype gr_writeconst struct {
   value gr_const;
 };
 
-deftype gr_strinit struct {
+deftype gr_writenothing struct {
   dest cell_num;
-  parts array[tup[u32, cell_num]];
 };
 
 deftype gr_branch struct {
@@ -711,20 +710,24 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
 }
 
 func gr_mk_strinit(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_strinit, out *gr_num) bool {
+  ngn gr_num = add_node(gr, node0(GrWriteNothing({rval_cell(x)})));
+
   precs array[gr_num];
   nparams size = count(&a->exprs);
-  parts array[tup[u32, cell_num]];
   for i size = 0; i < nparams; i = i + 1 {
     param *ast_strinit_param = ref(&a->exprs, i);
+    befdep gr_num = add_node(gr, node0(GrSubcell({result_cell(&param->ec), rval_cell(x), OffsetConst(strinit_param_info(param)->offset)})));
     dep gr_num;
     if !gr_expr_consume(cs, gr, &param->ec, &dep) {
       return false;
     }
-    push(&precs, dep);
-    push(&parts, cons(strinit_param_info(param)->offset, result_cell(&param->ec)));
+
+    prec gr_num = add_node(gr, node0(GrSequence({befdep, dep})));
+    push(&precs, prec);
   }
-  var ap = add_node(gr, node(precs, GrStrinit({rval_cell(x), parts})));
-  *out = ap;
+  var np = add_node(gr, node(precs, GrNop(void)));
+  var gn = add_node(gr, node0(GrSequence({ngn, np})));
+  *out = gn;
   return true;
 }
 
