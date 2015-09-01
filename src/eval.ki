@@ -35,12 +35,8 @@ func init_env(env *st_env, plat *platform_info, num_cells size) void {
   *env = {*plat, mk_array@[opt[st_value]](), repeat(num_cells, None())};
 }
 
-deftype st_symbol_name sym;
-
 deftype st_symbolref struct {
-  name st_symbol_name;
-  offset u32;
-  count u32;
+  fnid fn_body_id;
 };
 
 deftype st_value struct {
@@ -237,6 +233,14 @@ func mk_st_value_words(plat *platform_info, words array[u32], length u32) st_val
   return {words, ones, length, mk_array(), mk_array()};
 }
 
+func mk_st_value_symbolref(plat *platform_info, fnid fn_body_id) st_value {
+  r st_symbolref = {fnid};
+  length u32 = symbolref_size(plat, &r);
+  ret st_value = mk_st_value(plat, length);
+  push(&ret.symbolrefs, cons(@[u32] 0, r));
+  return ret;
+}
+
 
 func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st_value) bool {
   inst *def_inst = ref_inst(cs, inst_id);
@@ -348,7 +352,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
           }
           value = *val;
         case &ConstFnBody(fnid fn_body_id):
-          return TODO();
+          value = mk_st_value_symbolref(&env->plat, fnid);
         case &ConstBytes(arr array[u8]):
           value = st_u8s_to_value(&env->plat, &arr);
         }
