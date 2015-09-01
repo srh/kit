@@ -413,7 +413,28 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         }
         set(&env->framecells, a.name.~, Has(@[st_obj_ref]{pointer.num, new_offset, deref_size}));
       case &GrSubcell(a gr_subcell):
-        return TODO();
+        partof_obj st_obj_ref = cell_obj_ref(env, a.partof);
+        offset u32;
+        if !st_offset_compute(env, a.offset, &offset) {
+          return false;
+        }
+        if offset > partof_obj.count {
+          ERR(_u8("Subcell index out of range (for cell)"));
+          return false;
+        }
+        info *cell_info = ref_cell(&fg->gr, a.name);
+        deref_size u32 = info->props.flat_size;
+        new_offset u32 = partof_obj.offset + offset;
+        if case &Has(referee_val st_value) = ref(&env->objects, partof_obj.num.~) {
+          if new_offset > referee_val.length {
+            ERR(_u8("Subcell index out of range (for object)"));
+            return false;
+          }
+        } else {
+          ERR(_u8("Accessing subcell of dead object"));
+          return false;
+        }
+        set(&env->framecells, a.name.~, Has(@[st_obj_ref]{partof_obj.num, new_offset, deref_size}));
       default:
         ice(_u8("EvalOp not completely implemented."));
       }
