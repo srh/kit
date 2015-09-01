@@ -44,6 +44,7 @@ deftype st_symbolref struct {
 };
 
 deftype st_value struct {
+  // Note: Even when targeting big-endian systems, the lsB of a word is the still the least-addressable byte of that chunk of memory in this code here.  So, a 32-bit value of "5" would be represented by the array {0x05000000} when we target big-endian systems.  (Middle-endian on 16-bit systems could be a thing too.)
   words array[u32];
   // Bits set to 1 for those bits (in [0:length)) that are not garbage, not covered by refs.
   datas array[u32];
@@ -65,12 +66,12 @@ func ref_obj(env *st_env, num st_obj_num, out **st_value) bool {
   }
 }
 
-func symbolref_size(env *st_env, sref *st_symbolref) u32 {
-  return env->plat.fntraits.size;
+func symbolref_size(plat *platform_info, sref *st_symbolref) u32 {
+  return plat->fntraits.size;
 }
 
-func objref_size(env *st_env, oref *st_obj_ref) u32 {
-  return env->plat.ptrtraits.size;
+func objref_size(plat *platform_info, oref *st_obj_ref) u32 {
+  return plat->ptrtraits.size;
 }
 
 func copy_bnnos(plat *platform_info, src *array[u32], offset u32, count u32, dest *array[u32], dest_offset u32) void {
@@ -89,13 +90,9 @@ func copy_bnnos(plat *platform_info, src *array[u32], offset u32, count u32, des
   }
 }
 
-func obj_read(env *st_env, oref st_obj_ref, out *st_value) bool {
-  oref_end u32 = oref.offset + oref.count;
-  val *st_value;
-  if !ref_obj(env, oref.num, &val) {
-    return false;
-  }
-  if oref_end > val->length {
+func value_read(plat *platform_info, val *st_value, offset u32, ncount u32, out *st_value) void {
+  end u32 = offset + ncount;
+  if end > val->length {
     ice(_u8("static eval reading object out-of-bounds"));
   }
   refs array[tup[u32, st_symbolref]];
@@ -103,9 +100,9 @@ func obj_read(env *st_env, oref st_obj_ref, out *st_value) bool {
   for i size = 0; i < val_nrefs; i = i + 1 {
     vref *tup[u32, st_symbolref] = ref(&val->symbolrefs, i);
     vref_offset u32 = vref->car;
-    vref_end u32 = vref_offset + symbolref_size(env, &vref->cdr);
-    if oref.offset <= vref_offset && vref_end <= oref_end {
-      push(&refs, cons(vref_offset - oref.offset, vref->cdr));
+    vref_end u32 = vref_offset + symbolref_size(plat, &vref->cdr);
+    if offset <= vref_offset && vref_end <= end {
+      push(&refs, cons(vref_offset - offset, vref->cdr));
     }
   }
 
@@ -114,32 +111,36 @@ func obj_read(env *st_env, oref st_obj_ref, out *st_value) bool {
   for i size = 0; i < val_nobjrefs; i = i + 1 {
     vref *tup[u32, st_obj_ref] = ref(&val->objrefs, i);
     vref_offset u32 = vref->car;
-    vref_end u32 = vref_offset + objref_size(env, &vref->cdr);
-    if oref.offset <= vref_offset && vref_end <= oref_end {
-      push(&objrefs, cons(vref_offset - oref.offset, vref->cdr));
+    vref_end u32 = vref_offset + objref_size(plat, &vref->cdr);
+    if offset <= vref_offset && vref_end <= end {
+      push(&objrefs, cons(vref_offset - offset, vref->cdr));
     }
   }
 
-  bnnos_per_word u32 = 32 / env->plat.bnno_size;
-  ws array[u32] = repeat(~ceil_divide(oref.count, bnnos_per_word), 0);
-  copy_bnnos(&env->plat, &val->words, oref.offset, oref.count, &ws, 0);
-  ds array[u32] = repeat(~ceil_divide(oref.count, bnnos_per_word), 0);
-  copy_bnnos(&env->plat, &val->datas, oref.offset, oref.count, &ds, 0);
+  bnnos_per_word u32 = 32 / plat->bnno_size;
+  ws array[u32] = repeat(~ceil_divide(ncount, bnnos_per_word), 0);
+  copy_bnnos(plat, &val->words, offset, ncount, &ws, 0);
+  ds array[u32] = repeat(~ceil_divide(ncount, bnnos_per_word), 0);
+  copy_bnnos(plat, &val->datas, offset, ncount, &ds, 0);
 
-  *out = {ws, ds, oref.count, refs, objrefs};
-  return true;
+  *out = {ws, ds, ncount, refs, objrefs};
 }
 
-func obj_write(env *st_env, oref st_obj_ref, in *st_value) bool {
-  if oref.count != in->length {
-    ice(_u8("static eval writing object with non-matching length"));
-  }
-  oref_end u32 = oref.offset + oref.count;
+func obj_read(env *st_env, oref st_obj_ref, out *st_value) bool {
   val *st_value;
   if !ref_obj(env, oref.num, &val) {
     return false;
   }
-  if oref_end > val->length {
+  value_read(&env->plat, val, oref.offset, oref.count, out);
+  return true;
+}
+
+func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in *st_value) void {
+  if ncount != in->length {
+    ice(_u8("value_write sees non-matching length"));
+  }
+  end u32 = offset + ncount;
+  if end > val->length {
     ice(_u8("static eval writing object out-of-bounds"));
   }
 
@@ -148,8 +149,8 @@ func obj_write(env *st_env, oref st_obj_ref, in *st_value) bool {
   for i size = 0; i < val_nrefs; i = i + 1 {
     vref *tup[u32, st_symbolref] = ref(&val->symbolrefs, i);
     vref_offset u32 = vref->car;
-    vref_end u32 = vref_offset + symbolref_size(env, &vref->cdr);
-    if vref_end <= oref.offset || oref_end <= vref_offset {
+    vref_end u32 = vref_offset + symbolref_size(plat, &vref->cdr);
+    if vref_end <= offset || end <= vref_offset {
       set(&val->symbolrefs, w, *vref);
       w = w + 1;
     }
@@ -157,7 +158,7 @@ func obj_write(env *st_env, oref st_obj_ref, in *st_value) bool {
   truncate(&val->symbolrefs, w);
   for i size = 0; i < count(&in->symbolrefs); i = i + 1 {
     sref *tup[u32, st_symbolref] = ref(&in->symbolrefs, i);
-    push(&val->symbolrefs, cons(sref->car + oref.offset, sref->cdr));
+    push(&val->symbolrefs, cons(sref->car + offset, sref->cdr));
   }
 
   w = 0;
@@ -165,8 +166,8 @@ func obj_write(env *st_env, oref st_obj_ref, in *st_value) bool {
   for i size = 0; i < val_nobjrefs; i = i + 1 {
     vref *tup[u32, st_obj_ref] = ref(&val->objrefs, i);
     vref_offset u32 = vref->car;
-    vref_end u32 = vref_offset + objref_size(env, &vref->cdr);
-    if vref_end <= oref.offset || oref_end <= vref_offset {
+    vref_end u32 = vref_offset + objref_size(plat, &vref->cdr);
+    if vref_end <= offset || end <= vref_offset {
       set(&val->objrefs, w, *vref);
       w = w + 1;
     }
@@ -174,11 +175,22 @@ func obj_write(env *st_env, oref st_obj_ref, in *st_value) bool {
   truncate(&val->objrefs, w);
   for i size = 0; i < count(&in->objrefs); i = i + 1 {
     iref *tup[u32, st_obj_ref] = ref(&in->objrefs, i);
-    push(&val->objrefs, cons(iref->car + oref.offset, iref->cdr));
+    push(&val->objrefs, cons(iref->car + offset, iref->cdr));
   }
 
-  copy_bnnos(&env->plat, &in->words, 0, in->length, &val->words, oref.offset);
-  copy_bnnos(&env->plat, &in->datas, 0, in->length, &val->datas, oref.offset);
+  copy_bnnos(plat, &in->words, 0, in->length, &val->words, offset);
+  copy_bnnos(plat, &in->datas, 0, in->length, &val->datas, offset);
+}
+
+func obj_write(env *st_env, oref st_obj_ref, in *st_value) bool {
+  if oref.count != in->length {
+    ice(_u8("static eval writing object with non-matching length"));
+  }
+  val *st_value;
+  if !ref_obj(env, oref.num, &val) {
+    return false;
+  }
+  value_write(&env->plat, val, oref.offset, oref.count, in);
   return true;
 }
 
@@ -200,10 +212,27 @@ func add_obj(env *st_env, size u32) st_obj_num {
 }
 
 func mk_st_value(plat *platform_info, size u32) st_value {
-  zeros array[u32] = repeat(~ceil_divide(size, plat->bnno_size), 0);
+  zeros array[u32] = repeat(~ceil_divide(size * plat->bnno_size, 32), 0);
   // Importantly, datas is initialized to all-zero, indicating all garbage.
   return {zeros, zeros, size, mk_array(), mk_array()};
 }
+
+func mk_ones(plat *platform_info, length u32) array[u32] {
+  bitlength u32 = length * plat->bnno_size;
+  n size = ~ceil_divide(bitlength, 32);
+  ones array[u32] = repeat(n, 0xFFFFFFFF);
+  extra u32 = bitlength % 32;
+  if extra != 0 {
+    set(&ones, n - 1, 0xFFFFFFFF >> (32 - bitlength));
+  }
+  return ones;
+}
+
+func mk_st_value_words(plat *platform_info, words array[u32], length u32) st_value {
+  ones array[u32] = mk_ones(plat, length);
+  return {words, ones, length, mk_array(), mk_array()};
+}
+
 
 func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st_value) bool {
   inst *def_inst = ref_inst(cs, inst_id);
@@ -294,6 +323,24 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         value st_value;
         obj_read(env, srcref, &value);
         obj_write(env, destref, &value);
+      case &GrWriteConst(a gr_writeconst):
+        st_maybe_init_static(&fg->gr, env, a.dest);
+        destref st_obj_ref = cell_obj_ref(env, a.dest);
+        switch &a.value {
+        case &ConstInt(n bigint):
+          // TODO: This should crash if the constant is out-of-range.
+          return TODO();
+        case &ConstDef(ip instpair):
+          return TODO();
+        case &ConstFnBody(fnid fn_body_id):
+          return TODO();
+        // TODO: Rename ConstBytes to ConstU8s.
+        case &ConstBytes(arr array[u8]):
+          value st_value = st_u8s_to_value(&env->plat, &arr);
+          if !obj_write(env, destref, &value) {
+            return false;
+          }
+        }
       default:
         ice(_u8("EvalOp not completely implemented."));
       }
@@ -301,6 +348,44 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
   }
 
   return TODO();
+}
+
+func st_u8s_to_value(plat *platform_info, arr *array[u8]) st_value {
+  n size = count(arr);
+  bitlength u32 = ~(n * 8);
+  if bitlength % plat->bnno_size != 0 {
+    ice(_u8("st_u8s_to_value sees misaligned value (on 16-bit bnno_size?)"));
+  }
+  length u32 = bitlength / plat->bnno_size;
+
+  ret st_value = mk_st_value(plat, length);
+  for i u32 = 0; i < length; i = i + 1 {
+    bnno u32 = bnno_index_u8(plat, arr, i);
+    tmp st_value = mk_st_value_bnno(plat, bnno);
+    value_write(plat, &ret, i, 1, &tmp);
+  }
+
+  return ret;
+}
+
+func mk_st_value_bnno(plat *platform_info, bnno u32) st_value {
+  check(0 == (bnno & ^((1 << plat->bnno_size) - 1)));
+  return mk_st_value_words(plat, mk_array(bnno), 1);
+}
+
+func bnno_index_u8(plat *platform_info, arr *array[u8], ix u32) u32 {
+  if plat->bnno_size == 8 {
+    return ~get(arr, ~ix);
+  } else if plat->bnno_size == 4 {
+    return ~get(arr, ~((ix / 2) >> (4 * (ix % 2))));
+  } else if plat->bnno_size == 16 {
+    lo u32 = ~get(arr, ~(ix * 2));
+    hi u32 = ~get(arr, ~(ix * 2 + 1));
+    return lo + (hi << 8);
+  } else {
+    ice(_u8("bnno_index_u8 does not support bnno_size"));
+    return fake();
+  }
 }
 
 func st_maybe_init_static(gr *frame_graph, env *st_env, cell cell_num) void {

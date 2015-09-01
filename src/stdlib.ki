@@ -293,6 +293,14 @@ func ceil_divide(x u32, y u32) u32 {
   }
 }
 
+func ceil_divide(x size, y size) size {
+  if x % y == 0 {
+    return x / y;
+  } else {
+    return x / y + 1;
+  }
+}
+
 // TODO: This is... platform-specific.
 func[T] enumnum(x *T) u32 {
   return * @[*u32]cast(x);

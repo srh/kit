@@ -27,7 +27,16 @@ deftype integral_traits struct {
 def enum_tag_offset u32 = 0;
 def enum_tag_min u32 = 1;
 
+defenum endianness {
+  LittleEndian void;
+};
+
+func `==`(x endianness, y endianness) bool { return enumnum(&x) == enumnum(&y); }
+func `!=`(x endianness, y endianness) bool { return enumnum(&x) != enumnum(&y); }
+
+
 deftype platform_info struct {
+  endian endianness;
   // How many bits are in a byte (not necessarily octet)?
   bnno_size u32;
   enum_tag_size u32;
