@@ -344,6 +344,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         // TODO: Implement this (for prim ops at least).
         ERR(_u8("GrApply not implemented yet."));
         return false;
+
       case &GrMemCopy(a gr_memcopy):
         st_maybe_init_static(&fg->gr, env, a.dest);
         destref st_obj_ref = cell_obj_ref(env, a.dest);
@@ -355,6 +356,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         if !obj_write(env, destref, &value) {
           return false;
         }
+
       case &GrWriteConst(a gr_writeconst):
         st_maybe_init_static(&fg->gr, env, a.dest);
         destref st_obj_ref = cell_obj_ref(env, a.dest);
@@ -365,6 +367,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         if !obj_write(env, destref, &value) {
           return false;
         }
+
       case &GrAddressof(a gr_addressof):
         st_maybe_init_static(&fg->gr, env, a.dest);
         destref st_obj_ref = cell_obj_ref(env, a.dest);
@@ -373,6 +376,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         if !obj_write(env, destref, &value) {
           return false;
         }
+
       case &GrDeref(a gr_deref):
         pointer_obj st_obj_ref = cell_obj_ref(env, a.pointer);
         pointer_value st_value;
@@ -401,6 +405,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
           return false;
         }
         set(&env->framecells, a.name.~, Has(@[st_obj_ref]{pointer.num, new_offset, deref_size}));
+
       case &GrSubcell(a gr_subcell):
         partof_obj st_obj_ref = cell_obj_ref(env, a.partof);
         offset u32;
@@ -455,6 +460,12 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
             return false;
           }
         }
+
+      case &GrSequence(a gr_sequence):
+        // first gets evaluated before second (because it gets pushed after)
+        push(&stack, EvalOpAndPrecs(a.second));
+        push(&stack, EvalOpAndPrecs(a.first));
+
       default:
         ice(_u8("EvalOp not completely implemented."));
       }
