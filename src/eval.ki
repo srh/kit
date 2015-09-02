@@ -469,6 +469,14 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
       case &GrJmp(a gr_jmp):
         push(&stack, EvalOpAndPrecs(a.next));
 
+      case &GrWriteNothing(a gr_writenothing):
+        st_maybe_init_static(&fg->gr, env, a.dest);
+        destref st_obj_ref = cell_obj_ref(env, a.dest);
+        value st_value = mk_st_value(&env->plat, destref.count);
+        if !obj_write(env, destref, &value) {
+          return false;
+        }
+
       case &GrDead(a gr_dead):
         // We should only be using GrDead for cells that own the whole object.
         if case &Has(objref st_obj_ref) = ref(&env->framecells, a.cell.~) {

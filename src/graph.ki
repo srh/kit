@@ -112,10 +112,6 @@ deftype gr_writeconst struct {
   value gr_const;
 };
 
-deftype gr_writenothing struct {
-  dest cell_num;
-};
-
 deftype gr_branch struct {
   src cell_num;
   cases array[tup[gr_const, gr_num]];
@@ -129,6 +125,10 @@ deftype gr_sequence struct {
 
 deftype gr_jmp struct {
   next gr_num;
+};
+
+deftype gr_writenothing struct {
+  dest cell_num;
 };
 
 deftype gr_dead struct {
