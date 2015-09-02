@@ -76,7 +76,7 @@ func ref_obj(env *st_env, num st_obj_num, out **st_value) bool {
   }
 }
 
-func symbolref_size(plat *platform_info, sref *st_symbolref) u32 {
+func st_symbolref_size(plat *platform_info, sref *st_symbolref) u32 {
   return plat->fntraits.size;
 }
 
@@ -110,7 +110,7 @@ func value_read(plat *platform_info, val *st_value, offset u32, ncount u32, out 
   for i size = 0; i < val_nrefs; i = i + 1 {
     vref *tup[u32, st_symbolref] = ref(&val->symbolrefs, i);
     vref_offset u32 = vref->car;
-    vref_end u32 = vref_offset + symbolref_size(plat, &vref->cdr);
+    vref_end u32 = vref_offset + st_symbolref_size(plat, &vref->cdr);
     if offset <= vref_offset && vref_end <= end {
       push(&refs, cons(vref_offset - offset, vref->cdr));
     }
@@ -159,7 +159,7 @@ func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in 
   for i size = 0; i < val_nrefs; i = i + 1 {
     vref *tup[u32, st_symbolref] = ref(&val->symbolrefs, i);
     vref_offset u32 = vref->car;
-    vref_end u32 = vref_offset + symbolref_size(plat, &vref->cdr);
+    vref_end u32 = vref_offset + st_symbolref_size(plat, &vref->cdr);
     if vref_end <= offset || end <= vref_offset {
       set(&val->symbolrefs, w, *vref);
       w = w + 1;
@@ -252,7 +252,7 @@ func mk_st_value_pointer(plat *platform_info, p st_pointer) st_value {
 
 func mk_st_value_symbolref(plat *platform_info, fnid fn_body_id) st_value {
   r st_symbolref = {fnid};
-  length u32 = symbolref_size(plat, &r);
+  length u32 = st_symbolref_size(plat, &r);
   ret st_value = mk_st_value(plat, length);
   push(&ret.symbolrefs, cons(@[u32] 0, r));
   return ret;
@@ -346,9 +346,42 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
       node *gr_node = ref_node(&fg->gr, gn);
       switch &node->op {
       case &GrApply(a gr_apply):
-        // TODO: Implement this (for prim ops at least).
-        ERR(_u8("GrApply not implemented yet."));
-        return TODO();
+        funref st_obj_ref = cell_obj_ref(env, a.funcell);
+        if !is_full_oref(env, funref) {
+          ice(_u8("Function apply funptr cell is sub-object"));
+        }
+        funvalue st_value;
+        if !obj_read(env, funref, &funvalue) {
+          return false;
+        }
+        funcval st_symbolref;
+        if !st_value_as_symbolref(&env->plat, &funvalue, &funcval) {
+          return false;
+        }
+        paramorefs array[st_obj_ref];
+        nparams size = count(&a.params);
+        for i size = 0; i < nparams; i = i + 1 {
+          c cell_num = get(&a.params, i);
+          param_oref st_obj_ref = cell_obj_ref(env, c);
+          if !is_full_oref(env, param_oref) {
+            ice(_u8("Function parameter cell is sub-object"));
+          }
+          push(&paramorefs, param_oref);
+          set(&env->framecells, c.~, None());
+        }
+
+        fnent *fn_body_entry = ref_fn_body(cs, funcval.fnid);
+        if nparams != count(&fnent->argcells) {
+          ice(_u8("Param list length mismatches function argcells length"));
+        }
+
+        subenv st_env = mk_env(env->pool, env->plat, count(&fnent->graph.gr.cells));
+        retvalref st_obj_ref;
+        if !st_eval_frame_regraphed(cs, &subenv, &fnent->graph, &retvalref) {
+          return false;
+        }
+
+        set(&env->framecells, a.retcell.~, Has(retvalref));
 
       case &GrMemCopy(a gr_memcopy):
         st_maybe_init_static(&fg->gr, env, a.dest);
@@ -485,16 +518,8 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
       case &GrDead(a gr_dead):
         // We should only be using GrDead for cells that own the whole object.
         if case &Has(objref st_obj_ref) = ref(&env->framecells, a.cell.~) {
-          if objref.offset != 0 {
-            ice(_u8("GrDead sees cell pointing at sub-object offset."));
-          }
-          if case &Has(val st_value) = ref(&env->pool->objects, objref.num.~) {
-            if val.length < objref.count {
-              ice(_u8("GrDead sees cell pointing at sub-object with short length."));
-            }
-            check(val.length == objref.count);
-          } else {
-            ice(_u8("GrDead sees cell pointing to inactive object"));
+          if !is_full_oref(env, objref) {
+            ice(_u8("GrDead sees non-full objref"));
           }
           set(&env->pool->objects, objref.num.~, None());
         } else {
@@ -509,6 +534,17 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
   }
 
   return TODO();
+}
+
+func is_full_oref(env *st_env, oref st_obj_ref) bool {
+  if oref.offset == 0 {
+    if case &Has(val st_value) = ref(&env->pool->objects, oref.num.~) {
+      if oref.count == val.length {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 func st_values_selfcontained_equal(plat *platform_info, a *st_value, b *st_value, out *bool) bool {
@@ -723,6 +759,29 @@ func st_value_as_pointer(plat *platform_info, val *st_value, out *st_pointer) bo
     return false;
   }
   *out = oref->cdr;
+  return true;
+}
+
+func err_nonsymbolref() void {
+  ERR(_u8("Expected function pointer."));
+}
+
+func st_value_as_symbolref(plat *platform_info, val *st_value, out *st_symbolref) bool {
+  if count(&val->symbolrefs) != 1 {
+    err_nonsymbolref();
+    return false;
+  }
+  sref *tup[u32, st_symbolref] = ref(&val->symbolrefs, 0);
+  if sref->car != 0 {
+    err_nonsymbolref();
+    return false;
+  }
+  expected u32 = st_symbolref_size(plat, &sref->cdr);
+  if val->length != expected {
+    err_nonsymbolref();
+    return false;
+  }
+  *out = sref->cdr;
   return true;
 }
 
