@@ -533,7 +533,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
     }
   }
 
-  return TODO();
+  return true;
 }
 
 func is_full_oref(env *st_env, oref st_obj_ref) bool {
