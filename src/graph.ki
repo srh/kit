@@ -1671,7 +1671,9 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
       inst->graph = BeganComputing();
       switch &inst->rhs {
         case &InstRhsPrim(v void): {
-          inst->graph = Computed(None());
+          id fn_body_id = add_fn_body(cs, PrimFnBody({}));
+          frg frame_regraphed = mk_const_frame_regraphed(&inst->computed_type, &inst->computed_type_properties, ConstFnBody(id));
+          inst->graph = Computed(Has(frg));
           return true;
         }
         case &InstRhsExtern(v void): {

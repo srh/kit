@@ -63,3 +63,13 @@ func[T, U, V, W] ice(x T, y U, z V, p W) void {
   ERR(_u8("ICE: "), x, y, z, p);
   abort();
 }
+
+func[T, U, V, W, X] ice(x T, y U, z V, p W, q X) void {
+  ERR(_u8("ICE: "), x, y, z, p, q);
+  abort();
+}
+
+func[T, U, V, W, X, Y] ice(x T, y U, z V, p W, q X, r Y) void {
+  ERR(_u8("ICE: "), x, y, z, p, q, r);
+  abort();
+}
