@@ -7,17 +7,25 @@ on the HP Saturn that'd be nibbles, on other systems it might be 16
 bits.  The term "bnno" is used because "byte" is so likely to be
 misinterpreted. */
 
-deftype st_env struct {
-  plat platform_info;
-
+deftype st_objpool struct {
   objects array[opt[st_value]];
+};
+
+func mk_objpool() st_objpool {
+  return {mk_array@[opt[st_value]]()};
+}
+
+deftype st_env struct {
+  pool *st_objpool;
+
+  plat platform_info;
 
   // Indexed by cell_num.  Contains the number of the object representing the cell -- if the cell/object currently exists.
   framecells array[opt[st_obj_ref]];
 };
 
-func mk_env(plat platform_info, num_cells size) st_env {
-  ret st_env = {plat, mk_array(), repeat(num_cells, None())};
+func mk_env(pool *st_objpool, plat platform_info, num_cells size) st_env {
+  ret st_env = {pool, plat, repeat(num_cells, None())};
   return ret;
 }
 
@@ -36,10 +44,6 @@ deftype st_pointer struct {
   // The offset, in terms of bnnos.
   offset u32;
 };
-
-func init_env(env *st_env, plat *platform_info, num_cells size) void {
-  *env = {*plat, mk_array@[opt[st_value]](), repeat(num_cells, None())};
-}
 
 deftype st_symbolref struct {
   fnid fn_body_id;
@@ -63,7 +67,7 @@ func is_selfcontained(val *st_value) bool {
 }
 
 func ref_obj(env *st_env, num st_obj_num, out **st_value) bool {
-  if case &Has(v st_value) = ref(&env->objects, num.~) {
+  if case &Has(v st_value) = ref(&env->pool->objects, num.~) {
     *out = &v;
     return true;
   } else {
@@ -212,8 +216,8 @@ func cell_obj_ref(env *st_env, num cell_num) st_obj_ref {
 
 func add_obj(env *st_env, size u32) st_obj_num {
   ret st_obj_num;
-  ret.~ = count(&env->objects);
-  push(&env->objects, Has(mk_st_value(&env->plat, size)));
+  ret.~ = count(&env->pool->objects);
+  push(&env->pool->objects, Has(mk_st_value(&env->plat, size)));
   return ret;
 }
 
@@ -277,7 +281,8 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
   switch &inst->evaled_value {
     case &NotComputed(v void): {
       inst->evaled_value = BeganComputing();
-      env st_env = mk_env(cs->platform, count(&fg->gr.cells));
+      pool st_objpool = mk_objpool();
+      env st_env = mk_env(&pool, cs->platform, count(&fg->gr.cells));
 
       result st_obj_ref;
       if !st_eval_frame_regraphed(cs, &env, fg, &result) {
@@ -395,7 +400,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
           return false;
         }
         new_offset u32 = pointer.offset + offset;
-        if case &Has(referee_val st_value) = ref(&env->objects, pointer.num.~) {
+        if case &Has(referee_val st_value) = ref(&env->pool->objects, pointer.num.~) {
           if new_offset > referee_val.length {
             ERR(_u8("Dereferencing pointer out of range"));
             return false;
@@ -419,7 +424,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         info *cell_info = ref_cell(&fg->gr, a.name);
         deref_size u32 = info->props.flat_size;
         new_offset u32 = partof_obj.offset + offset;
-        if case &Has(referee_val st_value) = ref(&env->objects, partof_obj.num.~) {
+        if case &Has(referee_val st_value) = ref(&env->pool->objects, partof_obj.num.~) {
           if new_offset > referee_val.length {
             ERR(_u8("Subcell index out of range (for object)"));
             return false;
@@ -483,7 +488,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
           if objref.offset != 0 {
             ice(_u8("GrDead sees cell pointing at sub-object offset."));
           }
-          if case &Has(val st_value) = ref(&env->objects, objref.num.~) {
+          if case &Has(val st_value) = ref(&env->pool->objects, objref.num.~) {
             if val.length < objref.count {
               ice(_u8("GrDead sees cell pointing at sub-object with short length."));
             }
@@ -491,7 +496,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
           } else {
             ice(_u8("GrDead sees cell pointing to inactive object"));
           }
-          set(&env->objects, objref.num.~, None());
+          set(&env->pool->objects, objref.num.~, None());
         } else {
           ice(_u8("GrDead deading inactive cell"));
         }
