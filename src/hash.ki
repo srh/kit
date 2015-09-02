@@ -44,7 +44,7 @@ access hash[_, _] {
       }
     }
 
-    h->arr = new_array;
+    swap(&h->arr, &new_array);
   }
 
   func[K, V] try_insert(h *hash[K, V], key K, value V) bool {

@@ -62,6 +62,12 @@ access array[_] {
     r->cap = newcap;
   }
 
+  func[T] reserve(r *array[T], newcap size) void {
+    if newcap > r->cap {
+      change_cap_(r, newcap);
+    }
+  }
+
   func[T] pop(r *array[T]) void {
     check(r->count > 0);
     r->count = r->count - 1;
@@ -100,6 +106,12 @@ access array[_] {
     append_raw(&ret, &raw_arr[0], raw_arr.length);
     return ret;
   }
+
+  func[T] swap(a *array[T], b *array[T]) void {
+    var tmp = a->~;
+    a->~ = b->~;
+    b->~ = tmp;
+  }
 }
 
 func[T] truncate(a *array[T], n size) void {
@@ -131,6 +143,7 @@ func[T] append(a *array[T], b array[T]) void {
 func[T] reverse(a *array[T]) array[T] {
   n size = count(a);
   ret array[T];
+  reserve(&ret, n);
   while n > 0 {
     n = n - 1;
     push(&ret, get(a, n));
@@ -163,6 +176,7 @@ func[T] popval(a *array[T]) opt[T] {
 
 func[T] repeat(n size, value T) array[T] {
   ret array[T];
+  reserve(&ret, n);
   for i size = 0; i < n; i = i + 1 {
     push(&ret, value);
   }
@@ -176,6 +190,7 @@ func build_u8str(r *array[u8], a *array[u8]) void {
 func[U, T] mapconvert(x array[T]) array[U] {
   build array[U];
   n size = count(&x);
+  reserve(&build, n);
   for i size = 0; i < n; i = i + 1 {
     push(&build, @[U]~get(&x, i));
   }
@@ -220,6 +235,7 @@ func[T] mk_array(x0 T, x1 T, x2 T) array[T] {
 
 func[T] mk_array(x0 T, x1 T, x2 T, x3 T, x4 T, x5 T, x6 T, x7 T) array[T] {
   ret array[T];
+  reserve(&ret, 8);
   push(&ret, x0);
   push(&ret, x1);
   push(&ret, x2);

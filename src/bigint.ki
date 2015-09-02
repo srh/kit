@@ -42,6 +42,7 @@ access bigint {
     yn size = count(&y.parts);
     maxn size = max(xn, yn);
     build array[u32];
+    reserve(&build, maxn + 1);
     carry u32 = 0;
     for i size = 0; i < maxn; i = i + 1 {
       xval u32 = getbigdigit(&x, i);
@@ -320,6 +321,7 @@ func convert_to_bigint(base u32, digits *array[i8]) bigint {
 
 func[T] big(arr T) bigint {
   b array[i8];
+  reserve(&b, arr.length);
   for i size = 0; i < arr.length; i = i + 1 {
     val i8 = ~(@[u8] arr[i] - '0');
     check(val < 10);
