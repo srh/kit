@@ -1702,11 +1702,8 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
             id = add_fn_body(cs, GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells}));
           }
 
-          gr frame_graph = init_frame_graph_empty();
-          cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), inst->computed_type, inst->computed_type_properties});
-
-          gn gr_num = add_node(&gr, node0(GrWriteConst({cell, ConstFnBody(id)})));
-          inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, cell}));
+          frg frame_regraphed = mk_const_frame_regraphed(&inst->computed_type, &inst->computed_type_properties, ConstFnBody(id));
+          inst->graph = Computed(Has(frg));
           return true;
         }
       }
@@ -1723,4 +1720,11 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
       return true;
     }
   }
+}
+
+func mk_const_frame_regraphed(type *cu_typeexpr, props *type_properties, c gr_const) frame_regraphed {
+  gr frame_graph = init_frame_graph_empty();
+  cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), *type, *props});
+  gn gr_num = add_node(&gr, node0(GrWriteConst({cell, c})));
+  return {gr, gn, cell};
 }

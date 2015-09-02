@@ -317,8 +317,13 @@ deftype graphed_fn_body struct {
   argcells array[cell_num];
 };
 
+deftype prim_fn_body struct {
+  // TODO: Something here.
+};
+
 defenum fn_body_entry {
   GraphedFnBody graphed_fn_body;
+  PrimFnBody prim_fn_body;
 };
 
 deftype access_entry struct {

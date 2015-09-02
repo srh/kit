@@ -387,6 +387,9 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed, out
           if !st_eval_frame_regraphed(clq, &subenv, &fnent.graph, &retvalref) {
             return false;
           }
+        case &PrimFnBody(prent prim_fn_body):
+          ERR(_u8("No primitive function body can be evaled."));
+          return false;
         }
 
         set(&env->framecells, a.retcell.~, Has(retvalref));
