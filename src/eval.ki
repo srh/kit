@@ -343,7 +343,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
       case &GrApply(a gr_apply):
         // TODO: Implement this (for prim ops at least).
         ERR(_u8("GrApply not implemented yet."));
-        return false;
+        return TODO();
 
       case &GrMemCopy(a gr_memcopy):
         st_maybe_init_static(&fg->gr, env, a.dest);
@@ -497,8 +497,8 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         }
         set(&env->framecells, a.cell.~, None());
 
-      default:
-        ice(_u8("EvalOp not completely implemented."));
+      case &GrNop(v void):
+        // Do nothing
       }
     }
   }
