@@ -801,7 +801,7 @@ func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda,
     return false;
   }
 
-  id fn_body_id = add_fn_body(cs, {FnBodyLambda(a), {lambda_gr, fullbody_gn, return_cell}, info->arg_cells});
+  id fn_body_id = add_fn_body(cs, GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, return_cell}, info->arg_cells}));
   var gn = add_node(gr, node0(GrWriteConst({rval_cell(x), ConstFnBody(id)})));
   *out = gn;
   return true;
@@ -1699,7 +1699,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
             if !gr_magic(cs, clq, &mag, &body_gr, &body_gn, &return_cell, &arg_cells) {
               return false;
             }
-            id = add_fn_body(cs, {FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells});
+            id = add_fn_body(cs, GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells}));
           }
 
           gr frame_graph = init_frame_graph_empty();

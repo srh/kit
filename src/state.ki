@@ -310,11 +310,15 @@ defenum fn_body_spec {
   FnBodyMagic *def_magic;
 };
 
-deftype fn_body_entry struct {
+deftype graphed_fn_body struct {
   spec fn_body_spec;
   graph frame_regraphed;
   // The return cell is graph.cell.
   argcells array[cell_num];
+};
+
+defenum fn_body_entry {
+  GraphedFnBody graphed_fn_body;
 };
 
 deftype access_entry struct {

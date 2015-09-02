@@ -376,15 +376,17 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed, out
           set(&env->framecells, c.~, None());
         }
 
-        fnent *fn_body_entry = ref_fn_body(clq->cs, funcval.fnid);
-        if nparams != count(&fnent->argcells) {
-          ice(_u8("Param list length mismatches function argcells length"));
-        }
-
-        subenv st_env = mk_env(env->pool, env->plat, count(&fnent->graph.gr.cells));
         retvalref st_obj_ref;
-        if !st_eval_frame_regraphed(clq, &subenv, &fnent->graph, &retvalref) {
-          return false;
+        switch ref_fn_body(clq->cs, funcval.fnid) {
+        case &GraphedFnBody(fnent graphed_fn_body):
+          if nparams != count(&fnent.argcells) {
+            ice(_u8("Param list length mismatches function argcells length"));
+          }
+
+          subenv st_env = mk_env(env->pool, env->plat, count(&fnent.graph.gr.cells));
+          if !st_eval_frame_regraphed(clq, &subenv, &fnent.graph, &retvalref) {
+            return false;
+          }
         }
 
         set(&env->framecells, a.retcell.~, Has(retvalref));
