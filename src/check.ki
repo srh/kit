@@ -38,7 +38,9 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
         if !set_instantiation_depth(cs, e.instantiation_depth, &rw) {
           return false;
         }
-        if !ensure_def_inst_graphed(cs, clq, e.ent_id, e.inst_id) {
+        // TODO: It would be nice if checking/graphing, and evaling, were done in separate phases as much as possible.
+        val_discard *st_value;
+        if !ensure_def_inst_evaled(cs, clq, e.ent_id, e.inst_id, &val_discard) {
           return false;
         }
       }

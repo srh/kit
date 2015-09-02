@@ -258,9 +258,15 @@ func mk_st_value_symbolref(plat *platform_info, fnid fn_body_id) st_value {
   return ret;
 }
 
+func ensure_def_inst_evaled(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **st_value) bool {
+  if !ensure_def_inst_graphed(cs, clq, ent_id, inst_id) {
+    return false;
+  }
+  return st_eval_def(clq, ent_id, inst_id, out);
+}
 
-func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st_value) bool {
-  inst *def_inst = ref_inst(cs, inst_id);
+func st_eval_def(clq *clqueue, ent def_entry_id, inst_id def_inst_id, out **st_value) bool {
+  inst *def_inst = ref_inst(clq->cs, inst_id);
   if inst->status != FinishedCheckingRhs(void) {
     ice(_u8("Evaling def we have not finished checking."));
   }
@@ -282,10 +288,10 @@ func st_eval_def(cs *checkstate, ent def_entry_id, inst_id def_inst_id, out **st
     case &NotComputed(v void): {
       inst->evaled_value = BeganComputing();
       pool st_objpool = mk_objpool();
-      env st_env = mk_env(&pool, cs->platform, count(&fg->gr.cells));
+      env st_env = mk_env(&pool, clq->cs->platform, count(&fg->gr.cells));
 
       result st_obj_ref;
-      if !st_eval_frame_regraphed(cs, &env, fg, &result) {
+      if !st_eval_frame_regraphed(clq, &env, fg, &result) {
         return false;
       }
       value st_value;
@@ -327,7 +333,7 @@ defenum gr_stackent {
   EvalOp gr_num;
 };
 
-func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, out *st_obj_ref) bool {
+func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed, out *st_obj_ref) bool {
   // A stack of gr_num's to evaluate, in order.
   stack array[gr_stackent];
   push(&stack, EvalOpAndPrecs(fg->gn));
@@ -370,14 +376,14 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
           set(&env->framecells, c.~, None());
         }
 
-        fnent *fn_body_entry = ref_fn_body(cs, funcval.fnid);
+        fnent *fn_body_entry = ref_fn_body(clq->cs, funcval.fnid);
         if nparams != count(&fnent->argcells) {
           ice(_u8("Param list length mismatches function argcells length"));
         }
 
         subenv st_env = mk_env(env->pool, env->plat, count(&fnent->graph.gr.cells));
         retvalref st_obj_ref;
-        if !st_eval_frame_regraphed(cs, &subenv, &fnent->graph, &retvalref) {
+        if !st_eval_frame_regraphed(clq, &subenv, &fnent->graph, &retvalref) {
           return false;
         }
 
@@ -399,7 +405,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         st_maybe_init_static(&fg->gr, env, a.dest);
         destref st_obj_ref = cell_obj_ref(env, a.dest);
         value st_value;
-        if !st_const_compute(cs, env, &a.value, destref.count, &value) {
+        if !st_const_compute(clq, env, &a.value, destref.count, &value) {
           return false;
         }
         if !obj_write(env, destref, &value) {
@@ -478,7 +484,7 @@ func st_eval_frame_regraphed(cs *checkstate, env *st_env, fg *frame_regraphed, o
         for i size = 0; i < ncases && !found; i = i + 1 {
           case_i *tup[gr_const, gr_num] = ref(&a.cases, i);
           case_value st_value;
-          if !st_const_compute(cs, env, &case_i->car, src_obj.count, &case_value) {
+          if !st_const_compute(clq, env, &case_i->car, src_obj.count, &case_value) {
             return false;
           }
           case_matches bool;
@@ -567,13 +573,13 @@ func st_values_selfcontained_equal(plat *platform_info, a *st_value, b *st_value
   return array_equal(&a->words, &b->words);
 }
 
-func st_const_compute(cs *checkstate, env *st_env, c *gr_const, length u32, out *st_value) bool {
+func st_const_compute(clq *clqueue, env *st_env, c *gr_const, length u32, out *st_value) bool {
   switch c {
   case &ConstInt(b bigint):
     *out = st_bigint_to_value(&env->plat, length, b);
   case &ConstDef(ip instpair):
     val *st_value;
-    if !st_eval_def(cs, ip.ent_id, ip.inst_id, &val) {
+    if !ensure_def_inst_evaled(clq->cs, clq, ip.ent_id, ip.inst_id, &val) {
       return false;
     }
     *out = *val;
