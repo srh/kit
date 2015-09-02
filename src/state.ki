@@ -257,104 +257,6 @@ deftype cu_typrop struct {
   props type_properties;
 };
 
-func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
-  name sym = ref_deftype_entry(cs, ent_id)->name;
-  switch &ref_deftype_inst(cs, inst_id)->parms {
-    case &NoParms(v void): {
-      return ~TeName({name, Has({ent_id, inst_id})});
-    }
-    case &HasParms(a array[cu_typeexpr]): {
-      converted array[te_typeexpr];
-      n size = count(&a);
-      for i size = 0; i < n; i = i + 1 {
-        push(&converted, ref(&a, i)->~);
-      }
-      return ~TeApp({embox(TePureName(name)), converted, Has({ent_id, inst_id})});
-    }
-  }
-}
-
-// True if the type is trivial enough to be used in a def.  In other words, it has trivial copy/move/destroy constructors, but initialization could be non-trivial.  (It could default-initialize to a nonzero value.)
-func is_defwise_trivial(props *type_properties) bool {
-  return isTrivial(props->move_behavior) && isTrivial(props->copy_behavior) && isTrivial(props->destroy_behavior);
-}
-
-func lookup_explicit_method_or_lack_thereof(cs *checkstate, clq *clqueue, fntype *te_typeexpr, impl_name sym, behavior_out *derived_method_behavior) bool {
-  res match_def_res;
-  gp genparms = NoParms(void);
-  if !match_def(cs, impl_name, &gp, fntype, &res) {
-    return false;
-  }
-
-  switch &res {
-    case &NoMatch(v void): {
-      *behavior_out = DerivedMethodAbsent(void);
-      return true;
-    }
-    case &MultiMatch(v void): {
-      ERR(_u8("Multiple explicit methods '"), lookup(cs->im, impl_name), _u8("'"));
-      return false;
-    }
-    case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
-      inst_id def_inst_id;
-      if !make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
-        return false;
-      }
-      *behavior_out = DerivedMethodExplicit({m.ent, inst_id});
-      return true;
-    }
-  }
-}
-
-func to_defclass_properties(cs *checkstate, clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, props type_properties, out *type_properties) bool {
-  ret type_properties = props;
-  switch a {
-    case DefaultCopyMoveDestroy(v void): {
-      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
-      ptrtype te_typeexpr = ptr_type(cs, type.~);
-      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_init"))), &ret.init_behavior) {
-        return false;
-      }
-    }
-    case DefaultMove(v void): {
-      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
-      ptrtype te_typeexpr = ptr_type(cs, type.~);
-      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_init"))), &ret.init_behavior) {
-        return false;
-      }
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, from_u8(_u8("do_copy"))), &ret.copy_behavior) {
-        return false;
-      }
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_destroy"))), &ret.destroy_behavior) {
-        return false;
-      }
-    }
-    case NoDefaults(v void): {
-      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
-      ptrtype te_typeexpr = ptr_type(cs, type.~);
-      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_init"))), &ret.init_behavior) {
-        return false;
-      }
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, from_u8(_u8("do_move"))), &ret.move_behavior) {
-        return false;
-      }
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, from_u8(_u8("do_copy"))), &ret.copy_behavior) {
-        return false;
-      }
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_destroy"))), &ret.destroy_behavior) {
-        return false;
-      }
-    }
-  }
-  *out = ret;
-  return true;
-}
-
 deftype deftype_inst_rhs_info struct {
   rhs_cu cu_typeexpr;
   rhs_props type_properties;
@@ -585,4 +487,103 @@ access depth_rewinder {
     cs->instantiation_depth = depth;
     return true;
   }
+}
+
+
+func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
+  name sym = ref_deftype_entry(cs, ent_id)->name;
+  switch &ref_deftype_inst(cs, inst_id)->parms {
+    case &NoParms(v void): {
+      return ~TeName({name, Has({ent_id, inst_id})});
+    }
+    case &HasParms(a array[cu_typeexpr]): {
+      converted array[te_typeexpr];
+      n size = count(&a);
+      for i size = 0; i < n; i = i + 1 {
+        push(&converted, ref(&a, i)->~);
+      }
+      return ~TeApp({embox(TePureName(name)), converted, Has({ent_id, inst_id})});
+    }
+  }
+}
+
+// True if the type is trivial enough to be used in a def.  In other words, it has trivial copy/move/destroy constructors, but initialization could be non-trivial.  (It could default-initialize to a nonzero value.)
+func is_defwise_trivial(props *type_properties) bool {
+  return isTrivial(props->move_behavior) && isTrivial(props->copy_behavior) && isTrivial(props->destroy_behavior);
+}
+
+func lookup_explicit_method_or_lack_thereof(cs *checkstate, clq *clqueue, fntype *te_typeexpr, impl_name sym, behavior_out *derived_method_behavior) bool {
+  res match_def_res;
+  gp genparms = NoParms(void);
+  if !match_def(cs, impl_name, &gp, fntype, &res) {
+    return false;
+  }
+
+  switch &res {
+    case &NoMatch(v void): {
+      *behavior_out = DerivedMethodAbsent(void);
+      return true;
+    }
+    case &MultiMatch(v void): {
+      ERR(_u8("Multiple explicit methods '"), lookup(cs->im, impl_name), _u8("'"));
+      return false;
+    }
+    case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
+      inst_id def_inst_id;
+      if !make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
+        return false;
+      }
+      *behavior_out = DerivedMethodExplicit({m.ent, inst_id});
+      return true;
+    }
+  }
+}
+
+func to_defclass_properties(cs *checkstate, clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, props type_properties, out *type_properties) bool {
+  ret type_properties = props;
+  switch a {
+    case DefaultCopyMoveDestroy(v void): {
+      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      ptrtype te_typeexpr = ptr_type(cs, type.~);
+      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_init"))), &ret.init_behavior) {
+        return false;
+      }
+    }
+    case DefaultMove(v void): {
+      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      ptrtype te_typeexpr = ptr_type(cs, type.~);
+      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_init"))), &ret.init_behavior) {
+        return false;
+      }
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, from_u8(_u8("do_copy"))), &ret.copy_behavior) {
+        return false;
+      }
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_destroy"))), &ret.destroy_behavior) {
+        return false;
+      }
+    }
+    case NoDefaults(v void): {
+      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      ptrtype te_typeexpr = ptr_type(cs, type.~);
+      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_init"))), &ret.init_behavior) {
+        return false;
+      }
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, from_u8(_u8("do_move"))), &ret.move_behavior) {
+        return false;
+      }
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, from_u8(_u8("do_copy"))), &ret.copy_behavior) {
+        return false;
+      }
+      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, from_u8(_u8("do_destroy"))), &ret.destroy_behavior) {
+        return false;
+      }
+    }
+  }
+  *out = ret;
+  return true;
 }
