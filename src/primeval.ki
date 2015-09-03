@@ -25,11 +25,52 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
   }
 
   switch op->op_action {
-  case NumAdd(void):
+  case NumAdd(v void):
     return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) + get(&ps, 1), op);
+  case NumSub(v void):
+    return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) - get(&ps, 1), op);
+  case NumMul(v void):
+    return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) * get(&ps, 1), op);
+  case NumDiv(v void):
+    // TODO: This does not have x86-compatible (or platform-compatible) behavior for signed division.
+    div_result bigint;
+    mod_discard bigint;
+    if !st_divmod(get(&ps, 0), get(&ps, 1), op, &div_result, &mod_discard) {
+      return false;
+    }
+    return st_num_rangechecked_output(clq, env, retvalref, div_result, op);
+  case NumMod(v void):
+    // TODO: This does not have x86-compatible (or platform-compatible) behavior for signed division.
+    div_discard bigint;
+    mod_result bigint;
+    if !st_divmod(get(&ps, 0), get(&ps, 1), op, &div_discard, &mod_result) {
+      return false;
+    }
+    return st_num_rangechecked_output(clq, env, retvalref, mod_result, op);
+  case NumNegate(v void):
+    return st_num_rangechecked_output(clq, env, retvalref, - get(&ps, 0), op);
   default:
     return TODO();
   }
+}
+
+func st_divmod(x bigint, y bigint, op *primitive_numeric_op, div_out *bigint, mod_out *bigint) bool {
+  if y == ~ @[u32] 0 {
+    ERR(_u8("Static eval: divide by zero"));
+    return false;
+  }
+  switch op->op_numtraits.repr {
+  case Unsigned(v void): { }
+  case SignedTwos(v void):
+    if y == - (@[bigint] ~ @[u32] 1) && x == op->op_numtraits.minval {
+      ERR(_u8("Static eval: divide minval by -1"));
+      return false;
+    }
+  }
+  dm tup[bigint, bigint] = divmod(x, y);
+  *div_out = dm.car;
+  *mod_out = dm.cdr;
+  return true;
 }
 
 func st_num_rangechecked_output(clq *clqueue, env *st_env, retvalref st_obj_ref, num bigint, op *primitive_numeric_op) bool {
