@@ -43,7 +43,7 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
   if !check_module(&cs, intern(&im, testmodule_name())) {
     print(Stdout(), _u8("FAIL\n"));
     fflush(Stdout());
-    ctx->fail = true;
+    ctx->failures = ctx->failures + 1;
   } else {
     print(Stdout(), _u8("PASS\n"));
     fflush(Stdout());
@@ -59,7 +59,7 @@ func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
   if check_module(&cs, intern(&im, testmodule_name())) {
     print(Stdout(), _u8("FAIL\n"));
     fflush(Stdout());
-    ctx->fail = true;
+    ctx->failures = ctx->failures + 1;
   } else {
     print(Stdout(), _u8("PASS\n"));
     fflush(Stdout());
@@ -69,7 +69,7 @@ func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
 // TODO: Make test output not go directly to stdout/stderr.
 
 deftype check_ctx struct {
-  fail bool;
+  failures u32;
 };
 
 
@@ -1179,11 +1179,11 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
 }
 
 
-func test_check() bool {
+func test_check() tup[bool, u32] {
   ctx check_ctx;
   test_check_basic_cases(&ctx);
   test_check_lambda_cases(&ctx);
   test_check_more_cases(&ctx);
   test_check_yet_more_cases(&ctx);
-  return !ctx.fail;
+  return cons(ctx.failures == 0, ctx.failures);
 }

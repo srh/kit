@@ -15,11 +15,11 @@ export func main(argc i32, argv **u8) i32 {
     print(Stdout(), _u8("parse_test FAIL\n"));
   }
   fflush(Stdout());
-  test_check_passed bool = test_check();
-  if test_check_passed {
+  test_check_res tup[bool, u32] = test_check();
+  if test_check_res.car {
     print(Stdout(), _u8("check_test passes\n"));
   } else {
-    print(Stdout(), _u8("check_test FAIL\n"));
+    print(Stdout(), _u8("check_test FAIL ("), to_u8str(test_check_res.cdr), _u8(" failures)\n"));
   }
   fflush(Stdout());
   test_bigint_passed bool = test_bigint();
@@ -29,7 +29,7 @@ export func main(argc i32, argv **u8) i32 {
     print(Stdout(), _u8("check_bigint FAIL\n"));
   }
   fflush(Stdout());
-  if test_parse_passed && test_check_passed && test_bigint_passed {
+  if test_parse_passed && test_check_res.car && test_bigint_passed {
     print(Stdout(), _u8("All tests PASS!\n"));
   } else {
     print(Stdout(), _u8("FAIL FAIL FAIL\n"));
