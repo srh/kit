@@ -296,7 +296,7 @@ func test_check_lambda_cases(ctx *check_ctx) void {
     _u8("def x i32 = 3;\n"
         "def y u32 = 3 + 4;\n"
         "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"));
-  // TODO: This should fail because you can't evaluate z(3) statically.
+  // TODO: This should fail because you can't evaluate z(3) statically.  (We can't?)
   run_check_test(ctx, "c037",
     _u8("def x i32 = z(3);\n"
         "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"));

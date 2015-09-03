@@ -186,6 +186,14 @@ access bigint {
     return {lo, x - y * lo};
   }
 
+  func `/`(x bigint, y bigint) bigint {
+    return divmod(x, y).car;
+  }
+
+  func `%`(x bigint, y bigint) bigint {
+    return divmod(x, y).cdr;
+  }
+
   func add_oflow(x u32, y u32, sum_out *u32, carry_out *u32) void {
     xl u32 = (x & 0xFFFF);
     xh u32 = (x >> 16);

@@ -16,8 +16,8 @@ func st_eval_prim_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_re
 }
 
 func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, op *primitive_numeric_op) bool {
-  params array[bigint];
-  if !st_nums(env, paramorefs, op, &params) {
+  ps array[bigint];
+  if !st_nums(env, paramorefs, op, &ps) {
     return false;
   }
   if retvalref.count != op->op_size {
@@ -26,10 +26,35 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
 
   switch op->op_action {
   case NumAdd(void):
-    return TODO();
+    return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) + get(&ps, 1), op);
   default:
     return TODO();
   }
+}
+
+func st_num_rangechecked_output(clq *clqueue, env *st_env, retvalref st_obj_ref, num bigint, op *primitive_numeric_op) bool {
+  if num < op->op_numtraits.minval || num > op->op_numtraits.maxval {
+    if op->op_numtraits.trap_overflow {
+      ERR(_u8("Result out of range."));
+      return false;
+    }
+    // Make sure we know to handle some weird reprs later when we have them.
+    switch op->op_numtraits.repr {
+    case Unsigned(void):
+      // do nothing
+    case SignedTwos(void):
+      // do nothing
+    }
+    addand bigint = incr(op->op_numtraits.maxval - op->op_numtraits.minval);
+    num = ((num - op->op_numtraits.minval) % addand) + op->op_numtraits.minval;
+  }
+
+  val st_value;
+  if !st_bigint_to_value_twos(&env->plat, op->op_size, num, &val) {
+    ice(_u8("st_num_rangechecked_input just rangechecked bigint, could not convert to st_value."));
+  }
+  obj_write(env, retvalref, &val);
+  return true;
 }
 
 func st_nums(env *st_env, paramorefs *array[st_obj_ref], op *primitive_numeric_op, out *array[bigint]) bool {
