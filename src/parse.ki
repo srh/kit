@@ -802,6 +802,7 @@ func build_binop_expr(im *identmap, op ast_ident, lhs ast_expr, rhs ast_expr) as
   if op.value == im->cym.assignmentsym {
     return mk(Assignment({None(), embox(lhs), embox(rhs)}));
   } else {
+    // TODO: Handle logical short-circuiting ops.
     return mk(Funcall({embox(consume(mk(NameExpr(mk(op, None()))))),
                        mk_array(consume(lhs), consume(rhs))}));
   }

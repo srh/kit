@@ -318,7 +318,7 @@ deftype graphed_fn_body struct {
 };
 
 deftype prim_fn_body struct {
-  // TODO: Something here.
+  op primitive_op;
 };
 
 defenum fn_body_entry {
@@ -375,7 +375,7 @@ deftype def_inst_rhs_expr struct {
 
 defenum def_inst_rhs {
   // Prim defs... don't have an rhs to check.
-  InstRhsPrim void;
+  InstRhsPrim primitive_op;
   // Extern defs don't have an rhs.
   InstRhsExtern void;
   InstRhsExpr def_inst_rhs_expr;
@@ -416,7 +416,7 @@ deftype def_nonprim struct {
 
 defenum def_definition {
   // The def is a primitive (+, -, etc), has no RHS.
-  DefnPrim void;
+  DefnPrim primitive_op;
   DefnHasRhs def_nonprim;
   DefnMagic def_magic;
 };

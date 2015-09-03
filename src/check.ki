@@ -243,7 +243,7 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) b
     case &NotComputed(v void): {
       ent->converted_typeexpr = BeganComputing();
       switch &ent->definition {
-        case &DefnPrim(v2 void): {
+        case &DefnPrim(op primitive_op): {
           ice(_u8("def_entry for primitive has converted_typeexpr NotComputed."));
           return fake();
         }
@@ -349,8 +349,8 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
   }
   rhs def_inst_rhs;
   switch &ent->definition {
-    case &DefnPrim(v void): {
-      rhs = InstRhsPrim(void);
+    case &DefnPrim(op primitive_op): {
+      rhs = InstRhsPrim(op);
     }
     case &DefnHasRhs(np def_nonprim): {
       switch np.tl {
@@ -454,7 +454,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
       }
       inst->status = BeganCheckingRhs(void);
       switch &inst->rhs {
-        case &InstRhsPrim(v2 void): {
+        case &InstRhsPrim(op primitive_op): {
           // Do nothing.
         }
         case &InstRhsExtern(v2 void): {
