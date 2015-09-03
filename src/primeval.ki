@@ -3,7 +3,7 @@ import eval;
 func st_eval_prim_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, prent *prim_fn_body) bool {
   switch &prent->op {
   case &PrimNum(a primitive_numeric_op):
-    return TODO();
+    return st_eval_prim_num(clq, env, paramorefs, retvalref, &a);
   case &PrimNumCompare(a primitive_numeric_comparison_op):
     return TODO();
   case &PrimLogical(a primitive_logical_op):
@@ -13,4 +13,50 @@ func st_eval_prim_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_re
   case &PrimConversion(a primitive_conversion_op):
     return TODO();
   }
+}
+
+func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, op *primitive_numeric_op) bool {
+  params array[bigint];
+  if !st_nums(env, paramorefs, op, &params) {
+    return false;
+  }
+  switch op->op_action {
+  case NumAdd(void):
+    return TODO();
+  default:
+    return TODO();
+  }
+}
+
+func st_nums(env *st_env, paramorefs *array[st_obj_ref], op *primitive_numeric_op, out *array[bigint]) bool {
+  nparams size = count(paramorefs);
+  if op_arity(op->op_action) != ~nparams {
+    ice(_u8("st_nums numeric op bad arity"));
+  }
+  ret array[bigint];
+  for i size = 0; i < nparams; i = i + 1 {
+    oref st_obj_ref = get(paramorefs, i);
+    if oref.count != op->op_size {
+      ice(_u8("st_nums bad operand size"));
+    }
+    val st_value;
+    if !obj_read(env, oref, &val) {
+      return false;
+    }
+
+    num bigint;
+    switch op->op_numtraits.repr {
+    case Unsigned(void):
+      if !st_value_unsigned_as_bigint(&env->plat, &val, &num) {
+        return false;
+      }
+    case SignedTwos(void):
+      if !st_value_signed_twos_as_bigint(&env->plat, &val, &num) {
+        return false;
+      }
+    }
+    push(&ret, num);
+  }
+  *out = ret;
+  return true;
 }

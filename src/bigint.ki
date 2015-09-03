@@ -231,6 +231,16 @@ access bigint {
     return x + - y;
   }
 
+  func `<<`(x bigint, y u32) bigint {
+    // TODO: Improve this implementation.
+    two bigint = ~ @[u32] 2;
+    while y != 0 {
+      x = x * two;
+      y = y - 1;
+    }
+    return x;
+  }
+
   func `==`(x bigint, y bigint) bool {
     return x.negative == y.negative && array_equal(&x.parts, &y.parts);
   }

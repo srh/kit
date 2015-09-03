@@ -666,6 +666,27 @@ func st_value_unsigned_as_bigint(plat *platform_info, val *st_value, out *bigint
   return true;
 }
 
+func st_value_signed_twos_as_bigint(plat *platform_info, val *st_value, out *bigint) bool {
+  words array[u32];
+  if !st_value_self_contained(plat, val, &words) {
+    return false;
+  }
+
+  check_littleendian(plat);
+  check(val->length > 0);
+  // Not _so_ simple when little-endian.
+  bitlength u32 = val->length * plat->bnno_size;
+  index u32 = bitlength - 1;
+  negative bool = (0 != (get(&words, ~(index / 32)) & (@[u32] 1 << (index % 32))));
+  // Take the positive version of the value, subtract 2-to-the-bitlength if negative.
+  tmp bigint = squash(false, &words);
+  if negative {
+    tmp = tmp - ((@[bigint] ~ @[u32]1) << bitlength);
+  }
+  *out = tmp;
+  return true;
+}
+
 func st_value_self_contained(plat *platform_info, val *st_value, out *array[u32]) bool {
   if !is_selfcontained(val) {
     ERR(_u8("Value is not self-contained, expecting data."));
