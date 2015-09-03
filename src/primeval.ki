@@ -20,6 +20,10 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
   if !st_nums(env, paramorefs, op, &params) {
     return false;
   }
+  if retvalref.count != op->op_size {
+    ice(_u8("st_eval_prim_num bad retvalref size"));
+  }
+
   switch op->op_action {
   case NumAdd(void):
     return TODO();
