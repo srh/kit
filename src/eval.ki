@@ -381,6 +381,9 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed, out
           }
 
           subenv st_env = mk_env(env->pool, env->plat, count(&fnent.graph.gr.cells));
+          for i size = 0; i < nparams; i = i + 1 {
+            set(&subenv.framecells, get(&fnent.argcells, i).~, Has(get(&paramorefs, i)));
+          }
           if !st_eval_frame_regraphed(clq, &subenv, &fnent.graph, &retvalref) {
             return false;
           }
