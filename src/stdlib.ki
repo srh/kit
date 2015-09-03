@@ -196,6 +196,10 @@ func[S, T] cons(s S, t T) tup[S, T] {
   return ret;
 }
 
+func[S, T] `==`(x tup[S, T], y tup[S, T]) bool {
+  return x.car == y.car && x.cdr == y.cdr;
+}
+
 func[S, T] build_u8str(r *array[u8], p *tup[S, T]) void {
   build_u8str(r, &p->car);
   build_u8str(r, &p->cdr);
