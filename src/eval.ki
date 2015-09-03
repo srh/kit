@@ -592,7 +592,7 @@ func st_values_selfcontained_equal(plat *platform_info, a *st_value, b *st_value
 func st_const_compute(clq *clqueue, env *st_env, c *gr_const, length u32, out *st_value) bool {
   switch c {
   case &ConstInt(b bigint):
-    *out = st_bigint_to_value(&env->plat, length, b);
+    *out = st_bigint_to_value_unsigned(&env->plat, length, b);
   case &ConstDef(ip instpair):
     val *st_value;
     if !ensure_def_inst_evaled(clq->cs, clq, ip.ent_id, ip.inst_id, &val) {
@@ -626,7 +626,20 @@ func st_offset_compute(env *st_env, gro gr_offset, out *u32) bool {
   return true;
 }
 
-func st_bigint_to_value(plat *platform_info, length u32, b bigint) st_value {
+func st_bigint_to_value_unsigned(plat *platform_info, length u32, b bigint) st_value {
+  if is_negative(&b) {
+    ice(_u8("st_bigint_to_value_unsigned sees negative bigint"));
+  }
+  ret st_value;
+  if !st_bigint_to_value_twos(plat, length, b, &ret) {
+    ice(_u8("ConstInt too big for type"));
+  }
+  return ret;
+}
+
+// Signed or unsigned, this works!  Assumes we did a minval/maxval range check elsewhere.
+// TODO: Separate signed/unsigned cases rigorously.
+func st_bigint_to_value_twos(plat *platform_info, length u32, b bigint, out *st_value) bool {
   check_littleendian(plat);
   ret st_value = mk_st_value(plat, length);
   i u32 = 0;
@@ -647,11 +660,12 @@ func st_bigint_to_value(plat *platform_info, length u32, b bigint) st_value {
   for ; i < end; i = i + 1 {
     bnno u32 = bnno_index_bigint(plat, &b, i);
     if bnno != expected {
-      ice(_u8("ConstInt too big for type"));
+      return false;
     }
   }
 
-  return ret;
+  *out = ret;
+  return true;
 }
 
 func st_value_unsigned_as_bigint(plat *platform_info, val *st_value, out *bigint) bool {
