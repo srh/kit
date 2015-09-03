@@ -290,10 +290,10 @@ func st_eval_def(clq *clqueue, ent def_entry_id, inst_id def_inst_id, out **st_v
       pool st_objpool = mk_objpool();
       env st_env = mk_env(&pool, clq->cs->platform, count(&fg->gr.cells));
 
-      result st_obj_ref;
-      if !st_eval_frame_regraphed(clq, &env, fg, &result) {
+      if !st_eval_frame_regraphed(clq, &env, fg) {
         return false;
       }
+      result st_obj_ref = cell_obj_ref(&env, fg->cell);
       value st_value;
       if !obj_read(&env, result, &value) {
         return false;
@@ -330,7 +330,7 @@ defenum gr_stackent {
   EvalOp gr_num;
 };
 
-func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed, out *st_obj_ref) bool {
+func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) bool {
   // A stack of gr_num's to evaluate, in order.
   stack array[gr_stackent];
   push(&stack, EvalOpAndPrecs(fg->gn));
@@ -373,7 +373,9 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed, out
           set(&env->framecells, c.~, None());
         }
 
-        retvalref st_obj_ref;
+        st_maybe_init_static(&fg->gr, env, a.retcell);
+        retvalref st_obj_ref = cell_obj_ref(env, a.retcell);
+
         switch ref_fn_body(clq->cs, funcval.fnid) {
         case &GraphedFnBody(fnent graphed_fn_body):
           if nparams != count(&fnent.argcells) {
@@ -384,15 +386,15 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed, out
           for i size = 0; i < nparams; i = i + 1 {
             set(&subenv.framecells, get(&fnent.argcells, i).~, Has(get(&paramorefs, i)));
           }
-          if !st_eval_frame_regraphed(clq, &subenv, &fnent.graph, &retvalref) {
+          set(&subenv.framecells, fnent.graph.cell.~, Has(retvalref));
+
+          if !st_eval_frame_regraphed(clq, &subenv, &fnent.graph) {
             return false;
           }
         case &PrimFnBody(prent prim_fn_body):
           ERR(_u8("No primitive function body can be evaled."));
           return false;
         }
-
-        set(&env->framecells, a.retcell.~, Has(retvalref));
 
       case &GrMemCopy(a gr_memcopy):
         st_maybe_init_static(&fg->gr, env, a.dest);
@@ -544,7 +546,6 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed, out
     }
   }
 
-  *out = cell_obj_ref(env, fg->cell);
   return true;
 }
 

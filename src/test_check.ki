@@ -303,8 +303,8 @@ func test_check_lambda_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c038",
     _u8("def y i32 = -x;\n"
         "def x i32 = -3;\n"));
-  // TODO: This should fail because of cyclic reference.
-  run_check_test(ctx, "c039",
+  // Fails because of cyclic reference.
+  run_check_negtest(ctx, "c039",
     _u8("def y i32 = -x;\n"
         "def x i32 = -y;\n"));
 }
