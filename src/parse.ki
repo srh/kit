@@ -801,6 +801,10 @@ func build_unop_expr(im *identmap, op ast_ident, rhs ast_expr) ast_expr {
 func build_binop_expr(im *identmap, op ast_ident, lhs ast_expr, rhs ast_expr) ast_expr {
   if op.value == im->cym.assignmentsym {
     return mk(Assignment({None(), embox(lhs), embox(rhs)}));
+  } else if op.value == im->cym.logical_and_sym {
+    return mk(LogicalConjunction({false, embox(consume(lhs)), embox(consume(rhs))}));
+  } else if op.value == im->cym.logical_or_sym {
+    return mk(LogicalConjunction({true, embox(consume(lhs)), embox(consume(rhs))}));
   } else {
     // TODO: Handle logical short-circuiting ops.
     return mk(Funcall({embox(consume(mk(NameExpr(mk(op, None()))))),

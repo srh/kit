@@ -68,6 +68,13 @@ deftype ast_funcall struct {
   params array[ast_expr_consume];
 };
 
+deftype ast_logical_conjunction struct {
+  // True if this is a '||' expr, false if '&&'.
+  is_logical_or bool;
+  lhs box[ast_expr_consume];
+  rhs box[ast_expr_consume];
+};
+
 deftype ast_assignment_comparecells struct {
   ip instpair;
   funcell cell_num;
@@ -760,6 +767,7 @@ defenum ast_expr_enum {
   CharLiteral ast_char_literal;
   StringLiteral ast_string_literal;
   Funcall ast_funcall;
+  LogicalConjunction ast_logical_conjunction;
   Assignment ast_assignment;
   AddressOf ast_addressof;
   Deref ast_deref;

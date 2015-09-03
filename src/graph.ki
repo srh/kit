@@ -679,6 +679,9 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
     case &Funcall(a ast_funcall): {
       return gr_funcall(cs, gr, x, &a, out);
     }
+    case &LogicalConjunction(a ast_logical_conjunction): {
+      return gr_logical_conjunction(cs, gr, x, &a, out);
+    }
     case &Assignment(a ast_assignment): {
       return gr_assignment(cs, gr, x, &a, out);
     }
@@ -913,6 +916,37 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       return true;
     }
   }
+}
+
+func gr_logical_conjunction(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_logical_conjunction, out *gr_num) bool {
+  lhs_dep gr_num;
+  if !gr_expr_consume(cs, gr, oo(&a->lhs), &lhs_dep) {
+    return false;
+  }
+  rhs_dep gr_num;
+  if !gr_expr_consume(cs, gr, oo(&a->rhs), &rhs_dep) {
+    return false;
+  }
+
+  rhs_cp_gn gr_num = add_node(gr, node(mk_array(rhs_dep), GrMemCopy({rval_cell(x), result_cell(oo(&a->rhs))})));
+  rhs_dead_gn gr_num = add_node(gr, node(mk_array(rhs_cp_gn), GrDead({result_cell(oo(&a->rhs))})));
+
+  lhs_cp_gn gr_num = add_node(gr, node0(GrMemCopy({rval_cell(x), result_cell(oo(&a->lhs))})));
+  lhs_dead_gn gr_num = add_node(gr, node(mk_array(lhs_cp_gn), GrDead({result_cell(oo(&a->lhs))})));
+
+  cases array[tup[gr_const, gr_num]];
+  short_circuit_case gr_const;
+  eval_rhs_case gr_const;
+  if a->is_logical_or {
+    short_circuit_case = ConstInt(~ @[u32] 1);
+    eval_rhs_case = ConstInt(~ @[u32] 0);
+  } else {
+    short_circuit_case = ConstInt(~ @[u32] 0);
+    eval_rhs_case = ConstInt(~ @[u32] 1);
+  }
+  bn gr_num = add_node(gr, node(mk_array(lhs_dep), GrBranch({result_cell(oo(&a->lhs)), mk_array({short_circuit_case, lhs_dead_gn}, {eval_rhs_case, rhs_dead_gn}), None()})));
+  *out = bn;
+  return true;
 }
 
 func gr_funcall(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_funcall, out *gr_num) bool {

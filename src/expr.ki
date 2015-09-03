@@ -625,6 +625,10 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       return check_expr_funcall(es, ai, &a, pt, x);
     }
 
+    case &LogicalConjunction(a ast_logical_conjunction): {
+      return check_expr_logical_conjunction(es, &a, pt, x);
+    }
+
     case &Assignment(a ast_assignment): {
       // We check the lhs independently of the rhs, deliberately, to ensure clarity.
       if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), pt) {
@@ -1783,6 +1787,26 @@ func lookup_field_from_list(cs *checkstate, clq *clqueue, fields *array[te_varde
 
   *fieldtype_out = ~ ref(fields, psd.index)->type;
   *offset_out = psd.offset;
+  return true;
+}
+
+func check_expr_logical_conjunction(es *framescope, a *ast_logical_conjunction, pt *te_typeexpr, x *ast_expr) bool {
+  type cu_typeexpr;
+  props type_properties;
+  compute_prim(es->ds, primitive_bool_type(es->cs), &type, &props);
+
+  unified te_typeexpr;
+  if !unify_types(pt, &type.~, &unified) {
+    ERR(_u8("logical conjunction in bad place"));
+    return false;
+  }
+  if !check_expr_consume(es, oo(&a->lhs), &type.~) {
+    return false;
+  }
+  if !check_expr_consume(es, oo(&a->rhs), &type.~) {
+    return false;
+  }
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, type, props)), type, props)));
   return true;
 }
 

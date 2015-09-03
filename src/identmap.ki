@@ -80,6 +80,8 @@ deftype common_syms struct {
   uee_sym sym;
   derefsym sym;
   addressofsym sym;
+  logical_and_sym sym;
+  logical_or_sym sym;
   assignmentsym sym;
   convertsym sym;
   magic_init sym;
@@ -113,6 +115,8 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.uee_sym = intern(im, from_u8(_u8("U")));
   ret.derefsym = intern(im, from_u8(_u8("*")));
   ret.addressofsym = intern(im, from_u8(_u8("&")));
+  ret.logical_and_sym = intern(im, from_u8(_u8("&&")));
+  ret.logical_or_sym = intern(im, from_u8(_u8("||")));
   ret.assignmentsym = intern(im, from_u8(_u8("=")));
   ret.convertsym = intern(im, from_u8(_u8("~")));
   ret.magic_init = intern(im, from_u8(_u8("magic_init")));
