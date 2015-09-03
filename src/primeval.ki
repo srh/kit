@@ -1,6 +1,16 @@
 import eval;
 
 func st_eval_prim_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, prent *prim_fn_body) bool {
-  ERR(_u8("No primitive function body can be evaled."));
-  return TODO();
+  switch &prent->op {
+  case &PrimNum(a primitive_numeric_op):
+    return TODO();
+  case &PrimNumCompare(a primitive_numeric_comparison_op):
+    return TODO();
+  case &PrimLogical(a primitive_logical_op):
+    return TODO();
+  case &PrimPtrCompare(a primitive_ptr_comparison_op):
+    return TODO();
+  case &PrimConversion(a primitive_conversion_op):
+    return TODO();
+  }
 }

@@ -13,13 +13,24 @@ defenum primitive_numeric_op_action {
   NumBitNot void;
   NumShiftLeft void;
   NumShiftRight void;
-  NumEq void;
-  NumNe void;
-  NumLt void;
-  NumGt void;
-  NumLe void;
-  NumGe void;
 };
+
+defenum primitive_comparison_op_action {
+  CmpEq void;
+  CmpNe void;
+  CmpLt void;
+  CmpGt void;
+  CmpLe void;
+  CmpGe void;
+};
+
+func op_arity(act primitive_numeric_op_action) u32 {
+  switch act {
+  case NumNegate(v void): return 1;
+  case NumBitNot(v void): return 1;
+  default: return 2;
+  }
+}
 
 defenum primitive_logical_op {
   LogicalNot void;
@@ -27,13 +38,8 @@ defenum primitive_logical_op {
   BoolNe void;
 };
 
-defenum primitive_ptr_op {
-  PtrEq void;
-  PtrNe void;
-  PtrLt void;
-  PtrGt void;
-  PtrLe void;
-  PtrGe void;
+deftype primitive_ptr_comparison_op struct {
+  op_action primitive_comparison_op_action;
 };
 
 deftype primitive_numeric_op struct {
@@ -41,6 +47,13 @@ deftype primitive_numeric_op struct {
   op_size u32;
   op_numtraits numeric_traits;
   op_action primitive_numeric_op_action;
+};
+
+deftype primitive_numeric_comparison_op struct {
+  // Size in bnnos.
+  op_size u32;
+  op_numtraits numeric_traits;
+  op_action primitive_comparison_op_action;
 };
 
 // This conversion op checks overflow depending on both from_numtraits and to_numtraits.
@@ -54,8 +67,9 @@ deftype primitive_conversion_op struct {
 
 defenum primitive_op {
   PrimNum primitive_numeric_op;
+  PrimNumCompare primitive_numeric_comparison_op;
   PrimLogical primitive_logical_op;
-  PrimPtr primitive_ptr_op;
+  PrimPtrCompare primitive_ptr_comparison_op;
   PrimConversion primitive_conversion_op;
 };
 
@@ -208,6 +222,10 @@ func mk_op(traits integral_traits, action primitive_numeric_op_action) primitive
   return PrimNum({traits.flat.size, traits.numeric, action});
 }
 
+func mk_op(traits integral_traits, action primitive_comparison_op_action) primitive_op {
+  return PrimNumCompare({traits.flat.size, traits.numeric, action});
+}
+
 func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) void {
   add_simple_primitive(cs, name, traits.flat);
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("+"))), name, mk_op(traits, NumAdd(void)));
@@ -221,12 +239,12 @@ func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) vo
   add_unop_primitive(cs, intern(cs->im, from_u8(_u8("^"))), name, mk_op(traits, NumBitNot(void)));
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8("<<"))), name, mk_op(traits, NumShiftLeft(void)));
   add_binop_primitive(cs, intern(cs->im, from_u8(_u8(">>"))), name, mk_op(traits, NumShiftRight(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), name, mk_op(traits, NumEq(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), name, mk_op(traits, NumNe(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<"))), name, mk_op(traits, NumLt(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">"))), name, mk_op(traits, NumGt(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<="))), name, mk_op(traits, NumLe(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">="))), name, mk_op(traits, NumGe(void)));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), name, mk_op(traits, CmpEq(void)));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), name, mk_op(traits, CmpNe(void)));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<"))), name, mk_op(traits, CmpLt(void)));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">"))), name, mk_op(traits, CmpGt(void)));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<="))), name, mk_op(traits, CmpLe(void)));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">="))), name, mk_op(traits, CmpGe(void)));
 
   switch traits.numeric.repr {
   case Unsigned(void):
@@ -298,13 +316,13 @@ func add_pointer_primitive(cs *checkstate) void {
   add_pointer_primitive_type(cs);
   tee_type te_typeexpr = TeName({cs->im->cym.tee_sym, None()});
   bool_type te_typeexpr = primitive_bool_type(cs);
-  ent def_entry_id = add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), tee_generic(cs), ptr_type(cs, tee_type), PrimPtr(PtrEq(void)));
+  ent def_entry_id = add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), tee_generic(cs), ptr_type(cs, tee_type), PrimPtrCompare({CmpEq(void)}));
   set(&cs->prims.ptr_eq, ent);
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), tee_generic(cs), ptr_type(cs, tee_type), PrimPtr(PtrNe(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<"))), tee_generic(cs), ptr_type(cs, tee_type), PrimPtr(PtrLt(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">"))), tee_generic(cs), ptr_type(cs, tee_type), PrimPtr(PtrGt(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<="))), tee_generic(cs), ptr_type(cs, tee_type), PrimPtr(PtrLe(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">="))), tee_generic(cs), ptr_type(cs, tee_type), PrimPtr(PtrGe(void)));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), tee_generic(cs), ptr_type(cs, tee_type), PrimPtrCompare({CmpNe(void)}));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<"))), tee_generic(cs), ptr_type(cs, tee_type), PrimPtrCompare({CmpLt(void)}));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">"))), tee_generic(cs), ptr_type(cs, tee_type), PrimPtrCompare({CmpGt(void)}));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<="))), tee_generic(cs), ptr_type(cs, tee_type), PrimPtrCompare({CmpLe(void)}));
+  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">="))), tee_generic(cs), ptr_type(cs, tee_type), PrimPtrCompare({CmpGe(void)}));
 }
 
 func add_pointer_primitive_type(cs *checkstate) void {
