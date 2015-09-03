@@ -22,9 +22,6 @@ defenum primitive_numeric_op_action {
 };
 
 defenum primitive_logical_op {
-  // TODO: LogicalAnd and Or are not operators.
-  LogicalAnd void;
-  LogicalOr void;
   LogicalNot void;
   BoolEq void;
   BoolNe void;
@@ -245,9 +242,6 @@ func add_void_primitive(cs *checkstate) void {
 
 func add_bool_primitive(cs *checkstate) void {
   add_simple_primitive(cs, cs->im->cym.boolsym, cs->platform.booltraits);
-  // TODO: Oh no, these are short-circuiting logical operators.
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("&&"))), cs->im->cym.boolsym, PrimLogical(LogicalAnd(void)));
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("||"))), cs->im->cym.boolsym, PrimLogical(LogicalOr(void)));
   add_unop_primitive(cs, intern(cs->im, from_u8(_u8("!"))), cs->im->cym.boolsym, PrimLogical(LogicalNot(void)));
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), cs->im->cym.boolsym, PrimLogical(BoolEq(void)));
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), cs->im->cym.boolsym, PrimLogical(BoolNe(void)));
