@@ -8,8 +8,14 @@ import shp;
 import typeexpr;
 import u8ast;
 
+defenum numeric_representation {
+  Unsigned void;
+  SignedTwos void;
+};
+
 deftype numeric_traits struct {
-  signed bool;
+  repr numeric_representation;
+  trap_overflow bool;
   minval bigint;
   maxval bigint;
 };

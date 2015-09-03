@@ -42,17 +42,17 @@ defenum primitive_ptr_op {
 deftype primitive_numeric_op struct {
   // Size in bnnos.
   op_size u32;
-  op_signed bool;
+  op_numtraits numeric_traits;
   op_action primitive_numeric_op_action;
 };
 
-// TODO: This should use minval/maxval from numeric_traits, instead of assuming two's complement.  Maybe numeric_traits signed (and this signed field) should be a non-bool, should be "repr", with us using minval/maxval.
+// This conversion op checks overflow depending on both from_numtraits and to_numtraits.
 deftype primitive_conversion_op struct {
   // Size in bnnos.
   from_size u32;
-  from_signed bool;
+  from_numtraits numeric_traits;
   to_size u32;
-  to_signed bool;
+  to_numtraits numeric_traits;
 };
 
 defenum primitive_op {
@@ -104,7 +104,7 @@ func primitive_pointer_puretype(cs *checkstate) te_puretype {
 
 func add_conversion(cs *checkstate, from tup[sym, integral_traits], to tup[sym, integral_traits]) void {
   type te_typeexpr = fn_type(cs, TeName({from.car, None()}), TeName({to.car, None()}));
-  add_def_primitive(cs, cs->im->cym.convertsym, type, PrimConversion({from.cdr.flat.size, from.cdr.numeric.signed, to.cdr.flat.size, to.cdr.numeric.signed}));
+  add_def_primitive(cs, cs->im->cym.convertsym, type, PrimConversion({from.cdr.flat.size, from.cdr.numeric, to.cdr.flat.size, to.cdr.numeric}));
 }
 
 func add_integral_primitives(cs *checkstate) void {
@@ -208,7 +208,7 @@ func add_unop_primitive(cs *checkstate, oper sym, typename sym, op primitive_op)
 }
 
 func mk_op(traits integral_traits, action primitive_numeric_op_action) primitive_op {
-  return PrimNum({traits.flat.size, traits.numeric.signed, action});
+  return PrimNum({traits.flat.size, traits.numeric, action});
 }
 
 func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) void {
@@ -231,7 +231,10 @@ func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) vo
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<="))), name, mk_op(traits, NumLe(void)));
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">="))), name, mk_op(traits, NumGe(void)));
 
-  if traits.numeric.signed {
+  switch traits.numeric.repr {
+  case Unsigned(void):
+    // Do nothing.
+  case SignedTwos(void):
     add_unop_primitive(cs, intern(cs->im, from_u8(_u8("-"))), name, mk_op(traits, NumNegate(void)));
   }
 }
