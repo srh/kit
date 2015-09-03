@@ -361,8 +361,9 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         if !st_value_as_symbolref(&env->plat, &funvalue, &funcval) {
           return false;
         }
-        paramorefs array[st_obj_ref];
         nparams size = count(&a.params);
+        paramorefs array[st_obj_ref];
+        reserve(&paramorefs, nparams);
         for i size = 0; i < nparams; i = i + 1 {
           c cell_num = get(&a.params, i);
           param_oref st_obj_ref = cell_obj_ref(env, c);
@@ -376,23 +377,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         st_maybe_init_static(&fg->gr, env, a.retcell);
         retvalref st_obj_ref = cell_obj_ref(env, a.retcell);
 
-        switch ref_fn_body(clq->cs, funcval.fnid) {
-        case &GraphedFnBody(fnent graphed_fn_body):
-          if nparams != count(&fnent.argcells) {
-            ice(_u8("Param list length mismatches function argcells length"));
-          }
-
-          subenv st_env = mk_env(env->pool, env->plat, count(&fnent.graph.gr.cells));
-          for i size = 0; i < nparams; i = i + 1 {
-            set(&subenv.framecells, get(&fnent.argcells, i).~, Has(get(&paramorefs, i)));
-          }
-          set(&subenv.framecells, fnent.graph.cell.~, Has(retvalref));
-
-          if !st_eval_frame_regraphed(clq, &subenv, &fnent.graph) {
-            return false;
-          }
-        case &PrimFnBody(prent prim_fn_body):
-          ERR(_u8("No primitive function body can be evaled."));
+        if !st_eval_fn_body(clq, env, &paramorefs, retvalref, funcval.fnid) {
           return false;
         }
 
@@ -546,6 +531,30 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
     }
   }
 
+  return true;
+}
+
+func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, fnid fn_body_id) bool {
+  nparams size = count(paramorefs);
+  switch ref_fn_body(clq->cs, fnid) {
+  case &GraphedFnBody(fnent graphed_fn_body):
+    if nparams != count(&fnent.argcells) {
+      ice(_u8("Param list length mismatches function argcells length"));
+    }
+
+    subenv st_env = mk_env(env->pool, env->plat, count(&fnent.graph.gr.cells));
+    for i size = 0; i < nparams; i = i + 1 {
+      set(&subenv.framecells, get(&fnent.argcells, i).~, Has(get(paramorefs, i)));
+    }
+    set(&subenv.framecells, fnent.graph.cell.~, Has(retvalref));
+
+    if !st_eval_frame_regraphed(clq, &subenv, &fnent.graph) {
+      return false;
+    }
+  case &PrimFnBody(prent prim_fn_body):
+    ERR(_u8("No primitive function body can be evaled."));
+    return false;
+  }
   return true;
 }
 
