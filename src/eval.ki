@@ -1,4 +1,5 @@
 import check;
+import primeval;
 
 /* bnno = b.n.n.o. = "bytes" (not necessarily octets)
 
@@ -552,8 +553,7 @@ func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], r
       return false;
     }
   case &PrimFnBody(prent prim_fn_body):
-    ERR(_u8("No primitive function body can be evaled."));
-    return false;
+    return st_eval_prim_fn_body(clq, env, paramorefs, retvalref, &prent);
   }
   return true;
 }

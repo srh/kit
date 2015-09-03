@@ -1,0 +1,6 @@
+import eval;
+
+func st_eval_prim_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, prent *prim_fn_body) bool {
+  ERR(_u8("No primitive function body can be evaled."));
+  return TODO();
+}
