@@ -100,7 +100,7 @@ access bigint {
       *out = 0;
       return true;
     } else if n == 1 {
-      *out = get(&x->parts, n);
+      *out = get(&x->parts, 0);
       return true;
     } else {
       return false;
@@ -309,6 +309,39 @@ access bigint {
     return squash(x.negative, &newparts);
   }
 
+  func `&`(x bigint, y bigint) bigint {
+    n size = max(bigdigit_count(&x), bigdigit_count(&y));
+    parts array[u32];
+    for i size = 0; i < n; i = i + 1 {
+      a u32 = getbigdigit(&x, i);
+      b u32 = getbigdigit(&y, i);
+      push(&parts, a & b);
+    }
+    return squash(x.negative && y.negative, &parts);
+  }
+
+  func `|`(x bigint, y bigint) bigint {
+    n size = max(bigdigit_count(&x), bigdigit_count(&y));
+    parts array[u32];
+    for i size = 0; i < n; i = i + 1 {
+      a u32 = getbigdigit(&x, i);
+      b u32 = getbigdigit(&y, i);
+      push(&parts, a | b);
+    }
+    return squash(x.negative || y.negative, &parts);
+  }
+
+  func `^`(x bigint, y bigint) bigint {
+    n size = max(bigdigit_count(&x), bigdigit_count(&y));
+    parts array[u32];
+    for i size = 0; i < n; i = i + 1 {
+      a u32 = getbigdigit(&x, i);
+      b u32 = getbigdigit(&y, i);
+      push(&parts, a ^ b);
+    }
+    return squash(x.negative != y.negative, &parts);
+  }
+
   func `==`(x bigint, y bigint) bool {
     return x.negative == y.negative && array_equal(&x.parts, &y.parts);
   }
@@ -434,5 +467,9 @@ func test_bigint() bool {
   pass = pass & (incr(-(fourg + big("1"))) == -fourg);
   pass = pass & (divmod(big("17"), big("3")) == cons(big("5"), big("2")));
   pass = pass & (divmod(-big("17"), big("3")) == cons(-big("6"), big("1")));
+  pass = pass & (((-big("3")) & big("3")) == big("1"));
+  pass = pass & (((-big("3")) | big("2")) == -big("1"));
+  pass = pass & (((-big("3")) ^ big("3")) == -big("2"));
+  pass = pass & (^big("3") == -big("4"));
   return pass;
 }
