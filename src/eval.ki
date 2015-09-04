@@ -207,11 +207,21 @@ func obj_write(env *st_env, oref st_obj_ref, in *st_value) bool {
   return true;
 }
 
+// TODO: Eventually get rid of this.
+func[T] cell_obj_ref(env *st_env, num cell_num, msg T) st_obj_ref {
+  if case &Has(obj_ref st_obj_ref) = ref(&env->framecells, num.~) {
+    return obj_ref;
+  } else {
+    ice(_u8(msg));
+    return fake();
+  }
+}
+
 func cell_obj_ref(env *st_env, num cell_num) st_obj_ref {
   if case &Has(obj_ref st_obj_ref) = ref(&env->framecells, num.~) {
     return obj_ref;
   } else {
-    ice(_u8("static eval accessing inactive cell"));
+    ice(_u8("static eval accessing inactive cell, cell_num="), num.~);
     return fake();
   }
 }
@@ -295,7 +305,7 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
       if !st_eval_frame_regraphed(clq, &env, fg) {
         return false;
       }
-      result st_obj_ref = cell_obj_ref(&env, fg->cell);
+      result st_obj_ref = cell_obj_ref(&env, fg->cell, "in st_eval_def");
       value st_value;
       if !obj_read(&env, result, &value) {
         return false;
@@ -308,7 +318,6 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
       if case &Computed(x st_value) = &inst->evaled_value {
         if is_selfcontained(&x) {
           defname string = lookup(clq->cs->im, ref_def_entry(clq->cs, ent_id)->def_name);
-          DBG(_u8("Computed "), defname, _u8(" = "),  x);
         }
         *out = &x;
       } else {
@@ -355,7 +364,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
       node *gr_node = ref_node(&fg->gr, gn);
       switch &node->op {
       case &GrApply(a gr_apply):
-        funref st_obj_ref = cell_obj_ref(env, a.funcell);
+        funref st_obj_ref = cell_obj_ref(env, a.funcell, "in I");
         if !is_full_oref(env, funref) {
           ice(_u8("Function apply funptr cell is sub-object"));
         }
@@ -372,7 +381,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         reserve(&paramorefs, nparams);
         for i size = 0; i < nparams; i = i + 1 {
           c cell_num = get(&a.params, i);
-          param_oref st_obj_ref = cell_obj_ref(env, c);
+          param_oref st_obj_ref = cell_obj_ref(env, c, "in II");
           if !is_full_oref(env, param_oref) {
             ice(_u8("Function parameter cell is sub-object"));
           }
@@ -381,7 +390,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         }
 
         st_maybe_init_static(&fg->gr, env, a.retcell);
-        retvalref st_obj_ref = cell_obj_ref(env, a.retcell);
+        retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in III");
 
         if !st_eval_fn_body(clq, env, &paramorefs, retvalref, funcval.fnid) {
           return false;
@@ -389,8 +398,8 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
 
       case &GrMemCopy(a gr_memcopy):
         st_maybe_init_static(&fg->gr, env, a.dest);
-        destref st_obj_ref = cell_obj_ref(env, a.dest);
-        srcref st_obj_ref = cell_obj_ref(env, a.src);
+        destref st_obj_ref = cell_obj_ref(env, a.dest, "in IV");
+        srcref st_obj_ref = cell_obj_ref(env, a.src, "in V");
         value st_value;
         if !obj_read(env, srcref, &value) {
           return false;
@@ -401,7 +410,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
 
       case &GrWriteConst(a gr_writeconst):
         st_maybe_init_static(&fg->gr, env, a.dest);
-        destref st_obj_ref = cell_obj_ref(env, a.dest);
+        destref st_obj_ref = cell_obj_ref(env, a.dest, "in VI");
         value st_value;
         if !st_const_compute(clq, env, &a.value, destref.count, &value) {
           return false;
@@ -412,15 +421,17 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
 
       case &GrAddressof(a gr_addressof):
         st_maybe_init_static(&fg->gr, env, a.dest);
-        destref st_obj_ref = cell_obj_ref(env, a.dest);
-        addressee_ref st_obj_ref = cell_obj_ref(env, a.addressee);
+        destref st_obj_ref = cell_obj_ref(env, a.dest, "in VII");
+        // TODO: Don't do this.  Change other stuff so that the cell isn't dead?  Such as in assignment, after destroying, before copying/moving.
+        st_maybe_init_static(&fg->gr, env, a.addressee);
+        addressee_ref st_obj_ref = cell_obj_ref(env, a.addressee, "in VIII");
         value st_value = mk_st_value_pointer(&env->plat, {addressee_ref.num, addressee_ref.offset});
         if !obj_write(env, destref, &value) {
           return false;
         }
 
       case &GrDeref(a gr_deref):
-        pointer_obj st_obj_ref = cell_obj_ref(env, a.pointer);
+        pointer_obj st_obj_ref = cell_obj_ref(env, a.pointer, "in IX");
         pointer_value st_value;
         if !obj_read(env, pointer_obj, &pointer_value) {
           return false;
@@ -449,7 +460,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         set(&env->framecells, a.name.~, Has(@[st_obj_ref]{pointer.num, new_offset, deref_size}));
 
       case &GrSubcell(a gr_subcell):
-        partof_obj st_obj_ref = cell_obj_ref(env, a.partof);
+        partof_obj st_obj_ref = cell_obj_ref(env, a.partof, "in X");
         offset u32;
         if !st_offset_compute(env, a.offset, &offset) {
           return false;
@@ -472,7 +483,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         }
         set(&env->framecells, a.name.~, Has(@[st_obj_ref]{partof_obj.num, new_offset, deref_size}));
       case &GrBranch(a gr_branch):
-        src_obj st_obj_ref = cell_obj_ref(env, a.src);
+        src_obj st_obj_ref = cell_obj_ref(env, a.src, "in XI");
         src_value st_value;
         if !obj_read(env, src_obj, &src_value) {
           return false;
@@ -513,23 +524,28 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
 
       case &GrWriteNothing(a gr_writenothing):
         st_maybe_init_static(&fg->gr, env, a.dest);
-        destref st_obj_ref = cell_obj_ref(env, a.dest);
+        destref st_obj_ref = cell_obj_ref(env, a.dest, "in XII");
         value st_value = mk_st_value(&env->plat, destref.count);
         if !obj_write(env, destref, &value) {
           return false;
         }
 
       case &GrDead(a gr_dead):
-        // We should only be using GrDead for cells that own the whole object.
-        if case &Has(objref st_obj_ref) = ref(&env->framecells, a.cell.~) {
-          if !is_full_oref(env, objref) {
-            ice(_u8("GrDead sees non-full objref"));
+        // We disable GrDead because its logic is broken (in graph generation) right now.
+        // TODO: Remove GrDead, or make its usage (in assignment) be non-bogus.
+        if false {
+          // We should only be using GrDead for cells that own the whole object.
+          if case &Has(objref st_obj_ref) = ref(&env->framecells, a.cell.~) {
+            if !is_full_oref(env, objref) {
+              ice(_u8("GrDead sees non-full objref"));
+            }
+            set(&env->pool->objects, objref.num.~, None());
+          } else {
+            ice(_u8("GrDead deading inactive cell"));
           }
-          set(&env->pool->objects, objref.num.~, None());
-        } else {
-          ice(_u8("GrDead deading inactive cell"));
+          // This line means GrDead needs to be for temporaries and variables that went out of scope, not for intermediate destruction of a variable.
+          set(&env->framecells, a.cell.~, None());
         }
-        set(&env->framecells, a.cell.~, None());
 
       case &GrNop(v void):
         // Do nothing
@@ -557,10 +573,10 @@ func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], r
     if !st_eval_frame_regraphed(clq, &subenv, &fnent.graph) {
       return false;
     }
+    return true;
   case &PrimFnBody(prent prim_fn_body):
     return st_eval_prim_fn_body(clq, env, paramorefs, retvalref, &prent);
   }
-  return true;
 }
 
 func is_full_oref(env *st_env, oref st_obj_ref) bool {
@@ -618,7 +634,7 @@ func st_offset_compute(env *st_env, gro gr_offset, out *u32) bool {
   case OffsetConst(o u32):
     *out = o;
   case OffsetComputed(pair tup[u32, cell_num]):
-    index_obj st_obj_ref = cell_obj_ref(env, pair.cdr);
+    index_obj st_obj_ref = cell_obj_ref(env, pair.cdr, "in XIII");
     index_value st_value;
     if !obj_read(env, index_obj, &index_value) {
       return false;
@@ -717,7 +733,7 @@ func st_value_self_contained(plat *platform_info, val *st_value, out *array[u32]
   n u32 = bitlength / 32;
   for i u32 = 0; i < n; i = i + 1 {
     if get(&val->datas, ~i) != ^ @[u32]0 {
-      ERR(_u8("Use of uninitialized value."));
+      ERR(_u8("Use of uninitialized value (I)."));
       return false;
     }
     push(&ret, get(&val->words, ~i));
@@ -726,7 +742,7 @@ func st_value_self_contained(plat *platform_info, val *st_value, out *array[u32]
   if bitrem != 0 {
     lastmask u32 = ((1 << bitrem) - 1);
     if get(&val->datas, ~n) != lastmask {
-      ERR(_u8("Use of uninitialized value."));
+      ERR(_u8("Use of uninitialized value (II)."));
       return false;
     }
     x u32 = get(&val->words, ~n);

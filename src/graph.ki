@@ -899,10 +899,10 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
   if !gr_expr(cs, gr, oo(&a->rhs), &rp) {
     return false;
   }
+  lp_rp_nop gr_num = add_node(gr, node(mk_array(lp, rp), GrNop(void)));
   switch assignment_info(a) {
     case &StaticSelfAssignment(v void): {
-      var nop = add_node(gr, node(mk_array(lp, rp), GrNop(void)));
-      *out = nop;
+      *out = lp_rp_nop;
       return true;
     }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
@@ -924,7 +924,8 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       if !gr_after_actions(cs, gr, br, &ci.unconditional_actions, &unc) {
         return false;
       }
-      *out = unc;
+      var seq_lp_rp_nop = add_node(gr, node0(GrSequence({lp_rp_nop, unc})));
+      *out = seq_lp_rp_nop;
       return true;
     }
   }
