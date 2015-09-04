@@ -795,6 +795,16 @@ func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_f
   }
 }
 
+func check_all_cells_have_location(cells *array[cell_info]) void {
+  ncells size = count(cells);
+  for i size = 0; i < ncells; i = i + 1 {
+    c *cell_info = ref(cells, i);
+    if !isHas(&c->location) {
+      ice(_u8("check_all_cells_have_location sees cell without location"));
+    }
+  }
+}
+
 func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda, out *gr_num) bool {
   info *ast_fullbody_info = unHas(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_cells(info->cells);
@@ -803,6 +813,8 @@ func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda,
   if !gr_fullbody(cs, &lambda_gr, &a->body, &fullbody_gn, &return_cell) {
     return false;
   }
+
+  check_all_cells_have_location(&lambda_gr.cells);
 
   id fn_body_id = add_fn_body(cs, GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, return_cell}, info->arg_cells}));
   var gn = add_node(gr, node0(GrWriteConst({rval_cell(x), ConstFnBody(id)})));
