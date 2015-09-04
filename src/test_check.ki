@@ -35,6 +35,12 @@ func test_platform() platform_info {
 }
 
 func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
+  if case &Has(sname array[u8]) = &ctx->specific_run {
+    u8name array[u8] = _u8(name);
+    if !array_equal(&sname, &u8name) {
+      return;
+    }
+  }
   print(Stdout(), _u8("test "), _u8(name), _u8("..."));
   fflush(Stdout());
   im identmap = make_im();
@@ -51,6 +57,12 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
 }
 
 func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
+  if case &Has(sname array[u8]) = &ctx->specific_run {
+    u8name array[u8] = _u8(name);
+    if !array_equal(&sname, &u8name) {
+      return;
+    }
+  }
   print(Stdout(), _u8("test !"), _u8(name), _u8("..."));
   fflush(Stdout());
   im identmap = make_im();
@@ -69,6 +81,7 @@ func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
 // TODO: Make test output not go directly to stdout/stderr.
 
 deftype check_ctx struct {
+  specific_run opt[array[u8]];
   failures u32;
 };
 
@@ -297,9 +310,30 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "def y u32 = 3 + 4;\n"
         "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"));
   // TODO: This should fail because you can't evaluate z(3) statically.  (We can't?)
-  run_check_test(ctx, "c037",
+  run_check_test(ctx, "c037-a",
     _u8("def x i32 = z(3);\n"
         "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"));
+  // TODO: Likewise, this should ostensibly fail.
+  // TODO: Get ICE: static eval accessing inactive cell.
+  run_check_test(ctx, "c037-b",
+    _u8("def x i32 = bar();\n"
+        "func bar() i32 {\n"
+        "  var x i32 = 5;\n"
+        "  return x;\n"
+        "}\n"));
+  run_check_test(ctx, "c037-c",
+    _u8("def x i32 = bar();\n"
+        "def[T] fac fn[T, T] = func(x T) T {\n"
+        "  if (x == 0) {\n"
+        "    return 1;\n"
+        "  } else {\n"
+        "    return x * fac(x - 1);\n"
+        "  }\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  var x i32 = 5;\n"
+        "  return fac(x);\n"
+        "};\n"));
   run_check_test(ctx, "c038",
     _u8("def y i32 = -x;\n"
         "def x i32 = -3;\n"));
@@ -1178,9 +1212,10 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"));
 }
 
+func mk_ctx() check_ctx { return {None(), 0}; }
 
 func test_check() tup[bool, u32] {
-  ctx check_ctx;
+  ctx check_ctx = mk_ctx();
   test_check_basic_cases(&ctx);
   test_check_lambda_cases(&ctx);
   test_check_more_cases(&ctx);

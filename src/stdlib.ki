@@ -63,6 +63,17 @@ func build_u8str(r *array[u8], x *size) void {
   append(r, unsigned_as_dec(*x));
 }
 
+func as_zerohex(width size, x size) array[u8] {
+  arr array[u8] = as_hex(x);
+  n size = count(&arr);
+  if n < width {
+    var tmp = arr;
+    arr = repeat(width - n, '0');
+    append(&arr, &tmp);
+  }
+  return arr;
+}
+
 func as_hex(x size) array[u8] {
   arr array[u8];
   if x == 0 {

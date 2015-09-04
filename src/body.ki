@@ -450,11 +450,10 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
     return false;
   }
   cu_computed cu_typeexpr;
-  cu_props type_properties;
 
   complete_type *cu_typeexpr;
-  props *type_properties;
   note_initter bool;
+  cell cell_num;
   switch &a->rhs {
     case &HasExpr(x box[ast_expr_consume]): {
       if !check_expr_consume(&bs->es, oo(&x), &computed.te) {
@@ -462,8 +461,8 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
       }
       info *ast_expr_complete_info = expr_complete_info(&oo(&x)->expr);
       complete_type = &info->cu;
-      props = &info->cu_props;
       note_initter = false;
+      cell = result_cell(oo(&x));
     }
     case &AutoInit(x opt[init_action]): {
       if !computed.complete {
@@ -472,15 +471,14 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
       }
       cu_computed = ~computed.te;
       complete_type = &cu_computed;
+      cu_props type_properties;
       if !compute_type_properties(bs->cs, bs->clq, complete_type, &cu_props) {
         return false;
       }
-      props = &cu_props;
       note_initter = true;
+      cell = add_flex_cell(&bs->es, *complete_type, cu_props);
     }
   }
-
-  cell cell_num = add_flex_cell(&bs->es, *complete_type, *props);
 
   vn var_number;
   if !es_push_var(&bs->es, vp, cell, &a->decl.name, complete_type, AutoInitYes(void), &vn) {

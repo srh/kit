@@ -207,7 +207,6 @@ func obj_write(env *st_env, oref st_obj_ref, in *st_value) bool {
   return true;
 }
 
-
 func cell_obj_ref(env *st_env, num cell_num) st_obj_ref {
   if case &Has(obj_ref st_obj_ref) = ref(&env->framecells, num.~) {
     return obj_ref;
@@ -268,7 +267,7 @@ func ensure_def_inst_evaled(cs *checkstate, clq *clqueue, ent_id def_entry_id, i
   return st_eval_def(clq, ent_id, inst_id, out);
 }
 
-func st_eval_def(clq *clqueue, ent def_entry_id, inst_id def_inst_id, out **st_value) bool {
+func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **st_value) bool {
   inst *def_inst = ref_inst(clq->cs, inst_id);
   if inst->status != FinishedCheckingRhs(void) {
     ice(_u8("Evaling def we have not finished checking."));
@@ -307,6 +306,10 @@ func st_eval_def(clq *clqueue, ent def_entry_id, inst_id def_inst_id, out **st_v
 
       inst->evaled_value = Computed(value);
       if case &Computed(x st_value) = &inst->evaled_value {
+        if is_selfcontained(&x) {
+          defname string = lookup(clq->cs->im, ref_def_entry(clq->cs, ent_id)->def_name);
+          DBG(_u8("Computed "), defname, _u8(" = "),  x);
+        }
         *out = &x;
       } else {
         ice(_u8("locally impossible in st_eval_def"));
@@ -588,7 +591,8 @@ func st_values_selfcontained_equal(plat *platform_info, a *st_value, b *st_value
     return false;
   }
 
-  return array_equal(&a->words, &b->words);
+  *out = array_equal(&a->words, &b->words);
+  return true;
 }
 
 func st_const_compute(clq *clqueue, env *st_env, c *gr_const, length u32, out *st_value) bool {
@@ -861,4 +865,16 @@ func st_value_as_size(plat *platform_info, val *st_value, out *u32) bool {
   }
   *out = x;
   return true;
+}
+
+func build_u8str(r *array[u8], x *st_value) void {
+  append(r, _u8("st_value{len="));
+  build_u8str(r, &x->length);
+  append(r, _u8(","));
+  nwords size = count(&x->words);
+  for i size = 0; i < nwords; i = i + 1 {
+    append(r, _u8(" "));
+    append(r, as_zerohex(8, ~get(&x->words, i)));
+  }
+  append(r, _u8("}"));
 }

@@ -753,9 +753,12 @@ func binop_info(t tokval) opt[prec_pair] {
         if (c0 == '<' && c1 == '<') || (c0 == '>' && c1 =='>') {
           return Has({405, 405});
         }
-        if c1 == '=' && (c0 == '!' || c0 == '%' || c0 == '&' || c0 == '*'
-                         || c0 == '-' || c0 == '=' || c0 == '+' || c0 == '|'
-                         || c0 == '<' || c0 == '>' || c0 == '/') {
+        if c1 == '=' && (c0 == '=' || c0 == '<' || c0 == '>' || c0 == '!') {
+          return Has({405, 405});
+        }
+        if c1 == '=' && (c0 == '%' || c0 == '&' || c0 == '*'
+                         || c0 == '-' || c0 == '+' || c0 == '|'
+                         || c0 == '/') {
           return Has({306, 304});
         }
         return None();
@@ -1693,6 +1696,8 @@ func test_parse() bool {
                                _u8("access vec[_] { def foo i32 = 3; }\n"));
   pass = pass & run_parse_test(_u8("p055"),
                                _u8("func foo() a { if case foo(x) = bar { } else if y { } else { } }"));
+  pass = pass & run_parse_test(_u8("p056"),
+    _u8("func foo() a { if x == 0 { return 1; } else { return 2; } }"));
   return pass;
 }
 
