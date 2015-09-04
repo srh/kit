@@ -430,6 +430,8 @@ func convert_to_bigint(base u32, digits *array[i8]) bigint {
   return acc;
 }
 
+func bigu(x u32) bigint { return ~x; }
+
 func[T] big(arr T) bigint {
   b array[i8];
   reserve(&b, arr.length);

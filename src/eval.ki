@@ -697,7 +697,7 @@ func st_value_signed_twos_as_bigint(plat *platform_info, val *st_value, out *big
   // Take the positive version of the value, subtract 2-to-the-bitlength if negative.
   tmp bigint = squash(false, &words);
   if negative {
-    tmp = tmp - ((@[bigint] ~ @[u32]1) << bitlength);
+    tmp = tmp - (bigu(1) << bitlength);
   }
   *out = tmp;
   return true;

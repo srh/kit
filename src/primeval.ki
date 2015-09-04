@@ -47,7 +47,7 @@ func st_eval_prim_logical(clq *clqueue, env *st_env, paramorefs *array[st_obj_re
   result bool;
   switch op {
   case LogicalNot(v void):
-    result = (@[bigint] ~ @[u32] 0) == get(&ps, 0);
+    result = bigu(0) == get(&ps, 0);
   case BoolEq(v void):
     result = get(&ps, 0) == get(&ps, 1);
   case BoolNe(v void):
@@ -55,9 +55,9 @@ func st_eval_prim_logical(clq *clqueue, env *st_env, paramorefs *array[st_obj_re
   }
   resultint bigint;
   if result {
-    resultint = ~ @[u32] 1;
+    resultint = bigu(1);
   } else {
-    resultint = ~ @[u32] 0;
+    resultint = bigu(0);
   }
   val st_value = st_bigint_to_value_unsigned(&env->plat, retvalref.count, resultint);
   if !obj_write(env, retvalref, &val) {
@@ -104,9 +104,9 @@ func st_eval_prim_ptr_compare(clq *clqueue, env *st_env, paramorefs *array[st_ob
   // TODO: This could be deduped in this file.
   resultint bigint;
   if result {
-    resultint = ~ @[u32] 1;
+    resultint = bigu(1);
   } else {
-    resultint = ~ @[u32] 0;
+    resultint = bigu(0);
   }
   val st_value = st_bigint_to_value_unsigned(&env->plat, retvalref.count, resultint);
   if !obj_write(env, retvalref, &val) {
@@ -138,9 +138,9 @@ func st_eval_prim_num_compare(clq *clqueue, env *st_env, paramorefs *array[st_ob
   }
   resultint bigint;
   if result {
-    resultint = ~ @[u32] 1;
+    resultint = bigu(1);
   } else {
-    resultint = ~ @[u32] 0;
+    resultint = bigu(0);
   }
   val st_value = st_bigint_to_value_unsigned(&env->plat, retvalref.count, resultint);
   if !obj_write(env, retvalref, &val) {
@@ -214,19 +214,33 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
 }
 
 func st_divmod(x bigint, y bigint, op *primitive_numeric_op, div_out *bigint, mod_out *bigint) bool {
-  if y == ~ @[u32] 0 {
+  if y == bigu(0) {
     ERR(_u8("Static eval: divide by zero"));
     return false;
   }
   switch op->op_numtraits.repr {
   case Unsigned(v void): { }
   case SignedTwos(v void):
-    if y == - (@[bigint] ~ @[u32] 1) && x == op->op_numtraits.minval {
+    if y == -bigu(1) && x == op->op_numtraits.minval {
       ERR(_u8("Static eval: divide minval by -1"));
       return false;
     }
   }
   dm tup[bigint, bigint] = divmod(x, y);
+  // If numerator is negative, twiddle result to obey "official" SignedTwos (x86) semantics.  divmod already handles the x>0, y>0 case (duh) and the x>0, y<0 case correctly.
+  if dm.cdr != bigu(0) && is_negative(&x) {
+    if is_negative(&y) {
+      // div is positive, we need it smaller.
+      dm.car = dm.car - bigu(1);
+      // lessens the remainder
+      dm.cdr = dm.cdr + y;
+    } else {
+      // div is negative, we need it bigger.
+      dm.car = incr(dm.car);
+      // lessens the remainder
+      dm.cdr = dm.cdr - y;
+    }
+  }
   *div_out = dm.car;
   *mod_out = dm.cdr;
   return true;
