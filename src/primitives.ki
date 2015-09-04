@@ -38,6 +38,13 @@ defenum primitive_logical_op {
   BoolNe void;
 };
 
+func op_arity(op primitive_logical_op) u32 {
+  switch op {
+  case LogicalNot(v void): return 1;
+  default: return 2;
+  }
+}
+
 deftype primitive_ptr_comparison_op struct {
   op_action primitive_comparison_op_action;
 };
