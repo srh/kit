@@ -1164,10 +1164,10 @@ func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecell
     ice(_u8("fn_type props not computable"));
   }
 
-  funcell cell_num = add_cell(es, ~cfptr.te, cfptr_props);
-  destptr cell_num = add_cell(es, ptrtype, ptrtype_props);
-  srcptr cell_num = add_cell(es, ptrtype, ptrtype_props);
-  cmp_result cell_num = add_cell(es, booltype, boolprops);
+  funcell cell_num = add_rigid_cell(es, ~cfptr.te, cfptr_props);
+  destptr cell_num = add_rigid_cell(es, ptrtype, ptrtype_props);
+  srcptr cell_num = add_rigid_cell(es, ptrtype, ptrtype_props);
+  cmp_result cell_num = add_flex_cell(es, booltype, boolprops);
   return {ip, funcell, destptr, srcptr, cmp_result};
 }
 
