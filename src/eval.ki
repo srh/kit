@@ -31,6 +31,8 @@ func mk_env(pool *st_objpool, plat platform_info, num_cells size) st_env {
 }
 
 deftype st_obj_num size;
+func `==`(a st_obj_num, b st_obj_num) bool { return a.~ == b.~; }
+func `!=`(a st_obj_num, b st_obj_num) bool { return a.~ != b.~; }
 
 deftype st_obj_ref struct {
   num st_obj_num;
