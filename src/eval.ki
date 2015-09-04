@@ -794,7 +794,7 @@ func st_maybe_init_static(gr *frame_graph, env *st_env, cell cell_num) void {
     return;
   }
   info *cell_info = ref_cell(gr, cell);
-  if !isLocationStatic(*unHas(&info->location)) {
+  if !isLocationStatic(location(info)) {
     ice(_u8("st_maybe_init_static: cell with non-static location"));
   }
 

@@ -157,12 +157,12 @@ deftype fullbody_state struct {
 func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num, return_cell_out *cell_num) bool {
   var final_node = add_node(gr, node0(GrNop(void)));
 
+  info *ast_fullbody_info = fullbody_info(x);
   exit_node gr_num;
-  if !gr_unwind_vars(cs, gr, &unHas(&x->info)->parameter_destructions, final_node, &exit_node) {
+  if !gr_unwind_vars(cs, gr, &info->parameter_destructions, final_node, &exit_node) {
     return false;
   }
 
-  info *ast_fullbody_info = unHas(&x->info);
   label_gn array[gr_num];
   n size = count(&info->labels);
   for i size = 0; i < n; i = i + 1 {
@@ -196,7 +196,7 @@ func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num, 
 
 func gr_bracebody(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_bracebody, outflow gr_num, out *gr_num) bool {
   bn gr_num;
-  if !gr_unwind_vars(cs, gr, &unHas(&x->info)->destructions, outflow, &bn) {
+  if !gr_unwind_vars(cs, gr, &bracebody_info(x)->destructions, outflow, &bn) {
     return false;
   }
   n size = count(&x->statements);
@@ -284,7 +284,7 @@ func gr_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, x *ast_st
 }
 
 func gr_goto_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_goto_statement, outflow gr_num, out *gr_num) bool {
-  info *ast_goto_statement_info = unHas(&a->info);
+  info *ast_goto_statement_info = goto_statement_info(a);
   jmp gr_num = get(&fb->label_gn, info->label_number.~);
   wn gr_num;
   if !gr_wind_vars(cs, gr, &info->initializations, jmp, &wn) {
@@ -299,7 +299,7 @@ func gr_goto_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *a
 }
 
 func gr_label_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_label_statement, outflow gr_num, out *gr_num) bool {
-  gn gr_num = get(&fb->label_gn, unHas(&a->info)->label_number.~);
+  gn gr_num = get(&fb->label_gn, label_statement_info(a)->label_number.~);
   mut_nop_node(gr, gn, node0(GrJmp({outflow})));
   // Should we set *out to gn or outflow?  When labels get fancier, the answer will matter.
   *out = gn;
@@ -314,7 +314,7 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
 
   var exitseq = add_node(gr, node0(GrSequence({swartch_discard_gn, outflow})));
 
-  info *ast_enum_deconstruction_info = unHas(&a->info);
+  info *ast_enum_deconstruction_info = switch_statement_info(a);
   cases array[tup[gr_const, gr_num]];
   default_case opt[gr_num] = None();
   ncases size = count(&a->cases);
@@ -327,7 +327,7 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
 
     switch &sc->pattern {
       case &Case(cp ast_constructor_pattern): {
-        cp_info *ast_cp_info = unHas(&cp.cp_info);
+        cp_info *ast_cp_info = constructor_pattern_info(&cp);
         vi *var_info = ref(&fb->all_vars, cp_info->vn.~);
         var vcgn = add_node(gr, node0(GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)})));
         var gn = add_node(gr, node0(GrSequence({vcgn, body_gn})));
@@ -389,7 +389,7 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
     }
 
     initseq gr_num;
-    if !gr_unwind_vars(cs, gr, &unHas(&a->info)->initter_destructions, outflow, &initseq) {
+    if !gr_unwind_vars(cs, gr, &for_statement_info(a)->initter_destructions, outflow, &initseq) {
       return false;
     }
 
@@ -513,7 +513,7 @@ func gr_condition(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_co
       if !gr_expr_consume(cs, gr, oo(&pa.rhs), &rhs) {
         return false;
       }
-      info *ast_pattern_assign_info = unHas(&pa.info);
+      info *ast_pattern_assign_info = pattern_assign_info(&pa);
       taggn gr_num = add_node(gr, node(mk_array(rhs), GrSubcell({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)})));
       cases array[tup[gr_const, gr_num]];
       n size = info->deconstruct.num_enum_constructors;

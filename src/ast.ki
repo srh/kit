@@ -180,6 +180,15 @@ deftype ast_bracebody struct {
   statements array[ast_statement];
 };
 
+func bracebody_info(a *ast_bracebody) *ast_bracebody_info {
+  if case &Has(info) = &a->info {
+    return &info;
+  } else {
+    ice(_u8("bracebody_info sees None()"));
+    return fake();
+  }
+}
+
 deftype ast_var_info struct {
   vn var_number;
 };
@@ -210,6 +219,15 @@ deftype ast_pattern_assign struct {
   pattern ast_constructor_pattern;
   rhs box[ast_expr_consume];
 };
+
+func pattern_assign_info(a *ast_pattern_assign) *ast_pattern_assign_info {
+  if case &Has(info) = &a->info {
+    return &info;
+  } else {
+    ice(_u8("pattern_assign_info sees None()"));
+    return fake();
+  }
+}
 
 defenum ast_condition {
   ExprCondition box[ast_expr_consume];
@@ -253,12 +271,31 @@ deftype ast_for_statement struct {
   body ast_bracebody;
 };
 
+func for_statement_info(a *ast_for_statement) *ast_for_statement_info {
+  if case &Has(info) = &a->info {
+    return &info;
+  } else {
+    ice(_u8("for_statement_info sees None()"));
+    return fake();
+  }
+}
+
 deftype ast_switch_statement struct {
   info opt[ast_enum_deconstruction_info];
   swartch_discard ast_later_discard_info;
   swartch box[ast_expr_consume];
   cases array[ast_switch_case];
 };
+
+func switch_statement_info(a *ast_switch_statement) *ast_enum_deconstruction_info {
+  if case &Has(info) = &a->info {
+    return &info;
+  } else {
+    ice(_u8("switch_statement_info sees None()"));
+    return fake();
+  }
+}
+
 
 deftype ast_return_statement_info struct {
   // TODO: Nothing uses in_scope.
@@ -285,6 +322,15 @@ deftype ast_label_statement struct {
   name ast_ident;
 };
 
+func label_statement_info(a *ast_label_statement) *ast_label_statement_info {
+  if case &Has(info) = &a->info {
+    return &info;
+  } else {
+    ice(_u8("label_statement_info sees None()"));
+    return fake();
+  }
+}
+
 deftype ast_goto_statement_info struct {
   label_number label_num;
   destructions array[destroy_action];
@@ -295,6 +341,15 @@ deftype ast_goto_statement struct {
   info opt[ast_goto_statement_info];
   target ast_ident;
 };
+
+func goto_statement_info(a *ast_goto_statement) *ast_goto_statement_info {
+  if case &Has(info) = &a->info {
+    return &info;
+  } else {
+    ice(_u8("goto_statement_info sees None()"));
+    return fake();
+  }
+}
 
 defenum ast_statement {
   Expr ast_expr_discard;
@@ -322,6 +377,16 @@ deftype ast_constructor_pattern struct {
   constructor_name ast_ident;
   decl ast_vardecl;
 };
+
+func constructor_pattern_info(a *ast_constructor_pattern) *ast_cp_info {
+  if case &Has(info) = &a->cp_info {
+    return &info;
+  } else {
+    ice(_u8("constructor_pattern_info sees None()"));
+    return fake();
+  }
+}
+
 
 defenum ast_case_pattern {
   Case ast_constructor_pattern;
@@ -357,6 +422,15 @@ func annotate_fullbody(a *ast_fullbody, info ast_fullbody_info) void {
     ice(_u8("annotate_fullbody sees already annotated"));
   }
   a->info = Has(info);
+}
+
+func fullbody_info(a *ast_fullbody) *ast_fullbody_info {
+  if case &Has(info) = &a->info {
+    return &info;
+  } else {
+    ice(_u8("fullbody_info sees None"));
+    return fake();
+  }
 }
 
 deftype ast_lambda struct {

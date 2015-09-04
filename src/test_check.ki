@@ -314,7 +314,6 @@ func test_check_lambda_cases(ctx *check_ctx) void {
     _u8("def x i32 = z(3);\n"
         "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"));
   // TODO: Likewise, this should ostensibly fail.
-  // TODO: Get ICE: static eval accessing inactive cell.
   run_check_test(ctx, "c037-b",
     _u8("def x i32 = bar();\n"
         "func bar() i32 {\n"
@@ -324,7 +323,7 @@ func test_check_lambda_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c037-c",
     _u8("def x i32 = bar();\n"
         "def[T] fac fn[T, T] = func(x T) T {\n"
-        "  if (x == 0) {\n"
+        "  if x == 0 {\n"
         "    return 1;\n"
         "  } else {\n"
         "    return x * fac(x - 1);\n"
@@ -332,6 +331,20 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "};\n"
         "def bar fn[i32] = func() i32 {\n"
         "  var x i32 = 5;\n"
+        "  return fac(x);\n"
+        "};\n"));
+  run_check_test(ctx, "c037-d",
+    _u8("def x i32 = bar();\n"
+        "func fac (x i32) i32 {\n"
+        "  acc i32 = 1;\n"
+        "  while x != 0 {\n"
+        "    acc = acc * x;\n"
+        "    x = x - 1;\n"
+        "  }\n"
+        "  return acc;\n"
+        "}\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  var x i32 = 7;\n"
         "  return fac(x);\n"
         "};\n"));
   run_check_test(ctx, "c038",
@@ -1212,10 +1225,10 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"));
 }
 
-func mk_ctx() check_ctx { return {None(), 0}; }
+func mk_ctx(name opt[array[u8]]) check_ctx { return {name, 0}; }
 
 func test_check() tup[bool, u32] {
-  ctx check_ctx = mk_ctx();
+  ctx check_ctx = mk_ctx(Has(_u8("c037-d")));
   test_check_basic_cases(&ctx);
   test_check_lambda_cases(&ctx);
   test_check_more_cases(&ctx);

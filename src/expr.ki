@@ -36,6 +36,15 @@ deftype cell_info struct {
   props type_properties;
 };
 
+func location(info *cell_info) cell_location {
+  if case Has(loc) = info->location {
+    return loc;
+  } else {
+    ice(_u8("cell_info location is None()"));
+    return fake();
+  }
+}
+
 // Used with the variable name "es" -- its name used to be different.
 deftype framescope struct {
   ds *defscope;
