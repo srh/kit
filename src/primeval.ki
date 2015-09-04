@@ -5,7 +5,7 @@ func st_eval_prim_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_re
   case &PrimNum(a primitive_numeric_op):
     return st_eval_prim_num(clq, env, paramorefs, retvalref, &a);
   case &PrimNumCompare(a primitive_numeric_comparison_op):
-    return TODO();
+    return st_eval_prim_num_compare(clq, env, paramorefs, retvalref, &a);
   case &PrimLogical(a primitive_logical_op):
     return TODO();
   case &PrimPtrCompare(a primitive_ptr_comparison_op):
@@ -15,13 +15,47 @@ func st_eval_prim_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_re
   }
 }
 
+func st_eval_prim_num_compare(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, op *primitive_numeric_comparison_op) bool {
+  ps array[bigint];
+  // Comparison ops all take 2 arguments.
+  if !st_nums(env, paramorefs, 2, op->op_size, &op->op_numtraits, &ps) {
+    return false;
+  }
+  if retvalref.count != env->plat.booltraits.size {
+    ice(_u8("st_eval_prim_num_compare bad retvalref size"));
+  }
+
+  a bigint = get(&ps, 0);
+  b bigint = get(&ps, 1);
+  result bool;
+  switch op->op_action {
+  case CmpEq(v void): result = a == b;
+  case CmpNe(v void): result = a != b;
+  case CmpLt(v void): result = a < b;
+  case CmpGt(v void): result = a > b;
+  case CmpLe(v void): result = a <= b;
+  case CmpGe(v void): result = a >= b;
+  }
+  resultint bigint;
+  if result {
+    resultint = ~ @[u32] 1;
+  } else {
+    resultint = ~ @[u32] 0;
+  }
+  val st_value = st_bigint_to_value_unsigned(&env->plat, retvalref.count, resultint);
+  if !obj_write(env, retvalref, &val) {
+    ice(_u8("st_eval_prim_num_compare cannot write into retvalref"));
+  }
+  return true;
+}
+
 func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, op *primitive_numeric_op) bool {
   ps array[bigint];
-  if !st_nums(env, paramorefs, op, &ps) {
+  if !st_nums(env, paramorefs, op_arity(op->op_action), op->op_size, &op->op_numtraits, &ps) {
     return false;
   }
   if retvalref.count != op->op_size {
-    ice(_u8("st_eval_prim_num bad retvalref size"));
+    ice(_u8("st_eval_prim_arith bad retvalref size"));
   }
 
   switch op->op_action {
@@ -98,15 +132,15 @@ func st_num_rangechecked_output(clq *clqueue, env *st_env, retvalref st_obj_ref,
   return true;
 }
 
-func st_nums(env *st_env, paramorefs *array[st_obj_ref], op *primitive_numeric_op, out *array[bigint]) bool {
+func st_nums(env *st_env, paramorefs *array[st_obj_ref], op_arity u32, op_size u32, op_numtraits *numeric_traits, out *array[bigint]) bool {
   nparams size = count(paramorefs);
-  if op_arity(op->op_action) != ~nparams {
+  if op_arity != ~nparams {
     ice(_u8("st_nums numeric op bad arity"));
   }
   ret array[bigint];
   for i size = 0; i < nparams; i = i + 1 {
     oref st_obj_ref = get(paramorefs, i);
-    if oref.count != op->op_size {
+    if oref.count != op_size {
       ice(_u8("st_nums bad operand size"));
     }
     val st_value;
@@ -115,7 +149,7 @@ func st_nums(env *st_env, paramorefs *array[st_obj_ref], op *primitive_numeric_o
     }
 
     num bigint;
-    switch op->op_numtraits.repr {
+    switch op_numtraits->repr {
     case Unsigned(void):
       if !st_value_unsigned_as_bigint(&env->plat, &val, &num) {
         return false;
