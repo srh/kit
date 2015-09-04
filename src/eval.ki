@@ -235,7 +235,7 @@ func mk_ones(plat *platform_info, length u32) array[u32] {
   ones array[u32] = repeat(n, 0xFFFFFFFF);
   extra u32 = bitlength % 32;
   if extra != 0 {
-    set(&ones, n - 1, 0xFFFFFFFF >> (32 - bitlength));
+    set(&ones, n - 1, 0xFFFFFFFF >> (32 - extra));
   }
   return ones;
 }
