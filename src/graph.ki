@@ -1492,7 +1492,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       for j size = 0; j < nargs; j = j + 1 {
         fpc cell_num = add_cell(&gr, {Has(LocationRigid(void)), fieldptrtype, fieldptrtype_props});
         push(&fieldptrcella, fpc);
-        gn gr_num = add_node(&gr, node(mk_array(get(&fieldcellgn, j)), GrSubcell({fpc, get(&fieldcella, j), OffsetConst(ref(&psd.fields, i)->offset)})));
+        gn gr_num = add_node(&gr, node(mk_array(get(&fieldcellgn, j)), GrAddressof({fpc, get(&fieldcella, j)})));
         push(&precs, gn);
       }
 

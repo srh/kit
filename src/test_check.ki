@@ -1268,7 +1268,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def x u32 = foo();\n"));
 
-  run_check_test(ctx, "c137",
+  run_check_test(ctx, "c137-a",
     _u8("deftype st struct {\n"
         "  y [3]i8;\n"
         "  z u8;\n"
@@ -1285,6 +1285,25 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "\n"
         "def x st = foo(- @[i32] 15);\n"));
+
+  run_check_test(ctx, "c137-b",
+    _u8("defclass copy cl i32;\n"
+        "access cl {\n"
+        "  func do_init(x *cl) void {\n"
+        "    x->~ = 0x99;\n"
+        "  }\n"
+        "}\n"
+        "deftype st struct {\n"
+        "  x i32;\n"
+        "  w cl;\n"
+        "};\n"
+        "func foo(x i32) st {\n"
+        "  ret st;\n"
+        "  ret.x = x;\n"
+        "  return ret;\n"
+        "}\n"
+        "\n"
+        "def t st = foo(- @[i32] 15);\n"));
 
 }
 

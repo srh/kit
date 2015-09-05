@@ -399,6 +399,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
       node *gr_node = ref_node(&fg->gr, gn);
       switch &node->op {
       case &GrApply(a gr_apply):
+        // TODO: GrApply (and maybe some other things) should deaden parameters.
         funref st_obj_ref = cell_obj_ref(env, a.funcell, "in I");
         if !is_full_oref(env, funref) {
           ice(_u8("Function apply funptr cell is sub-object"));
@@ -418,7 +419,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
           c cell_num = get(&a.params, i);
           param_oref st_obj_ref = cell_obj_ref(env, c, "in II");
           if !is_full_oref(env, param_oref) {
-            ice(_u8("Function parameter cell is sub-object"));
+            ice(_u8("Function parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.~)->type), _u8(")"));
           }
           push(&paramorefs, param_oref);
           set(&env->framecells, c.~, None());
