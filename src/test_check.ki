@@ -1305,6 +1305,26 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "\n"
         "def t st = foo(- @[i32] 15);\n"));
 
+  // Fails because of a hole in the struct not getting initialized.  TODO: This should not fail!  Either get rid of the def-value-initialized check, _or_ struct initialization should zero-initialize holes so that structs can be safely memcpy'd without leaking information from memory.  (Right now, for trivial types, that is the case, since we memset the whole thing, and though you might think it's slightly nonsensical for defclass types to be memcpyable, it does make sense for "defclass copy" types that have a trivial destructor and copy constructor.)
+  run_check_negtest(ctx, "c137-c",
+    _u8("defclass copy cl i32;\n"
+        "access cl {\n"
+        "  func do_init(x *cl) void {\n"
+        "    x->~ = 0x99;\n"
+        "  }\n"
+        "}\n"
+        "deftype st struct {\n"
+        "  x i16;\n"
+        "  w cl;\n"
+        "};\n"
+        "func foo(x i32) st {\n"
+        "  ret st;\n"
+        "  ret.x = ~x;\n"
+        "  return ret;\n"
+        "}\n"
+        "\n"
+        "def t st = foo(- @[i32] 15);\n"));
+
 }
 
 func mk_ctx(name opt[array[u8]]) check_ctx { return {name, 0}; }
