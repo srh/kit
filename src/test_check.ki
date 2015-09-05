@@ -1229,6 +1229,20 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  ret foo;\n"
         "  return ret;\n"
         "}\n"));
+  run_check_negtest(ctx, "c134-a",
+    _u8("func foo() u32 {\n"
+        "  for n u8 = 0; ; n = n + 1 { }\n"
+        "}\n"
+        "def x u32 = foo();\n"));
+  run_check_negtest(ctx, "c134-b",
+    _u8("func foo() u32 {\n"
+        "  n u8 = 0;\n"
+        "  while true {\n"
+        "    n = n + 1;\n"
+        "  }\n"
+        "  return 80;\n"
+        "}\n"
+        "def x u32 = foo();\n"));
 }
 
 func mk_ctx(name opt[array[u8]]) check_ctx { return {name, 0}; }

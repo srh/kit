@@ -371,7 +371,7 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
       return false;
     }
     var totopgn = add_node(gr, node0(GrSequence({incrgn, topgn})));
-    continuegn = add_node(gr, node0(GrSequence({loopcleanupgn, incrgn})));
+    continuegn = add_node(gr, node0(GrSequence({loopcleanupgn, totopgn})));
   } else {
     continuegn = add_node(gr, node0(GrSequence({loopcleanupgn, topgn})));
   }
