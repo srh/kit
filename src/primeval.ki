@@ -192,24 +192,29 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
   case NumBitNot(v void):
     return st_num_rangechecked_output(clq, env, retvalref, ^get(&ps, 0), op, NeverTrapYes(void));
   case NumShiftLeft(v void):
-    // TODO: Exactly how should compile-time bitshifting work?  What if we overflow a signed value?
-    bitsize u32 = op->op_size * env->plat.bnno_size;
-    rhs bigint = get(&ps, 1);
-    rhs32 u32;
-    if !as_non_negative_u32(&rhs, &rhs32) || rhs32 >= bitsize {
-      ERR(_u8("Leftshift rhs out of range"));
-      return false;
+    switch op->op_numtraits.shifting {
+    case JustRangecheckRhs(v2 void):
+      bitsize u32 = op->op_size * env->plat.bnno_size;
+      rhs bigint = get(&ps, 1);
+      rhs32 u32;
+      if !as_non_negative_u32(&rhs, &rhs32) || rhs32 >= bitsize {
+        ERR(_u8("Leftshift rhs out of range"));
+        return false;
+      }
+      return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) << rhs32, op, NeverTrapYes(void));
     }
-    return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) << rhs32, op, NeverTrapYes(void));
   case NumShiftRight(v void):
-    bitsize u32 = op->op_size * env->plat.bnno_size;
-    rhs bigint = get(&ps, 1);
-    rhs32 u32;
-    if !as_non_negative_u32(&rhs, &rhs32) || rhs32 >= bitsize {
-      ERR(_u8("Rightshift rhs out of range"));
-      return false;
+    switch op->op_numtraits.shifting {
+    case JustRangecheckRhs(v2 void):
+      bitsize u32 = op->op_size * env->plat.bnno_size;
+      rhs bigint = get(&ps, 1);
+      rhs32 u32;
+      if !as_non_negative_u32(&rhs, &rhs32) || rhs32 >= bitsize {
+        ERR(_u8("Rightshift rhs out of range"));
+        return false;
+      }
+      return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) >> rhs32, op, NeverTrapYes(void));
     }
-    return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) >> rhs32, op, NeverTrapYes(void));
   }
 }
 

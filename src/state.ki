@@ -8,13 +8,27 @@ import shp;
 import typeexpr;
 import u8ast;
 
+// TODO: Move platform_info stuff to different file.
 defenum numeric_representation {
   Unsigned void;
   SignedTwos void;
 };
 
+defenum shift_behavior {
+  // When shifting, we merely range-check the RHS (that it's >= 0 and < bitsize), and then we perform a bitshift that,
+  //   - for right shifting, is
+  //      -- logical, if repr is Unsigned
+  //      -- arithmetic, if repr is SignedTwos
+  //   - for left shifting, does not care about overflow
+  //      -- if repr is Unsigned, this has simple and straightforward consequences
+  //      -- if repr is SignedTwos, shifting can change the sign bit
+  // We range-check the RHS even if it has trap_overflow false.
+  JustRangecheckRhs void;
+};
+
 deftype numeric_traits struct {
   repr numeric_representation;
+  shifting shift_behavior;
   trap_overflow bool;
   minval bigint;
   maxval bigint;
