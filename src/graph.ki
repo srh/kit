@@ -559,7 +559,7 @@ func gr_return_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
   } else {
     gn = add_node(gr, node0(GrNop(void)));
   }
-  info *ast_return_statement_info = unHas(&a->info);
+  info *ast_return_statement_info = return_statement_info(a);
   uw gr_num;
   if !gr_unwind_vars(cs, gr, &info->destructions, fb->final_node, &uw) {
     return false;
@@ -806,7 +806,7 @@ func check_all_cells_have_location(cells *array[cell_info]) void {
 }
 
 func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda, out *gr_num) bool {
-  info *ast_fullbody_info = unHas(&a->body.info);
+  info *ast_fullbody_info = fullbody_info(&a->body);
   lambda_gr frame_graph = init_frame_graph_from_cells(info->cells);
   fullbody_gn gr_num;
   return_cell cell_num;
@@ -1169,7 +1169,7 @@ func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph,
 }
 
 func gr_magic_ctor(cs *checkstate, clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) bool {
-  info *magic_ctor_info = unHas(&mc->info);
+  info *magic_ctor_info = ref_info(mc);
   switch info {
   case &MagicWholeFieldInfo(mwfi magic_whole_field_info):
     return gr_magic_whole_field_info(cs, clq, wc, &mwfi, gr_out, gn_out, return_cell_out, arg_cells_out);
@@ -1192,7 +1192,11 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   arraycount u32;
   if case &TeArraytype(at te_arraytype) = &mai->cu_type.~ {
     param = oo(&at.param);
-    arraycount = *unHas(&at.count);
+    if case Has(atcount u32) = at.count {
+      arraycount = atcount;
+    } else {
+      ice(_u8("gr_magic_arraytype_info missing count"));
+    }
   } else {
     ice(_u8("gr_magic_arraytype_info sees non-array type"));
   }
@@ -1728,7 +1732,12 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           return true;
         }
         case &InstRhsExpr(dire def_inst_rhs_expr): {
-          info *frame_info = unHas(&dire.frame_info);
+          info *frame_info;
+          if case &Has(finfo) = &dire.frame_info {
+            info = &finfo;
+          } else {
+            ice(_u8("ensure_def_inst_graphed missing 'dire' info"));
+          }
           gr frame_graph = init_frame_graph_from_cells(info->cells);
           gn gr_num;
           if !gr_expr_consume(cs, &gr, &dire.ec, &gn) {

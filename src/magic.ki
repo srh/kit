@@ -46,6 +46,15 @@ deftype magic_ctor struct {
   info opt[magic_ctor_info];
 };
 
+func ref_info(a *magic_ctor) *magic_ctor_info {
+  if case &Has(info) = &a->info {
+    return &info;
+  } else {
+    ice(_u8("magic_ctor lacks info"));
+    return fake();
+  }
+}
+
 deftype copy_destroy_desc struct {
   copy_desc ctor_desc;
   destroy_desc ctor_desc;

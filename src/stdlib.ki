@@ -164,7 +164,7 @@ func[T] isNone(p *opt[T]) bool {
   return false;
 }
 
-// TODO: Replace all uses of this (with better errors).
+// TODO: Replace all uses of this (with better errors).  (Or get backtraces working.)
 func[T] unHas(p *opt[T]) *T {
   if case &Has(t T) = p {
     return &t;

@@ -309,6 +309,15 @@ deftype ast_return_statement struct {
   expr opt[box[ast_expr_consume]];
 };
 
+func return_statement_info(a *ast_return_statement) *ast_return_statement_info {
+  if case &Has(info) = &a->info {
+    return &info;
+  } else {
+    ice(_u8("ast_return_statement info lacking"));
+    return fake();
+  }
+}
+
 deftype label_num size;
 def `~` fn[size, label_num] = wrapconvert;
 def `==` fn[label_num, label_num, bool] = wrapequate;

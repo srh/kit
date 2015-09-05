@@ -716,7 +716,7 @@ func connect_gotos(bs *bodystate) bool {
         return false;
       }
 
-      set(&g->st->info, {unHas(&l->st->info)->label_number, destructions, initializations});
+      set(&g->st->info, {label_statement_info(l->st)->label_number, destructions, initializations});
     } else {
       ERR(_u8("no label named '"), lookup(bs->im, g->label_name), _u8("'"));
       return false;
