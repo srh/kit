@@ -1290,8 +1290,16 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 }
 
 func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) bool {
-  if case CtorInit(v void) = wc {
+  init_padding bool = false;
+  switch wc {
+  case CtorInit(v void):
     ice(_u8("Magic CtorInit on enum type"));
+  case CtorCopy(v void):
+    init_padding = true;
+  case CtorMove(v void):
+    init_padding = true;
+  case CtorDestroy(v void):
+    // don't init padding.
   }
   gr frame_graph = init_frame_graph_empty();
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mei->cu_type.~));
@@ -1345,16 +1353,24 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       return false;
     }
 
+    field_offset u32 = enum_field_offset(cs, et, tagval);
+    field_end u32 = field_offset + fieldtype_props.flat_size;
+    tag_end u32 = enum_tag_offset + tagtype_props.flat_size;
+    prepadding_ogn opt[gr_num]
+      = gr_bzero_subcell(clq, &gr, get(&pointeecells, 0), tag_end, field_offset - tag_end);
+    postpadding_ogn opt[gr_num]
+      = gr_bzero_subcell(clq, &gr, get(&pointeecells, 0), field_end, mei->cu_props.flat_size - field_end);
+
     fieldcella array[cell_num];
     fieldcellgn array[gr_num];
     for j size = 0; j < nargs; j = j + 1 {
       fc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), fieldtype, fieldtype_props});
       push(&fieldcella, fc);
-      sn gr_num = add_node(&gr, node0(GrSubcell({get(&fieldcella, j), get(&pointeecells, j), OffsetConst(enum_field_offset(cs, et, tagval))})));
+      sn gr_num = add_node(&gr, node0(GrSubcell({get(&fieldcella, j), get(&pointeecells, j), OffsetConst(field_offset)})));
       push(&fieldcellgn, sn);
     }
 
-    lastgn gr_num;
+    last_ogn opt[gr_num];
     if case &Has(ip instpair) = ref(&mei->cips, i) {
       fieldptrtype cu_typeexpr;
       fieldptrtype_props type_properties;
@@ -1381,35 +1397,41 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
       ap gr_num = add_node(&gr, node(precs, GrApply({func_cell, fieldptrcella, fieldretcell})));
       vd gr_num = add_node(&gr, node(mk_array(ap), GrDead({fieldretcell})));
-      lastgn = vd;
+      last_ogn = Has(vd);
     } else {
-      gn gr_num;
+      ogn opt[gr_num];
       switch wc {
       case CtorInit(v void):
         ice(_u8("CtorInit on enum type"));
       case CtorCopy(v void):
-        gn = add_node(&gr, node(fieldcellgn, GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)})));
+        var cgn = add_node(&gr, node(fieldcellgn, GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)})));
+        ogn = Has(cgn);
       case CtorMove(v void):
-        gn = add_node(&gr, node(fieldcellgn, GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)})));
+        var cgn = add_node(&gr, node(fieldcellgn, GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)})));
+        ogn = Has(cgn);
       case CtorDestroy(v void):
+        ogn = None();
         // do nothing.
       }
 
-      lastgn = gn;
+      last_ogn = ogn;
     }
 
-    finalgn gr_num;
+    tagset_ogn opt[gr_num];
     switch wc {
     case CtorInit(v void):
       ice(_u8("CtorInit on wc type"));
     case CtorCopy(v void):
-      finalgn = add_node(&gr, node(mk_array(lastgn), GrWriteConst({get(&fieldcella, 0), ConstInt(~ tagval.~)})));
+      var tgn = add_node(&gr, node0(GrWriteConst({get(&fieldcella, 0), ConstInt(~ tagval.~)})));
+      tagset_ogn = Has(tgn);
     case CtorMove(v void):
-      finalgn = add_node(&gr, node(mk_array(lastgn), GrWriteConst({get(&fieldcella, 0), ConstInt(~ tagval.~)})));
+      var tgn = add_node(&gr, node0(GrWriteConst({get(&fieldcella, 0), ConstInt(~ tagval.~)})));
+      tagset_ogn = Has(tgn);
     case CtorDestroy(v void):
-      // codegen nothing
-      finalgn = lastgn;
+      tagset_ogn = None();
     }
+
+    finalgn gr_num = add_node(&gr, node(concat(tagset_ogn, prepadding_ogn, last_ogn, postpadding_ogn), GrNop(void)));
 
     finalseqgn gr_num = add_node(&gr, node0(GrSequence({finalgn, setret})));
     push(&cases_gn, cons(ConstInt(~ tagval.~), finalseqgn));
@@ -1549,11 +1571,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       padding_offset u32;
       padding_count u32;
       postpadding_offset_and_count(&psd, i, &padding_offset, &padding_count);
-      if padding_count != 0 {
-        padtype cu_typrop = compute_prim(clq, primitive_padding_type(clq->cs, padding_count));
-        pad_cell cell_num = add_cell(&gr, {Has(LocationVirtual(void)), padtype.cu, padtype.props});
-        var subcell_gn = add_node(&gr, node0(GrSubcell({pad_cell, get(&pointeecells, 0), OffsetConst(padding_offset)})));
-        var bzero_gn = add_node(&gr, node(mk_array(subcell_gn), GrWriteConst({pad_cell, ConstInt(bigu(0))})));
+      if case Has(bzero_gn gr_num) = gr_bzero_subcell(clq, &gr, get(&pointeecells, 0), padding_offset, padding_count) {
         var nop2_gn = add_node(&gr, node(mk_array(bzero_gn, field_gn), GrNop(void)));
         field_and_padding_gn = nop2_gn;
       } else {
@@ -1573,6 +1591,17 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
   *return_cell_out = return_cell;
   *arg_cells_out = argcells;
   return true;
+}
+
+func gr_bzero_subcell(clq *clqueue, gr *frame_graph, c cell_num, offset u32, size u32) opt[gr_num] {
+  if size == 0 {
+    return None();
+  }
+  padtype cu_typrop = compute_prim(clq, primitive_padding_type(clq->cs, size));
+  pad_cell cell_num = add_cell(gr, {Has(LocationVirtual(void)), padtype.cu, padtype.props});
+  var subcell_gn = add_node(gr, node0(GrSubcell({pad_cell, c, OffsetConst(offset)})));
+  var bzero_gn = add_node(gr, node(mk_array(subcell_gn), GrWriteConst({pad_cell, ConstInt(bigu(0))})));
+  return Has(bzero_gn);
 }
 
 func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *u32, count_out *u32) void {
@@ -1651,6 +1680,7 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
 
   argtype *te_typeexpr;
   field_offset u32;
+  tag_end u32;
   tag_cell cell_num;
   if case &TeEnum(et te_enum) = &mec->enum_type.~ {
     argtype = &ref(&et.constructors, mec->constructor_index)->type;
@@ -1658,10 +1688,17 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
     cu cu_typeexpr;
     props type_properties;
     compute_prim(cs, clq, enum_tag_type(cs, &et), &cu, &props);
+    tag_end = props.flat_size;
     tag_cell = add_cell(&gr, {Has(LocationVirtual(void)), cu, props});
   } else {
     ice(_u8("magic_enum_construct on non-enum type"));
   }
+
+  prepadding_ogn opt[gr_num]
+    = gr_bzero_subcell(clq, &gr, retnum, tag_end, field_offset - tag_end);
+  field_end u32 = field_offset + mec->rhs_props.flat_size;
+  postpadding_ogn opt[gr_num]
+    = gr_bzero_subcell(clq, &gr, retnum, field_end, mec->enum_type_props.flat_size - field_end);
 
   argnum cell_num = add_cell(&gr, {Has(LocationRigid(void)), ~ *argtype, mec->rhs_props});
   retpart cell_num = add_cell(&gr, {Has(LocationVirtual(void)), ~ *argtype, mec->rhs_props});
@@ -1693,7 +1730,7 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
 
   var tagcell_gn = add_node(&gr, node0(GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)})));
   var tag_gn = add_node(&gr, node(mk_array(tagcell_gn), GrWriteConst({tag_cell, ConstInt(~tagval.~)})));
-  var gn = add_node(&gr, node(mk_array(tag_gn, assign_gn), GrNop(void)));
+  var gn = add_node(&gr, node(concat(Has(tag_gn), prepadding_ogn, Has(assign_gn), postpadding_ogn), GrNop(void)));
   *gr_out = gr;
   *gn_out = gn;
   *return_cell_out = retnum;

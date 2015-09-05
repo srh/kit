@@ -217,6 +217,21 @@ func[T] is_strictly_increasing(x *array[T]) bool {
   return true;
 }
 
+func[T] pushopt(x *array[T], a opt[T]) void {
+  if case &Has(t T) = &a {
+    push(x, t);
+  }
+}
+
+func[T] concat(a opt[T], b opt[T], c opt[T], d opt[T]) array[T] {
+  ret array[T];
+  pushopt(&ret, a);
+  pushopt(&ret, b);
+  pushopt(&ret, c);
+  pushopt(&ret, d);
+  return ret;
+}
+
 func[T] mk_array() array[T] {
   ret array[T];
   return ret;

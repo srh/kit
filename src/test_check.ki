@@ -1305,7 +1305,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "\n"
         "def t st = foo(- @[i32] 15);\n"));
 
-  // This used to fail because the interior padding of st was not zeroed, and defs must be fully initialized -- but now interior padding of structs is zeroed.
+  // This used to fail because the padding of st was not zeroed, and defs must be fully initialized -- but now padding of structs is zeroed.
   run_check_test(ctx, "c137-c",
     _u8("defclass copy cl i32;\n"
         "access cl {\n"
@@ -1325,17 +1325,27 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "\n"
         "def t st = foo(- @[i32] 15);\n"));
 
-  // TODO: This should pass -- we should zero-initialize the paddings of enums.'
-  run_check_negtest(ctx, "c137-d",
-    _u8("defenum en {\n"
+  // A defect of these padding tests is that they don't check copy/move padding behavior, because non-trivially-copyable types cannot be used in defs.
+
+  // This used to fail because the padding of en was not zeroed, and defs must be fully initialized.  But now padding of enums is zeroed.
+  // This also used to fail because enum initialization was incorrectly derived to be non-trivial, when it had a class member.
+  run_check_test(ctx, "c137-d",
+    _u8("defclass copy cl i16;\n"
+        "access cl {\n"
+        "  func do_init(x *cl) void {\n"
+        "    x->~ = 0x99;\n"
+        "  }\n"
+        "}\n"
+        "defenum en {\n"
         "  Foo i32;\n"
-        "  Bar i16;\n"
+        "  Bar cl;\n"
         "};\n"
-        "func bar(x i16) en {\n"
-        "  return Bar(x);\n"
+        "func bar() en {\n"
+        "  c cl;\n"
+        "  return Bar(c);\n"
         "}\n"
         "\n"
-        "def t en = bar(15);\n"));
+        "def t en = bar();\n"));
 
 }
 
