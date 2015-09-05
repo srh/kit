@@ -69,6 +69,28 @@ func is_selfcontained(val *st_value) bool {
   return empty(&val->symbolrefs) && empty(&val->objrefs);
 }
 
+func is_fully_initialized(plat *platform_info, val *st_value) bool {
+  ones array[u32] = mk_ones(plat, val->length);
+  mask array[u32] = initialization_mask(plat, &ones, val);
+  return array_equal(&ones, &mask);
+}
+
+func initialization_mask(plat *platform_info, ones *array[u32], val *st_value) array[u32] {
+  ret array[u32] = val->datas;
+  nsyms size = count(&val->symbolrefs);
+  for i size = 0; i < nsyms; i = i + 1 {
+    p *tup[u32, st_symbolref] = ref(&val->symbolrefs, i);
+    copy_bnnos(plat, ones, p->car, st_symbolref_size(plat, &p->cdr), &ret, p->car);
+  }
+  nptrs size = count(&val->objrefs);
+  for i size = 0; i < nptrs; i = i + 1 {
+    p *tup[u32, st_pointer] = ref(&val->objrefs, i);
+    copy_bnnos(plat, ones, p->car, st_pointer_size(plat, &p->cdr), &ret, p->car);
+  }
+
+  return ret;
+}
+
 func ref_obj(env *st_env, num st_obj_num, out **st_value) bool {
   if case &Has(v st_value) = ref(&env->pool->objects, num.~) {
     *out = &v;
@@ -304,15 +326,26 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
 
       defname string = lookup(clq->cs->im, ref_def_entry(clq->cs, ent_id)->def_name);
       if !st_eval_frame_regraphed(clq, &env, fg) {
+        ERR(_u8("(in evaling def "), defname, _u8(")"));
+        inst->evaled_value = FailedComputation();
         return false;
       }
       result st_obj_ref = cell_obj_ref(&env, fg->cell, "in st_eval_def");
       value st_value;
       if !obj_read(&env, result, &value) {
+        ERR(_u8("(in result from evaling def "), defname, _u8(")"));
+        inst->evaled_value = FailedComputation();
         return false;
       }
       if count(&value.objrefs) != 0 {
-        ice(_u8("def value has objrefs"));
+        ERR(_u8("def value (for "), defname, _u8(") has objrefs"));
+        inst->evaled_value = FailedComputation();
+        return false;
+      }
+      if !is_fully_initialized(&env.plat, &value) {
+        ERR(_u8("def value (for "), defname, _u8(") is not fully initialized"));
+        inst->evaled_value = FailedComputation();
+        return false;
       }
 
       inst->evaled_value = Computed(value);
@@ -328,6 +361,7 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
     }
     case &BeganComputing(v void): {
       ERR(_u8("recursively computing def inst's value"));
+      inst->evaled_value = FailedComputation();
       return false;
     }
     case &FailedComputation(v void): {
