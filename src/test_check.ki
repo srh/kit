@@ -1267,6 +1267,25 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  return u.x;\n"
         "}\n"
         "def x u32 = foo();\n"));
+
+  run_check_test(ctx, "c137",
+    _u8("deftype st struct {\n"
+        "  y [3]i8;\n"
+        "  z u8;\n"
+        "  x i32;\n"
+        "};\n"
+        "func foo(x i32) st {\n"
+        "  ret st;\n"
+        "  ret.y[0] = 0;\n"
+        "  ret.y[1] = 1;\n"
+        "  ret.y[2] = -2;\n"
+        "  ret.z = 5;\n"
+        "  ret.x = x;\n"
+        "  return ret;\n"
+        "}\n"
+        "\n"
+        "def x st = foo(- @[i32] 15);\n"));
+
 }
 
 func mk_ctx(name opt[array[u8]]) check_ctx { return {name, 0}; }
