@@ -1305,8 +1305,8 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "\n"
         "def t st = foo(- @[i32] 15);\n"));
 
-  // Fails because of a hole in the struct not getting initialized.  TODO: This should not fail!  Either get rid of the def-value-initialized check, _or_ struct initialization should zero-initialize holes so that structs can be safely memcpy'd without leaking information from memory.  (Right now, for trivial types, that is the case, since we memset the whole thing, and though you might think it's slightly nonsensical for defclass types to be memcpyable, it does make sense for "defclass copy" types that have a trivial destructor and copy constructor.)
-  run_check_negtest(ctx, "c137-c",
+  // This used to fail because the interior padding of st was not zeroed, and defs must be fully initialized -- but now interior padding of structs is zeroed.
+  run_check_test(ctx, "c137-c",
     _u8("defclass copy cl i32;\n"
         "access cl {\n"
         "  func do_init(x *cl) void {\n"
@@ -1324,6 +1324,18 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "\n"
         "def t st = foo(- @[i32] 15);\n"));
+
+  // TODO: This should pass -- we should zero-initialize the paddings of enums.'
+  run_check_negtest(ctx, "c137-d",
+    _u8("defenum en {\n"
+        "  Foo i32;\n"
+        "  Bar i16;\n"
+        "};\n"
+        "func bar(x i16) en {\n"
+        "  return Bar(x);\n"
+        "}\n"
+        "\n"
+        "def t en = bar(15);\n"));
 
 }
 

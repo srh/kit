@@ -934,6 +934,7 @@ deftype partial_struct_data struct {
   copy_level u32;
   destroy_level u32;
 
+  // TODO: Get rid of index?
   // This is of length "index." -- doesn't have all the fields if we stopped early.
   fields array[struct_field_info];
 };

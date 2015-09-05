@@ -112,6 +112,19 @@ func primitive_string_literal_type(cs *checkstate, n size) te_typeexpr {
   return TeArraytype({Has(~n), embox(primitive_u8_type(cs))});
 }
 
+func primitive_unsigned_bnno_type(cs *checkstate) te_typeexpr {
+  if cs->platform.bnno_size == 8 {
+    return primitive_u8_type(cs);
+  } else {
+    ice(_u8("primitive_unsigned_bnno_type: unsupported bnno_size"));
+    return fake();
+  }
+}
+
+func primitive_padding_type(cs *checkstate, n u32) te_typeexpr {
+  return TeArraytype({Has(n), embox(primitive_unsigned_bnno_type(cs))});
+}
+
 func primitive_function_puretype(cs *checkstate) te_puretype {
   return TePureName(cs->im->cym.fnsym);
 }
