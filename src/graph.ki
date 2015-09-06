@@ -591,7 +591,7 @@ func gr_unwind_vars(cs *checkstate, gr *frame_graph, destructions *array[destroy
   n size = count(destructions);
   for i size = 0; i < n; i = i + 1 {
     gn gr_num;
-    if !gr_destroy_action(cs, gr, ref(destructions, i), &gn) {
+    if !gr_destroy_action(cs, gr, ref(destructions, i), DeadAfterDestroyYes(void), &gn) {
       return false;
     }
     bn = add_node(gr, node0(GrSequence({gn, bn})));
@@ -858,7 +858,7 @@ func gr_index_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_index_ex
 
 func gr_later_discard(cs *checkstate, gr *frame_graph, a *ast_later_discard_info, out *gr_num) bool {
   if case &Has(da destroy_action) = &a->action {
-    return gr_destroy_action(cs, gr, &da, out);
+    return gr_destroy_action(cs, gr, &da, DeadAfterDestroyYes(void), out);
   } else {
     ice(_u8("ast_later_discard_info not annotated"));
     return fake();
@@ -914,7 +914,7 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       var nop = add_node(gr, node0(GrNop(void)));
       var assignnop = add_node(gr, node0(GrNop(void)));
       assign gr_num;
-      if !gr_after_actions(cs, gr, assignnop, &ci.conditional_actions, &assign) {
+      if !gr_after_actions(cs, gr, assignnop, &ci.conditional_actions, DeadAfterDestroyNo(void), &assign) {
         return false;
       }
       cases array[tup[gr_const, gr_num]] = mk_array(cons(ConstInt(~ @[u32] 0), assign), cons(ConstInt(~ @[u32] 1), nop));
@@ -1052,11 +1052,21 @@ func rval_cell(x *is_lval) cell_num {
   }
 }
 
+// TODO: This is a lame and fragile way to specify when to make cells be GrDead.
+defenum dead_after_destroy {
+  DeadAfterDestroyYes void;
+  DeadAfterDestroyNo void;
+};
+
 func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *array[after_action], out *gr_num) bool {
+  return gr_after_actions(cs, gr, prec, x, DeadAfterDestroyYes(void), out);
+}
+
+func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *array[after_action], dad dead_after_destroy, out *gr_num) bool {
   nacts size = count(x);
   for i size = 0; i < nacts; i = i + 1 {
     dep gr_num;
-    if !gr_after_action(cs, gr, ref(x, i), &dep) {
+    if !gr_after_action(cs, gr, ref(x, i), dad, &dep) {
       return false;
     }
     prec = add_node(gr, node0(GrSequence({prec, dep})));
@@ -1065,7 +1075,7 @@ func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *array[aft
   return true;
 }
 
-func gr_after_action(cs *checkstate, gr *frame_graph, x *after_action, out *gr_num) bool {
+func gr_after_action(cs *checkstate, gr *frame_graph, x *after_action, dad dead_after_destroy, out *gr_num) bool {
   switch x {
     case &CopyAfter(ca copy_action): {
       return gr_bi_action(cs, gr, &ca.~, out);
@@ -1079,7 +1089,7 @@ func gr_after_action(cs *checkstate, gr *frame_graph, x *after_action, out *gr_n
       return true;
     }
     case &DestroyAfter(da destroy_action): {
-      return gr_destroy_action(cs, gr, &da, out);
+      return gr_destroy_action(cs, gr, &da, dad, out);
     }
   }
 }
@@ -1107,16 +1117,26 @@ func gr_init_action(cs *checkstate, gr *frame_graph, x *init_action, out *gr_num
   }
 }
 
-func gr_destroy_action(cs *checkstate, gr *frame_graph, x *destroy_action, out *gr_num) bool {
+func gr_destroy_action(cs *checkstate, gr *frame_graph, x *destroy_action, dad dead_after_destroy, out *gr_num) bool {
   switch &x->ctor {
     case &UniTrivialCtor(v void): {
-      var dp = add_node(gr, node0(GrDead({x->arg})));
+      dp gr_num;
+      if case DeadAfterDestroyYes(v2 void) = dad {
+        dp = add_node(gr, node0(GrDead({x->arg})));
+      } else {
+        dp = add_node(gr, node0(GrNop(void)));
+      }
       *out = dp;
       return true;
     }
     case &UniFunCtor(desc uni_fun_ctor_desc): {
       gn gr_num = gr_uni_fun_ctor_desc(cs, gr, &desc, x->arg);
-      var dp = add_node(gr, node(mk_array(gn), GrDead({x->arg})));
+      dp gr_num;
+      if case DeadAfterDestroyYes(v2 void) = dad {
+        dp = add_node(gr, node(mk_array(gn), GrDead({x->arg})));
+      } else {
+        dp = gn;
+      }
       *out = dp;
       return true;
     }

@@ -567,21 +567,17 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         }
 
       case &GrDead(a gr_dead):
-        // We disable GrDead because its logic is broken (in graph generation) right now.
-        // TODO: Remove GrDead, or make its usage (in assignment) be non-bogus.
-        if false {
-          // We should only be using GrDead for cells that own the whole object.
-          if case &Has(objref st_obj_ref) = ref(&env->framecells, a.cell.~) {
-            if !is_full_oref(env, objref) {
-              ice(_u8("GrDead sees non-full objref"));
-            }
-            set(&env->pool->objects, objref.num.~, None());
-          } else {
-            ice(_u8("GrDead deading inactive cell"));
+        // We make the object destroyed and mark its cell inactive.
+        if case &Has(objref st_obj_ref) = ref(&env->framecells, a.cell.~) {
+          // (We should only be using GrDead for cells that own the whole object.)
+          if !is_full_oref(env, objref) {
+            ice(_u8("GrDead sees non-full objref"));
           }
-          // This line means GrDead needs to be for temporaries and variables that went out of scope, not for intermediate destruction of a variable.
-          set(&env->framecells, a.cell.~, None());
+          set(&env->pool->objects, objref.num.~, None());
+        } else {
+          ice(_u8("GrDead deading inactive cell"));
         }
+        set(&env->framecells, a.cell.~, None());
 
       case &GrNop(v void):
         // Do nothing
