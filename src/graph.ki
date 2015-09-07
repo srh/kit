@@ -520,7 +520,11 @@ func gr_condition(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_co
       for i size = 0; i < n; i = i + 1 {
         tag enum_tag_value = mk_enum_tag_value(i);
         if info->matching_tag_value.~ == tag.~ {
-          push(&cases, cons(ConstInt(~tag.~), thengn));
+          cp_info *ast_cp_info = unHas(&pa.pattern.cp_info);
+          vi *var_info = ref(&fb->all_vars, cp_info->vn.~);
+          var vcgn = add_node(gr, node0(GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)})));
+          var gn = add_node(gr, node0(GrSequence({vcgn, thengn})));
+          push(&cases, cons(ConstInt(~tag.~), gn));
         } else {
           push(&cases, cons(ConstInt(~tag.~), elsegn));
         }
