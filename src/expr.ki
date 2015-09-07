@@ -162,8 +162,9 @@ deftype var_info struct {
   type cu_typeexpr;
   props type_properties;
   cell cell_num;
-  name sym;
-  // Can a goto statement enter this var's scope and construct the var?  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)
+  name opt[sym];
+  // Can a goto statement enter this var's scope and construct the var?  True if the var is self-contained.  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)  This also means the var needs to be destructed by return statements and gotos that leave its scope.  TODO: What about default cases of switch statements?  You shouldn't be able to goto into one of those?  But you should be able to goto into the else block of an "if case" -- this needs to be fixed?  Should the swartch get destroyed?  Are we treating the "destroy later" of the condition properly?
+  // TODO: Rename.
   autoinit var_binding;
   initter opt[ctor_desc];
   destroyer opt[ctor_desc];
@@ -212,17 +213,23 @@ func do_destroy(vp *varpopper) void {
   vp->es = null;
 }
 
-func es_push_var(es *framescope, vp *varpopper, cell cell_num, name *ast_ident, computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) bool {
-  if case Has(num var_number) = es_find_current_local(es, name->value) {
-    ERR(_u8("Local variable '"), lookup(es->im, name->value), _u8("' shadows another"));
-    return false;
+func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) bool {
+  osymname opt[sym];
+  if case Has(ident *ast_ident) = name {
+    osymname = Has(ident->value);
+    if case Has(num var_number) = es_find_current_local(es, ident->value) {
+      ERR(_u8("Local variable '"), lookup(es->im, ident->value), _u8("' shadows another"));
+      return false;
+    }
+  } else {
+    osymname = None();
   }
   props type_properties;
   if !compute_type_properties(es->cs, es->clq, computed_type, &props) {
     return false;
   }
   num var_number = ~count(&es->all_vars);
-  push(&es->all_vars, {num, *computed_type, props, cell, name->value, binding, None(), None()});
+  push(&es->all_vars, {num, *computed_type, props, cell, osymname, binding, None(), None()});
   push(&es->current_vars, num);
   push(&vp->nums, num);
   *vn_out = num;
@@ -557,8 +564,10 @@ func es_find_current_local(es *framescope, name sym) opt[var_number] {
   for i size = 0; i < n; i = i + 1 {
     num var_number = get(&es->current_vars, i);
     inf *var_info = ref_var(es, num);
-    if inf->name == name {
-      return Has(num);
+    if case Has(s sym) = inf->name {
+      if s == name {
+        return Has(num);
+      }
     }
   }
   return None();
@@ -1422,7 +1431,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *array
     push(&arg_cells, cell);
     vn var_number;
     // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
-    if !es_push_var(&bs->es, &vp, cell, &ref(&a->args, i)->name, &cu_param, VarSelfContained(void), &vn) {
+    if !es_push_var(&bs->es, &vp, cell, Has(&ref(&a->args, i)->name), &cu_param, VarSelfContained(void), &vn) {
       return false;
     }
     if !es_note_var_destroyer(&bs->es, vn) {

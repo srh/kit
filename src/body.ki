@@ -138,11 +138,15 @@ func make_destructions(es *framescope, vns *array[var_number], out *array[destro
   destructions array[destroy_action];
   n size = count(vns);
   for i size = 0; i < n; i = i + 1 {
-    da destroy_action;
-    if !make_destroy_action(es, get(vns, i), &da) {
-      return false;
+    vn var_number = get(vns, i);
+    vi *var_info = ref_var(es, vn);
+    if vi->autoinit == VarSelfContained(void) {
+      da destroy_action;
+      if !make_destroy_action(es, get(vns, i), &da) {
+        return false;
+      }
+      push(&destructions, da);
     }
-    push(&destructions, da);
   }
   *out = destructions;
   return true;
@@ -196,9 +200,12 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
     }
 
     case &IfThen(b ast_ifthen_statement): {
+      swartch_vp varpopper;
+      init_vp(&swartch_vp, &bs->es);
+
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
-      if !check_condition(&bs->es, &cond_vp, &b.condition, &b.condition_discard) {
+      if !check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard) {
         return false;
       }
       body_ee entryexit;
@@ -213,9 +220,12 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
     }
 
     case &IfThenElse(b ast_ifthenelse_statement): {
+      swartch_vp varpopper;
+      init_vp(&swartch_vp, &bs->es);
+
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
-      if !check_condition(&bs->es, &cond_vp, &b.condition, &b.condition_discard) {
+      if !check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard) {
         return false;
       }
       then_ee entryexit;
@@ -236,9 +246,12 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
     }
 
     case &While(b ast_while_statement): {
+      swartch_vp varpopper;
+      init_vp(&swartch_vp, &bs->es);
+
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
-      if !check_condition(&bs->es, &cond_vp, &b.condition, &b.condition_discard) {
+      if !check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard) {
         return false;
       }
       body_ee entryexit;
@@ -310,6 +323,12 @@ func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statemen
 
   if case &TeEnum(et te_enum) = enum_type {
     ncases size = count(&a->cases);
+    swartch_vp varpopper;
+    init_vp(&swartch_vp, &bs->es);
+    swartch_vn var_number;
+    if !es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None(), swartch_type, VarSelfContained(void), &swartch_vn) {
+      return false;
+    }
     for i size = 0; i < ncases; i = i + 1 {
       cas *ast_switch_case = ref(&a->cases, i);
       for j size = 0; j < i; j = j + 1 {
@@ -355,7 +374,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statemen
           }
           cell cell_num = add_virtual_cell(&bs->es, cu_expected_type, expected_type_props);
           vn var_number;
-          if !es_push_var(&bs->es, &case_vp, cell, &patt.decl.name, &cu_expected_type, VarVirtual(void), &vn) {
+          if !es_push_var(&bs->es, &case_vp, cell, Has(&patt.decl.name), &cu_expected_type, VarVirtual(void), &vn) {
             return false;
           }
 
@@ -480,7 +499,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
   }
 
   vn var_number;
-  if !es_push_var(&bs->es, vp, cell, &a->decl.name, complete_type, VarSelfContained(void), &vn) {
+  if !es_push_var(&bs->es, vp, cell, Has(&a->decl.name), complete_type, VarSelfContained(void), &vn) {
     return false;
   }
   a->info = Has({vn});
@@ -560,7 +579,7 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
   return false;
 }
 
-func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later *ast_later_discard_info) bool {
+func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, later *ast_later_discard_info) bool {
   switch a {
     case &ExprCondition(b box[ast_expr_consume]): {
       booltype cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
@@ -591,6 +610,13 @@ func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later
       // enum_type is complete, because complete_structural_rhs.
 
       if case &TeEnum(et te_enum) = enum_type {
+        if true {
+          swartch_vn var_number;
+          if !es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None(), swartch_type, VarSelfContained(void), &swartch_vn) {
+            return false;
+          }
+        }
+
         if isHas(&b.pattern.addressof_constructor) != is_ptr {
           ERR(_u8("condition pattern pointeriness mismatch"));
           return false;
@@ -625,7 +651,7 @@ func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later
         tag_cell cell_num = add_virtual_tag_cell(es, &et);
         set(&b.info, {{tag_cell, ~count(&et.constructors)}, mk_enum_tag_value(decl_index)});
         vn var_number;
-        if !es_push_var(es, cond_vp, cell, &b.pattern.decl.name, &cu_expected_type, VarVirtual(void), &vn) {
+        if !es_push_var(es, cond_vp, cell, Has(&b.pattern.decl.name), &cu_expected_type, VarVirtual(void), &vn) {
           return false;
         }
 
