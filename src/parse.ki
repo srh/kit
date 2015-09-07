@@ -1189,13 +1189,13 @@ func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
 }
 
 func parse_rest_of_while_statement(p *ps, out *ast_statement) bool {
-  condition ast_expr;
+  condition ast_condition;
   body ast_bracebody;
-  if !(parse_expr(p, kConditionPrec, &condition)
+  if !(parse_condition(p, &condition)
        && parse_bracebody(p, &body)) {
     return Fail;
   }
-  *out = While({mk_later(), ExprCondition(embox(consume(condition))), body});
+  *out = While({mk_later(), condition, body});
   return true;
 }
 

@@ -1306,7 +1306,7 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
           oo(&mod)->buf = arr;
           p ps = make_ps(cs->im, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
           if !parse_file(&p, &oo(&mod)->file) {
-            ERR(_u8("Trouble parsing module "), lookup(cs->im, mod_name));
+            ERR(_u8("Trouble parsing module "), lookup(cs->im, mod_name), _u8(" at offset "), peek(&p).interval.left.~);
             return None();
           }
           mod_id module_id = ~count(&cs->modules);
