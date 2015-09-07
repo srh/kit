@@ -1347,6 +1347,38 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "\n"
         "def t en = bar();\n"));
 
+  run_check_test(ctx, "c138-a",
+    _u8("defenum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "};\n"
+        "func foo(x opt[i32]) i32 {\n"
+        "  switch x {\n"
+        "  case Has(y i32):\n"
+        "    return y + 3;\n"
+        "  case None(v void):\n"
+        "    return 99;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo(None(void));\n"
+        "def d2 i32 = foo(Has(@[i32]40));\n"
+        ));
+  run_check_test(ctx, "c138-b",
+    _u8("defenum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "};\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  switch x {\n"
+        "  case Has(y i32):\n"
+        "    return y + 3;\n"
+        "  case None(v void):\n"
+        "    return 99;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
 }
 
 func mk_ctx(name opt[array[u8]]) check_ctx { return {name, 0}; }

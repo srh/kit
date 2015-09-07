@@ -355,8 +355,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statemen
           }
           cell cell_num = add_virtual_cell(&bs->es, cu_expected_type, expected_type_props);
           vn var_number;
-          // Can't auto-initialize bound case variables, be the switch be over a pointer or not.
-          if !es_push_var(&bs->es, &case_vp, cell, &patt.decl.name, &cu_expected_type, AutoInitNo(void), &vn) {
+          if !es_push_var(&bs->es, &case_vp, cell, &patt.decl.name, &cu_expected_type, VarVirtual(void), &vn) {
             return false;
           }
 
@@ -481,7 +480,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
   }
 
   vn var_number;
-  if !es_push_var(&bs->es, vp, cell, &a->decl.name, complete_type, AutoInitYes(void), &vn) {
+  if !es_push_var(&bs->es, vp, cell, &a->decl.name, complete_type, VarSelfContained(void), &vn) {
     return false;
   }
   a->info = Has({vn});
@@ -626,7 +625,7 @@ func check_condition(es *framescope, cond_vp *varpopper, a *ast_condition, later
         tag_cell cell_num = add_virtual_tag_cell(es, &et);
         set(&b.info, {{tag_cell, ~count(&et.constructors)}, mk_enum_tag_value(decl_index)});
         vn var_number;
-        if !es_push_var(es, cond_vp, cell, &b.pattern.decl.name, &cu_expected_type, AutoInitNo(void), &vn) {
+        if !es_push_var(es, cond_vp, cell, &b.pattern.decl.name, &cu_expected_type, VarVirtual(void), &vn) {
           return false;
         }
 
@@ -686,7 +685,7 @@ func connect_gotos(bs *bodystate) bool {
       for k size = 0; k < nconstruct; k = k + 1 {
         vn var_number = get(&construct, k);
         vi *var_info = ref_var(&bs->es, vn);
-        if vi->autoinit == AutoInitNo(void) {
+        if vi->autoinit == VarVirtual(void) {
           ERR(_u8("goto for label '"), lookup(bs->im, l->label_name), _u8("' enters non-initializable variable's scope"));
           return false;
         }

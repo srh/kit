@@ -145,12 +145,14 @@ func `<`(x var_number, y var_number) bool {
   return x.~ < y.~;
 }
 
-defenum var_autoinit {
-  AutoInitNo void;
-  AutoInitYes void;
+defenum var_binding {
+  // Is the variable "virtual" -- it overlays some other object, in a switch/etc?
+  VarVirtual void;
+  // The variable's a self-contained object -- it gets destroyed or not.
+  VarSelfContained void;
 };
 
-func `==`(x var_autoinit, y var_autoinit) bool {
+func `==`(x var_binding, y var_binding) bool {
   return enumnum(&x) == enumnum(&y);
 }
 
@@ -162,7 +164,7 @@ deftype var_info struct {
   cell cell_num;
   name sym;
   // Can a goto statement enter this var's scope and construct the var?  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)
-  autoinit var_autoinit;
+  autoinit var_binding;
   initter opt[ctor_desc];
   destroyer opt[ctor_desc];
 };
@@ -210,7 +212,7 @@ func do_destroy(vp *varpopper) void {
   vp->es = null;
 }
 
-func es_push_var(es *framescope, vp *varpopper, cell cell_num, name *ast_ident, computed_type *cu_typeexpr, autoinit var_autoinit, vn_out *var_number) bool {
+func es_push_var(es *framescope, vp *varpopper, cell cell_num, name *ast_ident, computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) bool {
   if case Has(num var_number) = es_find_current_local(es, name->value) {
     ERR(_u8("Local variable '"), lookup(es->im, name->value), _u8("' shadows another"));
     return false;
@@ -220,7 +222,7 @@ func es_push_var(es *framescope, vp *varpopper, cell cell_num, name *ast_ident, 
     return false;
   }
   num var_number = ~count(&es->all_vars);
-  push(&es->all_vars, {num, *computed_type, props, cell, name->value, autoinit, None(), None()});
+  push(&es->all_vars, {num, *computed_type, props, cell, name->value, binding, None(), None()});
   push(&es->current_vars, num);
   push(&vp->nums, num);
   *vn_out = num;
@@ -1420,7 +1422,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *array
     push(&arg_cells, cell);
     vn var_number;
     // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
-    if !es_push_var(&bs->es, &vp, cell, &ref(&a->args, i)->name, &cu_param, AutoInitYes(void), &vn) {
+    if !es_push_var(&bs->es, &vp, cell, &ref(&a->args, i)->name, &cu_param, VarSelfContained(void), &vn) {
       return false;
     }
     if !es_note_var_destroyer(&bs->es, vn) {
