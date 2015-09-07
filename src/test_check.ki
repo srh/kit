@@ -1379,6 +1379,27 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def d1 i32 = foo();\n"
         ));
+
+  // Maybe this test should fail, because the swartch should be alive during the default case, and the goto shouldn't be able to jump into the default case and default-initialize the swartch, the way it is doing right now.  Or should it?  Someday for non-scoped variables we'd want the swartch to die before entering the default case, so it seems fine to allow default-initialization now, especially since, for enum values (and ints, if we implement that), the default-constructed value is the trivially-initializable zero-tag value.
+  run_check_test(ctx, "c139",
+    _u8("defenum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "};\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  z i32 = 6;\n"
+        "  switch x {\n"
+        "  case Has(y i32):\n"
+        "    z = z + y;\n"
+        "  default:\n"
+        "    label baaz;\n"
+        "    return z;\n"
+        "  }\n"
+        "  goto baaz;\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
 }
 
 func mk_ctx(name opt[array[u8]]) check_ctx { return {name, 0}; }
