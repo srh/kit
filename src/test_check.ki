@@ -1447,7 +1447,63 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def d1 i32 = foo();\n"
         ));
 
+  // Analogues of c138-a,b.
   run_check_test(ctx, "c141-a",
+    _u8("defenum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "};\n"
+        "func foo(x opt[i32]) i32 {\n"
+        "  switch &x {\n"
+        "  case &Has(y i32):\n"
+        "    return y + 3;\n"
+        "  case &None(v void):\n"
+        "    return 99;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo(None(void));\n"
+        "def d2 i32 = foo(Has(@[i32]40));\n"
+        ));
+  run_check_test(ctx, "c141-b",
+    _u8("defenum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "};\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  switch &x {\n"
+        "  case &Has(y i32):\n"
+        "    return y + 3;\n"
+        "  case &None(v void):\n"
+        "    return 99;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+
+  // Analogue of c139, and maybe this test should fail, because of the goto.  (Maybe not, because the swartch is a pointer this time.)
+  run_check_test(ctx, "c142",
+    _u8("defenum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "};\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  z i32 = 6;\n"
+        "  switch &x {\n"
+        "  case &Has(y i32):\n"
+        "    z = z + y;\n"
+        "  default:\n"
+        "    label baaz;\n"
+        "    return z;\n"
+        "  }\n"
+        "  goto baaz;\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+
+  // Analogues of c140-a,b,c.
+  run_check_test(ctx, "c143-a",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1462,7 +1518,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def d1 i32 = foo();\n"
         ));
-  run_check_test(ctx, "c141-b",
+  run_check_test(ctx, "c143-b",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1477,7 +1533,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def d1 i32 = foo();\n"
         ));
-  run_check_test(ctx, "c141-c",
+  run_check_test(ctx, "c143-c",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"

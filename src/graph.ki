@@ -312,6 +312,9 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
     return false;
   }
 
+  param_discard *te_typeexpr;
+  is_ptr bool = decompose_typeapp(&expr_complete_type(&oo(&a->swartch)->expr)->~, primitive_pointer_puretype(cs), &param_discard);
+
   var exitseq = add_node(gr, node0(GrSequence({swartch_discard_gn, outflow})));
 
   info *ast_enum_deconstruction_info = unHas(&a->info);
@@ -329,7 +332,12 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
       case &Case(cp ast_constructor_pattern): {
         cp_info *ast_cp_info = unHas(&cp.cp_info);
         vi *var_info = ref(&fb->all_vars, cp_info->vn.~);
-        var vcgn = add_node(gr, node0(GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)})));
+        vcgn gr_num;
+        if is_ptr {
+          vcgn = add_node(gr, node0(GrDeref({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)})));
+        } else {
+          vcgn = add_node(gr, node0(GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)})));
+        }
         var gn = add_node(gr, node0(GrSequence({vcgn, body_gn})));
         push(&cases, cons(ConstInt(~cp_info->tag_value.~), gn));
       }
@@ -344,7 +352,12 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
     return false;
   }
 
-  var taggn = add_node(gr, node(mk_array(swartch_gn), GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)})));
+  taggn gr_num;
+  if is_ptr {
+    taggn = add_node(gr, node(mk_array(swartch_gn), GrDeref({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)})));
+  } else {
+    taggn = add_node(gr, node(mk_array(swartch_gn), GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)})));
+  }
 
   var br = add_node(gr, node(mk_array(taggn), GrBranch({info->tag_cell, cases, default_case})));
 
