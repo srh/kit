@@ -513,8 +513,15 @@ func gr_condition(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_co
       if !gr_expr_consume(cs, gr, oo(&pa.rhs), &rhs) {
         return false;
       }
+
       info *ast_pattern_assign_info = unHas(&pa.info);
-      taggn gr_num = add_node(gr, node(mk_array(rhs), GrSubcell({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)})));
+      // TODO: Avoid the duplicate checks for addressof_constructor, only do one GrDeref.
+      taggn gr_num;
+      if isHas(&pa.pattern.addressof_constructor) {
+        taggn = add_node(gr, node(mk_array(rhs), GrDeref({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)})));
+      } else {
+        taggn = add_node(gr, node(mk_array(rhs), GrSubcell({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)})));
+      }
       cases array[tup[gr_const, gr_num]];
       n size = info->deconstruct.num_enum_constructors;
       for i size = 0; i < n; i = i + 1 {
@@ -522,7 +529,12 @@ func gr_condition(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_co
         if info->matching_tag_value.~ == tag.~ {
           cp_info *ast_cp_info = unHas(&pa.pattern.cp_info);
           vi *var_info = ref(&fb->all_vars, cp_info->vn.~);
-          var vcgn = add_node(gr, node0(GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)})));
+          vcgn gr_num;
+          if isHas(&pa.pattern.addressof_constructor) {
+            vcgn = add_node(gr, node0(GrDeref({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)})));
+          } else {
+            vcgn = add_node(gr, node0(GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)})));
+          }
           var gn = add_node(gr, node0(GrSequence({vcgn, thengn})));
           push(&cases, cons(ConstInt(~tag.~), gn));
         } else {

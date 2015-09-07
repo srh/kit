@@ -1401,7 +1401,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def d1 i32 = foo();\n"
         ));
 
-  run_check_test(ctx, "c140-@",
+  run_check_test(ctx, "c140-a",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1416,7 +1416,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def d1 i32 = foo();\n"
         ));
-  run_check_test(ctx, "c140-a",
+  run_check_test(ctx, "c140-b",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1431,7 +1431,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def d1 i32 = foo();\n"
         ));
-  run_check_test(ctx, "c140-b",
+  run_check_test(ctx, "c140-c",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1439,6 +1439,52 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "func foo() i32 {\n"
         "  x opt[i32] = None(void);\n"
         "  if case Has(y i32) = x {\n"
+        "    return y + 1;\n"
+        "  } else {\n"
+        "    return 81;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+
+  run_check_test(ctx, "c141-a",
+    _u8("defenum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "};\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  if case &Has(y i32) = &x {\n"
+        "    return y;\n"
+        "  } else {\n"
+        "    return 81;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+  run_check_test(ctx, "c141-b",
+    _u8("defenum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "};\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  if case &Has(y i32) = &x {\n"
+        "    return y + 1;\n"
+        "  } else {\n"
+        "    return 81;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+  run_check_test(ctx, "c141-c",
+    _u8("defenum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "};\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = None(void);\n"
+        "  if case &Has(y i32) = &x {\n"
         "    return y + 1;\n"
         "  } else {\n"
         "    return 81;\n"
