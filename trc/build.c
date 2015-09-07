@@ -149,11 +149,10 @@ int generate_kit_name(struct checkstate *cs,
     databuf_append(&b, name, name_count);
   } else {
     if (cs->target_linux32) {
-      databuf_append(&b, "kit_", 4);
+      databuf_append_c_str(&b, "kit_");
     } else {
-      databuf_append(&b, "_kit_", 5);
+      databuf_append_c_str(&b, "_kit_");
     }
-    databuf_append(&b, name, name_count);
 
     /* I just don't want to lookup the stdarg documentation and
     implement databuf_appendf. */
@@ -173,6 +172,8 @@ int generate_kit_name(struct checkstate *cs,
     }
 
     databuf_append(&b, rbuf, i);
+    databuf_append_c_str(&b, "_");
+    databuf_append(&b, name, name_count);
   }
   databuf_move_destroy(&b, gen_name_out, gen_name_count_out);
   return 1;
@@ -189,7 +190,7 @@ uint32_t add_data_string(struct checkstate *cs, struct objfile *f,
   ident_value index = identmap_intern(&cs->sli_values, data, length);
   CHECK(index <= cs->sli_symbol_table_indexes_count);
   if (index == cs->sli_symbol_table_indexes_count) {
-    char name[] = "$string_literal";
+    char name[] = "string_literal$";
     void *gen_name;
     size_t gen_name_count;
     if (!generate_kit_name(cs, name, strlen(name),
@@ -258,9 +259,16 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
   for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
     struct def_instantiation *inst = ent->instantiations[i];
 
+    struct databuf namebuf;
+    databuf_init(&namebuf);
+    databuf_append(&namebuf, name, name_count);
+    if (inst->owner->generics.has_type_params) {
+      sprint_type_param_list(&namebuf, cs->im, inst->substitutions, inst->substitutions_count);
+    }
+
     void *gen_name;
     size_t gen_name_count;
-    if (!generate_kit_name(cs, name, name_count,
+    if (!generate_kit_name(cs, namebuf.buf, namebuf.count,
                            ent->is_export,
                            &gen_name, &gen_name_count)) {
       return 0;

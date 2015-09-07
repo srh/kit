@@ -63,14 +63,7 @@ void sprint_typeexpr(struct databuf *b, struct identmap *im, struct ast_typeexpr
   } break;
   case AST_TYPEEXPR_APP: {
     sprint_ident(b, im, &a->u.app.name);
-    databuf_append_c_str(b, "[");
-    for (size_t i = 0, e = a->u.app.params_count; i < e; i++) {
-      if (i != 0) {
-        databuf_append_c_str(b, ", ");
-      }
-      sprint_typeexpr(b, im, &a->u.app.params[i]);
-    }
-    databuf_append_c_str(b, "]");
+    sprint_type_param_list(b, im, a->u.app.params, a->u.app.params_count);
   } break;
   case AST_TYPEEXPR_STRUCTE: {
     databuf_append_c_str(b, "struct");
@@ -96,6 +89,17 @@ void sprint_typeexpr(struct databuf *b, struct identmap *im, struct ast_typeexpr
     databuf_append_c_str(b, "?" "?" "?typeexpr");
     break;
   }
+}
+
+void sprint_type_param_list(struct databuf *b, struct identmap *im, struct ast_typeexpr *types, size_t types_count) {
+  databuf_append_c_str(b, "[");
+  for (size_t i = 0; i < types_count; i++) {
+    if (i) {
+      databuf_append_c_str(b, ", ");
+    }
+    sprint_typeexpr(b, im, &types[i]);
+  }
+  databuf_append_c_str(b, "]");
 }
 
 void DBG_typeexpr(const char *msg, struct identmap *im, struct ast_typeexpr *a) {
