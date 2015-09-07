@@ -1626,6 +1626,55 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def d1 i32 = foo();\n"));
 
+  // A general for loop test.
+  run_check_test(ctx, "c142",
+    _u8("func fac(x i32) i32 {\n"
+        "  acc i32 = 1;\n"
+        "  for i i32 = 1; i <= x; i = i + 1 {\n"
+        "    acc = acc * i;\n"
+        "  }\n"
+        "  return acc;\n"
+        "}\n"
+        "def d1 i32 = fac(7);\n"));
+
+  // Fails because we overflow an i32.
+  run_check_negtest(ctx, "c143",
+    _u8("func fac(x i32) i32 {\n"
+        "  acc i32 = 1;\n"
+        "  for i i32 = 1; i <= x; i = i + 1 {\n"
+        "    acc = acc * i;\n"
+        "  }\n"
+        "  return acc;\n"
+        "}\n"
+        "def d1 i32 = fac(13);\n"));
+
+  // We use gotos to make a loop.
+  run_check_test(ctx, "c144-a",
+    _u8("func fac(x i32) i32 {\n"
+        "  acc i32 = 1;\n"
+        "  label top;\n"
+        "  if x == 0 {\n"
+        "    return acc;\n"
+        "  }\n"
+        "  acc = acc * x;\n"
+        "  x = x - 1;\n"
+        "  goto top;\n"
+        "}\n"
+        "def d1 i32 = fac(7);\n"));
+  run_check_test(ctx, "c144-b",
+    _u8("func fac(x i32) i32 {\n"
+        "  acc i32 = 1;\n"
+        "  label top;\n"
+        "  if x == 0 {\n"
+        "    goto bottom;\n"
+        "  }\n"
+        "  acc = acc * x;\n"
+        "  x = x - 1;\n"
+        "  goto top;\n"
+        "  label bottom;\n"
+        "  return acc;\n"
+        "}\n"
+        "def d1 i32 = fac(7);\n"));
 }
 
 func mk_ctx(name opt[array[u8]]) check_ctx { return {name, 0}; }
