@@ -1347,7 +1347,9 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "\n"
         "def t en = bar();\n"));
 
-  run_check_test(ctx, "c138-a",
+  // The next few tests involved switch statements and pattern-conditionals.  They come in direct/pointer variants with "/d" and "/p" in their names.
+
+  run_check_test(ctx, "c138-a/d",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1363,7 +1365,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def d1 i32 = foo(None(void));\n"
         "def d2 i32 = foo(Has(@[i32]40));\n"
         ));
-  run_check_test(ctx, "c138-b",
+  run_check_test(ctx, "c138-b/d",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1380,8 +1382,41 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def d1 i32 = foo();\n"
         ));
 
+  run_check_test(ctx, "c138-a/p",
+    _u8("defenum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "};\n"
+        "func foo(x opt[i32]) i32 {\n"
+        "  switch &x {\n"
+        "  case &Has(y i32):\n"
+        "    return y + 3;\n"
+        "  case &None(v void):\n"
+        "    return 99;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo(None(void));\n"
+        "def d2 i32 = foo(Has(@[i32]40));\n"
+        ));
+  run_check_test(ctx, "c138-b/p",
+    _u8("defenum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "};\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  switch &x {\n"
+        "  case &Has(y i32):\n"
+        "    return y + 3;\n"
+        "  case &None(v void):\n"
+        "    return 99;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+
   // Maybe this test should fail, because the swartch should be alive during the default case, and the goto shouldn't be able to jump into the default case and default-initialize the swartch, the way it is doing right now.  Or should it?  Someday for non-scoped variables we'd want the swartch to die before entering the default case, so it seems fine to allow default-initialization now, especially since, for enum values (and ints, if we implement that), the default-constructed value is the trivially-initializable zero-tag value.
-  run_check_test(ctx, "c139",
+  run_check_test(ctx, "c139/d",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1401,7 +1436,28 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def d1 i32 = foo();\n"
         ));
 
-  run_check_test(ctx, "c140-a",
+  // Unlike 139/d, maybe this should not fail, no matter what, because the swartch is a pointer and doesn't get destructed at all.
+  run_check_test(ctx, "c139/p",
+    _u8("defenum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "};\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  z i32 = 6;\n"
+        "  switch &x {\n"
+        "  case &Has(y i32):\n"
+        "    z = z + y;\n"
+        "  default:\n"
+        "    label baaz;\n"
+        "    return z;\n"
+        "  }\n"
+        "  goto baaz;\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+
+  run_check_test(ctx, "c140-a/d",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1416,7 +1472,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def d1 i32 = foo();\n"
         ));
-  run_check_test(ctx, "c140-b",
+  run_check_test(ctx, "c140-b/d",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1431,7 +1487,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def d1 i32 = foo();\n"
         ));
-  run_check_test(ctx, "c140-c",
+  run_check_test(ctx, "c140-c/d",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1447,63 +1503,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def d1 i32 = foo();\n"
         ));
 
-  // Analogues of c138-a,b.
-  run_check_test(ctx, "c141-a",
-    _u8("defenum[T] opt {\n"
-        "  Has T;\n"
-        "  None void;\n"
-        "};\n"
-        "func foo(x opt[i32]) i32 {\n"
-        "  switch &x {\n"
-        "  case &Has(y i32):\n"
-        "    return y + 3;\n"
-        "  case &None(v void):\n"
-        "    return 99;\n"
-        "  }\n"
-        "}\n"
-        "def d1 i32 = foo(None(void));\n"
-        "def d2 i32 = foo(Has(@[i32]40));\n"
-        ));
-  run_check_test(ctx, "c141-b",
-    _u8("defenum[T] opt {\n"
-        "  Has T;\n"
-        "  None void;\n"
-        "};\n"
-        "func foo() i32 {\n"
-        "  x opt[i32] = Has(4);\n"
-        "  switch &x {\n"
-        "  case &Has(y i32):\n"
-        "    return y + 3;\n"
-        "  case &None(v void):\n"
-        "    return 99;\n"
-        "  }\n"
-        "}\n"
-        "def d1 i32 = foo();\n"
-        ));
-
-  // Analogue of c139, and maybe this test should fail, because of the goto.  (Maybe not, because the swartch is a pointer this time.)
-  run_check_test(ctx, "c142",
-    _u8("defenum[T] opt {\n"
-        "  Has T;\n"
-        "  None void;\n"
-        "};\n"
-        "func foo() i32 {\n"
-        "  x opt[i32] = Has(4);\n"
-        "  z i32 = 6;\n"
-        "  switch &x {\n"
-        "  case &Has(y i32):\n"
-        "    z = z + y;\n"
-        "  default:\n"
-        "    label baaz;\n"
-        "    return z;\n"
-        "  }\n"
-        "  goto baaz;\n"
-        "}\n"
-        "def d1 i32 = foo();\n"
-        ));
-
-  // Analogues of c140-a,b,c.
-  run_check_test(ctx, "c143-a",
+  run_check_test(ctx, "c140-a/p",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1518,7 +1518,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def d1 i32 = foo();\n"
         ));
-  run_check_test(ctx, "c143-b",
+  run_check_test(ctx, "c140-b/p",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1533,7 +1533,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def d1 i32 = foo();\n"
         ));
-  run_check_test(ctx, "c143-c",
+  run_check_test(ctx, "c140-c/p",
     _u8("defenum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
