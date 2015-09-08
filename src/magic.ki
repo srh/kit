@@ -74,7 +74,36 @@ deftype magic_enum_construct struct {
   operational magic_enum_construct_op;
 };
 
+deftype non_magic_ctor_info struct {
+  cu_type cu_typeexpr;
+  cu_props type_properties;
+  ip instpair;
+};
+
+deftype non_magic_ctor struct {
+  type te_typeexpr;
+  info opt[non_magic_ctor_info];
+};
+
+deftype magic_bzero struct {
+  // size of buf to bzero in bnnos.
+  size opt[u32];
+};
+
+deftype magic_memcopy struct {
+  // size of buf to memcopy in bnnos.
+  size opt[u32];
+};
+
+deftype def_non_magic struct {
+  wc which_ctor;
+  nmc non_magic_ctor;
+};
+
 defenum def_magic {
+  MagicBzero magic_bzero;
+  MagicMemcopy magic_memcopy;
+  MagicNopdestroy void;
   MagicInit magic_ctor;
   MagicCopy magic_ctor;
   MagicMove magic_ctor;
@@ -98,25 +127,94 @@ func num_args(wc which_ctor) size {
   }
 }
 
+func check_non_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, nonmag *def_non_magic) bool {
+  return check_non_magic_ctor(cs, clq, g, parms, nonmag->wc, &nonmag->nmc);
+}
+
+func padding_oneparm_size(cs *checkstate, parms *cu_genparms) u32 {
+  switch parms {
+  case &NoParms(v void):
+    ice(_u8("padding_oneparm_size NoParms"));
+    return fake();
+  case &HasParms(arr array[cu_typeexpr]):
+    check(count(&arr) == 1);
+    return unwrap_primitive_padding_type_size(cs, ref(&arr, 0));
+  }
+}
+
 func check_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, mag *def_magic) bool {
   switch mag {
-    case &MagicInit(mc magic_ctor): {
-      return check_magic_ctor(cs, clq, g, parms, CtorInit(void), &mc);
-    }
-    case &MagicCopy(mc magic_ctor): {
-      return check_magic_ctor(cs, clq, g, parms, CtorCopy(void), &mc);
-    }
-    case &MagicMove(mc magic_ctor): {
-      return check_magic_ctor(cs, clq, g, parms, CtorMove(void), &mc);
-    }
-    case &MagicDestroy(mc magic_ctor): {
-      return check_magic_ctor(cs, clq, g, parms, CtorDestroy(void), &mc);
-    }
-    case &MagicEnumConstruct(me magic_enum_construct): {
+    case &MagicBzero(mb magic_bzero):
+      mb.size = Has(padding_oneparm_size(cs, parms));
+      return true;
+    case &MagicMemcopy(mm magic_memcopy):
+      mm.size = Has(padding_oneparm_size(cs, parms));
+      return true;
+    case &MagicNopdestroy(v void):
       // Nothing to check.
       return true;
+
+    case &MagicInit(mc magic_ctor):
+      return check_magic_ctor(cs, clq, g, parms, CtorInit(void), &mc);
+    case &MagicCopy(mc magic_ctor):
+      return check_magic_ctor(cs, clq, g, parms, CtorCopy(void), &mc);
+    case &MagicMove(mc magic_ctor):
+      return check_magic_ctor(cs, clq, g, parms, CtorMove(void), &mc);
+    case &MagicDestroy(mc magic_ctor):
+      return check_magic_ctor(cs, clq, g, parms, CtorDestroy(void), &mc);
+    case &MagicEnumConstruct(me magic_enum_construct):
+      // Nothing to check.
+      return true;
+  }
+}
+
+func check_non_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, wc which_ctor, nmc *non_magic_ctor) bool {
+  cac cac_typeexpr;
+  if !check_and_compute_typeexpr(cs, clq, g, parms, &nmc->type, &cac) {
+    return false;
+  }
+  check(cac.complete);
+
+  cac_props type_properties;
+  if !compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
+    return false;
+  }
+
+  beh *derived_method_behavior = select_behavior(wc, &cac_props);
+  oip opt[instpair] = instpair_or_trivial_from_behavior(beh);
+  if case Has(ip instpair) = oip {
+    set(&nmc->info, {~cac.te, cac_props, ip});
+  } else {
+    switch wc {
+    case CtorInit(v void):
+      ip instpair = make_magic_bzero(cs, clq, cac_props.flat_size);
+      set(&nmc->info, {~cac.te, cac_props, ip});
+    case CtorCopy(v void):
+      ip instpair = make_magic_memcopy(cs, clq, cac_props.flat_size);
+      set(&nmc->info, {~cac.te, cac_props, ip});
+    case CtorMove(v void):
+      ip instpair = make_magic_memcopy(cs, clq, cac_props.flat_size);
+      set(&nmc->info, {~cac.te, cac_props, ip});
+    case CtorDestroy(v void):
+      ip instpair = make_magic_nopdestroy(cs, clq, cac_props.flat_size);
+      set(&nmc->info, {~cac.te, cac_props, ip});
     }
   }
+
+  return true;
+}
+
+func make_magic_bzero(cs *checkstate, clq *clqueue, size u32) instpair {
+  type te_typeexpr = primitive_padding_type(cs, size);
+  return make_magic_inst(cs, clq, cs->im->cym.magic_bzero, 1, &type);
+}
+func make_magic_memcopy(cs *checkstate, clq *clqueue, size u32) instpair {
+  type te_typeexpr = primitive_padding_type(cs, size);
+  return make_magic_inst(cs, clq, cs->im->cym.magic_memcopy, 2, &type);
+}
+func make_magic_nopdestroy(cs *checkstate, clq *clqueue, size u32) instpair {
+  type te_typeexpr = primitive_padding_type(cs, size);
+  return make_magic_inst(cs, clq, cs->im->cym.magic_nopdestroy, 1, &type);
 }
 
 func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, wc which_ctor, mc *magic_ctor) bool {

@@ -1199,7 +1199,14 @@ func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bo
 // TODO: There's a lot of duplicated code in the splay-out of this function.
 func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) bool {
   switch mag {
-  case &MagicInit(mc magic_ctor):
+  case &MagicBzero(mb magic_bzero):
+    return gr_magic_bzero(cs, clq, &mb, gr_out, gn_out, return_cell_out, arg_cells_out);
+  case &MagicMemcopy(mm magic_memcopy):
+    return gr_magic_memcopy(cs, clq, &mm, gr_out, gn_out, return_cell_out, arg_cells_out);
+  case &MagicNopdestroy(v void):
+    return gr_magic_nopdestroy(cs, clq, gr_out, gn_out, return_cell_out, arg_cells_out);
+
+case &MagicInit(mc magic_ctor):
     return gr_magic_ctor(cs, clq, CtorInit(void), &mc, gr_out, gn_out, return_cell_out, arg_cells_out);
   case &MagicCopy(mc magic_ctor):
     return gr_magic_ctor(cs, clq, CtorCopy(void), &mc, gr_out, gn_out, return_cell_out, arg_cells_out);
@@ -1215,6 +1222,76 @@ func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph,
     *arg_cells_out = mk_array(arg_cell);
     return true;
   }
+}
+
+deftype gr_basics struct {
+  return_cell cell_num;
+  argcells array[cell_num];
+  pointeecells array[cell_num];
+  derefs array[gr_num];
+};
+
+func add_basics(cs *checkstate, clq *clqueue, gr *frame_graph, size u32, arity size, out *gr_basics) void {
+  pointee_tp cu_typrop = compute_prim(clq, primitive_padding_type(cs, size));
+  argtp cu_typrop = compute_prim(clq, ptr_type(cs, pointee_tp.cu.~));
+  voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
+  ret gr_basics;
+  ret.return_cell = add_cell(gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
+  for i size = 0; i < arity; i = i + 1 {
+    ac cell_num = add_cell(gr, {Has(LocationRigid(void)), argtp.cu, argtp.props});
+    push(&ret.argcells, ac);
+    pc cell_num = add_cell(gr, {Has(LocationVirtual(void)), pointee_tp.cu, pointee_tp.props});
+    push(&ret.pointeecells, pc);
+    dn gr_num = add_node(gr, node0(GrDeref({pc, ac, OffsetConst(0)})));
+    push(&ret.derefs, dn);
+  }
+  *out = ret;
+}
+
+func basics_cleanup(cs *checkstate, clq *clqueue, gr *frame_graph, bas *gr_basics, gn gr_num, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
+  precs array[gr_num];
+  ncells size = count(&bas->argcells);
+  for i size = 0; i < ncells; i = i + 1 {
+    gd gr_num = add_node(gr, node0(GrDead({get(&bas->argcells, i)})));
+    push(&precs, gd);
+  }
+  var retset = add_node(gr, node0(GrWriteConst({bas->return_cell, ConstInt(bigu(0))})));
+  push(&precs, retset);
+  var nopgn = add_node(gr, node(precs, GrNop(void)));
+  var fingn = add_node(gr, node0(GrSequence({gn, nopgn})));
+  *gr_out = *gr;
+  *gn_out = fingn;
+  *return_cell_out = bas->return_cell;
+  *arg_cells_out = bas->argcells;
+}
+
+func gr_magic_nopdestroy(cs *checkstate, clq *clqueue, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) bool {
+  gr frame_graph = init_frame_graph_empty();
+  bas gr_basics;
+  // TODO: This creates a needless deref node, pointee cell.
+  // TODO: How about make the size parameter opt[u32], don't deref if no size.
+  add_basics(cs, clq, &gr, 0 /* Pass a made-up size. */, 1, &bas);
+  gn gr_num = add_node(&gr, node0(GrNop(void)));
+  basics_cleanup(cs, clq, &gr, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
+  return true;
+}
+
+func gr_magic_memcopy(cs *checkstate, clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) bool {
+  gr frame_graph = init_frame_graph_empty();
+  bas gr_basics;
+  add_basics(cs, clq, &gr, *unHas(&mm->size), 2, &bas);
+  gn gr_num = add_node(&gr, node(bas.derefs, GrMemCopy({get(&bas.pointeecells, 0), get(&bas.pointeecells, 1)})));
+  basics_cleanup(cs, clq, &gr, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
+  return true;
+}
+
+func gr_magic_bzero(cs *checkstate, clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) bool {
+  gr frame_graph = init_frame_graph_empty();
+  bas gr_basics;
+  add_basics(cs, clq, &gr, *unHas(&mb->size), 1, &bas);
+  gn gr_num = add_node(&gr, node(bas.derefs, GrWriteConst({get(&bas.pointeecells, 0), ConstInt(bigu(0))})));
+  basics_cleanup(cs, clq, &gr, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
+  return true;
 }
 
 func gr_magic_ctor(cs *checkstate, clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) bool {
@@ -1883,6 +1960,14 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, result_cell(&dire.ec)}));
           return true;
         }
+
+        case &InstRhsNonMagic(nonmag def_non_magic): {
+          info *non_magic_ctor_info = unHas(&nonmag.nmc.info);
+          frg frame_regraphed = mk_const_frame_regraphed(&inst->computed_type, &inst->computed_type_properties, ConstDef(info->ip));
+          inst->graph = Computed(Has(frg));
+          return true;
+        }
+
         case &InstRhsMagic(mag def_magic): {
           id fn_body_id;
           if true {

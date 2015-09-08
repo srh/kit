@@ -261,6 +261,10 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) b
           }
           return true;
         }
+        case &DefnNonMagic(mag def_non_magic): {
+          ice(_u8("def_entry for \"non_magic\" implementation has converted_typeexpr NotComputed."));
+          return fake();
+        }
         case &DefnMagic(mag def_magic): {
           ice(_u8("def_entry for magic implementation has converted_typeexpr NotComputed."));
           return fake();
@@ -349,10 +353,9 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
   }
   rhs def_inst_rhs;
   switch &ent->definition {
-    case &DefnPrim(op primitive_op): {
+    case &DefnPrim(op primitive_op):
       rhs = InstRhsPrim(op);
-    }
-    case &DefnHasRhs(np def_nonprim): {
+    case &DefnHasRhs(np def_nonprim):
       switch np.tl {
         case &Def(a ast_def): {
           rhs = InstRhsExpr({a.rhs, None@[frame_info]()});
@@ -362,10 +365,10 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
           ice(_u8("def_entry has invalid toplevel\n"));
         }
       }
-    }
-    case &DefnMagic(mag def_magic): {
+    case &DefnNonMagic(nonmag def_non_magic):
+      rhs = InstRhsNonMagic(nonmag);
+    case &DefnMagic(mag def_magic):
       rhs = InstRhsMagic(mag);
-    }
   }
   var id = add_inst(cs, mk(*parms, rhs));
   push(&ent->insts, id);
@@ -466,6 +469,11 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
             return false;
           }
           rhs.frame_info = Has(info);
+        }
+        case &InstRhsNonMagic(nonmag def_non_magic): {
+          if !check_non_magic(cs, clq, &ent->generics, &inst->parms, &nonmag) {
+            return false;
+          }
         }
         case &InstRhsMagic(mag def_magic): {
           if !check_magic(cs, clq, &ent->generics, &inst->parms, &mag) {
@@ -1106,8 +1114,8 @@ func behavior_level(b *derived_method_behavior) u32 {
   }
 }
 
-func make_nontrivial(cs *checkstate, clq *clqueue, magic_name sym, magic_count size, type *te_typeexpr) derived_method_behavior {
-  params array[te_typeexpr] = repeat(magic_count, ptr_type(cs, *type));
+func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, type *te_typeexpr) instpair {
+  params array[te_typeexpr] = repeat(arity, ptr_type(cs, *type));
   push(&params, primitive_void_type(cs));
   fntype te_typeexpr = fn_type(cs, params);
 
@@ -1133,9 +1141,13 @@ func make_nontrivial(cs *checkstate, clq *clqueue, magic_name sym, magic_count s
       if !make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
         ice(_u8("make_inst (check_and_compute_parms) seeing error in match_def"));
       }
-      return DerivedMethodNontrivial({m.ent, inst_id});
+      return {m.ent, inst_id};
     }
   }
+}
+
+func make_nontrivial(cs *checkstate, clq *clqueue, magic_name sym, arity size, type *te_typeexpr) derived_method_behavior {
+  return DerivedMethodNontrivial(make_magic_inst(cs, clq, magic_name, arity, type));
 }
 
 func make_inst(cs *checkstate, clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_inst_id) bool {
@@ -1148,11 +1160,12 @@ func make_inst(cs *checkstate, clq *clqueue, ent def_entry_id, parms *genparms, 
   return true;
 }
 
-func level_to_derived(cs *checkstate, clq *clqueue, magic_name sym, magic_count size, type *te_typeexpr, level u32) derived_method_behavior {
+// TODO: Use which_ctor instead of magic_name/arity, which must match.
+func level_to_derived(cs *checkstate, clq *clqueue, magic_name sym, arity size, type *te_typeexpr, level u32) derived_method_behavior {
   if level == 0 {
     return DerivedMethodTrivial(void);
   } else if level == 1 {
-    return make_nontrivial(cs, clq, magic_name, magic_count, type);
+    return make_nontrivial(cs, clq, magic_name, arity, type);
   } else if level == 2 {
     return DerivedMethodAbsent(void);
   } else {

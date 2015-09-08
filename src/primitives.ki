@@ -121,6 +121,20 @@ func primitive_unsigned_bnno_type(cs *checkstate) te_typeexpr {
   }
 }
 
+func unwrap_primitive_padding_type_size(cs *checkstate, t *cu_typeexpr) u32 {
+  if case &TeArraytype(at te_arraytype) = &t->~ {
+    archetype te_typeexpr = primitive_unsigned_bnno_type(cs);
+    unified te_typeexpr;
+    if !unify_types(oo(&at.param), &archetype, &unified) {
+      ice(_u8("unwrap_primitive_padding_type_size on arraytype with bad param"));
+    }
+    return *unHas(&at.count);
+  } else {
+    ice(_u8("unwrap_primitive_padding_type_size on non-arraytype"));
+    return fake();
+  }
+}
+
 func primitive_padding_type(cs *checkstate, n u32) te_typeexpr {
   return TeArraytype({Has(n), embox(primitive_unsigned_bnno_type(cs))});
 }
@@ -395,6 +409,13 @@ func add_function_primitive(cs *checkstate) void {
   // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.
 }
 
+func add_non_magic_constructor_primitive(cs *checkstate, name sym, args size, nonmag def_non_magic) void {
+  var parms = repeat(args, ptr_type(cs, TeName({cs->im->cym.tee_sym, None()})));
+  push(&parms, primitive_void_type(cs));
+  type te_typeexpr = fn_type(cs, parms);
+  add_def_primitive(cs, name, tee_generic(cs), type, DefnNonMagic(nonmag));
+}
+
 func add_magic_constructor_primitive(cs *checkstate, name sym, args size, mag def_magic) void {
   var parms = repeat(args, ptr_type(cs, TeName({cs->im->cym.tee_sym, None()})));
   push(&parms, primitive_void_type(cs));
@@ -404,6 +425,14 @@ func add_magic_constructor_primitive(cs *checkstate, name sym, args size, mag de
 
 func add_magic_constructor_primitives(cs *checkstate) void {
   teetype te_typeexpr = TeName({cs->im->cym.tee_sym, None()});
+  add_non_magic_constructor_primitive(cs, cs->im->cym.init, 1, {CtorInit(void), {teetype, None@[non_magic_ctor_info]()}});
+  add_non_magic_constructor_primitive(cs, cs->im->cym.copy, 2, {CtorCopy(void), {teetype, None@[non_magic_ctor_info]()}});
+  add_non_magic_constructor_primitive(cs, cs->im->cym.move, 2, {CtorMove(void), {teetype, None@[non_magic_ctor_info]()}});
+  add_non_magic_constructor_primitive(cs, cs->im->cym.destroy, 1, {CtorDestroy(void), {teetype, None@[non_magic_ctor_info]()}});
+
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_bzero, 1, MagicBzero({None@[u32]()}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_memcopy, 2, MagicMemcopy({None@[u32]()}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_nopdestroy, 1, MagicNopdestroy(void));
   add_magic_constructor_primitive(cs, cs->im->cym.magic_init, 1, MagicInit({teetype, None@[magic_ctor_info]()}));
   add_magic_constructor_primitive(cs, cs->im->cym.magic_copy, 2, MagicCopy({teetype, None@[magic_ctor_info]()}));
   add_magic_constructor_primitive(cs, cs->im->cym.magic_move, 2, MagicMove({teetype, None@[magic_ctor_info]()}));

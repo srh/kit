@@ -399,6 +399,7 @@ defenum def_inst_rhs {
   // Extern defs don't have an rhs.
   InstRhsExtern void;
   InstRhsExpr def_inst_rhs_expr;
+  InstRhsNonMagic def_non_magic;
   InstRhsMagic def_magic;
 };
 
@@ -438,6 +439,7 @@ defenum def_definition {
   // The def is a primitive (+, -, etc), has no RHS.
   DefnPrim primitive_op;
   DefnHasRhs def_nonprim;
+  DefnNonMagic def_non_magic;
   DefnMagic def_magic;
 };
 
