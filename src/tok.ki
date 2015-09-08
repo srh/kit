@@ -17,6 +17,7 @@ deftype ps struct {
   // or 0 if we're at the beginning of the stream.
   prev_right size;
 
+  base_offset size;
   comments array[interval];
   // ast_meta values are indices into this array.
   metas array[meta_datum];
@@ -24,11 +25,12 @@ deftype ps struct {
   im *identmap;
 };
 
-func make_ps(im *identmap, data *u8, length size) ps {
+func make_ps(im *identmap, base_offset size, data *u8, length size) ps {
   p ps;
   p.data = data;
   p.length = length;
   p.pos = 0;
+  p.base_offset = base_offset;
   p.im = im;
   // Add an unused entry so that the zero ast_meta value is "invalid."
   nilmeta meta_datum;
@@ -38,13 +40,11 @@ func make_ps(im *identmap, data *u8, length size) ps {
 }
 
 func ps_pos(p *ps) pos {
-  ret pos;
-  ret.~ = p->pos;
-  return ret;
+  return mk_pos(p->base_offset, p->pos);
 }
 
 func ps_restore_pos(p *ps, pos pos) void {
-  p->pos = pos.~;
+  p->pos = pos.~ - p->base_offset;
 }
 
 func ps_peek(p *ps) i32 {
@@ -78,7 +78,7 @@ func end(p *ps, meta ast_meta) void {
       check(false);
     }
     case None(v): {
-      ref(&p->metas, meta.~)->right = Has(~p->prev_right);
+      ref(&p->metas, meta.~)->right = Has(mk_pos(p->base_offset, p->prev_right));
     }
   }
 }

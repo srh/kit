@@ -1296,6 +1296,65 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
   }
 }
 
+func modules_next_base_offset(cs *checkstate) size {
+  n size = count(&cs->modules);
+  if n == 0 {
+    return 0;
+  } else {
+    m *module = oo(ref(&cs->modules, n - 1));
+    // We add 1, so that the "last offset" from the k'th module is distinguishable from the "first offset" from the k+1'th module.
+    return m->base_offset + count(&m->buf) + 1;
+  }
+}
+
+func absolute_to_linecol(buf *array[u8], absolute size) tup[size, size] {
+  d *u8 = data(buf);
+  n size = count(buf);
+  check(absolute <= n);
+
+  line size = 1;
+  column size = 0;
+  for i size = 0; i < absolute; i = i + 1 {
+    ch u8 = d[i];
+    if ch == '\n' {
+      line = line + 1;
+      column = 0;
+    } else if ch == '\t' {
+      column = (column | 7) + 1;
+    } else {
+      column = column + 1;
+    }
+  }
+  return {line, column};
+}
+
+func to_human_pos(cs *checkstate, p pos) human_pos {
+  if case Has(m *module) = find_pos_module(cs, p) {
+    return to_human_pos(m, p);
+  } else {
+    ice(_u8("to_human_pos sees invalid pos with value "), p.~);
+    return fake();
+  }
+}
+
+func to_human_pos(m *module, p pos) human_pos {
+  absolute size = p.~ - m->base_offset;
+  linecol tup[size, size] = absolute_to_linecol(&m->buf, absolute);
+  return {m->module_name, linecol.car, linecol.cdr, absolute};
+}
+
+func find_pos_module(cs *checkstate, p pos) opt[*module] {
+  n size = count(&cs->modules);
+  for i size = 0; i < n; i = i + 1 {
+    m *module = oo(ref(&cs->modules, i));
+    DBG(_u8("to_module_and_offset comparing "), p.~, _u8(" between "), m->base_offset, _u8(" and "), m->base_offset + count(&m->buf));
+    if m->base_offset <= p.~ && m->base_offset + count(&m->buf) >= p.~ {
+      return Has(m);
+    }
+  }
+  return None();
+}
+
 func load_module(cs *checkstate, mod_name sym) opt[module_id] {
   dbgcheck(_u8("load_module"));
   switch lookup(&cs->modules_by_name, mod_name) {
@@ -1316,10 +1375,11 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
           mod shp[module];
           oo(&mod)->process_state = Unprocessed(void);
           oo(&mod)->module_name = mod_name;
+          oo(&mod)->base_offset = modules_next_base_offset(cs);
           oo(&mod)->buf = arr;
-          p ps = make_ps(cs->im, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
+          p ps = make_ps(cs->im, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
           if !parse_file(&p, &oo(&mod)->file) {
-            ERR(_u8("Trouble parsing module "), lookup(cs->im, mod_name), _u8(" at offset "), peek(&p).interval.left.~);
+            ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p).interval.left)));
             return None();
           }
           mod_id module_id = ~count(&cs->modules);

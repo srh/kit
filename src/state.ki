@@ -236,6 +236,8 @@ func `==`(a module_process_state, b module_process_state) bool {
 deftype module struct {
   module_name sym;
   file ast_file;
+  // Used for reconstructing pos information.
+  base_offset size;
   buf array[u8];
   process_state module_process_state;
   // vvv  Valid when process_state == DoneProcessing.  vvv
