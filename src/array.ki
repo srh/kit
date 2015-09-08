@@ -114,6 +114,17 @@ access array[_] {
   }
 }
 
+func[T] make_copy(p *T, n size) array[T] {
+  ret array[T];
+  reserve(&ret, n);
+  for i size = 0; i < n; i = i + 1 {
+    push(&ret, p[i]);
+  }
+  return ret;
+}
+
+
+
 func[T] truncate(a *array[T], n size) void {
   m size = count(a);
   check(n <= m);
@@ -217,18 +228,24 @@ func[T] is_strictly_increasing(x *array[T]) bool {
   return true;
 }
 
-func[T] pushopt(x *array[T], a opt[T]) void {
-  if case &Has(t T) = &a {
+func[T] append(x *array[T], a *opt[T]) void {
+  if case &Has(t T) = a {
     push(x, t);
   }
 }
 
-func[T] concat(a opt[T], b opt[T], c opt[T], d opt[T]) array[T] {
+func[T, U] concat(a array[T], b U) array[T] {
+  ret array[T] = a;
+  append(&ret, &b);
+  return ret;
+}
+
+func[T, U, V, W] concat(a opt[T], b U, c V, d W) array[T] {
   ret array[T];
-  pushopt(&ret, a);
-  pushopt(&ret, b);
-  pushopt(&ret, c);
-  pushopt(&ret, d);
+  append(&ret, &a);
+  append(&ret, &b);
+  append(&ret, &c);
+  append(&ret, &d);
   return ret;
 }
 
