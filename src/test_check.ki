@@ -35,6 +35,10 @@ func test_platform() platform_info {
   return ret;
 }
 
+func x86_platform() platform_info {
+  return test_platform();
+}
+
 func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
   if case &Has(sname array[u8]) = &ctx->specific_run {
     u8name array[u8] = _u8(name);

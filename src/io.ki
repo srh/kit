@@ -10,7 +10,7 @@ func read_file(path array[u8]) opt[array[u8]] {
   }
 
   dat array[u8];
-  buf array[u8] = repeat(0, 16384);
+  buf array[u8] = repeat(16384, @[u8] 0);
   done bool = false;
   while !done {
     nread size = fread(@[*void]cast(data(&buf)), 1, count(&buf), fp);

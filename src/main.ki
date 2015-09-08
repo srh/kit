@@ -1,5 +1,6 @@
 import array;
 import graph;
+import io;
 import test_check;
 import parse;
 import stdlib;
@@ -37,10 +38,24 @@ func run_tests() bool {
   return all_success;
 }
 
+func file_loader(cs *checkstate, name sym) opt[array[u8]] {
+  ns array[u8] = to_u8str(lookup(cs->im, name));
+  return read_file(concat(ns, _u8(".ki")));
+}
+
 func run_on_file(modulename array[u8]) bool {
-  path array[u8] = concat(modulename, _u8(".ki"));
-  ERR(_u8("run_on_file not implemented for file "), path);
-  return false;
+  im identmap = make_im();
+  cs checkstate = make_checkstate(&im, x86_platform(), null, file_loader);
+  add_primitives(&cs);
+  if !check_module(&cs, intern(&im, from_u8(modulename))) {
+    print(Stdout(), _u8("Failed.\n"));
+    fflush(Stdout());
+    return false;
+  } else {
+    print(Stdout(), _u8("Success.\n"));
+    fflush(Stdout());
+    return true;
+  }
 }
 
 // TODO: c_int
