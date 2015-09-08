@@ -84,6 +84,7 @@ func[T] MERR(cs *checkstate, m ast_meta, x T) void {
     append(&r, _u8("At ??: "));
   }
   build_u8str(cs->im, &r, &x);
+  push(&r, '\n');
   print(Stderr(), r);
   fflush(Stderr());
 }

@@ -1159,10 +1159,11 @@ func parse_rest_of_return_statement(p *ps, out *ast_statement) bool {
 }
 
 func parse_condition(p *ps, out *ast_condition) bool {
+  m ast_meta = start(p);
   if try_skip_token(p, Keyw(Case(void))) {
     conspatt ast_constructor_pattern;
     rhs ast_expr;
-    if !(parse_rest_of_constructor_pattern(p, &conspatt)
+    if !(parse_rest_of_constructor_pattern(p, m, &conspatt)
          && try_skip_oper(p, '=')
          && parse_expr(p, kConditionPrec, &rhs)) {
       return Fail;
@@ -1318,7 +1319,7 @@ func parse_switch_case(p *ps, out *ast_switch_case) bool {
   return true;
 }
 
-func parse_rest_of_constructor_pattern(p *ps,
+func parse_rest_of_constructor_pattern(p *ps, m ast_meta,
                                        out *ast_constructor_pattern) bool {
   addressof_oper ast_ident;
   addressof_constructor opt[ast_ident];
@@ -1335,7 +1336,8 @@ func parse_rest_of_constructor_pattern(p *ps,
        && try_skip_token(p, Grouper(RParen(void)))) {
     return Fail;
   }
-  *out = {None@[ast_cp_info](), addressof_constructor, constructor_name, decl};
+  end(p, m);
+  *out = {m, None@[ast_cp_info](), addressof_constructor, constructor_name, decl};
   return true;
 }
 
@@ -1345,8 +1347,9 @@ func parse_case_pattern(p *ps, out *ast_case_pattern) bool {
     return true;
   }
   conspatt ast_constructor_pattern;
+  m ast_meta = start(p);
   if !(try_skip_token(p, Keyw(Case(void)))
-       && parse_rest_of_constructor_pattern(p, &conspatt)) {
+       && parse_rest_of_constructor_pattern(p, m, &conspatt)) {
     return Fail;
   }
   *out = Case(conspatt);

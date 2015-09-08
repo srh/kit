@@ -359,9 +359,14 @@ func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statemen
             return false;
           }
 
+          cac cac_typeexpr;
+          if !check_and_compute_typeexpr(bs->cs, bs->clq, bs->ds->generics, bs->ds->parms, &converted, &cac) {
+            return false;
+          }
+
           unified te_typeexpr;
-          if !unify_types(&converted, expected_type, &unified) {
-            ERR(_u8("constructor variable type mismatch"));
+          if !unify_types(&cac.te, expected_type, &unified) {
+            MERR(bs->cs, patt.meta, _u8("constructor variable type mismatch"));
             return false;
           }
 
@@ -636,9 +641,14 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
           return false;
         }
 
+        cac cac_typeexpr;
+        if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &cac) {
+          return false;
+        }
+
         unified te_typeexpr;
-        if !unify_types(&converted, expected_type, &unified) {
-          ERR(_u8("constructor variable type mismatch"));
+        if !unify_types(&cac.te, expected_type, &unified) {
+          MERR(es->cs, b.pattern.meta, _u8("constructor variable type mismatch"));
           return false;
         }
 

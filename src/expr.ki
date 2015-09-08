@@ -1254,7 +1254,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
   }
   switch &match_res {
     case &NoMatch(v void): {
-      ERR(_u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, matching type '"), to_u8str(es->im, *pt), _u8("'"));
+      MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, matching type '"), to_u8str(es->im, *pt), _u8("'"));
       return false;
     }
     case &AmbigGlobalMatch(v void): {

@@ -852,7 +852,7 @@ func st_maybe_init_static(gr *frame_graph, env *st_env, cell cell_num) void {
   }
 
   objnum st_obj_num = add_obj(env, info->props.flat_size);
-  set(&env->framecells, cell.~, Has@[st_obj_ref]({objnum, 0, info->props.flat_size}));
+  set(&env->framecells, cell.~, Has(@[st_obj_ref]{objnum, 0, info->props.flat_size}));
 }
 
 func err_nonpointer() void {
