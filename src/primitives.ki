@@ -433,8 +433,8 @@ func add_magic_constructor_primitives(cs *checkstate) void {
   add_magic_constructor_primitive(cs, cs->im->cym.magic_bzero, 1, MagicBzero({None@[u32]()}));
   add_magic_constructor_primitive(cs, cs->im->cym.magic_memcopy, 2, MagicMemcopy({None@[u32]()}));
   add_magic_constructor_primitive(cs, cs->im->cym.magic_nopdestroy, 1, MagicNopdestroy(void));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_init, 1, MagicInit({teetype, None@[magic_ctor_info]()}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_copy, 2, MagicCopy({teetype, None@[magic_ctor_info]()}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_move, 2, MagicMove({teetype, None@[magic_ctor_info]()}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_destroy, 1, MagicDestroy({teetype, None@[magic_ctor_info]()}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_init, 1, MagicCtor({CtorInit(void), {teetype, None@[magic_ctor_info]()}}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_copy, 2, MagicCtor({CtorCopy(void), {teetype, None@[magic_ctor_info]()}}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_move, 2, MagicCtor({CtorMove(void), {teetype, None@[magic_ctor_info]()}}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_destroy, 1, MagicCtor({CtorDestroy(void), {teetype, None@[magic_ctor_info]()}}));
 }

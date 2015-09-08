@@ -100,14 +100,16 @@ deftype def_non_magic struct {
   nmc non_magic_ctor;
 };
 
+deftype which_magic_ctor struct {
+  wc which_ctor;
+  mc magic_ctor;
+};
+
 defenum def_magic {
   MagicBzero magic_bzero;
   MagicMemcopy magic_memcopy;
   MagicNopdestroy void;
-  MagicInit magic_ctor;
-  MagicCopy magic_ctor;
-  MagicMove magic_ctor;
-  MagicDestroy magic_ctor;
+  MagicCtor which_magic_ctor;
   MagicEnumConstruct magic_enum_construct;
 };
 
@@ -154,14 +156,8 @@ func check_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genpar
       // Nothing to check.
       return true;
 
-    case &MagicInit(mc magic_ctor):
-      return check_magic_ctor(cs, clq, g, parms, CtorInit(void), &mc);
-    case &MagicCopy(mc magic_ctor):
-      return check_magic_ctor(cs, clq, g, parms, CtorCopy(void), &mc);
-    case &MagicMove(mc magic_ctor):
-      return check_magic_ctor(cs, clq, g, parms, CtorMove(void), &mc);
-    case &MagicDestroy(mc magic_ctor):
-      return check_magic_ctor(cs, clq, g, parms, CtorDestroy(void), &mc);
+    case &MagicCtor(wmc which_magic_ctor):
+      return check_magic_ctor(cs, clq, g, parms, wmc.wc, &wmc.mc);
     case &MagicEnumConstruct(me magic_enum_construct):
       // Nothing to check.
       return true;

@@ -439,6 +439,7 @@ defenum def_definition {
   // The def is a primitive (+, -, etc), has no RHS.
   DefnPrim primitive_op;
   DefnHasRhs def_nonprim;
+  // The names are stupid: def_non_magic defs evaluate to values, while def_magic evaluate to fn_bodies.
   DefnNonMagic def_non_magic;
   DefnMagic def_magic;
 };

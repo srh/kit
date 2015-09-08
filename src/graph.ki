@@ -1206,14 +1206,8 @@ func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph,
   case &MagicNopdestroy(v void):
     return gr_magic_nopdestroy(cs, clq, gr_out, gn_out, return_cell_out, arg_cells_out);
 
-case &MagicInit(mc magic_ctor):
-    return gr_magic_ctor(cs, clq, CtorInit(void), &mc, gr_out, gn_out, return_cell_out, arg_cells_out);
-  case &MagicCopy(mc magic_ctor):
-    return gr_magic_ctor(cs, clq, CtorCopy(void), &mc, gr_out, gn_out, return_cell_out, arg_cells_out);
-  case &MagicMove(mc magic_ctor):
-    return gr_magic_ctor(cs, clq, CtorMove(void), &mc, gr_out, gn_out, return_cell_out, arg_cells_out);
-  case &MagicDestroy(mc magic_ctor):
-    return gr_magic_ctor(cs, clq, CtorDestroy(void), &mc, gr_out, gn_out, return_cell_out, arg_cells_out);
+  case &MagicCtor(wmc which_magic_ctor):
+    return gr_magic_ctor(cs, clq, wmc.wc, &wmc.mc, gr_out, gn_out, return_cell_out, arg_cells_out);
   case &MagicEnumConstruct(mec magic_enum_construct):
     arg_cell cell_num;
     if !gr_magic_enum_construct(cs, clq, &mec, gr_out, gn_out, return_cell_out, &arg_cell) {
