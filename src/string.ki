@@ -41,6 +41,13 @@ func hash_equal(x *string, y *string) bool {
   return true;
 }
 
+func[H] build_u8str(help H, r *array[u8], x *string) void {
+  n size = count(x);
+  for i size = 0; i < n; i = i + 1 {
+    push(r, ~get(&x->~, i));
+  }
+}
+
 func build_u8str(r *array[u8], x *string) void {
   n size = count(x);
   for i size = 0; i < n; i = i + 1 {

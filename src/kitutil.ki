@@ -39,8 +39,52 @@ func[T, U] ERR(x T, y U) void {
 }
 
 func[T] ERR(x T) void {
-  print(Stderr(), to_u8str(x));
-  print(Stderr(), _u8("\n"));
+  r array[u8];
+  build_u8str(&r, &x);
+  push(&r, '\n');
+  print(Stderr(), r);
+  fflush(Stderr());
+}
+
+func[T, U, V, W, X, Y, Z, A] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z, t A) void {
+  MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), cons(s, t))));
+}
+
+func[T, U, V, W, X, Y, Z] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z) void {
+  MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), s)));
+}
+
+func[T, U, V, W, X, Y] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y) void {
+  MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(q, r)));
+}
+
+func[T, U, V, W, X] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X) void {
+  MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), q));
+}
+
+func[T, U, V, W] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W) void {
+  MERR(cs, m, cons(cons(x, y), cons(z, p)));
+}
+
+func[T, U, V] MERR(cs *checkstate, m ast_meta, x T, y U, z V) void {
+  MERR(cs, m, cons(cons(x, y), z));
+}
+
+func[T, U] MERR(cs *checkstate, m ast_meta, x T, y U) void {
+  MERR(cs, m, cons(x, y));
+}
+
+func[T] MERR(cs *checkstate, m ast_meta, x T) void {
+  r array[u8];
+  if case Has(p pos) = ref(&cs->posits.metas, m.~)->left {
+    hp human_pos = to_human_pos(cs, p);
+    build_u8str(cs->im, &r, &hp);
+    append(&r, _u8(": "));
+  } else {
+    append(&r, _u8("At ??: "));
+  }
+  build_u8str(cs->im, &r, &x);
+  print(Stderr(), r);
   fflush(Stderr());
 }
 

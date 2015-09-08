@@ -1347,7 +1347,6 @@ func find_pos_module(cs *checkstate, p pos) opt[*module] {
   n size = count(&cs->modules);
   for i size = 0; i < n; i = i + 1 {
     m *module = oo(ref(&cs->modules, i));
-    DBG(_u8("to_module_and_offset comparing "), p.~, _u8(" between "), m->base_offset, _u8(" and "), m->base_offset + count(&m->buf));
     if m->base_offset <= p.~ && m->base_offset + count(&m->buf) >= p.~ {
       return Has(m);
     }
@@ -1377,7 +1376,7 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
           oo(&mod)->module_name = mod_name;
           oo(&mod)->base_offset = modules_next_base_offset(cs);
           oo(&mod)->buf = arr;
-          p ps = make_ps(cs->im, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
+          p ps = make_ps(cs->im, &cs->posits, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
           if !parse_file(&p, &oo(&mod)->file) {
             ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p).interval.left)));
             return None();

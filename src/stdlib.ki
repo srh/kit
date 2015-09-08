@@ -230,6 +230,11 @@ func[S, T] `==`(x tup[S, T], y tup[S, T]) bool {
   return x.car == y.car && x.cdr == y.cdr;
 }
 
+func[H, S, T] build_u8str(help H, r *array[u8], p *tup[S, T]) void {
+  build_u8str(help, r, &p->car);
+  build_u8str(help, r, &p->cdr);
+}
+
 func[S, T] build_u8str(r *array[u8], p *tup[S, T]) void {
   build_u8str(r, &p->car);
   build_u8str(r, &p->cdr);

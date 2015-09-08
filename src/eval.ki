@@ -111,7 +111,7 @@ func st_pointer_size(plat *platform_info, p *st_pointer) u32 {
 
 func copy_bnnos(plat *platform_info, src *array[u32], offset u32, count u32, dest *array[u32], dest_offset u32) void {
   bnno_size u32 = plat->bnno_size;
-  mask u32 = (1 << bnno_size) - 1;
+  mask u32 = (@[u32]1 << bnno_size) - 1;
   per_word u32 = 32 / bnno_size;
   for i u32 = 0; i < count; i = i + 1 {
     si u32 = offset + i;
@@ -267,7 +267,7 @@ func mk_ones(plat *platform_info, length u32) array[u32] {
   ones array[u32] = repeat(n, 0xFFFFFFFF);
   extra u32 = bitlength % 32;
   if extra != 0 {
-    set(&ones, n - 1, 0xFFFFFFFF >> (32 - extra));
+    set(&ones, n - 1, @[u32]0xFFFFFFFF >> (32 - extra));
   }
   return ones;
 }
@@ -777,7 +777,7 @@ func st_value_self_contained(plat *platform_info, val *st_value, out *array[u32]
   }
   bitrem u32 = bitlength % 32;
   if bitrem != 0 {
-    lastmask u32 = ((1 << bitrem) - 1);
+    lastmask u32 = ((@[u32]1 << bitrem) - 1);
     if get(&val->datas, ~n) != lastmask {
       ERR(_u8("Use of uninitialized value (II)."));
       return false;

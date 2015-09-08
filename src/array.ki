@@ -204,6 +204,10 @@ func[T] repeat(n size, value T) array[T] {
   return ret;
 }
 
+func[H] build_u8str(help H, r *array[u8], a *array[u8]) void {
+  append(r, a);
+}
+
 func build_u8str(r *array[u8], a *array[u8]) void {
   append(r, a);
 }

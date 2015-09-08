@@ -85,12 +85,32 @@ deftype cs_primitives struct {
   ptr_eq opt[def_entry_id];
 };
 
+deftype meta_datum struct {
+  left opt[pos];
+  right opt[pos];
+};
+
+// TODO: Don't just give ps and tok.ki code direct access to this?
+deftype positionals struct {
+  metas array[meta_datum];
+};
+
+func mk_positionals() positionals {
+  // Add an unused entry so that the zero ast_meta value is "invalid."
+  p positionals;
+  nilmeta meta_datum;
+  push(&p.metas, nilmeta);
+  return p;
+}
+
 deftype checkstate struct {
   im *identmap;
   instantiation_depth u32;
   platform platform_info;
   loader_ctx *void;
   loader fn[*checkstate, sym, opt[array[u8]]];
+
+  posits positionals;
 
   modules array[shp[module]];
   modules_by_name hash[sym, module_id];

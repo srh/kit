@@ -2,11 +2,6 @@ import ast;
 import identmap;
 import pos;
 
-deftype meta_datum struct {
-  left opt[pos];
-  right opt[pos];
-};
-
 deftype ps struct {
   data *u8;
   length size;
@@ -20,21 +15,19 @@ deftype ps struct {
   base_offset size;
   comments array[interval];
   // ast_meta values are indices into this array.
-  metas array[meta_datum];
+  metas *array[meta_datum];
 
   im *identmap;
 };
 
-func make_ps(im *identmap, base_offset size, data *u8, length size) ps {
+func make_ps(im *identmap, posits *positionals, base_offset size, data *u8, length size) ps {
   p ps;
   p.data = data;
   p.length = length;
   p.pos = 0;
   p.base_offset = base_offset;
   p.im = im;
-  // Add an unused entry so that the zero ast_meta value is "invalid."
-  nilmeta meta_datum;
-  push(&p.metas, nilmeta);
+  p.metas = &posits->metas;
   step(&p);
   return p;
 }
@@ -61,24 +54,24 @@ func ps_step(p *ps) void {
 }
 
 func startend(p *ps) ast_meta {
-  ret ast_meta = ~count(&p->metas);
-  push(&p->metas, {Has(p->current.interval.left), Has(p->current.interval.right)});
+  ret ast_meta = ~count(p->metas);
+  push(p->metas, {Has(p->current.interval.left), Has(p->current.interval.right)});
   return ret;
 }
 
 func start(p *ps) ast_meta {
-  ret ast_meta = ~count(&p->metas);
-  push(&p->metas, {Has(p->current.interval.left), None()});
+  ret ast_meta = ~count(p->metas);
+  push(p->metas, {Has(p->current.interval.left), None()});
   return ret;
 }
 
 func end(p *ps, meta ast_meta) void {
-  switch ref(&p->metas, meta.~)->right {
+  switch ref(p->metas, meta.~)->right {
     case Has(right_pos pos): {
       check(false);
     }
     case None(v): {
-      ref(&p->metas, meta.~)->right = Has(mk_pos(p->base_offset, p->prev_right));
+      ref(p->metas, meta.~)->right = Has(mk_pos(p->base_offset, p->prev_right));
     }
   }
 }

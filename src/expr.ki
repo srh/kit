@@ -1263,7 +1263,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
         annotate_info(x, IncompleteCheck(TeUnknown(void)));
         return true;
       } else {
-        ERR(_u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), to_u8str(es->im, *pt));
+        MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), to_u8str(es->im, *pt));
         return false;
       }
     }
