@@ -275,9 +275,9 @@ func st_num_rangechecked_output(clq *clqueue, env *st_env, retvalref st_obj_ref,
     }
     // Make sure we know to handle some weird reprs later when we have them.
     switch op_numtraits->repr {
-    case Unsigned(void):
+    case Unsigned(v void):
       // do nothing
-    case SignedTwos(void):
+    case SignedTwos(v void):
       // do nothing
     }
     addand bigint = incr(op_numtraits->maxval - op_numtraits->minval);
@@ -332,11 +332,11 @@ func st_nums(env *st_env, paramorefs *array[st_obj_ref], op_arity u32, op_size u
 
     num bigint;
     switch repr {
-    case Unsigned(void):
+    case Unsigned(v void):
       if !st_value_unsigned_as_bigint(&env->plat, ref(&vals, i), &num) {
         return false;
       }
-    case SignedTwos(void):
+    case SignedTwos(v void):
       if !st_value_signed_twos_as_bigint(&env->plat, ref(&vals, i), &num) {
         return false;
       }

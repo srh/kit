@@ -544,7 +544,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
       }
       return true;
     }
-    case &MultiMatch(void): {
+    case &MultiMatch(v void): {
       *res_out = AmbigGlobalMatch(void);
       return true;
     }

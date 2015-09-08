@@ -184,7 +184,7 @@ func add_def_entry(cs *checkstate, ent def_entry) def_entry_id {
   shent shp[def_entry] = emshp(ent);
   id def_entry_id = ~count(&cs->defs);
   push(&cs->defs, shent);
-  arr *array[def_entry_id] = try_insert_lookup(&cs->defs_by_name, oo(&shent)->def_name, default());
+  arr *array[def_entry_id] = try_insert_lookup(&cs->defs_by_name, oo(&shent)->def_name, mk_array());
   push(arr, id);
   return id;
 }
@@ -193,7 +193,7 @@ func add_deftype_entry(cs *checkstate, ent deftype_entry) deftype_entry_id {
   shent shp[deftype_entry] = emshp(ent);
   id deftype_entry_id = ~count(&cs->deftypes);
   push(&cs->deftypes, shent);
-  arr *array[deftype_entry_id] = try_insert_lookup(&cs->deftypes_by_name, oo(&shent)->name, default());
+  arr *array[deftype_entry_id] = try_insert_lookup(&cs->deftypes_by_name, oo(&shent)->name, mk_array());
   push(arr, id);
   return id;
 }
@@ -320,7 +320,7 @@ deftype deftype_entry struct {
 };
 
 func mk(module_name sym, name sym, accessible array[access_entry_id], accessibility rhs_accessibility, g ast_generics, tl *ast_type_def) deftype_entry {
-  return {module_name, name, accessible, accessibility, g, Has({tl, NotComputed()}), None(), default@[array[deftype_inst_id]]()};
+  return {module_name, name, accessible, accessibility, g, Has({tl, NotComputed()}), None(), mk_array@[deftype_inst_id]()};
 }
 
 defenum fn_body_spec {
@@ -425,7 +425,7 @@ deftype def_inst struct {
 };
 
 func mk(parms cu_genparms, rhs def_inst_rhs) def_inst {
-  return {parms, rhs, DidNotStartComputingType(void), default@[cu_typeexpr](), default@[type_properties](), NotComputed@[opt[frame_regraphed]](), NotComputed@[st_value]()};
+  return {parms, rhs, DidNotStartComputingType(void), default_value@[cu_typeexpr](), default_value@[type_properties](), NotComputed@[opt[frame_regraphed]](), NotComputed@[st_value]()};
 }
 
 deftype def_nonprim struct {
@@ -454,7 +454,7 @@ deftype def_entry struct {
 };
 
 func mk(module_name sym, def_name sym, accessible array[access_entry_id], generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
-  return {module_name, def_name, accessible, generics, DefnHasRhs({quick_typeexpr, tl}), NotComputed(), default@[array[def_inst_id]]()};
+  return {module_name, def_name, accessible, generics, DefnHasRhs({quick_typeexpr, tl}), NotComputed(), mk_array@[def_inst_id]()};
 }
 
 deftype clqueue_deftype_entry struct {

@@ -245,7 +245,8 @@ func[S, T] wrapequate(x S, y T) bool {
   return x.~ == y.~;
 }
 
-func[T] default() T {
+// TODO: All uses of this are kind of fruity.
+func[T] default_value() T {
   ret T;
   return ret;
 }
@@ -253,7 +254,7 @@ func[T] default() T {
 func[T] TODO() T {
   print(Stderr(), _u8("TODO()\n"));
   fflush(Stderr());
-  return default();
+  return default_value();
 }
 
 func check(x bool) void {

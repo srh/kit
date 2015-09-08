@@ -201,7 +201,7 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool 
 func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_typeexpr, definition def_definition) def_entry_id {
   // access_scope is not relevant to a primitive def.
   access_scope array[access_entry_id];
-  ent def_entry = {cs->im->cym.primitive_module_sym, name, access_scope, generics, definition, Computed(type), default@[array[def_inst_id]]()};
+  ent def_entry = {cs->im->cym.primitive_module_sym, name, access_scope, generics, definition, Computed(type), mk_array@[def_inst_id]()};
   id def_entry_id = add_def_entry(cs, ent);
   return id;
   // TODO: We probably want to put the id in some kind of "primitive" module.
@@ -267,9 +267,9 @@ func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) vo
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">="))), name, mk_op(traits, CmpGe(void)));
 
   switch traits.numeric.repr {
-  case Unsigned(void):
+  case Unsigned(v void):
     // Do nothing.
-  case SignedTwos(void):
+  case SignedTwos(v void):
     add_unop_primitive(cs, intern(cs->im, from_u8(_u8("-"))), name, mk_op(traits, NumNegate(void)));
   }
 }
@@ -352,7 +352,7 @@ func add_pointer_primitive_type(cs *checkstate) void {
   ent deftype_entry = {
     cs->im->cym.primitive_module_sym,
     cs->im->cym.ptrtype_sym,
-    default@[array[access_entry_id]](),
+    mk_array@[access_entry_id](),
     RhsImpossible(void),
     HasGenerics(one_generic),
     None(),
@@ -365,7 +365,7 @@ func add_pointer_primitive_type(cs *checkstate) void {
            DerivedMethodTrivial(void),
            DerivedMethodTrivial(void)
          }}),
-    default@[array[deftype_inst_id]]()
+    mk_array@[deftype_inst_id]()
   };
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.
@@ -376,9 +376,9 @@ func add_function_primitive(cs *checkstate) void {
   ent deftype_entry = {
     cs->im->cym.primitive_module_sym,
     cs->im->cym.fnsym,
-    default@[array[access_entry_id]](),
+    mk_array@[access_entry_id](),
     RhsImpossible(void),
-    VariadicGenerics({default@[array[ast_ident]](), {fake_ast_meta(), cs->im->cym.tee_sym}, mk_array({fake_ast_meta(), cs->im->cym.uee_sym})}),
+    VariadicGenerics({mk_array@[ast_ident](), {fake_ast_meta(), cs->im->cym.tee_sym}, mk_array({fake_ast_meta(), cs->im->cym.uee_sym})}),
     None(),
     Has({None(),
          @[type_properties]{
@@ -389,7 +389,7 @@ func add_function_primitive(cs *checkstate) void {
            DerivedMethodTrivial(void),
            DerivedMethodTrivial(void)
          }}),
-    default@[array[deftype_inst_id]]()
+    mk_array@[deftype_inst_id]()
   };
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.

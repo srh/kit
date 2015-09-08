@@ -9,7 +9,7 @@ deftype ast_meta size;
 
 def `~` fn[size, ast_meta] = wrapconvert;
 
-func fake_ast_meta() ast_meta { return default(); }
+func fake_ast_meta() ast_meta { return ~0; }
 
 deftype interval struct {
   left pos;
