@@ -1680,7 +1680,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def d1 i32 = fac(7);\n"));
 
-  run_check_test(ctx, "c145",
+  run_check_test(ctx, "c145-a",
     _u8("defclass copy cl i16;\n"
         "access cl {\n"
         "  func do_init(x *cl) void {\n"
@@ -1700,6 +1700,31 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  incr(&d);\n"
         "  copy(&c, &d);\n"
         "  return ~get(&c);\n"
+        "}\n"
+        "\n"
+        "def t i32 = bar();\n"));
+
+  // TODO: This fails with "Looking for structural type information on inaccessible..." when it should have a def matching error on "get" (in the return statement, since i16!=i32).  This is just bonkers.
+  run_check_negtest(ctx, "c145-b",
+    _u8("defclass copy cl i16;\n"
+        "access cl {\n"
+        "  func do_init(x *cl) void {\n"
+        "    x->~ = 0x99;\n"
+        "  }\n"
+        "  func incr(x *cl) void {\n"
+        "    x->~ = x->~ + 1;\n"
+        "  }\n"
+        "  func get(x *cl) i16 {\n"
+        "    return x->~;\n"
+        "  }\n"
+        "}\n"
+        "func bar() i32 {\n"
+        "  c cl;\n"
+        "  d cl;\n"
+        "  destroy(&c);\n"
+        "  incr(&d);\n"
+        "  copy(&c, &d);\n"
+        "  return get(&c);\n"
         "}\n"
         "\n"
         "def t i32 = bar();\n"));
