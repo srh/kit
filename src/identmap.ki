@@ -95,6 +95,8 @@ deftype common_syms struct {
   magic_copy sym;
   magic_move sym;
   magic_destroy sym;
+  sizeofsym sym;
+  alignofsym sym;
 };
 
 deftype identmap struct {
@@ -137,6 +139,8 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.magic_copy = intern(im, from_u8(_u8("magic_copy")));
   ret.magic_move = intern(im, from_u8(_u8("magic_move")));
   ret.magic_destroy = intern(im, from_u8(_u8("magic_destroy")));
+  ret.sizeofsym = intern(im, from_u8(_u8("sizeof")));
+  ret.alignofsym = intern(im, from_u8(_u8("alignof")));
   return ret;
 }
 

@@ -100,8 +100,20 @@ deftype which_non_magic_ctor struct {
   nmc non_magic_ctor;
 };
 
+defenum which_prop {
+  PropSizeof void;
+  PropAlignof void;
+};
+
+deftype non_magic_prop struct {
+  wp which_prop;
+  type te_typeexpr;
+  info opt[u32];
+};
+
 defenum def_non_magic {
   NonMagicCtor which_non_magic_ctor;
+  NonMagicProp non_magic_prop;
 };
 
 deftype which_magic_ctor struct {
@@ -137,7 +149,30 @@ func check_non_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_ge
   switch nonmag {
   case &NonMagicCtor(wnmc which_non_magic_ctor):
     return check_non_magic_ctor(cs, clq, g, parms, wnmc.wc, &wnmc.nmc);
+  case &NonMagicProp(nmp non_magic_prop):
+    return check_non_magic_prop(cs, clq, g, parms, &nmp);
   }
+}
+
+func check_non_magic_prop(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, nmp *non_magic_prop) bool {
+  cac cac_typeexpr;
+  if !check_and_compute_typeexpr(cs, clq, g, parms, &nmp->type, &cac) {
+    return false;
+  }
+  check(cac.complete);
+
+  cac_props type_properties;
+  if !compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
+    return false;
+  }
+
+  switch nmp->wp {
+  case PropSizeof(v void):
+    set(&nmp->info, cac_props.flat_size);
+  case PropAlignof(v void):
+    set(&nmp->info, cac_props.flat_alignment);
+  }
+  return true;
 }
 
 func padding_oneparm_size(cs *checkstate, parms *cu_genparms) u32 {

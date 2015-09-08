@@ -1962,6 +1962,11 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
             frg frame_regraphed = mk_const_frame_regraphed(&inst->computed_type, &inst->computed_type_properties, ConstDef(info->ip));
             inst->graph = Computed(Has(frg));
             return true;
+          case &NonMagicProp(nmp non_magic_prop):
+            info u32 = *unHas(&nmp.info);
+            frg frame_regraphed = mk_const_frame_regraphed(&inst->computed_type, &inst->computed_type_properties, ConstInt(~info));
+            inst->graph = Computed(Has(frg));
+            return true;
           }
         }
 

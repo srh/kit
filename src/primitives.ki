@@ -409,6 +409,7 @@ func add_function_primitive(cs *checkstate) void {
   // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.
 }
 
+// TODO: Rename -- remove the word "constructor."
 func add_non_magic_constructor_primitive(cs *checkstate, name sym, args size, nonmag def_non_magic) void {
   var parms = repeat(args, ptr_type(cs, TeName({cs->im->cym.tee_sym, None()})));
   push(&parms, primitive_void_type(cs));
@@ -429,6 +430,9 @@ func add_magic_constructor_primitives(cs *checkstate) void {
   add_non_magic_constructor_primitive(cs, cs->im->cym.copy, 2, NonMagicCtor({CtorCopy(void), {teetype, None@[non_magic_ctor_info]()}}));
   add_non_magic_constructor_primitive(cs, cs->im->cym.move, 2, NonMagicCtor({CtorMove(void), {teetype, None@[non_magic_ctor_info]()}}));
   add_non_magic_constructor_primitive(cs, cs->im->cym.destroy, 1, NonMagicCtor({CtorDestroy(void), {teetype, None@[non_magic_ctor_info]()}}));
+
+  add_def_primitive(cs, cs->im->cym.sizeofsym, tee_generic(cs), primitive_size_type(cs), DefnNonMagic(NonMagicProp({PropSizeof(void), teetype, None@[u32]()})));
+  add_def_primitive(cs, cs->im->cym.alignofsym, tee_generic(cs), primitive_size_type(cs), DefnNonMagic(NonMagicProp({PropAlignof(void), teetype, None@[u32]()})));
 
   add_magic_constructor_primitive(cs, cs->im->cym.magic_bzero, 1, MagicBzero({None@[u32]()}));
   add_magic_constructor_primitive(cs, cs->im->cym.magic_memcopy, 2, MagicMemcopy({None@[u32]()}));
