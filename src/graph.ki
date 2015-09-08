@@ -1956,10 +1956,13 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         }
 
         case &InstRhsNonMagic(nonmag def_non_magic): {
-          info *non_magic_ctor_info = unHas(&nonmag.nmc.info);
-          frg frame_regraphed = mk_const_frame_regraphed(&inst->computed_type, &inst->computed_type_properties, ConstDef(info->ip));
-          inst->graph = Computed(Has(frg));
-          return true;
+          switch &nonmag {
+          case &NonMagicCtor(wnmc which_non_magic_ctor):
+            info *non_magic_ctor_info = unHas(&wnmc.nmc.info);
+            frg frame_regraphed = mk_const_frame_regraphed(&inst->computed_type, &inst->computed_type_properties, ConstDef(info->ip));
+            inst->graph = Computed(Has(frg));
+            return true;
+          }
         }
 
         case &InstRhsMagic(mag def_magic): {

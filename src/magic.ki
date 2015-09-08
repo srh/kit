@@ -95,9 +95,13 @@ deftype magic_memcopy struct {
   size opt[u32];
 };
 
-deftype def_non_magic struct {
+deftype which_non_magic_ctor struct {
   wc which_ctor;
   nmc non_magic_ctor;
+};
+
+defenum def_non_magic {
+  NonMagicCtor which_non_magic_ctor;
 };
 
 deftype which_magic_ctor struct {
@@ -130,7 +134,10 @@ func num_args(wc which_ctor) size {
 }
 
 func check_non_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, nonmag *def_non_magic) bool {
-  return check_non_magic_ctor(cs, clq, g, parms, nonmag->wc, &nonmag->nmc);
+  switch nonmag {
+  case &NonMagicCtor(wnmc which_non_magic_ctor):
+    return check_non_magic_ctor(cs, clq, g, parms, wnmc.wc, &wnmc.nmc);
+  }
 }
 
 func padding_oneparm_size(cs *checkstate, parms *cu_genparms) u32 {
