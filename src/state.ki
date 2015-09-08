@@ -341,9 +341,15 @@ deftype prim_fn_body struct {
   op primitive_op;
 };
 
+deftype extern_fn_body struct {
+  // The name of the extern fn body.
+  name sym;
+};
+
 defenum fn_body_entry {
   GraphedFnBody graphed_fn_body;
   PrimFnBody prim_fn_body;
+  ExternFnBody extern_fn_body;
 };
 
 deftype access_entry struct {
@@ -481,11 +487,12 @@ defenum clqueue_entry {
 
 deftype clqueue struct {
   cs *checkstate;
+  im *identmap;
   entries array[clqueue_entry];
 };
 
 func mk(cs *checkstate) clqueue {
-  return {cs, mk_array@[clqueue_entry]()};
+  return {cs, cs->im, mk_array@[clqueue_entry]()};
 }
 
 defclass move depth_rewinder struct {

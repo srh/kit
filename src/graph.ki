@@ -1923,6 +1923,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
     return false;
   }
 
+  ent *def_entry = ref_def_entry(cs, ent_id);
   inst *def_inst = ref_inst(cs, inst_id);
   switch &inst->graph {
     case &NotComputed(v0 void): {
@@ -1935,7 +1936,10 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           return true;
         }
         case &InstRhsExtern(v void): {
-          inst->graph = Computed(None());
+          // TODO: What if an extern def isn't a function?
+          id fn_body_id = add_fn_body(cs, ExternFnBody({ent->def_name}));
+          frg frame_regraphed = mk_const_frame_regraphed(&inst->computed_type, &inst->computed_type_properties, ConstFnBody(id));
+          inst->graph = Computed(Has(frg));
           return true;
         }
         case &InstRhsExpr(dire def_inst_rhs_expr): {

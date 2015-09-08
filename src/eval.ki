@@ -300,7 +300,10 @@ func ensure_def_inst_evaled(cs *checkstate, clq *clqueue, ent_id def_entry_id, i
 }
 
 func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **st_value) bool {
+  ent *def_entry = ref_def_entry(clq->cs, ent_id);
   inst *def_inst = ref_inst(clq->cs, inst_id);
+
+  defname string = lookup(clq->cs->im, ent->def_name);
   if inst->status != FinishedCheckingRhs(void) {
     ice(_u8("Evaling def we have not finished checking."));
   }
@@ -312,7 +315,7 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
     if case &Has(fg2 frame_regraphed) = &ofg {
       fg = &fg2;
     } else {
-      ice(_u8("st_eval_def on prim or extern def"));
+      ice(_u8("st_eval_def on prim or extern def "), defname);
     }
   } else {
     ice(_u8("Evaling def whose graph we have not computed."));
@@ -324,7 +327,6 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
       pool st_objpool = mk_objpool();
       env st_env = mk_env(&pool, clq->cs->platform, count(&fg->gr.cells));
 
-      defname string = lookup(clq->cs->im, ref_def_entry(clq->cs, ent_id)->def_name);
       if !st_eval_frame_regraphed(clq, &env, fg) {
         ERR(_u8("(in evaling def "), defname, _u8(")"));
         inst->evaled_value = FailedComputation();
@@ -608,6 +610,9 @@ func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], r
     return true;
   case &PrimFnBody(prent prim_fn_body):
     return st_eval_prim_fn_body(clq, env, paramorefs, retvalref, &prent);
+  case &ExternFnBody(exent extern_fn_body):
+    ERR(_u8("st_eval_fn_body cannot eval extern fn body named "), lookup(clq->im, exent.name));
+    return false;
   }
 }
 
