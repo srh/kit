@@ -52,6 +52,10 @@ func st_eval_prim_logical(clq *clqueue, env *st_env, paramorefs *array[st_obj_re
     result = get(&ps, 0) == get(&ps, 1);
   case BoolNe(v void):
     result = get(&ps, 0) != get(&ps, 1);
+  case BoolBitAnd(v void):
+    result = (get(&ps, 0) == bigu(1) && get(&ps, 1) == bigu(1));
+  case BoolBitOr(v void):
+    result = (get(&ps, 0) == bigu(1) || get(&ps, 1) == bigu(1));
   }
   resultint bigint;
   if result {

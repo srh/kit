@@ -36,6 +36,8 @@ defenum primitive_logical_op {
   LogicalNot void;
   BoolEq void;
   BoolNe void;
+  BoolBitAnd void;
+  BoolBitOr void;
 };
 
 func op_arity(op primitive_logical_op) u32 {
@@ -297,6 +299,8 @@ func add_bool_primitive(cs *checkstate) void {
   add_unop_primitive(cs, intern(cs->im, from_u8(_u8("!"))), cs->im->cym.boolsym, PrimLogical(LogicalNot(void)));
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), cs->im->cym.boolsym, PrimLogical(BoolEq(void)));
   add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), cs->im->cym.boolsym, PrimLogical(BoolNe(void)));
+  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("&"))), cs->im->cym.boolsym, PrimLogical(BoolBitAnd(void)));
+  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("|"))), cs->im->cym.boolsym, PrimLogical(BoolBitOr(void)));
 }
 
 func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) void {
