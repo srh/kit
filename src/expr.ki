@@ -488,7 +488,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
 
   mec magic_enum_construct = {enum_type, enum_type_props, decl_index, rhs_props, meco};
 
-  ent def_entry_id = add_def_primitive(ds->cs, defname, NoGenerics(void), *ctor_type, DefnMagic(MagicEnumConstruct(mec)));
+  ent def_entry_id = add_def_primitive(ds->cs, defname, NoGenerics(void), *ctor_type, @[def_definition]DefnMagic(MagicEnumConstruct(mec)));
   inst_id def_inst_id;
   if !make_inst(ds->cs, ds->clq, ent, &nogp, &inst_id) {
     ice(_u8("lookup_or_make_enum_constructor_def make_inst failed on fresh def"));
@@ -592,7 +592,7 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
 
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~c.te, props)), ~c.te, props)));
   } else {
-    annotate_info(x, IncompleteCheck(type));
+    annotate_info(x, @[ast_expr_info]IncompleteCheck(type));
   }
   return true;
 }
@@ -724,7 +724,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       if !compute_complete_type_properties(es->cs, es->clq, param, &props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(IsLvalYes({add_virtual_cell(es, ~ *param, props)}), ~ *param, props)));
+      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_virtual_cell(es, ~ *param, props)}), ~ *param, props)));
       return true;
     }
 
@@ -771,7 +771,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
             return false;
           }
           if case &Has(aft ast_expr_after) = &after {
-            annotate_local_field(&a, ArrayLength({aft, value}));
+            annotate_local_field(&a, @[ast_local_field_info]ArrayLength({aft, value}));
           } else {
             ice(_u8("after not annotated"));
           }
@@ -1073,7 +1073,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *opt[ast_e
         return false;
       }
       dest cell_num = add_rigid_cell(es, info->cu, info->cu_props);
-      annotate_disposal(after, mk_after(CopyAfter({copy, dest, desc.num}), Has(dest)));
+      annotate_disposal(after, mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), Has(dest)));
     }
   }
   return true;
@@ -1088,7 +1088,7 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *opt[ast_e
       if !get_destroy_uni_ctor(es, &ref_cell(es, desc.whole_num)->type, &destroy) {
         return false;
       }
-      annotate_disposal(after, mk_after(DestroyAfter({destroy, desc.whole_num}), None()));
+      annotate_disposal(after, mk_after(@[after_action]DestroyAfter({destroy, desc.whole_num}), None()));
       annotate_cell_location(es, desc.whole_num, LocationFlex(void));
     }
     case &IsLvalYes(desc lval_description): {
@@ -1123,8 +1123,8 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
         }
         dest cell_num = add_flex_cell(es, info->cu, info->cu_props);
         annotate_disposal(after,
-          mk_after(CopyAfter({copy, dest, desc.partial_num}),
-                   DestroyAfter({destroy, desc.whole_num}),
+          mk_after(@[after_action]CopyAfter({copy, dest, desc.partial_num}),
+                   @[after_action]DestroyAfter({destroy, desc.whole_num}),
                    Has(dest)));
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate_later(later, {destroy, dest});
@@ -1141,7 +1141,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
       }
       dest cell_num = add_flex_cell(es, info->cu, info->cu_props);
       annotate_disposal(after,
-        mk_after(CopyAfter({copy, dest, desc.num}), Has(dest)));
+        mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), Has(dest)));
       annotate_later(later, {destroy_the_copy, dest});
     }
   }
@@ -1197,9 +1197,10 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         }
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate_assignment(assignment,
+          @[ast_assignment_info]
           ConditionalAssignment({make_comparecells(es, dest),
-                                 mk_array(DestroyAfter({destroy, dest}),
-                                          MoveAfter({move, dest, desc.whole_num})),
+                                 mk_array(@[after_action]DestroyAfter({destroy, dest}),
+                                          @[after_action]MoveAfter({move, dest, desc.whole_num})),
                                  mk_array()}));
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
@@ -1218,10 +1219,11 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
 
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate_assignment(assignment,
+          @[ast_assignment_info]
           ConditionalAssignment({make_comparecells(es, dest),
-                                 mk_array(DestroyAfter({target_destroy, dest}),
-                                          CopyAfter({copy, dest, desc.partial_num})),
-                                 mk_array(DestroyAfter({destroy, desc.whole_num}))}));
+                                 mk_array(@[after_action]DestroyAfter({target_destroy, dest}),
+                                          @[after_action]CopyAfter({copy, dest, desc.partial_num})),
+                                 mk_array(@[after_action]DestroyAfter({destroy, desc.whole_num}))}));
       }
     }
     case &IsLvalYes(desc lval_description): {
@@ -1234,8 +1236,9 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
           return false;
         }
         annotate_assignment(assignment,
+          @[ast_assignment_info]
           ConditionalAssignment({make_comparecells(es, dest),
-                                 mk_array(CopyAfter({copy, dest, desc.num})),
+                                 mk_array(@[after_action]CopyAfter({copy, dest, desc.num})),
                                  mk_array()}));
       }
     }
@@ -1260,7 +1263,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &AmbigGlobalMatch(v void): {
       if ai == AllowIncompleteYes(void) {
         // NOTE: We could annotate this more precisely in ambiguous-single-match cases.
-        annotate_info(x, IncompleteCheck(TeUnknown(void)));
+        annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
         return true;
       } else {
         MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), *pt);
@@ -1268,7 +1271,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       }
     }
     case &OneEnumConstructorMatch(ci constructor_info): {
-      annotate_name_info(a, EnumConstructor({ci.constructor_tag, ci.ip}));
+      annotate_name_info(a, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip}));
       props type_properties;
       if !compute_type_properties(es->cs, es->clq, &ci.type, &props) {
         return false;
@@ -1280,15 +1283,15 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, gi.ent), gi.inst) {
         return false;
       }
-      annotate_name_info(a, GlobalResolve({gi.ent, gi.inst}));
+      annotate_name_info(a, @[ast_name_expr_info]GlobalResolve({gi.ent, gi.inst}));
       inst *def_inst = ref_inst(es->cs, gi.inst);
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, inst->computed_type, inst->computed_type_properties)), inst->computed_type, inst->computed_type_properties)));
       return true;
     }
     case &OneLocalMatch(v local_info): {
-      annotate_name_info(a, LocalResolve({v.varnum}));
+      annotate_name_info(a, @[ast_name_expr_info]LocalResolve({v.varnum}));
       vi *var_info = ref_var(es, v.varnum);
-      annotate_info(x, CompleteCheck(mk(IsLvalYes({vi->cell}), vi->type, vi->props)));
+      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell}), vi->type, vi->props)));
       return true;
     }
   }
@@ -1312,7 +1315,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
   if !is_complete(pt) {
     if ai == AllowIncompleteYes(void) {
       // NOTE: We could have more specific info, like number of fields and their incomplete types.
-      annotate_info(x, IncompleteCheck(TeUnknown(void)));
+      annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
       return true;
     } else {
       ERR(_u8("Structure literal used ambiguously."));
@@ -1326,7 +1329,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
   }
   cu_pt cu_typeexpr = ~ *pt;
   structural_type *cu_typeexpr;
-  if !structural_rhs(es->ds, &cu_pt, &structural_type) {
+  if !recursive_structural_rhs(es->ds, &cu_pt, &structural_type) {
     return false;
   }
 
@@ -1366,7 +1369,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~ *pt, props)), ~ *pt, props)));
     return true;
   } else {
-    ERR(_u8("Structure literal used on non-struct type."));
+    MERR(es->cs, a->meta, _u8("Structure literal used on non-struct type, "), structural_type->~);
     return false;
   }
 }
@@ -1479,7 +1482,7 @@ func numeric_literal_value(a *ast_numeric_literal) bigint {
 func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr, n bigint, x *ast_expr) bool {
   if case &TeUnknown(v void) = pt {
     if ai == AllowIncompleteYes(void) {
-      annotate_info(x, IncompleteCheck(TeUnknown(void)));
+      annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
       return true;
     } else {
       ERR(_u8("Numeric literal usage is ambiguous."));
@@ -1627,6 +1630,23 @@ func complete_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typ
   }
 }
 
+func recursive_structural_rhs(ds *defscope, t *cu_typeexpr, rhs_type_out **cu_typeexpr) bool {
+  prev *cu_typeexpr = t;
+  for ;; {
+    stru *cu_typeexpr;
+    if !structural_rhs(ds, prev, &stru) {
+      return false;
+    }
+    // TODO: This pointer comparison for termination is a ghetto hack.
+    if stru == prev {
+      *rhs_type_out = stru;
+      return true;
+    }
+    prev = stru;
+  }
+}
+
+// TODO: Umm... this is very duplicated with complete_structural_rhs.
 func structural_rhs(ds *defscope, t *cu_typeexpr, rhs_type_out **cu_typeexpr) bool {
   switch &t->~ {
     case &TeName(a te_name): {
@@ -1851,7 +1871,7 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
 
   if expr_type_incomplete(&oo(&a->fun)->expr) {
     check(ai == AllowIncompleteYes(void));
-    annotate_info(x, IncompleteCheck(TeUnknown(void)));
+    annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
     return true;
   }
 

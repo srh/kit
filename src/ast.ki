@@ -492,6 +492,7 @@ deftype ast_strinit_param struct {
 };
 
 deftype ast_strinit struct {
+  meta ast_meta;
   exprs array[ast_strinit_param];
 };
 

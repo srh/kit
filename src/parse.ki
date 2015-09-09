@@ -908,6 +908,7 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
       }
     }
     case Grouper(g grouper): {
+      m ast_meta = start(p);
       switch g {
         case LParen(v): {
           step(p);
@@ -922,7 +923,7 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
         case LBrace(v): {
           step(p);
           // TODO: Have some way to prevent naked struct initializers in a condition expression.
-          return parse_rest_of_strinit(p, out);
+          return parse_rest_of_strinit(p, m, out);
         }
         default: { return Fail; }
       }
@@ -1022,7 +1023,7 @@ func parse_rest_of_lambda(p *ps, out *ast_expr) bool {
   return true;
 }
 
-func parse_rest_of_strinit(p *ps, out *ast_expr) bool {
+func parse_rest_of_strinit(p *ps, m ast_meta, out *ast_expr) bool {
   ecs array[ast_expr_consume];
   if !parse_rest_of_expr_list(p, RBrace(void), &ecs) {
     return Fail;
@@ -1032,7 +1033,8 @@ func parse_rest_of_strinit(p *ps, out *ast_expr) bool {
   for i size = 0; i < necs; i = i + 1 {
     push(&params, {None@[ast_strinit_param_info](), get(&ecs, i)});
   }
-  *out = mk(Strinit({params}));
+  end(p, m);
+  *out = mk(Strinit({m, params}));
   return true;
 }
 

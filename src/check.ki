@@ -879,7 +879,7 @@ func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, par
   dbgcheck(_u8("enqueue_deftype_inst"));
   var res = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
   if res.created {
-    push(&clq->entries, ClqDeftypeEntry({id, res.id, cs->instantiation_depth}));
+    push(&clq->entries, @[clqueue_entry]ClqDeftypeEntry({id, res.id, cs->instantiation_depth}));
   }
   return res.id;
 }
@@ -1184,7 +1184,7 @@ func lambda_declared_type(im *identmap, a *ast_lambda) ast_typeexpr {
     push(&type_params, ref(&a->args, i)->type);
   }
   push(&type_params, a->return_type);
-  return App({embox(Name({fake_ast_meta(), im->cym.fnsym})), type_params});
+  return App({embox(@[ast_typeexpr]Name({fake_ast_meta(), im->cym.fnsym})), type_params});
 }
 
 func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) bool {

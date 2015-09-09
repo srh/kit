@@ -555,7 +555,7 @@ func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_ins
   name sym = ref_deftype_entry(cs, ent_id)->name;
   switch &ref_deftype_inst(cs, inst_id)->parms {
     case &NoParms(v void): {
-      return ~TeName({name, Has({ent_id, inst_id})});
+      return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
     }
     case &HasParms(a array[cu_typeexpr]): {
       converted array[te_typeexpr];
@@ -563,7 +563,7 @@ func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_ins
       for i size = 0; i < n; i = i + 1 {
         push(&converted, ref(&a, i)->~);
       }
-      return ~TeApp({embox(TePureName(name)), converted, Has({ent_id, inst_id})});
+      return ~ @[te_typeexpr]TeApp({embox(TePureName(name)), converted, Has({ent_id, inst_id})});
     }
   }
 }
