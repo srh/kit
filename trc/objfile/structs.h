@@ -14,8 +14,6 @@ enum objfile_relocation_type {
   OBJFILE_RELOCATION_TYPE_REL32,
 };
 
-static const size_t OBJFILE_RELOCATION_TYPE_COUNT = 3;
-
 struct objfile_relocation {
   /* Offset from beginning of section. */
   uint32_t virtual_address;
@@ -28,7 +26,7 @@ struct objfile_relocation {
 struct objfile_section {
   struct databuf raw;
 
-  /* Relavant for .data and .rdata sections.  Not relevant for .text,
+  /* Relevant for .data and .rdata sections.  Not relevant for .text,
   which just uses 16. */
   size_t max_requested_alignment;
 
