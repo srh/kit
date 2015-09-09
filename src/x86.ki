@@ -1,0 +1,3 @@
+import array;
+
+def x86_fillercode_byte u8 = 0xCC;

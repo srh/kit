@@ -52,6 +52,7 @@ void objfile_set_symbol_value(struct objfile *f,
                               uint32_t SymbolTableIndex,
                               uint32_t value);
 
+/* TODO: Make a struct wrapper for sti's? */
 uint32_t objfile_add_local_symbol(struct objfile *f,
                                   ident_value name,
                                   uint32_t value,
@@ -69,6 +70,7 @@ int objfile_c_symbol_name(int target_linux32,
 /* Utility. */
 void append_zeros_to_align(struct databuf *d, size_t alignment);
 
+/* TODO: This should return a value in a wrapper struct? */
 uint32_t strtab_add(struct databuf *d, const void *buf, size_t count);
 
 #endif /* KIT_OBJFILE_OBJFILE_H_ */

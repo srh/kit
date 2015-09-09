@@ -1,0 +1,13 @@
+deftype le_u32 struct {
+  buf [4]u8;
+};
+
+func `~`(x u32) le_u32 {
+  ret le_u32;
+  ret.buf[0] = ~ (x & 0xFF);
+  ret.buf[1] = ~ ((x >> 8) & 0xFF);
+  ret.buf[2] = ~ ((x >> 16) & 0xFF);
+  ret.buf[3] = ~ ((x >> 24) & 0xFF);
+  return ret;
+}
+

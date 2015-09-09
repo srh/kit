@@ -232,6 +232,14 @@ func[T] is_strictly_increasing(x *array[T]) bool {
   return true;
 }
 
+func[T] overwrite_raw(x *array[T], offset size, p *T, n size) void {
+  check(n <= count(x) - offset);
+  w *T = ref(x, offset);
+  for i size = 0; i < n; i = i + 1 {
+    w[i] = p[i];
+  }
+}
+
 func[T] append(x *array[T], a *opt[T]) void {
   if case &Has(t T) = a {
     push(x, t);
