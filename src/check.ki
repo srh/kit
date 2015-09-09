@@ -655,7 +655,7 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
   }
 
   id deftype_entry_id;
-  if !match_deftype(cs, a->value, None(), &id) {
+  if !match_deftype(cs, fake_ast_meta(), a->value, None(), &id) {
     dbgcheck(_u8("match_deftype failed"));
     // An error happened when looking up a deftype (multiple matches?).
     return false;
@@ -694,7 +694,7 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
   switch oo(&a->typefunc) {
     case &TePureName(value sym): {
       id deftype_entry_id;
-      if !match_deftype(cs, value, Has(&params), &id) {
+      if !match_deftype(cs, fake_ast_meta(), value, Has(&params), &id) {
         return false;
       }
 
@@ -760,11 +760,11 @@ func arity_matches(a *ast_generics, parms *cu_genparms) bool {
   }
 }
 
-func ERR_no_match(im *identmap, name sym, params opt[*array[te_typeexpr]]) void {
-  ERR(_u8("No match for type with name '"), lookup(im, name), _u8("' and maybe some params"));
+func ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*array[te_typeexpr]]) void {
+  MERR(cs, m, _u8("No match for type with name '"), name, _u8("' and maybe some params"));
 }
 
-func match_deftype(cs *checkstate, name sym, params opt[*array[te_typeexpr]], out *deftype_entry_id) bool {
+func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*array[te_typeexpr]], out *deftype_entry_id) bool {
   if case Has(arr *array[deftype_entry_id]) = lookup_ref(&cs->deftypes_by_name, name) {
     n size = count(arr);
     match opt[deftype_entry_id];
@@ -783,11 +783,11 @@ func match_deftype(cs *checkstate, name sym, params opt[*array[te_typeexpr]], ou
       *out = id;
       return true;
     } else {
-      ERR_no_match(cs->im, name, params);
+      ERR_no_match(cs, m, name, params);
       return false;
     }
   } else {
-    ERR_no_match(cs->im, name, params);
+    ERR_no_match(cs, m, name, params);
     return false;
   }
 }
@@ -1524,7 +1524,7 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
       switch ent->arity {
         case AccessArityNone(u void): {
           id deftype_entry_id;
-          if !match_deftype(cs, ent->name, None(), &id) {
+          if !match_deftype(cs, fake_ast_meta(), ent->name, None(), &id) {
             ent->ent_id = FailedComputation();
             return false;
           }
@@ -1535,7 +1535,7 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
         case AccessArityFinite(n u32): {
           params array[te_typeexpr] = repeat(~n, TeUnknown(void));
           id deftype_entry_id;
-          if !match_deftype(cs, ent->name, Has(&params), &id) {
+          if !match_deftype(cs, fake_ast_meta(), ent->name, Has(&params), &id) {
             ent->ent_id = FailedComputation();
             return false;
           }

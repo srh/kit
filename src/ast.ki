@@ -1,5 +1,6 @@
 import arity;
 import box;
+import expr;
 import identmap;
 import pos;
 import typeexpr;

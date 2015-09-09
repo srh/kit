@@ -295,7 +295,7 @@ func grab_tok(p *ps) tok {
       }
 
       if is_numeric_postchar(ch) {
-        return mk_res(p, left, Num(HexNum(digits)));
+        return mk_res(p, left, @[tokval]Num(HexNum(digits)));
       } else {
         return {{left, ps_pos(p)}, Bad(void)};
       }
@@ -303,7 +303,7 @@ func grab_tok(p *ps) tok {
       if is_numeric_postchar(ch) {
         digits array[i8];
         push(&digits, 0);
-        return mk_res(p, left, Num(DecNum(digits)));
+        return mk_res(p, left, @[tokval]Num(DecNum(digits)));
       } else {
         return {{left, ps_pos(p)}, Bad(void)};
       }
@@ -319,7 +319,7 @@ func grab_tok(p *ps) tok {
       ch = ps_peek(p);
     }
     if is_numeric_postchar(ch) {
-      return mk_res(p, left, Num(DecNum(digits)));
+      return mk_res(p, left, @[tokval]Num(DecNum(digits)));
     } else {
       return {{left, ps_pos(p)}, Bad(void)};
     }
@@ -371,22 +371,22 @@ func grab_tok(p *ps) tok {
     return mk_res(p, left, Ident(arr));
   } else if ch == '(' {
     ps_step(p);
-    return mk_res(p, left, Grouper(LParen(void)));
+    return mk_res(p, left, @[tokval]Grouper(LParen(void)));
   } else if ch == ')' {
     ps_step(p);
-    return mk_res(p, left, Grouper(RParen(void)));
+    return mk_res(p, left, @[tokval]Grouper(RParen(void)));
   } else if ch == '[' {
     ps_step(p);
-    return mk_res(p, left, Grouper(LBracket(void)));
+    return mk_res(p, left, @[tokval]Grouper(LBracket(void)));
   } else if ch == ']' {
     ps_step(p);
-    return mk_res(p, left, Grouper(RBracket(void)));
+    return mk_res(p, left, @[tokval]Grouper(RBracket(void)));
   } else if ch == '{' {
     ps_step(p);
-    return mk_res(p, left, Grouper(LBrace(void)));
+    return mk_res(p, left, @[tokval]Grouper(LBrace(void)));
   } else if ch == '}' {
     ps_step(p);
-    return mk_res(p, left, Grouper(RBrace(void)));
+    return mk_res(p, left, @[tokval]Grouper(RBrace(void)));
   } else if ch == '\"' || ch == '\'' {
     ps_step(p);
     return mk_res(p, left, StringDelim(ch));
