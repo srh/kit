@@ -340,7 +340,7 @@ func enqueue_def_inst_compute_type(cs *checkstate, clq *clqueue, id def_entry_id
 func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *cu_genparms) def_inst_id {
   var res = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
   if res.created {
-    push(&clq->entries, ClqDefEntry({id, res.id, cs->instantiation_depth}));
+    push(&clq->entries, @[clqueue_entry]ClqDefEntry({id, res.id, cs->instantiation_depth}));
   }
   return res.id;
 }
@@ -663,7 +663,7 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
 
   np cu_genparms = NoParms(void);
   inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &np);
-  *computed_out = ~TeName({a->value, Has({id, inst_id})});
+  *computed_out = ~ @[te_typeexpr]TeName({a->value, Has({id, inst_id})});
   return true;
 }
 
@@ -754,7 +754,7 @@ func arity_matches(a *ast_generics, parms *genparms) bool {
 
 func arity_matches(a *ast_generics, parms *cu_genparms) bool {
   if case &HasParms(ps array[cu_typeexpr]) = parms {
-    return arity_matches(a, Has(&ps));
+    return arity_matches(a, @[opt[*array[cu_typeexpr]]]Has(&ps));
   } else {
     return arity_matches(a, @[opt[*array[cu_typeexpr]]] None());
   }

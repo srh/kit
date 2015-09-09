@@ -1061,8 +1061,8 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *opt[ast_e
         }
         dest cell_num = add_rigid_cell(es, info->cu, info->cu_props);
         annotate_disposal(after,
-          mk_after(CopyAfter({copy, dest, desc.partial_num}),
-                   DestroyAfter({destroy, desc.whole_num}),
+          mk_after(@[after_action]CopyAfter({copy, dest, desc.partial_num}),
+                   @[after_action]DestroyAfter({destroy, desc.whole_num}),
                    Has(dest)));
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
       }
@@ -1254,7 +1254,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
   }
   switch &match_res {
     case &NoMatch(v void): {
-      MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, matching type '"), to_u8str(es->im, *pt), _u8("'"));
+      MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, matching type '"), *pt, _u8("'"));
       return false;
     }
     case &AmbigGlobalMatch(v void): {
@@ -1263,7 +1263,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
         annotate_info(x, IncompleteCheck(TeUnknown(void)));
         return true;
       } else {
-        MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), to_u8str(es->im, *pt));
+        MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), *pt);
         return false;
       }
     }
