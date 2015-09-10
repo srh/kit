@@ -14,6 +14,12 @@ access array[_] {
   }
 
   func[T] do_copy(dest *array[T], src *array[T]) void {
+    if src->count == 0 {
+      dest->count = 0;
+      dest->cap = 0;
+      dest->ptr = null;
+      return;
+    }
     dest->count = src->count;
     dest->cap = src->count;
     dest->ptr = cast(checkmalloc(src->count * sizeof@[T]));
