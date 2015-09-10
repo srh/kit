@@ -98,24 +98,42 @@ func try_skip_token(p *ps, expected tokval) bool {
 }
 
 func try_parse_oper(p *ps, expected i32, out *ast_ident) bool {
-  oper tokval = mk_oper(expected);
-  if equal(&peek(p)->val, &oper) {
-    m ast_meta = startend(p);
-    *out = {m, intern(p->im, ~mk_array(expected))};
-    step(p);
-    return true;
-  } else {
-    return Fail;
+  if case &Oper(arr array[i32]) = &peek(p)->val {
+    if count(&arr) == 1 && get(&arr, 0) == expected {
+      m ast_meta = startend(p);
+      *out = {m, intern(p->im, ~arr)};
+      step(p);
+      return true;
+    }
   }
+  return Fail;
 }
 func try_skip_oper(p *ps, expected i32) bool {
-  return try_skip_token(p, mk_oper(expected));
+  if case &Oper(arr array[i32]) = &peek(p)->val {
+    if count(&arr) == 1 && get(&arr, 0) == expected {
+      step(p);
+      return true;
+    }
+  }
+  return Fail;
 }
 func try_skip_oper(p *ps, exp0 i32, exp1 i32) bool {
-  return try_skip_token(p, mk_oper(exp0, exp1));
+  if case &Oper(arr array[i32]) = &peek(p)->val {
+    if count(&arr) == 2 && get(&arr, 0) == exp0 && get(&arr, 1) == exp1 {
+      step(p);
+      return true;
+    }
+  }
+  return Fail;
 }
 func try_skip_oper(p *ps, exp0 i32, exp1 i32, exp2 i32) bool {
-  return try_skip_token(p, mk_oper(exp0, exp1, exp2));
+  if case &Oper(arr array[i32]) = &peek(p)->val {
+    if count(&arr) == 3 && get(&arr, 0) == exp0 && get(&arr, 1) == exp1 && get(&arr, 2) == exp2 {
+      step(p);
+      return true;
+    }
+  }
+  return Fail;
 }
 
 func parse_toplevel(p *ps, out *ast_toplevel) bool {
