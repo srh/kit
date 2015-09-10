@@ -346,3 +346,15 @@ func[T] enumnum(x *T) u32 {
   return * @[*u32]cast(x);
 }
 
+// TODO: Somewhere in linux_objfile.ki we could use this func... for the magic's padding.
+func[T] fill(p *T, n size, value T) void {
+  for i size = 0; i < n; i = i + 1 {
+    p[i] = value;
+  }
+}
+
+func[T] bufcopy(dest *T, src *T, n size) void {
+  for i size = 0; i < n; i = i + 1 {
+    dest[i] = src[i];
+  }
+}

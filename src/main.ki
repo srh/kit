@@ -1,14 +1,15 @@
 import array;
 import graph;
 import io;
-// TODO: We probably don't use this module here -- this was included at one point to make sure it compiles.
-import linux_objfile;
-// TODO: We probably don't use this module here -- this was included at one point to make sure it compiles.
-import objfile;
 import parse;
 import stdlib;
 import string;
 import test_check;
+
+// TODO: We probably don't use win_objfile, linux_objfile, or objfile here -- these were included at one point to make sure they get compiled.
+import linux_objfile;
+import win_objfile;
+import objfile;
 
 func run_tests() bool {
   test_parse_passed bool = test_parse();

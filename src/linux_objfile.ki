@@ -421,9 +421,10 @@ func linux32_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *ar
   *end_locals_out = end_locals;
 }
 
-func string_to_u8symbol(s *string) array[u8] {
+func linux_string_to_u8symbol(s *string) array[u8] {
   ret array[u8];
   build_u8str(&ret, s);
+  check_no_zeros(data(&ret), count(&ret));
   return ret;
 }
 
@@ -433,7 +434,7 @@ func push_symbol(im *identmap, symbol *objfile_symbol_record, symbols *array[u8]
   name sym = symbol->name;
   name_buf string = lookup(im, name);
 
-  offset u32 = strtab_add(strings, string_to_u8symbol(&name_buf));
+  offset u32 = strtab_add(strings, linux_string_to_u8symbol(&name_buf));
   ent.st_name = ~offset;
   ent.st_value = ~symbol->value;
   // TODO: (Also in s1:) It's OK to just use zero for everything?

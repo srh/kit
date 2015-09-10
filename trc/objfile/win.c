@@ -26,7 +26,6 @@ PACK_POP
 #define COFF_Header_EXPECTED_SIZE 20
 
 
-/* TODO: Section_Header ought to be removed from the header. */
 PACK_PUSH
 struct Section_Header {
   char Name[8];
@@ -140,13 +139,13 @@ uint32_t text_section_characteristics(void) {
 }
 
 uint32_t section_alignment_characteristic(size_t max_requested_alignment) {
- switch (max_requested_alignment) {
- case 4: return IMAGE_SCN_ALIGN_4_BYTES;
- case 8: return IMAGE_SCN_ALIGN_8_BYTES;
- case 16: return IMAGE_SCN_ALIGN_16_BYTES;
- default:
-   CRASH("max_requested_alignment has a weird value.");
- }
+  switch (max_requested_alignment) {
+  case 4: return IMAGE_SCN_ALIGN_4_BYTES;
+  case 8: return IMAGE_SCN_ALIGN_8_BYTES;
+  case 16: return IMAGE_SCN_ALIGN_16_BYTES;
+  default:
+    CRASH("max_requested_alignment has a weird value.");
+  }
 }
 
 uint32_t rdata_section_characteristics(size_t max_requested_alignment) {
