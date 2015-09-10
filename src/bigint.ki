@@ -133,20 +133,41 @@ access bigint {
     }
   }
 
+  func swap(x *bigint, y *bigint) void {
+    tmp bool = x->negative;
+    x->negative = y->negative;
+    y->negative = tmp;
+    swap(&x->parts, &y->parts);
+  }
+
   func multiply(x bigint, y bigint) bigint {
-    xn size = count(&x.parts);
-    yn size = count(&y.parts);
-    if !(x.negative || y.negative || xn > 1 || yn > 1) {
+    ret bigint;
+    multiply(&x, &y, &ret);
+    return ret;
+  }
+
+  func multiply(x *bigint, y *bigint) bigint {
+    ret bigint;
+    multiply(x, y, &ret);
+    return ret;
+  }
+
+  func multiply(x *bigint, y *bigint, out *bigint) void {
+    xn size = count(&x->parts);
+    yn size = count(&y->parts);
+    if !(x->negative || y->negative || xn > 1 || yn > 1) {
       if xn == 0 || yn == 0 {
         ret bigint;
-        return ret;
+        swap(out, &ret);
+        return;
       }
-      x0 u32 = get(&x.parts, 0);
-      y0 u32 = get(&y.parts, 0);
+      x0 u32 = get(&x->parts, 0);
+      y0 u32 = get(&y->parts, 0);
       if x0 <= 0xFFFF && y0 <= 0xFFFF {
         ret bigint;
         push(&ret.parts, x0 * y0);
-        return ret;
+        swap(out, &ret);
+        return;
       }
     }
     ressize size = xn + yn + 3;
@@ -156,7 +177,7 @@ access bigint {
       for j size = 0; j < ressize - i; j = j + 1 {
         lo u32;
         hi u32;
-        multiply_oflow(getbigdigit(&x, i), getbigdigit(&y, j), &lo, &hi);
+        multiply_oflow(getbigdigit(x, i), getbigdigit(y, j), &lo, &hi);
         add_to_array(&build, i + j + 1, hi);
         add_to_array(&build, i + j, lo);
       }
@@ -164,13 +185,12 @@ access bigint {
     signword u32 = get(&build, ressize - 2);
     if signword == 0 {
       pop(&build);
-      return squash(false, &build);
+      *out = squash(false, &build);
     } else if signword == ^ @[u32] 0 {
       pop(&build);
-      return squash(true, &build);
+      *out = squash(true, &build);
     } else {
       crash(_u8("bigint multiplication algorithm fail"));
-      return fake();
     }
   }
 
@@ -190,13 +210,13 @@ access bigint {
     hi bigint = incr(abs(x));
     while hi > incr(lo) {
       m bigint = (lo + hi) >> 1;
-      if multiply(y, m) <= x {
+      if multiply(&y, &m) <= x {
         lo = m;
       } else {
         hi = m;
       }
     }
-    return {lo, x - multiply(y, lo)};
+    return {lo, x - multiply(&y, &lo)};
   }
 
   func `/`(x bigint, y bigint) bigint {
@@ -437,7 +457,7 @@ func convert_to_bigint(base u32, digits *array[i8]) bigint {
   for i size = 0; i < n; i = i + 1 {
     x i8 = get(digits, i);
     check(x >= 0 && @[u32]~x < base);
-    acc = multiply(acc, bigbase) + ~x;
+    acc = multiply(&acc, &bigbase) + ~x;
   }
   return acc;
 }

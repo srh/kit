@@ -123,8 +123,6 @@ func[T] make_copy(p *T, n size) array[T] {
   return ret;
 }
 
-
-
 func[T] truncate(a *array[T], n size) void {
   m size = count(a);
   check(n <= m);

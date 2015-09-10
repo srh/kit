@@ -168,7 +168,7 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
   case NumSub(v void):
     return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) - get(&ps, 1), op);
   case NumMul(v void):
-    return st_num_rangechecked_output(clq, env, retvalref, multiply(get(&ps, 0), get(&ps, 1)), op);
+    return st_num_rangechecked_output(clq, env, retvalref, multiply(ref(&ps, 0), ref(&ps, 1)), op);
   case NumDiv(v void):
     // TODO: This does not have x86-compatible (or platform-compatible) behavior for signed division.
     div_result bigint;
