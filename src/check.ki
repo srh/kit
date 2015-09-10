@@ -95,14 +95,14 @@ func find_matching_inst(cs *checkstate, insts *array[def_inst_id], parms *cu_gen
   for i size = 0; i < n; i = i + 1 {
     id def_inst_id = get(insts, i);
     inst *def_inst = ref_inst(cs, id);
-    if parms_equal(cs, parms, &inst->parms) {
+    if parms_equal(parms, &inst->parms) {
       return Has(id);
     }
   }
   return None();
 }
 
-func parms_equal(cs *checkstate, a *cu_genparms, b *cu_genparms) bool {
+func parms_equal(a *cu_genparms, b *cu_genparms) bool {
   if enumnum(a) != enumnum(b) {
     return false;
   }
@@ -111,7 +111,7 @@ func parms_equal(cs *checkstate, a *cu_genparms, b *cu_genparms) bool {
     case &HasParms(ah array[cu_typeexpr]): {
       switch b {
         case &HasParms(bh array[cu_typeexpr]): {
-          return typeexpr_list_equal(cs, &ah, &bh);
+          return typeexpr_list_equal(&ah, &bh);
         }
       }
     }
@@ -856,7 +856,7 @@ func find_matching_deftype_inst(cs *checkstate, insts *array[deftype_inst_id], p
     id deftype_inst_id = datinsts[i];
     // We've manually inlined ref_deftype_inst here.
     inst *deftype_inst = oo(ref(&cs->type_instantiations, id.~));
-    if parms_equal(cs, parms, &inst->parms) {
+    if parms_equal(parms, &inst->parms) {
       return Has(id);
     }
   }
