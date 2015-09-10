@@ -133,7 +133,7 @@ access bigint {
     }
   }
 
-  func `*`(x bigint, y bigint) bigint {
+  func multiply(x bigint, y bigint) bigint {
     xn size = count(&x.parts);
     yn size = count(&y.parts);
     if !(x.negative || y.negative || xn > 1 || yn > 1) {
@@ -190,13 +190,13 @@ access bigint {
     hi bigint = incr(abs(x));
     while hi > incr(lo) {
       m bigint = (lo + hi) >> 1;
-      if y * m <= x {
+      if multiply(y, m) <= x {
         lo = m;
       } else {
         hi = m;
       }
     }
-    return {lo, x - y * lo};
+    return {lo, x - multiply(y, lo)};
   }
 
   func `/`(x bigint, y bigint) bigint {
@@ -437,7 +437,7 @@ func convert_to_bigint(base u32, digits *array[i8]) bigint {
   for i size = 0; i < n; i = i + 1 {
     x i8 = get(digits, i);
     check(x >= 0 && @[u32]~x < base);
-    acc = acc * bigbase + ~x;
+    acc = multiply(acc, bigbase) + ~x;
   }
   return acc;
 }
@@ -457,18 +457,18 @@ func[T] big(arr T) bigint {
 
 func test_bigint() bool {
   pass bool = true;
-  fourg bigint = @[bigint]~ @[u32]2 * ~ @[u32]0x80000000;
+  fourg bigint = multiply(@[bigint]~ @[u32]2, ~ @[u32]0x80000000);
   pass = pass & (big("1") + big("2") == big("3"));
   pass = pass & (big("20") + big("30") == big("50"));
   pass = pass & (big("2000000000") + big("3000000000") == big("5000000000"));
   pass = pass & (big("2000000000") - big("3000000000") == - big("1000000000"));
-  pass = pass & ((-big("10000000000")) * (-big("17")) == big("170000000000"));
+  pass = pass & (multiply(-big("10000000000"), -big("17")) == big("170000000000"));
   pass = pass & ((big("129") >> 2) == (big("32")));
-  pass = pass & (((fourg * big("129")) >> 34) == (big("32")));
+  pass = pass & ((multiply(fourg, big("129")) >> 34) == (big("32")));
   pass = pass & (((-big("9")) >> 2) == (-big("3")));
-  pass = pass & (((-(fourg * big("9"))) >> 34) == (-big("3")));
+  pass = pass & (((-multiply(fourg, big("9"))) >> 34) == (-big("3")));
   pass = pass & (((big("9")) << 2) == (big("36")));
-  pass = pass & (((big("9")) << 34) == (fourg * big("36")));
+  pass = pass & (((big("9")) << 34) == multiply(fourg, big("36")));
   pass = pass & (incr(fourg - big("1")) == fourg);
   pass = pass & (incr(fourg) == (fourg + big("1")));
   pass = pass & (incr(big("1")) == big("2"));
