@@ -47,7 +47,7 @@ func parse_toplevels(p *ps, stop tokval, out *array[ast_toplevel]) bool {
   dbgparse("parse_toplevels\n");
   ret array[ast_toplevel];
   for ;; {
-    if peek(p).val == stop {
+    if peek(p)->val == stop {
       *out = ret;
       return true;
     }
@@ -60,7 +60,7 @@ func parse_toplevels(p *ps, stop tokval, out *array[ast_toplevel]) bool {
 }
 
 func try_parse_token(p *ps, expected tokval) opt[ast_meta] {
-  if peek(p).val == expected {
+  if peek(p)->val == expected {
     meta ast_meta = startend(p);
     step(p);
     return Has(meta);
@@ -69,7 +69,7 @@ func try_parse_token(p *ps, expected tokval) opt[ast_meta] {
 }
 
 func try_skip_token(p *ps, expected tokval) bool {
-  if peek(p).val == expected {
+  if peek(p)->val == expected {
     step(p);
     return true;
   }
@@ -77,7 +77,7 @@ func try_skip_token(p *ps, expected tokval) bool {
 }
 
 func try_parse_oper(p *ps, expected i32, out *ast_ident) bool {
-  if peek(p).val == mk_oper(expected) {
+  if peek(p)->val == mk_oper(expected) {
     m ast_meta = startend(p);
     *out = {m, intern(p->im, ~mk_array(expected))};
     step(p);
@@ -328,7 +328,7 @@ func parse_ident(p *ps, out *ast_ident) bool {
 }
 
 func parse_rest_of_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) bool {
-  switch peek(p).val {
+  switch peek(p)->val {
   default:
     return Fail;
   // TODO: "Opers" such as "@" or maybe even "=" shouldn't really be allowed here -- only functional opers allowed.
@@ -346,7 +346,7 @@ func parse_rest_of_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) bo
 
 func try_parse_ident(p *ps, out *ast_ident) bool {
   dbgparse("try_parse_ident\n");
-  switch peek(p).val {
+  switch peek(p)->val {
   case Ident(text array[i32]):
     m ast_meta = startend(p);
     step(p);
@@ -364,7 +364,7 @@ func try_parse_ident(p *ps, out *ast_ident) bool {
 // It happens that we only use this on "copy" and "move", so we pass a 4-element u8 array.
 func try_skip_specific_ident(p *ps, x [4]u8) bool {
   dbgparse("try_skip_specific_ident\n");
-  switch peek(p).val {
+  switch peek(p)->val {
   case Ident(text array[i32]):
     if count(&text) != 4 {
       return Fail;
@@ -713,8 +713,8 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, lhs ast_expr, out *ast_expr) b
         return Fail;
       }
       lhs = mk(@[ast_expr_enum]DerefField({None@[ast_deref_field_info](), mk_later(), embox(consume(lhs)), NameField(fieldname)}));
-    } else if is_binop(peek(p).val) {
-      op tok = peek(p);
+    } else if is_binop(peek(p)->val) {
+      op tok = *peek(p);
       op_prec prec_pair = binop_prec(op.val);
       switch compare_prec(prec_ctx, op_prec.left) {
         case Conflicts(v): {
@@ -839,7 +839,7 @@ func build_binop_expr(im *identmap, op ast_ident, lhs ast_expr, rhs ast_expr) as
 }
 
 func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) bool {
-  switch peek(p).val {
+  switch peek(p)->val {
     case Oper(operch array[i32]): {
       if is_at_sign(&operch) {
         step(p);
@@ -859,7 +859,7 @@ func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) bool {
 }
 
 func parse_atomic_expr(p *ps, out *ast_expr) bool {
-  switch peek(p).val {
+  switch peek(p)->val {
     case Keyw(k): {
       switch k {
         case Func(v): {
@@ -1066,7 +1066,7 @@ func parse_rest_of_expr_list(p *ps, stop grouper, out *array[ast_expr_consume]) 
 }
 
 func parse_statement(p *ps, out *ast_statement) bool {
-  switch peek(p).val {
+  switch peek(p)->val {
     case Keyw(k): {
       switch k {
         case Var(v): {
@@ -1254,7 +1254,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
     condition = Has({mk_later(), embox(consume(expr))});
   }
   increment opt[box[ast_expr_discard]];
-  if peek(p).val == @[tokval]Grouper(LBrace(void)) {
+  if peek(p)->val == @[tokval]Grouper(LBrace(void)) {
     increment = None();
   } else {
     expr ast_expr;
@@ -1306,7 +1306,7 @@ func parse_switch_case(p *ps, out *ast_switch_case) bool {
       statements array[ast_statement];
       done bool = false;
       while !done {
-        if peek(p).val == @[tokval]Keyw(Case(void)) || peek(p).val == @[tokval]Keyw(Default(void)) || peek(p).val == @[tokval]Grouper(RBrace(void)) {
+        if peek(p)->val == @[tokval]Keyw(Case(void)) || peek(p)->val == @[tokval]Keyw(Default(void)) || peek(p)->val == @[tokval]Grouper(RBrace(void)) {
           body = {None@[ast_bracebody_info](), statements};
           done = true;
         } else {
@@ -1428,7 +1428,7 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
 
   decl ast_vardecl = {name, type};
 
-  if peek(p).val == mk_oper(';') {
+  if peek(p)->val == mk_oper(';') {
     switch fa {
       case ForceAssignmentYes(v): { return Fail; }
       case ForceAssignmentNo(v): {
@@ -1472,7 +1472,7 @@ func parse_rest_of_string_literal(p *ps, out *ast_expr) bool {
   while again {
     done bool = false;
     while !done {
-      switch peek(p).val {
+      switch peek(p)->val {
         case StringDelim(ch i32): {
           check(ch == '\"');
           step(p);
@@ -1489,7 +1489,7 @@ func parse_rest_of_string_literal(p *ps, out *ast_expr) bool {
     }
 
     again = false;
-    if case StringDelim(ch i32) = peek(p).val {
+    if case StringDelim(ch i32) = peek(p)->val {
       if ch == '\"' {
         string_step(p, '\"');
         again = true;
@@ -1502,7 +1502,7 @@ func parse_rest_of_string_literal(p *ps, out *ast_expr) bool {
 
 func parse_rest_of_char_literal(p *ps, out *ast_expr) bool {
   value i32;
-  switch peek(p).val {
+  switch peek(p)->val {
     case StringChar(ch i32): {
       value = ch;
       string_step(p, '\'');
@@ -1511,7 +1511,7 @@ func parse_rest_of_char_literal(p *ps, out *ast_expr) bool {
       return Fail;
     }
   }
-  switch peek(p).val {
+  switch peek(p)->val {
     case StringDelim(ch i32): {
       check(ch == '\'');
       step(p);
@@ -1556,7 +1556,7 @@ func see_if_parse(file array[u8]) bool {
   ret bool = parse_file(&p, &out);
   if !ret {
     print(Stdout(), _u8("at offset "));
-    print(Stdout(), showu8(peek(&p).interval.left.~));
+    print(Stdout(), showu8(peek(&p)->interval.left.~));
     print(Stdout(), _u8("..."));
     fflush(Stdout());
   }

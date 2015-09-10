@@ -266,8 +266,8 @@ func step(p *ps) void {
   }
 }
 
-func peek(p *ps) tok {
-  return p->current;
+func peek(p *ps) *tok {
+  return &p->current;
 }
 
 func grab_tok(p *ps) tok {
