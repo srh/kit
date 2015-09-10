@@ -103,6 +103,7 @@ access array[_] {
 
   func[T, U] make(raw_arr U) array[T] {
     ret array[T];
+    reserve(&ret, raw_arr.length);
     append_raw(&ret, &raw_arr[0], raw_arr.length);
     return ret;
   }

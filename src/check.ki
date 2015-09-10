@@ -11,14 +11,6 @@ import u8ast;
 
 // This code does some typechecking.  See state.ki for types that maintain typechecking state.
 
-/*
-func[T] dbgcheck(x T) void { DBG(x); }
-func[T, U] dbgcheck(x T, y U) void { DBG(x, y); }
-func[T, U, V] dbgcheck(x T, y U, z V) void { DBG(x, y, z); }
-*/
-func[T] dbgcheck(x T) void { }
-func[T, U] dbgcheck(x T, y U) void { }
-func[T, U, V] dbgcheck(x T, y U, z V) void { }
 
 func finish_checking(cs *checkstate, clq *clqueue) bool {
   check(cs->instantiation_depth == 0);
@@ -50,14 +42,11 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
 }
 
 func check_module(cs *checkstate, mod_name sym) bool {
-  dbgcheck(_u8("check_module"));
   switch process_module(cs, mod_name) {
     case None(v): {
-      dbgcheck(_u8("process_module None"));
       return false;
     }
     case Has(id module_id): {
-      dbgcheck(_u8("process_module Has"));
       mod *module = ref_module(cs, id);
 
       naccess_blocks size = count(&mod->access_blocks);
@@ -71,7 +60,6 @@ func check_module(cs *checkstate, mod_name sym) bool {
       ndefs size = count(&mod->defs);
       for i size = 0; i < ndefs; i = i + 1 {
         if !ensure_def_checked(cs, get(&mod->defs, i)) {
-          dbgcheck(_u8("ensure_def_checked failed"));
           return false;
         }
       }
@@ -79,7 +67,6 @@ func check_module(cs *checkstate, mod_name sym) bool {
       ndeftypes size = count(&mod->deftypes);
       for i size = 0; i < ndeftypes; i = i + 1 {
         if !ensure_deftype_checked(cs, get(&mod->deftypes, i)) {
-          dbgcheck(_u8("ensure_deftype_checked failed"));
           return false;
         }
       }
@@ -366,11 +353,9 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
 }
 
 func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
-  dbgcheck(_u8("ensure_def_inst_type_computed"));
   inst *def_inst = ref_inst(cs, inst_id);
   switch inst->status {
     case DidNotStartComputingType(v): {
-      dbgcheck(_u8("ensure_def_inst_type_computed DidNotStartComputingType"));
       rw depth_rewinder;
       if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
         return false;
@@ -379,21 +364,18 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
 
       ent_typeexpr *te_typeexpr;
       if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
-        dbgcheck(_u8("def_converted_typeexpr failed"));
         return false;
       }
 
       // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
       computed cac_typeexpr;
       if !check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_typeexpr, &computed) {
-        dbgcheck(_u8("check_and_compute_typeexpr failed"));
         return false;
       }
       check(computed.complete);
       props type_properties;
       cu_computed cu_typeexpr = ~computed.te;
       if !compute_type_properties(cs, clq, &cu_computed, &props) {
-        dbgcheck(_u8("compute_type_properties failed"));
         return false;
       }
       inst->status = FinishedComputingType(void);
@@ -425,9 +407,7 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
 
 func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
   ent *def_entry = ref_def_entry(cs, ent_id);
-  dbgcheck(_u8("ensure_def_inst_checked"));
   if !ensure_def_inst_type_computed(cs, clq, ent, inst_id) {
-    dbgcheck(_u8("ensure_def_inst_type_computed failed"));
     return false;
   }
   inst *def_inst = ref_inst(cs, inst_id);
@@ -518,12 +498,10 @@ func noscoped_check_and_compute_typeexpr(cs *checkstate, clq *clqueue, t *te_typ
 
 // TODO: Generics replacement should really be a separate phase.
 func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, t *te_typeexpr, out *cac_typeexpr) bool {
-  dbgcheck(_u8("check_and_compute_typeexpr"));
   switch t {
     case &TeName(a te_name): {
       computed cu_typeexpr;
       if !check_and_compute_name_type(cs, clq, g, parms, &a, &computed) {
-        dbgcheck(_u8("check_and_compute_name_type failed"));
         return false;
       }
       *out = {true, computed.~};
@@ -639,7 +617,6 @@ func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_
 }
 
 func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, a *te_name, computed_out *cu_typeexpr) bool {
-  dbgcheck(_u8("check_and_compute_name_type"));
   // Generic parameters have already been checked.  (I hope so.)
   if lookup_generic(g, parms, a->value, computed_out) {
     return true;
@@ -647,7 +624,6 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
 
   id deftype_entry_id;
   if !match_deftype(cs, fake_ast_meta(), a->value, None(), &id) {
-    dbgcheck(_u8("match_deftype failed"));
     // An error happened when looking up a deftype (multiple matches?).
     return false;
   }
@@ -856,7 +832,6 @@ func subsequent_depth(cs *checkstate, parms *cu_genparms) u32 {
 }
 
 func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, parms *cu_genparms) deftype_inst_id {
-  dbgcheck(_u8("enqueue_deftype_inst"));
   var res = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDeftypeEntry({id, res.id, cs->instantiation_depth}));
@@ -1186,7 +1161,6 @@ func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) bool {
 }
 
 func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_entry_id, id deftype_inst_id) bool {
-  dbgcheck(_u8("ensure_deftype_inst_checked for inst '"), id.~, _u8("'"));
   ent *deftype_entry = ref_deftype_entry(cs, ent_id);
   inst *deftype_inst = ref_deftype_inst(cs, id);
 
@@ -1335,22 +1309,17 @@ func find_pos_module(cs *checkstate, p pos) opt[*module] {
 }
 
 func load_module(cs *checkstate, mod_name sym) opt[module_id] {
-  dbgcheck(_u8("load_module"));
   switch lookup(&cs->modules_by_name, &mod_name) {
     case Has(id module_id): {
-      dbgcheck(_u8("load_module lookup Has"));
       return Has(id);
     }
     case None(v): {
-      dbgcheck(_u8("load_module lookup None"));
       switch (cs->loader)(cs, mod_name) {
         case None(v2): {
-          dbgcheck(_u8("load_module loader None"));
           ERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
           return None();
         }
         case Has(arr array[u8]): {
-          dbgcheck(_u8("load_module loader Has"));
           mod shp[module];
           oo(&mod)->process_state = Unprocessed(void);
           oo(&mod)->module_name = mod_name;
@@ -1375,14 +1344,11 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
 }
 
 func process_module(cs *checkstate, mod_name sym) opt[module_id] {
-  dbgcheck(_u8("process_module"));
   switch load_module(cs, mod_name) {
     case None(v): {
-      dbgcheck(_u8("load_module None"));
       return None();
     }
     case Has(id module_id): {
-      dbgcheck(_u8("load_module Has"));
       mod *module = ref_module(cs, id);
       if mod->process_state == Unprocessed(void) {
          if !process_module_toplevels(cs, mod) {

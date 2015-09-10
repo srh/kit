@@ -58,6 +58,7 @@ func build_u8str(r *array[u8], x *string) void {
 func from_u8(x array[u8]) string {
   build array[i32];
   n size = count(&x);
+  reserve(&build, n);
   for i size = 0; i < n; i = i + 1 {
     push(&build, ~get(&x, i));
   }
