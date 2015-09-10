@@ -169,10 +169,6 @@ func equal(a *tokval, b *tokval) bool {
   }
 }
 
-func `==`(a tokval, b tokval) bool {
-  return equal(&a, &b);
-}
-
 deftype tok struct {
   interval interval;
   val tokval;

@@ -47,7 +47,7 @@ func parse_toplevels(p *ps, stop tokval, out *array[ast_toplevel]) bool {
   dbgparse("parse_toplevels\n");
   ret array[ast_toplevel];
   for ;; {
-    if peek(p)->val == stop {
+    if equal(&peek(p)->val, &stop) {
       *out = ret;
       return true;
     }
@@ -59,11 +59,13 @@ func parse_toplevels(p *ps, stop tokval, out *array[ast_toplevel]) bool {
   }
 }
 
-func try_parse_token(p *ps, expected keyw) opt[ast_meta] {
+func try_parse_keyw(p *ps, expected keyw) opt[ast_meta] {
   if case &Keyw(k keyw) = &peek(p)->val {
-    meta ast_meta = startend(p);
-    step(p);
-    return Has(meta);
+    if k == expected {
+      meta ast_meta = startend(p);
+      step(p);
+      return Has(meta);
+    }
   }
   return None();  // Fail
 }
@@ -78,7 +80,7 @@ func try_parse_token(p *ps, expected tokval) opt[ast_meta] {
 }
 
 func try_skip_token(p *ps, expected tokval) bool {
-  if peek(p)->val == expected {
+  if equal(&peek(p)->val, &expected) {
     step(p);
     return true;
   }
@@ -86,7 +88,8 @@ func try_skip_token(p *ps, expected tokval) bool {
 }
 
 func try_parse_oper(p *ps, expected i32, out *ast_ident) bool {
-  if peek(p)->val == mk_oper(expected) {
+  oper tokval = mk_oper(expected);
+  if equal(&peek(p)->val, &oper) {
     m ast_meta = startend(p);
     *out = {m, intern(p->im, ~mk_array(expected))};
     step(p);
@@ -497,7 +500,7 @@ func success_or_fail(res bool) triparse_result {
 
 func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_result {
   voidmeta ast_meta;
-  if case Has(m ast_meta) = try_parse_token(p, @[tokval]Keyw(Void(void))) {
+  if case Has(m ast_meta) = try_parse_keyw(p, Void(void)) {
     *out = Name({m, p->im->cym.voidsym});
     return Success(void);
   }
@@ -1263,7 +1266,8 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
     condition = Has({mk_later(), embox(consume(expr))});
   }
   increment opt[box[ast_expr_discard]];
-  if peek(p)->val == @[tokval]Grouper(LBrace(void)) {
+  lbrace tokval = Grouper(LBrace(void));
+  if equal(&peek(p)->val, &lbrace) {
     increment = None();
   } else {
     expr ast_expr;
@@ -1314,8 +1318,11 @@ func parse_switch_case(p *ps, out *ast_switch_case) bool {
     case Quickfail(v void):
       statements array[ast_statement];
       done bool = false;
+      casekeyw tokval = Keyw(Case(void));
+      defaultkeyw tokval = Keyw(Default(void));
+      rbrace tokval = Grouper(RBrace(void));
       while !done {
-        if peek(p)->val == @[tokval]Keyw(Case(void)) || peek(p)->val == @[tokval]Keyw(Default(void)) || peek(p)->val == @[tokval]Grouper(RBrace(void)) {
+        if equal(&peek(p)->val, &casekeyw) || equal(&peek(p)->val, &defaultkeyw) || equal(&peek(p)->val, &rbrace) {
           body = {NotComputed@[ast_bracebody_info](), statements};
           done = true;
         } else {
@@ -1437,7 +1444,8 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
 
   decl ast_vardecl = {name, type};
 
-  if peek(p)->val == mk_oper(';') {
+  semicolon tokval = mk_oper(';');
+  if equal(&peek(p)->val, &semicolon) {
     switch fa {
       case ForceAssignmentYes(v): { return Fail; }
       case ForceAssignmentNo(v): {
