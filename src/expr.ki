@@ -1513,7 +1513,7 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, params_out
   // This could be implemented in terms of unify_under_generics, you know.
   if case &TeApp(app te_typeapp) = t {
     unified te_puretype;
-    if !unify_puretypes(oo(&app.typefunc), &expected_puretype, &unified) {
+    if !unify_puretypes(&app.typefunc, &expected_puretype, &unified) {
       return false;
     }
     *params_out = &app.params;
@@ -2087,7 +2087,7 @@ func make_fn_partial_type(cs *checkstate, return_type *te_typeexpr, params *arra
     push(&type_params, expr_type(&ref(params, i)->expr));
   }
   push(&type_params, *return_type);
-  return TeApp({embox(primitive_function_puretype(cs)), type_params, None()});
+  return TeApp({primitive_function_puretype(cs), type_params, None()});
 }
 
 func fn_return_type(cs *checkstate, func_type *te_typeexpr) *te_typeexpr {

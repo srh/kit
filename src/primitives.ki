@@ -332,7 +332,7 @@ func tee_generic(cs *checkstate) ast_generics {
 }
 
 func fn_type(cs *checkstate, params array[te_typeexpr]) te_typeexpr {
-  return TeApp({embox(primitive_function_puretype(cs)), params, None()});
+  return TeApp({primitive_function_puretype(cs), params, None()});
 }
 
 func fn_type(cs *checkstate, params array[te_typeexpr], return_type te_typeexpr) te_typeexpr {
@@ -349,7 +349,7 @@ func fn_type(cs *checkstate, t te_typeexpr, u te_typeexpr, v te_typeexpr) te_typ
 }
 
 func ptr_type(cs *checkstate, t te_typeexpr) te_typeexpr {
-  return TeApp({embox(primitive_pointer_puretype(cs)), mk_array(t), None()});
+  return TeApp({primitive_pointer_puretype(cs), mk_array(t), None()});
 }
 
 func add_pointer_primitive(cs *checkstate) void {

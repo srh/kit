@@ -188,7 +188,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
            && convert_typeexpr_list(cs, &b.params, &params)) {
         return false;
       }
-      *out = TeApp({embox(typefunc), params, None()});
+      *out = TeApp({typefunc, params, None()});
       return true;
     }
     case &Struct(b ast_struct): {
@@ -695,7 +695,7 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
     return false;
   }
 
-  switch oo(&a->typefunc) {
+  switch &a->typefunc {
     case &TePureName(value sym): {
       id deftype_entry_id;
       if !match_deftype(cs, fake_ast_meta(), value, Has(&params), &id) {
@@ -706,14 +706,14 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
         cu_params array[cu_typeexpr] = mapconvert(params);
         hp cu_genparms = HasParms(cu_params);
         inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
-        *out = {true, TeApp({embox(TePureName(value)), params, Has({id, inst_id})})};
+        *out = {true, TeApp({TePureName(value), params, Has({id, inst_id})})};
       } else {
-        *out = {false, TeApp({embox(TePureName(value)), params, None()})};
+        *out = {false, TeApp({TePureName(value), params, None()})};
       }
       return true;
     }
     case &TePureUnknown(v void): {
-      *out = {false, TeApp({embox(TePureUnknown(void)), params, None()})};
+      *out = {false, TeApp({TePureUnknown(void), params, None()})};
       return true;
     }
   }
@@ -1736,7 +1736,7 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
   switch t {
     case &TeName(a te_name): { return {true, isHas(&a.pack)}; }
     case &TeApp(a te_typeapp): {
-      if case &TePureUnknown(v void) = oo(&a.typefunc) {
+      if case &TePureUnknown(v void) = &a.typefunc {
         return {false, false};
       }
       all complete_computed = all_complete_computed(&a.params);
@@ -1805,7 +1805,7 @@ func unify_under_generics(pt *te_typeexpr,
       // Generics can't be type constructors (yet).
       if case &TeApp(pa te_typeapp) = pt {
         unified_typefunc te_puretype;
-        if !unify_puretypes(oo(&a.typefunc), oo(&pa.typefunc), &unified_typefunc) {
+        if !unify_puretypes(&a.typefunc, &pa.typefunc, &unified_typefunc) {
           return false;
         }
         n size = count(&a.params);
@@ -1820,7 +1820,7 @@ func unify_under_generics(pt *te_typeexpr,
           }
           push(&unified_params, unified);
         }
-        *unified_out = TeApp({embox(unified_typefunc), unified_params, None()});
+        *unified_out = TeApp({unified_typefunc, unified_params, None()});
         return true;
       } else {
         return false;
