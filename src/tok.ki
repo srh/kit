@@ -140,11 +140,11 @@ func `==`(a keyw, b keyw) bool {
   return enumnum(&a) == enumnum(&b);
 }
 
-func `==`(a numlit, b numlit) bool {
-  if enumnum(&a) != enumnum(&b) { return false; }
+func equal(a *numlit, b *numlit) bool {
+  if enumnum(a) != enumnum(b) { return false; }
   switch a {
-  case DecNum(j): { switch b { case DecNum(k): { return array_equal(&j, &k); } } }
-  case HexNum(j): { switch b { case HexNum(k): { return array_equal(&j, &k); } } }
+  case &DecNum(j): { switch b { case &DecNum(k): { return array_equal(&j, &k); } } }
+  case &HexNum(j): { switch b { case &HexNum(k): { return array_equal(&j, &k); } } }
   }
 }
 
@@ -152,25 +152,25 @@ func `==`(a grouper, b grouper) bool {
   return enumnum(&a) == enumnum(&b);
 }
 
-func `==`(a tokval, b tokval) bool {
-  if enumnum(&a) != enumnum(&b) { return false; }
+func equal(a *tokval, b *tokval) bool {
+  if enumnum(a) != enumnum(b) { return false; }
   switch a {
-  case Keyw(j): { switch b { case Keyw(k): { return j == k; } } }
-  case Num(j): { switch b { case Num(k): { return j == k; } } }
-  case Oper(j): { switch b { case Oper(k): { return array_equal(&j, &k); } } }
-  case Ident(j): { switch b { case Ident(k): { return array_equal(&j, &k); } } }
-  case Grouper(j): { switch b { case Grouper(k): { return j == k; } } }
-  case StringChar(j): { switch b { case StringChar(k): { return j == k; } } }
-  case StringDelim(j): { switch b { case StringDelim(k): { return j == k; } } }
-  case Backtick(j): { return true; }
-  case Bad(j): { return true; }
-  case Eof(j): { return true; }
-  case Comment(v): { return true; }
+  case &Keyw(j): { switch b { case &Keyw(k): { return j == k; } } }
+  case &Num(j): { switch b { case &Num(k): { return equal(&j, &k); } } }
+  case &Oper(j): { switch b { case &Oper(k): { return array_equal(&j, &k); } } }
+  case &Ident(j): { switch b { case &Ident(k): { return array_equal(&j, &k); } } }
+  case &Grouper(j): { switch b { case &Grouper(k): { return j == k; } } }
+  case &StringChar(j): { switch b { case &StringChar(k): { return j == k; } } }
+  case &StringDelim(j): { switch b { case &StringDelim(k): { return j == k; } } }
+  case &Backtick(j): { return true; }
+  case &Bad(j): { return true; }
+  case &Eof(j): { return true; }
+  case &Comment(v): { return true; }
   }
 }
 
-func `!=`(a tokval, b tokval) bool {
-  return !(a == b);
+func `==`(a tokval, b tokval) bool {
+  return equal(&a, &b);
 }
 
 deftype tok struct {

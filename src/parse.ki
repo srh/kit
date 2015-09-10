@@ -59,8 +59,17 @@ func parse_toplevels(p *ps, stop tokval, out *array[ast_toplevel]) bool {
   }
 }
 
+func try_parse_token(p *ps, expected keyw) opt[ast_meta] {
+  if case &Keyw(k keyw) = &peek(p)->val {
+    meta ast_meta = startend(p);
+    step(p);
+    return Has(meta);
+  }
+  return None();  // Fail
+}
+
 func try_parse_token(p *ps, expected tokval) opt[ast_meta] {
-  if peek(p)->val == expected {
+  if equal(&peek(p)->val, &expected) {
     meta ast_meta = startend(p);
     step(p);
     return Has(meta);
