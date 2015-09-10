@@ -1,16 +1,11 @@
 import array;
+import build;
 import graph;
 import io;
 import parse;
 import stdlib;
 import string;
 import test_check;
-
-// TODO: We probably don't use win_objfile, linux_objfile, or objfile here -- these were included at one point to make sure they get compiled.
-import build;
-import linux_objfile;
-import win_objfile;
-import objfile;
 
 func run_tests() bool {
   test_parse_passed bool = test_parse();
@@ -53,7 +48,7 @@ func run_on_file(modulename array[u8]) bool {
   im identmap = make_im();
   cs checkstate = make_checkstate(&im, x86_platform(), null, file_loader);
   add_primitives(&cs);
-  if !check_module(&cs, intern(&im, from_u8(modulename))) {
+  if !build_module(&cs, intern(&im, from_u8(modulename))) {
     print(Stdout(), _u8("Failed.\n"));
     fflush(Stdout());
     return false;

@@ -1,0 +1,9 @@
+import check;
+import linux_objfile;
+import win_objfile;
+import objfile;
+
+func build_module(cs *checkstate, modulename sym) bool {
+  // TODO: Actually build the module!
+  return check_module(cs, modulename);
+}
