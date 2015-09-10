@@ -138,6 +138,7 @@ func convert_typefunc(cs *checkstate, a *ast_typeexpr, out *te_puretype) bool {
 func convert_typeexpr_list(cs *checkstate, arr *array[ast_typeexpr], out *array[te_typeexpr]) bool {
   build array[te_typeexpr];
   n size = count(arr);
+  reserve(&build, n);
   for i size = 0; i < n; i = i + 1 {
     t te_typeexpr;
     if !convert_typeexpr(cs, ref(arr, i), &t) {
@@ -145,13 +146,14 @@ func convert_typeexpr_list(cs *checkstate, arr *array[ast_typeexpr], out *array[
     }
     push(&build, t);
   }
-  *out = build;
+  swap(out, &build);
   return true;
 }
 
 func convert_vardecl_list(cs *checkstate, arr *array[ast_vardecl], out *array[te_vardecl]) bool {
   build array[te_vardecl];
   n size = count(arr);
+  reserve(&build, n);
   for i size = 0; i < n; i = i + 1 {
     vd te_vardecl;
     if !convert_vardecl(cs, ref(arr, i), &vd) {
@@ -159,7 +161,7 @@ func convert_vardecl_list(cs *checkstate, arr *array[ast_vardecl], out *array[te
     }
     push(&build, vd);
   }
-  *out = build;
+  swap(out, &build);
   return true;
 }
 
@@ -503,6 +505,7 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *cu_
     case &HasParms(ps array[te_typeexpr]): {
       cu_ps array[cu_typeexpr];
       n size = count(&ps);
+      reserve(&cu_ps, n);
       for i size = 0; i < n; i = i + 1 {
         computed cac_typeexpr;
         if !noscoped_check_and_compute_typeexpr(cs, clq, ref(&ps, i), &computed) {
@@ -671,6 +674,7 @@ func check_and_compute_typeexpr_array(cs *checkstate, clq *clqueue, g *ast_gener
   complete bool = true;
   computed array[te_typeexpr];
   n size = count(t);
+  reserve(&computed, n);
   for i size = 0; i < n; i = i + 1 {
     c cac_typeexpr;
     if !check_and_compute_typeexpr(cs, clq, g, parms, ref(t, i), &c) {
@@ -679,7 +683,7 @@ func check_and_compute_typeexpr_array(cs *checkstate, clq *clqueue, g *ast_gener
     push(&computed, c.te);
     complete = complete & c.complete;
   }
-  *computed_out = computed;
+  swap(computed_out, &computed);
   *computed_complete_out = complete;
   return true;
 }
