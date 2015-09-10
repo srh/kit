@@ -849,10 +849,6 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
   }
 }
 
-func find_matching_deftype_inst(cs *checkstate, ent *deftype_entry, parms *cu_genparms) opt[deftype_inst_id] {
-  return lookup(&ent->instst, parms);
-}
-
 func deftype_rhs_type(rhs *ast_type_def_rhs) *ast_typeexpr {
   switch rhs {
     case &TypeexprRhs(a): { return &a; }
@@ -882,7 +878,7 @@ func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, par
 
 func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *cu_genparms) struct { id deftype_inst_id; created bool; } {
   check(arity_matches(&ent->generics, parms));
-  if case Has(id deftype_inst_id) = find_matching_deftype_inst(cs, ent, parms) {
+  if case Has(id deftype_inst_id) = lookup(&ent->instst, parms) {
     return {id, false};
   }
   inst deftype_inst;
