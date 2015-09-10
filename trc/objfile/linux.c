@@ -133,7 +133,7 @@ uint32_t strtab_append_c_str(struct databuf *d, const char *s) {
 
 void push_symbol(struct identmap *im, struct objfile_symbol_record *symbol,
                  struct databuf *symbols, struct databuf *strings) {
-  /* TODO: This and the for loop below is just a copy/paste job. */
+  /* TODO: (Also in s2:) This and the for loop below is just a copy/paste job. */
   struct elf32_Symtab_Entry ent;
   ident_value name = symbol->name;
   const void *name_buf;
@@ -143,7 +143,7 @@ void push_symbol(struct identmap *im, struct objfile_symbol_record *symbol,
   uint32_t offset = strtab_add(strings, name_buf, name_count);
   ent.st_name = to_le_u32(offset);
   ent.st_value = to_le_u32(symbol->value);
-  /* TODO: It's OK to just use zero for everything? */
+  /* TODO: (Also in s2:) It's OK to just use zero for everything? */
   ent.st_size = to_le_u32(0);
   ent.st_info = (symbol->is_function == IS_FUNCTION_YES ?
                  kSTT_FUNC : kSTT_OBJECT) | ((symbol->is_static ?
@@ -272,7 +272,7 @@ void linux32_section_headers(uint32_t prev_end_offset,
   *end_out = sh_end;
 }
 
-/* TODO: Don't mutate the section, plz.  Thanks. */
+/* TODO: (Also in s2:) Don't mutate the section, plz.  Thanks. */
 void linux32_append_relocations_and_mutate_section(
     uint32_t *sti_map, size_t sti_map_count,
     struct databuf *d, struct objfile_section *s) {

@@ -2,6 +2,8 @@ import array;
 import graph;
 import io;
 // TODO: We probably don't use this module here -- this was included at one point to make sure it compiles.
+import linux_objfile;
+// TODO: We probably don't use this module here -- this was included at one point to make sure it compiles.
 import objfile;
 import parse;
 import stdlib;

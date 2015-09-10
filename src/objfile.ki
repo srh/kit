@@ -112,6 +112,9 @@ func append_to_alignment(a *array[u8], alignment size, byte u8) void {
 
 func align_dword(s *objfile_section) void {
   append_to_alignment(&s->raw, ~DWORD_SIZE, 0);
+  if s->max_requested_alignment < DWORD_SIZE {
+    s->max_requested_alignment = DWORD_SIZE;
+  }
 }
 
 func fillercode_align_double_quadword(f *objfile) void {
@@ -167,10 +170,20 @@ func strtab_add(d *array[u8], buf *u8, n size) u32 {
   return ret;
 }
 
+func strtab_add(d *array[u8], buf array[u8]) u32 {
+  return strtab_add(d, data(&buf), count(&buf));
+}
+
 func check_no_zeros(buf *u8, n size) void {
   for i size = 0; i < n; i = i + 1 {
     if buf[i] == '\0' {
       crash(_u8("check_no_zeros sees zero"));
     }
   }
+}
+
+func[T] append_reinterpret(arr *array[u8], p *T) void {
+  d *u8 = cast(p);
+  n size = sizeof@[T];
+  append_raw(arr, d, n);
 }
