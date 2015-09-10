@@ -763,7 +763,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
             }
           }
           // There's no disposal, it's a real field access.
-          annotate_local_field(&a, FieldName(offset));
+          annotate(&a.info, FieldName(offset));
         }
         case ConstantField(value u32): {
           after opt[ast_expr_after];
@@ -771,7 +771,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
             return false;
           }
           if case &Has(aft ast_expr_after) = &after {
-            annotate_local_field(&a, @[ast_local_field_info]ArrayLength({aft, value}));
+            annotate(&a.info, @[ast_local_field_info]ArrayLength({aft, value}));
           } else {
             ice(_u8("after not annotated"));
           }
@@ -809,11 +809,11 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
         case InheritsLval(offset u32): {
           // We deref, so it's always an lval.
           lval = IsLvalYes({add_virtual_cell(es, fieldtype, props)});
-          annotate_deref_field(&a, DerefFieldName(offset));
+          annotate(&a.info, DerefFieldName(offset));
         }
         case ConstantField(value u32): {
           lval = wholeRval(add_cell(es, fieldtype, props));
-          annotate_deref_field(&a, DerefArrayLength(value));
+          annotate(&a.info, DerefArrayLength(value));
         }
       }
       annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
@@ -1111,7 +1111,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
       if whole_temporary(&desc) {
         annotate_disposal(after, mk_after(Has(desc.whole_num)));
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
-        annotate_later(later, {destroy, desc.whole_num});
+        annotate(&later->action, {destroy, desc.whole_num});
       } else {
         copy bi_ctor_desc;
         if !get_copy_bi_ctor(es, &info->cu, &copy) {
@@ -1127,7 +1127,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
                    @[after_action]DestroyAfter({destroy, desc.whole_num}),
                    Has(dest)));
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
-        annotate_later(later, {destroy, dest});
+        annotate(&later->action, {destroy, dest});
       }
     }
     case &IsLvalYes(desc lval_description): {
@@ -1142,7 +1142,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
       dest cell_num = add_flex_cell(es, info->cu, info->cu_props);
       annotate_disposal(after,
         mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), Has(dest)));
-      annotate_later(later, {destroy_the_copy, dest});
+      annotate(&later->action, {destroy_the_copy, dest});
     }
   }
   return true;
@@ -1196,7 +1196,7 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
           return false;
         }
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
-        annotate_assignment(assignment,
+        annotate(&assignment->info,
           @[ast_assignment_info]
           ConditionalAssignment({make_comparecells(es, dest),
                                  mk_array(@[after_action]DestroyAfter({destroy, dest}),
@@ -1218,7 +1218,7 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         }
 
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
-        annotate_assignment(assignment,
+        annotate(&assignment->info,
           @[ast_assignment_info]
           ConditionalAssignment({make_comparecells(es, dest),
                                  mk_array(@[after_action]DestroyAfter({target_destroy, dest}),
@@ -1229,13 +1229,13 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
     case &IsLvalYes(desc lval_description): {
       if dest == desc.num {
         // Static self-assignment!
-        annotate_assignment(assignment, StaticSelfAssignment(void));
+        annotate(&assignment->info, StaticSelfAssignment(void));
       } else {
         copy bi_ctor_desc;
         if !get_copy_bi_ctor(es, &ref_cell(es, dest)->type, &copy) {
           return false;
         }
-        annotate_assignment(assignment,
+        annotate(&assignment->info,
           @[ast_assignment_info]
           ConditionalAssignment({make_comparecells(es, dest),
                                  mk_array(@[after_action]CopyAfter({copy, dest, desc.num})),
@@ -1271,7 +1271,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       }
     }
     case &OneEnumConstructorMatch(ci constructor_info): {
-      annotate_name_info(a, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip}));
+      annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip}));
       props type_properties;
       if !compute_type_properties(es->cs, es->clq, &ci.type, &props) {
         return false;
@@ -1283,13 +1283,13 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, gi.ent), gi.inst) {
         return false;
       }
-      annotate_name_info(a, @[ast_name_expr_info]GlobalResolve({gi.ent, gi.inst}));
+      annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({gi.ent, gi.inst}));
       inst *def_inst = ref_inst(es->cs, gi.inst);
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, inst->computed_type, inst->computed_type_properties)), inst->computed_type, inst->computed_type_properties)));
       return true;
     }
     case &OneLocalMatch(v local_info): {
-      annotate_name_info(a, @[ast_name_expr_info]LocalResolve({v.varnum}));
+      annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({v.varnum}));
       vi *var_info = ref_var(es, v.varnum);
       annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell}), vi->type, vi->props)));
       return true;
@@ -1364,7 +1364,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
 
     for i size = 0; i < n; i = i + 1 {
       p_i *ast_strinit_param = ref(&a->exprs, i);
-      annotate_strinit_param(p_i, {get(&offsets, i)});
+      annotate(&p_i->info, {get(&offsets, i)});
     }
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~ *pt, props)), ~ *pt, props)));
     return true;
@@ -1463,7 +1463,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *array
   return_cell cell_num = add_rigid_cell(&bs->es, ~ *return_type, return_type_props);
 
   info ast_fullbody_info = {destructions, bs->es.all_vars, bs->es.cells, bs->gotos, bs->labels, bs->statements, return_cell, arg_cells};
-  annotate_fullbody(&a->body, info);
+  annotate(&a->body.info, info);
 
   return true;
 }
@@ -2000,7 +2000,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       }
     }
     // Nothing to dispose, it's a field access.
-    annotate_index_expr(a, {None@[ast_expr_after]()});
+    annotate(&a->info, {None@[ast_expr_after]()});
   } else {
     // Dereferencing a pointer always makes an lvalue.
     lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props)});
@@ -2008,7 +2008,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     if !annotate_disposal_for_consume(es, oo(&a->lhs), &ie_info.after) {
       return false;
     }
-    annotate_index_expr(a, ie_info);
+    annotate(&a->info, ie_info);
   }
 
   annotate_info(x, CompleteCheck(mk(lval, ~ *ixtype, props)));

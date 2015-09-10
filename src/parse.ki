@@ -143,7 +143,7 @@ func parse_rest_of_func(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
   }
 
   *out = Def({is_export, IsNotVar(void), generics, name, None(),
-              consume(mk(@[ast_expr_enum]Lambda({params, return_type, {None@[ast_fullbody_info](), body}})))});
+              consume(mk(@[ast_expr_enum]Lambda({params, return_type, {NotComputed@[ast_fullbody_info](), body}})))});
   return true;
 }
 
@@ -438,7 +438,7 @@ func triparse_bracebody(p *ps, out *ast_bracebody) triparse_result {
   statements array[ast_statement];
   for ;; {
     if try_skip_token(p, @[tokval]Grouper(RBrace(void))) {
-      *out = {None@[ast_bracebody_info](), statements};
+      *out = {NotComputed@[ast_bracebody_info](), statements};
       return Success(void);
     }
     statement ast_statement;
@@ -706,13 +706,13 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, lhs ast_expr, out *ast_expr) b
       }
       lhs = mk(@[ast_expr_enum]LocalField(@[ast_local_field]mk(embox(lhs), NameField(fieldname))));
     } else if try_skip_oper(p, '-', '>', '~') {
-      lhs = mk(@[ast_expr_enum]DerefField({None@[ast_deref_field_info](), mk_later(), embox(consume(lhs)), WholeField(void)}));
+      lhs = mk(@[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(lhs)), WholeField(void)}));
     } else if try_skip_oper(p, '-', '>') {
       fieldname ast_ident;
       if !parse_ident(p, &fieldname) {
         return Fail;
       }
-      lhs = mk(@[ast_expr_enum]DerefField({None@[ast_deref_field_info](), mk_later(), embox(consume(lhs)), NameField(fieldname)}));
+      lhs = mk(@[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(lhs)), NameField(fieldname)}));
     } else if is_binop(peek(p)->val) {
       op tok = *peek(p);
       op_prec prec_pair = binop_prec(op.val);
@@ -827,7 +827,7 @@ func build_unop_expr(im *identmap, op ast_ident, rhs ast_expr) ast_expr {
 
 func build_binop_expr(im *identmap, op ast_ident, lhs ast_expr, rhs ast_expr) ast_expr {
   if op.value == im->cym.assignmentsym {
-    return mk(@[ast_expr_enum]Assignment({None(), embox(lhs), embox(rhs)}));
+    return mk(@[ast_expr_enum]Assignment({NotComputed@[ast_assignment_info](), embox(lhs), embox(rhs)}));
   } else if op.value == im->cym.logical_and_sym {
     return mk(@[ast_expr_enum]LogicalConjunction({false, embox(consume(lhs)), embox(consume(rhs))}));
   } else if op.value == im->cym.logical_or_sym {
@@ -1022,7 +1022,7 @@ func parse_rest_of_lambda(p *ps, out *ast_expr) bool {
   if !parse_lambdaspec(p, &args, &return_type, &body) {
     return Fail;
   }
-  *out = mk(@[ast_expr_enum]Lambda({args, return_type, {None@[ast_fullbody_info](), body}}));
+  *out = mk(@[ast_expr_enum]Lambda({args, return_type, {NotComputed@[ast_fullbody_info](), body}}));
   return true;
 }
 
@@ -1034,7 +1034,7 @@ func parse_rest_of_strinit(p *ps, m ast_meta, out *ast_expr) bool {
   params array[ast_strinit_param];
   necs size = count(&ecs);
   for i size = 0; i < necs; i = i + 1 {
-    push(&params, {None@[ast_strinit_param_info](), get(&ecs, i)});
+    push(&params, {NotComputed@[ast_strinit_param_info](), get(&ecs, i)});
   }
   end(p, m);
   *out = mk(@[ast_expr_enum]Strinit({m, params}));
@@ -1114,7 +1114,7 @@ func parse_rest_of_label_statement(p *ps, out *ast_statement) bool {
   if !(parse_ident(p, &name) && try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = Label({None@[ast_label_statement_info](), name});
+  *out = Label({NotComputed@[ast_label_statement_info](), name});
   return true;
 }
 
@@ -1123,7 +1123,7 @@ func parse_rest_of_goto_statement(p *ps, out *ast_statement) bool {
   if !(parse_ident(p, &target) && try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = Goto({None@[ast_goto_statement_info](), target});
+  *out = Goto({NotComputed@[ast_goto_statement_info](), target});
   return true;
 }
 
@@ -1134,7 +1134,7 @@ func parse_rest_of_var_statement(p *ps, out *ast_statement) bool {
   }
 
   if try_skip_oper(p, ';') {
-    *out = Var({None(), decl, AutoInit(None())});
+    *out = Var({NotComputed@[ast_var_info](), decl, AutoInit(None())});
     return true;
   }
 
@@ -1145,13 +1145,13 @@ func parse_rest_of_var_statement(p *ps, out *ast_statement) bool {
     return Fail;
   }
 
-  *out = Var({None(), decl, HasExpr(embox(consume(rhs)))});
+  *out = Var({NotComputed@[ast_var_info](), decl, HasExpr(embox(consume(rhs)))});
   return true;
 }
 
 func parse_rest_of_return_statement(p *ps, out *ast_statement) bool {
   if try_skip_oper(p, ';') {
-    *out = Return({None@[ast_return_statement_info](), None()});
+    *out = Return({NotComputed@[ast_return_statement_info](), None()});
     return true;
   }
   expr ast_expr;
@@ -1159,7 +1159,7 @@ func parse_rest_of_return_statement(p *ps, out *ast_statement) bool {
        && try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = Return({None@[ast_return_statement_info](), Has(embox(consume(expr)))});
+  *out = Return({NotComputed@[ast_return_statement_info](), Has(embox(consume(expr)))});
   return true;
 }
 
@@ -1173,7 +1173,7 @@ func parse_condition(p *ps, out *ast_condition) bool {
          && parse_expr(p, kConditionPrec, &rhs)) {
       return Fail;
     }
-    *out = PatternCondition({None@[ast_pattern_assign_info](), conspatt, embox(consume(rhs))});
+    *out = PatternCondition({NotComputed@[ast_pattern_assign_info](), conspatt, embox(consume(rhs))});
     return true;
   } else {
     condition ast_expr;
@@ -1203,7 +1203,7 @@ func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
     if !parse_rest_of_if_statement(p, &elseif) {
       return Fail;
     }
-    *out = IfThenElse({mk_later(), condition, thenbody, {None@[ast_bracebody_info](), mk_array(elseif)}});
+    *out = IfThenElse({mk_later(), condition, thenbody, {NotComputed@[ast_bracebody_info](), mk_array(elseif)}});
     return true;
   }
   elsebody ast_bracebody;
@@ -1268,7 +1268,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
   if !parse_bracebody(p, &body) {
     return Fail;
   }
-  *out = For({None@[ast_for_statement_info](), initializer, condition, increment, body});
+  *out = For({NotComputed@[ast_for_statement_info](), initializer, condition, increment, body});
   return true;
 }
 
@@ -1282,7 +1282,7 @@ func parse_rest_of_switch_statement(p *ps, out *ast_statement) bool {
   cases array[ast_switch_case];
   for ;; {
     if try_skip_token(p, @[tokval]Grouper(RBrace(void))) {
-      *out = Switch({None@[ast_enum_deconstruction_info](), mk_later(), embox(consume(swartch)), cases});
+      *out = Switch({NotComputed@[ast_enum_deconstruction_info](), mk_later(), embox(consume(swartch)), cases});
       return true;
     }
     cas ast_switch_case;
@@ -1307,7 +1307,7 @@ func parse_switch_case(p *ps, out *ast_switch_case) bool {
       done bool = false;
       while !done {
         if peek(p)->val == @[tokval]Keyw(Case(void)) || peek(p)->val == @[tokval]Keyw(Default(void)) || peek(p)->val == @[tokval]Grouper(RBrace(void)) {
-          body = {None@[ast_bracebody_info](), statements};
+          body = {NotComputed@[ast_bracebody_info](), statements};
           done = true;
         } else {
           st ast_statement;
@@ -1342,7 +1342,7 @@ func parse_rest_of_constructor_pattern(p *ps, m ast_meta,
     return Fail;
   }
   end(p, m);
-  *out = {m, None@[ast_cp_info](), addressof_constructor, constructor_name, decl};
+  *out = {m, NotComputed@[ast_cp_info](), addressof_constructor, constructor_name, decl};
   return true;
 }
 
@@ -1433,7 +1433,7 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
       case ForceAssignmentYes(v): { return Fail; }
       case ForceAssignmentNo(v): {
         step(p);
-        *out = Var({None(), decl, AutoInit(None())});
+        *out = Var({NotComputed@[ast_var_info](), decl, AutoInit(None())});
         return true;
       }
     }
@@ -1445,7 +1445,7 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
        && try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = Var({None(), decl, HasExpr(embox(consume(rhs)))});
+  *out = Var({NotComputed@[ast_var_info](), decl, HasExpr(embox(consume(rhs)))});
   return true;
 }
 

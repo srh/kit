@@ -93,7 +93,7 @@ func check_body(bs *bodystate, a *ast_bracebody, ee_out *entryexit) bool {
   if !make_destructions(&bs->es, read_nums(&vp), &destructions) {
     return false;
   }
-  set(&a->info, {destructions});
+  annotate(&a->info, {destructions});
   *ee_out = {entry, exit};
   return true;
 }
@@ -286,7 +286,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
 
       label_number label_num = ~count(&bs->labels);
       push(&bs->labels, {num, &b, b.name.value, vars_in_scope(&bs->es), false});
-      set(&b.info, {label_number});
+      annotate(&b.info, {label_number});
       *ee_out = {num, num};
     }
     case &Goto(b ast_goto_statement): {
@@ -384,7 +384,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statemen
           }
 
           tag_value enum_tag_value = mk_enum_tag_value(decl_index);
-          set(&patt.cp_info, {vn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
+          annotate(&patt.cp_info, {vn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
 
           body_ee entryexit;
           if !check_body(bs, &cas->body, &body_ee) {
@@ -409,7 +409,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statemen
       return false;
     }
     tag_cell cell_num = add_virtual_tag_cell(&bs->es, &et);
-    set(&a->info, {tag_cell, ~count(&et.constructors)});
+    annotate(&a->info, {tag_cell, ~count(&et.constructors)});
   } else {
     ERR(_u8("Switching over non-switchable type."));
   }
@@ -456,7 +456,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   if !make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions) {
     return false;
   }
-  set(&a->info, {initter_destructions});
+  annotate(&a->info, {initter_destructions});
   *exit_out = exitnum;
   return true;
 }
@@ -507,7 +507,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
   if !es_push_var(&bs->es, vp, cell, Has(&a->decl.name), complete_type, VarSelfContained(void), &vn) {
     return false;
   }
-  a->info = Has({vn});
+  annotate(&a->info, {vn});
   if !es_note_var_destroyer(&bs->es, vn) {
     return false;
   }
@@ -549,7 +549,7 @@ func check_return_statement(bs *bodystate, vp *varpopper, a *ast_return_statemen
   if !make_destructions(&bs->es, &vars, &destructions) {
     return false;
   }
-  set(&a->info, {vars_in_scope(&bs->es), destructions});
+  annotate(&a->info, {vars_in_scope(&bs->es), destructions});
   *exit_out = add_statement(bs, None());
   return true;
 }
@@ -659,14 +659,14 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
         }
         cell cell_num = add_virtual_cell(es, cu_expected_type, expected_type_props);
         tag_cell cell_num = add_virtual_tag_cell(es, &et);
-        set(&b.info, {{tag_cell, ~count(&et.constructors)}, mk_enum_tag_value(decl_index)});
+        annotate(&b.info, {{tag_cell, ~count(&et.constructors)}, mk_enum_tag_value(decl_index)});
         vn var_number;
         if !es_push_var(es, cond_vp, cell, Has(&b.pattern.decl.name), &cu_expected_type, VarVirtual(void), &vn) {
           return false;
         }
 
         tag_value enum_tag_value = mk_enum_tag_value(decl_index);
-        set(&b.pattern.cp_info, {vn, tag_value, enum_field_offset(es->cs, &et, tag_value)});
+        annotate(&b.pattern.cp_info, {vn, tag_value, enum_field_offset(es->cs, &et, tag_value)});
 
         return true;
       } else {
@@ -751,7 +751,7 @@ func connect_gotos(bs *bodystate) bool {
         return false;
       }
 
-      set(&g->st->info, {unHas(&l->st->info)->label_number, destructions, initializations});
+      annotate(&g->st->info, {unHas(&l->st->info)->label_number, destructions, initializations});
     } else {
       ERR(_u8("no label named '"), lookup(bs->im, g->label_name), _u8("'"));
       return false;

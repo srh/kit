@@ -1,5 +1,6 @@
 import arity;
 import box;
+import deferred;
 import expr;
 import identmap;
 import pos;
@@ -102,17 +103,10 @@ defenum ast_assignment_info {
 };
 
 deftype ast_assignment struct {
-  info opt[ast_assignment_info];
+  info nc[ast_assignment_info];
   lhs box[ast_expr];
   rhs box[ast_expr];
 };
-
-func annotate_assignment(a *ast_assignment, info ast_assignment_info) void {
-  if case &Has(i ast_assignment_info) = &a->info {
-    ice(_u8("assignment already annotated"));
-  }
-  a->info = Has(info);
-}
 
 deftype ast_addressof struct {
   rhs box[ast_expr];
@@ -168,7 +162,7 @@ deftype ast_bracebody_info struct {
 };
 
 deftype ast_bracebody struct {
-  info opt[ast_bracebody_info];
+  info nc[ast_bracebody_info];
   statements array[ast_statement];
 };
 
@@ -182,7 +176,7 @@ defenum ast_var_rhs {
 };
 
 deftype ast_var_statement struct {
-  info opt[ast_var_info];
+  info nc[ast_var_info];
   decl ast_vardecl;
   rhs ast_var_rhs;
 };
@@ -198,7 +192,7 @@ deftype ast_enum_deconstruction_info struct {
 };
 
 deftype ast_pattern_assign struct {
-  info opt[ast_pattern_assign_info];
+  info nc[ast_pattern_assign_info];
   pattern ast_constructor_pattern;
   rhs box[ast_expr_consume];
 };
@@ -238,7 +232,7 @@ deftype ast_for_condition struct {
 
 deftype ast_for_statement struct {
   // Can only be an ast_expr or ast_statement_var.
-  info opt[ast_for_statement_info];
+  info nc[ast_for_statement_info];
   initializer opt[box[ast_statement]];
   condition opt[ast_for_condition];
   increment opt[box[ast_expr_discard]];
@@ -246,7 +240,7 @@ deftype ast_for_statement struct {
 };
 
 deftype ast_switch_statement struct {
-  info opt[ast_enum_deconstruction_info];
+  info nc[ast_enum_deconstruction_info];
   swartch_discard ast_later_discard_info;
   swartch box[ast_expr_consume];
   cases array[ast_switch_case];
@@ -260,7 +254,7 @@ deftype ast_return_statement_info struct {
 };
 
 deftype ast_return_statement struct {
-  info opt[ast_return_statement_info];
+  info nc[ast_return_statement_info];
   // If no expr, it returns void.
   expr opt[box[ast_expr_consume]];
 };
@@ -274,7 +268,7 @@ deftype ast_label_statement_info struct {
 };
 
 deftype ast_label_statement struct {
-  info opt[ast_label_statement_info];
+  info nc[ast_label_statement_info];
   name ast_ident;
 };
 
@@ -285,7 +279,7 @@ deftype ast_goto_statement_info struct {
 };
 
 deftype ast_goto_statement struct {
-  info opt[ast_goto_statement_info];
+  info nc[ast_goto_statement_info];
   target ast_ident;
 };
 
@@ -311,7 +305,7 @@ deftype ast_cp_info struct {
 
 deftype ast_constructor_pattern struct {
   meta ast_meta;
-  cp_info opt[ast_cp_info];
+  cp_info nc[ast_cp_info];
   addressof_constructor opt[ast_ident];
   constructor_name ast_ident;
   decl ast_vardecl;
@@ -343,16 +337,9 @@ deftype ast_fullbody_info struct {
 };
 
 deftype ast_fullbody struct {
-  info opt[ast_fullbody_info];
+  info nc[ast_fullbody_info];
   bb ast_bracebody;
 };
-
-func annotate_fullbody(a *ast_fullbody, info ast_fullbody_info) void {
-  if isHas(&a->info) {
-    ice(_u8("annotate_fullbody sees already annotated"));
-  }
-  a->info = Has(info);
-}
 
 deftype ast_lambda struct {
   args array[ast_vardecl];
@@ -378,20 +365,13 @@ defenum ast_local_field_info {
 };
 
 deftype ast_local_field struct {
-  info opt[ast_local_field_info];
+  info nc[ast_local_field_info];
   lhs box[ast_expr];
   fieldname ast_fieldname;
 };
 
 func mk(lhs box[ast_expr], fieldname ast_fieldname) ast_local_field {
-  return {None@[ast_local_field_info](), lhs, fieldname};
-}
-
-func annotate_local_field(a *ast_local_field, info ast_local_field_info) void {
-  if isHas(&a->info) {
-    ice(_u8("annotate_local_field already annotated"));
-  }
-  a->info = Has(info);
+  return {NotComputed@[ast_local_field_info](), lhs, fieldname};
 }
 
 defenum ast_deref_field_info {
@@ -402,18 +382,11 @@ defenum ast_deref_field_info {
 };
 
 deftype ast_deref_field struct {
-  info opt[ast_deref_field_info];
+  info nc[ast_deref_field_info];
   ptr_discard ast_later_discard_info;
   lhs box[ast_expr_consume];
   fieldname ast_fieldname;
 };
-
-func annotate_deref_field(a *ast_deref_field, info ast_deref_field_info) void {
-  if isHas(&a->info) {
-    ice(_u8("annotate_deref_field already annotated"));
-  }
-  a->info = Has(info);
-}
 
 // TODO: This could just have an instpair field.
 deftype global_info struct {
@@ -437,18 +410,13 @@ defenum ast_name_expr_info {
 };
 
 deftype ast_name_expr struct {
-  name_info opt[ast_name_expr_info];
+  name_info nc[ast_name_expr_info];
   ident ast_ident;
   generic_params opt[array[ast_typeexpr]];
 };
 
 func mk(ident ast_ident, generic_params opt[array[ast_typeexpr]]) ast_name_expr {
-  return {None(), ident, generic_params};
-}
-
-func annotate_name_info(a *ast_name_expr, info ast_name_expr_info) void {
-  check(isNone(&a->name_info));
-  a->name_info = Has(info);
+  return {NotComputed(), ident, generic_params};
 }
 
 deftype ast_paren_expr struct {
@@ -461,20 +429,13 @@ deftype ast_index_expr_info struct {
 };
 
 deftype ast_index_expr struct {
-  info opt[ast_index_expr_info];
+  info nc[ast_index_expr_info];
   lhs box[ast_expr];
   rhs box[ast_expr_consume];
 };
 
 func mk(lhs box[ast_expr], rhs box[ast_expr_consume]) ast_index_expr {
-  return {None@[ast_index_expr_info](), lhs, rhs};
-}
-
-func annotate_index_expr(a *ast_index_expr, info ast_index_expr_info) void {
-  if isHas(&a->info) {
-    ice(_u8("annotate_index_expr already annotated"));
-  }
-  a->info = Has(info);
+  return {NotComputed@[ast_index_expr_info](), lhs, rhs};
 }
 
 
@@ -488,7 +449,7 @@ deftype ast_strinit_param_info struct {
 };
 
 deftype ast_strinit_param struct {
-  info opt[ast_strinit_param_info];
+  info nc[ast_strinit_param_info];
   ec ast_expr_consume;
 };
 
@@ -496,13 +457,6 @@ deftype ast_strinit struct {
   meta ast_meta;
   exprs array[ast_strinit_param];
 };
-
-func annotate_strinit_param(a *ast_strinit_param, info ast_strinit_param_info) void {
-  if isHas(&a->info) {
-    ice(_u8("strinit_param already annotated"));
-  }
-  a->info = Has(info);
-}
 
 // Is a non-lval an rval?  Okay.
 deftype rval_description struct {
@@ -552,19 +506,12 @@ func value_cell(a *ast_expr) cell_num {
 }
 
 deftype ast_later_discard_info struct {
-  // None() means not-yet-specified, typechecking always leaves this in an isHas state.
-  action opt[destroy_action];
+  // typechecking always leaves this in a computed state.
+  action nc[destroy_action];
 };
 
 func mk_later() ast_later_discard_info {
-  return {None()};
-}
-
-func annotate_later(a *ast_later_discard_info, action destroy_action) void {
-  if isHas(&a->action) {
-    ice(_u8("ast_later_discard_info already annotated"));
-  }
-  a->action = Has(action);
+  return {NotComputed()};
 }
 
 deftype instpair struct {

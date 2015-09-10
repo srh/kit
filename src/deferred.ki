@@ -24,3 +24,28 @@ func[T] isBeganComputing(x *nbfc[T]) bool {
     return false;
   }
 }
+
+defenum[T] nc {
+  NotComputed void;
+  Computed T;
+};
+
+func[T] NotComputed() nc[T] {
+  return NotComputed(void);
+}
+
+func[T] annotate(x *nc[T], y T) void {
+  if case &Computed(already T) = x {
+    ice(_u8("Already annotated"));
+  }
+  *x = Computed(y);
+}
+
+func[T] unHas(x *nc[T]) *T {
+  if case &Computed(y T) = x {
+    return &y;
+  } else {
+    ice(_u8("unHas(nc) sees not-computed"));
+    return fake();
+  }
+}

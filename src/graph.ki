@@ -768,59 +768,51 @@ func gr_deref_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_deref_f
   if !gr_expr_consume(cs, gr, oo(&a->lhs), &rp) {
     return false;
   }
-  if case &Has(info ast_deref_field_info) = &a->info {
-    ap gr_num;
-    if !gr_later_discard(cs, gr, &a->ptr_discard, &ap) {
-      return false;
+  info *ast_deref_field_info = unHas(&a->info);
+  ap gr_num;
+  if !gr_later_discard(cs, gr, &a->ptr_discard, &ap) {
+    return false;
+  }
+  switch info {
+    case &DerefArrayLength(count u32): {
+      var cp = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstInt(~count)})));
+      var sp = add_node(gr, node0(@[gr_op]GrSequence({rp, ap})));
+      var gn = add_node(gr, node(mk_array(sp, cp), GrNop(void)));
+      *out = gn;
+      return true;
     }
-    switch info {
-      case DerefArrayLength(count u32): {
-        var cp = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstInt(~count)})));
-        var sp = add_node(gr, node0(@[gr_op]GrSequence({rp, ap})));
-        var gn = add_node(gr, node(mk_array(sp, cp), GrNop(void)));
-        *out = gn;
-        return true;
-      }
-      case DerefFieldName(offset u32): {
-        name cell_num = ellval_cell(x);
-        var dp = add_node(gr, node(mk_array(rp), @[gr_op]GrDeref({name, result_cell(oo(&a->lhs)), OffsetConst(offset)})));
-        var sp = add_node(gr, node0(@[gr_op]GrSequence({dp, ap})));
-        *out = sp;
-        return true;
-      }
+    case &DerefFieldName(offset u32): {
+      name cell_num = ellval_cell(x);
+      var dp = add_node(gr, node(mk_array(rp), @[gr_op]GrDeref({name, result_cell(oo(&a->lhs)), OffsetConst(offset)})));
+      var sp = add_node(gr, node0(@[gr_op]GrSequence({dp, ap})));
+      *out = sp;
+      return true;
     }
-  } else {
-    ice(_u8("gr_deref_field sees ast_deref_field not annotated"));
-    return fake();
   }
 }
 
 func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_field, out *gr_num) bool {
-  if case &Has(info ast_local_field_info) = &a->info {
-    lp gr_num;
-    if !gr_expr(cs, gr, oo(&a->lhs), &lp) {
-      return false;
-    }
-    switch &info {
-      case &ArrayLength(alinfo ast_arraylength_info): {
-        dp gr_num;
-        if !gr_after_actions(cs, gr, lp, &alinfo.after.actions, &dp) {
-          return false;
-        }
-        var cp = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)})));
-        var gn = add_node(gr, node(mk_array(dp, cp), GrNop(void)));
-        *out = gn;
-        return true;
+  info *ast_local_field_info = unHas(&a->info);
+  lp gr_num;
+  if !gr_expr(cs, gr, oo(&a->lhs), &lp) {
+    return false;
+  }
+  switch info {
+    case &ArrayLength(alinfo ast_arraylength_info): {
+      dp gr_num;
+      if !gr_after_actions(cs, gr, lp, &alinfo.after.actions, &dp) {
+        return false;
       }
-      case &FieldName(offset u32): {
-        var gn = add_node(gr, node(mk_array(lp), @[gr_op]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst(offset)})));
-        *out = gn;
-        return true;
-      }
+      var cp = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)})));
+      var gn = add_node(gr, node(mk_array(dp, cp), GrNop(void)));
+      *out = gn;
+      return true;
     }
-  } else {
-    ice(_u8("ast_local_field missing info"));
-    return fake();
+    case &FieldName(offset u32): {
+      var gn = add_node(gr, node(mk_array(lp), @[gr_op]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst(offset)})));
+      *out = gn;
+      return true;
+    }
   }
 }
 
@@ -852,46 +844,38 @@ func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda,
 }
 
 func gr_index_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_index_expr, out *gr_num) bool {
-  if case &Has(info ast_index_expr_info) = &a->info {
-    rp gr_num;
-    if !gr_expr_consume(cs, gr, oo(&a->rhs), &rp) {
+  info *ast_index_expr_info = unHas(&a->info);
+  rp gr_num;
+  if !gr_expr_consume(cs, gr, oo(&a->rhs), &rp) {
+    return false;
+  }
+  lp gr_num;
+  if !gr_expr(cs, gr, oo(&a->lhs), &lp) {
+    return false;
+  }
+  if case &Has(aft ast_expr_after) = &info->after {
+    // It's a pointer.
+    name cell_num = ellval_cell(x);
+    flat_size u32 = ref_cell(gr, name)->props.flat_size;
+    var gp = add_node(gr, node(mk_array(rp, lp), @[gr_op]GrDeref({name, result_cell(&aft), OffsetComputed(cons(flat_size, result_cell(oo(&a->rhs))))})));
+    gn gr_num;
+    if !gr_after_actions(cs, gr, gp, &aft.actions, &gn) {
       return false;
     }
-    lp gr_num;
-    if !gr_expr(cs, gr, oo(&a->lhs), &lp) {
-      return false;
-    }
-    if case &Has(aft ast_expr_after) = &info.after {
-      // It's a pointer.
-      name cell_num = ellval_cell(x);
-      flat_size u32 = ref_cell(gr, name)->props.flat_size;
-      var gp = add_node(gr, node(mk_array(rp, lp), @[gr_op]GrDeref({name, result_cell(&aft), OffsetComputed(cons(flat_size, result_cell(oo(&a->rhs))))})));
-      gn gr_num;
-      if !gr_after_actions(cs, gr, gp, &aft.actions, &gn) {
-        return false;
-      }
-      *out = gn;
-      return true;
-    } else {
-      name cell_num = value_cell(x);
-      flat_size u32 = ref_cell(gr, name)->props.flat_size;
-      var gp = add_node(gr, node(mk_array(rp, lp), @[gr_op]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed(cons(flat_size, result_cell(oo(&a->rhs))))})));
-      *out = gp;
-      return true;
-    }
+    *out = gn;
+    return true;
   } else {
-    ice(_u8("gr_index_expr sees unannotated ast_index_expr"));
-    return fake();
+    name cell_num = value_cell(x);
+    flat_size u32 = ref_cell(gr, name)->props.flat_size;
+    var gp = add_node(gr, node(mk_array(rp, lp), @[gr_op]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed(cons(flat_size, result_cell(oo(&a->rhs))))})));
+    *out = gp;
+    return true;
   }
 }
 
 func gr_later_discard(cs *checkstate, gr *frame_graph, a *ast_later_discard_info, out *gr_num) bool {
-  if case &Has(da destroy_action) = &a->action {
-    return gr_destroy_action(cs, gr, &da, DeadAfterDestroyYes(void), out);
-  } else {
-    ice(_u8("ast_later_discard_info not annotated"));
-    return fake();
-  }
+  da *destroy_action = unHas(&a->action);
+  return gr_destroy_action(cs, gr, da, DeadAfterDestroyYes(void), out);
 }
 
 func gr_mk_deref(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_deref, out *gr_num) bool {
