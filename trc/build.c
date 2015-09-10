@@ -274,6 +274,8 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
+    databuf_destroy(&namebuf);
+
     /* We later overwrite the symbol's value (we write zero here). */
     /* No defs are put in a read-only section... for now. */
     uint32_t symbol_table_index
