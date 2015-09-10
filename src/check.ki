@@ -850,18 +850,7 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
 }
 
 func find_matching_deftype_inst(cs *checkstate, ent *deftype_entry, parms *cu_genparms) opt[deftype_inst_id] {
-  insts *array[deftype_inst_id] = &ent->insts;
-  n size = count(insts);
-  datinsts *deftype_inst_id = data(insts);
-  for i size = 0; i < n; i = i + 1 {
-    id deftype_inst_id = datinsts[i];
-    // We've manually inlined ref_deftype_inst here.
-    inst *deftype_inst = oo(ref(&cs->type_instantiations, id.~));
-    if parms_equal(parms, &inst->parms) {
-      return Has(id);
-    }
-  }
-  return None();
+  return lookup(&ent->instst, parms);
 }
 
 func deftype_rhs_type(rhs *ast_type_def_rhs) *ast_typeexpr {
