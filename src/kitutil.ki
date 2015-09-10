@@ -1,4 +1,5 @@
 import stdlib;
+import state;
 
 func[T] DBG(x T) void { ERR(x); }
 func[T, U] DBG(x T, y U) void { ERR(x, y); }

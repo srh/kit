@@ -7,6 +7,7 @@ import string;
 import test_check;
 
 // TODO: We probably don't use win_objfile, linux_objfile, or objfile here -- these were included at one point to make sure they get compiled.
+import build;
 import linux_objfile;
 import win_objfile;
 import objfile;

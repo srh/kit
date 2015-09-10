@@ -161,3 +161,13 @@ func is_interned(im *identmap, s string) opt[sym] {
 func lookup(im *identmap, ident sym) string {
   return lookup(&im->sm, ident);
 }
+
+func build_u8str(im *identmap, r *array[u8], a *sym) void {
+  s string = lookup(im, *a);
+  build_u8str(r, &s);
+}
+
+func build_u8str(nohelp void, r *array[u8], a *sym) void {
+  build_u8str(r, a);
+}
+
