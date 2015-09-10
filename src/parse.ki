@@ -218,9 +218,9 @@ func parse_rest_of_defclass(p *ps, out *ast_toplevel) bool {
   }
   disposition ast_defclass_disposition;
   // TODO: Honestly this is bad syntax, now that copy and move aren't keywords.
-  if try_skip_specific_ident(p, mk_array@[i32]('c', 'o', 'p', 'y')) {
+  if try_skip_specific_ident(p, "copy") {
     disposition = DefaultCopyMoveDestroy(void);
-  } else if try_skip_specific_ident(p, mk_array@[i32]('m', 'o', 'v', 'e')) {
+  } else if try_skip_specific_ident(p, "move") {
     disposition = DefaultMove(void);
   } else {
     disposition = NoDefaults(void);
@@ -361,12 +361,16 @@ func try_parse_ident(p *ps, out *ast_ident) bool {
   }
 }
 
-// TODO: We're constructing/destructing the array param every time we call this function.
-func try_skip_specific_ident(p *ps, x array[i32]) bool {
+// It happens that we only use this on "copy" and "move", so we pass a 4-element u8 array.
+func try_skip_specific_ident(p *ps, x [4]u8) bool {
   dbgparse("try_skip_specific_ident\n");
   switch peek(p).val {
   case Ident(text array[i32]):
-    if !array_equal(&text, &x) {
+    if count(&text) != 4 {
+      return Fail;
+    }
+    y *i32 = data(&text);
+    if !(y[0] == ~x[0] && y[1] == ~x[1] && y[2] == ~x[2] && y[3] == ~x[3]) {
       return Fail;
     }
     m ast_meta = startend(p);
