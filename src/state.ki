@@ -203,7 +203,7 @@ func add_def_entry(cs *checkstate, ent def_entry) def_entry_id {
   shent shp[def_entry] = emshp(ent);
   id def_entry_id = ~count(&cs->defs);
   push(&cs->defs, shent);
-  arr *array[def_entry_id] = try_insert_lookup(&cs->defs_by_name, oo(&shent)->def_name, mk_array());
+  arr *array[def_entry_id] = try_insert_lookup(&cs->defs_by_name, &oo(&shent)->def_name, mk_array());
   push(arr, id);
   return id;
 }
@@ -212,7 +212,7 @@ func add_deftype_entry(cs *checkstate, ent deftype_entry) deftype_entry_id {
   shent shp[deftype_entry] = emshp(ent);
   id deftype_entry_id = ~count(&cs->deftypes);
   push(&cs->deftypes, shent);
-  arr *array[deftype_entry_id] = try_insert_lookup(&cs->deftypes_by_name, oo(&shent)->name, mk_array());
+  arr *array[deftype_entry_id] = try_insert_lookup(&cs->deftypes_by_name, &oo(&shent)->name, mk_array());
   push(arr, id);
   return id;
 }

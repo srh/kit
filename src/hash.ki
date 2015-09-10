@@ -47,18 +47,18 @@ access hash[_, _] {
     swap(&h->arr, &new_array);
   }
 
-  func[K, V] try_insert(h *hash[K, V], key K, value V) bool {
+  func[K, V] try_insert(h *hash[K, V], key *K, value V) bool {
     if count(&h->arr) == 0 {
       rebuild_(h, 8);
     }
 
     mask size = count(&h->arr) - 1;
-    offset size = ~ @[osize]hash_compute_hash(&key) & mask;
+    offset size = ~ @[osize]hash_compute_hash(key) & mask;
     step size = 1;
     for ;; {
       switch ref(&h->arr, offset) {
         case &None(v): {
-          set(&h->arr, offset, Has(cons(key, value)));
+          set(&h->arr, offset, Has(cons(*key, value)));
           h->count = h->count + 1;
           if h->count * 2 >= count(&h->arr) {
             rebuild_(h, count(&h->arr) * 2);
@@ -66,7 +66,7 @@ access hash[_, _] {
           return true;
         }
         case &Has(p tup[K, V]): {
-          if hash_equal(&p.car, &key) {
+          if hash_equal(&p.car, key) {
             return false;
           }
           offset = (offset + step) & mask;
@@ -77,13 +77,13 @@ access hash[_, _] {
   }
 
   // Return value's invalidated by any modification to the hash.
-  func[K, V] lookup_ref(h *hash[K, V], key K) opt[*V] {
+  func[K, V] lookup_ref(h *hash[K, V], key *K) opt[*V] {
     hash_count size = count(&h->arr);
     if hash_count == 0 {
       return None();
     }
     mask size = hash_count - 1;
-    offset size = ~ @[osize]hash_compute_hash(&key) & mask;
+    offset size = ~ @[osize]hash_compute_hash(key) & mask;
     step size = 1;
     for ;; {
       switch ref(&h->arr, offset) {
@@ -91,7 +91,7 @@ access hash[_, _] {
           return None();
         }
         case &Has(p): {
-          if hash_equal(&p.car, &key) {
+          if hash_equal(&p.car, key) {
             return Has(&p.cdr);
           }
           offset = (offset + step) & mask;
@@ -101,20 +101,20 @@ access hash[_, _] {
     }
   }
 
-  func[K, V] lookup(h *hash[K, V], key K) opt[V] {
-    if case Has(p *V) = lookup_ref(h, key) {
-      return Has(*p);
-    }
-    return None();
-  }
-
   func[K, V] count(h *hash[K, V]) size {
     return h->count;
   }
 }
 
+func[K, V] lookup(h *hash[K, V], key *K) opt[V] {
+  if case Has(p *V) = lookup_ref(h, key) {
+    return Has(*p);
+  }
+  return None();
+}
+
 // Returns an unstable reference -- use it right away.
-func[K, V] try_insert_lookup(h *hash[K, V], key K, value V) *V {
+func[K, V] try_insert_lookup(h *hash[K, V], key *K, value V) *V {
   switch lookup_ref(h, key) {
     case Has(p *V): { return p; }
     case None(v): {

@@ -40,11 +40,11 @@ access symmap[_] {
 
   func[T] intern(im *symmap[T], s T) sym {
     val size = count(&im->backmap);
-    if try_insert(&im->table, s, ~val) {
+    if try_insert(&im->table, &s, ~val) {
       push(&im->backmap, s);
       return ~val;
     } else {
-      switch lookup(&im->table, s) {
+      switch lookup(&im->table, &s) {
         case Has(value): {
           return value;
         }
@@ -53,7 +53,7 @@ access symmap[_] {
   }
 
   func[T] is_interned(im *symmap[T], s T) opt[sym] {
-    return lookup(&im->table, s);
+    return lookup(&im->table, &s);
   }
 
   func[T] lookup(im *symmap[T], ident sym) T {
