@@ -90,18 +90,6 @@ func check_module(cs *checkstate, mod_name sym) bool {
   }
 }
 
-func find_matching_inst(cs *checkstate, insts *array[def_inst_id], parms *cu_genparms) opt[def_inst_id] {
-  n size = count(insts);
-  for i size = 0; i < n; i = i + 1 {
-    id def_inst_id = get(insts, i);
-    inst *def_inst = ref_inst(cs, id);
-    if parms_equal(parms, &inst->parms) {
-      return Has(id);
-    }
-  }
-  return None();
-}
-
 func parms_equal(a *cu_genparms, b *cu_genparms) bool {
   if enumnum(a) != enumnum(b) {
     return false;
@@ -350,7 +338,7 @@ func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *cu_g
 // rhs is "None()" for extern defs and primitive defs.
 func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct { id def_inst_id; created bool; } {
   check(arity_matches(&ent->generics, parms));
-  if case Has(id) = find_matching_inst(cs, &ent->insts, parms) {
+  if case Has(id def_inst_id) = lookup(&ent->insts, parms) {
     return {id, false};
   }
   rhs def_inst_rhs;
@@ -372,8 +360,8 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
     case &DefnMagic(mag def_magic):
       rhs = InstRhsMagic(mag);
   }
-  var id = add_inst(cs, mk(*parms, rhs));
-  push(&ent->insts, id);
+  id def_inst_id = add_inst(cs, mk(*parms, rhs));
+  check_insert(&ent->insts, parms, id);
   return {id, true};
 }
 
