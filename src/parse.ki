@@ -70,6 +70,16 @@ func try_parse_keyw(p *ps, expected keyw) opt[ast_meta] {
   return None();  // Fail
 }
 
+func try_skip_keyw(p *ps, expected keyw) bool {
+  if case &Keyw(k keyw) = &peek(p)->val {
+    if k == expected {
+      step(p);
+      return true;
+    }
+  }
+  return Fail;
+}
+
 func try_parse_token(p *ps, expected tokval) opt[ast_meta] {
   if equal(&peek(p)->val, &expected) {
     meta ast_meta = startend(p);
@@ -110,32 +120,32 @@ func try_skip_oper(p *ps, exp0 i32, exp1 i32, exp2 i32) bool {
 
 func parse_toplevel(p *ps, out *ast_toplevel) bool {
   dbgparse("parse_toplevel\n");
-  if try_skip_token(p, @[tokval]Keyw(Func(void))) {
+  if try_skip_keyw(p, Func(void)) {
     return parse_rest_of_func(p, IsNotExport(void), out);
-  } else if try_skip_token(p, @[tokval]Keyw(Def(void))) {
+  } else if try_skip_keyw(p, Def(void)) {
     return parse_rest_of_def(p, IsNotExport(void), IsNotVar(void), out);
-  } else if try_skip_token(p, @[tokval]Keyw(Var(void))) {
+  } else if try_skip_keyw(p, Var(void)) {
     return parse_rest_of_def(p, IsNotExport(void), IsVar(void), out);
-  } else if try_skip_token(p, @[tokval]Keyw(Export(void))) {
-    if try_skip_token(p, @[tokval]Keyw(Func(void))) {
+  } else if try_skip_keyw(p, Export(void)) {
+    if try_skip_keyw(p, Func(void)) {
       return parse_rest_of_func(p, IsExport(void), out);
-    } else if try_skip_token(p, @[tokval]Keyw(Var(void))) {
+    } else if try_skip_keyw(p, Var(void)) {
       return parse_rest_of_def(p, IsExport(void), IsVar(void), out);
-    } else if try_skip_token(p, @[tokval]Keyw(Def(void))) {
+    } else if try_skip_keyw(p, Def(void)) {
       return parse_rest_of_def(p, IsExport(void), IsNotVar(void), out);
     }
     return Fail;
-  } else if try_skip_token(p, @[tokval]Keyw(Extern(void))) {
+  } else if try_skip_keyw(p, Extern(void)) {
     return parse_rest_of_extern_def(p, out);
-  } else if try_skip_token(p, @[tokval]Keyw(Import(void))) {
+  } else if try_skip_keyw(p, Import(void)) {
     return parse_rest_of_import(p, out);
-  } else if try_skip_token(p, @[tokval]Keyw(Deftype(void))) {
+  } else if try_skip_keyw(p, Deftype(void)) {
     return parse_rest_of_deftype(p, out);
-  } else if try_skip_token(p, @[tokval]Keyw(Defclass(void))) {
+  } else if try_skip_keyw(p, Defclass(void)) {
     return parse_rest_of_defclass(p, out);
-  } else if try_skip_token(p, @[tokval]Keyw(Defenum(void))) {
+  } else if try_skip_keyw(p, Defenum(void)) {
     return parse_rest_of_defenum(p, out);
-  } else if try_skip_token(p, @[tokval]Keyw(Access(void))) {
+  } else if try_skip_keyw(p, Access(void)) {
     return parse_rest_of_access(p, out);
   } else {
     return Fail;
@@ -282,7 +292,7 @@ func parse_rest_of_access(p *ps, out *ast_toplevel) bool {
             return Fail;
           }
         }
-        if !try_skip_token(p, @[tokval]Keyw(Underscore(void))) {
+        if !try_skip_keyw(p, Underscore(void)) {
           return Fail;
         }
         counter = counter + 1;
@@ -471,7 +481,7 @@ func parse_bracebody(p *ps, out *ast_bracebody) bool {
 func try_underscore_if_allowed(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
   switch ab {
     case AllowBlanksYes(v): {
-      if try_skip_token(p, @[tokval]Keyw(Underscore(void))) {
+      if try_skip_keyw(p, Underscore(void)) {
         *out = Unknown({});
         return true;
       }
@@ -504,13 +514,13 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_
     *out = Name({m, p->im->cym.voidsym});
     return Success(void);
   }
-  if try_skip_token(p, @[tokval]Keyw(Struct(void))) {
+  if try_skip_keyw(p, Struct(void)) {
     return success_or_fail(parse_rest_of_struct(p, out));
   }
-  if try_skip_token(p, @[tokval]Keyw(Enum(void))) {
+  if try_skip_keyw(p, Enum(void)) {
     return success_or_fail(parse_rest_of_enum(p, out));
   }
-  if try_skip_token(p, @[tokval]Keyw(Union(void))) {
+  if try_skip_keyw(p, Union(void)) {
     return success_or_fail(parse_rest_of_union(p, out));
   }
   if try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
@@ -572,7 +582,7 @@ func parse_rest_of_union(p *ps, out *ast_typeexpr) bool {
 func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
   switch ab {
     case AllowBlanksYes(v): {
-      if try_skip_token(p, @[tokval]Keyw(Underscore(void))) {
+      if try_skip_keyw(p, Underscore(void)) {
         param box[ast_typeexpr];
         if !(try_skip_token(p, @[tokval]Grouper(RBracket(void)))
              && help_parse_typeexpr(p, ab, oo(&param))) {
@@ -1177,7 +1187,7 @@ func parse_rest_of_return_statement(p *ps, out *ast_statement) bool {
 
 func parse_condition(p *ps, out *ast_condition) bool {
   m ast_meta = start(p);
-  if try_skip_token(p, @[tokval]Keyw(Case(void))) {
+  if try_skip_keyw(p, Case(void)) {
     conspatt ast_constructor_pattern;
     rhs ast_expr;
     if !(parse_rest_of_constructor_pattern(p, m, &conspatt)
@@ -1205,12 +1215,12 @@ func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
     return Fail;
   }
 
-  if !try_skip_token(p, @[tokval]Keyw(Else(void))) {
+  if !try_skip_keyw(p, Else(void)) {
     *out = IfThen({mk_later(), condition, thenbody});
     return true;
   }
 
-  if try_skip_token(p, @[tokval]Keyw(If(void))) {
+  if try_skip_keyw(p, If(void)) {
     elseif ast_statement;
     if !parse_rest_of_if_statement(p, &elseif) {
       return Fail;
@@ -1243,7 +1253,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
     initializer = None();
   } else {
     statement box[ast_statement];
-    if try_skip_token(p, @[tokval]Keyw(Var(void))) {
+    if try_skip_keyw(p, Var(void)) {
       if !parse_rest_of_var_statement(p, oo(&statement)) {
         return Fail;
       }
@@ -1363,13 +1373,13 @@ func parse_rest_of_constructor_pattern(p *ps, m ast_meta,
 }
 
 func parse_case_pattern(p *ps, out *ast_case_pattern) bool {
-  if try_skip_token(p, @[tokval]Keyw(Default(void))) {
+  if try_skip_keyw(p, Default(void)) {
     *out = Default(void);
     return true;
   }
   conspatt ast_constructor_pattern;
   m ast_meta = start(p);
-  if !(try_skip_token(p, @[tokval]Keyw(Case(void)))
+  if !(try_skip_keyw(p, Case(void))
        && parse_rest_of_constructor_pattern(p, m, &conspatt)) {
     return Fail;
   }
@@ -1401,7 +1411,7 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
   done bool = false;
   while !done {
     if try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
-      if try_skip_token(p, @[tokval]Keyw(Underscore(void))) {
+      if try_skip_keyw(p, Underscore(void)) {
         param box[ast_typeexpr];
         if !(try_skip_token(p, @[tokval]Grouper(RBracket(void)))
              && parse_typeexpr(p, oo(&param))) {
