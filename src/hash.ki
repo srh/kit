@@ -2,8 +2,8 @@ import array;
 import stdlib;
 
 // The type K must have the following functions implemented:
-// func hash_compute_hash(K *x) osize;
-// func hash_equal(K *x, K *y) bool;
+// func hash_compute_hash(x *K) osize;
+// func hash_equal(x *K, y *K) bool;
 
 defclass[K, V] copy hash struct {
   // count(&arr) is zero or a power of two.
@@ -106,6 +106,11 @@ access hash[_, _] {
   }
 }
 
+func[K, V] check_insert(h *hash[K, V], key *K, value V) void {
+  success bool = try_insert(h, key, value);
+  check(success);
+}
+
 func[K, V] lookup(h *hash[K, V], key *K) opt[V] {
   if case Has(p *V) = lookup_ref(h, key) {
     return Has(*p);
@@ -130,9 +135,7 @@ func[K, V] try_insert_lookup(h *hash[K, V], key *K, value V) *V {
   }
 }
 
-func[K, V] has_key(h *hash[K, V], key K) bool {
-  switch lookup_ref(h, key) {
-    case Has(p *V): { return true; }
-    case None(v): { return false; }
-  }
+func[K, V] mk_hash() hash[K, V] {
+  ret hash[K, V];
+  return ret;
 }

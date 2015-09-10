@@ -98,7 +98,7 @@ func help_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
             return p.inst_id.~ == q.inst_id.~;
           }
         }
-        crash(_u8("typeexpr_equal on a non-pack-having name typeexpr"));
+        ice(_u8("typeexpr_equal on a non-pack-having name typeexpr"));
       }
     }
     case &TeApp(ax te_typeapp): {
@@ -108,7 +108,7 @@ func help_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
             return p.inst_id.~ == q.inst_id.~;
           }
         }
-        crash(_u8("typeexpr_equal on non-pack-having app typeexpr"));
+        ice(_u8("typeexpr_equal on non-pack-having app typeexpr"));
       }
     }
     case &TeStruct(ax te_struct): {
@@ -296,4 +296,49 @@ func[H] build_u8str(help H, r *array[u8], a *te_puretype) void {
       append(r, _u8("TePureUnknown"));
     }
   }
+}
+
+func hash_compute_hash(x *cu_typeexpr) osize {
+  return help_compute_hash(&x->~);
+}
+
+// Must be called on complete, concrete types.
+func help_compute_hash(a *te_typeexpr) osize {
+  switch a {
+  case &TeName(ax te_name):
+    if case &Has(p te_instpack) = &ax.pack {
+      return ~p.inst_id.~;
+    }
+    ice(_u8("help_compute_hash on non-pack-having name typeexpr"));
+  case &TeApp(ax te_typeapp):
+    if case &Has(p te_instpack) = &ax.pack {
+      return ~p.inst_id.~;
+    }
+    ice(_u8("help_compute_hash on non-pack-having app typeexpr"));
+  case &TeStruct(ax te_struct):
+    return 0x3 ^ help_te_vardecl_list_compute_hash(&ax.fields);
+  case &TeEnum(ax te_enum):
+    return 0x4 ^ help_te_vardecl_list_compute_hash(&ax.constructors);
+  case &TeUnion(ax te_union):
+    return 0x5 ^ help_te_vardecl_list_compute_hash(&ax.fields);
+  case &TeArraytype(ax te_arraytype):
+    if case Has(n u32) = ax.count {
+      return (@[osize]~n * 0x3001) + help_compute_hash(oo(&ax.param));
+    }
+  case &TeUnknown(v void):
+    ice(_u8("help_compute_hash sees TeUnknown"));
+  }
+  return fake();
+}
+
+func help_te_vardecl_list_compute_hash(a *array[te_vardecl]) osize {
+  n size = count(a);
+  adata *te_vardecl = data(a);
+  accum osize = 0x84ac113;
+  for i size = 0; i < n; i = i + 1 {
+    adecl *te_vardecl = &adata[i];
+    accum = (accum * 33) ^ ~adecl->name.~;
+    accum = (accum * 3) ^ help_compute_hash(&adecl->type);
+  }
+  return accum;
 }
