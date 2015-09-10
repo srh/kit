@@ -149,9 +149,13 @@ func[H, T] to_u8str(help H, x T) array[u8] {
 }
 
 func checkmalloc(n size) *void {
-  n = max(n, 1);
+  if n == 0 {
+    n = 1;
+  }
   ret *void = malloc(n);
-  check(ret != null);
+  if ret == null {
+    crash(_u8("checkmalloc fail"));
+  }
   return ret;
 }
 
