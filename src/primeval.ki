@@ -164,7 +164,7 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
 
   switch op->op_action {
   case NumAdd(v void):
-    return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) + get(&ps, 1), op);
+    return st_num_rangechecked_output(clq, env, retvalref, add(ref(&ps, 0), ref(&ps, 1)), op);
   case NumSub(v void):
     return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) - get(&ps, 1), op);
   case NumMul(v void):

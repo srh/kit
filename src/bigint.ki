@@ -38,15 +38,27 @@ access bigint {
   }
 
   func `+`(x bigint, y bigint) bigint {
-    xn size = count(&x.parts);
-    yn size = count(&y.parts);
+    ret bigint;
+    add(&x, &y, &ret);
+    return ret;
+  }
+
+  func add(x *bigint, y *bigint) bigint {
+    ret bigint;
+    add(x, y, &ret);
+    return ret;
+  }
+
+  func add(x *bigint, y *bigint, out *bigint) void {
+    xn size = count(&x->parts);
+    yn size = count(&y->parts);
     maxn size = max(xn, yn);
     build array[u32];
     reserve(&build, maxn + 1);
     carry u32 = 0;
     for i size = 0; i < maxn; i = i + 1 {
-      xval u32 = getbigdigit(&x, i);
-      yval u32 = getbigdigit(&y, i);
+      xval u32 = getbigdigit(x, i);
+      yval u32 = getbigdigit(y, i);
       oflow1 u32;
       sum u32;
       add_oflow(xval, yval, &sum, &oflow1);
@@ -55,20 +67,20 @@ access bigint {
       carry = oflow1 + oflow2;
       push(&build, sum);
     }
-    if x.negative != y.negative {
-      return squash(carry == 0, &build);
-    } else if x.negative {
+    if x->negative != y->negative {
+      squash(carry == 0, &build, out);
+    } else if x->negative {
       // Both negative.
       if carry == 0 {
         push(&build, 0xFFFFFFFE);
       }
-      return squash(true, &build);
+      squash(true, &build, out);
     } else {
       // Both positive;
       if carry == 1 {
         push(&build, 1);
       }
-      return squash(false, &build);
+      squash(false, &build, out);
     }
   }
 
@@ -108,6 +120,12 @@ access bigint {
   }
 
   func squash(negative bool, build *array[u32]) bigint {
+    ret bigint;
+    squash(negative, build, &ret);
+    return ret;
+  }
+
+  func squash(negative bool, build *array[u32], out *bigint) void {
     val u32;
     if negative {
       val = ^ @[u32] 0;
@@ -118,11 +136,14 @@ access bigint {
     while n > 0 {
       n = n - 1;
       if get(build, n) != val {
-        return mk(negative, *build);
+        out->negative = negative;
+        swap(&out->parts, build);
+        return;
       }
       pop(build);
     }
-    return mk(negative, *build);
+    out->negative = negative;
+    swap(&out->parts, build);
   }
 
   func add_to_array(x *array[u32], ix size, val u32) void {
@@ -185,10 +206,10 @@ access bigint {
     signword u32 = get(&build, ressize - 2);
     if signword == 0 {
       pop(&build);
-      *out = squash(false, &build);
+      squash(false, &build, out);
     } else if signword == ^ @[u32] 0 {
       pop(&build);
-      *out = squash(true, &build);
+      squash(true, &build, out);
     } else {
       crash(_u8("bigint multiplication algorithm fail"));
     }
