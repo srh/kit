@@ -633,7 +633,7 @@ func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_
   for i size = 0; i < n; i = i + 1 {
     decl *te_vardecl = ref(a, i);
     for j size = 0; j < i; j = j + 1 {
-      if ref(a, j)->name == decl->name {
+      if ref(a, j)->name.~ == decl->name.~ {
         ERR(_u8("Duplicate field name "), lookup(cs->im, decl->name));
         return false;
       }
@@ -803,7 +803,7 @@ func find_generic(g *ast_generics, name sym) opt[size] {
     case &HasGenerics(a array[ast_ident]): {
       n size = count(&a);
       for i size = 0; i < n; i = i + 1 {
-        if ref(&a, i)->value == name {
+        if ref(&a, i)->value.~ == name.~ {
           return Has(i);
         }
       }
@@ -851,9 +851,11 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
 
 func find_matching_deftype_inst(cs *checkstate, insts *array[deftype_inst_id], parms *cu_genparms) opt[deftype_inst_id] {
   n size = count(insts);
+  datinsts *deftype_inst_id = data(insts);
   for i size = 0; i < n; i = i + 1 {
-    id deftype_inst_id = get(insts, i);
-    inst *deftype_inst = ref_deftype_inst(cs, id);
+    id deftype_inst_id = datinsts[i];
+    // We've manually inlined ref_deftype_inst here.
+    inst *deftype_inst = oo(ref(&cs->type_instantiations, id.~));
     if parms_equal(cs, parms, &inst->parms) {
       return Has(id);
     }

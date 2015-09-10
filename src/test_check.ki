@@ -6,7 +6,7 @@ func testmodule_name() string {
 }
 
 func test_loader(cs *checkstate, name sym) opt[array[u8]] {
-  if name == intern(cs->im, testmodule_name()) {
+  if name.~ == intern(cs->im, testmodule_name()).~ {
     return Has(* @[*array[u8]]cast(cs->loader_ctx));
   } else {
     return None();

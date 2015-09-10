@@ -22,7 +22,7 @@ func hash_compute_hash(x *sym) osize {
 }
 
 func hash_equal(x *sym, y *sym) bool {
-  return *x == *y;
+  return x->~ == y->~;
 }
 
 defclass[T] copy symmap struct {

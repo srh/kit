@@ -74,8 +74,10 @@ func typeexpr_list_equal(cs *checkstate, a *array[cu_typeexpr], b *array[cu_type
   if n != count(b) {
     return false;
   }
+  adata *cu_typeexpr = data(a);
+  bdata *cu_typeexpr = data(b);
   for i size = 0; i < n; i = i + 1 {
-    if !typeexpr_equal(cs, ref(a, i), ref(b, i)) {
+    if !typeexpr_equal(cs, &adata[i], &bdata[i]) {
       return false;
     }
   }
@@ -93,7 +95,7 @@ func help_typeexpr_equal(cs *checkstate, a *te_typeexpr, b *te_typeexpr) bool {
       if case &TeName(bx te_name) = b {
         if case &Has(p te_instpack) = &ax.pack {
           if case &Has(q te_instpack) = &bx.pack {
-            return p.inst_id == q.inst_id;
+            return p.inst_id.~ == q.inst_id.~;
           }
         }
         crash(_u8("typeexpr_equal on a non-pack-having name typeexpr"));
@@ -103,7 +105,7 @@ func help_typeexpr_equal(cs *checkstate, a *te_typeexpr, b *te_typeexpr) bool {
       if case &TeApp(bx te_typeapp) = b {
         if case &Has(p te_instpack) = &ax.pack {
           if case &Has(q te_instpack) = &bx.pack {
-            return p.inst_id == q.inst_id;
+            return p.inst_id.~ == q.inst_id.~;
           }
         }
         crash(_u8("typeexpr_equal on non-pack-having app typeexpr"));
@@ -158,9 +160,11 @@ func help_te_vardecl_list_equal(cs *checkstate, a *array[te_vardecl], b *array[t
   if n != count(b) {
     return false;
   }
+  adata *te_vardecl = data(a);
+  bdata *te_vardecl = data(b);
   for i size = 0; i < n; i = i + 1 {
-    adecl *te_vardecl = ref(a, i);
-    bdecl *te_vardecl = ref(b, i);
+    adecl *te_vardecl = &adata[i];
+    bdecl *te_vardecl = &bdata[i];
     if !(adecl->name == bdecl->name && help_typeexpr_equal(cs, &adecl->type, &bdecl->type)) {
       return false;
     }

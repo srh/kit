@@ -152,7 +152,6 @@ def `~` fn[size, def_inst_id] = wrapconvert;
 // An index into checkstate's type_instantiations array.
 deftype deftype_inst_id size;
 def `~` fn[size, deftype_inst_id] = wrapconvert;
-def `==` fn[deftype_inst_id, deftype_inst_id, bool] = wrapequate;
 
 // An index into checkstate's defs array.
 deftype def_entry_id size;
