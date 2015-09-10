@@ -367,10 +367,14 @@ deftype extern_fn_body struct {
   name sym;
 };
 
-defenum fn_body_entry {
+defenum fn_body_entry_enum {
   GraphedFnBody graphed_fn_body;
   PrimFnBody prim_fn_body;
   ExternFnBody extern_fn_body;
+};
+
+deftype fn_body_entry struct {
+  u fn_body_entry_enum;
 };
 
 deftype access_entry struct {

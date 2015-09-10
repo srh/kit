@@ -592,7 +592,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
 
 func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, fnid fn_body_id) bool {
   nparams size = count(paramorefs);
-  switch ref_fn_body(clq->cs, fnid) {
+  switch &ref_fn_body(clq->cs, fnid)->u {
   case &GraphedFnBody(fnent graphed_fn_body):
     if nparams != count(&fnent.argcells) {
       ice(_u8("Param list length mismatches function argcells length"));
