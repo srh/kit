@@ -206,6 +206,11 @@ access bigint {
   }
 
   func multiply_oflow(x u32, y u32, lo_out *u32, hi_out *u32) void {
+    if x <= 0xFFFF && y <= 0xFFFF {
+      *lo_out = x * y;
+      *hi_out = 0;
+      return;
+    }
     xl u32 = (x & 0xFFFF);
     xh u32 = (x >> 16);
     yl u32 = (y & 0xFFFF);
