@@ -267,10 +267,11 @@ func[T] TODO() T {
 }
 
 func check(x bool) void {
-  if !x {
-    debugstr("Check failed.\n");
-    abort();
+  if x {
+    return;
   }
+  debugstr("Check failed.\n");
+  abort();
 }
 
 func crash(msg array[u8]) void {
