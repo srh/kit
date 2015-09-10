@@ -878,7 +878,7 @@ func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, par
 
 func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *cu_genparms) struct { id deftype_inst_id; created bool; } {
   check(arity_matches(&ent->generics, parms));
-  if case Has(id deftype_inst_id) = lookup(&ent->instst, parms) {
+  if case Has(id deftype_inst_id) = lookup(&ent->insts, parms) {
     return {id, false};
   }
   inst deftype_inst;
@@ -888,8 +888,7 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *cu_genparms)
     inst = {*parms, NotComputed@[deftype_inst_info]()};
   }
   var id = add_deftype_inst(cs, inst);
-  push(&ent->insts, id);
-  check_insert(&ent->instst, parms, id);
+  check_insert(&ent->insts, parms, id);
   return {id, true};
 }
 

@@ -326,7 +326,7 @@ func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
 
   // access_scope is not relevant to a primitive deftype.
   access_scope array[access_entry_id];
-  ent deftype_entry = {cs->im->cym.primitive_module_sym, name, access_scope, RhsImpossible(void), NoGenerics(void), None(), Has(info), instst, insts};
+  ent deftype_entry = {cs->im->cym.primitive_module_sym, name, access_scope, RhsImpossible(void), NoGenerics(void), None(), Has(info), instst};
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" module.
 }
@@ -389,8 +389,7 @@ func add_pointer_primitive_type(cs *checkstate) void {
            DerivedMethodTrivial(void),
            DerivedMethodTrivial(void)
          }}),
-    mk_hash@[cu_genparms, deftype_inst_id](),
-    mk_array@[deftype_inst_id]()
+    mk_hash@[cu_genparms, deftype_inst_id]()
   };
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.
@@ -414,8 +413,7 @@ func add_function_primitive(cs *checkstate) void {
            DerivedMethodTrivial(void),
            DerivedMethodTrivial(void)
          }}),
-    mk_hash@[cu_genparms, deftype_inst_id](),
-    mk_array@[deftype_inst_id]()
+    mk_hash@[cu_genparms, deftype_inst_id]()
   };
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.

@@ -337,12 +337,11 @@ deftype deftype_entry struct {
   nonprim opt[deftype_nonprim];
   // Info for primitive types.
   default_info opt[deftype_inst_info];
-  instst hash[cu_genparms, deftype_inst_id];
-  insts array[deftype_inst_id];
+  insts hash[cu_genparms, deftype_inst_id];
 };
 
 func mk(module_name sym, name sym, accessible array[access_entry_id], accessibility rhs_accessibility, g ast_generics, tl *ast_type_def) deftype_entry {
-  return {module_name, name, accessible, accessibility, g, Has({tl, NotComputed()}), None(), mk_hash@[cu_genparms, deftype_inst_id](), mk_array@[deftype_inst_id]()};
+  return {module_name, name, accessible, accessibility, g, Has({tl, NotComputed()}), None(), mk_hash@[cu_genparms, deftype_inst_id]()};
 }
 
 defenum fn_body_spec {
