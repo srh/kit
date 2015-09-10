@@ -630,30 +630,21 @@ func gr_unwind_vars(cs *checkstate, gr *frame_graph, destructions *array[destroy
 }
 
 func gr_expr_discard(cs *checkstate, gr *frame_graph, x *ast_expr_discard, out *gr_num) bool {
-  if case &Has(aft ast_expr_after) = &x->after {
-    dp gr_num;
-    if !gr_expr(cs, gr, &x->expr, &dp) {
-      return false;
-    }
-    after_gn gr_num;
-    if !gr_after_actions(cs, gr, dp, &aft.actions, &after_gn) {
-      return false;
-    }
-    *out = after_gn;
-    return true;
-  } else {
-    ice(_u8("gr_expr_discard missing annotation"));
-    return fake();
+  aft *ast_expr_after = unHas(&x->after);
+  dp gr_num;
+  if !gr_expr(cs, gr, &x->expr, &dp) {
+    return false;
   }
+  after_gn gr_num;
+  if !gr_after_actions(cs, gr, dp, &aft->actions, &after_gn) {
+    return false;
+  }
+  *out = after_gn;
+  return true;
 }
 
 func gr_expr_consume(cs *checkstate, gr *frame_graph, x *ast_expr_consume, out *gr_num) bool {
-  if case &Has(aft ast_expr_after) = &x->after {
-    return gr_expr_and_consume(cs, gr, &x->expr, &aft, out);
-  } else {
-    ice(_u8("gr_expr_consume missing after"));
-    return fake();
-  }
+  return gr_expr_and_consume(cs, gr, &x->expr, unHas(&x->after), out);
 }
 
 func gr_expr_and_consume(cs *checkstate, gr *frame_graph, x *ast_expr, aft *ast_expr_after, out *gr_num) bool {

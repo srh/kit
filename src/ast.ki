@@ -591,12 +591,7 @@ func result_cell(a *ast_expr_after) cell_num {
 }
 
 func result_cell(a *ast_expr_consume) cell_num {
-  if case &Has(aft ast_expr_after) = &a->after {
-    return result_cell(&aft);
-  } else {
-    ice(_u8("result_cell sees None for after"));
-    return fake();
-  }
+  return result_cell(unHas(&a->after));
 }
 
 func mk_after(result opt[cell_num]) ast_expr_after {
@@ -665,20 +660,24 @@ func annotate_info(a *ast_expr, info ast_expr_info) void {
   a->info = info;
 }
 
+// TODO: Does anybody call this?
 func annotate_disposal(a *opt[ast_expr_after], aft ast_expr_after) void {
-  if case &Has(a2 ast_expr_after) = a {
-    ice(_u8("annotate_disposal impossibly called twice"));
-  } else {
-    *a = Has(aft);
-  }
+  set(a, aft);
 }
 
+// TODO: Does anybody use this?
+func annotate_disposal(a *nc[ast_expr_after], aft ast_expr_after) void {
+  annotate(a, aft);
+}
+
+
+// TODO: Does anything use this?
 func annotate_disposal(a *ast_expr_discard, aft ast_expr_after) void {
-  annotate_disposal(&a->after, aft);
+  annotate(&a->after, aft);
 }
 
 func annotate_disposal(a *ast_expr_consume, aft ast_expr_after) void {
-  annotate_disposal(&a->after, aft);
+  annotate(&a->after, aft);
 }
 
 
@@ -709,21 +708,21 @@ func mk(x ast_expr_enum) ast_expr {
 }
 
 deftype ast_expr_consume struct {
-  after opt[ast_expr_after];
+  after nc[ast_expr_after];
   expr ast_expr;
 };
 
 func consume(expr ast_expr) ast_expr_consume {
-  return {None@[ast_expr_after](), expr};
+  return {NotComputed@[ast_expr_after](), expr};
 }
 
 deftype ast_expr_discard struct {
-  after opt[ast_expr_after];
+  after nc[ast_expr_after];
   expr ast_expr;
 };
 
 func discard(expr ast_expr) ast_expr_discard {
-  return {None@[ast_expr_after](), expr};
+  return {NotComputed@[ast_expr_after](), expr};
 }
 
 deftype ast_variadic_generics struct {
