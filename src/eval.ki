@@ -660,7 +660,7 @@ func st_const_compute(clq *clqueue, env *st_env, c *gr_const, length u32, out *s
     *out = *val;
   case &ConstFnBody(fnid fn_body_id):
     *out = mk_st_value_symbolref(&env->plat, fnid);
-  case &ConstBytes(arr array[u8]):
+  case &ConstBytes(arr shray[u8]):
     *out = st_u8s_to_value(&env->plat, &arr);
   }
   return true;
@@ -791,7 +791,7 @@ func st_value_self_contained(plat *platform_info, val *st_value, out *array[u32]
   return true;
 }
 
-func st_u8s_to_value(plat *platform_info, arr *array[u8]) st_value {
+func st_u8s_to_value(plat *platform_info, arr *shray[u8]) st_value {
   n size = count(arr);
   bitlength u32 = ~(n * 8);
   if bitlength % plat->bnno_size != 0 {
@@ -818,7 +818,7 @@ func mk_st_value_bnno(plat *platform_info, bnno u32) st_value {
   return mk_st_value_words(plat, mk_array(bnno), 1);
 }
 
-func bnno_index_u8(plat *platform_info, arr *array[u8], ix u32) u32 {
+func bnno_index_u8(plat *platform_info, arr *shray[u8], ix u32) u32 {
   if plat->bnno_size == 8 {
     return ~get(arr, ~ix);
   } else if plat->bnno_size == 4 {

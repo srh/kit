@@ -129,6 +129,14 @@ func[T] shray_equal(a *shray[T], b *shray[T]) bool {
   return raw_buf_equal(data(a), data(b), n);
 }
 
+func[T, U, V, W] concat(a opt[T], b U, c V, d W) shray[T] {
+  ret array[T];
+  append(&ret, &a);
+  append(&ret, &b);
+  append(&ret, &c);
+  append(&ret, &d);
+  return freeze(&ret);
+}
 
 func[T] mk_shray() shray[T] {
   ret shray[T];

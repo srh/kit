@@ -260,15 +260,6 @@ func[T, U] concat(a array[T], b U) array[T] {
   return ret;
 }
 
-func[T, U, V, W] concat(a opt[T], b U, c V, d W) array[T] {
-  ret array[T];
-  append(&ret, &a);
-  append(&ret, &b);
-  append(&ret, &c);
-  append(&ret, &d);
-  return ret;
-}
-
 func[T] mk_array() array[T] {
   ret array[T];
   return ret;
