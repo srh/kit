@@ -43,16 +43,12 @@ defenum magic_ctor_info {
 
 deftype magic_ctor struct {
   type te_typeexpr;
-  info opt[magic_ctor_info];
+  info nc[magic_ctor_info];
 };
 
+// TODO: Nobody uses this, right?
 func ref_info(a *magic_ctor) *magic_ctor_info {
-  if case &Has(info) = &a->info {
-    return &info;
-  } else {
-    ice(_u8("magic_ctor lacks info"));
-    return fake();
-  }
+  return unHas(&a->info);
 }
 
 deftype copy_destroy_desc struct {
@@ -82,17 +78,17 @@ deftype non_magic_ctor_info struct {
 
 deftype non_magic_ctor struct {
   type te_typeexpr;
-  info opt[non_magic_ctor_info];
+  info nc[non_magic_ctor_info];
 };
 
 deftype magic_bzero struct {
   // size of buf to bzero in bnnos.
-  size opt[u32];
+  size nc[u32];
 };
 
 deftype magic_memcopy struct {
   // size of buf to memcopy in bnnos.
-  size opt[u32];
+  size nc[u32];
 };
 
 deftype which_non_magic_ctor struct {
@@ -108,7 +104,7 @@ defenum which_prop {
 deftype non_magic_prop struct {
   wp which_prop;
   type te_typeexpr;
-  info opt[u32];
+  info nc[u32];
 };
 
 defenum def_non_magic {
@@ -168,9 +164,9 @@ func check_non_magic_prop(cs *checkstate, clq *clqueue, g *ast_generics, parms *
 
   switch nmp->wp {
   case PropSizeof(v void):
-    set(&nmp->info, cac_props.flat_size);
+    annotate(&nmp->info, cac_props.flat_size);
   case PropAlignof(v void):
-    set(&nmp->info, cac_props.flat_alignment);
+    annotate(&nmp->info, cac_props.flat_alignment);
   }
   return true;
 }
@@ -189,10 +185,10 @@ func padding_oneparm_size(cs *checkstate, parms *cu_genparms) u32 {
 func check_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, mag *def_magic) bool {
   switch mag {
     case &MagicBzero(mb magic_bzero):
-      mb.size = Has(padding_oneparm_size(cs, parms));
+      annotate(&mb.size, padding_oneparm_size(cs, parms));
       return true;
     case &MagicMemcopy(mm magic_memcopy):
-      mm.size = Has(padding_oneparm_size(cs, parms));
+      annotate(&mm.size, padding_oneparm_size(cs, parms));
       return true;
     case &MagicNopdestroy(v void):
       // Nothing to check.
@@ -221,21 +217,21 @@ func check_non_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *
   beh *derived_method_behavior = select_behavior(wc, &cac_props);
   oip opt[instpair] = instpair_or_trivial_from_behavior(beh);
   if case Has(ip instpair) = oip {
-    set(&nmc->info, {~cac.te, cac_props, ip});
+    annotate(&nmc->info, {~cac.te, cac_props, ip});
   } else {
     switch wc {
     case CtorInit(v void):
       ip instpair = make_magic_bzero(cs, clq, cac_props.flat_size);
-      set(&nmc->info, {~cac.te, cac_props, ip});
+      annotate(&nmc->info, {~cac.te, cac_props, ip});
     case CtorCopy(v void):
       ip instpair = make_magic_memcopy(cs, clq, cac_props.flat_size);
-      set(&nmc->info, {~cac.te, cac_props, ip});
+      annotate(&nmc->info, {~cac.te, cac_props, ip});
     case CtorMove(v void):
       ip instpair = make_magic_memcopy(cs, clq, cac_props.flat_size);
-      set(&nmc->info, {~cac.te, cac_props, ip});
+      annotate(&nmc->info, {~cac.te, cac_props, ip});
     case CtorDestroy(v void):
       ip instpair = make_magic_nopdestroy(cs, clq, cac_props.flat_size);
-      set(&nmc->info, {~cac.te, cac_props, ip});
+      annotate(&nmc->info, {~cac.te, cac_props, ip});
     }
   }
 
@@ -274,7 +270,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_g
         if !check_pack_ctor(cs, clq, &cac.te, &cac_props, &p, wc, &info) {
           return false;
         }
-        set(&mc->info, info);
+        annotate(&mc->info, info);
       } else {
         ice(_u8("check_magic_ctor packless name type"));
       }
@@ -285,7 +281,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_g
         if !check_pack_ctor(cs, clq, &cac.te, &cac_props, &p, wc, &info) {
           return false;
         }
-        set(&mc->info, info);
+        annotate(&mc->info, info);
       } else {
         ice(_u8("check_magic_ctor packless app type"));
       }
@@ -295,14 +291,14 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_g
       if !check_vardecl_ctor(cs, clq, &a.fields, wc, &field_insts) {
         return false;
       }
-      set(&mc->info, @[magic_ctor_info]MagicStructInfo({~cac.te, cac_props, field_insts}));
+      annotate(&mc->info, @[magic_ctor_info]MagicStructInfo({~cac.te, cac_props, field_insts}));
     }
     case &TeEnum(a te_enum): {
       field_insts array[opt[instpair]];
       if !check_vardecl_ctor(cs, clq, &a.constructors, wc, &field_insts) {
         return false;
       }
-      set(&mc->info, @[magic_ctor_info]MagicEnumInfo({~cac.te, cac_props, field_insts}));
+      annotate(&mc->info, @[magic_ctor_info]MagicEnumInfo({~cac.te, cac_props, field_insts}));
     }
     case &TeUnion(a te_union): {
       ice(_u8("check_magic_ctor seeing TeUnion"));
@@ -312,7 +308,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_g
       if !compute_complete_type_properties(cs, clq, oo(&a.param), &props) {
         return false;
       }
-      set(&mc->info, @[magic_ctor_info]MagicArraytypeInfo({~cac.te, cac_props, instpair_from_behavior(select_behavior(wc, &props))}));
+      annotate(&mc->info, @[magic_ctor_info]MagicArraytypeInfo({~cac.te, cac_props, instpair_from_behavior(select_behavior(wc, &props))}));
     }
     case &TeUnknown(v void): {
       ice(_u8("check_magic_ctor seeing TeUnknown"));
