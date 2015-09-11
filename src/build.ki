@@ -46,6 +46,6 @@ func c_symbol_name(cs *checkstate, name sym) string {
   case Linux32(v void):
     return s;
   case Win32(v void):
-    return from_u8(_u8("_")) + s;
+    return _s("_") + s;
   }
 }

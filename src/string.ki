@@ -68,6 +68,17 @@ func from_u8(x array[u8]) string {
   return ~freeze(&build);
 }
 
+func[T] _s(arr T) string {
+  build array[i32];
+  n size = arr.length;
+  reserve(&build, n);
+  p *u8 = &arr[0];
+  for i size = 0; i < n; i = i + 1 {
+    push(&build, ~p[i]);
+  }
+  return ~freeze(&build);
+}
+
 func `+`(x string, y string) string {
   build array[i32];
   reserve(&build, count(&x) + count(&y));

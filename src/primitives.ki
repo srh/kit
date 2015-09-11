@@ -266,29 +266,29 @@ func mk_op(traits integral_traits, action primitive_comparison_op_action) primit
 
 func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) void {
   add_simple_primitive(cs, name, traits.flat);
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("+"))), name, mk_numop(traits, NumAdd(void)));
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("-"))), name, mk_numop(traits, NumSub(void)));
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("*"))), name, mk_numop(traits, NumMul(void)));
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("/"))), name, mk_numop(traits, NumDiv(void)));
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("%"))), name, mk_numop(traits, NumMod(void)));
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("&"))), name, mk_numop(traits, NumBitAnd(void)));
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("|"))), name, mk_numop(traits, NumBitOr(void)));
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("^"))), name, mk_numop(traits, NumBitXor(void)));
-  add_unop_primitive(cs, intern(cs->im, from_u8(_u8("^"))), name, mk_numop(traits, NumBitNot(void)));
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("<<"))), name, mk_numop(traits, NumShiftLeft(void)));
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8(">>"))), name, mk_numop(traits, NumShiftRight(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), name, mk_op(traits, CmpEq(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), name, mk_op(traits, CmpNe(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<"))), name, mk_op(traits, CmpLt(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">"))), name, mk_op(traits, CmpGt(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<="))), name, mk_op(traits, CmpLe(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">="))), name, mk_op(traits, CmpGe(void)));
+  add_binop_primitive(cs, intern(cs->im, _s("+")), name, mk_numop(traits, NumAdd(void)));
+  add_binop_primitive(cs, intern(cs->im, _s("-")), name, mk_numop(traits, NumSub(void)));
+  add_binop_primitive(cs, intern(cs->im, _s("*")), name, mk_numop(traits, NumMul(void)));
+  add_binop_primitive(cs, intern(cs->im, _s("/")), name, mk_numop(traits, NumDiv(void)));
+  add_binop_primitive(cs, intern(cs->im, _s("%")), name, mk_numop(traits, NumMod(void)));
+  add_binop_primitive(cs, intern(cs->im, _s("&")), name, mk_numop(traits, NumBitAnd(void)));
+  add_binop_primitive(cs, intern(cs->im, _s("|")), name, mk_numop(traits, NumBitOr(void)));
+  add_binop_primitive(cs, intern(cs->im, _s("^")), name, mk_numop(traits, NumBitXor(void)));
+  add_unop_primitive(cs, intern(cs->im, _s("^")), name, mk_numop(traits, NumBitNot(void)));
+  add_binop_primitive(cs, intern(cs->im, _s("<<")), name, mk_numop(traits, NumShiftLeft(void)));
+  add_binop_primitive(cs, intern(cs->im, _s(">>")), name, mk_numop(traits, NumShiftRight(void)));
+  add_comparison_primitive(cs, intern(cs->im, _s("==")), name, mk_op(traits, CmpEq(void)));
+  add_comparison_primitive(cs, intern(cs->im, _s("!=")), name, mk_op(traits, CmpNe(void)));
+  add_comparison_primitive(cs, intern(cs->im, _s("<")), name, mk_op(traits, CmpLt(void)));
+  add_comparison_primitive(cs, intern(cs->im, _s(">")), name, mk_op(traits, CmpGt(void)));
+  add_comparison_primitive(cs, intern(cs->im, _s("<=")), name, mk_op(traits, CmpLe(void)));
+  add_comparison_primitive(cs, intern(cs->im, _s(">=")), name, mk_op(traits, CmpGe(void)));
 
   switch traits.numeric.repr {
   case Unsigned(v void):
     // Do nothing.
   case SignedTwos(v void):
-    add_unop_primitive(cs, intern(cs->im, from_u8(_u8("-"))), name, mk_numop(traits, NumNegate(void)));
+    add_unop_primitive(cs, intern(cs->im, _s("-")), name, mk_numop(traits, NumNegate(void)));
   }
 }
 
@@ -298,11 +298,11 @@ func add_void_primitive(cs *checkstate) void {
 
 func add_bool_primitive(cs *checkstate) void {
   add_simple_primitive(cs, cs->im->cym.boolsym, cs->platform.booltraits);
-  add_unop_primitive(cs, intern(cs->im, from_u8(_u8("!"))), cs->im->cym.boolsym, @[primitive_op]PrimLogical(LogicalNot(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolEq(void)));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolNe(void)));
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("&"))), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolBitAnd(void)));
-  add_binop_primitive(cs, intern(cs->im, from_u8(_u8("|"))), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolBitOr(void)));
+  add_unop_primitive(cs, intern(cs->im, _s("!")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(LogicalNot(void)));
+  add_comparison_primitive(cs, intern(cs->im, _s("==")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolEq(void)));
+  add_comparison_primitive(cs, intern(cs->im, _s("!=")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolNe(void)));
+  add_binop_primitive(cs, intern(cs->im, _s("&")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolBitAnd(void)));
+  add_binop_primitive(cs, intern(cs->im, _s("|")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolBitOr(void)));
 }
 
 func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) void {
@@ -361,13 +361,13 @@ func add_pointer_primitive(cs *checkstate) void {
   add_pointer_primitive_type(cs);
   tee_type te_typeexpr = TeName({cs->im->cym.tee_sym, None()});
   bool_type te_typeexpr = primitive_bool_type(cs);
-  ent def_entry_id = add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("=="))), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpEq(void)}));
+  ent def_entry_id = add_comparison_primitive(cs, intern(cs->im, _s("==")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpEq(void)}));
   set(&cs->prims.ptr_eq, ent);
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("!="))), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpNe(void)}));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<"))), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpLt(void)}));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">"))), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpGt(void)}));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8("<="))), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpLe(void)}));
-  add_comparison_primitive(cs, intern(cs->im, from_u8(_u8(">="))), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpGe(void)}));
+  add_comparison_primitive(cs, intern(cs->im, _s("!=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpNe(void)}));
+  add_comparison_primitive(cs, intern(cs->im, _s("<")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpLt(void)}));
+  add_comparison_primitive(cs, intern(cs->im, _s(">")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpGt(void)}));
+  add_comparison_primitive(cs, intern(cs->im, _s("<=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpLe(void)}));
+  add_comparison_primitive(cs, intern(cs->im, _s(">=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpGe(void)}));
 }
 
 func add_pointer_primitive_type(cs *checkstate) void {

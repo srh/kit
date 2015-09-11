@@ -2,7 +2,7 @@ import check;
 import eval;
 
 func testmodule_name() string {
-  return from_u8(_u8("testmodule"));
+  return _s("testmodule");
 }
 
 func test_loader(cs *checkstate, name sym) opt[array[u8]] {
