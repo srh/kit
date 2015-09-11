@@ -103,12 +103,13 @@ void append_zeros_to_align(struct databuf *d, size_t alignment) {
   }
 }
 
-uint32_t objfile_add_local_symbol(struct objfile *f,
-                                  ident_value name,
-                                  uint32_t value,
-                                  enum section section,
-                                  enum is_static is_static) {
-  uint32_t ret = size_to_uint32(f->symbol_table_count);
+struct sti objfile_add_local_symbol(struct objfile *f,
+                                    ident_value name,
+                                    uint32_t value,
+                                    enum section section,
+                                    enum is_static is_static) {
+  struct sti ret;
+  ret.value = size_to_uint32(f->symbol_table_count);
   struct objfile_symbol_record rec;
   rec.name = name;
   rec.value = value;
@@ -122,10 +123,11 @@ uint32_t objfile_add_local_symbol(struct objfile *f,
   return ret;
 }
 
-uint32_t objfile_add_remote_symbol(struct objfile *f,
-                                   ident_value name,
-                                   enum is_function is_function) {
-  uint32_t ret = size_to_uint32(f->symbol_table_count);
+struct sti objfile_add_remote_symbol(struct objfile *f,
+                                     ident_value name,
+                                     enum is_function is_function) {
+  struct sti ret;
+  ret.value = size_to_uint32(f->symbol_table_count);
   struct objfile_symbol_record rec;
   rec.name = name;
   rec.value = 0;
@@ -159,17 +161,17 @@ void objfile_fillercode_align_double_quadword(struct objfile *f) {
 }
 
 void objfile_set_symbol_value(struct objfile *f,
-                              uint32_t SymbolTableIndex,
+                              struct sti SymbolTableIndex,
                               uint32_t value) {
-  CHECK(SymbolTableIndex < f->symbol_table_count);
+  CHECK(SymbolTableIndex.value < f->symbol_table_count);
   /* We should only be assigning this once, I think -- and we set it
   to zero before assigning it. */
-  CHECK(f->symbol_table[SymbolTableIndex].value == 0);
-  f->symbol_table[SymbolTableIndex].value = value;
+  CHECK(f->symbol_table[SymbolTableIndex.value].value == 0);
+  f->symbol_table[SymbolTableIndex.value].value = value;
 }
 
 void objfile_section_append_32bit_reloc(struct objfile_section *s,
-                                        uint32_t symbol_table_index,
+                                        struct sti symbol_table_index,
                                         enum objfile_relocation_type type) {
   struct objfile_relocation reloc;
   reloc.virtual_address = s->raw.count;
@@ -181,13 +183,13 @@ void objfile_section_append_32bit_reloc(struct objfile_section *s,
 }
 
 void objfile_section_append_dir32(struct objfile_section *s,
-                                  uint32_t symbol_table_index) {
+                                  struct sti symbol_table_index) {
   objfile_section_append_32bit_reloc(s, symbol_table_index,
                                      OBJFILE_RELOCATION_TYPE_DIR32);
 }
 
 void objfile_section_append_rel32(struct objfile_section *s,
-                                  uint32_t symbol_table_index) {
+                                  struct sti symbol_table_index) {
   objfile_section_append_32bit_reloc(s, symbol_table_index,
                                      OBJFILE_RELOCATION_TYPE_REL32);
 }

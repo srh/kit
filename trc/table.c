@@ -179,12 +179,12 @@ struct static_value *di_value_for_set(struct def_instantiation *inst) {
   inst->value_computed = 1;
   return &inst->value;
 }
-uint32_t di_symbol_table_index(struct def_instantiation *inst) {
+struct sti di_symbol_table_index(struct def_instantiation *inst) {
   CHECK(inst->symbol_table_index_computed);
   return inst->symbol_table_index;
 }
 void di_set_symbol_table_index(struct def_instantiation *inst,
-                               uint32_t symbol_table_index) {
+                               struct sti symbol_table_index) {
   CHECK(!inst->symbol_table_index_computed);
   inst->symbol_table_index_computed = 1;
   inst->symbol_table_index = symbol_table_index;

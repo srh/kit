@@ -280,7 +280,7 @@ void linux32_append_relocations_and_mutate_section(
   for (size_t i = 0, e = s->relocs_count; i < e; i++) {
     struct elf32_Rel rel;
     rel.r_offset = to_le_u32(relocs[i].virtual_address);
-    uint32_t sti = relocs[i].symbol_table_index;
+    uint32_t sti = relocs[i].symbol_table_index.value;
     CHECK(sti < sti_map_count);
     uint32_t new_sti = sti_map[sti];
     CHECK(new_sti <= (UINT32_MAX >> 8));

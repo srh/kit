@@ -111,7 +111,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
                                struct primitive_op prim_op,
                                struct ast_typeexpr *arg0_type_or_null,
                                struct ast_typeexpr *return_type);
-void x86_gen_call(struct objfile *f, uint32_t func_sti);
+void x86_gen_call(struct objfile *f, struct sti func_sti);
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc);
 void gen_mov(struct objfile *f, struct loc dest, struct loc src);
 void gen_bzero(struct objfile *f, struct loc dest);
@@ -133,10 +133,10 @@ void gen_crash_jmp(struct objfile *f, struct frame *h);
 /* Right now we don't worry about generating multiple objfiles, so we
 just blithely attach a serial number to each name to make them
 unique. */
-int generate_kit_name(struct checkstate *cs,
-                      const void *name, size_t name_count,
-                      int is_export,
-                      void **gen_name_out, size_t *gen_name_count_out) {
+void generate_kit_name(struct checkstate *cs,
+                       const void *name, size_t name_count,
+                       int is_export,
+                       void **gen_name_out, size_t *gen_name_count_out) {
   CHECK(cs->kit_name_counter != UINT32_MAX);
   cs->kit_name_counter++;
   uint32_t number_append = cs->kit_name_counter;
@@ -176,7 +176,6 @@ int generate_kit_name(struct checkstate *cs,
     databuf_append(&b, name, name_count);
   }
   databuf_move_destroy(&b, gen_name_out, gen_name_count_out);
-  return 1;
 }
 
 int is_primitive_but_not_sizeof_alignof(struct def_entry *ent) {
@@ -185,20 +184,18 @@ int is_primitive_but_not_sizeof_alignof(struct def_entry *ent) {
 }
 
 /* TODO: Put string literals in rdata (add section number to loc_global). */
-uint32_t add_data_string(struct checkstate *cs, struct objfile *f,
-                         const void *data, uint32_t length) {
+struct sti add_data_string(struct checkstate *cs, struct objfile *f,
+                           const void *data, uint32_t length) {
   ident_value index = identmap_intern(&cs->sli_values, data, length);
   CHECK(index <= cs->sli_symbol_table_indexes_count);
   if (index == cs->sli_symbol_table_indexes_count) {
     char name[] = "string_literal$";
     void *gen_name;
     size_t gen_name_count;
-    if (!generate_kit_name(cs, name, strlen(name),
-                           0, &gen_name, &gen_name_count)) {
-      return 0;
-    }
+    generate_kit_name(cs, name, strlen(name),
+                      0, &gen_name, &gen_name_count);
 
-    uint32_t symbol_table_index
+    struct sti symbol_table_index
       = objfile_add_local_symbol(f,
                                  identmap_intern(cs->im, gen_name, gen_name_count),
                                  objfile_section_size(objfile_data(f)),
@@ -240,7 +237,7 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
         return 0;
       }
 
-      uint32_t symbol_table_index
+      struct sti symbol_table_index
         = objfile_add_remote_symbol(f, identmap_intern(cs->im, c_name, c_name_count),
                                     typeexpr_is_func_type(cs->im, &ent->type) ?
                                     IS_FUNCTION_YES : IS_FUNCTION_NO);
@@ -268,17 +265,15 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
 
     void *gen_name;
     size_t gen_name_count;
-    if (!generate_kit_name(cs, namebuf.buf, namebuf.count,
-                           ent->is_export,
-                           &gen_name, &gen_name_count)) {
-      return 0;
-    }
+    generate_kit_name(cs, namebuf.buf, namebuf.count,
+                      ent->is_export,
+                      &gen_name, &gen_name_count);
 
     databuf_destroy(&namebuf);
 
     /* We later overwrite the symbol's value (we write zero here). */
     /* No defs are put in a read-only section... for now. */
-    uint32_t symbol_table_index
+    struct sti symbol_table_index
       = objfile_add_local_symbol(f, identmap_intern(cs->im, gen_name, gen_name_count),
                                  0 /* We'll overwrite the value later. */,
                                  typeexpr_is_func_type(cs->im, &ent->type) ?
@@ -304,7 +299,7 @@ enum immediate_tag {
 struct immediate {
   enum immediate_tag tag;
   union {
-    uint32_t func_sti;
+    struct sti func_sti;
     uint32_t u32;
     int32_t i32;
     uint8_t u8;
@@ -348,7 +343,7 @@ struct loc {
   uint32_t padded_size;
   union {
     int32_t ebp_offset;
-    uint32_t global_sti;
+    struct sti global_sti;
     int32_t ebp_indirect;
   } u;
 };
@@ -363,7 +358,7 @@ struct loc ebp_loc(uint32_t size, uint32_t padded_size, int32_t ebp_offset) {
   return ret;
 }
 
-struct loc global_loc(uint32_t size, uint32_t padded_size, uint32_t global_sti) {
+struct loc global_loc(uint32_t size, uint32_t padded_size, struct sti global_sti) {
   CHECK(size <= padded_size && padded_size - size < DWORD_SIZE);
   struct loc ret;
   ret.tag = LOC_GLOBAL;
@@ -391,7 +386,7 @@ int loc_equal(struct loc a, struct loc b) {
   case LOC_EBP_OFFSET:
     return a.u.ebp_offset == b.u.ebp_offset;
   case LOC_GLOBAL:
-    return a.u.global_sti == b.u.global_sti;
+    return a.u.global_sti.value == b.u.global_sti.value;
   case LOC_EBP_INDIRECT:
     return a.u.ebp_indirect == b.u.ebp_indirect;
   default:
@@ -790,7 +785,7 @@ void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
 }
 
 void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
-                            uint32_t symbol_table_index) {
+                            struct sti symbol_table_index) {
   uint8_t b = 0xB8 + (uint8_t)dest;
   objfile_section_append_raw(objfile_text(f), &b, 1);
   objfile_section_append_dir32(objfile_text(f), symbol_table_index);
@@ -1710,7 +1705,7 @@ void make_typetrav_sti_name(struct identmap *im,
   *out = b;
 }
 
-uint32_t lookup_or_make_typetrav_sti(
+struct sti lookup_or_make_typetrav_sti(
     struct objfile *f,
     struct checkstate *cs, enum typetrav_func tf,
     struct ast_typeexpr *type) {
@@ -1722,12 +1717,10 @@ uint32_t lookup_or_make_typetrav_sti(
     char name[] = "$typetrav";
     void *gen_name;
     size_t gen_name_count;
-    if (!generate_kit_name(cs, name, strlen(name),
-                           0, &gen_name, &gen_name_count)) {
-      return 0;
-    }
+    generate_kit_name(cs, name, strlen(name),
+                      0, &gen_name, &gen_name_count);
 
-    uint32_t symbol_table_index
+    struct sti symbol_table_index
       = objfile_add_local_symbol(f, identmap_intern(cs->im, gen_name, gen_name_count),
                                  0 /* We'll overwrite the value later. */,
                                  SECTION_TEXT,
@@ -1753,7 +1746,7 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
     return;
   }
   /* TODO: Go deeper on names to avoid needless function layers. */
-  uint32_t sti = lookup_or_make_typetrav_sti(f, cs, tf, type);
+  struct sti sti = lookup_or_make_typetrav_sti(f, cs, tf, type);
 
   int32_t saved_offset = frame_save_offset(h);
   if (has_src) {
@@ -2134,7 +2127,7 @@ void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src)
 }
 
 
-void x86_gen_call(struct objfile *f, uint32_t func_sti) {
+void x86_gen_call(struct objfile *f, struct sti func_sti) {
   uint8_t b = 0xE8;
   objfile_section_append_raw(objfile_text(f), &b, 1);
   objfile_section_append_rel32(objfile_text(f), func_sti);
@@ -4087,7 +4080,7 @@ int gen_string_literal(struct checkstate *cs, struct objfile *f,
                        struct frame *h, struct ast_expr *a,
                        struct expr_return *er) {
   uint32_t size = size_to_uint32(a->u.string_literal.values_count);
-  uint32_t symbol_table_index
+  struct sti symbol_table_index
     = add_data_string(cs, f, a->u.string_literal.values, size);
 
   struct loc loc = global_loc(size, size, symbol_table_index);

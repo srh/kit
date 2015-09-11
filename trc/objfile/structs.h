@@ -18,7 +18,7 @@ struct objfile_relocation {
   /* Offset from beginning of section. */
   uint32_t virtual_address;
   /* Index into the symbol table. */
-  uint32_t symbol_table_index;
+  struct sti symbol_table_index;
   /* What kind of relocation should be performed? */
   enum objfile_relocation_type type;
 };

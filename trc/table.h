@@ -4,6 +4,7 @@
 #include "ast.h"
 #include "arity.h"
 #include "primitive.h"
+#include "objfile/objfile.h"
 
 struct checkstate;
 
@@ -62,7 +63,7 @@ struct def_instantiation {
   struct static_value value;
 
   int symbol_table_index_computed;
-  uint32_t symbol_table_index;
+  struct sti symbol_table_index;
 };
 
 struct ast_expr *di_annotated_rhs(struct def_instantiation *inst);
@@ -72,9 +73,9 @@ void di_set_annotated_rhs(struct def_instantiation *inst,
 struct static_value *di_value(struct def_instantiation *inst);
 struct static_value *di_value_for_set(struct def_instantiation *inst);
 
-uint32_t di_symbol_table_index(struct def_instantiation *inst);
+struct sti di_symbol_table_index(struct def_instantiation *inst);
 void di_set_symbol_table_index(struct def_instantiation *inst,
-                               uint32_t symbol_table_index);
+                               struct sti symbol_table_index);
 
 struct defclass_ident {
   ident_value name;

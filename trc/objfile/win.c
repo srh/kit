@@ -334,7 +334,7 @@ void win_append_relocs(struct databuf *d, struct objfile_relocation *relocs,
   for (size_t i = 0; i < relocs_count; i++) {
     struct COFF_Relocation coff_reloc;
     coff_reloc.VirtualAddress = to_le_u32(relocs[i].virtual_address);
-    coff_reloc.SymbolTableIndex = to_le_u32(relocs[i].symbol_table_index);
+    coff_reloc.SymbolTableIndex = to_le_u32(relocs[i].symbol_table_index.value);
     coff_reloc.Type = to_le_u16(win_Type[relocs[i].type]);
     databuf_append(d, &coff_reloc, sizeof(coff_reloc));
   }
