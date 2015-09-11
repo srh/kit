@@ -4,6 +4,10 @@ import win_objfile;
 import objfile;
 
 func build_module(cs *checkstate, modulename sym) bool {
+  if !check_module(cs, modulename) {
+    return false;
+  }
+
   // TODO: Actually build the module!
-  return check_module(cs, modulename);
+  return true;
 }

@@ -60,6 +60,10 @@ func check_littleendian(plat *platform_info) void {
   }
 }
 
+defenum platform_os {
+  Linux32 void;
+  Win32 void;
+};
 
 deftype platform_info struct {
   endian endianness;
@@ -79,6 +83,8 @@ deftype platform_info struct {
   osizetraits integral_traits;
   ptrtraits flat_traits;
   fntraits flat_traits;
+
+  opsys platform_os;
 };
 
 deftype cs_primitives struct {
