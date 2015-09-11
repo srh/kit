@@ -41,11 +41,11 @@ func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
 }
 
 func c_symbol_name(cs *checkstate, name sym) string {
-  s string = lookup(cs->im, name);
+  namestr string = lookup(cs->im, name);
   switch cs->platform.opsys {
   case Linux32(v void):
-    return s;
+    return namestr;
   case Win32(v void):
-    return _s("_") + s;
+    return _s("_") + namestr;
   }
 }

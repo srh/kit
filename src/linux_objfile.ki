@@ -315,7 +315,7 @@ func linux32_append_relocations_and_mutate_section(sti_map *array[u32], d *array
     reloc *objfile_relocation = ref(&s->relocs, i);
     rel elf32_Rel;
     rel.r_offset = ~reloc->virtual_address;
-    sti u32 = reloc->symbol_table_index;
+    sti u32 = reloc->symbol_table_index.~;
     new_sti u32 = get(sti_map, ~sti);
     check(new_sti <= (@[u32]0xFFFFFFFF >> 8));
     rel_type u32;

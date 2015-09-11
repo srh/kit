@@ -323,7 +323,7 @@ func win_append_relocs(d *array[u8], relocs *array[objfile_relocation]) void {
     reloc *objfile_relocation = ref(relocs, i);
     coff_reloc COFF_Relocation;
     coff_reloc.VirtualAddress = ~reloc->virtual_address;
-    coff_reloc.SymbolTableIndex = ~reloc->symbol_table_index;
+    coff_reloc.SymbolTableIndex = ~reloc->symbol_table_index.~;
     switch reloc->type {
     case Dir32(v void):
       coff_reloc.Type = ~ @[u16] ~IMAGE_REL_I386_DIR32;

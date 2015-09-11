@@ -10,6 +10,9 @@ deftype objfile struct {
   symbol_table array[objfile_symbol_record];
 };
 
+deftype sti u32;
+def `~` fn[u32, sti] = wrapconvert;
+
 deftype objfile_symbol_record struct {
   name sym;
   value u32;
@@ -55,7 +58,7 @@ deftype objfile_relocation struct {
   // Offset from beginning of section.
   virtual_address u32;
   // Index into the symbol table.
-  symbol_table_index u32;
+  symbol_table_index sti;
   // What kind of relocation should be performed?
   type objfile_relocation_type;
 };
@@ -74,15 +77,15 @@ func mk_objfile_section() objfile_section {
   return {mk_array@[u8](), 4, mk_array@[objfile_relocation]()};
 }
 
-func append_dir32(s *objfile_section, sti u32) void {
+func append_dir32(s *objfile_section, sti sti) void {
   append_32bit_reloc(s, sti, Dir32(void));
 }
 
-func append_rel32(s *objfile_section, sti u32) void {
+func append_rel32(s *objfile_section, sti sti) void {
   append_32bit_reloc(s, sti, Rel32(void));
 }
 
-func append_32bit_reloc(s *objfile_section, sti u32, type objfile_relocation_type) void {
+func append_32bit_reloc(s *objfile_section, sti sti, type objfile_relocation_type) void {
   reloc objfile_relocation = {~count(&s->raw), sti, type};
   push(&s->relocs, reloc);
   zero le_u32 = ~ @[u32] 0;
@@ -140,8 +143,7 @@ func `==`(a section, b section) bool {
   return enumnum(&a) == enumnum(&b);
 }
 
-// TODO: Definitely put symbol_table_index values into a wrapper.
-func add_local_symbol(f *objfile, name sym, value u32, section section, is_static is_static) u32 {
+func add_local_symbol(f *objfile, name sym, value u32, section section, is_static is_static) sti {
   is_function is_function;
   if case SectionText(v void) = section {
     is_function = IsFunctionYes(void);
@@ -149,14 +151,14 @@ func add_local_symbol(f *objfile, name sym, value u32, section section, is_stati
     is_function = IsFunctionNo(void);
   }
   rec objfile_symbol_record = {name, value, ~section, is_function, is_static};
-  ret u32 = ~count(&f->symbol_table);
+  ret sti = ~ @[u32] ~count(&f->symbol_table);
   push(&f->symbol_table, rec);
   return ret;
 }
 
-func add_remote_symbol(f *objfile, name sym, is_function is_function) u32 {
+func add_remote_symbol(f *objfile, name sym, is_function is_function) sti {
   rec objfile_symbol_record = {name, 0, SymbolSectionUndefined(void), is_function, IsStaticNo(void)};
-  ret u32 = ~count(&f->symbol_table);
+  ret sti = ~ @[u32] ~count(&f->symbol_table);
   push(&f->symbol_table, rec);
   return ret;
 }

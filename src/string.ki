@@ -1,4 +1,5 @@
 import array;
+import shray;
 
 deftype string shray[i32];
 
