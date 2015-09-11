@@ -134,6 +134,8 @@ deftype checkstate struct {
 
   access_blocks array[shp[access_entry]];
 
+  kit_name_counter u32;
+
   prims cs_primitives;
 };
 
@@ -380,6 +382,7 @@ defenum fn_body_entry_enum {
 };
 
 deftype fn_body_entry struct {
+  symbol_table_index nc[sti];
   u fn_body_entry_enum;
 };
 

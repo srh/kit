@@ -34,18 +34,32 @@ func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
     case &GraphedFnBody(g graphed_fn_body): { }
     case &PrimFnBody(p prim_fn_body): { }
     case &ExternFnBody(e extern_fn_body):
-      c_name string = c_symbol_name(cs, e.name);
-      return TODO();
+      c_name sym = c_symbol_name(cs, e.name);
+      symbol_table_index sti = add_remote_symbol(f, c_name, IsFunctionYes(void));
+      annotate(&ent->symbol_table_index, symbol_table_index);
+      return true;
   }
-  return TODO();
+  // We do make symbol names for prim fn bodies, but maybe we won't actually generate them.
+  name sym = generate_kit_name(cs);
+  symbol_table_index sti = add_local_symbol(f, name, 0 /* We'll overwrite the value later. */, SectionText(void), IsStaticNo(void));
+  annotate(&ent->symbol_table_index, symbol_table_index);
+  return true;
 }
 
-func c_symbol_name(cs *checkstate, name sym) string {
-  namestr string = lookup(cs->im, name);
+func generate_kit_name(cs *checkstate) sym {
+  build array[u8] = _u8("_kit_");
+  num u32 = cs->kit_name_counter + 1;
+  cs->kit_name_counter = num;
+  build_u8str(&build, &num);
+  return intern(cs->im, from_u8(&build));
+}
+
+func c_symbol_name(cs *checkstate, name sym) sym {
   switch cs->platform.opsys {
   case Linux32(v void):
-    return namestr;
+    return name;
   case Win32(v void):
-    return _s("_") + namestr;
+    namestr string = lookup(cs->im, name);
+    return intern(cs->im, _s("_") + namestr);
   }
 }

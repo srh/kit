@@ -59,10 +59,14 @@ func build_u8str(r *array[u8], x *string) void {
 }
 
 func from_u8(x array[u8]) string {
+  return from_u8(&x);
+}
+
+func from_u8(x *array[u8]) string {
   build array[i32];
-  n size = count(&x);
+  n size = count(x);
   reserve(&build, n);
-  p *u8 = data(&x);
+  p *u8 = data(x);
   for i size = 0; i < n; i = i + 1 {
     push(&build, ~p[i]);
   }
