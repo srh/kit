@@ -732,7 +732,7 @@ func st_value_unsigned_as_bigint(plat *platform_info, val *st_value, out *bigint
 
   check_littleendian(plat);
   // It's pretty simple when it's little-endian.
-  *out = squash(false, &words);
+  squash(false, &words, out);
   return true;
 }
 
@@ -749,11 +749,12 @@ func st_value_signed_twos_as_bigint(plat *platform_info, val *st_value, out *big
   index u32 = bitlength - 1;
   negative bool = (0 != (get(&words, ~(index / 32)) & (@[u32] 1 << (index % 32))));
   // Take the positive version of the value, subtract 2-to-the-bitlength if negative.
-  tmp bigint = squash(false, &words);
+  tmp bigint;
+  squash(false, &words, &tmp);
   if negative {
     tmp = tmp - (bigu(1) << bitlength);
   }
-  *out = tmp;
+  swap(out, &tmp);
   return true;
 }
 
@@ -784,7 +785,7 @@ func st_value_self_contained(plat *platform_info, val *st_value, out *array[u32]
     push(&ret, x);
   }
 
-  *out = ret;
+  swap(out, &ret);
   return true;
 }
 
