@@ -41,11 +41,14 @@ func ps_restore_pos(p *ps, pos pos) void {
 }
 
 func ps_peek(p *ps) i32 {
-  check(p->pos <= p->length);
-  if p->pos == p->length {
-    return -1;
+  pos size = p->pos;
+  if pos < p->length {
+    return ~p->data[pos];
   }
-  return ~p->data[p->pos];
+  if pos > p->length {
+    crash(_u8("ps_peek pos out of range"));
+  }
+  return -1;
 }
 
 func ps_step(p *ps) void {
