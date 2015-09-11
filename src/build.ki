@@ -1,4 +1,5 @@
 import check;
+import gen;
 import linux_objfile;
 import win_objfile;
 import objfile;
@@ -14,8 +15,39 @@ func build_module(cs *checkstate, modulename sym) bool {
     return false;
   }
 
-  // TODO: Actually build the module!
+  if !build_fn_bodies(cs, &f) {
+    return false;
+  }
+
+  // TODO: Do whatever else we need to build stuff!
   return true;
+}
+
+func build_fn_bodies(cs *checkstate, f *objfile) bool {
+  nbodies size = count(&cs->fn_bodies);
+  for i size = 0; i < nbodies; i = i + 1 {
+    ent *fn_body_entry = oo(ref(&cs->fn_bodies, i));
+    if !build_fn_body(cs, f, ent) {
+      return false;
+    }
+  }
+  return true;
+}
+
+func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
+  switch &ent->u {
+  case &GraphedFnBody(g graphed_fn_body):
+    fillercode_align_double_quadword(f);
+    set_symbol_value(f, *unHas(&ent->symbol_table_index), secsize(&f->text));
+    return gen_graphed_fn_body(cs, f, &g);
+  case &PrimFnBody(p prim_fn_body):
+    ERR(_u8("PrimFnBody not supported yet."));
+    // TODO: Implement, or otherwise figure this out.
+    return true;
+  case &ExternFnBody(e extern_fn_body):
+    // We have nothing to do, of course.
+    return true;
+  }
 }
 
 func add_fn_body_symbols(cs *checkstate, f *objfile) bool {
@@ -31,13 +63,13 @@ func add_fn_body_symbols(cs *checkstate, f *objfile) bool {
 
 func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
   switch &ent->u {
-    case &GraphedFnBody(g graphed_fn_body): { }
-    case &PrimFnBody(p prim_fn_body): { }
-    case &ExternFnBody(e extern_fn_body):
-      c_name sym = c_symbol_name(cs, e.name);
-      symbol_table_index sti = add_remote_symbol(f, c_name, IsFunctionYes(void));
-      annotate(&ent->symbol_table_index, symbol_table_index);
-      return true;
+  case &GraphedFnBody(g graphed_fn_body): { }
+  case &PrimFnBody(p prim_fn_body): { }
+  case &ExternFnBody(e extern_fn_body):
+    c_name sym = c_symbol_name(cs, e.name);
+    symbol_table_index sti = add_remote_symbol(f, c_name, IsFunctionYes(void));
+    annotate(&ent->symbol_table_index, symbol_table_index);
+    return true;
   }
   // We do make symbol names for prim fn bodies, but maybe we won't actually generate them.
   name sym = generate_kit_name(cs);
