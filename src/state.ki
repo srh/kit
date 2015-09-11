@@ -586,11 +586,12 @@ func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_ins
       return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
     }
     case &HasParms(a array[cu_typeexpr]): {
-      converted array[te_typeexpr];
+      converted shp[array[te_typeexpr]];
+      converted_arr *array[te_typeexpr] = oo(&converted);
       n size = count(&a);
-      reserve(&converted, n);
+      reserve(converted_arr, n);
       for i size = 0; i < n; i = i + 1 {
-        push(&converted, ref(&a, i)->~);
+        push(converted_arr, ref(&a, i)->~);
       }
       return ~ @[te_typeexpr]TeApp({TePureName(name), converted, Has({ent_id, inst_id})});
     }
