@@ -22,19 +22,22 @@ access array[_] {
     }
     dest->count = src->count;
     dest->cap = src->count;
-    dest->ptr = cast(checkmalloc(src->count * sizeof@[T]));
+    destptr *T = cast(checkmalloc(src->count * sizeof@[T]));
+    dest->ptr = destptr;
+    srcptr *T = src->ptr;
     e size = src->count;
     for i size = 0; i < e; i = i + 1 {
-      copy(&dest->ptr[i], &src->ptr[i]);
+      copy(&destptr[i], &srcptr[i]);
     }
   }
 
   func[T] do_destroy(r *array[T]) void {
+    p *T = r->ptr;
     for i size = r->count; i > 0; {
       i = i - 1;
-      destroy(&r->ptr[i]);
+      destroy(&p[i]);
     }
-    free(@[*void] cast(r->ptr));
+    free(@[*void] cast(p));
   }
 
   func[T] set(r *array[T], i size, val T) void {
@@ -59,11 +62,12 @@ access array[_] {
   func[T] change_cap_(r *array[T], newcap size) void {
     check(newcap >= r->count);
     p *T = cast(checkmalloc(newcap * sizeof@[T]));
+    rptr *T = r->ptr;
     e size = r->count;
     for i size = 0; i < e; i = i + 1 {
-      move(&p[i], &r->ptr[i]);
+      move(&p[i], &rptr[i]);
     }
-    free(@[*void] cast(r->ptr));
+    free(@[*void] cast(rptr));
     r->ptr = p;
     r->cap = newcap;
   }
