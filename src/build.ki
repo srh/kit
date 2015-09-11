@@ -8,6 +8,17 @@ func build_module(cs *checkstate, modulename sym) bool {
     return false;
   }
 
+  f objfile = mk_objfile();
+
+  if !add_fn_body_symbols(cs, &f) {
+    return false;
+  }
+
   // TODO: Actually build the module!
+  return true;
+}
+
+func add_fn_body_symbols(cs *checkstate, f *objfile) bool {
+  // TODO: Implement.
   return true;
 }
