@@ -67,3 +67,11 @@ func from_u8(x array[u8]) string {
   }
   return ~freeze(&build);
 }
+
+func `+`(x string, y string) string {
+  build array[i32];
+  reserve(&build, count(&x) + count(&y));
+  append_raw(&build, data(&x), count(&x));
+  append_raw(&build, data(&y), count(&y));
+  return ~freeze(&build);
+}

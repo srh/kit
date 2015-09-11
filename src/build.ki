@@ -19,6 +19,33 @@ func build_module(cs *checkstate, modulename sym) bool {
 }
 
 func add_fn_body_symbols(cs *checkstate, f *objfile) bool {
-  // TODO: Implement.
+  nbodies size = count(&cs->fn_bodies);
+  for i size = 0; i < nbodies; i = i + 1 {
+    ent *fn_body_entry = oo(ref(&cs->fn_bodies, i));
+    if !add_fn_body_symbol(cs, f, ent) {
+      return false;
+    }
+  }
   return true;
+}
+
+func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
+  switch &ent->u {
+    case &GraphedFnBody(g graphed_fn_body): { }
+    case &PrimFnBody(p prim_fn_body): { }
+    case &ExternFnBody(e extern_fn_body):
+      c_name string = c_symbol_name(cs, e.name);
+      return TODO();
+  }
+  return TODO();
+}
+
+func c_symbol_name(cs *checkstate, name sym) string {
+  s string = lookup(cs->im, name);
+  switch cs->platform.opsys {
+  case Linux32(v void):
+    return s;
+  case Win32(v void):
+    return from_u8(_u8("_")) + s;
+  }
 }
