@@ -2079,6 +2079,7 @@ func expr_type_incomplete(a *ast_expr) bool {
 func make_fn_partial_type(cs *checkstate, return_type *te_typeexpr, params *array[ast_expr_consume]) te_typeexpr {
   type_params array[te_typeexpr];
   n size = count(params);
+  reserve(&type_params, n);
   for i size = 0; i < n; i = i + 1 {
     push(&type_params, expr_type(&ref(params, i)->expr));
   }

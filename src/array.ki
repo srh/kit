@@ -217,12 +217,12 @@ func build_u8str(r *array[u8], a *array[u8]) void {
   append(r, a);
 }
 
-func[U, T] mapconvert(x array[T]) array[U] {
+func[U, T] mapconvert(x *array[T]) array[U] {
   build array[U];
-  n size = count(&x);
+  n size = count(x);
   reserve(&build, n);
   for i size = 0; i < n; i = i + 1 {
-    push(&build, @[U]~get(&x, i));
+    push(&build, @[U]~ *ref(x, i));
   }
   return build;
 }

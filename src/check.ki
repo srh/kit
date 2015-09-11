@@ -667,7 +667,7 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
       }
 
       if params_complete {
-        cu_params array[cu_typeexpr] = mapconvert(params);
+        cu_params array[cu_typeexpr] = mapconvert(&params);
         hp cu_genparms = HasParms(cu_params);
         inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
         *out = {true, TeApp({TePureName(value), params, Has({id, inst_id})})};
@@ -1755,6 +1755,7 @@ func unify_under_generics(pt *te_typeexpr,
           return false;
         }
         unified_params array[te_typeexpr];
+        reserve(&unified_params, n);
         for i size = 0; i < n; i = i + 1 {
           unified te_typeexpr;
           if !unify_under_generics(ref(&pa.params, i), names, unif_parms, ref(&a.params, i), &unified) {
