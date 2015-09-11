@@ -32,12 +32,12 @@ access array[_] {
   }
 
   func[T] do_destroy(r *array[T]) void {
-    p *T = r->ptr;
+    rptr *T = r->ptr;
     for i size = r->count; i > 0; {
       i = i - 1;
-      destroy(&p[i]);
+      destroy(&rptr[i]);
     }
-    free(@[*void] cast(p));
+    free(@[*void] cast(rptr));
   }
 
   func[T] set(r *array[T], i size, val T) void {
