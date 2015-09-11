@@ -1072,7 +1072,7 @@ func behavior_level(b *derived_method_behavior) u32 {
 func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, type *te_typeexpr) instpair {
   params array[te_typeexpr] = repeat(arity, ptr_type(cs, *type));
   push(&params, primitive_void_type(cs));
-  fntype te_typeexpr = fn_type(cs, params);
+  fntype te_typeexpr = fn_type(cs, freeze(&params));
 
   parms genparms = HasParms(mk_shray(*type));
 

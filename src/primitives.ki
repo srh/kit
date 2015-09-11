@@ -335,22 +335,22 @@ func tee_generic(cs *checkstate) ast_generics {
   return HasGenerics(mk_array@[ast_ident]({fake_ast_meta(), cs->im->cym.tee_sym}));
 }
 
-func fn_type(cs *checkstate, params array[te_typeexpr]) te_typeexpr {
-  // TODO: shray on the outside instead.
-  return TeApp({primitive_function_puretype(cs), freeze(&params), None()});
+func fn_type(cs *checkstate, params shray[te_typeexpr]) te_typeexpr {
+  return TeApp({primitive_function_puretype(cs), params, None()});
 }
 
-func fn_type(cs *checkstate, params array[te_typeexpr], return_type te_typeexpr) te_typeexpr {
-  push(&params, return_type);
-  return fn_type(cs, params);
+func fn_type(cs *checkstate, params shray[te_typeexpr], return_type te_typeexpr) te_typeexpr {
+  par array[te_typeexpr] = mk_copy(&params);
+  push(&par, return_type);
+  return fn_type(cs, freeze(&par));
 }
 
 func fn_type(cs *checkstate, t te_typeexpr, u te_typeexpr) te_typeexpr {
-  return fn_type(cs, mk_array(t, u));
+  return fn_type(cs, mk_shray(t, u));
 }
 
 func fn_type(cs *checkstate, t te_typeexpr, u te_typeexpr, v te_typeexpr) te_typeexpr {
-  return fn_type(cs, mk_array(t, u, v));
+  return fn_type(cs, mk_shray(t, u, v));
 }
 
 func ptr_type(cs *checkstate, t te_typeexpr) te_typeexpr {
@@ -423,14 +423,14 @@ func add_function_primitive(cs *checkstate) void {
 func add_non_magic_fn_primitive(cs *checkstate, name sym, args size, nonmag def_non_magic) void {
   parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None()})));
   push(&parms, primitive_void_type(cs));
-  type te_typeexpr = fn_type(cs, parms);
+  type te_typeexpr = fn_type(cs, freeze(&parms));
   add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnNonMagic(nonmag));
 }
 
 func add_magic_constructor_primitive(cs *checkstate, name sym, args size, mag def_magic) void {
   parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None()})));
   push(&parms, primitive_void_type(cs));
-  type te_typeexpr = fn_type(cs, parms);
+  type te_typeexpr = fn_type(cs, freeze(&parms));
   add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnMagic(mag));
 }
 
