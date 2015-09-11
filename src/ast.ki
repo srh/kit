@@ -27,12 +27,12 @@ deftype ast_ident struct {
 
 deftype ast_hex_literal struct {
   meta ast_meta;
-  digits array[i8];
+  digits shray[i8];
 };
 
 deftype ast_dec_literal struct {
   meta ast_meta;
-  digits array[i8];
+  digits shray[i8];
 };
 
 defenum ast_numeric_literal {

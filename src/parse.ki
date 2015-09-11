@@ -98,7 +98,7 @@ func try_skip_token(p *ps, expected tokval) bool {
 }
 
 func try_parse_oper(p *ps, expected i32, out *ast_ident) bool {
-  if case &Oper(arr array[i32]) = &peek(p)->val {
+  if case &Oper(arr shray[i32]) = &peek(p)->val {
     if count(&arr) == 1 && get(&arr, 0) == expected {
       m ast_meta = startend(p);
       *out = {m, intern(p->im, ~arr)};
@@ -109,7 +109,7 @@ func try_parse_oper(p *ps, expected i32, out *ast_ident) bool {
   return Fail;
 }
 func try_skip_oper(p *ps, expected i32) bool {
-  if case &Oper(arr array[i32]) = &peek(p)->val {
+  if case &Oper(arr shray[i32]) = &peek(p)->val {
     if count(&arr) == 1 && get(&arr, 0) == expected {
       step(p);
       return true;
@@ -118,7 +118,7 @@ func try_skip_oper(p *ps, expected i32) bool {
   return Fail;
 }
 func try_skip_oper(p *ps, exp0 i32, exp1 i32) bool {
-  if case &Oper(arr array[i32]) = &peek(p)->val {
+  if case &Oper(arr shray[i32]) = &peek(p)->val {
     if count(&arr) == 2 && get(&arr, 0) == exp0 && get(&arr, 1) == exp1 {
       step(p);
       return true;
@@ -127,7 +127,7 @@ func try_skip_oper(p *ps, exp0 i32, exp1 i32) bool {
   return Fail;
 }
 func try_skip_oper(p *ps, exp0 i32, exp1 i32, exp2 i32) bool {
-  if case &Oper(arr array[i32]) = &peek(p)->val {
+  if case &Oper(arr shray[i32]) = &peek(p)->val {
     if count(&arr) == 3 && get(&arr, 0) == exp0 && get(&arr, 1) == exp1 && get(&arr, 2) == exp2 {
       step(p);
       return true;
@@ -373,7 +373,7 @@ func parse_rest_of_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) bo
     return Fail;
   // TODO: "Opers" such as "@" or maybe even "=" shouldn't really be allowed here -- only functional opers allowed.
   // TODO: We probably should not allow "` + `" to parse -- require tight quoting, do this at tokenization.
-  case Oper(operch array[i32]):
+  case Oper(operch shray[i32]):
     step(p);
     if !try_skip_token(p, Backtick(void)) {
       return Fail;
@@ -387,7 +387,7 @@ func parse_rest_of_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) bo
 func try_parse_ident(p *ps, out *ast_ident) bool {
   dbgparse("try_parse_ident\n");
   switch peek(p)->val {
-  case Ident(text array[i32]):
+  case Ident(text shray[i32]):
     m ast_meta = startend(p);
     step(p);
     *out = {m, intern(p->im, ~text)};
@@ -405,7 +405,7 @@ func try_parse_ident(p *ps, out *ast_ident) bool {
 func try_skip_specific_ident(p *ps, x [4]u8) bool {
   dbgparse("try_skip_specific_ident\n");
   switch peek(p)->val {
-  case Ident(text array[i32]):
+  case Ident(text shray[i32]):
     if count(&text) != 4 {
       return Fail;
     }
@@ -798,7 +798,7 @@ func binop_prec(t tokval) prec_pair {
 func binop_info(t tokval) opt[prec_pair] {
   switch t {
     default: { return None(); }
-    case Oper(x array[i32]): {
+    case Oper(x shray[i32]): {
       if count(&x) == 1 {
         c0 i32 = get(&x, 0);
         if c0 == '=' { return Has({306, 304}); }
@@ -848,9 +848,9 @@ func compare_prec(left i32, right i32) prec_cmp {
   return Conflicts(void);
 }
 
-func oper_arr(tv tokval) array[i32] {
+func oper_arr(tv tokval) shray[i32] {
   switch tv {
-    case Oper(arr array[i32]): { return arr; }
+    case Oper(arr shray[i32]): { return arr; }
     default: { check(false); return fake(); }
   }
 }
@@ -880,7 +880,7 @@ func build_binop_expr(im *identmap, op ast_ident, lhs ast_expr, rhs ast_expr) as
 
 func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) bool {
   switch peek(p)->val {
-    case Oper(operch array[i32]): {
+    case Oper(operch shray[i32]): {
       if is_at_sign(&operch) {
         step(p);
         args array[ast_typeexpr];
@@ -938,12 +938,12 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
     case Num(n numlit): {
       num_meta ast_meta = startend(p);
       switch n {
-        case DecNum(arr array[i8]): {
+        case DecNum(arr shray[i8]): {
           step(p);
           *out = mk(@[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]DecLiteral({num_meta, arr})));
           return true;
         }
-        case HexNum(arr array[i8]): {
+        case HexNum(arr shray[i8]): {
           step(p);
           *out = mk(@[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]HexLiteral({num_meta, arr})));
           return true;
@@ -971,12 +971,12 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
         default: { return Fail; }
       }
     }
-    case Ident(identch array[i32]): {
+    case Ident(identch shray[i32]): {
       ident_meta ast_meta = startend(p);
       step(p);
       return parse_finish_name_expr(p, {ident_meta, intern(p->im, ~identch)}, out);
     }
-    case Oper(operch array[i32]): {
+    case Oper(operch shray[i32]): {
       if is_at_sign(&operch) {
         step(p);
         type ast_typeexpr;
@@ -1035,7 +1035,7 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
   }
 }
 
-func unop_info(operch *array[i32]) opt[i32] {
+func unop_info(operch *shray[i32]) opt[i32] {
   if count(operch) != 1 {
     return None();
   }
@@ -1047,11 +1047,11 @@ func unop_info(operch *array[i32]) opt[i32] {
   return None();
 }
 
-func is_equal(arr *array[i32], v0 i32) bool {
+func is_equal(arr *shray[i32], v0 i32) bool {
   return count(arr) == 1 && get(arr, 0) == v0;
 }
 
-func is_at_sign(operch *array[i32]) bool {
+func is_at_sign(operch *shray[i32]) bool {
   return is_equal(operch, '@');
 }
 

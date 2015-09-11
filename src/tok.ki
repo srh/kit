@@ -108,8 +108,8 @@ defenum keyw {
 };
 
 defenum numlit {
-  DecNum array[i8];
-  HexNum array[i8];
+  DecNum shray[i8];
+  HexNum shray[i8];
 };
 
 defenum grouper {
@@ -124,8 +124,8 @@ defenum grouper {
 defenum tokval {
   Keyw keyw;
   Num numlit;
-  Oper array[i32];
-  Ident array[i32];
+  Oper shray[i32];
+  Ident shray[i32];
   Grouper grouper;
   StringChar i32;
   // TODO: Just make StringDelim and Backtick be Groupers.
@@ -143,8 +143,8 @@ func `==`(a keyw, b keyw) bool {
 func equal(a *numlit, b *numlit) bool {
   if enumnum(a) != enumnum(b) { return false; }
   switch a {
-  case &DecNum(j): { switch b { case &DecNum(k): { return array_equal(&j, &k); } } }
-  case &HexNum(j): { switch b { case &HexNum(k): { return array_equal(&j, &k); } } }
+  case &DecNum(j): { switch b { case &DecNum(k): { return shray_equal(&j, &k); } } }
+  case &HexNum(j): { switch b { case &HexNum(k): { return shray_equal(&j, &k); } } }
   }
 }
 
@@ -157,8 +157,8 @@ func equal(a *tokval, b *tokval) bool {
   switch a {
   case &Keyw(j): { switch b { case &Keyw(k): { return j == k; } } }
   case &Num(j): { switch b { case &Num(k): { return equal(&j, &k); } } }
-  case &Oper(j): { switch b { case &Oper(k): { return array_equal(&j, &k); } } }
-  case &Ident(j): { switch b { case &Ident(k): { return array_equal(&j, &k); } } }
+  case &Oper(j): { switch b { case &Oper(k): { return shray_equal(&j, &k); } } }
+  case &Ident(j): { switch b { case &Ident(k): { return shray_equal(&j, &k); } } }
   case &Grouper(j): { switch b { case &Grouper(k): { return j == k; } } }
   case &StringChar(j): { switch b { case &StringChar(k): { return j == k; } } }
   case &StringDelim(j): { switch b { case &StringDelim(k): { return j == k; } } }
@@ -291,7 +291,7 @@ func grab_tok(p *ps) tok {
       }
 
       if is_numeric_postchar(ch) {
-        return mk_res(p, left, @[tokval]Num(HexNum(digits)));
+        return mk_res(p, left, @[tokval]Num(HexNum(freeze(&digits))));
       } else {
         return {{left, ps_pos(p)}, Bad(void)};
       }
@@ -299,7 +299,7 @@ func grab_tok(p *ps) tok {
       if is_numeric_postchar(ch) {
         digits array[i8];
         push(&digits, 0);
-        return mk_res(p, left, @[tokval]Num(DecNum(digits)));
+        return mk_res(p, left, @[tokval]Num(DecNum(freeze(&digits))));
       } else {
         return {{left, ps_pos(p)}, Bad(void)};
       }
@@ -315,7 +315,7 @@ func grab_tok(p *ps) tok {
       ch = ps_peek(p);
     }
     if is_numeric_postchar(ch) {
-      return mk_res(p, left, @[tokval]Num(DecNum(digits)));
+      return mk_res(p, left, @[tokval]Num(DecNum(freeze(&digits))));
     } else {
       return {{left, ps_pos(p)}, Bad(void)};
     }
@@ -364,7 +364,7 @@ func grab_tok(p *ps) tok {
     if !is_ident_postchar(ch) {
       return {{left, ps_pos(p)}, Bad(void)};
     }
-    return mk_res(p, left, Ident(arr));
+    return mk_res(p, left, Ident(freeze(&arr)));
   } else if ch == '(' {
     ps_step(p);
     return mk_res(p, left, @[tokval]Grouper(LParen(void)));
@@ -391,10 +391,10 @@ func grab_tok(p *ps) tok {
     return mk_res(p, left, Backtick(void));
   } else if ch == '~' {
     ps_step(p);
-    return mk_res(p, left, Oper(mk_array(ch)));
+    return mk_res(p, left, Oper(mk_shray(ch)));
   } else if ch == '@' {
     ps_step(p);
-    return mk_res(p, left, Oper(mk_array(ch)));
+    return mk_res(p, left, Oper(mk_shray(ch)));
   } else if ch == '!' {
     return grab_oper2(p, left, ch, '=');
   } else if ch == '%' {
@@ -421,7 +421,7 @@ func grab_tok(p *ps) tok {
         ps_step(p);
       }
     }
-    return mk_res(p, left, Oper(arr));
+    return mk_res(p, left, Oper(freeze(&arr)));
   } else if ch == '=' {
     return grab_oper2(p, left, ch, '=');
   } else if ch == '+' {
@@ -430,13 +430,13 @@ func grab_tok(p *ps) tok {
     return grab_oper2(p, left, ch, '=', '|');
   } else if ch == ':' {
     ps_step(p);
-    return mk_res(p, left, Oper(mk_array(ch)));
+    return mk_res(p, left, Oper(mk_shray(ch)));
   } else if ch == ';' {
     ps_step(p);
-    return mk_res(p, left, Oper(mk_array(ch)));
+    return mk_res(p, left, Oper(mk_shray(ch)));
   } else if ch == ',' {
     ps_step(p);
-    return mk_res(p, left, Oper(mk_array(ch)));
+    return mk_res(p, left, Oper(mk_shray(ch)));
   } else if ch == '<' {
     return grab_angly(p, left, ch);
   } else if ch == '.' {
@@ -494,7 +494,7 @@ func grab_angly(p *ps, left pos, ch i32) tok {
     push(&arr, dh);
     ps_step(p);
   }
-  return mk_res(p, left, Oper(arr));
+  return mk_res(p, left, Oper(freeze(&arr)));
 }
 
 func grab_oper2(p *ps, left pos, ch i32, n0 i32) tok {
@@ -513,7 +513,7 @@ func grab_oper2(p *ps, left pos, ch i32, n0 i32, n1 i32, n2 i32) tok {
     push(&arr, ch);
     ps_step(p);
   }
-  return mk_res(p, left, Oper(arr));
+  return mk_res(p, left, Oper(freeze(&arr)));
 }
 
 func mk_res(p *ps, left pos, v tokval) tok {
@@ -521,15 +521,15 @@ func mk_res(p *ps, left pos, v tokval) tok {
 }
 
 func mk_oper(ch0 i32) tokval {
-  return Oper(mk_array(ch0));
+  return Oper(mk_shray(ch0));
 }
 
 func mk_oper(ch0 i32, ch1 i32) tokval {
-  return Oper(mk_array(ch0, ch1));
+  return Oper(mk_shray(ch0, ch1));
 }
 
 func mk_oper(ch0 i32, ch1 i32, ch2 i32) tokval {
-  return Oper(mk_array(ch0, ch1, ch2));
+  return Oper(mk_shray(ch0, ch1, ch2));
 }
 
 func[String] grab_keyword(p *ps, s String, k keyw, out *tok) bool {

@@ -149,12 +149,16 @@ func[T] truncate(a *array[T], n size) void {
 }
 
 func[T] array_equal(a *array[T], b *array[T]) bool {
-  e size = count(a);
-  if e != count(b) {
+  n size = count(a);
+  if n != count(b) {
     return false;
   }
-  for i size = 0; i < e; i = i + 1 {
-    if get(a, i) != get(b, i) {
+  return raw_buf_equal(data(a), data(b), n);
+}
+
+func[T] raw_buf_equal(a *T, b *T, n size) bool {
+  for i size = 0; i < n; i = i + 1 {
+    if a[i] != b[i] {
       return false;
     }
   }

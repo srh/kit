@@ -471,7 +471,7 @@ func `~`(x i8) bigint {
   }
 }
 
-func convert_to_bigint(base u32, digits *array[i8]) bigint {
+func convert_to_bigint(base u32, digits *shray[i8]) bigint {
   acc bigint;
   bigbase bigint = ~base;
   n size = count(digits);
@@ -493,7 +493,8 @@ func[T] big(arr T) bigint {
     check(val < 10);
     push(&b, val);
   }
-  return convert_to_bigint(10, &b);
+  b2 shray[i8] = freeze(&b);
+  return convert_to_bigint(10, &b2);
 }
 
 func test_bigint() bool {

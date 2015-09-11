@@ -563,7 +563,7 @@ func numeric_literal_to_u32(x *ast_numeric_literal, out *u32) bool {
   }
 }
 
-func convert_to_u32(base i8, digits *array[i8], out *u32) bool {
+func convert_to_u32(base i8, digits *shray[i8], out *u32) bool {
   check(base > 0);
   acc u32 = 0;
   n size = count(digits);
