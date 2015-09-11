@@ -336,8 +336,8 @@ func tee_generic(cs *checkstate) ast_generics {
 }
 
 func fn_type(cs *checkstate, params array[te_typeexpr]) te_typeexpr {
-  // TODO: emshp on the outside instead.
-  return TeApp({primitive_function_puretype(cs), emshp(params), None()});
+  // TODO: shray on the outside instead.
+  return TeApp({primitive_function_puretype(cs), freeze(&params), None()});
 }
 
 func fn_type(cs *checkstate, params array[te_typeexpr], return_type te_typeexpr) te_typeexpr {
@@ -354,7 +354,7 @@ func fn_type(cs *checkstate, t te_typeexpr, u te_typeexpr, v te_typeexpr) te_typ
 }
 
 func ptr_type(cs *checkstate, t te_typeexpr) te_typeexpr {
-  return TeApp({primitive_pointer_puretype(cs), emshp(mk_array(t)), None()});
+  return TeApp({primitive_pointer_puretype(cs), mk_shray(t), None()});
 }
 
 func add_pointer_primitive(cs *checkstate) void {
@@ -421,14 +421,14 @@ func add_function_primitive(cs *checkstate) void {
 }
 
 func add_non_magic_fn_primitive(cs *checkstate, name sym, args size, nonmag def_non_magic) void {
-  var parms = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None()})));
+  parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None()})));
   push(&parms, primitive_void_type(cs));
   type te_typeexpr = fn_type(cs, parms);
   add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnNonMagic(nonmag));
 }
 
 func add_magic_constructor_primitive(cs *checkstate, name sym, args size, mag def_magic) void {
-  var parms = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None()})));
+  parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None()})));
   push(&parms, primitive_void_type(cs));
   type te_typeexpr = fn_type(cs, parms);
   add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnMagic(mag));

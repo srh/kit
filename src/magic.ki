@@ -180,7 +180,7 @@ func padding_oneparm_size(cs *checkstate, parms *cu_genparms) u32 {
   case &NoParms(v void):
     ice(_u8("padding_oneparm_size NoParms"));
     return fake();
-  case &HasParms(arr array[cu_typeexpr]):
+  case &HasParms(arr shray[cu_typeexpr]):
     check(count(&arr) == 1);
     return unwrap_primitive_padding_type_size(cs, ref(&arr, 0));
   }

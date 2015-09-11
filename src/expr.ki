@@ -346,7 +346,7 @@ func replaced_name_parms(ds *defscope, a *ast_name_expr, out *genparms) bool {
       }
       push(&replaced, computed.te);
     }
-    *out = HasParms(replaced);
+    *out = HasParms(freeze(&replaced));
     return true;
   } else {
     *out = NoParms(void);
@@ -1151,7 +1151,7 @@ func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecell
 
   ip instpair;
   if case Has(ent def_entry_id) = es->cs->prims.ptr_eq {
-    cu_parms cu_genparms = HasParms(mk_array(ref_cell(es, dest)->type));
+    cu_parms cu_genparms = HasParms(mk_shray(ref_cell(es, dest)->type));
     inst_id def_inst_id = enqueue_def_inst(es->cs, es->clq, ent, &cu_parms);
     ip = {ent, inst_id};
   }
@@ -1391,7 +1391,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
     return false;
   }
 
-  computed_params *array[te_typeexpr];
+  computed_params *shray[te_typeexpr];
   if !decompose_typeapp(&computed.te, primitive_function_puretype(es->cs), &computed_params) {
     ice(_u8("lambda type is not a function type"));
   }
@@ -1414,7 +1414,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
 }
 
 // This helper method shields its code from using the wrong (outer) framescope variable in check_expr_lambda.
-func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *array[te_typeexpr]) bool {
+func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray[te_typeexpr]) bool {
   vp varpopper;
   init_vp(&vp, &bs->es);
   nargs size = count(&a->args);
@@ -1505,14 +1505,14 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   return true;
 }
 
-func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, params_out **array[te_typeexpr]) bool {
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, params_out **shray[te_typeexpr]) bool {
   // This could be implemented in terms of unify_under_generics, you know.
   if case &TeApp(app te_typeapp) = t {
     unified te_puretype;
     if !unify_puretypes(&app.typefunc, &expected_puretype, &unified) {
       return false;
     }
-    *params_out = oo(&app.params);
+    *params_out = &app.params;
     return true;
   } else {
     return false;
@@ -1520,7 +1520,7 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, params_out
 }
 
 func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr) bool {
-  params *array[te_typeexpr];
+  params *shray[te_typeexpr];
   if !decompose_typeapp(t, expected_puretype, &params) {
     return false;
   }
@@ -1532,7 +1532,7 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
 }
 
 func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr, twoparam_out **te_typeexpr) bool {
-  params *array[te_typeexpr];
+  params *shray[te_typeexpr];
   if !decompose_typeapp(t, expected_puretype, &params) {
     return false;
   }
@@ -1907,7 +1907,7 @@ func check_funcall_params_firsttime(es *framescope, params *array[ast_expr_consu
 func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, params *array[ast_expr_consume]) bool {
   n size = count(params);
 
-  type_params *array[te_typeexpr];
+  type_params *shray[te_typeexpr];
   if !decompose_typeapp(&functype->~, primitive_function_puretype(es->cs), &type_params) {
     ice(_u8("Expecting a TeApp for fn-type."));
   }
@@ -2077,19 +2077,18 @@ func expr_type_incomplete(a *ast_expr) bool {
 }
 
 func make_fn_partial_type(cs *checkstate, return_type *te_typeexpr, params *array[ast_expr_consume]) te_typeexpr {
-  type_params shp[array[te_typeexpr]];
-  type_params_arr *array[te_typeexpr] = oo(&type_params);
+  type_params array[te_typeexpr];
   n size = count(params);
-  reserve(type_params_arr, n);
+  reserve(&type_params, n + 1);
   for i size = 0; i < n; i = i + 1 {
-    push(type_params_arr, expr_type(&ref(params, i)->expr));
+    push(&type_params, expr_type(&ref(params, i)->expr));
   }
-  push(type_params_arr, *return_type);
-  return TeApp({primitive_function_puretype(cs), type_params, None()});
+  push(&type_params, *return_type);
+  return TeApp({primitive_function_puretype(cs), freeze(&type_params), None()});
 }
 
 func fn_return_type(cs *checkstate, func_type *te_typeexpr) *te_typeexpr {
-  params *array[te_typeexpr];
+  params *shray[te_typeexpr];
   if !decompose_typeapp(func_type, primitive_function_puretype(cs), &params) {
     ice(_u8("Expected TeApp for fn-type in fn_return_type."));
   }

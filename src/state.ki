@@ -395,19 +395,19 @@ func mk(name sym, arity ast_access_arity) access_entry {
 
 defenum genparms {
   NoParms void;
-  HasParms array[te_typeexpr];
+  HasParms shray[te_typeexpr];
 };
 
 defenum cu_genparms {
   NoParms void;
-  HasParms array[cu_typeexpr];
+  HasParms shray[cu_typeexpr];
 };
 
 func hash_compute_hash(x *cu_genparms) osize {
   switch x {
   case &NoParms(v void):
     return 1;
-  case &HasParms(ps array[cu_typeexpr]):
+  case &HasParms(ps shray[cu_typeexpr]):
     accum osize = 0x12345679;
     n size = count(&ps);
     p *cu_typeexpr = data(&ps);
@@ -585,15 +585,14 @@ func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_ins
     case &NoParms(v void): {
       return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
     }
-    case &HasParms(a array[cu_typeexpr]): {
-      converted shp[array[te_typeexpr]];
-      converted_arr *array[te_typeexpr] = oo(&converted);
+    case &HasParms(a shray[cu_typeexpr]): {
+      converted array[te_typeexpr];
       n size = count(&a);
-      reserve(converted_arr, n);
+      reserve(&converted, n);
       for i size = 0; i < n; i = i + 1 {
-        push(converted_arr, ref(&a, i)->~);
+        push(&converted, ref(&a, i)->~);
       }
-      return ~ @[te_typeexpr]TeApp({TePureName(name), converted, Has({ent_id, inst_id})});
+      return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
     }
   }
 }

@@ -1,5 +1,7 @@
 import ast;
+import shray;
 
+// TODO: Does anybody use this?
 func[T] build_array_u8str(r *array[u8], arr *array[T]) void {
   push(r, '[');
   n size = count(arr);
@@ -12,16 +14,23 @@ func[T] build_array_u8str(r *array[u8], arr *array[T]) void {
   push(r, ']');
 }
 
-func[H, T] build_array_u8str(help H, r *array[u8], arr *array[T]) void {
+func[H, T] build_array_raw_u8str(help H, r *array[u8], buf *T, n size) void {
   push(r, '[');
-  n size = count(arr);
   for i size = 0; i < n; i = i + 1 {
     if i != 0 {
       push(r, ',');
     }
-    build_u8str(help, r, ref(arr, i));
+    build_u8str(help, r, &buf[i]);
   }
   push(r, ']');
+}
+
+func[H, T] build_array_u8str(help H, r *array[u8], arr *array[T]) void {
+  build_array_raw_u8str(help, r, data(arr), count(arr));
+}
+
+func[H, T] build_shray_u8str(help H, r *array[u8], arr *shray[T]) void {
+  build_array_raw_u8str(help, r, data(arr), count(arr));
 }
 
 func[T] wrap_u8str(r *array[u8], x array[u8], y *T) void {

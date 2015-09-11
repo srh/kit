@@ -1309,7 +1309,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 
   fntype cu_typeexpr;
   fntype_props type_properties;
-  compute_prim(cs, clq, fn_type(cs, repeat(nargs, elemptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
+  compute_prim(cs, clq, fn_type(cs, @[array[_]]repeat(nargs, elemptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
   size_type cu_typeexpr;
   size_type_props type_properties;
@@ -1484,7 +1484,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
       fntype cu_typeexpr;
       fntype_props type_properties;
-      compute_prim(cs, clq, fn_type(cs, repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
+      compute_prim(cs, clq, fn_type(cs, @[array[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
       func_gn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({func_cell, ConstDef(ip)})));
@@ -1632,7 +1632,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
       fntype cu_typeexpr;
       fntype_props type_properties;
-      compute_prim(cs, clq, fn_type(cs, repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
+      compute_prim(cs, clq, fn_type(cs, @[array[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
 
@@ -1726,7 +1726,7 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
   nargs size = num_args(wc);
   fntype cu_typeexpr;
   fntype_props type_properties;
-  compute_prim(cs, clq, fn_type(cs, repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
+  compute_prim(cs, clq, fn_type(cs, @[array[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
   fncell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
   argcells array[cell_num];

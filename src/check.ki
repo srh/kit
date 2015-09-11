@@ -83,9 +83,9 @@ func parms_equal(a *cu_genparms, b *cu_genparms) bool {
   }
   switch a {
     case &NoParms(v void): { return true; }
-    case &HasParms(ah array[cu_typeexpr]): {
+    case &HasParms(ah shray[cu_typeexpr]): {
       switch b {
-        case &HasParms(bh array[cu_typeexpr]): {
+        case &HasParms(bh shray[cu_typeexpr]): {
           return typeexpr_list_equal(&ah, &bh);
         }
       }
@@ -110,7 +110,7 @@ func convert_typefunc(cs *checkstate, a *ast_typeexpr, out *te_puretype) bool {
   }
 }
 
-func convert_typeexpr_list(cs *checkstate, arr *array[ast_typeexpr], out *array[te_typeexpr]) bool {
+func convert_typeexpr_list(cs *checkstate, arr *array[ast_typeexpr], out *shray[te_typeexpr]) bool {
   build array[te_typeexpr];
   n size = count(arr);
   reserve(&build, n);
@@ -121,7 +121,7 @@ func convert_typeexpr_list(cs *checkstate, arr *array[ast_typeexpr], out *array[
     }
     push(&build, t);
   }
-  swap(out, &build);
+  *out = freeze(&build);
   return true;
 }
 
@@ -158,9 +158,9 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
     }
     case &App(b ast_typeapp): {
       typefunc te_puretype;
-      params shp[array[te_typeexpr]];
+      params shray[te_typeexpr];
       if !(convert_typefunc(cs, oo(&b.typefunc), &typefunc)
-           && convert_typeexpr_list(cs, &b.params, oo(&params))) {
+           && convert_typeexpr_list(cs, &b.params, &params)) {
         return false;
       }
       *out = TeApp({typefunc, params, None()});
@@ -470,7 +470,7 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *cu_
       *out = NoParms(void);
       return true;
     }
-    case &HasParms(ps array[te_typeexpr]): {
+    case &HasParms(ps shray[te_typeexpr]): {
       cu_ps array[cu_typeexpr];
       n size = count(&ps);
       reserve(&cu_ps, n);
@@ -484,7 +484,7 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *cu_
         }
         push(&cu_ps, ~computed.te);
       }
-      *out = HasParms(cu_ps);
+      *out = HasParms(freeze(&cu_ps));
       return true;
     }
   }
@@ -634,7 +634,7 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
   return true;
 }
 
-func check_and_compute_typeexpr_array(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, t *array[te_typeexpr], computed_out *array[te_typeexpr], computed_complete_out *bool) bool {
+func check_and_compute_typeexpr_shray(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, t *shray[te_typeexpr], computed_out *shray[te_typeexpr], computed_complete_out *bool) bool {
   complete bool = true;
   computed array[te_typeexpr];
   n size = count(t);
@@ -647,27 +647,27 @@ func check_and_compute_typeexpr_array(cs *checkstate, clq *clqueue, g *ast_gener
     push(&computed, c.te);
     complete = complete & c.complete;
   }
-  swap(computed_out, &computed);
+  *computed_out = freeze(&computed);
   *computed_complete_out = complete;
   return true;
 }
 
 func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, a *te_typeapp, out *cac_typeexpr) bool {
   params_complete bool;
-  params shp[array[te_typeexpr]];
-  if !check_and_compute_typeexpr_array(cs, clq, g, parms, oo(&a->params), oo(&params), &params_complete) {
+  params shray[te_typeexpr];
+  if !check_and_compute_typeexpr_shray(cs, clq, g, parms, &a->params, &params, &params_complete) {
     return false;
   }
 
   switch &a->typefunc {
     case &TePureName(value sym): {
       id deftype_entry_id;
-      if !match_deftype(cs, fake_ast_meta(), value, Has(oo(&params)), &id) {
+      if !match_deftype(cs, fake_ast_meta(), value, Has(&params), &id) {
         return false;
       }
 
       if params_complete {
-        cu_params array[cu_typeexpr] = mapconvert(oo(&params));
+        cu_params shray[cu_typeexpr] = mapconvert(&params);
         hp cu_genparms = HasParms(cu_params);
         inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
         *out = {true, TeApp({TePureName(value), params, Has({id, inst_id})})};
@@ -683,15 +683,15 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
   }
 }
 
-func arity_matches(a *ast_generics, params opt[*array[te_typeexpr]]) bool {
+func arity_matches(a *ast_generics, params opt[*shray[te_typeexpr]]) bool {
   return help_arity_matches(a, params);
 }
 
-func arity_matches(a *ast_generics, params opt[*array[cu_typeexpr]]) bool {
+func arity_matches(a *ast_generics, params opt[*shray[cu_typeexpr]]) bool {
   return help_arity_matches(a, params);
 }
 
-func[T] help_arity_matches(a *ast_generics, params opt[*array[T]]) bool {
+func[T] help_arity_matches(a *ast_generics, params opt[*shray[T]]) bool {
   switch arity(a) {
     case NoParamsArity(v void): {
       if case None(u void) = params {
@@ -713,26 +713,26 @@ func[T] help_arity_matches(a *ast_generics, params opt[*array[T]]) bool {
 }
 
 func arity_matches(a *ast_generics, parms *genparms) bool {
-  if case &HasParms(ps array[te_typeexpr]) = parms {
+  if case &HasParms(ps shray[te_typeexpr]) = parms {
     return arity_matches(a, Has(&ps));
   } else {
-    return arity_matches(a, @[opt[*array[te_typeexpr]]] None());
+    return arity_matches(a, @[opt[*shray[te_typeexpr]]] None());
   }
 }
 
 func arity_matches(a *ast_generics, parms *cu_genparms) bool {
-  if case &HasParms(ps array[cu_typeexpr]) = parms {
-    return arity_matches(a, @[opt[*array[cu_typeexpr]]]Has(&ps));
+  if case &HasParms(ps shray[cu_typeexpr]) = parms {
+    return arity_matches(a, @[opt[*shray[cu_typeexpr]]]Has(&ps));
   } else {
-    return arity_matches(a, @[opt[*array[cu_typeexpr]]] None());
+    return arity_matches(a, @[opt[*shray[cu_typeexpr]]] None());
   }
 }
 
-func ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*array[te_typeexpr]]) void {
+func ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]]) void {
   MERR(cs, m, _u8("No match for type with name '"), name, _u8("' and maybe some params"));
 }
 
-func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*array[te_typeexpr]], out *deftype_entry_id) bool {
+func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]], out *deftype_entry_id) bool {
   if case Has(arr *array[deftype_entry_id]) = lookup_ref(&cs->deftypes_by_name, &name) {
     n size = count(arr);
     match opt[deftype_entry_id];
@@ -825,7 +825,7 @@ func subsequent_depth(cs *checkstate, parms *cu_genparms) u32 {
     case &NoParms(v void): {
       return 0;
     }
-    case &HasParms(a array[cu_typeexpr]): {
+    case &HasParms(a shray[cu_typeexpr]): {
       return cs->instantiation_depth + 1;
     }
   }
@@ -1074,7 +1074,7 @@ func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, t
   push(&params, primitive_void_type(cs));
   fntype te_typeexpr = fn_type(cs, params);
 
-  parms genparms = HasParms(mk_array(*type));
+  parms genparms = HasParms(mk_shray(*type));
 
   res match_def_res;
   if !match_def(cs, magic_name, &parms, &fntype, &res) {
@@ -1479,7 +1479,7 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
           return true;
         }
         case AccessArityFinite(n u32): {
-          params array[te_typeexpr] = repeat(~n, TeUnknown(void));
+          params shray[te_typeexpr] = repeat(~n, TeUnknown(void));
           id deftype_entry_id;
           if !match_deftype(cs, fake_ast_meta(), ent->name, Has(&params), &id) {
             ent->ent_id = FailedComputation();
@@ -1575,7 +1575,7 @@ func from_type_matches_res(hasparms bool, x type_matches_res) entry_matches_res 
     case TypeMatchesAmbiguously(a): {
       return EntryMatchesAmbigously(void);
     }
-    case TypeMatchesPrecisely(a array[te_typeexpr]): {
+    case TypeMatchesPrecisely(a shray[te_typeexpr]): {
       if hasparms {
         return EntryMatchesPrecisely(HasParms(a));
       } else {
@@ -1590,13 +1590,13 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
   switch generics {
     case &NoGenerics(v void): {
       switch gp {
-        case &HasParms(parms array[te_typeexpr]): {
+        case &HasParms(parms shray[te_typeexpr]): {
           *matches_out = EntryDoesNotMatch(void);
           return true;
         }
         case &NoParms(u void): {
           names array[ast_ident];
-          parms array[te_typeexpr];
+          parms shray[te_typeexpr];
           *matches_out = from_type_matches_res(false, type_matches(pt, &names, &parms, typeexpr));
           return true;
         }
@@ -1604,7 +1604,7 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
     }
     case &HasGenerics(names array[ast_ident]): {
       switch gp {
-        case &HasParms(parms array[te_typeexpr]): {
+        case &HasParms(parms shray[te_typeexpr]): {
           if count(&parms) != count(&names) {
             *matches_out = EntryDoesNotMatch(void);
             return true;
@@ -1613,7 +1613,7 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
           return true;
         }
         case &NoParms(u void): {
-          parms array[te_typeexpr] = repeat(count(&names), TeUnknown(void));
+          parms shray[te_typeexpr] = repeat(count(&names), TeUnknown(void));
           *matches_out = from_type_matches_res(true, type_matches(pt, &names, &parms, typeexpr));
           return true;
         }
@@ -1625,30 +1625,31 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
 defenum type_matches_res {
   TypeDoesNotMatch void;
   // Provides partial types of some generic names.
-  TypeMatchesAmbiguously array[te_typeexpr];
+  TypeMatchesAmbiguously shray[te_typeexpr];
   // Provides complete types of all generic names.
-  TypeMatchesPrecisely array[te_typeexpr];
+  TypeMatchesPrecisely shray[te_typeexpr];
 };
 
 // t is complete, but it references the generic names in "names", whose corresponding values in "parms" could be incomplete.  pt is the partial type of an expression we're matching against this generic definition.  count(parms) == count(names).
-func type_matches(pt *te_typeexpr, names *array[ast_ident], parms *array[te_typeexpr],
+func type_matches(pt *te_typeexpr, names *array[ast_ident], parms *shray[te_typeexpr],
                   t *te_typeexpr) type_matches_res {
   check(count(names) == count(parms));
   // We need to retain all new information we gain about the value of the generic param typeexprs as we compare the whole type, in order to make sure we don't match conflicting information about a generic parameter.
-  unif_parms array[te_typeexpr] = *parms;
+  unif_parms array[te_typeexpr] = mk_copy(parms);
   // Since t is complete, discard_unified is irrelevant and must be identical to t.
   unified te_typeexpr;
   if !unify_under_generics(pt, names, &unif_parms, t, &unified) {
     return TypeDoesNotMatch(void);
   }
-  if all_complete_computed(&unif_parms).complete {
-    return TypeMatchesPrecisely(unif_parms);
+  frozen_unif_parms shray[te_typeexpr] = freeze(&unif_parms);
+  if all_complete_computed(&frozen_unif_parms).complete {
+    return TypeMatchesPrecisely(frozen_unif_parms);
   } else {
-    return TypeMatchesAmbiguously(unif_parms);
+    return TypeMatchesAmbiguously(frozen_unif_parms);
   }
 }
 
-func all_complete_computed(types *array[te_typeexpr]) complete_computed {
+func all_complete_computed(types *shray[te_typeexpr]) complete_computed {
   n size = count(types);
   all_computed bool = true;
   for i size = 0; i < n; i = i + 1 {
@@ -1681,7 +1682,7 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
       if case &TePureUnknown(v void) = &a.typefunc {
         return {false, false};
       }
-      all complete_computed = all_complete_computed(oo(&a.params));
+      all complete_computed = all_complete_computed(&a.params);
       return {all.complete, all.computed & isHas(&a.pack)};
     }
     case &TeStruct(a te_struct): { return all_complete_computed(&a.fields); }
@@ -1750,23 +1751,22 @@ func unify_under_generics(pt *te_typeexpr,
         if !unify_puretypes(&a.typefunc, &pa.typefunc, &unified_typefunc) {
           return false;
         }
-        a_params *array[te_typeexpr] = oo(&a.params);
-        pa_params *array[te_typeexpr] = oo(&pa.params);
+        a_params *shray[te_typeexpr] = &a.params;
+        pa_params *shray[te_typeexpr] = &pa.params;
         n size = count(a_params);
         if n != count(pa_params) {
           return false;
         }
-        unified_params shp[array[te_typeexpr]];
-        unified_params_arr *array[te_typeexpr] = oo(&unified_params);
-        reserve(unified_params_arr, n);
+        unified_params array[te_typeexpr];
+        reserve(&unified_params, n);
         for i size = 0; i < n; i = i + 1 {
           unified te_typeexpr;
           if !unify_under_generics(ref(pa_params, i), names, unif_parms, ref(a_params, i), &unified) {
             return false;
           }
-          push(unified_params_arr, unified);
+          push(&unified_params, unified);
         }
-        *unified_out = TeApp({unified_typefunc, unified_params, None()});
+        *unified_out = TeApp({unified_typefunc, freeze(&unified_params), None()});
         return true;
       } else {
         return false;
