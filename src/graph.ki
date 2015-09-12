@@ -85,6 +85,11 @@ deftype gr_memcopy struct {
   src cell_num;
 };
 
+deftype gr_writeconst struct {
+  dest cell_num;
+  value gr_const;
+};
+
 deftype gr_addressof struct {
   dest cell_num;
   addressee cell_num;
@@ -105,11 +110,6 @@ deftype gr_subcell struct {
 defenum gr_offset {
   OffsetConst u32;
   OffsetComputed tup[u32, cell_num];
-};
-
-deftype gr_writeconst struct {
-  dest cell_num;
-  value gr_const;
 };
 
 deftype gr_branch struct {

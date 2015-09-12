@@ -1,11 +1,11 @@
 import state;
 
 deftype cell_locs struct {
-
+  live bool;
 };
 
 deftype framestate struct {
-  locs array[tup[cell_num, cell_locs]];
+  locs array[cell_locs];
 };
 
 deftype gn_annot struct {
@@ -47,21 +47,100 @@ func dumbly_gen_graph(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn 
   }
 
   switch &node->op {
-  default: { /* TODO: Implement. */ }
+  case &GrApply(a gr_apply):
+    deaden(h, a.funcell);
+    nparams size = count(&a.params);
+    for i size = 0; i < nparams; i = i + 1 {
+      deaden(h, get(&a.params, i));
+    }
+    maybe_liven(h, a.retcell);
+  case &GrMemCopy(a gr_memcopy):
+    check_live(h, a.src);
+    maybe_liven(h, a.dest);
+  case &GrWriteConst(a gr_writeconst):
+    maybe_liven(h, a.dest);
+  case &GrAddressof(a gr_addressof):
+    check_live(h, a.addressee);
+    maybe_liven(h, a.dest);
+  case &GrDeref(a gr_deref):
+    check_live(h, a.pointer);
+    deaden(h, a.offset);
+    maybe_liven(h, a.name);
+  case &GrSubcell(a gr_subcell):
+    check_live(h, a.partof);
+    deaden(h, a.offset);
+    maybe_liven(h, a.name);
+  case &GrBranch(a gr_branch):
+    check_live(h, a.src);
+    save framestate = h->current;
+    ncases size = count(&a.cases);
+    for i size = 0; i < ncases; i = i + 1 {
+      if !dumbly_gen_graph(cs, f, h, gr, ref(&a.cases, i)->cdr) {
+        return false;
+      }
+      h->current = save;
+    }
+    if case Has(default_gn gr_num) = a.default_case {
+      if !dumbly_gen_graph(cs, f, h, gr, default_gn) {
+        return false;
+      }
+    }
+    return true;
+  case &GrSequence(a gr_sequence):
+    if !dumbly_gen_graph(cs, f, h, gr, a.first) {
+      return false;
+    }
+    if !dumbly_gen_graph(cs, f, h, gr, a.second) {
+      return false;
+    }
+  case &GrJmp(a gr_jmp):
+    if !dumbly_gen_graph(cs, f, h, gr, a.next) {
+      return false;
+    }
+  case &GrWriteNothing(a gr_writenothing):
+    maybe_liven(h, a.dest);
+  case &GrDead(a gr_dead):
+    deaden(h, a.cell);
+  case &GrNop(v void):
+    // Do nothing.
   }
   return true;
 }
 
-func mk_framestate() framestate {
-  return {mk_array()};
+func deaden(h *frame, offset gr_offset) void {
+  switch offset {
+  case OffsetConst(x u32):
+    // Do nothing.
+  case OffsetComputed(p tup[u32, cell_num]):
+    deaden(h, p.cdr);
+  }
+}
+
+func check_live(h *frame, c cell_num) void {
+  if !refcur(h, c)->live {
+    ice(_u8("check_live sees non-live cell"));
+  }
+}
+
+func deaden(h *frame, c cell_num) void {
+  check_live(h, c);
+  refcur(h, c)->live = false;
+}
+
+func maybe_liven(h *frame, c cell_num) void {
+  refcur(h, c)->live = true;
+}
+
+func refcur(h *frame, c cell_num) *cell_locs {
+  return ref(&h->current.locs, c.~);
 }
 
 func mk_arg_and_ret_framestate(g *graphed_fn_body) framestate {
-  arr array[tup[cell_num, cell_locs]];
+  arr array[cell_locs] = repeat(count(&g->graph.gr.cells), {false});
   nargcells size = count(&g->argcells);
   for i size = 0; i < nargcells; i = i + 1 {
-    push(&arr, {get(&g->argcells, i), {}});
+    ref(&arr, get(&g->argcells, i).~)->live = true;
   }
-  push(&arr, {g->graph.cell, {}});
+  ref(&arr, g->graph.cell.~)->live = true;
   return {arr};
 }
