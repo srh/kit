@@ -31,7 +31,7 @@ We should find that some restrictions are upheld:
 
 /* What we want to do:
 
-  First, let's get the bare minimum necessary to compile.  We'll identify what category each cell is part of.
+  At a minimum, we want to know whether a cell is a paramlist cell, and what paramlist it's part of.
 */
 
 deftype cell_disp struct {
