@@ -156,6 +156,10 @@ func[T] array_equal(a *array[T], b *array[T]) bool {
   return raw_buf_equal(data(a), data(b), n);
 }
 
+func u8_equal(a array[u8], b array[u8]) bool {
+  return array_equal(&a, &b);
+}
+
 func[T] raw_buf_equal(a *T, b *T, n size) bool {
   for i size = 0; i < n; i = i + 1 {
     if a[i] != b[i] {

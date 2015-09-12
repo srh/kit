@@ -13,7 +13,7 @@ func test_loader(cs *checkstate, name sym) opt[array[u8]] {
   }
 }
 
-func x86_linux_platform() platform_info {
+func x86_32_platform(opsys platform_os) platform_info {
   jrr shift_behavior = JustRangecheckRhs(void);
   ret platform_info = {
     LittleEndian(void),
@@ -31,13 +31,21 @@ func x86_linux_platform() platform_info {
     {{4, 4}, {Unsigned(void), jrr, false, big("0"), big("4294967296")}},
     {4, 4},
     {4, 4},
-    Linux32(void)
+    opsys
   };
   return ret;
 }
 
+func x86_linux32_platform() platform_info {
+  return x86_32_platform(Linux32(void));
+}
+
+func x86_win32_platform() platform_info {
+  return x86_32_platform(Win32(void));
+}
+
 func test_platform() platform_info {
-  return x86_linux_platform();
+  return x86_linux32_platform();
 }
 
 func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
