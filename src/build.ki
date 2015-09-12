@@ -1,6 +1,6 @@
 import anal;
 import check;
-import gen;
+import dumbgen;
 import linux_objfile;
 import win_objfile;
 import objfile;
@@ -40,10 +40,11 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
   case &GraphedFnBody(g graphed_fn_body):
     fillercode_align_double_quadword(f);
     set_symbol_value(f, *unHas(&ent->symbol_table_index), secsize(&f->text));
-    if !basic_analyze_fn_body(cs, f, &g) {
+    bas basic_analyze_state;
+    if !basic_analyze_fn_body(cs, f, &g, &bas) {
       return false;
     }
-    return gen_graphed_fn_body(cs, f, &g);
+    return dumbly_gen_graphed_fn_body(cs, f, &bas, &g);
   case &PrimFnBody(p prim_fn_body):
     ERR(_u8("TODO: PrimFnBody not supported yet."));
     // TODO: Implement, or otherwise figure this out.

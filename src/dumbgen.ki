@@ -1,0 +1,67 @@
+import state;
+
+deftype cell_locs struct {
+
+};
+
+deftype framestate struct {
+  locs array[tup[cell_num, cell_locs]];
+};
+
+deftype gn_annot struct {
+  fs framestate;
+};
+
+deftype frame struct {
+  bas *basic_analyze_state;
+  current framestate;
+  // by_gn[i].fs shows what the state must is _before_ evaluating node i.
+  by_gn array[nc[gn_annot]];
+};
+
+func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
+  h frame = {bas, mk_arg_and_ret_framestate(g), repeat(count(&g->graph.gr.ops), NotComputed())};
+
+  if !dumbly_gen_graph(cs, f, &h, &g->graph.gr, g->graph.gn) {
+    return false;
+  }
+
+  return true;
+}
+
+func dumbly_gen_graph(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num) bool {
+  gnc *nc[gn_annot] = ref(&h->by_gn, gn.~);
+  if case &Computed(annot gn_annot) = gnc {
+    // TODO: Return true??  Okay, I guess.
+    return true;
+  }
+
+  annotate(gnc, {h->current});
+
+  node *gr_node = ref_node(gr, gn);
+  nprecs size = count(&node->precs);
+  for i size = 0; i < nprecs; i = i + 1 {
+    if !dumbly_gen_graph(cs, f, h, gr, get(&node->precs, i)) {
+      return false;
+    }
+  }
+
+  switch &node->op {
+  default: { /* TODO: Implement. */ }
+  }
+  return true;
+}
+
+func mk_framestate() framestate {
+  return {mk_array()};
+}
+
+func mk_arg_and_ret_framestate(g *graphed_fn_body) framestate {
+  arr array[tup[cell_num, cell_locs]];
+  nargcells size = count(&g->argcells);
+  for i size = 0; i < nargcells; i = i + 1 {
+    push(&arr, {get(&g->argcells, i), {}});
+  }
+  push(&arr, {g->graph.cell, {}});
+  return {arr};
+}

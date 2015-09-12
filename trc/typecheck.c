@@ -5226,7 +5226,11 @@ int compute_static_values(struct checkstate *cs, struct def_entry *ent) {
         break;
       }
     } else {
-      CHECK(inst->typecheck_started);
+      if (!inst->typecheck_started) {
+        /* TODO: This check failed once (see git blame, change NotComputed of that commit to NotComputed@[gn_annot]()) to trigger this, while NotComputed() doesn't see this problem. */
+        ERR_DBG("inst->typecheck_started failed on def %.*s.\n", IM_P(cs->im, ent->name));
+        CHECK(inst->typecheck_started);
+      }
       struct static_value value;
       if (!eval_static_value(cs, di_annotated_rhs(inst), &value)) {
         return 0;
