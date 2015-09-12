@@ -1,0 +1,71 @@
+import state;
+
+/* We need to figure out what cell is what.
+
+In a function body, cells fit in exactly ONE leaf node of this tree of categories:
+
+ - subcells of some other cell
+   - constant offset subcells
+   - computed offset subcells -- location depends on another cell
+ - not a subcell
+   - static cells -- these can be statically located, have a static lifetime
+     - outer cells -- pre-existing, locations taken as given
+    //  - globals (these do not exist yet)
+        - outer func paramlist & return cell
+     - paramlist cells -- part of a func paramlist in GrApply
+     - free cells -- temporaries, variables, we can locate them anywhere in the stack frame.
+   - deref cells -- formed by dereferencing a pointer
+
+Some more definitions:
+ - A cell is "statically locatable" if it is a static cell or a constant offset subcells of a statically locatable cell.
+ - "Statlocat" is an abbrevation for "statically locatable."
+ - A cell is "derefalike" if it is a deref cell or a subcell of a derefalike cell.
+
+We should find that some restrictions are upheld:
+
+ - subcells are always subcells of exactly one cell, declared in exactly one node.  hell, every cell is sort of defined by exactly one node.
+ - computed offset subcells' location cells must be statlocat.
+ - GrApply return cells must be statlocat (for now).
+ - paramlist cells can only be part of one func paramlist.
+*/
+
+/* What we want to do:
+
+  First, let's get the bare minimum necessary to compile.  We'll identify what category each cell is part of.
+*/
+
+deftype cell_disp struct {
+  // If the cell's part of a function param list, tells what param list it's part of.
+  paramlist opt[gr_num];
+};
+
+deftype basic_analyze_state struct {
+  celldisp array[cell_disp];
+};
+
+func basic_analyze_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) bool {
+  bas basic_analyze_state = {
+    repeat(count(&g->graph.gr.cells), {None()})
+  };
+
+  return help_basic_analyze(cs, f, &bas, &g->graph.gr);
+}
+
+func help_basic_analyze(cs *checkstate, f *objfile, bas *basic_analyze_state, gr *frame_graph) bool {
+  n_ops size = count(&gr->ops);
+  for i size = 0; i < n_ops; i = i + 1 {
+    node *gr_node = ref(&gr->ops, i);
+    if case &GrApply(a gr_apply) = &node->op {
+      nparams size = count(&a.params);
+      for j size = 0; j < nparams; j = j + 1 {
+        mark_cell_paramlist(bas, get(&a.params, j), ~i);
+      }
+    }
+  }
+  return true;
+}
+
+func mark_cell_paramlist(bas *basic_analyze_state, c cell_num, apply_opnum gr_num) void {
+  p *cell_disp = ref(&bas->celldisp, c.~);
+  set(&p->paramlist, apply_opnum);
+}

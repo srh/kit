@@ -1,3 +1,4 @@
+import anal;
 import check;
 import gen;
 import linux_objfile;
@@ -39,9 +40,12 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
   case &GraphedFnBody(g graphed_fn_body):
     fillercode_align_double_quadword(f);
     set_symbol_value(f, *unHas(&ent->symbol_table_index), secsize(&f->text));
+    if !basic_analyze_fn_body(cs, f, &g) {
+      return false;
+    }
     return gen_graphed_fn_body(cs, f, &g);
   case &PrimFnBody(p prim_fn_body):
-    ERR(_u8("PrimFnBody not supported yet."));
+    ERR(_u8("TODO: PrimFnBody not supported yet."));
     // TODO: Implement, or otherwise figure this out.
     return true;
   case &ExternFnBody(e extern_fn_body):

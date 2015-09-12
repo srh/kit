@@ -5,6 +5,30 @@ deftype frame_graph struct {
   ops array[gr_node];
 };
 
+// To "evaluate" an op, first we evaluate its precs (in unspecified order), then we ealuate the op.
+deftype gr_node struct {
+  precs shray[gr_num];
+  op gr_op;
+};
+
+deftype gr_num size;
+def `~` fn[size, gr_num] = wrapconvert;
+
+defenum gr_op {
+  GrApply gr_apply;
+  GrMemCopy gr_memcopy;
+  GrWriteConst gr_writeconst;
+  GrAddressof gr_addressof;
+  GrDeref gr_deref;
+  GrSubcell gr_subcell;
+  GrBranch gr_branch;
+  GrSequence gr_sequence;
+  GrJmp gr_jmp;
+  GrWriteNothing gr_writenothing;
+  GrDead gr_dead;
+  GrNop void;
+};
+
 func init_frame_graph_from_cells(cells array[cell_info]) frame_graph {
   return {cells, mk_array@[gr_node]()};
 }
@@ -19,11 +43,8 @@ func add_cell(gr *frame_graph, info cell_info) cell_num {
   return num;
 }
 
-deftype gr_num size;
-
 func add_node(gr *frame_graph, node gr_node) gr_num {
-  ret gr_num;
-  ret.~ = count(&gr->ops);
+  ret gr_num = ~count(&gr->ops);
   push(&gr->ops, node);
   return ret;
 }
@@ -45,12 +66,6 @@ func ref_node(gr *frame_graph, gn gr_num) *gr_node {
   return ref(&gr->ops, gn.~);
 }
 
-// To "evaluate" an op, first we evaluate its precs (in unspecified order), then we ealuate the op.
-deftype gr_node struct {
-  precs shray[gr_num];
-  op gr_op;
-};
-
 func node(precs shray[gr_num], op gr_op) gr_node {
   return {precs, op};
 }
@@ -58,21 +73,6 @@ func node(precs shray[gr_num], op gr_op) gr_node {
 func node0(op gr_op) gr_node {
   return node(mk_shray(), op);
 }
-
-defenum gr_op {
-  GrApply gr_apply;
-  GrMemCopy gr_memcopy;
-  GrWriteConst gr_writeconst;
-  GrAddressof gr_addressof;
-  GrDeref gr_deref;
-  GrSubcell gr_subcell;
-  GrBranch gr_branch;
-  GrSequence gr_sequence;
-  GrJmp gr_jmp;
-  GrWriteNothing gr_writenothing;
-  GrDead gr_dead;
-  GrNop void;
-};
 
 deftype gr_apply struct {
   funcell cell_num;

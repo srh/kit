@@ -214,8 +214,7 @@ func[T] `==`(x opt[T], y opt[T]) bool {
 
 func[T] set(dest *opt[T], y T) void {
   if case &Has(t T) = dest {
-    print(Stderr(), _u8("set sees Has\n"));
-    abort();
+    crash( _u8("set sees Has\n"));
   }
   *dest = Has(y);
 }
