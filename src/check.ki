@@ -969,7 +969,7 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
     }
 
     case &TeEnum(a te_enum): {
-      tag_size u32 = cs->platform.enum_tag_size;
+      tag_size u32 = cs->plat.enum_tag_size;
       max_size u32 = tag_size;
       max_alignment u32 = tag_size;
       move_level u32 = 0;

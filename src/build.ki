@@ -91,7 +91,7 @@ func generate_kit_name(cs *checkstate) sym {
 }
 
 func c_symbol_name(cs *checkstate, name sym) sym {
-  switch cs->platform.opsys {
+  switch cs->plat.opsys {
   case Linux32(v void):
     return name;
   case Win32(v void):

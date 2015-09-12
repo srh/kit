@@ -112,7 +112,7 @@ func mk_positionals() positionals {
 deftype checkstate struct {
   im *identmap;
   instantiation_depth u32;
-  platform platform_info;
+  plat platform_info;
   loader_ctx *void;
   loader fn[*checkstate, sym, opt[array[u8]]];
 
@@ -139,11 +139,11 @@ deftype checkstate struct {
   prims cs_primitives;
 };
 
-func make_checkstate(im *identmap, platform platform_info, loader_ctx *void, loader fn[*checkstate, sym, opt[array[u8]]]) checkstate {
+func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader fn[*checkstate, sym, opt[array[u8]]]) checkstate {
   ret checkstate;
   ret.im = im;
   ret.instantiation_depth = 0;
-  ret.platform = platform;
+  ret.plat = plat;
   ret.loader_ctx = loader_ctx;
   ret.loader = loader;
   return ret;

@@ -174,7 +174,7 @@ func help_te_vardecl_list_equal(a *array[te_vardecl], b *array[te_vardecl]) bool
 }
 
 func enum_tag_type(cs *checkstate, et *te_enum) te_typeexpr {
-  tagsize u32 = cs->platform.enum_tag_size;
+  tagsize u32 = cs->plat.enum_tag_size;
   if tagsize == 1 {
     return primitive_u8_type(cs);
   } else if tagsize == 2 {
@@ -192,7 +192,7 @@ def `~` fn[u32, enum_tag_value] = wrapconvert;
 
 func enum_field_offset(cs *checkstate, et *te_enum, tag enum_tag_value) u32 {
   // Things will get more complicated at some point.
-  return cs->platform.enum_tag_size;
+  return cs->plat.enum_tag_size;
 }
 
 func mk_enum_tag_value(constructor_decl_index size) enum_tag_value {
