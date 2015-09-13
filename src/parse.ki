@@ -174,16 +174,17 @@ func parse_toplevel(p *ps, out *ast_toplevel) bool {
 func parse_rest_of_func(p *ps, is_export ast_isexport, out *ast_toplevel) bool {
   generics ast_generics;
   name ast_ident;
+  lambda_expr_meta ast_meta;
   params array[ast_vardecl];
   return_type ast_typeexpr;
   body ast_bracebody;
   if !(parse_def_generics_and_name(p, is_export, IsNotVar(void), &generics, &name)
-       && parse_lambdaspec(p, &params, &return_type, &body)) {
+       && parse_lambdaspec(p, &lambda_expr_meta, &params, &return_type, &body)) {
     return Fail;
   }
 
   *out = Def({is_export, IsNotVar(void), generics, name, None(),
-              consume(mk(@[ast_expr_enum]Lambda({params, return_type, {NotComputed@[ast_fullbody_info](), body}})))});
+              consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({params, return_type, {NotComputed@[ast_fullbody_info](), body}})))});
   return true;
 }
 
@@ -352,11 +353,14 @@ func parse_def_generics_and_name(p *ps, is_export ast_isexport, is_var ast_isvar
   return true;
 }
 
-func parse_lambdaspec(p *ps, params_out *array[ast_vardecl],
-                      return_type_out *ast_typeexpr, body_out *ast_bracebody) bool {
-  return parse_args_list(p, params_out)
-    && parse_typeexpr(p, return_type_out)
-    && parse_bracebody(p, body_out);
+func parse_lambdaspec(p *ps, lambda_expr_meta_out *ast_meta, params_out *array[ast_vardecl], return_type_out *ast_typeexpr, body_out *ast_bracebody) bool {
+  m ast_meta = start(p);
+  if !(parse_args_list(p, params_out) && parse_typeexpr(p, return_type_out) && parse_bracebody(p, body_out)) {
+    return Fail;
+  }
+  end(p, m);
+  *lambda_expr_meta_out = m;
+  return true;
 }
 
 func parse_typeexpr(p *ps, out *ast_typeexpr) bool {
@@ -729,30 +733,36 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, lhs ast_expr, out *ast_expr) b
       if !parse_rest_of_param_list(p, &params) {
         return Fail;
       }
-      lhs = mk(@[ast_expr_enum]Funcall({embox(consume(lhs)), params}));
+      m ast_meta = copyend(p, lhs.meta);
+      lhs = mk(m, @[ast_expr_enum]Funcall({embox(consume(lhs)), params}));
     } else if try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
       arg ast_expr;
       if !(parse_expr(p, kCommaPrec, &arg)
            && try_skip_token(p, @[tokval]Grouper(RBracket(void)))) {
         return Fail;
       }
-      lhs = mk(@[ast_expr_enum]IndexExpr(mk(embox(lhs), embox(consume(arg)))));
+      m ast_meta = copyend(p, lhs.meta);
+      lhs = mk(m, @[ast_expr_enum]IndexExpr(mk(embox(lhs), embox(consume(arg)))));
     } else if try_skip_oper(p, '.', '~') {
-      lhs = mk(@[ast_expr_enum]LocalField(@[ast_local_field]mk(embox(lhs), WholeField(void))));
+      m ast_meta = copyend(p, lhs.meta);
+      lhs = mk(m, @[ast_expr_enum]LocalField(@[ast_local_field]mk(embox(lhs), WholeField(void))));
     } else if try_skip_oper(p, '.') {
       fieldname ast_ident;
       if !parse_ident(p, &fieldname) {
         return Fail;
       }
-      lhs = mk(@[ast_expr_enum]LocalField(@[ast_local_field]mk(embox(lhs), NameField(fieldname))));
+      m ast_meta = copyend(p, lhs.meta);
+      lhs = mk(m, @[ast_expr_enum]LocalField(@[ast_local_field]mk(embox(lhs), NameField(fieldname))));
     } else if try_skip_oper(p, '-', '>', '~') {
-      lhs = mk(@[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(lhs)), WholeField(void)}));
+      m ast_meta = copyend(p, lhs.meta);
+      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(lhs)), WholeField(void)}));
     } else if try_skip_oper(p, '-', '>') {
       fieldname ast_ident;
       if !parse_ident(p, &fieldname) {
         return Fail;
       }
-      lhs = mk(@[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(lhs)), NameField(fieldname)}));
+      m ast_meta = copyend(p, lhs.meta);
+      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(lhs)), NameField(fieldname)}));
     } else if is_binop(peek(p)->val) {
       op tok = *peek(p);
       op_prec prec_pair = binop_prec(op.val);
@@ -771,7 +781,8 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, lhs ast_expr, out *ast_expr) b
           if !parse_expr(p, op_prec.right, &rhs) {
             return Fail;
           }
-          lhs = build_binop_expr(p->im, oper, lhs, rhs);
+          m ast_meta = copyend(p, lhs.meta);
+          lhs = build_binop_expr(p->im, m, oper, lhs, rhs);
         }
       }
     } else {
@@ -855,26 +866,26 @@ func oper_arr(tv tokval) shray[i32] {
   }
 }
 
-func build_unop_expr(im *identmap, op ast_ident, rhs ast_expr) ast_expr {
+func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_expr {
   if op.value == im->cym.addressofsym {
-    return mk(@[ast_expr_enum]AddressOf({embox(rhs)}));
+    return mk(m, @[ast_expr_enum]AddressOf({embox(rhs)}));
   } else if op.value == im->cym.derefsym {
-    return mk(@[ast_expr_enum]Deref({mk_later(), embox(consume(rhs))}));
+    return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(rhs))}));
   } else {
-    return mk(@[ast_expr_enum]Funcall({embox(consume(mk(@[ast_expr_enum]NameExpr(mk(op, None()))))), mk_array(consume(rhs))}));
+    return mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None()))))), mk_array(consume(rhs))}));
   }
 }
 
-func build_binop_expr(im *identmap, op ast_ident, lhs ast_expr, rhs ast_expr) ast_expr {
+func build_binop_expr(im *identmap, m ast_meta, op ast_ident, lhs ast_expr, rhs ast_expr) ast_expr {
   if op.value == im->cym.assignmentsym {
-    return mk(@[ast_expr_enum]Assignment({NotComputed@[ast_assignment_info](), embox(lhs), embox(rhs)}));
+    return mk(m, @[ast_expr_enum]Assignment({NotComputed@[ast_assignment_info](), embox(lhs), embox(rhs)}));
   } else if op.value == im->cym.logical_and_sym {
-    return mk(@[ast_expr_enum]LogicalConjunction({false, embox(consume(lhs)), embox(consume(rhs))}));
+    return mk(m, @[ast_expr_enum]LogicalConjunction({false, embox(consume(lhs)), embox(consume(rhs))}));
   } else if op.value == im->cym.logical_or_sym {
-    return mk(@[ast_expr_enum]LogicalConjunction({true, embox(consume(lhs)), embox(consume(rhs))}));
+    return mk(m, @[ast_expr_enum]LogicalConjunction({true, embox(consume(lhs)), embox(consume(rhs))}));
   } else {
-    return mk(@[ast_expr_enum]Funcall({embox(consume(mk(@[ast_expr_enum]NameExpr(mk(op, None()))))),
-                                       mk_array(consume(lhs), consume(rhs))}));
+    return mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None()))))),
+                                          mk_array(consume(lhs), consume(rhs))}));
   }
 }
 
@@ -888,13 +899,13 @@ func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) bool {
              && parse_rest_of_type_param_list(p, AllowBlanksNo(void), &args)) {
           return Fail;
         }
-        *out = mk(NameExpr(mk(ident, Has(args))));
+        *out = mk(ident.meta, NameExpr(mk(ident, Has(args))));
         return true;
       }
     }
     default: { }
   }
-  *out = mk(NameExpr(mk(ident, None())));
+  *out = mk(ident.meta, NameExpr(mk(ident, None())));
   return true;
 }
 
@@ -909,25 +920,25 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
         case True(v): {
           m ast_meta = startend(p);
           step(p);
-          *out = mk(@[ast_expr_enum]BoolLiteral({m, true}));
+          *out = mk(m, @[ast_expr_enum]BoolLiteral({m, true}));
           return true;
         }
         case False(v): {
           m ast_meta = startend(p);
           step(p);
-          *out = mk(@[ast_expr_enum]BoolLiteral({m, false}));
+          *out = mk(m, @[ast_expr_enum]BoolLiteral({m, false}));
           return true;
         }
         case Void(v): {
           m ast_meta = startend(p);
           step(p);
-          *out = mk(@[ast_expr_enum]VoidLiteral({m}));
+          *out = mk(m, @[ast_expr_enum]VoidLiteral({m}));
           return true;
         }
         case Null(v): {
           m ast_meta = startend(p);
           step(p);
-          *out = mk(@[ast_expr_enum]NullLiteral({m}));
+          *out = mk(m, @[ast_expr_enum]NullLiteral({m}));
           return true;
         }
         default: {
@@ -940,12 +951,12 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
       switch n {
         case DecNum(arr shray[i8]): {
           step(p);
-          *out = mk(@[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]DecLiteral({num_meta, arr})));
+          *out = mk(num_meta, @[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]DecLiteral({num_meta, arr})));
           return true;
         }
         case HexNum(arr shray[i8]): {
           step(p);
-          *out = mk(@[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]HexLiteral({num_meta, arr})));
+          *out = mk(num_meta, @[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]HexLiteral({num_meta, arr})));
           return true;
         }
       }
@@ -960,7 +971,8 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
                && try_skip_token(p, @[tokval]Grouper(RParen(void)))) {
             return Fail;
           }
-          *out = mk(@[ast_expr_enum]ParenExpr({embox(expr)}));
+          end(p, m);
+          *out = mk(m, @[ast_expr_enum]ParenExpr({embox(expr)}));
           return true;
         }
         case LBrace(v): {
@@ -977,6 +989,7 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
       return parse_finish_name_expr(p, {ident_meta, intern(p->im, ~identch)}, out);
     }
     case Oper(operch shray[i32]): {
+      m ast_meta = start(p);
       if is_at_sign(&operch) {
         step(p);
         type ast_typeexpr;
@@ -987,7 +1000,8 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
              && parse_expr(p, kConversionRightPrec, &expr)) {
           return Fail;
         }
-        *out = mk(@[ast_expr_enum]TypedExpr({type, embox(expr)}));
+        end(p, m);
+        *out = mk(m, @[ast_expr_enum]TypedExpr({type, embox(expr)}));
         return true;
       } else {
         switch unop_info(&operch) {
@@ -999,7 +1013,8 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
             if !parse_expr(p, rightprec, &rhs) {
               return Fail;
             }
-            *out = build_unop_expr(p->im, {oper_meta, intern(p->im, ~operch)}, rhs);
+            end(p, m);
+            *out = build_unop_expr(p->im, m, {oper_meta, intern(p->im, ~operch)}, rhs);
             return true;
           }
         }
@@ -1007,13 +1022,15 @@ func parse_atomic_expr(p *ps, out *ast_expr) bool {
     }
     case StringDelim(ch i32): {
       if ch == '\"' {
+        m ast_meta = start(p);
         string_step(p, '\"');
-        return parse_rest_of_string_literal(p, out);
+        return parse_rest_of_string_literal(p, m, out);
       } else if ch == '\'' {
+        m ast_meta = start(p);
         string_step(p, '\'');
-        return parse_rest_of_char_literal(p, out);
+        return parse_rest_of_char_literal(p, m, out);
       } else {
-        check(false);
+        ice(_u8("StringDelim with bad ch"));
         return fake();
       }
     }
@@ -1056,13 +1073,15 @@ func is_at_sign(operch *shray[i32]) bool {
 }
 
 func parse_rest_of_lambda(p *ps, out *ast_expr) bool {
+  // TODO: Uh, the meta should start a bit earlier, no?
+  lambda_expr_meta ast_meta;
   args array[ast_vardecl];
   return_type ast_typeexpr;
   body ast_bracebody;
-  if !parse_lambdaspec(p, &args, &return_type, &body) {
+  if !parse_lambdaspec(p, &lambda_expr_meta, &args, &return_type, &body) {
     return Fail;
   }
-  *out = mk(@[ast_expr_enum]Lambda({args, return_type, {NotComputed@[ast_fullbody_info](), body}}));
+  *out = mk(lambda_expr_meta, @[ast_expr_enum]Lambda({args, return_type, {NotComputed@[ast_fullbody_info](), body}}));
   return true;
 }
 
@@ -1077,7 +1096,7 @@ func parse_rest_of_strinit(p *ps, m ast_meta, out *ast_expr) bool {
     push(&params, {NotComputed@[ast_strinit_param_info](), get(&ecs, i)});
   }
   end(p, m);
-  *out = mk(@[ast_expr_enum]Strinit({m, params}));
+  *out = mk(m, @[ast_expr_enum]Strinit({m, params}));
   return true;
 }
 
@@ -1450,7 +1469,8 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
       local_type ast_typeexpr;
       switch help_triparse_typeexpr(p, AllowBlanksYes(void), &local_type) {
         case Quickfail(v): {
-          lhs ast_expr = expressionize(name, indexers);
+          m ast_meta = copystart(p, name.meta);
+          lhs ast_expr = expressionize(m, name, indexers);
           whole_expr ast_expr;
           if !(parse_after_atomic_expr(p, kSemicolonPrec, lhs, &whole_expr)
                && try_skip_oper(p, ';')) {
@@ -1494,11 +1514,11 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
   return true;
 }
 
-func expressionize(name ast_ident, indexers array[ast_expr]) ast_expr {
-  lhs ast_expr = mk(NameExpr(mk(name, None())));
+func expressionize(m ast_meta, name ast_ident, indexers array[ast_expr]) ast_expr {
+  lhs ast_expr = mk(name.meta, NameExpr(mk(name, None())));
   e size = count(&indexers);
   for i size = 0; i < e; i = i + 1 {
-    lhs = mk(IndexExpr(mk(embox(lhs), embox(consume(get(&indexers, i))))));
+    lhs = mk(m, IndexExpr(mk(embox(lhs), embox(consume(get(&indexers, i))))));
   }
   return lhs;
 }
@@ -1511,7 +1531,7 @@ func collapse_indexers(indexers array[ast_expr], param ast_typeexpr) ast_typeexp
   return param;
 }
 
-func parse_rest_of_string_literal(p *ps, out *ast_expr) bool {
+func parse_rest_of_string_literal(p *ps, m ast_meta, out *ast_expr) bool {
   specs array[ast_charspec];
   again bool = true;
   while again {
@@ -1541,11 +1561,12 @@ func parse_rest_of_string_literal(p *ps, out *ast_expr) bool {
       }
     }
   }
-  *out = mk(@[ast_expr_enum]StringLiteral({specs}));
+  end(p, m);
+  *out = mk(m, @[ast_expr_enum]StringLiteral({specs}));
   return true;
 }
 
-func parse_rest_of_char_literal(p *ps, out *ast_expr) bool {
+func parse_rest_of_char_literal(p *ps, m ast_meta, out *ast_expr) bool {
   value i32;
   switch peek(p)->val {
     case StringChar(ch i32): {
@@ -1560,7 +1581,8 @@ func parse_rest_of_char_literal(p *ps, out *ast_expr) bool {
     case StringDelim(ch i32): {
       check(ch == '\'');
       step(p);
-      *out = mk(@[ast_expr_enum]CharLiteral({{value}}));
+      end(p, m);
+      *out = mk(m, @[ast_expr_enum]CharLiteral({{value}}));
       return true;
     }
     default: {

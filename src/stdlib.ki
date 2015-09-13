@@ -275,6 +275,11 @@ func check(x bool) void {
   abort();
 }
 
+func crash() void {
+  debugstr("ICE: no message");
+  abort();
+}
+
 func crash(msg array[u8]) void {
   print(Stderr(), msg, make("\n"));
   fflush(Stderr());

@@ -623,6 +623,7 @@ defenum ast_expr_info {
 };
 
 deftype ast_expr struct {
+  meta ast_meta;
   info ast_expr_info;
   u ast_expr_enum;
 };
@@ -703,8 +704,8 @@ defenum ast_expr_enum {
   Strinit ast_strinit;
 };
 
-func mk(x ast_expr_enum) ast_expr {
-  return {NoInfo(void), x};
+func mk(m ast_meta, x ast_expr_enum) ast_expr {
+  return {m, NoInfo(void), x};
 }
 
 deftype ast_expr_consume struct {

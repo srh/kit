@@ -68,15 +68,24 @@ func start(p *ps) ast_meta {
   return ret;
 }
 
+func copystart(p *ps, meta ast_meta) ast_meta {
+  ret ast_meta = ~count(p->metas);
+  push(p->metas, {ref(p->metas, meta.~)->left, None()});
+  return ret;
+}
+
+func copyend(p *ps, meta ast_meta) ast_meta {
+  m ast_meta = copystart(p, meta);
+  end(p, m);
+  return m;
+}
+
 func end(p *ps, meta ast_meta) void {
-  switch ref(p->metas, meta.~)->right {
-    case Has(right_pos pos): {
-      check(false);
-    }
-    case None(v): {
-      ref(p->metas, meta.~)->right = Has(mk_pos(p->base_offset, p->prev_right));
-    }
+  r *meta_datum = ref(p->metas, meta.~);
+  if case Has(right_pos pos) = r->right {
+    crash();
   }
+  r->right = Has(mk_pos(p->base_offset, p->prev_right));
 }
 
 defenum keyw {
