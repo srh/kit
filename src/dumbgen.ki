@@ -13,6 +13,8 @@ deftype gn_annot struct {
 };
 
 deftype frame struct {
+  cs *checkstate;
+  gr *frame_graph;
   bas *basic_analyze_state;
   current framestate;
   // by_gn[i].fs shows what the state must is _before_ evaluating node i.
@@ -20,7 +22,7 @@ deftype frame struct {
 };
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
-  h frame = {bas, mk_arg_and_ret_framestate(g), repeat(count(&g->graph.gr.ops), NotComputed())};
+  h frame = {cs, &g->graph.gr, bas, mk_arg_and_ret_framestate(g), repeat(count(&g->graph.gr.ops), NotComputed())};
 
   if !dumbly_gen_graph(cs, f, &h, &g->graph.gr, g->graph.gn) {
     return false;
@@ -84,6 +86,7 @@ func dumbly_gen_graph(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn 
       if !dumbly_gen_graph(cs, f, h, gr, default_gn) {
         return false;
       }
+      h->current = save;
     }
     return true;
   case &GrSequence(a gr_sequence):
@@ -118,7 +121,7 @@ func deaden(h *frame, offset gr_offset) void {
 
 func check_live(h *frame, c cell_num) void {
   if !refcur(h, c)->live {
-    ice(_u8("check_live sees non-live cell"));
+    ice(_u8("check_live sees non-live cell in def "), lookup(h->cs->im, h->gr->informal_name));
   }
 }
 
