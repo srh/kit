@@ -160,9 +160,9 @@ func u8_equal(a array[u8], b array[u8]) bool {
   return array_equal(&a, &b);
 }
 
-func[T] raw_buf_equal(a *T, b *T, n size) bool {
+func[T] raw_buf_equal(p *T, q *T, n size) bool {
   for i size = 0; i < n; i = i + 1 {
-    if a[i] != b[i] {
+    if p[i] != q[i] {
       return false;
     }
   }
@@ -181,6 +181,59 @@ func[T] subarray(a *array[T], i size) array[T] {
     push(&ret, *ref(a, i));
   }
   return ret;
+}
+
+func[T] sorted_has_dups(a *array[T]) bool {
+  p *T = data(a);
+  n size = count(a);
+  for i size = 1; i < n; i = i + 1 {
+    if !(p[i - 1] < p[i]) {
+      if p[i] < p[i - 1] {
+        crash(_u8("sorted_has_dups sees non-sorted"));
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+func[T] dedup_sorted(a *array[T]) void {
+  p *T = data(a);
+  n size = count(a);
+  if n == 0 {
+    return;
+  }
+  w size = 1;
+  for i size = 1; i < n; i = i + 1 {
+    if p[i - 1] < p[i] {
+      p[w] = p[i];
+      w = w + 1;
+    } else {
+      if p[i] < p[i - 1] {
+        crash(_u8("dedup_sorted sees non-sorted"));
+      }
+    }
+  }
+  truncate(a, w);
+}
+
+func[T] sorted_intersect(a *array[T], b *array[T]) bool {
+  p *T = data(a);
+  an size = count(a);
+  q *T = data(b);
+  bn size = count(b);
+  i size = 0;
+  j size = 0;
+  while i < an && j < bn {
+    if p[i] < q[j] {
+      i = i + 1;
+    } else if p[j] < q[i] {
+      j = j + 1;
+    } else {
+      return true;
+    }
+  }
+  return false;
 }
 
 func[T] reverse(a *array[T]) array[T] {
@@ -249,6 +302,49 @@ func[T] overwrite_raw(x *array[T], offset size, p *T, n size) void {
   w *T = ref(x, offset);
   for i size = 0; i < n; i = i + 1 {
     w[i] = p[i];
+  }
+}
+
+func[T] sort(x *array[T]) void {
+  sort(data(x), count(x));
+}
+
+func[T] sort(p *T, n size) void {
+  for ;; {
+    if n <= 1 {
+      return;
+    }
+    if n == 2 {
+      if p[1] < p[0] {
+        tmp T = p[0];
+        p[0] = p[1];
+        p[1] = tmp;
+      }
+      return;
+    }
+
+    pi size = n >> 1;
+    pival T = p[pi];
+    i size = 0;
+    j size = n;
+    while i < j {
+      if p[i] < pival {
+        i = i + 1;
+      } else {
+        j = j - 1;
+        tmp T = p[j];
+        p[j] = p[i];
+        p[i] = tmp;
+      }
+    }
+    if i < pi {
+      sort(p, i);
+      p = &p[i];
+      n = n - i;
+    } else {
+      sort(&p[i], n - i);
+      n = i;
+    }
   }
 }
 

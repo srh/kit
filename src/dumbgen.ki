@@ -1,51 +1,60 @@
 import state;
 
-deftype cell_locs struct {
-  live bool;
-};
-
-deftype framestate struct {
-  locs array[cell_locs];
-};
-
 deftype gn_annot struct {
-  fs framestate;
+  // Which cells are guaranteed to be live when the gn starts.
+  live array[cell_num];
 };
 
 deftype frame struct {
   cs *checkstate;
   gr *frame_graph;
   bas *basic_analyze_state;
-  current framestate;
-  // by_gn[i].fs shows what the state must is _before_ evaluating node i.
-  by_gn array[nc[gn_annot]];
+  // by_gn[i].fs shows what the state must is _before_ evaluating node i.  (All incoming nodes must agree!)
+  by_gn array[opt[gn_annot]];
 };
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
-  h frame = {cs, &g->graph.gr, bas, mk_arg_and_ret_framestate(g), repeat(count(&g->graph.gr.ops), NotComputed())};
+  h frame = {cs, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), None())};
 
-  if !dumbly_gen_graph(cs, f, &h, &g->graph.gr, g->graph.gn) {
+  prelive array[cell_num] = g->argcells;
+  push(&prelive, g->graph.cell);
+  sort(&prelive);
+
+  mut exprmut;
+  if !dumbly_gen_expression(&mut, cs, f, &h, &g->graph.gr, g->graph.gn, &prelive) {
     return false;
   }
 
   return true;
 }
 
-func dumbly_gen_graph(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num) bool {
-  gnc *nc[gn_annot] = ref(&h->by_gn, gn.~);
-  if case &Computed(annot gn_annot) = gnc {
-    // TODO: Return true??  Okay, I guess.
+deftype exprmut struct {
+  used array[cell_num];
+  made_dead array[cell_num];
+};
+
+func dumbly_gen_expression(exprmut_append *exprmut, cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *array[cell_num]) bool {
+  gnc *opt[gn_annot] = ref(&h->by_gn, gn.~);
+  if case &Has(annot gn_annot) = gnc {
+    if !array_equal(prelive, &annot.live) {
+      ERR(_u8("Inconsistent liveness state when revisiting node."));
+      return false;
+    }
     return true;
   }
 
-  annotate(gnc, {h->current});
+  prec_muts exprmut;
 
   node *gr_node = ref_node(gr, gn);
   nprecs size = count(&node->precs);
   for i size = 0; i < nprecs; i = i + 1 {
-    if !dumbly_gen_graph(cs, f, h, gr, get(&node->precs, i)) {
+    if !dumbly_gen_expression(&prec_muts, cs, f, h, gr, get(&node->precs, i), prelive) {
       return false;
     }
+  }
+
+  if !collapse_combomut(&prec_muts) {
+    return false;
   }
 
   switch &node->op {
@@ -65,17 +74,22 @@ func dumbly_gen_graph(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn 
   return true;
 }
 
+func collapse_combomut(mut *exprmut) bool {
+  sort(&mut->made_dead);
+  if sorted_has_dups(&mut->made_dead) {
+    ERR(_u8("ICE: multiple prec-exprs made the same cell dead"));
+    return false;
+  }
 
-func refcur(h *frame, c cell_num) *cell_locs {
-  return ref(&h->current.locs, c.~);
+  sort(&mut->used);
+  dedup_sorted(&mut->used);
+  if sorted_intersect(&mut->made_dead, &mut->used) {
+    ERR(_u8("ICE: One prec-expr marks cell dead that another uses"));
+  }
+
+  return true;
 }
 
-func mk_arg_and_ret_framestate(g *graphed_fn_body) framestate {
-  arr array[cell_locs] = repeat(count(&g->graph.gr.cells), {false});
-  nargcells size = count(&g->argcells);
-  for i size = 0; i < nargcells; i = i + 1 {
-    ref(&arr, get(&g->argcells, i).~)->live = true;
-  }
-  ref(&arr, g->graph.cell.~)->live = true;
-  return {arr};
+func ref_annot(h *frame, gn gr_num) *opt[gn_annot] {
+  return ref(&h->by_gn, gn.~);
 }

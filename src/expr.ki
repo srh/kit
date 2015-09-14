@@ -72,6 +72,8 @@ deftype cell_num size;
 
 def `~` fn[size, cell_num] = wrapconvert;
 def `==` fn[cell_num, cell_num, bool] = wrapequate;
+func `!=`(x cell_num, y cell_num) bool { return x.~ != y.~; }
+func `<`(x cell_num, y cell_num) bool { return x.~ < y.~; }
 
 func help_add_cell(es *framescope, info cell_info) cell_num {
   ret size = count(&es->cells);
