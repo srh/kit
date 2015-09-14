@@ -104,6 +104,64 @@ access hash[_, _] {
   func[K, V] count(h *hash[K, V]) size {
     return h->count;
   }
+
+
+  func[T] sets_equal(a *hash[T, void], b *hash[T, void]) bool {
+    n size = count(a);
+    if n != count(b) {
+      return false;
+    }
+    e size = count(&a->arr);
+    for i size = 0; i < e; i = i + 1 {
+      if case &Has(p tup[T, void]) = ref(&a->arr, i) {
+        if !isHas(lookup_ref(b, &p.car)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  func[T] intersects(a *hash[T, void], b *hash[T, void]) bool {
+    n size = count(a);
+    bn size = count(b);
+    if bn < n {
+      n = bn;
+      tmp _ = a;
+      a = b;
+      b = tmp;
+    }
+    e size = count(&a->arr);
+    for i size = 0; i < e; i = i + 1 {
+      if case &Has(p tup[T, void]) = ref(&a->arr, i) {
+        if isHas(lookup_ref(b, &p.car)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  func[K, V] add_disjoint(onto *hash[K, V], from *hash[K, V]) bool {
+    e size = count(&from->arr);
+    for i size = 0; i < e; i = i + 1 {
+      if case &Has(p tup[K, void]) = ref(&from->arr, i) {
+        if !try_insert(onto, &p.car, void) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  func[T] add_union(onto *hash[T, void], from *hash[T, void]) void {
+    e size = count(&from->arr);
+    for i size = 0; i < e; i = i + 1 {
+      if case &Has(p tup[T, void]) = ref(&from->arr, i) {
+        try_insert(onto, &p.car, void);
+      }
+    }
+  }
 }
 
 func[K, V] check_insert(h *hash[K, V], key *K, value V) void {
@@ -139,3 +197,15 @@ func[K, V] mk_hash() hash[K, V] {
   ret hash[K, V];
   return ret;
 }
+
+func[T] check_add(h *hash[T, void], key T) void {
+  check_insert(h, &key, void);
+}
+
+func[T] check_add_all(h *hash[T, void], arr *array[T]) void {
+  n size = count(arr);
+  for i size = 0; i < n; i = i + 1 {
+    check_insert(h, ref(arr, i), void);
+  }
+}
+

@@ -183,6 +183,13 @@ func[T] isHas(p *opt[T]) bool {
   return false;
 }
 
+func[T] isHas(x opt[T]) bool {
+  if case &Has(y) = &x {
+    return true;
+  }
+  return false;
+}
+
 func[T] isNone(p *opt[T]) bool {
   if case &None(v void) = p {
     return true;

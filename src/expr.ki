@@ -74,6 +74,19 @@ def `~` fn[size, cell_num] = wrapconvert;
 def `==` fn[cell_num, cell_num, bool] = wrapequate;
 func `!=`(x cell_num, y cell_num) bool { return x.~ != y.~; }
 func `<`(x cell_num, y cell_num) bool { return x.~ < y.~; }
+func hash_compute_hash(x *cell_num) osize {
+  // This should suffice!
+  k osize = ~x->~;
+  k = k ^ (k >> 6);
+  k = k ^ (k << 13);
+  k = k ^ (k >> 17);
+  k = k * 0x23457812;
+  return k;
+}
+func hash_equal(x *cell_num, y *cell_num) bool {
+  return x->~ == y->~;
+}
+
 
 func help_add_cell(es *framescope, info cell_info) cell_num {
   ret size = count(&es->cells);

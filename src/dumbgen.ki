@@ -2,7 +2,7 @@ import state;
 
 deftype gn_annot struct {
   // Which cells are guaranteed to be live when the gn starts.
-  live array[cell_num];
+  live hash[cell_num, void];
 };
 
 deftype frame struct {
@@ -16,77 +16,136 @@ deftype frame struct {
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
   h frame = {cs, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), None())};
 
-  prelive array[cell_num] = g->argcells;
-  push(&prelive, g->graph.cell);
-  sort(&prelive);
+  prelive hash[cell_num, void];
+  check_add_all(&prelive, &g->argcells);
+  check_add(&prelive, g->graph.cell);
 
   mut exprmut;
-  if !dumbly_gen_expression(&mut, cs, f, &h, &g->graph.gr, g->graph.gn, &prelive) {
+  if !dumbly_gen_expression(cs, f, &h, &g->graph.gr, g->graph.gn, &prelive, &mut) {
     return false;
   }
+
+  // TODO: Is there something I should assert about mut?
 
   return true;
 }
 
 deftype exprmut struct {
-  used array[cell_num];
-  made_dead array[cell_num];
+  // Cells that weren't live, that are used.
+  made_live hash[cell_num, void];
+  // Cells that were live, that are used (and not made dead).
+  used hash[cell_num, void];
+  // Cells that were live, that are made dead.
+  made_dead hash[cell_num, void];
 };
 
-func dumbly_gen_expression(exprmut_append *exprmut, cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *array[cell_num]) bool {
-  gnc *opt[gn_annot] = ref(&h->by_gn, gn.~);
+func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *hash[cell_num, void], mut_out *exprmut) bool {
+  gnc *opt[gn_annot] = ref_annot(h, gn);
   if case &Has(annot gn_annot) = gnc {
-    if !array_equal(prelive, &annot.live) {
+    if !sets_equal(prelive, &annot.live) {
       ERR(_u8("Inconsistent liveness state when revisiting node."));
       return false;
     }
     return true;
   }
 
+  set(ref_annot(h, gn), {*prelive});
+
   prec_muts exprmut;
 
   node *gr_node = ref_node(gr, gn);
   nprecs size = count(&node->precs);
   for i size = 0; i < nprecs; i = i + 1 {
-    if !dumbly_gen_expression(&prec_muts, cs, f, h, gr, get(&node->precs, i), prelive) {
+    i_mut exprmut;
+    if !dumbly_gen_expression(cs, f, h, gr, get(&node->precs, i), prelive, &i_mut) {
+      return false;
+    }
+    if !add_mut(prelive, &prec_muts, &i_mut) {
       return false;
     }
   }
 
-  if !collapse_combomut(&prec_muts) {
-    return false;
-  }
-
   switch &node->op {
   case &GrApply(a gr_apply):
+    deaden(prelive, &prec_muts, a.funcell);
+    nparams size = count(&a.params);
+    for i size = 0; i < nparams; i = i + 1 {
+      deaden(prelive, &prec_muts, get(&a.params, i));
+    }
+    output(prelive, &prec_muts, a.retcell);
   case &GrMemCopy(a gr_memcopy):
+    output(prelive, &prec_muts, a.dest);
+    input(prelive, &prec_muts, a.src);
   case &GrWriteConst(a gr_writeconst):
+    output(prelive, &prec_muts, a.dest);
   case &GrAddressof(a gr_addressof):
+    input(prelive, &prec_muts, a.addressee);
+    output(prelive, &prec_muts, a.dest);
   case &GrDeref(a gr_deref):
+    input(prelive, &prec_muts, a.pointer);
+    // Location should always be virtual.
+    virtual(prelive, &prec_muts, a.name);
   case &GrSubcell(a gr_subcell):
+    input(prelive, &prec_muts, a.partof);
+    deaden_offset(prelive, &prec_muts, &a.offset);
+    virtual(prelive, &prec_muts, a.name);
   case &GrBranch(a gr_branch):
+    return TODO();
   case &GrSequence(a gr_sequence):
+    return TODO();
   case &GrJmp(a gr_jmp):
+    return TODO();
   case &GrWriteNothing(a gr_writenothing):
+    output(prelive, &prec_muts, a.dest);
   case &GrDead(a gr_dead):
-  case &GrNop(v void):
+    deaden(prelive, &prec_muts, a.cell);
+  case &GrNop(v void): { }
   }
   return true;
 }
 
-func collapse_combomut(mut *exprmut) bool {
-  sort(&mut->made_dead);
-  if sorted_has_dups(&mut->made_dead) {
+func deaden(prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
+  // TODO(): Implement
+}
+
+// input requires that the cell already be live.
+func input(prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
+  // TODO(): Implement
+}
+
+// output either makes the cell live, if it wasn't already, or it means we use the cell.
+func output(prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
+  // TODO(): Implement
+}
+
+// Says that we're naming a virtual cell.
+func virtual(prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
+  // TODO(): Implement
+}
+
+func deaden_offset(prelive *hash[cell_num, void], prec_muts *exprmut, goff *gr_offset) void {
+  switch goff {
+  case &OffsetConst(n u32): { }
+  case &OffsetComputed(p tup[u32, cell_num]):
+    deaden(prelive, prec_muts, p.cdr);
+  }
+}
+
+
+func add_mut(prelive *hash[cell_num, void], onto *exprmut, from *exprmut) bool {
+  if intersects(&onto->made_dead, &from->used) || intersects(&onto->used, &from->made_dead) {
+    ERR(_u8("ICE: One prec-expr marks cell dead that another uses"));
+  }
+  if !add_disjoint(&onto->made_live, &from->made_live) {
+    ERR(_u8("ICE: multiple prec-exprs made the same cell live"));
+    return false;
+  }
+  if !add_disjoint(&onto->made_dead, &from->made_dead) {
     ERR(_u8("ICE: multiple prec-exprs made the same cell dead"));
     return false;
   }
 
-  sort(&mut->used);
-  dedup_sorted(&mut->used);
-  if sorted_intersect(&mut->made_dead, &mut->used) {
-    ERR(_u8("ICE: One prec-expr marks cell dead that another uses"));
-  }
-
+  add_union(&onto->used, &from->used);
   return true;
 }
 
