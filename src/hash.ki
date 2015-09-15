@@ -68,7 +68,7 @@ access hash[_, _] {
     for ;; {
       switch ref(&h->arr, offset) {
         case &HashEmpty(v void): {
-          set(&h->arr, offset, HashValue@[K, V]({*key, value}));
+          set(&h->arr, offset, @[hash_entry[K, V]]HashValue({*key, value}));
           h->user_count = h->user_count + 1;
           h->cell_count = h->cell_count + 1;
           if h->cell_count * 2 >= count(&h->arr) {
@@ -90,7 +90,7 @@ access hash[_, _] {
             step = step + 1;
             switch ref(&h->arr, offset) {
             case &HashEmpty(v2 void):
-              set(&h->arr, insertion_offset, HashValue@[K, V]({*key, value}));
+              set(&h->arr, insertion_offset, @[hash_entry[K, V]]HashValue({*key, value}));
               h->user_count = h->user_count + 1;
               return true;
             case &HashValue(p tup[K, V]):
@@ -102,6 +102,32 @@ access hash[_, _] {
           }
         }
       }
+    }
+  }
+
+  func[K, V] try_remove(h *hash[K, V], key *K) bool {
+    arr_count size = count(&h->arr);
+    if arr_count == 0 {
+      return false;
+    }
+
+    mask size = arr_count - 1;
+    offset size = ~ @[osize]hash_compute_hash(key) & mask;
+    step size = 1;
+    for ;; {
+      switch ref(&h->arr, offset) {
+      case &HashEmpty(v void):
+        return false;
+      case &HashValue(p tup[K, V]):
+        if hash_equal(&p.car, key) {
+          set(&h->arr, offset, HashErased(void));
+          h->user_count = h->user_count - 1;
+          return true;
+        }
+      case &HashErased(v void): { }
+      }
+      offset = (offset + step) & mask;
+      step = step + 1;
     }
   }
 
@@ -209,6 +235,15 @@ func[T] add_union(onto *hash[T, void], from *hash[T, void]) void {
   }
 }
 
+func[T] remove_exactly(mutie *hash[T, void], diff *hash[T, void]) void {
+  it hash_iter[T, void] = iter(diff);
+  while case Has(p *tup[T, void]) = next(&it) {
+    if !try_remove(mutie, &p->car) {
+      crash();
+    }
+  }
+}
+
 func[K, V] check_insert(h *hash[K, V], key *K, value V) void {
   success bool = try_insert(h, key, value);
   check(success);
@@ -254,3 +289,8 @@ func[T] check_add_all(h *hash[T, void], arr *array[T]) void {
   }
 }
 
+func[T] check_add_disjoint(onto *hash[T, void], from *hash[T, void]) void {
+  if !add_disjoint(onto, from) {
+    crash();
+  }
+}

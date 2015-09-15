@@ -94,7 +94,14 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
   case &GrSequence(a gr_sequence):
     return TODO();
   case &GrJmp(a gr_jmp):
-    return TODO();
+    new_prelive hash[cell_num, void] = *prelive;
+    check_add_disjoint(&new_prelive, &prec_muts.made_live);
+    remove_exactly(&new_prelive, &prec_muts.made_dead);
+    exitmut exprmut;
+    if !dumbly_gen_expression(cs, f, h, gr, a.next, &new_prelive, &exitmut) {
+      return false;
+    }
+    compose_muts(&prec_muts, &exitmut);
   case &GrWriteNothing(a gr_writenothing):
     output(prelive, &prec_muts, a.dest);
   case &GrDead(a gr_dead):
@@ -131,6 +138,10 @@ func deaden_offset(prelive *hash[cell_num, void], prec_muts *exprmut, goff *gr_o
   }
 }
 
+func compose_muts(onto *exprmut, after *exprmut) void {
+  // Composes the mutation operations by running onto's muts, then after's muts.  For example, a cell in onto->made_live and after->made_dead becomes nothing.  (Maybe it should become "encapsulated," maybe that's an annotation we should use.  I guess it is -- if a cell has "encapsulated use" in one sub-expr, another sibling prec can't use it.  TODO: Add encapsulated cells to exprmut.)
+  // TODO: Implement.
+}
 
 func add_mut(prelive *hash[cell_num, void], onto *exprmut, from *exprmut) bool {
   if intersects(&onto->made_dead, &from->used) || intersects(&onto->used, &from->made_dead) {
