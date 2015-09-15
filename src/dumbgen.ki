@@ -20,12 +20,12 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
   check_add_all(&prelive, &g->argcells);
   check_add(&prelive, g->graph.cell);
 
-  mut exprmut;
+  mut opt[exprmut];
   if !dumbly_gen_expression(cs, f, &h, &g->graph.gr, g->graph.gn, &prelive, &mut) {
     return false;
   }
 
-  // TODO: Is there something I should assert about mut?
+  // TODO: Is there something I should assert about mut?  (It can be None if the function infinite-loops.)
 
   return true;
 }
@@ -41,13 +41,28 @@ deftype exprmut struct {
   made_dead hash[cell_num, void];
 };
 
-func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *hash[cell_num, void], mut_out *exprmut) bool {
+func dumbly_gen_returning_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *hash[cell_num, void], mut_out *exprmut) bool {
+  mbmut opt[exprmut];
+  if !dumbly_gen_expression(cs, f, h, gr, gn, prelive, &mbmut) {
+    return false;
+  }
+  if case &Has(m exprmut) = &mbmut {
+    *mut_out = m;
+    return true;
+  } else {
+    ERR(_u8("ICE: Expecting returning expression"));
+    return false;
+  }
+}
+
+func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *hash[cell_num, void], mut_out *opt[exprmut]) bool {
   gnc *opt[gn_annot] = ref_annot(h, gn);
   if case &Has(annot gn_annot) = gnc {
     if !sets_equal(prelive, &annot.live) {
       ERR(_u8("Inconsistent liveness state when revisiting node."));
       return false;
     }
+    *mut_out = None();
     return true;
   }
 
@@ -59,7 +74,7 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
   nprecs size = count(&node->precs);
   for i size = 0; i < nprecs; i = i + 1 {
     i_mut exprmut;
-    if !dumbly_gen_expression(cs, f, h, gr, get(&node->precs, i), prelive, &i_mut) {
+    if !dumbly_gen_returning_expression(cs, f, h, gr, get(&node->precs, i), prelive, &i_mut) {
       return false;
     }
     if !add_parallel_mut(prelive, &prec_muts, &i_mut) {
@@ -75,54 +90,85 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
       deaden(prelive, &prec_muts, get(&a.params, i));
     }
     output(prelive, &prec_muts, a.retcell);
+    *mut_out = Has(prec_muts);
+    return true;
   case &GrMemCopy(a gr_memcopy):
     output(prelive, &prec_muts, a.dest);
     input(prelive, &prec_muts, a.src);
+    *mut_out = Has(prec_muts);
+    return true;
   case &GrWriteConst(a gr_writeconst):
     output(prelive, &prec_muts, a.dest);
+    *mut_out = Has(prec_muts);
+    return true;
   case &GrAddressof(a gr_addressof):
     input(prelive, &prec_muts, a.addressee);
     output(prelive, &prec_muts, a.dest);
+    *mut_out = Has(prec_muts);
+    return true;
   case &GrDeref(a gr_deref):
     input(prelive, &prec_muts, a.pointer);
     // Location should always be virtual.
     virtual(prelive, &prec_muts, a.name);
+    *mut_out = Has(prec_muts);
+    return true;
   case &GrSubcell(a gr_subcell):
     input(prelive, &prec_muts, a.partof);
     deaden_offset(prelive, &prec_muts, &a.offset);
     virtual(prelive, &prec_muts, a.name);
+    *mut_out = Has(prec_muts);
+    return true;
   case &GrBranch(a gr_branch):
     return TODO();
   case &GrSequence(a gr_sequence):
     new_live hash[cell_num, void] = *prelive;
     compose_live(&new_live, &prec_muts);
     firstmut exprmut;
-    if !dumbly_gen_expression(cs, f, h, gr, a.first, &new_live, &firstmut) {
+    if !dumbly_gen_returning_expression(cs, f, h, gr, a.first, &new_live, &firstmut) {
       return false;
     }
     compose_muts(&prec_muts, &firstmut);
     compose_live(&new_live, &firstmut);
-    secondmut exprmut;
+    secondmut opt[exprmut];
     if !dumbly_gen_expression(cs, f, h, gr, a.second, &new_live, &secondmut) {
       return false;
     }
 
-    compose_muts(&prec_muts, &secondmut);
+    if case &Has(sm exprmut) = &secondmut {
+      compose_muts(&prec_muts, &sm);
+      *mut_out = Has(prec_muts);
+      return true;
+    } else {
+      *mut_out = None();
+      return true;
+    }
   case &GrJmp(a gr_jmp):
     new_live hash[cell_num, void] = *prelive;
     compose_live(&new_live, &prec_muts);
-    exitmut exprmut;
+    exitmut opt[exprmut];
     if !dumbly_gen_expression(cs, f, h, gr, a.next, &new_live, &exitmut) {
       return false;
     }
-    compose_muts(&prec_muts, &exitmut);
+    if case &Has(em exprmut) = &exitmut {
+      compose_muts(&prec_muts, &em);
+      *mut_out = Has(prec_muts);
+      return true;
+    } else {
+      *mut_out = None();
+      return true;
+    }
   case &GrWriteNothing(a gr_writenothing):
     output(prelive, &prec_muts, a.dest);
+    *mut_out = Has(prec_muts);
+    return true;
   case &GrDead(a gr_dead):
     deaden(prelive, &prec_muts, a.cell);
-  case &GrNop(v void): { }
+    *mut_out = Has(prec_muts);
+    return true;
+  case &GrNop(v void):
+    *mut_out = Has(prec_muts);
+    return true;
   }
-  return true;
 }
 
 func deaden(prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
