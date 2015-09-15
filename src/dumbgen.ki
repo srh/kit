@@ -20,7 +20,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
   check_add_all(&prelive, &g->argcells);
   check_add(&prelive, g->graph.cell);
 
-  mut opt[exprmut];
+  mut genexpr_result;
   if !dumbly_gen_expression(cs, f, &h, &g->graph.gr, g->graph.gn, &prelive, &mut) {
     return false;
   }
@@ -41,28 +41,40 @@ deftype exprmut struct {
   made_dead hash[cell_num, void];
 };
 
+deftype partial_exprmut struct {
+  used hash[cell_num, void];
+  encapsulated hash[cell_num, void];
+};
+
 func dumbly_gen_returning_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *hash[cell_num, void], mut_out *exprmut) bool {
-  mbmut opt[exprmut];
+  mbmut genexpr_result;
   if !dumbly_gen_expression(cs, f, h, gr, gn, prelive, &mbmut) {
     return false;
   }
-  if case &Has(m exprmut) = &mbmut {
+  switch &mbmut {
+  case &Terminal(m exprmut):
     *mut_out = m;
     return true;
-  } else {
-    ERR(_u8("ICE: Expecting returning expression"));
+  case &NonTerminal(pm partial_exprmut):
+    ERR(_u8("ICE: Expecting terminal expression"));
     return false;
   }
 }
 
-func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *hash[cell_num, void], mut_out *opt[exprmut]) bool {
+defenum genexpr_result {
+  Terminal exprmut;
+  NonTerminal partial_exprmut;
+};
+
+func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *hash[cell_num, void], mut_out *genexpr_result) bool {
   gnc *opt[gn_annot] = ref_annot(h, gn);
   if case &Has(annot gn_annot) = gnc {
+    // TODO: We should also check that we're part of the same sequential _family_ of exprs.
     if !sets_equal(prelive, &annot.live) {
       ERR(_u8("Inconsistent liveness state when revisiting node."));
       return false;
     }
-    *mut_out = None();
+    *mut_out = NonTerminal({mk_hash@[cell_num, void](), mk_hash@[cell_num, void]()});
     return true;
   }
 
@@ -90,35 +102,60 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
       deaden(prelive, &prec_muts, get(&a.params, i));
     }
     output(prelive, &prec_muts, a.retcell);
-    *mut_out = Has(prec_muts);
+    *mut_out = Terminal(prec_muts);
     return true;
   case &GrMemCopy(a gr_memcopy):
     output(prelive, &prec_muts, a.dest);
     input(prelive, &prec_muts, a.src);
-    *mut_out = Has(prec_muts);
+    *mut_out = Terminal(prec_muts);
     return true;
   case &GrWriteConst(a gr_writeconst):
     output(prelive, &prec_muts, a.dest);
-    *mut_out = Has(prec_muts);
+    *mut_out = Terminal(prec_muts);
     return true;
   case &GrAddressof(a gr_addressof):
     input(prelive, &prec_muts, a.addressee);
     output(prelive, &prec_muts, a.dest);
-    *mut_out = Has(prec_muts);
+    *mut_out = Terminal(prec_muts);
     return true;
   case &GrDeref(a gr_deref):
     input(prelive, &prec_muts, a.pointer);
     // Location should always be virtual.
     virtual(prelive, &prec_muts, a.name);
-    *mut_out = Has(prec_muts);
+    *mut_out = Terminal(prec_muts);
     return true;
   case &GrSubcell(a gr_subcell):
     input(prelive, &prec_muts, a.partof);
     deaden_offset(prelive, &prec_muts, &a.offset);
     virtual(prelive, &prec_muts, a.name);
-    *mut_out = Has(prec_muts);
+    *mut_out = Terminal(prec_muts);
     return true;
   case &GrBranch(a gr_branch):
+    input(prelive, &prec_muts, a.src);
+    new_live hash[cell_num, void] = *prelive;
+    compose_live(&new_live, &prec_muts);
+
+    combined_mut genexpr_result;
+    ncases size = count(&a.cases);
+    for i size = 0; i < ncases; i = i + 1 {
+      cas *tup[gr_const, gr_num] = ref(&a.cases, i);
+      casmut genexpr_result;
+      if !dumbly_gen_expression(cs, f, h, gr, cas->cdr, &new_live, &casmut) {
+        return false;
+      }
+      switch &combined_mut {
+      case &Terminal(tm exprmut):
+        switch &casmut {
+        case &Terminal(cm exprmut):
+          return TODO();
+        case &NonTerminal(ncm partial_exprmut):
+          // TODO: Non-terminal branches still have encapsulated cells and used cells.
+          return TODO();
+        }
+      case &NonTerminal(ntm partial_exprmut):
+        return TODO();
+      }
+    }
     return TODO();
   case &GrSequence(a gr_sequence):
     new_live hash[cell_num, void] = *prelive;
@@ -127,46 +164,34 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     if !dumbly_gen_returning_expression(cs, f, h, gr, a.first, &new_live, &firstmut) {
       return false;
     }
-    compose_muts(&prec_muts, &firstmut);
+    prec_muts = compose_muts(&prec_muts, &firstmut);
     compose_live(&new_live, &firstmut);
-    secondmut opt[exprmut];
+    secondmut genexpr_result;
     if !dumbly_gen_expression(cs, f, h, gr, a.second, &new_live, &secondmut) {
       return false;
     }
 
-    if case &Has(sm exprmut) = &secondmut {
-      compose_muts(&prec_muts, &sm);
-      *mut_out = Has(prec_muts);
-      return true;
-    } else {
-      *mut_out = None();
-      return true;
-    }
+    compose_result(&prec_muts, &secondmut, mut_out);
+    return true;
   case &GrJmp(a gr_jmp):
     new_live hash[cell_num, void] = *prelive;
     compose_live(&new_live, &prec_muts);
-    exitmut opt[exprmut];
+    exitmut genexpr_result;
     if !dumbly_gen_expression(cs, f, h, gr, a.next, &new_live, &exitmut) {
       return false;
     }
-    if case &Has(em exprmut) = &exitmut {
-      compose_muts(&prec_muts, &em);
-      *mut_out = Has(prec_muts);
-      return true;
-    } else {
-      *mut_out = None();
-      return true;
-    }
+    compose_result(&prec_muts, &exitmut, mut_out);
+    return true;
   case &GrWriteNothing(a gr_writenothing):
     output(prelive, &prec_muts, a.dest);
-    *mut_out = Has(prec_muts);
+    *mut_out = Terminal(prec_muts);
     return true;
   case &GrDead(a gr_dead):
     deaden(prelive, &prec_muts, a.cell);
-    *mut_out = Has(prec_muts);
+    *mut_out = Terminal(prec_muts);
     return true;
   case &GrNop(v void):
-    *mut_out = Has(prec_muts);
+    *mut_out = Terminal(prec_muts);
     return true;
   }
 }
@@ -203,9 +228,105 @@ func compose_live(live *hash[cell_num, void], muts *exprmut) void {
   remove_exactly(live, &muts->made_dead);
 }
 
-func compose_muts(onto *exprmut, after *exprmut) void {
-  // Composes the mutation operations by running onto's muts, then after's muts.  For example, a cell in onto->made_live and after->made_dead becomes nothing.  (Maybe it should become "encapsulated," maybe that's an annotation we should use.  I guess it is -- if a cell has "encapsulated use" in one sub-expr, another sibling prec can't use it.  TODO: Add encapsulated cells to exprmut.)
-  // TODO: Implement.
+func compose_muts(before *exprmut, after *exprmut) exprmut {
+  ret exprmut;
+
+  it hash_iter[cell_num, void] = iter(&before->made_live);
+  while case Has(p *_) = next(&it) {
+    c cell_num = p->car;
+    if case Has(v *void) = lookup_ref(&after->made_live, &c) {
+      ice(_u8("compose_muts made_live->made_live"));
+    } else if case Has(v *void) = lookup_ref(&after->used, &c) {
+      check_insert(&ret.made_live, &c, void);
+    } else if case Has(v *void) = lookup_ref(&after->encapsulated, &c) {
+      ice(_u8("compose_muts made_live->encapsulated"));
+    } else if case Has(v *void) = lookup_ref(&after->made_dead, &c) {
+      check_insert(&ret.encapsulated, &c, void);
+    } else {
+      check_insert(&ret.made_live, &c, void);
+    }
+  }
+
+  it = iter(&before->used);
+  while case Has(p *_) = next(&it) {
+    c cell_num = p->car;
+    if case Has(v *void) = lookup_ref(&after->made_live, &c) {
+      ice(_u8("compose_muts used->made_live"));
+    } else if case Has(v *void) = lookup_ref(&after->used, &c) {
+      check_insert(&ret.used, &c, void);
+    } else if case Has(v *void) = lookup_ref(&after->encapsulated, &c) {
+      ice(_u8("compose_muts used->encapsulated"));
+    } else if case Has(v *void) = lookup_ref(&after->made_dead, &c) {
+      check_insert(&ret.made_dead, &c, void);
+    } else {
+      check_insert(&ret.used, &c, void);
+    }
+  }
+
+  it = iter(&before->encapsulated);
+  while case Has(p *_) = next(&it) {
+    c cell_num = p->car;
+    if case Has(v *void) = lookup_ref(&after->made_live, &c) {
+      check_insert(&ret.made_live, &c, void);
+    } else if case Has(v *void) = lookup_ref(&after->used, &c) {
+      ice(_u8("compose_muts encapsulated->used"));
+    } else if case Has(v *void) = lookup_ref(&after->encapsulated, &c) {
+      check_insert(&ret.encapsulated, &c, void);
+    } else if case Has(v *void) = lookup_ref(&after->made_dead, &c) {
+      ice(_u8("compose_muts encapsulated->made_dead"));
+    } else {
+      check_insert(&ret.encapsulated, &c, void);
+    }
+  }
+
+  it = iter(&before->made_dead);
+  while case Has(p *_) = next(&it) {
+    c cell_num = p->car;
+    if case Has(v *void) = lookup_ref(&after->made_live, &c) {
+      check_insert(&ret.used, &c, void);
+    } else if case Has(v *void) = lookup_ref(&after->used, &c) {
+      ice(_u8("compose_muts made_dead->used"));
+    } else if case Has(v *void) = lookup_ref(&after->encapsulated, &c) {
+      check_insert(&ret.made_dead, &c, void);
+    } else if case Has(v *void) = lookup_ref(&after->made_dead, &c) {
+      ice(_u8("compose_muts made_dead->made_dead"));
+    } else {
+      check_insert(&ret.made_dead, &c, void);
+    }
+  }
+
+  compose_not_present(&ret, after, before);
+  return ret;
+}
+
+// Adds to build those of from that aren't in np.
+func compose_not_present(build *exprmut, from *exprmut, np *exprmut) void {
+  add_not_present(&build->made_live, &from->made_live, np);
+  add_not_present(&build->used, &from->used, np);
+  add_not_present(&build->encapsulated, &from->encapsulated, np);
+  add_not_present(&build->made_dead, &from->made_dead, np);
+}
+
+func add_not_present(onto *hash[cell_num, void], from *hash[cell_num, void], np *exprmut) void {
+  it hash_iter[cell_num, void] = iter(from);
+  while case Has(p *tup[cell_num, void]) = next(&it) {
+    c cell_num = p->car;
+    if !(member(&np->made_live, &c) || member(&np->used, &c) || member(&np->encapsulated, &c) || member(&np->made_dead, &c)) {
+      check_insert(onto, &c, void);
+    }
+  }
+}
+
+func compose_result(before *exprmut, after *genexpr_result, out *genexpr_result) void {
+  switch after {
+  case &Terminal(am exprmut):
+    *out = Terminal(compose_muts(before, &am));
+  case &NonTerminal(nam partial_exprmut):
+    ret partial_exprmut = nam;
+    add_union(&ret.used, &before->used);
+    add_union(&ret.encapsulated, &before->encapsulated);
+    *out = NonTerminal(ret);
+  }
 }
 
 // This function should have a symmetry about it.
