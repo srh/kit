@@ -60,7 +60,7 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
   im identmap = make_im();
   cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
   add_primitives(&cs);
-  if !build_module(&cs, intern(&im, testmodule_name())) {
+  if !check_module(&cs, intern(&im, testmodule_name())) {
     print(Stdout(), _u8("FAIL\n"));
     fflush(Stdout());
     ctx->failures = ctx->failures + 1;
