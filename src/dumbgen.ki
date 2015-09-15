@@ -35,6 +35,8 @@ deftype exprmut struct {
   made_live hash[cell_num, void];
   // Cells that were live, that are used (and not made dead).
   used hash[cell_num, void];
+  // Cells that were not live, that are used.
+  encapsulated hash[cell_num, void];
   // Cells that were live, that are made dead.
   made_dead hash[cell_num, void];
 };
@@ -60,7 +62,7 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     if !dumbly_gen_expression(cs, f, h, gr, get(&node->precs, i), prelive, &i_mut) {
       return false;
     }
-    if !add_mut(prelive, &prec_muts, &i_mut) {
+    if !add_parallel_mut(prelive, &prec_muts, &i_mut) {
       return false;
     }
   }
@@ -92,13 +94,25 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
   case &GrBranch(a gr_branch):
     return TODO();
   case &GrSequence(a gr_sequence):
-    return TODO();
+    new_live hash[cell_num, void] = *prelive;
+    compose_live(&new_live, &prec_muts);
+    firstmut exprmut;
+    if !dumbly_gen_expression(cs, f, h, gr, a.first, &new_live, &firstmut) {
+      return false;
+    }
+    compose_muts(&prec_muts, &firstmut);
+    compose_live(&new_live, &firstmut);
+    secondmut exprmut;
+    if !dumbly_gen_expression(cs, f, h, gr, a.second, &new_live, &secondmut) {
+      return false;
+    }
+
+    compose_muts(&prec_muts, &secondmut);
   case &GrJmp(a gr_jmp):
-    new_prelive hash[cell_num, void] = *prelive;
-    check_add_disjoint(&new_prelive, &prec_muts.made_live);
-    remove_exactly(&new_prelive, &prec_muts.made_dead);
+    new_live hash[cell_num, void] = *prelive;
+    compose_live(&new_live, &prec_muts);
     exitmut exprmut;
-    if !dumbly_gen_expression(cs, f, h, gr, a.next, &new_prelive, &exitmut) {
+    if !dumbly_gen_expression(cs, f, h, gr, a.next, &new_live, &exitmut) {
       return false;
     }
     compose_muts(&prec_muts, &exitmut);
@@ -138,14 +152,25 @@ func deaden_offset(prelive *hash[cell_num, void], prec_muts *exprmut, goff *gr_o
   }
 }
 
+func compose_live(live *hash[cell_num, void], muts *exprmut) void {
+  check_add_disjoint(live, &muts->made_live);
+  remove_exactly(live, &muts->made_dead);
+}
+
 func compose_muts(onto *exprmut, after *exprmut) void {
   // Composes the mutation operations by running onto's muts, then after's muts.  For example, a cell in onto->made_live and after->made_dead becomes nothing.  (Maybe it should become "encapsulated," maybe that's an annotation we should use.  I guess it is -- if a cell has "encapsulated use" in one sub-expr, another sibling prec can't use it.  TODO: Add encapsulated cells to exprmut.)
   // TODO: Implement.
 }
 
-func add_mut(prelive *hash[cell_num, void], onto *exprmut, from *exprmut) bool {
+// This function should have a symmetry about it.
+func add_parallel_mut(prelive *hash[cell_num, void], onto *exprmut, from *exprmut) bool {
   if intersects(&onto->made_dead, &from->used) || intersects(&onto->used, &from->made_dead) {
     ERR(_u8("ICE: One prec-expr marks cell dead that another uses"));
+    return false;
+  }
+  if intersects(&onto->made_live, &from->encapsulated) || intersects(&onto->encapsulated, &from->made_live) {
+    ERR(_u8("ICE: One prec-expr makes cell live that another encapsulates"));
+    return false;
   }
   if !add_disjoint(&onto->made_live, &from->made_live) {
     ERR(_u8("ICE: multiple prec-exprs made the same cell live"));
@@ -153,6 +178,10 @@ func add_mut(prelive *hash[cell_num, void], onto *exprmut, from *exprmut) bool {
   }
   if !add_disjoint(&onto->made_dead, &from->made_dead) {
     ERR(_u8("ICE: multiple prec-exprs made the same cell dead"));
+    return false;
+  }
+  if !add_disjoint(&onto->encapsulated, &from->encapsulated) {
+    ERR(_u8("ICE: multiple prec-exprs use and discard the same cell"));
     return false;
   }
 
