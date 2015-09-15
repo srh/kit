@@ -5,35 +5,44 @@ import stdlib;
 // func hash_compute_hash(x *K) osize;
 // func hash_equal(x *K, y *K) bool;
 
+defenum[K, V] hash_entry {
+  HashEmpty void;
+  HashValue tup[K, V];
+  HashErased void;
+};
+
 defclass[K, V] copy hash struct {
   // count(&arr) is zero or a power of two.
-  arr array[opt[tup[K, V]]];
-  // count is less than half count(&arr);
-  count size;
+  arr array[hash_entry[K, V]];
+  // cell_count, the number of HashValue and HashErased entries, is less than half count(&arr).
+  cell_count size;
+  // user_count, the number of HashValue entries, is just for a user-facing count(...) function.
+  user_count size;
 };
 
 access hash[_, _] {
   func[K, V] do_init(h *hash[K, V]) void {
     init(&h->arr);
-    h->count = 0;
+    h->cell_count = 0;
+    h->user_count = 0;
   }
 
   func[K, V] rebuild_(h *hash[K, V], new_limit size) void {
     new_mask size = new_limit - 1;
     check(0 == (new_limit & new_mask));
-    check(h->count * 2 < new_limit);
+    check(h->cell_count * 2 < new_limit);
 
-    new_array array[opt[tup[K, V]]] = repeat(new_limit, None@[tup[K, V]]());
+    new_array array[hash_entry[K, V]] = repeat(new_limit, HashEmpty(void));
     old_limit size = count(&h->arr);
     for i size = 0; i < old_limit; i = i + 1 {
-      if case &Has(p tup[K, V]) = ref(&h->arr, i) {
+      if case &HashValue(p tup[K, V]) = ref(&h->arr, i) {
         offset size = ~ @[osize]hash_compute_hash(&p.car) & new_mask;
         step size = 1;
         done bool = false;
         while !done {
           switch ref(&new_array, offset) {
-            case &None(v): { done = true; }
-            case &Has(new_p): {
+            case &HashEmpty(v void): { done = true; }
+            case &HashValue(new_p tup[K, V]): {
               offset = (offset + step) & new_mask;
               step = step + 1;
             }
@@ -44,6 +53,7 @@ access hash[_, _] {
       }
     }
 
+    h->cell_count = h->user_count;
     swap(&h->arr, &new_array);
   }
 
@@ -57,20 +67,39 @@ access hash[_, _] {
     step size = 1;
     for ;; {
       switch ref(&h->arr, offset) {
-        case &None(v): {
-          set(&h->arr, offset, Has(cons(*key, value)));
-          h->count = h->count + 1;
-          if h->count * 2 >= count(&h->arr) {
+        case &HashEmpty(v void): {
+          set(&h->arr, offset, HashValue@[K, V]({*key, value}));
+          h->user_count = h->user_count + 1;
+          h->cell_count = h->cell_count + 1;
+          if h->cell_count * 2 >= count(&h->arr) {
             rebuild_(h, count(&h->arr) * 2);
           }
           return true;
         }
-        case &Has(p tup[K, V]): {
+        case &HashValue(p tup[K, V]): {
           if hash_equal(&p.car, key) {
             return false;
           }
           offset = (offset + step) & mask;
           step = step + 1;
+        }
+        case &HashErased(v void): {
+          insertion_offset size = offset;
+          for ;; {
+            offset = (offset + step) & mask;
+            step = step + 1;
+            switch ref(&h->arr, offset) {
+            case &HashEmpty(v2 void):
+              set(&h->arr, insertion_offset, HashValue@[K, V]({*key, value}));
+              h->user_count = h->user_count + 1;
+              return true;
+            case &HashValue(p tup[K, V]):
+              if hash_equal(&p.car, key) {
+                return false;
+              }
+            case &HashErased(v2 void): { }
+            }
+          }
         }
       }
     }
@@ -87,80 +116,96 @@ access hash[_, _] {
     step size = 1;
     for ;; {
       switch ref(&h->arr, offset) {
-        case &None(v): {
+        case &HashEmpty(v void): {
           return None();
         }
-        case &Has(p): {
+        case &HashValue(p tup[K, V]): {
           if hash_equal(&p.car, key) {
             return Has(&p.cdr);
           }
-          offset = (offset + step) & mask;
-          step = step + 1;
         }
+        case &HashErased(v void): { }
       }
+      offset = (offset + step) & mask;
+      step = step + 1;
     }
   }
 
   func[K, V] count(h *hash[K, V]) size {
-    return h->count;
+    return h->user_count;
   }
 
+  deftype[K, V] hash_iter struct {
+    h *hash[K, V];
+    index size;
+  };
 
-  func[T] sets_equal(a *hash[T, void], b *hash[T, void]) bool {
-    n size = count(a);
-    if n != count(b) {
-      return false;
-    }
-    e size = count(&a->arr);
-    for i size = 0; i < e; i = i + 1 {
-      if case &Has(p tup[T, void]) = ref(&a->arr, i) {
-        if !isHas(lookup_ref(b, &p.car)) {
-          return false;
-        }
-      }
-    }
-    return true;
+  func[K, V] iter(a *hash[K, V]) hash_iter[K, V] {
+    ret hash_iter[K, V] = {a, 0};
+    return ret;
   }
 
-  func[T] intersects(a *hash[T, void], b *hash[T, void]) bool {
-    n size = count(a);
-    bn size = count(b);
-    if bn < n {
-      n = bn;
-      tmp _ = a;
-      a = b;
-      b = tmp;
-    }
-    e size = count(&a->arr);
-    for i size = 0; i < e; i = i + 1 {
-      if case &Has(p tup[T, void]) = ref(&a->arr, i) {
-        if isHas(lookup_ref(b, &p.car)) {
-          return true;
-        }
+  func[K, V] next(it *hash_iter[K, V]) opt[*tup[K, V]] {
+    i size = it->index;
+    h *hash[K, V] = it->h;
+    n size = count(&h->arr);
+    while i < n {
+      if case &HashValue(p tup[K, V]) = ref(&h->arr, i) {
+        it->index = i + 1;
+        return Has(&p);
       }
     }
+    it->index = i;
+    return None();
+  }
+}
+
+func[T] sets_equal(a *hash[T, void], b *hash[T, void]) bool {
+  n size = count(a);
+  if n != count(b) {
     return false;
   }
-
-  func[K, V] add_disjoint(onto *hash[K, V], from *hash[K, V]) bool {
-    e size = count(&from->arr);
-    for i size = 0; i < e; i = i + 1 {
-      if case &Has(p tup[K, void]) = ref(&from->arr, i) {
-        if !try_insert(onto, &p.car, void) {
-          return false;
-        }
-      }
+  it hash_iter[T, void] = iter(a);
+  while case Has(p *tup[T, void]) = next(&it) {
+    if !isHas(lookup_ref(b, &p->car)) {
+      return false;
     }
-    return true;
   }
+  return true;
+}
 
-  func[T] add_union(onto *hash[T, void], from *hash[T, void]) void {
-    e size = count(&from->arr);
-    for i size = 0; i < e; i = i + 1 {
-      if case &Has(p tup[T, void]) = ref(&from->arr, i) {
-        try_insert(onto, &p.car, void);
-      }
+func[T] intersects(a *hash[T, void], b *hash[T, void]) bool {
+  n size = count(a);
+  bn size = count(b);
+  if bn < n {
+    n = bn;
+    var tmp = a;
+    a = b;
+    b = tmp;
+  }
+  it hash_iter[T, void] = iter(a);
+  while case Has(p *tup[T, void]) = next(&it) {
+    if isHas(lookup_ref(b, &p->car)) {
+      return true;
     }
+  }
+  return false;
+}
+
+func[K, V] add_disjoint(onto *hash[K, V], from *hash[K, V]) bool {
+  it hash_iter[K, V] = iter(from);
+  while case Has(p *tup[K, V]) = next(&it) {
+    if !try_insert(onto, &p->car, p->cdr) {
+      return false;
+    }
+  }
+  return true;
+}
+
+func[T] add_union(onto *hash[T, void], from *hash[T, void]) void {
+  it hash_iter[T, void] = iter(from);
+  while case Has(p *tup[T, void]) = next(&it) {
+    discard bool = try_insert(onto, &p->car, void);
   }
 }
 
