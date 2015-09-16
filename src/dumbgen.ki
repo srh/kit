@@ -78,7 +78,7 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     return true;
   }
 
-  set(ref_annot(h, gn), {*prelive});
+  set(gnc, {*prelive});
 
   prec_muts exprmut;
 
