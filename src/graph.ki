@@ -12,6 +12,7 @@ deftype gr_node struct {
   op gr_op;
 };
 
+// TODO: Maybe gr_num should start from 1, so that 0 is an invalid value.
 deftype gr_num size;
 def `~` fn[size, gr_num] = wrapconvert;
 
@@ -1667,6 +1668,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
         gn = add_node(&gr, node(freeze(&fieldcellgn), @[gr_op]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)})));
       case CtorDestroy(v void):
         // do nothing.
+        gn = add_node(&gr, node0(@[gr_op]GrNop(void)));
       }
 
       field_gn = gn;
