@@ -175,7 +175,7 @@ access hash[_, _] {
     i size = it->index;
     h *hash[K, V] = it->h;
     n size = count(&h->arr);
-    while i < n {
+    for ; i < n; i = i + 1 {
       if case &HashValue(p tup[K, V]) = ref(&h->arr, i) {
         it->index = i + 1;
         return Has(&p);
@@ -187,8 +187,7 @@ access hash[_, _] {
 }
 
 func[T] sets_equal(a *hash[T, void], b *hash[T, void]) bool {
-  n size = count(a);
-  if n != count(b) {
+  if count(a) != count(b) {
     return false;
   }
   it hash_iter[T, void] = iter(a);
