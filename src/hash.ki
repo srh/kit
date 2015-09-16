@@ -244,6 +244,16 @@ func[T] set_union(a *hash[T, void], b *hash[T, void]) hash[T, void] {
   return build;
 }
 
+// Adds the elements of a that are not in b into onto.
+func[T] add_union_difference(onto *hash[T, void], a *hash[T, void], b *hash[T, void]) void {
+  it hash_iter[T, void] = iter(a);
+  while case Has(p *tup[T, void]) = next(&it) {
+    if case None(v void) = lookup_ref(b, &p->car) {
+      discard bool = try_insert(onto, &p->car, void);
+    }
+  }
+}
+
 func[K, V] add_disjoint(onto *hash[K, V], from *hash[K, V]) bool {
   it hash_iter[K, V] = iter(from);
   while case Has(p *tup[K, V]) = next(&it) {

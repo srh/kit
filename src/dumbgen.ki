@@ -135,7 +135,7 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     new_live hash[cell_num, void] = *prelive;
     compose_live(&new_live, &prec_muts);
 
-    combined_mut genexpr_result;
+    combined_mut genexpr_result = NonTerminal({mk_hash(), mk_hash()});
     ncases size = count(&a.cases);
     for i size = 0; i < ncases; i = i + 1 {
       cas *tup[gr_const, gr_num] = ref(&a.cases, i);
@@ -143,20 +143,19 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
       if !dumbly_gen_expression(cs, f, h, gr, cas->cdr, &new_live, &casmut) {
         return false;
       }
-      switch &combined_mut {
-      case &Terminal(tm exprmut):
-        switch &casmut {
-        case &Terminal(cm exprmut):
-          return TODO();
-        case &NonTerminal(ncm partial_exprmut):
-          // TODO: Non-terminal branches still have encapsulated cells and used cells.
-          return TODO();
-        }
-      case &NonTerminal(ntm partial_exprmut):
-        return TODO();
-      }
+      combine_branch_mut(&combined_mut, &casmut);
     }
-    return TODO();
+
+    if case Has(def_gn gr_num) = a.default_case {
+      defcasmut genexpr_result;
+      if !dumbly_gen_expression(cs, f, h, gr, def_gn, &new_live, &defcasmut) {
+        return false;
+      }
+      combine_branch_mut(&combined_mut, &defcasmut);
+    }
+
+    compose_result(&prec_muts, &combined_mut, mut_out);
+    return true;
   case &GrSequence(a gr_sequence):
     new_live hash[cell_num, void] = *prelive;
     compose_live(&new_live, &prec_muts);
@@ -193,6 +192,36 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
   case &GrNop(v void):
     *mut_out = Terminal(prec_muts);
     return true;
+  }
+}
+
+func combine_branch_mut(onto *genexpr_result, a *genexpr_result) void {
+  switch onto {
+  case &Terminal(tm exprmut):
+    switch a {
+    case &Terminal(cm exprmut):
+      check(sets_equal(&tm.made_live, &cm.made_live));
+      check(sets_equal(&tm.made_dead, &cm.made_dead));
+      add_union(&tm.used, &cm.used);
+      add_union(&tm.encapsulated, &cm.encapsulated);
+    case &NonTerminal(ncm partial_exprmut):
+      // Can made_live/made_dead be wrong?  No, because all paths to Terminal must have the same value.  (We _do_ check liveness state when revisiting the node.)
+      // We can track what cells are used and encapsulated by _expressions_ but we do _not_ gather such information from various points amid sequences of statements.  (Not when there's a loop.)
+      add_union_difference(&tm.used, &ncm.used, &tm.made_dead);
+      add_union_difference(&tm.encapsulated, &ncm.encapsulated, &tm.made_live);
+    }
+  case &NonTerminal(ntm partial_exprmut):
+    switch a {
+    case &Terminal(cm exprmut):
+      // This is just like the Terminal/NonTerminal case.
+      new_combined exprmut = cm;
+      add_union_difference(&new_combined.used, &ntm.used, &new_combined.made_dead);
+      add_union_difference(&new_combined.encapsulated, &ntm.encapsulated, &new_combined.made_live);
+      *onto = Terminal(new_combined);
+    case &NonTerminal(ncm partial_exprmut):
+      add_union(&ntm.used, &ncm.used);
+      add_union(&ntm.encapsulated, &ncm.encapsulated);
+    }
   }
 }
 
