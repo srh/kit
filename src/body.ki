@@ -592,6 +592,12 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
       if !check_consume_then_discard_expr(es, oo(&b), &booltype.~, later) {
         return false;
       }
+
+      // We need return statements in the "then" or "else" block to mark the boolean condition dead.  (It would be a smarter graph if we just marked it dead immediately after the branch, but... this way makes the code here handle all cases equivalently.)
+      swartch_vn var_number;
+      if !es_push_var(es, swartch_vp, result_cell(oo(&b)), None(), &booltype, VarSelfContained(void), &swartch_vn) {
+        return false;
+      }
       return true;
     }
     case &PatternCondition(b ast_pattern_assign): {

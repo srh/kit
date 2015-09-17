@@ -76,7 +76,7 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
   if case &Has(annot gn_annot) = gnc {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
     if !sets_equal(prelive, &annot.live) {
-      ERR(_u8("Inconsistent liveness state when revisiting node."));
+      ERR(_u8("ICE: Inconsistent liveness state when revisiting node, prelive="), *prelive, _u8(", annot.live="), annot.live);
       return false;
     }
     *mut_out = NonTerminal({mk_hash@[cell_num, void](), mk_hash@[cell_num, void]()});
