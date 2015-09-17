@@ -270,6 +270,12 @@ func[T] add_union(onto *hash[T, void], from *hash[T, void]) void {
   }
 }
 
+func[K, V] check_remove(h *hash[K, V], key *K) void {
+  if !try_remove(h, key) {
+    crash();
+  }
+}
+
 func[T] remove_exactly(mutie *hash[T, void], diff *hash[T, void]) void {
   it hash_iter[T, void] = iter(diff);
   while case Has(p *tup[T, void]) = next(&it) {
@@ -280,8 +286,9 @@ func[T] remove_exactly(mutie *hash[T, void], diff *hash[T, void]) void {
 }
 
 func[K, V] check_insert(h *hash[K, V], key *K, value V) void {
-  success bool = try_insert(h, key, value);
-  check(success);
+  if !try_insert(h, key, value) {
+    crash();
+  }
 }
 
 func[K, V] lookup(h *hash[K, V], key *K) opt[V] {

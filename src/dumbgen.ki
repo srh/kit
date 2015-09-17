@@ -97,48 +97,49 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
 
   switch &node->op {
   case &GrApply(a gr_apply):
-    deaden(prelive, &prec_muts, a.funcell);
+    deaden(gr, prelive, &prec_muts, a.funcell);
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
-      deaden(prelive, &prec_muts, get(&a.params, i));
+      deaden(gr, prelive, &prec_muts, get(&a.params, i));
     }
-    output(prelive, &prec_muts, a.retcell);
+    output(gr, prelive, &prec_muts, a.retcell);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrMemCopy(a gr_memcopy):
-    output(prelive, &prec_muts, a.dest);
-    input(prelive, &prec_muts, a.src);
+    output(gr, prelive, &prec_muts, a.dest);
+    input(gr, prelive, &prec_muts, a.src);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrWriteConst(a gr_writeconst):
-    output(prelive, &prec_muts, a.dest);
+    output(gr, prelive, &prec_muts, a.dest);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrAddressof(a gr_addressof):
-    input(prelive, &prec_muts, a.addressee);
-    output(prelive, &prec_muts, a.dest);
+    input(gr, prelive, &prec_muts, a.addressee);
+    output(gr, prelive, &prec_muts, a.dest);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrDeref(a gr_deref):
-    input(prelive, &prec_muts, a.pointer);
+    input(gr, prelive, &prec_muts, a.pointer);
+    deaden_offset(gr, prelive, &prec_muts, &a.offset);
     // Location should always be virtual.
-    virtual(prelive, &prec_muts, a.name);
+    virtual(gr, prelive, &prec_muts, a.name);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrSubcell(a gr_subcell):
-    input(prelive, &prec_muts, a.partof);
-    deaden_offset(prelive, &prec_muts, &a.offset);
-    virtual(prelive, &prec_muts, a.name);
+    input(gr, prelive, &prec_muts, a.partof);
+    deaden_offset(gr, prelive, &prec_muts, &a.offset);
+    virtual(gr, prelive, &prec_muts, a.name);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrBranch(a gr_branch):
-    input(prelive, &prec_muts, a.src);
+    input(gr, prelive, &prec_muts, a.src);
     new_live hash[cell_num, void] = *prelive;
     compose_live(&new_live, &prec_muts);
 
@@ -191,12 +192,12 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     return true;
 
   case &GrWriteNothing(a gr_writenothing):
-    output(prelive, &prec_muts, a.dest);
+    output(gr, prelive, &prec_muts, a.dest);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrDead(a gr_dead):
-    deaden(prelive, &prec_muts, a.cell);
+    deaden(gr, prelive, &prec_muts, a.cell);
     *mut_out = Terminal(prec_muts);
     return true;
 
@@ -236,30 +237,93 @@ func combine_branch_mut(onto *genexpr_result, a *genexpr_result) void {
   }
 }
 
-func deaden(prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
-  // TODO(): Implement
+// For deaden and other functions, prelive shows what was alive _before_ prec_muts modified it.
+func deaden(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
+  if !isLocationStatic(*unHas(&ref_cell(gr, c)->location)) {
+    return;
+  }
+
+  if case Has(v *void) = lookup_ref(&prec_muts->made_live, &c) {
+    check_remove(&prec_muts->made_live, &c);
+    check_insert(&prec_muts->encapsulated, &c, void);
+  } else if case Has(v *void) = lookup_ref(&prec_muts->used, &c) {
+    check_remove(&prec_muts->used, &c);
+    check_insert(&prec_muts->made_dead, &c, void);
+  } else if case Has(v *void) = lookup_ref(&prec_muts->encapsulated, &c) {
+    ice(_u8("deaden on cell seen in encapsulated"));
+  } else if case Has(v *void) = lookup_ref(&prec_muts->made_dead, &c) {
+    ice(_u8("deaden on cell seen in made_dead"));
+  } else {
+    if case Has(v *void) = lookup_ref(prelive, &c) {
+      check_insert(&prec_muts->made_dead, &c, void);
+    } else {
+      ice(_u8("deaden on un-live cell"));
+    }
+  }
 }
 
 // input requires that the cell already be live.
-func input(prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
-  // TODO(): Implement
+func input(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
+  if !isLocationStatic(*unHas(&ref_cell(gr, c)->location)) {
+    return;
+  }
+
+  if case Has(v *void) = lookup_ref(&prec_muts->made_live, &c) {
+    // Success, the cell's live.
+  } else if case Has(v *void) = lookup_ref(&prec_muts->used, &c) {
+    // Success, the cell's live (in prelive).  This check's redundant with internal logic of this graph-traversing code.
+    check(isHas(lookup_ref(prelive, &c)));
+  } else if case Has(v *void) = lookup_ref(&prec_muts->encapsulated, &c) {
+    ice(_u8("input cell seen in encapsulated"));
+  } else if case Has(v *void) = lookup_ref(&prec_muts->made_dead, &c) {
+    ice(_u8("input cell seen in made_dead"));
+  } else {
+    if case Has(v *void) = lookup_ref(prelive, &c) {
+      // Success, the cell's live.
+    } else {
+      ice(_u8("input cell "), c.~, _u8(" not seen in prelive"));
+    }
+  }
 }
 
 // output either makes the cell live, if it wasn't already, or it means we use the cell.
-func output(prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
-  // TODO(): Implement
+// (Yes, that's so lame -- we should use GrMakeLive.)
+func output(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
+  if !isLocationStatic(*unHas(&ref_cell(gr, c)->location)) {
+    return;
+  }
+
+  if case Has(v *void) = lookup_ref(&prec_muts->made_live, &c) {
+    // The cell's already live.
+  } else if case Has(v *void) = lookup_ref(&prec_muts->used, &c) {
+    // The cell's already live.
+  } else if case Has(v *void) = lookup_ref(&prec_muts->encapsulated, &c) {
+    // The cell's dead.  Make it live.
+    check_remove(&prec_muts->encapsulated, &c);
+    check_insert(&prec_muts->made_live, &c, void);
+  } else if case Has(v *void) = lookup_ref(&prec_muts->made_dead, &c) {
+    // The cell's dead.  Make it live.
+    check_remove(&prec_muts->made_dead, &c);
+    check_insert(&prec_muts->used, &c, void);
+  } else {
+    if case Has(v *void) = lookup_ref(prelive, &c) {
+      // The cell's already live.
+    } else {
+      check_insert(&prec_muts->made_live, &c, void);
+    }
+  }
 }
 
 // Says that we're naming a virtual cell.
-func virtual(prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
-  // TODO(): Implement
+func virtual(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
+  check(!isLocationStatic(*unHas(&ref_cell(gr, c)->location)));
 }
 
-func deaden_offset(prelive *hash[cell_num, void], prec_muts *exprmut, goff *gr_offset) void {
+func deaden_offset(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, goff *gr_offset) void {
   switch goff {
   case &OffsetConst(n u32): { }
   case &OffsetComputed(p tup[u32, cell_num]):
-    deaden(prelive, prec_muts, p.cdr);
+    deaden(gr, prelive, prec_muts, p.cdr);
   }
 }
 
