@@ -60,7 +60,13 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
   im identmap = make_im();
   cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
   add_primitives(&cs);
-  if !check_module(&cs, intern(&im, testmodule_name())) {
+  success bool;
+  if ctx->build {
+    success = build_module(&cs, intern(&im, testmodule_name()));
+  } else {
+    success = check_module(&cs, intern(&im, testmodule_name()));
+  }
+  if !success {
     print(Stdout(), _u8("FAIL\n"));
     fflush(Stdout());
     ctx->failures = ctx->failures + 1;
@@ -95,6 +101,7 @@ func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
 // TODO: Make test output not go directly to stdout/stderr.
 
 deftype check_ctx struct {
+  build bool;
   specific_run opt[array[u8]];
   failures u32;
 };
@@ -1760,10 +1767,10 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def d1 i32 = foo@[u32](Has(@[u32]3));\n"));
 }
 
-func mk_ctx(name opt[array[u8]]) check_ctx { return {name, 0}; }
+func mk_ctx(build bool, name opt[array[u8]]) check_ctx { return {build, name, 0}; }
 
-func test_check() tup[bool, u32] {
-  ctx check_ctx = mk_ctx(None());
+func test_check(build bool) tup[bool, u32] {
+  ctx check_ctx = mk_ctx(build, None());
   test_check_basic_cases(&ctx);
   test_check_lambda_cases(&ctx);
   test_check_more_cases(&ctx);
