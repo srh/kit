@@ -273,7 +273,7 @@ func deaden(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, 
     if case Has(v *void) = lookup_ref(prelive, &c) {
       check_insert(&prec_muts->made_dead, &c, void);
     } else {
-      ice(_u8("deaden on un-live cell"));
+      ice(_u8("deaden on un-live cell "), c.~);
     }
   }
 }

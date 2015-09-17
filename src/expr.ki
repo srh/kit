@@ -2031,7 +2031,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     if !annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later) {
       return false;
     }
-    
+
     annotate(&a->info, {Has({*unHas(&ie_info_after), lhs_later}), rhs_later});
   }
 

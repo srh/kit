@@ -867,7 +867,7 @@ func gr_index_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_index_ex
       return false;
     }
     var laters = add_node(gr, node(mk_shray(lhs_later, rhs_later), @[gr_op]GrNop(void)));
-    var gp_laters = add_node(gr, node0(@[gr_op]GrSequence({rp, laters})));
+    var gp_laters = add_node(gr, node0(@[gr_op]GrSequence({gp, laters})));
     *out = gp_laters;
     return true;
   } else {
