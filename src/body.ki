@@ -433,12 +433,18 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   }
 
   exitnum statement_num = add_statement(bs, None());
+  cond_vp varpopper;
+  init_vp(&cond_vp, &bs->es);
   if case &Has(cond ast_for_condition) = &a->condition {
     boolean cu_typeexpr = compute_prim(bs->ds, primitive_bool_type(bs->cs));
     if !check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.~, &cond.discard) {
       return false;
     }
     connect_statements(bs, loopnum, exitnum);
+    cond_vn var_number;
+    if !es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None(), &boolean, VarSelfContained(void), &cond_vn) {
+      return false;
+    }
   }
   if case &Has(incr box[ast_expr_discard]) = &a->increment {
     unknown te_typeexpr = TeUnknown(void);
@@ -446,6 +452,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
       return false;
     }
   }
+
   body_ee entryexit;
   if !check_body(bs, &a->body, &body_ee) {
     return false;
