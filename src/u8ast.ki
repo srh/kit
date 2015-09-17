@@ -1,19 +1,6 @@
 import ast;
 import shray;
 
-// TODO: Does anybody use this?
-func[T] build_array_u8str(r *array[u8], arr *array[T]) void {
-  push(r, '[');
-  n size = count(arr);
-  for i size = 0; i < n; i = i + 1 {
-    if i != 0 {
-      push(r, ',');
-    }
-    build_u8str(r, ref(arr, i));
-  }
-  push(r, ']');
-}
-
 func[H, T] build_array_raw_u8str(help H, r *array[u8], buf *T, n size) void {
   push(r, '[');
   for i size = 0; i < n; i = i + 1 {
@@ -33,13 +20,6 @@ func[H, T] build_shray_u8str(help H, r *array[u8], arr *shray[T]) void {
   build_array_raw_u8str(help, r, data(arr), count(arr));
 }
 
-func[T] wrap_u8str(r *array[u8], x array[u8], y *T) void {
-  append(r, &x);
-  push(r, '(');
-  build_u8str(r, y);
-  push(r, ')');
-}
-
 func[H, T] wrap_u8str(help H, r *array[u8], x array[u8], y *T) void {
   append(r, &x);
   push(r, '(');
@@ -47,107 +27,103 @@ func[H, T] wrap_u8str(help H, r *array[u8], x array[u8], y *T) void {
   push(r, ')');
 }
 
-func build_u8str(r *array[u8], a *ast_typeexpr) void {
+func[H] build_u8str(help H, r *array[u8], a *ast_typeexpr) void {
   switch a {
     case &Name(b ast_ident): {
-      wrap_u8str(r, _u8("Name"), &b);
+      wrap_u8str(help, r, _u8("Name"), &b);
     }
     case &App(b ast_typeapp): {
-      wrap_u8str(r, _u8("App"), &b);
+      wrap_u8str(help, r, _u8("App"), &b);
     }
     case &Struct(b ast_struct): {
-      wrap_u8str(r, _u8("Struct"), &b);
+      wrap_u8str(help, r, _u8("Struct"), &b);
     }
     case &Enum(b ast_enum): {
-      wrap_u8str(r, _u8("Enum"), &b);
+      wrap_u8str(help, r, _u8("Enum"), &b);
     }
     case &Union(b ast_union): {
-      wrap_u8str(r, _u8("Union"), &b);
+      wrap_u8str(help, r, _u8("Union"), &b);
     }
     case &Arraytype(b ast_arraytype): {
-      wrap_u8str(r, _u8("Arraytype"), &b);
+      wrap_u8str(help, r, _u8("Arraytype"), &b);
     }
     case &Unknown(b ast_unknown): {
-      wrap_u8str(r, _u8("Unknown"), &b);
+      wrap_u8str(help, r, _u8("Unknown"), &b);
     }
   }
 }
 
-func build_u8str(r *array[u8], a *ast_ident) void {
+func[H] build_u8str(help H, r *array[u8], a *ast_ident) void {
   append(r, _u8("{value:"));
-  build_u8str(r, &a->value);
+  build_u8str(help, r, &a->value);
   append(r, _u8("}"));
 }
 
-func build_u8str(r *array[u8], a *ast_typeapp) void {
+func[H] build_u8str(help H, r *array[u8], a *ast_typeapp) void {
   append(r, _u8("{typefunc:"));
-  build_u8str(r, &a->typefunc);
+  build_u8str(help, r, &a->typefunc);
   append(r, _u8(",params:"));
-  build_array_u8str(r, &a->params);
+  build_array_u8str(help, r, &a->params);
   push(r, '}');
 }
 
-func build_u8str(r *array[u8], a *ast_struct) void {
+func[H] build_u8str(help H, r *array[u8], a *ast_struct) void {
   append(r, _u8("{fields:"));
-  build_array_u8str(r, &a->fields);
+  build_array_u8str(help, r, &a->fields);
   push(r, '}');
 }
 
-func build_u8str(r *array[u8], a *ast_enum) void {
+func[H] build_u8str(help H, r *array[u8], a *ast_enum) void {
   append(r, _u8("{constructors:"));
-  build_array_u8str(r, &a->constructors);
+  build_array_u8str(help, r, &a->constructors);
   push(r, '}');
 }
 
-func build_u8str(r *array[u8], a *ast_union) void {
+func[H] build_u8str(help H, r *array[u8], a *ast_union) void {
   append(r, _u8("{fields:"));
-  build_array_u8str(r, &a->fields);
+  build_array_u8str(help, r, &a->fields);
   push(r, '}');
 }
 
-func build_u8str(r *array[u8], a *ast_arraytype) void {
+func[H] build_u8str(help H, r *array[u8], a *ast_arraytype) void {
   append(r, _u8("{count:"));
-  build_u8str(r, &a->count);
+  build_u8str(help, r, &a->count);
   append(r, _u8(",param:"));
-  build_u8str(r, &a->param);
+  build_u8str(help, r, &a->param);
   push(r, '}');
 }
 
-func build_u8str(r *array[u8], a *ast_unknown) void {
+func[H] build_u8str(help H, r *array[u8], a *ast_unknown) void {
   append(r, _u8("ast_unknown"));
   // Do nothing.
 }
 
-func build_u8str(r *array[u8], a *ast_vardecl) void {
+func[H] build_u8str(help H, r *array[u8], a *ast_vardecl) void {
   append(r, _u8("{name:"));
-  build_u8str(r, &a->name);
+  build_u8str(help, r, &a->name);
   append(r, _u8(",type:"));
-  build_u8str(r, &a->type);
+  build_u8str(help, r, &a->type);
   push(r, '}');
 }
 
-func[T] build_u8str(r *array[u8], a *opt[T]) void {
+func[H, T] build_u8str(help H, r *array[u8], a *opt[T]) void {
   switch a {
     case &None(v): {
       append(r, _u8("None()"));
     }
     case &Has(b T): {
       append(r, _u8("Has("));
-      build_u8str(r, &b);
+      build_u8str(help, r, &b);
       push(r, ')');
     }
   }
-}
-
-func[T] build_u8str(r *array[u8], a *box[T]) void {
-  build_u8str(r, oo(a));
 }
 
 func[H, T] build_u8str(help H, r *array[u8], a *box[T]) void {
   build_u8str(help, r, oo(a));
 }
 
-func build_u8str(r *array[u8], a *ast_expr) void {
+func[H] build_u8str(help H, r *array[u8], a *ast_expr) void {
   append(r, _u8("ast_expr"));
 }
 

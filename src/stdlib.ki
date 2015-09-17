@@ -49,13 +49,13 @@ func lpz_as_u8str(s *u8) array[u8] {
   return make_copy(s, n);
 }
 
-func[T] build_u8str(r *array[u8], x **T) void {
+func[H, T] build_u8str(help H, r *array[u8], x **T) void {
   u union { p *void; x size; };
   u.p = cast(x);
   append(r, as_hex(u.x));
 }
 
-func build_u8str(r *array[u8], x *bool) void {
+func[H] build_u8str(help H, r *array[u8], x *bool) void {
   if *x {
     append(r, _u8("true"));
   } else {
@@ -63,11 +63,11 @@ func build_u8str(r *array[u8], x *bool) void {
   }
 }
 
-func build_u8str(r *array[u8], x *u32) void {
+func[H] build_u8str(help H, r *array[u8], x *u32) void {
   append(r, unsigned_as_dec(*x));
 }
 
-func build_u8str(r *array[u8], x *i32) void {
+func[H] build_u8str(help H, r *array[u8], x *i32) void {
   if *x >= 0 {
     y u32 = ~ *x;
     build_u8str(r, &y);
@@ -79,7 +79,7 @@ func build_u8str(r *array[u8], x *i32) void {
   }
 }
 
-func build_u8str(r *array[u8], x *size) void {
+func[H] build_u8str(help H, r *array[u8], x *size) void {
   append(r, unsigned_as_dec(*x));
 }
 
@@ -138,7 +138,7 @@ func[T] printerr(x array[u8], y T) void {
 
 func[T] to_u8str(x T) array[u8] {
   ret array[u8];
-  build_u8str(&ret, &x);
+  build_u8str(void, &ret, &x);
   return ret;
 }
 
@@ -250,11 +250,6 @@ func[H] build_u8str(help H, r *array[u8], x *void) void {
 func[H, S, T] build_u8str(help H, r *array[u8], p *tup[S, T]) void {
   build_u8str(help, r, &p->car);
   build_u8str(help, r, &p->cdr);
-}
-
-func[S, T] build_u8str(r *array[u8], p *tup[S, T]) void {
-  build_u8str(r, &p->car);
-  build_u8str(r, &p->cdr);
 }
 
 func[S, T] wrapconvert(x T) S {

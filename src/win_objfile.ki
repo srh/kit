@@ -492,7 +492,7 @@ null-terminatable), and that it's non-empty (the first four bytes of a
 Name field can't be zero). */
 func win_string_to_u8symbol(s *string) array[u8] {
   ret array[u8];
-  build_u8str(&ret, s);
+  build_u8str(void, &ret, s);
   check_no_zeros(data(&ret), count(&ret));
   check(count(&ret) != 0);
   return ret;

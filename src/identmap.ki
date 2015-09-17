@@ -4,10 +4,6 @@ import stdlib;
 
 deftype sym size;
 
-func build_u8str(r *array[u8], v *sym) void {
-  append(r, as_hex(v->~));
-}
-
 def `~` fn[size, sym] = wrapconvert;
 
 func `==`(x sym, y sym) bool {
@@ -164,10 +160,10 @@ func lookup(im *identmap, ident sym) string {
 
 func build_u8str(im *identmap, r *array[u8], a *sym) void {
   s string = lookup(im, *a);
-  build_u8str(r, &s);
+  build_u8str(void, r, &s);
 }
 
 func build_u8str(nohelp void, r *array[u8], a *sym) void {
-  build_u8str(r, a);
+  build_u8str(nohelp, r, a);
 }
 

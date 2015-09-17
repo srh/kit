@@ -87,7 +87,7 @@ func generate_kit_name(cs *checkstate) sym {
   build array[u8] = _u8("_kit_");
   num u32 = cs->kit_name_counter + 1;
   cs->kit_name_counter = num;
-  build_u8str(&build, &num);
+  build_u8str(void, &build, &num);
   return intern(cs->im, from_u8(&build));
 }
 

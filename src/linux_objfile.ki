@@ -423,7 +423,7 @@ func linux32_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *ar
 
 func linux_string_to_u8symbol(s *string) array[u8] {
   ret array[u8];
-  build_u8str(&ret, s);
+  build_u8str(void, &ret, s);
   check_no_zeros(data(&ret), count(&ret));
   return ret;
 }

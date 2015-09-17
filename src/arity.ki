@@ -26,21 +26,21 @@ func arity(a *ast_generics) generics_arity {
   }
 }
 
-func build_u8str(r *array[u8], a *generics_arity) void {
+func[H] build_u8str(help H, r *array[u8], a *generics_arity) void {
   switch a {
     case &NoParamsArity(v void): {
       append(r, _u8("NoParamsArity"));
     }
     case &FiniteArity(n u32): {
       append(r, _u8("FiniteArity("));
-      build_u8str(r, &n);
+      build_u8str(help, r, &n);
       push(r, ')');
     }
     case &VariadicArity(ar variadic_arity): {
       append(r, _u8("VariadicArity(before: "));
-      build_u8str(r, &ar.before);
+      build_u8str(help, r, &ar.before);
       append(r, _u8(", after: "));
-      build_u8str(r, &ar.after);
+      build_u8str(help, r, &ar.after);
       push(r, ')');
     }
   }

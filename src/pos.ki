@@ -19,7 +19,7 @@ deftype human_pos struct {
 func build_u8str(im *identmap, r *array[u8], hp *human_pos) void {
   build_u8str(im, r, &hp->module);
   append(r, _u8(".ki:"));
-  build_u8str(r, &hp->line);
+  build_u8str(im, r, &hp->line);
   push(r, ':');
-  build_u8str(r, &hp->column);
+  build_u8str(im, r, &hp->column);
 }

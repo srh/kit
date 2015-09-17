@@ -50,14 +50,6 @@ func[H] build_u8str(help H, r *array[u8], x *string) void {
   }
 }
 
-func build_u8str(r *array[u8], x *string) void {
-  n size = count(x);
-  p *i32 = data(&x->~);
-  for i size = 0; i < n; i = i + 1 {
-    push(r, ~p[i]);
-  }
-}
-
 func from_u8(x array[u8]) string {
   return from_u8(&x);
 }

@@ -918,9 +918,9 @@ func st_value_as_size(plat *platform_info, val *st_value, out *u32) bool {
   return true;
 }
 
-func build_u8str(r *array[u8], x *st_value) void {
+func[H] build_u8str(help H, r *array[u8], x *st_value) void {
   append(r, _u8("st_value{len="));
-  build_u8str(r, &x->length);
+  build_u8str(help, r, &x->length);
   append(r, _u8(","));
   nwords size = count(&x->words);
   for i size = 0; i < nwords; i = i + 1 {

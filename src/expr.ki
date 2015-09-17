@@ -75,7 +75,7 @@ def `==` fn[cell_num, cell_num, bool] = wrapequate;
 func `!=`(x cell_num, y cell_num) bool { return x.~ != y.~; }
 func `<`(x cell_num, y cell_num) bool { return x.~ < y.~; }
 func[H] build_u8str(help H, r *array[u8], c *cell_num) void {
-  build_u8str(r, &c->~);
+  build_u8str(help, r, &c->~);
 }
 func hash_compute_hash(x *cell_num) osize {
   // This should suffice!
@@ -449,7 +449,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
 func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *te_typeexpr, decl_index size, out *instpair) bool {
   // TODO: Pick a better def name.
   defname_u8 array[u8] = _u8("magic_enum_ctor_");
-  build_u8str(&defname_u8, &decl_index);
+  build_u8str(void, &defname_u8, &decl_index);
   defname sym = intern(ds->im, from_u8(defname_u8));
 
   nogp genparms = NoParms(void);

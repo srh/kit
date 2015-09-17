@@ -263,7 +263,7 @@ func[H] build_u8str(help H, r *array[u8], a *te_union) void {
 
 func[H] build_u8str(help H, r *array[u8], a *te_arraytype) void {
   append(r, _u8("{count:"));
-  build_u8str(r, &a->count);
+  build_u8str(help, r, &a->count);
   append(r, _u8(",param:"));
   build_u8str(help, r, &a->param);
   push(r, '}');

@@ -41,7 +41,7 @@ func[T, U] ERR(x T, y U) void {
 
 func[T] ERR(x T) void {
   r array[u8];
-  build_u8str(&r, &x);
+  build_u8str(void, &r, &x);
   push(&r, '\n');
   print(Stderr(), r);
   fflush(Stderr());

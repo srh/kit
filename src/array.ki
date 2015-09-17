@@ -283,10 +283,6 @@ func[H] build_u8str(help H, r *array[u8], a *array[u8]) void {
   append(r, a);
 }
 
-func build_u8str(r *array[u8], a *array[u8]) void {
-  append(r, a);
-}
-
 func[T] is_strictly_increasing(x *array[T]) bool {
   n size = count(x);
   for i size = 1; i < n; i = i + 1 {
