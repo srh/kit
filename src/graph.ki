@@ -955,6 +955,9 @@ func gr_logical_conjunction(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast
   rhs_cp_gn gr_num = add_node(gr, node(mk_shray(rhs_dep), @[gr_op]GrMemCopy({rval_cell(x), result_cell(oo(&a->rhs))})));
   rhs_dead_gn gr_num = add_node(gr, node(mk_shray(rhs_cp_gn), @[gr_op]GrDead({result_cell(oo(&a->rhs))})));
 
+  rhs_lhs_dead_gn gr_num = add_node(gr, node0(@[gr_op]GrDead({result_cell(oo(&a->lhs))})));
+  lhs_dead_then_rhs gr_num = add_node(gr, node0(@[gr_op]GrSequence({rhs_lhs_dead_gn, rhs_dead_gn})));
+
   lhs_cp_gn gr_num = add_node(gr, node0(@[gr_op]GrMemCopy({rval_cell(x), result_cell(oo(&a->lhs))})));
   lhs_dead_gn gr_num = add_node(gr, node(mk_shray(lhs_cp_gn), @[gr_op]GrDead({result_cell(oo(&a->lhs))})));
 
@@ -968,7 +971,7 @@ func gr_logical_conjunction(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast
     short_circuit_case = ConstInt(~ @[u32] 0);
     eval_rhs_case = ConstInt(~ @[u32] 1);
   }
-  bn gr_num = add_node(gr, node(mk_shray(lhs_dep), @[gr_op]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, lhs_dead_gn}, {eval_rhs_case, rhs_dead_gn}), None()})));
+  bn gr_num = add_node(gr, node(mk_shray(lhs_dep), @[gr_op]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, lhs_dead_gn}, {eval_rhs_case, lhs_dead_then_rhs}), None()})));
   *out = bn;
   return true;
 }
