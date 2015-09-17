@@ -324,6 +324,12 @@ func[K, V] mk_hash() hash[K, V] {
   return ret;
 }
 
+func[K, V] mk_hash(key K, value V) hash[K, V] {
+  ret hash[K, V];
+  check_insert(&ret, &key, value);
+  return ret;
+}
+
 func[T] check_add(h *hash[T, void], key T) void {
   check_insert(h, &key, void);
 }

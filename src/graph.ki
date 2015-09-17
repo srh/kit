@@ -1359,7 +1359,8 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
     pc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), mai->cu_type, mai->cu_props});
     push(&pointeecells, pc);
 
-    gn gr_num = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
+    gn1 gr_num = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
+    gn gr_num = add_node(&gr, node(mk_shray(gn1), @[gr_op]GrDead({ac})));
     push(&derefgns, gn);
   }
 
@@ -1461,7 +1462,8 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     tc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), tagtype, tagtype_props});
     push(&tagcells, tc);
 
-    derefgn gr_num = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
+    derefgn1 gr_num = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
+    derefgn gr_num = add_node(&gr, node(mk_shray(derefgn1), @[gr_op]GrDead({ac})));
     push(&deref_gns, derefgn);
     tcgn gr_num = add_node(&gr, node(mk_shray(derefgn), @[gr_op]GrSubcell({tc, pc, OffsetConst(enum_tag_offset)})));
     push(&tagcell_gns, tcgn);
@@ -1619,7 +1621,8 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
     pc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), msi->cu_type, msi->cu_props});
     push(&pointeecells, pc);
 
-    gn gr_num = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
+    gn1 gr_num = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
+    gn gr_num = add_node(&gr, node(mk_shray(gn1), @[gr_op]GrDead({ac})));
     push(&derefgns, gn);
   }
 
@@ -1784,7 +1787,8 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
 
   precs array[gr_num];
   for i size = 0; i < nargs; i = i + 1 {
-    var pointee_gn = add_node(&gr, node0(@[gr_op]GrDeref({get(&pointeecells, i), get(&argcells, i), OffsetConst(0)})));
+    var pointee_gn1 = add_node(&gr, node0(@[gr_op]GrDeref({get(&pointeecells, i), get(&argcells, i), OffsetConst(0)})));
+    var pointee_gn = add_node(&gr, node(mk_shray(pointee_gn1), @[gr_op]GrDead({get(&argcells, i)})));
     var fieldcell_gn = add_node(&gr, node(mk_shray(pointee_gn), @[gr_op]GrSubcell({get(&fieldcells, i), get(&pointeecells, i), OffsetConst(0)})));
     var fieldptr_gn = add_node(&gr, node(mk_shray(fieldcell_gn), @[gr_op]GrAddressof({get(&fieldptrcells, i), get(&fieldcells, i)})));
     push(&precs, fieldptr_gn);

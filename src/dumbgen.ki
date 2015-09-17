@@ -26,7 +26,19 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
     return false;
   }
 
-  // TODO: Is there something I should assert about mut?  (It can be None if the function infinite-loops.)
+  switch &mut {
+  case &Terminal(m exprmut):
+    new_live hash[cell_num, void] = prelive;
+    compose_live(&new_live, &m);
+    expected hash[cell_num, void] = mk_hash(g->graph.cell, void);
+    if !sets_equal(&new_live, &expected) {
+      ice(_u8("fn_body leaves cells alive, expected "), g->graph.cell, _u8(", saw "), new_live);
+    }
+  case &NonTerminal(pm partial_exprmut):
+    // nothing to assert
+  }
+
+  // TODO: Is there anything else I should assert about mut?
 
   return true;
 }
