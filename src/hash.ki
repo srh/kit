@@ -340,3 +340,25 @@ func[T] check_add_disjoint(onto *hash[T, void], from *hash[T, void]) void {
     crash();
   }
 }
+
+func[H, K, V] build_u8str(help H, r *array[u8], a *hash[K, V]) void {
+  push(r, '{');
+  notfirst bool = false;
+  it hash_iter[K, V] = iter(a);
+  while case Has(p *tup[K, V]) = next(&it) {
+    if notfirst {
+      push(r, ',');
+    }
+    notfirst = true;
+    push(r, '(');
+    build_u8str(help, r, &p->car);
+    push(r, ',');
+    build_u8str(help, r, &p->cdr);
+    push(r, ')');
+  }
+  push(r, '}');
+}
+
+func[K, V] build_u8str(r *array[u8], a *hash[K, V]) void {
+  build_u8str(void, r, a);
+}

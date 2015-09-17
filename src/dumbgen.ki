@@ -228,8 +228,12 @@ func combine_branch_mut(onto *genexpr_result, a *genexpr_result) void {
   case &Terminal(tm exprmut):
     switch a {
     case &Terminal(cm exprmut):
-      check(sets_equal(&tm.made_live, &cm.made_live));
-      check(sets_equal(&tm.made_dead, &cm.made_dead));
+      if !sets_equal(&tm.made_live, &cm.made_live) {
+        ice(_u8("terminal/terminal made_live not equal, tm="), tm.made_live, _u8(", cm="), cm.made_live);
+      }
+      if !sets_equal(&tm.made_dead, &cm.made_dead) {
+        ice(_u8("terminal/terminal made_dead not equal, tm="), tm.made_dead, _u8(", cm="), cm.made_dead);
+      }
       add_union(&tm.used, &cm.used);
       add_union(&tm.encapsulated, &cm.encapsulated);
     case &NonTerminal(ncm partial_exprmut):

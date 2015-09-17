@@ -74,6 +74,9 @@ def `~` fn[size, cell_num] = wrapconvert;
 def `==` fn[cell_num, cell_num, bool] = wrapequate;
 func `!=`(x cell_num, y cell_num) bool { return x.~ != y.~; }
 func `<`(x cell_num, y cell_num) bool { return x.~ < y.~; }
+func[H] build_u8str(help H, r *array[u8], c *cell_num) void {
+  build_u8str(r, &c->~);
+}
 func hash_compute_hash(x *cell_num) osize {
   // This should suffice!
   k osize = ~x->~;
