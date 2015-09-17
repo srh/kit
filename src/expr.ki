@@ -1985,7 +1985,8 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   }
   sizetype cu_typeexpr = compute_prim(es->ds, primitive_size_type(es->cs));
 
-  if !check_expr_consume(es, oo(&a->rhs), &sizetype.~) {
+  rhs_later ast_later_discard_info;
+  if !check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.~, &rhs_later) {
     return false;
   }
 
@@ -2021,15 +2022,17 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       }
     }
     // Nothing to dispose, it's a field access.
-    annotate(&a->info, {None@[ast_expr_after]()});
+    annotate(&a->info, {None(), rhs_later});
   } else {
     // Dereferencing a pointer always makes an lvalue.
     lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props)});
     ie_info_after nc[ast_expr_after];
-    if !annotate_disposal_for_consume(es, oo(&a->lhs), &ie_info_after) {
+    lhs_later ast_later_discard_info;
+    if !annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later) {
       return false;
     }
-    annotate(&a->info, {Has(*unHas(&ie_info_after))});
+    
+    annotate(&a->info, {Has({*unHas(&ie_info_after), lhs_later}), rhs_later});
   }
 
   annotate_info(x, CompleteCheck(mk(lval, ~ *ixtype, props)));

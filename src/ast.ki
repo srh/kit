@@ -424,8 +424,9 @@ deftype ast_paren_expr struct {
 };
 
 deftype ast_index_expr_info struct {
-  // isHas if the lhs needs discarding (if it's a ptr).
-  after opt[ast_expr_after];
+  // isHas if the lhs needs consuming/discarding (if it's a ptr).
+  lhs_after opt[tup[ast_expr_after, ast_later_discard_info]];
+  rhs_later ast_later_discard_info;
 };
 
 deftype ast_index_expr struct {

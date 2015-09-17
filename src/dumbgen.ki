@@ -67,6 +67,10 @@ defenum genexpr_result {
   NonTerminal partial_exprmut;
 };
 
+func[T] DUMBG(x T) void {
+  DBG(x);
+}
+
 func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *hash[cell_num, void], mut_out *genexpr_result) bool {
   gnc *opt[gn_annot] = ref_annot(h, gn);
   if case &Has(annot gn_annot) = gnc {
@@ -97,6 +101,7 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
 
   switch &node->op {
   case &GrApply(a gr_apply):
+    DUMBG(_u8("GrApply"));
     deaden(gr, prelive, &prec_muts, a.funcell);
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
@@ -107,38 +112,43 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     return true;
 
   case &GrMemCopy(a gr_memcopy):
+    DUMBG(_u8("GrMemCopy"));
     output(gr, prelive, &prec_muts, a.dest);
     input(gr, prelive, &prec_muts, a.src);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrWriteConst(a gr_writeconst):
+    DUMBG(_u8("GrWriteConst"));
     output(gr, prelive, &prec_muts, a.dest);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrAddressof(a gr_addressof):
-    input(gr, prelive, &prec_muts, a.addressee);
+    DUMBG(_u8("GrAddressof"));
+    // Yes, addressee is an _output_ -- if it is not live -- we make it live.
+    output(gr, prelive, &prec_muts, a.addressee);
     output(gr, prelive, &prec_muts, a.dest);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrDeref(a gr_deref):
+    DUMBG(_u8("GrDeref"));
     input(gr, prelive, &prec_muts, a.pointer);
-    deaden_offset(gr, prelive, &prec_muts, &a.offset);
     // Location should always be virtual.
     virtual(gr, prelive, &prec_muts, a.name);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrSubcell(a gr_subcell):
+    DUMBG(_u8("GrSubcell"));
     input(gr, prelive, &prec_muts, a.partof);
-    deaden_offset(gr, prelive, &prec_muts, &a.offset);
     virtual(gr, prelive, &prec_muts, a.name);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrBranch(a gr_branch):
+    DUMBG(_u8("GrBranch"));
     input(gr, prelive, &prec_muts, a.src);
     new_live hash[cell_num, void] = *prelive;
     compose_live(&new_live, &prec_muts);
@@ -164,7 +174,9 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
 
     compose_result(&prec_muts, &combined_mut, mut_out);
     return true;
+
   case &GrSequence(a gr_sequence):
+    DUMBG(_u8("GrSequence"));
     new_live hash[cell_num, void] = *prelive;
     compose_live(&new_live, &prec_muts);
     firstmut exprmut;
@@ -182,6 +194,7 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     return true;
 
   case &GrJmp(a gr_jmp):
+    DUMBG(_u8("GrJmp"));
     new_live hash[cell_num, void] = *prelive;
     compose_live(&new_live, &prec_muts);
     exitmut genexpr_result;
@@ -192,16 +205,19 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     return true;
 
   case &GrWriteNothing(a gr_writenothing):
+    DUMBG(_u8("GrWriteNothing"));
     output(gr, prelive, &prec_muts, a.dest);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrDead(a gr_dead):
+    DUMBG(_u8("GrDead"));
     deaden(gr, prelive, &prec_muts, a.cell);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrNop(v void):
+    DUMBG(_u8("GrNop"));
     *mut_out = Terminal(prec_muts);
     return true;
   }
@@ -317,14 +333,6 @@ func output(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, 
 // Says that we're naming a virtual cell.
 func virtual(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
   check(!isLocationStatic(*unHas(&ref_cell(gr, c)->location)));
-}
-
-func deaden_offset(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, goff *gr_offset) void {
-  switch goff {
-  case &OffsetConst(n u32): { }
-  case &OffsetComputed(p tup[u32, cell_num]):
-    deaden(gr, prelive, prec_muts, p.cdr);
-  }
 }
 
 func compose_live(live *hash[cell_num, void], muts *exprmut) void {
