@@ -925,6 +925,14 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       *out = lp_rp_nop;
       return true;
     }
+    case &SimpleAssignment(si ast_simple_assignment_info): {
+      aagn gr_num;
+      if !gr_after_actions(cs, gr, lp_rp_nop, &si.assignment_actions, DeadAfterDestroyNo(void), &aagn) {
+        return false;
+      }
+      *out = aagn;
+      return true;
+    }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
       var fc = add_node(gr, node0(@[gr_op]GrWriteConst({ci.comparecells.funcell, ConstDef(ci.comparecells.ip)})));
       var dp = add_node(gr, node0(@[gr_op]GrAddressof({ci.comparecells.destptr, value_cell(oo(&a->lhs))})));

@@ -97,8 +97,13 @@ deftype ast_conditional_assignment_info struct {
   unconditional_actions array[after_action];
 };
 
+deftype ast_simple_assignment_info struct {
+  assignment_actions array[after_action];
+};
+
 defenum ast_assignment_info {
   StaticSelfAssignment void;
+  SimpleAssignment ast_simple_assignment_info;
   ConditionalAssignment ast_conditional_assignment_info;
 };
 
