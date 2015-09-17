@@ -140,6 +140,15 @@ func annotate_cell_location(es *framescope, num cell_num, loc cell_location) voi
   info->location = Has(loc);
 }
 
+func reannotate_rigid_to_virtual(es *framescope, num cell_num) void {
+  info *cell_info = ref_cell(es, num);
+  if case &LocationRigid(v void) = unHas(&info->location) {
+    info->location = Has(LocationVirtual(void));
+  } else {
+    ice(_u8("reannotate_rigid_to_virtual seeing non-rigid location"));
+  }
+}
+
 deftype defscope struct {
   cs *checkstate;
   // Same as cs->im.
@@ -1359,6 +1368,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       if !check_expr_consume(es, x_i, &field->type) {
         return false;
       }
+      reannotate_rigid_to_virtual(es, result_cell(x_i));
       psd partial_struct_data;
       if !compute_partial_struct_data(es->cs, es->clq, &b.fields, Has(field->name), &psd) {
         return false;

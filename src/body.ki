@@ -537,6 +537,7 @@ func check_return_statement(bs *bodystate, vp *varpopper, a *ast_return_statemen
     if !check_expr_consume(&bs->es, oo(&c), &bs->return_type->~) {
       return false;
     }
+    reannotate_rigid_to_virtual(&bs->es, result_cell(oo(&c)));
   } else {
     if !type_is_void(bs->cs, bs->return_type) {
       ERR(_u8("Empty return statement with non-void return value."));

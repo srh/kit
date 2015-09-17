@@ -180,7 +180,6 @@ func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num, 
   }
 
   // This assumes it's okay to have a subcell op produce the identical type -- it's the only place we do that.
-  // TODO: This and strinit are the places where a subcell is "rigid."
   return_subcell_ops array[gr_num];
   nreturncells size = count(&fb.return_cells);
   reserve(&return_subcell_ops, nreturncells);
