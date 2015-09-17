@@ -67,8 +67,8 @@ defenum genexpr_result {
   NonTerminal partial_exprmut;
 };
 
+// TODO: Remove this and its callers.
 func[T] DUMBG(x T) void {
-  DBG(x);
 }
 
 func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *hash[cell_num, void], mut_out *genexpr_result) bool {
@@ -101,7 +101,7 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
 
   switch &node->op {
   case &GrApply(a gr_apply):
-    DUMBG(_u8("GrApply"));
+    DUMBG("GrApply");
     deaden(gr, prelive, &prec_muts, a.funcell);
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
@@ -112,20 +112,20 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     return true;
 
   case &GrMemCopy(a gr_memcopy):
-    DUMBG(_u8("GrMemCopy"));
+    DUMBG("GrMemCopy");
     output(gr, prelive, &prec_muts, a.dest);
     input(gr, prelive, &prec_muts, a.src);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrWriteConst(a gr_writeconst):
-    DUMBG(_u8("GrWriteConst"));
+    DUMBG("GrWriteConst");
     output(gr, prelive, &prec_muts, a.dest);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrAddressof(a gr_addressof):
-    DUMBG(_u8("GrAddressof"));
+    DUMBG("GrAddressof");
     // Yes, addressee is an _output_ -- if it is not live -- we make it live.
     output(gr, prelive, &prec_muts, a.addressee);
     output(gr, prelive, &prec_muts, a.dest);
@@ -133,7 +133,7 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     return true;
 
   case &GrDeref(a gr_deref):
-    DUMBG(_u8("GrDeref"));
+    DUMBG("GrDeref");
     input(gr, prelive, &prec_muts, a.pointer);
     // Location should always be virtual.
     virtual(gr, prelive, &prec_muts, a.name);
@@ -141,14 +141,14 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     return true;
 
   case &GrSubcell(a gr_subcell):
-    DUMBG(_u8("GrSubcell"));
+    DUMBG("GrSubcell");
     input(gr, prelive, &prec_muts, a.partof);
     virtual(gr, prelive, &prec_muts, a.name);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrBranch(a gr_branch):
-    DUMBG(_u8("GrBranch"));
+    DUMBG("GrBranch");
     input(gr, prelive, &prec_muts, a.src);
     new_live hash[cell_num, void] = *prelive;
     compose_live(&new_live, &prec_muts);
@@ -176,7 +176,7 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     return true;
 
   case &GrSequence(a gr_sequence):
-    DUMBG(_u8("GrSequence"));
+    DUMBG("GrSequence");
     new_live hash[cell_num, void] = *prelive;
     compose_live(&new_live, &prec_muts);
     firstmut exprmut;
@@ -194,7 +194,7 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     return true;
 
   case &GrJmp(a gr_jmp):
-    DUMBG(_u8("GrJmp"));
+    DUMBG("GrJmp");
     new_live hash[cell_num, void] = *prelive;
     compose_live(&new_live, &prec_muts);
     exitmut genexpr_result;
@@ -205,19 +205,19 @@ func dumbly_gen_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph
     return true;
 
   case &GrWriteNothing(a gr_writenothing):
-    DUMBG(_u8("GrWriteNothing"));
+    DUMBG("GrWriteNothing");
     output(gr, prelive, &prec_muts, a.dest);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrDead(a gr_dead):
-    DUMBG(_u8("GrDead"));
+    DUMBG("GrDead");
     deaden(gr, prelive, &prec_muts, a.cell);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrNop(v void):
-    DUMBG(_u8("GrNop"));
+    DUMBG("GrNop");
     *mut_out = Terminal(prec_muts);
     return true;
   }
