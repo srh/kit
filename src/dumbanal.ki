@@ -93,6 +93,16 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
     *mut_out = Terminal(prec_muts);
     return true;
 
+  case &GrPrimApply(a gr_prim_apply):
+    DUMBG("GrPrimApply");
+    nparams size = count(&a.params);
+    for i size = 0; i < nparams; i = i + 1 {
+      deaden(gr, prelive, &prec_muts, get(&a.params, i));
+    }
+    output(gr, prelive, &prec_muts, a.retcell);
+    *mut_out = Terminal(prec_muts);
+    return true;
+
   case &GrMemCopy(a gr_memcopy):
     DUMBG("GrMemCopy");
     output(gr, prelive, &prec_muts, a.dest);

@@ -398,7 +398,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
       node *gr_node = ref_node(&fg->gr, gn);
       switch &node->op {
       case &GrApply(a gr_apply):
-        // TODO: GrApply (and maybe some other things) should deaden parameters.
+        // TODO: GrApply (and maybe some other things) should deaden parameters.  (But we do already with parameters?)
         funref st_obj_ref = cell_obj_ref(env, a.funcell, "in I");
         if !is_full_oref(env, funref) {
           ice(_u8("Function apply funptr cell is sub-object"));
@@ -430,6 +430,26 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         if !st_eval_fn_body(clq, env, &paramorefs, retvalref, funcval.fnid) {
           return false;
         }
+
+      case &GrPrimApply(a gr_prim_apply):
+        nparams size = count(&a.params);
+        paramorefs array[st_obj_ref];
+        reserve(&paramorefs, nparams);
+        for i size = 0; i < nparams; i = i + 1 {
+          c cell_num = get(&a.params, i);
+          param_oref st_obj_ref = cell_obj_ref(env, c, "in IIIa");
+          if !is_full_oref(env, param_oref) {
+            // TODO: Kind of code duplication with GrApply case.
+            ice(_u8("Primitive op parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.~)->type), _u8(")"));
+          }
+          push(&paramorefs, param_oref);
+          set(&env->framecells, c.~, None());
+        }
+
+        st_maybe_init_static(&fg->gr, env, a.retcell);
+        retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in IIIb");
+
+        return st_eval_prim_op(clq, env, &paramorefs, retvalref, &a.primop);
 
       case &GrMemCopy(a gr_memcopy):
         st_maybe_init_static(&fg->gr, env, a.dest);

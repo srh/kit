@@ -59,11 +59,19 @@ func help_basic_analyze(cs *checkstate, f *objfile, bas *basic_analyze_state, gr
   n_ops size = count(&gr->ops);
   for i size = 0; i < n_ops; i = i + 1 {
     node *gr_node = ref(&gr->ops, i);
-    if case &GrApply(a gr_apply) = &node->op {
+    switch &node->op {
+    case &GrApply(a gr_apply):
       nparams size = count(&a.params);
       for j size = 0; j < nparams; j = j + 1 {
         mark_cell_paramlist(bas, get(&a.params, j), ~i);
       }
+    case &GrPrimApply(a gr_prim_apply):
+      // TODO: Dedup.
+      nparams size = count(&a.params);
+      for j size = 0; j < nparams; j = j + 1 {
+        mark_cell_paramlist(bas, get(&a.params, j), ~i);
+      }
+    default: { }
     }
   }
   return true;

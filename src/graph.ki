@@ -18,6 +18,7 @@ def `~` fn[size, gr_num] = wrapconvert;
 
 defenum gr_op {
   GrApply gr_apply;
+  GrPrimApply gr_prim_apply;
   GrMemCopy gr_memcopy;
   GrWriteConst gr_writeconst;
   GrAddressof gr_addressof;
@@ -78,6 +79,12 @@ func node0(op gr_op) gr_node {
 
 deftype gr_apply struct {
   funcell cell_num;
+  params shray[cell_num];
+  retcell cell_num;
+};
+
+deftype gr_prim_apply struct {
+  primop primitive_op;
   params shray[cell_num];
   retcell cell_num;
 };

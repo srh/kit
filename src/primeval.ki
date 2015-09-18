@@ -1,7 +1,11 @@
 import eval;
 
 func st_eval_prim_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, prent *prim_fn_body) bool {
-  switch &prent->op {
+  return st_eval_prim_op(clq, env, paramorefs, retvalref, &prent->op);
+}
+
+func st_eval_prim_op(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, primop *primitive_op) bool {
+  switch primop {
   case &PrimNum(a primitive_numeric_op):
     return st_eval_prim_num(clq, env, paramorefs, retvalref, &a);
   case &PrimNumCompare(a primitive_numeric_comparison_op):
