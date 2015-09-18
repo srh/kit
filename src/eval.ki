@@ -611,8 +611,9 @@ func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], r
   nparams size = count(paramorefs);
   switch &ref_fn_body(clq->cs, fnid)->u {
   case &GraphedFnBody(fnent graphed_fn_body):
-    if nparams != count(&fnent.argcells) {
-      ice(_u8("Param list length mismatches function argcells length"));
+    nargcells size = count(&fnent.argcells);
+    if nparams != nargcells {
+      ice(_u8("Param list length ("), nparams, _u8(") mismatches function argcells length ("), nargcells, _u8(") for name "), lookup(clq->im, fnent.graph.gr.informal_name));
     }
 
     subenv st_env = mk_env(env->pool, env->plat, count(&fnent.graph.gr.cells));
@@ -625,8 +626,6 @@ func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], r
       return false;
     }
     return true;
-  case &PrimFnBody(prent prim_fn_body):
-    return st_eval_prim_fn_body(clq, env, paramorefs, retvalref, &prent);
   case &ExternFnBody(exent extern_fn_body):
     ERR(_u8("st_eval_fn_body cannot eval extern fn body named "), lookup(clq->im, exent.name));
     return false;

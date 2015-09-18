@@ -45,10 +45,6 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
       return false;
     }
     return dumbly_gen_graphed_fn_body(cs, f, &bas, &g);
-  case &PrimFnBody(p prim_fn_body):
-    ERR(_u8("TODO: PrimFnBody not supported yet."));
-    // TODO: Implement, or otherwise figure this out.
-    return true;
   case &ExternFnBody(e extern_fn_body):
     // We have nothing to do, of course.
     return true;
@@ -69,7 +65,6 @@ func add_fn_body_symbols(cs *checkstate, f *objfile) bool {
 func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
   switch &ent->u {
   case &GraphedFnBody(g graphed_fn_body): { }
-  case &PrimFnBody(p prim_fn_body): { }
   case &ExternFnBody(e extern_fn_body):
     c_name sym = c_symbol_name(cs, e.name);
     symbol_table_index sti = add_remote_symbol(f, c_name, IsFunctionYes(void));

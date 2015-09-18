@@ -357,6 +357,7 @@ defenum fn_body_spec {
   FnBodyLambda *ast_lambda;
   // Likewise, points to the checked def_magic within the def_inst definition.
   FnBodyMagic *def_magic;
+  FnBodyPrim primitive_op;
 };
 
 deftype graphed_fn_body struct {
@@ -366,10 +367,6 @@ deftype graphed_fn_body struct {
   argcells array[cell_num];
 };
 
-deftype prim_fn_body struct {
-  op primitive_op;
-};
-
 deftype extern_fn_body struct {
   // The name of the extern fn body.
   name sym;
@@ -377,7 +374,6 @@ deftype extern_fn_body struct {
 
 defenum fn_body_entry_enum {
   GraphedFnBody graphed_fn_body;
-  PrimFnBody prim_fn_body;
   ExternFnBody extern_fn_body;
 };
 
@@ -480,7 +476,7 @@ deftype def_inst struct {
   computed_type cu_typeexpr;
   // Right now, these type properties _must_ indicate that the type is defwise trivial.
   computed_type_properties type_properties;
-  // This is None() for InstRhsPrim and InstRhsExtern.
+  // This is None() for InstRhsExtern.
   graph nbfc[opt[frame_regraphed]];
   evaled_value nbfc[st_value];
 };
