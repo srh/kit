@@ -2,7 +2,7 @@ import state;
 
 deftype gn_annot struct {
   // Which cells are guaranteed to be live when the gn starts.
-  live hash[cell_num, void];
+  live nc[hash[cell_num, void]];
   // Only for GrApply and GrPrimApply.
   lower_paramlists nc[array[gr_num]];
 };
@@ -12,7 +12,7 @@ deftype frame struct {
   gr *frame_graph;
   bas *basic_analyze_state;
   // by_gn[i].fs shows what the state must is _before_ evaluating node i.  (All incoming nodes must agree!)
-  by_gn array[opt[gn_annot]];
+  by_gn array[gn_annot];
 };
 
 deftype exprmut struct {
@@ -56,18 +56,18 @@ func[T] DUMBG(x T) void {
 }
 
 func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *hash[cell_num, void], mut_out *genexpr_result) bool {
-  gnc *opt[gn_annot] = ref_annot(h, gn);
-  if case &Has(annot gn_annot) = gnc {
+  gnc *gn_annot = ref_annot(h, gn);
+  if case &Computed(live hash[cell_num, void]) = &gnc->live {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
-    if !sets_equal(prelive, &annot.live) {
-      ERR(_u8("ICE: Inconsistent liveness state when revisiting node, prelive="), *prelive, _u8(", annot.live="), annot.live);
+    if !sets_equal(prelive, &live) {
+      ERR(_u8("ICE: Inconsistent liveness state when revisiting node, prelive="), *prelive, _u8(", annot.live="), live);
       return false;
     }
     *mut_out = NonTerminal({mk_hash@[cell_num, void](), mk_hash@[cell_num, void]()});
     return true;
   }
 
-  set(gnc, {*prelive, NotComputed()});
+  annotate(&gnc->live, *prelive);
 
   prec_muts exprmut;
 
@@ -96,7 +96,7 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
       apptime_live hash[cell_num, void] = *prelive;
       compose_live(&apptime_live, &prec_muts);
 
-      note_lower_paramlists(h->bas, unHas(gnc), &apptime_live);
+      note_lower_paramlists(h->bas, gnc, &apptime_live);
     }
 
     deaden(gr, prelive, &prec_muts, a.funcell);
@@ -115,7 +115,7 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
       apptime_live hash[cell_num, void] = *prelive;
       compose_live(&apptime_live, &prec_muts);
 
-      note_lower_paramlists(h->bas, unHas(gnc), &apptime_live);
+      note_lower_paramlists(h->bas, gnc, &apptime_live);
     }
 
     nparams size = count(&a.params);
@@ -500,6 +500,6 @@ func add_parallel_mut(prelive *hash[cell_num, void], onto *exprmut, from *exprmu
   return true;
 }
 
-func ref_annot(h *frame, gn gr_num) *opt[gn_annot] {
+func ref_annot(h *frame, gn gr_num) *gn_annot {
   return ref(&h->by_gn, gn.~);
 }

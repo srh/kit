@@ -1,8 +1,12 @@
 import dumbanal;
 import state;
 
+func mk_gn_annot() gn_annot {
+  return {NotComputed(), NotComputed()};
+}
+
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
-  h frame = {cs, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), None())};
+  h frame = {cs, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot())};
 
   prelive hash[cell_num, void];
   check_add_all(&prelive, &g->argcells);
