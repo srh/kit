@@ -16,7 +16,7 @@ defenum cell_location {
   LocationVirtual void;
   // The cell's on the stack, its location flexible.
   LocationFlex void;
-  // The cell is in a "rigid" location.  Used for function parameters, strinit fields, and the like, what this really says is that the value is used "once."  The only rigid cells that truly must spend their lives in a calculated real-memory location are those without a trivial move constructor.
+  // The cell is in a "rigid" location.  Used for function parameters.  The only rigid cells that truly must spend their lives in a calculated real-memory location are those without a trivial move constructor, or, like any cell, those whose address has been computed.
   LocationRigid void;
 };
 

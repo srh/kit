@@ -26,7 +26,5 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
     // nothing to assert
   }
 
-  // TODO: Is there anything else I should assert about mut?
-
   return true;
 }
