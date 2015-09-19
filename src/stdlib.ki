@@ -361,7 +361,11 @@ func ceil_divide(x size, y size) size {
 
 // TODO: This is... platform-specific.
 func[T] enumnum(x *T) u32 {
-  return * @[*u32]cast(x);
+  ret u32 = * @[*u32]cast(x);
+  if ret == 0 {
+    crash();
+  }
+  return ret;
 }
 
 // TODO: Somewhere in linux_objfile.ki we could use this func... for the magic's padding.
