@@ -40,11 +40,13 @@ deftype cell_disp struct {
 };
 
 deftype basic_analyze_state struct {
+  paramlists array[gr_num];
   celldisp array[cell_disp];
 };
 
 func basic_analyze_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body, bas_out *basic_analyze_state) bool {
   bas basic_analyze_state = {
+    mk_array@[gr_num](),
     repeat(count(&g->graph.gr.cells), {None()})
   };
 
@@ -61,12 +63,14 @@ func help_basic_analyze(cs *checkstate, f *objfile, bas *basic_analyze_state, gr
     node *gr_node = ref(&gr->ops, i);
     switch &node->op {
     case &GrApply(a gr_apply):
+      push(&bas->paramlists, ~i);
       nparams size = count(&a.params);
       for j size = 0; j < nparams; j = j + 1 {
         mark_cell_paramlist(bas, get(&a.params, j), ~i);
       }
     case &GrPrimApply(a gr_prim_apply):
       // TODO: Dedup.
+      push(&bas->paramlists, ~i);
       nparams size = count(&a.params);
       for j size = 0; j < nparams; j = j + 1 {
         mark_cell_paramlist(bas, get(&a.params, j), ~i);
