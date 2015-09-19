@@ -3,6 +3,8 @@ import state;
 deftype gn_annot struct {
   // Which cells are guaranteed to be live when the gn starts.
   live hash[cell_num, void];
+  // Only for GrApply and GrPrimApply.
+  lower_paramlists nc[array[gr_num]];
 };
 
 deftype frame struct {
@@ -65,7 +67,7 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
     return true;
   }
 
-  set(gnc, {*prelive});
+  set(gnc, {*prelive, NotComputed()});
 
   prec_muts exprmut;
 
@@ -84,22 +86,42 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
   switch &node->op {
   case &GrApply(a gr_apply):
     DUMBG("GrApply");
+
+    // Retcell is activated _before_ the param cells are dead -- though we shouldn't be generating graphs where this matters for the purposes of this analysis _except_ that we need it for computing lower param lists.
+    output(gr, prelive, &prec_muts, a.retcell);
+
+    if true {
+      // TODO: Maybe have dumbly_analyze_expression, update prelive, instead of duplicating this update logic in its caller.
+      // TODO: Dedup with GrPrimApply.
+      apptime_live hash[cell_num, void] = *prelive;
+      compose_live(&apptime_live, &prec_muts);
+
+      note_lower_paramlists(h->bas, unHas(gnc), &apptime_live);
+    }
+
     deaden(gr, prelive, &prec_muts, a.funcell);
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
       deaden(gr, prelive, &prec_muts, get(&a.params, i));
     }
-    output(gr, prelive, &prec_muts, a.retcell);
     *mut_out = Terminal(prec_muts);
     return true;
 
   case &GrPrimApply(a gr_prim_apply):
     DUMBG("GrPrimApply");
+    output(gr, prelive, &prec_muts, a.retcell);
+
+    if true {
+      apptime_live hash[cell_num, void] = *prelive;
+      compose_live(&apptime_live, &prec_muts);
+
+      note_lower_paramlists(h->bas, unHas(gnc), &apptime_live);
+    }
+
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
       deaden(gr, prelive, &prec_muts, get(&a.params, i));
     }
-    output(gr, prelive, &prec_muts, a.retcell);
     *mut_out = Terminal(prec_muts);
     return true;
 
@@ -213,6 +235,20 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
     *mut_out = Terminal(prec_muts);
     return true;
   }
+}
+
+func note_lower_paramlists(bas *basic_analyze_state, gnc *gn_annot, live_at_app_time *hash[cell_num, void]) void {
+  paramlists array[gr_num];
+  it hash_iter[cell_num, void] = iter(live_at_app_time);
+  while case Has(p *tup[cell_num, void]) = next(&it) {
+    if case Has(gn gr_num) = ref(&bas->celldisp, p->car.~)->paramlist {
+      push(&paramlists, gn);
+    }
+  }
+
+  sort(&paramlists);
+  dedup_sorted(&paramlists);
+  annotate(&gnc->lower_paramlists, paramlists);
 }
 
 func combine_branch_mut(onto *genexpr_result, a *genexpr_result) void {

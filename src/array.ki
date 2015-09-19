@@ -321,8 +321,9 @@ func[T] sort(p *T, n size) void {
 
     pi size = n >> 1;
     pival T = p[pi];
+    p[pi] = p[n - 1];
     i size = 0;
-    j size = n;
+    j size = n - 1;
     while i < j {
       if p[i] < pival {
         i = i + 1;
@@ -333,12 +334,16 @@ func[T] sort(p *T, n size) void {
         p[i] = tmp;
       }
     }
+    p[n - 1] = p[i];
+    p[i] = pival;
+
+    i1 size = i + 1;
     if i < pi {
       sort(p, i);
-      p = &p[i];
-      n = n - i;
+      p = &p[i1];
+      n = n - i1;
     } else {
-      sort(&p[i], n - i);
+      sort(&p[i1], n - i1);
       n = i;
     }
   }

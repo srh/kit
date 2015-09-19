@@ -15,6 +15,7 @@ deftype gr_node struct {
 // TODO: Maybe gr_num should start from 1, so that 0 is an invalid value.
 deftype gr_num size;
 def `~` fn[size, gr_num] = wrapconvert;
+func `<`(x gr_num, y gr_num) bool { return x.~ < y.~; }
 
 defenum gr_op {
   GrApply gr_apply;
