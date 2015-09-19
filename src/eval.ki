@@ -449,7 +449,9 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         st_maybe_init_static(&fg->gr, env, a.retcell);
         retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in IIIb");
 
-        return st_eval_prim_op(clq, env, &paramorefs, retvalref, &a.primop);
+        if !st_eval_prim_op(clq, env, &paramorefs, retvalref, &a.primop) {
+          return false;
+        }
 
       case &GrMemCopy(a gr_memcopy):
         st_maybe_init_static(&fg->gr, env, a.dest);
@@ -623,6 +625,7 @@ func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], r
     set(&subenv.framecells, fnent.graph.cell.~, Has(retvalref));
 
     if !st_eval_frame_regraphed(clq, &subenv, &fnent.graph) {
+      ERR(_u8("(in evaling fn "), lookup(clq->im, fnent.graph.gr.informal_name));
       return false;
     }
     return true;

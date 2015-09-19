@@ -20,6 +20,18 @@ func[H, T] build_shray_u8str(help H, r *array[u8], arr *shray[T]) void {
   build_array_raw_u8str(help, r, data(arr), count(arr));
 }
 
+func[H, T] to_array_u8str(help H, arr array[T]) array[u8] {
+  ret array[u8];
+  build_array_u8str(help, &ret, &arr);
+  return ret;
+}
+
+func[H, T] to_shray_u8str(help H, arr shray[T]) array[u8] {
+  ret array[u8];
+  build_shray_u8str(help, &ret, &arr);
+  return ret;
+}
+
 func[H, T] wrap_u8str(help H, r *array[u8], x array[u8], y *T) void {
   append(r, &x);
   push(r, '(');

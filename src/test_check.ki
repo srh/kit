@@ -1765,6 +1765,27 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  }\n"
         "}\n"
         "def d1 i32 = foo@[u32](Has(@[u32]3));\n"));
+
+  run_check_test(ctx, "c148",
+    _u8("defclass ty struct { n i32; };\n"
+        "access ty {\n"
+        "  func do_init(x *ty) void {\n"
+        "    x->n = 5;\n"
+        "  }\n"
+        "  func do_copy(x *ty, y *ty) void {\n"
+        "    x->n = y->n + 1;\n"
+        "  }\n"
+        "  func do_destroy(x *ty) void {\n"
+        "  }\n"
+        "  func get(x *ty) i32 {\n"
+        "    return x->n;\n"
+        "  }\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  z [3]ty;\n"
+        "  return get(&z[2]);\n"
+        "}\n"
+        "def d1 i32 = foo();\n"));
 }
 
 func mk_ctx(build bool, name opt[array[u8]]) check_ctx { return {build, name, 0}; }

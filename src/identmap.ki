@@ -164,6 +164,6 @@ func build_u8str(im *identmap, r *array[u8], a *sym) void {
 }
 
 func build_u8str(nohelp void, r *array[u8], a *sym) void {
-  build_u8str(nohelp, r, a);
+  build_u8str(nohelp, r, &a->~);
 }
 
