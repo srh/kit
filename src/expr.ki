@@ -20,6 +20,10 @@ defenum cell_location {
   LocationRigid void;
 };
 
+func `==`(x cell_location, y cell_location) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+
 func isLocationStatic(location cell_location) bool {
   switch location {
   case LocationVirtual(v void): return false;
