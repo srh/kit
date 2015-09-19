@@ -16,6 +16,8 @@ Then, try running (on Windows),
    ..\out main
    cl main.obj dummy.c
    main
+   main --build
+   main main
 
 or, try running (on 32-bit Linux),
 
@@ -23,6 +25,8 @@ or, try running (on 32-bit Linux),
    ../out --linux main
    gcc main.o dummy.c
    ./a.out
+   ./a.out --build
+   ./a.out main
 
 or, try running (on 64-bit Linux with multilib set up),
 
@@ -30,9 +34,14 @@ or, try running (on 64-bit Linux with multilib set up),
    ../out --linux main
    gcc -m32 main.o dummy.c
    ./a.out
+   ./a.out --build
+   ./a.out main
 
 to see the test suite, written in proto-Kit, for parsing and
-typechecking.  The current directory structure is:
+typechecking (or with --build, to take it through the build
+process) (or with main or some other module name, to take it as far
+through the build process for that module as has been implemented).
+The current directory structure is:
 
    trc - 1st stage compiler, written in C, compiled by invoking
    windows_build.bat, linux_build.sh, etc.
