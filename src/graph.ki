@@ -30,6 +30,7 @@ defenum gr_op {
   GrJmp gr_jmp;
   GrWriteNothing gr_writenothing;
   GrDead gr_dead;
+  GrVirtualDead gr_virtual_dead;
   GrNop void;
 };
 
@@ -142,6 +143,10 @@ deftype gr_writenothing struct {
 };
 
 deftype gr_dead struct {
+  cell cell_num;
+};
+
+deftype gr_virtual_dead struct {
   cell cell_num;
 };
 

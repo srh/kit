@@ -230,6 +230,12 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
     *mut_out = Terminal(prec_muts);
     return true;
 
+  case &GrVirtualDead(a gr_virtual_dead):
+    DUMBG("GrVirtualDead");
+    // TODO: Actually track virtual-cell liveness.
+    *mut_out = Terminal(prec_muts);
+    return true;
+
   case &GrNop(v void):
     DUMBG("GrNop");
     *mut_out = Terminal(prec_muts);
