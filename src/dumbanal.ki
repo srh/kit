@@ -2,7 +2,7 @@ import state;
 
 deftype gn_annot struct {
   // Which cells are guaranteed to be live when the gn starts.
-  live nc[hash[cell_num, void]];
+  live nc[lives];
   // Only for GrApply and GrPrimApply.
   lower_paramlists nc[array[gr_num]];
 };
@@ -31,7 +31,15 @@ deftype partial_exprmut struct {
   encapsulated hash[cell_num, void];
 };
 
-func dumbly_analyze_returning_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *hash[cell_num, void], mut_out *exprmut) bool {
+deftype lives struct {
+  statics hash[cell_num, void];
+};
+
+func[H] build_u8str(help H, r *array[u8], x *lives) void {
+  build_u8str(help, r, &x->statics);
+}
+
+func dumbly_analyze_returning_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *lives, mut_out *exprmut) bool {
   mbmut genexpr_result;
   if !dumbly_analyze_expression(cs, f, h, gr, gn, prelive, &mbmut) {
     return false;
@@ -55,11 +63,15 @@ defenum genexpr_result {
 func[T] DUMBG(x T) void {
 }
 
-func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *hash[cell_num, void], mut_out *genexpr_result) bool {
+func lives_equal(x *lives, y *lives) bool {
+  return sets_equal(&x->statics, &y->statics);
+}
+
+func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_graph, gn gr_num, prelive *lives, mut_out *genexpr_result) bool {
   gnc *gn_annot = ref_annot(h, gn);
-  if case &Computed(live hash[cell_num, void]) = &gnc->live {
+  if case &Computed(live lives) = &gnc->live {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
-    if !sets_equal(prelive, &live) {
+    if !lives_equal(prelive, &live) {
       ERR(_u8("ICE: Inconsistent liveness state when revisiting node, prelive="), *prelive, _u8(", annot.live="), live);
       return false;
     }
@@ -93,7 +105,7 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
     if true {
       // TODO: Maybe have dumbly_analyze_expression, update prelive, instead of duplicating this update logic in its caller.
       // TODO: Dedup with GrPrimApply.
-      apptime_live hash[cell_num, void] = *prelive;
+      apptime_live lives = *prelive;
       compose_live(&apptime_live, &prec_muts);
 
       note_lower_paramlists(h->bas, gnc, &apptime_live);
@@ -112,7 +124,7 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
     output(gr, prelive, &prec_muts, a.retcell);
 
     if true {
-      apptime_live hash[cell_num, void] = *prelive;
+      apptime_live lives = *prelive;
       compose_live(&apptime_live, &prec_muts);
 
       note_lower_paramlists(h->bas, gnc, &apptime_live);
@@ -164,7 +176,7 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
   case &GrBranch(a gr_branch):
     DUMBG("GrBranch");
     input(gr, prelive, &prec_muts, a.src);
-    new_live hash[cell_num, void] = *prelive;
+    new_live lives = *prelive;
     compose_live(&new_live, &prec_muts);
 
     combined_mut genexpr_result = NonTerminal({mk_hash(), mk_hash()});
@@ -191,7 +203,7 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
 
   case &GrSequence(a gr_sequence):
     DUMBG("GrSequence");
-    new_live hash[cell_num, void] = *prelive;
+    new_live lives = *prelive;
     compose_live(&new_live, &prec_muts);
     firstmut exprmut;
     if !dumbly_analyze_returning_expression(cs, f, h, gr, a.first, &new_live, &firstmut) {
@@ -209,7 +221,7 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
 
   case &GrJmp(a gr_jmp):
     DUMBG("GrJmp");
-    new_live hash[cell_num, void] = *prelive;
+    new_live lives = *prelive;
     compose_live(&new_live, &prec_muts);
     exitmut genexpr_result;
     if !dumbly_analyze_expression(cs, f, h, gr, a.next, &new_live, &exitmut) {
@@ -243,9 +255,9 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
   }
 }
 
-func note_lower_paramlists(bas *basic_analyze_state, gnc *gn_annot, live_at_app_time *hash[cell_num, void]) void {
+func note_lower_paramlists(bas *basic_analyze_state, gnc *gn_annot, live_at_app_time *lives) void {
   paramlists array[gr_num];
-  it hash_iter[cell_num, void] = iter(live_at_app_time);
+  it hash_iter[cell_num, void] = iter(&live_at_app_time->statics);
   while case Has(p *tup[cell_num, void]) = next(&it) {
     if case Has(gn gr_num) = ref(&bas->celldisp, p->car.~)->paramlist {
       push(&paramlists, gn);
@@ -292,7 +304,7 @@ func combine_branch_mut(onto *genexpr_result, a *genexpr_result) void {
 }
 
 // For deaden and other functions, prelive shows what was alive _before_ prec_muts modified it.
-func deaden(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
+func deaden(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void {
   if !isLocationStatic(ref_cell(gr, c)->location) {
     crash(_u8("deaden on non-static cell"));
   }
@@ -308,7 +320,7 @@ func deaden(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, 
   } else if case Has(v *void) = lookup_ref(&prec_muts->made_dead, &c) {
     ice(_u8("deaden on cell seen in made_dead"));
   } else {
-    if case Has(v *void) = lookup_ref(prelive, &c) {
+    if case Has(v *void) = lookup_ref(&prelive->statics, &c) {
       check_insert(&prec_muts->made_dead, &c, void);
     } else {
       ice(_u8("deaden on un-live cell "), c.~);
@@ -317,7 +329,7 @@ func deaden(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, 
 }
 
 // input requires that the cell already be live.
-func input(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
+func input(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void {
   if !isLocationStatic(ref_cell(gr, c)->location) {
     return;
   }
@@ -326,13 +338,13 @@ func input(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c
     // Success, the cell's live.
   } else if case Has(v *void) = lookup_ref(&prec_muts->used, &c) {
     // Success, the cell's live (in prelive).  This check's redundant with internal logic of this graph-traversing code.
-    check(isHas(lookup_ref(prelive, &c)));
+    check(isHas(lookup_ref(&prelive->statics, &c)));
   } else if case Has(v *void) = lookup_ref(&prec_muts->encapsulated, &c) {
     ice(_u8("input cell seen in encapsulated"));
   } else if case Has(v *void) = lookup_ref(&prec_muts->made_dead, &c) {
     ice(_u8("input cell seen in made_dead"));
   } else {
-    if case Has(v *void) = lookup_ref(prelive, &c) {
+    if case Has(v *void) = lookup_ref(&prelive->statics, &c) {
       // Success, the cell's live.
     } else {
       ice(_u8("input cell "), c.~, _u8(" not seen in prelive"));
@@ -342,7 +354,7 @@ func input(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c
 
 // output either makes the cell live, if it wasn't already, or it means we use the cell.
 // (Yes, that's so lame -- we should use GrMakeLive.)
-func output(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
+func output(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void {
   if !isLocationStatic(ref_cell(gr, c)->location) {
     return;
   }
@@ -360,7 +372,7 @@ func output(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, 
     check_remove(&prec_muts->made_dead, &c);
     check_insert(&prec_muts->used, &c, void);
   } else {
-    if case Has(v *void) = lookup_ref(prelive, &c) {
+    if case Has(v *void) = lookup_ref(&prelive->statics, &c) {
       // The cell's already live.
     } else {
       check_insert(&prec_muts->made_live, &c, void);
@@ -369,13 +381,13 @@ func output(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, 
 }
 
 // Says that we're naming a virtual cell.
-func virtual(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
+func virtual(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void {
   check(!isLocationStatic(ref_cell(gr, c)->location));
 }
 
-func compose_live(live *hash[cell_num, void], muts *exprmut) void {
-  check_add_disjoint(live, &muts->made_live);
-  remove_exactly(live, &muts->made_dead);
+func compose_live(live *lives, muts *exprmut) void {
+  check_add_disjoint(&live->statics, &muts->made_live);
+  remove_exactly(&live->statics, &muts->made_dead);
 }
 
 func compose_muts(before *exprmut, after *exprmut) exprmut {
@@ -480,7 +492,7 @@ func compose_result(before *exprmut, after *genexpr_result, out *genexpr_result)
 }
 
 // This function should have a symmetry about it.
-func add_parallel_mut(prelive *hash[cell_num, void], onto *exprmut, from *exprmut) bool {
+func add_parallel_mut(prelive *lives, onto *exprmut, from *exprmut) bool {
   if intersects(&onto->made_dead, &from->used) || intersects(&onto->used, &from->made_dead) {
     ERR(_u8("ICE: One prec-expr marks cell dead that another uses"));
     return false;

@@ -8,9 +8,9 @@ func mk_gn_annot() gn_annot {
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
   h frame = {cs, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot())};
 
-  prelive hash[cell_num, void];
-  check_add_all(&prelive, &g->argcells);
-  check_add(&prelive, g->graph.cell);
+  prelive lives;
+  check_add_all(&prelive.statics, &g->argcells);
+  check_add(&prelive.statics, g->graph.cell);
 
   DBG(_u8("gen graphed fn body for "), lookup(cs->im, g->graph.gr.informal_name));
   mut genexpr_result;
@@ -20,10 +20,10 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
 
   switch &mut {
   case &Terminal(m exprmut):
-    new_live hash[cell_num, void] = prelive;
+    new_live lives = prelive;
     compose_live(&new_live, &m);
-    expected hash[cell_num, void] = mk_hash(g->graph.cell, void);
-    if !sets_equal(&new_live, &expected) {
+    expected lives = {mk_hash(g->graph.cell, void)};
+    if !lives_equal(&new_live, &expected) {
       ice(_u8("fn_body leaves cells alive, expected "), g->graph.cell, _u8(", saw "), new_live);
     }
   case &NonTerminal(pm partial_exprmut):
