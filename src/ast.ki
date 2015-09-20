@@ -675,16 +675,6 @@ func annotate_info(a *ast_expr, info ast_expr_info) void {
   a->info = info;
 }
 
-// TODO: Does anybody use this?
-func annotate_disposal(a *nc[ast_expr_after_consume], aft ast_expr_after_consume) void {
-  annotate(a, aft);
-}
-
-// TODO: Does anybody use this?
-func annotate_disposal(a *nc[ast_expr_after_discard], aft ast_expr_after_discard) void {
-  annotate(a, aft);
-}
-
 
 defenum ast_expr_enum {
   NameExpr ast_name_expr;

@@ -1075,7 +1075,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       if whole_temporary(&desc) {
-        annotate_disposal(after, mk_after(desc.whole_num));
+        annotate(after, mk_after(desc.whole_num));
         annotate_cell_location(es, desc.whole_num, LocationRigid(void));
       } else {
         copy bi_ctor_desc;
@@ -1087,7 +1087,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
           return false;
         }
         dest cell_num = add_rigid_cell(es, info->cu, info->cu_props);
-        annotate_disposal(after,
+        annotate(after,
           mk_after(@[after_action]CopyAfter({copy, dest, desc.partial_num}),
                    @[after_action]DestroyAfter({destroy, desc.whole_num}),
                    dest));
@@ -1100,7 +1100,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
         return false;
       }
       dest cell_num = add_rigid_cell(es, info->cu, info->cu_props);
-      annotate_disposal(after, mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), dest));
+      annotate(after, mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), dest));
     }
   }
   return true;
@@ -1115,12 +1115,12 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
       if !get_destroy_uni_ctor(es, &ref_cell(es, desc.whole_num)->type, &destroy) {
         return false;
       }
-      annotate_disposal(after, mk_after_discard(@[after_action]DestroyAfter({destroy, desc.whole_num})));
+      annotate(after, mk_after_discard(@[after_action]DestroyAfter({destroy, desc.whole_num})));
       annotate_cell_location(es, desc.whole_num, LocationFlex(void));
     }
     case &IsLvalYes(desc lval_description): {
       // This could ostensibly be Has(desc.num), but there's no reason to be inconsistent with the rvalue case.
-      annotate_disposal(after, mk_after_discard());
+      annotate(after, mk_after_discard());
     }
   }
   return true;
@@ -1136,7 +1136,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
         return false;
       }
       if whole_temporary(&desc) {
-        annotate_disposal(after, mk_after(desc.whole_num));
+        annotate(after, mk_after(desc.whole_num));
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate(&later->action, {destroy, desc.whole_num});
       } else {
@@ -1149,7 +1149,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
           return false;
         }
         dest cell_num = add_flex_cell(es, info->cu, info->cu_props);
-        annotate_disposal(after,
+        annotate(after,
           mk_after(@[after_action]CopyAfter({copy, dest, desc.partial_num}),
                    @[after_action]DestroyAfter({destroy, desc.whole_num}),
                    dest));
@@ -1167,7 +1167,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
         return false;
       }
       dest cell_num = add_flex_cell(es, info->cu, info->cu_props);
-      annotate_disposal(after,
+      annotate(after,
         mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), dest));
       annotate(&later->action, {destroy_the_copy, dest});
     }
