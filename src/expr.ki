@@ -151,7 +151,7 @@ func `<`(x var_number, y var_number) bool {
 }
 
 defenum var_binding {
-  // Is the variable "virtual" -- it overlays some other object, in a switch/etc?
+  // Is the variable "virtual" -- it overlays some other object, in a switch/etc?  Yes, that means its cell is virtual, too.  TODO: We should still rename this, in case the concepts diverge.
   VarVirtual void;
   // The variable's a self-contained object -- it gets destroyed or not.
   VarSelfContained void;
