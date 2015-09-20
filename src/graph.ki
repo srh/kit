@@ -941,11 +941,16 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       var ap = add_node(gr, node(mk_shray(fc, dp, sp), @[gr_op]GrApply({ci.comparecells.funcell, mk_shray(ci.comparecells.destptr, ci.comparecells.srcptr), ci.comparecells.cmp_result})));
 
       var just_dead = add_node(gr, node0(@[gr_op]GrDead({ci.comparecells.cmp_result})));
-      var assignnop = add_node(gr, node0(@[gr_op]GrNop(void)));
-      assign gr_num;
-      if !gr_after_actions(cs, gr, assignnop, &ci.conditional_actions, DeadAfterDestroyNo(void), &assign) {
+
+      assign_destroy gr_num;
+      if !gr_destroy_action(cs, gr, &ci.conditional_destroy, DeadAfterDestroyNo(void), &assign_destroy) {
         return false;
       }
+      assign_copy gr_num;
+      if !gr_copy_action(cs, gr, &ci.conditional_copy, &assign_copy) {
+        return false;
+      }
+      assign gr_num = add_node(gr, node0(@[gr_op]GrSequence({assign_destroy, assign_copy})));
       dead_before_assign gr_num = add_node(gr, node0(@[gr_op]GrDead({ci.comparecells.cmp_result})));
       dead_then_assign gr_num = add_node(gr, node0(@[gr_op]GrSequence({dead_before_assign, assign})));
       cases shray[tup[gr_const, gr_num]] = mk_shray(cons(@[gr_const]ConstInt(~ @[u32] 0), dead_then_assign), cons(@[gr_const]ConstInt(~ @[u32] 1), just_dead));

@@ -90,7 +90,8 @@ deftype ast_conditional_assignment_info struct {
 
   /* These actions perform the assignment -- they happen if the
   assignment isn't self-assignment. */
-  conditional_actions array[after_action];
+  conditional_destroy destroy_action;
+  conditional_copy copy_action;
 };
 
 deftype ast_simple_assignment_info struct {
