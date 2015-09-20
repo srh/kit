@@ -1144,8 +1144,8 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
         if !get_copy_bi_ctor(es, &info->cu, &copy) {
           return false;
         }
-        destroy_the_copy ctor_desc;
-        if !get_destroy_ctor(es->ds, &info->cu, &destroy_the_copy) {
+        destroy_the_copy uni_ctor_desc;
+        if !get_destroy_uni_ctor(es, &info->cu, &destroy_the_copy) {
           return false;
         }
         dest cell_num = add_flex_cell(es, info->cu, info->cu_props);
@@ -1154,7 +1154,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
                    @[after_action]DestroyAfter({destroy, desc.whole_num}),
                    dest));
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
-        annotate(&later->action, {destroy, dest});
+        annotate(&later->action, {destroy_the_copy, dest});
       }
     }
     case &IsLvalYes(desc lval_description): {
