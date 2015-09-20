@@ -359,7 +359,7 @@ defenum ast_fieldname {
 
 deftype ast_arraylength_info struct {
   // After actions to discard the array.
-  after ast_expr_after;
+  after ast_expr_after_discard;
   count u32;
 };
 
@@ -430,7 +430,7 @@ deftype ast_paren_expr struct {
 
 deftype ast_index_expr_info struct {
   // isHas if the lhs needs consuming/discarding (if it's a ptr).
-  lhs_after opt[tup[ast_expr_after, ast_later_discard_info]];
+  lhs_after opt[tup[ast_expr_after_consume, ast_later_discard_info]];
   rhs_later ast_later_discard_info;
 };
 
@@ -579,36 +579,44 @@ defenum after_action {
   DestroyAfter destroy_action;
 };
 
-deftype ast_expr_after struct {
+deftype ast_expr_after_consume struct {
   // The after-actions get evaluated -in order-.  For example, copying a field from a temporary should happen -before- destroying the temporary.
   actions array[after_action];
-  // The cell the expr's result... goes.  This is really a property of the thing holding the expr, not the expr itself...  If the result is discarded, this is None().
+  // The cell the expr's result... goes.
   // TODO: We should prohibit exprs where a non-whole_field result is discarded.  This will mean we don't need to handle the case where we discard a field lookup without copying it out first.
-  result opt[cell_num];
+  result cell_num;
 };
 
-func result_cell(a *ast_expr_after) cell_num {
-  if case &Has(c cell_num) = &a->result {
-    return c;
-  } else {
-    ice(_u8("result_cell sees None"));
-    return fake();
-  }
+deftype ast_expr_after_discard struct {
+  // The after-actions get evaluated -in order-.  For example, copying a field from a temporary should happen -before- destroying the temporary.
+  actions array[after_action];
+};
+
+func result_cell(a *ast_expr_after_consume) cell_num {
+  return a->result;
 }
 
 func result_cell(a *ast_expr_consume) cell_num {
   return result_cell(unHas(&a->after));
 }
 
-func mk_after(result opt[cell_num]) ast_expr_after {
+func mk_after(result cell_num) ast_expr_after_consume {
   return {mk_array(), result};
 }
 
-func mk_after(x after_action, result opt[cell_num]) ast_expr_after {
+func mk_after_discard() ast_expr_after_discard {
+  return {mk_array()};
+}
+
+func mk_after(x after_action, result cell_num) ast_expr_after_consume {
   return {mk_array(x), result};
 }
 
-func mk_after(x after_action, y after_action, result opt[cell_num]) ast_expr_after {
+func mk_after_discard(x after_action) ast_expr_after_discard {
+  return {mk_array(x)};
+}
+
+func mk_after(x after_action, y after_action, result cell_num) ast_expr_after_consume {
   return {mk_array(x, y), result};
 }
 
@@ -668,7 +676,12 @@ func annotate_info(a *ast_expr, info ast_expr_info) void {
 }
 
 // TODO: Does anybody use this?
-func annotate_disposal(a *nc[ast_expr_after], aft ast_expr_after) void {
+func annotate_disposal(a *nc[ast_expr_after_consume], aft ast_expr_after_consume) void {
+  annotate(a, aft);
+}
+
+// TODO: Does anybody use this?
+func annotate_disposal(a *nc[ast_expr_after_discard], aft ast_expr_after_discard) void {
   annotate(a, aft);
 }
 
@@ -700,21 +713,21 @@ func mk(m ast_meta, x ast_expr_enum) ast_expr {
 }
 
 deftype ast_expr_consume struct {
-  after nc[ast_expr_after];
+  after nc[ast_expr_after_consume];
   expr ast_expr;
 };
 
 func consume(expr ast_expr) ast_expr_consume {
-  return {NotComputed@[ast_expr_after](), expr};
+  return {NotComputed@[ast_expr_after_consume](), expr};
 }
 
 deftype ast_expr_discard struct {
-  after nc[ast_expr_after];
+  after nc[ast_expr_after_discard];
   expr ast_expr;
 };
 
 func discard(expr ast_expr) ast_expr_discard {
-  return {NotComputed@[ast_expr_after](), expr};
+  return {NotComputed@[ast_expr_after_discard](), expr};
 }
 
 deftype ast_variadic_generics struct {

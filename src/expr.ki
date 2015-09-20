@@ -352,7 +352,7 @@ func check_expr_consume(es *framescope, x *ast_expr_consume, pt *te_typeexpr) bo
   return check_consume_expr(es, &x->expr, &x->after, pt);
 }
 
-func check_consume_expr(es *framescope, x *ast_expr, aft *nc[ast_expr_after], pt *te_typeexpr) bool {
+func check_consume_expr(es *framescope, x *ast_expr, aft *nc[ast_expr_after_consume], pt *te_typeexpr) bool {
   if !check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
@@ -797,7 +797,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
           annotate(&a.info, FieldName(offset));
         }
         case ConstantField(value u32): {
-          after nc[ast_expr_after];
+          after nc[ast_expr_after_discard];
           if !annotate_disposal_for_discard(es, oo(&a.lhs), &after) {
             return false;
           }
@@ -1070,12 +1070,12 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr_consume) bool {
 }
 
 // Annotates the disposal to "consume" the value -- i.e. what happens if it's a function param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or whatever).
-func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_expr_after]) bool {
+func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume]) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       if whole_temporary(&desc) {
-        annotate_disposal(after, mk_after(Has(desc.whole_num)));
+        annotate_disposal(after, mk_after(desc.whole_num));
         annotate_cell_location(es, desc.whole_num, LocationRigid(void));
       } else {
         copy bi_ctor_desc;
@@ -1090,7 +1090,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
         annotate_disposal(after,
           mk_after(@[after_action]CopyAfter({copy, dest, desc.partial_num}),
                    @[after_action]DestroyAfter({destroy, desc.whole_num}),
-                   Has(dest)));
+                   dest));
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
       }
     }
@@ -1100,14 +1100,14 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
         return false;
       }
       dest cell_num = add_rigid_cell(es, info->cu, info->cu_props);
-      annotate_disposal(after, mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), Has(dest)));
+      annotate_disposal(after, mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), dest));
     }
   }
   return true;
 }
 
 // Annotates the disposal of an Expr statement's expr, or some other value we are done using.
-func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after]) bool {
+func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_discard]) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -1115,19 +1115,19 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
       if !get_destroy_uni_ctor(es, &ref_cell(es, desc.whole_num)->type, &destroy) {
         return false;
       }
-      annotate_disposal(after, mk_after(@[after_action]DestroyAfter({destroy, desc.whole_num}), None()));
+      annotate_disposal(after, mk_after_discard(@[after_action]DestroyAfter({destroy, desc.whole_num})));
       annotate_cell_location(es, desc.whole_num, LocationFlex(void));
     }
     case &IsLvalYes(desc lval_description): {
       // This could ostensibly be Has(desc.num), but there's no reason to be inconsistent with the rvalue case.
-      annotate_disposal(after, mk_after(None()));
+      annotate_disposal(after, mk_after_discard());
     }
   }
   return true;
 }
 
 // Annotates the disposal for a value we'll use but then discard.
-func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after], later *ast_later_discard_info) bool {
+func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume], later *ast_later_discard_info) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -1136,7 +1136,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
         return false;
       }
       if whole_temporary(&desc) {
-        annotate_disposal(after, mk_after(Has(desc.whole_num)));
+        annotate_disposal(after, mk_after(desc.whole_num));
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate(&later->action, {destroy, desc.whole_num});
       } else {
@@ -1152,7 +1152,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
         annotate_disposal(after,
           mk_after(@[after_action]CopyAfter({copy, dest, desc.partial_num}),
                    @[after_action]DestroyAfter({destroy, desc.whole_num}),
-                   Has(dest)));
+                   dest));
         annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate(&later->action, {destroy, dest});
       }
@@ -1168,7 +1168,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
       }
       dest cell_num = add_flex_cell(es, info->cu, info->cu_props);
       annotate_disposal(after,
-        mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), Has(dest)));
+        mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), dest));
       annotate(&later->action, {destroy_the_copy, dest});
     }
   }
@@ -2029,7 +2029,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   } else {
     // Dereferencing a pointer always makes an lvalue.
     lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props)});
-    ie_info_after nc[ast_expr_after];
+    ie_info_after nc[ast_expr_after_consume];
     lhs_later ast_later_discard_info;
     if !annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later) {
       return false;
