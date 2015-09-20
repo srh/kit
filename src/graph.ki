@@ -1238,42 +1238,61 @@ func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph,
   }
 }
 
-deftype gr_basics struct {
+deftype gr_minimal_basics struct {
   return_cell cell_num;
   argcells array[cell_num];
+};
+
+deftype gr_basics struct {
+  minimal gr_minimal_basics;
   pointeecells array[cell_num];
   derefs shray[gr_num];
 };
 
-func add_basics(cs *checkstate, clq *clqueue, gr *frame_graph, size u32, arity size, out *gr_basics) void {
+func add_minimal_basics(cs *checkstate, clq *clqueue, gr *frame_graph, size u32, arity size, out *gr_minimal_basics) void {
   pointee_tp cu_typrop = compute_prim(clq, primitive_padding_type(cs, size));
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, pointee_tp.cu.~));
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
-  ret gr_basics;
+  ret gr_minimal_basics;
   ret.return_cell = add_cell(gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
-  derefs array[gr_num];
   for i size = 0; i < arity; i = i + 1 {
     ac cell_num = add_cell(gr, {Has(LocationRigid(void)), argtp.cu, argtp.props});
     push(&ret.argcells, ac);
+  }
+  *out = ret;
+}
+
+func add_basics(cs *checkstate, clq *clqueue, gr *frame_graph, size u32, arity size, out *gr_basics) void {
+  ret gr_basics;
+  add_minimal_basics(cs, clq, gr, size, arity, &ret.minimal);
+
+  pointee_tp cu_typrop = compute_prim(clq, primitive_padding_type(cs, size));
+  derefs array[gr_num];
+  for i size = 0; i < arity; i = i + 1 {
     pc cell_num = add_cell(gr, {Has(LocationVirtual(void)), pointee_tp.cu, pointee_tp.props});
     push(&ret.pointeecells, pc);
-    dn gr_num = add_node(gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
+    dn gr_num = add_node(gr, node0(@[gr_op]GrDeref({pc, get(&ret.minimal.argcells, i), OffsetConst(0)})));
     push(&derefs, dn);
   }
   ret.derefs = freeze(&derefs);
   *out = ret;
 }
 
-func basics_cleanup(cs *checkstate, clq *clqueue, gr *frame_graph, bas *gr_basics, gn gr_num, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
+func minimal_basics_cleanup_precs(gr *frame_graph, bas *gr_minimal_basics, out *array[gr_num]) void {
   precs array[gr_num];
   ncells size = count(&bas->argcells);
-  reserve(&precs, ncells + 1);
   for i size = 0; i < ncells; i = i + 1 {
     gd gr_num = add_node(gr, node0(@[gr_op]GrDead({get(&bas->argcells, i)})));
     push(&precs, gd);
   }
   var retset = add_node(gr, node0(@[gr_op]GrWriteConst({bas->return_cell, ConstInt(bigu(0))})));
   push(&precs, retset);
+  swap(out, &precs);
+}
+
+func minimal_basics_cleanup(cs *checkstate, clq *clqueue, gr *frame_graph, bas *gr_minimal_basics, gn gr_num, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
+  precs array[gr_num];
+  minimal_basics_cleanup_precs(gr, bas, &precs);
   var nopgn = add_node(gr, node(freeze(&precs), @[gr_op]GrNop(void)));
   var fingn = add_node(gr, node0(@[gr_op]GrSequence({gn, nopgn})));
   *gr_out = *gr;
@@ -1282,14 +1301,29 @@ func basics_cleanup(cs *checkstate, clq *clqueue, gr *frame_graph, bas *gr_basic
   *arg_cells_out = bas->argcells;
 }
 
+func basics_cleanup(cs *checkstate, clq *clqueue, gr *frame_graph, bas *gr_basics, gn gr_num, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
+  precs array[gr_num];
+  minimal_basics_cleanup_precs(gr, &bas->minimal, &precs);
+  ncells size = count(&bas->pointeecells);
+  for i size = 0; i < ncells; i = i + 1 {
+    pd gr_num = add_node(gr, node0(@[gr_op]GrVirtualDead({get(&bas->pointeecells, i)})));
+    push(&precs, pd);
+  }
+  var nopgn = add_node(gr, node(freeze(&precs), @[gr_op]GrNop(void)));
+  var fingn = add_node(gr, node0(@[gr_op]GrSequence({gn, nopgn})));
+  *gr_out = *gr;
+  *gn_out = fingn;
+  *return_cell_out = bas->minimal.return_cell;
+  *arg_cells_out = bas->minimal.argcells;
+}
+
 func gr_magic_nopdestroy(cs *checkstate, clq *clqueue, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) bool {
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_nopdestroy")));
-  bas gr_basics;
-  // TODO: This creates a needless deref node, pointee cell.
+  bas gr_minimal_basics;
   // TODO: How about make the size parameter opt[u32], don't deref if no size.
-  add_basics(cs, clq, &gr, 0 /* Pass a made-up size. */, 1, &bas);
+  add_minimal_basics(cs, clq, &gr, 0 /* Pass a made-up size. */, 1, &bas);
   gn gr_num = add_node(&gr, node0(@[gr_op]GrNop(void)));
-  basics_cleanup(cs, clq, &gr, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
+  minimal_basics_cleanup(cs, clq, &gr, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
   return true;
 }
 
