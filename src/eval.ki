@@ -478,7 +478,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         st_maybe_init_static(&fg->gr, env, a.dest);
         destref st_obj_ref;
         if !try_cell_obj_ref(env, a.dest, &destref) {
-          ERR(_u8("cell obj cannot be reffed (in VI) (cell num = "), a.dest.~, _u8(")"));
+          ERR(_u8("ICE: cell obj cannot be reffed (in VI) (cell num = "), a.dest.~, _u8(")"));
           return false;
         }
         value st_value;

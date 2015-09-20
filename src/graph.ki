@@ -1599,10 +1599,10 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     case CtorInit(v void):
       ice(_u8("CtorInit on wc type"));
     case CtorCopy(v void):
-      var tgn = add_node(&gr, node0(@[gr_op]GrWriteConst({get(&fieldcella, 0), ConstInt(~ tagval.~)})));
+      var tgn = add_node(&gr, node0(@[gr_op]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.~)})));
       tagset_ogn = Has(tgn);
     case CtorMove(v void):
-      var tgn = add_node(&gr, node0(@[gr_op]GrWriteConst({get(&fieldcella, 0), ConstInt(~ tagval.~)})));
+      var tgn = add_node(&gr, node0(@[gr_op]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.~)})));
       tagset_ogn = Has(tgn);
     case CtorDestroy(v void):
       tagset_ogn = None();
