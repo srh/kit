@@ -1049,7 +1049,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       if whole_temporary(&desc) {
-        annotate(after, mk_after(desc.whole_num));
+        annotate(after, mk_after(@[consume_actions]ConsumeByInPlace(void), desc.whole_num));
       } else {
         copy bi_ctor_desc;
         if !get_copy_bi_ctor(es, &info->cu, &copy) {
@@ -1061,8 +1061,8 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
         }
         dest cell_num = add_static_cell(es, info->cu, info->cu_props);
         annotate(after,
-          mk_after(@[after_action]CopyAfter({copy, dest, desc.partial_num}),
-                   @[after_action]DestroyAfter({destroy, desc.whole_num}),
+          mk_after(@[consume_actions]ConsumeByCopyDestroy({{copy, dest, desc.partial_num},
+                                                           {destroy, desc.whole_num}}),
                    dest));
       }
     }
@@ -1072,7 +1072,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
         return false;
       }
       dest cell_num = add_static_cell(es, info->cu, info->cu_props);
-      annotate(after, mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), dest));
+      annotate(after, mk_after(@[consume_actions]ConsumeByCopy({copy, dest, desc.num}), dest));
     }
   }
   return true;

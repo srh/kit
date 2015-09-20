@@ -1099,6 +1099,30 @@ func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *array[aft
   return gr_after_actions(cs, gr, prec, x, DeadAfterDestroyYes(void), out);
 }
 
+func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *consume_actions, out *gr_num) bool {
+  switch x {
+  case &ConsumeByInPlace(v void): { }
+  case &ConsumeByCopyDestroy(cd copy_destroy_action):
+    dep gr_num;
+    if !gr_copy_action(cs, gr, &cd.copy, &dep) {
+      return false;
+    }
+    prec = add_node(gr, node0(@[gr_op]GrSequence({prec, dep})));
+    if !gr_destroy_action(cs, gr, &cd.destroy, DeadAfterDestroyYes(void), &dep) {
+      return false;
+    }
+    prec = add_node(gr, node0(@[gr_op]GrSequence({prec, dep})));
+  case &ConsumeByCopy(c copy_action):
+    dep gr_num;
+    if !gr_copy_action(cs, gr, &c, &dep) {
+      return false;
+    }
+    prec = add_node(gr, node0(@[gr_op]GrSequence({prec, dep})));
+  }
+  *out = prec;
+  return true;
+}
+
 func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *array[after_action], dad dead_after_destroy, out *gr_num) bool {
   nacts size = count(x);
   for i size = 0; i < nacts; i = i + 1 {
@@ -1110,6 +1134,10 @@ func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *array[aft
   }
   *out = prec;
   return true;
+}
+
+func gr_copy_action(cs *checkstate, gr *frame_graph, x *copy_action, out *gr_num) bool {
+  return gr_bi_action(cs, gr, &x->~, out);
 }
 
 func gr_after_action(cs *checkstate, gr *frame_graph, x *after_action, dad dead_after_destroy, out *gr_num) bool {

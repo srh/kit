@@ -579,9 +579,19 @@ defenum after_action {
   DestroyAfter destroy_action;
 };
 
+deftype copy_destroy_action struct {
+  copy copy_action;
+  destroy destroy_action;
+};
+
+defenum consume_actions {
+  ConsumeByInPlace void;
+  ConsumeByCopyDestroy copy_destroy_action;
+  ConsumeByCopy copy_action;
+};
+
 deftype ast_expr_after_consume struct {
-  // The after-actions get evaluated -in order-.  For example, copying a field from a temporary should happen -before- destroying the temporary.
-  actions array[after_action];
+  actions consume_actions;
   // The cell the expr's result... goes.
   // TODO: We should prohibit exprs where a non-whole_field result is discarded.  This will mean we don't need to handle the case where we discard a field lookup without copying it out first.
   result cell_num;
@@ -600,24 +610,16 @@ func result_cell(a *ast_expr_consume) cell_num {
   return result_cell(unHas(&a->after));
 }
 
-func mk_after(result cell_num) ast_expr_after_consume {
-  return {mk_array(), result};
+func mk_after(actions consume_actions, result cell_num) ast_expr_after_consume {
+  return {actions, result};
 }
 
 func mk_after_discard() ast_expr_after_discard {
   return {mk_array()};
 }
 
-func mk_after(x after_action, result cell_num) ast_expr_after_consume {
-  return {mk_array(x), result};
-}
-
 func mk_after_discard(x after_action) ast_expr_after_discard {
   return {mk_array(x)};
-}
-
-func mk_after(x after_action, y after_action, result cell_num) ast_expr_after_consume {
-  return {mk_array(x, y), result};
 }
 
 deftype ast_expr_complete_info struct {
