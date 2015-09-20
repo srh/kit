@@ -1890,31 +1890,26 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
 
   fncell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
   argcells array[cell_num];
-  pointeecells array[cell_num];
-  fieldcells array[cell_num];
   fieldptrcells array[cell_num];
+  precs array[gr_num];
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = add_cell(&gr, {Has(LocationRigid(void)), argtp.cu, argtp.props});
     push(&argcells, ac);
     pc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), mwfi->cu_type, mwfi->cu_props});
-    push(&pointeecells, pc);
     fc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), mwfi->rhs_type, mwfi->rhs_props});
-    push(&fieldcells, fc);
     fpc cell_num = add_cell(&gr, {Has(LocationRigid(void)), fieldptrtype, fieldptrtype_props});
     push(&fieldptrcells, fpc);
-  }
 
-  retcell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
-
-  precs array[gr_num];
-  for i size = 0; i < nargs; i = i + 1 {
-    var pointee_gn1 = add_node(&gr, node0(@[gr_op]GrDeref({get(&pointeecells, i), get(&argcells, i), OffsetConst(0)})));
-    var pointee_gn = add_node(&gr, node(mk_shray(pointee_gn1), @[gr_op]GrDead({get(&argcells, i)})));
-    var fieldcell_gn = add_node(&gr, node(mk_shray(pointee_gn), @[gr_op]GrSubcell({get(&fieldcells, i), get(&pointeecells, i), OffsetConst(0)})));
-    var fieldptr_gn = add_node(&gr, node(mk_shray(fieldcell_gn), @[gr_op]GrAddressof({get(&fieldptrcells, i), get(&fieldcells, i)})));
+    var pointee_gn1 = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
+    var pointee_gn = add_node(&gr, node(mk_shray(pointee_gn1), @[gr_op]GrDead({ac})));
+    var fieldcell_gn1 = add_node(&gr, node(mk_shray(pointee_gn), @[gr_op]GrSubcell({fc, pc, OffsetConst(0)})));
+    var fieldcell_gn = add_node(&gr, node(mk_shray(fieldcell_gn1), @[gr_op]GrVirtualDead({pc})));
+    var fieldptr_gn1 = add_node(&gr, node(mk_shray(fieldcell_gn), @[gr_op]GrAddressof({fpc, fc})));
+    var fieldptr_gn = add_node(&gr, node(mk_shray(fieldptr_gn1), @[gr_op]GrVirtualDead({fc})));
     push(&precs, fieldptr_gn);
   }
 
+  retcell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
   var fn_gn = add_node(&gr, node0(@[gr_op]GrWriteConst({fncell, ConstDef(mwfi->ip)})));
   push(&precs, fn_gn);
 
