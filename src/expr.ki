@@ -93,7 +93,7 @@ func help_add_cell(es *framescope, info cell_info) cell_num {
 }
 
 func add_virtual_cell(es *framescope, tp cu_typrop) cell_num {
-  return add_virtual_cell(es, tp.cu, tp.props);
+  return help_add_cell(es, {LocationVirtual(void), tp.cu, tp.props});
 }
 
 func add_virtual_cell(es *framescope, type cu_typeexpr, props type_properties) cell_num {
