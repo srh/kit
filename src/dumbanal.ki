@@ -294,7 +294,7 @@ func combine_branch_mut(onto *genexpr_result, a *genexpr_result) void {
 // For deaden and other functions, prelive shows what was alive _before_ prec_muts modified it.
 func deaden(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
   if !isLocationStatic(*unHas(&ref_cell(gr, c)->location)) {
-    return;
+    crash(_u8("deaden on non-static cell"));
   }
 
   if case Has(v *void) = lookup_ref(&prec_muts->made_live, &c) {
