@@ -926,16 +926,37 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       *out = lp_rp_nop;
       return true;
     }
-    case &SimpleAssignment(si ast_simple_assignment_info): {
-      aagn1 gr_num;
-      if !gr_after_actions(cs, gr, lp_rp_nop, &si.assignment_actions, DeadAfterDestroyNo(void), &aagn1) {
+    case &SimpleMoveAssignment(smi ast_simple_move_assignment_info): {
+      dgn gr_num;
+      if !gr_destroy_action(cs, gr, &smi.target_destroy, DeadAfterDestroyNo(void), &dgn) {
         return false;
       }
-      aagn gr_num;
-      if !gr_after_actions(cs, gr, aagn1, &si.cleanup_actions, &aagn) {
+      mgn gr_num;
+      if !gr_move_action(cs, gr, &smi.rhs_move, &mgn) {
         return false;
       }
-      *out = aagn;
+      gn1 gr_num = add_node(gr, node0(@[gr_op]GrSequence({dgn, mgn})));
+      gn2 gr_num = add_node(gr, node0(@[gr_op]GrSequence({lp_rp_nop, gn1})));
+      *out = gn2;
+      return true;
+    }
+    case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info): {
+      dgn gr_num;
+      if !gr_destroy_action(cs, gr, &scdi.target_destroy, DeadAfterDestroyNo(void), &dgn) {
+        return false;
+      }
+      mgn gr_num;
+      if !gr_copy_action(cs, gr, &scdi.rhs_copy, &mgn) {
+        return false;
+      }
+      drgn gr_num;
+      if !gr_destroy_action(cs, gr, &scdi.rhs_cleanup, DeadAfterDestroyYes(void), &drgn) {
+        return false;
+      }
+      gn1 gr_num = add_node(gr, node0(@[gr_op]GrSequence({mgn, drgn})));
+      gn2 gr_num = add_node(gr, node0(@[gr_op]GrSequence({dgn, gn1})));
+      gn3 gr_num = add_node(gr, node0(@[gr_op]GrSequence({lp_rp_nop, gn2})));
+      *out = gn3;
       return true;
     }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
@@ -1100,10 +1121,6 @@ defenum dead_after_destroy {
   DeadAfterDestroyNo void;
 };
 
-func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *array[after_action], out *gr_num) bool {
-  return gr_after_actions(cs, gr, prec, x, DeadAfterDestroyYes(void), out);
-}
-
 func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *opt[destroy_action], out *gr_num) bool {
   if case &Has(da destroy_action) = x {
     dep gr_num;
@@ -1140,40 +1157,17 @@ func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *consume_a
   return true;
 }
 
-func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *array[after_action], dad dead_after_destroy, out *gr_num) bool {
-  nacts size = count(x);
-  for i size = 0; i < nacts; i = i + 1 {
-    dep gr_num;
-    if !gr_after_action(cs, gr, ref(x, i), dad, &dep) {
-      return false;
-    }
-    prec = add_node(gr, node0(@[gr_op]GrSequence({prec, dep})));
-  }
-  *out = prec;
-  return true;
-}
-
 func gr_copy_action(cs *checkstate, gr *frame_graph, x *copy_action, out *gr_num) bool {
   return gr_bi_action(cs, gr, &x->~, out);
 }
 
-func gr_after_action(cs *checkstate, gr *frame_graph, x *after_action, dad dead_after_destroy, out *gr_num) bool {
-  switch x {
-    case &CopyAfter(ca copy_action): {
-      return gr_bi_action(cs, gr, &ca.~, out);
-    }
-    case &MoveAfter(ma move_action): {
-      dep gr_num;
-      if !gr_bi_action(cs, gr, &ma.~, &dep) {
-        return false;
-      }
-      *out = add_node(gr, node(mk_shray(dep), @[gr_op]GrDead({ma.src})));
-      return true;
-    }
-    case &DestroyAfter(da destroy_action): {
-      return gr_destroy_action(cs, gr, &da, dad, out);
-    }
+func gr_move_action(cs *checkstate, gr *frame_graph, x *move_action, out *gr_num) bool {
+  dep gr_num;
+  if !gr_bi_action(cs, gr, &x->~, &dep) {
+    return false;
   }
+  *out = add_node(gr, node(mk_shray(dep), @[gr_op]GrDead({x->src})));
+  return true;
 }
 
 func gr_uni_fun_ctor_desc(cs *checkstate, gr *frame_graph, desc *uni_fun_ctor_desc, arg cell_num) gr_num {

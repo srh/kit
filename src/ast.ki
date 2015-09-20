@@ -94,14 +94,21 @@ deftype ast_conditional_assignment_info struct {
   conditional_copy copy_action;
 };
 
-deftype ast_simple_assignment_info struct {
-  assignment_actions array[after_action];
-  cleanup_actions opt[destroy_action];
+deftype ast_simple_move_assignment_info struct {
+  target_destroy destroy_action;
+  rhs_move move_action;
+};
+
+deftype ast_simple_copydestroy_assignment_info struct {
+  target_destroy destroy_action;
+  rhs_copy copy_action;
+  rhs_cleanup destroy_action;
 };
 
 defenum ast_assignment_info {
   StaticSelfAssignment void;
-  SimpleAssignment ast_simple_assignment_info;
+  SimpleMoveAssignment ast_simple_move_assignment_info;
+  SimpleCopyDestroyAssignment ast_simple_copydestroy_assignment_info;
   ConditionalAssignment ast_conditional_assignment_info;
 };
 
@@ -569,12 +576,6 @@ deftype init_action uni_action;
 deftype uni_action struct {
   ctor uni_ctor_desc;
   arg cell_num;
-};
-
-defenum after_action {
-  CopyAfter copy_action;
-  MoveAfter move_action;
-  DestroyAfter destroy_action;
 };
 
 deftype copy_destroy_action struct {

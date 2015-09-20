@@ -1161,9 +1161,8 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         }
         annotate(&assignment->info,
           @[ast_assignment_info]
-          SimpleAssignment({mk_array(@[after_action]DestroyAfter({target_destroy, dest}),
-                                     @[after_action]MoveAfter({move, dest, desc.whole_num})),
-                            None()}));
+          SimpleMoveAssignment({@[destroy_action]{target_destroy, dest},
+                                @[move_action]{move, dest, desc.whole_num}}));
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
         copy bi_ctor_desc;
@@ -1177,9 +1176,9 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
 
         annotate(&assignment->info,
           @[ast_assignment_info]
-          SimpleAssignment({mk_array(@[after_action]DestroyAfter({target_destroy, dest}),
-                                     @[after_action]CopyAfter({copy, dest, desc.partial_num})),
-                            Has(@[destroy_action]{destroy, desc.whole_num})}));
+          SimpleCopyDestroyAssignment({@[destroy_action]{target_destroy, dest},
+                                       @[copy_action]{copy, dest, desc.partial_num},
+                                       @[destroy_action]{destroy, desc.whole_num}}));
       }
     }
     case &IsLvalYes(desc lval_description): {
