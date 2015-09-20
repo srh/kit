@@ -1959,17 +1959,19 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
   ctor_gn gr_num;
   switch &mec->operational {
   case &EnumConstructMove(cd ctor_desc):
-    bi_ctor_gn gr_num;
-    if !gr_bi_ctor(cs, clq, &gr, argtype, retpart, argnum, &cd, &bi_ctor_gn) {
+    bi_ctor_gn1 gr_num;
+    if !gr_bi_ctor(cs, clq, &gr, argtype, retpart, argnum, &cd, &bi_ctor_gn1) {
       return false;
     }
+    bi_ctor_gn gr_num = add_node(&gr, node(mk_shray(bi_ctor_gn1), @[gr_op]GrVirtualDead({retpart})));
     ctor_gn = add_node(&gr, node(mk_shray(bi_ctor_gn), @[gr_op]GrDead({argnum})));
 
   case &EnumConstructCopyDestroy(cdd copy_destroy_desc):
-    cpgn gr_num;
-    if !gr_bi_ctor(cs, clq, &gr, argtype, retpart, argnum, &cdd.copy_desc, &cpgn) {
+    cpgn1 gr_num;
+    if !gr_bi_ctor(cs, clq, &gr, argtype, retpart, argnum, &cdd.copy_desc, &cpgn1) {
       return false;
     }
+    cpgn gr_num = add_node(&gr, node(mk_shray(cpgn1), @[gr_op]GrVirtualDead({retpart})));
     destgn gr_num;
     if !gr_destroy_ctor(cs, clq, &gr, argtype, argnum, &cdd.destroy_desc, &destgn) {
       return false;
@@ -1980,7 +1982,8 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
   var assign_gn = add_node(&gr, node0(@[gr_op]GrSequence({retpart_gn, ctor_gn})));
 
   var tagcell_gn = add_node(&gr, node0(@[gr_op]GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)})));
-  var tag_gn = add_node(&gr, node(mk_shray(tagcell_gn), @[gr_op]GrWriteConst({tag_cell, ConstInt(~tagval.~)})));
+  var tag_gn1 = add_node(&gr, node(mk_shray(tagcell_gn), @[gr_op]GrWriteConst({tag_cell, ConstInt(~tagval.~)})));
+  var tag_gn = add_node(&gr, node(mk_shray(tag_gn1), @[gr_op]GrVirtualDead({tag_cell})));
   var gn = add_node(&gr, node(concat(@[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn), postpadding_ogn), GrNop(void)));
   *gr_out = gr;
   *gn_out = gn;
