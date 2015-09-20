@@ -596,8 +596,9 @@ deftype ast_expr_after_consume struct {
   result cell_num;
 };
 
-deftype ast_expr_after_discard struct {
-  actions opt[destroy_action];
+defenum ast_expr_after_discard {
+  DiscardTemporary destroy_action;
+  ForgetLvalue cell_num;
 };
 
 func result_cell(a *ast_expr_after_consume) cell_num {
@@ -612,8 +613,12 @@ func mk_after(actions consume_actions, result cell_num) ast_expr_after_consume {
   return {actions, result};
 }
 
-func mk_after_discard(x opt[destroy_action]) ast_expr_after_discard {
-  return {x};
+func mk_after_discard(x destroy_action) ast_expr_after_discard {
+  return DiscardTemporary(x);
+}
+
+func mk_forget_discard(lvalue_cell cell_num) ast_expr_after_discard {
+  return ForgetLvalue(lvalue_cell);
 }
 
 deftype ast_expr_complete_info struct {

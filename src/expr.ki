@@ -1087,11 +1087,11 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
       if !get_destroy_uni_ctor(es, &ref_cell(es, desc.whole_num)->type, &destroy) {
         return false;
       }
-      annotate(after, mk_after_discard(@[opt[destroy_action]]Has({destroy, desc.whole_num})));
+      annotate(after, mk_after_discard(@[destroy_action]{destroy, desc.whole_num}));
     }
     case &IsLvalYes(desc lval_description): {
       // This could ostensibly be Has(desc.num), but there's no reason to be inconsistent with the rvalue case.
-      annotate(after, mk_after_discard(None()));
+      annotate(after, mk_forget_discard(desc.num));
     }
   }
   return true;

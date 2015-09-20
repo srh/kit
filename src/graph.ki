@@ -647,14 +647,29 @@ func gr_unwind_vars(cs *checkstate, gr *frame_graph, destructions *array[destroy
 }
 
 func gr_expr_discard(cs *checkstate, gr *frame_graph, x *ast_expr_discard, out *gr_num) bool {
-  aft *ast_expr_after_discard = unHas(&x->after);
   dp gr_num;
   if !gr_expr(cs, gr, &x->expr, &dp) {
     return false;
   }
   after_gn gr_num;
-  if !gr_after_actions(cs, gr, dp, &aft->actions, &after_gn) {
+  if !gr_expr_after_discard(cs, gr, unHas(&x->after), &after_gn) {
     return false;
+  }
+  gn gr_num = add_node(gr, node0(@[gr_op]GrSequence({dp, after_gn})));
+  *out = gn;
+  return true;
+}
+
+func gr_expr_after_discard(cs *checkstate, gr *frame_graph, aft *ast_expr_after_discard, out *gr_num) bool {
+  after_gn gr_num;
+  switch aft {
+  case &DiscardTemporary(da destroy_action):
+    if !gr_destroy_action(cs, gr, &da, DeadAfterDestroyYes(void), &after_gn) {
+      return false;
+    }
+  case &ForgetLvalue(num cell_num):
+    // TODO: if num is virtual
+    after_gn = add_node(gr, node0(@[gr_op]GrNop(void)));
   }
   *out = after_gn;
   return true;
@@ -808,10 +823,11 @@ func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_f
   }
   switch info {
     case &ArrayLength(alinfo ast_arraylength_info): {
-      dp gr_num;
-      if !gr_after_actions(cs, gr, lp, &alinfo.after.actions, &dp) {
+      dp1 gr_num;
+      if !gr_expr_after_discard(cs, gr, &alinfo.after, &dp1) {
         return false;
       }
+      var dp = add_node(gr, node0(@[gr_op]GrSequence({lp, dp1})));
       var cp = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)})));
       var gn = add_node(gr, node(mk_shray(dp, cp), GrNop(void)));
       *out = gn;
