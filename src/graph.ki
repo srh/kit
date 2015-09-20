@@ -1380,12 +1380,23 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   derefgn gr_num = add_node(&gr, node(freeze(&derefgns), GrNop(void)));
 
   return_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
-  setret gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({return_cell, ConstInt(bigu(0))})));
 
   indexcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), size_type, size_type_props});
 
-  indexdead gr_num = add_node(&gr, node0(@[gr_op]GrDead({indexcell})));
-  indexdeadseq gr_num = add_node(&gr, node0(@[gr_op]GrSequence({indexdead, setret})));
+  deadprecs array[gr_num];
+  if true {
+    setret gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({return_cell, ConstInt(bigu(0))})));
+    push(&deadprecs, setret);
+    indexdead gr_num = add_node(&gr, node0(@[gr_op]GrDead({indexcell})));
+    push(&deadprecs, indexdead);
+
+    for i size = 0; i < nargs; i = i + 1 {
+      pd gr_num = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&pointeecells, i)})));
+      push(&deadprecs, pd);
+    }
+  }
+
+  deadseq gr_num = add_node(&gr, node(freeze(&deadprecs), @[gr_op]GrNop(void)));
 
   topgn gr_num = add_node(&gr, node0(@[gr_op]GrNop(void)));
 
@@ -1400,7 +1411,8 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
     epc cell_num = add_cell(&gr, {Has(LocationRigid(void)), elemptrtype, elemptrtype_props});
     push(&elemptrcells, epc);
     ptrgn gr_num = add_node(&gr, node(mk_shray(deadcopy), @[gr_op]GrAddressof({epc, ec})));
-    push(&precs, ptrgn);
+    ecdeadgn gr_num = add_node(&gr, node(mk_shray(ptrgn), @[gr_op]GrVirtualDead({ec})));
+    push(&precs, ecdeadgn);
   }
 
   elemretcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), voidtp.cu, voidtp.props});
@@ -1439,7 +1451,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 
   tie_gn gr_num = add_node(&gr, node0(@[gr_op]GrSequence({body_gn, topgn})));
 
-  branch_gn gr_num = add_node(&gr, node0(@[gr_op]GrBranch({indexcell, mk_shray(cons(@[gr_const]ConstInt(bigu(terminal_case)), indexdeadseq)), Has(tie_gn)})));
+  branch_gn gr_num = add_node(&gr, node0(@[gr_op]GrBranch({indexcell, mk_shray(cons(@[gr_const]ConstInt(bigu(terminal_case)), deadseq)), Has(tie_gn)})));
 
   mut_nop_node(&gr, topgn, node0(@[gr_op]GrJmp({branch_gn})));
 
