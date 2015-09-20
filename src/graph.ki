@@ -1855,7 +1855,8 @@ func gr_bzero_subcell(clq *clqueue, gr *frame_graph, c cell_num, offset u32, siz
   pad_cell cell_num = add_cell(gr, {Has(LocationVirtual(void)), padtype.cu, padtype.props});
   var subcell_gn = add_node(gr, node0(@[gr_op]GrSubcell({pad_cell, c, OffsetConst(offset)})));
   var bzero_gn = add_node(gr, node(mk_shray(subcell_gn), @[gr_op]GrWriteConst({pad_cell, ConstInt(bigu(0))})));
-  return Has(bzero_gn);
+  var vd_gn = add_node(gr, node(mk_shray(bzero_gn), @[gr_op]GrVirtualDead({pad_cell})));
+  return Has(vd_gn);
 }
 
 func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *u32, count_out *u32) void {
