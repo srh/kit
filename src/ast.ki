@@ -667,24 +667,9 @@ func annotate_info(a *ast_expr, info ast_expr_info) void {
   a->info = info;
 }
 
-// TODO: Does anybody call this?
-func annotate_disposal(a *opt[ast_expr_after], aft ast_expr_after) void {
-  set(a, aft);
-}
-
 // TODO: Does anybody use this?
 func annotate_disposal(a *nc[ast_expr_after], aft ast_expr_after) void {
   annotate(a, aft);
-}
-
-
-// TODO: Does anything use this?
-func annotate_disposal(a *ast_expr_discard, aft ast_expr_after) void {
-  annotate(&a->after, aft);
-}
-
-func annotate_disposal(a *ast_expr_consume, aft ast_expr_after) void {
-  annotate(&a->after, aft);
 }
 
 
