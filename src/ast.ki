@@ -96,6 +96,7 @@ deftype ast_conditional_assignment_info struct {
 
 deftype ast_simple_assignment_info struct {
   assignment_actions array[after_action];
+  cleanup_actions opt[destroy_action];
 };
 
 defenum ast_assignment_info {

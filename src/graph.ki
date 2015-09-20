@@ -927,8 +927,12 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       return true;
     }
     case &SimpleAssignment(si ast_simple_assignment_info): {
+      aagn1 gr_num;
+      if !gr_after_actions(cs, gr, lp_rp_nop, &si.assignment_actions, DeadAfterDestroyNo(void), &aagn1) {
+        return false;
+      }
       aagn gr_num;
-      if !gr_after_actions(cs, gr, lp_rp_nop, &si.assignment_actions, DeadAfterDestroyNo(void), &aagn) {
+      if !gr_after_actions(cs, gr, aagn1, &si.cleanup_actions, &aagn) {
         return false;
       }
       *out = aagn;
