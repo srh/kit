@@ -1099,6 +1099,18 @@ func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *array[aft
   return gr_after_actions(cs, gr, prec, x, DeadAfterDestroyYes(void), out);
 }
 
+func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *opt[destroy_action], out *gr_num) bool {
+  if case &Has(da destroy_action) = x {
+    dep gr_num;
+    if !gr_destroy_action(cs, gr, &da, DeadAfterDestroyYes(void), &dep) {
+      return false;
+    }
+    prec = add_node(gr, node0(@[gr_op]GrSequence({prec, dep})));
+  }
+  *out = prec;
+  return true;
+}
+
 func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *consume_actions, out *gr_num) bool {
   switch x {
   case &ConsumeByInPlace(v void): { }

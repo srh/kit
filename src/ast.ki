@@ -598,8 +598,7 @@ deftype ast_expr_after_consume struct {
 };
 
 deftype ast_expr_after_discard struct {
-  // The after-actions get evaluated -in order-.  For example, copying a field from a temporary should happen -before- destroying the temporary.
-  actions array[after_action];
+  actions opt[destroy_action];
 };
 
 func result_cell(a *ast_expr_after_consume) cell_num {
@@ -614,12 +613,8 @@ func mk_after(actions consume_actions, result cell_num) ast_expr_after_consume {
   return {actions, result};
 }
 
-func mk_after_discard() ast_expr_after_discard {
-  return {mk_array()};
-}
-
-func mk_after_discard(x after_action) ast_expr_after_discard {
-  return {mk_array(x)};
+func mk_after_discard(x opt[destroy_action]) ast_expr_after_discard {
+  return {x};
 }
 
 deftype ast_expr_complete_info struct {
