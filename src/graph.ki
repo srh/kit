@@ -962,8 +962,12 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       if !gr_destroy_action(cs, gr, &scdi.target_destroy, DeadAfterDestroyNo(void), &dgn) {
         return false;
       }
+      mgn1 gr_num;
+      if !gr_copy_action(cs, gr, &scdi.rhs_copy, &mgn1) {
+        return false;
+      }
       mgn gr_num;
-      if !gr_copy_action(cs, gr, &scdi.rhs_copy, &mgn) {
+      if !gr_chain_virtualdead(cs, gr, mgn1, scdi.rhs_copy.src, &mgn) {
         return false;
       }
       drgn gr_num;
@@ -983,6 +987,12 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       var ap = add_node(gr, node(mk_shray(fc, dp, sp), @[gr_op]GrApply({ci.comparecells.funcell, mk_shray(ci.comparecells.destptr, ci.comparecells.srcptr), ci.comparecells.cmp_result})));
 
       var just_dead = add_node(gr, node0(@[gr_op]GrDead({ci.comparecells.cmp_result})));
+      if case DeadMe(v void) = ci.rhs_deadme {
+        // TODO: It would be nice if we just had a closing node for virtualdead, maybe also for just_dead, instead of these duplicate tails.
+        if !gr_chain_virtualdead(cs, gr, just_dead, ci.conditional_copy.src, &just_dead) {
+          return false;
+        }
+      }
 
       assign_destroy gr_num;
       if !gr_destroy_action(cs, gr, &ci.conditional_destroy, DeadAfterDestroyNo(void), &assign_destroy) {
@@ -995,6 +1005,11 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       assign gr_num = add_node(gr, node0(@[gr_op]GrSequence({assign_destroy, assign_copy})));
       dead_before_assign gr_num = add_node(gr, node0(@[gr_op]GrDead({ci.comparecells.cmp_result})));
       dead_then_assign gr_num = add_node(gr, node0(@[gr_op]GrSequence({dead_before_assign, assign})));
+      if case DeadMe(v void) = ci.rhs_deadme {
+        if !gr_chain_virtualdead(cs, gr, dead_then_assign, ci.conditional_copy.src, &dead_then_assign) {
+          return false;
+        }
+      }
       cases shray[tup[gr_const, gr_num]] = mk_shray(cons(@[gr_const]ConstInt(~ @[u32] 0), dead_then_assign), cons(@[gr_const]ConstInt(~ @[u32] 1), just_dead));
 
       var br = add_node(gr, node(mk_shray(ap), @[gr_op]GrBranch({ci.comparecells.cmp_result, cases, None()})));

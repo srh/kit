@@ -92,6 +92,8 @@ deftype ast_conditional_assignment_info struct {
   assignment isn't self-assignment. */
   conditional_destroy destroy_action;
   conditional_copy copy_action;
+  // Should we dead the rhs virtual cell?
+  rhs_deadme lval_deadme;
 };
 
 deftype ast_simple_move_assignment_info struct {

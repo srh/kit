@@ -1198,7 +1198,8 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
           @[ast_assignment_info]
           ConditionalAssignment({make_comparecells(es, dest),
                                  @[destroy_action]{target_destroy, dest},
-                                 @[copy_action]{copy, dest, desc.num}}));
+                                 @[copy_action]{copy, dest, desc.num},
+                                 desc.deadme}));
       }
     }
   }
