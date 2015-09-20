@@ -825,16 +825,6 @@ func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_f
   }
 }
 
-func check_all_cells_have_location(cells *array[cell_info]) void {
-  ncells size = count(cells);
-  for i size = 0; i < ncells; i = i + 1 {
-    c *cell_info = ref(cells, i);
-    if !isHas(&c->location) {
-      ice(_u8("check_all_cells_have_location sees cell without location"));
-    }
-  }
-}
-
 func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda, out *gr_num) bool {
   info *ast_fullbody_info = unHas(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_cells(gr->informal_name, info->cells);
@@ -843,8 +833,6 @@ func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda,
   if !gr_fullbody(cs, &lambda_gr, &a->body, &fullbody_gn, &return_cell) {
     return false;
   }
-
-  check_all_cells_have_location(&lambda_gr.cells);
 
   id fn_body_id = add_fn_body(cs, {gr->informal_name, NotComputed@[sti](), @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, return_cell}, info->arg_cells})});
   var gn = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstFnBody(id)})));
@@ -1254,9 +1242,9 @@ func add_minimal_basics(cs *checkstate, clq *clqueue, gr *frame_graph, size u32,
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, pointee_tp.cu.~));
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
   ret gr_minimal_basics;
-  ret.return_cell = add_cell(gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
+  ret.return_cell = add_cell(gr, {LocationStatic(void), voidtp.cu, voidtp.props});
   for i size = 0; i < arity; i = i + 1 {
-    ac cell_num = add_cell(gr, {Has(LocationRigid(void)), argtp.cu, argtp.props});
+    ac cell_num = add_cell(gr, {LocationStatic(void), argtp.cu, argtp.props});
     push(&ret.argcells, ac);
   }
   *out = ret;
@@ -1269,7 +1257,7 @@ func add_basics(cs *checkstate, clq *clqueue, gr *frame_graph, size u32, arity s
   pointee_tp cu_typrop = compute_prim(clq, primitive_padding_type(cs, size));
   derefs array[gr_num];
   for i size = 0; i < arity; i = i + 1 {
-    pc cell_num = add_cell(gr, {Has(LocationVirtual(void)), pointee_tp.cu, pointee_tp.props});
+    pc cell_num = add_cell(gr, {LocationVirtual(void), pointee_tp.cu, pointee_tp.props});
     push(&ret.pointeecells, pc);
     dn gr_num = add_node(gr, node0(@[gr_op]GrDeref({pc, get(&ret.minimal.argcells, i), OffsetConst(0)})));
     push(&derefs, dn);
@@ -1401,9 +1389,9 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   pointeecells array[cell_num];
   derefgns array[gr_num];
   for i size = 0; i < nargs; i = i + 1 {
-    ac cell_num = add_cell(&gr, {Has(LocationRigid(void)), argtp.cu, argtp.props});
+    ac cell_num = add_cell(&gr, {LocationStatic(void), argtp.cu, argtp.props});
     push(&argcells, ac);
-    pc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), mai->cu_type, mai->cu_props});
+    pc cell_num = add_cell(&gr, {LocationVirtual(void), mai->cu_type, mai->cu_props});
     push(&pointeecells, pc);
 
     gn1 gr_num = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
@@ -1413,9 +1401,9 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 
   derefgn gr_num = add_node(&gr, node(freeze(&derefgns), GrNop(void)));
 
-  return_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
+  return_cell cell_num = add_cell(&gr, {LocationStatic(void), voidtp.cu, voidtp.props});
 
-  indexcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), size_type, size_type_props});
+  indexcell cell_num = add_cell(&gr, {LocationStatic(void), size_type, size_type_props});
 
   deadprecs array[gr_num];
   if true {
@@ -1437,20 +1425,20 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   elemptrcells array[cell_num];
   precs array[gr_num];
   for j size = 0; j < nargs; j = j + 1 {
-    ec cell_num = add_cell(&gr, {Has(LocationVirtual(void)), ~ *param, param_props});
-    indexcopycell cell_num = add_cell(&gr, {Has(LocationRigid(void)), size_type, size_type_props});
+    ec cell_num = add_cell(&gr, {LocationVirtual(void), ~ *param, param_props});
+    indexcopycell cell_num = add_cell(&gr, {LocationStatic(void), size_type, size_type_props});
     copygn gr_num = add_node(&gr, node0(@[gr_op]GrMemCopy({indexcopycell, indexcell})));
     gn gr_num = add_node(&gr, node(mk_shray(copygn), @[gr_op]GrSubcell({ec, get(&pointeecells, j), OffsetComputed({param_props.flat_size, indexcopycell})})));
     deadcopy gr_num = add_node(&gr, node(mk_shray(gn), @[gr_op]GrDead({indexcopycell})));
-    epc cell_num = add_cell(&gr, {Has(LocationRigid(void)), elemptrtype, elemptrtype_props});
+    epc cell_num = add_cell(&gr, {LocationStatic(void), elemptrtype, elemptrtype_props});
     push(&elemptrcells, epc);
     ptrgn gr_num = add_node(&gr, node(mk_shray(deadcopy), @[gr_op]GrAddressof({epc, ec})));
     ecdeadgn gr_num = add_node(&gr, node(mk_shray(ptrgn), @[gr_op]GrVirtualDead({ec})));
     push(&precs, ecdeadgn);
   }
 
-  elemretcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), voidtp.cu, voidtp.props});
-  func_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
+  elemretcell cell_num = add_cell(&gr, {LocationStatic(void), voidtp.cu, voidtp.props});
+  func_cell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
 
   func_gn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({func_cell, ConstDef(mai->ip)})));
   push(&precs, func_gn);
@@ -1458,9 +1446,9 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   ap gr_num = add_node(&gr, node(freeze(&precs), @[gr_op]GrApply({func_cell, freeze(&elemptrcells), elemretcell})));
   vd gr_num = add_node(&gr, node(mk_shray(ap), @[gr_op]GrDead({elemretcell})));
 
-  ic2cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), size_type, size_type_props});
+  ic2cell cell_num = add_cell(&gr, {LocationStatic(void), size_type, size_type_props});
   ic2gn gr_num = add_node(&gr, node0(@[gr_op]GrMemCopy({ic2cell, indexcell})));
-  onecell cell_num = add_cell(&gr, {Has(LocationRigid(void)), size_type, size_type_props});
+  onecell cell_num = add_cell(&gr, {LocationStatic(void), size_type, size_type_props});
   onegn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({onecell, ConstInt(bigu(1))})));
   op_action primitive_numeric_op_action;
   if case CtorDestroy(v void) = wc {
@@ -1534,11 +1522,11 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
   tagcell_gns array[gr_num];
   nargs size = num_args(wc);
   for i size = 0; i < nargs; i = i + 1 {
-    ac cell_num = add_cell(&gr, {Has(LocationRigid(void)), argtp.cu, argtp.props});
+    ac cell_num = add_cell(&gr, {LocationStatic(void), argtp.cu, argtp.props});
     push(&argcells, ac);
-    pc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), mei->cu_type, mei->cu_props});
+    pc cell_num = add_cell(&gr, {LocationVirtual(void), mei->cu_type, mei->cu_props});
     push(&pointeecells, pc);
-    tc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), tagtype, tagtype_props});
+    tc cell_num = add_cell(&gr, {LocationVirtual(void), tagtype, tagtype_props});
     push(&tagcells, tc);
 
     derefgn1 gr_num = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
@@ -1550,7 +1538,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
   deref_gn gr_num = add_node(&gr, node(freeze(&tagcell_gns), @[gr_op]GrNop(void)));
 
-  return_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
+  return_cell cell_num = add_cell(&gr, {LocationStatic(void), voidtp.cu, voidtp.props});
   deadprecs array[gr_num];
   if true {
     setret gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)})));
@@ -1586,7 +1574,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     fieldcella array[cell_num];
     fieldcellgn array[gr_num];
     for j size = 0; j < nargs; j = j + 1 {
-      fc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), fieldtype, fieldtype_props});
+      fc cell_num = add_cell(&gr, {LocationVirtual(void), fieldtype, fieldtype_props});
       push(&fieldcella, fc);
       sn gr_num = add_node(&gr, node0(@[gr_op]GrSubcell({get(&fieldcella, j), get(&pointeecells, j), OffsetConst(field_offset)})));
       push(&fieldcellgn, sn);
@@ -1601,20 +1589,20 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       fieldptrcella array[cell_num];
       precs array[gr_num];
       for j size = 0; j < nargs; j = j + 1 {
-        fpc cell_num = add_cell(&gr, {Has(LocationRigid(void)), fieldptrtype, fieldptrtype_props});
+        fpc cell_num = add_cell(&gr, {LocationStatic(void), fieldptrtype, fieldptrtype_props});
         push(&fieldptrcella, fpc);
         an1 gr_num = add_node(&gr, node(mk_shray(get(&fieldcellgn, j)), @[gr_op]GrAddressof({fpc, get(&fieldcella, j)})));
         an gr_num = add_node(&gr, node(mk_shray(an1), @[gr_op]GrVirtualDead({get(&fieldcella, j)})));
         push(&precs, an);
       }
 
-      fieldretcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), voidtp.cu, voidtp.props});
+      fieldretcell cell_num = add_cell(&gr, {LocationStatic(void), voidtp.cu, voidtp.props});
 
       fntype cu_typeexpr;
       fntype_props type_properties;
       compute_prim(cs, clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
-      func_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
+      func_cell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
       func_gn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({func_cell, ConstDef(ip)})));
       push(&precs, func_gn);
 
@@ -1716,9 +1704,9 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
   derefgns array[gr_num];
   nargs size = num_args(wc);
   for i size = 0; i < nargs; i = i + 1 {
-    ac cell_num = add_cell(&gr, {Has(LocationRigid(void)), argtp.cu, argtp.props});
+    ac cell_num = add_cell(&gr, {LocationStatic(void), argtp.cu, argtp.props});
     push(&argcells, ac);
-    pc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), msi->cu_type, msi->cu_props});
+    pc cell_num = add_cell(&gr, {LocationVirtual(void), msi->cu_type, msi->cu_props});
     push(&pointeecells, pc);
 
     gn1 gr_num = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
@@ -1728,7 +1716,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
   derefgn gr_num = add_node(&gr, node(freeze(&derefgns), GrNop(void)));
 
-  return_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
+  return_cell cell_num = add_cell(&gr, {LocationStatic(void), voidtp.cu, voidtp.props});
 
   deadprecs array[gr_num];
   if true {
@@ -1756,7 +1744,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
     fieldcella array[cell_num];
     fieldcellgn array[gr_num];
     for j size = 0; j < nargs; j = j + 1 {
-      fc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), ~ ref(&st->fields, i)->type, ref(&psd.fields, i)->props});
+      fc cell_num = add_cell(&gr, {LocationVirtual(void), ~ ref(&st->fields, i)->type, ref(&psd.fields, i)->props});
       push(&fieldcella, fc);
 
       gn gr_num = add_node(&gr, node0(@[gr_op]GrSubcell({fc, get(&pointeecells, j), OffsetConst(ref(&psd.fields, i)->offset)})));
@@ -1772,20 +1760,20 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       fieldptrcella array[cell_num];
       precs array[gr_num];
       for j size = 0; j < nargs; j = j + 1 {
-        fpc cell_num = add_cell(&gr, {Has(LocationRigid(void)), fieldptrtype, fieldptrtype_props});
+        fpc cell_num = add_cell(&gr, {LocationStatic(void), fieldptrtype, fieldptrtype_props});
         push(&fieldptrcella, fpc);
         gn1 gr_num = add_node(&gr, node(mk_shray(get(&fieldcellgn, j)), @[gr_op]GrAddressof({fpc, get(&fieldcella, j)})));
         gn gr_num = add_node(&gr, node(mk_shray(gn1), @[gr_op]GrVirtualDead({get(&fieldcella, j)})));
         push(&precs, gn);
       }
 
-      fieldretcell cell_num = add_cell(&gr, {Has(LocationFlex(void)), voidtp.cu, voidtp.props});
+      fieldretcell cell_num = add_cell(&gr, {LocationStatic(void), voidtp.cu, voidtp.props});
 
       fntype cu_typeexpr;
       fntype_props type_properties;
       compute_prim(cs, clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
-      func_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
+      func_cell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
 
       func_gn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({func_cell, ConstDef(ip)})));
       push(&precs, func_gn);
@@ -1852,7 +1840,7 @@ func gr_bzero_subcell(clq *clqueue, gr *frame_graph, c cell_num, offset u32, siz
     return None();
   }
   padtype cu_typrop = compute_prim(clq, primitive_padding_type(clq->cs, size));
-  pad_cell cell_num = add_cell(gr, {Has(LocationVirtual(void)), padtype.cu, padtype.props});
+  pad_cell cell_num = add_cell(gr, {LocationVirtual(void), padtype.cu, padtype.props});
   var subcell_gn = add_node(gr, node0(@[gr_op]GrSubcell({pad_cell, c, OffsetConst(offset)})));
   var bzero_gn = add_node(gr, node(mk_shray(subcell_gn), @[gr_op]GrWriteConst({pad_cell, ConstInt(bigu(0))})));
   var vd_gn = add_node(gr, node(mk_shray(bzero_gn), @[gr_op]GrVirtualDead({pad_cell})));
@@ -1888,16 +1876,16 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
   fntype_props type_properties;
   compute_prim(cs, clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
-  fncell cell_num = add_cell(&gr, {Has(LocationRigid(void)), fntype, fntype_props});
+  fncell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
   argcells array[cell_num];
   fieldptrcells array[cell_num];
   precs array[gr_num];
   for i size = 0; i < nargs; i = i + 1 {
-    ac cell_num = add_cell(&gr, {Has(LocationRigid(void)), argtp.cu, argtp.props});
+    ac cell_num = add_cell(&gr, {LocationStatic(void), argtp.cu, argtp.props});
     push(&argcells, ac);
-    pc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), mwfi->cu_type, mwfi->cu_props});
-    fc cell_num = add_cell(&gr, {Has(LocationVirtual(void)), mwfi->rhs_type, mwfi->rhs_props});
-    fpc cell_num = add_cell(&gr, {Has(LocationRigid(void)), fieldptrtype, fieldptrtype_props});
+    pc cell_num = add_cell(&gr, {LocationVirtual(void), mwfi->cu_type, mwfi->cu_props});
+    fc cell_num = add_cell(&gr, {LocationVirtual(void), mwfi->rhs_type, mwfi->rhs_props});
+    fpc cell_num = add_cell(&gr, {LocationStatic(void), fieldptrtype, fieldptrtype_props});
     push(&fieldptrcells, fpc);
 
     var pointee_gn1 = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
@@ -1909,7 +1897,7 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
     push(&precs, fieldptr_gn);
   }
 
-  retcell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
+  retcell cell_num = add_cell(&gr, {LocationStatic(void), voidtp.cu, voidtp.props});
   var fn_gn = add_node(&gr, node0(@[gr_op]GrWriteConst({fncell, ConstDef(mwfi->ip)})));
   push(&precs, fn_gn);
 
@@ -1925,7 +1913,7 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
 
 func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cell_out *cell_num) bool {
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_construct")));
-  retnum cell_num = add_cell(&gr, {Has(LocationRigid(void)), mec->enum_type, mec->enum_type_props});
+  retnum cell_num = add_cell(&gr, {LocationStatic(void), mec->enum_type, mec->enum_type_props});
 
   tagval enum_tag_value = mk_enum_tag_value(mec->constructor_index);
 
@@ -1940,7 +1928,7 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
     props type_properties;
     compute_prim(cs, clq, enum_tag_type(cs, &et), &cu, &props);
     tag_end = props.flat_size;
-    tag_cell = add_cell(&gr, {Has(LocationVirtual(void)), cu, props});
+    tag_cell = add_cell(&gr, {LocationVirtual(void), cu, props});
   } else {
     ice(_u8("magic_enum_construct on non-enum type"));
   }
@@ -1951,8 +1939,8 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
   postpadding_ogn opt[gr_num]
     = gr_bzero_subcell(clq, &gr, retnum, field_end, mec->enum_type_props.flat_size - field_end);
 
-  argnum cell_num = add_cell(&gr, {Has(LocationRigid(void)), ~ *argtype, mec->rhs_props});
-  retpart cell_num = add_cell(&gr, {Has(LocationVirtual(void)), ~ *argtype, mec->rhs_props});
+  argnum cell_num = add_cell(&gr, {LocationStatic(void), ~ *argtype, mec->rhs_props});
+  retpart cell_num = add_cell(&gr, {LocationVirtual(void), ~ *argtype, mec->rhs_props});
 
   var retpart_gn = add_node(&gr, node0(@[gr_op]GrSubcell({retpart, retnum, OffsetConst(field_offset)})));
 
@@ -2009,10 +1997,10 @@ func gr_bi_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, 
     functy_props type_properties;
     compute_prim(cs, clq, functy, &cu_functy, &functy_props);
 
-    funcptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_functy, functy_props});
-    destptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_pty, pty_props});
-    srcptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_pty, pty_props});
-    return_cell cell_num = add_cell(gr, {Has(LocationFlex(void)), voidtp.cu, voidtp.props});
+    funcptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_functy, functy_props});
+    destptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_pty, pty_props});
+    srcptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_pty, pty_props});
+    return_cell cell_num = add_cell(gr, {LocationStatic(void), voidtp.cu, voidtp.props});
 
     bi_desc bi_fun_ctor_desc = {ip, funcptr_cell, destptr_cell, srcptr_cell, return_cell};
 
@@ -2039,9 +2027,9 @@ func gr_destroy_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typee
     functy_props type_properties;
     compute_prim(cs, clq, functy, &cu_functy, &functy_props);
 
-    funcptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_functy, functy_props});
-    argptr_cell cell_num = add_cell(gr, {Has(LocationRigid(void)), cu_pty, pty_props});
-    return_cell cell_num = add_cell(gr, {Has(LocationFlex(void)), voidtp.cu, voidtp.props});
+    funcptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_functy, functy_props});
+    argptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_pty, pty_props});
+    return_cell cell_num = add_cell(gr, {LocationStatic(void), voidtp.cu, voidtp.props});
 
     uni_desc uni_fun_ctor_desc = {ip, funcptr_cell, argptr_cell, return_cell};
     gn gr_num = gr_uni_fun_ctor_desc(cs, gr, &uni_desc, argnum);
@@ -2066,7 +2054,7 @@ func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_
     if !compute_complete_type_properties(cs, clq, ty, &props) {
       ice(_u8("add_prim_fn_body typrops"));
     }
-    c cell_num = add_cell(&gr, {Has(LocationRigid(void)), ~ *ty, props});
+    c cell_num = add_cell(&gr, {LocationStatic(void), ~ *ty, props});
     push(&argcells, c);
   }
   retty *te_typeexpr = ref(typarams, ntyparams - 1);
@@ -2074,7 +2062,7 @@ func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_
   if !compute_complete_type_properties(cs, clq, retty, &retprops) {
     ice(_u8("add_prim_fn_body retprops"));
   }
-  retcell cell_num = add_cell(&gr, {Has(LocationRigid(void)), ~ *retty, retprops});
+  retcell cell_num = add_cell(&gr, {LocationStatic(void), ~ *retty, retprops});
 
   argcells_copy array[cell_num] = argcells;
   argshray shray[cell_num] = freeze(&argcells_copy);
@@ -2173,7 +2161,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
 
 func mk_const_frame_regraphed(informal_name sym, type *cu_typeexpr, props *type_properties, c gr_const) frame_regraphed {
   gr frame_graph = init_frame_graph_empty(informal_name);
-  cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), *type, *props});
+  cell cell_num = add_cell(&gr, {LocationStatic(void), *type, *props});
   gn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({cell, c})));
   return {gr, gn, cell};
 }

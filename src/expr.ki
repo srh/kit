@@ -14,10 +14,7 @@ in. Location should be specified when:
 defenum cell_location {
   // The "cell" is actually caused by dereferencing something, or maybe accessing something's field?
   LocationVirtual void;
-  // The cell's on the stack, its location flexible.
-  LocationFlex void;
-  // The cell is in a "rigid" location.  Used for function parameters.  The only rigid cells that truly must spend their lives in a calculated real-memory location are those without a trivial move constructor, or, like any cell, those whose address has been computed.
-  LocationRigid void;
+  LocationStatic void;
 };
 
 func `==`(x cell_location, y cell_location) bool {
@@ -27,26 +24,20 @@ func `==`(x cell_location, y cell_location) bool {
 func isLocationStatic(location cell_location) bool {
   switch location {
   case LocationVirtual(v void): return false;
-  case LocationFlex(v void): return true;
-  case LocationRigid(v void): return true;
+  case LocationStatic(v void): return true;
   }
 }
 
 // TODO: Move to graph.ki or something.
 deftype cell_info struct {
   // Location must be specified by type-checking, but it spends time in an unspecified state.
-  location opt[cell_location];
+  location cell_location;
   type cu_typeexpr;
   props type_properties;
 };
 
 func location(info *cell_info) cell_location {
-  if case Has(loc) = info->location {
-    return loc;
-  } else {
-    ice(_u8("cell_info location is None()"));
-    return fake();
-  }
+  return info->location;
 }
 
 // Used with the variable name "es" -- its name used to be different.
@@ -101,24 +92,16 @@ func help_add_cell(es *framescope, info cell_info) cell_num {
   return ~ret;
 }
 
-func add_cell(es *framescope, type cu_typeexpr, props type_properties) cell_num {
-  return help_add_cell(es, {None(), type, props});
-}
-
-func add_flex_cell(es *framescope, type cu_typeexpr, props type_properties) cell_num {
-  return help_add_cell(es, {Has(LocationFlex(void)), type, props});
-}
-
 func add_virtual_cell(es *framescope, tp cu_typrop) cell_num {
   return add_virtual_cell(es, tp.cu, tp.props);
 }
 
 func add_virtual_cell(es *framescope, type cu_typeexpr, props type_properties) cell_num {
-  return help_add_cell(es, {Has(LocationVirtual(void)), type, props});
+  return help_add_cell(es, {LocationVirtual(void), type, props});
 }
 
-func add_rigid_cell(es *framescope, type cu_typeexpr, props type_properties) cell_num {
-  return help_add_cell(es, {Has(LocationRigid(void)), type, props});
+func add_static_cell(es *framescope, type cu_typeexpr, props type_properties) cell_num {
+  return help_add_cell(es, {LocationStatic(void), type, props});
 }
 
 func add_virtual_tag_cell(es *framescope, et *te_enum) cell_num {
@@ -138,21 +121,12 @@ func count_cells(es *framescope) frame_cell_count {
   return ret;
 }
 
-
-func annotate_cell_location(es *framescope, num cell_num, loc cell_location) void {
+func reannotate_static_to_virtual(es *framescope, num cell_num) void {
   info *cell_info = ref_cell(es, num);
-  if isHas(&info->location) {
-    ice(_u8("framescope cell already has a location"));
-  }
-  info->location = Has(loc);
-}
-
-func reannotate_rigid_to_virtual(es *framescope, num cell_num) void {
-  info *cell_info = ref_cell(es, num);
-  if case &LocationRigid(v void) = unHas(&info->location) {
-    info->location = Has(LocationVirtual(void));
+  if case LocationStatic(v void) = info->location {
+    info->location = LocationVirtual(void);
   } else {
-    ice(_u8("reannotate_rigid_to_virtual seeing non-rigid location"));
+    ice(_u8("reannotate_static_to_virtual seeing non-rigid location"));
   }
 }
 
@@ -621,7 +595,7 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
       ice(_u8("help_check_simple_literal passed type with bad properties"));
     }
 
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~c.te, props)), ~c.te, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~c.te, props)), ~c.te, props)));
   } else {
     annotate_info(x, @[ast_expr_info]IncompleteCheck(type));
   }
@@ -734,7 +708,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       if !compute_complete_type_properties(es->cs, es->clq, &ptr_computed.te, &ptr_props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~ptr_computed.te, ptr_props)), ~ptr_computed.te, ptr_props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ptr_computed.te, ptr_props)), ~ptr_computed.te, ptr_props)));
       return true;
     }
     case &Deref(a ast_deref): {
@@ -802,7 +776,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
             return false;
           }
           annotate(&a.info, @[ast_local_field_info]ArrayLength({*unHas(&after), value}));
-          lval = wholeRval(add_cell(es, fieldtype, props));
+          lval = wholeRval(add_static_cell(es, fieldtype, props));
         }
       }
       annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
@@ -839,7 +813,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
           annotate(&a.info, DerefFieldName(offset));
         }
         case ConstantField(value u32): {
-          lval = wholeRval(add_cell(es, fieldtype, props));
+          lval = wholeRval(add_static_cell(es, fieldtype, props));
           annotate(&a.info, DerefArrayLength(value));
         }
       }
@@ -950,10 +924,10 @@ func behavior_to_bi_desc(es *framescope, b *derived_method_behavior, t *cu_typee
         return false;
       }
 
-      funcell cell_num = add_rigid_cell(es, ~cfptr.te, cfptr_props);
-      destptr cell_num = add_rigid_cell(es, cptr, cptr_props);
-      srcptr cell_num = add_rigid_cell(es, cptr, cptr_props);
-      retvoid cell_num = add_rigid_cell(es, voidtype, voidprops);
+      funcell cell_num = add_static_cell(es, ~cfptr.te, cfptr_props);
+      destptr cell_num = add_static_cell(es, cptr, cptr_props);
+      srcptr cell_num = add_static_cell(es, cptr, cptr_props);
+      retvoid cell_num = add_static_cell(es, voidtype, voidprops);
 
       *out = BiFunCtor({ip, funcell, destptr, srcptr, retvoid});
       return true;
@@ -991,9 +965,9 @@ func behavior_to_uni_desc(es *framescope, b *derived_method_behavior, t *cu_type
         return false;
       }
 
-      funcell cell_num = add_rigid_cell(es, ~cfptr.te, cfptr_props);
-      argptr cell_num = add_rigid_cell(es, cptr, cptr_props);
-      retvoid cell_num = add_rigid_cell(es, voidtype, voidprops);
+      funcell cell_num = add_static_cell(es, ~cfptr.te, cfptr_props);
+      argptr cell_num = add_static_cell(es, cptr, cptr_props);
+      retvoid cell_num = add_static_cell(es, voidtype, voidprops);
 
       *out = UniFunCtor({ip, funcell, argptr, retvoid});
       return true;
@@ -1076,7 +1050,6 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
     case &IsLvalNo(desc rval_description): {
       if whole_temporary(&desc) {
         annotate(after, mk_after(desc.whole_num));
-        annotate_cell_location(es, desc.whole_num, LocationRigid(void));
       } else {
         copy bi_ctor_desc;
         if !get_copy_bi_ctor(es, &info->cu, &copy) {
@@ -1086,12 +1059,11 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
         if !get_destroy_uni_ctor(es, &ref_cell(es, desc.whole_num)->type, &destroy) {
           return false;
         }
-        dest cell_num = add_rigid_cell(es, info->cu, info->cu_props);
+        dest cell_num = add_static_cell(es, info->cu, info->cu_props);
         annotate(after,
           mk_after(@[after_action]CopyAfter({copy, dest, desc.partial_num}),
                    @[after_action]DestroyAfter({destroy, desc.whole_num}),
                    dest));
-        annotate_cell_location(es, desc.whole_num, LocationFlex(void));
       }
     }
     case &IsLvalYes(desc lval_description): {
@@ -1099,7 +1071,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
       if !get_copy_bi_ctor(es, &info->cu, &copy) {
         return false;
       }
-      dest cell_num = add_rigid_cell(es, info->cu, info->cu_props);
+      dest cell_num = add_static_cell(es, info->cu, info->cu_props);
       annotate(after, mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), dest));
     }
   }
@@ -1116,7 +1088,6 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
         return false;
       }
       annotate(after, mk_after_discard(@[after_action]DestroyAfter({destroy, desc.whole_num})));
-      annotate_cell_location(es, desc.whole_num, LocationFlex(void));
     }
     case &IsLvalYes(desc lval_description): {
       // This could ostensibly be Has(desc.num), but there's no reason to be inconsistent with the rvalue case.
@@ -1137,7 +1108,6 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
       }
       if whole_temporary(&desc) {
         annotate(after, mk_after(desc.whole_num));
-        annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate(&later->action, {destroy, desc.whole_num});
       } else {
         copy bi_ctor_desc;
@@ -1148,12 +1118,11 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
         if !get_destroy_uni_ctor(es, &info->cu, &destroy_the_copy) {
           return false;
         }
-        dest cell_num = add_flex_cell(es, info->cu, info->cu_props);
+        dest cell_num = add_static_cell(es, info->cu, info->cu_props);
         annotate(after,
           mk_after(@[after_action]CopyAfter({copy, dest, desc.partial_num}),
                    @[after_action]DestroyAfter({destroy, desc.whole_num}),
                    dest));
-        annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate(&later->action, {destroy_the_copy, dest});
       }
     }
@@ -1166,7 +1135,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
       if !get_destroy_uni_ctor(es, &info->cu, &destroy_the_copy) {
         return false;
       }
-      dest cell_num = add_flex_cell(es, info->cu, info->cu_props);
+      dest cell_num = add_static_cell(es, info->cu, info->cu_props);
       annotate(after,
         mk_after(@[after_action]CopyAfter({copy, dest, desc.num}), dest));
       annotate(&later->action, {destroy_the_copy, dest});
@@ -1202,10 +1171,10 @@ func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecell
     ice(_u8("fn_type props not computable"));
   }
 
-  funcell cell_num = add_rigid_cell(es, ~cfptr.te, cfptr_props);
-  destptr cell_num = add_rigid_cell(es, ptrtype, ptrtype_props);
-  srcptr cell_num = add_rigid_cell(es, ptrtype, ptrtype_props);
-  cmp_result cell_num = add_flex_cell(es, booltype, boolprops);
+  funcell cell_num = add_static_cell(es, ~cfptr.te, cfptr_props);
+  destptr cell_num = add_static_cell(es, ptrtype, ptrtype_props);
+  srcptr cell_num = add_static_cell(es, ptrtype, ptrtype_props);
+  cmp_result cell_num = add_static_cell(es, booltype, boolprops);
   return {ip, funcell, destptr, srcptr, cmp_result};
 }
 
@@ -1222,7 +1191,6 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         if !get_destroy_uni_ctor(es, &ref_cell(es, dest)->type, &destroy) {
           return false;
         }
-        annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate(&assignment->info,
           @[ast_assignment_info]
           SimpleAssignment({mk_array(@[after_action]DestroyAfter({destroy, dest}),
@@ -1242,7 +1210,6 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
           return false;
         }
 
-        annotate_cell_location(es, desc.whole_num, LocationFlex(void));
         annotate(&assignment->info,
           @[ast_assignment_info]
           SimpleAssignment({mk_array(@[after_action]DestroyAfter({target_destroy, dest}),
@@ -1299,7 +1266,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       if !compute_type_properties(es->cs, es->clq, &ci.type, &props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ci.type, props)), ci.type, props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ci.type, props)), ci.type, props)));
       return true;
     }
     case &OneGlobalMatch(gi global_info): {
@@ -1308,7 +1275,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       }
       annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({gi.ent, gi.inst}));
       inst *def_inst = ref_inst(es->cs, gi.inst);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, inst->computed_type, inst->computed_type_properties)), inst->computed_type, inst->computed_type_properties)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, inst->computed_type, inst->computed_type_properties)), inst->computed_type, inst->computed_type_properties)));
       return true;
     }
     case &OneLocalMatch(v local_info): {
@@ -1330,7 +1297,7 @@ func check_expr_string_literal(es *framescope, a *ast_string_literal, pt *te_typ
     ERR(_u8("string literal in bad place"));
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, type, props)), type, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, type, props)), type, props)));
   return true;
 }
 
@@ -1371,7 +1338,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       if !check_expr_consume(es, x_i, &field->type) {
         return false;
       }
-      reannotate_rigid_to_virtual(es, result_cell(x_i));
+      reannotate_static_to_virtual(es, result_cell(x_i));
       psd partial_struct_data;
       if !compute_partial_struct_data(es->cs, es->clq, &b.fields, Has(field->name), &psd) {
         return false;
@@ -1390,7 +1357,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       p_i *ast_strinit_param = ref(&a->exprs, i);
       annotate(&p_i->info, {get(&offsets, i)});
     }
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~ *pt, props)), ~ *pt, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *pt, props)), ~ *pt, props)));
     return true;
   } else {
     MERR(es->cs, a->meta, _u8("Structure literal used on non-struct type, "), structural_type->~);
@@ -1437,7 +1404,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   if !compute_complete_type_properties(es->cs, es->clq, &computed.te, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~computed.te, props)), ~computed.te, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~computed.te, props)), ~computed.te, props)));
   return true;
 }
 
@@ -1454,7 +1421,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
     if !compute_type_properties(bs->cs, bs->clq, &cu_param, &cu_param_props) {
       return false;
     }
-    cell cell_num = add_rigid_cell(&bs->es, cu_param, cu_param_props);
+    cell cell_num = add_static_cell(&bs->es, cu_param, cu_param_props);
     push(&arg_cells, cell);
     vn var_number;
     // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
@@ -1484,7 +1451,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   if !compute_complete_type_properties(bs->cs, bs->clq, return_type, &return_type_props) {
     return false;
   }
-  return_cell cell_num = add_rigid_cell(&bs->es, ~ *return_type, return_type_props);
+  return_cell cell_num = add_static_cell(&bs->es, ~ *return_type, return_type_props);
 
   info ast_fullbody_info = {destructions, bs->es.all_vars, bs->es.cells, bs->gotos, bs->labels, bs->statements, return_cell, arg_cells};
   annotate(&a->body.info, info);
@@ -1529,7 +1496,7 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   if !compute_complete_type_properties(es->cs, es->clq, pt, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~ *pt, props)), ~ *pt, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *pt, props)), ~ *pt, props)));
   return true;
 }
 
@@ -1870,7 +1837,7 @@ func check_expr_logical_conjunction(es *framescope, a *ast_logical_conjunction, 
   if !check_expr_consume(es, oo(&a->rhs), &type.~) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, type, props)), type, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, type, props)), type, props)));
   return true;
 }
 
@@ -1912,7 +1879,7 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   if !compute_complete_type_properties(es->cs, es->clq, return_type, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, ~ *return_type, props)), ~ *return_type, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *return_type, props)), ~ *return_type, props)));
   return true;
 }
 

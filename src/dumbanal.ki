@@ -293,7 +293,7 @@ func combine_branch_mut(onto *genexpr_result, a *genexpr_result) void {
 
 // For deaden and other functions, prelive shows what was alive _before_ prec_muts modified it.
 func deaden(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
-  if !isLocationStatic(*unHas(&ref_cell(gr, c)->location)) {
+  if !isLocationStatic(ref_cell(gr, c)->location) {
     crash(_u8("deaden on non-static cell"));
   }
 
@@ -318,7 +318,7 @@ func deaden(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, 
 
 // input requires that the cell already be live.
 func input(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
-  if !isLocationStatic(*unHas(&ref_cell(gr, c)->location)) {
+  if !isLocationStatic(ref_cell(gr, c)->location) {
     return;
   }
 
@@ -343,7 +343,7 @@ func input(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c
 // output either makes the cell live, if it wasn't already, or it means we use the cell.
 // (Yes, that's so lame -- we should use GrMakeLive.)
 func output(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
-  if !isLocationStatic(*unHas(&ref_cell(gr, c)->location)) {
+  if !isLocationStatic(ref_cell(gr, c)->location) {
     return;
   }
 
@@ -370,7 +370,7 @@ func output(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, 
 
 // Says that we're naming a virtual cell.
 func virtual(gr *frame_graph, prelive *hash[cell_num, void], prec_muts *exprmut, c cell_num) void {
-  check(!isLocationStatic(*unHas(&ref_cell(gr, c)->location)));
+  check(!isLocationStatic(ref_cell(gr, c)->location));
 }
 
 func compose_live(live *hash[cell_num, void], muts *exprmut) void {

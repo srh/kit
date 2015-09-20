@@ -95,7 +95,7 @@ func help_basic_analyze(cs *checkstate, f *objfile, bas *basic_analyze_state, gr
     case &GrSubcell(a gr_subcell):
       set(&ref(&bas->celldisp, a.name.~)->subcell, {gn, a.partof, a.offset});
       push(&ref(&bas->celldisp, a.partof.~)->subcelled, a.name);
-      check(*unHas(&ref(&gr->cells, a.name.~)->location) == LocationVirtual(void));
+      check(ref(&gr->cells, a.name.~)->location == LocationVirtual(void));
     default: { }
     }
   }
