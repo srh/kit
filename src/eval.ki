@@ -239,6 +239,15 @@ func[T] cell_obj_ref(env *st_env, num cell_num, msg T) st_obj_ref {
   }
 }
 
+func try_cell_obj_ref(env *st_env, num cell_num, out *st_obj_ref) bool {
+  if case &Has(obj_ref st_obj_ref) = ref(&env->framecells, num.~) {
+    *out = obj_ref;
+    return true;
+  } else {
+    return false;
+  }
+}
+
 func cell_obj_ref(env *st_env, num cell_num) st_obj_ref {
   if case &Has(obj_ref st_obj_ref) = ref(&env->framecells, num.~) {
     return obj_ref;
@@ -467,7 +476,11 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
 
       case &GrWriteConst(a gr_writeconst):
         st_maybe_init_static(&fg->gr, env, a.dest);
-        destref st_obj_ref = cell_obj_ref(env, a.dest, "in VI");
+        destref st_obj_ref;
+        if !try_cell_obj_ref(env, a.dest, &destref) {
+          ERR(_u8("cell obj cannot be reffed (in VI) (cell num = "), a.dest.~, _u8(")"));
+          return false;
+        }
         value st_value;
         if !st_const_compute(clq, env, &a.value, destref.count, &value) {
           return false;
@@ -875,7 +888,7 @@ func st_maybe_init_static(gr *frame_graph, env *st_env, cell cell_num) void {
   }
   info *cell_info = ref_cell(gr, cell);
   if !isLocationStatic(location(info)) {
-    ice(_u8("st_maybe_init_static: cell with non-static location"));
+    return;
   }
 
   objnum st_obj_num = add_obj(env, info->props.flat_size);
