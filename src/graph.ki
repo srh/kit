@@ -667,8 +667,9 @@ func gr_expr_after_discard(cs *checkstate, gr *frame_graph, aft *ast_expr_after_
     if !gr_destroy_action(cs, gr, &da, DeadAfterDestroyYes(void), &after_gn) {
       return false;
     }
-  case &ForgetLvalue(num cell_num):
-    // TODO: if num is virtual
+  case &DiscardVirtualDead(c cell_num):
+    after_gn = add_node(gr, node0(@[gr_op]GrVirtualDead({c})));
+  case &DiscardNothing(v void):
     after_gn = add_node(gr, node0(@[gr_op]GrNop(void)));
   }
   *out = after_gn;
