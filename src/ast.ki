@@ -483,9 +483,16 @@ func whole_temporary(d *rval_description) bool {
   return d->whole_num == d->partial_num;
 }
 
+defenum lval_deadme {
+  DontDeadMe void;
+  DeadMe void;
+};
+
 deftype lval_description struct {
   // The cell number of the lvalue.  Be it part of a bigger object or not.
   num cell_num;
+  // DeadMe if the lval cell is only carried by the lval.
+  deadme lval_deadme;
 };
 
 defenum is_lval {
@@ -586,7 +593,7 @@ deftype copy_destroy_action struct {
 defenum consume_actions {
   ConsumeByInPlace void;
   ConsumeByCopyDestroy copy_destroy_action;
-  ConsumeByCopy copy_action;
+  ConsumeByCopy tup[copy_action, lval_deadme];
 };
 
 deftype ast_expr_after_consume struct {

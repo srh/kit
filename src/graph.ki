@@ -685,7 +685,7 @@ func gr_expr_and_consume(cs *checkstate, gr *frame_graph, x *ast_expr, aft *ast_
     return false;
   }
   after_gn gr_num;
-  if !gr_after_actions(cs, gr, expr_gn, &aft->actions, &after_gn) {
+  if !gr_consume_actions(cs, gr, expr_gn, &aft->actions, &after_gn) {
     return false;
   }
   *out = after_gn;
@@ -875,7 +875,7 @@ func gr_index_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_index_ex
     name cell_num = ellval_cell(x);
     flat_size u32 = ref_cell(gr, name)->props.flat_size;
     lgn gr_num;
-    if !gr_after_actions(cs, gr, lp, &aft.car.actions, &lgn) {
+    if !gr_consume_actions(cs, gr, lp, &aft.car.actions, &lgn) {
       return false;
     }
     var gp = add_node(gr, node(mk_shray(rp, lgn), @[gr_op]GrDeref({name, result_cell(&aft.car), OffsetComputed(cons(flat_size, result_cell(oo(&a->rhs))))})));
@@ -1149,7 +1149,16 @@ func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *opt[destr
   return true;
 }
 
-func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *consume_actions, out *gr_num) bool {
+func gr_chain_virtualdead(cs *checkstate, gr *frame_graph, prec gr_num, c cell_num, out *gr_num) bool {
+  switch location(ref_cell(gr, c)) {
+  case LocationVirtual(v void):
+    *out = add_node(gr, node(mk_shray(prec), @[gr_op]GrVirtualDead({c})));
+  case LocationStatic(v void): { }
+  }
+  return true;
+}
+
+func gr_consume_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *consume_actions, out *gr_num) bool {
   switch x {
   case &ConsumeByInPlace(v void): { }
   case &ConsumeByCopyDestroy(cd copy_destroy_action):
@@ -1157,15 +1166,23 @@ func gr_after_actions(cs *checkstate, gr *frame_graph, prec gr_num, x *consume_a
     if !gr_copy_action(cs, gr, &cd.copy, &dep) {
       return false;
     }
+    if !gr_chain_virtualdead(cs, gr, dep, cd.copy.src, &dep) {
+      return false;
+    }
     prec = add_node(gr, node0(@[gr_op]GrSequence({prec, dep})));
     if !gr_destroy_action(cs, gr, &cd.destroy, DeadAfterDestroyYes(void), &dep) {
       return false;
     }
     prec = add_node(gr, node0(@[gr_op]GrSequence({prec, dep})));
-  case &ConsumeByCopy(c copy_action):
+  case &ConsumeByCopy(cc tup[copy_action, lval_deadme]):
     dep gr_num;
-    if !gr_copy_action(cs, gr, &c, &dep) {
+    if !gr_copy_action(cs, gr, &cc.car, &dep) {
       return false;
+    }
+    if case DeadMe(v void) = cc.cdr {
+      if !gr_chain_virtualdead(cs, gr, dep, cc.car.src, &dep) {
+        return false;
+      }
     }
     prec = add_node(gr, node0(@[gr_op]GrSequence({prec, dep})));
   }

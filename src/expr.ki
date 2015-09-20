@@ -729,7 +729,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       if !compute_complete_type_properties(es->cs, es->clq, param, &props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_virtual_cell(es, ~ *param, props)}), ~ *param, props)));
+      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_virtual_cell(es, ~ *param, props), DeadMe(void)}), ~ *param, props)));
       return true;
     }
 
@@ -761,7 +761,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
         case InheritsLval(offset u32): {
           switch &info->lval {
             case &IsLvalYes(desc lval_description): {
-              lval = IsLvalYes({add_virtual_cell(es, fieldtype, props)});
+              lval = IsLvalYes({add_virtual_cell(es, fieldtype, props), DeadMe(void)});
             }
             case &IsLvalNo(desc rval_description): {
               lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, fieldtype, props)});
@@ -809,7 +809,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       switch cf_res {
         case InheritsLval(offset u32): {
           // We deref, so it's always an lval.
-          lval = IsLvalYes({add_virtual_cell(es, fieldtype, props)});
+          lval = IsLvalYes({add_virtual_cell(es, fieldtype, props), DeadMe(void)});
           annotate(&a.info, DerefFieldName(offset));
         }
         case ConstantField(value u32): {
@@ -1072,7 +1072,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
         return false;
       }
       dest cell_num = add_static_cell(es, info->cu, info->cu_props);
-      annotate(after, mk_after(@[consume_actions]ConsumeByCopy({copy, dest, desc.num}), dest));
+      annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]{copy, dest, desc.num}, desc.deadme)), dest));
     }
   }
   return true;
@@ -1246,7 +1246,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &OneLocalMatch(v local_info): {
       annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({v.varnum}));
       vi *var_info = ref_var(es, v.varnum);
-      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell}), vi->type, vi->props)));
+      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe(void)}), vi->type, vi->props)));
       return true;
     }
   }
@@ -1950,7 +1950,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     // TODO: This is totally duplicating field access logic.
     switch &lhs_info->lval {
       case &IsLvalYes(desc lval_description): {
-        lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props)});
+        lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props), DeadMe(void)});
       }
       case &IsLvalNo(desc rval_description): {
         lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, ~ *ixtype, props)});
@@ -1960,7 +1960,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     annotate(&a->info, {None(), rhs_later});
   } else {
     // Dereferencing a pointer always makes an lvalue.
-    lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props)});
+    lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props), DeadMe(void)});
     ie_info_after nc[ast_expr_after_consume];
     lhs_later ast_later_discard_info;
     if !annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later) {

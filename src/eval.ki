@@ -465,7 +465,11 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
       case &GrMemCopy(a gr_memcopy):
         st_maybe_init_static(&fg->gr, env, a.dest);
         destref st_obj_ref = cell_obj_ref(env, a.dest, "in IV");
-        srcref st_obj_ref = cell_obj_ref(env, a.src, "in V");
+        srcref st_obj_ref;
+        if !try_cell_obj_ref(env, a.src, &srcref) {
+          ERR(_u8("ICE: cell obj cannot be reffed (in V) (cell num = "), a.src.~, _u8(")"));
+          return false;
+        }
         value st_value;
         if !obj_read(env, srcref, &value) {
           return false;
