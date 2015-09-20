@@ -1551,7 +1551,18 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
   deref_gn gr_num = add_node(&gr, node(freeze(&tagcell_gns), @[gr_op]GrNop(void)));
 
   return_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
-  setret gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)})));
+  deadprecs array[gr_num];
+  if true {
+    setret gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)})));
+    push(&deadprecs, setret);
+    for i size = 0; i < nargs; i = i + 1 {
+      pd gr_num = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&pointeecells, i)})));
+      push(&deadprecs, pd);
+      td gr_num = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&tagcells, i)})));
+      push(&deadprecs, td);
+    }
+  }
+  deadseq gr_num = add_node(&gr, node(freeze(&deadprecs), @[gr_op]GrNop(void)));
 
   cases_gn array[tup[gr_const, gr_num]];
   nconstructors size = count(&et->constructors);
@@ -1581,7 +1592,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       push(&fieldcellgn, sn);
     }
 
-    last_ogn opt[gr_num];
+    last_ogn gr_num;
     if case &Has(ip instpair) = ref(&mei->cips, i) {
       fieldptrtype cu_typeexpr;
       fieldptrtype_props type_properties;
@@ -1592,7 +1603,8 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       for j size = 0; j < nargs; j = j + 1 {
         fpc cell_num = add_cell(&gr, {Has(LocationRigid(void)), fieldptrtype, fieldptrtype_props});
         push(&fieldptrcella, fpc);
-        an gr_num = add_node(&gr, node(mk_shray(get(&fieldcellgn, j)), @[gr_op]GrAddressof({fpc, get(&fieldcella, j)})));
+        an1 gr_num = add_node(&gr, node(mk_shray(get(&fieldcellgn, j)), @[gr_op]GrAddressof({fpc, get(&fieldcella, j)})));
+        an gr_num = add_node(&gr, node(mk_shray(an1), @[gr_op]GrVirtualDead({get(&fieldcella, j)})));
         push(&precs, an);
       }
 
@@ -1608,7 +1620,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
       ap gr_num = add_node(&gr, node(freeze(&precs), @[gr_op]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell})));
       vd gr_num = add_node(&gr, node(mk_shray(ap), @[gr_op]GrDead({fieldretcell})));
-      last_ogn = Has(vd);
+      last_ogn = vd;
     } else {
       ogn opt[gr_num];
       switch wc {
@@ -1624,8 +1636,17 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
         ogn = None();
         // do nothing.
       }
-
-      last_ogn = ogn;
+      dfcprecs array[gr_num];
+      for j size = 0; j < nargs; j = j + 1 {
+        var dfc = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&fieldcella, j)})));
+        push(&dfcprecs, dfc);
+      }
+      dfcnop gr_num = add_node(&gr, node(freeze(&dfcprecs), @[gr_op]GrNop(void)));
+      if case Has(gn gr_num) = ogn {
+        last_ogn = add_node(&gr, node0(@[gr_op]GrSequence({gn, dfcnop})));
+      } else {
+        last_ogn = dfcnop;
+      }
     }
 
     tagset_ogn opt[gr_num];
@@ -1642,9 +1663,9 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       tagset_ogn = None();
     }
 
-    finalgn gr_num = add_node(&gr, node(concat(tagset_ogn, prepadding_ogn, last_ogn, postpadding_ogn), GrNop(void)));
+    finalgn gr_num = add_node(&gr, node(concat(tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn), GrNop(void)));
 
-    finalseqgn gr_num = add_node(&gr, node0(@[gr_op]GrSequence({finalgn, setret})));
+    finalseqgn gr_num = add_node(&gr, node0(@[gr_op]GrSequence({finalgn, deadseq})));
     push(&cases_gn, cons(@[gr_const]ConstInt(~ tagval.~), finalseqgn));
   }
 
