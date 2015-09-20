@@ -951,11 +951,7 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       cases shray[tup[gr_const, gr_num]] = mk_shray(cons(@[gr_const]ConstInt(~ @[u32] 0), dead_then_assign), cons(@[gr_const]ConstInt(~ @[u32] 1), just_dead));
 
       var br = add_node(gr, node(mk_shray(ap), @[gr_op]GrBranch({ci.comparecells.cmp_result, cases, None()})));
-      unc gr_num;
-      if !gr_after_actions(cs, gr, br, &ci.unconditional_actions, &unc) {
-        return false;
-      }
-      var seq_lp_rp_nop = add_node(gr, node0(@[gr_op]GrSequence({lp_rp_nop, unc})));
+      var seq_lp_rp_nop = add_node(gr, node0(@[gr_op]GrSequence({lp_rp_nop, br})));
       *out = seq_lp_rp_nop;
       return true;
     }
