@@ -1729,7 +1729,19 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
   derefgn gr_num = add_node(&gr, node(freeze(&derefgns), GrNop(void)));
 
   return_cell cell_num = add_cell(&gr, {Has(LocationRigid(void)), voidtp.cu, voidtp.props});
-  bn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)})));
+
+  deadprecs array[gr_num];
+  if true {
+    setret gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)})));
+    push(&deadprecs, setret);
+
+    for i size = 0; i < nargs; i = i + 1 {
+      pd gr_num = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&pointeecells, i)})));
+      push(&deadprecs, pd);
+    }
+  }
+
+  bn gr_num = add_node(&gr, node(freeze(&deadprecs), @[gr_op]GrNop(void)));
 
   nfields size = count(&msi->fips);
   check(nfields == count(&st->fields));
@@ -1762,7 +1774,8 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       for j size = 0; j < nargs; j = j + 1 {
         fpc cell_num = add_cell(&gr, {Has(LocationRigid(void)), fieldptrtype, fieldptrtype_props});
         push(&fieldptrcella, fpc);
-        gn gr_num = add_node(&gr, node(mk_shray(get(&fieldcellgn, j)), @[gr_op]GrAddressof({fpc, get(&fieldcella, j)})));
+        gn1 gr_num = add_node(&gr, node(mk_shray(get(&fieldcellgn, j)), @[gr_op]GrAddressof({fpc, get(&fieldcella, j)})));
+        gn gr_num = add_node(&gr, node(mk_shray(gn1), @[gr_op]GrVirtualDead({get(&fieldcella, j)})));
         push(&precs, gn);
       }
 
@@ -1797,7 +1810,14 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
         gn = add_node(&gr, node0(@[gr_op]GrNop(void)));
       }
 
-      field_gn = gn;
+      dfcprecs array[gr_num];
+      for j size = 0; j < nargs; j = j + 1 {
+        var dfc = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&fieldcella, j)})));
+        push(&dfcprecs, dfc);
+      }
+      dfcnop gr_num = add_node(&gr, node(freeze(&dfcprecs), @[gr_op]GrNop(void)));
+
+      field_gn = add_node(&gr, node0(@[gr_op]GrSequence({gn, dfcnop})));
     }
 
     field_and_padding_gn gr_num;
