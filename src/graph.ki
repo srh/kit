@@ -1795,16 +1795,17 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
         ogn = None();
         // do nothing.
       }
-      dfcprecs array[gr_num];
-      for j size = 0; j < nargs; j = j + 1 {
-        var dfc = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&fieldcella, j)})));
-        push(&dfcprecs, dfc);
-      }
-      dfcnop gr_num = add_node(&gr, node(freeze(&dfcprecs), @[gr_op]GrNop(void)));
       if case Has(gn gr_num) = ogn {
+        dfcprecs array[gr_num];
+        for j size = 0; j < nargs; j = j + 1 {
+          var dfc = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&fieldcella, j)})));
+          push(&dfcprecs, dfc);
+        }
+        dfcnop gr_num = add_node(&gr, node(freeze(&dfcprecs), @[gr_op]GrNop(void)));
         last_ogn = add_node(&gr, node0(@[gr_op]GrSequence({gn, dfcnop})));
       } else {
-        last_ogn = dfcnop;
+        // The nodes that create fieldcella were never added to the graph, so we don't dead them.
+        last_ogn = add_node(&gr, node0(@[gr_op]GrNop(void)));
       }
     }
 
@@ -1955,28 +1956,34 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
       field_gn = vd;
     } else {
-      gn gr_num;
+      ogn opt[gr_num];
       switch wc {
       case CtorInit(v void):
         // zero-initialize.
-        gn = add_node(&gr, node(freeze(&fieldcellgn), @[gr_op]GrWriteConst({get(&fieldcella, 0), ConstInt(~ @[u32] 0)})));
+        var gn1 = add_node(&gr, node(freeze(&fieldcellgn), @[gr_op]GrWriteConst({get(&fieldcella, 0), ConstInt(~ @[u32] 0)})));
+        ogn = Has(gn1);
       case CtorCopy(v void):
-        gn = add_node(&gr, node(freeze(&fieldcellgn), @[gr_op]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)})));
+        var gn1 = add_node(&gr, node(freeze(&fieldcellgn), @[gr_op]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)})));
+        ogn = Has(gn1);
       case CtorMove(v void):
-        gn = add_node(&gr, node(freeze(&fieldcellgn), @[gr_op]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)})));
+        var gn1 = add_node(&gr, node(freeze(&fieldcellgn), @[gr_op]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)})));
+        ogn = Has(gn1);
       case CtorDestroy(v void):
         // do nothing.
-        gn = add_node(&gr, node0(@[gr_op]GrNop(void)));
+        ogn = None();
       }
 
-      dfcprecs array[gr_num];
-      for j size = 0; j < nargs; j = j + 1 {
-        var dfc = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&fieldcella, j)})));
-        push(&dfcprecs, dfc);
+      if case Has(gn gr_num) = ogn {
+        dfcprecs array[gr_num];
+        for j size = 0; j < nargs; j = j + 1 {
+          var dfc = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&fieldcella, j)})));
+          push(&dfcprecs, dfc);
+        }
+        dfcnop gr_num = add_node(&gr, node(freeze(&dfcprecs), @[gr_op]GrNop(void)));
+        field_gn = add_node(&gr, node0(@[gr_op]GrSequence({gn, dfcnop})));
+      } else {
+        field_gn = add_node(&gr, node0(@[gr_op]GrNop(void)));
       }
-      dfcnop gr_num = add_node(&gr, node(freeze(&dfcprecs), @[gr_op]GrNop(void)));
-
-      field_gn = add_node(&gr, node0(@[gr_op]GrSequence({gn, dfcnop})));
     }
 
     field_and_padding_gn gr_num;
