@@ -194,15 +194,21 @@ func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num, 
 
   // This assumes it's okay to have a subcell op produce the identical type -- it's the only place we do that.
   return_subcell_ops array[gr_num];
+  return_subcell_deads array[gr_num];
   nreturncells size = count(&fb.return_cells);
   reserve(&return_subcell_ops, nreturncells);
+  reserve(&return_subcell_deads, nreturncells);
   for i size = 0; i < nreturncells; i = i + 1 {
     var subn = add_node(gr, node0(@[gr_op]GrSubcell({get(&fb.return_cells, i), info->return_cell, OffsetConst(0)})));
     push(&return_subcell_ops, subn);
+    var deadn = add_node(gr, node0(@[gr_op]GrVirtualDead({get(&fb.return_cells, i)})));
+    push(&return_subcell_deads, deadn);
   }
 
   nopdep gr_num = add_node(gr, node(freeze(&return_subcell_ops), GrNop(void)));
   seqop gr_num = add_node(gr, node0(@[gr_op]GrSequence({nopdep, body_gn})));
+
+  mut_nop_node(gr, fb.final_node, node(freeze(&return_subcell_deads), GrNop(void)));
 
   *out = seqop;
   *return_cell_out = info->return_cell;
@@ -778,8 +784,10 @@ func gr_mk_strinit(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_strinit,
     if !gr_expr_consume(cs, gr, &param->ec, &dep) {
       return false;
     }
+    aftdep gr_num = add_node(gr, node0(@[gr_op]GrVirtualDead({result_cell(&param->ec)})));
 
-    prec gr_num = add_node(gr, node0(@[gr_op]GrSequence({befdep, dep})));
+    prec1 gr_num = add_node(gr, node0(@[gr_op]GrSequence({dep, aftdep})));
+    prec gr_num = add_node(gr, node0(@[gr_op]GrSequence({befdep, prec1})));
     push(&precs, prec);
   }
   var np = add_node(gr, node(freeze(&precs), GrNop(void)));
