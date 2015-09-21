@@ -595,9 +595,13 @@ func gr_condition(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_co
             vcgn = add_node(gr, node0(@[gr_op]GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)})));
           }
           var gn = add_node(gr, node0(@[gr_op]GrSequence({vcgn, thengn})));
-          push(&cases, cons(@[gr_const]ConstInt(~tag.~), gn));
+          tagdead gr_num = add_node(gr, node0(@[gr_op]GrVirtualDead({info->deconstruct.tag_cell})));
+          thenseq gr_num = add_node(gr, node0(@[gr_op]GrSequence({tagdead, gn})));
+          push(&cases, cons(@[gr_const]ConstInt(~tag.~), thenseq));
         } else {
-          push(&cases, cons(@[gr_const]ConstInt(~tag.~), elsegn));
+          tagdead gr_num = add_node(gr, node0(@[gr_op]GrVirtualDead({info->deconstruct.tag_cell})));
+          elseseq gr_num = add_node(gr, node0(@[gr_op]GrSequence({tagdead, elsegn})));
+          push(&cases, cons(@[gr_const]ConstInt(~tag.~), elseseq));
         }
       }
       var br = add_node(gr, node(mk_shray(taggn), @[gr_op]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None()})));
