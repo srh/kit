@@ -244,7 +244,7 @@ func dumbly_analyze_expression(cs *checkstate, f *objfile, h *frame, gr *frame_g
 
   case &GrVirtualDead(a gr_virtual_dead):
     DUMBG("GrVirtualDead");
-    // TODO: Actually track virtual-cell liveness.
+    deaden(gr, prelive, &prec_muts, a.cell);
     *mut_out = Terminal(prec_muts);
     return true;
 
@@ -305,10 +305,6 @@ func combine_branch_mut(onto *genexpr_result, a *genexpr_result) void {
 
 // For deaden and other functions, prelive shows what was alive _before_ prec_muts modified it.
 func deaden(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void {
-  if !isLocationStatic(ref_cell(gr, c)->location) {
-    crash(_u8("deaden on non-static cell"));
-  }
-
   if case Has(v *void) = lookup_ref(&prec_muts->made_live, &c) {
     check_remove(&prec_muts->made_live, &c);
     check_insert(&prec_muts->encapsulated, &c, void);
@@ -330,10 +326,6 @@ func deaden(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) voi
 
 // input requires that the cell already be live.
 func input(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void {
-  if !isLocationStatic(ref_cell(gr, c)->location) {
-    return;
-  }
-
   if case Has(v *void) = lookup_ref(&prec_muts->made_live, &c) {
     // Success, the cell's live.
   } else if case Has(v *void) = lookup_ref(&prec_muts->used, &c) {
@@ -355,10 +347,6 @@ func input(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void
 // output either makes the cell live, if it wasn't already, or it means we use the cell.
 // (Yes, that's so lame -- we should use GrMakeLive.)
 func output(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void {
-  if !isLocationStatic(ref_cell(gr, c)->location) {
-    return;
-  }
-
   if case Has(v *void) = lookup_ref(&prec_muts->made_live, &c) {
     // The cell's already live.
   } else if case Has(v *void) = lookup_ref(&prec_muts->used, &c) {
@@ -383,6 +371,9 @@ func output(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) voi
 // Says that we're naming a virtual cell.
 func virtual(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void {
   check(!isLocationStatic(ref_cell(gr, c)->location));
+  // We make the cell live.
+  // TODO: Assert that the cell is not already live?  Both these places define the virtual cell.
+  output(gr, prelive, prec_muts, c);
 }
 
 func compose_live(live *lives, muts *exprmut) void {

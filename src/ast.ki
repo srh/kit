@@ -170,7 +170,7 @@ deftype ast_vardecl struct {
 };
 
 deftype ast_bracebody_info struct {
-  destructions array[destroy_action];
+  destructions array[var_destruction];
 };
 
 deftype ast_bracebody struct {
@@ -214,27 +214,32 @@ defenum ast_condition {
   PatternCondition ast_pattern_assign;
 };
 
+deftype ast_condition_discard_info struct {
+  virtual_cell_dead nc[opt[cell_num]];
+  later ast_later_discard_info;
+};
+
 deftype ast_ifthen_statement struct {
-  condition_discard ast_later_discard_info;
+  condition_discard ast_condition_discard_info;
   condition ast_condition;
   body ast_bracebody;
 };
 
 deftype ast_ifthenelse_statement struct {
-  condition_discard ast_later_discard_info;
+  condition_discard ast_condition_discard_info;
   condition ast_condition;
   thenbody ast_bracebody;
   elsebody ast_bracebody;
 };
 
 deftype ast_while_statement struct {
-  condition_discard ast_later_discard_info;
+  condition_discard ast_condition_discard_info;
   condition ast_condition;
   body ast_bracebody;
 };
 
 deftype ast_for_statement_info struct {
-  initter_destructions array[destroy_action];
+  initter_destructions array[var_destruction];
 };
 
 deftype ast_for_condition struct {
@@ -262,7 +267,7 @@ deftype ast_switch_statement struct {
 deftype ast_return_statement_info struct {
   // TODO: Nothing uses in_scope.
   in_scope array[var_number];
-  destructions array[destroy_action];
+  destructions array[var_destruction];
 };
 
 deftype ast_return_statement struct {
@@ -286,7 +291,7 @@ deftype ast_label_statement struct {
 
 deftype ast_goto_statement_info struct {
   label_number label_num;
-  destructions array[destroy_action];
+  destructions array[var_destruction];
   initializations array[init_action];
 };
 
@@ -335,7 +340,7 @@ deftype ast_switch_case struct {
 };
 
 deftype ast_fullbody_info struct {
-  parameter_destructions array[destroy_action];
+  parameter_destructions array[var_destruction];
 
   all_vars array[var_info];
   cells array[cell_info];

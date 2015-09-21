@@ -1411,7 +1411,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
     return false;
   }
 
-  destructions array[destroy_action];
+  destructions array[var_destruction];
   if !make_destructions(&bs->es, read_nums(&vp), &destructions) {
     return false;
   }

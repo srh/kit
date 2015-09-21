@@ -89,7 +89,7 @@ func check_body(bs *bodystate, a *ast_bracebody, ee_out *entryexit) bool {
     connect_statements(bs, exit, ee.entry);
     exit = ee.exit;
   }
-  destructions array[destroy_action];
+  destructions array[var_destruction];
   if !make_destructions(&bs->es, read_nums(&vp), &destructions) {
     return false;
   }
@@ -134,21 +134,29 @@ func make_destroy_action(es *framescope, vn var_number, out *destroy_action) boo
   return true;
 }
 
-func make_destructions(es *framescope, vns *array[var_number], out *array[destroy_action]) bool {
-  destructions array[destroy_action];
+defenum var_destruction {
+  VarSelfContainedDestruction destroy_action;
+  VarVirtualCellDead cell_num;
+};
+
+func make_destructions(es *framescope, vns *array[var_number], out *array[var_destruction]) bool {
+  destructions array[var_destruction];
   n size = count(vns);
   for i size = 0; i < n; i = i + 1 {
     vn var_number = get(vns, i);
     vi *var_info = ref_var(es, vn);
-    if vi->autoinit == VarSelfContained(void) {
+    switch vi->autoinit {
+    case VarSelfContained(v void):
       da destroy_action;
       if !make_destroy_action(es, get(vns, i), &da) {
         return false;
       }
-      push(&destructions, da);
+      push(&destructions, VarSelfContainedDestruction(da));
+    case VarVirtual(v void):
+      push(&destructions, VarVirtualCellDead(vi->cell));
     }
   }
-  *out = destructions;
+  swap(out, &destructions);
   return true;
 }
 
@@ -459,7 +467,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   }
   connect_statements(bs, loopnum, body_ee.entry);
   connect_statements(bs, body_ee.exit, loopnum);
-  initter_destructions array[destroy_action];
+  initter_destructions array[var_destruction];
   if !make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions) {
     return false;
   }
@@ -553,7 +561,7 @@ func check_return_statement(bs *bodystate, vp *varpopper, a *ast_return_statemen
   }
   // Notably, this includes lambda parameter destructions.
   vars array[var_number] = vars_in_scope(&bs->es);
-  destructions array[destroy_action];
+  destructions array[var_destruction];
   if !make_destructions(&bs->es, &vars, &destructions) {
     return false;
   }
@@ -592,11 +600,11 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
   return false;
 }
 
-func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, later *ast_later_discard_info) bool {
+func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info) bool {
   switch a {
     case &ExprCondition(b box[ast_expr_consume]): {
       booltype cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
-      if !check_consume_then_discard_expr(es, oo(&b), &booltype.~, later) {
+      if !check_consume_then_discard_expr(es, oo(&b), &booltype.~, &cd->later) {
         return false;
       }
 
@@ -605,11 +613,12 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
       if !es_push_var(es, swartch_vp, result_cell(oo(&b)), None(), &booltype, VarSelfContained(void), &swartch_vn) {
         return false;
       }
+      annotate(&cd->virtual_cell_dead, None());
       return true;
     }
     case &PatternCondition(b ast_pattern_assign): {
       unknown te_typeexpr = TeUnknown(void);
-      if !check_consume_then_discard_expr(es, oo(&b.rhs), &unknown, later) {
+      if !check_consume_then_discard_expr(es, oo(&b.rhs), &unknown, &cd->later) {
         return false;
       }
 
@@ -672,6 +681,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
           return false;
         }
         cell cell_num = add_virtual_cell(es, cu_expected_type, expected_type_props);
+        annotate(&cd->virtual_cell_dead, Has(cell));
         tag_cell cell_num = add_virtual_tag_cell(es, &et);
         annotate(&b.info, {{tag_cell, ~count(&et.constructors)}, mk_enum_tag_value(decl_index)});
         vn var_number;
@@ -755,7 +765,7 @@ func connect_gotos(bs *bodystate) bool {
       l->hit = true;
       connect_statements(bs, g->stnum, l->stnum);
 
-      destructions array[destroy_action];
+      destructions array[var_destruction];
       if !make_destructions(&bs->es, &destruct, &destructions) {
         return false;
       }

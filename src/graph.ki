@@ -345,26 +345,40 @@ func gr_switch_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
   reserve(&cases, ncases);
   for i size = 0; i < ncases; i = i + 1 {
     sc *ast_switch_case = ref(&a->cases, i);
-    body_gn gr_num;
-    if !gr_bracebody(cs, gr, fb, &sc->body, exitseq, &body_gn) {
-      return false;
-    }
 
     switch &sc->pattern {
       case &Case(cp ast_constructor_pattern): {
         cp_info *ast_cp_info = unHas(&cp.cp_info);
         vi *var_info = ref(&fb->all_vars, cp_info->vn.~);
+
+        kill_var gr_num = add_node(gr, node0(@[gr_op]GrVirtualDead({vi->cell})));
+        bodyexit gr_num = add_node(gr, node0(@[gr_op]GrSequence({kill_var, exitseq})));
+
+        body_gn gr_num;
+        if !gr_bracebody(cs, gr, fb, &sc->body, bodyexit, &body_gn) {
+          return false;
+        }
+
         vcgn gr_num;
         if is_ptr {
           vcgn = add_node(gr, node0(@[gr_op]GrDeref({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)})));
         } else {
           vcgn = add_node(gr, node0(@[gr_op]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)})));
         }
-        var gn = add_node(gr, node0(@[gr_op]GrSequence({vcgn, body_gn})));
+        var gn1 = add_node(gr, node0(@[gr_op]GrSequence({vcgn, body_gn})));
+        kill_tag gr_num = add_node(gr, node0(@[gr_op]GrVirtualDead({info->tag_cell})));
+        var gn = add_node(gr, node0(@[gr_op]GrSequence({kill_tag, gn1})));
         push(&cases, cons(@[gr_const]ConstInt(~cp_info->tag_value.~), gn));
       }
       case &Default(v void): {
-        set(&default_case, body_gn);
+        body_gn gr_num;
+        if !gr_bracebody(cs, gr, fb, &sc->body, exitseq, &body_gn) {
+          return false;
+        }
+
+        kill_tag gr_num = add_node(gr, node0(@[gr_op]GrVirtualDead({info->tag_cell})));
+        var gn = add_node(gr, node0(@[gr_op]GrSequence({kill_tag, body_gn})));
+        set(&default_case, gn);
       }
     }
   }
@@ -451,16 +465,25 @@ func gr_for_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *as
   return true;
 }
 
+func gr_condition_discard(cs *checkstate, gr *frame_graph, a *ast_condition_discard_info, out *gr_num) bool {
+  disc gr_num;
+  if !gr_later_discard(cs, gr, &a->later, &disc) {
+    return false;
+  }
+  *out = disc;
+  return true;
+}
+
 func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_while_statement, outflow gr_num, out *gr_num) bool {
   var topgn = add_node(gr, node0(@[gr_op]GrNop(void)));
 
   loopcleanupgn gr_num;
-  if !gr_later_discard(cs, gr, &a->condition_discard, &loopcleanupgn) {
+  if !gr_condition_discard(cs, gr, &a->condition_discard, &loopcleanupgn) {
     return false;
   }
 
   loopexitgn gr_num;
-  if !gr_later_discard(cs, gr, &a->condition_discard, &loopexitgn) {
+  if !gr_condition_discard(cs, gr, &a->condition_discard, &loopexitgn) {
     return false;
   }
 
@@ -483,7 +506,7 @@ func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *
 
 func gr_ifthenelse_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_ifthenelse_statement, outflow gr_num, out *gr_num) bool {
   latergn gr_num;
-  if !gr_later_discard(cs, gr, &a->condition_discard, &latergn) {
+  if !gr_condition_discard(cs, gr, &a->condition_discard, &latergn) {
     return false;
   }
 
@@ -507,7 +530,7 @@ func gr_ifthenelse_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state
 
 func gr_ifthen_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_ifthen_statement, outflow gr_num, out *gr_num) bool {
   latergn gr_num;
-  if !gr_later_discard(cs, gr, &a->condition_discard, &latergn) {
+  if !gr_condition_discard(cs, gr, &a->condition_discard, &latergn) {
     return false;
   }
 
@@ -638,13 +661,18 @@ func gr_wind_vars(cs *checkstate, gr *frame_graph, initializations *array[init_a
 }
 
 // "destructions" is in variable declaration order -- the _opposite_ order of evaluation.
-func gr_unwind_vars(cs *checkstate, gr *frame_graph, destructions *array[destroy_action], outflow gr_num, out *gr_num) bool {
+func gr_unwind_vars(cs *checkstate, gr *frame_graph, destructions *array[var_destruction], outflow gr_num, out *gr_num) bool {
   bn gr_num = outflow;
   n size = count(destructions);
   for i size = 0; i < n; i = i + 1 {
     gn gr_num;
-    if !gr_destroy_action(cs, gr, ref(destructions, i), DeadAfterDestroyYes(void), &gn) {
-      return false;
+    switch get(destructions, i) {
+    case VarSelfContainedDestruction(da destroy_action):
+      if !gr_destroy_action(cs, gr, &da, DeadAfterDestroyYes(void), &gn) {
+        return false;
+      }
+    case VarVirtualCellDead(c cell_num):
+      gn = add_node(gr, node0(@[gr_op]GrVirtualDead({c})));
     }
     bn = add_node(gr, node0(@[gr_op]GrSequence({gn, bn})));
   }
@@ -843,7 +871,20 @@ func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_f
       return true;
     }
     case &FieldName(offset u32): {
-      var gn = add_node(gr, node(mk_shray(lp), @[gr_op]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst(offset)})));
+      var gn1 = add_node(gr, node(mk_shray(lp), @[gr_op]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst(offset)})));
+      gn gr_num;
+      switch &expr_complete_info(oo(&a->lhs))->lval {
+      case &IsLvalYes(desc lval_description):
+        if case DeadMe(v void) = desc.deadme {
+          gn = add_node(gr, node(mk_shray(gn1), @[gr_op]GrVirtualDead({desc.num})));
+        } else {
+          gn = gn1;
+        }
+      case &IsLvalNo(desc rval_description):
+        if !gr_chain_virtualdead(cs, gr, gn1, desc.partial_num, &gn) {
+          return false;
+        }
+      }
       *out = gn;
       return true;
     }
@@ -931,7 +972,14 @@ func gr_mk_addressof(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_addres
   if !gr_expr(cs, gr, oo(&a->rhs), &rp) {
     return false;
   }
-  ap gr_num = add_node(gr, node(mk_shray(rp), @[gr_op]GrAddressof({rval_cell(x), ellval_cell(oo(&a->rhs))})));
+  desc *lval_description = ellval_desc(oo(&a->rhs));
+  ap1 gr_num = add_node(gr, node(mk_shray(rp), @[gr_op]GrAddressof({rval_cell(x), desc->num})));
+  ap gr_num;
+  if case DeadMe(v void) = desc->deadme {
+    ap = add_node(gr, node(mk_shray(ap1), @[gr_op]GrVirtualDead({ellval_cell(oo(&a->rhs))})));
+  } else {
+    ap = ap1;
+  }
   *out = ap;
   return true;
 }
@@ -1125,9 +1173,9 @@ func gr_name_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_name_expr
   }
 }
 
-func ellval_cell(x *is_lval) cell_num {
+func ellval_desc(x *is_lval) *lval_description {
   switch x {
-    case &IsLvalYes(desc lval_description): { return desc.num; }
+    case &IsLvalYes(desc lval_description): { return &desc; }
     case &IsLvalNo(desc rval_description): {
       ice(_u8("lvalue_value_cell expects lvalue"));
       return fake();
@@ -1135,8 +1183,16 @@ func ellval_cell(x *is_lval) cell_num {
   }
 }
 
+func ellval_cell(x *is_lval) cell_num {
+  return ellval_desc(x)->num;
+}
+
 func ellval_cell(a *ast_expr) cell_num {
-  return ellval_cell(&expr_complete_info(a)->lval);
+  return ellval_desc(a)->num;
+}
+
+func ellval_desc(a *ast_expr) *lval_description {
+  return ellval_desc(&expr_complete_info(a)->lval);
 }
 
 func rval_cell(x *ast_expr) cell_num {
@@ -1177,7 +1233,8 @@ func gr_chain_virtualdead(cs *checkstate, gr *frame_graph, prec gr_num, c cell_n
   switch location(ref_cell(gr, c)) {
   case LocationVirtual(v void):
     *out = add_node(gr, node(mk_shray(prec), @[gr_op]GrVirtualDead({c})));
-  case LocationStatic(v void): { }
+  case LocationStatic(v void):
+    *out = prec;
   }
   return true;
 }

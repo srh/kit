@@ -1244,6 +1244,10 @@ func parse_condition(p *ps, out *ast_condition) bool {
   }
 }
 
+func mk_condition_discard_info() ast_condition_discard_info {
+  return {NotComputed(), mk_later()};
+}
+
 func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
   condition ast_condition;
   thenbody ast_bracebody;
@@ -1253,7 +1257,7 @@ func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
   }
 
   if !try_skip_keyw(p, Else(void)) {
-    *out = IfThen({mk_later(), condition, thenbody});
+    *out = IfThen({mk_condition_discard_info(), condition, thenbody});
     return true;
   }
 
@@ -1262,14 +1266,14 @@ func parse_rest_of_if_statement(p *ps, out *ast_statement) bool {
     if !parse_rest_of_if_statement(p, &elseif) {
       return Fail;
     }
-    *out = IfThenElse({mk_later(), condition, thenbody, {NotComputed@[ast_bracebody_info](), mk_array(elseif)}});
+    *out = IfThenElse({mk_condition_discard_info(), condition, thenbody, {NotComputed@[ast_bracebody_info](), mk_array(elseif)}});
     return true;
   }
   elsebody ast_bracebody;
   if !parse_bracebody(p, &elsebody) {
     return Fail;
   }
-  *out = IfThenElse({mk_later(), condition, thenbody, elsebody});
+  *out = IfThenElse({mk_condition_discard_info(), condition, thenbody, elsebody});
   return true;
 }
 
@@ -1280,7 +1284,7 @@ func parse_rest_of_while_statement(p *ps, out *ast_statement) bool {
        && parse_bracebody(p, &body)) {
     return Fail;
   }
-  *out = While({mk_later(), condition, body});
+  *out = While({mk_condition_discard_info(), condition, body});
   return true;
 }
 
