@@ -491,7 +491,7 @@ func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *
 
   var continuegn = add_node(gr, node0(@[gr_op]GrSequence({loopcleanupgn, topgn})));
   thengn gr_num;
-  if !gr_bracebody(cs, gr, fb, &a->body, continuegn, &thengn) {
+  if !gr_condition_body(cs, gr, fb, &a->condition_discard, &a->body, continuegn, &thengn) {
     return false;
   }
   gn gr_num;
@@ -513,7 +513,7 @@ func gr_ifthenelse_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state
   var latseq = add_node(gr, node0(@[gr_op]GrSequence({latergn, outflow})));
 
   thengn gr_num;
-  if !gr_bracebody(cs, gr, fb, &a->thenbody, latseq, &thengn) {
+  if !gr_condition_body(cs, gr, fb, &a->condition_discard, &a->thenbody, latseq, &thengn) {
     return false;
   }
   elsegn gr_num;
@@ -528,6 +528,14 @@ func gr_ifthenelse_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state
   return true;
 }
 
+func gr_condition_body(cs *checkstate, gr *frame_graph, fb *fullbody_state, cd *ast_condition_discard_info, body *ast_bracebody, outflow gr_num, out *gr_num) bool {
+  if case &Has(c cell_num) = unHas(&cd->virtual_cell_dead) {
+    vd gr_num = add_node(gr, node0(@[gr_op]GrVirtualDead({c})));
+    outflow = add_node(gr, node0(@[gr_op]GrSequence({vd, outflow})));
+  }
+  return gr_bracebody(cs, gr, fb, body, outflow, out);
+}
+
 func gr_ifthen_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *ast_ifthen_statement, outflow gr_num, out *gr_num) bool {
   latergn gr_num;
   if !gr_condition_discard(cs, gr, &a->condition_discard, &latergn) {
@@ -537,7 +545,7 @@ func gr_ifthen_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
   var latseq = add_node(gr, node0(@[gr_op]GrSequence({latergn, outflow})));
 
   bodygn gr_num;
-  if !gr_bracebody(cs, gr, fb, &a->body, latseq, &bodygn) {
+  if !gr_condition_body(cs, gr, fb, &a->condition_discard, &a->body, latseq, &bodygn) {
     return false;
   }
   gn gr_num;
