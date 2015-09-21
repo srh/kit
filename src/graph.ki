@@ -944,7 +944,21 @@ func gr_index_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_index_ex
   } else {
     name cell_num = value_cell(x);
     flat_size u32 = ref_cell(gr, name)->props.flat_size;
-    var gp = add_node(gr, node(mk_shray(rp, lp), @[gr_op]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed(cons(flat_size, result_cell(oo(&a->rhs))))})));
+    var gp1 = add_node(gr, node(mk_shray(rp, lp), @[gr_op]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed(cons(flat_size, result_cell(oo(&a->rhs))))})));
+    gp gr_num;
+    // TODO: Dedup with local_field code?
+    switch &expr_complete_info(oo(&a->lhs))->lval {
+    case &IsLvalYes(desc lval_description):
+      if case DeadMe(v void) = desc.deadme {
+        gp = add_node(gr, node(mk_shray(gp1), @[gr_op]GrVirtualDead({desc.num})));
+      } else {
+        gp = gp1;
+      }
+    case &IsLvalNo(desc rval_description):
+      if !gr_chain_virtualdead(cs, gr, gp1, desc.partial_num, &gp) {
+        return false;
+      }
+    }
     var gp_later = add_node(gr, node0(@[gr_op]GrSequence({gp, rhs_later})));
     *out = gp_later;
     return true;
