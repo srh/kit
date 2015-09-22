@@ -6,7 +6,7 @@ func mk_gn_annot() gn_annot {
 }
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
-  h frame = {cs, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot())};
+  h frame = {cs, cs->im, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot())};
 
   prelive lives;
   check_add_all(&prelive.statics, &g->argcells);
@@ -14,7 +14,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
 
   DBG(_u8("gen graphed fn body for "), lookup(cs->im, g->graph.gr.informal_name));
   mut genexpr_result;
-  if !dumbly_analyze_expression(cs, f, &h, &g->graph.gr, g->graph.gn, &prelive, &mut) {
+  if !dumbly_analyze_expression(&h, &g->graph.gr, g->graph.gn, &prelive, &mut) {
     return false;
   }
 
