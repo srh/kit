@@ -16,6 +16,7 @@ deftype gr_node struct {
 deftype gr_num size;
 def `~` fn[size, gr_num] = wrapconvert;
 func `<`(x gr_num, y gr_num) bool { return x.~ < y.~; }
+func `!=`(x gr_num, y gr_num) bool { return x.~ != y.~; }
 
 defenum gr_op {
   GrApply gr_apply;
