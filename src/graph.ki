@@ -17,6 +17,12 @@ deftype gr_num size;
 def `~` fn[size, gr_num] = wrapconvert;
 func `<`(x gr_num, y gr_num) bool { return x.~ < y.~; }
 func `!=`(x gr_num, y gr_num) bool { return x.~ != y.~; }
+func hash_compute_hash(n *gr_num) osize {
+  return hash_compute_hash(&n->~);
+}
+func hash_equal(x *gr_num, y *gr_num) bool {
+  return x->~ == y->~;
+}
 
 defenum gr_op {
   GrApply gr_apply;

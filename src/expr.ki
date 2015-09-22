@@ -73,13 +73,7 @@ func[H] build_u8str(help H, r *array[u8], c *cell_num) void {
   build_u8str(help, r, &c->~);
 }
 func hash_compute_hash(x *cell_num) osize {
-  // This should suffice!
-  k osize = ~x->~;
-  k = k ^ (k >> 6);
-  k = k ^ (k << 13);
-  k = k ^ (k >> 17);
-  k = k * 0x23457812;
-  return k;
+  return hash_compute_hash(&x->~);
 }
 func hash_equal(x *cell_num, y *cell_num) bool {
   return x->~ == y->~;

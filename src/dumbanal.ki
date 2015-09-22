@@ -6,6 +6,7 @@ deftype gn_annot struct {
 
   // Only for GrApply and GrPrimApply.
   lower_paramlists nc[array[gr_num]];
+  higher_paramlists hash[gr_num, void];
 };
 
 deftype frame struct {
@@ -264,6 +265,7 @@ func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *lives) voi
     if case Has(gn gr_num) = ref(&h->bas->celldisp, p->car.~)->paramlist {
       if gn != our_gn {
         push(&paramlists, gn);
+        check_insert(&ref_annot(h, gn)->higher_paramlists, &our_gn, void);
       }
     }
   }

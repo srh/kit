@@ -2,7 +2,7 @@ import dumbanal;
 import state;
 
 func mk_gn_annot() gn_annot {
-  return {NotComputed(), NotComputed()};
+  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void]()};
 }
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
