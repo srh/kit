@@ -205,6 +205,10 @@ func[T] unHas(p *opt[T]) *T {
   return fake();
 }
 
+func[T] unHas(p opt[T]) T {
+  return *unHas(&p);
+}
+
 func[T] `==`(x opt[T], y opt[T]) bool {
   switch &x {
     case &None(v): {

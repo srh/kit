@@ -5,6 +5,8 @@ func mk_gn_annot() gn_annot {
   return {NotComputed(), NotComputed(), mk_hash@[gr_num, void]()};
 }
 
+// Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
+
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
   h frame = {cs, cs->im, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot())};
 
@@ -30,5 +32,76 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
     // nothing to assert
   }
 
+  if !dumbly_layout_frame_cells(&h) {
+    return false;
+  }
+
+  // TODO(): Implement.
   return true;
 }
+
+func dumbly_layout_frame_cells(h *frame) bool {
+  // Left-most paramlist goes first.
+  paramlist_ordering array[gr_num];
+  if !dumbly_linearize_paramlist_ordering(h, &paramlist_ordering) {
+    return false;
+  }
+
+  // TODO(): Implement.
+  return true;
+}
+
+
+func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array[gr_num]) bool {
+  // Paramlists by in-degree, which is < the number of paramlists (since they can't point at themselves).
+  nparamlists size = count(&h->bas->paramlists);
+  // nparamlists is an impossible in-degree, and nparamlists + 1 is more impossible -- there's no way it could be decremented to zero while having count(&ordering) end up equalling nparamlists, below.
+  backmap array[size] = repeat(count(&h->by_gn), nparamlists + 1);
+  nreachable_paramlists size = 0;
+  zeroset hash[gr_num, void];
+  for i size = 0; i < nparamlists; i = i + 1 {
+    gn gr_num = get(&h->bas->paramlists, i);
+    // Nodes without lower_paramlists are unreachable.  So we don't need to worry about those!
+    // TODO: Maybe, don't gen graphs with dead nodes!
+    if case &Computed(arr array[gr_num]) = &ref(&h->by_gn, gn.~)->lower_paramlists {
+      nlower size = count(unHas(&ref(&h->by_gn, gn.~)->lower_paramlists));
+      if nlower == 0 {
+        check_insert(&zeroset, &gn, void);
+      }
+      set(&backmap, gn.~, nlower);
+      nreachable_paramlists = nreachable_paramlists + 1;
+    }
+  }
+
+  ordering array[gr_num];
+
+  while count(&zeroset) != 0 {
+    gn gr_num;
+    if true {
+      var it = iter(&zeroset);
+      gn = unHas(next(&it))->car;
+    }
+    check_remove(&zeroset, &gn);
+    push(&ordering, gn);
+    it hash_iter[gr_num, void] = iter(&ref_annot(h, gn)->higher_paramlists);
+    while case Has(p *tup[gr_num, void]) = next(&it) {
+      upn gr_num = p->car;
+      bucket size = get(&backmap, upn.~);
+      check(bucket > 0);
+      nextbucket size = bucket - 1;
+      if nextbucket == 0 {
+        check_insert(&zeroset, &upn, void);
+      }
+      set(&backmap, upn.~, nextbucket);
+    }
+  }
+
+  if count(&ordering) != nreachable_paramlists {
+    ERR(_u8("ICE: paramlist ordering has a cyclic dependency."));
+    return false;
+  }
+
+  *paramlist_ordering_out = ordering;
+  return true;
+}
+
