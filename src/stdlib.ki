@@ -355,6 +355,14 @@ func ceil_divide(x u32, y u32) u32 {
   }
 }
 
+func floor_aligned(x i32, y u32) i32 {
+  if x >= 0 {
+    return x - (x % ~y);
+  } else {
+    return - @[i32] ~ceil_aligned(~ -x, y);
+  }
+}
+
 func ceil_divide(x size, y size) size {
   if x % y == 0 {
     return x / y;

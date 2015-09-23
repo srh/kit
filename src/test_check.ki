@@ -17,6 +17,7 @@ func x86_32_platform(opsys platform_os) platform_info {
   jrr shift_behavior = JustRangecheckRhs(void);
   ret platform_info = {
     LittleEndian(void),
+    4,
     8,
     4,
     {0, 1},
