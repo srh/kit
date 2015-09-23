@@ -410,6 +410,15 @@ func[T] mk_array(x0 T, x1 T, x2 T, x3 T, x4 T, x5 T, x6 T, x7 T) array[T] {
   return ret;
 }
 
+func[T] unHas_array(x *array[opt[T]]) array[T] {
+  ret array[T];
+  n size = count(x);
+  reserve(&ret, n);
+  for i size = 0; i < n; i = i + 1 {
+    push(&ret, *unHas(ref(x, i)));
+  }
+  return ret;
+}
 
 // Heh.
 def[T] _u8 fn[T, array[u8]] = make;

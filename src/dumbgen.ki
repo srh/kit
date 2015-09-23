@@ -8,7 +8,7 @@ func mk_gn_annot() gn_annot {
 // Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
-  h frame = {cs, cs->im, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot())};
+  h frame = {cs, cs->im, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed@[array[i32]]()};
 
   prelive lives;
   check_add_all(&prelive.all, &g->argcells);
@@ -86,7 +86,7 @@ func dumbly_layout_frame_cells(h *frame) bool {
       }
     }
 
-    // 2. Layout cells that _are_ part of the paramlist.
+    // 2. Layout cells that _are_ part of the paramlist.  (They have to go beneath those which aren't.)
     pcells *shray[cell_num] = paramlist_cells(h->gr, gn);
     npcells size = count(pcells);
     for j size = npcells; j > 0; {
@@ -100,7 +100,7 @@ func dumbly_layout_frame_cells(h *frame) bool {
     }
   }
 
-  // 3. Layout cells that aren't live during any function call.
+  // 3. Layout cells that aren't live during any function call -- maybe these are just used in dead code.
   ncells size = count(&offsets);
   for i size = 0; i < ncells; i = i + 1 {
     if isNone(ref(&offsets, i)) {
@@ -111,6 +111,9 @@ func dumbly_layout_frame_cells(h *frame) bool {
       set(&offsets, c.~, Has(offset));
     }
   }
+
+  noopt_offsets array[i32] = unHas_array(&offsets);
+  annotate(&h->offsets, noopt_offsets);
   return true;
 }
 
