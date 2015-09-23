@@ -1,5 +1,9 @@
 import state;
 
+deftype lives struct {
+  all hash[cell_num, void];
+};
+
 deftype gn_annot struct {
   // Which cells are guaranteed to be live when the gn starts.
   live nc[lives];
@@ -34,12 +38,8 @@ deftype partial_exprmut struct {
   encapsulated hash[cell_num, void];
 };
 
-deftype lives struct {
-  statics hash[cell_num, void];
-};
-
 func[H] build_u8str(help H, r *array[u8], x *lives) void {
-  build_u8str(help, r, &x->statics);
+  build_u8str(help, r, &x->all);
 }
 
 func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, gn gr_num, prelive *lives, mut_out *exprmut) bool {
@@ -67,7 +67,7 @@ func[T] DUMBG(x T) void {
 }
 
 func lives_equal(x *lives, y *lives) bool {
-  return sets_equal(&x->statics, &y->statics);
+  return sets_equal(&x->all, &y->all);
 }
 
 func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *lives, mut_out *genexpr_result) bool {
@@ -260,7 +260,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
 
 func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *lives) void {
   paramlists array[gr_num];
-  it hash_iter[cell_num, void] = iter(&live_at_app_time->statics);
+  it hash_iter[cell_num, void] = iter(&live_at_app_time->all);
   while case Has(p *tup[cell_num, void]) = next(&it) {
     if case Has(gn gr_num) = ref(&h->bas->celldisp, p->car.~)->paramlist {
       if gn != our_gn {
@@ -322,7 +322,7 @@ func deaden(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) voi
   } else if case Has(v *void) = lookup_ref(&prec_muts->made_dead, &c) {
     ice(_u8("deaden on cell seen in made_dead"));
   } else {
-    if case Has(v *void) = lookup_ref(&prelive->statics, &c) {
+    if case Has(v *void) = lookup_ref(&prelive->all, &c) {
       check_insert(&prec_muts->made_dead, &c, void);
     } else {
       ice(_u8("deaden on un-live cell "), c.~);
@@ -336,13 +336,13 @@ func input(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void
     // Success, the cell's live.
   } else if case Has(v *void) = lookup_ref(&prec_muts->used, &c) {
     // Success, the cell's live (in prelive).  This check's redundant with internal logic of this graph-traversing code.
-    check(isHas(lookup_ref(&prelive->statics, &c)));
+    check(isHas(lookup_ref(&prelive->all, &c)));
   } else if case Has(v *void) = lookup_ref(&prec_muts->encapsulated, &c) {
     ice(_u8("input cell seen in encapsulated"));
   } else if case Has(v *void) = lookup_ref(&prec_muts->made_dead, &c) {
     ice(_u8("input cell seen in made_dead"));
   } else {
-    if case Has(v *void) = lookup_ref(&prelive->statics, &c) {
+    if case Has(v *void) = lookup_ref(&prelive->all, &c) {
       // Success, the cell's live.
     } else {
       ice(_u8("input cell "), c.~, _u8(" not seen in prelive"));
@@ -366,7 +366,7 @@ func output(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) voi
     check_remove(&prec_muts->made_dead, &c);
     check_insert(&prec_muts->used, &c, void);
   } else {
-    if case Has(v *void) = lookup_ref(&prelive->statics, &c) {
+    if case Has(v *void) = lookup_ref(&prelive->all, &c) {
       // The cell's already live.
     } else {
       check_insert(&prec_muts->made_live, &c, void);
@@ -383,8 +383,8 @@ func virtual(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) vo
 }
 
 func compose_live(live *lives, muts *exprmut) void {
-  check_add_disjoint(&live->statics, &muts->made_live);
-  remove_exactly(&live->statics, &muts->made_dead);
+  check_add_disjoint(&live->all, &muts->made_live);
+  remove_exactly(&live->all, &muts->made_dead);
 }
 
 func compose_muts(before *exprmut, after *exprmut) exprmut {
