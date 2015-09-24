@@ -1,8 +1,64 @@
 import dumbanal;
 import state;
 
+defenum cell_loc {
+  // Directly via an frame offset, per se.
+  DirectLoc i32;
+  // Indirectly via a pointer (through the frame offset).
+  IndirectLoc i32;
+};
+
+deftype lives struct {
+  all hash[cell_num, void];
+};
+
+deftype gn_annot struct {
+  // Which cells are guaranteed to be live when the gn starts.
+  live nc[lives];
+
+  // Only for GrApply and GrPrimApply.
+  lower_paramlists nc[array[gr_num]];
+  higher_paramlists hash[gr_num, void];
+};
+
+deftype frame struct {
+  cs *checkstate;
+  im *identmap;
+  argcells array[cell_num];
+  return_cell cell_num;
+  gr *frame_graph;
+  bas *basic_analyze_state;
+  // by_gn[i].fs shows what the state must is _before_ evaluating node i.  (All incoming nodes must agree!)
+  by_gn array[gn_annot];
+  // offsets[i] is the offset of a cell relative to the stack frame, or location of a cell, or something like that.
+  offsets nc[array[cell_loc]];
+  low_offset nc[i32];
+};
+
 func mk_gn_annot() gn_annot {
   return {NotComputed(), NotComputed(), mk_hash@[gr_num, void]()};
+}
+
+func unIndirect(loc cell_loc) i32 {
+  if case IndirectLoc(x i32) = loc {
+    return x;
+  } else {
+    ice(_u8("unIndirect fail"));
+    return fake();
+  }
+}
+
+func un_Direct(loc cell_loc) i32 {
+  if case DirectLoc(x i32) = loc {
+    return x;
+  } else {
+    ice(_u8("un_Direct fail"));
+    return fake();
+  }
+}
+
+func get_loc(h *frame, c cell_num) cell_loc {
+  return get(unHas(&h->offsets), c.~);
 }
 
 // Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
@@ -55,13 +111,6 @@ func paramlist_cells(gr *frame_graph, gn gr_num) *shray[cell_num] {
   }
 }
 
-defenum cell_loc {
-  // Directly via an frame offset, per se.
-  DirectLoc i32;
-  // Indirectly via a pointer (through the frame offset).
-  IndirectLoc i32;
-};
-
 func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   // Left-most paramlist goes first.
   paramlist_ordering array[gr_num];
@@ -79,13 +128,13 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   switch h->cs->plat.callconv {
   case UniversalCdeclConvention(v void):
     // It's OK to hard-code numbers here, because we're under the bullshit "UniversalCDeclConvention".
-    ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
     upward_offset i32 = 8;
-    if for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props) {
+    if for_universal_cc_exists_hidden_return_param(h) {
       set(ref(&offsets, h->return_cell.~), IndirectLoc(upward_offset));
       upward_offset = upward_offset + 4;
     } else {
       // Put its cell below the frame pointer.
+      ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
       offset cell_loc = next_stack_offset(h->cs, low_offset, ret_ci, &low_offset);
       set(ref(&offsets, h->return_cell.~), offset);
     }
@@ -171,6 +220,10 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   annotate(&h->offsets, noopt_offsets);
   annotate(&h->low_offset, low_offset);
   return true;
+}
+
+func for_universal_cc_exists_hidden_return_param(h *frame) bool {
+  return for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ref_cell(h->gr, h->return_cell)->props);
 }
 
 func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *type_properties) bool {
@@ -263,7 +316,58 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
 }
 
 func dumbly_gen_machine_code(f *objfile, h *frame, entry_gn gr_num) bool {
+  if !dumbly_gen_function_intro(f, h) {
+    return false;
+  }
+  if !dumbly_gen_function_body(f, h, entry_gn) {
+    return false;
+  }
+  if !dumbly_gen_function_exit(f, h) {
+    return false;
+  }
+
   // TODO: Actually implement.
   return true;
 }
 
+func dumbly_gen_function_intro(f *objfile, h *frame) bool {
+  switch h->cs->plat.callconv {
+  case UniversalCdeclConvention(v void):
+    x86_push32(f, X86_EBP);
+    x86_mov_reg32(f, X86_EBP, X86_ESP);
+    x86_add_esp_i32(f, *unHas(&h->low_offset));
+    return true;
+  }
+}
+
+func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
+  return TODO();
+}
+
+func dumbly_gen_function_exit(f *objfile, h *frame) bool {
+  switch h->cs->plat.callconv {
+  case UniversalCdeclConvention(v void):
+    ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
+    retsize u32 = ret_ci->props.flat_size;
+    hrp bool = for_universal_cc_exists_hidden_return_param(h);
+    if hrp {
+      // Put hidden return pointer into eax.
+      x86_load32(f, X86_EAX, X86_EBP, unIndirect(get_loc(h, h->return_cell)));
+    } else {
+      loc i32 = un_Direct(get_loc(h, h->return_cell));
+
+      // TODO: Investigate calling convention behavior on signed types.  Should we sign-extend?  (Also a question for s1.)
+
+      if retsize <= 4 {
+        x86_load32_zeroextend(f, loc, retsize);
+      } else if retsize <= 8 {
+        // TODO: This should not even be theoretically reachable on Linux32.
+        x86_load32(f, X86_EAX, X86_EBP, loc);
+        x86_load32_zeroextend(f, loc, retsize - 4);
+      } else {
+        ice(_u8("return size is too big for non-hidden return param"));
+      }
+    }
+    return TODO();
+  }
+}

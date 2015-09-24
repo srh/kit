@@ -89,7 +89,7 @@ func append_32bit_reloc(s *objfile_section, sti sti, type objfile_relocation_typ
   reloc objfile_relocation = {~count(&s->raw), sti, type};
   push(&s->relocs, reloc);
   zero le_u32 = ~ @[u32] 0;
-  append_raw(s, &zero.buf[0], sizeof@[le_u32]);
+  append_raw(s, &zero.buf[0], 4);
 }
 
 func append_raw(s *objfile_section, p *u8, n size) void {
@@ -190,7 +190,8 @@ func secsize(s *objfile_section) u32 {
 
 func[T] append_reinterpret(arr *array[u8], p *T) void {
   d *u8 = cast(p);
-  n size = sizeof@[T];
+  check(sizeof@[T] % sizeof@[u8] == 0);
+  n size = sizeof@[T] / sizeof@[u8];
   append_raw(arr, d, n);
 }
 

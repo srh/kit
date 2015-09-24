@@ -1,32 +1,5 @@
 import state;
 
-deftype lives struct {
-  all hash[cell_num, void];
-};
-
-deftype gn_annot struct {
-  // Which cells are guaranteed to be live when the gn starts.
-  live nc[lives];
-
-  // Only for GrApply and GrPrimApply.
-  lower_paramlists nc[array[gr_num]];
-  higher_paramlists hash[gr_num, void];
-};
-
-deftype frame struct {
-  cs *checkstate;
-  im *identmap;
-  argcells array[cell_num];
-  return_cell cell_num;
-  gr *frame_graph;
-  bas *basic_analyze_state;
-  // by_gn[i].fs shows what the state must is _before_ evaluating node i.  (All incoming nodes must agree!)
-  by_gn array[gn_annot];
-  // offsets[i] is the offset of a cell relative to the stack frame, or location of a cell, or something like that.
-  offsets nc[array[cell_loc]];
-  low_offset nc[i32];
-};
-
 deftype exprmut struct {
   // Cells that weren't live, that are used.
   made_live hash[cell_num, void];
