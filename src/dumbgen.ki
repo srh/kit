@@ -8,7 +8,7 @@ func mk_gn_annot() gn_annot {
 // Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
-  h frame = {cs, cs->im, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed()};
+  h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed(), NotComputed@[i32]()};
 
   prelive lives;
   check_add_all(&prelive.all, &g->argcells);
@@ -36,7 +36,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
     return false;
   }
 
-  if !dumbly_gen_machine_code(cs, f, &h, g->graph.gn) {
+  if !dumbly_gen_machine_code(f, &h, g->graph.gn) {
     return false;
   }
 
@@ -79,21 +79,20 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   switch h->cs->plat.callconv {
   case UniversalCdeclConvention(v void):
     // It's OK to hard-code numbers here, because we're under the bullshit "UniversalCDeclConvention".
-    return_cell cell_num = g->graph.cell;
-    ret_ci *cell_info = ref_cell(h->gr, return_cell);
+    ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
     upward_offset i32 = 8;
     if for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props) {
-      set(ref(&offsets, return_cell.~), IndirectLoc(upward_offset));
+      set(ref(&offsets, h->return_cell.~), IndirectLoc(upward_offset));
       upward_offset = upward_offset + 4;
     } else {
       // Put its cell below the frame pointer.
       offset cell_loc = next_stack_offset(h->cs, low_offset, ret_ci, &low_offset);
-      set(ref(&offsets, return_cell.~), offset);
+      set(ref(&offsets, h->return_cell.~), offset);
     }
 
-    nargcells size = count(&g->argcells);
+    nargcells size = count(&h->argcells);
     for i size = 0; i < nargcells; i = i + 1 {
-      c cell_num = get(&g->argcells, i);
+      c cell_num = get(&h->argcells, i);
       ci *cell_info = ref_cell(h->gr, c);
       if ci->location != LocationStatic(void) {
         ice(_u8("Non-static arglist cell"));
@@ -170,6 +169,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
 
   noopt_offsets array[cell_loc] = unHas_array(&offsets);
   annotate(&h->offsets, noopt_offsets);
+  annotate(&h->low_offset, low_offset);
   return true;
 }
 
@@ -262,7 +262,8 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
   return true;
 }
 
-func dumbly_gen_machine_code(cs *checkstate, f *objfile, h *frame, entry_gn gr_num) bool {
+func dumbly_gen_machine_code(f *objfile, h *frame, entry_gn gr_num) bool {
   // TODO: Actually implement.
   return true;
 }
+

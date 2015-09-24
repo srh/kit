@@ -16,12 +16,15 @@ deftype gn_annot struct {
 deftype frame struct {
   cs *checkstate;
   im *identmap;
+  argcells array[cell_num];
+  return_cell cell_num;
   gr *frame_graph;
   bas *basic_analyze_state;
   // by_gn[i].fs shows what the state must is _before_ evaluating node i.  (All incoming nodes must agree!)
   by_gn array[gn_annot];
   // offsets[i] is the offset of a cell relative to the stack frame, or location of a cell, or something like that.
   offsets nc[array[cell_loc]];
+  low_offset nc[i32];
 };
 
 deftype exprmut struct {
