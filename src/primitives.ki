@@ -265,7 +265,7 @@ func mk_op(traits integral_traits, action primitive_comparison_op_action) primit
 }
 
 func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) void {
-  add_simple_primitive(cs, name, traits.flat);
+  add_scalar_primitive(cs, name, traits.flat);
   add_binop_primitive(cs, intern(cs->im, _s("+")), name, mk_numop(traits, NumAdd(void)));
   add_binop_primitive(cs, intern(cs->im, _s("-")), name, mk_numop(traits, NumSub(void)));
   add_binop_primitive(cs, intern(cs->im, _s("*")), name, mk_numop(traits, NumMul(void)));
@@ -293,11 +293,11 @@ func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) vo
 }
 
 func add_void_primitive(cs *checkstate) void {
-  add_simple_primitive(cs, cs->im->cym.voidsym, cs->plat.voidtraits);
+  add_scalar_primitive(cs, cs->im->cym.voidsym, cs->plat.voidtraits);
 }
 
 func add_bool_primitive(cs *checkstate) void {
-  add_simple_primitive(cs, cs->im->cym.boolsym, cs->plat.booltraits);
+  add_scalar_primitive(cs, cs->im->cym.boolsym, cs->plat.booltraits);
   add_unop_primitive(cs, intern(cs->im, _s("!")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(LogicalNot(void)));
   add_comparison_primitive(cs, intern(cs->im, _s("==")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolEq(void)));
   add_comparison_primitive(cs, intern(cs->im, _s("!=")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolNe(void)));
@@ -305,7 +305,7 @@ func add_bool_primitive(cs *checkstate) void {
   add_binop_primitive(cs, intern(cs->im, _s("|")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolBitOr(void)));
 }
 
-func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) void {
+func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) void {
   info deftype_inst_info = {
     None(),
     @[type_properties]{
@@ -314,7 +314,8 @@ func add_simple_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
       DerivedMethodTrivial(void),
       DerivedMethodTrivial(void),
       DerivedMethodTrivial(void),
-      DerivedMethodTrivial(void)
+      DerivedMethodTrivial(void),
+      IsScalarYes(void)
     }
   };
   inst_id deftype_inst_id = add_deftype_inst(cs, {NoParms(void), Computed(info)});
@@ -388,7 +389,8 @@ func add_pointer_primitive_type(cs *checkstate) void {
            DerivedMethodTrivial(void),
            DerivedMethodTrivial(void),
            DerivedMethodTrivial(void),
-           DerivedMethodTrivial(void)
+           DerivedMethodTrivial(void),
+           IsScalarYes(void)
          }}),
     mk_hash@[cu_genparms, deftype_inst_id]()
   };
@@ -412,7 +414,8 @@ func add_function_primitive(cs *checkstate) void {
            DerivedMethodTrivial(void),
            DerivedMethodTrivial(void),
            DerivedMethodTrivial(void),
-           DerivedMethodTrivial(void)
+           DerivedMethodTrivial(void),
+           IsScalarYes(void)
          }}),
     mk_hash@[cu_genparms, deftype_inst_id]()
   };

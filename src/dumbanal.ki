@@ -20,8 +20,8 @@ deftype frame struct {
   bas *basic_analyze_state;
   // by_gn[i].fs shows what the state must is _before_ evaluating node i.  (All incoming nodes must agree!)
   by_gn array[gn_annot];
-  // offsets[i] is the offset of a cell relative to ebp or initial function call offset, or something.
-  offsets nc[array[i32]];
+  // offsets[i] is the offset of a cell relative to the stack frame, or location of a cell, or something like that.
+  offsets nc[array[cell_loc]];
 };
 
 deftype exprmut struct {

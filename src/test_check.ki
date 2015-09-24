@@ -32,7 +32,8 @@ func x86_32_platform(opsys platform_os) platform_info {
     {{4, 4}, {Unsigned(void), jrr, false, big("0"), big("4294967296")}},
     {4, 4},
     {4, 4},
-    opsys
+    opsys,
+    UniversalCdeclConvention(void)
   };
   return ret;
 }

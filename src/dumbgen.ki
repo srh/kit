@@ -8,7 +8,7 @@ func mk_gn_annot() gn_annot {
 // Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
-  h frame = {cs, cs->im, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed@[array[i32]]()};
+  h frame = {cs, cs->im, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed()};
 
   prelive lives;
   check_add_all(&prelive.all, &g->argcells);
@@ -32,11 +32,14 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
     // nothing to assert
   }
 
-  if !dumbly_layout_frame_cells(&h) {
+  if !dumbly_layout_frame_cells(g, &h) {
     return false;
   }
 
-  // TODO(): Implement.
+  if !dumbly_gen_machine_code(cs, f, &h, g->graph.gn) {
+    return false;
+  }
+
   return true;
 }
 
@@ -52,7 +55,14 @@ func paramlist_cells(gr *frame_graph, gn gr_num) *shray[cell_num] {
   }
 }
 
-func dumbly_layout_frame_cells(h *frame) bool {
+defenum cell_loc {
+  // Directly via an frame offset, per se.
+  DirectLoc i32;
+  // Indirectly via a pointer (through the frame offset).
+  IndirectLoc i32;
+};
+
+func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   // Left-most paramlist goes first.
   paramlist_ordering array[gr_num];
   if !dumbly_linearize_paramlist_ordering(h, &paramlist_ordering) {
@@ -60,9 +70,40 @@ func dumbly_layout_frame_cells(h *frame) bool {
   }
 
   // Offsets of either a static cell or a virtual cell's pointer.
-  offsets array[opt[i32]] = repeat(count(&h->gr->cells), None());
-  // TODO: Maybe after we push ebp, the alignment is 4 or something -- in cases where we need 8-byte or 16-byte alignment for some things.
+  offsets array[opt[cell_loc]] = repeat(count(&h->gr->cells), None());
+
+  // TODO: Maybe after we push the frame pointer, the alignment is 4 or something -- in cases where we need 8-byte or 16-byte alignment for some things.
   low_offset i32 = 0;
+
+  // 0. Layout arg cells, return cell.
+  switch h->cs->plat.callconv {
+  case UniversalCdeclConvention(v void):
+    // It's OK to hard-code numbers here, because we're under the bullshit "UniversalCDeclConvention".
+    return_cell cell_num = g->graph.cell;
+    ret_ci *cell_info = ref_cell(h->gr, return_cell);
+    upward_offset i32 = 8;
+    if for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props) {
+      set(ref(&offsets, return_cell.~), IndirectLoc(upward_offset));
+      upward_offset = upward_offset + 4;
+    } else {
+      // Put its cell below the frame pointer.
+      offset cell_loc = next_stack_offset(h->cs, low_offset, ret_ci, &low_offset);
+      set(ref(&offsets, return_cell.~), offset);
+    }
+
+    nargcells size = count(&g->argcells);
+    for i size = 0; i < nargcells; i = i + 1 {
+      c cell_num = get(&g->argcells, i);
+      ci *cell_info = ref_cell(h->gr, c);
+      if ci->location != LocationStatic(void) {
+        ice(_u8("Non-static arglist cell"));
+      }
+      offset i32 = upward_offset;
+      upward_offset = ceil_aligned(offset + ~ci->props.flat_size, 4);
+      set(ref(&offsets, c.~), DirectLoc(offset));
+    }
+  }
+
 
   ncalls size = count(&paramlist_ordering);
   for i size = 0; i < ncalls; i = i + 1 {
@@ -76,12 +117,13 @@ func dumbly_layout_frame_cells(h *frame) bool {
       if isNone(ref(&offsets, c.~)) {
         if case &Has(cell_paramlistgn gr_num) = &ref(&h->bas->celldisp, c.~)->paramlist {
           // Cells in other paramlists should already been processed -- and would have failed the isNone check just above.
-          check(cell_paramlistgn == gn);
+          if cell_paramlistgn == gn {
+            ice(_u8("cell is in other paramlist, was not processed"));
+          }
         } else {
           ci *cell_info = ref_cell(h->gr, c);
-          offset i32 = next_stack_offset(h->cs, low_offset, ci);
-          low_offset = offset;
-          set(&offsets, c.~, Has(offset));
+          offset cell_loc = next_stack_offset(h->cs, low_offset, ci, &low_offset);
+          set(ref(&offsets, c.~), offset);
         }
       }
     }
@@ -92,11 +134,26 @@ func dumbly_layout_frame_cells(h *frame) bool {
     for j size = npcells; j > 0; {
       j = j - 1;
       c cell_num = get(pcells, j);
-      ci *cell_info = ref_cell(h->gr, c);
-      offset i32 = next_stack_offset(h->cs, low_offset, ci);
-      low_offset = offset;
-      check(isNone(ref(&offsets, c.~)));
-      set(&offsets, c.~, Has(offset));
+      do_process bool;
+      if isHas(ref(&offsets, c.~)) {
+        // add_prim_fn_body applies primop directly to arg list.  TODO: Should we remove this special case here and make add_prim_fn_body copy the args into separate param cells?  Reconsider once we know how optimization would work.
+        if case &GrPrimApply(a gr_prim_apply) = &ref_node(h->gr, gn)->op {
+          do_process = false;
+        } else {
+          ice(_u8("cell is in paramlist, but already processed"));
+        }
+      } else {
+        do_process = true;
+      }
+
+      if do_process {
+        ci *cell_info = ref_cell(h->gr, c);
+        offset cell_loc = next_stack_offset(h->cs, low_offset, ci, &low_offset);
+        if !isNone(ref(&offsets, c.~)) {
+          ice(_u8("cell is in paramlist, but already processed"));
+        }
+        set(&offsets, c.~, Has(offset));
+      }
     }
   }
 
@@ -106,23 +163,48 @@ func dumbly_layout_frame_cells(h *frame) bool {
     if isNone(ref(&offsets, i)) {
       c cell_num = ~i;
       ci *cell_info = ref_cell(h->gr, c);
-      offset i32 = next_stack_offset(h->cs, low_offset, ci);
-      low_offset = offset;
+      offset cell_loc = next_stack_offset(h->cs, low_offset, ci, &low_offset);
       set(&offsets, c.~, Has(offset));
     }
   }
 
-  noopt_offsets array[i32] = unHas_array(&offsets);
+  noopt_offsets array[cell_loc] = unHas_array(&offsets);
   annotate(&h->offsets, noopt_offsets);
   return true;
 }
 
-func next_stack_offset(cs *checkstate, low_offset i32, ci *cell_info) i32 {
+func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *type_properties) bool {
+  switch plat->opsys {
+  case Linux32(v void):
+    if case IsScalarNo(v2 void) = props->is_scalar {
+      return true;
+    } else {
+      return false;
+    }
+  case Win32(v void):
+    n u32 = props->flat_size;
+    if n <= 2 || n == 4 || n == 8 {
+      if case &DerivedMethodTrivial(v2 void) = &props->move_behavior {
+        return false;
+      } else {
+        return true;
+      }
+    } else {
+      return true;
+    }
+  }
+}
+
+func next_stack_offset(cs *checkstate, low_offset i32, ci *cell_info, numeric_out *i32) cell_loc {
   switch ci->location {
   case LocationVirtual(v void):
-    return floor_aligned(low_offset - ~cs->plat.ptrtraits.size, max(cs->plat.min_stackvar_alignment, cs->plat.ptrtraits.size));
+    num i32 = floor_aligned(low_offset - ~cs->plat.ptrtraits.size, max(cs->plat.min_stackvar_alignment, cs->plat.ptrtraits.size));
+    *numeric_out = num;
+    return IndirectLoc(num);
   case LocationStatic(v void):
-    return floor_aligned(low_offset - ~ci->props.flat_size, max(cs->plat.min_stackvar_alignment, ci->props.flat_alignment));
+    num i32 = floor_aligned(low_offset - ~ci->props.flat_size, max(cs->plat.min_stackvar_alignment, ci->props.flat_alignment));
+    *numeric_out = num;
+    return DirectLoc(num);
   }
 }
 
@@ -180,3 +262,7 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
   return true;
 }
 
+func dumbly_gen_machine_code(cs *checkstate, f *objfile, h *frame, entry_gn gr_num) bool {
+  // TODO: Actually implement.
+  return true;
+}

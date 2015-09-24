@@ -65,6 +65,10 @@ defenum platform_os {
   Win32 void;
 };
 
+defenum universal_calling_convention {
+  UniversalCdeclConvention void;
+};
+
 deftype platform_info struct {
   endian endianness;
   min_stackvar_alignment u32;
@@ -86,6 +90,8 @@ deftype platform_info struct {
   fntraits flat_traits;
 
   opsys platform_os;
+  // There's no such thing as a universal calling convention, and as soon as this fiction goes away we'll remove/change this.
+  callconv universal_calling_convention;
 };
 
 deftype cs_primitives struct {
@@ -293,6 +299,11 @@ func isTrivial(behav derived_method_behavior) bool {
   return false;
 }
 
+defenum type_scalarity {
+  IsScalarNo void;
+  IsScalarYes void;
+};
+
 deftype type_properties struct {
   flat_size u32;
   flat_alignment u32;
@@ -300,6 +311,7 @@ deftype type_properties struct {
   move_behavior derived_method_behavior;
   copy_behavior derived_method_behavior;
   destroy_behavior derived_method_behavior;
+  is_scalar type_scalarity;
 };
 
 deftype cu_typrop struct {
@@ -673,6 +685,7 @@ func to_defclass_properties(cs *checkstate, clq *clqueue, ent_id deftype_entry_i
       if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior) {
         return false;
       }
+      ret.is_scalar = IsScalarNo(void);
     }
   }
   *out = ret;

@@ -964,7 +964,8 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
               level_to_derived(cs, clq, cs->im->cym.magic_init, 1, t, psd.init_level),
               level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, psd.move_level),
               level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, psd.copy_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, psd.destroy_level)};
+              level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, psd.destroy_level),
+              IsScalarNo(void)};
       return true;
     }
 
@@ -996,7 +997,8 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
               DerivedMethodTrivial(void),
               level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, move_level),
               level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, copy_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, destroy_level)};
+              level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, destroy_level),
+              IsScalarNo(void)};
       return true;
     }
 
@@ -1021,7 +1023,7 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
       final_size u32 = ceil_aligned(max_size, max_alignment);
       *out = {final_size, max_alignment, DerivedMethodTrivial(void),
               DerivedMethodTrivial(void), DerivedMethodTrivial(void),
-              DerivedMethodTrivial(void)};
+              DerivedMethodTrivial(void), IsScalarNo(void)};
       return true;
     }
 
@@ -1037,7 +1039,8 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
                 level_to_derived(cs, clq, cs->im->cym.magic_init, 1, t, behavior_level(&props.init_behavior)),
                 level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, behavior_level(&props.move_behavior)),
                 level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, behavior_level(&props.copy_behavior)),
-                level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, behavior_level(&props.destroy_behavior))};
+                level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, behavior_level(&props.destroy_behavior)),
+                IsScalarNo(void)};
         return true;
       } else {
         ice(_u8("compute_type_properties called on incomplete arraytype."));
