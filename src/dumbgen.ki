@@ -448,6 +448,15 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
             restore_esp_to_default_position(f, h);
           }
         }
+      case &GrPrimApply(a gr_prim_apply):
+        return TODO();
+      case &GrMemCopy(a gr_memcopy):
+        dest_ci *cell_info = ref_cell(h->gr, a.dest);
+        src_ci *cell_info = ref_cell(h->gr, a.src);
+        if dest_ci->props.flat_size != src_ci->props.flat_size {
+          ice(_u8("GrMemCopy to have same-size cells."));
+        }
+        x86_memcopy(f, get_loc(h, a.dest), get_loc(h, a.src), dest_ci->props.flat_size);
       default:
         return TODO();
       }

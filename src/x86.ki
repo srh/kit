@@ -419,6 +419,7 @@ func x86_lea32(f *objfile, dest u8, src_addr u8, src_disp i32) void {
   appendtext(f, 0x8D, encode_reg_rm(dest, src_addr, src_disp));
 }
 
+// TODO: What?  Why would we not use movzx?  Check s1.
 func x86_load8(f *objfile, dest u8, src_addr u8, src_disp i32) void {
   appendtext(f, 0x8A, encode_reg_rm(dest, src_addr, src_disp));
 }
@@ -437,4 +438,52 @@ func x86_store8(f *objfile, dest_addr u8, dest_disp i32, src u8) void {
 
 func x86_indirect_call(f *objfile, reg u8) void {
   appendtext(f, 0xFF, mrr(MOD11, 2, reg));
+}
+
+func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
+  // TODO: For sufficiently large n generate a loop, or call memcpy.
+
+  if size == 0 {
+    return;
+  }
+
+  dest_addr u8;
+  dest_disp i32;
+  x86_prep_loc_use(f, dest, X86_ECX, &dest_addr, &dest_disp);
+  src_addr u8;
+  src_disp i32;
+  x86_prep_loc_use(f, src, X86_EDX, &src_addr, &src_disp);
+
+  while size >= 4 {
+    x86_load32(f, X86_EAX, src_addr, src_disp);
+    x86_store32(f, dest_addr, dest_disp, X86_EAX);
+    src_disp = src_disp + 4;
+    dest_disp = dest_disp + 4;
+    size = size - 4;
+  }
+
+  if size >= 2 {
+    x86_movzx16(f, X86_EAX, src_addr, src_disp);
+    x86_store16(f, dest_addr, dest_disp, X86_EAX);
+    src_disp = src_disp + 2;
+    dest_disp = dest_disp + 2;
+    size = size - 2;
+  }
+
+  if size == 1 {
+    x86_movzx8(f, X86_EAX, src_addr, src_disp);
+    x86_store8(f, dest_addr, dest_disp, X86_EAX);
+  }
+}
+
+func x86_prep_loc_use(f *objfile, dest cell_loc, avail_reg u8, addr_reg_out *u8, disp_out *i32) void {
+  switch dest {
+  case DirectLoc(off i32):
+    *addr_reg_out = X86_EBP;
+    *disp_out = off;
+  case IndirectLoc(off i32):
+    x86_load32(f, avail_reg, X86_EBP, off);
+    *addr_reg_out = avail_reg;
+    *disp_out = 0;
+  }
 }
