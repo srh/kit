@@ -476,8 +476,8 @@ func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
   }
 }
 
-func x86_prep_loc_use(f *objfile, dest cell_loc, avail_reg u8, addr_reg_out *u8, disp_out *i32) void {
-  switch dest {
+func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, disp_out *i32) void {
+  switch loc {
   case DirectLoc(off i32):
     *addr_reg_out = X86_EBP;
     *disp_out = off;
@@ -486,4 +486,22 @@ func x86_prep_loc_use(f *objfile, dest cell_loc, avail_reg u8, addr_reg_out *u8,
     *addr_reg_out = avail_reg;
     *disp_out = 0;
   }
+}
+
+func x86_store32(f *objfile, dest cell_loc, src u8, scratch u8) void {
+  switch dest {
+  case DirectLoc(off i32):
+    x86_store32(f, X86_EBP, off, src);
+  case IndirectLoc(off i32):
+    x86_load32(f, scratch, X86_EBP, off);
+    x86_store32(f, scratch, 0, src);
+  }
+}
+
+
+func x86_load32(f *objfile, dest u8, src cell_loc) void {
+  src_addr u8;
+  src_disp i32;
+  x86_prep_loc_use(f, src, dest, &src_addr, &src_disp);
+  x86_load32(f, dest, src_addr, src_disp);
 }

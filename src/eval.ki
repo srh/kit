@@ -486,7 +486,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
           return false;
         }
         value st_value;
-        if !st_const_compute(clq, env, &a.value, destref.count, &value) {
+        if !st_const_compute(clq, &env->plat, &a.value, destref.count, &value) {
           return false;
         }
         if !obj_write(env, destref, &value) {
@@ -567,7 +567,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         for i size = 0; i < ncases && !found; i = i + 1 {
           case_i *tup[gr_const, gr_num] = ref(&a.cases, i);
           case_value st_value;
-          if !st_const_compute(clq, env, &case_i->car, src_obj.count, &case_value) {
+          if !st_const_compute(clq, &env->plat, &case_i->car, src_obj.count, &case_value) {
             return false;
           }
           case_matches bool;
@@ -692,10 +692,10 @@ func st_values_selfcontained_equal(plat *platform_info, a *st_value, b *st_value
   return true;
 }
 
-func st_const_compute(clq *clqueue, env *st_env, c *gr_const, length u32, out *st_value) bool {
+func st_const_compute(clq *clqueue, plat *platform_info, c *gr_const, length u32, out *st_value) bool {
   switch c {
   case &ConstInt(b bigint):
-    *out = st_bigint_to_value_unsigned(&env->plat, length, b);
+    *out = st_bigint_to_value_unsigned(plat, length, b);
   case &ConstDef(ip instpair):
     val *st_value;
     if !ensure_def_inst_evaled(clq->cs, clq, ip.ent_id, ip.inst_id, &val) {
@@ -703,9 +703,30 @@ func st_const_compute(clq *clqueue, env *st_env, c *gr_const, length u32, out *s
     }
     *out = *val;
   case &ConstFnBody(fnid fn_body_id):
-    *out = mk_st_value_symbolref(&env->plat, fnid);
+    *out = mk_st_value_symbolref(plat, fnid);
   case &ConstBytes(arr shray[u8]):
-    *out = st_u8s_to_value(&env->plat, &arr);
+    *out = st_u8s_to_value(plat, &arr);
+  }
+  return true;
+}
+
+// Same as st_const_compute except for ConstDef -- we're at code-gen time, everything should be computed.
+func st_const_compute_for_gen(cs *checkstate, c *gr_const, length u32, out *st_value) bool {
+  switch c {
+  case &ConstInt(b bigint):
+    *out = st_bigint_to_value_unsigned(&cs->plat, length, b);
+  case &ConstDef(ip instpair):
+    inst *def_inst = ref_inst(cs, ip.inst_id);
+    if case &Computed(x st_value) = &inst->evaled_value {
+      *out = x;
+    } else {
+      // This means we forgot to enqueue something onto a clq.
+      ice(_u8("st_const_compute_for_gen sees non-computed ConstDef"));
+    }
+  case &ConstFnBody(fnid fn_body_id):
+    *out = mk_st_value_symbolref(&cs->plat, fnid);
+  case &ConstBytes(arr shray[u8]):
+    *out = st_u8s_to_value(&cs->plat, &arr);
   }
   return true;
 }

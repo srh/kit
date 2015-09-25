@@ -65,6 +65,16 @@ func get_loc(h *frame, c cell_num) cell_loc {
   return get(unHas(&h->offsets), c.~);
 }
 
+func get_ptr_loc(h *frame, c cell_num) cell_loc {
+  check(ref_cell(h->gr, c)->props.flat_size == h->cs->plat.ptrtraits.size);
+  return get_loc(h, c);
+}
+
+func get_size_loc(h *frame, c cell_num) cell_loc {
+  check(ref_cell(h->gr, c)->props.flat_size == h->cs->plat.sizetraits.flat.size);
+  return get_loc(h, c);
+}
+
 // Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
@@ -457,14 +467,71 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
           ice(_u8("GrMemCopy to have same-size cells."));
         }
         x86_memcopy(f, get_loc(h, a.dest), get_loc(h, a.src), dest_ci->props.flat_size);
-      default:
+      case &GrWriteConst(a gr_writeconst):
+        dest_ci *cell_info = ref_cell(h->gr, a.dest);
+        value st_value;
+        if !st_const_compute_for_gen(h->cs, &a.value, dest_ci->props.flat_size, &value) {
+          return false;
+        }
+
+        gen_write_value(f, h, a.dest, &value);
+      case &GrAddressof(a gr_addressof):
+        x86_load_cell_address(f, h, X86_EAX, a.addressee);
+        x86_store32(f, get_ptr_loc(h, a.dest), X86_EAX, X86_EDX);
+      case &GrDeref(a gr_deref):
+        x86_load32(f, X86_EAX, get_ptr_loc(h, a.pointer));
+        x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
+        x86_store32(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX);
+      case &GrSubcell(a gr_subcell):
+        x86_load_cell_address(f, h, X86_EAX, a.partof);
+        x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
+        x86_store32(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX);
+      case &GrBranch(a gr_branch):
         return TODO();
+      case &GrSequence(a gr_sequence):
+        // first gets evaluated before second (because it gets pushed after)
+        push(&stack, EvalOpAndPrecs(a.second));
+        push(&stack, EvalOpAndPrecs(a.first));
+      case &GrJmp(a gr_jmp):
+        push(&stack, EvalOpAndPrecs(a.next));
+      case &GrWriteNothing(a gr_writenothing):
+        // Do nothing.  (This graph node is used for static eval, book keeping, etc.)
+      case &GrDead(a gr_dead):
+        // Do nothing.  (Likewise.)
+      case &GrVirtualDead(a gr_virtual_dead):
+        // Do nothing.  (Likewise.)
+      case &GrNop(v void):
+        // Do nothing (but do it less glamorously).
       }
     }
   }
 
   // Now we need to tie some jmps, or something.
   return TODO();
+}
+
+func x86_load_cell_address(f *objfile, h *frame, dest u8, c cell_num) void {
+  switch get_loc(h, c) {
+  case DirectLoc(off i32):
+    x86_lea32(f, X86_EAX, X86_EBP, off);
+  case IndirectLoc(off i32):
+    x86_load32(f, X86_EAX, X86_EBP, off);
+  }
+}
+
+func x86_add_offset(f *objfile, h *frame, dest u8, offset gr_offset, scratch1 u8, scratch2 u8) void {
+  switch offset {
+  case OffsetConst(off u32):
+    if off != 0 {
+      x86_mov_imm32(f, scratch1, ~off);
+      x86_add_w32(f, dest, scratch1);
+    }
+  case OffsetComputed(factors tup[u32, cell_num]):
+    x86_load32(f, scratch1, get_size_loc(h, factors.cdr));
+    x86_mov_imm32(f, scratch2, ~factors.car);
+    x86_imul_w32(f, scratch1, scratch2);
+    x86_add_w32(f, dest, scratch1);
+  }
 }
 
 func gen_placeholder_jmp(f *objfile, h *frame, target gr_num) void {
@@ -478,3 +545,8 @@ func set_esp_to_frame_offset(f *objfile, h *frame, offset i32) void {
 func restore_esp_to_default_position(f *objfile, h *frame) void {
   return TODO();
 }
+
+func gen_write_value(f *objfile, h *frame, dest cell_num, value *st_value) void {
+  return TODO();
+}
+
