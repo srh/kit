@@ -19,6 +19,10 @@ deftype gn_annot struct {
   // Only for GrApply and GrPrimApply.
   lower_paramlists nc[array[gr_num]];
   higher_paramlists hash[gr_num, void];
+  paramlist_bottom_frame_offset nc[i32];
+
+  // Some secsize(&f->text) value -- the jmp target for evaluating the node _and_ its precs.
+  instruction_offset nc[u32];
 };
 
 deftype frame struct {
@@ -36,7 +40,7 @@ deftype frame struct {
 };
 
 func mk_gn_annot() gn_annot {
-  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void]()};
+  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed(), NotComputed()};
 }
 
 func unIndirect(loc cell_loc) i32 {
@@ -129,12 +133,12 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   case UniversalCdeclConvention(v void):
     // It's OK to hard-code numbers here, because we're under the bullshit "UniversalCDeclConvention".
     upward_offset i32 = 8;
-    if for_universal_cc_exists_hidden_return_param(h) {
+    ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
+    if for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props) {
       set(ref(&offsets, h->return_cell.~), IndirectLoc(upward_offset));
       upward_offset = upward_offset + 4;
     } else {
       // Put its cell below the frame pointer.
-      ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
       offset cell_loc = next_stack_offset(h->cs, low_offset, ret_ci, &low_offset);
       set(ref(&offsets, h->return_cell.~), offset);
     }
@@ -156,7 +160,8 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   ncalls size = count(&paramlist_ordering);
   for i size = 0; i < ncalls; i = i + 1 {
     gn gr_num = get(&paramlist_ordering, i);
-    live *lives = unHas(&ref_annot(h, gn)->live);
+    annot *gn_annot = ref_annot(h, gn);
+    live *lives = unHas(&annot->live);
 
     // 1. Layout any cells live during the funcall, that are _not_ part of the paramlist.
     it hash_iter[cell_num, void] = iter(&live->all);
@@ -203,6 +208,8 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
         set(&offsets, c.~, Has(offset));
       }
     }
+
+    annotate(&annot->paramlist_bottom_frame_offset, low_offset);
   }
 
   // 3. Layout cells that aren't live during any function call -- maybe these are just used in dead code.
@@ -222,10 +229,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   return true;
 }
 
-func for_universal_cc_exists_hidden_return_param(h *frame) bool {
-  return for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ref_cell(h->gr, h->return_cell)->props);
-}
-
+// Props is the type properties of the return type.
 func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *type_properties) bool {
   switch plat->opsys {
   case Linux32(v void):
@@ -345,7 +349,7 @@ func dumbly_gen_function_exit(f *objfile, h *frame) bool {
   case UniversalCdeclConvention(v void):
     ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
     retsize u32 = ret_ci->props.flat_size;
-    hrp bool = for_universal_cc_exists_hidden_return_param(h);
+    hrp bool = for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props);
     if hrp {
       // Put hidden return pointer into eax.
       x86_load32(f, X86_EAX, X86_EBP, unIndirect(get_loc(h, h->return_cell)));
@@ -359,7 +363,7 @@ func dumbly_gen_function_exit(f *objfile, h *frame) bool {
       } else if retsize <= 8 {
         // TODO: This should not even be theoretically reachable on Linux32.
         x86_load32(f, X86_EAX, X86_EBP, loc);
-        x86_load32_zeroextend(f, loc, retsize - 4);
+        x86_load32_zeroextend(f, loc + 4, retsize - 4);
       } else {
         ice(_u8("return size is too big for non-hidden return param"));
       }
@@ -383,7 +387,85 @@ func dumbly_gen_function_exit(f *objfile, h *frame) bool {
   return true;
 }
 
+func universal_cc_write_to_retcell(f *objfile, h *frame, c cell_num) void {
+  ci *cell_info = ref_cell(h->gr, c);
+  retsize u32 = ci->props.flat_size;
+  loc i32 = un_Direct(get_loc(h, c));
+  if retsize <= 4 {
+    x86_store32_partial_destructively(f, loc, retsize);
+  } else if retsize <= 8 {
+    // TODO: This should not even be theoretically reachable on Linux32.
+    x86_store32(f, X86_EBP, loc, X86_EAX);
+    x86_store32_partial_destructively(f, loc + 4, retsize - 4);
+  } else {
+    ice(_u8("return size is too big for non-hidden return param"));
+  }
+}
 
 func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
+  stack array[gr_stackent];
+  push(&stack, EvalOpAndPrecs(entry_gn));
+  while case Has(se gr_stackent) = popval(&stack) {
+    switch se {
+    case EvalOpAndPrecs(gn gr_num):
+      annot *gn_annot = ref_annot(h, gn);
+      if case &Computed(off u32) = &annot->instruction_offset {
+        // TODO: Just gen the jmp directly -- no need for a placeholder, we know the offset.
+        gen_placeholder_jmp(f, h, gn);
+      } else {
+        annotate(&annot->instruction_offset, secsize(&f->text));
+        push(&stack, EvalOp(gn));
+        node *gr_node = ref_node(h->gr, gn);
+        // I don't know why, it's just instinct, but on a whim for now we're going to push the stack such that we eval the precs left-to-right, just like we do in static eval.  This will mean differences in behavior in runtime versus static eval cannot be caused by divergence in prec evaluation ordering.
+        nprecs size = count(&node->precs);
+        for i size = nprecs; i > 0; {
+          i = i - 1;
+          push(&stack, EvalOpAndPrecs(get(&node->precs, i)));
+        }
+      }
+    case EvalOp(gn gr_num):
+      node *gr_node = ref_node(h->gr, gn);
+      switch &node->op {
+      case &GrApply(a gr_apply):
+        switch h->cs->plat.callconv {
+        case UniversalCdeclConvention(v void):
+          ret_ci *cell_info = ref_cell(h->gr, a.retcell);
+          hrp bool = for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props);
+          framelist_bottom i32 = *unHas(&ref_annot(h, gn)->paramlist_bottom_frame_offset);
+          if hrp {
+            hrp_bottom i32 = framelist_bottom - 4;
+            x86_lea32(f, X86_EAX, X86_EBP, un_Direct(get_loc(h, a.retcell)));
+            x86_store32(f, X86_EBP, hrp_bottom, X86_EAX);
+            x86_load32(f, X86_EAX, X86_EBP, un_Direct(get_loc(h, a.funcell)));
+            set_esp_to_frame_offset(f, h, hrp_bottom);
+            x86_indirect_call(f, X86_EAX);
+            restore_esp_to_default_position(f, h);
+          } else {
+            x86_load32(f, X86_EAX, X86_EBP, un_Direct(get_loc(h, a.funcell)));
+            set_esp_to_frame_offset(f, h, framelist_bottom);
+            x86_indirect_call(f, X86_EAX);
+            universal_cc_write_to_retcell(f, h, a.retcell);
+            restore_esp_to_default_position(f, h);
+          }
+        }
+      default:
+        return TODO();
+      }
+    }
+  }
+
+  // Now we need to tie some jmps, or something.
+  return TODO();
+}
+
+func gen_placeholder_jmp(f *objfile, h *frame, target gr_num) void {
+  return TODO();
+}
+
+func set_esp_to_frame_offset(f *objfile, h *frame, offset i32) void {
+  return TODO();
+}
+
+func restore_esp_to_default_position(f *objfile, h *frame) void {
   return TODO();
 }

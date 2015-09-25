@@ -137,6 +137,11 @@ func x86_int_3(f *objfile) void {
   appendtext(f, 0xCC);
 }
 
+func x86_shr_imm_w32(f *objfile, dest u8, imm u8) void {
+  check(imm < 32);
+  appendtext(f, 0xC1, mrr(MOD11, 5, dest), imm);
+}
+
 func x86_shl_cl_w32(f *objfile, dest u8) void {
   // SHL, SHR, SAR have different reg/opcode fields.
   appendtext(f, 0xD3, mrr(MOD11, 4, dest));
@@ -316,6 +321,7 @@ func x86_setcc_b8(f *objfile, dest u8, setcc_code u8) void {
 }
 
 func x86_load32_zeroextend(f *objfile, ebp_disp i32, size u32) void {
+  // EAX/EBP is hard-coded so that we "know" this is on the stack and it's okay to overread when size == 3.  Also since EAX == AX == AL
   dest u8 = X86_EAX;
   src_addr u8 = X86_EBP;
   if size == 0 {
@@ -331,6 +337,28 @@ func x86_load32_zeroextend(f *objfile, ebp_disp i32, size u32) void {
     x86_and_imm32(f, dest, 0x00FFFFFF);
   } else {
     ice(_u8("x86_load32_zeroextend with bad size"));
+  }
+}
+
+func x86_store32_partial_destructively(f *objfile, ebp_disp i32, size u32) void {
+  // EAX/EBP is hard-coded because... well, x86_load32_zeroextend has it hard-coded too.  Also because EAX == AX == AL.
+  src u8 = X86_EAX;
+  dest_addr u8 = X86_EBP;
+  if size == 0 {
+    // Do nothing.
+  } else if size == 4 {
+    x86_store32(f, dest_addr, ebp_disp, src);
+  } else if size == 1 {
+    x86_store8(f, dest_addr, ebp_disp, src);
+  } else if size == 2 {
+    x86_store16(f, dest_addr, ebp_disp, src);
+  } else if size == 3 {
+    // Heh!  In s1 we didn't implement this case.
+    x86_store16(f, dest_addr, ebp_disp, src);
+    x86_shr_imm_w32(f, src, 16);
+    x86_store8(f, dest_addr, ebp_disp + 2, src);
+  } else {
+    ice(_u8("x86_store32_partial_destructively with bad size"));
   }
 }
 
@@ -407,3 +435,6 @@ func x86_store8(f *objfile, dest_addr u8, dest_disp i32, src u8) void {
   appendtext(f, 0x88, encode_reg_rm(src, dest_addr, dest_disp));
 }
 
+func x86_indirect_call(f *objfile, reg u8) void {
+  appendtext(f, 0xFF, mrr(MOD11, 2, reg));
+}
