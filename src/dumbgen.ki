@@ -340,10 +340,6 @@ func dumbly_gen_function_intro(f *objfile, h *frame) bool {
   }
 }
 
-func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
-  return TODO();
-}
-
 func dumbly_gen_function_exit(f *objfile, h *frame) bool {
   switch h->cs->plat.callconv {
   case UniversalCdeclConvention(v void):
@@ -368,6 +364,26 @@ func dumbly_gen_function_exit(f *objfile, h *frame) bool {
         ice(_u8("return size is too big for non-hidden return param"));
       }
     }
-    return TODO();
+
+    x86_mov_reg32(f, X86_ESP, X86_EBP);
+    x86_pop32(f, X86_EBP);
+    switch h->cs->plat.opsys {
+    case Linux32(v2 void):
+      if hrp {
+        x86_retn(f, ~ @[u32] 4);
+      } else {
+        x86_ret(f);
+      }
+    case Win32(v2 void):
+      x86_ret(f);
+    }
   }
+
+  // TODO: h->crash_target_exists, frame_define_target, gen_int_3 here.
+  return true;
+}
+
+
+func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
+  return TODO();
 }
