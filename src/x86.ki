@@ -11,6 +11,8 @@ def X86_EBP u8 = 5;
 def X86_ESI u8 = 6;
 def X86_EDI u8 = 7;
 
+def X86_JCC_E u8 = 0x84;
+
 func mrr(mod u8, reg u8, rm u8) u8 {
   // TODO: s1 won't parse associative bitwise ops.
   return ((mod << 6) | (reg << 3)) | rm;
@@ -57,12 +59,20 @@ func appendtext(f *objfile, x0 u8, x1 u8, x2 i32) void {
   append_raw(&f->text, &b[0], 6);
 }
 
-func appendtext(f *objfile, x0 u8, x1 u8, x2 u8, x3 i16) void {
+func appendtext(f *objfile, x0 u8, x1 u8, x2 u32) void {
+  b [6]u8;
+  b[0] = x0;
+  b[1] = x1;
+  write_le_u32(&b[2], x2);
+  append_raw(&f->text, &b[0], 6);
+}
+
+func appendtext(f *objfile, x0 u8, x1 u8, x2 u8, x3 u16) void {
   b [5]u8;
   b[0] = x0;
   b[1] = x1;
   b[2] = x2;
-  write_le_i16(&b[3], x3);
+  write_le_u16(&b[3], x3);
   append_raw(&f->text, &b[0], 5);
 }
 
@@ -290,16 +300,16 @@ func x86_cmp_w16(f *objfile, lhs u8, rhs u8) void {
   appendtext(f, 0x66, 0x39, mrr(MOD11, rhs, lhs));
 }
 
-func x86_cmp_imm32(f *objfile, lhs u8, x i32) void {
+func x86_cmp_imm32(f *objfile, lhs u8, x u32) void {
   appendtext(f, 0x81, mrr(MOD11, 7, lhs), x);
 }
 
-func x86_cmp_reg16_imm16(f *objfile, lhs u8, x i16) void {
+func x86_cmp_reg16_imm16(f *objfile, lhs u8, x u16) void {
   appendtext(f, 0x66, 0x81, mrr(MOD11, 7, lhs), x);
 }
 
-func x86_cmp_reg8_imm8(f *objfile, lhs u8, x i8) void {
-  appendtext(f, 0x80, mrr(MOD11, 7, lhs), @[u8] ~ (0xFF & @[i32] ~x));
+func x86_cmp_reg8_imm8(f *objfile, lhs u8, x u8) void {
+  appendtext(f, 0x80, mrr(MOD11, 7, lhs), x);
 }
 
 func x86_xor_w32(f *objfile, dest u8, src u8) void {
@@ -346,13 +356,17 @@ func x86_setcc_b8(f *objfile, dest u8, setcc_code u8) void {
   appendtext(f, 0x0F, setcc_code, mrr(MOD11, 0, dest));
 }
 
+func x86_reg32_has_lobyte(reg u8) bool {
+  return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
+}
+
 func x86_load32_zeroextend(f *objfile, dest u8, src_addr u8, src_disp i32, size u32) void {
   if size == 0 {
     x86_xor_w32(f, dest, dest);
   } else if size == 4 {
     x86_load32(f, dest, src_addr, src_disp);
   } else if size == 1 {
-    check(dest == X86_EAX || dest == X86_ECX || dest == X86_EDX || dest == X86_EBX);
+    check(x86_reg32_has_lobyte(dest));
     x86_movzx8(f, dest, src_addr, src_disp);
   } else if size == 2 {
     x86_movzx16(f, dest, src_addr, src_disp);

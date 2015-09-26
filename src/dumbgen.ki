@@ -491,7 +491,31 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
         x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
         x86_store32(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX);
       case &GrBranch(a gr_branch):
-        return TODO();
+        // TODO: It'd be nice to codegen this without the gratuitous jmps.
+        // TODO: Faster bool behavior.
+        src_size u32 = ref_cell(h->gr, a.src)->props.flat_size;
+        check(src_size == 4 || src_size == 2 || src_size == 1);
+        src_addr u8;
+        src_disp i32;
+        x86_prep_loc_use(f, get_loc(h, a.src), X86_EAX, &src_addr, &src_disp);
+        x86_load32_zeroextend(f, X86_EAX, src_addr, src_disp, src_size);
+        ncases size = count(&a.cases);
+        for i size = 0; i < ncases; i = i + 1 {
+          cas *tup[gr_const, gr_num] = ref(&a.cases, i);
+          expected st_value;
+          if !st_const_compute_for_gen(h->cs, &cas->car, src_size, &expected) {
+            return false;
+          }
+          x86_cmp_imm_sized(h->cs, f, X86_EAX, &expected, X86_ECX);
+          gen_placeholder_jcc(f, h, X86_JCC_E, cas->cdr);
+          push(&stack, EvalOpAndPrecs(cas->cdr));
+        }
+        if case Has(default_gn gr_num) = a.default_case {
+          gen_placeholder_jmp(f, h, default_gn);
+          push(&stack, EvalOpAndPrecs(default_gn));
+        } else {
+          gen_placeholder_crash_jmp(f, h);
+        }
       case &GrSequence(a gr_sequence):
         // first gets evaluated before second (because it gets pushed after)
         push(&stack, EvalOpAndPrecs(a.second));
@@ -539,6 +563,14 @@ func x86_add_offset(f *objfile, h *frame, dest u8, offset gr_offset, scratch1 u8
 }
 
 func gen_placeholder_jmp(f *objfile, h *frame, target gr_num) void {
+  return TODO();
+}
+
+func gen_placeholder_jcc(f *objfile, h *frame, jcc_code u8, target gr_num) void {
+  return TODO();
+}
+
+func gen_placeholder_crash_jmp(f *objfile, h *frame) void {
   return TODO();
 }
 
@@ -626,6 +658,31 @@ func x86_gen_write_data(f *objfile, h *frame, dest_addr u8, dest_disp i32, datas
     i = i + 1;
   }
   check(i == end);
+}
+
+func x86_cmp_imm_sized(cs *checkstate, f *objfile, lhs u8, rhs *st_value, avail u8) void {
+  if count(&rhs->symbolrefs) != 0 {
+    check(count(&rhs->symbolrefs) == 1);
+    check(rhs->length == 4);
+    srefpair tup[u32, st_symbolref] = get(&rhs->symbolrefs, 0);
+    check(srefpair.car == 0);
+    sref st_symbolref = srefpair.cdr;
+    check(st_symbolref_size(&cs->plat, &sref) == 4);
+    x86_mov_stiptr(f, avail, *unHas(&ref_fn_body(cs, sref.fnid)->symbol_table_index));
+    x86_cmp_w32(f, lhs, avail);
+  } else {
+    val u32 = get(&rhs->datas, 0);
+    if rhs->length == 1 {
+      check(x86_reg32_has_lobyte(lhs));
+      x86_cmp_reg8_imm8(f, lhs, ~val);
+    } else if rhs->length == 2 {
+      x86_cmp_reg16_imm16(f, lhs, ~val);
+    } else if rhs->length == 4 {
+      x86_cmp_imm32(f, lhs, val);
+    } else {
+      ice(_u8("x86_cmp_imm_sized bad length"));
+    }
+  }
 }
 
 func `<`(x tup[u32, st_symbolref], y tup[u32, st_symbolref]) bool {
