@@ -352,6 +352,7 @@ func dumbly_gen_function_intro(f *objfile, h *frame) bool {
     x86_add_esp_i32(f, *unHas(&h->low_offset));
     return true;
   }
+  restore_esp_to_default_position(f, h);
 }
 
 func dumbly_gen_function_exit(f *objfile, h *frame) bool {
@@ -542,11 +543,11 @@ func gen_placeholder_jmp(f *objfile, h *frame, target gr_num) void {
 }
 
 func set_esp_to_frame_offset(f *objfile, h *frame, offset i32) void {
-  return TODO();
+  x86_lea32(f, X86_ESP, X86_EBP, offset);
 }
 
 func restore_esp_to_default_position(f *objfile, h *frame) void {
-  return TODO();
+  set_esp_to_frame_offset(f, h, *unHas(&h->low_offset));
 }
 
 func x86_gen_write_value(f *objfile, h *frame, dest cell_num, value *st_value) void {
