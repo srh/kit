@@ -369,11 +369,11 @@ func dumbly_gen_function_exit(f *objfile, h *frame) bool {
       // TODO: Investigate calling convention behavior on signed types.  Should we sign-extend?  (Also a question for s1.)
 
       if retsize <= 4 {
-        x86_load32_zeroextend(f, loc, retsize);
+        x86_load32_zeroextend(f, X86_EAX, X86_EBP, loc, retsize);
       } else if retsize <= 8 {
         // TODO: This should not even be theoretically reachable on Linux32.
         x86_load32(f, X86_EAX, X86_EBP, loc);
-        x86_load32_zeroextend(f, loc + 4, retsize - 4);
+        x86_load32_zeroextend(f, X86_EDX, X86_EBP, loc + 4, retsize - 4);
       } else {
         ice(_u8("return size is too big for non-hidden return param"));
       }
@@ -400,13 +400,16 @@ func dumbly_gen_function_exit(f *objfile, h *frame) bool {
 func universal_cc_write_to_retcell(f *objfile, h *frame, c cell_num) void {
   ci *cell_info = ref_cell(h->gr, c);
   retsize u32 = ci->props.flat_size;
-  loc i32 = un_Direct(get_loc(h, c));
+  // TODO: The only time the retcell isn't static is in strinit and frame return_cell subcells.  Eventually we can use un_Direct here.
+  dest_addr u8;
+  dest_disp i32;
+  x86_prep_loc_use(f, get_loc(h, c), X86_ECX, &dest_addr, &dest_disp);
   if retsize <= 4 {
-    x86_store32_partial_destructively(f, loc, retsize);
+    x86_store32_partial_destructively(f, dest_addr, dest_disp, X86_EAX, retsize);
   } else if retsize <= 8 {
     // TODO: This should not even be theoretically reachable on Linux32.
-    x86_store32(f, X86_EBP, loc, X86_EAX);
-    x86_store32_partial_destructively(f, loc + 4, retsize - 4);
+    x86_store32(f, dest_addr, dest_disp, X86_EAX);
+    x86_store32_partial_destructively(f, dest_addr, dest_disp + 4, X86_EDX, retsize - 4);
   } else {
     ice(_u8("return size is too big for non-hidden return param"));
   }
@@ -444,7 +447,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
           framelist_bottom i32 = *unHas(&ref_annot(h, gn)->paramlist_bottom_frame_offset);
           if hrp {
             hrp_bottom i32 = framelist_bottom - 4;
-            x86_lea32(f, X86_EAX, X86_EBP, un_Direct(get_loc(h, a.retcell)));
+            x86_load_cell_address(f, h, X86_EAX, a.retcell);
             x86_store32(f, X86_EBP, hrp_bottom, X86_EAX);
             x86_load32(f, X86_EAX, X86_EBP, un_Direct(get_loc(h, a.funcell)));
             set_esp_to_frame_offset(f, h, hrp_bottom);
@@ -547,6 +550,12 @@ func restore_esp_to_default_position(f *objfile, h *frame) void {
 }
 
 func gen_write_value(f *objfile, h *frame, dest cell_num, value *st_value) void {
-  return TODO();
+  check(count(&value->objrefs) == 0);
+
+  srefs array[tup[u32, st_symbolref]] = value->symbolrefs;
+  sort(&srefs);
 }
 
+func `<`(x tup[u32, st_symbolref], y tup[u32, st_symbolref]) bool {
+  return x.car < y.car;
+}

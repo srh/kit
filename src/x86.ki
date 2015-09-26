@@ -320,43 +320,39 @@ func x86_setcc_b8(f *objfile, dest u8, setcc_code u8) void {
   appendtext(f, 0x0F, setcc_code, mrr(MOD11, 0, dest));
 }
 
-func x86_load32_zeroextend(f *objfile, ebp_disp i32, size u32) void {
-  // EAX/EBP is hard-coded so that we "know" this is on the stack and it's okay to overread when size == 3.  Also since EAX == AX == AL
-  dest u8 = X86_EAX;
-  src_addr u8 = X86_EBP;
+func x86_load32_zeroextend(f *objfile, dest u8, src_addr u8, src_disp i32, size u32) void {
   if size == 0 {
     x86_xor_w32(f, dest, dest);
   } else if size == 4 {
-    x86_load32(f, dest, src_addr, ebp_disp);
+    x86_load32(f, dest, src_addr, src_disp);
   } else if size == 1 {
-    x86_movzx8(f, dest, src_addr, ebp_disp);
+    check(dest == X86_EAX || dest == X86_ECX || dest == X86_EDX || dest == X86_EBX);
+    x86_movzx8(f, dest, src_addr, src_disp);
   } else if size == 2 {
-    x86_movzx16(f, dest, src_addr, ebp_disp);
+    x86_movzx16(f, dest, src_addr, src_disp);
   } else if size == 3 {
-    x86_load32(f, dest, src_addr, ebp_disp);
+    x86_load32(f, dest, src_addr, src_disp);
     x86_and_imm32(f, dest, 0x00FFFFFF);
   } else {
     ice(_u8("x86_load32_zeroextend with bad size"));
   }
 }
 
-func x86_store32_partial_destructively(f *objfile, ebp_disp i32, size u32) void {
-  // EAX/EBP is hard-coded because... well, x86_load32_zeroextend has it hard-coded too.  Also because EAX == AX == AL.
-  src u8 = X86_EAX;
-  dest_addr u8 = X86_EBP;
+func x86_store32_partial_destructively(f *objfile, dest_addr u8, dest_disp i32, src u8, size u32) void {
   if size == 0 {
     // Do nothing.
   } else if size == 4 {
-    x86_store32(f, dest_addr, ebp_disp, src);
+    x86_store32(f, dest_addr, dest_disp, src);
   } else if size == 1 {
-    x86_store8(f, dest_addr, ebp_disp, src);
+    check(src == X86_EAX || src == X86_ECX || src == X86_EDX || src == X86_EBX);
+    x86_store8(f, dest_addr, dest_disp, src);
   } else if size == 2 {
-    x86_store16(f, dest_addr, ebp_disp, src);
+    x86_store16(f, dest_addr, dest_disp, src);
   } else if size == 3 {
     // Heh!  In s1 we didn't implement this case.
-    x86_store16(f, dest_addr, ebp_disp, src);
+    x86_store16(f, dest_addr, dest_disp, src);
     x86_shr_imm_w32(f, src, 16);
-    x86_store8(f, dest_addr, ebp_disp + 2, src);
+    x86_store8(f, dest_addr, dest_disp + 2, src);
   } else {
     ice(_u8("x86_store32_partial_destructively with bad size"));
   }
