@@ -4,11 +4,15 @@ deftype le_u32 struct {
 
 func `~`(x u32) le_u32 {
   ret le_u32;
-  ret.buf[0] = ~ (x & 0xFF);
-  ret.buf[1] = ~ ((x >> 8) & 0xFF);
-  ret.buf[2] = ~ ((x >> 16) & 0xFF);
-  ret.buf[3] = ~ ((x >> 24) & 0xFF);
+  write_le_u32(&ret.buf[0], x);
   return ret;
+}
+
+func write_le_u32(dest *u8, x u32) void {
+  dest[0] = ~ (x & 0xFF);
+  dest[1] = ~ ((x >> 8) & 0xFF);
+  dest[2] = ~ ((x >> 16) & 0xFF);
+  dest[3] = ~ ((x >> 24) & 0xFF);
 }
 
 func `~`(x le_u32) u32 {

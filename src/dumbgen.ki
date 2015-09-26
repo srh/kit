@@ -477,7 +477,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
           return false;
         }
 
-        gen_write_value(f, h, a.dest, &value);
+        x86_gen_write_value(f, h, a.dest, &value);
       case &GrAddressof(a gr_addressof):
         x86_load_cell_address(f, h, X86_EAX, a.addressee);
         x86_store32(f, get_ptr_loc(h, a.dest), X86_EAX, X86_EDX);
@@ -549,11 +549,82 @@ func restore_esp_to_default_position(f *objfile, h *frame) void {
   return TODO();
 }
 
-func gen_write_value(f *objfile, h *frame, dest cell_num, value *st_value) void {
+func x86_gen_write_value(f *objfile, h *frame, dest cell_num, value *st_value) void {
   check(count(&value->objrefs) == 0);
+  check(h->cs->plat.bnno_size == 8);
+
+  len u32 = value->length;
+  if len == 0 {
+    return;
+  }
 
   srefs array[tup[u32, st_symbolref]] = value->symbolrefs;
   sort(&srefs);
+
+  dest_addr u8;
+  dest_disp i32;
+  x86_prep_loc_use(f, get_loc(h, dest), X86_EAX, &dest_addr, &dest_disp);
+
+  w u32 = 0;
+  nsrefs size = count(&srefs);
+  for i size = 0; i < nsrefs; i = i + 1 {
+    sref *tup[u32, st_symbolref] = ref(&srefs, i);
+    check(w <= sref->car);
+    x86_gen_write_data(f, h, dest_addr, dest_disp, &value->datas, w, sref->car);
+    symbol_table_index sti = *unHas(&ref_fn_body(h->cs, sref->cdr.fnid)->symbol_table_index);
+    x86_mov_stiptr(f, X86_ECX, symbol_table_index);
+    check(st_symbolref_size(&h->cs->plat, &sref->cdr) == 4);
+    x86_store32(f, dest_addr, dest_disp + ~sref->car, X86_ECX);
+    w = sref->car + 4;
+  }
+
+  x86_gen_write_data(f, h, dest_addr, dest_disp, &value->datas, w, len);
+}
+
+func x86_gen_write_data(f *objfile, h *frame, dest_addr u8, dest_disp i32, datas *array[u32], begin u32, end u32) void {
+  check(begin <= end);
+  if begin == end {
+    return;
+  }
+
+  // TODO: We assume (in terms of the optimality of this code) that dest_addr+dest_disp is aligned modulo 4.
+
+  i u32 = begin;
+  if i / 4 < end / 4 {
+    if i % 2 == 1 {
+      bval u8 = ~(0xFF & (get(datas, ~(i / 4)) >> ((i % 4) * 8)));
+      // TODO: Seriously, store the imm8 directly.
+      x86_store_imm8(f, dest_addr, dest_disp + ~i, bval);
+      i = i + 1;
+    }
+    if i % 4 == 2 {
+      wval u16 = ~(get(datas, ~(i / 4)) >> 16);
+      x86_store_imm16(f, dest_addr, dest_disp + ~i, wval);
+      i = i + 2;
+    }
+  }
+  emod u32 = end % 4;
+  loend u32 = end - emod;
+  while i < loend {
+    dval u32 = get(datas, ~(i / 4));
+    x86_store_imm32(f, dest_addr, dest_disp + ~i, dval);
+    i = i + 4;
+  }
+
+  if i == end {
+    return;
+  }
+  last u32 = get(datas, ~(i / 4));
+  if emod >= 2 {
+    x86_store_imm16(f, dest_addr, dest_disp + ~i, @[u16]~(last & 0xFFFF));
+    last = last >> 16;
+    i = i + 2;
+  }
+  if i < end {
+    x86_store_imm8(f, dest_addr, dest_disp + ~i, @[u8]~(last & 0xFF));
+    i = i + 1;
+  }
+  check(i == end);
 }
 
 func `<`(x tup[u32, st_symbolref], y tup[u32, st_symbolref]) bool {
