@@ -1069,7 +1069,23 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     }
     return true;
   case &PrimPtrCompare(b primitive_ptr_comparison_op):
-    return TODO();
+    check(count(&a->params) == 2);
+    op_size u32 = 4;
+    x86_load32_zeroextend(f, X86_EAX, get_loc(h, get(&a->params, 0)), op_size);
+    x86_load32_zeroextend(f, X86_ECX, get_loc(h, get(&a->params, 1)), op_size);
+    x86_cmp_w32(f, X86_EAX, X86_ECX);
+    setcc_code u8;
+    switch b.op_action {
+    case CmpEq(v2 void): setcc_code = X86_SETCC_E;
+    case CmpNe(v2 void): setcc_code = X86_SETCC_NE;
+    case CmpLt(v2 void): setcc_code = X86_SETCC_B;
+    case CmpGt(v2 void): setcc_code = X86_SETCC_A;
+    case CmpLe(v2 void): setcc_code = X86_SETCC_BE;
+    case CmpGe(v2 void): setcc_code = X86_SETCC_AE;
+    }
+    x86_setcc_b8(f, X86_EAX, setcc_code);
+    x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+    return true;
   case &PrimConversion(b primitive_conversion_op):
     return TODO();
   }
