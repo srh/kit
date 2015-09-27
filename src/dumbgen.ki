@@ -1039,10 +1039,35 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
       case CmpGe(v2 void): setcc_code = X86_SETCC_GE;
       }
     }
+    x86_setcc_b8(f, X86_AL, setcc_code);
     x86_movzx8_reg8(f, X86_EAX, X86_EAX);
     return true;
   case &PrimLogical(b primitive_logical_op):
-    return TODO();
+    arity u32 = op_arity(b);
+    check(count(&a->params) == ~arity);
+    op_size u32 = 1;
+    x86_load32_zeroextend(f, X86_EAX, get_loc(h, get(&a->params, 0)), op_size);
+    if arity == 2 {
+      x86_load32_zeroextend(f, X86_ECX, get_loc(h, get(&a->params, 1)), op_size);
+    } else {
+      check(arity == 1);
+    }
+    switch b {
+    case LogicalNot(v void):
+      x86_test_regs8(f, X86_AL, X86_AL);
+      x86_setcc_b8(f, X86_AL, X86_SETCC_Z);
+    case BoolEq(v void):
+      x86_cmp_w8(f, X86_EAX, X86_ECX);
+      x86_setcc_b8(f, X86_EAX, X86_SETCC_E);
+    case BoolNe(v void):
+      x86_cmp_w8(f, X86_EAX, X86_ECX);
+      x86_setcc_b8(f, X86_EAX, X86_SETCC_NE);
+    case BoolBitAnd(v void):
+      x86_and_w32(f, X86_EAX, X86_ECX);
+    case BoolBitOr(v void):
+      x86_or_w32(f, X86_EAX, X86_ECX);
+    }
+    return true;
   case &PrimPtrCompare(b primitive_ptr_comparison_op):
     return TODO();
   case &PrimConversion(b primitive_conversion_op):
