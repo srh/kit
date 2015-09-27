@@ -110,7 +110,7 @@ def kR_386_PC32 u32 = 2;
 
 func linux32_flatten(im *identmap, f *objfile) array[u8] {
   d array[u8];
-  section_header_offset u32 = ~sizeof@[elf32_Section_Header];
+  section_header_offset u32 = ~sizeof@[elf32_Header];
   kNumSectionHeaders u32 = 10;
   end_of_section_headers u32 = section_header_offset + kNumSectionHeaders * ~sizeof@[elf32_Section_Header];
 

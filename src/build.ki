@@ -32,7 +32,7 @@ func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u
 
 func build_module(cs *checkstate, modulename sym) bool {
   flattened array[u8];
-  if build_nowrite_module(cs, modulename, &flattened) {
+  if !build_nowrite_module(cs, modulename, &flattened) {
     return false;
   }
 
