@@ -2812,6 +2812,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_alah_div_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
     x86_gen_mov_reg8(f, X86_AL, X86_AH);
+    x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
   } break;
   case PRIMITIVE_OP_LT_BOOL: /* fallthrough */
   case PRIMITIVE_OP_LT_U8: {
@@ -2908,6 +2909,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_alah_idiv_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
     x86_gen_mov_reg8(f, X86_AL, X86_AH);
+    x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
   } break;
   case PRIMITIVE_OP_LT_I8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_L);

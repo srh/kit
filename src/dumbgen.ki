@@ -864,6 +864,45 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
       } else {
         ice(_u8("NumDiv bad size"));
       }
+    case NumMod(v void):
+      if b.op_size == 1 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_alah_div_w8(f, X86_ECX);
+          // Divide by zero will produce #DE.
+          // Wipe out modulus in AH.
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+        case SignedTwos(v2 void):
+          x86_alah_idiv_w8(f, X86_ECX);
+          // Divide by zero, -128/-1 (I guess) will produce #DE.
+          // Wipe out modulus in AH (don't sign-extend?).
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+        }
+      } else if b.op_size == 2 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_xor_w32(f, X86_EDX, X86_EDX);
+          x86_axdx_div_w16(f, X86_ECX);
+          // Divide by zeroe will produce #DE.
+        case SignedTwos(v2 void):
+          x86_cwd_w16(f);
+          x86_axdx_idiv_w16(f, X86_ECX);
+          // Divide by zero, INT16_MIN/-1 will produce #DE.
+        }
+      } else if b.op_size == 4 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_xor_w32(f, X86_EDX, X86_EDX);
+          x86_eaxedx_div_w32(f, X86_ECX);
+          // Divide by zero will produce #DE.
+        case SignedTwos(v2 void):
+          x86_cdq_w32(f);
+          x86_eaxedx_idiv_w32(f, X86_ECX);
+          // Divide by zero, INT32_MIN / -1 will produce #DE.
+        }
+      } else {
+        ice(_u8("NumDiv bad size"));
+      }
     default:
       return TODO();
     }
