@@ -4914,6 +4914,7 @@ int build_module(struct identmap *im,
   alloc_half_strcat(name_buf, name_count, target_linux32 ? ".o" : ".obj",
                     &path, &path_count);
   if (!write_file(path, buf, buf_size)) {
+    ERR("Could not write object file\n");
     goto cleanup_path_and_buf;
   }
 

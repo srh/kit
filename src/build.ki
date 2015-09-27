@@ -5,7 +5,7 @@ import linux_objfile;
 import win_objfile;
 import objfile;
 
-func build_module(cs *checkstate, modulename sym) bool {
+func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u8]) bool {
   if !check_module(cs, modulename) {
     return false;
   }
@@ -20,7 +20,35 @@ func build_module(cs *checkstate, modulename sym) bool {
     return false;
   }
 
-  // TODO: Do whatever else we need to build stuff!
+  switch cs->plat.opsys {
+  case Linux32(v void):
+    *flattened_out = linux32_flatten(cs->im, &f);
+  case Win32(v void):
+    *flattened_out = win_flatten(cs->im, &f);
+  }
+
+  return true;
+}
+
+func build_module(cs *checkstate, modulename sym) bool {
+  flattened array[u8];
+  if build_nowrite_module(cs, modulename, &flattened) {
+    return false;
+  }
+
+  path array[u8] = to_u8str(lookup(cs->im, modulename));
+  switch cs->plat.opsys {
+  case Linux32(v void):
+    append(&path, _u8(".o"));
+  case Win32(v void):
+    append(&path, _u8(".obj"));
+  }
+
+  if !write_file(path, &flattened) {
+    ERR(_u8("Could not write object file"));
+    return false;
+  }
+
   return true;
 }
 

@@ -64,7 +64,8 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
   add_primitives(&cs);
   success bool;
   if ctx->build {
-    success = build_module(&cs, intern(&im, testmodule_name()));
+    flattened array[u8];
+    success = build_nowrite_module(&cs, intern(&im, testmodule_name()), &flattened);
   } else {
     success = check_module(&cs, intern(&im, testmodule_name()));
   }
