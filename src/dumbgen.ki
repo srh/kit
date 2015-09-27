@@ -870,11 +870,13 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
         case Unsigned(v2 void):
           x86_alah_div_w8(f, X86_ECX);
           // Divide by zero will produce #DE.
+          x86_mov_reg8(f, X86_AL, X86_AH);
           // Wipe out modulus in AH.
           x86_movzx8_reg8(f, X86_EAX, X86_EAX);
         case SignedTwos(v2 void):
           x86_alah_idiv_w8(f, X86_ECX);
           // Divide by zero, -128/-1 (I guess) will produce #DE.
+          x86_mov_reg8(f, X86_AL, X86_AH);
           // Wipe out modulus in AH (don't sign-extend?).
           x86_movzx8_reg8(f, X86_EAX, X86_EAX);
         }
@@ -883,11 +885,13 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
         case Unsigned(v2 void):
           x86_xor_w32(f, X86_EDX, X86_EDX);
           x86_axdx_div_w16(f, X86_ECX);
-          // Divide by zeroe will produce #DE.
+          // Divide by zero will produce #DE.
+          x86_mov_reg32(f, X86_EAX, X86_EDX);
         case SignedTwos(v2 void):
           x86_cwd_w16(f);
           x86_axdx_idiv_w16(f, X86_ECX);
           // Divide by zero, INT16_MIN/-1 will produce #DE.
+          x86_mov_reg32(f, X86_EAX, X86_EDX);
         }
       } else if b.op_size == 4 {
         switch b.op_numtraits.repr {
@@ -895,21 +899,110 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
           x86_xor_w32(f, X86_EDX, X86_EDX);
           x86_eaxedx_div_w32(f, X86_ECX);
           // Divide by zero will produce #DE.
+          x86_mov_reg32(f, X86_EAX, X86_EDX);
         case SignedTwos(v2 void):
           x86_cdq_w32(f);
           x86_eaxedx_idiv_w32(f, X86_ECX);
           // Divide by zero, INT32_MIN / -1 will produce #DE.
+          x86_mov_reg32(f, X86_EAX, X86_EDX);
         }
       } else {
-        ice(_u8("NumDiv bad size"));
+        ice(_u8("NumMod bad size"));
       }
-    default:
-      return TODO();
+    case NumNegate(v void):
+      switch b.op_numtraits.repr {
+      case Unsigned(v2 void):
+        ice(_u8("NumNegate on unsigned"));
+      case SignedTwos(v2 void):
+        if b.op_size == 1 {
+          x86_movsx8_reg8(f, X86_EAX, X86_EAX);
+          // TODO: (Also in s1.) For this and the other negations, can't we just check OF after the fact?  I missed that in the docs on the first read?
+          // Crashes if the value is INT8_MIN by subtracting 1 and overflowign.
+          x86_cmp_reg8_imm8(f, X86_AL, 1);
+          x86_gen_crash_jcc(f, h, X86_JCC_O);
+          x86_neg_w32(f, X86_EAX);
+        } else if b.op_size == 2 {
+          x86_movsx16_reg16(f, X86_EAX, X86_EAX);
+          // Crashes if the value is INT16_MIN by subtracting 1 and overflowing.
+          x86_cmp_reg16_imm16(f, X86_EAX, @[u16] ~ @[u32] 1);
+          x86_gen_crash_jcc(f, h, X86_JCC_O);
+          x86_neg_w32(f, X86_EAX);
+        } else if b.op_size == 4 {
+          // Crashes if the value is INT32_MIN by subtracting 1 and overflowing.
+          x86_cmp_imm32(f, X86_EAX, 1);
+          x86_gen_crash_jcc(f, h, X86_JCC_O);
+          x86_neg_w32(f, X86_EAX);
+        } else {
+          ice(_u8("NumNegate bad size"));
+        }
+      }
+    case NumBitAnd(v void):
+      x86_and_w32(f, X86_EAX, X86_ECX);
+    case NumBitOr(v void):
+      x86_or_w32(f, X86_EAX, X86_ECX);
+    case NumBitXor(v void):
+      x86_xor_w32(f, X86_EAX, X86_ECX);
+    case NumBitNot(v void):
+      if b.op_size == 1 {
+        x86_not_w8(f, X86_EAX);
+      } else if b.op_size == 2 {
+        x86_not_w16(f, X86_EAX);
+      } else if b.op_size == 4 {
+        x86_not_w32(f, X86_EAX);
+      } else {
+        ice(_u8("NumBitNot bad size"));
+      }
+    case NumShiftLeft(v void):
+      if b.op_size == 1 {
+        x86_cmp_imm32(f, X86_ECX, 7);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        x86_shl_cl_w8(f, X86_EAX);
+      } else if b.op_size == 2 {
+        x86_cmp_imm32(f, X86_ECX, 15);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        x86_shl_cl_w16(f, X86_EAX);
+      } else if b.op_size == 4 {
+        x86_cmp_imm32(f, X86_ECX, 31);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        x86_shl_cl_w32(f, X86_EAX);
+      } else {
+        ice(_u8("NumShiftLeft bad size"));
+      }
+    case NumShiftRight(v void):
+      if b.op_size == 1 {
+        x86_cmp_imm32(f, X86_ECX, 7);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_shr_cl_w8(f, X86_EAX);
+        case SignedTwos(v2 void):
+          x86_sar_cl_w8(f, X86_EAX);
+        }
+      } else if b.op_size == 2 {
+        x86_cmp_imm32(f, X86_ECX, 15);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_shr_cl_w16(f, X86_EAX);
+        case SignedTwos(v2 void):
+          x86_sar_cl_w16(f, X86_EAX);
+        }
+      } else if b.op_size == 4 {
+        x86_cmp_imm32(f, X86_ECX, 31);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_shr_cl_w32(f, X86_EAX);
+        case SignedTwos(v2 void):
+          x86_sar_cl_w32(f, X86_EAX);
+        }
+      } else {
+        ice(_u8("NumShiftLeft bad size"));
+      }
     }
 
-    // (TODO: Write EAX into destination.)
-    return TODO();
-
+    x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.op_size, X86_EDX);
+    return true;
   case &PrimNumCompare(b primitive_numeric_comparison_op):
     return TODO();
   case &PrimLogical(b primitive_logical_op):

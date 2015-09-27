@@ -11,9 +11,24 @@ def X86_EBP u8 = 5;
 def X86_ESI u8 = 6;
 def X86_EDI u8 = 7;
 
-def X86_JCC_Z u8 = 0x84;
-def X86_JCC_C u8 = 0x82;
+def X86_AL u8 = 0;
+def X86_CL u8 = 1;
+def X86_DL u8 = 2;
+def X86_BL u8 = 3;
+def X86_AH u8 = 4;
+def X86_CH u8 = 5;
+def X86_DH u8 = 6;
+def X86_BH u8 = 7;
+
 def X86_JCC_O u8 = 0x80;
+def X86_JCC_Z u8 = 0x84;
+def X86_JCC_NE u8 = 0x85;
+def X86_JCC_S u8 = 0x88;
+def X86_JCC_A u8 = 0x87;
+def X86_JCC_AE u8 = 0x83;
+def X86_JCC_C u8 = 0x82;
+def X86_JCC_G u8 = 0x8F;
+def X86_JCC_L u8 = 0x8C;
 
 func mrr(mod u8, reg u8, rm u8) u8 {
   // TODO: s1 won't parse associative bitwise ops.
@@ -412,6 +427,13 @@ func x86_store32_partial_destructively(f *objfile, dest_addr u8, dest_disp i32, 
   }
 }
 
+func x86_store32_partial_destructively(f *objfile, dest cell_loc, src u8, size u32, scratch u8) void {
+  dest_addr u8;
+  dest_disp i32;
+  x86_prep_loc_use(f, dest, scratch, &dest_addr, &dest_disp);
+  x86_store32_partial_destructively(f, dest_addr, dest_disp, src, size);
+}
+
 // NOTE: If this changes buflength, its consumers (like appendtext) will need to change theirs.
 deftype reg_rm_encoded struct {
   length u8;
@@ -464,6 +486,14 @@ func x86_movsx16(f *objfile, dest u8, src_addr u8, src_disp i32) void {
 
 func x86_movzx8_reg8(f *objfile, dest u8, src u8) void {
   appendtext(f, 0x0F, 0xB6, mrr(MOD11, dest, src));
+}
+
+func x86_movsx8_reg8(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x0F, 0xBE, mrr(MOD11, dest, src));
+}
+
+func x86_movsx16_reg16(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x0F, 0xBF, mrr(MOD11, dest, src));
 }
 
 func x86_lea32(f *objfile, dest u8, src_addr u8, src_disp i32) void {
