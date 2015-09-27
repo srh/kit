@@ -1025,6 +1025,13 @@ void x86_gen_cmp_w16(struct objfile *f, enum x86_reg16 lhs, enum x86_reg16 rhs) 
   objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
+void x86_gen_cmp_w8(struct objfile *f, enum x86_reg8 lhs, enum x86_reg8 rhs) {
+  uint8_t b[2];
+  b[0] = 0x38;
+  b[1] = mod_reg_rm(MOD11, rhs, lhs);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 void x86_gen_cmp_imm32(struct objfile *f, enum x86_reg lhs, int32_t imm32) {
   uint8_t b[6];
   b[0] = 0x81;
@@ -2433,7 +2440,7 @@ void gen_cmp8_behavior(struct objfile *f,
                        enum x86_setcc setcc_code) {
   x86_gen_movzx8(f, X86_EDX, X86_EBP, off0);
   x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-  x86_gen_cmp_w32(f, X86_EDX, X86_ECX);
+  x86_gen_cmp_w8(f, X86_EDX, X86_ECX);
   x86_gen_setcc_b8(f, X86_AL, setcc_code);
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
