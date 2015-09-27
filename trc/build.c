@@ -909,6 +909,7 @@ void x86_gen_eaxedx_mul_w32(struct objfile *f, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+/* TODO: dxax is inconsistent with eaxedx, alah naming scheme.  (Also in s2.) */
 void x86_gen_dxax_mul_w16(struct objfile *f, enum x86_reg16 src) {
   uint8_t b[3];
   /* MUL, DIV, IDIV have different modr/m opcode. */
@@ -3064,6 +3065,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_DIV_I16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
+    /* TODO: Should dx not be the sign extension of ax?  (Also in s2.) */
     x86_gen_xor_w32(f, X86_EDX, X86_EDX);
     x86_gen_axdx_idiv_w16(f, X86_CX);
     /* Divide by zero will produce #DE. (I guess.) */

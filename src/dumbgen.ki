@@ -39,6 +39,7 @@ deftype frame struct {
   low_offset nc[i32];
   // An offset into &f->text of a 32-bit jmp offset, and the gn.
   placeholder_jump_fillin array[jmpdata];
+  crash_jumps array[crash_jmpdata];
 };
 
 deftype jmpdata struct {
@@ -46,6 +47,12 @@ deftype jmpdata struct {
   // On x86, this is overwrite_location + 4 for jmp and jcc instructions -- the location of the end of the instruction.
   relative_mathpoint u32;
   target gr_num;
+};
+
+deftype crash_jmpdata struct {
+  overwrite_location u32;
+  // Just a subset of jmpdata -- its target is hard-coded.
+  relative_mathpoint u32;
 };
 
 func mk_gn_annot() gn_annot {
@@ -87,7 +94,7 @@ func get_size_loc(h *frame, c cell_num) cell_loc {
 // Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
-  h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed(), NotComputed@[i32](), mk_array@[jmpdata]()};
+  h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed(), NotComputed@[i32](), mk_array@[jmpdata](), mk_array@[crash_jmpdata]()};
 
   prelive lives;
   check_add_all(&prelive.all, &g->argcells);
@@ -471,7 +478,9 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
           }
         }
       case &GrPrimApply(a gr_prim_apply):
-        return TODO();
+        if !x86_dumbly_prim_apply(f, h, &a) {
+          return false;
+        }
       case &GrMemCopy(a gr_memcopy):
         dest_ci *cell_info = ref_cell(h->gr, a.dest);
         src_ci *cell_info = ref_cell(h->gr, a.src);
@@ -515,14 +524,14 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
             return false;
           }
           x86_cmp_imm_sized(h->cs, f, X86_EAX, &expected, X86_ECX);
-          x86_gen_placeholder_jcc(f, h, X86_JCC_E, cas->cdr);
+          x86_gen_placeholder_jcc(f, h, X86_JCC_Z, cas->cdr);
           push(&stack, EvalOpAndPrecs(cas->cdr));
         }
         if case Has(default_gn gr_num) = a.default_case {
           x86_gen_placeholder_jmp(f, h, default_gn);
           push(&stack, EvalOpAndPrecs(default_gn));
         } else {
-          gen_crash(f, h);
+          x86_gen_crash(f, h);
         }
       case &GrSequence(a gr_sequence):
         // first gets evaluated before second (because it gets pushed after)
@@ -545,11 +554,25 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
   njumps size = count(&h->placeholder_jump_fillin);
   for i size = 0; i < njumps; i = i + 1 {
     p *jmpdata = ref(&h->placeholder_jump_fillin, i);
-    insn_offset u32 = *unHas(&ref_annot(h, p->target)->instruction_offset);
-    diff i32 = @[i32]~insn_offset - @[i32]~p->relative_mathpoint;
+    target u32 = *unHas(&ref_annot(h, p->target)->instruction_offset);
+    diff i32 = @[i32]~target - @[i32]~p->relative_mathpoint;
     le le_i32 = ~diff;
     overwrite_raw(&f->text, ~p->overwrite_location, &le.buf[0], 4);
   }
+
+  ncrash_jumps size = count(&h->crash_jumps);
+  if ncrash_jumps > 0 {
+    target u32 = secsize(&f->text);
+    x86_int_3(f);
+
+    for i size = 0; i < ncrash_jumps; i = i + 1 {
+      p *crash_jmpdata = ref(&h->crash_jumps, i);
+      diff i32 = @[i32]~target - @[i32]~p->relative_mathpoint;
+      le le_i32 = ~diff;
+      overwrite_raw(&f->text, ~p->overwrite_location, &le.buf[0], 4);
+    }
+  }
+
   return true;
 }
 
@@ -602,7 +625,20 @@ func x86_gen_placeholder_jcc(f *objfile, h *frame, x86_jcc_code u8, target gr_nu
   push(&h->placeholder_jump_fillin, {offset, offset + 4, target});
 }
 
-func gen_crash(f *objfile, h *frame) void {
+func x86_gen_crash_jcc(f *objfile, h *frame, x86_jcc_code u8) void {
+  offset u32 = 2 + secsize(&f->text);
+  b [6]u8;
+  b[0] = 0x0F;
+  b[1] = x86_jcc_code;
+  b[2] = 0;
+  b[3] = 0;
+  b[4] = 0;
+  b[5] = 0;
+  append_raw(&f->text, &b[0], 6);
+  push(&h->crash_jumps, {offset, offset + 4});
+}
+
+func x86_gen_crash(f *objfile, h *frame) void {
   x86_int_3(f);
 }
 
@@ -719,4 +755,139 @@ func x86_cmp_imm_sized(cs *checkstate, f *objfile, lhs u8, rhs *st_value, avail 
 
 func `<`(x tup[u32, st_symbolref], y tup[u32, st_symbolref]) bool {
   return x.car < y.car;
+}
+
+func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
+  switch &a->primop {
+  case &PrimNum(b primitive_numeric_op):
+    arity u32 = op_arity(b.op_action);
+    check(count(&a->params) == ~arity);
+    x86_load32_zeroextend(f, X86_EAX, get_loc(h, get(&a->params, 0)), b.op_size);
+    if arity == 2 {
+      x86_load32_zeroextend(f, X86_ECX, get_loc(h, get(&a->params, 1)), b.op_size);
+    } else {
+      check(arity == 1);
+    }
+
+    switch b.op_action {
+    case NumAdd(v void):
+      if b.op_size == 1 {
+        x86_add_w8(f, X86_EAX, X86_ECX);
+      } else if b.op_size == 2 {
+        x86_add_w16(f, X86_EAX, X86_ECX);
+      } else if b.op_size == 4 {
+        x86_add_w32(f, X86_EAX, X86_ECX);
+      } else {
+        ice(_u8("NumAdd bad size"));
+      }
+      x86_gen_crash_jcc(f, h, x86_repr_overflow_code(b.op_numtraits.repr));
+    case NumSub(v void):
+      if b.op_size == 1 {
+        x86_sub_w8(f, X86_EAX, X86_ECX);
+      } else if b.op_size == 2 {
+        x86_sub_w16(f, X86_EAX, X86_ECX);
+      } else if b.op_size == 4 {
+        x86_sub_w32(f, X86_EAX, X86_ECX);
+      } else {
+        ice(_u8("NumSub bad size"));
+      }
+      x86_gen_crash_jcc(f, h, x86_repr_overflow_code(b.op_numtraits.repr));
+    case NumMul(v void):
+      if b.op_size == 1 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_alah_mul_w8(f, X86_ECX);
+          x86_gen_crash_jcc(f, h, X86_JCC_C);
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+        case SignedTwos(v2 void):
+          x86_alah_imul_w8(f, X86_ECX);
+          x86_gen_crash_jcc(f, h, X86_JCC_O);
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+        }
+      } else if b.op_size == 2 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_dxax_mul_w16(f, X86_ECX);
+          x86_gen_crash_jcc(f, h, X86_JCC_C);
+        case SignedTwos(v2 void):
+          x86_imul_w16(f, X86_EAX, X86_ECX);
+          x86_gen_crash_jcc(f, h, X86_JCC_O);
+        }
+      } else if b.op_size == 4 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_eaxedx_mul_w32(f, X86_ECX);
+          x86_gen_crash_jcc(f, h, X86_JCC_C);
+        case SignedTwos(v2 void):
+          x86_imul_w32(f, X86_EAX, X86_ECX);
+          x86_gen_crash_jcc(f, h, X86_JCC_O);
+        }
+      } else {
+        ice(_u8("NumMul bad size"));
+      }
+    case NumDiv(v void):
+      if b.op_size == 1 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_alah_div_w8(f, X86_ECX);
+          // Divide by zero will produce #DE.
+          // Wipe out modulus in AH.
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+        case SignedTwos(v2 void):
+          x86_alah_idiv_w8(f, X86_ECX);
+          // Divide by zero, -128/-1 (I guess) will produce #DE.
+          // Wipe out modulus in AH (don't sign-extend?).
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+        }
+      } else if b.op_size == 2 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_xor_w32(f, X86_EDX, X86_EDX);
+          x86_axdx_div_w16(f, X86_ECX);
+          // Divide by zeroe will produce #DE.
+        case SignedTwos(v2 void):
+          // TODO: Should dx not be the sign extension of ax?  (Also in s1.)
+          x86_xor_w32(f, X86_EDX, X86_EDX);
+          x86_axdx_idiv_w16(f, X86_ECX);
+          // Divide by zero, INT16_MIN/-1 will produce #DE.
+        }
+      } else if b.op_size == 4 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_xor_w32(f, X86_EDX, X86_EDX);
+          x86_eaxedx_div_w32(f, X86_ECX);
+          // Divide by zero will produce #DE.
+        case SignedTwos(v2 void):
+          x86_cdq_w32(f);
+          x86_eaxedx_idiv_w32(f, X86_ECX);
+          // Divide by zero, INT32_MIN / -1 will produce #DE.
+        }
+      } else {
+        ice(_u8("NumDiv bad size"));
+      }
+    default:
+      return TODO();
+    }
+
+    // (TODO: Write EAX into destination.)
+    return TODO();
+
+  case &PrimNumCompare(b primitive_numeric_comparison_op):
+    return TODO();
+  case &PrimLogical(b primitive_logical_op):
+    return TODO();
+  case &PrimPtrCompare(b primitive_ptr_comparison_op):
+    return TODO();
+  case &PrimConversion(b primitive_conversion_op):
+    return TODO();
+  }
+}
+
+func x86_repr_overflow_code(repr numeric_representation) u8 {
+  switch repr {
+  case Unsigned(v void):
+    return X86_JCC_C;
+  case SignedTwos(v void):
+    return X86_JCC_O;
+  }
 }

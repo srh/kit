@@ -11,7 +11,9 @@ def X86_EBP u8 = 5;
 def X86_ESI u8 = 6;
 def X86_EDI u8 = 7;
 
-def X86_JCC_E u8 = 0x84;
+def X86_JCC_Z u8 = 0x84;
+def X86_JCC_C u8 = 0x82;
+def X86_JCC_O u8 = 0x80;
 
 func mrr(mod u8, reg u8, rm u8) u8 {
   // TODO: s1 won't parse associative bitwise ops.
@@ -244,6 +246,7 @@ func x86_eaxedx_mul_w32(f *objfile, src u8) void {
   appendtext(f, 0xF7, mrr(MOD11, 4, src));
 }
 
+// TODO: dxax is inconsistent with alah, eaxedx (also in s1).
 func x86_dxax_mul_w16(f *objfile, src u8) void {
   appendtext(f, 0x66, 0xF7, mrr(MOD11, 4, src));
 }
@@ -376,6 +379,13 @@ func x86_load32_zeroextend(f *objfile, dest u8, src_addr u8, src_disp i32, size 
   } else {
     ice(_u8("x86_load32_zeroextend with bad size"));
   }
+}
+
+func x86_load32_zeroextend(f *objfile, dest u8, src cell_loc, size u32) void {
+  src_addr u8;
+  src_disp i32;
+  x86_prep_loc_use(f, src, dest, &src_addr, &src_disp);
+  x86_load32_zeroextend(f, dest, src_addr, src_disp, size);
 }
 
 func x86_store32_partial_destructively(f *objfile, dest_addr u8, dest_disp i32, src u8, size u32) void {
