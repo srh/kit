@@ -119,6 +119,41 @@ access bigint {
     }
   }
 
+  func as_i32(x *bigint, out *i32) bool {
+    n size = count(&x->parts);
+    if x->negative {
+      if n == 0 {
+        *out = -1;
+        return true;
+      } else if n == 1 {
+        k u32 = get(&x->parts, 0);
+        if 0 != (k & 0x80000000) {
+          *out = (@[i32] ~(k - 0x80000000)) - 0x40000000 - 0x40000000;
+          return true;
+        } else {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    } else {
+      if n == 0 {
+        *out = 0;
+        return true;
+      } else if n == 1 {
+        k u32 = get(&x->parts, 1);
+        if 0 == (k & 0x8000000) {
+          *out = ~k;
+          return true;
+        } else {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
+  }
+
   func squash(negative bool, build *array[u32]) bigint {
     ret bigint;
     squash(negative, build, &ret);

@@ -215,7 +215,7 @@ func x86_shl_cl_w32(f *objfile, dest u8) void {
 
 func x86_shl_cl_w16(f *objfile, dest u8) void {
   // SHL, SHR, SAR have different reg/opcode fields.
-  appendtext(f, 0x66, 0xD3, mrr(MOD11, 4, dest));
+  appendtext(f, 0x66, @[u8]0xD3, mrr(MOD11, 4, dest));
 }
 
 func x86_shl_cl_w8(f *objfile, dest u8) void {
@@ -230,7 +230,7 @@ func x86_shr_cl_w32(f *objfile, dest u8) void {
 
 func x86_shr_cl_w16(f *objfile, dest u8) void {
   // SHL, SHR, SAR have different reg/opcode fileds.
-  appendtext(f, 0x66, 0xD3, mrr(MOD11, 5, dest));
+  appendtext(f, 0x66, @[u8]0xD3, mrr(MOD11, 5, dest));
 }
 
 func x86_shr_cl_w8(f *objfile, dest u8) void {
@@ -245,7 +245,7 @@ func x86_sar_cl_w32(f *objfile, dest u8) void {
 
 func x86_sar_cl_w16(f *objfile, dest u8) void {
   // SHL, SHR, SAR have different reg/opcode fileds.
-  appendtext(f, 0x66, 0xD3, mrr(MOD11, 7, dest));
+  appendtext(f, 0x66, @[u8]0xD3, mrr(MOD11, 7, dest));
 }
 
 func x86_sar_cl_w8(f *objfile, dest u8) void {
@@ -262,7 +262,7 @@ func x86_add_w32(f *objfile, dest u8, src u8) void {
 }
 
 func x86_add_w16(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x66, 0x01, mrr(MOD11, src, dest));
+  appendtext(f, 0x66, @[u8]0x01, mrr(MOD11, src, dest));
 }
 
 func x86_add_w8(f *objfile, dest u8, src u8) void {
@@ -276,7 +276,7 @@ func x86_eaxedx_mul_w32(f *objfile, src u8) void {
 
 // TODO: dxax is inconsistent with alah, eaxedx (also in s1).
 func x86_dxax_mul_w16(f *objfile, src u8) void {
-  appendtext(f, 0x66, 0xF7, mrr(MOD11, 4, src));
+  appendtext(f, 0x66, @[u8]0xF7, mrr(MOD11, 4, src));
 }
 
 func x86_alah_mul_w8(f *objfile, src u8) void {
@@ -284,11 +284,11 @@ func x86_alah_mul_w8(f *objfile, src u8) void {
 }
 
 func x86_imul_w32(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x0F, 0xAF, mrr(MOD11, dest, src));
+  appendtext(f, 0x0F, @[u8]0xAF, mrr(MOD11, dest, src));
 }
 
 func x86_imul_w16(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x66, 0x0F, 0xAF, mrr(MOD11, dest, src));
+  appendtext(f, 0x66, @[u8]0x0F, @[u8]0xAF, mrr(MOD11, dest, src));
 }
 
 func x86_alah_imul_w8(f *objfile, src u8) void {
@@ -300,7 +300,7 @@ func x86_eaxedx_div_w32(f *objfile, denom u8) void {
 }
 
 func x86_axdx_div_w16(f *objfile, denom u8) void {
-  appendtext(f, 0x66, 0xF7, mrr(MOD11, 6, denom));
+  appendtext(f, 0x66, @[u8]0xF7, mrr(MOD11, 6, denom));
 }
 
 func x86_alah_div_w8(f *objfile, denom u8) void {
@@ -312,7 +312,7 @@ func x86_eaxedx_idiv_w32(f *objfile, denom u8) void {
 }
 
 func x86_axdx_idiv_w16(f *objfile, denom u8) void {
-  appendtext(f, 0x66, 0xF7, mrr(MOD11, 7, denom));
+  appendtext(f, 0x66, @[u8]0xF7, mrr(MOD11, 7, denom));
 }
 
 func x86_alah_idiv_w8(f *objfile, denom u8) void {
@@ -320,7 +320,7 @@ func x86_alah_idiv_w8(f *objfile, denom u8) void {
 }
 
 func x86_cwd_w16(f *objfile) void {
-  appendtext(f, 0x66, 0x99);
+  appendtext(f, 0x66, @[u8]0x99);
 }
 
 func x86_cdq_w32(f *objfile) void {
@@ -332,7 +332,7 @@ func x86_cmp_w32(f *objfile, lhs u8, rhs u8) void {
 }
 
 func x86_cmp_w16(f *objfile, lhs u8, rhs u8) void {
-  appendtext(f, 0x66, 0x39, mrr(MOD11, rhs, lhs));
+  appendtext(f, 0x66, @[u8]0x39, mrr(MOD11, rhs, lhs));
 }
 
 func x86_cmp_w8(f *objfile, lhs u8, rhs u8) void {
@@ -340,6 +340,10 @@ func x86_cmp_w8(f *objfile, lhs u8, rhs u8) void {
 }
 
 func x86_cmp_imm32(f *objfile, lhs u8, x u32) void {
+  appendtext(f, 0x81, mrr(MOD11, 7, lhs), x);
+}
+
+func x86_cmp_imm32(f *objfile, lhs u8, x i32) void {
   appendtext(f, 0x81, mrr(MOD11, 7, lhs), x);
 }
 
@@ -368,7 +372,7 @@ func x86_not_w8(f *objfile, dest u8) void {
 }
 
 func x86_not_w16(f *objfile, dest u8) void {
-  appendtext(f, 0x66, 0xF7, mrr(MOD11, 2, dest));
+  appendtext(f, 0x66, @[u8]0xF7, mrr(MOD11, 2, dest));
 }
 
 func x86_not_w32(f *objfile, dest u8) void {
@@ -384,7 +388,7 @@ func x86_sub_w32(f *objfile, dest u8, src u8) void {
 }
 
 func x86_sub_w16(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x66, 0x29, mrr(MOD11, src, dest));
+  appendtext(f, 0x66, @[u8]0x29, mrr(MOD11, src, dest));
 }
 
 func x86_sub_w8(f *objfile, dest u8, src u8) void {
@@ -451,6 +455,28 @@ func x86_store32_partial_destructively(f *objfile, dest cell_loc, src u8, size u
   x86_store32_partial_destructively(f, dest_addr, dest_disp, src, size);
 }
 
+func x86_load32_signextend(f *objfile, dest u8, src_addr u8, src_disp i32, size u32) void {
+  if size == 0 {
+    x86_xor_w32(f, dest, dest);
+  } else if size == 4 {
+    x86_load32(f, dest, src_addr, src_disp);
+  } else if size == 1 {
+    check(x86_reg32_has_lobyte(dest));
+    x86_movsx8(f, dest, src_addr, src_disp);
+  } else if size == 2 {
+    x86_movsx16(f, dest, src_addr, src_disp);
+  } else {
+    ice(_u8("x86_load32_signextend with bad size"));
+  }
+}
+
+func x86_load32_signextend(f *objfile, dest u8, src cell_loc, size u32) void {
+  src_addr u8;
+  src_disp i32;
+  x86_prep_loc_use(f, src, dest, &src_addr, &src_disp);
+  x86_load32_signextend(f, dest, src_addr, src_disp, size);
+}
+
 // NOTE: If this changes buflength, its consumers (like appendtext) will need to change theirs.
 deftype reg_rm_encoded struct {
   length u8;
@@ -502,15 +528,15 @@ func x86_movsx16(f *objfile, dest u8, src_addr u8, src_disp i32) void {
 }
 
 func x86_movzx8_reg8(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x0F, 0xB6, mrr(MOD11, dest, src));
+  appendtext(f, 0x0F, @[u8]0xB6, mrr(MOD11, dest, src));
 }
 
 func x86_movsx8_reg8(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x0F, 0xBE, mrr(MOD11, dest, src));
+  appendtext(f, 0x0F, @[u8]0xBE, mrr(MOD11, dest, src));
 }
 
 func x86_movsx16_reg16(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x0F, 0xBF, mrr(MOD11, dest, src));
+  appendtext(f, 0x0F, @[u8]0xBF, mrr(MOD11, dest, src));
 }
 
 func x86_lea32(f *objfile, dest u8, src_addr u8, src_disp i32) void {
