@@ -291,6 +291,10 @@ func x86_alah_idiv_w8(f *objfile, denom u8) void {
   appendtext(f, 0xF6, mrr(MOD11, 7, denom));
 }
 
+func x86_cwd_w16(f *objfile) void {
+  appendtext(f, 0x66, 0x99);
+}
+
 func x86_cdq_w32(f *objfile) void {
   appendtext(f, 0x99);
 }

@@ -846,8 +846,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
           x86_axdx_div_w16(f, X86_ECX);
           // Divide by zeroe will produce #DE.
         case SignedTwos(v2 void):
-          // TODO: Should dx not be the sign extension of ax?  (Also in s1.)
-          x86_xor_w32(f, X86_EDX, X86_EDX);
+          x86_cwd_w16(f);
           x86_axdx_idiv_w16(f, X86_ECX);
           // Divide by zero, INT16_MIN/-1 will produce #DE.
         }
