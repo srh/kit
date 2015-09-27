@@ -1040,7 +1040,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
       }
     }
     x86_setcc_b8(f, X86_AL, setcc_code);
-    x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+    x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
     return true;
   case &PrimLogical(b primitive_logical_op):
     arity u32 = op_arity(b);
@@ -1067,6 +1067,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     case BoolBitOr(v void):
       x86_or_w32(f, X86_EAX, X86_ECX);
     }
+    x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
     return true;
   case &PrimPtrCompare(b primitive_ptr_comparison_op):
     check(count(&a->params) == 2);
@@ -1084,7 +1085,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     case CmpGe(v2 void): setcc_code = X86_SETCC_AE;
     }
     x86_setcc_b8(f, X86_EAX, setcc_code);
-    x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+    x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
     return true;
   case &PrimConversion(b primitive_conversion_op):
     return TODO();
