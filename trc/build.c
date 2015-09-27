@@ -2724,13 +2724,14 @@ void gen_primitive_op_behavior(struct checkstate *cs,
 
   case PRIMITIVE_OP_NEGATE_I8: {
     x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
-    /* TODO: For this and the other negations, can't we just check OF
-    after the fact?  I missed that in the docs on the first read? */
+    /* TODO: (Also in s2.) For this and the other negations, can't we
+    just check OF after the fact?  I missed that in the docs on the
+    first read? */
     /* Crashes if the value is INT8_MIN by subtracting 1 and
     overflowing. */
     x86_gen_cmp_reg8_imm8(f, X86_AL, 1);
     gen_crash_jcc(f, h, X86_JCC_O);
-    x86_gen_neg_w32(f, X86_AL);
+    x86_gen_neg_w32(f, X86_EAX);
   } break;
   case PRIMITIVE_OP_NEGATE_I16: {
     x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
@@ -2861,7 +2862,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    x86_gen_cmp_imm32(f, X86_ECX, 7);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shl_cl_w8(f, X86_AL);
@@ -2871,7 +2872,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    x86_gen_cmp_imm32(f, X86_ECX, 7);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shr_cl_w8(f, X86_AL);
@@ -2949,7 +2950,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    x86_gen_cmp_imm32(f, X86_ECX, 7);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shl_cl_w8(f, X86_AL);
@@ -2959,7 +2960,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    x86_gen_cmp_imm32(f, X86_ECX, 7);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_sar_cl_w8(f, X86_AL);
@@ -3037,7 +3038,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    x86_gen_cmp_imm32(f, X86_ECX, 15);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shl_cl_w16(f, X86_AX);
@@ -3047,7 +3048,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    x86_gen_cmp_imm32(f, X86_ECX, 15);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shr_cl_w16(f, X86_AX);
@@ -3123,7 +3124,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    x86_gen_cmp_imm32(f, X86_ECX, 15);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shl_cl_w16(f, X86_AX);
@@ -3133,7 +3134,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    x86_gen_cmp_imm32(f, X86_ECX, 15);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_sar_cl_w16(f, X86_AX);
