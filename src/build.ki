@@ -20,6 +20,10 @@ func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u
     return false;
   }
 
+  if !add_export_symbols(cs, &f, modulename) {
+    return false;
+  }
+
   switch cs->plat.opsys {
   case Linux32(v void):
     *flattened_out = linux32_flatten(cs->im, &f);
@@ -67,7 +71,9 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
   switch &ent->u {
   case &GraphedFnBody(g graphed_fn_body):
     fillercode_align_double_quadword(f);
-    set_symbol_value(f, *unHas(&ent->symbol_table_index), secsize(&f->text));
+    text_offset u32 = secsize(&f->text);
+    set_symbol_value(f, *unHas(&ent->symbol_table_index), text_offset);
+    annotate(&ent->body_text_offset, text_offset);
     bas basic_analyze_state;
     if !basic_analyze_fn_body(cs, f, &g, &bas) {
       return false;
@@ -77,6 +83,59 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
     // We have nothing to do, of course.
     return true;
   }
+}
+
+func add_export_symbols(cs *checkstate, f *objfile, modulename sym) bool {
+  mod_id module_id = unHas(lookup(&cs->modules_by_name, &modulename));
+  mod *module = ref_module(cs, mod_id);
+  ndefs size = count(&mod->defs);
+  for i size = 0; i < ndefs; i = i + 1 {
+    ent_id def_entry_id = get(&mod->defs, i);
+    ent *def_entry = ref_def_entry(cs, ent_id);
+    if def_is_export(ent) {
+      check(count(&ent->insts) == 1);
+      noparms cu_genparms = NoParms(void);
+      if case Has(inst_id def_inst_id) = lookup(&ent->insts, &noparms) {
+        inst *def_inst = ref_inst(cs, inst_id);
+        if !is_fn_type(cs, &inst->computed_type.~) {
+          ERR(_u8("Cannot codegen export symbols for non-fn def (can only export functions)"));
+          return false;
+        }
+        if case &Computed(val st_value) = &inst->evaled_value {
+          fnid fn_body_id;
+          if !x86_simple_symbolref(cs, &val, &fnid) {
+            ERR(_u8("Export fn-symbol has invalid value (zero-initialized fn[...] value, I bet)"));
+            return false;
+          }
+          body_text_offset u32 = *unHas(&ref_fn_body(cs, fnid)->body_text_offset);
+          name string = lookup(cs->im, ent->def_name);
+          switch cs->plat.opsys {
+          case Linux32(v void): { }
+          case Win32(v void):
+            name = _s("_") + name;
+          }
+          discard sti = add_local_symbol(f, intern(cs->im, name), body_text_offset, SectionText(void), IsStaticNo(void));
+        } else {
+          ice(_u8("add_export_symbols sees unevaled inst"));
+        }
+      } else {
+        ice(_u8("add_export_symbols cannot find inst (export-with-generics?)"));
+      }
+    }
+  }
+
+  return true;
+}
+
+func def_is_export(ent *def_entry) bool {
+  if case &DefnHasRhs(np def_nonprim) = &ent->definition {
+    if case &Def(d ast_def) = np.tl {
+      if case IsExport(v void) = d.is_export {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 func add_fn_body_symbols(cs *checkstate, f *objfile) bool {

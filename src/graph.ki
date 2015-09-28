@@ -920,7 +920,7 @@ func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda,
     return false;
   }
 
-  id fn_body_id = add_fn_body(cs, {gr->informal_name, NotComputed@[sti](), @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, return_cell}, info->arg_cells})});
+  id fn_body_id = add_fn_body(cs, {gr->informal_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, return_cell}, info->arg_cells})});
   var gn = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstFnBody(id)})));
   *out = gn;
   return true;
@@ -2261,7 +2261,7 @@ func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_
   argcells_copy array[cell_num] = argcells;
   argshray shray[cell_num] = freeze(&argcells_copy);
   gn gr_num = add_node(&gr, node0(@[gr_op]GrPrimApply({op, argshray, retcell})));
-  return add_fn_body(cs, {informal_name, NotComputed@[sti](), @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells})});
+  return add_fn_body(cs, {informal_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells})});
 }
 
 func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
@@ -2283,7 +2283,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         }
         case &InstRhsExtern(v void): {
           // TODO: What if an extern def isn't a function?
-          id fn_body_id = add_fn_body(cs, {ent->def_name, NotComputed@[sti](), @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
+          id fn_body_id = add_fn_body(cs, {ent->def_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
           frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst->computed_type, &inst->computed_type_properties, ConstFnBody(id));
           inst->graph = Computed(Has(frg));
           return true;
@@ -2330,7 +2330,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
             if !gr_magic(cs, clq, &mag, &body_gr, &body_gn, &return_cell, &arg_cells) {
               return false;
             }
-            id = add_fn_body(cs, {ent->def_name, NotComputed@[sti](), @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells})});
+            id = add_fn_body(cs, {ent->def_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells})});
           }
 
           frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst->computed_type, &inst->computed_type_properties, ConstFnBody(id));

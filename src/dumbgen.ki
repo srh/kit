@@ -728,15 +728,26 @@ func x86_gen_write_data(f *objfile, h *frame, dest_addr u8, dest_disp i32, datas
   check(i == end);
 }
 
+func x86_simple_symbolref(cs *checkstate, val *st_value, id_out *fn_body_id) bool {
+  if count(&val->symbolrefs) != 1 || val->length != 4 {
+    ERR(_u8("Value isn't simple function pointer"));
+    return false;
+  }
+  srefpair tup[u32, st_symbolref] = get(&val->symbolrefs, 0);
+  check(srefpair.car == 0);
+  sref st_symbolref = srefpair.cdr;
+  check(st_symbolref_size(&cs->plat, &sref) == 4);
+  *id_out = sref.fnid;
+  return true;
+}
+
 func x86_cmp_imm_sized(cs *checkstate, f *objfile, lhs u8, rhs *st_value, avail u8) void {
   if count(&rhs->symbolrefs) != 0 {
-    check(count(&rhs->symbolrefs) == 1);
-    check(rhs->length == 4);
-    srefpair tup[u32, st_symbolref] = get(&rhs->symbolrefs, 0);
-    check(srefpair.car == 0);
-    sref st_symbolref = srefpair.cdr;
-    check(st_symbolref_size(&cs->plat, &sref) == 4);
-    x86_mov_stiptr(f, avail, *unHas(&ref_fn_body(cs, sref.fnid)->symbol_table_index));
+    fnid fn_body_id;
+    if !x86_simple_symbolref(cs, rhs, &fnid) {
+      ice(_u8("x86_cmp_imm_sized sees non-simple (impossible) symbolref"));
+    }
+    x86_mov_stiptr(f, avail, *unHas(&ref_fn_body(cs, fnid)->symbol_table_index));
     x86_cmp_w32(f, lhs, avail);
   } else {
     val u32 = get(&rhs->datas, 0);

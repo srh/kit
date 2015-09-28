@@ -393,6 +393,7 @@ defenum fn_body_entry_enum {
 deftype fn_body_entry struct {
   informal_name sym;
   symbol_table_index nc[sti];
+  body_text_offset nc[u32];
   u fn_body_entry_enum;
 };
 
