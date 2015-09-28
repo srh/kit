@@ -159,18 +159,19 @@ func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
     return true;
   }
   // We do make symbol names for prim fn bodies, but maybe we won't actually generate them.
-  name sym = generate_kit_name(cs);
+  name sym = generate_kit_name(cs, ent->informal_name);
   symbol_table_index sti = add_local_symbol(f, name, 0 /* We'll overwrite the value later. */, SectionText(void), IsStaticNo(void));
   annotate(&ent->symbol_table_index, symbol_table_index);
   return true;
 }
 
-func generate_kit_name(cs *checkstate) sym {
+func generate_kit_name(cs *checkstate, informal_name sym) sym {
   build array[u8] = _u8("_kit_");
   num u32 = cs->kit_name_counter + 1;
   cs->kit_name_counter = num;
   build_u8str(void, &build, &num);
-  return intern(cs->im, from_u8(&build));
+  append(&build, _u8("_"));
+  return intern(cs->im, from_u8(&build) + lookup(cs->im, informal_name));
 }
 
 func c_symbol_name(cs *checkstate, name sym) sym {
