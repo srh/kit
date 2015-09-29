@@ -243,6 +243,15 @@ func[T] set_union(a *hash[T, void], b *hash[T, void]) hash[T, void] {
   return build;
 }
 
+func[T] sets_union(xs *shray[hash[T, void]]) hash[T, void] {
+  build hash[T, void];
+  n size = count(xs);
+  for i size = 0; i < n; i = i + 1 {
+    add_union(&build, ref(xs, i));
+  }
+  return build;
+}
+
 // Adds the elements of a that are not in b into onto.
 func[T] add_union_difference(onto *hash[T, void], a *hash[T, void], b *hash[T, void]) void {
   it hash_iter[T, void] = iter(a);

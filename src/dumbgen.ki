@@ -17,9 +17,14 @@ deftype gn_annot struct {
   // Also used as a marker to prevent recursion in first traversal of dumbly_analyze_expression.
   pre_live nc[lives];
   // Which cells precs make live.
-  precs_make_live nc[hash[cell_num, void]];
+  precs_make_live nc[shray[hash[cell_num, void]]];
+
+  // Cells which are in the precs_make_live of any of our parent gns, except those made live by ourselves and our line of parents.  Computed on the second pass.
+  paralive nc[hash[cell_num, void]];
 
   // Only for GrApply and GrPrimApply.
+  // lower_paramlists and higher_paramlists are set on the second pass.
+  // TODO: Reorder these fields.
   lower_paramlists nc[array[gr_num]];
   higher_paramlists hash[gr_num, void];
   // Equal to post_prec_live plus the return cell if it was not live.
@@ -73,7 +78,7 @@ func frame_define_target(h *frame, jt jmp_targetnum, text_offset u32) void {
 }
 
 func mk_gn_annot() gn_annot {
-  return {NotComputed(), NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[lives](), NotComputed@[i32](), NotComputed@[u32](), NotComputed@[jmp_targetnum]()};
+  return {NotComputed(), NotComputed(), NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[lives](), NotComputed@[i32](), NotComputed@[u32](), NotComputed@[jmp_targetnum]()};
 }
 
 func unIndirect(loc cell_loc) i32 {
@@ -133,6 +138,11 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
     }
   case &NonTerminal(pm partial_exprmut):
     // nothing to assert
+  }
+
+  outer_paralive hash[cell_num, void];
+  if !dumbly_analyze_secondpass(&h, &g->graph.gr, g->graph.gn, &outer_paralive) {
+    return false;
   }
 
   if !dumbly_layout_frame_cells(g, &h) {
@@ -204,10 +214,10 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   for i size = 0; i < ncalls; i = i + 1 {
     gn gr_num = get(&paramlist_ordering, i);
     annot *gn_annot = ref_annot(h, gn);
-    live *lives = unHas(&annot->app_time_live);
+    live hash[cell_num, void] = set_union(&unHas(&annot->app_time_live)->all, unHas(&annot->paralive));
 
     // 1. Layout any cells live during the funcall, that are _not_ part of the paramlist.
-    it hash_iter[cell_num, void] = iter(&live->all);
+    it hash_iter[cell_num, void] = iter(&live);
     while case Has(p *tup[cell_num, void]) = next(&it) {
       c cell_num = p->car;
       if isNone(ref(&offsets, c.~)) {
