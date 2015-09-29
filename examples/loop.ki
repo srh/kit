@@ -1,4 +1,4 @@
-export def runloop func[i32] = fn() i32 {
+export func runloop() i32 {
   var acc i32 = 0;
   var i i32 = 0;
   while (i < 1000000000) {
@@ -7,4 +7,4 @@ export def runloop func[i32] = fn() i32 {
   }
 
   return acc;
-};
+}
