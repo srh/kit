@@ -14,12 +14,15 @@ deftype lives struct {
 
 deftype gn_annot struct {
   // Which cells are guaranteed to be live when the gn starts.
-  // Also used as a marker to prevent recursion by dumbly_analyze_expression.
+  // Also used as a marker to prevent recursion in first traversal of dumbly_analyze_expression.
   pre_live nc[lives];
+  // Which cells precs make live.
+  precs_make_live nc[lives];
 
   // Only for GrApply and GrPrimApply.
   lower_paramlists nc[array[gr_num]];
   higher_paramlists hash[gr_num, void];
+  // Equal to post_prec_live plus the return cell if it was not live.
   app_time_live nc[lives];
   paramlist_bottom_frame_offset nc[i32];
 
@@ -70,7 +73,7 @@ func frame_define_target(h *frame, jt jmp_targetnum, text_offset u32) void {
 }
 
 func mk_gn_annot() gn_annot {
-  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[lives](), NotComputed@[i32](), NotComputed@[u32](), NotComputed@[jmp_targetnum]()};
+  return {NotComputed(), NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[lives](), NotComputed@[i32](), NotComputed@[u32](), NotComputed@[jmp_targetnum]()};
 }
 
 func unIndirect(loc cell_loc) i32 {
@@ -1267,3 +1270,4 @@ func x86_repr_overflow_code(repr numeric_representation) u8 {
     return X86_JCC_O;
   }
 }
+

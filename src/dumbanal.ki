@@ -76,6 +76,8 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     }
   }
 
+  annotate(&gnc->precs_make_live, {prec_muts.made_live});
+
   switch &node->op {
   case &GrApply(a gr_apply):
     DUMBG("GrApply");
