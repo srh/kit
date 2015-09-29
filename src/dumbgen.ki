@@ -361,9 +361,11 @@ func dumbly_gen_machine_code(f *objfile, h *frame, entry_gn gr_num) bool {
   if !dumbly_gen_function_intro(f, h) {
     return false;
   }
-  if !dumbly_gen_function_body(f, h, entry_gn) {
+  bodyaft jmp_targetnum = frame_create_target(h);
+  if !dumbly_gen_function_body(f, h, entry_gn, bodyaft) {
     return false;
   }
+  frame_define_target(h, bodyaft, secsize(&f->text));
   if !dumbly_gen_function_exit(f, h) {
     return false;
   }
@@ -460,30 +462,55 @@ func universal_cc_write_to_retcell(f *objfile, h *frame, c cell_num) void {
   }
 }
 
-func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
-  stack array[gr_stackent];
-  push(&stack, EvalOpAndPrecs(entry_gn));
-  while case Has(se gr_stackent) = popval(&stack) {
+deftype gn_and_jmpaft struct {
+  gn gr_num;
+  jmpaft jmp_targetnum;
+};
+
+deftype op_targ_gn_jmpaft struct {
+  op_targ jmp_targetnum;
+  gn gr_num;
+  jmpaft jmp_targetnum;
+};
+
+defenum dumbgen_stackent {
+  DumbgenOpAndPrecs gn_and_jmpaft;
+  DumbgenOp op_targ_gn_jmpaft;
+};
+
+func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp_targetnum) bool {
+  stack array[dumbgen_stackent];
+  push(&stack, DumbgenOpAndPrecs({entry_gn, bodyaft}));
+  while case Has(se dumbgen_stackent) = popval(&stack) {
     switch se {
-    case EvalOpAndPrecs(gn gr_num):
+    case DumbgenOpAndPrecs(gna gn_and_jmpaft):
+      gn gr_num = gna.gn;
       annot *gn_annot = ref_annot(h, gn);
       if case &Computed(off u32) = &annot->instruction_offset {
         // TODO: Just gen the jmp directly -- no need for a placeholder, we know the offset.
-        x86_gen_placeholder_jmp(f, h, gn);
+        x86_gen_placeholder_jmp(f, h, frame_gn_targetnum(h, gn));
       } else {
         text_offset u32 = secsize(&f->text);
         annotate(&annot->instruction_offset, text_offset);
         frame_define_target(h, frame_gn_targetnum(h, gn), text_offset);
-        push(&stack, EvalOp(gn));
+        op_targ jmp_targetnum = frame_create_target(h);
+        push(&stack, DumbgenOp({op_targ, gn, gna.jmpaft}));
         node *gr_node = ref_node(h->gr, gn);
-        // I don't know why, it's just instinct, but on a whim for now we're going to push the stack such that we eval the precs left-to-right, just like we do in static eval.  This will mean differences in behavior in runtime versus static eval cannot be caused by divergence in prec evaluation ordering.
+
+        // For now we eval precs left-to-right, just like in static eval.  This means behavior differences must be the result of bugs.
+
+        precaft jmp_targetnum = op_targ;
         nprecs size = count(&node->precs);
         for i size = nprecs; i > 0; {
           i = i - 1;
-          push(&stack, EvalOpAndPrecs(get(&node->precs, i)));
+          prec_gn gr_num = get(&node->precs, i);
+          push(&stack, DumbgenOpAndPrecs({prec_gn, precaft}));
+          precaft = frame_gn_targetnum(h, prec_gn);
         }
       }
-    case EvalOp(gn gr_num):
+    case DumbgenOp(otgna op_targ_gn_jmpaft):
+      frame_define_target(h, otgna.op_targ, secsize(&f->text));
+      gn gr_num = otgna.gn;
       node *gr_node = ref_node(h->gr, gn);
       switch &node->op {
       case &GrApply(a gr_apply):
@@ -555,21 +582,21 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
             return false;
           }
           x86_cmp_imm_sized(h->cs, f, X86_EAX, &expected, X86_ECX);
-          x86_gen_placeholder_jcc(f, h, X86_JCC_Z, cas->cdr);
-          push(&stack, EvalOpAndPrecs(cas->cdr));
+          x86_gen_placeholder_jcc(f, h, X86_JCC_Z, frame_gn_targetnum(h, cas->cdr));
+          push(&stack, DumbgenOpAndPrecs({cas->cdr, otgna.jmpaft}));
         }
         if case Has(default_gn gr_num) = a.default_case {
-          x86_gen_placeholder_jmp(f, h, default_gn);
-          push(&stack, EvalOpAndPrecs(default_gn));
+          x86_gen_placeholder_jmp(f, h, frame_gn_targetnum(h, default_gn));
+          push(&stack, DumbgenOpAndPrecs({default_gn, otgna.jmpaft}));
         } else {
           x86_gen_crash(f, h);
         }
       case &GrSequence(a gr_sequence):
         // first gets evaluated before second (because it gets pushed after)
-        push(&stack, EvalOpAndPrecs(a.second));
-        push(&stack, EvalOpAndPrecs(a.first));
+        push(&stack, DumbgenOpAndPrecs({a.second, otgna.jmpaft}));
+        push(&stack, DumbgenOpAndPrecs({a.first, frame_gn_targetnum(h, a.second)}));
       case &GrJmp(a gr_jmp):
-        push(&stack, EvalOpAndPrecs(a.next));
+        push(&stack, DumbgenOpAndPrecs({a.next, otgna.jmpaft}));
       case &GrWriteNothing(a gr_writenothing):
         // Do nothing.  (This graph node is used for static eval, book keeping, etc.)
       case &GrDead(a gr_dead):
@@ -579,6 +606,8 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
       case &GrNop(v void):
         // Do nothing (but do it less glamorously).
       }
+      // TODO: Only actually jmp to the jmpaft after sequential ops, and not redundantly like we do here -- and cleanup op usage so that tails of sequential ops are only sequential ops.
+      x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
     }
   }
 
@@ -629,7 +658,7 @@ func frame_crash_targetnum(h *frame) jmp_targetnum {
   return frame_get_or_create_targetnum(h, &h->crash_target);
 }
 
-func x86_gen_placeholder_jmp(f *objfile, h *frame, target gr_num) void {
+func x86_gen_placeholder_jmp(f *objfile, h *frame, target jmp_targetnum) void {
   offset u32 = 1 + secsize(&f->text);
   b [5]u8;
   b[0] = 0xE9;
@@ -639,10 +668,10 @@ func x86_gen_placeholder_jmp(f *objfile, h *frame, target gr_num) void {
   b[4] = 0;
   append_raw(&f->text, &b[0], 5);
 
-  push(&h->placeholder_jumps, {offset, offset + 4, frame_gn_targetnum(h, target)});
+  push(&h->placeholder_jumps, {offset, offset + 4, target});
 }
 
-func x86_gen_placeholder_jcc(f *objfile, h *frame, x86_jcc_code u8, target gr_num) void {
+func x86_gen_placeholder_jcc(f *objfile, h *frame, x86_jcc_code u8, target jmp_targetnum) void {
   offset u32 = 2 + secsize(&f->text);
   b [6]u8;
   b[0] = 0x0F;
@@ -652,7 +681,7 @@ func x86_gen_placeholder_jcc(f *objfile, h *frame, x86_jcc_code u8, target gr_nu
   b[4] = 0;
   b[5] = 0;
   append_raw(&f->text, &b[0], 6);
-  push(&h->placeholder_jumps, {offset, offset + 4, frame_gn_targetnum(h, target)});
+  push(&h->placeholder_jumps, {offset, offset + 4, target});
 }
 
 func x86_gen_crash_jcc(f *objfile, h *frame, x86_jcc_code u8) void {
