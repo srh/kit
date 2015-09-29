@@ -17,7 +17,7 @@ deftype gn_annot struct {
   // Also used as a marker to prevent recursion in first traversal of dumbly_analyze_expression.
   pre_live nc[lives];
   // Which cells precs make live.
-  precs_make_live nc[lives];
+  precs_make_live nc[hash[cell_num, void]];
 
   // Only for GrApply and GrPrimApply.
   lower_paramlists nc[array[gr_num]];
