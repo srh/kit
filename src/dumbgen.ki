@@ -14,11 +14,13 @@ deftype lives struct {
 
 deftype gn_annot struct {
   // Which cells are guaranteed to be live when the gn starts.
-  live nc[lives];
+  // Also used as a marker to prevent recursion by dumbly_analyze_expression.
+  pre_live nc[lives];
 
   // Only for GrApply and GrPrimApply.
   lower_paramlists nc[array[gr_num]];
   higher_paramlists hash[gr_num, void];
+  app_time_live nc[lives];
   paramlist_bottom_frame_offset nc[i32];
 
   // Some secsize(&f->text) value -- the jmp target for evaluating the node _and_ its precs.  This is Computed if and only if we've begun generating code for the gn (and so it serves as a color-marker for our graph traversal -- see usage).
@@ -68,7 +70,7 @@ func frame_define_target(h *frame, jt jmp_targetnum, text_offset u32) void {
 }
 
 func mk_gn_annot() gn_annot {
-  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[i32](), NotComputed@[u32](), NotComputed@[jmp_targetnum]()};
+  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[lives](), NotComputed@[i32](), NotComputed@[u32](), NotComputed@[jmp_targetnum]()};
 }
 
 func unIndirect(loc cell_loc) i32 {
@@ -199,7 +201,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   for i size = 0; i < ncalls; i = i + 1 {
     gn gr_num = get(&paramlist_ordering, i);
     annot *gn_annot = ref_annot(h, gn);
-    live *lives = unHas(&annot->live);
+    live *lives = unHas(&annot->app_time_live);
 
     // 1. Layout any cells live during the funcall, that are _not_ part of the paramlist.
     it hash_iter[cell_num, void] = iter(&live->all);
@@ -208,7 +210,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
       if isNone(ref(&offsets, c.~)) {
         if case &Has(cell_paramlistgn gr_num) = &ref(&h->bas->celldisp, c.~)->paramlist {
           // Cells in other paramlists should already been processed -- and would have failed the isNone check just above.
-          if cell_paramlistgn == gn {
+          if cell_paramlistgn != gn {
             ice(_u8("cell is in other paramlist, was not processed"));
           }
         } else {
@@ -480,7 +482,7 @@ defenum dumbgen_stackent {
 
 func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp_targetnum) bool {
   stack array[dumbgen_stackent];
-  push(&stack, DumbgenOpAndPrecs({entry_gn, bodyaft}));
+  push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({entry_gn, bodyaft}));
   while case Has(se dumbgen_stackent) = popval(&stack) {
     switch se {
     case DumbgenOpAndPrecs(gna gn_and_jmpaft):
@@ -494,7 +496,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         annotate(&annot->instruction_offset, text_offset);
         frame_define_target(h, frame_gn_targetnum(h, gn), text_offset);
         op_targ jmp_targetnum = frame_create_target(h);
-        push(&stack, DumbgenOp({op_targ, gn, gna.jmpaft}));
+        push(&stack, @[dumbgen_stackent]DumbgenOp({op_targ, gn, gna.jmpaft}));
         node *gr_node = ref_node(h->gr, gn);
 
         // For now we eval precs left-to-right, just like in static eval.  This means behavior differences must be the result of bugs.
@@ -504,7 +506,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         for i size = nprecs; i > 0; {
           i = i - 1;
           prec_gn gr_num = get(&node->precs, i);
-          push(&stack, DumbgenOpAndPrecs({prec_gn, precaft}));
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({prec_gn, precaft}));
           precaft = frame_gn_targetnum(h, prec_gn);
         }
       }
@@ -583,20 +585,20 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           }
           x86_cmp_imm_sized(h->cs, f, X86_EAX, &expected, X86_ECX);
           x86_gen_placeholder_jcc(f, h, X86_JCC_Z, frame_gn_targetnum(h, cas->cdr));
-          push(&stack, DumbgenOpAndPrecs({cas->cdr, otgna.jmpaft}));
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({cas->cdr, otgna.jmpaft}));
         }
         if case Has(default_gn gr_num) = a.default_case {
           x86_gen_placeholder_jmp(f, h, frame_gn_targetnum(h, default_gn));
-          push(&stack, DumbgenOpAndPrecs({default_gn, otgna.jmpaft}));
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({default_gn, otgna.jmpaft}));
         } else {
           x86_gen_crash(f, h);
         }
       case &GrSequence(a gr_sequence):
         // first gets evaluated before second (because it gets pushed after)
-        push(&stack, DumbgenOpAndPrecs({a.second, otgna.jmpaft}));
-        push(&stack, DumbgenOpAndPrecs({a.first, frame_gn_targetnum(h, a.second)}));
+        push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.second, otgna.jmpaft}));
+        push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.first, frame_gn_targetnum(h, a.second)}));
       case &GrJmp(a gr_jmp):
-        push(&stack, DumbgenOpAndPrecs({a.next, otgna.jmpaft}));
+        push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.next, otgna.jmpaft}));
       case &GrWriteNothing(a gr_writenothing):
         // Do nothing.  (This graph node is used for static eval, book keeping, etc.)
       case &GrDead(a gr_dead):

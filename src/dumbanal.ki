@@ -50,7 +50,7 @@ func lives_equal(x *lives, y *lives) bool {
 
 func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *lives, mut_out *genexpr_result) bool {
   gnc *gn_annot = ref_annot(h, gn);
-  if case &Computed(live lives) = &gnc->live {
+  if case &Computed(live lives) = &gnc->pre_live {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
     if !lives_equal(prelive, &live) {
       ERR(_u8("ICE: Inconsistent liveness state when revisiting node, prelive="), *prelive, _u8(", annot.live="), live);
@@ -60,7 +60,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     return true;
   }
 
-  annotate(&gnc->live, *prelive);
+  annotate(&gnc->pre_live, *prelive);
 
   prec_muts exprmut;
 
@@ -84,12 +84,13 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     output(gr, prelive, &prec_muts, a.retcell);
 
     if true {
-      // TODO: Maybe have dumbly_analyze_expression, update prelive, instead of duplicating this update logic in its caller.
+      // TODO: Maybe have dumbly_analyze_expression update prelive, instead of duplicating this update logic in its caller.
       // TODO: Dedup with GrPrimApply.
       apptime_live lives = *prelive;
       compose_live(&apptime_live, &prec_muts);
 
       note_lower_paramlists(h, gn, &apptime_live);
+      annotate(&gnc->app_time_live, apptime_live);
     }
 
     deaden(gr, prelive, &prec_muts, a.funcell);
@@ -109,6 +110,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
       compose_live(&apptime_live, &prec_muts);
 
       note_lower_paramlists(h, gn, &apptime_live);
+      annotate(&gnc->app_time_live, apptime_live);
     }
 
     nparams size = count(&a.params);
