@@ -893,7 +893,9 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
       } else {
         ice(_u8("NumAdd bad size"));
       }
-      x86_gen_crash_jcc(f, h, x86_repr_overflow_code(b.op_numtraits.repr));
+      if b.op_numtraits.trap_overflow {
+        x86_gen_crash_jcc(f, h, x86_repr_overflow_code(b.op_numtraits.repr));
+      }
     case NumSub(v void):
       if b.op_size == 1 {
         x86_sub_w8(f, X86_EAX, X86_ECX);
@@ -904,36 +906,50 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
       } else {
         ice(_u8("NumSub bad size"));
       }
-      x86_gen_crash_jcc(f, h, x86_repr_overflow_code(b.op_numtraits.repr));
+      if b.op_numtraits.trap_overflow {
+        x86_gen_crash_jcc(f, h, x86_repr_overflow_code(b.op_numtraits.repr));
+      }
     case NumMul(v void):
       if b.op_size == 1 {
         switch b.op_numtraits.repr {
         case Unsigned(v2 void):
           x86_alah_mul_w8(f, X86_ECX);
-          x86_gen_crash_jcc(f, h, X86_JCC_C);
+          if b.op_numtraits.trap_overflow {
+            x86_gen_crash_jcc(f, h, X86_JCC_C);
+          }
           x86_movzx8_reg8(f, X86_EAX, X86_EAX);
         case SignedTwos(v2 void):
           x86_alah_imul_w8(f, X86_ECX);
-          x86_gen_crash_jcc(f, h, X86_JCC_O);
+          if b.op_numtraits.trap_overflow {
+            x86_gen_crash_jcc(f, h, X86_JCC_O);
+          }
           x86_movzx8_reg8(f, X86_EAX, X86_EAX);
         }
       } else if b.op_size == 2 {
         switch b.op_numtraits.repr {
         case Unsigned(v2 void):
           x86_dxax_mul_w16(f, X86_ECX);
-          x86_gen_crash_jcc(f, h, X86_JCC_C);
+          if b.op_numtraits.trap_overflow {
+            x86_gen_crash_jcc(f, h, X86_JCC_C);
+          }
         case SignedTwos(v2 void):
           x86_imul_w16(f, X86_EAX, X86_ECX);
-          x86_gen_crash_jcc(f, h, X86_JCC_O);
+          if b.op_numtraits.trap_overflow {
+            x86_gen_crash_jcc(f, h, X86_JCC_O);
+          }
         }
       } else if b.op_size == 4 {
         switch b.op_numtraits.repr {
         case Unsigned(v2 void):
           x86_eaxedx_mul_w32(f, X86_ECX);
-          x86_gen_crash_jcc(f, h, X86_JCC_C);
+          if b.op_numtraits.trap_overflow {
+            x86_gen_crash_jcc(f, h, X86_JCC_C);
+          }
         case SignedTwos(v2 void):
           x86_imul_w32(f, X86_EAX, X86_ECX);
-          x86_gen_crash_jcc(f, h, X86_JCC_O);
+          if b.op_numtraits.trap_overflow {
+            x86_gen_crash_jcc(f, h, X86_JCC_O);
+          }
         }
       } else {
         ice(_u8("NumMul bad size"));
@@ -1031,19 +1047,25 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
           x86_movsx8_reg8(f, X86_EAX, X86_EAX);
           // TODO: (Also in s1.) For this and the other negations, can't we just check OF after the fact?  I missed that in the docs on the first read?
           // Crashes if the value is INT8_MIN by subtracting 1 and overflowign.
-          x86_cmp_reg8_imm8(f, X86_AL, 1);
-          x86_gen_crash_jcc(f, h, X86_JCC_O);
+          if b.op_numtraits.trap_overflow {
+            x86_cmp_reg8_imm8(f, X86_AL, 1);
+            x86_gen_crash_jcc(f, h, X86_JCC_O);
+          }
           x86_neg_w32(f, X86_EAX);
         } else if b.op_size == 2 {
           x86_movsx16_reg16(f, X86_EAX, X86_EAX);
           // Crashes if the value is INT16_MIN by subtracting 1 and overflowing.
-          x86_cmp_reg16_imm16(f, X86_EAX, @[u16] ~ @[u32] 1);
-          x86_gen_crash_jcc(f, h, X86_JCC_O);
+          if b.op_numtraits.trap_overflow {
+            x86_cmp_reg16_imm16(f, X86_EAX, @[u16] ~ @[u32] 1);
+            x86_gen_crash_jcc(f, h, X86_JCC_O);
+          }
           x86_neg_w32(f, X86_EAX);
         } else if b.op_size == 4 {
           // Crashes if the value is INT32_MIN by subtracting 1 and overflowing.
-          x86_cmp_imm32(f, X86_EAX, @[u32]1);
-          x86_gen_crash_jcc(f, h, X86_JCC_O);
+          if b.op_numtraits.trap_overflow {
+            x86_cmp_imm32(f, X86_EAX, @[u32]1);
+            x86_gen_crash_jcc(f, h, X86_JCC_O);
+          }
           x86_neg_w32(f, X86_EAX);
         } else {
           ice(_u8("NumNegate bad size"));
@@ -1066,6 +1088,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
         ice(_u8("NumBitNot bad size"));
       }
     case NumShiftLeft(v void):
+      // It is intentional that we always range check here, even if !trap_overflow.  It is also intentional that the shift could overflow.
       if b.op_size == 1 {
         x86_cmp_imm32(f, X86_ECX, @[u32]7);
         x86_gen_crash_jcc(f, h, X86_JCC_A);
@@ -1082,6 +1105,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
         ice(_u8("NumShiftLeft bad size"));
       }
     case NumShiftRight(v void):
+      // It is intentional that we always range check here, even if !trap_overflow.
       if b.op_size == 1 {
         x86_cmp_imm32(f, X86_ECX, @[u32]7);
         x86_gen_crash_jcc(f, h, X86_JCC_A);
@@ -1233,7 +1257,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
       switch b.to_numtraits.repr {
       case Unsigned(v2 void):
         check(b.to_numtraits.minval == bigu(0));
-        if b.to_numtraits.maxval >= b.from_numtraits.maxval {
+        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.maxval >= b.from_numtraits.maxval {
           // Just check for negativity.
           x86_test_regs32(f, X86_EAX, X86_EAX);
           x86_gen_crash_jcc(f, h, X86_JCC_S);
@@ -1249,7 +1273,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
         x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
         return true;
       case SignedTwos(v2 void):
-        if b.to_numtraits.maxval < b.from_numtraits.maxval {
+        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.maxval < b.from_numtraits.maxval {
           to_maxval u32;
           if !as_non_negative_u32(&b.to_numtraits.maxval, &to_maxval) {
             ice(_u8("conversion unsigned maxval outside u32 range"));
@@ -1257,7 +1281,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
           x86_cmp_imm32(f, X86_EAX, to_maxval);
           x86_gen_crash_jcc(f, h, X86_JCC_G);
         }
-        if b.to_numtraits.minval > b.from_numtraits.minval {
+        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.minval > b.from_numtraits.minval {
           to_minval i32;
           if !as_i32(&b.to_numtraits.minval, &to_minval) {
             ice(_u8("conversion signed minval outside i32 range"));
