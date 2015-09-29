@@ -21,8 +21,11 @@ deftype gn_annot struct {
   higher_paramlists hash[gr_num, void];
   paramlist_bottom_frame_offset nc[i32];
 
-  // Some secsize(&f->text) value -- the jmp target for evaluating the node _and_ its precs.
+  // Some secsize(&f->text) value -- the jmp target for evaluating the node _and_ its precs.  This is Computed if and only if we've begun generating code for the gn (and so it serves as a color-marker for our graph traversal -- see usage).
+  // TODO: I don't think we actually use the u32 value from here.
   instruction_offset nc[u32];
+  // The jmp target number for evaluating the node _and_ its precs.
+  this_targetnum nc[jmp_targetnum];
 };
 
 deftype frame struct {
@@ -37,26 +40,35 @@ deftype frame struct {
   // offsets[i] is the offset of a cell relative to the stack frame, or location of a cell, or something like that.
   offsets nc[array[cell_loc]];
   low_offset nc[i32];
-  // An offset into &f->text of a 32-bit jmp offset, and the gn.
-  placeholder_jump_fillin array[jmpdata];
-  crash_jumps array[crash_jmpdata];
+
+  jmp_targets array[nc[u32]];
+  placeholder_jumps array[jmpdata];
+
+  crash_target nc[jmp_targetnum];
 };
+
+deftype jmp_targetnum size;
+def `~` fn[size, jmp_targetnum] = wrapconvert;
 
 deftype jmpdata struct {
   overwrite_location u32;
-  // On x86, this is overwrite_location + 4 for jmp and jcc instructions -- the location of the end of the instruction.
+  // On x86, this is overwrite_location + 4 for imm32 jmp and jcc instructions -- the location of the end of the instruction.
   relative_mathpoint u32;
-  target gr_num;
+  target jmp_targetnum;
 };
 
-deftype crash_jmpdata struct {
-  overwrite_location u32;
-  // Just a subset of jmpdata -- its target is hard-coded.
-  relative_mathpoint u32;
-};
+func frame_create_target(h *frame) jmp_targetnum {
+  ret jmp_targetnum = ~count(&h->jmp_targets);
+  push(&h->jmp_targets, NotComputed());
+  return ret;
+}
+
+func frame_define_target(h *frame, jt jmp_targetnum, text_offset u32) void {
+  annotate(ref(&h->jmp_targets, jt.~), text_offset);
+}
 
 func mk_gn_annot() gn_annot {
-  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed(), NotComputed()};
+  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[i32](), NotComputed@[u32](), NotComputed@[jmp_targetnum]()};
 }
 
 func unIndirect(loc cell_loc) i32 {
@@ -94,7 +106,7 @@ func get_size_loc(h *frame, c cell_num) cell_loc {
 // Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
-  h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed(), NotComputed@[i32](), mk_array@[jmpdata](), mk_array@[crash_jmpdata]()};
+  h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed(), NotComputed@[i32](), mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed@[jmp_targetnum]()};
 
   prelive lives;
   check_add_all(&prelive.all, &g->argcells);
@@ -411,26 +423,19 @@ func dumbly_gen_function_exit(f *objfile, h *frame) bool {
 
     // Finally, kindly tie our jumps together.
 
-    njumps size = count(&h->placeholder_jump_fillin);
+    if case &Computed(jt jmp_targetnum) = &h->crash_target {
+      frame_define_target(h, jt, secsize(&f->text));
+      // TODO: Rename x86_int_3 to int3, it looks like that in assembly.
+      x86_int_3(f);
+    }
+
+    njumps size = count(&h->placeholder_jumps);
     for i size = 0; i < njumps; i = i + 1 {
-      p *jmpdata = ref(&h->placeholder_jump_fillin, i);
-      target u32 = *unHas(&ref_annot(h, p->target)->instruction_offset);
+      p *jmpdata = ref(&h->placeholder_jumps, i);
+      target u32 = *unHas(ref(&h->jmp_targets, p->target.~));
       diff i32 = @[i32]~target - @[i32]~p->relative_mathpoint;
       le le_i32 = ~diff;
       overwrite_raw(&f->text, ~p->overwrite_location, &le.buf[0], 4);
-    }
-
-    ncrash_jumps size = count(&h->crash_jumps);
-    if ncrash_jumps > 0 {
-      target u32 = secsize(&f->text);
-      x86_int_3(f);
-
-      for i size = 0; i < ncrash_jumps; i = i + 1 {
-        p *crash_jmpdata = ref(&h->crash_jumps, i);
-        diff i32 = @[i32]~target - @[i32]~p->relative_mathpoint;
-        le le_i32 = ~diff;
-        overwrite_raw(&f->text, ~p->overwrite_location, &le.buf[0], 4);
-      }
     }
   }
 
@@ -466,7 +471,9 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num) bool {
         // TODO: Just gen the jmp directly -- no need for a placeholder, we know the offset.
         x86_gen_placeholder_jmp(f, h, gn);
       } else {
-        annotate(&annot->instruction_offset, secsize(&f->text));
+        text_offset u32 = secsize(&f->text);
+        annotate(&annot->instruction_offset, text_offset);
+        frame_define_target(h, frame_gn_targetnum(h, gn), text_offset);
         push(&stack, EvalOp(gn));
         node *gr_node = ref_node(h->gr, gn);
         // I don't know why, it's just instinct, but on a whim for now we're going to push the stack such that we eval the precs left-to-right, just like we do in static eval.  This will mean differences in behavior in runtime versus static eval cannot be caused by divergence in prec evaluation ordering.
@@ -602,6 +609,26 @@ func x86_add_offset(f *objfile, h *frame, dest u8, offset gr_offset, scratch1 u8
   }
 }
 
+func frame_get_or_create_targetnum(h *frame, tn *nc[jmp_targetnum]) jmp_targetnum {
+  ret jmp_targetnum;
+  if case &Computed(jt jmp_targetnum) = tn {
+    ret = jt;
+  } else {
+    ret = frame_create_target(h);
+    *tn = Computed(ret);
+  }
+  return ret;
+}
+
+// The targetnum for evaluating the op _and_ its precs.
+func frame_gn_targetnum(h *frame, gn gr_num) jmp_targetnum {
+  return frame_get_or_create_targetnum(h, &ref_annot(h, gn)->this_targetnum);
+}
+
+func frame_crash_targetnum(h *frame) jmp_targetnum {
+  return frame_get_or_create_targetnum(h, &h->crash_target);
+}
+
 func x86_gen_placeholder_jmp(f *objfile, h *frame, target gr_num) void {
   offset u32 = 1 + secsize(&f->text);
   b [5]u8;
@@ -611,7 +638,8 @@ func x86_gen_placeholder_jmp(f *objfile, h *frame, target gr_num) void {
   b[3] = 0;
   b[4] = 0;
   append_raw(&f->text, &b[0], 5);
-  push(&h->placeholder_jump_fillin, {offset, offset + 4, target});
+
+  push(&h->placeholder_jumps, {offset, offset + 4, frame_gn_targetnum(h, target)});
 }
 
 func x86_gen_placeholder_jcc(f *objfile, h *frame, x86_jcc_code u8, target gr_num) void {
@@ -624,7 +652,7 @@ func x86_gen_placeholder_jcc(f *objfile, h *frame, x86_jcc_code u8, target gr_nu
   b[4] = 0;
   b[5] = 0;
   append_raw(&f->text, &b[0], 6);
-  push(&h->placeholder_jump_fillin, {offset, offset + 4, target});
+  push(&h->placeholder_jumps, {offset, offset + 4, frame_gn_targetnum(h, target)});
 }
 
 func x86_gen_crash_jcc(f *objfile, h *frame, x86_jcc_code u8) void {
@@ -637,7 +665,7 @@ func x86_gen_crash_jcc(f *objfile, h *frame, x86_jcc_code u8) void {
   b[4] = 0;
   b[5] = 0;
   append_raw(&f->text, &b[0], 6);
-  push(&h->crash_jumps, {offset, offset + 4});
+  push(&h->placeholder_jumps, {offset, offset + 4, frame_crash_targetnum(h)});
 }
 
 func x86_gen_crash(f *objfile, h *frame) void {
