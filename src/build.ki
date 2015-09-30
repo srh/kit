@@ -149,11 +149,21 @@ func add_fn_body_symbols(cs *checkstate, f *objfile) bool {
   return true;
 }
 
+func argcell_types(cs *checkstate, g *graphed_fn_body) shray[cu_typeexpr] {
+  bu array[cu_typeexpr];
+  nargcells size = count(&g->argcells);
+  for i size = 0; i < nargcells; i = i + 1 {
+    push(&bu, ref_cell(&g->graph.gr, get(&g->argcells, i))->type);
+  }
+  return freeze(&bu);
+}
+
 func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
   switch &ent->u {
   case &GraphedFnBody(g graphed_fn_body):
+    arg_types shray[cu_typeexpr] = argcell_types(cs, &g);
     // We do make symbol names for prim fn bodies, but maybe we won't actually generate them.
-    name sym = generate_kit_name(cs, ent->informal_name);
+    name sym = generate_kit_name(cs, ent->informal_name, arg_types);
     symbol_table_index sti = add_local_symbol(f, name, 0 /* We'll overwrite the value later. */, SectionText(void), IsStaticNo(void));
     annotate(&ent->symbol_table_index, symbol_table_index);
     return true;
@@ -165,13 +175,24 @@ func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
   }
 }
 
-func generate_kit_name(cs *checkstate, informal_name sym) sym {
+func generate_kit_name(cs *checkstate, informal_name sym, arg_types shray[cu_typeexpr]) sym {
   build array[u8] = _u8("_kit_");
   num u32 = cs->kit_name_counter + 1;
   cs->kit_name_counter = num;
   build_u8str(void, &build, &num);
-  append(&build, _u8("_"));
-  return intern(cs->im, from_u8(&build) + lookup(cs->im, informal_name));
+  push(&build, '_');
+  // TODO: Actually, build should be a string, not an array[u8].
+  append(&build, to_u8str(lookup(cs->im, informal_name)));
+  push(&build, '[');
+  nargtypes size = count(&arg_types);
+  for i size = 0; i < nargtypes; i = i + 1 {
+    if i != 0 {
+      push(&build, ',');
+    }
+    build_u8str(void, &build, ref(&arg_types, i));
+  }
+  push(&build, ']');
+  return intern(cs->im, from_u8(&build));
 }
 
 func c_symbol_name(cs *checkstate, name sym) sym {
