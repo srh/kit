@@ -1724,15 +1724,19 @@ struct sti lookup_or_make_typetrav_sti(
     struct objfile *f,
     struct checkstate *cs, enum typetrav_func tf,
     struct ast_typeexpr *type) {
-  struct databuf name;
-  make_typetrav_sti_name(cs->im, tf, type, &name);
-  ident_value id = identmap_intern(&cs->typetrav_values, name.buf, name.count);
+  ident_value id;
+  {
+    struct databuf name;
+    make_typetrav_sti_name(cs->im, tf, type, &name);
+    id = identmap_intern(&cs->typetrav_values, name.buf, name.count);
+    databuf_destroy(&name);
+  }
   CHECK(id <= cs->typetrav_symbol_infos_count);
   if (id == cs->typetrav_symbol_infos_count) {
-    char name[] = "$typetrav";
+    char dollar_typetrav[] = "$typetrav";
     void *gen_name;
     size_t gen_name_count;
-    generate_kit_name(cs, name, strlen(name),
+    generate_kit_name(cs, dollar_typetrav, strlen(dollar_typetrav),
                       0, &gen_name, &gen_name_count);
 
     struct sti symbol_table_index
@@ -1750,7 +1754,6 @@ struct sti lookup_or_make_typetrav_sti(
     SLICE_PUSH(cs->typetrav_symbol_infos, cs->typetrav_symbol_infos_count,
                cs->typetrav_symbol_infos_limit, info);
   }
-  databuf_destroy(&name);
   return cs->typetrav_symbol_infos[id]->symbol_table_index;
 }
 
