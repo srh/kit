@@ -220,11 +220,11 @@ func is_hexdigit(x i32, val_out *i8) bool {
     return true;
   }
   if 'A' <= x && x <= 'F' {
-    *val_out = ~(x - 'A');
+    *val_out = 10 + ~(x - 'A');
     return true;
   }
   if 'a' <= x && x <= 'f' {
-    *val_out = ~(x - 'a');
+    *val_out = 10 + ~(x - 'a');
     return true;
   }
   return false;

@@ -532,35 +532,67 @@ func[T] big(arr T) bigint {
   return convert_to_bigint(10, &b2);
 }
 
+deftype big_ctx struct {
+  failures u32;
+};
+
+func[T] add_test(ctx *big_ctx, name T, result bool) void {
+  name8 array[u8] = _u8(name);
+  if !result {
+    print(Stdout(), _u8("bigint test "), name8, _u8(" FAIL\n"));
+    ctx->failures = ctx->failures + 1;
+  } else {
+    print(Stdout(), _u8("bigint test "), name8, _u8(" PASS\n"));
+  }
+  fflush(Stdout());
+}
+
 func test_bigint() bool {
-  pass bool = true;
+  ctx big_ctx;
   fourg bigint = multiply(@[bigint]~ @[u32]2, ~ @[u32]0x80000000);
-  pass = pass & (big("1") + big("2") == big("3"));
-  pass = pass & (big("20") + big("30") == big("50"));
-  pass = pass & (big("2000000000") + big("3000000000") == big("5000000000"));
-  pass = pass & (big("2000000000") - big("3000000000") == - big("1000000000"));
-  pass = pass & (multiply(-big("10000000000"), -big("17")) == big("170000000000"));
-  pass = pass & ((big("129") >> 2) == (big("32")));
-  pass = pass & ((multiply(fourg, big("129")) >> 34) == (big("32")));
-  pass = pass & (((-big("9")) >> 2) == (-big("3")));
-  pass = pass & (((-multiply(fourg, big("9"))) >> 34) == (-big("3")));
-  pass = pass & (((big("9")) << 2) == (big("36")));
-  pass = pass & (((big("9")) << 34) == multiply(fourg, big("36")));
-  pass = pass & (incr(fourg - big("1")) == fourg);
-  pass = pass & (incr(fourg) == (fourg + big("1")));
-  pass = pass & (incr(big("1")) == big("2"));
-  pass = pass & (incr(big("0")) == big("1"));
-  pass = pass & (incr(-big("1")) == big("0"));
-  pass = pass & (incr(-big("2")) == -big("1"));
-  pass = pass & (incr(-big("18")) == -big("17"));
-  pass = pass & (incr(-big("19")) == -big("18"));
-  pass = pass & (incr(-fourg) == -(fourg - big("1")));
-  pass = pass & (incr(-(fourg + big("1"))) == -fourg);
-  pass = pass & (divmod(big("17"), big("3")) == cons(big("5"), big("2")));
-  pass = pass & (divmod(-big("17"), big("3")) == cons(-big("6"), big("1")));
-  pass = pass & (((-big("3")) & big("3")) == big("1"));
-  pass = pass & (((-big("3")) | big("2")) == -big("1"));
-  pass = pass & (((-big("3")) ^ big("3")) == -big("2"));
-  pass = pass & (^big("3") == -big("4"));
-  return pass;
+  add_test(&ctx, "b001", big("1") + big("2") == big("3"));
+  add_test(&ctx, "b002", big("20") + big("30") == big("50"));
+  add_test(&ctx, "b003", big("2000000000") + big("3000000000") == big("5000000000"));
+  add_test(&ctx, "b004", big("2000000000") - big("3000000000") == - big("1000000000"));
+  add_test(&ctx, "b005", multiply(-big("10000000000"), -big("17")) == big("170000000000"));
+  add_test(&ctx, "b006", (big("129") >> 2) == (big("32")));
+  add_test(&ctx, "b007", (multiply(fourg, big("129")) >> 34) == (big("32")));
+  add_test(&ctx, "b008", ((-big("9")) >> 2) == (-big("3")));
+  add_test(&ctx, "b009", ((-multiply(fourg, big("9"))) >> 34) == (-big("3")));
+  add_test(&ctx, "b010", ((big("9")) << 2) == (big("36")));
+  add_test(&ctx, "b011", ((big("9")) << 34) == multiply(fourg, big("36")));
+  add_test(&ctx, "b012", incr(fourg - big("1")) == fourg);
+  add_test(&ctx, "b013", incr(fourg) == (fourg + big("1")));
+  add_test(&ctx, "b014", incr(big("1")) == big("2"));
+  add_test(&ctx, "b015", incr(big("0")) == big("1"));
+  add_test(&ctx, "b016", incr(-big("1")) == big("0"));
+  add_test(&ctx, "b017", incr(-big("2")) == -big("1"));
+  add_test(&ctx, "b018", incr(-big("18")) == -big("17"));
+  add_test(&ctx, "b019", incr(-big("19")) == -big("18"));
+  add_test(&ctx, "b020", incr(-fourg) == -(fourg - big("1")));
+  add_test(&ctx, "b021", incr(-(fourg + big("1"))) == -fourg);
+  add_test(&ctx, "b022", divmod(big("17"), big("3")) == cons(big("5"), big("2")));
+  add_test(&ctx, "b023", divmod(-big("17"), big("3")) == cons(-big("6"), big("1")));
+  add_test(&ctx, "b024", ((-big("3")) & big("3")) == big("1"));
+  add_test(&ctx, "b025", ((-big("3")) | big("2")) == -big("1"));
+  add_test(&ctx, "b026", ((-big("3")) ^ big("3")) == -big("2"));
+  add_test(&ctx, "b027", ^big("3") == -big("4"));
+  return ctx.failures == 0;
+}
+
+func[H] build_u8str(help H, r *array[u8], x *bigint) void {
+  append(r, _u8("big"));
+  if is_negative(x) {
+    append(r, _u8("(neg)"));
+  }
+  push(r, '{');
+  n size = bigdigit_count(x);
+  for i size = 0; i < n; i = i + 1 {
+    if i != 0 {
+      push(r, ' ');
+    }
+    k u32 = getbigdigit(x, i);
+    build_u8str(help, r, &k);
+  }
+  push(r, '}');
 }
