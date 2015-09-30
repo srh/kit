@@ -735,7 +735,7 @@ func ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typ
 func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]], out *deftype_entry_id) bool {
   if case Has(arr *array[deftype_entry_id]) = lookup_ref(&cs->deftypes_by_name, &name) {
     n size = count(arr);
-    match opt[deftype_entry_id];
+    match opt[deftype_entry_id] = None();
     for i size = 0; i < n; i = i + 1 {
       id deftype_entry_id = get(arr, i);
       ent *_ = ref_deftype_entry(cs, id);
