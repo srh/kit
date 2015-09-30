@@ -769,7 +769,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
           annotate(&a.info, FieldName(offset));
         }
         case ConstantField(value u32): {
-          after nc[ast_expr_after_discard];
+          after nc[ast_expr_after_discard] = NotComputed();
           if !annotate_disposal_for_discard(es, oo(&a.lhs), &after) {
             return false;
           }
@@ -1966,7 +1966,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   } else {
     // Dereferencing a pointer always makes an lvalue.
     lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props), DeadMe(void)});
-    ie_info_after nc[ast_expr_after_consume];
+    ie_info_after nc[ast_expr_after_consume] = NotComputed();
     lhs_later ast_later_discard_info = mk_later();
     if !annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later) {
       return false;
