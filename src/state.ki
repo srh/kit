@@ -111,7 +111,7 @@ deftype positionals struct {
 func mk_positionals() positionals {
   // Add an unused entry so that the zero ast_meta value is "invalid."
   p positionals;
-  nilmeta meta_datum;
+  nilmeta meta_datum = {None(), None()};
   push(&p.metas, nilmeta);
   return p;
 }
