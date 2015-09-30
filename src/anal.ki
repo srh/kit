@@ -80,7 +80,12 @@ func help_basic_analyze(cs *checkstate, f *objfile, bas *basic_analyze_state, gr
     switch &node->op {
     case &GrApply(a gr_apply):
       push(&bas->paramlists, ~i);
-      set(&ref(&bas->celldisp, a.funcell.~)->funcell, gn);
+      funcell_cd *cell_disp = ref(&bas->celldisp, a.funcell.~);
+      if case &Has(other_gn gr_num) = &funcell_cd->funcell {
+        ice(_u8("two-timing funcell "), a.funcell.~, _u8(" for "), other_gn.~, _u8(" and "), i);
+      } else {
+        funcell_cd->funcell = Has(gn);
+      }
       nparams size = count(&a.params);
       for j size = 0; j < nparams; j = j + 1 {
         mark_cell_paramlist(bas, get(&a.params, j), gn);
