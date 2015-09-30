@@ -189,7 +189,7 @@ func generate_kit_name(cs *checkstate, informal_name sym, arg_types shray[cu_typ
     if i != 0 {
       push(&build, ',');
     }
-    build_u8str(void, &build, ref(&arg_types, i));
+    build_u8str(cs->im, &build, ref(&arg_types, i));
   }
   push(&build, ']');
   return intern(cs->im, from_u8(&build));
