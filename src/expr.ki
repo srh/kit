@@ -1925,7 +1925,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   }
   sizetype cu_typeexpr = compute_prim(es->ds, primitive_size_type(es->cs));
 
-  rhs_later ast_later_discard_info;
+  rhs_later ast_later_discard_info = mk_later();
   if !check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.~, &rhs_later) {
     return false;
   }
@@ -1967,7 +1967,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     // Dereferencing a pointer always makes an lvalue.
     lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props), DeadMe(void)});
     ie_info_after nc[ast_expr_after_consume];
-    lhs_later ast_later_discard_info;
+    lhs_later ast_later_discard_info = mk_later();
     if !annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later) {
       return false;
     }
