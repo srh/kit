@@ -278,7 +278,8 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
 
   noopt_offsets array[cell_loc] = unHas_array(&offsets);
   annotate(&h->offsets, noopt_offsets);
-  annotate(&h->low_offset, low_offset);
+  // We subtract 4 because we haven't accounted for the possible need to make a hidden return pointer for the x86 callconv.
+  annotate(&h->low_offset, low_offset - 4);
   return true;
 }
 
