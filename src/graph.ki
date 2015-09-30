@@ -1845,6 +1845,16 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     push(&cases_gn, cons(@[gr_const]ConstInt(~ tagval.~), finalseqgn));
   }
 
+  if true {
+    if case CtorDestroy(v void) = wc {
+      push(&cases_gn, cons(@[gr_const]ConstInt(bigu(0)), deadseq));
+    } else {
+      ztgn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))})));
+      ztseq gr_num = add_node(&gr, node0(@[gr_op]GrSequence({ztgn, deadseq})));
+      push(&cases_gn, cons(@[gr_const]ConstInt(bigu(0)), ztseq));
+    }
+  }
+
   br gr_num = add_node(&gr, node0(@[gr_op]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None()})));
   sqr gr_num = add_node(&gr, node0(@[gr_op]GrSequence({deref_gn, br})));
   *gr_out = gr;
