@@ -1,7 +1,7 @@
 import bar;
 import string;
 
-export def foo i32 = 1;
+def foo i32 = 1;
 
 func fac(x i32) i32 {
   acc i32 = 1;
@@ -102,11 +102,13 @@ def blah_enty = func(x enty) enty {
     s string = lits("not c1 this time\n");
     print(&s);
   }
+
   while case c1(a void) = x {
     s string = lits("c1 (void) while looped\n");
     print(&s);
     x = c3(s);
   }
+
 
   daw enty = y;
   y = kraw;

@@ -122,7 +122,6 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
   check_add_all(&prelive.all, &g->argcells);
   check_add(&prelive.all, g->graph.cell);
 
-  DBG(_u8("gen graphed fn body for "), lookup(cs->im, g->graph.gr.informal_name));
   mut genexpr_result;
   if !dumbly_analyze_expression(&h, &g->graph.gr, g->graph.gn, &prelive, &mut) {
     return false;

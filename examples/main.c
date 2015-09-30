@@ -8,7 +8,6 @@ struct ty {
   int32_t y;
 };
 
-extern int32_t foo;
 struct ty showfacs(struct ty *t, uint16_t *num);
 
 int32_t flushstdout(void) {
@@ -17,8 +16,6 @@ int32_t flushstdout(void) {
 }
 
 int main(void) {
-  printf("foo value: %" PRIu32 "\n", foo);
-
   struct ty blah[2];
   uint16_t num;
   struct ty res = showfacs(blah, &num);
