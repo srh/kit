@@ -1124,6 +1124,8 @@ func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecell
     cu_parms cu_genparms = HasParms(mk_shray(ref_cell(es, dest)->type));
     inst_id def_inst_id = enqueue_def_inst(es->cs, es->clq, ent, &cu_parms);
     ip = {ent, inst_id};
+  } else {
+    ice(_u8("cs->prims.ptr_eq not initialized"));
   }
 
   booltype cu_typeexpr;

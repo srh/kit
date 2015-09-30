@@ -147,12 +147,27 @@ deftype checkstate struct {
 };
 
 func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader fn[*checkstate, sym, opt[array[u8]]]) checkstate {
-  ret checkstate;
-  ret.im = im;
-  ret.instantiation_depth = 0;
-  ret.plat = plat;
-  ret.loader_ctx = loader_ctx;
-  ret.loader = loader;
+  ret checkstate = {
+    im,
+    0,
+    plat,
+    loader_ctx,
+    loader,
+    mk_positionals(),
+    mk_array(),
+    mk_hash(),
+    mk_array(),
+    mk_array(),
+    mk_array(),
+    mk_hash(),
+    mk_array(),
+    mk_hash(),
+    mk_array(),
+    mk_array(),
+    0,
+    // TODO: s1 doesn't require this initialization -- I think its "if case ..." code tolerates uninitialized values.
+    {None()}
+  };
   return ret;
 }
 
