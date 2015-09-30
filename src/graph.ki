@@ -2080,7 +2080,6 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
   fntype_props type_properties;
   compute_prim(cs, clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
-  fncell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
   argcells array[cell_num];
   fieldptrcells array[cell_num];
   precs array[gr_num];
@@ -2102,6 +2101,7 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
   }
 
   retcell cell_num = add_cell(&gr, {LocationStatic(void), voidtp.cu, voidtp.props});
+  fncell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
   var fn_gn = add_node(&gr, node0(@[gr_op]GrWriteConst({fncell, ConstDef(mwfi->ip)})));
   push(&precs, fn_gn);
 
