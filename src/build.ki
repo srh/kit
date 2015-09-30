@@ -151,18 +151,18 @@ func add_fn_body_symbols(cs *checkstate, f *objfile) bool {
 
 func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
   switch &ent->u {
-  case &GraphedFnBody(g graphed_fn_body): { }
+  case &GraphedFnBody(g graphed_fn_body):
+    // We do make symbol names for prim fn bodies, but maybe we won't actually generate them.
+    name sym = generate_kit_name(cs, ent->informal_name);
+    symbol_table_index sti = add_local_symbol(f, name, 0 /* We'll overwrite the value later. */, SectionText(void), IsStaticNo(void));
+    annotate(&ent->symbol_table_index, symbol_table_index);
+    return true;
   case &ExternFnBody(e extern_fn_body):
     c_name sym = c_symbol_name(cs, e.name);
     symbol_table_index sti = add_remote_symbol(f, c_name, IsFunctionYes(void));
     annotate(&ent->symbol_table_index, symbol_table_index);
     return true;
   }
-  // We do make symbol names for prim fn bodies, but maybe we won't actually generate them.
-  name sym = generate_kit_name(cs, ent->informal_name);
-  symbol_table_index sti = add_local_symbol(f, name, 0 /* We'll overwrite the value later. */, SectionText(void), IsStaticNo(void));
-  annotate(&ent->symbol_table_index, symbol_table_index);
-  return true;
 }
 
 func generate_kit_name(cs *checkstate, informal_name sym) sym {
