@@ -1290,7 +1290,6 @@ func rval_cell(x *is_lval) cell_num {
   }
 }
 
-// TODO: This is a lame and fragile way to specify when to make cells be GrDead.
 defenum dead_after_destroy {
   DeadAfterDestroyYes void;
   DeadAfterDestroyNo void;
@@ -1386,6 +1385,7 @@ func gr_init_action(cs *checkstate, gr *frame_graph, x *init_action, out *gr_num
   }
 }
 
+// TODO: The dead_after_destroy parameter here is definitely unnecessary, but not too harmful now.
 func gr_destroy_action(cs *checkstate, gr *frame_graph, x *destroy_action, dad dead_after_destroy, out *gr_num) bool {
   switch &x->ctor {
     case &UniTrivialCtor(v void): {
