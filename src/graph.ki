@@ -57,10 +57,23 @@ func add_cell(gr *frame_graph, info cell_info) cell_num {
   return num;
 }
 
+// TODO: Get rid of this -- use addx, addq.
 func add_node(gr *frame_graph, node gr_node) gr_num {
   ret gr_num = ~count(&gr->ops);
   push(&gr->ops, node);
   return ret;
+}
+
+func addx(gr *frame_graph, precs shray[gr_num], op gr_op) gr_num {
+  return add_node(gr, {precs, op});
+}
+
+func addx(gr *frame_graph, op gr_op) gr_num {
+  return add_node(gr, {mk_shray(), op});
+}
+
+func addq(gr *frame_graph, op gr_op) gr_num {
+  return add_node(gr, {mk_shray(), op});
 }
 
 func mut_xnop_node(gr *frame_graph, ix gr_num, newnode gr_node) void {
@@ -188,7 +201,7 @@ deftype fullbody_state struct {
 };
 
 func gr_fullbody(cs *checkstate, gr *frame_graph, x *ast_fullbody, out *gr_num, return_cell_out *cell_num) bool {
-  var final_node = add_node(gr, node0(@[gr_op]GrXNop(void)));
+  var final_node = addx(gr, GrXNop(void));
 
   info *ast_fullbody_info = unHas(&x->info);
   exit_node gr_num;
