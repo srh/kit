@@ -57,23 +57,22 @@ func add_cell(gr *frame_graph, info cell_info) cell_num {
   return num;
 }
 
-// TODO: Get rid of this -- use addx, addq.
-func add_node(gr *frame_graph, node gr_node) gr_num {
+func help_add_node(gr *frame_graph, node gr_node) gr_num {
   ret gr_num = ~count(&gr->ops);
   push(&gr->ops, node);
   return ret;
 }
 
 func addx(gr *frame_graph, precs shray[gr_num], op gr_op) gr_num {
-  return add_node(gr, {precs, op});
+  return help_add_node(gr, {precs, op});
 }
 
 func addx(gr *frame_graph, op gr_op) gr_num {
-  return add_node(gr, {mk_shray(), op});
+  return help_add_node(gr, {mk_shray(), op});
 }
 
 func addq(gr *frame_graph, op gr_op) gr_num {
-  return add_node(gr, {mk_shray(), op});
+  return help_add_node(gr, {mk_shray(), op});
 }
 
 func mut_xnop_node(gr *frame_graph, ix gr_num, newnode gr_node) void {
@@ -2133,7 +2132,7 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
   var fn_gn = addx(&gr, @[gr_op]GrWriteConst({fncell, ConstDef(mwfi->ip)}));
   push(&precs, fn_gn);
 
-  var ap = add_node(&gr, node(freeze(&precs), @[gr_op]GrApply({fncell, freeze(&fieldptrcells), retcell})));
+  var ap = addx(&gr, freeze(&precs), @[gr_op]GrApply({fncell, freeze(&fieldptrcells), retcell}));
 
   *gr_out = gr;
   *gn_out = ap;
@@ -2204,7 +2203,7 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
   var tagcell_gn = addx(&gr, @[gr_op]GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)}));
   var tag_gn1 = addx(&gr, mk_shray(tagcell_gn), @[gr_op]GrWriteConst({tag_cell, ConstInt(~tagval.~)}));
   var tag_gn = addx(&gr, mk_shray(tag_gn1), @[gr_op]GrVirtualDead({tag_cell}));
-  var gn = add_node(&gr, node(concat(@[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn), postpadding_ogn), @[gr_op]GrXNop(void)));
+  var gn = addx(&gr, concat(@[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn), postpadding_ogn), @[gr_op]GrXNop(void));
   *gr_out = gr;
   *gn_out = gn;
   *return_cell_out = retnum;
