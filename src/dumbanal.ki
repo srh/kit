@@ -168,17 +168,17 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     combined_mut genexpr_result = NonTerminal({mk_hash(), mk_hash()});
     ncases size = count(&a.cases);
     for i size = 0; i < ncases; i = i + 1 {
-      cas *tup[gr_const, gr_num] = ref(&a.cases, i);
+      cas *tup[gr_const, sq_num] = ref(&a.cases, i);
       casmut genexpr_result;
-      if !dumbly_analyze_expression(h, gr, cas->cdr, &new_live, &casmut) {
+      if !dumbly_analyze_expression(h, gr, cas->cdr.~, &new_live, &casmut) {
         return false;
       }
       combine_branch_mut(&combined_mut, &casmut);
     }
 
-    if case Has(def_gn gr_num) = a.default_case {
+    if case Has(def_gn sq_num) = a.default_case {
       defcasmut genexpr_result;
-      if !dumbly_analyze_expression(h, gr, def_gn, &new_live, &defcasmut) {
+      if !dumbly_analyze_expression(h, gr, def_gn.~, &new_live, &defcasmut) {
         return false;
       }
       combine_branch_mut(&combined_mut, &defcasmut);
@@ -198,7 +198,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     prec_muts = compose_muts(&prec_muts, &firstmut);
     compose_live(&new_live, &firstmut);
     secondmut genexpr_result;
-    if !dumbly_analyze_expression(h, gr, a.second, &new_live, &secondmut) {
+    if !dumbly_analyze_expression(h, gr, a.second.~, &new_live, &secondmut) {
       return false;
     }
 
@@ -210,7 +210,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     new_live lives = *prelive;
     compose_live(&new_live, &prec_muts);
     exitmut genexpr_result;
-    if !dumbly_analyze_expression(h, gr, a.next, &new_live, &exitmut) {
+    if !dumbly_analyze_expression(h, gr, a.next.~, &new_live, &exitmut) {
       return false;
     }
     compose_result(&prec_muts, &exitmut, mut_out);
@@ -549,12 +549,12 @@ func dumbly_analyze_secondpass(h *frame, gr *frame_graph, gn gr_num, paras *hash
   case &GrBranch(a gr_branch):
     ncases size = count(&a.cases);
     for i size = 0; i < ncases; i = i + 1 {
-      if !dumbly_analyze_secondpass(h, gr, ref(&a.cases, i)->cdr, paras) {
+      if !dumbly_analyze_secondpass(h, gr, ref(&a.cases, i)->cdr.~, paras) {
         return false;
       }
     }
-    if case Has(def_gn gr_num) = a.default_case {
-      if !dumbly_analyze_secondpass(h, gr, def_gn, paras) {
+    if case Has(def_gn sq_num) = a.default_case {
+      if !dumbly_analyze_secondpass(h, gr, def_gn.~, paras) {
         return false;
       }
     }
@@ -562,11 +562,11 @@ func dumbly_analyze_secondpass(h *frame, gr *frame_graph, gn gr_num, paras *hash
     if !dumbly_analyze_secondpass(h, gr, a.first, paras) {
       return false;
     }
-    if !dumbly_analyze_secondpass(h, gr, a.second, paras) {
+    if !dumbly_analyze_secondpass(h, gr, a.second.~, paras) {
       return false;
     }
   case &GrJmp(a gr_jmp):
-    if !dumbly_analyze_secondpass(h, gr, a.next, paras) {
+    if !dumbly_analyze_secondpass(h, gr, a.next.~, paras) {
       return false;
     }
   case &GrWriteNothing(a gr_writenothing): { }

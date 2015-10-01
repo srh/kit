@@ -565,7 +565,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         ncases size = count(&a.cases);
         found bool = false;
         for i size = 0; i < ncases && !found; i = i + 1 {
-          case_i *tup[gr_const, gr_num] = ref(&a.cases, i);
+          case_i *tup[gr_const, sq_num] = ref(&a.cases, i);
           case_value st_value;
           if !st_const_compute(clq, &env->plat, &case_i->car, src_obj.count, &case_value) {
             return false;
@@ -575,13 +575,13 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
             return false;
           }
           if case_matches {
-            push(&stack, EvalOpAndPrecs(case_i->cdr));
+            push(&stack, EvalOpAndPrecs(case_i->cdr.~));
             found = true;
           }
         }
         if !found {
-          if case Has(default_gn gr_num) = a.default_case {
-            push(&stack, EvalOpAndPrecs(default_gn));
+          if case Has(default_gn sq_num) = a.default_case {
+            push(&stack, EvalOpAndPrecs(default_gn.~));
           } else {
             ERR(_u8("GrBranch meets unhandled case"));
             return false;
@@ -590,11 +590,11 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
 
       case &GrSequence(a gr_sequence):
         // first gets evaluated before second (because it gets pushed after)
-        push(&stack, EvalOpAndPrecs(a.second));
+        push(&stack, EvalOpAndPrecs(a.second.~));
         push(&stack, EvalOpAndPrecs(a.first));
 
       case &GrJmp(a gr_jmp):
-        push(&stack, EvalOpAndPrecs(a.next));
+        push(&stack, EvalOpAndPrecs(a.next.~));
 
       case &GrWriteNothing(a gr_writenothing):
         st_maybe_init_static(&fg->gr, env, a.dest);
