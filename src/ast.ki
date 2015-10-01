@@ -233,7 +233,8 @@ deftype ast_ifthenelse_statement struct {
 };
 
 deftype ast_while_statement struct {
-  condition_discard ast_condition_discard_info;
+  condition_discard_continue ast_condition_discard_info;
+  condition_discard_exit ast_condition_discard_info;
   condition ast_condition;
   body ast_bracebody;
 };

@@ -172,10 +172,13 @@ func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) bo
 
 // For exprs that we use, but then discard.  Conditionals... and switches?  Kinda.
 func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info) bool {
+  return check_consume_then_discard_expr(es, x, pt, later, None());
+}
+func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) bool {
   if !check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
     return false;
   }
-  if !annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later) {
+  if !annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later, later2) {
     return false;
   }
   return true;
@@ -259,7 +262,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
 
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
-      if !check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard) {
+      if !check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard_continue, Has(&b.condition_discard_exit)) {
         return false;
       }
       body_ee entryexit;
@@ -601,10 +604,22 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
 }
 
 func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info) bool {
+  return check_condition(es, swartch_vp, cond_vp, a, cd, None());
+}
+
+func cdi_later(cdo opt[*ast_condition_discard_info]) opt[*ast_later_discard_info] {
+  if case Has(p) = cdo {
+    return Has(&p->later);
+  } else {
+    return None();
+  }
+}
+
+func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info, cd2 opt[*ast_condition_discard_info]) bool {
   switch a {
     case &ExprCondition(b box[ast_expr_consume]): {
       booltype cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
-      if !check_consume_then_discard_expr(es, oo(&b), &booltype.~, &cd->later) {
+      if !check_consume_then_discard_expr(es, oo(&b), &booltype.~, &cd->later, cdi_later(cd2)) {
         return false;
       }
 
@@ -614,11 +629,14 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
         return false;
       }
       annotate(&cd->virtual_cell_dead, None());
+      if case Has(p) = cd2 {
+        annotate(&p->virtual_cell_dead, None());
+      }
       return true;
     }
     case &PatternCondition(b ast_pattern_assign): {
       unknown te_typeexpr = TeUnknown(void);
-      if !check_consume_then_discard_expr(es, oo(&b.rhs), &unknown, &cd->later) {
+      if !check_consume_then_discard_expr(es, oo(&b.rhs), &unknown, &cd->later, cdi_later(cd2)) {
         return false;
       }
 
@@ -682,6 +700,9 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
         }
         cell cell_num = add_virtual_cell(es, cu_expected_type, expected_type_props);
         annotate(&cd->virtual_cell_dead, Has(cell));
+        if case Has(p) = cd2 {
+          annotate(&p->virtual_cell_dead, Has(cell));
+        }
         tag_cell cell_num = add_virtual_tag_cell(es, &et);
         annotate(&b.info, {{tag_cell, ~count(&et.constructors)}, mk_enum_tag_value(decl_index)});
         vn var_number;

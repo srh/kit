@@ -1284,7 +1284,7 @@ func parse_rest_of_while_statement(p *ps, out *ast_statement) bool {
        && parse_bracebody(p, &body)) {
     return Fail;
   }
-  *out = While({mk_condition_discard_info(), condition, body});
+  *out = While({mk_condition_discard_info(), mk_condition_discard_info(), condition, body});
   return true;
 }
 

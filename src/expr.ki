@@ -1099,18 +1099,31 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
   return true;
 }
 
+
 // Annotates the disposal for a value we'll use but then discard.
-func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume], later *ast_later_discard_info) bool {
+func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume], later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) bool {
   if !annotate_disposal_for_consume(es, a, after) {
     return false;
   }
 
-  info *ast_expr_complete_info = expr_complete_info(a);
-  destroy uni_ctor_desc;
-  if !get_destroy_uni_ctor(es, &info->cu, &destroy) {
-    return false;
+  // TODO: Dedup this code or stop generating all cells at check-time.
+  if true {
+    info *ast_expr_complete_info = expr_complete_info(a);
+    destroy uni_ctor_desc;
+    if !get_destroy_uni_ctor(es, &info->cu, &destroy) {
+      return false;
+    }
+    annotate(&later->action, {destroy, result_cell(unHas(after))});
   }
-  annotate(&later->action, {destroy, result_cell(unHas(after))});
+
+  if case Has(p *ast_later_discard_info) = later2 {
+    info *ast_expr_complete_info = expr_complete_info(a);
+    destroy uni_ctor_desc;
+    if !get_destroy_uni_ctor(es, &info->cu, &destroy) {
+      return false;
+    }
+    annotate(&p->action, {destroy, result_cell(unHas(after))});
+  }
   return true;
 }
 
@@ -1968,7 +1981,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props), DeadMe(void)});
     ie_info_after nc[ast_expr_after_consume] = NotComputed();
     lhs_later ast_later_discard_info = mk_later();
-    if !annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later) {
+    if !annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later, None()) {
       return false;
     }
 

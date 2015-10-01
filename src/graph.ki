@@ -486,12 +486,12 @@ func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *
   var topgn = add_node(gr, node0(@[gr_op]GrNop(void)));
 
   loopcleanupgn gr_num;
-  if !gr_condition_discard(cs, gr, &a->condition_discard, &loopcleanupgn) {
+  if !gr_condition_discard(cs, gr, &a->condition_discard_continue, &loopcleanupgn) {
     return false;
   }
 
   loopexitgn gr_num;
-  if !gr_condition_discard(cs, gr, &a->condition_discard, &loopexitgn) {
+  if !gr_condition_discard(cs, gr, &a->condition_discard_exit, &loopexitgn) {
     return false;
   }
 
@@ -499,7 +499,7 @@ func gr_while_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a *
 
   var continuegn = add_node(gr, node0(@[gr_op]GrSequence({loopcleanupgn, topgn})));
   thengn gr_num;
-  if !gr_condition_body(cs, gr, fb, &a->condition_discard, &a->body, continuegn, &thengn) {
+  if !gr_condition_body(cs, gr, fb, &a->condition_discard_continue, &a->body, continuegn, &thengn) {
     return false;
   }
   gn gr_num;
