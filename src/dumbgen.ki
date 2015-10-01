@@ -645,8 +645,13 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         DUMBGEN("GrVirtualDead");
         // Do nothing.  (Likewise.)
         x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
-      case &GrNop(v void):
-        DUMBGEN("GrNop");
+      case &GrXNop(v void):
+        DUMBGEN("GrXNop");
+        // Do nothing (but do it less glamorously).
+        // TODO: Don't jmp so gratuitously.
+        x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
+      case &GrQNop(v void):
+        DUMBGEN("GrQNop");
         // Do nothing (but do it less glamorously).
         // TODO: Don't jmp so gratuitously.
         x86_gen_placeholder_jmp(f, h, otgna.jmpaft);

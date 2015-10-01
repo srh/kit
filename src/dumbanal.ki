@@ -234,8 +234,13 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     *mut_out = Terminal(prec_muts);
     return true;
 
-  case &GrNop(v void):
-    DUMBG("GrNop");
+  case &GrXNop(v void):
+    DUMBG("GrXNop");
+    *mut_out = Terminal(prec_muts);
+    return true;
+
+  case &GrQNop(v void):
+    DUMBG("GrQNop");
     *mut_out = Terminal(prec_muts);
     return true;
   }
@@ -567,7 +572,8 @@ func dumbly_analyze_secondpass(h *frame, gr *frame_graph, gn gr_num, paras *hash
   case &GrWriteNothing(a gr_writenothing): { }
   case &GrDead(a gr_dead): { }
   case &GrVirtualDead(a gr_virtual_dead): { }
-  case &GrNop(v void): { }
+  case &GrXNop(v void): { }
+  case &GrQNop(v void): { }
   }
   return true;
 }
