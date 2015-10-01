@@ -602,6 +602,8 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         src_disp i32;
         x86_prep_loc_use(f, get_loc(h, a.src), X86_EAX, &src_addr, &src_disp);
         x86_load32_zeroextend(f, X86_EAX, src_addr, src_disp, src_size);
+
+        done_a_push bool = false;
         ncases size = count(&a.cases);
         for i size = 0; i < ncases; i = i + 1 {
           cas *tup[gr_const, sq_num] = ref(&a.cases, i);
@@ -611,12 +613,13 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           }
           x86_cmp_imm_sized(h->cs, f, X86_EAX, &expected, X86_ECX);
           x86_gen_placeholder_jcc(f, h, X86_JCC_Z, frame_gn_targetnum(h, cas->cdr.~));
-          // TODO: Be more precise about this -- the first branch case we push doesn't need a jmpaft.
-          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({cas->cdr.~, otgna.jmpaft, true}));
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({cas->cdr.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
+          done_a_push = true;
         }
         if case Has(default_gn sq_num) = a.default_case {
           x86_gen_placeholder_jmp(f, h, frame_gn_targetnum(h, default_gn.~));
-          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({default_gn.~, otgna.jmpaft, true}));
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({default_gn.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
+          done_a_push = true;
         } else {
           x86_gen_crash(f, h);
         }
