@@ -653,82 +653,15 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
     }
 
     case &Assignment(a ast_assignment): {
-      // We check the lhs independently of the rhs, deliberately, to ensure clarity.
-      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), pt) {
-        return false;
-      }
-      lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a.lhs));
-      switch &lhs_info->lval {
-        case &IsLvalNo(desc rval_description): {
-          ERR(_u8("Assigning to non-lvalue"));
-          return false;
-        }
-        case &IsLvalYes(desc lval_description): {
-          if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), &lhs_info->cu.~) {
-            return false;
-          }
-          if !annotate_disposal_for_assignment(es, desc.num, oo(&a.rhs), &a) {
-            return false;
-          }
-          annotate_info(x, CompleteCheck(mk(lhs_info->lval, lhs_info->cu, lhs_info->cu_props)));
-          return true;
-        }
-      }
+      return check_expr_assignment(es, pt, &a, x);
     }
 
     case &AddressOf(a ast_addressof): {
-      ptr_unknown te_typeexpr = ptr_type(es->cs, TeUnknown(void));
-      unif_pt te_typeexpr;
-      if !unify_types(pt, &ptr_unknown, &unif_pt) {
-        ERR(_u8("AddressOf expr in non-pointer context"));
-      }
-      param *te_typeexpr;
-      if !decompose_typeapp(&unif_pt, primitive_pointer_puretype(es->cs), &param) {
-        ice(_u8("AddressOf sees non-pointer after unifying with pointer."));
-      }
-      // We require complete matching, because, meh, the rhs should be some crystal clear lvalue anyway.
-      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.rhs), param) {
-        return false;
-      }
-      rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a.rhs));
-      if isNo(rhs_info->lval) {
-        ERR(_u8("Taking address of a non-lvalue"));
-        return false;
-      }
-
-      ptr_type te_typeexpr = ptr_type(es->cs, rhs_info->cu.~);
-      ptr_computed cac_typeexpr;
-      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_type, &ptr_computed) {
-        return false;
-      }
-      check(ptr_computed.complete);
-      ptr_props type_properties;
-      if !compute_complete_type_properties(es->cs, es->clq, &ptr_computed.te, &ptr_props) {
-        return false;
-      }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ptr_computed.te, ptr_props)), ~ptr_computed.te, ptr_props)));
-      return true;
+      return check_expr_addressof(es, pt, &a, x);
     }
+
     case &Deref(a ast_deref): {
-      ptr_pt te_typeexpr = ptr_type(es->cs, *pt);
-      ptr_cac cac_typeexpr;
-      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_pt, &ptr_cac) {
-        return false;
-      }
-      // Seems like no point to allowing an incomplete rhs.
-      if !check_consume_then_discard_expr(es, oo(&a.rhs), &ptr_cac.te, &a.ptr_discard) {
-        return false;
-      }
-      param *te_typeexpr;
-      if !decompose_typeapp(&expr_complete_type(&oo(&a.rhs)->expr)->~, primitive_pointer_puretype(es->cs), &param) {
-        ice(_u8("Deref sees rhs type being non-pointer."));
-      }
-      props type_properties;
-      if !compute_complete_type_properties(es->cs, es->clq, param, &props) {
-        return false;
-      }
-      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_virtual_cell(es, ~ *param, props), DeadMe(void)}), ~ *param, props)));
-      return true;
+      return check_expr_deref(es, pt, &a, x);
     }
 
     case &IndexExpr(a ast_index_expr): {
@@ -740,119 +673,211 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
     }
 
     case &LocalField(a ast_local_field): {
-      unknown te_typeexpr = TeUnknown(void);
-      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a.lhs), &unknown) {
-        return false;
-      }
-      info *ast_expr_complete_info = expr_complete_info(oo(&a.lhs));
-      fieldtype cu_typeexpr;
-      cf_res check_field_result;
-      if !check_field(es, &info->cu, &a.fieldname, pt, &fieldtype, &cf_res) {
-        return false;
-      }
-      props type_properties;
-      if !compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
-        return false;
-      }
-      lval is_lval;
-      switch cf_res {
-        case InheritsLval(offset u32): {
-          switch &info->lval {
-            case &IsLvalYes(desc lval_description): {
-              lval = IsLvalYes({add_virtual_cell(es, fieldtype, props), DeadMe(void)});
-            }
-            case &IsLvalNo(desc rval_description): {
-              lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, fieldtype, props)});
-            }
-          }
-          // There's no disposal, it's a real field access.
-          annotate(&a.info, FieldName(offset));
-        }
-        case ConstantField(value u32): {
-          after nc[ast_expr_after_discard] = NotComputed();
-          if !annotate_disposal_for_discard(es, oo(&a.lhs), &after) {
-            return false;
-          }
-          annotate(&a.info, @[ast_local_field_info]ArrayLength({*unHas(&after), value}));
-          lval = wholeRval(add_static_cell(es, fieldtype, props));
-        }
-      }
-      annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
-      return true;
+      return check_expr_local_field(es, pt, &a, x);
     }
 
     case &DerefField(a ast_deref_field): {
-      // The fact that our partial type isn't a pointer type is deliberate.
-      unknown te_typeexpr = TeUnknown(void);
-      if !check_consume_then_discard_expr(es, oo(&a.lhs), &unknown, &a.ptr_discard) {
-        return false;
-      }
-      info *ast_expr_complete_info = expr_complete_info(&oo(&a.lhs)->expr);
-      param *te_typeexpr;
-      if !decompose_typeapp(&info->cu.~, primitive_pointer_puretype(es->cs), &param) {
-        ERR(_u8("Expected pointer for lhs of deref field"));
-        return false;
-      }
-      cu_param cu_typeexpr = ~ *param;
-      fieldtype cu_typeexpr;
-      cf_res check_field_result;
-      if !check_field(es, &cu_param, &a.fieldname, pt, &fieldtype, &cf_res) {
-        return false;
-      }
-      props type_properties;
-      if !compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
-        return false;
-      }
-      lval is_lval;
-      switch cf_res {
-        case InheritsLval(offset u32): {
-          // We deref, so it's always an lval.
-          lval = IsLvalYes({add_virtual_cell(es, fieldtype, props), DeadMe(void)});
-          annotate(&a.info, DerefFieldName(offset));
-        }
-        case ConstantField(value u32): {
-          lval = wholeRval(add_static_cell(es, fieldtype, props));
-          annotate(&a.info, DerefArrayLength(value));
-        }
-      }
-      annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
-      return true;
+      return check_expr_deref_field(es, pt, &a, x);
     }
 
     case &TypedExpr(a ast_typed_expr): {
-      // TODO: Cache converted.
-      converted te_typeexpr;
-      if !convert_typeexpr(es->cs, &a.type, &converted) {
-        return false;
-      }
-      // We call check_and_compute_typeexpr to disallow totally bogus typeexprs more directly than the eventual type error that would happen.
-      computed cac_typeexpr;
-      if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &computed) {
-        return false;
-      }
-      unified te_typeexpr;
-      if !unify_types(pt, &computed.te, &unified) {
-        ERR(_u8("TypedExpr is incompatible with contextual type."));
-        return false;
-      }
-      unified_computed cac_typeexpr;
-      if computed.complete {
-        unified_computed = computed;
-      } else {
-        if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &unified_computed) {
-          ERR(_u8("TypedExpr encounters un-computable unified type."));
-          return false;
-        }
-      }
-      if !check_expr_ai(es, ai, oo(&a.expr), &unified_computed.te) {
-        return false;
-      }
-      annotate_info(x, inner_info(&oo(&a.expr)->info));
-      return true;
+      return check_expr_typed_expr(es, ai, pt, &a, x);
     }
 
     case &Strinit(a ast_strinit): {
       return check_expr_strinit(es, ai, &a, pt, x);
+    }
+  }
+}
+
+func check_expr_typed_expr(es *framescope, ai allow_incomplete, pt *te_typeexpr, a *ast_typed_expr, x *ast_expr) bool {
+  // TODO: Cache converted.
+  converted te_typeexpr;
+  if !convert_typeexpr(es->cs, &a->type, &converted) {
+    return false;
+  }
+  // We call check_and_compute_typeexpr to disallow totally bogus typeexprs more directly than the eventual type error that would happen.
+  computed cac_typeexpr;
+  if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &computed) {
+    return false;
+  }
+  unified te_typeexpr;
+  if !unify_types(pt, &computed.te, &unified) {
+    ERR(_u8("TypedExpr is incompatible with contextual type."));
+    return false;
+  }
+  unified_computed cac_typeexpr;
+  if computed.complete {
+    unified_computed = computed;
+  } else {
+    if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &unified_computed) {
+      ERR(_u8("TypedExpr encounters un-computable unified type."));
+      return false;
+    }
+  }
+  if !check_expr_ai(es, ai, oo(&a->expr), &unified_computed.te) {
+    return false;
+  }
+  annotate_info(x, inner_info(&oo(&a->expr)->info));
+  return true;
+}
+
+func check_expr_deref_field(es *framescope, pt *te_typeexpr, a *ast_deref_field, x *ast_expr) bool {
+  // The fact that our partial type isn't a pointer type is deliberate.
+  unknown te_typeexpr = TeUnknown(void);
+  if !check_consume_then_discard_expr(es, oo(&a->lhs), &unknown, &a->ptr_discard) {
+    return false;
+  }
+  info *ast_expr_complete_info = expr_complete_info(&oo(&a->lhs)->expr);
+  param *te_typeexpr;
+  if !decompose_typeapp(&info->cu.~, primitive_pointer_puretype(es->cs), &param) {
+    ERR(_u8("Expected pointer for lhs of deref field"));
+    return false;
+  }
+  cu_param cu_typeexpr = ~ *param;
+  fieldtype cu_typeexpr;
+  cf_res check_field_result;
+  if !check_field(es, &cu_param, &a->fieldname, pt, &fieldtype, &cf_res) {
+    return false;
+  }
+  props type_properties;
+  if !compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
+    return false;
+  }
+  lval is_lval;
+  switch cf_res {
+    case InheritsLval(offset u32): {
+      // We deref, so it's always an lval.
+      lval = IsLvalYes({add_virtual_cell(es, fieldtype, props), DeadMe(void)});
+      annotate(&a->info, DerefFieldName(offset));
+    }
+    case ConstantField(value u32): {
+      lval = wholeRval(add_static_cell(es, fieldtype, props));
+      annotate(&a->info, DerefArrayLength(value));
+    }
+  }
+  annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
+  return true;
+}
+
+func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field, x *ast_expr) bool {
+  unknown te_typeexpr = TeUnknown(void);
+  if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), &unknown) {
+    return false;
+  }
+  info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
+  fieldtype cu_typeexpr;
+  cf_res check_field_result;
+  if !check_field(es, &info->cu, &a->fieldname, pt, &fieldtype, &cf_res) {
+    return false;
+  }
+  props type_properties;
+  if !compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
+    return false;
+  }
+  lval is_lval;
+  switch cf_res {
+    case InheritsLval(offset u32): {
+      switch &info->lval {
+        case &IsLvalYes(desc lval_description): {
+          lval = IsLvalYes({add_virtual_cell(es, fieldtype, props), DeadMe(void)});
+        }
+        case &IsLvalNo(desc rval_description): {
+          lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, fieldtype, props)});
+        }
+      }
+      // There's no disposal, it's a real field access.
+      annotate(&a->info, FieldName(offset));
+    }
+    case ConstantField(value u32): {
+      after nc[ast_expr_after_discard] = NotComputed();
+      if !annotate_disposal_for_discard(es, oo(&a->lhs), &after) {
+        return false;
+      }
+      annotate(&a->info, @[ast_local_field_info]ArrayLength({*unHas(&after), value}));
+      lval = wholeRval(add_static_cell(es, fieldtype, props));
+    }
+  }
+  annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
+  return true;
+}
+
+func check_expr_deref(es *framescope, pt *te_typeexpr, a *ast_deref, x *ast_expr) bool {
+  ptr_pt te_typeexpr = ptr_type(es->cs, *pt);
+  ptr_cac cac_typeexpr;
+  if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_pt, &ptr_cac) {
+    return false;
+  }
+  // Seems like no point to allowing an incomplete rhs.
+  if !check_consume_then_discard_expr(es, oo(&a->rhs), &ptr_cac.te, &a->ptr_discard) {
+    return false;
+  }
+  param *te_typeexpr;
+  if !decompose_typeapp(&expr_complete_type(&oo(&a->rhs)->expr)->~, primitive_pointer_puretype(es->cs), &param) {
+    ice(_u8("Deref sees rhs type being non-pointer."));
+  }
+  props type_properties;
+  if !compute_complete_type_properties(es->cs, es->clq, param, &props) {
+    return false;
+  }
+  annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_virtual_cell(es, ~ *param, props), DeadMe(void)}), ~ *param, props)));
+  return true;
+}
+
+func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *ast_expr) bool {
+  ptr_unknown te_typeexpr = ptr_type(es->cs, TeUnknown(void));
+  unif_pt te_typeexpr;
+  if !unify_types(pt, &ptr_unknown, &unif_pt) {
+    ERR(_u8("AddressOf expr in non-pointer context"));
+  }
+  param *te_typeexpr;
+  if !decompose_typeapp(&unif_pt, primitive_pointer_puretype(es->cs), &param) {
+    ice(_u8("AddressOf sees non-pointer after unifying with pointer."));
+  }
+  // We require complete matching, because, meh, the rhs should be some crystal clear lvalue anyway.
+  if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), param) {
+    return false;
+  }
+  rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
+  if isNo(rhs_info->lval) {
+    ERR(_u8("Taking address of a non-lvalue"));
+    return false;
+  }
+
+  ptr_type te_typeexpr = ptr_type(es->cs, rhs_info->cu.~);
+  ptr_computed cac_typeexpr;
+  if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_type, &ptr_computed) {
+    return false;
+  }
+  check(ptr_computed.complete);
+  ptr_props type_properties;
+  if !compute_complete_type_properties(es->cs, es->clq, &ptr_computed.te, &ptr_props) {
+    return false;
+  }
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ptr_computed.te, ptr_props)), ~ptr_computed.te, ptr_props)));
+  return true;
+}
+
+func check_expr_assignment(es *framescope, pt *te_typeexpr, a *ast_assignment, x *ast_expr) bool {
+  // We check the lhs independently of the rhs, deliberately, to ensure clarity.
+  if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), pt) {
+    return false;
+  }
+  lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
+  switch &lhs_info->lval {
+    case &IsLvalNo(desc rval_description): {
+      ERR(_u8("Assigning to non-lvalue"));
+      return false;
+    }
+    case &IsLvalYes(desc lval_description): {
+      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), &lhs_info->cu.~) {
+        return false;
+      }
+      if !annotate_disposal_for_assignment(es, desc.num, oo(&a->rhs), a) {
+        return false;
+      }
+      annotate_info(x, CompleteCheck(mk(lhs_info->lval, lhs_info->cu, lhs_info->cu_props)));
+      return true;
     }
   }
 }
