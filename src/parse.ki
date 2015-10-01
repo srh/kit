@@ -909,131 +909,145 @@ func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) bool {
   return true;
 }
 
-func parse_atomic_expr(p *ps, out *ast_expr) bool {
-  switch peek(p)->val {
-    case Keyw(k): {
-      switch k {
-        case Func(v): {
-          step(p);
-          return parse_rest_of_lambda(p, out);
-        }
-        case True(v): {
-          m ast_meta = startend(p);
-          step(p);
-          *out = mk(m, @[ast_expr_enum]BoolLiteral({m, true}));
-          return true;
-        }
-        case False(v): {
-          m ast_meta = startend(p);
-          step(p);
-          *out = mk(m, @[ast_expr_enum]BoolLiteral({m, false}));
-          return true;
-        }
-        case Void(v): {
-          m ast_meta = startend(p);
-          step(p);
-          *out = mk(m, @[ast_expr_enum]VoidLiteral({m}));
-          return true;
-        }
-        case Null(v): {
-          m ast_meta = startend(p);
-          step(p);
-          *out = mk(m, @[ast_expr_enum]NullLiteral({m}));
-          return true;
-        }
-        default: {
-          return Fail;
-        }
-      }
-    }
-    case Num(n numlit): {
-      num_meta ast_meta = startend(p);
-      switch n {
-        case DecNum(arr shray[i8]): {
-          step(p);
-          *out = mk(num_meta, @[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]DecLiteral({num_meta, arr})));
-          return true;
-        }
-        case HexNum(arr shray[i8]): {
-          step(p);
-          *out = mk(num_meta, @[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]HexLiteral({num_meta, arr})));
-          return true;
-        }
-      }
-    }
-    case Grouper(g grouper): {
-      m ast_meta = start(p);
-      switch g {
-        case LParen(v): {
-          step(p);
-          expr ast_expr;
-          if !(parse_expr(p, kSemicolonPrec, &expr)
-               && try_skip_token(p, @[tokval]Grouper(RParen(void)))) {
-            return Fail;
-          }
-          end(p, m);
-          *out = mk(m, @[ast_expr_enum]ParenExpr({embox(expr)}));
-          return true;
-        }
-        case LBrace(v): {
-          step(p);
-          // TODO: Have some way to prevent naked struct initializers in a condition expression.
-          return parse_rest_of_strinit(p, m, out);
-        }
-        default: { return Fail; }
-      }
-    }
-    case Ident(identch shray[i32]): {
-      ident_meta ast_meta = startend(p);
+func parse_atomic_expr_upon_keyw(p *ps, k keyw, out *ast_expr) bool {
+  switch k {
+    case Func(v): {
       step(p);
-      return parse_finish_name_expr(p, {ident_meta, intern(p->im, ~identch)}, out);
+      return parse_rest_of_lambda(p, out);
     }
-    case Oper(operch shray[i32]): {
-      m ast_meta = start(p);
-      if is_at_sign(&operch) {
+    case True(v): {
+      m ast_meta = startend(p);
+      step(p);
+      *out = mk(m, @[ast_expr_enum]BoolLiteral({m, true}));
+      return true;
+    }
+    case False(v): {
+      m ast_meta = startend(p);
+      step(p);
+      *out = mk(m, @[ast_expr_enum]BoolLiteral({m, false}));
+      return true;
+    }
+    case Void(v): {
+      m ast_meta = startend(p);
+      step(p);
+      *out = mk(m, @[ast_expr_enum]VoidLiteral({m}));
+      return true;
+    }
+    case Null(v): {
+      m ast_meta = startend(p);
+      step(p);
+      *out = mk(m, @[ast_expr_enum]NullLiteral({m}));
+      return true;
+    }
+    default: {
+      return Fail;
+    }
+  }
+}
+
+func parse_atomic_expr_upon_num(p *ps, n *numlit, out *ast_expr) bool {
+  num_meta ast_meta = startend(p);
+  switch n {
+    case &DecNum(arr shray[i8]): {
+      step(p);
+      *out = mk(num_meta, @[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]DecLiteral({num_meta, arr})));
+      return true;
+    }
+    case &HexNum(arr shray[i8]): {
+      step(p);
+      *out = mk(num_meta, @[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]HexLiteral({num_meta, arr})));
+      return true;
+    }
+  }
+}
+
+func parse_atomic_expr_upon_grouper(p *ps, g grouper, out *ast_expr) bool {
+  m ast_meta = start(p);
+  switch g {
+    case LParen(v): {
+      step(p);
+      expr ast_expr;
+      if !(parse_expr(p, kSemicolonPrec, &expr)
+           && try_skip_token(p, @[tokval]Grouper(RParen(void)))) {
+        return Fail;
+      }
+      end(p, m);
+      *out = mk(m, @[ast_expr_enum]ParenExpr({embox(expr)}));
+      return true;
+    }
+    case LBrace(v): {
+      step(p);
+      // TODO: Have some way to prevent naked struct initializers in a condition expression.
+      return parse_rest_of_strinit(p, m, out);
+    }
+    default: { return Fail; }
+  }
+}
+
+func parse_atomic_expr_upon_oper(p *ps, operch *shray[i32], out *ast_expr) bool {
+  m ast_meta = start(p);
+  if is_at_sign(operch) {
+    step(p);
+    type ast_typeexpr;
+    expr ast_expr;
+    if !(try_skip_token(p, @[tokval]Grouper(LBracket(void)))
+         && help_parse_typeexpr(p, AllowBlanksYes(void), &type)
+         && try_skip_token(p, @[tokval]Grouper(RBracket(void)))
+         && parse_expr(p, kConversionRightPrec, &expr)) {
+      return Fail;
+    }
+    end(p, m);
+    *out = mk(m, @[ast_expr_enum]TypedExpr({type, embox(expr)}));
+    return true;
+  } else {
+    switch unop_info(operch) {
+      case None(v): { return Fail; }
+      case Has(rightprec i32): {
+        oper_meta ast_meta = startend(p);
         step(p);
-        type ast_typeexpr;
-        expr ast_expr;
-        if !(try_skip_token(p, @[tokval]Grouper(LBracket(void)))
-             && help_parse_typeexpr(p, AllowBlanksYes(void), &type)
-             && try_skip_token(p, @[tokval]Grouper(RBracket(void)))
-             && parse_expr(p, kConversionRightPrec, &expr)) {
+        rhs ast_expr;
+        if !parse_expr(p, rightprec, &rhs) {
           return Fail;
         }
         end(p, m);
-        *out = mk(m, @[ast_expr_enum]TypedExpr({type, embox(expr)}));
+        *out = build_unop_expr(p->im, m, {oper_meta, intern(p->im, ~ *operch)}, rhs);
         return true;
-      } else {
-        switch unop_info(&operch) {
-          case None(v): { return Fail; }
-          case Has(rightprec i32): {
-            oper_meta ast_meta = startend(p);
-            step(p);
-            rhs ast_expr;
-            if !parse_expr(p, rightprec, &rhs) {
-              return Fail;
-            }
-            end(p, m);
-            *out = build_unop_expr(p->im, m, {oper_meta, intern(p->im, ~operch)}, rhs);
-            return true;
-          }
-        }
       }
     }
-    case StringDelim(ch i32): {
-      if ch == '\"' {
-        m ast_meta = start(p);
-        string_step(p, '\"');
-        return parse_rest_of_string_literal(p, m, out);
-      } else if ch == '\'' {
-        m ast_meta = start(p);
-        string_step(p, '\'');
-        return parse_rest_of_char_literal(p, m, out);
-      } else {
-        ice(_u8("StringDelim with bad ch"));
-        return fake();
-      }
-    }
+  }
+}
+
+func parse_atomic_expr_upon_stringdelim(p *ps, ch i32, out *ast_expr) bool {
+  if ch == '\"' {
+    m ast_meta = start(p);
+    string_step(p, '\"');
+    return parse_rest_of_string_literal(p, m, out);
+  } else if ch == '\'' {
+    m ast_meta = start(p);
+    string_step(p, '\'');
+    return parse_rest_of_char_literal(p, m, out);
+  } else {
+    ice(_u8("StringDelim with bad ch"));
+    return fake();
+  }
+}
+
+func parse_atomic_expr(p *ps, out *ast_expr) bool {
+  switch peek(p)->val {
+    case Keyw(k keyw):
+      return parse_atomic_expr_upon_keyw(p, k, out);
+    case Num(n numlit):
+      return parse_atomic_expr_upon_num(p, &n, out);
+    case Grouper(g grouper):
+      return parse_atomic_expr_upon_grouper(p, g, out);
+    case Ident(identch shray[i32]):
+      ident_meta ast_meta = startend(p);
+      step(p);
+      return parse_finish_name_expr(p, {ident_meta, intern(p->im, ~identch)}, out);
+    case Oper(operch shray[i32]):
+      return parse_atomic_expr_upon_oper(p, &operch, out);
+    case StringDelim(ch i32):
+      return parse_atomic_expr_upon_stringdelim(p, ch, out);
     case Backtick(v): {
       ident_meta ast_meta = start(p);
       step(p);
