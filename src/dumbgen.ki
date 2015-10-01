@@ -554,13 +554,11 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
             restore_esp_to_default_position(f, h);
           }
         }
-        x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
       case &GrPrimApply(a gr_prim_apply):
         DUMBGEN("GrPrimApply");
         if !x86_dumbly_prim_apply(f, h, &a) {
           return false;
         }
-        x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
       case &GrMemCopy(a gr_memcopy):
         DUMBGEN("GrMemCopy");
         dest_ci *cell_info = ref_cell(h->gr, a.dest);
@@ -569,7 +567,6 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           ice(_u8("GrMemCopy to have same-size cells."));
         }
         x86_memcopy(f, get_loc(h, a.dest), get_loc(h, a.src), dest_ci->props.flat_size);
-        x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
       case &GrWriteConst(a gr_writeconst):
         DUMBGEN("GrWriteConst");
         dest_ci *cell_info = ref_cell(h->gr, a.dest);
@@ -579,24 +576,20 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         }
 
         x86_gen_write_value(f, h, a.dest, &value);
-        x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
       case &GrAddressof(a gr_addressof):
         DUMBGEN("GrAddressof");
         x86_load_cell_address(f, h, X86_EAX, a.addressee);
         x86_store32(f, get_ptr_loc(h, a.dest), X86_EAX, X86_EDX);
-        x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
       case &GrDeref(a gr_deref):
         DUMBGEN("GrDeref");
         x86_load32(f, X86_EAX, get_ptr_loc(h, a.pointer));
         x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
         x86_store32(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX);
-        x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
       case &GrSubcell(a gr_subcell):
         DUMBGEN("GrSubcell");
         x86_load_cell_address(f, h, X86_EAX, a.partof);
         x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
         x86_store32(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX);
-        x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
       case &GrBranch(a gr_branch):
         DUMBGEN("GrBranch");
         // TODO: It'd be nice to codegen this without the gratuitous jmps.
@@ -635,20 +628,15 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
       case &GrWriteNothing(a gr_writenothing):
         DUMBGEN("GrWriteNothing");
         // Do nothing.  (This graph node is used for static eval, book keeping, etc.)
-        x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
       case &GrDead(a gr_dead):
         DUMBGEN("GrDead");
         // Do nothing.  (Likewise.)
-        x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
       case &GrVirtualDead(a gr_virtual_dead):
         DUMBGEN("GrVirtualDead");
         // Do nothing.  (Likewise.)
-        x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
       case &GrXNop(v void):
         DUMBGEN("GrXNop");
         // Do nothing (but do it less glamorously).
-        // TODO: Don't jmp so gratuitously.
-        x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
       case &GrQNop(v void):
         DUMBGEN("GrQNop");
         // Do nothing (but do it less glamorously).
