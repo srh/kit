@@ -675,7 +675,7 @@ func gr_return_statement(cs *checkstate, gr *frame_graph, fb *fullbody_state, a 
     }
     push(&fb->return_cells, result_cell(oo(&b)));
   } else {
-    gn = add_node(gr, node0(@[gr_op]GrXNop(void)));
+    gn = addx(gr, @[gr_op]GrXNop(void));
   }
   info *ast_return_statement_info = unHas(&a->info);
   uw gr_num;
@@ -747,7 +747,7 @@ func gr_expr_after_discard(cs *checkstate, gr *frame_graph, aft *ast_expr_after_
   case &DiscardVirtualDead(c cell_num):
     after_gn = addx(gr, @[gr_op]GrVirtualDead({c}));
   case &DiscardNothing(v void):
-    after_gn = add_node(gr, node0(@[gr_op]GrXNop(void)));
+    after_gn = addx(gr, @[gr_op]GrXNop(void));
   }
   *out = after_gn;
   return true;
@@ -843,7 +843,7 @@ func gr_expr(cs *checkstate, gr *frame_graph, x *ast_expr, out *gr_num) bool {
 }
 
 func gr_mk_strinit(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_strinit, out *gr_num) bool {
-  ngn gr_num = add_node(gr, node0(@[gr_op]GrWriteNothing({rval_cell(x)})));
+  ngn gr_num = addx(gr, @[gr_op]GrWriteNothing({rval_cell(x)}));
 
   precs array[gr_num];
   nparams size = count(&a->exprs);
@@ -879,9 +879,9 @@ func gr_deref_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_deref_f
   }
   switch info {
     case &DerefArrayLength(count u32): {
-      var cp = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstInt(~count)})));
+      var cp = addx(gr, @[gr_op]GrWriteConst({rval_cell(x), ConstInt(~count)}));
       var sp = addq(gr, @[gr_op]GrSequence({rp, ap}));
-      var gn = add_node(gr, node(mk_shray(sp, cp), @[gr_op]GrXNop(void)));
+      var gn = addx(gr, mk_shray(sp, cp), @[gr_op]GrXNop(void));
       *out = gn;
       return true;
     }
@@ -908,8 +908,8 @@ func gr_local_field(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_local_f
         return false;
       }
       var dp = addq(gr, @[gr_op]GrSequence({lp, dp1}));
-      var cp = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)})));
-      var gn = add_node(gr, node(mk_shray(dp, cp), @[gr_op]GrXNop(void)));
+      var cp = addx(gr, @[gr_op]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)}));
+      var gn = addx(gr, mk_shray(dp, cp), @[gr_op]GrXNop(void));
       *out = gn;
       return true;
     }
@@ -944,7 +944,7 @@ func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda,
   }
 
   id fn_body_id = add_fn_body(cs, {gr->informal_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, return_cell}, info->arg_cells})});
-  var gn = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstFnBody(id)})));
+  var gn = addx(gr, @[gr_op]GrWriteConst({rval_cell(x), ConstFnBody(id)}));
   *out = gn;
   return true;
 }
@@ -1050,7 +1050,7 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
   if !gr_expr(cs, gr, oo(&a->rhs), &rp) {
     return false;
   }
-  lp_rp_nop gr_num = add_node(gr, node(mk_shray(lp, rp), @[gr_op]GrXNop(void)));
+  lp_rp_nop gr_num = addx(gr, mk_shray(lp, rp), @[gr_op]GrXNop(void));
   switch unHas(&a->info) {
     case &StaticSelfAssignment(v void): {
       *out = lp_rp_nop;
@@ -1094,12 +1094,12 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       return true;
     }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
-      var fc = add_node(gr, node0(@[gr_op]GrWriteConst({ci.comparecells.funcell, ConstDef(ci.comparecells.ip)})));
-      var dp = add_node(gr, node0(@[gr_op]GrAddressof({ci.comparecells.destptr, value_cell(oo(&a->lhs))})));
-      var sp = add_node(gr, node0(@[gr_op]GrAddressof({ci.comparecells.srcptr, value_cell(oo(&a->rhs))})));
+      var fc = addx(gr, @[gr_op]GrWriteConst({ci.comparecells.funcell, ConstDef(ci.comparecells.ip)}));
+      var dp = addx(gr, @[gr_op]GrAddressof({ci.comparecells.destptr, value_cell(oo(&a->lhs))}));
+      var sp = addx(gr, @[gr_op]GrAddressof({ci.comparecells.srcptr, value_cell(oo(&a->rhs))}));
       var ap = addx(gr, mk_shray(fc, dp, sp), @[gr_op]GrApply({ci.comparecells.funcell, mk_shray(ci.comparecells.destptr, ci.comparecells.srcptr), ci.comparecells.cmp_result}));
 
-      var just_dead = add_node(gr, node0(@[gr_op]GrDead({ci.comparecells.cmp_result})));
+      var just_dead = addx(gr, @[gr_op]GrDead({ci.comparecells.cmp_result}));
       if case DeadMe(v void) = ci.rhs_deadme {
         // TODO: It would be nice if we just had a closing node for virtualdead, maybe also for just_dead, instead of these duplicate tails.
         if !gr_chain_virtualdead(cs, gr, just_dead, ci.conditional_copy.src, &just_dead) {
@@ -1116,7 +1116,7 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
         return false;
       }
       assign gr_num = addq(gr, @[gr_op]GrSequence({assign_destroy, assign_copy}));
-      dead_before_assign gr_num = add_node(gr, node0(@[gr_op]GrDead({ci.comparecells.cmp_result})));
+      dead_before_assign gr_num = addx(gr, @[gr_op]GrDead({ci.comparecells.cmp_result}));
       dead_then_assign gr_num = addq(gr, @[gr_op]GrSequence({dead_before_assign, assign}));
       if case DeadMe(v void) = ci.rhs_deadme {
         if !gr_chain_virtualdead(cs, gr, dead_then_assign, ci.conditional_copy.src, &dead_then_assign) {
@@ -1146,10 +1146,10 @@ func gr_logical_conjunction(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast
   rhs_cp_gn gr_num = addx(gr, mk_shray(rhs_dep), @[gr_op]GrMemCopy({rval_cell(x), result_cell(oo(&a->rhs))}));
   rhs_dead_gn gr_num = addx(gr, mk_shray(rhs_cp_gn), @[gr_op]GrDead({result_cell(oo(&a->rhs))}));
 
-  rhs_lhs_dead_gn gr_num = add_node(gr, node0(@[gr_op]GrDead({result_cell(oo(&a->lhs))})));
+  rhs_lhs_dead_gn gr_num = addx(gr, @[gr_op]GrDead({result_cell(oo(&a->lhs))}));
   lhs_dead_then_rhs gr_num = addq(gr, @[gr_op]GrSequence({rhs_lhs_dead_gn, rhs_dead_gn}));
 
-  lhs_cp_gn gr_num = add_node(gr, node0(@[gr_op]GrMemCopy({rval_cell(x), result_cell(oo(&a->lhs))})));
+  lhs_cp_gn gr_num = addx(gr, @[gr_op]GrMemCopy({rval_cell(x), result_cell(oo(&a->lhs))}));
   lhs_dead_gn gr_num = addx(gr, mk_shray(lhs_cp_gn), @[gr_op]GrDead({result_cell(oo(&a->lhs))}));
 
   cases array[tup[gr_const, gr_num]];
@@ -1202,13 +1202,13 @@ func gr_string_literal(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_stri
     }
     push(&bytes, ~ch);
   }
-  var gn = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstBytes(freeze(&bytes))})));
+  var gn = addx(gr, @[gr_op]GrWriteConst({rval_cell(x), ConstBytes(freeze(&bytes))}));
   *out = gn;
   return true;
 }
 
 func gr_literal(cs *checkstate, gr *frame_graph, x *ast_expr, value bigint, out *gr_num) bool {
-  var gn = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstInt(value)})));
+  var gn = addx(gr, @[gr_op]GrWriteConst({rval_cell(x), ConstInt(value)}));
   *out = gn;
   return true;
 }
@@ -1216,15 +1216,15 @@ func gr_literal(cs *checkstate, gr *frame_graph, x *ast_expr, value bigint, out 
 func gr_name_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_name_expr, out *gr_num) bool {
   switch unHas(&a->name_info) {
     case &LocalResolve(li local_info): {
-      *out = add_node(gr, node0(@[gr_op]GrXNop(void)));
+      *out = addx(gr, @[gr_op]GrXNop(void));
       return true;
     }
     case &GlobalResolve(gi global_info): {
-      *out = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstDef({gi.ent, gi.inst})})));
+      *out = addx(gr, @[gr_op]GrWriteConst({rval_cell(x), ConstDef({gi.ent, gi.inst})}));
       return true;
     }
     case &EnumConstructor(ei enum_constructor_info): {
-      *out = add_node(gr, node0(@[gr_op]GrWriteConst({rval_cell(x), ConstDef(ei.ip)})));
+      *out = addx(gr, @[gr_op]GrWriteConst({rval_cell(x), ConstDef(ei.ip)}));
       return true;
     }
   }
@@ -1342,8 +1342,8 @@ func gr_move_action(cs *checkstate, gr *frame_graph, x *move_action, out *gr_num
 }
 
 func gr_uni_fun_ctor_desc(cs *checkstate, gr *frame_graph, desc *uni_fun_ctor_desc, arg cell_num) gr_num {
-  var fc = add_node(gr, node0(@[gr_op]GrWriteConst({desc->funcell, ConstDef(desc->ip)})));
-  var arp = add_node(gr, node0(@[gr_op]GrAddressof({desc->argptr, arg})));
+  var fc = addx(gr, @[gr_op]GrWriteConst({desc->funcell, ConstDef(desc->ip)}));
+  var arp = addx(gr, @[gr_op]GrAddressof({desc->argptr, arg}));
   var ap = addx(gr, mk_shray(fc, arp), @[gr_op]GrApply({desc->funcell, mk_shray(desc->argptr), desc->retvoid}));
   var deadret = addx(gr, mk_shray(ap), @[gr_op]GrDead({desc->retvoid}));
   return deadret;
@@ -1352,7 +1352,7 @@ func gr_uni_fun_ctor_desc(cs *checkstate, gr *frame_graph, desc *uni_fun_ctor_de
 func gr_init_action(cs *checkstate, gr *frame_graph, x *init_action, out *gr_num) bool {
   switch &x->ctor {
     case &UniTrivialCtor(v void): {
-      var dp = add_node(gr, node0(@[gr_op]GrWriteConst({x->arg, ConstInt(~ @[u32] 0)})));
+      var dp = addx(gr, @[gr_op]GrWriteConst({x->arg, ConstInt(~ @[u32] 0)}));
       *out = dp;
       return true;
     }
@@ -1369,9 +1369,9 @@ func gr_destroy_action(cs *checkstate, gr *frame_graph, x *destroy_action, dad d
     case &UniTrivialCtor(v void): {
       dp gr_num;
       if case DeadAfterDestroyYes(v2 void) = dad {
-        dp = add_node(gr, node0(@[gr_op]GrDead({x->arg})));
+        dp = addx(gr, @[gr_op]GrDead({x->arg}));
       } else {
-        dp = add_node(gr, node0(@[gr_op]GrXNop(void)));
+        dp = addx(gr, @[gr_op]GrXNop(void));
       }
       *out = dp;
       return true;
@@ -1391,9 +1391,9 @@ func gr_destroy_action(cs *checkstate, gr *frame_graph, x *destroy_action, dad d
 }
 
 func gr_bi_fun_ctor_desc(cs *checkstate, gr *frame_graph, desc *bi_fun_ctor_desc, dest cell_num, src cell_num) gr_num {
-  var fc = add_node(gr, node0(@[gr_op]GrWriteConst({desc->funcell, ConstDef(desc->ip)})));
-  var dp = add_node(gr, node0(@[gr_op]GrAddressof({desc->destptr, dest})));
-  var sp = add_node(gr, node0(@[gr_op]GrAddressof({desc->srcptr, src})));
+  var fc = addx(gr, @[gr_op]GrWriteConst({desc->funcell, ConstDef(desc->ip)}));
+  var dp = addx(gr, @[gr_op]GrAddressof({desc->destptr, dest}));
+  var sp = addx(gr, @[gr_op]GrAddressof({desc->srcptr, src}));
   var ap = addx(gr, mk_shray(fc, dp, sp), @[gr_op]GrApply({desc->funcell, mk_shray(desc->destptr, desc->srcptr), desc->retvoid}));
   var deadret = addx(gr, mk_shray(ap), @[gr_op]GrDead({desc->retvoid}));
   return deadret;
@@ -1402,7 +1402,7 @@ func gr_bi_fun_ctor_desc(cs *checkstate, gr *frame_graph, desc *bi_fun_ctor_desc
 func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bool {
   switch &x->ctor {
     case &BiTrivialCtor(v void): {
-      var cp = add_node(gr, node0(@[gr_op]GrMemCopy({x->dest, x->src})));
+      var cp = addx(gr, @[gr_op]GrMemCopy({x->dest, x->src}));
       *out = cp;
       return true;
     }
@@ -1480,10 +1480,10 @@ func minimal_basics_cleanup_precs(gr *frame_graph, bas *gr_minimal_basics, out *
   precs array[gr_num];
   ncells size = count(&bas->argcells);
   for i size = 0; i < ncells; i = i + 1 {
-    gd gr_num = add_node(gr, node0(@[gr_op]GrDead({get(&bas->argcells, i)})));
+    gd gr_num = addx(gr, @[gr_op]GrDead({get(&bas->argcells, i)}));
     push(&precs, gd);
   }
-  var retset = add_node(gr, node0(@[gr_op]GrWriteConst({bas->return_cell, ConstInt(bigu(0))})));
+  var retset = addx(gr, @[gr_op]GrWriteConst({bas->return_cell, ConstInt(bigu(0))}));
   push(&precs, retset);
   swap(out, &precs);
 }
@@ -1520,7 +1520,7 @@ func gr_magic_nopdestroy(cs *checkstate, clq *clqueue, gr_out *frame_graph, gn_o
   bas gr_minimal_basics;
   // TODO: How about make the size parameter opt[u32], don't deref if no size.
   add_minimal_basics(cs, clq, &gr, 0 /* Pass a made-up size. */, 1, &bas);
-  gn gr_num = add_node(&gr, node0(@[gr_op]GrXNop(void)));
+  gn gr_num = addx(&gr, @[gr_op]GrXNop(void));
   minimal_basics_cleanup(cs, clq, &gr, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
   return true;
 }
@@ -1604,7 +1604,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
     pc cell_num = add_cell(&gr, {LocationVirtual(void), mai->cu_type, mai->cu_props});
     push(&pointeecells, pc);
 
-    gn1 gr_num = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
+    gn1 gr_num = addx(&gr, @[gr_op]GrDeref({pc, ac, OffsetConst(0)}));
     gn gr_num = add_node(&gr, node(mk_shray(gn1), @[gr_op]GrDead({ac})));
     push(&derefgns, gn);
   }
@@ -1617,27 +1617,27 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 
   deadprecs array[gr_num];
   if true {
-    setret gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({return_cell, ConstInt(bigu(0))})));
+    setret gr_num = addx(&gr, @[gr_op]GrWriteConst({return_cell, ConstInt(bigu(0))}));
     push(&deadprecs, setret);
-    indexdead gr_num = add_node(&gr, node0(@[gr_op]GrDead({indexcell})));
+    indexdead gr_num = addx(&gr, @[gr_op]GrDead({indexcell}));
     push(&deadprecs, indexdead);
 
     for i size = 0; i < nargs; i = i + 1 {
-      pd gr_num = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&pointeecells, i)})));
+      pd gr_num = addx(&gr, @[gr_op]GrVirtualDead({get(&pointeecells, i)}));
       push(&deadprecs, pd);
     }
   }
 
   deadseq gr_num = add_node(&gr, node(freeze(&deadprecs), @[gr_op]GrXNop(void)));
 
-  topgn gr_num = add_node(&gr, node0(@[gr_op]GrQNop(void)));
+  topgn gr_num = addq(&gr, @[gr_op]GrQNop(void));
 
   elemptrcells array[cell_num];
   precs array[gr_num];
   for j size = 0; j < nargs; j = j + 1 {
     ec cell_num = add_cell(&gr, {LocationVirtual(void), ~ *param, param_props});
     indexcopycell cell_num = add_cell(&gr, {LocationStatic(void), size_type, size_type_props});
-    copygn gr_num = add_node(&gr, node0(@[gr_op]GrMemCopy({indexcopycell, indexcell})));
+    copygn gr_num = addx(&gr, @[gr_op]GrMemCopy({indexcopycell, indexcell}));
     gn gr_num = add_node(&gr, node(mk_shray(copygn), @[gr_op]GrSubcell({ec, get(&pointeecells, j), OffsetComputed({param_props.flat_size, indexcopycell})})));
     deadcopy gr_num = add_node(&gr, node(mk_shray(gn), @[gr_op]GrDead({indexcopycell})));
     epc cell_num = add_cell(&gr, {LocationStatic(void), elemptrtype, elemptrtype_props});
@@ -1650,16 +1650,16 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   elemretcell cell_num = add_cell(&gr, {LocationStatic(void), voidtp.cu, voidtp.props});
   func_cell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
 
-  func_gn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({func_cell, ConstDef(mai->ip)})));
+  func_gn gr_num = addx(&gr, @[gr_op]GrWriteConst({func_cell, ConstDef(mai->ip)}));
   push(&precs, func_gn);
 
   ap gr_num = add_node(&gr, node(freeze(&precs), @[gr_op]GrApply({func_cell, freeze(&elemptrcells), elemretcell})));
   vd gr_num = add_node(&gr, node(mk_shray(ap), @[gr_op]GrDead({elemretcell})));
 
   ic2cell cell_num = add_cell(&gr, {LocationStatic(void), size_type, size_type_props});
-  ic2gn gr_num = add_node(&gr, node0(@[gr_op]GrMemCopy({ic2cell, indexcell})));
+  ic2gn gr_num = addx(&gr, @[gr_op]GrMemCopy({ic2cell, indexcell}));
   onecell cell_num = add_cell(&gr, {LocationStatic(void), size_type, size_type_props});
-  onegn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({onecell, ConstInt(bigu(1))})));
+  onegn gr_num = addx(&gr, @[gr_op]GrWriteConst({onecell, ConstInt(bigu(1))}));
   op_action primitive_numeric_op_action;
   if case CtorDestroy(v void) = wc {
     op_action = NumSub(void);
@@ -1672,24 +1672,24 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   init_value u32;
   body_gn gr_num;
   if case CtorDestroy(v void) = wc {
-    body_gn = add_node(&gr, node0(@[gr_op]GrSequence({incrgn, vd})));
+    body_gn = addq(&gr, @[gr_op]GrSequence({incrgn, vd}));
     init_value = arraycount;
     terminal_case = 0;
   } else {
-    body_gn = add_node(&gr, node0(@[gr_op]GrSequence({vd, incrgn})));
+    body_gn = addq(&gr, @[gr_op]GrSequence({vd, incrgn}));
     init_value = 0;
     terminal_case = arraycount;
   }
 
-  tie_gn gr_num = add_node(&gr, node0(@[gr_op]GrSequence({body_gn, topgn})));
+  tie_gn gr_num = addq(&gr, @[gr_op]GrSequence({body_gn, topgn}));
 
-  branch_gn gr_num = add_node(&gr, node0(@[gr_op]GrBranch({indexcell, mk_shray(cons(@[gr_const]ConstInt(bigu(terminal_case)), deadseq)), Has(tie_gn)})));
+  branch_gn gr_num = addq(&gr, @[gr_op]GrBranch({indexcell, mk_shray(cons(@[gr_const]ConstInt(bigu(terminal_case)), deadseq)), Has(tie_gn)}));
 
   mut_qnop_node(&gr, topgn, node0(@[gr_op]GrJmp({branch_gn})));
 
-  init_indexcell_gn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({indexcell, ConstInt(bigu(init_value))})));
-  it_gn gr_num = add_node(&gr, node0(@[gr_op]GrSequence({init_indexcell_gn, topgn})));
-  var gn = add_node(&gr, node0(@[gr_op]GrSequence({derefgn, it_gn})));
+  init_indexcell_gn gr_num = addx(&gr, @[gr_op]GrWriteConst({indexcell, ConstInt(bigu(init_value))}));
+  it_gn gr_num = addq(&gr, @[gr_op]GrSequence({init_indexcell_gn, topgn}));
+  var gn = addq(&gr, @[gr_op]GrSequence({derefgn, it_gn}));
   *gr_out = gr;
   *gn_out = gn;
   *return_cell_out = return_cell;
@@ -1739,7 +1739,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     tc cell_num = add_cell(&gr, {LocationVirtual(void), tagtype, tagtype_props});
     push(&tagcells, tc);
 
-    derefgn1 gr_num = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
+    derefgn1 gr_num = addx(&gr, @[gr_op]GrDeref({pc, ac, OffsetConst(0)}));
     derefgn gr_num = add_node(&gr, node(mk_shray(derefgn1), @[gr_op]GrDead({ac})));
     push(&deref_gns, derefgn);
     tcgn gr_num = add_node(&gr, node(mk_shray(derefgn), @[gr_op]GrSubcell({tc, pc, OffsetConst(enum_tag_offset)})));
@@ -1751,12 +1751,12 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
   return_cell cell_num = add_cell(&gr, {LocationStatic(void), voidtp.cu, voidtp.props});
   deadprecs array[gr_num];
   if true {
-    setret gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)})));
+    setret gr_num = addx(&gr, @[gr_op]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)}));
     push(&deadprecs, setret);
     for i size = 0; i < nargs; i = i + 1 {
-      pd gr_num = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&pointeecells, i)})));
+      pd gr_num = addx(&gr, @[gr_op]GrVirtualDead({get(&pointeecells, i)}));
       push(&deadprecs, pd);
-      td gr_num = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&tagcells, i)})));
+      td gr_num = addx(&gr, @[gr_op]GrVirtualDead({get(&tagcells, i)}));
       push(&deadprecs, td);
     }
   }
@@ -1786,7 +1786,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     for j size = 0; j < nargs; j = j + 1 {
       fc cell_num = add_cell(&gr, {LocationVirtual(void), fieldtype, fieldtype_props});
       push(&fieldcella, fc);
-      sn gr_num = add_node(&gr, node0(@[gr_op]GrSubcell({get(&fieldcella, j), get(&pointeecells, j), OffsetConst(field_offset)})));
+      sn gr_num = addx(&gr, @[gr_op]GrSubcell({get(&fieldcella, j), get(&pointeecells, j), OffsetConst(field_offset)}));
       push(&fieldcellgn, sn);
     }
 
@@ -1813,7 +1813,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       compute_prim(cs, clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
-      func_gn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({func_cell, ConstDef(ip)})));
+      func_gn gr_num = addx(&gr, @[gr_op]GrWriteConst({func_cell, ConstDef(ip)}));
       push(&precs, func_gn);
 
       ap gr_num = add_node(&gr, node(freeze(&precs), @[gr_op]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell})));
@@ -1837,14 +1837,14 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       if case Has(gn gr_num) = ogn {
         dfcprecs array[gr_num];
         for j size = 0; j < nargs; j = j + 1 {
-          var dfc = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&fieldcella, j)})));
+          var dfc = addx(&gr, @[gr_op]GrVirtualDead({get(&fieldcella, j)}));
           push(&dfcprecs, dfc);
         }
         dfcnop gr_num = add_node(&gr, node(freeze(&dfcprecs), @[gr_op]GrXNop(void)));
-        last_ogn = add_node(&gr, node0(@[gr_op]GrSequence({gn, dfcnop})));
+        last_ogn = addq(&gr, @[gr_op]GrSequence({gn, dfcnop}));
       } else {
         // The nodes that create fieldcella were never added to the graph, so we don't dead them.
-        last_ogn = add_node(&gr, node0(@[gr_op]GrQNop(void)));
+        last_ogn = addq(&gr, @[gr_op]GrQNop(void));
       }
     }
 
@@ -1853,10 +1853,10 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     case CtorInit(v void):
       ice(_u8("CtorInit on wc type"));
     case CtorCopy(v void):
-      var tgn = add_node(&gr, node0(@[gr_op]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.~)})));
+      var tgn = addx(&gr, @[gr_op]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.~)}));
       tagset_ogn = Has(tgn);
     case CtorMove(v void):
-      var tgn = add_node(&gr, node0(@[gr_op]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.~)})));
+      var tgn = addx(&gr, @[gr_op]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.~)}));
       tagset_ogn = Has(tgn);
     case CtorDestroy(v void):
       tagset_ogn = None();
@@ -1864,7 +1864,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
     finalgn gr_num = add_node(&gr, node(concat(tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn), @[gr_op]GrXNop(void)));
 
-    finalseqgn gr_num = add_node(&gr, node0(@[gr_op]GrSequence({finalgn, deadseq})));
+    finalseqgn gr_num = addq(&gr, @[gr_op]GrSequence({finalgn, deadseq}));
     push(&cases_gn, cons(@[gr_const]ConstInt(~ tagval.~), finalseqgn));
   }
 
@@ -1872,14 +1872,14 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     if case CtorDestroy(v void) = wc {
       push(&cases_gn, cons(@[gr_const]ConstInt(bigu(0)), deadseq));
     } else {
-      ztgn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))})));
-      ztseq gr_num = add_node(&gr, node0(@[gr_op]GrSequence({ztgn, deadseq})));
+      ztgn gr_num = addx(&gr, @[gr_op]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))}));
+      ztseq gr_num = addq(&gr, @[gr_op]GrSequence({ztgn, deadseq}));
       push(&cases_gn, cons(@[gr_const]ConstInt(bigu(0)), ztseq));
     }
   }
 
-  br gr_num = add_node(&gr, node0(@[gr_op]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None()})));
-  sqr gr_num = add_node(&gr, node0(@[gr_op]GrSequence({deref_gn, br})));
+  br gr_num = addq(&gr, @[gr_op]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None()}));
+  sqr gr_num = addq(&gr, @[gr_op]GrSequence({deref_gn, br}));
   *gr_out = gr;
   *gn_out = sqr;
   *return_cell_out = return_cell;
@@ -1930,7 +1930,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
     pc cell_num = add_cell(&gr, {LocationVirtual(void), msi->cu_type, msi->cu_props});
     push(&pointeecells, pc);
 
-    gn1 gr_num = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
+    gn1 gr_num = addx(&gr, @[gr_op]GrDeref({pc, ac, OffsetConst(0)}));
     gn gr_num = add_node(&gr, node(mk_shray(gn1), @[gr_op]GrDead({ac})));
     push(&derefgns, gn);
   }
@@ -1945,7 +1945,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
     push(&deadprecs, setret);
 
     for i size = 0; i < nargs; i = i + 1 {
-      pd gr_num = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&pointeecells, i)})));
+      pd gr_num = addx(&gr, @[gr_op]GrVirtualDead({get(&pointeecells, i)}));
       push(&deadprecs, pd);
     }
   }
@@ -1968,7 +1968,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       fc cell_num = add_cell(&gr, {LocationVirtual(void), ~ ref(&st->fields, i)->type, ref(&psd.fields, i)->props});
       push(&fieldcella, fc);
 
-      gn gr_num = add_node(&gr, node0(@[gr_op]GrSubcell({fc, get(&pointeecells, j), OffsetConst(ref(&psd.fields, i)->offset)})));
+      gn gr_num = addx(&gr, @[gr_op]GrSubcell({fc, get(&pointeecells, j), OffsetConst(ref(&psd.fields, i)->offset)}));
       push(&fieldcellgn, gn);
     }
 
@@ -1996,7 +1996,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
       func_cell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
 
-      func_gn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({func_cell, ConstDef(ip)})));
+      func_gn gr_num = addx(&gr, @[gr_op]GrWriteConst({func_cell, ConstDef(ip)}));
       push(&precs, func_gn);
 
       ap gr_num = add_node(&gr, node(freeze(&precs), @[gr_op]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell})));
@@ -2025,13 +2025,13 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       if case Has(gn gr_num) = ogn {
         dfcprecs array[gr_num];
         for j size = 0; j < nargs; j = j + 1 {
-          var dfc = add_node(&gr, node0(@[gr_op]GrVirtualDead({get(&fieldcella, j)})));
+          var dfc = addx(&gr, @[gr_op]GrVirtualDead({get(&fieldcella, j)}));
           push(&dfcprecs, dfc);
         }
         dfcnop gr_num = add_node(&gr, node(freeze(&dfcprecs), @[gr_op]GrXNop(void)));
-        field_gn = add_node(&gr, node0(@[gr_op]GrSequence({gn, dfcnop})));
+        field_gn = addq(&gr, @[gr_op]GrSequence({gn, dfcnop}));
       } else {
-        field_gn = add_node(&gr, node0(@[gr_op]GrXNop(void)));
+        field_gn = addx(&gr, @[gr_op]GrXNop(void));
       }
     }
 
@@ -2050,10 +2050,10 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       field_and_padding_gn = field_gn;
     }
 
-    bn = add_node(&gr, node0(@[gr_op]GrSequence({field_and_padding_gn, bn})));
+    bn = addq(&gr, @[gr_op]GrSequence({field_and_padding_gn, bn}));
   }
 
-  var gn = add_node(&gr, node0(@[gr_op]GrSequence({derefgn, bn})));
+  var gn = addq(&gr, @[gr_op]GrSequence({derefgn, bn}));
 
   *gr_out = gr;
   *gn_out = gn;
@@ -2114,7 +2114,7 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
     fpc cell_num = add_cell(&gr, {LocationStatic(void), fieldptrtype, fieldptrtype_props});
     push(&fieldptrcells, fpc);
 
-    var pointee_gn1 = add_node(&gr, node0(@[gr_op]GrDeref({pc, ac, OffsetConst(0)})));
+    var pointee_gn1 = addx(&gr, @[gr_op]GrDeref({pc, ac, OffsetConst(0)}));
     var pointee_gn = add_node(&gr, node(mk_shray(pointee_gn1), @[gr_op]GrDead({ac})));
     var fieldcell_gn1 = add_node(&gr, node(mk_shray(pointee_gn), @[gr_op]GrSubcell({fc, pc, OffsetConst(0)})));
     var fieldcell_gn = add_node(&gr, node(mk_shray(fieldcell_gn1), @[gr_op]GrVirtualDead({pc})));
@@ -2125,7 +2125,7 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
 
   retcell cell_num = add_cell(&gr, {LocationStatic(void), voidtp.cu, voidtp.props});
   fncell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
-  var fn_gn = add_node(&gr, node0(@[gr_op]GrWriteConst({fncell, ConstDef(mwfi->ip)})));
+  var fn_gn = addx(&gr, @[gr_op]GrWriteConst({fncell, ConstDef(mwfi->ip)}));
   push(&precs, fn_gn);
 
   var ap = add_node(&gr, node(freeze(&precs), @[gr_op]GrApply({fncell, freeze(&fieldptrcells), retcell})));
@@ -2169,7 +2169,7 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
   argnum cell_num = add_cell(&gr, {LocationStatic(void), ~ *argtype, mec->rhs_props});
   retpart cell_num = add_cell(&gr, {LocationVirtual(void), ~ *argtype, mec->rhs_props});
 
-  var retpart_gn = add_node(&gr, node0(@[gr_op]GrSubcell({retpart, retnum, OffsetConst(field_offset)})));
+  var retpart_gn = addx(&gr, @[gr_op]GrSubcell({retpart, retnum, OffsetConst(field_offset)}));
 
   ctor_gn gr_num;
   switch &mec->operational {
@@ -2191,12 +2191,12 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
     if !gr_destroy_ctor(cs, clq, &gr, argtype, argnum, &cdd.destroy_desc, &destgn) {
       return false;
     }
-    ctor_gn = add_node(&gr, node0(@[gr_op]GrSequence({cpgn, destgn})));
+    ctor_gn = addq(&gr, @[gr_op]GrSequence({cpgn, destgn}));
   }
 
-  var assign_gn = add_node(&gr, node0(@[gr_op]GrSequence({retpart_gn, ctor_gn})));
+  var assign_gn = addq(&gr, @[gr_op]GrSequence({retpart_gn, ctor_gn}));
 
-  var tagcell_gn = add_node(&gr, node0(@[gr_op]GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)})));
+  var tagcell_gn = addx(&gr, @[gr_op]GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)}));
   var tag_gn1 = add_node(&gr, node(mk_shray(tagcell_gn), @[gr_op]GrWriteConst({tag_cell, ConstInt(~tagval.~)})));
   var tag_gn = add_node(&gr, node(mk_shray(tag_gn1), @[gr_op]GrVirtualDead({tag_cell})));
   var gn = add_node(&gr, node(concat(@[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn), postpadding_ogn), @[gr_op]GrXNop(void)));
@@ -2210,7 +2210,7 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
 func gr_bi_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, destnum cell_num, srcnum cell_num, cd *ctor_desc, gn_out *gr_num) bool {
   switch cd {
   case &TrivialCtor(v void):
-    var gn = add_node(gr, node0(@[gr_op]GrMemCopy({destnum, srcnum})));
+    var gn = addx(gr, @[gr_op]GrMemCopy({destnum, srcnum}));
     *gn_out = gn;
   case &FunCtor(ip instpair):
     pty te_typeexpr = ptr_type(cs, *ty);
@@ -2240,7 +2240,7 @@ func gr_bi_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, 
 func gr_destroy_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, argnum cell_num, cd *ctor_desc, gn_out *gr_num) bool {
   switch cd {
   case &TrivialCtor(v void):
-    var dp = add_node(gr, node0(@[gr_op]GrDead({argnum})));
+    var dp = addx(gr, @[gr_op]GrDead({argnum}));
     *gn_out = dp;
   case &FunCtor(ip instpair):
     pty te_typeexpr = ptr_type(cs, *ty);
@@ -2293,7 +2293,7 @@ func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_
 
   argcells_copy array[cell_num] = argcells;
   argshray shray[cell_num] = freeze(&argcells_copy);
-  gn gr_num = add_node(&gr, node0(@[gr_op]GrPrimApply({op, argshray, retcell})));
+  gn gr_num = addx(&gr, @[gr_op]GrPrimApply({op, argshray, retcell}));
   return add_fn_body(cs, {informal_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells})});
 }
 
@@ -2389,6 +2389,6 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
 func mk_const_frame_regraphed(informal_name sym, type *cu_typeexpr, props *type_properties, c gr_const) frame_regraphed {
   gr frame_graph = init_frame_graph_empty(informal_name);
   cell cell_num = add_cell(&gr, {LocationStatic(void), *type, *props});
-  gn gr_num = add_node(&gr, node0(@[gr_op]GrWriteConst({cell, c})));
+  gn gr_num = addx(&gr, @[gr_op]GrWriteConst({cell, c}));
   return {gr, gn, cell};
 }
