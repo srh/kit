@@ -607,9 +607,8 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
   }
 
   switch &x->u {
-    case &NameExpr(a ast_name_expr): {
+    case &NameExpr(a ast_name_expr):
       return check_expr_name(es, ai, &a, pt, x);
-    }
 
     case &ParenExpr(a ast_paren_expr): {
       if !check_expr_ai(es, ai, oo(&a.expr), pt) {
@@ -620,73 +619,56 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
       return true;
     }
 
-    case &NumericLiteral(a ast_numeric_literal): {
+    case &NumericLiteral(a ast_numeric_literal):
       return check_numeric_literal(es, ai, pt, numeric_literal_value(&a), x);
-    }
 
-    case &BoolLiteral(a ast_bool_literal): {
+    case &BoolLiteral(a ast_bool_literal):
       return help_check_simple_literal(es, pt, primitive_bool_type(es->cs), _u8("bool"), x);
-    }
 
-    case &VoidLiteral(a ast_void_literal): {
+    case &VoidLiteral(a ast_void_literal):
       return help_check_simple_literal(es, pt, primitive_void_type(es->cs), _u8("void"), x);
-    }
 
-    case &NullLiteral(a ast_null_literal): {
+    case &NullLiteral(a ast_null_literal):
       return help_check_simple_literal(es, pt, ptr_type(es->cs, TeUnknown(void)), _u8("null"), x);
-    }
 
-    case &CharLiteral(a ast_char_literal): {
+    case &CharLiteral(a ast_char_literal):
       return check_numeric_literal(es, ai, pt, ~a.charspec.value, x);
-    }
 
-    case &StringLiteral(a ast_string_literal): {
+    case &StringLiteral(a ast_string_literal):
       return check_expr_string_literal(es, &a, pt, x);
-    }
 
-    case &Funcall(a ast_funcall): {
+    case &Funcall(a ast_funcall):
       return check_expr_funcall(es, ai, &a, pt, x);
-    }
 
-    case &LogicalConjunction(a ast_logical_conjunction): {
+    case &LogicalConjunction(a ast_logical_conjunction):
       return check_expr_logical_conjunction(es, &a, pt, x);
-    }
 
-    case &Assignment(a ast_assignment): {
+    case &Assignment(a ast_assignment):
       return check_expr_assignment(es, pt, &a, x);
-    }
 
-    case &AddressOf(a ast_addressof): {
+    case &AddressOf(a ast_addressof):
       return check_expr_addressof(es, pt, &a, x);
-    }
 
-    case &Deref(a ast_deref): {
+    case &Deref(a ast_deref):
       return check_expr_deref(es, pt, &a, x);
-    }
 
-    case &IndexExpr(a ast_index_expr): {
+    case &IndexExpr(a ast_index_expr):
       return check_expr_index(es, &a, pt, x);
-    }
 
-    case &Lambda(a ast_lambda): {
+    case &Lambda(a ast_lambda):
       return check_expr_lambda(es, &a, pt, x);
-    }
 
-    case &LocalField(a ast_local_field): {
+    case &LocalField(a ast_local_field):
       return check_expr_local_field(es, pt, &a, x);
-    }
 
-    case &DerefField(a ast_deref_field): {
+    case &DerefField(a ast_deref_field):
       return check_expr_deref_field(es, pt, &a, x);
-    }
 
-    case &TypedExpr(a ast_typed_expr): {
+    case &TypedExpr(a ast_typed_expr):
       return check_expr_typed_expr(es, ai, pt, &a, x);
-    }
 
-    case &Strinit(a ast_strinit): {
+    case &Strinit(a ast_strinit):
       return check_expr_strinit(es, ai, &a, pt, x);
-    }
   }
 }
 

@@ -385,7 +385,6 @@ func dumbly_gen_machine_code(f *objfile, h *frame, entry_gn gr_num) bool {
     return false;
   }
 
-  // TODO: Actually implement.
   return true;
 }
 
