@@ -99,6 +99,7 @@ func help_basic_analyze(cs *checkstate, f *objfile, bas *basic_analyze_state, gr
       for j size = 0; j < nparams; j = j + 1 {
         mark_cell_paramlist(bas, get(&a.params, j), gn);
       }
+      mark_cell_not_const(bas, a.retcell);
     case &GrPrimApply(a gr_prim_apply):
       // TODO: Dedup.
       push(&bas->paramlists, ~i);
@@ -106,6 +107,9 @@ func help_basic_analyze(cs *checkstate, f *objfile, bas *basic_analyze_state, gr
       for j size = 0; j < nparams; j = j + 1 {
         mark_cell_paramlist(bas, get(&a.params, j), gn);
       }
+      mark_cell_not_const(bas, a.retcell);
+    case &GrMemCopy(a gr_memcopy):
+      mark_cell_not_const(bas, a.dest);
     case &GrWriteConst(a gr_writeconst):
       if case LocationStatic(v void) = ref(&gr->cells, a.dest.~)->location {
         disp *cell_const_disp = &ref(&bas->celldisp, a.dest.~)->const_value;
@@ -117,6 +121,9 @@ func help_basic_analyze(cs *checkstate, f *objfile, bas *basic_analyze_state, gr
         case &NotConst(v2 void): { }
         }
       }
+    case &GrAddressof(a gr_addressof):
+      // If this is the address of a static cell, the value is actually const.  But we ignore that possibility.
+      mark_cell_not_const(bas, a.dest);
     case &GrSubcell(a gr_subcell):
       set(&ref(&bas->celldisp, a.name.~)->subcell, {gn, a.partof, a.offset});
       push(&ref(&bas->celldisp, a.partof.~)->subcelled, a.name);
@@ -130,4 +137,8 @@ func help_basic_analyze(cs *checkstate, f *objfile, bas *basic_analyze_state, gr
 func mark_cell_paramlist(bas *basic_analyze_state, c cell_num, apply_opnum gr_num) void {
   p *cell_disp = ref(&bas->celldisp, c.~);
   set(&p->paramlist, apply_opnum);
+}
+
+func mark_cell_not_const(bas *basic_analyze_state, c cell_num) void {
+  ref(&bas->celldisp, c.~)->const_value = NotConst(void);
 }
