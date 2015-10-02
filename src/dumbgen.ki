@@ -167,6 +167,28 @@ func paramlist_cells(gr *frame_graph, gn gr_num) *shray[cell_num] {
   }
 }
 
+defenum tmp_offsets_val {
+  Nope void;
+  Has cell_loc;
+  StaticSubcell tup[cell_num, u32];
+};
+
+func set(dest *tmp_offsets_val, c cell_loc) void {
+  if case &Nope(v void) = dest {
+    *dest = Has(c);
+  } else {
+    ice(_u8("set(*tmp_offsets_val, cell_loc) sees non-Nope"));
+  }
+}
+
+func isNope(p *tmp_offsets_val) bool {
+  if case &Nope(v void) = p {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   // Left-most paramlist goes first.
   paramlist_ordering array[gr_num];
@@ -175,7 +197,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   }
 
   // Offsets of either a static cell or a virtual cell's pointer.
-  offsets array[opt[cell_loc]] = repeat(count(&h->gr->cells), None());
+  offsets array[tmp_offsets_val] = repeat(count(&h->gr->cells), Nope(void));
 
   // TODO: Maybe after we push the frame pointer, the alignment is 4 or something -- in cases where we need 8-byte or 16-byte alignment for some things.
   low_offset i32 = 0;
@@ -219,7 +241,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
     it hash_iter[cell_num, void] = iter(&live);
     while case Has(p *tup[cell_num, void]) = next(&it) {
       c cell_num = p->car;
-      if isNone(ref(&offsets, c.~)) {
+      if isNope(ref(&offsets, c.~)) {
         if case &Has(cell_paramlistgn gr_num) = &ref(&h->bas->celldisp, c.~)->paramlist {
           // Cells in other paramlists should already been processed -- and would have failed the isNone check just above.
           if cell_paramlistgn != gn {
@@ -238,7 +260,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
       j = j - 1;
       c cell_num = get(pcells, j);
       do_process bool;
-      if isHas(ref(&offsets, c.~)) {
+      if !isNope(ref(&offsets, c.~)) {
         // add_prim_fn_body applies primop directly to arg list.  TODO: Should we remove this special case here and make add_prim_fn_body copy the args into separate param cells?  Reconsider once we know how optimization would work.
         if case &GrPrimApply(a gr_prim_apply) = &ref_node(h->gr, gn)->op {
           do_process = false;
@@ -252,7 +274,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
       if do_process {
         ci *cell_info = ref_cell(h->gr, c);
         offset cell_loc = next_stack_offset(h->cs, low_offset, ci, &low_offset);
-        if !isNone(ref(&offsets, c.~)) {
+        if !isNope(ref(&offsets, c.~)) {
           ice(_u8("cell is in paramlist, but already processed"));
         }
         set(&offsets, c.~, Has(offset));
@@ -266,23 +288,85 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   // TODO: Don't layout cells that are in dead parts of the graph.
   ncells size = count(&offsets);
   for i size = 0; i < ncells; i = i + 1 {
-    if isNone(ref(&offsets, i)) {
+    if isNope(ref(&offsets, i)) {
       c cell_num = ~i;
       layout_individual_cell(h, c, &low_offset, &offsets);
     }
   }
 
-  noopt_offsets array[cell_loc] = unHas_array(&offsets);
+  noopt_offsets array[cell_loc] = flatten_offsets(&offsets);
   annotate(&h->offsets, noopt_offsets);
   // We subtract 4 because we haven't accounted for the possible need to make a hidden return pointer for the x86 callconv.
   annotate(&h->low_offset, low_offset - 4);
   return true;
 }
 
-func layout_individual_cell(h *frame, cell cell_num, low_offset_ref *i32, offsets_ref *array[opt[cell_loc]]) void {
-  ci *cell_info = ref_cell(h->gr, cell);
-  offset cell_loc = next_stack_offset(h->cs, *low_offset_ref, ci, low_offset_ref);
-  set(offsets_ref, cell.~, Has(offset));
+func flatten_offsets(a *array[tmp_offsets_val]) array[cell_loc] {
+  ret array[cell_loc];
+  n size = count(a);
+  reserve(&ret, n);
+  for i size = 0; i < n; i = i + 1 {
+    switch ref(a, i) {
+    case &Nope(v void):
+      ice(_u8("flatten_offsets offset unspecified"));
+    case &Has(c cell_loc):
+      push(&ret, c);
+    case &StaticSubcell(p tup[cell_num, u32]):
+      if case &Has(cl cell_loc) = ref(a, p.car.~) {
+        switch cl {
+        case DirectLoc(x i32):
+          push(&ret, DirectLoc(x + ~p.cdr));
+        case IndirectLoc(x i32):
+          ice(_u8("StaticSubcell of cell without directloc"));
+        }
+      } else {
+        ice(_u8("StaticSubcell of cell without Has-loc"));
+      }
+    }
+  }
+  return ret;
+}
+
+func layout_individual_cell(h *frame, cell cell_num, low_offset_ref *i32, offsets_ref *array[tmp_offsets_val]) void {
+  if case Has(p tup[cell_num, u32]) = is_static_subcell(h, cell) {
+    set(offsets_ref, cell.~, StaticSubcell(p));
+  } else {
+    ci *cell_info = ref_cell(h->gr, cell);
+    offset cell_loc = next_stack_offset(h->cs, *low_offset_ref, ci, low_offset_ref);
+    set(offsets_ref, cell.~, Has(offset));
+  }
+}
+
+func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
+  nonzero_iterations bool = false;
+  cumulative_offset u32 = 0;
+  for ;; {
+    ci *cell_info = ref_cell(h->gr, c);
+    switch ci->location {
+    case LocationVirtual(v void):
+      if case &Has(sd subcell_disp) = &ref(&h->bas->celldisp, c.~)->subcell {
+        if case &OffsetConst(offset u32) = &sd.offset {
+          c = sd.partof;
+          cumulative_offset = cumulative_offset + offset;
+          nonzero_iterations = true;
+        } else {
+          return None();
+        }
+      } else {
+        return None();
+      }
+    case LocationStatic(v void):
+      if !nonzero_iterations {
+        return None();
+      } else if c == h->return_cell {
+        // TODO: Even if we're going to be dumb like this, we should only be None() when there's an hrp.  And we shouldn't have such a hard-coded special case.
+        // TODO: Don't have such a hard-coded special case.
+        return None();
+      } else {
+        return Has(cons(c, cumulative_offset));
+      }
+    }
+  }
 }
 
 // Props is the type properties of the return type.
@@ -320,7 +404,6 @@ func next_stack_offset(cs *checkstate, low_offset i32, ci *cell_info, numeric_ou
     return DirectLoc(num);
   }
 }
-
 
 func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array[gr_num]) bool {
   // Paramlists by in-degree, which is < the number of paramlists (since they can't point at themselves).
@@ -592,9 +675,13 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         x86_store32(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX);
       case &GrSubcell(a gr_subcell):
         DUMBGEN("GrSubcell");
-        x86_load_cell_address(f, h, X86_EAX, a.partof);
-        x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
-        x86_store32(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX);
+        switch get_loc(h, a.name) {
+        case DirectLoc(off i32): { }
+        case IndirectLoc(off i32):
+          x86_load_cell_address(f, h, X86_EAX, a.partof);
+          x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
+          x86_store32(f, X86_EBP, off, X86_EAX);
+        }
       case &GrBranch(a gr_branch):
         DUMBGEN("GrBranch");
         // TODO: It'd be nice to codegen this without the gratuitous jmps.
