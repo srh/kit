@@ -226,9 +226,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
             ice(_u8("cell is in other paramlist, was not processed"));
           }
         } else {
-          ci *cell_info = ref_cell(h->gr, c);
-          offset cell_loc = next_stack_offset(h->cs, low_offset, ci, &low_offset);
-          set(ref(&offsets, c.~), offset);
+          layout_individual_cell(h, c, &low_offset, &offsets);
         }
       }
     }
@@ -265,13 +263,12 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   }
 
   // 3. Layout cells that aren't live during any function call -- maybe these are just used in dead code.
+  // TODO: Don't layout cells that are in dead parts of the graph.
   ncells size = count(&offsets);
   for i size = 0; i < ncells; i = i + 1 {
     if isNone(ref(&offsets, i)) {
       c cell_num = ~i;
-      ci *cell_info = ref_cell(h->gr, c);
-      offset cell_loc = next_stack_offset(h->cs, low_offset, ci, &low_offset);
-      set(&offsets, c.~, Has(offset));
+      layout_individual_cell(h, c, &low_offset, &offsets);
     }
   }
 
@@ -280,6 +277,12 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   // We subtract 4 because we haven't accounted for the possible need to make a hidden return pointer for the x86 callconv.
   annotate(&h->low_offset, low_offset - 4);
   return true;
+}
+
+func layout_individual_cell(h *frame, cell cell_num, low_offset_ref *i32, offsets_ref *array[opt[cell_loc]]) void {
+  ci *cell_info = ref_cell(h->gr, cell);
+  offset cell_loc = next_stack_offset(h->cs, *low_offset_ref, ci, low_offset_ref);
+  set(offsets_ref, cell.~, Has(offset));
 }
 
 // Props is the type properties of the return type.
