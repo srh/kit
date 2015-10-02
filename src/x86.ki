@@ -572,6 +572,11 @@ func x86_store_imm8(f *objfile, dest_addr u8, dest_disp i32, value u8) void {
   appendtext(f, 0xC6, encode_reg_rm(0, dest_addr, dest_disp), value);
 }
 
+func x86_call(f *objfile, symbol_table_index sti) void {
+  appendtext(f, 0xE8);
+  append_rel32(&f->text, symbol_table_index);
+}
+
 func x86_indirect_call(f *objfile, reg u8) void {
   appendtext(f, 0xFF, mrr(MOD11, 2, reg));
 }
@@ -621,6 +626,9 @@ func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, 
     x86_load32(f, avail_reg, X86_EBP, off);
     *addr_reg_out = avail_reg;
     *disp_out = 0;
+  case ConstFuncellLoc(fnid fn_body_id):
+    // TODO: Better type safety?
+    ice(_u8("x86_prep_loc_use sees ConstFuncellLoc"));
   }
 }
 

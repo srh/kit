@@ -6,6 +6,7 @@ defenum cell_loc {
   DirectLoc i32;
   // Indirectly via a pointer (through the frame offset).
   IndirectLoc i32;
+  ConstFuncellLoc fn_body_id;
 };
 
 deftype lives struct {
@@ -171,6 +172,8 @@ defenum tmp_offsets_val {
   Nope void;
   Has cell_loc;
   StaticSubcell tup[cell_num, u32];
+  // TODO: Just use Has(ConstFuncellLoc(...))?
+  ConstFuncell fn_body_id;
 };
 
 func set(dest *tmp_offsets_val, c cell_loc) void {
@@ -325,6 +328,8 @@ func flatten_offsets(h *frame, a *array[tmp_offsets_val]) array[cell_loc] {
       } else {
         ice(_u8("StaticSubcell of cell without Has-loc"));
       }
+    case &ConstFuncell(fnid fn_body_id):
+      push(&ret, ConstFuncellLoc(fnid));
     }
   }
   return ret;
@@ -333,6 +338,8 @@ func flatten_offsets(h *frame, a *array[tmp_offsets_val]) array[cell_loc] {
 func layout_individual_cell(h *frame, cell cell_num, low_offset_ref *i32, offsets_ref *array[tmp_offsets_val]) void {
   if case Has(p tup[cell_num, u32]) = is_static_subcell(h, cell) {
     set(offsets_ref, cell.~, StaticSubcell(p));
+  } else if case Has(fnid fn_body_id) = is_const_funcell(h, cell) {
+    set(offsets_ref, cell.~, ConstFuncell(fnid));
   } else {
     ci *cell_info = ref_cell(h->gr, cell);
     offset cell_loc = next_stack_offset(h->cs, *low_offset_ref, ci, low_offset_ref);
@@ -368,6 +375,41 @@ func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
         return Has(cons(c, cumulative_offset));
       }
     }
+  }
+}
+
+func is_const_funcell(h *frame, c cell_num) opt[fn_body_id] {
+  disp *cell_disp = ref(&h->bas->celldisp, c.~);
+  if isHas(&disp->funcell) {
+    if case &HasConstValue(gc gr_const) = &disp->const_value {
+      switch &gc {
+      case &ConstInt(b bigint): return None();
+      case &ConstDef(ip instpair): return st_def_to_fnid(h, ip);
+      case &ConstFnBody(fnid fn_body_id): return Has(fnid);
+      case &ConstBytes(b shray[u8]): return None();
+      }
+    }
+  }
+  return None();
+}
+
+func st_def_to_fnid(h *frame, ip instpair) opt[fn_body_id] {
+  inst *def_inst = ref_inst(h->cs, ip.inst_id);
+  if case &Computed(x st_value) = &inst->evaled_value {
+    if count(&x.symbolrefs) != 0 {
+      fnid fn_body_id;
+      if !x86_simple_symbolref(h->cs, &x, &fnid) {
+        ice(_u8("st_def_to_fnid sees non-simple (impossible symbolref"));
+      }
+      return Has(fnid);
+    } else {
+      // Weird, I don't know, maybe it's zero-initialized?  Something a graph could have, if not a real program.
+      return None();
+    }
+  } else {
+    // This means we forgot to enqueue something onto a clq.
+    ice(_u8("st_def_to_fnid sees non-computed ConstDef"));
+    return fake();
   }
 }
 
@@ -632,14 +674,30 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
             hrp_bottom i32 = framelist_bottom - 4;
             x86_load_cell_address(f, h, X86_EAX, a.retcell);
             x86_store32(f, X86_EBP, hrp_bottom, X86_EAX);
-            x86_load32(f, X86_EAX, X86_EBP, un_Direct(get_loc(h, a.funcell)));
-            set_esp_to_frame_offset(f, h, hrp_bottom);
-            x86_indirect_call(f, X86_EAX);
+            // TODO: I think we could dedup some code here and below.
+            switch get_loc(h, a.funcell) {
+            case DirectLoc(x i32):
+              x86_load32(f, X86_EAX, X86_EBP, x);
+              set_esp_to_frame_offset(f, h, hrp_bottom);
+              x86_indirect_call(f, X86_EAX);
+            case ConstFuncellLoc(fnid fn_body_id):
+              symbol_table_index sti = *unHas(&ref_fn_body(h->cs, fnid)->symbol_table_index);
+              set_esp_to_frame_offset(f, h, hrp_bottom);
+              x86_call(f, symbol_table_index);
+            }
             restore_esp_to_default_position(f, h);
           } else {
-            x86_load32(f, X86_EAX, X86_EBP, un_Direct(get_loc(h, a.funcell)));
-            set_esp_to_frame_offset(f, h, framelist_bottom);
-            x86_indirect_call(f, X86_EAX);
+            switch get_loc(h, a.funcell) {
+            case DirectLoc(x i32):
+              x86_load32(f, X86_EAX, X86_EBP, x);
+              set_esp_to_frame_offset(f, h, framelist_bottom);
+              x86_indirect_call(f, X86_EAX);
+            case ConstFuncellLoc(fnid fn_body_id):
+              symbol_table_index sti = *unHas(&ref_fn_body(h->cs, fnid)->symbol_table_index);
+              set_esp_to_frame_offset(f, h, framelist_bottom);
+              x86_call(f, symbol_table_index);
+            }
+
             universal_cc_write_to_retcell(f, h, a.retcell);
             restore_esp_to_default_position(f, h);
           }
@@ -659,13 +717,18 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         x86_memcopy(f, get_loc(h, a.dest), get_loc(h, a.src), dest_ci->props.flat_size);
       case &GrWriteConst(a gr_writeconst):
         DUMBGEN("GrWriteConst");
-        dest_ci *cell_info = ref_cell(h->gr, a.dest);
-        value st_value;
-        if !st_const_compute_for_gen(h->cs, &a.value, dest_ci->props.flat_size, &value) {
-          return false;
-        }
+        dest_loc cell_loc = get_loc(h, a.dest);
+        if case &ConstFuncellLoc(id fn_body_id) = &dest_loc {
+          // Do nothing.
+        } else {
+          dest_ci *cell_info = ref_cell(h->gr, a.dest);
+          value st_value;
+          if !st_const_compute_for_gen(h->cs, &a.value, dest_ci->props.flat_size, &value) {
+            return false;
+          }
 
-        x86_gen_write_value(f, h, a.dest, &value);
+          x86_gen_write_value(f, h, dest_loc, &value);
+        }
       case &GrAddressof(a gr_addressof):
         DUMBGEN("GrAddressof");
         x86_load_cell_address(f, h, X86_EAX, a.addressee);
@@ -844,7 +907,7 @@ func restore_esp_to_default_position(f *objfile, h *frame) void {
   set_esp_to_frame_offset(f, h, *unHas(&h->low_offset));
 }
 
-func x86_gen_write_value(f *objfile, h *frame, dest cell_num, value *st_value) void {
+func x86_gen_write_value(f *objfile, h *frame, dest_loc cell_loc, value *st_value) void {
   check(count(&value->objrefs) == 0);
   check(h->cs->plat.bnno_size == 8);
 
@@ -858,7 +921,7 @@ func x86_gen_write_value(f *objfile, h *frame, dest cell_num, value *st_value) v
 
   dest_addr u8;
   dest_disp i32;
-  x86_prep_loc_use(f, get_loc(h, dest), X86_EAX, &dest_addr, &dest_disp);
+  x86_prep_loc_use(f, dest_loc, X86_EAX, &dest_addr, &dest_disp);
 
   w u32 = 0;
   nsrefs size = count(&srefs);
