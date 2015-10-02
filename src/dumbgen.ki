@@ -294,14 +294,14 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
     }
   }
 
-  noopt_offsets array[cell_loc] = flatten_offsets(&offsets);
+  noopt_offsets array[cell_loc] = flatten_offsets(h, &offsets);
   annotate(&h->offsets, noopt_offsets);
   // We subtract 4 because we haven't accounted for the possible need to make a hidden return pointer for the x86 callconv.
   annotate(&h->low_offset, low_offset - 4);
   return true;
 }
 
-func flatten_offsets(a *array[tmp_offsets_val]) array[cell_loc] {
+func flatten_offsets(h *frame, a *array[tmp_offsets_val]) array[cell_loc] {
   ret array[cell_loc];
   n size = count(a);
   reserve(&ret, n);
@@ -317,7 +317,10 @@ func flatten_offsets(a *array[tmp_offsets_val]) array[cell_loc] {
         case DirectLoc(x i32):
           push(&ret, DirectLoc(x + ~p.cdr));
         case IndirectLoc(x i32):
-          ice(_u8("StaticSubcell of cell without directloc"));
+          if p.car != h->return_cell || p.cdr != 0 {
+            ice(_u8("StaticSubcell of cell without directloc"));
+          }
+          push(&ret, IndirectLoc(x));
         }
       } else {
         ice(_u8("StaticSubcell of cell without Has-loc"));
@@ -358,9 +361,8 @@ func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
     case LocationStatic(v void):
       if !nonzero_iterations {
         return None();
-      } else if c == h->return_cell {
-        // TODO: Even if we're going to be dumb like this, we should only be None() when there's an hrp.  And we shouldn't have such a hard-coded special case.
-        // TODO: Don't have such a hard-coded special case.
+      } else if c == h->return_cell && cumulative_offset != 0 {
+        // TODO: Don't have such a hard-coded special case.  (When we support constant-virtual-plus-offset, we won't.)
         return None();
       } else {
         return Has(cons(c, cumulative_offset));
