@@ -104,12 +104,8 @@ func ref_node(gr *frame_graph, gn gr_num) *gr_node {
   return ref(&gr->ops, gn.~);
 }
 
-func node(precs shray[gr_num], op gr_op) gr_node {
-  return {precs, op};
-}
-
 func node0(op gr_op) gr_node {
-  return node(mk_shray(), op);
+  return {mk_shray(), op};
 }
 
 deftype gr_apply struct {
