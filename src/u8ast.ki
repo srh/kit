@@ -135,6 +135,10 @@ func[H, T] build_u8str(help H, r *array[u8], a *box[T]) void {
   build_u8str(help, r, oo(a));
 }
 
+func[H, T] build_u8str(help H, r *array[u8], a *shp[T]) void {
+  build_u8str(help, r, oo(a));
+}
+
 func[H] build_u8str(help H, r *array[u8], a *ast_expr) void {
   append(r, _u8("ast_expr"));
 }

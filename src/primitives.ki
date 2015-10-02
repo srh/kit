@@ -113,7 +113,7 @@ func primitive_size_type(cs *checkstate) te_typeexpr {
 }
 
 func primitive_string_literal_type(cs *checkstate, n size) te_typeexpr {
-  return TeArraytype({Has(~n), embox(primitive_u8_type(cs))});
+  return TeArraytype({Has(~n), emshp(primitive_u8_type(cs))});
 }
 
 func primitive_unsigned_bnno_type(cs *checkstate) te_typeexpr {
@@ -140,7 +140,7 @@ func unwrap_primitive_padding_type_size(cs *checkstate, t *cu_typeexpr) u32 {
 }
 
 func primitive_padding_type(cs *checkstate, n u32) te_typeexpr {
-  return TeArraytype({Has(n), embox(primitive_unsigned_bnno_type(cs))});
+  return TeArraytype({Has(n), emshp(primitive_unsigned_bnno_type(cs))});
 }
 
 func primitive_function_puretype(cs *checkstate) te_puretype {

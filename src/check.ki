@@ -171,7 +171,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
       if !convert_vardecl_list(cs, &b.fields, &fields) {
         return false;
       }
-      *out = TeStruct({fields});
+      *out = TeStruct({freeze(&fields)});
       return true;
     }
     case &Enum(b ast_enum): {
@@ -179,7 +179,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
       if !convert_vardecl_list(cs, &b.constructors, &constructors) {
         return false;
       }
-      *out = TeEnum({constructors});
+      *out = TeEnum({freeze(&constructors)});
       return true;
     }
     case &Union(b ast_union): {
@@ -187,7 +187,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
       if !convert_vardecl_list(cs, &b.fields, &fields) {
         return false;
       }
-      *out = TeUnion({fields});
+      *out = TeUnion({freeze(&fields)});
       return true;
     }
     case &Arraytype(b ast_arraytype): {
@@ -201,7 +201,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
       } else {
         count = None();
       }
-      param box[te_typeexpr];
+      param shp[te_typeexpr];
       if !convert_typeexpr(cs, oo(&b.param), oo(&param)) {
         return false;
       }
@@ -516,7 +516,7 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
       if !help_check_fields(cs, clq, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
         return false;
       }
-      *out = {computed_fields_complete, TeStruct({computed_fields})};
+      *out = {computed_fields_complete, TeStruct({freeze(&computed_fields)})};
       return true;
     }
     case &TeEnum(a te_enum): {
@@ -525,7 +525,7 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
       if !help_check_fields(cs, clq, g, parms, &a.constructors, &computed_constructors, &computed_constructors_complete) {
         return false;
       }
-      *out = {computed_constructors_complete, TeEnum({computed_constructors})};
+      *out = {computed_constructors_complete, TeEnum({freeze(&computed_constructors)})};
       return true;
     }
     case &TeUnion(a te_union): {
@@ -534,7 +534,7 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
       if !help_check_fields(cs, clq, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
         return false;
       }
-      *out = {computed_fields_complete, TeUnion({computed_fields})};
+      *out = {computed_fields_complete, TeUnion({freeze(&computed_fields)})};
       return true;
     }
     case &TeArraytype(a te_arraytype): {
@@ -542,7 +542,7 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
       if !check_and_compute_typeexpr(cs, clq, g, parms, oo(&a.param), &param) {
         return false;
       }
-      *out = {param.complete && isHas(&a.count), TeArraytype({a.count, embox(param.te)})};
+      *out = {param.complete && isHas(&a.count), TeArraytype({a.count, emshp(param.te)})};
       return true;
     }
     case &TeUnknown(v void): {
@@ -592,7 +592,7 @@ func fake_eval_arraytype_count(x *ast_expr, count_out *u32) bool {
   }
 }
 
-func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, a *array[te_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) bool {
+func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, a *shray[te_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) bool {
   n size = count(a);
   all_complete bool = true;
   all_computed array[te_vardecl];
@@ -611,7 +611,7 @@ func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_
     all_complete = all_complete & computed.complete;
     push(&all_computed, {decl->name, computed.te});
   }
-  *computed_fields_out = all_computed;
+  swap(computed_fields_out, &all_computed);
   *computed_fields_complete_out = all_complete;
   return true;
 }
@@ -903,7 +903,7 @@ deftype partial_struct_data struct {
 };
 
 // fields had better damn well be complete
-func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *array[te_vardecl], name opt[sym], out *partial_struct_data) bool {
+func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *shray[te_vardecl], name opt[sym], out *partial_struct_data) bool {
   ret partial_struct_data = {0, false, 0, 1, 0, 0, 0, 0, mk_array@[struct_field_info]()};
   n size = count(fields);
   for ; ret.index < n; ret.index = ret.index + 1 {
@@ -1665,7 +1665,7 @@ func all_complete_computed(types *shray[te_typeexpr]) complete_computed {
   return {true, all_computed};
 }
 
-func all_complete_computed(decls *array[te_vardecl]) complete_computed {
+func all_complete_computed(decls *shray[te_vardecl]) complete_computed {
   n size = count(decls);
   all_computed bool = true;
   for i size = 0; i < n; i = i + 1 {
@@ -1795,7 +1795,7 @@ func unify_under_generics(pt *te_typeexpr,
           }
           push(&unified_fields, {d->name, unified});
         }
-        *unified_out = TeStruct({unified_fields});
+        *unified_out = TeStruct({freeze(&unified_fields)});
         return true;
       } else {
         return false;
@@ -1821,7 +1821,7 @@ func unify_under_generics(pt *te_typeexpr,
           }
           push(&unified_constructors, {d->name, unified});
         }
-        *unified_out = TeEnum({unified_constructors});
+        *unified_out = TeEnum({freeze(&unified_constructors)});
         return true;
       } else {
         return false;
@@ -1847,7 +1847,7 @@ func unify_under_generics(pt *te_typeexpr,
           }
           push(&unified_fields, {d->name, unified});
         }
-        *unified_out = TeUnion({unified_fields});
+        *unified_out = TeUnion({freeze(&unified_fields)});
         return true;
       } else {
         return false;
@@ -1874,7 +1874,7 @@ func unify_under_generics(pt *te_typeexpr,
         if !unify_under_generics(oo(&pa.param), names, unif_parms, oo(&a.param), &unified_type) {
           return false;
         }
-        *unified_out = TeArraytype({unified_count, embox(unified_type)});
+        *unified_out = TeArraytype({unified_count, emshp(unified_type)});
         return true;
       } else {
         return false;

@@ -1781,7 +1781,7 @@ func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_ou
   }
 }
 
-func find_vardecl(a *array[te_vardecl], name sym, out **te_typeexpr, index_out *size) bool {
+func find_vardecl(a *shray[te_vardecl], name sym, out **te_typeexpr, index_out *size) bool {
   n size = count(a);
   for i size = 0; i < n; i = i + 1 {
     d *te_vardecl = ref(a, i);
@@ -1795,7 +1795,7 @@ func find_vardecl(a *array[te_vardecl], name sym, out **te_typeexpr, index_out *
 }
 
 // fields is supposed to be complete.
-func lookup_field_from_list(cs *checkstate, clq *clqueue, fields *array[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr, offset_out *u32) bool {
+func lookup_field_from_list(cs *checkstate, clq *clqueue, fields *shray[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr, offset_out *u32) bool {
   psd partial_struct_data;
   if !compute_partial_struct_data(cs, clq, fields, Has(fieldname), &psd) {
     return false;

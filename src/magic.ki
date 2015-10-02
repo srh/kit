@@ -318,7 +318,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_g
   return true;
 }
 
-func check_vardecl_ctor(cs *checkstate, clq *clqueue, ds *array[te_vardecl], wc which_ctor, insts_out *array[opt[instpair]]) bool {
+func check_vardecl_ctor(cs *checkstate, clq *clqueue, ds *shray[te_vardecl], wc which_ctor, insts_out *array[opt[instpair]]) bool {
   insts array[opt[instpair]];
   nds size = count(ds);
   for i size = 0; i < nds; i = i + 1 {

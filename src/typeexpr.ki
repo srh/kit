@@ -48,22 +48,21 @@ deftype te_typeapp struct {
   pack opt[te_instpack];
 };
 
-// TODO: Make these fields be shray.
 deftype te_struct struct {
-  fields array[te_vardecl];
+  fields shray[te_vardecl];
 };
 
 deftype te_enum struct {
-  constructors array[te_vardecl];
+  constructors shray[te_vardecl];
 };
 
 deftype te_union struct {
-  fields array[te_vardecl];
+  fields shray[te_vardecl];
 };
 
 deftype te_arraytype struct {
   count opt[u32];
-  param box[te_typeexpr];
+  param shp[te_typeexpr];
 };
 
 deftype te_vardecl struct {
@@ -157,7 +156,7 @@ func te_puretype_equal(cs *checkstate, a *te_puretype, b *te_puretype) bool {
   return false;
 }
 
-func help_te_vardecl_list_equal(a *array[te_vardecl], b *array[te_vardecl]) bool {
+func help_te_vardecl_list_equal(a *shray[te_vardecl], b *shray[te_vardecl]) bool {
   n size = count(a);
   if n != count(b) {
     return false;
@@ -246,19 +245,19 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeapp) void {
 
 func[H] build_u8str(help H, r *array[u8], a *te_struct) void {
   append(r, _u8("{fields:"));
-  build_array_u8str(help, r, &a->fields);
+  build_shray_u8str(help, r, &a->fields);
   push(r, '}');
 }
 
 func[H] build_u8str(help H, r *array[u8], a *te_enum) void {
   append(r, _u8("{constructors:"));
-  build_array_u8str(help, r, &a->constructors);
+  build_shray_u8str(help, r, &a->constructors);
   push(r, '}');
 }
 
 func[H] build_u8str(help H, r *array[u8], a *te_union) void {
   append(r, _u8("{fields:"));
-  build_array_u8str(help, r, &a->fields);
+  build_shray_u8str(help, r, &a->fields);
   push(r, '}');
 }
 
@@ -324,7 +323,7 @@ func help_compute_hash(a *te_typeexpr) osize {
   return fake();
 }
 
-func help_te_vardecl_list_compute_hash(a *array[te_vardecl]) osize {
+func help_te_vardecl_list_compute_hash(a *shray[te_vardecl]) osize {
   n size = count(a);
   adata *te_vardecl = data(a);
   accum osize = 0x84ac113;
@@ -391,7 +390,7 @@ func pretty_u8str_list(im *identmap, r *array[u8], a *shray[te_typeexpr]) void {
   }
 }
 
-func help_pretty_vardecl(im *identmap, r *array[u8], a *array[te_vardecl]) void {
+func help_pretty_vardecl(im *identmap, r *array[u8], a *shray[te_vardecl]) void {
   n size = count(a);
   for i size = 0; i < n; i = i + 1 {
     v *te_vardecl = ref(a, i);
