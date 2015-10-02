@@ -184,15 +184,16 @@ func generate_kit_name(cs *checkstate, informal_name sym, arg_types shray[cu_typ
   push(&build, '_');
   // TODO: Actually, build should be a string, not an array[u8].
   append(&build, to_u8str(lookup(cs->im, informal_name)));
-  push(&build, '[');
+  push(&build, '(');
   nargtypes size = count(&arg_types);
   for i size = 0; i < nargtypes; i = i + 1 {
     if i != 0 {
       push(&build, ',');
+      push(&build, ' ');
     }
-    build_u8str(cs->im, &build, ref(&arg_types, i));
+    pretty_u8str(cs->im, &build, &ref(&arg_types, i)->~);
   }
-  push(&build, ']');
+  push(&build, ')');
   return intern(cs->im, from_u8(&build));
 }
 

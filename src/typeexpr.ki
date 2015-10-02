@@ -48,6 +48,7 @@ deftype te_typeapp struct {
   pack opt[te_instpack];
 };
 
+// TODO: Make these fields be shray.
 deftype te_struct struct {
   fields array[te_vardecl];
 };
@@ -333,4 +334,71 @@ func help_te_vardecl_list_compute_hash(a *array[te_vardecl]) osize {
     accum = (accum * 3) ^ help_compute_hash(&adecl->type);
   }
   return accum;
+}
+
+func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
+  switch a {
+  case &TeName(b te_name):
+    build_u8str(im, r, &b.value);
+  case &TeApp(b te_typeapp):
+    switch b.typefunc {
+    case TePureName(s sym):
+      build_u8str(im, r, &s);
+      if s == im->cym.ptrtype_sym && count(&b.params) == 1 {
+        pretty_u8str(im, r, ref(&b.params, 0));
+      } else {
+        push(r, '[');
+        pretty_u8str_list(im, r, &b.params);
+        push(r, ']');
+      }
+    case TePureUnknown(v void):
+      push(r, '_');
+    }
+  case &TeStruct(b te_struct):
+    append(r, _u8("struct { "));
+    help_pretty_vardecl(im, r, &b.fields);
+    push(r, '}');
+  case &TeEnum(b te_enum):
+    append(r, _u8("enum { "));
+    help_pretty_vardecl(im, r, &b.constructors);
+    push(r, '}');
+  case &TeUnion(b te_union):
+    append(r, _u8("struct { "));
+    help_pretty_vardecl(im, r, &b.fields);
+    push(r, '}');
+  case &TeArraytype(b te_arraytype):
+    push(r, '[');
+    if case Has(n u32) = b.count {
+      build_u8str(void, r, &n);
+    } else {
+      push(r, '_');
+    }
+    push(r, ']');
+    pretty_u8str(im, r, oo(&b.param));
+  case &TeUnknown(v void):
+    push(r, '_');
+  }
+}
+
+func pretty_u8str_list(im *identmap, r *array[u8], a *shray[te_typeexpr]) void {
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    if i != 0 {
+      push(r, ',');
+      push(r, ' ');
+    }
+    pretty_u8str(im, r, ref(a, i));
+  }
+}
+
+func help_pretty_vardecl(im *identmap, r *array[u8], a *array[te_vardecl]) void {
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    v *te_vardecl = ref(a, i);
+    build_u8str(im, r, &v->name);
+    push(r, ' ');
+    pretty_u8str(im, r, &v->type);
+    push(r, ';');
+    push(r, ' ');
+  }
 }
