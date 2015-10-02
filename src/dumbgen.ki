@@ -342,7 +342,7 @@ func flatten_offsets(h *frame, a *array[tmp_offsets_val]) array[cell_loc] {
 func layout_individual_cell(h *frame, cell cell_num, low_offset_ref *i32, offsets_ref *array[tmp_offsets_val]) void {
   if case Has(p tup[cell_num, u32]) = is_static_subcell(h, cell) {
     set(offsets_ref, cell.~, StaticSubcell(p));
-  } else if case Has(fnid fn_body_id) = is_const_funcell(h, cell) {
+  } else if case Has(fnid fn_body_id) = is_const_funcell(h->cs, h->bas, cell) {
     set(offsets_ref, cell.~, ConstFuncell(fnid));
   } else {
     ci *cell_info = ref_cell(h->gr, cell);
@@ -382,13 +382,13 @@ func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
   }
 }
 
-func is_const_funcell(h *frame, c cell_num) opt[fn_body_id] {
-  disp *cell_disp = ref(&h->bas->celldisp, c.~);
+func is_const_funcell(cs *checkstate, bas *basic_analyze_state, c cell_num) opt[fn_body_id] {
+  disp *cell_disp = ref(&bas->celldisp, c.~);
   if isHas(&disp->funcell) {
     if case &HasConstValue(gc gr_const) = &disp->const_value {
       switch &gc {
       case &ConstInt(b bigint): return None();
-      case &ConstDef(ip instpair): return st_def_to_fnid(h, ip);
+      case &ConstDef(ip instpair): return st_def_to_fnid(cs, ip);
       case &ConstFnBody(fnid fn_body_id): return Has(fnid);
       case &ConstBytes(b shray[u8]): return None();
       }
@@ -397,12 +397,12 @@ func is_const_funcell(h *frame, c cell_num) opt[fn_body_id] {
   return None();
 }
 
-func st_def_to_fnid(h *frame, ip instpair) opt[fn_body_id] {
-  inst *def_inst = ref_inst(h->cs, ip.inst_id);
+func st_def_to_fnid(cs *checkstate, ip instpair) opt[fn_body_id] {
+  inst *def_inst = ref_inst(cs, ip.inst_id);
   if case &Computed(x st_value) = &inst->evaled_value {
     if count(&x.symbolrefs) != 0 {
       fnid fn_body_id;
-      if !x86_simple_symbolref(h->cs, &x, &fnid) {
+      if !x86_simple_symbolref(cs, &x, &fnid) {
         ice(_u8("st_def_to_fnid sees non-simple (impossible symbolref"));
       }
       return Has(fnid);
