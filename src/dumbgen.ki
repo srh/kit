@@ -122,8 +122,11 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
   repeat_out(count(&g->graph.gr.ops), mk_gn_annot(), &h.by_gn);
 
   liveset lives;
-  check_add_all(&liveset.all, &g->argcells);
-  check_add(&liveset.all, g->graph.cell);
+  nargcells size = count(&g->argcells);
+  for i size = 0; i < nargcells; i = i + 1 {
+    create(&liveset, get(&g->argcells, i));
+  }
+  create(&liveset, g->graph.cell);
 
   mut genexpr_result;
   if !dumbly_analyze_expression(&h, &g->graph.gr, &liveset, g->graph.gn, &mut) {

@@ -61,22 +61,22 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     DUMBG("GrApply");
 
     // Retcell is activated _before_ the param cells are dead -- though we shouldn't be generating graphs where this matters for the purposes of this analysis _except_ that we need it for computing lower param lists.
-    output(gr, liveset, a.retcell);
+    output(liveset, a.retcell);
 
     note_lower_paramlists(h, gn, liveset);
     annotate_ref(&gnc->app_time_live, liveset);
 
-    deaden(gr, liveset, a.funcell);
+    deaden(liveset, a.funcell);
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
-      deaden(gr, liveset, get(&a.params, i));
+      deaden(liveset, get(&a.params, i));
     }
     *out = Terminal(void);
     return true;
 
   case &GrPrimApply(a gr_prim_apply):
     DUMBG("GrPrimApply");
-    output(gr, liveset, a.retcell);
+    output(liveset, a.retcell);
 
     // TODO: Do we really need to treat GrPrimApply like GrApply when computing cell layout?  I think not...
     note_lower_paramlists(h, gn, liveset);
@@ -84,50 +84,51 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
 
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
-      deaden(gr, liveset, get(&a.params, i));
+      deaden(liveset, get(&a.params, i));
     }
     *out = Terminal(void);
     return true;
 
   case &GrMemCopy(a gr_memcopy):
     DUMBG("GrMemCopy");
-    output(gr, liveset, a.dest);
-    input(gr, liveset, a.src);
+    output(liveset, a.dest);
+    input(liveset, a.src);
     *out = Terminal(void);
     return true;
 
   case &GrWriteConst(a gr_writeconst):
     DUMBG("GrWriteConst");
-    output(gr, liveset, a.dest);
+    output(liveset, a.dest);
     *out = Terminal(void);
     return true;
 
   case &GrAddressof(a gr_addressof):
     DUMBG("GrAddressof");
     // Yes, addressee is an _output_ -- if it is not live -- we make it live.
-    output(gr, liveset, a.addressee);
-    output(gr, liveset, a.dest);
+    output(liveset, a.addressee);
+    output(liveset, a.dest);
     *out = Terminal(void);
     return true;
 
   case &GrDeref(a gr_deref):
     DUMBG("GrDeref");
-    input(gr, liveset, a.pointer);
-    // Location should always be virtual.
-    virtual(gr, liveset, a.name);
+    input(liveset, a.pointer);
+    check(!isLocationStatic(ref_cell(gr, a.name)->location));
+    create(liveset, a.name);
     *out = Terminal(void);
     return true;
 
   case &GrSubcell(a gr_subcell):
     DUMBG("GrSubcell");
-    input(gr, liveset, a.partof);
-    virtual(gr, liveset, a.name);
+    input(liveset, a.partof);
+    check(!isLocationStatic(ref_cell(gr, a.name)->location));
+    create(liveset, a.name);
     *out = Terminal(void);
     return true;
 
   case &GrBranch(a gr_branch):
     DUMBG("GrBranch");
-    input(gr, liveset, a.src);
+    input(liveset, a.src);
 
     end_lives lives;
     combined_mut genexpr_result = NonTerminal(void);
@@ -169,19 +170,19 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
 
   case &GrWriteNothing(a gr_writenothing):
     DUMBG("GrWriteNothing");
-    output(gr, liveset, a.dest);
+    output(liveset, a.dest);
     *out = Terminal(void);
     return true;
 
   case &GrDead(a gr_dead):
     DUMBG("GrDead");
-    deaden(gr, liveset, a.cell);
+    deaden(liveset, a.cell);
     *out = Terminal(void);
     return true;
 
   case &GrVirtualDead(a gr_virtual_dead):
     DUMBG("GrVirtualDead");
-    deaden(gr, liveset, a.cell);
+    deaden(liveset, a.cell);
     *out = Terminal(void);
     return true;
 
@@ -231,14 +232,14 @@ func combine_branch_mut(new_live *lives, onto *genexpr_result, case_mut genexpr_
 }
 
 // For deaden and other functions, prelive shows what was alive _before_ prec_muts modified it.
-func deaden(gr *frame_graph, liveset *lives, c cell_num) void {
+func deaden(liveset *lives, c cell_num) void {
   if !try_remove(&liveset->all, &c) {
     ice(_u8("deaden on unlive cell "), c.~);
   }
 }
 
 // input requires that the cell already be live.
-func input(gr *frame_graph, liveset *lives, c cell_num) void {
+func input(liveset *lives, c cell_num) void {
   if case None(v void) = lookup_ref(&liveset->all, &c) {
     ice(_u8("input on unlive cell "), c.~);
   }
@@ -246,13 +247,11 @@ func input(gr *frame_graph, liveset *lives, c cell_num) void {
 
 // output either makes the cell live, if it wasn't already, or it means we use the cell.
 // (Yes, that's so lame -- we should add GrMakeLive.)
-func output(gr *frame_graph, liveset *lives, c cell_num) void {
+func output(liveset *lives, c cell_num) void {
   discard bool = try_insert(&liveset->all, &c, void);
 }
 
-// Says that we're naming a virtual cell.
-func virtual(gr *frame_graph, liveset *lives, c cell_num) void {
-  check(!isLocationStatic(ref_cell(gr, c)->location));
+func create(liveset *lives, c cell_num) void {
   // Both these places define the virtual cell.  So it should not be live.
   if !try_insert(&liveset->all, &c, void) {
     ice(_u8("virtual on live cell "), c.~);

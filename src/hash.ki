@@ -331,23 +331,6 @@ func[K, V] mk_hash(key K, value V) hash[K, V] {
   return ret;
 }
 
-func[T] check_add(h *hash[T, void], key T) void {
-  check_insert(h, &key, void);
-}
-
-func[T] check_add_all(h *hash[T, void], arr *array[T]) void {
-  n size = count(arr);
-  for i size = 0; i < n; i = i + 1 {
-    check_insert(h, ref(arr, i), void);
-  }
-}
-
-func[T] check_add_disjoint(onto *hash[T, void], from *hash[T, void]) void {
-  if !add_disjoint(onto, from) {
-    crash();
-  }
-}
-
 func[H, K, V] build_u8str(help H, r *array[u8], a *hash[K, V]) void {
   push(r, '{');
   notfirst bool = false;
