@@ -228,26 +228,6 @@ func[T] intersects(a *hash[T, void], b *hash[T, void]) bool {
   return false;
 }
 
-// TODO: Does anybody use set_union, set_intersection, or certain other functions?
-func[T] set_intersection(a *hash[T, void], b *hash[T, void]) hash[T, void] {
-  n size = count(a);
-  bn size = count(b);
-  if bn < n {
-    n = bn;
-    var tmp = a;
-    a = b;
-    b = tmp;
-  }
-  it hash_iter[T, void] = iter(a);
-  build hash[T, void];
-  while case Has(p *tup[T, void]) = next(&it) {
-    if isHas(lookup_ref(b, &p->car)) {
-      check_insert(&build, &p->car, void);
-    }
-  }
-  return build;
-}
-
 func[T] set_union(a *hash[T, void], b *hash[T, void]) hash[T, void] {
   build hash[T, void] = *a;
   add_union(&build, b);
