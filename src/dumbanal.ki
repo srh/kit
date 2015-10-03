@@ -552,12 +552,10 @@ func dumbly_analyze_secondpass(h *frame, gr *frame_graph, gn gr_num, paras *hash
 
   annotate_ref(&gnc->paralive, paras);
 
-  // TODO: We could maintain a single data structure (with add/remove to paras around the recursion) and avoid needless copying.
   pml *shray[hash[cell_num, void]] = unHas(&gnc->precs_make_live);
-  combined_paras hash[cell_num, void];
-  sets_union(pml, &combined_paras);
   precs_paras hash[cell_num, void];
-  set_union(paras, &combined_paras, &precs_paras);
+  sets_union(pml, &precs_paras);
+  add_union(&precs_paras, paras);
 
   node *gr_node = ref_node(gr, gn);
   nprecs size = count(&node->precs);
