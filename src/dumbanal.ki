@@ -63,6 +63,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     // Retcell is activated _before_ the param cells are dead -- though we shouldn't be generating graphs where this matters for the purposes of this analysis _except_ that we need it for computing lower param lists.
     output(gr, liveset, a.retcell);
 
+    note_lower_paramlists(h, gn, liveset);
     annotate_ref(&gnc->app_time_live, liveset);
 
     deaden(gr, liveset, a.funcell);
@@ -78,6 +79,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     output(gr, liveset, a.retcell);
 
     // TODO: Do we really need to treat GrPrimApply like GrApply when computing cell layout?  I think not...
+    note_lower_paramlists(h, gn, liveset);
     annotate_ref(&gnc->app_time_live, liveset);
 
     nparams size = count(&a.params);
@@ -258,62 +260,4 @@ func virtual(gr *frame_graph, liveset *lives, c cell_num) void {
 
 func ref_annot(h *frame, gn gr_num) *gn_annot {
   return ref(&h->by_gn, gn.~);
-}
-
-func dumbly_analyze_secondpass(h *frame, gr *frame_graph, gn gr_num) bool {
-  gnc *gn_annot = ref_annot(h, gn);
-  if case &Computed(v void) = &gnc->secondpass {
-    return true;
-  }
-
-  annotate(&gnc->secondpass, void);
-
-  node *gr_node = ref_node(gr, gn);
-  nprecs size = count(&node->precs);
-  for i size = 0; i < nprecs; i = i + 1 {
-    if !dumbly_analyze_secondpass(h, gr, get(&node->precs, i)) {
-      return false;
-    }
-  }
-
-  switch &node->op {
-  case &GrApply(a gr_apply):
-    note_lower_paramlists(h, gn, unHas(&gnc->app_time_live));
-  case &GrPrimApply(a gr_prim_apply):
-    note_lower_paramlists(h, gn, unHas(&gnc->app_time_live));
-  case &GrMemCopy(a gr_memcopy): { }
-  case &GrWriteConst(a gr_writeconst): { }
-  case &GrAddressof(a gr_addressof): { }
-  case &GrDeref(a gr_deref): { }
-  case &GrSubcell(a gr_subcell): { }
-  case &GrBranch(a gr_branch):
-    ncases size = count(&a.cases);
-    for i size = 0; i < ncases; i = i + 1 {
-      if !dumbly_analyze_secondpass(h, gr, ref(&a.cases, i)->cdr.~) {
-        return false;
-      }
-    }
-    if case Has(def_gn sq_num) = a.default_case {
-      if !dumbly_analyze_secondpass(h, gr, def_gn.~) {
-        return false;
-      }
-    }
-  case &GrSequence(a gr_sequence):
-    if !dumbly_analyze_secondpass(h, gr, a.first) {
-      return false;
-    }
-    if !dumbly_analyze_secondpass(h, gr, a.second.~) {
-      return false;
-    }
-  case &GrJmp(a gr_jmp):
-    if !dumbly_analyze_secondpass(h, gr, a.next.~) {
-      return false;
-    }
-  case &GrWriteNothing(a gr_writenothing): { }
-  case &GrDead(a gr_dead): { }
-  case &GrVirtualDead(a gr_virtual_dead): { }
-  case &GrXNop(v void): { }
-  case &GrQNop(v void): { }
-  }
-  return true;
 }

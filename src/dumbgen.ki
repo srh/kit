@@ -20,9 +20,6 @@ func swap(x *lives, y *lives) void {
 deftype gn_annot struct {
   plainly_live nc[lives];
 
-  // TODO: I think we can get rid of the secondpass, we don't really need it to annotate higher and lower paramlists, do we?  We just can skip the ones where app_time_live is not computed.  (It's dead code.)
-  secondpass nc[void];
-
   // Only for GrApply and GrPrimApply.
   // lower_paramlists and higher_paramlists are set on the second pass.
   // TODO: Reorder these fields.
@@ -83,7 +80,7 @@ func frame_define_target(h *frame, jt jmp_targetnum, text_offset u32) void {
 }
 
 func mk_gn_annot() gn_annot {
-  return {NotComputed(), NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[lives](), NotComputed@[i32](), NotComputed@[u32](), NotComputed@[jmp_targetnum]()};
+  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[lives](), NotComputed@[i32](), NotComputed@[u32](), NotComputed@[jmp_targetnum]()};
 }
 
 func unIndirect(loc cell_loc) i32 {
@@ -140,10 +137,6 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
     }
   case &NonTerminal(v void):
     // nothing to assert
-  }
-
-  if !dumbly_analyze_secondpass(&h, &g->graph.gr, g->graph.gn) {
-    return false;
   }
 
   if !dumbly_layout_frame_cells(g, &h) {
