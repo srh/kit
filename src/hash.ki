@@ -175,8 +175,9 @@ access hash[_, _] {
     i size = it->index;
     h *hash[K, V] = it->h;
     n size = count(&h->arr);
+    d *hash_entry[K, V] = data(&h->arr);
     for ; i < n; i = i + 1 {
-      if case &HashValue(p tup[K, V]) = ref(&h->arr, i) {
+      if case &HashValue(p tup[K, V]) = &d[i] {
         it->index = i + 1;
         return Has(&p);
       }
