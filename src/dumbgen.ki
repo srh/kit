@@ -43,6 +43,10 @@ deftype gn_annot struct {
   this_targetnum nc[jmp_targetnum];
 };
 
+func live_for_funcall(annot *gn_annot, out *hash[cell_num, void]) void {
+  *out = set_union(&unHas(&annot->app_time_live)->all, unHas(&annot->paralive));
+}
+
 deftype frame struct {
   cs *checkstate;
   im *identmap;
@@ -242,7 +246,8 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   for i size = 0; i < ncalls; i = i + 1 {
     gn gr_num = get(&paramlist_ordering, i);
     annot *gn_annot = ref_annot(h, gn);
-    live hash[cell_num, void] = set_union(&unHas(&annot->app_time_live)->all, unHas(&annot->paralive));
+    live hash[cell_num, void];
+    live_for_funcall(annot, &live);
 
     // 1. Layout any cells live during the funcall, that are _not_ part of the paramlist.
     it hash_iter[cell_num, void] = iter(&live);
