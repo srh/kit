@@ -228,19 +228,19 @@ func[T] intersects(a *hash[T, void], b *hash[T, void]) bool {
   return false;
 }
 
-func[T] set_union(a *hash[T, void], b *hash[T, void]) hash[T, void] {
+func[T] set_union(a *hash[T, void], b *hash[T, void], out *hash[T, void]) void {
   build hash[T, void] = *a;
   add_union(&build, b);
-  return build;
+  swap(out, &build);
 }
 
-func[T] sets_union(xs *shray[hash[T, void]]) hash[T, void] {
+func[T] sets_union(xs *shray[hash[T, void]], out *hash[T, void]) void {
   build hash[T, void];
   n size = count(xs);
   for i size = 0; i < n; i = i + 1 {
     add_union(&build, ref(xs, i));
   }
-  return build;
+  swap(out, &build);
 }
 
 // Adds the elements of a that are not in b into onto.

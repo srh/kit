@@ -44,7 +44,7 @@ deftype gn_annot struct {
 };
 
 func live_for_funcall(annot *gn_annot, out *hash[cell_num, void]) void {
-  *out = set_union(&unHas(&annot->app_time_live)->all, unHas(&annot->paralive));
+  set_union(&unHas(&annot->app_time_live)->all, unHas(&annot->paralive), out);
 }
 
 deftype frame struct {
