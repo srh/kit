@@ -27,24 +27,20 @@ defenum genexpr_result {
 func[T] DUMBG(x T) void {
 }
 
-func lives_equal(x *lives, y *lives) bool {
-  return sets_equal(&x->all, &y->all);
-}
-
 
 func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_num, out *genexpr_result) bool {
   gnc *gn_annot = ref_annot(h, gn);
-  if case &Computed(live lives) = &gnc->plainly_live {
+  if case &Computed(live lives_checksum) = &gnc->plainly_live {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
-    if !lives_equal(liveset, &live) {
-      ERR(_u8("ICE: Inconsistent liveness state when revisiting node, liveset="), *liveset, _u8(", annot.live="), live);
+    if !(liveset->xored == live.xored && liveset->summed == live.summed) {
+      ERR(_u8("ICE: Inconsistent liveness state when revisiting node, liveset="), *liveset);
       return false;
     }
     *out = NonTerminal(void);
     return true;
   }
 
-  annotate_ref(&gnc->plainly_live, liveset);
+  annotate(&gnc->plainly_live, {liveset->xored, liveset->summed});
 
   precs_make_live array[hash[cell_num, void]];
 
@@ -220,7 +216,7 @@ func combine_branch_mut(new_live *lives, onto *genexpr_result, case_mut genexpr_
   case Terminal(v void):
     switch *onto {
     case Terminal(v2 void):
-      if !lives_equal(new_live, end_lives) {
+      if new_live->xored != end_lives->xored || new_live->summed != end_lives->summed {
         ice(_u8("terminal/terminal new_live not equal, end_lives="), *end_lives, _u8(", new_live="), *new_live);
       }
     case NonTerminal(v2 void):
@@ -236,6 +232,8 @@ func deaden(liveset *lives, c cell_num) void {
   if !try_remove(&liveset->all, &c) {
     ice(_u8("deaden on unlive cell "), c.~);
   }
+  liveset->xored = liveset->xored ^ ~c.~;
+  liveset->summed = liveset->summed - ~c.~;
 }
 
 // input requires that the cell already be live.
@@ -248,7 +246,10 @@ func input(liveset *lives, c cell_num) void {
 // output either makes the cell live, if it wasn't already, or it means we use the cell.
 // (Yes, that's so lame -- we should add GrMakeLive.)
 func output(liveset *lives, c cell_num) void {
-  discard bool = try_insert(&liveset->all, &c, void);
+  if try_insert(&liveset->all, &c, void) {
+    liveset->xored = liveset->xored ^ ~c.~;
+    liveset->summed = liveset->summed + ~c.~;
+  }
 }
 
 func create(liveset *lives, c cell_num) void {
@@ -256,6 +257,8 @@ func create(liveset *lives, c cell_num) void {
   if !try_insert(&liveset->all, &c, void) {
     ice(_u8("virtual on live cell "), c.~);
   }
+  liveset->xored = liveset->xored ^ ~c.~;
+  liveset->summed = liveset->summed + ~c.~;
 }
 
 func ref_annot(h *frame, gn gr_num) *gn_annot {

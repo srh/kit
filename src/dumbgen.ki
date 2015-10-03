@@ -11,14 +11,28 @@ defenum cell_loc {
 
 deftype lives struct {
   all hash[cell_num, void];
+  // The xor and sum of the cell nums -- makes for a quick commutative hash.
+  xored osize;
+  summed osize;
+};
+
+deftype lives_checksum struct {
+  xored osize;
+  summed osize;
 };
 
 func swap(x *lives, y *lives) void {
   swap(&x->all, &y->all);
+  tmpx osize = x->xored;
+  x->xored = y->xored;
+  y->xored = tmpx;
+  tmps osize = x->summed;
+  x->summed = y->summed;
+  y->summed = tmps;
 }
 
 deftype gn_annot struct {
-  plainly_live nc[lives];
+  plainly_live nc[lives_checksum];
 
   // Only for GrApply and GrPrimApply.
   // lower_paramlists and higher_paramlists are set on the second pass.
@@ -135,9 +149,9 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
 
   switch &mut {
   case &Terminal(v void):
-    expected lives = {mk_hash(g->graph.cell, void)};
-    if !lives_equal(&liveset, &expected) {
-      ice(_u8("fn_body leaves cells alive, expected "), g->graph.cell, _u8(", saw "), liveset);
+    expected hash[cell_num, void] = mk_hash(g->graph.cell, void);
+    if !sets_equal(&liveset.all, &expected) {
+      ice(_u8("fn_body leaves cells alive, expected "), g->graph.cell, _u8(", saw "), liveset.all);
     }
   case &NonTerminal(v void):
     // nothing to assert
