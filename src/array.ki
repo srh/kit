@@ -41,17 +41,23 @@ access array[_] {
   }
 
   func[T] set(r *array[T], i size, val T) void {
-    check(i < r->count);
+    if i >= r->count {
+      crash();
+    }
     r->ptr[i] = val;
   }
 
   func[T] get(r *array[T], i size) T {
-    check(i < r->count);
+    if i >= r->count {
+      crash();
+    }
     return r->ptr[i];
   }
 
   func[T] ref(r *array[T], i size) *T {
-    check(i < r->count);
+    if i >= r->count {
+      crash();
+    }
     return &r->ptr[i];
   }
 
@@ -79,7 +85,9 @@ access array[_] {
   }
 
   func[T] pop(r *array[T]) void {
-    check(r->count > 0);
+    if r->count == 0 {
+      crash();
+    }
     r->count = r->count - 1;
     destroy(&r->ptr[r->count]);
   }
