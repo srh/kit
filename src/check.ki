@@ -1073,7 +1073,8 @@ func behavior_level(b *derived_method_behavior) u32 {
 }
 
 func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, type *te_typeexpr) instpair {
-  params array[te_typeexpr] = repeat(arity, ptr_type(cs, *type));
+  params array[te_typeexpr];
+  repeat_out(arity, ptr_type(cs, *type), &params);
   push(&params, primitive_void_type(cs));
   fntype te_typeexpr = fn_type(cs, freeze(&params));
 

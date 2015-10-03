@@ -40,6 +40,23 @@ access array[_] {
     free(@[*void] cast(rptr));
   }
 
+  func[T] repeat_out(n size, value T, out *array[T]) void {
+    destroy(out);
+    if n == 0 {
+      out->count = 0;
+      out->cap = 0;
+      out->ptr = null;
+      return;
+    }
+    out->count = n;
+    out->cap = n;
+    ptr *T = cast(checkmalloc(n * sizeof@[T]));
+    out->ptr = ptr;
+    for i size = 0; i < n; i = i + 1 {
+      copy(&ptr[i], &value);
+    }
+  }
+
   func[T] set(r *array[T], i size, val T) void {
     if i >= r->count {
       crash();
@@ -119,16 +136,20 @@ access array[_] {
   }
 
   func[T] append(r *array[T], s *array[T]) void {
-    n size = s->count;
-    for i size = 0; i < n; i = i + 1 {
-      push(r, s->ptr[i]);
-    }
+    append_raw(r, s->ptr, s->count);
   }
 
   func[T] append_raw(r *array[T], p *T, n size) void {
-    for i size = 0; i < n; i = i + 1 {
-      push(r, p[i]);
+    rn size = r->count;
+    newcount size = n + rn;
+    if newcount > r->cap {
+      change_cap_(r, max(8, max(rn * 2, newcount)));
     }
+    rp *T = r->ptr;
+    for i size = 0; i < n; i = i + 1 {
+      copy(&rp[rn + i], &p[i]);
+    }
+    r->count = newcount;
   }
 
   func[T] data(r *array[T]) *T {
@@ -296,10 +317,7 @@ func[T] popval(a *array[T]) opt[T] {
 
 func[T] repeat(n size, value T) array[T] {
   ret array[T];
-  reserve(&ret, n);
-  for i size = 0; i < n; i = i + 1 {
-    push(&ret, value);
-  }
+  repeat_out(n, value, &ret);
   return ret;
 }
 

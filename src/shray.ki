@@ -105,7 +105,8 @@ func[U, T] mapconvert(x *shray[T]) shray[U] {
 }
 
 func[T] repeat(n size, x T) shray[T] {
-  ret array[T] = repeat(n, x);
+  ret array[T];
+  repeat_out(n, x, &ret);
   return freeze(&ret);
 }
 

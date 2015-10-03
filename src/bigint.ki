@@ -227,7 +227,8 @@ access bigint {
       }
     }
     ressize size = xn + yn + 3;
-    build array[u32] = repeat(ressize + 1, 0);
+    build array[u32];
+    repeat_out(ressize + 1, 0, &build);
     carry u32 = 0;
     for i size = 0; i < ressize; i = i + 1 {
       for j size = 0; j < ressize - i; j = j + 1 {
@@ -376,7 +377,7 @@ access bigint {
     wholewords size = ~(y / 32);
     yr u32 = y % 32;
     newparts array[u32];
-    newparts = repeat(wholewords, @[u32] 0);
+    repeat_out(wholewords, @[u32] 0, &newparts);
     if yr == 0 {
       // We handle the yr == 0 case to avoid a shift-by-32.
       append(&newparts, &x.parts);

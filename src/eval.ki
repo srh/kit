@@ -153,9 +153,11 @@ func value_read(plat *platform_info, val *st_value, offset u32, ncount u32, out 
   }
 
   bnnos_per_word u32 = 32 / plat->bnno_size;
-  ws array[u32] = repeat(~ceil_divide(ncount, bnnos_per_word), 0);
+  ws array[u32];
+  repeat_out(~ceil_divide(ncount, bnnos_per_word), 0, &ws);
   copy_bnnos(plat, &val->words, offset, ncount, &ws, 0);
-  ds array[u32] = repeat(~ceil_divide(ncount, bnnos_per_word), 0);
+  ds array[u32];
+  repeat_out(~ceil_divide(ncount, bnnos_per_word), 0, &ds);
   copy_bnnos(plat, &val->datas, offset, ncount, &ds, 0);
 
   *out = {ws, ds, ncount, refs, objrefs};
@@ -265,7 +267,8 @@ func add_obj(env *st_env, size u32) st_obj_num {
 }
 
 func mk_st_value(plat *platform_info, size u32) st_value {
-  zeros array[u32] = repeat(~ceil_divide(size * plat->bnno_size, 32), 0);
+  zeros array[u32];
+  repeat_out(~ceil_divide(size * plat->bnno_size, 32), 0, &zeros);
   // Importantly, datas is initialized to all-zero, indicating all garbage.
   return {zeros, zeros, size, mk_array(), mk_array()};
 }
@@ -273,7 +276,8 @@ func mk_st_value(plat *platform_info, size u32) st_value {
 func mk_ones(plat *platform_info, length u32) array[u32] {
   bitlength u32 = length * plat->bnno_size;
   n size = ~ceil_divide(bitlength, 32);
-  ones array[u32] = repeat(n, 0xFFFFFFFF);
+  ones array[u32];
+  repeat_out(n, 0xFFFFFFFF, &ones);
   extra u32 = bitlength % 32;
   if extra != 0 {
     set(&ones, n - 1, @[u32]0xFFFFFFFF >> (32 - extra));
