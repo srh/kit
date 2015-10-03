@@ -1,55 +1,26 @@
 import state;
 
-deftype exprmut struct {
-  // Cells that weren't live, that are used.
-  made_live hash[cell_num, void];
-  // Cells that were live, that are used (and not made dead).
-  used hash[cell_num, void];
-  // Cells that were not live, that are used.
-  encapsulated hash[cell_num, void];
-  // Cells that were live, that are made dead.
-  made_dead hash[cell_num, void];
-};
-
-func swap(x *exprmut, y *exprmut) void {
-  swap(&x->made_live, &y->made_live);
-  swap(&x->used, &y->used);
-  swap(&x->encapsulated, &y->encapsulated);
-  swap(&x->made_dead, &y->made_dead);
-}
-
-deftype partial_exprmut struct {
-  used hash[cell_num, void];
-  encapsulated hash[cell_num, void];
-};
-
-func swap(x *partial_exprmut, y *partial_exprmut) void {
-  swap(&x->used, &y->used);
-  swap(&x->encapsulated, &y->encapsulated);
-}
-
 func[H] build_u8str(help H, r *array[u8], x *lives) void {
   build_u8str(help, r, &x->all);
 }
 
-func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, gn gr_num, prelive *lives, mut_out *exprmut) bool {
+func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_num) bool {
   mbmut genexpr_result;
-  if !dumbly_analyze_expression(h, gr, gn, prelive, &mbmut) {
+  if !dumbly_analyze_expression(h, gr, liveset, gn, &mbmut) {
     return false;
   }
   switch &mbmut {
-  case &Terminal(m exprmut):
-    swap(mut_out, &m);
+  case &Terminal(v void):
     return true;
-  case &NonTerminal(pm partial_exprmut):
+  case &NonTerminal(v void):
     ERR(_u8("ICE: Expecting terminal expression, for gn "), gn.~, _u8(" in "), lookup(h->im, gr->informal_name));
     return false;
   }
 }
 
 defenum genexpr_result {
-  Terminal exprmut;
-  NonTerminal partial_exprmut;
+  Terminal void;
+  NonTerminal void;
 };
 
 // TODO: Remove this and its callers.
@@ -61,202 +32,165 @@ func lives_equal(x *lives, y *lives) bool {
 }
 
 
-func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *lives, mut_out *genexpr_result) bool {
+func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_num, out *genexpr_result) bool {
   gnc *gn_annot = ref_annot(h, gn);
-  if case &Computed(live lives) = &gnc->pre_live {
+  if case &Computed(live lives) = &gnc->plainly_live {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
-    if !lives_equal(prelive, &live) {
-      ERR(_u8("ICE: Inconsistent liveness state when revisiting node, prelive="), *prelive, _u8(", annot.live="), live);
+    if !lives_equal(liveset, &live) {
+      ERR(_u8("ICE: Inconsistent liveness state when revisiting node, liveset="), *liveset, _u8(", annot.live="), live);
       return false;
     }
-    *mut_out = NonTerminal({mk_hash@[cell_num, void](), mk_hash@[cell_num, void]()});
+    *out = NonTerminal(void);
     return true;
   }
 
-  annotate_ref(&gnc->pre_live, prelive);
-
-  prec_muts exprmut;
+  annotate_ref(&gnc->plainly_live, liveset);
 
   precs_make_live array[hash[cell_num, void]];
 
   node *gr_node = ref_node(gr, gn);
   nprecs size = count(&node->precs);
   for i size = 0; i < nprecs; i = i + 1 {
-    i_mut exprmut;
-    if !dumbly_analyze_returning_expression(h, gr, get(&node->precs, i), prelive, &i_mut) {
-      return false;
-    }
-    pushref(&precs_make_live, &i_mut.made_live);
-    if !add_parallel_mut(prelive, &prec_muts, &i_mut) {
+    if !dumbly_analyze_returning_expression(h, gr, liveset, get(&node->precs, i)) {
       return false;
     }
   }
-
-  annotate(&gnc->precs_make_live, freeze(&precs_make_live));
 
   switch &node->op {
   case &GrApply(a gr_apply):
     DUMBG("GrApply");
 
     // Retcell is activated _before_ the param cells are dead -- though we shouldn't be generating graphs where this matters for the purposes of this analysis _except_ that we need it for computing lower param lists.
-    output(gr, prelive, &prec_muts, a.retcell);
+    output(gr, liveset, a.retcell);
 
-    if true {
-      // TODO: Maybe have dumbly_analyze_expression update prelive, instead of duplicating this update logic in its caller.
-      // TODO: Dedup with GrPrimApply.
-      apptime_live lives = *prelive;
-      compose_live(&apptime_live, &prec_muts);
+    annotate_ref(&gnc->app_time_live, liveset);
 
-      annotate_move(&gnc->app_time_live, &apptime_live);
-    }
-
-    deaden(gr, prelive, &prec_muts, a.funcell);
+    deaden(gr, liveset, a.funcell);
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
-      deaden(gr, prelive, &prec_muts, get(&a.params, i));
+      deaden(gr, liveset, get(&a.params, i));
     }
-    move_terminal(&prec_muts, mut_out);
+    *out = Terminal(void);
     return true;
 
   case &GrPrimApply(a gr_prim_apply):
     DUMBG("GrPrimApply");
-    output(gr, prelive, &prec_muts, a.retcell);
+    output(gr, liveset, a.retcell);
 
-    if true {
-      apptime_live lives = *prelive;
-      compose_live(&apptime_live, &prec_muts);
-
-      annotate_move(&gnc->app_time_live, &apptime_live);
-    }
+    // TODO: Do we really need to treat GrPrimApply like GrApply when computing cell layout?  I think not...
+    annotate_ref(&gnc->app_time_live, liveset);
 
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
-      deaden(gr, prelive, &prec_muts, get(&a.params, i));
+      deaden(gr, liveset, get(&a.params, i));
     }
-    move_terminal(&prec_muts, mut_out);
+    *out = Terminal(void);
     return true;
 
   case &GrMemCopy(a gr_memcopy):
     DUMBG("GrMemCopy");
-    output(gr, prelive, &prec_muts, a.dest);
-    input(gr, prelive, &prec_muts, a.src);
-    move_terminal(&prec_muts, mut_out);
+    output(gr, liveset, a.dest);
+    input(gr, liveset, a.src);
+    *out = Terminal(void);
     return true;
 
   case &GrWriteConst(a gr_writeconst):
     DUMBG("GrWriteConst");
-    output(gr, prelive, &prec_muts, a.dest);
-    move_terminal(&prec_muts, mut_out);
+    output(gr, liveset, a.dest);
+    *out = Terminal(void);
     return true;
 
   case &GrAddressof(a gr_addressof):
     DUMBG("GrAddressof");
     // Yes, addressee is an _output_ -- if it is not live -- we make it live.
-    output(gr, prelive, &prec_muts, a.addressee);
-    output(gr, prelive, &prec_muts, a.dest);
-    move_terminal(&prec_muts, mut_out);
+    output(gr, liveset, a.addressee);
+    output(gr, liveset, a.dest);
+    *out = Terminal(void);
     return true;
 
   case &GrDeref(a gr_deref):
     DUMBG("GrDeref");
-    input(gr, prelive, &prec_muts, a.pointer);
+    input(gr, liveset, a.pointer);
     // Location should always be virtual.
-    virtual(gr, prelive, &prec_muts, a.name);
-    move_terminal(&prec_muts, mut_out);
+    virtual(gr, liveset, a.name);
+    *out = Terminal(void);
     return true;
 
   case &GrSubcell(a gr_subcell):
     DUMBG("GrSubcell");
-    input(gr, prelive, &prec_muts, a.partof);
-    virtual(gr, prelive, &prec_muts, a.name);
-    move_terminal(&prec_muts, mut_out);
+    input(gr, liveset, a.partof);
+    virtual(gr, liveset, a.name);
+    *out = Terminal(void);
     return true;
 
   case &GrBranch(a gr_branch):
     DUMBG("GrBranch");
-    input(gr, prelive, &prec_muts, a.src);
-    new_live lives = *prelive;
-    compose_live(&new_live, &prec_muts);
+    input(gr, liveset, a.src);
 
-    combined_mut genexpr_result = NonTerminal({mk_hash(), mk_hash()});
+    end_lives lives;
+    combined_mut genexpr_result = NonTerminal(void);
     ncases size = count(&a.cases);
     for i size = 0; i < ncases; i = i + 1 {
       cas *tup[gr_const, sq_num] = ref(&a.cases, i);
+      new_live lives = *liveset;
       casmut genexpr_result;
-      if !dumbly_analyze_expression(h, gr, cas->cdr.~, &new_live, &casmut) {
+      if !dumbly_analyze_expression(h, gr, &new_live, cas->cdr.~, &casmut) {
         return false;
       }
-      combine_branch_mut(&combined_mut, &casmut);
+      combine_branch_mut(&new_live, &combined_mut, casmut, &end_lives);
     }
 
     if case Has(def_gn sq_num) = a.default_case {
+      new_live lives = *liveset;
       defcasmut genexpr_result;
-      if !dumbly_analyze_expression(h, gr, def_gn.~, &new_live, &defcasmut) {
+      if !dumbly_analyze_expression(h, gr, &new_live, def_gn.~, &defcasmut) {
         return false;
       }
-      combine_branch_mut(&combined_mut, &defcasmut);
+      combine_branch_mut(&new_live, &combined_mut, defcasmut, &end_lives);
     }
 
-    compose_result(&prec_muts, &combined_mut, mut_out);
+    // Yes this is empty of it's NonTerminal -- it doesn't matter.
+    *liveset = end_lives;
+    *out = combined_mut;
     return true;
 
   case &GrSequence(a gr_sequence):
     DUMBG("GrSequence");
-    new_live lives = *prelive;
-    compose_live(&new_live, &prec_muts);
-    firstmut exprmut;
-    if !dumbly_analyze_returning_expression(h, gr, a.first, &new_live, &firstmut) {
+    if !dumbly_analyze_returning_expression(h, gr, liveset, a.first) {
       return false;
     }
-    tmp_muts exprmut;
-    compose_muts(&prec_muts, &firstmut, &tmp_muts);
-    swap(&prec_muts, &tmp_muts);
-    compose_live(&new_live, &firstmut);
-    secondmut genexpr_result;
-    if !dumbly_analyze_expression(h, gr, a.second.~, &new_live, &secondmut) {
-      return false;
-    }
-
-    compose_result(&prec_muts, &secondmut, mut_out);
-    return true;
+    return dumbly_analyze_expression(h, gr, liveset, a.second.~, out);
 
   case &GrJmp(a gr_jmp):
     DUMBG("GrJmp");
-    new_live lives = *prelive;
-    compose_live(&new_live, &prec_muts);
-    exitmut genexpr_result;
-    if !dumbly_analyze_expression(h, gr, a.next.~, &new_live, &exitmut) {
-      return false;
-    }
-    compose_result(&prec_muts, &exitmut, mut_out);
-    return true;
+    return dumbly_analyze_expression(h, gr, liveset, a.next.~, out);
 
   case &GrWriteNothing(a gr_writenothing):
     DUMBG("GrWriteNothing");
-    output(gr, prelive, &prec_muts, a.dest);
-    move_terminal(&prec_muts, mut_out);
+    output(gr, liveset, a.dest);
+    *out = Terminal(void);
     return true;
 
   case &GrDead(a gr_dead):
     DUMBG("GrDead");
-    deaden(gr, prelive, &prec_muts, a.cell);
-    move_terminal(&prec_muts, mut_out);
+    deaden(gr, liveset, a.cell);
+    *out = Terminal(void);
     return true;
 
   case &GrVirtualDead(a gr_virtual_dead):
     DUMBG("GrVirtualDead");
-    deaden(gr, prelive, &prec_muts, a.cell);
-    move_terminal(&prec_muts, mut_out);
+    deaden(gr, liveset, a.cell);
+    *out = Terminal(void);
     return true;
 
   case &GrXNop(v void):
     DUMBG("GrXNop");
-    move_terminal(&prec_muts, mut_out);
+    *out = Terminal(void);
     return true;
 
   case &GrQNop(v void):
     DUMBG("GrQNop");
-    move_terminal(&prec_muts, mut_out);
+    *out = Terminal(void);
     return true;
   }
 }
@@ -278,304 +212,75 @@ func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *lives) voi
   annotate_move(&ref_annot(h, our_gn)->lower_paramlists, &paramlists);
 }
 
-func combine_branch_mut(onto *genexpr_result, a *genexpr_result) void {
-  switch onto {
-  case &Terminal(tm exprmut):
-    switch a {
-    case &Terminal(cm exprmut):
-      if !sets_equal(&tm.made_live, &cm.made_live) {
-        ice(_u8("terminal/terminal made_live not equal, tm="), tm.made_live, _u8(", cm="), cm.made_live);
+func combine_branch_mut(new_live *lives, onto *genexpr_result, case_mut genexpr_result, end_lives *lives) void {
+  switch case_mut {
+  case Terminal(v void):
+    switch *onto {
+    case Terminal(v2 void):
+      if !lives_equal(new_live, end_lives) {
+        ice(_u8("terminal/terminal new_live not equal, end_lives="), *end_lives, _u8(", new_live="), *new_live);
       }
-      if !sets_equal(&tm.made_dead, &cm.made_dead) {
-        ice(_u8("terminal/terminal made_dead not equal, tm="), tm.made_dead, _u8(", cm="), cm.made_dead);
-      }
-      add_union(&tm.used, &cm.used);
-      add_union(&tm.encapsulated, &cm.encapsulated);
-    case &NonTerminal(ncm partial_exprmut):
-      // Can made_live/made_dead be wrong?  No, because all paths to Terminal must have the same value.  (We _do_ check liveness state when revisiting the node.)
-      // We can track what cells are used and encapsulated by _expressions_ but we do _not_ gather such information from various points amid sequences of statements.  (Not when there's a loop.)
-      add_union_difference(&tm.used, &ncm.used, &tm.made_dead);
-      add_union_difference(&tm.encapsulated, &ncm.encapsulated, &tm.made_live);
+    case NonTerminal(v2 void):
+      *onto = Terminal(void);
+      *end_lives = *new_live;
     }
-  case &NonTerminal(ntm partial_exprmut):
-    switch a {
-    case &Terminal(cm exprmut):
-      // This is just like the Terminal/NonTerminal case.
-      new_combined exprmut = cm;
-      add_union_difference(&new_combined.used, &ntm.used, &new_combined.made_dead);
-      add_union_difference(&new_combined.encapsulated, &ntm.encapsulated, &new_combined.made_live);
-      move_terminal(&new_combined, onto);
-    case &NonTerminal(ncm partial_exprmut):
-      add_union(&ntm.used, &ncm.used);
-      add_union(&ntm.encapsulated, &ncm.encapsulated);
-    }
+  case NonTerminal(v void): { }
   }
 }
 
 // For deaden and other functions, prelive shows what was alive _before_ prec_muts modified it.
-func deaden(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void {
-  if case Has(v *void) = lookup_ref(&prec_muts->made_live, &c) {
-    check_remove(&prec_muts->made_live, &c);
-    check_insert(&prec_muts->encapsulated, &c, void);
-  } else if case Has(v *void) = lookup_ref(&prec_muts->used, &c) {
-    check_remove(&prec_muts->used, &c);
-    check_insert(&prec_muts->made_dead, &c, void);
-  } else if case Has(v *void) = lookup_ref(&prec_muts->encapsulated, &c) {
-    ice(_u8("deaden on cell seen in encapsulated"));
-  } else if case Has(v *void) = lookup_ref(&prec_muts->made_dead, &c) {
-    ice(_u8("deaden on cell seen in made_dead"));
-  } else {
-    if case Has(v *void) = lookup_ref(&prelive->all, &c) {
-      check_insert(&prec_muts->made_dead, &c, void);
-    } else {
-      ice(_u8("deaden on un-live cell "), c.~);
-    }
+func deaden(gr *frame_graph, liveset *lives, c cell_num) void {
+  if !try_remove(&liveset->all, &c) {
+    ice(_u8("deaden on unlive cell "), c.~);
   }
 }
 
 // input requires that the cell already be live.
-func input(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void {
-  if case Has(v *void) = lookup_ref(&prec_muts->made_live, &c) {
-    // Success, the cell's live.
-  } else if case Has(v *void) = lookup_ref(&prec_muts->used, &c) {
-    // Success, the cell's live (in prelive).  This check's redundant with internal logic of this graph-traversing code.
-    check(isHas(lookup_ref(&prelive->all, &c)));
-  } else if case Has(v *void) = lookup_ref(&prec_muts->encapsulated, &c) {
-    ice(_u8("input cell seen in encapsulated"));
-  } else if case Has(v *void) = lookup_ref(&prec_muts->made_dead, &c) {
-    ice(_u8("input cell seen in made_dead"));
-  } else {
-    if case Has(v *void) = lookup_ref(&prelive->all, &c) {
-      // Success, the cell's live.
-    } else {
-      ice(_u8("input cell "), c.~, _u8(" not seen in prelive"));
-    }
+func input(gr *frame_graph, liveset *lives, c cell_num) void {
+  if case None(v void) = lookup_ref(&liveset->all, &c) {
+    ice(_u8("input on unlive cell "), c.~);
   }
 }
 
 // output either makes the cell live, if it wasn't already, or it means we use the cell.
-// (Yes, that's so lame -- we should use GrMakeLive.)
-func output(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void {
-  if case Has(v *void) = lookup_ref(&prec_muts->made_live, &c) {
-    // The cell's already live.
-  } else if case Has(v *void) = lookup_ref(&prec_muts->used, &c) {
-    // The cell's already live.
-  } else if case Has(v *void) = lookup_ref(&prec_muts->encapsulated, &c) {
-    // The cell's dead.  Make it live.
-    check_remove(&prec_muts->encapsulated, &c);
-    check_insert(&prec_muts->made_live, &c, void);
-  } else if case Has(v *void) = lookup_ref(&prec_muts->made_dead, &c) {
-    // The cell's dead.  Make it live.
-    check_remove(&prec_muts->made_dead, &c);
-    check_insert(&prec_muts->used, &c, void);
-  } else {
-    if case Has(v *void) = lookup_ref(&prelive->all, &c) {
-      // The cell's already live.
-    } else {
-      check_insert(&prec_muts->made_live, &c, void);
-    }
-  }
+// (Yes, that's so lame -- we should add GrMakeLive.)
+func output(gr *frame_graph, liveset *lives, c cell_num) void {
+  discard bool = try_insert(&liveset->all, &c, void);
 }
 
 // Says that we're naming a virtual cell.
-func virtual(gr *frame_graph, prelive *lives, prec_muts *exprmut, c cell_num) void {
+func virtual(gr *frame_graph, liveset *lives, c cell_num) void {
   check(!isLocationStatic(ref_cell(gr, c)->location));
   // We make the cell live.
   // TODO: Assert that the cell is not already live?  Both these places define the virtual cell.
-  output(gr, prelive, prec_muts, c);
-}
-
-func compose_live(live *lives, muts *exprmut) void {
-  check_add_disjoint(&live->all, &muts->made_live);
-  remove_exactly(&live->all, &muts->made_dead);
-}
-
-func compose_muts(before *exprmut, after *exprmut, out *exprmut) void {
-  ret exprmut;
-
-  it hash_iter[cell_num, void] = iter(&before->made_live);
-  while case Has(p *_) = next(&it) {
-    c cell_num = p->car;
-    if case Has(v *void) = lookup_ref(&after->made_live, &c) {
-      ice(_u8("compose_muts made_live->made_live"));
-    } else if case Has(v *void) = lookup_ref(&after->used, &c) {
-      check_insert(&ret.made_live, &c, void);
-    } else if case Has(v *void) = lookup_ref(&after->encapsulated, &c) {
-      ice(_u8("compose_muts made_live->encapsulated"));
-    } else if case Has(v *void) = lookup_ref(&after->made_dead, &c) {
-      check_insert(&ret.encapsulated, &c, void);
-    } else {
-      check_insert(&ret.made_live, &c, void);
-    }
-  }
-
-  it = iter(&before->used);
-  while case Has(p *_) = next(&it) {
-    c cell_num = p->car;
-    if case Has(v *void) = lookup_ref(&after->made_live, &c) {
-      ice(_u8("compose_muts used->made_live"));
-    } else if case Has(v *void) = lookup_ref(&after->used, &c) {
-      check_insert(&ret.used, &c, void);
-    } else if case Has(v *void) = lookup_ref(&after->encapsulated, &c) {
-      ice(_u8("compose_muts used->encapsulated"));
-    } else if case Has(v *void) = lookup_ref(&after->made_dead, &c) {
-      check_insert(&ret.made_dead, &c, void);
-    } else {
-      check_insert(&ret.used, &c, void);
-    }
-  }
-
-  it = iter(&before->encapsulated);
-  while case Has(p *_) = next(&it) {
-    c cell_num = p->car;
-    if case Has(v *void) = lookup_ref(&after->made_live, &c) {
-      check_insert(&ret.made_live, &c, void);
-    } else if case Has(v *void) = lookup_ref(&after->used, &c) {
-      ice(_u8("compose_muts encapsulated->used"));
-    } else if case Has(v *void) = lookup_ref(&after->encapsulated, &c) {
-      check_insert(&ret.encapsulated, &c, void);
-    } else if case Has(v *void) = lookup_ref(&after->made_dead, &c) {
-      ice(_u8("compose_muts encapsulated->made_dead"));
-    } else {
-      check_insert(&ret.encapsulated, &c, void);
-    }
-  }
-
-  it = iter(&before->made_dead);
-  while case Has(p *_) = next(&it) {
-    c cell_num = p->car;
-    if case Has(v *void) = lookup_ref(&after->made_live, &c) {
-      check_insert(&ret.used, &c, void);
-    } else if case Has(v *void) = lookup_ref(&after->used, &c) {
-      ice(_u8("compose_muts made_dead->used"));
-    } else if case Has(v *void) = lookup_ref(&after->encapsulated, &c) {
-      check_insert(&ret.made_dead, &c, void);
-    } else if case Has(v *void) = lookup_ref(&after->made_dead, &c) {
-      ice(_u8("compose_muts made_dead->made_dead"));
-    } else {
-      check_insert(&ret.made_dead, &c, void);
-    }
-  }
-
-  compose_not_present(&ret, after, before);
-  swap(out, &ret);
-}
-
-// Adds to build those of from that aren't in np.
-func compose_not_present(build *exprmut, from *exprmut, np *exprmut) void {
-  add_not_present(&build->made_live, &from->made_live, np);
-  add_not_present(&build->used, &from->used, np);
-  add_not_present(&build->encapsulated, &from->encapsulated, np);
-  add_not_present(&build->made_dead, &from->made_dead, np);
-}
-
-func add_not_present(onto *hash[cell_num, void], from *hash[cell_num, void], np *exprmut) void {
-  it hash_iter[cell_num, void] = iter(from);
-  while case Has(p *tup[cell_num, void]) = next(&it) {
-    c cell_num = p->car;
-    if !(member(&np->made_live, &c) || member(&np->used, &c) || member(&np->encapsulated, &c) || member(&np->made_dead, &c)) {
-      check_insert(onto, &c, void);
-    }
-  }
-}
-
-func move_terminal(in *exprmut, out *genexpr_result) void {
-  e exprmut;
-  *out = Terminal(e);
-  if case &Terminal(x exprmut) = out {
-    swap(&x, in);
-  }
-}
-
-func move_nonterminal(in *partial_exprmut, out *genexpr_result) void {
-  e partial_exprmut;
-  *out = NonTerminal(e);
-  if case &NonTerminal(x partial_exprmut) = out {
-    swap(&x, in);
-  }
-}
-
-func compose_result(before *exprmut, after *genexpr_result, out *genexpr_result) void {
-  switch after {
-  case &Terminal(am exprmut):
-    ass exprmut;
-    compose_muts(before, &am, &ass);
-    move_terminal(&ass, out);
-  case &NonTerminal(nam partial_exprmut):
-    ret partial_exprmut = nam;
-    add_union(&ret.used, &before->used);
-    add_union(&ret.encapsulated, &before->encapsulated);
-    move_nonterminal(&ret, out);
-  }
-}
-
-// This function should have a symmetry about it.
-func add_parallel_mut(prelive *lives, onto *exprmut, from *exprmut) bool {
-  if intersects(&onto->made_dead, &from->used) || intersects(&onto->used, &from->made_dead) {
-    ERR(_u8("ICE: One prec-expr marks cell dead that another uses"));
-    return false;
-  }
-  if intersects(&onto->made_live, &from->encapsulated) || intersects(&onto->encapsulated, &from->made_live) {
-    ERR(_u8("ICE: One prec-expr makes cell live that another encapsulates"));
-    return false;
-  }
-  if !add_disjoint(&onto->made_live, &from->made_live) {
-    ERR(_u8("ICE: multiple prec-exprs made the same cell live"));
-    return false;
-  }
-  if !add_disjoint(&onto->made_dead, &from->made_dead) {
-    ERR(_u8("ICE: multiple prec-exprs made the same cell dead"));
-    return false;
-  }
-  if !add_disjoint(&onto->encapsulated, &from->encapsulated) {
-    ERR(_u8("ICE: multiple prec-exprs use and discard the same cell"));
-    return false;
-  }
-
-  add_union(&onto->used, &from->used);
-  return true;
+  output(gr, liveset, c);
 }
 
 func ref_annot(h *frame, gn gr_num) *gn_annot {
   return ref(&h->by_gn, gn.~);
 }
 
-func dumbly_analyze_secondpass(h *frame, gr *frame_graph, gn gr_num, paras *hash[cell_num, void]) bool {
+func dumbly_analyze_secondpass(h *frame, gr *frame_graph, gn gr_num) bool {
   gnc *gn_annot = ref_annot(h, gn);
-  if case &Computed(live hash[cell_num, void]) = &gnc->paralive {
-    if !sets_equal(&live, paras) {
-      ERR(_u8("ICE: Inconsistent paraliveness state when revisiting node on secondpass"));
-      return false;
-    }
+  if case &Computed(v void) = &gnc->secondpass {
     return true;
   }
 
-  annotate_ref(&gnc->paralive, paras);
-
-  pml *shray[hash[cell_num, void]] = unHas(&gnc->precs_make_live);
-  precs_paras hash[cell_num, void];
-  sets_union(pml, &precs_paras);
-  add_union(&precs_paras, paras);
+  annotate(&gnc->secondpass, void);
 
   node *gr_node = ref_node(gr, gn);
   nprecs size = count(&node->precs);
   for i size = 0; i < nprecs; i = i + 1 {
-    remove_exactly(&precs_paras, ref(pml, i));
-    if !dumbly_analyze_secondpass(h, gr, get(&node->precs, i), &precs_paras) {
+    if !dumbly_analyze_secondpass(h, gr, get(&node->precs, i)) {
       return false;
     }
-    add_union(&precs_paras, ref(pml, i));
   }
 
   switch &node->op {
   case &GrApply(a gr_apply):
-    full lives = {mk_hash()};
-    set_union(paras, &unHas(&gnc->app_time_live)->all, &full.all);
-    note_lower_paramlists(h, gn, &full);
+    note_lower_paramlists(h, gn, unHas(&gnc->app_time_live));
   case &GrPrimApply(a gr_prim_apply):
-    full lives = {mk_hash()};
-    set_union(paras, &unHas(&gnc->app_time_live)->all, &full.all);
-    note_lower_paramlists(h, gn, &full);
+    note_lower_paramlists(h, gn, unHas(&gnc->app_time_live));
   case &GrMemCopy(a gr_memcopy): { }
   case &GrWriteConst(a gr_writeconst): { }
   case &GrAddressof(a gr_addressof): { }
@@ -584,24 +289,24 @@ func dumbly_analyze_secondpass(h *frame, gr *frame_graph, gn gr_num, paras *hash
   case &GrBranch(a gr_branch):
     ncases size = count(&a.cases);
     for i size = 0; i < ncases; i = i + 1 {
-      if !dumbly_analyze_secondpass(h, gr, ref(&a.cases, i)->cdr.~, paras) {
+      if !dumbly_analyze_secondpass(h, gr, ref(&a.cases, i)->cdr.~) {
         return false;
       }
     }
     if case Has(def_gn sq_num) = a.default_case {
-      if !dumbly_analyze_secondpass(h, gr, def_gn.~, paras) {
+      if !dumbly_analyze_secondpass(h, gr, def_gn.~) {
         return false;
       }
     }
   case &GrSequence(a gr_sequence):
-    if !dumbly_analyze_secondpass(h, gr, a.first, paras) {
+    if !dumbly_analyze_secondpass(h, gr, a.first) {
       return false;
     }
-    if !dumbly_analyze_secondpass(h, gr, a.second.~, paras) {
+    if !dumbly_analyze_secondpass(h, gr, a.second.~) {
       return false;
     }
   case &GrJmp(a gr_jmp):
-    if !dumbly_analyze_secondpass(h, gr, a.next.~, paras) {
+    if !dumbly_analyze_secondpass(h, gr, a.next.~) {
       return false;
     }
   case &GrWriteNothing(a gr_writenothing): { }
