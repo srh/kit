@@ -253,9 +253,10 @@ func output(gr *frame_graph, liveset *lives, c cell_num) void {
 // Says that we're naming a virtual cell.
 func virtual(gr *frame_graph, liveset *lives, c cell_num) void {
   check(!isLocationStatic(ref_cell(gr, c)->location));
-  // We make the cell live.
-  // TODO: Assert that the cell is not already live?  Both these places define the virtual cell.
-  output(gr, liveset, c);
+  // Both these places define the virtual cell.  So it should not be live.
+  if !try_insert(&liveset->all, &c, void) {
+    ice(_u8("virtual on live cell "), c.~);
+  }
 }
 
 func ref_annot(h *frame, gn gr_num) *gn_annot {
