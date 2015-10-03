@@ -41,6 +41,24 @@ func[T] annotate(x *nc[T], y T) void {
   *x = Computed(y);
 }
 
+func[T] annotate_ref(x *nc[T], y *T) void {
+  if case &Computed(already T) = x {
+    ice(_u8("Already annotated"));
+  }
+  *x = Computed(*y);
+}
+
+func[T] annotate_move(x *nc[T], y *T) void {
+  if case &Computed(already T) = x {
+    ice(_u8("Already annotated"));
+  }
+  tmp T;
+  *x = Computed(tmp);
+  if case &Computed(dest T) = x {
+    swap(&dest, y);
+  }
+}
+
 func[T] unHas(x *nc[T]) *T {
   if case &Computed(y T) = x {
     return &y;

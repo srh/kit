@@ -73,7 +73,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     return true;
   }
 
-  annotate(&gnc->pre_live, *prelive);
+  annotate_ref(&gnc->pre_live, prelive);
 
   prec_muts exprmut;
 
@@ -107,7 +107,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
       apptime_live lives = *prelive;
       compose_live(&apptime_live, &prec_muts);
 
-      annotate(&gnc->app_time_live, apptime_live);
+      annotate_move(&gnc->app_time_live, &apptime_live);
     }
 
     deaden(gr, prelive, &prec_muts, a.funcell);
@@ -126,7 +126,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
       apptime_live lives = *prelive;
       compose_live(&apptime_live, &prec_muts);
 
-      annotate(&gnc->app_time_live, apptime_live);
+      annotate_move(&gnc->app_time_live, &apptime_live);
     }
 
     nparams size = count(&a.params);
@@ -275,7 +275,7 @@ func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *lives) voi
 
   sort(&paramlists);
   dedup_sorted(&paramlists);
-  annotate(&ref_annot(h, our_gn)->lower_paramlists, paramlists);
+  annotate_move(&ref_annot(h, our_gn)->lower_paramlists, &paramlists);
 }
 
 func combine_branch_mut(onto *genexpr_result, a *genexpr_result) void {
@@ -550,7 +550,7 @@ func dumbly_analyze_secondpass(h *frame, gr *frame_graph, gn gr_num, paras *hash
     return true;
   }
 
-  annotate(&gnc->paralive, *paras);
+  annotate_ref(&gnc->paralive, paras);
 
   // TODO: We could maintain a single data structure (with add/remove to paras around the recursion) and avoid needless copying.
   pml *shray[hash[cell_num, void]] = unHas(&gnc->precs_make_live);

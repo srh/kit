@@ -13,6 +13,10 @@ deftype lives struct {
   all hash[cell_num, void];
 };
 
+func swap(x *lives, y *lives) void {
+  swap(&x->all, &y->all);
+}
+
 deftype gn_annot struct {
   // Which cells are guaranteed to be live when the gn starts.
   // Also used as a marker to prevent recursion in first traversal of dumbly_analyze_expression.
