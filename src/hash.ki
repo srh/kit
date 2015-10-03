@@ -184,6 +184,16 @@ access hash[_, _] {
     it->index = i;
     return None();
   }
+
+  func[K, V] swap(x *hash[K, V], y *hash[K, V]) void {
+    swap(&x->arr, &y->arr);
+    tmp_cell size = x->cell_count;
+    x->cell_count = y->cell_count;
+    y->cell_count = tmp_cell;
+    tmp_user size = x->user_count;
+    x->user_count = y->user_count;
+    y->user_count = tmp_user;
+  }
 }
 
 func[T] sets_equal(a *hash[T, void], b *hash[T, void]) bool {

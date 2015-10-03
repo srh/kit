@@ -11,10 +11,22 @@ deftype exprmut struct {
   made_dead hash[cell_num, void];
 };
 
+func swap(x *exprmut, y *exprmut) void {
+  swap(&x->made_live, &y->made_live);
+  swap(&x->used, &y->used);
+  swap(&x->encapsulated, &y->encapsulated);
+  swap(&x->made_dead, &y->made_dead);
+}
+
 deftype partial_exprmut struct {
   used hash[cell_num, void];
   encapsulated hash[cell_num, void];
 };
+
+func swap(x *partial_exprmut, y *partial_exprmut) void {
+  swap(&x->used, &y->used);
+  swap(&x->encapsulated, &y->encapsulated);
+}
 
 func[H] build_u8str(help H, r *array[u8], x *lives) void {
   build_u8str(help, r, &x->all);
@@ -27,7 +39,7 @@ func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, gn gr_num, p
   }
   switch &mbmut {
   case &Terminal(m exprmut):
-    *mut_out = m;
+    swap(mut_out, &m);
     return true;
   case &NonTerminal(pm partial_exprmut):
     ERR(_u8("ICE: Expecting terminal expression, for gn "), gn.~, _u8(" in "), lookup(h->im, gr->informal_name));
@@ -47,6 +59,7 @@ func[T] DUMBG(x T) void {
 func lives_equal(x *lives, y *lives) bool {
   return sets_equal(&x->all, &y->all);
 }
+
 
 func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *lives, mut_out *genexpr_result) bool {
   gnc *gn_annot = ref_annot(h, gn);
@@ -73,7 +86,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     if !dumbly_analyze_returning_expression(h, gr, get(&node->precs, i), prelive, &i_mut) {
       return false;
     }
-    push(&precs_make_live, i_mut.made_live);
+    pushref(&precs_make_live, &i_mut.made_live);
     if !add_parallel_mut(prelive, &prec_muts, &i_mut) {
       return false;
     }
@@ -102,7 +115,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     for i size = 0; i < nparams; i = i + 1 {
       deaden(gr, prelive, &prec_muts, get(&a.params, i));
     }
-    *mut_out = Terminal(prec_muts);
+    move_terminal(&prec_muts, mut_out);
     return true;
 
   case &GrPrimApply(a gr_prim_apply):
@@ -120,20 +133,20 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     for i size = 0; i < nparams; i = i + 1 {
       deaden(gr, prelive, &prec_muts, get(&a.params, i));
     }
-    *mut_out = Terminal(prec_muts);
+    move_terminal(&prec_muts, mut_out);
     return true;
 
   case &GrMemCopy(a gr_memcopy):
     DUMBG("GrMemCopy");
     output(gr, prelive, &prec_muts, a.dest);
     input(gr, prelive, &prec_muts, a.src);
-    *mut_out = Terminal(prec_muts);
+    move_terminal(&prec_muts, mut_out);
     return true;
 
   case &GrWriteConst(a gr_writeconst):
     DUMBG("GrWriteConst");
     output(gr, prelive, &prec_muts, a.dest);
-    *mut_out = Terminal(prec_muts);
+    move_terminal(&prec_muts, mut_out);
     return true;
 
   case &GrAddressof(a gr_addressof):
@@ -141,7 +154,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     // Yes, addressee is an _output_ -- if it is not live -- we make it live.
     output(gr, prelive, &prec_muts, a.addressee);
     output(gr, prelive, &prec_muts, a.dest);
-    *mut_out = Terminal(prec_muts);
+    move_terminal(&prec_muts, mut_out);
     return true;
 
   case &GrDeref(a gr_deref):
@@ -149,14 +162,14 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     input(gr, prelive, &prec_muts, a.pointer);
     // Location should always be virtual.
     virtual(gr, prelive, &prec_muts, a.name);
-    *mut_out = Terminal(prec_muts);
+    move_terminal(&prec_muts, mut_out);
     return true;
 
   case &GrSubcell(a gr_subcell):
     DUMBG("GrSubcell");
     input(gr, prelive, &prec_muts, a.partof);
     virtual(gr, prelive, &prec_muts, a.name);
-    *mut_out = Terminal(prec_muts);
+    move_terminal(&prec_muts, mut_out);
     return true;
 
   case &GrBranch(a gr_branch):
@@ -195,7 +208,9 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
     if !dumbly_analyze_returning_expression(h, gr, a.first, &new_live, &firstmut) {
       return false;
     }
-    prec_muts = compose_muts(&prec_muts, &firstmut);
+    tmp_muts exprmut;
+    compose_muts(&prec_muts, &firstmut, &tmp_muts);
+    swap(&prec_muts, &tmp_muts);
     compose_live(&new_live, &firstmut);
     secondmut genexpr_result;
     if !dumbly_analyze_expression(h, gr, a.second.~, &new_live, &secondmut) {
@@ -219,29 +234,29 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, gn gr_num, prelive *li
   case &GrWriteNothing(a gr_writenothing):
     DUMBG("GrWriteNothing");
     output(gr, prelive, &prec_muts, a.dest);
-    *mut_out = Terminal(prec_muts);
+    move_terminal(&prec_muts, mut_out);
     return true;
 
   case &GrDead(a gr_dead):
     DUMBG("GrDead");
     deaden(gr, prelive, &prec_muts, a.cell);
-    *mut_out = Terminal(prec_muts);
+    move_terminal(&prec_muts, mut_out);
     return true;
 
   case &GrVirtualDead(a gr_virtual_dead):
     DUMBG("GrVirtualDead");
     deaden(gr, prelive, &prec_muts, a.cell);
-    *mut_out = Terminal(prec_muts);
+    move_terminal(&prec_muts, mut_out);
     return true;
 
   case &GrXNop(v void):
     DUMBG("GrXNop");
-    *mut_out = Terminal(prec_muts);
+    move_terminal(&prec_muts, mut_out);
     return true;
 
   case &GrQNop(v void):
     DUMBG("GrQNop");
-    *mut_out = Terminal(prec_muts);
+    move_terminal(&prec_muts, mut_out);
     return true;
   }
 }
@@ -289,7 +304,7 @@ func combine_branch_mut(onto *genexpr_result, a *genexpr_result) void {
       new_combined exprmut = cm;
       add_union_difference(&new_combined.used, &ntm.used, &new_combined.made_dead);
       add_union_difference(&new_combined.encapsulated, &ntm.encapsulated, &new_combined.made_live);
-      *onto = Terminal(new_combined);
+      move_terminal(&new_combined, onto);
     case &NonTerminal(ncm partial_exprmut):
       add_union(&ntm.used, &ncm.used);
       add_union(&ntm.encapsulated, &ncm.encapsulated);
@@ -375,7 +390,7 @@ func compose_live(live *lives, muts *exprmut) void {
   remove_exactly(&live->all, &muts->made_dead);
 }
 
-func compose_muts(before *exprmut, after *exprmut) exprmut {
+func compose_muts(before *exprmut, after *exprmut, out *exprmut) void {
   ret exprmut;
 
   it hash_iter[cell_num, void] = iter(&before->made_live);
@@ -443,7 +458,7 @@ func compose_muts(before *exprmut, after *exprmut) exprmut {
   }
 
   compose_not_present(&ret, after, before);
-  return ret;
+  swap(out, &ret);
 }
 
 // Adds to build those of from that aren't in np.
@@ -464,15 +479,33 @@ func add_not_present(onto *hash[cell_num, void], from *hash[cell_num, void], np 
   }
 }
 
+func move_terminal(in *exprmut, out *genexpr_result) void {
+  e exprmut;
+  *out = Terminal(e);
+  if case &Terminal(x exprmut) = out {
+    swap(&x, in);
+  }
+}
+
+func move_nonterminal(in *partial_exprmut, out *genexpr_result) void {
+  e partial_exprmut;
+  *out = NonTerminal(e);
+  if case &NonTerminal(x partial_exprmut) = out {
+    swap(&x, in);
+  }
+}
+
 func compose_result(before *exprmut, after *genexpr_result, out *genexpr_result) void {
   switch after {
   case &Terminal(am exprmut):
-    *out = Terminal(compose_muts(before, &am));
+    ass exprmut;
+    compose_muts(before, &am, &ass);
+    move_terminal(&ass, out);
   case &NonTerminal(nam partial_exprmut):
     ret partial_exprmut = nam;
     add_union(&ret.used, &before->used);
     add_union(&ret.encapsulated, &before->encapsulated);
-    *out = NonTerminal(ret);
+    move_nonterminal(&ret, out);
   }
 }
 

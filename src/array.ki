@@ -85,12 +85,28 @@ access array[_] {
   }
 
   func[T] push(r *array[T], value T) void {
-    if (r->count == r->cap) {
+    if r->count == r->cap {
       change_cap_(r, max(8, r->cap * 2));
     }
-    // The reason we use copy, not move, here, is because value's
-    // destructor will get called when we exit this function.
+    // This is not move() and init(&value) because without inlining... and where it materially affects performance, we'll use pushref or pushmove.
     copy(&r->ptr[r->count], &value);
+    r->count = r->count + 1;
+  }
+
+  func[T] pushref(r *array[T], value *T) void {
+    if r->count == r->cap {
+      change_cap_(r, max(8, r->cap * 2));
+    }
+    copy(&r->ptr[r->count], value);
+    r->count = r->count + 1;
+  }
+
+  func[T] pushmove(r *array[T], value *T) void {
+    if r->count == r->cap {
+      change_cap_(r, max(8, r->cap * 2));
+    }
+    move(&r->ptr[r->count], value);
+    init(value);
     r->count = r->count + 1;
   }
 
