@@ -1733,11 +1733,29 @@ struct sti lookup_or_make_typetrav_sti(
   }
   CHECK(id <= cs->typetrav_symbol_infos_count);
   if (id == cs->typetrav_symbol_infos_count) {
-    char dollar_typetrav[] = "$typetrav";
+    struct databuf namebuf;
+    databuf_init(&namebuf);
+    switch (tf) {
+    case TYPETRAV_FUNC_DESTROY:
+      databuf_append_c_str(&namebuf, "$destroy[");
+      break;
+    case TYPETRAV_FUNC_COPY:
+      databuf_append_c_str(&namebuf, "$copy[");
+      break;
+    case TYPETRAV_FUNC_MOVE_OR_COPYDESTROY:
+      databuf_append_c_str(&namebuf, "$moveor[");
+      break;
+    case TYPETRAV_FUNC_DEFAULT_CONSTRUCT:
+      databuf_append_c_str(&namebuf, "$init[");
+      break;
+    }
+    sprint_typeexpr(&namebuf, cs->im, type);
+    databuf_append_c_str(&namebuf, "]");
     void *gen_name;
     size_t gen_name_count;
-    generate_kit_name(cs, dollar_typetrav, strlen(dollar_typetrav),
+    generate_kit_name(cs, namebuf.buf, namebuf.count,
                       0, &gen_name, &gen_name_count);
+    databuf_destroy(&namebuf);
 
     struct sti symbol_table_index
       = objfile_add_local_symbol(f, identmap_intern(cs->im, gen_name, gen_name_count),
