@@ -388,11 +388,20 @@ defenum fn_body_spec {
   FnBodyPrim primitive_op;
 };
 
+defenum should_inline {
+  // We ALWAYS inline this function.  End of discussion.  For primitive ops.
+  InlineMust void;
+  // Nobody said anything about inlining this function.
+  InlineYawn void;
+};
+
 deftype graphed_fn_body struct {
   spec fn_body_spec;
   graph frame_regraphed;
   // The return cell is graph.cell.
   argcells array[cell_num];
+  // How should/shouldn't we inline this?
+  inline should_inline;
 };
 
 deftype extern_fn_body struct {

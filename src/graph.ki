@@ -959,7 +959,7 @@ func gr_lambda_expr(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_lambda,
     return false;
   }
 
-  id fn_body_id = add_fn_body(cs, {gr->informal_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, return_cell}, info->arg_cells})});
+  id fn_body_id = add_fn_body(cs, {gr->informal_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, return_cell}, info->arg_cells, InlineYawn(void)})});
   var gn = addx(gr, @[gr_op]GrWriteConst({rval_cell(x), ConstFnBody(id)}));
   *out = gn;
   return true;
@@ -1433,23 +1433,39 @@ func gr_bi_action(cs *checkstate, gr *frame_graph, x *bi_action, out *gr_num) bo
 }
 
 // TODO: There's a lot of duplicated code in the splay-out of this function.
-func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) bool {
+func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num], inline_out *should_inline) bool {
   switch mag {
   case &MagicBzero(mb magic_bzero):
-    return gr_magic_bzero(cs, clq, &mb, gr_out, gn_out, return_cell_out, arg_cells_out);
+    if !gr_magic_bzero(cs, clq, &mb, gr_out, gn_out, return_cell_out, arg_cells_out) {
+      return false;
+    }
+    *inline_out = InlineMust(void);
+    return true;
   case &MagicMemcopy(mm magic_memcopy):
-    return gr_magic_memcopy(cs, clq, &mm, gr_out, gn_out, return_cell_out, arg_cells_out);
+    if !gr_magic_memcopy(cs, clq, &mm, gr_out, gn_out, return_cell_out, arg_cells_out) {
+      return false;
+    }
+    *inline_out = InlineMust(void);
+    return true;
   case &MagicNopdestroy(v void):
-    return gr_magic_nopdestroy(cs, clq, gr_out, gn_out, return_cell_out, arg_cells_out);
-
+    if !gr_magic_nopdestroy(cs, clq, gr_out, gn_out, return_cell_out, arg_cells_out) {
+      return false;
+    }
+    *inline_out = InlineMust(void);
+    return true;
   case &MagicCtor(wmc which_magic_ctor):
-    return gr_magic_ctor(cs, clq, wmc.wc, &wmc.mc, gr_out, gn_out, return_cell_out, arg_cells_out);
+    if !gr_magic_ctor(cs, clq, wmc.wc, &wmc.mc, gr_out, gn_out, return_cell_out, arg_cells_out) {
+      return false;
+    }
+    *inline_out = InlineYawn(void);
+    return true;
   case &MagicEnumConstruct(mec magic_enum_construct):
     arg_cell cell_num;
     if !gr_magic_enum_construct(cs, clq, &mec, gr_out, gn_out, return_cell_out, &arg_cell) {
       return false;
     }
     *arg_cells_out = mk_array(arg_cell);
+    *inline_out = InlineMust(void);
     return true;
   }
 }
@@ -2312,7 +2328,7 @@ func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_
   argcells_copy array[cell_num] = argcells;
   argshray shray[cell_num] = freeze(&argcells_copy);
   gn gr_num = addx(&gr, @[gr_op]GrPrimApply({op, argshray, retcell}));
-  return add_fn_body(cs, {informal_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells})});
+  return add_fn_body(cs, {informal_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells, InlineMust(void)})});
 }
 
 func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
@@ -2378,10 +2394,11 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
             body_gn gr_num;
             return_cell cell_num;
             arg_cells array[cell_num];
-            if !gr_magic(cs, clq, &mag, &body_gr, &body_gn, &return_cell, &arg_cells) {
+            inline should_inline;
+            if !gr_magic(cs, clq, &mag, &body_gr, &body_gn, &return_cell, &arg_cells, &inline) {
               return false;
             }
-            id = add_fn_body(cs, {ent->def_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells})});
+            id = add_fn_body(cs, {ent->def_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells, inline})});
           }
 
           frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst->computed_type, &inst->computed_type_properties, ConstFnBody(id));
