@@ -76,7 +76,7 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
     set_symbol_value(f, *unHas(&ent->symbol_table_index), text_offset);
     annotate(&ent->body_text_offset, text_offset);
     bas basic_analyze_state;
-    if !basic_analyze_fn_body(cs, f, &g, &bas) {
+    if !basic_analyze_fn_body(cs, &g, &bas) {
       return false;
     }
     return dumbly_gen_graphed_fn_body(cs, f, &bas, &g);

@@ -65,13 +65,13 @@ deftype basic_analyze_state struct {
   celldisp array[cell_disp];
 };
 
-func basic_analyze_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body, bas_out *basic_analyze_state) bool {
+func basic_analyze_fn_body(cs *checkstate, g *graphed_fn_body, bas_out *basic_analyze_state) bool {
   bas basic_analyze_state = {
     mk_array@[gr_num](),
     repeat(count(&g->graph.gr.cells), {None(), None(), None(), NoConstDisp(void), mk_array@[cell_num]()})
   };
 
-  if !help_basic_analyze(cs, f, &bas, &g->graph.gr) {
+  if !help_basic_analyze(cs, &bas, &g->graph.gr) {
     return false;
   }
 
@@ -81,7 +81,7 @@ func basic_analyze_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body, bas_o
   return true;
 }
 
-func help_basic_analyze(cs *checkstate, f *objfile, bas *basic_analyze_state, gr *frame_graph) bool {
+func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_graph) bool {
   n_ops size = count(&gr->ops);
   for i size = 0; i < n_ops; i = i + 1 {
     gn gr_num = ~i;
