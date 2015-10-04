@@ -1388,6 +1388,10 @@ func parse_switch_case(p *ps, out *ast_switch_case) bool {
       rbrace tokval = Grouper(RBrace(void));
       while !done {
         if equal(&peek(p)->val, &casekeyw) || equal(&peek(p)->val, &defaultkeyw) || equal(&peek(p)->val, &rbrace) {
+          // We disallow empty non-braced switch cases -- they look too much like fallthrough cases.
+          if count(&statements) == 0 {
+            return Fail;
+          }
           body = {NotComputed@[ast_bracebody_info](), statements};
           done = true;
         } else {
@@ -1648,12 +1652,23 @@ func see_if_parse(file array[u8]) bool {
   return ret;
 }
 
+func run_parse_negtest(test_name array[u8], file array[u8]) bool {
+  return help_run_parse_test(test_name, file, false);
+}
+
 func run_parse_test(test_name array[u8], file array[u8]) bool {
+  return help_run_parse_test(test_name, file, true);
+}
+
+func help_run_parse_test(test_name array[u8], file array[u8], expected_success bool) bool {
   print(Stdout(), _u8("test "));
+  if !expected_success {
+    print(Stdout(), _u8("!"));
+  }
   print(Stdout(), test_name);
   print(Stdout(), _u8("..."));
   fflush(Stdout());
-  if !see_if_parse(file) {
+  if expected_success != see_if_parse(file) {
     print(Stdout(), _u8("FAIL\n"));
     fflush(Stdout());
     return false;
@@ -1757,7 +1772,7 @@ func test_parse() bool {
                                _u8("func a() b { switch c { case e(f g): { } case h(i): { j; } default: { } } }"));
   pass = pass & run_parse_test(_u8("p036-b"),
                                _u8("func a() b { switch c { case &e(f g): { } case h(i): { j; } default: { } } }"));
-  pass = pass & run_parse_test(_u8("p036-c"),
+  pass = pass & run_parse_negtest(_u8("p036-c"),
                                _u8("func a() b { switch c { case &e(f g): case h(i): j; default: } }"));
   pass = pass & run_parse_test(_u8("p037"),
                                _u8("func `~`(x u32) size { }"));
