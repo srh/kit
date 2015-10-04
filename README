@@ -93,6 +93,8 @@ Here's the project timeline:
        V. actual modules/namespaces.
        W. pretentious quotes in the binaries.
        X. removal of pretentious quotes in the binaries.
+       Y. field names in struct literals.
+       Z. array literals (struct literals in an array place).
 
 s1's language is merely "C, with templates, constructors/destructors,
 elementary encapsulation, tagged enum types, no implicit
