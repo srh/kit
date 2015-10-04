@@ -290,8 +290,7 @@ func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) vo
   add_comparison_primitive(cs, intern(cs->im, _s(">=")), name, mk_op(traits, CmpGe(void)));
 
   switch traits.numeric.repr {
-  case Unsigned(v void):
-    // Do nothing.
+  case Unsigned(v void): { }
   case SignedTwos(v void):
     add_unop_primitive(cs, intern(cs->im, _s("-")), name, mk_numop(traits, NumNegate(void)));
   }

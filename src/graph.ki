@@ -1740,8 +1740,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     init_padding = true;
   case CtorMove(v void):
     init_padding = true;
-  case CtorDestroy(v void):
-    // don't init padding.
+  case CtorDestroy(v void): { /* don't init padding. */ }
   }
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_info")));
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mei->cu_type.~));

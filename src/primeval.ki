@@ -279,10 +279,8 @@ func st_num_rangechecked_output(clq *clqueue, env *st_env, retvalref st_obj_ref,
     }
     // Make sure we know to handle some weird reprs later when we have them.
     switch op_numtraits->repr {
-    case Unsigned(v void):
-      // do nothing
-    case SignedTwos(v void):
-      // do nothing
+    case Unsigned(v void): { }
+    case SignedTwos(v void): { }
     }
     addand bigint = incr(op_numtraits->maxval - op_numtraits->minval);
     num = ((num - op_numtraits->minval) % addand) + op_numtraits->minval;

@@ -629,11 +629,8 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         }
         set(&env->framecells, a.cell.~, None());
 
-      case &GrQNop(v void):
-        // Do nothing
-
-      case &GrXNop(v void):
-        // Do nothing
+      case &GrQNop(v void): { }
+      case &GrXNop(v void): { }
       }
     }
   }

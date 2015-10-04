@@ -1118,6 +1118,12 @@ int parse_cased_statement(struct ps *p, struct ast_cased_statement *out) {
     for (;;) {
       struct ps_savestate save = ps_save(p);
       if (try_skip_keyword(p, "case") || try_skip_keyword(p, "default") || try_skip_char(p, '}')) {
+        /* Require at least one naked statement, so that it doesn't
+        look like fall-through. */
+        if (statements_count == 0) {
+          goto fail_statements;
+        }
+
         ps_restore(p, save);
         ast_bracebody_init(&body, ast_meta_make(bracebody_start, ps_pos(p)),
                            statements, statements_count);

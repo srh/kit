@@ -153,8 +153,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
     if !sets_equal(&liveset.all, &expected) {
       ice(_u8("fn_body leaves cells alive, expected "), g->graph.cell, _u8(", saw "), liveset.all);
     }
-  case &NonTerminal(v void):
-    // nothing to assert
+  case &NonTerminal(v void): { /* nothing to assert */ }
   }
 
   if !dumbly_layout_frame_cells(g, &h) {
