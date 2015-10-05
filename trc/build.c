@@ -4757,7 +4757,7 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
   gen_function_intro(f, &h);
   note_param_locations(cs, &h, a);
 
-  int res = gen_bracebody(cs, f, &h, &a->u.lambda.bracebody);
+  int res = gen_bracebody(cs, f, &h, &a->u.lambda.body);
 
   if (res) {
     gen_function_exit(cs, f, &h);

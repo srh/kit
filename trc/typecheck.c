@@ -3395,7 +3395,7 @@ int check_expr_lambda(struct exprscope *es,
   struct ast_typeexpr computed_return_type;
   if (!check_expr_funcbody(
           &bb_es,
-          &x->bracebody,
+          &x->body,
           &funcexpr.u.app.params[size_sub(funcexpr.u.app.params_count, 1)],
           &computed_return_type)) {
     CHECK_DBG("check_expr_funcbody fails\n");

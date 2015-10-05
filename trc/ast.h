@@ -477,8 +477,7 @@ struct ast_lambda {
   struct ast_vardecl *params;
   size_t params_count;
   struct ast_typeexpr return_type;
-  /* TODO: Rename field to body. */
-  struct ast_bracebody bracebody;
+  struct ast_bracebody body;
 };
 
 void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,

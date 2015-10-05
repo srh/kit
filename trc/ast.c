@@ -820,12 +820,12 @@ void ast_binop_expr_destroy(struct ast_binop_expr *a) {
 void ast_lambda_init(struct ast_lambda *a, struct ast_meta meta,
                      struct ast_vardecl *params, size_t params_count,
                      struct ast_typeexpr return_type,
-                     struct ast_bracebody bracebody) {
+                     struct ast_bracebody body) {
   a->meta = meta;
   a->params = params;
   a->params_count = params_count;
   a->return_type = return_type;
-  a->bracebody = bracebody;
+  a->body = body;
 }
 
 void ast_lambda_init_copy(struct ast_lambda *a, struct ast_lambda *c) {
@@ -833,14 +833,14 @@ void ast_lambda_init_copy(struct ast_lambda *a, struct ast_lambda *c) {
   SLICE_INIT_COPY(a->params, a->params_count, c->params, c->params_count,
                   ast_vardecl_init_copy);
   ast_typeexpr_init_copy(&a->return_type, &c->return_type);
-  ast_bracebody_init_copy(&a->bracebody, &c->bracebody);
+  ast_bracebody_init_copy(&a->body, &c->body);
 }
 
 void ast_lambda_destroy(struct ast_lambda *a) {
   ast_meta_destroy(&a->meta);
   SLICE_FREE(a->params, a->params_count, ast_vardecl_destroy);
   ast_typeexpr_destroy(&a->return_type);
-  ast_bracebody_destroy(&a->bracebody);
+  ast_bracebody_destroy(&a->body);
 }
 
 void ast_fieldname_init(struct ast_fieldname *a,
