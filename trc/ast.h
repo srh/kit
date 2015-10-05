@@ -240,8 +240,6 @@ void ast_bracebody_destroy(struct ast_bracebody *a);
 struct ast_var_statement {
   struct ast_meta meta;
   struct ast_vardecl decl;
-  /* TODO: In the case of no RHS, there must be explicit
-  initialization instructions. */
   int has_rhs;
   struct ast_exprcall *rhs;
 };
