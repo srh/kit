@@ -7,7 +7,7 @@ defclass copy bigint struct {
 };
 
 access bigint {
-  func do_init(b *bigint) void {
+  inline func do_init(b *bigint) void {
     init(&b->negative);
     init(&b->parts);
   }

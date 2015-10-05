@@ -18,7 +18,7 @@ access shp[_] {
     u->~->refcount = 1;
   }
 
-  func[T] do_copy(dest *shp[T], src *shp[T]) void {
+  inline func[T] do_copy(dest *shp[T], src *shp[T]) void {
     src->~->refcount = src->~->refcount + 1;
     dest->~ = src->~;
   }
@@ -32,16 +32,16 @@ access shp[_] {
     }
   }
 
-  func[T] oo(x *shp[T]) *T {
+  inline func[T] oo(x *shp[T]) *T {
     return &x->~->value;
   }
 
-  func[T] oo(x shp[T]) *T {
+  inline func[T] oo(x shp[T]) *T {
     return &x.~->value;
   }
 }
 
-func[T] emshp(val T) shp[T] {
+inline func[T] emshp(val T) shp[T] {
   ret shp[T];
   *oo(&ret) = val;
   return ret;

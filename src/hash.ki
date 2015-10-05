@@ -21,7 +21,7 @@ defclass[K, V] copy hash struct {
 };
 
 access hash[_, _] {
-  func[K, V] do_init(h *hash[K, V]) void {
+  inline func[K, V] do_init(h *hash[K, V]) void {
     init(&h->arr);
     h->cell_count = 0;
     h->user_count = 0;
@@ -362,6 +362,6 @@ func hash_compute_hash(x *size) osize {
   return k;
 }
 
-func hash_equal(x *size, y *size) bool {
+inline func hash_equal(x *size, y *size) bool {
   return *x == *y;
 }

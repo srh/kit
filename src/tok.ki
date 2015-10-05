@@ -32,11 +32,11 @@ func make_ps(im *identmap, posits *positionals, base_offset size, data *u8, leng
   return p;
 }
 
-func ps_pos(p *ps) pos {
+inline func ps_pos(p *ps) pos {
   return mk_pos(p->base_offset, p->pos);
 }
 
-func ps_restore_pos(p *ps, pos pos) void {
+inline func ps_restore_pos(p *ps, pos pos) void {
   p->pos = pos.~ - p->base_offset;
 }
 
@@ -46,13 +46,15 @@ func ps_peek(p *ps) i32 {
     return ~p->data[pos];
   }
   if pos > p->length {
-    crash(_u8("ps_peek pos out of range"));
+    crash();
   }
   return -1;
 }
 
 func ps_step(p *ps) void {
-  check(p->pos < p->length);
+  if p->pos >= p->length {
+    crash();
+  }
   p->pos = p->pos + 1;
 }
 
@@ -148,7 +150,7 @@ defenum tokval {
   Comment void;
 };
 
-func `==`(a keyw, b keyw) bool {
+inline func `==`(a keyw, b keyw) bool {
   return enumnum(&a) == enumnum(&b);
 }
 
@@ -190,26 +192,26 @@ func mk_tok(left pos, right pos, val tokval) tok {
   return {{left, right}, val};
 }
 
-func is_lower(x i32) bool {
+inline func is_lower(x i32) bool {
   // TODO: Statically assert 'z' - 'a' == 25.
   return x >= 'a' && x <= 'z';
 }
 
-func is_upper(x i32) bool {
+inline func is_upper(x i32) bool {
   // TODO: Statically assert 'Z' - 'A' == 25.
   return x >= 'A' && x <= 'Z';
 }
 
-func is_alpha(x i32) bool {
+inline func is_alpha(x i32) bool {
   return is_lower(x) || is_upper(x);
 }
 
-func is_digit(x i32) bool {
+inline func is_digit(x i32) bool {
   // TODO: Statically assert '9' - '0' == 9.
   return x >= '0' && x <= '9';
 }
 
-func is_alnum(x i32) bool {
+inline func is_alnum(x i32) bool {
   return is_alpha(x) || is_digit(x);
 }
 
@@ -230,30 +232,30 @@ func is_hexdigit(x i32, val_out *i8) bool {
   return false;
 }
 
-func is_numeric_postchar(x i32) bool {
+inline func is_numeric_postchar(x i32) bool {
   // TODO: Implement for real.
   return !is_alnum(x);
 }
 
-func is_ident_firstchar(x i32) bool {
+inline func is_ident_firstchar(x i32) bool {
   return is_alpha(x) || x == '_';
 }
 
-func is_ident_midchar(x i32) bool {
+inline func is_ident_midchar(x i32) bool {
   return is_ident_firstchar(x) || is_digit(x);
 }
 
-func is_ident_postchar(x i32) bool {
+inline func is_ident_postchar(x i32) bool {
   // TODO: Implement for real.
   return !is_ident_midchar(x);
 }
 
-func is_string_postchar(x i32) bool {
+inline func is_string_postchar(x i32) bool {
   // TODO: Implement for real.
   return x != '\'' && x != '\"';
 }
 
-func is_ws(x i32) bool {
+inline func is_ws(x i32) bool {
   return x == ' ' || x == '\n' || x == '\t' || x == '\r';
 }
 
@@ -274,7 +276,7 @@ func step(p *ps) void {
   }
 }
 
-func peek(p *ps) *tok {
+inline func peek(p *ps) *tok {
   return &p->current;
 }
 

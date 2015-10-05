@@ -5,15 +5,15 @@ defenum[T] nbfc {
   Computed T;
 };
 
-func[T] NotComputed() nbfc[T] {
+inline func[T] NotComputed() nbfc[T] {
   return NotComputed(void);
 }
 
-func[T] BeganComputing() nbfc[T] {
+inline func[T] BeganComputing() nbfc[T] {
   return BeganComputing(void);
 }
 
-func[T] FailedComputation() nbfc[T] {
+inline func[T] FailedComputation() nbfc[T] {
   return NotComputed(void);
 }
 
@@ -30,7 +30,7 @@ defenum[T] nc {
   Computed T;
 };
 
-func[T] NotComputed() nc[T] {
+inline func[T] NotComputed() nc[T] {
   return NotComputed(void);
 }
 

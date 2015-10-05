@@ -6,18 +6,18 @@ deftype sym size;
 
 def `~` fn[size, sym] = wrapconvert;
 
-func `==`(x sym, y sym) bool {
+inline func `==`(x sym, y sym) bool {
   return x.~ == y.~;
 }
-func `!=`(x sym, y sym) bool {
+inline func `!=`(x sym, y sym) bool {
   return x.~ != y.~;
 }
 
-func hash_compute_hash(x *sym) osize {
+inline func hash_compute_hash(x *sym) osize {
   return ~x->~;
 }
 
-func hash_equal(x *sym, y *sym) bool {
+inline func hash_equal(x *sym, y *sym) bool {
   return x->~ == y->~;
 }
 
@@ -29,7 +29,7 @@ defclass[T] copy symmap struct {
 };
 
 access symmap[_] {
-  func[T] do_init(im *symmap[T]) void {
+  inline func[T] do_init(im *symmap[T]) void {
     init(&im->table);
     init(&im->backmap);
   }
@@ -48,11 +48,11 @@ access symmap[_] {
     }
   }
 
-  func[T] is_interned(im *symmap[T], s T) opt[sym] {
+  inline func[T] is_interned(im *symmap[T], s T) opt[sym] {
     return lookup(&im->table, &s);
   }
 
-  func[T] lookup(im *symmap[T], ident sym) T {
+  inline func[T] lookup(im *symmap[T], ident sym) T {
     return get(&im->backmap, ident.~);
   }
 }

@@ -3,7 +3,7 @@ import identmap;
 
 deftype pos size;
 
-func mk_pos(base_offset size, n size) pos {
+inline func mk_pos(base_offset size, n size) pos {
   p pos;
   p.~ = base_offset + n;
   return p;

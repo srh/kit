@@ -172,7 +172,7 @@ defenum[T] opt {
   Has T;
 };
 
-func[T] None() opt[T] {
+inline func[T] None() opt[T] {
   return None(void);
 }
 
@@ -374,7 +374,7 @@ func ceil_divide(x size, y size) size {
 }
 
 // TODO: This is... platform-specific.
-func[T] enumnum(x *T) u32 {
+inline func[T] enumnum(x *T) u32 {
   ret u32 = * @[*u32]cast(x);
   if ret == 0 {
     crash();

@@ -25,7 +25,7 @@ defenum prec_cmp {
 };
 
 // def[T] dbgparse fn[T, void] = debugstr;
-func[T] dbgparse(x T) void { }
+inline func[T] dbgparse(x T) void { }
 
 def kSemicolonPrec i32 = 205;
 def kCommaPrec i32 = 205;
@@ -529,7 +529,7 @@ func help_parse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
   }
 }
 
-func success_or_fail(res bool) triparse_result {
+inline func success_or_fail(res bool) triparse_result {
   if res {
     return Success(void);
   } else {

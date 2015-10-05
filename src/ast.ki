@@ -11,7 +11,7 @@ deftype ast_meta size;
 
 def `~` fn[size, ast_meta] = wrapconvert;
 
-func fake_ast_meta() ast_meta { return ~0; }
+inline func fake_ast_meta() ast_meta { return ~0; }
 
 deftype interval struct {
   left pos;
@@ -489,7 +489,7 @@ deftype rval_description struct {
 };
 
 // Tells whether the rval would need to get copied out of the temporary, or whether the rval _is_ the whole temporary and can get moved.
-func whole_temporary(d *rval_description) bool {
+inline func whole_temporary(d *rval_description) bool {
   return d->whole_num == d->partial_num;
 }
 
@@ -510,7 +510,7 @@ defenum is_lval {
   IsLvalYes lval_description;
 };
 
-func wholeRval(num cell_num) is_lval {
+inline func wholeRval(num cell_num) is_lval {
   return IsLvalNo({num, num});
 }
 
@@ -529,7 +529,7 @@ func value_cell(x *is_lval) cell_num {
   }
 }
 
-func value_cell(a *ast_expr) cell_num {
+inline func value_cell(a *ast_expr) cell_num {
   return value_cell(&expr_complete_info(a)->lval);
 }
 
@@ -538,7 +538,7 @@ deftype ast_later_discard_info struct {
   action nc[destroy_action];
 };
 
-func mk_later() ast_later_discard_info {
+inline func mk_later() ast_later_discard_info {
   return {NotComputed()};
 }
 
@@ -619,27 +619,27 @@ defenum ast_expr_after_discard {
   DiscardNothing void;
 };
 
-func result_cell(a *ast_expr_after_consume) cell_num {
+inline func result_cell(a *ast_expr_after_consume) cell_num {
   return a->result;
 }
 
-func result_cell(a *ast_expr_consume) cell_num {
+inline func result_cell(a *ast_expr_consume) cell_num {
   return result_cell(unHas(&a->after));
 }
 
-func mk_after(actions consume_actions, result cell_num) ast_expr_after_consume {
+inline func mk_after(actions consume_actions, result cell_num) ast_expr_after_consume {
   return {actions, result};
 }
 
-func mk_after_discard(x destroy_action) ast_expr_after_discard {
+inline func mk_after_discard(x destroy_action) ast_expr_after_discard {
   return DiscardTemporary(x);
 }
 
-func mk_virtualdead_discard(lvalue_cell cell_num) ast_expr_after_discard {
+inline func mk_virtualdead_discard(lvalue_cell cell_num) ast_expr_after_discard {
   return DiscardVirtualDead(lvalue_cell);
 }
 
-func mk_nothing_discard() ast_expr_after_discard {
+inline func mk_nothing_discard() ast_expr_after_discard {
   return DiscardNothing(void);
 }
 
