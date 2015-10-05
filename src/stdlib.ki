@@ -225,9 +225,16 @@ func[T] `==`(x opt[T], y opt[T]) bool {
 
 func[T] set(dest *opt[T], y T) void {
   if case &Has(t T) = dest {
-    crash( _u8("set sees Has\n"));
+    crash(_u8("set sees Has"));
   }
   *dest = Has(y);
+}
+
+func[T] unSet(dest *opt[T]) void {
+  if case &None(v void) = dest {
+    crash(_u8("unset sees None"));
+  }
+  *dest = None();
 }
 
 deftype[S, T] tup struct {

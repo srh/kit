@@ -400,6 +400,7 @@ deftype graphed_fn_body struct {
   graph frame_regraphed;
   // The return cell is graph.cell.
   argcells array[cell_num];
+  // TODO: I think this should go _outside_ graphed_fn_body.
   // How should/shouldn't we inline this?
   inline should_inline;
 };

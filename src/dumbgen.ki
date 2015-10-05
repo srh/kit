@@ -140,6 +140,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
   for i size = 0; i < nargcells; i = i + 1 {
     create(&liveset, get(&g->argcells, i));
   }
+  // TODO: It would be cleaner if function bodies had to mark the return cell live.  It would make inlining simpler too.
   create(&liveset, g->graph.cell);
 
   mut genexpr_result;

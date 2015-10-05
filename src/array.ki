@@ -296,6 +296,16 @@ func[T] empty(a *array[T]) bool {
   return count(a) == 0;
 }
 
+func[T] find(a *array[T], b T) opt[size] {
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    if *ref(a, i) == b {
+      return Has(i);
+    }
+  }
+  return None();
+}
+
 func[T] popval(a *array[T], val_out *T) bool {
   n size = count(a);
   if n == 0 {
