@@ -587,13 +587,9 @@ int try_skip_keyword(struct ps *p, const char *kw) {
   return 1;
 }
 
-/* This doesn't really catch all keywords, for example, really "copy"
-and "move" as used in defclass should be keywords?  We really have
-valid typenames and valid expression literals and valid variable
-names.  For example, "void" isn't here because it's a type name and
-gets parsed by typechecking code, too.  But it should not be allowed
-as the name of a variable.  TODO: Do more specific name-checking
-instead. */
+/* What is a keyword?  Something you cannot use as your own name.
+TODO: The name "void" should be part of this set.  We'd have to adjust
+the typeexpr parsing code.  We fix this in s2. */
 int is_ident_keyword(struct ps *p, size_t global_offset_begin, size_t global_offset_end) {
   size_t begin = size_sub(global_offset_begin, p->global_offset_base);
   size_t end = size_sub(global_offset_end, p->global_offset_base);
@@ -2770,17 +2766,8 @@ int parse_toplevels(struct ps *p, int32_t until_ch,
 }
 
 int parse_rest_of_access(struct ps *p, struct pos pos_start, struct ast_access *out) {
-  /* This is weird: We require exactly one space between the keyword
-  "access" and the type being accessed.  This way, you can grep
-  "access typename" */
-  /* TODO: This is stupid, and s2 doesn't behave this way. */
-  if (ps_peek(p) != ' ') {
-    goto fail;
-  }
-  ps_step(p);
-
   struct ast_ident name;
-  if (!parse_ident(p, &name)) {
+  if (!(skip_ws(p) && parse_ident(p, &name))) {
     goto fail;
   }
 
