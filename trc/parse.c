@@ -2848,6 +2848,12 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   } else if (try_skip_keyword(p, "def")) {
     out->tag = AST_TOPLEVEL_DEF;
     return parse_rest_of_def(p, pos_start, 0, &out->u.def);
+  } else if (try_skip_keyword(p, "inline")) {
+    if (!(skip_ws(p) && try_skip_keyword(p, "func"))) {
+      return 0;
+    }
+    out->tag = AST_TOPLEVEL_DEF;
+    return parse_rest_of_func(p, pos_start, 0, &out->u.def);
   } else if (try_skip_keyword(p, "export")) {
     if (!skip_ws(p)) {
       return 0;

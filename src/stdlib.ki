@@ -242,14 +242,11 @@ deftype[S, T] tup struct {
   cdr T;
 };
 
-func[S, T] cons(s S, t T) tup[S, T] {
-  ret tup[S, T];
-  ret.car = s;
-  ret.cdr = t;
-  return ret;
+inline func[S, T] cons(s S, t T) tup[S, T] {
+  return {s, t};
 }
 
-func[S, T] `==`(x tup[S, T], y tup[S, T]) bool {
+inline func[S, T] `==`(x tup[S, T], y tup[S, T]) bool {
   return x.car == y.car && x.cdr == y.cdr;
 }
 
@@ -263,13 +260,13 @@ func[H, S, T] build_u8str(help H, r *array[u8], p *tup[S, T]) void {
   build_u8str(help, r, &p->cdr);
 }
 
-func[S, T] wrapconvert(x T) S {
+inline func[S, T] wrapconvert(x T) S {
   ret S;
   ret.~ = x;
   return ret;
 }
 
-func[S, T] wrapequate(x S, y T) bool {
+inline func[S, T] wrapequate(x S, y T) bool {
   return x.~ == y.~;
 }
 
@@ -309,7 +306,7 @@ func[T] check_mutate(p *T, old T, new T) void {
   *p = new;
 }
 
-func[T] max(x T, y T) T {
+inline func[T] max(x T, y T) T {
   if (x < y) {
     return y;
   } else {
@@ -317,16 +314,10 @@ func[T] max(x T, y T) T {
   }
 }
 
-func[S, T] cast(p *S) *T {
+inline func[S, T] cast(p *S) *T {
   u union { p *S; q *T; };
   u.p = p;
   return u.q;
-}
-
-func[S, T] up(s S) T {
-  ret T;
-  ret.~ = s;
-  return ret;
 }
 
 def U32_MAX u32 = ^(@[u32]0);

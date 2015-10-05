@@ -7,7 +7,7 @@ defclass[T] move array struct {
 };
 
 access array[_] {
-  func[T] do_init(r *array[T]) void {
+  inline func[T] do_init(r *array[T]) void {
     r->count = 0;
     r->cap = 0;
     r->ptr = null;
@@ -64,21 +64,21 @@ access array[_] {
     r->ptr[i] = val;
   }
 
-  func[T] get(r *array[T], i size) T {
+  inline func[T] get(r *array[T], i size) T {
     if i >= r->count {
       crash();
     }
     return r->ptr[i];
   }
 
-  func[T] ref(r *array[T], i size) *T {
+  inline func[T] ref(r *array[T], i size) *T {
     if i >= r->count {
       crash();
     }
     return &r->ptr[i];
   }
 
-  func[T] count(r *array[T]) size {
+  inline func[T] count(r *array[T]) size {
     return r->count;
   }
 
@@ -95,7 +95,7 @@ access array[_] {
     r->cap = newcap;
   }
 
-  func[T] reserve(r *array[T], newcap size) void {
+  inline func[T] reserve(r *array[T], newcap size) void {
     if newcap > r->cap {
       change_cap_(r, newcap);
     }
@@ -135,7 +135,7 @@ access array[_] {
     r->count = r->count + 1;
   }
 
-  func[T] append(r *array[T], s *array[T]) void {
+  inline func[T] append(r *array[T], s *array[T]) void {
     append_raw(r, s->ptr, s->count);
   }
 
@@ -152,7 +152,7 @@ access array[_] {
     r->count = newcount;
   }
 
-  func[T] data(r *array[T]) *T {
+  inline func[T] data(r *array[T]) *T {
     return r->ptr;
   }
 
@@ -163,7 +163,7 @@ access array[_] {
     return ret;
   }
 
-  func[T] swap(a *array[T], b *array[T]) void {
+  inline func[T] swap(a *array[T], b *array[T]) void {
     var tmp = a->~;
     a->~ = b->~;
     b->~ = tmp;
@@ -201,7 +201,7 @@ func[T] array_equal(a *array[T], b *array[T]) bool {
   return raw_buf_equal(data(a), data(b), n);
 }
 
-func u8_equal(a array[u8], b array[u8]) bool {
+inline func u8_equal(a array[u8], b array[u8]) bool {
   return array_equal(&a, &b);
 }
 
@@ -214,7 +214,7 @@ func[T] raw_buf_equal(p *T, q *T, n size) bool {
   return true;
 }
 
-func[T] append(a *array[T], b array[T]) void {
+inline func[T] append(a *array[T], b array[T]) void {
   return append(a, &b);
 }
 
@@ -292,7 +292,7 @@ func[T] reverse(a *array[T]) array[T] {
   return ret;
 }
 
-func[T] empty(a *array[T]) bool {
+inline func[T] empty(a *array[T]) bool {
   return count(a) == 0;
 }
 
@@ -353,7 +353,7 @@ func[T] overwrite_raw(x *array[T], offset size, p *T, n size) void {
   }
 }
 
-func[T] sort(x *array[T]) void {
+inline func[T] sort(x *array[T]) void {
   sort(data(x), count(x));
 }
 

@@ -360,6 +360,8 @@ deftype ast_fullbody struct {
 };
 
 deftype ast_lambda struct {
+  // TODO: We put is_inline here mainly for convenience of implementation (in gr_lambda_expr), it is unprincipled in the long run (I think?).
+  is_inline ast_isinline;
   args array[ast_vardecl];
   return_type ast_typeexpr;
   body ast_fullbody;
@@ -757,6 +759,11 @@ defenum ast_generics {
 defenum ast_isexport {
   IsExport void;
   IsNotExport void;
+};
+
+defenum ast_isinline {
+  IsInline void;
+  IsNotInline void;
 };
 
 defenum ast_isvar {
