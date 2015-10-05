@@ -148,9 +148,6 @@ void ast_unione_init(struct ast_unione *a, struct ast_meta meta,
 
 struct ast_arraytype {
   struct ast_meta meta;
-  /* TODO: This should be a (statically evaluable) expr.  But such an
-  expr would need to be analyzed for sizeof and alignof expressions
-  when seen in another type. */
   struct ast_numeric_literal number;
   struct ast_typeexpr *param;
 };
@@ -185,8 +182,8 @@ struct ast_typeexpr {
     struct ast_unione unione;
     struct ast_arraytype arraytype;
     struct ast_unknown unknown;
-    /* TODO: We have an ast_unknown field because...?  We have no
-    metadata, there are no numeric expressions. */
+    /* TODO: This holds a nonsensical meta value just so
+    ast_typeexpr_meta has one to return. */
     struct ast_unknown numeric;
   } u;
 };
@@ -456,7 +453,6 @@ void ast_statement_destroy(struct ast_statement *a);
 void ast_statement_alloc_move(struct ast_statement movee,
                               struct ast_statement **out);
 
-/* TODO: Rename. */
 struct ast_cased_statement {
   struct ast_meta meta;
   struct ast_case_pattern pattern;
