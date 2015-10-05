@@ -4322,7 +4322,7 @@ int gen_casebody(struct checkstate *cs, struct objfile *f,
   x86_gen_cmp_imm32(f, X86_EAX,
                     int32_add(
                         size_to_int32(
-                            ast_case_pattern_info_constructor_number(&constructor->info)),
+                            ast_case_pattern_info_constructor_number(&constructor->info).value),
                         FIRST_ENUM_TAG_NUMBER));
   gen_placeholder_jcc(f, h, X86_JCC_NE, fail_target_number);
   struct ast_typeexpr *var_type = ast_var_info_type(&constructor->decl.var_info);
@@ -4675,7 +4675,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       x86_gen_mov_reg_imm32(f, X86_ECX, FIRST_ENUM_TAG_NUMBER);
       x86_gen_sub_w32(f, X86_EAX, X86_ECX);
       x86_gen_cmp_imm32(f, X86_EAX,
-                        size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.u.default_pattern.info)));
+                        size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.u.default_pattern.info).value));
       gen_placeholder_jcc(f, h, X86_JCC_AE, next_target);
 
       if (!gen_bracebody(cs, f, h,

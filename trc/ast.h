@@ -253,18 +253,21 @@ void ast_var_statement_init_without_rhs(
 
 struct ast_typeexpr *ast_var_statement_type(struct ast_var_statement *a);
 
-struct ast_case_pattern_info {
-  int info_valid;
-  /* TODO: Wrap in a wrapper type. */
-  /* This contains number of constructors (in the enum type) if the
-  pattern is a default pattern. */
-  size_t constructor_number;
+struct constructor_num {
+  size_t value;
 };
 
-size_t ast_case_pattern_info_constructor_number(struct ast_case_pattern_info *a);
+struct ast_case_pattern_info {
+  int info_valid;
+  /* This contains number of constructors (in the enum type) if the
+  pattern is a default pattern. */
+  struct constructor_num constructor_number;
+};
+
+struct constructor_num ast_case_pattern_info_constructor_number(struct ast_case_pattern_info *a);
 
 void ast_case_pattern_info_specify(struct ast_case_pattern_info *a,
-                                   size_t constructor_number);
+                                   struct constructor_num constructor_number);
 
 struct ast_default_pattern {
   struct ast_case_pattern_info info;

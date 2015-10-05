@@ -2852,7 +2852,9 @@ int check_constructor(struct exprscope *es,
   ast_typeexpr_init_copy(&concrete_type_copy,
                          &spec->concrete_enumspec.enumfields[constructor_num].type);
   ast_var_info_specify(&constructor->decl.var_info, concrete_type_copy);
-  ast_case_pattern_info_specify(&constructor->info, constructor_num);
+  struct constructor_num cn;
+  cn.value = constructor_num;
+  ast_case_pattern_info_specify(&constructor->info, cn);
 
   out->replaced_decl = replaced_decl;
   return 1;
@@ -3178,8 +3180,9 @@ int check_statement(struct bodystate *bs,
         if (!check_expr_bracebody(bs, &cas->body, &cas_fallthrough)) {
           goto switch_fail_spec;
         }
-        ast_case_pattern_info_specify(&cas->pattern.u.default_pattern.info,
-                                      spec.concrete_enumspec.enumfields_count);
+        struct constructor_num cn;
+        cn.value = spec.concrete_enumspec.enumfields_count;
+        ast_case_pattern_info_specify(&cas->pattern.u.default_pattern.info, cn);
       } else {
         struct ast_constructor_pattern *constructor = &cas->pattern.u.constructor;
         struct varwind varwind;

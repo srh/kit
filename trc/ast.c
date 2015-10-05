@@ -642,17 +642,17 @@ void ast_case_pattern_info_init_copy(struct ast_case_pattern_info *a,
 void ast_case_pattern_info_destroy(struct ast_case_pattern_info *a) {
   if (a->info_valid) {
     a->info_valid = 0;
-    a->constructor_number = 0;
+    a->constructor_number.value = 0;
   }
 }
 
-size_t ast_case_pattern_info_constructor_number(struct ast_case_pattern_info *a) {
+struct constructor_num ast_case_pattern_info_constructor_number(struct ast_case_pattern_info *a) {
   CHECK(a->info_valid);
   return a->constructor_number;
 }
 
 void ast_case_pattern_info_specify(struct ast_case_pattern_info *a,
-                                   size_t constructor_number) {
+                                   struct constructor_num constructor_number) {
   CHECK(!a->info_valid);
   a->info_valid = 1;
   a->constructor_number = constructor_number;
