@@ -1313,11 +1313,11 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     return false;
   }
 
-  // NOTE: We could allow arrays, especially if ambig matching returns number of fields and their type.
-  if case &TeStruct(b te_struct) = &structural_type->~ {
+  switch &structural_type->~ {
+  case &TeStruct(b te_struct):
     n size = count(&b.fields);
     if n != count(&a->exprs) {
-      ERR(_u8("Structure literal has wrong number of fields."));
+      MERR(es->cs, a->meta, _u8("Structure literal has wrong number of fields."));
       return false;
     }
 
@@ -1349,7 +1349,40 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     }
     annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *pt, props)), ~ *pt, props)));
     return true;
-  } else {
+  case &TeArraytype(b te_arraytype):
+    n u32 = *unHas(&b.count);  // We checked is_complete(pt).
+    if n != ~count(&a->exprs) {
+      MERR(es->cs, a->meta, _u8("Structure literal has wrong number of fields."));
+      return false;
+    }
+
+    for i u32 = 0; i < n; i = i + 1 {
+      x_i *ast_expr_consume = &ref(&a->exprs, ~i)->ec;
+      if !check_expr_consume(es, x_i, oo(&b.param)) {
+        return false;
+      }
+      reannotate_static_to_virtual(es, result_cell(x_i));
+    }
+
+    // We checked is_computed(pt).
+    props type_properties;
+    if !compute_complete_type_properties(es->cs, es->clq, pt, &props) {
+      return false;
+    }
+
+    // We checked is_computed(pt)
+    param_props type_properties;
+    if !compute_complete_type_properties(es->cs, es->clq, oo(&b.param), &param_props) {
+      return false;
+    }
+
+    for i u32 = 0; i < n; i = i + 1 {
+      p_i *ast_strinit_param = ref(&a->exprs, ~i);
+      annotate(&p_i->info, {i * param_props.flat_size});
+    }
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *pt, props)), ~ *pt, props)));
+    return true;
+  default:
     MERR(es->cs, a->meta, _u8("Structure literal used on non-struct type, "), structural_type->~);
     return false;
   }

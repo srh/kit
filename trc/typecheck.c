@@ -3935,7 +3935,7 @@ int chase_struct_field_types(struct checkstate *cs,
                              struct ast_meta *meta,
                              struct ast_typeexpr *type,
                              size_t expected_field_count,
-                             struct ast_typeexpr *structe_type_out) {
+                             struct ast_typeexpr *structe_or_array_type_out) {
   switch (type->tag) {
   case AST_TYPEEXPR_NAME: {
     struct deftype_entry *ent;
@@ -3961,7 +3961,7 @@ int chase_struct_field_types(struct checkstate *cs,
       case AST_DEFTYPE_RHS_TYPE: {
         return chase_struct_field_types(cs, meta, &deftype->rhs.u.type,
                                         expected_field_count,
-                                        structe_type_out);
+                                        structe_or_array_type_out);
       } break;
       case AST_DEFTYPE_RHS_ENUMSPEC: {
         METERR(cs, *meta, "Using a struct initializer on enum type '%.*s'\n",
@@ -4016,7 +4016,7 @@ int chase_struct_field_types(struct checkstate *cs,
 
         int ret = chase_struct_field_types(cs, meta, &replaced_type,
                                            expected_field_count,
-                                           structe_type_out);
+                                           structe_or_array_type_out);
         ast_typeexpr_destroy(&replaced_type);
         return ret;
       } break;
@@ -4046,7 +4046,7 @@ int chase_struct_field_types(struct checkstate *cs,
       return 0;
     }
 
-    ast_typeexpr_init_copy(structe_type_out, type);
+    ast_typeexpr_init_copy(structe_or_array_type_out, type);
     return 1;
   } break;
   case AST_TYPEEXPR_UNIONE: {
@@ -4054,8 +4054,13 @@ int chase_struct_field_types(struct checkstate *cs,
     return 0;
   } break;
   case AST_TYPEEXPR_ARRAY: {
-    METERR(cs, *meta, "Using a struct initializer on an array type (which would make sense, but it's not supported.%s", "\n");
-    return 0;
+    uint32_t arrlen = unsafe_numeric_literal_u32(&type->u.arraytype.number);
+    if (arrlen != size_to_uint32(expected_field_count)) {
+      METERR(cs, *meta, "Struct initializer has wrong number of fields for array.%s", "\n");
+      return 0;
+    }
+    ast_typeexpr_init_copy(structe_or_array_type_out, type);
+    return 1;
   } break;
   default:
     UNREACHABLE();
@@ -4077,29 +4082,39 @@ int check_expr_strinit(struct exprscope *es,
     }
   }
 
-  struct ast_typeexpr structe_type;
+  struct ast_typeexpr structish_type;
   if (!chase_struct_field_types(es->cs,
                                 &x->u.strinit.meta, partial_type,
                                 x->u.strinit.exprs_count,
-                                &structe_type)) {
+                                &structish_type)) {
     goto fail;
   }
 
-  CHECK(structe_type.tag == AST_TYPEEXPR_STRUCTE);
-  CHECK(structe_type.u.structe.fields_count == x->u.strinit.exprs_count);
+  if (structish_type.tag == AST_TYPEEXPR_STRUCTE) {
+    CHECK(structish_type.u.structe.fields_count == x->u.strinit.exprs_count);
 
-  for (size_t i = 0, e = x->u.strinit.exprs_count; i < e; i++) {
-    if (!check_expr(es, &x->u.strinit.exprs[i],
-                    &structe_type.u.structe.fields[i].type)) {
-      goto fail_structe_type;
+    for (size_t i = 0, e = x->u.strinit.exprs_count; i < e; i++) {
+      if (!check_expr(es, &x->u.strinit.exprs[i],
+                      &structish_type.u.structe.fields[i].type)) {
+        goto fail_structish_type;
+      }
     }
+  } else if (structish_type.tag == AST_TYPEEXPR_ARRAY) {
+    for (size_t i = 0, e = x->u.strinit.exprs_count; i < e; i++) {
+      if (!check_expr(es, &x->u.strinit.exprs[i],
+                      structish_type.u.arraytype.param)) {
+        goto fail_structish_type;
+      }
+    }
+  } else {
+    UNREACHABLE();
   }
 
   struct ast_typeexpr concrete_type;
   ast_typeexpr_init_copy(&concrete_type, partial_type);
   struct ast_typeexpr temporary_type;
   ast_typeexpr_init_copy(&temporary_type, &concrete_type);
-  ast_strinit_set_struct_type(&x->u.strinit, structe_type);
+  ast_strinit_set_structish_type(&x->u.strinit, structish_type);
   ast_expr_update(x,
                   ast_expr_info_typechecked_temporary(
                       0,
@@ -4108,8 +4123,8 @@ int check_expr_strinit(struct exprscope *es,
                       1,
                       exprscope_temptag(es)));
   return 1;
- fail_structe_type:
-  ast_typeexpr_destroy(&structe_type);
+ fail_structish_type:
+  ast_typeexpr_destroy(&structish_type);
  fail:
   return 0;
 }
@@ -6455,6 +6470,18 @@ int check_more_testcases(struct identmap *im) {
       "    return -1;\n"
       "  }\n"
       "};\n");
+  pass &= check_foocase(
+      im, "check_file_test_more_76",
+      "func foo(x i32) [2]i32 {\n"
+      "  y [2]i32 = {x, x + 1};\n"
+      "  return {y[1], y[0]};\n"
+      "}\n");
+  pass &= check_negcase(
+      im, "check_file_test_more_77",
+      "func foo(x i32) [2]i32 {\n"
+      "  y [2]i32 = {x, x + 1, x + 2};\n"
+      "  return {y[1], y[0]};\n"
+      "}\n");
 
   return pass;
 }

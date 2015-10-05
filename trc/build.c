@@ -4093,16 +4093,22 @@ void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
 int gen_strinit_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
-  struct ast_typeexpr *stype = ast_strinit_struct_type(&a->u.strinit);
-  CHECK(stype->tag == AST_TYPEEXPR_STRUCTE);
-  CHECK(stype->u.structe.fields_count == a->u.strinit.exprs_count);
+  struct ast_typeexpr *stype = ast_strinit_structish_type(&a->u.strinit);
   uint32_t size = x86_sizeof(&cs->nt, stype);
   struct loc loc = frame_push_loc(h, size);
 
   for (size_t i = 0, e = a->u.strinit.exprs_count; i < e; i++) {
     int32_t saved_offset = frame_save_offset(h);
-    struct loc field_loc = gen_field_loc(cs, f, h, loc, stype,
-                                         &stype->u.structe.fields[i].name.value);
+    struct loc field_loc;
+    if (stype->tag == AST_TYPEEXPR_STRUCTE) {
+      CHECK(stype->u.structe.fields_count == a->u.strinit.exprs_count);
+      field_loc = gen_field_loc(cs, f, h, loc, stype,
+                                &stype->u.structe.fields[i].name.value);
+    } else {
+      CHECK(stype->tag == AST_TYPEEXPR_ARRAY);
+      CHECK(unsafe_numeric_literal_u32(&stype->u.arraytype.number) == size_to_uint32(a->u.strinit.exprs_count));
+      field_loc = gen_array_element_loc(cs, f, h, loc, stype->u.arraytype.param, i);
+    }
     struct expr_return field_er = demand_expr_return(field_loc);
     if (!gen_expr(cs, f, h, &a->u.strinit.exprs[i], &field_er)) {
       return 0;

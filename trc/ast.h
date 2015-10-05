@@ -650,7 +650,7 @@ void ast_typed_expr_init_copy(struct ast_typed_expr *a,
 
 struct ast_strinit_info {
   int info_valid;
-  struct ast_typeexpr concrete_structe_type;
+  struct ast_typeexpr concrete_structish_type;
 };
 
 struct ast_strinit {
@@ -667,9 +667,9 @@ void ast_strinit_init(struct ast_strinit *a,
 void ast_strinit_init_copy(struct ast_strinit *a,
                            struct ast_strinit *c);
 
-void ast_strinit_set_struct_type(struct ast_strinit *a,
-                                 struct ast_typeexpr struct_type);
-struct ast_typeexpr *ast_strinit_struct_type(struct ast_strinit *a);
+void ast_strinit_set_structish_type(struct ast_strinit *a,
+                                    struct ast_typeexpr structish_type);
+struct ast_typeexpr *ast_strinit_structish_type(struct ast_strinit *a);
 
 enum ast_typechecked {
   AST_TYPECHECKED_NO,

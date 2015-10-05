@@ -1058,8 +1058,8 @@ void ast_strinit_init_copy(struct ast_strinit *a,
   a->meta = ast_meta_make_copy(&c->meta);
   a->info.info_valid = c->info.info_valid;
   if (c->info.info_valid) {
-    ast_typeexpr_init_copy(&a->info.concrete_structe_type,
-                           &c->info.concrete_structe_type);
+    ast_typeexpr_init_copy(&a->info.concrete_structish_type,
+                           &c->info.concrete_structish_type);
   }
   SLICE_INIT_COPY(a->exprs, a->exprs_count, c->exprs, c->exprs_count,
                   ast_expr_init_copy);
@@ -1068,24 +1068,27 @@ void ast_strinit_init_copy(struct ast_strinit *a,
 void ast_strinit_destroy(struct ast_strinit *a) {
   ast_meta_destroy(&a->meta);
   if (a->info.info_valid) {
-    ast_typeexpr_destroy(&a->info.concrete_structe_type);
+    ast_typeexpr_destroy(&a->info.concrete_structish_type);
     a->info.info_valid = 0;
   }
   SLICE_FREE(a->exprs, a->exprs_count, ast_expr_destroy);
 }
 
-struct ast_typeexpr *ast_strinit_struct_type(struct ast_strinit *a) {
+struct ast_typeexpr *ast_strinit_structish_type(struct ast_strinit *a) {
   CHECK(a->info.info_valid);
-  return &a->info.concrete_structe_type;
+  return &a->info.concrete_structish_type;
 }
 
-void ast_strinit_set_struct_type(struct ast_strinit *a,
-                                 struct ast_typeexpr struct_type) {
-  CHECK(struct_type.tag == AST_TYPEEXPR_STRUCTE);
-  CHECK(struct_type.u.structe.fields_count == a->exprs_count);
+void ast_strinit_set_structish_type(struct ast_strinit *a,
+                                    struct ast_typeexpr structish_type) {
+  if (structish_type.tag == AST_TYPEEXPR_STRUCTE) {
+    CHECK(structish_type.u.structe.fields_count == a->exprs_count);
+  } else {
+    CHECK(structish_type.tag == AST_TYPEEXPR_ARRAY);
+  }
   CHECK(!a->info.info_valid);
   a->info.info_valid = 1;
-  a->info.concrete_structe_type = struct_type;
+  a->info.concrete_structish_type = structish_type;
 }
 
 struct ast_expr_info ast_expr_info_default(void) {

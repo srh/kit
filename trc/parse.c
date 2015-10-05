@@ -3101,20 +3101,6 @@ int parse_test_defs(void) {
                          "  }\n"
                          "}\n",
                          62);
-  pass &= run_count_test("def26",
-                         "func a() c {\n"
-                         "  switch d {\n"
-                         "    case e(f g):\n"
-                         "    case h(i j): { k; }\n"
-                         "  }\n"
-                         "}\n"
-                         "func b() c {\n"
-                         "  switch d {\n"
-                         "    case e(f g): { }\n"
-                         "    case h(i j): k; l + j;\n"
-                         "  }\n"
-                         "}\n",
-                         62);
   pass &= run_count_test("def27",
                          "func `~`(x u32) size { }\n",
                          11);

@@ -58,50 +58,34 @@ func appendtext(f *objfile, x u8) void {
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8) void {
-  b [2]u8;
-  b[0] = x0;
-  b[1] = x1;
+  b [2]u8 = {x0, x1};
   append_raw(&f->text, &b[0], 2);
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 u8) void {
-  b [3]u8;
-  b[0] = x0;
-  b[1] = x1;
-  b[2] = x2;
+  b [3]u8 = {x0, x1, x2};
   append_raw(&f->text, &b[0], 3);
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 u8, x3 u8) void {
-  b [3]u8;
-  b[0] = x0;
-  b[1] = x1;
-  b[2] = x2;
-  b[3] = x3;
+  b [4]u8 = {x0, x1, x2, x3};
   append_raw(&f->text, &b[0], 4);
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 i32) void {
-  b [6]u8;
-  b[0] = x0;
-  b[1] = x1;
+  b [6]u8 = {x0, x1, 0, 0, 0, 0};
   write_le_i32(&b[2], x2);
   append_raw(&f->text, &b[0], 6);
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 u32) void {
-  b [6]u8;
-  b[0] = x0;
-  b[1] = x1;
+  b [6]u8 = {x0, x1, 0, 0, 0, 0};
   write_le_u32(&b[2], x2);
   append_raw(&f->text, &b[0], 6);
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 u8, x3 u16) void {
-  b [5]u8;
-  b[0] = x0;
-  b[1] = x1;
-  b[2] = x2;
+  b [5]u8 = {x0, x1, x2, 0, 0};
   write_le_u16(&b[3], x3);
   append_raw(&f->text, &b[0], 5);
 }
@@ -112,9 +96,7 @@ func appendtext(f *objfile, x0 u8, x1 reg_rm_encoded) void {
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 reg_rm_encoded) void {
-  b [2]u8;
-  b[0] = x0;
-  b[1] = x1;
+  b [2]u8 = {x0, x1};
   append_raw(&f->text, &b[0], 2);
   append_raw(&f->text, &x2.buf[0], ~x2.length);
 }
@@ -128,9 +110,7 @@ func appendtext(f *objfile, x0 u8, x1 reg_rm_encoded, x2 u32) void {
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 reg_rm_encoded, x3 u16) void {
-  b [2]u8;
-  b[0] = x0;
-  b[1] = x1;
+  b [2]u8 = {x0, x1};
   append_raw(&f->text, &b[0], 2);
   append_raw(&f->text, &x2.buf[0], ~x2.length);
   c [2]u8;
