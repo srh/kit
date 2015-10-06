@@ -4,7 +4,7 @@ Current status:  "proto-Kit"
 
 Definitions:
    s1: A compiler, written in C.  It can compile s2.  Located in trc/.
-   s2: A compiler, written in proto-Kit.  It can compile itself.  Located in src/.
+   s2: A compiler, written in proto-Kit.  It can compile itself.  Located in urc/.
    s2-by-s1: s2, as compiled by s1.
    s2-self: s2, as compiled by s2.
 
@@ -21,7 +21,7 @@ Definitions:
 # Run some useless tests
    out --test  (or ./out --test)
 # Step 2. Build s2-by-s1
-   cd src
+   cd urc
    ..\out main  (or ../out --linux main)  # makes main.obj (or main.o)
    cl main.obj dummy.c  (or gcc -m32 main.o dummy.c -o main)
    ren main.exe s2b.exe  (or mv main s2b)
@@ -48,7 +48,7 @@ Definitions:
 The current directory structure is:
 
    trc - s1, implemented in C.  Used to compile s2.
-   src - s2, implemented in proto-Kit.  Used to compile itself.
+   urc - s2, implemented in proto-Kit.  Used to compile itself.
    examples - examples to run, disorganized junk
 
 Here's the project timeline:
