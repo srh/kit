@@ -71,7 +71,7 @@ Here's the project timeline:
       Wishlist:
        A. defstruct, no more naked structs.
        B. type aliases.
-       C. a non-truncative conversion operator (prefix +).
+       C. a non-truncative conversion operator (prefix +).  (DONE)
        D. negative integer literals.
        E. var keyword after variable.
        F. o8, o16, o32.

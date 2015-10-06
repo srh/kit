@@ -1839,6 +1839,17 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c151",
     _u8("def y u32 = 2;\n"
         "def x u32 = 1 + (y + ((((y + y + 1) + 2) + 3) + (y + (5 + (y + 7 + 8)))));\n"));
+
+  // Fails because conversion is lossy.
+  run_check_negtest(ctx, "c152-a",
+    _u8("def x u32 = 8;\n"
+        "def y i32 = +x;\n"));
+  run_check_test(ctx, "c152-b",
+    _u8("def x i16 = 8;\n"
+        "def y i32 = +x;\n"));
+  run_check_test(ctx, "c152-c",
+    _u8("def x u8 = 8;\n"
+        "def y i32 = +x;\n"));
 }
 
 func mk_ctx(build bool, name opt[array[u8]]) check_ctx { return {build, name, 0}; }

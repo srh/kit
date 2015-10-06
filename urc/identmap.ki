@@ -80,6 +80,7 @@ deftype common_syms struct {
   logical_or_sym sym;
   assignmentsym sym;
   convertsym sym;
+  nonlossyconvertsym sym;
   init sym;
   copy sym;
   move sym;
@@ -124,6 +125,7 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.logical_or_sym = intern(im, _s("||"));
   ret.assignmentsym = intern(im, _s("="));
   ret.convertsym = intern(im, _s("~"));
+  ret.nonlossyconvertsym = intern(im, _s("+"));
   ret.init = intern(im, _s("init"));
   ret.copy = intern(im, _s("copy"));
   ret.move = intern(im, _s("move"));

@@ -161,6 +161,12 @@ func add_conversion(cs *checkstate, from tup[sym, integral_traits], to tup[sym, 
   add_def_primitive(cs, cs->im->cym.convertsym, type, @[primitive_op]PrimConversion({from.cdr.flat.size, from.cdr.numeric, to.cdr.flat.size, to.cdr.numeric}));
 }
 
+func add_nonlossy_conversion(cs *checkstate, from tup[sym, integral_traits], to tup[sym, integral_traits]) void {
+  type te_typeexpr = fn_type(cs, @[te_typeexpr]TeName({from.car, None()}), @[te_typeexpr]TeName({to.car, None()}));
+  add_def_primitive(cs, cs->im->cym.nonlossyconvertsym, type, @[primitive_op]PrimConversion({from.cdr.flat.size, from.cdr.numeric, to.cdr.flat.size, to.cdr.numeric}));
+}
+
+
 func add_integral_primitives(cs *checkstate) void {
   // See also is_numeric_type.
   nt [8]tup[sym, integral_traits] = {
@@ -174,12 +180,17 @@ func add_integral_primitives(cs *checkstate) void {
       {cs->im->cym.osizesym, cs->plat.osizetraits}
   };
 
+  sizeix size = 6;
+  osizeix size = 7;
 
   n size = nt.length;
   for i size = 0; i < n; i = i + 1 {
     add_integral_primitive(cs, nt[i].car, nt[i].cdr);
     for j size = 0; j < n; j = j + 1 {
       add_conversion(cs, nt[i], nt[j]);
+      if nt[i].cdr.numeric.minval >= nt[j].cdr.numeric.minval && nt[i].cdr.numeric.maxval <= nt[j].cdr.numeric.maxval {
+        add_nonlossy_conversion(cs, nt[i], nt[j]);
+      }
     }
   }
 }

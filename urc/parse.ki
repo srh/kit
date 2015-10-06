@@ -1098,7 +1098,7 @@ func unop_info(operch *shray[i32]) opt[i32] {
   }
   ch0 i32 = get(operch, 0);
   if ch0 == '~' || ch0 == '*' || ch0 == '&'
-     || ch0 == '-' || ch0 == '!' || ch0 == '^' {
+     || ch0 == '-' || ch0 == '!' || ch0 == '^' || ch0 == '+' {
     return Has(905);
   }
   return None();
