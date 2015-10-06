@@ -77,7 +77,7 @@ Here's the project timeline:
        F. o8, o16, o32.  (DONE in s2)
        G. u64, i64, o64.
        H. a signed size type.  ("diff"?)
-       I. negation for o-verflow types.
+       I. negation for o-verflow types.  (DONE in s2)
        J. smart move/allocate-in-the-spot semantics.
        K. scoped types or scoped vars.
        L. better syntax for defining copy/init/move/destroy.

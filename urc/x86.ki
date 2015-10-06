@@ -515,6 +515,10 @@ func x86_movsx8_reg8(f *objfile, dest u8, src u8) void {
   appendtext(f, 0x0F, @[u8]0xBE, mrr(MOD11, dest, src));
 }
 
+func x86_movzx16_reg16(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x0F, @[u8]0xB7, mrr(MOD11, dest, src));
+}
+
 func x86_movsx16_reg16(f *objfile, dest u8, src u8) void {
   appendtext(f, 0x0F, @[u8]0xBF, mrr(MOD11, dest, src));
 }

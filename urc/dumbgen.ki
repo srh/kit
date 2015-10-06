@@ -1210,11 +1210,22 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     case NumNegate(v void):
       switch b.op_numtraits.repr {
       case Unsigned(v2 void):
-        ice(_u8("NumNegate on unsigned"));
+        check(!b.op_numtraits.trap_overflow);
+        if b.op_size == 1 {
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+          x86_neg_w32(f, X86_EAX);
+        } else if b.op_size == 2 {
+          x86_movzx16_reg16(f, X86_EAX, X86_EAX);
+          x86_neg_w32(f, X86_EAX);
+        } else if b.op_size == 4 {
+          x86_neg_w32(f, X86_EAX);
+        } else {
+          ice(_u8("NumNegate bad size"));
+        }
       case SignedTwos(v2 void):
         if b.op_size == 1 {
           x86_movsx8_reg8(f, X86_EAX, X86_EAX);
-          // TODO: (Also in s1.) For this and the other negations, can't we just check OF after the fact?  I missed that in the docs on the first read?
+          // TODO: (Also in s1.) For this and the other negations, can't we just check OF after the fact?  (But do x86_neg_w16 on 16-bit)  I missed that in the docs on the first read?
           // Crashes if the value is INT8_MIN by subtracting 1 and overflowign.
           if b.op_numtraits.trap_overflow {
             x86_cmp_reg8_imm8(f, X86_AL, 1);
