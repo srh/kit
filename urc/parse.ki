@@ -29,7 +29,7 @@ inline func[T] dbgparse(x T) void { }
 
 def kSemicolonPrec i32 = 205;
 def kCommaPrec i32 = 205;
-// Just enough to force assignment in conditionals to be parenthesized.
+// This is 305 because it would prevent assignment in conditionals, if it weren't otherwise banned (which it is).
 def kConditionPrec i32 = 305;
 def kConversionRightPrec i32 = 905;
 
@@ -212,7 +212,7 @@ func parse_rest_of_def(p *ps, is_export ast_isexport, is_var ast_isvar, out *ast
   }
 
   rhs ast_expr;
-  if !(parse_expr(p, kSemicolonPrec, &rhs)
+  if !(parse_expr(p, kSemicolonPrec, IsNotStatementExpr(void), &rhs)
        && try_skip_oper(p, ';')) {
     return Fail;
   }
@@ -627,7 +627,7 @@ func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) bool {
 
   count box[ast_expr];
   param box[ast_typeexpr];
-  if !(parse_expr(p, kSemicolonPrec, oo(&count))
+  if !(parse_expr(p, kSemicolonPrec, IsNotStatementExpr(void), oo(&count))
        && try_skip_token(p, @[tokval]Grouper(RBracket(void)))
        && parse_typeexpr(p, oo(&param))) {
     return Fail;
@@ -724,16 +724,16 @@ func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) bool {
   }
 }
 
-func parse_expr(p *ps, prec_ctx i32, out *ast_expr) bool {
+func parse_expr(p *ps, prec_ctx i32, se statement_expr, out *ast_expr) bool {
   lhs ast_expr;
   if !parse_atomic_expr(p, &lhs) {
     return Fail;
   }
 
-  return parse_after_atomic_expr(p, prec_ctx, lhs, out);
+  return parse_after_atomic_expr(p, prec_ctx, se, lhs, out);
 }
 
-func parse_after_atomic_expr(p *ps, prec_ctx i32, lhs ast_expr, out *ast_expr) bool {
+func parse_after_atomic_expr(p *ps, prec_ctx i32, se statement_expr, lhs ast_expr, out *ast_expr) bool {
   for ;; {
     if try_skip_token(p, @[tokval]Grouper(LParen(void))) {
       params array[ast_expr_consume];
@@ -744,7 +744,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, lhs ast_expr, out *ast_expr) b
       lhs = mk(m, @[ast_expr_enum]Funcall({embox(consume(lhs)), params}));
     } else if try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
       arg ast_expr;
-      if !(parse_expr(p, kCommaPrec, &arg)
+      if !(parse_expr(p, kCommaPrec, IsNotStatementExpr(void), &arg)
            && try_skip_token(p, @[tokval]Grouper(RBracket(void)))) {
         return Fail;
       }
@@ -785,11 +785,14 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, lhs ast_expr, out *ast_expr) b
           oper ast_ident = {startend(p), intern(p->im, ~oper_arr(op.val))};
           step(p);
           rhs ast_expr;
-          if !parse_expr(p, op_prec.right, &rhs) {
+          if !parse_expr(p, op_prec.right, IsNotStatementExpr(void), &rhs) {
             return Fail;
           }
           m ast_meta = copyend(p, lhs.meta);
-          lhs = build_binop_expr(p->im, m, oper, lhs, rhs);
+          // TODO: This is fragile.  What if we had a statement, "x = y ! z;", where "!" is a lower-precedence operator than "="?  Right now no such operators exist (besides comma, which doesn't work in expressions) so we're okay.
+          if !build_binop_expr(p->im, se, m, oper, lhs, rhs, &lhs) {
+            return Fail;
+          }
         }
       }
     } else {
@@ -819,7 +822,7 @@ func binop_info(t tokval) opt[prec_pair] {
     case Oper(x shray[i32]): {
       if count(&x) == 1 {
         c0 i32 = get(&x, 0);
-        if c0 == '=' { return Has({306, 304}); }
+        if c0 == '=' { return Has({305, 305}); }
         if c0 == '+' || c0 == '-' { return Has({504, 506}); }
         if c0 == '<' || c0 == '>' { return Has({405, 405}); }
         if c0 == '*' || c0 == '/' { return Has({604, 606}); }
@@ -841,7 +844,7 @@ func binop_info(t tokval) opt[prec_pair] {
         if c1 == '=' && (c0 == '%' || c0 == '&' || c0 == '*'
                          || c0 == '-' || c0 == '+' || c0 == '|'
                          || c0 == '/') {
-          return Has({306, 304});
+          return Has({305, 305});
         }
         return None();
       }
@@ -851,7 +854,7 @@ func binop_info(t tokval) opt[prec_pair] {
         c2 i32 = get(&x, 2);
         if c2 == '=' && ((c0 == '<' && c1 == '<')
                          || (c0 == '>' && c1 == '>')) {
-          return Has({306, 304});
+          return Has({305, 305});
         }
         return None();
       }
@@ -883,17 +886,26 @@ func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_e
   }
 }
 
-func build_binop_expr(im *identmap, m ast_meta, op ast_ident, lhs ast_expr, rhs ast_expr) ast_expr {
+defenum statement_expr {
+  IsNotStatementExpr void;
+  IsStatementExpr void;
+};
+
+func build_binop_expr(im *identmap, se statement_expr, m ast_meta, op ast_ident, lhs ast_expr, rhs ast_expr, out *ast_expr) bool {
   if op.value == im->cym.assignmentsym {
-    return mk(m, @[ast_expr_enum]Assignment({NotComputed@[ast_assignment_info](), embox(lhs), embox(rhs)}));
+    if case IsNotStatementExpr(v void) = se {
+      return Fail;
+    }
+    *out = mk(m, @[ast_expr_enum]Assignment({NotComputed@[ast_assignment_info](), embox(lhs), embox(rhs)}));
   } else if op.value == im->cym.logical_and_sym {
-    return mk(m, @[ast_expr_enum]LogicalConjunction({false, embox(consume(lhs)), embox(consume(rhs))}));
+    *out = mk(m, @[ast_expr_enum]LogicalConjunction({false, embox(consume(lhs)), embox(consume(rhs))}));
   } else if op.value == im->cym.logical_or_sym {
-    return mk(m, @[ast_expr_enum]LogicalConjunction({true, embox(consume(lhs)), embox(consume(rhs))}));
+    *out = mk(m, @[ast_expr_enum]LogicalConjunction({true, embox(consume(lhs)), embox(consume(rhs))}));
   } else {
-    return mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None()))))),
+    *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None()))))),
                                           mk_array(consume(lhs), consume(rhs))}));
   }
+  return true;
 }
 
 func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) bool {
@@ -974,7 +986,7 @@ func parse_atomic_expr_upon_grouper(p *ps, g grouper, out *ast_expr) bool {
     case LParen(v): {
       step(p);
       expr ast_expr;
-      if !(parse_expr(p, kSemicolonPrec, &expr)
+      if !(parse_expr(p, kSemicolonPrec, IsNotStatementExpr(void), &expr)
            && try_skip_token(p, @[tokval]Grouper(RParen(void)))) {
         return Fail;
       }
@@ -1000,7 +1012,7 @@ func parse_atomic_expr_upon_oper(p *ps, operch *shray[i32], out *ast_expr) bool 
     if !(try_skip_token(p, @[tokval]Grouper(LBracket(void)))
          && help_parse_typeexpr(p, AllowBlanksYes(void), &type)
          && try_skip_token(p, @[tokval]Grouper(RBracket(void)))
-         && parse_expr(p, kConversionRightPrec, &expr)) {
+         && parse_expr(p, kConversionRightPrec, IsNotStatementExpr(void), &expr)) {
       return Fail;
     }
     end(p, m);
@@ -1013,7 +1025,7 @@ func parse_atomic_expr_upon_oper(p *ps, operch *shray[i32], out *ast_expr) bool 
         oper_meta ast_meta = startend(p);
         step(p);
         rhs ast_expr;
-        if !parse_expr(p, rightprec, &rhs) {
+        if !parse_expr(p, rightprec, IsNotStatementExpr(void), &rhs) {
           return Fail;
         }
         end(p, m);
@@ -1138,7 +1150,7 @@ func parse_rest_of_expr_list(p *ps, stop grouper, out *array[ast_expr_consume]) 
       }
     }
     expr ast_expr;
-    if !parse_expr(p, kCommaPrec, &expr) {
+    if !parse_expr(p, kCommaPrec, IsNotStatementExpr(void), &expr) {
       return Fail;
     }
     push(&exprs, consume(expr));
@@ -1220,7 +1232,7 @@ func parse_rest_of_var_statement(p *ps, out *ast_statement) bool {
 
   rhs ast_expr;
   if !(try_skip_oper(p, '=')
-       && parse_expr(p, kSemicolonPrec, &rhs)
+       && parse_expr(p, kSemicolonPrec, IsNotStatementExpr(void), &rhs)
        && try_skip_oper(p, ';')) {
     return Fail;
   }
@@ -1235,7 +1247,7 @@ func parse_rest_of_return_statement(p *ps, out *ast_statement) bool {
     return true;
   }
   expr ast_expr;
-  if !(parse_expr(p, kSemicolonPrec, &expr)
+  if !(parse_expr(p, kSemicolonPrec, IsNotStatementExpr(void), &expr)
        && try_skip_oper(p, ';')) {
     return Fail;
   }
@@ -1250,14 +1262,14 @@ func parse_condition(p *ps, out *ast_condition) bool {
     rhs ast_expr;
     if !(parse_rest_of_constructor_pattern(p, m, &conspatt)
          && try_skip_oper(p, '=')
-         && parse_expr(p, kConditionPrec, &rhs)) {
+         && parse_expr(p, kConditionPrec, IsNotStatementExpr(void), &rhs)) {
       return Fail;
     }
     *out = PatternCondition({NotComputed@[ast_pattern_assign_info](), conspatt, embox(consume(rhs))});
     return true;
   } else {
     condition ast_expr;
-    if !parse_expr(p, kConditionPrec, &condition) {
+    if !parse_expr(p, kConditionPrec, IsNotStatementExpr(void), &condition) {
       return Fail;
     }
     *out = ExprCondition(embox(consume(condition)));
@@ -1331,7 +1343,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
     condition = None();
   } else {
     expr ast_expr;
-    if !(parse_expr(p, kConditionPrec, &expr)
+    if !(parse_expr(p, kConditionPrec, IsNotStatementExpr(void), &expr)
          && try_skip_oper(p, ';')) {
       return Fail;
     }
@@ -1343,7 +1355,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
     increment = None();
   } else {
     expr ast_expr;
-    if !parse_expr(p, kSemicolonPrec, &expr) {
+    if !parse_expr(p, kSemicolonPrec, IsStatementExpr(void), &expr) {
       return Fail;
     }
     increment = Has(embox(discard(expr)));
@@ -1359,7 +1371,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
 
 func parse_rest_of_switch_statement(p *ps, out *ast_statement) bool {
   swartch ast_expr;
-  if !(parse_expr(p, kConditionPrec, &swartch)
+  if !(parse_expr(p, kConditionPrec, IsNotStatementExpr(void), &swartch)
        && try_skip_token(p, @[tokval]Grouper(LBrace(void)))) {
     return Fail;
   }
@@ -1464,7 +1476,7 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
   if !try_parse_ident(p, &name) {
     // (The force_assignment argument only matters for var statements.)
     expr ast_expr;
-    if !(parse_expr(p, kSemicolonPrec, &expr)
+    if !(parse_expr(p, kSemicolonPrec, IsStatementExpr(void), &expr)
          && try_skip_oper(p, ';')) {
       return Fail;
     }
@@ -1488,7 +1500,7 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
         done = true;
       } else {
         ambi ast_expr;
-        if !(parse_expr(p, kCommaPrec, &ambi)
+        if !(parse_expr(p, kCommaPrec, IsNotStatementExpr(void), &ambi)
              && try_skip_token(p, @[tokval]Grouper(RBracket(void)))) {
           return Fail;
         }
@@ -1501,7 +1513,7 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
           m ast_meta = copystart(p, name.meta);
           lhs ast_expr = expressionize(m, name, indexers);
           whole_expr ast_expr;
-          if !(parse_after_atomic_expr(p, kSemicolonPrec, lhs, &whole_expr)
+          if !(parse_after_atomic_expr(p, kSemicolonPrec, IsStatementExpr(void), lhs, &whole_expr)
                && try_skip_oper(p, ';')) {
             return Fail;
           }
@@ -1535,7 +1547,7 @@ func parse_naked_var_or_expr_statement(p *ps, fa force_assignment, out *ast_stat
 
   rhs ast_expr;
   if !(try_skip_oper(p, '=')
-       && parse_expr(p, kSemicolonPrec, &rhs)
+       && parse_expr(p, kSemicolonPrec, IsNotStatementExpr(void), &rhs)
        && try_skip_oper(p, ';')) {
     return Fail;
   }
@@ -1834,6 +1846,12 @@ func test_parse() bool {
                                _u8("func foo() a { if case foo(x) = bar { } else if y { } else { } }"));
   pass = pass & run_parse_test(_u8("p056"),
     _u8("func foo() a { if x == 0 { return 1; } else { return 2; } }"));
+  pass = pass & run_parse_negtest(_u8("p057"),
+    _u8("func foo() a { if a = 3 { } }"));
+  pass = pass & run_parse_negtest(_u8("p058"),
+    _u8("func foo() a { (a = 3); }"));
+  pass = pass & run_parse_test(_u8("p059"),
+    _u8("func foo() a { a = 3; }"));
   return pass;
 }
 
