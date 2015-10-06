@@ -1,4 +1,6 @@
 Some feature differences between s1 and s2:
 - s2 enum constructor type-checking/lookup is different.
 - s2 has gotos.
-- s2 only allows assignment at top-level exprs of statements.
+
+- s2 disallows assignment except for top-level exprs.
+- s2 disallows strinits nakedly in conditionals/swartch locations.
