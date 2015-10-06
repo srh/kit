@@ -1116,6 +1116,26 @@ func gr_assignment(cs *checkstate, gr *frame_graph, x *ast_expr, a *ast_assignme
       *out = gn3.~;
       return true;
     }
+    case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): {
+      // TODO: This is disgusting.  We have a trivial destructor, trivial copy assignment.  Why go through this rigamarole?
+      dgn gr_num;
+      if !gr_destroy_action(cs, gr, &sci.target_destroy, DeadAfterDestroyNo(void), &dgn) {
+        return false;
+      }
+      mgn gr_num;
+      if !gr_copy_action(cs, gr, &sci.rhs_copy, &mgn) {
+        return false;
+      }
+      if case DeadMe(v void) = sci.rhs_deadme {
+        if !gr_chain_virtualdead(cs, gr, mgn, sci.rhs_copy.src, &mgn) {
+          return false;
+        }
+      }
+      gn1 sq_num = seqq(gr, {dgn, seq1(gr, mgn)});
+      gn2 sq_num = seqq(gr, {lp_rp_nop, gn1});
+      *out = gn2.~;
+      return true;
+    }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
       var fc = addx(gr, @[gr_op]GrWriteConst({ci.comparecells.funcell, ConstDef(ci.comparecells.ip)}));
       var dp = addx(gr, @[gr_op]GrAddressof({ci.comparecells.destptr, value_cell(oo(&a->lhs))}));

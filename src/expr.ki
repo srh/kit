@@ -1218,12 +1218,32 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         if !get_copy_bi_ctor(es, &ref_cell(es, dest)->type, &copy) {
           return false;
         }
-        annotate(&assignment->info,
-          @[ast_assignment_info]
-          ConditionalAssignment({make_comparecells(es, dest),
-                                 @[destroy_action]{target_destroy, dest},
-                                 @[copy_action]{copy, dest, desc.num},
-                                 desc.deadme}));
+        do_conditional bool;
+        switch &target_destroy {
+        case &UniTrivialCtor(v void):
+          switch &copy {
+          case &BiTrivialCtor(v2 void):
+            do_conditional = false;
+          case &BiFunCtor(bfcd):
+            do_conditional = true;
+          }
+        case &UniFunCtor(ufcd):
+          do_conditional = true;
+        }
+        if do_conditional {
+          annotate(&assignment->info,
+            @[ast_assignment_info]
+            ConditionalAssignment({make_comparecells(es, dest),
+                                   @[destroy_action]{target_destroy, dest},
+                                   @[copy_action]{copy, dest, desc.num},
+                                   desc.deadme}));
+        } else {
+          annotate(&assignment->info,
+            @[ast_assignment_info]
+            SimpleCopyAssignment({@[destroy_action]{target_destroy, dest},
+                                  @[copy_action]{copy, dest, desc.num},
+                                  desc.deadme}));
+        }
       }
     }
   }

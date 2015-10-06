@@ -96,6 +96,13 @@ deftype ast_conditional_assignment_info struct {
   rhs_deadme lval_deadme;
 };
 
+deftype ast_simple_copy_assignment_info struct {
+  target_destroy destroy_action;
+  rhs_copy copy_action;
+  // Should we dead the rhs virtual cell?
+  rhs_deadme lval_deadme;
+};
+
 deftype ast_simple_move_assignment_info struct {
   target_destroy destroy_action;
   rhs_move move_action;
@@ -111,6 +118,7 @@ defenum ast_assignment_info {
   StaticSelfAssignment void;
   SimpleMoveAssignment ast_simple_move_assignment_info;
   SimpleCopyDestroyAssignment ast_simple_copydestroy_assignment_info;
+  SimpleCopyAssignment ast_simple_copy_assignment_info;
   ConditionalAssignment ast_conditional_assignment_info;
 };
 
