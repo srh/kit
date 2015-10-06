@@ -777,13 +777,13 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       }
       step(p);
       m ast_meta = copyend(p, lhs.meta);
-      // (TODO: Is expanding out this funcall/typed/addressof expr the best software design choice?  I think so, we can add layover information saying this is an incr expr, later.)
+      // (TODO: Is expanding out this funcall/typed/addressof expr the best software design choice?  I think so, we can add layover information saying this is an incr expr, later.  Likewise with user assignment ops.)
       *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
          embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None()))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))))})))}));
       return true;
-    } else if case Has(op_prec prec_pair) = binop_info(peek(p)->val) {
+    } else if case Has(op_facts binop_facts) = binop_info(peek(p)->val) {
       op tok = *peek(p);
-      switch compare_prec(prec_ctx, op_prec.left) {
+      switch compare_prec(prec_ctx, op_facts.op_prec.left) {
         case Conflicts(v): {
           return Fail;
         }
@@ -795,12 +795,12 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
           oper ast_ident = {startend(p), intern(p->im, ~oper_arr(op.val))};
           step(p);
           rhs ast_expr;
-          if !parse_expr(p, op_prec.right, ab, IsNotStatementExpr(void), &rhs) {
+          if !parse_expr(p, op_facts.op_prec.right, ab, IsNotStatementExpr(void), &rhs) {
             return Fail;
           }
           m ast_meta = copyend(p, lhs.meta);
           // TODO: This is fragile.  What if we had a statement, "x = y ! z;", where "!" is a lower-precedence operator than "="?  Right now no such operators exist (besides comma, which doesn't work in expressions) so we're okay.
-          if !build_binop_expr(p->im, se, m, oper, lhs, rhs, &lhs) {
+          if !build_binop_expr(p->im, se, m, op_facts.user_assignment, oper, lhs, rhs, &lhs) {
             return Fail;
           }
         }
@@ -838,35 +838,40 @@ func incrdecr_sym(im *identmap, is_incr bool) sym {
   }
 }
 
-func binop_info(t tokval) opt[prec_pair] {
+deftype binop_facts struct {
+  op_prec prec_pair;
+  user_assignment bool;
+};
+
+func binop_info(t tokval) opt[binop_facts] {
   switch t {
     default: { return None(); }
     case Oper(x shray[i32]): {
       if count(&x) == 1 {
         c0 i32 = get(&x, 0);
-        if c0 == '=' { return Has({305, 305}); }
-        if c0 == '+' || c0 == '-' { return Has({504, 506}); }
-        if c0 == '<' || c0 == '>' { return Has({405, 405}); }
-        if c0 == '*' || c0 == '/' { return Has({604, 606}); }
-        if c0 == '%' { return Has({605, 605}); }
-        if c0 == '^' || c0 == '&' || c0 == '|' { return Has({405, 405}); }
+        if c0 == '=' { return Has({{305, 305}, false}); }
+        if c0 == '+' || c0 == '-' { return Has({{504, 506}, false}); }
+        if c0 == '<' || c0 == '>' { return Has({{405, 405}, false}); }
+        if c0 == '*' || c0 == '/' { return Has({{604, 606}, false}); }
+        if c0 == '%' { return Has({{605, 605}, false}); }
+        if c0 == '^' || c0 == '&' || c0 == '|' { return Has({{405, 405}, false}); }
         return None();
       }
       if count(&x) == 2 {
         c0 i32 = get(&x, 0);
         c1 i32 = get(&x, 1);
-        if c0 == '&' && c1 == '&' { return Has({376, 374}); }
-        if c0 == '|' && c1 == '|' { return Has({356, 354}); }
+        if c0 == '&' && c1 == '&' { return Has({{376, 374}, false}); }
+        if c0 == '|' && c1 == '|' { return Has({{356, 354}, false}); }
         if (c0 == '<' && c1 == '<') || (c0 == '>' && c1 =='>') {
-          return Has({405, 405});
+          return Has({{405, 405}, false});
         }
         if c1 == '=' && (c0 == '=' || c0 == '<' || c0 == '>' || c0 == '!') {
-          return Has({405, 405});
+          return Has({{405, 405}, false});
         }
         if c1 == '=' && (c0 == '%' || c0 == '&' || c0 == '*'
                          || c0 == '-' || c0 == '+' || c0 == '|'
                          || c0 == '/') {
-          return Has({305, 305});
+          return Has({{305, 305}, true});
         }
         return None();
       }
@@ -876,7 +881,7 @@ func binop_info(t tokval) opt[prec_pair] {
         c2 i32 = get(&x, 2);
         if c2 == '=' && ((c0 == '<' && c1 == '<')
                          || (c0 == '>' && c1 == '>')) {
-          return Has({305, 305});
+          return Has({{305, 305}, true});
         }
         return None();
       }
@@ -913,7 +918,7 @@ defenum statement_expr {
   IsStatementExpr void;
 };
 
-func build_binop_expr(im *identmap, se statement_expr, m ast_meta, op ast_ident, lhs ast_expr, rhs ast_expr, out *ast_expr) bool {
+func build_binop_expr(im *identmap, se statement_expr, m ast_meta, user_assignment bool, op ast_ident, lhs ast_expr, rhs ast_expr, out *ast_expr) bool {
   if op.value == im->cym.assignmentsym {
     if case IsNotStatementExpr(v void) = se {
       return Fail;
@@ -924,8 +929,16 @@ func build_binop_expr(im *identmap, se statement_expr, m ast_meta, op ast_ident,
   } else if op.value == im->cym.logical_or_sym {
     *out = mk(m, @[ast_expr_enum]LogicalConjunction({true, embox(consume(lhs)), embox(consume(rhs))}));
   } else {
-    *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None()))))),
-                                          mk_array(consume(lhs), consume(rhs))}));
+    if user_assignment {
+      if case IsNotStatementExpr(v void) = se {
+        return Fail;
+      }
+      *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, im->cym.voidsym}),
+         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None()))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(rhs))})))}));
+    } else {
+      *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None()))))),
+                                            mk_array(consume(lhs), consume(rhs))}));
+    }
   }
   return true;
 }

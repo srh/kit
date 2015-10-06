@@ -62,7 +62,7 @@ Here's the project timeline:
        A. Structure / array initialization syntax. (DONE)
        B. Packed struct types.  (DON'T CARE for now -- use le_u32)
        C. Destructuring assignment.
-       D. Incr/decr and "+="-type operators.
+       D. Incr/decr and "+="-type operators. (DONE in s2 but user-defined)
    6. Linux support. (DONE)
    7. Make a self-hosted implementation (adding improvements and
       fixes to the C implementation when useful). (DONE)
