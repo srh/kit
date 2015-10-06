@@ -163,7 +163,7 @@ func add_conversion(cs *checkstate, from tup[sym, integral_traits], to tup[sym, 
 
 func add_integral_primitives(cs *checkstate) void {
   // See also is_numeric_type.
-  nt array[tup[sym, integral_traits]] = mk_array(
+  nt [8]tup[sym, integral_traits] = {
       {cs->im->cym.i8sym, cs->plat.i8traits},
       {cs->im->cym.u8sym, cs->plat.u8traits},
       {cs->im->cym.i16sym, cs->plat.i16traits},
@@ -171,15 +171,15 @@ func add_integral_primitives(cs *checkstate) void {
       {cs->im->cym.i32sym, cs->plat.i32traits},
       {cs->im->cym.u32sym, cs->plat.u32traits},
       {cs->im->cym.sizesym, cs->plat.sizetraits},
-      {cs->im->cym.osizesym, cs->plat.osizetraits});
+      {cs->im->cym.osizesym, cs->plat.osizetraits}
+  };
 
 
-  n size = count(&nt);
+  n size = nt.length;
   for i size = 0; i < n; i = i + 1 {
-    p *tup[sym, integral_traits] = ref(&nt, i);
-    add_integral_primitive(cs, p->car, p->cdr);
+    add_integral_primitive(cs, nt[i].car, nt[i].cdr);
     for j size = 0; j < n; j = j + 1 {
-      add_conversion(cs, *p, get(&nt, j));
+      add_conversion(cs, nt[i], nt[j]);
     }
   }
 }
