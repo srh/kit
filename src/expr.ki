@@ -1172,12 +1172,12 @@ func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecell
 
 func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr, assignment *ast_assignment) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
-  target_destroy uni_ctor_desc;
-  if !get_destroy_uni_ctor(es, &ref_cell(es, dest)->type, &target_destroy) {
-    return false;
-  }
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
+      target_destroy uni_ctor_desc;
+      if !get_destroy_uni_ctor(es, &ref_cell(es, dest)->type, &target_destroy) {
+        return false;
+      }
       if whole_temporary(&desc) {
         move bi_ctor_desc;
         if !get_move_bi_ctor(es, &ref_cell(es, dest)->type, &move) {
@@ -1210,6 +1210,10 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         // Static self-assignment!
         annotate(&assignment->info, StaticSelfAssignment(void));
       } else {
+        target_destroy uni_ctor_desc;
+        if !get_destroy_uni_ctor(es, &ref_cell(es, dest)->type, &target_destroy) {
+          return false;
+        }
         copy bi_ctor_desc;
         if !get_copy_bi_ctor(es, &ref_cell(es, dest)->type, &copy) {
           return false;

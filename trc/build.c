@@ -4468,6 +4468,9 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_VAR: {
+    /* TODO: We could also get this information from some var info or
+    something.  We could save the cost of copying the
+    ast_typeexpr. */
     struct ast_typeexpr *var_type = ast_var_statement_type(&s->u.var_statement);
     uint32_t var_size = x86_sizeof(&cs->nt, var_type);
     struct loc var_loc = frame_push_loc(h, var_size);
