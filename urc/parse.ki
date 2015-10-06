@@ -770,6 +770,17 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       }
       m ast_meta = copyend(p, lhs.meta);
       lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(lhs)), NameField(fieldname)}));
+    } else if case Has(is_incr bool) = is_postfix_incrdecr(peek(p)->val) {
+      oper_meta ast_meta = startend(p);
+      if case IsNotStatementExpr(v void) = se {
+        return Fail;
+      }
+      step(p);
+      m ast_meta = copyend(p, lhs.meta);
+      // (TODO: Is expanding out this funcall/typed/addressof expr the best software design choice?  I think so, we can add layover information saying this is an incr expr, later.)
+      *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
+         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None()))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))))})))}));
+      return true;
     } else if is_binop(peek(p)->val) {
       op tok = *peek(p);
       op_prec prec_pair = binop_prec(op.val);
@@ -799,6 +810,32 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       *out = lhs;
       return true;
     }
+  }
+}
+
+func is_postfix_incrdecr(t tokval) opt[bool] {
+  if case &Oper(x shray[i32]) = &t {
+    if count(&x) == 2 {
+      ch0 i32 = get(&x, 0);
+      if ch0 == '+' {
+        if get(&x, 1) == '+' {
+          return Has(true);
+        }
+      } else if ch0 == '-' {
+        if get(&x, 1) == '-' {
+          return Has(false);
+        }
+      }
+    }
+  }
+  return None();
+}
+
+func incrdecr_sym(im *identmap, is_incr bool) sym {
+  if is_incr {
+    return im->cym.postfix_incrsym;
+  } else {
+    return im->cym.postfix_decrsym;
   }
 }
 

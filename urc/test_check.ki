@@ -1859,6 +1859,24 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c152-e",
     _u8("def x u8 = 8;\n"
         "def y o8 = +x + 253;\n"));
+
+  run_check_negtest(ctx, "c153-a",
+    _u8("func foo(x i32) void {\n"
+        "  x++;\n"
+        "  for i i32 = 0; i < x; i++ {\n"
+        "    if i == 5 { return; }\n"
+        "  }\n"
+        "}\n"));
+  run_check_test(ctx, "c153-b",
+    _u8("func foo(x i32) void {\n"
+        "  x++;\n"
+        "  for i i32 = 0; i < x; i++ {\n"
+        "    if i == 5 { return; }\n"
+        "  }\n"
+        "}\n"
+        "inline func `++`(x *i32) void {\n"
+        "  *x = *x + 1;\n"
+        "}\n"));
 }
 
 func mk_ctx(build bool, name opt[array[u8]]) check_ctx { return {build, name, 0}; }

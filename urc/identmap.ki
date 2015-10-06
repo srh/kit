@@ -97,6 +97,8 @@ deftype common_syms struct {
   magic_destroy sym;
   sizeofsym sym;
   alignofsym sym;
+  postfix_incrsym sym;
+  postfix_decrsym sym;
 };
 
 deftype identmap struct {
@@ -145,6 +147,8 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.magic_destroy = intern(im, _s("magic_destroy"));
   ret.sizeofsym = intern(im, _s("sizeof"));
   ret.alignofsym = intern(im, _s("alignof"));
+  ret.postfix_incrsym = intern(im, _s("++"));
+  ret.postfix_decrsym = intern(im, _s("--"));
   return ret;
 }
 
