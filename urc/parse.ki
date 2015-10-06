@@ -781,9 +781,8 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
          embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None()))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))))})))}));
       return true;
-    } else if is_binop(peek(p)->val) {
+    } else if case Has(op_prec prec_pair) = binop_info(peek(p)->val) {
       op tok = *peek(p);
-      op_prec prec_pair = binop_prec(op.val);
       switch compare_prec(prec_ctx, op_prec.left) {
         case Conflicts(v): {
           return Fail;
@@ -836,20 +835,6 @@ func incrdecr_sym(im *identmap, is_incr bool) sym {
     return im->cym.postfix_incrsym;
   } else {
     return im->cym.postfix_decrsym;
-  }
-}
-
-func is_binop(t tokval) bool {
-  switch binop_info(t) {
-    case Has(x): { return true; }
-    case None(v): { return false; }
-  }
-}
-
-func binop_prec(t tokval) prec_pair {
-  switch binop_info(t) {
-    case Has(x): { return x; }
-    case None(v): { check(false); return fake(); }
   }
 }
 
