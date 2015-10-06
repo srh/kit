@@ -169,13 +169,16 @@ func add_nonlossy_conversion(cs *checkstate, from tup[sym, integral_traits], to 
 
 func add_integral_primitives(cs *checkstate) void {
   // See also is_numeric_type.
-  nt [8]tup[sym, integral_traits] = {
+  nt [11]tup[sym, integral_traits] = {
       {cs->im->cym.i8sym, cs->plat.i8traits},
       {cs->im->cym.u8sym, cs->plat.u8traits},
+      {cs->im->cym.o8sym, cs->plat.o8traits},
       {cs->im->cym.i16sym, cs->plat.i16traits},
       {cs->im->cym.u16sym, cs->plat.u16traits},
+      {cs->im->cym.o16sym, cs->plat.o16traits},
       {cs->im->cym.i32sym, cs->plat.i32traits},
       {cs->im->cym.u32sym, cs->plat.u32traits},
+      {cs->im->cym.o32sym, cs->plat.o32traits},
       {cs->im->cym.sizesym, cs->plat.sizetraits},
       {cs->im->cym.osizesym, cs->plat.osizetraits}
   };
@@ -211,14 +214,20 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool 
       *out = cs->plat.i8traits.numeric;
     } else if a.value == cs->im->cym.u8sym {
       *out = cs->plat.u8traits.numeric;
+    } else if a.value == cs->im->cym.o8sym {
+      *out = cs->plat.o8traits.numeric;
     } else if a.value == cs->im->cym.i16sym {
       *out = cs->plat.i16traits.numeric;
     } else if a.value == cs->im->cym.u16sym {
       *out = cs->plat.u16traits.numeric;
+    } else if a.value == cs->im->cym.o16sym {
+      *out = cs->plat.o16traits.numeric;
     } else if a.value == cs->im->cym.i32sym {
       *out = cs->plat.i32traits.numeric;
     } else if a.value == cs->im->cym.u32sym {
       *out = cs->plat.u32traits.numeric;
+    } else if a.value == cs->im->cym.o32sym {
+      *out = cs->plat.o32traits.numeric;
     } else if a.value == cs->im->cym.sizesym {
       *out = cs->plat.sizetraits.numeric;
     } else if a.value == cs->im->cym.osizesym {

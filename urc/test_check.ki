@@ -24,10 +24,13 @@ func x86_32_platform(opsys platform_os) platform_info {
     {1, 1},
     {{1, 1}, {SignedTwos(void), jrr, true, -big("128"), big("127")}},
     {{1, 1}, {Unsigned(void), jrr, true, big("0"), big("255")}},
+    {{1, 1}, {Unsigned(void), jrr, false, big("0"), big("255")}},
     {{2, 2}, {SignedTwos(void), jrr, true, -big("32768"), big("32767")}},
     {{2, 2}, {Unsigned(void), jrr, true, big("0"), big("65535")}},
+    {{2, 2}, {Unsigned(void), jrr, false, big("0"), big("65535")}},
     {{4, 4}, {SignedTwos(void), jrr, true, -big("2147483648"), big("2147483647")}},
     {{4, 4}, {Unsigned(void), jrr, true, big("0"), big("4294967295")}},
+    {{4, 4}, {Unsigned(void), jrr, false, big("0"), big("4294967295")}},
     {{4, 4}, {Unsigned(void), jrr, true, big("0"), big("4294967295")}},
     {{4, 4}, {Unsigned(void), jrr, false, big("0"), big("4294967295")}},
     {4, 4},
@@ -1850,6 +1853,12 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c152-c",
     _u8("def x u8 = 8;\n"
         "def y i32 = +x;\n"));
+  run_check_negtest(ctx, "c152-d",
+    _u8("def x u8 = 8;\n"
+        "def y o8 = +(x + 253);\n"));
+  run_check_test(ctx, "c152-e",
+    _u8("def x u8 = 8;\n"
+        "def y o8 = +x + 253;\n"));
 }
 
 func mk_ctx(build bool, name opt[array[u8]]) check_ctx { return {build, name, 0}; }

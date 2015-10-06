@@ -63,10 +63,13 @@ deftype common_syms struct {
   voidsym sym;
   i8sym sym;
   u8sym sym;
+  o8sym sym;
   i16sym sym;
   u16sym sym;
+  o16sym sym;
   i32sym sym;
   u32sym sym;
+  o32sym sym;
   sizesym sym;
   osizesym sym;
   primitive_module_sym sym;
@@ -108,10 +111,13 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.voidsym = intern(im, _s("void"));
   ret.i8sym = intern(im, _s("i8"));
   ret.u8sym = intern(im, _s("u8"));
+  ret.o8sym = intern(im, _s("o8"));
   ret.i16sym = intern(im, _s("i16"));
   ret.u16sym = intern(im, _s("u16"));
+  ret.o16sym = intern(im, _s("o16"));
   ret.i32sym = intern(im, _s("i32"));
   ret.u32sym = intern(im, _s("u32"));
+  ret.o32sym = intern(im, _s("o32"));
   ret.sizesym = intern(im, _s("size"));
   ret.osizesym = intern(im, _s("osize"));
   ret.primitive_module_sym = intern(im, _s("<primitive>"));
