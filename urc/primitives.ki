@@ -169,7 +169,7 @@ func add_nonlossy_conversion(cs *checkstate, from tup[sym, integral_traits], to 
 
 func add_integral_primitives(cs *checkstate) void {
   // See also is_numeric_type.
-  nt [11]tup[sym, integral_traits] = {
+  nt [12]tup[sym, integral_traits] = {
       {cs->im->cym.i8sym, cs->plat.i8traits},
       {cs->im->cym.u8sym, cs->plat.u8traits},
       {cs->im->cym.o8sym, cs->plat.o8traits},
@@ -179,12 +179,10 @@ func add_integral_primitives(cs *checkstate) void {
       {cs->im->cym.i32sym, cs->plat.i32traits},
       {cs->im->cym.u32sym, cs->plat.u32traits},
       {cs->im->cym.o32sym, cs->plat.o32traits},
+      {cs->im->cym.diffsym, cs->plat.difftraits},
       {cs->im->cym.sizesym, cs->plat.sizetraits},
       {cs->im->cym.osizesym, cs->plat.osizetraits}
   };
-
-  sizeix size = 6;
-  osizeix size = 7;
 
   n size = nt.length;
   for i size = 0; i < n; i = i + 1 {

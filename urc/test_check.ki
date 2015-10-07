@@ -31,6 +31,7 @@ func x86_32_platform(opsys platform_os) platform_info {
     {{4, 4}, {SignedTwos(void), jrr, true, -big("2147483648"), big("2147483647")}},
     {{4, 4}, {Unsigned(void), jrr, true, big("0"), big("4294967295")}},
     {{4, 4}, {Unsigned(void), jrr, false, big("0"), big("4294967295")}},
+    {{4, 4}, {SignedTwos(void), jrr, true, -big("2147483648"), big("2147483647")}},
     {{4, 4}, {Unsigned(void), jrr, true, big("0"), big("4294967295")}},
     {{4, 4}, {Unsigned(void), jrr, false, big("0"), big("4294967295")}},
     {4, 4},

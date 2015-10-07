@@ -70,6 +70,7 @@ deftype common_syms struct {
   i32sym sym;
   u32sym sym;
   o32sym sym;
+  diffsym sym;
   sizesym sym;
   osizesym sym;
   primitive_module_sym sym;
@@ -120,6 +121,7 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.i32sym = intern(im, _s("i32"));
   ret.u32sym = intern(im, _s("u32"));
   ret.o32sym = intern(im, _s("o32"));
+  ret.diffsym = intern(im, _s("diff"));
   ret.sizesym = intern(im, _s("size"));
   ret.osizesym = intern(im, _s("osize"));
   ret.primitive_module_sym = intern(im, _s("<primitive>"));

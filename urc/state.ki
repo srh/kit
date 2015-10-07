@@ -87,6 +87,7 @@ deftype platform_info struct {
   i32traits integral_traits;
   u32traits integral_traits;
   o32traits integral_traits;
+  difftraits integral_traits;
   sizetraits integral_traits;
   osizetraits integral_traits;
   ptrtraits flat_traits;
