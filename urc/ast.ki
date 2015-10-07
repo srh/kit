@@ -431,10 +431,15 @@ deftype enum_constructor_info struct {
   ip instpair;
 };
 
+deftype enum_voidconstructed_info struct {
+  constructor_tag enum_tag_value;
+};
+
 defenum ast_name_expr_info {
   LocalResolve local_info;
   GlobalResolve global_info;
   EnumConstructor enum_constructor_info;
+  EnumVoidConstructed enum_voidconstructed_info;
 };
 
 deftype ast_name_expr struct {

@@ -358,15 +358,23 @@ func replaced_name_parms(ds *defscope, a *ast_name_expr, out *genparms) bool {
 }
 
 deftype constructor_info struct {
+  // A fn type.
   type cu_typeexpr;
   constructor_tag enum_tag_value;
   ip instpair;
+};
+
+deftype voidconstructed_info struct {
+  // The enum type.
+  type cu_typeexpr;
+  constructor_tag enum_tag_value;
 };
 
 defenum ds_constructor_res {
   NoMatchConstructor void;
   AmbigMatchConstructor void;
   MatchedConstructor constructor_info;
+  MatchedVoidConstructed voidconstructed_info;
 };
 
 func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_out *ds_constructor_res) bool {
@@ -377,8 +385,52 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   arg_type *te_typeexpr;
   return_type *te_typeexpr;
   if !decompose_typeapp(pt, primitive_function_puretype(ds->cs), &arg_type, &return_type) {
-    *res_out = NoMatchConstructor(void);
-    return true;
+    switch pt {
+    case &TeName(te te_name): { }
+    case &TeApp(te te_typeapp): { }
+    case &TeEnum(te te_enum): { }
+    case &TeUnknown(v void):
+      *res_out = AmbigMatchConstructor(void);
+      return true;
+    default:
+      *res_out = NoMatchConstructor(void);
+      return true;
+    }
+    // TODO: Dedup some of the code from here on?
+    if !is_complete(pt) {
+      *res_out = AmbigMatchConstructor(void);
+      return true;
+    }
+    // enum_type is complete.
+    enum_type *te_typeexpr;
+    if !complete_structural_rhs(ds, pt, &enum_type) {
+      return false;
+    }
+    if case &TeEnum(et te_enum) = enum_type {
+      rhs_type *te_typeexpr;
+      decl_index size;
+      if !find_vardecl(&et.constructors, name, &rhs_type, &decl_index) {
+        *res_out = NoMatchConstructor(void);
+        return true;
+      }
+      void_type te_typeexpr = primitive_void_type(ds->cs);
+      unified te_typeexpr;
+      if !unify_types(&void_type, rhs_type, &unified) {
+        *res_out = NoMatchConstructor(void);
+        return true;
+      }
+      cac_enum_type cac_typeexpr;
+      if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, enum_type, &cac_enum_type) {
+        return false;
+      }
+      check(cac_enum_type.complete);
+
+      *res_out = MatchedVoidConstructed({~cac_enum_type.te, mk_enum_tag_value(decl_index)});
+      return true;
+    } else {
+      *res_out = NoMatchConstructor(void);
+      return true;
+    }
   }
   if !is_complete(return_type) {
     *res_out = AmbigMatchConstructor(void);
@@ -507,6 +559,7 @@ defenum es_match_res {
   OneGlobalMatch global_info;
   OneLocalMatch local_info;
   OneEnumConstructorMatch constructor_info;
+  EnumVoidConstructedMatch voidconstructed_info;
 };
 
 func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_match_res) bool {
@@ -535,15 +588,14 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
         return false;
       }
       switch &constructor_res {
-        case &NoMatchConstructor(u void): {
-          *res_out = NoMatch(void);
-        }
-        case &AmbigMatchConstructor(u void): {
-          *res_out = AmbigGlobalMatch(void);
-        }
-        case &MatchedConstructor(inf constructor_info): {
-          *res_out = OneEnumConstructorMatch(inf);
-        }
+      case &NoMatchConstructor(u void):
+        *res_out = NoMatch(void);
+      case &AmbigMatchConstructor(u void):
+        *res_out = AmbigGlobalMatch(void);
+      case &MatchedConstructor(inf constructor_info):
+        *res_out = OneEnumConstructorMatch(inf);
+      case &MatchedVoidConstructed(inf voidconstructed_info):
+        *res_out = EnumVoidConstructedMatch(inf);
       }
       return true;
     }
@@ -1283,6 +1335,15 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ci.type, props)), ci.type, props)));
       return true;
     }
+    case &EnumVoidConstructedMatch(vci voidconstructed_info): {
+      annotate(&a->name_info, @[ast_name_expr_info]EnumVoidConstructed({vci.constructor_tag}));
+      props type_properties;
+      if !compute_type_properties(es->cs, es->clq, &vci.type, &props) {
+        return false;
+      }
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, vci.type, props)), vci.type, props)));
+      return true;
+    }
     case &OneGlobalMatch(gi global_info): {
       if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, gi.ent), gi.inst) {
         return false;
@@ -1639,7 +1700,7 @@ func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool)
   }
 }
 
-// t must be complete.
+// t must be complete.  And computed.
 func complete_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typeexpr) bool {
   switch t {
     case &TeName(a te_name): {
@@ -1730,7 +1791,7 @@ func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **
       return fake();
     }
   } else {
-    ice(_u8("lhs type in type_structural_rhs is not computed."));
+    ice(_u8("lhs type in help_structural_rhs is not computed."));
     return fake();
   }
 }

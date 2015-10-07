@@ -139,6 +139,13 @@ func[T, U, V, W] concat(a opt[T], b U, c V, d W) shray[T] {
   return freeze(&ret);
 }
 
+func[T, U] concat(a opt[T], b U) shray[T] {
+  ret array[T];
+  append(&ret, &a);
+  append(&ret, &b);
+  return freeze(&ret);
+}
+
 func[T] mk_shray() shray[T] {
   ret shray[T];
   return ret;

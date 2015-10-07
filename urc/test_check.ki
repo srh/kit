@@ -1405,7 +1405,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "    return 99;\n"
         "  }\n"
         "}\n"
-        "def d1 i32 = foo(None(void));\n"
+        "def d1 i32 = foo(None);\n"
         "def d2 i32 = foo(Has(@[i32]40));\n"
         ));
   run_check_test(ctx, "c138-b/d",
@@ -1438,7 +1438,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "    return 99;\n"
         "  }\n"
         "}\n"
-        "def d1 i32 = foo(None(void));\n"
+        "def d1 i32 = foo(None);\n"
         "def d2 i32 = foo(Has(@[i32]40));\n"
         ));
   run_check_test(ctx, "c138-b/p",
