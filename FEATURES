@@ -1,6 +1,13 @@
 Some feature differences between s1 and s2:
-- s2 enum constructor type-checking/lookup is different.
-- s2 has gotos.
+  Superset of s1:
+  - s2 has gotos.
+  - s2 has o8, o16, o32, diff.
+  - s2 has incr/decr and "+="-type operators.
+  - s2 allows negation for overflow types.
+  - s2 has the prefix + unary operator.
 
-- s2 disallows assignment except for top-level exprs.
-- s2 disallows strinits nakedly in conditionals/swartch locations.
+  Subset of s1:
+  - s2 disallows assignment except for top-level exprs.
+  - s2 disallows strinits nakedly in conditionals/swartch locations.
+  - s2 enum constructor type-checking/lookup is different.
+

@@ -1,0 +1,47 @@
+import ast;
+
+deftype variadic_arity struct {
+  // The variadic param can go "in the middle," so with n varargs, it looks like
+  // foo[a_1, ..., a_before, vararg_1, ..., vararg_n, b_1, ..., b_after].
+  before u32;
+  after u32;
+};
+
+defenum generics_arity {
+  NoParamsArity void;
+  FiniteArity u32;
+  // The number's the minimal arity, variadics always go at the end.
+  VariadicArity variadic_arity;
+};
+
+func arity(a *ast_generics) generics_arity {
+  switch a {
+    case &NoGenerics(v void): { return NoParamsArity(void); }
+    case &HasGenerics(arr array[ast_ident]): {
+      return FiniteArity(~count(&arr));
+    }
+    case &VariadicGenerics(b ast_variadic_generics): {
+      return VariadicArity({~count(&b.before), ~count(&b.after)});
+    }
+  }
+}
+
+func[H] build_u8str(help H, r *array[u8], a *generics_arity) void {
+  switch a {
+    case &NoParamsArity(v void): {
+      append(r, _u8("NoParamsArity"));
+    }
+    case &FiniteArity(n u32): {
+      append(r, _u8("FiniteArity("));
+      build_u8str(help, r, &n);
+      push(r, ')');
+    }
+    case &VariadicArity(ar variadic_arity): {
+      append(r, _u8("VariadicArity(before: "));
+      build_u8str(help, r, &ar.before);
+      append(r, _u8(", after: "));
+      build_u8str(help, r, &ar.after);
+      push(r, ')');
+    }
+  }
+}

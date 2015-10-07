@@ -1,0 +1,1487 @@
+import dumbanal;
+import state;
+
+defenum cell_loc {
+  // Directly via an frame offset, per se.
+  DirectLoc i32;
+  // Indirectly via a pointer (through the frame offset).
+  IndirectLoc i32;
+  ConstFuncellLoc fn_body_id;
+};
+
+deftype lives struct {
+  all hash[cell_num, void];
+  // The xor and sum of the cell nums -- makes for a quick commutative hash.
+  xored osize;
+  summed osize;
+};
+
+deftype lives_checksum struct {
+  xored osize;
+  summed osize;
+};
+
+func swap(x *lives, y *lives) void {
+  swap(&x->all, &y->all);
+  tmpx osize = x->xored;
+  x->xored = y->xored;
+  y->xored = tmpx;
+  tmps osize = x->summed;
+  x->summed = y->summed;
+  y->summed = tmps;
+}
+
+deftype gn_annot struct {
+  plainly_live nc[lives_checksum];
+
+  // Only for GrApply and GrPrimApply.
+  // lower_paramlists and higher_paramlists are set on the second pass.
+  // TODO: Reorder these fields.
+  lower_paramlists nc[array[gr_num]];
+  higher_paramlists hash[gr_num, void];
+  // What's live after the precs are evaluated, plus the return cell if that's not live yet.
+  app_time_live nc[lives];
+  paramlist_bottom_frame_offset nc[i32];
+
+  // Some secsize(&f->text) value -- the jmp target for evaluating the node _and_ its precs.  This is Computed if and only if we've begun generating code for the gn (and so it serves as a color-marker for our graph traversal -- see usage).
+  // TODO: I don't think we actually use the u32 value from here.
+  instruction_offset nc[u32];
+  // The jmp target number for evaluating the node _and_ its precs.
+  this_targetnum nc[jmp_targetnum];
+};
+
+func live_for_funcall(annot *gn_annot) *hash[cell_num, void] {
+  return &unHas(&annot->app_time_live)->all;
+}
+
+deftype frame struct {
+  cs *checkstate;
+  im *identmap;
+  argcells array[cell_num];
+  return_cell cell_num;
+  gr *frame_graph;
+  bas *basic_analyze_state;
+  // by_gn[i].fs shows what the state must is _before_ evaluating node i.  (All incoming nodes must agree!)
+  by_gn array[gn_annot];
+  // offsets[i] is the offset of a cell relative to the stack frame, or location of a cell, or something like that.
+  offsets nc[array[cell_loc]];
+  low_offset nc[i32];
+
+  jmp_targets array[nc[u32]];
+  placeholder_jumps array[jmpdata];
+
+  crash_target nc[jmp_targetnum];
+};
+
+deftype jmp_targetnum size;
+def `~` fn[size, jmp_targetnum] = wrapconvert;
+
+deftype jmpdata struct {
+  overwrite_location u32;
+  // On x86, this is overwrite_location + 4 for imm32 jmp and jcc instructions -- the location of the end of the instruction.
+  relative_mathpoint u32;
+  target jmp_targetnum;
+};
+
+func frame_create_target(h *frame) jmp_targetnum {
+  ret jmp_targetnum = ~count(&h->jmp_targets);
+  push(&h->jmp_targets, NotComputed());
+  return ret;
+}
+
+func frame_define_target(h *frame, jt jmp_targetnum, text_offset u32) void {
+  annotate(ref(&h->jmp_targets, jt.~), text_offset);
+}
+
+func mk_gn_annot() gn_annot {
+  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[lives](), NotComputed@[i32](), NotComputed@[u32](), NotComputed@[jmp_targetnum]()};
+}
+
+func unIndirect(loc cell_loc) i32 {
+  if case IndirectLoc(x i32) = loc {
+    return x;
+  } else {
+    ice(_u8("unIndirect fail"));
+    return fake();
+  }
+}
+
+func un_Direct(loc cell_loc) i32 {
+  if case DirectLoc(x i32) = loc {
+    return x;
+  } else {
+    ice(_u8("un_Direct fail"));
+    return fake();
+  }
+}
+
+func get_loc(h *frame, c cell_num) cell_loc {
+  return get(unHas(&h->offsets), c.~);
+}
+
+func get_ptr_loc(h *frame, c cell_num) cell_loc {
+  check(ref_cell(h->gr, c)->props.flat_size == h->cs->plat.ptrtraits.size);
+  return get_loc(h, c);
+}
+
+func get_size_loc(h *frame, c cell_num) cell_loc {
+  check(ref_cell(h->gr, c)->props.flat_size == h->cs->plat.sizetraits.flat.size);
+  return get_loc(h, c);
+}
+
+// Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
+
+func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
+  h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, mk_array@[gn_annot](), NotComputed(), NotComputed@[i32](), mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed@[jmp_targetnum]()};
+  repeat_out(count(&g->graph.gr.ops), mk_gn_annot(), &h.by_gn);
+
+  liveset lives;
+  nargcells size = count(&g->argcells);
+  for i size = 0; i < nargcells; i = i + 1 {
+    create(&liveset, get(&g->argcells, i));
+  }
+  // TODO: It would be cleaner if function bodies had to mark the return cell live.  It would make inlining simpler too.
+  create(&liveset, g->graph.cell);
+
+  mut genexpr_result;
+  if !dumbly_analyze_expression(&h, &g->graph.gr, &liveset, g->graph.gn, &mut) {
+    return false;
+  }
+
+  switch &mut {
+  case &Terminal(v void):
+    expected hash[cell_num, void] = mk_hash(g->graph.cell, void);
+    if !sets_equal(&liveset.all, &expected) {
+      ice(_u8("fn_body leaves cells alive, expected "), g->graph.cell, _u8(", saw "), liveset.all);
+    }
+  case &NonTerminal(v void): { /* nothing to assert */ }
+  }
+
+  if !dumbly_layout_frame_cells(g, &h) {
+    return false;
+  }
+
+  if !dumbly_gen_machine_code(f, &h, g->graph.gn) {
+    return false;
+  }
+
+  return true;
+}
+
+func paramlist_cells(gr *frame_graph, gn gr_num) *shray[cell_num] {
+  switch &ref_node(gr, gn)->op {
+  case &GrApply(a gr_apply):
+    return &a.params;
+  case &GrPrimApply(a gr_prim_apply):
+    return &a.params;
+  default:
+    ice(_u8("paramlist_cells called on non-paramlist op"));
+    return fake();
+  }
+}
+
+defenum tmp_offsets_val {
+  Nope void;
+  Has cell_loc;
+  StaticSubcell tup[cell_num, u32];
+  // TODO: Just use Has(ConstFuncellLoc(...))?
+  ConstFuncell fn_body_id;
+};
+
+func set(dest *tmp_offsets_val, c cell_loc) void {
+  if case &Nope(v void) = dest {
+    *dest = Has(c);
+  } else {
+    ice(_u8("set(*tmp_offsets_val, cell_loc) sees non-Nope"));
+  }
+}
+
+func isNope(p *tmp_offsets_val) bool {
+  if case &Nope(v void) = p {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
+  // Left-most paramlist goes first.
+  paramlist_ordering array[gr_num];
+  if !dumbly_linearize_paramlist_ordering(h, &paramlist_ordering) {
+    return false;
+  }
+
+  // Offsets of either a static cell or a virtual cell's pointer.
+  offsets array[tmp_offsets_val];
+  repeat_out(count(&h->gr->cells), Nope(void), &offsets);
+
+  // TODO: Maybe after we push the frame pointer, the alignment is 4 or something -- in cases where we need 8-byte or 16-byte alignment for some things.
+  low_offset i32 = 0;
+
+  // 0. Layout arg cells, return cell.
+  switch h->cs->plat.callconv {
+  case UniversalCdeclConvention(v void):
+    // It's OK to hard-code numbers here, because we're under the bullshit "UniversalCDeclConvention".
+    upward_offset i32 = 8;
+    ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
+    if for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props) {
+      set(ref(&offsets, h->return_cell.~), IndirectLoc(upward_offset));
+      upward_offset = upward_offset + 4;
+    } else {
+      // Put its cell below the frame pointer.
+      offset cell_loc = next_stack_offset(h->cs, low_offset, ret_ci, &low_offset);
+      set(ref(&offsets, h->return_cell.~), offset);
+    }
+
+    nargcells size = count(&h->argcells);
+    for i size = 0; i < nargcells; i = i + 1 {
+      c cell_num = get(&h->argcells, i);
+      ci *cell_info = ref_cell(h->gr, c);
+      if ci->location != LocationStatic(void) {
+        ice(_u8("Non-static arglist cell"));
+      }
+      offset i32 = upward_offset;
+      upward_offset = ceil_aligned(offset + ~ci->props.flat_size, 4);
+      set(ref(&offsets, c.~), DirectLoc(offset));
+    }
+  }
+
+
+  ncalls size = count(&paramlist_ordering);
+  for i size = 0; i < ncalls; i = i + 1 {
+    gn gr_num = get(&paramlist_ordering, i);
+    annot *gn_annot = ref_annot(h, gn);
+    live *hash[cell_num, void] = live_for_funcall(annot);
+
+    // 1. Layout any cells live during the funcall, that are _not_ part of the paramlist.
+    it hash_iter[cell_num, void] = iter(live);
+    while case Has(p *tup[cell_num, void]) = next(&it) {
+      c cell_num = p->car;
+      if isNope(ref(&offsets, c.~)) {
+        if case &Has(cell_paramlistgn gr_num) = &ref(&h->bas->celldisp, c.~)->paramlist {
+          // Cells in other paramlists should already been processed -- and would have failed the isNone check just above.
+          if cell_paramlistgn != gn {
+            ice(_u8("cell is in other paramlist, was not processed"));
+          }
+        } else {
+          layout_individual_cell(h, c, &low_offset, &offsets);
+        }
+      }
+    }
+
+    // 2. Layout cells that _are_ part of the paramlist.  (They have to go beneath those which aren't.)
+    pcells *shray[cell_num] = paramlist_cells(h->gr, gn);
+    npcells size = count(pcells);
+    for j size = npcells; j > 0; {
+      j = j - 1;
+      c cell_num = get(pcells, j);
+      do_process bool;
+      if !isNope(ref(&offsets, c.~)) {
+        // add_prim_fn_body applies primop directly to arg list.  TODO: Should we remove this special case here and make add_prim_fn_body copy the args into separate param cells?  Reconsider once we know how optimization would work.
+        if case &GrPrimApply(a gr_prim_apply) = &ref_node(h->gr, gn)->op {
+          do_process = false;
+        } else {
+          ice(_u8("cell is in paramlist, but already processed"));
+        }
+      } else {
+        do_process = true;
+      }
+
+      if do_process {
+        ci *cell_info = ref_cell(h->gr, c);
+        offset cell_loc = next_stack_offset(h->cs, low_offset, ci, &low_offset);
+        if !isNope(ref(&offsets, c.~)) {
+          ice(_u8("cell is in paramlist, but already processed"));
+        }
+        set(&offsets, c.~, Has(offset));
+      }
+    }
+
+    annotate(&annot->paramlist_bottom_frame_offset, low_offset);
+  }
+
+  // 3. Layout cells that aren't live during any function call -- maybe these are just used in dead code.
+  // TODO: Don't layout cells that are in dead parts of the graph.
+  ncells size = count(&offsets);
+  for i size = 0; i < ncells; i = i + 1 {
+    if isNope(ref(&offsets, i)) {
+      c cell_num = ~i;
+      layout_individual_cell(h, c, &low_offset, &offsets);
+    }
+  }
+
+  noopt_offsets array[cell_loc] = flatten_offsets(h, &offsets);
+  annotate(&h->offsets, noopt_offsets);
+  // We subtract 4 because we haven't accounted for the possible need to make a hidden return pointer for the x86 callconv.
+  annotate(&h->low_offset, low_offset - 4);
+  return true;
+}
+
+func flatten_offsets(h *frame, a *array[tmp_offsets_val]) array[cell_loc] {
+  ret array[cell_loc];
+  n size = count(a);
+  reserve(&ret, n);
+  for i size = 0; i < n; i = i + 1 {
+    switch ref(a, i) {
+    case &Nope(v void):
+      ice(_u8("flatten_offsets offset unspecified"));
+    case &Has(c cell_loc):
+      push(&ret, c);
+    case &StaticSubcell(p tup[cell_num, u32]):
+      if case &Has(cl cell_loc) = ref(a, p.car.~) {
+        switch cl {
+        case DirectLoc(x i32):
+          push(&ret, DirectLoc(x + ~p.cdr));
+        case IndirectLoc(x i32):
+          if p.car != h->return_cell || p.cdr != 0 {
+            ice(_u8("StaticSubcell of cell without directloc"));
+          }
+          push(&ret, IndirectLoc(x));
+        }
+      } else {
+        ice(_u8("StaticSubcell of cell without Has-loc"));
+      }
+    case &ConstFuncell(fnid fn_body_id):
+      push(&ret, ConstFuncellLoc(fnid));
+    }
+  }
+  return ret;
+}
+
+func layout_individual_cell(h *frame, cell cell_num, low_offset_ref *i32, offsets_ref *array[tmp_offsets_val]) void {
+  if case Has(p tup[cell_num, u32]) = is_static_subcell(h, cell) {
+    set(offsets_ref, cell.~, StaticSubcell(p));
+  } else if case Has(fnid fn_body_id) = is_const_funcell(h->cs, h->bas, cell) {
+    set(offsets_ref, cell.~, ConstFuncell(fnid));
+  } else {
+    ci *cell_info = ref_cell(h->gr, cell);
+    offset cell_loc = next_stack_offset(h->cs, *low_offset_ref, ci, low_offset_ref);
+    set(offsets_ref, cell.~, Has(offset));
+  }
+}
+
+func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
+  nonzero_iterations bool = false;
+  cumulative_offset u32 = 0;
+  for ;; {
+    ci *cell_info = ref_cell(h->gr, c);
+    switch ci->location {
+    case LocationVirtual(v void):
+      if case &Has(sd subcell_disp) = &ref(&h->bas->celldisp, c.~)->subcell {
+        if case &OffsetConst(offset u32) = &sd.offset {
+          c = sd.partof;
+          cumulative_offset = cumulative_offset + offset;
+          nonzero_iterations = true;
+        } else {
+          return None();
+        }
+      } else {
+        return None();
+      }
+    case LocationStatic(v void):
+      if !nonzero_iterations {
+        return None();
+      } else if c == h->return_cell && cumulative_offset != 0 {
+        // TODO: Don't have such a hard-coded special case.  (When we support constant-virtual-plus-offset, we won't.)
+        return None();
+      } else {
+        return Has(cons(c, cumulative_offset));
+      }
+    }
+  }
+}
+
+func is_const_funcell(cs *checkstate, bas *basic_analyze_state, c cell_num) opt[fn_body_id] {
+  disp *cell_disp = ref(&bas->celldisp, c.~);
+  if isHas(&disp->funcell) {
+    if case &HasConstValue(gc gr_const) = &disp->const_value {
+      switch &gc {
+      case &ConstInt(b bigint): return None();
+      case &ConstDef(ip instpair): return st_def_to_fnid(cs, ip);
+      case &ConstFnBody(fnid fn_body_id): return Has(fnid);
+      case &ConstBytes(b shray[u8]): return None();
+      }
+    }
+  }
+  return None();
+}
+
+func st_def_to_fnid(cs *checkstate, ip instpair) opt[fn_body_id] {
+  inst *def_inst = ref_inst(cs, ip.inst_id);
+  if case &Computed(x st_value) = &inst->evaled_value {
+    if count(&x.symbolrefs) != 0 {
+      fnid fn_body_id;
+      if !x86_simple_symbolref(cs, &x, &fnid) {
+        ice(_u8("st_def_to_fnid sees non-simple (impossible symbolref"));
+      }
+      return Has(fnid);
+    } else {
+      // Weird, I don't know, maybe it's zero-initialized?  Something a graph could have, if not a real program.
+      return None();
+    }
+  } else {
+    // This means we forgot to enqueue something onto a clq.
+    ice(_u8("st_def_to_fnid sees non-computed ConstDef"));
+    return fake();
+  }
+}
+
+// Props is the type properties of the return type.
+func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *type_properties) bool {
+  switch plat->opsys {
+  case Linux32(v void):
+    if case IsScalarNo(v2 void) = props->is_scalar {
+      return true;
+    } else {
+      return false;
+    }
+  case Win32(v void):
+    n u32 = props->flat_size;
+    if n <= 2 || n == 4 || n == 8 {
+      if case &DerivedMethodTrivial(v2 void) = &props->move_behavior {
+        return false;
+      } else {
+        return true;
+      }
+    } else {
+      return true;
+    }
+  }
+}
+
+func next_stack_offset(cs *checkstate, low_offset i32, ci *cell_info, numeric_out *i32) cell_loc {
+  switch ci->location {
+  case LocationVirtual(v void):
+    num i32 = floor_aligned(low_offset - ~cs->plat.ptrtraits.size, max(cs->plat.min_stackvar_alignment, cs->plat.ptrtraits.size));
+    *numeric_out = num;
+    return IndirectLoc(num);
+  case LocationStatic(v void):
+    num i32 = floor_aligned(low_offset - ~ci->props.flat_size, max(cs->plat.min_stackvar_alignment, ci->props.flat_alignment));
+    *numeric_out = num;
+    return DirectLoc(num);
+  }
+}
+
+func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array[gr_num]) bool {
+  // Paramlists by in-degree, which is < the number of paramlists (since they can't point at themselves).
+  nparamlists size = count(&h->bas->paramlists);
+  // nparamlists is an impossible in-degree, and nparamlists + 1 is more impossible -- there's no way it could be decremented to zero while having count(&ordering) end up equalling nparamlists, below.
+  backmap array[size];
+  repeat_out(count(&h->by_gn), nparamlists + 1, &backmap);
+  nreachable_paramlists size = 0;
+  zeroset hash[gr_num, void];
+  for i size = 0; i < nparamlists; i = i + 1 {
+    gn gr_num = get(&h->bas->paramlists, i);
+    // Nodes without lower_paramlists are unreachable.  So we don't need to worry about those!
+    // TODO: Maybe, don't gen graphs with dead nodes!
+    if case &Computed(arr array[gr_num]) = &ref(&h->by_gn, gn.~)->lower_paramlists {
+      nlower size = count(unHas(&ref(&h->by_gn, gn.~)->lower_paramlists));
+      if nlower == 0 {
+        check_insert(&zeroset, &gn, void);
+      }
+      set(&backmap, gn.~, nlower);
+      nreachable_paramlists = nreachable_paramlists + 1;
+    }
+  }
+
+  ordering array[gr_num];
+
+  while count(&zeroset) != 0 {
+    gn gr_num;
+    if true {
+      it var = iter(&zeroset);
+      gn = unHas(next(&it))->car;
+    }
+    check_remove(&zeroset, &gn);
+    push(&ordering, gn);
+    it hash_iter[gr_num, void] = iter(&ref_annot(h, gn)->higher_paramlists);
+    while case Has(p *tup[gr_num, void]) = next(&it) {
+      upn gr_num = p->car;
+      bucket size = get(&backmap, upn.~);
+      check(bucket > 0);
+      nextbucket size = bucket - 1;
+      if nextbucket == 0 {
+        check_insert(&zeroset, &upn, void);
+      }
+      set(&backmap, upn.~, nextbucket);
+    }
+  }
+
+  if count(&ordering) != nreachable_paramlists {
+    ERR(_u8("ICE: paramlist ordering has a cyclic dependency."));
+    return false;
+  }
+
+  *paramlist_ordering_out = ordering;
+  return true;
+}
+
+func dumbly_gen_machine_code(f *objfile, h *frame, entry_gn gr_num) bool {
+  if !dumbly_gen_function_intro(f, h) {
+    return false;
+  }
+  bodyaft jmp_targetnum = frame_create_target(h);
+  if !dumbly_gen_function_body(f, h, entry_gn, bodyaft) {
+    return false;
+  }
+  frame_define_target(h, bodyaft, secsize(&f->text));
+  if !dumbly_gen_function_exit(f, h) {
+    return false;
+  }
+
+  return true;
+}
+
+func dumbly_gen_function_intro(f *objfile, h *frame) bool {
+  switch h->cs->plat.callconv {
+  case UniversalCdeclConvention(v void):
+    x86_push32(f, X86_EBP);
+    x86_mov_reg32(f, X86_EBP, X86_ESP);
+    x86_add_esp_i32(f, *unHas(&h->low_offset));
+    return true;
+  }
+  restore_esp_to_default_position(f, h);
+}
+
+func dumbly_gen_function_exit(f *objfile, h *frame) bool {
+  switch h->cs->plat.callconv {
+  case UniversalCdeclConvention(v void):
+    ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
+    retsize u32 = ret_ci->props.flat_size;
+    hrp bool = for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props);
+    if hrp {
+      // Put hidden return pointer into eax.
+      x86_load32(f, X86_EAX, X86_EBP, unIndirect(get_loc(h, h->return_cell)));
+    } else {
+      loc i32 = un_Direct(get_loc(h, h->return_cell));
+
+      // TODO: Investigate calling convention behavior on signed types.  Should we sign-extend?  (Also a question for s1.)
+
+      if retsize <= 4 {
+        x86_load32_zeroextend(f, X86_EAX, X86_EBP, loc, retsize);
+      } else if retsize <= 8 {
+        // TODO: This should not even be theoretically reachable on Linux32.
+        x86_load32(f, X86_EAX, X86_EBP, loc);
+        x86_load32_zeroextend(f, X86_EDX, X86_EBP, loc + 4, retsize - 4);
+      } else {
+        ice(_u8("return size is too big for non-hidden return param"));
+      }
+    }
+
+    x86_mov_reg32(f, X86_ESP, X86_EBP);
+    x86_pop32(f, X86_EBP);
+    switch h->cs->plat.opsys {
+    case Linux32(v2 void):
+      if hrp {
+        x86_retn(f, ~ @[u32] 4);
+      } else {
+        x86_ret(f);
+      }
+    case Win32(v2 void):
+      x86_ret(f);
+    }
+
+    // Finally, kindly tie our jumps together.
+
+    if case &Computed(jt jmp_targetnum) = &h->crash_target {
+      frame_define_target(h, jt, secsize(&f->text));
+      // TODO: Rename x86_int_3 to int3, it looks like that in assembly.
+      x86_int_3(f);
+    }
+
+    njumps size = count(&h->placeholder_jumps);
+    for i size = 0; i < njumps; i = i + 1 {
+      p *jmpdata = ref(&h->placeholder_jumps, i);
+      target u32 = *unHas(ref(&h->jmp_targets, p->target.~));
+      diff i32 = @[i32]~target - @[i32]~p->relative_mathpoint;
+      le le_i32 = ~diff;
+      overwrite_raw(&f->text, ~p->overwrite_location, &le.buf[0], 4);
+    }
+  }
+
+  return true;
+}
+
+// TODO: Remove this and its callers.
+func[T] DUMBGEN(x T) void {
+}
+
+func universal_cc_write_to_retcell(f *objfile, h *frame, c cell_num) void {
+  ci *cell_info = ref_cell(h->gr, c);
+  retsize u32 = ci->props.flat_size;
+  // TODO: The only time the retcell isn't static is in strinit and frame return_cell subcells.  Eventually we can use un_Direct here.
+  dest_addr u8;
+  dest_disp i32;
+  x86_prep_loc_use(f, get_loc(h, c), X86_ECX, &dest_addr, &dest_disp);
+  if retsize <= 4 {
+    x86_store32_partial_destructively(f, dest_addr, dest_disp, X86_EAX, retsize);
+  } else if retsize <= 8 {
+    // TODO: This should not even be theoretically reachable on Linux32.
+    x86_store32(f, dest_addr, dest_disp, X86_EAX);
+    x86_store32_partial_destructively(f, dest_addr, dest_disp + 4, X86_EDX, retsize - 4);
+  } else {
+    ice(_u8("return size is too big for non-hidden return param"));
+  }
+}
+
+deftype gn_and_jmpaft struct {
+  gn gr_num;
+  jmpaft jmp_targetnum;
+  jmp_necessary bool;
+};
+
+deftype op_targ_gn_jmpaft struct {
+  op_targ jmp_targetnum;
+  gn gr_num;
+  jmpaft jmp_targetnum;
+  jmp_necessary bool;
+};
+
+defenum dumbgen_stackent {
+  DumbgenOpAndPrecs gn_and_jmpaft;
+  DumbgenOp op_targ_gn_jmpaft;
+};
+
+func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp_targetnum) bool {
+  stack array[dumbgen_stackent];
+  push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({entry_gn, bodyaft, false}));
+  while case Has(se dumbgen_stackent) = popval(&stack) {
+    switch se {
+    case DumbgenOpAndPrecs(gna gn_and_jmpaft):
+      gn gr_num = gna.gn;
+      annot *gn_annot = ref_annot(h, gn);
+      if case &Computed(off u32) = &annot->instruction_offset {
+        // TODO: Just gen the jmp directly -- no need for a placeholder, we know the offset.
+        x86_gen_placeholder_jmp(f, h, frame_gn_targetnum(h, gn));
+      } else {
+        text_offset u32 = secsize(&f->text);
+        annotate(&annot->instruction_offset, text_offset);
+        frame_define_target(h, frame_gn_targetnum(h, gn), text_offset);
+        op_targ jmp_targetnum = frame_create_target(h);
+        push(&stack, @[dumbgen_stackent]DumbgenOp({op_targ, gn, gna.jmpaft, gna.jmp_necessary}));
+        node *gr_node = ref_node(h->gr, gn);
+
+        // For now we eval precs left-to-right, just like in static eval.  This means behavior differences must be the result of bugs.
+
+        precaft jmp_targetnum = op_targ;
+        nprecs size = count(&node->precs);
+        for i size = nprecs; i > 0; {
+          i = i - 1;
+          prec_gn gr_num = get(&node->precs, i);
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({prec_gn, precaft, false}));
+          precaft = frame_gn_targetnum(h, prec_gn);
+        }
+      }
+    case DumbgenOp(otgna op_targ_gn_jmpaft):
+      frame_define_target(h, otgna.op_targ, secsize(&f->text));
+      gn gr_num = otgna.gn;
+      node *gr_node = ref_node(h->gr, gn);
+      switch &node->op {
+      case &GrApply(a gr_apply):
+        DUMBGEN("GrApply");
+        switch h->cs->plat.callconv {
+        case UniversalCdeclConvention(v void):
+          ret_ci *cell_info = ref_cell(h->gr, a.retcell);
+          hrp bool = for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props);
+          framelist_bottom i32 = *unHas(&ref_annot(h, gn)->paramlist_bottom_frame_offset);
+          if hrp {
+            hrp_bottom i32 = framelist_bottom - 4;
+            x86_load_cell_address(f, h, X86_EAX, a.retcell);
+            x86_store32(f, X86_EBP, hrp_bottom, X86_EAX);
+            // TODO: I think we could dedup some code here and below.
+            switch get_loc(h, a.funcell) {
+            case DirectLoc(x i32):
+              x86_load32(f, X86_EAX, X86_EBP, x);
+              set_esp_to_frame_offset(f, h, hrp_bottom);
+              x86_indirect_call(f, X86_EAX);
+            case ConstFuncellLoc(fnid fn_body_id):
+              symbol_table_index sti = *unHas(&ref_fn_body(h->cs, fnid)->symbol_table_index);
+              set_esp_to_frame_offset(f, h, hrp_bottom);
+              x86_call(f, symbol_table_index);
+            }
+            restore_esp_to_default_position(f, h);
+          } else {
+            switch get_loc(h, a.funcell) {
+            case DirectLoc(x i32):
+              x86_load32(f, X86_EAX, X86_EBP, x);
+              set_esp_to_frame_offset(f, h, framelist_bottom);
+              x86_indirect_call(f, X86_EAX);
+            case ConstFuncellLoc(fnid fn_body_id):
+              symbol_table_index sti = *unHas(&ref_fn_body(h->cs, fnid)->symbol_table_index);
+              set_esp_to_frame_offset(f, h, framelist_bottom);
+              x86_call(f, symbol_table_index);
+            }
+
+            universal_cc_write_to_retcell(f, h, a.retcell);
+            restore_esp_to_default_position(f, h);
+          }
+        }
+      case &GrPrimApply(a gr_prim_apply):
+        DUMBGEN("GrPrimApply");
+        if !x86_dumbly_prim_apply(f, h, &a) {
+          return false;
+        }
+      case &GrMemCopy(a gr_memcopy):
+        DUMBGEN("GrMemCopy");
+        dest_ci *cell_info = ref_cell(h->gr, a.dest);
+        src_ci *cell_info = ref_cell(h->gr, a.src);
+        if dest_ci->props.flat_size != src_ci->props.flat_size {
+          ice(_u8("GrMemCopy to have same-size cells."));
+        }
+        x86_memcopy(f, get_loc(h, a.dest), get_loc(h, a.src), dest_ci->props.flat_size);
+      case &GrWriteConst(a gr_writeconst):
+        DUMBGEN("GrWriteConst");
+        dest_loc cell_loc = get_loc(h, a.dest);
+        if case &ConstFuncellLoc(id fn_body_id) = &dest_loc {
+          // Do nothing.
+        } else {
+          dest_ci *cell_info = ref_cell(h->gr, a.dest);
+          value st_value;
+          if !st_const_compute_for_gen(h->cs, &a.value, dest_ci->props.flat_size, &value) {
+            return false;
+          }
+
+          x86_gen_write_value(f, h, dest_loc, &value);
+        }
+      case &GrAddressof(a gr_addressof):
+        DUMBGEN("GrAddressof");
+        x86_load_cell_address(f, h, X86_EAX, a.addressee);
+        x86_store32(f, get_ptr_loc(h, a.dest), X86_EAX, X86_EDX);
+      case &GrDeref(a gr_deref):
+        DUMBGEN("GrDeref");
+        x86_load32(f, X86_EAX, get_ptr_loc(h, a.pointer));
+        x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
+        x86_store32(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX);
+      case &GrSubcell(a gr_subcell):
+        DUMBGEN("GrSubcell");
+        switch get_loc(h, a.name) {
+        case DirectLoc(off i32): { }
+        case IndirectLoc(off i32):
+          x86_load_cell_address(f, h, X86_EAX, a.partof);
+          x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
+          x86_store32(f, X86_EBP, off, X86_EAX);
+        }
+      case &GrBranch(a gr_branch):
+        DUMBGEN("GrBranch");
+        // TODO: It'd be nice to codegen this without the gratuitous jmps.
+        // TODO: Faster bool behavior.
+        src_size u32 = ref_cell(h->gr, a.src)->props.flat_size;
+        check(src_size == 4 || src_size == 2 || src_size == 1);
+        src_addr u8;
+        src_disp i32;
+        x86_prep_loc_use(f, get_loc(h, a.src), X86_EAX, &src_addr, &src_disp);
+        x86_load32_zeroextend(f, X86_EAX, src_addr, src_disp, src_size);
+
+        done_a_push bool = false;
+        ncases size = count(&a.cases);
+        for i size = 0; i < ncases; i = i + 1 {
+          cas *tup[gr_const, sq_num] = ref(&a.cases, i);
+          expected st_value;
+          if !st_const_compute_for_gen(h->cs, &cas->car, src_size, &expected) {
+            return false;
+          }
+          x86_cmp_imm_sized(h->cs, f, X86_EAX, &expected, X86_ECX);
+          x86_gen_placeholder_jcc(f, h, X86_JCC_Z, frame_gn_targetnum(h, cas->cdr.~));
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({cas->cdr.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
+          done_a_push = true;
+        }
+        if case Has(default_gn sq_num) = a.default_case {
+          x86_gen_placeholder_jmp(f, h, frame_gn_targetnum(h, default_gn.~));
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({default_gn.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
+          done_a_push = true;
+        } else {
+          x86_gen_crash(f, h);
+        }
+      case &GrSequence(a gr_sequence):
+        DUMBGEN("GrSequence");
+        // first gets evaluated before second (because it gets pushed after)
+        push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.second.~, otgna.jmpaft, otgna.jmp_necessary}));
+        push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.first, frame_gn_targetnum(h, a.second.~), false}));
+      case &GrJmp(a gr_jmp):
+        DUMBGEN("GrJmp");
+        push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.next.~, otgna.jmpaft, otgna.jmp_necessary}));
+      case &GrWriteNothing(a gr_writenothing):
+        DUMBGEN("GrWriteNothing");
+        // Do nothing.  (This graph node is used for static eval, book keeping, etc.)
+      case &GrDead(a gr_dead):
+        DUMBGEN("GrDead");
+        // Do nothing.  (Likewise.)
+      case &GrVirtualDead(a gr_virtual_dead):
+        DUMBGEN("GrVirtualDead");
+        // Do nothing.  (Likewise.)
+      case &GrXNop(v void):
+        DUMBGEN("GrXNop");
+        // Do nothing (but do it less glamorously).
+      case &GrQNop(v void):
+        DUMBGEN("GrQNop");
+        // Do nothing (but do it less glamorously).
+        // TODO: Ugh.
+        if otgna.jmp_necessary {
+          x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+func x86_load_cell_address(f *objfile, h *frame, dest u8, c cell_num) void {
+  switch get_loc(h, c) {
+  case DirectLoc(off i32):
+    x86_lea32(f, X86_EAX, X86_EBP, off);
+  case IndirectLoc(off i32):
+    x86_load32(f, X86_EAX, X86_EBP, off);
+  }
+}
+
+func x86_add_offset(f *objfile, h *frame, dest u8, offset gr_offset, scratch1 u8, scratch2 u8) void {
+  switch offset {
+  case OffsetConst(off u32):
+    if off != 0 {
+      x86_mov_imm32(f, scratch1, ~off);
+      x86_add_w32(f, dest, scratch1);
+    }
+  case OffsetComputed(factors tup[u32, cell_num]):
+    x86_load32(f, scratch1, get_size_loc(h, factors.cdr));
+    x86_mov_imm32(f, scratch2, ~factors.car);
+    x86_imul_w32(f, scratch1, scratch2);
+    x86_add_w32(f, dest, scratch1);
+  }
+}
+
+func frame_get_or_create_targetnum(h *frame, tn *nc[jmp_targetnum]) jmp_targetnum {
+  ret jmp_targetnum;
+  if case &Computed(jt jmp_targetnum) = tn {
+    ret = jt;
+  } else {
+    ret = frame_create_target(h);
+    *tn = Computed(ret);
+  }
+  return ret;
+}
+
+// The targetnum for evaluating the op _and_ its precs.
+func frame_gn_targetnum(h *frame, gn gr_num) jmp_targetnum {
+  return frame_get_or_create_targetnum(h, &ref_annot(h, gn)->this_targetnum);
+}
+
+func frame_crash_targetnum(h *frame) jmp_targetnum {
+  return frame_get_or_create_targetnum(h, &h->crash_target);
+}
+
+func x86_gen_placeholder_jmp(f *objfile, h *frame, target jmp_targetnum) void {
+  offset u32 = 1 + secsize(&f->text);
+  b [5]u8;
+  b[0] = 0xE9;
+  b[1] = 0;
+  b[2] = 0;
+  b[3] = 0;
+  b[4] = 0;
+  append_raw(&f->text, &b[0], 5);
+
+  push(&h->placeholder_jumps, {offset, offset + 4, target});
+}
+
+func x86_gen_placeholder_jcc(f *objfile, h *frame, x86_jcc_code u8, target jmp_targetnum) void {
+  offset u32 = 2 + secsize(&f->text);
+  b [6]u8;
+  b[0] = 0x0F;
+  b[1] = x86_jcc_code;
+  b[2] = 0;
+  b[3] = 0;
+  b[4] = 0;
+  b[5] = 0;
+  append_raw(&f->text, &b[0], 6);
+  push(&h->placeholder_jumps, {offset, offset + 4, target});
+}
+
+func x86_gen_crash_jcc(f *objfile, h *frame, x86_jcc_code u8) void {
+  offset u32 = 2 + secsize(&f->text);
+  b [6]u8;
+  b[0] = 0x0F;
+  b[1] = x86_jcc_code;
+  b[2] = 0;
+  b[3] = 0;
+  b[4] = 0;
+  b[5] = 0;
+  append_raw(&f->text, &b[0], 6);
+  push(&h->placeholder_jumps, {offset, offset + 4, frame_crash_targetnum(h)});
+}
+
+func x86_gen_crash(f *objfile, h *frame) void {
+  x86_int_3(f);
+}
+
+func set_esp_to_frame_offset(f *objfile, h *frame, offset i32) void {
+  x86_lea32(f, X86_ESP, X86_EBP, offset);
+}
+
+func restore_esp_to_default_position(f *objfile, h *frame) void {
+  set_esp_to_frame_offset(f, h, *unHas(&h->low_offset));
+}
+
+func x86_gen_write_value(f *objfile, h *frame, dest_loc cell_loc, value *st_value) void {
+  check(count(&value->objrefs) == 0);
+  check(h->cs->plat.bnno_size == 8);
+
+  len u32 = value->length;
+  if len == 0 {
+    return;
+  }
+
+  srefs array[tup[u32, st_symbolref]] = value->symbolrefs;
+  sort(&srefs);
+
+  dest_addr u8;
+  dest_disp i32;
+  x86_prep_loc_use(f, dest_loc, X86_EAX, &dest_addr, &dest_disp);
+
+  w u32 = 0;
+  nsrefs size = count(&srefs);
+  for i size = 0; i < nsrefs; i = i + 1 {
+    sref *tup[u32, st_symbolref] = ref(&srefs, i);
+    check(w <= sref->car);
+    x86_gen_write_data(f, h, dest_addr, dest_disp, &value->words, w, sref->car);
+    symbol_table_index sti = *unHas(&ref_fn_body(h->cs, sref->cdr.fnid)->symbol_table_index);
+    x86_mov_stiptr(f, X86_ECX, symbol_table_index);
+    check(st_symbolref_size(&h->cs->plat, &sref->cdr) == 4);
+    x86_store32(f, dest_addr, dest_disp + ~sref->car, X86_ECX);
+    w = sref->car + 4;
+  }
+
+  x86_gen_write_data(f, h, dest_addr, dest_disp, &value->words, w, len);
+}
+
+func x86_gen_write_data(f *objfile, h *frame, dest_addr u8, dest_disp i32, words *array[u32], begin u32, end u32) void {
+  check(begin <= end);
+  if begin == end {
+    return;
+  }
+
+  // TODO: We assume (in terms of the optimality of this code) that dest_addr+dest_disp is aligned modulo 4.
+
+  i u32 = begin;
+  if i / 4 < end / 4 {
+    if i % 2 == 1 {
+      bval u8 = ~(0xFF & (get(words, ~(i / 4)) >> ((i % 4) * 8)));
+      // TODO: Seriously, store the imm8 directly.
+      x86_store_imm8(f, dest_addr, dest_disp + ~i, bval);
+      i = i + 1;
+    }
+    if i % 4 == 2 {
+      wval u16 = ~(get(words, ~(i / 4)) >> 16);
+      x86_store_imm16(f, dest_addr, dest_disp + ~i, wval);
+      i = i + 2;
+    }
+  }
+  emod u32 = end % 4;
+  loend u32 = end - emod;
+  while i < loend {
+    dval u32 = get(words, ~(i / 4));
+    x86_store_imm32(f, dest_addr, dest_disp + ~i, dval);
+    i = i + 4;
+  }
+
+  if i == end {
+    return;
+  }
+  last u32 = get(words, ~(i / 4));
+  if emod >= 2 {
+    x86_store_imm16(f, dest_addr, dest_disp + ~i, @[u16]~(last & 0xFFFF));
+    last = last >> 16;
+    i = i + 2;
+  }
+  if i < end {
+    x86_store_imm8(f, dest_addr, dest_disp + ~i, @[u8]~(last & 0xFF));
+    i = i + 1;
+  }
+  check(i == end);
+}
+
+func x86_simple_symbolref(cs *checkstate, val *st_value, id_out *fn_body_id) bool {
+  if count(&val->symbolrefs) != 1 || val->length != 4 {
+    ERR(_u8("Value isn't simple function pointer"));
+    return false;
+  }
+  srefpair tup[u32, st_symbolref] = get(&val->symbolrefs, 0);
+  check(srefpair.car == 0);
+  sref st_symbolref = srefpair.cdr;
+  check(st_symbolref_size(&cs->plat, &sref) == 4);
+  *id_out = sref.fnid;
+  return true;
+}
+
+func x86_cmp_imm_sized(cs *checkstate, f *objfile, lhs u8, rhs *st_value, avail u8) void {
+  if count(&rhs->symbolrefs) != 0 {
+    fnid fn_body_id;
+    if !x86_simple_symbolref(cs, rhs, &fnid) {
+      ice(_u8("x86_cmp_imm_sized sees non-simple (impossible) symbolref"));
+    }
+    x86_mov_stiptr(f, avail, *unHas(&ref_fn_body(cs, fnid)->symbol_table_index));
+    x86_cmp_w32(f, lhs, avail);
+  } else {
+    val u32 = get(&rhs->words, 0);
+    if rhs->length == 1 {
+      check(x86_reg32_has_lobyte(lhs));
+      x86_cmp_reg8_imm8(f, lhs, ~val);
+    } else if rhs->length == 2 {
+      x86_cmp_reg16_imm16(f, lhs, ~val);
+    } else if rhs->length == 4 {
+      x86_cmp_imm32(f, lhs, val);
+    } else {
+      ice(_u8("x86_cmp_imm_sized bad length"));
+    }
+  }
+}
+
+func `<`(x tup[u32, st_symbolref], y tup[u32, st_symbolref]) bool {
+  return x.car < y.car;
+}
+
+func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
+  switch &a->primop {
+  case &PrimNum(b primitive_numeric_op):
+    arity u32 = op_arity(b.op_action);
+    check(count(&a->params) == ~arity);
+    x86_load32_zeroextend(f, X86_EAX, get_loc(h, get(&a->params, 0)), b.op_size);
+    if arity == 2 {
+      x86_load32_zeroextend(f, X86_ECX, get_loc(h, get(&a->params, 1)), b.op_size);
+    } else {
+      check(arity == 1);
+    }
+
+    switch b.op_action {
+    case NumAdd(v void):
+      if b.op_size == 1 {
+        x86_add_w8(f, X86_EAX, X86_ECX);
+      } else if b.op_size == 2 {
+        x86_add_w16(f, X86_EAX, X86_ECX);
+      } else if b.op_size == 4 {
+        x86_add_w32(f, X86_EAX, X86_ECX);
+      } else {
+        ice(_u8("NumAdd bad size"));
+      }
+      if b.op_numtraits.trap_overflow {
+        x86_gen_crash_jcc(f, h, x86_repr_overflow_code(b.op_numtraits.repr));
+      }
+    case NumSub(v void):
+      if b.op_size == 1 {
+        x86_sub_w8(f, X86_EAX, X86_ECX);
+      } else if b.op_size == 2 {
+        x86_sub_w16(f, X86_EAX, X86_ECX);
+      } else if b.op_size == 4 {
+        x86_sub_w32(f, X86_EAX, X86_ECX);
+      } else {
+        ice(_u8("NumSub bad size"));
+      }
+      if b.op_numtraits.trap_overflow {
+        x86_gen_crash_jcc(f, h, x86_repr_overflow_code(b.op_numtraits.repr));
+      }
+    case NumMul(v void):
+      if b.op_size == 1 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_alah_mul_w8(f, X86_ECX);
+          if b.op_numtraits.trap_overflow {
+            x86_gen_crash_jcc(f, h, X86_JCC_C);
+          }
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+        case SignedTwos(v2 void):
+          x86_alah_imul_w8(f, X86_ECX);
+          if b.op_numtraits.trap_overflow {
+            x86_gen_crash_jcc(f, h, X86_JCC_O);
+          }
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+        }
+      } else if b.op_size == 2 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_dxax_mul_w16(f, X86_ECX);
+          if b.op_numtraits.trap_overflow {
+            x86_gen_crash_jcc(f, h, X86_JCC_C);
+          }
+        case SignedTwos(v2 void):
+          x86_imul_w16(f, X86_EAX, X86_ECX);
+          if b.op_numtraits.trap_overflow {
+            x86_gen_crash_jcc(f, h, X86_JCC_O);
+          }
+        }
+      } else if b.op_size == 4 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_eaxedx_mul_w32(f, X86_ECX);
+          if b.op_numtraits.trap_overflow {
+            x86_gen_crash_jcc(f, h, X86_JCC_C);
+          }
+        case SignedTwos(v2 void):
+          x86_imul_w32(f, X86_EAX, X86_ECX);
+          if b.op_numtraits.trap_overflow {
+            x86_gen_crash_jcc(f, h, X86_JCC_O);
+          }
+        }
+      } else {
+        ice(_u8("NumMul bad size"));
+      }
+    case NumDiv(v void):
+      if b.op_size == 1 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_alah_div_w8(f, X86_ECX);
+          // Divide by zero will produce #DE.
+          // Wipe out modulus in AH.
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+        case SignedTwos(v2 void):
+          x86_alah_idiv_w8(f, X86_ECX);
+          // Divide by zero, -128/-1 (I guess) will produce #DE.
+          // Wipe out modulus in AH (don't sign-extend?).
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+        }
+      } else if b.op_size == 2 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_xor_w32(f, X86_EDX, X86_EDX);
+          x86_axdx_div_w16(f, X86_ECX);
+          // Divide by zeroe will produce #DE.
+        case SignedTwos(v2 void):
+          x86_cwd_w16(f);
+          x86_axdx_idiv_w16(f, X86_ECX);
+          // Divide by zero, INT16_MIN/-1 will produce #DE.
+        }
+      } else if b.op_size == 4 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_xor_w32(f, X86_EDX, X86_EDX);
+          x86_eaxedx_div_w32(f, X86_ECX);
+          // Divide by zero will produce #DE.
+        case SignedTwos(v2 void):
+          x86_cdq_w32(f);
+          x86_eaxedx_idiv_w32(f, X86_ECX);
+          // Divide by zero, INT32_MIN / -1 will produce #DE.
+        }
+      } else {
+        ice(_u8("NumDiv bad size"));
+      }
+    case NumMod(v void):
+      if b.op_size == 1 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_alah_div_w8(f, X86_ECX);
+          // Divide by zero will produce #DE.
+          x86_mov_reg8(f, X86_AL, X86_AH);
+          // Wipe out modulus in AH.
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+        case SignedTwos(v2 void):
+          x86_alah_idiv_w8(f, X86_ECX);
+          // Divide by zero, -128/-1 (I guess) will produce #DE.
+          x86_mov_reg8(f, X86_AL, X86_AH);
+          // Wipe out modulus in AH (don't sign-extend?).
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+        }
+      } else if b.op_size == 2 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_xor_w32(f, X86_EDX, X86_EDX);
+          x86_axdx_div_w16(f, X86_ECX);
+          // Divide by zero will produce #DE.
+          x86_mov_reg32(f, X86_EAX, X86_EDX);
+        case SignedTwos(v2 void):
+          x86_cwd_w16(f);
+          x86_axdx_idiv_w16(f, X86_ECX);
+          // Divide by zero, INT16_MIN/-1 will produce #DE.
+          x86_mov_reg32(f, X86_EAX, X86_EDX);
+        }
+      } else if b.op_size == 4 {
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_xor_w32(f, X86_EDX, X86_EDX);
+          x86_eaxedx_div_w32(f, X86_ECX);
+          // Divide by zero will produce #DE.
+          x86_mov_reg32(f, X86_EAX, X86_EDX);
+        case SignedTwos(v2 void):
+          x86_cdq_w32(f);
+          x86_eaxedx_idiv_w32(f, X86_ECX);
+          // Divide by zero, INT32_MIN / -1 will produce #DE.
+          x86_mov_reg32(f, X86_EAX, X86_EDX);
+        }
+      } else {
+        ice(_u8("NumMod bad size"));
+      }
+    case NumNegate(v void):
+      switch b.op_numtraits.repr {
+      case Unsigned(v2 void):
+        check(!b.op_numtraits.trap_overflow);
+        if b.op_size == 1 {
+          x86_movzx8_reg8(f, X86_EAX, X86_EAX);
+          x86_neg_w32(f, X86_EAX);
+        } else if b.op_size == 2 {
+          x86_movzx16_reg16(f, X86_EAX, X86_EAX);
+          x86_neg_w32(f, X86_EAX);
+        } else if b.op_size == 4 {
+          x86_neg_w32(f, X86_EAX);
+        } else {
+          ice(_u8("NumNegate bad size"));
+        }
+      case SignedTwos(v2 void):
+        if b.op_size == 1 {
+          x86_movsx8_reg8(f, X86_EAX, X86_EAX);
+          // TODO: (Also in s1.) For this and the other negations, can't we just check OF after the fact?  (But do x86_neg_w16 on 16-bit)  I missed that in the docs on the first read?
+          // Crashes if the value is INT8_MIN by subtracting 1 and overflowign.
+          if b.op_numtraits.trap_overflow {
+            x86_cmp_reg8_imm8(f, X86_AL, 1);
+            x86_gen_crash_jcc(f, h, X86_JCC_O);
+          }
+          x86_neg_w32(f, X86_EAX);
+        } else if b.op_size == 2 {
+          x86_movsx16_reg16(f, X86_EAX, X86_EAX);
+          // Crashes if the value is INT16_MIN by subtracting 1 and overflowing.
+          if b.op_numtraits.trap_overflow {
+            x86_cmp_reg16_imm16(f, X86_EAX, @[u16] ~ @[u32] 1);
+            x86_gen_crash_jcc(f, h, X86_JCC_O);
+          }
+          x86_neg_w32(f, X86_EAX);
+        } else if b.op_size == 4 {
+          // Crashes if the value is INT32_MIN by subtracting 1 and overflowing.
+          if b.op_numtraits.trap_overflow {
+            x86_cmp_imm32(f, X86_EAX, @[u32]1);
+            x86_gen_crash_jcc(f, h, X86_JCC_O);
+          }
+          x86_neg_w32(f, X86_EAX);
+        } else {
+          ice(_u8("NumNegate bad size"));
+        }
+      }
+    case NumBitAnd(v void):
+      x86_and_w32(f, X86_EAX, X86_ECX);
+    case NumBitOr(v void):
+      x86_or_w32(f, X86_EAX, X86_ECX);
+    case NumBitXor(v void):
+      x86_xor_w32(f, X86_EAX, X86_ECX);
+    case NumBitNot(v void):
+      if b.op_size == 1 {
+        x86_not_w8(f, X86_EAX);
+      } else if b.op_size == 2 {
+        x86_not_w16(f, X86_EAX);
+      } else if b.op_size == 4 {
+        x86_not_w32(f, X86_EAX);
+      } else {
+        ice(_u8("NumBitNot bad size"));
+      }
+    case NumShiftLeft(v void):
+      // It is intentional that we always range check here, even if !trap_overflow.  It is also intentional that the shift could overflow.
+      if b.op_size == 1 {
+        x86_cmp_imm32(f, X86_ECX, @[u32]7);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        x86_shl_cl_w8(f, X86_EAX);
+      } else if b.op_size == 2 {
+        x86_cmp_imm32(f, X86_ECX, @[u32]15);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        x86_shl_cl_w16(f, X86_EAX);
+      } else if b.op_size == 4 {
+        x86_cmp_imm32(f, X86_ECX, @[u32]31);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        x86_shl_cl_w32(f, X86_EAX);
+      } else {
+        ice(_u8("NumShiftLeft bad size"));
+      }
+    case NumShiftRight(v void):
+      // It is intentional that we always range check here, even if !trap_overflow.
+      if b.op_size == 1 {
+        x86_cmp_imm32(f, X86_ECX, @[u32]7);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_shr_cl_w8(f, X86_EAX);
+        case SignedTwos(v2 void):
+          x86_sar_cl_w8(f, X86_EAX);
+        }
+      } else if b.op_size == 2 {
+        x86_cmp_imm32(f, X86_ECX, @[u32]15);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_shr_cl_w16(f, X86_EAX);
+        case SignedTwos(v2 void):
+          x86_sar_cl_w16(f, X86_EAX);
+        }
+      } else if b.op_size == 4 {
+        x86_cmp_imm32(f, X86_ECX, @[u32]31);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        switch b.op_numtraits.repr {
+        case Unsigned(v2 void):
+          x86_shr_cl_w32(f, X86_EAX);
+        case SignedTwos(v2 void):
+          x86_sar_cl_w32(f, X86_EAX);
+        }
+      } else {
+        ice(_u8("NumShiftLeft bad size"));
+      }
+    }
+
+    x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.op_size, X86_EDX);
+    return true;
+  case &PrimNumCompare(b primitive_numeric_comparison_op):
+    check(count(&a->params) == 2);
+    x86_load32_zeroextend(f, X86_EAX, get_loc(h, get(&a->params, 0)), b.op_size);
+    x86_load32_zeroextend(f, X86_ECX, get_loc(h, get(&a->params, 1)), b.op_size);
+
+    if b.op_size == 1 {
+      x86_cmp_w8(f, X86_EAX, X86_ECX);
+    } else if b.op_size == 2 {
+      x86_cmp_w16(f, X86_EAX, X86_ECX);
+    } else if b.op_size == 4 {
+      x86_cmp_w32(f, X86_EAX, X86_ECX);
+    } else {
+      ice(_u8("PrimNumCompare bad size"));
+    }
+
+    setcc_code u8;
+    switch b.op_numtraits.repr {
+    case Unsigned(v void):
+      switch b.op_action {
+      case CmpEq(v2 void): setcc_code = X86_SETCC_E;
+      case CmpNe(v2 void): setcc_code = X86_SETCC_NE;
+      case CmpLt(v2 void): setcc_code = X86_SETCC_B;
+      case CmpGt(v2 void): setcc_code = X86_SETCC_A;
+      case CmpLe(v2 void): setcc_code = X86_SETCC_BE;
+      case CmpGe(v2 void): setcc_code = X86_SETCC_AE;
+      }
+    case SignedTwos(v void):
+      switch b.op_action {
+      case CmpEq(v2 void): setcc_code = X86_SETCC_E;
+      case CmpNe(v2 void): setcc_code = X86_SETCC_NE;
+      case CmpLt(v2 void): setcc_code = X86_SETCC_L;
+      case CmpGt(v2 void): setcc_code = X86_SETCC_G;
+      case CmpLe(v2 void): setcc_code = X86_SETCC_LE;
+      case CmpGe(v2 void): setcc_code = X86_SETCC_GE;
+      }
+    }
+    x86_setcc_b8(f, X86_AL, setcc_code);
+    x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
+    return true;
+  case &PrimLogical(b primitive_logical_op):
+    arity u32 = op_arity(b);
+    check(count(&a->params) == ~arity);
+    op_size u32 = 1;
+    x86_load32_zeroextend(f, X86_EAX, get_loc(h, get(&a->params, 0)), op_size);
+    if arity == 2 {
+      x86_load32_zeroextend(f, X86_ECX, get_loc(h, get(&a->params, 1)), op_size);
+    } else {
+      check(arity == 1);
+    }
+    switch b {
+    case LogicalNot(v void):
+      x86_test_regs8(f, X86_AL, X86_AL);
+      x86_setcc_b8(f, X86_AL, X86_SETCC_Z);
+    case BoolEq(v void):
+      x86_cmp_w8(f, X86_EAX, X86_ECX);
+      x86_setcc_b8(f, X86_EAX, X86_SETCC_E);
+    case BoolNe(v void):
+      x86_cmp_w8(f, X86_EAX, X86_ECX);
+      x86_setcc_b8(f, X86_EAX, X86_SETCC_NE);
+    case BoolBitAnd(v void):
+      x86_and_w32(f, X86_EAX, X86_ECX);
+    case BoolBitOr(v void):
+      x86_or_w32(f, X86_EAX, X86_ECX);
+    }
+    x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
+    return true;
+  case &PrimPtrCompare(b primitive_ptr_comparison_op):
+    check(count(&a->params) == 2);
+    op_size u32 = 4;
+    x86_load32_zeroextend(f, X86_EAX, get_loc(h, get(&a->params, 0)), op_size);
+    x86_load32_zeroextend(f, X86_ECX, get_loc(h, get(&a->params, 1)), op_size);
+    x86_cmp_w32(f, X86_EAX, X86_ECX);
+    setcc_code u8;
+    switch b.op_action {
+    case CmpEq(v2 void): setcc_code = X86_SETCC_E;
+    case CmpNe(v2 void): setcc_code = X86_SETCC_NE;
+    case CmpLt(v2 void): setcc_code = X86_SETCC_B;
+    case CmpGt(v2 void): setcc_code = X86_SETCC_A;
+    case CmpLe(v2 void): setcc_code = X86_SETCC_BE;
+    case CmpGe(v2 void): setcc_code = X86_SETCC_AE;
+    }
+    x86_setcc_b8(f, X86_EAX, setcc_code);
+    x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
+    return true;
+  case &PrimConversion(b primitive_conversion_op):
+    check(count(&a->params) == 1);
+    param0 cell_num = get(&a->params, 0);
+    paramloc cell_loc = get_loc(h, param0);
+    retloc cell_loc = get_loc(h, a->retcell);
+    switch b.from_numtraits.repr {
+    case Unsigned(v void):
+      check(b.from_numtraits.minval == bigu(0));
+      check(b.from_numtraits.maxval == (bigu(1) << (b.from_size * 8)) - bigu(1));
+      x86_load32_zeroextend(f, X86_EAX, paramloc, b.from_size);
+      switch b.to_numtraits.repr {
+      case Unsigned(v2 void):
+        check(b.to_numtraits.minval == bigu(0));
+        check(b.from_numtraits.maxval == (bigu(1) << (b.from_size * 8)) - bigu(1));
+      case SignedTwos(v2 void):
+        check(b.to_numtraits.minval < bigu(0));
+      }
+      if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.maxval < b.from_numtraits.maxval {
+        to_maxval u32;
+        if !as_non_negative_u32(&b.to_numtraits.maxval, &to_maxval) {
+          ice(_u8("conversion unsigned maxval outside u32 range"));
+        }
+        x86_cmp_imm32(f, X86_EAX, to_maxval);
+        x86_gen_crash_jcc(f, h, X86_JCC_A);
+      }
+      x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
+      return true;
+    case SignedTwos(v void):
+      check(b.from_numtraits.minval < bigu(0));
+      x86_load32_signextend(f, X86_EAX, paramloc, b.from_size);
+      switch b.to_numtraits.repr {
+      case Unsigned(v2 void):
+        check(b.to_numtraits.minval == bigu(0));
+        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.maxval >= b.from_numtraits.maxval {
+          // Just check for negativity.
+          x86_test_regs32(f, X86_EAX, X86_EAX);
+          x86_gen_crash_jcc(f, h, X86_JCC_S);
+        } else {
+          // Check unsigned above maxval.
+          to_maxval u32;
+          if !as_non_negative_u32(&b.to_numtraits.maxval, &to_maxval) {
+            ice(_u8("conversion unsigned maxval outside u32 range"));
+          }
+          x86_cmp_imm32(f, X86_EAX, to_maxval);
+          x86_gen_crash_jcc(f, h, X86_JCC_A);
+        }
+        x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
+        return true;
+      case SignedTwos(v2 void):
+        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.maxval < b.from_numtraits.maxval {
+          to_maxval u32;
+          if !as_non_negative_u32(&b.to_numtraits.maxval, &to_maxval) {
+            ice(_u8("conversion unsigned maxval outside u32 range"));
+          }
+          x86_cmp_imm32(f, X86_EAX, to_maxval);
+          x86_gen_crash_jcc(f, h, X86_JCC_G);
+        }
+        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.minval > b.from_numtraits.minval {
+          to_minval i32;
+          if !as_i32(&b.to_numtraits.minval, &to_minval) {
+            ice(_u8("conversion signed minval outside i32 range"));
+          }
+          x86_cmp_imm32(f, X86_EAX, to_minval);
+          x86_gen_crash_jcc(f, h, X86_JCC_L);
+        }
+        x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
+        return true;
+      }
+    }
+  }
+}
+
+func x86_repr_overflow_code(repr numeric_representation) u8 {
+  switch repr {
+  case Unsigned(v void):
+    return X86_JCC_C;
+  case SignedTwos(v void):
+    return X86_JCC_O;
+  }
+}
+
