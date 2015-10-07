@@ -700,7 +700,8 @@ int help_parse_vardecl(struct ps *p, enum allow_blanks allow_blanks, struct ast_
   struct ast_typeexpr type;
   if (allow_blanks == ALLOW_BLANKS_YES && !is_typeexpr_firstchar(ps_peek(p))) {
     type.tag = AST_TYPEEXPR_UNKNOWN;
-    ast_unknown_init(&type.u.unknown, ast_meta_make(name.meta.pos_end, name.meta.pos_end));
+    ast_unknown_init(&type.u.unknown,
+                     ast_meta_make(name.meta.pos_end, name.meta.pos_end));
     type_pos_end = ps_pos(p);
   } else {
     if (!help_parse_typeexpr(p, allow_blanks, &type, &type_pos_end)) {
@@ -1282,8 +1283,17 @@ enum tri triparse_naked_var_or_expr_statement(
     goto error_name;
   }
 
+  struct pos type_pos_start = ps_pos(p);
   struct ast_vardecl decl;
-  {
+  if (try_skip_keyword(p, "var")) {
+    struct ast_typeexpr type;
+    type.tag = AST_TYPEEXPR_UNKNOWN;
+    struct pos type_pos_end = ps_pos(p);
+    ast_unknown_init(&type.u.unknown,
+                     ast_meta_make(type_pos_start, type_pos_end));
+    ast_vardecl_init(&decl, ast_meta_make(pos_start, type_pos_end),
+                     name, type);
+  } else {
     struct ambig_indexer *indexers = NULL;
     size_t indexers_count = 0;
     size_t indexers_limit = 0;
@@ -2999,10 +3009,10 @@ int parse_test_defs(void) {
                          16);
   pass &= run_count_test("def13",
                          "def[] foo fn[int] = func() int {\n"
-                         "   var x int = 3;\n"
+                         "   x var = 3;\n"
                          "   return x;\n"
                          "};\n",
-                         25);
+                         24);
   pass &= run_count_test("def14",
                          "def[a,b] foo/*heh*/fn[int] = func() int {"
                          "//blah blah blah\n"
