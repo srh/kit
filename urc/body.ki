@@ -364,38 +364,50 @@ func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statemen
           }
           // expected_type is complete, because enum_type was.
 
-          // TODO: Cache converted?
-          converted te_typeexpr;
-          if !convert_typeexpr(bs->cs, &patt.decl.type, &converted) {
-            return false;
-          }
-
-          cac cac_typeexpr;
-          if !check_and_compute_typeexpr(bs->cs, bs->clq, bs->ds->generics, bs->ds->parms, &converted, &cac) {
-            return false;
-          }
-
-          unified te_typeexpr;
-          if !unify_types(&cac.te, expected_type, &unified) {
-            MERR(bs->cs, patt.meta, _u8("constructor variable type mismatch"));
-            return false;
-          }
+          tag_value enum_tag_value = mk_enum_tag_value(decl_index);
 
           case_vp varpopper;
           init_vp(&case_vp, &bs->es);
-          cu_expected_type cu_typeexpr = ~ *expected_type;
-          expected_type_props type_properties;
-          if !compute_type_properties(bs->cs, bs->clq, &cu_expected_type, &expected_type_props) {
-            return false;
-          }
-          cell cell_num = add_virtual_cell(&bs->es, cu_expected_type, expected_type_props);
-          vn var_number;
-          if !es_push_var(&bs->es, &case_vp, cell, Has(&patt.decl.name), &cu_expected_type, VarVirtual(void), &vn) {
-            return false;
-          }
+          ovn opt[var_number];
+          if case &Has(vd ast_vardecl) = &patt.decl {
+            // TODO: Cache converted?
+            converted te_typeexpr;
+            if !convert_typeexpr(bs->cs, &vd.type, &converted) {
+              return false;
+            }
 
-          tag_value enum_tag_value = mk_enum_tag_value(decl_index);
-          annotate(&patt.cp_info, {vn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
+            cac cac_typeexpr;
+            if !check_and_compute_typeexpr(bs->cs, bs->clq, bs->ds->generics, bs->ds->parms, &converted, &cac) {
+              return false;
+            }
+
+            unified te_typeexpr;
+            if !unify_types(&cac.te, expected_type, &unified) {
+              MERR(bs->cs, patt.meta, _u8("constructor variable type mismatch"));
+              return false;
+            }
+
+            cu_expected_type cu_typeexpr = ~ *expected_type;
+            expected_type_props type_properties;
+            if !compute_type_properties(bs->cs, bs->clq, &cu_expected_type, &expected_type_props) {
+              return false;
+            }
+            cell cell_num = add_virtual_cell(&bs->es, cu_expected_type, expected_type_props);
+            vn var_number;
+            if !es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), &cu_expected_type, VarVirtual(void), &vn) {
+              return false;
+            }
+            ovn = Has(vn);
+          } else {
+            voidtp cu_typrop = compute_prim(bs->clq, primitive_void_type(bs->cs));
+            unified te_typeexpr;
+            if !unify_types(&voidtp.cu.~, expected_type, &unified) {
+              ERR(_u8("decl-free case pattern used with non-void case"));
+              return false;
+            }
+            ovn = None();
+          }
+          annotate(&patt.cp_info, {ovn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
 
           body_ee entryexit;
           if !check_body(bs, &cas->body, &body_ee) {
@@ -676,43 +688,60 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
         }
         // expected_type is complete because enum_type is.
 
-        // TODO: Cache converted?
-        converted te_typeexpr;
-        if !convert_typeexpr(es->cs, &b.pattern.decl.type, &converted) {
-          return false;
-        }
-
-        cac cac_typeexpr;
-        if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &cac) {
-          return false;
-        }
-
-        unified te_typeexpr;
-        if !unify_types(&cac.te, expected_type, &unified) {
-          MERR(es->cs, b.pattern.meta, _u8("constructor variable type mismatch"));
-          return false;
-        }
-
-        cu_expected_type cu_typeexpr = ~ *expected_type;
-        expected_type_props type_properties;
-        if !compute_type_properties(es->cs, es->clq, &cu_expected_type, &expected_type_props) {
-          return false;
-        }
-        cell cell_num = add_virtual_cell(es, cu_expected_type, expected_type_props);
-        annotate(&cd->virtual_cell_dead, Has(cell));
-        if case Has(p) = cd2 {
-          annotate(&p->virtual_cell_dead, Has(cell));
-        }
         tag_cell cell_num = add_virtual_tag_cell(es, &et);
         annotate(&b.info, {{tag_cell, ~count(&et.constructors)}, mk_enum_tag_value(decl_index)});
-        vn var_number;
-        if !es_push_var(es, cond_vp, cell, Has(&b.pattern.decl.name), &cu_expected_type, VarVirtual(void), &vn) {
-          return false;
+
+        ovn opt[var_number];
+        if case &Has(vd ast_vardecl) = &b.pattern.decl {
+          // TODO: Cache converted?
+          converted te_typeexpr;
+          if !convert_typeexpr(es->cs, &vd.type, &converted) {
+            return false;
+          }
+
+          cac cac_typeexpr;
+          if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &cac) {
+            return false;
+          }
+
+          unified te_typeexpr;
+          if !unify_types(&cac.te, expected_type, &unified) {
+            MERR(es->cs, b.pattern.meta, _u8("constructor variable type mismatch"));
+            return false;
+          }
+
+          cu_expected_type cu_typeexpr = ~ *expected_type;
+          expected_type_props type_properties;
+          if !compute_type_properties(es->cs, es->clq, &cu_expected_type, &expected_type_props) {
+            return false;
+          }
+          cell cell_num = add_virtual_cell(es, cu_expected_type, expected_type_props);
+          annotate(&cd->virtual_cell_dead, Has(cell));
+          if case Has(p) = cd2 {
+            annotate(&p->virtual_cell_dead, Has(cell));
+          }
+          vn var_number;
+          if !es_push_var(es, cond_vp, cell, Has(&vd.name), &cu_expected_type, VarVirtual(void), &vn) {
+            return false;
+          }
+
+          ovn = Has(vn);
+        } else {
+          // TODO: At some point we just need an "is_void" type.  And what's the deal with compute_prim here?
+          voidtp cu_typrop = compute_prim(es->clq, primitive_void_type(es->cs));
+          unified te_typeexpr;
+          if !unify_types(&voidtp.cu.~, expected_type, &unified) {
+            ERR(_u8("decl-free case pattern used with non-void case"));
+            return false;
+          }
+          annotate(&cd->virtual_cell_dead, None());
+          if case Has(p) = cd2 {
+            annotate(&p->virtual_cell_dead, None());
+          }
+          ovn = None();
         }
-
         tag_value enum_tag_value = mk_enum_tag_value(decl_index);
-        annotate(&b.pattern.cp_info, {vn, tag_value, enum_field_offset(es->cs, &et, tag_value)});
-
+        annotate(&b.pattern.cp_info, {ovn, tag_value, enum_field_offset(es->cs, &et, tag_value)});
         return true;
       } else {
         ERR(_u8("Condition pattern over non-switchable type."));

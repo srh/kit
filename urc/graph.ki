@@ -393,26 +393,36 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *a
     switch &sc->pattern {
       case &Case(cp ast_constructor_pattern): {
         cp_info *ast_cp_info = unHas(&cp.cp_info);
-        vi *var_info = ref(&fb->all_vars, cp_info->vn.~);
+        if case Has(vn var_number) = cp_info->ovn {
+          vi *var_info = ref(&fb->all_vars, vn.~);
 
-        kill_var gr_num = addx(gr, @[gr_op]GrVirtualDead({vi->cell}));
-        bodyexit sq_num = seqq(gr, {kill_var, exitseq});
+          kill_var gr_num = addx(gr, @[gr_op]GrVirtualDead({vi->cell}));
+          bodyexit sq_num = seqq(gr, {kill_var, exitseq});
 
-        body_gn sq_num;
-        if !gr_bracebody(clq, gr, fb, &sc->body, bodyexit, &body_gn) {
-          return false;
-        }
+          body_gn sq_num;
+          if !gr_bracebody(clq, gr, fb, &sc->body, bodyexit, &body_gn) {
+            return false;
+          }
 
-        vcgn gr_num;
-        if is_ptr {
-          vcgn = addx(gr, @[gr_op]GrDeref({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
+          vcgn gr_num;
+          if is_ptr {
+            vcgn = addx(gr, @[gr_op]GrDeref({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
+          } else {
+            vcgn = addx(gr, @[gr_op]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
+          }
+          gn1 var = seqq(gr, {vcgn, body_gn});
+          kill_tag gr_num = addx(gr, @[gr_op]GrVirtualDead({info->tag_cell}));
+          gn var = seqq(gr, {kill_tag, gn1});
+          push(&cases, cons(@[gr_const]ConstInt(~cp_info->tag_value.~), gn));
         } else {
-          vcgn = addx(gr, @[gr_op]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
+          body_gn sq_num;
+          if !gr_bracebody(clq, gr, fb, &sc->body, exitseq, &body_gn) {
+            return false;
+          }
+          kill_tag gr_num = addx(gr, @[gr_op]GrVirtualDead({info->tag_cell}));
+          gn var = seqq(gr, {kill_tag, body_gn});
+          push(&cases, cons(@[gr_const]ConstInt(~cp_info->tag_value.~), gn));
         }
-        gn1 var = seqq(gr, {vcgn, body_gn});
-        kill_tag gr_num = addx(gr, @[gr_op]GrVirtualDead({info->tag_cell}));
-        gn var = seqq(gr, {kill_tag, gn1});
-        push(&cases, cons(@[gr_const]ConstInt(~cp_info->tag_value.~), gn));
       }
       case &Default(v void): {
         body_gn sq_num;
@@ -641,17 +651,23 @@ func gr_condition(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_cond
         tag enum_tag_value = mk_enum_tag_value(i);
         if info->matching_tag_value.~ == tag.~ {
           cp_info *ast_cp_info = unHas(&pa.pattern.cp_info);
-          vi *var_info = ref(&fb->all_vars, cp_info->vn.~);
-          vcgn gr_num;
-          if isHas(&pa.pattern.addressof_constructor) {
-            vcgn = addx(gr, @[gr_op]GrDeref({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)}));
+          if case Has(vn var_number) = cp_info->ovn {
+            vi *var_info = ref(&fb->all_vars, vn.~);
+            vcgn gr_num;
+            if isHas(&pa.pattern.addressof_constructor) {
+              vcgn = addx(gr, @[gr_op]GrDeref({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)}));
+            } else {
+              vcgn = addx(gr, @[gr_op]GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)}));
+            }
+            gn var = seqq(gr, {vcgn, thengn});
+            tagdead gr_num = addx(gr, @[gr_op]GrVirtualDead({info->deconstruct.tag_cell}));
+            thenseq sq_num = seqq(gr, {tagdead, gn});
+            push(&cases, cons(@[gr_const]ConstInt(~tag.~), thenseq));
           } else {
-            vcgn = addx(gr, @[gr_op]GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)}));
+            tagdead gr_num = addx(gr, @[gr_op]GrVirtualDead({info->deconstruct.tag_cell}));
+            thenseq sq_num = seqq(gr, {tagdead, thengn});
+            push(&cases, cons(@[gr_const]ConstInt(~tag.~), thenseq));
           }
-          gn var = seqq(gr, {vcgn, thengn});
-          tagdead gr_num = addx(gr, @[gr_op]GrVirtualDead({info->deconstruct.tag_cell}));
-          thenseq sq_num = seqq(gr, {tagdead, gn});
-          push(&cases, cons(@[gr_const]ConstInt(~tag.~), thenseq));
         } else {
           tagdead gr_num = addx(gr, @[gr_op]GrVirtualDead({info->deconstruct.tag_cell}));
           elseseq sq_num = seqq(gr, {tagdead, elsegn});
@@ -1288,7 +1304,7 @@ func gr_name_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_name_expr, 
         tag_end u32 = enum_tag_offset + props.flat_size;
         postpadding_ogn opt[gr_num]
           = gr_bzero_subcell(clq, gr, x_cell, tag_end, info->cu_props.flat_size - tag_end);
-        c_gn var = addx(gr, concat(Has(b_gn), postpadding_ogn), @[gr_op]GrVirtualDead({tag_cell}));
+        c_gn var = addx(gr, concat(@[opt[gr_num]]Has(b_gn), postpadding_ogn), @[gr_op]GrVirtualDead({tag_cell}));
         *out = c_gn;
         return true;
       } else {

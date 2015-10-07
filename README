@@ -84,7 +84,7 @@ Here's the project timeline:
        M. defer statements (or scoped statements).
        N. handlers for overflow errors.
        O. enum types with "default" values instead of zero-tag.
-       P. cute enum syntax for voids.
+       P. cute enum syntax for voids.  (DONE in s2)
        Q. better type-checking, see-through-negation.
        R. explicit overloading/specialization.
        S. support for multiple calling conventions.

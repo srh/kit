@@ -323,7 +323,7 @@ defenum ast_statement {
 };
 
 deftype ast_cp_info struct {
-  vn var_number;
+  ovn opt[var_number];
   tag_value enum_tag_value;
   // enum_field_offset(cs, et, tag_value) -- annotated here because getting a te_enum in graph.ki is needlessly annoying.
   field_offset u32;
@@ -334,7 +334,7 @@ deftype ast_constructor_pattern struct {
   cp_info nc[ast_cp_info];
   addressof_constructor opt[ast_ident];
   constructor_name ast_ident;
-  decl ast_vardecl;
+  decl opt[ast_vardecl];
 };
 
 

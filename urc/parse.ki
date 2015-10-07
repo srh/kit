@@ -1449,12 +1449,19 @@ func parse_rest_of_constructor_pattern(p *ps, m ast_meta,
     addressof_constructor = None();
   }
   constructor_name ast_ident;
-  decl ast_vardecl;
-  if !(parse_ident(p, &constructor_name)
-       && try_skip_token(p, @[tokval]Grouper(LParen(void)))
-       && parse_vardecl(p, AllowBlanksYes(void), &decl)
-       && try_skip_token(p, @[tokval]Grouper(RParen(void)))) {
+  if !parse_ident(p, &constructor_name) {
     return Fail;
+  }
+  decl opt[ast_vardecl];
+  if try_skip_token(p, @[tokval]Grouper(LParen(void))) {
+    vd ast_vardecl;
+    if !(parse_vardecl(p, AllowBlanksYes(void), &vd)
+         && try_skip_token(p, @[tokval]Grouper(RParen(void)))) {
+      return Fail;
+    }
+    decl = Has(vd);
+  } else {
+    decl = None();
   }
   end(p, m);
   *out = {m, NotComputed@[ast_cp_info](), addressof_constructor, constructor_name, decl};
