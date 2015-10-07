@@ -164,7 +164,7 @@ access array[_] {
   }
 
   inline func[T] swap(a *array[T], b *array[T]) void {
-    var tmp = a->~;
+    tmp var = a->~;
     a->~ = b->~;
     b->~ = tmp;
   }

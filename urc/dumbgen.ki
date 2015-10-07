@@ -489,7 +489,7 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
   while count(&zeroset) != 0 {
     gn gr_num;
     if true {
-      var it = iter(&zeroset);
+      it var = iter(&zeroset);
       gn = unHas(next(&it))->car;
     }
     check_remove(&zeroset, &gn);

@@ -87,7 +87,7 @@ func as_zerohex(width size, x size) array[u8] {
   arr array[u8] = as_hex(x);
   n size = count(&arr);
   if n < width {
-    var tmp = arr;
+    tmp var = arr;
     repeat_out(width - n, '0', &arr);
     append(&arr, &tmp);
   }

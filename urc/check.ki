@@ -315,7 +315,7 @@ func enqueue_def_inst_compute_type(cs *checkstate, clq *clqueue, id def_entry_id
 }
 
 func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *cu_genparms) def_inst_id {
-  var res = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
+  res var = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDefEntry({id, res.id, cs->instantiation_depth}));
   }
@@ -832,7 +832,7 @@ func subsequent_depth(cs *checkstate, parms *cu_genparms) u32 {
 }
 
 func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, parms *cu_genparms) deftype_inst_id {
-  var res = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
+  res var = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDeftypeEntry({id, res.id, cs->instantiation_depth}));
   }
@@ -850,7 +850,7 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *cu_genparms)
   } else {
     inst = {*parms, NotComputed@[deftype_inst_info]()};
   }
-  var id = add_deftype_inst(cs, inst);
+  id deftype_inst_id = add_deftype_inst(cs, inst);
   check_insert(&ent->insts, parms, id);
   return {id, true};
 }

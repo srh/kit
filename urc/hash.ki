@@ -216,7 +216,7 @@ func[T] intersects(a *hash[T, void], b *hash[T, void]) bool {
   bn size = count(b);
   if bn < n {
     n = bn;
-    var tmp = a;
+    tmp var = a;
     a = b;
     b = tmp;
   }

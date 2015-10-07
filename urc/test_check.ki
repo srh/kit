@@ -186,14 +186,14 @@ func test_check_lambda_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c014",
     _u8("def x i32 = 3;\n"
         "def y fn[i32, i32] = func(z i32)i32 {\n"
-        "  var x i32 = 4;\n"
+        "  x i32 = 4;\n"
         "  return z;\n"
         "};\n"));
   // Fails because z shadows a local.
   run_check_negtest(ctx, "c016",
     _u8("def x i32 = 3;\n"
         "def y fn[i32, i32] = func(z i32)i32 {\n"
-        "  var z i32 = 4;\n"
+        "  z i32 = 4;\n"
         "  return x;\n"
         "};\n"));
   run_check_test(ctx, "c017",
@@ -243,7 +243,7 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "};\n"));
   run_check_test(ctx, "c025-a",
     _u8("def y fn[i32, i32] = func(z i32) i32 {\n"
-        "  var k fn[i32, i32] = func(m i32) i32 {\n"
+        "  k fn[i32, i32] = func(m i32) i32 {\n"
         "    return m + m;\n"
         "  };\n"
         "  return k(z) + k(z);\n"
@@ -258,7 +258,7 @@ func test_check_lambda_cases(ctx *check_ctx) void {
   // Fails because lambdas can't capture.
   run_check_negtest(ctx, "c026",
     _u8("def y fn[i32, i32] = func(z i32) i32 {\n"
-        "  var k fn[i32, i32] = func(m i32) i32 {\n"
+        "  k fn[i32, i32] = func(m i32) i32 {\n"
         "    return m + z;\n"
         "  };\n"
         "  return k(z) + k(z);\n"
@@ -310,14 +310,14 @@ func test_check_lambda_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c032",
     _u8("def[T] foo fn[*T, T] = func(x *T) T { return *x; };\n"
         "def bar fn[i32] = func() i32 {\n"
-        "  var x i32 = 3;\n"
+        "  x i32 = 3;\n"
         "  return foo(&x);\n"
         "};\n"));
   // Fails because the def does not match.
   run_check_negtest(ctx, "c033",
     _u8("def[T] foo fn[*T, T] = func(x *T) T { return *x; };\n"
         "def bar fn[i32] = func() i32 {\n"
-        "  var x i32 = 3;\n"
+        "  x i32 = 3;\n"
         "  return foo(x);\n"
         "};\n"));
   run_check_test(ctx, "c034",
@@ -329,7 +329,7 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "  }\n"
         "};\n"
         "def bar fn[i32] = func() i32 {\n"
-        "  var x i32 = 5;\n"
+        "  x i32 = 5;\n"
         "  return fac(x);\n"
         "};\n"));
   // Fails because of recursive template instantiation.
@@ -342,7 +342,7 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "  return rec(biggefy(x));\n"
         "};\n"
         "def bar fn[i32] = func() i32 {\n"
-        "  var x u32 = 5;\n"
+        "  x u32 = 5;\n"
         "  return rec(x);\n"
         "};\n"));
   run_check_test(ctx, "c036",
@@ -357,7 +357,7 @@ func test_check_lambda_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c037-b",
     _u8("def x i32 = bar();\n"
         "func bar() i32 {\n"
-        "  var x i32 = 5;\n"
+        "  x i32 = 5;\n"
         "  return x;\n"
         "}\n"));
   run_check_test(ctx, "c037-c",
@@ -370,7 +370,7 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "  }\n"
         "};\n"
         "def bar fn[i32] = func() i32 {\n"
-        "  var x i32 = 5;\n"
+        "  x i32 = 5;\n"
         "  return fac(x);\n"
         "};\n"));
   run_check_test(ctx, "c037-d",
@@ -384,7 +384,7 @@ func test_check_lambda_cases(ctx *check_ctx) void {
         "  return acc;\n"
         "}\n"
         "def bar fn[i32] = func() i32 {\n"
-        "  var x i32 = 7;\n"
+        "  x i32 = 7;\n"
         "  return fac(x);\n"
         "};\n"));
   run_check_test(ctx, "c038",
@@ -439,7 +439,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "def bar i32 = 5 << foo;\n"));
   run_check_test(ctx, "c047-a",
     _u8("def[T] foo fn[T, T] = func(x T) T {\n"
-        "  var y T = x;\n"
+        "  y T = x;\n"
         "  return y;\n"
         "};\n"
         "def bar fn[i32] = func() i32 {\n"
@@ -455,7 +455,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"));
   run_check_test(ctx, "c048",
     _u8("def[T] add32 fn[i32, T, i32] = func(x i32, y T) i32 {\n"
-        "  var z i32 = 4;\n"
+        "  z i32 = 4;\n"
         "  return x + z;\n"
         "};\n"
         "def bar fn[i32] = func() i32 {\n"
@@ -471,7 +471,7 @@ func test_check_more_cases(ctx *check_ctx) void {
 
   run_check_test(ctx, "c051",
     _u8("def[T] foo fn[*T, i32, T] = func(p *T, i i32) T {\n"
-        "  var ret T = p[i];\n"
+        "  ret T = p[i];\n"
         "  p[i] = p[i + 1];\n"
         "  return ret;\n"
         "};\n"));
@@ -479,7 +479,7 @@ func test_check_more_cases(ctx *check_ctx) void {
   run_check_negtest(ctx, "c052",
     _u8("deftype vec3 [3]u32;\n"
         "def foo fn[[3]u32, vec3] = func(arr [3]u32) vec3 {\n"
-        "  var v vec3 = arr;\n"
+        "  v vec3 = arr;\n"
         "  return v;\n"
         "};\n"));
   // Passes because the conversion of ~@[u32]3 can be inferred.
@@ -493,7 +493,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"));
   run_check_test(ctx, "c055",
     _u8("def foo fn[i32] = func() i32 {\n"
-        "  var x i32 = 5;\n"
+        "  x i32 = 5;\n"
         "  while (x > 3) {\n"
         "    x = x + 1;\n"
         "  }\n"
@@ -502,7 +502,7 @@ func test_check_more_cases(ctx *check_ctx) void {
 
   run_check_test(ctx, "c056",
     _u8("def foo fn[i32] = func() i32 {\n"
-        "  var x i32 = 5;\n"
+        "  x i32 = 5;\n"
         "  while !(x > 3) {\n"
         "    x = x + 1;\n"
         "  }\n"
@@ -511,7 +511,7 @@ func test_check_more_cases(ctx *check_ctx) void {
   // Fails because some control paths don't return a value.
   run_check_negtest(ctx, "c057",
     _u8("def foo fn[i32] = func() i32 {\n"
-        "  var x i32 = 2;\n"
+        "  x i32 = 2;\n"
         "  if (x < 3) {\n"
         "    x = x + 1;\n"
         "  } else {\n"
@@ -520,7 +520,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"));
   run_check_test(ctx, "c058",
     _u8("def foo fn[i32] = func() i32 {\n"
-        "  var acc u32 = 0;\n"
+        "  acc u32 = 0;\n"
         "  for i u32 = 0; i < 10; i = i + 1 {\n"
         "    acc = acc + i;\n"
         "  }\n"
@@ -530,7 +530,7 @@ func test_check_more_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c059",
     _u8("def[T] foo fn[i32, T] = func(x i32) T {\n"
         "  // Why not test '@[T]' works where T is generic.\n"
-        "  var y T = @[T](~x);\n"
+        "  y T = @[T](~x);\n"
         "  return y;\n"
         "};\n"
         "def bar fn[fn[i32, i16], i32, i16] = func(x fn[i32, i16], y i32) i16 {\n"
@@ -542,7 +542,7 @@ func test_check_more_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c060",
     _u8("def[T] foo fn[i32, T] = func(x i32) T {\n"
         "  // Why not test '@[T]' works where T is generic.\n"
-        "  var y T = @[T]~x;\n"
+        "  y T = @[T]~x;\n"
         "  return y;\n"
         "};\n"
         "def bar fn[fn[i32, i16], i32, i16] = func(x fn[i32, i16], y i32) i16 {\n"
@@ -688,37 +688,37 @@ func test_check_more_cases(ctx *check_ctx) void {
     _u8("defclass copy ty i32;\n"
         "access ty {\n"
         "def do_init fn[*ty, void] = func(t *ty) void {\n"
-        "  var ret void;\n"
+        "  ret void;\n"
         "  return ret;\n"
         "};\n"
         "}\n"
         "def foo fn[i32] = func() i32 {\n"
-        "  var k ty;\n"
+        "  k ty;\n"
         "  return 1;\n"
         "};\n"));
   // Fails because blah is not the name of a type.
   run_check_negtest(ctx, "c078",
     _u8("def foo fn[i32] = func() i32 {\n"
-        "  var x blah;\n"
+        "  x blah;\n"
         "  return 1;\n"
         "};\n"));
   run_check_negtest(ctx, "c079",
     _u8("defclass copy ty i32;\n"
         "def foo fn[i32] = func() i32 {\n"
-        "  var k ty;\n"
+        "  k ty;\n"
         "  return 1;\n"
         "};\n"));
   run_check_test(ctx, "c080",
     _u8("defclass copy ty i32;\n"
         "access ty {\n"
         "def do_init fn[*ty, void] = func(t *ty) void {\n"
-        "  var ret void;\n"
+        "  ret void;\n"
         "  return ret;\n"
         "};\n"
         "}\n"
         "deftype ty2 struct { x i32; y ty; };\n"
         "def foo fn[i32] = func() i32 {\n"
-        "  var k ty2;\n"
+        "  k ty2;\n"
         "  return 1;\n"
         "};\n"));
 
@@ -726,7 +726,7 @@ func test_check_more_cases(ctx *check_ctx) void {
     _u8("defclass copy ty i32;\n"
         "deftype ty2 struct { x i32; y ty; };\n"
         "def foo fn[i32] = func() i32 {\n"
-        "  var k ty2;\n"
+        "  k ty2;\n"
         "  return 1;\n"
         "};\n"));
   run_check_test(ctx, "c082",
@@ -748,9 +748,9 @@ func test_check_more_cases(ctx *check_ctx) void {
         "  c2 struct { p i32; q i32; };\n"
         "};\n"
         "def foo fn[ty, ty] = func(x ty) ty {\n"
-        "  var v void;\n"
-        "  var y ty = c1(v);\n"
-        "  var u struct { p i32; q i32; };\n"
+        "  v void;\n"
+        "  y ty = c1(v);\n"
+        "  u struct { p i32; q i32; };\n"
         "  y = c2(u);\n"
         "  return y;\n"
         "};\n"));
@@ -761,9 +761,9 @@ func test_check_more_cases(ctx *check_ctx) void {
         "  c2 struct { p i32; q i32; };\n"
         "};\n"
         "def foo fn[ty, ty] = func(x ty) ty {\n"
-        "  var v void;\n"
-        "  var y ty = c1(v);\n"
-        "  var u struct { p i32; q u32; };\n"
+        "  v void;\n"
+        "  y ty = c1(v);\n"
+        "  u struct { p i32; q u32; };\n"
         "  y = c2(u);\n"
         "  return y;\n"
         "};\n"));
@@ -773,9 +773,9 @@ func test_check_more_cases(ctx *check_ctx) void {
         "  c2 struct { p T; q T; };\n"
         "};\n"
         "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
-        "  var v void;\n"
-        "  var y ty[i32] = c1(v);\n"
-        "  var u struct { p i32; q i32; };\n"
+        "  v void;\n"
+        "  y ty[i32] = c1(v);\n"
+        "  u struct { p i32; q i32; };\n"
         "  y = c2(u);\n"
         "  return y;\n"
         "};\n"));
@@ -786,9 +786,9 @@ func test_check_more_cases(ctx *check_ctx) void {
         "  c2 struct { p T; q T; };\n"
         "};\n"
         "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
-        "  var v void;\n"
-        "  var y ty[i32] = c1(v);\n"
-        "  var u struct { p u32; q u32; };\n"
+        "  v void;\n"
+        "  y ty[i32] = c1(v);\n"
+        "  u struct { p u32; q u32; };\n"
         "  y = c2(u);\n"
         "  return y;\n"
         "};\n"));
@@ -834,11 +834,11 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"));
   run_check_test(ctx, "c092",
     _u8("def foo fn[i32, void] = func(x i32) void {\n"
-        "  var p *_ = &x;\n"
-        "  var q _ = *p;\n"
-        "  var r = q;\n"
-        "  var s i32 = r;\n"
-        "  var ret void;\n"
+        "  p *_ = &x;\n"
+        "  q var = *p;\n"
+        "  r var = q;\n"
+        "  s i32 = r;\n"
+        "  ret void;\n"
         "  return ret;\n"
         "};\n"));
   run_check_test(ctx, "c093",
@@ -855,13 +855,13 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"));
   run_check_test(ctx, "c094",
     _u8("def foo fn[i32, void] = func(x i32) void {\n"
-        "  var p *_ = &x;\n"
-        "  var q _ = *p;\n"
+        "  p *_ = &x;\n"
+        "  q _ = *p;\n"
         "  if (x == 3) {\n"
         "    return;\n"
         "  }\n"
-        "  var r = q;\n"
-        "  var s i32 = r;\n"
+        "  r var = q;\n"
+        "  s i32 = r;\n"
         "};\n"));
   run_check_test(ctx, "c095",
     _u8("def foo = func(x i32, y u32) void {\n"
@@ -875,7 +875,7 @@ func test_check_more_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c097",
     _u8("deftype notsize u32;\n"
         "func `~`(x u32) notsize {\n"
-        "  var ret notsize;\n"
+        "  ret notsize;\n"
         "  ret.~ = x;\n"
         "  return ret;\n"
         "}\n"
@@ -885,18 +885,18 @@ func test_check_more_cases(ctx *check_ctx) void {
   // Fails because x[0] is of wrong type.
   run_check_negtest(ctx, "c098",
     _u8("func foo() i32 {\n"
-        "  var x [3]u32;\n"
+        "  x [3]u32;\n"
         "  return x[0];\n"
         "}\n"));
   run_check_test(ctx, "c099",
     _u8("func foo() bool {\n"
-        "  var x [3]u32;\n"
+        "  x [3]u32;\n"
         "  return &x[0] == &x[1];\n"
         "}\n"));
   // Fails because ptr types don't match.
   run_check_negtest(ctx, "c100",
     _u8("func foo() bool {\n"
-        "  var x [3]u32;\n"
+        "  x [3]u32;\n"
         "  return &x[0] == &x;\n"
         "}\n"));
 
@@ -1243,7 +1243,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "func foo() ty { t *ty = null; return *t; }\n"
         "func f() void {\n"
         "  if true {\n"
-        "    var k ty = foo();\n"
+        "    k ty = foo();\n"
         "    label bar;\n"
         "  }\n"
         "  goto bar;\n"
@@ -1256,7 +1256,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "func foo() ty { t *ty = null; return *t; }\n"
         "func f() void {\n"
         "  if true {\n"
-        "    var k ty = foo();\n"
+        "    k ty = foo();\n"
         "    label bar;\n"
         "  }\n"
         "  goto bar;\n"
