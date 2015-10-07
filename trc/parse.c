@@ -858,47 +858,6 @@ int parse_rest_of_if_statement(struct ps *p, struct pos pos_start,
   return 0;
 }
 
-int parse_rest_of_var_statement(struct ps *p, struct pos pos_start,
-                                struct ast_var_statement *out) {
-  struct ast_vardecl decl;
-  if (!(skip_ws(p) && help_parse_vardecl(p, ALLOW_BLANKS_YES, &decl))) {
-    goto fail;
-  }
-
-  if (!skip_ws(p)) {
-    goto fail;
-  }
-
-  if (try_skip_semicolon(p)) {
-    ast_var_statement_init_without_rhs(out, ast_meta_make(pos_start, ps_pos(p)),
-                                       decl);
-    return 1;
-  }
-
-  if (!try_skip_oper(p, "=")) {
-    goto fail;
-  }
-  struct ast_expr rhs;
-  if (!(skip_ws(p) && parse_expr(p, &rhs, kSemicolonPrecedence))) {
-    goto fail_decl;
-  }
-
-  if (!try_skip_semicolon(p)) {
-    goto fail_rhs;
-  }
-
-  ast_var_statement_init_with_rhs(out, ast_meta_make(pos_start, ps_pos(p)),
-                                  decl, ast_exprcall_make(rhs));
-  return 1;
-
- fail_rhs:
-  ast_expr_destroy(&rhs);
- fail_decl:
-  ast_vardecl_destroy(&decl);
- fail:
-  return 0;
-}
-
 int parse_rest_of_while_statement(struct ps *p, struct pos pos_start,
                                   struct ast_while_statement *out) {
   struct ast_condition condition;
@@ -945,22 +904,14 @@ int parse_rest_of_for_statement(struct ps *p, struct pos pos_start,
     goto fail;
   }
 
-  struct pos initializer_start = ps_pos(p);
   int has_initializer;
   struct ast_statement initializer = { 0 };
   if (try_skip_semicolon(p)) {
     has_initializer = 0;
   } else {
     has_initializer = 1;
-    if (try_skip_keyword(p, "var")) {
-      initializer.tag = AST_STATEMENT_VAR;
-      if (!parse_rest_of_var_statement(p, initializer_start, &initializer.u.var_statement)) {
-        goto fail;
-      }
-    } else {
-      if (!parse_naked_var_or_expr_statement(p, 1, &initializer)) {
-        goto fail;
-      }
+    if (!parse_naked_var_or_expr_statement(p, 1, &initializer)) {
+      goto fail;
     }
   }
 
@@ -1429,10 +1380,7 @@ int parse_naked_var_or_expr_statement(struct ps *p, int force_assignment,
 
 int parse_statement(struct ps *p, struct ast_statement *out) {
   struct pos pos_start = ps_pos(p);
-  if (try_skip_keyword(p, "var")) {
-    out->tag = AST_STATEMENT_VAR;
-    return parse_rest_of_var_statement(p, pos_start, &out->u.var_statement);
-  } else if (try_skip_keyword(p, "return")) {
+  if (try_skip_keyword(p, "return")) {
     if (!skip_ws(p)) {
       return 0;
     }
@@ -3016,10 +2964,10 @@ int parse_test_defs(void) {
   pass &= run_count_test("def14",
                          "def[a,b] foo/*heh*/fn[int] = func() int {"
                          "//blah blah blah\n"
-                         "   var x int = -3;\n"
+                         "   x int = -3;\n"
                          "   return x;\n"
                          "};\n",
-                         29);
+                         28);
   pass &= run_count_test("def15",
                          "def foo i32 = 1 == 1 || 2 == 1;\n",
                          12);
@@ -3028,9 +2976,9 @@ int parse_test_defs(void) {
                          9);
   pass &= run_count_test("def17",
                          "def foo fn[int] = func() int {\n"
-                         "  var x int;\n"
+                         "  x var;\n"
                          "};\n",
-                         18);
+                         17);
   pass &= run_count_test("def18",
                          "def foo bar = func() void {\n"
                          "  (x+3)[y(z)] = 3;\n"
@@ -3039,17 +2987,17 @@ int parse_test_defs(void) {
                          31);
   pass &= run_count_test("def19",
                          "def foo bar = func() void {\n"
-                         "  for var i i32 = 3; i < 3; i = i + 1 {\n"
+                         "  for i i32 = 3; i < 3; i = i + 1 {\n"
                          "  }\n"
                          "};\n",
-                         29);
+                         28);
   pass &= run_count_test("def20",
                          "def foo bar = func() void {\n"
-                         "  for var i i32 = 3; i < 3; i = i + 1 {\n"
+                         "  for i i32 = 3; i < 3; i = i + 1 {\n"
                          "    x = 2;\n"
                          "  }\n"
                          "};\n",
-                         33);
+                         32);
   pass &= run_count_test("def20",
                          "def foo bar = baz@[a, b](1, 2, 3);\n",
                          19);

@@ -73,7 +73,7 @@ Here's the project timeline:
        B. type aliases.
        C. a non-truncative conversion operator (prefix +).  (DONE in s2)
        D. negative integer literals.
-       E. var keyword after variable.  (DONE -- allowed but not required)
+       E. var keyword after variable.  (DONE)
        F. o8, o16, o32.  (DONE in s2)
        G. u64, i64, o64.
        H. a signed size type.  ("diff"?)

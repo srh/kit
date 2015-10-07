@@ -5535,14 +5535,14 @@ int check_lambda_testcases(struct identmap *im) {
   pass &= check_foocase(im, "check_file_test_lambda_5",
                         "def x i32 = 3;\n"
                         "def y fn[i32, i32] = func(z i32)i32 {\n"
-                        "  var x i32 = 4;\n"
+                        "  x i32 = 4;\n"
                         "  return z;\n"
                         "};\n");
   /* Fails because z shadows a local. */
   pass &= check_negcase(im, "check_file_test_lambda_6",
                         "def x i32 = 3;\n"
                         "def y fn[i32, i32] = func(z i32)i32 {\n"
-                        "  var z i32 = 4;\n"
+                        "  z i32 = 4;\n"
                         "  return x;\n"
                         "};\n");
   pass &= check_foocase(im, "check_file_test_lambda_7",
@@ -5592,7 +5592,7 @@ int check_lambda_testcases(struct identmap *im) {
                         "};\n");
   pass &= check_foocase(im, "check_file_test_lambda_15",
                         "def y fn[i32, i32] = func(z i32) i32 {\n"
-                        "  var k fn[i32, i32] = func(m i32) i32 {\n"
+                        "  k fn[i32, i32] = func(m i32) i32 {\n"
                         "    return m + m;\n"
                         "  };\n"
                         "  return k(z) + k(z);\n"
@@ -5601,7 +5601,7 @@ int check_lambda_testcases(struct identmap *im) {
   /* Fails because the inner lambda tries to capture "z". */
   pass &= check_negcase(im, "check_file_test_lambda_16",
                         "def y fn[i32, i32] = func(z i32) i32 {\n"
-                        "  var k fn[i32, i32] = func(m i32) i32 {\n"
+                        "  k fn[i32, i32] = func(m i32) i32 {\n"
                         "    return m + z;\n"
                         "  };\n"
                         "  return k(z) + k(z);\n"
@@ -5646,7 +5646,7 @@ int check_lambda_testcases(struct identmap *im) {
       im, "check_file_test_lambda_22",
       "def[T] foo fn[ptr[T], T] = func(x ptr[T]) T { return *x; };\n"
       "def bar fn[i32] = func() i32 {\n"
-      "  var x i32 = 3;\n"
+      "  x i32 = 3;\n"
       "  return foo(&x);\n"
       "};\n");
   /* Fails because the def does not match. */
@@ -5654,7 +5654,7 @@ int check_lambda_testcases(struct identmap *im) {
       im, "check_file_test_lambda_23",
       "def[T] foo fn[ptr[T], T] = func(x ptr[T]) T { return *x; };\n"
       "def bar fn[i32] = func() i32 {\n"
-      "  var x i32 = 3;\n"
+      "  x i32 = 3;\n"
       "  return foo(x);\n"
       "};\n");
   pass &= check_foocase(
@@ -5667,7 +5667,7 @@ int check_lambda_testcases(struct identmap *im) {
       "  }\n"
       "};\n"
       "def bar fn[i32] = func() i32 {\n"
-      "  var x i32 = 5;\n"
+      "  x i32 = 5;\n"
       "  return fac(x);\n"
       "};\n");
   /* Fails because of recursive template instantiation. */
@@ -5681,7 +5681,7 @@ int check_lambda_testcases(struct identmap *im) {
       "  return rec(biggefy(x));\n"
       "};\n"
       "def bar fn[i32] = func() i32 {\n"
-      "  var x u32 = 5;\n"
+      "  x u32 = 5;\n"
       "  return rec(x);\n"
       "};\n");
   pass &= check_foocase(
@@ -5789,7 +5789,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_7",
       "def[T] foo fn[T, T] = func(x T) T {\n"
-      "  var y T = x;\n"
+      "  y T = x;\n"
       "  return y;\n"
       "};\n"
       "def bar fn[i32] = func() i32 {\n"
@@ -5798,7 +5798,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_8",
       "def[T] add32 fn[i32, T, i32] = func(x i32, y T) i32 {\n"
-      "  var z i32 = 4;\n"
+      "  z i32 = 4;\n"
       "  return x + z;\n"
       "};\n"
       "def bar fn[i32] = func() i32 {\n"
@@ -5817,7 +5817,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_11",
       "def[T] foo fn[ptr[T], i32, T] = func(p ptr[T], i i32) T {\n"
-      "  var ret T = p[i];\n"
+      "  ret T = p[i];\n"
       "  p[i] = p[i + 1];\n"
       "  return ret;\n"
       "};\n");
@@ -5826,7 +5826,7 @@ int check_more_testcases(struct identmap *im) {
       im, "check_file_test_more_12",
       "deftype vec3 [3]u32;\n"
       "def foo fn[[3]u32, vec3] = func(arr [3]u32) vec3 {\n"
-      "  var v vec3 = arr;\n"
+      "  v vec3 = arr;\n"
       "  return v;\n"
       "};\n");
   /* Passes because the conversion of ~@[u32]3 can be inferred. */
@@ -5843,7 +5843,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_15",
       "def foo fn[i32] = func() i32 {\n"
-      "  var x i32 = 5;\n"
+      "  x i32 = 5;\n"
       "  while (x > 3) {\n"
       "    x = x + 1;\n"
       "  }\n"
@@ -5852,7 +5852,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_16",
       "def foo fn[i32] = func() i32 {\n"
-      "  var x i32 = 5;\n"
+      "  x i32 = 5;\n"
       "  while !(x > 3) {\n"
       "    x = x + 1;\n"
       "  }\n"
@@ -5862,7 +5862,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_negcase(
       im, "check_file_test_more_17",
       "def foo fn[i32] = func() i32 {\n"
-      "  var x i32 = 2;\n"
+      "  x i32 = 2;\n"
       "  if (x < 3) {\n"
       "    x = x + 1;\n"
       "  } else {\n"
@@ -5872,7 +5872,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_18",
       "def foo fn[i32] = func() i32 {\n"
-      "  var acc u32 = 0;\n"
+      "  acc u32 = 0;\n"
       "  for i u32 = 0; i < 10; i = i + 1 {\n"
       "    acc = acc + i;\n"
       "  }\n"
@@ -5882,7 +5882,7 @@ int check_more_testcases(struct identmap *im) {
       im, "check_file_test_more_19",
       "def[T] foo fn[i32, T] = func(x i32) T {\n"
       "  // Why not test '@[T]' works where T is generic.\n"
-      "  var y T = @[T](~x);\n"
+      "  y T = @[T](~x);\n"
       "  return y;\n"
       "};\n"
       "def bar fn[fn[i32, i16], i32, i16] = func(x fn[i32, i16], y i32) i16 {\n"
@@ -5895,7 +5895,7 @@ int check_more_testcases(struct identmap *im) {
       im, "check_file_test_more_20",
       "def[T] foo fn[i32, T] = func(x i32) T {\n"
       "  // Why not test '@[T]' works where T is generic.\n"
-      "  var y T = @[T]~x;\n"
+      "  y T = @[T]~x;\n"
       "  return y;\n"
       "};\n"
       "def bar fn[fn[i32, i16], i32, i16] = func(x fn[i32, i16], y i32) i16 {\n"
@@ -6062,19 +6062,19 @@ int check_more_testcases(struct identmap *im) {
       "defclass copy ty i32;\n"
       "access ty {\n"
       "def do_init fn[*ty, void] = func(t *ty) void {\n"
-      "  var ret void;\n"
+      "  ret void;\n"
       "  return ret;\n"
       "};\n"
       "}\n"
       "def foo fn[i32] = func() i32 {\n"
-      "  var k ty;\n"
+      "  k ty;\n"
       "  return 1;\n"
       "};\n");
   /* Fails because blah is not the name of a type. */
   pass &= check_negcase(
       im, "check_file_test_more_38",
       "def foo fn[i32] = func() i32 {\n"
-      "  var x blah;\n"
+      "  x blah;\n"
       "  return 1;\n"
       "};\n");
   /* Fails because k is not default-initializable. */
@@ -6082,7 +6082,7 @@ int check_more_testcases(struct identmap *im) {
       im, "check_file_test_more_39",
       "defclass copy ty i32;\n"
       "def foo fn[i32] = func() i32 {\n"
-      "  var k ty;\n"
+      "  k ty;\n"
       "  return 1;\n"
       "};\n");
   pass &= check_foocase(
@@ -6090,13 +6090,13 @@ int check_more_testcases(struct identmap *im) {
       "defclass copy ty i32;\n"
       "access ty {\n"
       "def do_init fn[*ty, void] = func(t *ty) void {\n"
-      "  var ret void;\n"
+      "  ret void;\n"
       "  return ret;\n"
       "};\n"
       "}\n"
       "deftype ty2 struct { x i32; y ty; };\n"
       "def foo fn[i32] = func() i32 {\n"
-      "  var k ty2;\n"
+      "  k ty2;\n"
       "  return 1;\n"
       "};\n");
 
@@ -6106,7 +6106,7 @@ int check_more_testcases(struct identmap *im) {
       "defclass copy ty i32;\n"
       "deftype ty2 struct { x i32; y ty; };\n"
       "def foo fn[i32] = func() i32 {\n"
-      "  var k ty2;\n"
+      "  k ty2;\n"
       "  return 1;\n"
       "};\n");
   pass &= check_foocase(
@@ -6132,9 +6132,9 @@ int check_more_testcases(struct identmap *im) {
       "  c2 struct { p i32; q i32; };\n"
       "};\n"
       "def foo fn[ty, ty] = func(x ty) ty {\n"
-      "  var v void;\n"
-      "  var y ty = c1(v);\n"
-      "  var u struct { p i32; q i32; };\n"
+      "  v void;\n"
+      "  y ty = c1(v);\n"
+      "  u struct { p i32; q i32; };\n"
       "  y = c2(u);\n"
       "  return y;\n"
       "};\n");
@@ -6146,9 +6146,9 @@ int check_more_testcases(struct identmap *im) {
       "  c2 struct { p i32; q i32; };\n"
       "};\n"
       "def foo fn[ty, ty] = func(x ty) ty {\n"
-      "  var v void;\n"
-      "  var y ty = c1(v);\n"
-      "  var u struct { p i32; q u32; };\n"
+      "  v void;\n"
+      "  y ty = c1(v);\n"
+      "  u struct { p i32; q u32; };\n"
       "  y = c2(u);\n"
       "  return y;\n"
       "};\n");
@@ -6159,9 +6159,9 @@ int check_more_testcases(struct identmap *im) {
       "  c2 struct { p T; q T; };\n"
       "};\n"
       "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
-      "  var v void;\n"
-      "  var y ty[i32] = c1(v);\n"
-      "  var u struct { p i32; q i32; };\n"
+      "  v void;\n"
+      "  y ty[i32] = c1(v);\n"
+      "  u struct { p i32; q i32; };\n"
       "  y = c2(u);\n"
       "  return y;\n"
       "};\n");
@@ -6173,9 +6173,9 @@ int check_more_testcases(struct identmap *im) {
       "  c2 struct { p T; q T; };\n"
       "};\n"
       "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
-      "  var v void;\n"
-      "  var y ty[i32] = c1(v);\n"
-      "  var u struct { p u32; q u32; };\n"
+      "  v void;\n"
+      "  y ty[i32] = c1(v);\n"
+      "  u struct { p u32; q u32; };\n"
       "  y = c2(u);\n"
       "  return y;\n"
       "};\n");
@@ -6226,11 +6226,11 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_52",
       "def foo fn[i32, void] = func(x i32) void {\n"
-      "  var p *_ = &x;\n"
-      "  var q _ = *p;\n"
-      "  var r = q;\n"
-      "  var s i32 = r;\n"
-      "  var ret void;\n"
+      "  p *_ = &x;\n"
+      "  q _ = *p;\n"
+      "  r var = q;\n"
+      "  s i32 = r;\n"
+      "  ret void;\n"
       "  return ret;\n"
       "};\n");
   pass &= check_foocase(
@@ -6250,13 +6250,13 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_54",
       "def foo fn[i32, void] = func(x i32) void {\n"
-      "  var p *_ = &x;\n"
-      "  var q _ = *p;\n"
+      "  p *_ = &x;\n"
+      "  q _ = *p;\n"
       "  if (x == 3) {\n"
       "    return;\n"
       "  }\n"
-      "  var r = q;\n"
-      "  var s i32 = r;\n"
+      "  r var = q;\n"
+      "  s i32 = r;\n"
       "};\n");
   pass &= check_foocase(
       im, "check_file_test_more_55",
@@ -6273,7 +6273,7 @@ int check_more_testcases(struct identmap *im) {
       im, "check_file_test_more_57",
       "deftype notsize u32;\n"
       "func `~`(x u32) notsize {\n"
-      "  var ret notsize;\n"
+      "  ret notsize;\n"
       "  ret.~ = x;\n"
       "  return ret;\n"
       "}\n"
@@ -6284,20 +6284,20 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_negcase(
       im, "check_file_test_more_58",
       "func foo() i32 {\n"
-      "  var x [3]u32;\n"
+      "  x [3]u32;\n"
       "  return x[0];\n"
       "}\n");
   pass &= check_foocase(
       im, "check_file_test_more_59",
       "func foo() bool {\n"
-      "  var x [3]u32;\n"
+      "  x [3]u32;\n"
       "  return &x[0] == &x[1];\n"
       "}\n");
   /* Fails because ptr types don't match. */
   pass &= check_negcase(
       im, "check_file_test_more_60",
       "func foo() bool {\n"
-      "  var x [3]u32;\n"
+      "  x [3]u32;\n"
       "  return &x[0] == &x;\n"
       "}\n");
 
