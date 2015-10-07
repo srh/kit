@@ -599,7 +599,8 @@ int is_ident_keyword(struct ps *p, size_t global_offset_begin, size_t global_off
   const uint8_t *ptr = p->data + begin;
   switch (count) {
   case 3:
-    return 0 == memcmp(ptr, "def", count);
+    return 0 == memcmp(ptr, "def", count)
+      || 0 == memcmp(ptr, "var", count);
   case 4:
     return 0 == memcmp(ptr, "true", count)
       || 0 == memcmp(ptr, "null", count)
