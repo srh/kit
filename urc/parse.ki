@@ -1527,54 +1527,59 @@ func parse_naked_var_or_expr_statement(p *ps, ab allow_braces, fa force_assignme
     return true;
   }
 
-  type ast_typeexpr;
-  indexers array[ast_expr];
-  done bool = false;
-  while !done {
-    if try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
-      if try_skip_keyw(p, Underscore(void)) {
-        param box[ast_typeexpr];
-        if !(try_skip_token(p, @[tokval]Grouper(RBracket(void)))
-             && parse_typeexpr(p, oo(&param))) {
-          return Fail;
-        }
-
-        type = collapse_indexers(indexers, @[ast_typeexpr]Arraytype({None(), param}));
-        done = true;
-      } else {
-        ambi ast_expr;
-        if !(parse_expr(p, kCommaPrec, AllowBracesYes(void), IsNotStatementExpr(void), &ambi)
-             && try_skip_token(p, @[tokval]Grouper(RBracket(void)))) {
-          return Fail;
-        }
-        push(&indexers, ambi);
-      }
-    } else {
-      local_type ast_typeexpr;
-      switch help_triparse_typeexpr(p, AllowBlanksYes(void), &local_type) {
-        case Quickfail(v): {
-          m ast_meta = copystart(p, name.meta);
-          lhs ast_expr = expressionize(m, name, indexers);
-          whole_expr ast_expr;
-          if !(parse_after_atomic_expr(p, kSemicolonPrec, ab, IsStatementExpr(void), lhs, &whole_expr)
-               && try_skip_oper(p, ';')) {
+  decl ast_vardecl;
+  if try_skip_keyw(p, Var(void)) {
+    decl = {name, Unknown({})};
+  } else {
+    type ast_typeexpr;
+    indexers array[ast_expr];
+    done bool = false;
+    while !done {
+      if try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
+        if try_skip_keyw(p, Underscore(void)) {
+          param box[ast_typeexpr];
+          if !(try_skip_token(p, @[tokval]Grouper(RBracket(void)))
+               && parse_typeexpr(p, oo(&param))) {
             return Fail;
           }
-          *out = Expr(discard(whole_expr));
-          return true;
-        }
-        case Error(v): {
-          return Fail;
-        }
-        case Success(v): {
-          type = collapse_indexers(indexers, local_type);
+
+          type = collapse_indexers(indexers, @[ast_typeexpr]Arraytype({None(), param}));
           done = true;
+        } else {
+          ambi ast_expr;
+          if !(parse_expr(p, kCommaPrec, AllowBracesYes(void), IsNotStatementExpr(void), &ambi)
+               && try_skip_token(p, @[tokval]Grouper(RBracket(void)))) {
+            return Fail;
+          }
+          push(&indexers, ambi);
+        }
+      } else {
+        local_type ast_typeexpr;
+        switch help_triparse_typeexpr(p, AllowBlanksYes(void), &local_type) {
+          case Quickfail(v): {
+            m ast_meta = copystart(p, name.meta);
+            lhs ast_expr = expressionize(m, name, indexers);
+            whole_expr ast_expr;
+            if !(parse_after_atomic_expr(p, kSemicolonPrec, ab, IsStatementExpr(void), lhs, &whole_expr)
+                 && try_skip_oper(p, ';')) {
+              return Fail;
+            }
+            *out = Expr(discard(whole_expr));
+            return true;
+          }
+          case Error(v): {
+            return Fail;
+          }
+          case Success(v): {
+            type = collapse_indexers(indexers, local_type);
+            done = true;
+          }
         }
       }
     }
-  }
 
-  decl ast_vardecl = {name, type};
+    decl = {name, type};
+  }
 
   semicolon tokval = mk_oper(';');
   if equal(&peek(p)->val, &semicolon) {
@@ -1768,10 +1773,14 @@ func test_parse() bool {
                                _u8("def[] foo fn[int] = func() int {\n"
                                    "var x int = 3;\n"
                                    "  return x;};"));
-  pass = pass & run_parse_test(_u8("p016"),
+  pass = pass & run_parse_test(_u8("p016-a"),
                                _u8("def[] foo/*heh*/fn[int] = func() int {\n"
                                    "//blah blah\n"
                                    "  var x int =-3;return x;};"));
+  pass = pass & run_parse_test(_u8("p016-b"),
+                               _u8("def[] foo fn[int] = func() int {\n"
+                                   "  x var = -3;\n"
+                                   "};"));
   pass = pass & run_parse_test(_u8("p017"),
                                _u8("def a b = 1 == 1 || 2 == 1;\n"));
   pass = pass & run_parse_test(_u8("p018"),
