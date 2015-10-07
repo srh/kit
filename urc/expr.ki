@@ -1902,7 +1902,10 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
     return false;
   }
 
-  func_pt te_typeexpr = make_fn_partial_type(es->cs, pt, &a->params);
+  func_pt te_typeexpr;
+  if !make_fn_partial_type(es->clq, pt, &a->params, &func_pt) {
+    return false;
+  }
   if !check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes(void)), &oo(&a->fun)->expr, &func_pt) {
     return false;
   }
@@ -2121,7 +2124,7 @@ func expr_type_incomplete(a *ast_expr) bool {
   return !expr_type_complete(a);
 }
 
-func make_fn_partial_type(cs *checkstate, return_type *te_typeexpr, params *array[ast_expr_consume]) te_typeexpr {
+func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[ast_expr_consume], out *te_typeexpr) bool {
   type_params array[te_typeexpr];
   n size = count(params);
   reserve(&type_params, n + 1);
@@ -2129,7 +2132,13 @@ func make_fn_partial_type(cs *checkstate, return_type *te_typeexpr, params *arra
     push(&type_params, expr_type(&ref(params, i)->expr));
   }
   push(&type_params, *return_type);
-  return TeApp({primitive_function_puretype(cs), freeze(&type_params), None()});
+  fntype te_typeexpr = TeApp({primitive_function_puretype(clq->cs), freeze(&type_params), None()});
+  cac cac_typeexpr;
+  if !noscoped_check_and_compute_typeexpr(clq->cs, clq, &fntype, &cac) {
+    return false;
+  }
+  *out = cac.te;
+  return true;
 }
 
 func fn_return_type(cs *checkstate, func_type *te_typeexpr) *te_typeexpr {
