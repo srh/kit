@@ -928,29 +928,7 @@ func behavior_to_bi_desc(es *framescope, b *derived_method_behavior, t *cu_typee
       return true;
     }
     case FunCtor(ip instpair): {
-      cptr_props type_properties;
-      cptr cu_typeexpr;
-      computed_ptr_type(es->cs, es->clq, t, &cptr, &cptr_props);
-      voidtype cu_typeexpr;
-      voidprops type_properties;
-      compute_prim(es->ds, primitive_void_type(es->cs), &voidtype, &voidprops);
-
-      fptr te_typeexpr = fn_type(es->cs, cptr.~, cptr.~, voidtype.~);
-      cfptr cac_typeexpr;
-      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &fptr, &cfptr) {
-        return false;
-      }
-      check(cfptr.complete);
-      cfptr_props type_properties;
-      if !compute_complete_type_properties(es->cs, es->clq, &cfptr.te, &cfptr_props) {
-        return false;
-      }
-
-      funcell cell_num = add_static_cell(es, ~cfptr.te, cfptr_props);
-      destptr cell_num = add_static_cell(es, cptr, cptr_props);
-      srcptr cell_num = add_static_cell(es, cptr, cptr_props);
-
-      *out = BiFunCtor({ip, funcell, destptr, srcptr});
+      *out = BiFunCtor(ip);
       return true;
     }
   }

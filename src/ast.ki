@@ -567,15 +567,7 @@ defenum ctor_desc {
 
 defenum bi_ctor_desc {
   BiTrivialCtor void;
-  BiFunCtor bi_fun_ctor_desc;
-};
-
-deftype bi_fun_ctor_desc struct {
-  ip instpair;
-  // Cells for the constructor params and return cell.
-  funcell cell_num;
-  destptr cell_num;
-  srcptr cell_num;
+  BiFunCtor instpair;
 };
 
 deftype bi_action struct {

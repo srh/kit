@@ -1525,13 +1525,21 @@ func gr_destroy_action(clq *clqueue, gr *frame_graph, x *destroy_action, dad dea
   }
 }
 
-func gr_bi_fun_ctor_desc(clq *clqueue, gr *frame_graph, desc *bi_fun_ctor_desc, dest cell_num, src cell_num) gr_num {
-  fc var = addx(gr, @[gr_op]GrWriteConst({desc->funcell, ConstDef(desc->ip)}));
-  dp var = addx(gr, @[gr_op]GrAddressof({desc->destptr, dest}));
-  sp var = addx(gr, @[gr_op]GrAddressof({desc->srcptr, src}));
-  voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
-  retvoid cell_num = add_cell(gr, {LocationStatic, voidtp.cu, voidtp.props});
-  ap var = addx(gr, mk_shray(fc, dp, sp), @[gr_op]GrApply({desc->funcell, mk_shray(desc->destptr, desc->srcptr), retvoid}));
+func gr_bi_fun(clq *clqueue, gr *frame_graph, ip instpair, dest cell_num, src cell_num) gr_num {
+  // In our "bi_fun" uses the dest and src have the same type.  It seems wrong for this menial code to know that, though.
+  destptr cu_typrop = computed_ptr_type(clq, &ref_cell(gr, dest)->type);
+  srcptr cu_typrop = computed_ptr_type(clq, &ref_cell(gr, src)->type);
+  voidret cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
+  fnptr cu_typrop = compute_prim(clq, fn_type(clq->cs, destptr.cu.~, srcptr.cu.~, voidret.cu.~));
+  funcell cell_num = add_cell(gr, {LocationStatic, fnptr.cu, fnptr.props});
+  destptrcell cell_num = add_cell(gr, {LocationStatic, destptr.cu, destptr.props});
+  srcptrcell cell_num = add_cell(gr, {LocationStatic, srcptr.cu, srcptr.props});
+  retvoid cell_num = add_cell(gr, {LocationStatic, voidret.cu, voidret.props});
+
+  fc gr_num = addx(gr, @[gr_op]GrWriteConst({funcell, ConstDef(ip)}));
+  dp gr_num = addx(gr, @[gr_op]GrAddressof({destptrcell, dest}));
+  sp gr_num = addx(gr, @[gr_op]GrAddressof({srcptrcell, src}));
+  ap gr_num = addx(gr, mk_shray(fc, dp, sp), @[gr_op]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid}));
   deadret var = addx(gr, mk_shray(ap), @[gr_op]GrDead({retvoid}));
   return deadret;
 }
@@ -1543,9 +1551,8 @@ func gr_bi_action(clq *clqueue, gr *frame_graph, x *bi_action, out *gr_num) bool
       *out = cp;
       return true;
     }
-    case &BiFunCtor(desc bi_fun_ctor_desc): {
-      gn gr_num = gr_bi_fun_ctor_desc(clq, gr, &desc, x->dest, x->src);
-      *out = gn;
+    case &BiFunCtor(ip instpair): {
+      *out = gr_bi_fun(clq, gr, ip, x->dest, x->src);
       return true;
     }
   }
@@ -2362,28 +2369,9 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
 func gr_bi_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, destnum cell_num, srcnum cell_num, cd *ctor_desc, gn_out *gr_num) bool {
   switch cd {
   case &TrivialCtor(v void):
-    gn var = addx(gr, @[gr_op]GrMemCopy({destnum, srcnum}));
-    *gn_out = gn;
+    *gn_out = addx(gr, @[gr_op]GrMemCopy({destnum, srcnum}));
   case &FunCtor(ip instpair):
-    pty te_typeexpr = ptr_type(cs, *ty);
-    cu_pty cu_typeexpr;
-    pty_props type_properties;
-    compute_prim(cs, clq, pty, &cu_pty, &pty_props);
-    voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
-
-    functy te_typeexpr = fn_type(cs, pty, pty, voidtp.cu.~);
-    cu_functy cu_typeexpr;
-    functy_props type_properties;
-    compute_prim(cs, clq, functy, &cu_functy, &functy_props);
-
-    funcptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_functy, functy_props});
-    destptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_pty, pty_props});
-    srcptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_pty, pty_props});
-
-    bi_desc bi_fun_ctor_desc = {ip, funcptr_cell, destptr_cell, srcptr_cell};
-
-    gn gr_num = gr_bi_fun_ctor_desc(clq, gr, &bi_desc, destnum, srcnum);
-    *gn_out = gn;
+    *gn_out = gr_bi_fun(clq, gr, ip, destnum, srcnum);
   }
   return true;
 }
