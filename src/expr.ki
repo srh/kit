@@ -910,13 +910,6 @@ func computed_ptr_type(clq *clqueue, t *cu_typeexpr) cu_typrop {
   return compute_prim(clq, ptr_type(clq->cs, t->~));
 }
 
-// TODO: Remove this.
-func computed_ptr_type(cs *checkstate, clq *clqueue, t *cu_typeexpr, ptr_out *cu_typeexpr, ptr_props_out *type_properties) void {
-  ret cu_typrop = computed_ptr_type(clq, t);
-  *ptr_out = ret.cu;
-  *ptr_props_out = ret.props;
-}
-
 func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   props type_properties;
   if !compute_type_properties(ds->cs, ds->clq, t, &props) {
@@ -1040,9 +1033,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
 }
 
 func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecells {
-  ptrtype_props type_properties;
-  ptrtype cu_typeexpr;
-  computed_ptr_type(es->cs, es->clq, &ref_cell(es, dest)->type, &ptrtype, &ptrtype_props);
+  ptrtype cu_typrop = computed_ptr_type(es->clq, &ref_cell(es, dest)->type);
 
   ip instpair;
   if case Has(ent def_entry_id) = es->cs->prims.ptr_eq {
@@ -1053,11 +1044,9 @@ func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecell
     ice(_u8("cs->prims.ptr_eq not initialized"));
   }
 
-  booltype cu_typeexpr;
-  boolprops type_properties;
-  compute_prim(es->ds, primitive_bool_type(es->cs), &booltype, &boolprops);
+  boolty cu_typrop = compute_prim(es->clq, primitive_bool_type(es->cs));
 
-  fptr te_typeexpr = fn_type(es->cs, ptrtype.~, ptrtype.~, booltype.~);
+  fptr te_typeexpr = fn_type(es->cs, ptrtype.cu.~, ptrtype.cu.~, boolty.cu.~);
   cfptr cac_typeexpr;
   if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &fptr, &cfptr) {
     ice(_u8("fn_type produced non-computable type from computables"));
@@ -1069,9 +1058,9 @@ func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecell
   }
 
   funcell cell_num = add_static_cell(es, ~cfptr.te, cfptr_props);
-  destptr cell_num = add_static_cell(es, ptrtype, ptrtype_props);
-  srcptr cell_num = add_static_cell(es, ptrtype, ptrtype_props);
-  cmp_result cell_num = add_static_cell(es, booltype, boolprops);
+  destptr cell_num = add_static_cell(es, ptrtype.cu, ptrtype.props);
+  srcptr cell_num = add_static_cell(es, ptrtype.cu, ptrtype.props);
+  cmp_result cell_num = add_static_cell(es, boolty.cu, boolty.props);
   return {ip, funcell, destptr, srcptr, cmp_result};
 }
 
