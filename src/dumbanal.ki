@@ -23,10 +23,6 @@ defenum genexpr_result {
   NonTerminal void;
 };
 
-// TODO: Remove this and its callers.
-func[T] DUMBG(x T) void {
-}
-
 
 func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_num, out *genexpr_result) bool {
   gnc *gn_annot = ref_annot(h, gn);
@@ -54,8 +50,6 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
 
   switch &node->op {
   case &GrApply(a gr_apply):
-    DUMBG("GrApply");
-
     // Retcell is activated _before_ the param cells are dead -- though we shouldn't be generating graphs where this matters for the purposes of this analysis _except_ that we need it for computing lower param lists.
     output(liveset, a.retcell);
 
@@ -71,7 +65,6 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     return true;
 
   case &GrPrimApply(a gr_prim_apply):
-    DUMBG("GrPrimApply");
     output(liveset, a.retcell);
 
     nparams size = count(&a.params);
@@ -82,20 +75,17 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     return true;
 
   case &GrMemCopy(a gr_memcopy):
-    DUMBG("GrMemCopy");
     output(liveset, a.dest);
     input(liveset, a.src);
     *out = Terminal(void);
     return true;
 
   case &GrWriteConst(a gr_writeconst):
-    DUMBG("GrWriteConst");
     output(liveset, a.dest);
     *out = Terminal(void);
     return true;
 
   case &GrAddressof(a gr_addressof):
-    DUMBG("GrAddressof");
     // Yes, addressee is an _output_ -- if it is not live -- we make it live.
     output(liveset, a.addressee);
     output(liveset, a.dest);
@@ -103,7 +93,6 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     return true;
 
   case &GrDeref(a gr_deref):
-    DUMBG("GrDeref");
     input(liveset, a.pointer);
     check(!isLocationStatic(ref_cell(gr, a.name)->location));
     create(liveset, a.name);
@@ -111,7 +100,6 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     return true;
 
   case &GrSubcell(a gr_subcell):
-    DUMBG("GrSubcell");
     input(liveset, a.partof);
     check(!isLocationStatic(ref_cell(gr, a.name)->location));
     create(liveset, a.name);
@@ -119,7 +107,6 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     return true;
 
   case &GrBranch(a gr_branch):
-    DUMBG("GrBranch");
     input(liveset, a.src);
 
     end_lives lives;
@@ -150,41 +137,34 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     return true;
 
   case &GrSequence(a gr_sequence):
-    DUMBG("GrSequence");
     if !dumbly_analyze_returning_expression(h, gr, liveset, a.first) {
       return false;
     }
     return dumbly_analyze_expression(h, gr, liveset, a.second.~, out);
 
   case &GrJmp(a gr_jmp):
-    DUMBG("GrJmp");
     return dumbly_analyze_expression(h, gr, liveset, a.next.~, out);
 
   case &GrWriteNothing(a gr_writenothing):
-    DUMBG("GrWriteNothing");
     output(liveset, a.dest);
     *out = Terminal(void);
     return true;
 
   case &GrDead(a gr_dead):
-    DUMBG("GrDead");
     deaden(liveset, a.cell);
     *out = Terminal(void);
     return true;
 
   case &GrVirtualDead(a gr_virtual_dead):
-    DUMBG("GrVirtualDead");
     deaden(liveset, a.cell);
     *out = Terminal(void);
     return true;
 
   case &GrXNop(v void):
-    DUMBG("GrXNop");
     *out = Terminal(void);
     return true;
 
   case &GrQNop(v void):
-    DUMBG("GrQNop");
     *out = Terminal(void);
     return true;
   }
