@@ -6,6 +6,47 @@ deftype frame_graph struct {
   ops array[gr_node];
 };
 
+/* A cell location is tricky: the location of an expr's return value
+is defined both by the expr itself and the context it's found
+in. Location should be specified when:
+
+   - for lvalues, whenever we create the cell (by calling add_cell) for the lvalue.
+   - for rvalues, when we annotate the disposal for the rvalue.
+*/
+
+defenum cell_location {
+  // The "cell" is actually caused by dereferencing something, or maybe accessing something's field?
+  LocationVirtual void;
+  LocationStatic void;
+};
+
+func `==`(x cell_location, y cell_location) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+
+func `!=`(x cell_location, y cell_location) bool {
+  return enumnum(&x) != enumnum(&y);
+}
+
+func isLocationStatic(location cell_location) bool {
+  switch location {
+  case LocationVirtual(v void): return false;
+  case LocationStatic(v void): return true;
+  }
+}
+
+// TODO: Move to graph.ki or something.
+deftype cell_info struct {
+  // Location must be specified by type-checking, but it spends time in an unspecified state.
+  location cell_location;
+  type cu_typeexpr;
+  props type_properties;
+};
+
+func location(info *cell_info) cell_location {
+  return info->location;
+}
+
 // To "evaluate" an op, first we evaluate its precs (in unspecified order), then we ealuate the op.
 deftype gr_node struct {
   precs shray[gr_num];
@@ -1431,8 +1472,10 @@ func gr_move_action(clq *clqueue, gr *frame_graph, x *move_action, out *gr_num) 
 func gr_uni_fun_ctor_desc(clq *clqueue, gr *frame_graph, desc *uni_fun_ctor_desc, arg cell_num) gr_num {
   fc var = addx(gr, @[gr_op]GrWriteConst({desc->funcell, ConstDef(desc->ip)}));
   arp var = addx(gr, @[gr_op]GrAddressof({desc->argptr, arg}));
-  ap var = addx(gr, mk_shray(fc, arp), @[gr_op]GrApply({desc->funcell, mk_shray(desc->argptr), desc->retvoid}));
-  deadret var = addx(gr, mk_shray(ap), @[gr_op]GrDead({desc->retvoid}));
+  voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
+  retvoid cell_num = add_cell(gr, {LocationStatic, voidtp.cu, voidtp.props});
+  ap var = addx(gr, mk_shray(fc, arp), @[gr_op]GrApply({desc->funcell, mk_shray(desc->argptr), retvoid}));
+  deadret var = addx(gr, mk_shray(ap), @[gr_op]GrDead({retvoid}));
   return deadret;
 }
 
@@ -1482,8 +1525,10 @@ func gr_bi_fun_ctor_desc(clq *clqueue, gr *frame_graph, desc *bi_fun_ctor_desc, 
   fc var = addx(gr, @[gr_op]GrWriteConst({desc->funcell, ConstDef(desc->ip)}));
   dp var = addx(gr, @[gr_op]GrAddressof({desc->destptr, dest}));
   sp var = addx(gr, @[gr_op]GrAddressof({desc->srcptr, src}));
-  ap var = addx(gr, mk_shray(fc, dp, sp), @[gr_op]GrApply({desc->funcell, mk_shray(desc->destptr, desc->srcptr), desc->retvoid}));
-  deadret var = addx(gr, mk_shray(ap), @[gr_op]GrDead({desc->retvoid}));
+  voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
+  retvoid cell_num = add_cell(gr, {LocationStatic, voidtp.cu, voidtp.props});
+  ap var = addx(gr, mk_shray(fc, dp, sp), @[gr_op]GrApply({desc->funcell, mk_shray(desc->destptr, desc->srcptr), retvoid}));
+  deadret var = addx(gr, mk_shray(ap), @[gr_op]GrDead({retvoid}));
   return deadret;
 }
 
@@ -2330,9 +2375,8 @@ func gr_bi_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, 
     funcptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_functy, functy_props});
     destptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_pty, pty_props});
     srcptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_pty, pty_props});
-    return_cell cell_num = add_cell(gr, {LocationStatic(void), voidtp.cu, voidtp.props});
 
-    bi_desc bi_fun_ctor_desc = {ip, funcptr_cell, destptr_cell, srcptr_cell, return_cell};
+    bi_desc bi_fun_ctor_desc = {ip, funcptr_cell, destptr_cell, srcptr_cell};
 
     gn gr_num = gr_bi_fun_ctor_desc(clq, gr, &bi_desc, destnum, srcnum);
     *gn_out = gn;
@@ -2359,9 +2403,8 @@ func gr_destroy_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typee
 
     funcptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_functy, functy_props});
     argptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_pty, pty_props});
-    return_cell cell_num = add_cell(gr, {LocationStatic(void), voidtp.cu, voidtp.props});
 
-    uni_desc uni_fun_ctor_desc = {ip, funcptr_cell, argptr_cell, return_cell};
+    uni_desc uni_fun_ctor_desc = {ip, funcptr_cell, argptr_cell};
     gn gr_num = gr_uni_fun_ctor_desc(clq, gr, &uni_desc, argnum);
     dp var = addx(gr, mk_shray(gn), @[gr_op]GrDead({argnum}));
     *gn_out = dp;

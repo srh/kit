@@ -576,7 +576,6 @@ deftype bi_fun_ctor_desc struct {
   funcell cell_num;
   destptr cell_num;
   srcptr cell_num;
-  retvoid cell_num;
 };
 
 deftype bi_action struct {
@@ -597,7 +596,6 @@ deftype uni_fun_ctor_desc struct {
   ip instpair;
   funcell cell_num;
   argptr cell_num;
-  retvoid cell_num;
 };
 
 deftype destroy_action uni_action;

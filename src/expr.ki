@@ -3,47 +3,6 @@ import body;
 import check;
 import primitives;
 
-/* A cell location is tricky: the location of an expr's return value
-is defined both by the expr itself and the context it's found
-in. Location should be specified when:
-
-   - for lvalues, whenever we create the cell (by calling add_cell) for the lvalue.
-   - for rvalues, when we annotate the disposal for the rvalue.
-*/
-
-defenum cell_location {
-  // The "cell" is actually caused by dereferencing something, or maybe accessing something's field?
-  LocationVirtual void;
-  LocationStatic void;
-};
-
-func `==`(x cell_location, y cell_location) bool {
-  return enumnum(&x) == enumnum(&y);
-}
-
-func `!=`(x cell_location, y cell_location) bool {
-  return enumnum(&x) != enumnum(&y);
-}
-
-func isLocationStatic(location cell_location) bool {
-  switch location {
-  case LocationVirtual(v void): return false;
-  case LocationStatic(v void): return true;
-  }
-}
-
-// TODO: Move to graph.ki or something.
-deftype cell_info struct {
-  // Location must be specified by type-checking, but it spends time in an unspecified state.
-  location cell_location;
-  type cu_typeexpr;
-  props type_properties;
-};
-
-func location(info *cell_info) cell_location {
-  return info->location;
-}
-
 // Used with the variable name "es" -- its name used to be different.
 deftype framescope struct {
   ds *defscope;
@@ -994,9 +953,8 @@ func behavior_to_bi_desc(es *framescope, b *derived_method_behavior, t *cu_typee
       funcell cell_num = add_static_cell(es, ~cfptr.te, cfptr_props);
       destptr cell_num = add_static_cell(es, cptr, cptr_props);
       srcptr cell_num = add_static_cell(es, cptr, cptr_props);
-      retvoid cell_num = add_static_cell(es, voidtype, voidprops);
 
-      *out = BiFunCtor({ip, funcell, destptr, srcptr, retvoid});
+      *out = BiFunCtor({ip, funcell, destptr, srcptr});
       return true;
     }
   }
@@ -1034,9 +992,8 @@ func behavior_to_uni_desc(es *framescope, b *derived_method_behavior, t *cu_type
 
       funcell cell_num = add_static_cell(es, ~cfptr.te, cfptr_props);
       argptr cell_num = add_static_cell(es, cptr, cptr_props);
-      retvoid cell_num = add_static_cell(es, voidtype, voidprops);
 
-      *out = UniFunCtor({ip, funcell, argptr, retvoid});
+      *out = UniFunCtor({ip, funcell, argptr});
       return true;
     }
   }
