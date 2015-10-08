@@ -658,6 +658,16 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
     return true;
   }
 
+  if !help_check_expr_ai(es, ai, x, pt) {
+    // TODO: Get rid of this terrible hackish way to error message.
+    MERR(es->cs, x->meta, _u8(" in this expression"));
+    return false;
+  }
+
+  return true;
+}
+
+func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
   switch &x->u {
     case &NameExpr(a ast_name_expr):
       return check_expr_name(es, ai, &a, pt, x);
