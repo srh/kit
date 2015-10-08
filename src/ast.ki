@@ -77,16 +77,8 @@ deftype ast_logical_conjunction struct {
   rhs box[ast_expr_consume];
 };
 
-deftype ast_assignment_comparecells struct {
-  ip instpair;
-  funcell cell_num;
-  destptr cell_num;
-  srcptr cell_num;
-  cmp_result cell_num;
-};
-
 deftype ast_conditional_assignment_info struct {
-  comparecells ast_assignment_comparecells;
+  comparecells instpair;
 
   /* These actions perform the assignment -- they happen if the
   assignment isn't self-assignment. */

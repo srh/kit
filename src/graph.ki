@@ -1195,12 +1195,23 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       return true;
     }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
-      fc var = addx(gr, @[gr_op]GrWriteConst({ci.comparecells.funcell, ConstDef(ci.comparecells.ip)}));
-      dp var = addx(gr, @[gr_op]GrAddressof({ci.comparecells.destptr, value_cell(oo(&a->lhs))}));
-      sp var = addx(gr, @[gr_op]GrAddressof({ci.comparecells.srcptr, value_cell(oo(&a->rhs))}));
-      ap var = addx(gr, mk_shray(fc, dp, sp), @[gr_op]GrApply({ci.comparecells.funcell, mk_shray(ci.comparecells.destptr, ci.comparecells.srcptr), ci.comparecells.cmp_result}));
+      destcell cell_num = value_cell(oo(&a->lhs));
+      valuetype *cu_typeexpr = &ref_cell(gr, destcell)->type;
+      ptrtype cu_typrop = computed_ptr_type(clq, valuetype);
+      booltype cu_typrop = compute_prim(clq, primitive_bool_type(clq->cs));
+      fntype cu_typrop = compute_prim(clq, fn_type(clq->cs, ptrtype.cu.~, ptrtype.cu.~, booltype.cu.~));
 
-      just_dead var = addx(gr, @[gr_op]GrDead({ci.comparecells.cmp_result}));
+      funcell cell_num = add_cell(gr, {LocationStatic, fntype.cu, fntype.props});
+      destptr cell_num = add_cell(gr, {LocationStatic, ptrtype.cu, ptrtype.props});
+      srcptr cell_num = add_cell(gr, {LocationStatic, ptrtype.cu, ptrtype.props});
+      cmp_result cell_num = add_cell(gr, {LocationStatic, booltype.cu, booltype.props});
+
+      fc var = addx(gr, @[gr_op]GrWriteConst({funcell, ConstDef(ci.comparecells)}));
+      dp var = addx(gr, @[gr_op]GrAddressof({destptr, destcell}));
+      sp var = addx(gr, @[gr_op]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
+      ap var = addx(gr, mk_shray(fc, dp, sp), @[gr_op]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result}));
+
+      just_dead var = addx(gr, @[gr_op]GrDead({cmp_result}));
       if case DeadMe(v void) = ci.rhs_deadme {
         // TODO: It would be nice if we just had a closing node for virtualdead, maybe also for just_dead, instead of these duplicate tails.
         if !gr_chain_virtualdead(clq, gr, just_dead, ci.conditional_copy.src, &just_dead) {
@@ -1217,7 +1228,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
         return false;
       }
       assign sq_num = seqq(gr, {assign_destroy, seq1(gr, assign_copy)});
-      dead_before_assign gr_num = addx(gr, @[gr_op]GrDead({ci.comparecells.cmp_result}));
+      dead_before_assign gr_num = addx(gr, @[gr_op]GrDead({cmp_result}));
       dead_then_assign gr_num = seqq(gr, {dead_before_assign, assign}).~;
       if case DeadMe(v void) = ci.rhs_deadme {
         if !gr_chain_virtualdead(clq, gr, dead_then_assign, ci.conditional_copy.src, &dead_then_assign) {
@@ -1227,7 +1238,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       cases shray[tup[gr_const, sq_num]] = mk_shray(cons(@[gr_const]ConstInt(~ @[u32] 0), seq1(gr, dead_then_assign)), cons(@[gr_const]ConstInt(~ @[u32] 1), seq1(gr, just_dead)));
 
       br var = seqq(gr, {ap,
-        addq(gr, @[gr_op]GrBranch({ci.comparecells.cmp_result, cases, None()}))});
+        addq(gr, @[gr_op]GrBranch({cmp_result, cases, None()}))});
       seq_lp_rp_nop var = seqq(gr, {lp_rp_nop, br});
       *out = seq_lp_rp_nop.~;
       return true;

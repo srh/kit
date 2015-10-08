@@ -1032,36 +1032,15 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
   return true;
 }
 
-func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecells {
-  ptrtype cu_typrop = computed_ptr_type(es->clq, &ref_cell(es, dest)->type);
-
-  ip instpair;
+func make_comparecells(es *framescope, dest cell_num) instpair {
   if case Has(ent def_entry_id) = es->cs->prims.ptr_eq {
     cu_parms cu_genparms = HasParms(mk_shray(ref_cell(es, dest)->type));
     inst_id def_inst_id = enqueue_def_inst(es->cs, es->clq, ent, &cu_parms);
-    ip = {ent, inst_id};
+    return {ent, inst_id};
   } else {
     ice(_u8("cs->prims.ptr_eq not initialized"));
+    return fake();
   }
-
-  boolty cu_typrop = compute_prim(es->clq, primitive_bool_type(es->cs));
-
-  fptr te_typeexpr = fn_type(es->cs, ptrtype.cu.~, ptrtype.cu.~, boolty.cu.~);
-  cfptr cac_typeexpr;
-  if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &fptr, &cfptr) {
-    ice(_u8("fn_type produced non-computable type from computables"));
-  }
-  check(cfptr.complete);
-  cfptr_props type_properties;
-  if !compute_complete_type_properties(es->cs, es->clq, &cfptr.te, &cfptr_props) {
-    ice(_u8("fn_type props not computable"));
-  }
-
-  funcell cell_num = add_static_cell(es, ~cfptr.te, cfptr_props);
-  destptr cell_num = add_static_cell(es, ptrtype.cu, ptrtype.props);
-  srcptr cell_num = add_static_cell(es, ptrtype.cu, ptrtype.props);
-  cmp_result cell_num = add_static_cell(es, boolty.cu, boolty.props);
-  return {ip, funcell, destptr, srcptr, cmp_result};
 }
 
 func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr, assignment *ast_assignment) bool {
