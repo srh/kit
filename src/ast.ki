@@ -266,8 +266,6 @@ deftype ast_switch_statement struct {
 
 
 deftype ast_return_statement_info struct {
-  // TODO: Nothing uses in_scope.
-  in_scope array[var_number];
   destructions array[var_destruction];
 };
 

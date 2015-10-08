@@ -580,7 +580,7 @@ func check_return_statement(bs *bodystate, vp *varpopper, a *ast_return_statemen
   if !make_destructions(&bs->es, &vars, &destructions) {
     return false;
   }
-  annotate(&a->info, {vars_in_scope(&bs->es), destructions});
+  annotate(&a->info, {destructions});
   *exit_out = add_statement(bs, None());
   return true;
 }
