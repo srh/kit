@@ -74,10 +74,6 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     DUMBG("GrPrimApply");
     output(liveset, a.retcell);
 
-    // TODO: Do we really need to treat GrPrimApply like GrApply when computing cell layout?  I think not...
-    note_lower_paramlists(h, gn, liveset);
-    annotate_ref(&gnc->app_time_live, liveset);
-
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
       deaden(liveset, get(&a.params, i));

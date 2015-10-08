@@ -105,12 +105,6 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
       }
       mark_cell_not_const(bas, a.retcell);
     case &GrPrimApply(a gr_prim_apply):
-      // TODO: Dedup.
-      push(&bas->paramlists, ~i);
-      nparams size = count(&a.params);
-      for j size = 0; j < nparams; j = j + 1 {
-        mark_cell_paramlist(bas, get(&a.params, j), gn);
-      }
       mark_cell_not_const(bas, a.retcell);
     case &GrMemCopy(a gr_memcopy):
       mark_cell_not_const(bas, a.dest);
