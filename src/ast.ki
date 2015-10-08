@@ -589,13 +589,7 @@ deftype move_action bi_action;
 
 defenum uni_ctor_desc {
   UniTrivialCtor void;
-  UniFunCtor uni_fun_ctor_desc;
-};
-
-deftype uni_fun_ctor_desc struct {
-  ip instpair;
-  funcell cell_num;
-  argptr cell_num;
+  UniFunCtor instpair;
 };
 
 deftype destroy_action uni_action;

@@ -906,19 +906,15 @@ func behavior_to_desc(b *derived_method_behavior, out *ctor_desc) bool {
   }
 }
 
+func computed_ptr_type(clq *clqueue, t *cu_typeexpr) cu_typrop {
+  return compute_prim(clq, ptr_type(clq->cs, t->~));
+}
+
+// TODO: Remove this.
 func computed_ptr_type(cs *checkstate, clq *clqueue, t *cu_typeexpr, ptr_out *cu_typeexpr, ptr_props_out *type_properties) void {
-  tptr te_typeexpr = ptr_type(cs, t->~);
-  ctptr cac_typeexpr;
-  if !noscoped_check_and_compute_typeexpr(cs, clq, &tptr, &ctptr) {
-    ice(_u8("computed_ptr_type fails to check and compute"));
-  }
-  check(ctptr.complete);
-  props type_properties;
-  if !compute_complete_type_properties(cs, clq, &ctptr.te, &props) {
-    ice(_u8("computed_ptr_type fails to compute properties"));
-  }
-  ptr_out->~ = ctptr.te;
-  *ptr_props_out = props;
+  ret cu_typrop = computed_ptr_type(clq, t);
+  *ptr_out = ret.cu;
+  *ptr_props_out = ret.props;
 }
 
 func behavior_to_bi_desc(es *framescope, b *derived_method_behavior, t *cu_typeexpr, out *bi_ctor_desc) bool {
@@ -971,29 +967,8 @@ func behavior_to_uni_desc(es *framescope, b *derived_method_behavior, t *cu_type
       return true;
     }
     case FunCtor(ip instpair): {
-      cptr_props type_properties;
-      cptr cu_typeexpr;
-      computed_ptr_type(es->cs, es->clq, t, &cptr, &cptr_props);
-      voidtype cu_typeexpr;
-      voidprops type_properties;
-      compute_prim(es->ds, primitive_void_type(es->cs), &voidtype, &voidprops);
-
-      fptr te_typeexpr = fn_type(es->cs, cptr.~, voidtype.~);
-      // TODO: This noscoped+type_properties computation is probably duped all over.
-      cfptr cac_typeexpr;
-      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &fptr, &cfptr) {
-        return false;
-      }
-      check(cfptr.complete);
-      cfptr_props type_properties;
-      if !compute_complete_type_properties(es->cs, es->clq, &cfptr.te, &cfptr_props) {
-        return false;
-      }
-
-      funcell cell_num = add_static_cell(es, ~cfptr.te, cfptr_props);
-      argptr cell_num = add_static_cell(es, cptr, cptr_props);
-
-      *out = UniFunCtor({ip, funcell, argptr});
+      // (TODO: Do we even need the UniFunCtor and BiFunCtor?  Why not just ctor_desc?)
+      *out = UniFunCtor(ip);
       return true;
     }
   }
@@ -1246,7 +1221,7 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
           case &BiFunCtor(bfcd):
             do_conditional = true;
           }
-        case &UniFunCtor(ufcd):
+        case &UniFunCtor(ip instpair):
           do_conditional = true;
         }
         if do_conditional {

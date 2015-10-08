@@ -1469,13 +1469,18 @@ func gr_move_action(clq *clqueue, gr *frame_graph, x *move_action, out *gr_num) 
   return true;
 }
 
-func gr_uni_fun_ctor_desc(clq *clqueue, gr *frame_graph, desc *uni_fun_ctor_desc, arg cell_num) gr_num {
-  fc var = addx(gr, @[gr_op]GrWriteConst({desc->funcell, ConstDef(desc->ip)}));
-  arp var = addx(gr, @[gr_op]GrAddressof({desc->argptr, arg}));
-  voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
-  retvoid cell_num = add_cell(gr, {LocationStatic, voidtp.cu, voidtp.props});
-  ap var = addx(gr, mk_shray(fc, arp), @[gr_op]GrApply({desc->funcell, mk_shray(desc->argptr), retvoid}));
-  deadret var = addx(gr, mk_shray(ap), @[gr_op]GrDead({retvoid}));
+func gr_uni_fun(clq *clqueue, gr *frame_graph, ip instpair, arg cell_num) gr_num {
+  argptr cu_typrop = computed_ptr_type(clq, &ref_cell(gr, arg)->type);
+  voidret cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
+  fnptr cu_typrop = compute_prim(clq, fn_type(clq->cs, argptr.cu.~, voidret.cu.~));
+  funcell cell_num = add_cell(gr, {LocationStatic, fnptr.cu, fnptr.props});
+  argptrcell cell_num = add_cell(gr, {LocationStatic, argptr.cu, argptr.props});
+  retvoid cell_num = add_cell(gr, {LocationStatic, voidret.cu, voidret.props});
+
+  fc gr_num = addx(gr, @[gr_op]GrWriteConst({funcell, ConstDef(ip)}));
+  arp gr_num = addx(gr, @[gr_op]GrAddressof({argptrcell, arg}));
+  ap gr_num = addx(gr, mk_shray(fc, arp), @[gr_op]GrApply({funcell, mk_shray(argptrcell), retvoid}));
+  deadret gr_num = addx(gr, mk_shray(ap), @[gr_op]GrDead({retvoid}));
   return deadret;
 }
 
@@ -1486,9 +1491,8 @@ func gr_init_action(clq *clqueue, gr *frame_graph, x *init_action, out *gr_num) 
       *out = dp;
       return true;
     }
-    case &UniFunCtor(desc uni_fun_ctor_desc): {
-      gn gr_num = gr_uni_fun_ctor_desc(clq, gr, &desc, x->arg);
-      *out = gn;
+    case &UniFunCtor(ip instpair): {
+      *out = gr_uni_fun(clq, gr, ip, x->arg);
       return true;
     }
   }
@@ -1507,8 +1511,8 @@ func gr_destroy_action(clq *clqueue, gr *frame_graph, x *destroy_action, dad dea
       *out = dp;
       return true;
     }
-    case &UniFunCtor(desc uni_fun_ctor_desc): {
-      gn gr_num = gr_uni_fun_ctor_desc(clq, gr, &desc, x->arg);
+    case &UniFunCtor(ip instpair): {
+      gn gr_num = gr_uni_fun(clq, gr, ip, x->arg);
       dp gr_num;
       if case DeadAfterDestroyYes(v2 void) = dad {
         dp = addx(gr, mk_shray(gn), @[gr_op]GrDead({x->arg}));
@@ -2390,22 +2394,7 @@ func gr_destroy_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typee
     dp var = addx(gr, @[gr_op]GrDead({argnum}));
     *gn_out = dp;
   case &FunCtor(ip instpair):
-    pty te_typeexpr = ptr_type(cs, *ty);
-    cu_pty cu_typeexpr;
-    pty_props type_properties;
-    compute_prim(cs, clq, pty, &cu_pty, &pty_props);
-    voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
-
-    functy te_typeexpr = fn_type(cs, pty, voidtp.cu.~);
-    cu_functy cu_typeexpr;
-    functy_props type_properties;
-    compute_prim(cs, clq, functy, &cu_functy, &functy_props);
-
-    funcptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_functy, functy_props});
-    argptr_cell cell_num = add_cell(gr, {LocationStatic(void), cu_pty, pty_props});
-
-    uni_desc uni_fun_ctor_desc = {ip, funcptr_cell, argptr_cell};
-    gn gr_num = gr_uni_fun_ctor_desc(clq, gr, &uni_desc, argnum);
+    gn gr_num = gr_uni_fun(clq, gr, ip, argnum);
     dp var = addx(gr, mk_shray(gn), @[gr_op]GrDead({argnum}));
     *gn_out = dp;
   }
