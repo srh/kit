@@ -565,13 +565,8 @@ defenum ctor_desc {
   FunCtor instpair;
 };
 
-defenum bi_ctor_desc {
-  BiTrivialCtor void;
-  BiFunCtor instpair;
-};
-
 deftype bi_action struct {
-  ctor bi_ctor_desc;
+  ctor ctor_desc;
   dest cell_num;
   src cell_num;
 };
@@ -579,16 +574,11 @@ deftype bi_action struct {
 deftype copy_action bi_action;
 deftype move_action bi_action;
 
-defenum uni_ctor_desc {
-  UniTrivialCtor void;
-  UniFunCtor instpair;
-};
-
 deftype destroy_action uni_action;
 deftype init_action uni_action;
 
 deftype uni_action struct {
-  ctor uni_ctor_desc;
+  ctor ctor_desc;
   arg cell_num;
 };
 

@@ -917,55 +917,12 @@ func computed_ptr_type(cs *checkstate, clq *clqueue, t *cu_typeexpr, ptr_out *cu
   *ptr_props_out = ret.props;
 }
 
-func behavior_to_bi_desc(es *framescope, b *derived_method_behavior, t *cu_typeexpr, out *bi_ctor_desc) bool {
-  desc ctor_desc;
-  if !behavior_to_desc(b, &desc) {
-    return false;
-  }
-  switch desc {
-    case TrivialCtor(v void): {
-      *out = BiTrivialCtor(void);
-      return true;
-    }
-    case FunCtor(ip instpair): {
-      *out = BiFunCtor(ip);
-      return true;
-    }
-  }
-}
-
-func behavior_to_uni_desc(es *framescope, b *derived_method_behavior, t *cu_typeexpr, out *uni_ctor_desc) bool {
-  desc ctor_desc;
-  if !behavior_to_desc(b, &desc) {
-    return false;
-  }
-  switch desc {
-    case TrivialCtor(v void): {
-      *out = UniTrivialCtor(void);
-      return true;
-    }
-    case FunCtor(ip instpair): {
-      // (TODO: Do we even need the UniFunCtor and BiFunCtor?  Why not just ctor_desc?)
-      *out = UniFunCtor(ip);
-      return true;
-    }
-  }
-}
-
 func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   props type_properties;
   if !compute_type_properties(ds->cs, ds->clq, t, &props) {
     return false;
   }
   return behavior_to_desc(&props.init_behavior, out);
-}
-
-func get_init_uni_ctor(es *framescope, t *cu_typeexpr, out *uni_ctor_desc) bool {
-  props type_properties;
-  if !compute_type_properties(es->cs, es->clq, t, &props) {
-    return false;
-  }
-  return behavior_to_uni_desc(es, &props.init_behavior, t, out);
 }
 
 func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
@@ -976,14 +933,6 @@ func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   return behavior_to_desc(&props.copy_behavior, out);
 }
 
-func get_copy_bi_ctor(es *framescope, t *cu_typeexpr, out *bi_ctor_desc) bool {
-  props type_properties;
-  if !compute_type_properties(es->cs, es->clq, t, &props) {
-    return false;
-  }
-  return behavior_to_bi_desc(es, &props.copy_behavior, t, out);
-}
-
 func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   props type_properties;
   if !compute_type_properties(ds->cs, ds->clq, t, &props) {
@@ -992,28 +941,12 @@ func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   return behavior_to_desc(&props.move_behavior, out);
 }
 
-func get_move_bi_ctor(es *framescope, t *cu_typeexpr, out *bi_ctor_desc) bool {
-  props type_properties;
-  if !compute_type_properties(es->cs, es->clq, t, &props) {
-    return false;
-  }
-  return behavior_to_bi_desc(es, &props.move_behavior, t, out);
-}
-
 func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   props type_properties;
   if !compute_type_properties(ds->cs, ds->clq, t, &props) {
     return false;
   }
   return behavior_to_desc(&props.destroy_behavior, out);
-}
-
-func get_destroy_uni_ctor(es *framescope, t *cu_typeexpr, out *uni_ctor_desc) bool {
-  props type_properties;
-  if !compute_type_properties(es->cs, es->clq, t, &props) {
-    return false;
-  }
-  return behavior_to_uni_desc(es, &props.destroy_behavior, t, out);
 }
 
 func annotate_disposal_for_consume(es *framescope, a *ast_expr_consume) bool {
@@ -1028,12 +961,12 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
       if whole_temporary(&desc) {
         annotate(after, mk_after(@[consume_actions]ConsumeByInPlace(void), desc.whole_num));
       } else {
-        copy bi_ctor_desc;
-        if !get_copy_bi_ctor(es, &info->cu, &copy) {
+        copy ctor_desc;
+        if !get_copy_ctor(es->ds, &info->cu, &copy) {
           return false;
         }
-        destroy uni_ctor_desc;
-        if !get_destroy_uni_ctor(es, &ref_cell(es, desc.whole_num)->type, &destroy) {
+        destroy ctor_desc;
+        if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
           return false;
         }
         dest cell_num = add_static_cell(es, info->cu, info->cu_props);
@@ -1044,8 +977,8 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
       }
     }
     case &IsLvalYes(desc lval_description): {
-      copy bi_ctor_desc;
-      if !get_copy_bi_ctor(es, &info->cu, &copy) {
+      copy ctor_desc;
+      if !get_copy_ctor(es->ds, &info->cu, &copy) {
         return false;
       }
       dest cell_num = add_static_cell(es, info->cu, info->cu_props);
@@ -1060,8 +993,8 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      destroy uni_ctor_desc;
-      if !get_destroy_uni_ctor(es, &ref_cell(es, desc.whole_num)->type, &destroy) {
+      destroy ctor_desc;
+      if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
         return false;
       }
       annotate(after, mk_after_discard(@[destroy_action]{destroy, desc.whole_num}));
@@ -1088,8 +1021,8 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
   // TODO: Dedup this code or stop generating all cells at check-time.
   if true {
     info *ast_expr_complete_info = expr_complete_info(a);
-    destroy uni_ctor_desc;
-    if !get_destroy_uni_ctor(es, &info->cu, &destroy) {
+    destroy ctor_desc;
+    if !get_destroy_ctor(es->ds, &info->cu, &destroy) {
       return false;
     }
     annotate(&later->action, {destroy, result_cell(unHas(after))});
@@ -1097,8 +1030,8 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
 
   if case Has(p *ast_later_discard_info) = later2 {
     info *ast_expr_complete_info = expr_complete_info(a);
-    destroy uni_ctor_desc;
-    if !get_destroy_uni_ctor(es, &info->cu, &destroy) {
+    destroy ctor_desc;
+    if !get_destroy_ctor(es->ds, &info->cu, &destroy) {
       return false;
     }
     annotate(&p->action, {destroy, result_cell(unHas(after))});
@@ -1146,13 +1079,13 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      target_destroy uni_ctor_desc;
-      if !get_destroy_uni_ctor(es, &ref_cell(es, dest)->type, &target_destroy) {
+      target_destroy ctor_desc;
+      if !get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
         return false;
       }
       if whole_temporary(&desc) {
-        move bi_ctor_desc;
-        if !get_move_bi_ctor(es, &ref_cell(es, dest)->type, &move) {
+        move ctor_desc;
+        if !get_move_ctor(es->ds, &ref_cell(es, dest)->type, &move) {
           return false;
         }
         annotate(&assignment->info,
@@ -1161,12 +1094,12 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
                                 @[move_action]{move, dest, desc.whole_num}}));
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
-        copy bi_ctor_desc;
-        if !get_copy_bi_ctor(es, &ref_cell(es, dest)->type, &copy) {
+        copy ctor_desc;
+        if !get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
           return false;
         }
-        destroy uni_ctor_desc;
-        if !get_destroy_uni_ctor(es, &ref_cell(es, desc.whole_num)->type, &destroy) {
+        destroy ctor_desc;
+        if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
           return false;
         }
 
@@ -1182,24 +1115,24 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         // Static self-assignment!
         annotate(&assignment->info, StaticSelfAssignment(void));
       } else {
-        target_destroy uni_ctor_desc;
-        if !get_destroy_uni_ctor(es, &ref_cell(es, dest)->type, &target_destroy) {
+        target_destroy ctor_desc;
+        if !get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
           return false;
         }
-        copy bi_ctor_desc;
-        if !get_copy_bi_ctor(es, &ref_cell(es, dest)->type, &copy) {
+        copy ctor_desc;
+        if !get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
           return false;
         }
         do_conditional bool;
         switch &target_destroy {
-        case &UniTrivialCtor(v void):
+        case &TrivialCtor(v void):
           switch &copy {
-          case &BiTrivialCtor(v2 void):
+          case &TrivialCtor(v2 void):
             do_conditional = false;
-          case &BiFunCtor(bfcd):
+          case &FunCtor(bfcd):
             do_conditional = true;
           }
-        case &UniFunCtor(ip instpair):
+        case &FunCtor(ip instpair):
           do_conditional = true;
         }
         if do_conditional {

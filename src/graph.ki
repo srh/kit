@@ -1486,12 +1486,12 @@ func gr_uni_fun(clq *clqueue, gr *frame_graph, ip instpair, arg cell_num) gr_num
 
 func gr_init_action(clq *clqueue, gr *frame_graph, x *init_action, out *gr_num) bool {
   switch &x->ctor {
-    case &UniTrivialCtor(v void): {
+    case &TrivialCtor(v void): {
       dp var = addx(gr, @[gr_op]GrWriteConst({x->arg, ConstInt(~ @[u32] 0)}));
       *out = dp;
       return true;
     }
-    case &UniFunCtor(ip instpair): {
+    case &FunCtor(ip instpair): {
       *out = gr_uni_fun(clq, gr, ip, x->arg);
       return true;
     }
@@ -1501,7 +1501,7 @@ func gr_init_action(clq *clqueue, gr *frame_graph, x *init_action, out *gr_num) 
 // TODO: The dead_after_destroy parameter here is definitely unnecessary, but not too harmful now.
 func gr_destroy_action(clq *clqueue, gr *frame_graph, x *destroy_action, dad dead_after_destroy, out *gr_num) bool {
   switch &x->ctor {
-    case &UniTrivialCtor(v void): {
+    case &TrivialCtor(v void): {
       dp gr_num;
       if case DeadAfterDestroyYes(v2 void) = dad {
         dp = addx(gr, @[gr_op]GrDead({x->arg}));
@@ -1511,7 +1511,7 @@ func gr_destroy_action(clq *clqueue, gr *frame_graph, x *destroy_action, dad dea
       *out = dp;
       return true;
     }
-    case &UniFunCtor(ip instpair): {
+    case &FunCtor(ip instpair): {
       gn gr_num = gr_uni_fun(clq, gr, ip, x->arg);
       dp gr_num;
       if case DeadAfterDestroyYes(v2 void) = dad {
@@ -1546,12 +1546,12 @@ func gr_bi_fun(clq *clqueue, gr *frame_graph, ip instpair, dest cell_num, src ce
 
 func gr_bi_action(clq *clqueue, gr *frame_graph, x *bi_action, out *gr_num) bool {
   switch &x->ctor {
-    case &BiTrivialCtor(v void): {
+    case &TrivialCtor(v void): {
       cp var = addx(gr, @[gr_op]GrMemCopy({x->dest, x->src}));
       *out = cp;
       return true;
     }
-    case &BiFunCtor(ip instpair): {
+    case &FunCtor(ip instpair): {
       *out = gr_bi_fun(clq, gr, ip, x->dest, x->src);
       return true;
     }
