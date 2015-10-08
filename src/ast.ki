@@ -406,7 +406,7 @@ deftype ast_deref_field struct {
   fieldname ast_fieldname;
 };
 
-// TODO: This could just have an instpair field.
+// This could just have an instpair.
 deftype global_info struct {
   ent def_entry_id;
   inst def_inst_id;
@@ -586,7 +586,7 @@ defenum consume_actions {
 deftype ast_expr_after_consume struct {
   actions consume_actions;
   // The cell the expr's result... goes.
-  // TODO: We should prohibit exprs where a non-whole_field result is discarded.  This will mean we don't need to handle the case where we discard a field lookup without copying it out first.
+  // TODO: We should prohibit exprs where a non-whole_field result (or any result?) is discarded.  This will mean we don't need to handle the case where we discard a field lookup without copying it out first.
   result cell_num;
 };
 
