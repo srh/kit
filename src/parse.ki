@@ -217,7 +217,7 @@ func parse_rest_of_def(p *ps, is_export ast_isexport, is_var ast_isvar, out *ast
     return Fail;
   }
 
-  *out = Def({is_export, is_var, generics, name, typeexpr, consume(rhs)});
+  *out = Def({is_export, is_var, generics, name, typeexpr, consume(&rhs)});
   return true;
 }
 
@@ -741,7 +741,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
         return Fail;
       }
       m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]Funcall({embox(consume(lhs)), params}));
+      lhs = mk(m, @[ast_expr_enum]Funcall({embox(consume(&lhs)), params}));
     } else if try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
       arg ast_expr;
       if !(parse_expr(p, kCommaPrec, AllowBracesYes(void), IsNotStatementExpr(void), &arg)
@@ -749,7 +749,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
         return Fail;
       }
       m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]IndexExpr(mk(embox(lhs), embox(consume(arg)))));
+      lhs = mk(m, @[ast_expr_enum]IndexExpr(mk(embox(lhs), embox(consume(&arg)))));
     } else if try_skip_oper(p, '.', '~') {
       m ast_meta = copyend(p, lhs.meta);
       lhs = mk(m, @[ast_expr_enum]LocalField(@[ast_local_field]mk(embox(lhs), WholeField(void))));
@@ -762,14 +762,14 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       lhs = mk(m, @[ast_expr_enum]LocalField(@[ast_local_field]mk(embox(lhs), NameField(fieldname))));
     } else if try_skip_oper(p, '-', '>', '~') {
       m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(lhs)), WholeField(void)}));
+      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(&lhs)), WholeField(void)}));
     } else if try_skip_oper(p, '-', '>') {
       fieldname ast_ident;
       if !parse_ident(p, &fieldname) {
         return Fail;
       }
       m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(lhs)), NameField(fieldname)}));
+      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(&lhs)), NameField(fieldname)}));
     } else if case Has(is_incr bool) = is_postfix_incrdecr(peek(p)->val) {
       oper_meta ast_meta = startend(p);
       if case IsNotStatementExpr(v void) = se {
@@ -907,9 +907,9 @@ func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_e
   if op.value == im->cym.addressofsym {
     return mk(m, @[ast_expr_enum]AddressOf({embox(rhs)}));
   } else if op.value == im->cym.derefsym {
-    return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(rhs))}));
+    return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(&rhs))}));
   } else {
-    return mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None()))))), mk_array(consume(rhs))}));
+    return mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None()))))), mk_array(consume(&rhs))}));
   }
 }
 
@@ -925,19 +925,19 @@ func build_binop_expr(im *identmap, se statement_expr, m ast_meta, user_assignme
     }
     *out = mk(m, @[ast_expr_enum]Assignment({NotComputed@[ast_assignment_info](), embox(lhs), embox(rhs)}));
   } else if op.value == im->cym.logical_and_sym {
-    *out = mk(m, @[ast_expr_enum]LogicalConjunction({false, embox(consume(lhs)), embox(consume(rhs))}));
+    *out = mk(m, @[ast_expr_enum]LogicalConjunction({false, embox(consume(&lhs)), embox(consume(&rhs))}));
   } else if op.value == im->cym.logical_or_sym {
-    *out = mk(m, @[ast_expr_enum]LogicalConjunction({true, embox(consume(lhs)), embox(consume(rhs))}));
+    *out = mk(m, @[ast_expr_enum]LogicalConjunction({true, embox(consume(&lhs)), embox(consume(&rhs))}));
   } else {
     if user_assignment {
       if case IsNotStatementExpr(v void) = se {
         return Fail;
       }
       *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, im->cym.voidsym}),
-         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None()))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(rhs))})))}));
+         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None()))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(&rhs))})))}));
     } else {
       *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None()))))),
-                                            mk_array(consume(lhs), consume(rhs))}));
+                                            mk_array(consume(&lhs), consume(&rhs))}));
     }
   }
   return true;
@@ -1196,7 +1196,7 @@ func parse_rest_of_expr_list(p *ps, ab allow_braces, stop grouper, out *array[as
     if !parse_expr(p, kCommaPrec, ab, IsNotStatementExpr(void), &expr) {
       return Fail;
     }
-    push(&exprs, consume(expr));
+    push(&exprs, consume(&expr));
   }
 }
 
@@ -1268,7 +1268,7 @@ func parse_rest_of_return_statement(p *ps, out *ast_statement) bool {
        && try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = Return({NotComputed@[ast_return_statement_info](), Has(embox(consume(expr)))});
+  *out = Return({NotComputed@[ast_return_statement_info](), Has(embox(consume(&expr)))});
   return true;
 }
 
@@ -1282,14 +1282,14 @@ func parse_condition(p *ps, ab allow_braces, out *ast_condition) bool {
          && parse_expr(p, kConditionPrec, ab, IsNotStatementExpr(void), &rhs)) {
       return Fail;
     }
-    *out = PatternCondition({NotComputed@[ast_pattern_assign_info](), conspatt, embox(consume(rhs))});
+    *out = PatternCondition({NotComputed@[ast_pattern_assign_info](), conspatt, embox(consume(&rhs))});
     return true;
   } else {
     condition ast_expr;
     if !parse_expr(p, kConditionPrec, ab, IsNotStatementExpr(void), &condition) {
       return Fail;
     }
-    *out = ExprCondition(embox(consume(condition)));
+    *out = ExprCondition(embox(consume(&condition)));
     return true;
   }
 }
@@ -1358,7 +1358,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
          && try_skip_oper(p, ';')) {
       return Fail;
     }
-    condition = Has({mk_later(), embox(consume(expr))});
+    condition = Has({mk_later(), embox(consume(&expr))});
   }
   increment opt[box[ast_expr_discard]];
   lbrace tokval = Grouper(LBrace(void));
@@ -1369,7 +1369,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) bool {
     if !parse_expr(p, kSemicolonPrec, AllowBracesNo(void), IsStatementExpr(void), &expr) {
       return Fail;
     }
-    increment = Has(embox(discard(expr)));
+    increment = Has(embox(discard(&expr)));
   }
 
   body ast_bracebody;
@@ -1390,7 +1390,7 @@ func parse_rest_of_switch_statement(p *ps, out *ast_statement) bool {
   cases array[ast_switch_case];
   for ;; {
     if try_skip_token(p, @[tokval]Grouper(RBrace(void))) {
-      *out = Switch({NotComputed@[ast_enum_deconstruction_info](), mk_later(), embox(consume(swartch)), cases});
+      *out = Switch({NotComputed@[ast_enum_deconstruction_info](), mk_later(), embox(consume(&swartch)), cases});
       return true;
     }
     cas ast_switch_case;
@@ -1498,7 +1498,7 @@ func parse_naked_var_or_expr_statement(p *ps, ab allow_braces, fa force_assignme
          && try_skip_oper(p, ';')) {
       return Fail;
     }
-    *out = Expr(discard(expr));
+    *out = Expr(discard(&expr));
     return true;
   }
 
@@ -1539,7 +1539,7 @@ func parse_naked_var_or_expr_statement(p *ps, ab allow_braces, fa force_assignme
                  && try_skip_oper(p, ';')) {
               return Fail;
             }
-            *out = Expr(discard(whole_expr));
+            *out = Expr(discard(&whole_expr));
             return true;
           }
           case Error(v): {
@@ -1574,7 +1574,7 @@ func parse_naked_var_or_expr_statement(p *ps, ab allow_braces, fa force_assignme
        && try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = Var({NotComputed@[ast_var_info](), decl, HasExpr(embox(consume(rhs)))});
+  *out = Var({NotComputed@[ast_var_info](), decl, HasExpr(embox(consume(&rhs)))});
   return true;
 }
 
@@ -1582,7 +1582,7 @@ func expressionize(m ast_meta, name ast_ident, indexers array[ast_expr]) ast_exp
   lhs ast_expr = mk(name.meta, NameExpr(mk(name, None())));
   e size = count(&indexers);
   for i size = 0; i < e; i = i + 1 {
-    lhs = mk(m, IndexExpr(mk(embox(lhs), embox(consume(get(&indexers, i))))));
+    lhs = mk(m, IndexExpr(mk(embox(lhs), embox(consume(ref(&indexers, i))))));
   }
   return lhs;
 }

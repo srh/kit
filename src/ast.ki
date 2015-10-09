@@ -709,6 +709,11 @@ deftype ast_expr_consume struct {
   expr ast_expr;
 };
 
+// TODO: Remove once we can costlessly pass by value.
+func consume(expr *ast_expr) ast_expr_consume {
+  return {NotComputed@[ast_expr_after_consume](), *expr};
+}
+
 func consume(expr ast_expr) ast_expr_consume {
   return {NotComputed@[ast_expr_after_consume](), expr};
 }
@@ -717,6 +722,11 @@ deftype ast_expr_discard struct {
   after nc[ast_expr_after_discard];
   expr ast_expr;
 };
+
+// TODO: Remove once we can costlessly pass by value.
+func discard(expr *ast_expr) ast_expr_discard {
+  return {NotComputed@[ast_expr_after_discard](), *expr};
+}
 
 func discard(expr ast_expr) ast_expr_discard {
   return {NotComputed@[ast_expr_after_discard](), expr};
