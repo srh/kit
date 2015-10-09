@@ -337,11 +337,11 @@ func layout_individual_cell(h *frame, cell cell_num, low_offset_ref *i32, offset
   if case Has(p tup[cell_num, u32]) = is_static_subcell(h, cell) {
     set(offsets_ref, cell.~, StaticSubcell(p));
   } else if case Has(fnid fn_body_id) = is_const_funcell(h->cs, h->bas, cell) {
-    set(offsets_ref, cell.~, Has(@[cell_loc]ConstFuncellLoc(fnid)));
+    set(ref(offsets_ref, cell.~), @[cell_loc]ConstFuncellLoc(fnid));
   } else {
     ci *cell_info = ref_cell(h->gr, cell);
     offset cell_loc = next_stack_offset(h->cs, *low_offset_ref, ci, low_offset_ref);
-    set(offsets_ref, cell.~, Has(offset));
+    set(ref(offsets_ref, cell.~), offset);
   }
 }
 
