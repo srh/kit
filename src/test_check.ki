@@ -5,11 +5,12 @@ func testmodule_name() string {
   return _s("testmodule");
 }
 
-func test_loader(cs *checkstate, name sym) opt[array[u8]] {
-  if name.~ == intern(cs->im, testmodule_name()).~ {
-    return Has(* @[*array[u8]]cast(cs->loader_ctx));
+func test_loader(cs *checkstate, name sym, out *array[u8]) bool {
+  if name == intern(cs->im, testmodule_name()) {
+    *out = * @[*array[u8]]cast(cs->loader_ctx);
+    return true;
   } else {
-    return None();
+    return false;
   }
 }
 

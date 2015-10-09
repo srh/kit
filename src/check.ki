@@ -1317,30 +1317,28 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
       return Has(id);
     }
     case None(v): {
-      switch (cs->loader)(cs, mod_name) {
-        case None(v2): {
-          ERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
+      arr array[u8];
+      if (cs->loader)(cs, mod_name, &arr) {
+        mod shp[module];
+        oo(&mod)->process_state = Unprocessed(void);
+        oo(&mod)->module_name = mod_name;
+        oo(&mod)->base_offset = modules_next_base_offset(cs);
+        swap(&oo(&mod)->buf, &arr);
+        p ps = make_ps(cs->im, &cs->posits, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
+        if !parse_file(&p, &oo(&mod)->file) {
+          ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p)->interval.left)));
           return None();
         }
-        case Has(arr array[u8]): {
-          mod shp[module];
-          oo(&mod)->process_state = Unprocessed(void);
-          oo(&mod)->module_name = mod_name;
-          oo(&mod)->base_offset = modules_next_base_offset(cs);
-          oo(&mod)->buf = arr;
-          p ps = make_ps(cs->im, &cs->posits, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
-          if !parse_file(&p, &oo(&mod)->file) {
-            ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p)->interval.left)));
-            return None();
-          }
-          mod_id module_id = ~count(&cs->modules);
-          push(&cs->modules, mod);
-          if !try_insert(&cs->modules_by_name, &mod_name, mod_id) {
-            ERR(_u8("ICE: modules_by_name already has name "), lookup(cs->im, mod_name));
-            return None();
-          }
-          return Has(mod_id);
+        mod_id module_id = ~count(&cs->modules);
+        push(&cs->modules, mod);
+        if !try_insert(&cs->modules_by_name, &mod_name, mod_id) {
+          ERR(_u8("ICE: modules_by_name already has name "), lookup(cs->im, mod_name));
+          return None();
         }
+        return Has(mod_id);
+      } else {
+        ERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
+        return None();
       }
     }
   }

@@ -125,7 +125,7 @@ deftype checkstate struct {
   instantiation_depth u32;
   plat platform_info;
   loader_ctx *void;
-  loader fn[*checkstate, sym, opt[array[u8]]];
+  loader fn[*checkstate, sym, *array[u8], bool];
 
   posits positionals;
 
@@ -150,7 +150,7 @@ deftype checkstate struct {
   prims cs_primitives;
 };
 
-func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader fn[*checkstate, sym, opt[array[u8]]]) checkstate {
+func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader fn[*checkstate, sym, *array[u8], bool]) checkstate {
   ret checkstate = {
     im,
     0,
