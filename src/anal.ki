@@ -219,8 +219,6 @@ func basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *graphe
       } else {
         push(&new_paramlists, gn);
       }
-    case &GrPrimApply(a gr_prim_apply):
-      push(&new_paramlists, gn);
     default:
       ice(_u8("basic_inline_inlinables impossible node type"));
     }

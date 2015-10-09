@@ -169,8 +169,6 @@ func paramlist_cells(gr *frame_graph, gn gr_num) *shray[cell_num] {
   switch &ref_node(gr, gn)->op {
   case &GrApply(a gr_apply):
     return &a.params;
-  case &GrPrimApply(a gr_prim_apply):
-    return &a.params;
   default:
     ice(_u8("paramlist_cells called on non-paramlist op"));
     return fake();
@@ -269,26 +267,13 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
     for j size = npcells; j > 0; {
       j = j - 1;
       c cell_num = get(pcells, j);
-      do_process bool;
       if !isNope(ref(&offsets, c.~)) {
-        // add_prim_fn_body applies primop directly to arg list.  TODO: Should we remove this special case here and make add_prim_fn_body copy the args into separate param cells?  Reconsider once we know how optimization would work.
-        if case &GrPrimApply(a gr_prim_apply) = &ref_node(h->gr, gn)->op {
-          do_process = false;
-        } else {
-          ice(_u8("cell is in paramlist, but already processed"));
-        }
-      } else {
-        do_process = true;
+        ice(_u8("cell is in paramlist, but already processed"));
       }
 
-      if do_process {
-        ci *cell_info = ref_cell(h->gr, c);
-        offset cell_loc = next_stack_offset(h->cs, low_offset, ci, &low_offset);
-        if !isNope(ref(&offsets, c.~)) {
-          ice(_u8("cell is in paramlist, but already processed"));
-        }
-        set(&offsets, c.~, Has(offset));
-      }
+      ci *cell_info = ref_cell(h->gr, c);
+      offset cell_loc = next_stack_offset(h->cs, low_offset, ci, &low_offset);
+      set(&offsets, c.~, Has(offset));
     }
 
     annotate(&annot->paramlist_bottom_frame_offset, low_offset);
