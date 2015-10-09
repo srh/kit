@@ -91,6 +91,12 @@ access shray[_] {
       return ret;
     }
   }
+
+  inline func[T] swap(x *shray[T], y *shray[T]) void {
+    tmp var = x->~;
+    x->~ = y->~;
+    y->~ = tmp;
+  }
 }
 
 func[U, T] mapconvert(x *shray[T]) shray[U] {
@@ -152,6 +158,20 @@ func[T, U] concat(a opt[T], b U) shray[T] {
   append(&ret, &a);
   append(&ret, &b);
   return freeze(&ret);
+}
+
+inline func[T] append(x *array[T], y *shray[T]) void {
+  append_raw(x, data(y), count(y));
+}
+
+func[T] subarray(a *shray[T], i size) array[T] {
+  // If i >= count(a), successfully return empty.
+  ret array[T];
+  n size = count(a);
+  for ; i < n; i = i + 1 {
+    push(&ret, *ref(a, i));
+  }
+  return ret;
 }
 
 func[T] mk_shray() shray[T] {

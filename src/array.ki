@@ -230,16 +230,6 @@ inline func[T] append(a *array[T], b array[T]) void {
   return append(a, &b);
 }
 
-func[T] subarray(a *array[T], i size) array[T] {
-  // If i >= count(a), successfully return empty.
-  ret array[T];
-  n size = count(a);
-  for ; i < n; i = i + 1 {
-    push(&ret, *ref(a, i));
-  }
-  return ret;
-}
-
 func[T] sorted_has_dups(a *array[T]) bool {
   p *T = data(a);
   n size = count(a);
