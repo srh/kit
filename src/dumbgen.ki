@@ -7,6 +7,8 @@ defenum cell_loc {
   // Indirectly via a pointer (through the frame offset).
   IndirectLoc i32;
   ConstFuncellLoc fn_body_id;
+  // The cell is completely unused, it's never made live.  It's in a dead code part of the graph.
+  UnusedLoc void;
 };
 
 deftype lives struct {
@@ -135,10 +137,10 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_s
   liveset lives;
   nargcells size = count(&g->argcells);
   for i size = 0; i < nargcells; i = i + 1 {
-    create(&liveset, get(&g->argcells, i));
+    create(&h, &liveset, get(&g->argcells, i));
   }
   // TODO: It would be cleaner if function bodies had to mark the return cell live.  It would make inlining simpler too.
-  create(&liveset, g->graph.cell);
+  create(&h, &liveset, g->graph.cell);
 
   mut genexpr_result;
   if !dumbly_analyze_expression(&h, &g->graph.gr, &liveset, g->graph.gn, &mut) {
@@ -273,7 +275,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
 
       ci *cell_info = ref_cell(h->gr, c);
       offset cell_loc = next_stack_offset(h->cs, low_offset, ci, &low_offset);
-      set(&offsets, c.~, Has(offset));
+      set(ref(&offsets, c.~), offset);
     }
 
     annotate(&annot->paramlist_bottom_frame_offset, low_offset);
@@ -285,7 +287,11 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   for i size = 0; i < ncells; i = i + 1 {
     if isNope(ref(&offsets, i)) {
       c cell_num = ~i;
-      layout_individual_cell(h, c, &low_offset, &offsets);
+      if !empty(&ref(&h->bas->celldisp, i)->conflicting) {
+        layout_individual_cell(h, c, &low_offset, &offsets);
+      } else {
+        set(ref(&offsets, i), UnusedLoc);
+      }
     }
   }
 
@@ -316,6 +322,8 @@ func flatten_offsets(h *frame, a *array[tmp_offsets_val]) array[cell_loc] {
             ice(_u8("StaticSubcell of cell without directloc"));
           }
           push(&ret, IndirectLoc(x));
+        default:
+          ice(_u8("flatten_offsets nonsensical subcell"));
         }
       } else {
         ice(_u8("StaticSubcell of cell without Has-loc"));

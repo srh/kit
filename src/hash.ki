@@ -157,7 +157,7 @@ access hash[_, _] {
     }
   }
 
-  func[K, V] count(h *hash[K, V]) size {
+  inline func[K, V] count(h *hash[K, V]) size {
     return h->user_count;
   }
 
@@ -166,7 +166,7 @@ access hash[_, _] {
     index size;
   };
 
-  func[K, V] iter(a *hash[K, V]) hash_iter[K, V] {
+  inline func[K, V] iter(a *hash[K, V]) hash_iter[K, V] {
     ret hash_iter[K, V] = {a, 0};
     return ret;
   }
@@ -195,6 +195,10 @@ access hash[_, _] {
     x->user_count = y->user_count;
     y->user_count = tmp_user;
   }
+}
+
+inline func[K, V] empty(a *hash[K, V]) bool {
+  return count(a) == 0;
 }
 
 func[T] sets_equal(a *hash[T, void], b *hash[T, void]) bool {

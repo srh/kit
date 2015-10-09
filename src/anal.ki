@@ -56,6 +56,9 @@ deftype cell_disp struct {
   // If the cell has a constant value.  (Must be a static cell.)
   const_value cell_const_disp;
 
+  // Which cells are alive at the same time as this one (except this one).
+  conflicting hash[cell_num, void];
+
   // Which cells are subcells of this one.
   subcelled array[cell_num];
 };
@@ -84,7 +87,7 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
   n_ops size = count(&gr->ops);
   cellcount size = count(&gr->cells);
   for i size = count(&bas->celldisp); i < cellcount; i = i + 1 {
-    push(&bas->celldisp, {None(), None(), None(), NoConstDisp(void), mk_array@[cell_num]()});
+    push(&bas->celldisp, {None(), None(), None(), NoConstDisp(void), mk_hash@[cell_num, void](), mk_array@[cell_num]()});
   }
 
   for i size = bas->gns_analyzed; i < n_ops; i = i + 1 {
