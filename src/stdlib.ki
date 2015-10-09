@@ -307,10 +307,18 @@ func[T] check_mutate(p *T, old T, new T) void {
 }
 
 inline func[T] max(x T, y T) T {
-  if (x < y) {
+  if x < y {
     return y;
   } else {
     return x;
+  }
+}
+
+inline func[T] min(x T, y T) T {
+  if x < y {
+    return x;
+  } else {
+    return y;
   }
 }
 
