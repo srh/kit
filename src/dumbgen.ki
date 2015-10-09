@@ -240,12 +240,13 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
     }
   }
 
-
   ncalls size = count(&paramlist_ordering);
   for i size = 0; i < ncalls; i = i + 1 {
     gn gr_num = get(&paramlist_ordering, i);
     annot *gn_annot = ref_annot(h, gn);
     live *hash[cell_num, void] = live_for_funcall(annot);
+
+    bumpline i32 = 0;
 
     // 1. Layout any cells live during the funcall, that are _not_ part of the paramlist.
     it hash_iter[cell_num, void] = iter(live);
@@ -258,7 +259,8 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
             ice(_u8("cell is in other paramlist, was not processed"));
           }
         } else {
-          layout_individual_cell(h, c, &low_offset, &offsets);
+          duck_conflicting_cells(h, c, &bumpline, &offsets);
+          layout_individual_cell(h, c, &bumpline, &offsets);
         }
       }
     }
@@ -266,6 +268,10 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
     // 2. Layout cells that _are_ part of the paramlist.  (They have to go beneath those which aren't.)
     pcells *shray[cell_num] = paramlist_cells(h->gr, gn);
     npcells size = count(pcells);
+    for j size = 0; j < npcells; j++ {
+      duck_conflicting_cells(h, get(pcells, j), &bumpline, &offsets);
+    }
+
     for j size = npcells; j > 0; {
       j = j - 1;
       c cell_num = get(pcells, j);
@@ -274,15 +280,16 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
       }
 
       ci *cell_info = ref_cell(h->gr, c);
-      offset cell_loc = next_stack_offset(h->cs, low_offset, ci, &low_offset);
+      offset cell_loc = next_stack_offset(h->cs, bumpline, ci, &bumpline);
       set(ref(&offsets, c.~), offset);
     }
 
-    annotate(&annot->paramlist_bottom_frame_offset, low_offset);
+    annotate(&annot->paramlist_bottom_frame_offset, bumpline);
+
+    low_offset = min(low_offset, bumpline);
   }
 
   // 3. Layout cells that aren't live during any function call -- maybe these are just used in dead code.
-  // TODO: Don't layout cells that are in dead parts of the graph.
   ncells size = count(&offsets);
   for i size = 0; i < ncells; i = i + 1 {
     if isNope(ref(&offsets, i)) {
@@ -300,6 +307,29 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   // We subtract 4 because we haven't accounted for the possible need to make a hidden return pointer for the x86 callconv.
   annotate(&h->low_offset, low_offset - 4);
   return true;
+}
+
+func duck_conflicting_cells(h *frame, c cell_num, bumpline *i32, offsets *array[tmp_offsets_val]) void {
+  bline i32 = *bumpline;
+  c_disp *cell_disp = ref(&h->bas->celldisp, c.~);
+  it hash_iter[cell_num, void] = iter(&c_disp->conflicting);
+  while case Has(p *tup[cell_num, void]) = next(&it) {
+    d cell_num = p->car;
+    switch ref(offsets, d.~) {
+    case &Nope: { }
+    case &Has(loc cell_loc):
+      switch &loc {
+      case &DirectLoc(x i32):
+        bline = min(bline, x);
+      case &IndirectLoc(x i32):
+        bline = min(bline, x);
+      case &ConstFuncellLoc(fnid fn_body_id): { }
+      case &UnusedLoc: { }
+      }
+    case &StaticSubcell(p2 tup[cell_num, u32]): { }
+    }
+  }
+  *bumpline = bline;
 }
 
 func flatten_offsets(h *frame, a *array[tmp_offsets_val]) array[cell_loc] {
