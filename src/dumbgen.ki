@@ -295,7 +295,10 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
     if isNope(ref(&offsets, i)) {
       c cell_num = ~i;
       if !empty(&ref(&h->bas->celldisp, i)->conflicting) {
-        layout_individual_cell(h, c, &low_offset, &offsets);
+        bumpline i32 = 0;
+        duck_conflicting_cells(h, c, &bumpline, &offsets);
+        layout_individual_cell(h, c, &bumpline, &offsets);
+        low_offset = min(low_offset, bumpline);
       } else {
         set(ref(&offsets, i), UnusedLoc);
       }
