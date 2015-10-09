@@ -844,6 +844,7 @@ func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *
   unif_pt te_typeexpr;
   if !unify_types(pt, &ptr_unknown, &unif_pt) {
     ERR(_u8("AddressOf expr in non-pointer context"));
+    return false;
   }
   param *te_typeexpr;
   if !decompose_typeapp(&unif_pt, primitive_pointer_puretype(es->cs), &param) {
