@@ -197,7 +197,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
 
     case &Return(b ast_return_statement): {
       exit_num statement_num;
-      if !check_return_statement(bs, vp, &b, &exit_num) {
+      if !check_return_statement(bs, &b, &exit_num) {
         return false;
       }
       *ee_out = {num, exit_num};
@@ -585,7 +585,7 @@ func compute_varcells(es *framescope, a *array[var_number]) shray[opt[cell_num]]
   return freeze(&b);
 }
 
-func check_return_statement(bs *bodystate, vp *varpopper, a *ast_return_statement, exit_out *statement_num) bool {
+func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *statement_num) bool {
   // Notably, this includes lambda parameter destructions.
   vars array[var_number] = vars_in_scope(&bs->es);
   varcells shray[opt[cell_num]] = compute_varcells(&bs->es, &vars);
