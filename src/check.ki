@@ -1375,7 +1375,7 @@ func process_module_toplevels(cs *checkstate, mod *module) bool {
 func add_def_entry(cs *checkstate,
                    module_name sym,
                    module_defs *array[def_entry_id],
-                   ent def_entry) void {
+                   ent shp[def_entry]) void {
   id def_entry_id = add_def_entry(cs, ent);
   push(module_defs, id);
 }
@@ -1407,11 +1407,11 @@ func process_toplevels(cs *checkstate,
           return false;
         }
         ent def_entry = mk(mod->module_name, a.name.value, access_scope, a.generics, quick_te, toplevel);
-        add_def_entry(cs, mod->module_name, &mod->defs, ent);
+        add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
       }
       case &ExternDef(a ast_extern_def): {
         ent def_entry = mk(mod->module_name, a.name.value, access_scope, NoGenerics(void), a.type, toplevel);
-        add_def_entry(cs, mod->module_name, &mod->defs, ent);
+        add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
       }
       case &TypeDef(a ast_type_def): {
         if !check_generics_unique(cs, &a.generics) {

@@ -233,8 +233,7 @@ func ref_deftype_inst(cs *checkstate, id deftype_inst_id) *deftype_inst {
   return oo(ref(&cs->type_instantiations, id.~));
 }
 
-func add_def_entry(cs *checkstate, ent def_entry) def_entry_id {
-  shent shp[def_entry] = emshp(ent);
+func add_def_entry(cs *checkstate, shent shp[def_entry]) def_entry_id {
   id def_entry_id = ~count(&cs->defs);
   push(&cs->defs, shent);
   arr *array[def_entry_id] = try_insert_lookup(&cs->defs_by_name, &oo(&shent)->def_name, mk_array());
