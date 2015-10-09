@@ -181,8 +181,6 @@ defenum tmp_offsets_val {
   Nope void;
   Has cell_loc;
   StaticSubcell tup[cell_num, u32];
-  // TODO: Just use Has(ConstFuncellLoc(...))?
-  ConstFuncell fn_body_id;
 };
 
 func set(dest *tmp_offsets_val, c cell_loc) void {
@@ -337,8 +335,6 @@ func flatten_offsets(h *frame, a *array[tmp_offsets_val]) array[cell_loc] {
       } else {
         ice(_u8("StaticSubcell of cell without Has-loc"));
       }
-    case &ConstFuncell(fnid fn_body_id):
-      push(&ret, ConstFuncellLoc(fnid));
     }
   }
   return ret;
@@ -348,7 +344,7 @@ func layout_individual_cell(h *frame, cell cell_num, low_offset_ref *i32, offset
   if case Has(p tup[cell_num, u32]) = is_static_subcell(h, cell) {
     set(offsets_ref, cell.~, StaticSubcell(p));
   } else if case Has(fnid fn_body_id) = is_const_funcell(h->cs, h->bas, cell) {
-    set(offsets_ref, cell.~, ConstFuncell(fnid));
+    set(offsets_ref, cell.~, Has(@[cell_loc]ConstFuncellLoc(fnid)));
   } else {
     ci *cell_info = ref_cell(h->gr, cell);
     offset cell_loc = next_stack_offset(h->cs, *low_offset_ref, ci, low_offset_ref);
