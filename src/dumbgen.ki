@@ -43,9 +43,7 @@ deftype gn_annot struct {
   app_time_live nc[lives];
   paramlist_bottom_frame_offset nc[i32];
 
-  // Some secsize(&f->text) value -- the jmp target for evaluating the node _and_ its precs.  This is Computed if and only if we've begun generating code for the gn (and so it serves as a color-marker for our graph traversal -- see usage).
-  // TODO: I don't think we actually use the u32 value from here.
-  instruction_offset nc[u32];
+  dumbgen_gen_function_body_visited bool;
   // The jmp target number for evaluating the node _and_ its precs.
   this_targetnum nc[jmp_targetnum];
 };
@@ -94,7 +92,7 @@ func frame_define_target(h *frame, jt jmp_targetnum, text_offset u32) void {
 }
 
 func mk_gn_annot() gn_annot {
-  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[lives](), NotComputed@[i32](), NotComputed@[u32](), NotComputed@[jmp_targetnum]()};
+  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[lives](), NotComputed@[i32](), false, NotComputed@[jmp_targetnum]()};
 }
 
 func unIndirect(loc cell_loc) i32 {
@@ -647,13 +645,12 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
     case DumbgenOpAndPrecs(gna gn_and_jmpaft):
       gn gr_num = gna.gn;
       annot *gn_annot = ref_annot(h, gn);
-      if case &Computed(off u32) = &annot->instruction_offset {
+      if annot->dumbgen_gen_function_body_visited {
         // TODO: Just gen the jmp directly -- no need for a placeholder, we know the offset.
         x86_gen_placeholder_jmp(f, h, frame_gn_targetnum(h, gn));
       } else {
-        text_offset u32 = secsize(&f->text);
-        annotate(&annot->instruction_offset, text_offset);
-        frame_define_target(h, frame_gn_targetnum(h, gn), text_offset);
+        annot->dumbgen_gen_function_body_visited = true;
+        frame_define_target(h, frame_gn_targetnum(h, gn), secsize(&f->text));
         op_targ jmp_targetnum = frame_create_target(h);
         push(&stack, @[dumbgen_stackent]DumbgenOp({op_targ, gn, gna.jmpaft, gna.jmp_necessary}));
         node *gr_node = ref_node(h->gr, gn);
