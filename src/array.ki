@@ -40,21 +40,20 @@ access array[_] {
     free(@[*void] cast(rptr));
   }
 
-  func[T] repeat_out(n size, value T, out *array[T]) void {
-    destroy(out);
+  func[T] repeat(n size, value T) array[T] {
     if n == 0 {
-      out->count = 0;
-      out->cap = 0;
-      out->ptr = null;
-      return;
+      ret array[T];
+      return ret;
     }
-    out->count = n;
-    out->cap = n;
+    ret array[T];
+    ret.count = n;
+    ret.cap = n;
     ptr *T = cast(checkmalloc(n * sizeof@[T]));
-    out->ptr = ptr;
+    ret.ptr = ptr;
     for i size = 0; i < n; i = i + 1 {
       copy(&ptr[i], &value);
     }
+    return ret;
   }
 
   func[T] set(r *array[T], i size, val T) void {
@@ -323,12 +322,6 @@ func[T] popval(a *array[T]) opt[T] {
   } else {
     return None();
   }
-}
-
-func[T] repeat(n size, value T) array[T] {
-  ret array[T];
-  repeat_out(n, value, &ret);
-  return ret;
 }
 
 func[H] build_u8str(help H, r *array[u8], a *array[u8]) void {

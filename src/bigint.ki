@@ -227,8 +227,7 @@ access bigint {
       }
     }
     ressize size = xn + yn + 3;
-    build array[u32];
-    repeat_out(ressize + 1, 0, &build);
+    build array[u32] = repeat(ressize + 1, 0);
     carry u32 = 0;
     for i size = 0; i < ressize; i = i + 1 {
       for j size = 0; j < ressize - i; j = j + 1 {
@@ -376,8 +375,7 @@ access bigint {
   func `<<`(x bigint, y u32) bigint {
     wholewords size = ~(y / 32);
     yr u32 = y % 32;
-    newparts array[u32];
-    repeat_out(wholewords, @[u32] 0, &newparts);
+    newparts array[u32] = repeat(wholewords, @[u32] 0);
     if yr == 0 {
       // We handle the yr == 0 case to avoid a shift-by-32.
       append(&newparts, &x.parts);
