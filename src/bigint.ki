@@ -12,19 +12,12 @@ access bigint {
     init(&b->parts);
   }
 
-  func mk(negative bool, parts array[u32]) bigint {
-    ret bigint;
-    ret.negative = negative;
-    ret.parts = parts;
-    return ret;
-  }
-
   func `~`(x u32) bigint {
-    parts array[u32];
+    ret bigint;
     if x != 0 {
-      push(&parts, x);
+      push(&ret.parts, x);
     }
-    return mk(false, parts);
+    return ret;
   }
 
   func `~`(x i32) bigint {
