@@ -8,7 +8,7 @@ defclass[T] move shray struct {
 };
 
 access shray[_] {
-  func[T] do_init(r *shray[T]) void {
+  inline func[T] do_init(r *shray[T]) void {
     r->count = 0;
     r->cap = 0;
     r->refp = null;
@@ -50,20 +50,20 @@ access shray[_] {
     *refp = refc;
   }
 
-  func[T] data(r *shray[T]) *T {
+  inline func[T] data(r *shray[T]) *T {
     return r->ptr;
   }
 
-  func[T] count(r *shray[T]) size {
+  inline func[T] count(r *shray[T]) size {
     return r->count;
   }
 
-  func[T] get(r *shray[T], i size) T {
+  inline func[T] get(r *shray[T], i size) T {
     check(i < r->count);
     return r->ptr[i];
   }
 
-  func[T] ref(r *shray[T], i size) *T {
+  inline func[T] ref(r *shray[T], i size) *T {
     check(i < r->count);
     return &r->ptr[i];
   }
@@ -93,7 +93,6 @@ access shray[_] {
   }
 }
 
-// TODO: Make this return a shray.
 func[U, T] mapconvert(x *shray[T]) shray[U] {
   build array[U];
   n size = count(x);
