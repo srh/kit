@@ -1893,6 +1893,18 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "inline func `++`(x *i32) void {\n"
         "  *x = *x + 1;\n"
         "}\n"));
+
+  run_check_test(ctx, "c154",
+    _u8("defenum en {\n"
+        "  Foo void;\n"
+        "};\n"
+        "func blah(x en) u32 {\n"
+        "  switch x {\n"
+        "  case Foo(v void):\n"
+        "    accum u32 = 0x12345679;\n"
+        "    return accum;\n"
+        "  }\n"
+        "}\n"));
 }
 
 func mk_ctx(build bool, name opt[array[u8]]) check_ctx { return {build, name, 0}; }

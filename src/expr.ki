@@ -218,6 +218,7 @@ func read_nums(vp *varpopper) *array[var_number] {
 
 }  // access varpopper
 
+// TODO: Nothing uses varsaver?
 defclass varsaver struct {
   es *framescope;
   current_vars array[var_number];
@@ -284,10 +285,21 @@ func check_expr_consume(es *framescope, x *ast_expr_consume, pt *te_typeexpr) bo
 }
 
 func check_consume_expr(es *framescope, x *ast_expr, aft *nc[ast_expr_after_consume], pt *te_typeexpr) bool {
+  // If you change this, see also check_expr_retconsume.
   if !check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
   if !annotate_disposal_for_consume(es, x, aft) {
+    return false;
+  }
+  return true;
+}
+
+func check_expr_retconsume(es *framescope, x *ast_expr_consume, pt *te_typeexpr, movable_cells *shray[opt[cell_num]], moved_cell_ix_out *opt[size]) bool {
+  if !check_expr_ai(es, AllowIncompleteNo, &x->expr, pt) {
+    return false;
+  }
+  if !annotate_disposal_for_consume(es, &x->expr, movable_cells, &x->after, moved_cell_ix_out) {
     return false;
   }
   return true;
@@ -942,12 +954,14 @@ func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   return behavior_to_desc(&props.destroy_behavior, out);
 }
 
-func annotate_disposal_for_consume(es *framescope, a *ast_expr_consume) bool {
-  return annotate_disposal_for_consume(es, &a->expr, &a->after);
+func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume]) bool {
+  movable_cells shray[opt[cell_num]];
+  moved_cell_ix_discard opt[size];
+  return annotate_disposal_for_consume(es, a, &movable_cells, after, &moved_cell_ix_discard);
 }
 
 // Annotates the disposal to "consume" the value -- i.e. what happens if it's a function param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or whatever).
-func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume]) bool {
+func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *shray[opt[cell_num]], after *nc[ast_expr_after_consume], moved_cell_ix_out *opt[size]) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -968,14 +982,25 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
                                                            {destroy, desc.whole_num}}),
                    dest));
       }
+      *moved_cell_ix_out = None();
     }
     case &IsLvalYes(desc lval_description): {
-      copy ctor_desc;
-      if !get_copy_ctor(es->ds, &info->cu, &copy) {
-        return false;
-      }
       dest cell_num = add_static_cell(es, info->cu, info->cu_props);
-      annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]{copy, dest, desc.num}, desc.deadme)), dest));
+      if case Has(ix size) = find(movable_cells, Has(desc.num)) {
+        move ctor_desc;
+        if !get_move_ctor(es->ds, &info->cu, &move) {
+          return false;
+        }
+        annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]{move, dest, desc.num}), dest));
+        *moved_cell_ix_out = Has(ix);
+      } else {
+        copy ctor_desc;
+        if !get_copy_ctor(es->ds, &info->cu, &copy) {
+          return false;
+        }
+        annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]{copy, dest, desc.num}, desc.deadme)), dest));
+        *moved_cell_ix_out = None();
+      }
     }
   }
   return true;
@@ -1788,21 +1813,22 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   if !make_fn_partial_type(es->clq, pt, &a->params, &func_pt) {
     return false;
   }
-  if !check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes(void)), &oo(&a->fun)->expr, &func_pt) {
+  funec *ast_expr_consume = oo(&a->fun);
+  if !check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes(void)), &funec->expr, &func_pt) {
     return false;
   }
 
-  if expr_type_incomplete(&oo(&a->fun)->expr) {
+  if expr_type_incomplete(&funec->expr) {
     check(ai == AllowIncompleteYes(void));
     annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
     return true;
   }
 
-  if !check_funcall_params_secondtime(es, expr_complete_type(&oo(&a->fun)->expr), &a->params) {
+  if !check_funcall_params_secondtime(es, expr_complete_type(&funec->expr), &a->params) {
     return false;
   }
 
-  if !annotate_disposal_for_consume(es, oo(&a->fun)) {
+  if !annotate_disposal_for_consume(es, &funec->expr, &funec->after) {
     return false;
   }
 

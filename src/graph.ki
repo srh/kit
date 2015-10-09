@@ -1462,6 +1462,12 @@ func gr_consume_actions(clq *clqueue, gr *frame_graph, prec gr_num, x *consume_a
       }
     }
     prec = seqq(gr, {prec, seq1(gr, dep)}).~;
+  case &ConsumeByMove(m move_action):
+    dep gr_num;
+    if !gr_move_action(clq, gr, &m, &dep) {
+      return false;
+    }
+    prec = seqq(gr, {prec, seq1(gr, dep)}).~;
   }
   *out = prec;
   return true;

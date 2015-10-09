@@ -139,6 +139,16 @@ func[T, U, V, W] concat(a opt[T], b U, c V, d W) shray[T] {
   return freeze(&ret);
 }
 
+func[T] find(a *shray[T], b T) opt[size] {
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    if *ref(a, i) == b {
+      return Has(i);
+    }
+  }
+  return None();
+}
+
 func[T, U] concat(a opt[T], b U) shray[T] {
   ret array[T];
   append(&ret, &a);

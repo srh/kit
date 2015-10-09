@@ -581,6 +581,8 @@ defenum consume_actions {
   ConsumeByInPlace void;
   ConsumeByCopyDestroy copy_destroy_action;
   ConsumeByCopy tup[copy_action, lval_deadme];
+  // Only used for return statements, but later will be used for other exprs.
+  ConsumeByMove move_action;
 };
 
 deftype ast_expr_after_consume struct {
