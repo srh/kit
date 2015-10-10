@@ -702,7 +702,35 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
 
     case &Strinit(a ast_strinit):
       return check_expr_strinit(es, ai, &a, pt, x);
+
+    case &Ternary(a ast_ternary):
+      return check_expr_ternary(es, ai, pt, &a, x);
   }
+}
+
+func check_expr_ternary(es *framescope, ai allow_incomplete, pt *te_typeexpr, a *ast_ternary, x *ast_expr) bool {
+  boolean cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
+  if !check_consume_then_discard_expr(es, oo(&oo(&a->condition)->expr), &boolean.~, &oo(&a->condition)->discard) {
+    return false;
+  }
+  if !check_expr_consume(es, oo(&a->then_clause), pt) {
+    return false;
+  }
+  if !check_expr_consume(es, oo(&a->else_clause), pt) {
+    return false;
+  }
+
+  conjoined cell_num;
+  if true {
+    then_cell *cell_info = ref_cell(es, result_cell(oo(&a->then_clause)));
+    conjoined = add_static_cell(es, then_cell->type, then_cell->props);
+  }
+  reannotate_static_to_virtual(es, result_cell(oo(&a->then_clause)));
+  reannotate_static_to_virtual(es, result_cell(oo(&a->else_clause)));
+  annotate(&a->info, {conjoined});
+  conj *cell_info = ref_cell(es, conjoined);
+  annotate_info(x, @[ast_expr_info]CompleteCheck({IsLvalNo({conjoined, conjoined}), conj->type, conj->props}));
+  return true;
 }
 
 func check_expr_typed_expr(es *framescope, ai allow_incomplete, pt *te_typeexpr, a *ast_typed_expr, x *ast_expr) bool {

@@ -115,6 +115,7 @@ defenum keyw {
   Return void;
   Struct void;
   Switch void;
+  Then void;
   True void;
   Underscore void;
   Union void;
@@ -166,6 +167,14 @@ func equal(a *numlit, b *numlit) bool {
 
 func `==`(a grouper, b grouper) bool {
   return enumnum(&a) == enumnum(&b);
+}
+
+func is_keyw(a *tokval, k keyw) bool {
+  if case &Keyw(j keyw) = a {
+    return j == k;
+  } else {
+    return false;
+  }
 }
 
 func equal(a *tokval, b *tokval) bool {
@@ -361,6 +370,7 @@ func grab_tok(p *ps) tok {
         || grab_keyword(p, "return", Return(void), &ret)
         || grab_keyword(p, "struct", Struct(void), &ret)
         || grab_keyword(p, "switch", Switch(void), &ret)
+        || grab_keyword(p, "then", Then(void), &ret)
         || grab_keyword(p, "true", True(void), &ret)
         || grab_keyword(p, "_", Underscore(void), &ret)
         || grab_keyword(p, "union", Union(void), &ret)

@@ -1906,6 +1906,10 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "    return accum;\n"
         "  }\n"
         "}\n"));
+  run_check_test(ctx, "c155",
+    _u8("func blah(x i32) u32 {\n"
+        "  return x == 3 then 99 else 66;\n"
+        "}\n"));
 }
 
 func mk_ctx(build bool, name opt[array[u8]]) check_ctx { return {build, name, 0}; }

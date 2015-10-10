@@ -586,6 +586,7 @@ func gr_for_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_
 
   gn sq_num;
   if case &Has(cond ast_expr_condition) = &a->condition {
+    // TODO: This would be using the same cells in different nodes.
     loopexitgn gr_num;
     if !gr_later_discard(clq, gr, &cond.discard, &loopexitgn) {
       return false;
@@ -598,7 +599,7 @@ func gr_for_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_
 
     exitseq var = seqq(gr, {loopexitgn, initseq});
 
-    if !gr_expr_condition(clq, gr, fb, oo(&cond.expr), thengn, exitseq, &gn) {
+    if !gr_expr_condition(clq, gr, oo(&cond.expr), thengn, exitseq, &gn) {
       return false;
     }
   } else {
@@ -712,7 +713,7 @@ func gr_ifthen_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg 
   return true;
 }
 
-func gr_expr_condition(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_expr_consume, thengn sq_num, elsegn sq_num, out *sq_num) bool {
+func gr_expr_condition(clq *clqueue, gr *frame_graph, a *ast_expr_consume, thengn sq_num, elsegn sq_num, out *sq_num) bool {
   congn gr_num;
   if !gr_expr_consume(clq, gr, a, &congn) {
     return false;
@@ -728,7 +729,7 @@ func gr_expr_condition(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast
 func gr_condition(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, out *sq_num) bool {
   switch a {
     case &ExprCondition(bec box[ast_expr_consume]): {
-      return gr_expr_condition(clq, gr, fb, oo(&bec), thengn, elsegn, out);
+      return gr_expr_condition(clq, gr, oo(&bec), thengn, elsegn, out);
     }
 
     case &PatternCondition(pa ast_pattern_assign): {
@@ -970,10 +971,58 @@ func gr_expr(clq *clqueue, gr *frame_graph, x *ast_expr, out *gr_num) bool {
     case &TypedExpr(a ast_typed_expr): {
       return gr_expr(clq, gr, oo(&a.expr), out);
     }
-    case &Strinit(a ast_strinit): {
+    case &Strinit(a ast_strinit):
       return gr_mk_strinit(clq, gr, x, &a, out);
-    }
+    case &Ternary(a ast_ternary):
+      return gr_mk_ternary(clq, gr, x, &a, out);
   }
+}
+
+func gr_mk_ternary(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_ternary, out *gr_num) bool {
+  // TODO: We do the condcleanup at the end instead of repeating it twice right after the branch... do it right after the branch.
+  condcleanupgn gr_num;
+  if !gr_later_discard(clq, gr, &oo(&a->condition)->discard, &condcleanupgn) {
+    return false;
+  }
+
+  cleanup_tail sq_num = seq1(gr, condcleanupgn);
+
+  then_gn gr_num;
+  if !gr_expr_consume(clq, gr, oo(&a->then_clause), &then_gn) {
+    return false;
+  }
+  else_gn gr_num;
+  if !gr_expr_consume(clq, gr, oo(&a->else_clause), &else_gn) {
+    return false;
+  }
+
+  conjoined cell_num = unHas(&a->info)->conjoined_result_cell;
+
+  then_sn sq_num = seqq(gr, {
+    addx(gr, @[gr_op]GrSubcell({result_cell(oo(&a->then_clause)), conjoined, OffsetConst(0)})),
+    seqq(gr, {
+      then_gn,
+      seqq(gr, {
+        addx(gr, @[gr_op]GrVirtualDead({result_cell(oo(&a->then_clause))})),
+        cleanup_tail})})});
+  else_sn sq_num = seqq(gr, {
+    addx(gr, @[gr_op]GrSubcell({result_cell(oo(&a->else_clause)), conjoined, OffsetConst(0)})),
+    seqq(gr, {
+      else_gn,
+      seqq(gr, {
+        addx(gr, @[gr_op]GrVirtualDead({result_cell(oo(&a->else_clause))})),
+        cleanup_tail})})});
+
+  cond_sn sq_num;
+  if !gr_expr_condition(clq, gr, oo(&oo(&a->condition)->expr), then_sn, else_sn, &cond_sn) {
+    return false;
+  }
+
+  seq sq_num = seqq(gr, {
+    addx(gr, @[gr_op]GrWriteNothing({conjoined})),
+    cond_sn});
+  *out = seq.~;
+  return true;
 }
 
 func gr_mk_strinit(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_strinit, out *gr_num) bool {

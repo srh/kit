@@ -770,6 +770,29 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       }
       m ast_meta = copyend(p, lhs.meta);
       lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(&lhs)), NameField(fieldname)}));
+    } else if is_keyw(&peek(p)->val, Then) {
+      switch compare_prec(prec_ctx, thenexpr_then_prec().left) {
+      case Conflicts:
+        return Fail;
+      case PullsLeft:
+        *out = lhs;
+        return true;
+      case PullsRight:
+        step(p);
+        then_clause ast_expr;
+        if !parse_expr(p, thenexpr_then_prec().right, ab, IsNotStatementExpr, &then_clause) {
+          return Fail;
+        }
+        if !try_skip_keyw(p, Else) {
+          return Fail;
+        }
+        else_clause ast_expr;
+        if !parse_expr(p, thenexpr_else_right_prec, ab, IsNotStatementExpr, &else_clause) {
+          return Fail;
+        }
+        m ast_meta = copyend(p, lhs.meta);
+        lhs = mk(m, @[ast_expr_enum]Ternary({NotComputed(), embox(@[ast_expr_condition]{mk_later(), embox(consume(&lhs))}), embox(consume(&then_clause)), embox(consume(&else_clause))}));
+      }
     } else if case Has(is_incr bool) = is_postfix_incrdecr(peek(p)->val) {
       oper_meta ast_meta = startend(p);
       if case IsNotStatementExpr(v void) = se {
@@ -837,6 +860,13 @@ func incrdecr_sym(im *identmap, is_incr bool) sym {
     return im->cym.postfix_decrsym;
   }
 }
+
+inline func thenexpr_then_prec() prec_pair {
+  return {316, 314};
+}
+
+// Lower than anything... except another then-expr.
+def thenexpr_else_right_prec i32 = 314;
 
 deftype binop_facts struct {
   op_prec prec_pair;
@@ -1914,6 +1944,12 @@ func test_parse() bool {
     _u8("func foo() a { if a == ({1, 2}) { return; } }"));
   pass = pass & run_parse_test(_u8("p058-c"),
     _u8("func foo() a { if (a == {1, 2}) { return; } }"));
+  pass = pass & run_parse_test(_u8("p059"),
+    _u8("func foo() a { return x == y then 23 else 45; }"));
+  pass = pass & run_parse_test(_u8("p060"),
+    _u8("func foo() a { return x == y then blarg then 23 else 64 else 45; }"));
+  pass = pass & run_parse_test(_u8("p061"),
+    _u8("func foo() a { return x == y then 64 else hey & jay then feh else 45; }"));
   return pass;
 }
 

@@ -500,6 +500,18 @@ deftype ast_strinit struct {
   exprs array[ast_strinit_param];
 };
 
+deftype ast_ternary_info struct {
+  conjoined_result_cell cell_num;
+};
+
+deftype ast_ternary struct {
+  info nc[ast_ternary_info];
+  // I'm not crazy enough to support case patterns in ternary operators yet.
+  condition box[ast_expr_condition];
+  then_clause box[ast_expr_consume];
+  else_clause box[ast_expr_consume];
+};
+
 // Is a non-lval an rval?  Okay.
 deftype rval_description struct {
   // The cell number of the temporary that this rval is _part of_.
@@ -716,6 +728,7 @@ defenum ast_expr_enum {
   DerefField ast_deref_field;
   TypedExpr ast_typed_expr;
   Strinit ast_strinit;
+  Ternary ast_ternary;
 };
 
 func mk(m ast_meta, x ast_expr_enum) ast_expr {
