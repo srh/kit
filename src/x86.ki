@@ -174,6 +174,17 @@ func x86_mov_imm32(f *objfile, dest u8, x i32) void {
   }
 }
 
+func x86_mov_imm32(f *objfile, dest u8, x u32) void {
+  if x == 0 {
+    x86_xor_w32(f, dest, dest);
+  } else {
+    b [5]u8;
+    b[0] = 0xB8 + dest;
+    write_le_u32(&b[1], x);
+    append_raw(&f->text, &b[0], 5);
+  }
+}
+
 func x86_mov_stiptr(f *objfile, dest u8, symbol_table_index sti) void {
   appendtext(f, 0xB8 + dest);
   append_dir32(&f->text, symbol_table_index);
@@ -401,11 +412,20 @@ func x86_load32_zeroextend(f *objfile, dest u8, src_addr u8, src_disp i32, size 
   }
 }
 
-func x86_load32_zeroextend(f *objfile, dest u8, src cell_loc, size u32) void {
+func x86_load32_for_primop(f *objfile, dest u8, src cell_loc, size u32) void {
   src_addr u8;
   src_disp i32;
-  x86_prep_loc_use(f, src, dest, &src_addr, &src_disp);
-  x86_load32_zeroextend(f, dest, src_addr, src_disp, size);
+  if case Has(b bigint) = x86_prep_loc_use(f, src, dest, &src_addr, &src_disp) {
+    // TODO: We are on relatively thin ice here -- we should just have an st_value at this point.
+    value u32;
+    if !as_non_negative_u32(&b, &value) {
+      ice(_u8("x86_load32_for_primop has invalid bigint of value "), b);
+    } else {
+      x86_mov_imm32(f, dest, value);
+    }
+  } else {
+    x86_load32_zeroextend(f, dest, src_addr, src_disp, size);
+  }
 }
 
 func x86_store32_partial_destructively(f *objfile, dest_addr u8, dest_disp i32, src u8, size u32) void {
@@ -450,11 +470,21 @@ func x86_load32_signextend(f *objfile, dest u8, src_addr u8, src_disp i32, size 
   }
 }
 
-func x86_load32_signextend(f *objfile, dest u8, src cell_loc, size u32) void {
+func x86_load32_signextend_for_primop(f *objfile, dest u8, src cell_loc, size u32) void {
   src_addr u8;
   src_disp i32;
-  x86_prep_loc_use(f, src, dest, &src_addr, &src_disp);
-  x86_load32_signextend(f, dest, src_addr, src_disp, size);
+  if case Has(b bigint) = x86_prep_loc_use(f, src, dest, &src_addr, &src_disp) {
+    // TODO: We are on relatively thin ice here -- we should just have an st_value at this point.
+    ivalue i32;
+    if as_i32(&b, &ivalue) {
+      // It doesn't matter whether we sign extend or zero extend.
+      x86_mov_imm32(f, dest, ivalue);
+    } else {
+      ice(_u8("x86_load32_signextend_for_primop has invalid bigint of value "), b);
+    }
+  } else {
+    x86_load32_signextend(f, dest, src_addr, src_disp, size);
+  }
 }
 
 // NOTE: If this changes buflength, its consumers (like appendtext) will need to change theirs.
@@ -601,7 +631,7 @@ func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
   }
 }
 
-func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, disp_out *i32) void {
+func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, disp_out *i32) opt[bigint] {
   switch loc {
   case DirectLoc(off i32):
     *addr_reg_out = X86_EBP;
@@ -613,7 +643,10 @@ func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, 
   case ConstFuncellLoc(fnid fn_body_id):
     // TODO: Better type safety?
     ice(_u8("x86_prep_loc_use sees ConstFuncellLoc"));
+  case ConstIntCellLoc(b bigint):
+    return Has(b);
   }
+  return None();
 }
 
 func x86_store32(f *objfile, dest cell_loc, src u8, scratch u8) void {

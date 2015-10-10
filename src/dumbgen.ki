@@ -7,6 +7,7 @@ defenum cell_loc {
   // Indirectly via a pointer (through the frame offset).
   IndirectLoc i32;
   ConstFuncellLoc fn_body_id;
+  ConstIntCellLoc bigint;
   // The cell is completely unused, it's never made live.  It's in a dead code part of the graph.
   UnusedLoc void;
 };
@@ -327,6 +328,7 @@ func duck_conflicting_cells(h *frame, c cell_num, bumpline *i32, offsets *array[
       case &IndirectLoc(x i32):
         bline = min(bline, x);
       case &ConstFuncellLoc(fnid fn_body_id): { }
+      case &ConstIntCellLoc(b bigint): { }
       case &UnusedLoc: { }
       }
     case &StaticSubcell(p2 tup[cell_num, u32]): { }
@@ -371,6 +373,8 @@ func layout_individual_cell(h *frame, cell cell_num, low_offset_ref *i32, offset
     set(offsets_ref, cell.~, StaticSubcell(p));
   } else if case Has(fnid fn_body_id) = is_const_funcell(h->cs, h->bas, cell) {
     set(ref(offsets_ref, cell.~), @[cell_loc]ConstFuncellLoc(fnid));
+  } else if case Has(b bigint) = is_const_primop_int_cell(h, cell) {
+    set(ref(offsets_ref, cell.~), @[cell_loc]ConstIntCellLoc(b));
   } else {
     ci *cell_info = ref_cell(h->gr, cell);
     offset cell_loc = next_stack_offset(h->cs, *low_offset_ref, ci, low_offset_ref);
@@ -407,6 +411,26 @@ func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
       }
     }
   }
+}
+
+func is_const_primop_int_cell(h *frame, c cell_num) opt[bigint] {
+  disp *cell_disp = ref(&h->bas->celldisp, c.~);
+  if case Has(gn gr_num) = disp->prim_paramlist {
+    node *gr_node = ref_node(h->gr, gn);
+    if case &GrPrimApply(a gr_prim_apply) = &node->op {
+      if case &HasConstValue(gc gr_const) = &disp->const_value {
+        switch &gc {
+        case &ConstInt(b bigint):
+          return Has(b);
+        // TODO: For some (all) of these other cases, we could produce a const st_value.
+        case &ConstDef(ip instpair): { }
+        case &ConstFnBody(fnid fn_body_id): { }
+        case &ConstBytes(b shray[u8]): { }
+        }
+      }
+    }
+  }
+  return None();
 }
 
 func is_const_funcell(cs *checkstate, bas *basic_analyze_state, c cell_num) opt[fn_body_id] {
@@ -748,9 +772,10 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
       case &GrWriteConst(a gr_writeconst):
         DUMBGEN("GrWriteConst");
         dest_loc cell_loc = get_loc(h, a.dest);
-        if case &ConstFuncellLoc(id fn_body_id) = &dest_loc {
-          // Do nothing.
-        } else {
+        switch &dest_loc {
+        case &ConstFuncellLoc(id fn_body_id): { }
+        case &ConstIntCellLoc(b bigint): { }
+        default:
           dest_ci *cell_info = ref_cell(h->gr, a.dest);
           value st_value;
           if !st_const_compute_for_gen(h->cs, &a.value, dest_ci->props.flat_size, &value) {
@@ -855,12 +880,12 @@ func x86_add_offset(f *objfile, h *frame, dest u8, offset gr_offset, scratch1 u8
   switch offset {
   case OffsetConst(off u32):
     if off != 0 {
-      x86_mov_imm32(f, scratch1, ~off);
+      x86_mov_imm32(f, scratch1, off);
       x86_add_w32(f, dest, scratch1);
     }
   case OffsetComputed(factors tup[u32, cell_num]):
     x86_load32(f, scratch1, get_size_loc(h, factors.cdr));
-    x86_mov_imm32(f, scratch2, ~factors.car);
+    x86_mov_imm32(f, scratch2, factors.car);
     x86_imul_w32(f, scratch1, scratch2);
     x86_add_w32(f, dest, scratch1);
   }
@@ -1060,9 +1085,9 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
   case &PrimNum(b primitive_numeric_op):
     arity u32 = op_arity(b.op_action);
     check(count(&a->params) == ~arity);
-    x86_load32_zeroextend(f, X86_EAX, get_loc(h, get(&a->params, 0)), b.op_size);
+    x86_load32_for_primop(f, X86_EAX, get_loc(h, get(&a->params, 0)), b.op_size);
     if arity == 2 {
-      x86_load32_zeroextend(f, X86_ECX, get_loc(h, get(&a->params, 1)), b.op_size);
+      x86_load32_for_primop(f, X86_ECX, get_loc(h, get(&a->params, 1)), b.op_size);
     } else {
       check(arity == 1);
     }
@@ -1338,8 +1363,8 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     return true;
   case &PrimNumCompare(b primitive_numeric_comparison_op):
     check(count(&a->params) == 2);
-    x86_load32_zeroextend(f, X86_EAX, get_loc(h, get(&a->params, 0)), b.op_size);
-    x86_load32_zeroextend(f, X86_ECX, get_loc(h, get(&a->params, 1)), b.op_size);
+    x86_load32_for_primop(f, X86_EAX, get_loc(h, get(&a->params, 0)), b.op_size);
+    x86_load32_for_primop(f, X86_ECX, get_loc(h, get(&a->params, 1)), b.op_size);
 
     if b.op_size == 1 {
       x86_cmp_w8(f, X86_EAX, X86_ECX);
@@ -1379,9 +1404,9 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     arity u32 = op_arity(b);
     check(count(&a->params) == ~arity);
     op_size u32 = 1;
-    x86_load32_zeroextend(f, X86_EAX, get_loc(h, get(&a->params, 0)), op_size);
+    x86_load32_for_primop(f, X86_EAX, get_loc(h, get(&a->params, 0)), op_size);
     if arity == 2 {
-      x86_load32_zeroextend(f, X86_ECX, get_loc(h, get(&a->params, 1)), op_size);
+      x86_load32_for_primop(f, X86_ECX, get_loc(h, get(&a->params, 1)), op_size);
     } else {
       check(arity == 1);
     }
@@ -1405,8 +1430,8 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
   case &PrimPtrCompare(b primitive_ptr_comparison_op):
     check(count(&a->params) == 2);
     op_size u32 = 4;
-    x86_load32_zeroextend(f, X86_EAX, get_loc(h, get(&a->params, 0)), op_size);
-    x86_load32_zeroextend(f, X86_ECX, get_loc(h, get(&a->params, 1)), op_size);
+    x86_load32_for_primop(f, X86_EAX, get_loc(h, get(&a->params, 0)), op_size);
+    x86_load32_for_primop(f, X86_ECX, get_loc(h, get(&a->params, 1)), op_size);
     x86_cmp_w32(f, X86_EAX, X86_ECX);
     setcc_code u8;
     switch b.op_action {
@@ -1429,7 +1454,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     case Unsigned(v void):
       check(b.from_numtraits.minval == bigu(0));
       check(b.from_numtraits.maxval == (bigu(1) << (b.from_size * 8)) - bigu(1));
-      x86_load32_zeroextend(f, X86_EAX, paramloc, b.from_size);
+      x86_load32_for_primop(f, X86_EAX, paramloc, b.from_size);
       switch b.to_numtraits.repr {
       case Unsigned(v2 void):
         check(b.to_numtraits.minval == bigu(0));
@@ -1449,7 +1474,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
       return true;
     case SignedTwos(v void):
       check(b.from_numtraits.minval < bigu(0));
-      x86_load32_signextend(f, X86_EAX, paramloc, b.from_size);
+      x86_load32_signextend_for_primop(f, X86_EAX, paramloc, b.from_size);
       switch b.to_numtraits.repr {
       case Unsigned(v2 void):
         check(b.to_numtraits.minval == bigu(0));

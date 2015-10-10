@@ -53,6 +53,19 @@ access array[_] {
     r->count = newcount;
   }
 
+  func[T] grow(r *array[T], n size, value T) void {
+    rn size = r->count;
+    newcount size = rn + n;
+    if newcount > r->cap {
+      change_cap_(r, max(8, max(rn * 2, newcount)));
+    }
+    rp *T = r->ptr;
+    for i size = rn; i < newcount; i = i + 1 {
+      copy(&rp[i], &value);
+    }
+    r->count = newcount;
+  }
+
   func[T] repeat(n size, value T) array[T] {
     if n == 0 {
       ret array[T];
