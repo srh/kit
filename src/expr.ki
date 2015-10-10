@@ -1799,7 +1799,7 @@ func lookup_field_from_list(cs *checkstate, clq *clqueue, fields *shray[te_varde
     return false;
   }
 
-  *fieldtype_out = ~ ref(fields, psd.index)->type;
+  *fieldtype_out = ~ ref(fields, psd_index(&psd))->type;
   *offset_out = psd.offset;
   return true;
 }

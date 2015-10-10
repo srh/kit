@@ -888,7 +888,6 @@ deftype struct_field_info struct {
 };
 
 deftype partial_struct_data struct {
-  index size;
   found_field bool;
   offset u32;
   max_alignment u32;
@@ -897,17 +896,20 @@ deftype partial_struct_data struct {
   copy_level u32;
   destroy_level u32;
 
-  // TODO: Get rid of index?
-  // This is of length "index." -- doesn't have all the fields if we stopped early.
+  // The length of this is the index of the search-for field (-- it doesn't have all the fields if we stopped early.)
   fields array[struct_field_info];
 };
 
+inline func psd_index(psd *partial_struct_data) size {
+  return count(&psd->fields);
+}
+
 // fields had better damn well be complete
 func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *shray[te_vardecl], name opt[sym], out *partial_struct_data) bool {
-  ret partial_struct_data = {0, false, 0, 1, 0, 0, 0, 0, mk_array@[struct_field_info]()};
+  ret partial_struct_data = {false, 0, 1, 0, 0, 0, 0, mk_array@[struct_field_info]()};
   n size = count(fields);
-  for ; ret.index < n; ret.index = ret.index + 1 {
-    vd *te_vardecl = ref(fields, ret.index);
+  for i size = 0; i < n; i++ {
+    vd *te_vardecl = ref(fields, i);
     props type_properties;
     if !compute_complete_type_properties(cs, clq, &vd->type, &props) {
       return false;
