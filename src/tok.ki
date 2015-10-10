@@ -92,7 +92,9 @@ func end(p *ps, meta ast_meta) void {
 
 defenum keyw {
   Access void;
+  Break void;
   Case void;
+  Continue void;
   Def void;
   Default void;
   Defclass void;
@@ -336,7 +338,9 @@ func grab_tok(p *ps) tok {
   } else if is_ident_firstchar(ch) {
     ret tok;
     if (grab_keyword(p, "access", Access(void), &ret)
+        || grab_keyword(p, "break", Break(void), &ret)
         || grab_keyword(p, "case", Case(void), &ret)
+        || grab_keyword(p, "continue", Continue(void), &ret)
         || grab_keyword(p, "def", Def(void), &ret)
         || grab_keyword(p, "default", Default(void), &ret)
         || grab_keyword(p, "defclass", Defclass(void), &ret)

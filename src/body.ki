@@ -74,7 +74,7 @@ func connect_statements(bs *bodystate, from statement_num, to statement_num) voi
 // Returns the fall-through entry node and the fall-through exit node of a body or statement.  A body or statement might not have a fall-through exit, if e.g. it has a return statement.
 deftype entryexit struct { entry statement_num; exit statement_num; };
 
-func check_body(bs *bodystate, a *ast_bracebody, ee_out *entryexit) bool {
+func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *entryexit) bool {
   nstatements size = count(&a->statements);
   entry statement_num = add_statement(bs, None());
   exit statement_num = entry;
@@ -83,7 +83,7 @@ func check_body(bs *bodystate, a *ast_bracebody, ee_out *entryexit) bool {
   for i size = 0; i < nstatements; i = i + 1 {
     s *ast_statement = ref(&a->statements, i);
     ee entryexit;
-    if !check_statement(bs, &vp, s, &ee) {
+    if !check_statement(bs, &vp, obp, s, &ee) {
       return false;
     }
     connect_statements(bs, exit, ee.entry);
@@ -184,7 +184,15 @@ func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te
   return true;
 }
 
-func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *entryexit) bool {
+deftype breakpack struct {
+  // TODO: For these we could just use threshold var numbers.
+  break_target statement_num;
+  break_in_scope array[var_number];
+  continue_target statement_num;
+  continue_in_scope array[var_number];
+};
+
+func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) bool {
   num statement_num = add_statement(bs, Has(s));
   switch s {
     case &Expr(b ast_expr_discard): {
@@ -220,7 +228,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
         return false;
       }
       body_ee entryexit;
-      if !check_body(bs, &b.body, &body_ee) {
+      if !check_body(bs, obp, &b.body, &body_ee) {
         return false;
       }
       tailnum statement_num = add_statement(bs, None());
@@ -240,12 +248,12 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
         return false;
       }
       then_ee entryexit;
-      if !check_body(bs, &b.thenbody, &then_ee) {
+      if !check_body(bs, obp, &b.thenbody, &then_ee) {
         return false;
       }
       descope_vars(&cond_vp);
       else_ee entryexit;
-      if !check_body(bs, &b.elsebody, &else_ee) {
+      if !check_body(bs, obp, &b.elsebody, &else_ee) {
         return false;
       }
       tailnum statement_num = add_statement(bs, None());
@@ -260,16 +268,17 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       swartch_vp varpopper;
       init_vp(&swartch_vp, &bs->es);
 
+      tailnum statement_num = add_statement(bs, None());
+      bp breakpack = {tailnum, vars_in_scope(&bs->es), num, vars_in_scope(&bs->es)};
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
       if !check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard_continue, Has(&b.condition_discard_exit)) {
         return false;
       }
       body_ee entryexit;
-      if !check_body(bs, &b.body, &body_ee) {
+      if !check_body(bs, Has(&bp), &b.body, &body_ee) {
         return false;
       }
-      tailnum statement_num = add_statement(bs, None());
       connect_statements(bs, num, body_ee.entry);
       connect_statements(bs, body_ee.exit, num);
       connect_statements(bs, num, tailnum);
@@ -286,11 +295,40 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
 
     case &Switch(b ast_switch_statement): {
       exitnum statement_num;
-      if !check_switch_statement(bs, vp, &b, num, &exitnum) {
+      if !check_switch_statement(bs, vp, obp, &b, num, &exitnum) {
         return false;
       }
       *ee_out = {num, exitnum};
     }
+
+    case &Break(b ast_break_statement):
+      if case Has(bp *breakpack) = obp {
+        destructions array[var_destruction];
+        if !compute_destruct(bs, vars_in_scope(&bs->es), &bp->break_in_scope, &destructions) {
+          return false;
+        }
+        annotate(&b.info, {destructions});
+        connect_statements(bs, num, bp->break_target);
+        *ee_out = {num, add_statement(bs, None())};
+      } else {
+        ERR(_u8("break statement in bad place."));
+        return false;
+      }
+
+    case &Continue(b ast_continue_statement):
+      if case Has(bp *breakpack) = obp {
+        destructions array[var_destruction];
+        if !compute_destruct(bs, vars_in_scope(&bs->es), &bp->continue_in_scope, &destructions) {
+          return false;
+        }
+        annotate(&b.info, {destructions});
+        connect_statements(bs, num, bp->continue_target);
+        *ee_out = {num, add_statement(bs, None())};
+      } else {
+        ERR(_u8("continue statement in bad place."));
+        return false;
+      }
+
     case &Label(b ast_label_statement): {
       if case Has(ix size) = lookup_label(bs, b.name.value) {
         ERR(_u8("Duplicate label name."));
@@ -302,6 +340,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       annotate(&b.info, {label_number});
       *ee_out = {num, num};
     }
+
     case &Goto(b ast_goto_statement): {
       push(&bs->gotos, {num, &b, b.target.value, vars_in_scope(&bs->es)});
       *ee_out = {num, add_statement(bs, None())};
@@ -310,7 +349,7 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
   return true;
 }
 
-func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statement, num statement_num, exit_out *statement_num) bool {
+func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a *ast_switch_statement, num statement_num, exit_out *statement_num) bool {
   unknown te_typeexpr = TeUnknown(void);
   if !check_consume_then_discard_expr(&bs->es, oo(&a->swartch), &unknown, &a->swartch_discard) {
     return false;
@@ -412,7 +451,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statemen
           annotate(&patt.cp_info, {ovn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
 
           body_ee entryexit;
-          if !check_body(bs, &cas->body, &body_ee) {
+          if !check_body(bs, obp, &cas->body, &body_ee) {
             return false;
           }
           connect_statements(bs, num, body_ee.entry);
@@ -420,7 +459,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statemen
         }
         case &Default(v void): {
           body_ee entryexit;
-          if !check_body(bs, &cas->body, &body_ee) {
+          if !check_body(bs, obp, &cas->body, &body_ee) {
             return false;
           }
           connect_statements(bs, num, body_ee.entry);
@@ -443,12 +482,14 @@ func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statemen
 }
 
 func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num statement_num, exit_out *statement_num) bool {
+  break_in_scope array[var_number] = vars_in_scope(&bs->es);
+
   initter_vp varpopper;
   init_vp(&initter_vp, &bs->es);
   loopnum statement_num = add_statement(bs, None());
   if case &Has(initter box[ast_statement]) = &a->initializer {
     initter_ee entryexit;
-    if !check_statement(bs, &initter_vp, oo(&initter), &initter_ee) {
+    if !check_statement(bs, &initter_vp, None(), oo(&initter), &initter_ee) {
       return false;
     }
     connect_statements(bs, num, initter_ee.entry);
@@ -456,6 +497,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   } else {
     connect_statements(bs, num, loopnum);
   }
+  loop_in_scope array[var_number] = vars_in_scope(&bs->es);
 
   exitnum statement_num = add_statement(bs, None());
   cond_vp varpopper;
@@ -478,8 +520,10 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
     }
   }
 
+  bp breakpack = {exitnum, break_in_scope, loopnum, loop_in_scope};
+
   body_ee entryexit;
-  if !check_body(bs, &a->body, &body_ee) {
+  if !check_body(bs, Has(&bp), &a->body, &body_ee) {
     return false;
   }
   connect_statements(bs, loopnum, body_ee.entry);
@@ -812,49 +856,72 @@ func mark_reachable(bs *bodystate, entry statement_num) void {
   }
 }
 
+func compute_destruct(bs *bodystate, goto_in_scope array[var_number], target_in_scope *array[var_number], out *array[var_destruction]) bool {
+  destructions array[var_destruction];
+  initializations array[init_action];
+  if !compute_destruct_construct(bs, &goto_in_scope, target_in_scope, &destructions, &initializations) {
+    return false;
+  }
+  check(empty(&initializations));
+  swap(out, &destructions);
+  return true;
+}
+
+func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number], target_in_scope *array[var_number], destructions_out *array[var_destruction], initializations_out *array[init_action]) bool {
+  destruct array[var_number];
+  construct array[var_number];
+  var_difference(goto_in_scope, target_in_scope, &destruct, &construct);
+
+  nconstruct size = count(&construct);
+  for i size = 0; i < nconstruct; i++ {
+    vn var_number = get(&construct, i);
+    vi *var_info = ref_var(&bs->es, vn);
+    if vi->autoinit == VarVirtual {
+      ERR(_u8("goto enters non-initiannlizable variable scope"));
+      return false;
+    }
+    if !es_note_var_initter(&bs->es, vn) {
+      return false;
+    }
+  }
+
+  ndestruct size = count(&destruct);
+  for i size = 0; i < ndestruct; i++ {
+    vn var_number = get(&destruct, i);
+    if !es_note_var_destroyer(&bs->es, vn) {
+      return false;
+    }
+  }
+
+  destructions array[var_destruction];
+  if !make_destructions(&bs->es, &destruct, &destructions) {
+    return false;
+  }
+
+  initializations array[init_action];
+  if !make_initializations(&bs->es, &construct, &initializations) {
+    return false;
+  }
+
+  swap(destructions_out, &destructions);
+  swap(initializations_out, &initializations);
+  return true;
+}
+
 func connect_gotos(bs *bodystate) bool {
   ngotos size = count(&bs->gotos);
   for i size = 0; i < ngotos; i = i + 1 {
     g *goto_info = ref(&bs->gotos, i);
     if case Has(j size) = lookup_label(bs, g->label_name) {
       l *label_info = ref(&bs->labels, j);
-      destruct array[var_number];
-      construct array[var_number];
-      var_difference(&g->in_scope, &l->in_scope, &destruct, &construct);
-
-      nconstruct size = count(&construct);
-      for k size = 0; k < nconstruct; k = k + 1 {
-        vn var_number = get(&construct, k);
-        vi *var_info = ref_var(&bs->es, vn);
-        if vi->autoinit == VarVirtual(void) {
-          ERR(_u8("goto for label '"), lookup(bs->im, l->label_name), _u8("' enters non-initializable variable's scope"));
-          return false;
-        }
-        if !es_note_var_initter(&bs->es, vn) {
-          return false;
-        }
-      }
-
-      ndestruct size = count(&destruct);
-      for k size = 0; k < ndestruct; k = k + 1 {
-        vn var_number = get(&destruct, k);
-        if !es_note_var_destroyer(&bs->es, vn) {
-          return false;
-        }
+      destructions array[var_destruction];
+      initializations array[init_action];
+      if !compute_destruct_construct(bs, &g->in_scope, &l->in_scope, &destructions, &initializations) {
+        return false;
       }
 
       l->hit = true;
       connect_statements(bs, g->stnum, l->stnum);
-
-      destructions array[var_destruction];
-      if !make_destructions(&bs->es, &destruct, &destructions) {
-        return false;
-      }
-
-      initializations array[init_action];
-      if !make_initializations(&bs->es, &construct, &initializations) {
-        return false;
-      }
 
       annotate(&g->st->info, {unHas(&l->st->info)->label_number, destructions, initializations});
     } else {

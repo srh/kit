@@ -275,6 +275,22 @@ deftype ast_return_statement struct {
   expr opt[box[ast_expr_consume]];
 };
 
+deftype ast_break_statement_info struct {
+  destructions array[var_destruction];
+};
+
+deftype ast_break_statement struct {
+  info nc[ast_break_statement_info];
+};
+
+deftype ast_continue_statement_info struct {
+  destructions array[var_destruction];
+};
+
+deftype ast_continue_statement struct {
+  info nc[ast_continue_statement_info];
+};
+
 deftype label_num size;
 def `~` fn[size, label_num] = wrapconvert;
 def `==` fn[label_num, label_num, bool] = wrapequate;
@@ -308,6 +324,8 @@ defenum ast_statement {
   While ast_while_statement;
   For ast_for_statement;
   Switch ast_switch_statement;
+  Break ast_break_statement;
+  Continue ast_continue_statement;
   Label ast_label_statement;
   Goto ast_goto_statement;
 };

@@ -1389,7 +1389,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   }
 
   ee entryexit;
-  if !check_body(bs, &a->body.bb, &ee) {
+  if !check_body(bs, None(), &a->body.bb, &ee) {
     return false;
   }
   if !finish_lambda_body(bs, ee) {

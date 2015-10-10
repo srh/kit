@@ -270,7 +270,7 @@ func gr_fullbody(clq *clqueue, gr *frame_graph, x *ast_fullbody, out *gr_num, re
   fb fullbody_state = {info->all_vars, final_node, label_gn, mk_array@[cell_num]()};
 
   body_gn sq_num;
-  if !gr_bracebody(clq, gr, &fb, &x->bb, exit_node, &body_gn) {
+  if !gr_bracebody(clq, gr, &fb, None, &x->bb, exit_node, &body_gn) {
     return false;
   }
 
@@ -300,7 +300,13 @@ func gr_fullbody(clq *clqueue, gr *frame_graph, x *ast_fullbody, out *gr_num, re
   return true;
 }
 
-func gr_bracebody(clq *clqueue, gr *frame_graph, fb *fullbody_state, x *ast_bracebody, outflow sq_num, out *sq_num) bool {
+// TODO: Stop needing this -- make label_info and goto_info more general and use that, or make some other sort of annotation.  The use of breakgrack duplicates the usage of breakpack in body.ki.  It's not _particularly_ unsafe though.
+deftype breakgrack struct {
+  break_target sq_num;
+  continue_target sq_num;
+};
+
+func gr_bracebody(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, outflow sq_num, out *sq_num) bool {
   bn sq_num;
   if !gr_unwind_vars(clq, gr, &unHas(&x->info)->destructions, outflow, &bn) {
     return false;
@@ -309,7 +315,7 @@ func gr_bracebody(clq *clqueue, gr *frame_graph, fb *fullbody_state, x *ast_brac
   for i size = n; i > 0; {
     i = i - 1;
     gn sq_num;
-    if !gr_statement(clq, gr, fb, ref(&x->statements, i), bn, &gn) {
+    if !gr_statement(clq, gr, fb, obg, ref(&x->statements, i), bn, &gn) {
       return false;
     }
     bn = gn;
@@ -318,7 +324,7 @@ func gr_bracebody(clq *clqueue, gr *frame_graph, fb *fullbody_state, x *ast_brac
   return true;
 }
 
-func gr_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, x *ast_statement, outflow sq_num, out *sq_num) bool {
+func gr_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], x *ast_statement, outflow sq_num, out *sq_num) bool {
   switch x {
     case &Expr(a ast_expr_discard): {
       gn gr_num;
@@ -344,13 +350,13 @@ func gr_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, x *ast_stat
     }
 
     case &IfThen(a ast_ifthen_statement): {
-      if !gr_ifthen_statement(clq, gr, fb, &a, outflow, out) {
+      if !gr_ifthen_statement(clq, gr, fb, obg, &a, outflow, out) {
         return false;
       }
       return true;
     }
     case &IfThenElse(a ast_ifthenelse_statement): {
-      if !gr_ifthenelse_statement(clq, gr, fb, &a, outflow, out) {
+      if !gr_ifthenelse_statement(clq, gr, fb, obg, &a, outflow, out) {
         return false;
       }
       return true;
@@ -369,11 +375,24 @@ func gr_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, x *ast_stat
       return true;
     }
     case &Switch(a ast_switch_statement): {
-      if !gr_switch_statement(clq, gr, fb, &a, outflow, out) {
+      if !gr_switch_statement(clq, gr, fb, obg, &a, outflow, out) {
         return false;
       }
       return true;
     }
+
+    case &Break(a ast_break_statement):
+      if !gr_break_statement(clq, gr, fb, obg, &a, outflow, out) {
+        return false;
+      }
+      return true;
+
+    case &Continue(a ast_continue_statement):
+      if !gr_continue_statement(clq, gr, fb, obg, &a, outflow, out) {
+        return false;
+      }
+      return true;
+
     case &Label(a ast_label_statement): {
       if !gr_label_statement(clq, gr, fb, &a, outflow, out) {
         return false;
@@ -387,6 +406,26 @@ func gr_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, x *ast_stat
       return true;
     }
   }
+}
+
+func gr_break_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, outflow sq_num, out *sq_num) bool {
+  info *ast_break_statement_info = unHas(&a->info);
+  un sq_num;
+  if !gr_unwind_vars(clq, gr, &info->destructions, unHas(&obg)->break_target, &un) {
+    return false;
+  }
+  *out = un;
+  return true;
+}
+
+func gr_continue_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, outflow sq_num, out *sq_num) bool {
+  info *ast_continue_statement_info = unHas(&a->info);
+  un sq_num;
+  if !gr_unwind_vars(clq, gr, &info->destructions, unHas(&obg)->continue_target, &un) {
+    return false;
+  }
+  *out = un;
+  return true;
 }
 
 func gr_goto_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_goto_statement, outflow sq_num, out *sq_num) bool {
@@ -412,7 +451,7 @@ func gr_label_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *as
   return true;
 }
 
-func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_switch_statement, outflow sq_num, out *sq_num) bool {
+func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], a *ast_switch_statement, outflow sq_num, out *sq_num) bool {
   swartch_discard_gn gr_num;
   if !gr_later_discard(clq, gr, &a->swartch_discard, &swartch_discard_gn) {
     return false;
@@ -442,7 +481,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *a
           bodyexit sq_num = seqq(gr, {kill_var, exitseq});
 
           body_gn sq_num;
-          if !gr_bracebody(clq, gr, fb, &sc->body, bodyexit, &body_gn) {
+          if !gr_bracebody(clq, gr, fb, obg, &sc->body, bodyexit, &body_gn) {
             return false;
           }
 
@@ -458,7 +497,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *a
           set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         } else {
           body_gn sq_num;
-          if !gr_bracebody(clq, gr, fb, &sc->body, exitseq, &body_gn) {
+          if !gr_bracebody(clq, gr, fb, obg, &sc->body, exitseq, &body_gn) {
             return false;
           }
           kill_tag gr_num = addx(gr, @[gr_op]GrVirtualDead({info->tag_cell}));
@@ -468,7 +507,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *a
       }
       case &Default(v void): {
         body_gn sq_num;
-        if !gr_bracebody(clq, gr, fb, &sc->body, exitseq, &body_gn) {
+        if !gr_bracebody(clq, gr, fb, obg, &sc->body, exitseq, &body_gn) {
           return false;
         }
 
@@ -522,6 +561,8 @@ func gr_for_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_
     loopcleanupgn = addx(gr, @[gr_op]GrXNop(void));
   }
 
+  continue_target sq_num;
+
   continuegn sq_num;
   if case &Has(increment box[ast_expr_discard]) = &a->increment {
     incrgn gr_num;
@@ -529,13 +570,17 @@ func gr_for_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_
       return false;
     }
     totopgn var = seqq(gr, {incrgn, topgn});
+    continue_target = totopgn;
     continuegn = seqq(gr, {loopcleanupgn, totopgn});
   } else {
     continuegn = seqq(gr, {loopcleanupgn, topgn});
+    continue_target = continuegn;
   }
 
+  bp breakgrack = {outflow, continue_target};
+
   thengn sq_num;
-  if !gr_bracebody(clq, gr, fb, &a->body, continuegn, &thengn) {
+  if !gr_bracebody(clq, gr, fb, Has(bp), &a->body, continuegn, &thengn) {
     return false;
   }
 
@@ -564,7 +609,7 @@ func gr_for_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_
 
   fingn sq_num;
   if case &Has(bi box[ast_statement]) = &a->initializer {
-    if !gr_statement(clq, gr, fb, oo(&bi), topgn, &fingn) {
+    if !gr_statement(clq, gr, fb, None(), oo(&bi), topgn, &fingn) {
       return false;
     }
   } else {
@@ -596,11 +641,13 @@ func gr_while_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *as
     return false;
   }
 
+  bp breakgrack = {outflow, topgn};
+
   exitseq var = seqq(gr, {loopexitgn, outflow});
 
   continuegn var = seqq(gr, {loopcleanupgn, topgn});
   thengn sq_num;
-  if !gr_condition_body(clq, gr, fb, &a->condition_discard_continue, &a->body, continuegn, &thengn) {
+  if !gr_condition_body(clq, gr, fb, Has(bp), &a->condition_discard_continue, &a->body, continuegn, &thengn) {
     return false;
   }
   gn sq_num;
@@ -613,7 +660,7 @@ func gr_while_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *as
   return true;
 }
 
-func gr_ifthenelse_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_ifthenelse_statement, outflow sq_num, out *sq_num) bool {
+func gr_ifthenelse_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, outflow sq_num, out *sq_num) bool {
   latergn gr_num;
   if !gr_condition_discard(clq, gr, &a->condition_discard, &latergn) {
     return false;
@@ -622,11 +669,11 @@ func gr_ifthenelse_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, 
   latseq var = seqq(gr, {latergn, outflow});
 
   thengn sq_num;
-  if !gr_condition_body(clq, gr, fb, &a->condition_discard, &a->thenbody, latseq, &thengn) {
+  if !gr_condition_body(clq, gr, fb, obg, &a->condition_discard, &a->thenbody, latseq, &thengn) {
     return false;
   }
   elsegn sq_num;
-  if !gr_bracebody(clq, gr, fb, &a->elsebody, latseq, &elsegn) {
+  if !gr_bracebody(clq, gr, fb, obg, &a->elsebody, latseq, &elsegn) {
     return false;
   }
   gn sq_num;
@@ -637,15 +684,15 @@ func gr_ifthenelse_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, 
   return true;
 }
 
-func gr_condition_body(clq *clqueue, gr *frame_graph, fb *fullbody_state, cd *ast_condition_discard_info, body *ast_bracebody, outflow sq_num, out *sq_num) bool {
+func gr_condition_body(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], cd *ast_condition_discard_info, body *ast_bracebody, outflow sq_num, out *sq_num) bool {
   if case &Has(c cell_num) = unHas(&cd->virtual_cell_dead) {
     vd gr_num = addx(gr, @[gr_op]GrVirtualDead({c}));
     outflow = seqq(gr, {vd, outflow});
   }
-  return gr_bracebody(clq, gr, fb, body, outflow, out);
+  return gr_bracebody(clq, gr, fb, obg, body, outflow, out);
 }
 
-func gr_ifthen_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_ifthen_statement, outflow sq_num, out *sq_num) bool {
+func gr_ifthen_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthen_statement, outflow sq_num, out *sq_num) bool {
   latergn gr_num;
   if !gr_condition_discard(clq, gr, &a->condition_discard, &latergn) {
     return false;
@@ -654,7 +701,7 @@ func gr_ifthen_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *a
   latseq var = seqq(gr, {latergn, outflow});
 
   bodygn sq_num;
-  if !gr_condition_body(clq, gr, fb, &a->condition_discard, &a->body, latseq, &bodygn) {
+  if !gr_condition_body(clq, gr, fb, obg, &a->condition_discard, &a->body, latseq, &bodygn) {
     return false;
   }
   gn sq_num;
