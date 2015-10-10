@@ -175,12 +175,12 @@ func help_te_vardecl_list_equal(a *shray[te_vardecl], b *shray[te_vardecl]) bool
 
 func enum_tag_type(cs *checkstate, et *te_enum) te_typeexpr {
   tagsize u32 = cs->plat.enum_tag_size;
-  if tagsize == 1 {
+  if tagsize == 4 {
+    return primitive_u32_type(cs);
+  } else if tagsize == 1 {
     return primitive_u8_type(cs);
   } else if tagsize == 2 {
     return primitive_u16_type(cs);
-  } else if tagsize == 4 {
-    return primitive_u32_type(cs);
   } else {
     ice(_u8("enum_tag_type does not support enum_tag_size value"));
     return fake();
