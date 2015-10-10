@@ -199,6 +199,10 @@ func mk_enum_tag_value(constructor_decl_index size) enum_tag_value {
   return ~(enum_tag_min + ~constructor_decl_index);
 }
 
+func unmk_enum_tag_value(val enum_tag_value) size {
+  return @[size]~(val.~ - enum_tag_min);
+}
+
 func[H] build_u8str(help H, r *array[u8], a *cu_typeexpr) void {
   return build_u8str(help, r, &a->~);
 }

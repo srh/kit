@@ -424,7 +424,8 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *a
   exitseq var = seqq(gr, {swartch_discard_gn, outflow});
 
   info *ast_enum_deconstruction_info = unHas(&a->info);
-  cases array[tup[gr_const, sq_num]];
+  // TODO: Rename field
+  cases array[opt[sq_num]] = repeat(info->num_enum_constructors, None);
   default_case opt[sq_num] = None();
   ncases size = count(&a->cases);
   reserve(&cases, ncases);
@@ -454,7 +455,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *a
           gn1 var = seqq(gr, {vcgn, body_gn});
           kill_tag gr_num = addx(gr, @[gr_op]GrVirtualDead({info->tag_cell}));
           gn var = seqq(gr, {kill_tag, gn1});
-          push(&cases, cons(@[gr_const]ConstInt(~cp_info->tag_value.~), gn));
+          set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         } else {
           body_gn sq_num;
           if !gr_bracebody(clq, gr, fb, &sc->body, exitseq, &body_gn) {
@@ -462,7 +463,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *a
           }
           kill_tag gr_num = addx(gr, @[gr_op]GrVirtualDead({info->tag_cell}));
           gn var = seqq(gr, {kill_tag, body_gn});
-          push(&cases, cons(@[gr_const]ConstInt(~cp_info->tag_value.~), gn));
+          set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         }
       }
       case &Default(v void): {
@@ -474,6 +475,18 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *a
         kill_tag gr_num = addx(gr, @[gr_op]GrVirtualDead({info->tag_cell}));
         gn var = seqq(gr, {kill_tag, body_gn});
         set(&default_case, gn);
+      }
+    }
+  }
+
+  branch_cases array[tup[gr_const, sq_num]];
+  nconstructors size = count(&cases);
+  for i size = 0; i < nconstructors; i++ {
+    if case Has(sq sq_num) = get(&cases, i) {
+      push(&branch_cases, {ConstInt(bigu(mk_enum_tag_value(i).~)), sq});
+    } else {
+      if case Has(dq sq_num) = default_case {
+        push(&branch_cases, {ConstInt(bigu(mk_enum_tag_value(i).~)), dq});
       }
     }
   }
@@ -491,7 +504,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *a
   }
 
   br var = seqq(gr, {taggn,
-    addq(gr, @[gr_op]GrBranch({info->tag_cell, freeze(&cases), default_case}))});
+    addq(gr, @[gr_op]GrBranch({info->tag_cell, freeze(&branch_cases), None()}))});
 
   *out = br;
   return true;
