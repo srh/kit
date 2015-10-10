@@ -961,10 +961,10 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
       }
       final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
       *out = {final_size, psd.max_alignment,
-              level_to_derived(cs, clq, cs->im->cym.magic_init, 1, t, psd.init_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, psd.move_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, psd.copy_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, psd.destroy_level),
+              level_to_derived(cs, clq, CtorInit, 1, t, psd.init_level),
+              level_to_derived(cs, clq, CtorMove, 2, t, psd.move_level),
+              level_to_derived(cs, clq, CtorCopy, 2, t, psd.copy_level),
+              level_to_derived(cs, clq, CtorDestroy, 1, t, psd.destroy_level),
               IsScalarNo(void)};
       return true;
     }
@@ -995,9 +995,9 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
       *out = {final_size, max_alignment,
               // Enum initialization is always trivial -- initializes to zero-filled invalid tag value.
               DerivedMethodTrivial(void),
-              level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, move_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, copy_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, destroy_level),
+              level_to_derived(cs, clq, CtorMove, 2, t, move_level),
+              level_to_derived(cs, clq, CtorCopy, 2, t, copy_level),
+              level_to_derived(cs, clq, CtorDestroy, 1, t, destroy_level),
               IsScalarNo(void)};
       return true;
     }
@@ -1036,10 +1036,10 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
 
         // We _should_ maintain alignment for a zero-element array because the pointer to such an array might hack in tag-bit logic.
         *out = {props.flat_size * c, props.flat_alignment,
-                level_to_derived(cs, clq, cs->im->cym.magic_init, 1, t, behavior_level(&props.init_behavior)),
-                level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, behavior_level(&props.move_behavior)),
-                level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, behavior_level(&props.copy_behavior)),
-                level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, behavior_level(&props.destroy_behavior)),
+                level_to_derived(cs, clq, CtorInit, 1, t, behavior_level(&props.init_behavior)),
+                level_to_derived(cs, clq, CtorMove, 2, t, behavior_level(&props.move_behavior)),
+                level_to_derived(cs, clq, CtorCopy, 2, t, behavior_level(&props.copy_behavior)),
+                level_to_derived(cs, clq, CtorDestroy, 1, t, behavior_level(&props.destroy_behavior)),
                 IsScalarNo(void)};
         return true;
       } else {
@@ -1104,8 +1104,8 @@ func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, t
   }
 }
 
-func make_nontrivial(cs *checkstate, clq *clqueue, magic_name sym, arity size, type *te_typeexpr) derived_method_behavior {
-  return DerivedMethodNontrivial(make_magic_inst(cs, clq, magic_name, arity, type));
+func make_nontrivial(cs *checkstate, clq *clqueue, wc which_ctor, arity size, type *te_typeexpr) derived_method_behavior {
+  return DerivedMethodNontrivial(make_magic_inst(cs, clq, magic_name(cs->im, wc), arity, type));
 }
 
 func make_inst(cs *checkstate, clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_inst_id) bool {
@@ -1118,12 +1118,11 @@ func make_inst(cs *checkstate, clq *clqueue, ent def_entry_id, parms *genparms, 
   return true;
 }
 
-// TODO: Use which_ctor instead of magic_name/arity, which must match.
-func level_to_derived(cs *checkstate, clq *clqueue, magic_name sym, arity size, type *te_typeexpr, level u32) derived_method_behavior {
+func level_to_derived(cs *checkstate, clq *clqueue, wc which_ctor, arity size, type *te_typeexpr, level u32) derived_method_behavior {
   if level == 0 {
     return DerivedMethodTrivial(void);
   } else if level == 1 {
-    return make_nontrivial(cs, clq, magic_name, arity, type);
+    return make_nontrivial(cs, clq, wc, arity, type);
   } else if level == 2 {
     return DerivedMethodAbsent(void);
   } else {

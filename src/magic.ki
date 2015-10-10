@@ -387,3 +387,12 @@ func select_behavior(wc which_ctor, props *type_properties) *derived_method_beha
     case CtorDestroy(v void): { return &props->destroy_behavior; }
   }
 }
+
+func magic_name(im *identmap, wc which_ctor) sym {
+  switch wc {
+  case CtorInit: return im->cym.magic_init;
+  case CtorCopy: return im->cym.magic_copy;
+  case CtorMove: return im->cym.magic_move;
+  case CtorDestroy: return im->cym.magic_destroy;
+  }
+}
