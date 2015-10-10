@@ -269,9 +269,11 @@ func check_statement(bs *bodystate, vp *varpopper, s *ast_statement, ee_out *ent
       if !check_body(bs, &b.body, &body_ee) {
         return false;
       }
+      tailnum statement_num = add_statement(bs, None());
       connect_statements(bs, num, body_ee.entry);
       connect_statements(bs, body_ee.exit, num);
-      *ee_out = {num, num};
+      connect_statements(bs, num, tailnum);
+      *ee_out = {num, tailnum};
     }
 
     case &For(b ast_for_statement): {
