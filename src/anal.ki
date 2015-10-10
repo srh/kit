@@ -125,10 +125,12 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
     case &GrAddressof(a gr_addressof):
       // If this is the address of a static cell, the value is actually const.  But we ignore that possibility.
       mark_cell_not_const(bas, a.dest);
+      mark_cell_not_const(bas, a.addressee);
     case &GrSubcell(a gr_subcell):
       set(&ref(&bas->celldisp, a.name.~)->subcell, {gn, a.partof, a.offset});
       push(&ref(&bas->celldisp, a.partof.~)->subcelled, a.name);
       check(ref(&gr->cells, a.name.~)->location == LocationVirtual(void));
+      mark_cell_not_const(bas, a.partof);
     default: { }
     }
   }
