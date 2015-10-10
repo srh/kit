@@ -670,9 +670,9 @@ func gr_expr_condition(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast
   if !gr_expr_consume(clq, gr, a, &congn) {
     return false;
   }
-  cases shray[tup[gr_const, sq_num]] = mk_shray(cons(@[gr_const]ConstInt(~ @[u32] 0), elsegn), cons(@[gr_const]ConstInt(~ @[u32] 1), thengn));
+  cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(~ @[u32] 0), elsegn});
   br var = seqq(gr, {congn,
-    addq(gr, @[gr_op]GrBranch({result_cell(a), cases, None()}))});
+    addq(gr, @[gr_op]GrBranch({result_cell(a), cases, Has(thengn)}))});
 
   *out = br;
   return true;
