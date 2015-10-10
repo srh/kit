@@ -502,7 +502,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   exitnum statement_num = add_statement(bs, None());
   cond_vp varpopper;
   init_vp(&cond_vp, &bs->es);
-  if case &Has(cond ast_for_condition) = &a->condition {
+  if case &Has(cond ast_expr_condition) = &a->condition {
     boolean cu_typeexpr = compute_prim(bs->ds, primitive_bool_type(bs->cs));
     if !check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.~, &cond.discard) {
       return false;

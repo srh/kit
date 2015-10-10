@@ -553,7 +553,7 @@ func gr_for_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_
   topgn var = nopq(gr);
 
   loopcleanupgn gr_num;
-  if case &Has(cond ast_for_condition) = &a->condition {
+  if case &Has(cond ast_expr_condition) = &a->condition {
     if !gr_later_discard(clq, gr, &cond.discard, &loopcleanupgn) {
       return false;
     }
@@ -585,7 +585,7 @@ func gr_for_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_
   }
 
   gn sq_num;
-  if case &Has(cond ast_for_condition) = &a->condition {
+  if case &Has(cond ast_expr_condition) = &a->condition {
     loopexitgn gr_num;
     if !gr_later_discard(clq, gr, &cond.discard, &loopexitgn) {
       return false;
