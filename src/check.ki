@@ -296,8 +296,7 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
       }
     }
   } else {
-    // TODO: Probably this function should take a non-prim deftype.
-    ice(_u8("Calling deftype_converted_rhs on non-prim deftype."));
+    ice(_u8("Calling deftype_converted_rhs on primitive deftype."));
     return fake();
   }
 }
@@ -354,13 +353,13 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
 
 func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
   inst *def_inst = ref_inst(cs, inst_id);
-  switch inst->status {
-    case DidNotStartComputingType(v): {
+  switch inst->type_status {
+    case DidNotStartComputingType: {
       rw depth_rewinder;
       if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
         return false;
       }
-      inst->status = BeganComputingType(void);
+      inst->type_status = BeganComputingType;
 
       ent_typeexpr *te_typeexpr;
       if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
@@ -378,7 +377,7 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       if !compute_type_properties(cs, clq, &cu_computed, &props) {
         return false;
       }
-      inst->status = FinishedComputingType(void);
+      inst->type_status = FinishedComputingType;
       inst->computed_type = cu_computed;
 
       if !is_defwise_trivial(&props) {
@@ -389,17 +388,11 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       inst->computed_type_properties = props;
       return true;
     }
-    case BeganComputingType(v): {
+    case BeganComputingType: {
       ERR(_u8("computing def's type arouses cyclic dependency"), lookup(cs->im, ent->def_name));
       return false;
     }
-    case FinishedComputingType(v): {
-      return true;
-    }
-    case BeganCheckingRhs(v): {
-      return true;
-    }
-    case FinishedCheckingRhs(v): {
+    case FinishedComputingType: {
       return true;
     }
   }
@@ -411,21 +404,14 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
     return false;
   }
   inst *def_inst = ref_inst(cs, inst_id);
-  switch inst->status {
-    case DidNotStartComputingType(v void): {
-      ice(_u8("unexpected DidNotStartComputingType status"));
-      return fake();
-    }
-    case BeganComputingType(v void): {
-      ice(_u8("unexpected BeganComputingType status"));
-      return fake();
-    }
-    case FinishedComputingType(v void): {
+  check(inst->type_status == FinishedComputingType);
+  switch inst->rhs_status {
+    case DidNotCheckRhs(v void): {
       rw depth_rewinder;
       if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
         return false;
       }
-      inst->status = BeganCheckingRhs(void);
+      inst->rhs_status = BeganCheckingRhs(void);
       switch &inst->rhs {
         case &InstRhsPrim(op primitive_op): {
           // Do nothing.
@@ -451,7 +437,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           }
         }
       }
-      inst->status = FinishedCheckingRhs(void);
+      inst->rhs_status = FinishedCheckingRhs(void);
       return true;
     }
     case BeganCheckingRhs(v void): {

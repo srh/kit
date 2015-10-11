@@ -5,6 +5,7 @@ defenum[T] nbfc {
   Computed T;
 };
 
+// TODO: Get rid of these functions (once cute void enums are in s1).
 inline func[T] NotComputed() nbfc[T] {
   return NotComputed(void);
 }

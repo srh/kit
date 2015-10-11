@@ -466,20 +466,31 @@ func hash_equal(x *cu_genparms, y *cu_genparms) bool {
   return parms_equal(x, y);
 }
 
-defenum def_inst_status {
+defenum def_inst_type_status {
   DidNotStartComputingType void;
   BeganComputingType void;
   FinishedComputingType void;
-  // The following are OK, if the def_inst's rhs is None().  (Non-ephemerally, you'll only see FinishedCheckingRhs.)
+};
+
+func `==`(x def_inst_type_status, y def_inst_type_status) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+
+func `!=`(x def_inst_type_status, y def_inst_type_status) bool {
+  return !(x == y);
+}
+
+defenum def_inst_rhs_status {
+  DidNotCheckRhs void;
   BeganCheckingRhs void;
   FinishedCheckingRhs void;
 };
 
-func `==`(x def_inst_status, y def_inst_status) bool {
+func `==`(x def_inst_rhs_status, y def_inst_rhs_status) bool {
   return enumnum(&x) == enumnum(&y);
 }
 
-func `!=`(x def_inst_status, y def_inst_status) bool {
+func `!=`(x def_inst_rhs_status, y def_inst_rhs_status) bool {
   return !(x == y);
 }
 
@@ -515,7 +526,8 @@ deftype def_inst struct {
   parms cu_genparms;
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None() if we have an extern def or primitive def.
   rhs def_inst_rhs;
-  status def_inst_status;
+  type_status def_inst_type_status;
+  rhs_status def_inst_rhs_status;
   // TODO: Use nbfc or something.
   // Becomes the concrete type (with generics replaced) once we've computed it and checked it (see status).
   computed_type cu_typeexpr;
@@ -527,7 +539,7 @@ deftype def_inst struct {
 };
 
 func mk(parms cu_genparms, rhs def_inst_rhs) def_inst {
-  return {parms, rhs, DidNotStartComputingType(void), default_value@[cu_typeexpr](), default_value@[type_properties](), NotComputed@[opt[frame_regraphed]](), NotComputed@[st_value]()};
+  return {parms, rhs, DidNotStartComputingType(void), DidNotCheckRhs(void), default_value@[cu_typeexpr](), default_value@[type_properties](), NotComputed@[opt[frame_regraphed]](), NotComputed@[st_value]()};
 }
 
 deftype def_nonprim struct {
