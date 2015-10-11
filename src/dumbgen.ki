@@ -132,7 +132,8 @@ func get_size_loc(h *frame, c cell_num) cell_loc {
 
 // Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
 
-func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, bas *basic_analyze_state, g *graphed_fn_body) bool {
+func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) bool {
+  bas *basic_analyze_state = unComputed(&g->inline_state);
   h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed(), NotComputed@[i32](), mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed@[jmp_targetnum]()};
 
   liveset lives;

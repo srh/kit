@@ -70,19 +70,16 @@ func build_fn_bodies(cs *checkstate, f *objfile) bool {
 func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
   switch &ent->u {
   case &GraphedFnBody(g graphed_fn_body):
+    if !basic_and_inline(cs, &g) {
+      return false;
+    }
+
     fillercode_align_double_quadword(f);
     // DBG(_u8("gen graphed fn body for "), lookup(cs->im, g.graph.gr.informal_name));
     text_offset u32 = secsize(&f->text);
     set_symbol_value(f, *unHas(&ent->symbol_table_index), text_offset);
     annotate(&ent->body_text_offset, text_offset);
-    bas basic_analyze_state;
-    if !basic_analyze_fn_body(cs, &g, &bas) {
-      return false;
-    }
-    if !basic_inline_inlinables(cs, &bas, &g) {
-      return false;
-    }
-    return dumbly_gen_graphed_fn_body(cs, f, &bas, &g);
+    return dumbly_gen_graphed_fn_body(cs, f, &g);
   case &ExternFnBody(e extern_fn_body):
     // We have nothing to do, of course.
     return true;
