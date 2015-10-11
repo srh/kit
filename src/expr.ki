@@ -403,13 +403,17 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       return true;
     }
   }
-  if !is_complete(return_type) {
+  cac_return_type cac_typeexpr;
+  if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, return_type, &cac_return_type) {
+    return false;
+  }
+  if !cac_return_type.complete {
     *res_out = AmbigMatchConstructor(void);
     return true;
   }
-  // enum_type is complete.
+  // enum_type is complete and computed.
   enum_type *te_typeexpr;
-  if !complete_structural_rhs(ds, return_type, &enum_type) {
+  if !complete_structural_rhs(ds, &cac_return_type.te, &enum_type) {
     return false;
   }
   if case &TeEnum(et te_enum) = enum_type {
@@ -425,7 +429,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       *res_out = NoMatchConstructor(void);
       return true;
     }
-    ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, *return_type);
+    ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
     cac_ctor_type cac_typeexpr;
     if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &ctor_type, &cac_ctor_type) {
       return false;
