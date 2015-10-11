@@ -177,24 +177,24 @@ func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
 }
 
 func generate_kit_name(cs *checkstate, informal_name sym, arg_types shray[cu_typeexpr]) sym {
-  build array[u8] = _u8("_kit_");
+  build string = _s("_kit_");
   num u32 = cs->kit_name_counter + 1;
   cs->kit_name_counter = num;
-  build_u8str(void, &build, &num);
-  push(&build, '_');
-  // TODO: Actually, build should be a string, not an array[u8].
-  append(&build, to_u8str(lookup(cs->im, informal_name)));
-  push(&build, '(');
+  build += from_u8(to_u8str(num));
+  build += _s("_");
+  build += lookup(cs->im, informal_name);
+  btmp array[u8];
+  push(&btmp, '(');
   nargtypes size = count(&arg_types);
   for i size = 0; i < nargtypes; i = i + 1 {
     if i != 0 {
-      push(&build, ',');
-      push(&build, ' ');
+      push(&btmp, ',');
+      push(&btmp, ' ');
     }
-    pretty_u8str(cs->im, &build, &ref(&arg_types, i)->~);
+    pretty_u8str(cs->im, &btmp, &ref(&arg_types, i)->~);
   }
-  push(&build, ')');
-  return intern(cs->im, from_u8(&build));
+  push(&btmp, ')');
+  return intern(cs->im, build + from_u8(&btmp));
 }
 
 func c_symbol_name(cs *checkstate, name sym) sym {

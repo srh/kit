@@ -802,7 +802,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
           ovn = Has(vn);
         } else {
-          // TODO: At some point we just need an "is_void" type.  And what's the deal with compute_prim here?
+          // TODO: At some point we just need an "is_void" function.
           voidtp cu_typrop = compute_prim(es->clq, primitive_void_type(es->cs));
           unified te_typeexpr;
           if !unify_types(&voidtp.cu.~, expected_type, &unified) {

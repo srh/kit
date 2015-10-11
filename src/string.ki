@@ -5,15 +5,15 @@ deftype string shray[i32];
 
 def `~` fn[shray[i32], string] = wrapconvert;
 
-func data(s *string) *i32 {
+inline func data(s *string) *i32 {
   return data(&s->~);
 }
 
-func get(s *string, i size) i32 {
+inline func get(s *string, i size) i32 {
   return get(&s->~ , i);
 }
 
-func count(s *string) size {
+inline func count(s *string) size {
   return count(&s->~);
 }
 
@@ -50,7 +50,7 @@ func[H] build_u8str(help H, r *array[u8], x *string) void {
   }
 }
 
-func from_u8(x array[u8]) string {
+inline func from_u8(x array[u8]) string {
   return from_u8(&x);
 }
 
