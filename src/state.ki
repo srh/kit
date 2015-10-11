@@ -487,8 +487,8 @@ deftype frame_info struct {
 
 deftype def_inst_rhs_expr struct {
   ec ast_expr_consume;
-  // This becomes Has(...) when the def_inst status == FinishedCheckingRhs(void).
-  frame_info opt[frame_info];
+  // This becomes Computed(...) when the def_inst status == FinishedCheckingRhs(void).
+  frame_info nc[frame_info];
 };
 
 defenum def_inst_rhs {

@@ -2571,7 +2571,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         }
         case &InstRhsExpr(dire def_inst_rhs_expr): {
           info *frame_info;
-          if case &Has(finfo) = &dire.frame_info {
+          if case &Computed(finfo) = &dire.frame_info {
             info = &finfo;
           } else {
             ice(_u8("ensure_def_inst_graphed missing 'dire' info"));
