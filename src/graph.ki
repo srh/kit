@@ -6,6 +6,22 @@ deftype frame_graph struct {
   ops array[gr_node];
 };
 
+deftype cell_num size;
+
+def `~` fn[size, cell_num] = wrapconvert;
+def `==` fn[cell_num, cell_num, bool] = wrapequate;
+func `!=`(x cell_num, y cell_num) bool { return x.~ != y.~; }
+func `<`(x cell_num, y cell_num) bool { return x.~ < y.~; }
+func[H] build_u8str(help H, r *array[u8], c *cell_num) void {
+  build_u8str(help, r, &c->~);
+}
+func hash_compute_hash(x *cell_num) osize {
+  return hash_compute_hash(&x->~);
+}
+func hash_equal(x *cell_num, y *cell_num) bool {
+  return x->~ == y->~;
+}
+
 /* A cell location is tricky: the location of an expr's return value
 is defined both by the expr itself and the context it's found
 in. Location should be specified when:
@@ -35,7 +51,6 @@ func isLocationStatic(location cell_location) bool {
   }
 }
 
-// TODO: Move to graph.ki or something.
 deftype cell_info struct {
   // Location must be specified by type-checking, but it spends time in an unspecified state.
   location cell_location;
@@ -53,7 +68,6 @@ deftype gr_node struct {
   op gr_op;
 };
 
-// TODO: Maybe gr_num should start from 1, so that 0 is an invalid value.
 deftype gr_num size;
 def `~` fn[size, gr_num] = wrapconvert;
 func `==`(x gr_num, y gr_num) bool { return x.~ == y.~; }
