@@ -26,13 +26,17 @@ func[T] isBeganComputing(x *nbfc[T]) bool {
   }
 }
 
-func[T] unComputed(x *nbfc[T]) *T {
+func[T] unHas(x *nbfc[T]) *T {
   if case &Computed(t T) = x {
     return &t;
   } else {
     ice(_u8("unComputed failed"));
     return fake();
   }
+}
+
+inline func[T] unComputed(x *nbfc[T]) *T {
+  return unHas(x);
 }
 
 defenum[T] nc {

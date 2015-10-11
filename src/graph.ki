@@ -2577,15 +2577,15 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
       inst->graph = BeganComputing();
       switch &inst->rhs {
         case &InstRhsPrim(op primitive_op): {
-          id fn_body_id = add_prim_fn_body(cs, clq, ent->def_name, &inst->computed_type, op);
-          frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst->computed_type, &inst->computed_type_properties, ConstFnBody(id));
+          id fn_body_id = add_prim_fn_body(cs, clq, ent->def_name, &unHas(&inst->typrop)->cu, op);
+          frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &unHas(&inst->typrop)->cu, &unHas(&inst->typrop)->props, ConstFnBody(id));
           inst->graph = Computed(Has(frg));
           return true;
         }
         case &InstRhsExtern(v void): {
           // TODO: What if an extern def isn't a function?
           id fn_body_id = add_fn_body(cs, {ent->def_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
-          frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst->computed_type, &inst->computed_type_properties, ConstFnBody(id));
+          frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &unHas(&inst->typrop)->cu, &unHas(&inst->typrop)->props, ConstFnBody(id));
           inst->graph = Computed(Has(frg));
           return true;
         }
@@ -2610,12 +2610,12 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           switch &nonmag {
           case &NonMagicCtor(wnmc which_non_magic_ctor):
             info *non_magic_ctor_info = unHas(&wnmc.nmc.info);
-            frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst->computed_type, &inst->computed_type_properties, ConstDef(info->ip));
+            frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &unHas(&inst->typrop)->cu, &unHas(&inst->typrop)->props, ConstDef(info->ip));
             inst->graph = Computed(Has(frg));
             return true;
           case &NonMagicProp(nmp non_magic_prop):
             info u32 = *unHas(&nmp.info);
-            frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst->computed_type, &inst->computed_type_properties, @[gr_const]ConstInt(~info));
+            frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &unHas(&inst->typrop)->cu, &unHas(&inst->typrop)->props, @[gr_const]ConstInt(~info));
             inst->graph = Computed(Has(frg));
             return true;
           }
@@ -2635,7 +2635,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
             id = add_fn_body(cs, {ent->def_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells, inline, NotComputed})});
           }
 
-          frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst->computed_type, &inst->computed_type_properties, ConstFnBody(id));
+          frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &unHas(&inst->typrop)->cu, &unHas(&inst->typrop)->props, ConstFnBody(id));
           inst->graph = Computed(Has(frg));
           return true;
         }

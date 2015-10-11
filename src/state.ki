@@ -526,20 +526,17 @@ deftype def_inst struct {
   parms cu_genparms;
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None() if we have an extern def or primitive def.
   rhs def_inst_rhs;
-  type_status def_inst_type_status;
+  // The concrete type (with generics replaced) once we've computed it and checked it.  And its properties.  The type properties _must_ (right now) indicate that the type is defwise trivial.
+  // TODO: Many needless uses of unHas, also some of the users of this could stand to take one cu_typrop parameter instead of its fields separately.
+  typrop nbfc[cu_typrop];
   rhs_status def_inst_rhs_status;
-  // TODO: Use nbfc or something.
-  // Becomes the concrete type (with generics replaced) once we've computed it and checked it (see status).
-  computed_type cu_typeexpr;
-  // Right now, these type properties _must_ indicate that the type is defwise trivial.
-  computed_type_properties type_properties;
   // This is None() for InstRhsExtern.
   graph nbfc[opt[frame_regraphed]];
   evaled_value nbfc[st_value];
 };
 
 func mk(parms cu_genparms, rhs def_inst_rhs) def_inst {
-  return {parms, rhs, DidNotStartComputingType(void), DidNotCheckRhs(void), default_value@[cu_typeexpr](), default_value@[type_properties](), NotComputed@[opt[frame_regraphed]](), NotComputed@[st_value]()};
+  return {parms, rhs, NotComputed@[cu_typrop](), DidNotCheckRhs(void), NotComputed@[opt[frame_regraphed]](), NotComputed@[st_value]()};
 }
 
 deftype def_nonprim struct {

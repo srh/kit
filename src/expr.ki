@@ -1215,7 +1215,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       }
       annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({gi.ent, gi.inst}));
       inst *def_inst = ref_inst(es->cs, gi.inst);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, inst->computed_type, inst->computed_type_properties)), inst->computed_type, inst->computed_type_properties)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, unHas(&inst->typrop)->cu, unHas(&inst->typrop)->props)), unHas(&inst->typrop)->cu, unHas(&inst->typrop)->props)));
       return true;
     }
     case &OneLocalMatch(v local_info): {

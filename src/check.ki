@@ -353,46 +353,51 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
 
 func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
   inst *def_inst = ref_inst(cs, inst_id);
-  switch inst->type_status {
-    case DidNotStartComputingType: {
+  switch inst->typrop {
+    case NotComputed: {
       rw depth_rewinder;
       if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
         return false;
       }
-      inst->type_status = BeganComputingType;
+      inst->typrop = BeganComputing;
 
       ent_typeexpr *te_typeexpr;
       if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
+        inst->typrop = FailedComputation;
         return false;
       }
 
       // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
       computed cac_typeexpr;
       if !check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_typeexpr, &computed) {
+        inst->typrop = FailedComputation;
         return false;
       }
       check(computed.complete);
       props type_properties;
       cu_computed cu_typeexpr = ~computed.te;
       if !compute_type_properties(cs, clq, &cu_computed, &props) {
+        inst->typrop = FailedComputation;
         return false;
       }
-      inst->type_status = FinishedComputingType;
-      inst->computed_type = cu_computed;
-
       if !is_defwise_trivial(&props) {
         ERR(_u8("def (instantiation) has non-trivial type"));
+        inst->typrop = FailedComputation;
         return false;
       }
 
-      inst->computed_type_properties = props;
+      inst->typrop = Computed({cu_computed, props});
       return true;
     }
-    case BeganComputingType: {
-      ERR(_u8("computing def's type arouses cyclic dependency"), lookup(cs->im, ent->def_name));
+    case BeganComputing: {
+      ERR(_u8("computing def's type arouses cyclic dependency "), lookup(cs->im, ent->def_name));
       return false;
     }
-    case FinishedComputingType: {
+    case FailedComputation: {
+      ERR(_u8("revisiting def's type after failure for "), lookup(cs->im, ent->def_name));
+      return false;
+    }
+    case Computed(typr cu_typrop): {
       return true;
     }
   }
@@ -404,7 +409,6 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
     return false;
   }
   inst *def_inst = ref_inst(cs, inst_id);
-  check(inst->type_status == FinishedComputingType);
   switch inst->rhs_status {
     case DidNotCheckRhs(v void): {
       rw depth_rewinder;
@@ -421,7 +425,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         }
         case &InstRhsExpr(rhs def_inst_rhs_expr): {
           info frame_info;
-          if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs.ec, &inst->computed_type.~, ent->def_name, &info) {
+          if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs.ec, &unHas(&inst->typrop)->cu.~, ent->def_name, &info) {
             return false;
           }
           annotate_ref(&rhs.frame_info, &info);
