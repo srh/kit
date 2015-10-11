@@ -301,18 +301,6 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
   }
 }
 
-func enqueue_def_inst_compute_type(cs *checkstate, clq *clqueue, id def_entry_id, parms *cu_genparms, computed_type_out **cu_typeexpr, computed_type_properties_out **type_properties, inst_id_out *def_inst_id) bool {
-  inst_id def_inst_id = enqueue_def_inst(cs, clq, id, parms);
-  if !ensure_def_inst_type_computed(cs, clq, ref_def_entry(cs, id), inst_id) {
-    return false;
-  }
-  inst *def_inst = ref_inst(cs, inst_id);
-  *computed_type_out = &inst->computed_type;
-  *computed_type_properties_out = &inst->computed_type_properties;
-  *inst_id_out = inst_id;
-  return true;
-}
-
 func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *cu_genparms) def_inst_id {
   res var = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
   if res.created {
