@@ -325,7 +325,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, a *ast_switch_statemen
   // switchable_type is complete, because swartch_type was.
 
   enum_type *te_typeexpr;
-  if !complete_structural_rhs(bs->ds, switchable_type, &enum_type) {
+  if !to_bool_error(complete_structural_rhs(bs->ds, switchable_type, &enum_type)) {
     return false;
   }
   // enum_type is complete, because complete_structural_rhs does that.
@@ -662,7 +662,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
       // switchable_type is complete, because swartch_type is.
 
       enum_type *te_typeexpr;
-      if !complete_structural_rhs(es->ds, switchable_type, &enum_type) {
+      if !to_bool_error(complete_structural_rhs(es->ds, switchable_type, &enum_type)) {
         return false;
       }
       // enum_type is complete, because complete_structural_rhs.

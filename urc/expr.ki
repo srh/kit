@@ -403,8 +403,13 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     }
     // enum_type is complete.
     enum_type *te_typeexpr;
-    if !complete_structural_rhs(ds, pt, &enum_type) {
+    switch complete_structural_rhs(ds, pt, &enum_type) {
+    case Error(v void):
       return false;
+    case Success(v void): { }
+    case NoAccessibleStructuralRhs(v void):
+      *res_out = NoMatchConstructor(void);
+      return true;
     }
     if case &TeEnum(et te_enum) = enum_type {
       rhs_type *te_typeexpr;
@@ -442,8 +447,13 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   }
   // enum_type is complete and computed.
   enum_type *te_typeexpr;
-  if !complete_structural_rhs(ds, &cac_return_type.te, &enum_type) {
+  switch complete_structural_rhs(ds, &cac_return_type.te, &enum_type) {
+  case Error(v void):
     return false;
+  case Success(v void): { }
+  case NoAccessibleStructuralRhs(v void):
+    *res_out = NoMatchConstructor(void);
+    return true;
   }
   if case &TeEnum(et te_enum) = enum_type {
     rhs_type *te_typeexpr;
@@ -1714,32 +1724,51 @@ func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool)
   }
 }
 
+defenum structural_rhs_result {
+  Error void;
+  Success void;
+  NoAccessibleStructuralRhs void;
+};
+
 // t must be complete.  And computed.
-func complete_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typeexpr) bool {
+func complete_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typeexpr) structural_rhs_result {
   switch t {
     case &TeName(a te_name): {
       cu_rhs *cu_typeexpr;
-      if !help_structural_rhs(ds, &a.pack, &cu_rhs) {
-        return false;
+      res var = help_structural_rhs(ds, &a.pack, &cu_rhs);
+      if case Success(v void) = res {
+        *rhs_type_out = &cu_rhs->~;
       }
-      *rhs_type_out = &cu_rhs->~;
-      return true;
+      return res;
     }
     case &TeApp(a te_typeapp): {
       cu_rhs *cu_typeexpr;
-      if !help_structural_rhs(ds, &a.pack, &cu_rhs) {
-        return false;
+      res var = help_structural_rhs(ds, &a.pack, &cu_rhs);
+      if case Success(v void) = res {
+        *rhs_type_out = &cu_rhs->~;
       }
-      *rhs_type_out = &cu_rhs->~;
-      return true;
+      return res;
     }
     default: {
       if case &TeUnknown(v void) = t {
         ice(_u8("structural_rhs called on incomplete type"));
       }
+      // TODO: Hrm.  Does this mean that help_structural_rhs recurses?
       *rhs_type_out = t;
-      return true;
+      return Success(void);
     }
+  }
+}
+
+func to_bool_error(res structural_rhs_result) bool {
+  switch res {
+  case Error(v void):
+    return false;
+  case Success(v void):
+    return true;
+  case NoAccessibleStructuralRhs(v void):
+    ERR(_u8("Recursive structural rhs hit an inaccessible or non-structural type"));
+    return false;
   }
 }
 
@@ -1747,7 +1776,7 @@ func recursive_structural_rhs(ds *defscope, t *cu_typeexpr, rhs_type_out **cu_ty
   prev *cu_typeexpr = t;
   for ;; {
     stru *cu_typeexpr;
-    if !structural_rhs(ds, prev, &stru) {
+    if !to_bool_error(structural_rhs(ds, prev, &stru)) {
       return false;
     }
     // TODO: This pointer comparison for termination is a ghetto hack.
@@ -1760,7 +1789,7 @@ func recursive_structural_rhs(ds *defscope, t *cu_typeexpr, rhs_type_out **cu_ty
 }
 
 // TODO: Umm... this is very duplicated with complete_structural_rhs.
-func structural_rhs(ds *defscope, t *cu_typeexpr, rhs_type_out **cu_typeexpr) bool {
+func structural_rhs(ds *defscope, t *cu_typeexpr, rhs_type_out **cu_typeexpr) structural_rhs_result {
   switch &t->~ {
     case &TeName(a te_name): {
       return help_structural_rhs(ds, &a.pack, rhs_type_out);
@@ -1773,29 +1802,28 @@ func structural_rhs(ds *defscope, t *cu_typeexpr, rhs_type_out **cu_typeexpr) bo
         ice(_u8("structural_rhs called on incomplete type"));
       }
       *rhs_type_out = t;
-      return true;
+      return Success(void);
     }
   }
 }
 
-func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **cu_typeexpr) bool {
+func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **cu_typeexpr) structural_rhs_result {
   if case &Has(pack te_instpack) = mbpack {
     accessible_result bool;
     if !deftype_rhs_accessible(ds, pack.ent_id, &accessible_result) {
-      return false;
+      return Error(void);
     }
     if !accessible_result {
-      ERR(_u8("Looking for structural type information on inaccessible defclass type"));
-      return false;
+      return NoAccessibleStructuralRhs(void);
     }
     if !ensure_deftype_inst_checked(ds->cs, ds->clq, pack.ent_id, pack.inst_id) {
-      return false;
+      return Error(void);
     }
     inst *deftype_inst = ref_deftype_inst(ds->cs, pack.inst_id);
     if case &Computed(info deftype_inst_info) = &inst->info {
       if case &Has(rhs_info deftype_inst_rhs_info) = &info.rhs {
         *rhs_type_out = &rhs_info.rhs_cu;
-        return true;
+        return Success(void);
       } else {
         ice(_u8("deftype_rhs_accessible permitted a primitive type."));
         return fake();
@@ -1812,19 +1840,29 @@ func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **
 
 func lookup_whole_field(es *framescope, mbpack *opt[te_instpack], fieldtype_out *cu_typeexpr) bool {
   p *cu_typeexpr;
-  if !help_structural_rhs(es->ds, mbpack, &p) {
+  switch help_structural_rhs(es->ds, mbpack, &p) {
+  case Error(v void):
+    return false;
+  case Success(v void):
+    *fieldtype_out = *p;
+    return true;
+  case NoAccessibleStructuralRhs(v void):
+    ERR(_u8("Looking up whole field on inaccessible defclass or primitive type"));
     return false;
   }
-  *fieldtype_out = *p;
-  return true;
 }
 
 func lookup_name_field(es *framescope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) bool {
   p *cu_typeexpr;
-  if !help_structural_rhs(es->ds, mbpack, &p) {
+  switch help_structural_rhs(es->ds, mbpack, &p) {
+  case Error(v void):
+    return false;
+  case Success(v void):
+    return help_lookup_name_field(es, p, fieldname, fieldtype_out, res_out);
+  case NoAccessibleStructuralRhs(v void):
+    ERR(_u8("Looking up field on inaccessible defclass or primitive type"));
     return false;
   }
-  return help_lookup_name_field(es, p, fieldname, fieldtype_out, res_out);
 }
 
 func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) bool {
