@@ -339,10 +339,11 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
   return {id, true};
 }
 
-func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
+// Outputs a stable pointer.
+func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id, out **cu_typrop) bool {
   inst *def_inst = ref_inst(cs, inst_id);
-  switch inst->typrop {
-    case NotComputed: {
+  switch &inst->typrop {
+    case &NotComputed: {
       rw depth_rewinder;
       if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
         return false;
@@ -375,17 +376,19 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       }
 
       inst->typrop = Computed({cu_computed, props});
+      *out = unHas(&inst->typrop);
       return true;
     }
-    case BeganComputing: {
+    case &BeganComputing: {
       ERR(_u8("computing def's type arouses cyclic dependency "), lookup(cs->im, ent->def_name));
       return false;
     }
-    case FailedComputation: {
+    case &FailedComputation: {
       ERR(_u8("revisiting def's type after failure for "), lookup(cs->im, ent->def_name));
       return false;
     }
-    case Computed(typr cu_typrop): {
+    case &Computed(typr cu_typrop): {
+      *out = &typr;
       return true;
     }
   }
@@ -393,7 +396,8 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
 
 func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
   ent *def_entry = ref_def_entry(cs, ent_id);
-  if !ensure_def_inst_type_computed(cs, clq, ent, inst_id) {
+  typrop *cu_typrop;
+  if !ensure_def_inst_type_computed(cs, clq, ent, inst_id, &typrop) {
     return false;
   }
   inst *def_inst = ref_inst(cs, inst_id);
@@ -413,7 +417,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         }
         case &InstRhsExpr(rhs def_inst_rhs_expr): {
           info frame_info;
-          if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs.ec, &unHas(&inst->typrop)->cu.~, ent->def_name, &info) {
+          if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs.ec, &typrop->cu.~, ent->def_name, &info) {
             return false;
           }
           annotate_ref(&rhs.frame_info, &info);
