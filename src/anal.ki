@@ -167,7 +167,7 @@ func basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *graphe
     node gr_node = *ref_node(gr, gn);
     switch &node.op {
     case &GrApply(a gr_apply):
-      // TODO: Remove vestigial funcell after inlining.
+      // TODO: Remove vestigial funcell (if nothing ever reads it) after inlining.  (Somehow.)
       if case Has(fnid fn_body_id) = is_const_funcell(cs, bas, a.funcell) {
         ent *fn_body_entry = ref_fn_body(cs, fnid);
         switch &ent->u {

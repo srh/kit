@@ -87,8 +87,14 @@ defenum gr_op {
   GrQNop void;
 };
 
-func init_frame_graph_from_cells(informal_name sym, cells array[cell_info]) frame_graph {
-  return {informal_name, cells, mk_array@[gr_node]()};
+// TODO: What's the deal with informal_name and the incomplete_graph's informal name?
+func init_frame_graph_from_incomplete(incomplete_graph *opt[frame_graph]) frame_graph {
+  incomplete *frame_graph = unHas(incomplete_graph);
+  ret frame_graph = {incomplete->informal_name, mk_array@[cell_info](), mk_array@[gr_node]()};
+  swap(&ret.cells, &incomplete->cells);
+  swap(&ret.ops, &incomplete->ops);
+  *incomplete_graph = None;
+  return ret;
 }
 
 func init_frame_graph_empty(informal_name sym) frame_graph {
@@ -137,15 +143,15 @@ func mut_qnop_node(gr *frame_graph, ix sq_num, newnode gr_node) void {
   }
 }
 
-func ref_cell(gr *frame_graph, c cell_num) *cell_info {
+inline func ref_cell(gr *frame_graph, c cell_num) *cell_info {
   return ref(&gr->cells, c.~);
 }
 
-func ref_node(gr *frame_graph, gn gr_num) *gr_node {
+inline func ref_node(gr *frame_graph, gn gr_num) *gr_node {
   return ref(&gr->ops, gn.~);
 }
 
-func node0(op gr_op) gr_node {
+inline func node0(op gr_op) gr_node {
   return {mk_shray(), op};
 }
 
@@ -1119,7 +1125,7 @@ func gr_local_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_local_fie
 
 func gr_lambda_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_lambda, out *gr_num) bool {
   info *ast_fullbody_info = unHas(&a->body.info);
-  lambda_gr frame_graph = init_frame_graph_from_cells(gr->informal_name, info->cells);
+  lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
   fullbody_gn gr_num;
   return_cell cell_num;
   if !gr_fullbody(clq, &lambda_gr, &a->body, &fullbody_gn, &return_cell) {
@@ -2576,7 +2582,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           } else {
             ice(_u8("ensure_def_inst_graphed missing 'dire' info"));
           }
-          gr frame_graph = init_frame_graph_from_cells(ent->def_name, info->cells);
+          gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
           gn gr_num;
           if !gr_expr_consume(clq, &gr, &dire.ec, &gn) {
             inst->graph = FailedComputation();

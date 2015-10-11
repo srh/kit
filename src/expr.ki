@@ -18,12 +18,12 @@ deftype framescope struct {
   // These var_numbers are always in increasing order.
   current_vars array[var_number];
 
-  cells array[cell_info];
+  gr frame_graph;
 };
 
 func mk(ds *defscope) framescope {
   return {ds, ds->cs, ds->im, ds->clq,
-          mk_array@[var_info](), mk_array@[var_number](), mk_array@[cell_info]()};
+          mk_array@[var_info](), mk_array@[var_number](), init_frame_graph_empty(ds->def_informal_name)};
 }
 
 deftype cell_num size;
@@ -44,9 +44,7 @@ func hash_equal(x *cell_num, y *cell_num) bool {
 
 
 func help_add_cell(es *framescope, info cell_info) cell_num {
-  ret size = count(&es->cells);
-  push(&es->cells, info);
-  return ~ret;
+  return add_cell(&es->gr, info);
 }
 
 func add_virtual_cell(es *framescope, tp cu_typrop) cell_num {
@@ -66,17 +64,11 @@ func add_virtual_tag_cell(es *framescope, et *te_enum) cell_num {
   return add_virtual_cell(es, tp);
 }
 
-func ref_cell(es *framescope, num cell_num) *cell_info {
-  return ref(&es->cells, num.~);
+inline func ref_cell(es *framescope, num cell_num) *cell_info {
+  return ref_cell(&es->gr, num);
 }
 
 deftype frame_cell_count size;
-
-func count_cells(es *framescope) frame_cell_count {
-  ret frame_cell_count;
-  ret.~ = count(&es->cells);
-  return ret;
-}
 
 func reannotate_static_to_virtual(es *framescope, num cell_num) void {
   info *cell_info = ref_cell(es, num);
@@ -96,6 +88,7 @@ deftype defscope struct {
   // Generics and their _complete_ replacements.
   generics *ast_generics;
   parms *cu_genparms;
+  def_informal_name sym;
 };
 
 deftype var_number size;
@@ -270,13 +263,13 @@ func es_note_var_destroyer(es *framescope, vn var_number) bool {
   return true;
 }
 
-func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr_consume, pt *te_typeexpr, frame_info_out *frame_info) bool {
-  ds defscope = {cs, cs->im, clq, accessible, g, parms};
+func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) bool {
+  ds defscope = {cs, cs->im, clq, accessible, g, parms, def_informal_name};
   es framescope = mk(&ds);
   if !check_expr_consume(&es, x, pt) {
     return false;
   }
-  *frame_info_out = {es.cells};
+  *frame_info_out = {Has(es.gr)};
   return true;
 }
 
@@ -1450,7 +1443,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   }
   return_cell cell_num = add_static_cell(&bs->es, ~ *return_type, return_type_props);
 
-  info ast_fullbody_info = {destructions, bs->es.all_vars, bs->es.cells, bs->gotos, bs->labels, bs->statements, return_cell, arg_cells};
+  info ast_fullbody_info = {destructions, bs->es.all_vars, Has(bs->es.gr), bs->gotos, bs->labels, bs->statements, return_cell, arg_cells};
   annotate(&a->body.info, info);
 
   return true;

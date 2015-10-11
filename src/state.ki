@@ -482,7 +482,8 @@ func `!=`(x def_inst_status, y def_inst_status) bool {
 }
 
 deftype frame_info struct {
-  cells array[cell_info];
+  // This becomes None() when we begin to fully build the graph.
+  incomplete_graph opt[frame_graph];
 };
 
 deftype def_inst_rhs_expr struct {
