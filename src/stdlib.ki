@@ -387,6 +387,14 @@ func[T] bufcopy(dest *T, src *T, n size) void {
   }
 }
 
+func[T] move(x *T) T {
+  ret T;
+  destroy(&ret);
+  move(&ret, x);
+  init(x);
+  return ret;
+}
+
 // TODO: Consider hard-coding these behaviors into the language.
 inline func[T] `++`(x *T) void { *x = *x + 1; }
 inline func[T] `--`(x *T) void { *x = *x - 1; }

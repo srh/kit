@@ -104,9 +104,7 @@ defenum gr_op {
 // TODO: What's the deal with informal_name and the incomplete_graph's informal name?
 func init_frame_graph_from_incomplete(incomplete_graph *opt[frame_graph]) frame_graph {
   incomplete *frame_graph = unHas(incomplete_graph);
-  ret frame_graph = {incomplete->informal_name, mk_array@[cell_info](), mk_array@[gr_node]()};
-  swap(&ret.cells, &incomplete->cells);
-  swap(&ret.ops, &incomplete->ops);
+  ret frame_graph = move(incomplete);
   *incomplete_graph = None;
   return ret;
 }

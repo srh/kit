@@ -252,7 +252,7 @@ func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id],
   if !check_expr_consume(&es, x, pt) {
     return false;
   }
-  *frame_info_out = {Has(es.gr)};
+  *frame_info_out = {Has(move(&es.gr))};
   return true;
 }
 
