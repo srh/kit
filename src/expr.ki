@@ -194,32 +194,6 @@ func read_nums(vp *varpopper) *array[var_number] {
 
 }  // access varpopper
 
-// TODO: Nothing uses varsaver?
-defclass varsaver struct {
-  es *framescope;
-  current_vars array[var_number];
-};
-
-access varsaver {
-func do_init(vp *varsaver) void {
-  init(&vp->es);
-  init(&vp->current_vars);
-}
-func save_and_wipe_current_vars(vp *varsaver, es *framescope) void {
-  check(vp->es == null);
-  vp->es = es;
-  vp->current_vars = es->current_vars;
-  es->current_vars = mk_array();
-}
-func do_destroy(vp *varsaver) void {
-  if vp->es != null {
-    vp->es->current_vars = vp->current_vars;
-  }
-  destroy(&vp->current_vars);
-  vp->es = null;
-}
-}
-
 func es_note_var_initter(es *framescope, vn var_number) bool {
   info *var_info = ref_var(es, vn);
   if case &Has(desc ctor_desc) = &info->initter {
