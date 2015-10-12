@@ -410,122 +410,134 @@ func grab_tok(p *ps) tok {
     }
     return mk_res(p, left, Ident(freeze(&arr)));
   } else {
-    if ch == '!' {
-      return grab_oper2(p, left, ch, '=');
-    } else if ch == '\"' {
-      ps_step(p);
-      return mk_res(p, left, StringDelim(ch));
-    } else if ch == '%' {
-      return grab_oper2(p, left, ch, '=');
-    } else if ch == '&' {
-      return grab_oper2(p, left, ch, '=', '&');
-    } else if ch == '\'' {
-      ps_step(p);
-      return mk_res(p, left, StringDelim(ch));
-    } else if ch == '(' {
-      ps_step(p);
-      return mk_res(p, left, @[tokval]Grouper(LParen(void)));
-    } else if ch == ')' {
-      ps_step(p);
-      return mk_res(p, left, @[tokval]Grouper(RParen(void)));
-    } else if ch == '*' {
-      return grab_oper2(p, left, ch, '=');
-    } else if ch == '+' {
-      return grab_oper2(p, left, ch, '=', '+');
-    } else if ch == ',' {
-      ps_step(p);
-      return mk_res(p, left, Oper(mk_shray(ch)));
-    } else if ch == '-' {
-      arr array[i32] = mk_array(ch);
-      ps_step(p);
-      ch = ps_peek(p);
-      if ch == '=' || ch == '-' {
-        push(&arr, ch);
+    if ch < '.' {
+      if ch == '!' {
+        return grab_oper2(p, left, ch, '=');
+      } else if ch == '\"' {
         ps_step(p);
-      } else if ch == '>' {
-        push(&arr, ch);
+        return mk_res(p, left, StringDelim(ch));
+      } else if ch == '%' {
+        return grab_oper2(p, left, ch, '=');
+      } else if ch == '&' {
+        return grab_oper2(p, left, ch, '=', '&');
+      } else if ch == '\'' {
+        ps_step(p);
+        return mk_res(p, left, StringDelim(ch));
+      } else if ch == '(' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(LParen(void)));
+      } else if ch == ')' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(RParen(void)));
+      } else if ch == '*' {
+        return grab_oper2(p, left, ch, '=');
+      } else if ch == '+' {
+        return grab_oper2(p, left, ch, '=', '+');
+      } else if ch == ',' {
+        ps_step(p);
+        return mk_res(p, left, Oper(mk_shray(ch)));
+      } else if ch == '-' {
+        arr array[i32] = mk_array(ch);
         ps_step(p);
         ch = ps_peek(p);
-        if ch == '~' {
+        if ch == '=' || ch == '-' {
           push(&arr, ch);
           ps_step(p);
-        }
-      }
-      return mk_res(p, left, Oper(freeze(&arr)));
-    } else if ch == '.' {
-      return grab_oper2(p, left, ch, '~');
-    } else if ch == '=' {
-      return grab_oper2(p, left, ch, '=');
-    } else if ch == '/' {
-      ps_step(p);
-      ch = ps_peek(p);
-      if ch == '/' {
-        ps_step(p);
-        ch = ps_peek(p);
-        while ch != '\n' {
+        } else if ch == '>' {
+          push(&arr, ch);
           ps_step(p);
           ch = ps_peek(p);
+          if ch == '~' {
+            push(&arr, ch);
+            ps_step(p);
+          }
         }
-        ps_step(p);
-        return mk_res(p, left, Comment(void));
-      } else if ch == '*' {
+        return mk_res(p, left, Oper(freeze(&arr)));
+      } else {
+        return {{left, ps_pos(p)}, Bad(void)};
+      }
+
+    } else if ch < '[' {
+      if ch == '.' {
+        return grab_oper2(p, left, ch, '~');
+      } else if ch == '=' {
+        return grab_oper2(p, left, ch, '=');
+      } else if ch == '/' {
         ps_step(p);
         ch = ps_peek(p);
-        for ;; {
-          while ch != '*' {
+        if ch == '/' {
+          ps_step(p);
+          ch = ps_peek(p);
+          while ch != '\n' {
             ps_step(p);
             ch = ps_peek(p);
           }
           ps_step(p);
+          return mk_res(p, left, Comment(void));
+        } else if ch == '*' {
+          ps_step(p);
           ch = ps_peek(p);
-          if ch == '/' {
+          for ;; {
+            while ch != '*' {
+              ps_step(p);
+              ch = ps_peek(p);
+            }
             ps_step(p);
-            return mk_res(p, left, Comment(void));
+            ch = ps_peek(p);
+            if ch == '/' {
+              ps_step(p);
+              return mk_res(p, left, Comment(void));
+            }
           }
+        } else if ch == '=' {
+          ps_step(p);
+          return mk_res(p, left, mk_oper('/', '='));
+        } else {
+          return mk_res(p, left, mk_oper('/'));
         }
-      } else if ch == '=' {
+      } else if ch == ':' {
         ps_step(p);
-        return mk_res(p, left, mk_oper('/', '='));
+        return mk_res(p, left, Oper(mk_shray(ch)));
+      } else if ch == ';' {
+        ps_step(p);
+        return mk_res(p, left, Oper(mk_shray(ch)));
+      } else if ch == '<' {
+        return grab_angly(p, left, ch);
+      } else if ch == '>' {
+        return grab_angly(p, left, ch);
+      } else if ch == '@' {
+        ps_step(p);
+        return mk_res(p, left, Oper(mk_shray(ch)));
       } else {
-        return mk_res(p, left, mk_oper('/'));
+        return {{left, ps_pos(p)}, Bad(void)};
       }
-    } else if ch == ':' {
-      ps_step(p);
-      return mk_res(p, left, Oper(mk_shray(ch)));
-    } else if ch == ';' {
-      ps_step(p);
-      return mk_res(p, left, Oper(mk_shray(ch)));
-    } else if ch == '<' {
-      return grab_angly(p, left, ch);
-    } else if ch == '>' {
-      return grab_angly(p, left, ch);
-    } else if ch == '@' {
-      ps_step(p);
-      return mk_res(p, left, Oper(mk_shray(ch)));
-    } else if ch == '[' {
-      ps_step(p);
-      return mk_res(p, left, @[tokval]Grouper(LBracket(void)));
-    } else if ch == ']' {
-      ps_step(p);
-      return mk_res(p, left, @[tokval]Grouper(RBracket(void)));
-    } else if ch == '^' {
-      return grab_oper2(p, left, ch, '=');
-    } else if ch == '`' {
-      ps_step(p);
-      return mk_res(p, left, Backtick(void));
-    } else if ch == '{' {
-      ps_step(p);
-      return mk_res(p, left, @[tokval]Grouper(LBrace(void)));
-    } else if ch == '|' {
-      return grab_oper2(p, left, ch, '=', '|');
-    } else if ch == '}' {
-      ps_step(p);
-      return mk_res(p, left, @[tokval]Grouper(RBrace(void)));
-    } else if ch == '~' {
-      ps_step(p);
-      return mk_res(p, left, Oper(mk_shray(ch)));
+
     } else {
-      return {{left, ps_pos(p)}, Bad(void)};
+      if ch == '[' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(LBracket(void)));
+      } else if ch == ']' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(RBracket(void)));
+      } else if ch == '^' {
+        return grab_oper2(p, left, ch, '=');
+      } else if ch == '`' {
+        ps_step(p);
+        return mk_res(p, left, Backtick(void));
+      } else if ch == '{' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(LBrace(void)));
+      } else if ch == '|' {
+        return grab_oper2(p, left, ch, '=', '|');
+      } else if ch == '}' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(RBrace(void)));
+      } else if ch == '~' {
+        ps_step(p);
+        return mk_res(p, left, Oper(mk_shray(ch)));
+      } else {
+        return {{left, ps_pos(p)}, Bad(void)};
+      }
     }
   }
 }
