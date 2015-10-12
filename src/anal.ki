@@ -246,7 +246,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
             // It's important to note that GrXNop would be ignored by help_basic_analyze.
             // TODO: It'd be nice if we could undo the mark_cell_not_const of a.retcell (that happened when we processed GrApply in help_basic_analyze before).
 
-            set(&gr->ops, gn.~, {mk_shray(seqer.~), GrXNop(void)});
+            *ref(&gr->ops, gn.~) = {mk_shray(seqer.~), GrXNop(void)};
 
             // And since there's no apply op, we update the arg/funcell cell_disps.
             unSet(&ref(&bas->celldisp, a.funcell.~)->funcell);

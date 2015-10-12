@@ -371,7 +371,7 @@ func flatten_offsets(h *frame, a *array[tmp_offsets_val]) array[cell_loc] {
 
 func layout_individual_cell(h *frame, cell cell_num, low_offset_ref *i32, offsets_ref *array[tmp_offsets_val]) void {
   if case Has(p tup[cell_num, u32]) = is_static_subcell(h, cell) {
-    set(offsets_ref, cell.~, StaticSubcell(p));
+    *ref(offsets_ref, cell.~) = StaticSubcell(p);
   } else if case Has(fnid fn_body_id) = is_const_funcell(h->cs, h->bas, cell) {
     set(ref(offsets_ref, cell.~), @[cell_loc]ConstFuncellLoc(fnid));
   } else if case Has(b bigint) = is_const_primop_int_cell(h, cell) {
@@ -521,7 +521,7 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
       if nlower == 0 {
         check_insert(&zeroset, &gn, void);
       }
-      set(&backmap, gn.~, nlower);
+      *ref(&backmap, gn.~) = nlower;
       nreachable_paramlists = nreachable_paramlists + 1;
     }
   }
@@ -545,7 +545,7 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
       if nextbucket == 0 {
         check_insert(&zeroset, &upn, void);
       }
-      set(&backmap, upn.~, nextbucket);
+      *ref(&backmap, upn.~) = nextbucket;
     }
   }
 

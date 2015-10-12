@@ -1703,7 +1703,7 @@ func unify_under_generics(pt *te_typeexpr,
         if !unify_types(ref(unif_parms, ix), pt, &unified) {
           return false;
         }
-        set(unif_parms, ix, unified);
+        *ref(unif_parms, ix) = unified;
         *unified_out = TeName({a.value, None()});
         return true;
       } else {

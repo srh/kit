@@ -49,7 +49,7 @@ access hash[_, _] {
           }
         }
 
-        set(&new_array, offset, get(&h->arr, i));
+        *ref(&new_array, offset) = get(&h->arr, i);
       }
     }
 
@@ -68,7 +68,7 @@ access hash[_, _] {
     for ;; {
       switch ref(&h->arr, offset) {
         case &HashEmpty(v void): {
-          set(&h->arr, offset, @[hash_entry[K, V]]HashValue({*key, value}));
+          *ref(&h->arr, offset) = @[hash_entry[K, V]]HashValue({*key, value});
           h->user_count = h->user_count + 1;
           h->cell_count = h->cell_count + 1;
           if h->cell_count * 2 >= count(&h->arr) {
@@ -90,7 +90,7 @@ access hash[_, _] {
             step = step + 1;
             switch ref(&h->arr, offset) {
             case &HashEmpty(v2 void):
-              set(&h->arr, insertion_offset, @[hash_entry[K, V]]HashValue({*key, value}));
+              *ref(&h->arr, insertion_offset) = @[hash_entry[K, V]]HashValue({*key, value});
               h->user_count = h->user_count + 1;
               return true;
             case &HashValue(p tup[K, V]):
@@ -120,7 +120,7 @@ access hash[_, _] {
         return false;
       case &HashValue(p tup[K, V]):
         if hash_equal(&p.car, key) {
-          set(&h->arr, offset, HashErased(void));
+          *ref(&h->arr, offset) = HashErased(void);
           h->user_count = h->user_count - 1;
           return true;
         }

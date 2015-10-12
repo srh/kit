@@ -186,7 +186,7 @@ func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in 
     vref_offset u32 = vref->car;
     vref_end u32 = vref_offset + st_symbolref_size(plat, &vref->cdr);
     if vref_end <= offset || end <= vref_offset {
-      set(&val->symbolrefs, w, *vref);
+      *ref(&val->symbolrefs, w) = *vref;
       w = w + 1;
     }
   }
@@ -203,7 +203,7 @@ func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in 
     vref_offset u32 = vref->car;
     vref_end u32 = vref_offset + st_pointer_size(plat, &vref->cdr);
     if vref_end <= offset || end <= vref_offset {
-      set(&val->objrefs, w, *vref);
+      *ref(&val->objrefs, w) = *vref;
       w = w + 1;
     }
   }
@@ -276,7 +276,7 @@ func mk_ones(plat *platform_info, length u32) array[u32] {
   ones array[u32] = repeat(n, 0xFFFFFFFF);
   extra u32 = bitlength % 32;
   if extra != 0 {
-    set(&ones, n - 1, @[u32]0xFFFFFFFF >> (32 - extra));
+    *ref(&ones, n - 1) = @[u32]0xFFFFFFFF >> (32 - extra);
   }
   return ones;
 }
@@ -431,7 +431,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
             ice(_u8("Function parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.~)->type), _u8(")"));
           }
           push(&paramorefs, param_oref);
-          set(&env->framecells, c.~, None());
+          *ref(&env->framecells, c.~) = None();
         }
 
         st_maybe_init_static(&fg->gr, env, a.retcell);
@@ -453,7 +453,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
             ice(_u8("Primitive op parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.~)->type), _u8(")"));
           }
           push(&paramorefs, param_oref);
-          set(&env->framecells, c.~, None());
+          *ref(&env->framecells, c.~) = None;
         }
 
         st_maybe_init_static(&fg->gr, env, a.retcell);
@@ -532,7 +532,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
           ERR(_u8("Dereferencing pointer to dead object"));
           return false;
         }
-        set(&env->framecells, a.name.~, Has(@[st_obj_ref]{pointer.num, new_offset, deref_size}));
+        *ref(&env->framecells, a.name.~) = Has(@[st_obj_ref]{pointer.num, new_offset, deref_size});
 
       case &GrSubcell(a gr_subcell):
         partof_obj st_obj_ref = cell_obj_ref(env, a.partof, "in X");
@@ -556,7 +556,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
           ERR(_u8("Accessing subcell of dead object"));
           return false;
         }
-        set(&env->framecells, a.name.~, Has(@[st_obj_ref]{partof_obj.num, new_offset, deref_size}));
+        *ref(&env->framecells, a.name.~) = Has(@[st_obj_ref]{partof_obj.num, new_offset, deref_size});
       case &GrBranch(a gr_branch):
         src_obj st_obj_ref = cell_obj_ref(env, a.src, "in XI");
         src_value st_value;
@@ -612,11 +612,11 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
           if !is_full_oref(env, objref) {
             ice(_u8("GrDead sees non-full objref"));
           }
-          set(&env->pool->objects, objref.num.~, None());
+          *ref(&env->pool->objects, objref.num.~) = None();
         } else {
           ice(_u8("GrDead deading inactive cell"));
         }
-        set(&env->framecells, a.cell.~, None());
+        *ref(&env->framecells, a.cell.~) = None();
 
       case &GrVirtualDead(a gr_virtual_dead):
         // TODO: At some point we'll want to assert that virtual cells (and static cells) dead when we define them _active_.
@@ -624,7 +624,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         if !isHas(ref(&env->framecells, a.cell.~)) {
           ice(_u8("GrVirtualDead deading inactive cell "), a.cell.~);
         }
-        set(&env->framecells, a.cell.~, None());
+        *ref(&env->framecells, a.cell.~) = None();
 
       case &GrQNop(v void): { }
       case &GrXNop(v void): { }
@@ -646,9 +646,9 @@ func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], r
 
     subenv st_env = mk_env(env->pool, env->plat, count(&fnent.graph.gr.cells));
     for i size = 0; i < nparams; i = i + 1 {
-      set(&subenv.framecells, get(&fnent.argcells, i).~, Has(get(paramorefs, i)));
+      *ref(&subenv.framecells, get(&fnent.argcells, i).~) = Has(get(paramorefs, i));
     }
-    set(&subenv.framecells, fnent.graph.cell.~, Has(retvalref));
+    *ref(&subenv.framecells, fnent.graph.cell.~) = Has(retvalref);
 
     if !st_eval_frame_regraphed(clq, &subenv, &fnent.graph) {
       ERR(_u8("(in evaling fn "), lookup(clq->im, fnent.graph.gr.informal_name));
@@ -919,7 +919,7 @@ func st_maybe_init_static(gr *frame_graph, env *st_env, cell cell_num) void {
   }
 
   objnum st_obj_num = add_obj(env, info->props.flat_size);
-  set(&env->framecells, cell.~, Has(@[st_obj_ref]{objnum, 0, info->props.flat_size}));
+  *ref(&env->framecells, cell.~) = Has(@[st_obj_ref]{objnum, 0, info->props.flat_size});
 }
 
 func err_nonpointer() void {

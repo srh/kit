@@ -82,13 +82,6 @@ access array[_] {
     return ret;
   }
 
-  func[T] set(r *array[T], i size, val T) void {
-    if i >= r->count {
-      crash();
-    }
-    r->ptr[i] = val;
-  }
-
   inline func[T] get(r *array[T], i size) T {
     if i >= r->count {
       crash();
