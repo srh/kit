@@ -1,3 +1,4 @@
+import dumbgen;
 import state;
 
 /* We need to figure out what cell is what.

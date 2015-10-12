@@ -1,3 +1,4 @@
+import dumbgen;
 import state;
 
 func[H] build_u8str(help H, r *array[u8], x *lives) void {

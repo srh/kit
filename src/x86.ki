@@ -1,4 +1,7 @@
 import array;
+import dumbgen;
+import kitutil;
+import objfile;
 
 def x86_fillercode_byte u8 = 0xCC;
 

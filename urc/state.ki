@@ -4,6 +4,7 @@ import deferred;
 import identmap;
 import kitutil;
 import magic;
+import objfile;
 import shp;
 import typeexpr;
 import u8ast;

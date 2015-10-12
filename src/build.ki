@@ -1,6 +1,7 @@
 import anal;
 import check;
 import dumbgen;
+import io;
 import linux_objfile;
 import win_objfile;
 import objfile;

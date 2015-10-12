@@ -694,14 +694,6 @@ func[T] help_arity_matches(a *ast_generics, params opt[*shray[T]]) bool {
   return false;
 }
 
-func arity_matches(a *ast_generics, parms *genparms) bool {
-  if case &HasParms(ps shray[te_typeexpr]) = parms {
-    return arity_matches(a, Has(&ps));
-  } else {
-    return arity_matches(a, @[opt[*shray[te_typeexpr]]] None());
-  }
-}
-
 func arity_matches(a *ast_generics, parms *cu_genparms) bool {
   if case &HasParms(ps shray[cu_typeexpr]) = parms {
     return arity_matches(a, @[opt[*shray[cu_typeexpr]]]Has(&ps));

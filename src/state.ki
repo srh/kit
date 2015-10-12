@@ -1,9 +1,11 @@
+import anal;
 import ast;
 import box;
 import deferred;
 import identmap;
 import kitutil;
 import magic;
+import objfile;
 import platform;
 import shp;
 import typeexpr;
