@@ -40,18 +40,15 @@ inline func ps_restore_pos(p *ps, pos pos) void {
   p->pos = pos.~ - p->base_offset;
 }
 
-func ps_peek(p *ps) i32 {
+inline func ps_peek(p *ps) i32 {
   pos size = p->pos;
   if pos < p->length {
-    return ~p->data[pos];
-  }
-  if pos > p->length {
-    crash();
+    return +p->data[pos];
   }
   return -1;
 }
 
-func ps_step(p *ps) void {
+inline func ps_step(p *ps) void {
   if p->pos >= p->length {
     crash();
   }
@@ -267,7 +264,7 @@ inline func is_string_postchar(x i32) bool {
 }
 
 inline func is_ws(x i32) bool {
-  return x == ' ' || x == '\n' || x == '\t' || x == '\r';
+  return x <= ' ' && (x == ' ' || x == '\n' || x == '\t' || x == '\r');
 }
 
 func step(p *ps) void {
@@ -298,7 +295,7 @@ func grab_tok(p *ps) tok {
     ch = ps_peek(p);
   }
   left pos = ps_pos(p);
-  if ch == @[i32]-1 {
+  if ch < 0 {
     return {{left, left}, Eof(void)};
   }
   if ch == '0' {
@@ -346,38 +343,57 @@ func grab_tok(p *ps) tok {
     }
   } else if is_ident_firstchar(ch) {
     ret tok;
-    if (grab_keyword(p, "access", Access(void), &ret)
-        || grab_keyword(p, "break", Break(void), &ret)
-        || grab_keyword(p, "case", Case(void), &ret)
-        || grab_keyword(p, "continue", Continue(void), &ret)
-        || grab_keyword(p, "def", Def(void), &ret)
-        || grab_keyword(p, "default", Default(void), &ret)
-        || grab_keyword(p, "defclass", Defclass(void), &ret)
-        || grab_keyword(p, "defenum", Defenum(void), &ret)
-        || grab_keyword(p, "deftype", Deftype(void), &ret)
-        || grab_keyword(p, "else", Else(void), &ret)
-        || grab_keyword(p, "enum", Enum(void), &ret)
-        || grab_keyword(p, "export", Export(void), &ret)
-        || grab_keyword(p, "extern", Extern(void), &ret)
-        || grab_keyword(p, "false", False(void), &ret)
-        || grab_keyword(p, "for", For(void), &ret)
-        || grab_keyword(p, "func", Func(void), &ret)
-        || grab_keyword(p, "goto", Goto(void), &ret)
-        || grab_keyword(p, "if", If(void), &ret)
-        || grab_keyword(p, "import", Import(void), &ret)
-        || grab_keyword(p, "label", Label(void), &ret)
-        || grab_keyword(p, "null", Null(void), &ret)
-        || grab_keyword(p, "return", Return(void), &ret)
-        || grab_keyword(p, "struct", Struct(void), &ret)
-        || grab_keyword(p, "switch", Switch(void), &ret)
-        || grab_keyword(p, "then", Then(void), &ret)
-        || grab_keyword(p, "true", True(void), &ret)
-        || grab_keyword(p, "_", Underscore(void), &ret)
-        || grab_keyword(p, "union", Union(void), &ret)
-        || grab_keyword(p, "var", Var(void), &ret)
-        || grab_keyword(p, "void", Void(void), &ret)
-        || grab_keyword(p, "while", While(void), &ret)) {
-      return ret;
+
+    // '_' == 95, by the way.
+    if ch >= '_' && ch <= 'w' {
+      if ch < 'f' {
+        if ch < 'd' {
+          if (grab_keyword(p, "_", Underscore(void), &ret)
+              || grab_keyword(p, "access", Access(void), &ret)
+              || grab_keyword(p, "break", Break(void), &ret)
+              || grab_keyword(p, "case", Case(void), &ret)
+              || grab_keyword(p, "continue", Continue(void), &ret)) {
+            return ret;
+          }
+        } else {
+          if (grab_keyword(p, "def", Def(void), &ret)
+              || grab_keyword(p, "default", Default(void), &ret)
+              || grab_keyword(p, "defclass", Defclass(void), &ret)
+              || grab_keyword(p, "defenum", Defenum(void), &ret)
+              || grab_keyword(p, "deftype", Deftype(void), &ret)
+              || grab_keyword(p, "else", Else(void), &ret)
+              || grab_keyword(p, "enum", Enum(void), &ret)
+              || grab_keyword(p, "export", Export(void), &ret)
+              || grab_keyword(p, "extern", Extern(void), &ret)) {
+            return ret;
+          }
+        }
+      } else {
+        if ch < 'r' {
+          if (grab_keyword(p, "false", False(void), &ret)
+              || grab_keyword(p, "for", For(void), &ret)
+              || grab_keyword(p, "func", Func(void), &ret)
+              || grab_keyword(p, "goto", Goto(void), &ret)
+              || grab_keyword(p, "if", If(void), &ret)
+              || grab_keyword(p, "import", Import(void), &ret)
+              || grab_keyword(p, "label", Label(void), &ret)
+              || grab_keyword(p, "null", Null(void), &ret)) {
+            return ret;
+          }
+        } else {
+          if (grab_keyword(p, "return", Return(void), &ret)
+              || grab_keyword(p, "struct", Struct(void), &ret)
+              || grab_keyword(p, "switch", Switch(void), &ret)
+              || grab_keyword(p, "then", Then(void), &ret)
+              || grab_keyword(p, "true", True(void), &ret)
+              || grab_keyword(p, "union", Union(void), &ret)
+              || grab_keyword(p, "var", Var(void), &ret)
+              || grab_keyword(p, "void", Void(void), &ret)
+              || grab_keyword(p, "while", While(void), &ret)) {
+            return ret;
+          }
+        }
+      }
     }
 
     arr array[i32];
@@ -562,7 +578,8 @@ func mk_oper(ch0 i32, ch1 i32, ch2 i32) tokval {
 
 func[String] grab_keyword(p *ps, s String, k keyw, out *tok) bool {
   left pos = ps_pos(p);
-  for i size = 0; i < s.length; i = i + 1 {
+  n size = s.length;
+  for i size = 0; i < n; i = i + 1 {
     si u8 = s[i];
     if ps_peek(p) != ~si {
       ps_restore_pos(p, left);
