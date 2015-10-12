@@ -15,10 +15,10 @@ func `<`(x cell_num, y cell_num) bool { return x.~ < y.~; }
 func[H] build_u8str(help H, r *array[u8], c *cell_num) void {
   build_u8str(help, r, &c->~);
 }
-func hash_compute_hash(x *cell_num) osize {
+inline func hash_compute_hash(x *cell_num) osize {
   return hash_compute_hash(&x->~);
 }
-func hash_equal(x *cell_num, y *cell_num) bool {
+inline func hash_equal(x *cell_num, y *cell_num) bool {
   return x->~ == y->~;
 }
 
@@ -73,10 +73,10 @@ def `~` fn[size, gr_num] = wrapconvert;
 func `==`(x gr_num, y gr_num) bool { return x.~ == y.~; }
 func `!=`(x gr_num, y gr_num) bool { return x.~ != y.~; }
 func `<`(x gr_num, y gr_num) bool { return x.~ < y.~; }
-func hash_compute_hash(n *gr_num) osize {
+inline func hash_compute_hash(n *gr_num) osize {
   return hash_compute_hash(&n->~);
 }
-func hash_equal(x *gr_num, y *gr_num) bool {
+inline func hash_equal(x *gr_num, y *gr_num) bool {
   return x->~ == y->~;
 }
 
