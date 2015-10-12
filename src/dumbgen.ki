@@ -317,9 +317,10 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
 func duck_conflicting_cells(h *frame, c cell_num, bumpline *i32, offsets *array[tmp_offsets_val]) void {
   bline i32 = *bumpline;
   c_disp *cell_disp = ref(&h->bas->celldisp, c.~);
-  it hash_iter[cell_num, void] = iter(&c_disp->conflicting);
-  while case Has(p *tup[cell_num, void]) = next(&it) {
-    d cell_num = p->car;
+  // c_disp->conflicting can have duplicates, but that obviously doesn't affect this computation.
+  nconflicting size = count(&c_disp->conflicting);
+  for i size = 0; i < nconflicting; i = i + 1 {
+    d cell_num = get(&c_disp->conflicting, i);
     switch ref(offsets, d.~) {
     case &Nope: { }
     case &Has(loc cell_loc):

@@ -244,8 +244,8 @@ func note_conflicting(h *frame, all *hash[cell_num, void], c cell_num) void {
   while case Has(p *tup[cell_num, void]) = next(&it) {
     d cell_num = p->car;
     d_disp *cell_disp = ref(&h->bas->celldisp, d.~);
-    discard bool = try_insert(&c_disp->conflicting, &d, void);
-    discard = try_insert(&d_disp->conflicting, &c, void);
+    push(&c_disp->conflicting, d);
+    push(&d_disp->conflicting, c);
   }
 }
 
