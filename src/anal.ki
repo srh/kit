@@ -95,49 +95,53 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
   for i size = bas->gns_analyzed; i < n_ops; i = i + 1 {
     gn gr_num = ~i;
     node *gr_node = ref(&gr->ops, i);
-    switch node_op(node) {
-    case &GrApply(a gr_apply):
-      push(&bas->paramlists, ~i);
-      funcell_cd *cell_disp = ref(&bas->celldisp, a.funcell.~);
-      if case &Has(other_gn gr_num) = &funcell_cd->funcell {
-        ice(_u8("two-timing funcell "), a.funcell.~, _u8(" for "), other_gn.~, _u8(" and "), i);
-      } else {
-        funcell_cd->funcell = Has(gn);
-      }
-      nparams size = count(&a.params);
-      for j size = 0; j < nparams; j = j + 1 {
-        mark_cell_paramlist(bas, get(&a.params, j), gn);
-      }
-      mark_cell_not_const(bas, a.retcell);
-    case &GrPrimApply(a gr_prim_apply):
-      nparams size = count(&a.params);
-      for j size = 0; j < nparams; j++ {
-        mark_cell_prim_paramlist(bas, get(&a.params, j), gn);
-      }
-      mark_cell_not_const(bas, a.retcell);
-    case &GrMemCopy(a gr_memcopy):
-      mark_cell_not_const(bas, a.dest);
-    case &GrWriteConst(a gr_writeconst):
-      if case LocationStatic(v void) = ref(&gr->cells, a.dest.~)->location {
-        disp *cell_const_disp = &ref(&bas->celldisp, a.dest.~)->const_value;
-        switch disp {
-        case &NoConstDisp(v2 void):
-          *disp = HasConstValue(a.value);
-        case &HasConstValue(gc gr_const):
-          *disp = NotConst(void);
-        case &NotConst(v2 void): { }
+    switch node {
+    case &XOp(xn gr_xnode):
+      switch &xn.op {
+      case &GrApply(a gr_apply):
+        push(&bas->paramlists, ~i);
+        funcell_cd *cell_disp = ref(&bas->celldisp, a.funcell.~);
+        if case &Has(other_gn gr_num) = &funcell_cd->funcell {
+          ice(_u8("two-timing funcell "), a.funcell.~, _u8(" for "), other_gn.~, _u8(" and "), i);
+        } else {
+          funcell_cd->funcell = Has(gn);
         }
+        nparams size = count(&a.params);
+        for j size = 0; j < nparams; j = j + 1 {
+          mark_cell_paramlist(bas, get(&a.params, j), gn);
+        }
+        mark_cell_not_const(bas, a.retcell);
+      case &GrPrimApply(a gr_prim_apply):
+        nparams size = count(&a.params);
+        for j size = 0; j < nparams; j++ {
+          mark_cell_prim_paramlist(bas, get(&a.params, j), gn);
+        }
+        mark_cell_not_const(bas, a.retcell);
+      case &GrMemCopy(a gr_memcopy):
+        mark_cell_not_const(bas, a.dest);
+      case &GrWriteConst(a gr_writeconst):
+        if case LocationStatic(v void) = ref(&gr->cells, a.dest.~)->location {
+          disp *cell_const_disp = &ref(&bas->celldisp, a.dest.~)->const_value;
+          switch disp {
+          case &NoConstDisp(v2 void):
+            *disp = HasConstValue(a.value);
+          case &HasConstValue(gc gr_const):
+            *disp = NotConst(void);
+          case &NotConst(v2 void): { }
+          }
+        }
+      case &GrAddressof(a gr_addressof):
+        // If this is the address of a static cell, the value is actually const.  But we ignore that possibility.
+        mark_cell_not_const(bas, a.dest);
+        mark_cell_not_const(bas, a.addressee);
+      case &GrSubcell(a gr_subcell):
+        set(&ref(&bas->celldisp, a.name.~)->subcell, {gn, a.partof, a.offset});
+        push(&ref(&bas->celldisp, a.partof.~)->subcelled, a.name);
+        check(ref(&gr->cells, a.name.~)->location == LocationVirtual(void));
+        mark_cell_not_const(bas, a.partof);
+       default: { }
       }
-    case &GrAddressof(a gr_addressof):
-      // If this is the address of a static cell, the value is actually const.  But we ignore that possibility.
-      mark_cell_not_const(bas, a.dest);
-      mark_cell_not_const(bas, a.addressee);
-    case &GrSubcell(a gr_subcell):
-      set(&ref(&bas->celldisp, a.name.~)->subcell, {gn, a.partof, a.offset});
-      push(&ref(&bas->celldisp, a.partof.~)->subcelled, a.name);
-      check(ref(&gr->cells, a.name.~)->location == LocationVirtual(void));
-      mark_cell_not_const(bas, a.partof);
-    default: { }
+    case &QOp(qn gr_qnode): { }
     }
   }
   bas->gns_analyzed = n_ops;
@@ -191,82 +195,84 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
   nparamlists size = count(&bas->paramlists);
   new_paramlists array[gr_num];
   for i size = 0; i < nparamlists; i = i + 1 {
-    // (We avoid retaining references into arrays that we'll modify.)
     gn gr_num = get(&bas->paramlists, i);
-    node gr_node = *ref_node(gr, gn);
-    switch node_op(&node) {
-    case &GrApply(a gr_apply):
-      // TODO: Remove vestigial funcell (if nothing ever reads it) after inlining.  (Somehow.)
-      if case Has(fnid fn_body_id) = is_const_funcell(cs, bas, a.funcell) {
-        ent *fn_body_entry = ref_fn_body(cs, fnid);
-        switch &ent->u {
-        case &GraphedFnBody(eg graphed_fn_body):
-          switch eg.inline {
-          case InlineMust(v void):
-            if !basic_and_inline(cs, &eg) {
-              return false;
-            }
-            nparams size = count(&a.params);
-            check(count(&eg.argcells) == nparams);
-            // Okay, we're inlining.
-            nec size = count(&eg.graph.gr.cells);
-            cell_mapping array[cell_num];
-            reserve(&cell_mapping, nec);
-            for j size = 0; j < nec; j = j + 1 {
-              mapped cell_num;
-              if case Has(k size) = find(&eg.argcells, ~j) {
-                // TODO: Assert that the cell types in g and eg are equal?  The sizes?
-                mapped = get(&a.params, k);
-              } else if eg.graph.cell == ~j {
-                // TODO: Assert that the cell types in g and eg are equal?  The sizes?
-                mapped = a.retcell;
-              } else {
-                egi *cell_info = ref(&eg.graph.gr.cells, j);
-                mapped = add_cell(gr, {egi->location, egi->type, egi->props});
+    // (We avoid retaining references into arrays that we'll modify -- so we copy out the node.)
+    if case XOp(xn gr_xnode) = *ref_node(gr, gn) {
+      if case &GrApply(a gr_apply) = &xn.op {
+        // TODO: Remove vestigial funcell (if nothing ever reads it) after inlining.  (Somehow.)
+        if case Has(fnid fn_body_id) = is_const_funcell(cs, bas, a.funcell) {
+          ent *fn_body_entry = ref_fn_body(cs, fnid);
+          switch &ent->u {
+          case &GraphedFnBody(eg graphed_fn_body):
+            switch eg.inline {
+            case InlineMust(v void):
+              if !basic_and_inline(cs, &eg) {
+                return false;
               }
-              push(&cell_mapping, mapped);
+              nparams size = count(&a.params);
+              check(count(&eg.argcells) == nparams);
+              // Okay, we're inlining.
+              nec size = count(&eg.graph.gr.cells);
+              cell_mapping array[cell_num];
+              reserve(&cell_mapping, nec);
+              for j size = 0; j < nec; j = j + 1 {
+                mapped cell_num;
+                if case Has(k size) = find(&eg.argcells, ~j) {
+                  // TODO: Assert that the cell types in g and eg are equal?  The sizes?
+                  mapped = get(&a.params, k);
+                } else if eg.graph.cell == ~j {
+                  // TODO: Assert that the cell types in g and eg are equal?  The sizes?
+                  mapped = a.retcell;
+                } else {
+                  egi *cell_info = ref(&eg.graph.gr.cells, j);
+                  mapped = add_cell(gr, {egi->location, egi->type, egi->props});
+                }
+                push(&cell_mapping, mapped);
+              }
+
+              op_addend size = count(&gr->ops);
+
+              neo size = count(&eg.graph.gr.ops);
+              for j size = 0; j < neo; j = j + 1 {
+                push(&gr->ops, adjust_op_for_inline(op_addend, &cell_mapping, get(&eg.graph.gr.ops, j)));
+              }
+
+              base_op_adjusted gr_num = ~(eg.graph.gn.~ + op_addend);
+
+              // Now we overwrite the apply op.
+              // TODO: It would be nice if function bodies always had to set their return cell live, instead of having it be done for them with our GrWriteNothing statement.
+              precs_op gr_num = addx(gr, xn.precs, @[gr_xop]GrDead({a.funcell}));
+              seqer sq_num = seqq(gr, {precs_op,
+                                       seqq(gr, {addx(gr, @[gr_xop]GrWriteNothing({a.retcell})),
+                                                 seqq(gr, {base_op_adjusted,
+                                                           nopq(gr)})})});
+
+              // It's important to note that GrXNop would be ignored by help_basic_analyze.
+              // TODO: It'd be nice if we could undo the mark_cell_not_const of a.retcell (that happened when we processed GrApply in help_basic_analyze before).
+
+              *ref(&gr->ops, gn.~) = XOp({mk_shray(seqer.~), GrXNop(void)});
+
+              // And since there's no apply op, we update the arg/funcell cell_disps.
+              unSet(&ref(&bas->celldisp, a.funcell.~)->funcell);
+              for j size = 0; j < nparams; j = j + 1 {
+                unSet(&ref(&bas->celldisp, get(&a.params, j).~)->paramlist);
+              }
+
+              help_basic_analyze(cs, bas, gr);
+              nparamlists = count(&bas->paramlists);
+            case InlineYawn(v void):
+              push(&new_paramlists, gn);
             }
-
-            op_addend size = count(&gr->ops);
-
-            neo size = count(&eg.graph.gr.ops);
-            for j size = 0; j < neo; j = j + 1 {
-              push(&gr->ops, adjust_op_for_inline(op_addend, &cell_mapping, get(&eg.graph.gr.ops, j)));
-            }
-
-            base_op_adjusted gr_num = ~(eg.graph.gn.~ + op_addend);
-
-            // Now we overwrite the apply op.
-            // TODO: It would be nice if function bodies always had to set their return cell live, instead of having it be done for them with our GrWriteNothing statement.
-            precs_op gr_num = addx(gr, node_precs(&node), @[gr_op]GrDead({a.funcell}));
-            seqer sq_num = seqq(gr, {precs_op,
-                                     seqq(gr, {addx(gr, @[gr_op]GrWriteNothing({a.retcell})),
-                                               seqq(gr, {base_op_adjusted,
-                                                         nopq(gr)})})});
-
-            // It's important to note that GrXNop would be ignored by help_basic_analyze.
-            // TODO: It'd be nice if we could undo the mark_cell_not_const of a.retcell (that happened when we processed GrApply in help_basic_analyze before).
-
-            *ref(&gr->ops, gn.~) = XOp({mk_shray(seqer.~), GrXNop(void)});
-
-            // And since there's no apply op, we update the arg/funcell cell_disps.
-            unSet(&ref(&bas->celldisp, a.funcell.~)->funcell);
-            for j size = 0; j < nparams; j = j + 1 {
-              unSet(&ref(&bas->celldisp, get(&a.params, j).~)->paramlist);
-            }
-
-            help_basic_analyze(cs, bas, gr);
-            nparamlists = count(&bas->paramlists);
-          case InlineYawn(v void):
+          default:
             push(&new_paramlists, gn);
           }
-        default:
+        } else {
           push(&new_paramlists, gn);
         }
       } else {
-        push(&new_paramlists, gn);
+        ice(_u8("basic_inline_inlinables impossible xnode type"));
       }
-    default:
+    } else {
       ice(_u8("basic_inline_inlinables impossible node type"));
     }
   }

@@ -170,13 +170,13 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
 }
 
 func paramlist_cells(gr *frame_graph, gn gr_num) *shray[cell_num] {
-  switch node_op(ref_node(gr, gn)) {
-  case &GrApply(a gr_apply):
-    return &a.params;
-  default:
-    ice(_u8("paramlist_cells called on non-paramlist op"));
-    return fake();
+  if case &XOp(xn gr_xnode) = ref_node(gr, gn) {
+    if case &GrApply(a gr_apply) = &xn.op {
+      return &a.params;
+    }
   }
+  ice(_u8("paramlist_cells called on non-paramlist op"));
+  return fake();
 }
 
 defenum tmp_offsets_val {
@@ -418,16 +418,17 @@ func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
 func is_const_primop_int_cell(h *frame, c cell_num) opt[bigint] {
   disp *cell_disp = ref(&h->bas->celldisp, c.~);
   if case Has(gn gr_num) = disp->prim_paramlist {
-    node *gr_node = ref_node(h->gr, gn);
-    if case &GrPrimApply(a gr_prim_apply) = node_op(node) {
-      if case &HasConstValue(gc gr_const) = &disp->const_value {
-        switch &gc {
-        case &ConstInt(b bigint):
-          return Has(b);
-        // TODO: For some (all) of these other cases, we could produce a const st_value.
-        case &ConstDef(ip instpair): { }
-        case &ConstFnBody(fnid fn_body_id): { }
-        case &ConstBytes(b shray[u8]): { }
+    if case &XOp(xn gr_xnode) = ref_node(h->gr, gn) {
+      if case &GrPrimApply(a gr_prim_apply) = &xn.op {
+        if case &HasConstValue(gc gr_const) = &disp->const_value {
+          switch &gc {
+          case &ConstInt(b bigint):
+            return Has(b);
+          // TODO: For some (all) of these other cases, we could produce a const st_value.
+          case &ConstDef(ip instpair): { }
+          case &ConstFnBody(fnid fn_body_id): { }
+          case &ConstBytes(b shray[u8]): { }
+          }
         }
       }
     }
@@ -721,149 +722,155 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
     case DumbgenOp(otgna op_targ_gn_jmpaft):
       frame_define_target(h, otgna.op_targ, secsize(&f->text));
       gn gr_num = otgna.gn;
-      switch node_op(ref_node(h->gr, gn)) {
-      case &GrApply(a gr_apply):
-        DUMBGEN("GrApply");
-        switch h->cs->plat.callconv {
-        case UniversalCdeclConvention(v void):
-          ret_ci *cell_info = ref_cell(h->gr, a.retcell);
-          hrp bool = for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props);
-          framelist_bottom i32 = *unHas(&ref_annot(h, gn)->paramlist_bottom_frame_offset);
-          if hrp {
-            hrp_bottom i32 = framelist_bottom - 4;
-            x86_load_cell_address(f, h, X86_EAX, a.retcell);
-            x86_store32(f, X86_EBP, hrp_bottom, X86_EAX);
-            // TODO: I think we could dedup some code here and below.
-            switch get_loc(h, a.funcell) {
-            case DirectLoc(x i32):
-              x86_load32(f, X86_EAX, X86_EBP, x);
-              set_esp_to_frame_offset(f, h, hrp_bottom);
-              x86_indirect_call(f, X86_EAX);
-            case ConstFuncellLoc(fnid fn_body_id):
-              symbol_table_index sti = *unHas(&ref_fn_body(h->cs, fnid)->symbol_table_index);
-              set_esp_to_frame_offset(f, h, hrp_bottom);
-              x86_call(f, symbol_table_index);
-            }
-            restore_esp_to_default_position(f, h);
-          } else {
-            switch get_loc(h, a.funcell) {
-            case DirectLoc(x i32):
-              x86_load32(f, X86_EAX, X86_EBP, x);
-              set_esp_to_frame_offset(f, h, framelist_bottom);
-              x86_indirect_call(f, X86_EAX);
-            case ConstFuncellLoc(fnid fn_body_id):
-              symbol_table_index sti = *unHas(&ref_fn_body(h->cs, fnid)->symbol_table_index);
-              set_esp_to_frame_offset(f, h, framelist_bottom);
-              x86_call(f, symbol_table_index);
-            }
+      switch ref_node(h->gr, gn) {
+      case &XOp(xn gr_xnode):
+        switch &xn.op {
+        case &GrApply(a gr_apply):
+          DUMBGEN("GrApply");
+          switch h->cs->plat.callconv {
+          case UniversalCdeclConvention(v void):
+            ret_ci *cell_info = ref_cell(h->gr, a.retcell);
+            hrp bool = for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props);
+            framelist_bottom i32 = *unHas(&ref_annot(h, gn)->paramlist_bottom_frame_offset);
+            if hrp {
+              hrp_bottom i32 = framelist_bottom - 4;
+              x86_load_cell_address(f, h, X86_EAX, a.retcell);
+              x86_store32(f, X86_EBP, hrp_bottom, X86_EAX);
+              // TODO: I think we could dedup some code here and below.
+              switch get_loc(h, a.funcell) {
+              case DirectLoc(x i32):
+                x86_load32(f, X86_EAX, X86_EBP, x);
+                set_esp_to_frame_offset(f, h, hrp_bottom);
+                x86_indirect_call(f, X86_EAX);
+              case ConstFuncellLoc(fnid fn_body_id):
+                symbol_table_index sti = *unHas(&ref_fn_body(h->cs, fnid)->symbol_table_index);
+                set_esp_to_frame_offset(f, h, hrp_bottom);
+                x86_call(f, symbol_table_index);
+              }
+              restore_esp_to_default_position(f, h);
+            } else {
+              switch get_loc(h, a.funcell) {
+              case DirectLoc(x i32):
+                x86_load32(f, X86_EAX, X86_EBP, x);
+                set_esp_to_frame_offset(f, h, framelist_bottom);
+                x86_indirect_call(f, X86_EAX);
+              case ConstFuncellLoc(fnid fn_body_id):
+                symbol_table_index sti = *unHas(&ref_fn_body(h->cs, fnid)->symbol_table_index);
+                set_esp_to_frame_offset(f, h, framelist_bottom);
+                x86_call(f, symbol_table_index);
+              }
 
-            universal_cc_write_to_retcell(f, h, a.retcell);
-            restore_esp_to_default_position(f, h);
+              universal_cc_write_to_retcell(f, h, a.retcell);
+              restore_esp_to_default_position(f, h);
+            }
           }
-        }
-      case &GrPrimApply(a gr_prim_apply):
-        DUMBGEN("GrPrimApply");
-        if !x86_dumbly_prim_apply(f, h, &a) {
-          return false;
-        }
-      case &GrMemCopy(a gr_memcopy):
-        DUMBGEN("GrMemCopy");
-        dest_ci *cell_info = ref_cell(h->gr, a.dest);
-        src_ci *cell_info = ref_cell(h->gr, a.src);
-        if dest_ci->props.flat_size != src_ci->props.flat_size {
-          ice(_u8("GrMemCopy to have same-size cells."));
-        }
-        x86_memcopy(f, get_loc(h, a.dest), get_loc(h, a.src), dest_ci->props.flat_size);
-      case &GrWriteConst(a gr_writeconst):
-        DUMBGEN("GrWriteConst");
-        dest_loc cell_loc = get_loc(h, a.dest);
-        switch &dest_loc {
-        case &ConstFuncellLoc(id fn_body_id): { }
-        case &ConstIntCellLoc(b bigint): { }
-        default:
+        case &GrPrimApply(a gr_prim_apply):
+          DUMBGEN("GrPrimApply");
+          if !x86_dumbly_prim_apply(f, h, &a) {
+            return false;
+          }
+        case &GrMemCopy(a gr_memcopy):
+          DUMBGEN("GrMemCopy");
           dest_ci *cell_info = ref_cell(h->gr, a.dest);
-          value st_value;
-          if !st_const_compute_for_gen(h->cs, &a.value, dest_ci->props.flat_size, &value) {
-            return false;
+          src_ci *cell_info = ref_cell(h->gr, a.src);
+          if dest_ci->props.flat_size != src_ci->props.flat_size {
+            ice(_u8("GrMemCopy to have same-size cells."));
           }
+          x86_memcopy(f, get_loc(h, a.dest), get_loc(h, a.src), dest_ci->props.flat_size);
+        case &GrWriteConst(a gr_writeconst):
+          DUMBGEN("GrWriteConst");
+          dest_loc cell_loc = get_loc(h, a.dest);
+          switch &dest_loc {
+          case &ConstFuncellLoc(id fn_body_id): { }
+          case &ConstIntCellLoc(b bigint): { }
+          default:
+            dest_ci *cell_info = ref_cell(h->gr, a.dest);
+            value st_value;
+            if !st_const_compute_for_gen(h->cs, &a.value, dest_ci->props.flat_size, &value) {
+              return false;
+            }
 
-          x86_gen_write_value(f, h, dest_loc, &value);
-        }
-      case &GrAddressof(a gr_addressof):
-        DUMBGEN("GrAddressof");
-        x86_load_cell_address(f, h, X86_EAX, a.addressee);
-        x86_store32(f, get_ptr_loc(h, a.dest), X86_EAX, X86_EDX);
-      case &GrDeref(a gr_deref):
-        DUMBGEN("GrDeref");
-        x86_load32(f, X86_EAX, get_ptr_loc(h, a.pointer));
-        x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
-        x86_store32(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX);
-      case &GrSubcell(a gr_subcell):
-        DUMBGEN("GrSubcell");
-        switch get_loc(h, a.name) {
-        case DirectLoc(off i32): { }
-        case IndirectLoc(off i32):
-          x86_load_cell_address(f, h, X86_EAX, a.partof);
+            x86_gen_write_value(f, h, dest_loc, &value);
+          }
+        case &GrAddressof(a gr_addressof):
+          DUMBGEN("GrAddressof");
+          x86_load_cell_address(f, h, X86_EAX, a.addressee);
+          x86_store32(f, get_ptr_loc(h, a.dest), X86_EAX, X86_EDX);
+        case &GrDeref(a gr_deref):
+          DUMBGEN("GrDeref");
+          x86_load32(f, X86_EAX, get_ptr_loc(h, a.pointer));
           x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
-          x86_store32(f, X86_EBP, off, X86_EAX);
-        }
-      case &GrBranch(a gr_branch):
-        DUMBGEN("GrBranch");
-        // TODO: It'd be nice to codegen this without the gratuitous jmps.
-        // TODO: Faster bool behavior.
-        src_size u32 = ref_cell(h->gr, a.src)->props.flat_size;
-        check(src_size == 4 || src_size == 2 || src_size == 1);
-        src_addr u8;
-        src_disp i32;
-        x86_prep_loc_use(f, get_loc(h, a.src), X86_EAX, &src_addr, &src_disp);
-        x86_load32_zeroextend(f, X86_EAX, src_addr, src_disp, src_size);
-
-        done_a_push bool = false;
-        ncases size = count(&a.cases);
-        for i size = 0; i < ncases; i = i + 1 {
-          cas *tup[gr_const, sq_num] = ref(&a.cases, i);
-          expected st_value;
-          if !st_const_compute_for_gen(h->cs, &cas->car, src_size, &expected) {
-            return false;
+          x86_store32(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX);
+        case &GrSubcell(a gr_subcell):
+          DUMBGEN("GrSubcell");
+          switch get_loc(h, a.name) {
+          case DirectLoc(off i32): { }
+          case IndirectLoc(off i32):
+            x86_load_cell_address(f, h, X86_EAX, a.partof);
+            x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
+            x86_store32(f, X86_EBP, off, X86_EAX);
           }
-          x86_cmp_imm_sized(h->cs, f, X86_EAX, &expected, X86_ECX);
-          x86_gen_placeholder_jcc(f, h, X86_JCC_Z, frame_gn_targetnum(h, cas->cdr.~));
-          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({cas->cdr.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
-          done_a_push = true;
+        case &GrWriteNothing(a gr_writenothing):
+          DUMBGEN("GrWriteNothing");
+          // Do nothing.  (This graph node is used for static eval, book keeping, etc.)
+        case &GrDead(a gr_dead):
+          DUMBGEN("GrDead");
+          // Do nothing.  (Likewise.)
+        case &GrVirtualDead(a gr_virtual_dead):
+          DUMBGEN("GrVirtualDead");
+          // Do nothing.  (Likewise.)
+        case &GrXNop(v void):
+          DUMBGEN("GrXNop");
+          // Do nothing (but do it less glamorously).
         }
-        if case Has(default_gn sq_num) = a.default_case {
-          x86_gen_placeholder_jmp(f, h, frame_gn_targetnum(h, default_gn.~));
-          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({default_gn.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
-          done_a_push = true;
-        } else {
-          x86_gen_crash(f, h);
-        }
-      case &GrSequence(a gr_sequence):
-        DUMBGEN("GrSequence");
-        // first gets evaluated before second (because it gets pushed after)
-        push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.second.~, otgna.jmpaft, otgna.jmp_necessary}));
-        push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.first, frame_gn_targetnum(h, a.second.~), false}));
-      case &GrJmp(a gr_jmp):
-        DUMBGEN("GrJmp");
-        push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.next.~, otgna.jmpaft, otgna.jmp_necessary}));
-      case &GrWriteNothing(a gr_writenothing):
-        DUMBGEN("GrWriteNothing");
-        // Do nothing.  (This graph node is used for static eval, book keeping, etc.)
-      case &GrDead(a gr_dead):
-        DUMBGEN("GrDead");
-        // Do nothing.  (Likewise.)
-      case &GrVirtualDead(a gr_virtual_dead):
-        DUMBGEN("GrVirtualDead");
-        // Do nothing.  (Likewise.)
-      case &GrXNop(v void):
-        DUMBGEN("GrXNop");
-        // Do nothing (but do it less glamorously).
-      case &GrQNop(v void):
-        DUMBGEN("GrQNop");
-        // Do nothing (but do it less glamorously).
-        // TODO: Ugh.
-        if otgna.jmp_necessary {
-          x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
+      case &QOp(qn gr_qnode):
+        switch &qn.op {
+        case &GrBranch(a gr_branch):
+          DUMBGEN("GrBranch");
+          // TODO: It'd be nice to codegen this without the gratuitous jmps.
+          // TODO: Faster bool behavior.
+          src_size u32 = ref_cell(h->gr, a.src)->props.flat_size;
+          check(src_size == 4 || src_size == 2 || src_size == 1);
+          src_addr u8;
+          src_disp i32;
+          x86_prep_loc_use(f, get_loc(h, a.src), X86_EAX, &src_addr, &src_disp);
+          x86_load32_zeroextend(f, X86_EAX, src_addr, src_disp, src_size);
+
+          done_a_push bool = false;
+          ncases size = count(&a.cases);
+          for i size = 0; i < ncases; i = i + 1 {
+            cas *tup[gr_const, sq_num] = ref(&a.cases, i);
+            expected st_value;
+            if !st_const_compute_for_gen(h->cs, &cas->car, src_size, &expected) {
+              return false;
+            }
+            x86_cmp_imm_sized(h->cs, f, X86_EAX, &expected, X86_ECX);
+            x86_gen_placeholder_jcc(f, h, X86_JCC_Z, frame_gn_targetnum(h, cas->cdr.~));
+            push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({cas->cdr.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
+            done_a_push = true;
+          }
+          if case Has(default_gn sq_num) = a.default_case {
+            x86_gen_placeholder_jmp(f, h, frame_gn_targetnum(h, default_gn.~));
+            push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({default_gn.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
+            done_a_push = true;
+          } else {
+            x86_gen_crash(f, h);
+          }
+        case &GrSequence(a gr_sequence):
+          DUMBGEN("GrSequence");
+          // first gets evaluated before second (because it gets pushed after)
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.second.~, otgna.jmpaft, otgna.jmp_necessary}));
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.first, frame_gn_targetnum(h, a.second.~), false}));
+        case &GrJmp(a gr_jmp):
+          DUMBGEN("GrJmp");
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.next.~, otgna.jmpaft, otgna.jmp_necessary}));
+        case &GrQNop(v void):
+          DUMBGEN("GrQNop");
+          // Do nothing (but do it less glamorously).
+          // TODO: Ugh.
+          if otgna.jmp_necessary {
+            x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
+          }
         }
       }
     }
