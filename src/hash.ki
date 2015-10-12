@@ -357,12 +357,7 @@ func[K, V] build_u8str(r *array[u8], a *hash[K, V]) void {
 }
 
 func hash_compute_hash(x *size) osize {
-  k osize = ~ *x;
-  k = k ^ (k >> 6);
-  k = k ^ (k << 13);
-  k = k ^ (k >> 17);
-  k = k * 0x23457812;
-  return k;
+  return 0x23457813 * @[osize]+ *x;
 }
 
 inline func hash_equal(x *size, y *size) bool {
