@@ -1174,8 +1174,10 @@ func is_equal(arr *shray[i32], v0 i32) bool {
 }
 
 func is_at_sign(operch *shray[i32]) bool {
-  return is_equal(operch, '@');
+  return is_equal(operch, at_sign);
 }
+
+def at_sign i32 = '@';
 
 func parse_rest_of_lambda(p *ps, out *ast_expr) bool {
   // TODO: Uh, the meta should start a bit earlier, no?
@@ -1557,6 +1559,18 @@ func parse_naked_var_or_expr_statement(p *ps, ab allow_braces, fa force_assignme
   decl ast_vardecl;
   if try_skip_keyw(p, Var(void)) {
     decl = {name, Unknown({})};
+  } else if try_skip_oper(p, at_sign) {
+    lhs ast_expr;
+    if !parse_finish_name_expr(p, name, &lhs) {
+      return Fail;
+    }
+    whole_expr ast_expr;
+    if !(parse_after_atomic_expr(p, kSemicolonPrec, ab, IsStatementExpr, lhs, &whole_expr)
+         && try_skip_oper(p, ';')) {
+      return Fail;
+    }
+    *out = Expr(discard(&whole_expr));
+    return true;
   } else {
     type ast_typeexpr;
     indexers array[ast_expr];
