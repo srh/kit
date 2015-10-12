@@ -39,14 +39,18 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
   annotate(&gnc->plainly_live, {liveset->xored, liveset->summed});
 
   node *gr_node = ref_node(gr, gn);
-  nprecs size = count(&node->precs);
-  for i size = 0; i < nprecs; i = i + 1 {
-    if !dumbly_analyze_returning_expression(h, gr, liveset, get(&node->precs, i)) {
-      return false;
+  switch node {
+  case &XOp(xn gr_xnode):
+    nprecs size = count(&xn.precs);
+    for i size = 0; i < nprecs; i = i + 1 {
+      if !dumbly_analyze_returning_expression(h, gr, liveset, get(&xn.precs, i)) {
+        return false;
+      }
     }
+  case &QOp(qn gr_qnode): { }
   }
 
-  switch &node->op {
+  switch node_op(node) {
   case &GrApply(a gr_apply):
     // Retcell is activated _before_ the param cells are dead -- though we shouldn't be generating graphs where this matters for the purposes of this analysis _except_ that we need it for computing lower param lists.
     output(h, liveset, a.retcell);

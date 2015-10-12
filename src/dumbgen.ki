@@ -170,7 +170,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
 }
 
 func paramlist_cells(gr *frame_graph, gn gr_num) *shray[cell_num] {
-  switch &ref_node(gr, gn)->op {
+  switch node_op(ref_node(gr, gn)) {
   case &GrApply(a gr_apply):
     return &a.params;
   default:
@@ -419,7 +419,7 @@ func is_const_primop_int_cell(h *frame, c cell_num) opt[bigint] {
   disp *cell_disp = ref(&h->bas->celldisp, c.~);
   if case Has(gn gr_num) = disp->prim_paramlist {
     node *gr_node = ref_node(h->gr, gn);
-    if case &GrPrimApply(a gr_prim_apply) = &node->op {
+    if case &GrPrimApply(a gr_prim_apply) = node_op(node) {
       if case &HasConstValue(gc gr_const) = &disp->const_value {
         switch &gc {
         case &ConstInt(b bigint):
@@ -705,20 +705,23 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
 
         // For now we eval precs left-to-right, just like in static eval.  This means behavior differences must be the result of bugs.
 
-        precaft jmp_targetnum = op_targ;
-        nprecs size = count(&node->precs);
-        for i size = nprecs; i > 0; {
-          i = i - 1;
-          prec_gn gr_num = get(&node->precs, i);
-          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({prec_gn, precaft, false}));
-          precaft = frame_gn_targetnum(h, prec_gn);
+        switch node {
+        case &XOp(xn gr_xnode):
+          precaft jmp_targetnum = op_targ;
+          nprecs size = count(&xn.precs);
+          for i size = nprecs; i > 0; {
+            i = i - 1;
+            prec_gn gr_num = get(&xn.precs, i);
+            push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({prec_gn, precaft, false}));
+            precaft = frame_gn_targetnum(h, prec_gn);
+          }
+        case &QOp(qn gr_qnode): { }
         }
       }
     case DumbgenOp(otgna op_targ_gn_jmpaft):
       frame_define_target(h, otgna.op_targ, secsize(&f->text));
       gn gr_num = otgna.gn;
-      node *gr_node = ref_node(h->gr, gn);
-      switch &node->op {
+      switch node_op(ref_node(h->gr, gn)) {
       case &GrApply(a gr_apply):
         DUMBGEN("GrApply");
         switch h->cs->plat.callconv {

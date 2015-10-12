@@ -397,16 +397,18 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
     switch se {
     case EvalOpAndPrecs(gn gr_num):
       push(&stack, EvalOp(gn));
-      node *gr_node = ref_node(&fg->gr, gn);
       // Push the stack such that we eval the precs left-to-right in static eval.
-      nprecs size = count(&node->precs);
-      for i size = nprecs; i > 0; {
-        i = i - 1;
-        push(&stack, EvalOpAndPrecs(get(&node->precs, i)));
+      switch ref_node(&fg->gr, gn) {
+      case &XOp(xn gr_xnode):
+        nprecs size = count(&xn.precs);
+        for i size = nprecs; i > 0; {
+          i = i - 1;
+          push(&stack, EvalOpAndPrecs(get(&xn.precs, i)));
+        }
+      case &QOp(qn gr_qnode): { }
       }
     case EvalOp(gn gr_num):
-      node *gr_node = ref_node(&fg->gr, gn);
-      switch &node->op {
+      switch node_op(ref_node(&fg->gr, gn)) {
       case &GrApply(a gr_apply):
         // TODO: GrApply (and maybe some other things) should deaden parameters.  (But we do already with parameters?)
         funref st_obj_ref = cell_obj_ref(env, a.funcell, "in I");
