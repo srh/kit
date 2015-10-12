@@ -400,7 +400,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
           expected_type *te_typeexpr;
           decl_index size;
           if !find_vardecl(&et.constructors, patt.constructor_name.value, &expected_type, &decl_index) {
-            ERR(_u8("constructor not found"));
+            MERR(bs->cs, patt.meta, _u8("constructor not found"));
             return false;
           }
           // expected_type is complete, because enum_type was.
