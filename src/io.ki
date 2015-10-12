@@ -10,6 +10,8 @@ func read_file(path array[u8], out *array[u8]) bool {
   }
 
   dat array[u8];
+  // Reserve size bigger than the largest .ki source file we have.
+  reserve(&dat, 131072);
   totread size = 0;
   done bool = false;
   while !done {
