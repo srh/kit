@@ -556,9 +556,6 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_
   if try_parse_oper(p, '*', &oper) {
     return success_or_fail(parse_rest_of_pointer(p, ab, oper, out));
   }
-  if try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
-    return success_or_fail(parse_rest_of_arraytype(p, ab, out));
-  }
   if try_skip_oper(p, '^') {
     if !try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
       return Error(void);
@@ -1513,53 +1510,25 @@ func parse_naked_var_or_expr_statement(p *ps, ab allow_braces, fa force_assignme
     decl = {name, Unknown({})};
   } else {
     type ast_typeexpr;
-    indexers array[ast_expr];
-    done bool = false;
-    while !done {
-      if try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
-        if try_skip_keyw(p, Underscore(void)) {
-          param box[ast_typeexpr];
-          if !(try_skip_token(p, @[tokval]Grouper(RBracket(void)))
-               && parse_typeexpr(p, oo(&param))) {
-            return Fail;
-          }
-
-          type = collapse_indexers(indexers, @[ast_typeexpr]Arraytype({None(), param}));
-          done = true;
-        } else {
-          ambi ast_expr;
-          if !(parse_expr(p, kCommaPrec, AllowBracesYes(void), IsNotStatementExpr(void), &ambi)
-               && try_skip_token(p, @[tokval]Grouper(RBracket(void)))) {
-            return Fail;
-          }
-          push(&indexers, ambi);
+    switch help_triparse_typeexpr(p, AllowBlanksYes(void), &type) {
+      case Quickfail(v): {
+        m ast_meta = copystart(p, name.meta);
+        lhs ast_expr = mk(name.meta, NameExpr(mk(name, None())));
+        whole_expr ast_expr;
+        if !(parse_after_atomic_expr(p, kSemicolonPrec, ab, IsStatementExpr(void), lhs, &whole_expr)
+             && try_skip_oper(p, ';')) {
+          return Fail;
         }
-      } else {
-        local_type ast_typeexpr;
-        switch help_triparse_typeexpr(p, AllowBlanksYes(void), &local_type) {
-          case Quickfail(v): {
-            m ast_meta = copystart(p, name.meta);
-            lhs ast_expr = expressionize(m, name, indexers);
-            whole_expr ast_expr;
-            if !(parse_after_atomic_expr(p, kSemicolonPrec, ab, IsStatementExpr(void), lhs, &whole_expr)
-                 && try_skip_oper(p, ';')) {
-              return Fail;
-            }
-            *out = Expr(discard(whole_expr));
-            return true;
-          }
-          case Error(v): {
-            return Fail;
-          }
-          case Success(v): {
-            type = collapse_indexers(indexers, local_type);
-            done = true;
-          }
-        }
+        *out = Expr(discard(whole_expr));
+        return true;
+      }
+      case Error(v): {
+        return Fail;
+      }
+      case Success(v): {
+        decl = {name, type};
       }
     }
-
-    decl = {name, type};
   }
 
   semicolon tokval = mk_oper(';');
@@ -1582,23 +1551,6 @@ func parse_naked_var_or_expr_statement(p *ps, ab allow_braces, fa force_assignme
   }
   *out = Var({NotComputed@[ast_var_info](), decl, HasExpr(embox(consume(rhs)))});
   return true;
-}
-
-func expressionize(m ast_meta, name ast_ident, indexers array[ast_expr]) ast_expr {
-  lhs ast_expr = mk(name.meta, NameExpr(mk(name, None())));
-  e size = count(&indexers);
-  for i size = 0; i < e; i = i + 1 {
-    lhs = mk(m, IndexExpr(mk(embox(lhs), embox(consume(get(&indexers, i))))));
-  }
-  return lhs;
-}
-
-func collapse_indexers(indexers array[ast_expr], param ast_typeexpr) ast_typeexpr {
-  for i size = count(&indexers); i > 0; {
-    i = i - 1;
-    param = Arraytype({Has(embox(get(&indexers, i))), embox(param)});
-  }
-  return param;
 }
 
 func parse_rest_of_string_literal(p *ps, m ast_meta, out *ast_expr) bool {
@@ -1788,23 +1740,11 @@ func test_parse() bool {
                                    "  return x[y];  }"));
   pass = pass & run_parse_test(_u8("p025"),
                                _u8("func a() int {\n"
-                                   "  x *[y(z)]t = 3;\n"
+                                   "  x *^[y(z)]t = 3;\n"
                                    "  return x[y]; }"));
-  pass = pass & run_parse_test(_u8("p026-a"),
+  pass = pass & run_parse_test(_u8("p026"),
                                _u8("func a() int {\n"
-                                   "  x [y(z)][1][2]t = 3;\n"
-                                   "  return x[y]; }"));
-  pass = pass & run_parse_test(_u8("p026-b"),
-                               _u8("func a() int {\n"
-                                   "  x ^[y(z)][1][2]t = 3;\n"
-                                   "  return x[y]; }"));
-  pass = pass & run_parse_test(_u8("p026-c"),
-                               _u8("func a() int {\n"
-                                   "  x [y(z)]^[1][2]t = 3;\n"
-                                   "  return x[y]; }"));
-  pass = pass & run_parse_test(_u8("p026-d"),
-                               _u8("func a() int {\n"
-                                   "  x ^[y(z)]^[1][2]t = 3;\n"
+                                   "  x ^[y(z)]^[1]^[2]t = 3;\n"
                                    "  return x[y]; }"));
   pass = pass & run_parse_test(_u8("p027"),
                                _u8("func a() int {\n"
@@ -1876,15 +1816,10 @@ func test_parse() bool {
   pass = pass & run_parse_test(_u8("p048"),
                                _u8("deftype[] foo struct {x bar [quux]; };\n"));
   pass = pass & run_parse_test(_u8("p049-a"),
-                               _u8("deftype[] foo struct {x [2 + 3]bar; };\n"));
+                               _u8("deftype[] foo struct {x ^[2 + 3]bar; };\n"));
   pass = pass & run_parse_test(_u8("p049-b"),
-                               _u8("deftype[T, U] foo struct {x [2 + 3]bar; };\n"));
-  pass = pass & run_parse_test(_u8("p049-c"),
                                _u8("deftype[T, U] foo struct {x ^[2 + 3]bar; };\n"));
-  pass = pass & run_parse_test(_u8("p050-a"),
-                               _u8("defclass move foo [7]bar;\n"
-                                   "deftype[T] foo struct { count u32; p [3]T; };\n"));
-  pass = pass & run_parse_test(_u8("p050-b"),
+  pass = pass & run_parse_test(_u8("p050"),
                                _u8("defclass move foo ^[7]bar;\n"
                                    "deftype[T] foo struct { count u32; p ^[3]T; };\n"));
   pass = pass & run_parse_test(_u8("p051"),

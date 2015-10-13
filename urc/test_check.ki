@@ -479,8 +479,8 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"));
   // Fails because vec3 and [3]u32 are different types.
   run_check_negtest(ctx, "c052",
-    _u8("deftype vec3 [3]u32;\n"
-        "def foo fn[[3]u32, vec3] = func(arr [3]u32) vec3 {\n"
+    _u8("deftype vec3 ^[3]u32;\n"
+        "def foo fn[^[3]u32, vec3] = func(arr ^[3]u32) vec3 {\n"
         "  v vec3 = arr;\n"
         "  return v;\n"
         "};\n"));
@@ -739,10 +739,10 @@ func test_check_more_cases(ctx *check_ctx) void {
   // TODO: This should fail if string literals not allowed in static evaluation.
   // TODO: String literals should be allowed, this should pass.
   run_check_test(ctx, "c084",
-    _u8("def x [5]u8 = \"pq\\x12rs\";\n"));
+    _u8("def x ^[5]u8 = \"pq\\x12rs\";\n"));
   // Fails because the array size is wrong.
   run_check_negtest(ctx, "c085",
-    _u8("def x [6]u8 = \"pq\\x12rs\";\n"));
+    _u8("def x ^[6]u8 = \"pq\\x12rs\";\n"));
 
   run_check_test(ctx, "c086",
     _u8("defenum ty {\n"
@@ -887,18 +887,18 @@ func test_check_more_cases(ctx *check_ctx) void {
   // Fails because x[0] is of wrong type.
   run_check_negtest(ctx, "c098",
     _u8("func foo() i32 {\n"
-        "  x [3]u32;\n"
+        "  x ^[3]u32;\n"
         "  return x[0];\n"
         "}\n"));
   run_check_test(ctx, "c099",
     _u8("func foo() bool {\n"
-        "  x [3]u32;\n"
+        "  x ^[3]u32;\n"
         "  return &x[0] == &x[1];\n"
         "}\n"));
   // Fails because ptr types don't match.
   run_check_negtest(ctx, "c100",
     _u8("func foo() bool {\n"
-        "  x [3]u32;\n"
+        "  x ^[3]u32;\n"
         "  return &x[0] == &x;\n"
         "}\n"));
 
@@ -1301,7 +1301,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c136",
     _u8("func foo() u32 {\n"
         "  u union {\n"
-        "    ch [4]u8;\n"
+        "    ch ^[4]u8;\n"
         "    x u32;\n"
         "  };\n"
         "  u.ch[0] = 3;\n"
@@ -1314,7 +1314,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
 
   run_check_test(ctx, "c137-a",
     _u8("deftype st struct {\n"
-        "  y [3]i8;\n"
+        "  y ^[3]i8;\n"
         "  z u8;\n"
         "  x i32;\n"
         "};\n"
@@ -1805,7 +1805,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  }\n"
         "}\n"
         "func foo() i32 {\n"
-        "  z [3]ty;\n"
+        "  z ^[3]ty;\n"
         "  return get(&z[2]);\n"
         "}\n"
         "def d1 i32 = foo();\n"));
