@@ -850,7 +850,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
             done_a_push = true;
           }
           if case Has(default_gn sq_num) = a.default_case {
-            x86_gen_placeholder_jmp(f, h, frame_gn_targetnum(h, default_gn.~));
+            // No jmp for this case, since it's code-genned right after.  (Just like a.first in GrSequence.)
             push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({default_gn.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
             done_a_push = true;
           } else {
