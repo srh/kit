@@ -52,8 +52,10 @@ deftype cell_disp struct {
   paramlist opt[gr_num];
   // If the cell's part of a primop param list, tells what paramlist it's part of.
   prim_paramlist opt[gr_num];
-  // If the cell's a funcell of a GrApply, tells what paramlist it's applying.
+  // If the cell's a funcell of a GrApply, tells what paramlist it's applying.  Or tells what paramlist it used to apply, if the function got inlined.
   funcell opt[gr_num];
+  // If the cell's value is used, outside of a funcell.
+  value_used bool;
   // If the cell's a subcell of another, tells what it's a subcell of.
   subcell opt[subcell_disp];
   // If the cell has a constant value.  (Must be a static cell.)
@@ -90,7 +92,7 @@ func basic_analyze_fn_body(cs *checkstate, g *graphed_fn_body, bas_out *basic_an
 func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_graph) bool {
   n_ops size = count(&gr->ops);
   cellcount size = count(&gr->cells);
-  grow(&bas->celldisp, cellcount - count(&bas->celldisp), {None(), None(), None(), None(), NoConstDisp(void), mk_array@[cell_num](), mk_array@[cell_num]()});
+  grow(&bas->celldisp, cellcount - count(&bas->celldisp), {None(), None(), None(), false, None(), NoConstDisp(void), mk_array@[cell_num](), mk_array@[cell_num]()});
 
   for i size = bas->gns_analyzed; i < n_ops; i = i + 1 {
     gn gr_num = ~i;
@@ -118,6 +120,7 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
         }
         mark_cell_not_const(bas, a.retcell);
       case &GrMemCopy(a gr_memcopy):
+        mark_cell_value_used(bas, a.src);
         mark_cell_not_const(bas, a.dest);
       case &GrWriteConst(a gr_writeconst):
         if case LocationStatic(v void) = ref(&gr->cells, a.dest.~)->location {
@@ -131,6 +134,7 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
           }
         }
       case &GrAddressof(a gr_addressof):
+        mark_cell_value_used(bas, a.addressee);
         // If this is the address of a static cell, the value is actually const.  But we ignore that possibility.
         mark_cell_not_const(bas, a.dest);
         mark_cell_not_const(bas, a.addressee);
@@ -139,23 +143,39 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
         push(&ref(&bas->celldisp, a.partof.~)->subcelled, a.name);
         check(ref(&gr->cells, a.name.~)->location == LocationVirtual(void));
         mark_cell_not_const(bas, a.partof);
+        mark_cell_value_used(bas, a.name);
+        mark_cell_value_used(bas, a.partof);
        default: { }
       }
-    case &QOp(qn gr_qnode): { }
+    case &QOp(qn gr_qnode):
+      switch &qn.op {
+      case &GrBranch(a gr_branch):
+        mark_cell_value_used(bas, a.src);
+      default: { }
+      }
     }
   }
   bas->gns_analyzed = n_ops;
   return true;
 }
 
+func mark_cell_value_used(bas *basic_analyze_state, c cell_num) void {
+  p *cell_disp = ref(&bas->celldisp, c.~);
+  p->value_used = true;
+}
+
+// Also marks value_used.
 func mark_cell_paramlist(bas *basic_analyze_state, c cell_num, apply_opnum gr_num) void {
   p *cell_disp = ref(&bas->celldisp, c.~);
   set(&p->paramlist, apply_opnum);
+  p->value_used = true;
 }
 
+// Also marks value_used.
 func mark_cell_prim_paramlist(bas *basic_analyze_state, c cell_num, apply_opnum gr_num) void {
   p *cell_disp = ref(&bas->celldisp, c.~);
   set(&p->prim_paramlist, apply_opnum);
+  p->value_used = true;
 }
 
 func mark_cell_not_const(bas *basic_analyze_state, c cell_num) void {
@@ -253,7 +273,8 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
               *ref(&gr->ops, gn.~) = XOp({mk_shray(seqer.~), GrXNop(void)});
 
               // And since there's no apply op, we update the arg/funcell cell_disps.
-              unSet(&ref(&bas->celldisp, a.funcell.~)->funcell);
+              // Actually, we don't update the funcell disp, so that we don't allocate/write its cell needlessly.
+              // unSet(&ref(&bas->celldisp, a.funcell.~)->funcell);
               for j size = 0; j < nparams; j = j + 1 {
                 unSet(&ref(&bas->celldisp, get(&a.params, j).~)->paramlist);
               }
