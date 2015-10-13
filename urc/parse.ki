@@ -552,12 +552,18 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_
   if try_skip_keyw(p, Union(void)) {
     return success_or_fail(parse_rest_of_union(p, out));
   }
-  if try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
-    return success_or_fail(parse_rest_of_arraytype(p, ab, out));
-  }
   oper ast_ident;
   if try_parse_oper(p, '*', &oper) {
     return success_or_fail(parse_rest_of_pointer(p, ab, oper, out));
+  }
+  if try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
+    return success_or_fail(parse_rest_of_arraytype(p, ab, out));
+  }
+  if try_skip_oper(p, '^') {
+    if !try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
+      return Error(void);
+    }
+    return success_or_fail(parse_rest_of_arraytype(p, ab, out));
   }
 
   lhs ast_typeexpr;
@@ -1784,9 +1790,21 @@ func test_parse() bool {
                                _u8("func a() int {\n"
                                    "  x *[y(z)]t = 3;\n"
                                    "  return x[y]; }"));
-  pass = pass & run_parse_test(_u8("p026"),
+  pass = pass & run_parse_test(_u8("p026-a"),
                                _u8("func a() int {\n"
                                    "  x [y(z)][1][2]t = 3;\n"
+                                   "  return x[y]; }"));
+  pass = pass & run_parse_test(_u8("p026-b"),
+                               _u8("func a() int {\n"
+                                   "  x ^[y(z)][1][2]t = 3;\n"
+                                   "  return x[y]; }"));
+  pass = pass & run_parse_test(_u8("p026-c"),
+                               _u8("func a() int {\n"
+                                   "  x [y(z)]^[1][2]t = 3;\n"
+                                   "  return x[y]; }"));
+  pass = pass & run_parse_test(_u8("p026-d"),
+                               _u8("func a() int {\n"
+                                   "  x ^[y(z)]^[1][2]t = 3;\n"
                                    "  return x[y]; }"));
   pass = pass & run_parse_test(_u8("p027"),
                                _u8("func a() int {\n"
@@ -1861,9 +1879,14 @@ func test_parse() bool {
                                _u8("deftype[] foo struct {x [2 + 3]bar; };\n"));
   pass = pass & run_parse_test(_u8("p049-b"),
                                _u8("deftype[T, U] foo struct {x [2 + 3]bar; };\n"));
-  pass = pass & run_parse_test(_u8("p050"),
+  pass = pass & run_parse_test(_u8("p049-c"),
+                               _u8("deftype[T, U] foo struct {x ^[2 + 3]bar; };\n"));
+  pass = pass & run_parse_test(_u8("p050-a"),
                                _u8("defclass move foo [7]bar;\n"
                                    "deftype[T] foo struct { count u32; p [3]T; };\n"));
+  pass = pass & run_parse_test(_u8("p050-b"),
+                               _u8("defclass move foo ^[7]bar;\n"
+                                   "deftype[T] foo struct { count u32; p ^[3]T; };\n"));
   pass = pass & run_parse_test(_u8("p051"),
                                _u8("defclass copy foo bar;"));
   pass = pass & run_parse_test(_u8("p052"),
