@@ -61,34 +61,34 @@ func appendtext(f *objfile, x u8) void {
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8) void {
-  b [2]u8 = {x0, x1};
+  b ^[2]u8 = {x0, x1};
   append_raw(&f->text, &b[0], 2);
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 u8) void {
-  b [3]u8 = {x0, x1, x2};
+  b ^[3]u8 = {x0, x1, x2};
   append_raw(&f->text, &b[0], 3);
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 u8, x3 u8) void {
-  b [4]u8 = {x0, x1, x2, x3};
+  b ^[4]u8 = {x0, x1, x2, x3};
   append_raw(&f->text, &b[0], 4);
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 i32) void {
-  b [6]u8 = {x0, x1, 0, 0, 0, 0};
+  b ^[6]u8 = {x0, x1, 0, 0, 0, 0};
   write_le_i32(&b[2], x2);
   append_raw(&f->text, &b[0], 6);
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 u32) void {
-  b [6]u8 = {x0, x1, 0, 0, 0, 0};
+  b ^[6]u8 = {x0, x1, 0, 0, 0, 0};
   write_le_u32(&b[2], x2);
   append_raw(&f->text, &b[0], 6);
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 u8, x3 u16) void {
-  b [5]u8 = {x0, x1, x2, 0, 0};
+  b ^[5]u8 = {x0, x1, x2, 0, 0};
   write_le_u16(&b[3], x3);
   append_raw(&f->text, &b[0], 5);
 }
@@ -99,7 +99,7 @@ func appendtext(f *objfile, x0 u8, x1 reg_rm_encoded) void {
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 reg_rm_encoded) void {
-  b [2]u8 = {x0, x1};
+  b ^[2]u8 = {x0, x1};
   append_raw(&f->text, &b[0], 2);
   append_raw(&f->text, &x2.buf[0], ~x2.length);
 }
@@ -107,16 +107,16 @@ func appendtext(f *objfile, x0 u8, x1 u8, x2 reg_rm_encoded) void {
 func appendtext(f *objfile, x0 u8, x1 reg_rm_encoded, x2 u32) void {
   append_raw(&f->text, &x0, 1);
   append_raw(&f->text, &x1.buf[0], ~x1.length);
-  b [4]u8;
+  b ^[4]u8;
   write_le_u32(&b[0], x2);
   append_raw(&f->text, &b[0], 4);
 }
 
 func appendtext(f *objfile, x0 u8, x1 u8, x2 reg_rm_encoded, x3 u16) void {
-  b [2]u8 = {x0, x1};
+  b ^[2]u8 = {x0, x1};
   append_raw(&f->text, &b[0], 2);
   append_raw(&f->text, &x2.buf[0], ~x2.length);
-  c [2]u8;
+  c ^[2]u8;
   write_le_u16(&c[0], x3);
   append_raw(&f->text, &c[0], 2);
 }
@@ -144,7 +144,7 @@ func x86_ret(f *objfile) void {
 func x86_retn(f *objfile, x u16) void {
   // I don't know if the immediate is treated signed or unsigned.
   check(x < ~ @[u32] 32768);
-  b [3]u8;
+  b ^[3]u8;
   b[0] = 0xC2;
   write_le_u16(&b[1], x);
   append_raw(&f->text, &b[0], 3);
@@ -170,7 +170,7 @@ func x86_mov_imm32(f *objfile, dest u8, x i32) void {
   if x == 0 {
     x86_xor_w32(f, dest, dest);
   } else {
-    b [5]u8;
+    b ^[5]u8;
     b[0] = 0xB8 + dest;
     write_le_i32(&b[1], x);
     append_raw(&f->text, &b[0], 5);
@@ -463,7 +463,7 @@ func x86_load32_signextend(f *objfile, dest u8, src cell_loc, size u32) void {
 // NOTE: If this changes buflength, its consumers (like appendtext) will need to change theirs.
 deftype reg_rm_encoded struct {
   length u8;
-  buf [5]u8;
+  buf ^[5]u8;
 };
 
 func encode_reg_rm(reg u8, rm_addr u8, rm_disp i32) reg_rm_encoded {

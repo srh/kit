@@ -873,7 +873,7 @@ func frame_crash_targetnum(h *frame) jmp_targetnum {
 
 func x86_gen_placeholder_jmp(f *objfile, h *frame, target jmp_targetnum) void {
   offset u32 = 1 + secsize(&f->text);
-  b [5]u8;
+  b ^[5]u8;
   b[0] = 0xE9;
   b[1] = 0;
   b[2] = 0;
@@ -886,7 +886,7 @@ func x86_gen_placeholder_jmp(f *objfile, h *frame, target jmp_targetnum) void {
 
 func x86_gen_placeholder_jcc(f *objfile, h *frame, x86_jcc_code u8, target jmp_targetnum) void {
   offset u32 = 2 + secsize(&f->text);
-  b [6]u8;
+  b ^[6]u8;
   b[0] = 0x0F;
   b[1] = x86_jcc_code;
   b[2] = 0;
@@ -899,7 +899,7 @@ func x86_gen_placeholder_jcc(f *objfile, h *frame, x86_jcc_code u8, target jmp_t
 
 func x86_gen_crash_jcc(f *objfile, h *frame, x86_jcc_code u8) void {
   offset u32 = 2 + secsize(&f->text);
-  b [6]u8;
+  b ^[6]u8;
   b[0] = 0x0F;
   b[1] = x86_jcc_code;
   b[2] = 0;

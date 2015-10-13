@@ -251,7 +251,7 @@ inline func[S, T] `==`(x tup[S, T], y tup[S, T]) bool {
 }
 
 func[H] build_u8str(help H, r *array[u8], x *void) void {
-  arr [4]u8 = "void";
+  arr ^[4]u8 = "void";
   append_raw(r, &arr[0], 4);
 }
 
