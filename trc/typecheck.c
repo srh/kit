@@ -5824,8 +5824,8 @@ int check_more_testcases(struct identmap *im) {
   /* Fails because vec3 and [3]u32 are different types. */
   pass &= check_negcase(
       im, "check_file_test_more_12",
-      "deftype vec3 [3]u32;\n"
-      "def foo fn[[3]u32, vec3] = func(arr [3]u32) vec3 {\n"
+      "deftype vec3 ^[3]u32;\n"
+      "def foo fn[^[3]u32, vec3] = func(arr ^[3]u32) vec3 {\n"
       "  v vec3 = arr;\n"
       "  return v;\n"
       "};\n");
@@ -6120,11 +6120,11 @@ int check_more_testcases(struct identmap *im) {
   /* TODO: String literals should be allowed, this should pass. */
   pass &= check_negcase(
       im, "check_file_test_more_44",
-      "def x [5]u8 = \"pq\\x12rs\";\n");
+      "def x ^[5]u8 = \"pq\\x12rs\";\n");
   /* Fails because the array size is wrong. */
   pass &= check_negcase(
       im, "check_file_test_more_45",
-      "def x [6]u8 = \"pq\\x12rs\";\n");
+      "def x ^[6]u8 = \"pq\\x12rs\";\n");
   pass &= check_foocase(
       im, "check_file_test_more_46",
       "defenum ty {\n"
@@ -6284,20 +6284,20 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_negcase(
       im, "check_file_test_more_58",
       "func foo() i32 {\n"
-      "  x [3]u32;\n"
+      "  x ^[3]u32;\n"
       "  return x[0];\n"
       "}\n");
   pass &= check_foocase(
       im, "check_file_test_more_59",
       "func foo() bool {\n"
-      "  x [3]u32;\n"
+      "  x ^[3]u32;\n"
       "  return &x[0] == &x[1];\n"
       "}\n");
   /* Fails because ptr types don't match. */
   pass &= check_negcase(
       im, "check_file_test_more_60",
       "func foo() bool {\n"
-      "  x [3]u32;\n"
+      "  x ^[3]u32;\n"
       "  return &x[0] == &x;\n"
       "}\n");
 
@@ -6475,20 +6475,14 @@ int check_more_testcases(struct identmap *im) {
       "};\n");
   pass &= check_foocase(
       im, "check_file_test_more_76",
-      "func foo(x i32) [2]i32 {\n"
-      "  y [2]i32 = {x, x + 1};\n"
+      "func foo(x i32) ^[2]i32 {\n"
+      "  y ^[2]i32 = {x, x + 1};\n"
       "  return {y[1], y[0]};\n"
       "}\n");
   pass &= check_negcase(
       im, "check_file_test_more_77",
-      "func foo(x i32) [2]i32 {\n"
-      "  y [2]i32 = {x, x + 1, x + 2};\n"
-      "  return {y[1], y[0]};\n"
-      "}\n");
-  pass &= check_foocase(
-      im, "check_file_test_more_78",
-      "func foo(x i32) [2]i32 {\n"
-      "  y ^[2]i32 = {x, x + 1};\n"
+      "func foo(x i32) ^[2]i32 {\n"
+      "  y ^[2]i32 = {x, x + 1, x + 2};\n"
       "  return {y[1], y[0]};\n"
       "}\n");
 

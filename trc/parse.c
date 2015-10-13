@@ -1149,52 +1149,6 @@ int parse_after_atomic(struct ps *p, struct pos pos_start, struct ast_expr lhs,
 enum tri help_triparse_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
                                 struct ast_typeexpr *out, struct pos *pos_end_out);
 
-struct ambig_indexer {
-  struct pos type_start;
-  struct pos expr_end;
-  struct ast_numeric_literal number;
-};
-
-void ambig_indexer_destroy(struct ambig_indexer *ambi) {
-  ast_numeric_literal_destroy(&ambi->number);
-}
-
-void expressionize(struct ast_ident name,
-                   struct ambig_indexer *indexers, size_t indexers_count,
-                   struct ast_expr *out) {
-  struct pos pos_start = name.meta.pos_start;
-  struct ast_expr lhs;
-  ast_expr_partial_init(&lhs, AST_EXPR_NAME, ast_expr_info_default());
-  ast_name_expr_init(&lhs.u.name, name);
-  for (size_t i = 0; i < indexers_count; i++) {
-    struct ast_expr number_expr;
-    ast_expr_partial_init(&number_expr, AST_EXPR_NUMERIC_LITERAL, ast_expr_info_default());
-    number_expr.u.numeric_literal = indexers[i].number;
-    struct ast_expr index_expr;
-    ast_expr_partial_init(&index_expr, AST_EXPR_INDEX, ast_expr_info_default());
-    ast_index_expr_init(&index_expr.u.index_expr, ast_meta_make(pos_start, indexers[i].expr_end),
-                        lhs, number_expr);
-    lhs = index_expr;
-  }
-  free(indexers);
-  *out = lhs;
-}
-
-void collapse_indexers(struct ambig_indexer *indexers, size_t indexers_count,
-                       struct ast_typeexpr param, struct pos param_pos_end,
-                       struct ast_typeexpr *out) {
-  for (size_t i = indexers_count; i > 0;) {
-    i--;
-    struct ast_typeexpr tmp;
-    tmp.tag = AST_TYPEEXPR_ARRAY;
-    ast_arraytype_init(&tmp.u.arraytype, ast_meta_make(indexers[i].type_start, param_pos_end),
-                       indexers[i].number, param);
-    param = tmp;
-  }
-  free(indexers);
-  *out = param;
-}
-
 int parse_statement_after_atomic(struct ps *p, struct pos pos_start,
                                  struct ast_expr lhs, struct ast_statement *out) {
   struct ast_expr whole_expr;
@@ -1245,84 +1199,26 @@ enum tri triparse_naked_var_or_expr_statement(
     ast_vardecl_init(&decl, ast_meta_make(pos_start, type_pos_end),
                      name, type);
   } else {
-    struct ambig_indexer *indexers = NULL;
-    size_t indexers_count = 0;
-    size_t indexers_limit = 0;
-
     struct ast_typeexpr type;
     struct pos type_pos_end;
-    for (;;) {
-      struct pos type_start = ps_pos(p);
-      if (try_skip_char(p, '[')) {
-        if (!skip_ws(p)) {
-          goto error_name;
-        }
-        struct ambig_indexer ambi;
-        enum tri numeric_res = triparse_numeric_literal(p, &ambi.number);
-        switch (numeric_res) {
-        case TRI_ERROR:
-          goto error_name;
-        case TRI_QUICKFAIL: {
-          struct ast_expr arg;
-          if (!parse_rest_of_index_param(p, &arg)) {
-            goto error_indexers;
-          }
-          struct ast_expr lhs;
-          expressionize(name, indexers, indexers_count, &lhs);
-          struct ast_expr index_expr;
-          ast_expr_partial_init(&index_expr, AST_EXPR_INDEX, ast_expr_info_default());
-          ast_index_expr_init(&index_expr.u.index_expr, ast_meta_make(pos_start, ps_pos(p)),
-                              lhs, arg);
-          if (!parse_statement_after_atomic(p, pos_start, index_expr, out)) {
-            return TRI_ERROR;
-          } else {
-            return TRI_SUCCESS;
-          }
-        } break;
-        case TRI_SUCCESS:
-          break;
-        default:
-          UNREACHABLE();
-        }
-
-        if (!(skip_ws(p) && try_skip_char(p, ']'))) {
-          goto error_indexers;
-        }
-
-        ambi.type_start = type_start;
-        ambi.expr_end = ps_pos(p);
-        SLICE_PUSH(indexers, indexers_count, indexers_limit, ambi);
-        if (!skip_ws(p)) {
-          goto error_indexers;
-        }
-        continue;
-      } else {
-        struct ast_typeexpr local_type;
-        struct pos local_type_pos_end;
-        enum tri local_type_res = help_triparse_typeexpr(p, ALLOW_BLANKS_YES, &local_type,
-                                                         &local_type_pos_end);
-        switch (local_type_res) {
-        case TRI_QUICKFAIL: {
-          PARSE_DBG("%u:%u: triparse_naked_var whole expr\n", p->line, p->column);
-          struct ast_expr lhs;
-          expressionize(name, indexers, indexers_count, &lhs);
-          return success_or_fail(parse_statement_after_atomic(p, pos_start, lhs, out));
-        } break;
-        case TRI_ERROR:
-          goto error_indexers;
-        case TRI_SUCCESS: {
-          collapse_indexers(indexers, indexers_count, local_type, local_type_pos_end, &type);
-          type_pos_end = local_type_pos_end;
-          goto build_vardecl;
-        } break;
-        default:
-          UNREACHABLE();
-        }
-      }
+    enum tri type_res = help_triparse_typeexpr(p, ALLOW_BLANKS_YES,
+                                               &type, &type_pos_end);
+    switch (type_res) {
+    case TRI_QUICKFAIL: {
+      PARSE_DBG("%u:%u: triparse_naked_var whole expr\n", p->line, p->column);
+      struct ast_expr lhs;
+      ast_expr_partial_init(&lhs, AST_EXPR_NAME, ast_expr_info_default());
+      ast_name_expr_init(&lhs.u.name, name);
+      return success_or_fail(parse_statement_after_atomic(p, pos_start, lhs, out));
+    } break;
+    case TRI_ERROR:
+      goto error_name;
+    case TRI_SUCCESS: {
+      goto build_vardecl;
+    } break;
+    default:
+      UNREACHABLE();
     }
-  error_indexers:
-    SLICE_FREE(indexers, indexers_count, ambig_indexer_destroy);
-    goto error_name;
   build_vardecl:
     ast_vardecl_init(&decl, ast_meta_make(pos_start, type_pos_end), name, type);
   }
@@ -2362,11 +2258,6 @@ enum tri help_triparse_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
     return success_or_fail(parse_rest_of_pointer(p, ast_meta_make(pos_start, ps_pos(p)), allow_blanks, out, pos_end_out));
   }
 
-  if (try_skip_char(p, '[')) {
-    out->tag = AST_TYPEEXPR_ARRAY;
-    return success_or_fail(parse_rest_of_arraytype(p, allow_blanks, pos_start, &out->u.arraytype, pos_end_out));
-  }
-
   if (try_skip_char(p, '^')) {
     if (!try_skip_char(p, '[')) {
       return TRI_ERROR;
@@ -3019,12 +2910,12 @@ int parse_test_defs(void) {
                          "def foo u8 = '\\x2A';\n",
                          8);
   pass &= run_count_test("def24-a",
-                         "def foo [11]u8 = \"\\x2Abcdef\";\n",
-                         16);
+                         "def foo ^[11]u8 = \"\\x2Abcdef\";\n",
+                         17);
   pass &= run_count_test("def24-b",
-                         "def foo [21]u8 = \"\\x2Abcdef\"\n"
+                         "def foo ^[21]u8 = \"\\x2Abcdef\"\n"
                          "  \"abcdefghi\\\"\";\n",
-                         28);
+                         29);
   pass &= run_count_test("def25-a",
                          "def a b = func() c {\n"
                          "  switch d {\n"
@@ -3087,12 +2978,12 @@ int parse_test_defs(void) {
                          19);
   pass &= run_count_test("def33",
                          "func foo() void {\n"
-                         "  x [3]i32;\n"
-                         "  x [3][4]i32;\n"
+                         "  x ^[3]i32;\n"
+                         "  x ^[3]^[4]i32;\n"
                          "  x[1][y] = z;\n"
                          "  x struct { };\n"
                          "}\n",
-                         37);
+                         40);
   pass &= run_count_test("def34",
                          "func foo() void {\n"
                          "  return x->~.~->~;\n"
@@ -3136,17 +3027,17 @@ int parse_test_deftypes(void) {
                          "deftype[T] foo struct { count u32; p ptr[T]; };\n",
                          24);
   pass &= run_count_test("deftype7",
-                         "deftype foo [7]bar;\n"
-                         "deftype[T] foo struct { count u32; p [3]T; };\n",
-                         25);
-  pass &= run_count_test("deftype8",
-                         "defclass move foo [7]bar;\n"
-                         "deftype[T] foo struct { count u32; p [3]T; };\n",
-                         26);
-  pass &= run_count_test("deftype9",
-                         "defclass move foo [7]bar;\n"
-                         "defclass[T] copy foo struct { count u32; p [3]T; };\n",
+                         "deftype foo ^[7]bar;\n"
+                         "deftype[T] foo struct { count u32; p ^[3]T; };\n",
                          27);
+  pass &= run_count_test("deftype8",
+                         "defclass move foo ^[7]bar;\n"
+                         "deftype[T] foo struct { count u32; p ^[3]T; };\n",
+                         28);
+  pass &= run_count_test("deftype9",
+                         "defclass move foo ^[7]bar;\n"
+                         "defclass[T] copy foo struct { count u32; p ^[3]T; };\n",
+                         29);
   return pass;
 }
 
