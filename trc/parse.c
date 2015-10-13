@@ -2358,13 +2358,21 @@ enum tri help_triparse_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
     return success_or_fail(parse_rest_of_unione(p, allow_blanks, pos_start, &out->u.unione, pos_end_out));
   }
 
+  if (try_skip_char(p, '*')) {
+    return success_or_fail(parse_rest_of_pointer(p, ast_meta_make(pos_start, ps_pos(p)), allow_blanks, out, pos_end_out));
+  }
+
   if (try_skip_char(p, '[')) {
     out->tag = AST_TYPEEXPR_ARRAY;
     return success_or_fail(parse_rest_of_arraytype(p, allow_blanks, pos_start, &out->u.arraytype, pos_end_out));
   }
 
-  if (try_skip_char(p, '*')) {
-    return success_or_fail(parse_rest_of_pointer(p, ast_meta_make(pos_start, ps_pos(p)), allow_blanks, out, pos_end_out));
+  if (try_skip_char(p, '^')) {
+    if (!try_skip_char(p, '[')) {
+      return TRI_ERROR;
+    }
+    out->tag = AST_TYPEEXPR_ARRAY;
+    return success_or_fail(parse_rest_of_arraytype(p, allow_blanks, pos_start, &out->u.arraytype, pos_end_out));
   }
 
   struct ps_savestate before_underscore = ps_save(p);

@@ -6485,6 +6485,12 @@ int check_more_testcases(struct identmap *im) {
       "  y [2]i32 = {x, x + 1, x + 2};\n"
       "  return {y[1], y[0]};\n"
       "}\n");
+  pass &= check_foocase(
+      im, "check_file_test_more_78",
+      "func foo(x i32) [2]i32 {\n"
+      "  y ^[2]i32 = {x, x + 1};\n"
+      "  return {y[1], y[0]};\n"
+      "}\n");
 
   return pass;
 }
