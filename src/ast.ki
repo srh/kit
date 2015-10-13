@@ -1,0 +1,854 @@
+import arity;
+import box;
+import deferred;
+import expr;
+import identmap;
+import pos;
+import typeexpr;
+
+// This is an index into some ps-specific structure.
+deftype ast_meta size;
+
+def `~` fn[size, ast_meta] = wrapconvert;
+
+inline func fake_ast_meta() ast_meta { return ~0; }
+
+deftype interval struct {
+  left pos;
+  right pos;
+};
+
+deftype ast_ident struct {
+  meta ast_meta;
+  value sym;
+};
+
+// Add pos info below.
+
+deftype ast_hex_literal struct {
+  meta ast_meta;
+  digits shray[i8];
+};
+
+deftype ast_dec_literal struct {
+  meta ast_meta;
+  digits shray[i8];
+};
+
+defenum ast_numeric_literal {
+  HexLiteral ast_hex_literal;
+  DecLiteral ast_dec_literal;
+};
+
+deftype ast_bool_literal struct {
+  meta ast_meta;
+  value bool;
+};
+
+deftype ast_void_literal struct {
+  meta ast_meta;
+};
+
+deftype ast_null_literal struct {
+  meta ast_meta;
+};
+
+deftype ast_charspec struct {
+  value i32;
+};
+
+deftype ast_char_literal struct {
+  charspec ast_charspec;
+};
+
+deftype ast_string_literal struct {
+  charspecs array[ast_charspec];
+};
+
+deftype ast_funcall struct {
+  fun box[ast_expr_consume];
+  params array[ast_expr_consume];
+};
+
+deftype ast_logical_conjunction struct {
+  // True if this is a '||' expr, false if '&&'.
+  is_logical_or bool;
+  lhs box[ast_expr_consume];
+  rhs box[ast_expr_consume];
+};
+
+deftype ast_conditional_assignment_info struct {
+  comparecells instpair;
+
+  /* These actions perform the assignment -- they happen if the
+  assignment isn't self-assignment. */
+  conditional_destroy destroy_action;
+  conditional_copy copy_action;
+  // Should we dead the rhs virtual cell?
+  rhs_deadme lval_deadme;
+};
+
+deftype ast_simple_copy_assignment_info struct {
+  target_destroy destroy_action;
+  rhs_copy copy_action;
+  // Should we dead the rhs virtual cell?
+  rhs_deadme lval_deadme;
+};
+
+deftype ast_simple_move_assignment_info struct {
+  target_destroy destroy_action;
+  rhs_move move_action;
+};
+
+deftype ast_simple_copydestroy_assignment_info struct {
+  target_destroy destroy_action;
+  rhs_copy copy_action;
+  rhs_cleanup destroy_action;
+};
+
+defenum ast_assignment_info {
+  StaticSelfAssignment void;
+  SimpleMoveAssignment ast_simple_move_assignment_info;
+  SimpleCopyDestroyAssignment ast_simple_copydestroy_assignment_info;
+  SimpleCopyAssignment ast_simple_copy_assignment_info;
+  ConditionalAssignment ast_conditional_assignment_info;
+};
+
+deftype ast_assignment struct {
+  info nc[ast_assignment_info];
+  lhs box[ast_expr];
+  rhs box[ast_expr];
+};
+
+deftype ast_addressof struct {
+  rhs box[ast_expr];
+};
+
+deftype ast_deref struct {
+  ptr_discard ast_later_discard_info;
+  rhs box[ast_expr_consume];
+};
+
+deftype ast_typeapp struct {
+  typefunc box[ast_typeexpr];
+  params array[ast_typeexpr];
+};
+
+deftype ast_struct struct {
+  fields array[ast_vardecl];
+};
+
+deftype ast_enum struct {
+  constructors array[ast_vardecl];
+};
+
+deftype ast_union struct {
+  fields array[ast_vardecl];
+};
+
+deftype ast_arraytype struct {
+  count opt[box[ast_expr]];
+  param box[ast_typeexpr];
+};
+
+deftype ast_unknown struct {
+};
+
+defenum ast_typeexpr {
+  Name ast_ident;
+  App ast_typeapp;
+  Struct ast_struct;
+  Enum ast_enum;
+  Union ast_union;
+  Arraytype ast_arraytype;
+  Unknown ast_unknown;
+};
+
+deftype ast_vardecl struct {
+  name ast_ident;
+  type ast_typeexpr;
+};
+
+deftype ast_bracebody_info struct {
+  destructions array[var_destruction];
+};
+
+deftype ast_bracebody struct {
+  info nc[ast_bracebody_info];
+  statements array[ast_statement];
+};
+
+deftype ast_var_info struct {
+  vn var_number;
+};
+
+defenum ast_var_rhs {
+  HasExpr box[ast_expr_consume];
+  AutoInit opt[init_action];
+};
+
+deftype ast_var_statement struct {
+  info nc[ast_var_info];
+  decl ast_vardecl;
+  rhs ast_var_rhs;
+};
+
+deftype ast_pattern_assign_info struct {
+  deconstruct ast_enum_deconstruction_info;
+  matching_tag_value enum_tag_value;
+};
+
+deftype ast_enum_deconstruction_info struct {
+  tag_cell cell_num;
+  num_enum_constructors size;
+};
+
+deftype ast_pattern_assign struct {
+  info nc[ast_pattern_assign_info];
+  pattern ast_constructor_pattern;
+  rhs box[ast_expr_consume];
+};
+
+defenum ast_condition {
+  ExprCondition box[ast_expr_consume];
+  PatternCondition ast_pattern_assign;
+};
+
+deftype ast_condition_discard_info struct {
+  virtual_cell_dead nc[opt[cell_num]];
+  later ast_later_discard_info;
+};
+
+deftype ast_ifthen_statement struct {
+  condition_discard ast_condition_discard_info;
+  condition ast_condition;
+  body ast_bracebody;
+};
+
+deftype ast_ifthenelse_statement struct {
+  condition_discard ast_condition_discard_info;
+  condition ast_condition;
+  thenbody ast_bracebody;
+  elsebody ast_bracebody;
+};
+
+deftype ast_while_statement struct {
+  condition_discard_continue ast_condition_discard_info;
+  condition_discard_exit ast_condition_discard_info;
+  condition ast_condition;
+  body ast_bracebody;
+};
+
+deftype ast_for_statement_info struct {
+  initter_destructions array[var_destruction];
+};
+
+deftype ast_expr_condition struct {
+  discard ast_later_discard_info;
+  expr box[ast_expr_consume];
+};
+
+deftype ast_for_statement struct {
+  // Can only be an ast_expr or ast_statement_var.
+  info nc[ast_for_statement_info];
+  initializer opt[box[ast_statement]];
+  condition opt[ast_expr_condition];
+  increment opt[box[ast_expr_discard]];
+  body ast_bracebody;
+};
+
+deftype ast_switch_statement struct {
+  info nc[ast_enum_deconstruction_info];
+  swartch_discard ast_later_discard_info;
+  swartch box[ast_expr_consume];
+  cases array[ast_switch_case];
+};
+
+
+deftype ast_return_statement_info struct {
+  destructions array[var_destruction];
+};
+
+deftype ast_return_statement struct {
+  info nc[ast_return_statement_info];
+  // If no expr, it returns void.
+  expr opt[box[ast_expr_consume]];
+};
+
+deftype ast_break_statement_info struct {
+  destructions array[var_destruction];
+};
+
+deftype ast_break_statement struct {
+  info nc[ast_break_statement_info];
+};
+
+deftype ast_continue_statement_info struct {
+  destructions array[var_destruction];
+};
+
+deftype ast_continue_statement struct {
+  info nc[ast_continue_statement_info];
+};
+
+deftype label_num size;
+def `~` fn[size, label_num] = wrapconvert;
+def `==` fn[label_num, label_num, bool] = wrapequate;
+
+deftype ast_label_statement_info struct {
+  label_number label_num;
+};
+
+deftype ast_label_statement struct {
+  info nc[ast_label_statement_info];
+  name ast_ident;
+};
+
+deftype ast_goto_statement_info struct {
+  label_number label_num;
+  destructions array[var_destruction];
+  initializations array[init_action];
+};
+
+deftype ast_goto_statement struct {
+  info nc[ast_goto_statement_info];
+  target ast_ident;
+};
+
+defenum ast_statement {
+  Expr ast_expr_discard;
+  Return ast_return_statement;
+  Var ast_var_statement;
+  IfThen ast_ifthen_statement;
+  IfThenElse ast_ifthenelse_statement;
+  While ast_while_statement;
+  For ast_for_statement;
+  Switch ast_switch_statement;
+  Break ast_break_statement;
+  Continue ast_continue_statement;
+  Label ast_label_statement;
+  Goto ast_goto_statement;
+};
+
+deftype ast_cp_info struct {
+  ovn opt[var_number];
+  tag_value enum_tag_value;
+  // enum_field_offset(cs, et, tag_value) -- annotated here because getting a te_enum in graph.ki is needlessly annoying.
+  field_offset u32;
+};
+
+deftype ast_constructor_pattern struct {
+  meta ast_meta;
+  cp_info nc[ast_cp_info];
+  addressof_constructor opt[ast_ident];
+  constructor_name ast_ident;
+  decl opt[ast_vardecl];
+};
+
+
+defenum ast_case_pattern {
+  Case ast_constructor_pattern;
+  Default void;
+};
+
+deftype ast_switch_case struct {
+  pattern ast_case_pattern;
+  body ast_bracebody;
+};
+
+deftype ast_fullbody_info struct {
+  parameter_destructions array[var_destruction];
+
+  all_vars array[var_info];
+  incomplete_graph opt[frame_graph];
+
+  gotos array[goto_info];
+  labels array[label_info];
+  statements array[statement_info];
+
+  return_cell cell_num;
+  arg_cells array[cell_num];
+};
+
+deftype ast_fullbody struct {
+  info nc[ast_fullbody_info];
+  bb ast_bracebody;
+};
+
+deftype ast_lambda struct {
+  // TODO: We put is_inline here mainly for convenience of implementation (in gr_lambda_expr), it is unprincipled in the long run (I think?).
+  is_inline ast_isinline;
+  args array[ast_vardecl];
+  return_type ast_typeexpr;
+  body ast_fullbody;
+};
+
+defenum ast_fieldname {
+  WholeField void;
+  NameField ast_ident;
+};
+
+deftype ast_arraylength_info struct {
+  // After actions to discard the array.
+  after ast_expr_after_discard;
+  count u32;
+};
+
+defenum ast_local_field_info {
+  ArrayLength ast_arraylength_info;
+  // Holds the offset.
+  FieldName u32;
+};
+
+deftype ast_local_field struct {
+  info nc[ast_local_field_info];
+  lhs box[ast_expr];
+  fieldname ast_fieldname;
+};
+
+func mk(lhs box[ast_expr], fieldname ast_fieldname) ast_local_field {
+  return {NotComputed@[ast_local_field_info](), lhs, fieldname};
+}
+
+defenum ast_deref_field_info {
+  // The array's count.
+  DerefArrayLength u32;
+  // The field's offset.
+  DerefFieldName u32;
+};
+
+deftype ast_deref_field struct {
+  info nc[ast_deref_field_info];
+  ptr_discard ast_later_discard_info;
+  lhs box[ast_expr_consume];
+  fieldname ast_fieldname;
+};
+
+// This could just have an instpair.
+deftype global_info struct {
+  ent def_entry_id;
+  inst def_inst_id;
+};
+
+deftype local_info struct {
+  varnum var_number;
+};
+
+deftype enum_constructor_info struct {
+  constructor_tag enum_tag_value;
+  ip instpair;
+};
+
+deftype enum_voidconstructed_info struct {
+  constructor_tag enum_tag_value;
+};
+
+defenum ast_name_expr_info {
+  LocalResolve local_info;
+  GlobalResolve global_info;
+  EnumConstructor enum_constructor_info;
+  EnumVoidConstructed enum_voidconstructed_info;
+};
+
+deftype ast_name_expr struct {
+  name_info nc[ast_name_expr_info];
+  ident ast_ident;
+  generic_params opt[array[ast_typeexpr]];
+};
+
+func mk(ident ast_ident, generic_params opt[array[ast_typeexpr]]) ast_name_expr {
+  return {NotComputed(), ident, generic_params};
+}
+
+deftype ast_paren_expr struct {
+  expr box[ast_expr];
+};
+
+deftype ast_index_expr_info struct {
+  // isHas if the lhs needs consuming/discarding (if it's a ptr).
+  lhs_after opt[tup[ast_expr_after_consume, ast_later_discard_info]];
+  rhs_later ast_later_discard_info;
+};
+
+deftype ast_index_expr struct {
+  info nc[ast_index_expr_info];
+  lhs box[ast_expr];
+  rhs box[ast_expr_consume];
+};
+
+func mk(lhs box[ast_expr], rhs box[ast_expr_consume]) ast_index_expr {
+  return {NotComputed@[ast_index_expr_info](), lhs, rhs};
+}
+
+
+deftype ast_typed_expr struct {
+  type ast_typeexpr;
+  expr box[ast_expr];
+};
+
+deftype ast_strinit_param_info struct {
+  offset u32;
+};
+
+deftype ast_strinit_param struct {
+  info nc[ast_strinit_param_info];
+  ec ast_expr_consume;
+};
+
+deftype ast_strinit struct {
+  meta ast_meta;
+  exprs array[ast_strinit_param];
+};
+
+deftype ast_ternary_info struct {
+  conjoined_result_cell cell_num;
+};
+
+deftype ast_ternary struct {
+  info nc[ast_ternary_info];
+  // I'm not crazy enough to support case patterns in ternary operators yet.
+  condition box[ast_expr_condition];
+  then_clause box[ast_expr_consume];
+  else_clause box[ast_expr_consume];
+};
+
+// Is a non-lval an rval?  Okay.
+deftype rval_description struct {
+  // The cell number of the temporary that this rval is _part of_.
+  whole_num cell_num;
+
+  // The cell number of the field (a virtual cell if different from num).
+  partial_num cell_num;
+};
+
+// Tells whether the rval would need to get copied out of the temporary, or whether the rval _is_ the whole temporary and can get moved.
+inline func whole_temporary(d *rval_description) bool {
+  return d->whole_num == d->partial_num;
+}
+
+defenum lval_deadme {
+  DontDeadMe void;
+  DeadMe void;
+};
+
+deftype lval_description struct {
+  // The cell number of the lvalue.  Be it part of a bigger object or not.
+  num cell_num;
+  // DeadMe if the lval cell is only carried by the lval.
+  deadme lval_deadme;
+};
+
+defenum is_lval {
+  IsLvalNo rval_description;
+  IsLvalYes lval_description;
+};
+
+inline func wholeRval(num cell_num) is_lval {
+  return IsLvalNo({num, num});
+}
+
+func isNo(x is_lval) bool {
+  if case IsLvalNo(a rval_description) = x {
+    return true;
+  }
+  return false;
+}
+
+// Where the value of the expr is, _before_ after actions are run.
+func value_cell(x *is_lval) cell_num {
+  switch x {
+    case &IsLvalYes(desc lval_description): { return desc.num; }
+    case &IsLvalNo(desc rval_description): { return desc.partial_num; }
+  }
+}
+
+inline func value_cell(a *ast_expr) cell_num {
+  return value_cell(&expr_complete_info(a)->lval);
+}
+
+deftype ast_later_discard_info struct {
+  // typechecking always leaves this in a computed state.
+  action nc[destroy_action];
+};
+
+inline func mk_later() ast_later_discard_info {
+  return {NotComputed()};
+}
+
+deftype instpair struct {
+  ent_id def_entry_id;
+  inst_id def_inst_id;
+};
+
+defenum ctor_desc {
+  TrivialCtor void;
+  FunCtor instpair;
+};
+
+deftype bi_action struct {
+  ctor ctor_desc;
+  dest cell_num;
+  src cell_num;
+};
+
+deftype copy_action bi_action;
+deftype move_action bi_action;
+
+deftype destroy_action uni_action;
+deftype init_action uni_action;
+
+deftype uni_action struct {
+  ctor ctor_desc;
+  arg cell_num;
+};
+
+deftype copy_destroy_action struct {
+  copy copy_action;
+  destroy destroy_action;
+};
+
+defenum consume_actions {
+  ConsumeByInPlace void;
+  ConsumeByCopyDestroy copy_destroy_action;
+  ConsumeByCopy tup[copy_action, lval_deadme];
+  // Only used for return statements, but later will be used for other exprs.
+  ConsumeByMove move_action;
+};
+
+deftype ast_expr_after_consume struct {
+  actions consume_actions;
+  // The cell the expr's result... goes.
+  // TODO: We should prohibit exprs where a non-whole_field result (or any result?) is discarded.  This will mean we don't need to handle the case where we discard a field lookup without copying it out first.
+  result cell_num;
+};
+
+defenum ast_expr_after_discard {
+  DiscardTemporary destroy_action;
+  DiscardVirtualDead cell_num;
+  DiscardNothing void;
+};
+
+inline func result_cell(a *ast_expr_after_consume) cell_num {
+  return a->result;
+}
+
+inline func result_cell(a *ast_expr_consume) cell_num {
+  return result_cell(unHas(&a->after));
+}
+
+inline func mk_after(actions consume_actions, result cell_num) ast_expr_after_consume {
+  return {actions, result};
+}
+
+inline func mk_after_discard(x destroy_action) ast_expr_after_discard {
+  return DiscardTemporary(x);
+}
+
+inline func mk_virtualdead_discard(lvalue_cell cell_num) ast_expr_after_discard {
+  return DiscardVirtualDead(lvalue_cell);
+}
+
+inline func mk_nothing_discard() ast_expr_after_discard {
+  return DiscardNothing(void);
+}
+
+deftype ast_expr_complete_info struct {
+  lval is_lval;
+  cu cu_typeexpr;
+  cu_props type_properties;
+};
+
+func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties) ast_expr_complete_info {
+  return {lval, cu, cu_props};
+}
+
+defenum ast_expr_info {
+  NoInfo void;
+  IncompleteCheck te_typeexpr;
+  CompleteCheck ast_expr_complete_info;
+};
+
+deftype ast_expr struct {
+  meta ast_meta;
+  info ast_expr_info;
+  u ast_expr_enum;
+};
+
+func inner_info(a *ast_expr_info) ast_expr_info {
+  switch a {
+    case &NoInfo(v void): {
+      return NoInfo(void);
+    }
+    case &IncompleteCheck(t te_typeexpr): {
+      return IncompleteCheck(t);
+    }
+    case &CompleteCheck(t ast_expr_complete_info): {
+      return CompleteCheck(mk(t.lval, t.cu, t.cu_props));
+    }
+  }
+}
+
+func annotate_info(a *ast_expr, info ast_expr_info) void {
+  switch &a->info {
+    case &CompleteCheck(t ast_expr_complete_info): {
+      ice(_u8("expr already completely annotated"));
+    }
+    case &IncompleteCheck(pt te_typeexpr): {
+      switch &info {
+        case &CompleteCheck(t ast_expr_complete_info): { /* Do nothing. */ }
+        default: {
+          ice(_u8("expr already incompletely annotated"));
+        }
+      }
+    }
+    case &NoInfo(v void): { }
+  }
+
+  a->info = info;
+}
+
+
+defenum ast_expr_enum {
+  NameExpr ast_name_expr;
+  ParenExpr ast_paren_expr;
+  NumericLiteral ast_numeric_literal;
+  BoolLiteral ast_bool_literal;
+  VoidLiteral ast_void_literal;
+  NullLiteral ast_null_literal;
+  CharLiteral ast_char_literal;
+  StringLiteral ast_string_literal;
+  Funcall ast_funcall;
+  LogicalConjunction ast_logical_conjunction;
+  Assignment ast_assignment;
+  AddressOf ast_addressof;
+  Deref ast_deref;
+  IndexExpr ast_index_expr;
+  Lambda ast_lambda;
+  LocalField ast_local_field;
+  DerefField ast_deref_field;
+  TypedExpr ast_typed_expr;
+  Strinit ast_strinit;
+  Ternary ast_ternary;
+};
+
+func mk(m ast_meta, x ast_expr_enum) ast_expr {
+  return {m, NoInfo(void), x};
+}
+
+deftype ast_expr_consume struct {
+  after nc[ast_expr_after_consume];
+  expr ast_expr;
+};
+
+// TODO: Remove once we can costlessly pass by value.
+func consume(expr *ast_expr) ast_expr_consume {
+  return {NotComputed@[ast_expr_after_consume](), *expr};
+}
+
+func consume(expr ast_expr) ast_expr_consume {
+  return {NotComputed@[ast_expr_after_consume](), expr};
+}
+
+deftype ast_expr_discard struct {
+  after nc[ast_expr_after_discard];
+  expr ast_expr;
+};
+
+// TODO: Remove once we can costlessly pass by value.
+func discard(expr *ast_expr) ast_expr_discard {
+  return {NotComputed@[ast_expr_after_discard](), *expr};
+}
+
+func discard(expr ast_expr) ast_expr_discard {
+  return {NotComputed@[ast_expr_after_discard](), expr};
+}
+
+deftype ast_variadic_generics struct {
+  before array[ast_ident];
+  variadic_name ast_ident;
+  after array[ast_ident];
+};
+
+defenum ast_generics {
+  NoGenerics void;
+  HasGenerics array[ast_ident];
+  // Right now VariadicGenerics can't be parsed.
+  VariadicGenerics ast_variadic_generics;
+};
+
+defenum ast_isexport {
+  IsExport void;
+  IsNotExport void;
+};
+
+defenum ast_isinline {
+  IsInline void;
+  IsNotInline void;
+};
+
+defenum ast_isvar {
+  IsVar void;
+  IsNotVar void;
+};
+
+deftype ast_def struct {
+  is_export ast_isexport;
+  is_var ast_isvar;
+  generics ast_generics;
+  name ast_ident;
+  syntactic_typeexpr opt[ast_typeexpr];
+  rhs ast_expr_consume;
+};
+
+deftype ast_extern_def struct {
+  name ast_ident;
+  type ast_typeexpr;
+};
+
+deftype ast_import struct {
+  name ast_ident;
+};
+
+defenum ast_defclass_disposition {
+  DefaultCopyMoveDestroy void;
+  DefaultMove void;
+  NoDefaults void;
+};
+
+defenum ast_type_def_rhs {
+  TypeexprRhs ast_typeexpr;
+  ClassexprRhs struct {
+    disposition ast_defclass_disposition;
+    rhs_type ast_typeexpr;
+  };
+};
+
+deftype ast_type_def struct {
+  generics ast_generics;
+  name ast_ident;
+  rhs ast_type_def_rhs;
+};
+
+defenum ast_access_arity {
+  AccessArityNone void;
+  AccessArityFinite u32;
+};
+
+deftype ast_access struct {
+  name ast_ident;
+  arity ast_access_arity;
+  toplevels array[ast_toplevel];
+};
+
+defenum ast_toplevel {
+  Import ast_import;
+  Def ast_def;
+  ExternDef ast_extern_def;
+  TypeDef ast_type_def;
+  Access ast_access;
+};
+
+deftype ast_file struct {
+  toplevels array[ast_toplevel];
+};
+
