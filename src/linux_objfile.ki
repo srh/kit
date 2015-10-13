@@ -4,7 +4,7 @@ def kEI_NIDENT u32 = 16;
 
 deftype elf32_Header struct {
   // TODO: Move constant 16 to a def kEI_NIDENT (when the language supports it).
-  e_ident [16]u8;
+  e_ident ^[16]u8;
   // Type: Relocatable, executable, etc.
   e_type le_u16;
   // Machine: 386, amd64, etc.

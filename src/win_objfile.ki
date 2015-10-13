@@ -16,7 +16,7 @@ deftype COFF_Header struct {
 def COFF_Header_EXPECTED_SIZE u32 = 20;
 
 deftype Section_Header struct {
-  Name [8]u8;
+  Name ^[8]u8;
   VirtualSize le_u32;
   VirtualAddress le_u32;
   SizeOfRawData le_u32;
@@ -175,7 +175,7 @@ deftype COFF_Relocation struct {
 };
 
 deftype name_eight union {
-  ShortName [8]u8;
+  ShortName ^[8]u8;
   LongName struct {
     Zeroes le_u32;
     Offset le_u32;
@@ -218,7 +218,7 @@ deftype COFF_symbol_aux_sectiondef struct {
   Number le_u16;
   /* COMDAT selection number, set to zero. */
   Selection u8;
-  Unused [3]u8;
+  Unused ^[3]u8;
 };
 
 def kNumberOfSections u32 = 3;

@@ -1,5 +1,5 @@
 deftype le_u32 struct {
-  buf [4]u8;
+  buf ^[4]u8;
 };
 
 func `~`(x u32) le_u32 {
@@ -21,7 +21,7 @@ func `~`(x le_u32) u32 {
 }
 
 deftype le_i32 struct {
-  buf [4]u8;
+  buf ^[4]u8;
 };
 
 func `~`(x i32) le_i32 {
@@ -38,7 +38,7 @@ func write_le_i32(dest *u8, x i32) void {
 }
 
 deftype le_u16 struct {
-  buf [2]u8;
+  buf ^[2]u8;
 };
 
 func `~`(x u16) le_u16 {
