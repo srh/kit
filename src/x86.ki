@@ -248,7 +248,11 @@ func x86_sar_cl_w8(f *objfile, dest u8) void {
 }
 
 func x86_add_esp_i32(f *objfile, x i32) void {
-  appendtext(f, 0x81, mrr(MOD11, 0, X86_ESP), x);
+  if case Has(x8 u8) = as_imm8(x) {
+    appendtext(f, 0x83, mrr(MOD11, 0, X86_ESP), x8);
+  } else {
+    appendtext(f, 0x81, mrr(MOD11, 0, X86_ESP), x);
+  }
 }
 
 func x86_add_w32(f *objfile, dest u8, src u8) void {
@@ -333,16 +337,32 @@ func x86_cmp_w8(f *objfile, lhs u8, rhs u8) void {
   appendtext(f, 0x38, mrr(MOD11, rhs, lhs));
 }
 
+func x86_math81_imm32(f *objfile, op u8, lhs u8, x i32) void {
+  if case Has(x8 u8) = as_imm8(x) {
+    appendtext(f, 0x83, mrr(MOD11, op, lhs), x8);
+  } else {
+    appendtext(f, 0x81, mrr(MOD11, op, lhs), x);
+  }
+}
+
 func x86_cmp_imm32(f *objfile, lhs u8, x u32) void {
-  appendtext(f, 0x81, mrr(MOD11, 7, lhs), x);
+  if case Has(x8 u8) = as_imm8(x) {
+    appendtext(f, 0x83, mrr(MOD11, 7, lhs), x8);
+  } else {
+    appendtext(f, 0x81, mrr(MOD11, 7, lhs), x);
+  }
 }
 
 func x86_cmp_imm32(f *objfile, lhs u8, x i32) void {
-  appendtext(f, 0x81, mrr(MOD11, 7, lhs), x);
+  x86_math81_imm32(f, 7, lhs, x);
 }
 
 func x86_cmp_reg16_imm16(f *objfile, lhs u8, x u16) void {
-  appendtext(f, 0x66, 0x81, mrr(MOD11, 7, lhs), x);
+  if case Has(x8 u8) = as_imm8(x) {
+    appendtext(f, 0x66, 0x83, mrr(MOD11, 7, lhs), x8);
+  } else {
+    appendtext(f, 0x66, 0x81, mrr(MOD11, 7, lhs), x);
+  }
 }
 
 func x86_cmp_reg8_imm8(f *objfile, lhs u8, x u8) void {
@@ -496,6 +516,30 @@ deftype reg_rm_encoded struct {
   buf ^[5]u8;
 };
 
+func as_imm8(x u16) opt[u8] {
+  if x <= 127 {
+    return Has(~ (x & 0xFF));
+  } else {
+    return None;
+  }
+}
+
+func as_imm8(x u32) opt[u8] {
+  if x <= 127 {
+    return Has(~ (x & 0xFF));
+  } else {
+    return None;
+  }
+}
+
+func as_imm8(x i32) opt[u8] {
+  if x >= @[i32] -128 && x <= 127 {
+    return Has(~ (x & 0xFF));
+  } else {
+    return None;
+  }
+}
+
 func encode_reg_rm(reg u8, rm_addr u8, rm_disp i32) reg_rm_encoded {
   ret reg_rm_encoded;
   if rm_disp == 0 && rm_addr != X86_ESP && rm_addr != X86_EBP {
@@ -504,9 +548,9 @@ func encode_reg_rm(reg u8, rm_addr u8, rm_disp i32) reg_rm_encoded {
   } else if rm_addr == X86_ESP {
     // TODO: This would be nice.
     ice(_u8("encode_reg_rm does not support ESP addrs (yet)"));
-  } else if rm_disp >= @[i32] -128 && rm_disp <= 127 {
+  } else if case Has(disp8 u8) = as_imm8(rm_disp) {
     ret.buf[0] = mrr(MOD01, reg, rm_addr);
-    ret.buf[1] = ~ (rm_disp & 0xFF);
+    ret.buf[1] = disp8;
     ret.length = 2;
   } else {
     ret.buf[0] = mrr(MOD10, reg, rm_addr);
@@ -529,7 +573,7 @@ func x86_movzx16(f *objfile, dest u8, src_addr u8, src_disp i32) void {
 }
 
 func x86_and_imm32(f *objfile, dest u8, x i32) void {
-  appendtext(f, 0x81, mrr(MOD11, 4, dest), x);
+  x86_math81_imm32(f, 4, dest, x);
 }
 
 func x86_movsx8(f *objfile, dest u8, src_addr u8, src_disp i32) void {
