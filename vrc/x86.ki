@@ -436,9 +436,8 @@ func x86_load32_zeroextend(f *objfile, dest u8, src_addr u8, src_disp i32, size 
 }
 
 func x86_load32_for_primop(f *objfile, dest u8, src cell_loc, size u32) void {
-  src_addr u8;
-  src_disp i32;
-  if case Has(b bigint) = x86_prep_loc_or_const(f, src, dest, &src_addr, &src_disp) {
+  switch x86_prep_loc_or_const(f, src, dest) {
+  case Const(b bigint):
     // TODO: We are on relatively thin ice here -- we should just have an st_value at this point.
     value u32;
     if !as_non_negative_u32(&b, &value) {
@@ -446,8 +445,8 @@ func x86_load32_for_primop(f *objfile, dest u8, src cell_loc, size u32) void {
     } else {
       x86_mov_imm32(f, dest, value);
     }
-  } else {
-    x86_load32_zeroextend(f, dest, src_addr, src_disp, size);
+  case Regdisp(rd regdisp):
+    x86_load32_zeroextend(f, dest, rd.addr, rd.disp, size);
   }
 }
 
@@ -494,9 +493,8 @@ func x86_load32_signextend(f *objfile, dest u8, src_addr u8, src_disp i32, size 
 }
 
 func x86_load32_signextend_for_primop(f *objfile, dest u8, src cell_loc, size u32) void {
-  src_addr u8;
-  src_disp i32;
-  if case Has(b bigint) = x86_prep_loc_or_const(f, src, dest, &src_addr, &src_disp) {
+  switch x86_prep_loc_or_const(f, src, dest) {
+  case Const(b bigint):
     // TODO: We are on relatively thin ice here -- we should just have an st_value at this point.
     ivalue i32;
     if as_i32(&b, &ivalue) {
@@ -505,8 +503,8 @@ func x86_load32_signextend_for_primop(f *objfile, dest u8, src cell_loc, size u3
     } else {
       ice(_u8("x86_load32_signextend_for_primop has invalid bigint of value "), b);
     }
-  } else {
-    x86_load32_signextend(f, dest, src_addr, src_disp, size);
+  case Regdisp(rd regdisp):
+    x86_load32_signextend(f, dest, rd.addr, rd.disp, size);
   }
 }
 
@@ -678,22 +676,27 @@ func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
   }
 }
 
-func x86_prep_loc_or_const(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, disp_out *i32) opt[bigint] {
+deftype regdisp struct { addr u8; disp i32; };
+
+defenum regdisp_or_const {
+  Regdisp regdisp;
+  Const bigint;
+};
+
+func x86_prep_loc_or_const(f *objfile, loc cell_loc, avail_reg u8) regdisp_or_const {
   switch loc {
   case DirectLoc(off i32):
-    *addr_reg_out = X86_EBP;
-    *disp_out = off;
+    return Regdisp({X86_EBP, off});
   case IndirectLoc(off i32):
     x86_load32(f, avail_reg, X86_EBP, off);
-    *addr_reg_out = avail_reg;
-    *disp_out = 0;
+    return Regdisp({avail_reg, 0});
   case ConstFuncellLoc(fnid fn_body_id):
     // TODO: Better type safety?
     ice(_u8("x86_prep_loc_use sees ConstFuncellLoc"));
+    return fake();
   case ConstIntCellLoc(b bigint):
-    return Has(b);
+    return Const(b);
   }
-  return None();
 }
 
 func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, disp_out *i32) void {
