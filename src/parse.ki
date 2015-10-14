@@ -580,6 +580,9 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_
   if +try_parse_oper(p, '*', &oper) {
     return success_or_fail(parse_rest_of_pointer(p, ab, oper, out));
   }
+  if +try_parse_oper(p, '&', &oper) {
+    return success_or_fail(parse_rest_of_reference(p, ab, oper, out));
+  }
   if +try_skip_oper(p, '^') {
     if !try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
       return Error(void);
@@ -675,6 +678,35 @@ func parse_rest_of_pointer(p *ps, ab allow_blanks, oper ast_ident, out *ast_type
   }
   *out = App({embox(Name(oper)),
               mk_array(arg)});
+  return Success;
+}
+
+func parse_rest_of_reference(p *ps, ab allow_blanks, oper ast_ident, out *ast_typeexpr) parse_result {
+  arg ast_typeexpr;
+  if !help_parse_typeexpr(p, ab, &arg) {
+    return Fail;
+  }
+  lifetime_arg ast_lifetime;
+  switch triparse_lifetime(p, &lifetime_arg) {
+  case Success:
+    *out = App({embox(Name(oper)), mk_array(arg, Lifetime(lifetime_arg))});
+    return Success;
+  case Quickfail:
+    return Fail;
+  case Error:
+    return Fail;
+  }
+}
+
+func triparse_lifetime(p *ps, out *ast_lifetime) triparse_result {
+  if !try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
+    return Quickfail;
+  }
+  name ast_ident;
+  if !parse_ident(p, &name) {
+    return Error;
+  }
+  *out = {name};
   return Success;
 }
 

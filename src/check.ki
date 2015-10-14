@@ -208,6 +208,10 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
       *out = TeArraytype({count, param});
       return true;
     }
+    case &Lifetime(b ast_lifetime): {
+      ERR(_u8("Lifetime types not supported at typechecking time... yet."));
+      return TODO();
+    }
     case &Unknown(b ast_unknown): {
       *out = TeUnknown(void);
       return true;

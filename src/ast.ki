@@ -151,6 +151,10 @@ deftype ast_arraytype struct {
   param box[ast_typeexpr];
 };
 
+deftype ast_lifetime struct {
+  name ast_ident;
+};
+
 deftype ast_unknown struct {
 };
 
@@ -161,6 +165,7 @@ defenum ast_typeexpr {
   Enum ast_enum;
   Union ast_union;
   Arraytype ast_arraytype;
+  Lifetime ast_lifetime;
   Unknown ast_unknown;
 };
 
