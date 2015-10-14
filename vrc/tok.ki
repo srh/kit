@@ -133,6 +133,9 @@ defenum grouper {
   RBracket void;
   LBrace void;
   RBrace void;
+  DoubleQuote void;
+  SingleQuote void;
+  Backtick void;
 };
 
 defenum tokval {
@@ -142,9 +145,6 @@ defenum tokval {
   Ident shray[i32];
   Grouper grouper;
   StringChar i32;
-  // TODO: Just make StringDelim and Backtick be Groupers.
-  StringDelim i32;
-  Backtick void;
   Bad void;
   Eof void;
   Comment void;
@@ -183,8 +183,6 @@ func equal(a *tokval, b *tokval) bool {
   case &Ident(j): { switch b { case &Ident(k): { return shray_equal(&j, &k); } } }
   case &Grouper(j): { switch b { case &Grouper(k): { return j == k; } } }
   case &StringChar(j): { switch b { case &StringChar(k): { return j == k; } } }
-  case &StringDelim(j): { switch b { case &StringDelim(k): { return j == k; } } }
-  case &Backtick(j): { return true; }
   case &Bad(j): { return true; }
   case &Eof(j): { return true; }
   case &Comment(v): { return true; }
@@ -415,14 +413,14 @@ func grab_tok(p *ps) tok {
         return grab_oper2(p, left, ch, '=');
       } else if ch == '\"' {
         ps_step(p);
-        return mk_res(p, left, StringDelim(ch));
+        return mk_res(p, left, @[tokval]Grouper(DoubleQuote));
       } else if ch == '%' {
         return grab_oper2(p, left, ch, '=');
       } else if ch == '&' {
         return grab_oper2(p, left, ch, '=', '&');
       } else if ch == '\'' {
         ps_step(p);
-        return mk_res(p, left, StringDelim(ch));
+        return mk_res(p, left, @[tokval]Grouper(SingleQuote));
       } else if ch == '(' {
         ps_step(p);
         return mk_res(p, left, @[tokval]Grouper(LParen(void)));
@@ -523,7 +521,7 @@ func grab_tok(p *ps) tok {
         return grab_oper2(p, left, ch, '=');
       } else if ch == '`' {
         ps_step(p);
-        return mk_res(p, left, Backtick(void));
+        return mk_res(p, left, @[tokval]Grouper(Backtick));
       } else if ch == '{' {
         ps_step(p);
         return mk_res(p, left, @[tokval]Grouper(LBrace(void)));
@@ -639,7 +637,12 @@ func string_grab_tok(p *ps, stop i32) tok {
     } else {
       dh i32 = ps_peek(p);
       if is_string_postchar(dh) {
-        return {{left, ps_pos(p)}, StringDelim(ch)};
+        if ch == '\"' {
+          return {{left, ps_pos(p)}, @[tokval]Grouper(DoubleQuote)};
+        } else {
+          check(ch == '\'');
+          return {{left, ps_pos(p)}, @[tokval]Grouper(SingleQuote)};
+        }
       } else {
         return {{left, ps_pos(p)}, Bad(void)};
       }

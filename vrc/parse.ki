@@ -384,7 +384,7 @@ func parse_rest_of_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) bo
   // TODO: We probably should not allow "` + `" to parse -- require tight quoting, do this at tokenization.
   case Oper(operch shray[i32]):
     step(p);
-    if !try_skip_token(p, Backtick(void)) {
+    if !try_skip_token(p, @[tokval]Grouper(Backtick)) {
       return Fail;
     }
     end(p, ident_meta);
@@ -401,10 +401,14 @@ func try_parse_ident(p *ps, out *ast_ident) bool {
     step(p);
     *out = {m, intern(p->im, ~text)};
     return true;
-  case Backtick(v void):
-    ident_meta ast_meta = start(p);
-    step(p);
-    return parse_rest_of_backtick_ident(p, ident_meta, out);
+  case Grouper(g grouper):
+    if case Backtick = g {
+      ident_meta ast_meta = start(p);
+      step(p);
+      return parse_rest_of_backtick_ident(p, ident_meta, out);
+    } else {
+      return Fail;
+    }
   default:
     return Fail;
   }
@@ -427,10 +431,8 @@ func[T] try_skip_specific_ident(p *ps, x T) bool {
     m ast_meta = startend(p);
     step(p);
     return true;
-  case Backtick(v void):
-    // No caller expects a backtick ident.
-    return Fail;
   default:
+    // No caller expects a backtick ident.
     return Fail;
   }
 }
@@ -1074,7 +1076,19 @@ func parse_atomic_expr_upon_grouper(p *ps, ab allow_braces, g grouper, out *ast_
       step(p);
       return parse_rest_of_strinit(p, m, out);
     }
-    default: { return Fail; }
+    case DoubleQuote:
+      return parse_atomic_expr_upon_stringdelim(p, '\"', out);
+    case SingleQuote:
+      return parse_atomic_expr_upon_stringdelim(p, '\'', out);
+    case Backtick:
+      step(p);
+      ident ast_ident;
+      if !parse_rest_of_backtick_ident(p, m, &ident) {
+        return Fail;
+      }
+      return parse_finish_name_expr(p, ident, out);
+    default:
+      return Fail;
   }
 }
 
@@ -1140,17 +1154,6 @@ func parse_atomic_expr(p *ps, ab allow_braces, out *ast_expr) bool {
       return parse_finish_name_expr(p, {ident_meta, intern(p->im, ~identch)}, out);
     case Oper(operch shray[i32]):
       return parse_atomic_expr_upon_oper(p, ab, &operch, out);
-    case StringDelim(ch i32):
-      return parse_atomic_expr_upon_stringdelim(p, ch, out);
-    case Backtick(v): {
-      ident_meta ast_meta = start(p);
-      step(p);
-      ident ast_ident;
-      if !parse_rest_of_backtick_ident(p, ident_meta, &ident) {
-        return Fail;
-      }
-      return parse_finish_name_expr(p, ident, out);
-    }
     case Bad(v): {
       return Fail;
     }
@@ -1626,10 +1629,13 @@ func parse_rest_of_string_literal(p *ps, m ast_meta, out *ast_expr) bool {
     done bool = false;
     while !done {
       switch peek(p)->val {
-        case StringDelim(ch i32): {
-          check(ch == '\"');
-          step(p);
-          done = true;
+        case Grouper(g grouper): {
+          if case DoubleQuote = g {
+            step(p);
+            done = true;
+          } else {
+            ice(_u8("String literal expected to end in double quote"));
+          }
         }
         case StringChar(ch i32): {
           push(&specs, {ch});
@@ -1642,8 +1648,8 @@ func parse_rest_of_string_literal(p *ps, m ast_meta, out *ast_expr) bool {
     }
 
     again = false;
-    if case StringDelim(ch i32) = peek(p)->val {
-      if ch == '\"' {
+    if case Grouper(g grouper) = peek(p)->val {
+      if case DoubleQuote = g {
         string_step(p, '\"');
         again = true;
       }
@@ -1666,12 +1672,15 @@ func parse_rest_of_char_literal(p *ps, m ast_meta, out *ast_expr) bool {
     }
   }
   switch peek(p)->val {
-    case StringDelim(ch i32): {
-      check(ch == '\'');
-      step(p);
-      end(p, m);
-      *out = mk(m, @[ast_expr_enum]CharLiteral({{value}}));
-      return true;
+    case Grouper(g grouper): {
+      if case SingleQuote = g {
+        step(p);
+        end(p, m);
+        *out = mk(m, @[ast_expr_enum]CharLiteral({{value}}));
+        return true;
+      } else {
+        return Fail;
+      }
     }
     default: {
       return Fail;
