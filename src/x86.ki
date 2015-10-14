@@ -438,7 +438,7 @@ func x86_load32_zeroextend(f *objfile, dest u8, src_addr u8, src_disp i32, size 
 func x86_load32_for_primop(f *objfile, dest u8, src cell_loc, size u32) void {
   src_addr u8;
   src_disp i32;
-  if case Has(b bigint) = x86_prep_loc_use(f, src, dest, &src_addr, &src_disp) {
+  if case Has(b bigint) = x86_prep_loc_or_const(f, src, dest, &src_addr, &src_disp) {
     // TODO: We are on relatively thin ice here -- we should just have an st_value at this point.
     value u32;
     if !as_non_negative_u32(&b, &value) {
@@ -496,7 +496,7 @@ func x86_load32_signextend(f *objfile, dest u8, src_addr u8, src_disp i32, size 
 func x86_load32_signextend_for_primop(f *objfile, dest u8, src cell_loc, size u32) void {
   src_addr u8;
   src_disp i32;
-  if case Has(b bigint) = x86_prep_loc_use(f, src, dest, &src_addr, &src_disp) {
+  if case Has(b bigint) = x86_prep_loc_or_const(f, src, dest, &src_addr, &src_disp) {
     // TODO: We are on relatively thin ice here -- we should just have an st_value at this point.
     ivalue i32;
     if as_i32(&b, &ivalue) {
@@ -678,7 +678,7 @@ func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
   }
 }
 
-func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, disp_out *i32) opt[bigint] {
+func x86_prep_loc_or_const(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, disp_out *i32) opt[bigint] {
   switch loc {
   case DirectLoc(off i32):
     *addr_reg_out = X86_EBP;
@@ -694,6 +694,23 @@ func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, 
     return Has(b);
   }
   return None();
+}
+
+func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, disp_out *i32) void {
+  switch loc {
+  case DirectLoc(off i32):
+    *addr_reg_out = X86_EBP;
+    *disp_out = off;
+  case IndirectLoc(off i32):
+    x86_load32(f, avail_reg, X86_EBP, off);
+    *addr_reg_out = avail_reg;
+    *disp_out = 0;
+  case ConstFuncellLoc(fnid fn_body_id):
+    // TODO: Better type safety?
+    ice(_u8("x86_prep_loc_use sees ConstFuncellLoc"));
+  case ConstIntCellLoc(b bigint):
+    ice(_u8("x86_prep_loc_use sees ConstIntCelloc"));
+  }
 }
 
 func x86_store32(f *objfile, dest cell_loc, src u8, scratch u8) void {
