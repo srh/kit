@@ -476,6 +476,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
     annotate(&a->info, {tag_cell, ~count(&et.constructors)});
   } else {
     ERR(_u8("Switching over non-switchable type."));
+    return false;
   }
   *exit_out = exitnum;
   return true;
