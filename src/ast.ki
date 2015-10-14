@@ -124,6 +124,10 @@ deftype ast_addressof struct {
   rhs box[ast_expr];
 };
 
+deftype ast_refof struct {
+  rhs box[ast_expr];
+};
+
 deftype ast_deref struct {
   ptr_discard ast_later_discard_info;
   rhs box[ast_expr_consume];
@@ -725,6 +729,7 @@ defenum ast_expr_enum {
   Funcall ast_funcall;
   LogicalConjunction ast_logical_conjunction;
   Assignment ast_assignment;
+  RefOf ast_refof;
   AddressOf ast_addressof;
   Deref ast_deref;
   IndexExpr ast_index_expr;

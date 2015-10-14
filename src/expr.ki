@@ -643,6 +643,10 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
     case &Assignment(a ast_assignment):
       return check_expr_assignment(es, pt, &a, x);
 
+    case &RefOf(a ast_refof):
+      ERR(_u8("Typechecking RefOf operators not supported"));
+      return TODO();
+
     case &AddressOf(a ast_addressof):
       return check_expr_addressof(es, pt, &a, x);
 

@@ -999,6 +999,8 @@ func oper_arr(tv tokval) shray[i32] {
 func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_expr {
   if op.value == im->cym.addressofsym {
     return mk(m, @[ast_expr_enum]AddressOf({embox(rhs)}));
+  } else if op.value == im->cym.refofsym {
+    return mk(m, @[ast_expr_enum]RefOf({embox(rhs)}));
   } else if op.value == im->cym.derefsym {
     return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(&rhs))}));
   } else {
@@ -1222,13 +1224,17 @@ func parse_atomic_expr(p *ps, ab allow_braces, out *ast_expr) parse_result {
 }
 
 func unop_info(operch *shray[i32]) opt[i32] {
-  if count(operch) != 1 {
-    return None();
-  }
-  ch0 i32 = get(operch, 0);
-  if ch0 == '~' || ch0 == '*' || ch0 == '&'
-     || ch0 == '-' || ch0 == '!' || ch0 == '^' || ch0 == '+' {
-    return Has(905);
+  nch size = count(operch);
+  if nch == 1 {
+    ch0 i32 = get(operch, 0);
+    if ch0 == '~' || ch0 == '*' || ch0 == '&'
+       || ch0 == '-' || ch0 == '!' || ch0 == '^' || ch0 == '+' {
+      return Has(905);
+    }
+  } else if nch == 2{
+    if get(operch, 0) == '&' && get(operch, 1) == '&' {
+      return Has(905);
+    }
   }
   return None();
 }

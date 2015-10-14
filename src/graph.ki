@@ -981,6 +981,9 @@ func gr_expr(clq *clqueue, gr *frame_graph, x *ast_expr, out *gr_num) bool {
     case &Assignment(a ast_assignment): {
       return gr_assignment(clq, gr, x, &a, out);
     }
+    case &RefOf(a ast_refof):
+      ERR(_u8("graphing RefOf not supported"));
+      return TODO();
     case &AddressOf(a ast_addressof): {
       return gr_mk_addressof(clq, gr, x, &a, out);
     }
