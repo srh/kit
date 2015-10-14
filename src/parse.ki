@@ -390,7 +390,11 @@ func parse_typeexpr(p *ps, out *ast_typeexpr) parse_result {
 }
 
 func parse_ident(p *ps, out *ast_ident) parse_result {
-  return try_parse_ident(p, out);
+  if case Success = triparse_ident(p, out) {
+    return Success;
+  } else {
+    return Fail;
+  }
 }
 
 func parse_rest_of_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) parse_result {
@@ -410,7 +414,7 @@ func parse_rest_of_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) pa
   }
 }
 
-func try_parse_ident(p *ps, out *ast_ident) parse_result {
+func triparse_ident(p *ps, out *ast_ident) triparse_result {
   dbgparse("try_parse_ident\n");
   switch peek(p)->val {
   case Ident(text shray[i32]):
@@ -422,12 +426,12 @@ func try_parse_ident(p *ps, out *ast_ident) parse_result {
     if case Backtick = g {
       ident_meta ast_meta = start(p);
       step(p);
-      return parse_rest_of_backtick_ident(p, ident_meta, out);
+      return success_or_fail(parse_rest_of_backtick_ident(p, ident_meta, out));
     } else {
-      return Fail;
+      return Quickfail;
     }
   default:
-    return Fail;
+    return Quickfail;
   }
 }
 
@@ -586,8 +590,12 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_
   lhs ast_typeexpr;
   if !try_underscore_if_allowed(p, ab, &lhs) {
     name ast_ident;
-    if !try_parse_ident(p, &name) {
+    switch triparse_ident(p, &name) {
+    case Success: { }
+    case Quickfail:
       return Quickfail(void);
+    case Error:
+      return Error;
     }
     lhs = Name(name);
   }
@@ -1569,7 +1577,11 @@ defenum triparse_result {
 
 func parse_naked_var_or_expr_statement(p *ps, ab allow_braces, fa force_assignment, out *ast_statement) parse_result {
   name ast_ident;
-  if !try_parse_ident(p, &name) {
+  switch triparse_ident(p, &name) {
+  case Success: { }
+  case Error:
+    return Fail;
+  case Quickfail:
     // (The force_assignment argument only matters for var statements.)
     expr ast_expr;
     if !(+parse_expr(p, kSemicolonPrec, ab, IsStatementExpr(void), &expr)
