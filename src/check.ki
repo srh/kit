@@ -523,6 +523,7 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
       *out = {computed_fields_complete, TeUnion({freeze(&computed_fields)})};
       return true;
     }
+
     case &TeArraytype(a te_arraytype): {
       param cac_typeexpr;
       if !check_and_compute_typeexpr(cs, clq, g, parms, oo(&a.param), &param) {
@@ -531,6 +532,10 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
       *out = {param.complete && isHas(&a.count), TeArraytype({a.count, emshp(param.te)})};
       return true;
     }
+
+    case &TeLifetime(a te_lifetime):
+      ERR(_u8("check_and_compute_typeexpr: TeLifetime not supported"));
+      return TODO();
     case &TeUnknown(v void): {
       *out = {false, TeUnknown(void)};
       return true;
@@ -1027,6 +1032,11 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
         return fake();
       }
     }
+
+    case &TeLifetime(a te_lifetime):
+      // Presumably this should be an ICE.
+      ERR(_u8("ICE: compute_complete_type_properties on TeLifetime"));
+      return TODO();
 
     case &TeUnknown(a void): {
       ice(_u8("compute_type_properties called on incomplete type."));
@@ -1675,6 +1685,10 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
         return {false, false};
       }
     }
+    case &TeLifetime(a te_lifetime):
+      ice(_u8("is_complete_computed: TeLifetime not supported"));
+      return fake();
+
     case &TeUnknown(v void): {
       return {false, false};
     }
@@ -1857,6 +1871,11 @@ func unify_under_generics(pt *te_typeexpr,
         return false;
       }
     }
+
+    case &TeLifetime(a te_lifetime):
+      ERR(_u8("unify_under_generics: TeLifetime not supported"));
+      return TODO();
+
 
     case &TeUnknown(v void): {
       // Right now, the only callers are type_matches and unify_types.  From type_matches, t is complete, and from unify_types, there are no generic names.

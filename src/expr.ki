@@ -1311,6 +1311,11 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     }
     annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *pt, props)), ~ *pt, props)));
     return true;
+
+  case &TeLifetime(b te_lifetime):
+    ERR(_u8("ICE: check_expr_strinit sees a lifetime as structural rhs"));
+    return false;
+
   default:
     MERR(es->cs, a->meta, _u8("Structure literal used on non-struct type, "), structural_type->~);
     return false;
@@ -1728,6 +1733,10 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
       }
       return true;
     }
+    case &TeLifetime(a te_lifetime):
+      ERR(_u8("ICE: Looking up name field of... a lifetime type?"));
+      return false;
+
     case &TeUnknown(v void): {
       ice(_u8("lookup_field sees incomplete type"));
       return fake();

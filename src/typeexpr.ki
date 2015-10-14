@@ -22,6 +22,7 @@ defenum te_typeexpr {
   TeEnum te_enum;
   TeUnion te_union;
   TeArraytype te_arraytype;
+  TeLifetime te_lifetime;
   TeUnknown void;
 };
 
@@ -63,6 +64,11 @@ deftype te_union struct {
 deftype te_arraytype struct {
   count opt[u32];
   param shp[te_typeexpr];
+};
+
+// We better not allow name shadowing of lifetimes!
+deftype te_lifetime struct {
+  name sym;
 };
 
 deftype te_vardecl struct {
@@ -132,6 +138,9 @@ func help_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
         return ax.count == bx.count && help_typeexpr_equal(oo(&ax.param), oo(&bx.param));
       }
     }
+    case &TeLifetime(ax te_lifetime):
+      // TODO(): Figure out callers, what we are using this for, what is appropriate behavior.
+      ice(_u8("typeexpr_equal not implemented for TeLifetime"));
     case &TeUnknown(v void): {
       ice(_u8("typeexpr_equal sees TeUnknown"));
     }
@@ -227,6 +236,8 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
     case &TeArraytype(b te_arraytype): {
       wrap_u8str(help, r, _u8("TeArraytype"), &b);
     }
+    case &TeLifetime(b te_lifetime):
+      wrap_u8str(help, r, _u8("TeLifetime"), &b);
     case &TeUnknown(v void): {
       append(r, _u8("TeUnknown"));
     }
@@ -271,6 +282,10 @@ func[H] build_u8str(help H, r *array[u8], a *te_arraytype) void {
   append(r, _u8(",param:"));
   build_u8str(help, r, &a->param);
   push(r, '}');
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_lifetime) void {
+  build_u8str(help, r, &a->name);
 }
 
 func[H] build_u8str(help H, r *array[u8], a *te_vardecl) void {
@@ -321,6 +336,9 @@ func help_compute_hash(a *te_typeexpr) osize {
     if case Has(n u32) = ax.count {
       return (@[osize]~n * 0x3001) + help_compute_hash(oo(&ax.param));
     }
+  case &TeLifetime(ax te_lifetime):
+    ice(_u8("Look at caller and figure out what is appropriate here."));
+    return TODO();
   case &TeUnknown(v void):
     ice(_u8("help_compute_hash sees TeUnknown"));
   }
@@ -378,6 +396,9 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
     }
     push(r, ']');
     pretty_u8str(im, r, oo(&b.param));
+  case &TeLifetime(b te_lifetime):
+    push(r, '\'');
+    build_u8str(im, r, &b.name);
   case &TeUnknown(v void):
     push(r, '_');
   }
