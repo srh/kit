@@ -154,7 +154,7 @@ func[T] find(a *shray[T], b T) opt[size] {
       return Has(i);
     }
   }
-  return None();
+  return None;
 }
 
 func[T, U] concat(a opt[T], b U) shray[T] {

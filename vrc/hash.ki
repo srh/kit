@@ -135,7 +135,7 @@ access hash[_, _] {
   func[K, V] lookup_ref(h *hash[K, V], key *K) opt[*V] {
     hash_count size = count(&h->arr);
     if hash_count == 0 {
-      return None();
+      return None;
     }
     mask size = hash_count - 1;
     offset size = ~ @[osize]hash_compute_hash(key) & mask;
@@ -143,7 +143,7 @@ access hash[_, _] {
     for ;; {
       switch ref(&h->arr, offset) {
         case &HashEmpty(v void): {
-          return None();
+          return None;
         }
         case &HashValue(p tup[K, V]): {
           if hash_equal(&p.car, key) {
@@ -183,7 +183,7 @@ access hash[_, _] {
       }
     }
     it->index = i;
-    return None();
+    return None;
   }
 
   func[K, V] swap(x *hash[K, V], y *hash[K, V]) void {
@@ -299,7 +299,7 @@ func[K, V] lookup(h *hash[K, V], key *K) opt[V] {
   if case Has(p *V) = lookup_ref(h, key) {
     return Has(*p);
   }
-  return None();
+  return None;
 }
 
 func[K, V] lookup_sole_value(h *hash[K, V], expected *K) opt[V] {

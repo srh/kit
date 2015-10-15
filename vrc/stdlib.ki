@@ -162,7 +162,7 @@ defenum[T] opt {
 };
 
 inline func[T] None() opt[T] {
-  return None(void);
+  return None;
 }
 
 func[T] isHas(p *opt[T]) bool {
@@ -190,7 +190,7 @@ func[T] unHas(p *opt[T]) *T {
   if case &Has(t T) = p {
     return &t;
   }
-  crash(_u8("unHas sees None()"));
+  crash(_u8("unHas sees None"));
   return fake();
 }
 
@@ -223,7 +223,7 @@ func[T] unSet(dest *opt[T]) void {
   if case &None(v void) = dest {
     crash(_u8("unset sees None"));
   }
-  *dest = None();
+  *dest = None;
 }
 
 deftype[S, T] tup struct {

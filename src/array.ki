@@ -311,7 +311,7 @@ func[T] find(a *array[T], b T) opt[size] {
       return Has(i);
     }
   }
-  return None();
+  return None;
 }
 
 func[T] popval(a *array[T], val_out *T) bool {
@@ -329,7 +329,7 @@ func[T] popval(a *array[T]) opt[T] {
   if popval(a, &val) {
     return Has(val);
   } else {
-    return None();
+    return None;
   }
 }
 
