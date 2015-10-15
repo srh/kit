@@ -262,7 +262,7 @@ deftype deftype_inst_info struct {
 };
 
 deftype deftype_inst struct {
-  parms cu_genparms;
+  parms idy_genparms;
   info nbfc[deftype_inst_info];
 };
 
@@ -289,11 +289,11 @@ deftype deftype_entry struct {
   nonprim opt[deftype_nonprim];
   // Info for primitive types.
   default_info opt[deftype_inst_info];
-  insts hash[cu_genparms, deftype_inst_id];
+  insts hash[idy_genparms, deftype_inst_id];
 };
 
 func mk(module_name sym, name sym, accessible array[access_entry_id], accessibility rhs_accessibility, g ast_generics, tl *ast_type_def) deftype_entry {
-  return {module_name, name, accessible, accessibility, g, Has({tl, NotComputed()}), None(), mk_hash@[cu_genparms, deftype_inst_id]()};
+  return {module_name, name, accessible, accessibility, g, Has({tl, NotComputed()}), None(), mk_hash@[idy_genparms, deftype_inst_id]()};
 }
 
 defenum fn_body_spec {
@@ -360,23 +360,33 @@ defenum cu_genparms {
   HasParms shray[cu_typeexpr];
 };
 
-func hash_compute_hash(x *cu_genparms) osize {
-  switch x {
-  case &NoParms(v void):
-    return 1;
+deftype idy_genparms struct {
+  // If the ast_generics is NoGenerics, this is of course empty.
+  repls shray[cu_typeexpr];
+};
+
+func parms_to_idy(g *ast_generics, parms *cu_genparms) idy_genparms {
+  check(arity_matches(g, parms));
+  switch parms {
+  case &NoParms:
+    return {mk_shray()};
   case &HasParms(ps shray[cu_typeexpr]):
-    accum osize = 0x12345679;
-    n size = count(&ps);
-    p *cu_typeexpr = data(&ps);
-    for i size = 0; i < n; i = i + 1 {
-      accum = (accum * 33) ^ hash_compute_hash(&p[i]);
-    }
-    return accum;
+    return {ps};
   }
 }
 
-func hash_equal(x *cu_genparms, y *cu_genparms) bool {
-  return parms_equal(x, y);
+func hash_compute_hash(x *idy_genparms) osize {
+  accum osize = 0x12345679;
+  n size = count(&x->repls);
+  p *cu_typeexpr = data(&x->repls);
+  for i size = 0; i < n; i = i + 1 {
+    accum = (accum * 33) ^ hash_compute_hash(&p[i]);
+  }
+  return accum;
+}
+
+func hash_equal(x *idy_genparms, y *idy_genparms) bool {
+  return typeexpr_list_equal(&x->repls, &y->repls);
 }
 
 defenum def_inst_type_status {
@@ -436,7 +446,7 @@ deftype frame_regraphed struct {
 };
 
 deftype def_inst struct {
-  parms cu_genparms;
+  parms idy_genparms;
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None() if we have an extern def or primitive def.
   rhs def_inst_rhs;
   // The concrete type (with generics replaced) once we've computed it and checked it.  And its properties.  The type properties _must_ (right now) indicate that the type is defwise trivial.
@@ -448,7 +458,7 @@ deftype def_inst struct {
   evaled_value nbfc[st_value];
 };
 
-func mk(parms cu_genparms, rhs def_inst_rhs) def_inst {
+func mk(parms idy_genparms, rhs def_inst_rhs) def_inst {
   return {parms, rhs, NotComputed@[cu_typrop](), DidNotCheckRhs(void), NotComputed@[opt[frame_regraphed]](), NotComputed@[st_value]()};
 }
 
@@ -476,11 +486,11 @@ deftype def_entry struct {
   definition def_definition;
   converted_typeexpr nbfc[te_typeexpr];
 
-  insts hash[cu_genparms, def_inst_id];
+  insts hash[idy_genparms, def_inst_id];
 };
 
 func mk(module_name sym, def_name sym, accessible array[access_entry_id], generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
-  return {module_name, def_name, accessible, generics, DefnHasRhs({quick_typeexpr, tl}), NotComputed(), mk_hash@[cu_genparms, def_inst_id]()};
+  return {module_name, def_name, accessible, generics, DefnHasRhs({quick_typeexpr, tl}), NotComputed(), mk_hash@[idy_genparms, def_inst_id]()};
 }
 
 deftype clqueue_deftype_entry struct {
@@ -545,22 +555,22 @@ access depth_rewinder {
   }
 }
 
-
+// TODO: The very concept of this function will soon be (when we have true generic non-instantiated parameters) broken?
 func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
-  name sym = ref_deftype_entry(cs, ent_id)->name;
-  switch &ref_deftype_inst(cs, inst_id)->parms {
-    case &NoParms(v void): {
-      return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
+  ent *deftype_entry = ref_deftype_entry(cs, ent_id);
+  name sym = ent->name;
+  switch &ent->generics {
+  case &NoGenerics:
+    return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
+  default:
+    parms *idy_genparms = &ref_deftype_inst(cs, inst_id)->parms;
+    converted array[te_typeexpr];
+    n size = count(&parms->repls);
+    reserve(&converted, n);
+    for i size = 0; i < n; i = i + 1 {
+      push(&converted, ref(&parms->repls, i)->~);
     }
-    case &HasParms(a shray[cu_typeexpr]): {
-      converted array[te_typeexpr];
-      n size = count(&a);
-      reserve(&converted, n);
-      for i size = 0; i < n; i = i + 1 {
-        push(&converted, ref(&a, i)->~);
-      }
-      return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
-    }
+    return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
   }
 }
 

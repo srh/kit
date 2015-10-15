@@ -99,6 +99,10 @@ access shray[_] {
   }
 }
 
+inline func[T] empty(r *shray[T]) bool {
+  return count(r) == 0;
+}
+
 func[U, T] mapconvert(x *shray[T]) shray[U] {
   build array[U];
   n size = count(x);

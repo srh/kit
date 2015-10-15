@@ -302,6 +302,17 @@ func[K, V] lookup(h *hash[K, V], key *K) opt[V] {
   return None();
 }
 
+func[K, V] lookup_sole_value(h *hash[K, V], expected *K) opt[V] {
+  check(count(h) <= 1);
+  it hash_iter[K, V] = iter(h);
+  if case Has(p *tup[K, V]) = next(&it) {
+    check(hash_equal(&p->car, expected));
+    return Has(p->cdr);
+  } else {
+    return None;
+  }
+}
+
 func[K, V] member(h *hash[K, V], key *K) bool {
   return isHas(lookup_ref(h, key));
 }

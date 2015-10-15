@@ -70,7 +70,7 @@ deftype defscope struct {
   accessible array[access_entry_id];
   // Generics and their _complete_ replacements.
   generics *ast_generics;
-  parms *cu_genparms;
+  parms *idy_genparms;
   def_informal_name sym;
 };
 
@@ -220,7 +220,7 @@ func es_note_var_destroyer(es *framescope, vn var_number) bool {
   return true;
 }
 
-func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) bool {
+func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *idy_genparms, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) bool {
   ds defscope = {cs, cs->im, clq, accessible, g, parms, def_informal_name};
   es framescope = mk(&ds);
   if !check_expr_consume(&es, x, pt) {
