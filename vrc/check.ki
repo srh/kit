@@ -78,22 +78,6 @@ func check_module(cs *checkstate, mod_name sym) bool {
   }
 }
 
-func parms_equal(a *cu_genparms, b *cu_genparms) bool {
-  if enumnum(a) != enumnum(b) {
-    return false;
-  }
-  switch a {
-    case &NoParms(v void): { return true; }
-    case &HasParms(ah shray[cu_typeexpr]): {
-      switch b {
-        case &HasParms(bh shray[cu_typeexpr]): {
-          return typeexpr_list_equal(&ah, &bh);
-        }
-      }
-    }
-  }
-}
-
 func convert_typefunc(cs *checkstate, a *ast_typeexpr, out *te_puretype) bool {
   switch a {
     case &Name(b ast_ident): {
@@ -805,15 +789,10 @@ func deftype_rhs_type(rhs *ast_type_def_rhs) *ast_typeexpr {
 }
 
 func subsequent_depth(cs *checkstate, parms *idy_genparms) u32 {
-  switch &parms->cup {
-  case &NoParms(v void):
+  if empty(&parms->repls) {
     return 0;
-  case &HasParms(a shray[cu_typeexpr]):
-    if empty(&a) {
-      return 0;
-    } else {
-      return cs->instantiation_depth + 1;
-    }
+  } else {
+    return cs->instantiation_depth + 1;
   }
 }
 
