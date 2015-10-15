@@ -355,25 +355,10 @@ defenum genparms {
   HasParms shray[te_typeexpr];
 };
 
-defenum cu_genparms {
-  NoParms void;
-  HasParms shray[cu_typeexpr];
-};
-
 deftype idy_genparms struct {
   // If the ast_generics is NoGenerics, this is of course empty.
   repls shray[cu_typeexpr];
 };
-
-func parms_to_idy(g *ast_generics, parms *cu_genparms) idy_genparms {
-  check(arity_matches(g, parms));
-  switch parms {
-  case &NoParms:
-    return {mk_shray()};
-  case &HasParms(ps shray[cu_typeexpr]):
-    return {ps};
-  }
-}
 
 func hash_compute_hash(x *idy_genparms) osize {
   accum osize = 0x12345679;

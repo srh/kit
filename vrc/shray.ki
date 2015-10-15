@@ -178,7 +178,7 @@ func[T] subarray(a *shray[T], i size) array[T] {
   return ret;
 }
 
-func[T] mk_shray() shray[T] {
+inline func[T] mk_shray() shray[T] {
   ret shray[T];
   return ret;
 }

@@ -423,7 +423,7 @@ func[T, U] concat(a array[T], b U) array[T] {
   return ret;
 }
 
-func[T] mk_array() array[T] {
+inline func[T] mk_array() array[T] {
   ret array[T];
   return ret;
 }

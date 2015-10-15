@@ -1052,8 +1052,8 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
 
 func make_comparecells(es *framescope, dest cell_num) instpair {
   if case Has(ent def_entry_id) = es->cs->prims.ptr_eq {
-    cu_parms cu_genparms = HasParms(mk_shray(ref_cell(es, dest)->type));
-    inst_id def_inst_id = enqueue_def_inst(es->cs, es->clq, ent, &cu_parms);
+    parms idy_genparms = {mk_shray(ref_cell(es, dest)->type)};
+    inst_id def_inst_id = enqueue_def_inst(es->cs, es->clq, ent, &parms);
     return {ent, inst_id};
   } else {
     ice(_u8("cs->prims.ptr_eq not initialized"));

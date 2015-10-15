@@ -290,7 +290,7 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
   }
 }
 
-func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *cu_genparms) def_inst_id {
+func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *idy_genparms) def_inst_id {
   res id_and_created = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDefEntry({id, res.id, cs->instantiation_depth}));
@@ -304,9 +304,8 @@ deftype id_and_created struct {
 };
 
 // rhs is "None()" for extern defs and primitive defs.
-func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) id_and_created {
-  idyparms idy_genparms = parms_to_idy(&ent->generics, parms);
-  if case Has(id def_inst_id) = lookup(&ent->insts, &idyparms) {
+func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms) id_and_created {
+  if case Has(id def_inst_id) = lookup(&ent->insts, parms) {
     return {id, false};
   }
   rhs def_inst_rhs;
@@ -328,8 +327,8 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) id_and_
     case &DefnMagic(mag def_magic):
       rhs = InstRhsMagic(mag);
   }
-  id def_inst_id = add_inst(cs, mk(idyparms, rhs));
-  check_insert(&ent->insts, &idyparms, id);
+  id def_inst_id = add_inst(cs, mk(*parms, rhs));
+  check_insert(&ent->insts, parms, id);
   return {id, true};
 }
 
@@ -440,10 +439,10 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
 }
 
 // parms have already had generics replaced.  They should also be complete.
-func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *cu_genparms) bool {
+func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy_genparms) bool {
   switch t {
     case &NoParms(v void): {
-      *out = NoParms(void);
+      *out = {mk_shray()};
       return true;
     }
     case &HasParms(ps shray[te_typeexpr]): {
@@ -460,7 +459,7 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *cu_
         }
         push(&cu_ps, ~computed.te);
       }
-      *out = HasParms(freeze(&cu_ps));
+      *out = {freeze(&cu_ps)};
       return true;
     }
   }
@@ -609,7 +608,7 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
     return false;
   }
 
-  np cu_genparms = NoParms(void);
+  np idy_genparms = {mk_shray()};
   inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &np);
   *computed_out = ~ @[te_typeexpr]TeName({a->value, Has({id, inst_id})});
   return true;
@@ -648,8 +647,7 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
       }
 
       if params_complete {
-        cu_params shray[cu_typeexpr] = mapconvert(&params);
-        hp cu_genparms = HasParms(cu_params);
+        hp idy_genparms = {mapconvert(&params)};
         inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
         *out = {true, TeApp({TePureName(value), params, Has({id, inst_id})})};
       } else {
@@ -693,14 +691,6 @@ func[T] help_arity_matches(a *ast_generics, params opt[*shray[T]]) bool {
   return false;
 }
 
-func arity_matches(a *ast_generics, parms *cu_genparms) bool {
-  if case &HasParms(ps shray[cu_typeexpr]) = parms {
-    return arity_matches(a, @[opt[*shray[cu_typeexpr]]]Has(&ps));
-  } else {
-    return arity_matches(a, @[opt[*shray[cu_typeexpr]]] None());
-  }
-}
-
 func ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]]) void {
   MERR(cs, m, _u8("No match for type with name '"), name, _u8("' and maybe some params"));
 }
@@ -711,7 +701,7 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_ty
     match opt[deftype_entry_id] = None();
     for i size = 0; i < n; i = i + 1 {
       id deftype_entry_id = get(arr, i);
-      ent *_ = ref_deftype_entry(cs, id);
+      ent *deftype_entry = ref_deftype_entry(cs, id);
       if arity_matches(&ent->generics, params) {
         if case Has(alt_id) = match {
           ERR(_u8("Multiple deftypes named '"), lookup(cs->im, name), _u8("' match arity"));
@@ -766,7 +756,7 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
   ent *def_entry = ref_def_entry(cs, id);
   switch &ent->generics {
     case &NoGenerics(v): {
-      parms cu_genparms = NoParms(void);
+      parms idy_genparms = {mk_shray()};
       clq clqueue = mk(cs);
       discard_inst_id def_inst_id = enqueue_def_inst(cs, &clq, id, &parms);
       return finish_checking(cs, &clq);
@@ -797,7 +787,7 @@ func subsequent_depth(cs *checkstate, parms *idy_genparms) u32 {
   }
 }
 
-func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, parms *cu_genparms) deftype_inst_id {
+func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, parms *idy_genparms) deftype_inst_id {
   res type_id_and_created = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDeftypeEntry({id, res.id, cs->instantiation_depth}));
@@ -810,19 +800,18 @@ deftype type_id_and_created struct {
   created bool;
 };
 
-func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *cu_genparms) type_id_and_created {
-  idyparms idy_genparms = parms_to_idy(&ent->generics, parms);
-  if case Has(id deftype_inst_id) = lookup(&ent->insts, &idyparms) {
+func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *idy_genparms) type_id_and_created {
+  if case Has(id deftype_inst_id) = lookup(&ent->insts, parms) {
     return {id, false};
   }
   inst deftype_inst;
   if case &Has(info deftype_inst_info) = &ent->default_info {
-    inst = {idyparms, Computed(info)};
+    inst = {*parms, Computed(info)};
   } else {
-    inst = {idyparms, NotComputed@[deftype_inst_info]()};
+    inst = {*parms, NotComputed@[deftype_inst_info]()};
   }
   id deftype_inst_id = add_deftype_inst(cs, inst);
-  check_insert(&ent->insts, &idyparms, id);
+  check_insert(&ent->insts, parms, id);
   return {id, true};
 }
 
@@ -1087,11 +1076,11 @@ func make_nontrivial(cs *checkstate, clq *clqueue, wc which_ctor, arity size, ty
 }
 
 func make_inst(cs *checkstate, clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_inst_id) bool {
-  cu_parms cu_genparms;
-  if !check_and_compute_parms(cs, clq, parms, &cu_parms) {
+  idy_parms idy_genparms;
+  if !check_and_compute_parms(cs, clq, parms, &idy_parms) {
     return false;
   }
-  inst_id def_inst_id = enqueue_def_inst(cs, clq, ent, &cu_parms);
+  inst_id def_inst_id = enqueue_def_inst(cs, clq, ent, &idy_parms);
   *inst_out = inst_id;
   return true;
 }
@@ -1214,7 +1203,7 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
   if case &Has(np deftype_nonprim) = &ent->nonprim {
     switch &np.tl->generics {
       case &NoGenerics(v): {
-        parms cu_genparms = NoParms(void);
+        parms idy_genparms = {mk_shray()};
         clq clqueue = mk(cs);
         discard_id deftype_inst_id = enqueue_deftype_inst(cs, &clq, id, &parms);
         return finish_checking(cs, &clq);
