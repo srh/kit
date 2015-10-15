@@ -95,11 +95,8 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) bool {
     ent_id def_entry_id = get(&mod->defs, i);
     ent *def_entry = ref_def_entry(cs, ent_id);
     if def_is_export(ent) {
-      check(count(&ent->insts) == 1);
-      // TODO(): Replace with lookup_sole_value or something like that.
-      noparms cu_genparms = NoParms(void);
-      idyparms idy_genparms = parms_to_idy(&ent->generics, &noparms);
-      if case Has(inst_id def_inst_id) = lookup(&ent->insts, &idyparms) {
+      idyparms idy_genparms = {mk_shray()};
+      if case Has(inst_id def_inst_id) = lookup_sole_value(&ent->insts, &idyparms) {
         inst *def_inst = ref_inst(cs, inst_id);
         if !is_fn_type(cs, &unHas(&inst->typrop)->cu.~) {
           ERR(_u8("Cannot codegen export symbols for non-fn def (can only export functions)"));
