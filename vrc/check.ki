@@ -347,9 +347,8 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       }
 
       // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
-      cuparms cu_genparms = unidy_parms(&ent->generics, &inst->parms);
       computed cac_typeexpr;
-      if !check_and_compute_typeexpr(cs, clq, &ent->generics, &cuparms, ent_typeexpr, &computed) {
+      if !check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_typeexpr, &computed) {
         inst->typrop = FailedComputation;
         return false;
       }
@@ -407,22 +406,19 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           // Do nothing.
         }
         case &InstRhsExpr(rhs def_inst_rhs_expr): {
-          cuparms cu_genparms = unidy_parms(&ent->generics, &inst->parms);
           info frame_info;
-          if !check_expr(cs, clq, ent->accessible, &ent->generics, &cuparms, &rhs.ec, &typrop->cu.~, ent->def_name, &info) {
+          if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs.ec, &typrop->cu.~, ent->def_name, &info) {
             return false;
           }
           annotate(&rhs.frame_info, move(&info));
         }
         case &InstRhsNonMagic(nonmag def_non_magic): {
-          cuparms cu_genparms = unidy_parms(&ent->generics, &inst->parms);
-          if !check_non_magic(cs, clq, &ent->generics, &cuparms, &nonmag) {
+          if !check_non_magic(cs, clq, &ent->generics, &inst->parms, &nonmag) {
             return false;
           }
         }
         case &InstRhsMagic(mag def_magic): {
-          cuparms cu_genparms = unidy_parms(&ent->generics, &inst->parms);
-          if !check_magic(cs, clq, &ent->generics, &cuparms, &mag) {
+          if !check_magic(cs, clq, &ent->generics, &inst->parms, &mag) {
             return false;
           }
         }
@@ -468,12 +464,12 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *cu_
 
 func noscoped_check_and_compute_typeexpr(cs *checkstate, clq *clqueue, t *te_typeexpr, out *cac_typeexpr) bool {
   ng ast_generics = NoGenerics(void);
-  np cu_genparms = NoParms(void);
+  np idy_genparms = {mk_shray()};
   return check_and_compute_typeexpr(cs, clq, &ng, &np, t, out);
 }
 
 // TODO: Generics replacement should really be a separate phase.
-func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, t *te_typeexpr, out *cac_typeexpr) bool {
+func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, t *te_typeexpr, out *cac_typeexpr) bool {
   switch t {
     case &TeName(a te_name): {
       computed cu_typeexpr;
@@ -568,7 +564,7 @@ func fake_eval_arraytype_count(x *ast_expr, count_out *u32) bool {
   }
 }
 
-func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, a *shray[te_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) bool {
+func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *shray[te_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) bool {
   n size = count(a);
   all_complete bool = true;
   all_computed array[te_vardecl];
@@ -592,7 +588,7 @@ func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_
   return true;
 }
 
-func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, a *te_name, computed_out *cu_typeexpr) bool {
+func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *te_name, computed_out *cu_typeexpr) bool {
   // Generic parameters have already been checked.  (I hope so.)
   if lookup_generic(g, parms, a->value, computed_out) {
     return true;
@@ -610,7 +606,7 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
   return true;
 }
 
-func check_and_compute_typeexpr_shray(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, t *shray[te_typeexpr], computed_out *shray[te_typeexpr], computed_complete_out *bool) bool {
+func check_and_compute_typeexpr_shray(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, t *shray[te_typeexpr], computed_out *shray[te_typeexpr], computed_complete_out *bool) bool {
   complete bool = true;
   computed array[te_typeexpr];
   n size = count(t);
@@ -628,7 +624,7 @@ func check_and_compute_typeexpr_shray(cs *checkstate, clq *clqueue, g *ast_gener
   return true;
 }
 
-func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, a *te_typeapp, out *cac_typeexpr) bool {
+func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *te_typeapp, out *cac_typeexpr) bool {
   params_complete bool;
   params shray[te_typeexpr];
   if !check_and_compute_typeexpr_shray(cs, clq, g, parms, &a->params, &params, &params_complete) {
@@ -749,14 +745,10 @@ func find_generic(g *ast_generics, name sym) opt[size] {
   }
 }
 
-func lookup_generic(g *ast_generics, parms *cu_genparms, name sym, out *cu_typeexpr) bool {
+func lookup_generic(g *ast_generics, parms *idy_genparms, name sym, out *cu_typeexpr) bool {
   if case Has(ix size) = find_generic(g, name) {
-    if case &HasParms(ps) = parms {
-      *out = *ref(&ps, ix);
-      return true;
-    } else {
-      ice(_u8("lookup_generic with non-matching parms"));
-    }
+    *out = *ref(&parms->repls, ix);
+    return true;
   }
   return false;
 }
@@ -1151,9 +1143,8 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
         return false;
       }
 
-      cuparms cu_genparms = unidy_parms(&ent->generics, &inst->parms);
       rhs_computed cac_typeexpr;
-      if !check_and_compute_typeexpr(cs, clq, &ent->generics, &cuparms, ent_rhs, &rhs_computed) {
+      if !check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_rhs, &rhs_computed) {
         inst->info = FailedComputation();
         return false;
       }

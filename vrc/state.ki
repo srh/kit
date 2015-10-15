@@ -375,18 +375,6 @@ func parms_to_idy(g *ast_generics, parms *cu_genparms) idy_genparms {
   }
 }
 
-// TODO: Maybe all uses of this are bunk.
-func unidy_parms(g *ast_generics, idyparms *idy_genparms) cu_genparms {
-  switch g {
-  case &NoGenerics:
-    return NoParms;
-  case &HasGenerics(names array[ast_ident]):
-    return HasParms(idyparms->repls);
-  case &VariadicGenerics(vargen ast_variadic_generics):
-    return HasParms(idyparms->repls);
-  }
-}
-
 func hash_compute_hash(x *idy_genparms) osize {
   accum osize = 0x12345679;
   n size = count(&x->repls);
@@ -567,24 +555,22 @@ access depth_rewinder {
   }
 }
 
-// TODO: The very concept of this function will soon be (when we have genparms) broken.
+// TODO: The very concept of this function will soon be (when we have true generic non-instantiated parameters) broken?
 func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
   ent *deftype_entry = ref_deftype_entry(cs, ent_id);
   name sym = ent->name;
-  cuparms cu_genparms = unidy_parms(&ent->generics, &ref_deftype_inst(cs, inst_id)->parms);
-  switch &cuparms {
-    case &NoParms(v void): {
-      return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
+  switch &ent->generics {
+  case &NoGenerics:
+    return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
+  default:
+    parms *idy_genparms = &ref_deftype_inst(cs, inst_id)->parms;
+    converted array[te_typeexpr];
+    n size = count(&parms->repls);
+    reserve(&converted, n);
+    for i size = 0; i < n; i = i + 1 {
+      push(&converted, ref(&parms->repls, i)->~);
     }
-    case &HasParms(a shray[cu_typeexpr]): {
-      converted array[te_typeexpr];
-      n size = count(&a);
-      reserve(&converted, n);
-      for i size = 0; i < n; i = i + 1 {
-        push(&converted, ref(&a, i)->~);
-      }
-      return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
-    }
+    return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
   }
 }
 
