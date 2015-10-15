@@ -795,16 +795,16 @@ func gr_condition(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_cond
             gn var = seqq(gr, {vcgn, thengn});
             tagdead gr_num = addx(gr, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
             thenseq sq_num = seqq(gr, {tagdead, gn});
-            push(&cases, cons(@[gr_const]ConstInt(~tag.~), thenseq));
+            push(&cases, {@[gr_const]ConstInt(~tag.~), thenseq});
           } else {
             tagdead gr_num = addx(gr, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
             thenseq sq_num = seqq(gr, {tagdead, thengn});
-            push(&cases, cons(@[gr_const]ConstInt(~tag.~), thenseq));
+            push(&cases, {@[gr_const]ConstInt(~tag.~), thenseq});
           }
         } else {
           tagdead gr_num = addx(gr, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
           elseseq sq_num = seqq(gr, {tagdead, elsegn});
-          push(&cases, cons(@[gr_const]ConstInt(~tag.~), elseseq));
+          push(&cases, {@[gr_const]ConstInt(~tag.~), elseseq});
         }
       }
       br var = seqq(gr, {taggn,
@@ -1192,7 +1192,7 @@ func gr_index_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_index_expr
     if !gr_consume_actions(clq, gr, lp, &aft.car.actions, &lgn) {
       return false;
     }
-    gp var = addx(gr, mk_shray(rp, lgn), @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed(cons(flat_size, result_cell(oo(&a->rhs))))}));
+    gp var = addx(gr, mk_shray(rp, lgn), @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
     lhs_later gr_num;
     if !gr_later_discard(clq, gr, &aft.cdr, &lhs_later) {
       return false;
@@ -1204,7 +1204,7 @@ func gr_index_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_index_expr
   } else {
     name cell_num = value_cell(x);
     flat_size u32 = ref_cell(gr, name)->props.flat_size;
-    gp1 var = addx(gr, mk_shray(rp, lp), @[gr_xop]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed(cons(flat_size, result_cell(oo(&a->rhs))))}));
+    gp1 var = addx(gr, mk_shray(rp, lp), @[gr_xop]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
     gp gr_num;
     // TODO: Dedup with local_field code?
     switch &expr_complete_info(oo(&a->lhs))->lval {
@@ -1375,7 +1375,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
           return false;
         }
       }
-      cases shray[tup[gr_const, sq_num]] = mk_shray(cons(@[gr_const]ConstInt(~ @[u32] 0), seq1(gr, dead_then_assign)), cons(@[gr_const]ConstInt(~ @[u32] 1), seq1(gr, just_dead)));
+      cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(~ @[u32] 0), seq1(gr, dead_then_assign)}, {@[gr_const]ConstInt(~ @[u32] 1), seq1(gr, just_dead)});
 
       br var = seqq(gr, {ap,
         addq(gr, @[gr_qop]GrBranch({cmp_result, cases, None()}))});
@@ -2000,7 +2000,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 
   tie_gn sq_num = seqq(&gr, {body_gn.~, topgn});
 
-  branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray(cons(@[gr_const]ConstInt(bigu(terminal_case)), deadseq)), Has(tie_gn)}));
+  branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray({@[gr_const]ConstInt(bigu(terminal_case)), deadseq}), Has(tie_gn)}));
 
   mut_qnop_node(&gr, topgn, {@[gr_qop]GrJmp({branch_gn})});
 
@@ -2181,16 +2181,16 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     finalgn gr_num = addx(&gr, concat(tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn), @[gr_xop]GrXNop(void));
 
     finalseqgn sq_num = seqq(&gr, {finalgn, deadseq});
-    push(&cases_gn, cons(@[gr_const]ConstInt(~ tagval.~), finalseqgn));
+    push(&cases_gn, {@[gr_const]ConstInt(~ tagval.~), finalseqgn});
   }
 
   if true {
     if case CtorDestroy(v void) = wc {
-      push(&cases_gn, cons(@[gr_const]ConstInt(bigu(0)), deadseq));
+      push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), deadseq});
     } else {
       ztgn gr_num = addx(&gr, @[gr_xop]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))}));
       ztseq sq_num = seqq(&gr, {ztgn, deadseq});
-      push(&cases_gn, cons(@[gr_const]ConstInt(bigu(0)), ztseq));
+      push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), ztseq});
     }
   }
 

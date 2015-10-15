@@ -409,7 +409,7 @@ func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
         // TODO: Don't have such a hard-coded special case.  (When we support constant-virtual-plus-offset, we won't.)
         return None();
       } else {
-        return Has(cons(c, cumulative_offset));
+        return Has({c, cumulative_offset});
       }
     }
   }

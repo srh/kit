@@ -137,7 +137,7 @@ func value_read(plat *platform_info, val *st_value, offset u32, ncount u32, out 
     vref_offset u32 = vref->car;
     vref_end u32 = vref_offset + st_symbolref_size(plat, &vref->cdr);
     if offset <= vref_offset && vref_end <= end {
-      push(&refs, cons(vref_offset - offset, vref->cdr));
+      push(&refs, {vref_offset - offset, vref->cdr});
     }
   }
 
@@ -148,7 +148,7 @@ func value_read(plat *platform_info, val *st_value, offset u32, ncount u32, out 
     vref_offset u32 = vref->car;
     vref_end u32 = vref_offset + st_pointer_size(plat, &vref->cdr);
     if offset <= vref_offset && vref_end <= end {
-      push(&objrefs, cons(vref_offset - offset, vref->cdr));
+      push(&objrefs, {vref_offset - offset, vref->cdr});
     }
   }
 
@@ -193,7 +193,7 @@ func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in 
   truncate(&val->symbolrefs, w);
   for i size = 0; i < count(&in->symbolrefs); i = i + 1 {
     sref *tup[u32, st_symbolref] = ref(&in->symbolrefs, i);
-    push(&val->symbolrefs, cons(sref->car + offset, sref->cdr));
+    push(&val->symbolrefs, {sref->car + offset, sref->cdr});
   }
 
   w = 0;
@@ -210,7 +210,7 @@ func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in 
   truncate(&val->objrefs, w);
   for i size = 0; i < count(&in->objrefs); i = i + 1 {
     iref *tup[u32, st_pointer] = ref(&in->objrefs, i);
-    push(&val->objrefs, cons(iref->car + offset, iref->cdr));
+    push(&val->objrefs, {iref->car + offset, iref->cdr});
   }
 
   copy_bnnos(plat, &in->words, 0, in->length, &val->words, offset);
@@ -289,7 +289,7 @@ func mk_st_value_words(plat *platform_info, words array[u32], length u32) st_val
 func mk_st_value_pointer(plat *platform_info, p st_pointer) st_value {
   length u32 = st_pointer_size(plat, &p);
   ret st_value = mk_st_value(plat, length);
-  push(&ret.objrefs, cons(@[u32] 0, p));
+  push(&ret.objrefs, {@[u32] 0, p});
   return ret;
 }
 
@@ -297,7 +297,7 @@ func mk_st_value_symbolref(plat *platform_info, fnid fn_body_id) st_value {
   r st_symbolref = {fnid};
   length u32 = st_symbolref_size(plat, &r);
   ret st_value = mk_st_value(plat, length);
-  push(&ret.symbolrefs, cons(@[u32] 0, r));
+  push(&ret.symbolrefs, {@[u32] 0, r});
   return ret;
 }
 

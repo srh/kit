@@ -577,8 +577,8 @@ func test_bigint() bool {
   add_test(&ctx, "b019", incr(-big("19")) == -big("18"));
   add_test(&ctx, "b020", incr(-fourg) == -(fourg - big("1")));
   add_test(&ctx, "b021", incr(-(fourg + big("1"))) == -fourg);
-  add_test(&ctx, "b022", divmod(big("17"), big("3")) == cons(big("5"), big("2")));
-  add_test(&ctx, "b023", divmod(-big("17"), big("3")) == cons(-big("6"), big("1")));
+  add_test(&ctx, "b022", divmod(big("17"), big("3")) == {big("5"), big("2")});
+  add_test(&ctx, "b023", divmod(-big("17"), big("3")) == {-big("6"), big("1")});
   add_test(&ctx, "b024", ((-big("3")) & big("3")) == big("1"));
   add_test(&ctx, "b025", ((-big("3")) | big("2")) == -big("1"));
   add_test(&ctx, "b026", ((-big("3")) ^ big("3")) == -big("2"));
