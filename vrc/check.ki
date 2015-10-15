@@ -302,15 +302,20 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
 }
 
 func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *cu_genparms) def_inst_id {
-  res var = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
+  res id_and_created = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDefEntry({id, res.id, cs->instantiation_depth}));
   }
   return res.id;
 }
 
+deftype id_and_created struct {
+  id def_inst_id;
+  created bool;
+};
+
 // rhs is "None()" for extern defs and primitive defs.
-func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct { id def_inst_id; created bool; } {
+func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) id_and_created {
   check(arity_matches(&ent->generics, parms));
   if case Has(id def_inst_id) = lookup(&ent->insts, parms) {
     return {id, false};
@@ -806,14 +811,19 @@ func subsequent_depth(cs *checkstate, parms *cu_genparms) u32 {
 }
 
 func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, parms *cu_genparms) deftype_inst_id {
-  res var = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
+  res type_id_and_created = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDeftypeEntry({id, res.id, cs->instantiation_depth}));
   }
   return res.id;
 }
 
-func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *cu_genparms) struct { id deftype_inst_id; created bool; } {
+deftype type_id_and_created struct {
+  id deftype_inst_id;
+  created bool;
+};
+
+func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *cu_genparms) type_id_and_created {
   check(arity_matches(&ent->generics, parms));
   if case Has(id deftype_inst_id) = lookup(&ent->insts, parms) {
     return {id, false};
