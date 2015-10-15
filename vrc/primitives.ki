@@ -242,7 +242,7 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool 
 func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_typeexpr, definition def_definition) def_entry_id {
   // access_scope is not relevant to a primitive def.
   ent shp[def_entry];
-  *oo(&ent) = {cs->im->cym.primitive_module_sym, name, mk_array@[access_entry_id](), generics, definition, Computed(type), mk_hash@[cu_genparms, def_inst_id]()};
+  *oo(&ent) = {cs->im->cym.primitive_module_sym, name, mk_array@[access_entry_id](), generics, definition, Computed(type), mk_hash@[idy_genparms, def_inst_id]()};
   id def_entry_id = add_def_entry(cs, ent);
   return id;
 }
@@ -342,11 +342,11 @@ func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
       IsScalarYes(void)
     }
   };
-  inst_id deftype_inst_id = add_deftype_inst(cs, {NoParms(void), Computed(info)});
+  instparms idy_genparms = {NoParms(void)};
+  inst_id deftype_inst_id = add_deftype_inst(cs, {instparms, Computed(info)});
   insts array[deftype_inst_id];
   push(&insts, inst_id);
-  instst hash[cu_genparms, deftype_inst_id];
-  instparms cu_genparms = NoParms(void);
+  instst hash[idy_genparms, deftype_inst_id];
   check_insert(&instst, &instparms, inst_id);
 
   // access_scope is not relevant to a primitive deftype.
@@ -416,7 +416,7 @@ func add_pointer_primitive_type(cs *checkstate) void {
            DerivedMethodTrivial(void),
            IsScalarYes(void)
          }}),
-    mk_hash@[cu_genparms, deftype_inst_id]()
+    mk_hash@[idy_genparms, deftype_inst_id]()
   };
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.
@@ -441,7 +441,7 @@ func add_function_primitive(cs *checkstate) void {
            DerivedMethodTrivial(void),
            IsScalarYes(void)
          }}),
-    mk_hash@[cu_genparms, deftype_inst_id]()
+    mk_hash@[idy_genparms, deftype_inst_id]()
   };
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.

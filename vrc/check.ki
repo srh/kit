@@ -5,6 +5,7 @@ import kitutil;
 import parse;
 import tok;
 import typeexpr;
+import shray;
 import shp;
 import state;
 import u8ast;
@@ -316,8 +317,8 @@ deftype id_and_created struct {
 
 // rhs is "None()" for extern defs and primitive defs.
 func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) id_and_created {
-  check(arity_matches(&ent->generics, parms));
-  if case Has(id def_inst_id) = lookup(&ent->insts, parms) {
+  idyparms idy_genparms = parms_to_idy(&ent->generics, parms);
+  if case Has(id def_inst_id) = lookup(&ent->insts, &idyparms) {
     return {id, false};
   }
   rhs def_inst_rhs;
@@ -339,8 +340,8 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) id_and_
     case &DefnMagic(mag def_magic):
       rhs = InstRhsMagic(mag);
   }
-  id def_inst_id = add_inst(cs, mk(*parms, rhs));
-  check_insert(&ent->insts, parms, id);
+  id def_inst_id = add_inst(cs, mk(idyparms, rhs));
+  check_insert(&ent->insts, &idyparms, id);
   return {id, true};
 }
 
@@ -362,8 +363,9 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       }
 
       // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
+      cuparms cu_genparms = unidy_parms(&ent->generics, &inst->parms);
       computed cac_typeexpr;
-      if !check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_typeexpr, &computed) {
+      if !check_and_compute_typeexpr(cs, clq, &ent->generics, &cuparms, ent_typeexpr, &computed) {
         inst->typrop = FailedComputation;
         return false;
       }
@@ -421,19 +423,22 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           // Do nothing.
         }
         case &InstRhsExpr(rhs def_inst_rhs_expr): {
+          cuparms cu_genparms = unidy_parms(&ent->generics, &inst->parms);
           info frame_info;
-          if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs.ec, &typrop->cu.~, ent->def_name, &info) {
+          if !check_expr(cs, clq, ent->accessible, &ent->generics, &cuparms, &rhs.ec, &typrop->cu.~, ent->def_name, &info) {
             return false;
           }
           annotate(&rhs.frame_info, move(&info));
         }
         case &InstRhsNonMagic(nonmag def_non_magic): {
-          if !check_non_magic(cs, clq, &ent->generics, &inst->parms, &nonmag) {
+          cuparms cu_genparms = unidy_parms(&ent->generics, &inst->parms);
+          if !check_non_magic(cs, clq, &ent->generics, &cuparms, &nonmag) {
             return false;
           }
         }
         case &InstRhsMagic(mag def_magic): {
-          if !check_magic(cs, clq, &ent->generics, &inst->parms, &mag) {
+          cuparms cu_genparms = unidy_parms(&ent->generics, &inst->parms);
+          if !check_magic(cs, clq, &ent->generics, &cuparms, &mag) {
             return false;
           }
         }
@@ -799,12 +804,14 @@ func deftype_rhs_type(rhs *ast_type_def_rhs) *ast_typeexpr {
   }
 }
 
-func subsequent_depth(cs *checkstate, parms *cu_genparms) u32 {
-  switch parms {
-    case &NoParms(v void): {
+func subsequent_depth(cs *checkstate, parms *idy_genparms) u32 {
+  switch &parms->cup {
+  case &NoParms(v void):
+    return 0;
+  case &HasParms(a shray[cu_typeexpr]):
+    if empty(&a) {
       return 0;
-    }
-    case &HasParms(a shray[cu_typeexpr]): {
+    } else {
       return cs->instantiation_depth + 1;
     }
   }
@@ -824,18 +831,18 @@ deftype type_id_and_created struct {
 };
 
 func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *cu_genparms) type_id_and_created {
-  check(arity_matches(&ent->generics, parms));
-  if case Has(id deftype_inst_id) = lookup(&ent->insts, parms) {
+  idyparms idy_genparms = parms_to_idy(&ent->generics, parms);
+  if case Has(id deftype_inst_id) = lookup(&ent->insts, &idyparms) {
     return {id, false};
   }
   inst deftype_inst;
   if case &Has(info deftype_inst_info) = &ent->default_info {
-    inst = {*parms, Computed(info)};
+    inst = {idyparms, Computed(info)};
   } else {
-    inst = {*parms, NotComputed@[deftype_inst_info]()};
+    inst = {idyparms, NotComputed@[deftype_inst_info]()};
   }
   id deftype_inst_id = add_deftype_inst(cs, inst);
-  check_insert(&ent->insts, parms, id);
+  check_insert(&ent->insts, &idyparms, id);
   return {id, true};
 }
 
@@ -1165,8 +1172,9 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
         return false;
       }
 
+      cuparms cu_genparms = unidy_parms(&ent->generics, &inst->parms);
       rhs_computed cac_typeexpr;
-      if !check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_rhs, &rhs_computed) {
+      if !check_and_compute_typeexpr(cs, clq, &ent->generics, &cuparms, ent_rhs, &rhs_computed) {
         inst->info = FailedComputation();
         return false;
       }
