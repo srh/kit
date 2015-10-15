@@ -339,6 +339,12 @@ func help_te_vardecl_list_compute_hash(a *shray[te_vardecl]) osize {
   return accum;
 }
 
+func[H, T] pretty(help H, x *T) array[u8] {
+  ret array[u8];
+  pretty_u8str(help, &ret, x);
+  return ret;
+}
+
 func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
   switch a {
   case &TeName(b te_name):

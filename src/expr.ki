@@ -1156,7 +1156,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
   }
   switch &match_res {
     case &NoMatch(v void): {
-      MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, matching type '"), *pt, _u8("'"));
+      MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, matching type '"), pretty(es->im, pt), _u8("'"));
       return false;
     }
     case &AmbigGlobalMatch(v void): {
@@ -1165,7 +1165,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
         annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
         return true;
       } else {
-        MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), *pt);
+        MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), pretty(es->im, pt));
         return false;
       }
     }
@@ -1317,7 +1317,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     return false;
 
   default:
-    MERR(es->cs, a->meta, _u8("Structure literal used on non-struct type, "), structural_type->~);
+    MERR(es->cs, a->meta, _u8("Structure literal used on non-struct type, "), pretty(es->im, &structural_type->~));
     return false;
   }
 }
