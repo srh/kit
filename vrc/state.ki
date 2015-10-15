@@ -386,7 +386,7 @@ func hash_compute_hash(x *idy_genparms) osize {
 }
 
 func hash_equal(x *idy_genparms, y *idy_genparms) bool {
-  return typeexpr_list_equal(&x->repls, &y->repls);
+  return idy_typeexpr_list_equal(&x->repls, &y->repls);
 }
 
 defenum def_inst_type_status {
