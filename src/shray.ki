@@ -103,16 +103,6 @@ inline func[T] empty(r *shray[T]) bool {
   return count(r) == 0;
 }
 
-func[U, T] mapconvert(x *shray[T]) shray[U] {
-  build array[U];
-  n size = count(x);
-  reserve(&build, n);
-  for i size = 0; i < n; i = i + 1 {
-    push(&build, @[U]~ *ref(x, i));
-  }
-  return freeze(&build);
-}
-
 func[T] repeat(n size, x T) shray[T] {
   ret array[T] = repeat(n, x);
   return freeze(&ret);

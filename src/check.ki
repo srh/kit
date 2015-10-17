@@ -2,6 +2,7 @@ import ast;
 import deferred;
 import expr;
 import kitutil;
+import lifetime;
 import parse;
 import tok;
 import typeexpr;
@@ -442,10 +443,11 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
 func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy_genparms) bool {
   switch t {
     case &NoParms(v void): {
-      *out = {mk_shray()};
+      *out = blank_idyparms();
       return true;
     }
     case &HasParms(ps shray[te_typeexpr]): {
+      lifetime_names array[sym];
       cu_ps array[cu_typeexpr];
       n size = count(&ps);
       reserve(&cu_ps, n);
@@ -457,9 +459,11 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy
         if !computed.complete {
           ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
         }
-        push(&cu_ps, ~computed.te);
+        canonicalized te_typeexpr;
+        canonicalize_idy_lifetimes(cs->im, &lifetime_names, &computed.te, &canonicalized);
+        push(&cu_ps, ~canonicalized);
       }
-      *out = {freeze(&cu_ps)};
+      *out = {count(&lifetime_names), freeze(&cu_ps)};
       return true;
     }
   }
@@ -467,7 +471,7 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy
 
 func noscoped_check_and_compute_typeexpr(cs *checkstate, clq *clqueue, t *te_typeexpr, out *cac_typeexpr) bool {
   ng ast_generics = NoGenerics(void);
-  np idy_genparms = {mk_shray()};
+  np idy_genparms = blank_idyparms();
   return check_and_compute_typeexpr(cs, clq, &ng, &np, t, out);
 }
 
@@ -608,7 +612,7 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
     return false;
   }
 
-  np idy_genparms = {mk_shray()};
+  np idy_genparms = blank_idyparms();
   inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &np);
   *computed_out = ~ @[te_typeexpr]TeName({a->value, Has({id, inst_id})});
   return true;
@@ -647,7 +651,16 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
       }
 
       if params_complete {
-        hp idy_genparms = {mapconvert(&params)};
+        // TODO: This is quite duplicated with check_and_compute_parms.
+        lifetime_names array[sym];
+        canonical array[cu_typeexpr];
+        n size = count(&params);
+        for i size = 0; i < n; i = i + 1 {
+          canonicalized te_typeexpr;
+          canonicalize_idy_lifetimes(cs->im, &lifetime_names, ref(&params, i), &canonicalized);
+          push(&canonical, ~canonicalized);
+        }
+        hp idy_genparms = {count(&lifetime_names), freeze(&canonical)};
         inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
         *out = {true, TeApp({TePureName(value), params, Has({id, inst_id})})};
       } else {
@@ -756,7 +769,7 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
   ent *def_entry = ref_def_entry(cs, id);
   switch &ent->generics {
     case &NoGenerics(v): {
-      parms idy_genparms = {mk_shray()};
+      parms idy_genparms = blank_idyparms();
       clq clqueue = mk(cs);
       discard_inst_id def_inst_id = enqueue_def_inst(cs, &clq, id, &parms);
       return finish_checking(cs, &clq);
@@ -1203,7 +1216,7 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
   if case &Has(np deftype_nonprim) = &ent->nonprim {
     switch &np.tl->generics {
       case &NoGenerics(v): {
-        parms idy_genparms = {mk_shray()};
+        parms idy_genparms = blank_idyparms();
         clq clqueue = mk(cs);
         discard_id deftype_inst_id = enqueue_deftype_inst(cs, &clq, id, &parms);
         return finish_checking(cs, &clq);
