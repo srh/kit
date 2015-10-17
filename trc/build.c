@@ -4325,20 +4325,25 @@ int gen_casebody(struct checkstate *cs, struct objfile *f,
                             ast_case_pattern_info_constructor_number(&constructor->info).value),
                         FIRST_ENUM_TAG_NUMBER));
   gen_placeholder_jcc(f, h, X86_JCC_NE, fail_target_number);
-  struct ast_typeexpr *var_type = ast_var_info_type(&constructor->decl.var_info);
-  struct loc var_loc = make_enum_body_loc(f, h, facts->enum_loc,
-                                          x86_sizeof(&cs->nt, var_type));
 
   struct vardata vd;
-  /* We don't destroy the variable -- the swartch gets push/popped instead. */
-  vardata_init(&vd, constructor->decl.name.value, 0, var_type, var_loc);
-  SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+  if (constructor->has_decl) {
+    struct ast_typeexpr *var_type = ast_var_info_type(&constructor->decl_.var_info);
+    struct loc var_loc = make_enum_body_loc(f, h, facts->enum_loc,
+                                            x86_sizeof(&cs->nt, var_type));
+
+    /* We don't destroy the variable -- the swartch gets push/popped instead. */
+    vardata_init(&vd, constructor->decl_.name.value, 0, var_type, var_loc);
+    SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+  }
 
   if (!gen_bracebody(cs, f, h, body)) {
     return 0;
   }
 
-  SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+  if (constructor->has_decl) {
+    SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+  }
   return 1;
 }
 

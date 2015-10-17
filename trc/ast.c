@@ -676,31 +676,53 @@ void ast_default_pattern_destroy(struct ast_default_pattern *a) {
 }
 
 
-void ast_constructor_pattern_init(struct ast_constructor_pattern *a,
-                                  struct ast_meta meta,
-                                  int addressof_constructor,
-                                  struct ast_ident constructor_name,
-                                  struct ast_vardecl decl) {
+void ast_constructor_pattern_init_with_decl(
+    struct ast_constructor_pattern *a,
+    struct ast_meta meta,
+    int addressof_constructor,
+    struct ast_ident constructor_name,
+    struct ast_vardecl decl) {
   ast_case_pattern_info_init(&a->info);
   a->meta = meta;
   a->addressof_constructor = addressof_constructor;
   a->constructor_name = constructor_name;
-  a->decl = decl;
+  a->has_decl = 1;
+  a->decl_ = decl;
 }
+void ast_constructor_pattern_init_without_decl(
+    struct ast_constructor_pattern *a,
+    struct ast_meta meta,
+    int addressof_constructor,
+    struct ast_ident constructor_name) {
+  ast_case_pattern_info_init(&a->info);
+  a->meta = meta;
+  a->addressof_constructor = addressof_constructor;
+  a->constructor_name = constructor_name;
+  a->has_decl = 0;
+}
+
 void ast_constructor_pattern_init_copy(struct ast_constructor_pattern *a,
                                        struct ast_constructor_pattern *c) {
   ast_case_pattern_info_init_copy(&a->info, &c->info);
   a->meta = ast_meta_make_copy(&c->meta);
   a->addressof_constructor = c->addressof_constructor;
   ast_ident_init_copy(&a->constructor_name, &c->constructor_name);
-  ast_vardecl_init_copy(&a->decl, &c->decl);
+  if (c->has_decl) {
+    a->has_decl = 1;
+    ast_vardecl_init_copy(&a->decl_, &c->decl_);
+  } else {
+    a->has_decl = 0;
+  }
 }
 void ast_constructor_pattern_destroy(struct ast_constructor_pattern *a) {
   ast_case_pattern_info_destroy(&a->info);
   ast_meta_destroy(&a->meta);
   a->addressof_constructor = 0;
   ast_ident_destroy(&a->constructor_name);
-  ast_vardecl_destroy(&a->decl);
+  if (a->has_decl) {
+    a->has_decl = 0;
+    ast_vardecl_destroy(&a->decl_);
+  }
 }
 
 

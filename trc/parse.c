@@ -1005,23 +1005,34 @@ int parse_constructor_pattern(struct ps *p, struct ast_constructor_pattern *out)
     goto fail;
   }
 
-  struct ast_vardecl decl;
-  if (!(skip_ws(p) && try_skip_char(p, '(')
-        && skip_ws(p) && help_parse_vardecl(p, ALLOW_BLANKS_YES, &decl))) {
+  if (!skip_ws(p)) {
     goto fail_constructor_name;
   }
 
-  if (!(skip_ws(p) && try_skip_char(p, ')'))) {
-    goto fail_decl;
+  if (try_skip_char(p, '(')) {
+    struct ast_vardecl decl;
+    if (!(skip_ws(p) && help_parse_vardecl(p, ALLOW_BLANKS_YES, &decl))) {
+      goto fail_constructor_name;
+    }
+    if (!(skip_ws(p) && try_skip_char(p, ')'))) {
+      goto fail_decl;
+    }
+
+    ast_constructor_pattern_init_with_decl(
+        out, ast_meta_make(pos_start, ps_pos(p)), addressof_constructor,
+        constructor_name, decl);
+    return 1;
+
+  fail_decl:
+    ast_vardecl_destroy(&decl);
+    goto fail_constructor_name;
+  } else {
+    ast_constructor_pattern_init_without_decl(
+        out, ast_meta_make(pos_start, ps_pos(p)), addressof_constructor,
+        constructor_name);
+    return 1;
   }
 
-  ast_constructor_pattern_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                               addressof_constructor,
-                               constructor_name, decl);
-  return 1;
-
- fail_decl:
-  ast_vardecl_destroy(&decl);
  fail_constructor_name:
   ast_ident_destroy(&constructor_name);
  fail:

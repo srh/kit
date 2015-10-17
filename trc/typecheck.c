@@ -2767,16 +2767,22 @@ int check_swartch(struct exprscope *es, struct ast_expr *swartch,
 }
 
 struct varwind {
-  struct ast_vardecl *replaced_decl;
+  int has_decl;
+  struct ast_vardecl *replaced_decl_;
 };
 
 void varwind_destroy(struct varwind *a) {
-  free_ast_vardecl(&a->replaced_decl);
+  if (a->has_decl) {
+    free_ast_vardecl(&a->replaced_decl_);
+    a->has_decl = 0;
+  }
 }
 
 void varwind_unwind_destroy(struct exprscope *es, struct varwind *a) {
-  exprscope_pop_var(es);
-  varwind_destroy(a);
+  if (a->has_decl) {
+    exprscope_pop_var(es);
+    varwind_destroy(a);
+  }
 }
 
 int check_constructor(struct exprscope *es,
@@ -2819,9 +2825,9 @@ int check_constructor(struct exprscope *es,
   }
 
   struct ast_vardecl *replaced_decl = NULL;
-  {
+  if (constructor->has_decl) {
     struct ast_typeexpr replaced_incomplete_type;
-    replace_generics(es, &constructor->decl.type, &replaced_incomplete_type);
+    replace_generics(es, &constructor->decl_.type, &replaced_incomplete_type);
 
     int unify_res = unify_directionally(
         es->cs->im, &replaced_incomplete_type,
@@ -2833,30 +2839,43 @@ int check_constructor(struct exprscope *es,
     }
 
     struct ast_ident replaced_decl_name;
-    ast_ident_init_copy(&replaced_decl_name, &constructor->decl.name);
+    ast_ident_init_copy(&replaced_decl_name, &constructor->decl_.name);
     struct ast_typeexpr concrete_type_copy;
     ast_typeexpr_init_copy(&concrete_type_copy,
                            &spec->concrete_enumspec.enumfields[constructor_num].type);
     replaced_decl = malloc(sizeof(*replaced_decl));
     CHECK(replaced_decl);
-    ast_vardecl_init(replaced_decl, ast_meta_make_copy(&constructor->decl.meta),
+    ast_vardecl_init(replaced_decl, ast_meta_make_copy(&constructor->decl_.meta),
                      replaced_decl_name, concrete_type_copy);
+  } else {
+    struct ast_typeexpr void_type;
+    init_name_type(&void_type, es->cs->cm.voide);
+    int unify_res = unify_directionally(es->cs->im, &void_type, &spec->concrete_enumspec.enumfields[constructor_num].type);
+    ast_typeexpr_destroy(&void_type);
+    if (!unify_res) {
+      METERR(es->cs, constructor->meta, "Decl-free case pattern used with non-void case.%s", "\n");
+      return 0;
+    }
   }
 
-  if (!exprscope_push_var(es, replaced_decl)) {
-    free_ast_vardecl(&replaced_decl);
-    return 0;
+  if (constructor->has_decl) {
+    if (!exprscope_push_var(es, replaced_decl)) {
+      free_ast_vardecl(&replaced_decl);
+      return 0;
+    }
+
+    struct ast_typeexpr concrete_type_copy;
+    ast_typeexpr_init_copy(&concrete_type_copy,
+                           &spec->concrete_enumspec.enumfields[constructor_num].type);
+    ast_var_info_specify(&constructor->decl_.var_info, concrete_type_copy);
   }
 
-  struct ast_typeexpr concrete_type_copy;
-  ast_typeexpr_init_copy(&concrete_type_copy,
-                         &spec->concrete_enumspec.enumfields[constructor_num].type);
-  ast_var_info_specify(&constructor->decl.var_info, concrete_type_copy);
   struct constructor_num cn;
   cn.value = constructor_num;
   ast_case_pattern_info_specify(&constructor->info, cn);
 
-  out->replaced_decl = replaced_decl;
+  out->has_decl = constructor->has_decl;
+  out->replaced_decl_ = replaced_decl;
   return 1;
 }
 

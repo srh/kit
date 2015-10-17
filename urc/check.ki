@@ -43,7 +43,7 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
 
 func check_module(cs *checkstate, mod_name sym) bool {
   switch process_module(cs, mod_name) {
-    case None(v): {
+    case None: {
       return false;
     }
     case Has(id module_id): {
