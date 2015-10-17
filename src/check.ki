@@ -1645,7 +1645,7 @@ func type_matches(pt *te_typeexpr, names *array[ast_generik], parms *shray[te_ty
   check(count(names) == count(parms));
   // We need to retain all new information we gain about the value of the generic param typeexprs as we compare the whole type, in order to make sure we don't match conflicting information about a generic parameter.
   unif_parms array[te_typeexpr] = mk_copy(parms);
-  // Since t is complete, discard_unified is irrelevant and must be identical to t.
+  // Since t is complete, unified is irrelevant and must be identical to t.
   unified te_typeexpr;
   if !unify_under_generics(pt, names, &unif_parms, t, &unified) {
     return TypeDoesNotMatch(void);
