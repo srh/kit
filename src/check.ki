@@ -739,21 +739,14 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_ty
 // Returns an index into the HasGenerics array.
 func find_generic(g *ast_generics, name sym) opt[size] {
   switch g {
-    case &NoGenerics(v void): { return None(); }
-    case &HasGenerics(a array[ast_ident]): {
-      n size = count(&a);
-      for i size = 0; i < n; i = i + 1 {
-        if ref(&a, i)->value.~ == name.~ {
-          return Has(i);
-        }
-      }
-      return None();
-    }
-    case &VariadicGenerics(a ast_variadic_generics): {
-      // We can't see variadic generics because there's no "RHS type" of a fn.
-      ice(_u8("find_generic sees variadic generic."));
-      return fake();
-    }
+  case &NoGenerics(v void):
+    return None();
+  case &HasGenerics(a array[ast_ident]):
+    return lookup_name(&a, name);
+  case &VariadicGenerics(a ast_variadic_generics):
+    // We can't see variadic generics because there's no "RHS type" of a fn.
+    ice(_u8("find_generic sees variadic generic."));
+    return fake();
   }
 }
 
