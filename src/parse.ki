@@ -699,18 +699,15 @@ func parse_rest_of_pointer(p *ps, ab allow_blanks, oper ast_ident, out *ast_type
 }
 
 func parse_rest_of_reference(p *ps, ab allow_blanks, oper ast_ident, out *ast_typeexpr) parse_result {
-  arg ast_typeexpr;
-  if !help_parse_typeexpr(p, ab, &arg) {
-    return Fail;
-  }
   lifetime_arg ast_lifetime;
-  switch triparse_lifetime(p, &lifetime_arg) {
-  case Success:
+  if case Success = triparse_lifetime(p, &lifetime_arg) {
+    arg ast_typeexpr;
+    if !help_parse_typeexpr(p, ab, &arg) {
+      return Fail;
+    }
     *out = App({embox(Name(oper)), mk_array(arg, Lifetime(lifetime_arg))});
     return Success;
-  case Quickfail:
-    return Fail;
-  case Error:
+  } else {
     return Fail;
   }
 }
