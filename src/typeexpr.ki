@@ -139,8 +139,9 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
       }
     }
     case &TeLifetime(ax te_lifetime):
-      // TODO(): Figure out callers, what we are using this for, what is appropriate behavior.
-      ice(_u8("typeexpr_equal not implemented for TeLifetime"));
+      if case &TeLifetime(bx te_lifetime) = b {
+        return ax.name == bx.name;
+      }
     case &TeUnknown(v void): {
       ice(_u8("idy_typeexpr_equal sees TeUnknown"));
     }
@@ -313,7 +314,7 @@ func hash_compute_hash(x *cu_typeexpr) osize {
   return help_compute_hash(&x->~);
 }
 
-// Must be called on complete, concrete types.
+// Used for idy_typeexpr types.
 func help_compute_hash(a *te_typeexpr) osize {
   switch a {
   case &TeName(ax te_name):
@@ -337,8 +338,7 @@ func help_compute_hash(a *te_typeexpr) osize {
       return (@[osize]~n * 0x3001) + help_compute_hash(oo(&ax.param));
     }
   case &TeLifetime(ax te_lifetime):
-    ice(_u8("Look at caller and figure out what is appropriate here."));
-    return TODO();
+    return 0x6 ^ hash_compute_hash(&ax.name);
   case &TeUnknown(v void):
     ice(_u8("help_compute_hash sees TeUnknown"));
   }
