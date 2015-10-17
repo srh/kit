@@ -527,8 +527,17 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
     }
 
     case &TeLifetime(a te_lifetime):
-      ERR(_u8("check_and_compute_typeexpr: TeLifetime not supported"));
-      return TODO();
+      if case Has(ix size) = find_lifetime_generic(g, a.name) {
+        *out = {true, TeLifetime({a.name})};
+        return true;
+      }
+      if is_parm_generic(cs->im, parms->num_lifetime_types_used, a.name) {
+        *out = {true, TeLifetime({a.name})};
+        return true;
+      }
+      ERR(_u8("Lifetime type with unrecognized name"));
+      return false;
+
     case &TeUnknown(v void): {
       *out = {false, TeUnknown(void)};
       return true;
@@ -743,6 +752,19 @@ func find_plain_generic(g *ast_generics, name sym) opt[size] {
     return None();
   case &HasGenerics(a array[ast_generik]):
     return lookup_plain_name(&a, name);
+  case &VariadicGenerics(a ast_variadic_generics):
+    // We can't see variadic generics because there's no "RHS type" of a fn.
+    ice(_u8("find_generic sees variadic generic."));
+    return fake();
+  }
+}
+
+func find_lifetime_generic(g *ast_generics, name sym) opt[size] {
+  switch g {
+  case &NoGenerics(v void):
+    return None();
+  case &HasGenerics(a array[ast_generik]):
+    return lookup_lifetime_name(&a, name);
   case &VariadicGenerics(a ast_variadic_generics):
     // We can't see variadic generics because there's no "RHS type" of a fn.
     ice(_u8("find_generic sees variadic generic."));
@@ -1892,6 +1914,20 @@ func lookup_plain_name(arr *array[ast_generik], x sym) opt[size] {
         return Has(i);
       }
     case &LifetimeGeneric(b ast_ident): { }
+    }
+  }
+  return None();
+}
+
+func lookup_lifetime_name(arr *array[ast_generik], x sym) opt[size] {
+  n size = count(arr);
+  for i size = 0; i < n; i = i + 1 {
+    switch ref(arr, i) {
+    case &PlainGeneric(b ast_ident): { }
+    case &LifetimeGeneric(b ast_ident):
+      if b.value == x {
+        return Has(i);
+      }
     }
   }
   return None();

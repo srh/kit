@@ -67,3 +67,12 @@ func canonicalize_idy_vardecls(im *identmap, lifetime_names *array[sym], a *shra
   }
   return freeze(&build);
 }
+
+func is_parm_generic(im *identmap, num_lifetime_types_used size, name sym) bool {
+  for i size = 0; i < num_lifetime_types_used; i++ {
+    if make_canonicalized_lifetime_name(im, i) == name {
+      return true;
+    }
+  }
+  return false;
+}
