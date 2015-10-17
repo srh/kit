@@ -773,15 +773,22 @@ func discard(expr ast_expr) ast_expr_discard {
   return {NotComputed@[ast_expr_after_discard](), expr};
 }
 
+// Variadic generics doesn't support lifetime generics (for no particular reason, other than that we have no need for it) yet.
 deftype ast_variadic_generics struct {
   before array[ast_ident];
   variadic_name ast_ident;
   after array[ast_ident];
 };
 
+// This is named with a k to prevent typos with ast_generics.
+defenum ast_generik {
+  PlainGeneric ast_ident;
+  LifetimeGeneric ast_ident;
+};
+
 defenum ast_generics {
   NoGenerics void;
-  HasGenerics array[ast_ident];
+  HasGenerics array[ast_generik];
   // Right now VariadicGenerics can't be parsed.
   VariadicGenerics ast_variadic_generics;
 };

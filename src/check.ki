@@ -602,7 +602,7 @@ func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy
 
 func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *te_name, computed_out *cu_typeexpr) bool {
   // Generic parameters have already been checked.  (I hope so.)
-  if lookup_generic(g, parms, a->value, computed_out) {
+  if lookup_plain_generic(g, parms, a->value, computed_out) {
     return true;
   }
 
@@ -737,12 +737,12 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_ty
 }
 
 // Returns an index into the HasGenerics array.
-func find_generic(g *ast_generics, name sym) opt[size] {
+func find_plain_generic(g *ast_generics, name sym) opt[size] {
   switch g {
   case &NoGenerics(v void):
     return None();
-  case &HasGenerics(a array[ast_ident]):
-    return lookup_name(&a, name);
+  case &HasGenerics(a array[ast_generik]):
+    return lookup_plain_name(&a, name);
   case &VariadicGenerics(a ast_variadic_generics):
     // We can't see variadic generics because there's no "RHS type" of a fn.
     ice(_u8("find_generic sees variadic generic."));
@@ -750,8 +750,8 @@ func find_generic(g *ast_generics, name sym) opt[size] {
   }
 }
 
-func lookup_generic(g *ast_generics, parms *idy_genparms, name sym, out *cu_typeexpr) bool {
-  if case Has(ix size) = find_generic(g, name) {
+func lookup_plain_generic(g *ast_generics, parms *idy_genparms, name sym, out *cu_typeexpr) bool {
+  if case Has(ix size) = find_plain_generic(g, name) {
     *out = *ref(&parms->repls, ix);
     return true;
   }
@@ -1411,13 +1411,13 @@ func check_generics_unique(cs *checkstate, a *ast_generics) bool {
     case &NoGenerics(v void): {
       return true;
     }
-    case &HasGenerics(b array[ast_ident]): {
+    case &HasGenerics(b array[ast_generik]): {
       n size = count(&b);
       for i size = 0; i < n; i = i + 1 {
-        xi sym = ref(&b, i)->value;
+        xi *ast_generik = ref(&b, i);
         for j size = 0; j < i; j = j + 1 {
-          yi sym = ref(&b, j)->value;
-          if xi == yi {
+          yi *ast_generik = ref(&b, j);
+          if generiks_equiv(xi, yi) {
             ERR(_u8("Generic params are self-shadowing."));
             return false;
           }
@@ -1426,6 +1426,20 @@ func check_generics_unique(cs *checkstate, a *ast_generics) bool {
       return true;
     }
   }
+}
+
+func generiks_equiv(a *ast_generik, b *ast_generik) bool {
+  switch a {
+  case &PlainGeneric(an ast_ident):
+    if case &PlainGeneric(bn ast_ident) = b {
+      return an.value == bn.value;
+    }
+  case &LifetimeGeneric(an ast_ident):
+    if case &LifetimeGeneric(bn ast_ident) = b {
+      return an.value == bn.value;
+    }
+  }
+  return false;
 }
 
 func is_public(a *ast_type_def_rhs) rhs_accessibility {
@@ -1568,14 +1582,14 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
           return true;
         }
         case &NoParms(u void): {
-          names array[ast_ident];
+          names array[ast_generik];
           parms shray[te_typeexpr];
           *matches_out = from_type_matches_res(false, type_matches(pt, &names, &parms, typeexpr));
           return true;
         }
       }
     }
-    case &HasGenerics(names array[ast_ident]): {
+    case &HasGenerics(names array[ast_generik]): {
       switch gp {
         case &HasParms(parms shray[te_typeexpr]): {
           if count(&parms) != count(&names) {
@@ -1604,7 +1618,7 @@ defenum type_matches_res {
 };
 
 // t is complete, but it references the generic names in "names", whose corresponding values in "parms" could be incomplete.  pt is the partial type of an expression we're matching against this generic definition.  count(parms) == count(names).
-func type_matches(pt *te_typeexpr, names *array[ast_ident], parms *shray[te_typeexpr],
+func type_matches(pt *te_typeexpr, names *array[ast_generik], parms *shray[te_typeexpr],
                   t *te_typeexpr) type_matches_res {
   check(count(names) == count(parms));
   // We need to retain all new information we gain about the value of the generic param typeexprs as we compare the whole type, in order to make sure we don't match conflicting information about a generic parameter.
@@ -1690,7 +1704,7 @@ func is_complete(t *te_typeexpr) bool {
 // t references the generic names in "names", whose corresponding values in "unif_parms" might be incomplete.  We update the values in unif_parms when necessary.  t does not need to be complete -- this code is also used by unify_types.
 // "*unified_out" is initialized with the unified type, _except_ when t references a generic name, in which case it's initialized with the value of "*t", the generic name.  (The reason is, we might not have gathered complete information about the generic parameter when we've halfway-processed the type -- the caller can and should reconstruct the correct values later.)
 func unify_under_generics(pt *te_typeexpr,
-                          names *array[ast_ident], unif_parms *array[te_typeexpr],
+                          names *array[ast_generik], unif_parms *array[te_typeexpr],
                           t *te_typeexpr, unified_out *te_typeexpr) bool {
   if case &TeUnknown(v void) = pt {
     // It's worth pointing out:  This _is_ correct behavior if t is a generic parameter.
@@ -1699,7 +1713,7 @@ func unify_under_generics(pt *te_typeexpr,
   }
   switch t {
     case &TeName(a te_name): {
-      if case Has(ix size) = lookup_name(names, a.value) {
+      if case Has(ix size) = lookup_plain_name(names, a.value) {
         unified te_typeexpr;
         if !unify_types(ref(unif_parms, ix), pt, &unified) {
           return false;
@@ -1869,11 +1883,15 @@ func unify_under_generics(pt *te_typeexpr,
   }
 }
 
-func lookup_name(arr *array[ast_ident], x sym) opt[size] {
+func lookup_plain_name(arr *array[ast_generik], x sym) opt[size] {
   n size = count(arr);
   for i size = 0; i < n; i = i + 1 {
-    if ref(arr, i)->value == x {
-      return Has(i);
+    switch ref(arr, i) {
+    case &PlainGeneric(b ast_ident):
+      if b.value == x {
+        return Has(i);
+      }
+    case &LifetimeGeneric(b ast_ident): { }
     }
   }
   return None();
@@ -1905,7 +1923,7 @@ func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) boo
 }
 
 func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
-  names array[ast_ident];
+  names array[ast_generik];
   unif_parms array[te_typeexpr];
   return unify_under_generics(pta, &names, &unif_parms, ptb, out);
 }

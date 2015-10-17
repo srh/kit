@@ -357,7 +357,7 @@ func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
 }
 
 func tee_generic(cs *checkstate) ast_generics {
-  return HasGenerics(mk_array@[ast_ident]({fake_ast_meta(), cs->im->cym.tee_sym}));
+  return HasGenerics(mk_array(@[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym})));
 }
 
 func fn_type(cs *checkstate, params shray[te_typeexpr]) te_typeexpr {
@@ -396,8 +396,7 @@ func add_pointer_primitive(cs *checkstate) void {
 }
 
 func add_pointer_primitive_type(cs *checkstate) void {
-  one_generic array[ast_ident];
-  push(&one_generic, {fake_ast_meta(), cs->im->cym.tee_sym});
+  one_generic array[ast_generik] = mk_array(@[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym}));
   // It's as if pointers belong in an even _more_ primitive module than integer/bool types.
   ent deftype_entry = {
     cs->im->cym.primitive_module_sym,

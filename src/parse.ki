@@ -459,7 +459,7 @@ func[T] try_skip_specific_ident(p *ps, x T) parse_result {
 }
 
 func parse_generics_if_present(p *ps, out *ast_generics) parse_result {
-  args array[ast_ident];
+  args array[ast_generik];
   if !try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
     *out = NoGenerics(void);
     return Success;
@@ -474,12 +474,29 @@ func parse_generics_if_present(p *ps, out *ast_generics) parse_result {
         return Fail;
       }
     }
-    arg ast_ident;
-    if !parse_ident(p, &arg) {
+    arg ast_generik;
+    if !parse_generik(p, &arg) {
       return Fail;
     }
     push(&args, arg);
   }
+}
+
+func parse_generik(p *ps, out *ast_generik) parse_result {
+  if +try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
+    name ast_ident;
+    if !parse_ident(p, &name) {
+      return Fail;
+    }
+    *out = LifetimeGeneric(name);
+    return Success;
+  }
+  name ast_ident;
+  if !parse_ident(p, &name) {
+    return Fail;
+  }
+  *out = PlainGeneric(name);
+  return Success;
 }
 
 func parse_args_list(p *ps, out *array[ast_vardecl]) parse_result {
