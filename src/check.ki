@@ -1041,7 +1041,7 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
     case &TeLifetime(a te_lifetime):
       // Presumably this should be an ICE.
       ERR(_u8("ICE: compute_complete_type_properties on TeLifetime"));
-      return TODO();
+      return false;
 
     case &TeUnknown(a void): {
       ice(_u8("compute_type_properties called on incomplete type."));
