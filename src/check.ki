@@ -1892,9 +1892,27 @@ func unify_under_generics(pt *te_typeexpr,
     }
 
     case &TeLifetime(a te_lifetime):
-      ERR(_u8("unify_under_generics: TeLifetime not supported"));
-      return TODO();
-
+      // NOTE: I mimicked the TeName case, and haven't fully thought out how that would affect this function's callers, so treat this code with skepticism.
+      if case Has(ix size) = lookup_lifetime_name(names, a.name) {
+        unified te_typeexpr;
+        if !unify_types(ref(unif_parms, ix), pt, &unified) {
+          return false;
+        }
+        *ref(unif_parms, ix) = unified;
+        *unified_out = TeLifetime({a.name});
+        return true;
+      } else {
+        if case &TeLifetime(pa te_lifetime) = pt {
+          // NOTE: The TeName case says something about scopage for its analogue of this comparison.
+          if a.name != pa.name {
+            return false;
+          }
+          *unified_out = TeLifetime({a.name});
+          return true;
+        } else {
+          return false;
+        }
+      }
 
     case &TeUnknown(v void): {
       // Right now, the only callers are type_matches and unify_types.  From type_matches, t is complete, and from unify_types, there are no generic names.
