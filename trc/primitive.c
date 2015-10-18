@@ -17,3 +17,11 @@ struct primitive_op make_enumconstruct_op(size_t enumconstruct_number) {
   ret.u.enumconstruct_number = enumconstruct_number;
   return ret;
 }
+
+struct primitive_op make_enumvoid_op(size_t enumconstruct_number) {
+  struct primitive_op ret;
+  ret.tag = PRIMITIVE_OP_ENUMVOID;
+  ret.u.enumconstruct_number = enumconstruct_number;
+  return ret;
+}
+

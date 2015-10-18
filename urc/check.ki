@@ -153,7 +153,7 @@ func convert_vardecl(cs *checkstate, a *ast_vardecl, out *te_vardecl) bool {
 func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
   switch a {
     case &Name(b ast_ident): {
-      *out = TeName({b.value, None()});
+      *out = TeName({b.value, None});
       return true;
     }
     case &App(b ast_typeapp): {
@@ -163,7 +163,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
            && convert_typeexpr_list(cs, &b.params, &params)) {
         return false;
       }
-      *out = TeApp({typefunc, params, None()});
+      *out = TeApp({typefunc, params, None});
       return true;
     }
     case &Struct(b ast_struct): {
@@ -199,7 +199,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
         }
         count = Has(num);
       } else {
-        count = None();
+        count = None;
       }
       param shp[te_typeexpr];
       if !convert_typeexpr(cs, oo(&b.param), oo(&param)) {
@@ -335,7 +335,7 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
     case &DefnHasRhs(np def_nonprim):
       switch np.tl {
         case &Def(a ast_def): {
-          rhs = InstRhsExpr({a.rhs, None@[frame_info]()});
+          rhs = InstRhsExpr({a.rhs, None});
         }
         case &ExternDef(a ast_extern_def): { rhs = InstRhsExtern(void); }
         default: {

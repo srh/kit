@@ -87,19 +87,20 @@ void append_fillercode_to_align(struct databuf *d, size_t alignment) {
   }
 }
 
+void append_zeros(struct databuf *d, size_t count) {
+  static const uint8_t ch[16] = { 0 };
+  while (count > 16) {
+    databuf_append(d, ch, 16);
+    count = count - 16;
+  }
+  databuf_append(d, ch, count);
+}
+
 void append_zeros_to_align(struct databuf *d, size_t alignment) {
   CHECK(alignment > 0);
   size_t n = d->count % alignment;
   if (n != 0) {
-    static const uint8_t ch[16] = { 0 };
-
-    size_t m = size_sub(alignment, n);
-
-    while (m > 16) {
-      databuf_append(d, ch, 16);
-      m = size_sub(m, 16);
-    }
-    databuf_append(d, ch, m);
+    append_zeros(d, size_sub(alignment, n));
   }
 }
 
@@ -154,6 +155,10 @@ void objfile_section_align_dword(struct objfile_section *s) {
   if (s->max_requested_alignment < 4) {
     s->max_requested_alignment = 4;
   }
+}
+
+void objfile_section_append_zeros(struct objfile_section *s, size_t count) {
+  append_zeros(&s->raw, count);
 }
 
 void objfile_fillercode_align_double_quadword(struct objfile *f) {

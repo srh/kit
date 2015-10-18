@@ -178,9 +178,11 @@ void generate_kit_name(struct checkstate *cs,
   databuf_move_destroy(&b, gen_name_out, gen_name_count_out);
 }
 
+/* TODO: Rename. */
 int is_primitive_but_not_sizeof_alignof(struct def_entry *ent) {
   return ent->is_primitive && ent->primitive_op.tag != PRIMITIVE_OP_SIZEOF
-    && ent->primitive_op.tag != PRIMITIVE_OP_ALIGNOF;
+    && ent->primitive_op.tag != PRIMITIVE_OP_ALIGNOF
+    && ent->primitive_op.tag != PRIMITIVE_OP_ENUMVOID;
 }
 
 /* TODO: Put string literals in rdata (add section number to loc_global). */
@@ -4820,6 +4822,16 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     CHECK(value->u.bool_value == 0 || value->u.bool_value == 1);
     bytes[0] = (uint8_t)value->u.bool_value;
     objfile_section_append_raw(objfile_data(f), bytes, 4);
+    return 1;
+  } break;
+  case STATIC_VALUE_ENUMVOID: {
+    objfile_section_align_dword(objfile_data(f));
+    objfile_set_symbol_value(f, di_symbol_table_index(inst),
+                             objfile_section_size(objfile_data(f)));
+    char buf[4];
+    write_le_u32(buf, size_to_uint32(size_add(value->u.enumvoid_value.enumconstruct_number, FIRST_ENUM_TAG_NUMBER)));
+    objfile_section_append_raw(objfile_data(f), buf, sizeof(buf));
+    objfile_section_append_zeros(objfile_data(f), size_sub(value->u.enumvoid_value.enumsize, 4));
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {

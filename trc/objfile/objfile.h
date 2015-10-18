@@ -51,6 +51,7 @@ void objfile_section_overwrite_raw(struct objfile_section *s,
                                    const void *buf, size_t n);
 void objfile_section_align_dword(struct objfile_section *s);
 void objfile_fillercode_align_double_quadword(struct objfile *f);
+void objfile_section_append_zeros(struct objfile_section *s, size_t count);
 
 void objfile_set_symbol_value(struct objfile *f,
                               struct sti SymbolTableIndex,
@@ -72,6 +73,7 @@ int objfile_c_symbol_name(int target_linux32,
 
 /* Utility. */
 void append_zeros_to_align(struct databuf *d, size_t alignment);
+void append_zeros(struct databuf *d, size_t count);
 
 /* TODO: This should return a value in a wrapper struct? */
 uint32_t strtab_add(struct databuf *d, const void *buf, size_t count);

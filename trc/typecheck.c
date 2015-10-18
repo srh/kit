@@ -859,17 +859,31 @@ int add_enum_constructors(struct checkstate *cs,
     ast_typeapp_init(&func_type.u.app, ast_meta_make_garbage(),
                      make_ast_ident(cs->cm.func), params, 2);
 
-    int success = name_table_add_primitive_def(
-        cs->im,
-        &cs->nt,
-        f->name.value,
-        make_enumconstruct_op(i),
-        generics,
-        &func_type);
-    ast_typeexpr_destroy(&func_type);
-    if (!success) {
+    if (!name_table_add_primitive_def(
+            cs->im,
+            &cs->nt,
+            f->name.value,
+            make_enumconstruct_op(i),
+            generics,
+            &func_type)) {
+      ast_typeexpr_destroy(&func_type);
       return 0;
     }
+
+    if (f->type.tag == AST_TYPEEXPR_NAME && f->type.u.name.value == cs->cm.voide) {
+      if (!name_table_add_primitive_def(
+              cs->im,
+              &cs->nt,
+              f->name.value,
+              make_enumvoid_op(i),
+              generics,
+              &func_type.u.app.params[1])) {
+        ast_typeexpr_destroy(&func_type);
+        return 0;
+      }
+    }
+
+    ast_typeexpr_destroy(&func_type);
   }
 
   return 1;
@@ -5258,6 +5272,12 @@ int compute_static_values(struct checkstate *cs, struct def_entry *ent) {
         uint32_t alignment = x86_alignof(&cs->nt, &inst->substitutions[0]);
         static_value_init_u32(di_value_for_set(inst), alignment);
       } break;
+      case PRIMITIVE_OP_ENUMVOID: {
+        static_value_init_enumvoid(
+            di_value_for_set(inst),
+            ent->primitive_op.u.enumconstruct_number,
+            x86_sizeof(&cs->nt, &inst->type));
+      } break;
       default:
         static_value_init_primitive_op(di_value_for_set(inst), ent->primitive_op);
         break;
@@ -6172,7 +6192,7 @@ int check_more_testcases(struct identmap *im) {
       "  return y;\n"
       "};\n");
   pass &= check_foocase(
-      im, "check_file_test_more_48",
+      im, "check_file_test_more_48-a",
       "defenum[T] ty {\n"
       "  c1 void;\n"
       "  c2 struct { p T; q T; };\n"
@@ -6180,6 +6200,19 @@ int check_more_testcases(struct identmap *im) {
       "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
       "  v void;\n"
       "  y ty[i32] = c1(v);\n"
+      "  u struct { p i32; q i32; };\n"
+      "  y = c2(u);\n"
+      "  return y;\n"
+      "};\n");
+  pass &= check_foocase(
+      im, "check_file_test_more_48-b",
+      "defenum[T] ty {\n"
+      "  c1 void;\n"
+      "  c2 struct { p T; q T; };\n"
+      "};\n"
+      "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
+      "  v void;\n"
+      "  y ty[i32] = c1;\n"
       "  u struct { p i32; q i32; };\n"
       "  y = c2(u);\n"
       "  return y;\n"

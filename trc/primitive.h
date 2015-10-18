@@ -4,7 +4,6 @@
 #include <stddef.h>
 
 enum primitive_op_tag {
-  /* TODO: Implement (or change what primitive_ops generally are...) */
   PRIMITIVE_OP_ENUMCONSTRUCT,
 
   PRIMITIVE_OP_INIT,
@@ -93,6 +92,7 @@ enum primitive_op_tag {
   /* TODO: Idk about this. */
   PRIMITIVE_OP_SIZEOF,
   PRIMITIVE_OP_ALIGNOF,
+  PRIMITIVE_OP_ENUMVOID,
 
   PRIMITIVE_OP_BIT_NOT_I8,
   PRIMITIVE_OP_BIT_NOT_U8,
@@ -265,5 +265,6 @@ struct primitive_op {
 
 struct primitive_op make_primop(enum primitive_op_tag tag);
 struct primitive_op make_enumconstruct_op(size_t enumconstruct_number);
+struct primitive_op make_enumvoid_op(size_t enumconstruct_number);
 
 #endif /* KIT_PRIMITIVE_H_ */

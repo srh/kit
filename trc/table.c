@@ -38,6 +38,12 @@ void static_value_init_bool(struct static_value *a, int bool_value) {
   a->u.bool_value = bool_value;
 }
 
+void static_value_init_enumvoid(struct static_value *a, size_t enumconstruct_number, size_t enumsize) {
+  a->tag = STATIC_VALUE_ENUMVOID;
+  a->u.enumvoid_value.enumconstruct_number = enumconstruct_number;
+  a->u.enumvoid_value.enumsize = enumsize;
+}
+
 void static_value_init_typechecked_lambda(struct static_value *a,
                                           struct ast_expr lambda) {
   CHECK(lambda.info.typechecked == AST_TYPECHECKED_YES);
@@ -66,6 +72,9 @@ void static_value_init_copy(struct static_value *a, struct static_value *c) {
   case STATIC_VALUE_BOOL:
     a->u.bool_value = c->u.bool_value;
     break;
+  case STATIC_VALUE_ENUMVOID:
+    a->u.enumvoid_value = c->u.enumvoid_value;
+    break;
   case STATIC_VALUE_LAMBDA:
     ast_expr_init_copy(&a->u.typechecked_lambda,
                        &c->u.typechecked_lambda);
@@ -93,6 +102,9 @@ void static_value_init_move(struct static_value *a, struct static_value *m) {
   case STATIC_VALUE_BOOL:
     a->u.bool_value = m->u.bool_value;
     break;
+  case STATIC_VALUE_ENUMVOID:
+    a->u.enumvoid_value = m->u.enumvoid_value;
+    break;
   case STATIC_VALUE_LAMBDA:
     a->u.typechecked_lambda = m->u.typechecked_lambda;
     break;
@@ -109,7 +121,8 @@ void static_value_destroy(struct static_value *sv) {
   case STATIC_VALUE_I32: /* fallthrough */
   case STATIC_VALUE_U32: /* fallthrough */
   case STATIC_VALUE_U8: /* fallthrough */
-  case STATIC_VALUE_BOOL:
+  case STATIC_VALUE_BOOL: /* fallthrough */
+  case STATIC_VALUE_ENUMVOID:
     break;
   case STATIC_VALUE_LAMBDA:
     ast_expr_destroy(&sv->u.typechecked_lambda);
