@@ -12,6 +12,8 @@ Definitions:
    s2-self: s2, as compiled by s2.
    s3-by-s2: s3, as compiled by s2.
    s3-self: s3, as compiled by s3.
+   s4-by-s3: s4, asd compiled by s3.
+   s4-self: s4, as compiled by s4.
 
   BUILD INSTRUCTIONS
 
@@ -25,18 +27,16 @@ Definitions:
    windows_build.bat  (or ./linux_build.sh)
 # Step 2. Build s2 -- creates executable "s2.exe" (or "s2")
    windows_build_s2.bat  (or ./linux_build_s2.sh)
-# Step 3. Build s3-by-s2
+# Step 3. Build s3
+   windows_build_s3.bat
+# Step 4. Build s4
+   windows_build_s4.bat
+# Step 5. Run parsing/typechecking+codegen tests.
+   s4 --build  (or ./s4 --build)
+# Step 6. If you wish, run s4-self on itself
    cd src
-   ..\s2 main && cl main.obj dummy.c /Fes3b /link /stack:0x100000,0x100000
-     (or ../s2 --linux main && gcc -m32 main.o dummy.c -o s3b)
-# Step 4. Build s3-self
-   s3b main && cl main.obj dummy.c /Fes3 /link /stack:0x100000,0x100000
-     (or ../s3 --linux main && gcc -m32 main.o dummy.c -o s3)
-# Run parsing/typechecking+codegen tests.
-   s3 --build  (or ./s3 --build)
-# Step 5. If you wish, run s3-self on itself
    move main.obj old_main.obj
-   s3 main
+   ..\s4 main
    sha1sum old_main.obj main.obj
 # The sha1sums should match.
 
@@ -46,7 +46,8 @@ The current directory structure is:
 
    trc - s1, implemented in C.  Compiles s2.
    urc - s2, implemented in proto-Kit, v0.00.1.x.  Compiles s2 and s3.
-   src - s3, implemented in proto-Kit, v0.00.2.x.  Compiles s3.
+   src - s3, implemented in proto-Kit, v0.00.2.x.  Compiles s3 and s4.
+   vrc - s4, implemented in proto-Kit, v0.00.2A.x.  Compiles s4.
    examples - examples to run, disorganized junk
 
   COMMAND USAGE
@@ -59,6 +60,7 @@ The current directory structure is:
    s2 --build    # runs parsing/typechecking tests with codegen.
    s2 <modulename>  # builds <modulename>.ki and its imports.
    s3 ...    # same as s2.
+   s4 ...    # same as s3 and s2.
 
   PROJECT TIMELINE
 
@@ -82,7 +84,7 @@ Here's the project timeline:
       Wishlist:
        A. defstruct, no more naked structs.
        B. type aliases.
-       C. a non-truncative conversion operator (prefix +).  (DONE in s2)
+       C. a non-truncative conversion operator (prefix +).  (DONE)
        D. negative integer literals.
        E. var keyword after variable.  (DONE)
        F. o8, o16, o32.  (DONE in s2)
@@ -95,7 +97,7 @@ Here's the project timeline:
        M. defer statements (or scoped statements).
        N. handlers for overflow errors.
        O. enum types with "default" values instead of zero-tag.
-       P. cute enum syntax for voids.  (DONE in s2)
+       P. cute enum syntax for voids.  (DONE)
        Q. better type-checking, see-through-negation.
        R. explicit overloading/specialization.
        S. support for multiple calling conventions.
@@ -114,8 +116,13 @@ constructors and destructors, elementary encapsulation, tagged enum
 types, no implicit conversions."  s2's, v0.00.2.x, is the same as
 s1's, but with some basic convenience enhancements that should be
 easy to backport to s1 -- the differences are described in
-FEATURES.  s3's should soon become quite different from s2's.  The
-expectation is that someday, s1 will be able to compile s3, and we
-can skip s2.  (By that time, there might be an s4.)
+FEATURES.  s3's, v0.00.2A.x, is very similar to s2's, I think there
+might not be any differences.  s4's should become quite different
+from s3's.
 
-
+Right now, s1 is very close to being able to compile s3.  s2 will
+disappear pretty soon -- its new language features are gradually
+getting implemented in s1.  Actually, s1 can compile both s3 and s4
+at the time of writing this.  s3 or s4 wouldn't disappear until
+there's an s5, though -- we don't want the actively developed
+compiler version to have to maintain compatibility with s1's warts.
