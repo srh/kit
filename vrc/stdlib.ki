@@ -394,3 +394,17 @@ func[T] move(x *T) T {
   init(x);
   return ret;
 }
+
+// TODO: Consider hard-coding these behaviors into the language.
+inline func[T] `++`(x *T) void { *x = *x + 1; }
+inline func[T] `--`(x *T) void { *x = *x - 1; }
+inline func[T] `%=`(x *T, y T) void { *x = *x % y; }
+inline func[T] `^=`(x *T, y T) void { *x = *x ^ y; }
+inline func[T] `&=`(x *T, y T) void { *x = *x & y; }
+inline func[T] `*=`(x *T, y T) void { *x = *x * y; }
+inline func[T] `-=`(x *T, y T) void { *x = *x - y; }
+inline func[T] `+=`(x *T, y T) void { *x = *x + y; }
+inline func[T] `|=`(x *T, y T) void { *x = *x | y; }
+inline func[T] `/=`(x *T, y T) void { *x = *x / y; }
+inline func[T] `<<=`(x *T, y T) void { *x = *x << y; }
+inline func[T] `>>=`(x *T, y T) void { *x = *x >> y; }
