@@ -852,7 +852,7 @@ inline func psd_index(psd *partial_struct_data) size {
 func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *shray[te_vardecl], name opt[sym], out *partial_struct_data) bool {
   ret partial_struct_data = {false, 0, 1, 0, 0, 0, 0, mk_array@[struct_field_info]()};
   n size = count(fields);
-  for i size = 0; i < n; i++ {
+  for i size = 0; i < n; i = i + 1 {
     vd *te_vardecl = ref(fields, i);
     props type_properties;
     if !compute_complete_type_properties(cs, clq, &vd->type, &props) {

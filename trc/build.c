@@ -3559,6 +3559,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
   } break;
   case AST_UNOP_NEGATE:
   case AST_UNOP_CONVERT:
+  case AST_UNOP_UPCONVERT:
   case AST_UNOP_LOGICAL_NOT:
   case AST_UNOP_BITWISE_NOT:
   default:

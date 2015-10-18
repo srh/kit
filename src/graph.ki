@@ -149,15 +149,6 @@ func addq(gr *frame_graph, op gr_qop) sq_num {
   return ~help_add_node(gr, @[gr_node]QOp({op}));
 }
 
-func mut_xnop_node(gr *frame_graph, ix gr_num, newnode gr_node) void {
-  node *gr_node = ref(&gr->ops, ix.~);
-  if case &GrXNop(v void) = &node->op {
-    *node = newnode;
-  } else {
-    ice(_u8("mut_xnop_node sees non-nop node"));
-  }
-}
-
 func mut_qnop_node(gr *frame_graph, ix sq_num, newnode gr_qnode) void {
   node *gr_node = ref_node(gr, ix.~);
   switch node {
@@ -551,7 +542,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg 
 
   branch_cases array[tup[gr_const, sq_num]];
   nconstructors size = count(&cases);
-  for i size = 0; i < nconstructors; i++ {
+  for i size = 0; i < nconstructors; i = i + 1 {
     if case Has(sq sq_num) = get(&cases, i) {
       push(&branch_cases, {ConstInt(bigu(mk_enum_tag_value(i).~)), sq});
     } else {

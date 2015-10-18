@@ -376,13 +376,13 @@ inline func[T] enumnum(x *T) u32 {
 
 // TODO: Somewhere in linux_objfile.ki we could use this func... for the magic's padding.
 func[T] fill(p *T, n size, value T) void {
-  for i size = 0; i < n; i++ {
+  for i size = 0; i < n; i = i + 1 {
     p[i] = value;
   }
 }
 
 func[T] bufcopy(dest *T, src *T, n size) void {
-  for i size = 0; i < n; i++ {
+  for i size = 0; i < n; i = i + 1 {
     dest[i] = src[i];
   }
 }
@@ -394,17 +394,3 @@ func[T] move(x *T) T {
   init(x);
   return ret;
 }
-
-// TODO: Consider hard-coding these behaviors into the language.
-inline func[T] `++`(x *T) void { *x = *x + 1; }
-inline func[T] `--`(x *T) void { *x = *x - 1; }
-inline func[T] `%=`(x *T, y T) void { *x = *x % y; }
-inline func[T] `^=`(x *T, y T) void { *x = *x ^ y; }
-inline func[T] `&=`(x *T, y T) void { *x = *x & y; }
-inline func[T] `*=`(x *T, y T) void { *x = *x * y; }
-inline func[T] `-=`(x *T, y T) void { *x = *x - y; }
-inline func[T] `+=`(x *T, y T) void { *x = *x + y; }
-inline func[T] `|=`(x *T, y T) void { *x = *x | y; }
-inline func[T] `/=`(x *T, y T) void { *x = *x / y; }
-inline func[T] `<<=`(x *T, y T) void { *x = *x << y; }
-inline func[T] `>>=`(x *T, y T) void { *x = *x >> y; }

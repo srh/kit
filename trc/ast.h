@@ -493,6 +493,7 @@ enum ast_unop {
      ast_unop_expr. */
   AST_UNOP_NEGATE,
   AST_UNOP_CONVERT,
+  AST_UNOP_UPCONVERT,
   AST_UNOP_LOGICAL_NOT,
   AST_UNOP_BITWISE_NOT,
 };

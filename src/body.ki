@@ -614,7 +614,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
 func compute_varcells(es *framescope, a *array[var_number]) shray[opt[cell_num]] {
   b array[opt[cell_num]];
   n size = count(a);
-  for i size = 0; i < n; i++ {
+  for i size = 0; i < n; i = i + 1 {
     vi *var_info = ref_var(es, get(a, i));
     pushed opt[cell_num];
     switch vi->autoinit {
@@ -874,7 +874,7 @@ func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number],
   var_difference(goto_in_scope, target_in_scope, &destruct, &construct);
 
   nconstruct size = count(&construct);
-  for i size = 0; i < nconstruct; i++ {
+  for i size = 0; i < nconstruct; i = i + 1 {
     vn var_number = get(&construct, i);
     vi *var_info = ref_var(&bs->es, vn);
     if vi->autoinit == VarVirtual {
@@ -887,7 +887,7 @@ func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number],
   }
 
   ndestruct size = count(&destruct);
-  for i size = 0; i < ndestruct; i++ {
+  for i size = 0; i < ndestruct; i = i + 1 {
     vn var_number = get(&destruct, i);
     if !es_note_var_destroyer(&bs->es, vn) {
       return false;

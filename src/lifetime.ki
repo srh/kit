@@ -25,7 +25,7 @@ func canonicalize_idy_lifetimes(im *identmap, lifetime_names *array[sym], t *te_
   case &TeApp(a te_typeapp):
     newparams array[te_typeexpr];
     nparams size = count(&a.params);
-    for i size = 0; i < nparams; i++ {
+    for i size = 0; i < nparams; i = i + 1 {
       tmp te_typeexpr;
       canonicalize_idy_lifetimes(im, lifetime_names, ref(&a.params, i), &tmp);
       push(&newparams, tmp);
@@ -59,7 +59,7 @@ func canonicalize_idy_lifetimes(im *identmap, lifetime_names *array[sym], t *te_
 func canonicalize_idy_vardecls(im *identmap, lifetime_names *array[sym], a *shray[te_vardecl]) shray[te_vardecl] {
   build array[te_vardecl];
   n size = count(a);
-  for i size = 0; i < n; i++ {
+  for i size = 0; i < n; i = i + 1 {
     decl *te_vardecl = ref(a, i);
     tmp te_typeexpr;
     canonicalize_idy_lifetimes(im, lifetime_names, &decl->type, &tmp);
@@ -69,7 +69,7 @@ func canonicalize_idy_vardecls(im *identmap, lifetime_names *array[sym], a *shra
 }
 
 func is_parm_generic(im *identmap, num_lifetime_types_used size, name sym) bool {
-  for i size = 0; i < num_lifetime_types_used; i++ {
+  for i size = 0; i < num_lifetime_types_used; i = i + 1 {
     if make_canonicalized_lifetime_name(im, i) == name {
       return true;
     }

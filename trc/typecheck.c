@@ -299,6 +299,7 @@ void intern_binop(struct checkstate *cs,
 }
 
 #define CONVERT_FUNCTION_NAME "~"
+#define UPCONVERT_FUNCTION_NAME "+"
 
 int typeexpr_is_func_type(struct identmap *im, struct ast_typeexpr *x) {
   return x->tag == AST_TYPEEXPR_APP
@@ -421,6 +422,8 @@ void import_bool_binops(struct checkstate *cs) {
   ast_generics_destroy(&generics);
 }
 
+struct fake_limit { int low, high; };
+
 void import_integer_conversions(struct checkstate *cs) {
   const size_t num_types = 8;
   ident_value types[8];
@@ -433,7 +436,19 @@ void import_integer_conversions(struct checkstate *cs) {
   types[6] = cs->cm.size_type_name;
   types[7] = cs->cm.osize_type_name;
 
+  struct fake_limit fake_limits[8] = {
+    {0, 4},
+    {-3, 3},
+    {0, 8},
+    {-7, 7},
+    {0, 12},
+    {-11, 11},
+    {0, 12},
+    {0, 12},
+  };
+
   ident_value convert = identmap_intern_c_str(cs->im, CONVERT_FUNCTION_NAME);
+  ident_value upconvert = identmap_intern_c_str(cs->im, UPCONVERT_FUNCTION_NAME);
 
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
@@ -527,6 +542,14 @@ void import_integer_conversions(struct checkstate *cs) {
                                    make_primop(conversions[i][j]),
                                    &generics,
                                    &func_type);
+      if (fake_limits[i].low >= fake_limits[j].low && fake_limits[i].high <= fake_limits[j].high) {
+        name_table_add_primitive_def(cs->im,
+                                     &cs->nt,
+                                     upconvert,
+                                     make_primop(conversions[i][j]),
+                                     &generics,
+                                     &func_type);
+      }
       ast_typeexpr_destroy(&func_type);
     }
   }
@@ -3632,6 +3655,7 @@ int check_expr_magic_unop(struct exprscope *es,
   } break;
   case AST_UNOP_NEGATE:
   case AST_UNOP_CONVERT:
+  case AST_UNOP_UPCONVERT:
   case AST_UNOP_LOGICAL_NOT:
   case AST_UNOP_BITWISE_NOT:
   default:

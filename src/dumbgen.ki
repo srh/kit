@@ -270,7 +270,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
     // 2. Layout cells that _are_ part of the paramlist.  (They have to go beneath those which aren't.)
     pcells *shray[cell_num] = paramlist_cells(h->gr, gn);
     npcells size = count(pcells);
-    for j size = 0; j < npcells; j++ {
+    for j size = 0; j < npcells; j = j + 1 {
       duck_conflicting_cells(h, get(pcells, j), &bumpline, &offsets);
     }
 

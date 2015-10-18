@@ -4,7 +4,6 @@ Some feature differences between s1 and s2:
   - s2 has o8, o16, o32, diff.
   - s2 has incr/decr and "+="-type operators.
   - s2 allows negation for overflow types.
-  - s2 has the prefix + unary operator.
 
   Subset of s1:
   - s2 disallows assignment except for top-level exprs.

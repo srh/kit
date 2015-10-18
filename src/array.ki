@@ -349,7 +349,7 @@ func[T] is_strictly_increasing(x *array[T]) bool {
 
 func[T] shifterase_elem(x *array[T], k size) void {
   n size = count(x);
-  for i size = k + 1; i < n; i++ {
+  for i size = k + 1; i < n; i = i + 1 {
     *ref(x, i - 1) = *ref(x, i);
   }
   pop(x);

@@ -180,9 +180,9 @@ func generate_kit_name(cs *checkstate, informal_name sym, arg_types shray[cu_typ
   build string = _s("_kit_");
   num u32 = cs->kit_name_counter + 1;
   cs->kit_name_counter = num;
-  build += from_u8(to_u8str(num));
-  build += _s("_");
-  build += lookup(cs->im, informal_name);
+  build = build + from_u8(to_u8str(num));
+  build = build + _s("_");
+  build = build + lookup(cs->im, informal_name);
   btmp array[u8];
   push(&btmp, '(');
   nargtypes size = count(&arg_types);

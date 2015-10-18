@@ -515,8 +515,8 @@ deftype reg_rm_encoded struct {
 };
 
 func as_imm8(x u16) opt[u8] {
-  if x <= 127 {
-    return Has(~ (x & 0xFF));
+  if x <= + @[u8]127 {
+    return Has(~ (x & + @[u8]0xFF));
   } else {
     return None;
   }
