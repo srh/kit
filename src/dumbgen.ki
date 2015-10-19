@@ -13,7 +13,8 @@ defenum cell_loc {
 };
 
 deftype lives struct {
-  all hash[cell_num, void];
+  // Maintained in sorted order.
+  all array[cell_num];
   // The xor and sum of the cell nums -- makes for a quick commutative hash.
   xored osize;
   summed osize;
@@ -51,7 +52,7 @@ deftype gn_annot struct {
   this_targetnum nc[jmp_targetnum];
 };
 
-func live_for_funcall(annot *gn_annot) *hash[cell_num, void] {
+func live_for_funcall(annot *gn_annot) *array[cell_num] {
   return &unHas(&annot->app_time_live)->all;
 }
 
@@ -151,9 +152,8 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
 
   switch &mut {
   case &Terminal(v void):
-    expected hash[cell_num, void] = mk_hash(g->graph.cell, void);
-    if !sets_equal(&liveset.all, &expected) {
-      ice(_u8("fn_body leaves cells alive, expected "), g->graph.cell, _u8(", saw "), liveset.all);
+    if !(count(&liveset.all) == 1 && get(&liveset.all, 0) == g->graph.cell) {
+      ice(_u8("fn_body leaves cells alive, expected "), g->graph.cell, _u8(", saw "), to_array_u8str(cs->im, liveset.all));
     }
   case &NonTerminal(v void): { /* nothing to assert */ }
   }
@@ -246,14 +246,14 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   for i size = 0; i < ncalls; i = i + 1 {
     gn gr_num = get(&paramlist_ordering, i);
     annot *gn_annot = ref_annot(h, gn);
-    live *hash[cell_num, void] = live_for_funcall(annot);
+    live *array[cell_num] = live_for_funcall(annot);
 
     bumpline i32 = 0;
 
     // 1. Layout any cells live during the funcall, that are _not_ part of the paramlist.
-    it hash_iter[cell_num, void] = iter(live);
-    while case Has(p *tup[cell_num, void]) = next(&it) {
-      c cell_num = p->car;
+    nlive size = count(live);
+    for j size = 0; j < nlive; j = j + 1 {
+      c cell_num = get(live, j);
       if isNope(ref(&offsets, c.~)) {
         if case &Has(cell_paramlistgn gr_num) = &ref(&h->bas->celldisp, c.~)->paramlist {
           // Cells in other paramlists should already been processed -- and would have failed the isNone check just above.

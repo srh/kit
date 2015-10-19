@@ -1,7 +1,7 @@
 import state;
 
 func[H] build_u8str(help H, r *array[u8], x *lives) void {
-  build_u8str(help, r, &x->all);
+  build_array_u8str(help, r, &x->all);
 }
 
 func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_num) bool {
@@ -174,9 +174,10 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
 
 func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *lives) void {
   paramlists array[gr_num];
-  it hash_iter[cell_num, void] = iter(&live_at_app_time->all);
-  while case Has(p *tup[cell_num, void]) = next(&it) {
-    if case Has(gn gr_num) = ref(&h->bas->celldisp, p->car.~)->paramlist {
+  nall size = count(&live_at_app_time->all);
+  for i size = 0; i < nall; i = i + 1 {
+    c cell_num = get(&live_at_app_time->all, i);
+    if case Has(gn gr_num) = ref(&h->bas->celldisp, c.~)->paramlist {
       if gn != our_gn {
         push(&paramlists, gn);
         discard bool = try_insert(&ref_annot(h, gn)->higher_paramlists, &our_gn, void);
@@ -207,7 +208,7 @@ func combine_branch_mut(new_live *lives, onto *genexpr_result, case_mut genexpr_
 
 // For deaden and other functions, prelive shows what was alive _before_ prec_muts modified it.
 func deaden(liveset *lives, c cell_num) void {
-  if !try_remove(&liveset->all, &c) {
+  if !try_remove(&liveset->all, c) {
     ice(_u8("deaden on unlive cell "), c.~);
   }
   liveset->xored = liveset->xored ^ ~c.~;
@@ -216,7 +217,7 @@ func deaden(liveset *lives, c cell_num) void {
 
 // input requires that the cell already be live.
 func input(liveset *lives, c cell_num) void {
-  if case None(v void) = lookup_ref(&liveset->all, &c) {
+  if case None = lookup(&liveset->all, c) {
     ice(_u8("input on unlive cell "), c.~);
   }
 }
@@ -224,7 +225,7 @@ func input(liveset *lives, c cell_num) void {
 // output either makes the cell live, if it wasn't already, or it means we use the cell.
 // (Yes, that's so lame -- we should add GrMakeLive.)
 func output(h *frame, liveset *lives, c cell_num) void {
-  if try_insert(&liveset->all, &c, void) {
+  if try_insert(&liveset->all, c) {
     liveset->xored = liveset->xored ^ ~c.~;
     liveset->summed = liveset->summed + ~c.~;
     note_conflicting(h, &liveset->all, c);
@@ -233,7 +234,7 @@ func output(h *frame, liveset *lives, c cell_num) void {
 
 func create(h *frame, liveset *lives, c cell_num) void {
   // Both these places define the virtual cell.  So it should not be live.
-  if !try_insert(&liveset->all, &c, void) {
+  if !try_insert(&liveset->all, c) {
     ice(_u8("virtual on live cell "), c.~);
   }
   liveset->xored = liveset->xored ^ ~c.~;
@@ -241,12 +242,12 @@ func create(h *frame, liveset *lives, c cell_num) void {
   note_conflicting(h, &liveset->all, c);
 }
 
-func note_conflicting(h *frame, all *hash[cell_num, void], c cell_num) void {
+func note_conflicting(h *frame, all *array[cell_num], c cell_num) void {
   // This also means conflicting is set to non-empty for any cell that's made live.
   c_disp *cell_disp = ref(&h->bas->celldisp, c.~);
-  it hash_iter[cell_num, void] = iter(all);
-  while case Has(p *tup[cell_num, void]) = next(&it) {
-    d cell_num = p->car;
+  nall size = count(all);
+  for i size = 0; i < nall; i = i + 1 {
+    d cell_num = get(all, i);
     d_disp *cell_disp = ref(&h->bas->celldisp, d.~);
     push(&c_disp->conflicting, d);
     push(&d_disp->conflicting, c);
