@@ -26,25 +26,8 @@ func mk(ds *defscope) framescope {
           mk_array@[var_info](), mk_array@[var_number](), init_frame_graph_empty(ds->def_informal_name)};
 }
 
-func help_add_cell(es *framescope, info cell_info) cell_num {
-  return add_cell(&es->gr, info);
-}
-
-func add_virtual_cell(es *framescope, tp cu_typrop) cell_num {
-  return help_add_cell(es, {LocationVirtual(void), tp.cu, tp.props});
-}
-
-func add_virtual_cell(es *framescope, type cu_typeexpr, props type_properties) cell_num {
-  return help_add_cell(es, {LocationVirtual(void), type, props});
-}
-
-func add_static_cell(es *framescope, type cu_typeexpr, props type_properties) cell_num {
-  return help_add_cell(es, {LocationStatic(void), type, props});
-}
-
-func add_virtual_tag_cell(es *framescope, et *te_enum) cell_num {
-  tp cu_typrop = compute_prim(es->clq, enum_tag_type(es->cs, et));
-  return add_virtual_cell(es, tp);
+inline func add_cell(es *framescope, info cell_info) cell_num {
+  return add_cellp(&es->gr, &info);
 }
 
 inline func ref_cell(es *framescope, num cell_num) *cell_info {
@@ -580,7 +563,7 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
       ice(_u8("help_check_simple_literal passed type with bad properties"));
     }
 
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~c.te, props)), ~c.te, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~c.te, props})), ~c.te, props)));
   } else {
     annotate_info(x, @[ast_expr_info]IncompleteCheck(type));
   }
@@ -691,7 +674,7 @@ func check_expr_ternary(es *framescope, ai allow_incomplete, pt *te_typeexpr, a 
   conjoined cell_num;
   if true {
     then_cell *cell_info = ref_cell(es, result_cell(oo(&a->then_clause)));
-    conjoined = add_static_cell(es, then_cell->type, then_cell->props);
+    conjoined = add_cell(es, {LocationStatic, then_cell->type, then_cell->props});
   }
   reannotate_static_to_virtual(es, result_cell(oo(&a->then_clause)));
   reannotate_static_to_virtual(es, result_cell(oo(&a->else_clause)));
@@ -759,11 +742,11 @@ func check_expr_deref_field(es *framescope, pt *te_typeexpr, a *ast_deref_field,
   switch cf_res {
     case InheritsLval(offset u32): {
       // We deref, so it's always an lval.
-      lval = IsLvalYes({add_virtual_cell(es, fieldtype, props), DeadMe(void)});
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void)});
       annotate(&a->info, DerefFieldName(offset));
     }
     case ConstantField(value u32): {
-      lval = wholeRval(add_static_cell(es, fieldtype, props));
+      lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
       annotate(&a->info, DerefArrayLength(value));
     }
   }
@@ -791,10 +774,10 @@ func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field,
     case InheritsLval(offset u32): {
       switch &info->lval {
         case &IsLvalYes(desc lval_description): {
-          lval = IsLvalYes({add_virtual_cell(es, fieldtype, props), DeadMe(void)});
+          lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void)});
         }
         case &IsLvalNo(desc rval_description): {
-          lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, fieldtype, props)});
+          lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, fieldtype, props})});
         }
       }
       // There's no disposal, it's a real field access.
@@ -806,7 +789,7 @@ func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field,
         return false;
       }
       annotate(&a->info, @[ast_local_field_info]ArrayLength({*unHas(&after), value}));
-      lval = wholeRval(add_static_cell(es, fieldtype, props));
+      lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
     }
   }
   annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
@@ -831,7 +814,7 @@ func check_expr_deref(es *framescope, pt *te_typeexpr, a *ast_deref, x *ast_expr
   if !compute_complete_type_properties(es->cs, es->clq, param, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_virtual_cell(es, ~ *param, props), DeadMe(void)}), ~ *param, props)));
+  annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}), DeadMe(void)}), ~ *param, props)));
   return true;
 }
 
@@ -866,7 +849,7 @@ func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *
   if !compute_complete_type_properties(es->cs, es->clq, &ptr_computed.te, &ptr_props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ptr_computed.te, ptr_props)), ~ptr_computed.te, ptr_props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ptr_computed.te, ptr_props})), ~ptr_computed.te, ptr_props)));
   return true;
 }
 
@@ -973,7 +956,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
         if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
           return false;
         }
-        dest cell_num = add_static_cell(es, info->cu, info->cu_props);
+        dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
         annotate(after,
           mk_after(@[consume_actions]ConsumeByCopyDestroy({{copy, dest, desc.partial_num},
                                                            {destroy, desc.whole_num}}),
@@ -982,7 +965,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
       *moved_cell_ix_out = None();
     }
     case &IsLvalYes(desc lval_description): {
-      dest cell_num = add_static_cell(es, info->cu, info->cu_props);
+      dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
       if case Has(ix size) = find(movable_cells, Has(desc.num)) {
         move ctor_desc;
         if !get_move_ctor(es->ds, &info->cu, &move) {
@@ -1178,7 +1161,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       if !compute_type_properties(es->cs, es->clq, &ci.type, &props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ci.type, props)), ci.type, props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ci.type, props})), ci.type, props)));
       return true;
     }
     case &EnumVoidConstructedMatch(vci voidconstructed_info): {
@@ -1187,7 +1170,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       if !compute_type_properties(es->cs, es->clq, &vci.type, &props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, vci.type, props)), vci.type, props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.type, props})), vci.type, props)));
       return true;
     }
     case &OneGlobalMatch(gi global_info): {
@@ -1197,7 +1180,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       }
       annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({gi.ent, gi.inst}));
       inst *def_inst = ref_inst(es->cs, gi.inst);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, typrop->cu, typrop->props)), typrop->cu, typrop->props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, typrop->cu, typrop->props})), typrop->cu, typrop->props)));
       return true;
     }
     case &OneLocalMatch(v local_info): {
@@ -1219,7 +1202,7 @@ func check_expr_string_literal(es *framescope, a *ast_string_literal, pt *te_typ
     ERR(_u8("string literal in bad place"));
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, type, props)), type, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, type, props})), type, props)));
   return true;
 }
 
@@ -1279,7 +1262,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       p_i *ast_strinit_param = ref(&a->exprs, i);
       annotate(&p_i->info, {get(&offsets, i)});
     }
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *pt, props)), ~ *pt, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
     return true;
   case &TeArraytype(b te_arraytype):
     n u32 = *unHas(&b.count);  // We checked is_complete(pt).
@@ -1312,7 +1295,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       p_i *ast_strinit_param = ref(&a->exprs, ~i);
       annotate(&p_i->info, {i * param_props.flat_size});
     }
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *pt, props)), ~ *pt, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
     return true;
 
   case &TeLifetime(b te_lifetime):
@@ -1364,7 +1347,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   if !compute_complete_type_properties(es->cs, es->clq, &computed.te, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~computed.te, props)), ~computed.te, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~computed.te, props})), ~computed.te, props)));
   return true;
 }
 
@@ -1381,7 +1364,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
     if !compute_type_properties(bs->cs, bs->clq, &cu_param, &cu_param_props) {
       return false;
     }
-    cell cell_num = add_static_cell(&bs->es, cu_param, cu_param_props);
+    cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
     push(&arg_cells, cell);
     vn var_number;
     // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
@@ -1411,7 +1394,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   if !compute_complete_type_properties(bs->cs, bs->clq, return_type, &return_type_props) {
     return false;
   }
-  return_cell cell_num = add_static_cell(&bs->es, ~ *return_type, return_type_props);
+  return_cell cell_num = add_cell(&bs->es, {LocationStatic, ~ *return_type, return_type_props});
 
   info ast_fullbody_info = {destructions, bs->es.all_vars, Has(bs->es.gr), bs->gotos, bs->labels, bs->statements, return_cell, arg_cells};
   annotate(&a->body.info, info);
@@ -1456,7 +1439,7 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   if !compute_complete_type_properties(es->cs, es->clq, pt, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *pt, props)), ~ *pt, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
   return true;
 }
 
@@ -1829,7 +1812,7 @@ func check_expr_logical_conjunction(es *framescope, a *ast_logical_conjunction, 
   if !check_expr_consume(es, oo(&a->rhs), &type.~) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, type, props)), type, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, type, props})), type, props)));
   return true;
 }
 
@@ -1875,7 +1858,7 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   if !compute_complete_type_properties(es->cs, es->clq, return_type, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *return_type, props)), ~ *return_type, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *return_type, props})), ~ *return_type, props)));
   return true;
 }
 
@@ -1981,17 +1964,17 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     // TODO: This is totally duplicating field access logic.
     switch &lhs_info->lval {
       case &IsLvalYes(desc lval_description): {
-        lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props), DeadMe(void)});
+        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void)});
       }
       case &IsLvalNo(desc rval_description): {
-        lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, ~ *ixtype, props)});
+        lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *ixtype, props})});
       }
     }
     // Nothing to dispose, it's a field access.
     annotate(&a->info, {None(), rhs_later});
   } else {
     // Dereferencing a pointer always makes an lvalue.
-    lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props), DeadMe(void)});
+    lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void)});
     ie_info_after nc[ast_expr_after_consume] = NotComputed();
     lhs_later ast_later_discard_info = mk_later();
     if !annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later, None()) {

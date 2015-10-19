@@ -125,15 +125,19 @@ func init_frame_graph_empty(informal_name sym) frame_graph {
   return {informal_name, mk_array@[cell_info](), mk_array@[gr_node]()};
 }
 
-func add_cell(gr *frame_graph, info cell_info) cell_num {
+func add_cellp(gr *frame_graph, info *cell_info) cell_num {
   num cell_num = ~count(&gr->cells);
-  push(&gr->cells, info);
+  pushref(&gr->cells, info);
   return num;
+}
+
+inline func add_cell(gr *frame_graph, info cell_info) cell_num {
+  return add_cellp(gr, &info);
 }
 
 func help_add_node(gr *frame_graph, node gr_node) gr_num {
   ret gr_num = ~count(&gr->ops);
-  push(&gr->ops, node);
+  pushref(&gr->ops, &node);
   return ret;
 }
 

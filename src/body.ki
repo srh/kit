@@ -433,7 +433,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
             if !compute_type_properties(bs->cs, bs->clq, &cu_expected_type, &expected_type_props) {
               return false;
             }
-            cell cell_num = add_virtual_cell(&bs->es, cu_expected_type, expected_type_props);
+            cell cell_num = add_cell(&bs->es, {LocationVirtual, cu_expected_type, expected_type_props});
             vn var_number;
             if !es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), &cu_expected_type, VarVirtual(void), &vn) {
               return false;
@@ -480,6 +480,11 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
   }
   *exit_out = exitnum;
   return true;
+}
+
+func add_virtual_tag_cell(es *framescope, et *te_enum) cell_num {
+  tp cu_typrop = compute_prim(es->clq, enum_tag_type(es->cs, et));
+  return add_cell(es, {LocationVirtual, tp.cu, tp.props});
 }
 
 func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num statement_num, exit_out *statement_num) bool {
@@ -576,7 +581,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
         return false;
       }
       note_initter = true;
-      cell = add_static_cell(&bs->es, *complete_type, cu_props);
+      cell = add_cell(&bs->es, {LocationStatic, *complete_type, cu_props});
     }
   }
 
@@ -791,7 +796,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
           if !compute_type_properties(es->cs, es->clq, &cu_expected_type, &expected_type_props) {
             return false;
           }
-          cell cell_num = add_virtual_cell(es, cu_expected_type, expected_type_props);
+          cell cell_num = add_cell(es, {LocationVirtual, cu_expected_type, expected_type_props});
           annotate(&cd->virtual_cell_dead, Has(cell));
           if case Has(p) = cd2 {
             annotate(&p->virtual_cell_dead, Has(cell));
