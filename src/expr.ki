@@ -627,8 +627,7 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
       return check_expr_assignment(es, pt, &a, x);
 
     case &RefOf(a ast_refof):
-      ERR(_u8("Typechecking RefOf operators not supported"));
-      return TODO();
+      return check_expr_refof(es, pt, &a, x);
 
     case &AddressOf(a ast_addressof):
       return check_expr_addressof(es, pt, &a, x);
@@ -657,6 +656,11 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
     case &Ternary(a ast_ternary):
       return check_expr_ternary(es, ai, pt, &a, x);
   }
+}
+
+func check_expr_refof(es *framescope, pt *te_typeexpr, a *ast_refof, x *ast_expr) bool {
+  ERR(_u8("Typechecking RefOf operators not supported"));
+  return TODO();
 }
 
 func check_expr_ternary(es *framescope, ai allow_incomplete, pt *te_typeexpr, a *ast_ternary, x *ast_expr) bool {
