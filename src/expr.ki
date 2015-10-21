@@ -783,8 +783,9 @@ func check_expr_deref_field(es *framescope, pt *te_typeexpr, a *ast_deref_field,
     return false;
   }
   info *ast_expr_complete_info = expr_complete_info(&oo(&a->lhs)->expr);
+  lifetime te_typeexpr;
   param *te_typeexpr;
-  if !decompose_typeapp(&info->cu.~, primitive_pointer_puretype(es->cs), &param) {
+  if !decompose_ref_or_ptr(&info->cu.~, es->cs, &lifetime, &param) {
     ERR(_u8("Expected pointer for lhs of deref field"));
     return false;
   }
@@ -802,7 +803,7 @@ func check_expr_deref_field(es *framescope, pt *te_typeexpr, a *ast_deref_field,
   switch cf_res {
     case InheritsLval(offset u32): {
       // We deref, so it's always an lval.
-      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void), field_lifetime(fake_lifetime(es->cs))});
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void), field_lifetime(lifetime)});
       annotate(&a->info, DerefFieldName(offset));
     }
     case ConstantField(value u32): {
