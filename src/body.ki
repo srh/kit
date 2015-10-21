@@ -349,42 +349,106 @@ func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_s
   return true;
 }
 
-func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a *ast_switch_statement, num statement_num, exit_out *statement_num) bool {
-  unknown te_typeexpr = TeUnknown(void);
-  if !check_consume_then_discard_expr(&bs->es, oo(&a->swartch), &unknown, &a->swartch_discard) {
+deftype swartch_checkobj struct {
+  swartch_type *cu_typeexpr;
+  swartch_lifetime te_typeexpr;
+  switchable_type_lifetime te_typeexpr;
+  // Will be initialized to a complete type.
+  enum_type *te_typeexpr;
+  is_ptr bool;
+};
+
+func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard_info, later2 opt[*ast_later_discard_info], checkobj_out *swartch_checkobj) bool {
+  unknown te_typeexpr = TeUnknown;
+  if !check_consume_then_discard_expr(es, a, &unknown, later, later2) {
     return false;
   }
 
-  swartch_type *cu_typeexpr = expr_complete_type(&oo(&a->swartch)->expr);
-
-  swartch_lifetime te_typeexpr = unnamed_lifetime(&bs->es);
-
+  swartch_type *cu_typeexpr = expr_complete_type(&a->expr);
+  checkobj_out->swartch_type = swartch_type;
+  checkobj_out->swartch_lifetime = unnamed_lifetime(es);
   switchable_type *te_typeexpr;
-  switchable_type_lifetime te_typeexpr;
-  is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(bs->cs), &switchable_type);
+  is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(es->cs), &switchable_type);
   if is_ptr {
-    switchable_type_lifetime = fake_lifetime(bs->cs);
+    checkobj_out->switchable_type_lifetime = fake_lifetime(es->cs);
   } else {
     switchable_type = &swartch_type->~;
-    switchable_type_lifetime = swartch_lifetime;
+    checkobj_out->switchable_type_lifetime = checkobj_out->swartch_lifetime;
   }
-
-  // switchable_type is complete, because swartch_type was.
-
+  // switchable_type is complete, because swartch type is.
   enum_type *te_typeexpr;
-  if !to_bool_error(complete_structural_rhs(bs->ds, switchable_type, &enum_type)) {
+  if !to_bool_error(complete_structural_rhs(es->ds, switchable_type, &enum_type)) {
     return false;
   }
   // enum_type is complete, because complete_structural_rhs does that.
+  checkobj_out->enum_type = enum_type;
+  checkobj_out->is_ptr = is_ptr;
+  return true;
+}
+
+// expected_type_out is complete (et must be complete).
+func check_pattern(es *framescope, chk *swartch_checkobj, et *te_enum, patt *ast_constructor_pattern, expected_type_out **te_typeexpr, decl_index_out *size) bool {
+  if isHas(&patt->addressof_constructor) != chk->is_ptr {
+    ERR(_u8("swartch/pattern pointeriness mismatch"));
+    return false;
+  }
+
+  expected_type *te_typeexpr;
+  decl_index size;
+  if !find_vardecl(&et->constructors, patt->constructor_name.value, &expected_type, &decl_index) {
+    MERR(es->cs, patt->meta, _u8("constructor not found"));
+    return false;
+  }
+
+  // expected_type is complete, because enum_type (i.e. et) was.
+  *expected_type_out = expected_type;
+  *decl_index_out = decl_index;
+  return true;
+}
+
+func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_type *te_typeexpr, vd *ast_vardecl, cu_expected_type_out *cu_typeexpr, varcell_out *cell_num) bool {
+  // TODO: Cache converted?
+  converted te_typeexpr;
+  if !convert_typeexpr(es->cs, &vd->type, &converted) {
+    return false;
+  }
+
+  cac cac_typeexpr;
+  if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &cac) {
+    return false;
+  }
+
+  unified te_typeexpr;
+  if !unify_types(&cac.te, expected_type, &unified) {
+    MERR(es->cs, patt->meta, _u8("constructor variable type mismatch"));
+    return false;
+  }
+
+  *cu_expected_type_out = ~ *expected_type;
+  expected_type_props type_properties;
+  if !compute_type_properties(es->cs, es->clq, cu_expected_type_out, &expected_type_props) {
+    return false;
+  }
+  *varcell_out = add_cell(es, {LocationVirtual, *cu_expected_type_out, expected_type_props});
+  return true;
+}
+
+func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a *ast_switch_statement, num statement_num, exit_out *statement_num) bool {
+  chk swartch_checkobj;
+  if !check_swartch(&bs->es, oo(&a->swartch), &a->swartch_discard, None, &chk) {
+    return false;
+  }
+
+  // enum_type is complete, because check_swartch says so.
 
   exitnum statement_num = add_statement(bs, None);
 
-  if case &TeEnum(et te_enum) = enum_type {
+  if case &TeEnum(et te_enum) = chk.enum_type {
     ncases size = count(&a->cases);
     swartch_vp varpopper;
     init_vp(&swartch_vp, &bs->es);
     swartch_vn var_number;
-    if !es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, ~swartch_lifetime, swartch_type, VarSelfContained(void), &swartch_vn) {
+    if !es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
       return false;
     }
     for i size = 0; i < ncases; i = i + 1 {
@@ -398,18 +462,12 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
 
       switch &cas->pattern {
         case &Case(patt ast_constructor_pattern): {
-          if isHas(&patt.addressof_constructor) != is_ptr {
-            ERR(_u8("swartch/pattern pointeriness mismatch"));
-            return false;
-          }
-
           expected_type *te_typeexpr;
           decl_index size;
-          if !find_vardecl(&et.constructors, patt.constructor_name.value, &expected_type, &decl_index) {
-            MERR(bs->cs, patt.meta, _u8("constructor not found"));
+          if !check_pattern(&bs->es, &chk, &et, &patt, &expected_type, &decl_index) {
             return false;
           }
-          // expected_type is complete, because enum_type was.
+          // expected_type is complete, because check_pattern says so.
 
           tag_value enum_tag_value = mk_enum_tag_value(decl_index);
 
@@ -417,31 +475,14 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
           init_vp(&case_vp, &bs->es);
           ovn opt[var_number];
           if case &Has(vd ast_vardecl) = &patt.decl {
-            // TODO: Cache converted?
-            converted te_typeexpr;
-            if !convert_typeexpr(bs->cs, &vd.type, &converted) {
+            cu_expected_type cu_typeexpr;
+            cell cell_num;
+            if !check_pattern_var(&bs->es, &patt, expected_type, &vd, &cu_expected_type, &cell) {
               return false;
             }
 
-            cac cac_typeexpr;
-            if !check_and_compute_typeexpr(bs->cs, bs->clq, bs->ds->generics, bs->ds->parms, &converted, &cac) {
-              return false;
-            }
-
-            unified te_typeexpr;
-            if !unify_types(&cac.te, expected_type, &unified) {
-              MERR(bs->cs, patt.meta, _u8("constructor variable type mismatch"));
-              return false;
-            }
-
-            cu_expected_type cu_typeexpr = ~ *expected_type;
-            expected_type_props type_properties;
-            if !compute_type_properties(bs->cs, bs->clq, &cu_expected_type, &expected_type_props) {
-              return false;
-            }
-            cell cell_num = add_cell(&bs->es, {LocationVirtual, cu_expected_type, expected_type_props});
             vn var_number;
-            if !es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~switchable_type_lifetime, &cu_expected_type, VarVirtual(void), &vn) {
+            if !es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarVirtual, &vn) {
               return false;
             }
             ovn = Has(vn);
@@ -734,88 +775,45 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
       return true;
     }
     case &PatternCondition(b ast_pattern_assign): {
-      unknown te_typeexpr = TeUnknown(void);
-      if !check_consume_then_discard_expr(es, oo(&b.rhs), &unknown, &cd->later, cdi_later(cd2)) {
+      chk swartch_checkobj;
+      if !check_swartch(es, oo(&b.rhs), &cd->later, cdi_later(cd2), &chk) {
         return false;
       }
 
-      // TODO: vv Some of this code is redundant with switch statement code.
-      swartch_type *cu_typeexpr = expr_complete_type(&oo(&b.rhs)->expr);
+      // enum_type is complete, because check_swartch says so.
 
-      swartch_lifetime te_typeexpr = unnamed_lifetime(es);
-
-      switchable_type *te_typeexpr;
-      switchable_type_lifetime te_typeexpr;
-      is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(es->cs), &switchable_type);
-      if is_ptr {
-        switchable_type_lifetime = fake_lifetime(es->cs);
-      } else {
-        switchable_type = &swartch_type->~;
-        switchable_type_lifetime = swartch_lifetime;
-      }
-      // switchable_type is complete, because swartch_type is.
-
-      enum_type *te_typeexpr;
-      if !to_bool_error(complete_structural_rhs(es->ds, switchable_type, &enum_type)) {
-        return false;
-      }
-      // enum_type is complete, because complete_structural_rhs.
-
-      if case &TeEnum(et te_enum) = enum_type {
+      if case &TeEnum(et te_enum) = chk.enum_type {
         if true {
           swartch_vn var_number;
-          if !es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~swartch_lifetime, swartch_type, VarSelfContained(void), &swartch_vn) {
+          if !es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
             return false;
           }
         }
 
-        if isHas(&b.pattern.addressof_constructor) != is_ptr {
-          ERR(_u8("condition pattern pointeriness mismatch"));
-          return false;
-        }
-
         expected_type *te_typeexpr;
         decl_index size;
-        if !find_vardecl(&et.constructors, b.pattern.constructor_name.value, &expected_type, &decl_index) {
-          ERR(_u8("constructor not found in condition pattern"));
+        if !check_pattern(es, &chk, &et, &b.pattern, &expected_type, &decl_index) {
           return false;
         }
-        // expected_type is complete because enum_type is.
+        // expected_type is complete, because check_pattern says so.
 
         tag_cell cell_num = add_virtual_tag_cell(es, &et);
         annotate(&b.info, {{tag_cell, ~count(&et.constructors)}, mk_enum_tag_value(decl_index)});
 
         ovn opt[var_number];
         if case &Has(vd ast_vardecl) = &b.pattern.decl {
-          // TODO: Cache converted?
-          converted te_typeexpr;
-          if !convert_typeexpr(es->cs, &vd.type, &converted) {
+          cu_expected_type cu_typeexpr;
+          cell cell_num;
+          if !check_pattern_var(es, &b.pattern, expected_type, &vd, &cu_expected_type, &cell) {
             return false;
           }
 
-          cac cac_typeexpr;
-          if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &cac) {
-            return false;
-          }
-
-          unified te_typeexpr;
-          if !unify_types(&cac.te, expected_type, &unified) {
-            MERR(es->cs, b.pattern.meta, _u8("constructor variable type mismatch"));
-            return false;
-          }
-
-          cu_expected_type cu_typeexpr = ~ *expected_type;
-          expected_type_props type_properties;
-          if !compute_type_properties(es->cs, es->clq, &cu_expected_type, &expected_type_props) {
-            return false;
-          }
-          cell cell_num = add_cell(es, {LocationVirtual, cu_expected_type, expected_type_props});
           annotate(&cd->virtual_cell_dead, Has(cell));
           if case Has(p) = cd2 {
             annotate(&p->virtual_cell_dead, Has(cell));
           }
           vn var_number;
-          if !es_push_var(es, cond_vp, cell, Has(&vd.name), ~switchable_type_lifetime, &cu_expected_type, VarVirtual(void), &vn) {
+          if !es_push_var(es, cond_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarVirtual, &vn) {
             return false;
           }
 
