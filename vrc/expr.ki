@@ -269,8 +269,10 @@ deftype constructor_info struct {
 };
 
 deftype voidconstructed_info struct {
-  // The enum type.
-  type cu_typeexpr;
+  // The actual constructed type, which we need for some reason.
+  constructed_type cu_typeexpr;
+  // The enum type (the structural rhs of constructed_type).
+  enum_type cu_typeexpr;
   constructor_tag enum_tag_value;
 };
 
@@ -281,6 +283,7 @@ defenum ds_constructor_res {
   MatchedVoidConstructed voidconstructed_info;
 };
 
+// Like any pt, pt is either (a) incomplete, or (b) complete and computed.
 func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_out *ds_constructor_res) bool {
   if case &HasParms(a) = gp {
     *res_out = NoMatchConstructor(void);
@@ -315,6 +318,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       *res_out = NoMatchConstructor(void);
       return true;
     }
+
     if case &TeEnum(et te_enum) = enum_type {
       rhs_type *te_typeexpr;
       decl_index size;
@@ -334,7 +338,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       }
       check(cac_enum_type.complete);
 
-      *res_out = MatchedVoidConstructed({~cac_enum_type.te, mk_enum_tag_value(decl_index)});
+      *res_out = MatchedVoidConstructed({~ *pt, ~cac_enum_type.te, mk_enum_tag_value(decl_index)});
       return true;
     } else {
       *res_out = NoMatchConstructor(void);
@@ -1158,12 +1162,12 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       return true;
     }
     case &EnumVoidConstructedMatch(vci voidconstructed_info): {
-      annotate(&a->name_info, @[ast_name_expr_info]EnumVoidConstructed({vci.constructor_tag}));
+      annotate(&a->name_info, @[ast_name_expr_info]EnumVoidConstructed({vci.constructor_tag, vci.enum_type}));
       props type_properties;
-      if !compute_type_properties(es->cs, es->clq, &vci.type, &props) {
+      if !compute_type_properties(es->cs, es->clq, &vci.constructed_type, &props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.type, props})), vci.type, props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.constructed_type, props})), vci.constructed_type, props)));
       return true;
     }
     case &OneGlobalMatch(gi global_info): {

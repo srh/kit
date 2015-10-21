@@ -1478,7 +1478,7 @@ func gr_name_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_name_expr, 
     }
     case &EnumVoidConstructed(vi enum_voidconstructed_info): {
       info var = expr_complete_info(x);
-      if case &TeEnum(et te_enum) = &info->cu.~ {
+      if case &TeEnum(et te_enum) = &vi.enum_type.~ {
         x_cell cell_num = rval_cell(x);
         cu cu_typeexpr;
         props type_properties;
