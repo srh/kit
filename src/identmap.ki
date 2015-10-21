@@ -75,6 +75,7 @@ deftype common_syms struct {
   osizesym sym;
   primitive_module_sym sym;
   ptrtype_sym sym;
+  reftype_sym sym;
   lengthsym sym;
   tee_sym sym;
   uee_sym sym;
@@ -101,6 +102,7 @@ deftype common_syms struct {
   alignofsym sym;
   postfix_incrsym sym;
   postfix_decrsym sym;
+  fakesym sym;
 };
 
 deftype identmap struct {
@@ -127,6 +129,7 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.osizesym = intern(im, _s("osize"));
   ret.primitive_module_sym = intern(im, _s("<primitive>"));
   ret.ptrtype_sym = intern(im, _s("*"));
+  ret.reftype_sym = intern(im, _s("&"));
   ret.lengthsym = intern(im, _s("length"));
   ret.tee_sym = intern(im, _s("T"));
   ret.uee_sym = intern(im, _s("U"));
@@ -153,6 +156,7 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.alignofsym = intern(im, _s("alignof"));
   ret.postfix_incrsym = intern(im, _s("++"));
   ret.postfix_decrsym = intern(im, _s("--"));
+  ret.fakesym = intern(im, _s("$fake"));
   return ret;
 }
 

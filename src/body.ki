@@ -357,10 +357,16 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
 
   swartch_type *cu_typeexpr = expr_complete_type(&oo(&a->swartch)->expr);
 
+  swartch_lifetime te_typeexpr = unnamed_lifetime(&bs->es);
+
   switchable_type *te_typeexpr;
+  switchable_type_lifetime te_typeexpr;
   is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(bs->cs), &switchable_type);
-  if !is_ptr {
+  if is_ptr {
+    switchable_type_lifetime = fake_lifetime(bs->cs);
+  } else {
     switchable_type = &swartch_type->~;
+    switchable_type_lifetime = swartch_lifetime;
   }
 
   // switchable_type is complete, because swartch_type was.
@@ -378,7 +384,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
     swartch_vp varpopper;
     init_vp(&swartch_vp, &bs->es);
     swartch_vn var_number;
-    if !es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, swartch_type, VarSelfContained(void), &swartch_vn) {
+    if !es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, ~swartch_lifetime, swartch_type, VarSelfContained(void), &swartch_vn) {
       return false;
     }
     for i size = 0; i < ncases; i = i + 1 {
@@ -435,7 +441,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
             }
             cell cell_num = add_cell(&bs->es, {LocationVirtual, cu_expected_type, expected_type_props});
             vn var_number;
-            if !es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), &cu_expected_type, VarVirtual(void), &vn) {
+            if !es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~switchable_type_lifetime, &cu_expected_type, VarVirtual(void), &vn) {
               return false;
             }
             ovn = Has(vn);
@@ -515,7 +521,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
     }
     connect_statements(bs, loopnum, exitnum);
     cond_vn var_number;
-    if !es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, &boolean, VarSelfContained(void), &cond_vn) {
+    if !es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, ~unnamed_lifetime(&bs->es), &boolean, VarSelfContained(void), &cond_vn) {
       return false;
     }
   }
@@ -586,7 +592,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
   }
 
   vn var_number;
-  if !es_push_var(&bs->es, vp, cell, Has(&a->decl.name), complete_type, VarSelfContained(void), &vn) {
+  if !es_push_var(&bs->es, vp, cell, Has(&a->decl.name), ~varname_lifetime(bs->im, a->decl.name.value), complete_type, VarSelfContained(void), &vn) {
     return false;
   }
   annotate(&a->info, {vn});
@@ -718,7 +724,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
       // We need return statements in the "then" or "else" block to mark the boolean condition dead.  (It would be a smarter graph if we just marked it dead immediately after the branch, but... this way makes the code here handle all cases equivalently.)
       swartch_vn var_number;
-      if !es_push_var(es, swartch_vp, result_cell(oo(&b)), None, &booltype, VarSelfContained(void), &swartch_vn) {
+      if !es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_lifetime(es), &booltype, VarSelfContained(void), &swartch_vn) {
         return false;
       }
       annotate(&cd->virtual_cell_dead, None);
@@ -735,10 +741,17 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
       // TODO: vv Some of this code is redundant with switch statement code.
       swartch_type *cu_typeexpr = expr_complete_type(&oo(&b.rhs)->expr);
+
+      swartch_lifetime te_typeexpr = unnamed_lifetime(es);
+
       switchable_type *te_typeexpr;
+      switchable_type_lifetime te_typeexpr;
       is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(es->cs), &switchable_type);
-      if !is_ptr {
+      if is_ptr {
+        switchable_type_lifetime = fake_lifetime(es->cs);
+      } else {
         switchable_type = &swartch_type->~;
+        switchable_type_lifetime = swartch_lifetime;
       }
       // switchable_type is complete, because swartch_type is.
 
@@ -751,7 +764,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
       if case &TeEnum(et te_enum) = enum_type {
         if true {
           swartch_vn var_number;
-          if !es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, swartch_type, VarSelfContained(void), &swartch_vn) {
+          if !es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~swartch_lifetime, swartch_type, VarSelfContained(void), &swartch_vn) {
             return false;
           }
         }
@@ -802,7 +815,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
             annotate(&p->virtual_cell_dead, Has(cell));
           }
           vn var_number;
-          if !es_push_var(es, cond_vp, cell, Has(&vd.name), &cu_expected_type, VarVirtual(void), &vn) {
+          if !es_push_var(es, cond_vp, cell, Has(&vd.name), ~switchable_type_lifetime, &cu_expected_type, VarVirtual(void), &vn) {
             return false;
           }
 

@@ -151,6 +151,10 @@ func primitive_pointer_puretype(cs *checkstate) te_puretype {
   return TePureName(cs->im->cym.ptrtype_sym);
 }
 
+func primitive_ref_puretype(cs *checkstate) te_puretype {
+  return TePureName(cs->im->cym.reftype_sym);
+}
+
 func is_fn_type(cs *checkstate, t *te_typeexpr) bool {
   typarams *shray[te_typeexpr];
   return decompose_typeapp(t, primitive_function_puretype(cs), &typarams);
@@ -380,6 +384,14 @@ func fn_type(cs *checkstate, t te_typeexpr, u te_typeexpr, v te_typeexpr) te_typ
 
 func ptr_type(cs *checkstate, t te_typeexpr) te_typeexpr {
   return TeApp({primitive_pointer_puretype(cs), mk_shray(t), None});
+}
+
+func mk_ref_type(cs *checkstate, lifetime te_typeexpr, param te_typeexpr) te_typeexpr {
+  return TeApp({primitive_ref_puretype(cs), mk_shray(lifetime, param), None});
+}
+
+func fake_lifetime(cs *checkstate) te_typeexpr {
+  return TeLifetime({cs->im->cym.fakesym});
 }
 
 func add_pointer_primitive(cs *checkstate) void {

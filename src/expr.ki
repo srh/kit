@@ -18,12 +18,17 @@ deftype framescope struct {
   // These var_numbers are always in increasing order.
   current_vars array[var_number];
 
+  // Used for auto-generating $frame_1, $frame_2, ... lifetimes.
+  lifetime_gen_counter size;
+
   gr frame_graph;
 };
 
 func mk(ds *defscope) framescope {
   return {ds, ds->cs, ds->im, ds->clq,
-          mk_array@[var_info](), mk_array@[var_number](), init_frame_graph_empty(ds->def_informal_name)};
+          mk_array@[var_info](), mk_array@[var_number](),
+          0,
+          init_frame_graph_empty(ds->def_informal_name)};
 }
 
 inline func add_cell(es *framescope, info cell_info) cell_num {
@@ -84,6 +89,7 @@ deftype var_info struct {
   props type_properties;
   cell cell_num;
   name opt[sym];
+  lifetime cu_typeexpr;
   // Can a goto statement enter this var's scope and construct the var?  True if the var is self-contained.  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)  This also means the var needs to be destructed by return statements and gotos that leave its scope.  TODO: What about default cases of switch statements?  You shouldn't be able to goto into one of those?  But you should be able to goto into the else block of an "if case" -- this needs to be fixed?  Should the swartch get destroyed?  Are we treating the "destroy later" of the condition properly?
   // TODO: Rename.
   autoinit var_binding;
@@ -134,7 +140,7 @@ func do_destroy(vp *varpopper) void {
   vp->es = null;
 }
 
-func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) bool {
+func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], lifetime cu_typeexpr, computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) bool {
   osymname opt[sym];
   if case Has(ident *ast_ident) = name {
     osymname = Has(ident->value);
@@ -150,7 +156,7 @@ func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ide
     return false;
   }
   num var_number = ~count(&es->all_vars);
-  push(&es->all_vars, {num, *computed_type, props, cell, osymname, binding, None, None});
+  push(&es->all_vars, {num, *computed_type, props, cell, osymname, lifetime, binding, None, None});
   push(&es->current_vars, num);
   push(&vp->nums, num);
   *vn_out = num;
@@ -663,8 +669,54 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
 }
 
 func check_expr_refof(es *framescope, pt *te_typeexpr, a *ast_refof, x *ast_expr) bool {
-  ERR(_u8("Typechecking RefOf operators not supported"));
-  return TODO();
+  ref_skeleton te_typeexpr = mk_ref_type(es->cs, TeUnknown, TeUnknown);
+  unif_pt te_typeexpr;
+  if !unify_types(pt, &ref_skeleton, &unif_pt) {
+    ERR(_u8("RefOf expr in non-ref context"));
+    return false;
+  }
+
+  pt_lifetime *te_typeexpr;
+  pt_param *te_typeexpr;
+  if !decompose_typeapp(&unif_pt, primitive_ref_puretype(es->cs), &pt_lifetime, &pt_param) {
+    ice(_u8("RefOf sees non-ref after unifying with ref."));
+  }
+
+  // We require complete matching because addressof requires it.  Addressof says meh, the rhs should be some crystal clear lvalue anyway.
+  if !check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), pt_param) {
+    return false;
+  }
+
+  rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
+  switch &rhs_info->lval {
+  case &IsLvalNo(desc rval_description):
+    // TODO: Support taking reference of an rvalue -- have it become a temporary that expires... when it can.
+    ERR(_u8("Taking reference of a non-lvalue"));
+    return false;
+  case &IsLvalYes(desc lval_description):
+    unified_lifetime te_typeexpr;
+    if !unify_types(pt_lifetime, &desc.lifetime, &unified_lifetime) {
+      return false;
+    }
+
+    ref_type te_typeexpr = mk_ref_type(es->cs, unified_lifetime, rhs_info->cu.~);
+    ref_computed cac_typeexpr;
+    if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ref_type, &ref_computed) {
+      return false;
+    }
+    // (TODO: Make lval desc.lifetime be a te_lifetime, so it can't be incomplete?)
+    if !ref_computed.complete {
+      ERR(_u8("ICE?  lval desc.lifetime must have been incomplete (after complete type-check)."));
+      return false;
+    }
+
+    ref_props type_properties;
+    if !compute_complete_type_properties(es->cs, es->clq, &ref_computed.te, &ref_props) {
+      return false;
+    }
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ref_computed.te, ref_props})), ~ref_computed.te, ref_props)));
+    return true;
+  }
 }
 
 func check_expr_ternary(es *framescope, ai allow_incomplete, pt *te_typeexpr, a *ast_ternary, x *ast_expr) bool {
@@ -750,7 +802,7 @@ func check_expr_deref_field(es *framescope, pt *te_typeexpr, a *ast_deref_field,
   switch cf_res {
     case InheritsLval(offset u32): {
       // We deref, so it's always an lval.
-      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void)});
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void), field_lifetime(fake_lifetime(es->cs))});
       annotate(&a->info, DerefFieldName(offset));
     }
     case ConstantField(value u32): {
@@ -760,6 +812,24 @@ func check_expr_deref_field(es *framescope, pt *te_typeexpr, a *ast_deref_field,
   }
   annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
   return true;
+}
+
+// Right now fields have the same lifetime as what they're part of -- they're part of the same object!  So, having equal lifetimes does not mean you're the same object.
+func field_lifetime(outer_lifetime te_typeexpr) te_typeexpr {
+  return outer_lifetime;
+}
+
+// Varnames aren't supposed to shadow, so... we have user-friendly lifetime names.  (Note that vars could shadow generic lifetime parameters, for now, so we add the $var_ prefix.)
+func varname_lifetime(im *identmap, name sym) te_typeexpr {
+  n sym = intern(im, _s("$var_") + lookup(im, name));
+  return TeLifetime({n});
+}
+
+// TODO: Most uses of this will get replaced by some rval lifetime getter.  (We'll set rval lifetimes with this value, though.)
+func unnamed_lifetime(es *framescope) te_typeexpr {
+  n sym = intern(es->im, _s("$frame_") + from_u8(to_u8str(void, es->lifetime_gen_counter)));
+  es->lifetime_gen_counter++;
+  return TeLifetime({n});
 }
 
 func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field, x *ast_expr) bool {
@@ -782,7 +852,7 @@ func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field,
     case InheritsLval(offset u32): {
       switch &info->lval {
         case &IsLvalYes(desc lval_description): {
-          lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void)});
+          lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void), field_lifetime(desc.lifetime)});
         }
         case &IsLvalNo(desc rval_description): {
           lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, fieldtype, props})});
@@ -822,14 +892,14 @@ func check_expr_deref(es *framescope, pt *te_typeexpr, a *ast_deref, x *ast_expr
   if !compute_complete_type_properties(es->cs, es->clq, param, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}), DeadMe(void)}), ~ *param, props)));
+  annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}), DeadMe(void), fake_lifetime(es->cs)}), ~ *param, props)));
   return true;
 }
 
 func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *ast_expr) bool {
-  ptr_unknown te_typeexpr = ptr_type(es->cs, TeUnknown(void));
+  ptr_skeleton te_typeexpr = ptr_type(es->cs, TeUnknown);
   unif_pt te_typeexpr;
-  if !unify_types(pt, &ptr_unknown, &unif_pt) {
+  if !unify_types(pt, &ptr_skeleton, &unif_pt) {
     ERR(_u8("AddressOf expr in non-pointer context"));
     return false;
   }
@@ -843,6 +913,7 @@ func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *
   }
   rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
   if case &IsLvalNo(desc rval_description) = &rhs_info->lval {
+    // TODO: Support taking address of an rvalue -- have it become a temporary that expires at the end of the full expression.
     ERR(_u8("Taking address of a non-lvalue"));
     return false;
   }
@@ -1194,7 +1265,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &OneLocalMatch(v local_info): {
       annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({v.varnum}));
       vi *var_info = ref_var(es, v.varnum);
-      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe(void)}), vi->type, vi->props)));
+      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe(void), vi->lifetime.~}), vi->type, vi->props)));
       return true;
     }
   }
@@ -1376,7 +1447,8 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
     push(&arg_cells, cell);
     vn var_number;
     // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
-    if !es_push_var(&bs->es, &vp, cell, Has(&ref(&a->args, i)->name), &cu_param, VarSelfContained(void), &vn) {
+    name *ast_ident = &ref(&a->args, i)->name;
+    if !es_push_var(&bs->es, &vp, cell, Has(name), ~varname_lifetime(bs->im, name->value), &cu_param, VarSelfContained(void), &vn) {
       return false;
     }
     if !es_note_var_destroyer(&bs->es, vn) {
@@ -1972,7 +2044,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     // TODO: This is totally duplicating field access logic.
     switch &lhs_info->lval {
       case &IsLvalYes(desc lval_description): {
-        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void)});
+        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void), field_lifetime(desc.lifetime)});
       }
       case &IsLvalNo(desc rval_description): {
         lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *ixtype, props})});
@@ -1982,7 +2054,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     annotate(&a->info, {None, rhs_later});
   } else {
     // Dereferencing a pointer always makes an lvalue.
-    lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void)});
+    lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void), field_lifetime(fake_lifetime(es->cs))});
     ie_info_after nc[ast_expr_after_consume] = NotComputed();
     lhs_later ast_later_discard_info = mk_later();
     if !annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later, None) {

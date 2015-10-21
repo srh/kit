@@ -547,6 +547,11 @@ deftype lval_description struct {
   num cell_num;
   // DeadMe if the lval cell is only carried by the lval.
   deadme lval_deadme;
+  // The lval's lifetime.
+  // TODO: Maybe deadme could be obviated by the lifetime field.
+  // TODO: Maybe this field should be a te_lifetime.
+  // TODO: Maybe this field should be a cu_typeexpr.
+  lifetime te_typeexpr;
 };
 
 defenum is_lval {
