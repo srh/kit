@@ -678,7 +678,7 @@ func check_expr_refof(es *framescope, pt *te_typeexpr, a *ast_refof, x *ast_expr
 
   pt_lifetime *te_typeexpr;
   pt_param *te_typeexpr;
-  if !decompose_typeapp(&unif_pt, primitive_ref_puretype(es->cs), &pt_lifetime, &pt_param) {
+  if !decompose_ref(&unif_pt, es->cs, &pt_lifetime, &pt_param) {
     ice(_u8("RefOf sees non-ref after unifying with ref."));
   }
 
@@ -899,7 +899,7 @@ func check_expr_deref(es *framescope, pt *te_typeexpr, a *ast_deref, x *ast_expr
     return true;
   }
   lifetime *te_typeexpr;
-  if decompose_typeapp(&rhs_type->~, primitive_ref_puretype(es->cs), &lifetime, &param) {
+  if decompose_ref(&rhs_type->~, es->cs, &lifetime, &param) {
     // param is already complete.
     unified_discard te_typeexpr;
     if !unify_types(pt, param, &unified_discard) {
@@ -1543,6 +1543,11 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
   return true;
+}
+
+// You really should use this, in case we decide to rearrange the order of parameters of the ref type.
+func decompose_ref(t *te_typeexpr, cs *checkstate, lifetime_out **te_typeexpr, param_out **te_typeexpr) bool {
+  return decompose_typeapp(t, primitive_ref_puretype(cs), lifetime_out, param_out);
 }
 
 func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, params_out **shray[te_typeexpr]) bool {
