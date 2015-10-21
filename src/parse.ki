@@ -1763,30 +1763,6 @@ func parse_rest_of_char_literal(p *ps, m ast_meta, out *ast_expr) parse_result {
   }
 }
 
-
-// TODO: This is redundant with some stdlib function.
-func showu8(x size) array[u8] {
-  ret array[u8];
-  if x == 0 {
-    push(&ret, '0');
-    return ret;
-  }
-  while x != 0 {
-    push(&ret, @[u8]'0' + ~(x % 10));
-    x = x / 10;
-  }
-  j size = count(&ret);
-  d *u8 = data(&ret);
-  for i size = 0; i < j; {
-    j = j - 1;
-    tmp u8 = d[i];
-    d[i] = d[j];
-    d[j] = tmp;
-    i = i + 1;
-  }
-  return ret;
-}
-
 func see_if_parse(file array[u8]) bool {
   im identmap = make_im();
   posits positionals = mk_positionals();
@@ -1795,7 +1771,7 @@ func see_if_parse(file array[u8]) bool {
   ret bool = +parse_file(&p, &out);
   if !ret {
     print(Stdout(), _u8("at offset "));
-    print(Stdout(), showu8(peek(&p)->interval.left.~));
+    print(Stdout(), to_u8str(peek(&p)->interval.left.~));
     print(Stdout(), _u8("..."));
     fflush(Stdout());
   }
