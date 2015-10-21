@@ -1319,7 +1319,7 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
         oo(&mod)->base_offset = modules_next_base_offset(cs);
         swap(&oo(&mod)->buf, &arr);
         p ps = make_ps(cs->im, &cs->posits, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
-        if !parse_file(&p, &oo(&mod)->file) {
+        if !+parse_file(&p, &oo(&mod)->file) {
           ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p)->interval.left)));
           return None;
         }
