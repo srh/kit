@@ -46,8 +46,8 @@ func `!=`(x cell_location, y cell_location) bool {
 
 func isLocationStatic(location cell_location) bool {
   switch location {
-  case LocationVirtual(v void): return false;
-  case LocationStatic(v void): return true;
+  case LocationVirtual: return false;
+  case LocationStatic: return true;
   }
 }
 
@@ -531,7 +531,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg 
           set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         }
       }
-      case &Default(v void): {
+      case &Default: {
         body_gn sq_num;
         if !gr_bracebody(clq, gr, fb, obg, &sc->body, exitseq, &body_gn) {
           return false;
@@ -906,7 +906,7 @@ func gr_expr_after_discard(clq *clqueue, gr *frame_graph, aft *ast_expr_after_di
     }
   case &DiscardVirtualDead(c cell_num):
     after_gn = addx(gr, @[gr_xop]GrVirtualDead({c}));
-  case &DiscardNothing(v void):
+  case &DiscardNothing:
     after_gn = addx(gr, @[gr_xop]GrXNop(void));
   }
   *out = after_gn;
@@ -1163,8 +1163,8 @@ func gr_lambda_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_lambda, o
 
 func parsed_inline_to_state_inline(a ast_isinline) should_inline {
   switch a {
-  case IsInline(v void): return InlineMust(void);
-  case IsNotInline(v void): return InlineYawn(void);
+  case IsInline: return InlineMust(void);
+  case IsNotInline: return InlineYawn(void);
   }
 }
 
@@ -1271,7 +1271,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
   }
   lp_rp_nop gr_num = addx(gr, mk_shray(lp, rp), @[gr_xop]GrXNop(void));
   switch unHas(&a->info) {
-    case &StaticSelfAssignment(v void): {
+    case &StaticSelfAssignment: {
       *out = lp_rp_nop;
       return true;
     }
@@ -1565,9 +1565,9 @@ func gr_after_actions(clq *clqueue, gr *frame_graph, prec gr_num, x *opt[destroy
 
 func gr_chain_virtualdead(clq *clqueue, gr *frame_graph, prec gr_num, c cell_num, out *gr_num) bool {
   switch location(ref_cell(gr, c)) {
-  case LocationVirtual(v void):
+  case LocationVirtual:
     *out = addx(gr, mk_shray(prec), @[gr_xop]GrVirtualDead({c}));
-  case LocationStatic(v void):
+  case LocationStatic:
     *out = prec;
   }
   return true;
@@ -1575,7 +1575,7 @@ func gr_chain_virtualdead(clq *clqueue, gr *frame_graph, prec gr_num, c cell_num
 
 func gr_consume_actions(clq *clqueue, gr *frame_graph, prec gr_num, x *consume_actions, out *gr_num) bool {
   switch x {
-  case &ConsumeByInPlace(v void): { }
+  case &ConsumeByInPlace: { }
   case &ConsumeByCopyDestroy(cd copy_destroy_action):
     dep gr_num;
     if !gr_copy_action(clq, gr, &cd.copy, &dep) {
@@ -1641,7 +1641,7 @@ func gr_uni_fun(clq *clqueue, gr *frame_graph, ip instpair, arg cell_num) gr_num
 
 func gr_init_action(clq *clqueue, gr *frame_graph, x *init_action, out *gr_num) bool {
   switch &x->ctor {
-    case &TrivialCtor(v void): {
+    case &TrivialCtor: {
       dp var = addx(gr, @[gr_xop]GrWriteConst({x->arg, ConstInt(~ @[u32] 0)}));
       *out = dp;
       return true;
@@ -1656,7 +1656,7 @@ func gr_init_action(clq *clqueue, gr *frame_graph, x *init_action, out *gr_num) 
 // TODO: The dead_after_destroy parameter here is definitely unnecessary, but not too harmful now.
 func gr_destroy_action(clq *clqueue, gr *frame_graph, x *destroy_action, dad dead_after_destroy, out *gr_num) bool {
   switch &x->ctor {
-    case &TrivialCtor(v void): {
+    case &TrivialCtor: {
       dp gr_num;
       if case DeadAfterDestroyYes(v2 void) = dad {
         dp = addx(gr, @[gr_xop]GrDead({x->arg}));
@@ -1701,7 +1701,7 @@ func gr_bi_fun(clq *clqueue, gr *frame_graph, ip instpair, dest cell_num, src ce
 
 func gr_bi_action(clq *clqueue, gr *frame_graph, x *bi_action, out *gr_num) bool {
   switch &x->ctor {
-    case &TrivialCtor(v void): {
+    case &TrivialCtor: {
       cp var = addx(gr, @[gr_xop]GrMemCopy({x->dest, x->src}));
       *out = cp;
       return true;
@@ -1728,7 +1728,7 @@ func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph,
     }
     *inline_out = InlineMust(void);
     return true;
-  case &MagicNopdestroy(v void):
+  case &MagicNopdestroy:
     if !gr_magic_nopdestroy(cs, clq, gr_out, gn_out, return_cell_out, arg_cells_out) {
       return false;
     }
@@ -2015,13 +2015,13 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) bool {
   init_padding bool = false;
   switch wc {
-  case CtorInit(v void):
+  case CtorInit:
     ice(_u8("Magic CtorInit on enum type"));
-  case CtorCopy(v void):
+  case CtorCopy:
     init_padding = true;
-  case CtorMove(v void):
+  case CtorMove:
     init_padding = true;
-  case CtorDestroy(v void): { /* don't init padding. */ }
+  case CtorDestroy: { /* don't init padding. */ }
   }
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_info")));
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mei->cu_type.~));
@@ -2136,15 +2136,15 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     } else {
       ogn opt[gr_num];
       switch wc {
-      case CtorInit(v void):
+      case CtorInit:
         ice(_u8("CtorInit on enum type"));
-      case CtorCopy(v void):
+      case CtorCopy:
         cgn var = addx(&gr, freeze(&fieldcellgn), @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
         ogn = Has(cgn);
-      case CtorMove(v void):
+      case CtorMove:
         cgn var = addx(&gr, freeze(&fieldcellgn), @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
         ogn = Has(cgn);
-      case CtorDestroy(v void):
+      case CtorDestroy:
         ogn = None;
         // do nothing.
       }
@@ -2164,15 +2164,15 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
     tagset_ogn opt[gr_num];
     switch wc {
-    case CtorInit(v void):
+    case CtorInit:
       ice(_u8("CtorInit on wc type"));
-    case CtorCopy(v void):
+    case CtorCopy:
       tgn var = addx(&gr, @[gr_xop]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.~)}));
       tagset_ogn = Has(tgn);
-    case CtorMove(v void):
+    case CtorMove:
       tgn var = addx(&gr, @[gr_xop]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.~)}));
       tagset_ogn = Has(tgn);
-    case CtorDestroy(v void):
+    case CtorDestroy:
       tagset_ogn = None;
     }
 
@@ -2207,13 +2207,13 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
   // Init, copy, and move requires initializing intervening padding.
   init_padding bool = false;
   switch wc {
-  case CtorInit(v void):
+  case CtorInit:
     init_padding = true;
-  case CtorCopy(v void):
+  case CtorCopy:
     init_padding = true;
-  case CtorMove(v void):
+  case CtorMove:
     init_padding = true;
-  case CtorDestroy(v void):
+  case CtorDestroy:
     reverse_order = true;
   }
 
@@ -2321,17 +2321,17 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
     } else {
       ogn opt[gr_num];
       switch wc {
-      case CtorInit(v void):
+      case CtorInit:
         // zero-initialize.
         gn1 var = addx(&gr, freeze(&fieldcellgn), @[gr_xop]GrWriteConst({get(&fieldcella, 0), ConstInt(~ @[u32] 0)}));
         ogn = Has(gn1);
-      case CtorCopy(v void):
+      case CtorCopy:
         gn1 var = addx(&gr, freeze(&fieldcellgn), @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
         ogn = Has(gn1);
-      case CtorMove(v void):
+      case CtorMove:
         gn1 var = addx(&gr, freeze(&fieldcellgn), @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
         ogn = Has(gn1);
-      case CtorDestroy(v void):
+      case CtorDestroy:
         // do nothing.
         ogn = None;
       }
@@ -2522,7 +2522,7 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
 
 func gr_bi_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, destnum cell_num, srcnum cell_num, cd *ctor_desc, gn_out *gr_num) bool {
   switch cd {
-  case &TrivialCtor(v void):
+  case &TrivialCtor:
     *gn_out = addx(gr, @[gr_xop]GrMemCopy({destnum, srcnum}));
   case &FunCtor(ip instpair):
     *gn_out = gr_bi_fun(clq, gr, ip, destnum, srcnum);
@@ -2532,7 +2532,7 @@ func gr_bi_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, 
 
 func gr_destroy_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typeexpr, argnum cell_num, cd *ctor_desc, gn_out *gr_num) bool {
   switch cd {
-  case &TrivialCtor(v void):
+  case &TrivialCtor:
     dp var = addx(gr, @[gr_xop]GrDead({argnum}));
     *gn_out = dp;
   case &FunCtor(ip instpair):
@@ -2582,7 +2582,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
   ent *def_entry = ref_def_entry(cs, ent_id);
   inst *def_inst = ref_inst(cs, inst_id);
   switch &inst->graph {
-    case &NotComputed(v0 void): {
+    case &NotComputed: {
       inst->graph = BeganComputing();
       switch &inst->rhs {
         case &InstRhsPrim(op primitive_op): {
@@ -2591,7 +2591,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           inst->graph = Computed(Has(frg));
           return true;
         }
-        case &InstRhsExtern(v void): {
+        case &InstRhsExtern: {
           // TODO: What if an extern def isn't a function?
           id fn_body_id = add_fn_body(cs, {ent->def_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
           frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &unHas(&inst->typrop)->cu, &unHas(&inst->typrop)->props, ConstFnBody(id));
@@ -2650,11 +2650,11 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         }
       }
     }
-    case &BeganComputing(v void): {
+    case &BeganComputing: {
       ice(_u8("ensure_def_inst_graphed recursively computing"));
       return fake();
     }
-    case &FailedComputation(v void): {
+    case &FailedComputation: {
       ERR(_u8("ensure_def_inst_graphed fails again on same def"));
       return false;
     }

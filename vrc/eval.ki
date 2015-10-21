@@ -332,7 +332,7 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
   }
 
   switch &inst->evaled_value {
-    case &NotComputed(v void): {
+    case &NotComputed: {
       inst->evaled_value = BeganComputing();
       pool st_objpool = mk_objpool();
       env st_env = mk_env(&pool, clq->cs->plat, count(&fg->gr.cells));
@@ -368,12 +368,12 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
       }
       return true;
     }
-    case &BeganComputing(v void): {
+    case &BeganComputing: {
       ERR(_u8("recursively computing def inst's value"));
       inst->evaled_value = FailedComputation();
       return false;
     }
-    case &FailedComputation(v void): {
+    case &FailedComputation: {
       ERR(_u8("repeat error of st_eval_def"));
       return false;
     }
@@ -590,7 +590,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
           }
           *ref(&env->framecells, a.cell.~) = None;
 
-        case &GrXNop(v void): { }
+        case &GrXNop: { }
 
         }
       case &QOp(qn gr_qnode):
@@ -635,7 +635,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         case &GrJmp(a gr_jmp):
           push(&stack, EvalOpAndPrecs(a.next.~));
 
-        case &GrQNop(v void): { }
+        case &GrQNop: { }
         }
       }
     }

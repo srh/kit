@@ -321,10 +321,10 @@ func linux32_append_relocations_and_mutate_section(sti_map *array[u32], d *array
     rel_type u32;
     addend_le le_i32;
     switch reloc->type {
-    case Dir32(v void):
+    case Dir32:
       rel_type = kR_386_32;
       addend_le = ~ @[i32] 0;
-    case Rel32(v void):
+    case Rel32:
       rel_type = kR_386_PC32;
       addend_le = ~ - @[i32] 4;  // (There's a negative sign!)
     }
@@ -454,10 +454,10 @@ func push_symbol(im *identmap, symbol *objfile_symbol_record, symbols *array[u8]
   ent.st_other = 0;
 
   switch symbol->section {
-  case SymbolSectionUndefined(v void): ent.st_shndx = ~ @[u16] ~kSHN_UNDEF;
-  case SymbolSectionData(v void): ent.st_shndx = ~ @[u16] ~kLinux32DataSectionNumber;
-  case SymbolSectionRdata(v void): ent.st_shndx = ~ @[u16] ~kLinux32RodataSectionNumber;
-  case SymbolSectionText(v void): ent.st_shndx = ~ @[u16] ~kLinux32TextSectionNumber;
+  case SymbolSectionUndefined: ent.st_shndx = ~ @[u16] ~kSHN_UNDEF;
+  case SymbolSectionData: ent.st_shndx = ~ @[u16] ~kLinux32DataSectionNumber;
+  case SymbolSectionRdata: ent.st_shndx = ~ @[u16] ~kLinux32RodataSectionNumber;
+  case SymbolSectionText: ent.st_shndx = ~ @[u16] ~kLinux32TextSectionNumber;
   }
 
   append_reinterpret(symbols, &ent);

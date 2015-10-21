@@ -46,15 +46,15 @@ func st_eval_prim_logical(clq *clqueue, env *st_env, paramorefs *array[st_obj_re
 
   result bool;
   switch op {
-  case LogicalNot(v void):
+  case LogicalNot:
     result = bigu(0) == get(&ps, 0);
-  case BoolEq(v void):
+  case BoolEq:
     result = get(&ps, 0) == get(&ps, 1);
-  case BoolNe(v void):
+  case BoolNe:
     result = get(&ps, 0) != get(&ps, 1);
-  case BoolBitAnd(v void):
+  case BoolBitAnd:
     result = (get(&ps, 0) == bigu(1) && get(&ps, 1) == bigu(1));
-  case BoolBitOr(v void):
+  case BoolBitOr:
     result = (get(&ps, 0) == bigu(1) || get(&ps, 1) == bigu(1));
   }
   resultint bigint;
@@ -85,9 +85,9 @@ func st_eval_prim_ptr_compare(clq *clqueue, env *st_env, paramorefs *array[st_ob
   }
   result bool;
   switch op->op_action {
-  case CmpEq(v void):
+  case CmpEq:
     result = a.num == b.num && a.offset == b.offset;
-  case CmpNe(v void):
+  case CmpNe:
     result = a.num != b.num || a.offset != b.offset;
   default:
     if a.num != b.num {
@@ -95,13 +95,13 @@ func st_eval_prim_ptr_compare(clq *clqueue, env *st_env, paramorefs *array[st_ob
       return false;
     }
     switch op->op_action {
-    case CmpLt(v void):
+    case CmpLt:
       result = a.offset < b.offset;
-    case CmpGt(v void):
+    case CmpGt:
       result = a.offset > b.offset;
-    case CmpLe(v void):
+    case CmpLe:
       result = a.offset <= b.offset;
-    case CmpGe(v void):
+    case CmpGe:
       result = a.offset >= b.offset;
     }
   }
@@ -133,12 +133,12 @@ func st_eval_prim_num_compare(clq *clqueue, env *st_env, paramorefs *array[st_ob
   b bigint = get(&ps, 1);
   result bool;
   switch op->op_action {
-  case CmpEq(v void): result = a == b;
-  case CmpNe(v void): result = a != b;
-  case CmpLt(v void): result = a < b;
-  case CmpGt(v void): result = a > b;
-  case CmpLe(v void): result = a <= b;
-  case CmpGe(v void): result = a >= b;
+  case CmpEq: result = a == b;
+  case CmpNe: result = a != b;
+  case CmpLt: result = a < b;
+  case CmpGt: result = a > b;
+  case CmpLe: result = a <= b;
+  case CmpGe: result = a >= b;
   }
   resultint bigint;
   if result {
@@ -163,13 +163,13 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
   }
 
   switch op->op_action {
-  case NumAdd(v void):
+  case NumAdd:
     return st_num_rangechecked_output(clq, env, retvalref, add(ref(&ps, 0), ref(&ps, 1)), op);
-  case NumSub(v void):
+  case NumSub:
     return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) - get(&ps, 1), op);
-  case NumMul(v void):
+  case NumMul:
     return st_num_rangechecked_output(clq, env, retvalref, multiply(ref(&ps, 0), ref(&ps, 1)), op);
-  case NumDiv(v void):
+  case NumDiv:
     // TODO: This does not have x86-compatible (or platform-compatible) behavior for signed division.
     div_result bigint;
     mod_discard bigint;
@@ -177,7 +177,7 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
       return false;
     }
     return st_num_rangechecked_output(clq, env, retvalref, div_result, op);
-  case NumMod(v void):
+  case NumMod:
     // TODO: This does not have x86-compatible (or platform-compatible) behavior for signed division.
     div_discard bigint;
     mod_result bigint;
@@ -185,19 +185,19 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
       return false;
     }
     return st_num_rangechecked_output(clq, env, retvalref, mod_result, op);
-  case NumNegate(v void):
+  case NumNegate:
     return st_num_rangechecked_output(clq, env, retvalref, - get(&ps, 0), op);
-  case NumBitAnd(v void):
+  case NumBitAnd:
     return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) & get(&ps, 1), op);
-  case NumBitOr(v void):
+  case NumBitOr:
     return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) | get(&ps, 1), op);
-  case NumBitXor(v void):
+  case NumBitXor:
     return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) ^ get(&ps, 1), op);
-  case NumBitNot(v void):
+  case NumBitNot:
     return st_num_rangechecked_output(clq, env, retvalref, ^get(&ps, 0), op, NeverTrapYes(void));
-  case NumShiftLeft(v void):
+  case NumShiftLeft:
     switch op->op_numtraits.shifting {
-    case JustRangecheckRhs(v2 void):
+    case JustRangecheckRhs:
       bitsize u32 = op->op_size * env->plat.bnno_size;
       rhs bigint = get(&ps, 1);
       rhs32 u32;
@@ -207,9 +207,9 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
       }
       return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) << rhs32, op, NeverTrapYes(void));
     }
-  case NumShiftRight(v void):
+  case NumShiftRight:
     switch op->op_numtraits.shifting {
-    case JustRangecheckRhs(v2 void):
+    case JustRangecheckRhs:
       bitsize u32 = op->op_size * env->plat.bnno_size;
       rhs bigint = get(&ps, 1);
       rhs32 u32;
@@ -228,8 +228,8 @@ func st_divmod(x bigint, y bigint, op *primitive_numeric_op, div_out *bigint, mo
     return false;
   }
   switch op->op_numtraits.repr {
-  case Unsigned(v void): { }
-  case SignedTwos(v void):
+  case Unsigned: { }
+  case SignedTwos:
     if y == -bigu(1) && x == op->op_numtraits.minval {
       ERR(_u8("Static eval: divide minval by -1"));
       return false;
@@ -279,8 +279,8 @@ func st_num_rangechecked_output(clq *clqueue, env *st_env, retvalref st_obj_ref,
     }
     // Make sure we know to handle some weird reprs later when we have them.
     switch op_numtraits->repr {
-    case Unsigned(v void): { }
-    case SignedTwos(v void): { }
+    case Unsigned: { }
+    case SignedTwos: { }
     }
     addand bigint = incr(op_numtraits->maxval - op_numtraits->minval);
     num = ((num - op_numtraits->minval) % addand) + op_numtraits->minval;
@@ -334,11 +334,11 @@ func st_nums(env *st_env, paramorefs *array[st_obj_ref], op_arity u32, op_size u
 
     num bigint;
     switch repr {
-    case Unsigned(v void):
+    case Unsigned:
       if !st_value_unsigned_as_bigint(&env->plat, ref(&vals, i), &num) {
         return false;
       }
-    case SignedTwos(v void):
+    case SignedTwos:
       if !st_value_signed_twos_as_bigint(&env->plat, ref(&vals, i), &num) {
         return false;
       }

@@ -132,7 +132,7 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
         return ax.count == bx.count && help_idy_typeexpr_equal(oo(&ax.param), oo(&bx.param));
       }
     }
-    case &TeUnknown(v void): {
+    case &TeUnknown: {
       ice(_u8("idy_typeexpr_equal sees TeUnknown"));
     }
   }
@@ -147,7 +147,7 @@ func te_puretype_equal(cs *checkstate, a *te_puretype, b *te_puretype) bool {
         return an == bn;
       }
     }
-    case &TePureUnknown(u void): {
+    case &TePureUnknown: {
       if case &TePureUnknown(v void) = b {
         return true;
       }
@@ -227,7 +227,7 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
     case &TeArraytype(b te_arraytype): {
       wrap_u8str(help, r, _u8("TeArraytype"), &b);
     }
-    case &TeUnknown(v void): {
+    case &TeUnknown: {
       append(r, _u8("TeUnknown"));
     }
   }
@@ -288,7 +288,7 @@ func[H] build_u8str(help H, r *array[u8], a *te_puretype) void {
       build_u8str(help, r, &s);
       push(r, ')');
     }
-    case &TePureUnknown(v void): {
+    case &TePureUnknown: {
       append(r, _u8("TePureUnknown"));
     }
   }
@@ -321,7 +321,7 @@ func help_compute_hash(a *te_typeexpr) osize {
     if case Has(n u32) = ax.count {
       return (@[osize]~n * 0x3001) + help_compute_hash(oo(&ax.param));
     }
-  case &TeUnknown(v void):
+  case &TeUnknown:
     ice(_u8("help_compute_hash sees TeUnknown"));
   }
   return fake();
@@ -360,7 +360,7 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
         pretty_u8str_list(im, r, &b.params);
         push(r, ']');
       }
-    case TePureUnknown(v void):
+    case TePureUnknown:
       push(r, '_');
     }
   case &TeStruct(b te_struct):
@@ -384,7 +384,7 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
     }
     push(r, ']');
     pretty_u8str(im, r, oo(&b.param));
-  case &TeUnknown(v void):
+  case &TeUnknown:
     push(r, '_');
   }
 }

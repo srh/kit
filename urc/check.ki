@@ -44,7 +44,7 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
 
 func check_module(cs *checkstate, mod_name sym) bool {
   switch process_module(cs, mod_name) {
-    case None(v): {
+    case None: {
       return false;
     }
     case Has(id module_id): {
@@ -202,7 +202,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
 
 func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) bool {
   switch &ent->converted_typeexpr {
-    case &NotComputed(v void): {
+    case &NotComputed: {
       ent->converted_typeexpr = BeganComputing();
       switch &ent->definition {
         case &DefnPrim(op primitive_op): {
@@ -233,11 +233,11 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) b
         }
       }
     }
-    case &BeganComputing(v void): {
+    case &BeganComputing: {
       ERR(_u8("recursively computing def's typeexpr"));
       return false;
     }
-    case &FailedComputation(v void): {
+    case &FailedComputation: {
       ERR(_u8("repeat of error in def_converted_typeexpr"));
       return false;
     }
@@ -251,7 +251,7 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) b
 func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr) bool {
   if case &Has(np) = &ent->nonprim {
     switch &np.rhs {
-      case &NotComputed(v void): {
+      case &NotComputed: {
         np.rhs = BeganComputing();
         a *ast_typeexpr = deftype_rhs_type(&np.tl->rhs);
         converted te_typeexpr;
@@ -267,11 +267,11 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
         }
         return true;
       }
-      case &BeganComputing(v void): {
+      case &BeganComputing: {
         ERR(_u8("recursively computing deftype's rhs"));
         return false;
       }
-      case &FailedComputation(v void): {
+      case &FailedComputation: {
         ERR(_u8("repeat of error in deftype_converted_rhs"));
         return false;
       }
@@ -391,7 +391,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
   }
   inst *def_inst = ref_inst(cs, inst_id);
   switch inst->rhs_status {
-    case DidNotCheckRhs(v void): {
+    case DidNotCheckRhs: {
       rw depth_rewinder;
       if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
         return false;
@@ -401,7 +401,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         case &InstRhsPrim(op primitive_op): {
           // Do nothing.
         }
-        case &InstRhsExtern(v2 void): {
+        case &InstRhsExtern: {
           // Do nothing.
         }
         case &InstRhsExpr(rhs def_inst_rhs_expr): {
@@ -425,10 +425,10 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
       inst->rhs_status = FinishedCheckingRhs(void);
       return true;
     }
-    case BeganCheckingRhs(v void): {
+    case BeganCheckingRhs: {
       return true;
     }
-    case FinishedCheckingRhs(v void): {
+    case FinishedCheckingRhs: {
       return true;
     }
   }
@@ -437,7 +437,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
 // parms have already had generics replaced.  They should also be complete.
 func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy_genparms) bool {
   switch t {
-    case &NoParms(v void): {
+    case &NoParms: {
       *out = {mk_shray()};
       return true;
     }
@@ -516,7 +516,7 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
       *out = {param.complete && isHas(&a.count), TeArraytype({a.count, emshp(param.te)})};
       return true;
     }
-    case &TeUnknown(v void): {
+    case &TeUnknown: {
       *out = {false, TeUnknown(void)};
       return true;
     }
@@ -646,7 +646,7 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
       }
       return true;
     }
-    case &TePureUnknown(v void): {
+    case &TePureUnknown: {
       *out = {false, TeApp({TePureUnknown(void), params, None})};
       return true;
     }
@@ -663,8 +663,8 @@ func arity_matches(a *ast_generics, params opt[*shray[cu_typeexpr]]) bool {
 
 func[T] help_arity_matches(a *ast_generics, params opt[*shray[T]]) bool {
   switch arity(a) {
-    case NoParamsArity(v void): {
-      if case None(u void) = params {
+    case NoParamsArity: {
+      if case None = params {
         return true;
       }
     }
@@ -717,7 +717,7 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_ty
 // Returns an index into the HasGenerics array.
 func find_generic(g *ast_generics, name sym) opt[size] {
   switch g {
-  case &NoGenerics(v void):
+  case &NoGenerics:
     return None;
   case &HasGenerics(a array[ast_ident]):
     return lookup_name(&a, name);
@@ -739,7 +739,7 @@ func lookup_generic(g *ast_generics, parms *idy_genparms, name sym, out *cu_type
 func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
   ent *def_entry = ref_def_entry(cs, id);
   switch &ent->generics {
-    case &NoGenerics(v): {
+    case &NoGenerics: {
       parms idy_genparms = {mk_shray()};
       clq clqueue = mk(cs);
       discard_inst_id def_inst_id = enqueue_def_inst(cs, &clq, id, &parms);
@@ -994,7 +994,7 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
       }
     }
 
-    case &TeUnknown(a void): {
+    case &TeUnknown: {
       ice(_u8("compute_type_properties called on incomplete type."));
       return fake();
     }
@@ -1003,7 +1003,7 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
 
 func behavior_level(b *derived_method_behavior) u32 {
   switch b {
-    case &DerivedMethodAbsent(v void): {
+    case &DerivedMethodAbsent: {
       return 2;
     }
     case &DerivedMethodExplicit(ip instpair): {
@@ -1012,7 +1012,7 @@ func behavior_level(b *derived_method_behavior) u32 {
     case &DerivedMethodNontrivial(v instpair): {
       return 1;
     }
-    case &DerivedMethodTrivial(v void): {
+    case &DerivedMethodTrivial: {
       return 0;
     }
   }
@@ -1031,11 +1031,11 @@ func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, t
   }
 
   switch &res {
-    case &NoMatch(v void): {
+    case &NoMatch: {
       ice(_u8("No match for magic def"));
       return fake();
     }
-    case &MultiMatch(v void): {
+    case &MultiMatch: {
       // TODO: This should be impossible.  Pick a less likely name...
       ice(_u8("Multiple matches for magic def (is there a user-defined one?"));
       return fake();
@@ -1113,7 +1113,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
   inst *deftype_inst = ref_deftype_inst(cs, id);
 
   switch inst->info {
-    case NotComputed(v void): {
+    case NotComputed: {
       rw depth_rewinder;
       if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
         return false;
@@ -1159,11 +1159,11 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
       }
       return true;
     }
-    case BeganComputing(v void): {
+    case BeganComputing: {
       ERR(_u8("deftype for '"), lookup(cs->im, ent->name), _u8("' recursively checking"));
       return false;
     }
-    case FailedComputation(v void): {
+    case FailedComputation: {
       ERR(_u8("deftype for '"), lookup(cs->im, ent->name), _u8("' already failed checking"));
       return false;
     }
@@ -1181,7 +1181,7 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
   }
   if case &Has(np deftype_nonprim) = &ent->nonprim {
     switch &np.tl->generics {
-      case &NoGenerics(v): {
+      case &NoGenerics: {
         parms idy_genparms = {mk_shray()};
         clq clqueue = mk(cs);
         discard_id deftype_inst_id = enqueue_deftype_inst(cs, &clq, id, &parms);
@@ -1261,7 +1261,7 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
     case Has(id module_id): {
       return Has(id);
     }
-    case None(v): {
+    case None: {
       arr array[u8];
       if (cs->loader)(cs, mod_name, &arr) {
         mod shp[module];
@@ -1291,7 +1291,7 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
 
 func process_module(cs *checkstate, mod_name sym) opt[module_id] {
   switch load_module(cs, mod_name) {
-    case None(v): {
+    case None: {
       return None;
     }
     case Has(id module_id): {
@@ -1335,7 +1335,7 @@ func process_toplevels(cs *checkstate,
     switch toplevel {
       case &Import(a ast_import): {
         switch process_module(cs, a.name.value) {
-          case None(v): {
+          case None: {
             return false;
           }
           case Has(id module_id): {
@@ -1381,7 +1381,7 @@ func process_toplevels(cs *checkstate,
 
 func check_generics_unique(cs *checkstate, a *ast_generics) bool {
   switch a {
-    case &NoGenerics(v void): {
+    case &NoGenerics: {
       return true;
     }
     case &HasGenerics(b array[ast_ident]): {
@@ -1411,10 +1411,10 @@ func is_public(a *ast_type_def_rhs) rhs_accessibility {
 func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_entry_id) bool {
   ent *access_entry = ref_access_entry(cs, aid);
   switch ent->ent_id {
-    case NotComputed(v void): {
+    case NotComputed: {
       ent->ent_id = BeganComputing();
       switch ent->arity {
-        case AccessArityNone(u void): {
+        case AccessArityNone: {
           id deftype_entry_id;
           if !match_deftype(cs, fake_ast_meta(), ent->name, None, &id) {
             ent->ent_id = FailedComputation();
@@ -1437,11 +1437,11 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
         }
       }
     }
-    case BeganComputing(v void): {
+    case BeganComputing: {
       ERR(_u8("Recursively computing access block reference"));
       return false;
     }
-    case FailedComputation(v void): {
+    case FailedComputation: {
       ERR(_u8("Repeated get_accessible_deftype error"));
       return false;
     }
@@ -1476,10 +1476,10 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
         return false;
       }
       switch match_result {
-        case EntryDoesNotMatch(v void): {
+        case EntryDoesNotMatch: {
           // Do nothing.
         }
-        case EntryMatchesAmbigously(v void): {
+        case EntryMatchesAmbigously: {
           // TODO: We could see if we have _one_ ambiguously matching entry, and extract any type information that we learned, to help the next match attempt (see check_expr and its allow_ambiguous parameter).  (Maybe we should, but maybe we shouldn't to keep the type checking algorithm simple and describable.)
           // Certainly the error message (somewhere) could be improved.
           *res_out = MultiMatch(void);
@@ -1515,7 +1515,7 @@ defenum entry_matches_res {
 
 func from_type_matches_res(hasparms bool, x type_matches_res) entry_matches_res {
   switch x {
-    case TypeDoesNotMatch(v void): {
+    case TypeDoesNotMatch: {
       return EntryDoesNotMatch(void);
     }
     case TypeMatchesAmbiguously(a): {
@@ -1534,13 +1534,13 @@ func from_type_matches_res(hasparms bool, x type_matches_res) entry_matches_res 
 
 func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *genparms, typeexpr *te_typeexpr, matches_out *entry_matches_res) bool {
   switch generics {
-    case &NoGenerics(v void): {
+    case &NoGenerics: {
       switch gp {
         case &HasParms(parms shray[te_typeexpr]): {
           *matches_out = EntryDoesNotMatch(void);
           return true;
         }
-        case &NoParms(u void): {
+        case &NoParms: {
           names array[ast_ident];
           parms shray[te_typeexpr];
           *matches_out = from_type_matches_res(false, type_matches(pt, &names, &parms, typeexpr));
@@ -1558,7 +1558,7 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
           *matches_out = from_type_matches_res(true, type_matches(pt, &names, &parms, typeexpr));
           return true;
         }
-        case &NoParms(u void): {
+        case &NoParms: {
           parms shray[te_typeexpr] = repeat(count(&names), TeUnknown(void));
           *matches_out = from_type_matches_res(true, type_matches(pt, &names, &parms, typeexpr));
           return true;
@@ -1641,7 +1641,7 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
         return {false, false};
       }
     }
-    case &TeUnknown(v void): {
+    case &TeUnknown: {
       return {false, false};
     }
   }
@@ -1824,7 +1824,7 @@ func unify_under_generics(pt *te_typeexpr,
       }
     }
 
-    case &TeUnknown(v void): {
+    case &TeUnknown: {
       // Right now, the only callers are type_matches and unify_types.  From type_matches, t is complete, and from unify_types, there are no generic names.
       check(count(names) == 0);
       *unified_out = *pt;
@@ -1855,13 +1855,13 @@ func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) boo
             return false;
           }
         }
-        case &TePureUnknown(v void): {
+        case &TePureUnknown: {
           *out = *ppta;
           return true;
         }
       }
     }
-    case &TePureUnknown(v void): {
+    case &TePureUnknown: {
       *out = *pptb;
       return true;
     }

@@ -134,10 +134,10 @@ defenum which_ctor {
 
 func num_args(wc which_ctor) size {
   switch wc {
-  case CtorInit(v void): return 1;
-  case CtorCopy(v void): return 2;
-  case CtorMove(v void): return 2;
-  case CtorDestroy(v void): return 1;
+  case CtorInit: return 1;
+  case CtorCopy: return 2;
+  case CtorMove: return 2;
+  case CtorDestroy: return 1;
   }
 }
 
@@ -163,9 +163,9 @@ func check_non_magic_prop(cs *checkstate, clq *clqueue, g *ast_generics, parms *
   }
 
   switch nmp->wp {
-  case PropSizeof(v void):
+  case PropSizeof:
     annotate(&nmp->info, cac_props.flat_size);
-  case PropAlignof(v void):
+  case PropAlignof:
     annotate(&nmp->info, cac_props.flat_alignment);
   }
   return true;
@@ -184,7 +184,7 @@ func check_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genpa
     case &MagicMemcopy(mm magic_memcopy):
       annotate(&mm.size, padding_oneparm_size(cs, parms));
       return true;
-    case &MagicNopdestroy(v void):
+    case &MagicNopdestroy:
       // Nothing to check.
       return true;
 
@@ -214,16 +214,16 @@ func check_non_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *
     annotate(&nmc->info, {~cac.te, cac_props, ip});
   } else {
     switch wc {
-    case CtorInit(v void):
+    case CtorInit:
       ip instpair = make_magic_bzero(cs, clq, cac_props.flat_size);
       annotate(&nmc->info, {~cac.te, cac_props, ip});
-    case CtorCopy(v void):
+    case CtorCopy:
       ip instpair = make_magic_memcopy(cs, clq, cac_props.flat_size);
       annotate(&nmc->info, {~cac.te, cac_props, ip});
-    case CtorMove(v void):
+    case CtorMove:
       ip instpair = make_magic_memcopy(cs, clq, cac_props.flat_size);
       annotate(&nmc->info, {~cac.te, cac_props, ip});
-    case CtorDestroy(v void):
+    case CtorDestroy:
       ip instpair = make_magic_nopdestroy(cs, clq, cac_props.flat_size);
       annotate(&nmc->info, {~cac.te, cac_props, ip});
     }
@@ -304,7 +304,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_
       }
       annotate(&mc->info, @[magic_ctor_info]MagicArraytypeInfo({~cac.te, cac_props, instpair_from_behavior(select_behavior(wc, &props))}));
     }
-    case &TeUnknown(v void): {
+    case &TeUnknown: {
       ice(_u8("check_magic_ctor seeing TeUnknown"));
     }
   }
@@ -353,13 +353,13 @@ func instpair_from_behavior(b *derived_method_behavior) instpair {
 
 func instpair_or_trivial_from_behavior(b *derived_method_behavior) opt[instpair] {
   switch b {
-    case &DerivedMethodAbsent(v void): {
+    case &DerivedMethodAbsent: {
       ice(_u8("instpair_or_trivial_from_behavior sees absent"));
       return fake();
     }
     case &DerivedMethodExplicit(ip instpair): { return Has(ip); }
     case &DerivedMethodNontrivial(ip instpair): { return Has(ip); }
-    case &DerivedMethodTrivial(v void): { return None; }
+    case &DerivedMethodTrivial: { return None; }
   }
 }
 
@@ -375,10 +375,10 @@ func check_pack_ctor(cs *checkstate, clq *clqueue, complete_te *te_typeexpr, pro
 
 func select_behavior(wc which_ctor, props *type_properties) *derived_method_behavior {
   switch wc {
-    case CtorInit(v void): { return &props->init_behavior; }
-    case CtorCopy(v void): { return &props->copy_behavior; }
-    case CtorMove(v void): { return &props->move_behavior; }
-    case CtorDestroy(v void): { return &props->destroy_behavior; }
+    case CtorInit: { return &props->init_behavior; }
+    case CtorCopy: { return &props->copy_behavior; }
+    case CtorMove: { return &props->move_behavior; }
+    case CtorDestroy: { return &props->destroy_behavior; }
   }
 }
 

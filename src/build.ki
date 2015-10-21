@@ -26,9 +26,9 @@ func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u
   }
 
   switch cs->plat.opsys {
-  case Linux32(v void):
+  case Linux32:
     *flattened_out = linux32_flatten(cs->im, &f);
-  case Win32(v void):
+  case Win32:
     *flattened_out = win_flatten(cs->im, &f);
   }
 
@@ -43,9 +43,9 @@ func build_module(cs *checkstate, modulename sym) bool {
 
   path array[u8] = to_u8str(lookup(cs->im, modulename));
   switch cs->plat.opsys {
-  case Linux32(v void):
+  case Linux32:
     append(&path, _u8(".o"));
-  case Win32(v void):
+  case Win32:
     append(&path, _u8(".obj"));
   }
 
@@ -111,8 +111,8 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) bool {
           body_text_offset u32 = *unHas(&ref_fn_body(cs, fnid)->body_text_offset);
           name string = lookup(cs->im, ent->def_name);
           switch cs->plat.opsys {
-          case Linux32(v void): { }
-          case Win32(v void):
+          case Linux32: { }
+          case Win32:
             name = _s("_") + name;
           }
           discard sti = add_local_symbol(f, intern(cs->im, name), body_text_offset, SectionText(void), IsStaticNo(void));
@@ -199,9 +199,9 @@ func generate_kit_name(cs *checkstate, informal_name sym, arg_types shray[cu_typ
 
 func c_symbol_name(cs *checkstate, name sym) sym {
   switch cs->plat.opsys {
-  case Linux32(v void):
+  case Linux32:
     return name;
-  case Win32(v void):
+  case Win32:
     namestr string = lookup(cs->im, name);
     return intern(cs->im, _s("_") + namestr);
   }

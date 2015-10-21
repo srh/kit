@@ -196,7 +196,7 @@ func[T] unHas(p opt[T]) T {
 
 func[T] `==`(x opt[T], y opt[T]) bool {
   switch &x {
-    case &None(v): {
+    case &None: {
       if case &None(u) = &y { return true; }
     }
     case &Has(a T): {

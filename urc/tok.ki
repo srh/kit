@@ -185,7 +185,7 @@ func equal(a *tokval, b *tokval) bool {
   case &StringChar(j): { switch b { case &StringChar(k): { return j == k; } } }
   case &Bad(j): { return true; }
   case &Eof(j): { return true; }
-  case &Comment(v): { return true; }
+  case &Comment: { return true; }
   }
 }
 
@@ -270,7 +270,7 @@ func step(p *ps) void {
   for ;; {
     t tok = grab_tok(p);
     switch t.val {
-      case Comment(v): {
+      case Comment: {
         push(&p->comments, t.interval);
       }
       default: {

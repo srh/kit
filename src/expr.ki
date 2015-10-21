@@ -296,7 +296,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     case &TeName(te te_name): { }
     case &TeApp(te te_typeapp): { }
     case &TeEnum(te te_enum): { }
-    case &TeUnknown(v void):
+    case &TeUnknown:
       *res_out = AmbigMatchConstructor(void);
       return true;
     default:
@@ -311,10 +311,10 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     // enum_type is complete.
     enum_type *te_typeexpr;
     switch complete_structural_rhs(ds, pt, &enum_type) {
-    case Error(v void):
+    case Error:
       return false;
-    case Success(v void): { }
-    case NoAccessibleStructuralRhs(v void):
+    case Success: { }
+    case NoAccessibleStructuralRhs:
       *res_out = NoMatchConstructor(void);
       return true;
     }
@@ -356,10 +356,10 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   // enum_type is complete and computed.
   enum_type *te_typeexpr;
   switch complete_structural_rhs(ds, &cac_return_type.te, &enum_type) {
-  case Error(v void):
+  case Error:
     return false;
-  case Success(v void): { }
-  case NoAccessibleStructuralRhs(v void):
+  case Success: { }
+  case NoAccessibleStructuralRhs:
     *res_out = NoMatchConstructor(void);
     return true;
   }
@@ -409,10 +409,10 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
       return false;
     }
     switch &res {
-      case &NoMatch(v void): {
+      case &NoMatch: {
         // Do nothing.
       }
-      case &MultiMatch(v void): {
+      case &MultiMatch: {
         ice(_u8("magic_enum_ctor lookup sees MultiMatch"));
       }
       case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
@@ -435,7 +435,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
 
   meco magic_enum_construct_op;
   switch &rhs_props.move_behavior {
-    case &DerivedMethodAbsent(v void): {
+    case &DerivedMethodAbsent: {
       copy_desc ctor_desc;
       if !behavior_to_desc(&rhs_props.copy_behavior, &copy_desc) {
         return false;
@@ -452,7 +452,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
     case &DerivedMethodNontrivial(ip instpair): {
       meco = EnumConstructMove(FunCtor(ip));
     }
-    case &DerivedMethodTrivial(v void): {
+    case &DerivedMethodTrivial: {
       meco = EnumConstructMove(TrivialCtor(void));
     }
   }
@@ -504,15 +504,15 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
   }
 
   switch &res {
-    case &NoMatch(v void): {
+    case &NoMatch: {
       constructor_res ds_constructor_res;
       if !ds_lookup_constructor(es->ds, name, gp, pt, &constructor_res) {
         return false;
       }
       switch &constructor_res {
-      case &NoMatchConstructor(u void):
+      case &NoMatchConstructor:
         *res_out = NoMatch(void);
-      case &AmbigMatchConstructor(u void):
+      case &AmbigMatchConstructor:
         *res_out = AmbigGlobalMatch(void);
       case &MatchedConstructor(inf constructor_info):
         *res_out = OneEnumConstructorMatch(inf);
@@ -521,7 +521,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
       }
       return true;
     }
-    case &MultiMatch(v void): {
+    case &MultiMatch: {
       *res_out = AmbigGlobalMatch(void);
       return true;
     }
@@ -887,7 +887,7 @@ func check_expr_assignment(es *framescope, pt *te_typeexpr, a *ast_assignment, x
 
 func behavior_to_desc(b *derived_method_behavior, out *ctor_desc) bool {
   switch b {
-    case &DerivedMethodAbsent(v void): {
+    case &DerivedMethodAbsent: {
       ERR(_u8("Cannot find derived method."));
       return false;
     }
@@ -899,7 +899,7 @@ func behavior_to_desc(b *derived_method_behavior, out *ctor_desc) bool {
       *out = FunCtor(ip);
       return true;
     }
-    case &DerivedMethodTrivial(v void): {
+    case &DerivedMethodTrivial: {
       *out = TrivialCtor(void);
       return true;
     }
@@ -1109,9 +1109,9 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         }
         do_conditional bool;
         switch &target_destroy {
-        case &TrivialCtor(v void):
+        case &TrivialCtor:
           switch &copy {
-          case &TrivialCtor(v2 void):
+          case &TrivialCtor:
             do_conditional = false;
           case &FunCtor(bfcd):
             do_conditional = true;
@@ -1149,11 +1149,11 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     return false;
   }
   switch &match_res {
-    case &NoMatch(v void): {
+    case &NoMatch: {
       MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, matching type '"), pretty(es->im, pt), _u8("'"));
       return false;
     }
-    case &AmbigGlobalMatch(v void): {
+    case &AmbigGlobalMatch: {
       if ai == AllowIncompleteYes(void) {
         // NOTE: We could annotate this more precisely in ambiguous-single-match cases.
         annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
@@ -1516,11 +1516,11 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
 func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool) bool {
   ent *deftype_entry = ref_deftype_entry(ds->cs, id);
   switch ent->accessibility {
-    case RhsPublic(v void): {
+    case RhsPublic: {
       *result_out = true;
       return true;
     }
-    case RhsPrivate(v void): {
+    case RhsPrivate: {
       n size = count(&ds->accessible);
       for i size = 0; i < n; i = i + 1 {
         aid access_entry_id = get(&ds->accessible, i);
@@ -1536,7 +1536,7 @@ func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool)
       *result_out = false;
       return true;
     }
-    case RhsImpossible(v void): {
+    case RhsImpossible: {
       *result_out = false;
       return true;
     }
@@ -1581,11 +1581,11 @@ func complete_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typ
 
 func to_bool_error(res structural_rhs_result) bool {
   switch res {
-  case Error(v void):
+  case Error:
     return false;
-  case Success(v void):
+  case Success:
     return true;
-  case NoAccessibleStructuralRhs(v void):
+  case NoAccessibleStructuralRhs:
     ERR(_u8("Recursive structural rhs hit an inaccessible or non-structural type"));
     return false;
   }
@@ -1660,12 +1660,12 @@ func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **
 func lookup_whole_field(es *framescope, mbpack *opt[te_instpack], fieldtype_out *cu_typeexpr) bool {
   p *cu_typeexpr;
   switch help_structural_rhs(es->ds, mbpack, &p) {
-  case Error(v void):
+  case Error:
     return false;
-  case Success(v void):
+  case Success:
     *fieldtype_out = *p;
     return true;
-  case NoAccessibleStructuralRhs(v void):
+  case NoAccessibleStructuralRhs:
     ERR(_u8("Looking up whole field on inaccessible defclass or primitive type"));
     return false;
   }
@@ -1674,11 +1674,11 @@ func lookup_whole_field(es *framescope, mbpack *opt[te_instpack], fieldtype_out 
 func lookup_name_field(es *framescope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) bool {
   p *cu_typeexpr;
   switch help_structural_rhs(es->ds, mbpack, &p) {
-  case Error(v void):
+  case Error:
     return false;
-  case Success(v void):
+  case Success:
     return help_lookup_name_field(es, p, fieldname, fieldtype_out, res_out);
-  case NoAccessibleStructuralRhs(v void):
+  case NoAccessibleStructuralRhs:
     ERR(_u8("Looking up field on inaccessible defclass or primitive type"));
     return false;
   }
@@ -1731,7 +1731,7 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
       ERR(_u8("ICE: Looking up name field of... a lifetime type?"));
       return false;
 
-    case &TeUnknown(v void): {
+    case &TeUnknown: {
       ice(_u8("lookup_field sees incomplete type"));
       return fake();
     }
@@ -1740,7 +1740,7 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
 
 func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_out *cu_typeexpr, res_out *check_field_result) bool {
   switch f {
-    case &WholeField(v void): {
+    case &WholeField: {
       switch &t->~ {
         case &TeName(a te_name): {
           if !lookup_whole_field(es, &a.pack, fieldtype_out) {
@@ -1762,7 +1762,7 @@ func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_ou
           ERR(_u8("whole field lookup on 'bare' type"));
           return false;
         }
-        case &TeUnknown(u void): {
+        case &TeUnknown: {
           ice(_u8("lookup_field sees incomplete type."));
           return fake();
         }
@@ -2019,7 +2019,7 @@ func decompose_arraytype(t *te_typeexpr, out **te_typeexpr) bool {
 
 func expr_type(a *ast_expr) te_typeexpr {
   switch &a->info {
-    case &NoInfo(v void): {
+    case &NoInfo: {
       ice(_u8("expr_type sees NoInfo"));
       return fake();
     }
@@ -2047,7 +2047,7 @@ func expr_complete_type(a *ast_expr) *cu_typeexpr {
 
 func expr_type_complete(a *ast_expr) bool {
   switch &a->info {
-    case &NoInfo(v void): {
+    case &NoInfo: {
       ice(_u8("expr_type_complete sees NoInfo"));
       return fake();
     }

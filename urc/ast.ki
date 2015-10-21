@@ -678,7 +678,7 @@ deftype ast_expr struct {
 
 func inner_info(a *ast_expr_info) ast_expr_info {
   switch a {
-    case &NoInfo(v void): {
+    case &NoInfo: {
       return NoInfo(void);
     }
     case &IncompleteCheck(t te_typeexpr): {
@@ -703,7 +703,7 @@ func annotate_info(a *ast_expr, info ast_expr_info) void {
         }
       }
     }
-    case &NoInfo(v void): { }
+    case &NoInfo: { }
   }
 
   a->info = info;

@@ -133,9 +133,9 @@ func set_symbol_value(f *objfile, sti sti, value u32) void {
 
 func `~`(sec section) objfile_symbol_section {
   switch sec {
-  case SectionData(v void): return SymbolSectionData(void);
-  case SectionRdata(v void): return SymbolSectionRdata(void);
-  case SectionText(v void): return SymbolSectionText(void);
+  case SectionData: return SymbolSectionData(void);
+  case SectionRdata: return SymbolSectionRdata(void);
+  case SectionText: return SymbolSectionText(void);
   }
 }
 

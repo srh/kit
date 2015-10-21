@@ -51,7 +51,7 @@ func canonicalize_idy_lifetimes(im *identmap, lifetime_names *array[sym], t *te_
       push(lifetime_names, a.name);
       *out = TeLifetime({make_canonicalized_lifetime_name(im, n)});
     }
-  case &TeUnknown(v void):
+  case &TeUnknown:
     ice(_u8("canonicalize_idy_lifetimes sees TeUnknown."));
   }
 }

@@ -10,9 +10,9 @@ func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, liveset *liv
     return false;
   }
   switch &mbmut {
-  case &Terminal(v void):
+  case &Terminal:
     return true;
-  case &NonTerminal(v void):
+  case &NonTerminal:
     ERR(_u8("ICE: Expecting terminal expression, for gn "), gn.~, _u8(" in "), lookup(h->im, gr->informal_name));
     return false;
   }
@@ -120,7 +120,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       *out = Terminal(void);
       return true;
 
-    case &GrXNop(v void):
+    case &GrXNop:
       *out = Terminal(void);
       return true;
     }
@@ -165,7 +165,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     case &GrJmp(a gr_jmp):
       return dumbly_analyze_expression(h, gr, liveset, a.next.~, out);
 
-    case &GrQNop(v void):
+    case &GrQNop:
       *out = Terminal(void);
       return true;
     }
@@ -192,17 +192,17 @@ func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *lives) voi
 
 func combine_branch_mut(new_live *lives, onto *genexpr_result, case_mut genexpr_result, end_lives *lives) void {
   switch case_mut {
-  case Terminal(v void):
+  case Terminal:
     switch *onto {
-    case Terminal(v2 void):
+    case Terminal:
       if new_live->xored != end_lives->xored || new_live->summed != end_lives->summed {
         ice(_u8("terminal/terminal new_live not equal, end_lives="), *end_lives, _u8(", new_live="), *new_live);
       }
-    case NonTerminal(v2 void):
+    case NonTerminal:
       *onto = Terminal(void);
       *end_lives = *new_live;
     }
-  case NonTerminal(v void): { }
+  case NonTerminal: { }
   }
 }
 

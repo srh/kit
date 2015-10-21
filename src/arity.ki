@@ -17,7 +17,7 @@ defenum generics_arity {
 // TODO: The so-called "arity" might need to include information whether it's a lifetime generic or plain generic.
 func arity(a *ast_generics) generics_arity {
   switch a {
-    case &NoGenerics(v void): { return NoParamsArity(void); }
+    case &NoGenerics: { return NoParamsArity(void); }
     case &HasGenerics(arr array[ast_generik]): {
       return FiniteArity(~count(&arr));
     }
@@ -29,7 +29,7 @@ func arity(a *ast_generics) generics_arity {
 
 func[H] build_u8str(help H, r *array[u8], a *generics_arity) void {
   switch a {
-    case &NoParamsArity(v void): {
+    case &NoParamsArity: {
       append(r, _u8("NoParamsArity"));
     }
     case &FiniteArity(n u32): {

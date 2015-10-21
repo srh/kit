@@ -325,9 +325,9 @@ func win_append_relocs(d *array[u8], relocs *array[objfile_relocation]) void {
     coff_reloc.VirtualAddress = ~reloc->virtual_address;
     coff_reloc.SymbolTableIndex = ~reloc->symbol_table_index.~;
     switch reloc->type {
-    case Dir32(v void):
+    case Dir32:
       coff_reloc.Type = ~ @[u16] ~IMAGE_REL_I386_DIR32;
-    case Rel32(v void):
+    case Rel32:
       coff_reloc.Type = ~ @[u16] ~IMAGE_REL_I386_REL32;
     }
     append_reinterpret(d, &coff_reloc);
@@ -402,27 +402,27 @@ func win_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *array[
 
     standard.Value = ~rec->value;
     switch rec->section {
-    case SymbolSectionUndefined(v void):
+    case SymbolSectionUndefined:
       standard.SectionNumber = ~ @[u16] ~IMAGE_SYM_UNDEFINED;
-    case SymbolSectionData(v void):
+    case SymbolSectionData:
       standard.SectionNumber = ~ @[u16] ~kWinDataSectionNumber;
-    case SymbolSectionRdata(v void):
+    case SymbolSectionRdata:
       standard.SectionNumber = ~ @[u16] ~kWinRdataSectionNumber;
-    case SymbolSectionText(v void):
+    case SymbolSectionText:
       standard.SectionNumber = ~ @[u16] ~kWinTextSectionNumber;
     }
 
     switch rec->is_function {
-    case IsFunctionNo(v void):
+    case IsFunctionNo:
       standard.Type = ~ @[u16] ~kNullSymType;
-    case IsFunctionYes(v void):
+    case IsFunctionYes:
       standard.Type = ~ @[u16] ~kFunctionSymType;
     }
 
     switch rec->is_static {
-    case IsStaticNo(v void):
+    case IsStaticNo:
       standard.StorageClass = ~ @[u16] ~IMAGE_SYM_CLASS_EXTERNAL;
-    case IsStaticYes(v void):
+    case IsStaticYes:
       standard.StorageClass = ~ @[u16] ~IMAGE_SYM_CLASS_STATIC;
     }
     standard.NumberOfAuxSymbols = 0;

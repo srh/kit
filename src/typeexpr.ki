@@ -142,7 +142,7 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
       if case &TeLifetime(bx te_lifetime) = b {
         return ax.name == bx.name;
       }
-    case &TeUnknown(v void): {
+    case &TeUnknown: {
       ice(_u8("idy_typeexpr_equal sees TeUnknown"));
     }
   }
@@ -157,7 +157,7 @@ func te_puretype_equal(cs *checkstate, a *te_puretype, b *te_puretype) bool {
         return an == bn;
       }
     }
-    case &TePureUnknown(u void): {
+    case &TePureUnknown: {
       if case &TePureUnknown(v void) = b {
         return true;
       }
@@ -239,7 +239,7 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
     }
     case &TeLifetime(b te_lifetime):
       wrap_u8str(help, r, _u8("TeLifetime"), &b);
-    case &TeUnknown(v void): {
+    case &TeUnknown: {
       append(r, _u8("TeUnknown"));
     }
   }
@@ -304,7 +304,7 @@ func[H] build_u8str(help H, r *array[u8], a *te_puretype) void {
       build_u8str(help, r, &s);
       push(r, ')');
     }
-    case &TePureUnknown(v void): {
+    case &TePureUnknown: {
       append(r, _u8("TePureUnknown"));
     }
   }
@@ -339,7 +339,7 @@ func help_compute_hash(a *te_typeexpr) osize {
     }
   case &TeLifetime(ax te_lifetime):
     return 0x6 ^ hash_compute_hash(&ax.name);
-  case &TeUnknown(v void):
+  case &TeUnknown:
     ice(_u8("help_compute_hash sees TeUnknown"));
   }
   return fake();
@@ -378,7 +378,7 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
         pretty_u8str_list(im, r, &b.params);
         push(r, ']');
       }
-    case TePureUnknown(v void):
+    case TePureUnknown:
       push(r, '_');
     }
   case &TeStruct(b te_struct):
@@ -405,7 +405,7 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
   case &TeLifetime(b te_lifetime):
     push(r, '\'');
     build_u8str(im, r, &b.name);
-  case &TeUnknown(v void):
+  case &TeUnknown:
     push(r, '_');
   }
 }
