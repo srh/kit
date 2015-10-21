@@ -549,13 +549,6 @@ inline func wholeRval(num cell_num) is_lval {
   return IsLvalNo({num, num});
 }
 
-func isNo(x is_lval) bool {
-  if case IsLvalNo(a rval_description) = x {
-    return true;
-  }
-  return false;
-}
-
 // Where the value of the expr is, _before_ after actions are run.
 func value_cell(x *is_lval) cell_num {
   switch x {

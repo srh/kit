@@ -834,7 +834,7 @@ func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *
     return false;
   }
   rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
-  if isNo(rhs_info->lval) {
+  if case &IsLvalNo(desc rval_description) = &rhs_info->lval {
     ERR(_u8("Taking address of a non-lvalue"));
     return false;
   }
