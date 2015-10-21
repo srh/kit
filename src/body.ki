@@ -355,7 +355,7 @@ deftype swartch_checkobj struct {
   switchable_type_lifetime te_typeexpr;
   // Will be initialized to a complete type.
   enum_type *te_typeexpr;
-  is_ptr bool;
+  is_deref bool;
 };
 
 func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard_info, later2 opt[*ast_later_discard_info], checkobj_out *swartch_checkobj) bool {
@@ -368,10 +368,8 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
   checkobj_out->swartch_type = swartch_type;
   checkobj_out->swartch_lifetime = unnamed_lifetime(es);
   switchable_type *te_typeexpr;
-  is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(es->cs), &switchable_type);
-  if is_ptr {
-    checkobj_out->switchable_type_lifetime = fake_lifetime(es->cs);
-  } else {
+  is_deref bool = decompose_ref_or_ptr(&swartch_type->~, es->cs, &checkobj_out->switchable_type_lifetime, &switchable_type);
+  if !is_deref {
     switchable_type = &swartch_type->~;
     checkobj_out->switchable_type_lifetime = checkobj_out->swartch_lifetime;
   }
@@ -382,13 +380,13 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
   }
   // enum_type is complete, because complete_structural_rhs does that.
   checkobj_out->enum_type = enum_type;
-  checkobj_out->is_ptr = is_ptr;
+  checkobj_out->is_deref = is_deref;
   return true;
 }
 
 // expected_type_out is complete (et must be complete).
 func check_pattern(es *framescope, chk *swartch_checkobj, et *te_enum, patt *ast_constructor_pattern, expected_type_out **te_typeexpr, decl_index_out *size) bool {
-  if isHas(&patt->addressof_constructor) != chk->is_ptr {
+  if isHas(&patt->addressof_constructor) != chk->is_deref {
     ERR(_u8("swartch/pattern pointeriness mismatch"));
     return false;
   }
