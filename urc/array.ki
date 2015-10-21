@@ -40,28 +40,46 @@ access array[_] {
     free(@[*void] cast(rptr));
   }
 
-  func[T] repeat_out(n size, value T, out *array[T]) void {
-    destroy(out);
-    if n == 0 {
-      out->count = 0;
-      out->cap = 0;
-      out->ptr = null;
-      return;
+  func[T] grow(r *array[T], n size) void {
+    rn size = r->count;
+    newcount size = rn + n;
+    if newcount > r->cap {
+      change_cap_(r, max(8, max(rn * 2, newcount)));
     }
-    out->count = n;
-    out->cap = n;
+    rp *T = r->ptr;
+    for i size = rn; i < newcount; i = i + 1 {
+      init(&rp[i]);
+    }
+    r->count = newcount;
+  }
+
+  func[T] grow(r *array[T], n size, value T) void {
+    rn size = r->count;
+    newcount size = rn + n;
+    if newcount > r->cap {
+      change_cap_(r, max(8, max(rn * 2, newcount)));
+    }
+    rp *T = r->ptr;
+    for i size = rn; i < newcount; i = i + 1 {
+      copy(&rp[i], &value);
+    }
+    r->count = newcount;
+  }
+
+  func[T] repeat(n size, value T) array[T] {
+    if n == 0 {
+      ret array[T];
+      return ret;
+    }
+    ret array[T];
+    ret.count = n;
+    ret.cap = n;
     ptr *T = cast(checkmalloc(n * sizeof@[T]));
-    out->ptr = ptr;
+    ret.ptr = ptr;
     for i size = 0; i < n; i = i + 1 {
       copy(&ptr[i], &value);
     }
-  }
-
-  func[T] set(r *array[T], i size, val T) void {
-    if i >= r->count {
-      crash();
-    }
-    r->ptr[i] = val;
+    return ret;
   }
 
   inline func[T] get(r *array[T], i size) T {
@@ -218,16 +236,6 @@ inline func[T] append(a *array[T], b array[T]) void {
   return append(a, &b);
 }
 
-func[T] subarray(a *array[T], i size) array[T] {
-  // If i >= count(a), successfully return empty.
-  ret array[T];
-  n size = count(a);
-  for ; i < n; i = i + 1 {
-    push(&ret, *ref(a, i));
-  }
-  return ret;
-}
-
 func[T] sorted_has_dups(a *array[T]) bool {
   p *T = data(a);
   n size = count(a);
@@ -303,7 +311,7 @@ func[T] find(a *array[T], b T) opt[size] {
       return Has(i);
     }
   }
-  return None();
+  return None;
 }
 
 func[T] popval(a *array[T], val_out *T) bool {
@@ -321,14 +329,8 @@ func[T] popval(a *array[T]) opt[T] {
   if popval(a, &val) {
     return Has(val);
   } else {
-    return None();
+    return None;
   }
-}
-
-func[T] repeat(n size, value T) array[T] {
-  ret array[T];
-  repeat_out(n, value, &ret);
-  return ret;
 }
 
 func[H] build_u8str(help H, r *array[u8], a *array[u8]) void {
@@ -337,12 +339,74 @@ func[H] build_u8str(help H, r *array[u8], a *array[u8]) void {
 
 func[T] is_strictly_increasing(x *array[T]) bool {
   n size = count(x);
+  p *T = data(x);
   for i size = 1; i < n; i = i + 1 {
-    if !(get(x, i - 1) < get(x, i)) {
+    if !(p[i - 1] < p[i]) {
       return false;
     }
   }
   return true;
+}
+
+// Remove elem from strictly increasing array.  We expect inserts/removes very near end.
+func[T] try_remove(x *array[T], y T) bool {
+  n size = count(x);
+  p *T = data(x);
+  for i size = n; i > 0; {
+    i = i - 1;
+    if p[i] == y {
+      j size = i + 1;
+      for ; j < n; j = j + 1 {
+        p[j - 1] = p[j];
+      }
+      pop(x);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Looks up elem from strictly increasing array.  We expect inserts/removes very near end.
+func[T] lookup(x *array[T], y T) opt[size] {
+  p *T = data(x);
+  for i size = count(x); i > 0; {
+    i = i - 1;
+    if p[i] == y {
+      return Has(i);
+    }
+  }
+  return None;
+}
+
+// Inserts elem into strictly increasing array.  We expect inserts/removes very near end.
+func[T] try_insert(x *array[T], y T) bool {
+  n size = count(x);
+  p *T = data(x);
+  i size = n;
+  // y < p[k] for all k in [i, n).
+  for ; i > 0 && y < p[i - 1]; {
+    i = i - 1;
+  }
+  // y < p[k] for all k in [i, n), and (i == 0 or p[i - 1] <= y).
+  if i == 0 || p[i - 1] < y {
+    val T;
+    pushref(x, &val);
+    p = data(x);
+    for j size = n; j > i; j = j - 1 {
+      p[j]= p[j - 1];
+    }
+    p[i] = y;
+    return true;
+  }
+  return false;
+}
+
+func[T] shifterase_elem(x *array[T], k size) void {
+  n size = count(x);
+  for i size = k + 1; i < n; i = i + 1 {
+    *ref(x, i - 1) = *ref(x, i);
+  }
+  pop(x);
 }
 
 func[T] overwrite_raw(x *array[T], offset size, p *T, n size) void {
@@ -413,7 +477,7 @@ func[T, U] concat(a array[T], b U) array[T] {
   return ret;
 }
 
-func[T] mk_array() array[T] {
+inline func[T] mk_array() array[T] {
   ret array[T];
   return ret;
 }

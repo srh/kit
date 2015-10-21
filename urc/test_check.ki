@@ -6,11 +6,12 @@ func testmodule_name() string {
   return _s("testmodule");
 }
 
-func test_loader(cs *checkstate, name sym) opt[array[u8]] {
-  if name.~ == intern(cs->im, testmodule_name()).~ {
-    return Has(* @[*array[u8]]cast(cs->loader_ctx));
+func test_loader(cs *checkstate, name sym, out *array[u8]) bool {
+  if name == intern(cs->im, testmodule_name()) {
+    *out = * @[*array[u8]]cast(cs->loader_ctx);
+    return true;
   } else {
-    return None();
+    return false;
   }
 }
 
@@ -23,18 +24,18 @@ func x86_32_platform(opsys platform_os) platform_info {
     4,
     {0, 1},
     {1, 1},
-    {{1, 1}, {SignedTwos(void), jrr, true, -big("128"), big("127")}},
-    {{1, 1}, {Unsigned(void), jrr, true, big("0"), big("255")}},
-    {{1, 1}, {Unsigned(void), jrr, false, big("0"), big("255")}},
-    {{2, 2}, {SignedTwos(void), jrr, true, -big("32768"), big("32767")}},
-    {{2, 2}, {Unsigned(void), jrr, true, big("0"), big("65535")}},
-    {{2, 2}, {Unsigned(void), jrr, false, big("0"), big("65535")}},
-    {{4, 4}, {SignedTwos(void), jrr, true, -big("2147483648"), big("2147483647")}},
-    {{4, 4}, {Unsigned(void), jrr, true, big("0"), big("4294967295")}},
-    {{4, 4}, {Unsigned(void), jrr, false, big("0"), big("4294967295")}},
-    {{4, 4}, {SignedTwos(void), jrr, true, -big("2147483648"), big("2147483647")}},
-    {{4, 4}, {Unsigned(void), jrr, true, big("0"), big("4294967295")}},
-    {{4, 4}, {Unsigned(void), jrr, false, big("0"), big("4294967295")}},
+    {{1, 1}, {SignedTwos(void), jrr, true, -bigu(128), bigu(127)}},
+    {{1, 1}, {Unsigned(void), jrr, true, bigu(0), bigu(255)}},
+    {{1, 1}, {Unsigned(void), jrr, false, bigu(0), bigu(255)}},
+    {{2, 2}, {SignedTwos(void), jrr, true, -bigu(32768), bigu(32767)}},
+    {{2, 2}, {Unsigned(void), jrr, true, bigu(0), bigu(65535)}},
+    {{2, 2}, {Unsigned(void), jrr, false, bigu(0), bigu(65535)}},
+    {{4, 4}, {SignedTwos(void), jrr, true, -bigu(2147483648), bigu(2147483647)}},
+    {{4, 4}, {Unsigned(void), jrr, true, bigu(0), bigu(4294967295)}},
+    {{4, 4}, {Unsigned(void), jrr, false, bigu(0), bigu(4294967295)}},
+    {{4, 4}, {SignedTwos(void), jrr, true, -bigu(2147483648), bigu(2147483647)}},
+    {{4, 4}, {Unsigned(void), jrr, true, bigu(0), bigu(4294967295)}},
+    {{4, 4}, {Unsigned(void), jrr, false, bigu(0), bigu(4294967295)}},
     {4, 4},
     {4, 4},
     opsys,
@@ -1893,6 +1894,22 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "inline func `++`(x *i32) void {\n"
         "  *x = *x + 1;\n"
+        "}\n"));
+
+  run_check_test(ctx, "c154",
+    _u8("defenum en {\n"
+        "  Foo void;\n"
+        "};\n"
+        "func blah(x en) u32 {\n"
+        "  switch x {\n"
+        "  case Foo(v void):\n"
+        "    accum u32 = 0x12345679;\n"
+        "    return accum;\n"
+        "  }\n"
+        "}\n"));
+  run_check_test(ctx, "c155",
+    _u8("func blah(x i32) u32 {\n"
+        "  return x == 3 then 99 else 66;\n"
         "}\n"));
 }
 

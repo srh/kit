@@ -5,6 +5,7 @@ defenum[T] nbfc {
   Computed T;
 };
 
+// TODO: Get rid of these functions (once cute void enums are in s1).
 inline func[T] NotComputed() nbfc[T] {
   return NotComputed(void);
 }
@@ -23,6 +24,19 @@ func[T] isBeganComputing(x *nbfc[T]) bool {
   } else {
     return false;
   }
+}
+
+func[T] unHas(x *nbfc[T]) *T {
+  if case &Computed(t T) = x {
+    return &t;
+  } else {
+    ice(_u8("unComputed failed"));
+    return fake();
+  }
+}
+
+inline func[T] unComputed(x *nbfc[T]) *T {
+  return unHas(x);
 }
 
 defenum[T] nc {

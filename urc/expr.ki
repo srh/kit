@@ -3,47 +3,6 @@ import body;
 import check;
 import primitives;
 
-/* A cell location is tricky: the location of an expr's return value
-is defined both by the expr itself and the context it's found
-in. Location should be specified when:
-
-   - for lvalues, whenever we create the cell (by calling add_cell) for the lvalue.
-   - for rvalues, when we annotate the disposal for the rvalue.
-*/
-
-defenum cell_location {
-  // The "cell" is actually caused by dereferencing something, or maybe accessing something's field?
-  LocationVirtual void;
-  LocationStatic void;
-};
-
-func `==`(x cell_location, y cell_location) bool {
-  return enumnum(&x) == enumnum(&y);
-}
-
-func `!=`(x cell_location, y cell_location) bool {
-  return enumnum(&x) != enumnum(&y);
-}
-
-func isLocationStatic(location cell_location) bool {
-  switch location {
-  case LocationVirtual(v void): return false;
-  case LocationStatic(v void): return true;
-  }
-}
-
-// TODO: Move to graph.ki or something.
-deftype cell_info struct {
-  // Location must be specified by type-checking, but it spends time in an unspecified state.
-  location cell_location;
-  type cu_typeexpr;
-  props type_properties;
-};
-
-func location(info *cell_info) cell_location {
-  return info->location;
-}
-
 // Used with the variable name "es" -- its name used to be different.
 deftype framescope struct {
   ds *defscope;
@@ -59,65 +18,23 @@ deftype framescope struct {
   // These var_numbers are always in increasing order.
   current_vars array[var_number];
 
-  cells array[cell_info];
+  gr frame_graph;
 };
 
 func mk(ds *defscope) framescope {
   return {ds, ds->cs, ds->im, ds->clq,
-          mk_array@[var_info](), mk_array@[var_number](), mk_array@[cell_info]()};
+          mk_array@[var_info](), mk_array@[var_number](), init_frame_graph_empty(ds->def_informal_name)};
 }
 
-deftype cell_num size;
-
-def `~` fn[size, cell_num] = wrapconvert;
-def `==` fn[cell_num, cell_num, bool] = wrapequate;
-func `!=`(x cell_num, y cell_num) bool { return x.~ != y.~; }
-func `<`(x cell_num, y cell_num) bool { return x.~ < y.~; }
-func[H] build_u8str(help H, r *array[u8], c *cell_num) void {
-  build_u8str(help, r, &c->~);
-}
-func hash_compute_hash(x *cell_num) osize {
-  return hash_compute_hash(&x->~);
-}
-func hash_equal(x *cell_num, y *cell_num) bool {
-  return x->~ == y->~;
+inline func add_cell(es *framescope, info cell_info) cell_num {
+  return add_cellp(&es->gr, &info);
 }
 
-
-func help_add_cell(es *framescope, info cell_info) cell_num {
-  ret size = count(&es->cells);
-  push(&es->cells, info);
-  return ~ret;
-}
-
-func add_virtual_cell(es *framescope, tp cu_typrop) cell_num {
-  return help_add_cell(es, {LocationVirtual(void), tp.cu, tp.props});
-}
-
-func add_virtual_cell(es *framescope, type cu_typeexpr, props type_properties) cell_num {
-  return help_add_cell(es, {LocationVirtual(void), type, props});
-}
-
-func add_static_cell(es *framescope, type cu_typeexpr, props type_properties) cell_num {
-  return help_add_cell(es, {LocationStatic(void), type, props});
-}
-
-func add_virtual_tag_cell(es *framescope, et *te_enum) cell_num {
-  tp cu_typrop = compute_prim(es->clq, enum_tag_type(es->cs, et));
-  return add_virtual_cell(es, tp);
-}
-
-func ref_cell(es *framescope, num cell_num) *cell_info {
-  return ref(&es->cells, num.~);
+inline func ref_cell(es *framescope, num cell_num) *cell_info {
+  return ref_cell(&es->gr, num);
 }
 
 deftype frame_cell_count size;
-
-func count_cells(es *framescope) frame_cell_count {
-  ret frame_cell_count;
-  ret.~ = count(&es->cells);
-  return ret;
-}
 
 func reannotate_static_to_virtual(es *framescope, num cell_num) void {
   info *cell_info = ref_cell(es, num);
@@ -136,7 +53,8 @@ deftype defscope struct {
   accessible array[access_entry_id];
   // Generics and their _complete_ replacements.
   generics *ast_generics;
-  parms *cu_genparms;
+  parms *idy_genparms;
+  def_informal_name sym;
 };
 
 deftype var_number size;
@@ -259,31 +177,6 @@ func read_nums(vp *varpopper) *array[var_number] {
 
 }  // access varpopper
 
-defclass varsaver struct {
-  es *framescope;
-  current_vars array[var_number];
-};
-
-access varsaver {
-func do_init(vp *varsaver) void {
-  init(&vp->es);
-  init(&vp->current_vars);
-}
-func save_and_wipe_current_vars(vp *varsaver, es *framescope) void {
-  check(vp->es == null);
-  vp->es = es;
-  vp->current_vars = es->current_vars;
-  es->current_vars = mk_array();
-}
-func do_destroy(vp *varsaver) void {
-  if vp->es != null {
-    vp->es->current_vars = vp->current_vars;
-  }
-  destroy(&vp->current_vars);
-  vp->es = null;
-}
-}
-
 func es_note_var_initter(es *framescope, vn var_number) bool {
   info *var_info = ref_var(es, vn);
   if case &Has(desc ctor_desc) = &info->initter {
@@ -310,13 +203,13 @@ func es_note_var_destroyer(es *framescope, vn var_number) bool {
   return true;
 }
 
-func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *cu_genparms, x *ast_expr_consume, pt *te_typeexpr, frame_info_out *frame_info) bool {
-  ds defscope = {cs, cs->im, clq, accessible, g, parms};
+func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *idy_genparms, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) bool {
+  ds defscope = {cs, cs->im, clq, accessible, g, parms, def_informal_name};
   es framescope = mk(&ds);
   if !check_expr_consume(&es, x, pt) {
     return false;
   }
-  *frame_info_out = {es.cells};
+  *frame_info_out = {Has(move(&es.gr))};
   return true;
 }
 
@@ -325,10 +218,21 @@ func check_expr_consume(es *framescope, x *ast_expr_consume, pt *te_typeexpr) bo
 }
 
 func check_consume_expr(es *framescope, x *ast_expr, aft *nc[ast_expr_after_consume], pt *te_typeexpr) bool {
+  // If you change this, see also check_expr_retconsume.
   if !check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
     return false;
   }
   if !annotate_disposal_for_consume(es, x, aft) {
+    return false;
+  }
+  return true;
+}
+
+func check_expr_retconsume(es *framescope, x *ast_expr_consume, pt *te_typeexpr, movable_cells *shray[opt[cell_num]], moved_cell_ix_out *opt[size]) bool {
+  if !check_expr_ai(es, AllowIncompleteNo, &x->expr, pt) {
+    return false;
+  }
+  if !annotate_disposal_for_consume(es, &x->expr, movable_cells, &x->after, moved_cell_ix_out) {
     return false;
   }
   return true;
@@ -659,7 +563,7 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
       ice(_u8("help_check_simple_literal passed type with bad properties"));
     }
 
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~c.te, props)), ~c.te, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~c.te, props})), ~c.te, props)));
   } else {
     annotate_info(x, @[ast_expr_info]IncompleteCheck(type));
   }
@@ -745,7 +649,35 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
 
     case &Strinit(a ast_strinit):
       return check_expr_strinit(es, ai, &a, pt, x);
+
+    case &Ternary(a ast_ternary):
+      return check_expr_ternary(es, ai, pt, &a, x);
   }
+}
+
+func check_expr_ternary(es *framescope, ai allow_incomplete, pt *te_typeexpr, a *ast_ternary, x *ast_expr) bool {
+  boolean cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
+  if !check_consume_then_discard_expr(es, oo(&oo(&a->condition)->expr), &boolean.~, &oo(&a->condition)->discard) {
+    return false;
+  }
+  if !check_expr_consume(es, oo(&a->then_clause), pt) {
+    return false;
+  }
+  if !check_expr_consume(es, oo(&a->else_clause), pt) {
+    return false;
+  }
+
+  conjoined cell_num;
+  if true {
+    then_cell *cell_info = ref_cell(es, result_cell(oo(&a->then_clause)));
+    conjoined = add_cell(es, {LocationStatic, then_cell->type, then_cell->props});
+  }
+  reannotate_static_to_virtual(es, result_cell(oo(&a->then_clause)));
+  reannotate_static_to_virtual(es, result_cell(oo(&a->else_clause)));
+  annotate(&a->info, {conjoined});
+  conj *cell_info = ref_cell(es, conjoined);
+  annotate_info(x, @[ast_expr_info]CompleteCheck({IsLvalNo({conjoined, conjoined}), conj->type, conj->props}));
+  return true;
 }
 
 func check_expr_typed_expr(es *framescope, ai allow_incomplete, pt *te_typeexpr, a *ast_typed_expr, x *ast_expr) bool {
@@ -806,11 +738,11 @@ func check_expr_deref_field(es *framescope, pt *te_typeexpr, a *ast_deref_field,
   switch cf_res {
     case InheritsLval(offset u32): {
       // We deref, so it's always an lval.
-      lval = IsLvalYes({add_virtual_cell(es, fieldtype, props), DeadMe(void)});
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void)});
       annotate(&a->info, DerefFieldName(offset));
     }
     case ConstantField(value u32): {
-      lval = wholeRval(add_static_cell(es, fieldtype, props));
+      lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
       annotate(&a->info, DerefArrayLength(value));
     }
   }
@@ -838,10 +770,10 @@ func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field,
     case InheritsLval(offset u32): {
       switch &info->lval {
         case &IsLvalYes(desc lval_description): {
-          lval = IsLvalYes({add_virtual_cell(es, fieldtype, props), DeadMe(void)});
+          lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void)});
         }
         case &IsLvalNo(desc rval_description): {
-          lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, fieldtype, props)});
+          lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, fieldtype, props})});
         }
       }
       // There's no disposal, it's a real field access.
@@ -853,7 +785,7 @@ func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field,
         return false;
       }
       annotate(&a->info, @[ast_local_field_info]ArrayLength({*unHas(&after), value}));
-      lval = wholeRval(add_static_cell(es, fieldtype, props));
+      lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
     }
   }
   annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
@@ -878,7 +810,7 @@ func check_expr_deref(es *framescope, pt *te_typeexpr, a *ast_deref, x *ast_expr
   if !compute_complete_type_properties(es->cs, es->clq, param, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_virtual_cell(es, ~ *param, props), DeadMe(void)}), ~ *param, props)));
+  annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}), DeadMe(void)}), ~ *param, props)));
   return true;
 }
 
@@ -887,6 +819,7 @@ func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *
   unif_pt te_typeexpr;
   if !unify_types(pt, &ptr_unknown, &unif_pt) {
     ERR(_u8("AddressOf expr in non-pointer context"));
+    return false;
   }
   param *te_typeexpr;
   if !decompose_typeapp(&unif_pt, primitive_pointer_puretype(es->cs), &param) {
@@ -912,7 +845,7 @@ func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *
   if !compute_complete_type_properties(es->cs, es->clq, &ptr_computed.te, &ptr_props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ptr_computed.te, ptr_props)), ~ptr_computed.te, ptr_props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ptr_computed.te, ptr_props})), ~ptr_computed.te, ptr_props)));
   return true;
 }
 
@@ -961,99 +894,8 @@ func behavior_to_desc(b *derived_method_behavior, out *ctor_desc) bool {
   }
 }
 
-func computed_ptr_type(cs *checkstate, clq *clqueue, t *cu_typeexpr, ptr_out *cu_typeexpr, ptr_props_out *type_properties) void {
-  tptr te_typeexpr = ptr_type(cs, t->~);
-  ctptr cac_typeexpr;
-  if !noscoped_check_and_compute_typeexpr(cs, clq, &tptr, &ctptr) {
-    ice(_u8("computed_ptr_type fails to check and compute"));
-  }
-  check(ctptr.complete);
-  props type_properties;
-  if !compute_complete_type_properties(cs, clq, &ctptr.te, &props) {
-    ice(_u8("computed_ptr_type fails to compute properties"));
-  }
-  ptr_out->~ = ctptr.te;
-  *ptr_props_out = props;
-}
-
-func behavior_to_bi_desc(es *framescope, b *derived_method_behavior, t *cu_typeexpr, out *bi_ctor_desc) bool {
-  desc ctor_desc;
-  if !behavior_to_desc(b, &desc) {
-    return false;
-  }
-  switch desc {
-    case TrivialCtor(v void): {
-      *out = BiTrivialCtor(void);
-      return true;
-    }
-    case FunCtor(ip instpair): {
-      cptr_props type_properties;
-      cptr cu_typeexpr;
-      computed_ptr_type(es->cs, es->clq, t, &cptr, &cptr_props);
-      voidtype cu_typeexpr;
-      voidprops type_properties;
-      compute_prim(es->ds, primitive_void_type(es->cs), &voidtype, &voidprops);
-
-      fptr te_typeexpr = fn_type(es->cs, cptr.~, cptr.~, voidtype.~);
-      cfptr cac_typeexpr;
-      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &fptr, &cfptr) {
-        return false;
-      }
-      check(cfptr.complete);
-      cfptr_props type_properties;
-      if !compute_complete_type_properties(es->cs, es->clq, &cfptr.te, &cfptr_props) {
-        return false;
-      }
-
-      funcell cell_num = add_static_cell(es, ~cfptr.te, cfptr_props);
-      destptr cell_num = add_static_cell(es, cptr, cptr_props);
-      srcptr cell_num = add_static_cell(es, cptr, cptr_props);
-      retvoid cell_num = add_static_cell(es, voidtype, voidprops);
-
-      *out = BiFunCtor({ip, funcell, destptr, srcptr, retvoid});
-      return true;
-    }
-  }
-}
-
-func behavior_to_uni_desc(es *framescope, b *derived_method_behavior, t *cu_typeexpr, out *uni_ctor_desc) bool {
-  desc ctor_desc;
-  if !behavior_to_desc(b, &desc) {
-    return false;
-  }
-  switch desc {
-    case TrivialCtor(v void): {
-      *out = UniTrivialCtor(void);
-      return true;
-    }
-    case FunCtor(ip instpair): {
-      cptr_props type_properties;
-      cptr cu_typeexpr;
-      computed_ptr_type(es->cs, es->clq, t, &cptr, &cptr_props);
-      voidtype cu_typeexpr;
-      voidprops type_properties;
-      compute_prim(es->ds, primitive_void_type(es->cs), &voidtype, &voidprops);
-
-      fptr te_typeexpr = fn_type(es->cs, cptr.~, voidtype.~);
-      // TODO: This noscoped+type_properties computation is probably duped all over.
-      cfptr cac_typeexpr;
-      if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &fptr, &cfptr) {
-        return false;
-      }
-      check(cfptr.complete);
-      cfptr_props type_properties;
-      if !compute_complete_type_properties(es->cs, es->clq, &cfptr.te, &cfptr_props) {
-        return false;
-      }
-
-      funcell cell_num = add_static_cell(es, ~cfptr.te, cfptr_props);
-      argptr cell_num = add_static_cell(es, cptr, cptr_props);
-      retvoid cell_num = add_static_cell(es, voidtype, voidprops);
-
-      *out = UniFunCtor({ip, funcell, argptr, retvoid});
-      return true;
-    }
-  }
+func computed_ptr_type(clq *clqueue, t *cu_typeexpr) cu_typrop {
+  return compute_prim(clq, ptr_type(clq->cs, t->~));
 }
 
 func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
@@ -1064,28 +906,12 @@ func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   return behavior_to_desc(&props.init_behavior, out);
 }
 
-func get_init_uni_ctor(es *framescope, t *cu_typeexpr, out *uni_ctor_desc) bool {
-  props type_properties;
-  if !compute_type_properties(es->cs, es->clq, t, &props) {
-    return false;
-  }
-  return behavior_to_uni_desc(es, &props.init_behavior, t, out);
-}
-
 func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   props type_properties;
   if !compute_type_properties(ds->cs, ds->clq, t, &props) {
     return false;
   }
   return behavior_to_desc(&props.copy_behavior, out);
-}
-
-func get_copy_bi_ctor(es *framescope, t *cu_typeexpr, out *bi_ctor_desc) bool {
-  props type_properties;
-  if !compute_type_properties(es->cs, es->clq, t, &props) {
-    return false;
-  }
-  return behavior_to_bi_desc(es, &props.copy_behavior, t, out);
 }
 
 func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
@@ -1096,14 +922,6 @@ func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   return behavior_to_desc(&props.move_behavior, out);
 }
 
-func get_move_bi_ctor(es *framescope, t *cu_typeexpr, out *bi_ctor_desc) bool {
-  props type_properties;
-  if !compute_type_properties(es->cs, es->clq, t, &props) {
-    return false;
-  }
-  return behavior_to_bi_desc(es, &props.move_behavior, t, out);
-}
-
 func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   props type_properties;
   if !compute_type_properties(ds->cs, ds->clq, t, &props) {
@@ -1112,48 +930,53 @@ func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   return behavior_to_desc(&props.destroy_behavior, out);
 }
 
-func get_destroy_uni_ctor(es *framescope, t *cu_typeexpr, out *uni_ctor_desc) bool {
-  props type_properties;
-  if !compute_type_properties(es->cs, es->clq, t, &props) {
-    return false;
-  }
-  return behavior_to_uni_desc(es, &props.destroy_behavior, t, out);
-}
-
-func annotate_disposal_for_consume(es *framescope, a *ast_expr_consume) bool {
-  return annotate_disposal_for_consume(es, &a->expr, &a->after);
+func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume]) bool {
+  movable_cells shray[opt[cell_num]];
+  moved_cell_ix_discard opt[size];
+  return annotate_disposal_for_consume(es, a, &movable_cells, after, &moved_cell_ix_discard);
 }
 
 // Annotates the disposal to "consume" the value -- i.e. what happens if it's a function param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or whatever).
-func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume]) bool {
+func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *shray[opt[cell_num]], after *nc[ast_expr_after_consume], moved_cell_ix_out *opt[size]) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       if whole_temporary(&desc) {
         annotate(after, mk_after(@[consume_actions]ConsumeByInPlace(void), desc.whole_num));
       } else {
-        copy bi_ctor_desc;
-        if !get_copy_bi_ctor(es, &info->cu, &copy) {
+        copy ctor_desc;
+        if !get_copy_ctor(es->ds, &info->cu, &copy) {
           return false;
         }
-        destroy uni_ctor_desc;
-        if !get_destroy_uni_ctor(es, &ref_cell(es, desc.whole_num)->type, &destroy) {
+        destroy ctor_desc;
+        if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
           return false;
         }
-        dest cell_num = add_static_cell(es, info->cu, info->cu_props);
+        dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
         annotate(after,
           mk_after(@[consume_actions]ConsumeByCopyDestroy({{copy, dest, desc.partial_num},
                                                            {destroy, desc.whole_num}}),
                    dest));
       }
+      *moved_cell_ix_out = None();
     }
     case &IsLvalYes(desc lval_description): {
-      copy bi_ctor_desc;
-      if !get_copy_bi_ctor(es, &info->cu, &copy) {
-        return false;
+      dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
+      if case Has(ix size) = find(movable_cells, Has(desc.num)) {
+        move ctor_desc;
+        if !get_move_ctor(es->ds, &info->cu, &move) {
+          return false;
+        }
+        annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]{move, dest, desc.num}), dest));
+        *moved_cell_ix_out = Has(ix);
+      } else {
+        copy ctor_desc;
+        if !get_copy_ctor(es->ds, &info->cu, &copy) {
+          return false;
+        }
+        annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]{copy, dest, desc.num}, desc.deadme)), dest));
+        *moved_cell_ix_out = None();
       }
-      dest cell_num = add_static_cell(es, info->cu, info->cu_props);
-      annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]{copy, dest, desc.num}, desc.deadme)), dest));
     }
   }
   return true;
@@ -1164,8 +987,8 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      destroy uni_ctor_desc;
-      if !get_destroy_uni_ctor(es, &ref_cell(es, desc.whole_num)->type, &destroy) {
+      destroy ctor_desc;
+      if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
         return false;
       }
       annotate(after, mk_after_discard(@[destroy_action]{destroy, desc.whole_num}));
@@ -1192,8 +1015,8 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
   // TODO: Dedup this code or stop generating all cells at check-time.
   if true {
     info *ast_expr_complete_info = expr_complete_info(a);
-    destroy uni_ctor_desc;
-    if !get_destroy_uni_ctor(es, &info->cu, &destroy) {
+    destroy ctor_desc;
+    if !get_destroy_ctor(es->ds, &info->cu, &destroy) {
       return false;
     }
     annotate(&later->action, {destroy, result_cell(unHas(after))});
@@ -1201,8 +1024,8 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
 
   if case Has(p *ast_later_discard_info) = later2 {
     info *ast_expr_complete_info = expr_complete_info(a);
-    destroy uni_ctor_desc;
-    if !get_destroy_uni_ctor(es, &info->cu, &destroy) {
+    destroy ctor_desc;
+    if !get_destroy_ctor(es->ds, &info->cu, &destroy) {
       return false;
     }
     annotate(&p->action, {destroy, result_cell(unHas(after))});
@@ -1210,53 +1033,28 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
   return true;
 }
 
-func make_comparecells(es *framescope, dest cell_num) ast_assignment_comparecells {
-  ptrtype_props type_properties;
-  ptrtype cu_typeexpr;
-  computed_ptr_type(es->cs, es->clq, &ref_cell(es, dest)->type, &ptrtype, &ptrtype_props);
-
-  ip instpair;
+func make_comparecells(es *framescope, dest cell_num) instpair {
   if case Has(ent def_entry_id) = es->cs->prims.ptr_eq {
-    cu_parms cu_genparms = HasParms(mk_shray(ref_cell(es, dest)->type));
-    inst_id def_inst_id = enqueue_def_inst(es->cs, es->clq, ent, &cu_parms);
-    ip = {ent, inst_id};
+    parms idy_genparms = {mk_shray(ref_cell(es, dest)->type)};
+    inst_id def_inst_id = enqueue_def_inst(es->cs, es->clq, ent, &parms);
+    return {ent, inst_id};
   } else {
     ice(_u8("cs->prims.ptr_eq not initialized"));
+    return fake();
   }
-
-  booltype cu_typeexpr;
-  boolprops type_properties;
-  compute_prim(es->ds, primitive_bool_type(es->cs), &booltype, &boolprops);
-
-  fptr te_typeexpr = fn_type(es->cs, ptrtype.~, ptrtype.~, booltype.~);
-  cfptr cac_typeexpr;
-  if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &fptr, &cfptr) {
-    ice(_u8("fn_type produced non-computable type from computables"));
-  }
-  check(cfptr.complete);
-  cfptr_props type_properties;
-  if !compute_complete_type_properties(es->cs, es->clq, &cfptr.te, &cfptr_props) {
-    ice(_u8("fn_type props not computable"));
-  }
-
-  funcell cell_num = add_static_cell(es, ~cfptr.te, cfptr_props);
-  destptr cell_num = add_static_cell(es, ptrtype, ptrtype_props);
-  srcptr cell_num = add_static_cell(es, ptrtype, ptrtype_props);
-  cmp_result cell_num = add_static_cell(es, booltype, boolprops);
-  return {ip, funcell, destptr, srcptr, cmp_result};
 }
 
 func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr, assignment *ast_assignment) bool {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      target_destroy uni_ctor_desc;
-      if !get_destroy_uni_ctor(es, &ref_cell(es, dest)->type, &target_destroy) {
+      target_destroy ctor_desc;
+      if !get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
         return false;
       }
       if whole_temporary(&desc) {
-        move bi_ctor_desc;
-        if !get_move_bi_ctor(es, &ref_cell(es, dest)->type, &move) {
+        move ctor_desc;
+        if !get_move_ctor(es->ds, &ref_cell(es, dest)->type, &move) {
           return false;
         }
         annotate(&assignment->info,
@@ -1265,12 +1063,12 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
                                 @[move_action]{move, dest, desc.whole_num}}));
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
-        copy bi_ctor_desc;
-        if !get_copy_bi_ctor(es, &ref_cell(es, dest)->type, &copy) {
+        copy ctor_desc;
+        if !get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
           return false;
         }
-        destroy uni_ctor_desc;
-        if !get_destroy_uni_ctor(es, &ref_cell(es, desc.whole_num)->type, &destroy) {
+        destroy ctor_desc;
+        if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
           return false;
         }
 
@@ -1286,24 +1084,24 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         // Static self-assignment!
         annotate(&assignment->info, StaticSelfAssignment(void));
       } else {
-        target_destroy uni_ctor_desc;
-        if !get_destroy_uni_ctor(es, &ref_cell(es, dest)->type, &target_destroy) {
+        target_destroy ctor_desc;
+        if !get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
           return false;
         }
-        copy bi_ctor_desc;
-        if !get_copy_bi_ctor(es, &ref_cell(es, dest)->type, &copy) {
+        copy ctor_desc;
+        if !get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
           return false;
         }
         do_conditional bool;
         switch &target_destroy {
-        case &UniTrivialCtor(v void):
+        case &TrivialCtor(v void):
           switch &copy {
-          case &BiTrivialCtor(v2 void):
+          case &TrivialCtor(v2 void):
             do_conditional = false;
-          case &BiFunCtor(bfcd):
+          case &FunCtor(bfcd):
             do_conditional = true;
           }
-        case &UniFunCtor(ufcd):
+        case &FunCtor(ip instpair):
           do_conditional = true;
         }
         if do_conditional {
@@ -1337,7 +1135,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
   }
   switch &match_res {
     case &NoMatch(v void): {
-      MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, matching type '"), *pt, _u8("'"));
+      MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, matching type '"), pretty(es->im, pt), _u8("'"));
       return false;
     }
     case &AmbigGlobalMatch(v void): {
@@ -1346,7 +1144,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
         annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
         return true;
       } else {
-        MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), *pt);
+        MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), pretty(es->im, pt));
         return false;
       }
     }
@@ -1356,7 +1154,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       if !compute_type_properties(es->cs, es->clq, &ci.type, &props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ci.type, props)), ci.type, props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ci.type, props})), ci.type, props)));
       return true;
     }
     case &EnumVoidConstructedMatch(vci voidconstructed_info): {
@@ -1365,16 +1163,17 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       if !compute_type_properties(es->cs, es->clq, &vci.type, &props) {
         return false;
       }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, vci.type, props)), vci.type, props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.type, props})), vci.type, props)));
       return true;
     }
     case &OneGlobalMatch(gi global_info): {
-      if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, gi.ent), gi.inst) {
+      typrop *cu_typrop;
+      if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, gi.ent), gi.inst, &typrop) {
         return false;
       }
       annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({gi.ent, gi.inst}));
       inst *def_inst = ref_inst(es->cs, gi.inst);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, inst->computed_type, inst->computed_type_properties)), inst->computed_type, inst->computed_type_properties)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, typrop->cu, typrop->props})), typrop->cu, typrop->props)));
       return true;
     }
     case &OneLocalMatch(v local_info): {
@@ -1396,7 +1195,7 @@ func check_expr_string_literal(es *framescope, a *ast_string_literal, pt *te_typ
     ERR(_u8("string literal in bad place"));
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, type, props)), type, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, type, props})), type, props)));
   return true;
 }
 
@@ -1456,7 +1255,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       p_i *ast_strinit_param = ref(&a->exprs, i);
       annotate(&p_i->info, {get(&offsets, i)});
     }
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *pt, props)), ~ *pt, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
     return true;
   case &TeArraytype(b te_arraytype):
     n u32 = *unHas(&b.count);  // We checked is_complete(pt).
@@ -1489,10 +1288,10 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       p_i *ast_strinit_param = ref(&a->exprs, ~i);
       annotate(&p_i->info, {i * param_props.flat_size});
     }
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *pt, props)), ~ *pt, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
     return true;
   default:
-    MERR(es->cs, a->meta, _u8("Structure literal used on non-struct type, "), structural_type->~);
+    MERR(es->cs, a->meta, _u8("Structure literal used on non-struct type, "), pretty(es->im, &structural_type->~));
     return false;
   }
 }
@@ -1536,7 +1335,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   if !compute_complete_type_properties(es->cs, es->clq, &computed.te, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~computed.te, props)), ~computed.te, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~computed.te, props})), ~computed.te, props)));
   return true;
 }
 
@@ -1553,7 +1352,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
     if !compute_type_properties(bs->cs, bs->clq, &cu_param, &cu_param_props) {
       return false;
     }
-    cell cell_num = add_static_cell(&bs->es, cu_param, cu_param_props);
+    cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
     push(&arg_cells, cell);
     vn var_number;
     // AutoInitYes means a goto from "outside" the lambda could ostensibly construct the variable and initialize it.  That's complete haberdash, of course.
@@ -1566,7 +1365,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   }
 
   ee entryexit;
-  if !check_body(bs, &a->body.bb, &ee) {
+  if !check_body(bs, None(), &a->body.bb, &ee) {
     return false;
   }
   if !finish_lambda_body(bs, ee) {
@@ -1583,9 +1382,9 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   if !compute_complete_type_properties(bs->cs, bs->clq, return_type, &return_type_props) {
     return false;
   }
-  return_cell cell_num = add_static_cell(&bs->es, ~ *return_type, return_type_props);
+  return_cell cell_num = add_cell(&bs->es, {LocationStatic, ~ *return_type, return_type_props});
 
-  info ast_fullbody_info = {destructions, bs->es.all_vars, bs->es.cells, bs->gotos, bs->labels, bs->statements, return_cell, arg_cells};
+  info ast_fullbody_info = {destructions, bs->es.all_vars, Has(bs->es.gr), bs->gotos, bs->labels, bs->statements, return_cell, arg_cells};
   annotate(&a->body.info, info);
 
   return true;
@@ -1628,7 +1427,7 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   if !compute_complete_type_properties(es->cs, es->clq, pt, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *pt, props)), ~ *pt, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
   return true;
 }
 
@@ -1976,7 +1775,7 @@ func lookup_field_from_list(cs *checkstate, clq *clqueue, fields *shray[te_varde
     return false;
   }
 
-  *fieldtype_out = ~ ref(fields, psd.index)->type;
+  *fieldtype_out = ~ ref(fields, psd_index(&psd))->type;
   *offset_out = psd.offset;
   return true;
 }
@@ -1997,7 +1796,7 @@ func check_expr_logical_conjunction(es *framescope, a *ast_logical_conjunction, 
   if !check_expr_consume(es, oo(&a->rhs), &type.~) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, type, props)), type, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, type, props})), type, props)));
   return true;
 }
 
@@ -2019,21 +1818,22 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   if !make_fn_partial_type(es->clq, pt, &a->params, &func_pt) {
     return false;
   }
-  if !check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes(void)), &oo(&a->fun)->expr, &func_pt) {
+  funec *ast_expr_consume = oo(&a->fun);
+  if !check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes(void)), &funec->expr, &func_pt) {
     return false;
   }
 
-  if expr_type_incomplete(&oo(&a->fun)->expr) {
+  if expr_type_incomplete(&funec->expr) {
     check(ai == AllowIncompleteYes(void));
     annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
     return true;
   }
 
-  if !check_funcall_params_secondtime(es, expr_complete_type(&oo(&a->fun)->expr), &a->params) {
+  if !check_funcall_params_secondtime(es, expr_complete_type(&funec->expr), &a->params) {
     return false;
   }
 
-  if !annotate_disposal_for_consume(es, oo(&a->fun)) {
+  if !annotate_disposal_for_consume(es, &funec->expr, &funec->after) {
     return false;
   }
 
@@ -2042,7 +1842,7 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   if !compute_complete_type_properties(es->cs, es->clq, return_type, &props) {
     return false;
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_static_cell(es, ~ *return_type, props)), ~ *return_type, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *return_type, props})), ~ *return_type, props)));
   return true;
 }
 
@@ -2148,17 +1948,17 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     // TODO: This is totally duplicating field access logic.
     switch &lhs_info->lval {
       case &IsLvalYes(desc lval_description): {
-        lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props), DeadMe(void)});
+        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void)});
       }
       case &IsLvalNo(desc rval_description): {
-        lval = IsLvalNo({desc.whole_num, add_virtual_cell(es, ~ *ixtype, props)});
+        lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *ixtype, props})});
       }
     }
     // Nothing to dispose, it's a field access.
     annotate(&a->info, {None(), rhs_later});
   } else {
     // Dereferencing a pointer always makes an lvalue.
-    lval = IsLvalYes({add_virtual_cell(es, ~ *ixtype, props), DeadMe(void)});
+    lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void)});
     ie_info_after nc[ast_expr_after_consume] = NotComputed();
     lhs_later ast_later_discard_info = mk_later();
     if !annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later, None()) {

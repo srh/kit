@@ -1,3 +1,4 @@
+import anal;
 import ast;
 import box;
 import deferred;
@@ -5,99 +6,10 @@ import identmap;
 import kitutil;
 import magic;
 import objfile;
+import platform;
 import shp;
 import typeexpr;
 import u8ast;
-
-// TODO: Move platform_info stuff to different file.
-defenum numeric_representation {
-  Unsigned void;
-  SignedTwos void;
-};
-
-defenum shift_behavior {
-  // When shifting, we merely range-check the RHS (that it's >= 0 and < bitsize), and then we perform a bitshift that,
-  //   - for right shifting, is
-  //      -- logical, if repr is Unsigned
-  //      -- arithmetic, if repr is SignedTwos
-  //   - for left shifting, does not care about overflow
-  //      -- if repr is Unsigned, this has simple and straightforward consequences
-  //      -- if repr is SignedTwos, shifting can change the sign bit
-  // We range-check the RHS even if it has trap_overflow false.
-  JustRangecheckRhs void;
-};
-
-deftype numeric_traits struct {
-  repr numeric_representation;
-  shifting shift_behavior;
-  trap_overflow bool;
-  minval bigint;
-  maxval bigint;
-};
-
-deftype flat_traits struct {
-  size u32;
-  alignment u32;
-};
-
-deftype integral_traits struct {
-  flat flat_traits;
-  numeric numeric_traits;
-};
-
-def enum_tag_offset u32 = 0;
-def enum_tag_min u32 = 1;
-
-defenum endianness {
-  LittleEndian void;
-};
-
-func `==`(x endianness, y endianness) bool { return enumnum(&x) == enumnum(&y); }
-func `!=`(x endianness, y endianness) bool { return enumnum(&x) != enumnum(&y); }
-
-func check_littleendian(plat *platform_info) void {
-  if plat->endian != LittleEndian(void) {
-    ice(_u8("check_littleendian fail"));
-  }
-}
-
-defenum platform_os {
-  Linux32 void;
-  Win32 void;
-};
-
-defenum universal_calling_convention {
-  UniversalCdeclConvention void;
-};
-
-deftype platform_info struct {
-  endian endianness;
-  min_stackvar_alignment u32;
-  // How many bits are in a byte (not necessarily octet)?
-  bnno_size u32;
-  enum_tag_size u32;
-
-  voidtraits flat_traits;
-  booltraits flat_traits;
-  i8traits integral_traits;
-  u8traits integral_traits;
-  o8traits integral_traits;
-  i16traits integral_traits;
-  u16traits integral_traits;
-  o16traits integral_traits;
-  i32traits integral_traits;
-  u32traits integral_traits;
-  o32traits integral_traits;
-  difftraits integral_traits;
-  sizetraits integral_traits;
-  osizetraits integral_traits;
-  ptrtraits flat_traits;
-  fntraits flat_traits;
-
-  opsys platform_os;
-  // There's no such thing as a universal calling convention, and as soon as this fiction goes away we'll remove/change this.
-  callconv universal_calling_convention;
-};
 
 deftype cs_primitives struct {
   ptr_eq opt[def_entry_id];
@@ -126,7 +38,7 @@ deftype checkstate struct {
   instantiation_depth u32;
   plat platform_info;
   loader_ctx *void;
-  loader fn[*checkstate, sym, opt[array[u8]]];
+  loader fn[*checkstate, sym, *array[u8], bool];
 
   posits positionals;
 
@@ -151,7 +63,7 @@ deftype checkstate struct {
   prims cs_primitives;
 };
 
-func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader fn[*checkstate, sym, opt[array[u8]]]) checkstate {
+func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader fn[*checkstate, sym, *array[u8], bool]) checkstate {
   ret checkstate = {
     im,
     0,
@@ -234,8 +146,7 @@ func ref_deftype_inst(cs *checkstate, id deftype_inst_id) *deftype_inst {
   return oo(ref(&cs->type_instantiations, id.~));
 }
 
-func add_def_entry(cs *checkstate, ent def_entry) def_entry_id {
-  shent shp[def_entry] = emshp(ent);
+func add_def_entry(cs *checkstate, shent shp[def_entry]) def_entry_id {
   id def_entry_id = ~count(&cs->defs);
   push(&cs->defs, shent);
   arr *array[def_entry_id] = try_insert_lookup(&cs->defs_by_name, &oo(&shent)->def_name, mk_array());
@@ -351,7 +262,7 @@ deftype deftype_inst_info struct {
 };
 
 deftype deftype_inst struct {
-  parms cu_genparms;
+  parms idy_genparms;
   info nbfc[deftype_inst_info];
 };
 
@@ -378,11 +289,11 @@ deftype deftype_entry struct {
   nonprim opt[deftype_nonprim];
   // Info for primitive types.
   default_info opt[deftype_inst_info];
-  insts hash[cu_genparms, deftype_inst_id];
+  insts hash[idy_genparms, deftype_inst_id];
 };
 
 func mk(module_name sym, name sym, accessible array[access_entry_id], accessibility rhs_accessibility, g ast_generics, tl *ast_type_def) deftype_entry {
-  return {module_name, name, accessible, accessibility, g, Has({tl, NotComputed()}), None(), mk_hash@[cu_genparms, deftype_inst_id]()};
+  return {module_name, name, accessible, accessibility, g, Has({tl, NotComputed()}), None(), mk_hash@[idy_genparms, deftype_inst_id]()};
 }
 
 defenum fn_body_spec {
@@ -408,6 +319,8 @@ deftype graphed_fn_body struct {
   // TODO: I think this should go _outside_ graphed_fn_body.
   // How should/shouldn't we inline this?
   inline should_inline;
+  // Whether we've inlined (or begun inlining) graph.  This is used for all fn bodies -- it's about the def inlining other functions, not about stuff inlining this fn body (which is what "inline" is about) -- but it's only useful to prevent recursive inlining.
+  inline_state nbfc[basic_analyze_state];
 };
 
 deftype extern_fn_body struct {
@@ -442,55 +355,62 @@ defenum genparms {
   HasParms shray[te_typeexpr];
 };
 
-defenum cu_genparms {
-  NoParms void;
-  HasParms shray[cu_typeexpr];
+deftype idy_genparms struct {
+  // If the ast_generics is NoGenerics, this is of course empty.
+  repls shray[cu_typeexpr];
 };
 
-func hash_compute_hash(x *cu_genparms) osize {
-  switch x {
-  case &NoParms(v void):
-    return 1;
-  case &HasParms(ps shray[cu_typeexpr]):
-    accum osize = 0x12345679;
-    n size = count(&ps);
-    p *cu_typeexpr = data(&ps);
-    for i size = 0; i < n; i = i + 1 {
-      accum = (accum * 33) ^ hash_compute_hash(&p[i]);
-    }
-    return accum;
+func hash_compute_hash(x *idy_genparms) osize {
+  accum osize = 0x12345679;
+  n size = count(&x->repls);
+  p *cu_typeexpr = data(&x->repls);
+  for i size = 0; i < n; i = i + 1 {
+    accum = (accum * 33) ^ hash_compute_hash(&p[i]);
   }
+  return accum;
 }
 
-func hash_equal(x *cu_genparms, y *cu_genparms) bool {
-  return parms_equal(x, y);
+func hash_equal(x *idy_genparms, y *idy_genparms) bool {
+  return idy_typeexpr_list_equal(&x->repls, &y->repls);
 }
 
-defenum def_inst_status {
+defenum def_inst_type_status {
   DidNotStartComputingType void;
   BeganComputingType void;
   FinishedComputingType void;
-  // The following are OK, if the def_inst's rhs is None().  (Non-ephemerally, you'll only see FinishedCheckingRhs.)
+};
+
+func `==`(x def_inst_type_status, y def_inst_type_status) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+
+func `!=`(x def_inst_type_status, y def_inst_type_status) bool {
+  return !(x == y);
+}
+
+defenum def_inst_rhs_status {
+  DidNotCheckRhs void;
   BeganCheckingRhs void;
   FinishedCheckingRhs void;
 };
 
-func `==`(x def_inst_status, y def_inst_status) bool {
+func `==`(x def_inst_rhs_status, y def_inst_rhs_status) bool {
   return enumnum(&x) == enumnum(&y);
 }
 
-func `!=`(x def_inst_status, y def_inst_status) bool {
+func `!=`(x def_inst_rhs_status, y def_inst_rhs_status) bool {
   return !(x == y);
 }
 
 deftype frame_info struct {
-  cells array[cell_info];
+  // This becomes None() when we begin to fully build the graph.
+  incomplete_graph opt[frame_graph];
 };
 
 deftype def_inst_rhs_expr struct {
   ec ast_expr_consume;
-  // This becomes Has(...) when the def_inst status == FinishedCheckingRhs(void).
-  frame_info opt[frame_info];
+  // This becomes Computed(...) when the def_inst status == FinishedCheckingRhs(void).
+  frame_info nc[frame_info];
 };
 
 defenum def_inst_rhs {
@@ -511,22 +431,20 @@ deftype frame_regraphed struct {
 };
 
 deftype def_inst struct {
-  parms cu_genparms;
+  parms idy_genparms;
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None() if we have an extern def or primitive def.
   rhs def_inst_rhs;
-  status def_inst_status;
-  // TODO: Use nbfc or something.
-  // Becomes the concrete type (with generics replaced) once we've computed it and checked it (see status).
-  computed_type cu_typeexpr;
-  // Right now, these type properties _must_ indicate that the type is defwise trivial.
-  computed_type_properties type_properties;
+  // The concrete type (with generics replaced) once we've computed it and checked it.  And its properties.  The type properties _must_ (right now) indicate that the type is defwise trivial.
+  // TODO: Many needless uses of unHas, also some of the users of this could stand to take one cu_typrop parameter instead of its fields separately.
+  typrop nbfc[cu_typrop];
+  rhs_status def_inst_rhs_status;
   // This is None() for InstRhsExtern.
   graph nbfc[opt[frame_regraphed]];
   evaled_value nbfc[st_value];
 };
 
-func mk(parms cu_genparms, rhs def_inst_rhs) def_inst {
-  return {parms, rhs, DidNotStartComputingType(void), default_value@[cu_typeexpr](), default_value@[type_properties](), NotComputed@[opt[frame_regraphed]](), NotComputed@[st_value]()};
+func mk(parms idy_genparms, rhs def_inst_rhs) def_inst {
+  return {parms, rhs, NotComputed@[cu_typrop](), DidNotCheckRhs(void), NotComputed@[opt[frame_regraphed]](), NotComputed@[st_value]()};
 }
 
 deftype def_nonprim struct {
@@ -553,11 +471,11 @@ deftype def_entry struct {
   definition def_definition;
   converted_typeexpr nbfc[te_typeexpr];
 
-  insts hash[cu_genparms, def_inst_id];
+  insts hash[idy_genparms, def_inst_id];
 };
 
 func mk(module_name sym, def_name sym, accessible array[access_entry_id], generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
-  return {module_name, def_name, accessible, generics, DefnHasRhs({quick_typeexpr, tl}), NotComputed(), mk_hash@[cu_genparms, def_inst_id]()};
+  return {module_name, def_name, accessible, generics, DefnHasRhs({quick_typeexpr, tl}), NotComputed(), mk_hash@[idy_genparms, def_inst_id]()};
 }
 
 deftype clqueue_deftype_entry struct {
@@ -622,22 +540,22 @@ access depth_rewinder {
   }
 }
 
-
+// TODO: The very concept of this function will soon be (when we have true generic non-instantiated parameters) broken?
 func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
-  name sym = ref_deftype_entry(cs, ent_id)->name;
-  switch &ref_deftype_inst(cs, inst_id)->parms {
-    case &NoParms(v void): {
-      return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
+  ent *deftype_entry = ref_deftype_entry(cs, ent_id);
+  name sym = ent->name;
+  switch &ent->generics {
+  case &NoGenerics:
+    return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
+  default:
+    parms *idy_genparms = &ref_deftype_inst(cs, inst_id)->parms;
+    converted array[te_typeexpr];
+    n size = count(&parms->repls);
+    reserve(&converted, n);
+    for i size = 0; i < n; i = i + 1 {
+      push(&converted, ref(&parms->repls, i)->~);
     }
-    case &HasParms(a shray[cu_typeexpr]): {
-      converted array[te_typeexpr];
-      n size = count(&a);
-      reserve(&converted, n);
-      for i size = 0; i < n; i = i + 1 {
-        push(&converted, ref(&a, i)->~);
-      }
-      return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
-    }
+    return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
   }
 }
 

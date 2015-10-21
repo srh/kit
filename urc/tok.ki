@@ -40,18 +40,15 @@ inline func ps_restore_pos(p *ps, pos pos) void {
   p->pos = pos.~ - p->base_offset;
 }
 
-func ps_peek(p *ps) i32 {
+inline func ps_peek(p *ps) i32 {
   pos size = p->pos;
   if pos < p->length {
-    return ~p->data[pos];
-  }
-  if pos > p->length {
-    crash();
+    return +p->data[pos];
   }
   return -1;
 }
 
-func ps_step(p *ps) void {
+inline func ps_step(p *ps) void {
   if p->pos >= p->length {
     crash();
   }
@@ -92,7 +89,9 @@ func end(p *ps, meta ast_meta) void {
 
 defenum keyw {
   Access void;
+  Break void;
   Case void;
+  Continue void;
   Def void;
   Default void;
   Defclass void;
@@ -113,6 +112,7 @@ defenum keyw {
   Return void;
   Struct void;
   Switch void;
+  Then void;
   True void;
   Underscore void;
   Union void;
@@ -133,6 +133,9 @@ defenum grouper {
   RBracket void;
   LBrace void;
   RBrace void;
+  DoubleQuote void;
+  SingleQuote void;
+  Backtick void;
 };
 
 defenum tokval {
@@ -142,9 +145,6 @@ defenum tokval {
   Ident shray[i32];
   Grouper grouper;
   StringChar i32;
-  // TODO: Just make StringDelim and Backtick be Groupers.
-  StringDelim i32;
-  Backtick void;
   Bad void;
   Eof void;
   Comment void;
@@ -166,6 +166,14 @@ func `==`(a grouper, b grouper) bool {
   return enumnum(&a) == enumnum(&b);
 }
 
+func is_keyw(a *tokval, k keyw) bool {
+  if case &Keyw(j keyw) = a {
+    return j == k;
+  } else {
+    return false;
+  }
+}
+
 func equal(a *tokval, b *tokval) bool {
   if enumnum(a) != enumnum(b) { return false; }
   switch a {
@@ -175,8 +183,6 @@ func equal(a *tokval, b *tokval) bool {
   case &Ident(j): { switch b { case &Ident(k): { return shray_equal(&j, &k); } } }
   case &Grouper(j): { switch b { case &Grouper(k): { return j == k; } } }
   case &StringChar(j): { switch b { case &StringChar(k): { return j == k; } } }
-  case &StringDelim(j): { switch b { case &StringDelim(k): { return j == k; } } }
-  case &Backtick(j): { return true; }
   case &Bad(j): { return true; }
   case &Eof(j): { return true; }
   case &Comment(v): { return true; }
@@ -256,7 +262,7 @@ inline func is_string_postchar(x i32) bool {
 }
 
 inline func is_ws(x i32) bool {
-  return x == ' ' || x == '\n' || x == '\t' || x == '\r';
+  return x <= ' ' && (x == ' ' || x == '\n' || x == '\t' || x == '\r');
 }
 
 func step(p *ps) void {
@@ -287,7 +293,7 @@ func grab_tok(p *ps) tok {
     ch = ps_peek(p);
   }
   left pos = ps_pos(p);
-  if ch == @[i32]-1 {
+  if ch < 0 {
     return {{left, left}, Eof(void)};
   }
   if ch == '0' {
@@ -335,35 +341,57 @@ func grab_tok(p *ps) tok {
     }
   } else if is_ident_firstchar(ch) {
     ret tok;
-    if (grab_keyword(p, "access", Access(void), &ret)
-        || grab_keyword(p, "case", Case(void), &ret)
-        || grab_keyword(p, "def", Def(void), &ret)
-        || grab_keyword(p, "default", Default(void), &ret)
-        || grab_keyword(p, "defclass", Defclass(void), &ret)
-        || grab_keyword(p, "defenum", Defenum(void), &ret)
-        || grab_keyword(p, "deftype", Deftype(void), &ret)
-        || grab_keyword(p, "else", Else(void), &ret)
-        || grab_keyword(p, "enum", Enum(void), &ret)
-        || grab_keyword(p, "export", Export(void), &ret)
-        || grab_keyword(p, "extern", Extern(void), &ret)
-        || grab_keyword(p, "false", False(void), &ret)
-        || grab_keyword(p, "for", For(void), &ret)
-        || grab_keyword(p, "func", Func(void), &ret)
-        || grab_keyword(p, "goto", Goto(void), &ret)
-        || grab_keyword(p, "if", If(void), &ret)
-        || grab_keyword(p, "import", Import(void), &ret)
-        || grab_keyword(p, "label", Label(void), &ret)
-        || grab_keyword(p, "null", Null(void), &ret)
-        || grab_keyword(p, "return", Return(void), &ret)
-        || grab_keyword(p, "struct", Struct(void), &ret)
-        || grab_keyword(p, "switch", Switch(void), &ret)
-        || grab_keyword(p, "true", True(void), &ret)
-        || grab_keyword(p, "_", Underscore(void), &ret)
-        || grab_keyword(p, "union", Union(void), &ret)
-        || grab_keyword(p, "var", Var(void), &ret)
-        || grab_keyword(p, "void", Void(void), &ret)
-        || grab_keyword(p, "while", While(void), &ret)) {
-      return ret;
+
+    // '_' == 95, by the way.
+    if ch >= '_' && ch <= 'w' {
+      if ch < 'f' {
+        if ch < 'd' {
+          if (grab_keyword(p, "_", Underscore(void), &ret)
+              || grab_keyword(p, "access", Access(void), &ret)
+              || grab_keyword(p, "break", Break(void), &ret)
+              || grab_keyword(p, "case", Case(void), &ret)
+              || grab_keyword(p, "continue", Continue(void), &ret)) {
+            return ret;
+          }
+        } else {
+          if (grab_keyword(p, "def", Def(void), &ret)
+              || grab_keyword(p, "default", Default(void), &ret)
+              || grab_keyword(p, "defclass", Defclass(void), &ret)
+              || grab_keyword(p, "defenum", Defenum(void), &ret)
+              || grab_keyword(p, "deftype", Deftype(void), &ret)
+              || grab_keyword(p, "else", Else(void), &ret)
+              || grab_keyword(p, "enum", Enum(void), &ret)
+              || grab_keyword(p, "export", Export(void), &ret)
+              || grab_keyword(p, "extern", Extern(void), &ret)) {
+            return ret;
+          }
+        }
+      } else {
+        if ch < 'r' {
+          if (grab_keyword(p, "false", False(void), &ret)
+              || grab_keyword(p, "for", For(void), &ret)
+              || grab_keyword(p, "func", Func(void), &ret)
+              || grab_keyword(p, "goto", Goto(void), &ret)
+              || grab_keyword(p, "if", If(void), &ret)
+              || grab_keyword(p, "import", Import(void), &ret)
+              || grab_keyword(p, "label", Label(void), &ret)
+              || grab_keyword(p, "null", Null(void), &ret)) {
+            return ret;
+          }
+        } else {
+          if (grab_keyword(p, "return", Return(void), &ret)
+              || grab_keyword(p, "struct", Struct(void), &ret)
+              || grab_keyword(p, "switch", Switch(void), &ret)
+              || grab_keyword(p, "then", Then(void), &ret)
+              || grab_keyword(p, "true", True(void), &ret)
+              || grab_keyword(p, "union", Union(void), &ret)
+              || grab_keyword(p, "var", Var(void), &ret)
+              || grab_keyword(p, "void", Void(void), &ret)
+              || grab_keyword(p, "while", While(void), &ret)) {
+            return ret;
+          }
+        }
+      }
     }
 
     arr array[i32];
@@ -379,119 +407,136 @@ func grab_tok(p *ps) tok {
       return {{left, ps_pos(p)}, Bad(void)};
     }
     return mk_res(p, left, Ident(freeze(&arr)));
-  } else if ch == '(' {
-    ps_step(p);
-    return mk_res(p, left, @[tokval]Grouper(LParen(void)));
-  } else if ch == ')' {
-    ps_step(p);
-    return mk_res(p, left, @[tokval]Grouper(RParen(void)));
-  } else if ch == '[' {
-    ps_step(p);
-    return mk_res(p, left, @[tokval]Grouper(LBracket(void)));
-  } else if ch == ']' {
-    ps_step(p);
-    return mk_res(p, left, @[tokval]Grouper(RBracket(void)));
-  } else if ch == '{' {
-    ps_step(p);
-    return mk_res(p, left, @[tokval]Grouper(LBrace(void)));
-  } else if ch == '}' {
-    ps_step(p);
-    return mk_res(p, left, @[tokval]Grouper(RBrace(void)));
-  } else if ch == '\"' || ch == '\'' {
-    ps_step(p);
-    return mk_res(p, left, StringDelim(ch));
-  } else if ch == '`' {
-    ps_step(p);
-    return mk_res(p, left, Backtick(void));
-  } else if ch == '~' {
-    ps_step(p);
-    return mk_res(p, left, Oper(mk_shray(ch)));
-  } else if ch == '@' {
-    ps_step(p);
-    return mk_res(p, left, Oper(mk_shray(ch)));
-  } else if ch == '!' {
-    return grab_oper2(p, left, ch, '=');
-  } else if ch == '%' {
-    return grab_oper2(p, left, ch, '=');
-  } else if ch == '^' {
-    return grab_oper2(p, left, ch, '=');
-  } else if ch == '&' {
-    return grab_oper2(p, left, ch, '=', '&');
-  } else if ch == '*' {
-    return grab_oper2(p, left, ch, '=');
-  } else if ch == '-' {
-    arr array[i32] = mk_array(ch);
-    ps_step(p);
-    ch = ps_peek(p);
-    if ch == '=' || ch == '-' {
-      push(&arr, ch);
-      ps_step(p);
-    } else if ch == '>' {
-      push(&arr, ch);
-      ps_step(p);
-      ch = ps_peek(p);
-      if ch == '~' {
-        push(&arr, ch);
+  } else {
+    if ch < '.' {
+      if ch == '!' {
+        return grab_oper2(p, left, ch, '=');
+      } else if ch == '\"' {
         ps_step(p);
-      }
-    }
-    return mk_res(p, left, Oper(freeze(&arr)));
-  } else if ch == '=' {
-    return grab_oper2(p, left, ch, '=');
-  } else if ch == '+' {
-    return grab_oper2(p, left, ch, '=', '+');
-  } else if ch == '|' {
-    return grab_oper2(p, left, ch, '=', '|');
-  } else if ch == ':' {
-    ps_step(p);
-    return mk_res(p, left, Oper(mk_shray(ch)));
-  } else if ch == ';' {
-    ps_step(p);
-    return mk_res(p, left, Oper(mk_shray(ch)));
-  } else if ch == ',' {
-    ps_step(p);
-    return mk_res(p, left, Oper(mk_shray(ch)));
-  } else if ch == '<' {
-    return grab_angly(p, left, ch);
-  } else if ch == '.' {
-    return grab_oper2(p, left, ch, '~');
-  } else if ch == '>' {
-    return grab_angly(p, left, ch);
-  } else if ch == '/' {
-    ps_step(p);
-    ch = ps_peek(p);
-    if ch == '/' {
-      ps_step(p);
-      ch = ps_peek(p);
-      while ch != '\n' {
+        return mk_res(p, left, @[tokval]Grouper(DoubleQuote));
+      } else if ch == '%' {
+        return grab_oper2(p, left, ch, '=');
+      } else if ch == '&' {
+        return grab_oper2(p, left, ch, '=', '&');
+      } else if ch == '\'' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(SingleQuote));
+      } else if ch == '(' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(LParen(void)));
+      } else if ch == ')' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(RParen(void)));
+      } else if ch == '*' {
+        return grab_oper2(p, left, ch, '=');
+      } else if ch == '+' {
+        return grab_oper2(p, left, ch, '=', '+');
+      } else if ch == ',' {
+        ps_step(p);
+        return mk_res(p, left, Oper(mk_shray(ch)));
+      } else if ch == '-' {
+        arr array[i32] = mk_array(ch);
         ps_step(p);
         ch = ps_peek(p);
-      }
-      ps_step(p);
-      return mk_res(p, left, Comment(void));
-    } else if ch == '*' {
-      ps_step(p);
-      ch = ps_peek(p);
-      for ;; {
-        while ch != '*' {
+        if ch == '=' || ch == '-' {
+          push(&arr, ch);
+          ps_step(p);
+        } else if ch == '>' {
+          push(&arr, ch);
           ps_step(p);
           ch = ps_peek(p);
+          if ch == '~' {
+            push(&arr, ch);
+            ps_step(p);
+          }
         }
+        return mk_res(p, left, Oper(freeze(&arr)));
+      } else {
+        return {{left, ps_pos(p)}, Bad(void)};
+      }
+
+    } else if ch < '[' {
+      if ch == '.' {
+        return grab_oper2(p, left, ch, '~');
+      } else if ch == '=' {
+        return grab_oper2(p, left, ch, '=');
+      } else if ch == '/' {
         ps_step(p);
         ch = ps_peek(p);
         if ch == '/' {
           ps_step(p);
+          ch = ps_peek(p);
+          while ch != '\n' {
+            ps_step(p);
+            ch = ps_peek(p);
+          }
+          ps_step(p);
           return mk_res(p, left, Comment(void));
+        } else if ch == '*' {
+          ps_step(p);
+          ch = ps_peek(p);
+          for ;; {
+            while ch != '*' {
+              ps_step(p);
+              ch = ps_peek(p);
+            }
+            ps_step(p);
+            ch = ps_peek(p);
+            if ch == '/' {
+              ps_step(p);
+              return mk_res(p, left, Comment(void));
+            }
+          }
+        } else if ch == '=' {
+          ps_step(p);
+          return mk_res(p, left, mk_oper('/', '='));
+        } else {
+          return mk_res(p, left, mk_oper('/'));
         }
+      } else if ch == ':' {
+        ps_step(p);
+        return mk_res(p, left, Oper(mk_shray(ch)));
+      } else if ch == ';' {
+        ps_step(p);
+        return mk_res(p, left, Oper(mk_shray(ch)));
+      } else if ch == '<' {
+        return grab_angly(p, left, ch);
+      } else if ch == '>' {
+        return grab_angly(p, left, ch);
+      } else if ch == '@' {
+        ps_step(p);
+        return mk_res(p, left, Oper(mk_shray(ch)));
+      } else {
+        return {{left, ps_pos(p)}, Bad(void)};
       }
-    } else if ch == '=' {
-      ps_step(p);
-      return mk_res(p, left, mk_oper('/', '='));
+
     } else {
-      return mk_res(p, left, mk_oper('/'));
+      if ch == '[' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(LBracket(void)));
+      } else if ch == ']' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(RBracket(void)));
+      } else if ch == '^' {
+        return grab_oper2(p, left, ch, '=');
+      } else if ch == '`' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(Backtick));
+      } else if ch == '{' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(LBrace(void)));
+      } else if ch == '|' {
+        return grab_oper2(p, left, ch, '=', '|');
+      } else if ch == '}' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Grouper(RBrace(void)));
+      } else if ch == '~' {
+        ps_step(p);
+        return mk_res(p, left, Oper(mk_shray(ch)));
+      } else {
+        return {{left, ps_pos(p)}, Bad(void)};
+      }
     }
-  } else {
-    return {{left, ps_pos(p)}, Bad(void)};
   }
 }
 
@@ -548,7 +593,8 @@ func mk_oper(ch0 i32, ch1 i32, ch2 i32) tokval {
 
 func[String] grab_keyword(p *ps, s String, k keyw, out *tok) bool {
   left pos = ps_pos(p);
-  for i size = 0; i < s.length; i = i + 1 {
+  n size = s.length;
+  for i size = 0; i < n; i = i + 1 {
     si u8 = s[i];
     if ps_peek(p) != ~si {
       ps_restore_pos(p, left);
@@ -591,7 +637,12 @@ func string_grab_tok(p *ps, stop i32) tok {
     } else {
       dh i32 = ps_peek(p);
       if is_string_postchar(dh) {
-        return {{left, ps_pos(p)}, StringDelim(ch)};
+        if ch == '\"' {
+          return {{left, ps_pos(p)}, @[tokval]Grouper(DoubleQuote)};
+        } else {
+          check(ch == '\'');
+          return {{left, ps_pos(p)}, @[tokval]Grouper(SingleQuote)};
+        }
       } else {
         return {{left, ps_pos(p)}, Bad(void)};
       }

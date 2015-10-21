@@ -39,9 +39,9 @@ func run_tests(build bool) bool {
   return all_success;
 }
 
-func file_loader(cs *checkstate, name sym) opt[array[u8]] {
+func file_loader(cs *checkstate, name sym, out *array[u8]) bool {
   ns array[u8] = to_u8str(lookup(cs->im, name));
-  return read_file(concat(ns, _u8(".ki")));
+  return read_file(concat(ns, _u8(".ki")), out);
 }
 
 func run_on_file(plat platform_info, modulename array[u8]) bool {

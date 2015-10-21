@@ -77,16 +77,8 @@ deftype ast_logical_conjunction struct {
   rhs box[ast_expr_consume];
 };
 
-deftype ast_assignment_comparecells struct {
-  ip instpair;
-  funcell cell_num;
-  destptr cell_num;
-  srcptr cell_num;
-  cmp_result cell_num;
-};
-
 deftype ast_conditional_assignment_info struct {
-  comparecells ast_assignment_comparecells;
+  comparecells instpair;
 
   /* These actions perform the assignment -- they happen if the
   assignment isn't self-assignment. */
@@ -251,7 +243,7 @@ deftype ast_for_statement_info struct {
   initter_destructions array[var_destruction];
 };
 
-deftype ast_for_condition struct {
+deftype ast_expr_condition struct {
   discard ast_later_discard_info;
   expr box[ast_expr_consume];
 };
@@ -260,7 +252,7 @@ deftype ast_for_statement struct {
   // Can only be an ast_expr or ast_statement_var.
   info nc[ast_for_statement_info];
   initializer opt[box[ast_statement]];
-  condition opt[ast_for_condition];
+  condition opt[ast_expr_condition];
   increment opt[box[ast_expr_discard]];
   body ast_bracebody;
 };
@@ -274,8 +266,6 @@ deftype ast_switch_statement struct {
 
 
 deftype ast_return_statement_info struct {
-  // TODO: Nothing uses in_scope.
-  in_scope array[var_number];
   destructions array[var_destruction];
 };
 
@@ -283,6 +273,22 @@ deftype ast_return_statement struct {
   info nc[ast_return_statement_info];
   // If no expr, it returns void.
   expr opt[box[ast_expr_consume]];
+};
+
+deftype ast_break_statement_info struct {
+  destructions array[var_destruction];
+};
+
+deftype ast_break_statement struct {
+  info nc[ast_break_statement_info];
+};
+
+deftype ast_continue_statement_info struct {
+  destructions array[var_destruction];
+};
+
+deftype ast_continue_statement struct {
+  info nc[ast_continue_statement_info];
 };
 
 deftype label_num size;
@@ -318,6 +324,8 @@ defenum ast_statement {
   While ast_while_statement;
   For ast_for_statement;
   Switch ast_switch_statement;
+  Break ast_break_statement;
+  Continue ast_continue_statement;
   Label ast_label_statement;
   Goto ast_goto_statement;
 };
@@ -352,7 +360,7 @@ deftype ast_fullbody_info struct {
   parameter_destructions array[var_destruction];
 
   all_vars array[var_info];
-  cells array[cell_info];
+  incomplete_graph opt[frame_graph];
 
   gotos array[goto_info];
   labels array[label_info];
@@ -416,7 +424,7 @@ deftype ast_deref_field struct {
   fieldname ast_fieldname;
 };
 
-// TODO: This could just have an instpair field.
+// This could just have an instpair.
 deftype global_info struct {
   ent def_entry_id;
   inst def_inst_id;
@@ -492,6 +500,18 @@ deftype ast_strinit struct {
   exprs array[ast_strinit_param];
 };
 
+deftype ast_ternary_info struct {
+  conjoined_result_cell cell_num;
+};
+
+deftype ast_ternary struct {
+  info nc[ast_ternary_info];
+  // I'm not crazy enough to support case patterns in ternary operators yet.
+  condition box[ast_expr_condition];
+  then_clause box[ast_expr_consume];
+  else_clause box[ast_expr_consume];
+};
+
 // Is a non-lval an rval?  Okay.
 deftype rval_description struct {
   // The cell number of the temporary that this rval is _part of_.
@@ -565,22 +585,8 @@ defenum ctor_desc {
   FunCtor instpair;
 };
 
-defenum bi_ctor_desc {
-  BiTrivialCtor void;
-  BiFunCtor bi_fun_ctor_desc;
-};
-
-deftype bi_fun_ctor_desc struct {
-  ip instpair;
-  // Cells for the constructor params and return cell.
-  funcell cell_num;
-  destptr cell_num;
-  srcptr cell_num;
-  retvoid cell_num;
-};
-
 deftype bi_action struct {
-  ctor bi_ctor_desc;
+  ctor ctor_desc;
   dest cell_num;
   src cell_num;
 };
@@ -588,23 +594,11 @@ deftype bi_action struct {
 deftype copy_action bi_action;
 deftype move_action bi_action;
 
-defenum uni_ctor_desc {
-  UniTrivialCtor void;
-  UniFunCtor uni_fun_ctor_desc;
-};
-
-deftype uni_fun_ctor_desc struct {
-  ip instpair;
-  funcell cell_num;
-  argptr cell_num;
-  retvoid cell_num;
-};
-
 deftype destroy_action uni_action;
 deftype init_action uni_action;
 
 deftype uni_action struct {
-  ctor uni_ctor_desc;
+  ctor ctor_desc;
   arg cell_num;
 };
 
@@ -617,12 +611,14 @@ defenum consume_actions {
   ConsumeByInPlace void;
   ConsumeByCopyDestroy copy_destroy_action;
   ConsumeByCopy tup[copy_action, lval_deadme];
+  // Only used for return statements, but later will be used for other exprs.
+  ConsumeByMove move_action;
 };
 
 deftype ast_expr_after_consume struct {
   actions consume_actions;
   // The cell the expr's result... goes.
-  // TODO: We should prohibit exprs where a non-whole_field result is discarded.  This will mean we don't need to handle the case where we discard a field lookup without copying it out first.
+  // TODO: We should prohibit exprs where a non-whole_field result (or any result?) is discarded.  This will mean we don't need to handle the case where we discard a field lookup without copying it out first.
   result cell_num;
 };
 
@@ -732,6 +728,7 @@ defenum ast_expr_enum {
   DerefField ast_deref_field;
   TypedExpr ast_typed_expr;
   Strinit ast_strinit;
+  Ternary ast_ternary;
 };
 
 func mk(m ast_meta, x ast_expr_enum) ast_expr {
@@ -743,6 +740,11 @@ deftype ast_expr_consume struct {
   expr ast_expr;
 };
 
+// TODO: Remove once we can costlessly pass by value.
+func consume(expr *ast_expr) ast_expr_consume {
+  return {NotComputed@[ast_expr_after_consume](), *expr};
+}
+
 func consume(expr ast_expr) ast_expr_consume {
   return {NotComputed@[ast_expr_after_consume](), expr};
 }
@@ -751,6 +753,11 @@ deftype ast_expr_discard struct {
   after nc[ast_expr_after_discard];
   expr ast_expr;
 };
+
+// TODO: Remove once we can costlessly pass by value.
+func discard(expr *ast_expr) ast_expr_discard {
+  return {NotComputed@[ast_expr_after_discard](), *expr};
+}
 
 func discard(expr ast_expr) ast_expr_discard {
   return {NotComputed@[ast_expr_after_discard](), expr};

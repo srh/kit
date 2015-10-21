@@ -32,8 +32,7 @@ access hash[_, _] {
     check(0 == (new_limit & new_mask));
     check(h->cell_count * 2 < new_limit);
 
-    new_array array[hash_entry[K, V]];
-    repeat_out(new_limit, HashEmpty(void), &new_array);
+    new_array array[hash_entry[K, V]] = repeat(new_limit, HashEmpty(void));
     old_limit size = count(&h->arr);
     for i size = 0; i < old_limit; i = i + 1 {
       if case &HashValue(p tup[K, V]) = ref(&h->arr, i) {
@@ -50,7 +49,7 @@ access hash[_, _] {
           }
         }
 
-        set(&new_array, offset, get(&h->arr, i));
+        *ref(&new_array, offset) = get(&h->arr, i);
       }
     }
 
@@ -69,7 +68,7 @@ access hash[_, _] {
     for ;; {
       switch ref(&h->arr, offset) {
         case &HashEmpty(v void): {
-          set(&h->arr, offset, @[hash_entry[K, V]]HashValue({*key, value}));
+          *ref(&h->arr, offset) = @[hash_entry[K, V]]HashValue({*key, value});
           h->user_count = h->user_count + 1;
           h->cell_count = h->cell_count + 1;
           if h->cell_count * 2 >= count(&h->arr) {
@@ -91,7 +90,7 @@ access hash[_, _] {
             step = step + 1;
             switch ref(&h->arr, offset) {
             case &HashEmpty(v2 void):
-              set(&h->arr, insertion_offset, @[hash_entry[K, V]]HashValue({*key, value}));
+              *ref(&h->arr, insertion_offset) = @[hash_entry[K, V]]HashValue({*key, value});
               h->user_count = h->user_count + 1;
               return true;
             case &HashValue(p tup[K, V]):
@@ -121,7 +120,7 @@ access hash[_, _] {
         return false;
       case &HashValue(p tup[K, V]):
         if hash_equal(&p.car, key) {
-          set(&h->arr, offset, HashErased(void));
+          *ref(&h->arr, offset) = HashErased(void);
           h->user_count = h->user_count - 1;
           return true;
         }
@@ -136,7 +135,7 @@ access hash[_, _] {
   func[K, V] lookup_ref(h *hash[K, V], key *K) opt[*V] {
     hash_count size = count(&h->arr);
     if hash_count == 0 {
-      return None();
+      return None;
     }
     mask size = hash_count - 1;
     offset size = ~ @[osize]hash_compute_hash(key) & mask;
@@ -144,7 +143,7 @@ access hash[_, _] {
     for ;; {
       switch ref(&h->arr, offset) {
         case &HashEmpty(v void): {
-          return None();
+          return None;
         }
         case &HashValue(p tup[K, V]): {
           if hash_equal(&p.car, key) {
@@ -158,7 +157,7 @@ access hash[_, _] {
     }
   }
 
-  func[K, V] count(h *hash[K, V]) size {
+  inline func[K, V] count(h *hash[K, V]) size {
     return h->user_count;
   }
 
@@ -167,16 +166,16 @@ access hash[_, _] {
     index size;
   };
 
-  func[K, V] iter(a *hash[K, V]) hash_iter[K, V] {
+  inline func[K, V] iter(a *hash[K, V]) hash_iter[K, V] {
     ret hash_iter[K, V] = {a, 0};
     return ret;
   }
 
   func[K, V] next(it *hash_iter[K, V]) opt[*tup[K, V]] {
     i size = it->index;
-    h *hash[K, V] = it->h;
-    n size = count(&h->arr);
-    d *hash_entry[K, V] = data(&h->arr);
+    ha *array[hash_entry[K, V]] = &it->h->arr;
+    n size = count(ha);
+    d *hash_entry[K, V] = data(ha);
     for ; i < n; i = i + 1 {
       if case &HashValue(p tup[K, V]) = &d[i] {
         it->index = i + 1;
@@ -184,7 +183,7 @@ access hash[_, _] {
       }
     }
     it->index = i;
-    return None();
+    return None;
   }
 
   func[K, V] swap(x *hash[K, V], y *hash[K, V]) void {
@@ -196,6 +195,10 @@ access hash[_, _] {
     x->user_count = y->user_count;
     y->user_count = tmp_user;
   }
+}
+
+inline func[K, V] empty(a *hash[K, V]) bool {
+  return count(a) == 0;
 }
 
 func[T] sets_equal(a *hash[T, void], b *hash[T, void]) bool {
@@ -296,7 +299,18 @@ func[K, V] lookup(h *hash[K, V], key *K) opt[V] {
   if case Has(p *V) = lookup_ref(h, key) {
     return Has(*p);
   }
-  return None();
+  return None;
+}
+
+func[K, V] lookup_sole_value(h *hash[K, V], expected *K) opt[V] {
+  check(count(h) <= 1);
+  it hash_iter[K, V] = iter(h);
+  if case Has(p *tup[K, V]) = next(&it) {
+    check(hash_equal(&p->car, expected));
+    return Has(p->cdr);
+  } else {
+    return None;
+  }
 }
 
 func[K, V] member(h *hash[K, V], key *K) bool {
@@ -354,12 +368,7 @@ func[K, V] build_u8str(r *array[u8], a *hash[K, V]) void {
 }
 
 func hash_compute_hash(x *size) osize {
-  k osize = ~ *x;
-  k = k ^ (k >> 6);
-  k = k ^ (k << 13);
-  k = k ^ (k >> 17);
-  k = k * 0x23457812;
-  return k;
+  return 0x23457813 * @[osize]+ *x;
 }
 
 inline func hash_equal(x *size, y *size) bool {

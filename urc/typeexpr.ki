@@ -70,7 +70,7 @@ deftype te_vardecl struct {
   type te_typeexpr;
 };
 
-func typeexpr_list_equal(a *shray[cu_typeexpr], b *shray[cu_typeexpr]) bool {
+func idy_typeexpr_list_equal(a *shray[cu_typeexpr], b *shray[cu_typeexpr]) bool {
   n size = count(a);
   if n != count(b) {
     return false;
@@ -78,19 +78,19 @@ func typeexpr_list_equal(a *shray[cu_typeexpr], b *shray[cu_typeexpr]) bool {
   adata *cu_typeexpr = data(a);
   bdata *cu_typeexpr = data(b);
   for i size = 0; i < n; i = i + 1 {
-    if !typeexpr_equal(&adata[i], &bdata[i]) {
+    if !idy_typeexpr_equal(&adata[i], &bdata[i]) {
       return false;
     }
   }
   return true;
 }
 
-func typeexpr_equal(a *cu_typeexpr, b *cu_typeexpr) bool {
-  return help_typeexpr_equal(&a->~, &b->~);
+func idy_typeexpr_equal(a *cu_typeexpr, b *cu_typeexpr) bool {
+  return help_idy_typeexpr_equal(&a->~, &b->~);
 }
 
 // Must be called on complete, concrete types.
-func help_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
+func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
   switch a {
     case &TeName(ax te_name): {
       if case &TeName(bx te_name) = b {
@@ -99,7 +99,7 @@ func help_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
             return p.inst_id.~ == q.inst_id.~;
           }
         }
-        ice(_u8("typeexpr_equal on a non-pack-having name typeexpr"));
+        ice(_u8("idy_typeexpr_equal on a non-pack-having name typeexpr"));
       }
     }
     case &TeApp(ax te_typeapp): {
@@ -109,7 +109,7 @@ func help_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
             return p.inst_id.~ == q.inst_id.~;
           }
         }
-        ice(_u8("typeexpr_equal on non-pack-having app typeexpr"));
+        ice(_u8("idy_typeexpr_equal on non-pack-having app typeexpr"));
       }
     }
     case &TeStruct(ax te_struct): {
@@ -129,11 +129,11 @@ func help_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
     }
     case &TeArraytype(ax te_arraytype): {
       if case &TeArraytype(bx te_arraytype) = b {
-        return ax.count == bx.count && help_typeexpr_equal(oo(&ax.param), oo(&bx.param));
+        return ax.count == bx.count && help_idy_typeexpr_equal(oo(&ax.param), oo(&bx.param));
       }
     }
     case &TeUnknown(v void): {
-      ice(_u8("typeexpr_equal sees TeUnknown"));
+      ice(_u8("idy_typeexpr_equal sees TeUnknown"));
     }
   }
 
@@ -166,7 +166,7 @@ func help_te_vardecl_list_equal(a *shray[te_vardecl], b *shray[te_vardecl]) bool
   for i size = 0; i < n; i = i + 1 {
     adecl *te_vardecl = &adata[i];
     bdecl *te_vardecl = &bdata[i];
-    if !(adecl->name == bdecl->name && help_typeexpr_equal(&adecl->type, &bdecl->type)) {
+    if !(adecl->name == bdecl->name && help_idy_typeexpr_equal(&adecl->type, &bdecl->type)) {
       return false;
     }
   }
@@ -175,12 +175,12 @@ func help_te_vardecl_list_equal(a *shray[te_vardecl], b *shray[te_vardecl]) bool
 
 func enum_tag_type(cs *checkstate, et *te_enum) te_typeexpr {
   tagsize u32 = cs->plat.enum_tag_size;
-  if tagsize == 1 {
+  if tagsize == 4 {
+    return primitive_u32_type(cs);
+  } else if tagsize == 1 {
     return primitive_u8_type(cs);
   } else if tagsize == 2 {
     return primitive_u16_type(cs);
-  } else if tagsize == 4 {
-    return primitive_u32_type(cs);
   } else {
     ice(_u8("enum_tag_type does not support enum_tag_size value"));
     return fake();
@@ -197,6 +197,10 @@ func enum_field_offset(cs *checkstate, et *te_enum, tag enum_tag_value) u32 {
 
 func mk_enum_tag_value(constructor_decl_index size) enum_tag_value {
   return ~(enum_tag_min + ~constructor_decl_index);
+}
+
+func unmk_enum_tag_value(val enum_tag_value) size {
+  return @[size]~(val.~ - enum_tag_min);
 }
 
 func[H] build_u8str(help H, r *array[u8], a *cu_typeexpr) void {
@@ -333,6 +337,12 @@ func help_te_vardecl_list_compute_hash(a *shray[te_vardecl]) osize {
     accum = (accum * 3) ^ help_compute_hash(&adecl->type);
   }
   return accum;
+}
+
+func[H, T] pretty(help H, x *T) array[u8] {
+  ret array[u8];
+  pretty_u8str(help, &ret, x);
+  return ret;
 }
 
 func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {

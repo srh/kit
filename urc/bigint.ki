@@ -4,7 +4,7 @@ import shray;
 defclass copy bigint struct {
   negative bool;
   // We use a 2's complement representation.  (So -2 is represented by [0xFFFFFFFE], -1 is represented by [].)
-  parts array[u32];
+  parts shray[u32];
 };
 
 access bigint {
@@ -13,7 +13,7 @@ access bigint {
     init(&b->parts);
   }
 
-  func mk(negative bool, parts array[u32]) bigint {
+  func mk(negative bool, parts shray[u32]) bigint {
     ret bigint;
     ret.negative = negative;
     ret.parts = parts;
@@ -21,11 +21,11 @@ access bigint {
   }
 
   func `~`(x u32) bigint {
-    parts array[u32];
+    ret bigint;
     if x != 0 {
-      push(&parts, x);
+      ret.parts = mk_shray(x);
     }
-    return mk(false, parts);
+    return ret;
   }
 
   func `~`(x i32) bigint {
@@ -173,13 +173,13 @@ access bigint {
       n = n - 1;
       if get(build, n) != val {
         out->negative = negative;
-        swap(&out->parts, build);
+        out->parts = freeze(build);
         return;
       }
       pop(build);
     }
     out->negative = negative;
-    swap(&out->parts, build);
+    out->parts = freeze(build);
   }
 
   func add_to_array(x *array[u32], ix size, val u32) void {
@@ -222,14 +222,13 @@ access bigint {
       y0 u32 = get(&y->parts, 0);
       if x0 <= 0xFFFF && y0 <= 0xFFFF {
         ret bigint;
-        push(&ret.parts, x0 * y0);
+        ret.parts = mk_shray(x0 * y0);
         swap(out, &ret);
         return;
       }
     }
     ressize size = xn + yn + 3;
-    build array[u32];
-    repeat_out(ressize + 1, 0, &build);
+    build array[u32] = repeat(ressize + 1, 0);
     carry u32 = 0;
     for i size = 0; i < ressize; i = i + 1 {
       for j size = 0; j < ressize - i; j = j + 1 {
@@ -319,29 +318,35 @@ access bigint {
   }
 
   func `^`(x bigint) bigint {
+    build array[u32];
     n size = count(&x.parts);
     for i size = 0; i < n; i = i + 1 {
-      p *u32 = ref(&x.parts, i);
-      *p = ^ *p;
+      push(&build, ^get(&x.parts, i));
     }
-    x.negative = !x.negative;
-    return x;
+    return mk(!x.negative, freeze(&build));
   }
 
   func incr(x bigint) bigint {
+    build array[u32];
     carry u32 = 1;
     n size = count(&x.parts);
-    for i size = 0; carry != 0 && i < n; i = i + 1 {
-      p *u32 = ref(&x.parts, i);
-      add_oflow(carry, *p, p, &carry);
+    i size = 0;
+    for ; carry != 0 && i < n; i = i + 1 {
+      p u32 = get(&x.parts, i);
+      newp u32;
+      add_oflow(carry, p, &newp, &carry);
+      push(&build, newp);
+    }
+    for ; i < n; i = i + 1 {
+      push(&build, get(&x.parts, i));
     }
     if x.negative {
-      return squash(carry == 0, &x.parts);
+      return squash(carry == 0, &build);
     } else {
       if carry != 0 {
-        push(&x.parts, carry);
+        push(&build, carry);
       }
-      return x;
+      return mk(x.negative, freeze(&build));
     }
   }
 
@@ -377,11 +382,10 @@ access bigint {
   func `<<`(x bigint, y u32) bigint {
     wholewords size = ~(y / 32);
     yr u32 = y % 32;
-    newparts array[u32];
-    repeat_out(wholewords, @[u32] 0, &newparts);
+    newparts array[u32] = repeat(wholewords, @[u32] 0);
     if yr == 0 {
       // We handle the yr == 0 case to avoid a shift-by-32.
-      append(&newparts, &x.parts);
+      append_raw(&newparts, data(&x.parts), count(&x.parts));
     } else {
       ys u32 = 32 - yr;
       nparts size = count(&x.parts);
@@ -433,7 +437,7 @@ access bigint {
   }
 
   func `==`(x bigint, y bigint) bool {
-    return x.negative == y.negative && array_equal(&x.parts, &y.parts);
+    return x.negative == y.negative && shray_equal(&x.parts, &y.parts);
   }
   func `!=`(x bigint, y bigint) bool {
     return !(x == y);
@@ -573,8 +577,8 @@ func test_bigint() bool {
   add_test(&ctx, "b019", incr(-big("19")) == -big("18"));
   add_test(&ctx, "b020", incr(-fourg) == -(fourg - big("1")));
   add_test(&ctx, "b021", incr(-(fourg + big("1"))) == -fourg);
-  add_test(&ctx, "b022", divmod(big("17"), big("3")) == cons(big("5"), big("2")));
-  add_test(&ctx, "b023", divmod(-big("17"), big("3")) == cons(-big("6"), big("1")));
+  add_test(&ctx, "b022", divmod(big("17"), big("3")) == {big("5"), big("2")});
+  add_test(&ctx, "b023", divmod(-big("17"), big("3")) == {-big("6"), big("1")});
   add_test(&ctx, "b024", ((-big("3")) & big("3")) == big("1"));
   add_test(&ctx, "b025", ((-big("3")) | big("2")) == -big("1"));
   add_test(&ctx, "b026", ((-big("3")) ^ big("3")) == -big("2"));

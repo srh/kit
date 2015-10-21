@@ -5,6 +5,7 @@ import kitutil;
 import parse;
 import tok;
 import typeexpr;
+import shray;
 import shp;
 import state;
 import u8ast;
@@ -43,7 +44,7 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
 
 func check_module(cs *checkstate, mod_name sym) bool {
   switch process_module(cs, mod_name) {
-    case None: {
+    case None(v): {
       return false;
     }
     case Has(id module_id): {
@@ -73,22 +74,6 @@ func check_module(cs *checkstate, mod_name sym) bool {
 
       // I guess that's everything.
       return true;
-    }
-  }
-}
-
-func parms_equal(a *cu_genparms, b *cu_genparms) bool {
-  if enumnum(a) != enumnum(b) {
-    return false;
-  }
-  switch a {
-    case &NoParms(v void): { return true; }
-    case &HasParms(ah shray[cu_typeexpr]): {
-      switch b {
-        case &HasParms(bh shray[cu_typeexpr]): {
-          return typeexpr_list_equal(&ah, &bh);
-        }
-      }
     }
   }
 }
@@ -153,7 +138,7 @@ func convert_vardecl(cs *checkstate, a *ast_vardecl, out *te_vardecl) bool {
 func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
   switch a {
     case &Name(b ast_ident): {
-      *out = TeName({b.value, None});
+      *out = TeName({b.value, None()});
       return true;
     }
     case &App(b ast_typeapp): {
@@ -163,7 +148,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
            && convert_typeexpr_list(cs, &b.params, &params)) {
         return false;
       }
-      *out = TeApp({typefunc, params, None});
+      *out = TeApp({typefunc, params, None()});
       return true;
     }
     case &Struct(b ast_struct): {
@@ -199,7 +184,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
         }
         count = Has(num);
       } else {
-        count = None;
+        count = None();
       }
       param shp[te_typeexpr];
       if !convert_typeexpr(cs, oo(&b.param), oo(&param)) {
@@ -296,35 +281,26 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
       }
     }
   } else {
-    // TODO: Probably this function should take a non-prim deftype.
-    ice(_u8("Calling deftype_converted_rhs on non-prim deftype."));
+    ice(_u8("Calling deftype_converted_rhs on primitive deftype."));
     return fake();
   }
 }
 
-func enqueue_def_inst_compute_type(cs *checkstate, clq *clqueue, id def_entry_id, parms *cu_genparms, computed_type_out **cu_typeexpr, computed_type_properties_out **type_properties, inst_id_out *def_inst_id) bool {
-  inst_id def_inst_id = enqueue_def_inst(cs, clq, id, parms);
-  if !ensure_def_inst_type_computed(cs, clq, ref_def_entry(cs, id), inst_id) {
-    return false;
-  }
-  inst *def_inst = ref_inst(cs, inst_id);
-  *computed_type_out = &inst->computed_type;
-  *computed_type_properties_out = &inst->computed_type_properties;
-  *inst_id_out = inst_id;
-  return true;
-}
-
-func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *cu_genparms) def_inst_id {
-  res var = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
+func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *idy_genparms) def_inst_id {
+  res id_and_created = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDefEntry({id, res.id, cs->instantiation_depth}));
   }
   return res.id;
 }
 
+deftype id_and_created struct {
+  id def_inst_id;
+  created bool;
+};
+
 // rhs is "None()" for extern defs and primitive defs.
-func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct { id def_inst_id; created bool; } {
-  check(arity_matches(&ent->generics, parms));
+func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms) id_and_created {
   if case Has(id def_inst_id) = lookup(&ent->insts, parms) {
     return {id, false};
   }
@@ -335,7 +311,7 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
     case &DefnHasRhs(np def_nonprim):
       switch np.tl {
         case &Def(a ast_def): {
-          rhs = InstRhsExpr({a.rhs, None});
+          rhs = InstRhsExpr({a.rhs, NotComputed@[frame_info]()});
         }
         case &ExternDef(a ast_extern_def): { rhs = InstRhsExtern(void); }
         default: {
@@ -352,54 +328,56 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *cu_genparms) struct 
   return {id, true};
 }
 
-func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id) bool {
+// Outputs a stable pointer.
+func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id, out **cu_typrop) bool {
   inst *def_inst = ref_inst(cs, inst_id);
-  switch inst->status {
-    case DidNotStartComputingType(v): {
+  switch &inst->typrop {
+    case &NotComputed: {
       rw depth_rewinder;
       if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
         return false;
       }
-      inst->status = BeganComputingType(void);
+      inst->typrop = BeganComputing;
 
       ent_typeexpr *te_typeexpr;
       if !def_converted_typeexpr(cs, ent, &ent_typeexpr) {
+        inst->typrop = FailedComputation;
         return false;
       }
 
       // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
       computed cac_typeexpr;
       if !check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_typeexpr, &computed) {
+        inst->typrop = FailedComputation;
         return false;
       }
       check(computed.complete);
       props type_properties;
       cu_computed cu_typeexpr = ~computed.te;
       if !compute_type_properties(cs, clq, &cu_computed, &props) {
+        inst->typrop = FailedComputation;
         return false;
       }
-      inst->status = FinishedComputingType(void);
-      inst->computed_type = cu_computed;
-
       if !is_defwise_trivial(&props) {
         ERR(_u8("def (instantiation) has non-trivial type"));
+        inst->typrop = FailedComputation;
         return false;
       }
 
-      inst->computed_type_properties = props;
+      inst->typrop = Computed({cu_computed, props});
+      *out = unHas(&inst->typrop);
       return true;
     }
-    case BeganComputingType(v): {
-      ERR(_u8("computing def's type arouses cyclic dependency"), lookup(cs->im, ent->def_name));
+    case &BeganComputing: {
+      ERR(_u8("computing def's type arouses cyclic dependency "), lookup(cs->im, ent->def_name));
       return false;
     }
-    case FinishedComputingType(v): {
-      return true;
+    case &FailedComputation: {
+      ERR(_u8("revisiting def's type after failure for "), lookup(cs->im, ent->def_name));
+      return false;
     }
-    case BeganCheckingRhs(v): {
-      return true;
-    }
-    case FinishedCheckingRhs(v): {
+    case &Computed(typr cu_typrop): {
+      *out = &typr;
       return true;
     }
   }
@@ -407,25 +385,18 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
 
 func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
   ent *def_entry = ref_def_entry(cs, ent_id);
-  if !ensure_def_inst_type_computed(cs, clq, ent, inst_id) {
+  typrop *cu_typrop;
+  if !ensure_def_inst_type_computed(cs, clq, ent, inst_id, &typrop) {
     return false;
   }
   inst *def_inst = ref_inst(cs, inst_id);
-  switch inst->status {
-    case DidNotStartComputingType(v void): {
-      ice(_u8("unexpected DidNotStartComputingType status"));
-      return fake();
-    }
-    case BeganComputingType(v void): {
-      ice(_u8("unexpected BeganComputingType status"));
-      return fake();
-    }
-    case FinishedComputingType(v void): {
+  switch inst->rhs_status {
+    case DidNotCheckRhs(v void): {
       rw depth_rewinder;
       if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
         return false;
       }
-      inst->status = BeganCheckingRhs(void);
+      inst->rhs_status = BeganCheckingRhs(void);
       switch &inst->rhs {
         case &InstRhsPrim(op primitive_op): {
           // Do nothing.
@@ -435,10 +406,10 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         }
         case &InstRhsExpr(rhs def_inst_rhs_expr): {
           info frame_info;
-          if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs.ec, &inst->computed_type.~, &info) {
+          if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs.ec, &typrop->cu.~, ent->def_name, &info) {
             return false;
           }
-          rhs.frame_info = Has(info);
+          annotate(&rhs.frame_info, move(&info));
         }
         case &InstRhsNonMagic(nonmag def_non_magic): {
           if !check_non_magic(cs, clq, &ent->generics, &inst->parms, &nonmag) {
@@ -451,7 +422,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           }
         }
       }
-      inst->status = FinishedCheckingRhs(void);
+      inst->rhs_status = FinishedCheckingRhs(void);
       return true;
     }
     case BeganCheckingRhs(v void): {
@@ -464,10 +435,10 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
 }
 
 // parms have already had generics replaced.  They should also be complete.
-func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *cu_genparms) bool {
+func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy_genparms) bool {
   switch t {
     case &NoParms(v void): {
-      *out = NoParms(void);
+      *out = {mk_shray()};
       return true;
     }
     case &HasParms(ps shray[te_typeexpr]): {
@@ -484,7 +455,7 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *cu_
         }
         push(&cu_ps, ~computed.te);
       }
-      *out = HasParms(freeze(&cu_ps));
+      *out = {freeze(&cu_ps)};
       return true;
     }
   }
@@ -492,12 +463,12 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *cu_
 
 func noscoped_check_and_compute_typeexpr(cs *checkstate, clq *clqueue, t *te_typeexpr, out *cac_typeexpr) bool {
   ng ast_generics = NoGenerics(void);
-  np cu_genparms = NoParms(void);
+  np idy_genparms = {mk_shray()};
   return check_and_compute_typeexpr(cs, clq, &ng, &np, t, out);
 }
 
-// TODO: Generics replacement should really be a separate phase.
-func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, t *te_typeexpr, out *cac_typeexpr) bool {
+// TODO: Generics replacement should really be a separate phase.  (Why?)
+func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, t *te_typeexpr, out *cac_typeexpr) bool {
   switch t {
     case &TeName(a te_name): {
       computed cu_typeexpr;
@@ -592,7 +563,7 @@ func fake_eval_arraytype_count(x *ast_expr, count_out *u32) bool {
   }
 }
 
-func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, a *shray[te_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) bool {
+func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *shray[te_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) bool {
   n size = count(a);
   all_complete bool = true;
   all_computed array[te_vardecl];
@@ -616,7 +587,7 @@ func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_
   return true;
 }
 
-func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, a *te_name, computed_out *cu_typeexpr) bool {
+func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *te_name, computed_out *cu_typeexpr) bool {
   // Generic parameters have already been checked.  (I hope so.)
   if lookup_generic(g, parms, a->value, computed_out) {
     return true;
@@ -628,13 +599,13 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
     return false;
   }
 
-  np cu_genparms = NoParms(void);
+  np idy_genparms = {mk_shray()};
   inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &np);
   *computed_out = ~ @[te_typeexpr]TeName({a->value, Has({id, inst_id})});
   return true;
 }
 
-func check_and_compute_typeexpr_shray(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, t *shray[te_typeexpr], computed_out *shray[te_typeexpr], computed_complete_out *bool) bool {
+func check_and_compute_typeexpr_shray(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, t *shray[te_typeexpr], computed_out *shray[te_typeexpr], computed_complete_out *bool) bool {
   complete bool = true;
   computed array[te_typeexpr];
   n size = count(t);
@@ -652,7 +623,7 @@ func check_and_compute_typeexpr_shray(cs *checkstate, clq *clqueue, g *ast_gener
   return true;
 }
 
-func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *cu_genparms, a *te_typeapp, out *cac_typeexpr) bool {
+func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *te_typeapp, out *cac_typeexpr) bool {
   params_complete bool;
   params shray[te_typeexpr];
   if !check_and_compute_typeexpr_shray(cs, clq, g, parms, &a->params, &params, &params_complete) {
@@ -667,8 +638,7 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
       }
 
       if params_complete {
-        cu_params shray[cu_typeexpr] = mapconvert(&params);
-        hp cu_genparms = HasParms(cu_params);
+        hp idy_genparms = {mapconvert(&params)};
         inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
         *out = {true, TeApp({TePureName(value), params, Has({id, inst_id})})};
       } else {
@@ -712,14 +682,6 @@ func[T] help_arity_matches(a *ast_generics, params opt[*shray[T]]) bool {
   return false;
 }
 
-func arity_matches(a *ast_generics, parms *cu_genparms) bool {
-  if case &HasParms(ps shray[cu_typeexpr]) = parms {
-    return arity_matches(a, @[opt[*shray[cu_typeexpr]]]Has(&ps));
-  } else {
-    return arity_matches(a, @[opt[*shray[cu_typeexpr]]] None());
-  }
-}
-
 func ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]]) void {
   MERR(cs, m, _u8("No match for type with name '"), name, _u8("' and maybe some params"));
 }
@@ -730,7 +692,7 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_ty
     match opt[deftype_entry_id] = None();
     for i size = 0; i < n; i = i + 1 {
       id deftype_entry_id = get(arr, i);
-      ent *_ = ref_deftype_entry(cs, id);
+      ent *deftype_entry = ref_deftype_entry(cs, id);
       if arity_matches(&ent->generics, params) {
         if case Has(alt_id) = match {
           ERR(_u8("Multiple deftypes named '"), lookup(cs->im, name), _u8("' match arity"));
@@ -755,32 +717,21 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_ty
 // Returns an index into the HasGenerics array.
 func find_generic(g *ast_generics, name sym) opt[size] {
   switch g {
-    case &NoGenerics(v void): { return None(); }
-    case &HasGenerics(a array[ast_ident]): {
-      n size = count(&a);
-      for i size = 0; i < n; i = i + 1 {
-        if ref(&a, i)->value.~ == name.~ {
-          return Has(i);
-        }
-      }
-      return None();
-    }
-    case &VariadicGenerics(a ast_variadic_generics): {
-      // We can't see variadic generics because there's no "RHS type" of a fn.
-      ice(_u8("find_generic sees variadic generic."));
-      return fake();
-    }
+  case &NoGenerics(v void):
+    return None();
+  case &HasGenerics(a array[ast_ident]):
+    return lookup_name(&a, name);
+  case &VariadicGenerics(a ast_variadic_generics):
+    // We can't see variadic generics because there's no "RHS type" of a fn.
+    ice(_u8("find_generic sees variadic generic."));
+    return fake();
   }
 }
 
-func lookup_generic(g *ast_generics, parms *cu_genparms, name sym, out *cu_typeexpr) bool {
+func lookup_generic(g *ast_generics, parms *idy_genparms, name sym, out *cu_typeexpr) bool {
   if case Has(ix size) = find_generic(g, name) {
-    if case &HasParms(ps) = parms {
-      *out = *ref(&ps, ix);
-      return true;
-    } else {
-      ice(_u8("lookup_generic with non-matching parms"));
-    }
+    *out = *ref(&parms->repls, ix);
+    return true;
   }
   return false;
 }
@@ -789,7 +740,7 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
   ent *def_entry = ref_def_entry(cs, id);
   switch &ent->generics {
     case &NoGenerics(v): {
-      parms cu_genparms = NoParms(void);
+      parms idy_genparms = {mk_shray()};
       clq clqueue = mk(cs);
       discard_inst_id def_inst_id = enqueue_def_inst(cs, &clq, id, &parms);
       return finish_checking(cs, &clq);
@@ -812,27 +763,28 @@ func deftype_rhs_type(rhs *ast_type_def_rhs) *ast_typeexpr {
   }
 }
 
-func subsequent_depth(cs *checkstate, parms *cu_genparms) u32 {
-  switch parms {
-    case &NoParms(v void): {
-      return 0;
-    }
-    case &HasParms(a shray[cu_typeexpr]): {
-      return cs->instantiation_depth + 1;
-    }
+func subsequent_depth(cs *checkstate, parms *idy_genparms) u32 {
+  if empty(&parms->repls) {
+    return 0;
+  } else {
+    return cs->instantiation_depth + 1;
   }
 }
 
-func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, parms *cu_genparms) deftype_inst_id {
-  res var = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
+func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, parms *idy_genparms) deftype_inst_id {
+  res type_id_and_created = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDeftypeEntry({id, res.id, cs->instantiation_depth}));
   }
   return res.id;
 }
 
-func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *cu_genparms) struct { id deftype_inst_id; created bool; } {
-  check(arity_matches(&ent->generics, parms));
+deftype type_id_and_created struct {
+  id deftype_inst_id;
+  created bool;
+};
+
+func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *idy_genparms) type_id_and_created {
   if case Has(id deftype_inst_id) = lookup(&ent->insts, parms) {
     return {id, false};
   }
@@ -880,7 +832,6 @@ deftype struct_field_info struct {
 };
 
 deftype partial_struct_data struct {
-  index size;
   found_field bool;
   offset u32;
   max_alignment u32;
@@ -889,17 +840,20 @@ deftype partial_struct_data struct {
   copy_level u32;
   destroy_level u32;
 
-  // TODO: Get rid of index?
-  // This is of length "index." -- doesn't have all the fields if we stopped early.
+  // The length of this is the index of the search-for field (-- it doesn't have all the fields if we stopped early.)
   fields array[struct_field_info];
 };
 
+inline func psd_index(psd *partial_struct_data) size {
+  return count(&psd->fields);
+}
+
 // fields had better damn well be complete
 func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *shray[te_vardecl], name opt[sym], out *partial_struct_data) bool {
-  ret partial_struct_data = {0, false, 0, 1, 0, 0, 0, 0, mk_array@[struct_field_info]()};
+  ret partial_struct_data = {false, 0, 1, 0, 0, 0, 0, mk_array@[struct_field_info]()};
   n size = count(fields);
-  for ; ret.index < n; ret.index = ret.index + 1 {
-    vd *te_vardecl = ref(fields, ret.index);
+  for i size = 0; i < n; i = i + 1 {
+    vd *te_vardecl = ref(fields, i);
     props type_properties;
     if !compute_complete_type_properties(cs, clq, &vd->type, &props) {
       return false;
@@ -953,10 +907,10 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
       }
       final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
       *out = {final_size, psd.max_alignment,
-              level_to_derived(cs, clq, cs->im->cym.magic_init, 1, t, psd.init_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, psd.move_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, psd.copy_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, psd.destroy_level),
+              level_to_derived(cs, clq, CtorInit, 1, t, psd.init_level),
+              level_to_derived(cs, clq, CtorMove, 2, t, psd.move_level),
+              level_to_derived(cs, clq, CtorCopy, 2, t, psd.copy_level),
+              level_to_derived(cs, clq, CtorDestroy, 1, t, psd.destroy_level),
               IsScalarNo(void)};
       return true;
     }
@@ -987,9 +941,9 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
       *out = {final_size, max_alignment,
               // Enum initialization is always trivial -- initializes to zero-filled invalid tag value.
               DerivedMethodTrivial(void),
-              level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, move_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, copy_level),
-              level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, destroy_level),
+              level_to_derived(cs, clq, CtorMove, 2, t, move_level),
+              level_to_derived(cs, clq, CtorCopy, 2, t, copy_level),
+              level_to_derived(cs, clq, CtorDestroy, 1, t, destroy_level),
               IsScalarNo(void)};
       return true;
     }
@@ -1028,10 +982,10 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
 
         // We _should_ maintain alignment for a zero-element array because the pointer to such an array might hack in tag-bit logic.
         *out = {props.flat_size * c, props.flat_alignment,
-                level_to_derived(cs, clq, cs->im->cym.magic_init, 1, t, behavior_level(&props.init_behavior)),
-                level_to_derived(cs, clq, cs->im->cym.magic_move, 2, t, behavior_level(&props.move_behavior)),
-                level_to_derived(cs, clq, cs->im->cym.magic_copy, 2, t, behavior_level(&props.copy_behavior)),
-                level_to_derived(cs, clq, cs->im->cym.magic_destroy, 1, t, behavior_level(&props.destroy_behavior)),
+                level_to_derived(cs, clq, CtorInit, 1, t, behavior_level(&props.init_behavior)),
+                level_to_derived(cs, clq, CtorMove, 2, t, behavior_level(&props.move_behavior)),
+                level_to_derived(cs, clq, CtorCopy, 2, t, behavior_level(&props.copy_behavior)),
+                level_to_derived(cs, clq, CtorDestroy, 1, t, behavior_level(&props.destroy_behavior)),
                 IsScalarNo(void)};
         return true;
       } else {
@@ -1065,8 +1019,7 @@ func behavior_level(b *derived_method_behavior) u32 {
 }
 
 func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, type *te_typeexpr) instpair {
-  params array[te_typeexpr];
-  repeat_out(arity, ptr_type(cs, *type), &params);
+  params array[te_typeexpr] = repeat(arity, ptr_type(cs, *type));
   push(&params, primitive_void_type(cs));
   fntype te_typeexpr = fn_type(cs, freeze(&params));
 
@@ -1097,26 +1050,25 @@ func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, t
   }
 }
 
-func make_nontrivial(cs *checkstate, clq *clqueue, magic_name sym, arity size, type *te_typeexpr) derived_method_behavior {
-  return DerivedMethodNontrivial(make_magic_inst(cs, clq, magic_name, arity, type));
+func make_nontrivial(cs *checkstate, clq *clqueue, wc which_ctor, arity size, type *te_typeexpr) derived_method_behavior {
+  return DerivedMethodNontrivial(make_magic_inst(cs, clq, magic_name(cs->im, wc), arity, type));
 }
 
 func make_inst(cs *checkstate, clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_inst_id) bool {
-  cu_parms cu_genparms;
-  if !check_and_compute_parms(cs, clq, parms, &cu_parms) {
+  idy_parms idy_genparms;
+  if !check_and_compute_parms(cs, clq, parms, &idy_parms) {
     return false;
   }
-  inst_id def_inst_id = enqueue_def_inst(cs, clq, ent, &cu_parms);
+  inst_id def_inst_id = enqueue_def_inst(cs, clq, ent, &idy_parms);
   *inst_out = inst_id;
   return true;
 }
 
-// TODO: Use which_ctor instead of magic_name/arity, which must match.
-func level_to_derived(cs *checkstate, clq *clqueue, magic_name sym, arity size, type *te_typeexpr, level u32) derived_method_behavior {
+func level_to_derived(cs *checkstate, clq *clqueue, wc which_ctor, arity size, type *te_typeexpr, level u32) derived_method_behavior {
   if level == 0 {
     return DerivedMethodTrivial(void);
   } else if level == 1 {
-    return make_nontrivial(cs, clq, magic_name, arity, type);
+    return make_nontrivial(cs, clq, wc, arity, type);
   } else if level == 2 {
     return DerivedMethodAbsent(void);
   } else {
@@ -1230,7 +1182,7 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
   if case &Has(np deftype_nonprim) = &ent->nonprim {
     switch &np.tl->generics {
       case &NoGenerics(v): {
-        parms cu_genparms = NoParms(void);
+        parms idy_genparms = {mk_shray()};
         clq clqueue = mk(cs);
         discard_id deftype_inst_id = enqueue_deftype_inst(cs, &clq, id, &parms);
         return finish_checking(cs, &clq);
@@ -1310,30 +1262,28 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
       return Has(id);
     }
     case None(v): {
-      switch (cs->loader)(cs, mod_name) {
-        case None(v2): {
-          ERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
+      arr array[u8];
+      if (cs->loader)(cs, mod_name, &arr) {
+        mod shp[module];
+        oo(&mod)->process_state = Unprocessed(void);
+        oo(&mod)->module_name = mod_name;
+        oo(&mod)->base_offset = modules_next_base_offset(cs);
+        swap(&oo(&mod)->buf, &arr);
+        p ps = make_ps(cs->im, &cs->posits, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
+        if !parse_file(&p, &oo(&mod)->file) {
+          ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p)->interval.left)));
           return None();
         }
-        case Has(arr array[u8]): {
-          mod shp[module];
-          oo(&mod)->process_state = Unprocessed(void);
-          oo(&mod)->module_name = mod_name;
-          oo(&mod)->base_offset = modules_next_base_offset(cs);
-          oo(&mod)->buf = arr;
-          p ps = make_ps(cs->im, &cs->posits, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
-          if !parse_file(&p, &oo(&mod)->file) {
-            ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p)->interval.left)));
-            return None();
-          }
-          mod_id module_id = ~count(&cs->modules);
-          push(&cs->modules, mod);
-          if !try_insert(&cs->modules_by_name, &mod_name, mod_id) {
-            ERR(_u8("ICE: modules_by_name already has name "), lookup(cs->im, mod_name));
-            return None();
-          }
-          return Has(mod_id);
+        mod_id module_id = ~count(&cs->modules);
+        push(&cs->modules, mod);
+        if !try_insert(&cs->modules_by_name, &mod_name, mod_id) {
+          ERR(_u8("ICE: modules_by_name already has name "), lookup(cs->im, mod_name));
+          return None();
         }
+        return Has(mod_id);
+      } else {
+        ERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
+        return None();
       }
     }
   }
@@ -1370,7 +1320,7 @@ func process_module_toplevels(cs *checkstate, mod *module) bool {
 func add_def_entry(cs *checkstate,
                    module_name sym,
                    module_defs *array[def_entry_id],
-                   ent def_entry) void {
+                   ent shp[def_entry]) void {
   id def_entry_id = add_def_entry(cs, ent);
   push(module_defs, id);
 }
@@ -1402,11 +1352,11 @@ func process_toplevels(cs *checkstate,
           return false;
         }
         ent def_entry = mk(mod->module_name, a.name.value, access_scope, a.generics, quick_te, toplevel);
-        add_def_entry(cs, mod->module_name, &mod->defs, ent);
+        add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
       }
       case &ExternDef(a ast_extern_def): {
         ent def_entry = mk(mod->module_name, a.name.value, access_scope, NoGenerics(void), a.type, toplevel);
-        add_def_entry(cs, mod->module_name, &mod->defs, ent);
+        add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
       }
       case &TypeDef(a ast_type_def): {
         if !check_generics_unique(cs, &a.generics) {
@@ -1723,7 +1673,7 @@ func unify_under_generics(pt *te_typeexpr,
         if !unify_types(ref(unif_parms, ix), pt, &unified) {
           return false;
         }
-        set(unif_parms, ix, unified);
+        *ref(unif_parms, ix) = unified;
         *unified_out = TeName({a.value, None()});
         return true;
       } else {

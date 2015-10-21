@@ -177,6 +177,17 @@ func x86_mov_imm32(f *objfile, dest u8, x i32) void {
   }
 }
 
+func x86_mov_imm32(f *objfile, dest u8, x u32) void {
+  if x == 0 {
+    x86_xor_w32(f, dest, dest);
+  } else {
+    b ^[5]u8;
+    b[0] = 0xB8 + dest;
+    write_le_u32(&b[1], x);
+    append_raw(&f->text, &b[0], 5);
+  }
+}
+
 func x86_mov_stiptr(f *objfile, dest u8, symbol_table_index sti) void {
   appendtext(f, 0xB8 + dest);
   append_dir32(&f->text, symbol_table_index);
@@ -237,7 +248,11 @@ func x86_sar_cl_w8(f *objfile, dest u8) void {
 }
 
 func x86_add_esp_i32(f *objfile, x i32) void {
-  appendtext(f, 0x81, mrr(MOD11, 0, X86_ESP), x);
+  if case Has(x8 u8) = as_imm8(x) {
+    appendtext(f, 0x83, mrr(MOD11, 0, X86_ESP), x8);
+  } else {
+    appendtext(f, 0x81, mrr(MOD11, 0, X86_ESP), x);
+  }
 }
 
 func x86_add_w32(f *objfile, dest u8, src u8) void {
@@ -322,16 +337,32 @@ func x86_cmp_w8(f *objfile, lhs u8, rhs u8) void {
   appendtext(f, 0x38, mrr(MOD11, rhs, lhs));
 }
 
+func x86_math81_imm32(f *objfile, op u8, lhs u8, x i32) void {
+  if case Has(x8 u8) = as_imm8(x) {
+    appendtext(f, 0x83, mrr(MOD11, op, lhs), x8);
+  } else {
+    appendtext(f, 0x81, mrr(MOD11, op, lhs), x);
+  }
+}
+
 func x86_cmp_imm32(f *objfile, lhs u8, x u32) void {
-  appendtext(f, 0x81, mrr(MOD11, 7, lhs), x);
+  if case Has(x8 u8) = as_imm8(x) {
+    appendtext(f, 0x83, mrr(MOD11, 7, lhs), x8);
+  } else {
+    appendtext(f, 0x81, mrr(MOD11, 7, lhs), x);
+  }
 }
 
 func x86_cmp_imm32(f *objfile, lhs u8, x i32) void {
-  appendtext(f, 0x81, mrr(MOD11, 7, lhs), x);
+  x86_math81_imm32(f, 7, lhs, x);
 }
 
 func x86_cmp_reg16_imm16(f *objfile, lhs u8, x u16) void {
-  appendtext(f, 0x66, 0x81, mrr(MOD11, 7, lhs), x);
+  if case Has(x8 u8) = as_imm8(x) {
+    appendtext(f, 0x66, 0x83, mrr(MOD11, 7, lhs), x8);
+  } else {
+    appendtext(f, 0x66, 0x81, mrr(MOD11, 7, lhs), x);
+  }
 }
 
 func x86_cmp_reg8_imm8(f *objfile, lhs u8, x u8) void {
@@ -404,11 +435,19 @@ func x86_load32_zeroextend(f *objfile, dest u8, src_addr u8, src_disp i32, size 
   }
 }
 
-func x86_load32_zeroextend(f *objfile, dest u8, src cell_loc, size u32) void {
-  src_addr u8;
-  src_disp i32;
-  x86_prep_loc_use(f, src, dest, &src_addr, &src_disp);
-  x86_load32_zeroextend(f, dest, src_addr, src_disp, size);
+func x86_load32_for_primop(f *objfile, dest u8, src cell_loc, size u32) void {
+  switch x86_prep_loc_or_const(f, src, dest) {
+  case Const(b bigint):
+    // TODO: We are on relatively thin ice here -- we should just have an st_value at this point.
+    value u32;
+    if !as_non_negative_u32(&b, &value) {
+      ice(_u8("x86_load32_for_primop has invalid bigint of value "), b);
+    } else {
+      x86_mov_imm32(f, dest, value);
+    }
+  case Regdisp(rd regdisp):
+    x86_load32_zeroextend(f, dest, rd.addr, rd.disp, size);
+  }
 }
 
 func x86_store32_partial_destructively(f *objfile, dest_addr u8, dest_disp i32, src u8, size u32) void {
@@ -453,11 +492,20 @@ func x86_load32_signextend(f *objfile, dest u8, src_addr u8, src_disp i32, size 
   }
 }
 
-func x86_load32_signextend(f *objfile, dest u8, src cell_loc, size u32) void {
-  src_addr u8;
-  src_disp i32;
-  x86_prep_loc_use(f, src, dest, &src_addr, &src_disp);
-  x86_load32_signextend(f, dest, src_addr, src_disp, size);
+func x86_load32_signextend_for_primop(f *objfile, dest u8, src cell_loc, size u32) void {
+  switch x86_prep_loc_or_const(f, src, dest) {
+  case Const(b bigint):
+    // TODO: We are on relatively thin ice here -- we should just have an st_value at this point.
+    ivalue i32;
+    if as_i32(&b, &ivalue) {
+      // It doesn't matter whether we sign extend or zero extend.
+      x86_mov_imm32(f, dest, ivalue);
+    } else {
+      ice(_u8("x86_load32_signextend_for_primop has invalid bigint of value "), b);
+    }
+  case Regdisp(rd regdisp):
+    x86_load32_signextend(f, dest, rd.addr, rd.disp, size);
+  }
 }
 
 // NOTE: If this changes buflength, its consumers (like appendtext) will need to change theirs.
@@ -465,6 +513,30 @@ deftype reg_rm_encoded struct {
   length u8;
   buf ^[5]u8;
 };
+
+func as_imm8(x u16) opt[u8] {
+  if x <= + @[u8]127 {
+    return Has(~ (x & + @[u8]0xFF));
+  } else {
+    return None;
+  }
+}
+
+func as_imm8(x u32) opt[u8] {
+  if x <= 127 {
+    return Has(~ (x & 0xFF));
+  } else {
+    return None;
+  }
+}
+
+func as_imm8(x i32) opt[u8] {
+  if x >= @[i32] -128 && x <= 127 {
+    return Has(~ (x & 0xFF));
+  } else {
+    return None;
+  }
+}
 
 func encode_reg_rm(reg u8, rm_addr u8, rm_disp i32) reg_rm_encoded {
   ret reg_rm_encoded;
@@ -474,9 +546,9 @@ func encode_reg_rm(reg u8, rm_addr u8, rm_disp i32) reg_rm_encoded {
   } else if rm_addr == X86_ESP {
     // TODO: This would be nice.
     ice(_u8("encode_reg_rm does not support ESP addrs (yet)"));
-  } else if rm_disp >= @[i32] -128 && rm_disp <= 127 {
+  } else if case Has(disp8 u8) = as_imm8(rm_disp) {
     ret.buf[0] = mrr(MOD01, reg, rm_addr);
-    ret.buf[1] = ~ (rm_disp & 0xFF);
+    ret.buf[1] = disp8;
     ret.length = 2;
   } else {
     ret.buf[0] = mrr(MOD10, reg, rm_addr);
@@ -499,7 +571,7 @@ func x86_movzx16(f *objfile, dest u8, src_addr u8, src_disp i32) void {
 }
 
 func x86_and_imm32(f *objfile, dest u8, x i32) void {
-  appendtext(f, 0x81, mrr(MOD11, 4, dest), x);
+  x86_math81_imm32(f, 4, dest, x);
 }
 
 func x86_movsx8(f *objfile, dest u8, src_addr u8, src_disp i32) void {
@@ -604,6 +676,29 @@ func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
   }
 }
 
+deftype regdisp struct { addr u8; disp i32; };
+
+defenum regdisp_or_const {
+  Regdisp regdisp;
+  Const bigint;
+};
+
+func x86_prep_loc_or_const(f *objfile, loc cell_loc, avail_reg u8) regdisp_or_const {
+  switch loc {
+  case DirectLoc(off i32):
+    return Regdisp({X86_EBP, off});
+  case IndirectLoc(off i32):
+    x86_load32(f, avail_reg, X86_EBP, off);
+    return Regdisp({avail_reg, 0});
+  case ConstFuncellLoc(fnid fn_body_id):
+    // TODO: Better type safety?
+    ice(_u8("x86_prep_loc_use sees ConstFuncellLoc"));
+    return fake();
+  case ConstIntCellLoc(b bigint):
+    return Const(b);
+  }
+}
+
 func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, disp_out *i32) void {
   switch loc {
   case DirectLoc(off i32):
@@ -616,6 +711,8 @@ func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, 
   case ConstFuncellLoc(fnid fn_body_id):
     // TODO: Better type safety?
     ice(_u8("x86_prep_loc_use sees ConstFuncellLoc"));
+  case ConstIntCellLoc(b bigint):
+    ice(_u8("x86_prep_loc_use sees ConstIntCelloc"));
   }
 }
 

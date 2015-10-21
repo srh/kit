@@ -8,7 +8,7 @@ defclass[T] move shray struct {
 };
 
 access shray[_] {
-  func[T] do_init(r *shray[T]) void {
+  inline func[T] do_init(r *shray[T]) void {
     r->count = 0;
     r->cap = 0;
     r->refp = null;
@@ -50,20 +50,20 @@ access shray[_] {
     *refp = refc;
   }
 
-  func[T] data(r *shray[T]) *T {
+  inline func[T] data(r *shray[T]) *T {
     return r->ptr;
   }
 
-  func[T] count(r *shray[T]) size {
+  inline func[T] count(r *shray[T]) size {
     return r->count;
   }
 
-  func[T] get(r *shray[T], i size) T {
+  inline func[T] get(r *shray[T], i size) T {
     check(i < r->count);
     return r->ptr[i];
   }
 
-  func[T] ref(r *shray[T], i size) *T {
+  inline func[T] ref(r *shray[T], i size) *T {
     check(i < r->count);
     return &r->ptr[i];
   }
@@ -91,9 +91,18 @@ access shray[_] {
       return ret;
     }
   }
+
+  inline func[T] swap(x *shray[T], y *shray[T]) void {
+    tmp var = x->~;
+    x->~ = y->~;
+    y->~ = tmp;
+  }
 }
 
-// TODO: Make this return a shray.
+inline func[T] empty(r *shray[T]) bool {
+  return count(r) == 0;
+}
+
 func[U, T] mapconvert(x *shray[T]) shray[U] {
   build array[U];
   n size = count(x);
@@ -105,8 +114,7 @@ func[U, T] mapconvert(x *shray[T]) shray[U] {
 }
 
 func[T] repeat(n size, x T) shray[T] {
-  ret array[T];
-  repeat_out(n, x, &ret);
+  ret array[T] = repeat(n, x);
   return freeze(&ret);
 }
 
@@ -139,6 +147,16 @@ func[T, U, V, W] concat(a opt[T], b U, c V, d W) shray[T] {
   return freeze(&ret);
 }
 
+func[T] find(a *shray[T], b T) opt[size] {
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    if *ref(a, i) == b {
+      return Has(i);
+    }
+  }
+  return None;
+}
+
 func[T, U] concat(a opt[T], b U) shray[T] {
   ret array[T];
   append(&ret, &a);
@@ -146,7 +164,21 @@ func[T, U] concat(a opt[T], b U) shray[T] {
   return freeze(&ret);
 }
 
-func[T] mk_shray() shray[T] {
+inline func[T] append(x *array[T], y *shray[T]) void {
+  append_raw(x, data(y), count(y));
+}
+
+func[T] subarray(a *shray[T], i size) array[T] {
+  // If i >= count(a), successfully return empty.
+  ret array[T];
+  n size = count(a);
+  for ; i < n; i = i + 1 {
+    push(&ret, *ref(a, i));
+  }
+  return ret;
+}
+
+inline func[T] mk_shray() shray[T] {
   ret shray[T];
   return ret;
 }

@@ -83,17 +83,6 @@ func[H] build_u8str(help H, r *array[u8], x *size) void {
   append(r, unsigned_as_dec(*x));
 }
 
-func as_zerohex(width size, x size) array[u8] {
-  arr array[u8] = as_hex(x);
-  n size = count(&arr);
-  if n < width {
-    tmp var = arr;
-    repeat_out(width - n, '0', &arr);
-    append(&arr, &tmp);
-  }
-  return arr;
-}
-
 func as_hex(x size) array[u8] {
   arr array[u8];
   if x == 0 {
@@ -173,7 +162,7 @@ defenum[T] opt {
 };
 
 inline func[T] None() opt[T] {
-  return None(void);
+  return None;
 }
 
 func[T] isHas(p *opt[T]) bool {
@@ -201,7 +190,7 @@ func[T] unHas(p *opt[T]) *T {
   if case &Has(t T) = p {
     return &t;
   }
-  crash(_u8("unHas sees None()"));
+  crash(_u8("unHas sees None"));
   return fake();
 }
 
@@ -234,7 +223,7 @@ func[T] unSet(dest *opt[T]) void {
   if case &None(v void) = dest {
     crash(_u8("unset sees None"));
   }
-  *dest = None();
+  *dest = None;
 }
 
 deftype[S, T] tup struct {
@@ -270,16 +259,11 @@ inline func[S, T] wrapequate(x S, y T) bool {
   return x.~ == y.~;
 }
 
-// TODO: All uses of this are kind of fruity.
-func[T] default_value() T {
-  ret T;
-  return ret;
-}
-
 func[T] TODO() T {
   print(Stderr(), _u8("TODO()\n"));
   fflush(Stderr());
-  return default_value();
+  ret T;
+  return ret;
 }
 
 func check(x bool) void {
@@ -307,10 +291,18 @@ func[T] check_mutate(p *T, old T, new T) void {
 }
 
 inline func[T] max(x T, y T) T {
-  if (x < y) {
+  if x < y {
     return y;
   } else {
     return x;
+  }
+}
+
+inline func[T] min(x T, y T) T {
+  if x < y {
+    return x;
+  } else {
+    return y;
   }
 }
 
@@ -393,4 +385,12 @@ func[T] bufcopy(dest *T, src *T, n size) void {
   for i size = 0; i < n; i = i + 1 {
     dest[i] = src[i];
   }
+}
+
+func[T] move(x *T) T {
+  ret T;
+  destroy(&ret);
+  move(&ret, x);
+  init(x);
+  return ret;
 }
