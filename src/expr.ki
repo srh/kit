@@ -875,25 +875,30 @@ func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field,
 }
 
 func check_expr_deref(es *framescope, pt *te_typeexpr, a *ast_deref, x *ast_expr) bool {
-  ptr_pt te_typeexpr = ptr_type(es->cs, *pt);
-  ptr_cac cac_typeexpr;
-  if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_pt, &ptr_cac) {
+  ptr_pt te_typeexpr = TeUnknown;
+  // Let's force the rhs to be a complete type.  Because why not!
+  if !check_consume_then_discard_expr(es, oo(&a->rhs), &ptr_pt, &a->ptr_discard) {
     return false;
   }
-  // Seems like no point to allowing an incomplete rhs.
-  if !check_consume_then_discard_expr(es, oo(&a->rhs), &ptr_cac.te, &a->ptr_discard) {
-    return false;
-  }
+  rhs_type *cu_typeexpr = expr_complete_type(&oo(&a->rhs)->expr);
   param *te_typeexpr;
-  if !decompose_typeapp(&expr_complete_type(&oo(&a->rhs)->expr)->~, primitive_pointer_puretype(es->cs), &param) {
-    ice(_u8("Deref sees rhs type being non-pointer."));
+  if decompose_typeapp(&rhs_type->~, primitive_pointer_puretype(es->cs), &param) {
+    // param is already complete.
+    unified_discard te_typeexpr;
+    if !unify_types(pt, param, &unified_discard) {
+      ERR(_u8("Pointer dereferences into wrong type."));
+      return false;
+    }
+
+    props type_properties;
+    if !compute_complete_type_properties(es->cs, es->clq, param, &props) {
+      return false;
+    }
+    annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}), DeadMe(void), fake_lifetime(es->cs)}), ~ *param, props)));
+    return true;
   }
-  props type_properties;
-  if !compute_complete_type_properties(es->cs, es->clq, param, &props) {
-    return false;
-  }
-  annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}), DeadMe(void), fake_lifetime(es->cs)}), ~ *param, props)));
-  return true;
+  ERR(_u8("Trying to deref a non-pointer."));
+  return false;
 }
 
 func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *ast_expr) bool {
