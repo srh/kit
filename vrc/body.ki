@@ -76,7 +76,7 @@ deftype entryexit struct { entry statement_num; exit statement_num; };
 
 func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *entryexit) bool {
   nstatements size = count(&a->statements);
-  entry statement_num = add_statement(bs, None());
+  entry statement_num = add_statement(bs, None);
   exit statement_num = entry;
   vp varpopper;
   init_vp(&vp, &bs->es);
@@ -172,7 +172,7 @@ func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) bo
 
 // For exprs that we use, but then discard.  Conditionals... and switches?  Kinda.
 func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info) bool {
-  return check_consume_then_discard_expr(es, x, pt, later, None());
+  return check_consume_then_discard_expr(es, x, pt, later, None);
 }
 func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) bool {
   if !check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
@@ -231,7 +231,7 @@ func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_s
       if !check_body(bs, obp, &b.body, &body_ee) {
         return false;
       }
-      tailnum statement_num = add_statement(bs, None());
+      tailnum statement_num = add_statement(bs, None);
       connect_statements(bs, num, tailnum);
       connect_statements(bs, num, body_ee.entry);
       connect_statements(bs, body_ee.exit, tailnum);
@@ -256,7 +256,7 @@ func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_s
       if !check_body(bs, obp, &b.elsebody, &else_ee) {
         return false;
       }
-      tailnum statement_num = add_statement(bs, None());
+      tailnum statement_num = add_statement(bs, None);
       connect_statements(bs, num, then_ee.entry);
       connect_statements(bs, num, else_ee.entry);
       connect_statements(bs, then_ee.exit, tailnum);
@@ -268,7 +268,7 @@ func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_s
       swartch_vp varpopper;
       init_vp(&swartch_vp, &bs->es);
 
-      tailnum statement_num = add_statement(bs, None());
+      tailnum statement_num = add_statement(bs, None);
       bp breakpack = {tailnum, vars_in_scope(&bs->es), num, vars_in_scope(&bs->es)};
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
@@ -309,7 +309,7 @@ func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_s
         }
         annotate(&b.info, {destructions});
         connect_statements(bs, num, bp->break_target);
-        *ee_out = {num, add_statement(bs, None())};
+        *ee_out = {num, add_statement(bs, None)};
       } else {
         ERR(_u8("break statement in bad place."));
         return false;
@@ -323,7 +323,7 @@ func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_s
         }
         annotate(&b.info, {destructions});
         connect_statements(bs, num, bp->continue_target);
-        *ee_out = {num, add_statement(bs, None())};
+        *ee_out = {num, add_statement(bs, None)};
       } else {
         ERR(_u8("continue statement in bad place."));
         return false;
@@ -343,7 +343,7 @@ func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_s
 
     case &Goto(b ast_goto_statement): {
       push(&bs->gotos, {num, &b, b.target.value, vars_in_scope(&bs->es)});
-      *ee_out = {num, add_statement(bs, None())};
+      *ee_out = {num, add_statement(bs, None)};
     }
   }
   return true;
@@ -371,14 +371,14 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
   }
   // enum_type is complete, because complete_structural_rhs does that.
 
-  exitnum statement_num = add_statement(bs, None());
+  exitnum statement_num = add_statement(bs, None);
 
   if case &TeEnum(et te_enum) = enum_type {
     ncases size = count(&a->cases);
     swartch_vp varpopper;
     init_vp(&swartch_vp, &bs->es);
     swartch_vn var_number;
-    if !es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None(), swartch_type, VarSelfContained(void), &swartch_vn) {
+    if !es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, swartch_type, VarSelfContained(void), &swartch_vn) {
       return false;
     }
     for i size = 0; i < ncases; i = i + 1 {
@@ -446,7 +446,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
               ERR(_u8("decl-free case pattern used with non-void case"));
               return false;
             }
-            ovn = None();
+            ovn = None;
           }
           annotate(&patt.cp_info, {ovn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
 
@@ -492,10 +492,10 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
 
   initter_vp varpopper;
   init_vp(&initter_vp, &bs->es);
-  loopnum statement_num = add_statement(bs, None());
+  loopnum statement_num = add_statement(bs, None);
   if case &Has(initter box[ast_statement]) = &a->initializer {
     initter_ee entryexit;
-    if !check_statement(bs, &initter_vp, None(), oo(&initter), &initter_ee) {
+    if !check_statement(bs, &initter_vp, None, oo(&initter), &initter_ee) {
       return false;
     }
     connect_statements(bs, num, initter_ee.entry);
@@ -505,7 +505,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   }
   loop_in_scope array[var_number] = vars_in_scope(&bs->es);
 
-  exitnum statement_num = add_statement(bs, None());
+  exitnum statement_num = add_statement(bs, None);
   cond_vp varpopper;
   init_vp(&cond_vp, &bs->es);
   if case &Has(cond ast_expr_condition) = &a->condition {
@@ -515,7 +515,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
     }
     connect_statements(bs, loopnum, exitnum);
     cond_vn var_number;
-    if !es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None(), &boolean, VarSelfContained(void), &cond_vn) {
+    if !es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, &boolean, VarSelfContained(void), &cond_vn) {
       return false;
     }
   }
@@ -652,7 +652,7 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
       ERR(_u8("Empty return statement with non-void return value."));
       return false;
     }
-    moved_var_ix = None();
+    moved_var_ix = None;
   }
   if case Has(ix size) = moved_var_ix {
     shifterase_elem(&vars, ix);
@@ -662,7 +662,7 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
     return false;
   }
   annotate(&a->info, {destructions});
-  *exit_out = add_statement(bs, None());
+  *exit_out = add_statement(bs, None);
   return true;
 }
 
@@ -673,7 +673,7 @@ func help_lookup_label(labels *array[label_info], label_name sym) opt[size] {
       return Has(i);
     }
   }
-  return None();
+  return None;
 }
 
 func lookup_label(bs *bodystate, label_name sym) opt[size] {
@@ -697,14 +697,14 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
 }
 
 func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info) bool {
-  return check_condition(es, swartch_vp, cond_vp, a, cd, None());
+  return check_condition(es, swartch_vp, cond_vp, a, cd, None);
 }
 
 func cdi_later(cdo opt[*ast_condition_discard_info]) opt[*ast_later_discard_info] {
   if case Has(p) = cdo {
     return Has(&p->later);
   } else {
-    return None();
+    return None;
   }
 }
 
@@ -718,12 +718,12 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
       // We need return statements in the "then" or "else" block to mark the boolean condition dead.  (It would be a smarter graph if we just marked it dead immediately after the branch, but... this way makes the code here handle all cases equivalently.)
       swartch_vn var_number;
-      if !es_push_var(es, swartch_vp, result_cell(oo(&b)), None(), &booltype, VarSelfContained(void), &swartch_vn) {
+      if !es_push_var(es, swartch_vp, result_cell(oo(&b)), None, &booltype, VarSelfContained(void), &swartch_vn) {
         return false;
       }
-      annotate(&cd->virtual_cell_dead, None());
+      annotate(&cd->virtual_cell_dead, None);
       if case Has(p) = cd2 {
-        annotate(&p->virtual_cell_dead, None());
+        annotate(&p->virtual_cell_dead, None);
       }
       return true;
     }
@@ -751,7 +751,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
       if case &TeEnum(et te_enum) = enum_type {
         if true {
           swartch_vn var_number;
-          if !es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None(), swartch_type, VarSelfContained(void), &swartch_vn) {
+          if !es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, swartch_type, VarSelfContained(void), &swartch_vn) {
             return false;
           }
         }
@@ -815,11 +815,11 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
             ERR(_u8("decl-free case pattern used with non-void case"));
             return false;
           }
-          annotate(&cd->virtual_cell_dead, None());
+          annotate(&cd->virtual_cell_dead, None);
           if case Has(p) = cd2 {
-            annotate(&p->virtual_cell_dead, None());
+            annotate(&p->virtual_cell_dead, None);
           }
-          ovn = None();
+          ovn = None;
         }
         tag_value enum_tag_value = mk_enum_tag_value(decl_index);
         annotate(&b.pattern.cp_info, {ovn, tag_value, enum_field_offset(es->cs, &et, tag_value)});

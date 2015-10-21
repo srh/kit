@@ -35,7 +35,7 @@ deftype magic_arraytype_info struct {
 
 defenum magic_ctor_info {
   MagicWholeFieldInfo magic_whole_field_info;
-  // These are None() for fields that are trivially constructed.  But of course one field is not None().
+  // These are None for fields that are trivially constructed.  But of course one field is not None.
   MagicStructInfo magic_struct_info;
   MagicEnumInfo magic_enum_info;
   MagicArraytypeInfo magic_arraytype_info;
@@ -359,7 +359,7 @@ func instpair_or_trivial_from_behavior(b *derived_method_behavior) opt[instpair]
     }
     case &DerivedMethodExplicit(ip instpair): { return Has(ip); }
     case &DerivedMethodNontrivial(ip instpair): { return Has(ip); }
-    case &DerivedMethodTrivial(v void): { return None(); }
+    case &DerivedMethodTrivial(v void): { return None; }
   }
 }
 

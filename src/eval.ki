@@ -26,7 +26,7 @@ deftype st_env struct {
 };
 
 func mk_env(pool *st_objpool, plat platform_info, num_cells size) st_env {
-  ret st_env = {pool, plat, repeat(num_cells, None())};
+  ret st_env = {pool, plat, repeat(num_cells, None)};
   return ret;
 }
 
@@ -435,7 +435,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
               ice(_u8("Function parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.~)->type), _u8(")"));
             }
             push(&paramorefs, param_oref);
-            *ref(&env->framecells, c.~) = None();
+            *ref(&env->framecells, c.~) = None;
           }
 
           st_maybe_init_static(&fg->gr, env, a.retcell);
@@ -576,11 +576,11 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
             if !is_full_oref(env, objref) {
               ice(_u8("GrDead sees non-full objref"));
             }
-            *ref(&env->pool->objects, objref.num.~) = None();
+            *ref(&env->pool->objects, objref.num.~) = None;
           } else {
             ice(_u8("GrDead deading inactive cell"));
           }
-          *ref(&env->framecells, a.cell.~) = None();
+          *ref(&env->framecells, a.cell.~) = None;
 
         case &GrVirtualDead(a gr_virtual_dead):
           // TODO: At some point we'll want to assert that virtual cells (and static cells) dead when we define them _active_.
@@ -588,7 +588,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
           if !isHas(ref(&env->framecells, a.cell.~)) {
             ice(_u8("GrVirtualDead deading inactive cell "), a.cell.~);
           }
-          *ref(&env->framecells, a.cell.~) = None();
+          *ref(&env->framecells, a.cell.~) = None;
 
         case &GrXNop(v void): { }
 

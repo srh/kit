@@ -85,31 +85,31 @@ defenum primitive_op {
 };
 
 func primitive_bool_type(cs *checkstate) te_typeexpr {
-  return TeName({cs->im->cym.boolsym, None()});
+  return TeName({cs->im->cym.boolsym, None});
 }
 
 func primitive_void_type(cs *checkstate) te_typeexpr {
-  return TeName({cs->im->cym.voidsym, None()});
+  return TeName({cs->im->cym.voidsym, None});
 }
 
 func primitive_u8_type(cs *checkstate) te_typeexpr {
-  return TeName({cs->im->cym.u8sym, None()});
+  return TeName({cs->im->cym.u8sym, None});
 }
 
 func primitive_u16_type(cs *checkstate) te_typeexpr {
-  return TeName({cs->im->cym.u16sym, None()});
+  return TeName({cs->im->cym.u16sym, None});
 }
 
 func primitive_u32_type(cs *checkstate) te_typeexpr {
-  return TeName({cs->im->cym.u32sym, None()});
+  return TeName({cs->im->cym.u32sym, None});
 }
 
 func primitive_i32_type(cs *checkstate) te_typeexpr {
-  return TeName({cs->im->cym.i32sym, None()});
+  return TeName({cs->im->cym.i32sym, None});
 }
 
 func primitive_size_type(cs *checkstate) te_typeexpr {
-  return TeName({cs->im->cym.sizesym, None()});
+  return TeName({cs->im->cym.sizesym, None});
 }
 
 func primitive_string_literal_type(cs *checkstate, n size) te_typeexpr {
@@ -157,12 +157,12 @@ func is_fn_type(cs *checkstate, t *te_typeexpr) bool {
 }
 
 func add_conversion(cs *checkstate, from tup[sym, integral_traits], to tup[sym, integral_traits]) void {
-  type te_typeexpr = fn_type(cs, @[te_typeexpr]TeName({from.car, None()}), @[te_typeexpr]TeName({to.car, None()}));
+  type te_typeexpr = fn_type(cs, @[te_typeexpr]TeName({from.car, None}), @[te_typeexpr]TeName({to.car, None}));
   add_def_primitive(cs, cs->im->cym.convertsym, type, @[primitive_op]PrimConversion({from.cdr.flat.size, from.cdr.numeric, to.cdr.flat.size, to.cdr.numeric}));
 }
 
 func add_nonlossy_conversion(cs *checkstate, from tup[sym, integral_traits], to tup[sym, integral_traits]) void {
-  type te_typeexpr = fn_type(cs, @[te_typeexpr]TeName({from.car, None()}), @[te_typeexpr]TeName({to.car, None()}));
+  type te_typeexpr = fn_type(cs, @[te_typeexpr]TeName({from.car, None}), @[te_typeexpr]TeName({to.car, None}));
   add_def_primitive(cs, cs->im->cym.nonlossyconvertsym, type, @[primitive_op]PrimConversion({from.cdr.flat.size, from.cdr.numeric, to.cdr.flat.size, to.cdr.numeric}));
 }
 
@@ -257,7 +257,7 @@ func add_def_primitive(cs *checkstate, name sym, type te_typeexpr, op primitive_
 }
 
 func add_op_primitive(cs *checkstate, oper sym, typename sym, arity size, op primitive_op) void {
-  type te_typeexpr = fn_type(cs, repeat(arity + 1, @[te_typeexpr]TeName({typename, None()})));
+  type te_typeexpr = fn_type(cs, repeat(arity + 1, @[te_typeexpr]TeName({typename, None})));
   add_def_primitive(cs, oper, type, op);
 }
 
@@ -267,7 +267,7 @@ func add_comparison_primitive(cs *checkstate, oper sym, generics ast_generics, t
 }
 
 func add_comparison_primitive(cs *checkstate, oper sym, typename sym, op primitive_op) void {
-  add_comparison_primitive(cs, oper, NoGenerics(void), @[te_typeexpr]TeName({typename, None()}), op);
+  add_comparison_primitive(cs, oper, NoGenerics(void), @[te_typeexpr]TeName({typename, None}), op);
 }
 
 func add_binop_primitive(cs *checkstate, oper sym, typename sym, op primitive_op) void {
@@ -331,7 +331,7 @@ func add_bool_primitive(cs *checkstate) void {
 
 func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) void {
   info deftype_inst_info = {
-    None(),
+    None,
     @[type_properties]{
       flat_traits.size,
       flat_traits.alignment,
@@ -351,7 +351,7 @@ func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
 
   // access_scope is not relevant to a primitive deftype.
   access_scope array[access_entry_id];
-  ent deftype_entry = {cs->im->cym.primitive_module_sym, name, access_scope, RhsImpossible(void), NoGenerics(void), None(), Has(info), instst};
+  ent deftype_entry = {cs->im->cym.primitive_module_sym, name, access_scope, RhsImpossible(void), NoGenerics(void), None, Has(info), instst};
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" module.
 }
@@ -361,7 +361,7 @@ func tee_generic(cs *checkstate) ast_generics {
 }
 
 func fn_type(cs *checkstate, params shray[te_typeexpr]) te_typeexpr {
-  return TeApp({primitive_function_puretype(cs), params, None()});
+  return TeApp({primitive_function_puretype(cs), params, None});
 }
 
 func fn_type(cs *checkstate, params shray[te_typeexpr], return_type te_typeexpr) te_typeexpr {
@@ -379,12 +379,12 @@ func fn_type(cs *checkstate, t te_typeexpr, u te_typeexpr, v te_typeexpr) te_typ
 }
 
 func ptr_type(cs *checkstate, t te_typeexpr) te_typeexpr {
-  return TeApp({primitive_pointer_puretype(cs), mk_shray(t), None()});
+  return TeApp({primitive_pointer_puretype(cs), mk_shray(t), None});
 }
 
 func add_pointer_primitive(cs *checkstate) void {
   add_pointer_primitive_type(cs);
-  tee_type te_typeexpr = TeName({cs->im->cym.tee_sym, None()});
+  tee_type te_typeexpr = TeName({cs->im->cym.tee_sym, None});
   bool_type te_typeexpr = primitive_bool_type(cs);
   ent def_entry_id = add_comparison_primitive(cs, intern(cs->im, _s("==")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpEq(void)}));
   set(&cs->prims.ptr_eq, ent);
@@ -404,8 +404,8 @@ func add_pointer_primitive_type(cs *checkstate) void {
     mk_array@[access_entry_id](),
     RhsImpossible(void),
     HasGenerics(one_generic),
-    None(),
-    Has({None(),
+    None,
+    Has({None,
          @[type_properties]{
            cs->plat.ptrtraits.size,
            cs->plat.ptrtraits.alignment,
@@ -429,8 +429,8 @@ func add_function_primitive(cs *checkstate) void {
     mk_array@[access_entry_id](),
     RhsImpossible(void),
     VariadicGenerics({mk_array@[ast_ident](), {fake_ast_meta(), cs->im->cym.tee_sym}, mk_array({fake_ast_meta(), cs->im->cym.uee_sym})}),
-    None(),
-    Has({None(),
+    None,
+    Has({None,
          @[type_properties]{
            cs->plat.fntraits.size,
            cs->plat.fntraits.alignment,
@@ -447,21 +447,21 @@ func add_function_primitive(cs *checkstate) void {
 }
 
 func add_non_magic_fn_primitive(cs *checkstate, name sym, args size, nonmag def_non_magic) void {
-  parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None()})));
+  parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None})));
   push(&parms, primitive_void_type(cs));
   type te_typeexpr = fn_type(cs, freeze(&parms));
   add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnNonMagic(nonmag));
 }
 
 func add_magic_constructor_primitive(cs *checkstate, name sym, args size, mag def_magic) void {
-  parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None()})));
+  parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None})));
   push(&parms, primitive_void_type(cs));
   type te_typeexpr = fn_type(cs, freeze(&parms));
   add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnMagic(mag));
 }
 
 func add_magic_constructor_primitives(cs *checkstate) void {
-  teetype te_typeexpr = TeName({cs->im->cym.tee_sym, None()});
+  teetype te_typeexpr = TeName({cs->im->cym.tee_sym, None});
   add_non_magic_fn_primitive(cs, cs->im->cym.init, 1, @[def_non_magic]NonMagicCtor({CtorInit(void), {teetype, NotComputed@[non_magic_ctor_info]()}}));
   add_non_magic_fn_primitive(cs, cs->im->cym.copy, 2, @[def_non_magic]NonMagicCtor({CtorCopy(void), {teetype, NotComputed@[non_magic_ctor_info]()}}));
   add_non_magic_fn_primitive(cs, cs->im->cym.move, 2, @[def_non_magic]NonMagicCtor({CtorMove(void), {teetype, NotComputed@[non_magic_ctor_info]()}}));

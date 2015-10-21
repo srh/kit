@@ -161,10 +161,6 @@ defenum[T] opt {
   Has T;
 };
 
-inline func[T] None() opt[T] {
-  return None;
-}
-
 func[T] isHas(p *opt[T]) bool {
   if case &Has(x) = p {
     return true;

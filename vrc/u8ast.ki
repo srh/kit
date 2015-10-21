@@ -121,7 +121,7 @@ func[H] build_u8str(help H, r *array[u8], a *ast_vardecl) void {
 func[H, T] build_u8str(help H, r *array[u8], a *opt[T]) void {
   switch a {
     case &None(v): {
-      append(r, _u8("None()"));
+      append(r, _u8("None"));
     }
     case &Has(b T): {
       append(r, _u8("Has("));

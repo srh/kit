@@ -84,7 +84,7 @@ func try_parse_keyw(p *ps, expected keyw) opt[ast_meta] {
       return Has(meta);
     }
   }
-  return None();  // Fail
+  return None;  // Fail
 }
 
 func try_skip_keyw(p *ps, expected keyw) parse_result {
@@ -103,7 +103,7 @@ func try_parse_token(p *ps, expected tokval) opt[ast_meta] {
     step(p);
     return Has(meta);
   }
-  return None();  // Fail
+  return None;  // Fail
 }
 
 func try_skip_token(p *ps, expected tokval) parse_result {
@@ -205,7 +205,7 @@ func parse_rest_of_func(p *ps, is_export ast_isexport, is_inline ast_isinline, o
     return Fail;
   }
 
-  *out = Def({is_export, IsNotVar(void), generics, name, None(),
+  *out = Def({is_export, IsNotVar(void), generics, name, None,
               consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({is_inline, params, return_type, {NotComputed@[ast_fullbody_info](), body}})))});
   return Success;
 }
@@ -219,7 +219,7 @@ func parse_rest_of_def(p *ps, is_export ast_isexport, is_var ast_isvar, out *ast
 
   typeexpr opt[ast_typeexpr];
   if +try_skip_oper(p, '=') {
-    typeexpr = None();
+    typeexpr = None;
   } else {
     t ast_typeexpr;
     if !(+parse_typeexpr(p, &t) && +try_skip_oper(p, '=')) {
@@ -649,7 +649,7 @@ func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) parse_re
           return Fail;
         }
 
-        *out = Arraytype({None(), param});
+        *out = Arraytype({None, param});
         return Success;
       }
     }
@@ -833,7 +833,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       m ast_meta = copyend(p, lhs.meta);
       // (TODO: Is expanding out this funcall/typed/addressof expr the best software design choice?  I think so, we can add layover information saying this is an incr expr, later.  Likewise with user assignment ops.)
       *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
-         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None()))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))))})))}));
+         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))))})))}));
       return Success;
     } else if case Has(op_facts binop_facts) = binop_info(peek(p)->val) {
       op tok = *peek(p);
@@ -881,7 +881,7 @@ func is_postfix_incrdecr(t tokval) opt[bool] {
       }
     }
   }
-  return None();
+  return None;
 }
 
 func incrdecr_sym(im *identmap, is_incr bool) sym {
@@ -906,7 +906,7 @@ deftype binop_facts struct {
 
 func binop_info(t tokval) opt[binop_facts] {
   switch t {
-    default: { return None(); }
+    default: { return None; }
     case Oper(x shray[i32]): {
       if count(&x) == 1 {
         c0 i32 = get(&x, 0);
@@ -916,7 +916,7 @@ func binop_info(t tokval) opt[binop_facts] {
         if c0 == '*' || c0 == '/' { return Has({{604, 606}, false}); }
         if c0 == '%' { return Has({{605, 605}, false}); }
         if c0 == '^' || c0 == '&' || c0 == '|' { return Has({{405, 405}, false}); }
-        return None();
+        return None;
       }
       if count(&x) == 2 {
         c0 i32 = get(&x, 0);
@@ -934,7 +934,7 @@ func binop_info(t tokval) opt[binop_facts] {
                          || c0 == '/') {
           return Has({{305, 305}, true});
         }
-        return None();
+        return None;
       }
       if count(&x) == 3 {
         c0 i32 = get(&x, 0);
@@ -944,9 +944,9 @@ func binop_info(t tokval) opt[binop_facts] {
                          || (c0 == '>' && c1 == '>')) {
           return Has({{305, 305}, true});
         }
-        return None();
+        return None;
       }
-      return None();
+      return None;
     }
   }
 }
@@ -970,7 +970,7 @@ func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_e
   } else if op.value == im->cym.derefsym {
     return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(&rhs))}));
   } else {
-    return mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None()))))), mk_array(consume(&rhs))}));
+    return mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))), mk_array(consume(&rhs))}));
   }
 }
 
@@ -995,9 +995,9 @@ func build_binop_expr(im *identmap, se statement_expr, m ast_meta, user_assignme
         return Fail;
       }
       *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, im->cym.voidsym}),
-         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None()))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(&rhs))})))}));
+         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(&rhs))})))}));
     } else {
-      *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None()))))),
+      *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))),
                                             mk_array(consume(&lhs), consume(&rhs))}));
     }
   }
@@ -1020,7 +1020,7 @@ func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) parse_result 
     }
     default: { }
   }
-  *out = mk(ident.meta, NameExpr(mk(ident, None())));
+  *out = mk(ident.meta, NameExpr(mk(ident, None)));
   return Success;
 }
 
@@ -1191,14 +1191,14 @@ func parse_atomic_expr(p *ps, ab allow_braces, out *ast_expr) parse_result {
 
 func unop_info(operch *shray[i32]) opt[i32] {
   if count(operch) != 1 {
-    return None();
+    return None;
   }
   ch0 i32 = get(operch, 0);
   if ch0 == '~' || ch0 == '*' || ch0 == '&'
      || ch0 == '-' || ch0 == '!' || ch0 == '^' || ch0 == '+' {
     return Has(905);
   }
-  return None();
+  return None;
 }
 
 func is_equal(arr *shray[i32], v0 i32) bool {
@@ -1346,7 +1346,7 @@ func parse_rest_of_goto_statement(p *ps, out *ast_statement) parse_result {
 
 func parse_rest_of_return_statement(p *ps, out *ast_statement) parse_result {
   if +try_skip_oper(p, ';') {
-    *out = Return({NotComputed@[ast_return_statement_info](), None()});
+    *out = Return({NotComputed@[ast_return_statement_info](), None});
     return Success;
   }
   expr ast_expr;
@@ -1427,7 +1427,7 @@ func parse_rest_of_while_statement(p *ps, out *ast_statement) parse_result {
 func parse_rest_of_for_statement(p *ps, out *ast_statement) parse_result {
   initializer opt[box[ast_statement]];
   if +try_skip_oper(p, ';') {
-    initializer = None();
+    initializer = None;
   } else {
     statement box[ast_statement];
     if !parse_naked_var_or_expr_statement(p, AllowBracesNo(void), ForceAssignmentYes(void), oo(&statement)) {
@@ -1437,7 +1437,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) parse_result {
   }
   condition opt[ast_expr_condition];
   if +try_skip_oper(p, ';') {
-    condition = None();
+    condition = None;
   } else {
     expr ast_expr;
     if !(+parse_expr(p, kConditionPrec, AllowBracesNo(void), IsNotStatementExpr(void), &expr)
@@ -1449,7 +1449,7 @@ func parse_rest_of_for_statement(p *ps, out *ast_statement) parse_result {
   increment opt[box[ast_expr_discard]];
   lbrace tokval = Grouper(LBrace(void));
   if equal(&peek(p)->val, &lbrace) {
-    increment = None();
+    increment = None;
   } else {
     expr ast_expr;
     if !parse_expr(p, kSemicolonPrec, AllowBracesNo(void), IsStatementExpr(void), &expr) {
@@ -1532,7 +1532,7 @@ func parse_rest_of_constructor_pattern(p *ps, m ast_meta,
   if +try_parse_oper(p, '&', &addressof_oper) {
     addressof_constructor = Has(addressof_oper);
   } else {
-    addressof_constructor = None();
+    addressof_constructor = None;
   }
   constructor_name ast_ident;
   if !parse_ident(p, &constructor_name) {
@@ -1547,7 +1547,7 @@ func parse_rest_of_constructor_pattern(p *ps, m ast_meta,
     }
     decl = Has(vd);
   } else {
-    decl = None();
+    decl = None;
   }
   end(p, m);
   *out = {m, NotComputed@[ast_cp_info](), addressof_constructor, constructor_name, decl};
@@ -1612,7 +1612,7 @@ func parse_naked_var_or_expr_statement(p *ps, ab allow_braces, fa force_assignme
     switch help_triparse_typeexpr(p, AllowBlanksYes(void), &type) {
       case Quickfail(v): {
         m ast_meta = copystart(p, name.meta);
-        lhs ast_expr = mk(name.meta, NameExpr(mk(name, None())));
+        lhs ast_expr = mk(name.meta, NameExpr(mk(name, None)));
         whole_expr ast_expr;
         if !(+parse_after_atomic_expr(p, kSemicolonPrec, ab, IsStatementExpr(void), lhs, &whole_expr)
              && +try_skip_oper(p, ';')) {
@@ -1636,7 +1636,7 @@ func parse_naked_var_or_expr_statement(p *ps, ab allow_braces, fa force_assignme
       case ForceAssignmentYes(v): { return Fail; }
       case ForceAssignmentNo(v): {
         step(p);
-        *out = Var({NotComputed@[ast_var_info](), decl, AutoInit(None())});
+        *out = Var({NotComputed@[ast_var_info](), decl, AutoInit(None)});
         return Success;
       }
     }

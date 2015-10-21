@@ -63,13 +63,13 @@ func startend(p *ps) ast_meta {
 
 func start(p *ps) ast_meta {
   ret ast_meta = ~count(p->metas);
-  push(p->metas, {Has(p->current.interval.left), None()});
+  push(p->metas, {Has(p->current.interval.left), None});
   return ret;
 }
 
 func copystart(p *ps, meta ast_meta) ast_meta {
   ret ast_meta = ~count(p->metas);
-  push(p->metas, {ref(p->metas, meta.~)->left, None()});
+  push(p->metas, {ref(p->metas, meta.~)->left, None});
   return ret;
 }
 

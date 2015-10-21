@@ -397,17 +397,17 @@ func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
           cumulative_offset = cumulative_offset + offset;
           nonzero_iterations = true;
         } else {
-          return None();
+          return None;
         }
       } else {
-        return None();
+        return None;
       }
     case LocationStatic(v void):
       if !nonzero_iterations {
-        return None();
+        return None;
       } else if c == h->return_cell && cumulative_offset != 0 {
         // TODO: Don't have such a hard-coded special case.  (When we support constant-virtual-plus-offset, we won't.)
-        return None();
+        return None;
       } else {
         return Has({c, cumulative_offset});
       }
@@ -433,7 +433,7 @@ func is_const_primop_int_cell(h *frame, c cell_num) opt[bigint] {
       }
     }
   }
-  return None();
+  return None;
 }
 
 func is_const_funcell(cs *checkstate, bas *basic_analyze_state, c cell_num) opt[fn_body_id] {
@@ -441,14 +441,14 @@ func is_const_funcell(cs *checkstate, bas *basic_analyze_state, c cell_num) opt[
   if isHas(&disp->funcell) {
     if case &HasConstValue(gc gr_const) = &disp->const_value {
       switch &gc {
-      case &ConstInt(b bigint): return None();
+      case &ConstInt(b bigint): return None;
       case &ConstDef(ip instpair): return st_def_to_fnid(cs, ip);
       case &ConstFnBody(fnid fn_body_id): return Has(fnid);
-      case &ConstBytes(b shray[u8]): return None();
+      case &ConstBytes(b shray[u8]): return None;
       }
     }
   }
-  return None();
+  return None;
 }
 
 func st_def_to_fnid(cs *checkstate, ip instpair) opt[fn_body_id] {
@@ -462,7 +462,7 @@ func st_def_to_fnid(cs *checkstate, ip instpair) opt[fn_body_id] {
       return Has(fnid);
     } else {
       // Weird, I don't know, maybe it's zero-initialized?  Something a graph could have, if not a real program.
-      return None();
+      return None;
     }
   } else {
     // This means we forgot to enqueue something onto a clq.
