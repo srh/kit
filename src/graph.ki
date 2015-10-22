@@ -977,8 +977,7 @@ func gr_expr(clq *clqueue, gr *frame_graph, x *ast_expr, out *gr_num) bool {
       return gr_assignment(clq, gr, x, &a, out);
     }
     case &RefOf(a ast_refof):
-      ERR(_u8("graphing RefOf not supported"));
-      return TODO();
+      return gr_mk_refof(clq, gr, x, &a, out);
     case &AddressOf(a ast_addressof): {
       return gr_mk_addressof(clq, gr, x, &a, out);
     }
@@ -1244,6 +1243,25 @@ func gr_mk_deref(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_deref, out *
 }
 
 func gr_mk_addressof(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_addressof, out *gr_num) bool {
+  // This is a total copy/paste of gr_mk_refof.
+  rp gr_num;
+  if !gr_expr(clq, gr, oo(&a->rhs), &rp) {
+    return false;
+  }
+  desc *lval_description = ellval_desc(oo(&a->rhs));
+  ap1 gr_num = addx(gr, mk_shray(rp), @[gr_xop]GrAddressof({rval_cell(x), desc->num}));
+  ap gr_num;
+  if case DeadMe(v void) = desc->deadme {
+    ap = addx(gr, mk_shray(ap1), @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->rhs))}));
+  } else {
+    ap = ap1;
+  }
+  *out = ap;
+  return true;
+}
+
+func gr_mk_refof(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_refof, out *gr_num) bool {
+  // This is a total copy/paste of gr_mk_addressof.
   rp gr_num;
   if !gr_expr(clq, gr, oo(&a->rhs), &rp) {
     return false;

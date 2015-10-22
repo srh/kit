@@ -140,9 +140,13 @@ func['a] un_ref(p &'a u32) u32 {
 }
 
 func try_ref() void {
-  x u32;
+  x u32 = 666;
   z u32 = un_ref(&&x);
   print(z);
+  putchar(32);
+  z = z + 1;
+  t u32 = un_ref(&&z);
+  print(t);
   putchar(10);
 }
 
