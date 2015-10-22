@@ -698,7 +698,7 @@ func parse_rest_of_reference(p *ps, ab allow_blanks, oper ast_ident, out *ast_ty
     if !+help_parse_typeexpr(p, ab, &arg) {
       return Fail;
     }
-    *out = App({embox(Name(oper)), mk_array(arg, Lifetime(lifetime_arg))});
+    *out = App({embox(Name(oper)), mk_array(Lifetime(lifetime_arg), arg)});
     return Success;
   } else {
     return Fail;

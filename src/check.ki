@@ -1710,8 +1710,8 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
       }
     }
     case &TeLifetime(a te_lifetime):
-      ice(_u8("is_complete_computed: TeLifetime not supported"));
-      return fake();
+      // Yes, I guess.
+      return {true, true};
 
     case &TeUnknown: {
       return {false, false};
