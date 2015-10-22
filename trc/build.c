@@ -4269,6 +4269,7 @@ struct swartch_facts {
   struct ast_typeexpr *type;
   struct loc loc;
   struct loc enum_loc;
+  size_t num_constructors;
 };
 
 int gen_swartch(struct checkstate *cs, struct objfile *f,
@@ -4443,6 +4444,13 @@ void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
     /* No cleanup. */
   } break;
   case AST_CONDITION_PATTERN: {
+    /* Check for zero-tag. */
+    /* TODO: Check for other out-of-range cases. */
+    struct loc swartch_num_loc = make_enum_num_loc(f, h, cstate->u.pattern.facts.enum_loc);
+    gen_load_register(f, X86_EAX, swartch_num_loc);
+    STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
+    x86_gen_test_regs32(f, X86_EAX, X86_EAX);
+    gen_crash_jcc(f, h, X86_JCC_Z);
     ungen_swartch(cs, f, h, &cstate->u.pattern.facts);
   } break;
   }
