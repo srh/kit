@@ -205,6 +205,7 @@ func add_primitives(cs *checkstate) void {
   add_void_primitive(cs);
   add_bool_primitive(cs);
   add_pointer_primitive(cs);
+  add_ref_primitive_type(cs);
   add_function_primitive(cs);
   add_magic_constructor_primitives(cs);
 }
@@ -426,6 +427,32 @@ func add_pointer_primitive_type(cs *checkstate) void {
            DerivedMethodTrivial(void),
            DerivedMethodTrivial(void),
            IsScalarYes(void)
+         }}),
+    mk_hash@[idy_genparms, deftype_inst_id]()
+  };
+  id deftype_entry_id = add_deftype_entry(cs, ent);
+  // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.
+}
+
+func add_ref_primitive_type(cs *checkstate) void {
+  two_generic array[ast_generik] = mk_array(@[ast_generik]LifetimeGeneric({fake_ast_meta(), intern(cs->im, _s("a"))}), @[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym}));
+  ent deftype_entry = {
+    cs->im->cym.primitive_module_sym,
+    cs->im->cym.reftype_sym,
+    mk_array@[access_entry_id](),
+    RhsImpossible,
+    HasGenerics(two_generic),
+    None,
+    Has({None,
+         @[type_properties]{
+           // Someday fat refs might exist, and the traits will depend on the referent, but right now they are just like pointers, as far as these traits go.
+           cs->plat.ptrtraits.size,
+           cs->plat.ptrtraits.alignment,
+           DerivedMethodTrivial,
+           DerivedMethodTrivial,
+           DerivedMethodTrivial,
+           DerivedMethodTrivial,
+           IsScalarYes
          }}),
     mk_hash@[idy_genparms, deftype_inst_id]()
   };

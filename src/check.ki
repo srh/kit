@@ -527,6 +527,10 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
     }
 
     case &TeLifetime(a te_lifetime):
+      *out = {true, TeLifetime({a.name})};
+      return true;
+      // TODO: Make sure that user-defined lifetimes are well-scoped.  Probably we need to prove that other lifetime situations are well-scoped.
+      /*
       if case Has(ix size) = find_lifetime_generic(g, a.name) {
         *out = {true, TeLifetime({a.name})};
         return true;
@@ -537,6 +541,7 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
       }
       ERR(_u8("Lifetime type with unrecognized name"));
       return false;
+      */
 
     case &TeUnknown: {
       *out = {false, TeUnknown(void)};

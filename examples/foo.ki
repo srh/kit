@@ -134,9 +134,22 @@ func try_osize() void {
   putchar(10);
 }
 
+func['a] un_ref(p &'a u32) u32 {
+  r u32 = *p;
+  return r;
+}
+
+func try_ref() void {
+  x u32;
+  z u32 = un_ref(&&x);
+  print(z);
+  putchar(10);
+}
+
 export func showfacs(p *ty, num *u16) ty {
   try_kla();
   try_string();
+  try_ref();
 
   k enty = blah_enty(c1(void));
   vz struct { p i32; q i32; };
