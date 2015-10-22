@@ -324,7 +324,12 @@ deftype ast_goto_statement struct {
   target ast_ident;
 };
 
-defenum ast_statement {
+deftype ast_statement struct {
+  meta ast_meta;
+  u ast_statement_enum;
+};
+
+defenum ast_statement_enum {
   Expr ast_expr_discard;
   Return ast_return_statement;
   Var ast_var_statement;

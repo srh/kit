@@ -351,7 +351,7 @@ func gr_bracebody(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[bre
 }
 
 func gr_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], x *ast_statement, outflow sq_num, out *sq_num) bool {
-  switch x {
+  switch &x->u {
     case &Expr(a ast_expr_discard): {
       gn gr_num;
       if !gr_expr_discard(clq, gr, &a, &gn) {

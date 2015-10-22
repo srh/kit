@@ -193,8 +193,16 @@ deftype breakpack struct {
 };
 
 func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) bool {
+  if !help_check_statement(bs, vp, obp, s, ee_out) {
+    MERR(bs->cs, s->meta, _u8(" in this statement"));
+    return false;
+  }
+  return true;
+}
+
+func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) bool {
   num statement_num = add_statement(bs, Has(s));
-  switch s {
+  switch &s->u {
     case &Expr(b ast_expr_discard): {
       pt te_typeexpr = TeUnknown(void);
       if !check_discard_expr(&bs->es, &b, &pt) {
