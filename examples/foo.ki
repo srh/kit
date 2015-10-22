@@ -123,13 +123,13 @@ def au8 fn[*string, u8, void] = func(p *string, x u8) void {
 };
 
 def try_string = func() void {
-  var x = lits("Hello, world!\n");
+  x var = lits("Hello, world!\n");
   print(&x);
 };
 
 func try_osize() void {
   ox osize = 1;
-  var oy = ox - 2;
+  oy var = ox - 2;
   print(@[u32]~oy);
   putchar(10);
 }
@@ -151,7 +151,7 @@ export func showfacs(p *ty, num *u16) ty {
   p->x = -p->x;
 
   tmp u32 = ~fac(p->x);
-  var y u32 = ~(*p).y;
+  y u32 = ~(*p).y;
   print(tmp);
   putchar(10);
   print(y);
@@ -159,22 +159,22 @@ export func showfacs(p *ty, num *u16) ty {
 
   yptr *i32 = &p->y;
   *yptr = 'M';  // 'M' is 77
-  var xptr *i32 = &p->x;
+  xptr *i32 = &p->x;
   xptr[0] = 99;
 
   p[1] = { 33, ~(@[u16]~ @[u32] 22 + @[u16]~ @[u32]44) };
   *num = ~ @[u32]29;
 
-  var heh [2]ty;
+  heh ^[2]ty;
   heh[0] = p[1];
   heh[0].x = ^34;
   p[1] = heh[0];
 
   try_osize();
 
-  var void_value void;
+  void_value void;
 
-  var naked struct { x i32; y i32; };
+  naked struct { x i32; y i32; };
   naked.x = p->x;
   naked.y = ~getsize@[ty]();
 

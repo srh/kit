@@ -4,7 +4,7 @@ extern malloc fn[size, *void];
 extern free fn[*void, void];
 
 func[T] alloc_array(n size) *T {
-  var u union { vp *void; tp *T; };
+  u union { vp *void; tp *T; };
   u.vp = malloc(n * sizeof@[T]);
   for i size = 0; i < n; i = i + 1 {
     init(&u.tp[i]);
@@ -13,22 +13,22 @@ func[T] alloc_array(n size) *T {
 }
 
 def[T] delete_array = func(n size, p *T) void {
-  for var i size = 0; i < n; i = i + 1 {
+  for i size = 0; i < n; i = i + 1 {
     destroy(&p[i]);
   }
-  var u union { vp *void; tp *T; };
+  u union { vp *void; tp *T; };
   u.tp = p;
   free(u.vp);
 };
 
 def alloc_u8_array = func(n size) *u8 {
-  var u union { vp *void; u8p *u8; };
+  u union { vp *void; u8p *u8; };
   u.vp = malloc(n);
   return u.u8p;
 };
 
 def free_u8_array = func(p *u8) void {
-  var u union { vp *void; u8p *u8; };
+  u union { vp *void; u8p *u8; };
   u.u8p = p;
   free(u.vp);
 };
@@ -61,7 +61,7 @@ access string {
   };
 
   def grow_cap = func(p *string, newcap size) void {
-    var buf = alloc_array@[u8](newcap);
+    buf var = alloc_array@[u8](newcap);
     sz size = p->size;
     for i size = 0; i < sz; i = i + 1 {
       buf[i] = p->buf[i];
@@ -74,7 +74,7 @@ access string {
 
   def append = func(p *string, c u8) void {
     if p->size == p->cap {
-      var new_cap size;
+      new_cap size;
       if (p->cap == 0) {
         new_cap = 8;
       } else {
@@ -96,9 +96,9 @@ access string {
   };
 
   func[T] lits(arr T) string {
-    var ret string;
-    var sz size = arr.length;
-    for var i size = 0; i < sz; i = i + 1 {
+    ret string;
+    sz size = arr.length;
+    for i size = 0; i < sz; i = i + 1 {
       append(&ret, @[u8] arr[i]);
     }
     return ret;
@@ -106,8 +106,8 @@ access string {
 }
 
 def print = func(p *string) void {
-  for var i size = 0; i < count(p); i = i + 1 {
-    var ch i32 = ~get(p, i);
+  for i size = 0; i < count(p); i = i + 1 {
+    ch i32 = ~get(p, i);
     putchar(ch);
   }
 };

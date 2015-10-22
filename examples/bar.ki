@@ -6,7 +6,7 @@ def print = func(x u32) u32 {
     putchar(48);
     return 1;
   } else {
-    var data [20]u8;
+    data ^[20]u8;
     i size = 0;
     while x > 0 {
       data[i] = ~(x % 10);
