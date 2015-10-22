@@ -696,6 +696,7 @@ func check_expr_refof(es *framescope, pt *te_typeexpr, a *ast_refof, x *ast_expr
   case &IsLvalYes(desc lval_description):
     unified_lifetime te_typeexpr;
     if !unify_types(pt_lifetime, &desc.lifetime, &unified_lifetime) {
+      ERR(_u8("Refof lifetime types do not match."));
       return false;
     }
 
