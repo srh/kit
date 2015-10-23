@@ -415,7 +415,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
       case &MultiMatch: {
         ice(_u8("magic_enum_ctor lookup sees MultiMatch"));
       }
-      case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
+      case &OneMatch(m ent_and_parms): {
         inst_id def_inst_id;
         if !make_inst(ds->cs, ds->clq, m.ent, &m.parms, &inst_id) {
           ice(_u8("lookup_or_make_enum_constructor_def make_inst failed after match"));
@@ -525,7 +525,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
       *res_out = AmbigGlobalMatch(void);
       return true;
     }
-    case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
+    case &OneMatch(m ent_and_parms): {
       inst_id def_inst_id;
       if !make_inst(es->cs, es->clq, m.ent, &m.parms, &inst_id) {
         return false;

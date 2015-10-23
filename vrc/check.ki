@@ -1040,7 +1040,7 @@ func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, t
       ice(_u8("Multiple matches for magic def (is there a user-defined one?"));
       return fake();
     }
-    case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
+    case &OneMatch(m ent_and_parms): {
       inst_id def_inst_id;
       if !make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
         ice(_u8("make_inst (check_and_compute_parms) seeing error in match_def"));
@@ -1452,10 +1452,15 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
   }
 }
 
+deftype ent_and_parms struct {
+  ent def_entry_id;
+  parms genparms;
+};
+
 defenum match_def_res {
   NoMatch void;
   MultiMatch void;
-  OneMatch struct { ent def_entry_id; parms genparms; };
+  OneMatch ent_and_parms;
 };
 
 // Note that gp could be incomplete.
@@ -1463,7 +1468,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
                res_out *match_def_res) bool {
   if case Has(arr *array[def_entry_id]) = lookup_ref(&cs->defs_by_name, &name) {
     n size = count(arr);
-    matches array[struct { ent def_entry_id; parms genparms; }];
+    matches array[ent_and_parms];
     for i size = 0; i < n; i = i + 1 {
       id def_entry_id = get(arr, i);
       ent *def_entry = ref_def_entry(cs, id);

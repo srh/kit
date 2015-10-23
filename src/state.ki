@@ -595,7 +595,7 @@ func lookup_explicit_method_or_lack_thereof(cs *checkstate, clq *clqueue, fntype
       ERR(_u8("Multiple explicit methods '"), lookup(cs->im, impl_name), _u8("'"));
       return false;
     }
-    case &OneMatch(m struct { ent def_entry_id; parms genparms; }): {
+    case &OneMatch(m ent_and_parms): {
       inst_id def_inst_id;
       if !make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
         return false;
