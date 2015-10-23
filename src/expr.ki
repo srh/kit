@@ -481,10 +481,16 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
   return true;
 }
 
+deftype es_global_match struct {
+  ent_id def_entry_id;
+  inst_id def_inst_id;
+  parms genparms;
+};
+
 defenum es_match_res {
   NoMatch void;
   AmbigGlobalMatch void;
-  OneGlobalMatch global_info;
+  OneGlobalMatch es_global_match;
   OneLocalMatch local_info;
   OneEnumConstructorMatch constructor_info;
   EnumVoidConstructedMatch voidconstructed_info;
@@ -536,7 +542,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
       if !make_inst(es->cs, es->clq, m.ent, &m.parms, &inst_id) {
         return false;
       }
-      *res_out = OneGlobalMatch({m.ent, inst_id});
+      *res_out = OneGlobalMatch({m.ent, inst_id, m.parms});
       return true;
     }
   }
@@ -1260,13 +1266,14 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.constructed_type, props})), vci.constructed_type, props)));
       return true;
     }
-    case &OneGlobalMatch(gi global_info): {
+    case &OneGlobalMatch(egm es_global_match): {
       typrop *cu_typrop;
-      if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, gi.ent), gi.inst, &typrop) {
+      // TODO(): This is one place where we need to handle generics in typrop differently.
+      if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, egm.ent_id), egm.inst_id, &typrop) {
         return false;
       }
-      annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({gi.ent, gi.inst}));
-      inst *def_inst = ref_inst(es->cs, gi.inst);
+      annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id}));
+      inst *def_inst = ref_inst(es->cs, egm.inst_id);
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, typrop->cu, typrop->props})), typrop->cu, typrop->props)));
       return true;
     }
