@@ -134,12 +134,35 @@ func try_osize() void {
   putchar(10);
 }
 
+deftype['a] reffer struct {
+  r &'a osize;
+};
+
+func['a] mk_reffer(x &'a osize) reffer['a] {
+  return {x};
+}
+
+func[T, U] subtract_rs(x *T, y *U) osize {
+  return *x->r - *y->r;
+}
+
+func try_ref2() void {
+  y osize = 5;
+  z osize = 6;
+  x1 reffer[_] = mk_reffer(&&y);
+  x2 reffer[_] = mk_reffer(&&z);
+  diff osize = subtract_rs(&x1, &x2);
+  putchar('^');
+  print(@[u32]~diff);
+  putchar(10);
+}
+
 func['a] un_ref(p &'a u32) u32 {
   r u32 = *p;
   return r;
 }
 
-func try_ref() void {
+func try_ref1() void {
   x u32 = 666;
   z u32 = un_ref(&&x);
   print(z);
@@ -148,6 +171,11 @@ func try_ref() void {
   t u32 = un_ref(&&z);
   print(t);
   putchar(10);
+}
+
+func try_ref() void {
+  try_ref1();
+  try_ref2();
 }
 
 export func showfacs(p *ty, num *u16) ty {
