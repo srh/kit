@@ -1586,15 +1586,15 @@ defenum entry_matches_res {
   EntryMatchesPrecisely genparms;
 };
 
-func from_type_matches_res(hasparms bool, x type_matches_res) entry_matches_res {
+func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res {
   switch x {
-    case TypeDoesNotMatch: {
+    case &TypeDoesNotMatch: {
       return EntryDoesNotMatch(void);
     }
-    case TypeMatchesAmbiguously(a): {
+    case &TypeMatchesAmbiguously(a): {
       return EntryMatchesAmbigously(void);
     }
-    case TypeMatchesPrecisely(a shray[te_typeexpr]): {
+    case &TypeMatchesPrecisely(a shray[te_typeexpr]): {
       if hasparms {
         return EntryMatchesPrecisely(HasParms(a));
       } else {
@@ -1616,7 +1616,8 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
         case &NoParms: {
           names array[ast_generik];
           parms shray[te_typeexpr];
-          *matches_out = from_type_matches_res(false, type_matches(pt, &names, &parms, typeexpr));
+          res var = type_matches(pt, &names, &parms, typeexpr);
+          *matches_out = from_type_matches_res(false, &res);
           return true;
         }
       }
@@ -1628,12 +1629,14 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
             *matches_out = EntryDoesNotMatch(void);
             return true;
           }
-          *matches_out = from_type_matches_res(true, type_matches(pt, &names, &parms, typeexpr));
+          res var = type_matches(pt, &names, &parms, typeexpr);
+          *matches_out = from_type_matches_res(true, &res);
           return true;
         }
         case &NoParms: {
           parms shray[te_typeexpr] = repeat(count(&names), TeUnknown(void));
-          *matches_out = from_type_matches_res(true, type_matches(pt, &names, &parms, typeexpr));
+          res var = type_matches(pt, &names, &parms, typeexpr);
+          *matches_out = from_type_matches_res(true, &res);
           return true;
         }
       }
