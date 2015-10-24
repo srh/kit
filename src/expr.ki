@@ -1267,13 +1267,13 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       return true;
     }
     case &OneGlobalMatch(egm es_global_match): {
+      ent *def_entry = ref_def_entry(es->cs, egm.ent_id);
       typrop *cu_typrop;
       // TODO(): This is one place where we need to handle generics in typrop differently.
-      if !ensure_def_inst_type_computed(es->cs, es->clq, ref_def_entry(es->cs, egm.ent_id), egm.inst_id, &typrop) {
+      if !ensure_def_inst_type_computed(es->cs, es->clq, ent, egm.inst_id, &typrop) {
         return false;
       }
       annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id}));
-      inst *def_inst = ref_inst(es->cs, egm.inst_id);
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, typrop->cu, typrop->props})), typrop->cu, typrop->props)));
       return true;
     }
