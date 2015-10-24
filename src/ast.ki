@@ -778,7 +778,7 @@ func discard(expr ast_expr) ast_expr_discard {
   return {NotComputed@[ast_expr_after_discard](), expr};
 }
 
-// Variadic generics doesn't support lifetime generics (for no particular reason, other than that we have no need for it) yet.
+// Variadic generics doesn't support lifetime generics (for no particular reason, other than that we have no need for it) yet.  NOTE: type_from_inst assumes the fact that this doesn't support lifetime generics.
 deftype ast_variadic_generics struct {
   before array[ast_ident];
   variadic_name ast_ident;

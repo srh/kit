@@ -447,23 +447,28 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy
       return true;
     }
     case &HasParms(ps shray[te_typeexpr]): {
-      lifetime_names array[sym];
-      cu_ps array[cu_typeexpr];
-      n size = count(&ps);
-      reserve(&cu_ps, n);
-      for i size = 0; i < n; i = i + 1 {
-        computed cac_typeexpr;
-        if !noscoped_check_and_compute_typeexpr(cs, clq, ref(&ps, i), &computed) {
-          return false;
-        }
-        if !computed.complete {
-          ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
-        }
-        canonicalized te_typeexpr;
-        canonicalize_idy_lifetimes(cs->im, &lifetime_names, &computed.te, &canonicalized);
-        push(&cu_ps, ~canonicalized);
+      noscope_g ast_generics = NoGenerics;
+      noscope_parms idy_genparms = blank_idyparms();
+      params_complete bool;
+      params shray[te_typeexpr];
+      if !check_and_compute_typeexpr_shray(cs, clq, &noscope_g, &noscope_parms, &ps, &params, &params_complete) {
+        return false;
       }
-      *out = {count(&lifetime_names), freeze(&cu_ps)};
+
+      if !params_complete {
+        ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
+      }
+
+      lifetime_names array[sym];
+      cu_params array[cu_typeexpr];
+      n size = count(&params);
+      reserve(&cu_params, n);
+      for i size = 0; i < n; i = i + 1 {
+        canonicalized te_typeexpr;
+        canonicalize_idy_lifetimes(cs->im, &lifetime_names, ref(&params, i), &canonicalized);
+        push(&cu_params, ~canonicalized);
+      }
+      *out = {count(&lifetime_names), freeze(&cu_params)};
       return true;
     }
   }
@@ -475,7 +480,7 @@ func noscoped_check_and_compute_typeexpr(cs *checkstate, clq *clqueue, t *te_typ
   return check_and_compute_typeexpr(cs, clq, &ng, &np, t, out);
 }
 
-// TODO: Generics replacement should really be a separate phase.  (Why?)
+// TODO: Generics replacement should really be a separate phase.  (Why?)  (Performance is one counter-argument -- we'd create an extra intermediate te_typeexpr.)
 func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, t *te_typeexpr, out *cac_typeexpr) bool {
   switch t {
     case &TeName(a te_name): {
@@ -665,7 +670,7 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
       }
 
       if params_complete {
-        // TODO: This is quite duplicated with check_and_compute_parms.
+        // TODO: This is quite duplicated with check_and_compute_parms.  With the changes we're making we should definitely dedup this code.
         lifetime_names array[sym];
         canonical array[cu_typeexpr];
         n size = count(&params);
@@ -1444,7 +1449,7 @@ func check_generics_unique(cs *checkstate, a *ast_generics) bool {
         xi *ast_generik = ref(&b, i);
         for j size = 0; j < i; j = j + 1 {
           yi *ast_generik = ref(&b, j);
-          if generiks_equiv(xi, yi) {
+          if generiks_same_human_name(xi, yi) {
             ERR(_u8("Generic params are self-shadowing."));
             return false;
           }
@@ -1455,18 +1460,15 @@ func check_generics_unique(cs *checkstate, a *ast_generics) bool {
   }
 }
 
-func generiks_equiv(a *ast_generik, b *ast_generik) bool {
+func generik_human_name(a *ast_generik) *ast_ident {
   switch a {
-  case &PlainGeneric(an ast_ident):
-    if case &PlainGeneric(bn ast_ident) = b {
-      return an.value == bn.value;
-    }
-  case &LifetimeGeneric(an ast_ident):
-    if case &LifetimeGeneric(bn ast_ident) = b {
-      return an.value == bn.value;
-    }
+  case &PlainGeneric(an ast_ident): return &an;
+  case &LifetimeGeneric(an ast_ident): return &an;
   }
-  return false;
+}
+
+func generiks_same_human_name(a *ast_generik, b *ast_generik) bool {
+  return generik_human_name(a)->value == generik_human_name(b)->value;
 }
 
 func is_public(a *ast_type_def_rhs) rhs_accessibility {
