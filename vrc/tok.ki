@@ -217,8 +217,12 @@ inline func is_digit(x i32) bool {
   return x >= '0' && x <= '9';
 }
 
-inline func is_alnum(x i32) bool {
-  return is_alpha(x) || is_digit(x);
+inline func is_alphalike(x i32) bool {
+  return is_alpha(x) || x == '_';
+}
+
+inline func is_alnumlike(x i32) bool {
+  return is_alphalike(x) || is_digit(x);
 }
 
 func is_hexdigit(x i32, val_out *i8) bool {
@@ -238,27 +242,30 @@ func is_hexdigit(x i32, val_out *i8) bool {
   return false;
 }
 
+// We use blacklists for postchar funcs, stuff like non-printable characters won't parse anyway.
 inline func is_numeric_postchar(x i32) bool {
-  // TODO: Implement for real.
-  return !is_alnum(x);
+  return !(is_alnumlike(x) || is_quotelike(x));
 }
 
 inline func is_ident_firstchar(x i32) bool {
-  return is_alpha(x) || x == '_';
+  return is_alphalike(x);
 }
 
 inline func is_ident_midchar(x i32) bool {
+  // Same as is_alnumlike.
   return is_ident_firstchar(x) || is_digit(x);
 }
 
 inline func is_ident_postchar(x i32) bool {
-  // TODO: Implement for real.
-  return !is_ident_midchar(x);
+  return !(is_ident_midchar(x) || is_quotelike(x));
+}
+
+inline func is_quotelike(x i32) bool {
+  return x == '\'' || x == '\"' || x == '`';
 }
 
 inline func is_string_postchar(x i32) bool {
-  // TODO: Implement for real.
-  return x != '\'' && x != '\"';
+  return !(is_alnumlike(x) || is_quotelike(x));
 }
 
 inline func is_ws(x i32) bool {
