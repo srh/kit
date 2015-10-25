@@ -383,7 +383,7 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
   }
   // switchable_type is complete, because swartch type is.
   enum_type *te_typeexpr;
-  if !to_bool_error(complete_structural_rhs(es->ds, switchable_type, &enum_type)) {
+  if !successful(complete_structural_rhs(es->ds, switchable_type, &enum_type)) {
     return false;
   }
   // enum_type is complete, because complete_structural_rhs does that.
