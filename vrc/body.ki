@@ -145,14 +145,14 @@ func make_destructions(es *framescope, vns *array[var_number], out *array[var_de
   for i size = 0; i < n; i = i + 1 {
     vn var_number = get(vns, i);
     vi *var_info = ref_var(es, vn);
-    switch vi->autoinit {
+    switch vi->binding {
     case VarSelfContained:
       da destroy_action;
       if !make_destroy_action(es, get(vns, i), &da) {
         return false;
       }
       push(&destructions, VarSelfContainedDestruction(da));
-    case VarVirtual:
+    case VarOverlay:
       push(&destructions, VarVirtualCellDead(vi->cell));
     }
   }
@@ -482,7 +482,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
             }
 
             vn var_number;
-            if !es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), &cu_expected_type, VarVirtual(void), &vn) {
+            if !es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), &cu_expected_type, VarOverlay, &vn) {
               return false;
             }
             ovn = Has(vn);
@@ -669,14 +669,14 @@ func compute_varcells(es *framescope, a *array[var_number]) shray[opt[cell_num]]
   for i size = 0; i < n; i = i + 1 {
     vi *var_info = ref_var(es, get(a, i));
     pushed opt[cell_num];
-    switch vi->autoinit {
+    switch vi->binding {
     case VarSelfContained:
       if case &DerivedMethodAbsent = &vi->props.move_behavior {
         pushed = None;
       } else {
         pushed = Has(vi->cell);
       }
-    case VarVirtual:
+    case VarOverlay:
       pushed = None;
     }
     push(&b, pushed);
@@ -811,7 +811,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
             annotate(&p->virtual_cell_dead, Has(cell));
           }
           vn var_number;
-          if !es_push_var(es, cond_vp, cell, Has(&vd.name), &cu_expected_type, VarVirtual(void), &vn) {
+          if !es_push_var(es, cond_vp, cell, Has(&vd.name), &cu_expected_type, VarOverlay, &vn) {
             return false;
           }
 
@@ -891,7 +891,7 @@ func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number],
   for i size = 0; i < nconstruct; i = i + 1 {
     vn var_number = get(&construct, i);
     vi *var_info = ref_var(&bs->es, vn);
-    if vi->autoinit == VarVirtual {
+    if case VarOverlay = vi->binding {
       ERR(_u8("goto enters non-initiannlizable variable scope"));
       return false;
     }
