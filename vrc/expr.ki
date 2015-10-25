@@ -1216,13 +1216,12 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
   if !is_complete_computed(pt).computed {
     ice(_u8("check_expr_strinit has non-computed pt"));
   }
-  cu_pt cu_typeexpr = ~ *pt;
-  structural_type *cu_typeexpr;
-  if !recursive_structural_rhs(es->ds, &cu_pt, &structural_type) {
+  structural_type *te_typeexpr;
+  if !recursive_structural_rhs(es->ds, pt, &structural_type) {
     return false;
   }
 
-  switch &structural_type->~ {
+  switch structural_type {
   case &TeStruct(b te_struct):
     n size = count(&b.fields);
     if n != count(&a->exprs) {
@@ -1292,7 +1291,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
     return true;
   default:
-    MERR(es->cs, a->meta, _u8("Structure literal used on non-struct type, "), pretty(es->im, &structural_type->~));
+    MERR(es->cs, a->meta, _u8("Structure literal used on non-struct type, "), pretty(es->im, structural_type));
     return false;
   }
 }
@@ -1532,30 +1531,26 @@ defenum structural_rhs_result {
 // t must be complete.  And computed.
 func complete_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typeexpr) structural_rhs_result {
   switch t {
-    case &TeName(a te_name): {
-      cu_rhs *cu_typeexpr;
-      res var = help_structural_rhs(ds, &a.pack, &cu_rhs);
-      if case Success(v void) = res {
-        *rhs_type_out = &cu_rhs->~;
-      }
-      return res;
+  case &TeName(a te_name):
+    cu_rhs *cu_typeexpr;
+    res var = help_structural_rhs(ds, &a.pack, &cu_rhs);
+    if case Success(v void) = res {
+      *rhs_type_out = &cu_rhs->~;
     }
-    case &TeApp(a te_typeapp): {
-      cu_rhs *cu_typeexpr;
-      res var = help_structural_rhs(ds, &a.pack, &cu_rhs);
-      if case Success(v void) = res {
-        *rhs_type_out = &cu_rhs->~;
-      }
-      return res;
+    return res;
+  case &TeApp(a te_typeapp):
+    cu_rhs *cu_typeexpr;
+    res var = help_structural_rhs(ds, &a.pack, &cu_rhs);
+    if case Success(v void) = res {
+      *rhs_type_out = &cu_rhs->~;
     }
-    default: {
-      if case &TeUnknown(v void) = t {
-        ice(_u8("structural_rhs called on incomplete type"));
-      }
-      // TODO: Hrm.  Does this mean that help_structural_rhs recurses?
-      *rhs_type_out = t;
-      return Success(void);
+    return res;
+  default:
+    if case &TeUnknown(v void) = t {
+      ice(_u8("structural_rhs called on incomplete type"));
     }
+    *rhs_type_out = t;
+    return Success(void);
   }
 }
 
@@ -1571,11 +1566,11 @@ func to_bool_error(res structural_rhs_result) bool {
   }
 }
 
-func recursive_structural_rhs(ds *defscope, t *cu_typeexpr, rhs_type_out **cu_typeexpr) bool {
-  prev *cu_typeexpr = t;
+func recursive_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typeexpr) bool {
+  prev *te_typeexpr = t;
   for ;; {
-    stru *cu_typeexpr;
-    if !to_bool_error(structural_rhs(ds, prev, &stru)) {
+    stru *te_typeexpr;
+    if !to_bool_error(complete_structural_rhs(ds, prev, &stru)) {
       return false;
     }
     // TODO: This pointer comparison for termination is a ghetto hack.
@@ -1584,25 +1579,6 @@ func recursive_structural_rhs(ds *defscope, t *cu_typeexpr, rhs_type_out **cu_ty
       return true;
     }
     prev = stru;
-  }
-}
-
-// TODO: Umm... this is very duplicated with complete_structural_rhs.
-func structural_rhs(ds *defscope, t *cu_typeexpr, rhs_type_out **cu_typeexpr) structural_rhs_result {
-  switch &t->~ {
-    case &TeName(a te_name): {
-      return help_structural_rhs(ds, &a.pack, rhs_type_out);
-    }
-    case &TeApp(a te_typeapp): {
-      return help_structural_rhs(ds, &a.pack, rhs_type_out);
-    }
-    default: {
-      if case &TeUnknown(v void) = &t->~ {
-        ice(_u8("structural_rhs called on incomplete type"));
-      }
-      *rhs_type_out = t;
-      return Success(void);
-    }
   }
 }
 
