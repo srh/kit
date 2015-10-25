@@ -32,7 +32,7 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
         if !set_instantiation_depth(cs, e.instantiation_depth, &rw) {
           return false;
         }
-        // TODO: It would be nice if checking/graphing, and evaling, were done in separate phases as much as possible.
+        // NOTE: It would be nice if checking/graphing, and evaling, were done in separate phases as much as possible.
         val_discard *st_value;
         if !ensure_def_inst_evaled(cs, clq, e.ent_id, e.inst_id, &val_discard) {
           return false;
@@ -135,7 +135,7 @@ func convert_vardecl(cs *checkstate, a *ast_vardecl, out *te_vardecl) bool {
   return true;
 }
 
-// TODO: Callers of this might expect this function to also lookup names, check arity, etc.  Or they need to do such things themselves.
+// NOTE: Callers of this might expect this function to also lookup names, check arity, etc.  Or they need to do such things themselves.
 func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
   switch a {
     case &Name(b ast_ident): {
@@ -513,7 +513,7 @@ func noscoped_check_and_compute_typeexpr(cs *checkstate, clq *clqueue, t *te_typ
   return check_and_compute_typeexpr(cs, clq, &ng, &np, t, out);
 }
 
-// TODO: Generics replacement should really be a separate phase.  (Why?)  (Performance is one counter-argument -- we'd create an extra intermediate te_typeexpr.)
+// NOTE: Generics replacement should really be a separate phase.  (Why?)  (Performance is one counter-argument -- we'd create an extra intermediate te_typeexpr.)
 func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, t *te_typeexpr, out *cac_typeexpr) bool {
   switch t {
     case &TeName(a te_name): {
@@ -609,7 +609,7 @@ func convert_to_u32(base i8, digits *shray[i8], out *u32) bool {
 }
 
 func fake_eval_arraytype_count(x *ast_expr, count_out *u32) bool {
-  // TODO: Remove this function and really evaluate an array's count expression.
+  // NOTE: Remove this function and really evaluate an array's count expression.
   switch &x->u {
     case &NumericLiteral(a ast_numeric_literal): {
       return numeric_literal_to_u32(&a, count_out);
@@ -1121,7 +1121,7 @@ func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, t
       return fake();
     }
     case &MultiMatch: {
-      // TODO: This should be impossible.  Pick a less likely name...
+      // NOTE: This should be impossible.  Pick a less likely name...
       ice(_u8("Multiple matches for magic def (is there a user-defined one?"));
       return fake();
     }
@@ -1239,7 +1239,6 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
           }
         }
       } else {
-        // TODO: Figure this shiz out.
         ice(_u8("Assigning inst properties on primitive deftype."));
       }
       return true;
@@ -1581,7 +1580,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
           // Do nothing.
         }
         case EntryMatchesAmbigously: {
-          // TODO: We could see if we have _one_ ambiguously matching entry, and extract any type information that we learned, to help the next match attempt (see check_expr and its allow_ambiguous parameter).  (Maybe we should, but maybe we shouldn't to keep the type checking algorithm simple and describable.)
+          // NOTE: We could see if we have _one_ ambiguously matching entry, and extract any type information that we learned, to help the next match attempt (see check_expr and its allow_ambiguous parameter).  (Maybe we should, but maybe we shouldn't to keep the type checking algorithm simple and describable.)
           // Certainly the error message (somewhere) could be improved.
           *res_out = MultiMatch(void);
           return true;

@@ -72,7 +72,7 @@ func `<`(x var_number, y var_number) bool {
 }
 
 defenum var_binding {
-  // Is the variable "virtual" -- it overlays some other object, in a switch/etc?  Yes, that means its cell is virtual, too.  TODO: We should still rename this, in case the concepts diverge.
+  // Is the variable "virtual" -- it overlays some other object, in a switch/etc?  Yes, that means its cell is virtual, too.  NOTE: We should still rename this, in case the concepts diverge.
   VarVirtual void;
   // The variable's a self-contained object -- it gets destroyed or not.
   VarSelfContained void;
@@ -90,7 +90,7 @@ deftype var_info struct {
   cell cell_num;
   name opt[sym];
   lifetime cu_typeexpr;
-  // Can a goto statement enter this var's scope and construct the var?  True if the var is self-contained.  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)  This also means the var needs to be destructed by return statements and gotos that leave its scope.  TODO: What about default cases of switch statements?  You shouldn't be able to goto into one of those?  But you should be able to goto into the else block of an "if case" -- this needs to be fixed?  Should the swartch get destroyed?  Are we treating the "destroy later" of the condition properly?
+  // Can a goto statement enter this var's scope and construct the var?  True if the var is self-contained.  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)  This also means the var needs to be destructed by return statements and gotos that leave its scope.  NOTE: What about default cases of switch statements?  You shouldn't be able to goto into one of those?  But you should be able to goto into the else block of an "if case" -- this needs to be fixed?  Should the swartch get destroyed?  Are we treating the "destroy later" of the condition properly?
   // TODO: Rename.
   autoinit var_binding;
   initter opt[ctor_desc];
@@ -403,8 +403,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
 }
 
 func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *te_typeexpr, decl_index size, out *instpair) bool {
-  // TODO: Pick a better def name.
-  defname_u8 array[u8] = _u8("magic_enum_ctor_");
+  defname_u8 array[u8] = _u8("$magic_enum_ctor_");
   build_u8str(void, &defname_u8, &decl_index);
   defname sym = intern(ds->im, from_u8(defname_u8));
 
@@ -593,7 +592,7 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
   }
 
   if !help_check_expr_ai(es, ai, x, pt) {
-    // TODO: Get rid of this terrible hackish way to error message.
+    // NOTE: Get rid of this terrible hackish way to error message.
     MERR(es->cs, x->meta, _u8(" in this expression"));
     return false;
   }

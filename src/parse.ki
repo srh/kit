@@ -191,7 +191,7 @@ func parse_toplevel(p *ps, out *ast_toplevel) parse_result {
   }
 }
 
-// TODO: Have a specific AST datatype for funcs instead of munging them into ast_def.  (Why?)
+// NOTE: Have a specific AST datatype for funcs instead of munging them into ast_def.  (Why?)
 func parse_rest_of_func(p *ps, is_export ast_isexport, is_inline ast_isinline, out *ast_toplevel) parse_result {
   generics ast_generics;
   name ast_ident;
@@ -282,7 +282,7 @@ func parse_rest_of_defclass(p *ps, out *ast_toplevel) parse_result {
     return Fail;
   }
   disposition ast_defclass_disposition;
-  // TODO: Honestly this is bad syntax, now that copy and move aren't keywords.
+  // NOTE: Honestly this is bad syntax, now that copy and move aren't keywords.
   if +try_skip_specific_ident(p, "copy") {
     disposition = DefaultCopyMoveDestroy(void);
   } else if +try_skip_specific_ident(p, "move") {
@@ -401,7 +401,7 @@ func parse_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) parse_resu
   switch peek(p)->val {
   default:
     return Fail;
-  // TODO: "Opers" such as "@" or maybe even "=" shouldn't really be allowed here -- only functional opers allowed.
+  // NOTE: "Opers" such as "@" or maybe even "=" shouldn't really be allowed here -- only functional opers allowed.
   case Oper(operch shray[i32]):
     backquote_step(p);
     if !+try_skip_token(p, @[tokval]Grouper(Backtick)) {
@@ -887,7 +887,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       }
       step(p);
       m ast_meta = copyend(p, lhs.meta);
-      // (TODO: Is expanding out this funcall/typed/addressof expr the best software design choice?  I think so, we can add layover information saying this is an incr expr, later.  Likewise with user assignment ops.)
+      // (NOTE: Is expanding out this funcall/typed/addressof expr the best software design choice?  I think so, we can add layover information saying this is an incr expr, later.  Likewise with user assignment ops.)
       *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
          embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))))})))}));
       return Success;
