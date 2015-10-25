@@ -440,6 +440,39 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
 }
 
 // parms have already had generics replaced.  They should also be complete.
+func check_and_compute_parms_no_canonicalize(cs *checkstate, clq *clqueue, t *genparms, out *idy_repls) bool {
+  switch t {
+    case &NoParms: {
+      *out = blank_idyrepls();
+      return true;
+    }
+    case &HasParms(ps shray[te_typeexpr]): {
+      noscope_g ast_generics = NoGenerics;
+      noscope_parms idy_repls = blank_idyrepls();
+      params_complete bool;
+      params shray[te_typeexpr];
+      if !check_and_compute_typeexpr_shray(cs, clq, &noscope_g, &noscope_parms, &ps, &params, &params_complete) {
+        return false;
+      }
+
+      if !params_complete {
+        ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
+      }
+
+      // TODO: Isn't there some function mapconvert for this?
+      cu_params array[cu_typeexpr];
+      n size = count(&params);
+      reserve(&cu_params, n);
+      for i size = 0; i < n; i = i + 1 {
+        push(&cu_params, ~get(&params, i));
+      }
+      *out = {freeze(&cu_params)};
+      return true;
+    }
+  }
+}
+
+// parms have already had generics replaced.  They should also be complete.
 func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy_genparms) bool {
   switch t {
     case &NoParms: {

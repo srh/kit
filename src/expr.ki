@@ -1268,14 +1268,33 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     }
     case &OneGlobalMatch(egm es_global_match): {
       ent *def_entry = ref_def_entry(es->cs, egm.ent_id);
-      typrop *cu_typrop;
-      // TODO(): This is one place where we need to handle generics in typrop differently.
-      // TODO: Why even ensure that the inst's type is computed?
-      if !ensure_def_inst_type_computed(es->cs, es->clq, ent, egm.inst_id, &typrop) {
+
+      // This parallels or plagairizes ensure_def_inst_type_computed.
+      // TODO: Dedup anything?
+      matched_parms idy_repls;
+      if !check_and_compute_parms_no_canonicalize(es->cs, es->clq, &egm.parms, &matched_parms) {
         return false;
       }
+
+      ent_typeexpr *te_typeexpr;
+      if !def_converted_typeexpr(es->cs, ent, &ent_typeexpr) {
+        return false;
+      }
+
+      computed cac_typeexpr;
+      if !check_and_compute_typeexpr(es->cs, es->clq, &ent->generics, &matched_parms, ent_typeexpr, &computed) {
+        return false;
+      }
+
+      check(computed.complete);
+      cu_computed cu_typeexpr = ~computed.te;
+      props type_properties;
+      if !compute_type_properties(es->cs, es->clq, &cu_computed, &props) {
+        return false;
+      }
+
       annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id}));
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, typrop->cu, typrop->props})), typrop->cu, typrop->props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, cu_computed, props})), cu_computed, props)));
       return true;
     }
     case &OneLocalMatch(v local_info): {
