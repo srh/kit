@@ -15,7 +15,7 @@ defenum parse_result {
   Success void;
 };
 
-// TODO: This can fail if x is unininitialized.  Should this be "~"?  In the long run the uninitialized value should be impossible.  If that changes, this should be changed to "~".
+// NOTE: This can fail if x is unininitialized.  Should this be "~"?  In the long run the uninitialized value should be impossible.  If that changes, this should be changed to "~".
 func `+`(x parse_result) bool {
   switch x {
   case Fail: return false;
@@ -185,7 +185,7 @@ func parse_toplevel(p *ps, out *ast_toplevel) parse_result {
   }
 }
 
-// TODO: Have a specific AST datatype for funcs instead of munging them into ast_def.
+// TODO: Have a specific AST datatype for funcs instead of munging them into ast_def.  (Why?)
 func parse_rest_of_func(p *ps, is_export ast_isexport, is_inline ast_isinline, out *ast_toplevel) parse_result {
   generics ast_generics;
   name ast_ident;
@@ -390,14 +390,14 @@ func parse_ident(p *ps, out *ast_ident) parse_result {
   }
 }
 
-func parse_rest_of_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) parse_result {
+func parse_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) parse_result {
+  backquote_step(p);
   switch peek(p)->val {
   default:
     return Fail;
   // TODO: "Opers" such as "@" or maybe even "=" shouldn't really be allowed here -- only functional opers allowed.
-  // TODO: We probably should not allow "` + `" to parse -- require tight quoting, do this at tokenization.
   case Oper(operch shray[i32]):
-    step(p);
+    backquote_step(p);
     if !+try_skip_token(p, @[tokval]Grouper(Backtick)) {
       return Fail;
     }
@@ -418,8 +418,7 @@ func triparse_ident(p *ps, out *ast_ident) triparse_result {
   case Grouper(g grouper):
     if case Backtick = g {
       ident_meta ast_meta = start(p);
-      step(p);
-      return success_or_fail(parse_rest_of_backtick_ident(p, ident_meta, out));
+      return success_or_fail(parse_backtick_ident(p, ident_meta, out));
     } else {
       return Quickfail;
     }
@@ -600,7 +599,7 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_
   if !+parse_rest_of_type_param_list(p, ab, &args) {
     return Error(void);
   }
-  // TODO: Allow arbitrarily many type applications?
+  // NOTE: Allow arbitrarily many type applications?
   *out = App({embox(lhs), args});
   return Success(void);
 }
@@ -846,7 +845,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
             return Fail;
           }
           m ast_meta = copyend(p, lhs.meta);
-          // TODO: This is fragile.  What if we had a statement, "x = y ! z;", where "!" is a lower-precedence operator than "="?  Right now no such operators exist (besides comma, which doesn't work in expressions) so we're okay.
+          // NOTE: This is fragile.  What if we had a statement, "x = y ! z;", where "!" is a lower-precedence operator than "="?  Right now no such operators exist (besides comma, which doesn't work in expressions) so we're okay.
           if !+build_binop_expr(p->im, se, m, op_facts.user_assignment, oper, lhs, rhs, &lhs) {
             return Fail;
           }
@@ -1100,9 +1099,8 @@ func parse_atomic_expr_upon_grouper(p *ps, ab allow_braces, g grouper, out *ast_
     case SingleQuote:
       return parse_atomic_expr_upon_stringdelim(p, '\'', out);
     case Backtick:
-      step(p);
       ident ast_ident;
-      if !+parse_rest_of_backtick_ident(p, m, &ident) {
+      if !+parse_backtick_ident(p, m, &ident) {
         return Fail;
       }
       return parse_finish_name_expr(p, ident, out);
@@ -1946,6 +1944,8 @@ func test_parse() bool {
     _u8("func foo() a { return x == y then blarg then 23 else 64 else 45; }"));
   pass = pass & run_parse_test(_u8("p061"),
     _u8("func foo() a { return x == y then 64 else hey & jay then feh else 45; }"));
+  pass = pass & run_parse_negtest(_u8("p062"),
+    _u8("func `  + `() a { return b; }"));
   return pass;
 }
 

@@ -225,10 +225,6 @@ inline func is_alnumlike(x i32) bool {
   return is_alphalike(x) || is_digit(x);
 }
 
-inline func is_alnumlike(x i32) bool {
-  return is_alnum(x) || x == '_';
-}
-
 func is_hexdigit(x i32, val_out *i8) bool {
   // TODO: Statically assert 'f' - 'a', 'F' - 'A', '9' - '0'.
   if is_digit(x) {
@@ -623,6 +619,35 @@ func[String] grab_keyword(p *ps, s String, k keyw, out *tok) bool {
   return true;
 }
 
+func backquote_step(p *ps) void {
+  p->current = backquote_grab_tok(p);
+}
+
+func backquote_grab_tok(p *ps) tok {
+  left pos = ps_pos(p);
+  ch i32 = ps_peek(p);
+  if ch == '`' {
+    ps_step(p);
+    return mk_res(p, left, Grouper(@[grouper]Backtick));
+  }
+  build array[i32];
+  for ;; {
+    // NOTE: ASCII static assertions.
+    // The less-than-or-equal-to is intentional.
+    // Also, if ch is -1, we return Bad (not Eof).
+    if ch <= ' ' || ch > '~' || is_alnumlike(ch) {
+      return mk_res(p, left, Bad);
+    }
+    // TODO: Do backquote token-grabbing much better -- only accept valid opers.
+    if ch == '`' {
+      return mk_res(p, left, Oper(freeze(&build)));
+    }
+    ps_step(p);
+    push(&build, ch);
+    ch = ps_peek(p);
+  }
+}
+
 // stop is either '\'' or '\"'.
 func string_step(p *ps, stop i32) void {
   p->current = string_grab_tok(p, stop);
@@ -632,11 +657,8 @@ func string_grab_tok(p *ps, stop i32) tok {
   left pos = ps_pos(p);
   ch i32 = ps_peek(p);
 
-  if ch == @[i32]-1 {
-    return {{left, left}, Eof(void)};
-  }
-
   // TODO: ASCII static assertions.
+  // If ch is -1, we return Bad (not Eof).
   if ch < ' ' || ch > '~' {
     return {{left, left}, Bad(void)};
   }
