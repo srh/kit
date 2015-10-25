@@ -195,14 +195,17 @@ func parse_toplevel(p *ps, out *ast_toplevel) parse_result {
 func parse_rest_of_func(p *ps, is_export ast_isexport, is_inline ast_isinline, out *ast_toplevel) parse_result {
   generics ast_generics;
   name ast_ident;
-  lambda_expr_meta ast_meta;
   params array[ast_vardecl];
   return_type ast_typeexpr;
   body ast_bracebody;
-  if !(+parse_def_generics_and_name(p, is_export, IsNotVar(void), &generics, &name)
-       && +parse_lambdaspec(p, &lambda_expr_meta, &params, &return_type, &body)) {
+  if !+parse_def_generics_and_name(p, is_export, IsNotVar(void), &generics, &name) {
     return Fail;
   }
+  lambda_expr_meta ast_meta = start(p);
+  if !+parse_lambdaspec(p, &params, &return_type, &body) {
+    return Fail;
+  }
+  end(p, lambda_expr_meta);
 
   *out = Def({is_export, IsNotVar(void), generics, name, None,
               consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({is_inline, params, return_type, {NotComputed@[ast_fullbody_info](), body}})))});
@@ -374,13 +377,10 @@ func parse_def_generics_and_name(p *ps, is_export ast_isexport, is_var ast_isvar
   return Success;
 }
 
-func parse_lambdaspec(p *ps, lambda_expr_meta_out *ast_meta, params_out *array[ast_vardecl], return_type_out *ast_typeexpr, body_out *ast_bracebody) parse_result {
-  m ast_meta = start(p);
+func parse_lambdaspec(p *ps, params_out *array[ast_vardecl], return_type_out *ast_typeexpr, body_out *ast_bracebody) parse_result {
   if !(+parse_args_list(p, params_out) && +parse_typeexpr(p, return_type_out) && +parse_bracebody(p, body_out)) {
     return Fail;
   }
-  end(p, m);
-  *lambda_expr_meta_out = m;
   return Success;
 }
 
@@ -1085,8 +1085,9 @@ func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) parse_result 
 func parse_atomic_expr_upon_keyw(p *ps, k keyw, out *ast_expr) parse_result {
   switch k {
     case Func: {
+      m ast_meta = start(p);
       step(p);
-      return parse_rest_of_lambda(p, out);
+      return parse_rest_of_lambda(p, m, out);
     }
     case True: {
       m ast_meta = startend(p);
@@ -1272,15 +1273,14 @@ func is_at_sign(operch *shray[i32]) bool {
 
 def at_sign i32 = '@';
 
-func parse_rest_of_lambda(p *ps, out *ast_expr) parse_result {
-  // TODO: Uh, the meta should start a bit earlier, no?
-  lambda_expr_meta ast_meta;
+func parse_rest_of_lambda(p *ps, lambda_expr_meta ast_meta, out *ast_expr) parse_result {
   args array[ast_vardecl];
   return_type ast_typeexpr;
   body ast_bracebody;
-  if !+parse_lambdaspec(p, &lambda_expr_meta, &args, &return_type, &body) {
+  if !+parse_lambdaspec(p, &args, &return_type, &body) {
     return Fail;
   }
+  end(p, lambda_expr_meta);
   *out = mk(lambda_expr_meta, @[ast_expr_enum]Lambda({IsNotInline(void), args, return_type, {NotComputed@[ast_fullbody_info](), body}}));
   return Success;
 }
