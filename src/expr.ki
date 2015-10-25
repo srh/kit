@@ -1135,7 +1135,7 @@ func make_comparecells(es *framescope, dest cell_num) instpair {
     lifetime_names array[sym];
     canonical te_typeexpr;
     canonicalize_idy_lifetimes(es->im, &lifetime_names, &ref_cell(es, dest)->type.~, &canonical);
-    parms idy_genparms = {count(&lifetime_names), mk_shray(~canonical)};
+    parms idy_genparms = {count(&lifetime_names), {mk_shray(~canonical)}};
     inst_id def_inst_id = enqueue_def_inst(es->cs, es->clq, ent, &parms);
     return {ent, inst_id};
   } else {

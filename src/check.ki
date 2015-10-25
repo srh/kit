@@ -468,7 +468,7 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy
         canonicalize_idy_lifetimes(cs->im, &lifetime_names, ref(&params, i), &canonicalized);
         push(&cu_params, ~canonicalized);
       }
-      *out = {count(&lifetime_names), freeze(&cu_params)};
+      *out = {count(&lifetime_names), {freeze(&cu_params)}};
       return true;
     }
   }
@@ -533,7 +533,7 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
 
     case &TeLifetime(a te_lifetime):
       if case Has(ix size) = find_lifetime_generic(g, a.name) {
-        *out = {true, ref(&parms->repls, ix)->~};
+        *out = {true, ref(&parms->repls.tys, ix)->~};
         return true;
       }
       // Assume it's a valid lifetime in scope, because what else can we do, keep track of that?
@@ -672,7 +672,7 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
           canonicalize_idy_lifetimes(cs->im, &lifetime_names, ref(&params, i), &canonicalized);
           push(&canonical, ~canonicalized);
         }
-        hp idy_genparms = {count(&lifetime_names), freeze(&canonical)};
+        hp idy_genparms = {count(&lifetime_names), {freeze(&canonical)}};
         inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &hp);
         *out = {true, TeApp({TePureName(value), params, Has({id, inst_id})})};
       } else {
@@ -777,7 +777,7 @@ func find_lifetime_generic(g *ast_generics, name sym) opt[size] {
 
 func lookup_plain_generic(g *ast_generics, parms *idy_genparms, name sym, out *cu_typeexpr) bool {
   if case Has(ix size) = find_plain_generic(g, name) {
-    *out = *ref(&parms->repls, ix);
+    *out = *ref(&parms->repls.tys, ix);
     return true;
   }
   return false;
@@ -811,7 +811,7 @@ func deftype_rhs_type(rhs *ast_type_def_rhs) *ast_typeexpr {
 }
 
 func subsequent_depth(cs *checkstate, parms *idy_genparms) u32 {
-  if empty(&parms->repls) {
+  if empty(&parms->repls.tys) {
     return 0;
   } else {
     return cs->instantiation_depth + 1;

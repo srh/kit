@@ -371,17 +371,21 @@ deftype idy_genparms struct {
 
   // If the ast_generics is NoGenerics, this is of course empty.
   // Entries that line up with lifetime parameters will be some canonicalized lifetime.
-  repls shray[cu_typeexpr];
+  repls idy_repls;
 };
 
 inline func blank_idyparms() idy_genparms {
-  return {0, mk_shray()};
+  return {0, {mk_shray()}};
 }
+
+deftype idy_repls struct {
+  tys shray[cu_typeexpr];
+};
 
 func hash_compute_hash(x *idy_genparms) osize {
   accum osize = hash_compute_hash(&x->num_lifetime_types_used);
-  n size = count(&x->repls);
-  p *cu_typeexpr = data(&x->repls);
+  n size = count(&x->repls.tys);
+  p *cu_typeexpr = data(&x->repls.tys);
   for i size = 0; i < n; i = i + 1 {
     accum = (accum * 33) ^ hash_compute_hash(&p[i]);
   }
@@ -389,7 +393,7 @@ func hash_compute_hash(x *idy_genparms) osize {
 }
 
 func hash_equal(x *idy_genparms, y *idy_genparms) bool {
-  return x->num_lifetime_types_used == y->num_lifetime_types_used && idy_typeexpr_list_equal(&x->repls, &y->repls);
+  return x->num_lifetime_types_used == y->num_lifetime_types_used && idy_typeexpr_list_equal(&x->repls.tys, &y->repls.tys);
 }
 
 defenum def_inst_type_status {
@@ -569,10 +573,10 @@ func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_ins
   default:
     parms *idy_genparms = &ref_deftype_inst(cs, inst_id)->parms;
     converted array[te_typeexpr];
-    n size = count(&parms->repls);
+    n size = count(&parms->repls.tys);
     reserve(&converted, n);
     for i size = 0; i < n; i = i + 1 {
-      push(&converted, ref(&parms->repls, i)->~);
+      push(&converted, ref(&parms->repls.tys, i)->~);
     }
     return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
   }

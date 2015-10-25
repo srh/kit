@@ -172,8 +172,8 @@ func check_non_magic_prop(cs *checkstate, clq *clqueue, g *ast_generics, parms *
 }
 
 func padding_oneparm_size(cs *checkstate, parms *idy_genparms) u32 {
-  check(count(&parms->repls) == 1);
-  return unwrap_primitive_padding_type_size(cs, ref(&parms->repls, 0));
+  check(count(&parms->repls.tys) == 1);
+  return unwrap_primitive_padding_type_size(cs, ref(&parms->repls.tys, 0));
 }
 
 func check_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, mag *def_magic) bool {
