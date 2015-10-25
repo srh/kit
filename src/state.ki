@@ -382,6 +382,10 @@ deftype idy_repls struct {
   tys shray[cu_typeexpr];
 };
 
+inline func blank_idyrepls() idy_repls {
+  return {mk_shray()};
+}
+
 func hash_compute_hash(x *idy_genparms) osize {
   accum osize = hash_compute_hash(&x->num_lifetime_types_used);
   n size = count(&x->repls.tys);
