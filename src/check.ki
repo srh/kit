@@ -532,21 +532,14 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
     }
 
     case &TeLifetime(a te_lifetime):
+      if case Has(ix size) = find_lifetime_generic(g, a.name) {
+        *out = {true, ref(&parms->repls, ix)->~};
+        return true;
+      }
+      // Assume it's a valid lifetime in scope, because what else can we do, keep track of that?
+      // TODO: Make sure that user-defined lifetimes we see are well-scoped... if it still seems worth it.
       *out = {true, TeLifetime({a.name})};
       return true;
-      // TODO: Make sure that user-defined lifetimes are well-scoped.  Probably we need to prove that other lifetime situations are well-scoped.
-      /*
-      if case Has(ix size) = find_lifetime_generic(g, a.name) {
-        *out = {true, TeLifetime({a.name})};
-        return true;
-      }
-      if is_parm_generic(cs->im, parms->num_lifetime_types_used, a.name) {
-        *out = {true, TeLifetime({a.name})};
-        return true;
-      }
-      ERR(_u8("Lifetime type with unrecognized name"));
-      return false;
-      */
 
     case &TeUnknown: {
       *out = {false, TeUnknown(void)};

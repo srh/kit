@@ -1270,6 +1270,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       ent *def_entry = ref_def_entry(es->cs, egm.ent_id);
       typrop *cu_typrop;
       // TODO(): This is one place where we need to handle generics in typrop differently.
+      // TODO: Why even ensure that the inst's type is computed?
       if !ensure_def_inst_type_computed(es->cs, es->clq, ent, egm.inst_id, &typrop) {
         return false;
       }
