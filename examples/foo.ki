@@ -154,6 +154,9 @@ func try_ref2() void {
   diff osize = subtract_rs(&x1, &x2);
   putchar('^');
   print(@[u32]~diff);
+  diff2 osize = subtract_rs(&x2, &x2);
+  putchar(' ');
+  print(@[u32]~diff2);
   putchar(10);
 }
 
