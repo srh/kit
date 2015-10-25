@@ -674,20 +674,6 @@ deftype ast_expr struct {
   u ast_expr_enum;
 };
 
-func inner_info(a *ast_expr_info) ast_expr_info {
-  switch a {
-    case &NoInfo: {
-      return NoInfo(void);
-    }
-    case &IncompleteCheck(t te_typeexpr): {
-      return IncompleteCheck(t);
-    }
-    case &CompleteCheck(t ast_expr_complete_info): {
-      return CompleteCheck(mk(t.lval, t.cu, t.cu_props));
-    }
-  }
-}
-
 func annotate_info(a *ast_expr, info ast_expr_info) void {
   switch &a->info {
     case &CompleteCheck(t ast_expr_complete_info): {

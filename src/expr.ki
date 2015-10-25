@@ -600,14 +600,12 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
     case &NameExpr(a ast_name_expr):
       return check_expr_name(es, ai, &a, pt, x);
 
-    case &ParenExpr(a ast_paren_expr): {
+    case &ParenExpr(a ast_paren_expr):
       if !check_expr_ai(es, ai, oo(&a.expr), pt) {
         return false;
       }
-      // TODO: inner_info is done?
-      annotate_info(x, inner_info(&oo(&a.expr)->info));
+      annotate_info(x, oo(&a.expr)->info);
       return true;
-    }
 
     case &NumericLiteral(a ast_numeric_literal):
       return check_numeric_literal(es, ai, pt, numeric_literal_value(&a), x);
@@ -773,7 +771,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   if !check_expr_ai(es, ai, oo(&a->expr), &unified_computed.te) {
     return false;
   }
-  annotate_info(x, inner_info(&oo(&a->expr)->info));
+  annotate_info(x, oo(&a->expr)->info);
   return true;
 }
 
