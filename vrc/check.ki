@@ -78,19 +78,18 @@ func check_module(cs *checkstate, mod_name sym) bool {
   }
 }
 
-func convert_typefunc(cs *checkstate, a *ast_typeexpr, out *te_puretype) bool {
+func convert_typefunc(cs *checkstate, a *ast_typeexpr, out *te_puretype) np {
   switch a {
     case &Name(b ast_ident): {
       *out = TePureName(b.value);
-      return true;
+      return NoFail;
     }
     case &Unknown(b ast_unknown): {
       *out = TePureUnknown(void);
-      return true;
+      return NoFail;
     }
     default: {
-      ERR(_u8("Fancy type expression '"), to_u8str(a), _u8("' in typefunc"));
-      return false;
+      return ERR(_u8("Fancy type expression '"), to_u8str(a), _u8("' in typefunc"));
     }
   }
 }
@@ -144,7 +143,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
     case &App(b ast_typeapp): {
       typefunc te_puretype;
       params shray[te_typeexpr];
-      if !(convert_typefunc(cs, oo(&b.typefunc), &typefunc)
+      if !(~convert_typefunc(cs, oo(&b.typefunc), &typefunc)
            && convert_typeexpr_list(cs, &b.params, &params)) {
         return false;
       }

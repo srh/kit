@@ -1,14 +1,30 @@
 import stdlib;
 import state;
 
-func[T] ERR(x T) void { DBG(x); }
-func[T, U] ERR(x T, y U) void { DBG(x, y); }
-func[T, U, V] ERR(x T, y U, z V) void { DBG(x, y, z); }
-func[T, U, V, W] ERR(x T, y U, z V, p W) void { DBG(x, y, z, p); }
-func[T, U, V, W, X] ERR(x T, y U, z V, p W, q X) void { DBG(x, y, z, p, q); }
-func[T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) void { DBG(x, y, z, p, q, r); }
-func[T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) void { DBG(x, y, z, p, q, r, s); }
-func[T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) void { DBG(x, y, z, p, q, r, s, t); }
+// Tells (a) if the operation failed, and (b) if it did, whether location info was printed.  Might be expanded to include other info.
+defenum np {
+  // No failure happened.
+  NoFail void;
+  // We had a failure, and an error message was printed.  True if location info was printed.
+  Printed bool;
+};
+
+// TODO: Get rid of this (we don't want to discard Printed info).
+inline func `~`(x np) bool {
+  switch x {
+  case NoFail: return true;
+  case Printed(b bool): return false;
+  }
+}
+
+func[T] ERR(x T) np { DBG(x); return Printed(false); }
+func[T, U] ERR(x T, y U) np { DBG(x, y); return Printed(false); }
+func[T, U, V] ERR(x T, y U, z V) np { DBG(x, y, z); return Printed(false); }
+func[T, U, V, W] ERR(x T, y U, z V, p W) np { DBG(x, y, z, p); return Printed(false); }
+func[T, U, V, W, X] ERR(x T, y U, z V, p W, q X) np { DBG(x, y, z, p, q); return Printed(false); }
+func[T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) np { DBG(x, y, z, p, q, r); return Printed(false); }
+func[T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) np { DBG(x, y, z, p, q, r, s); return Printed(false); }
+func[T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) np { DBG(x, y, z, p, q, r, s, t); return Printed(false); }
 
 
 func[T, U, V, W, X, Y, Z, A] DBG(x T, y U, z V, p W, q X, r Y, s Z, t A) void {
