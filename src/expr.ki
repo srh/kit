@@ -285,10 +285,10 @@ defenum ds_constructor_res {
 };
 
 // Like any pt, pt is either (a) incomplete, or (b) complete and computed.
-func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_out *ds_constructor_res) bool {
+func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_out *ds_constructor_res) np {
   if case &HasParms(a) = gp {
     *res_out = NoMatchConstructor(void);
-    return true;
+    return NoFail;
   }
   arg_type *te_typeexpr;
   return_type *te_typeexpr;
@@ -299,26 +299,26 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     case &TeEnum(te te_enum): { }
     case &TeUnknown:
       *res_out = AmbigMatchConstructor(void);
-      return true;
+      return NoFail;
     default:
       *res_out = NoMatchConstructor(void);
-      return true;
+      return NoFail;
     }
     // TODO: Dedup some of the code from here on?
     if !is_complete(pt) {
       *res_out = AmbigMatchConstructor(void);
-      return true;
+      return NoFail;
     }
     // enum_type is complete.
     enum_type *te_typeexpr;
     switch complete_structural_rhs(ds, pt, &enum_type) {
     case Error:
-      return false;
+      return Printed();
     case SuccessHasRhs: { }
     case SuccessNoRhs: { }
     case NoAccessibleStructuralRhs:
       *res_out = NoMatchConstructor(void);
-      return true;
+      return NoFail;
     }
 
     if case &TeEnum(et te_enum) = enum_type {
@@ -326,76 +326,76 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       decl_index size;
       if !find_vardecl(&et.constructors, name, &rhs_type, &decl_index) {
         *res_out = NoMatchConstructor(void);
-        return true;
+        return NoFail;
       }
       void_type te_typeexpr = primitive_void_type(ds->cs);
       unified te_typeexpr;
       if !unify_types(&void_type, rhs_type, &unified) {
         *res_out = NoMatchConstructor(void);
-        return true;
+        return NoFail;
       }
       cac_enum_type cac_typeexpr;
-      if ! ~noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, enum_type, &cac_enum_type) {
-        return false;
+      if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, enum_type, &cac_enum_type) {
+        return Printed(pm);
       }
       check(cac_enum_type.complete);
 
       *res_out = MatchedVoidConstructed({~ *pt, ~cac_enum_type.te, mk_enum_tag_value(decl_index)});
-      return true;
+      return NoFail;
     } else {
       *res_out = NoMatchConstructor(void);
-      return true;
+      return NoFail;
     }
   }
   cac_return_type cac_typeexpr;
-  if ! ~noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, return_type, &cac_return_type) {
-    return false;
+  if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, return_type, &cac_return_type) {
+    return Printed(pm);
   }
   if !cac_return_type.complete {
     *res_out = AmbigMatchConstructor(void);
-    return true;
+    return NoFail;
   }
   // enum_type is complete and computed.
   enum_type *te_typeexpr;
   switch complete_structural_rhs(ds, &cac_return_type.te, &enum_type) {
   case Error:
-    return false;
+    return Printed();
   case SuccessHasRhs: { }
   case SuccessNoRhs: { }
   case NoAccessibleStructuralRhs:
     *res_out = NoMatchConstructor(void);
-    return true;
+    return NoFail;
   }
   if case &TeEnum(et te_enum) = enum_type {
     rhs_type *te_typeexpr;
     decl_index size;
     if !find_vardecl(&et.constructors, name, &rhs_type, &decl_index) {
       *res_out = NoMatchConstructor(void);
-      return true;
+      return NoFail;
     }
     // rhs_type is complete.
     unified te_typeexpr;
     if !unify_types(arg_type, rhs_type, &unified) {
       *res_out = NoMatchConstructor(void);
-      return true;
+      return NoFail;
     }
     ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
     cac_ctor_type cac_typeexpr;
-    if ! ~noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &ctor_type, &cac_ctor_type) {
-      return false;
+    if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &ctor_type, &cac_ctor_type) {
+      return Printed(pm);
     }
     check(cac_ctor_type.complete);
 
     ip instpair;
     if !lookup_or_make_enum_constructor_def(ds, &et, &cac_ctor_type.te, decl_index, &ip) {
-      return false;
+      return Printed();
     }
 
     *res_out = MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index), ip});
-    return true;
+    return NoFail;
   } else {
     *res_out = NoMatchConstructor(void);
-    return true;
+    return NoFail;
   }
 }
 
@@ -513,8 +513,8 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
   switch &res {
     case &NoMatch: {
       constructor_res ds_constructor_res;
-      if !ds_lookup_constructor(es->ds, name, gp, pt, &constructor_res) {
-        return Printed();
+      if case Printed(pm) = ds_lookup_constructor(es->ds, name, gp, pt, &constructor_res) {
+        return Printed(pm);
       }
       switch &constructor_res {
       case &NoMatchConstructor:
