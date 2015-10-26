@@ -184,7 +184,7 @@ func es_note_var_initter(es *framescope, vn var_number) bool {
     return true;
   }
   desc ctor_desc;
-  if !get_init_ctor(es->ds, &info->type, &desc) {
+  if case Printed(pm) = get_init_ctor(es->ds, &info->type, &desc) {
     return false;
   }
   info->initter = Has(desc);
@@ -197,7 +197,7 @@ func es_note_var_destroyer(es *framescope, vn var_number) bool {
     return true;
   }
   desc ctor_desc;
-  if !get_destroy_ctor(es->ds, &info->type, &desc) {
+  if case Printed(pm) = get_destroy_ctor(es->ds, &info->type, &desc) {
     return false;
   }
   info->destroyer = Has(desc);
@@ -439,11 +439,11 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
   switch &rhs_props.move_behavior {
     case &DerivedMethodAbsent: {
       copy_desc ctor_desc;
-      if !behavior_to_desc(&rhs_props.copy_behavior, &copy_desc) {
+      if case Printed(pm) = behavior_to_desc(&rhs_props.copy_behavior, &copy_desc) {
         return false;
       }
       destroy_desc ctor_desc;
-      if !behavior_to_desc(&rhs_props.destroy_behavior, &destroy_desc) {
+      if case Printed(pm) = behavior_to_desc(&rhs_props.destroy_behavior, &destroy_desc) {
         return false;
       }
       meco = EnumConstructCopyDestroy({copy_desc, destroy_desc});
@@ -954,23 +954,22 @@ func check_expr_assignment(es *framescope, pt *te_typeexpr, a *ast_assignment, x
   }
 }
 
-func behavior_to_desc(b *derived_method_behavior, out *ctor_desc) bool {
+func behavior_to_desc(b *derived_method_behavior, out *ctor_desc) np {
   switch b {
     case &DerivedMethodAbsent: {
-      ERR(_u8("Cannot find derived method."));
-      return false;
+      return ERR(_u8("Cannot find derived method."));
     }
     case &DerivedMethodExplicit(ip instpair): {
       *out = FunCtor(ip);
-      return true;
+      return NoFail;
     }
     case &DerivedMethodNontrivial(ip instpair): {
       *out = FunCtor(ip);
-      return true;
+      return NoFail;
     }
     case &DerivedMethodTrivial: {
       *out = TrivialCtor(void);
-      return true;
+      return NoFail;
     }
   }
 }
@@ -979,34 +978,34 @@ func computed_ptr_type(clq *clqueue, t *cu_typeexpr) cu_typrop {
   return compute_prim(clq, ptr_type(clq->cs, t->~));
 }
 
-func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
+func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
   props type_properties;
-  if ! ~compute_type_properties(ds->cs, ds->clq, t, &props) {
-    return false;
+  if case Printed(pm) = compute_type_properties(ds->cs, ds->clq, t, &props) {
+    return Printed(pm);
   }
   return behavior_to_desc(&props.init_behavior, out);
 }
 
-func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
+func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
   props type_properties;
-  if ! ~compute_type_properties(ds->cs, ds->clq, t, &props) {
-    return false;
+  if case Printed(pm) = compute_type_properties(ds->cs, ds->clq, t, &props) {
+    return Printed(pm);
   }
   return behavior_to_desc(&props.copy_behavior, out);
 }
 
-func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
+func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
   props type_properties;
-  if ! ~compute_type_properties(ds->cs, ds->clq, t, &props) {
-    return false;
+  if case Printed(pm) = compute_type_properties(ds->cs, ds->clq, t, &props) {
+    return Printed(pm);
   }
   return behavior_to_desc(&props.move_behavior, out);
 }
 
-func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
+func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
   props type_properties;
-  if ! ~compute_type_properties(ds->cs, ds->clq, t, &props) {
-    return false;
+  if case Printed(pm) = compute_type_properties(ds->cs, ds->clq, t, &props) {
+    return Printed(pm);
   }
   return behavior_to_desc(&props.destroy_behavior, out);
 }
@@ -1026,12 +1025,12 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
         annotate(after, mk_after(@[consume_actions]ConsumeByInPlace(void), desc.whole_num));
       } else {
         copy ctor_desc;
-        if !get_copy_ctor(es->ds, &info->cu, &copy) {
-          return Printed();
+        if case Printed(pm) = get_copy_ctor(es->ds, &info->cu, &copy) {
+          return Printed(pm);
         }
         destroy ctor_desc;
-        if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
-          return Printed();
+        if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
+          return Printed(pm);
         }
         dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
         annotate(after,
@@ -1045,15 +1044,15 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
       dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
       if case Has(ix size) = find(movable_cells, Has(desc.num)) {
         move ctor_desc;
-        if !get_move_ctor(es->ds, &info->cu, &move) {
-          return Printed();
+        if case Printed(pm) = get_move_ctor(es->ds, &info->cu, &move) {
+          return Printed(pm);
         }
         annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]{move, dest, desc.num}), dest));
         *moved_cell_ix_out = Has(ix);
       } else {
         copy ctor_desc;
-        if !get_copy_ctor(es->ds, &info->cu, &copy) {
-          return Printed();
+        if case Printed(pm) = get_copy_ctor(es->ds, &info->cu, &copy) {
+          return Printed(pm);
         }
         annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]{copy, dest, desc.num}, desc.deadme)), dest));
         *moved_cell_ix_out = None;
@@ -1069,8 +1068,8 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       destroy ctor_desc;
-      if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
-        return Printed();
+      if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
+        return Printed(pm);
       }
       annotate(after, mk_after_discard(@[destroy_action]{destroy, desc.whole_num}));
     }
@@ -1097,8 +1096,8 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
   if true {
     info *ast_expr_complete_info = expr_complete_info(a);
     destroy ctor_desc;
-    if !get_destroy_ctor(es->ds, &info->cu, &destroy) {
-      return Printed();
+    if case Printed(pm) = get_destroy_ctor(es->ds, &info->cu, &destroy) {
+      return Printed(pm);
     }
     annotate(&later->action, {destroy, result_cell(unHas(after))});
   }
@@ -1106,8 +1105,8 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
   if case Has(p *ast_later_discard_info) = later2 {
     info *ast_expr_complete_info = expr_complete_info(a);
     destroy ctor_desc;
-    if !get_destroy_ctor(es->ds, &info->cu, &destroy) {
-      return Printed();
+    if case Printed(pm) = get_destroy_ctor(es->ds, &info->cu, &destroy) {
+      return Printed(pm);
     }
     annotate(&p->action, {destroy, result_cell(unHas(after))});
   }
@@ -1133,13 +1132,13 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       target_destroy ctor_desc;
-      if !get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
-        return Printed();
+      if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
+        return Printed(pm);
       }
       if whole_temporary(&desc) {
         move ctor_desc;
-        if !get_move_ctor(es->ds, &ref_cell(es, dest)->type, &move) {
-          return Printed();
+        if case Printed(pm) = get_move_ctor(es->ds, &ref_cell(es, dest)->type, &move) {
+          return Printed(pm);
         }
         annotate(&assignment->info,
           @[ast_assignment_info]
@@ -1148,12 +1147,12 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
         copy ctor_desc;
-        if !get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
-          return Printed();
+        if case Printed(pm) = get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
+          return Printed(pm);
         }
         destroy ctor_desc;
-        if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
-          return Printed();
+        if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
+          return Printed(pm);
         }
 
         annotate(&assignment->info,
@@ -1169,12 +1168,12 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         annotate(&assignment->info, StaticSelfAssignment(void));
       } else {
         target_destroy ctor_desc;
-        if !get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
-          return Printed();
+        if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
+          return Printed(pm);
         }
         copy ctor_desc;
-        if !get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
-          return Printed();
+        if case Printed(pm) = get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
+          return Printed(pm);
         }
         do_conditional bool;
         switch &target_destroy {
