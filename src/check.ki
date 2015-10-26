@@ -1380,7 +1380,7 @@ func process_module_toplevels(cs *checkstate, mod *module) bool {
   check_mutate(&mod->process_state, Unprocessed(void), Processing(void));
   // We start the module outside of any access blocks, so the scope is empty, of course.
   access_scope array[access_entry_id];
-  if !process_toplevels(cs, access_scope, mod, &mod->file.toplevels) {
+  if ! ~process_toplevels(cs, access_scope, mod, &mod->file.toplevels) {
     return false;
   }
   check_mutate(&mod->process_state, Processing(void), DoneProcessing(void));
@@ -1398,7 +1398,7 @@ func add_def_entry(cs *checkstate,
 func process_toplevels(cs *checkstate,
                        access_scope array[access_entry_id],
                        mod *module,
-                       toplevels *array[ast_toplevel]) bool {
+                       toplevels *array[ast_toplevel]) np {
   ntoplevels size = count(toplevels);
   for i size = 0; i < ntoplevels; i = i + 1 {
     toplevel *ast_toplevel = ref(toplevels, i);
@@ -1406,7 +1406,7 @@ func process_toplevels(cs *checkstate,
       case &Import(a ast_import): {
         switch process_module(cs, a.name.value) {
           case Printed(pm): {
-            return false;
+            return Printed(pm);
           }
           case NoFail(id module_id): {
             // Do nothing!  We've processed the module successfully.
@@ -1415,11 +1415,11 @@ func process_toplevels(cs *checkstate,
       }
       case &Def(a ast_def): {
         quick_te ast_typeexpr;
-        if ! ~quick_typeexpr(cs->im, &a, &quick_te) {
-          return false;
+        if case Printed(pm) = quick_typeexpr(cs->im, &a, &quick_te) {
+          return Printed(pm);
         }
-        if ! ~check_generics_unique(cs, &a.generics) {
-          return false;
+        if case Printed(pm) = check_generics_unique(cs, &a.generics) {
+          return Printed(pm);
         }
         ent def_entry = mk(mod->module_name, a.name.value, access_scope, a.generics, quick_te, toplevel);
         add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
@@ -1429,8 +1429,8 @@ func process_toplevels(cs *checkstate,
         add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
       }
       case &TypeDef(a ast_type_def): {
-        if ! ~check_generics_unique(cs, &a.generics) {
-          return false;
+        if case Printed(pm) = check_generics_unique(cs, &a.generics) {
+          return Printed(pm);
         }
         id deftype_entry_id = add_deftype_entry(cs, mk(mod->module_name, a.name.value, access_scope, is_public(&a.rhs), a.generics, &a));
         push(&mod->deftypes, id);
@@ -1439,14 +1439,14 @@ func process_toplevels(cs *checkstate,
         access_id access_entry_id = add_access_entry(cs, mk(a.name.value, a.arity));
         push(&mod->access_blocks, access_id);
         push(&access_scope, access_id);
-        if !process_toplevels(cs, access_scope, mod, &a.toplevels) {
-          return false;
+        if case Printed(pm) = process_toplevels(cs, access_scope, mod, &a.toplevels) {
+          return Printed(pm);
         }
         pop(&access_scope);
       }
     }
   }
-  return true;
+  return NoFail;
 }
 
 func check_generics_unique(cs *checkstate, a *ast_generics) np {
