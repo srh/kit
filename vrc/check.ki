@@ -601,29 +601,29 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
   return NoFail;
 }
 
-func check_and_compute_typeexpr_shray(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, t *shray[te_typeexpr], computed_out *shray[te_typeexpr], computed_complete_out *bool) bool {
+func check_and_compute_typeexpr_shray(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, t *shray[te_typeexpr], computed_out *shray[te_typeexpr], computed_complete_out *bool) np {
   complete bool = true;
   computed array[te_typeexpr];
   n size = count(t);
   reserve(&computed, n);
   for i size = 0; i < n; i = i + 1 {
     c cac_typeexpr;
-    if ! ~check_and_compute_typeexpr(cs, clq, g, parms, ref(t, i), &c) {
-      return false;
+    if case Printed(pm) = check_and_compute_typeexpr(cs, clq, g, parms, ref(t, i), &c) {
+      return Printed(pm);
     }
     push(&computed, c.te);
     complete = complete & c.complete;
   }
   *computed_out = freeze(&computed);
   *computed_complete_out = complete;
-  return true;
+  return NoFail;
 }
 
 func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *te_typeapp, out *cac_typeexpr) np {
   params_complete bool;
   params shray[te_typeexpr];
-  if !check_and_compute_typeexpr_shray(cs, clq, g, parms, &a->params, &params, &params_complete) {
-    return Printed();
+  if case Printed(pm) = check_and_compute_typeexpr_shray(cs, clq, g, parms, &a->params, &params, &params_complete) {
+    return Printed(pm);
   }
 
   switch &a->typefunc {
