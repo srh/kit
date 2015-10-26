@@ -181,8 +181,8 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) np {
       count opt[u32];
       if case &Has(bo box[ast_expr]) = &b.count {
         num u32;
-        if !fake_eval_arraytype_count(oo(&bo), &num) {
-          return Printed();
+        if case Printed(pm) = fake_eval_arraytype_count(oo(&bo), &num) {
+          return Printed(pm);
         }
         count = Has(num);
       } else {
@@ -602,16 +602,16 @@ func convert_to_u32(base i8, digits *shray[i8], out *u32) bool {
   return true;
 }
 
-func fake_eval_arraytype_count(x *ast_expr, count_out *u32) bool {
+func fake_eval_arraytype_count(x *ast_expr, count_out *u32) np {
   // NOTE: Remove this function and really evaluate an array's count expression.
   switch &x->u {
-    case &NumericLiteral(a ast_numeric_literal): {
-      return numeric_literal_to_u32(&a, count_out);
+  case &NumericLiteral(a ast_numeric_literal):
+    if !numeric_literal_to_u32(&a, count_out) {
+      return Printed();
     }
-    default: {
-      ERR(_u8("Array types (for now) must have a numeric literal for length (or _)."));
-      return false;
-    }
+    return NoFail;
+  default:
+    return ERR(_u8("Array types (for now) must have a numeric literal for length (or _)."));
   }
 }
 
