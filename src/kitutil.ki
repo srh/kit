@@ -2,6 +2,7 @@ import stdlib;
 import state;
 
 // Tells (a) if the operation failed, and (b) if it did, whether location info was printed.  Might be expanded to include other info.
+// TODO: Possibly deprecated in favor of np[T].
 defenum np {
   // No failure happened.
   NoFail void;
@@ -17,9 +18,26 @@ inline func `~`(x np) bool {
   }
 }
 
+defenum[T] np {
+  NoFail T;
+  Printed bool;
+};
+
+// TODO: Get rid of this too.
+inline func[T] `~`(x np[T]) bool {
+  switch &x {
+  case &NoFail(y T): return true;
+  case &Printed(b bool): return false;
+  }
+}
+
 // This exists for code that needs to return an np when it's passing along a failure where a callee returned a boolean.  We know the callee printed an error message, we assume it didn't print the location, and the callee should be updated to return an np.
 // TODO: Get rid of this (and fix it callers).
 func Printed() np {
+  return Printed(false);
+}
+
+func[T] Printed() np[T] {
   return Printed(false);
 }
 

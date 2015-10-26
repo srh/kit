@@ -45,10 +45,10 @@ func finish_checking(cs *checkstate, clq *clqueue) np {
 
 func check_module(cs *checkstate, mod_name sym) bool {
   switch process_module(cs, mod_name) {
-    case None: {
+    case Printed(pm): {
       return false;
     }
-    case Has(id module_id): {
+    case NoFail(id module_id): {
       mod *module = ref_module(cs, id);
 
       naccess_blocks size = count(&mod->access_blocks);
@@ -1328,10 +1328,10 @@ func find_pos_module(cs *checkstate, p pos) opt[*module] {
   return None;
 }
 
-func load_module(cs *checkstate, mod_name sym) opt[module_id] {
+func load_module(cs *checkstate, mod_name sym) np[module_id] {
   switch lookup(&cs->modules_by_name, &mod_name) {
     case Has(id module_id): {
-      return Has(id);
+      return NoFail(id);
     }
     case None: {
       arr array[u8];
@@ -1344,36 +1344,36 @@ func load_module(cs *checkstate, mod_name sym) opt[module_id] {
         p ps = make_ps(cs->im, &cs->posits, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
         if !+parse_file(&p, &oo(&mod)->file) {
           ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p)->interval.left)));
-          return None;
+          return Printed(true);
         }
         mod_id module_id = ~count(&cs->modules);
         push(&cs->modules, mod);
         if !try_insert(&cs->modules_by_name, &mod_name, mod_id) {
           ERR(_u8("ICE: modules_by_name already has name "), lookup(cs->im, mod_name));
-          return None;
+          return Printed(false);
         }
-        return Has(mod_id);
+        return NoFail(mod_id);
       } else {
         ERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
-        return None;
+        return Printed(false);
       }
     }
   }
 }
 
-func process_module(cs *checkstate, mod_name sym) opt[module_id] {
+func process_module(cs *checkstate, mod_name sym) np[module_id] {
   switch load_module(cs, mod_name) {
-    case None: {
-      return None;
+    case Printed(pm): {
+      return Printed(pm);
     }
-    case Has(id module_id): {
+    case NoFail(id module_id): {
       mod *module = ref_module(cs, id);
       if mod->process_state == Unprocessed(void) {
          if !process_module_toplevels(cs, mod) {
-           return None;
+           return Printed();
          }
       }
-      return Has(id);
+      return NoFail(id);
     }
   }
 }
@@ -1407,10 +1407,10 @@ func process_toplevels(cs *checkstate,
     switch toplevel {
       case &Import(a ast_import): {
         switch process_module(cs, a.name.value) {
-          case None: {
+          case Printed(pm): {
             return false;
           }
-          case Has(id module_id): {
+          case NoFail(id module_id): {
             // Do nothing!  We've processed the module successfully.
           }
         }
