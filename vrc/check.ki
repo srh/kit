@@ -1334,7 +1334,7 @@ func process_toplevels(cs *checkstate,
         if ! ~quick_typeexpr(cs->im, &a, &quick_te) {
           return false;
         }
-        if !check_generics_unique(cs, &a.generics) {
+        if ! ~check_generics_unique(cs, &a.generics) {
           return false;
         }
         ent def_entry = mk(mod->module_name, a.name.value, access_scope, a.generics, quick_te, toplevel);
@@ -1345,7 +1345,7 @@ func process_toplevels(cs *checkstate,
         add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
       }
       case &TypeDef(a ast_type_def): {
-        if !check_generics_unique(cs, &a.generics) {
+        if ! ~check_generics_unique(cs, &a.generics) {
           return false;
         }
         id deftype_entry_id = add_deftype_entry(cs, mk(mod->module_name, a.name.value, access_scope, is_public(&a.rhs), a.generics, &a));
@@ -1365,10 +1365,10 @@ func process_toplevels(cs *checkstate,
   return true;
 }
 
-func check_generics_unique(cs *checkstate, a *ast_generics) bool {
+func check_generics_unique(cs *checkstate, a *ast_generics) np {
   switch a {
     case &NoGenerics: {
-      return true;
+      return NoFail;
     }
     case &HasGenerics(b array[ast_ident]): {
       n size = count(&b);
@@ -1377,12 +1377,11 @@ func check_generics_unique(cs *checkstate, a *ast_generics) bool {
         for j size = 0; j < i; j = j + 1 {
           yi sym = ref(&b, j)->value;
           if xi == yi {
-            ERR(_u8("Generic params are self-shadowing."));
-            return false;
+            return ERR(_u8("Generic params are self-shadowing."));
           }
         }
       }
-      return true;
+      return NoFail;
     }
   }
 }
