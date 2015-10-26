@@ -220,8 +220,8 @@ func check_expr_consume(es *framescope, x *ast_expr_consume, pt *te_typeexpr) np
 
 func check_consume_expr(es *framescope, x *ast_expr, aft *nc[ast_expr_after_consume], pt *te_typeexpr) np {
   // If you change this, see also check_expr_retconsume.
-  if !check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
-    return Printed();
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
+    return Printed(pm);
   }
   if !annotate_disposal_for_consume(es, x, aft) {
     return Printed();
@@ -230,8 +230,8 @@ func check_consume_expr(es *framescope, x *ast_expr, aft *nc[ast_expr_after_cons
 }
 
 func check_expr_retconsume(es *framescope, x *ast_expr_consume, pt *te_typeexpr, movable_cells *shray[opt[cell_num]], moved_cell_ix_out *opt[size]) np {
-  if !check_expr_ai(es, AllowIncompleteNo, &x->expr, pt) {
-    return Printed();
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, &x->expr, pt) {
+    return Printed(pm);
   }
   if !annotate_disposal_for_consume(es, &x->expr, movable_cells, &x->after, moved_cell_ix_out) {
     return Printed();
@@ -583,18 +583,17 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
 }
 
 // pt is either (a) incomplete, or (b) complete and computed.
-func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
+func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) np {
   if case &CompleteCheck(t ast_expr_complete_info) = &x->info {
-    return true;
+    return NoFail;
   }
 
   if !help_check_expr_ai(es, ai, x, pt) {
-    // NOTE: Get rid of this terrible hackish way to error message.
-    MERR(es->cs, x->meta, _u8(" in this expression"));
-    return false;
+    // TODO: Get rid of this terrible hackish way to error message.
+    return MERR(es->cs, x->meta, _u8(" in this expression"));
   }
 
-  return true;
+  return NoFail;
 }
 
 func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) bool {
@@ -603,7 +602,7 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
       return check_expr_name(es, ai, &a, pt, x);
 
     case &ParenExpr(a ast_paren_expr):
-      if !check_expr_ai(es, ai, oo(&a.expr), pt) {
+      if case Printed(pm) = check_expr_ai(es, ai, oo(&a.expr), pt) {
         return false;
       }
       annotate_info(x, oo(&a.expr)->info);
@@ -683,7 +682,7 @@ func check_expr_refof(es *framescope, pt *te_typeexpr, a *ast_refof, x *ast_expr
   }
 
   // We require complete matching because addressof requires it.  Addressof says meh, the rhs should be some crystal clear lvalue anyway.
-  if !check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), pt_param) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), pt_param) {
     return false;
   }
 
@@ -770,7 +769,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, pt *te_typeexpr,
       return false;
     }
   }
-  if !check_expr_ai(es, ai, oo(&a->expr), &unified_computed.te) {
+  if case Printed(pm) = check_expr_ai(es, ai, oo(&a->expr), &unified_computed.te) {
     return false;
   }
   annotate_info(x, oo(&a->expr)->info);
@@ -836,7 +835,7 @@ func unnamed_lifetime(es *framescope) te_typeexpr {
 
 func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field, x *ast_expr) bool {
   unknown te_typeexpr = TeUnknown(void);
-  if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), &unknown) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), &unknown) {
     return false;
   }
   info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
@@ -916,7 +915,7 @@ func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *
     ice(_u8("AddressOf sees non-pointer after unifying with pointer."));
   }
   // We require complete matching, because, meh, the rhs should be some crystal clear lvalue anyway.
-  if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), param) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), param) {
     return false;
   }
   rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
@@ -942,7 +941,7 @@ func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *
 
 func check_expr_assignment(es *framescope, pt *te_typeexpr, a *ast_assignment, x *ast_expr) bool {
   // We check the lhs independently of the rhs, deliberately, to ensure clarity.
-  if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), pt) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), pt) {
     return false;
   }
   lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
@@ -952,7 +951,7 @@ func check_expr_assignment(es *framescope, pt *te_typeexpr, a *ast_assignment, x
       return false;
     }
     case &IsLvalYes(desc lval_description): {
-      if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), &lhs_info->cu.~) {
+      if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), &lhs_info->cu.~) {
         return false;
       }
       if !annotate_disposal_for_assignment(es, desc.num, oo(&a->rhs), a) {
@@ -1948,7 +1947,7 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
     return false;
   }
   funec *ast_expr_consume = oo(&a->fun);
-  if !check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes(void)), &funec->expr, &func_pt) {
+  if case Printed(pm) = check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes(void)), &funec->expr, &func_pt) {
     return false;
   }
 
@@ -1981,7 +1980,7 @@ func check_funcall_params_firsttime(es *framescope, params *array[ast_expr_consu
   all_params_complete bool = true;
   for i size = 0; i < n; i = i + 1 {
     expr *ast_expr = &ref(params, i)->expr;
-    if !check_expr_ai(es, AllowIncompleteYes(void), expr, &unknown) {
+    if case Printed(pm) = check_expr_ai(es, AllowIncompleteYes(void), expr, &unknown) {
       return false;
     }
     complete bool = expr_type_complete(expr);
@@ -2042,7 +2041,7 @@ func compute_prim(ds *defscope, t te_typeexpr, out *cu_typeexpr, props_out *type
 
 func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast_expr) bool {
   unknown te_typeexpr = TeUnknown(void);
-  if !check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), &unknown) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), &unknown) {
     return false;
   }
   sizetype cu_typeexpr = compute_prim(es->ds, primitive_size_type(es->cs));

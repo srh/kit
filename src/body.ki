@@ -161,7 +161,7 @@ func make_destructions(es *framescope, vns *array[var_number], out *array[var_de
 }
 
 func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) bool {
-  if !check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
     return false;
   }
   if !annotate_disposal_for_discard(es, &x->expr, &x->after) {
@@ -175,7 +175,7 @@ func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te
   return check_consume_then_discard_expr(es, x, pt, later, None);
 }
 func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) bool {
-  if !check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
     return false;
   }
   if !annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later, later2) {
