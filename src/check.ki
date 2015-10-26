@@ -922,21 +922,21 @@ inline func psd_index(psd *partial_struct_data) size {
 }
 
 // fields had better damn well be complete
-func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *shray[te_vardecl], name opt[sym], out *partial_struct_data) bool {
+func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *shray[te_vardecl], name opt[sym], out *partial_struct_data) np {
   ret partial_struct_data = {false, 0, 1, 0, 0, 0, 0, mk_array@[struct_field_info]()};
   n size = count(fields);
   for i size = 0; i < n; i = i + 1 {
     vd *te_vardecl = ref(fields, i);
     props type_properties;
-    if ! ~compute_complete_type_properties(cs, clq, &vd->type, &props) {
-      return false;
+    if case Printed(pm) = compute_complete_type_properties(cs, clq, &vd->type, &props) {
+      return Printed(pm);
     }
 
     ret.offset = ceil_aligned(ret.offset, props.flat_alignment);
     if Has(vd->name) == name {
       ret.found_field = true;
       *out = ret;
-      return true;
+      return NoFail;
     }
     push(&ret.fields, {ret.offset, props});
     ret.offset = ret.offset + props.flat_size;
@@ -949,7 +949,7 @@ func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *shray[te_
     ret.destroy_level = max(ret.destroy_level, behavior_level(&props.destroy_behavior));
   }
   *out = ret;
-  return true;
+  return NoFail;
 }
 
 
@@ -975,8 +975,8 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
 
     case &TeStruct(a te_struct): {
       psd partial_struct_data;
-      if !compute_partial_struct_data(cs, clq, &a.fields, None, &psd) {
-        return Printed();
+      if case Printed(pm) = compute_partial_struct_data(cs, clq, &a.fields, None, &psd) {
+        return Printed(pm);
       }
       final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
       *out = {final_size, psd.max_alignment,

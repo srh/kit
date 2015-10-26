@@ -2248,7 +2248,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
   }
 
   psd partial_struct_data;
-  if !compute_partial_struct_data(cs, clq, &st->fields, None, &psd) {
+  if ! ~compute_partial_struct_data(cs, clq, &st->fields, None, &psd) {
     return false;
   }
 
