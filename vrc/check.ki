@@ -1018,7 +1018,7 @@ func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, t
   parms genparms = HasParms(mk_shray(*type));
 
   res match_def_res;
-  if !match_def(cs, magic_name, &parms, &fntype, &res) {
+  if case Printed(pm) = match_def(cs, magic_name, &parms, &fntype, &res) {
     ice(_u8("make_nontrivial seeing error from match_def"));
   }
 
@@ -1454,7 +1454,7 @@ defenum match_def_res {
 
 // Note that gp could be incomplete.
 func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
-               res_out *match_def_res) bool {
+               res_out *match_def_res) np {
   if case Has(arr *array[def_entry_id]) = lookup_ref(&cs->defs_by_name, &name) {
     n size = count(arr);
     matches array[ent_and_parms];
@@ -1462,12 +1462,12 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
       id def_entry_id = get(arr, i);
       ent *def_entry = ref_def_entry(cs, id);
       ent_typeexpr *te_typeexpr;
-      if ! ~def_converted_typeexpr(cs, ent, &ent_typeexpr) {
-        return false;
+      if case Printed(pm) = def_converted_typeexpr(cs, ent, &ent_typeexpr) {
+        return Printed(pm);
       }
       match_result entry_matches_res;
       if !entry_matches(cs, pt, &ent->generics, gp, ent_typeexpr, &match_result) {
-        return false;
+        return Printed();
       }
       switch match_result {
         case EntryDoesNotMatch: {
@@ -1477,7 +1477,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
           // NOTE: We could see if we have _one_ ambiguously matching entry, and extract any type information that we learned, to help the next match attempt (see check_expr and its allow_ambiguous parameter).  (Maybe we should, but maybe we shouldn't to keep the type checking algorithm simple and describable.)
           // Certainly the error message (somewhere) could be improved.
           *res_out = MultiMatch(void);
-          return true;
+          return NoFail;
         }
         case EntryMatchesPrecisely(complete_parms genparms): {
           push(&matches, {id, complete_parms});
@@ -1487,17 +1487,17 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
     num_matches size = count(&matches);
     if num_matches == 0 {
       *res_out = NoMatch(void);
-      return true;
+      return NoFail;
     } else if num_matches == 1 {
       *res_out = OneMatch(get(&matches, 0));
-      return true;
+      return NoFail;
     } else {
       *res_out = MultiMatch(void);
-      return true;
+      return NoFail;
     }
   } else {
     *res_out = NoMatch(void);
-    return true;
+    return NoFail;
   }
 }
 

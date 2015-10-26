@@ -401,7 +401,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
   nogp genparms = NoParms(void);
   if true {
     res match_def_res;
-    if !match_def(ds->cs, defname, &nogp, ctor_type, &res) {
+    if ! ~match_def(ds->cs, defname, &nogp, ctor_type, &res) {
       return false;
     }
     switch &res {
@@ -495,7 +495,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
   }
 
   res match_def_res;
-  if !match_def(es->cs, name, gp, pt, &res) {
+  if ! ~match_def(es->cs, name, gp, pt, &res) {
     return false;
   }
 
