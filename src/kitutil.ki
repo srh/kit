@@ -69,35 +69,35 @@ func[T] DBG(x T) void {
   fflush(Stderr());
 }
 
-func[T, U, V, W, X, Y, Z, A] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z, t A) void {
-  MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), cons(s, t))));
+func[T, U, V, W, X, Y, Z, A] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z, t A) np {
+  return MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), cons(s, t))));
 }
 
-func[T, U, V, W, X, Y, Z] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z) void {
-  MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), s)));
+func[T, U, V, W, X, Y, Z] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z) np {
+  return MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), s)));
 }
 
-func[T, U, V, W, X, Y] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y) void {
-  MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(q, r)));
+func[T, U, V, W, X, Y] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y) np {
+  return MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(q, r)));
 }
 
-func[T, U, V, W, X] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X) void {
-  MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), q));
+func[T, U, V, W, X] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X) np {
+  return MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), q));
 }
 
-func[T, U, V, W] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W) void {
-  MERR(cs, m, cons(cons(x, y), cons(z, p)));
+func[T, U, V, W] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W) np {
+  return MERR(cs, m, cons(cons(x, y), cons(z, p)));
 }
 
-func[T, U, V] MERR(cs *checkstate, m ast_meta, x T, y U, z V) void {
-  MERR(cs, m, cons(cons(x, y), z));
+func[T, U, V] MERR(cs *checkstate, m ast_meta, x T, y U, z V) np {
+  return MERR(cs, m, cons(cons(x, y), z));
 }
 
-func[T, U] MERR(cs *checkstate, m ast_meta, x T, y U) void {
-  MERR(cs, m, cons(x, y));
+func[T, U] MERR(cs *checkstate, m ast_meta, x T, y U) np {
+  return MERR(cs, m, cons(x, y));
 }
 
-func[T] MERR(cs *checkstate, m ast_meta, x T) void {
+func[T] MERR(cs *checkstate, m ast_meta, x T) np {
   r array[u8];
   if case Has(p pos) = ref(&cs->posits.metas, m.~)->left {
     hp human_pos = to_human_pos(cs, p);
@@ -110,6 +110,7 @@ func[T] MERR(cs *checkstate, m ast_meta, x T) void {
   push(&r, '\n');
   print(Stderr(), r);
   fflush(Stderr());
+  return Printed(true);
 }
 
 func[T] ice(x T) void {

@@ -648,9 +648,9 @@ func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, 
   }
 
   id deftype_entry_id;
-  if !match_deftype(cs, fake_ast_meta(), a->value, None, &id) {
+  if case Printed(pm) = match_deftype(cs, fake_ast_meta(), a->value, None, &id) {
     // An error happened when looking up a deftype (multiple matches?).
-    return Printed();
+    return Printed(pm);
   }
 
   np idy_genparms = blank_idyparms();
@@ -687,8 +687,8 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
   switch &a->typefunc {
     case &TePureName(value sym): {
       id deftype_entry_id;
-      if !match_deftype(cs, fake_ast_meta(), value, Has(&params), &id) {
-        return Printed();
+      if case Printed(pm) = match_deftype(cs, fake_ast_meta(), value, Has(&params), &id) {
+        return Printed(pm);
       }
 
       if params_complete {
@@ -745,11 +745,11 @@ func[T] help_arity_matches(a *ast_generics, params opt[*shray[T]]) bool {
   return false;
 }
 
-func ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]]) void {
-  MERR(cs, m, _u8("No match for type with name '"), name, _u8("' and maybe some params"));
+func ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]]) np {
+  return MERR(cs, m, _u8("No match for type with name '"), name, _u8("' and maybe some params"));
 }
 
-func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]], out *deftype_entry_id) bool {
+func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]], out *deftype_entry_id) np {
   if case Has(arr *array[deftype_entry_id]) = lookup_ref(&cs->deftypes_by_name, &name) {
     n size = count(arr);
     match opt[deftype_entry_id] = None;
@@ -758,22 +758,19 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_ty
       ent *deftype_entry = ref_deftype_entry(cs, id);
       if arity_matches(&ent->generics, params) {
         if case Has(alt_id) = match {
-          ERR(_u8("Multiple deftypes named '"), lookup(cs->im, name), _u8("' match arity"));
-          return false;
+          return ERR(_u8("Multiple deftypes named '"), lookup(cs->im, name), _u8("' match arity"));
         }
         match = Has(id);
       }
     }
     if case Has(id) = match {
       *out = id;
-      return true;
+      return NoFail;
     } else {
-      ERR_no_match(cs, m, name, params);
-      return false;
+      return ERR_no_match(cs, m, name, params);
     }
   } else {
-    ERR_no_match(cs, m, name, params);
-    return false;
+    return ERR_no_match(cs, m, name, params);
   }
 }
 
@@ -1507,7 +1504,7 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
       switch ent->arity {
         case AccessArityNone: {
           id deftype_entry_id;
-          if !match_deftype(cs, fake_ast_meta(), ent->name, None, &id) {
+          if ! ~match_deftype(cs, fake_ast_meta(), ent->name, None, &id) {
             ent->ent_id = FailedComputation();
             return false;
           }
@@ -1518,7 +1515,7 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
         case AccessArityFinite(n u32): {
           params shray[te_typeexpr] = repeat(~n, TeUnknown(void));
           id deftype_entry_id;
-          if !match_deftype(cs, fake_ast_meta(), ent->name, Has(&params), &id) {
+          if ! ~match_deftype(cs, fake_ast_meta(), ent->name, Has(&params), &id) {
             ent->ent_id = FailedComputation();
             return false;
           }
