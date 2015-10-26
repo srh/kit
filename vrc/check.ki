@@ -441,8 +441,8 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy
       reserve(&cu_ps, n);
       for i size = 0; i < n; i = i + 1 {
         computed cac_typeexpr;
-        if !noscoped_check_and_compute_typeexpr(cs, clq, ref(&ps, i), &computed) {
-          return Printed();
+        if case Printed(pm) = noscoped_check_and_compute_typeexpr(cs, clq, ref(&ps, i), &computed) {
+          return Printed(pm);
         }
         if !computed.complete {
           ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
@@ -455,10 +455,10 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy
   }
 }
 
-func noscoped_check_and_compute_typeexpr(cs *checkstate, clq *clqueue, t *te_typeexpr, out *cac_typeexpr) bool {
+func noscoped_check_and_compute_typeexpr(cs *checkstate, clq *clqueue, t *te_typeexpr, out *cac_typeexpr) np {
   ng ast_generics = NoGenerics(void);
   np idy_genparms = {mk_shray()};
-  return ~check_and_compute_typeexpr(cs, clq, &ng, &np, t, out);
+  return check_and_compute_typeexpr(cs, clq, &ng, &np, t, out);
 }
 
 // NOTE: Generics replacement should really be a separate phase.  (Why?)

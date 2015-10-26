@@ -335,7 +335,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
         return true;
       }
       cac_enum_type cac_typeexpr;
-      if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, enum_type, &cac_enum_type) {
+      if ! ~noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, enum_type, &cac_enum_type) {
         return false;
       }
       check(cac_enum_type.complete);
@@ -348,7 +348,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     }
   }
   cac_return_type cac_typeexpr;
-  if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, return_type, &cac_return_type) {
+  if ! ~noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, return_type, &cac_return_type) {
     return false;
   }
   if !cac_return_type.complete {
@@ -381,7 +381,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     }
     ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
     cac_ctor_type cac_typeexpr;
-    if !noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &ctor_type, &cac_ctor_type) {
+    if ! ~noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &ctor_type, &cac_ctor_type) {
       return false;
     }
     check(cac_ctor_type.complete);
@@ -566,7 +566,7 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
   }
   if is_complete(&unified) {
     c cac_typeexpr;
-    if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &c) {
+    if ! ~noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &c) {
       ice(_u8("help_check_simple_literal passed bad type"));
     }
     check(c.complete);
@@ -702,7 +702,7 @@ func check_expr_refof(es *framescope, pt *te_typeexpr, a *ast_refof, x *ast_expr
 
     ref_type te_typeexpr = mk_ref_type(es->cs, unified_lifetime, rhs_info->cu.~);
     ref_computed cac_typeexpr;
-    if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ref_type, &ref_computed) {
+    if ! ~noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ref_type, &ref_computed) {
       return false;
     }
     // (TODO: Make lval desc.lifetime be a te_lifetime, so it can't be incomplete?)
@@ -765,7 +765,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   if computed.complete {
     unified_computed = computed;
   } else {
-    if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &unified_computed) {
+    if ! ~noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &unified_computed) {
       ERR(_u8("TypedExpr encounters un-computable unified type."));
       return false;
     }
@@ -928,7 +928,7 @@ func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *
 
   ptr_type te_typeexpr = ptr_type(es->cs, rhs_info->cu.~);
   ptr_computed cac_typeexpr;
-  if !noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_type, &ptr_computed) {
+  if ! ~noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_type, &ptr_computed) {
     return false;
   }
   check(ptr_computed.complete);
@@ -2011,7 +2011,7 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
 
 func compute_prim(cs *checkstate, clq *clqueue, t te_typeexpr) cu_typeexpr {
   cac cac_typeexpr;
-  if !noscoped_check_and_compute_typeexpr(cs, clq, &t, &cac) {
+  if ! ~noscoped_check_and_compute_typeexpr(cs, clq, &t, &cac) {
     ice(_u8("compute_prim encounters uncomputable type"));
   }
   check(cac.complete);
@@ -2177,7 +2177,7 @@ func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[
   push(&type_params, *return_type);
   fntype te_typeexpr = TeApp({primitive_function_puretype(clq->cs), freeze(&type_params), None});
   cac cac_typeexpr;
-  if !noscoped_check_and_compute_typeexpr(clq->cs, clq, &fntype, &cac) {
+  if ! ~noscoped_check_and_compute_typeexpr(clq->cs, clq, &fntype, &cac) {
     return false;
   }
   *out = cac.te;

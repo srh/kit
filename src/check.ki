@@ -501,10 +501,10 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy
   }
 }
 
-func noscoped_check_and_compute_typeexpr(cs *checkstate, clq *clqueue, t *te_typeexpr, out *cac_typeexpr) bool {
+func noscoped_check_and_compute_typeexpr(cs *checkstate, clq *clqueue, t *te_typeexpr, out *cac_typeexpr) np {
   ng ast_generics = NoGenerics(void);
   np idy_repls = blank_idyrepls();
-  return ~check_and_compute_typeexpr(cs, clq, &ng, &np, t, out);
+  return check_and_compute_typeexpr(cs, clq, &ng, &np, t, out);
 }
 
 // NOTE: Generics replacement should really be a separate phase.  (Why?)  (Performance is one counter-argument -- we'd create an extra intermediate te_typeexpr.)
