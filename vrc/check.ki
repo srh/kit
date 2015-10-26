@@ -19,7 +19,7 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
     switch &entry {
       case &ClqDeftypeEntry(e clqueue_deftype_entry): {
         rw depth_rewinder;
-        if !set_instantiation_depth(cs, e.instantiation_depth, &rw) {
+        if ! ~set_instantiation_depth(cs, e.instantiation_depth, &rw) {
           return false;
         }
         if !ensure_deftype_inst_checked(cs, clq, e.ent_id, e.inst_id) {
@@ -28,7 +28,7 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
       }
       case &ClqDefEntry(e clqueue_def_entry): {
         rw depth_rewinder;
-        if !set_instantiation_depth(cs, e.instantiation_depth, &rw) {
+        if ! ~set_instantiation_depth(cs, e.instantiation_depth, &rw) {
           return false;
         }
         // NOTE: It would be nice if checking/graphing, and evaling, were done in separate phases as much as possible.
@@ -331,8 +331,8 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
   switch &inst->typrop {
     case &NotComputed: {
       rw depth_rewinder;
-      if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
-        return Printed();
+      if case Printed(pm) = set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
+        return Printed(pm);
       }
       inst->typrop = BeganComputing;
 
@@ -387,7 +387,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
   switch inst->rhs_status {
     case DidNotCheckRhs: {
       rw depth_rewinder;
-      if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
+      if ! ~set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
         return false;
       }
       inst->rhs_status = BeganCheckingRhs(void);
@@ -1109,7 +1109,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
   switch inst->info {
     case NotComputed: {
       rw depth_rewinder;
-      if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
+      if ! ~set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
         return false;
       }
       inst->info = BeganComputing();

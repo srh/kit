@@ -527,16 +527,15 @@ access depth_rewinder {
     d->cs = null;
     d->old_depth = 0;
   }
-  func set_instantiation_depth(cs *checkstate, depth u32, rw *depth_rewinder) bool {
+  func set_instantiation_depth(cs *checkstate, depth u32, rw *depth_rewinder) np {
     check(rw->cs == null);
     if depth > template_instantiation_limit {
-      ERR(_u8("Instantiation depth too deep."));
-      return false;
+      return ERR(_u8("Instantiation depth too deep."));
     }
     rw->cs = cs;
     rw->old_depth = cs->instantiation_depth;
     cs->instantiation_depth = depth;
-    return true;
+    return NoFail;
   }
 }
 
