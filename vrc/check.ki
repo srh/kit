@@ -1034,7 +1034,7 @@ func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, t
     }
     case &OneMatch(m ent_and_parms): {
       inst_id def_inst_id;
-      if !make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
+      if ! ~make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
         ice(_u8("make_inst (check_and_compute_parms) seeing error in match_def"));
       }
       return {m.ent, inst_id};
@@ -1046,14 +1046,14 @@ func make_nontrivial(cs *checkstate, clq *clqueue, wc which_ctor, arity size, ty
   return DerivedMethodNontrivial(make_magic_inst(cs, clq, magic_name(cs->im, wc), arity, type));
 }
 
-func make_inst(cs *checkstate, clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_inst_id) bool {
+func make_inst(cs *checkstate, clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_inst_id) np {
   idy_parms idy_genparms;
   if !check_and_compute_parms(cs, clq, parms, &idy_parms) {
-    return false;
+    return Printed();
   }
   inst_id def_inst_id = enqueue_def_inst(cs, clq, ent, &idy_parms);
   *inst_out = inst_id;
-  return true;
+  return NoFail;
 }
 
 func level_to_derived(cs *checkstate, clq *clqueue, wc which_ctor, arity size, type *te_typeexpr, level u32) derived_method_behavior {

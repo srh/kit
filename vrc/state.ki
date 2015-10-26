@@ -580,8 +580,8 @@ func lookup_explicit_method_or_lack_thereof(cs *checkstate, clq *clqueue, fntype
     }
     case &OneMatch(m ent_and_parms): {
       inst_id def_inst_id;
-      if !make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
-        return Printed();
+      if case Printed(pm) = make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
+        return Printed(pm);
       }
       *behavior_out = DerivedMethodExplicit({m.ent, inst_id});
       return NoFail;
