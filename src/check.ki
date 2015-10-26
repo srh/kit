@@ -405,8 +405,8 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         }
         case &InstRhsExpr(rhs def_inst_rhs_expr): {
           info frame_info;
-          if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms.repls, &rhs.ec, &typrop->cu.~, ent->def_name, &info) {
-            return Printed();
+          if case Printed(pm) = check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms.repls, &rhs.ec, &typrop->cu.~, ent->def_name, &info) {
+            return Printed(pm);
           }
           annotate(&rhs.frame_info, move(&info));
         }

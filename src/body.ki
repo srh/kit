@@ -614,7 +614,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
   cell cell_num;
   switch &a->rhs {
     case &HasExpr(x box[ast_expr_consume]): {
-      if !check_expr_consume(&bs->es, oo(&x), &computed.te) {
+      if ! ~check_expr_consume(&bs->es, oo(&x), &computed.te) {
         return false;
       }
       info *ast_expr_complete_info = expr_complete_info(&oo(&x)->expr);
@@ -696,7 +696,7 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
   varcells shray[opt[cell_num]] = compute_varcells(&bs->es, &vars);
   moved_var_ix opt[size];
   if case &Has(c box[ast_expr_consume]) = &a->expr {
-    if !check_expr_retconsume(&bs->es, oo(&c), &bs->return_type->~, &varcells, &moved_var_ix) {
+    if ! ~check_expr_retconsume(&bs->es, oo(&c), &bs->return_type->~, &varcells, &moved_var_ix) {
       return false;
     }
     reannotate_static_to_virtual(&bs->es, result_cell(oo(&c)));
