@@ -467,11 +467,11 @@ func check_and_compute_parms_no_canonicalize(cs *checkstate, clq *clqueue, t *ge
 }
 
 // parms have already had generics replaced.  They should also be complete.
-func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy_genparms) bool {
+func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy_genparms) np {
   switch t {
     case &NoParms: {
       *out = blank_idyparms();
-      return true;
+      return NoFail;
     }
     case &HasParms(ps shray[te_typeexpr]): {
       noscope_g ast_generics = NoGenerics;
@@ -479,7 +479,7 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy
       params_complete bool;
       params shray[te_typeexpr];
       if ! ~check_and_compute_typeexpr_shray(cs, clq, &noscope_g, &noscope_parms, &ps, &params, &params_complete) {
-        return false;
+        return NoFail;
       }
 
       if !params_complete {
@@ -496,7 +496,7 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy
         push(&cu_params, ~canonicalized);
       }
       *out = {count(&lifetime_names), {freeze(&cu_params)}};
-      return true;
+      return NoFail;
     }
   }
 }
@@ -1132,8 +1132,8 @@ func make_nontrivial(cs *checkstate, clq *clqueue, wc which_ctor, arity size, ty
 
 func make_inst(cs *checkstate, clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_inst_id) np {
   idy_parms idy_genparms;
-  if !check_and_compute_parms(cs, clq, parms, &idy_parms) {
-    return Printed();
+  if case Printed(pm) = check_and_compute_parms(cs, clq, parms, &idy_parms) {
+    return Printed(pm);
   }
   inst_id def_inst_id = enqueue_def_inst(cs, clq, ent, &idy_parms);
   *inst_out = inst_id;
