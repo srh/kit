@@ -40,8 +40,8 @@ Definitions:
 The current directory structure is:
 
    trc - s1, implemented in C.  Compiles s3.
-   src - s3, implemented in proto-Kit, v0.00.2.x.  Compiles s3 and s4.
-   vrc - s4, implemented in proto-Kit, v0.00.2A.x.  Compiles s4.
+   urc - s3, implemented in proto-Kit, v0.00.2.x.  Compiles s4.
+   src - s4, implemented in proto-Kit, v0.00.2A.x.  Compiles s3 and s4.
    examples - examples to run, disorganized junk
 
   COMMAND USAGE

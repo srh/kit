@@ -3,9 +3,7 @@
 *.exe
 a.out
 out
-s2
-/urc/s2b
 s3
-/vrc/s3b
+/urc/s3b
 s4
 /src/s4b
