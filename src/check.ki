@@ -331,56 +331,53 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms) id_and
 }
 
 // Outputs a stable pointer.
-func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id, out **cu_typrop) bool {
+func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry, inst_id def_inst_id, out **cu_typrop) np {
   inst *def_inst = ref_inst(cs, inst_id);
   switch &inst->typrop {
     case &NotComputed: {
       rw depth_rewinder;
       if !set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms.repls), &rw) {
-        return false;
+        return Printed();
       }
       inst->typrop = BeganComputing;
 
       ent_typeexpr *te_typeexpr;
-      if ! ~def_converted_typeexpr(cs, ent, &ent_typeexpr) {
+      if case Printed(pm) = def_converted_typeexpr(cs, ent, &ent_typeexpr) {
         inst->typrop = FailedComputation;
-        return false;
+        return Printed(pm);
       }
 
       // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
       computed cac_typeexpr;
       if !check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms.repls, ent_typeexpr, &computed) {
         inst->typrop = FailedComputation;
-        return false;
+        return Printed();
       }
       check(computed.complete);
       props type_properties;
       cu_computed cu_typeexpr = ~computed.te;
       if !compute_type_properties(cs, clq, &cu_computed, &props) {
         inst->typrop = FailedComputation;
-        return false;
+        return Printed();
       }
       if !is_defwise_trivial(&props) {
-        ERR(_u8("def (instantiation) has non-trivial type"));
         inst->typrop = FailedComputation;
-        return false;
+        return ERR(_u8("def (instantiation) has non-trivial type"));
       }
 
       inst->typrop = Computed({cu_computed, props});
       *out = unHas(&inst->typrop);
-      return true;
+      return NoFail;
     }
     case &BeganComputing: {
-      ERR(_u8("computing def's type arouses cyclic dependency "), lookup(cs->im, ent->def_name));
-      return false;
+      return ERR(_u8("computing def's type arouses cyclic dependency "), lookup(cs->im, ent->def_name));
     }
     case &FailedComputation: {
-      ERR(_u8("revisiting def's type after failure for "), lookup(cs->im, ent->def_name));
-      return false;
+      return ERR(_u8("revisiting def's type after failure for "), lookup(cs->im, ent->def_name));
     }
     case &Computed(typr cu_typrop): {
       *out = &typr;
-      return true;
+      return NoFail;
     }
   }
 }
@@ -388,7 +385,7 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
 func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
   ent *def_entry = ref_def_entry(cs, ent_id);
   typrop *cu_typrop;
-  if !ensure_def_inst_type_computed(cs, clq, ent, inst_id, &typrop) {
+  if ! ~ensure_def_inst_type_computed(cs, clq, ent, inst_id, &typrop) {
     return false;
   }
   inst *def_inst = ref_inst(cs, inst_id);
