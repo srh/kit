@@ -1,45 +1,45 @@
 import stdlib;
 import state;
 
-func[T] DBG(x T) void { ERR(x); }
-func[T, U] DBG(x T, y U) void { ERR(x, y); }
-func[T, U, V] DBG(x T, y U, z V) void { ERR(x, y, z); }
-func[T, U, V, W] DBG(x T, y U, z V, p W) void { ERR(x, y, z, p); }
-func[T, U, V, W, X] DBG(x T, y U, z V, p W, q X) void { ERR(x, y, z, p, q); }
-func[T, U, V, W, X, Y] DBG(x T, y U, z V, p W, q X, r Y) void { ERR(x, y, z, p, q, r); }
-func[T, U, V, W, X, Y, Z] DBG(x T, y U, z V, p W, q X, r Y, s Z) void { ERR(x, y, z, p, q, r, s); }
-func[T, U, V, W, X, Y, Z, A] DBG(x T, y U, z V, p W, q X, r Y, s Z, t A) void { ERR(x, y, z, p, q, r, s, t); }
+func[T] ERR(x T) void { DBG(x); }
+func[T, U] ERR(x T, y U) void { DBG(x, y); }
+func[T, U, V] ERR(x T, y U, z V) void { DBG(x, y, z); }
+func[T, U, V, W] ERR(x T, y U, z V, p W) void { DBG(x, y, z, p); }
+func[T, U, V, W, X] ERR(x T, y U, z V, p W, q X) void { DBG(x, y, z, p, q); }
+func[T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) void { DBG(x, y, z, p, q, r); }
+func[T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) void { DBG(x, y, z, p, q, r, s); }
+func[T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) void { DBG(x, y, z, p, q, r, s, t); }
 
 
-func[T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) void {
-  ERR(cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), cons(s, t))));
+func[T, U, V, W, X, Y, Z, A] DBG(x T, y U, z V, p W, q X, r Y, s Z, t A) void {
+  DBG(cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), cons(s, t))));
 }
 
-func[T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) void {
-  ERR(cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), s)));
+func[T, U, V, W, X, Y, Z] DBG(x T, y U, z V, p W, q X, r Y, s Z) void {
+  DBG(cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), s)));
 }
 
-func[T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) void {
-  ERR(cons(cons(cons(x, y), cons(z, p)), cons(q, r)));
+func[T, U, V, W, X, Y] DBG(x T, y U, z V, p W, q X, r Y) void {
+  DBG(cons(cons(cons(x, y), cons(z, p)), cons(q, r)));
 }
 
-func[T, U, V, W, X] ERR(x T, y U, z V, p W, q X) void {
-  ERR(cons(cons(cons(x, y), cons(z, p)), q));
+func[T, U, V, W, X] DBG(x T, y U, z V, p W, q X) void {
+  DBG(cons(cons(cons(x, y), cons(z, p)), q));
 }
 
-func[T, U, V, W] ERR(x T, y U, z V, p W) void {
-  ERR(cons(cons(x, y), cons(z, p)));
+func[T, U, V, W] DBG(x T, y U, z V, p W) void {
+  DBG(cons(cons(x, y), cons(z, p)));
 }
 
-func[T, U, V] ERR(x T, y U, z V) void {
-  ERR(cons(cons(x, y), z));
+func[T, U, V] DBG(x T, y U, z V) void {
+  DBG(cons(cons(x, y), z));
 }
 
-func[T, U] ERR(x T, y U) void {
-  ERR(cons(x, y));
+func[T, U] DBG(x T, y U) void {
+  DBG(cons(x, y));
 }
 
-func[T] ERR(x T) void {
+func[T] DBG(x T) void {
   r array[u8];
   build_u8str(void, &r, &x);
   push(&r, '\n');
