@@ -23,7 +23,7 @@ func finish_checking(cs *checkstate, clq *clqueue) bool {
         if ! ~set_instantiation_depth(cs, e.instantiation_depth, &rw) {
           return false;
         }
-        if !ensure_deftype_inst_checked(cs, clq, e.ent_id, e.inst_id) {
+        if ! ~ensure_deftype_inst_checked(cs, clq, e.ent_id, e.inst_id) {
           return false;
         }
       }
@@ -873,8 +873,8 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *idy_genparms
 }
 
 func compute_pack_info(cs *checkstate, clq *clqueue, pack *te_instpack, out **deftype_inst_info) np {
-  if !ensure_deftype_inst_checked(cs, clq, pack->ent_id, pack->inst_id) {
-    return Printed();
+  if case Printed(pm) = ensure_deftype_inst_checked(cs, clq, pack->ent_id, pack->inst_id) {
+    return Printed(pm);
   }
   inst *deftype_inst = ref_deftype_inst(cs, pack->inst_id);
   if case &Computed(info deftype_inst_info) = &inst->info {
@@ -1184,35 +1184,35 @@ func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) bool {
   }
 }
 
-func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_entry_id, id deftype_inst_id) bool {
+func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_entry_id, id deftype_inst_id) np {
   ent *deftype_entry = ref_deftype_entry(cs, ent_id);
   inst *deftype_inst = ref_deftype_inst(cs, id);
 
   switch inst->info {
     case NotComputed: {
       rw depth_rewinder;
-      if ! ~set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms.repls), &rw) {
-        return false;
+      if case Printed(pm) = set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms.repls), &rw) {
+        return Printed(pm);
       }
       inst->info = BeganComputing();
 
       ent_rhs *te_typeexpr;
-      if ! ~deftype_converted_rhs(cs, ent, &ent_rhs) {
-        return false;
+      if case Printed(pm) = deftype_converted_rhs(cs, ent, &ent_rhs) {
+        return Printed(pm);
       }
 
       rhs_computed cac_typeexpr;
-      if ! ~check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms.repls, ent_rhs, &rhs_computed) {
+      if case Printed(pm) = check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms.repls, ent_rhs, &rhs_computed) {
         inst->info = FailedComputation();
-        return false;
+        return Printed(pm);
       }
       check(rhs_computed.complete);
 
       check(isBeganComputing(&inst->info));
       rhs_props type_properties;
-      if ! ~compute_complete_type_properties(cs, clq, &rhs_computed.te, &rhs_props) {
+      if case Printed(pm) = compute_complete_type_properties(cs, clq, &rhs_computed.te, &rhs_props) {
         inst->info = FailedComputation();
-        return false;
+        return Printed(pm);
       }
       check(isBeganComputing(&inst->info));
       if case &Has(np deftype_nonprim) = &ent->nonprim {
@@ -1224,7 +1224,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
             class_props type_properties;
             if !to_defclass_properties(cs, clq, ent_id, id, a.disposition, rhs_props, &class_props) {
               inst->info = FailedComputation();
-              return false;
+              return Printed();
             }
             inst->info = Computed({Has({~rhs_computed.te, rhs_props}), class_props});
           }
@@ -1232,18 +1232,16 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
       } else {
         ice(_u8("Assigning inst properties on primitive deftype."));
       }
-      return true;
+      return NoFail;
     }
     case BeganComputing: {
-      ERR(_u8("deftype for '"), lookup(cs->im, ent->name), _u8("' recursively checking"));
-      return false;
+      return ERR(_u8("deftype for '"), lookup(cs->im, ent->name), _u8("' recursively checking"));
     }
     case FailedComputation: {
-      ERR(_u8("deftype for '"), lookup(cs->im, ent->name), _u8("' already failed checking"));
-      return false;
+      return ERR(_u8("deftype for '"), lookup(cs->im, ent->name), _u8("' already failed checking"));
     }
     case Computed(info deftype_inst_info): {
-      return true;
+      return NoFail;
     }
   }
 }

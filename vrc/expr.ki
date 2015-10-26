@@ -1594,7 +1594,7 @@ func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **
     if !accessible_result {
       return NoAccessibleStructuralRhs;
     }
-    if !ensure_deftype_inst_checked(ds->cs, ds->clq, pack.ent_id, pack.inst_id) {
+    if ! ~ensure_deftype_inst_checked(ds->cs, ds->clq, pack.ent_id, pack.inst_id) {
       return Error;
     }
     inst *deftype_inst = ref_deftype_inst(ds->cs, pack.inst_id);
