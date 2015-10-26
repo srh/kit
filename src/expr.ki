@@ -830,7 +830,7 @@ func varname_lifetime(im *identmap, name sym) te_typeexpr {
 // TODO: Most uses of this will get replaced by some rval lifetime getter.  (We'll set rval lifetimes with this value, though.)
 func unnamed_lifetime(es *framescope) te_typeexpr {
   n sym = intern(es->im, _s("$frame_") + from_u8(to_u8str(void, es->lifetime_gen_counter)));
-  es->lifetime_gen_counter++;
+  es->lifetime_gen_counter = es->lifetime_gen_counter + 1;
   return TeLifetime({n});
 }
 

@@ -1328,7 +1328,7 @@ func find_pos_module(cs *checkstate, p pos) opt[*module] {
   return None;
 }
 
-func load_module(cs *checkstate, mod_name sym) np[module_id] {
+func load_module(cs *checkstate, mod_name sym) cr[module_id] {
   switch lookup(&cs->modules_by_name, &mod_name) {
     case Has(id module_id): {
       return NoFail(id);
@@ -1342,7 +1342,7 @@ func load_module(cs *checkstate, mod_name sym) np[module_id] {
         oo(&mod)->base_offset = modules_next_base_offset(cs);
         swap(&oo(&mod)->buf, &arr);
         p ps = make_ps(cs->im, &cs->posits, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
-        if !+parse_file(&p, &oo(&mod)->file) {
+        if ! +parse_file(&p, &oo(&mod)->file) {
           ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p)->interval.left)));
           return Printed(true);
         }
@@ -1359,7 +1359,7 @@ func load_module(cs *checkstate, mod_name sym) np[module_id] {
   }
 }
 
-func process_module(cs *checkstate, mod_name sym) np[module_id] {
+func process_module(cs *checkstate, mod_name sym) cr[module_id] {
   switch load_module(cs, mod_name) {
     case Printed(pm): {
       return Printed(pm);

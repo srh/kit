@@ -18,13 +18,14 @@ inline func `~`(x np) bool {
   }
 }
 
-defenum[T] np {
+// cr = check result.
+defenum[T] cr {
   NoFail T;
   Printed bool;
 };
 
 // TODO: Get rid of this too.
-inline func[T] `~`(x np[T]) bool {
+inline func[T] `~`(x cr[T]) bool {
   switch &x {
   case &NoFail(y T): return true;
   case &Printed(b bool): return false;
@@ -37,7 +38,7 @@ func Printed() np {
   return Printed(false);
 }
 
-func[T] Printed() np[T] {
+func[T] Printed() cr[T] {
   return Printed(false);
 }
 
@@ -52,14 +53,14 @@ func[T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) np { DB
 
 // Named RERR to avoid ambiguous lookups with ERR.
 // TODO: Rename to ERR (get rid of all void-position uses) (or make everything use MERR).
-func[R, T] RERR(x T) np[R] { DBG(x); return Printed(false); }
-func[R, T, U] RERR(x T, y U) np[R] { DBG(x, y); return Printed(false); }
-func[R, T, U, V] RERR(x T, y U, z V) np[R] { DBG(x, y, z); return Printed(false); }
-func[R, T, U, V, W] RERR(x T, y U, z V, p W) np[R] { DBG(x, y, z, p); return Printed(false); }
-func[R, T, U, V, W, X] RERR(x T, y U, z V, p W, q X) np[R] { DBG(x, y, z, p, q); return Printed(false); }
-func[R, T, U, V, W, X, Y] RERR(x T, y U, z V, p W, q X, r Y) np[R] { DBG(x, y, z, p, q, r); return Printed(false); }
-func[R, T, U, V, W, X, Y, Z] RERR(x T, y U, z V, p W, q X, r Y, s Z) np[R] { DBG(x, y, z, p, q, r, s); return Printed(false); }
-func[R, T, U, V, W, X, Y, Z, A] RERR(x T, y U, z V, p W, q X, r Y, s Z, t A) np[R] { DBG(x, y, z, p, q, r, s, t); return Printed(false); }
+func[R, T] RERR(x T) cr[R] { DBG(x); return Printed(false); }
+func[R, T, U] RERR(x T, y U) cr[R] { DBG(x, y); return Printed(false); }
+func[R, T, U, V] RERR(x T, y U, z V) cr[R] { DBG(x, y, z); return Printed(false); }
+func[R, T, U, V, W] RERR(x T, y U, z V, p W) cr[R] { DBG(x, y, z, p); return Printed(false); }
+func[R, T, U, V, W, X] RERR(x T, y U, z V, p W, q X) cr[R] { DBG(x, y, z, p, q); return Printed(false); }
+func[R, T, U, V, W, X, Y] RERR(x T, y U, z V, p W, q X, r Y) cr[R] { DBG(x, y, z, p, q, r); return Printed(false); }
+func[R, T, U, V, W, X, Y, Z] RERR(x T, y U, z V, p W, q X, r Y, s Z) cr[R] { DBG(x, y, z, p, q, r, s); return Printed(false); }
+func[R, T, U, V, W, X, Y, Z, A] RERR(x T, y U, z V, p W, q X, r Y, s Z, t A) cr[R] { DBG(x, y, z, p, q, r, s, t); return Printed(false); }
 
 
 func[T, U, V, W, X, Y, Z, A] DBG(x T, y U, z V, p W, q X, r Y, s Z, t A) void {
