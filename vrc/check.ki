@@ -473,8 +473,8 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
       return NoFail;
     }
     case &TeApp(a te_typeapp): {
-      if !check_and_compute_app_type(cs, clq, g, parms, &a, out) {
-        return Printed();
+      if case Printed(pm) = check_and_compute_app_type(cs, clq, g, parms, &a, out) {
+        return Printed(pm);
       }
       return NoFail;
     }
@@ -620,18 +620,18 @@ func check_and_compute_typeexpr_shray(cs *checkstate, clq *clqueue, g *ast_gener
   return true;
 }
 
-func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *te_typeapp, out *cac_typeexpr) bool {
+func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *te_typeapp, out *cac_typeexpr) np {
   params_complete bool;
   params shray[te_typeexpr];
   if !check_and_compute_typeexpr_shray(cs, clq, g, parms, &a->params, &params, &params_complete) {
-    return false;
+    return Printed();
   }
 
   switch &a->typefunc {
     case &TePureName(value sym): {
       id deftype_entry_id;
       if !match_deftype(cs, fake_ast_meta(), value, Has(&params), &id) {
-        return false;
+        return Printed();
       }
 
       if params_complete {
@@ -641,11 +641,11 @@ func check_and_compute_app_type(cs *checkstate, clq *clqueue, g *ast_generics, p
       } else {
         *out = {false, TeApp({TePureName(value), params, None})};
       }
-      return true;
+      return NoFail;
     }
     case &TePureUnknown: {
       *out = {false, TeApp({TePureUnknown(void), params, None})};
-      return true;
+      return NoFail;
     }
   }
 }
