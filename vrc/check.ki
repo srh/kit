@@ -549,7 +549,7 @@ func fake_eval_arraytype_count(x *ast_expr, count_out *u32) np {
   switch &x->u {
   case &NumericLiteral(a ast_numeric_literal):
     if !numeric_literal_to_u32(&a, count_out) {
-      return Printed();
+      return ERR(_u8("Numeric literal out of range for array length"));
     }
     return NoFail;
   default:
