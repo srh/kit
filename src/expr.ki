@@ -720,8 +720,8 @@ func check_expr_refof(es *framescope, pt *te_typeexpr, a *ast_refof, x *ast_expr
 
 func check_expr_ternary(es *framescope, ai allow_incomplete, pt *te_typeexpr, a *ast_ternary, x *ast_expr) np {
   boolean cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
-  if !check_consume_then_discard_expr(es, oo(&oo(&a->condition)->expr), &boolean.~, &oo(&a->condition)->discard) {
-    return Printed();
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&oo(&a->condition)->expr), &boolean.~, &oo(&a->condition)->discard) {
+    return Printed(pm);
   }
   if case Printed(pm) = check_expr_consume(es, oo(&a->then_clause), pt) {
     return Printed(pm);
@@ -776,8 +776,8 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, pt *te_typeexpr,
 func check_expr_deref_field(es *framescope, pt *te_typeexpr, a *ast_deref_field, x *ast_expr) np {
   // The fact that our partial type isn't a pointer type is deliberate.
   unknown te_typeexpr = TeUnknown(void);
-  if !check_consume_then_discard_expr(es, oo(&a->lhs), &unknown, &a->ptr_discard) {
-    return Printed();
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->lhs), &unknown, &a->ptr_discard) {
+    return Printed(pm);
   }
   info *ast_expr_complete_info = expr_complete_info(&oo(&a->lhs)->expr);
   lifetime te_typeexpr;
@@ -874,8 +874,8 @@ func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field,
 func check_expr_deref(es *framescope, pt *te_typeexpr, a *ast_deref, x *ast_expr) np {
   ptr_pt te_typeexpr = TeUnknown;
   // Let's force the rhs to be a complete type.  Because why not!
-  if !check_consume_then_discard_expr(es, oo(&a->rhs), &ptr_pt, &a->ptr_discard) {
-    return Printed();
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->rhs), &ptr_pt, &a->ptr_discard) {
+    return Printed(pm);
   }
   rhs_type *cu_typeexpr = expr_complete_type(&oo(&a->rhs)->expr);
   lifetime te_typeexpr;
@@ -2025,8 +2025,8 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   sizetype cu_typeexpr = compute_prim(es->ds, primitive_size_type(es->cs));
 
   rhs_later ast_later_discard_info = mk_later();
-  if !check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.~, &rhs_later) {
-    return Printed();
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.~, &rhs_later) {
+    return Printed(pm);
   }
 
   lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
