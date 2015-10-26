@@ -158,7 +158,7 @@ func check_non_magic_prop(cs *checkstate, clq *clqueue, g *ast_generics, parms *
   check(cac.complete);
 
   cac_props type_properties;
-  if !compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
+  if ! ~compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
     return false;
   }
 
@@ -204,7 +204,7 @@ func check_non_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *
   check(cac.complete);
 
   cac_props type_properties;
-  if !compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
+  if ! ~compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
     return false;
   }
 
@@ -253,7 +253,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_
   check(cac.complete);
 
   cac_props type_properties;
-  if !compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
+  if ! ~compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
     return false;
   }
 
@@ -299,7 +299,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_
     }
     case &TeArraytype(a te_arraytype): {
       props type_properties;
-      if !compute_complete_type_properties(cs, clq, oo(&a.param), &props) {
+      if ! ~compute_complete_type_properties(cs, clq, oo(&a.param), &props) {
         return false;
       }
       annotate(&mc->info, @[magic_ctor_info]MagicArraytypeInfo({~cac.te, cac_props, instpair_from_behavior(select_behavior(wc, &props))}));
@@ -320,7 +320,7 @@ func check_vardecl_ctor(cs *checkstate, clq *clqueue, ds *shray[te_vardecl], wc 
   nds size = count(ds);
   for i size = 0; i < nds; i = i + 1 {
     props type_properties;
-    if !compute_complete_type_properties(cs, clq, &ref(ds, i)->type, &props) {
+    if ! ~compute_complete_type_properties(cs, clq, &ref(ds, i)->type, &props) {
       return false;
     }
     oip opt[instpair] = instpair_or_trivial_from_behavior(select_behavior(wc, &props));

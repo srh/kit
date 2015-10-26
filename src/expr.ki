@@ -147,7 +147,7 @@ func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ide
     osymname = None;
   }
   props type_properties;
-  if !compute_type_properties(es->cs, es->clq, computed_type, &props) {
+  if ! ~compute_type_properties(es->cs, es->clq, computed_type, &props) {
     return false;
   }
   num var_number = ~count(&es->all_vars);
@@ -431,7 +431,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
   // There was no match -- so we make the def ourselves.
   rhs_type *te_typeexpr = &ref(&et->constructors, decl_index)->type;
   rhs_props type_properties;
-  if !compute_complete_type_properties(ds->cs, ds->clq, rhs_type, &rhs_props) {
+  if ! ~compute_complete_type_properties(ds->cs, ds->clq, rhs_type, &rhs_props) {
     return false;
   }
 
@@ -461,7 +461,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
 
   enum_type cu_typeexpr = ~TeEnum(*et);
   enum_type_props type_properties;
-  if !compute_type_properties(ds->cs, ds->clq, &enum_type, &enum_type_props) {
+  if ! ~compute_type_properties(ds->cs, ds->clq, &enum_type, &enum_type_props) {
     return false;
   }
 
@@ -571,7 +571,7 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
     }
     check(c.complete);
     props type_properties;
-    if !compute_complete_type_properties(es->cs, es->clq, &c.te, &props) {
+    if ! ~compute_complete_type_properties(es->cs, es->clq, &c.te, &props) {
       ice(_u8("help_check_simple_literal passed type with bad properties"));
     }
 
@@ -712,7 +712,7 @@ func check_expr_refof(es *framescope, pt *te_typeexpr, a *ast_refof, x *ast_expr
     }
 
     ref_props type_properties;
-    if !compute_complete_type_properties(es->cs, es->clq, &ref_computed.te, &ref_props) {
+    if ! ~compute_complete_type_properties(es->cs, es->clq, &ref_computed.te, &ref_props) {
       return false;
     }
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ref_computed.te, ref_props})), ~ref_computed.te, ref_props)));
@@ -797,7 +797,7 @@ func check_expr_deref_field(es *framescope, pt *te_typeexpr, a *ast_deref_field,
     return false;
   }
   props type_properties;
-  if !compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
+  if ! ~compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
     return false;
   }
   lval is_lval;
@@ -846,7 +846,7 @@ func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field,
     return false;
   }
   props type_properties;
-  if !compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
+  if ! ~compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
     return false;
   }
   lval is_lval;
@@ -894,7 +894,7 @@ func check_expr_deref(es *framescope, pt *te_typeexpr, a *ast_deref, x *ast_expr
     }
 
     props type_properties;
-    if !compute_complete_type_properties(es->cs, es->clq, param, &props) {
+    if ! ~compute_complete_type_properties(es->cs, es->clq, param, &props) {
       return false;
     }
     annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}), DeadMe(void), lifetime}), ~ *param, props)));
@@ -933,7 +933,7 @@ func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *
   }
   check(ptr_computed.complete);
   ptr_props type_properties;
-  if !compute_complete_type_properties(es->cs, es->clq, &ptr_computed.te, &ptr_props) {
+  if ! ~compute_complete_type_properties(es->cs, es->clq, &ptr_computed.te, &ptr_props) {
     return false;
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ptr_computed.te, ptr_props})), ~ptr_computed.te, ptr_props)));
@@ -991,7 +991,7 @@ func computed_ptr_type(clq *clqueue, t *cu_typeexpr) cu_typrop {
 
 func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   props type_properties;
-  if !compute_type_properties(ds->cs, ds->clq, t, &props) {
+  if ! ~compute_type_properties(ds->cs, ds->clq, t, &props) {
     return false;
   }
   return behavior_to_desc(&props.init_behavior, out);
@@ -999,7 +999,7 @@ func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
 
 func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   props type_properties;
-  if !compute_type_properties(ds->cs, ds->clq, t, &props) {
+  if ! ~compute_type_properties(ds->cs, ds->clq, t, &props) {
     return false;
   }
   return behavior_to_desc(&props.copy_behavior, out);
@@ -1007,7 +1007,7 @@ func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
 
 func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   props type_properties;
-  if !compute_type_properties(ds->cs, ds->clq, t, &props) {
+  if ! ~compute_type_properties(ds->cs, ds->clq, t, &props) {
     return false;
   }
   return behavior_to_desc(&props.move_behavior, out);
@@ -1015,7 +1015,7 @@ func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
 
 func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   props type_properties;
-  if !compute_type_properties(ds->cs, ds->clq, t, &props) {
+  if ! ~compute_type_properties(ds->cs, ds->clq, t, &props) {
     return false;
   }
   return behavior_to_desc(&props.destroy_behavior, out);
@@ -1245,7 +1245,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &OneEnumConstructorMatch(ci constructor_info): {
       annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip}));
       props type_properties;
-      if !compute_type_properties(es->cs, es->clq, &ci.type, &props) {
+      if ! ~compute_type_properties(es->cs, es->clq, &ci.type, &props) {
         return false;
       }
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ci.type, props})), ci.type, props)));
@@ -1254,7 +1254,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &EnumVoidConstructedMatch(vci voidconstructed_info): {
       annotate(&a->name_info, @[ast_name_expr_info]EnumVoidConstructed({vci.constructor_tag, vci.enum_type}));
       props type_properties;
-      if !compute_type_properties(es->cs, es->clq, &vci.constructed_type, &props) {
+      if ! ~compute_type_properties(es->cs, es->clq, &vci.constructed_type, &props) {
         return false;
       }
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.constructed_type, props})), vci.constructed_type, props)));
@@ -1283,7 +1283,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       check(computed.complete);
       cu_computed cu_typeexpr = ~computed.te;
       props type_properties;
-      if !compute_type_properties(es->cs, es->clq, &cu_computed, &props) {
+      if ! ~compute_type_properties(es->cs, es->clq, &cu_computed, &props) {
         return false;
       }
 
@@ -1361,7 +1361,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
 
     // We checked is_computed(pt).
     props type_properties;
-    if !compute_complete_type_properties(es->cs, es->clq, pt, &props) {
+    if ! ~compute_complete_type_properties(es->cs, es->clq, pt, &props) {
       return false;
     }
 
@@ -1388,13 +1388,13 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
 
     // We checked is_computed(pt).
     props type_properties;
-    if !compute_complete_type_properties(es->cs, es->clq, pt, &props) {
+    if ! ~compute_complete_type_properties(es->cs, es->clq, pt, &props) {
       return false;
     }
 
     // We checked is_computed(pt)
     param_props type_properties;
-    if !compute_complete_type_properties(es->cs, es->clq, oo(&b.param), &param_props) {
+    if ! ~compute_complete_type_properties(es->cs, es->clq, oo(&b.param), &param_props) {
       return false;
     }
 
@@ -1451,7 +1451,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   }
 
   props type_properties;
-  if !compute_complete_type_properties(es->cs, es->clq, &computed.te, &props) {
+  if ! ~compute_complete_type_properties(es->cs, es->clq, &computed.te, &props) {
     return false;
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~computed.te, props})), ~computed.te, props)));
@@ -1468,7 +1468,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   for i size = 0; i < nargs; i = i + 1 {
     cu_param cu_typeexpr = ~get(computed_params, i);
     cu_param_props type_properties;
-    if !compute_type_properties(bs->cs, bs->clq, &cu_param, &cu_param_props) {
+    if ! ~compute_type_properties(bs->cs, bs->clq, &cu_param, &cu_param_props) {
       return false;
     }
     cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
@@ -1498,7 +1498,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
 
   return_type *te_typeexpr = ref(computed_params, nargs);
   return_type_props type_properties;
-  if !compute_complete_type_properties(bs->cs, bs->clq, return_type, &return_type_props) {
+  if ! ~compute_complete_type_properties(bs->cs, bs->clq, return_type, &return_type_props) {
     return false;
   }
   return_cell cell_num = add_cell(&bs->es, {LocationStatic, ~ *return_type, return_type_props});
@@ -1543,7 +1543,7 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   // It's a pt, and it's a numeric type, which means it must be a complete pt, which means it's computed.
   check(is_complete_computed(pt).computed);
   props type_properties;
-  if !compute_complete_type_properties(es->cs, es->clq, pt, &props) {
+  if ! ~compute_complete_type_properties(es->cs, es->clq, pt, &props) {
     return false;
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
@@ -1968,7 +1968,7 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
 
   return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(&oo(&a->fun)->expr)->~);
   props type_properties;
-  if !compute_complete_type_properties(es->cs, es->clq, return_type, &props) {
+  if ! ~compute_complete_type_properties(es->cs, es->clq, return_type, &props) {
     return false;
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *return_type, props})), ~ *return_type, props)));
@@ -2030,7 +2030,7 @@ func compute_prim(clq *clqueue, t te_typeexpr) cu_typrop {
 
 func compute_prim(cs *checkstate, clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
   type cu_typeexpr = compute_prim(cs, clq, t);
-  if !compute_type_properties(cs, clq, &type, props_out) {
+  if ! ~compute_type_properties(cs, clq, &type, props_out) {
     ice(_u8("compute_prim fails to compute type properties"));
   }
   *out = type;
@@ -2068,7 +2068,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   }
 
   props type_properties;
-  if !compute_complete_type_properties(es->cs, es->clq, ixtype, &props) {
+  if ! ~compute_complete_type_properties(es->cs, es->clq, ixtype, &props) {
     return false;
   }
 

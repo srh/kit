@@ -351,9 +351,9 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       check(computed.complete);
       props type_properties;
       cu_computed cu_typeexpr = ~computed.te;
-      if !compute_type_properties(cs, clq, &cu_computed, &props) {
+      if case Printed(pm) = compute_type_properties(cs, clq, &cu_computed, &props) {
         inst->typrop = FailedComputation;
-        return Printed();
+        return Printed(pm);
       }
       if !is_defwise_trivial(&props) {
         inst->typrop = FailedComputation;
@@ -806,16 +806,16 @@ func compute_pack_info(cs *checkstate, clq *clqueue, pack *te_instpack, out **de
   }
 }
 
-func compute_pack_properties(cs *checkstate, clq *clqueue, pack *te_instpack, out *type_properties) bool {
+func compute_pack_properties(cs *checkstate, clq *clqueue, pack *te_instpack, out *type_properties) np {
   info *deftype_inst_info;
   if !compute_pack_info(cs, clq, pack, &info) {
-    return false;
+    return Printed();
   }
   *out = info->props;
-  return true;
+  return NoFail;
 }
 
-func compute_type_properties(cs *checkstate, clq *clqueue, t *cu_typeexpr, out *type_properties) bool {
+func compute_type_properties(cs *checkstate, clq *clqueue, t *cu_typeexpr, out *type_properties) np {
   return compute_complete_type_properties(cs, clq, &t->~, out);
 }
 
@@ -848,7 +848,7 @@ func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *shray[te_
   for i size = 0; i < n; i = i + 1 {
     vd *te_vardecl = ref(fields, i);
     props type_properties;
-    if !compute_complete_type_properties(cs, clq, &vd->type, &props) {
+    if ! ~compute_complete_type_properties(cs, clq, &vd->type, &props) {
       return false;
     }
 
@@ -874,7 +874,7 @@ func compute_partial_struct_data(cs *checkstate, clq *clqueue, fields *shray[te_
 
 
 // t had better be complete.
-func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeexpr, out *type_properties) bool {
+func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeexpr, out *type_properties) np {
   switch t {
     case &TeName(a te_name): {
       if case &Has(p te_instpack) = &a.pack {
@@ -896,7 +896,7 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
     case &TeStruct(a te_struct): {
       psd partial_struct_data;
       if !compute_partial_struct_data(cs, clq, &a.fields, None, &psd) {
-        return false;
+        return Printed();
       }
       final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
       *out = {final_size, psd.max_alignment,
@@ -905,7 +905,7 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
               level_to_derived(cs, clq, CtorCopy, 2, t, psd.copy_level),
               level_to_derived(cs, clq, CtorDestroy, 1, t, psd.destroy_level),
               IsScalarNo(void)};
-      return true;
+      return NoFail;
     }
 
     case &TeEnum(a te_enum): {
@@ -918,8 +918,8 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
       n size = count(&a.constructors);
       for i size = 0; i < n; i = i + 1 {
         props type_properties;
-        if !compute_complete_type_properties(cs, clq, &ref(&a.constructors, i)->type, &props) {
-          return false;
+        if case Printed(pm) = compute_complete_type_properties(cs, clq, &ref(&a.constructors, i)->type, &props) {
+          return Printed(pm);
         }
         tagged_size u32 = ceil_aligned(tag_size, props.flat_alignment) + props.flat_size;
         max_size = max(max_size, tagged_size);
@@ -938,7 +938,7 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
               level_to_derived(cs, clq, CtorCopy, 2, t, copy_level),
               level_to_derived(cs, clq, CtorDestroy, 1, t, destroy_level),
               IsScalarNo(void)};
-      return true;
+      return NoFail;
     }
 
     case &TeUnion(a te_union): {
@@ -948,14 +948,13 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
       n size = count(&a.fields);
       for i size = 0; i < n; i = i + 1 {
         props type_properties;
-        if !compute_complete_type_properties(cs, clq, &ref(&a.fields, i)->type, &props) {
-          return false;
+        if case Printed(pm) = compute_complete_type_properties(cs, clq, &ref(&a.fields, i)->type, &props) {
+          return Printed(pm);
         }
         max_size = max(max_size, props.flat_size);
         max_alignment = max(max_alignment, props.flat_alignment);
         if !(isTrivial(props.init_behavior) && isTrivial(props.move_behavior) && isTrivial(props.copy_behavior) && isTrivial(props.destroy_behavior)) {
-          ERR(_u8("union type has non-trivial field"));
-          return false;
+          return ERR(_u8("union type has non-trivial field"));
         }
       }
       // Consider the case where you have a union of {uint32_t, uint32_t, uint32_t} and {uint64_t}.  We have alignment 8, thus we need size 16.
@@ -963,14 +962,14 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
       *out = {final_size, max_alignment, DerivedMethodTrivial(void),
               DerivedMethodTrivial(void), DerivedMethodTrivial(void),
               DerivedMethodTrivial(void), IsScalarNo(void)};
-      return true;
+      return NoFail;
     }
 
     case &TeArraytype(a te_arraytype): {
       if case Has(c u32) = a.count {
         props type_properties;
-        if !compute_complete_type_properties(cs, clq, oo(&a.param), &props) {
-          return false;
+        if case Printed(pm) = compute_complete_type_properties(cs, clq, oo(&a.param), &props) {
+          return Printed(pm);
         }
 
         // We _should_ maintain alignment for a zero-element array because the pointer to such an array might hack in tag-bit logic.
@@ -980,7 +979,7 @@ func compute_complete_type_properties(cs *checkstate, clq *clqueue, t *te_typeex
                 level_to_derived(cs, clq, CtorCopy, 2, t, behavior_level(&props.copy_behavior)),
                 level_to_derived(cs, clq, CtorDestroy, 1, t, behavior_level(&props.destroy_behavior)),
                 IsScalarNo(void)};
-        return true;
+        return NoFail;
       } else {
         ice(_u8("compute_type_properties called on incomplete arraytype."));
         return fake();
@@ -1127,7 +1126,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
 
       check(isBeganComputing(&inst->info));
       rhs_props type_properties;
-      if !compute_complete_type_properties(cs, clq, &rhs_computed.te, &rhs_props) {
+      if ! ~compute_complete_type_properties(cs, clq, &rhs_computed.te, &rhs_props) {
         inst->info = FailedComputation();
         return false;
       }
