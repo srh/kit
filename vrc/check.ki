@@ -1466,8 +1466,8 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
         return Printed(pm);
       }
       match_result entry_matches_res;
-      if !entry_matches(cs, pt, &ent->generics, gp, ent_typeexpr, &match_result) {
-        return Printed();
+      if case Printed(pm) = entry_matches(cs, pt, &ent->generics, gp, ent_typeexpr, &match_result) {
+        return Printed(pm);
       }
       switch match_result {
         case EntryDoesNotMatch: {
@@ -1526,20 +1526,20 @@ func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res
   }
 }
 
-func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *genparms, typeexpr *te_typeexpr, matches_out *entry_matches_res) bool {
+func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *genparms, typeexpr *te_typeexpr, matches_out *entry_matches_res) np {
   switch generics {
     case &NoGenerics: {
       switch gp {
         case &HasParms(parms shray[te_typeexpr]): {
           *matches_out = EntryDoesNotMatch(void);
-          return true;
+          return NoFail;
         }
         case &NoParms: {
           names array[ast_ident];
           parms shray[te_typeexpr];
           res var = type_matches(pt, &names, &parms, typeexpr);
           *matches_out = from_type_matches_res(false, &res);
-          return true;
+          return NoFail;
         }
       }
     }
@@ -1548,17 +1548,17 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
         case &HasParms(parms shray[te_typeexpr]): {
           if count(&parms) != count(&names) {
             *matches_out = EntryDoesNotMatch(void);
-            return true;
+            return NoFail;
           }
           res var = type_matches(pt, &names, &parms, typeexpr);
           *matches_out = from_type_matches_res(true, &res);
-          return true;
+          return NoFail;
         }
         case &NoParms: {
           parms shray[te_typeexpr] = repeat(count(&names), TeUnknown(void));
           res var = type_matches(pt, &names, &parms, typeexpr);
           *matches_out = from_type_matches_res(true, &res);
-          return true;
+          return NoFail;
         }
       }
     }
