@@ -3,14 +3,11 @@
 Current status:  "proto-Kit"
 
 Definitions:
-   s1: A compiler, written in C.  It can compile s2.  Located in trc/.
-   s2: A compiler, written in proto-Kit-v0.00.1.x.  It can
-       compile itself and s3.  Located in urc/.
+   s1: A compiler, written in C.  It can compile s3.  Located in trc/.
+   s2: No longer exists.
    s3: A compiler, written in proto-Kit-v0.00.2.x.  It can
        compile itself.  Located in src/.
-   s2-by-s1: s2, as compiled by s1.
-   s2-self: s2, as compiled by s2.
-   s3-by-s2: s3, as compiled by s2.
+   s3-by-s1: s3, as compiled by s1.
    s3-self: s3, as compiled by s3.
    s4-by-s3: s4, asd compiled by s3.
    s4-self: s4, as compiled by s4.
@@ -25,10 +22,8 @@ Definitions:
 
 # Step 1. Build s1 -- creates executable "out.exe" (or "out")
    windows_build.bat  (or ./linux_build.sh)
-# Step 2. Build s2 -- creates executable "s2.exe" (or "s2")
-   windows_build_s2.bat  (or ./linux_build_s2.sh)
-# Step 3. Build s3
-   windows_build_s3.bat
+# Step 3. Build s3 -- creates executable "s3.exe" (or "s3")
+   windows_build_s3.bat  (or ./linux_build_s3.sh)
 # Step 4. Build s4
    windows_build_s4.bat
 # Step 5. Run parsing/typechecking+codegen tests.
@@ -44,23 +39,21 @@ Definitions:
 
 The current directory structure is:
 
-   trc - s1, implemented in C.  Compiles s2.
-   urc - s2, implemented in proto-Kit, v0.00.1.x.  Compiles s2 and s3.
+   trc - s1, implemented in C.  Compiles s3.
    src - s3, implemented in proto-Kit, v0.00.2.x.  Compiles s3 and s4.
    vrc - s4, implemented in proto-Kit, v0.00.2A.x.  Compiles s4.
    examples - examples to run, disorganized junk
 
   COMMAND USAGE
 
-"out" is the name of the s1 executable, "s2" is the name of the s2 executable, and "s3" is the name of the s3 executable.
+"out" is the name of the s1 executable, "s3" is the name of the s3 executable, and "s4" is the name of the s4 executable.
 
    out --test    # runs tests.
    out <modulename>    # builds <modulename>.ki and its imports.
-   s2    # runs parsing/typechecking tests without codegen.
-   s2 --build    # runs parsing/typechecking tests with codegen.
-   s2 <modulename>  # builds <modulename>.ki and its imports.
-   s3 ...    # same as s2.
-   s4 ...    # same as s3 and s2.
+   s3    # runs parsing/typechecking tests without codegen.
+   s3 --build    # runs parsing/typechecking tests with codegen.
+   s3 <modulename>  # builds <modulename>.ki and its imports.
+   s4 ...    # same as s3.
 
   PROJECT TIMELINE
 
@@ -116,13 +109,10 @@ constructors and destructors, elementary encapsulation, tagged enum
 types, no implicit conversions."  s2's, v0.00.2.x, is the same as
 s1's, but with some basic convenience enhancements that should be
 easy to backport to s1 -- the differences are described in
-FEATURES.  s3's, v0.00.2A.x, is very similar to s2's, I think there
-might not be any differences.  s4's should become quite different
-from s3's.
+FEATURES.  s2 no longer exists.  s3's, v0.00.2A.x, is very similar
+to s2's, I think there might not be any differences.  s4's should
+become quite different from s3's.
 
-Right now, s1 is very close to being able to compile s3.  s2 will
-disappear pretty soon -- its new language features are gradually
-getting implemented in s1.  Actually, s1 can compile both s3 and s4
-at the time of writing this.  s3 or s4 wouldn't disappear until
-there's an s5, though -- we don't want the actively developed
-compiler version to have to maintain compatibility with s1's warts.
+Right now, s1 can compile s3, and it can almost compile s4.  In the
+long run, as soon as s5 is the actively developed version, s3 will
+go away.
