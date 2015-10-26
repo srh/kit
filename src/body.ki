@@ -415,7 +415,7 @@ func check_pattern(es *framescope, chk *swartch_checkobj, et *te_enum, patt *ast
 func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_type *te_typeexpr, vd *ast_vardecl, cu_expected_type_out *cu_typeexpr, varcell_out *cell_num) bool {
   // TODO: Cache converted?
   converted te_typeexpr;
-  if !convert_typeexpr(es->cs, &vd->type, &converted) {
+  if ! ~convert_typeexpr(es->cs, &vd->type, &converted) {
     return false;
   }
 
@@ -599,7 +599,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
 func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) bool {
   // TODO: Cache converted... or something.
   converted te_typeexpr;
-  if !convert_typeexpr(bs->cs, &a->decl.type, &converted) {
+  if ! ~convert_typeexpr(bs->cs, &a->decl.type, &converted) {
     return false;
   }
 

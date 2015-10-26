@@ -17,6 +17,12 @@ inline func `~`(x np) bool {
   }
 }
 
+// This exists for code that needs to return an np when it's passing along a failure where a callee returned a boolean.  We know the callee printed an error message, we assume it didn't print the location, and the callee should be updated to return an np.
+// TODO: Get rid of this (and fix it callers).
+func Printed() np {
+  return Printed(false);
+}
+
 func[T] ERR(x T) np { DBG(x); return Printed(false); }
 func[T, U] ERR(x T, y U) np { DBG(x, y); return Printed(false); }
 func[T, U, V] ERR(x T, y U, z V) np { DBG(x, y, z); return Printed(false); }

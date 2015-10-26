@@ -239,7 +239,7 @@ func replaced_name_parms(ds *defscope, a *ast_name_expr, out *genparms) bool {
     n size = count(&arr);
     for i size = 0; i < n; i = i + 1 {
       converted te_typeexpr;
-      if !convert_typeexpr(ds->cs, ref(&arr, i), &converted) {
+      if ! ~convert_typeexpr(ds->cs, ref(&arr, i), &converted) {
         return false;
       }
       computed cac_typeexpr;
@@ -681,7 +681,7 @@ func check_expr_ternary(es *framescope, ai allow_incomplete, pt *te_typeexpr, a 
 func check_expr_typed_expr(es *framescope, ai allow_incomplete, pt *te_typeexpr, a *ast_typed_expr, x *ast_expr) bool {
   // TODO: Cache converted.
   converted te_typeexpr;
-  if !convert_typeexpr(es->cs, &a->type, &converted) {
+  if ! ~convert_typeexpr(es->cs, &a->type, &converted) {
     return false;
   }
   // We call check_and_compute_typeexpr to disallow totally bogus typeexprs more directly than the eventual type error that would happen.
@@ -1303,7 +1303,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   type ast_typeexpr = lambda_declared_type(es->im, a);
   // TODO: Cache converted.
   converted te_typeexpr;
-  if !convert_typeexpr(es->cs, &type, &converted) {
+  if ! ~convert_typeexpr(es->cs, &type, &converted) {
     return false;
   }
   // TODO: I see some duplicated logic with the TypedExpr case.

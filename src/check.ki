@@ -95,111 +95,113 @@ func convert_typefunc(cs *checkstate, a *ast_typeexpr, out *te_puretype) np {
   }
 }
 
-func convert_typeexpr_list(cs *checkstate, arr *array[ast_typeexpr], out *shray[te_typeexpr]) bool {
+func convert_typeexpr_list(cs *checkstate, arr *array[ast_typeexpr], out *shray[te_typeexpr]) np {
   build array[te_typeexpr];
   n size = count(arr);
   reserve(&build, n);
   for i size = 0; i < n; i = i + 1 {
     t te_typeexpr;
-    if !convert_typeexpr(cs, ref(arr, i), &t) {
-      return false;
+    if case Printed(pm) = convert_typeexpr(cs, ref(arr, i), &t) {
+      return Printed(pm);
     }
     push(&build, t);
   }
   *out = freeze(&build);
-  return true;
+  return NoFail;
 }
 
-func convert_vardecl_list(cs *checkstate, arr *array[ast_vardecl], out *array[te_vardecl]) bool {
+func convert_vardecl_list(cs *checkstate, arr *array[ast_vardecl], out *array[te_vardecl]) np {
   build array[te_vardecl];
   n size = count(arr);
   reserve(&build, n);
   for i size = 0; i < n; i = i + 1 {
     vd te_vardecl;
-    if !convert_vardecl(cs, ref(arr, i), &vd) {
-      return false;
+    if case Printed(pm) = convert_vardecl(cs, ref(arr, i), &vd) {
+      return Printed(pm);
     }
     push(&build, vd);
   }
   swap(out, &build);
-  return true;
+  return NoFail;
 }
 
-func convert_vardecl(cs *checkstate, a *ast_vardecl, out *te_vardecl) bool {
+func convert_vardecl(cs *checkstate, a *ast_vardecl, out *te_vardecl) np {
   type te_typeexpr;
-  if !convert_typeexpr(cs, &a->type, &type) {
-    return false;
+  if case Printed(pm) = convert_typeexpr(cs, &a->type, &type) {
+    return Printed(pm);
   }
   *out = {a->name.value, type};
-  return true;
+  return NoFail;
 }
 
 // NOTE: Callers of this might expect this function to also lookup names, check arity, etc.  Or they need to do such things themselves.
-func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) bool {
+func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) np {
   switch a {
     case &Name(b ast_ident): {
       *out = TeName({b.value, None});
-      return true;
+      return NoFail;
     }
     case &App(b ast_typeapp): {
       typefunc te_puretype;
       params shray[te_typeexpr];
-      if !(~convert_typefunc(cs, oo(&b.typefunc), &typefunc)
-           && convert_typeexpr_list(cs, &b.params, &params)) {
-        return false;
+      if case Printed(pm) = convert_typefunc(cs, oo(&b.typefunc), &typefunc) {
+        return Printed(pm);
+      }
+      if case Printed(pm) = convert_typeexpr_list(cs, &b.params, &params) {
+        return Printed(pm);
       }
       *out = TeApp({typefunc, params, None});
-      return true;
+      return NoFail;
     }
     case &Struct(b ast_struct): {
       fields array[te_vardecl];
-      if !convert_vardecl_list(cs, &b.fields, &fields) {
-        return false;
+      if case Printed(pm) = convert_vardecl_list(cs, &b.fields, &fields) {
+        return Printed(pm);
       }
       *out = TeStruct({freeze(&fields)});
-      return true;
+      return NoFail;
     }
     case &Enum(b ast_enum): {
       constructors array[te_vardecl];
-      if !convert_vardecl_list(cs, &b.constructors, &constructors) {
-        return false;
+      if case Printed(pm) = convert_vardecl_list(cs, &b.constructors, &constructors) {
+        return Printed(pm);
       }
       *out = TeEnum({freeze(&constructors)});
-      return true;
+      return NoFail;
     }
     case &Union(b ast_union): {
       fields array[te_vardecl];
-      if !convert_vardecl_list(cs, &b.fields, &fields) {
-        return false;
+      if case Printed(pm) = convert_vardecl_list(cs, &b.fields, &fields) {
+        return Printed(pm);
       }
       *out = TeUnion({freeze(&fields)});
-      return true;
+      return NoFail;
     }
     case &Arraytype(b ast_arraytype): {
       count opt[u32];
       if case &Has(bo box[ast_expr]) = &b.count {
         num u32;
         if !fake_eval_arraytype_count(oo(&bo), &num) {
-          return false;
+          return Printed();
         }
         count = Has(num);
       } else {
         count = None;
       }
       param shp[te_typeexpr];
-      if !convert_typeexpr(cs, oo(&b.param), oo(&param)) {
-        return false;
+      if case Printed(pm) = convert_typeexpr(cs, oo(&b.param), oo(&param)) {
+        return Printed(pm);
       }
       *out = TeArraytype({count, param});
-      return true;
+      return NoFail;
     }
     case &Lifetime(b ast_lifetime):
       *out = TeLifetime({b.name.value});
-      return true;
+      return NoFail;
 
     case &Unknown(b ast_unknown): {
       *out = TeUnknown(void);
-      return true;
+      return NoFail;
     }
   }
 }
@@ -215,7 +217,7 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) b
         }
         case &DefnHasRhs(np def_nonprim): {
           converted te_typeexpr;
-          if !convert_typeexpr(cs, &np.quick_typeexpr, &converted) {
+          if ! ~convert_typeexpr(cs, &np.quick_typeexpr, &converted) {
             ent->converted_typeexpr = FailedComputation();
             return false;
           }
@@ -259,7 +261,7 @@ func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr
         np.rhs = BeganComputing();
         a *ast_typeexpr = deftype_rhs_type(&np.tl->rhs);
         converted te_typeexpr;
-        if !convert_typeexpr(cs, a, &converted) {
+        if ! ~convert_typeexpr(cs, a, &converted) {
           np.rhs = FailedComputation();
           return false;
         }
