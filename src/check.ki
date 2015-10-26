@@ -34,8 +34,8 @@ func finish_checking(cs *checkstate, clq *clqueue) np {
         }
         // NOTE: It would be nice if checking/graphing, and evaling, were done in separate phases as much as possible.
         val_discard *st_value;
-        if !ensure_def_inst_evaled(cs, clq, e.ent_id, e.inst_id, &val_discard) {
-          return Printed();
+        if case Printed(pm) = ensure_def_inst_evaled(cs, clq, e.ent_id, e.inst_id, &val_discard) {
+          return Printed(pm);
         }
       }
     }

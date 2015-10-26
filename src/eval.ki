@@ -301,14 +301,14 @@ func mk_st_value_symbolref(plat *platform_info, fnid fn_body_id) st_value {
   return ret;
 }
 
-func ensure_def_inst_evaled(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **st_value) bool {
+func ensure_def_inst_evaled(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **st_value) np {
   if !ensure_def_inst_graphed(cs, clq, ent_id, inst_id) {
-    return false;
+    return Printed();
   }
   return st_eval_def(clq, ent_id, inst_id, out);
 }
 
-func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **st_value) bool {
+func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **st_value) np {
   ent *def_entry = ref_def_entry(clq->cs, ent_id);
   inst *def_inst = ref_inst(clq->cs, inst_id);
 
@@ -338,26 +338,22 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
       env st_env = mk_env(&pool, clq->cs->plat, count(&fg->gr.cells));
 
       if !st_eval_frame_regraphed(clq, &env, fg) {
-        ERR(_u8("(in evaling def "), defname, _u8(")"));
         inst->evaled_value = FailedComputation();
-        return false;
+        return ERR(_u8("(in evaling def "), defname, _u8(")"));
       }
       result st_obj_ref = cell_obj_ref(&env, fg->cell, "in st_eval_def");
       value st_value;
       if !obj_read(&env, result, &value) {
-        ERR(_u8("(in result from evaling def "), defname, _u8(")"));
         inst->evaled_value = FailedComputation();
-        return false;
+        return ERR(_u8("(in result from evaling def "), defname, _u8(")"));
       }
       if count(&value.objrefs) != 0 {
-        ERR(_u8("def value (for "), defname, _u8(") has objrefs"));
         inst->evaled_value = FailedComputation();
-        return false;
+        return ERR(_u8("def value (for "), defname, _u8(") has objrefs"));
       }
       if !is_fully_initialized(&env.plat, &value) {
-        ERR(_u8("def value (for "), defname, _u8(") is not fully initialized"));
         inst->evaled_value = FailedComputation();
-        return false;
+        return ERR(_u8("def value (for "), defname, _u8(") is not fully initialized"));
       }
 
       inst->evaled_value = Computed(value);
@@ -366,20 +362,18 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
       } else {
         ice(_u8("locally impossible in st_eval_def"));
       }
-      return true;
+      return NoFail;
     }
     case &BeganComputing: {
-      ERR(_u8("recursively computing def inst's value"));
       inst->evaled_value = FailedComputation();
-      return false;
+      return ERR(_u8("recursively computing def inst's value"));
     }
     case &FailedComputation: {
-      ERR(_u8("repeat error of st_eval_def"));
-      return false;
+      return ERR(_u8("repeat error of st_eval_def"));
     }
     case &Computed(x st_value): {
       *out = &x;
-      return true;
+      return NoFail;
     }
   }
 }
@@ -708,7 +702,7 @@ func st_const_compute(clq *clqueue, plat *platform_info, c *gr_const, length u32
     *out = st_bigint_to_value_unsigned(plat, length, b);
   case &ConstDef(ip instpair):
     val *st_value;
-    if !ensure_def_inst_evaled(clq->cs, clq, ip.ent_id, ip.inst_id, &val) {
+    if ! ~ensure_def_inst_evaled(clq->cs, clq, ip.ent_id, ip.inst_id, &val) {
       return false;
     }
     *out = *val;
