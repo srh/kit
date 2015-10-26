@@ -1271,7 +1271,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       }
 
       ent_typeexpr *te_typeexpr;
-      if !def_converted_typeexpr(es->cs, ent, &ent_typeexpr) {
+      if ! ~def_converted_typeexpr(es->cs, ent, &ent_typeexpr) {
         return false;
       }
 
