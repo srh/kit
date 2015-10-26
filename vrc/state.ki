@@ -563,42 +563,41 @@ func is_defwise_trivial(props *type_properties) bool {
   return isTrivial(props->move_behavior) && isTrivial(props->copy_behavior) && isTrivial(props->destroy_behavior);
 }
 
-func lookup_explicit_method_or_lack_thereof(cs *checkstate, clq *clqueue, fntype *te_typeexpr, impl_name sym, behavior_out *derived_method_behavior) bool {
+func lookup_explicit_method_or_lack_thereof(cs *checkstate, clq *clqueue, fntype *te_typeexpr, impl_name sym, behavior_out *derived_method_behavior) np {
   res match_def_res;
   gp genparms = NoParms(void);
   if !match_def(cs, impl_name, &gp, fntype, &res) {
-    return false;
+    return Printed();
   }
 
   switch &res {
     case &NoMatch: {
       *behavior_out = DerivedMethodAbsent(void);
-      return true;
+      return NoFail;
     }
     case &MultiMatch: {
-      ERR(_u8("Multiple explicit methods '"), lookup(cs->im, impl_name), _u8("'"));
-      return false;
+      return ERR(_u8("Multiple explicit methods '"), lookup(cs->im, impl_name), _u8("'"));
     }
     case &OneMatch(m ent_and_parms): {
       inst_id def_inst_id;
       if !make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
-        return false;
+        return Printed();
       }
       *behavior_out = DerivedMethodExplicit({m.ent, inst_id});
-      return true;
+      return NoFail;
     }
   }
 }
 
-func to_defclass_properties(cs *checkstate, clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, props type_properties, out *type_properties) bool {
+func to_defclass_properties(cs *checkstate, clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, props type_properties, out *type_properties) np {
   ret type_properties = props;
   switch a {
     case DefaultCopyMoveDestroy: {
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
       ptrtype te_typeexpr = ptr_type(cs, type.~);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
-        return false;
+      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
+        return Printed(pm);
       }
     }
     case DefaultMove: {
@@ -606,14 +605,14 @@ func to_defclass_properties(cs *checkstate, clq *clqueue, ent_id deftype_entry_i
       ptrtype te_typeexpr = ptr_type(cs, type.~);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
-        return false;
+      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
+        return Printed(pm);
       }
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, _s("do_copy")), &ret.copy_behavior) {
-        return false;
+      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, _s("do_copy")), &ret.copy_behavior) {
+        return Printed(pm);
       }
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior) {
-        return false;
+      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior) {
+        return Printed(pm);
       }
     }
     case NoDefaults: {
@@ -621,21 +620,21 @@ func to_defclass_properties(cs *checkstate, clq *clqueue, ent_id deftype_entry_i
       ptrtype te_typeexpr = ptr_type(cs, type.~);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
-        return false;
+      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
+        return Printed(pm);
       }
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, _s("do_move")), &ret.move_behavior) {
-        return false;
+      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, _s("do_move")), &ret.move_behavior) {
+        return Printed(pm);
       }
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, _s("do_copy")), &ret.copy_behavior) {
-        return false;
+      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(cs, clq, &fntype2, intern(cs->im, _s("do_copy")), &ret.copy_behavior) {
+        return Printed(pm);
       }
-      if !lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior) {
-        return false;
+      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(cs, clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior) {
+        return Printed(pm);
       }
       ret.is_scalar = IsScalarNo(void);
     }
   }
   *out = ret;
-  return true;
+  return NoFail;
 }
