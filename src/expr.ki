@@ -492,30 +492,29 @@ defenum es_match_res {
   EnumVoidConstructedMatch voidconstructed_info;
 };
 
-func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_match_res) bool {
+func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_match_res) np {
   if case &NoParms(v void) = gp {
     if case Has(num var_number) = es_find_current_local(es, name) {
       type te_typeexpr;
       vartype *cu_typeexpr = &ref_var(es, num)->type;
       if !unify_types(pt, &vartype->~, &type) {
-        ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"), to_u8str(es->im, *vartype), _u8("' where '"), to_u8str(es->im, *pt), _u8("' expected"));
-        return false;
+        return ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"), to_u8str(es->im, *vartype), _u8("' where '"), to_u8str(es->im, *pt), _u8("' expected"));
       }
       *res_out = OneLocalMatch({num});
-      return true;
+      return NoFail;
     }
   }
 
   res match_def_res;
-  if ! ~match_def(es->cs, name, gp, pt, &res) {
-    return false;
+  if case Printed(pm) = match_def(es->cs, name, gp, pt, &res) {
+    return Printed(pm);
   }
 
   switch &res {
     case &NoMatch: {
       constructor_res ds_constructor_res;
       if !ds_lookup_constructor(es->ds, name, gp, pt, &constructor_res) {
-        return false;
+        return Printed();
       }
       switch &constructor_res {
       case &NoMatchConstructor:
@@ -527,19 +526,19 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
       case &MatchedVoidConstructed(inf voidconstructed_info):
         *res_out = EnumVoidConstructedMatch(inf);
       }
-      return true;
+      return NoFail;
     }
     case &MultiMatch: {
       *res_out = AmbigGlobalMatch(void);
-      return true;
+      return NoFail;
     }
     case &OneMatch(m ent_and_parms): {
       inst_id def_inst_id;
-      if ! ~make_inst(es->cs, es->clq, m.ent, &m.parms, &inst_id) {
-        return false;
+      if case Printed(pm) = make_inst(es->cs, es->clq, m.ent, &m.parms, &inst_id) {
+        return Printed(pm);
       }
       *res_out = OneGlobalMatch({m.ent, inst_id, m.parms});
-      return true;
+      return NoFail;
     }
   }
 }
@@ -1213,8 +1212,8 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     return Printed();
   }
   match_res es_match_res;
-  if !es_lookup_name(es, a->ident.value, &parms, pt, &match_res) {
-    return Printed();
+  if case Printed(pm) = es_lookup_name(es, a->ident.value, &parms, pt, &match_res) {
+    return Printed(pm);
   }
   switch &match_res {
     case &NoMatch: {
