@@ -1349,13 +1349,11 @@ func load_module(cs *checkstate, mod_name sym) np[module_id] {
         mod_id module_id = ~count(&cs->modules);
         push(&cs->modules, mod);
         if !try_insert(&cs->modules_by_name, &mod_name, mod_id) {
-          ERR(_u8("ICE: modules_by_name already has name "), lookup(cs->im, mod_name));
-          return Printed(false);
+          return RERR(_u8("ICE: modules_by_name already has name "), lookup(cs->im, mod_name));
         }
         return NoFail(mod_id);
       } else {
-        ERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
-        return Printed(false);
+        return RERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
       }
     }
   }
