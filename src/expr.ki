@@ -249,7 +249,7 @@ func replaced_name_parms(ds *defscope, a *ast_name_expr, out *genparms) bool {
         return false;
       }
       computed cac_typeexpr;
-      if !check_and_compute_typeexpr(ds->cs, ds->clq, ds->generics, ds->repls, &converted, &computed) {
+      if ! ~check_and_compute_typeexpr(ds->cs, ds->clq, ds->generics, ds->repls, &converted, &computed) {
         return false;
       }
       push(&replaced, computed.te);
@@ -753,7 +753,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   }
   // We call check_and_compute_typeexpr to disallow totally bogus typeexprs more directly than the eventual type error that would happen.
   computed cac_typeexpr;
-  if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->repls, &converted, &computed) {
+  if ! ~check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->repls, &converted, &computed) {
     return false;
   }
   unified te_typeexpr;
@@ -1276,7 +1276,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       }
 
       computed cac_typeexpr;
-      if !check_and_compute_typeexpr(es->cs, es->clq, &ent->generics, &matched_parms, ent_typeexpr, &computed) {
+      if ! ~check_and_compute_typeexpr(es->cs, es->clq, &ent->generics, &matched_parms, ent_typeexpr, &computed) {
         return false;
       }
 
@@ -1425,7 +1425,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   }
   // TODO: I see some duplicated logic with the TypedExpr case.
   computed cac_typeexpr;
-  if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->repls, &converted, &computed) {
+  if ! ~check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->repls, &converted, &computed) {
     return false;
   }
   // Lambda exprs can't have partial types (yet!).

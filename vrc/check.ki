@@ -344,9 +344,9 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
 
       // Important:  We check the typeexpr first.  If that typeexpr cyclically refers to this def, we fail.  If there is no typeexpr, we need to compute it from the rhs (and that also needs to not depend cyclically on this def's own typeexpr).
       computed cac_typeexpr;
-      if !check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_typeexpr, &computed) {
+      if case Printed(pm) = check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_typeexpr, &computed) {
         inst->typrop = FailedComputation;
-        return Printed();
+        return Printed(pm);
       }
       check(computed.complete);
       props type_properties;
@@ -458,61 +458,64 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy
 func noscoped_check_and_compute_typeexpr(cs *checkstate, clq *clqueue, t *te_typeexpr, out *cac_typeexpr) bool {
   ng ast_generics = NoGenerics(void);
   np idy_genparms = {mk_shray()};
-  return check_and_compute_typeexpr(cs, clq, &ng, &np, t, out);
+  return ~check_and_compute_typeexpr(cs, clq, &ng, &np, t, out);
 }
 
 // NOTE: Generics replacement should really be a separate phase.  (Why?)
-func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, t *te_typeexpr, out *cac_typeexpr) bool {
+func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, t *te_typeexpr, out *cac_typeexpr) np {
   switch t {
     case &TeName(a te_name): {
       computed cu_typeexpr;
       if !check_and_compute_name_type(cs, clq, g, parms, &a, &computed) {
-        return false;
+        return Printed();
       }
       *out = {true, computed.~};
-      return true;
+      return NoFail;
     }
     case &TeApp(a te_typeapp): {
-      return check_and_compute_app_type(cs, clq, g, parms, &a, out);
+      if !check_and_compute_app_type(cs, clq, g, parms, &a, out) {
+        return Printed();
+      }
+      return NoFail;
     }
     case &TeStruct(a te_struct): {
       computed_fields_complete bool;
       computed_fields array[te_vardecl];
       if !help_check_fields(cs, clq, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
-        return false;
+        return Printed();
       }
       *out = {computed_fields_complete, TeStruct({freeze(&computed_fields)})};
-      return true;
+      return NoFail;
     }
     case &TeEnum(a te_enum): {
       computed_constructors_complete bool;
       computed_constructors array[te_vardecl];
       if !help_check_fields(cs, clq, g, parms, &a.constructors, &computed_constructors, &computed_constructors_complete) {
-        return false;
+        return Printed();
       }
       *out = {computed_constructors_complete, TeEnum({freeze(&computed_constructors)})};
-      return true;
+      return NoFail;
     }
     case &TeUnion(a te_union): {
       computed_fields_complete bool;
       computed_fields array[te_vardecl];
       if !help_check_fields(cs, clq, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
-        return false;
+        return Printed();
       }
       *out = {computed_fields_complete, TeUnion({freeze(&computed_fields)})};
-      return true;
+      return NoFail;
     }
     case &TeArraytype(a te_arraytype): {
       param cac_typeexpr;
-      if !check_and_compute_typeexpr(cs, clq, g, parms, oo(&a.param), &param) {
-        return false;
+      if case Printed(pm) = check_and_compute_typeexpr(cs, clq, g, parms, oo(&a.param), &param) {
+        return Printed(pm);
       }
       *out = {param.complete && isHas(&a.count), TeArraytype({a.count, emshp(param.te)})};
-      return true;
+      return NoFail;
     }
     case &TeUnknown: {
       *out = {false, TeUnknown(void)};
-      return true;
+      return NoFail;
     }
   }
 }
@@ -570,7 +573,7 @@ func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy
       }
     }
     computed cac_typeexpr;
-    if !check_and_compute_typeexpr(cs, clq, g, parms, &decl->type, &computed) {
+    if ! ~check_and_compute_typeexpr(cs, clq, g, parms, &decl->type, &computed) {
       return false;
     }
     all_complete = all_complete & computed.complete;
@@ -606,7 +609,7 @@ func check_and_compute_typeexpr_shray(cs *checkstate, clq *clqueue, g *ast_gener
   reserve(&computed, n);
   for i size = 0; i < n; i = i + 1 {
     c cac_typeexpr;
-    if !check_and_compute_typeexpr(cs, clq, g, parms, ref(t, i), &c) {
+    if ! ~check_and_compute_typeexpr(cs, clq, g, parms, ref(t, i), &c) {
       return false;
     }
     push(&computed, c.te);
@@ -1120,7 +1123,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
       }
 
       rhs_computed cac_typeexpr;
-      if !check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_rhs, &rhs_computed) {
+      if ! ~check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms, ent_rhs, &rhs_computed) {
         inst->info = FailedComputation();
         return false;
       }

@@ -416,7 +416,7 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
   }
 
   cac cac_typeexpr;
-  if !check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &cac) {
+  if ! ~check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &cac) {
     return false;
   }
 
@@ -598,7 +598,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
   }
 
   computed cac_typeexpr;
-  if !check_and_compute_typeexpr(bs->cs, bs->clq, bs->ds->generics, bs->ds->parms, &converted, &computed) {
+  if ! ~check_and_compute_typeexpr(bs->cs, bs->clq, bs->ds->generics, bs->ds->parms, &converted, &computed) {
     return false;
   }
   cu_computed cu_typeexpr;

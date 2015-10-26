@@ -152,7 +152,7 @@ func check_non_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_r
 
 func check_non_magic_prop(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, nmp *non_magic_prop) bool {
   cac cac_typeexpr;
-  if !check_and_compute_typeexpr(cs, clq, g, parms, &nmp->type, &cac) {
+  if ! ~check_and_compute_typeexpr(cs, clq, g, parms, &nmp->type, &cac) {
     return false;
   }
   check(cac.complete);
@@ -198,7 +198,7 @@ func check_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls
 
 func check_non_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, wc which_ctor, nmc *non_magic_ctor) bool {
   cac cac_typeexpr;
-  if !check_and_compute_typeexpr(cs, clq, g, parms, &nmc->type, &cac) {
+  if ! ~check_and_compute_typeexpr(cs, clq, g, parms, &nmc->type, &cac) {
     return false;
   }
   check(cac.complete);
@@ -247,7 +247,7 @@ func make_magic_nopdestroy(cs *checkstate, clq *clqueue, size u32) instpair {
 
 func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, wc which_ctor, mc *magic_ctor) bool {
   cac cac_typeexpr;
-  if !check_and_compute_typeexpr(cs, clq, g, parms, &mc->type, &cac) {
+  if ! ~check_and_compute_typeexpr(cs, clq, g, parms, &mc->type, &cac) {
     return false;
   }
   check(cac.complete);
