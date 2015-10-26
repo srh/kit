@@ -332,7 +332,7 @@ func check_vardecl_ctor(cs *checkstate, clq *clqueue, ds *shray[te_vardecl], wc 
 
 func pack_rhs_info(cs *checkstate, clq *clqueue, p *te_instpack, rhs_type_out **cu_typeexpr, rhs_props_out **type_properties) bool {
   info *deftype_inst_info;
-  if !compute_pack_info(cs, clq, p, &info) {
+  if ! ~compute_pack_info(cs, clq, p, &info) {
     return false;
   }
   if case &Has(rhs_info deftype_inst_rhs_info) = &info->rhs {

@@ -872,14 +872,14 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *idy_genparms
   return {id, true};
 }
 
-func compute_pack_info(cs *checkstate, clq *clqueue, pack *te_instpack, out **deftype_inst_info) bool {
+func compute_pack_info(cs *checkstate, clq *clqueue, pack *te_instpack, out **deftype_inst_info) np {
   if !ensure_deftype_inst_checked(cs, clq, pack->ent_id, pack->inst_id) {
-    return false;
+    return Printed();
   }
   inst *deftype_inst = ref_deftype_inst(cs, pack->inst_id);
   if case &Computed(info deftype_inst_info) = &inst->info {
     *out = &info;
-    return true;
+    return NoFail;
   } else {
     ice(_u8("ensure_deftype_inst_checked did not compute properties."));
     return fake();
@@ -888,8 +888,8 @@ func compute_pack_info(cs *checkstate, clq *clqueue, pack *te_instpack, out **de
 
 func compute_pack_properties(cs *checkstate, clq *clqueue, pack *te_instpack, out *type_properties) np {
   info *deftype_inst_info;
-  if !compute_pack_info(cs, clq, pack, &info) {
-    return Printed();
+  if case Printed(pm) = compute_pack_info(cs, clq, pack, &info) {
+    return Printed(pm);
   }
   *out = info->props;
   return NoFail;
