@@ -54,7 +54,7 @@ func check_module(cs *checkstate, mod_name sym) bool {
       naccess_blocks size = count(&mod->access_blocks);
       for i size = 0; i < naccess_blocks; i = i + 1 {
         dti deftype_entry_id;
-        if !get_accessible_deftype(cs, get(&mod->access_blocks, i), &dti) {
+        if ! ~get_accessible_deftype(cs, get(&mod->access_blocks, i), &dti) {
           return false;
         }
       }
@@ -1488,7 +1488,7 @@ func is_public(a *ast_type_def_rhs) rhs_accessibility {
   }
 }
 
-func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_entry_id) bool {
+func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_entry_id) np {
   ent *access_entry = ref_access_entry(cs, aid);
   switch ent->ent_id {
     case NotComputed: {
@@ -1496,38 +1496,36 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
       switch ent->arity {
         case AccessArityNone: {
           id deftype_entry_id;
-          if ! ~match_deftype(cs, fake_ast_meta(), ent->name, None, &id) {
+          if case Printed(pm) = match_deftype(cs, fake_ast_meta(), ent->name, None, &id) {
             ent->ent_id = FailedComputation();
-            return false;
+            return Printed(pm);
           }
           *out = id;
           ent->ent_id = Computed(id);
-          return true;
+          return NoFail;
         }
         case AccessArityFinite(n u32): {
           params shray[te_typeexpr] = repeat(~n, TeUnknown(void));
           id deftype_entry_id;
-          if ! ~match_deftype(cs, fake_ast_meta(), ent->name, Has(&params), &id) {
+          if case Printed(pm) = match_deftype(cs, fake_ast_meta(), ent->name, Has(&params), &id) {
             ent->ent_id = FailedComputation();
-            return false;
+            return Printed(pm);
           }
           *out = id;
           ent->ent_id = Computed(id);
-          return true;
+          return NoFail;
         }
       }
     }
     case BeganComputing: {
-      ERR(_u8("Recursively computing access block reference"));
-      return false;
+      return ERR(_u8("Recursively computing access block reference"));
     }
     case FailedComputation: {
-      ERR(_u8("Repeated get_accessible_deftype error"));
-      return false;
+      return ERR(_u8("Repeated get_accessible_deftype error"));
     }
     case Computed(x deftype_entry_id): {
       *out = x;
-      return true;
+      return NoFail;
     }
   }
 }

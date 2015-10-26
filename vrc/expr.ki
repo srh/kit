@@ -1506,7 +1506,7 @@ func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool)
       for i size = 0; i < n; i = i + 1 {
         aid access_entry_id = get(&ds->accessible, i);
         dti deftype_entry_id;
-        if !get_accessible_deftype(ds->cs, aid, &dti) {
+        if ! ~get_accessible_deftype(ds->cs, aid, &dti) {
           return false;
         }
         if dti == id {
