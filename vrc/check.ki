@@ -377,18 +377,18 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
   }
 }
 
-func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
+func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) np {
   ent *def_entry = ref_def_entry(cs, ent_id);
   typrop *cu_typrop;
-  if ! ~ensure_def_inst_type_computed(cs, clq, ent, inst_id, &typrop) {
-    return false;
+  if case Printed(pm) = ensure_def_inst_type_computed(cs, clq, ent, inst_id, &typrop) {
+    return Printed(pm);
   }
   inst *def_inst = ref_inst(cs, inst_id);
   switch inst->rhs_status {
     case DidNotCheckRhs: {
       rw depth_rewinder;
-      if ! ~set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
-        return false;
+      if case Printed(pm) = set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms), &rw) {
+        return Printed(pm);
       }
       inst->rhs_status = BeganCheckingRhs(void);
       switch &inst->rhs {
@@ -401,29 +401,29 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         case &InstRhsExpr(rhs def_inst_rhs_expr): {
           info frame_info;
           if !check_expr(cs, clq, ent->accessible, &ent->generics, &inst->parms, &rhs.ec, &typrop->cu.~, ent->def_name, &info) {
-            return false;
+            return Printed();
           }
           annotate(&rhs.frame_info, move(&info));
         }
         case &InstRhsNonMagic(nonmag def_non_magic): {
           if !check_non_magic(cs, clq, &ent->generics, &inst->parms, &nonmag) {
-            return false;
+            return Printed();
           }
         }
         case &InstRhsMagic(mag def_magic): {
           if !check_magic(cs, clq, &ent->generics, &inst->parms, &mag) {
-            return false;
+            return Printed();
           }
         }
       }
       inst->rhs_status = FinishedCheckingRhs(void);
-      return true;
+      return NoFail;
     }
     case BeganCheckingRhs: {
-      return true;
+      return NoFail;
     }
     case FinishedCheckingRhs: {
-      return true;
+      return NoFail;
     }
   }
 }

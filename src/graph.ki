@@ -2593,7 +2593,7 @@ func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_
 }
 
 func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
-  if !ensure_def_inst_checked(cs, clq, ent_id, inst_id) {
+  if ! ~ensure_def_inst_checked(cs, clq, ent_id, inst_id) {
     return false;
   }
 
