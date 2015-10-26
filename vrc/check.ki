@@ -481,8 +481,8 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
     case &TeStruct(a te_struct): {
       computed_fields_complete bool;
       computed_fields array[te_vardecl];
-      if !help_check_fields(cs, clq, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
-        return Printed();
+      if case Printed(pm) = help_check_fields(cs, clq, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
+        return Printed(pm);
       }
       *out = {computed_fields_complete, TeStruct({freeze(&computed_fields)})};
       return NoFail;
@@ -490,8 +490,8 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
     case &TeEnum(a te_enum): {
       computed_constructors_complete bool;
       computed_constructors array[te_vardecl];
-      if !help_check_fields(cs, clq, g, parms, &a.constructors, &computed_constructors, &computed_constructors_complete) {
-        return Printed();
+      if case Printed(pm) = help_check_fields(cs, clq, g, parms, &a.constructors, &computed_constructors, &computed_constructors_complete) {
+        return Printed(pm);
       }
       *out = {computed_constructors_complete, TeEnum({freeze(&computed_constructors)})};
       return NoFail;
@@ -499,8 +499,8 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
     case &TeUnion(a te_union): {
       computed_fields_complete bool;
       computed_fields array[te_vardecl];
-      if !help_check_fields(cs, clq, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
-        return Printed();
+      if case Printed(pm) = help_check_fields(cs, clq, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
+        return Printed(pm);
       }
       *out = {computed_fields_complete, TeUnion({freeze(&computed_fields)})};
       return NoFail;
@@ -560,7 +560,7 @@ func fake_eval_arraytype_count(x *ast_expr, count_out *u32) np {
   }
 }
 
-func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *shray[te_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) bool {
+func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *shray[te_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) np {
   n size = count(a);
   all_complete bool = true;
   all_computed array[te_vardecl];
@@ -568,20 +568,19 @@ func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy
     decl *te_vardecl = ref(a, i);
     for j size = 0; j < i; j = j + 1 {
       if ref(a, j)->name.~ == decl->name.~ {
-        ERR(_u8("Duplicate field name "), lookup(cs->im, decl->name));
-        return false;
+        return ERR(_u8("Duplicate field name "), lookup(cs->im, decl->name));
       }
     }
     computed cac_typeexpr;
-    if ! ~check_and_compute_typeexpr(cs, clq, g, parms, &decl->type, &computed) {
-      return false;
+    if case Printed(pm) = check_and_compute_typeexpr(cs, clq, g, parms, &decl->type, &computed) {
+      return Printed(pm);
     }
     all_complete = all_complete & computed.complete;
     push(&all_computed, {decl->name, computed.te});
   }
   swap(computed_fields_out, &all_computed);
   *computed_fields_complete_out = all_complete;
-  return true;
+  return NoFail;
 }
 
 func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_genparms, a *te_name, computed_out *cu_typeexpr) np {
