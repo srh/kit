@@ -13,33 +13,33 @@ import u8ast;
 // This code does some typechecking.  See state.ki for types that maintain typechecking state.
 
 
-func finish_checking(cs *checkstate, clq *clqueue) bool {
+func finish_checking(cs *checkstate, clq *clqueue) np {
   check(cs->instantiation_depth == 0);
   while case Has(entry clqueue_entry) = popval(&clq->entries) {
     switch &entry {
       case &ClqDeftypeEntry(e clqueue_deftype_entry): {
         rw depth_rewinder;
-        if ! ~set_instantiation_depth(cs, e.instantiation_depth, &rw) {
-          return false;
+        if case Printed(pm) = set_instantiation_depth(cs, e.instantiation_depth, &rw) {
+          return Printed(pm);
         }
-        if ! ~ensure_deftype_inst_checked(cs, clq, e.ent_id, e.inst_id) {
-          return false;
+        if case Printed(pm) = ensure_deftype_inst_checked(cs, clq, e.ent_id, e.inst_id) {
+          return Printed(pm);
         }
       }
       case &ClqDefEntry(e clqueue_def_entry): {
         rw depth_rewinder;
-        if ! ~set_instantiation_depth(cs, e.instantiation_depth, &rw) {
-          return false;
+        if case Printed(pm) = set_instantiation_depth(cs, e.instantiation_depth, &rw) {
+          return Printed(pm);
         }
         // NOTE: It would be nice if checking/graphing, and evaling, were done in separate phases as much as possible.
         val_discard *st_value;
         if !ensure_def_inst_evaled(cs, clq, e.ent_id, e.inst_id, &val_discard) {
-          return false;
+          return Printed();
         }
       }
     }
   }
-  return true;
+  return NoFail;
 }
 
 func check_module(cs *checkstate, mod_name sym) bool {
@@ -736,7 +736,7 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
       parms idy_genparms = {mk_shray()};
       clq clqueue = mk(cs);
       discard_inst_id def_inst_id = enqueue_def_inst(cs, &clq, id, &parms);
-      return finish_checking(cs, &clq);
+      return ~ finish_checking(cs, &clq);
     }
     case &HasGenerics(ig): {
       discard *te_typeexpr;
@@ -1174,7 +1174,7 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
         parms idy_genparms = {mk_shray()};
         clq clqueue = mk(cs);
         discard_id deftype_inst_id = enqueue_deftype_inst(cs, &clq, id, &parms);
-        return finish_checking(cs, &clq);
+        return ~finish_checking(cs, &clq);
       }
       case &HasGenerics(ig): {
         // We declare success -- we check non-generic defs.
