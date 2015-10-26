@@ -512,8 +512,8 @@ func check_and_compute_typeexpr(cs *checkstate, clq *clqueue, g *ast_generics, p
   switch t {
     case &TeName(a te_name): {
       computed cu_typeexpr;
-      if !check_and_compute_name_type(cs, clq, g, parms, &a, &computed) {
-        return Printed();
+      if case Printed(pm) = check_and_compute_name_type(cs, clq, g, parms, &a, &computed) {
+        return Printed(pm);
       }
       *out = {true, computed.~};
       return NoFail;
@@ -642,22 +642,22 @@ func help_check_fields(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy
   return true;
 }
 
-func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, a *te_name, computed_out *cu_typeexpr) bool {
+func check_and_compute_name_type(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, a *te_name, computed_out *cu_typeexpr) np {
   // Generic parameters have already been checked.  (I hope so.)
   if lookup_plain_generic(g, parms, a->value, computed_out) {
-    return true;
+    return NoFail;
   }
 
   id deftype_entry_id;
   if !match_deftype(cs, fake_ast_meta(), a->value, None, &id) {
     // An error happened when looking up a deftype (multiple matches?).
-    return false;
+    return Printed();
   }
 
   np idy_genparms = blank_idyparms();
   inst_id deftype_inst_id = enqueue_deftype_inst(cs, clq, id, &np);
   *computed_out = ~ @[te_typeexpr]TeName({a->value, Has({id, inst_id})});
-  return true;
+  return NoFail;
 }
 
 func check_and_compute_typeexpr_shray(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, t *shray[te_typeexpr], computed_out *shray[te_typeexpr], computed_complete_out *bool) bool {
