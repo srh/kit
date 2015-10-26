@@ -7,7 +7,7 @@ import win_objfile;
 import objfile;
 
 func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u8]) bool {
-  if !check_module(cs, modulename) {
+  if ! ~check_module(cs, modulename) {
     return false;
   }
 
