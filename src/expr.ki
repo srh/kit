@@ -788,8 +788,8 @@ func check_expr_deref_field(es *framescope, pt *te_typeexpr, a *ast_deref_field,
   cu_param cu_typeexpr = ~ *param;
   fieldtype cu_typeexpr;
   cf_res check_field_result;
-  if !check_field(es, &cu_param, &a->fieldname, pt, &fieldtype, &cf_res) {
-    return Printed();
+  if case Printed(pm) = check_field(es, &cu_param, &a->fieldname, pt, &fieldtype, &cf_res) {
+    return Printed(pm);
   }
   props type_properties;
   if case Printed(pm) = compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
@@ -837,8 +837,8 @@ func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field,
   info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
   fieldtype cu_typeexpr;
   cf_res check_field_result;
-  if !check_field(es, &info->cu, &a->fieldname, pt, &fieldtype, &cf_res) {
-    return Printed();
+  if case Printed(pm) = check_field(es, &info->cu, &a->fieldname, pt, &fieldtype, &cf_res) {
+    return Printed(pm);
   }
   props type_properties;
   if case Printed(pm) = compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
@@ -1596,20 +1596,19 @@ defenum check_field_result {
   ConstantField u32;
 };
 
-func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *cu_typeexpr, res_out *check_field_result) bool {
+func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   fieldtype cu_typeexpr;
   res check_field_result;
   if !lookup_field(es, t, a, &fieldtype, &res) {
-    return false;
+    return Printed();
   }
   unified te_typeexpr;
   if !unify_types(pt, &fieldtype.~, &unified) {
-    ERR(_u8("field has wrong type."));
-    return false;
+    return ERR(_u8("field has wrong type."));
   }
   *fieldtype_out = fieldtype;
   *res_out = res;
-  return true;
+  return NoFail;
 }
 
 func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool) bool {
