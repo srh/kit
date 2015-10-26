@@ -223,8 +223,8 @@ func check_consume_expr(es *framescope, x *ast_expr, aft *nc[ast_expr_after_cons
   if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
     return Printed(pm);
   }
-  if !annotate_disposal_for_consume(es, x, aft) {
-    return Printed();
+  if case Printed(pm) = annotate_disposal_for_consume(es, x, aft) {
+    return Printed(pm);
   }
   return NoFail;
 }
@@ -233,8 +233,8 @@ func check_expr_retconsume(es *framescope, x *ast_expr_consume, pt *te_typeexpr,
   if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, &x->expr, pt) {
     return Printed(pm);
   }
-  if !annotate_disposal_for_consume(es, &x->expr, movable_cells, &x->after, moved_cell_ix_out) {
-    return Printed();
+  if case Printed(pm) = annotate_disposal_for_consume(es, &x->expr, movable_cells, &x->after, moved_cell_ix_out) {
+    return Printed(pm);
   }
   return NoFail;
 }
@@ -860,8 +860,8 @@ func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field,
     }
     case ConstantField(value u32): {
       after nc[ast_expr_after_discard] = NotComputed();
-      if !annotate_disposal_for_discard(es, oo(&a->lhs), &after) {
-        return Printed();
+      if case Printed(pm) = annotate_disposal_for_discard(es, oo(&a->lhs), &after) {
+        return Printed(pm);
       }
       annotate(&a->info, @[ast_local_field_info]ArrayLength({*unHas(&after), value}));
       lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
@@ -945,8 +945,8 @@ func check_expr_assignment(es *framescope, pt *te_typeexpr, a *ast_assignment, x
       if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), &lhs_info->cu.~) {
         return Printed(pm);
       }
-      if !annotate_disposal_for_assignment(es, desc.num, oo(&a->rhs), a) {
-        return Printed();
+      if case Printed(pm) = annotate_disposal_for_assignment(es, desc.num, oo(&a->rhs), a) {
+        return Printed(pm);
       }
       annotate_info(x, CompleteCheck(mk(lhs_info->lval, lhs_info->cu, lhs_info->cu_props)));
       return NoFail;
@@ -1011,14 +1011,14 @@ func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) bool {
   return behavior_to_desc(&props.destroy_behavior, out);
 }
 
-func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume]) bool {
+func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume]) np {
   movable_cells shray[opt[cell_num]];
   moved_cell_ix_discard opt[size];
   return annotate_disposal_for_consume(es, a, &movable_cells, after, &moved_cell_ix_discard);
 }
 
 // Annotates the disposal to "consume" the value -- i.e. what happens if it's a function param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or whatever).
-func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *shray[opt[cell_num]], after *nc[ast_expr_after_consume], moved_cell_ix_out *opt[size]) bool {
+func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *shray[opt[cell_num]], after *nc[ast_expr_after_consume], moved_cell_ix_out *opt[size]) np {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -1027,11 +1027,11 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
       } else {
         copy ctor_desc;
         if !get_copy_ctor(es->ds, &info->cu, &copy) {
-          return false;
+          return Printed();
         }
         destroy ctor_desc;
         if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
-          return false;
+          return Printed();
         }
         dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
         annotate(after,
@@ -1046,31 +1046,31 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
       if case Has(ix size) = find(movable_cells, Has(desc.num)) {
         move ctor_desc;
         if !get_move_ctor(es->ds, &info->cu, &move) {
-          return false;
+          return Printed();
         }
         annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]{move, dest, desc.num}), dest));
         *moved_cell_ix_out = Has(ix);
       } else {
         copy ctor_desc;
         if !get_copy_ctor(es->ds, &info->cu, &copy) {
-          return false;
+          return Printed();
         }
         annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]{copy, dest, desc.num}, desc.deadme)), dest));
         *moved_cell_ix_out = None;
       }
     }
   }
-  return true;
+  return NoFail;
 }
 
 // Annotates the disposal of an Expr statement's expr, or some other value we are done using.
-func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_discard]) bool {
+func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_discard]) np {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       destroy ctor_desc;
       if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
-        return false;
+        return Printed();
       }
       annotate(after, mk_after_discard(@[destroy_action]{destroy, desc.whole_num}));
     }
@@ -1083,14 +1083,14 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
       }
     }
   }
-  return true;
+  return NoFail;
 }
 
 
 // Annotates the disposal for a value we'll use but then discard.
-func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume], later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) bool {
-  if !annotate_disposal_for_consume(es, a, after) {
-    return false;
+func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume], later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) np {
+  if case Printed(pm) = annotate_disposal_for_consume(es, a, after) {
+    return Printed(pm);
   }
 
   // TODO: Dedup this code or stop generating all cells at check-time.
@@ -1098,7 +1098,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
     info *ast_expr_complete_info = expr_complete_info(a);
     destroy ctor_desc;
     if !get_destroy_ctor(es->ds, &info->cu, &destroy) {
-      return false;
+      return Printed();
     }
     annotate(&later->action, {destroy, result_cell(unHas(after))});
   }
@@ -1107,11 +1107,11 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
     info *ast_expr_complete_info = expr_complete_info(a);
     destroy ctor_desc;
     if !get_destroy_ctor(es->ds, &info->cu, &destroy) {
-      return false;
+      return Printed();
     }
     annotate(&p->action, {destroy, result_cell(unHas(after))});
   }
-  return true;
+  return NoFail;
 }
 
 func make_comparecells(es *framescope, dest cell_num) instpair {
@@ -1128,18 +1128,18 @@ func make_comparecells(es *framescope, dest cell_num) instpair {
   }
 }
 
-func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr, assignment *ast_assignment) bool {
+func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr, assignment *ast_assignment) np {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       target_destroy ctor_desc;
       if !get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
-        return false;
+        return Printed();
       }
       if whole_temporary(&desc) {
         move ctor_desc;
         if !get_move_ctor(es->ds, &ref_cell(es, dest)->type, &move) {
-          return false;
+          return Printed();
         }
         annotate(&assignment->info,
           @[ast_assignment_info]
@@ -1149,11 +1149,11 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
         copy ctor_desc;
         if !get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
-          return false;
+          return Printed();
         }
         destroy ctor_desc;
         if !get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
-          return false;
+          return Printed();
         }
 
         annotate(&assignment->info,
@@ -1170,11 +1170,11 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
       } else {
         target_destroy ctor_desc;
         if !get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
-          return false;
+          return Printed();
         }
         copy ctor_desc;
         if !get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
-          return false;
+          return Printed();
         }
         do_conditional bool;
         switch &target_destroy {
@@ -1205,7 +1205,7 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
       }
     }
   }
-  return true;
+  return NoFail;
 }
 
 func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *te_typeexpr, x *ast_expr) np {
@@ -1939,8 +1939,8 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
     return Printed();
   }
 
-  if !annotate_disposal_for_consume(es, &funec->expr, &funec->after) {
-    return Printed();
+  if case Printed(pm) = annotate_disposal_for_consume(es, &funec->expr, &funec->after) {
+    return Printed(pm);
   }
 
   return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(&oo(&a->fun)->expr)->~);
@@ -2065,8 +2065,8 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void), field_lifetime(fake_lifetime(es->cs))});
     ie_info_after nc[ast_expr_after_consume] = NotComputed();
     lhs_later ast_later_discard_info = mk_later();
-    if !annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later, None) {
-      return Printed();
+    if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later, None) {
+      return Printed(pm);
     }
 
     annotate(&a->info, {Has({*unHas(&ie_info_after), lhs_later}), rhs_later});

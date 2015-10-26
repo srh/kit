@@ -164,7 +164,7 @@ func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) bo
   if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
     return false;
   }
-  if !annotate_disposal_for_discard(es, &x->expr, &x->after) {
+  if case Printed(pm) = annotate_disposal_for_discard(es, &x->expr, &x->after) {
     return false;
   }
   return true;
@@ -178,7 +178,7 @@ func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te
   if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
     return false;
   }
-  if !annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later, later2) {
+  if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later, later2) {
     return false;
   }
   return true;
