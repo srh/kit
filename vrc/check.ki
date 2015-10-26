@@ -60,8 +60,8 @@ func check_module(cs *checkstate, mod_name sym) np {
 
       ndefs size = count(&mod->defs);
       for i size = 0; i < ndefs; i = i + 1 {
-        if !ensure_def_checked(cs, get(&mod->defs, i)) {
-          return Printed();
+        if case Printed(pm) = ensure_def_checked(cs, get(&mod->defs, i)) {
+          return Printed(pm);
         }
       }
 
@@ -729,22 +729,22 @@ func lookup_generic(g *ast_generics, parms *idy_genparms, name sym, out *cu_type
   return false;
 }
 
-func ensure_def_checked(cs *checkstate, id def_entry_id) bool {
+func ensure_def_checked(cs *checkstate, id def_entry_id) np {
   ent *def_entry = ref_def_entry(cs, id);
   switch &ent->generics {
     case &NoGenerics: {
       parms idy_genparms = {mk_shray()};
       clq clqueue = mk(cs);
       discard_inst_id def_inst_id = enqueue_def_inst(cs, &clq, id, &parms);
-      return ~ finish_checking(cs, &clq);
+      return finish_checking(cs, &clq);
     }
     case &HasGenerics(ig): {
       discard *te_typeexpr;
-      if ! ~def_converted_typeexpr(cs, ent, &discard) {
-        return false;
+      if case Printed(pm) = def_converted_typeexpr(cs, ent, &discard) {
+        return Printed(pm);
       }
       // We declare success -- we check non-generic defs.
-      return true;
+      return NoFail;
     }
   }
 }
