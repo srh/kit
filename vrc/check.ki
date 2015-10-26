@@ -1082,19 +1082,18 @@ func lambda_declared_type(im *identmap, a *ast_lambda) ast_typeexpr {
   return App({embox(@[ast_typeexpr]Name({fake_ast_meta(), im->cym.fnsym})), type_params});
 }
 
-func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) bool {
+func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) np {
   if case &Has(s ast_typeexpr) = &a->syntactic_typeexpr {
     *out = s;
-    return true;
+    return NoFail;
   } else {
     switch &a->rhs.expr.u {
       case &Lambda(b ast_lambda): {
         *out = lambda_declared_type(im, &b);
-        return true;
+        return NoFail;
       }
       default: {
-        ERR(_u8("Def does not have immediately conceivable typeexpr."));
-        return false;
+        return ERR(_u8("Def does not have immediately conceivable typeexpr."));
       }
     }
   }
@@ -1334,7 +1333,7 @@ func process_toplevels(cs *checkstate,
       }
       case &Def(a ast_def): {
         quick_te ast_typeexpr;
-        if !quick_typeexpr(cs->im, &a, &quick_te) {
+        if ! ~quick_typeexpr(cs->im, &a, &quick_te) {
           return false;
         }
         if !check_generics_unique(cs, &a.generics) {
