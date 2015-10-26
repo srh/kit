@@ -1283,8 +1283,8 @@ func process_module(cs *checkstate, mod_name sym) np[module_id] {
     case NoFail(id module_id): {
       mod *module = ref_module(cs, id);
       if mod->process_state == Unprocessed(void) {
-         if !process_module_toplevels(cs, mod) {
-           return Printed();
+         if case Printed(pm) = process_module_toplevels(cs, mod) {
+           return Printed(pm);
          }
       }
       return NoFail(id);
@@ -1292,15 +1292,15 @@ func process_module(cs *checkstate, mod_name sym) np[module_id] {
   }
 }
 
-func process_module_toplevels(cs *checkstate, mod *module) bool {
+func process_module_toplevels(cs *checkstate, mod *module) np {
   check_mutate(&mod->process_state, Unprocessed(void), Processing(void));
   // We start the module outside of any access blocks, so the scope is empty, of course.
   access_scope array[access_entry_id];
-  if ! ~process_toplevels(cs, access_scope, mod, &mod->file.toplevels) {
-    return false;
+  if case Printed(pm) = process_toplevels(cs, access_scope, mod, &mod->file.toplevels) {
+    return Printed(pm);
   }
   check_mutate(&mod->process_state, Processing(void), DoneProcessing(void));
-  return true;
+  return NoFail;
 }
 
 func add_def_entry(cs *checkstate,
