@@ -68,8 +68,8 @@ func check_module(cs *checkstate, mod_name sym) np {
 
       ndeftypes size = count(&mod->deftypes);
       for i size = 0; i < ndeftypes; i = i + 1 {
-        if !ensure_deftype_checked(cs, get(&mod->deftypes, i)) {
-          return Printed();
+        if case Printed(pm) = ensure_deftype_checked(cs, get(&mod->deftypes, i)) {
+          return Printed(pm);
         }
       }
 
@@ -1245,11 +1245,11 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
   }
 }
 
-func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
+func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) np {
   ent *deftype_entry = ref_deftype_entry(cs, id);
   discard *te_typeexpr;
-  if ! ~deftype_converted_rhs(cs, ent, &discard) {
-    return false;
+  if case Printed(pm) = deftype_converted_rhs(cs, ent, &discard) {
+    return Printed(pm);
   }
   if case &Has(np deftype_nonprim) = &ent->nonprim {
     switch &np.tl->generics {
@@ -1257,16 +1257,16 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) bool {
         parms idy_genparms = blank_idyparms();
         clq clqueue = mk(cs);
         discard_id deftype_inst_id = enqueue_deftype_inst(cs, &clq, id, &parms);
-        return ~finish_checking(cs, &clq);
+        return finish_checking(cs, &clq);
       }
       case &HasGenerics(ig): {
         // We declare success -- we check non-generic defs.
-        return true;
+        return NoFail;
       }
     }
   } else {
     // Primitive types are pre-checked.
-    return true;
+    return NoFail;
   }
 }
 
