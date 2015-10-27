@@ -1681,6 +1681,7 @@ func successful(res structural_rhs_result) bool {
   }
 }
 
+// TODO: Check every use of complete_structural_rhs -- which should be recursive_structural_rhs?
 func recursive_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typeexpr) np {
   prev *te_typeexpr = t;
   for ;; {
