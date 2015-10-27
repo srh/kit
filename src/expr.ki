@@ -387,8 +387,8 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     check(cac_ctor_type.complete);
 
     ip instpair;
-    if !lookup_or_make_enum_constructor_def(ds, &et, &cac_ctor_type.te, decl_index, &ip) {
-      return Printed();
+    if case Printed(pm) = lookup_or_make_enum_constructor_def(ds, &et, &cac_ctor_type.te, decl_index, &ip) {
+      return Printed(pm);
     }
 
     *res_out = MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index), ip});
@@ -399,7 +399,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   }
 }
 
-func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *te_typeexpr, decl_index size, out *instpair) bool {
+func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *te_typeexpr, decl_index size, out *instpair) np {
   defname_u8 array[u8] = _u8("$magic_enum_ctor_");
   build_u8str(void, &defname_u8, &decl_index);
   defname sym = intern(ds->im, from_u8(defname_u8));
@@ -407,8 +407,8 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
   nogp genparms = NoParms(void);
   if true {
     res match_def_res;
-    if ! ~match_def(ds->cs, defname, &nogp, ctor_type, &res) {
-      return false;
+    if case Printed(pm) = match_def(ds->cs, defname, &nogp, ctor_type, &res) {
+      return Printed(pm);
     }
     switch &res {
       case &NoMatch: {
@@ -423,7 +423,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
           ice(_u8("lookup_or_make_enum_constructor_def make_inst failed after match"));
         }
         *out = {m.ent, inst_id};
-        return true;
+        return NoFail;
       }
     }
   }
@@ -431,8 +431,8 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
   // There was no match -- so we make the def ourselves.
   rhs_type *te_typeexpr = &ref(&et->constructors, decl_index)->type;
   rhs_props type_properties;
-  if ! ~compute_complete_type_properties(ds->cs, ds->clq, rhs_type, &rhs_props) {
-    return false;
+  if case Printed(pm) = compute_complete_type_properties(ds->cs, ds->clq, rhs_type, &rhs_props) {
+    return Printed(pm);
   }
 
   meco magic_enum_construct_op;
@@ -440,11 +440,11 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
     case &DerivedMethodAbsent: {
       copy_desc ctor_desc;
       if case Printed(pm) = behavior_to_desc(&rhs_props.copy_behavior, &copy_desc) {
-        return false;
+        return Printed(pm);
       }
       destroy_desc ctor_desc;
       if case Printed(pm) = behavior_to_desc(&rhs_props.destroy_behavior, &destroy_desc) {
-        return false;
+        return Printed(pm);
       }
       meco = EnumConstructCopyDestroy({copy_desc, destroy_desc});
     }
@@ -461,8 +461,8 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
 
   enum_type cu_typeexpr = ~TeEnum(*et);
   enum_type_props type_properties;
-  if ! ~compute_type_properties(ds->cs, ds->clq, &enum_type, &enum_type_props) {
-    return false;
+  if case Printed(pm) = compute_type_properties(ds->cs, ds->clq, &enum_type, &enum_type_props) {
+    return Printed(pm);
   }
 
   mec magic_enum_construct = {enum_type, enum_type_props, decl_index, rhs_props, meco};
@@ -474,7 +474,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
   }
 
   *out = {ent, inst_id};
-  return true;
+  return NoFail;
 }
 
 deftype es_global_match struct {
