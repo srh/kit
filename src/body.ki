@@ -98,40 +98,40 @@ func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *en
   return NoFail;
 }
 
-func make_init_action(es *framescope, vn var_number, out *init_action) bool {
+func make_init_action(es *framescope, vn var_number, out *init_action) np {
   vi *var_info = ref_var(es, vn);
   init ctor_desc;
   if case Printed(pm) = get_init_ctor(es->ds, &vi->type, &init) {
-    return false;
+    return Printed(pm);
   }
   ia init_action = {init, vi->cell};
   *out = ia;
-  return true;
+  return NoFail;
 }
 
-func make_initializations(es *framescope, vns *array[var_number], out *array[init_action]) bool {
+func make_initializations(es *framescope, vns *array[var_number], out *array[init_action]) np {
   initializations array[init_action];
   n size = count(vns);
   for i size = 0; i < n; i = i + 1 {
     ia init_action;
-    if !make_init_action(es, get(vns, i), &ia) {
-      return false;
+    if case Printed(pm) = make_init_action(es, get(vns, i), &ia) {
+      return Printed(pm);
     }
     push(&initializations, ia);
   }
   *out = initializations;
-  return true;
+  return NoFail;
 }
 
-func make_destroy_action(es *framescope, vn var_number, out *destroy_action) bool {
+func make_destroy_action(es *framescope, vn var_number, out *destroy_action) np {
   vi *var_info = ref_var(es, vn);
   destroy ctor_desc;
   if case Printed(pm) = get_destroy_ctor(es->ds, &vi->type, &destroy) {
-    return false;
+    return Printed(pm);
   }
   da destroy_action = {destroy, vi->cell};
   *out = da;
-  return true;
+  return NoFail;
 }
 
 defenum var_destruction {
@@ -148,8 +148,8 @@ func make_destructions(es *framescope, vns *array[var_number], out *array[var_de
     switch vi->binding {
     case VarSelfContained:
       da destroy_action;
-      if !make_destroy_action(es, get(vns, i), &da) {
-        return Printed();
+      if case Printed(pm) = make_destroy_action(es, get(vns, i), &da) {
+        return Printed(pm);
       }
       push(&destructions, VarSelfContainedDestruction(da));
     case VarOverlay:
@@ -919,8 +919,8 @@ func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number],
   }
 
   initializations array[init_action];
-  if !make_initializations(&bs->es, &construct, &initializations) {
-    return Printed();
+  if case Printed(pm) = make_initializations(&bs->es, &construct, &initializations) {
+    return Printed(pm);
   }
 
   swap(destructions_out, &destructions);
