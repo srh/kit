@@ -1465,8 +1465,8 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   if case Printed(pm) = check_body(bs, None, &a->body.bb, &ee) {
     return Printed(pm);
   }
-  if !finish_lambda_body(bs, ee) {
-    return Printed();
+  if case Printed(pm) = finish_lambda_body(bs, ee) {
+    return Printed(pm);
   }
 
   destructions array[var_destruction];

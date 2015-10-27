@@ -311,7 +311,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
     case &Break(b ast_break_statement):
       if case Has(bp *breakpack) = obp {
         destructions array[var_destruction];
-        if !compute_destruct(bs, vars_in_scope(&bs->es), &bp->break_in_scope, &destructions) {
+        if ! ~compute_destruct(bs, vars_in_scope(&bs->es), &bp->break_in_scope, &destructions) {
           return false;
         }
         annotate(&b.info, {destructions});
@@ -325,7 +325,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
     case &Continue(b ast_continue_statement):
       if case Has(bp *breakpack) = obp {
         destructions array[var_destruction];
-        if !compute_destruct(bs, vars_in_scope(&bs->es), &bp->continue_in_scope, &destructions) {
+        if ! ~compute_destruct(bs, vars_in_scope(&bs->es), &bp->continue_in_scope, &destructions) {
           return false;
         }
         annotate(&b.info, {destructions});
@@ -854,16 +854,15 @@ func type_is_void(cs *checkstate, t *cu_typeexpr) bool {
   return unify_types(&void_type, &t->~, &unified);
 }
 
-func finish_lambda_body(bs *bodystate, ee entryexit) bool {
-  if !connect_gotos(bs) {
-    return false;
+func finish_lambda_body(bs *bodystate, ee entryexit) np {
+  if case Printed(pm) = connect_gotos(bs) {
+    return Printed(pm);
   }
   mark_reachable(bs, ee.entry);
   if ref(&bs->statements, ee.exit.~)->marked_reachable && !type_is_void(bs->cs, bs->return_type) {
-    ERR(_u8("Body can exit without return"));
-    return false;
+    return ERR(_u8("Body can exit without return"));
   }
-  return true;
+  return NoFail;
 }
 
 func mark_reachable(bs *bodystate, entry statement_num) void {
@@ -878,18 +877,18 @@ func mark_reachable(bs *bodystate, entry statement_num) void {
   }
 }
 
-func compute_destruct(bs *bodystate, goto_in_scope array[var_number], target_in_scope *array[var_number], out *array[var_destruction]) bool {
+func compute_destruct(bs *bodystate, goto_in_scope array[var_number], target_in_scope *array[var_number], out *array[var_destruction]) np {
   destructions array[var_destruction];
   initializations array[init_action];
-  if !compute_destruct_construct(bs, &goto_in_scope, target_in_scope, &destructions, &initializations) {
-    return false;
+  if case Printed(pm) = compute_destruct_construct(bs, &goto_in_scope, target_in_scope, &destructions, &initializations) {
+    return Printed(pm);
   }
   check(empty(&initializations));
   swap(out, &destructions);
-  return true;
+  return NoFail;
 }
 
-func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number], target_in_scope *array[var_number], destructions_out *array[var_destruction], initializations_out *array[init_action]) bool {
+func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number], target_in_scope *array[var_number], destructions_out *array[var_destruction], initializations_out *array[init_action]) np {
   destruct array[var_number];
   construct array[var_number];
   var_difference(goto_in_scope, target_in_scope, &destruct, &construct);
@@ -899,38 +898,37 @@ func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number],
     vn var_number = get(&construct, i);
     vi *var_info = ref_var(&bs->es, vn);
     if case VarOverlay = vi->binding {
-      ERR(_u8("goto enters non-initiannlizable variable scope"));
-      return false;
+      return ERR(_u8("goto enters non-initiannlizable variable scope"));
     }
-    if ! ~es_note_var_initter(&bs->es, vn) {
-      return false;
+    if case Printed(pm) = es_note_var_initter(&bs->es, vn) {
+      return Printed(pm);
     }
   }
 
   ndestruct size = count(&destruct);
   for i size = 0; i < ndestruct; i = i + 1 {
     vn var_number = get(&destruct, i);
-    if ! ~es_note_var_destroyer(&bs->es, vn) {
-      return false;
+    if case Printed(pm) = es_note_var_destroyer(&bs->es, vn) {
+      return Printed(pm);
     }
   }
 
   destructions array[var_destruction];
-  if ! ~make_destructions(&bs->es, &destruct, &destructions) {
-    return false;
+  if case Printed(pm) = make_destructions(&bs->es, &destruct, &destructions) {
+    return Printed(pm);
   }
 
   initializations array[init_action];
   if !make_initializations(&bs->es, &construct, &initializations) {
-    return false;
+    return Printed();
   }
 
   swap(destructions_out, &destructions);
   swap(initializations_out, &initializations);
-  return true;
+  return NoFail;
 }
 
-func connect_gotos(bs *bodystate) bool {
+func connect_gotos(bs *bodystate) np {
   ngotos size = count(&bs->gotos);
   for i size = 0; i < ngotos; i = i + 1 {
     g *goto_info = ref(&bs->gotos, i);
@@ -938,8 +936,8 @@ func connect_gotos(bs *bodystate) bool {
       l *label_info = ref(&bs->labels, j);
       destructions array[var_destruction];
       initializations array[init_action];
-      if !compute_destruct_construct(bs, &g->in_scope, &l->in_scope, &destructions, &initializations) {
-        return false;
+      if case Printed(pm) = compute_destruct_construct(bs, &g->in_scope, &l->in_scope, &destructions, &initializations) {
+        return Printed(pm);
       }
 
       l->hit = true;
@@ -947,8 +945,7 @@ func connect_gotos(bs *bodystate) bool {
 
       annotate(&g->st->info, {unHas(&l->st->info)->label_number, destructions, initializations});
     } else {
-      ERR(_u8("no label named '"), lookup(bs->im, g->label_name), _u8("'"));
-      return false;
+      return ERR(_u8("no label named '"), lookup(bs->im, g->label_name), _u8("'"));
     }
   }
 
@@ -956,12 +953,11 @@ func connect_gotos(bs *bodystate) bool {
   for i size = 0; i < nlabels; i = i + 1 {
     l *label_info = ref(&bs->labels, i);
     if !l->hit {
-      ERR(_u8("no gotos for label named '"), lookup(bs->im, l->label_name), _u8("'"));
-      return false;
+      return ERR(_u8("no gotos for label named '"), lookup(bs->im, l->label_name), _u8("'"));
     }
   }
 
-  return true;
+  return NoFail;
 }
 
 // g and l are in increasing order.
