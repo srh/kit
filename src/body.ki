@@ -74,7 +74,7 @@ func connect_statements(bs *bodystate, from statement_num, to statement_num) voi
 // Returns the fall-through entry node and the fall-through exit node of a body or statement.  A body or statement might not have a fall-through exit, if e.g. it has a return statement.
 deftype entryexit struct { entry statement_num; exit statement_num; };
 
-func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *entryexit) bool {
+func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *entryexit) np {
   nstatements size = count(&a->statements);
   entry statement_num = add_statement(bs, None);
   exit statement_num = entry;
@@ -83,19 +83,19 @@ func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *en
   for i size = 0; i < nstatements; i = i + 1 {
     s *ast_statement = ref(&a->statements, i);
     ee entryexit;
-    if !check_statement(bs, &vp, obp, s, &ee) {
-      return false;
+    if case Printed(pm) = check_statement(bs, &vp, obp, s, &ee) {
+      return Printed(pm);
     }
     connect_statements(bs, exit, ee.entry);
     exit = ee.exit;
   }
   destructions array[var_destruction];
-  if !make_destructions(&bs->es, read_nums(&vp), &destructions) {
-    return false;
+  if case Printed(pm) = make_destructions(&bs->es, read_nums(&vp), &destructions) {
+    return Printed(pm);
   }
   annotate(&a->info, {destructions});
   *ee_out = {entry, exit};
-  return true;
+  return NoFail;
 }
 
 func make_init_action(es *framescope, vn var_number, out *init_action) bool {
@@ -139,7 +139,7 @@ defenum var_destruction {
   VarVirtualCellDead cell_num;
 };
 
-func make_destructions(es *framescope, vns *array[var_number], out *array[var_destruction]) bool {
+func make_destructions(es *framescope, vns *array[var_number], out *array[var_destruction]) np {
   destructions array[var_destruction];
   n size = count(vns);
   for i size = 0; i < n; i = i + 1 {
@@ -149,7 +149,7 @@ func make_destructions(es *framescope, vns *array[var_number], out *array[var_de
     case VarSelfContained:
       da destroy_action;
       if !make_destroy_action(es, get(vns, i), &da) {
-        return false;
+        return Printed();
       }
       push(&destructions, VarSelfContainedDestruction(da));
     case VarOverlay:
@@ -157,7 +157,7 @@ func make_destructions(es *framescope, vns *array[var_number], out *array[var_de
     }
   }
   swap(out, &destructions);
-  return true;
+  return NoFail;
 }
 
 func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) bool {
@@ -192,12 +192,11 @@ deftype breakpack struct {
   continue_in_scope array[var_number];
 };
 
-func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) bool {
+func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) np {
   if !help_check_statement(bs, vp, obp, s, ee_out) {
-    MERR(bs->cs, s->meta, _u8(" in this statement"));
-    return false;
+    return MERR(bs->cs, s->meta, _u8(" in this statement"));
   }
-  return true;
+  return NoFail;
 }
 
 func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) bool {
@@ -236,7 +235,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
         return false;
       }
       body_ee entryexit;
-      if !check_body(bs, obp, &b.body, &body_ee) {
+      if ! ~check_body(bs, obp, &b.body, &body_ee) {
         return false;
       }
       tailnum statement_num = add_statement(bs, None);
@@ -256,12 +255,12 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
         return false;
       }
       then_ee entryexit;
-      if !check_body(bs, obp, &b.thenbody, &then_ee) {
+      if ! ~check_body(bs, obp, &b.thenbody, &then_ee) {
         return false;
       }
       descope_vars(&cond_vp);
       else_ee entryexit;
-      if !check_body(bs, obp, &b.elsebody, &else_ee) {
+      if ! ~check_body(bs, obp, &b.elsebody, &else_ee) {
         return false;
       }
       tailnum statement_num = add_statement(bs, None);
@@ -284,7 +283,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
         return false;
       }
       body_ee entryexit;
-      if !check_body(bs, Has(&bp), &b.body, &body_ee) {
+      if ! ~check_body(bs, Has(&bp), &b.body, &body_ee) {
         return false;
       }
       connect_statements(bs, num, body_ee.entry);
@@ -504,7 +503,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
           annotate(&patt.cp_info, {ovn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
 
           body_ee entryexit;
-          if !check_body(bs, obp, &cas->body, &body_ee) {
+          if ! ~check_body(bs, obp, &cas->body, &body_ee) {
             return false;
           }
           connect_statements(bs, num, body_ee.entry);
@@ -512,7 +511,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
         }
         case &Default: {
           body_ee entryexit;
-          if !check_body(bs, obp, &cas->body, &body_ee) {
+          if ! ~check_body(bs, obp, &cas->body, &body_ee) {
             return false;
           }
           connect_statements(bs, num, body_ee.entry);
@@ -548,7 +547,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   loopnum statement_num = add_statement(bs, None);
   if case &Has(initter box[ast_statement]) = &a->initializer {
     initter_ee entryexit;
-    if !check_statement(bs, &initter_vp, None, oo(&initter), &initter_ee) {
+    if ! ~check_statement(bs, &initter_vp, None, oo(&initter), &initter_ee) {
       return false;
     }
     connect_statements(bs, num, initter_ee.entry);
@@ -582,13 +581,13 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   bp breakpack = {exitnum, break_in_scope, loopnum, loop_in_scope};
 
   body_ee entryexit;
-  if !check_body(bs, Has(&bp), &a->body, &body_ee) {
+  if ! ~check_body(bs, Has(&bp), &a->body, &body_ee) {
     return false;
   }
   connect_statements(bs, loopnum, body_ee.entry);
   connect_statements(bs, body_ee.exit, loopnum);
   initter_destructions array[var_destruction];
-  if !make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions) {
+  if ! ~make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions) {
     return false;
   }
   annotate(&a->info, {initter_destructions});
@@ -711,7 +710,7 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
     shifterase_elem(&vars, ix);
   }
   destructions array[var_destruction];
-  if !make_destructions(&bs->es, &vars, &destructions) {
+  if ! ~make_destructions(&bs->es, &vars, &destructions) {
     return false;
   }
   annotate(&a->info, {destructions});
@@ -917,7 +916,7 @@ func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number],
   }
 
   destructions array[var_destruction];
-  if !make_destructions(&bs->es, &destruct, &destructions) {
+  if ! ~make_destructions(&bs->es, &destruct, &destructions) {
     return false;
   }
 

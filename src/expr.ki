@@ -1462,16 +1462,16 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   }
 
   ee entryexit;
-  if !check_body(bs, None, &a->body.bb, &ee) {
-    return Printed();
+  if case Printed(pm) = check_body(bs, None, &a->body.bb, &ee) {
+    return Printed(pm);
   }
   if !finish_lambda_body(bs, ee) {
     return Printed();
   }
 
   destructions array[var_destruction];
-  if !make_destructions(&bs->es, read_nums(&vp), &destructions) {
-    return Printed();
+  if case Printed(pm) = make_destructions(&bs->es, read_nums(&vp), &destructions) {
+    return Printed(pm);
   }
 
   return_type *te_typeexpr = ref(computed_params, nargs);
