@@ -1314,8 +1314,12 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     ice(_u8("check_expr_strinit has non-computed pt"));
   }
   structural_type *te_typeexpr;
-  if case Printed(pm) = recursive_structural_rhs(es->ds, pt, &structural_type) {
+  switch recursive_structural_rhs(es->ds, pt, &structural_type) {
+  case Error(pm):
     return Printed(pm);
+  case Success: { }
+  case NoAccessibleStructuralRhs:
+    return ERR(_u8("Strinit for inaccessible or non-structural type"));
   }
 
   switch structural_type {
@@ -1681,22 +1685,29 @@ func successful(res structural_rhs_result) bool {
   }
 }
 
-// TODO: Check every use of complete_structural_rhs -- which should be recursive_structural_rhs?
-func recursive_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typeexpr) np {
+defenum recursive_structural_rhs_result {
+  // True if the printed error message include location info.
+  Error bool;
+  Success void;
+  // Some callers turn this into an error message, others don't.
+  NoAccessibleStructuralRhs void;
+};
+
+func recursive_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typeexpr) recursive_structural_rhs_result {
   prev *te_typeexpr = t;
   for ;; {
     stru *te_typeexpr;
     res var = complete_structural_rhs(ds, prev, &stru);
     switch res {
     case Error(pm):
-      return Printed(pm);
+      return Error(pm);
     case SuccessHasRhs:
       prev = stru;
     case SuccessNoRhs:
       *rhs_type_out = stru;
-      return NoFail;
+      return Success;
     case NoAccessibleStructuralRhs:
-      return ERR(_u8("Recursive structural rhs hit an inaccessible or non-structural type"));
+      return NoAccessibleStructuralRhs;
     }
   }
 }
