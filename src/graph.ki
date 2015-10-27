@@ -2592,9 +2592,9 @@ func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_
   return add_fn_body(cs, {informal_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells, InlineMust(void), NotComputed})});
 }
 
-func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) bool {
-  if ! ~ensure_def_inst_checked(cs, clq, ent_id, inst_id) {
-    return false;
+func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) np {
+  if case Printed(pm) = ensure_def_inst_checked(cs, clq, ent_id, inst_id) {
+    return Printed(pm);
   }
 
   ent *def_entry = ref_def_entry(cs, ent_id);
@@ -2608,14 +2608,14 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           id fn_body_id = add_prim_fn_body(cs, clq, ent->def_name, &inst_typrop->cu, op);
           frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
           inst->graph = Computed(Has(frg));
-          return true;
+          return NoFail;
         }
         case &InstRhsExtern: {
           // TODO: What if an extern def isn't a function?
           id fn_body_id = add_fn_body(cs, {ent->def_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
           frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
           inst->graph = Computed(Has(frg));
-          return true;
+          return NoFail;
         }
         case &InstRhsExpr(dire def_inst_rhs_expr): {
           info *frame_info;
@@ -2628,10 +2628,10 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           gn gr_num;
           if !gr_expr_consume(clq, &gr, &dire.ec, &gn) {
             inst->graph = FailedComputation();
-            return false;
+            return Printed();
           }
           inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, result_cell(&dire.ec)}));
-          return true;
+          return NoFail;
         }
 
         case &InstRhsNonMagic(nonmag def_non_magic): {
@@ -2640,12 +2640,12 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
             info *non_magic_ctor_info = unHas(&wnmc.nmc.info);
             frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstDef(info->ip));
             inst->graph = Computed(Has(frg));
-            return true;
+            return NoFail;
           case &NonMagicProp(nmp non_magic_prop):
             info u32 = *unHas(&nmp.info);
             frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, @[gr_const]ConstInt(~info));
             inst->graph = Computed(Has(frg));
-            return true;
+            return NoFail;
           }
         }
 
@@ -2658,14 +2658,14 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
             arg_cells array[cell_num];
             inline should_inline;
             if !gr_magic(cs, clq, &mag, &body_gr, &body_gn, &return_cell, &arg_cells, &inline) {
-              return false;
+              return Printed();
             }
             id = add_fn_body(cs, {ent->def_name, NotComputed@[sti](), NotComputed@[u32](), @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells, inline, NotComputed})});
           }
 
           frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
           inst->graph = Computed(Has(frg));
-          return true;
+          return NoFail;
         }
       }
     }
@@ -2674,11 +2674,10 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
       return fake();
     }
     case &FailedComputation: {
-      ERR(_u8("ensure_def_inst_graphed fails again on same def"));
-      return false;
+      return ERR(_u8("ensure_def_inst_graphed fails again on same def"));
     }
     case &Computed(odr opt[frame_regraphed]): {
-      return true;
+      return NoFail;
     }
   }
 }
