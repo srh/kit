@@ -135,27 +135,26 @@ func do_destroy(vp *varpopper) void {
   vp->es = null;
 }
 
-func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], lifetime cu_typeexpr, computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) bool {
+func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], lifetime cu_typeexpr, computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) np {
   osymname opt[sym];
   if case Has(ident *ast_ident) = name {
     osymname = Has(ident->value);
     if case Has(num var_number) = es_find_current_local(es, ident->value) {
-      ERR(_u8("Local variable '"), lookup(es->im, ident->value), _u8("' shadows another"));
-      return false;
+      return ERR(_u8("Local variable '"), lookup(es->im, ident->value), _u8("' shadows another"));
     }
   } else {
     osymname = None;
   }
   props type_properties;
-  if ! ~compute_type_properties(es->cs, es->clq, computed_type, &props) {
-    return false;
+  if case Printed(pm) = compute_type_properties(es->cs, es->clq, computed_type, &props) {
+    return Printed(pm);
   }
   num var_number = ~count(&es->all_vars);
   push(&es->all_vars, {num, *computed_type, props, cell, osymname, lifetime, binding, None, None});
   push(&es->current_vars, num);
   push(&vp->nums, num);
   *vn_out = num;
-  return true;
+  return NoFail;
 }
 
 func descope_vars(vp *varpopper) void {
@@ -1454,8 +1453,8 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
     push(&arg_cells, cell);
     vn var_number;
     name *ast_ident = &ref(&a->args, i)->name;
-    if !es_push_var(&bs->es, &vp, cell, Has(name), ~varname_lifetime(bs->im, name->value), &cu_param, VarSelfContained, &vn) {
-      return Printed();
+    if case Printed(pm) = es_push_var(&bs->es, &vp, cell, Has(name), ~varname_lifetime(bs->im, name->value), &cu_param, VarSelfContained, &vn) {
+      return Printed(pm);
     }
     if !es_note_var_destroyer(&bs->es, vn) {
       return Printed();
