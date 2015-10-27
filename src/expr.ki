@@ -1252,8 +1252,8 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       // This parallels or plagairizes ensure_def_inst_type_computed.
       // TODO: Dedup anything?
       matched_parms idy_repls;
-      if !check_and_compute_parms_no_canonicalize(es->cs, es->clq, &egm.parms, &matched_parms) {
-        return Printed();
+      if case Printed(pm) = check_and_compute_parms_no_canonicalize(es->cs, es->clq, &egm.parms, &matched_parms) {
+        return Printed(pm);
       }
 
       ent_typeexpr *te_typeexpr;
