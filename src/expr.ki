@@ -310,11 +310,10 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     }
     // enum_type is complete.
     enum_type *te_typeexpr;
-    switch complete_structural_rhs(ds, pt, &enum_type) {
+    switch recursive_structural_rhs(ds, pt, &enum_type) {
     case Error(pm):
       return Printed(pm);
-    case SuccessHasRhs: { }
-    case SuccessNoRhs: { }
+    case Success: { }
     case NoAccessibleStructuralRhs:
       *res_out = NoMatchConstructor(void);
       return NoFail;
@@ -356,11 +355,10 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   }
   // enum_type is complete and computed.
   enum_type *te_typeexpr;
-  switch complete_structural_rhs(ds, &cac_return_type.te, &enum_type) {
+  switch recursive_structural_rhs(ds, &cac_return_type.te, &enum_type) {
   case Error(pm):
     return Printed(pm);
-  case SuccessHasRhs: { }
-  case SuccessNoRhs: { }
+  case Success: { }
   case NoAccessibleStructuralRhs:
     *res_out = NoMatchConstructor(void);
     return NoFail;

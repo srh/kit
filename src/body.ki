@@ -383,11 +383,10 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
   }
   // switchable_type is complete, because swartch type is.
   enum_type *te_typeexpr;
-  switch complete_structural_rhs(es->ds, switchable_type, &enum_type) {
+  switch recursive_structural_rhs(es->ds, switchable_type, &enum_type) {
   case Error(pm):
     return Printed(pm);
-  case SuccessHasRhs: { }
-  case SuccessNoRhs: { }
+  case Success: { }
   case NoAccessibleStructuralRhs:
     return ERR(_u8("Inaccessible rhs hit or non-structural type in swartch"));
   }
