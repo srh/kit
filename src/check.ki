@@ -411,13 +411,13 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           annotate(&rhs.frame_info, move(&info));
         }
         case &InstRhsNonMagic(nonmag def_non_magic): {
-          if !check_non_magic(cs, clq, &ent->generics, &inst->parms.repls, &nonmag) {
-            return Printed();
+          if case Printed(pm) = check_non_magic(cs, clq, &ent->generics, &inst->parms.repls, &nonmag) {
+            return Printed(pm);
           }
         }
         case &InstRhsMagic(mag def_magic): {
-          if !check_magic(cs, clq, &ent->generics, &inst->parms.repls, &mag) {
-            return Printed();
+          if case Printed(pm) = check_magic(cs, clq, &ent->generics, &inst->parms.repls, &mag) {
+            return Printed(pm);
           }
         }
       }

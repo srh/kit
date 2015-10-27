@@ -141,7 +141,7 @@ func num_args(wc which_ctor) size {
   }
 }
 
-func check_non_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, nonmag *def_non_magic) bool {
+func check_non_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, nonmag *def_non_magic) np {
   switch nonmag {
   case &NonMagicCtor(wnmc which_non_magic_ctor):
     return check_non_magic_ctor(cs, clq, g, parms, wnmc.wc, &wnmc.nmc);
@@ -150,16 +150,16 @@ func check_non_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_r
   }
 }
 
-func check_non_magic_prop(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, nmp *non_magic_prop) bool {
+func check_non_magic_prop(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, nmp *non_magic_prop) np {
   cac cac_typeexpr;
-  if ! ~check_and_compute_typeexpr(cs, clq, g, parms, &nmp->type, &cac) {
-    return false;
+  if case Printed(pm) = check_and_compute_typeexpr(cs, clq, g, parms, &nmp->type, &cac) {
+    return Printed(pm);
   }
   check(cac.complete);
 
   cac_props type_properties;
-  if ! ~compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
-    return false;
+  if case Printed(pm) = compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
+    return Printed(pm);
   }
 
   switch nmp->wp {
@@ -168,7 +168,7 @@ func check_non_magic_prop(cs *checkstate, clq *clqueue, g *ast_generics, parms *
   case PropAlignof:
     annotate(&nmp->info, cac_props.flat_alignment);
   }
-  return true;
+  return NoFail;
 }
 
 func padding_oneparm_size(cs *checkstate, parms *idy_repls) u32 {
@@ -176,36 +176,36 @@ func padding_oneparm_size(cs *checkstate, parms *idy_repls) u32 {
   return unwrap_primitive_padding_type_size(cs, ref(&parms->tys, 0));
 }
 
-func check_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, mag *def_magic) bool {
+func check_magic(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, mag *def_magic) np {
   switch mag {
     case &MagicBzero(mb magic_bzero):
       annotate(&mb.size, padding_oneparm_size(cs, parms));
-      return true;
+      return NoFail;
     case &MagicMemcopy(mm magic_memcopy):
       annotate(&mm.size, padding_oneparm_size(cs, parms));
-      return true;
+      return NoFail;
     case &MagicNopdestroy:
       // Nothing to check.
-      return true;
+      return NoFail;
 
     case &MagicCtor(wmc which_magic_ctor):
       return check_magic_ctor(cs, clq, g, parms, wmc.wc, &wmc.mc);
     case &MagicEnumConstruct(me magic_enum_construct):
       // Nothing to check.
-      return true;
+      return NoFail;
   }
 }
 
-func check_non_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, wc which_ctor, nmc *non_magic_ctor) bool {
+func check_non_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, wc which_ctor, nmc *non_magic_ctor) np {
   cac cac_typeexpr;
-  if ! ~check_and_compute_typeexpr(cs, clq, g, parms, &nmc->type, &cac) {
-    return false;
+  if case Printed(pm) = check_and_compute_typeexpr(cs, clq, g, parms, &nmc->type, &cac) {
+    return Printed(pm);
   }
   check(cac.complete);
 
   cac_props type_properties;
-  if ! ~compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
-    return false;
+  if case Printed(pm) = compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
+    return Printed(pm);
   }
 
   beh *derived_method_behavior = select_behavior(wc, &cac_props);
@@ -229,7 +229,7 @@ func check_non_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *
     }
   }
 
-  return true;
+  return NoFail;
 }
 
 func make_magic_bzero(cs *checkstate, clq *clqueue, size u32) instpair {
@@ -245,16 +245,16 @@ func make_magic_nopdestroy(cs *checkstate, clq *clqueue, size u32) instpair {
   return make_magic_inst(cs, clq, cs->im->cym.magic_nopdestroy, 1, &type);
 }
 
-func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, wc which_ctor, mc *magic_ctor) bool {
+func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_repls, wc which_ctor, mc *magic_ctor) np {
   cac cac_typeexpr;
-  if ! ~check_and_compute_typeexpr(cs, clq, g, parms, &mc->type, &cac) {
-    return false;
+  if case Printed(pm) = check_and_compute_typeexpr(cs, clq, g, parms, &mc->type, &cac) {
+    return Printed(pm);
   }
   check(cac.complete);
 
   cac_props type_properties;
-  if ! ~compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
-    return false;
+  if case Printed(pm) = compute_complete_type_properties(cs, clq, &cac.te, &cac_props) {
+    return Printed(pm);
   }
 
   switch &cac.te {
@@ -262,7 +262,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_
       if case &Has(p te_instpack) = &a.pack {
         info magic_ctor_info;
         if !check_pack_ctor(cs, clq, &cac.te, &cac_props, &p, wc, &info) {
-          return false;
+          return Printed();
         }
         annotate(&mc->info, info);
       } else {
@@ -273,7 +273,7 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_
       if case &Has(p te_instpack) = &a.pack {
         info magic_ctor_info;
         if !check_pack_ctor(cs, clq, &cac.te, &cac_props, &p, wc, &info) {
-          return false;
+          return Printed();
         }
         annotate(&mc->info, info);
       } else {
@@ -283,14 +283,14 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_
     case &TeStruct(a te_struct): {
       field_insts array[opt[instpair]];
       if !check_vardecl_ctor(cs, clq, &a.fields, wc, &field_insts) {
-        return false;
+        return Printed();
       }
       annotate(&mc->info, @[magic_ctor_info]MagicStructInfo({~cac.te, cac_props, field_insts}));
     }
     case &TeEnum(a te_enum): {
       field_insts array[opt[instpair]];
       if !check_vardecl_ctor(cs, clq, &a.constructors, wc, &field_insts) {
-        return false;
+        return Printed();
       }
       annotate(&mc->info, @[magic_ctor_info]MagicEnumInfo({~cac.te, cac_props, field_insts}));
     }
@@ -299,20 +299,19 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_
     }
     case &TeArraytype(a te_arraytype): {
       props type_properties;
-      if ! ~compute_complete_type_properties(cs, clq, oo(&a.param), &props) {
-        return false;
+      if case Printed(pm) = compute_complete_type_properties(cs, clq, oo(&a.param), &props) {
+        return Printed(pm);
       }
       annotate(&mc->info, @[magic_ctor_info]MagicArraytypeInfo({~cac.te, cac_props, instpair_from_behavior(select_behavior(wc, &props))}));
     }
     case &TeLifetime(a te_lifetime):
-      ERR(_u8("ICE: check_magic_ctor seeing TeLifetime."));
-      return false;
+      return ERR(_u8("ICE: check_magic_ctor seeing TeLifetime."));
     case &TeUnknown: {
       ice(_u8("check_magic_ctor seeing TeUnknown"));
     }
   }
 
-  return true;
+  return NoFail;
 }
 
 func check_vardecl_ctor(cs *checkstate, clq *clqueue, ds *shray[te_vardecl], wc which_ctor, insts_out *array[opt[instpair]]) bool {
