@@ -239,26 +239,26 @@ func check_expr_retconsume(es *framescope, x *ast_expr_consume, pt *te_typeexpr,
   return NoFail;
 }
 
-func replaced_name_parms(ds *defscope, a *ast_name_expr, out *genparms) bool {
+func replaced_name_parms(ds *defscope, a *ast_name_expr, out *genparms) np {
   if case &Has(arr array[ast_typeexpr]) = &a->generic_params {
     replaced array[te_typeexpr];
     n size = count(&arr);
     for i size = 0; i < n; i = i + 1 {
       converted te_typeexpr;
-      if ! ~convert_typeexpr(ds->cs, ref(&arr, i), &converted) {
-        return false;
+      if case Printed(pm) = convert_typeexpr(ds->cs, ref(&arr, i), &converted) {
+        return Printed(pm);
       }
       computed cac_typeexpr;
-      if ! ~check_and_compute_typeexpr(ds->cs, ds->clq, ds->generics, ds->repls, &converted, &computed) {
-        return false;
+      if case Printed(pm) = check_and_compute_typeexpr(ds->cs, ds->clq, ds->generics, ds->repls, &converted, &computed) {
+        return Printed(pm);
       }
       push(&replaced, computed.te);
     }
     *out = HasParms(freeze(&replaced));
-    return true;
+    return NoFail;
   } else {
     *out = NoParms(void);
-    return true;
+    return NoFail;
   }
 }
 
@@ -1208,8 +1208,8 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
 
 func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *te_typeexpr, x *ast_expr) np {
   parms genparms;
-  if !replaced_name_parms(es->ds, a, &parms) {
-    return Printed();
+  if case Printed(pm) = replaced_name_parms(es->ds, a, &parms) {
+    return Printed(pm);
   }
   match_res es_match_res;
   if case Printed(pm) = es_lookup_name(es, a->ident.value, &parms, pt, &match_res) {
