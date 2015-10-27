@@ -1596,8 +1596,8 @@ defenum check_field_result {
 func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   fieldtype cu_typeexpr;
   res check_field_result;
-  if !lookup_field(es, t, a, &fieldtype, &res) {
-    return Printed();
+  if case Printed(pm) = lookup_field(es, t, a, &fieldtype, &res) {
+    return Printed(pm);
   }
   unified te_typeexpr;
   if !unify_types(pt, &fieldtype.~, &unified) {
@@ -1731,40 +1731,36 @@ func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **
   }
 }
 
-func lookup_whole_field(es *framescope, mbpack *opt[te_instpack], fieldtype_out *cu_typeexpr) bool {
+func lookup_whole_field(es *framescope, mbpack *opt[te_instpack], fieldtype_out *cu_typeexpr) np {
   p *cu_typeexpr;
   switch help_structural_rhs(es->ds, mbpack, &p) {
   case Error(pm):
-    return false;
+    return Printed(pm);
   case SuccessHasRhs:
     *fieldtype_out = *p;
-    return true;
+    return NoFail;
   case SuccessNoRhs:
-    ERR(_u8("ICE: SuccessNoRhs should be impossible for help_structural_rhs (in lookup_whole_field)"));
-    return false;
+    return ERR(_u8("ICE: SuccessNoRhs should be impossible for help_structural_rhs (in lookup_whole_field)"));
   case NoAccessibleStructuralRhs:
-    ERR(_u8("Looking up whole field on inaccessible defclass or primitive type"));
-    return false;
+    return ERR(_u8("Looking up whole field on inaccessible defclass or primitive type"));
   }
 }
 
-func lookup_name_field(es *framescope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) bool {
+func lookup_name_field(es *framescope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   p *cu_typeexpr;
   switch help_structural_rhs(es->ds, mbpack, &p) {
   case Error(pm):
-    return false;
+    return Printed(pm);
   case SuccessHasRhs:
     return help_lookup_name_field(es, p, fieldname, fieldtype_out, res_out);
   case SuccessNoRhs:
-    ERR(_u8("ICE: SuccessNoRhs should be impossible for help_structural_rhs (in lookup_name_field)"));
-    return false;
+    return ERR(_u8("ICE: SuccessNoRhs should be impossible for help_structural_rhs (in lookup_name_field)"));
   case NoAccessibleStructuralRhs:
-    ERR(_u8("Looking up field on inaccessible defclass or primitive type"));
-    return false;
+    return ERR(_u8("Looking up field on inaccessible defclass or primitive type"));
   }
 }
 
-func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) bool {
+func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   switch &t->~ {
     case &TeName(a te_name): {
       return lookup_name_field(es, &a.pack, fieldname, fieldtype_out, res_out);
@@ -1774,30 +1770,28 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
     }
     case &TeStruct(a te_struct): {
       offset u32;
-      if !lookup_field_from_list(es->cs, es->clq, &a.fields, fieldname->value, fieldtype_out, &offset) {
-        return false;
+      if case Printed(pm) = lookup_field_from_list(es->cs, es->clq, &a.fields, fieldname->value, fieldtype_out, &offset) {
+        return Printed(pm);
       }
       *res_out = InheritsLval(offset);
-      return true;
+      return NoFail;
     }
     case &TeEnum(a te_enum): {
-      ERR(_u8("field lookup on an enum type"));
-      return false;
+      return ERR(_u8("field lookup on an enum type"));
     }
     case &TeUnion(a te_union): {
       // The offset's what it would be for a struct.
       offset_discard u32;
-      if !lookup_field_from_list(es->cs, es->clq, &a.fields, fieldname->value, fieldtype_out, &offset_discard) {
-        return false;
+      if case Printed(pm) = lookup_field_from_list(es->cs, es->clq, &a.fields, fieldname->value, fieldtype_out, &offset_discard) {
+        return Printed(pm);
       }
       // Offset's always 0 for a union.
       *res_out = InheritsLval(0);
-      return true;
+      return NoFail;
     }
     case &TeArraytype(a te_arraytype): {
       if fieldname->value != es->im->cym.lengthsym {
-        ERR(_u8("field lookup (not .length) on array type"));
-        return false;
+        return ERR(_u8("field lookup (not .length) on array type"));
       }
       *fieldtype_out = compute_prim(es->ds, primitive_size_type(es->cs));
       if case Has(n u32) = a.count {
@@ -1805,11 +1799,10 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
       } else {
         ice(_u8("Complete arraytype has incomplete count"));
       }
-      return true;
+      return NoFail;
     }
     case &TeLifetime(a te_lifetime):
-      ERR(_u8("ICE: Looking up name field of... a lifetime type?"));
-      return false;
+      return ERR(_u8("ICE: Looking up name field of... a lifetime type?"));
 
     case &TeUnknown: {
       ice(_u8("lookup_field sees incomplete type"));
@@ -1818,29 +1811,28 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
   }
 }
 
-func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_out *cu_typeexpr, res_out *check_field_result) bool {
+func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   switch f {
     case &WholeField: {
       switch &t->~ {
         case &TeName(a te_name): {
-          if !lookup_whole_field(es, &a.pack, fieldtype_out) {
-            return false;
+          if case Printed(pm) = lookup_whole_field(es, &a.pack, fieldtype_out) {
+            return Printed(pm);
           }
           // Whole field has zero offset.
           *res_out = InheritsLval(0);
-          return true;
+          return NoFail;
         }
         case &TeApp(a te_typeapp): {
-          if !lookup_whole_field(es, &a.pack, fieldtype_out) {
-            return false;
+          if case Printed(pm) = lookup_whole_field(es, &a.pack, fieldtype_out) {
+            return Printed(pm);
           }
           // Whole field has zero offset.
           *res_out = InheritsLval(0);
-          return true;
+          return NoFail;
         }
         default: {
-          ERR(_u8("whole field lookup on 'bare' type"));
-          return false;
+          return ERR(_u8("whole field lookup on 'bare' type"));
         }
         case &TeUnknown: {
           ice(_u8("lookup_field sees incomplete type."));
@@ -1868,20 +1860,19 @@ func find_vardecl(a *shray[te_vardecl], name sym, out **te_typeexpr, index_out *
 }
 
 // fields is supposed to be complete.
-func lookup_field_from_list(cs *checkstate, clq *clqueue, fields *shray[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr, offset_out *u32) bool {
+func lookup_field_from_list(cs *checkstate, clq *clqueue, fields *shray[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr, offset_out *u32) np {
   psd partial_struct_data;
-  if ! ~compute_partial_struct_data(cs, clq, fields, Has(fieldname), &psd) {
-    return false;
+  if case Printed(pm) = compute_partial_struct_data(cs, clq, fields, Has(fieldname), &psd) {
+    return Printed(pm);
   }
 
   if !psd.found_field {
-    ERR(_u8("fieldname '"), lookup(cs->im, fieldname), _u8("' not found"));
-    return false;
+    return ERR(_u8("fieldname '"), lookup(cs->im, fieldname), _u8("' not found"));
   }
 
   *fieldtype_out = ~ ref(fields, psd_index(&psd))->type;
   *offset_out = psd.offset;
-  return true;
+  return NoFail;
 }
 
 func check_expr_logical_conjunction(es *framescope, a *ast_logical_conjunction, pt *te_typeexpr, x *ast_expr) np {
