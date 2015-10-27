@@ -1904,13 +1904,13 @@ func ai_incomplete(yes bool) allow_incomplete {
 
 func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt *te_typeexpr, x *ast_expr) np {
   a_param_incomplete bool;
-  if !check_funcall_params_firsttime(es, &a->params, &a_param_incomplete) {
-    return Printed();
+  if case Printed(pm) = check_funcall_params_firsttime(es, &a->params, &a_param_incomplete) {
+    return Printed(pm);
   }
 
   func_pt te_typeexpr;
-  if !make_fn_partial_type(es->clq, pt, &a->params, &func_pt) {
-    return Printed();
+  if case Printed(pm) = make_fn_partial_type(es->clq, pt, &a->params, &func_pt) {
+    return Printed(pm);
   }
   funec *ast_expr_consume = oo(&a->fun);
   if case Printed(pm) = check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes(void)), &funec->expr, &func_pt) {
@@ -1923,8 +1923,8 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
     return NoFail;
   }
 
-  if !check_funcall_params_secondtime(es, expr_complete_type(&funec->expr), &a->params) {
-    return Printed();
+  if case Printed(pm) = check_funcall_params_secondtime(es, expr_complete_type(&funec->expr), &a->params) {
+    return Printed(pm);
   }
 
   if case Printed(pm) = annotate_disposal_for_consume(es, &funec->expr, &funec->after) {
@@ -1940,23 +1940,23 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   return NoFail;
 }
 
-func check_funcall_params_firsttime(es *framescope, params *array[ast_expr_consume], a_param_incomplete_out *bool) bool {
+func check_funcall_params_firsttime(es *framescope, params *array[ast_expr_consume], a_param_incomplete_out *bool) np {
   n size = count(params);
   unknown te_typeexpr = TeUnknown(void);
   all_params_complete bool = true;
   for i size = 0; i < n; i = i + 1 {
     expr *ast_expr = &ref(params, i)->expr;
     if case Printed(pm) = check_expr_ai(es, AllowIncompleteYes(void), expr, &unknown) {
-      return false;
+      return Printed(pm);
     }
     complete bool = expr_type_complete(expr);
     all_params_complete = all_params_complete & complete;
   }
   *a_param_incomplete_out = !all_params_complete;
-  return true;
+  return NoFail;
 }
 
-func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, params *array[ast_expr_consume]) bool {
+func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, params *array[ast_expr_consume]) np {
   n size = count(params);
 
   type_params *shray[te_typeexpr];
@@ -1967,11 +1967,11 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
 
   for i size = 0; i < n; i = i + 1 {
     ec *ast_expr_consume = ref(params, i);
-    if ! ~check_expr_consume(es, ec, ref(type_params, i)) {
-      return false;
+    if case Printed(pm) = check_expr_consume(es, ec, ref(type_params, i)) {
+      return Printed(pm);
     }
   }
-  return true;
+  return NoFail;
 }
 
 func compute_prim(cs *checkstate, clq *clqueue, t te_typeexpr) cu_typeexpr {
@@ -2130,7 +2130,7 @@ func expr_type_incomplete(a *ast_expr) bool {
   return !expr_type_complete(a);
 }
 
-func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[ast_expr_consume], out *te_typeexpr) bool {
+func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[ast_expr_consume], out *te_typeexpr) np {
   type_params array[te_typeexpr];
   n size = count(params);
   reserve(&type_params, n + 1);
@@ -2140,11 +2140,11 @@ func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[
   push(&type_params, *return_type);
   fntype te_typeexpr = TeApp({primitive_function_puretype(clq->cs), freeze(&type_params), None});
   cac cac_typeexpr;
-  if ! ~noscoped_check_and_compute_typeexpr(clq->cs, clq, &fntype, &cac) {
-    return false;
+  if case Printed(pm) = noscoped_check_and_compute_typeexpr(clq->cs, clq, &fntype, &cac) {
+    return Printed(pm);
   }
   *out = cac.te;
-  return true;
+  return NoFail;
 }
 
 func fn_return_type(cs *checkstate, func_type *te_typeexpr) *te_typeexpr {
