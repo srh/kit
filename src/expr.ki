@@ -1424,8 +1424,8 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
     nargs size = count(&a->args);
     return_type cu_typeexpr = ~get(computed_params, nargs);
     bs bodystate = mk(es->ds, &return_type);
-    if !help_check_lambda_body(&bs, a, computed_params) {
-      return Printed();
+    if case Printed(pm) = help_check_lambda_body(&bs, a, computed_params) {
+      return Printed(pm);
     }
   }
 
@@ -1438,7 +1438,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
 }
 
 // This helper method shields its code from using the wrong (outer) framescope variable in check_expr_lambda.
-func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray[te_typeexpr]) bool {
+func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray[te_typeexpr]) np {
   vp varpopper;
   init_vp(&vp, &bs->es);
   nargs size = count(&a->args);
@@ -1447,45 +1447,45 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   for i size = 0; i < nargs; i = i + 1 {
     cu_param cu_typeexpr = ~get(computed_params, i);
     cu_param_props type_properties;
-    if ! ~compute_type_properties(bs->cs, bs->clq, &cu_param, &cu_param_props) {
-      return false;
+    if case Printed(pm) = compute_type_properties(bs->cs, bs->clq, &cu_param, &cu_param_props) {
+      return Printed(pm);
     }
     cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
     push(&arg_cells, cell);
     vn var_number;
     name *ast_ident = &ref(&a->args, i)->name;
     if !es_push_var(&bs->es, &vp, cell, Has(name), ~varname_lifetime(bs->im, name->value), &cu_param, VarSelfContained, &vn) {
-      return false;
+      return Printed();
     }
     if !es_note_var_destroyer(&bs->es, vn) {
-      return false;
+      return Printed();
     }
   }
 
   ee entryexit;
   if !check_body(bs, None, &a->body.bb, &ee) {
-    return false;
+    return Printed();
   }
   if !finish_lambda_body(bs, ee) {
-    return false;
+    return Printed();
   }
 
   destructions array[var_destruction];
   if !make_destructions(&bs->es, read_nums(&vp), &destructions) {
-    return false;
+    return Printed();
   }
 
   return_type *te_typeexpr = ref(computed_params, nargs);
   return_type_props type_properties;
-  if ! ~compute_complete_type_properties(bs->cs, bs->clq, return_type, &return_type_props) {
-    return false;
+  if case Printed(pm) = compute_complete_type_properties(bs->cs, bs->clq, return_type, &return_type_props) {
+    return Printed(pm);
   }
   return_cell cell_num = add_cell(&bs->es, {LocationStatic, ~ *return_type, return_type_props});
 
   info ast_fullbody_info = {destructions, bs->es.all_vars, Has(bs->es.gr), bs->gotos, bs->labels, bs->statements, return_cell, arg_cells};
   annotate(&a->body.info, info);
 
-  return true;
+  return NoFail;
 }
 
 func numeric_literal_value(a *ast_numeric_literal) bigint {
