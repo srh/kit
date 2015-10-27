@@ -261,8 +261,8 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_
     case &TeName(a te_name): {
       if case &Has(p te_instpack) = &a.pack {
         info magic_ctor_info;
-        if !check_pack_ctor(cs, clq, &cac.te, &cac_props, &p, wc, &info) {
-          return Printed();
+        if case Printed(pm) = check_pack_ctor(cs, clq, &cac.te, &cac_props, &p, wc, &info) {
+          return Printed(pm);
         }
         annotate(&mc->info, info);
       } else {
@@ -272,8 +272,8 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_
     case &TeApp(a te_typeapp): {
       if case &Has(p te_instpack) = &a.pack {
         info magic_ctor_info;
-        if !check_pack_ctor(cs, clq, &cac.te, &cac_props, &p, wc, &info) {
-          return Printed();
+        if case Printed(pm) = check_pack_ctor(cs, clq, &cac.te, &cac_props, &p, wc, &info) {
+          return Printed(pm);
         }
         annotate(&mc->info, info);
       } else {
@@ -282,15 +282,15 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_
     }
     case &TeStruct(a te_struct): {
       field_insts array[opt[instpair]];
-      if !check_vardecl_ctor(cs, clq, &a.fields, wc, &field_insts) {
-        return Printed();
+      if case Printed(pm) = check_vardecl_ctor(cs, clq, &a.fields, wc, &field_insts) {
+        return Printed(pm);
       }
       annotate(&mc->info, @[magic_ctor_info]MagicStructInfo({~cac.te, cac_props, field_insts}));
     }
     case &TeEnum(a te_enum): {
       field_insts array[opt[instpair]];
-      if !check_vardecl_ctor(cs, clq, &a.constructors, wc, &field_insts) {
-        return Printed();
+      if case Printed(pm) = check_vardecl_ctor(cs, clq, &a.constructors, wc, &field_insts) {
+        return Printed(pm);
       }
       annotate(&mc->info, @[magic_ctor_info]MagicEnumInfo({~cac.te, cac_props, field_insts}));
     }
@@ -314,30 +314,30 @@ func check_magic_ctor(cs *checkstate, clq *clqueue, g *ast_generics, parms *idy_
   return NoFail;
 }
 
-func check_vardecl_ctor(cs *checkstate, clq *clqueue, ds *shray[te_vardecl], wc which_ctor, insts_out *array[opt[instpair]]) bool {
+func check_vardecl_ctor(cs *checkstate, clq *clqueue, ds *shray[te_vardecl], wc which_ctor, insts_out *array[opt[instpair]]) np {
   insts array[opt[instpair]];
   nds size = count(ds);
   for i size = 0; i < nds; i = i + 1 {
     props type_properties;
-    if ! ~compute_complete_type_properties(cs, clq, &ref(ds, i)->type, &props) {
-      return false;
+    if case Printed(pm) = compute_complete_type_properties(cs, clq, &ref(ds, i)->type, &props) {
+      return Printed(pm);
     }
     oip opt[instpair] = instpair_or_trivial_from_behavior(select_behavior(wc, &props));
     push(&insts, oip);
   }
   *insts_out = insts;
-  return true;
+  return NoFail;
 }
 
-func pack_rhs_info(cs *checkstate, clq *clqueue, p *te_instpack, rhs_type_out **cu_typeexpr, rhs_props_out **type_properties) bool {
+func pack_rhs_info(cs *checkstate, clq *clqueue, p *te_instpack, rhs_type_out **cu_typeexpr, rhs_props_out **type_properties) np {
   info *deftype_inst_info;
-  if ! ~compute_pack_info(cs, clq, p, &info) {
-    return false;
+  if case Printed(pm) = compute_pack_info(cs, clq, p, &info) {
+    return Printed(pm);
   }
   if case &Has(rhs_info deftype_inst_rhs_info) = &info->rhs {
     *rhs_type_out = &rhs_info.rhs_cu;
     *rhs_props_out = &rhs_info.rhs_props;
-    return true;
+    return NoFail;
   } else {
     ice(_u8("check_pack_ctor on primitive type"));
     return fake();
@@ -365,14 +365,14 @@ func instpair_or_trivial_from_behavior(b *derived_method_behavior) opt[instpair]
   }
 }
 
-func check_pack_ctor(cs *checkstate, clq *clqueue, complete_te *te_typeexpr, props *type_properties, p *te_instpack, wc which_ctor, info_out *magic_ctor_info) bool {
+func check_pack_ctor(cs *checkstate, clq *clqueue, complete_te *te_typeexpr, props *type_properties, p *te_instpack, wc which_ctor, info_out *magic_ctor_info) np {
   rhs_type *cu_typeexpr;
   rhs_props *type_properties;
-  if !pack_rhs_info(cs, clq, p, &rhs_type, &rhs_props) {
-    return false;
+  if case Printed(pm) = pack_rhs_info(cs, clq, p, &rhs_type, &rhs_props) {
+    return Printed(pm);
   }
   *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, rhs_props)), ~ *complete_te, *props, *rhs_type, *rhs_props});
-  return true;
+  return NoFail;
 }
 
 func select_behavior(wc which_ctor, props *type_properties) *derived_method_behavior {
