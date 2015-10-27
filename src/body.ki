@@ -643,11 +643,11 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
     return false;
   }
   annotate(&a->info, {vn});
-  if !es_note_var_destroyer(&bs->es, vn) {
+  if ! ~es_note_var_destroyer(&bs->es, vn) {
     return false;
   }
   if note_initter {
-    if !es_note_var_initter(&bs->es, vn) {
+    if ! ~es_note_var_initter(&bs->es, vn) {
       return false;
     }
     switch &a->rhs {
@@ -903,7 +903,7 @@ func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number],
       ERR(_u8("goto enters non-initiannlizable variable scope"));
       return false;
     }
-    if !es_note_var_initter(&bs->es, vn) {
+    if ! ~es_note_var_initter(&bs->es, vn) {
       return false;
     }
   }
@@ -911,7 +911,7 @@ func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number],
   ndestruct size = count(&destruct);
   for i size = 0; i < ndestruct; i = i + 1 {
     vn var_number = get(&destruct, i);
-    if !es_note_var_destroyer(&bs->es, vn) {
+    if ! ~es_note_var_destroyer(&bs->es, vn) {
       return false;
     }
   }

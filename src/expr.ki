@@ -177,30 +177,30 @@ func read_nums(vp *varpopper) *array[var_number] {
 
 }  // access varpopper
 
-func es_note_var_initter(es *framescope, vn var_number) bool {
+func es_note_var_initter(es *framescope, vn var_number) np {
   info *var_info = ref_var(es, vn);
   if case &Has(desc ctor_desc) = &info->initter {
-    return true;
+    return NoFail;
   }
   desc ctor_desc;
   if case Printed(pm) = get_init_ctor(es->ds, &info->type, &desc) {
-    return false;
+    return Printed(pm);
   }
   info->initter = Has(desc);
-  return true;
+  return NoFail;
 }
 
-func es_note_var_destroyer(es *framescope, vn var_number) bool {
+func es_note_var_destroyer(es *framescope, vn var_number) np {
   info *var_info = ref_var(es, vn);
   if case &Has(desc ctor_desc) = &info->destroyer {
-    return true;
+    return NoFail;
   }
   desc ctor_desc;
   if case Printed(pm) = get_destroy_ctor(es->ds, &info->type, &desc) {
-    return false;
+    return Printed(pm);
   }
   info->destroyer = Has(desc);
-  return true;
+  return NoFail;
 }
 
 func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *idy_repls, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
@@ -1456,8 +1456,8 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
     if case Printed(pm) = es_push_var(&bs->es, &vp, cell, Has(name), ~varname_lifetime(bs->im, name->value), &cu_param, VarSelfContained, &vn) {
       return Printed(pm);
     }
-    if !es_note_var_destroyer(&bs->es, vn) {
-      return Printed();
+    if case Printed(pm) = es_note_var_destroyer(&bs->es, vn) {
+      return Printed(pm);
     }
   }
 
