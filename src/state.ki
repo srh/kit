@@ -18,6 +18,7 @@ deftype cs_primitives struct {
 deftype meta_datum struct {
   left opt[pos];
   right opt[pos];
+  original_syntax opt[ast_original_syntax];
 };
 
 // TODO: Don't just give ps and tok.ki code direct access to this?
@@ -28,7 +29,7 @@ deftype positionals struct {
 func mk_positionals() positionals {
   // Add an unused entry so that the zero ast_meta value is "invalid."
   p positionals;
-  nilmeta meta_datum = {None, None};
+  nilmeta meta_datum = {None, None, None};
   push(&p.metas, nilmeta);
   return p;
 }

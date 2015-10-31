@@ -887,6 +887,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       }
       step(p);
       m ast_meta = copyend(p, lhs.meta);
+      note_original(p, m, IncrDecr);
       // (NOTE: Is expanding out this funcall/typed/addressof expr the best software design choice?  I think so, we can add layover information saying this is an incr expr, later.  Likewise with user assignment ops.)
       *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
          embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))))})))}));
@@ -910,7 +911,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
           }
           m ast_meta = copyend(p, lhs.meta);
           // NOTE: This is fragile.  What if we had a statement, "x = y ! z;", where "!" is a lower-precedence operator than "="?  Right now no such operators exist (besides comma, which doesn't work in expressions) so we're okay.
-          if ! +build_binop_expr(p->im, se, m, op_facts.user_assignment, oper, lhs, rhs, &lhs) {
+          if ! +build_binop_expr(p, se, m, op_facts.user_assignment, oper, lhs, rhs, &lhs) {
             return Fail;
           }
         }
@@ -1037,22 +1038,23 @@ defenum statement_expr {
   IsStatementExpr void;
 };
 
-func build_binop_expr(im *identmap, se statement_expr, m ast_meta, user_assignment bool, op ast_ident, lhs ast_expr, rhs ast_expr, out *ast_expr) parse_result {
-  if op.value == im->cym.assignmentsym {
+func build_binop_expr(p *ps, se statement_expr, m ast_meta, user_assignment bool, op ast_ident, lhs ast_expr, rhs ast_expr, out *ast_expr) parse_result {
+  if op.value == p->im->cym.assignmentsym {
     if case IsNotStatementExpr(v void) = se {
       return Fail;
     }
     *out = mk(m, @[ast_expr_enum]Assignment({NotComputed@[ast_assignment_info](), embox(lhs), embox(rhs)}));
-  } else if op.value == im->cym.logical_and_sym {
+  } else if op.value == p->im->cym.logical_and_sym {
     *out = mk(m, @[ast_expr_enum]LogicalConjunction({false, embox(consume(&lhs)), embox(consume(&rhs))}));
-  } else if op.value == im->cym.logical_or_sym {
+  } else if op.value == p->im->cym.logical_or_sym {
     *out = mk(m, @[ast_expr_enum]LogicalConjunction({true, embox(consume(&lhs)), embox(consume(&rhs))}));
   } else {
     if user_assignment {
       if case IsNotStatementExpr(v void) = se {
         return Fail;
       }
-      *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, im->cym.voidsym}),
+      note_original(p, m, UserAssignment);
+      *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
          embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(&rhs))})))}));
     } else {
       *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))),

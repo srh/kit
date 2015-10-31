@@ -13,6 +13,11 @@ def `~` fn[size, ast_meta] = wrapconvert;
 
 inline func fake_ast_meta() ast_meta { return ~0; }
 
+defenum ast_original_syntax {
+  UserAssignment void;
+  IncrDecr void;
+};
+
 deftype interval struct {
   left pos;
   right pos;

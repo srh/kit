@@ -57,19 +57,19 @@ inline func ps_step(p *ps) void {
 
 func startend(p *ps) ast_meta {
   ret ast_meta = ~count(p->metas);
-  push(p->metas, {Has(p->current.interval.left), Has(p->current.interval.right)});
+  push(p->metas, {Has(p->current.interval.left), Has(p->current.interval.right), None});
   return ret;
 }
 
 func start(p *ps) ast_meta {
   ret ast_meta = ~count(p->metas);
-  push(p->metas, {Has(p->current.interval.left), None});
+  push(p->metas, {Has(p->current.interval.left), None, None});
   return ret;
 }
 
 func copystart(p *ps, meta ast_meta) ast_meta {
   ret ast_meta = ~count(p->metas);
-  push(p->metas, {ref(p->metas, meta.~)->left, None});
+  push(p->metas, {ref(p->metas, meta.~)->left, None, None});
   return ret;
 }
 
@@ -81,11 +81,14 @@ func copyend(p *ps, meta ast_meta) ast_meta {
 
 func end(p *ps, meta ast_meta) void {
   r *meta_datum = ref(p->metas, meta.~);
-  if case Has(right_pos pos) = r->right {
-    crash();
-  }
-  r->right = Has(mk_pos(p->base_offset, p->prev_right));
+  set(&r->right, mk_pos(p->base_offset, p->prev_right));
 }
+
+func note_original(p *ps, meta ast_meta, orig ast_original_syntax) void {
+  r *meta_datum = ref(p->metas, meta.~);
+  set(&r->original_syntax, orig);
+}
+
 
 defenum keyw {
   Access void;
