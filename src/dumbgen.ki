@@ -580,10 +580,10 @@ func dumbly_gen_function_intro(f *objfile, h *frame) bool {
   case UniversalCdeclConvention:
     x86_push32(f, X86_EBP);
     x86_mov_reg32(f, X86_EBP, X86_ESP);
-    x86_add_esp_i32(f, *unHas(&h->low_offset));
+    // We can use this function now that EBP is in place.
+    restore_esp_to_default_position(f, h);
     return true;
   }
-  restore_esp_to_default_position(f, h);
 }
 
 func dumbly_gen_function_exit(f *objfile, h *frame) bool {
