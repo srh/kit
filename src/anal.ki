@@ -76,7 +76,7 @@ deftype basic_analyze_state struct {
   celldisp array[cell_disp];
 };
 
-func basic_analyze_fn_body(cs *checkstate, g *graphed_fn_body, bas_out *basic_analyze_state) bool {
+func basic_analyze_fn_body(cs *checkstate, g *graphed_fn_body, bas_out *basic_analyze_state) void {
   bas basic_analyze_state = {0, mk_array@[gr_num](), mk_array@[cell_disp]()};
 
   help_basic_analyze(cs, &bas, &g->graph.gr);
@@ -84,7 +84,6 @@ func basic_analyze_fn_body(cs *checkstate, g *graphed_fn_body, bas_out *basic_an
   // TODO: Check mutual exclusivity of celldisps -- cells can't be certain combinations of things.
 
   *bas_out = bas;
-  return true;
 }
 
 func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_graph) void {
@@ -184,10 +183,8 @@ func basic_and_inline(cs *checkstate, g *graphed_fn_body) np {
   case &NotComputed:
     g->inline_state = BeganComputing;
     bas basic_analyze_state;
-    if !basic_analyze_fn_body(cs, g, &bas) {
-      g->inline_state = FailedComputation;
-      return Printed();
-    }
+    basic_analyze_fn_body(cs, g, &bas);
+
     if case Printed(pm) = help_basic_inline_inlinables(cs, &bas, g) {
       g->inline_state = FailedComputation;
       return Printed(pm);
