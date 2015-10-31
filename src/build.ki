@@ -21,7 +21,7 @@ func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u
     return false;
   }
 
-  if !add_export_symbols(cs, &f, modulename) {
+  if ! ~add_export_symbols(cs, &f, modulename) {
     return false;
   }
 
@@ -87,7 +87,7 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
   }
 }
 
-func add_export_symbols(cs *checkstate, f *objfile, modulename sym) bool {
+func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
   mod_id module_id = unHas(lookup(&cs->modules_by_name, &modulename));
   mod *module = ref_module(cs, mod_id);
   ndefs size = count(&mod->defs);
@@ -99,14 +99,12 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) bool {
       if case Has(inst_id def_inst_id) = lookup_sole_value(&ent->insts, &idyparms) {
         inst *def_inst = ref_inst(cs, inst_id);
         if !is_fn_type(cs, &unHas(&inst->typrop)->cu.~) {
-          ERR(_u8("Cannot codegen export symbols for non-fn def (can only export functions)"));
-          return false;
+          return ERR(_u8("Cannot codegen export symbols for non-fn def (can only export functions)"));
         }
         if case &Computed(val st_value) = &inst->evaled_value {
           fnid fn_body_id;
           if !x86_simple_symbolref(cs, &val, &fnid) {
-            ERR(_u8("Export fn-symbol has invalid value (zero-initialized fn[...] value, I bet)"));
-            return false;
+            return ERR(_u8("Export fn-symbol has invalid value (zero-initialized fn[...] value, I bet)"));
           }
           body_text_offset u32 = *unHas(&ref_fn_body(cs, fnid)->body_text_offset);
           name string = lookup(cs->im, ent->def_name);
@@ -125,7 +123,7 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) bool {
     }
   }
 
-  return true;
+  return NoFail;
 }
 
 func def_is_export(ent *def_entry) bool {
