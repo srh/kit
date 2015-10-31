@@ -560,33 +560,30 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
 }
 
 func dumbly_gen_machine_code(f *objfile, h *frame, entry_gn gr_num) bool {
-  if !dumbly_gen_function_intro(f, h) {
-    return false;
-  }
+  dumbly_gen_function_intro(f, h);
+
   bodyaft jmp_targetnum = frame_create_target(h);
   if !dumbly_gen_function_body(f, h, entry_gn, bodyaft) {
     return false;
   }
   frame_define_target(h, bodyaft, secsize(&f->text));
-  if !dumbly_gen_function_exit(f, h) {
-    return false;
-  }
+
+  dumbly_gen_function_exit(f, h);
 
   return true;
 }
 
-func dumbly_gen_function_intro(f *objfile, h *frame) bool {
+func dumbly_gen_function_intro(f *objfile, h *frame) void {
   switch h->cs->plat.callconv {
   case UniversalCdeclConvention:
     x86_push32(f, X86_EBP);
     x86_mov_reg32(f, X86_EBP, X86_ESP);
     // We can use this function now that EBP is in place.
     restore_esp_to_default_position(f, h);
-    return true;
   }
 }
 
-func dumbly_gen_function_exit(f *objfile, h *frame) bool {
+func dumbly_gen_function_exit(f *objfile, h *frame) void {
   switch h->cs->plat.callconv {
   case UniversalCdeclConvention:
     ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
@@ -641,8 +638,6 @@ func dumbly_gen_function_exit(f *objfile, h *frame) bool {
       overwrite_raw(&f->text, ~p->overwrite_location, &le.buf[0], 4);
     }
   }
-
-  return true;
 }
 
 // TODO: Remove this and its callers.
