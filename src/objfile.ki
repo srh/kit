@@ -177,7 +177,7 @@ func strtab_add(d *array[u8], buf array[u8]) u32 {
 }
 
 func check_no_zeros(buf *u8, n size) void {
-  for i size = 0; i < n; i = i + 1 {
+  for i size = 0; i < n; i += 1 {
     if buf[i] == '\0' {
       crash(_u8("check_no_zeros sees zero"));
     }
