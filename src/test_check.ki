@@ -71,7 +71,7 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
   success bool;
   if ctx->build {
     flattened array[u8];
-    success = build_nowrite_module(&cs, intern(&im, testmodule_name()), &flattened);
+    success = ~build_nowrite_module(&cs, intern(&im, testmodule_name()), &flattened);
   } else {
     success = ~check_module(&cs, intern(&im, testmodule_name()));
   }
