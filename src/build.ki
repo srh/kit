@@ -17,8 +17,8 @@ func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u
     return Printed();
   }
 
-  if !build_fn_bodies(cs, &f) {
-    return Printed();
+  if case Printed(pm) = build_fn_bodies(cs, &f) {
+    return Printed(pm);
   }
 
   if case Printed(pm) = add_export_symbols(cs, &f, modulename) {
@@ -56,22 +56,22 @@ func build_module(cs *checkstate, modulename sym) np {
   return NoFail;
 }
 
-func build_fn_bodies(cs *checkstate, f *objfile) bool {
+func build_fn_bodies(cs *checkstate, f *objfile) np {
   nbodies size = count(&cs->fn_bodies);
   for i size = 0; i < nbodies; i = i + 1 {
     ent *fn_body_entry = oo(ref(&cs->fn_bodies, i));
-    if !build_fn_body(cs, f, ent) {
-      return false;
+    if case Printed(pm) = build_fn_body(cs, f, ent) {
+      return Printed(pm);
     }
   }
-  return true;
+  return NoFail;
 }
 
-func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
+func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) np {
   switch &ent->u {
   case &GraphedFnBody(g graphed_fn_body):
-    if !basic_and_inline(cs, &g) {
-      return false;
+    if case Printed(pm) = basic_and_inline(cs, &g) {
+      return Printed(pm);
     }
 
     fillercode_align_double_quadword(f);
@@ -79,10 +79,13 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
     text_offset u32 = secsize(&f->text);
     set_symbol_value(f, *unHas(&ent->symbol_table_index), text_offset);
     annotate(&ent->body_text_offset, text_offset);
-    return dumbly_gen_graphed_fn_body(cs, f, &g);
+    if !dumbly_gen_graphed_fn_body(cs, f, &g) {
+      return Printed();
+    }
+    return NoFail;
   case &ExternFnBody(e extern_fn_body):
     // We have nothing to do, of course.
-    return true;
+    return NoFail;
   }
 }
 
