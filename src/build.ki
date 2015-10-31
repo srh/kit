@@ -35,10 +35,10 @@ func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u
   return true;
 }
 
-func build_module(cs *checkstate, modulename sym) bool {
+func build_module(cs *checkstate, modulename sym) np {
   flattened array[u8];
   if !build_nowrite_module(cs, modulename, &flattened) {
-    return false;
+    return Printed();
   }
 
   path array[u8] = to_u8str(lookup(cs->im, modulename));
@@ -50,11 +50,10 @@ func build_module(cs *checkstate, modulename sym) bool {
   }
 
   if !write_file(path, &flattened) {
-    ERR(_u8("Could not write object file"));
-    return false;
+    return ERR(_u8("Could not write object file"));
   }
 
-  return true;
+  return NoFail;
 }
 
 func build_fn_bodies(cs *checkstate, f *objfile) bool {
