@@ -13,9 +13,7 @@ func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u
 
   f objfile = mk_objfile();
 
-  if !add_fn_body_symbols(cs, &f) {
-    return Printed();
-  }
+  add_fn_body_symbols(cs, &f);
 
   if case Printed(pm) = build_fn_bodies(cs, &f) {
     return Printed(pm);
@@ -139,15 +137,12 @@ func def_is_export(ent *def_entry) bool {
   return false;
 }
 
-func add_fn_body_symbols(cs *checkstate, f *objfile) bool {
+func add_fn_body_symbols(cs *checkstate, f *objfile) void {
   nbodies size = count(&cs->fn_bodies);
   for i size = 0; i < nbodies; i = i + 1 {
     ent *fn_body_entry = oo(ref(&cs->fn_bodies, i));
-    if !add_fn_body_symbol(cs, f, ent) {
-      return false;
-    }
+    add_fn_body_symbol(cs, f, ent);
   }
-  return true;
 }
 
 func argcell_types(cs *checkstate, g *graphed_fn_body) shray[cu_typeexpr] {
@@ -159,7 +154,7 @@ func argcell_types(cs *checkstate, g *graphed_fn_body) shray[cu_typeexpr] {
   return freeze(&bu);
 }
 
-func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
+func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) void {
   switch &ent->u {
   case &GraphedFnBody(g graphed_fn_body):
     arg_types shray[cu_typeexpr] = argcell_types(cs, &g);
@@ -167,12 +162,10 @@ func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
     name sym = generate_kit_name(cs, ent->informal_name, arg_types);
     symbol_table_index sti = add_local_symbol(f, name, 0 /* We'll overwrite the value later. */, SectionText(void), IsStaticNo(void));
     annotate(&ent->symbol_table_index, symbol_table_index);
-    return true;
   case &ExternFnBody(e extern_fn_body):
     c_name sym = c_symbol_name(cs, e.name);
     symbol_table_index sti = add_remote_symbol(f, c_name, IsFunctionYes(void));
     annotate(&ent->symbol_table_index, symbol_table_index);
-    return true;
   }
 }
 
