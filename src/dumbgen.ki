@@ -162,9 +162,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
     return Printed(pm);
   }
 
-  if !dumbly_gen_machine_code(f, &h, g->graph.gn) {
-    return Printed();
-  }
+  dumbly_gen_machine_code(f, &h, g->graph.gn);
 
   return NoFail;
 }
@@ -559,18 +557,12 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
   return NoFail;
 }
 
-func dumbly_gen_machine_code(f *objfile, h *frame, entry_gn gr_num) bool {
+func dumbly_gen_machine_code(f *objfile, h *frame, entry_gn gr_num) void {
   dumbly_gen_function_intro(f, h);
-
   bodyaft jmp_targetnum = frame_create_target(h);
-  if !dumbly_gen_function_body(f, h, entry_gn, bodyaft) {
-    return false;
-  }
+  dumbly_gen_function_body(f, h, entry_gn, bodyaft);
   frame_define_target(h, bodyaft, secsize(&f->text));
-
   dumbly_gen_function_exit(f, h);
-
-  return true;
 }
 
 func dumbly_gen_function_intro(f *objfile, h *frame) void {
@@ -680,7 +672,7 @@ defenum dumbgen_stackent {
   DumbgenOp op_targ_gn_jmpaft;
 };
 
-func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp_targetnum) bool {
+func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp_targetnum) void {
   stack array[dumbgen_stackent];
   push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({entry_gn, bodyaft, false}));
   while case Has(se dumbgen_stackent) = popval(&stack) {
@@ -760,9 +752,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           }
         case &GrPrimApply(a gr_prim_apply):
           DUMBGEN("GrPrimApply");
-          if !x86_dumbly_prim_apply(f, h, &a) {
-            return false;
-          }
+          x86_dumbly_prim_apply(f, h, &a);
         case &GrMemCopy(a gr_memcopy):
           DUMBGEN("GrMemCopy");
           dest_ci *cell_info = ref_cell(h->gr, a.dest);
@@ -780,9 +770,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           default:
             dest_ci *cell_info = ref_cell(h->gr, a.dest);
             value st_value;
-            if !st_const_compute_for_gen(h->cs, &a.value, dest_ci->props.flat_size, &value) {
-              return false;
-            }
+            st_const_compute_for_gen(h->cs, &a.value, dest_ci->props.flat_size, &value);
 
             x86_gen_write_value(f, h, dest_loc, &value);
           }
@@ -835,9 +823,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           for i size = 0; i < ncases; i = i + 1 {
             cas *tup[gr_const, sq_num] = ref(&a.cases, i);
             expected st_value;
-            if !st_const_compute_for_gen(h->cs, &cas->car, src_size, &expected) {
-              return false;
-            }
+            st_const_compute_for_gen(h->cs, &cas->car, src_size, &expected);
             x86_cmp_imm_sized(h->cs, f, X86_EAX, &expected, X86_ECX);
             x86_gen_placeholder_jcc(f, h, X86_JCC_Z, frame_gn_targetnum(h, cas->cdr.~));
             push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({cas->cdr.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
@@ -869,8 +855,6 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
       }
     }
   }
-
-  return true;
 }
 
 func x86_load_cell_address(f *objfile, h *frame, dest u8, c cell_num) void {
@@ -1085,7 +1069,7 @@ func `<`(x tup[u32, st_symbolref], y tup[u32, st_symbolref]) bool {
   return x.car < y.car;
 }
 
-func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
+func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
   switch &a->primop {
   case &PrimNum(b primitive_numeric_op):
     arity u32 = op_arity(b.op_action);
@@ -1365,7 +1349,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     }
 
     x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.op_size, X86_EDX);
-    return true;
   case &PrimNumCompare(b primitive_numeric_comparison_op):
     check(count(&a->params) == 2);
     x86_load32_for_primop(f, X86_EAX, get_loc(h, get(&a->params, 0)), b.op_size);
@@ -1404,7 +1387,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     }
     x86_setcc_b8(f, X86_AL, setcc_code);
     x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
-    return true;
   case &PrimLogical(b primitive_logical_op):
     arity u32 = op_arity(b);
     check(count(&a->params) == ~arity);
@@ -1431,7 +1413,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
       x86_or_w32(f, X86_EAX, X86_ECX);
     }
     x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
-    return true;
   case &PrimPtrCompare(b primitive_ptr_comparison_op):
     check(count(&a->params) == 2);
     op_size u32 = 4;
@@ -1449,7 +1430,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     }
     x86_setcc_b8(f, X86_EAX, setcc_code);
     x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
-    return true;
   case &PrimConversion(b primitive_conversion_op):
     check(count(&a->params) == 1);
     param0 cell_num = get(&a->params, 0);
@@ -1476,7 +1456,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
         x86_gen_crash_jcc(f, h, X86_JCC_A);
       }
       x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
-      return true;
     case SignedTwos:
       check(b.from_numtraits.minval < bigu(0));
       x86_load32_signextend_for_primop(f, X86_EAX, paramloc, b.from_size);
@@ -1497,7 +1476,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
           x86_gen_crash_jcc(f, h, X86_JCC_A);
         }
         x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
-        return true;
       case SignedTwos:
         if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.maxval < b.from_numtraits.maxval {
           to_maxval u32;
@@ -1516,7 +1494,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
           x86_gen_crash_jcc(f, h, X86_JCC_L);
         }
         x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
-        return true;
       }
     }
   }

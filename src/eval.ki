@@ -705,7 +705,7 @@ func st_const_compute(clq *clqueue, plat *platform_info, c *gr_const, length u32
 }
 
 // Same as st_const_compute except for ConstDef -- we're at code-gen time, everything should be computed.
-func st_const_compute_for_gen(cs *checkstate, c *gr_const, length u32, out *st_value) bool {
+func st_const_compute_for_gen(cs *checkstate, c *gr_const, length u32, out *st_value) void {
   switch c {
   case &ConstInt(b bigint):
     *out = st_bigint_to_value_unsigned(&cs->plat, length, b);
@@ -722,7 +722,6 @@ func st_const_compute_for_gen(cs *checkstate, c *gr_const, length u32, out *st_v
   case &ConstBytes(arr shray[u8]):
     *out = st_u8s_to_value(&cs->plat, &arr);
   }
-  return true;
 }
 
 func st_offset_compute(env *st_env, gro gr_offset, out *u32) np {
