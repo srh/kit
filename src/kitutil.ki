@@ -144,36 +144,36 @@ func[T] MERR(cs *checkstate, m ast_meta, x T) np {
 }
 
 func[T] ice(x T) void {
-  ERR(_u8("ICE: "), x);
+  DBG(_u8("ICE: "), x);
   abort();
 }
 
 func[T, U] ice(x T, y U) void {
-  ERR(_u8("ICE: "), x, y);
+  DBG(_u8("ICE: "), x, y);
   abort();
 }
 
 func[T, U, V] ice(x T, y U, z V) void {
-  ERR(_u8("ICE: "), x, y, z);
+  DBG(_u8("ICE: "), x, y, z);
   abort();
 }
 
 func[T, U, V, W] ice(x T, y U, z V, p W) void {
-  ERR(_u8("ICE: "), x, y, z, p);
+  DBG(_u8("ICE: "), x, y, z, p);
   abort();
 }
 
 func[T, U, V, W, X] ice(x T, y U, z V, p W, q X) void {
-  ERR(_u8("ICE: "), x, y, z, p, q);
+  DBG(_u8("ICE: "), x, y, z, p, q);
   abort();
 }
 
 func[T, U, V, W, X, Y] ice(x T, y U, z V, p W, q X, r Y) void {
-  ERR(_u8("ICE: "), x, y, z, p, q, r);
+  DBG(_u8("ICE: "), x, y, z, p, q, r);
   abort();
 }
 
 func[T, U, V, W, X, Y, Z] ice(x T, y U, z V, p W, q X, r Y, s Z) void {
-  ERR(_u8("ICE: "), x, y, z, p, q, r, s);
+  DBG(_u8("ICE: "), x, y, z, p, q, r, s);
   abort();
 }
