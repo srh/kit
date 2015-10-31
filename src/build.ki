@@ -77,10 +77,7 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) np {
     text_offset u32 = secsize(&f->text);
     set_symbol_value(f, *unHas(&ent->symbol_table_index), text_offset);
     annotate(&ent->body_text_offset, text_offset);
-    if !dumbly_gen_graphed_fn_body(cs, f, &g) {
-      return Printed();
-    }
-    return NoFail;
+    return dumbly_gen_graphed_fn_body(cs, f, &g);
   case &ExternFnBody(e extern_fn_body):
     // We have nothing to do, of course.
     return NoFail;

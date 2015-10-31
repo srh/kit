@@ -133,7 +133,7 @@ func get_size_loc(h *frame, c cell_num) cell_loc {
 
 // Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
 
-func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) bool {
+func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) np {
   bas *basic_analyze_state = unComputed(&g->inline_state);
   h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed(), NotComputed@[i32](), mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed@[jmp_targetnum]()};
 
@@ -147,7 +147,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
 
   mut genexpr_result;
   if !dumbly_analyze_expression(&h, &g->graph.gr, &liveset, g->graph.gn, &mut) {
-    return false;
+    return Printed();
   }
 
   switch &mut {
@@ -158,15 +158,15 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
   case &NonTerminal: { /* nothing to assert */ }
   }
 
-  if ! ~dumbly_layout_frame_cells(g, &h) {
-    return false;
+  if case Printed(pm) = dumbly_layout_frame_cells(g, &h) {
+    return Printed(pm);
   }
 
   if !dumbly_gen_machine_code(f, &h, g->graph.gn) {
-    return false;
+    return Printed();
   }
 
-  return true;
+  return NoFail;
 }
 
 func paramlist_cells(gr *frame_graph, gn gr_num) *shray[cell_num] {
