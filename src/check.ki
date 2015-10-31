@@ -478,8 +478,8 @@ func check_and_compute_parms(cs *checkstate, clq *clqueue, t *genparms, out *idy
       noscope_parms idy_repls = blank_idyrepls();
       params_complete bool;
       params shray[te_typeexpr];
-      if ! ~check_and_compute_typeexpr_shray(cs, clq, &noscope_g, &noscope_parms, &ps, &params, &params_complete) {
-        return NoFail;
+      if case Printed(pm) = check_and_compute_typeexpr_shray(cs, clq, &noscope_g, &noscope_parms, &ps, &params, &params_complete) {
+        return Printed(pm);
       }
 
       if !params_complete {
@@ -1118,7 +1118,7 @@ func make_magic_inst(cs *checkstate, clq *clqueue, magic_name sym, arity size, t
     }
     case &OneMatch(m ent_and_parms): {
       inst_id def_inst_id;
-      if ! ~make_inst(cs, clq, m.ent, &m.parms, &inst_id) {
+      if !from_np(make_inst(cs, clq, m.ent, &m.parms, &inst_id)) {
         ice(_u8("make_inst (check_and_compute_parms) seeing error in match_def"));
       }
       return {m.ent, inst_id};

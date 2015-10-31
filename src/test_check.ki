@@ -71,9 +71,9 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
   success bool;
   if ctx->build {
     flattened array[u8];
-    success = ~build_nowrite_module(&cs, intern(&im, testmodule_name()), &flattened);
+    success = from_np(build_nowrite_module(&cs, intern(&im, testmodule_name()), &flattened));
   } else {
-    success = ~check_module(&cs, intern(&im, testmodule_name()));
+    success = from_np(check_module(&cs, intern(&im, testmodule_name())));
   }
   if !success {
     print(Stdout(), _u8("FAIL\n"));
@@ -97,7 +97,7 @@ func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
   im identmap = make_im();
   cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
   add_primitives(&cs);
-  if ~check_module(&cs, intern(&im, testmodule_name())) {
+  if from_np(check_module(&cs, intern(&im, testmodule_name()))) {
     print(Stdout(), _u8("FAIL\n"));
     fflush(Stdout());
     ctx->failures = ctx->failures + 1;

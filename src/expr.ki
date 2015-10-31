@@ -416,7 +416,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
       }
       case &OneMatch(m ent_and_parms): {
         inst_id def_inst_id;
-        if ! ~make_inst(ds->cs, ds->clq, m.ent, &m.parms, &inst_id) {
+        if !from_np(make_inst(ds->cs, ds->clq, m.ent, &m.parms, &inst_id)) {
           ice(_u8("lookup_or_make_enum_constructor_def make_inst failed after match"));
         }
         *out = {m.ent, inst_id};
@@ -466,7 +466,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
 
   ent def_entry_id = add_def_primitive(ds->cs, defname, NoGenerics(void), *ctor_type, @[def_definition]DefnMagic(MagicEnumConstruct(mec)));
   inst_id def_inst_id;
-  if ! ~make_inst(ds->cs, ds->clq, ent, &nogp, &inst_id) {
+  if !from_np(make_inst(ds->cs, ds->clq, ent, &nogp, &inst_id)) {
     ice(_u8("lookup_or_make_enum_constructor_def make_inst failed on fresh def"));
   }
 
@@ -561,12 +561,12 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
   }
   if is_complete(&unified) {
     c cac_typeexpr;
-    if ! ~noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &c) {
+    if !from_np(noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &c)) {
       ice(_u8("help_check_simple_literal passed bad type"));
     }
     check(c.complete);
     props type_properties;
-    if ! ~compute_complete_type_properties(es->cs, es->clq, &c.te, &props) {
+    if !from_np(compute_complete_type_properties(es->cs, es->clq, &c.te, &props)) {
       ice(_u8("help_check_simple_literal passed type with bad properties"));
     }
 
@@ -758,7 +758,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   if computed.complete {
     unified_computed = computed;
   } else {
-    if ! ~noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &unified_computed) {
+    if !from_np(noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &unified_computed)) {
       return ERR(_u8("TypedExpr encounters un-computable unified type."));
     }
   }
@@ -1986,7 +1986,7 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
 
 func compute_prim(cs *checkstate, clq *clqueue, t te_typeexpr) cu_typeexpr {
   cac cac_typeexpr;
-  if ! ~noscoped_check_and_compute_typeexpr(cs, clq, &t, &cac) {
+  if !from_np(noscoped_check_and_compute_typeexpr(cs, clq, &t, &cac)) {
     ice(_u8("compute_prim encounters uncomputable type"));
   }
   check(cac.complete);
@@ -2005,7 +2005,7 @@ func compute_prim(clq *clqueue, t te_typeexpr) cu_typrop {
 
 func compute_prim(cs *checkstate, clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
   type cu_typeexpr = compute_prim(cs, clq, t);
-  if ! ~compute_type_properties(cs, clq, &type, props_out) {
+  if !from_np(compute_type_properties(cs, clq, &type, props_out)) {
     ice(_u8("compute_prim fails to compute type properties"));
   }
   *out = type;

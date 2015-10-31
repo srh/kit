@@ -454,7 +454,7 @@ func st_def_to_fnid(cs *checkstate, ip instpair) opt[fn_body_id] {
   if case &Computed(x st_value) = &inst->evaled_value {
     if count(&x.symbolrefs) != 0 {
       fnid fn_body_id;
-      if ! ~x86_simple_symbolref(cs, &x, &fnid) {
+      if !from_np(x86_simple_symbolref(cs, &x, &fnid)) {
         ice(_u8("st_def_to_fnid sees non-simple (impossible symbolref"));
       }
       return Has(fnid);
@@ -1045,7 +1045,7 @@ func x86_simple_symbolref(cs *checkstate, val *st_value, id_out *fn_body_id) np 
 func x86_cmp_imm_sized(cs *checkstate, f *objfile, lhs u8, rhs *st_value, avail u8) void {
   if count(&rhs->symbolrefs) != 0 {
     fnid fn_body_id;
-    if ! ~x86_simple_symbolref(cs, rhs, &fnid) {
+    if !from_np(x86_simple_symbolref(cs, rhs, &fnid)) {
       ice(_u8("x86_cmp_imm_sized sees non-simple (impossible) symbolref"));
     }
     x86_mov_stiptr(f, avail, *unHas(&ref_fn_body(cs, fnid)->symbol_table_index));
