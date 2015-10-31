@@ -146,8 +146,8 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
   create(&h, &liveset, g->graph.cell);
 
   mut genexpr_result;
-  if !dumbly_analyze_expression(&h, &g->graph.gr, &liveset, g->graph.gn, &mut) {
-    return Printed();
+  if case Printed(pm) = dumbly_analyze_expression(&h, &g->graph.gr, &liveset, g->graph.gn, &mut) {
+    return Printed(pm);
   }
 
   switch &mut {
