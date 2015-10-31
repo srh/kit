@@ -214,15 +214,11 @@ func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id],
 }
 
 func check_expr_consume(es *framescope, x *ast_expr_consume, pt *te_typeexpr) np {
-  return check_consume_expr(es, &x->expr, &x->after, pt);
-}
-
-func check_consume_expr(es *framescope, x *ast_expr, aft *nc[ast_expr_after_consume], pt *te_typeexpr) np {
   // If you change this, see also check_expr_retconsume.
-  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), x, pt) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
     return Printed(pm);
   }
-  if case Printed(pm) = annotate_disposal_for_consume(es, x, aft) {
+  if case Printed(pm) = annotate_disposal_for_consume(es, &x->expr, &x->after) {
     return Printed(pm);
   }
   return NoFail;
