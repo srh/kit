@@ -628,16 +628,16 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
       return check_expr_logical_conjunction(es, &a, pt, x);
 
     case &Assignment(a ast_assignment):
-      return check_expr_assignment(es, pt, &a, x);
+      return check_expr_assignment(es, &a, pt, x);
 
     case &RefOf(a ast_refof):
-      return check_expr_refof(es, pt, &a, x);
+      return check_expr_refof(es, &a, pt, x);
 
     case &AddressOf(a ast_addressof):
-      return check_expr_addressof(es, pt, &a, x);
+      return check_expr_addressof(es, &a, pt, x);
 
     case &Deref(a ast_deref):
-      return check_expr_deref(es, pt, &a, x);
+      return check_expr_deref(es, &a, pt, x);
 
     case &IndexExpr(a ast_index_expr):
       return check_expr_index(es, &a, pt, x);
@@ -646,23 +646,23 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
       return check_expr_lambda(es, &a, pt, x);
 
     case &LocalField(a ast_local_field):
-      return check_expr_local_field(es, pt, &a, x);
+      return check_expr_local_field(es, &a, pt, x);
 
     case &DerefField(a ast_deref_field):
-      return check_expr_deref_field(es, pt, &a, x);
+      return check_expr_deref_field(es, &a, pt, x);
 
     case &TypedExpr(a ast_typed_expr):
-      return check_expr_typed_expr(es, ai, pt, &a, x);
+      return check_expr_typed_expr(es, ai, &a, pt, x);
 
     case &Strinit(a ast_strinit):
       return check_expr_strinit(es, ai, &a, pt, x);
 
     case &Ternary(a ast_ternary):
-      return check_expr_ternary(es, ai, pt, &a, x);
+      return check_expr_ternary(es, ai, &a, pt, x);
   }
 }
 
-func check_expr_refof(es *framescope, pt *te_typeexpr, a *ast_refof, x *ast_expr) np {
+func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr) np {
   ref_skeleton te_typeexpr = mk_ref_type(es->cs, TeUnknown, TeUnknown);
   unif_pt te_typeexpr;
   if !unify_types(pt, &ref_skeleton, &unif_pt) {
@@ -710,7 +710,7 @@ func check_expr_refof(es *framescope, pt *te_typeexpr, a *ast_refof, x *ast_expr
   }
 }
 
-func check_expr_ternary(es *framescope, ai allow_incomplete, pt *te_typeexpr, a *ast_ternary, x *ast_expr) np {
+func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt *te_typeexpr, x *ast_expr) np {
   boolean cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
   if case Printed(pm) = check_consume_then_discard_expr(es, oo(&oo(&a->condition)->expr), &boolean.~, &oo(&a->condition)->discard) {
     return Printed(pm);
@@ -735,7 +735,7 @@ func check_expr_ternary(es *framescope, ai allow_incomplete, pt *te_typeexpr, a 
   return NoFail;
 }
 
-func check_expr_typed_expr(es *framescope, ai allow_incomplete, pt *te_typeexpr, a *ast_typed_expr, x *ast_expr) np {
+func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_expr, pt *te_typeexpr, x *ast_expr) np {
   // TODO: Cache converted.
   converted te_typeexpr;
   if case Printed(pm) = convert_typeexpr(es->cs, &a->type, &converted) {
@@ -765,7 +765,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   return NoFail;
 }
 
-func check_expr_deref_field(es *framescope, pt *te_typeexpr, a *ast_deref_field, x *ast_expr) np {
+func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr, x *ast_expr) np {
   // The fact that our partial type isn't a pointer type is deliberate.
   unknown te_typeexpr = TeUnknown(void);
   if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->lhs), &unknown, &a->ptr_discard) {
@@ -821,7 +821,7 @@ func unnamed_lifetime(es *framescope) te_typeexpr {
   return TeLifetime({n});
 }
 
-func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field, x *ast_expr) np {
+func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr, x *ast_expr) np {
   unknown te_typeexpr = TeUnknown(void);
   if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), &unknown) {
     return Printed(pm);
@@ -863,7 +863,7 @@ func check_expr_local_field(es *framescope, pt *te_typeexpr, a *ast_local_field,
   return NoFail;
 }
 
-func check_expr_deref(es *framescope, pt *te_typeexpr, a *ast_deref, x *ast_expr) np {
+func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr) np {
   ptr_pt te_typeexpr = TeUnknown;
   // Let's force the rhs to be a complete type.  Because why not!
   if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->rhs), &ptr_pt, &a->ptr_discard) {
@@ -889,7 +889,7 @@ func check_expr_deref(es *framescope, pt *te_typeexpr, a *ast_deref, x *ast_expr
   return ERR(_u8("Trying to deref a non-pointer, non-reference."));
 }
 
-func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *ast_expr) np {
+func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *ast_expr) np {
   ptr_skeleton te_typeexpr = ptr_type(es->cs, TeUnknown);
   unif_pt te_typeexpr;
   if !unify_types(pt, &ptr_skeleton, &unif_pt) {
@@ -923,7 +923,7 @@ func check_expr_addressof(es *framescope, pt *te_typeexpr, a *ast_addressof, x *
   return NoFail;
 }
 
-func check_expr_assignment(es *framescope, pt *te_typeexpr, a *ast_assignment, x *ast_expr) np {
+func check_expr_assignment(es *framescope, a *ast_assignment, pt *te_typeexpr, x *ast_expr) np {
   // We check the lhs independently of the rhs, deliberately, to ensure clarity.
   if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), pt) {
     return Printed(pm);
