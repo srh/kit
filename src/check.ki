@@ -81,17 +81,14 @@ func check_module(cs *checkstate, mod_name sym) np {
 
 func convert_typefunc(cs *checkstate, a *ast_typeexpr, out *te_puretype) np {
   switch a {
-    case &Name(b ast_ident): {
-      *out = TePureName(b.value);
-      return NoFail;
-    }
-    case &Unknown(b ast_unknown): {
-      *out = TePureUnknown(void);
-      return NoFail;
-    }
-    default: {
-      return ERR(_u8("Fancy type expression '"), to_u8str(a), _u8("' in typefunc"));
-    }
+  case &Name(b ast_ident):
+    *out = TePureName(b.value);
+    return NoFail;
+  case &Unknown(b ast_unknown):
+    *out = TePureUnknown(void);
+    return NoFail;
+  default:
+    return ERR(_u8("Fancy type expression '"), to_u8str(a), _u8("' in typefunc"));
   }
 }
 
