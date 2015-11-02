@@ -76,20 +76,17 @@ deftype basic_analyze_state struct {
   celldisp array[cell_disp];
 };
 
-func basic_analyze_fn_body(cs *checkstate, g *graphed_fn_body, bas_out *basic_analyze_state) bool {
+func basic_analyze_fn_body(cs *checkstate, g *graphed_fn_body, bas_out *basic_analyze_state) void {
   bas basic_analyze_state = {0, mk_array@[gr_num](), mk_array@[cell_disp]()};
 
-  if !help_basic_analyze(cs, &bas, &g->graph.gr) {
-    return false;
-  }
+  help_basic_analyze(cs, &bas, &g->graph.gr);
 
   // TODO: Check mutual exclusivity of celldisps -- cells can't be certain combinations of things.
 
   *bas_out = bas;
-  return true;
 }
 
-func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_graph) bool {
+func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_graph) void {
   n_ops size = count(&gr->ops);
   cellcount size = count(&gr->cells);
   grow(&bas->celldisp, cellcount - count(&bas->celldisp), {None, None, None, false, None, NoConstDisp(void), mk_array@[cell_num](), mk_array@[cell_num]()});
@@ -156,7 +153,6 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
     }
   }
   bas->gns_analyzed = n_ops;
-  return true;
 }
 
 func mark_cell_value_used(bas *basic_analyze_state, c cell_num) void {
@@ -182,34 +178,30 @@ func mark_cell_not_const(bas *basic_analyze_state, c cell_num) void {
   ref(&bas->celldisp, c.~)->const_value = NotConst(void);
 }
 
-func basic_and_inline(cs *checkstate, g *graphed_fn_body) bool {
+func basic_and_inline(cs *checkstate, g *graphed_fn_body) np {
   switch &g->inline_state {
   case &NotComputed:
     g->inline_state = BeganComputing;
     bas basic_analyze_state;
-    if !basic_analyze_fn_body(cs, g, &bas) {
+    basic_analyze_fn_body(cs, g, &bas);
+
+    if case Printed(pm) = help_basic_inline_inlinables(cs, &bas, g) {
       g->inline_state = FailedComputation;
-      return false;
-    }
-    if !help_basic_inline_inlinables(cs, &bas, g) {
-      g->inline_state = FailedComputation;
-      return false;
+      return Printed(pm);
     }
     g->inline_state = Computed(bas);
-    return true;
+    return NoFail;
   case &BeganComputing:
-    ERR(_u8("Recursively inlining function "), lookup(cs->im, g->graph.gr.informal_name));
     g->inline_state = FailedComputation;
-    return false;
+    return ERR(_u8("Recursively inlining function "), lookup(cs->im, g->graph.gr.informal_name));
   case &FailedComputation:
-    ERR(_u8("basic_inline_inlinables already failed for "), lookup(cs->im, g->graph.gr.informal_name));
-    return false;
+    return ERR(_u8("basic_inline_inlinables already failed for "), lookup(cs->im, g->graph.gr.informal_name));
   case &Computed(x basic_analyze_state):
-    return true;
+    return NoFail;
   }
 }
 
-func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *graphed_fn_body) bool {
+func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *graphed_fn_body) np {
   gr *frame_graph = &g->graph.gr;
   // nparamlists is _not_ constant.
   nparamlists size = count(&bas->paramlists);
@@ -226,8 +218,8 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
           case &GraphedFnBody(eg graphed_fn_body):
             switch eg.inline {
             case InlineMust:
-              if !basic_and_inline(cs, &eg) {
-                return false;
+              if case Printed(pm) = basic_and_inline(cs, &eg) {
+                return Printed(pm);
               }
               nparams size = count(&a.params);
               check(count(&eg.argcells) == nparams);
@@ -298,7 +290,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
     }
   }
   swap(&bas->paramlists, &new_paramlists);
-  return true;
+  return NoFail;
 }
 
 func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_node {

@@ -6,23 +6,21 @@ import linux_objfile;
 import win_objfile;
 import objfile;
 
-func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u8]) bool {
-  if ! ~check_module(cs, modulename) {
-    return false;
+func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u8]) np {
+  if case Printed(pm) = check_module(cs, modulename) {
+    return Printed(pm);
   }
 
   f objfile = mk_objfile();
 
-  if !add_fn_body_symbols(cs, &f) {
-    return false;
+  add_fn_body_symbols(cs, &f);
+
+  if case Printed(pm) = build_fn_bodies(cs, &f) {
+    return Printed(pm);
   }
 
-  if !build_fn_bodies(cs, &f) {
-    return false;
-  }
-
-  if !add_export_symbols(cs, &f, modulename) {
-    return false;
+  if case Printed(pm) = add_export_symbols(cs, &f, modulename) {
+    return Printed(pm);
   }
 
   switch cs->plat.opsys {
@@ -32,13 +30,13 @@ func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u
     *flattened_out = win_flatten(cs->im, &f);
   }
 
-  return true;
+  return NoFail;
 }
 
-func build_module(cs *checkstate, modulename sym) bool {
+func build_module(cs *checkstate, modulename sym) np {
   flattened array[u8];
-  if !build_nowrite_module(cs, modulename, &flattened) {
-    return false;
+  if case Printed(pm) = build_nowrite_module(cs, modulename, &flattened) {
+    return Printed(pm);
   }
 
   path array[u8] = to_u8str(lookup(cs->im, modulename));
@@ -50,29 +48,28 @@ func build_module(cs *checkstate, modulename sym) bool {
   }
 
   if !write_file(path, &flattened) {
-    ERR(_u8("Could not write object file"));
-    return false;
+    return ERR(_u8("Could not write object file"));
   }
 
-  return true;
+  return NoFail;
 }
 
-func build_fn_bodies(cs *checkstate, f *objfile) bool {
+func build_fn_bodies(cs *checkstate, f *objfile) np {
   nbodies size = count(&cs->fn_bodies);
   for i size = 0; i < nbodies; i = i + 1 {
     ent *fn_body_entry = oo(ref(&cs->fn_bodies, i));
-    if !build_fn_body(cs, f, ent) {
-      return false;
+    if case Printed(pm) = build_fn_body(cs, f, ent) {
+      return Printed(pm);
     }
   }
-  return true;
+  return NoFail;
 }
 
-func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
+func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) np {
   switch &ent->u {
   case &GraphedFnBody(g graphed_fn_body):
-    if !basic_and_inline(cs, &g) {
-      return false;
+    if case Printed(pm) = basic_and_inline(cs, &g) {
+      return Printed(pm);
     }
 
     fillercode_align_double_quadword(f);
@@ -83,11 +80,11 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
     return dumbly_gen_graphed_fn_body(cs, f, &g);
   case &ExternFnBody(e extern_fn_body):
     // We have nothing to do, of course.
-    return true;
+    return NoFail;
   }
 }
 
-func add_export_symbols(cs *checkstate, f *objfile, modulename sym) bool {
+func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
   mod_id module_id = unHas(lookup(&cs->modules_by_name, &modulename));
   mod *module = ref_module(cs, mod_id);
   ndefs size = count(&mod->defs);
@@ -95,18 +92,17 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) bool {
     ent_id def_entry_id = get(&mod->defs, i);
     ent *def_entry = ref_def_entry(cs, ent_id);
     if def_is_export(ent) {
-      idyparms idy_genparms = {mk_shray()};
+      idyparms idy_genparms = blank_idyparms();
       if case Has(inst_id def_inst_id) = lookup_sole_value(&ent->insts, &idyparms) {
         inst *def_inst = ref_inst(cs, inst_id);
         if !is_fn_type(cs, &unHas(&inst->typrop)->cu.~) {
-          ERR(_u8("Cannot codegen export symbols for non-fn def (can only export functions)"));
-          return false;
+          return ERR(_u8("Cannot codegen export symbols for non-fn def (can only export functions)"));
         }
         if case &Computed(val st_value) = &inst->evaled_value {
           fnid fn_body_id;
-          if !x86_simple_symbolref(cs, &val, &fnid) {
-            ERR(_u8("Export fn-symbol has invalid value (zero-initialized fn[...] value, I bet)"));
-            return false;
+          if case Printed(pm) = x86_simple_symbolref(cs, &val, &fnid) {
+            @[np]ERR(_u8("Export fn-symbol has invalid value (zero-initialized fn[...] value, I bet)"));
+            return Printed(pm);
           }
           body_text_offset u32 = *unHas(&ref_fn_body(cs, fnid)->body_text_offset);
           name string = lookup(cs->im, ent->def_name);
@@ -125,7 +121,7 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) bool {
     }
   }
 
-  return true;
+  return NoFail;
 }
 
 func def_is_export(ent *def_entry) bool {
@@ -139,15 +135,12 @@ func def_is_export(ent *def_entry) bool {
   return false;
 }
 
-func add_fn_body_symbols(cs *checkstate, f *objfile) bool {
+func add_fn_body_symbols(cs *checkstate, f *objfile) void {
   nbodies size = count(&cs->fn_bodies);
   for i size = 0; i < nbodies; i = i + 1 {
     ent *fn_body_entry = oo(ref(&cs->fn_bodies, i));
-    if !add_fn_body_symbol(cs, f, ent) {
-      return false;
-    }
+    add_fn_body_symbol(cs, f, ent);
   }
-  return true;
 }
 
 func argcell_types(cs *checkstate, g *graphed_fn_body) shray[cu_typeexpr] {
@@ -159,7 +152,7 @@ func argcell_types(cs *checkstate, g *graphed_fn_body) shray[cu_typeexpr] {
   return freeze(&bu);
 }
 
-func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
+func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) void {
   switch &ent->u {
   case &GraphedFnBody(g graphed_fn_body):
     arg_types shray[cu_typeexpr] = argcell_types(cs, &g);
@@ -167,12 +160,10 @@ func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) bool {
     name sym = generate_kit_name(cs, ent->informal_name, arg_types);
     symbol_table_index sti = add_local_symbol(f, name, 0 /* We'll overwrite the value later. */, SectionText(void), IsStaticNo(void));
     annotate(&ent->symbol_table_index, symbol_table_index);
-    return true;
   case &ExternFnBody(e extern_fn_body):
     c_name sym = c_symbol_name(cs, e.name);
     symbol_table_index sti = add_remote_symbol(f, c_name, IsFunctionYes(void));
     annotate(&ent->symbol_table_index, symbol_table_index);
-    return true;
   }
 }
 

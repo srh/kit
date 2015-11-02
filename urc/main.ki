@@ -48,7 +48,7 @@ func run_on_file(plat platform_info, modulename array[u8]) bool {
   im identmap = make_im();
   cs checkstate = make_checkstate(&im, plat, null, file_loader);
   add_primitives(&cs);
-  if !build_module(&cs, intern(&im, from_u8(modulename))) {
+  if !from_np(build_module(&cs, intern(&im, from_u8(modulename)))) {
     print(Stdout(), _u8("Failed.\n"));
     fflush(Stdout());
     return false;

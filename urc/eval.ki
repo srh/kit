@@ -91,13 +91,12 @@ func initialization_mask(plat *platform_info, ones *array[u32], val *st_value) a
   return ret;
 }
 
-func ref_obj(env *st_env, num st_obj_num, out **st_value) bool {
+func ref_obj(env *st_env, num st_obj_num, out **st_value) np {
   if case &Has(v st_value) = ref(&env->pool->objects, num.~) {
     *out = &v;
-    return true;
+    return NoFail;
   } else {
-    ERR(_u8("static evaluation accessing object that has been destroyed"));
-    return false;
+    return ERR(_u8("static evaluation accessing object that has been destroyed"));
   }
 }
 
@@ -161,13 +160,13 @@ func value_read(plat *platform_info, val *st_value, offset u32, ncount u32, out 
   *out = {ws, ds, ncount, refs, objrefs};
 }
 
-func obj_read(env *st_env, oref st_obj_ref, out *st_value) bool {
+func obj_read(env *st_env, oref st_obj_ref, out *st_value) np {
   val *st_value;
-  if !ref_obj(env, oref.num, &val) {
-    return false;
+  if case Printed(pm) = ref_obj(env, oref.num, &val) {
+    return Printed(pm);
   }
   value_read(&env->plat, val, oref.offset, oref.count, out);
-  return true;
+  return NoFail;
 }
 
 func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in *st_value) void {
@@ -217,16 +216,16 @@ func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in 
   copy_bnnos(plat, &in->datas, 0, in->length, &val->datas, offset);
 }
 
-func obj_write(env *st_env, oref st_obj_ref, in *st_value) bool {
+func obj_write(env *st_env, oref st_obj_ref, in *st_value) np {
   if oref.count != in->length {
     ice(_u8("static eval writing object with non-matching length (oref.count="), oref.count, _u8(", in->length="), in->length, _u8(")"));
   }
   val *st_value;
-  if !ref_obj(env, oref.num, &val) {
-    return false;
+  if case Printed(pm) = ref_obj(env, oref.num, &val) {
+    return Printed(pm);
   }
   value_write(&env->plat, val, oref.offset, oref.count, in);
-  return true;
+  return NoFail;
 }
 
 // TODO: Eventually get rid of this.
@@ -302,8 +301,8 @@ func mk_st_value_symbolref(plat *platform_info, fnid fn_body_id) st_value {
 }
 
 func ensure_def_inst_evaled(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **st_value) np {
-  if !ensure_def_inst_graphed(cs, clq, ent_id, inst_id) {
-    return Printed();
+  if case Printed(pm) = ensure_def_inst_graphed(cs, clq, ent_id, inst_id) {
+    return Printed(pm);
   }
   return st_eval_def(clq, ent_id, inst_id, out);
 }
@@ -337,13 +336,15 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
       pool st_objpool = mk_objpool();
       env st_env = mk_env(&pool, clq->cs->plat, count(&fg->gr.cells));
 
-      if !st_eval_frame_regraphed(clq, &env, fg) {
+      if case Printed(printed_meta bool) = st_eval_frame_regraphed(clq, &env, fg) {
+        // We ignore printed_meta -- this is like a stack trace.
         inst->evaled_value = FailedComputation();
         return ERR(_u8("(in evaling def "), defname, _u8(")"));
       }
       result st_obj_ref = cell_obj_ref(&env, fg->cell, "in st_eval_def");
       value st_value;
-      if !obj_read(&env, result, &value) {
+      if case Printed(printed_meta bool) = obj_read(&env, result, &value) {
+        // We ignore printed_meta.
         inst->evaled_value = FailedComputation();
         return ERR(_u8("(in result from evaling def "), defname, _u8(")"));
       }
@@ -383,7 +384,7 @@ defenum gr_stackent {
   EvalOp gr_num;
 };
 
-func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) bool {
+func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np {
   // A stack of gr_num's to evaluate, in order.
   stack array[gr_stackent];
   push(&stack, EvalOpAndPrecs(fg->gn));
@@ -412,12 +413,12 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
             ice(_u8("Function apply funptr cell is sub-object"));
           }
           funvalue st_value;
-          if !obj_read(env, funref, &funvalue) {
-            return false;
+          if case Printed(pm) = obj_read(env, funref, &funvalue) {
+            return Printed(pm);
           }
           funcval st_symbolref;
-          if !st_value_as_symbolref(&env->plat, &funvalue, &funcval) {
-            return false;
+          if case Printed(pm) = st_value_as_symbolref(&env->plat, &funvalue, &funcval) {
+            return Printed(pm);
           }
           nparams size = count(&a.params);
           paramorefs array[st_obj_ref];
@@ -435,8 +436,8 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
           st_maybe_init_static(&fg->gr, env, a.retcell);
           retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in III");
 
-          if !st_eval_fn_body(clq, env, &paramorefs, retvalref, funcval.fnid) {
-            return false;
+          if case Printed(pm) = st_eval_fn_body(clq, env, &paramorefs, retvalref, funcval.fnid) {
+            return Printed(pm);
           }
 
         case &GrPrimApply(a gr_prim_apply):
@@ -457,8 +458,8 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
           st_maybe_init_static(&fg->gr, env, a.retcell);
           retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in IIIb");
 
-          if !st_eval_prim_op(clq, env, &paramorefs, retvalref, &a.primop) {
-            return false;
+          if case Printed(pm) = st_eval_prim_op(clq, env, &paramorefs, retvalref, &a.primop) {
+            return Printed(pm);
           }
 
         case &GrMemCopy(a gr_memcopy):
@@ -466,30 +467,28 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
           destref st_obj_ref = cell_obj_ref(env, a.dest, "in IV");
           srcref st_obj_ref;
           if !try_cell_obj_ref(env, a.src, &srcref) {
-            ERR(_u8("ICE: cell obj cannot be reffed (in V) (cell num = "), a.src.~, _u8(")"));
-            return false;
+            return ERR(_u8("ICE: cell obj cannot be reffed (in V) (cell num = "), a.src.~, _u8(")"));
           }
           value st_value;
-          if !obj_read(env, srcref, &value) {
-            return false;
+          if case Printed(pm) = obj_read(env, srcref, &value) {
+            return Printed(pm);
           }
-          if !obj_write(env, destref, &value) {
-            return false;
+          if case Printed(pm) = obj_write(env, destref, &value) {
+            return Printed(pm);
           }
 
         case &GrWriteConst(a gr_writeconst):
           st_maybe_init_static(&fg->gr, env, a.dest);
           destref st_obj_ref;
           if !try_cell_obj_ref(env, a.dest, &destref) {
-            ERR(_u8("ICE: cell obj cannot be reffed (in VI) (cell num = "), a.dest.~, _u8(")"));
-            return false;
+            return ERR(_u8("ICE: cell obj cannot be reffed (in VI) (cell num = "), a.dest.~, _u8(")"));
           }
           value st_value;
-          if !st_const_compute(clq, &env->plat, &a.value, destref.count, &value) {
-            return false;
+          if case Printed(pm) = st_const_compute(clq, &env->plat, &a.value, destref.count, &value) {
+            return Printed(pm);
           }
-          if !obj_write(env, destref, &value) {
-            return false;
+          if case Printed(pm) = obj_write(env, destref, &value) {
+            return Printed(pm);
           }
 
         case &GrAddressof(a gr_addressof):
@@ -499,68 +498,63 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
           st_maybe_init_static(&fg->gr, env, a.addressee);
           addressee_ref st_obj_ref = cell_obj_ref(env, a.addressee, "in VIII");
           value st_value = mk_st_value_pointer(&env->plat, {addressee_ref.num, addressee_ref.offset});
-          if !obj_write(env, destref, &value) {
-            return false;
+          if case Printed(pm) = obj_write(env, destref, &value) {
+            return Printed(pm);
           }
 
         case &GrDeref(a gr_deref):
           pointer_obj st_obj_ref = cell_obj_ref(env, a.pointer, "in IX");
           pointer_value st_value;
-          if !obj_read(env, pointer_obj, &pointer_value) {
-            return false;
+          if case Printed(pm) = obj_read(env, pointer_obj, &pointer_value) {
+            return Printed(pm);
           }
           pointer st_pointer;
-          if !st_value_as_pointer(&env->plat, &pointer_value, &pointer) {
-            return false;
+          if case Printed(pm) = st_value_as_pointer(&env->plat, &pointer_value, &pointer) {
+            return Printed(pm);
           }
           info *cell_info = ref_cell(&fg->gr, a.name);
           deref_size u32 = info->props.flat_size;
           // We add offset to pointer.offset.
           offset u32;
-          if !st_offset_compute(env, a.offset, &offset) {
-            return false;
+          if case Printed(pm) = st_offset_compute(env, a.offset, &offset) {
+            return Printed(pm);
           }
           new_offset u32 = pointer.offset + offset;
           if case &Has(referee_val st_value) = ref(&env->pool->objects, pointer.num.~) {
             if new_offset > referee_val.length {
-              ERR(_u8("Dereferencing pointer out of range"));
-              return false;
+              return ERR(_u8("Dereferencing pointer out of range"));
             }
           } else {
-            ERR(_u8("Dereferencing pointer to dead object"));
-            return false;
+            return ERR(_u8("Dereferencing pointer to dead object"));
           }
           *ref(&env->framecells, a.name.~) = Has(@[st_obj_ref]{pointer.num, new_offset, deref_size});
 
         case &GrSubcell(a gr_subcell):
           partof_obj st_obj_ref = cell_obj_ref(env, a.partof, "in X");
           offset u32;
-          if !st_offset_compute(env, a.offset, &offset) {
-            return false;
+          if case Printed(pm) = st_offset_compute(env, a.offset, &offset) {
+            return Printed(pm);
           }
           if offset > partof_obj.count {
-            ERR(_u8("Subcell index out of range (for cell)"));
-            return false;
+            return ERR(_u8("Subcell index out of range (for cell)"));
           }
           info *cell_info = ref_cell(&fg->gr, a.name);
           deref_size u32 = info->props.flat_size;
           new_offset u32 = partof_obj.offset + offset;
           if case &Has(referee_val st_value) = ref(&env->pool->objects, partof_obj.num.~) {
             if new_offset > referee_val.length {
-              ERR(_u8("Subcell index out of range (for object)"));
-              return false;
+              return ERR(_u8("Subcell index out of range (for object)"));
             }
           } else {
-            ERR(_u8("Accessing subcell of dead object"));
-            return false;
+            return ERR(_u8("Accessing subcell of dead object"));
           }
           *ref(&env->framecells, a.name.~) = Has(@[st_obj_ref]{partof_obj.num, new_offset, deref_size});
         case &GrWriteNothing(a gr_writenothing):
           st_maybe_init_static(&fg->gr, env, a.dest);
           destref st_obj_ref = cell_obj_ref(env, a.dest, "in XII");
           value st_value = mk_st_value(&env->plat, destref.count);
-          if !obj_write(env, destref, &value) {
-            return false;
+          if case Printed(pm) = obj_write(env, destref, &value) {
+            return Printed(pm);
           }
 
         case &GrDead(a gr_dead):
@@ -592,20 +586,20 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
         case &GrBranch(a gr_branch):
           src_obj st_obj_ref = cell_obj_ref(env, a.src, "in XI");
           src_value st_value;
-          if !obj_read(env, src_obj, &src_value) {
-            return false;
+          if case Printed(pm) = obj_read(env, src_obj, &src_value) {
+            return Printed(pm);
           }
           ncases size = count(&a.cases);
           found bool = false;
           for i size = 0; i < ncases && !found; i = i + 1 {
             case_i *tup[gr_const, sq_num] = ref(&a.cases, i);
             case_value st_value;
-            if !st_const_compute(clq, &env->plat, &case_i->car, src_obj.count, &case_value) {
-              return false;
+            if case Printed(pm) = st_const_compute(clq, &env->plat, &case_i->car, src_obj.count, &case_value) {
+              return Printed(pm);
             }
             case_matches bool;
-            if !st_values_selfcontained_equal(&env->plat, &src_value, &case_value, &case_matches) {
-              return false;
+            if case Printed(pm) = st_values_selfcontained_equal(&env->plat, &src_value, &case_value, &case_matches) {
+              return Printed(pm);
             }
             if case_matches {
               push(&stack, EvalOpAndPrecs(case_i->cdr.~));
@@ -616,8 +610,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
             if case Has(default_gn sq_num) = a.default_case {
               push(&stack, EvalOpAndPrecs(default_gn.~));
             } else {
-              ERR(_u8("GrBranch meets unhandled case"));
-              return false;
+              return ERR(_u8("GrBranch meets unhandled case"));
             }
           }
 
@@ -635,10 +628,10 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) boo
     }
   }
 
-  return true;
+  return NoFail;
 }
 
-func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, fnid fn_body_id) bool {
+func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, fnid fn_body_id) np {
   nparams size = count(paramorefs);
   switch &ref_fn_body(clq->cs, fnid)->u {
   case &GraphedFnBody(fnent graphed_fn_body):
@@ -653,14 +646,13 @@ func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], r
     }
     *ref(&subenv.framecells, fnent.graph.cell.~) = Has(retvalref);
 
-    if !st_eval_frame_regraphed(clq, &subenv, &fnent.graph) {
-      ERR(_u8("(in evaling fn "), lookup(clq->im, fnent.graph.gr.informal_name));
-      return false;
+    if case Printed(printed_meta bool) = st_eval_frame_regraphed(clq, &subenv, &fnent.graph) {
+      // We ignore printed_meta -- this is essentially a stack frame.
+      return ERR(_u8("(in evaling fn "), lookup(clq->im, fnent.graph.gr.informal_name), _u8(")"));
     }
-    return true;
+    return NoFail;
   case &ExternFnBody(exent extern_fn_body):
-    ERR(_u8("st_eval_fn_body cannot eval extern fn body named "), lookup(clq->im, exent.name));
-    return false;
+    return ERR(_u8("st_eval_fn_body cannot eval extern fn body named "), lookup(clq->im, exent.name));
   }
 }
 
@@ -675,35 +667,33 @@ func is_full_oref(env *st_env, oref st_obj_ref) bool {
   return false;
 }
 
-func st_values_selfcontained_equal(plat *platform_info, a *st_value, b *st_value, out *bool) bool {
+func st_values_selfcontained_equal(plat *platform_info, a *st_value, b *st_value, out *bool) np {
   check(a != b);
   if a->length != b->length {
     ice(_u8("st_values_equal sees non-equal lengths"));
   }
   // Right now nothing expects to compare pointer values.
   if !(is_selfcontained(a) && is_selfcontained(b)) {
-    ERR(_u8("Comparing non-self-contained values"));
-    return false;
+    return ERR(_u8("Comparing non-self-contained values"));
   }
   expected_datas array[u32] = mk_ones(plat, a->length);
   if !array_equal(&a->datas, &expected_datas) || !array_equal(&b->datas, &expected_datas) {
     // Arguably if just one of the initialized bits is different, we could deterministically declare the values non-equal.  But, no.
-    ERR(_u8("Comparing non-initialized values"));
-    return false;
+    return ERR(_u8("Comparing non-initialized values"));
   }
 
   *out = array_equal(&a->words, &b->words);
-  return true;
+  return NoFail;
 }
 
-func st_const_compute(clq *clqueue, plat *platform_info, c *gr_const, length u32, out *st_value) bool {
+func st_const_compute(clq *clqueue, plat *platform_info, c *gr_const, length u32, out *st_value) np {
   switch c {
   case &ConstInt(b bigint):
     *out = st_bigint_to_value_unsigned(plat, length, b);
   case &ConstDef(ip instpair):
     val *st_value;
-    if ! ~ensure_def_inst_evaled(clq->cs, clq, ip.ent_id, ip.inst_id, &val) {
-      return false;
+    if case Printed(pm) = ensure_def_inst_evaled(clq->cs, clq, ip.ent_id, ip.inst_id, &val) {
+      return Printed(pm);
     }
     *out = *val;
   case &ConstFnBody(fnid fn_body_id):
@@ -711,11 +701,11 @@ func st_const_compute(clq *clqueue, plat *platform_info, c *gr_const, length u32
   case &ConstBytes(arr shray[u8]):
     *out = st_u8s_to_value(plat, &arr);
   }
-  return true;
+  return NoFail;
 }
 
 // Same as st_const_compute except for ConstDef -- we're at code-gen time, everything should be computed.
-func st_const_compute_for_gen(cs *checkstate, c *gr_const, length u32, out *st_value) bool {
+func st_const_compute_for_gen(cs *checkstate, c *gr_const, length u32, out *st_value) void {
   switch c {
   case &ConstInt(b bigint):
     *out = st_bigint_to_value_unsigned(&cs->plat, length, b);
@@ -732,26 +722,25 @@ func st_const_compute_for_gen(cs *checkstate, c *gr_const, length u32, out *st_v
   case &ConstBytes(arr shray[u8]):
     *out = st_u8s_to_value(&cs->plat, &arr);
   }
-  return true;
 }
 
-func st_offset_compute(env *st_env, gro gr_offset, out *u32) bool {
+func st_offset_compute(env *st_env, gro gr_offset, out *u32) np {
   switch gro {
   case OffsetConst(o u32):
     *out = o;
   case OffsetComputed(pair tup[u32, cell_num]):
     index_obj st_obj_ref = cell_obj_ref(env, pair.cdr, "in XIII");
     index_value st_value;
-    if !obj_read(env, index_obj, &index_value) {
-      return false;
+    if case Printed(pm) = obj_read(env, index_obj, &index_value) {
+      return Printed(pm);
     }
     index u32;
-    if !st_value_as_size(&env->plat, &index_value, &index) {
-      return false;
+    if case Printed(pm) = st_value_as_size(&env->plat, &index_value, &index) {
+      return Printed(pm);
     }
     *out = pair.car * index;
   }
-  return true;
+  return NoFail;
 }
 
 func st_bigint_to_value_unsigned(plat *platform_info, length u32, b bigint) st_value {
@@ -796,22 +785,22 @@ func st_bigint_to_value_twos(plat *platform_info, length u32, b bigint, out *st_
   return true;
 }
 
-func st_value_unsigned_as_bigint(plat *platform_info, val *st_value, out *bigint) bool {
+func st_value_unsigned_as_bigint(plat *platform_info, val *st_value, out *bigint) np {
   words array[u32];
-  if !st_value_self_contained(plat, val, &words) {
-    return false;
+  if case Printed(pm) = st_value_self_contained(plat, val, &words) {
+    return Printed(pm);
   }
 
   check_littleendian(plat);
   // It's pretty simple when it's little-endian.
   squash(false, &words, out);
-  return true;
+  return NoFail;
 }
 
-func st_value_signed_twos_as_bigint(plat *platform_info, val *st_value, out *bigint) bool {
+func st_value_signed_twos_as_bigint(plat *platform_info, val *st_value, out *bigint) np {
   words array[u32];
-  if !st_value_self_contained(plat, val, &words) {
-    return false;
+  if case Printed(pm) = st_value_self_contained(plat, val, &words) {
+    return Printed(pm);
   }
 
   check_littleendian(plat);
@@ -827,21 +816,19 @@ func st_value_signed_twos_as_bigint(plat *platform_info, val *st_value, out *big
     tmp = tmp - (bigu(1) << bitlength);
   }
   swap(out, &tmp);
-  return true;
+  return NoFail;
 }
 
-func st_value_self_contained(plat *platform_info, val *st_value, out *array[u32]) bool {
+func st_value_self_contained(plat *platform_info, val *st_value, out *array[u32]) np {
   if !is_selfcontained(val) {
-    ERR(_u8("Value is not self-contained, expecting data."));
-    return false;
+    return ERR(_u8("Value is not self-contained, expecting data."));
   }
   ret array[u32];
   bitlength u32 = val->length * plat->bnno_size;
   n u32 = bitlength / 32;
   for i u32 = 0; i < n; i = i + 1 {
     if get(&val->datas, ~i) != ^ @[u32]0 {
-      ERR(_u8("Use of uninitialized value (I)."));
-      return false;
+      return ERR(_u8("Use of uninitialized value (I)."));
     }
     push(&ret, get(&val->words, ~i));
   }
@@ -849,8 +836,7 @@ func st_value_self_contained(plat *platform_info, val *st_value, out *array[u32]
   if bitrem != 0 {
     lastmask u32 = ((@[u32]1 << bitrem) - 1);
     if get(&val->datas, ~n) != lastmask {
-      ERR(_u8("Use of uninitialized value (II)."));
-      return false;
+      return ERR(_u8("Use of uninitialized value (II)."));
     }
     x u32 = get(&val->words, ~n);
     check((x & (^lastmask)) == 0);
@@ -858,7 +844,7 @@ func st_value_self_contained(plat *platform_info, val *st_value, out *array[u32]
   }
 
   swap(out, &ret);
-  return true;
+  return NoFail;
 }
 
 func st_u8s_to_value(plat *platform_info, arr *shray[u8]) st_value {
@@ -925,69 +911,61 @@ func st_maybe_init_static(gr *frame_graph, env *st_env, cell cell_num) void {
   *ref(&env->framecells, cell.~) = Has(@[st_obj_ref]{objnum, 0, info->props.flat_size});
 }
 
-func err_nonpointer() void {
-  ERR(_u8("Treating non-pointer value as pointer."));
+func err_nonpointer() np {
+  return ERR(_u8("Treating non-pointer value as pointer."));
 }
 
-func st_value_as_pointer(plat *platform_info, val *st_value, out *st_pointer) bool {
+func st_value_as_pointer(plat *platform_info, val *st_value, out *st_pointer) np {
   if count(&val->objrefs) != 1 {
-    err_nonpointer();
-    return false;
+    return err_nonpointer();
   }
   oref *tup[u32, st_pointer] = ref(&val->objrefs, 0);
   if oref->car != 0 {
-    err_nonpointer();
-    return false;
+    return err_nonpointer();
   }
   expected u32 = st_pointer_size(plat, &oref->cdr);
   if val->length != expected {
-    err_nonpointer();
-    return false;
+    return err_nonpointer();
   }
   *out = oref->cdr;
-  return true;
+  return NoFail;
 }
 
-func err_nonsymbolref() void {
-  ERR(_u8("Expected function pointer."));
+func err_nonsymbolref() np {
+  return ERR(_u8("Expected function pointer."));
 }
 
-func st_value_as_symbolref(plat *platform_info, val *st_value, out *st_symbolref) bool {
+func st_value_as_symbolref(plat *platform_info, val *st_value, out *st_symbolref) np {
   if count(&val->symbolrefs) != 1 {
-    err_nonsymbolref();
-    return false;
+    return err_nonsymbolref();
   }
   sref *tup[u32, st_symbolref] = ref(&val->symbolrefs, 0);
   if sref->car != 0 {
-    err_nonsymbolref();
-    return false;
+    return err_nonsymbolref();
   }
   expected u32 = st_symbolref_size(plat, &sref->cdr);
   if val->length != expected {
-    err_nonsymbolref();
-    return false;
+    return err_nonsymbolref();
   }
   *out = sref->cdr;
-  return true;
+  return NoFail;
 }
 
 // Reads a value of the target platform's size type -- but outputs a u32 -- errors if truncation would happen.
-func st_value_as_size(plat *platform_info, val *st_value, out *u32) bool {
+func st_value_as_size(plat *platform_info, val *st_value, out *u32) np {
   if val->length != plat->sizetraits.flat.size {
-    ERR(_u8("Treating non-size-sized value as size."));
-    return false;
+    return ERR(_u8("Treating non-size-sized value as size."));
   }
   b bigint;
-  if !st_value_unsigned_as_bigint(plat, val, &b) {
-    return false;
+  if case Printed(pm) = st_value_unsigned_as_bigint(plat, val, &b) {
+    return Printed(pm);
   }
   x u32;
   if !as_non_negative_u32(&b, &x) {
-    ERR(_u8("Size out of range for static evaluation."));
-    return false;
+    return ERR(_u8("Size out of range for static evaluation."));
   }
   *out = x;
-  return true;
+  return NoFail;
 }
 
 func[H] build_u8str(help H, r *array[u8], x *st_value) void {

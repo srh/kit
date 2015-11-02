@@ -151,6 +151,10 @@ func primitive_pointer_puretype(cs *checkstate) te_puretype {
   return TePureName(cs->im->cym.ptrtype_sym);
 }
 
+func primitive_ref_puretype(cs *checkstate) te_puretype {
+  return TePureName(cs->im->cym.reftype_sym);
+}
+
 func is_fn_type(cs *checkstate, t *te_typeexpr) bool {
   typarams *shray[te_typeexpr];
   return decompose_typeapp(t, primitive_function_puretype(cs), &typarams);
@@ -201,6 +205,7 @@ func add_primitives(cs *checkstate) void {
   add_void_primitive(cs);
   add_bool_primitive(cs);
   add_pointer_primitive(cs);
+  add_ref_primitive_type(cs);
   add_function_primitive(cs);
   add_magic_constructor_primitives(cs);
 }
@@ -342,7 +347,7 @@ func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
       IsScalarYes(void)
     }
   };
-  instparms idy_genparms = {mk_shray()};
+  instparms idy_genparms = blank_idyparms();
   inst_id deftype_inst_id = add_deftype_inst(cs, {instparms, Computed(info)});
   insts array[deftype_inst_id];
   push(&insts, inst_id);
@@ -357,7 +362,7 @@ func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
 }
 
 func tee_generic(cs *checkstate) ast_generics {
-  return HasGenerics(mk_array@[ast_ident]({fake_ast_meta(), cs->im->cym.tee_sym}));
+  return HasGenerics(mk_array(@[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym})));
 }
 
 func fn_type(cs *checkstate, params shray[te_typeexpr]) te_typeexpr {
@@ -382,6 +387,14 @@ func ptr_type(cs *checkstate, t te_typeexpr) te_typeexpr {
   return TeApp({primitive_pointer_puretype(cs), mk_shray(t), None});
 }
 
+func mk_ref_type(cs *checkstate, lifetime te_typeexpr, param te_typeexpr) te_typeexpr {
+  return TeApp({primitive_ref_puretype(cs), mk_shray(lifetime, param), None});
+}
+
+func fake_lifetime(cs *checkstate) te_typeexpr {
+  return TeLifetime({cs->im->cym.fakesym});
+}
+
 func add_pointer_primitive(cs *checkstate) void {
   add_pointer_primitive_type(cs);
   tee_type te_typeexpr = TeName({cs->im->cym.tee_sym, None});
@@ -396,8 +409,7 @@ func add_pointer_primitive(cs *checkstate) void {
 }
 
 func add_pointer_primitive_type(cs *checkstate) void {
-  one_generic array[ast_ident];
-  push(&one_generic, {fake_ast_meta(), cs->im->cym.tee_sym});
+  one_generic array[ast_generik] = mk_array(@[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym}));
   // It's as if pointers belong in an even _more_ primitive module than integer/bool types.
   ent deftype_entry = {
     cs->im->cym.primitive_module_sym,
@@ -415,6 +427,32 @@ func add_pointer_primitive_type(cs *checkstate) void {
            DerivedMethodTrivial(void),
            DerivedMethodTrivial(void),
            IsScalarYes(void)
+         }}),
+    mk_hash@[idy_genparms, deftype_inst_id]()
+  };
+  id deftype_entry_id = add_deftype_entry(cs, ent);
+  // TODO: We probably want to put the id in some kind of "primitive" or hyper-primitive module.
+}
+
+func add_ref_primitive_type(cs *checkstate) void {
+  two_generic array[ast_generik] = mk_array(@[ast_generik]LifetimeGeneric({fake_ast_meta(), intern(cs->im, _s("a"))}), @[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym}));
+  ent deftype_entry = {
+    cs->im->cym.primitive_module_sym,
+    cs->im->cym.reftype_sym,
+    mk_array@[access_entry_id](),
+    RhsImpossible,
+    HasGenerics(two_generic),
+    None,
+    Has({None,
+         @[type_properties]{
+           // Someday fat refs might exist, and the traits will depend on the referent, but right now they are just like pointers, as far as these traits go.
+           cs->plat.ptrtraits.size,
+           cs->plat.ptrtraits.alignment,
+           DerivedMethodTrivial,
+           DerivedMethodTrivial,
+           DerivedMethodTrivial,
+           DerivedMethodTrivial,
+           IsScalarYes
          }}),
     mk_hash@[idy_genparms, deftype_inst_id]()
   };

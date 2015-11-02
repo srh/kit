@@ -5,6 +5,12 @@ defenum allow_blanks {
   AllowBlanksYes void;
 };
 
+// This isn't passed recursively -- "No" is used whenever parsing always expects a concrete type anyway.
+defenum allow_lifetimes {
+  AllowLifetimesNo void;
+  AllowLifetimesYes void;
+};
+
 defenum force_assignment {
   ForceAssignmentNo void;
   ForceAssignmentYes void;
@@ -15,7 +21,7 @@ defenum parse_result {
   Success void;
 };
 
-// NOTE: This can fail if x is unininitialized.  Should this be "~"?  In the long run the uninitialized value should be impossible.  If that changes, this should be changed to "~".
+// NOTE: This can fail if x is unininitialized.  Should this be "~"?  In the long run the uninitialized value should be impossible.  If that does not happen, this should be changed to "~".
 func `+`(x parse_result) bool {
   switch x {
   case Fail: return false;
@@ -379,7 +385,7 @@ func parse_lambdaspec(p *ps, params_out *array[ast_vardecl], return_type_out *as
 }
 
 func parse_typeexpr(p *ps, out *ast_typeexpr) parse_result {
-  return help_parse_typeexpr(p, AllowBlanksNo(void), out);
+  return help_parse_typeexpr(p, AllowBlanksNo, AllowLifetimesNo, out);
 }
 
 func parse_ident(p *ps, out *ast_ident) parse_result {
@@ -451,7 +457,7 @@ func[T] try_skip_specific_ident(p *ps, x T) parse_result {
 }
 
 func parse_generics_if_present(p *ps, out *ast_generics) parse_result {
-  args array[ast_ident];
+  args array[ast_generik];
   if ! +try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
     *out = NoGenerics(void);
     return Success;
@@ -466,12 +472,29 @@ func parse_generics_if_present(p *ps, out *ast_generics) parse_result {
         return Fail;
       }
     }
-    arg ast_ident;
-    if ! +parse_ident(p, &arg) {
+    arg ast_generik;
+    if ! +parse_generik(p, &arg) {
       return Fail;
     }
     push(&args, arg);
   }
+}
+
+func parse_generik(p *ps, out *ast_generik) parse_result {
+  if +try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
+    name ast_ident;
+    if ! +parse_ident(p, &name) {
+      return Fail;
+    }
+    *out = LifetimeGeneric(name);
+    return Success;
+  }
+  name ast_ident;
+  if ! +parse_ident(p, &name) {
+    return Fail;
+  }
+  *out = PlainGeneric(name);
+  return Success;
 }
 
 func parse_args_list(p *ps, out *array[ast_vardecl]) parse_result {
@@ -537,8 +560,8 @@ func try_underscore_if_allowed(p *ps, ab allow_blanks, out *ast_typeexpr) parse_
   }
 }
 
-func help_parse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) parse_result {
-  switch help_triparse_typeexpr(p, ab, out) {
+func help_parse_typeexpr(p *ps, ab allow_blanks, al allow_lifetimes, out *ast_typeexpr) parse_result {
+  switch help_triparse_typeexpr(p, ab, al, out) {
     case Success: { return Success; }
     default: { return Fail; }
   }
@@ -553,7 +576,7 @@ inline func success_or_fail(res parse_result) triparse_result {
   }
 }
 
-func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_result {
+func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_lifetimes, out *ast_typeexpr) triparse_result {
   voidmeta ast_meta;
   if case Has(m ast_meta) = try_parse_keyw(p, Void(void)) {
     *out = Name({m, p->im->cym.voidsym});
@@ -572,11 +595,26 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, out *ast_typeexpr) triparse_
   if +try_parse_oper(p, '*', &oper) {
     return success_or_fail(parse_rest_of_pointer(p, ab, oper, out));
   }
+  if +try_parse_oper(p, '&', &oper) {
+    return success_or_fail(parse_rest_of_reference(p, ab, oper, out));
+  }
   if +try_skip_oper(p, '^') {
     if ! +try_skip_token(p, @[tokval]Grouper(LBracket(void))) {
       return Error(void);
     }
     return success_or_fail(parse_rest_of_arraytype(p, ab, out));
+  }
+
+  if case AllowLifetimesYes = al {
+    lifetime ast_lifetime;
+    switch triparse_lifetime(p, &lifetime) {
+    case Success:
+      *out = Lifetime(lifetime);
+      return Success;
+    case Quickfail: { }
+    case Error:
+      return Error;
+    }
   }
 
   lhs ast_typeexpr;
@@ -637,7 +675,7 @@ func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) parse_re
       if +try_skip_keyw(p, Underscore(void)) {
         param box[ast_typeexpr];
         if !(+try_skip_token(p, @[tokval]Grouper(RBracket(void)))
-             && +help_parse_typeexpr(p, ab, oo(&param))) {
+             && +help_parse_typeexpr(p, ab, AllowLifetimesNo, oo(&param))) {
           return Fail;
         }
 
@@ -662,11 +700,37 @@ func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) parse_re
 
 func parse_rest_of_pointer(p *ps, ab allow_blanks, oper ast_ident, out *ast_typeexpr) parse_result {
   arg ast_typeexpr;
-  if ! +help_parse_typeexpr(p, ab, &arg) {
+  if ! +help_parse_typeexpr(p, ab, AllowLifetimesNo, &arg) {
     return Fail;
   }
   *out = App({embox(Name(oper)),
               mk_array(arg)});
+  return Success;
+}
+
+func parse_rest_of_reference(p *ps, ab allow_blanks, oper ast_ident, out *ast_typeexpr) parse_result {
+  lifetime_arg ast_lifetime;
+  if case Success = triparse_lifetime(p, &lifetime_arg) {
+    arg ast_typeexpr;
+    if ! +help_parse_typeexpr(p, ab, AllowLifetimesNo, &arg) {
+      return Fail;
+    }
+    *out = App({embox(Name(oper)), mk_array(Lifetime(lifetime_arg), arg)});
+    return Success;
+  } else {
+    return Fail;
+  }
+}
+
+func triparse_lifetime(p *ps, out *ast_lifetime) triparse_result {
+  if ! +try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
+    return Quickfail;
+  }
+  name ast_ident;
+  if ! +parse_ident(p, &name) {
+    return Error;
+  }
+  *out = {name};
   return Success;
 }
 
@@ -685,7 +749,7 @@ func parse_rest_of_type_param_list(p *ps, ab allow_blanks, out *array[ast_typeex
     }
 
     typeexpr ast_typeexpr;
-    if ! +help_parse_typeexpr(p, ab, &typeexpr) {
+    if ! +help_parse_typeexpr(p, ab, AllowLifetimesYes, &typeexpr) {
       return Fail;
     }
     push(&args, typeexpr);
@@ -722,7 +786,7 @@ func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) parse_result {
   switch ab {
     case AllowBlanksYes: {
       type ast_typeexpr;
-      switch help_triparse_typeexpr(p, ab, &type) {
+      switch help_triparse_typeexpr(p, ab, AllowLifetimesNo, &type) {
         case Success: {
           *out = {name, type};
           return Success;
@@ -738,7 +802,7 @@ func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) parse_result {
     }
     case AllowBlanksNo: {
       type ast_typeexpr;
-      if ! +help_parse_typeexpr(p, ab, &type) {
+      if ! +help_parse_typeexpr(p, ab, AllowLifetimesNo, &type) {
         return Fail;
       }
       *out = {name, type};
@@ -823,6 +887,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       }
       step(p);
       m ast_meta = copyend(p, lhs.meta);
+      note_original(p, m, IncrDecr);
       // (NOTE: Is expanding out this funcall/typed/addressof expr the best software design choice?  I think so, we can add layover information saying this is an incr expr, later.  Likewise with user assignment ops.)
       *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
          embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))))})))}));
@@ -846,7 +911,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
           }
           m ast_meta = copyend(p, lhs.meta);
           // NOTE: This is fragile.  What if we had a statement, "x = y ! z;", where "!" is a lower-precedence operator than "="?  Right now no such operators exist (besides comma, which doesn't work in expressions) so we're okay.
-          if ! +build_binop_expr(p->im, se, m, op_facts.user_assignment, oper, lhs, rhs, &lhs) {
+          if ! +build_binop_expr(p, se, m, op_facts.user_assignment, oper, lhs, rhs, &lhs) {
             return Fail;
           }
         }
@@ -959,6 +1024,8 @@ func oper_arr(tv tokval) shray[i32] {
 func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_expr {
   if op.value == im->cym.addressofsym {
     return mk(m, @[ast_expr_enum]AddressOf({embox(rhs)}));
+  } else if op.value == im->cym.refofsym {
+    return mk(m, @[ast_expr_enum]RefOf({embox(rhs)}));
   } else if op.value == im->cym.derefsym {
     return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(&rhs))}));
   } else {
@@ -971,22 +1038,23 @@ defenum statement_expr {
   IsStatementExpr void;
 };
 
-func build_binop_expr(im *identmap, se statement_expr, m ast_meta, user_assignment bool, op ast_ident, lhs ast_expr, rhs ast_expr, out *ast_expr) parse_result {
-  if op.value == im->cym.assignmentsym {
+func build_binop_expr(p *ps, se statement_expr, m ast_meta, user_assignment bool, op ast_ident, lhs ast_expr, rhs ast_expr, out *ast_expr) parse_result {
+  if op.value == p->im->cym.assignmentsym {
     if case IsNotStatementExpr(v void) = se {
       return Fail;
     }
     *out = mk(m, @[ast_expr_enum]Assignment({NotComputed@[ast_assignment_info](), embox(lhs), embox(rhs)}));
-  } else if op.value == im->cym.logical_and_sym {
+  } else if op.value == p->im->cym.logical_and_sym {
     *out = mk(m, @[ast_expr_enum]LogicalConjunction({false, embox(consume(&lhs)), embox(consume(&rhs))}));
-  } else if op.value == im->cym.logical_or_sym {
+  } else if op.value == p->im->cym.logical_or_sym {
     *out = mk(m, @[ast_expr_enum]LogicalConjunction({true, embox(consume(&lhs)), embox(consume(&rhs))}));
   } else {
     if user_assignment {
       if case IsNotStatementExpr(v void) = se {
         return Fail;
       }
-      *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, im->cym.voidsym}),
+      note_original(p, m, UserAssignment);
+      *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
          embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(&rhs))})))}));
     } else {
       *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))),
@@ -1117,7 +1185,7 @@ func parse_atomic_expr_upon_oper(p *ps, ab allow_braces, operch *shray[i32], out
     type ast_typeexpr;
     expr ast_expr;
     if !(+try_skip_token(p, @[tokval]Grouper(LBracket(void)))
-         && +help_parse_typeexpr(p, AllowBlanksYes(void), &type)
+         && +help_parse_typeexpr(p, AllowBlanksYes(void), AllowLifetimesYes, &type)
          && +try_skip_token(p, @[tokval]Grouper(RBracket(void)))
          && +parse_expr(p, kConversionRightPrec, ab, IsNotStatementExpr(void), &expr)) {
       return Fail;
@@ -1182,13 +1250,17 @@ func parse_atomic_expr(p *ps, ab allow_braces, out *ast_expr) parse_result {
 }
 
 func unop_info(operch *shray[i32]) opt[i32] {
-  if count(operch) != 1 {
-    return None;
-  }
-  ch0 i32 = get(operch, 0);
-  if ch0 == '~' || ch0 == '*' || ch0 == '&'
-     || ch0 == '-' || ch0 == '!' || ch0 == '^' || ch0 == '+' {
-    return Has(905);
+  nch size = count(operch);
+  if nch == 1 {
+    ch0 i32 = get(operch, 0);
+    if ch0 == '~' || ch0 == '*' || ch0 == '&'
+       || ch0 == '-' || ch0 == '!' || ch0 == '^' || ch0 == '+' {
+      return Has(905);
+    }
+  } else if nch == 2{
+    if get(operch, 0) == '&' && get(operch, 1) == '&' {
+      return Has(905);
+    }
   }
   return None;
 }
@@ -1616,7 +1688,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
     return Success;
   } else {
     type ast_typeexpr;
-    switch help_triparse_typeexpr(p, AllowBlanksYes(void), &type) {
+    switch help_triparse_typeexpr(p, AllowBlanksYes, AllowLifetimesNo, &type) {
       case Quickfail: {
         m ast_meta = copystart(p, name.meta);
         lhs ast_expr = mk(name.meta, NameExpr(mk(name, None)));

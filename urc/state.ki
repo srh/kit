@@ -18,6 +18,7 @@ deftype cs_primitives struct {
 deftype meta_datum struct {
   left opt[pos];
   right opt[pos];
+  original_syntax opt[ast_original_syntax];
 };
 
 // TODO: Don't just give ps and tok.ki code direct access to this?
@@ -28,7 +29,7 @@ deftype positionals struct {
 func mk_positionals() positionals {
   // Add an unused entry so that the zero ast_meta value is "invalid."
   p positionals;
-  nilmeta meta_datum = {None, None};
+  nilmeta meta_datum = {None, None, None};
   push(&p.metas, nilmeta);
   return p;
 }
@@ -356,14 +357,40 @@ defenum genparms {
 };
 
 deftype idy_genparms struct {
+  // When we create an instantiation, some of the types in "repls" could have lifetime parameters.  We don't want the actual template instantiation to use actual realized values for those lifetime parameters -- they'd be stuff like "the lifetime of the variable x" and such -- so they're renamed, ordered by first appearance in the left-to-right traversal of repls, and named with the deterministic sequence '$0, '$1, '$2, and so on (or something like that).
+  //
+  // The canonicalization of the order prevents many spurious template instantiations from happening -- for example, if you have a func[T, U] and T = foo['a], U = bar['b], we will only have one instantiation for foo['$0], bar['$1].  However, we could also have an instantiation for foo['$0], bar['$0], where the lifetime parameters are equal.  In general we can have up to B_n instantiations, where B_n is the nth Bell number, the number of ways to divide a set up into non-empty equivalence classes.  Thus, we have this to-do comment:
+  //
+  // The canonicalization also happens for the lifetime types that replace lifetime type parameters.  So all lifetime types in repls are of a canonicalized lifetime vaulue.
+  //
+  //   TODO: Improve this by noting which equivalences are actually used/required, avoid all duplicate implementations, thus precisely create the set of instantiations that are needed.
+  //
+  // The implementation of that feature might get hairy, especially if function lookup gets more complicated.  So it makes sense to put off implementing that feature.  (Also, in general, if we get rid of commonplace template instantiation, it might end up moot.)
+
+  // The number of distinct lifetime types used in repls.
+  num_lifetime_types_used size;
+
   // If the ast_generics is NoGenerics, this is of course empty.
-  repls shray[cu_typeexpr];
+  // Entries that line up with lifetime parameters will be some canonicalized lifetime.
+  repls idy_repls;
 };
 
+inline func blank_idyparms() idy_genparms {
+  return {0, {mk_shray()}};
+}
+
+deftype idy_repls struct {
+  tys shray[cu_typeexpr];
+};
+
+inline func blank_idyrepls() idy_repls {
+  return {mk_shray()};
+}
+
 func hash_compute_hash(x *idy_genparms) osize {
-  accum osize = 0x12345679;
-  n size = count(&x->repls);
-  p *cu_typeexpr = data(&x->repls);
+  accum osize = hash_compute_hash(&x->num_lifetime_types_used);
+  n size = count(&x->repls.tys);
+  p *cu_typeexpr = data(&x->repls.tys);
   for i size = 0; i < n; i = i + 1 {
     accum = (accum * 33) ^ hash_compute_hash(&p[i]);
   }
@@ -371,7 +398,7 @@ func hash_compute_hash(x *idy_genparms) osize {
 }
 
 func hash_equal(x *idy_genparms, y *idy_genparms) bool {
-  return idy_typeexpr_list_equal(&x->repls, &y->repls);
+  return x->num_lifetime_types_used == y->num_lifetime_types_used && idy_typeexpr_list_equal(&x->repls.tys, &y->repls.tys);
 }
 
 defenum def_inst_type_status {
@@ -540,6 +567,7 @@ access depth_rewinder {
 }
 
 // TODO: The very concept of this function will soon be (when we have true generic non-instantiated parameters) broken?
+// Update: We only use this function in to_defclass_properties, so the question becomes one of whether its use makes sense for that situation.  It does, because we return a type that references lifetimes that are in fact generic parameters, but it's perfectly normal to do name lookup using types that have generic lifetimes without any sort of scopage information on those lifetimes -- that's just how it's done.
 func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
   ent *deftype_entry = ref_deftype_entry(cs, ent_id);
   name sym = ent->name;
@@ -549,10 +577,10 @@ func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_ins
   default:
     parms *idy_genparms = &ref_deftype_inst(cs, inst_id)->parms;
     converted array[te_typeexpr];
-    n size = count(&parms->repls);
+    n size = count(&parms->repls.tys);
     reserve(&converted, n);
     for i size = 0; i < n; i = i + 1 {
-      push(&converted, ref(&parms->repls, i)->~);
+      push(&converted, ref(&parms->repls.tys, i)->~);
     }
     return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
   }

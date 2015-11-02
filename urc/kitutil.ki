@@ -10,8 +10,8 @@ defenum np {
   Printed bool;
 };
 
-// TODO: Get rid of this (we don't want to discard Printed info).
-inline func `~`(x np) bool {
+// Callers of this are OK with discarding Printed info (presumably).
+func from_np(x np) bool {
   switch x {
   case NoFail: return true;
   case Printed(b bool): return false;
@@ -23,14 +23,6 @@ defenum[T] cr {
   NoFail T;
   Printed bool;
 };
-
-// TODO: Get rid of this too.
-inline func[T] `~`(x cr[T]) bool {
-  switch &x {
-  case &NoFail(y T): return true;
-  case &Printed(b bool): return false;
-  }
-}
 
 // This exists for code that needs to return an np when it's passing along a failure where a callee returned a boolean.  We know the callee printed an error message, we assume it didn't print the location, and the callee should be updated to return an np.
 // TODO: Get rid of this (and fix it callers).
@@ -51,16 +43,14 @@ func[T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) np { DBG(x, y, z, p, q,
 func[T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) np { DBG(x, y, z, p, q, r, s); return Printed(false); }
 func[T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) np { DBG(x, y, z, p, q, r, s, t); return Printed(false); }
 
-// Named RERR to avoid ambiguous lookups with ERR.
-// TODO: Rename to ERR (get rid of all void-position uses) (or make everything use MERR).
-func[R, T] RERR(x T) cr[R] { DBG(x); return Printed(false); }
-func[R, T, U] RERR(x T, y U) cr[R] { DBG(x, y); return Printed(false); }
-func[R, T, U, V] RERR(x T, y U, z V) cr[R] { DBG(x, y, z); return Printed(false); }
-func[R, T, U, V, W] RERR(x T, y U, z V, p W) cr[R] { DBG(x, y, z, p); return Printed(false); }
-func[R, T, U, V, W, X] RERR(x T, y U, z V, p W, q X) cr[R] { DBG(x, y, z, p, q); return Printed(false); }
-func[R, T, U, V, W, X, Y] RERR(x T, y U, z V, p W, q X, r Y) cr[R] { DBG(x, y, z, p, q, r); return Printed(false); }
-func[R, T, U, V, W, X, Y, Z] RERR(x T, y U, z V, p W, q X, r Y, s Z) cr[R] { DBG(x, y, z, p, q, r, s); return Printed(false); }
-func[R, T, U, V, W, X, Y, Z, A] RERR(x T, y U, z V, p W, q X, r Y, s Z, t A) cr[R] { DBG(x, y, z, p, q, r, s, t); return Printed(false); }
+func[R, T] ERR(x T) cr[R] { DBG(x); return Printed(false); }
+func[R, T, U] ERR(x T, y U) cr[R] { DBG(x, y); return Printed(false); }
+func[R, T, U, V] ERR(x T, y U, z V) cr[R] { DBG(x, y, z); return Printed(false); }
+func[R, T, U, V, W] ERR(x T, y U, z V, p W) cr[R] { DBG(x, y, z, p); return Printed(false); }
+func[R, T, U, V, W, X] ERR(x T, y U, z V, p W, q X) cr[R] { DBG(x, y, z, p, q); return Printed(false); }
+func[R, T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) cr[R] { DBG(x, y, z, p, q, r); return Printed(false); }
+func[R, T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) cr[R] { DBG(x, y, z, p, q, r, s); return Printed(false); }
+func[R, T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) cr[R] { DBG(x, y, z, p, q, r, s, t); return Printed(false); }
 
 
 func[T, U, V, W, X, Y, Z, A] DBG(x T, y U, z V, p W, q X, r Y, s Z, t A) void {
@@ -144,36 +134,36 @@ func[T] MERR(cs *checkstate, m ast_meta, x T) np {
 }
 
 func[T] ice(x T) void {
-  ERR(_u8("ICE: "), x);
+  DBG(_u8("ICE: "), x);
   abort();
 }
 
 func[T, U] ice(x T, y U) void {
-  ERR(_u8("ICE: "), x, y);
+  DBG(_u8("ICE: "), x, y);
   abort();
 }
 
 func[T, U, V] ice(x T, y U, z V) void {
-  ERR(_u8("ICE: "), x, y, z);
+  DBG(_u8("ICE: "), x, y, z);
   abort();
 }
 
 func[T, U, V, W] ice(x T, y U, z V, p W) void {
-  ERR(_u8("ICE: "), x, y, z, p);
+  DBG(_u8("ICE: "), x, y, z, p);
   abort();
 }
 
 func[T, U, V, W, X] ice(x T, y U, z V, p W, q X) void {
-  ERR(_u8("ICE: "), x, y, z, p, q);
+  DBG(_u8("ICE: "), x, y, z, p, q);
   abort();
 }
 
 func[T, U, V, W, X, Y] ice(x T, y U, z V, p W, q X, r Y) void {
-  ERR(_u8("ICE: "), x, y, z, p, q, r);
+  DBG(_u8("ICE: "), x, y, z, p, q, r);
   abort();
 }
 
 func[T, U, V, W, X, Y, Z] ice(x T, y U, z V, p W, q X, r Y, s Z) void {
-  ERR(_u8("ICE: "), x, y, z, p, q, r, s);
+  DBG(_u8("ICE: "), x, y, z, p, q, r, s);
   abort();
 }

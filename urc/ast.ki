@@ -13,6 +13,11 @@ def `~` fn[size, ast_meta] = wrapconvert;
 
 inline func fake_ast_meta() ast_meta { return ~0; }
 
+defenum ast_original_syntax {
+  UserAssignment void;
+  IncrDecr void;
+};
+
 deftype interval struct {
   left pos;
   right pos;
@@ -124,6 +129,10 @@ deftype ast_addressof struct {
   rhs box[ast_expr];
 };
 
+deftype ast_refof struct {
+  rhs box[ast_expr];
+};
+
 deftype ast_deref struct {
   ptr_discard ast_later_discard_info;
   rhs box[ast_expr_consume];
@@ -151,6 +160,10 @@ deftype ast_arraytype struct {
   param box[ast_typeexpr];
 };
 
+deftype ast_lifetime struct {
+  name ast_ident;
+};
+
 deftype ast_unknown struct {
 };
 
@@ -161,6 +174,7 @@ defenum ast_typeexpr {
   Enum ast_enum;
   Union ast_union;
   Arraytype ast_arraytype;
+  Lifetime ast_lifetime;
   Unknown ast_unknown;
 };
 
@@ -543,6 +557,11 @@ deftype lval_description struct {
   num cell_num;
   // DeadMe if the lval cell is only carried by the lval.
   deadme lval_deadme;
+  // The lval's lifetime.
+  // TODO: Maybe deadme could be obviated by the lifetime field.
+  // TODO: Maybe this field should be a te_lifetime.
+  // TODO: Maybe this field should be a cu_typeexpr.
+  lifetime te_typeexpr;
 };
 
 defenum is_lval {
@@ -706,6 +725,7 @@ defenum ast_expr_enum {
   Funcall ast_funcall;
   LogicalConjunction ast_logical_conjunction;
   Assignment ast_assignment;
+  RefOf ast_refof;
   AddressOf ast_addressof;
   Deref ast_deref;
   IndexExpr ast_index_expr;
@@ -749,15 +769,22 @@ func discard(expr ast_expr) ast_expr_discard {
   return {NotComputed@[ast_expr_after_discard](), expr};
 }
 
+// Variadic generics doesn't support lifetime generics (for no particular reason, other than that we have no need for it) yet.  NOTE: type_from_inst assumes the fact that this doesn't support lifetime generics.
 deftype ast_variadic_generics struct {
   before array[ast_ident];
   variadic_name ast_ident;
   after array[ast_ident];
 };
 
+// This is named with a k to prevent typos with ast_generics.
+defenum ast_generik {
+  PlainGeneric ast_ident;
+  LifetimeGeneric ast_ident;
+};
+
 defenum ast_generics {
   NoGenerics void;
-  HasGenerics array[ast_ident];
+  HasGenerics array[ast_generik];
   // Right now VariadicGenerics can't be parsed.
   VariadicGenerics ast_variadic_generics;
 };

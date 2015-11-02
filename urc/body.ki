@@ -74,7 +74,7 @@ func connect_statements(bs *bodystate, from statement_num, to statement_num) voi
 // Returns the fall-through entry node and the fall-through exit node of a body or statement.  A body or statement might not have a fall-through exit, if e.g. it has a return statement.
 deftype entryexit struct { entry statement_num; exit statement_num; };
 
-func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *entryexit) bool {
+func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *entryexit) np {
   nstatements size = count(&a->statements);
   entry statement_num = add_statement(bs, None);
   exit statement_num = entry;
@@ -83,55 +83,55 @@ func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *en
   for i size = 0; i < nstatements; i = i + 1 {
     s *ast_statement = ref(&a->statements, i);
     ee entryexit;
-    if !check_statement(bs, &vp, obp, s, &ee) {
-      return false;
+    if case Printed(pm) = check_statement(bs, &vp, obp, s, &ee) {
+      return Printed(pm);
     }
     connect_statements(bs, exit, ee.entry);
     exit = ee.exit;
   }
   destructions array[var_destruction];
-  if !make_destructions(&bs->es, read_nums(&vp), &destructions) {
-    return false;
+  if case Printed(pm) = make_destructions(&bs->es, read_nums(&vp), &destructions) {
+    return Printed(pm);
   }
   annotate(&a->info, {destructions});
   *ee_out = {entry, exit};
-  return true;
+  return NoFail;
 }
 
-func make_init_action(es *framescope, vn var_number, out *init_action) bool {
+func make_init_action(es *framescope, vn var_number, out *init_action) np {
   vi *var_info = ref_var(es, vn);
   init ctor_desc;
-  if !get_init_ctor(es->ds, &vi->type, &init) {
-    return false;
+  if case Printed(pm) = get_init_ctor(es->ds, &vi->type, &init) {
+    return Printed(pm);
   }
   ia init_action = {init, vi->cell};
   *out = ia;
-  return true;
+  return NoFail;
 }
 
-func make_initializations(es *framescope, vns *array[var_number], out *array[init_action]) bool {
+func make_initializations(es *framescope, vns *array[var_number], out *array[init_action]) np {
   initializations array[init_action];
   n size = count(vns);
   for i size = 0; i < n; i = i + 1 {
     ia init_action;
-    if !make_init_action(es, get(vns, i), &ia) {
-      return false;
+    if case Printed(pm) = make_init_action(es, get(vns, i), &ia) {
+      return Printed(pm);
     }
     push(&initializations, ia);
   }
   *out = initializations;
-  return true;
+  return NoFail;
 }
 
-func make_destroy_action(es *framescope, vn var_number, out *destroy_action) bool {
+func make_destroy_action(es *framescope, vn var_number, out *destroy_action) np {
   vi *var_info = ref_var(es, vn);
   destroy ctor_desc;
-  if !get_destroy_ctor(es->ds, &vi->type, &destroy) {
-    return false;
+  if case Printed(pm) = get_destroy_ctor(es->ds, &vi->type, &destroy) {
+    return Printed(pm);
   }
   da destroy_action = {destroy, vi->cell};
   *out = da;
-  return true;
+  return NoFail;
 }
 
 defenum var_destruction {
@@ -139,7 +139,7 @@ defenum var_destruction {
   VarVirtualCellDead cell_num;
 };
 
-func make_destructions(es *framescope, vns *array[var_number], out *array[var_destruction]) bool {
+func make_destructions(es *framescope, vns *array[var_number], out *array[var_destruction]) np {
   destructions array[var_destruction];
   n size = count(vns);
   for i size = 0; i < n; i = i + 1 {
@@ -148,8 +148,8 @@ func make_destructions(es *framescope, vns *array[var_number], out *array[var_de
     switch vi->binding {
     case VarSelfContained:
       da destroy_action;
-      if !make_destroy_action(es, get(vns, i), &da) {
-        return false;
+      if case Printed(pm) = make_destroy_action(es, get(vns, i), &da) {
+        return Printed(pm);
       }
       push(&destructions, VarSelfContainedDestruction(da));
     case VarOverlay:
@@ -157,31 +157,31 @@ func make_destructions(es *framescope, vns *array[var_number], out *array[var_de
     }
   }
   swap(out, &destructions);
-  return true;
+  return NoFail;
 }
 
-func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) bool {
-  if !check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
-    return false;
+func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) np {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
+    return Printed(pm);
   }
-  if !annotate_disposal_for_discard(es, &x->expr, &x->after) {
-    return false;
+  if case Printed(pm) = annotate_disposal_for_discard(es, &x->expr, &x->after) {
+    return Printed(pm);
   }
-  return true;
+  return NoFail;
 }
 
 // For exprs that we use, but then discard.  Conditionals... and switches?  Kinda.
-func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info) bool {
+func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info) np {
   return check_consume_then_discard_expr(es, x, pt, later, None);
 }
-func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) bool {
-  if !check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
-    return false;
+func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) np {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
+    return Printed(pm);
   }
-  if !annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later, later2) {
-    return false;
+  if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later, later2) {
+    return Printed(pm);
   }
-  return true;
+  return NoFail;
 }
 
 deftype breakpack struct {
@@ -192,36 +192,39 @@ deftype breakpack struct {
   continue_in_scope array[var_number];
 };
 
-func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) bool {
-  if !help_check_statement(bs, vp, obp, s, ee_out) {
-    MERR(bs->cs, s->meta, _u8(" in this statement"));
-    return false;
+func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) np {
+  if case Printed(printed_meta bool) = help_check_statement(bs, vp, obp, s, ee_out) {
+    if !printed_meta {
+      return MERR(bs->cs, s->meta, _u8(" in this statement"));
+    } else {
+      return Printed(printed_meta);
+    }
   }
-  return true;
+  return NoFail;
 }
 
-func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) bool {
+func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) np {
   num statement_num = add_statement(bs, Has(s));
   switch &s->u {
     case &Expr(b ast_expr_discard): {
       pt te_typeexpr = TeUnknown(void);
-      if !check_discard_expr(&bs->es, &b, &pt) {
-        return false;
+      if case Printed(pm) = check_discard_expr(&bs->es, &b, &pt) {
+        return Printed(pm);
       }
       *ee_out = {num, num};
     }
 
     case &Return(b ast_return_statement): {
       exit_num statement_num;
-      if !check_return_statement(bs, &b, &exit_num) {
-        return false;
+      if case Printed(pm) = check_return_statement(bs, &b, &exit_num) {
+        return Printed(pm);
       }
       *ee_out = {num, exit_num};
     }
 
     case &Var(b ast_var_statement): {
-      if !check_var_statement(bs, vp, &b) {
-        return false;
+      if case Printed(pm) = check_var_statement(bs, vp, &b) {
+        return Printed(pm);
       }
       *ee_out = {num, num};
     }
@@ -232,12 +235,12 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
 
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
-      if !check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard) {
-        return false;
+      if case Printed(pm) = check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard) {
+        return Printed(pm);
       }
       body_ee entryexit;
-      if !check_body(bs, obp, &b.body, &body_ee) {
-        return false;
+      if case Printed(pm) = check_body(bs, obp, &b.body, &body_ee) {
+        return Printed(pm);
       }
       tailnum statement_num = add_statement(bs, None);
       connect_statements(bs, num, tailnum);
@@ -252,17 +255,17 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
 
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
-      if !check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard) {
-        return false;
+      if case Printed(pm) = check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard) {
+        return Printed(pm);
       }
       then_ee entryexit;
-      if !check_body(bs, obp, &b.thenbody, &then_ee) {
-        return false;
+      if case Printed(pm) = check_body(bs, obp, &b.thenbody, &then_ee) {
+        return Printed(pm);
       }
       descope_vars(&cond_vp);
       else_ee entryexit;
-      if !check_body(bs, obp, &b.elsebody, &else_ee) {
-        return false;
+      if case Printed(pm) = check_body(bs, obp, &b.elsebody, &else_ee) {
+        return Printed(pm);
       }
       tailnum statement_num = add_statement(bs, None);
       connect_statements(bs, num, then_ee.entry);
@@ -280,12 +283,12 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       bp breakpack = {tailnum, vars_in_scope(&bs->es), num, vars_in_scope(&bs->es)};
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
-      if !check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard_continue, Has(&b.condition_discard_exit)) {
-        return false;
+      if case Printed(pm) = check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard_continue, Has(&b.condition_discard_exit)) {
+        return Printed(pm);
       }
       body_ee entryexit;
-      if !check_body(bs, Has(&bp), &b.body, &body_ee) {
-        return false;
+      if case Printed(pm) = check_body(bs, Has(&bp), &b.body, &body_ee) {
+        return Printed(pm);
       }
       connect_statements(bs, num, body_ee.entry);
       connect_statements(bs, body_ee.exit, num);
@@ -295,16 +298,16 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
 
     case &For(b ast_for_statement): {
       exitnum statement_num;
-      if !check_for_statement(bs, vp, &b, num, &exitnum) {
-        return false;
+      if case Printed(pm) = check_for_statement(bs, vp, &b, num, &exitnum) {
+        return Printed(pm);
       }
       *ee_out = {num, exitnum};
     }
 
     case &Switch(b ast_switch_statement): {
       exitnum statement_num;
-      if !check_switch_statement(bs, vp, obp, &b, num, &exitnum) {
-        return false;
+      if case Printed(pm) = check_switch_statement(bs, vp, obp, &b, num, &exitnum) {
+        return Printed(pm);
       }
       *ee_out = {num, exitnum};
     }
@@ -312,35 +315,32 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
     case &Break(b ast_break_statement):
       if case Has(bp *breakpack) = obp {
         destructions array[var_destruction];
-        if !compute_destruct(bs, vars_in_scope(&bs->es), &bp->break_in_scope, &destructions) {
-          return false;
+        if case Printed(pm) = compute_destruct(bs, vars_in_scope(&bs->es), &bp->break_in_scope, &destructions) {
+          return Printed(pm);
         }
         annotate(&b.info, {destructions});
         connect_statements(bs, num, bp->break_target);
         *ee_out = {num, add_statement(bs, None)};
       } else {
-        ERR(_u8("break statement in bad place."));
-        return false;
+        return ERR(_u8("break statement in bad place."));
       }
 
     case &Continue(b ast_continue_statement):
       if case Has(bp *breakpack) = obp {
         destructions array[var_destruction];
-        if !compute_destruct(bs, vars_in_scope(&bs->es), &bp->continue_in_scope, &destructions) {
-          return false;
+        if case Printed(pm) = compute_destruct(bs, vars_in_scope(&bs->es), &bp->continue_in_scope, &destructions) {
+          return Printed(pm);
         }
         annotate(&b.info, {destructions});
         connect_statements(bs, num, bp->continue_target);
         *ee_out = {num, add_statement(bs, None)};
       } else {
-        ERR(_u8("continue statement in bad place."));
-        return false;
+        return ERR(_u8("continue statement in bad place."));
       }
 
     case &Label(b ast_label_statement): {
       if case Has(ix size) = lookup_label(bs, b.name.value) {
-        ERR(_u8("Duplicate label name."));
-        return false;
+        return ERR(_u8("Duplicate label name."));
       }
 
       label_number label_num = ~count(&bs->labels);
@@ -354,92 +354,99 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       *ee_out = {num, add_statement(bs, None)};
     }
   }
-  return true;
+  return NoFail;
 }
 
 deftype swartch_checkobj struct {
   swartch_type *cu_typeexpr;
+  swartch_lifetime te_typeexpr;
+  switchable_type_lifetime te_typeexpr;
   // Will be initialized to a complete type.
   enum_type *te_typeexpr;
-  is_ptr bool;
+  is_deref bool;
 };
 
-// switchable_type_out will be initialized to a complete type.
-func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard_info, later2 opt[*ast_later_discard_info], checkobj_out *swartch_checkobj) bool {
+func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard_info, later2 opt[*ast_later_discard_info], checkobj_out *swartch_checkobj) np {
   unknown te_typeexpr = TeUnknown;
-  if !check_consume_then_discard_expr(es, a, &unknown, later, later2) {
-    return false;
+  if case Printed(pm) = check_consume_then_discard_expr(es, a, &unknown, later, later2) {
+    return Printed(pm);
   }
+
   swartch_type *cu_typeexpr = expr_complete_type(&a->expr);
   checkobj_out->swartch_type = swartch_type;
+  checkobj_out->swartch_lifetime = unnamed_lifetime(es);
   switchable_type *te_typeexpr;
-  is_ptr bool = decompose_typeapp(&swartch_type->~, primitive_pointer_puretype(es->cs), &switchable_type);
-  if !is_ptr {
+  is_deref bool = decompose_ref_or_ptr(&swartch_type->~, es->cs, &checkobj_out->switchable_type_lifetime, &switchable_type);
+  if !is_deref {
     switchable_type = &swartch_type->~;
+    checkobj_out->switchable_type_lifetime = checkobj_out->swartch_lifetime;
   }
-  // switchable_type is complete, because swartch_type is.
+  // switchable_type is complete, because swartch type is.
   enum_type *te_typeexpr;
-  if !successful(complete_structural_rhs(es->ds, switchable_type, &enum_type)) {
-    return false;
+  switch recursive_structural_rhs(es->ds, switchable_type, &enum_type) {
+  case Error(pm):
+    return Printed(pm);
+  case Success: { }
+  case NoAccessibleStructuralRhs:
+    return ERR(_u8("Inaccessible rhs hit or non-structural type in swartch"));
   }
   // enum_type is complete, because complete_structural_rhs does that.
   checkobj_out->enum_type = enum_type;
-  checkobj_out->is_ptr = is_ptr;
-  return true;
+  checkobj_out->is_deref = is_deref;
+  return NoFail;
 }
 
 // expected_type_out is complete (et must be complete).
-func check_pattern(es *framescope, chk *swartch_checkobj, et *te_enum, patt *ast_constructor_pattern, expected_type_out **te_typeexpr, decl_index_out *size) bool {
-  if isHas(&patt->addressof_constructor) != chk->is_ptr {
-    ERR(_u8("swartch/pattern pointeriness mismatch"));
-    return false;
+func check_pattern(es *framescope, chk *swartch_checkobj, et *te_enum, patt *ast_constructor_pattern, expected_type_out **te_typeexpr, decl_index_out *size) np {
+  if isHas(&patt->addressof_constructor) != chk->is_deref {
+    return ERR(_u8("swartch/pattern pointeriness mismatch"));
   }
 
   expected_type *te_typeexpr;
   decl_index size;
   if !find_vardecl(&et->constructors, patt->constructor_name.value, &expected_type, &decl_index) {
-    MERR(es->cs, patt->meta, _u8("constructor not found"));
-    return false;
+    return MERR(es->cs, patt->meta, _u8("constructor not found"));
   }
 
   // expected_type is complete, because enum_type (i.e. et) was.
   *expected_type_out = expected_type;
   *decl_index_out = decl_index;
-  return true;
+  return NoFail;
 }
 
-func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_type *te_typeexpr, vd *ast_vardecl, cu_expected_type_out *cu_typeexpr, varcell_out *cell_num) bool {
+func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_type *te_typeexpr, vd *ast_vardecl, cu_expected_type_out *cu_typeexpr, varcell_out *cell_num) np {
   // TODO: Cache converted?
   converted te_typeexpr;
-  if ! ~convert_typeexpr(es->cs, &vd->type, &converted) {
-    return false;
+  if case Printed(pm) = convert_typeexpr(es->cs, &vd->type, &converted) {
+    return Printed(pm);
   }
 
   cac cac_typeexpr;
-  if ! ~check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->parms, &converted, &cac) {
-    return false;
+  if case Printed(pm) = check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->repls, &converted, &cac) {
+    return Printed(pm);
   }
 
   unified te_typeexpr;
   if !unify_types(&cac.te, expected_type, &unified) {
-    MERR(es->cs, patt->meta, _u8("constructor variable type mismatch"));
-    return false;
+    return MERR(es->cs, patt->meta, _u8("constructor variable type mismatch"));
   }
 
   *cu_expected_type_out = ~ *expected_type;
   expected_type_props type_properties;
-  if ! ~compute_type_properties(es->cs, es->clq, cu_expected_type_out, &expected_type_props) {
-    return false;
+  if case Printed(pm) = compute_type_properties(es->cs, es->clq, cu_expected_type_out, &expected_type_props) {
+    return Printed(pm);
   }
   *varcell_out = add_cell(es, {LocationVirtual, *cu_expected_type_out, expected_type_props});
-  return true;
+  return NoFail;
 }
 
-func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a *ast_switch_statement, num statement_num, exit_out *statement_num) bool {
+func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a *ast_switch_statement, num statement_num, exit_out *statement_num) np {
   chk swartch_checkobj;
-  if !check_swartch(&bs->es, oo(&a->swartch), &a->swartch_discard, None, &chk) {
-    return false;
+  if case Printed(pm) = check_swartch(&bs->es, oo(&a->swartch), &a->swartch_discard, None, &chk) {
+    return Printed(pm);
   }
+
+  // enum_type is complete, because check_swartch says so.
 
   exitnum statement_num = add_statement(bs, None);
 
@@ -448,15 +455,14 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
     swartch_vp varpopper;
     init_vp(&swartch_vp, &bs->es);
     swartch_vn var_number;
-    if !es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, chk.swartch_type, VarSelfContained, &swartch_vn) {
-      return false;
+    if case Printed(pm) = es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
+      return Printed(pm);
     }
     for i size = 0; i < ncases; i = i + 1 {
       cas *ast_switch_case = ref(&a->cases, i);
       for j size = 0; j < i; j = j + 1 {
         if duped_patterns(&cas->pattern, &ref(&a->cases, j)->pattern) {
-          ERR(_u8("duplicate patterns"));
-          return false;
+          return ERR(_u8("duplicate patterns"));
         }
       }
 
@@ -464,8 +470,8 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
         case &Case(patt ast_constructor_pattern): {
           expected_type *te_typeexpr;
           decl_index size;
-          if !check_pattern(&bs->es, &chk, &et, &patt, &expected_type, &decl_index) {
-            return false;
+          if case Printed(pm) = check_pattern(&bs->es, &chk, &et, &patt, &expected_type, &decl_index) {
+            return Printed(pm);
           }
           // expected_type is complete, because check_pattern says so.
 
@@ -477,37 +483,36 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
           if case &Has(vd ast_vardecl) = &patt.decl {
             cu_expected_type cu_typeexpr;
             cell cell_num;
-            if !check_pattern_var(&bs->es, &patt, expected_type, &vd, &cu_expected_type, &cell) {
-              return false;
+            if case Printed(pm) = check_pattern_var(&bs->es, &patt, expected_type, &vd, &cu_expected_type, &cell) {
+              return Printed(pm);
             }
 
             vn var_number;
-            if !es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), &cu_expected_type, VarOverlay, &vn) {
-              return false;
+            if case Printed(pm) = es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
+              return Printed(pm);
             }
             ovn = Has(vn);
           } else {
             voidtp cu_typrop = compute_prim(bs->clq, primitive_void_type(bs->cs));
             unified te_typeexpr;
             if !unify_types(&voidtp.cu.~, expected_type, &unified) {
-              ERR(_u8("decl-free case pattern used with non-void case"));
-              return false;
+              return ERR(_u8("decl-free case pattern used with non-void case"));
             }
             ovn = None;
           }
           annotate(&patt.cp_info, {ovn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
 
           body_ee entryexit;
-          if !check_body(bs, obp, &cas->body, &body_ee) {
-            return false;
+          if case Printed(pm) = check_body(bs, obp, &cas->body, &body_ee) {
+            return Printed(pm);
           }
           connect_statements(bs, num, body_ee.entry);
           connect_statements(bs, body_ee.exit, exitnum);
         }
         case &Default: {
           body_ee entryexit;
-          if !check_body(bs, obp, &cas->body, &body_ee) {
-            return false;
+          if case Printed(pm) = check_body(bs, obp, &cas->body, &body_ee) {
+            return Printed(pm);
           }
           connect_statements(bs, num, body_ee.entry);
           connect_statements(bs, body_ee.exit, exitnum);
@@ -516,17 +521,15 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
     }
     if ncases > count(&et.constructors) {
       check(ncases == 1 + count(&et.constructors));
-      ERR(_u8("Unnecessary default case."));
-      return false;
+      return ERR(_u8("Unnecessary default case."));
     }
     tag_cell cell_num = add_virtual_tag_cell(&bs->es, &et);
     annotate(&a->info, {tag_cell, ~count(&et.constructors)});
   } else {
-    ERR(_u8("Switching over non-switchable type."));
-    return false;
+    return ERR(_u8("Switching over non-switchable type."));
   }
   *exit_out = exitnum;
-  return true;
+  return NoFail;
 }
 
 func add_virtual_tag_cell(es *framescope, et *te_enum) cell_num {
@@ -534,7 +537,7 @@ func add_virtual_tag_cell(es *framescope, et *te_enum) cell_num {
   return add_cell(es, {LocationVirtual, tp.cu, tp.props});
 }
 
-func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num statement_num, exit_out *statement_num) bool {
+func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num statement_num, exit_out *statement_num) np {
   break_in_scope array[var_number] = vars_in_scope(&bs->es);
 
   initter_vp varpopper;
@@ -542,8 +545,8 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   loopnum statement_num = add_statement(bs, None);
   if case &Has(initter box[ast_statement]) = &a->initializer {
     initter_ee entryexit;
-    if !check_statement(bs, &initter_vp, None, oo(&initter), &initter_ee) {
-      return false;
+    if case Printed(pm) = check_statement(bs, &initter_vp, None, oo(&initter), &initter_ee) {
+      return Printed(pm);
     }
     connect_statements(bs, num, initter_ee.entry);
     connect_statements(bs, initter_ee.exit, loopnum);
@@ -557,49 +560,49 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   init_vp(&cond_vp, &bs->es);
   if case &Has(cond ast_expr_condition) = &a->condition {
     boolean cu_typeexpr = compute_prim(bs->ds, primitive_bool_type(bs->cs));
-    if !check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.~, &cond.discard) {
-      return false;
+    if case Printed(pm) = check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.~, &cond.discard) {
+      return Printed(pm);
     }
     connect_statements(bs, loopnum, exitnum);
     cond_vn var_number;
-    if !es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, &boolean, VarSelfContained(void), &cond_vn) {
-      return false;
+    if case Printed(pm) = es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, ~unnamed_lifetime(&bs->es), &boolean, VarSelfContained(void), &cond_vn) {
+      return Printed(pm);
     }
   }
   if case &Has(incr box[ast_expr_discard]) = &a->increment {
     unknown te_typeexpr = TeUnknown(void);
-    if !check_discard_expr(&bs->es, oo(&incr), &unknown) {
-      return false;
+    if case Printed(pm) = check_discard_expr(&bs->es, oo(&incr), &unknown) {
+      return Printed(pm);
     }
   }
 
   bp breakpack = {exitnum, break_in_scope, loopnum, loop_in_scope};
 
   body_ee entryexit;
-  if !check_body(bs, Has(&bp), &a->body, &body_ee) {
-    return false;
+  if case Printed(pm) = check_body(bs, Has(&bp), &a->body, &body_ee) {
+    return Printed(pm);
   }
   connect_statements(bs, loopnum, body_ee.entry);
   connect_statements(bs, body_ee.exit, loopnum);
   initter_destructions array[var_destruction];
-  if !make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions) {
-    return false;
+  if case Printed(pm) = make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions) {
+    return Printed(pm);
   }
   annotate(&a->info, {initter_destructions});
   *exit_out = exitnum;
-  return true;
+  return NoFail;
 }
 
-func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) bool {
+func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np {
   // TODO: Cache converted... or something.
   converted te_typeexpr;
-  if ! ~convert_typeexpr(bs->cs, &a->decl.type, &converted) {
-    return false;
+  if case Printed(pm) = convert_typeexpr(bs->cs, &a->decl.type, &converted) {
+    return Printed(pm);
   }
 
   computed cac_typeexpr;
-  if ! ~check_and_compute_typeexpr(bs->cs, bs->clq, bs->ds->generics, bs->ds->parms, &converted, &computed) {
-    return false;
+  if case Printed(pm) = check_and_compute_typeexpr(bs->cs, bs->clq, bs->ds->generics, bs->ds->repls, &converted, &computed) {
+    return Printed(pm);
   }
   cu_computed cu_typeexpr;
 
@@ -608,8 +611,8 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
   cell cell_num;
   switch &a->rhs {
     case &HasExpr(x box[ast_expr_consume]): {
-      if !check_expr_consume(&bs->es, oo(&x), &computed.te) {
-        return false;
+      if case Printed(pm) = check_expr_consume(&bs->es, oo(&x), &computed.te) {
+        return Printed(pm);
       }
       info *ast_expr_complete_info = expr_complete_info(&oo(&x)->expr);
       complete_type = &info->cu;
@@ -618,14 +621,13 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
     }
     case &AutoInit(x opt[init_action]): {
       if !computed.complete {
-        ERR(_u8("Variable declaration with no rhs, incomplete type"));
-        return false;
+        return ERR(_u8("Variable declaration with no rhs, incomplete type"));
       }
       cu_computed = ~computed.te;
       complete_type = &cu_computed;
       cu_props type_properties;
-      if ! ~compute_type_properties(bs->cs, bs->clq, complete_type, &cu_props) {
-        return false;
+      if case Printed(pm) = compute_type_properties(bs->cs, bs->clq, complete_type, &cu_props) {
+        return Printed(pm);
       }
       note_initter = true;
       cell = add_cell(&bs->es, {LocationStatic, *complete_type, cu_props});
@@ -633,16 +635,16 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
   }
 
   vn var_number;
-  if !es_push_var(&bs->es, vp, cell, Has(&a->decl.name), complete_type, VarSelfContained(void), &vn) {
-    return false;
+  if case Printed(pm) = es_push_var(&bs->es, vp, cell, Has(&a->decl.name), ~varname_lifetime(bs->im, a->decl.name.value), complete_type, VarSelfContained(void), &vn) {
+    return Printed(pm);
   }
   annotate(&a->info, {vn});
-  if !es_note_var_destroyer(&bs->es, vn) {
-    return false;
+  if case Printed(pm) = es_note_var_destroyer(&bs->es, vn) {
+    return Printed(pm);
   }
   if note_initter {
-    if !es_note_var_initter(&bs->es, vn) {
-      return false;
+    if case Printed(pm) = es_note_var_initter(&bs->es, vn) {
+      return Printed(pm);
     }
     switch &a->rhs {
       case &HasExpr(x box[ast_expr_consume]): {
@@ -650,15 +652,15 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) boo
       }
       case &AutoInit(x opt[init_action]): {
         init ctor_desc;
-        if !get_init_ctor(bs->ds, complete_type, &init) {
-          return false;
+        if case Printed(pm) = get_init_ctor(bs->ds, complete_type, &init) {
+          return Printed(pm);
         }
         ia init_action = {init, cell};
         x = Has(ia);
       }
     }
   }
-  return true;
+  return NoFail;
 }
 
 // Returns Has(..) for cells which are actually movable, self-contained.
@@ -684,20 +686,19 @@ func compute_varcells(es *framescope, a *array[var_number]) shray[opt[cell_num]]
   return freeze(&b);
 }
 
-func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *statement_num) bool {
+func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *statement_num) np {
   // Notably, this includes lambda parameter destructions.
   vars array[var_number] = vars_in_scope(&bs->es);
   varcells shray[opt[cell_num]] = compute_varcells(&bs->es, &vars);
   moved_var_ix opt[size];
   if case &Has(c box[ast_expr_consume]) = &a->expr {
-    if !check_expr_retconsume(&bs->es, oo(&c), &bs->return_type->~, &varcells, &moved_var_ix) {
-      return false;
+    if case Printed(pm) = check_expr_retconsume(&bs->es, oo(&c), &bs->return_type->~, &varcells, &moved_var_ix) {
+      return Printed(pm);
     }
     reannotate_static_to_virtual(&bs->es, result_cell(oo(&c)));
   } else {
     if !type_is_void(bs->cs, bs->return_type) {
-      ERR(_u8("Empty return statement with non-void return value."));
-      return false;
+      return ERR(_u8("Empty return statement with non-void return value."));
     }
     moved_var_ix = None;
   }
@@ -705,12 +706,12 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
     shifterase_elem(&vars, ix);
   }
   destructions array[var_destruction];
-  if !make_destructions(&bs->es, &vars, &destructions) {
-    return false;
+  if case Printed(pm) = make_destructions(&bs->es, &vars, &destructions) {
+    return Printed(pm);
   }
   annotate(&a->info, {destructions});
   *exit_out = add_statement(bs, None);
-  return true;
+  return NoFail;
 }
 
 func help_lookup_label(labels *array[label_info], label_name sym) opt[size] {
@@ -743,7 +744,7 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
   return false;
 }
 
-func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info) bool {
+func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info) np {
   return check_condition(es, swartch_vp, cond_vp, a, cd, None);
 }
 
@@ -755,43 +756,45 @@ func cdi_later(cdo opt[*ast_condition_discard_info]) opt[*ast_later_discard_info
   }
 }
 
-func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info, cd2 opt[*ast_condition_discard_info]) bool {
+func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info, cd2 opt[*ast_condition_discard_info]) np {
   switch a {
     case &ExprCondition(b box[ast_expr_consume]): {
       booltype cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
-      if !check_consume_then_discard_expr(es, oo(&b), &booltype.~, &cd->later, cdi_later(cd2)) {
-        return false;
+      if case Printed(pm) = check_consume_then_discard_expr(es, oo(&b), &booltype.~, &cd->later, cdi_later(cd2)) {
+        return Printed(pm);
       }
 
       // We need return statements in the "then" or "else" block to mark the boolean condition dead.  (It would be a smarter graph if we just marked it dead immediately after the branch, but... this way makes the code here handle all cases equivalently.)
       swartch_vn var_number;
-      if !es_push_var(es, swartch_vp, result_cell(oo(&b)), None, &booltype, VarSelfContained(void), &swartch_vn) {
-        return false;
+      if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_lifetime(es), &booltype, VarSelfContained(void), &swartch_vn) {
+        return Printed(pm);
       }
       annotate(&cd->virtual_cell_dead, None);
       if case Has(p) = cd2 {
         annotate(&p->virtual_cell_dead, None);
       }
-      return true;
+      return NoFail;
     }
     case &PatternCondition(b ast_pattern_assign): {
       chk swartch_checkobj;
-      if !check_swartch(es, oo(&b.rhs), &cd->later, cdi_later(cd2), &chk) {
-        return false;
+      if case Printed(pm) = check_swartch(es, oo(&b.rhs), &cd->later, cdi_later(cd2), &chk) {
+        return Printed(pm);
       }
+
+      // enum_type is complete, because check_swartch says so.
 
       if case &TeEnum(et te_enum) = chk.enum_type {
         if true {
           swartch_vn var_number;
-          if !es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, chk.swartch_type, VarSelfContained, &swartch_vn) {
-            return false;
+          if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
+            return Printed(pm);
           }
         }
 
         expected_type *te_typeexpr;
         decl_index size;
-        if !check_pattern(es, &chk, &et, &b.pattern, &expected_type, &decl_index) {
-          return false;
+        if case Printed(pm) = check_pattern(es, &chk, &et, &b.pattern, &expected_type, &decl_index) {
+          return Printed(pm);
         }
         // expected_type is complete, because check_pattern says so.
 
@@ -802,8 +805,8 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
         if case &Has(vd ast_vardecl) = &b.pattern.decl {
           cu_expected_type cu_typeexpr;
           cell cell_num;
-          if !check_pattern_var(es, &b.pattern, expected_type, &vd, &cu_expected_type, &cell) {
-            return false;
+          if case Printed(pm) = check_pattern_var(es, &b.pattern, expected_type, &vd, &cu_expected_type, &cell) {
+            return Printed(pm);
           }
 
           annotate(&cd->virtual_cell_dead, Has(cell));
@@ -811,8 +814,8 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
             annotate(&p->virtual_cell_dead, Has(cell));
           }
           vn var_number;
-          if !es_push_var(es, cond_vp, cell, Has(&vd.name), &cu_expected_type, VarOverlay, &vn) {
-            return false;
+          if case Printed(pm) = es_push_var(es, cond_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
+            return Printed(pm);
           }
 
           ovn = Has(vn);
@@ -821,8 +824,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
           voidtp cu_typrop = compute_prim(es->clq, primitive_void_type(es->cs));
           unified te_typeexpr;
           if !unify_types(&voidtp.cu.~, expected_type, &unified) {
-            ERR(_u8("decl-free case pattern used with non-void case"));
-            return false;
+            return ERR(_u8("decl-free case pattern used with non-void case"));
           }
           annotate(&cd->virtual_cell_dead, None);
           if case Has(p) = cd2 {
@@ -832,10 +834,9 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
         }
         tag_value enum_tag_value = mk_enum_tag_value(decl_index);
         annotate(&b.pattern.cp_info, {ovn, tag_value, enum_field_offset(es->cs, &et, tag_value)});
-        return true;
+        return NoFail;
       } else {
-        ERR(_u8("Condition pattern over non-switchable type."));
-        return false;
+        return ERR(_u8("Condition pattern over non-switchable type."));
       }
     }
   }
@@ -847,16 +848,15 @@ func type_is_void(cs *checkstate, t *cu_typeexpr) bool {
   return unify_types(&void_type, &t->~, &unified);
 }
 
-func finish_lambda_body(bs *bodystate, ee entryexit) bool {
-  if !connect_gotos(bs) {
-    return false;
+func finish_lambda_body(bs *bodystate, ee entryexit) np {
+  if case Printed(pm) = connect_gotos(bs) {
+    return Printed(pm);
   }
   mark_reachable(bs, ee.entry);
   if ref(&bs->statements, ee.exit.~)->marked_reachable && !type_is_void(bs->cs, bs->return_type) {
-    ERR(_u8("Body can exit without return"));
-    return false;
+    return ERR(_u8("Body can exit without return"));
   }
-  return true;
+  return NoFail;
 }
 
 func mark_reachable(bs *bodystate, entry statement_num) void {
@@ -871,18 +871,18 @@ func mark_reachable(bs *bodystate, entry statement_num) void {
   }
 }
 
-func compute_destruct(bs *bodystate, goto_in_scope array[var_number], target_in_scope *array[var_number], out *array[var_destruction]) bool {
+func compute_destruct(bs *bodystate, goto_in_scope array[var_number], target_in_scope *array[var_number], out *array[var_destruction]) np {
   destructions array[var_destruction];
   initializations array[init_action];
-  if !compute_destruct_construct(bs, &goto_in_scope, target_in_scope, &destructions, &initializations) {
-    return false;
+  if case Printed(pm) = compute_destruct_construct(bs, &goto_in_scope, target_in_scope, &destructions, &initializations) {
+    return Printed(pm);
   }
   check(empty(&initializations));
   swap(out, &destructions);
-  return true;
+  return NoFail;
 }
 
-func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number], target_in_scope *array[var_number], destructions_out *array[var_destruction], initializations_out *array[init_action]) bool {
+func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number], target_in_scope *array[var_number], destructions_out *array[var_destruction], initializations_out *array[init_action]) np {
   destruct array[var_number];
   construct array[var_number];
   var_difference(goto_in_scope, target_in_scope, &destruct, &construct);
@@ -892,38 +892,37 @@ func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number],
     vn var_number = get(&construct, i);
     vi *var_info = ref_var(&bs->es, vn);
     if case VarOverlay = vi->binding {
-      ERR(_u8("goto enters non-initiannlizable variable scope"));
-      return false;
+      return ERR(_u8("goto enters non-initiannlizable variable scope"));
     }
-    if !es_note_var_initter(&bs->es, vn) {
-      return false;
+    if case Printed(pm) = es_note_var_initter(&bs->es, vn) {
+      return Printed(pm);
     }
   }
 
   ndestruct size = count(&destruct);
   for i size = 0; i < ndestruct; i = i + 1 {
     vn var_number = get(&destruct, i);
-    if !es_note_var_destroyer(&bs->es, vn) {
-      return false;
+    if case Printed(pm) = es_note_var_destroyer(&bs->es, vn) {
+      return Printed(pm);
     }
   }
 
   destructions array[var_destruction];
-  if !make_destructions(&bs->es, &destruct, &destructions) {
-    return false;
+  if case Printed(pm) = make_destructions(&bs->es, &destruct, &destructions) {
+    return Printed(pm);
   }
 
   initializations array[init_action];
-  if !make_initializations(&bs->es, &construct, &initializations) {
-    return false;
+  if case Printed(pm) = make_initializations(&bs->es, &construct, &initializations) {
+    return Printed(pm);
   }
 
   swap(destructions_out, &destructions);
   swap(initializations_out, &initializations);
-  return true;
+  return NoFail;
 }
 
-func connect_gotos(bs *bodystate) bool {
+func connect_gotos(bs *bodystate) np {
   ngotos size = count(&bs->gotos);
   for i size = 0; i < ngotos; i = i + 1 {
     g *goto_info = ref(&bs->gotos, i);
@@ -931,8 +930,8 @@ func connect_gotos(bs *bodystate) bool {
       l *label_info = ref(&bs->labels, j);
       destructions array[var_destruction];
       initializations array[init_action];
-      if !compute_destruct_construct(bs, &g->in_scope, &l->in_scope, &destructions, &initializations) {
-        return false;
+      if case Printed(pm) = compute_destruct_construct(bs, &g->in_scope, &l->in_scope, &destructions, &initializations) {
+        return Printed(pm);
       }
 
       l->hit = true;
@@ -940,8 +939,7 @@ func connect_gotos(bs *bodystate) bool {
 
       annotate(&g->st->info, {unHas(&l->st->info)->label_number, destructions, initializations});
     } else {
-      ERR(_u8("no label named '"), lookup(bs->im, g->label_name), _u8("'"));
-      return false;
+      return ERR(_u8("no label named '"), lookup(bs->im, g->label_name), _u8("'"));
     }
   }
 
@@ -949,12 +947,11 @@ func connect_gotos(bs *bodystate) bool {
   for i size = 0; i < nlabels; i = i + 1 {
     l *label_info = ref(&bs->labels, i);
     if !l->hit {
-      ERR(_u8("no gotos for label named '"), lookup(bs->im, l->label_name), _u8("'"));
-      return false;
+      return ERR(_u8("no gotos for label named '"), lookup(bs->im, l->label_name), _u8("'"));
     }
   }
 
-  return true;
+  return NoFail;
 }
 
 // g and l are in increasing order.

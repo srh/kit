@@ -483,14 +483,14 @@ func parse_generics_if_present(p *ps, out *ast_generics) parse_result {
 func parse_generik(p *ps, out *ast_generik) parse_result {
   if +try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
     name ast_ident;
-    if !+parse_ident(p, &name) {
+    if ! +parse_ident(p, &name) {
       return Fail;
     }
     *out = LifetimeGeneric(name);
     return Success;
   }
   name ast_ident;
-  if !+parse_ident(p, &name) {
+  if ! +parse_ident(p, &name) {
     return Fail;
   }
   *out = PlainGeneric(name);
@@ -712,7 +712,7 @@ func parse_rest_of_reference(p *ps, ab allow_blanks, oper ast_ident, out *ast_ty
   lifetime_arg ast_lifetime;
   if case Success = triparse_lifetime(p, &lifetime_arg) {
     arg ast_typeexpr;
-    if !+help_parse_typeexpr(p, ab, AllowLifetimesNo, &arg) {
+    if ! +help_parse_typeexpr(p, ab, AllowLifetimesNo, &arg) {
       return Fail;
     }
     *out = App({embox(Name(oper)), mk_array(Lifetime(lifetime_arg), arg)});
@@ -723,11 +723,11 @@ func parse_rest_of_reference(p *ps, ab allow_blanks, oper ast_ident, out *ast_ty
 }
 
 func triparse_lifetime(p *ps, out *ast_lifetime) triparse_result {
-  if !+try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
+  if ! +try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
     return Quickfail;
   }
   name ast_ident;
-  if !+parse_ident(p, &name) {
+  if ! +parse_ident(p, &name) {
     return Error;
   }
   *out = {name};

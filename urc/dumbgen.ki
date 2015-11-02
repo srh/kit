@@ -133,7 +133,7 @@ func get_size_loc(h *frame, c cell_num) cell_loc {
 
 // Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
 
-func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) bool {
+func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) np {
   bas *basic_analyze_state = unComputed(&g->inline_state);
   h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed(), NotComputed@[i32](), mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed@[jmp_targetnum]()};
 
@@ -146,8 +146,8 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
   create(&h, &liveset, g->graph.cell);
 
   mut genexpr_result;
-  if !dumbly_analyze_expression(&h, &g->graph.gr, &liveset, g->graph.gn, &mut) {
-    return false;
+  if case Printed(pm) = dumbly_analyze_expression(&h, &g->graph.gr, &liveset, g->graph.gn, &mut) {
+    return Printed(pm);
   }
 
   switch &mut {
@@ -158,15 +158,13 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
   case &NonTerminal: { /* nothing to assert */ }
   }
 
-  if !dumbly_layout_frame_cells(g, &h) {
-    return false;
+  if case Printed(pm) = dumbly_layout_frame_cells(g, &h) {
+    return Printed(pm);
   }
 
-  if !dumbly_gen_machine_code(f, &h, g->graph.gn) {
-    return false;
-  }
+  dumbly_gen_machine_code(f, &h, g->graph.gn);
 
-  return true;
+  return NoFail;
 }
 
 func paramlist_cells(gr *frame_graph, gn gr_num) *shray[cell_num] {
@@ -201,11 +199,11 @@ func isNope(p *tmp_offsets_val) bool {
   }
 }
 
-func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
+func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
   // Left-most paramlist goes first.
   paramlist_ordering array[gr_num];
-  if !dumbly_linearize_paramlist_ordering(h, &paramlist_ordering) {
-    return false;
+  if case Printed(pm) = dumbly_linearize_paramlist_ordering(h, &paramlist_ordering) {
+    return Printed(pm);
   }
 
   // Offsets of either a static cell or a virtual cell's pointer.
@@ -311,7 +309,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) bool {
   annotate(&h->offsets, noopt_offsets);
   // We subtract 4 because we haven't accounted for the possible need to make a hidden return pointer for the x86 callconv.
   annotate(&h->low_offset, low_offset - 4);
-  return true;
+  return NoFail;
 }
 
 func duck_conflicting_cells(h *frame, c cell_num, bumpline *i32, offsets *array[tmp_offsets_val]) void {
@@ -456,7 +454,7 @@ func st_def_to_fnid(cs *checkstate, ip instpair) opt[fn_body_id] {
   if case &Computed(x st_value) = &inst->evaled_value {
     if count(&x.symbolrefs) != 0 {
       fnid fn_body_id;
-      if !x86_simple_symbolref(cs, &x, &fnid) {
+      if !from_np(x86_simple_symbolref(cs, &x, &fnid)) {
         ice(_u8("st_def_to_fnid sees non-simple (impossible symbolref"));
       }
       return Has(fnid);
@@ -507,7 +505,7 @@ func next_stack_offset(cs *checkstate, low_offset i32, ci *cell_info, numeric_ou
   }
 }
 
-func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array[gr_num]) bool {
+func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array[gr_num]) np {
   // Paramlists by in-degree, which is < the number of paramlists (since they can't point at themselves).
   nparamlists size = count(&h->bas->paramlists);
   // nparamlists is an impossible in-degree, and nparamlists + 1 is more impossible -- there's no way it could be decremented to zero while having count(&ordering) end up equalling nparamlists, below.
@@ -552,42 +550,32 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
   }
 
   if count(&ordering) != nreachable_paramlists {
-    ERR(_u8("ICE: paramlist ordering has a cyclic dependency."));
-    return false;
+    return ERR(_u8("ICE: paramlist ordering has a cyclic dependency."));
   }
 
   *paramlist_ordering_out = ordering;
-  return true;
+  return NoFail;
 }
 
-func dumbly_gen_machine_code(f *objfile, h *frame, entry_gn gr_num) bool {
-  if !dumbly_gen_function_intro(f, h) {
-    return false;
-  }
+func dumbly_gen_machine_code(f *objfile, h *frame, entry_gn gr_num) void {
+  dumbly_gen_function_intro(f, h);
   bodyaft jmp_targetnum = frame_create_target(h);
-  if !dumbly_gen_function_body(f, h, entry_gn, bodyaft) {
-    return false;
-  }
+  dumbly_gen_function_body(f, h, entry_gn, bodyaft);
   frame_define_target(h, bodyaft, secsize(&f->text));
-  if !dumbly_gen_function_exit(f, h) {
-    return false;
-  }
-
-  return true;
+  dumbly_gen_function_exit(f, h);
 }
 
-func dumbly_gen_function_intro(f *objfile, h *frame) bool {
+func dumbly_gen_function_intro(f *objfile, h *frame) void {
   switch h->cs->plat.callconv {
   case UniversalCdeclConvention:
     x86_push32(f, X86_EBP);
     x86_mov_reg32(f, X86_EBP, X86_ESP);
-    x86_add_esp_i32(f, *unHas(&h->low_offset));
-    return true;
+    // We can use this function now that EBP is in place.
+    restore_esp_to_default_position(f, h);
   }
-  restore_esp_to_default_position(f, h);
 }
 
-func dumbly_gen_function_exit(f *objfile, h *frame) bool {
+func dumbly_gen_function_exit(f *objfile, h *frame) void {
   switch h->cs->plat.callconv {
   case UniversalCdeclConvention:
     ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
@@ -642,8 +630,6 @@ func dumbly_gen_function_exit(f *objfile, h *frame) bool {
       overwrite_raw(&f->text, ~p->overwrite_location, &le.buf[0], 4);
     }
   }
-
-  return true;
 }
 
 // TODO: Remove this and its callers.
@@ -686,7 +672,7 @@ defenum dumbgen_stackent {
   DumbgenOp op_targ_gn_jmpaft;
 };
 
-func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp_targetnum) bool {
+func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp_targetnum) void {
   stack array[dumbgen_stackent];
   push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({entry_gn, bodyaft, false}));
   while case Has(se dumbgen_stackent) = popval(&stack) {
@@ -766,9 +752,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           }
         case &GrPrimApply(a gr_prim_apply):
           DUMBGEN("GrPrimApply");
-          if !x86_dumbly_prim_apply(f, h, &a) {
-            return false;
-          }
+          x86_dumbly_prim_apply(f, h, &a);
         case &GrMemCopy(a gr_memcopy):
           DUMBGEN("GrMemCopy");
           dest_ci *cell_info = ref_cell(h->gr, a.dest);
@@ -786,9 +770,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           default:
             dest_ci *cell_info = ref_cell(h->gr, a.dest);
             value st_value;
-            if !st_const_compute_for_gen(h->cs, &a.value, dest_ci->props.flat_size, &value) {
-              return false;
-            }
+            st_const_compute_for_gen(h->cs, &a.value, dest_ci->props.flat_size, &value);
 
             x86_gen_write_value(f, h, dest_loc, &value);
           }
@@ -841,9 +823,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           for i size = 0; i < ncases; i = i + 1 {
             cas *tup[gr_const, sq_num] = ref(&a.cases, i);
             expected st_value;
-            if !st_const_compute_for_gen(h->cs, &cas->car, src_size, &expected) {
-              return false;
-            }
+            st_const_compute_for_gen(h->cs, &cas->car, src_size, &expected);
             x86_cmp_imm_sized(h->cs, f, X86_EAX, &expected, X86_ECX);
             x86_gen_placeholder_jcc(f, h, X86_JCC_Z, frame_gn_targetnum(h, cas->cdr.~));
             push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({cas->cdr.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
@@ -875,8 +855,6 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
       }
     }
   }
-
-  return true;
 }
 
 func x86_load_cell_address(f *objfile, h *frame, dest u8, c cell_num) void {
@@ -1052,23 +1030,22 @@ func x86_gen_write_data(f *objfile, h *frame, dest_addr u8, dest_disp i32, words
   check(i == end);
 }
 
-func x86_simple_symbolref(cs *checkstate, val *st_value, id_out *fn_body_id) bool {
+func x86_simple_symbolref(cs *checkstate, val *st_value, id_out *fn_body_id) np {
   if count(&val->symbolrefs) != 1 || val->length != 4 {
-    ERR(_u8("Value isn't simple function pointer"));
-    return false;
+    return ERR(_u8("Value isn't simple function pointer"));
   }
   srefpair tup[u32, st_symbolref] = get(&val->symbolrefs, 0);
   check(srefpair.car == 0);
   sref st_symbolref = srefpair.cdr;
   check(st_symbolref_size(&cs->plat, &sref) == 4);
   *id_out = sref.fnid;
-  return true;
+  return NoFail;
 }
 
 func x86_cmp_imm_sized(cs *checkstate, f *objfile, lhs u8, rhs *st_value, avail u8) void {
   if count(&rhs->symbolrefs) != 0 {
     fnid fn_body_id;
-    if !x86_simple_symbolref(cs, rhs, &fnid) {
+    if !from_np(x86_simple_symbolref(cs, rhs, &fnid)) {
       ice(_u8("x86_cmp_imm_sized sees non-simple (impossible) symbolref"));
     }
     x86_mov_stiptr(f, avail, *unHas(&ref_fn_body(cs, fnid)->symbol_table_index));
@@ -1092,7 +1069,7 @@ func `<`(x tup[u32, st_symbolref], y tup[u32, st_symbolref]) bool {
   return x.car < y.car;
 }
 
-func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
+func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
   switch &a->primop {
   case &PrimNum(b primitive_numeric_op):
     arity u32 = op_arity(b.op_action);
@@ -1372,7 +1349,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     }
 
     x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.op_size, X86_EDX);
-    return true;
   case &PrimNumCompare(b primitive_numeric_comparison_op):
     check(count(&a->params) == 2);
     x86_load32_for_primop(f, X86_EAX, get_loc(h, get(&a->params, 0)), b.op_size);
@@ -1411,7 +1387,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     }
     x86_setcc_b8(f, X86_AL, setcc_code);
     x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
-    return true;
   case &PrimLogical(b primitive_logical_op):
     arity u32 = op_arity(b);
     check(count(&a->params) == ~arity);
@@ -1438,7 +1413,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
       x86_or_w32(f, X86_EAX, X86_ECX);
     }
     x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
-    return true;
   case &PrimPtrCompare(b primitive_ptr_comparison_op):
     check(count(&a->params) == 2);
     op_size u32 = 4;
@@ -1456,7 +1430,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
     }
     x86_setcc_b8(f, X86_EAX, setcc_code);
     x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
-    return true;
   case &PrimConversion(b primitive_conversion_op):
     check(count(&a->params) == 1);
     param0 cell_num = get(&a->params, 0);
@@ -1483,7 +1456,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
         x86_gen_crash_jcc(f, h, X86_JCC_A);
       }
       x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
-      return true;
     case SignedTwos:
       check(b.from_numtraits.minval < bigu(0));
       x86_load32_signextend_for_primop(f, X86_EAX, paramloc, b.from_size);
@@ -1504,7 +1476,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
           x86_gen_crash_jcc(f, h, X86_JCC_A);
         }
         x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
-        return true;
       case SignedTwos:
         if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.maxval < b.from_numtraits.maxval {
           to_maxval u32;
@@ -1523,7 +1494,6 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) bool {
           x86_gen_crash_jcc(f, h, X86_JCC_L);
         }
         x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
-        return true;
       }
     }
   }
