@@ -620,6 +620,8 @@ int is_ident_keyword(struct ps *p, size_t global_offset_begin, size_t global_off
       || 0 == memcmp(ptr, "defenum", count);
   case 8:
     return 0 == memcmp(ptr, "defclass", count);
+  case 9:
+    return 0 == memcmp(ptr, "defstruct", count);
   default:
     return 0;
   }
@@ -2529,6 +2531,45 @@ int parse_rest_of_import(struct ps *p, struct pos pos_start,
 
 int parse_toplevel(struct ps *p, struct ast_toplevel *out);
 
+int parse_rest_of_defstruct(struct ps *p, struct pos pos_start,
+                            struct ast_deftype *out) {
+  PARSE_DBG("parse_rest_of_defstruct");
+  struct ast_generics generics;
+  if (!(skip_ws(p) && parse_type_params_if_present(p, &generics))) {
+    goto fail;
+  }
+  struct ast_ident name;
+  if (!(skip_ws(p) && parse_ident(p, &name))) {
+    goto fail_generics;
+  }
+  struct ast_vardecl *fields;
+  size_t fields_count;
+  if (!(skip_ws(p) && parse_braced_fields(p, ALLOW_BLANKS_NO, &fields, &fields_count))) {
+    goto fail_name;
+  }
+  struct pos pos_end = ps_pos(p);
+  if (!(skip_ws(p) && try_skip_semicolon(p))) {
+    goto fail_fields;
+  }
+  struct ast_typeexpr type;
+  type.tag = AST_TYPEEXPR_STRUCTE;
+  ast_structe_init(&type.u.structe, ast_meta_make(pos_start, pos_end), fields, fields_count);
+  ast_deftype_init(out, ast_meta_make(pos_start, ps_pos(p)),
+                   AST_DEFTYPE_NOT_CLASS,
+                   generics, name, type);
+  return 1;
+
+ fail_fields:
+  SLICE_FREE(fields, fields_count, ast_vardecl_destroy);
+ fail_name:
+  ast_ident_destroy(&name);
+ fail_generics:
+  ast_generics_destroy(&generics);
+ fail:
+  return 0;
+}
+
+
 int parse_rest_of_deftype(struct ps *p, struct pos pos_start,
                           int is_class,
                           struct ast_deftype *out) {
@@ -2731,6 +2772,9 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   } else if (try_skip_keyword(p, "import")) {
     out->tag = AST_TOPLEVEL_IMPORT;
     return parse_rest_of_import(p, pos_start, &out->u.import);
+  } else if (try_skip_keyword(p, "defstruct")) {
+    out->tag = AST_TOPLEVEL_DEFTYPE;
+    return parse_rest_of_defstruct(p, pos_start, &out->u.deftype);
   } else if (try_skip_keyword(p, "deftype")) {
     out->tag = AST_TOPLEVEL_DEFTYPE;
     return parse_rest_of_deftype(p, pos_start, 0, &out->u.deftype);
@@ -3043,10 +3087,14 @@ int parse_test_deftypes(void) {
                          "deftype foo ^[7]bar;\n"
                          "deftype[T] foo struct { count u32; p ^[3]T; };\n",
                          27);
-  pass &= run_count_test("deftype8",
+  pass &= run_count_test("deftype8-a",
                          "defclass move foo ^[7]bar;\n"
                          "deftype[T] foo struct { count u32; p ^[3]T; };\n",
                          28);
+  pass &= run_count_test("deftype8-b",
+                         "defclass move foo ^[7]bar;\n"
+                         "defstruct[T] foo { count u32; p ^[3]T; };\n",
+                         27);
   pass &= run_count_test("deftype9",
                          "defclass move foo ^[7]bar;\n"
                          "defclass[T] copy foo struct { count u32; p ^[3]T; };\n",
