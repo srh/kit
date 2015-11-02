@@ -173,6 +173,8 @@ func parse_toplevel(p *ps, out *ast_toplevel) parse_result {
     return parse_rest_of_extern_def(p, out);
   } else if +try_skip_keyw(p, Import(void)) {
     return parse_rest_of_import(p, out);
+  } else if +try_skip_keyw(p, Defstruct(void)) {
+    return parse_rest_of_defstruct(p, out);
   } else if +try_skip_keyw(p, Deftype(void)) {
     return parse_rest_of_deftype(p, out);
   } else if +try_skip_keyw(p, Defclass(void)) {
@@ -297,6 +299,20 @@ func parse_rest_of_defclass(p *ps, out *ast_toplevel) parse_result {
     return Fail;
   }
   *out = TypeDef({generics, name, ClassexprRhs({disposition, type})});
+  return Success;
+}
+
+func parse_rest_of_defstruct(p *ps, out *ast_toplevel) parse_result {
+  generics ast_generics;
+  name ast_ident;
+  fields array[ast_vardecl];
+  if !(+parse_generics_if_present(p, &generics)
+       && +parse_ident(p, &name)
+       && +parse_braced_fields(p, &fields)
+       && +try_skip_oper(p, ';')) {
+    return Fail;
+  }
+  *out = TypeDef({generics, name, TypeexprRhs(@[ast_typeexpr]Struct({fields}))});
   return Success;
 }
 
@@ -1979,9 +1995,12 @@ func test_parse() bool {
                                _u8("deftype[] foo struct {x ^[2 + 3]bar; };\n"));
   pass = pass & run_parse_test(_u8("p049-b"),
                                _u8("deftype[T, U] foo struct {x ^[2 + 3]bar; };\n"));
-  pass = pass & run_parse_test(_u8("p050"),
+  pass = pass & run_parse_test(_u8("p050-a"),
                                _u8("defclass move foo ^[7]bar;\n"
                                    "deftype[T] foo struct { count u32; p ^[3]T; };\n"));
+  pass = pass & run_parse_test(_u8("p050-b"),
+                               _u8("defclass move foo ^[7]bar;\n"
+                                   "defstruct[T] foo { count u32; p ^[3]T; };\n"));
   pass = pass & run_parse_test(_u8("p051"),
                                _u8("defclass copy foo bar;"));
   pass = pass & run_parse_test(_u8("p052"),
