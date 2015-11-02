@@ -35,7 +35,7 @@ We should find that some restrictions are upheld:
   At a minimum, we want to know whether a cell is a paramlist cell, and what paramlist it's part of.
 */
 
-deftype subcell_disp struct {
+defstruct subcell_disp {
   subcell_opnum gr_num;
   partof cell_num;
   offset gr_offset;
@@ -47,7 +47,7 @@ defenum cell_const_disp {
   NotConst void;
 };
 
-deftype cell_disp struct {
+defstruct cell_disp {
   // If the cell's part of a function param list, tells what paramlist it's part of.
   paramlist opt[gr_num];
   // If the cell's part of a primop param list, tells what paramlist it's part of.
@@ -69,7 +69,7 @@ deftype cell_disp struct {
   subcelled array[cell_num];
 };
 
-deftype basic_analyze_state struct {
+defstruct basic_analyze_state {
   // This means we've analyzed gns [0, gns_analyzed).  But we haven't analyzed further gns.
   gns_analyzed size;
   paramlists array[gr_num];

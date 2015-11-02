@@ -8,7 +8,7 @@ deftype cu_typeexpr te_typeexpr;
 def `~` fn[te_typeexpr, cu_typeexpr] = wrapconvert;
 
 // A "check and computed" typeexpr -- if it's not complete, it should not be converted to a cu_typeexpr.
-deftype cac_typeexpr struct {
+defstruct cac_typeexpr {
   complete bool;
   te te_typeexpr;
 };
@@ -31,47 +31,47 @@ defenum te_puretype {
   TePureUnknown void;
 };
 
-deftype te_instpack struct {
+defstruct te_instpack {
   ent_id deftype_entry_id;
   inst_id deftype_inst_id;
 };
 
-deftype te_name struct {
+defstruct te_name {
   value sym;
   // Only supplied if the type is complete, the lookup actually happened.
   pack opt[te_instpack];
 };
 
-deftype te_typeapp struct {
+defstruct te_typeapp {
   typefunc te_puretype;
   params shray[te_typeexpr];
   // Only supplied if the type is complete, the lookup actually happened.
   pack opt[te_instpack];
 };
 
-deftype te_struct struct {
+defstruct te_struct {
   fields shray[te_vardecl];
 };
 
-deftype te_enum struct {
+defstruct te_enum {
   constructors shray[te_vardecl];
 };
 
-deftype te_union struct {
+defstruct te_union {
   fields shray[te_vardecl];
 };
 
-deftype te_arraytype struct {
+defstruct te_arraytype {
   count opt[u32];
   param shp[te_typeexpr];
 };
 
 // We better not allow name shadowing of lifetimes!
-deftype te_lifetime struct {
+defstruct te_lifetime {
   name sym;
 };
 
-deftype te_vardecl struct {
+defstruct te_vardecl {
   name sym;
   type te_typeexpr;
 };

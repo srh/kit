@@ -2,7 +2,7 @@ import ast;
 import identmap;
 import pos;
 
-deftype ps struct {
+defstruct ps {
   data *u8;
   length size;
   pos size;
@@ -193,7 +193,7 @@ func equal(a *tokval, b *tokval) bool {
   }
 }
 
-deftype tok struct {
+defstruct tok {
   interval interval;
   val tokval;
 };

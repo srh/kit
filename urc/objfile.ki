@@ -2,7 +2,7 @@ import endian;
 import identmap;
 import x86;
 
-deftype objfile struct {
+defstruct objfile {
   data objfile_section;
   rdata objfile_section;
   text objfile_section;
@@ -13,7 +13,7 @@ deftype objfile struct {
 deftype sti u32;
 def `~` fn[u32, sti] = wrapconvert;
 
-deftype objfile_symbol_record struct {
+defstruct objfile_symbol_record {
   name sym;
   value u32;
   section objfile_symbol_section;
@@ -47,14 +47,14 @@ defenum is_static {
   IsStaticYes void;
 };
 
-deftype objfile_section struct {
+defstruct objfile_section {
   raw array[u8];
   // Relevant for .data and .rdata sections.  Not relevant for .text, which just uses 16.
   max_requested_alignment u32;
   relocs array[objfile_relocation];
 };
 
-deftype objfile_relocation struct {
+defstruct objfile_relocation {
   // Offset from beginning of section.
   virtual_address u32;
   // Index into the symbol table.

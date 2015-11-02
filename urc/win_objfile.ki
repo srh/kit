@@ -3,7 +3,7 @@ import objfile;
 def IMAGE_FILE_MACHINE_I386 u32 = 0x14c;
 def kFakeTimeDateStamp u32 = 12345;
 
-deftype COFF_Header struct {
+defstruct COFF_Header {
   Machine le_u16;
   NumberOfSections le_u16;
   TimeDateStamp le_u32;
@@ -15,7 +15,7 @@ deftype COFF_Header struct {
 
 def COFF_Header_EXPECTED_SIZE u32 = 20;
 
-deftype Section_Header struct {
+defstruct Section_Header {
   Name ^[8]u8;
   VirtualSize le_u32;
   VirtualAddress le_u32;
@@ -146,7 +146,7 @@ func data_section_characteristics(max_requested_alignment u32) u32 {
     | IMAGE_SCN_MEM_READ) | IMAGE_SCN_MEM_WRITE;
 }
 
-deftype COFF_Relocation struct {
+defstruct COFF_Relocation {
   /* Offset from beginning of section, assuming its section header
   VirtualAddress is zero. */
   VirtualAddress le_u32;
@@ -182,7 +182,7 @@ deftype name_eight union {
   };
 };
 
-deftype COFF_symbol_standard_record struct {
+defstruct COFF_symbol_standard_record {
   Name name_eight;
   Value le_u32;
   /* Uses a 1-based index into the section table.  Special values:
@@ -207,7 +207,7 @@ deftype COFF_symbol_standard_record struct {
   NumberOfAuxSymbols u8;
 };
 
-deftype COFF_symbol_aux_sectiondef struct {
+defstruct COFF_symbol_aux_sectiondef {
   Length le_u32;
   NumberOfRelocations le_u16;
   NumberOfLineNumbers le_u16;

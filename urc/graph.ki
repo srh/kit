@@ -1,6 +1,6 @@
 import check;
 
-deftype frame_graph struct {
+defstruct frame_graph {
   informal_name sym;
   cells array[cell_info];
   ops array[gr_node];
@@ -51,7 +51,7 @@ func isLocationStatic(location cell_location) bool {
   }
 }
 
-deftype cell_info struct {
+defstruct cell_info {
   // Location must be specified by type-checking, but it spends time in an unspecified state.
   location cell_location;
   type cu_typeexpr;
@@ -68,12 +68,12 @@ defenum gr_node {
   QOp gr_qnode;
 };
 
-deftype gr_xnode struct {
+defstruct gr_xnode {
   precs shray[gr_num];
   op gr_xop;
 };
 
-deftype gr_qnode struct {
+defstruct gr_qnode {
   op gr_qop;
 };
 
@@ -175,40 +175,40 @@ inline func ref_node(gr *frame_graph, gn gr_num) *gr_node {
   return ref(&gr->ops, gn.~);
 }
 
-deftype gr_apply struct {
+defstruct gr_apply {
   funcell cell_num;
   params shray[cell_num];
   retcell cell_num;
 };
 
-deftype gr_prim_apply struct {
+defstruct gr_prim_apply {
   primop primitive_op;
   params shray[cell_num];
   retcell cell_num;
 };
 
-deftype gr_memcopy struct {
+defstruct gr_memcopy {
   dest cell_num;
   src cell_num;
 };
 
-deftype gr_writeconst struct {
+defstruct gr_writeconst {
   dest cell_num;
   value gr_const;
 };
 
-deftype gr_addressof struct {
+defstruct gr_addressof {
   dest cell_num;
   addressee cell_num;
 };
 
-deftype gr_deref struct {
+defstruct gr_deref {
   name cell_num;
   pointer cell_num;
   offset gr_offset;
 };
 
-deftype gr_subcell struct {
+defstruct gr_subcell {
   name cell_num;
   partof cell_num;
   offset gr_offset;
@@ -219,30 +219,30 @@ defenum gr_offset {
   OffsetComputed tup[u32, cell_num];
 };
 
-deftype gr_branch struct {
+defstruct gr_branch {
   src cell_num;
   cases shray[tup[gr_const, sq_num]];
   default_case opt[sq_num];
 };
 
-deftype gr_sequence struct {
+defstruct gr_sequence {
   first gr_num;
   second sq_num;
 };
 
-deftype gr_jmp struct {
+defstruct gr_jmp {
   next sq_num;
 };
 
-deftype gr_writenothing struct {
+defstruct gr_writenothing {
   dest cell_num;
 };
 
-deftype gr_dead struct {
+defstruct gr_dead {
   cell cell_num;
 };
 
-deftype gr_virtual_dead struct {
+defstruct gr_virtual_dead {
   cell cell_num;
 };
 
@@ -253,7 +253,7 @@ defenum gr_const {
   ConstBytes shray[u8];
 };
 
-deftype fullbody_state struct {
+defstruct fullbody_state {
   // all_vars and labels is from the ast_fullbody_info.
   // We use the cell field, to know the name of the var's cell.
   all_vars array[var_info];
@@ -327,7 +327,7 @@ func gr_fullbody(clq *clqueue, gr *frame_graph, x *ast_fullbody, out *gr_num, re
 }
 
 // TODO: Stop needing this -- make label_info and goto_info more general and use that, or make some other sort of annotation.  The use of breakgrack duplicates the usage of breakpack in body.ki.  It's not _particularly_ unsafe though.
-deftype breakgrack struct {
+defstruct breakgrack {
   break_target sq_num;
   continue_target sq_num;
 };
@@ -1769,12 +1769,12 @@ func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph,
   }
 }
 
-deftype gr_minimal_basics struct {
+defstruct gr_minimal_basics {
   return_cell cell_num;
   argcells array[cell_num];
 };
 
-deftype gr_basics struct {
+defstruct gr_basics {
   minimal gr_minimal_basics;
   pointeecells array[cell_num];
   derefs shray[gr_num];

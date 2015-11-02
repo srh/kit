@@ -9,7 +9,7 @@ inline func mk_pos(base_offset size, n size) pos {
   return p;
 }
 
-deftype human_pos struct {
+defstruct human_pos {
   module sym;
   line size;
   column size;

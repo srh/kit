@@ -20,7 +20,7 @@ defenum shift_behavior {
   JustRangecheckRhs void;
 };
 
-deftype numeric_traits struct {
+defstruct numeric_traits {
   repr numeric_representation;
   shifting shift_behavior;
   trap_overflow bool;
@@ -28,12 +28,12 @@ deftype numeric_traits struct {
   maxval bigint;
 };
 
-deftype flat_traits struct {
+defstruct flat_traits {
   size u32;
   alignment u32;
 };
 
-deftype integral_traits struct {
+defstruct integral_traits {
   flat flat_traits;
   numeric numeric_traits;
 };
@@ -63,7 +63,7 @@ defenum universal_calling_convention {
   UniversalCdeclConvention void;
 };
 
-deftype platform_info struct {
+defstruct platform_info {
   endian endianness;
   min_stackvar_alignment u32;
   // How many bits are in a byte (not necessarily octet)?

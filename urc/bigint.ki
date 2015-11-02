@@ -538,7 +538,7 @@ func[T] big(arr T) bigint {
   return convert_to_bigint(10, &b2);
 }
 
-deftype big_ctx struct {
+defstruct big_ctx {
   failures u32;
 };
 

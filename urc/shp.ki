@@ -4,7 +4,7 @@ import stdlib;
 // copy, the way box does, because non-copying movable types are not
 // practical yet.
 
-deftype[T] shp_pointee struct {
+defstruct[T] shp_pointee {
   refcount size;
   value T;
 };

@@ -1,6 +1,6 @@
 import ast;
 
-deftype variadic_arity struct {
+defstruct variadic_arity {
   // The variadic param can go "in the middle," so with n varargs, it looks like
   // foo[a_1, ..., a_before, vararg_1, ..., vararg_n, b_1, ..., b_after].
   before u32;

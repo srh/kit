@@ -222,7 +222,7 @@ func[T] unSet(dest *opt[T]) void {
   *dest = None;
 }
 
-deftype[S, T] tup struct {
+defstruct[S, T] tup {
   car S;
   cdr T;
 };
