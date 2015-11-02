@@ -2,7 +2,7 @@ import objfile;
 
 def kEI_NIDENT u32 = 16;
 
-deftype elf32_Header struct {
+defstruct elf32_Header {
   // TODO: Move constant 16 to a def kEI_NIDENT (when the language supports it).
   e_ident ^[16]u8;
   // Type: Relocatable, executable, etc.
@@ -33,7 +33,7 @@ deftype elf32_Header struct {
   e_shstrndx le_u16;
 };
 
-deftype elf32_Section_Header struct {
+defstruct elf32_Section_Header {
   // An index into the section header string table section.
   sh_name le_u32;
   /* SHT_PROGBITS for "information defined by the program", SHT_SYMTAB
@@ -64,7 +64,7 @@ deftype elf32_Section_Header struct {
   sh_entsize le_u32;
 };
 
-deftype elf32_Symtab_Entry struct {
+defstruct elf32_Symtab_Entry {
   st_name le_u32;
   st_value le_u32;
   st_size le_u32;
@@ -73,7 +73,7 @@ deftype elf32_Symtab_Entry struct {
   st_shndx le_u16;
 };
 
-deftype elf32_Rel struct {
+defstruct elf32_Rel {
   r_offset le_u32;
   r_info le_u32;
 };

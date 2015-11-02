@@ -11,18 +11,18 @@ import shp;
 import typeexpr;
 import u8ast;
 
-deftype cs_primitives struct {
+defstruct cs_primitives {
   ptr_eq opt[def_entry_id];
 };
 
-deftype meta_datum struct {
+defstruct meta_datum {
   left opt[pos];
   right opt[pos];
   original_syntax opt[ast_original_syntax];
 };
 
 // TODO: Don't just give ps and tok.ki code direct access to this?
-deftype positionals struct {
+defstruct positionals {
   metas array[meta_datum];
 };
 
@@ -34,7 +34,7 @@ func mk_positionals() positionals {
   return p;
 }
 
-deftype checkstate struct {
+defstruct checkstate {
   im *identmap;
   instantiation_depth u32;
   plat platform_info;
@@ -199,7 +199,7 @@ func `==`(a module_process_state, b module_process_state) bool {
   return enumnum(&a) == enumnum(&b);
 }
 
-deftype module struct {
+defstruct module {
   module_name sym;
   file ast_file;
   // Used for reconstructing pos information.
@@ -236,7 +236,7 @@ defenum type_scalarity {
   IsScalarYes void;
 };
 
-deftype type_properties struct {
+defstruct type_properties {
   flat_size u32;
   flat_alignment u32;
   init_behavior derived_method_behavior;
@@ -246,28 +246,28 @@ deftype type_properties struct {
   is_scalar type_scalarity;
 };
 
-deftype cu_typrop struct {
+defstruct cu_typrop {
   cu cu_typeexpr;
   props type_properties;
 };
 
-deftype deftype_inst_rhs_info struct {
+defstruct deftype_inst_rhs_info {
   rhs_cu cu_typeexpr;
   rhs_props type_properties;
 };
 
-deftype deftype_inst_info struct {
+defstruct deftype_inst_info {
   // This is None if the type is primitive.
   rhs opt[deftype_inst_rhs_info];
   props type_properties;
 };
 
-deftype deftype_inst struct {
+defstruct deftype_inst {
   parms idy_genparms;
   info nbfc[deftype_inst_info];
 };
 
-deftype deftype_nonprim struct {
+defstruct deftype_nonprim {
   tl *ast_type_def;
   // The RHS typeexpr, if computed, without generics replaced, of course.
   rhs nbfc[te_typeexpr];
@@ -279,7 +279,7 @@ defenum rhs_accessibility {
   RhsImpossible void;
 };
 
-deftype deftype_entry struct {
+defstruct deftype_entry {
   module_name sym;
   name sym;
   accessible array[access_entry_id];
@@ -312,7 +312,7 @@ defenum should_inline {
   InlineYawn void;
 };
 
-deftype graphed_fn_body struct {
+defstruct graphed_fn_body {
   spec fn_body_spec;
   graph frame_regraphed;
   // The return cell is graph.cell.
@@ -324,7 +324,7 @@ deftype graphed_fn_body struct {
   inline_state nbfc[basic_analyze_state];
 };
 
-deftype extern_fn_body struct {
+defstruct extern_fn_body {
   // The name of the extern fn body.
   name sym;
 };
@@ -334,14 +334,14 @@ defenum fn_body_entry_enum {
   ExternFnBody extern_fn_body;
 };
 
-deftype fn_body_entry struct {
+defstruct fn_body_entry {
   informal_name sym;
   symbol_table_index nc[sti];
   body_text_offset nc[u32];
   u fn_body_entry_enum;
 };
 
-deftype access_entry struct {
+defstruct access_entry {
   name sym;
   arity ast_access_arity;
   ent_id nbfc[deftype_entry_id];
@@ -356,7 +356,7 @@ defenum genparms {
   HasParms shray[te_typeexpr];
 };
 
-deftype idy_genparms struct {
+defstruct idy_genparms {
   // When we create an instantiation, some of the types in "repls" could have lifetime parameters.  We don't want the actual template instantiation to use actual realized values for those lifetime parameters -- they'd be stuff like "the lifetime of the variable x" and such -- so they're renamed, ordered by first appearance in the left-to-right traversal of repls, and named with the deterministic sequence '$0, '$1, '$2, and so on (or something like that).
   //
   // The canonicalization of the order prevents many spurious template instantiations from happening -- for example, if you have a func[T, U] and T = foo['a], U = bar['b], we will only have one instantiation for foo['$0], bar['$1].  However, we could also have an instantiation for foo['$0], bar['$0], where the lifetime parameters are equal.  In general we can have up to B_n instantiations, where B_n is the nth Bell number, the number of ways to divide a set up into non-empty equivalence classes.  Thus, we have this to-do comment:
@@ -379,7 +379,7 @@ inline func blank_idyparms() idy_genparms {
   return {0, {mk_shray()}};
 }
 
-deftype idy_repls struct {
+defstruct idy_repls {
   tys shray[cu_typeexpr];
 };
 
@@ -429,12 +429,12 @@ func `!=`(x def_inst_rhs_status, y def_inst_rhs_status) bool {
   return !(x == y);
 }
 
-deftype frame_info struct {
+defstruct frame_info {
   // This becomes None when we begin to fully build the graph.
   incomplete_graph opt[frame_graph];
 };
 
-deftype def_inst_rhs_expr struct {
+defstruct def_inst_rhs_expr {
   ec ast_expr_consume;
   // This becomes Computed(...) when the def_inst status == FinishedCheckingRhs(void).
   frame_info nc[frame_info];
@@ -450,14 +450,14 @@ defenum def_inst_rhs {
   InstRhsMagic def_magic;
 };
 
-deftype frame_regraphed struct {
+defstruct frame_regraphed {
   gr frame_graph;
   gn gr_num;
   // This cell is something that ought to be verifiable by looking at fg and finding which rigid/flex cells aren't "dead" -- there should just be one: this one.  For a top-level-expr it's the value the expr produces, and for a fullbody it's the return cell.
   cell cell_num;
 };
 
-deftype def_inst struct {
+defstruct def_inst {
   parms idy_genparms;
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None if we have an extern def or primitive def.
   rhs def_inst_rhs;
@@ -474,7 +474,7 @@ func mk(parms idy_genparms, rhs def_inst_rhs) def_inst {
   return {parms, rhs, NotComputed@[cu_typrop](), DidNotCheckRhs(void), NotComputed@[opt[frame_regraphed]](), NotComputed@[st_value]()};
 }
 
-deftype def_nonprim struct {
+defstruct def_nonprim {
   // This is either the syntactic typeexpr or converted from a shallow look at the RHS.
   quick_typeexpr ast_typeexpr;
   tl *ast_toplevel;
@@ -489,7 +489,7 @@ defenum def_definition {
   DefnMagic def_magic;
 };
 
-deftype def_entry struct {
+defstruct def_entry {
   module_name sym;
   def_name sym;
   accessible array[access_entry_id];
@@ -505,14 +505,14 @@ func mk(module_name sym, def_name sym, accessible array[access_entry_id], generi
   return {module_name, def_name, accessible, generics, DefnHasRhs({quick_typeexpr, tl}), NotComputed(), mk_hash@[idy_genparms, def_inst_id]()};
 }
 
-deftype clqueue_deftype_entry struct {
+defstruct clqueue_deftype_entry {
   ent_id deftype_entry_id;
   inst_id deftype_inst_id;
   // The instantiation depth when we _push_ the entry.
   instantiation_depth u32;
 };
 
-deftype clqueue_def_entry struct {
+defstruct clqueue_def_entry {
   ent_id def_entry_id;
   inst_id def_inst_id;
   // The instantiation depth when we _push_ the entry.
@@ -524,7 +524,7 @@ defenum clqueue_entry {
   ClqDefEntry clqueue_def_entry;
 };
 
-deftype clqueue struct {
+defstruct clqueue {
   cs *checkstate;
   im *identmap;
   entries array[clqueue_entry];

@@ -509,7 +509,7 @@ func x86_load32_signextend_for_primop(f *objfile, dest u8, src cell_loc, size u3
 }
 
 // NOTE: If this changes buflength, its consumers (like appendtext) will need to change theirs.
-deftype reg_rm_encoded struct {
+defstruct reg_rm_encoded {
   length u8;
   buf ^[5]u8;
 };
@@ -676,7 +676,7 @@ func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
   }
 }
 
-deftype regdisp struct { addr u8; disp i32; };
+defstruct regdisp { addr u8; disp i32; };
 
 defenum regdisp_or_const {
   Regdisp regdisp;

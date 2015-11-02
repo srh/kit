@@ -109,7 +109,7 @@ func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
 
 // TODO: Make test output not go directly to stdout/stderr.
 
-deftype check_ctx struct {
+defstruct check_ctx {
   build bool;
   specific_run opt[array[u8]];
   failures u32;

@@ -57,7 +57,7 @@ access symmap[_] {
   }
 }
 
-deftype common_syms struct {
+defstruct common_syms {
   fnsym sym;
   boolsym sym;
   voidsym sym;
@@ -105,7 +105,7 @@ deftype common_syms struct {
   fakesym sym;
 };
 
-deftype identmap struct {
+defstruct identmap {
   sm symmap[string];
   cym common_syms;
 };

@@ -293,7 +293,7 @@ func enqueue_def_inst(cs *checkstate, clq *clqueue, id def_entry_id, parms *idy_
   return res.id;
 }
 
-deftype id_and_created struct {
+defstruct id_and_created {
   id def_inst_id;
   created bool;
 };
@@ -849,7 +849,7 @@ func enqueue_deftype_inst(cs *checkstate, clq *clqueue, id deftype_entry_id, par
   return res.id;
 }
 
-deftype type_id_and_created struct {
+defstruct type_id_and_created {
   id deftype_inst_id;
   created bool;
 };
@@ -896,12 +896,12 @@ func compute_type_properties(cs *checkstate, clq *clqueue, t *cu_typeexpr, out *
   return compute_complete_type_properties(cs, clq, &t->~, out);
 }
 
-deftype struct_field_info struct {
+defstruct struct_field_info {
   offset u32;
   props type_properties;
 };
 
-deftype partial_struct_data struct {
+defstruct partial_struct_data {
   found_field bool;
   offset u32;
   max_alignment u32;
@@ -1527,7 +1527,7 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
   }
 }
 
-deftype ent_and_parms struct {
+defstruct ent_and_parms {
   ent def_entry_id;
   parms genparms;
 };
@@ -1734,7 +1734,7 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
   }
 }
 
-deftype complete_computed struct {
+defstruct complete_computed {
   complete bool;
   computed bool;
 };

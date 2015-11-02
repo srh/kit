@@ -8,7 +8,7 @@ on the HP Saturn that'd be nibbles, on other systems it might be 16
 bits.  The term "bnno" is used because "byte" is so likely to be
 misinterpreted. */
 
-deftype st_objpool struct {
+defstruct st_objpool {
   objects array[opt[st_value]];
 };
 
@@ -16,7 +16,7 @@ func mk_objpool() st_objpool {
   return {mk_array@[opt[st_value]]()};
 }
 
-deftype st_env struct {
+defstruct st_env {
   pool *st_objpool;
 
   plat platform_info;
@@ -34,7 +34,7 @@ deftype st_obj_num size;
 func `==`(a st_obj_num, b st_obj_num) bool { return a.~ == b.~; }
 func `!=`(a st_obj_num, b st_obj_num) bool { return a.~ != b.~; }
 
-deftype st_obj_ref struct {
+defstruct st_obj_ref {
   num st_obj_num;
   // The offset, in terms of bnnos
   offset u32;
@@ -42,17 +42,17 @@ deftype st_obj_ref struct {
   count u32;
 };
 
-deftype st_pointer struct {
+defstruct st_pointer {
   num st_obj_num;
   // The offset, in terms of bnnos.
   offset u32;
 };
 
-deftype st_symbolref struct {
+defstruct st_symbolref {
   fnid fn_body_id;
 };
 
-deftype st_value struct {
+defstruct st_value {
   // Note: Even when targeting big-endian systems, the lsB of a word is the still the least-addressable byte of that chunk of memory in this code here.  So, a 32-bit value of "5" would be represented by the array {0x05000000} when we target big-endian systems.  (Middle-endian on 16-bit systems could be a thing too.)
   words array[u32];
   // Bits set to 1 for those bits (in [0:length)) that are not garbage, not covered by refs.

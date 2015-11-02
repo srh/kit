@@ -29,7 +29,7 @@ func `+`(x parse_result) bool {
   }
 }
 
-deftype prec_pair struct {
+defstruct prec_pair {
   left i32;
   right i32;
 };
@@ -972,7 +972,7 @@ inline func thenexpr_then_prec() prec_pair {
 // Lower than anything... except another then-expr.
 def thenexpr_else_right_prec i32 = 314;
 
-deftype binop_facts struct {
+defstruct binop_facts {
   op_prec prec_pair;
   user_assignment bool;
 };
@@ -1982,7 +1982,7 @@ func test_parse() bool {
   pass = pass & run_parse_test(_u8("p045-b"),
                                _u8("deftype foo fn[int, int] ;"));
   pass = pass & run_parse_test(_u8("p046-a"),
-                               _u8("deftype foo struct { x y; z int; t fn[beh]; };"));
+                               _u8("defstruct foo { x y; z int; t fn[beh]; };"));
   pass = pass & run_parse_test(_u8("p046-b"),
                                _u8("deftype foo enum { x y; z int; t fn[beh]; };"));
   pass = pass & run_parse_test(_u8("p046-c"),

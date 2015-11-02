@@ -7,14 +7,14 @@ import expr;
 //   - that no control path reaches the end of the function without a return statement.
 //   - that there's no dead code after a goto or return statement.  (Really?  Maybe let that be a warning.)
 
-deftype goto_info struct {
+defstruct goto_info {
   stnum statement_num;
   st *ast_goto_statement;
   label_name sym;
   in_scope array[var_number];
 };
 
-deftype label_info struct {
+defstruct label_info {
   stnum statement_num;
   st *ast_label_statement;
   label_name sym;
@@ -22,7 +22,7 @@ deftype label_info struct {
   hit bool;
 };
 
-deftype statement_info struct {
+defstruct statement_info {
   // TODO: Nobody uses st.
   st opt[*ast_statement];
   incoming array[statement_num];
@@ -30,7 +30,7 @@ deftype statement_info struct {
   marked_reachable bool;
 };
 
-deftype bodystate struct {
+defstruct bodystate {
   es framescope;
   ds *defscope;
   cs *checkstate;
@@ -72,7 +72,7 @@ func connect_statements(bs *bodystate, from statement_num, to statement_num) voi
 }
 
 // Returns the fall-through entry node and the fall-through exit node of a body or statement.  A body or statement might not have a fall-through exit, if e.g. it has a return statement.
-deftype entryexit struct { entry statement_num; exit statement_num; };
+defstruct entryexit { entry statement_num; exit statement_num; };
 
 func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *entryexit) np {
   nstatements size = count(&a->statements);
@@ -184,7 +184,7 @@ func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te
   return NoFail;
 }
 
-deftype breakpack struct {
+defstruct breakpack {
   // TODO: For these we could just use threshold var numbers.
   break_target statement_num;
   break_in_scope array[var_number];
@@ -357,7 +357,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
   return NoFail;
 }
 
-deftype swartch_checkobj struct {
+defstruct swartch_checkobj {
   swartch_type *cu_typeexpr;
   swartch_lifetime te_typeexpr;
   switchable_type_lifetime te_typeexpr;
