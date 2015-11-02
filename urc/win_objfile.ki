@@ -174,12 +174,14 @@ defstruct COFF_Relocation {
   Type le_u16;
 };
 
+defstruct long_name {
+  Zeroes le_u32;
+  Offset le_u32;
+};
+
 deftype name_eight union {
   ShortName ^[8]u8;
-  LongName struct {
-    Zeroes le_u32;
-    Offset le_u32;
-  };
+  LongName long_name;
 };
 
 defstruct COFF_symbol_standard_record {
