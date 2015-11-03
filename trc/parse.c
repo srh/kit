@@ -613,14 +613,13 @@ int is_ident_keyword(struct ps *p, size_t global_offset_begin, size_t global_off
       || 0 == memcmp(ptr, "false", count)
       || 0 == memcmp(ptr, "union", count);
   case 6:
-    return 0 == memcmp(ptr, "switch", count);
+    return 0 == memcmp(ptr, "switch", count)
+      || 0 == memcmp(ptr, "struct", count);
   case 7:
     return 0 == memcmp(ptr, "deftype", count)
       || 0 == memcmp(ptr, "defenum", count);
   case 8:
     return 0 == memcmp(ptr, "defclass", count);
-  case 9:
-    return 0 == memcmp(ptr, "defstruct", count);
   default:
     return 0;
   }
@@ -2770,7 +2769,7 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   } else if (try_skip_keyword(p, "import")) {
     out->tag = AST_TOPLEVEL_IMPORT;
     return parse_rest_of_import(p, pos_start, &out->u.import);
-  } else if (try_skip_keyword(p, "defstruct")) {
+  } else if (try_skip_keyword(p, "struct")) {
     out->tag = AST_TOPLEVEL_DEFTYPE;
     return parse_rest_of_defstruct(p, pos_start, 0, &out->u.deftype);
   } else if (try_skip_keyword(p, "deftype")) {
@@ -3067,30 +3066,30 @@ int parse_test_deftypes(void) {
                          "deftype foo fn[int, int] ; ",
                          9);
   pass &= run_count_test("deftype3",
-                         "defstruct foo { x y; z int; t fn[beh]; };\n"
+                         "struct foo { x y; z int; t fn[beh]; };\n"
                          "deftype [ c, d ]  bar union{a b;c d[e,f];};",
                          39);
   pass &= run_count_test("deftype4",
                          "deftype[] foo bar;\n",
                          6);
   pass &= run_count_test("deftype5",
-                         "defstruct foo { x bar [quux]; };\n",
+                         "struct foo { x bar [quux]; };\n",
                          11);
   pass &= run_count_test("deftype6",
                          "def x int = 3;"
-                         "defstruct[T] foo { count u32; p ptr[T]; };\n",
+                         "struct[T] foo { count u32; p ptr[T]; };\n",
                          23);
   pass &= run_count_test("deftype7",
                          "deftype foo ^[7]bar;\n"
-                         "defstruct[T] foo { count u32; p ^[3]T; };\n",
+                         "struct[T] foo { count u32; p ^[3]T; };\n",
                          26);
   pass &= run_count_test("deftype8-a",
                          "defclass move foo { field ^[7]bar; };\n"
-                         "defstruct[T] foo { count u32; p ^[3]T; };\n",
+                         "struct[T] foo { count u32; p ^[3]T; };\n",
                          31);
   pass &= run_count_test("deftype8-b",
                          "defclass move foo { field ^[7]bar; };\n"
-                         "defstruct[T] foo { count u32; p ^[3]T; };\n",
+                         "struct[T] foo { count u32; p ^[3]T; };\n",
                          31);
   pass &= run_count_test("deftype9",
                          "defclass move foo { field ^[7]bar; };\n"

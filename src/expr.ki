@@ -4,7 +4,7 @@ import check;
 import primitives;
 
 // Used with the variable name "es" -- its name used to be different.
-defstruct framescope {
+struct framescope {
   ds *defscope;
   // Same as ds->cs.
   cs *checkstate;
@@ -50,7 +50,7 @@ func reannotate_static_to_virtual(es *framescope, num cell_num) void {
   }
 }
 
-defstruct defscope {
+struct defscope {
   cs *checkstate;
   // Same as cs->im.
   im *identmap;
@@ -78,7 +78,7 @@ defenum var_binding {
   VarSelfContained void;
 };
 
-defstruct var_info {
+struct var_info {
   num var_number;
   // A complete, checked, type, with generics replaced.
   type cu_typeexpr;
@@ -257,14 +257,14 @@ func replaced_name_parms(ds *defscope, a *ast_name_expr, out *genparms) np {
   }
 }
 
-defstruct constructor_info {
+struct constructor_info {
   // A fn type.
   type cu_typeexpr;
   constructor_tag enum_tag_value;
   ip instpair;
 };
 
-defstruct voidconstructed_info {
+struct voidconstructed_info {
   // The actual constructed type, which we need for some reason.
   constructed_type cu_typeexpr;
   // The enum type (the structural rhs of constructed_type).
@@ -470,7 +470,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
   return NoFail;
 }
 
-defstruct es_global_match {
+struct es_global_match {
   ent_id def_entry_id;
   inst_id def_inst_id;
   parms genparms;

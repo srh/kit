@@ -49,18 +49,18 @@ func op_arity(op primitive_logical_op) u32 {
   }
 }
 
-defstruct primitive_ptr_comparison_op {
+struct primitive_ptr_comparison_op {
   op_action primitive_comparison_op_action;
 };
 
-defstruct primitive_numeric_op {
+struct primitive_numeric_op {
   // Size in bnnos.
   op_size u32;
   op_numtraits numeric_traits;
   op_action primitive_numeric_op_action;
 };
 
-defstruct primitive_numeric_comparison_op {
+struct primitive_numeric_comparison_op {
   // Size in bnnos.
   op_size u32;
   op_numtraits numeric_traits;
@@ -68,7 +68,7 @@ defstruct primitive_numeric_comparison_op {
 };
 
 // This conversion op checks overflow depending on both from_numtraits and to_numtraits.
-defstruct primitive_conversion_op {
+struct primitive_conversion_op {
   // Size in bnnos.
   from_size u32;
   from_numtraits numeric_traits;

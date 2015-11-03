@@ -161,7 +161,7 @@ access hash[_, _] {
     return h->user_count;
   }
 
-  defstruct[K, V] hash_iter {
+  struct[K, V] hash_iter {
     h *hash[K, V];
     index size;
   };

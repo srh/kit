@@ -7,7 +7,7 @@ import shp;
 import typeexpr;
 import u8ast;
 
-defstruct magic_whole_field_info {
+struct magic_whole_field_info {
   ip instpair;
   cu_type cu_typeexpr;
   cu_props type_properties;
@@ -15,19 +15,19 @@ defstruct magic_whole_field_info {
   rhs_props type_properties;
 };
 
-defstruct magic_struct_info {
+struct magic_struct_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
   fips array[opt[instpair]];
 };
 
-defstruct magic_enum_info {
+struct magic_enum_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
   cips array[opt[instpair]];
 };
 
-defstruct magic_arraytype_info {
+struct magic_arraytype_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
   ip instpair;
@@ -41,7 +41,7 @@ defenum magic_ctor_info {
   MagicArraytypeInfo magic_arraytype_info;
 };
 
-defstruct magic_ctor {
+struct magic_ctor {
   type te_typeexpr;
   info nc[magic_ctor_info];
 };
@@ -51,7 +51,7 @@ func ref_info(a *magic_ctor) *magic_ctor_info {
   return unHas(&a->info);
 }
 
-defstruct copy_destroy_desc {
+struct copy_destroy_desc {
   copy_desc ctor_desc;
   destroy_desc ctor_desc;
 };
@@ -62,7 +62,7 @@ defenum magic_enum_construct_op {
   EnumConstructCopyDestroy copy_destroy_desc;
 };
 
-defstruct magic_enum_construct {
+struct magic_enum_construct {
   enum_type cu_typeexpr;
   enum_type_props type_properties;
   constructor_index size;
@@ -70,28 +70,28 @@ defstruct magic_enum_construct {
   operational magic_enum_construct_op;
 };
 
-defstruct non_magic_ctor_info {
+struct non_magic_ctor_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
   ip instpair;
 };
 
-defstruct non_magic_ctor {
+struct non_magic_ctor {
   type te_typeexpr;
   info nc[non_magic_ctor_info];
 };
 
-defstruct magic_bzero {
+struct magic_bzero {
   // size of buf to bzero in bnnos.
   size nc[u32];
 };
 
-defstruct magic_memcopy {
+struct magic_memcopy {
   // size of buf to memcopy in bnnos.
   size nc[u32];
 };
 
-defstruct which_non_magic_ctor {
+struct which_non_magic_ctor {
   wc which_ctor;
   nmc non_magic_ctor;
 };
@@ -101,7 +101,7 @@ defenum which_prop {
   PropAlignof void;
 };
 
-defstruct non_magic_prop {
+struct non_magic_prop {
   wp which_prop;
   type te_typeexpr;
   info nc[u32];
@@ -112,7 +112,7 @@ defenum def_non_magic {
   NonMagicProp non_magic_prop;
 };
 
-defstruct which_magic_ctor {
+struct which_magic_ctor {
   wc which_ctor;
   mc magic_ctor;
 };

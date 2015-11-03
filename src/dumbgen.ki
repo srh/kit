@@ -12,7 +12,7 @@ defenum cell_loc {
   UnusedLoc void;
 };
 
-defstruct lives {
+struct lives {
   // Maintained in sorted order.
   all array[cell_num];
   // The xor and sum of the cell nums -- makes for a quick commutative hash.
@@ -20,7 +20,7 @@ defstruct lives {
   summed osize;
 };
 
-defstruct lives_checksum {
+struct lives_checksum {
   xored osize;
   summed osize;
 };
@@ -35,7 +35,7 @@ func swap(x *lives, y *lives) void {
   y->summed = tmps;
 }
 
-defstruct gn_annot {
+struct gn_annot {
   plainly_live nc[lives_checksum];
 
   // Only for GrApply and GrPrimApply.
@@ -56,7 +56,7 @@ func live_for_funcall(annot *gn_annot) *array[cell_num] {
   return &unHas(&annot->app_time_live)->all;
 }
 
-defstruct frame {
+struct frame {
   cs *checkstate;
   im *identmap;
   argcells array[cell_num];
@@ -78,7 +78,7 @@ defstruct frame {
 deftype jmp_targetnum size;
 def `~` fn[size, jmp_targetnum] = wrapconvert;
 
-defstruct jmpdata {
+struct jmpdata {
   overwrite_location u32;
   // On x86, this is overwrite_location + 4 for imm32 jmp and jcc instructions -- the location of the end of the instruction.
   relative_mathpoint u32;
@@ -654,13 +654,13 @@ func universal_cc_write_to_retcell(f *objfile, h *frame, c cell_num) void {
   }
 }
 
-defstruct gn_and_jmpaft {
+struct gn_and_jmpaft {
   gn gr_num;
   jmpaft jmp_targetnum;
   jmp_necessary bool;
 };
 
-defstruct op_targ_gn_jmpaft {
+struct op_targ_gn_jmpaft {
   op_targ jmp_targetnum;
   gn gr_num;
   jmpaft jmp_targetnum;
