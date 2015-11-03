@@ -1257,8 +1257,8 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) np {
       }
     }
   } else {
-    // Primitive types are pre-checked.
-    return NoFail;
+    ice(_u8("ensure_deftype_checked on primitive type"));
+    return fake();
   }
 }
 
