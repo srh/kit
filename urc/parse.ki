@@ -598,9 +598,6 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_lifetimes, out *ast
     *out = Name({m, p->im->cym.voidsym});
     return Success(void);
   }
-  if +try_skip_keyw(p, Struct(void)) {
-    return success_or_fail(parse_rest_of_struct(p, out));
-  }
   if +try_skip_keyw(p, Enum(void)) {
     return success_or_fail(parse_rest_of_enum(p, out));
   }
