@@ -1515,7 +1515,10 @@ int check_typeexpr_name_traits(struct checkstate *cs,
     ret = 1;
   } else {
     /* We should have already typechecked the insts at typechecking time. */
-    CHECK(also_typecheck);
+    if (!also_typecheck) {
+      METERR(cs, *ast_typeexpr_meta(a), "ICE: also_typecheck null for name %.*s\n", IM_P(cs->im, a->u.name.value));
+      CRASH("in check_typeexpr_name_traits");
+    }
     struct typeexpr_traits traits;
     struct typeexpr_trait_instantiations trait_insts;
     ret = finish_checking_name_traits(cs,
