@@ -179,9 +179,6 @@ defstruct long_name {
   Offset le_u32;
 };
 
-// TODO: Works around a bug where we don't typecheck union type traits.  (Because we know they must have trivial constructors?  So we create a special code path for them?  Stupid.)
-func s1_bug_workaround(x long_name) long_name { return x; }
-
 deftype name_eight union {
   ShortName ^[8]u8;
   LongName long_name;

@@ -1681,13 +1681,9 @@ int check_typeexpr_unione_traits(struct checkstate *cs,
                                  struct ast_typeexpr *a,
                                  struct exprscope *also_typecheck,
                                  struct typeexpr_traits *out) {
-  (void)also_typecheck;
-
   for (size_t i = 0, e = a->u.unione.fields_count; i < e; i++) {
-    /* We don't typecheck the traits since we know they must have
-    trivial copy constructors. */
     struct typeexpr_traits traits;
-    if (!check_typeexpr_traits(cs, &a->u.unione.fields[i].type, NULL, &traits)) {
+    if (!check_typeexpr_traits(cs, &a->u.unione.fields[i].type, also_typecheck, &traits)) {
       return 0;
     }
 
