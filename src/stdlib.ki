@@ -3,7 +3,7 @@ import array;
 extern malloc fn[size, *void];
 extern free fn[*void, void];
 extern abort fn[void];
-defclass FILE void;
+defclass FILE { };
 extern Stdout fn[*FILE];
 extern Stdin fn[*FILE];
 extern Stderr fn[*FILE];

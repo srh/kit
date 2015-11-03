@@ -1,7 +1,7 @@
 import array;
 import shray;
 
-defclass copy bigint struct {
+defclass copy bigint {
   negative bool;
   // We use a 2's complement representation.  (So -2 is represented by [0xFFFFFFFE], -1 is represented by [].)
   parts shray[u32];

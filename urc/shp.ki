@@ -9,35 +9,37 @@ defstruct[T] shp_pointee {
   value T;
 };
 
-defclass[T] move shp *shp_pointee[T];
+defclass[T] move shp {
+  ptr *shp_pointee[T];
+};
 
 access shp[_] {
   func[T] do_init(u *shp[T]) void {
-    u->~ = @[*shp_pointee[T]]cast(checkmalloc(sizeof@[shp_pointee[T]]));
-    init(&u->~->value);
-    u->~->refcount = 1;
+    u->ptr = @[*shp_pointee[T]]cast(checkmalloc(sizeof@[shp_pointee[T]]));
+    init(&u->ptr->value);
+    u->ptr->refcount = 1;
   }
 
   inline func[T] do_copy(dest *shp[T], src *shp[T]) void {
-    src->~->refcount = src->~->refcount + 1;
-    dest->~ = src->~;
+    src->ptr->refcount = src->ptr->refcount + 1;
+    dest->ptr = src->ptr;
   }
 
   func[T] do_destroy(u *shp[T]) void {
-    rc size = u->~->refcount - 1;
-    u->~->refcount = rc;
+    rc size = u->ptr->refcount - 1;
+    u->ptr->refcount = rc;
     if rc == 0 {
-      destroy(u->~);
-      free(@[*void]cast(u->~));
+      destroy(u->ptr);
+      free(@[*void]cast(u->ptr));
     }
   }
 
   inline func[T] oo(x *shp[T]) *T {
-    return &x->~->value;
+    return &x->ptr->value;
   }
 
   inline func[T] oo(x shp[T]) *T {
-    return &x.~->value;
+    return &x.ptr->value;
   }
 }
 

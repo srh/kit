@@ -534,7 +534,7 @@ func mk(cs *checkstate) clqueue {
   return {cs, cs->im, mk_array@[clqueue_entry]()};
 }
 
-defclass move depth_rewinder struct {
+defclass move depth_rewinder {
   cs *checkstate;
   old_depth u32;
 };

@@ -11,7 +11,7 @@ defenum[K, V] hash_entry {
   HashErased void;
 };
 
-defclass[K, V] copy hash struct {
+defclass[K, V] copy hash {
   // count(&arr) is zero or a power of two.
   arr array[hash_entry[K, V]];
   // cell_count, the number of HashValue and HashErased entries, is less than half count(&arr).

@@ -564,7 +564,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "def y size = alignof@[ty];\n"));
   // Fails because whatever is not the name of a defclass type.
   run_check_negtest(ctx, "c062",
-    _u8("defclass ty struct { x i32; y i32; };\n"
+    _u8("defclass ty { x i32; y i32; };\n"
         "access whatever {\n"
         "def foo fn[*ty, i32] = func(t *ty) i32 {\n"
         "  return t->x;\n"
@@ -572,7 +572,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "}\n"));
   // Fails because ty[] has bad arity.
   run_check_negtest(ctx, "c063",
-    _u8("defclass ty struct { x i32; y i32; };\n"
+    _u8("defclass ty { x i32; y i32; };\n"
         "access ty[] {\n"
         "def foo fn[*ty, i32] = func(t *ty) i32 {\n"
         "  return t->x;\n"
@@ -580,21 +580,21 @@ func test_check_more_cases(ctx *check_ctx) void {
         "}\n"));
   // Fails because ty[_, _] has bad arity.
   run_check_negtest(ctx, "c064",
-    _u8("defclass ty struct { x i32; y i32; };\n"
+    _u8("defclass ty { x i32; y i32; };\n"
         "access ty[_, _] {\n"
         "def foo fn[*ty, i32] = func(t *ty) i32 {\n"
         "  return t->x;\n"
         "};\n"
         "}\n"));
   run_check_test(ctx, "c065",
-    _u8("defclass ty struct { x i32; y i32; };\n"
+    _u8("defclass ty { x i32; y i32; };\n"
         "access ty {\n"
         "def foo fn[*ty, i32] = func(t *ty) i32 {\n"
         "  return t->x;\n"
         "};\n"
         "}\n"));
   run_check_test(ctx, "c066",
-    _u8("defclass[T] ty struct { x T; y T; };\n"
+    _u8("defclass[T] ty { x T; y T; };\n"
         "access ty[_] {\n"
         "def[T] foo fn[*ty[T], T] = func(t *ty[T]) T {\n"
         "  return t->x;\n"
@@ -603,7 +603,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "def bar fn[*ty[i32], i32] = foo;\n"));
   // Fails because we try to access a field of a defclass type.
   run_check_negtest(ctx, "c067",
-    _u8("defclass[T] ty struct { x T; y T; };\n"
+    _u8("defclass[T] ty { x T; y T; };\n"
         "def[T] foo fn[*ty[T], T] = func(t *ty[T]) T {\n"
         "  return t->x;\n"
         "};\n"
@@ -613,82 +613,82 @@ func test_check_more_cases(ctx *check_ctx) void {
         "def foo fn[ty, i32] = func(t ty) i32 {\n"
         "  return t.~;\n"
         "};\n"));
-  // Fails (unlike c068) because ty is defclass, and the conversion operator is private.
+  // Fails (unlike c068) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs, checks that field access is accessible.
   run_check_negtest(ctx, "c069",
-    _u8("defclass ty i32;\n"
+    _u8("defclass ty { field i32; };\n"
         "def foo fn[ty, i32] = func(t ty) i32 {\n"
-        "  return t.~;\n"
+        "  return t.field;\n"
         "};\n"));
   run_check_negtest(ctx, "c070",
-    _u8("defclass ty i32;\n"
+    _u8("defclass ty { field i32; };\n"
         "access ty {\n"
         "def foo fn[ty, i32] = func(t ty) i32 {\n"
-        "  return t.~;\n"
+        "  return t.field;\n"
         "};\n"
         "}\n"));
   run_check_test(ctx, "c071",
-    _u8("defclass copy ty i32;\n"
+    _u8("defclass copy ty { field i32; };\n"
         "access ty {\n"
         "def foo fn[ty, i32] = func(t ty) i32 {\n"
-        "  return t.~;\n"
+        "  return t.field;\n"
         "};\n"
         "}\n"));
 
-  // Fails (like more_29) because ty is defclass, and the conversion operator is private.
+  // Fails (like more_29) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs, checks that field access is accessible.
   run_check_negtest(ctx, "c071",
-    _u8("defclass[T] ty i32;\n"
+    _u8("defclass[T] ty { field i32; };\n"
         "def[T] foo fn[ty[T], i32] = func(t ty[T]) i32 {\n"
-        "  return t.~;\n"
+        "  return t.field;\n"
         "};\n"
         "def bar fn[ty[u32], i32] = foo;\n"));
   run_check_negtest(ctx, "c072a",
-    _u8("defclass[T] ty i32;\n"
+    _u8("defclass[T] ty { field i32; };\n"
         "access ty[_] {\n"
         "def[T] foo fn[ty[T], i32] = func(t ty[T]) i32 {\n"
-        "  return t.~;\n"
+        "  return t.field;\n"
         "};\n"
         "}\n"
         "def bar fn[ty[u32], i32] = foo;\n"));
   run_check_test(ctx, "c072b",
-    _u8("defclass[T] copy ty i32;\n"
+    _u8("defclass[T] copy ty { field i32; };\n"
         "access ty[_] {\n"
         "def[T] foo fn[ty[T], i32] = func(t ty[T]) i32 {\n"
-        "  return t.~;\n"
+        "  return t.field;\n"
         "};\n"
         "}\n"
         "def bar fn[ty[u32], i32] = foo;\n"));
-  // Fails (unlike c068) because ty is defclass, and the conversion operator is private.
+  // Fails (unlike c068) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs, checks whether field access is accessible.
   run_check_negtest(ctx, "c073",
     _u8("defclass ty i32;\n"
         "def foo fn[*ty, *i32] = func(t *ty) *i32 {\n"
-        "  return &t->~;\n"
+        "  return &t->field;\n"
         "};\n"));
   run_check_test(ctx, "c074",
-    _u8("defclass ty i32;\n"
+    _u8("defclass ty { field i32; };\n"
         "access ty {\n"
         "def foo fn[*ty, *i32] = func(t *ty) *i32 {\n"
-        "  return &t->~;\n"
+        "  return &t->field;\n"
         "};\n"
         "}\n"));
-  // Fails (like c069) because ty is defclass, and the conversion operator is private.
+  // Fails (like c069) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs...
   run_check_negtest(ctx, "c075",
-    _u8("defclass[T] ty i32;\n"
+    _u8("defclass[T] ty { field i32; };\n"
         "def[T] foo fn[*ty[T], *i32] = func(t *ty[T]) *i32 {\n"
-        "  return &t->~;\n"
+        "  return &t->field;\n"
         "};\n"
         "def bar fn[*ty[u32], *i32] = foo;\n"));
 
   run_check_test(ctx, "c076",
-    _u8("defclass[T] ty i32;\n"
+    _u8("defclass[T] ty { field i32; };\n"
         "access ty[_] {\n"
         "def[T] foo fn[*ty[T], *i32] = func(t *ty[T]) *i32 {\n"
-        "  return &t->~;\n"
+        "  return &t->field;\n"
         "};\n"
         "}\n"
         "def bar fn[*ty[u32], *i32] = foo;\n"));
 
   run_check_test(ctx, "c077",
-    _u8("defclass copy ty i32;\n"
+    _u8("defclass copy ty { field i32; };\n"
         "access ty {\n"
         "def do_init fn[*ty, void] = func(t *ty) void {\n"
         "  ret void;\n"
@@ -706,13 +706,13 @@ func test_check_more_cases(ctx *check_ctx) void {
         "  return 1;\n"
         "};\n"));
   run_check_negtest(ctx, "c079",
-    _u8("defclass copy ty i32;\n"
+    _u8("defclass copy ty { field i32; };\n"
         "def foo fn[i32] = func() i32 {\n"
         "  k ty;\n"
         "  return 1;\n"
         "};\n"));
   run_check_test(ctx, "c080",
-    _u8("defclass copy ty i32;\n"
+    _u8("defclass copy ty { field i32; };\n"
         "access ty {\n"
         "def do_init fn[*ty, void] = func(t *ty) void {\n"
         "  ret void;\n"
@@ -726,7 +726,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"));
 
   run_check_negtest(ctx, "c081",
-    _u8("defclass copy ty i32;\n"
+    _u8("defclass copy ty { field i32; };\n"
         "defstruct ty2 { x i32; y ty; };\n"
         "def foo fn[i32] = func() i32 {\n"
         "  k ty2;\n"
@@ -1242,7 +1242,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
 
   // Fails because ty doesn't have an init method.
   run_check_negtest(ctx, "c132-a",
-    _u8("defclass copy ty i32;\n"
+    _u8("defclass copy ty { field i32; };\n"
         "func foo() ty { t *ty = null; return *t; }\n"
         "func f() void {\n"
         "  if true {\n"
@@ -1252,7 +1252,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  goto bar;\n"
         "}\n"));
   run_check_test(ctx, "c132-b",
-    _u8("defclass copy ty i32;\n"
+    _u8("defclass copy ty { field i32; };\n"
         "access ty {\n"
         "  func do_init(t *ty) void { }\n"
         "}\n"
@@ -1332,10 +1332,10 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def x st = foo(- @[i32] 15);\n"));
 
   run_check_test(ctx, "c137-b",
-    _u8("defclass copy cl i32;\n"
+    _u8("defclass copy cl { field i32; };\n"
         "access cl {\n"
         "  func do_init(x *cl) void {\n"
-        "    x->~ = 0x99;\n"
+        "    x->field = 0x99;\n"
         "  }\n"
         "}\n"
         "defstruct st {\n"
@@ -1352,10 +1352,10 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
 
   // This used to fail because the padding of st was not zeroed, and defs must be fully initialized -- but now padding of structs is zeroed.
   run_check_test(ctx, "c137-c",
-    _u8("defclass copy cl i32;\n"
+    _u8("defclass copy cl { field i32; };\n"
         "access cl {\n"
         "  func do_init(x *cl) void {\n"
-        "    x->~ = 0x99;\n"
+        "    x->field = 0x99;\n"
         "  }\n"
         "}\n"
         "defstruct st {\n"
@@ -1375,10 +1375,10 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
   // This used to fail because the padding of en was not zeroed, and defs must be fully initialized.  But now padding of enums is zeroed.
   // This also used to fail because enum initialization was incorrectly derived to be non-trivial, when it had a class member.
   run_check_test(ctx, "c137-d",
-    _u8("defclass copy cl i16;\n"
+    _u8("defclass copy cl { field i16; };\n"
         "access cl {\n"
         "  func do_init(x *cl) void {\n"
-        "    x->~ = 0x99;\n"
+        "    x->field = 0x99;\n"
         "  }\n"
         "}\n"
         "defenum en {\n"
@@ -1722,16 +1722,16 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def d1 i32 = fac(7);\n"));
 
   run_check_test(ctx, "c145-a",
-    _u8("defclass copy cl i16;\n"
+    _u8("defclass copy cl { field i16; };\n"
         "access cl {\n"
         "  func do_init(x *cl) void {\n"
-        "    x->~ = 0x99;\n"
+        "    x->field = 0x99;\n"
         "  }\n"
         "  func incr(x *cl) void {\n"
-        "    x->~ = x->~ + 1;\n"
+        "    x->field = x->field + 1;\n"
         "  }\n"
         "  func get(x *cl) i16 {\n"
-        "    return x->~;\n"
+        "    return x->field;\n"
         "  }\n"
         "}\n"
         "func bar() i32 {\n"
@@ -1747,16 +1747,16 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
 
   // TODO: This fails with "Looking for structural type information on inaccessible..." when it should have a def matching error on "get" (in the return statement, since i16!=i32).  This is just bonkers.
   run_check_negtest(ctx, "c145-b",
-    _u8("defclass copy cl i16;\n"
+    _u8("defclass copy cl { field i16; };\n"
         "access cl {\n"
         "  func do_init(x *cl) void {\n"
-        "    x->~ = 0x99;\n"
+        "    x->field = 0x99;\n"
         "  }\n"
         "  func incr(x *cl) void {\n"
-        "    x->~ = x->~ + 1;\n"
+        "    x->field = x->field + 1;\n"
         "  }\n"
         "  func get(x *cl) i16 {\n"
-        "    return x->~;\n"
+        "    return x->field;\n"
         "  }\n"
         "}\n"
         "func bar() i32 {\n"
@@ -1791,7 +1791,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def d1 i32 = foo@[u32](Has(@[u32]3));\n"));
 
   run_check_test(ctx, "c148",
-    _u8("defclass ty struct { n i32; };\n"
+    _u8("defclass ty { n i32; };\n"
         "access ty {\n"
         "  func do_init(x *ty) void {\n"
         "    x->n = 5;\n"
@@ -1812,7 +1812,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def d1 i32 = foo();\n"));
 
   run_check_test(ctx, "c149",
-    _u8("defclass ty struct { n i8; };\n"
+    _u8("defclass ty { n i8; };\n"
         "access ty {\n"
         "  func do_init(x *ty) void {\n"
         "    x->n = 5;\n"

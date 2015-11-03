@@ -110,7 +110,7 @@ func `==`(x allow_incomplete, y allow_incomplete) bool {
   return enumnum(&x) == enumnum(&y);
 }
 
-defclass move varpopper struct {
+defclass move varpopper {
   es *framescope;
   nums array[var_number];
 };

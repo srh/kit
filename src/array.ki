@@ -1,6 +1,6 @@
 import stdlib;
 
-defclass[T] move array struct {
+defclass[T] move array {
   count size;
   cap size;
   ptr *T;

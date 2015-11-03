@@ -21,7 +21,7 @@ inline func hash_equal(x *sym, y *sym) bool {
   return x->~ == y->~;
 }
 
-defclass[T] copy symmap struct {
+defclass[T] copy symmap {
   // A map from T's to ident values.
   table hash[T, sym];
   // A map from ident values to T's.

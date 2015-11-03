@@ -1,6 +1,6 @@
 import stdlib;
 
-defclass[T] move shray struct {
+defclass[T] move shray {
   count size;
   cap size;
   refp *size;
