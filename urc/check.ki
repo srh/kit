@@ -249,39 +249,34 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) n
   }
 }
 
-func deftype_converted_rhs(cs *checkstate, ent *deftype_entry, out **te_typeexpr) np {
-  if case &Has(np) = &ent->nonprim {
-    switch &np.rhs {
-      case &NotComputed: {
-        np.rhs = BeganComputing();
-        a *ast_typeexpr = deftype_rhs_type(&np.tl->rhs);
-        converted te_typeexpr;
-        if case Printed(pm) = convert_typeexpr(cs, a, &converted) {
-          np.rhs = FailedComputation();
-          return Printed(pm);
-        }
-        np.rhs = Computed(converted);
-        if case &Computed(te te_typeexpr) = &np.rhs {
-          *out = &te;
-        } else {
-          crash(_u8("impossible rhs"));
-        }
-        return NoFail;
+func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **te_typeexpr) np {
+  switch &np->rhs {
+    case &NotComputed: {
+      np->rhs = BeganComputing();
+      a *ast_typeexpr = deftype_rhs_type(&np->tl->rhs);
+      converted te_typeexpr;
+      if case Printed(pm) = convert_typeexpr(cs, a, &converted) {
+        np->rhs = FailedComputation();
+        return Printed(pm);
       }
-      case &BeganComputing: {
-        return ERR(_u8("recursively computing deftype's rhs"));
+      np->rhs = Computed(converted);
+      if case &Computed(te te_typeexpr) = &np->rhs {
+        *out = &te;
+      } else {
+        crash(_u8("impossible rhs"));
       }
-      case &FailedComputation: {
-        return ERR(_u8("repeat of error in deftype_converted_rhs"));
-      }
-      case &Computed(x te_typeexpr): {
-        *out = &x;
-        return NoFail;
-      }
+      return NoFail;
     }
-  } else {
-    ice(_u8("Calling deftype_converted_rhs on primitive deftype."));
-    return fake();
+    case &BeganComputing: {
+      return ERR(_u8("recursively computing deftype's rhs"));
+    }
+    case &FailedComputation: {
+      return ERR(_u8("repeat of error in deftype_converted_rhs"));
+    }
+    case &Computed(x te_typeexpr): {
+      *out = &x;
+      return NoFail;
+    }
   }
 }
 
@@ -1192,26 +1187,26 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
       }
       inst->info = BeganComputing();
 
-      ent_rhs *te_typeexpr;
-      if case Printed(pm) = deftype_converted_rhs(cs, ent, &ent_rhs) {
-        return Printed(pm);
-      }
-
-      rhs_computed cac_typeexpr;
-      if case Printed(pm) = check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms.repls, ent_rhs, &rhs_computed) {
-        inst->info = FailedComputation();
-        return Printed(pm);
-      }
-      check(rhs_computed.complete);
-
-      check(isBeganComputing(&inst->info));
-      rhs_props type_properties;
-      if case Printed(pm) = compute_complete_type_properties(cs, clq, &rhs_computed.te, &rhs_props) {
-        inst->info = FailedComputation();
-        return Printed(pm);
-      }
-      check(isBeganComputing(&inst->info));
       if case &Has(np deftype_nonprim) = &ent->nonprim {
+        ent_rhs *te_typeexpr;
+        if case Printed(pm) = deftype_converted_rhs(cs, &np, &ent_rhs) {
+          return Printed(pm);
+        }
+
+        rhs_computed cac_typeexpr;
+        if case Printed(pm) = check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms.repls, ent_rhs, &rhs_computed) {
+          inst->info = FailedComputation();
+          return Printed(pm);
+        }
+        check(rhs_computed.complete);
+
+        check(isBeganComputing(&inst->info));
+        rhs_props type_properties;
+        if case Printed(pm) = compute_complete_type_properties(cs, clq, &rhs_computed.te, &rhs_props) {
+          inst->info = FailedComputation();
+          return Printed(pm);
+        }
+        check(isBeganComputing(&inst->info));
         switch &np.tl->rhs {
           case &TypeexprRhs(a): {
             inst->info = Computed({Has({~rhs_computed.te, rhs_props}), rhs_props});
@@ -1226,7 +1221,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
           }
         }
       } else {
-        ice(_u8("Assigning inst properties on primitive deftype."));
+        ice(_u8("ensure_deftype_inst_checked sees NonComputed inst on primitive type."));
       }
       return NoFail;
     }
@@ -1244,11 +1239,11 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
 
 func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) np {
   ent *deftype_entry = ref_deftype_entry(cs, id);
-  discard *te_typeexpr;
-  if case Printed(pm) = deftype_converted_rhs(cs, ent, &discard) {
-    return Printed(pm);
-  }
   if case &Has(np deftype_nonprim) = &ent->nonprim {
+    discard *te_typeexpr;
+    if case Printed(pm) = deftype_converted_rhs(cs, &np, &discard) {
+      return Printed(pm);
+    }
     switch &np.tl->generics {
       case &NoGenerics: {
         parms idy_genparms = blank_idyparms();
