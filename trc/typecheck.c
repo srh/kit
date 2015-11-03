@@ -6189,95 +6189,103 @@ int check_more_testcases(struct identmap *im) {
       "def x ^[6]u8 = \"pq\\x12rs\";\n");
   pass &= check_foocase(
       im, "check_file_test_more_46",
+      "defstruct pq { p i32; q i32; };\n"
       "defenum ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p i32; q i32; };\n"
+      "  c2 pq;\n"
       "};\n"
       "def foo fn[ty, ty] = func(x ty) ty {\n"
       "  v void;\n"
       "  y ty = c1(v);\n"
-      "  u struct { p i32; q i32; };\n"
+      "  u pq;\n"
       "  y = c2(u);\n"
       "  return y;\n"
       "};\n");
   /* Fails because c2 passed wrong type. */
   pass &= check_negcase(
       im, "check_file_test_more_47",
+      "defstruct pq { p i32; q i32; };\n"
+      "defstruct pqu { p i32; q u32; };\n"
       "defenum ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p i32; q i32; };\n"
+      "  c2 pq;\n"
       "};\n"
       "def foo fn[ty, ty] = func(x ty) ty {\n"
       "  v void;\n"
       "  y ty = c1(v);\n"
-      "  u struct { p i32; q u32; };\n"
+      "  u pqu;\n"
       "  y = c2(u);\n"
       "  return y;\n"
       "};\n");
   pass &= check_foocase(
       im, "check_file_test_more_48-a",
+      "defstruct[T] pq { p T; q T; };\n"
       "defenum[T] ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p T; q T; };\n"
+      "  c2 pq[T];\n"
       "};\n"
       "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
       "  v void;\n"
       "  y ty[i32] = c1(v);\n"
-      "  u struct { p i32; q i32; };\n"
+      "  u pq[i32];\n"
       "  y = c2(u);\n"
       "  return y;\n"
       "};\n");
   pass &= check_foocase(
       im, "check_file_test_more_48-b",
+      "defstruct[T] pq { p T; q T; };\n"
       "defenum[T] ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p T; q T; };\n"
+      "  c2 pq[T];\n"
       "};\n"
       "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
       "  v void;\n"
       "  y ty[i32] = c1;\n"
-      "  u struct { p i32; q i32; };\n"
+      "  u pq[i32];\n"
       "  y = c2(u);\n"
       "  return y;\n"
       "};\n");
   /* Fails because c2 returns wrong type. */
   pass &= check_negcase(
       im, "check_file_test_more_49",
+      "defstruct[T] pq { p T; q T; };\n"
       "defenum[T] ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p T; q T; };\n"
+      "  c2 pq[T];\n"
       "};\n"
       "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
       "  v void;\n"
       "  y ty[i32] = c1(v);\n"
-      "  u struct { p u32; q u32; };\n"
+      "  u pq[u32];\n"
       "  y = c2(u);\n"
       "  return y;\n"
       "};\n");
   pass &= check_foocase(
       im, "check_file_test_more_50a",
+      "defstruct pq { p i32; q i32; };\n"
       "defenum ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p i32; q i32; };\n"
+      "  c2 pq;\n"
       "};\n"
       "def foo fn[ty, i32] = func(x ty) i32 {\n"
       "  switch x {\n"
       "    case c1(v void): { return -1; }\n"
-      "    case c2(s struct { p i32; q i32; }): {\n"
+      "    case c2(s pq): {\n"
       "      return s.p + s.q;\n"
       "    }\n"
       "  }\n"
       "};\n");
   pass &= check_foocase(
       im, "check_file_test_more_50b",
+      "defstruct pq { p i32; q i32; };\n"
       "defenum ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p i32; q i32; };\n"
+      "  c2 pq;\n"
       "};\n"
       "def foo fn[ty, i32] = func(x ty) i32 {\n"
       "  switch &x {\n"
       "    case &c1(v void): { return -1; }\n"
-      "    case &c2(s struct { p i32; q i32; }): {\n"
+      "    case &c2(s pq): {\n"
       "      return s.p + s.q;\n"
       "    }\n"
       "  }\n"
@@ -6286,14 +6294,15 @@ int check_more_testcases(struct identmap *im) {
   /* Fails because a control path in the switch does not return a value. */
   pass &= check_negcase(
       im, "check_file_test_more_51",
+      "defstruct pq { p i32; q i32; };\n"
       "defenum ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p i32; q i32; };\n"
+      "  c2 pq;\n"
       "};\n"
       "def foo fn[ty, i32] = func(x ty) i32 {\n"
       "  switch x {\n"
       "    case c1(v void): { return -1; }\n"
-      "    case c2(s struct { p i32; q i32; }): {\n"
+      "    case c2(s pq): {\n"
       "      s.p + s.q;\n"
       "    }\n"
       "  }\n"
@@ -6310,9 +6319,10 @@ int check_more_testcases(struct identmap *im) {
       "};\n");
   pass &= check_foocase(
       im, "check_file_test_more_53",
+      "defstruct pq { p i32; q i32; };\n"
       "defenum ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p i32; q i32; };\n"
+      "  c2 pq;\n"
       "};\n"
       "def foo fn[ty, i32] = func(x ty) i32 {\n"
       "  switch x {\n"
@@ -6394,9 +6404,10 @@ int check_more_testcases(struct identmap *im) {
       "}\n");
   pass &= check_foocase(
       im, "check_file_test_more_64",
+      "defstruct pq { p i32; q i32; };\n"
       "defenum ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p i32; q i32; };\n"
+      "  c2 pq;\n"
       "};\n"
       "def foo fn[ty, i32] = func(x ty) i32 {\n"
       "  switch x {\n"
@@ -6409,9 +6420,10 @@ int check_more_testcases(struct identmap *im) {
   /* Fails because of overlapping default cases. */
   pass &= check_negcase(
       im, "check_file_test_more_65a",
+      "defstruct pq { p i32; q i32; };\n"
       "defenum ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p i32; q i32; };\n"
+      "  c2 pq;\n"
       "};\n"
       "def foo fn[ty, i32] = func(x ty) i32 {\n"
       "  switch x {\n"
@@ -6425,9 +6437,10 @@ int check_more_testcases(struct identmap *im) {
   /* Fails because of overlapping default cases. */
   pass &= check_negcase(
       im, "check_file_test_more_65b",
+      "defstruct pq { p i32; q i32; };\n"
       "defenum ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p i32; q i32; };\n"
+      "  c2 pq;\n"
       "};\n"
       "def foo fn[ty, i32] = func(x ty) i32 {\n"
       "  switch &x {\n"
@@ -6511,24 +6524,26 @@ int check_more_testcases(struct identmap *im) {
       "}\n");
   pass &= check_foocase(
       im, "check_file_test_more_73",
+      "defstruct pq { p i32; q i32; };\n"
       "defenum ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p i32; q i32; };\n"
+      "  c2 pq;\n"
       "};\n"
       "def foo fn[ty, i32] = func(x ty) i32 {\n"
-      "  if case c2(s struct { p i32; q i32; }) = x {\n"
+      "  if case c2(s pq) = x {\n"
       "    return s.p + s.q;\n"
       "  }\n"
       "  return -1;\n"
       "};\n");
   pass &= check_foocase(
       im, "check_file_test_more_74",
+      "defstruct pq { p i32; q i32; };\n"
       "defenum ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p i32; q i32; };\n"
+      "  c2 pq;\n"
       "};\n"
       "def foo fn[ty, i32] = func(x ty) i32 {\n"
-      "  if case c2(s struct { p i32; q i32; }) = x {\n"
+      "  if case c2(s pq) = x {\n"
       "    return s.p + s.q;\n"
       "  } else {\n"
       "    return -1;\n"
@@ -6537,9 +6552,11 @@ int check_more_testcases(struct identmap *im) {
   /* Fails because pattern mismatch. */
   pass &= check_negcase(
       im, "check_file_test_more_75",
+      "defstruct pq { p i32; q i32; };\n"
+      "defstruct puq { p u32; q i32; };\n"
       "defenum ty {\n"
       "  c1 void;\n"
-      "  c2 struct { p i32; q i32; };\n"
+      "  c2 pq;\n"
       "};\n"
       "def foo fn[ty, i32] = func(x ty) i32 {\n"
       "  if case c2(s struct { p u32; q i32; }) = x {\n"

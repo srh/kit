@@ -613,8 +613,7 @@ int is_ident_keyword(struct ps *p, size_t global_offset_begin, size_t global_off
       || 0 == memcmp(ptr, "false", count)
       || 0 == memcmp(ptr, "union", count);
   case 6:
-    return 0 == memcmp(ptr, "switch", count)
-      || 0 == memcmp(ptr, "struct", count);
+    return 0 == memcmp(ptr, "switch", count);
   case 7:
     return 0 == memcmp(ptr, "deftype", count)
       || 0 == memcmp(ptr, "defenum", count);
@@ -2259,11 +2258,6 @@ int continue_ident_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
 enum tri help_triparse_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
                                 struct ast_typeexpr *out, struct pos *pos_end_out) {
   struct pos pos_start = ps_pos(p);
-  if (try_skip_keyword(p, "struct")) {
-    out->tag = AST_TYPEEXPR_STRUCTE;
-    return success_or_fail(parse_rest_of_structe(p, allow_blanks, pos_start, &out->u.structe, pos_end_out));
-  }
-
   if (try_skip_keyword(p, "union")) {
     out->tag = AST_TYPEEXPR_UNIONE;
     return success_or_fail(parse_rest_of_unione(p, allow_blanks, pos_start, &out->u.unione, pos_end_out));

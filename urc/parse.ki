@@ -1974,7 +1974,7 @@ func test_parse() bool {
   pass = pass & run_parse_test(_u8("p042"),
                                _u8("func foo() a { label foo; goto bar; }"));
   pass = pass & run_parse_test(_u8("p043"),
-                               _u8("func foo() a { x struct { }; y union { }; z enum { }; }"));
+                               _u8("func foo() a { y union { }; z enum { }; }"));
   pass = pass & run_parse_test(_u8("p044"),
                                _u8(" deftype foo bar ;"));
   pass = pass & run_parse_test(_u8("p045-a"),
@@ -1990,11 +1990,11 @@ func test_parse() bool {
   pass = pass & run_parse_test(_u8("p047"),
                                _u8("deftype[] foo bar;\n"));
   pass = pass & run_parse_test(_u8("p048"),
-                               _u8("deftype[] foo struct {x bar [quux]; };\n"));
+                               _u8("defstruct[] foo {x bar [quux]; };\n"));
   pass = pass & run_parse_test(_u8("p049-a"),
-                               _u8("deftype[] foo struct {x ^[2 + 3]bar; };\n"));
+                               _u8("defstruct[] foo {x ^[2 + 3]bar; };\n"));
   pass = pass & run_parse_test(_u8("p049-b"),
-                               _u8("deftype[T, U] foo struct {x ^[2 + 3]bar; };\n"));
+                               _u8("defstruct[T, U] foo {x ^[2 + 3]bar; };\n"));
   pass = pass & run_parse_test(_u8("p050-a"),
                                _u8("defclass move foo { field ^[7]bar; };\n"
                                    "defstruct[T] foo { count u32; p ^[3]T; };\n"));

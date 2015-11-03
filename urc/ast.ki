@@ -828,12 +828,14 @@ defenum ast_defclass_disposition {
   NoDefaults void;
 };
 
+defstruct ast_classexpr_rhs {
+  disposition ast_defclass_disposition;
+  rhs_type ast_typeexpr;
+};
+
 defenum ast_type_def_rhs {
   TypeexprRhs ast_typeexpr;
-  ClassexprRhs struct {
-    disposition ast_defclass_disposition;
-    rhs_type ast_typeexpr;
-  };
+  ClassexprRhs ast_classexpr_rhs;
 };
 
 defstruct ast_type_def {
