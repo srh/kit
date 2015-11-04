@@ -1333,57 +1333,49 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
     return NoFail;
   } else {
+    b *te_struct;
     structural_type *te_typeexpr;
-    switch recursive_structural_rhs(es->ds, pt, &structural_type) {
+    switch structural_struct_type(es->ds, pt, &structural_type, &b) {
     case Error(pm):
       return Printed(pm);
     case Success: { }
-    case NoAccessibleStructuralRhs:
-      return ERR(_u8("Strinit for inaccessible or non-structural type"));
+    case NotAccessibleStruct:
+      return MERR(es->cs, a->meta, _u8("Strinit for inaccessible or non-structural type, "), pretty(es->im, pt));
     }
 
-    switch structural_type {
-    case &TeStruct(b te_struct):
-      n size = count(&b.fields);
-      if n != count(&a->exprs) {
-        return MERR(es->cs, a->meta, _u8("Structure literal has wrong number of fields."));
-      }
+    n size = count(&b->fields);
+    if n != count(&a->exprs) {
+      return MERR(es->cs, a->meta, _u8("Structure literal has wrong number of fields."));
+    }
 
-      offsets array[u32];
-      for i size = 0; i < n; i = i + 1 {
-        x_i *ast_expr_consume = &ref(&a->exprs, i)->ec;
-        field *te_vardecl = ref(&b.fields, i);
-        if case Printed(pm) = check_expr_consume(es, x_i, &field->type) {
-          return Printed(pm);
-        }
-        reannotate_static_to_virtual(es, result_cell(x_i));
-        psd partial_struct_data;
-        if case Printed(pm) = compute_partial_struct_data(es->cs, es->clq, &b.fields, Has(field->name), &psd) {
-          return Printed(pm);
-        }
-        check(psd.found_field);
-        push(&offsets, psd.offset);
-      }
-
-      // We checked is_computed(pt).
-      props type_properties;
-      if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, pt, &props) {
+    offsets array[u32];
+    for i size = 0; i < n; i = i + 1 {
+      x_i *ast_expr_consume = &ref(&a->exprs, i)->ec;
+      field *te_vardecl = ref(&b->fields, i);
+      if case Printed(pm) = check_expr_consume(es, x_i, &field->type) {
         return Printed(pm);
       }
-
-      for i size = 0; i < n; i = i + 1 {
-        p_i *ast_strinit_param = ref(&a->exprs, i);
-        annotate(&p_i->info, {get(&offsets, i)});
+      reannotate_static_to_virtual(es, result_cell(x_i));
+      psd partial_struct_data;
+      if case Printed(pm) = compute_partial_struct_data(es->cs, es->clq, &b->fields, Has(field->name), &psd) {
+        return Printed(pm);
       }
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
-      return NoFail;
-
-    case &TeLifetime(b te_lifetime):
-      return ERR(_u8("ICE: check_expr_strinit sees a lifetime as structural rhs"));
-
-    default:
-      return MERR(es->cs, a->meta, _u8("Structure literal used on non-struct type, "), pretty(es->im, structural_type));
+      check(psd.found_field);
+      push(&offsets, psd.offset);
     }
+
+    // We checked is_computed(pt).
+    props type_properties;
+    if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, pt, &props) {
+      return Printed(pm);
+    }
+
+    for i size = 0; i < n; i = i + 1 {
+      p_i *ast_strinit_param = ref(&a->exprs, i);
+      annotate(&p_i->info, {get(&offsets, i)});
+    }
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
+    return NoFail;
   }
 }
 
@@ -1599,6 +1591,32 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
   *fieldtype_out = fieldtype;
   *res_out = res;
   return NoFail;
+}
+
+defenum structural_struct_type_result {
+  // Error(pm)
+  Error bool;
+  Success void;
+  NotAccessibleStruct void;
+};
+
+// st_out is just the inside te_struct of struct_type_out.  Some caller wants it.
+func structural_struct_type(ds *defscope, t *te_typeexpr, struct_type_out **te_typeexpr, st_out **te_struct) structural_struct_type_result {
+  struct_type *te_typeexpr;
+  switch recursive_structural_rhs(ds, t, &struct_type) {
+  case Error(pm):
+    return Error(pm);
+  case Success:
+    if case &TeStruct(st te_struct) = struct_type {
+      *struct_type_out = struct_type;
+      *st_out = &st;
+      return Success;
+    } else {
+      return NotAccessibleStruct;
+    }
+  case NoAccessibleStructuralRhs:
+    return NotAccessibleStruct;
+  }
 }
 
 defenum structural_enum_type_result {
