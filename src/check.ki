@@ -244,7 +244,7 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
           np->rhs = FailedComputation();
           return Printed(pm);
         }
-        np->rhs = Computed(@[deftype_rhs_spec]ClassexprRhsSpec({{freeze(&fields)}}));
+        np->rhs = Computed(@[deftype_rhs_spec]ClassexprRhsSpec({a.disposition, {freeze(&fields)}}));
         if case &Computed(b deftype_rhs_spec) = &np->rhs {
           *out = &b;
         } else {
@@ -1222,6 +1222,14 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
             return Printed(pm);
           }
           check(isBeganComputing(&inst->info));
+
+          class_props type_properties;
+          if case Printed(pm) = to_defclass_properties(clq, ent_id, id, crs.disposition, rhs_props, &class_props) {
+            inst->info = FailedComputation();
+            return Printed(pm);
+          }
+          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({~rhs_computed.te, rhs_props})), class_props});
+
         case &DefstructRhsSpec(drs defstruct_rhs_spec):
           // TODO(): Gross.
           spec_type te_typeexpr = TeStruct({drs.fields});
@@ -1237,6 +1245,9 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
             return Printed(pm);
           }
           check(isBeganComputing(&inst->info));
+
+          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({~rhs_computed.te, rhs_props})), rhs_props});
+
         case &DefenumRhsSpec(drs defenum_rhs_spec):
           // TODO(): Gross.
           spec_type te_typeexpr = TeEnum({drs.constructors});
@@ -1252,20 +1263,9 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
             return Printed(pm);
           }
           check(isBeganComputing(&inst->info));
-        }
-        switch &np.tl->rhs {
-        case &ClassexprRhs(a ast_classexpr_rhs):
-          class_props type_properties;
-          if case Printed(pm) = to_defclass_properties(clq, ent_id, id, a.disposition, rhs_props, &class_props) {
-            inst->info = FailedComputation();
-            return Printed(pm);
-          }
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({~rhs_computed.te, rhs_props})), class_props});
 
-        case &DefstructRhs(a ast_defstruct_rhs):
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({~rhs_computed.te, rhs_props})), rhs_props});
-        case &DefenumRhs(a ast_defenum_rhs):
           inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsEnumInfo({~rhs_computed.te, rhs_props})), rhs_props});
+
         }
       } else {
         ice(_u8("ensure_deftype_inst_checked sees NonComputed inst on primitive type."));

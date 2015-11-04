@@ -294,6 +294,7 @@ struct defenum_rhs_spec {
 };
 
 struct classexpr_rhs_spec {
+  disposition ast_defclass_disposition;
   drs defstruct_rhs_spec;
 };
 
