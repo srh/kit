@@ -296,7 +296,7 @@ func parse_rest_of_defstruct(p *ps, out *ast_toplevel) parse_result {
        && +try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = TypeDef({generics, name, DefstructRhs({@[ast_typeexpr]Struct({fields})})});
+  *out = TypeDef({generics, name, DefstructRhs({fields})});
   return Success;
 }
 
@@ -310,8 +310,7 @@ func parse_rest_of_defenum(p *ps, out *ast_toplevel) parse_result {
        && +try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = TypeDef({generics, name,
-                  DefenumRhs({@[ast_typeexpr]Enum({enumfields})})});
+  *out = TypeDef({generics, name, DefenumRhs({enumfields})});
   return Success;
 }
 

@@ -268,11 +268,12 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
         }
         return NoFail;
       case &DefstructRhs(a ast_defstruct_rhs):
-        converted te_typeexpr;
-        if case Printed(pm) = convert_typeexpr(cs, &a.type, &converted) {
-          np->rhs = FailedComputation();
+        fields array[te_vardecl];
+        if case Printed(pm) = convert_vardecl_list(cs, &a.fields, &fields) {
+          np->rhs = FailedComputation;
           return Printed(pm);
         }
+        converted te_typeexpr = TeStruct({freeze(&fields)});
         np->rhs = Computed(@[deftype_rhs_spec]DefstructRhsSpec({converted}));
         if case &Computed(b deftype_rhs_spec) = &np->rhs {
           *out = &b;
@@ -281,11 +282,12 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
         }
         return NoFail;
       case &DefenumRhs(a ast_defenum_rhs):
-        converted te_typeexpr;
-        if case Printed(pm) = convert_typeexpr(cs, &a.type, &converted) {
-          np->rhs = FailedComputation();
+        constructors array[te_vardecl];
+        if case Printed(pm) = convert_vardecl_list(cs, &a.constructors, &constructors) {
+          np->rhs = FailedComputation;
           return Printed(pm);
         }
+        converted te_typeexpr = TeEnum({freeze(&constructors)});
         np->rhs = Computed(@[deftype_rhs_spec]DefenumRhsSpec({converted}));
         if case &Computed(b deftype_rhs_spec) = &np->rhs {
           *out = &b;
