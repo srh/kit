@@ -404,9 +404,8 @@ struct ast_lambda {
   body ast_fullbody;
 };
 
-defenum ast_fieldname {
-  WholeField void;
-  NameField ast_ident;
+struct ast_fieldname {
+  name ast_ident;
 };
 
 struct ast_arraylength_info {

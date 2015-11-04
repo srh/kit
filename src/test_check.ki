@@ -609,7 +609,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"
         "def bar fn[*ty[i32], i32] = foo;\n"));
   run_check_test(ctx, "c068",
-    _u8("deftype ty i32;\n"
+    _u8("struct ty { x i32; };\n"
         "def foo fn[ty, i32] = func(t ty) i32 {\n"
         "  return t.x;\n"
         "};\n"));
@@ -885,7 +885,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "  @[i32] 1;\n"
         "}\n"));
   run_check_test(ctx, "c097",
-    _u8("deftype notsize u32;\n"
+    _u8("struct notsize { x u32; };\n"
         "func `~`(x u32) notsize {\n"
         "  ret notsize;\n"
         "  ret.x = x;\n"
@@ -1241,9 +1241,9 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
     _u8("deftype[T, T] ty i32;\n"));
   // Fails because fn type has variadic after-arity of 1.
   run_check_negtest(ctx, "c130-a",
-    _u8("deftype foo fn[];\n"));
+    _u8("struct foo { x fn[]; };\n"));
   run_check_test(ctx, "c130-b",
-    _u8("deftype foo fn[void];\n"));
+    _u8("struct foo { x fn[void]; };\n"));
 
   // Fails because we try to assign to an rvalue.
   run_check_negtest(ctx, "c131-a",

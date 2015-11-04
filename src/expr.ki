@@ -1738,19 +1738,6 @@ func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_type
   }
 }
 
-func lookup_whole_field(es *framescope, pack *te_instpack, fieldtype_out *cu_typeexpr) np {
-  p *cu_typeexpr;
-  switch help_structural_rhs(es->ds, pack, &p) {
-  case Error(pm):
-    return Printed(pm);
-  case Success:
-    *fieldtype_out = *p;
-    return NoFail;
-  case NotAccessible:
-    return ERR(_u8("Looking up whole field on inaccessible defclass or primitive type"));
-  }
-}
-
 func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   p *cu_typeexpr;
   switch help_structural_rhs(es->ds, pack, &p) {
@@ -1815,38 +1802,7 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
 }
 
 func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
-  switch f {
-    case &WholeField: {
-      switch &t->x {
-        case &TeName(a te_name): {
-          if case Printed(pm) = lookup_whole_field(es, unHas(&a.pack), fieldtype_out) {
-            return Printed(pm);
-          }
-          // Whole field has zero offset.
-          *res_out = InheritsLval(0);
-          return NoFail;
-        }
-        case &TeApp(a te_typeapp): {
-          if case Printed(pm) = lookup_whole_field(es, unHas(&a.pack), fieldtype_out) {
-            return Printed(pm);
-          }
-          // Whole field has zero offset.
-          *res_out = InheritsLval(0);
-          return NoFail;
-        }
-        default: {
-          return ERR(_u8("whole field lookup on 'bare' type"));
-        }
-        case &TeUnknown: {
-          ice(_u8("lookup_field sees incomplete type."));
-          return fake();
-        }
-      }
-    }
-    case &NameField(b ast_ident): {
-      return help_lookup_name_field(es, t, &b, fieldtype_out, res_out);
-    }
-  }
+  return help_lookup_name_field(es, t, &f->name, fieldtype_out, res_out);
 }
 
 func find_vardecl(a *shray[te_vardecl], name sym, out **te_typeexpr, index_out *size) bool {

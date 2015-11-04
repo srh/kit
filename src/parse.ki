@@ -850,26 +850,20 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       }
       m ast_meta = copyend(p, lhs.meta);
       lhs = mk(m, @[ast_expr_enum]IndexExpr(mk(embox(lhs), embox(consume(&arg)))));
-    } else if +try_skip_oper(p, '.', '~') {
-      m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]LocalField(@[ast_local_field]mk(embox(lhs), WholeField(void))));
     } else if +try_skip_oper(p, '.') {
       fieldname ast_ident;
       if ! +parse_ident(p, &fieldname) {
         return Fail;
       }
       m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]LocalField(@[ast_local_field]mk(embox(lhs), NameField(fieldname))));
-    } else if +try_skip_oper(p, '-', '>', '~') {
-      m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(&lhs)), WholeField(void)}));
+      lhs = mk(m, @[ast_expr_enum]LocalField(@[ast_local_field]mk(embox(lhs), {fieldname})));
     } else if +try_skip_oper(p, '-', '>') {
       fieldname ast_ident;
       if ! +parse_ident(p, &fieldname) {
         return Fail;
       }
       m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(&lhs)), NameField(fieldname)}));
+      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(&lhs)), {fieldname}}));
     } else if is_keyw(&peek(p)->val, Then) {
       switch compare_prec(prec_ctx, thenexpr_then_prec().left) {
       case Conflicts:
