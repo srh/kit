@@ -1516,7 +1516,7 @@ func generiks_same_human_name(a *ast_generik, b *ast_generik) bool {
   return generik_human_name(a)->value == generik_human_name(b)->value;
 }
 
-// TODO(): This'll have to be different, its callers will, for defstruct.
+// TODO(): This'll have to be different, its callers will, for defstruct and defclass.  (See RhsImpossible.)
 func is_public(a *ast_type_def_rhs) rhs_accessibility {
   switch a {
   case &TypeexprRhs(b ast_typeexpr): return RhsPublic;
