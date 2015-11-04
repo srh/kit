@@ -1499,26 +1499,21 @@ func gr_name_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_name_expr, 
     }
     case &EnumVoidConstructed(vi enum_voidconstructed_info): {
       info var = expr_complete_info(x);
-      if case &TeEnum(et te_enum) = &vi.enum_type.~ {
-        x_cell cell_num = rval_cell(x);
-        cu cu_typeexpr;
-        props type_properties;
-        compute_prim(clq->cs, clq, enum_tag_type(clq->cs, &et), &cu, &props);
-        tag_cell cell_num = add_cell(gr, {LocationVirtual(void), cu, props});
-        field_offset u32 = enum_field_offset(clq->cs, &et, vi.constructor_tag);
-        backtick_gn var = addx(gr, @[gr_xop]GrWriteNothing({x_cell}));
-        a_gn var = addx(gr, mk_shray(backtick_gn), @[gr_xop]GrSubcell({tag_cell, x_cell, OffsetConst(enum_tag_offset)}));
-        b_gn var = addx(gr, mk_shray(a_gn), @[gr_xop]GrWriteConst({tag_cell, ConstInt(~vi.constructor_tag.~)}));
-        tag_end u32 = enum_tag_offset + props.flat_size;
-        postpadding_ogn opt[gr_num]
-          = gr_bzero_subcell(clq, gr, x_cell, tag_end, info->cu_props.flat_size - tag_end);
-        c_gn var = addx(gr, concat(@[opt[gr_num]]Has(b_gn), postpadding_ogn), @[gr_xop]GrVirtualDead({tag_cell}));
-        *out = c_gn;
-        return NoFail;
-      } else {
-        ice(_u8("EnumVoidConstructed on non-enum type"));
-        return fake();
-      }
+      x_cell cell_num = rval_cell(x);
+      cu cu_typeexpr;
+      props type_properties;
+      compute_prim(clq->cs, clq, enum_tag_type(clq->cs, &vi.et), &cu, &props);
+      tag_cell cell_num = add_cell(gr, {LocationVirtual(void), cu, props});
+      field_offset u32 = enum_field_offset(clq->cs, &vi.et, vi.constructor_tag);
+      backtick_gn var = addx(gr, @[gr_xop]GrWriteNothing({x_cell}));
+      a_gn var = addx(gr, mk_shray(backtick_gn), @[gr_xop]GrSubcell({tag_cell, x_cell, OffsetConst(enum_tag_offset)}));
+      b_gn var = addx(gr, mk_shray(a_gn), @[gr_xop]GrWriteConst({tag_cell, ConstInt(~vi.constructor_tag.~)}));
+      tag_end u32 = enum_tag_offset + props.flat_size;
+      postpadding_ogn opt[gr_num]
+        = gr_bzero_subcell(clq, gr, x_cell, tag_end, info->cu_props.flat_size - tag_end);
+      c_gn var = addx(gr, concat(@[opt[gr_num]]Has(b_gn), postpadding_ogn), @[gr_xop]GrVirtualDead({tag_cell}));
+      *out = c_gn;
+      return NoFail;
     }
   }
 }

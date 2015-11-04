@@ -268,7 +268,7 @@ struct voidconstructed_info {
   // The actual constructed type, which we need for some reason.
   constructed_type cu_typeexpr;
   // The enum type (the structural rhs of constructed_type).
-  enum_type cu_typeexpr;
+  et te_enum;
   constructor_tag enum_tag_value;
 };
 
@@ -333,8 +333,12 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       return Printed(pm);
     }
     check(cac_enum_type.complete);
-
-    *res_out = MatchedVoidConstructed({~ *pt, ~cac_enum_type.te, mk_enum_tag_value(decl_index)});
+    // TODO(): Noscoped check_and_compute_te_enum.  Or raw fields or something.
+    if case &TeEnum(cu_et te_enum) = &cac_enum_type.te {
+      *res_out = MatchedVoidConstructed({~ *pt, cu_et, mk_enum_tag_value(decl_index)});
+    } else {
+      ice(_u8("structural_enum_type returned a non-enum type"));
+    }
     return NoFail;
   }
   cac_return_type cac_typeexpr;
@@ -1223,7 +1227,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       return NoFail;
     }
     case &EnumVoidConstructedMatch(vci voidconstructed_info): {
-      annotate(&a->name_info, @[ast_name_expr_info]EnumVoidConstructed({vci.constructor_tag, vci.enum_type}));
+      annotate(&a->name_info, @[ast_name_expr_info]EnumVoidConstructed({vci.constructor_tag, vci.et}));
       props type_properties;
       if case Printed(pm) = compute_type_properties(es->cs, es->clq, &vci.constructed_type, &props) {
         return Printed(pm);
