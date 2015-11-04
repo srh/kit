@@ -150,22 +150,6 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) np {
       *out = TeApp({typefunc, params, None});
       return NoFail;
     }
-    case &Struct(b ast_struct): {
-      fields array[te_vardecl];
-      if case Printed(pm) = convert_vardecl_list(cs, &b.fields, &fields) {
-        return Printed(pm);
-      }
-      *out = TeStruct({freeze(&fields)});
-      return NoFail;
-    }
-    case &Enum(b ast_enum): {
-      constructors array[te_vardecl];
-      if case Printed(pm) = convert_vardecl_list(cs, &b.constructors, &constructors) {
-        return Printed(pm);
-      }
-      *out = TeEnum({freeze(&constructors)});
-      return NoFail;
-    }
     case &Union(b ast_union): {
       fields array[te_vardecl];
       if case Printed(pm) = convert_vardecl_list(cs, &b.fields, &fields) {
@@ -255,11 +239,12 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
       np->rhs = BeganComputing();
       switch &np->tl->rhs {
       case &ClassexprRhs(a ast_classexpr_rhs):
-        converted te_typeexpr;
-        if case Printed(pm) = convert_typeexpr(cs, &a.rhs_type, &converted) {
+        fields array[te_vardecl];
+        if case Printed(pm) = convert_vardecl_list(cs, &a.fields, &fields) {
           np->rhs = FailedComputation();
           return Printed(pm);
         }
+        converted te_typeexpr = TeStruct({freeze(&fields)});
         np->rhs = Computed(@[deftype_rhs_spec]ClassexprRhsSpec({{converted}}));
         if case &Computed(b deftype_rhs_spec) = &np->rhs {
           *out = &b;

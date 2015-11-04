@@ -145,14 +145,6 @@ struct ast_typeapp {
   params array[ast_typeexpr];
 };
 
-struct ast_struct {
-  fields array[ast_vardecl];
-};
-
-struct ast_enum {
-  constructors array[ast_vardecl];
-};
-
 struct ast_union {
   fields array[ast_vardecl];
 };
@@ -172,8 +164,6 @@ struct ast_unknown {
 enum ast_typeexpr {
   Name ast_ident;
   App ast_typeapp;
-  Struct ast_struct;
-  Enum ast_enum;
   Union ast_union;
   Arraytype ast_arraytype;
   Lifetime ast_lifetime;
@@ -837,7 +827,7 @@ enum ast_defclass_disposition {
 
 struct ast_classexpr_rhs {
   disposition ast_defclass_disposition;
-  rhs_type ast_typeexpr;
+  fields array[ast_vardecl];
 };
 
 struct ast_defstruct_rhs {
