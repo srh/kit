@@ -1654,9 +1654,6 @@ func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool)
       return Printed(pm);
     }
     switch rhs {
-    case &RhsWithType(t te_typeexpr):
-      *result_out = true;
-      return NoFail;
     case &ClassexprRhsSpec(crs classexpr_rhs_spec):
       n size = count(&ds->accessible);
       for i size = 0; i < n; i = i + 1 {
@@ -1673,6 +1670,9 @@ func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool)
       *result_out = false;
       return NoFail;
     case &DefstructRhsSpec(drs defstruct_rhs_spec):
+      *result_out = true;
+      return NoFail;
+    case &DefenumRhsSpec(drs defenum_rhs_spec):
       *result_out = true;
       return NoFail;
     }
@@ -1724,9 +1724,9 @@ func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_type
   if case &Computed(info deftype_inst_info) = &inst->info {
     if case &Has(rhs_info deftype_inst_rhs_info) = &info.rhs {
       switch &rhs_info {
-      case &RhsTypeInfo(ri deftype_inst_rhstype_info):
-        *rhs_type_out = &ri.rhs_cu;
       case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
+        *rhs_type_out = &ri.rhs_cu;
+      case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
         *rhs_type_out = &ri.rhs_cu;
       }
       return Success;

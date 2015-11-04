@@ -311,7 +311,7 @@ func parse_rest_of_defenum(p *ps, out *ast_toplevel) parse_result {
     return Fail;
   }
   *out = TypeDef({generics, name,
-                  TypeexprRhs(@[ast_typeexpr]Enum({enumfields}))});
+                  DefenumRhs({@[ast_typeexpr]Enum({enumfields})})});
   return Success;
 }
 
