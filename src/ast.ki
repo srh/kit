@@ -6,6 +6,8 @@ import identmap;
 import pos;
 import typeexpr;
 
+// ATTENTION!  "ast" types must use UNSHARED data structures.
+
 // This is an index into some ps-specific structure.
 deftype ast_meta size;
 
@@ -833,9 +835,14 @@ struct ast_classexpr_rhs {
   rhs_type ast_typeexpr;
 };
 
+struct ast_defstruct_rhs {
+  type ast_typeexpr;
+};
+
 defenum ast_type_def_rhs {
   TypeexprRhs ast_typeexpr;
   ClassexprRhs ast_classexpr_rhs;
+  DefstructRhs ast_defstruct_rhs;
 };
 
 struct ast_type_def {
