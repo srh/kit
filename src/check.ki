@@ -244,8 +244,7 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
           np->rhs = FailedComputation();
           return Printed(pm);
         }
-        converted te_typeexpr = TeStruct({freeze(&fields)});
-        np->rhs = Computed(@[deftype_rhs_spec]ClassexprRhsSpec({{converted}}));
+        np->rhs = Computed(@[deftype_rhs_spec]ClassexprRhsSpec({{freeze(&fields)}}));
         if case &Computed(b deftype_rhs_spec) = &np->rhs {
           *out = &b;
         } else {
@@ -258,8 +257,7 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
           np->rhs = FailedComputation;
           return Printed(pm);
         }
-        converted te_typeexpr = TeStruct({freeze(&fields)});
-        np->rhs = Computed(@[deftype_rhs_spec]DefstructRhsSpec({converted}));
+        np->rhs = Computed(@[deftype_rhs_spec]DefstructRhsSpec({freeze(&fields)}));
         if case &Computed(b deftype_rhs_spec) = &np->rhs {
           *out = &b;
         } else {
@@ -272,8 +270,7 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
           np->rhs = FailedComputation;
           return Printed(pm);
         }
-        converted te_typeexpr = TeEnum({freeze(&constructors)});
-        np->rhs = Computed(@[deftype_rhs_spec]DefenumRhsSpec({converted}));
+        np->rhs = Computed(@[deftype_rhs_spec]DefenumRhsSpec({freeze(&constructors)}));
         if case &Computed(b deftype_rhs_spec) = &np->rhs {
           *out = &b;
         } else {
@@ -1211,7 +1208,9 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
         switch ent_rhs {
         case &ClassexprRhsSpec(crs classexpr_rhs_spec):
           // TODO(): Dedup these cases.
-          if case Printed(pm) = check_and_compute_typeexpr(clq, &ent->generics, &inst->parms.repls, &crs.drs.type, &rhs_computed) {
+          // TODO(): Gross.
+          spec_type te_typeexpr = TeStruct({crs.drs.fields});
+          if case Printed(pm) = check_and_compute_typeexpr(clq, &ent->generics, &inst->parms.repls, &spec_type, &rhs_computed) {
             inst->info = FailedComputation();
             return Printed(pm);
           }
@@ -1224,7 +1223,9 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           }
           check(isBeganComputing(&inst->info));
         case &DefstructRhsSpec(drs defstruct_rhs_spec):
-          if case Printed(pm) = check_and_compute_typeexpr(clq, &ent->generics, &inst->parms.repls, &drs.type, &rhs_computed) {
+          // TODO(): Gross.
+          spec_type te_typeexpr = TeStruct({drs.fields});
+          if case Printed(pm) = check_and_compute_typeexpr(clq, &ent->generics, &inst->parms.repls, &spec_type, &rhs_computed) {
             inst->info = FailedComputation();
             return Printed(pm);
           }
@@ -1237,7 +1238,9 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           }
           check(isBeganComputing(&inst->info));
         case &DefenumRhsSpec(drs defenum_rhs_spec):
-          if case Printed(pm) = check_and_compute_typeexpr(clq, &ent->generics, &inst->parms.repls, &drs.type, &rhs_computed) {
+          // TODO(): Gross.
+          spec_type te_typeexpr = TeEnum({drs.constructors});
+          if case Printed(pm) = check_and_compute_typeexpr(clq, &ent->generics, &inst->parms.repls, &spec_type, &rhs_computed) {
             inst->info = FailedComputation();
             return Printed(pm);
           }

@@ -286,13 +286,11 @@ struct deftype_inst {
 };
 
 struct defstruct_rhs_spec {
-  // TODO(): That this is just a te_typeexpr is a placeholder.
-  type te_typeexpr;
+  fields shray[te_vardecl];
 };
 
 struct defenum_rhs_spec {
-  // TODO(): Yeah.
-  type te_typeexpr;
+  constructors shray[te_vardecl];
 };
 
 struct classexpr_rhs_spec {
