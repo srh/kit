@@ -1209,7 +1209,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
         check(isBeganComputing(&inst->info));
         switch &np.tl->rhs {
           case &TypeexprRhs(a): {
-            inst->info = Computed({Has({~rhs_computed.te, rhs_props}), rhs_props});
+            inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsTypeInfo({~rhs_computed.te, rhs_props})), rhs_props});
           }
           case &ClassexprRhs(a): {
             class_props type_properties;
@@ -1217,7 +1217,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
               inst->info = FailedComputation();
               return Printed(pm);
             }
-            inst->info = Computed({Has({~rhs_computed.te, rhs_props}), class_props});
+            inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsTypeInfo({~rhs_computed.te, rhs_props})), class_props});
           }
         }
       } else {

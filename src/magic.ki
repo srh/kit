@@ -329,14 +329,13 @@ func check_vardecl_ctor(cs *checkstate, clq *clqueue, ds *shray[te_vardecl], wc 
   return NoFail;
 }
 
-func pack_rhs_info(cs *checkstate, clq *clqueue, p *te_instpack, rhs_type_out **cu_typeexpr, rhs_props_out **type_properties) np {
+func pack_rhs_info(cs *checkstate, clq *clqueue, p *te_instpack, rhs_info_out **deftype_inst_rhs_info) np {
   info *deftype_inst_info;
   if case Printed(pm) = compute_pack_info(cs, clq, p, &info) {
     return Printed(pm);
   }
   if case &Has(rhs_info deftype_inst_rhs_info) = &info->rhs {
-    *rhs_type_out = &rhs_info.rhs_cu;
-    *rhs_props_out = &rhs_info.rhs_props;
+    *rhs_info_out = &rhs_info;
     return NoFail;
   } else {
     ice(_u8("check_pack_ctor on primitive type"));
@@ -366,12 +365,14 @@ func instpair_or_trivial_from_behavior(b *derived_method_behavior) opt[instpair]
 }
 
 func check_pack_ctor(cs *checkstate, clq *clqueue, complete_te *te_typeexpr, props *type_properties, p *te_instpack, wc which_ctor, info_out *magic_ctor_info) np {
-  rhs_type *cu_typeexpr;
-  rhs_props *type_properties;
-  if case Printed(pm) = pack_rhs_info(cs, clq, p, &rhs_type, &rhs_props) {
+  rhs_info *deftype_inst_rhs_info;
+  if case Printed(pm) = pack_rhs_info(cs, clq, p, &rhs_info) {
     return Printed(pm);
   }
-  *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, rhs_props)), ~ *complete_te, *props, *rhs_type, *rhs_props});
+  switch rhs_info {
+  case &RhsTypeInfo(ri deftype_inst_rhstype_info):
+    *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, &ri.rhs_props)), ~ *complete_te, *props, ri.rhs_cu, ri.rhs_props});
+  }
   return NoFail;
 }
 
