@@ -1645,14 +1645,19 @@ func structural_enum_type(ds *defscope, t *te_typeexpr, enum_type_out **te_typee
   }
 }
 
+// TODO(): This function will become obsolete in the new order.
 func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool) np {
   ent *deftype_entry = ref_deftype_entry(ds->cs, id);
-  switch ent->accessibility {
-    case RhsPublic: {
+  if case &Has(np deftype_nonprim) = &ent->nonprim {
+    rhs *deftype_rhs_spec;
+    if case Printed(pm) = deftype_converted_rhs(ds->cs, &np, &rhs) {
+      return Printed(pm);
+    }
+    switch rhs {
+    case &RhsWithType(t te_typeexpr):
       *result_out = true;
       return NoFail;
-    }
-    case RhsPrivate: {
+    case &ClassexprRhsSpec(crs classexpr_rhs_spec):
       n size = count(&ds->accessible);
       for i size = 0; i < n; i = i + 1 {
         aid access_entry_id = get(&ds->accessible, i);
@@ -1667,11 +1672,13 @@ func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool)
       }
       *result_out = false;
       return NoFail;
-    }
-    case RhsImpossible: {
-      *result_out = false;
+    case &DefstructRhsSpec(drs defstruct_rhs_spec):
+      *result_out = true;
       return NoFail;
     }
+  } else {
+    *result_out = false;
+    return NoFail;
   }
 }
 

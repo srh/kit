@@ -276,9 +276,14 @@ struct defstruct_rhs_spec {
   type te_typeexpr;
 };
 
+struct classexpr_rhs_spec {
+  drs defstruct_rhs_spec;
+};
+
 defenum deftype_rhs_spec {
   // The RHS typeexpr, if computed, without generics replaced, of course.
   RhsWithType te_typeexpr;
+  ClassexprRhsSpec classexpr_rhs_spec;
   DefstructRhsSpec defstruct_rhs_spec;
 };
 
@@ -287,17 +292,10 @@ struct deftype_nonprim {
   rhs nbfc[deftype_rhs_spec];
 };
 
-defenum rhs_accessibility {
-  RhsPublic void;
-  RhsPrivate void;
-  RhsImpossible void;
-};
-
 struct deftype_entry {
   module_name sym;
   name sym;
   accessible array[access_entry_id];
-  accessibility rhs_accessibility;
   generics ast_generics;
   // nonprim/default_info are mutually exclusive Has-havers.
   // Info relevant for non-primitive types.
@@ -307,8 +305,8 @@ struct deftype_entry {
   insts hash[idy_genparms, deftype_inst_id];
 };
 
-func mk(module_name sym, name sym, accessible array[access_entry_id], accessibility rhs_accessibility, g ast_generics, tl *ast_type_def) deftype_entry {
-  return {module_name, name, accessible, accessibility, g, Has({tl, NotComputed()}), None, mk_hash@[idy_genparms, deftype_inst_id]()};
+func mk(module_name sym, name sym, accessible array[access_entry_id], g ast_generics, tl *ast_type_def) deftype_entry {
+  return {module_name, name, accessible, g, Has({tl, NotComputed()}), None, mk_hash@[idy_genparms, deftype_inst_id]()};
 }
 
 defenum fn_body_spec {
