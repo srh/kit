@@ -382,22 +382,18 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
     checkobj_out->switchable_type_lifetime = checkobj_out->swartch_lifetime;
   }
   // switchable_type is complete, because swartch type is.
-  enum_type *te_typeexpr;
-  switch structural_enum_type(es->ds, switchable_type, &enum_type) {
+  et *te_enum;
+  switch structural_enum_type(es->ds, switchable_type, &et) {
   case Error(pm):
     return Printed(pm);
   case Success: { }
   case NoAccessibleStructuralRhs:
     return ERR(_u8("Inaccessible rhs hit or non-structural type in swartch"));
   }
-  if case &TeEnum(et te_enum) = enum_type {
-    // enum_type is complete, because complete_structural_rhs does that.
-    checkobj_out->enum_type = &et;
-    checkobj_out->is_deref = is_deref;
-    return NoFail;
-  } else {
-    return ERR(_u8("Switching over non-enum type"));
-  }
+  // enum_type is complete, because complete_structural_rhs i.e. structural_enum_type does that.
+  checkobj_out->enum_type = et;
+  checkobj_out->is_deref = is_deref;
+  return NoFail;
 }
 
 // expected_type_out is complete (et must be complete).

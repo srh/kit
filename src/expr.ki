@@ -1606,8 +1606,22 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
   return NoFail;
 }
 
-func structural_enum_type(ds *defscope, t *te_typeexpr, enum_type_out **te_typeexpr) recursive_structural_rhs_result {
-  return recursive_structural_rhs(ds, t, enum_type_out);
+func structural_enum_type(ds *defscope, t *te_typeexpr, et_out **te_enum) recursive_structural_rhs_result {
+  enum_type *te_typeexpr;
+  switch recursive_structural_rhs(ds, t, &enum_type) {
+  case Error(pm):
+    return Error(pm);
+  case Success:
+    if case &TeEnum(et te_enum) = enum_type {
+      *et_out = &et;
+      return Success;
+    } else {
+      @[np]ERR(_u8("Structural type is not an enum type."));
+      return Error(false);
+    }
+  case NoAccessibleStructuralRhs:
+    return NoAccessibleStructuralRhs;
+  }
 }
 
 func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool) np {
