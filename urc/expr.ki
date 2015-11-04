@@ -306,40 +306,36 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     }
     // enum_type is complete.
     enum_type *te_typeexpr;
-    switch recursive_structural_rhs(ds, pt, &enum_type) {
+    et *te_enum;
+    switch structural_enum_type(ds, pt, &enum_type, &et) {
     case Error(pm):
       return Printed(pm);
     case Success: { }
-    case NoAccessibleStructuralRhs:
-      *res_out = NoMatchConstructor(void);
+    case NotAccessibleEnum:
+      *res_out = NoMatchConstructor;
       return NoFail;
     }
 
-    if case &TeEnum(et te_enum) = enum_type {
-      rhs_type *te_typeexpr;
-      decl_index size;
-      if !find_vardecl(&et.constructors, name, &rhs_type, &decl_index) {
-        *res_out = NoMatchConstructor(void);
-        return NoFail;
-      }
-      void_type te_typeexpr = primitive_void_type(ds->cs);
-      unified te_typeexpr;
-      if !unify_types(&void_type, rhs_type, &unified) {
-        *res_out = NoMatchConstructor(void);
-        return NoFail;
-      }
-      cac_enum_type cac_typeexpr;
-      if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, enum_type, &cac_enum_type) {
-        return Printed(pm);
-      }
-      check(cac_enum_type.complete);
-
-      *res_out = MatchedVoidConstructed({~ *pt, ~cac_enum_type.te, mk_enum_tag_value(decl_index)});
-      return NoFail;
-    } else {
+    rhs_type *te_typeexpr;
+    decl_index size;
+    if !find_vardecl(&et->constructors, name, &rhs_type, &decl_index) {
       *res_out = NoMatchConstructor(void);
       return NoFail;
     }
+    void_type te_typeexpr = primitive_void_type(ds->cs);
+    unified te_typeexpr;
+    if !unify_types(&void_type, rhs_type, &unified) {
+      *res_out = NoMatchConstructor(void);
+      return NoFail;
+    }
+    cac_enum_type cac_typeexpr;
+    if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, enum_type, &cac_enum_type) {
+      return Printed(pm);
+    }
+    check(cac_enum_type.complete);
+
+    *res_out = MatchedVoidConstructed({~ *pt, ~cac_enum_type.te, mk_enum_tag_value(decl_index)});
+    return NoFail;
   }
   cac_return_type cac_typeexpr;
   if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, return_type, &cac_return_type) {
@@ -351,45 +347,41 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   }
   // enum_type is complete and computed.
   enum_type *te_typeexpr;
-  switch recursive_structural_rhs(ds, &cac_return_type.te, &enum_type) {
+  et *te_enum;
+  switch structural_enum_type(ds, &cac_return_type.te, &enum_type, &et) {
   case Error(pm):
     return Printed(pm);
   case Success: { }
-  case NoAccessibleStructuralRhs:
+  case NotAccessibleEnum:
+    *res_out = NoMatchConstructor;
+    return NoFail;
+  }
+  rhs_type *te_typeexpr;
+  decl_index size;
+  if !find_vardecl(&et->constructors, name, &rhs_type, &decl_index) {
     *res_out = NoMatchConstructor(void);
     return NoFail;
   }
-  if case &TeEnum(et te_enum) = enum_type {
-    rhs_type *te_typeexpr;
-    decl_index size;
-    if !find_vardecl(&et.constructors, name, &rhs_type, &decl_index) {
-      *res_out = NoMatchConstructor(void);
-      return NoFail;
-    }
-    // rhs_type is complete.
-    unified te_typeexpr;
-    if !unify_types(arg_type, rhs_type, &unified) {
-      *res_out = NoMatchConstructor(void);
-      return NoFail;
-    }
-    ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
-    cac_ctor_type cac_typeexpr;
-    if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &ctor_type, &cac_ctor_type) {
-      return Printed(pm);
-    }
-    check(cac_ctor_type.complete);
-
-    ip instpair;
-    if case Printed(pm) = lookup_or_make_enum_constructor_def(ds, &et, &cac_ctor_type.te, decl_index, &ip) {
-      return Printed(pm);
-    }
-
-    *res_out = MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index), ip});
-    return NoFail;
-  } else {
+  // rhs_type is complete.
+  unified te_typeexpr;
+  if !unify_types(arg_type, rhs_type, &unified) {
     *res_out = NoMatchConstructor(void);
     return NoFail;
   }
+  ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
+  cac_ctor_type cac_typeexpr;
+  if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &ctor_type, &cac_ctor_type) {
+    return Printed(pm);
+  }
+  check(cac_ctor_type.complete);
+
+  ip instpair;
+  if case Printed(pm) = lookup_or_make_enum_constructor_def(ds, et, &cac_ctor_type.te, decl_index, &ip) {
+    return Printed(pm);
+  }
+
+  *res_out = MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index), ip});
+  return NoFail;
 }
 
 func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *te_typeexpr, decl_index size, out *instpair) np {
@@ -1026,8 +1018,8 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
         }
         dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
         annotate(after,
-          mk_after(@[consume_actions]ConsumeByCopyDestroy({{copy, dest, desc.partial_num},
-                                                           {destroy, desc.whole_num}}),
+          mk_after(@[consume_actions]ConsumeByCopyDestroy({+{copy, dest, desc.partial_num},
+                                                           +{destroy, desc.whole_num}}),
                    dest));
       }
       *moved_cell_ix_out = None;
@@ -1039,14 +1031,14 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
         if case Printed(pm) = get_move_ctor(es->ds, &info->cu, &move) {
           return Printed(pm);
         }
-        annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]{move, dest, desc.num}), dest));
+        annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]+{move, dest, desc.num}), dest));
         *moved_cell_ix_out = Has(ix);
       } else {
         copy ctor_desc;
         if case Printed(pm) = get_copy_ctor(es->ds, &info->cu, &copy) {
           return Printed(pm);
         }
-        annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]{copy, dest, desc.num}, desc.deadme)), dest));
+        annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]+{copy, dest, desc.num}, desc.deadme)), dest));
         *moved_cell_ix_out = None;
       }
     }
@@ -1063,7 +1055,7 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
       if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
         return Printed(pm);
       }
-      annotate(after, mk_after_discard(@[destroy_action]{destroy, desc.whole_num}));
+      annotate(after, mk_after_discard(@[destroy_action]+{destroy, desc.whole_num}));
     }
     case &IsLvalYes(desc lval_description): {
       if case DeadMe(v void) = desc.deadme {
@@ -1091,7 +1083,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
     if case Printed(pm) = get_destroy_ctor(es->ds, &info->cu, &destroy) {
       return Printed(pm);
     }
-    annotate(&later->action, {destroy, result_cell(unHas(after))});
+    annotate(&later->action, @[destroy_action]+{destroy, result_cell(unHas(after))});
   }
 
   if case Has(p *ast_later_discard_info) = later2 {
@@ -1100,7 +1092,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
     if case Printed(pm) = get_destroy_ctor(es->ds, &info->cu, &destroy) {
       return Printed(pm);
     }
-    annotate(&p->action, {destroy, result_cell(unHas(after))});
+    annotate(&p->action, @[destroy_action]+{destroy, result_cell(unHas(after))});
   }
   return NoFail;
 }
@@ -1134,8 +1126,8 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         }
         annotate(&assignment->info,
           @[ast_assignment_info]
-          SimpleMoveAssignment({@[destroy_action]{target_destroy, dest},
-                                @[move_action]{move, dest, desc.whole_num}}));
+          SimpleMoveAssignment({@[destroy_action]+{target_destroy, dest},
+                                @[move_action]+{move, dest, desc.whole_num}}));
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
         copy ctor_desc;
@@ -1149,9 +1141,9 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
 
         annotate(&assignment->info,
           @[ast_assignment_info]
-          SimpleCopyDestroyAssignment({@[destroy_action]{target_destroy, dest},
-                                       @[copy_action]{copy, dest, desc.partial_num},
-                                       @[destroy_action]{destroy, desc.whole_num}}));
+          SimpleCopyDestroyAssignment({@[destroy_action]+{target_destroy, dest},
+                                       @[copy_action]+{copy, dest, desc.partial_num},
+                                       @[destroy_action]+{destroy, desc.whole_num}}));
       }
     }
     case &IsLvalYes(desc lval_description): {
@@ -1183,14 +1175,14 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
           annotate(&assignment->info,
             @[ast_assignment_info]
             ConditionalAssignment({make_comparecells(es, dest),
-                                   @[destroy_action]{target_destroy, dest},
-                                   @[copy_action]{copy, dest, desc.num},
+                                   @[destroy_action]+{target_destroy, dest},
+                                   @[copy_action]+{copy, dest, desc.num},
                                    desc.deadme}));
         } else {
           annotate(&assignment->info,
             @[ast_assignment_info]
-            SimpleCopyAssignment({@[destroy_action]{target_destroy, dest},
-                                  @[copy_action]{copy, dest, desc.num},
+            SimpleCopyAssignment({@[destroy_action]+{target_destroy, dest},
+                                  @[copy_action]+{copy, dest, desc.num},
                                   desc.deadme}));
         }
       }
@@ -1307,51 +1299,8 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
   if !is_complete_computed(pt).computed {
     ice(_u8("check_expr_strinit has non-computed pt"));
   }
-  structural_type *te_typeexpr;
-  switch recursive_structural_rhs(es->ds, pt, &structural_type) {
-  case Error(pm):
-    return Printed(pm);
-  case Success: { }
-  case NoAccessibleStructuralRhs:
-    return ERR(_u8("Strinit for inaccessible or non-structural type"));
-  }
 
-  switch structural_type {
-  case &TeStruct(b te_struct):
-    n size = count(&b.fields);
-    if n != count(&a->exprs) {
-      return MERR(es->cs, a->meta, _u8("Structure literal has wrong number of fields."));
-    }
-
-    offsets array[u32];
-    for i size = 0; i < n; i = i + 1 {
-      x_i *ast_expr_consume = &ref(&a->exprs, i)->ec;
-      field *te_vardecl = ref(&b.fields, i);
-      if case Printed(pm) = check_expr_consume(es, x_i, &field->type) {
-        return Printed(pm);
-      }
-      reannotate_static_to_virtual(es, result_cell(x_i));
-      psd partial_struct_data;
-      if case Printed(pm) = compute_partial_struct_data(es->cs, es->clq, &b.fields, Has(field->name), &psd) {
-        return Printed(pm);
-      }
-      check(psd.found_field);
-      push(&offsets, psd.offset);
-    }
-
-    // We checked is_computed(pt).
-    props type_properties;
-    if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, pt, &props) {
-      return Printed(pm);
-    }
-
-    for i size = 0; i < n; i = i + 1 {
-      p_i *ast_strinit_param = ref(&a->exprs, i);
-      annotate(&p_i->info, {get(&offsets, i)});
-    }
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
-    return NoFail;
-  case &TeArraytype(b te_arraytype):
+  if case &TeArraytype(b te_arraytype) = pt {
     n u32 = *unHas(&b.count);  // We checked is_complete(pt).
     if n != ~count(&a->exprs) {
       return MERR(es->cs, a->meta, _u8("Structure literal has wrong number of fields."));
@@ -1383,12 +1332,50 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     }
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
     return NoFail;
+  } else {
+    b *te_struct;
+    structural_type *te_typeexpr;
+    switch structural_struct_type(es->ds, pt, &structural_type, &b) {
+    case Error(pm):
+      return Printed(pm);
+    case Success: { }
+    case NotAccessibleStruct:
+      return MERR(es->cs, a->meta, _u8("Strinit for inaccessible or non-structural type, "), pretty(es->im, pt));
+    }
 
-  case &TeLifetime(b te_lifetime):
-    return ERR(_u8("ICE: check_expr_strinit sees a lifetime as structural rhs"));
+    n size = count(&b->fields);
+    if n != count(&a->exprs) {
+      return MERR(es->cs, a->meta, _u8("Structure literal has wrong number of fields."));
+    }
 
-  default:
-    return MERR(es->cs, a->meta, _u8("Structure literal used on non-struct type, "), pretty(es->im, structural_type));
+    offsets array[u32];
+    for i size = 0; i < n; i = i + 1 {
+      x_i *ast_expr_consume = &ref(&a->exprs, i)->ec;
+      field *te_vardecl = ref(&b->fields, i);
+      if case Printed(pm) = check_expr_consume(es, x_i, &field->type) {
+        return Printed(pm);
+      }
+      reannotate_static_to_virtual(es, result_cell(x_i));
+      psd partial_struct_data;
+      if case Printed(pm) = compute_partial_struct_data(es->cs, es->clq, &b->fields, Has(field->name), &psd) {
+        return Printed(pm);
+      }
+      check(psd.found_field);
+      push(&offsets, psd.offset);
+    }
+
+    // We checked is_computed(pt).
+    props type_properties;
+    if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, pt, &props) {
+      return Printed(pm);
+    }
+
+    for i size = 0; i < n; i = i + 1 {
+      p_i *ast_strinit_param = ref(&a->exprs, i);
+      annotate(&p_i->info, {get(&offsets, i)});
+    }
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
+    return NoFail;
   }
 }
 
@@ -1606,6 +1593,76 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
   return NoFail;
 }
 
+defenum structural_struct_type_result {
+  // Error(pm)
+  Error bool;
+  Success void;
+  NotAccessibleStruct void;
+};
+
+// st_out is just the inside te_struct of struct_type_out.  Some caller wants it.
+func structural_struct_type(ds *defscope, t *te_typeexpr, struct_type_out **te_typeexpr, st_out **te_struct) structural_struct_type_result {
+  struct_type *te_typeexpr;
+  switch complete_structural_rhs(ds, t, &struct_type) {
+  case Error(pm):
+    return Error(pm);
+  case SuccessHasRhs:
+    // TODO(): Dedup cases.
+    if case &TeStruct(st te_struct) = struct_type {
+      *struct_type_out = struct_type;
+      *st_out = &st;
+      return Success;
+    } else {
+      return NotAccessibleStruct;
+    }
+  case SuccessNoRhs:
+    if case &TeStruct(st te_struct) = struct_type {
+      *struct_type_out = struct_type;
+      *st_out = &st;
+      return Success;
+    } else {
+      return NotAccessibleStruct;
+    }
+  case NoAccessibleStructuralRhs:
+    return NotAccessibleStruct;
+  }
+}
+
+defenum structural_enum_type_result {
+  // Error(pm)
+  Error bool;
+  Success void;
+  NotAccessibleEnum void;
+};
+
+// et_out is just the inside te_enum of enum_type_out.  Some caller wants it.
+func structural_enum_type(ds *defscope, t *te_typeexpr, enum_type_out **te_typeexpr, et_out **te_enum) structural_enum_type_result {
+  enum_type *te_typeexpr;
+  switch complete_structural_rhs(ds, t, &enum_type) {
+  case Error(pm):
+    return Error(pm);
+  case SuccessHasRhs:
+    // TODO(): Dedup cases.
+    if case &TeEnum(et te_enum) = enum_type {
+      *enum_type_out = enum_type;
+      *et_out = &et;
+      return Success;
+    } else {
+      return NotAccessibleEnum;
+    }
+  case SuccessNoRhs:
+    if case &TeEnum(et te_enum) = enum_type {
+      *enum_type_out = enum_type;
+      *et_out = &et;
+      return Success;
+    } else {
+      return NotAccessibleEnum;
+    }
+  case NoAccessibleStructuralRhs:
+    return NotAccessibleEnum;
+  }
+}
+
 func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool) np {
   ent *deftype_entry = ref_deftype_entry(ds->cs, id);
   switch ent->accessibility {
@@ -1679,33 +1736,6 @@ func successful(res structural_rhs_result) bool {
   }
 }
 
-defenum recursive_structural_rhs_result {
-  // True if the printed error message include location info.
-  Error bool;
-  Success void;
-  // Some callers turn this into an error message, others don't.
-  NoAccessibleStructuralRhs void;
-};
-
-func recursive_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typeexpr) recursive_structural_rhs_result {
-  prev *te_typeexpr = t;
-  for ;; {
-    stru *te_typeexpr;
-    res var = complete_structural_rhs(ds, prev, &stru);
-    switch res {
-    case Error(pm):
-      return Error(pm);
-    case SuccessHasRhs:
-      prev = stru;
-    case SuccessNoRhs:
-      *rhs_type_out = stru;
-      return Success;
-    case NoAccessibleStructuralRhs:
-      return NoAccessibleStructuralRhs;
-    }
-  }
-}
-
 func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **cu_typeexpr) structural_rhs_result {
   if case &Has(pack te_instpack) = mbpack {
     accessible_result bool;
@@ -1721,7 +1751,10 @@ func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **
     inst *deftype_inst = ref_deftype_inst(ds->cs, pack.inst_id);
     if case &Computed(info deftype_inst_info) = &inst->info {
       if case &Has(rhs_info deftype_inst_rhs_info) = &info.rhs {
-        *rhs_type_out = &rhs_info.rhs_cu;
+        switch &rhs_info {
+        case &RhsTypeInfo(ri deftype_inst_rhstype_info):
+          *rhs_type_out = &ri.rhs_cu;
+        }
         return SuccessHasRhs;
       } else {
         ice(_u8("deftype_rhs_accessible permitted a primitive type."));

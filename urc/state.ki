@@ -251,9 +251,13 @@ struct cu_typrop {
   props type_properties;
 };
 
-struct deftype_inst_rhs_info {
+struct deftype_inst_rhstype_info {
   rhs_cu cu_typeexpr;
   rhs_props type_properties;
+};
+
+defenum deftype_inst_rhs_info {
+  RhsTypeInfo deftype_inst_rhstype_info;
 };
 
 struct deftype_inst_info {
@@ -267,10 +271,20 @@ struct deftype_inst {
   info nbfc[deftype_inst_info];
 };
 
+struct defstruct_rhs_spec {
+  // TODO(): That this is just a te_typeexpr is a placeholder.
+  type te_typeexpr;
+};
+
+defenum deftype_rhs_spec {
+  // The RHS typeexpr, if computed, without generics replaced, of course.
+  RhsWithType te_typeexpr;
+  DefstructRhsSpec defstruct_rhs_spec;
+};
+
 struct deftype_nonprim {
   tl *ast_type_def;
-  // The RHS typeexpr, if computed, without generics replaced, of course.
-  rhs nbfc[te_typeexpr];
+  rhs nbfc[deftype_rhs_spec];
 };
 
 defenum rhs_accessibility {
