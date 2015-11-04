@@ -3,7 +3,7 @@ import shray;
 import state;
 
 // A "computed" typeexpr, which is complete, and which has isHas instpacks.
-deftype cu_typeexpr te_typeexpr;
+struct cu_typeexpr { x te_typeexpr; };
 
 def `~` fn[te_typeexpr, cu_typeexpr] = wrapconvert;
 
@@ -92,7 +92,7 @@ func idy_typeexpr_list_equal(a *shray[cu_typeexpr], b *shray[cu_typeexpr]) bool 
 }
 
 func idy_typeexpr_equal(a *cu_typeexpr, b *cu_typeexpr) bool {
-  return help_idy_typeexpr_equal(&a->~, &b->~);
+  return help_idy_typeexpr_equal(&a->x, &b->x);
 }
 
 // Must be called on complete, concrete types.
@@ -102,7 +102,7 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
       if case &TeName(bx te_name) = b {
         if case &Has(p te_instpack) = &ax.pack {
           if case &Has(q te_instpack) = &bx.pack {
-            return p.inst_id.~ == q.inst_id.~;
+            return p.inst_id.x == q.inst_id.x;
           }
         }
         ice(_u8("idy_typeexpr_equal on a non-pack-having name typeexpr"));
@@ -112,7 +112,7 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
       if case &TeApp(bx te_typeapp) = b {
         if case &Has(p te_instpack) = &ax.pack {
           if case &Has(q te_instpack) = &bx.pack {
-            return p.inst_id.~ == q.inst_id.~;
+            return p.inst_id.x == q.inst_id.x;
           }
         }
         ice(_u8("idy_typeexpr_equal on non-pack-having app typeexpr"));
@@ -197,7 +197,7 @@ func enum_tag_type(cs *checkstate, et *te_enum) te_typeexpr {
   }
 }
 
-deftype enum_tag_value u32;
+struct enum_tag_value { x u32; };
 def `~` fn[u32, enum_tag_value] = wrapconvert;
 
 func enum_field_offset(cs *checkstate, et *te_enum, tag enum_tag_value) u32 {
@@ -210,11 +210,11 @@ func mk_enum_tag_value(constructor_decl_index size) enum_tag_value {
 }
 
 func unmk_enum_tag_value(val enum_tag_value) size {
-  return @[size]~(val.~ - enum_tag_min);
+  return @[size]~(val.x - enum_tag_min);
 }
 
 func[H] build_u8str(help H, r *array[u8], a *cu_typeexpr) void {
-  return build_u8str(help, r, &a->~);
+  return build_u8str(help, r, &a->x);
 }
 
 func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
@@ -311,7 +311,7 @@ func[H] build_u8str(help H, r *array[u8], a *te_puretype) void {
 }
 
 func hash_compute_hash(x *cu_typeexpr) osize {
-  return help_compute_hash(&x->~);
+  return help_compute_hash(&x->x);
 }
 
 // Used for idy_typeexpr types.
@@ -319,12 +319,12 @@ func help_compute_hash(a *te_typeexpr) osize {
   switch a {
   case &TeName(ax te_name):
     if case &Has(p te_instpack) = &ax.pack {
-      return ~p.inst_id.~;
+      return ~p.inst_id.x;
     }
     ice(_u8("help_compute_hash on non-pack-having name typeexpr"));
   case &TeApp(ax te_typeapp):
     if case &Has(p te_instpack) = &ax.pack {
-      return ~p.inst_id.~;
+      return ~p.inst_id.x;
     }
     ice(_u8("help_compute_hash on non-pack-having app typeexpr"));
   case &TeStruct(ax te_struct):
@@ -351,7 +351,7 @@ func help_te_vardecl_list_compute_hash(a *shray[te_vardecl]) osize {
   accum osize = 0x84ac113;
   for i size = 0; i < n; i = i + 1 {
     adecl *te_vardecl = &adata[i];
-    accum = (accum * 33) ^ ~adecl->name.~;
+    accum = (accum * 33) ^ ~adecl->name.x;
     accum = (accum * 3) ^ help_compute_hash(&adecl->type);
   }
   return accum;

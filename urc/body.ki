@@ -54,7 +54,7 @@ func mk(ds *defscope, return_type *cu_typeexpr) bodystate {
   return ret;
 }
 
-deftype statement_num size;
+struct statement_num { x size; };
 
 def `~` fn[size, statement_num] = wrapconvert;
 
@@ -65,8 +65,8 @@ func add_statement(bs *bodystate, s opt[*ast_statement]) statement_num {
 }
 
 func connect_statements(bs *bodystate, from statement_num, to statement_num) void {
-  from_inf *statement_info = ref(&bs->statements, from.~);
-  to_inf *statement_info = ref(&bs->statements, to.~);
+  from_inf *statement_info = ref(&bs->statements, from.x);
+  to_inf *statement_info = ref(&bs->statements, to.x);
   push(&from_inf->outgoing, to);
   push(&to_inf->incoming, from);
 }
@@ -376,9 +376,9 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
   checkobj_out->swartch_type = swartch_type;
   checkobj_out->swartch_lifetime = unnamed_lifetime(es);
   switchable_type *te_typeexpr;
-  is_deref bool = decompose_ref_or_ptr(&swartch_type->~, es->cs, &checkobj_out->switchable_type_lifetime, &switchable_type);
+  is_deref bool = decompose_ref_or_ptr(&swartch_type->x, es->cs, &checkobj_out->switchable_type_lifetime, &switchable_type);
   if !is_deref {
-    switchable_type = &swartch_type->~;
+    switchable_type = &swartch_type->x;
     checkobj_out->switchable_type_lifetime = checkobj_out->swartch_lifetime;
   }
   // switchable_type is complete, because swartch type is.
@@ -388,7 +388,7 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
   case Error(pm):
     return Printed(pm);
   case Success: { }
-  case NotAccessibleEnum:
+  case NotAccessible:
     return ERR(_u8("Inaccessible rhs hit or non-enum type in swartch"));
   }
   // enum_type is complete, because complete_structural_rhs i.e. structural_enum_type does that.
@@ -423,7 +423,7 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
   }
 
   cac cac_typeexpr;
-  if case Printed(pm) = check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->repls, &converted, &cac) {
+  if case Printed(pm) = check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &cac) {
     return Printed(pm);
   }
 
@@ -434,7 +434,7 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
 
   *cu_expected_type_out = ~ *expected_type;
   expected_type_props type_properties;
-  if case Printed(pm) = compute_type_properties(es->cs, es->clq, cu_expected_type_out, &expected_type_props) {
+  if case Printed(pm) = compute_type_properties(es->clq, cu_expected_type_out, &expected_type_props) {
     return Printed(pm);
   }
   *varcell_out = add_cell(es, {LocationVirtual, *cu_expected_type_out, expected_type_props});
@@ -497,7 +497,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
         } else {
           voidtp cu_typrop = compute_prim(bs->clq, primitive_void_type(bs->cs));
           unified te_typeexpr;
-          if !unify_types(&voidtp.cu.~, expected_type, &unified) {
+          if !unify_types(&voidtp.cu.x, expected_type, &unified) {
             return ERR(_u8("decl-free case pattern used with non-void case"));
           }
           ovn = None;
@@ -559,8 +559,8 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   cond_vp varpopper;
   init_vp(&cond_vp, &bs->es);
   if case &Has(cond ast_expr_condition) = &a->condition {
-    boolean cu_typeexpr = compute_prim(bs->ds, primitive_bool_type(bs->cs));
-    if case Printed(pm) = check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.~, &cond.discard) {
+    boolean cu_typeexpr = compute_prim(bs->clq, primitive_bool_type(bs->cs));
+    if case Printed(pm) = check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.x, &cond.discard) {
       return Printed(pm);
     }
     connect_statements(bs, loopnum, exitnum);
@@ -601,7 +601,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   }
 
   computed cac_typeexpr;
-  if case Printed(pm) = check_and_compute_typeexpr(bs->cs, bs->clq, bs->ds->generics, bs->ds->repls, &converted, &computed) {
+  if case Printed(pm) = check_and_compute_typeexpr(bs->clq, bs->ds->generics, bs->ds->repls, &converted, &computed) {
     return Printed(pm);
   }
   cu_computed cu_typeexpr;
@@ -626,7 +626,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
       cu_computed = ~computed.te;
       complete_type = &cu_computed;
       cu_props type_properties;
-      if case Printed(pm) = compute_type_properties(bs->cs, bs->clq, complete_type, &cu_props) {
+      if case Printed(pm) = compute_type_properties(bs->clq, complete_type, &cu_props) {
         return Printed(pm);
       }
       note_initter = true;
@@ -692,7 +692,7 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
   varcells shray[opt[cell_num]] = compute_varcells(&bs->es, &vars);
   moved_var_ix opt[size];
   if case &Has(c box[ast_expr_consume]) = &a->expr {
-    if case Printed(pm) = check_expr_retconsume(&bs->es, oo(&c), &bs->return_type->~, &varcells, &moved_var_ix) {
+    if case Printed(pm) = check_expr_retconsume(&bs->es, oo(&c), &bs->return_type->x, &varcells, &moved_var_ix) {
       return Printed(pm);
     }
     reannotate_static_to_virtual(&bs->es, result_cell(oo(&c)));
@@ -759,8 +759,8 @@ func cdi_later(cdo opt[*ast_condition_discard_info]) opt[*ast_later_discard_info
 func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info, cd2 opt[*ast_condition_discard_info]) np {
   switch a {
     case &ExprCondition(b box[ast_expr_consume]): {
-      booltype cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
-      if case Printed(pm) = check_consume_then_discard_expr(es, oo(&b), &booltype.~, &cd->later, cdi_later(cd2)) {
+      booltype cu_typeexpr = compute_prim(es->clq, primitive_bool_type(es->cs));
+      if case Printed(pm) = check_consume_then_discard_expr(es, oo(&b), &booltype.x, &cd->later, cdi_later(cd2)) {
         return Printed(pm);
       }
 
@@ -823,7 +823,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
         // TODO: At some point we just need an "is_void" function.
         voidtp cu_typrop = compute_prim(es->clq, primitive_void_type(es->cs));
         unified te_typeexpr;
-        if !unify_types(&voidtp.cu.~, expected_type, &unified) {
+        if !unify_types(&voidtp.cu.x, expected_type, &unified) {
           return ERR(_u8("decl-free case pattern used with non-void case"));
         }
         annotate(&cd->virtual_cell_dead, None);
@@ -842,7 +842,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 func type_is_void(cs *checkstate, t *cu_typeexpr) bool {
   void_type te_typeexpr = primitive_void_type(cs);
   unified te_typeexpr;
-  return unify_types(&void_type, &t->~, &unified);
+  return unify_types(&void_type, &t->x, &unified);
 }
 
 func finish_lambda_body(bs *bodystate, ee entryexit) np {
@@ -850,7 +850,7 @@ func finish_lambda_body(bs *bodystate, ee entryexit) np {
     return Printed(pm);
   }
   mark_reachable(bs, ee.entry);
-  if ref(&bs->statements, ee.exit.~)->marked_reachable && !type_is_void(bs->cs, bs->return_type) {
+  if ref(&bs->statements, ee.exit.x)->marked_reachable && !type_is_void(bs->cs, bs->return_type) {
     return ERR(_u8("Body can exit without return"));
   }
   return NoFail;
@@ -860,7 +860,7 @@ func mark_reachable(bs *bodystate, entry statement_num) void {
   working array[statement_num];
   push(&working, entry);
   while case Has(num) = popval(&working) {
-    inf *statement_info = ref(&bs->statements, num.~);
+    inf *statement_info = ref(&bs->statements, num.x);
     if !inf->marked_reachable {
       inf->marked_reachable = true;
       append(&working, &inf->outgoing);

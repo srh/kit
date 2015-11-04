@@ -75,7 +75,7 @@ struct frame {
   crash_target nc[jmp_targetnum];
 };
 
-deftype jmp_targetnum size;
+struct jmp_targetnum { x size; };
 def `~` fn[size, jmp_targetnum] = wrapconvert;
 
 struct jmpdata {
@@ -92,7 +92,7 @@ func frame_create_target(h *frame) jmp_targetnum {
 }
 
 func frame_define_target(h *frame, jt jmp_targetnum, text_offset u32) void {
-  annotate(ref(&h->jmp_targets, jt.~), text_offset);
+  annotate(ref(&h->jmp_targets, jt.x), text_offset);
 }
 
 func mk_gn_annot() gn_annot {
@@ -118,7 +118,7 @@ func un_Direct(loc cell_loc) i32 {
 }
 
 func get_loc(h *frame, c cell_num) cell_loc {
-  return get(unHas(&h->offsets), c.~);
+  return get(unHas(&h->offsets), c.x);
 }
 
 func get_ptr_loc(h *frame, c cell_num) cell_loc {
@@ -219,12 +219,12 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
     upward_offset i32 = 8;
     ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
     if for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props) {
-      set(ref(&offsets, h->return_cell.~), IndirectLoc(upward_offset));
+      set(ref(&offsets, h->return_cell.x), IndirectLoc(upward_offset));
       upward_offset = upward_offset + 4;
     } else {
       // Put its cell below the frame pointer.
       offset cell_loc = next_stack_offset(h->cs, low_offset, ret_ci, &low_offset);
-      set(ref(&offsets, h->return_cell.~), offset);
+      set(ref(&offsets, h->return_cell.x), offset);
     }
 
     nargcells size = count(&h->argcells);
@@ -236,7 +236,7 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
       }
       offset i32 = upward_offset;
       upward_offset = ceil_aligned(offset + ~ci->props.flat_size, 4);
-      set(ref(&offsets, c.~), DirectLoc(offset));
+      set(ref(&offsets, c.x), DirectLoc(offset));
     }
   }
 
@@ -252,8 +252,8 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
     nlive size = count(live);
     for j size = 0; j < nlive; j = j + 1 {
       c cell_num = get(live, j);
-      if isNope(ref(&offsets, c.~)) {
-        if case &Has(cell_paramlistgn gr_num) = &ref(&h->bas->celldisp, c.~)->paramlist {
+      if isNope(ref(&offsets, c.x)) {
+        if case &Has(cell_paramlistgn gr_num) = &ref(&h->bas->celldisp, c.x)->paramlist {
           // Cells in other paramlists should already been processed -- and would have failed the isNone check just above.
           if cell_paramlistgn != gn {
             ice(_u8("cell is in other paramlist, was not processed"));
@@ -275,13 +275,13 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
     for j size = npcells; j > 0; {
       j = j - 1;
       c cell_num = get(pcells, j);
-      if !isNope(ref(&offsets, c.~)) {
+      if !isNope(ref(&offsets, c.x)) {
         ice(_u8("cell is in paramlist, but already processed"));
       }
 
       ci *cell_info = ref_cell(h->gr, c);
       offset cell_loc = next_stack_offset(h->cs, bumpline, ci, &bumpline);
-      set(ref(&offsets, c.~), offset);
+      set(ref(&offsets, c.x), offset);
     }
 
     annotate(&annot->paramlist_bottom_frame_offset, bumpline);
@@ -314,12 +314,12 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
 
 func duck_conflicting_cells(h *frame, c cell_num, bumpline *i32, offsets *array[tmp_offsets_val]) void {
   bline i32 = *bumpline;
-  c_disp *cell_disp = ref(&h->bas->celldisp, c.~);
+  c_disp *cell_disp = ref(&h->bas->celldisp, c.x);
   // c_disp->conflicting can have duplicates, but that obviously doesn't affect this computation.
   nconflicting size = count(&c_disp->conflicting);
   for i size = 0; i < nconflicting; i = i + 1 {
     d cell_num = get(&c_disp->conflicting, i);
-    switch ref(offsets, d.~) {
+    switch ref(offsets, d.x) {
     case &Nope: { }
     case &Has(loc cell_loc):
       switch &loc {
@@ -348,7 +348,7 @@ func flatten_offsets(h *frame, a *array[tmp_offsets_val]) array[cell_loc] {
     case &Has(c cell_loc):
       push(&ret, c);
     case &StaticSubcell(p tup[cell_num, u32]):
-      if case &Has(cl cell_loc) = ref(a, p.car.~) {
+      if case &Has(cl cell_loc) = ref(a, p.car.x) {
         switch cl {
         case DirectLoc(x i32):
           push(&ret, DirectLoc(x + ~p.cdr));
@@ -370,15 +370,15 @@ func flatten_offsets(h *frame, a *array[tmp_offsets_val]) array[cell_loc] {
 
 func layout_individual_cell(h *frame, cell cell_num, low_offset_ref *i32, offsets_ref *array[tmp_offsets_val]) void {
   if case Has(p tup[cell_num, u32]) = is_static_subcell(h, cell) {
-    *ref(offsets_ref, cell.~) = StaticSubcell(p);
+    *ref(offsets_ref, cell.x) = StaticSubcell(p);
   } else if case Has(fnid fn_body_id) = is_const_funcell(h->cs, h->bas, cell) {
-    set(ref(offsets_ref, cell.~), @[cell_loc]ConstFuncellLoc(fnid));
+    set(ref(offsets_ref, cell.x), @[cell_loc]ConstFuncellLoc(fnid));
   } else if case Has(b bigint) = is_const_primop_int_cell(h, cell) {
-    set(ref(offsets_ref, cell.~), @[cell_loc]ConstIntCellLoc(b));
+    set(ref(offsets_ref, cell.x), @[cell_loc]ConstIntCellLoc(b));
   } else {
     ci *cell_info = ref_cell(h->gr, cell);
     offset cell_loc = next_stack_offset(h->cs, *low_offset_ref, ci, low_offset_ref);
-    set(ref(offsets_ref, cell.~), offset);
+    set(ref(offsets_ref, cell.x), offset);
   }
 }
 
@@ -389,7 +389,7 @@ func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
     ci *cell_info = ref_cell(h->gr, c);
     switch ci->location {
     case LocationVirtual:
-      if case &Has(sd subcell_disp) = &ref(&h->bas->celldisp, c.~)->subcell {
+      if case &Has(sd subcell_disp) = &ref(&h->bas->celldisp, c.x)->subcell {
         if case &OffsetConst(offset u32) = &sd.offset {
           c = sd.partof;
           cumulative_offset = cumulative_offset + offset;
@@ -414,7 +414,7 @@ func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
 }
 
 func is_const_primop_int_cell(h *frame, c cell_num) opt[bigint] {
-  disp *cell_disp = ref(&h->bas->celldisp, c.~);
+  disp *cell_disp = ref(&h->bas->celldisp, c.x);
   if case Has(gn gr_num) = disp->prim_paramlist {
     if case &XOp(xn gr_xnode) = ref_node(h->gr, gn) {
       if case &GrPrimApply(a gr_prim_apply) = &xn.op {
@@ -435,7 +435,7 @@ func is_const_primop_int_cell(h *frame, c cell_num) opt[bigint] {
 }
 
 func is_const_funcell(cs *checkstate, bas *basic_analyze_state, c cell_num) opt[fn_body_id] {
-  disp *cell_disp = ref(&bas->celldisp, c.~);
+  disp *cell_disp = ref(&bas->celldisp, c.x);
   if isHas(&disp->funcell) {
     if case &HasConstValue(gc gr_const) = &disp->const_value {
       switch &gc {
@@ -516,12 +516,12 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
     gn gr_num = get(&h->bas->paramlists, i);
     // Nodes without lower_paramlists are unreachable.  So we don't need to worry about those!
     // TODO: Maybe, don't gen graphs with dead nodes!
-    if case &Computed(arr array[gr_num]) = &ref(&h->by_gn, gn.~)->lower_paramlists {
-      nlower size = count(unHas(&ref(&h->by_gn, gn.~)->lower_paramlists));
+    if case &Computed(arr array[gr_num]) = &ref(&h->by_gn, gn.x)->lower_paramlists {
+      nlower size = count(unHas(&ref(&h->by_gn, gn.x)->lower_paramlists));
       if nlower == 0 {
         check_insert(&zeroset, &gn, void);
       }
-      *ref(&backmap, gn.~) = nlower;
+      *ref(&backmap, gn.x) = nlower;
       nreachable_paramlists = nreachable_paramlists + 1;
     }
   }
@@ -539,13 +539,13 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
     it hash_iter[gr_num, void] = iter(&ref_annot(h, gn)->higher_paramlists);
     while case Has(p *tup[gr_num, void]) = next(&it) {
       upn gr_num = p->car;
-      bucket size = get(&backmap, upn.~);
+      bucket size = get(&backmap, upn.x);
       check(bucket > 0);
       nextbucket size = bucket - 1;
       if nextbucket == 0 {
         check_insert(&zeroset, &upn, void);
       }
-      *ref(&backmap, upn.~) = nextbucket;
+      *ref(&backmap, upn.x) = nextbucket;
     }
   }
 
@@ -624,7 +624,7 @@ func dumbly_gen_function_exit(f *objfile, h *frame) void {
     njumps size = count(&h->placeholder_jumps);
     for i size = 0; i < njumps; i = i + 1 {
       p *jmpdata = ref(&h->placeholder_jumps, i);
-      target u32 = *unHas(ref(&h->jmp_targets, p->target.~));
+      target u32 = *unHas(ref(&h->jmp_targets, p->target.x));
       diff i32 = @[i32]~target - @[i32]~p->relative_mathpoint;
       le le_i32 = ~diff;
       overwrite_raw(&f->text, ~p->overwrite_location, &le.buf[0], 4);
@@ -825,13 +825,13 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
             expected st_value;
             st_const_compute_for_gen(h->cs, &cas->car, src_size, &expected);
             x86_cmp_imm_sized(h->cs, f, X86_EAX, &expected, X86_ECX);
-            x86_gen_placeholder_jcc(f, h, X86_JCC_Z, frame_gn_targetnum(h, cas->cdr.~));
-            push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({cas->cdr.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
+            x86_gen_placeholder_jcc(f, h, X86_JCC_Z, frame_gn_targetnum(h, cas->cdr.x));
+            push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({cas->cdr.x, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
             done_a_push = true;
           }
           if case Has(default_gn sq_num) = a.default_case {
             // No jmp for this case, since it's code-genned right after.  (Just like a.first in GrSequence.)
-            push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({default_gn.~, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
+            push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({default_gn.x, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
             done_a_push = true;
           } else {
             x86_gen_crash(f, h);
@@ -839,11 +839,11 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         case &GrSequence(a gr_sequence):
           DUMBGEN("GrSequence");
           // first gets evaluated before second (because it gets pushed after)
-          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.second.~, otgna.jmpaft, otgna.jmp_necessary}));
-          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.first, frame_gn_targetnum(h, a.second.~), false}));
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.second.x, otgna.jmpaft, otgna.jmp_necessary}));
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.first, frame_gn_targetnum(h, a.second.x), false}));
         case &GrJmp(a gr_jmp):
           DUMBGEN("GrJmp");
-          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.next.~, otgna.jmpaft, otgna.jmp_necessary}));
+          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.next.x, otgna.jmpaft, otgna.jmp_necessary}));
         case &GrQNop:
           DUMBGEN("GrQNop");
           // Do nothing (but do it less glamorously).

@@ -2,23 +2,23 @@ import hash;
 import string;
 import stdlib;
 
-deftype sym size;
+struct sym { x size; };
 
 def `~` fn[size, sym] = wrapconvert;
 
 inline func `==`(x sym, y sym) bool {
-  return x.~ == y.~;
+  return x.x == y.x;
 }
 inline func `!=`(x sym, y sym) bool {
-  return x.~ != y.~;
+  return x.x != y.x;
 }
 
 inline func hash_compute_hash(x *sym) osize {
-  return ~x->~;
+  return ~x->x;
 }
 
 inline func hash_equal(x *sym, y *sym) bool {
-  return x->~ == y->~;
+  return x->x == y->x;
 }
 
 defclass[T] copy symmap {
@@ -53,7 +53,7 @@ access symmap[_] {
   }
 
   inline func[T] lookup(im *symmap[T], ident sym) T {
-    return get(&im->backmap, ident.~);
+    return get(&im->backmap, ident.x);
   }
 }
 
@@ -184,6 +184,6 @@ func build_u8str(im *identmap, r *array[u8], a *sym) void {
 }
 
 func build_u8str(nohelp void, r *array[u8], a *sym) void {
-  build_u8str(nohelp, r, &a->~);
+  build_u8str(nohelp, r, &a->x);
 }
 

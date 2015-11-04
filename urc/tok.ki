@@ -37,7 +37,7 @@ inline func ps_pos(p *ps) pos {
 }
 
 inline func ps_restore_pos(p *ps, pos pos) void {
-  p->pos = pos.~ - p->base_offset;
+  p->pos = pos.x - p->base_offset;
 }
 
 inline func ps_peek(p *ps) i32 {
@@ -69,7 +69,7 @@ func start(p *ps) ast_meta {
 
 func copystart(p *ps, meta ast_meta) ast_meta {
   ret ast_meta = ~count(p->metas);
-  push(p->metas, {ref(p->metas, meta.~)->left, None, None});
+  push(p->metas, {ref(p->metas, meta.x)->left, None, None});
   return ret;
 }
 
@@ -80,12 +80,12 @@ func copyend(p *ps, meta ast_meta) ast_meta {
 }
 
 func end(p *ps, meta ast_meta) void {
-  r *meta_datum = ref(p->metas, meta.~);
+  r *meta_datum = ref(p->metas, meta.x);
   set(&r->right, mk_pos(p->base_offset, p->prev_right));
 }
 
 func note_original(p *ps, meta ast_meta, orig ast_original_syntax) void {
-  r *meta_datum = ref(p->metas, meta.~);
+  r *meta_datum = ref(p->metas, meta.x);
   set(&r->original_syntax, orig);
 }
 

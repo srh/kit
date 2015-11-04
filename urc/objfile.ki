@@ -10,7 +10,7 @@ struct objfile {
   symbol_table array[objfile_symbol_record];
 };
 
-deftype sti u32;
+struct sti { x u32; };
 def `~` fn[u32, sti] = wrapconvert;
 
 struct objfile_symbol_record {
@@ -126,7 +126,7 @@ func fillercode_align_double_quadword(f *objfile) void {
 }
 
 func set_symbol_value(f *objfile, sti sti, value u32) void {
-  rec *objfile_symbol_record = ref(&f->symbol_table, ~sti.~);
+  rec *objfile_symbol_record = ref(&f->symbol_table, ~sti.x);
   check(rec->value == 0);
   rec->value = value;
 }

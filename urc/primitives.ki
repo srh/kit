@@ -126,7 +126,7 @@ func primitive_unsigned_bnno_type(cs *checkstate) te_typeexpr {
 }
 
 func unwrap_primitive_padding_type_size(cs *checkstate, t *cu_typeexpr) u32 {
-  if case &TeArraytype(at te_arraytype) = &t->~ {
+  if case &TeArraytype(at te_arraytype) = &t->x {
     archetype te_typeexpr = primitive_unsigned_bnno_type(cs);
     unified te_typeexpr;
     if !unify_types(oo(&at.param), &archetype, &unified) {
@@ -356,7 +356,7 @@ func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
 
   // access_scope is not relevant to a primitive deftype.
   access_scope array[access_entry_id];
-  ent deftype_entry = {cs->im->cym.primitive_module_sym, name, access_scope, RhsImpossible(void), NoGenerics(void), None, Has(info), instst};
+  ent deftype_entry = {cs->im->cym.primitive_module_sym, name, access_scope, NoGenerics, None, Has(info), instst};
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" module.
 }
@@ -415,7 +415,6 @@ func add_pointer_primitive_type(cs *checkstate) void {
     cs->im->cym.primitive_module_sym,
     cs->im->cym.ptrtype_sym,
     mk_array@[access_entry_id](),
-    RhsImpossible(void),
     HasGenerics(one_generic),
     None,
     Has({None,
@@ -440,7 +439,6 @@ func add_ref_primitive_type(cs *checkstate) void {
     cs->im->cym.primitive_module_sym,
     cs->im->cym.reftype_sym,
     mk_array@[access_entry_id](),
-    RhsImpossible,
     HasGenerics(two_generic),
     None,
     Has({None,
@@ -466,7 +464,6 @@ func add_function_primitive(cs *checkstate) void {
     cs->im->cym.primitive_module_sym,
     cs->im->cym.fnsym,
     mk_array@[access_entry_id](),
-    RhsImpossible(void),
     VariadicGenerics({mk_array@[ast_ident](), {fake_ast_meta(), cs->im->cym.tee_sym}, mk_array({fake_ast_meta(), cs->im->cym.uee_sym})}),
     None,
     Has({None,

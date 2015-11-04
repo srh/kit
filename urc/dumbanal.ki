@@ -13,7 +13,7 @@ func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, liveset *liv
   case &Terminal:
     return NoFail;
   case &NonTerminal:
-    return ERR(_u8("ICE: Expecting terminal expression, for gn "), gn.~, _u8(" in "), lookup(h->im, gr->informal_name));
+    return ERR(_u8("ICE: Expecting terminal expression, for gn "), gn.x, _u8(" in "), lookup(h->im, gr->informal_name));
   }
 }
 
@@ -134,7 +134,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
         cas *tup[gr_const, sq_num] = ref(&a.cases, i);
         new_live lives = *liveset;
         casmut genexpr_result;
-        if case Printed(pm) = dumbly_analyze_expression(h, gr, &new_live, cas->cdr.~, &casmut) {
+        if case Printed(pm) = dumbly_analyze_expression(h, gr, &new_live, cas->cdr.x, &casmut) {
           return Printed(pm);
         }
         combine_branch_mut(&new_live, &combined_mut, casmut, &end_lives);
@@ -143,7 +143,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       if case Has(def_gn sq_num) = a.default_case {
         new_live lives = *liveset;
         defcasmut genexpr_result;
-        if case Printed(pm) = dumbly_analyze_expression(h, gr, &new_live, def_gn.~, &defcasmut) {
+        if case Printed(pm) = dumbly_analyze_expression(h, gr, &new_live, def_gn.x, &defcasmut) {
           return Printed(pm);
         }
         combine_branch_mut(&new_live, &combined_mut, defcasmut, &end_lives);
@@ -158,10 +158,10 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       if case Printed(pm) = dumbly_analyze_returning_expression(h, gr, liveset, a.first) {
         return Printed(pm);
       }
-      return dumbly_analyze_expression(h, gr, liveset, a.second.~, out);
+      return dumbly_analyze_expression(h, gr, liveset, a.second.x, out);
 
     case &GrJmp(a gr_jmp):
-      return dumbly_analyze_expression(h, gr, liveset, a.next.~, out);
+      return dumbly_analyze_expression(h, gr, liveset, a.next.x, out);
 
     case &GrQNop:
       *out = Terminal(void);
@@ -175,7 +175,7 @@ func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *lives) voi
   nall size = count(&live_at_app_time->all);
   for i size = 0; i < nall; i = i + 1 {
     c cell_num = get(&live_at_app_time->all, i);
-    if case Has(gn gr_num) = ref(&h->bas->celldisp, c.~)->paramlist {
+    if case Has(gn gr_num) = ref(&h->bas->celldisp, c.x)->paramlist {
       if gn != our_gn {
         push(&paramlists, gn);
         discard bool = try_insert(&ref_annot(h, gn)->higher_paramlists, &our_gn, void);
@@ -207,16 +207,16 @@ func combine_branch_mut(new_live *lives, onto *genexpr_result, case_mut genexpr_
 // For deaden and other functions, prelive shows what was alive _before_ prec_muts modified it.
 func deaden(liveset *lives, c cell_num) void {
   if !try_remove(&liveset->all, c) {
-    ice(_u8("deaden on unlive cell "), c.~);
+    ice(_u8("deaden on unlive cell "), c.x);
   }
-  liveset->xored = liveset->xored ^ ~c.~;
-  liveset->summed = liveset->summed - ~c.~;
+  liveset->xored = liveset->xored ^ ~c.x;
+  liveset->summed = liveset->summed - ~c.x;
 }
 
 // input requires that the cell already be live.
 func input(liveset *lives, c cell_num) void {
   if case None = lookup(&liveset->all, c) {
-    ice(_u8("input on unlive cell "), c.~);
+    ice(_u8("input on unlive cell "), c.x);
   }
 }
 
@@ -224,8 +224,8 @@ func input(liveset *lives, c cell_num) void {
 // (Yes, that's so lame -- we should add GrMakeLive.)
 func output(h *frame, liveset *lives, c cell_num) void {
   if try_insert(&liveset->all, c) {
-    liveset->xored = liveset->xored ^ ~c.~;
-    liveset->summed = liveset->summed + ~c.~;
+    liveset->xored = liveset->xored ^ ~c.x;
+    liveset->summed = liveset->summed + ~c.x;
     note_conflicting(h, &liveset->all, c);
   }
 }
@@ -233,25 +233,25 @@ func output(h *frame, liveset *lives, c cell_num) void {
 func create(h *frame, liveset *lives, c cell_num) void {
   // Both these places define the virtual cell.  So it should not be live.
   if !try_insert(&liveset->all, c) {
-    ice(_u8("virtual on live cell "), c.~);
+    ice(_u8("virtual on live cell "), c.x);
   }
-  liveset->xored = liveset->xored ^ ~c.~;
-  liveset->summed = liveset->summed + ~c.~;
+  liveset->xored = liveset->xored ^ ~c.x;
+  liveset->summed = liveset->summed + ~c.x;
   note_conflicting(h, &liveset->all, c);
 }
 
 func note_conflicting(h *frame, all *array[cell_num], c cell_num) void {
   // This also means conflicting is set to non-empty for any cell that's made live.
-  c_disp *cell_disp = ref(&h->bas->celldisp, c.~);
+  c_disp *cell_disp = ref(&h->bas->celldisp, c.x);
   nall size = count(all);
   for i size = 0; i < nall; i = i + 1 {
     d cell_num = get(all, i);
-    d_disp *cell_disp = ref(&h->bas->celldisp, d.~);
+    d_disp *cell_disp = ref(&h->bas->celldisp, d.x);
     push(&c_disp->conflicting, d);
     push(&d_disp->conflicting, c);
   }
 }
 
 func ref_annot(h *frame, gn gr_num) *gn_annot {
-  return ref(&h->by_gn, gn.~);
+  return ref(&h->by_gn, gn.x);
 }

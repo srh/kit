@@ -245,14 +245,15 @@ func[H, S, T] build_u8str(help H, r *array[u8], p *tup[S, T]) void {
   build_u8str(help, r, &p->cdr);
 }
 
+// Our replacements of whole_field expressions use .x as the field name.
 inline func[S, T] wrapconvert(x T) S {
   ret S;
-  ret.~ = x;
+  ret.x = x;
   return ret;
 }
 
 inline func[S, T] wrapequate(x S, y T) bool {
-  return x.~ == y.~;
+  return x.x == y.x;
 }
 
 func[T] TODO() T {
