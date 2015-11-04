@@ -311,7 +311,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     case Error(pm):
       return Printed(pm);
     case Success: { }
-    case NotAccessibleEnum:
+    case NotAccessible:
       *res_out = NoMatchConstructor;
       return NoFail;
     }
@@ -352,7 +352,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   case Error(pm):
     return Printed(pm);
   case Success: { }
-  case NotAccessibleEnum:
+  case NotAccessible:
     *res_out = NoMatchConstructor;
     return NoFail;
   }
@@ -1339,7 +1339,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     case Error(pm):
       return Printed(pm);
     case Success: { }
-    case NotAccessibleStruct:
+    case NotAccessible:
       return MERR(es->cs, a->meta, _u8("Strinit for inaccessible or non-structural type, "), pretty(es->im, pt));
     }
 
@@ -1593,71 +1593,51 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
   return NoFail;
 }
 
-defenum structural_struct_type_result {
-  // Error(pm)
-  Error bool;
-  Success void;
-  NotAccessibleStruct void;
-};
-
 // st_out is just the inside te_struct of struct_type_out.  Some caller wants it.
-func structural_struct_type(ds *defscope, t *te_typeexpr, struct_type_out **te_typeexpr, st_out **te_struct) structural_struct_type_result {
+func structural_struct_type(ds *defscope, t *te_typeexpr, struct_type_out **te_typeexpr, st_out **te_struct) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
     cu_rhs *cu_typeexpr;
-    res structural_rhs_result = help_structural_rhs(ds, &pack, &cu_rhs);
-    // TODO(): Cleanup help_structural_rhs return codes, avoid weird successful/half-switch.
-    if successful(res) {
+    switch help_structural_rhs(ds, &pack, &cu_rhs) {
+    case Error(pm):
+      return Error(pm);
+    case Success:
       if case &TeStruct(st te_struct) = &cu_rhs->~ {
         *struct_type_out = &cu_rhs->~;
         *st_out = &st;
         return Success;
       } else {
-        return NotAccessibleStruct;
+        return NotAccessible;
       }
-    } else {
-      switch res {
-      case Error(pm): return Error(pm);
-      case NoAccessibleStructuralRhs: return NotAccessibleStruct;
-      }
+    case NotAccessible:
+      return NotAccessible;
     }
   } else {
     // We don't allow strinit exprs on raw struct types anymore.
-    return NotAccessibleStruct;
+    return NotAccessible;
   }
 }
 
-defenum structural_enum_type_result {
-  // Error(pm)
-  Error bool;
-  Success void;
-  NotAccessibleEnum void;
-};
-
 // et_out is just the inside te_enum of enum_type_out.  Some caller wants it.
-func structural_enum_type(ds *defscope, t *te_typeexpr, enum_type_out **te_typeexpr, et_out **te_enum) structural_enum_type_result {
-  enum_type *te_typeexpr;
-  switch complete_structural_rhs(ds, t, &enum_type) {
-  case Error(pm):
-    return Error(pm);
-  case SuccessHasRhs:
-    // TODO(): Dedup cases.
-    if case &TeEnum(et te_enum) = enum_type {
-      *enum_type_out = enum_type;
-      *et_out = &et;
-      return Success;
-    } else {
-      return NotAccessibleEnum;
+func structural_enum_type(ds *defscope, t *te_typeexpr, enum_type_out **te_typeexpr, et_out **te_enum) structural_rhs_result {
+  if case Has(pack te_instpack) = type_pack(t) {
+    cu_rhs *cu_typeexpr;
+    switch help_structural_rhs(ds, &pack, &cu_rhs) {
+    case Error(pm):
+      return Error(pm);
+    case Success:
+      if case &TeEnum(et te_enum) = &cu_rhs->~ {
+        *enum_type_out = &cu_rhs->~;
+        *et_out = &et;
+        return Success;
+      } else {
+        return NotAccessible;
+      }
+    case NotAccessible:
+      return NotAccessible;
     }
-  case SuccessNoRhs:
-    if case &TeEnum(et te_enum) = enum_type {
-      *enum_type_out = enum_type;
-      *et_out = &et;
-      return Success;
-    } else {
-      return NotAccessibleEnum;
-    }
-  case NoAccessibleStructuralRhs:
-    return NotAccessibleEnum;
+  } else {
+    // We don't allow constructors/switching on raw enum types anymore.
+    return NotAccessible;
   }
 }
 
@@ -1714,34 +1694,9 @@ func type_pack(t *te_typeexpr) opt[te_instpack] {
 defenum structural_rhs_result {
   // An error was printed.  True if location info was printed.
   Error bool;
-  SuccessHasRhs void;
-  SuccessNoRhs void;
-  NoAccessibleStructuralRhs void;
+  Success void;
+  NotAccessible void;
 };
-
-// t must be complete.  And computed.
-func complete_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typeexpr) structural_rhs_result {
-  if case Has(pack te_instpack) = type_pack(t) {
-    cu_rhs *cu_typeexpr;
-    res var = help_structural_rhs(ds, &pack, &cu_rhs);
-    if successful(res) {
-      *rhs_type_out = &cu_rhs->~;
-    }
-    return res;
-  } else {
-    *rhs_type_out = t;
-    return SuccessNoRhs;
-  }
-}
-
-func successful(res structural_rhs_result) bool {
-  switch res {
-  case Error(pm): return false;
-  case SuccessHasRhs: return true;
-  case SuccessNoRhs: return true;
-  case NoAccessibleStructuralRhs: return false;
-  }
-}
 
 func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_typeexpr) structural_rhs_result {
   accessible_result bool;
@@ -1749,7 +1704,7 @@ func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_type
     return Error(pm);
   }
   if !accessible_result {
-    return NoAccessibleStructuralRhs;
+    return NotAccessible;
   }
   if case Printed(pm) = ensure_deftype_inst_checked(ds->cs, ds->clq, pack->ent_id, pack->inst_id) {
     return Error(pm);
@@ -1761,7 +1716,7 @@ func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_type
       case &RhsTypeInfo(ri deftype_inst_rhstype_info):
         *rhs_type_out = &ri.rhs_cu;
       }
-      return SuccessHasRhs;
+      return Success;
     } else {
       ice(_u8("deftype_rhs_accessible permitted a primitive type."));
       return fake();
@@ -1777,12 +1732,10 @@ func lookup_whole_field(es *framescope, pack *te_instpack, fieldtype_out *cu_typ
   switch help_structural_rhs(es->ds, pack, &p) {
   case Error(pm):
     return Printed(pm);
-  case SuccessHasRhs:
+  case Success:
     *fieldtype_out = *p;
     return NoFail;
-  case SuccessNoRhs:
-    return ERR(_u8("ICE: SuccessNoRhs should be impossible for help_structural_rhs (in lookup_whole_field)"));
-  case NoAccessibleStructuralRhs:
+  case NotAccessible:
     return ERR(_u8("Looking up whole field on inaccessible defclass or primitive type"));
   }
 }
@@ -1792,11 +1745,9 @@ func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, 
   switch help_structural_rhs(es->ds, pack, &p) {
   case Error(pm):
     return Printed(pm);
-  case SuccessHasRhs:
+  case Success:
     return help_lookup_name_field(es, p, fieldname, fieldtype_out, res_out);
-  case SuccessNoRhs:
-    return ERR(_u8("ICE: SuccessNoRhs should be impossible for help_structural_rhs (in lookup_name_field)"));
-  case NoAccessibleStructuralRhs:
+  case NotAccessible:
     return ERR(_u8("Looking up field on inaccessible defclass or primitive type"));
   }
 }

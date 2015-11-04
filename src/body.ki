@@ -388,7 +388,7 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
   case Error(pm):
     return Printed(pm);
   case Success: { }
-  case NotAccessibleEnum:
+  case NotAccessible:
     return ERR(_u8("Inaccessible rhs hit or non-enum type in swartch"));
   }
   // enum_type is complete, because complete_structural_rhs i.e. structural_enum_type does that.
