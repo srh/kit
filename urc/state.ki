@@ -256,8 +256,22 @@ struct deftype_inst_rhstype_info {
   rhs_props type_properties;
 };
 
+struct deftype_inst_rhsstruct_info {
+  // TODO(): Uh.
+  rhs_cu cu_typeexpr;
+  rhs_props type_properties;
+};
+
+struct deftype_inst_rhsenum_info {
+  // TODO(): Uh.
+  rhs_cu cu_typeexpr;
+  rhs_props type_properties;
+};
+
 defenum deftype_inst_rhs_info {
-  RhsTypeInfo deftype_inst_rhstype_info;
+  // Also used for defclasses.
+  RhsStructInfo deftype_inst_rhsstruct_info;
+  RhsEnumInfo deftype_inst_rhsenum_info;
 };
 
 struct deftype_inst_info {
@@ -276,15 +290,19 @@ struct defstruct_rhs_spec {
   type te_typeexpr;
 };
 
+struct defenum_rhs_spec {
+  // TODO(): Yeah.
+  type te_typeexpr;
+};
+
 struct classexpr_rhs_spec {
   drs defstruct_rhs_spec;
 };
 
 defenum deftype_rhs_spec {
-  // The RHS typeexpr, if computed, without generics replaced, of course.
-  RhsWithType te_typeexpr;
   ClassexprRhsSpec classexpr_rhs_spec;
   DefstructRhsSpec defstruct_rhs_spec;
+  DefenumRhsSpec defenum_rhs_spec;
 };
 
 struct deftype_nonprim {

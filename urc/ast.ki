@@ -841,13 +841,19 @@ struct ast_classexpr_rhs {
 };
 
 struct ast_defstruct_rhs {
+  // TODO(): Placeholder.
+  type ast_typeexpr;
+};
+
+struct ast_defenum_rhs {
+  // TODO(): Placeholder.
   type ast_typeexpr;
 };
 
 defenum ast_type_def_rhs {
-  TypeexprRhs ast_typeexpr;
   ClassexprRhs ast_classexpr_rhs;
   DefstructRhs ast_defstruct_rhs;
+  DefenumRhs ast_defenum_rhs;
 };
 
 struct ast_type_def {

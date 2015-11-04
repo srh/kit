@@ -179,9 +179,11 @@ struct long_name {
   Offset le_u32;
 };
 
-deftype name_eight union {
-  ShortName ^[8]u8;
-  LongName long_name;
+struct name_eight {
+  u union {
+    ShortName ^[8]u8;
+    LongName long_name;
+  };
 };
 
 struct COFF_symbol_standard_record {
@@ -392,14 +394,14 @@ func win_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *array[
 
     nameu8 array[u8] = win_string_to_u8symbol(&name_buf);
     if count(&nameu8) <= 8 {
-      fill(&standard.Name.ShortName[0], 8, 0);
-      bufcopy(&standard.Name.ShortName[0], data(&nameu8), count(&nameu8));
+      fill(&standard.Name.u.ShortName[0], 8, 0);
+      bufcopy(&standard.Name.u.ShortName[0], data(&nameu8), count(&nameu8));
     } else {
       /* The offset includes the leading 4 bytes -- the minimimum
          possible offset is 4. */
       offset u32 = strtab_add(&strings, nameu8);
-      standard.Name.LongName.Zeroes = ~ @[u32] 0;
-      standard.Name.LongName.Offset = ~ offset;
+      standard.Name.u.LongName.Zeroes = ~ @[u32] 0;
+      standard.Name.u.LongName.Offset = ~ offset;
     }
 
     standard.Value = ~rec->value;
@@ -460,8 +462,8 @@ func win_append_section_symbols(d *array[u8], s *objfile_section, name array[u8]
   if true {
     standard COFF_symbol_standard_record;
     check(count(&name) <= 8);
-    fill(&standard.Name.ShortName[0], 8, 0);
-    bufcopy(&standard.Name.ShortName[0], data(&name), count(&name));
+    fill(&standard.Name.u.ShortName[0], 8, 0);
+    bufcopy(&standard.Name.u.ShortName[0], data(&name), count(&name));
     standard.Value = ~ @[u32] 0;
     standard.SectionNumber = ~ SectionNumber;
     standard.Type = ~ @[u16] ~ @[u32] 0;
