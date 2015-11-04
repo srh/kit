@@ -1693,6 +1693,26 @@ func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool)
   }
 }
 
+func type_pack(t *te_typeexpr) opt[te_instpack] {
+  switch t {
+  case &TeName(a te_name):
+    if case &Has(pack te_instpack) = &a.pack {
+      return Has(pack);
+    }
+    ice(_u8("type_pack called on uncomputed type"));
+  case &TeApp(a te_typeapp):
+    if case &Has(pack te_instpack) = &a.pack {
+      return Has(pack);
+    }
+    ice(_u8("type_pack called on uncomputed type"));
+  case &TeUnknown:
+    ice(_u8("type_pack called on incomplete type"));
+  default:
+    return None;
+  }
+  return fake();
+}
+
 defenum structural_rhs_result {
   // An error was printed.  True if location info was printed.
   Error bool;
@@ -1703,25 +1723,14 @@ defenum structural_rhs_result {
 
 // t must be complete.  And computed.
 func complete_structural_rhs(ds *defscope, t *te_typeexpr, rhs_type_out **te_typeexpr) structural_rhs_result {
-  switch t {
-  case &TeName(a te_name):
+  if case Has(pack te_instpack) = type_pack(t) {
     cu_rhs *cu_typeexpr;
-    res var = help_structural_rhs(ds, &a.pack, &cu_rhs);
+    res var = help_structural_rhs(ds, &pack, &cu_rhs);
     if successful(res) {
       *rhs_type_out = &cu_rhs->~;
     }
     return res;
-  case &TeApp(a te_typeapp):
-    cu_rhs *cu_typeexpr;
-    res var = help_structural_rhs(ds, &a.pack, &cu_rhs);
-    if successful(res) {
-      *rhs_type_out = &cu_rhs->~;
-    }
-    return res;
-  default:
-    if case &TeUnknown(v void) = t {
-      ice(_u8("structural_rhs called on incomplete type"));
-    }
+  } else {
     *rhs_type_out = t;
     return SuccessNoRhs;
   }
@@ -1736,43 +1745,38 @@ func successful(res structural_rhs_result) bool {
   }
 }
 
-func help_structural_rhs(ds *defscope, mbpack *opt[te_instpack], rhs_type_out **cu_typeexpr) structural_rhs_result {
-  if case &Has(pack te_instpack) = mbpack {
-    accessible_result bool;
-    if case Printed(pm) = deftype_rhs_accessible(ds, pack.ent_id, &accessible_result) {
-      return Error(pm);
-    }
-    if !accessible_result {
-      return NoAccessibleStructuralRhs;
-    }
-    if case Printed(pm) = ensure_deftype_inst_checked(ds->cs, ds->clq, pack.ent_id, pack.inst_id) {
-      return Error(pm);
-    }
-    inst *deftype_inst = ref_deftype_inst(ds->cs, pack.inst_id);
-    if case &Computed(info deftype_inst_info) = &inst->info {
-      if case &Has(rhs_info deftype_inst_rhs_info) = &info.rhs {
-        switch &rhs_info {
-        case &RhsTypeInfo(ri deftype_inst_rhstype_info):
-          *rhs_type_out = &ri.rhs_cu;
-        }
-        return SuccessHasRhs;
-      } else {
-        ice(_u8("deftype_rhs_accessible permitted a primitive type."));
-        return fake();
+func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_typeexpr) structural_rhs_result {
+  accessible_result bool;
+  if case Printed(pm) = deftype_rhs_accessible(ds, pack->ent_id, &accessible_result) {
+    return Error(pm);
+  }
+  if !accessible_result {
+    return NoAccessibleStructuralRhs;
+  }
+  if case Printed(pm) = ensure_deftype_inst_checked(ds->cs, ds->clq, pack->ent_id, pack->inst_id) {
+    return Error(pm);
+  }
+  inst *deftype_inst = ref_deftype_inst(ds->cs, pack->inst_id);
+  if case &Computed(info deftype_inst_info) = &inst->info {
+    if case &Has(rhs_info deftype_inst_rhs_info) = &info.rhs {
+      switch &rhs_info {
+      case &RhsTypeInfo(ri deftype_inst_rhstype_info):
+        *rhs_type_out = &ri.rhs_cu;
       }
+      return SuccessHasRhs;
     } else {
-      ice(_u8("inst checked, info still None"));
+      ice(_u8("deftype_rhs_accessible permitted a primitive type."));
       return fake();
     }
   } else {
-    ice(_u8("lhs type in help_structural_rhs is not computed."));
+    ice(_u8("inst checked, info still None"));
     return fake();
   }
 }
 
-func lookup_whole_field(es *framescope, mbpack *opt[te_instpack], fieldtype_out *cu_typeexpr) np {
+func lookup_whole_field(es *framescope, pack *te_instpack, fieldtype_out *cu_typeexpr) np {
   p *cu_typeexpr;
-  switch help_structural_rhs(es->ds, mbpack, &p) {
+  switch help_structural_rhs(es->ds, pack, &p) {
   case Error(pm):
     return Printed(pm);
   case SuccessHasRhs:
@@ -1785,9 +1789,9 @@ func lookup_whole_field(es *framescope, mbpack *opt[te_instpack], fieldtype_out 
   }
 }
 
-func lookup_name_field(es *framescope, mbpack *opt[te_instpack], fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   p *cu_typeexpr;
-  switch help_structural_rhs(es->ds, mbpack, &p) {
+  switch help_structural_rhs(es->ds, pack, &p) {
   case Error(pm):
     return Printed(pm);
   case SuccessHasRhs:
@@ -1802,10 +1806,10 @@ func lookup_name_field(es *framescope, mbpack *opt[te_instpack], fieldname *ast_
 func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   switch &t->~ {
     case &TeName(a te_name): {
-      return lookup_name_field(es, &a.pack, fieldname, fieldtype_out, res_out);
+      return lookup_name_field(es, unHas(&a.pack), fieldname, fieldtype_out, res_out);
     }
     case &TeApp(a te_typeapp): {
-      return lookup_name_field(es, &a.pack, fieldname, fieldtype_out, res_out);
+      return lookup_name_field(es, unHas(&a.pack), fieldname, fieldtype_out, res_out);
     }
     case &TeStruct(a te_struct): {
       offset u32;
@@ -1855,7 +1859,7 @@ func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_ou
     case &WholeField: {
       switch &t->~ {
         case &TeName(a te_name): {
-          if case Printed(pm) = lookup_whole_field(es, &a.pack, fieldtype_out) {
+          if case Printed(pm) = lookup_whole_field(es, unHas(&a.pack), fieldtype_out) {
             return Printed(pm);
           }
           // Whole field has zero offset.
@@ -1863,7 +1867,7 @@ func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_ou
           return NoFail;
         }
         case &TeApp(a te_typeapp): {
-          if case Printed(pm) = lookup_whole_field(es, &a.pack, fieldtype_out) {
+          if case Printed(pm) = lookup_whole_field(es, unHas(&a.pack), fieldtype_out) {
             return Printed(pm);
           }
           // Whole field has zero offset.
