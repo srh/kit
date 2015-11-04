@@ -300,8 +300,8 @@ func mk_st_value_symbolref(plat *platform_info, fnid fn_body_id) st_value {
   return ret;
 }
 
-func ensure_def_inst_evaled(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **st_value) np {
-  if case Printed(pm) = ensure_def_inst_graphed(cs, clq, ent_id, inst_id) {
+func ensure_def_inst_evaled(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **st_value) np {
+  if case Printed(pm) = ensure_def_inst_graphed(clq->cs, clq, ent_id, inst_id) {
     return Printed(pm);
   }
   return st_eval_def(clq, ent_id, inst_id, out);
@@ -692,7 +692,7 @@ func st_const_compute(clq *clqueue, plat *platform_info, c *gr_const, length u32
     *out = st_bigint_to_value_unsigned(plat, length, b);
   case &ConstDef(ip instpair):
     val *st_value;
-    if case Printed(pm) = ensure_def_inst_evaled(clq->cs, clq, ip.ent_id, ip.inst_id, &val) {
+    if case Printed(pm) = ensure_def_inst_evaled(clq, ip.ent_id, ip.inst_id, &val) {
       return Printed(pm);
     }
     *out = *val;

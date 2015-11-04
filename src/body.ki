@@ -423,7 +423,7 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
   }
 
   cac cac_typeexpr;
-  if case Printed(pm) = check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->repls, &converted, &cac) {
+  if case Printed(pm) = check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &cac) {
     return Printed(pm);
   }
 
@@ -434,7 +434,7 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
 
   *cu_expected_type_out = ~ *expected_type;
   expected_type_props type_properties;
-  if case Printed(pm) = compute_type_properties(es->cs, es->clq, cu_expected_type_out, &expected_type_props) {
+  if case Printed(pm) = compute_type_properties(es->clq, cu_expected_type_out, &expected_type_props) {
     return Printed(pm);
   }
   *varcell_out = add_cell(es, {LocationVirtual, *cu_expected_type_out, expected_type_props});
@@ -559,7 +559,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   cond_vp varpopper;
   init_vp(&cond_vp, &bs->es);
   if case &Has(cond ast_expr_condition) = &a->condition {
-    boolean cu_typeexpr = compute_prim(bs->ds, primitive_bool_type(bs->cs));
+    boolean cu_typeexpr = compute_prim(bs->clq, primitive_bool_type(bs->cs));
     if case Printed(pm) = check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.~, &cond.discard) {
       return Printed(pm);
     }
@@ -601,7 +601,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   }
 
   computed cac_typeexpr;
-  if case Printed(pm) = check_and_compute_typeexpr(bs->cs, bs->clq, bs->ds->generics, bs->ds->repls, &converted, &computed) {
+  if case Printed(pm) = check_and_compute_typeexpr(bs->clq, bs->ds->generics, bs->ds->repls, &converted, &computed) {
     return Printed(pm);
   }
   cu_computed cu_typeexpr;
@@ -626,7 +626,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
       cu_computed = ~computed.te;
       complete_type = &cu_computed;
       cu_props type_properties;
-      if case Printed(pm) = compute_type_properties(bs->cs, bs->clq, complete_type, &cu_props) {
+      if case Printed(pm) = compute_type_properties(bs->clq, complete_type, &cu_props) {
         return Printed(pm);
       }
       note_initter = true;
@@ -759,7 +759,7 @@ func cdi_later(cdo opt[*ast_condition_discard_info]) opt[*ast_later_discard_info
 func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info, cd2 opt[*ast_condition_discard_info]) np {
   switch a {
     case &ExprCondition(b box[ast_expr_consume]): {
-      booltype cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
+      booltype cu_typeexpr = compute_prim(es->clq, primitive_bool_type(es->cs));
       if case Printed(pm) = check_consume_then_discard_expr(es, oo(&b), &booltype.~, &cd->later, cdi_later(cd2)) {
         return Printed(pm);
       }

@@ -1502,7 +1502,7 @@ func gr_name_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_name_expr, 
       x_cell cell_num = rval_cell(x);
       cu cu_typeexpr;
       props type_properties;
-      compute_prim(clq->cs, clq, enum_tag_type(clq->cs, &vi.et), &cu, &props);
+      compute_prim(clq, enum_tag_type(clq->cs, &vi.et), &cu, &props);
       tag_cell cell_num = add_cell(gr, {LocationVirtual(void), cu, props});
       field_offset u32 = enum_field_offset(clq->cs, &vi.et, vi.constructor_tag);
       backtick_gn var = addx(gr, @[gr_xop]GrWriteNothing({x_cell}));
@@ -1905,23 +1905,23 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   }
 
   param_props type_properties;
-  if case Printed(pm) = compute_complete_type_properties(cs, clq, param, &param_props) {
+  if case Printed(pm) = compute_complete_type_properties(clq, param, &param_props) {
     return Printed(pm);
   }
 
   elemptrtype cu_typeexpr;
   elemptrtype_props type_properties;
-  compute_prim(cs, clq, ptr_type(cs, *param), &elemptrtype, &elemptrtype_props);
+  compute_prim(clq, ptr_type(cs, *param), &elemptrtype, &elemptrtype_props);
 
   nargs size = num_args(wc);
 
   fntype cu_typeexpr;
   fntype_props type_properties;
-  compute_prim(cs, clq, fn_type(cs, @[shray[_]]repeat(nargs, elemptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
+  compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, elemptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
   size_type cu_typeexpr;
   size_type_props type_properties;
-  compute_prim(cs, clq, primitive_size_type(clq->cs), &size_type, &size_type_props);
+  compute_prim(clq, primitive_size_type(clq->cs), &size_type, &size_type_props);
 
   argcells array[cell_num];
   pointeecells array[cell_num];
@@ -2050,7 +2050,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
   tagtype cu_typeexpr;
   tagtype_props type_properties;
-  compute_prim(cs, clq, enum_tag_type(cs, et), &tagtype, &tagtype_props);
+  compute_prim(clq, enum_tag_type(cs, et), &tagtype, &tagtype_props);
 
   argcells array[cell_num];
   pointeecells array[cell_num];
@@ -2096,7 +2096,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
     fieldtype cu_typeexpr = ~ref(&et->constructors, i)->type;
     fieldtype_props type_properties;
-    if case Printed(pm) = compute_type_properties(cs, clq, &fieldtype, &fieldtype_props) {
+    if case Printed(pm) = compute_type_properties(clq, &fieldtype, &fieldtype_props) {
       return Printed(pm);
     }
 
@@ -2121,7 +2121,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     if case &Has(ip instpair) = ref(&mei->cips, i) {
       fieldptrtype cu_typeexpr;
       fieldptrtype_props type_properties;
-      compute_prim(cs, clq, ptr_type(cs, fieldtype.~), &fieldptrtype, &fieldptrtype_props);
+      compute_prim(clq, ptr_type(cs, fieldtype.~), &fieldptrtype, &fieldptrtype_props);
 
       fieldptrcella array[cell_num];
       precs array[gr_num];
@@ -2137,7 +2137,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
       fntype cu_typeexpr;
       fntype_props type_properties;
-      compute_prim(cs, clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
+      compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
       func_gn gr_num = addx(&gr, @[gr_xop]GrWriteConst({func_cell, ConstDef(ip)}));
@@ -2243,7 +2243,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
   }
 
   psd partial_struct_data;
-  if case Printed(pm) = compute_partial_struct_data(cs, clq, &st->fields, None, &psd) {
+  if case Printed(pm) = compute_partial_struct_data(clq, &st->fields, None, &psd) {
     return Printed(pm);
   }
 
@@ -2303,7 +2303,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
     if case Has(ip instpair) = get(&msi->fips, i) {
       fieldptrtype cu_typeexpr;
       fieldptrtype_props type_properties;
-      compute_prim(cs, clq, ptr_type(cs, ref(&st->fields, i)->type), &fieldptrtype, &fieldptrtype_props);
+      compute_prim(clq, ptr_type(cs, ref(&st->fields, i)->type), &fieldptrtype, &fieldptrtype_props);
 
       fieldptrcella array[cell_num];
       precs array[gr_num];
@@ -2319,7 +2319,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
       fntype cu_typeexpr;
       fntype_props type_properties;
-      compute_prim(cs, clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
+      compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
 
@@ -2420,14 +2420,14 @@ func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi
 
   fieldptrtype cu_typeexpr;
   fieldptrtype_props type_properties;
-  compute_prim(cs, clq, ptr_type(cs, mwfi->rhs_type.~), &fieldptrtype, &fieldptrtype_props);
+  compute_prim(clq, ptr_type(cs, mwfi->rhs_type.~), &fieldptrtype, &fieldptrtype_props);
 
-  voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
+  voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
 
   nargs size = num_args(wc);
   fntype cu_typeexpr;
   fntype_props type_properties;
-  compute_prim(cs, clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
+  compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
 
   argcells array[cell_num];
   fieldptrcells array[cell_num];
@@ -2479,7 +2479,7 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
     field_offset = enum_field_offset(cs, &et, tagval);
     cu cu_typeexpr;
     props type_properties;
-    compute_prim(cs, clq, enum_tag_type(cs, &et), &cu, &props);
+    compute_prim(clq, enum_tag_type(cs, &et), &cu, &props);
     tag_end = props.flat_size;
     tag_cell = add_cell(&gr, {LocationVirtual(void), cu, props});
   } else {
@@ -2559,7 +2559,7 @@ func gr_destroy_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typee
 func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_typeexpr, op primitive_op) fn_body_id {
   gr frame_graph = init_frame_graph_empty(informal_name);
   typarams *shray[te_typeexpr];
-  if !decompose_typeapp(&type->~, primitive_function_puretype(clq->cs), &typarams) {
+  if !decompose_typeapp(&type->~, primitive_function_puretype(cs), &typarams) {
     ice(_u8("add_prim_fn_body called with non-fn type"));
   }
   argcells array[cell_num];
@@ -2568,7 +2568,7 @@ func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_
   for i size = 0; i < nfn_params; i = i + 1 {
     ty *te_typeexpr = ref(typarams, i);
     props type_properties;
-    if case Printed(pm) = compute_complete_type_properties(cs, clq, ty, &props) {
+    if case Printed(pm) = compute_complete_type_properties(clq, ty, &props) {
       ice(_u8("add_prim_fn_body typrops"));
     }
     c cell_num = add_cell(&gr, {LocationStatic(void), ~ *ty, props});
@@ -2576,7 +2576,7 @@ func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_
   }
   retty *te_typeexpr = ref(typarams, ntyparams - 1);
   retprops type_properties;
-  if case Printed(pm) = compute_complete_type_properties(cs, clq, retty, &retprops) {
+  if case Printed(pm) = compute_complete_type_properties(clq, retty, &retprops) {
     ice(_u8("add_prim_fn_body retprops"));
   }
   retcell cell_num = add_cell(&gr, {LocationStatic(void), ~ *retty, retprops});

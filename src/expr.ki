@@ -146,7 +146,7 @@ func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ide
     osymname = None;
   }
   props type_properties;
-  if case Printed(pm) = compute_type_properties(es->cs, es->clq, computed_type, &props) {
+  if case Printed(pm) = compute_type_properties(es->clq, computed_type, &props) {
     return Printed(pm);
   }
   num var_number = ~count(&es->all_vars);
@@ -203,8 +203,8 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
   return NoFail;
 }
 
-func check_expr(cs *checkstate, clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *idy_repls, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
-  ds defscope = {cs, cs->im, clq, accessible, g, parms, def_informal_name};
+func check_expr(clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *idy_repls, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
+  ds defscope = {clq->cs, clq->im, clq, accessible, g, parms, def_informal_name};
   es framescope = mk(&ds);
   if case Printed(pm) = check_expr_consume(&es, x, pt) {
     return Printed(pm);
@@ -244,7 +244,7 @@ func replaced_name_parms(ds *defscope, a *ast_name_expr, out *genparms) np {
         return Printed(pm);
       }
       computed cac_typeexpr;
-      if case Printed(pm) = check_and_compute_typeexpr(ds->cs, ds->clq, ds->generics, ds->repls, &converted, &computed) {
+      if case Printed(pm) = check_and_compute_typeexpr(ds->clq, ds->generics, ds->repls, &converted, &computed) {
         return Printed(pm);
       }
       push(&replaced, computed.te);
@@ -329,7 +329,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       return NoFail;
     }
     cac_enum_type cac_typeexpr;
-    if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, enum_type, &cac_enum_type) {
+    if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->clq, enum_type, &cac_enum_type) {
       return Printed(pm);
     }
     check(cac_enum_type.complete);
@@ -342,7 +342,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     return NoFail;
   }
   cac_return_type cac_typeexpr;
-  if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, return_type, &cac_return_type) {
+  if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->clq, return_type, &cac_return_type) {
     return Printed(pm);
   }
   if !cac_return_type.complete {
@@ -374,7 +374,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   }
   ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
   cac_ctor_type cac_typeexpr;
-  if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->cs, ds->clq, &ctor_type, &cac_ctor_type) {
+  if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->clq, &ctor_type, &cac_ctor_type) {
     return Printed(pm);
   }
   check(cac_ctor_type.complete);
@@ -408,7 +408,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
       }
       case &OneMatch(m ent_and_parms): {
         inst_id def_inst_id;
-        if !from_np(make_inst(ds->cs, ds->clq, m.ent, &m.parms, &inst_id)) {
+        if !from_np(make_inst(ds->clq, m.ent, &m.parms, &inst_id)) {
           ice(_u8("lookup_or_make_enum_constructor_def make_inst failed after match"));
         }
         *out = {m.ent, inst_id};
@@ -420,7 +420,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
   // There was no match -- so we make the def ourselves.
   rhs_type *te_typeexpr = &ref(&et->constructors, decl_index)->type;
   rhs_props type_properties;
-  if case Printed(pm) = compute_complete_type_properties(ds->cs, ds->clq, rhs_type, &rhs_props) {
+  if case Printed(pm) = compute_complete_type_properties(ds->clq, rhs_type, &rhs_props) {
     return Printed(pm);
   }
 
@@ -450,7 +450,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
 
   enum_type cu_typeexpr = ~TeEnum(*et);
   enum_type_props type_properties;
-  if case Printed(pm) = compute_type_properties(ds->cs, ds->clq, &enum_type, &enum_type_props) {
+  if case Printed(pm) = compute_type_properties(ds->clq, &enum_type, &enum_type_props) {
     return Printed(pm);
   }
 
@@ -458,7 +458,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
 
   ent def_entry_id = add_def_primitive(ds->cs, defname, NoGenerics(void), *ctor_type, @[def_definition]DefnMagic(MagicEnumConstruct(mec)));
   inst_id def_inst_id;
-  if !from_np(make_inst(ds->cs, ds->clq, ent, &nogp, &inst_id)) {
+  if !from_np(make_inst(ds->clq, ent, &nogp, &inst_id)) {
     ice(_u8("lookup_or_make_enum_constructor_def make_inst failed on fresh def"));
   }
 
@@ -523,7 +523,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
     }
     case &OneMatch(m ent_and_parms): {
       inst_id def_inst_id;
-      if case Printed(pm) = make_inst(es->cs, es->clq, m.ent, &m.parms, &inst_id) {
+      if case Printed(pm) = make_inst(es->clq, m.ent, &m.parms, &inst_id) {
         return Printed(pm);
       }
       *res_out = OneGlobalMatch({m.ent, inst_id, m.parms});
@@ -553,12 +553,12 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
   }
   if is_complete(&unified) {
     c cac_typeexpr;
-    if !from_np(noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &c)) {
+    if !from_np(noscoped_check_and_compute_typeexpr(es->clq, &unified, &c)) {
       ice(_u8("help_check_simple_literal passed bad type"));
     }
     check(c.complete);
     props type_properties;
-    if !from_np(compute_complete_type_properties(es->cs, es->clq, &c.te, &props)) {
+    if !from_np(compute_complete_type_properties(es->clq, &c.te, &props)) {
       ice(_u8("help_check_simple_literal passed type with bad properties"));
     }
 
@@ -689,7 +689,7 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
 
     ref_type te_typeexpr = mk_ref_type(es->cs, unified_lifetime, rhs_info->cu.~);
     ref_computed cac_typeexpr;
-    if case Printed(pm) = noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ref_type, &ref_computed) {
+    if case Printed(pm) = noscoped_check_and_compute_typeexpr(es->clq, &ref_type, &ref_computed) {
       return Printed(pm);
     }
     // (TODO: Make lval desc.lifetime be a te_lifetime, so it can't be incomplete?)
@@ -698,7 +698,7 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
     }
 
     ref_props type_properties;
-    if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, &ref_computed.te, &ref_props) {
+    if case Printed(pm) = compute_complete_type_properties(es->clq, &ref_computed.te, &ref_props) {
       return Printed(pm);
     }
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ref_computed.te, ref_props})), ~ref_computed.te, ref_props)));
@@ -707,7 +707,7 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
 }
 
 func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt *te_typeexpr, x *ast_expr) np {
-  boolean cu_typeexpr = compute_prim(es->ds, primitive_bool_type(es->cs));
+  boolean cu_typeexpr = compute_prim(es->clq, primitive_bool_type(es->cs));
   if case Printed(pm) = check_consume_then_discard_expr(es, oo(&oo(&a->condition)->expr), &boolean.~, &oo(&a->condition)->discard) {
     return Printed(pm);
   }
@@ -739,7 +739,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_exp
   }
   // We call check_and_compute_typeexpr to disallow totally bogus typeexprs more directly than the eventual type error that would happen.
   computed cac_typeexpr;
-  if case Printed(pm) = check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->repls, &converted, &computed) {
+  if case Printed(pm) = check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &computed) {
     return Printed(pm);
   }
   unified te_typeexpr;
@@ -750,7 +750,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_exp
   if computed.complete {
     unified_computed = computed;
   } else {
-    if !from_np(noscoped_check_and_compute_typeexpr(es->cs, es->clq, &unified, &unified_computed)) {
+    if !from_np(noscoped_check_and_compute_typeexpr(es->clq, &unified, &unified_computed)) {
       return ERR(_u8("TypedExpr encounters un-computable unified type."));
     }
   }
@@ -780,7 +780,7 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
     return Printed(pm);
   }
   props type_properties;
-  if case Printed(pm) = compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
+  if case Printed(pm) = compute_type_properties(es->clq, &fieldtype, &props) {
     return Printed(pm);
   }
   lval is_lval;
@@ -829,7 +829,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
     return Printed(pm);
   }
   props type_properties;
-  if case Printed(pm) = compute_type_properties(es->cs, es->clq, &fieldtype, &props) {
+  if case Printed(pm) = compute_type_properties(es->clq, &fieldtype, &props) {
     return Printed(pm);
   }
   lval is_lval;
@@ -876,7 +876,7 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
     }
 
     props type_properties;
-    if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, param, &props) {
+    if case Printed(pm) = compute_complete_type_properties(es->clq, param, &props) {
       return Printed(pm);
     }
     annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}), DeadMe(void), lifetime}), ~ *param, props)));
@@ -907,12 +907,12 @@ func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *
 
   ptr_type te_typeexpr = ptr_type(es->cs, rhs_info->cu.~);
   ptr_computed cac_typeexpr;
-  if case Printed(pm) = noscoped_check_and_compute_typeexpr(es->cs, es->clq, &ptr_type, &ptr_computed) {
+  if case Printed(pm) = noscoped_check_and_compute_typeexpr(es->clq, &ptr_type, &ptr_computed) {
     return Printed(pm);
   }
   check(ptr_computed.complete);
   ptr_props type_properties;
-  if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, &ptr_computed.te, &ptr_props) {
+  if case Printed(pm) = compute_complete_type_properties(es->clq, &ptr_computed.te, &ptr_props) {
     return Printed(pm);
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ptr_computed.te, ptr_props})), ~ptr_computed.te, ptr_props)));
@@ -968,7 +968,7 @@ func computed_ptr_type(clq *clqueue, t *cu_typeexpr) cu_typrop {
 
 func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
   props type_properties;
-  if case Printed(pm) = compute_type_properties(ds->cs, ds->clq, t, &props) {
+  if case Printed(pm) = compute_type_properties(ds->clq, t, &props) {
     return Printed(pm);
   }
   return behavior_to_desc(&props.init_behavior, out);
@@ -976,7 +976,7 @@ func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
 
 func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
   props type_properties;
-  if case Printed(pm) = compute_type_properties(ds->cs, ds->clq, t, &props) {
+  if case Printed(pm) = compute_type_properties(ds->clq, t, &props) {
     return Printed(pm);
   }
   return behavior_to_desc(&props.copy_behavior, out);
@@ -984,7 +984,7 @@ func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
 
 func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
   props type_properties;
-  if case Printed(pm) = compute_type_properties(ds->cs, ds->clq, t, &props) {
+  if case Printed(pm) = compute_type_properties(ds->clq, t, &props) {
     return Printed(pm);
   }
   return behavior_to_desc(&props.move_behavior, out);
@@ -992,7 +992,7 @@ func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
 
 func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
   props type_properties;
-  if case Printed(pm) = compute_type_properties(ds->cs, ds->clq, t, &props) {
+  if case Printed(pm) = compute_type_properties(ds->clq, t, &props) {
     return Printed(pm);
   }
   return behavior_to_desc(&props.destroy_behavior, out);
@@ -1107,7 +1107,7 @@ func make_comparecells(es *framescope, dest cell_num) instpair {
     canonical te_typeexpr;
     canonicalize_idy_lifetimes(es->im, &lifetime_names, &ref_cell(es, dest)->type.~, &canonical);
     parms idy_genparms = {count(&lifetime_names), {mk_shray(~canonical)}};
-    inst_id def_inst_id = enqueue_def_inst(es->cs, es->clq, ent, &parms);
+    inst_id def_inst_id = enqueue_def_inst(es->clq, ent, &parms);
     return {ent, inst_id};
   } else {
     ice(_u8("cs->prims.ptr_eq not initialized"));
@@ -1220,7 +1220,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &OneEnumConstructorMatch(ci constructor_info): {
       annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip}));
       props type_properties;
-      if case Printed(pm) = compute_type_properties(es->cs, es->clq, &ci.type, &props) {
+      if case Printed(pm) = compute_type_properties(es->clq, &ci.type, &props) {
         return Printed(pm);
       }
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ci.type, props})), ci.type, props)));
@@ -1229,7 +1229,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &EnumVoidConstructedMatch(vci voidconstructed_info): {
       annotate(&a->name_info, @[ast_name_expr_info]EnumVoidConstructed({vci.constructor_tag, vci.et}));
       props type_properties;
-      if case Printed(pm) = compute_type_properties(es->cs, es->clq, &vci.constructed_type, &props) {
+      if case Printed(pm) = compute_type_properties(es->clq, &vci.constructed_type, &props) {
         return Printed(pm);
       }
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.constructed_type, props})), vci.constructed_type, props)));
@@ -1241,7 +1241,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       // This parallels or plagairizes ensure_def_inst_type_computed.
       // TODO: Dedup anything?
       matched_parms idy_repls;
-      if case Printed(pm) = check_and_compute_parms_no_canonicalize(es->cs, es->clq, &egm.parms, &matched_parms) {
+      if case Printed(pm) = check_and_compute_parms_no_canonicalize(es->clq, &egm.parms, &matched_parms) {
         return Printed(pm);
       }
 
@@ -1251,14 +1251,14 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       }
 
       computed cac_typeexpr;
-      if case Printed(pm) = check_and_compute_typeexpr(es->cs, es->clq, &ent->generics, &matched_parms, ent_typeexpr, &computed) {
+      if case Printed(pm) = check_and_compute_typeexpr(es->clq, &ent->generics, &matched_parms, ent_typeexpr, &computed) {
         return Printed(pm);
       }
 
       check(computed.complete);
       cu_computed cu_typeexpr = ~computed.te;
       props type_properties;
-      if case Printed(pm) = compute_type_properties(es->cs, es->clq, &cu_computed, &props) {
+      if case Printed(pm) = compute_type_properties(es->clq, &cu_computed, &props) {
         return Printed(pm);
       }
 
@@ -1278,7 +1278,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
 func check_expr_string_literal(es *framescope, a *ast_string_literal, pt *te_typeexpr, x *ast_expr) np {
   type cu_typeexpr;
   props type_properties;
-  compute_prim(es->ds, primitive_string_literal_type(es->cs, count(&a->charspecs)),
+  compute_prim(es->clq, primitive_string_literal_type(es->cs, count(&a->charspecs)),
                &type, &props);
   unified te_typeexpr;
   if !unify_types(pt, &type.~, &unified) {
@@ -1320,13 +1320,13 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
 
     // We checked is_computed(pt).
     props type_properties;
-    if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, pt, &props) {
+    if case Printed(pm) = compute_complete_type_properties(es->clq, pt, &props) {
       return Printed(pm);
     }
 
     // We checked is_computed(pt)
     param_props type_properties;
-    if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, oo(&b.param), &param_props) {
+    if case Printed(pm) = compute_complete_type_properties(es->clq, oo(&b.param), &param_props) {
       return Printed(pm);
     }
 
@@ -1361,7 +1361,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       }
       reannotate_static_to_virtual(es, result_cell(x_i));
       psd partial_struct_data;
-      if case Printed(pm) = compute_partial_struct_data(es->cs, es->clq, &b->fields, Has(field->name), &psd) {
+      if case Printed(pm) = compute_partial_struct_data(es->clq, &b->fields, Has(field->name), &psd) {
         return Printed(pm);
       }
       check(psd.found_field);
@@ -1370,7 +1370,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
 
     // We checked is_computed(pt).
     props type_properties;
-    if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, pt, &props) {
+    if case Printed(pm) = compute_complete_type_properties(es->clq, pt, &props) {
       return Printed(pm);
     }
 
@@ -1393,7 +1393,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   }
   // TODO: I see some duplicated logic with the TypedExpr case.
   computed cac_typeexpr;
-  if case Printed(pm) = check_and_compute_typeexpr(es->cs, es->clq, es->ds->generics, es->ds->repls, &converted, &computed) {
+  if case Printed(pm) = check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &computed) {
     return Printed(pm);
   }
   // Lambda exprs can't have partial types (yet!).
@@ -1418,7 +1418,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   }
 
   props type_properties;
-  if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, &computed.te, &props) {
+  if case Printed(pm) = compute_complete_type_properties(es->clq, &computed.te, &props) {
     return Printed(pm);
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~computed.te, props})), ~computed.te, props)));
@@ -1435,7 +1435,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   for i size = 0; i < nargs; i = i + 1 {
     cu_param cu_typeexpr = ~get(computed_params, i);
     cu_param_props type_properties;
-    if case Printed(pm) = compute_type_properties(bs->cs, bs->clq, &cu_param, &cu_param_props) {
+    if case Printed(pm) = compute_type_properties(bs->clq, &cu_param, &cu_param_props) {
       return Printed(pm);
     }
     cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
@@ -1465,7 +1465,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
 
   return_type *te_typeexpr = ref(computed_params, nargs);
   return_type_props type_properties;
-  if case Printed(pm) = compute_complete_type_properties(bs->cs, bs->clq, return_type, &return_type_props) {
+  if case Printed(pm) = compute_complete_type_properties(bs->clq, return_type, &return_type_props) {
     return Printed(pm);
   }
   return_cell cell_num = add_cell(&bs->es, {LocationStatic, ~ *return_type, return_type_props});
@@ -1507,7 +1507,7 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   // It's a pt, and it's a numeric type, which means it must be a complete pt, which means it's computed.
   check(is_complete_computed(pt).computed);
   props type_properties;
-  if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, pt, &props) {
+  if case Printed(pm) = compute_complete_type_properties(es->clq, pt, &props) {
     return Printed(pm);
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
@@ -1710,7 +1710,7 @@ func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_type
   if !accessible_result {
     return NotAccessible;
   }
-  if case Printed(pm) = ensure_deftype_inst_checked(ds->cs, ds->clq, pack->ent_id, pack->inst_id) {
+  if case Printed(pm) = ensure_deftype_inst_checked(ds->clq, pack->ent_id, pack->inst_id) {
     return Error(pm);
   }
   inst *deftype_inst = ref_deftype_inst(ds->cs, pack->inst_id);
@@ -1766,7 +1766,7 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
     }
     case &TeStruct(a te_struct): {
       offset u32;
-      if case Printed(pm) = lookup_field_from_list(es->cs, es->clq, &a.fields, fieldname->value, fieldtype_out, &offset) {
+      if case Printed(pm) = lookup_field_from_list(es->clq, &a.fields, fieldname->value, fieldtype_out, &offset) {
         return Printed(pm);
       }
       *res_out = InheritsLval(offset);
@@ -1778,7 +1778,7 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
     case &TeUnion(a te_union): {
       // The offset's what it would be for a struct.
       offset_discard u32;
-      if case Printed(pm) = lookup_field_from_list(es->cs, es->clq, &a.fields, fieldname->value, fieldtype_out, &offset_discard) {
+      if case Printed(pm) = lookup_field_from_list(es->clq, &a.fields, fieldname->value, fieldtype_out, &offset_discard) {
         return Printed(pm);
       }
       // Offset's always 0 for a union.
@@ -1789,7 +1789,7 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
       if fieldname->value != es->im->cym.lengthsym {
         return ERR(_u8("field lookup (not .length) on array type"));
       }
-      *fieldtype_out = compute_prim(es->ds, primitive_size_type(es->cs));
+      *fieldtype_out = compute_prim(es->clq, primitive_size_type(es->cs));
       if case Has(n u32) = a.count {
         *res_out = ConstantField(n);
       } else {
@@ -1856,14 +1856,14 @@ func find_vardecl(a *shray[te_vardecl], name sym, out **te_typeexpr, index_out *
 }
 
 // fields is supposed to be complete.
-func lookup_field_from_list(cs *checkstate, clq *clqueue, fields *shray[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr, offset_out *u32) np {
+func lookup_field_from_list(clq *clqueue, fields *shray[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr, offset_out *u32) np {
   psd partial_struct_data;
-  if case Printed(pm) = compute_partial_struct_data(cs, clq, fields, Has(fieldname), &psd) {
+  if case Printed(pm) = compute_partial_struct_data(clq, fields, Has(fieldname), &psd) {
     return Printed(pm);
   }
 
   if !psd.found_field {
-    return ERR(_u8("fieldname '"), lookup(cs->im, fieldname), _u8("' not found"));
+    return ERR(_u8("fieldname '"), lookup(clq->im, fieldname), _u8("' not found"));
   }
 
   *fieldtype_out = ~ ref(fields, psd_index(&psd))->type;
@@ -1874,7 +1874,7 @@ func lookup_field_from_list(cs *checkstate, clq *clqueue, fields *shray[te_varde
 func check_expr_logical_conjunction(es *framescope, a *ast_logical_conjunction, pt *te_typeexpr, x *ast_expr) np {
   type cu_typeexpr;
   props type_properties;
-  compute_prim(es->ds, primitive_bool_type(es->cs), &type, &props);
+  compute_prim(es->clq, primitive_bool_type(es->cs), &type, &props);
 
   unified te_typeexpr;
   if !unify_types(pt, &type.~, &unified) {
@@ -1929,7 +1929,7 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
 
   return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(&oo(&a->fun)->expr)->~);
   props type_properties;
-  if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, return_type, &props) {
+  if case Printed(pm) = compute_complete_type_properties(es->clq, return_type, &props) {
     return Printed(pm);
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *return_type, props})), ~ *return_type, props)));
@@ -1970,35 +1970,27 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
   return NoFail;
 }
 
-func compute_prim(cs *checkstate, clq *clqueue, t te_typeexpr) cu_typeexpr {
+func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
   cac cac_typeexpr;
-  if !from_np(noscoped_check_and_compute_typeexpr(cs, clq, &t, &cac)) {
+  if !from_np(noscoped_check_and_compute_typeexpr(clq, &t, &cac)) {
     ice(_u8("compute_prim encounters uncomputable type"));
   }
   check(cac.complete);
   return ~cac.te;
 }
 
-func compute_prim(ds *defscope, t te_typeexpr) cu_typeexpr {
-  return compute_prim(ds->cs, ds->clq, t);
-}
-
 func compute_prim(clq *clqueue, t te_typeexpr) cu_typrop {
   ret cu_typrop;
-  compute_prim(clq->cs, clq, t, &ret.cu, &ret.props);
+  compute_prim(clq, t, &ret.cu, &ret.props);
   return ret;
 }
 
-func compute_prim(cs *checkstate, clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
-  type cu_typeexpr = compute_prim(cs, clq, t);
-  if !from_np(compute_type_properties(cs, clq, &type, props_out)) {
+func compute_prim(clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
+  type cu_typeexpr = compute_prim(clq, t);
+  if !from_np(compute_type_properties(clq, &type, props_out)) {
     ice(_u8("compute_prim fails to compute type properties"));
   }
   *out = type;
-}
-
-func compute_prim(ds *defscope, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
-  compute_prim(ds->cs, ds->clq, t, out, props_out);
 }
 
 func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast_expr) np {
@@ -2006,7 +1998,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), oo(&a->lhs), &unknown) {
     return Printed(pm);
   }
-  sizetype cu_typeexpr = compute_prim(es->ds, primitive_size_type(es->cs));
+  sizetype cu_typeexpr = compute_prim(es->clq, primitive_size_type(es->cs));
 
   rhs_later ast_later_discard_info = mk_later();
   if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.~, &rhs_later) {
@@ -2027,7 +2019,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   }
 
   props type_properties;
-  if case Printed(pm) = compute_complete_type_properties(es->cs, es->clq, ixtype, &props) {
+  if case Printed(pm) = compute_complete_type_properties(es->clq, ixtype, &props) {
     return Printed(pm);
   }
 
@@ -2136,7 +2128,7 @@ func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[
   push(&type_params, *return_type);
   fntype te_typeexpr = TeApp({primitive_function_puretype(clq->cs), freeze(&type_params), None});
   cac cac_typeexpr;
-  if case Printed(pm) = noscoped_check_and_compute_typeexpr(clq->cs, clq, &fntype, &cac) {
+  if case Printed(pm) = noscoped_check_and_compute_typeexpr(clq, &fntype, &cac) {
     return Printed(pm);
   }
   *out = cac.te;
