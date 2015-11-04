@@ -3,7 +3,7 @@ import state;
 
 // Tells (a) if the operation failed, and (b) if it did, whether location info was printed.  Might be expanded to include other info.
 // TODO: Possibly deprecated in favor of np[T].
-defenum np {
+enum np {
   // No failure happened.
   NoFail void;
   // We had a failure, and an error message was printed.  True if location info was printed.
@@ -19,7 +19,7 @@ func from_np(x np) bool {
 }
 
 // cr = check result.
-defenum[T] cr {
+enum[T] cr {
   NoFail T;
   Printed bool;
 };

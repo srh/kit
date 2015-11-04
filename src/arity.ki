@@ -7,7 +7,7 @@ struct variadic_arity {
   after u32;
 };
 
-defenum generics_arity {
+enum generics_arity {
   NoParamsArity void;
   FiniteArity u32;
   // The number's the minimal arity, variadics always go at the end.

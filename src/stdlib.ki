@@ -156,7 +156,7 @@ func[T] fake() T {
   return ret;
 }
 
-defenum[T] opt {
+enum[T] opt {
   None void;
   Has T;
 };

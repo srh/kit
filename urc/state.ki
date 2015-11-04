@@ -189,7 +189,7 @@ func add_fn_body(cs *checkstate, ent fn_body_entry) fn_body_id {
   return id;
 }
 
-defenum module_process_state {
+enum module_process_state {
   Unprocessed void;
   Processing void;
   DoneProcessing void;
@@ -213,7 +213,7 @@ struct module {
 };
 
 // Describes the behavior of init/copy/move/destroy methods.
-defenum derived_method_behavior {
+enum derived_method_behavior {
   // Behavior would be explicitly defined by a method, but it doesn't exist -- behavior is not allowed.
   DerivedMethodAbsent void;
   // Behavior's explicitly defined by a method.
@@ -231,7 +231,7 @@ func isTrivial(behav derived_method_behavior) bool {
   return false;
 }
 
-defenum type_scalarity {
+enum type_scalarity {
   IsScalarNo void;
   IsScalarYes void;
 };
@@ -268,7 +268,7 @@ struct deftype_inst_rhsenum_info {
   rhs_props type_properties;
 };
 
-defenum deftype_inst_rhs_info {
+enum deftype_inst_rhs_info {
   // Also used for defclasses.
   RhsStructInfo deftype_inst_rhsstruct_info;
   RhsEnumInfo deftype_inst_rhsenum_info;
@@ -299,7 +299,7 @@ struct classexpr_rhs_spec {
   drs defstruct_rhs_spec;
 };
 
-defenum deftype_rhs_spec {
+enum deftype_rhs_spec {
   ClassexprRhsSpec classexpr_rhs_spec;
   DefstructRhsSpec defstruct_rhs_spec;
   DefenumRhsSpec defenum_rhs_spec;
@@ -327,7 +327,7 @@ func mk(module_name sym, name sym, accessible array[access_entry_id], g ast_gene
   return {module_name, name, accessible, g, Has({tl, NotComputed()}), None, mk_hash@[idy_genparms, deftype_inst_id]()};
 }
 
-defenum fn_body_spec {
+enum fn_body_spec {
   // Points to the annotated lambda within the def_inst rhs sub-expr.
   FnBodyLambda *ast_lambda;
   // Likewise, points to the checked def_magic within the def_inst definition.
@@ -335,7 +335,7 @@ defenum fn_body_spec {
   FnBodyPrim primitive_op;
 };
 
-defenum should_inline {
+enum should_inline {
   // We ALWAYS inline this function.  End of discussion.  For primitive ops.
   InlineMust void;
   // Nobody said anything about inlining this function.
@@ -359,7 +359,7 @@ struct extern_fn_body {
   name sym;
 };
 
-defenum fn_body_entry_enum {
+enum fn_body_entry_enum {
   GraphedFnBody graphed_fn_body;
   ExternFnBody extern_fn_body;
 };
@@ -381,7 +381,7 @@ func mk(name sym, arity ast_access_arity) access_entry {
   return {name, arity, NotComputed()};
 }
 
-defenum genparms {
+enum genparms {
   NoParms void;
   HasParms shray[te_typeexpr];
 };
@@ -431,7 +431,7 @@ func hash_equal(x *idy_genparms, y *idy_genparms) bool {
   return x->num_lifetime_types_used == y->num_lifetime_types_used && idy_typeexpr_list_equal(&x->repls.tys, &y->repls.tys);
 }
 
-defenum def_inst_type_status {
+enum def_inst_type_status {
   DidNotStartComputingType void;
   BeganComputingType void;
   FinishedComputingType void;
@@ -445,7 +445,7 @@ func `!=`(x def_inst_type_status, y def_inst_type_status) bool {
   return !(x == y);
 }
 
-defenum def_inst_rhs_status {
+enum def_inst_rhs_status {
   DidNotCheckRhs void;
   BeganCheckingRhs void;
   FinishedCheckingRhs void;
@@ -470,7 +470,7 @@ struct def_inst_rhs_expr {
   frame_info nc[frame_info];
 };
 
-defenum def_inst_rhs {
+enum def_inst_rhs {
   // Prim defs... don't have an rhs to check.
   InstRhsPrim primitive_op;
   // Extern defs don't have an rhs.
@@ -510,7 +510,7 @@ struct def_nonprim {
   tl *ast_toplevel;
 };
 
-defenum def_definition {
+enum def_definition {
   // The def is a primitive (+, -, etc), has no RHS.
   DefnPrim primitive_op;
   DefnHasRhs def_nonprim;
@@ -549,7 +549,7 @@ struct clqueue_def_entry {
   instantiation_depth u32;
 };
 
-defenum clqueue_entry {
+enum clqueue_entry {
   ClqDeftypeEntry clqueue_deftype_entry;
   ClqDefEntry clqueue_def_entry;
 };

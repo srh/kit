@@ -1577,7 +1577,7 @@ struct ent_and_parms {
   parms genparms;
 };
 
-defenum match_def_res {
+enum match_def_res {
   NoMatch void;
   MultiMatch void;
   OneMatch ent_and_parms;
@@ -1632,7 +1632,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
   }
 }
 
-defenum entry_matches_res {
+enum entry_matches_res {
   EntryDoesNotMatch void;
   EntryMatchesAmbigously void;
   EntryMatchesPrecisely genparms;
@@ -1696,7 +1696,7 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
   }
 }
 
-defenum type_matches_res {
+enum type_matches_res {
   TypeDoesNotMatch void;
   // Provides partial types of some generic names.
   TypeMatchesAmbiguously shray[te_typeexpr];

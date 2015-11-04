@@ -1,4 +1,4 @@
-defenum[T] nbfc {
+enum[T] nbfc {
   NotComputed void;
   BeganComputing void;
   FailedComputation void;
@@ -39,7 +39,7 @@ inline func[T] unComputed(x *nbfc[T]) *T {
   return unHas(x);
 }
 
-defenum[T] nc {
+enum[T] nc {
   NotComputed void;
   Computed T;
 };

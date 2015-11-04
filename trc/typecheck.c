@@ -6156,7 +6156,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_46",
       "struct pq { p i32; q i32; };\n"
-      "defenum ty {\n"
+      "enum ty {\n"
       "  c1 void;\n"
       "  c2 pq;\n"
       "};\n"
@@ -6172,7 +6172,7 @@ int check_more_testcases(struct identmap *im) {
       im, "check_file_test_more_47",
       "struct pq { p i32; q i32; };\n"
       "struct pqu { p i32; q u32; };\n"
-      "defenum ty {\n"
+      "enum ty {\n"
       "  c1 void;\n"
       "  c2 pq;\n"
       "};\n"
@@ -6186,7 +6186,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_48-a",
       "struct[T] pq { p T; q T; };\n"
-      "defenum[T] ty {\n"
+      "enum[T] ty {\n"
       "  c1 void;\n"
       "  c2 pq[T];\n"
       "};\n"
@@ -6200,7 +6200,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_48-b",
       "struct[T] pq { p T; q T; };\n"
-      "defenum[T] ty {\n"
+      "enum[T] ty {\n"
       "  c1 void;\n"
       "  c2 pq[T];\n"
       "};\n"
@@ -6215,7 +6215,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_negcase(
       im, "check_file_test_more_49",
       "struct[T] pq { p T; q T; };\n"
-      "defenum[T] ty {\n"
+      "enum[T] ty {\n"
       "  c1 void;\n"
       "  c2 pq[T];\n"
       "};\n"
@@ -6229,7 +6229,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_50a",
       "struct pq { p i32; q i32; };\n"
-      "defenum ty {\n"
+      "enum ty {\n"
       "  c1 void;\n"
       "  c2 pq;\n"
       "};\n"
@@ -6244,7 +6244,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_50b",
       "struct pq { p i32; q i32; };\n"
-      "defenum ty {\n"
+      "enum ty {\n"
       "  c1 void;\n"
       "  c2 pq;\n"
       "};\n"
@@ -6261,7 +6261,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_negcase(
       im, "check_file_test_more_51",
       "struct pq { p i32; q i32; };\n"
-      "defenum ty {\n"
+      "enum ty {\n"
       "  c1 void;\n"
       "  c2 pq;\n"
       "};\n"
@@ -6286,7 +6286,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_53",
       "struct pq { p i32; q i32; };\n"
-      "defenum ty {\n"
+      "enum ty {\n"
       "  c1 void;\n"
       "  c2 pq;\n"
       "};\n"
@@ -6371,7 +6371,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_64",
       "struct pq { p i32; q i32; };\n"
-      "defenum ty {\n"
+      "enum ty {\n"
       "  c1 void;\n"
       "  c2 pq;\n"
       "};\n"
@@ -6387,7 +6387,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_negcase(
       im, "check_file_test_more_65a",
       "struct pq { p i32; q i32; };\n"
-      "defenum ty {\n"
+      "enum ty {\n"
       "  c1 void;\n"
       "  c2 pq;\n"
       "};\n"
@@ -6404,7 +6404,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_negcase(
       im, "check_file_test_more_65b",
       "struct pq { p i32; q i32; };\n"
-      "defenum ty {\n"
+      "enum ty {\n"
       "  c1 void;\n"
       "  c2 pq;\n"
       "};\n"
@@ -6491,7 +6491,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_73",
       "struct pq { p i32; q i32; };\n"
-      "defenum ty {\n"
+      "enum ty {\n"
       "  c1 void;\n"
       "  c2 pq;\n"
       "};\n"
@@ -6504,7 +6504,7 @@ int check_more_testcases(struct identmap *im) {
   pass &= check_foocase(
       im, "check_file_test_more_74",
       "struct pq { p i32; q i32; };\n"
-      "defenum ty {\n"
+      "enum ty {\n"
       "  c1 void;\n"
       "  c2 pq;\n"
       "};\n"
@@ -6520,7 +6520,7 @@ int check_more_testcases(struct identmap *im) {
       im, "check_file_test_more_75",
       "struct pq { p i32; q i32; };\n"
       "struct puq { p u32; q i32; };\n"
-      "defenum ty {\n"
+      "enum ty {\n"
       "  c1 void;\n"
       "  c2 pq;\n"
       "};\n"

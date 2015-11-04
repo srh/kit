@@ -71,7 +71,7 @@ func `<`(x var_number, y var_number) bool {
   return x.x < y.x;
 }
 
-defenum var_binding {
+enum var_binding {
   // The variable overlays some other object, in a switch/etc.  It's bound _to_ some object, or partt of one, and we can't auto-initialize it (and it doesn't get destructed on its own when it goes out of scope).
   VarOverlay void;
   // The variable's a self-contained object -- it gets destroyed or not, it can be autoinitialized.
@@ -101,7 +101,7 @@ func vars_in_scope(es *framescope) array[var_number] {
 }
 
 
-defenum allow_incomplete {
+enum allow_incomplete {
   AllowIncompleteNo void;
   AllowIncompleteYes void;
 };
@@ -272,7 +272,7 @@ struct voidconstructed_info {
   constructor_tag enum_tag_value;
 };
 
-defenum ds_constructor_res {
+enum ds_constructor_res {
   NoMatchConstructor void;
   AmbigMatchConstructor void;
   MatchedConstructor constructor_info;
@@ -472,7 +472,7 @@ struct es_global_match {
   parms genparms;
 };
 
-defenum es_match_res {
+enum es_match_res {
   NoMatch void;
   AmbigGlobalMatch void;
   OneGlobalMatch es_global_match;
@@ -1575,7 +1575,7 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
   return true;
 }
 
-defenum check_field_result {
+enum check_field_result {
   // Inherits the lvalue-ness of the thing it's a field of.  Includes the field's offset (in bnnos).
   InheritsLval u32;
   // Doesn't inherit the lvalue-ness.  In fact it's a compile-time constant (for the array ".length" field).
@@ -1702,7 +1702,7 @@ func type_pack(t *te_typeexpr) opt[te_instpack] {
   return fake();
 }
 
-defenum structural_rhs_result {
+enum structural_rhs_result {
   // An error was printed.  True if location info was printed.
   Error bool;
   Success void;

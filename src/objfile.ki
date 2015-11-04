@@ -21,7 +21,7 @@ struct objfile_symbol_record {
   is_static is_static;
 };
 
-defenum objfile_symbol_section {
+enum objfile_symbol_section {
   // For external symbols.
   SymbolSectionUndefined void;
   // For non-external symbols.
@@ -31,18 +31,18 @@ defenum objfile_symbol_section {
 };
 
 // TODO: I'm not sure we need both objfile_symbol_section and section.  Likewise in s1.
-defenum section {
+enum section {
   SectionData void;
   SectionRdata void;
   SectionText void;
 };
 
-defenum is_function {
+enum is_function {
   IsFunctionNo void;
   IsFunctionYes void;
 };
 
-defenum is_static {
+enum is_static {
   IsStaticNo void;
   IsStaticYes void;
 };
@@ -63,7 +63,7 @@ struct objfile_relocation {
   type objfile_relocation_type;
 };
 
-defenum objfile_relocation_type {
+enum objfile_relocation_type {
   Dir32 void;
   Rel32 void;
 };
@@ -177,7 +177,7 @@ func strtab_add(d *array[u8], buf array[u8]) u32 {
 }
 
 func check_no_zeros(buf *u8, n size) void {
-  for i size = 0; i < n; i += 1 {
+  for i size = 0; i < n; i = i + 1 {
     if buf[i] == '\0' {
       crash(_u8("check_no_zeros sees zero"));
     }

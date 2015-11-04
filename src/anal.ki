@@ -41,7 +41,7 @@ struct subcell_disp {
   offset gr_offset;
 };
 
-defenum cell_const_disp {
+enum cell_const_disp {
   NoConstDisp void;
   HasConstValue gr_const;
   NotConst void;

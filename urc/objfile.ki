@@ -21,7 +21,7 @@ struct objfile_symbol_record {
   is_static is_static;
 };
 
-defenum objfile_symbol_section {
+enum objfile_symbol_section {
   // For external symbols.
   SymbolSectionUndefined void;
   // For non-external symbols.
@@ -31,18 +31,18 @@ defenum objfile_symbol_section {
 };
 
 // TODO: I'm not sure we need both objfile_symbol_section and section.  Likewise in s1.
-defenum section {
+enum section {
   SectionData void;
   SectionRdata void;
   SectionText void;
 };
 
-defenum is_function {
+enum is_function {
   IsFunctionNo void;
   IsFunctionYes void;
 };
 
-defenum is_static {
+enum is_static {
   IsStaticNo void;
   IsStaticYes void;
 };
@@ -63,7 +63,7 @@ struct objfile_relocation {
   type objfile_relocation_type;
 };
 
-defenum objfile_relocation_type {
+enum objfile_relocation_type {
   Dir32 void;
   Rel32 void;
 };

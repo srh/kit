@@ -5,7 +5,7 @@ import stdlib;
 // func hash_compute_hash(x *K) osize;
 // func hash_equal(x *K, y *K) bool;
 
-defenum[K, V] hash_entry {
+enum[K, V] hash_entry {
   HashEmpty void;
   HashValue tup[K, V];
   HashErased void;

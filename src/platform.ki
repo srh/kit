@@ -3,12 +3,12 @@ import kitutil;
 import shray;
 import stdlib;
 
-defenum numeric_representation {
+enum numeric_representation {
   Unsigned void;
   SignedTwos void;
 };
 
-defenum shift_behavior {
+enum shift_behavior {
   // When shifting, we merely range-check the RHS (that it's >= 0 and < bitsize), and then we perform a bitshift that,
   //   - for right shifting, is
   //      -- logical, if repr is Unsigned
@@ -41,7 +41,7 @@ struct integral_traits {
 def enum_tag_offset u32 = 0;
 def enum_tag_min u32 = 1;
 
-defenum endianness {
+enum endianness {
   LittleEndian void;
 };
 
@@ -54,12 +54,12 @@ func check_littleendian(plat *platform_info) void {
   }
 }
 
-defenum platform_os {
+enum platform_os {
   Linux32 void;
   Win32 void;
 };
 
-defenum universal_calling_convention {
+enum universal_calling_convention {
   UniversalCdeclConvention void;
 };
 

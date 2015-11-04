@@ -595,7 +595,8 @@ int is_ident_keyword(struct ps *p, size_t global_offset_begin, size_t global_off
     return 0 == memcmp(ptr, "true", count)
       || 0 == memcmp(ptr, "null", count)
       || 0 == memcmp(ptr, "else", count)
-      || 0 == memcmp(ptr, "func", count);
+      || 0 == memcmp(ptr, "func", count)
+      || 0 == memcmp(ptr, "enum", count);
   case 5:
     return 0 == memcmp(ptr, "while", count)
       || 0 == memcmp(ptr, "false", count)
@@ -604,8 +605,7 @@ int is_ident_keyword(struct ps *p, size_t global_offset_begin, size_t global_off
     return 0 == memcmp(ptr, "switch", count)
       || 0 == memcmp(ptr, "struct", count);
   case 7:
-    return 0 == memcmp(ptr, "deftype", count)
-      || 0 == memcmp(ptr, "defenum", count);
+    return 0 == memcmp(ptr, "deftype", count);
   case 8:
     return 0 == memcmp(ptr, "defclass", count);
   default:
@@ -2744,7 +2744,7 @@ int parse_toplevel(struct ps *p, struct ast_toplevel *out) {
   } else if (try_skip_keyword(p, "defclass")) {
     out->tag = AST_TOPLEVEL_DEFTYPE;
     return parse_rest_of_defstruct(p, pos_start, 1, &out->u.deftype);
-  } else if (try_skip_keyword(p, "defenum")) {
+  } else if (try_skip_keyword(p, "enum")) {
     out->tag = AST_TOPLEVEL_DEFTYPE;
     return parse_rest_of_defenum(p, pos_start, &out->u.deftype);
   } else if (try_skip_keyword(p, "access")) {

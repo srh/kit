@@ -254,7 +254,7 @@ func st_divmod(x bigint, y bigint, op *primitive_numeric_op, div_out *bigint, mo
 }
 
 // Says that we should _not_ trap on overflow -- used for bitwise ops where it's possible and OK to overflow (namely, bitwise not).
-defenum never_trap {
+enum never_trap {
   NeverTrapNo void;
   NeverTrapYes void;
 };

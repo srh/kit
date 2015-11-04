@@ -33,7 +33,7 @@ struct magic_arraytype_info {
   ip instpair;
 };
 
-defenum magic_ctor_info {
+enum magic_ctor_info {
   MagicWholeFieldInfo magic_whole_field_info;
   // These are None for fields that are trivially constructed.  But of course one field is not None.
   MagicStructInfo magic_struct_info;
@@ -57,7 +57,7 @@ struct copy_destroy_desc {
 };
 
 // This'll be obsolete as soon as we construct enums inline.
-defenum magic_enum_construct_op {
+enum magic_enum_construct_op {
   EnumConstructMove ctor_desc;
   EnumConstructCopyDestroy copy_destroy_desc;
 };
@@ -96,7 +96,7 @@ struct which_non_magic_ctor {
   nmc non_magic_ctor;
 };
 
-defenum which_prop {
+enum which_prop {
   PropSizeof void;
   PropAlignof void;
 };
@@ -107,7 +107,7 @@ struct non_magic_prop {
   info nc[u32];
 };
 
-defenum def_non_magic {
+enum def_non_magic {
   NonMagicCtor which_non_magic_ctor;
   NonMagicProp non_magic_prop;
 };
@@ -117,7 +117,7 @@ struct which_magic_ctor {
   mc magic_ctor;
 };
 
-defenum def_magic {
+enum def_magic {
   MagicBzero magic_bzero;
   MagicMemcopy magic_memcopy;
   MagicNopdestroy void;
@@ -125,7 +125,7 @@ defenum def_magic {
   MagicEnumConstruct magic_enum_construct;
 };
 
-defenum which_ctor {
+enum which_ctor {
   CtorInit void;
   CtorCopy void;
   CtorMove void;

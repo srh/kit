@@ -15,7 +15,7 @@ def `~` fn[size, ast_meta] = wrapconvert;
 
 inline func fake_ast_meta() ast_meta { return ~0; }
 
-defenum ast_original_syntax {
+enum ast_original_syntax {
   UserAssignment void;
   IncrDecr void;
 };
@@ -42,7 +42,7 @@ struct ast_dec_literal {
   digits shray[i8];
 };
 
-defenum ast_numeric_literal {
+enum ast_numeric_literal {
   HexLiteral ast_hex_literal;
   DecLiteral ast_dec_literal;
 };
@@ -113,7 +113,7 @@ struct ast_simple_copydestroy_assignment_info {
   rhs_cleanup destroy_action;
 };
 
-defenum ast_assignment_info {
+enum ast_assignment_info {
   StaticSelfAssignment void;
   SimpleMoveAssignment ast_simple_move_assignment_info;
   SimpleCopyDestroyAssignment ast_simple_copydestroy_assignment_info;
@@ -169,7 +169,7 @@ struct ast_lifetime {
 struct ast_unknown {
 };
 
-defenum ast_typeexpr {
+enum ast_typeexpr {
   Name ast_ident;
   App ast_typeapp;
   Struct ast_struct;
@@ -198,7 +198,7 @@ struct ast_var_info {
   vn var_number;
 };
 
-defenum ast_var_rhs {
+enum ast_var_rhs {
   HasExpr box[ast_expr_consume];
   AutoInit opt[init_action];
 };
@@ -225,7 +225,7 @@ struct ast_pattern_assign {
   rhs box[ast_expr_consume];
 };
 
-defenum ast_condition {
+enum ast_condition {
   ExprCondition box[ast_expr_consume];
   PatternCondition ast_pattern_assign;
 };
@@ -336,7 +336,7 @@ struct ast_statement {
   u ast_statement_enum;
 };
 
-defenum ast_statement_enum {
+enum ast_statement_enum {
   Expr ast_expr_discard;
   Return ast_return_statement;
   Var ast_var_statement;
@@ -367,7 +367,7 @@ struct ast_constructor_pattern {
 };
 
 
-defenum ast_case_pattern {
+enum ast_case_pattern {
   Case ast_constructor_pattern;
   Default void;
 };
@@ -414,7 +414,7 @@ struct ast_arraylength_info {
   count u32;
 };
 
-defenum ast_local_field_info {
+enum ast_local_field_info {
   ArrayLength ast_arraylength_info;
   // Holds the offset.
   FieldName u32;
@@ -430,7 +430,7 @@ func mk(lhs box[ast_expr], fieldname ast_fieldname) ast_local_field {
   return {NotComputed@[ast_local_field_info](), lhs, fieldname};
 }
 
-defenum ast_deref_field_info {
+enum ast_deref_field_info {
   // The array's count.
   DerefArrayLength u32;
   // The field's offset.
@@ -465,7 +465,7 @@ struct enum_voidconstructed_info {
   et te_enum;
 };
 
-defenum ast_name_expr_info {
+enum ast_name_expr_info {
   LocalResolve local_info;
   GlobalResolve global_info;
   EnumConstructor enum_constructor_info;
@@ -548,7 +548,7 @@ inline func whole_temporary(d *rval_description) bool {
   return d->whole_num == d->partial_num;
 }
 
-defenum lval_deadme {
+enum lval_deadme {
   DontDeadMe void;
   DeadMe void;
 };
@@ -565,7 +565,7 @@ struct lval_description {
   lifetime te_typeexpr;
 };
 
-defenum is_lval {
+enum is_lval {
   IsLvalNo rval_description;
   IsLvalYes lval_description;
 };
@@ -600,7 +600,7 @@ struct instpair {
   inst_id def_inst_id;
 };
 
-defenum ctor_desc {
+enum ctor_desc {
   TrivialCtor void;
   FunCtor instpair;
 };
@@ -633,7 +633,7 @@ struct copy_destroy_action {
   destroy destroy_action;
 };
 
-defenum consume_actions {
+enum consume_actions {
   ConsumeByInPlace void;
   ConsumeByCopyDestroy copy_destroy_action;
   ConsumeByCopy tup[copy_action, lval_deadme];
@@ -648,7 +648,7 @@ struct ast_expr_after_consume {
   result cell_num;
 };
 
-defenum ast_expr_after_discard {
+enum ast_expr_after_discard {
   DiscardTemporary destroy_action;
   DiscardVirtualDead cell_num;
   DiscardNothing void;
@@ -688,7 +688,7 @@ func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties) ast_expr_complet
   return {lval, cu, cu_props};
 }
 
-defenum ast_expr_info {
+enum ast_expr_info {
   NoInfo void;
   IncompleteCheck te_typeexpr;
   CompleteCheck ast_expr_complete_info;
@@ -720,7 +720,7 @@ func annotate_info(a *ast_expr, info ast_expr_info) void {
 }
 
 
-defenum ast_expr_enum {
+enum ast_expr_enum {
   NameExpr ast_name_expr;
   ParenExpr ast_paren_expr;
   NumericLiteral ast_numeric_literal;
@@ -784,29 +784,29 @@ struct ast_variadic_generics {
 };
 
 // This is named with a k to prevent typos with ast_generics.
-defenum ast_generik {
+enum ast_generik {
   PlainGeneric ast_ident;
   LifetimeGeneric ast_ident;
 };
 
-defenum ast_generics {
+enum ast_generics {
   NoGenerics void;
   HasGenerics array[ast_generik];
   // Right now VariadicGenerics can't be parsed.
   VariadicGenerics ast_variadic_generics;
 };
 
-defenum ast_isexport {
+enum ast_isexport {
   IsExport void;
   IsNotExport void;
 };
 
-defenum ast_isinline {
+enum ast_isinline {
   IsInline void;
   IsNotInline void;
 };
 
-defenum ast_isvar {
+enum ast_isvar {
   IsVar void;
   IsNotVar void;
 };
@@ -829,7 +829,7 @@ struct ast_import {
   name ast_ident;
 };
 
-defenum ast_defclass_disposition {
+enum ast_defclass_disposition {
   DefaultCopyMoveDestroy void;
   DefaultMove void;
   NoDefaults void;
@@ -850,7 +850,7 @@ struct ast_defenum_rhs {
   type ast_typeexpr;
 };
 
-defenum ast_type_def_rhs {
+enum ast_type_def_rhs {
   ClassexprRhs ast_classexpr_rhs;
   DefstructRhs ast_defstruct_rhs;
   DefenumRhs ast_defenum_rhs;
@@ -862,7 +862,7 @@ struct ast_type_def {
   rhs ast_type_def_rhs;
 };
 
-defenum ast_access_arity {
+enum ast_access_arity {
   AccessArityNone void;
   AccessArityFinite u32;
 };
@@ -873,7 +873,7 @@ struct ast_access {
   toplevels array[ast_toplevel];
 };
 
-defenum ast_toplevel {
+enum ast_toplevel {
   Import ast_import;
   Def ast_def;
   ExternDef ast_extern_def;

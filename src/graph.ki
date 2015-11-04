@@ -30,7 +30,7 @@ in. Location should be specified when:
    - for rvalues, when we annotate the disposal for the rvalue.
 */
 
-defenum cell_location {
+enum cell_location {
   // The "cell" is actually caused by dereferencing something, or maybe accessing something's field?
   LocationVirtual void;
   LocationStatic void;
@@ -63,7 +63,7 @@ func location(info *cell_info) cell_location {
 }
 
 // To "evaluate" an op, first we evaluate its precs (in unspecified order), then we ealuate the op.
-defenum gr_node {
+enum gr_node {
   XOp gr_xnode;
   QOp gr_qnode;
 };
@@ -92,7 +92,7 @@ inline func hash_equal(x *gr_num, y *gr_num) bool {
 struct sq_num { x gr_num; };
 def `~` fn[gr_num, sq_num] = wrapconvert;
 
-defenum gr_xop {
+enum gr_xop {
   GrApply gr_apply;
   GrPrimApply gr_prim_apply;
   GrMemCopy gr_memcopy;
@@ -106,7 +106,7 @@ defenum gr_xop {
   GrXNop void;
 };
 
-defenum gr_qop {
+enum gr_qop {
   GrBranch gr_branch;
   GrSequence gr_sequence;
   GrJmp gr_jmp;
@@ -214,7 +214,7 @@ struct gr_subcell {
   offset gr_offset;
 };
 
-defenum gr_offset {
+enum gr_offset {
   OffsetConst u32;
   OffsetComputed tup[u32, cell_num];
 };
@@ -246,7 +246,7 @@ struct gr_virtual_dead {
   cell cell_num;
 };
 
-defenum gr_const {
+enum gr_const {
   ConstInt bigint;
   ConstDef instpair;
   ConstFnBody fn_body_id;
@@ -1559,7 +1559,7 @@ func rval_cell(x *is_lval) cell_num {
   }
 }
 
-defenum dead_after_destroy {
+enum dead_after_destroy {
   DeadAfterDestroyYes void;
   DeadAfterDestroyNo void;
 };

@@ -678,7 +678,7 @@ func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
 
 struct regdisp { addr u8; disp i32; };
 
-defenum regdisp_or_const {
+enum regdisp_or_const {
   Regdisp regdisp;
   Const bigint;
 };

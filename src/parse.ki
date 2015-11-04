@@ -1,22 +1,22 @@
 import tok;
 
-defenum allow_blanks {
+enum allow_blanks {
   AllowBlanksNo void;
   AllowBlanksYes void;
 };
 
 // This isn't passed recursively -- "No" is used whenever parsing always expects a concrete type anyway.
-defenum allow_lifetimes {
+enum allow_lifetimes {
   AllowLifetimesNo void;
   AllowLifetimesYes void;
 };
 
-defenum force_assignment {
+enum force_assignment {
   ForceAssignmentNo void;
   ForceAssignmentYes void;
 };
 
-defenum parse_result {
+enum parse_result {
   Fail void;
   Success void;
 };
@@ -34,7 +34,7 @@ struct prec_pair {
   right i32;
 };
 
-defenum prec_cmp {
+enum prec_cmp {
   Conflicts void;
   PullsLeft void;
   PullsRight void;
@@ -177,7 +177,7 @@ func parse_toplevel(p *ps, out *ast_toplevel) parse_result {
     return parse_rest_of_defstruct(p, out);
   } else if +try_skip_keyw(p, Defclass(void)) {
     return parse_rest_of_defclass(p, out);
-  } else if +try_skip_keyw(p, Defenum(void)) {
+  } else if +try_skip_keyw(p, Enum(void)) {
     return parse_rest_of_defenum(p, out);
   } else if +try_skip_keyw(p, Access(void)) {
     return parse_rest_of_access(p, out);
@@ -581,9 +581,6 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_lifetimes, out *ast
   if case Has(m ast_meta) = try_parse_keyw(p, Void(void)) {
     *out = Name({m, p->im->cym.voidsym});
     return Success(void);
-  }
-  if +try_skip_keyw(p, Enum(void)) {
-    return success_or_fail(parse_rest_of_enum(p, out));
   }
   if +try_skip_keyw(p, Union(void)) {
     return success_or_fail(parse_rest_of_union(p, out));
@@ -1024,7 +1021,7 @@ func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_e
   }
 }
 
-defenum statement_expr {
+enum statement_expr {
   IsNotStatementExpr void;
   IsStatementExpr void;
 };
@@ -1128,7 +1125,7 @@ func parse_atomic_expr_upon_num(p *ps, n *numlit, out *ast_expr) parse_result {
   }
 }
 
-defenum allow_braces {
+enum allow_braces {
   AllowBracesNo void;
   AllowBracesYes void;
 };
@@ -1639,7 +1636,7 @@ func parse_case_pattern(p *ps, out *ast_case_pattern) parse_result {
   return Success;
 }
 
-defenum triparse_result {
+enum triparse_result {
   Success void;
   Quickfail void;
   Error void;
@@ -1949,13 +1946,13 @@ func test_parse() bool {
   pass = pass & run_parse_test(_u8("p042"),
                                _u8("func foo() a { label foo; goto bar; }"));
   pass = pass & run_parse_test(_u8("p043"),
-                               _u8("func foo() a { y union { }; z enum { }; }"));
+                               _u8("func foo() a { y union { }; }"));
   pass = pass & run_parse_test(_u8("p046-a"),
                                _u8("struct foo { x y; z int; t fn[beh]; };"));
   pass = pass & run_parse_test(_u8("p046-b"),
-                               _u8("defenum foo { x y; z int; t fn[beh]; };"));
+                               _u8("enum foo { x y; z int; t fn[beh]; };"));
   pass = pass & run_parse_test(_u8("p046-c"),
-                               _u8("defenum foo { x y; z int; t fn[beh]; };"));
+                               _u8("enum foo { x y; z int; t fn[beh]; };"));
   pass = pass & run_parse_test(_u8("p048"),
                                _u8("struct[] foo {x bar [quux]; };\n"));
   pass = pass & run_parse_test(_u8("p049-a"),

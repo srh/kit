@@ -15,7 +15,7 @@ struct cac_typeexpr {
 
 // TODO: Might this still exist in a particular scope?
 // This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics replaced consistently.
-defenum te_typeexpr {
+enum te_typeexpr {
   TeName te_name;
   TeApp te_typeapp;
   TeStruct te_struct;
@@ -26,7 +26,7 @@ defenum te_typeexpr {
   TeUnknown void;
 };
 
-defenum te_puretype {
+enum te_puretype {
   TePureName sym;
   TePureUnknown void;
 };

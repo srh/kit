@@ -134,7 +134,7 @@ func make_destroy_action(es *framescope, vn var_number, out *destroy_action) np 
   return NoFail;
 }
 
-defenum var_destruction {
+enum var_destruction {
   VarSelfContainedDestruction destroy_action;
   VarVirtualCellDead cell_num;
 };

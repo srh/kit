@@ -1,7 +1,7 @@
 import dumbanal;
 import state;
 
-defenum cell_loc {
+enum cell_loc {
   // Directly via an frame offset, per se.
   DirectLoc i32;
   // Indirectly via a pointer (through the frame offset).
@@ -177,7 +177,7 @@ func paramlist_cells(gr *frame_graph, gn gr_num) *shray[cell_num] {
   return fake();
 }
 
-defenum tmp_offsets_val {
+enum tmp_offsets_val {
   Nope void;
   Has cell_loc;
   StaticSubcell tup[cell_num, u32];
@@ -667,7 +667,7 @@ struct op_targ_gn_jmpaft {
   jmp_necessary bool;
 };
 
-defenum dumbgen_stackent {
+enum dumbgen_stackent {
   DumbgenOpAndPrecs gn_and_jmpaft;
   DumbgenOp op_targ_gn_jmpaft;
 };

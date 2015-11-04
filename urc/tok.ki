@@ -90,7 +90,7 @@ func note_original(p *ps, meta ast_meta, orig ast_original_syntax) void {
 }
 
 
-defenum keyw {
+enum keyw {
   Access void;
   Break void;
   Case void;
@@ -123,12 +123,12 @@ defenum keyw {
   While void;
 };
 
-defenum numlit {
+enum numlit {
   DecNum shray[i8];
   HexNum shray[i8];
 };
 
-defenum grouper {
+enum grouper {
   LParen void;
   RParen void;
   LBracket void;
@@ -140,7 +140,7 @@ defenum grouper {
   Backtick void;
 };
 
-defenum tokval {
+enum tokval {
   Keyw keyw;
   Num numlit;
   Oper shray[i32];
@@ -366,7 +366,6 @@ func grab_tok(p *ps) tok {
           if (grab_keyword(p, "def", Def(void), &ret)
               || grab_keyword(p, "default", Default(void), &ret)
               || grab_keyword(p, "defclass", Defclass(void), &ret)
-              || grab_keyword(p, "defenum", Defenum(void), &ret)
               || grab_keyword(p, "else", Else(void), &ret)
               || grab_keyword(p, "enum", Enum(void), &ret)
               || grab_keyword(p, "export", Export(void), &ret)

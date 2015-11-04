@@ -2,7 +2,7 @@ import eval;
 import state;
 import graph;
 
-defenum primitive_numeric_op_action {
+enum primitive_numeric_op_action {
   NumAdd void;
   NumSub void;
   NumMul void;
@@ -17,7 +17,7 @@ defenum primitive_numeric_op_action {
   NumShiftRight void;
 };
 
-defenum primitive_comparison_op_action {
+enum primitive_comparison_op_action {
   CmpEq void;
   CmpNe void;
   CmpLt void;
@@ -34,7 +34,7 @@ func op_arity(act primitive_numeric_op_action) u32 {
   }
 }
 
-defenum primitive_logical_op {
+enum primitive_logical_op {
   LogicalNot void;
   BoolEq void;
   BoolNe void;
@@ -76,7 +76,7 @@ struct primitive_conversion_op {
   to_numtraits numeric_traits;
 };
 
-defenum primitive_op {
+enum primitive_op {
   PrimNum primitive_numeric_op;
   PrimNumCompare primitive_numeric_comparison_op;
   PrimLogical primitive_logical_op;
