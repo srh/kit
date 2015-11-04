@@ -256,8 +256,15 @@ struct deftype_inst_rhstype_info {
   rhs_props type_properties;
 };
 
+struct deftype_inst_rhsstruct_info {
+  // TODO(): Uh.
+  rhs_cu cu_typeexpr;
+  rhs_props type_properties;
+};
+
 defenum deftype_inst_rhs_info {
   RhsTypeInfo deftype_inst_rhstype_info;
+  RhsStructInfo deftype_inst_rhsstruct_info;
 };
 
 struct deftype_inst_info {

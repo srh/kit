@@ -372,6 +372,9 @@ func check_pack_ctor(clq *clqueue, complete_te *te_typeexpr, props *type_propert
   switch rhs_info {
   case &RhsTypeInfo(ri deftype_inst_rhstype_info):
     *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, &ri.rhs_props)), ~ *complete_te, *props, ri.rhs_cu, ri.rhs_props});
+  case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
+    // TODO():  Uh.  Yeah.  Use MagicStructInfo?  Adapt it to our needs?
+    *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, &ri.rhs_props)), ~ *complete_te, *props, ri.rhs_cu, ri.rhs_props});
   }
   return NoFail;
 }
