@@ -2052,20 +2052,6 @@ int parse_braced_fields(struct ps *p,
   return 0;
 }
 
-int parse_rest_of_structe(struct ps *p, enum allow_blanks allow_blanks, struct pos pos_start,
-                          struct ast_structe *out, struct pos *pos_end_out) {
-  struct ast_vardecl *fields;
-  size_t fields_count;
-  if (!(skip_ws(p) && parse_braced_fields(p, allow_blanks, &fields, &fields_count))) {
-    return 0;
-  }
-  struct pos pos_end = ps_pos(p);
-  *pos_end_out = pos_end;
-  ast_structe_init(out, ast_meta_make(pos_start, pos_end),
-                   fields, fields_count);
-  return 1;
-}
-
 int parse_rest_of_unione(struct ps *p,
                          enum allow_blanks allow_blanks,
                          struct pos pos_start,
