@@ -1606,6 +1606,10 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
   return NoFail;
 }
 
+func structural_enum_type(ds *defscope, t *te_typeexpr, enum_type_out **te_typeexpr) recursive_structural_rhs_result {
+  return recursive_structural_rhs(ds, t, enum_type_out);
+}
+
 func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool) np {
   ent *deftype_entry = ref_deftype_entry(ds->cs, id);
   switch ent->accessibility {

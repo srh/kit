@@ -362,7 +362,7 @@ struct swartch_checkobj {
   swartch_lifetime te_typeexpr;
   switchable_type_lifetime te_typeexpr;
   // Will be initialized to a complete type.
-  enum_type *te_typeexpr;
+  enum_type *te_enum;
   is_deref bool;
 };
 
@@ -383,17 +383,21 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
   }
   // switchable_type is complete, because swartch type is.
   enum_type *te_typeexpr;
-  switch recursive_structural_rhs(es->ds, switchable_type, &enum_type) {
+  switch structural_enum_type(es->ds, switchable_type, &enum_type) {
   case Error(pm):
     return Printed(pm);
   case Success: { }
   case NoAccessibleStructuralRhs:
     return ERR(_u8("Inaccessible rhs hit or non-structural type in swartch"));
   }
-  // enum_type is complete, because complete_structural_rhs does that.
-  checkobj_out->enum_type = enum_type;
-  checkobj_out->is_deref = is_deref;
-  return NoFail;
+  if case &TeEnum(et te_enum) = enum_type {
+    // enum_type is complete, because complete_structural_rhs does that.
+    checkobj_out->enum_type = &et;
+    checkobj_out->is_deref = is_deref;
+    return NoFail;
+  } else {
+    return ERR(_u8("Switching over non-enum type"));
+  }
 }
 
 // expected_type_out is complete (et must be complete).
@@ -450,84 +454,83 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
 
   exitnum statement_num = add_statement(bs, None);
 
-  if case &TeEnum(et te_enum) = chk.enum_type {
-    ncases size = count(&a->cases);
-    swartch_vp varpopper;
-    init_vp(&swartch_vp, &bs->es);
-    swartch_vn var_number;
-    if case Printed(pm) = es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
-      return Printed(pm);
-    }
-    for i size = 0; i < ncases; i = i + 1 {
-      cas *ast_switch_case = ref(&a->cases, i);
-      for j size = 0; j < i; j = j + 1 {
-        if duped_patterns(&cas->pattern, &ref(&a->cases, j)->pattern) {
-          return ERR(_u8("duplicate patterns"));
-        }
-      }
+  et *te_enum = chk.enum_type;
 
-      switch &cas->pattern {
-        case &Case(patt ast_constructor_pattern): {
-          expected_type *te_typeexpr;
-          decl_index size;
-          if case Printed(pm) = check_pattern(&bs->es, &chk, &et, &patt, &expected_type, &decl_index) {
-            return Printed(pm);
-          }
-          // expected_type is complete, because check_pattern says so.
-
-          tag_value enum_tag_value = mk_enum_tag_value(decl_index);
-
-          case_vp varpopper;
-          init_vp(&case_vp, &bs->es);
-          ovn opt[var_number];
-          if case &Has(vd ast_vardecl) = &patt.decl {
-            cu_expected_type cu_typeexpr;
-            cell cell_num;
-            if case Printed(pm) = check_pattern_var(&bs->es, &patt, expected_type, &vd, &cu_expected_type, &cell) {
-              return Printed(pm);
-            }
-
-            vn var_number;
-            if case Printed(pm) = es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
-              return Printed(pm);
-            }
-            ovn = Has(vn);
-          } else {
-            voidtp cu_typrop = compute_prim(bs->clq, primitive_void_type(bs->cs));
-            unified te_typeexpr;
-            if !unify_types(&voidtp.cu.~, expected_type, &unified) {
-              return ERR(_u8("decl-free case pattern used with non-void case"));
-            }
-            ovn = None;
-          }
-          annotate(&patt.cp_info, {ovn, tag_value, enum_field_offset(bs->cs, &et, tag_value)});
-
-          body_ee entryexit;
-          if case Printed(pm) = check_body(bs, obp, &cas->body, &body_ee) {
-            return Printed(pm);
-          }
-          connect_statements(bs, num, body_ee.entry);
-          connect_statements(bs, body_ee.exit, exitnum);
-        }
-        case &Default: {
-          body_ee entryexit;
-          if case Printed(pm) = check_body(bs, obp, &cas->body, &body_ee) {
-            return Printed(pm);
-          }
-          connect_statements(bs, num, body_ee.entry);
-          connect_statements(bs, body_ee.exit, exitnum);
-        }
-      }
-    }
-    if ncases > count(&et.constructors) {
-      check(ncases == 1 + count(&et.constructors));
-      return ERR(_u8("Unnecessary default case."));
-    }
-    tag_cell cell_num = add_virtual_tag_cell(&bs->es, &et);
-    annotate(&a->info, {tag_cell, ~count(&et.constructors)});
-  } else {
-    return ERR(_u8("Switching over non-switchable type."));
+  ncases size = count(&a->cases);
+  swartch_vp varpopper;
+  init_vp(&swartch_vp, &bs->es);
+  swartch_vn var_number;
+  if case Printed(pm) = es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
+    return Printed(pm);
   }
+  for i size = 0; i < ncases; i = i + 1 {
+    cas *ast_switch_case = ref(&a->cases, i);
+    for j size = 0; j < i; j = j + 1 {
+      if duped_patterns(&cas->pattern, &ref(&a->cases, j)->pattern) {
+        return ERR(_u8("duplicate patterns"));
+      }
+    }
+
+    switch &cas->pattern {
+      case &Case(patt ast_constructor_pattern): {
+        expected_type *te_typeexpr;
+        decl_index size;
+        if case Printed(pm) = check_pattern(&bs->es, &chk, et, &patt, &expected_type, &decl_index) {
+          return Printed(pm);
+        }
+        // expected_type is complete, because check_pattern says so.
+
+        tag_value enum_tag_value = mk_enum_tag_value(decl_index);
+
+        case_vp varpopper;
+        init_vp(&case_vp, &bs->es);
+        ovn opt[var_number];
+        if case &Has(vd ast_vardecl) = &patt.decl {
+          cu_expected_type cu_typeexpr;
+          cell cell_num;
+          if case Printed(pm) = check_pattern_var(&bs->es, &patt, expected_type, &vd, &cu_expected_type, &cell) {
+            return Printed(pm);
+          }
+
+          vn var_number;
+          if case Printed(pm) = es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
+            return Printed(pm);
+          }
+          ovn = Has(vn);
+        } else {
+          voidtp cu_typrop = compute_prim(bs->clq, primitive_void_type(bs->cs));
+          unified te_typeexpr;
+          if !unify_types(&voidtp.cu.~, expected_type, &unified) {
+            return ERR(_u8("decl-free case pattern used with non-void case"));
+          }
+          ovn = None;
+        }
+        annotate(&patt.cp_info, {ovn, tag_value, enum_field_offset(bs->cs, et, tag_value)});
+
+        body_ee entryexit;
+        if case Printed(pm) = check_body(bs, obp, &cas->body, &body_ee) {
+          return Printed(pm);
+        }
+        connect_statements(bs, num, body_ee.entry);
+        connect_statements(bs, body_ee.exit, exitnum);
+      }
+      case &Default: {
+        body_ee entryexit;
+        if case Printed(pm) = check_body(bs, obp, &cas->body, &body_ee) {
+          return Printed(pm);
+        }
+        connect_statements(bs, num, body_ee.entry);
+        connect_statements(bs, body_ee.exit, exitnum);
+      }
+    }
+  }
+  if ncases > count(&et->constructors) {
+    check(ncases == 1 + count(&et->constructors));
+    return ERR(_u8("Unnecessary default case."));
+  }
+  tag_cell cell_num = add_virtual_tag_cell(&bs->es, et);
+  annotate(&a->info, {tag_cell, ~count(&et->constructors)});
+
   *exit_out = exitnum;
   return NoFail;
 }
@@ -783,61 +786,58 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
       // enum_type is complete, because check_swartch says so.
 
-      if case &TeEnum(et te_enum) = chk.enum_type {
-        if true {
-          swartch_vn var_number;
-          if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
-            return Printed(pm);
-          }
-        }
-
-        expected_type *te_typeexpr;
-        decl_index size;
-        if case Printed(pm) = check_pattern(es, &chk, &et, &b.pattern, &expected_type, &decl_index) {
+      et *te_enum = chk.enum_type;
+      if true {
+        swartch_vn var_number;
+        if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
           return Printed(pm);
         }
-        // expected_type is complete, because check_pattern says so.
-
-        tag_cell cell_num = add_virtual_tag_cell(es, &et);
-        annotate(&b.info, {{tag_cell, ~count(&et.constructors)}, mk_enum_tag_value(decl_index)});
-
-        ovn opt[var_number];
-        if case &Has(vd ast_vardecl) = &b.pattern.decl {
-          cu_expected_type cu_typeexpr;
-          cell cell_num;
-          if case Printed(pm) = check_pattern_var(es, &b.pattern, expected_type, &vd, &cu_expected_type, &cell) {
-            return Printed(pm);
-          }
-
-          annotate(&cd->virtual_cell_dead, Has(cell));
-          if case Has(p) = cd2 {
-            annotate(&p->virtual_cell_dead, Has(cell));
-          }
-          vn var_number;
-          if case Printed(pm) = es_push_var(es, cond_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
-            return Printed(pm);
-          }
-
-          ovn = Has(vn);
-        } else {
-          // TODO: At some point we just need an "is_void" function.
-          voidtp cu_typrop = compute_prim(es->clq, primitive_void_type(es->cs));
-          unified te_typeexpr;
-          if !unify_types(&voidtp.cu.~, expected_type, &unified) {
-            return ERR(_u8("decl-free case pattern used with non-void case"));
-          }
-          annotate(&cd->virtual_cell_dead, None);
-          if case Has(p) = cd2 {
-            annotate(&p->virtual_cell_dead, None);
-          }
-          ovn = None;
-        }
-        tag_value enum_tag_value = mk_enum_tag_value(decl_index);
-        annotate(&b.pattern.cp_info, {ovn, tag_value, enum_field_offset(es->cs, &et, tag_value)});
-        return NoFail;
-      } else {
-        return ERR(_u8("Condition pattern over non-switchable type."));
       }
+
+      expected_type *te_typeexpr;
+      decl_index size;
+      if case Printed(pm) = check_pattern(es, &chk, et, &b.pattern, &expected_type, &decl_index) {
+        return Printed(pm);
+      }
+      // expected_type is complete, because check_pattern says so.
+
+      tag_cell cell_num = add_virtual_tag_cell(es, et);
+      annotate(&b.info, {{tag_cell, ~count(&et->constructors)}, mk_enum_tag_value(decl_index)});
+
+      ovn opt[var_number];
+      if case &Has(vd ast_vardecl) = &b.pattern.decl {
+        cu_expected_type cu_typeexpr;
+        cell cell_num;
+        if case Printed(pm) = check_pattern_var(es, &b.pattern, expected_type, &vd, &cu_expected_type, &cell) {
+          return Printed(pm);
+        }
+
+        annotate(&cd->virtual_cell_dead, Has(cell));
+        if case Has(p) = cd2 {
+          annotate(&p->virtual_cell_dead, Has(cell));
+        }
+        vn var_number;
+        if case Printed(pm) = es_push_var(es, cond_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
+          return Printed(pm);
+        }
+
+        ovn = Has(vn);
+      } else {
+        // TODO: At some point we just need an "is_void" function.
+        voidtp cu_typrop = compute_prim(es->clq, primitive_void_type(es->cs));
+        unified te_typeexpr;
+        if !unify_types(&voidtp.cu.~, expected_type, &unified) {
+          return ERR(_u8("decl-free case pattern used with non-void case"));
+        }
+        annotate(&cd->virtual_cell_dead, None);
+        if case Has(p) = cd2 {
+          annotate(&p->virtual_cell_dead, None);
+        }
+        ovn = None;
+      }
+      tag_value enum_tag_value = mk_enum_tag_value(decl_index);
+      annotate(&b.pattern.cp_info, {ovn, tag_value, enum_field_offset(es->cs, et, tag_value)});
+      return NoFail;
     }
   }
 }
