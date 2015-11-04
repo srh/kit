@@ -3709,8 +3709,7 @@ int lookup_field_type(struct exprscope *es,
     }
 
     if (ent->is_primitive) {
-      METERR(es->cs, fieldname->meta, "Looking up %sfield on primitive type %.*s.",
-             fieldname->whole_field ? "whole " : "",
+      METERR(es->cs, fieldname->meta, "Looking up field on primitive type %.*s.",
              IM_P(es->cs->im, type->u.name.value));
       return 0;
     }
@@ -3724,19 +3723,10 @@ int lookup_field_type(struct exprscope *es,
 
     switch (deftype->rhs.tag) {
     case AST_DEFTYPE_RHS_TYPE: {
-      if (fieldname->whole_field) {
-        /* Stop here -- we don't recursively follow deftype chains on
-        whole-field access.  Maybe we shouldn't, for named fields,
-        too, but we do. */
-        ast_typeexpr_init_copy(field_type_out, &deftype->rhs.u.type);
-        return 1;
-      } else {
-        return lookup_field_type(es, &deftype->rhs.u.type, fieldname, field_type_out);
-      }
+      return lookup_field_type(es, &deftype->rhs.u.type, fieldname, field_type_out);
     } break;
     case AST_DEFTYPE_RHS_ENUMSPEC:
-      METERR(es->cs, fieldname->meta, "Looking up %sfield on enumspec type.\n",
-             fieldname->whole_field ? "whole " : "");
+      METERR(es->cs, fieldname->meta, "Looking up field on enumspec type.%s", "\n");
       return 0;
     default:
       UNREACHABLE();
@@ -3750,8 +3740,7 @@ int lookup_field_type(struct exprscope *es,
       CRASH("lookup_field_type sees an invalid generic type.");
     }
     if (ent->is_primitive) {
-      METERR(es->cs, fieldname->meta, "Looking up %sfield on primitive type.\n",
-             fieldname->whole_field ? "whole " : "");
+      METERR(es->cs, fieldname->meta, "Looking up field on primitive type.%s", "\n");
       return 0;
     }
 
@@ -3773,32 +3762,19 @@ int lookup_field_type(struct exprscope *es,
                           &deftype->rhs.u.type,
                           &concrete_deftype_type);
 
-      if (fieldname->whole_field) {
-        /* Stop here -- we don't recursively follow deftype chains on
-        whole-field access.  Maybe we shouldn't, for named fields,
-        too, but we do. */
-        *field_type_out = concrete_deftype_type;
-        return 1;
-      } else {
-        int ret = lookup_field_type(es, &concrete_deftype_type, fieldname,
-                                    field_type_out);
-        ast_typeexpr_destroy(&concrete_deftype_type);
-        return ret;
-      }
+      int ret = lookup_field_type(es, &concrete_deftype_type, fieldname,
+                                  field_type_out);
+      ast_typeexpr_destroy(&concrete_deftype_type);
+      return ret;
     } break;
     case AST_DEFTYPE_RHS_ENUMSPEC:
-      METERR(es->cs, fieldname->meta, "Looking up %sfield on enumspec type.\n",
-             fieldname->whole_field ? "whole " : "");
+      METERR(es->cs, fieldname->meta, "Looking up field on enumspec type.%s", "\n");
       return 0;
     default:
       UNREACHABLE();
     }
   } break;
   case AST_TYPEEXPR_STRUCTE: {
-    if (fieldname->whole_field) {
-      METERR(es->cs, fieldname->meta, "Looking up whole field of a naked struct type.%s", "\n");
-      return 0;
-    }
     return lookup_fields_field_type(es->cs,
                                     type->u.structe.fields,
                                     type->u.structe.fields_count,
@@ -3806,10 +3782,6 @@ int lookup_field_type(struct exprscope *es,
                                     field_type_out);
   } break;
   case AST_TYPEEXPR_UNIONE: {
-    if (fieldname->whole_field) {
-      METERR(es->cs, fieldname->meta, "Looking up whole field of a struct type.%s", "\n");
-      return 0;
-    }
     return lookup_fields_field_type(es->cs,
                                     type->u.unione.fields,
                                     type->u.unione.fields_count,
@@ -3817,8 +3789,7 @@ int lookup_field_type(struct exprscope *es,
                                     field_type_out);
   }
   case AST_TYPEEXPR_ARRAY: {
-    METERR(es->cs, fieldname->meta, "Looking up %sfield on array type.\n",
-           fieldname->whole_field ? "whole " : "");
+    METERR(es->cs, fieldname->meta, "Looking up field on array type.%s", "\n");
     return 0;
   } break;
   default:
@@ -3839,7 +3810,6 @@ int check_expr_local_field_access(
   }
 
   if (ast_expr_type(x->lhs)->tag == AST_TYPEEXPR_ARRAY
-      && !x->fieldname.whole_field
       && x->fieldname.ident.value == es->cs->cm.array_length_fieldname) {
     struct ast_typeexpr size_type;
     init_name_type(&size_type, es->cs->cm.size_type_name);
@@ -3866,12 +3836,8 @@ int check_expr_local_field_access(
   }
 
   if (!unify_directionally(es->cs->im, partial_type, &field_type)) {
-    if (x->fieldname.whole_field) {
-      METERR(es->cs, x->meta, "'Whole field' has wrong type for expression context.%s", "\n");
-    } else {
-      METERR(es->cs, x->meta, "Field '%.*s' has wrong type for expression context.\n",
-             IM_P(es->cs->im, x->fieldname.ident.value));
-    }
+    METERR(es->cs, x->meta, "Field '%.*s' has wrong type for expression context.\n",
+           IM_P(es->cs->im, x->fieldname.ident.value));
     goto cleanup_field_type;
   }
 
@@ -5886,7 +5852,7 @@ int check_more_testcases(struct identmap *im) {
   /* Fails because vec3 and [3]u32 are different types. */
   pass &= check_negcase(
       im, "check_file_test_more_12",
-      "deftype vec3 ^[3]u32;\n"
+      "struct vec3 { x ^[3]u32; };\n"
       "def foo fn[^[3]u32, vec3] = func(arr ^[3]u32) vec3 {\n"
       "  v vec3 = arr;\n"
       "  return v;\n"
@@ -6026,9 +5992,9 @@ int check_more_testcases(struct identmap *im) {
       "def bar fn[*ty[i32], i32] = foo;\n");
   pass &= check_foocase(
       im, "check_file_test_more_28",
-      "deftype ty i32;\n"
+      "struct ty { x i32; };\n"
       "def foo fn[ty, i32] = func(t ty) i32 {\n"
-      "  return t.~;\n"
+      "  return t.x;\n"
       "};\n");
   /* Fails (unlike more_28) because ty is defclass, and the conversion
   operator is private.  Or, now, we just have field access private. */
@@ -6356,10 +6322,10 @@ int check_more_testcases(struct identmap *im) {
       "}\n");
   pass &= check_foocase(
       im, "check_file_test_more_57",
-      "deftype notsize u32;\n"
+      "struct notsize { x u32; };\n"
       "func `~`(x u32) notsize {\n"
       "  ret notsize;\n"
-      "  ret.~ = x;\n"
+      "  ret.x = x;\n"
       "  return ret;\n"
       "}\n"
       "func foo(x u32) notsize {\n"

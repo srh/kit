@@ -869,31 +869,18 @@ void ast_fieldname_init(struct ast_fieldname *a,
                         struct ast_meta meta,
                         struct ast_ident ident) {
   a->meta = meta;
-  a->whole_field = 0;
   a->ident = ident;
 }
 
 void ast_fieldname_init_copy(struct ast_fieldname *a,
                              struct ast_fieldname *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  a->whole_field = c->whole_field;
-  if (!c->whole_field) {
-    ast_ident_init_copy(&a->ident, &c->ident);
-  }
-}
-
-void ast_fieldname_init_whole(struct ast_fieldname *a,
-                              struct ast_meta meta) {
-  a->meta = meta;
-  a->whole_field = 1;
+  ast_ident_init_copy(&a->ident, &c->ident);
 }
 
 void ast_fieldname_destroy(struct ast_fieldname *a) {
   ast_meta_destroy(&a->meta);
-  if (!a->whole_field) {
-    ast_ident_destroy(&a->ident);
-  }
-  a->whole_field = 0;
+  ast_ident_destroy(&a->ident);
 }
 
 void ast_local_field_access_init(struct ast_local_field_access *a,

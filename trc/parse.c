@@ -408,18 +408,6 @@ int skip_string(struct ps *p, const char *s) {
   }
 }
 
-int try_skip_tilder(struct ps *p, const char *s) {
-  struct ps_savestate save = ps_save(p);
-  if (skip_string(p, s)) {
-    if (ps_peek(p) != '~') {
-      ps_count_leaf(p);
-      return 1;
-    }
-  }
-  ps_restore(p, save);
-  return 0;
-}
-
 int try_skip_char(struct ps *p, char ch) {
   CHECK(ch > 0);
   if (ps_peek(p) == ch) {
@@ -1941,17 +1929,6 @@ int parse_after_atomic(struct ps *p, struct pos pos_start, struct ast_expr lhs,
       ast_expr_partial_init(&lhs, AST_EXPR_INDEX, ast_expr_info_default());
       ast_index_expr_init(&lhs.u.index_expr, ast_meta_make(pos_start, ps_pos(p)),
                           old_lhs, arg);
-    } else if (try_skip_tilder(p, ".~")) {
-      struct ast_fieldname fieldname;
-      ast_fieldname_init_whole(&fieldname, ast_meta_make(pos_fieldname, ps_pos(p)));
-
-      struct ast_expr old_lhs = lhs;
-      ast_expr_partial_init(&lhs, AST_EXPR_LOCAL_FIELD_ACCESS,
-                            ast_expr_info_default());
-      ast_local_field_access_init(&lhs.u.local_field_access,
-                                  ast_meta_make(pos_start, ps_pos(p)),
-                                  old_lhs,
-                                  fieldname);
     } else if (try_skip_oper(p, ".")) {
       struct ast_ident ident;
       if (!(skip_ws(p) && parse_ident(p, &ident))) {
@@ -1966,17 +1943,6 @@ int parse_after_atomic(struct ps *p, struct pos pos_start, struct ast_expr lhs,
       ast_expr_partial_init(&lhs, AST_EXPR_LOCAL_FIELD_ACCESS,
                             ast_expr_info_default());
       ast_local_field_access_init(&lhs.u.local_field_access,
-                                  ast_meta_make(pos_start, ps_pos(p)),
-                                  old_lhs,
-                                  fieldname);
-    } else if (try_skip_tilder(p, "->~")) {
-      struct ast_fieldname fieldname;
-      ast_fieldname_init_whole(&fieldname, ast_meta_make(pos_fieldname, ps_pos(p)));
-
-      struct ast_expr old_lhs = lhs;
-      ast_expr_partial_init(&lhs, AST_EXPR_DEREF_FIELD_ACCESS,
-                            ast_expr_info_default());
-      ast_deref_field_access_init(&lhs.u.deref_field_access,
                                   ast_meta_make(pos_start, ps_pos(p)),
                                   old_lhs,
                                   fieldname);
@@ -3039,9 +3005,9 @@ int parse_test_defs(void) {
                          35);
   pass &= run_count_test("def34",
                          "func foo() void {\n"
-                         "  return x->~.~->~;\n"
+                         "  return x->x.x->x;\n"
                          "}\n",
-                         13);
+                         16);
   pass &= run_count_test("def35",
                          "func foo() void {\n"
                          "  if case Foo(x) = y {\n"

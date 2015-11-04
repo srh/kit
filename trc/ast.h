@@ -549,16 +549,12 @@ void ast_binop_expr_init(struct ast_binop_expr *a, struct ast_meta meta,
 
 struct ast_fieldname {
   struct ast_meta meta;
-  int whole_field;
   struct ast_ident ident;
 };
 
 void ast_fieldname_init(struct ast_fieldname *a,
                         struct ast_meta meta,
                         struct ast_ident ident);
-
-void ast_fieldname_init_whole(struct ast_fieldname *a,
-                              struct ast_meta meta);
 
 void ast_fieldname_init_copy(struct ast_fieldname *a,
                              struct ast_fieldname *c);

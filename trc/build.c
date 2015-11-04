@@ -96,7 +96,7 @@ struct loc gen_field_loc(struct checkstate *cs,
                          struct frame *h,
                          struct loc lhs_loc,
                          struct ast_typeexpr *type,
-                         ident_value *fieldname_or_null_for_whole_thing);
+                         ident_value fieldname);
 
 struct loc gen_array_element_loc(struct checkstate *cs,
                                  struct objfile *f,
@@ -1655,10 +1655,10 @@ void really_gen_typetrav_behavior(struct checkstate *cs, struct objfile *f,
   case AST_TYPEEXPR_STRUCTE: {
     for (size_t i = 0, e = type->u.structe.fields_count; i < e; i++) {
       int32_t saved_offset = frame_save_offset(h);
-      struct loc dest_field_loc = gen_field_loc(cs, f, h, dest, type, &type->u.structe.fields[i].name.value);
+      struct loc dest_field_loc = gen_field_loc(cs, f, h, dest, type, type->u.structe.fields[i].name.value);
       struct loc src_field_loc;
       if (has_src) {
-        src_field_loc = gen_field_loc(cs, f, h, src, type, &type->u.structe.fields[i].name.value);
+        src_field_loc = gen_field_loc(cs, f, h, src, type, type->u.structe.fields[i].name.value);
       } else {
         src_field_loc.tag = (enum loc_tag)-1;
       }
@@ -3975,20 +3975,14 @@ struct loc gen_field_loc(struct checkstate *cs,
                          struct frame *h,
                          struct loc lhs_loc,
                          struct ast_typeexpr *type,
-                         ident_value *fieldname_or_null_for_whole_thing) {
+                         ident_value fieldname) {
   /* Generally speaking: There's no way the field possibly gets a
   padded_size, because the first N fields of two struct types, if
   identical, need to be accessible when they're in a union without
   touching subsequent fields. */
   uint32_t size;
   uint32_t offset;
-  if (!fieldname_or_null_for_whole_thing) {
-    size = x86_sizeof(&cs->nt, type);
-    offset = 0;
-  } else {
-    x86_field_sizeoffset(&cs->nt, type, *fieldname_or_null_for_whole_thing,
-                         &size, &offset);
-  }
+  x86_field_sizeoffset(&cs->nt, type, fieldname, &size, &offset);
 
   return gen_subobject_loc(f, h, lhs_loc, size, offset);
 }
@@ -4039,8 +4033,7 @@ void apply_field_access(struct checkstate *cs,
                         struct ast_fieldname *fieldname,
                         struct ast_typeexpr *field_type,
                         struct expr_return *er) {
-  struct loc field_loc = gen_field_loc(cs, f, h, lhs_loc, type,
-                                       fieldname->whole_field ? NULL : &fieldname->ident.value);
+  struct loc field_loc = gen_field_loc(cs, f, h, lhs_loc, type, fieldname->ident.value);
   expr_return_set(cs, f, h, er, field_loc, field_type, temp_subobject(lhs_tr));
 }
 
@@ -4053,7 +4046,6 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
   }
   struct ast_typeexpr *lhs_type = ast_expr_type(a->u.local_field_access.lhs);
   if (lhs_type->tag == AST_TYPEEXPR_ARRAY) {
-    CHECK(!a->u.local_field_access.fieldname.whole_field);
     CHECK(a->u.local_field_access.fieldname.ident.value == cs->cm.array_length_fieldname);
     gen_destroy_temp(cs, f, h, *er_tr(&lhs_er));
     uint32_t lhs_arraytype_count = unsafe_numeric_literal_u32(&lhs_type->u.arraytype.number);
@@ -4106,7 +4098,7 @@ int gen_strinit_expr(struct checkstate *cs, struct objfile *f,
     if (stype->tag == AST_TYPEEXPR_STRUCTE) {
       CHECK(stype->u.structe.fields_count == a->u.strinit.exprs_count);
       field_loc = gen_field_loc(cs, f, h, loc, stype,
-                                &stype->u.structe.fields[i].name.value);
+                                stype->u.structe.fields[i].name.value);
     } else {
       CHECK(stype->tag == AST_TYPEEXPR_ARRAY);
       CHECK(unsafe_numeric_literal_u32(&stype->u.arraytype.number) == size_to_uint32(a->u.strinit.exprs_count));
