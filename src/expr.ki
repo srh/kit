@@ -1602,28 +1602,26 @@ defenum structural_struct_type_result {
 
 // st_out is just the inside te_struct of struct_type_out.  Some caller wants it.
 func structural_struct_type(ds *defscope, t *te_typeexpr, struct_type_out **te_typeexpr, st_out **te_struct) structural_struct_type_result {
-  struct_type *te_typeexpr;
-  switch complete_structural_rhs(ds, t, &struct_type) {
-  case Error(pm):
-    return Error(pm);
-  case SuccessHasRhs:
-    // TODO(): Dedup cases.
-    if case &TeStruct(st te_struct) = struct_type {
-      *struct_type_out = struct_type;
-      *st_out = &st;
-      return Success;
+  if case Has(pack te_instpack) = type_pack(t) {
+    cu_rhs *cu_typeexpr;
+    res structural_rhs_result = help_structural_rhs(ds, &pack, &cu_rhs);
+    // TODO(): Cleanup help_structural_rhs return codes, avoid weird successful/half-switch.
+    if successful(res) {
+      if case &TeStruct(st te_struct) = &cu_rhs->~ {
+        *struct_type_out = &cu_rhs->~;
+        *st_out = &st;
+        return Success;
+      } else {
+        return NotAccessibleStruct;
+      }
     } else {
-      return NotAccessibleStruct;
+      switch res {
+      case Error(pm): return Error(pm);
+      case NoAccessibleStructuralRhs: return NotAccessibleStruct;
+      }
     }
-  case SuccessNoRhs:
-    if case &TeStruct(st te_struct) = struct_type {
-      *struct_type_out = struct_type;
-      *st_out = &st;
-      return Success;
-    } else {
-      return NotAccessibleStruct;
-    }
-  case NoAccessibleStructuralRhs:
+  } else {
+    // We don't allow strinit exprs on raw struct types anymore.
     return NotAccessibleStruct;
   }
 }
