@@ -104,7 +104,7 @@ func make_init_action(es *framescope, vn var_number, out *init_action) np {
   if case Printed(pm) = get_init_ctor(es->ds, &vi->type, &init) {
     return Printed(pm);
   }
-  ia init_action = {init, vi->cell};
+  ia init_action = +{init, vi->cell};
   *out = ia;
   return NoFail;
 }
@@ -129,7 +129,7 @@ func make_destroy_action(es *framescope, vn var_number, out *destroy_action) np 
   if case Printed(pm) = get_destroy_ctor(es->ds, &vi->type, &destroy) {
     return Printed(pm);
   }
-  da destroy_action = {destroy, vi->cell};
+  da destroy_action = +{destroy, vi->cell};
   *out = da;
   return NoFail;
 }
@@ -655,7 +655,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
         if case Printed(pm) = get_init_ctor(bs->ds, complete_type, &init) {
           return Printed(pm);
         }
-        ia init_action = {init, cell};
+        ia init_action = +{init, cell};
         x = Has(ia);
       }
     }

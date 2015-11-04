@@ -615,8 +615,14 @@ struct bi_action {
 deftype copy_action bi_action;
 deftype move_action bi_action;
 
+def `+` fn[bi_action, copy_action] = wrapconvert;
+def `+` fn[bi_action, move_action] = wrapconvert;
+
 deftype destroy_action uni_action;
 deftype init_action uni_action;
+
+def `+` fn[uni_action, destroy_action] = wrapconvert;
+def `+` fn[uni_action, init_action] = wrapconvert;
 
 struct uni_action {
   ctor ctor_desc;
