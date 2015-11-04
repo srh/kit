@@ -128,14 +128,14 @@ func test_check_basic_cases(ctx *check_ctx) void {
     _u8("def x u32 = -3;"));
   run_check_test(ctx, "c002",
     _u8("def x i32 = 3;\n"
-        "deftype dword u32;\n"
-        "deftype blah dword;\n"
-        "deftype feh *blah;\n"
-        "deftype quux *quux;\n"));
+        "struct dword { x u32; };\n"
+        "struct blah { x dword; };\n"
+        "struct feh { x *blah; };\n"
+        "struct quux { x *quux; };\n"));
   // Fails because foo holds itself flatly.
   run_check_negtest(ctx, "c003",
-    _u8("deftype foo bar;\n"
-        "deftype bar foo;\n"));
+    _u8("struct foo { x bar; };\n"
+        "struct bar { x foo; };\n"));
   run_check_test(ctx, "c004",
     _u8("def x i32 = 3;\n"
         "struct foo { x u32; y i32; z *foo; };\n"));
@@ -152,7 +152,7 @@ func test_check_basic_cases(ctx *check_ctx) void {
   run_check_negtest(ctx, "c006-c",
     _u8("def x i32 = 3;"
         "struct[T] foo { count u32; p whatever[T]; };\n"
-        "deftype bar foo[i32];\n"));
+        "struct bar { x foo[i32]; }\n"));
   // Fails because bar recursively holds itself through a template parameter.
   run_check_negtest(ctx, "c007",
     _u8("struct[T, U] foo { x *T; y U; };\n"
@@ -480,7 +480,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"));
   // Fails because vec3 and [3]u32 are different types.
   run_check_negtest(ctx, "c052",
-    _u8("deftype vec3 ^[3]u32;\n"
+    _u8("struct vec3 { x ^[3]u32; };\n"
         "def foo fn[^[3]u32, vec3] = func(arr ^[3]u32) vec3 {\n"
         "  v vec3 = arr;\n"
         "  return v;\n"
@@ -1235,10 +1235,10 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
   run_check_negtest(ctx, "c129-b",
     _u8("func[T, T] foo() void { }\n"));
   run_check_test(ctx, "c129-c",
-    _u8("deftype[T, U] ty i32;\n"));
+    _u8("struct[T, U] ty { x i32; };\n"));
   // Fails because of duplicate generics.
   run_check_negtest(ctx, "c129-c",
-    _u8("deftype[T, T] ty i32;\n"));
+    _u8("struct[T, T] ty { x i32; };\n"));
   // Fails because fn type has variadic after-arity of 1.
   run_check_negtest(ctx, "c130-a",
     _u8("struct foo { x fn[]; };\n"));

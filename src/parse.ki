@@ -175,8 +175,6 @@ func parse_toplevel(p *ps, out *ast_toplevel) parse_result {
     return parse_rest_of_import(p, out);
   } else if +try_skip_keyw(p, Struct(void)) {
     return parse_rest_of_defstruct(p, out);
-  } else if +try_skip_keyw(p, Deftype(void)) {
-    return parse_rest_of_deftype(p, out);
   } else if +try_skip_keyw(p, Defclass(void)) {
     return parse_rest_of_defclass(p, out);
   } else if +try_skip_keyw(p, Defenum(void)) {
@@ -261,20 +259,6 @@ func parse_rest_of_import(p *ps, out *ast_toplevel) parse_result {
     return Fail;
   }
   *out = Import({name});
-  return Success;
-}
-
-func parse_rest_of_deftype(p *ps, out *ast_toplevel) parse_result {
-  generics ast_generics;
-  name ast_ident;
-  type ast_typeexpr;
-  if !(+parse_generics_if_present(p, &generics)
-       && +parse_ident(p, &name)
-       && +parse_typeexpr(p, &type)
-       && +try_skip_oper(p, ';')) {
-    return Fail;
-  }
-  *out = TypeDef({generics, name, TypeexprRhs(type)});
   return Success;
 }
 
@@ -1966,20 +1950,12 @@ func test_parse() bool {
                                _u8("func foo() a { label foo; goto bar; }"));
   pass = pass & run_parse_test(_u8("p043"),
                                _u8("func foo() a { y union { }; z enum { }; }"));
-  pass = pass & run_parse_test(_u8("p044"),
-                               _u8(" deftype foo bar ;"));
-  pass = pass & run_parse_test(_u8("p045-a"),
-                               _u8("deftype foo fn[int, int] ;"));
-  pass = pass & run_parse_test(_u8("p045-b"),
-                               _u8("deftype foo fn[int, int] ;"));
   pass = pass & run_parse_test(_u8("p046-a"),
                                _u8("struct foo { x y; z int; t fn[beh]; };"));
   pass = pass & run_parse_test(_u8("p046-b"),
-                               _u8("deftype foo enum { x y; z int; t fn[beh]; };"));
+                               _u8("defenum foo { x y; z int; t fn[beh]; };"));
   pass = pass & run_parse_test(_u8("p046-c"),
                                _u8("defenum foo { x y; z int; t fn[beh]; };"));
-  pass = pass & run_parse_test(_u8("p047"),
-                               _u8("deftype[] foo bar;\n"));
   pass = pass & run_parse_test(_u8("p048"),
                                _u8("struct[] foo {x bar [quux]; };\n"));
   pass = pass & run_parse_test(_u8("p049-a"),
