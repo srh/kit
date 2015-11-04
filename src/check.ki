@@ -249,23 +249,51 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) n
   }
 }
 
-func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **te_typeexpr) np {
+func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rhs_spec) np {
   switch &np->rhs {
     case &NotComputed: {
       np->rhs = BeganComputing();
-      a *ast_typeexpr = deftype_rhs_type(&np->tl->rhs);
-      converted te_typeexpr;
-      if case Printed(pm) = convert_typeexpr(cs, a, &converted) {
-        np->rhs = FailedComputation();
-        return Printed(pm);
+      switch &np->tl->rhs {
+      case &TypeexprRhs(a ast_typeexpr):
+        converted te_typeexpr;
+        if case Printed(pm) = convert_typeexpr(cs, &a, &converted) {
+          np->rhs = FailedComputation();
+          return Printed(pm);
+        }
+        np->rhs = Computed(RhsWithType(converted));
+        if case &Computed(b deftype_rhs_spec) = &np->rhs {
+          *out = &b;
+        } else {
+          crash(_u8("impossible rhs"));
+        }
+        return NoFail;
+      case &ClassexprRhs(a ast_classexpr_rhs):
+        converted te_typeexpr;
+        if case Printed(pm) = convert_typeexpr(cs, &a.rhs_type, &converted) {
+          np->rhs = FailedComputation();
+          return Printed(pm);
+        }
+        np->rhs = Computed(RhsWithType(converted));
+        if case &Computed(b deftype_rhs_spec) = &np->rhs {
+          *out = &b;
+        } else {
+          crash(_u8("impossible rhs"));
+        }
+        return NoFail;
+      case &DefstructRhs(a ast_defstruct_rhs):
+        converted te_typeexpr;
+        if case Printed(pm) = convert_typeexpr(cs, &a.type, &converted) {
+          np->rhs = FailedComputation();
+          return Printed(pm);
+        }
+        np->rhs = Computed(@[deftype_rhs_spec]DefstructRhsSpec({converted}));
+        if case &Computed(b deftype_rhs_spec) = &np->rhs {
+          *out = &b;
+        } else {
+          crash(_u8("impossible rhs"));
+        }
+        return NoFail;
       }
-      np->rhs = Computed(converted);
-      if case &Computed(te te_typeexpr) = &np->rhs {
-        *out = &te;
-      } else {
-        crash(_u8("impossible rhs"));
-      }
-      return NoFail;
     }
     case &BeganComputing: {
       return ERR(_u8("recursively computing deftype's rhs"));
@@ -273,7 +301,7 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **te_typeexp
     case &FailedComputation: {
       return ERR(_u8("repeat of error in deftype_converted_rhs"));
     }
-    case &Computed(x te_typeexpr): {
+    case &Computed(x deftype_rhs_spec): {
       *out = &x;
       return NoFail;
     }
@@ -821,14 +849,6 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) np {
   }
 }
 
-func deftype_rhs_type(rhs *ast_type_def_rhs) *ast_typeexpr {
-  switch rhs {
-    case &TypeexprRhs(a ast_typeexpr): { return &a; }
-    case &ClassexprRhs(a ast_classexpr_rhs): { return &a.rhs_type; }
-    case &DefstructRhs(a ast_defstruct_rhs): { return &a.type; }
-  }
-}
-
 func subsequent_depth(cs *checkstate, parms *idy_repls) u32 {
   if empty(&parms->tys) {
     return 0;
@@ -1189,25 +1209,41 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
       inst->info = BeganComputing();
 
       if case &Has(np deftype_nonprim) = &ent->nonprim {
-        ent_rhs *te_typeexpr;
+        ent_rhs *deftype_rhs_spec;
         if case Printed(pm) = deftype_converted_rhs(cs, &np, &ent_rhs) {
           return Printed(pm);
         }
 
         rhs_computed cac_typeexpr;
-        if case Printed(pm) = check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms.repls, ent_rhs, &rhs_computed) {
-          inst->info = FailedComputation();
-          return Printed(pm);
-        }
-        check(rhs_computed.complete);
-
-        check(isBeganComputing(&inst->info));
         rhs_props type_properties;
-        if case Printed(pm) = compute_complete_type_properties(cs, clq, &rhs_computed.te, &rhs_props) {
-          inst->info = FailedComputation();
-          return Printed(pm);
+        switch ent_rhs {
+        case &RhsWithType(rhs_type te_typeexpr):
+          if case Printed(pm) = check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms.repls, &rhs_type, &rhs_computed) {
+            inst->info = FailedComputation();
+            return Printed(pm);
+          }
+          check(rhs_computed.complete);
+
+          check(isBeganComputing(&inst->info));
+          if case Printed(pm) = compute_complete_type_properties(cs, clq, &rhs_computed.te, &rhs_props) {
+            inst->info = FailedComputation();
+            return Printed(pm);
+          }
+          check(isBeganComputing(&inst->info));
+        case &DefstructRhsSpec(drs defstruct_rhs_spec):
+          if case Printed(pm) = check_and_compute_typeexpr(cs, clq, &ent->generics, &inst->parms.repls, &drs.type, &rhs_computed) {
+            inst->info = FailedComputation();
+            return Printed(pm);
+          }
+          check(rhs_computed.complete);
+
+          check(isBeganComputing(&inst->info));
+          if case Printed(pm) = compute_complete_type_properties(cs, clq, &rhs_computed.te, &rhs_props) {
+            inst->info = FailedComputation();
+            return Printed(pm);
+          }
+          check(isBeganComputing(&inst->info));
         }
-        check(isBeganComputing(&inst->info));
         switch &np.tl->rhs {
         case &TypeexprRhs(a ast_typeexpr):
           inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsTypeInfo({~rhs_computed.te, rhs_props})), rhs_props});
@@ -1242,7 +1278,7 @@ func ensure_deftype_inst_checked(cs *checkstate, clq *clqueue, ent_id deftype_en
 func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) np {
   ent *deftype_entry = ref_deftype_entry(cs, id);
   if case &Has(np deftype_nonprim) = &ent->nonprim {
-    discard *te_typeexpr;
+    discard *deftype_rhs_spec;
     if case Printed(pm) = deftype_converted_rhs(cs, &np, &discard) {
       return Printed(pm);
     }
