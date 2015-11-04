@@ -6,20 +6,20 @@ struct frame_graph {
   ops array[gr_node];
 };
 
-deftype cell_num size;
+struct cell_num { x size; };
 
 def `~` fn[size, cell_num] = wrapconvert;
 def `==` fn[cell_num, cell_num, bool] = wrapequate;
-func `!=`(x cell_num, y cell_num) bool { return x.~ != y.~; }
-func `<`(x cell_num, y cell_num) bool { return x.~ < y.~; }
+func `!=`(x cell_num, y cell_num) bool { return x.x != y.x; }
+func `<`(x cell_num, y cell_num) bool { return x.x < y.x; }
 func[H] build_u8str(help H, r *array[u8], c *cell_num) void {
-  build_u8str(help, r, &c->~);
+  build_u8str(help, r, &c->x);
 }
 inline func hash_compute_hash(x *cell_num) osize {
-  return hash_compute_hash(&x->~);
+  return hash_compute_hash(&x->x);
 }
 inline func hash_equal(x *cell_num, y *cell_num) bool {
-  return x->~ == y->~;
+  return x->x == y->x;
 }
 
 /* A cell location is tricky: the location of an expr's return value
@@ -77,19 +77,19 @@ struct gr_qnode {
   op gr_qop;
 };
 
-deftype gr_num size;
+struct gr_num { x size; };
 def `~` fn[size, gr_num] = wrapconvert;
-func `==`(x gr_num, y gr_num) bool { return x.~ == y.~; }
-func `!=`(x gr_num, y gr_num) bool { return x.~ != y.~; }
-func `<`(x gr_num, y gr_num) bool { return x.~ < y.~; }
+func `==`(x gr_num, y gr_num) bool { return x.x == y.x; }
+func `!=`(x gr_num, y gr_num) bool { return x.x != y.x; }
+func `<`(x gr_num, y gr_num) bool { return x.x < y.x; }
 inline func hash_compute_hash(n *gr_num) osize {
-  return hash_compute_hash(&n->~);
+  return hash_compute_hash(&n->x);
 }
 inline func hash_equal(x *gr_num, y *gr_num) bool {
-  return x->~ == y->~;
+  return x->x == y->x;
 }
 
-deftype sq_num gr_num;
+struct sq_num { x gr_num; };
 def `~` fn[gr_num, sq_num] = wrapconvert;
 
 defenum gr_xop {
@@ -154,7 +154,7 @@ func addq(gr *frame_graph, op gr_qop) sq_num {
 }
 
 func mut_qnop_node(gr *frame_graph, ix sq_num, newnode gr_qnode) void {
-  node *gr_node = ref_node(gr, ix.~);
+  node *gr_node = ref_node(gr, ix.x);
   switch node {
   case &XOp(xn gr_xnode):
     ice(_u8("mut_qnop_node sees XOp"));
@@ -168,11 +168,11 @@ func mut_qnop_node(gr *frame_graph, ix sq_num, newnode gr_qnode) void {
 }
 
 inline func ref_cell(gr *frame_graph, c cell_num) *cell_info {
-  return ref(&gr->cells, c.~);
+  return ref(&gr->cells, c.x);
 }
 
 inline func ref_node(gr *frame_graph, gn gr_num) *gr_node {
-  return ref(&gr->ops, gn.~);
+  return ref(&gr->ops, gn.x);
 }
 
 struct gr_apply {
@@ -321,7 +321,7 @@ func gr_fullbody(clq *clqueue, gr *frame_graph, x *ast_fullbody, out *gr_num, re
                    addx(gr, freeze(&return_subcell_deads), @[gr_xop]GrXNop(void)),
                    nopq(gr)})});
 
-  *out = seqop.~;
+  *out = seqop.x;
   *return_cell_out = info->return_cell;
   return NoFail;
 }
@@ -456,7 +456,7 @@ func gr_continue_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, ob
 
 func gr_goto_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_goto_statement, outflow sq_num, out *sq_num) np {
   info *ast_goto_statement_info = unHas(&a->info);
-  jmp sq_num = get(&fb->label_gn, info->label_number.~);
+  jmp sq_num = get(&fb->label_gn, info->label_number.x);
   wn sq_num;
   if case Printed(pm) = gr_wind_vars(clq, gr, &info->initializations, jmp, &wn) {
     return Printed(pm);
@@ -470,7 +470,7 @@ func gr_goto_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast
 }
 
 func gr_label_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_label_statement, outflow sq_num, out *sq_num) np {
-  gn sq_num = get(&fb->label_gn, unHas(&a->info)->label_number.~);
+  gn sq_num = get(&fb->label_gn, unHas(&a->info)->label_number.x);
   mut_qnop_node(gr, gn, {@[gr_qop]GrJmp({outflow})});
   // Should we set *out to gn or outflow?  When labels get fancier, the answer will matter.
   *out = gn;
@@ -484,7 +484,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg 
   }
 
   param_discard *te_typeexpr;
-  is_ptr bool = decompose_typeapp(&expr_complete_type(&oo(&a->swartch)->expr)->~, primitive_pointer_puretype(clq->cs), &param_discard);
+  is_ptr bool = decompose_typeapp(&expr_complete_type(&oo(&a->swartch)->expr)->x, primitive_pointer_puretype(clq->cs), &param_discard);
 
   exitseq var = seqq(gr, {swartch_discard_gn, outflow});
 
@@ -501,7 +501,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg 
       case &Case(cp ast_constructor_pattern): {
         cp_info *ast_cp_info = unHas(&cp.cp_info);
         if case Has(vn var_number) = cp_info->ovn {
-          vi *var_info = ref(&fb->all_vars, vn.~);
+          vi *var_info = ref(&fb->all_vars, vn.x);
 
           kill_var gr_num = addx(gr, @[gr_xop]GrVirtualDead({vi->cell}));
           bodyexit sq_num = seqq(gr, {kill_var, exitseq});
@@ -548,10 +548,10 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg 
   nconstructors size = count(&cases);
   for i size = 0; i < nconstructors; i = i + 1 {
     if case Has(sq sq_num) = get(&cases, i) {
-      push(&branch_cases, {ConstInt(bigu(mk_enum_tag_value(i).~)), sq});
+      push(&branch_cases, {ConstInt(bigu(mk_enum_tag_value(i).x)), sq});
     } else {
       if case Has(dq sq_num) = default_case {
-        push(&branch_cases, {ConstInt(bigu(mk_enum_tag_value(i).~)), dq});
+        push(&branch_cases, {ConstInt(bigu(mk_enum_tag_value(i).x)), dq});
       }
     }
   }
@@ -777,10 +777,10 @@ func gr_condition(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_cond
       reserve(&cases, n);
       for i size = 0; i < n; i = i + 1 {
         tag enum_tag_value = mk_enum_tag_value(i);
-        if info->matching_tag_value.~ == tag.~ {
+        if info->matching_tag_value.x == tag.x {
           cp_info *ast_cp_info = unHas(&pa.pattern.cp_info);
           if case Has(vn var_number) = cp_info->ovn {
-            vi *var_info = ref(&fb->all_vars, vn.~);
+            vi *var_info = ref(&fb->all_vars, vn.x);
             vcgn gr_num;
             if isHas(&pa.pattern.addressof_constructor) {
               vcgn = addx(gr, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)}));
@@ -790,16 +790,16 @@ func gr_condition(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_cond
             gn var = seqq(gr, {vcgn, thengn});
             tagdead gr_num = addx(gr, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
             thenseq sq_num = seqq(gr, {tagdead, gn});
-            push(&cases, {@[gr_const]ConstInt(~tag.~), thenseq});
+            push(&cases, {@[gr_const]ConstInt(~tag.x), thenseq});
           } else {
             tagdead gr_num = addx(gr, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
             thenseq sq_num = seqq(gr, {tagdead, thengn});
-            push(&cases, {@[gr_const]ConstInt(~tag.~), thenseq});
+            push(&cases, {@[gr_const]ConstInt(~tag.x), thenseq});
           }
         } else {
           tagdead gr_num = addx(gr, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
           elseseq sq_num = seqq(gr, {tagdead, elsegn});
-          push(&cases, {@[gr_const]ConstInt(~tag.~), elseseq});
+          push(&cases, {@[gr_const]ConstInt(~tag.x), elseseq});
         }
       }
       br var = seqq(gr, {taggn,
@@ -893,7 +893,7 @@ func gr_expr_discard(clq *clqueue, gr *frame_graph, x *ast_expr_discard, out *gr
     return Printed(pm);
   }
   gn sq_num = seqq(gr, {dp, seq1(gr, after_gn)});
-  *out = gn.~;
+  *out = gn.x;
   return NoFail;
 }
 
@@ -1049,7 +1049,7 @@ func gr_mk_ternary(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_ternary, o
   seq sq_num = seqq(gr, {
     addx(gr, @[gr_xop]GrWriteNothing({conjoined})),
     cond_sn});
-  *out = seq.~;
+  *out = seq.x;
   return NoFail;
 }
 
@@ -1070,11 +1070,11 @@ func gr_mk_strinit(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_strinit, o
 
     prec1 sq_num = seqq(gr, {dep, seq1(gr, aftdep)});
     prec sq_num = seqq(gr, {befdep, prec1});
-    push(&precs, prec.~);
+    push(&precs, prec.x);
   }
   np var = addx(gr, freeze(&precs), @[gr_xop]GrXNop(void));
   gn sq_num = seqq(gr, {ngn, seq1(gr, np)});
-  *out = gn.~;
+  *out = gn.x;
   return NoFail;
 }
 
@@ -1092,7 +1092,7 @@ func gr_deref_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_deref_fie
     case &DerefArrayLength(count u32): {
       cp var = addx(gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~count)}));
       sp var = seqq(gr, {rp, seq1(gr, ap)});
-      gn var = addx(gr, mk_shray(sp.~, cp), @[gr_xop]GrXNop(void));
+      gn var = addx(gr, mk_shray(sp.x, cp), @[gr_xop]GrXNop(void));
       *out = gn;
       return NoFail;
     }
@@ -1100,7 +1100,7 @@ func gr_deref_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_deref_fie
       name cell_num = ellval_cell(x);
       dp var = addx(gr, mk_shray(rp), @[gr_xop]GrDeref({name, result_cell(oo(&a->lhs)), OffsetConst(offset)}));
       sp sq_num = seqq(gr, {dp, seq1(gr, ap)});
-      *out = sp.~;
+      *out = sp.x;
       return NoFail;
     }
   }
@@ -1120,7 +1120,7 @@ func gr_local_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_local_fie
       }
       dp var = seqq(gr, {lp, seq1(gr, dp1)});
       cp var = addx(gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)}));
-      gn var = addx(gr, mk_shray(dp.~, cp), @[gr_xop]GrXNop(void));
+      gn var = addx(gr, mk_shray(dp.x, cp), @[gr_xop]GrXNop(void));
       *out = gn;
       return NoFail;
     }
@@ -1196,7 +1196,7 @@ func gr_index_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_index_expr
     }
     laters var = addx(gr, mk_shray(lhs_later, rhs_later), @[gr_xop]GrXNop(void));
     gp_laters var = seqq(gr, {gp, seq1(gr, laters)});
-    *out = gp_laters.~;
+    *out = gp_laters.x;
     return NoFail;
   } else {
     name cell_num = value_cell(x);
@@ -1217,7 +1217,7 @@ func gr_index_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_index_expr
       }
     }
     gp_later sq_num = seqq(gr, {gp, seq1(gr, rhs_later)});
-    *out = gp_later.~;
+    *out = gp_later.x;
     return NoFail;
   }
 }
@@ -1238,7 +1238,7 @@ func gr_mk_deref(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_deref, out *
     return Printed(pm);
   }
   gn sq_num = seqq(gr, {dp, seq1(gr, ap)});
-  *out = gn.~;
+  *out = gn.x;
   return NoFail;
 }
 
@@ -1304,7 +1304,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       }
       gn1 sq_num = seqq(gr, {dgn, seq1(gr, mgn)});
       gn2 sq_num = seqq(gr, {lp_rp_nop, gn1});
-      *out = gn2.~;
+      *out = gn2.x;
       return NoFail;
     }
     case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info): {
@@ -1317,7 +1317,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
         return Printed(pm);
       }
       mgn gr_num;
-      if case Printed(pm) = gr_chain_virtualdead(clq, gr, mgn1, scdi.rhs_copy.src, &mgn) {
+      if case Printed(pm) = gr_chain_virtualdead(clq, gr, mgn1, scdi.rhs_copy.x.src, &mgn) {
         return Printed(pm);
       }
       drgn gr_num;
@@ -1327,7 +1327,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       gn1 sq_num = seqq(gr, {mgn, seq1(gr, drgn)});
       gn2 sq_num = seqq(gr, {dgn, gn1});
       gn3 sq_num = seqq(gr, {lp_rp_nop, gn2});
-      *out = gn3.~;
+      *out = gn3.x;
       return NoFail;
     }
     case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): {
@@ -1341,13 +1341,13 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
         return Printed(pm);
       }
       if case DeadMe(v void) = sci.rhs_deadme {
-        if case Printed(pm) = gr_chain_virtualdead(clq, gr, mgn, sci.rhs_copy.src, &mgn) {
+        if case Printed(pm) = gr_chain_virtualdead(clq, gr, mgn, sci.rhs_copy.x.src, &mgn) {
           return Printed(pm);
         }
       }
       gn1 sq_num = seqq(gr, {dgn, seq1(gr, mgn)});
       gn2 sq_num = seqq(gr, {lp_rp_nop, gn1});
-      *out = gn2.~;
+      *out = gn2.x;
       return NoFail;
     }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
@@ -1355,7 +1355,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       valuetype *cu_typeexpr = &ref_cell(gr, destcell)->type;
       ptrtype cu_typrop = computed_ptr_type(clq, valuetype);
       booltype cu_typrop = compute_prim(clq, primitive_bool_type(clq->cs));
-      fntype cu_typrop = compute_prim(clq, fn_type(clq->cs, ptrtype.cu.~, ptrtype.cu.~, booltype.cu.~));
+      fntype cu_typrop = compute_prim(clq, fn_type(clq->cs, ptrtype.cu.x, ptrtype.cu.x, booltype.cu.x));
 
       funcell cell_num = add_cell(gr, {LocationStatic, fntype.cu, fntype.props});
       destptr cell_num = add_cell(gr, {LocationStatic, ptrtype.cu, ptrtype.props});
@@ -1370,7 +1370,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       just_dead var = addx(gr, @[gr_xop]GrDead({cmp_result}));
       if case DeadMe(v void) = ci.rhs_deadme {
         // TODO: It would be nice if we just had a closing node for virtualdead, maybe also for just_dead, instead of these duplicate tails.
-        if case Printed(pm) = gr_chain_virtualdead(clq, gr, just_dead, ci.conditional_copy.src, &just_dead) {
+        if case Printed(pm) = gr_chain_virtualdead(clq, gr, just_dead, ci.conditional_copy.x.src, &just_dead) {
           return Printed(pm);
         }
       }
@@ -1385,9 +1385,9 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       }
       assign sq_num = seqq(gr, {assign_destroy, seq1(gr, assign_copy)});
       dead_before_assign gr_num = addx(gr, @[gr_xop]GrDead({cmp_result}));
-      dead_then_assign gr_num = seqq(gr, {dead_before_assign, assign}).~;
+      dead_then_assign gr_num = seqq(gr, {dead_before_assign, assign}).x;
       if case DeadMe(v void) = ci.rhs_deadme {
-        if case Printed(pm) = gr_chain_virtualdead(clq, gr, dead_then_assign, ci.conditional_copy.src, &dead_then_assign) {
+        if case Printed(pm) = gr_chain_virtualdead(clq, gr, dead_then_assign, ci.conditional_copy.x.src, &dead_then_assign) {
           return Printed(pm);
         }
       }
@@ -1396,7 +1396,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       br var = seqq(gr, {ap,
         addq(gr, @[gr_qop]GrBranch({cmp_result, cases, None}))});
       seq_lp_rp_nop var = seqq(gr, {lp_rp_nop, br});
-      *out = seq_lp_rp_nop.~;
+      *out = seq_lp_rp_nop.x;
       return NoFail;
     }
   }
@@ -1433,7 +1433,7 @@ func gr_logical_conjunction(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_l
   }
   bn sq_num = seqq(gr, {lhs_dep,
     addq(gr, @[gr_qop]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, seq1(gr, lhs_dead_gn)}, {eval_rhs_case, lhs_dead_then_rhs}), None}))});
-  *out = bn.~;
+  *out = bn.x;
   return NoFail;
 }
 
@@ -1507,7 +1507,7 @@ func gr_name_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_name_expr, 
       field_offset u32 = enum_field_offset(clq->cs, &vi.et, vi.constructor_tag);
       backtick_gn var = addx(gr, @[gr_xop]GrWriteNothing({x_cell}));
       a_gn var = addx(gr, mk_shray(backtick_gn), @[gr_xop]GrSubcell({tag_cell, x_cell, OffsetConst(enum_tag_offset)}));
-      b_gn var = addx(gr, mk_shray(a_gn), @[gr_xop]GrWriteConst({tag_cell, ConstInt(~vi.constructor_tag.~)}));
+      b_gn var = addx(gr, mk_shray(a_gn), @[gr_xop]GrWriteConst({tag_cell, ConstInt(~vi.constructor_tag.x)}));
       tag_end u32 = enum_tag_offset + props.flat_size;
       postpadding_ogn opt[gr_num]
         = gr_bzero_subcell(clq, gr, x_cell, tag_end, info->cu_props.flat_size - tag_end);
@@ -1570,7 +1570,7 @@ func gr_after_actions(clq *clqueue, gr *frame_graph, prec gr_num, x *opt[destroy
     if case Printed(pm) = gr_destroy_action(clq, gr, &da, DeadAfterDestroyYes(void), &dep) {
       return Printed(pm);
     }
-    prec = seqq(gr, {prec, seq1(gr, dep)}).~;
+    prec = seqq(gr, {prec, seq1(gr, dep)}).x;
   }
   *out = prec;
   return NoFail;
@@ -1594,53 +1594,53 @@ func gr_consume_actions(clq *clqueue, gr *frame_graph, prec gr_num, x *consume_a
     if case Printed(pm) = gr_copy_action(clq, gr, &cd.copy, &dep) {
       return Printed(pm);
     }
-    if case Printed(pm) = gr_chain_virtualdead(clq, gr, dep, cd.copy.src, &dep) {
+    if case Printed(pm) = gr_chain_virtualdead(clq, gr, dep, cd.copy.x.src, &dep) {
       return Printed(pm);
     }
-    prec = seqq(gr, {prec, seq1(gr, dep)}).~;
+    prec = seqq(gr, {prec, seq1(gr, dep)}).x;
     if case Printed(pm) = gr_destroy_action(clq, gr, &cd.destroy, DeadAfterDestroyYes(void), &dep) {
       return Printed(pm);
     }
-    prec = seqq(gr, {prec, seq1(gr, dep)}).~;
+    prec = seqq(gr, {prec, seq1(gr, dep)}).x;
   case &ConsumeByCopy(cc tup[copy_action, lval_deadme]):
     dep gr_num;
     if case Printed(pm) = gr_copy_action(clq, gr, &cc.car, &dep) {
       return Printed(pm);
     }
     if case DeadMe(v void) = cc.cdr {
-      if case Printed(pm) = gr_chain_virtualdead(clq, gr, dep, cc.car.src, &dep) {
+      if case Printed(pm) = gr_chain_virtualdead(clq, gr, dep, cc.car.x.src, &dep) {
         return Printed(pm);
       }
     }
-    prec = seqq(gr, {prec, seq1(gr, dep)}).~;
+    prec = seqq(gr, {prec, seq1(gr, dep)}).x;
   case &ConsumeByMove(m move_action):
     dep gr_num;
     if case Printed(pm) = gr_move_action(clq, gr, &m, &dep) {
       return Printed(pm);
     }
-    prec = seqq(gr, {prec, seq1(gr, dep)}).~;
+    prec = seqq(gr, {prec, seq1(gr, dep)}).x;
   }
   *out = prec;
   return NoFail;
 }
 
 func gr_copy_action(clq *clqueue, gr *frame_graph, x *copy_action, out *gr_num) np {
-  return gr_bi_action(clq, gr, &x->~, out);
+  return gr_bi_action(clq, gr, &x->x, out);
 }
 
 func gr_move_action(clq *clqueue, gr *frame_graph, x *move_action, out *gr_num) np {
   dep gr_num;
-  if case Printed(pm) = gr_bi_action(clq, gr, &x->~, &dep) {
+  if case Printed(pm) = gr_bi_action(clq, gr, &x->x, &dep) {
     return Printed(pm);
   }
-  *out = addx(gr, mk_shray(dep), @[gr_xop]GrDead({x->src}));
+  *out = addx(gr, mk_shray(dep), @[gr_xop]GrDead({x->x.src}));
   return NoFail;
 }
 
 func gr_uni_fun(clq *clqueue, gr *frame_graph, ip instpair, arg cell_num) gr_num {
   argptr cu_typrop = computed_ptr_type(clq, &ref_cell(gr, arg)->type);
   voidret cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
-  fnptr cu_typrop = compute_prim(clq, fn_type(clq->cs, argptr.cu.~, voidret.cu.~));
+  fnptr cu_typrop = compute_prim(clq, fn_type(clq->cs, argptr.cu.x, voidret.cu.x));
   funcell cell_num = add_cell(gr, {LocationStatic, fnptr.cu, fnptr.props});
   argptrcell cell_num = add_cell(gr, {LocationStatic, argptr.cu, argptr.props});
   retvoid cell_num = add_cell(gr, {LocationStatic, voidret.cu, voidret.props});
@@ -1653,14 +1653,14 @@ func gr_uni_fun(clq *clqueue, gr *frame_graph, ip instpair, arg cell_num) gr_num
 }
 
 func gr_init_action(clq *clqueue, gr *frame_graph, x *init_action, out *gr_num) np {
-  switch &x->ctor {
+  switch &x->x.ctor {
     case &TrivialCtor: {
-      dp var = addx(gr, @[gr_xop]GrWriteConst({x->arg, ConstInt(~ @[u32] 0)}));
+      dp var = addx(gr, @[gr_xop]GrWriteConst({x->x.arg, ConstInt(~ @[u32] 0)}));
       *out = dp;
       return NoFail;
     }
     case &FunCtor(ip instpair): {
-      *out = gr_uni_fun(clq, gr, ip, x->arg);
+      *out = gr_uni_fun(clq, gr, ip, x->x.arg);
       return NoFail;
     }
   }
@@ -1668,11 +1668,11 @@ func gr_init_action(clq *clqueue, gr *frame_graph, x *init_action, out *gr_num) 
 
 // TODO: The dead_after_destroy parameter here is definitely unnecessary, but not too harmful now.
 func gr_destroy_action(clq *clqueue, gr *frame_graph, x *destroy_action, dad dead_after_destroy, out *gr_num) np {
-  switch &x->ctor {
+  switch &x->x.ctor {
     case &TrivialCtor: {
       dp gr_num;
       if case DeadAfterDestroyYes(v2 void) = dad {
-        dp = addx(gr, @[gr_xop]GrDead({x->arg}));
+        dp = addx(gr, @[gr_xop]GrDead({x->x.arg}));
       } else {
         dp = addx(gr, @[gr_xop]GrXNop(void));
       }
@@ -1680,10 +1680,10 @@ func gr_destroy_action(clq *clqueue, gr *frame_graph, x *destroy_action, dad dea
       return NoFail;
     }
     case &FunCtor(ip instpair): {
-      gn gr_num = gr_uni_fun(clq, gr, ip, x->arg);
+      gn gr_num = gr_uni_fun(clq, gr, ip, x->x.arg);
       dp gr_num;
       if case DeadAfterDestroyYes(v2 void) = dad {
-        dp = addx(gr, mk_shray(gn), @[gr_xop]GrDead({x->arg}));
+        dp = addx(gr, mk_shray(gn), @[gr_xop]GrDead({x->x.arg}));
       } else {
         dp = gn;
       }
@@ -1698,7 +1698,7 @@ func gr_bi_fun(clq *clqueue, gr *frame_graph, ip instpair, dest cell_num, src ce
   destptr cu_typrop = computed_ptr_type(clq, &ref_cell(gr, dest)->type);
   srcptr cu_typrop = computed_ptr_type(clq, &ref_cell(gr, src)->type);
   voidret cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
-  fnptr cu_typrop = compute_prim(clq, fn_type(clq->cs, destptr.cu.~, srcptr.cu.~, voidret.cu.~));
+  fnptr cu_typrop = compute_prim(clq, fn_type(clq->cs, destptr.cu.x, srcptr.cu.x, voidret.cu.x));
   funcell cell_num = add_cell(gr, {LocationStatic, fnptr.cu, fnptr.props});
   destptrcell cell_num = add_cell(gr, {LocationStatic, destptr.cu, destptr.props});
   srcptrcell cell_num = add_cell(gr, {LocationStatic, srcptr.cu, srcptr.props});
@@ -1777,7 +1777,7 @@ struct gr_basics {
 
 func add_minimal_basics(cs *checkstate, clq *clqueue, gr *frame_graph, size u32, arity size, out *gr_minimal_basics) void {
   pointee_tp cu_typrop = compute_prim(clq, primitive_padding_type(cs, size));
-  argtp cu_typrop = compute_prim(clq, ptr_type(cs, pointee_tp.cu.~));
+  argtp cu_typrop = compute_prim(clq, ptr_type(cs, pointee_tp.cu.x));
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
   ret gr_minimal_basics;
   ret.return_cell = add_cell(gr, {LocationStatic(void), voidtp.cu, voidtp.props});
@@ -1822,7 +1822,7 @@ func minimal_basics_cleanup(cs *checkstate, clq *clqueue, gr *frame_graph, bas *
   nopgn var = addx(gr, freeze(&precs), @[gr_xop]GrXNop(void));
   fingn var = seqq(gr, {gn, seq1(gr, nopgn)});
   *gr_out = *gr;
-  *gn_out = fingn.~;
+  *gn_out = fingn.x;
   *return_cell_out = bas->return_cell;
   *arg_cells_out = bas->argcells;
 }
@@ -1838,7 +1838,7 @@ func basics_cleanup(cs *checkstate, clq *clqueue, gr *frame_graph, bas *gr_basic
   nopgn var = addx(gr, freeze(&precs), @[gr_xop]GrXNop(void));
   fingn var = seqq(gr, {gn, seq1(gr, nopgn)});
   *gr_out = *gr;
-  *gn_out = fingn.~;
+  *gn_out = fingn.x;
   *return_cell_out = bas->minimal.return_cell;
   *arg_cells_out = bas->minimal.argcells;
 }
@@ -1887,13 +1887,13 @@ func gr_magic_ctor(cs *checkstate, clq *clqueue, wc which_ctor, mc *magic_ctor, 
 
 func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *magic_arraytype_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_arraytype")));
-  argtp cu_typrop = compute_prim(clq, ptr_type(cs, mai->cu_type.~));
+  argtp cu_typrop = compute_prim(clq, ptr_type(cs, mai->cu_type.x));
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
 
   param *te_typeexpr;
   arraycount u32;
-  if case &TeArraytype(at te_arraytype) = &mai->cu_type.~ {
+  if case &TeArraytype(at te_arraytype) = &mai->cu_type.x {
     param = oo(&at.param);
     if case Has(atcount u32) = at.count {
       arraycount = atcount;
@@ -1917,7 +1917,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 
   fntype cu_typeexpr;
   fntype_props type_properties;
-  compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, elemptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
+  compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, elemptrtype.x), voidtp.cu.x), &fntype, &fntype_props);
 
   size_type cu_typeexpr;
   size_type_props type_properties;
@@ -2009,7 +2009,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
     terminal_case = arraycount;
   }
 
-  tie_gn sq_num = seqq(&gr, {body_gn.~, topgn});
+  tie_gn sq_num = seqq(&gr, {body_gn.x, topgn});
 
   branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray({@[gr_const]ConstInt(bigu(terminal_case)), deadseq}), Has(tie_gn)}));
 
@@ -2019,7 +2019,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   it_gn sq_num = seqq(&gr, {init_indexcell_gn, topgn});
   gn var = seqq(&gr, {derefgn, it_gn});
   *gr_out = gr;
-  *gn_out = gn.~;
+  *gn_out = gn.x;
   *return_cell_out = return_cell;
   *arg_cells_out = argcells;
   return NoFail;
@@ -2037,12 +2037,12 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
   case CtorDestroy: { /* don't init padding. */ }
   }
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_info")));
-  argtp cu_typrop = compute_prim(clq, ptr_type(cs, mei->cu_type.~));
+  argtp cu_typrop = compute_prim(clq, ptr_type(cs, mei->cu_type.x));
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
 
   et *te_enum;
-  if case &TeEnum(t te_enum) = &mei->cu_type.~ {
+  if case &TeEnum(t te_enum) = &mei->cu_type.x {
     et = &t;
   } else {
     ice(_u8("gr_magic_enum_info called on non-enum"));
@@ -2121,7 +2121,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     if case &Has(ip instpair) = ref(&mei->cips, i) {
       fieldptrtype cu_typeexpr;
       fieldptrtype_props type_properties;
-      compute_prim(clq, ptr_type(cs, fieldtype.~), &fieldptrtype, &fieldptrtype_props);
+      compute_prim(clq, ptr_type(cs, fieldtype.x), &fieldptrtype, &fieldptrtype_props);
 
       fieldptrcella array[cell_num];
       precs array[gr_num];
@@ -2137,7 +2137,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
       fntype cu_typeexpr;
       fntype_props type_properties;
-      compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
+      compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.x), voidtp.cu.x), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
       func_gn gr_num = addx(&gr, @[gr_xop]GrWriteConst({func_cell, ConstDef(ip)}));
@@ -2168,10 +2168,10 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
           push(&dfcprecs, dfc);
         }
         dfcnop gr_num = addx(&gr, freeze(&dfcprecs), @[gr_xop]GrXNop(void));
-        last_ogn = seqq(&gr, {gn, seq1(&gr, dfcnop)}).~;
+        last_ogn = seqq(&gr, {gn, seq1(&gr, dfcnop)}).x;
       } else {
         // The nodes that create fieldcella were never added to the graph, so we don't dead them.
-        last_ogn = nopq(&gr).~;
+        last_ogn = nopq(&gr).x;
       }
     }
 
@@ -2180,10 +2180,10 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     case CtorInit:
       ice(_u8("CtorInit on wc type"));
     case CtorCopy:
-      tgn var = addx(&gr, @[gr_xop]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.~)}));
+      tgn var = addx(&gr, @[gr_xop]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.x)}));
       tagset_ogn = Has(tgn);
     case CtorMove:
-      tgn var = addx(&gr, @[gr_xop]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.~)}));
+      tgn var = addx(&gr, @[gr_xop]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.x)}));
       tagset_ogn = Has(tgn);
     case CtorDestroy:
       tagset_ogn = None;
@@ -2192,7 +2192,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
     finalgn gr_num = addx(&gr, concat(tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn), @[gr_xop]GrXNop(void));
 
     finalseqgn sq_num = seqq(&gr, {finalgn, deadseq});
-    push(&cases_gn, {@[gr_const]ConstInt(~ tagval.~), finalseqgn});
+    push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), finalseqgn});
   }
 
   if true {
@@ -2208,7 +2208,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
   br sq_num = addq(&gr, @[gr_qop]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None}));
   sqr sq_num = seqq(&gr, {deref_gn, br});
   *gr_out = gr;
-  *gn_out = sqr.~;
+  *gn_out = sqr.x;
   *return_cell_out = return_cell;
   *arg_cells_out = argcells;
   return NoFail;
@@ -2231,12 +2231,12 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
   }
 
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_struct_info")));
-  argtp cu_typrop = compute_prim(clq, ptr_type(cs, msi->cu_type.~));
+  argtp cu_typrop = compute_prim(clq, ptr_type(cs, msi->cu_type.x));
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
 
   st *te_struct;
-  if case &TeStruct(t te_struct) = &msi->cu_type.~ {
+  if case &TeStruct(t te_struct) = &msi->cu_type.x {
     st = &t;
   } else {
     ice(_u8("gr_magic_struct_info called on non-struct"));
@@ -2319,7 +2319,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
       fntype cu_typeexpr;
       fntype_props type_properties;
-      compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
+      compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.x), voidtp.cu.x), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
 
@@ -2356,7 +2356,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
           push(&dfcprecs, dfc);
         }
         dfcnop gr_num = addx(&gr, freeze(&dfcprecs), @[gr_xop]GrXNop(void));
-        field_gn = seqq(&gr, {gn, seq1(&gr, dfcnop)}).~;
+        field_gn = seqq(&gr, {gn, seq1(&gr, dfcnop)}).x;
       } else {
         field_gn = addx(&gr, @[gr_xop]GrXNop(void));
       }
@@ -2383,7 +2383,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
   gn var = seqq(&gr, {derefgn, bn});
 
   *gr_out = gr;
-  *gn_out = gn.~;
+  *gn_out = gn.x;
   *return_cell_out = return_cell;
   *arg_cells_out = argcells;
   return NoFail;
@@ -2416,18 +2416,18 @@ func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *
 
 func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi *magic_whole_field_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_whole_field_info")));
-  argtp cu_typrop = compute_prim(clq, ptr_type(cs, mwfi->cu_type.~));
+  argtp cu_typrop = compute_prim(clq, ptr_type(cs, mwfi->cu_type.x));
 
   fieldptrtype cu_typeexpr;
   fieldptrtype_props type_properties;
-  compute_prim(clq, ptr_type(cs, mwfi->rhs_type.~), &fieldptrtype, &fieldptrtype_props);
+  compute_prim(clq, ptr_type(cs, mwfi->rhs_type.x), &fieldptrtype, &fieldptrtype_props);
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
 
   nargs size = num_args(wc);
   fntype cu_typeexpr;
   fntype_props type_properties;
-  compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.~), voidtp.cu.~), &fntype, &fntype_props);
+  compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.x), voidtp.cu.x), &fntype, &fntype_props);
 
   argcells array[cell_num];
   fieldptrcells array[cell_num];
@@ -2474,7 +2474,7 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
   field_offset u32;
   tag_end u32;
   tag_cell cell_num;
-  if case &TeEnum(et te_enum) = &mec->enum_type.~ {
+  if case &TeEnum(et te_enum) = &mec->enum_type.x {
     argtype = &ref(&et.constructors, mec->constructor_index)->type;
     field_offset = enum_field_offset(cs, &et, tagval);
     cu cu_typeexpr;
@@ -2517,15 +2517,15 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
     if case Printed(pm) = gr_destroy_ctor(cs, clq, &gr, argtype, argnum, &cdd.destroy_desc, &destgn) {
       return Printed(pm);
     }
-    ctor_gn = seqq(&gr, {cpgn, seq1(&gr, destgn)}).~;
+    ctor_gn = seqq(&gr, {cpgn, seq1(&gr, destgn)}).x;
   }
 
   assign_gn var = seqq(&gr, {retpart_gn, seq1(&gr, ctor_gn)});
 
   tagcell_gn var = addx(&gr, @[gr_xop]GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)}));
-  tag_gn1 var = addx(&gr, mk_shray(tagcell_gn), @[gr_xop]GrWriteConst({tag_cell, ConstInt(~tagval.~)}));
+  tag_gn1 var = addx(&gr, mk_shray(tagcell_gn), @[gr_xop]GrWriteConst({tag_cell, ConstInt(~tagval.x)}));
   tag_gn var = addx(&gr, mk_shray(tag_gn1), @[gr_xop]GrVirtualDead({tag_cell}));
-  gn var = addx(&gr, concat(@[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn.~), postpadding_ogn), @[gr_xop]GrXNop(void));
+  gn var = addx(&gr, concat(@[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn.x), postpadding_ogn), @[gr_xop]GrXNop(void));
   *gr_out = gr;
   *gn_out = gn;
   *return_cell_out = retnum;
@@ -2559,7 +2559,7 @@ func gr_destroy_ctor(cs *checkstate, clq *clqueue, gr *frame_graph, ty *te_typee
 func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_typeexpr, op primitive_op) fn_body_id {
   gr frame_graph = init_frame_graph_empty(informal_name);
   typarams *shray[te_typeexpr];
-  if !decompose_typeapp(&type->~, primitive_function_puretype(cs), &typarams) {
+  if !decompose_typeapp(&type->x, primitive_function_puretype(cs), &typarams) {
     ice(_u8("add_prim_fn_body called with non-fn type"));
   }
   argcells array[cell_num];

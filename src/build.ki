@@ -95,7 +95,7 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
       idyparms idy_genparms = blank_idyparms();
       if case Has(inst_id def_inst_id) = lookup_sole_value(&ent->insts, &idyparms) {
         inst *def_inst = ref_inst(cs, inst_id);
-        if !is_fn_type(cs, &unHas(&inst->typrop)->cu.~) {
+        if !is_fn_type(cs, &unHas(&inst->typrop)->cu.x) {
           return ERR(_u8("Cannot codegen export symbols for non-fn def (can only export functions)"));
         }
         if case &Computed(val st_value) = &inst->evaled_value {
@@ -182,7 +182,7 @@ func generate_kit_name(cs *checkstate, informal_name sym, arg_types shray[cu_typ
       push(&btmp, ',');
       push(&btmp, ' ');
     }
-    pretty_u8str(cs->im, &btmp, &ref(&arg_types, i)->~);
+    pretty_u8str(cs->im, &btmp, &ref(&arg_types, i)->x);
   }
   push(&btmp, ')');
   return intern(cs->im, build + from_u8(&btmp));

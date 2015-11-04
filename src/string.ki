@@ -1,20 +1,20 @@
 import array;
 import shray;
 
-deftype string shray[i32];
+struct string { x shray[i32]; };
 
 def `~` fn[shray[i32], string] = wrapconvert;
 
 inline func data(s *string) *i32 {
-  return data(&s->~);
+  return data(&s->x);
 }
 
 inline func get(s *string, i size) i32 {
-  return get(&s->~ , i);
+  return get(&s->x , i);
 }
 
 inline func count(s *string) size {
-  return count(&s->~);
+  return count(&s->x);
 }
 
 func hash_compute_hash(x *string) osize {
@@ -44,7 +44,7 @@ func hash_equal(x *string, y *string) bool {
 
 func[H] build_u8str(help H, r *array[u8], x *string) void {
   n size = count(x);
-  p *i32 = data(&x->~);
+  p *i32 = data(&x->x);
   for i size = 0; i < n; i = i + 1 {
     push(r, ~p[i]);
   }

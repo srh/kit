@@ -99,9 +99,9 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
       switch &xn.op {
       case &GrApply(a gr_apply):
         push(&bas->paramlists, ~i);
-        funcell_cd *cell_disp = ref(&bas->celldisp, a.funcell.~);
+        funcell_cd *cell_disp = ref(&bas->celldisp, a.funcell.x);
         if case &Has(other_gn gr_num) = &funcell_cd->funcell {
-          ice(_u8("two-timing funcell "), a.funcell.~, _u8(" for "), other_gn.~, _u8(" and "), i);
+          ice(_u8("two-timing funcell "), a.funcell.x, _u8(" for "), other_gn.x, _u8(" and "), i);
         } else {
           funcell_cd->funcell = Has(gn);
         }
@@ -120,8 +120,8 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
         mark_cell_value_used(bas, a.src);
         mark_cell_not_const(bas, a.dest);
       case &GrWriteConst(a gr_writeconst):
-        if case LocationStatic(v void) = ref(&gr->cells, a.dest.~)->location {
-          disp *cell_const_disp = &ref(&bas->celldisp, a.dest.~)->const_value;
+        if case LocationStatic(v void) = ref(&gr->cells, a.dest.x)->location {
+          disp *cell_const_disp = &ref(&bas->celldisp, a.dest.x)->const_value;
           switch disp {
           case &NoConstDisp:
             *disp = HasConstValue(a.value);
@@ -136,9 +136,9 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
         mark_cell_not_const(bas, a.dest);
         mark_cell_not_const(bas, a.addressee);
       case &GrSubcell(a gr_subcell):
-        set(&ref(&bas->celldisp, a.name.~)->subcell, {gn, a.partof, a.offset});
-        push(&ref(&bas->celldisp, a.partof.~)->subcelled, a.name);
-        check(ref(&gr->cells, a.name.~)->location == LocationVirtual(void));
+        set(&ref(&bas->celldisp, a.name.x)->subcell, {gn, a.partof, a.offset});
+        push(&ref(&bas->celldisp, a.partof.x)->subcelled, a.name);
+        check(ref(&gr->cells, a.name.x)->location == LocationVirtual(void));
         mark_cell_not_const(bas, a.partof);
         mark_cell_value_used(bas, a.name);
         mark_cell_value_used(bas, a.partof);
@@ -156,26 +156,26 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
 }
 
 func mark_cell_value_used(bas *basic_analyze_state, c cell_num) void {
-  p *cell_disp = ref(&bas->celldisp, c.~);
+  p *cell_disp = ref(&bas->celldisp, c.x);
   p->value_used = true;
 }
 
 // Also marks value_used.
 func mark_cell_paramlist(bas *basic_analyze_state, c cell_num, apply_opnum gr_num) void {
-  p *cell_disp = ref(&bas->celldisp, c.~);
+  p *cell_disp = ref(&bas->celldisp, c.x);
   set(&p->paramlist, apply_opnum);
   p->value_used = true;
 }
 
 // Also marks value_used.
 func mark_cell_prim_paramlist(bas *basic_analyze_state, c cell_num, apply_opnum gr_num) void {
-  p *cell_disp = ref(&bas->celldisp, c.~);
+  p *cell_disp = ref(&bas->celldisp, c.x);
   set(&p->prim_paramlist, apply_opnum);
   p->value_used = true;
 }
 
 func mark_cell_not_const(bas *basic_analyze_state, c cell_num) void {
-  ref(&bas->celldisp, c.~)->const_value = NotConst(void);
+  ref(&bas->celldisp, c.x)->const_value = NotConst(void);
 }
 
 func basic_and_inline(cs *checkstate, g *graphed_fn_body) np {
@@ -249,7 +249,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
                 push(&gr->ops, adjust_op_for_inline(op_addend, &cell_mapping, get(&eg.graph.gr.ops, j)));
               }
 
-              base_op_adjusted gr_num = ~(eg.graph.gn.~ + op_addend);
+              base_op_adjusted gr_num = ~(eg.graph.gn.x + op_addend);
 
               // Now we overwrite the apply op.
               // TODO: It would be nice if function bodies always had to set their return cell live, instead of having it be done for them with our GrWriteNothing statement.
@@ -262,13 +262,13 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
               // It's important to note that GrXNop would be ignored by help_basic_analyze.
               // TODO: It'd be nice if we could undo the mark_cell_not_const of a.retcell (that happened when we processed GrApply in help_basic_analyze before).
 
-              *ref(&gr->ops, gn.~) = XOp({mk_shray(seqer.~), GrXNop(void)});
+              *ref(&gr->ops, gn.x) = XOp({mk_shray(seqer.x), GrXNop(void)});
 
               // And since there's no apply op, we update the arg/funcell cell_disps.
               // Actually, we don't update the funcell disp, so that we don't allocate/write its cell needlessly.
-              // unSet(&ref(&bas->celldisp, a.funcell.~)->funcell);
+              // unSet(&ref(&bas->celldisp, a.funcell.x)->funcell);
               for j size = 0; j < nparams; j = j + 1 {
-                unSet(&ref(&bas->celldisp, get(&a.params, j).~)->paramlist);
+                unSet(&ref(&bas->celldisp, get(&a.params, j).x)->paramlist);
               }
 
               help_basic_analyze(cs, bas, gr);
@@ -299,30 +299,30 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
     build array[gr_num];
     nprecs size = count(&xn.precs);
     for i size = 0; i < nprecs; i = i + 1 {
-      push(&build, ~(get(&xn.precs, i).~ + op_addend));
+      push(&build, ~(get(&xn.precs, i).x + op_addend));
     }
     newprecs shray[gr_num] = freeze(&build);
     switch &xn.op {
     case &GrApply(a gr_apply):
-      return XOp({newprecs, GrApply({get(cm, a.funcell.~), help_adjust_params(cm, &a.params), get(cm, a.retcell.~)})});
+      return XOp({newprecs, GrApply({get(cm, a.funcell.x), help_adjust_params(cm, &a.params), get(cm, a.retcell.x)})});
     case &GrPrimApply(a gr_prim_apply):
-      return XOp({newprecs, GrPrimApply({a.primop, help_adjust_params(cm, &a.params), get(cm, a.retcell.~)})});
+      return XOp({newprecs, GrPrimApply({a.primop, help_adjust_params(cm, &a.params), get(cm, a.retcell.x)})});
     case &GrMemCopy(a gr_memcopy):
-      return XOp({newprecs, GrMemCopy({get(cm, a.dest.~), get(cm, a.src.~)})});
+      return XOp({newprecs, GrMemCopy({get(cm, a.dest.x), get(cm, a.src.x)})});
     case &GrWriteConst(a gr_writeconst):
-      return XOp({newprecs, GrWriteConst({get(cm, a.dest.~), a.value})});
+      return XOp({newprecs, GrWriteConst({get(cm, a.dest.x), a.value})});
     case &GrAddressof(a gr_addressof):
-      return XOp({newprecs, GrAddressof({get(cm, a.dest.~), get(cm, a.addressee.~)})});
+      return XOp({newprecs, GrAddressof({get(cm, a.dest.x), get(cm, a.addressee.x)})});
     case &GrDeref(a gr_deref):
-      return XOp({newprecs, GrDeref({get(cm, a.name.~), get(cm, a.pointer.~), help_adjust_offset(cm, &a.offset)})});
+      return XOp({newprecs, GrDeref({get(cm, a.name.x), get(cm, a.pointer.x), help_adjust_offset(cm, &a.offset)})});
     case &GrSubcell(a gr_subcell):
-      return XOp({newprecs, GrSubcell({get(cm, a.name.~), get(cm, a.partof.~), help_adjust_offset(cm, &a.offset)})});
+      return XOp({newprecs, GrSubcell({get(cm, a.name.x), get(cm, a.partof.x), help_adjust_offset(cm, &a.offset)})});
     case &GrWriteNothing(a gr_writenothing):
-      return XOp({newprecs, GrWriteNothing({get(cm, a.dest.~)})});
+      return XOp({newprecs, GrWriteNothing({get(cm, a.dest.x)})});
     case &GrDead(a gr_dead):
-      return XOp({newprecs, GrDead({get(cm, a.cell.~)})});
+      return XOp({newprecs, GrDead({get(cm, a.cell.x)})});
     case &GrVirtualDead(a gr_virtual_dead):
-      return XOp({newprecs, GrVirtualDead({get(cm, a.cell.~)})});
+      return XOp({newprecs, GrVirtualDead({get(cm, a.cell.x)})});
     case &GrXNop:
       return XOp({newprecs, GrXNop(void)});
     }
@@ -333,19 +333,19 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
       ncases size = count(&a.cases);
       for i size = 0; i < ncases; i = i + 1 {
         cas *tup[gr_const, sq_num] = ref(&a.cases, i);
-        push(&newcases, {cas->car, ~ ~(cas->cdr.~.~ + op_addend)});
+        push(&newcases, {cas->car, ~ ~(cas->cdr.x.x + op_addend)});
       }
       defaultcase opt[sq_num];
       if case Has(sn sq_num) = a.default_case {
-        defaultcase = Has(~ @[gr_num]~(sn.~.~ + op_addend));
+        defaultcase = Has(~ @[gr_num]~(sn.x.x + op_addend));
       } else {
         defaultcase = None;
       }
-      return QOp({GrBranch({get(cm, a.src.~), freeze(&newcases), defaultcase})});
+      return QOp({GrBranch({get(cm, a.src.x), freeze(&newcases), defaultcase})});
     case &GrSequence(a gr_sequence):
-      return QOp({GrSequence({~(a.first.~ + op_addend), ~ ~(a.second.~.~ + op_addend)})});
+      return QOp({GrSequence({~(a.first.x + op_addend), ~ ~(a.second.x.x + op_addend)})});
     case &GrJmp(a gr_jmp):
-      return QOp({GrJmp({~ ~(a.next.~.~ + op_addend)})});
+      return QOp({GrJmp({~ ~(a.next.x.x + op_addend)})});
     case &GrQNop:
       return QOp({GrQNop(void)});
     }
@@ -356,7 +356,7 @@ func help_adjust_params(cm *array[cell_num], params *shray[cell_num]) shray[cell
   ret array[cell_num];
   n size = count(params);
   for i size = 0; i < n; i = i + 1 {
-    push(&ret, get(cm, get(params, i).~));
+    push(&ret, get(cm, get(params, i).x));
   }
   return freeze(&ret);
 }
@@ -366,6 +366,6 @@ func help_adjust_offset(cm *array[cell_num], off *gr_offset) gr_offset {
   case &OffsetConst(x u32):
     return OffsetConst(x);
   case &OffsetComputed(p tup[u32, cell_num]):
-    return OffsetComputed({p.car, get(cm, p.cdr.~)});
+    return OffsetComputed({p.car, get(cm, p.cdr.x)});
   }
 }

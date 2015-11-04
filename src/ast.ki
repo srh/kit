@@ -9,7 +9,7 @@ import typeexpr;
 // ATTENTION!  "ast" types must use UNSHARED data structures.
 
 // This is an index into some ps-specific structure.
-deftype ast_meta size;
+struct ast_meta { x size; };
 
 def `~` fn[size, ast_meta] = wrapconvert;
 
@@ -307,7 +307,7 @@ struct ast_continue_statement {
   info nc[ast_continue_statement_info];
 };
 
-deftype label_num size;
+struct label_num { x size; };
 def `~` fn[size, label_num] = wrapconvert;
 def `==` fn[label_num, label_num, bool] = wrapequate;
 
@@ -612,14 +612,14 @@ struct bi_action {
   src cell_num;
 };
 
-deftype copy_action bi_action;
-deftype move_action bi_action;
+struct copy_action { x bi_action; };
+struct move_action { x bi_action; };
 
 def `+` fn[bi_action, copy_action] = wrapconvert;
 def `+` fn[bi_action, move_action] = wrapconvert;
 
-deftype destroy_action uni_action;
-deftype init_action uni_action;
+struct destroy_action { x uni_action; };
+struct init_action { x uni_action; };
 
 def `+` fn[uni_action, destroy_action] = wrapconvert;
 def `+` fn[uni_action, init_action] = wrapconvert;

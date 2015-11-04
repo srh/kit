@@ -90,61 +90,61 @@ func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader 
 }
 
 // An index into checkstate's modules array.
-deftype module_id size;
+struct module_id { x size; };
 def `~` fn[size, module_id] = wrapconvert;
 
 // An index into checkstate's instantiations array.
-deftype def_inst_id size;
+struct def_inst_id { x size; };
 def `~` fn[size, def_inst_id] = wrapconvert;
 
 // An index into checkstate's type_instantiations array.
-deftype deftype_inst_id size;
+struct deftype_inst_id { x size; };
 def `~` fn[size, deftype_inst_id] = wrapconvert;
 
 // An index into checkstate's defs array.
-deftype def_entry_id size;
+struct def_entry_id { x size; };
 def `~` fn[size, def_entry_id] = wrapconvert;
 
 // An index into checkstate's deftypes array.
-deftype deftype_entry_id size;
+struct deftype_entry_id { x size; };
 def `~` fn[size, deftype_entry_id] = wrapconvert;
 def `==` fn[deftype_entry_id, deftype_entry_id, bool] = wrapequate;
 
 // An index into checkstate's fn_bodies array.
-deftype fn_body_id size;
+struct fn_body_id { x size; };
 def `~` fn[size, fn_body_id] = wrapconvert;
 def `==` fn[fn_body_id, fn_body_id, bool] = wrapequate;
 
 // An index into checkstate's access_blocks array.
-deftype access_entry_id size;
+struct access_entry_id { x size; };
 def `~` fn[size, access_entry_id] = wrapconvert;
 
 func ref_module(cs *checkstate, id module_id) *module {
-  return oo(ref(&cs->modules, id.~));
+  return oo(ref(&cs->modules, id.x));
 }
 
 func ref_def_entry(cs *checkstate, id def_entry_id) *def_entry {
-  return oo(ref(&cs->defs, id.~));
+  return oo(ref(&cs->defs, id.x));
 }
 
 func ref_deftype_entry(cs *checkstate, id deftype_entry_id) *deftype_entry {
-  return oo(ref(&cs->deftypes, id.~));
+  return oo(ref(&cs->deftypes, id.x));
 }
 
 func ref_fn_body(cs *checkstate, id fn_body_id) *fn_body_entry {
-  return oo(ref(&cs->fn_bodies, id.~));
+  return oo(ref(&cs->fn_bodies, id.x));
 }
 
 func ref_access_entry(cs *checkstate, id access_entry_id) *access_entry {
-  return oo(ref(&cs->access_blocks, id.~));
+  return oo(ref(&cs->access_blocks, id.x));
 }
 
 func ref_inst(cs *checkstate, id def_inst_id) *def_inst {
-  return oo(ref(&cs->instantiations, id.~));
+  return oo(ref(&cs->instantiations, id.x));
 }
 
 func ref_deftype_inst(cs *checkstate, id deftype_inst_id) *deftype_inst {
-  return oo(ref(&cs->type_instantiations, id.~));
+  return oo(ref(&cs->type_instantiations, id.x));
 }
 
 func add_def_entry(cs *checkstate, shent shp[def_entry]) def_entry_id {
@@ -592,7 +592,7 @@ func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_ins
     n size = count(&parms->repls.tys);
     reserve(&converted, n);
     for i size = 0; i < n; i = i + 1 {
-      push(&converted, ref(&parms->repls.tys, i)->~);
+      push(&converted, ref(&parms->repls.tys, i)->x);
     }
     return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
   }
@@ -635,7 +635,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
   switch a {
     case DefaultCopyMoveDestroy: {
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
-      ptrtype te_typeexpr = ptr_type(cs, type.~);
+      ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
         return Printed(pm);
@@ -643,7 +643,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
     }
     case DefaultMove: {
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
-      ptrtype te_typeexpr = ptr_type(cs, type.~);
+      ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
       if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
@@ -658,7 +658,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
     }
     case NoDefaults: {
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
-      ptrtype te_typeexpr = ptr_type(cs, type.~);
+      ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
       if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {

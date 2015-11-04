@@ -1,11 +1,11 @@
 import stdlib;
 import identmap;
 
-deftype pos size;
+struct pos { x size; };
 
 inline func mk_pos(base_offset size, n size) pos {
   p pos;
-  p.~ = base_offset + n;
+  p.x = base_offset + n;
   return p;
 }
 

@@ -611,7 +611,7 @@ func test_check_more_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c068",
     _u8("deftype ty i32;\n"
         "def foo fn[ty, i32] = func(t ty) i32 {\n"
-        "  return t.~;\n"
+        "  return t.x;\n"
         "};\n"));
   // Fails (unlike c068) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs, checks that field access is accessible.
   run_check_negtest(ctx, "c069",
@@ -888,7 +888,7 @@ func test_check_more_cases(ctx *check_ctx) void {
     _u8("deftype notsize u32;\n"
         "func `~`(x u32) notsize {\n"
         "  ret notsize;\n"
-        "  ret.~ = x;\n"
+        "  ret.x = x;\n"
         "  return ret;\n"
         "}\n"
         "func foo(x u32) notsize {\n"

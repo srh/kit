@@ -92,10 +92,19 @@ access shray[_] {
     }
   }
 
-  inline func[T] swap(x *shray[T], y *shray[T]) void {
-    tmp var = x->~;
-    x->~ = y->~;
-    y->~ = tmp;
+  inline func[T] swap(a *shray[T], b *shray[T]) void {
+    tmp size = a->count;
+    a->count = b->count;
+    b->count = tmp;
+    tmp = a->cap;
+    a->cap = b->cap;
+    b->cap = tmp;
+    q *size = a->refp;
+    a->refp = b->refp;
+    b->refp = q;
+    p *T = a->ptr;
+    a->ptr = b->ptr;
+    b->ptr = p;
   }
 }
 

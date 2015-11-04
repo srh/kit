@@ -426,7 +426,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         }
         case &InstRhsExpr(rhs def_inst_rhs_expr): {
           info frame_info;
-          if case Printed(pm) = check_expr(clq, ent->accessible, &ent->generics, &inst->parms.repls, &rhs.ec, &typrop->cu.~, ent->def_name, &info) {
+          if case Printed(pm) = check_expr(clq, ent->accessible, &ent->generics, &inst->parms.repls, &rhs.ec, &typrop->cu.x, ent->def_name, &info) {
             return Printed(pm);
           }
           annotate(&rhs.frame_info, move(&info));
@@ -536,7 +536,7 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
       if case Printed(pm) = check_and_compute_name_type(clq, g, parms, &a, &computed) {
         return Printed(pm);
       }
-      *out = {true, computed.~};
+      *out = {true, computed.x};
       return NoFail;
     }
     case &TeApp(a te_typeapp): {
@@ -584,7 +584,7 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
 
     case &TeLifetime(a te_lifetime):
       if case Has(ix size) = find_lifetime_generic(g, a.name) {
-        *out = {true, ref(&parms->tys, ix)->~};
+        *out = {true, ref(&parms->tys, ix)->x};
         return NoFail;
       }
       // Assume it's a valid lifetime in scope, because what else can we do, keep track of that?
@@ -646,7 +646,7 @@ func help_check_fields(clq *clqueue, g *ast_generics, parms *idy_repls, a *shray
   for i size = 0; i < n; i = i + 1 {
     decl *te_vardecl = ref(a, i);
     for j size = 0; j < i; j = j + 1 {
-      if ref(a, j)->name.~ == decl->name.~ {
+      if ref(a, j)->name.x == decl->name.x {
         return ERR(_u8("Duplicate field name "), lookup(clq->im, decl->name));
       }
     }
@@ -911,7 +911,7 @@ func compute_pack_properties(clq *clqueue, pack *te_instpack, out *type_properti
 }
 
 func compute_type_properties(clq *clqueue, t *cu_typeexpr, out *type_properties) np {
-  return compute_complete_type_properties(clq, &t->~, out);
+  return compute_complete_type_properties(clq, &t->x, out);
 }
 
 struct struct_field_info {
@@ -1355,13 +1355,13 @@ func to_human_pos(cs *checkstate, p pos) human_pos {
   if case Has(m *module) = find_pos_module(cs, p) {
     return to_human_pos(m, p);
   } else {
-    ice(_u8("to_human_pos sees invalid pos with value "), p.~);
+    ice(_u8("to_human_pos sees invalid pos with value "), p.x);
     return fake();
   }
 }
 
 func to_human_pos(m *module, p pos) human_pos {
-  absolute size = p.~ - m->base_offset;
+  absolute size = p.x - m->base_offset;
   linecol tup[size, size] = absolute_to_linecol(&m->buf, absolute);
   return {m->module_name, linecol.car, linecol.cdr, absolute};
 }
@@ -1370,7 +1370,7 @@ func find_pos_module(cs *checkstate, p pos) opt[*module] {
   n size = count(&cs->modules);
   for i size = 0; i < n; i = i + 1 {
     m *module = oo(ref(&cs->modules, i));
-    if m->base_offset <= p.~ && m->base_offset + count(&m->buf) >= p.~ {
+    if m->base_offset <= p.x && m->base_offset + count(&m->buf) >= p.x {
       return Has(m);
     }
   }

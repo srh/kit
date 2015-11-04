@@ -1818,7 +1818,7 @@ func see_if_parse(file array[u8]) bool {
   ret bool = +parse_file(&p, &out);
   if !ret {
     print(Stdout(), _u8("at offset "));
-    print(Stdout(), to_u8str(peek(&p)->interval.left.~));
+    print(Stdout(), to_u8str(peek(&p)->interval.left.x));
     print(Stdout(), _u8("..."));
     fflush(Stdout());
   }

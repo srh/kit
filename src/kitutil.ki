@@ -119,7 +119,7 @@ func[T, U] MERR(cs *checkstate, m ast_meta, x T, y U) np {
 
 func[T] MERR(cs *checkstate, m ast_meta, x T) np {
   r array[u8];
-  if case Has(p pos) = ref(&cs->posits.metas, m.~)->left {
+  if case Has(p pos) = ref(&cs->posits.metas, m.x)->left {
     hp human_pos = to_human_pos(cs, p);
     build_u8str(cs->im, &r, &hp);
     append(&r, _u8(": "));

@@ -182,9 +182,15 @@ access array[_] {
   }
 
   inline func[T] swap(a *array[T], b *array[T]) void {
-    tmp var = a->~;
-    a->~ = b->~;
-    b->~ = tmp;
+    tmp size = a->count;
+    a->count = b->count;
+    b->count = tmp;
+    tmp = a->cap;
+    a->cap = b->cap;
+    b->cap = tmp;
+    p *T = a->ptr;
+    a->ptr = b->ptr;
+    b->ptr = p;
   }
 
   func[T] clear(a *array[T]) void {

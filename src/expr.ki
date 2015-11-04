@@ -39,7 +39,7 @@ inline func ref_cell(es *framescope, num cell_num) *cell_info {
   return ref_cell(&es->gr, num);
 }
 
-deftype frame_cell_count size;
+struct frame_cell_count { x size; };
 
 func reannotate_static_to_virtual(es *framescope, num cell_num) void {
   info *cell_info = ref_cell(es, num);
@@ -62,13 +62,13 @@ struct defscope {
   def_informal_name sym;
 };
 
-deftype var_number size;
+struct var_number { x size; };
 
 def `~` fn[size, var_number] = wrapconvert;
 def `==` fn[var_number, var_number, bool] = wrapequate;
 func `!=`(x var_number, y var_number) bool { return !(x == y); }
 func `<`(x var_number, y var_number) bool {
-  return x.~ < y.~;
+  return x.x < y.x;
 }
 
 defenum var_binding {
@@ -93,7 +93,7 @@ struct var_info {
 };
 
 func ref_var(es *framescope, num var_number) *var_info {
-  return ref(&es->all_vars, num.~);
+  return ref(&es->all_vars, num.x);
 }
 
 func vars_in_scope(es *framescope) array[var_number] {
@@ -486,7 +486,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
     if case Has(num var_number) = es_find_current_local(es, name) {
       type te_typeexpr;
       vartype *cu_typeexpr = &ref_var(es, num)->type;
-      if !unify_types(pt, &vartype->~, &type) {
+      if !unify_types(pt, &vartype->x, &type) {
         return ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"), to_u8str(es->im, *vartype), _u8("' where '"), to_u8str(es->im, *pt), _u8("' expected"));
       }
       *res_out = OneLocalMatch({num});
@@ -687,7 +687,7 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
       return ERR(_u8("Refof lifetime types do not match."));
     }
 
-    ref_type te_typeexpr = mk_ref_type(es->cs, unified_lifetime, rhs_info->cu.~);
+    ref_type te_typeexpr = mk_ref_type(es->cs, unified_lifetime, rhs_info->cu.x);
     ref_computed cac_typeexpr;
     if case Printed(pm) = noscoped_check_and_compute_typeexpr(es->clq, &ref_type, &ref_computed) {
       return Printed(pm);
@@ -708,7 +708,7 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
 
 func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt *te_typeexpr, x *ast_expr) np {
   boolean cu_typeexpr = compute_prim(es->clq, primitive_bool_type(es->cs));
-  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&oo(&a->condition)->expr), &boolean.~, &oo(&a->condition)->discard) {
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&oo(&a->condition)->expr), &boolean.x, &oo(&a->condition)->discard) {
     return Printed(pm);
   }
   if case Printed(pm) = check_expr_consume(es, oo(&a->then_clause), pt) {
@@ -770,7 +770,7 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   info *ast_expr_complete_info = expr_complete_info(&oo(&a->lhs)->expr);
   lifetime te_typeexpr;
   param *te_typeexpr;
-  if !decompose_ref_or_ptr(&info->cu.~, es->cs, &lifetime, &param) {
+  if !decompose_ref_or_ptr(&info->cu.x, es->cs, &lifetime, &param) {
     return ERR(_u8("Expected pointer for lhs of deref field"));
   }
   cu_param cu_typeexpr = ~ *param;
@@ -868,7 +868,7 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
   rhs_type *cu_typeexpr = expr_complete_type(&oo(&a->rhs)->expr);
   lifetime te_typeexpr;
   param *te_typeexpr;
-  if decompose_ref_or_ptr(&rhs_type->~, es->cs, &lifetime, &param) {
+  if decompose_ref_or_ptr(&rhs_type->x, es->cs, &lifetime, &param) {
     // param is already complete.
     unified_discard te_typeexpr;
     if !unify_types(pt, param, &unified_discard) {
@@ -905,7 +905,7 @@ func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *
     return ERR(_u8("Taking address of a non-lvalue"));
   }
 
-  ptr_type te_typeexpr = ptr_type(es->cs, rhs_info->cu.~);
+  ptr_type te_typeexpr = ptr_type(es->cs, rhs_info->cu.x);
   ptr_computed cac_typeexpr;
   if case Printed(pm) = noscoped_check_and_compute_typeexpr(es->clq, &ptr_type, &ptr_computed) {
     return Printed(pm);
@@ -930,7 +930,7 @@ func check_expr_assignment(es *framescope, a *ast_assignment, pt *te_typeexpr, x
       return ERR(_u8("Assigning to non-lvalue"));
     }
     case &IsLvalYes(desc lval_description): {
-      if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), &lhs_info->cu.~) {
+      if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), oo(&a->rhs), &lhs_info->cu.x) {
         return Printed(pm);
       }
       if case Printed(pm) = annotate_disposal_for_assignment(es, desc.num, oo(&a->rhs), a) {
@@ -963,7 +963,7 @@ func behavior_to_desc(b *derived_method_behavior, out *ctor_desc) np {
 }
 
 func computed_ptr_type(clq *clqueue, t *cu_typeexpr) cu_typrop {
-  return compute_prim(clq, ptr_type(clq->cs, t->~));
+  return compute_prim(clq, ptr_type(clq->cs, t->x));
 }
 
 func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
@@ -1105,7 +1105,7 @@ func make_comparecells(es *framescope, dest cell_num) instpair {
   if case Has(ent def_entry_id) = es->cs->prims.ptr_eq {
     lifetime_names array[sym];
     canonical te_typeexpr;
-    canonicalize_idy_lifetimes(es->im, &lifetime_names, &ref_cell(es, dest)->type.~, &canonical);
+    canonicalize_idy_lifetimes(es->im, &lifetime_names, &ref_cell(es, dest)->type.x, &canonical);
     parms idy_genparms = {count(&lifetime_names), {mk_shray(~canonical)}};
     inst_id def_inst_id = enqueue_def_inst(es->clq, ent, &parms);
     return {ent, inst_id};
@@ -1269,7 +1269,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &OneLocalMatch(v local_info): {
       annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({v.varnum}));
       vi *var_info = ref_var(es, v.varnum);
-      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe(void), vi->lifetime.~}), vi->type, vi->props)));
+      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe(void), vi->lifetime.x}), vi->type, vi->props)));
       return NoFail;
     }
   }
@@ -1281,7 +1281,7 @@ func check_expr_string_literal(es *framescope, a *ast_string_literal, pt *te_typ
   compute_prim(es->clq, primitive_string_literal_type(es->cs, count(&a->charspecs)),
                &type, &props);
   unified te_typeexpr;
-  if !unify_types(pt, &type.~, &unified) {
+  if !unify_types(pt, &type.x, &unified) {
     return ERR(_u8("string literal in bad place"));
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, type, props})), type, props)));
@@ -1589,7 +1589,7 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
     return Printed(pm);
   }
   unified te_typeexpr;
-  if !unify_types(pt, &fieldtype.~, &unified) {
+  if !unify_types(pt, &fieldtype.x, &unified) {
     return ERR(_u8("field has wrong type."));
   }
   *fieldtype_out = fieldtype;
@@ -1605,8 +1605,8 @@ func structural_struct_type(ds *defscope, t *te_typeexpr, struct_type_out **te_t
     case Error(pm):
       return Error(pm);
     case Success:
-      if case &TeStruct(st te_struct) = &cu_rhs->~ {
-        *struct_type_out = &cu_rhs->~;
+      if case &TeStruct(st te_struct) = &cu_rhs->x {
+        *struct_type_out = &cu_rhs->x;
         *st_out = &st;
         return Success;
       } else {
@@ -1629,8 +1629,8 @@ func structural_enum_type(ds *defscope, t *te_typeexpr, enum_type_out **te_typee
     case Error(pm):
       return Error(pm);
     case Success:
-      if case &TeEnum(et te_enum) = &cu_rhs->~ {
-        *enum_type_out = &cu_rhs->~;
+      if case &TeEnum(et te_enum) = &cu_rhs->x {
+        *enum_type_out = &cu_rhs->x;
         *et_out = &et;
         return Success;
       } else {
@@ -1764,7 +1764,7 @@ func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, 
 }
 
 func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
-  switch &t->~ {
+  switch &t->x {
     case &TeName(a te_name): {
       return lookup_name_field(es, unHas(&a.pack), fieldname, fieldtype_out, res_out);
     }
@@ -1817,7 +1817,7 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
 func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   switch f {
     case &WholeField: {
-      switch &t->~ {
+      switch &t->x {
         case &TeName(a te_name): {
           if case Printed(pm) = lookup_whole_field(es, unHas(&a.pack), fieldtype_out) {
             return Printed(pm);
@@ -1884,13 +1884,13 @@ func check_expr_logical_conjunction(es *framescope, a *ast_logical_conjunction, 
   compute_prim(es->clq, primitive_bool_type(es->cs), &type, &props);
 
   unified te_typeexpr;
-  if !unify_types(pt, &type.~, &unified) {
+  if !unify_types(pt, &type.x, &unified) {
     return ERR(_u8("logical conjunction in bad place"));
   }
-  if case Printed(pm) = check_expr_consume(es, oo(&a->lhs), &type.~) {
+  if case Printed(pm) = check_expr_consume(es, oo(&a->lhs), &type.x) {
     return Printed(pm);
   }
-  if case Printed(pm) = check_expr_consume(es, oo(&a->rhs), &type.~) {
+  if case Printed(pm) = check_expr_consume(es, oo(&a->rhs), &type.x) {
     return Printed(pm);
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, type, props})), type, props)));
@@ -1934,7 +1934,7 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
     return Printed(pm);
   }
 
-  return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(&oo(&a->fun)->expr)->~);
+  return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(&oo(&a->fun)->expr)->x);
   props type_properties;
   if case Printed(pm) = compute_complete_type_properties(es->clq, return_type, &props) {
     return Printed(pm);
@@ -1963,7 +1963,7 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
   n size = count(params);
 
   type_params *shray[te_typeexpr];
-  if !decompose_typeapp(&functype->~, primitive_function_puretype(es->cs), &type_params) {
+  if !decompose_typeapp(&functype->x, primitive_function_puretype(es->cs), &type_params) {
     ice(_u8("Expecting a TeApp for fn-type."));
   }
   check(count(type_params) == n + 1);
@@ -2008,7 +2008,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   sizetype cu_typeexpr = compute_prim(es->clq, primitive_size_type(es->cs));
 
   rhs_later ast_later_discard_info = mk_later();
-  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.~, &rhs_later) {
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.x, &rhs_later) {
     return Printed(pm);
   }
 
@@ -2016,7 +2016,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
 
   ixtype *te_typeexpr;
   is_arraytype bool;
-  if !decompose_indexable(es->cs, &lhs_info->cu.~, &ixtype, &is_arraytype) {
+  if !decompose_indexable(es->cs, &lhs_info->cu.x, &ixtype, &is_arraytype) {
     return ERR(_u8("indexing on non-indexable type"));
   }
 
@@ -2091,7 +2091,7 @@ func expr_type(a *ast_expr) te_typeexpr {
       return t;
     }
     case &CompleteCheck(t ast_expr_complete_info): {
-      return t.cu.~;
+      return t.cu.x;
     }
   }
 }
