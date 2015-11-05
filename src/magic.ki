@@ -7,14 +7,6 @@ import shp;
 import typeexpr;
 import u8ast;
 
-struct magic_whole_field_info {
-  ip instpair;
-  cu_type cu_typeexpr;
-  cu_props type_properties;
-  rhs_type cu_typeexpr;
-  rhs_props type_properties;
-};
-
 struct magic_struct_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
@@ -35,7 +27,6 @@ struct magic_arraytype_info {
 };
 
 enum magic_ctor_info {
-  MagicWholeFieldInfo magic_whole_field_info;
   // These are None for fields that are trivially constructed.  But of course one field is not None.
   MagicStructInfo magic_struct_info;
   MagicEnumInfo magic_enum_info;
