@@ -107,6 +107,8 @@ struct non_magic_prop {
   info nc[u32];
 };
 
+// Used for DefnNonMagic in def_definition in def_entry.
+// Used for InstRhsNonMagic in def_inst_rhs in def_inst, maybe with generics replaced?
 enum def_non_magic {
   NonMagicCtor which_non_magic_ctor;
   NonMagicProp non_magic_prop;
@@ -117,6 +119,8 @@ struct which_magic_ctor {
   mc magic_ctor;
 };
 
+// Used for DefnMagic in def_definition in def_entry.
+// Used for InstRhsMagic in def_inst_rhs in def_inst, maybe with generics replaced?
 enum def_magic {
   MagicBzero magic_bzero;
   MagicMemcopy magic_memcopy;
