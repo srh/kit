@@ -1872,7 +1872,7 @@ func gr_magic_bzero(cs *checkstate, clq *clqueue, mb *magic_bzero, gr_out *frame
 }
 
 func gr_magic_ctor(cs *checkstate, clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
-  info *magic_ctor_info = ref_info(mc);
+  info *magic_ctor_info = unHas(&mc->info);
   switch info {
   case &MagicWholeFieldInfo(mwfi magic_whole_field_info):
     return gr_magic_whole_field_info(cs, clq, wc, &mwfi, gr_out, gn_out, return_cell_out, arg_cells_out);

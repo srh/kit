@@ -46,11 +46,6 @@ struct magic_ctor {
   info nc[magic_ctor_info];
 };
 
-// TODO: Nobody uses this, right?
-func ref_info(a *magic_ctor) *magic_ctor_info {
-  return unHas(&a->info);
-}
-
 struct copy_destroy_desc {
   copy_desc ctor_desc;
   destroy_desc ctor_desc;
