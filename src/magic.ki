@@ -24,6 +24,7 @@ struct magic_struct_info {
 struct magic_enum_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
+  enum_type cu_typeexpr;
   cips array[opt[instpair]];
 };
 
@@ -284,6 +285,7 @@ func check_magic_ctor(clq *clqueue, g *ast_generics, parms *idy_repls, wc which_
       if case Printed(pm) = check_vardecl_ctor(clq, &a.fields, wc, &field_insts) {
         return Printed(pm);
       }
+      // TODO(): Get rid of this whole case, structs in general.
       annotate(&mc->info, @[magic_ctor_info]MagicStructInfo({~cac.te, cac_props, field_insts}));
     }
     case &TeEnum(a te_enum): {
@@ -291,7 +293,8 @@ func check_magic_ctor(clq *clqueue, g *ast_generics, parms *idy_repls, wc which_
       if case Printed(pm) = check_vardecl_ctor(clq, &a.constructors, wc, &field_insts) {
         return Printed(pm);
       }
-      annotate(&mc->info, @[magic_ctor_info]MagicEnumInfo({~cac.te, cac_props, field_insts}));
+      // TODO(): Uh.  Get rid of this whole case, but also the TeEnum(..) is lame here.
+      annotate(&mc->info, @[magic_ctor_info]MagicEnumInfo({~cac.te, cac_props, ~ @[te_typeexpr]TeEnum({a.constructors}), field_insts}));
     }
     case &TeUnion(a te_union): {
       ice(_u8("check_magic_ctor seeing TeUnion"));
@@ -378,8 +381,13 @@ func check_pack_ctor(clq *clqueue, complete_te *te_typeexpr, props *type_propert
     // TODO():  Uh.  Yeah.  Use MagicStructInfo?  Adapt it to our needs?
     *info_out = MagicStructInfo({~ *complete_te, *props, field_insts});
   case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
-    // TODO():  Uh.  Yeah.  And the TeEnum.  Yuck.
-    *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, &ri.rhs_props)), ~ *complete_te, *props, ~TeEnum(ri.rhs_enumspec), ri.rhs_props});
+    field_insts array[opt[instpair]];
+    if case Printed(pm) = check_vardecl_ctor(clq, &ri.rhs_enumspec.constructors, wc, &field_insts) {
+      return Printed(pm);
+    }
+
+    // TODO():  Uh.  Yeah.  No TeEnum wrapper plz.
+    *info_out = MagicEnumInfo({~ *complete_te, *props, ~ @[te_typeexpr]TeEnum(ri.rhs_enumspec), field_insts});
   }
   return NoFail;
 }
