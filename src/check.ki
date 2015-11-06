@@ -1216,7 +1216,8 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
 
           check(isBeganComputing(&inst->info));
           // TODO(): Gross.
-          rhs_computed_te te_typeexpr = TeStruct({freeze(&rhs_fields)});
+          st te_struct = {freeze(&rhs_fields)};
+          rhs_computed_te te_typeexpr = TeStruct(st);
 
           // TODO(): Note that the very concept of computing rhs_properties (in their entirety) is broken because there is no rhs struct type from which to generate non-trivial insts (when level_to_derived calls make_magic_inst)
           rhs_props type_properties;
@@ -1231,7 +1232,8 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
             inst->info = FailedComputation();
             return Printed(pm);
           }
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({~rhs_computed_te, rhs_props})), class_props});
+
+          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({st, rhs_props})), class_props});
 
         case &DefstructRhsSpec(drs defstruct_rhs_spec):
           rhs_fields array[te_vardecl];
@@ -1245,7 +1247,8 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
 
           check(isBeganComputing(&inst->info));
           // TODO(): Gross.
-          rhs_computed_te te_typeexpr = TeStruct({freeze(&rhs_fields)});
+          st te_struct = {freeze(&rhs_fields)};
+          rhs_computed_te te_typeexpr = TeStruct(st);
 
           rhs_props type_properties;
           if case Printed(pm) = compute_complete_type_properties(clq, &rhs_computed_te, &rhs_props) {
@@ -1254,7 +1257,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           }
           check(isBeganComputing(&inst->info));
 
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({~rhs_computed_te, rhs_props})), rhs_props});
+          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({st, rhs_props})), rhs_props});
 
         case &DefenumRhsSpec(drs defenum_rhs_spec):
           rhs_constructors array[te_vardecl];

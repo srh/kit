@@ -257,8 +257,8 @@ struct deftype_inst_rhstype_info {
 };
 
 struct deftype_inst_rhsstruct_info {
-  // TODO(): Uh.
-  rhs_cu cu_typeexpr;
+  // TODO(): Uh.  At some point maybe this'll be all we use te_struct for.
+  rhs_structspec te_struct;
   rhs_props type_properties;
 };
 

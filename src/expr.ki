@@ -1324,8 +1324,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     return NoFail;
   } else {
     b *te_struct;
-    structural_type *te_typeexpr;
-    switch structural_struct_type(es->ds, pt, &structural_type, &b) {
+    switch structural_struct_type(es->ds, pt, &b) {
     case Error(pm):
       return Printed(pm);
     case Success: { }
@@ -1584,21 +1583,15 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
 }
 
 // st_out is just the inside te_struct of struct_type_out.  Some caller wants it.
-func structural_struct_type(ds *defscope, t *te_typeexpr, struct_type_out **te_typeexpr, st_out **te_struct) structural_rhs_result {
+func structural_struct_type(ds *defscope, t *te_typeexpr, st_out **te_struct) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
-    cu_rhs *cu_typeexpr;
-    switch help_structural_struct_type(ds, &pack, &cu_rhs) {
+    st *te_struct;
+    switch help_structural_struct_type(ds, &pack, &st) {
     case Error(pm):
       return Error(pm);
     case Success:
-      if case &TeStruct(st te_struct) = &cu_rhs->x {
-        *struct_type_out = &cu_rhs->x;
-        *st_out = &st;
-        return Success;
-      } else {
-        ice(_u8("help_structural_struct_type emitted non-struct type"));
-        return fake();
-      }
+      *st_out = st;
+      return Success;
     case NotAccessible:
       return NotAccessible;
     }
@@ -1735,7 +1728,7 @@ func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **te_enum
   }
 }
 
-func help_structural_struct_type(ds *defscope, pack *te_instpack, rhs_type_out **cu_typeexpr) structural_rhs_result {
+func help_structural_struct_type(ds *defscope, pack *te_instpack, st_out **te_struct) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
@@ -1743,7 +1736,7 @@ func help_structural_struct_type(ds *defscope, pack *te_instpack, rhs_type_out *
   case Success:
     switch rhs_info {
     case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
-      *rhs_type_out = &ri.rhs_cu;
+      *st_out = &ri.rhs_structspec;
       return Success;
     case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
       return NotAccessible;
@@ -1754,18 +1747,27 @@ func help_structural_struct_type(ds *defscope, pack *te_instpack, rhs_type_out *
 }
 
 func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
-  p *cu_typeexpr;
-  switch help_structural_struct_type(es->ds, pack, &p) {
+  st *te_struct;
+  switch help_structural_struct_type(es->ds, pack, &st) {
   case Error(pm):
     return Printed(pm);
   case Success:
-    return help_lookup_name_field(es, p, fieldname, fieldtype_out, res_out);
+    return help_lookup_struct_field(es, st, fieldname, fieldtype_out, res_out);
   case NotAccessible:
     return ERR(_u8("Looking up field on inaccessible defclass or primitive type"));
   }
 }
 
-// TODO(): At some point we won't be passing structs into this.
+func help_lookup_struct_field(es *framescope, st *te_struct, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+  offset u32;
+  if case Printed(pm) = lookup_field_from_list(es->clq, &st->fields, fieldname->value, fieldtype_out, &offset) {
+    return Printed(pm);
+  }
+  *res_out = InheritsLval(offset);
+  return NoFail;
+}
+
+// TODO(): At some point we won't be passing structs into this.  Update: I think we've reached that point.
 func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   switch &t->x {
     case &TeName(a te_name): {
@@ -1775,12 +1777,7 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
       return lookup_name_field(es, unHas(&a.pack), fieldname, fieldtype_out, res_out);
     }
     case &TeStruct(a te_struct): {
-      offset u32;
-      if case Printed(pm) = lookup_field_from_list(es->clq, &a.fields, fieldname->value, fieldtype_out, &offset) {
-        return Printed(pm);
-      }
-      *res_out = InheritsLval(offset);
-      return NoFail;
+      return help_lookup_struct_field(es, &a, fieldname, fieldtype_out, res_out);
     }
     case &TeEnum(a te_enum): {
       return ERR(_u8("field lookup on an enum type"));
