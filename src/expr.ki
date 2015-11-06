@@ -304,10 +304,8 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       *res_out = AmbigMatchConstructor(void);
       return NoFail;
     }
-    // enum_type is complete.
-    enum_type *te_typeexpr;
     et *te_enum;
-    switch structural_enum_type(ds, pt, &enum_type, &et) {
+    switch structural_enum_type(ds, pt, &et) {
     case Error(pm):
       return Printed(pm);
     case Success: { }
@@ -328,17 +326,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       *res_out = NoMatchConstructor(void);
       return NoFail;
     }
-    cac_enum_type cac_typeexpr;
-    if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->clq, enum_type, &cac_enum_type) {
-      return Printed(pm);
-    }
-    check(cac_enum_type.complete);
-    // TODO(): Noscoped check_and_compute_te_enum.  Or raw fields or something.
-    if case &TeEnum(cu_et te_enum) = &cac_enum_type.te {
-      *res_out = MatchedVoidConstructed({~ *pt, cu_et, mk_enum_tag_value(decl_index)});
-    } else {
-      ice(_u8("structural_enum_type returned a non-enum type"));
-    }
+    *res_out = MatchedVoidConstructed({~ *pt, *et, mk_enum_tag_value(decl_index)});
     return NoFail;
   }
   cac_return_type cac_typeexpr;
@@ -349,10 +337,8 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     *res_out = AmbigMatchConstructor(void);
     return NoFail;
   }
-  // enum_type is complete and computed.
-  enum_type *te_typeexpr;
   et *te_enum;
-  switch structural_enum_type(ds, &cac_return_type.te, &enum_type, &et) {
+  switch structural_enum_type(ds, &cac_return_type.te, &et) {
   case Error(pm):
     return Printed(pm);
   case Success: { }
@@ -1622,22 +1608,16 @@ func structural_struct_type(ds *defscope, t *te_typeexpr, struct_type_out **te_t
   }
 }
 
-// et_out is just the inside te_enum of enum_type_out.  Some caller wants it.
-func structural_enum_type(ds *defscope, t *te_typeexpr, enum_type_out **te_typeexpr, et_out **te_enum) structural_rhs_result {
+// et_out is set to a complete/computed value.
+func structural_enum_type(ds *defscope, t *te_typeexpr, et_out **te_enum) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
-    cu_rhs *cu_typeexpr;
-    switch help_structural_enum_type(ds, &pack, &cu_rhs) {
+    et *te_enum;
+    switch help_structural_enum_type(ds, &pack, &et) {
     case Error(pm):
       return Error(pm);
     case Success:
-      if case &TeEnum(et te_enum) = &cu_rhs->x {
-        *enum_type_out = &cu_rhs->x;
-        *et_out = &et;
-        return Success;
-      } else {
-        ice(_u8("help_structural_enum_type emitted non-enum type"));
-        return fake();
-      }
+      *et_out = et;
+      return Success;
     case NotAccessible:
       return NotAccessible;
     }
@@ -1737,7 +1717,7 @@ func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **de
   }
 }
 
-func help_structural_enum_type(ds *defscope, pack *te_instpack, rhs_type_out **cu_typeexpr) structural_rhs_result {
+func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **te_enum) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
@@ -1747,7 +1727,7 @@ func help_structural_enum_type(ds *defscope, pack *te_instpack, rhs_type_out **c
     case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
       return NotAccessible;
     case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
-      *rhs_type_out = &ri.rhs_cu;
+      *et_out = &ri.rhs_enumspec;
       return Success;
     }
   case NotAccessible:
@@ -1785,6 +1765,7 @@ func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, 
   }
 }
 
+// TODO(): At some point we won't be passing structs into this.
 func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   switch &t->x {
     case &TeName(a te_name): {

@@ -1267,8 +1267,9 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(rhs_constructors_complete);
 
           check(isBeganComputing(&inst->info));
+          et te_enum = {freeze(&rhs_constructors)};
           // TODO(): Gross.
-          rhs_computed_te te_typeexpr = TeEnum({freeze(&rhs_constructors)});
+          rhs_computed_te te_typeexpr = TeEnum(et);
 
           rhs_props type_properties;
           if case Printed(pm) = compute_complete_type_properties(clq, &rhs_computed_te, &rhs_props) {
@@ -1277,7 +1278,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           }
           check(isBeganComputing(&inst->info));
 
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsEnumInfo({~rhs_computed_te, rhs_props})), rhs_props});
+          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsEnumInfo({et, rhs_props})), rhs_props});
 
         }
       } else {

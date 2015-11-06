@@ -373,8 +373,8 @@ func check_pack_ctor(clq *clqueue, complete_te *te_typeexpr, props *type_propert
     // TODO():  Uh.  Yeah.  Use MagicStructInfo?  Adapt it to our needs?
     *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, &ri.rhs_props)), ~ *complete_te, *props, ri.rhs_cu, ri.rhs_props});
   case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
-    // TODO():  Uh.  Yeah.
-    *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, &ri.rhs_props)), ~ *complete_te, *props, ri.rhs_cu, ri.rhs_props});
+    // TODO():  Uh.  Yeah.  And the TeEnum.  Yuck.
+    *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, &ri.rhs_props)), ~ *complete_te, *props, ~TeEnum(ri.rhs_enumspec), ri.rhs_props});
   }
   return NoFail;
 }
