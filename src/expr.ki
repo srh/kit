@@ -1625,7 +1625,7 @@ func structural_struct_type(ds *defscope, t *te_typeexpr, struct_type_out **te_t
 func structural_enum_type(ds *defscope, t *te_typeexpr, enum_type_out **te_typeexpr, et_out **te_enum) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
     cu_rhs *cu_typeexpr;
-    switch help_structural_rhs(ds, &pack, &cu_rhs) {
+    switch help_structural_enum_type(ds, &pack, &cu_rhs) {
     case Error(pm):
       return Error(pm);
     case Success:
@@ -1634,7 +1634,8 @@ func structural_enum_type(ds *defscope, t *te_typeexpr, enum_type_out **te_typee
         *et_out = &et;
         return Success;
       } else {
-        return NotAccessible;
+        ice(_u8("help_structural_enum_type emitted non-enum type"));
+        return fake();
       }
     case NotAccessible:
       return NotAccessible;
@@ -1732,6 +1733,25 @@ func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **de
   } else {
     ice(_u8("inst checked, info still None"));
     return fake();
+  }
+}
+
+// TODO(): Kinda duplicative with help_structural_rhs.
+func help_structural_enum_type(ds *defscope, pack *te_instpack, rhs_type_out **cu_typeexpr) structural_rhs_result {
+  rhs_info *deftype_inst_rhs_info;
+  switch help_structural_rhs_info(ds, pack, &rhs_info) {
+  case Error(pm):
+    return Error(pm);
+  case Success:
+    switch rhs_info {
+    case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
+      return NotAccessible;
+    case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
+      *rhs_type_out = &ri.rhs_cu;
+      return Success;
+    }
+  case NotAccessible:
+    return NotAccessible;
   }
 }
 
