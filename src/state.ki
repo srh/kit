@@ -251,11 +251,6 @@ struct cu_typrop {
   props type_properties;
 };
 
-struct deftype_inst_rhstype_info {
-  rhs_cu cu_typeexpr;
-  rhs_props type_properties;
-};
-
 struct deftype_inst_rhsstruct_info {
   // TODO(): Uh.  At some point maybe this'll be all we use te_struct for.
   rhs_structspec te_struct;
