@@ -1601,7 +1601,7 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
 func structural_struct_type(ds *defscope, t *te_typeexpr, struct_type_out **te_typeexpr, st_out **te_struct) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
     cu_rhs *cu_typeexpr;
-    switch help_structural_rhs(ds, &pack, &cu_rhs) {
+    switch help_structural_struct_type(ds, &pack, &cu_rhs) {
     case Error(pm):
       return Error(pm);
     case Success:
@@ -1610,7 +1610,8 @@ func structural_struct_type(ds *defscope, t *te_typeexpr, struct_type_out **te_t
         *st_out = &st;
         return Success;
       } else {
-        return NotAccessible;
+        ice(_u8("help_structural_struct_type emitted non-struct type"));
+        return fake();
       }
     case NotAccessible:
       return NotAccessible;
@@ -1736,7 +1737,6 @@ func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **de
   }
 }
 
-// TODO(): Kinda duplicative with help_structural_rhs.
 func help_structural_enum_type(ds *defscope, pack *te_instpack, rhs_type_out **cu_typeexpr) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
@@ -1755,7 +1755,7 @@ func help_structural_enum_type(ds *defscope, pack *te_instpack, rhs_type_out **c
   }
 }
 
-func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_typeexpr) structural_rhs_result {
+func help_structural_struct_type(ds *defscope, pack *te_instpack, rhs_type_out **cu_typeexpr) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
@@ -1764,10 +1764,10 @@ func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_type
     switch rhs_info {
     case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
       *rhs_type_out = &ri.rhs_cu;
+      return Success;
     case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
-      *rhs_type_out = &ri.rhs_cu;
+      return NotAccessible;
     }
-    return Success;
   case NotAccessible:
     return NotAccessible;
   }
@@ -1775,7 +1775,7 @@ func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_type
 
 func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   p *cu_typeexpr;
-  switch help_structural_rhs(es->ds, pack, &p) {
+  switch help_structural_struct_type(es->ds, pack, &p) {
   case Error(pm):
     return Printed(pm);
   case Success:
