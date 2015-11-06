@@ -1709,7 +1709,7 @@ enum structural_rhs_result {
   NotAccessible void;
 };
 
-func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_typeexpr) structural_rhs_result {
+func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **deftype_inst_rhs_info) structural_rhs_result {
   accessible_result bool;
   if case Printed(pm) = deftype_rhs_accessible(ds, pack->ent_id, &accessible_result) {
     return Error(pm);
@@ -1723,12 +1723,7 @@ func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_type
   inst *deftype_inst = ref_deftype_inst(ds->cs, pack->inst_id);
   if case &Computed(info deftype_inst_info) = &inst->info {
     if case &Has(rhs_info deftype_inst_rhs_info) = &info.rhs {
-      switch &rhs_info {
-      case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
-        *rhs_type_out = &ri.rhs_cu;
-      case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
-        *rhs_type_out = &ri.rhs_cu;
-      }
+      *rhs_info_out = &rhs_info;
       return Success;
     } else {
       ice(_u8("deftype_rhs_accessible permitted a primitive type."));
@@ -1737,6 +1732,24 @@ func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_type
   } else {
     ice(_u8("inst checked, info still None"));
     return fake();
+  }
+}
+
+func help_structural_rhs(ds *defscope, pack *te_instpack, rhs_type_out **cu_typeexpr) structural_rhs_result {
+  rhs_info *deftype_inst_rhs_info;
+  switch help_structural_rhs_info(ds, pack, &rhs_info) {
+  case Error(pm):
+    return Error(pm);
+  case Success:
+    switch rhs_info {
+    case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
+      *rhs_type_out = &ri.rhs_cu;
+    case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
+      *rhs_type_out = &ri.rhs_cu;
+    }
+    return Success;
+  case NotAccessible:
+    return NotAccessible;
   }
 }
 
