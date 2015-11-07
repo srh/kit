@@ -641,10 +641,11 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
 
 func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *te_struct, out *type_properties) np {
   cs *checkstate = clq->cs;
+  it te_typeexpr = inst_type(cs, ent_id, inst_id);
   switch a {
     case DefaultMoveCopyDestroy: {
       ret type_properties;
-      if case Printed(pm) = compute_complete_struct_properties(clq, st, (ComputeMove | ComputeCopy) | ComputeDestroy, &ret) {
+      if case Printed(pm) = compute_complete_struct_properties(clq, st, &it, (ComputeMove | ComputeCopy) | ComputeDestroy, &ret) {
         return Printed(pm);
       }
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
@@ -658,7 +659,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
     }
     case DefaultMove: {
       ret type_properties;
-      if case Printed(pm) = compute_complete_struct_properties(clq, st, ComputeMove, &ret) {
+      if case Printed(pm) = compute_complete_struct_properties(clq, st, &it, ComputeMove, &ret) {
         return Printed(pm);
       }
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
@@ -679,7 +680,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
     }
     case NoDefaults: {
       ret type_properties;
-      if case Printed(pm) = compute_complete_struct_properties(clq, st, ComputeNone, &ret) {
+      if case Printed(pm) = compute_complete_struct_properties(clq, st, &it, ComputeNone, &ret) {
         return Printed(pm);
       }
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);

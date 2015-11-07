@@ -967,19 +967,18 @@ func mask_level(mask u32, level u32) u32 {
 }
 
 // st had better be complete and computed.
-func compute_complete_struct_properties(clq *clqueue, st *te_struct, constructor_mask u32, out *type_properties) np {
+// Realtype is the name (or app) type (a struct or defclass) whose fields the te_struct specifies.  TODO():  Right now realtype could be a TeStruct.
+func compute_complete_struct_properties(clq *clqueue, st *te_struct, realtype *te_typeexpr, constructor_mask u32, out *type_properties) np {
   psd partial_struct_data;
   if case Printed(pm) = compute_partial_struct_data(clq, &st->fields, None, &psd) {
     return Printed(pm);
   }
-  // TODO(): Ugh.
-  t te_typeexpr = TeStruct(*st);
   final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
   *out = {final_size, psd.max_alignment,
-          level_to_derived(clq, CtorInit, 1, &t, mask_level(constructor_mask & ComputeInit, psd.init_level)),
-          level_to_derived(clq, CtorMove, 2, &t, mask_level(constructor_mask & ComputeMove, psd.move_level)),
-          level_to_derived(clq, CtorCopy, 2, &t, mask_level(constructor_mask & ComputeCopy, psd.copy_level)),
-          level_to_derived(clq, CtorDestroy, 1, &t, mask_level(constructor_mask & ComputeDestroy, psd.destroy_level)),
+          level_to_derived(clq, CtorInit, 1, realtype, mask_level(constructor_mask & ComputeInit, psd.init_level)),
+          level_to_derived(clq, CtorMove, 2, realtype, mask_level(constructor_mask & ComputeMove, psd.move_level)),
+          level_to_derived(clq, CtorCopy, 2, realtype, mask_level(constructor_mask & ComputeCopy, psd.copy_level)),
+          level_to_derived(clq, CtorDestroy, 1, realtype, mask_level(constructor_mask & ComputeDestroy, psd.destroy_level)),
           IsScalarNo(void)};
   return NoFail;
 }
@@ -1042,7 +1041,7 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
     }
 
     case &TeStruct(a te_struct):
-      return compute_complete_struct_properties(clq, &a, ComputeAll, out);
+      return compute_complete_struct_properties(clq, &a, t, ComputeAll, out);
 
     case &TeEnum(a te_enum):
       return compute_complete_enum_properties(clq, &a, out);
@@ -1211,17 +1210,24 @@ func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) np {
   }
 }
 
-// This does return a complete and computed typeexpr.
+// This does return a complete and computed typeexpr.  Note that it'll have some generic parameters from an idy_genparms, so watch your scopage.
 func inst_type(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) te_typeexpr {
   ent *deftype_entry = ref_deftype_entry(cs, ent_id);
   inst *deftype_inst = ref_deftype_inst(cs, inst_id);
   switch &ent->generics {
   case &NoGenerics:
-    return TeName(ent->name, Has({ent_id, inst_id}));
-  case &HasGenerics: { }
-  case &VariadicGenerics: { }
+    return TeName({ent->name, Has({ent_id, inst_id})});
+  case &HasGenerics(a array[ast_generik]): { }
+  case &VariadicGenerics(a ast_variadic_generics): { }
   }
-  return TeApp({TePureName(ent->name), inst->parms.repls, Has({ent_id, inst_id})});
+  cu_params *shray[cu_typeexpr] = &inst->parms.repls.tys;
+  te_params array[te_typeexpr];
+  n size = count(cu_params);
+  reserve(&te_params, n);
+  for i size = 0; i < n; i = i + 1 {
+    push(&te_params, ref(cu_params, i)->x);
+  }
+  return TeApp({TePureName(ent->name), freeze(&te_params), Has({ent_id, inst_id})});
 }
 
 func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id deftype_inst_id) np {
@@ -1281,8 +1287,9 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           // TODO(): Gross.
           st te_struct = {freeze(&rhs_fields)};
 
+          it te_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
-          if case Printed(pm) = compute_complete_struct_properties(clq, &st, ComputeAll, &rhs_props) {
+          if case Printed(pm) = compute_complete_struct_properties(clq, &st, &it, ComputeAll, &rhs_props) {
             inst->info = FailedComputation();
             return Printed(pm);
           }

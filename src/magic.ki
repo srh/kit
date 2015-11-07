@@ -10,6 +10,7 @@ import u8ast;
 struct magic_struct_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
+  st te_struct;
   fips array[opt[instpair]];
 };
 
@@ -277,7 +278,7 @@ func check_magic_ctor(clq *clqueue, g *ast_generics, parms *idy_repls, wc which_
         return Printed(pm);
       }
       // TODO(): Get rid of this whole case, structs in general.
-      annotate(&mc->info, @[magic_ctor_info]MagicStructInfo({~cac.te, cac_props, field_insts}));
+      annotate(&mc->info, @[magic_ctor_info]MagicStructInfo({~cac.te, cac_props, {a.fields}, field_insts}));
     }
     case &TeEnum(a te_enum): {
       field_insts array[opt[instpair]];
@@ -370,7 +371,7 @@ func check_pack_ctor(clq *clqueue, complete_te *te_typeexpr, props *type_propert
     }
 
     // TODO():  Uh.  Yeah.  Use MagicStructInfo?  Adapt it to our needs?  Uh, we're using it?
-    *info_out = MagicStructInfo({~ *complete_te, *props, field_insts});
+    *info_out = MagicStructInfo({~ *complete_te, *props, ri.rhs_structspec, field_insts});
   case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
     field_insts array[opt[instpair]];
     if case Printed(pm) = check_vardecl_ctor(clq, &ri.rhs_enumspec.constructors, wc, &field_insts) {

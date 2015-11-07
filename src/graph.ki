@@ -2228,12 +2228,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
 
-  st *te_struct;
-  if case &TeStruct(t te_struct) = &msi->cu_type.x {
-    st = &t;
-  } else {
-    ice(_u8("gr_magic_struct_info called on non-struct"));
-  }
+  st *te_struct = &msi->st;
 
   psd partial_struct_data;
   if case Printed(pm) = compute_partial_struct_data(clq, &st->fields, None, &psd) {
