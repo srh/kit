@@ -51,8 +51,9 @@ enum magic_enum_construct_op {
 };
 
 struct magic_enum_construct {
-  enum_type cu_typeexpr;
-  enum_type_props type_properties;
+  et te_enum;
+  return_type cu_typeexpr;
+  return_type_props type_properties;
   constructor_index size;
   rhs_props type_properties;
   operational magic_enum_construct_op;

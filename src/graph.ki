@@ -2404,31 +2404,27 @@ func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *
 
 func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cell_out *cell_num) np {
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_construct")));
-  retnum cell_num = add_cell(&gr, {LocationStatic(void), mec->enum_type, mec->enum_type_props});
+  retnum cell_num = add_cell(&gr, {LocationStatic(void), mec->return_type, mec->return_type_props});
 
   tagval enum_tag_value = mk_enum_tag_value(mec->constructor_index);
 
-  argtype *te_typeexpr;
-  field_offset u32;
+  argtype *te_typeexpr = &ref(&mec->et.constructors, mec->constructor_index)->type;
+  field_offset u32 = enum_field_offset(cs, &mec->et, tagval);
   tag_end u32;
   tag_cell cell_num;
-  if case &TeEnum(et te_enum) = &mec->enum_type.x {
-    argtype = &ref(&et.constructors, mec->constructor_index)->type;
-    field_offset = enum_field_offset(cs, &et, tagval);
+  if true {
     cu cu_typeexpr;
     props type_properties;
-    compute_prim(clq, enum_tag_type(cs, &et), &cu, &props);
+    compute_prim(clq, enum_tag_type(cs, &mec->et), &cu, &props);
     tag_end = props.flat_size;
     tag_cell = add_cell(&gr, {LocationVirtual(void), cu, props});
-  } else {
-    ice(_u8("magic_enum_construct on non-enum type"));
   }
 
   prepadding_ogn opt[gr_num]
     = gr_bzero_subcell(clq, &gr, retnum, tag_end, field_offset - tag_end);
   field_end u32 = field_offset + mec->rhs_props.flat_size;
   postpadding_ogn opt[gr_num]
-    = gr_bzero_subcell(clq, &gr, retnum, field_end, mec->enum_type_props.flat_size - field_end);
+    = gr_bzero_subcell(clq, &gr, retnum, field_end, mec->return_type_props.flat_size - field_end);
 
   argnum cell_num = add_cell(&gr, {LocationStatic(void), ~ *argtype, mec->rhs_props});
   retpart cell_num = add_cell(&gr, {LocationVirtual(void), ~ *argtype, mec->rhs_props});

@@ -366,7 +366,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   check(cac_ctor_type.complete);
 
   ip instpair;
-  if case Printed(pm) = lookup_or_make_enum_constructor_def(ds, et, &cac_ctor_type.te, decl_index, &ip) {
+  if case Printed(pm) = lookup_or_make_enum_constructor_def(ds, et, &cac_return_type.te, &cac_ctor_type.te, decl_index, &ip) {
     return Printed(pm);
   }
 
@@ -374,7 +374,8 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   return NoFail;
 }
 
-func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *te_typeexpr, decl_index size, out *instpair) np {
+// return_type is the return type of ctor_type.  Both are complete and computed.
+func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, return_type *te_typeexpr, ctor_type *te_typeexpr, decl_index size, out *instpair) np {
   defname_u8 array[u8] = _u8("$magic_enum_ctor_");
   build_u8str(void, &defname_u8, &decl_index);
   defname sym = intern(ds->im, from_u8(defname_u8));
@@ -434,13 +435,12 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, ctor_type *t
     }
   }
 
-  enum_type cu_typeexpr = ~TeEnum(*et);
-  enum_type_props type_properties;
-  if case Printed(pm) = compute_type_properties(ds->clq, &enum_type, &enum_type_props) {
+  return_type_props type_properties;
+  if case Printed(pm) = compute_complete_type_properties(ds->clq, return_type, &return_type_props) {
     return Printed(pm);
   }
 
-  mec magic_enum_construct = {enum_type, enum_type_props, decl_index, rhs_props, meco};
+  mec magic_enum_construct = {*et, ~ *return_type, return_type_props, decl_index, rhs_props, meco};
 
   ent def_entry_id = add_def_primitive(ds->cs, defname, NoGenerics(void), *ctor_type, @[def_definition]DefnMagic(MagicEnumConstruct(mec)));
   inst_id def_inst_id;
