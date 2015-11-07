@@ -820,7 +820,7 @@ struct ast_import {
 };
 
 enum ast_defclass_disposition {
-  DefaultCopyMoveDestroy void;
+  DefaultMoveCopyDestroy void;
   DefaultMove void;
   NoDefaults void;
 };

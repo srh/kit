@@ -270,11 +270,11 @@ func parse_rest_of_defclass(p *ps, out *ast_toplevel) parse_result {
   disposition ast_defclass_disposition;
   // NOTE: Honestly this is bad syntax, now that copy and move aren't keywords.
   if +try_skip_specific_ident(p, "copy") {
-    disposition = DefaultCopyMoveDestroy(void);
+    disposition = DefaultMoveCopyDestroy;
   } else if +try_skip_specific_ident(p, "move") {
-    disposition = DefaultMove(void);
+    disposition = DefaultMove;
   } else {
-    disposition = NoDefaults(void);
+    disposition = NoDefaults;
   }
   name ast_ident;
   fields array[ast_vardecl];
