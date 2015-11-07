@@ -1242,7 +1242,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
             inst->info = FailedComputation();
             return Printed(pm);
           }
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({st, rhs_props})), class_props});
+          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({st})), class_props});
 
         case &DefstructRhsSpec(drs defstruct_rhs_spec):
           rhs_fields array[te_vardecl];
@@ -1265,7 +1265,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           }
           check(isBeganComputing(&inst->info));
 
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({st, rhs_props})), rhs_props});
+          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({st})), rhs_props});
 
         case &DefenumRhsSpec(drs defenum_rhs_spec):
           rhs_constructors array[te_vardecl];
