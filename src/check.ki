@@ -529,15 +529,7 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
       }
       return NoFail;
     }
-    case &TeEnum(a te_enum): {
-      computed_constructors_complete bool;
-      computed_constructors array[te_vardecl];
-      if case Printed(pm) = help_check_and_compute_fields(clq, g, parms, &a.constructors, &computed_constructors, &computed_constructors_complete) {
-        return Printed(pm);
-      }
-      *out = {computed_constructors_complete, TeEnum({freeze(&computed_constructors)})};
-      return NoFail;
-    }
+
     case &TeUnion(a te_union): {
       computed_fields_complete bool;
       computed_fields array[te_vardecl];
@@ -1028,11 +1020,7 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
       }
     }
 
-    case &TeEnum(a te_enum):
-      return compute_complete_enum_properties(clq, &a, t, out);
-
     case &TeUnion(a te_union): {
-      // This is very similar to TeEnum, but TeEnum will change and this will not.
       max_size u32 = 0;
       max_alignment u32 = 1;
       n size = count(&a.fields);
@@ -1789,7 +1777,6 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
       all complete_computed = all_complete_computed(&a.params);
       return {all.complete, all.computed & isHas(&a.pack)};
     }
-    case &TeEnum(a te_enum): { return all_complete_computed(&a.constructors);    }
     case &TeUnion(a te_union): { return all_complete_computed(&a.fields); }
     case &TeArraytype(a te_arraytype): {
       if isHas(&a.count) {
@@ -1874,32 +1861,6 @@ func unify_under_generics(pt *te_typeexpr,
           push(&unified_params, unified);
         }
         *unified_out = TeApp({unified_typefunc, freeze(&unified_params), None});
-        return true;
-      } else {
-        return false;
-      }
-    }
-
-    case &TeEnum(a te_enum): {
-      if case &TeEnum(pa te_enum) = pt {
-        n size = count(&a.constructors);
-        if n != count(&pa.constructors) {
-          return false;
-        }
-        unified_constructors array[te_vardecl];
-        for i size = 0; i < n; i = i + 1 {
-          pd *te_vardecl = ref(&pa.constructors, i);
-          d *te_vardecl = ref(&a.constructors, i);
-          if pd->name != d->name {
-            return false;
-          }
-          unified te_typeexpr;
-          if !unify_under_generics(&pd->type, names, unif_parms, &d->type, &unified) {
-            return false;
-          }
-          push(&unified_constructors, {d->name, unified});
-        }
-        *unified_out = TeEnum({freeze(&unified_constructors)});
         return true;
       } else {
         return false;

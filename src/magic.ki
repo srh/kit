@@ -273,14 +273,6 @@ func check_magic_ctor(clq *clqueue, g *ast_generics, parms *idy_repls, wc which_
         ice(_u8("check_magic_ctor packless app type"));
       }
     }
-    case &TeEnum(a te_enum): {
-      field_insts array[opt[instpair]];
-      if case Printed(pm) = check_vardecl_ctor(clq, &a.constructors, wc, &field_insts) {
-        return Printed(pm);
-      }
-      // TODO(): Uh.  Get rid of this whole case, but also the TeEnum(..) is lame here.
-      annotate(&mc->info, @[magic_ctor_info]MagicEnumInfo({~cac.te, cac_props, {a.constructors}, field_insts}));
-    }
     case &TeUnion(a te_union): {
       ice(_u8("check_magic_ctor seeing TeUnion"));
     }
