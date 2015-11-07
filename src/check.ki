@@ -941,8 +941,8 @@ def ComputeCopy u32 = 4;
 def ComputeDestroy u32 = 8;
 def ComputeAll u32 = 0xf;
 
-func mask_level(mask u32, level behavior_level) behavior_level {
-  if mask == 0 {
+func mask_level(mask u32, bit u32, level behavior_level) behavior_level {
+  if (mask & bit) == 0 {
     return AbsentLevel;
   } else {
     return level;
@@ -958,10 +958,10 @@ func compute_complete_struct_properties(clq *clqueue, st *te_struct, realtype *t
   }
   final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
   *out = {final_size, psd.max_alignment,
-          level_to_derived(clq, CtorInit, 1, realtype, mask_level(constructor_mask & ComputeInit, psd.init_level)),
-          level_to_derived(clq, CtorMove, 2, realtype, mask_level(constructor_mask & ComputeMove, psd.move_level)),
-          level_to_derived(clq, CtorCopy, 2, realtype, mask_level(constructor_mask & ComputeCopy, psd.copy_level)),
-          level_to_derived(clq, CtorDestroy, 1, realtype, mask_level(constructor_mask & ComputeDestroy, psd.destroy_level)),
+          level_to_derived(clq, CtorInit, 1, realtype, mask_level(constructor_mask, ComputeInit, psd.init_level)),
+          level_to_derived(clq, CtorMove, 2, realtype, mask_level(constructor_mask, ComputeMove, psd.move_level)),
+          level_to_derived(clq, CtorCopy, 2, realtype, mask_level(constructor_mask, ComputeCopy, psd.copy_level)),
+          level_to_derived(clq, CtorDestroy, 1, realtype, mask_level(constructor_mask, ComputeDestroy, psd.destroy_level)),
           IsScalarNo(void)};
   return NoFail;
 }
