@@ -642,7 +642,7 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
 func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *te_struct, out *type_properties) np {
   cs *checkstate = clq->cs;
   ret type_properties;
-  if case Printed(pm) = compute_complete_struct_properties(clq, st, &ret) {
+  if case Printed(pm) = compute_complete_struct_properties(clq, st, ComputeAll, &ret) {
     return Printed(pm);
   }
   switch a {
