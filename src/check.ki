@@ -951,8 +951,61 @@ func compute_partial_struct_data(clq *clqueue, fields *shray[te_vardecl], name o
   return NoFail;
 }
 
+// st had better be complete and computed.
+func compute_complete_struct_properties(clq *clqueue, st *te_struct, out *type_properties) np {
+  psd partial_struct_data;
+  if case Printed(pm) = compute_partial_struct_data(clq, &st->fields, None, &psd) {
+    return Printed(pm);
+  }
+  // TODO(): Ugh.
+  t te_typeexpr = TeStruct(*st);
+  final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
+  *out = {final_size, psd.max_alignment,
+          level_to_derived(clq, CtorInit, 1, &t, psd.init_level),
+          level_to_derived(clq, CtorMove, 2, &t, psd.move_level),
+          level_to_derived(clq, CtorCopy, 2, &t, psd.copy_level),
+          level_to_derived(clq, CtorDestroy, 1, &t, psd.destroy_level),
+          IsScalarNo(void)};
+  return NoFail;
+}
 
-// t had better be complete.
+func compute_complete_enum_properties(clq *clqueue, et *te_enum, out *type_properties) np {
+  tag_size u32 = clq->cs->plat.enum_tag_size;
+  max_size u32 = tag_size;
+  max_alignment u32 = tag_size;
+  move_level u32 = 0;
+  copy_level u32 = 0;
+  destroy_level u32 = 0;
+  n size = count(&et->constructors);
+  for i size = 0; i < n; i = i + 1 {
+    props type_properties;
+    if case Printed(pm) = compute_complete_type_properties(clq, &ref(&et->constructors, i)->type, &props) {
+      return Printed(pm);
+    }
+    tagged_size u32 = ceil_aligned(tag_size, props.flat_alignment) + props.flat_size;
+    max_size = max(max_size, tagged_size);
+    max_alignment = max(max_alignment, props.flat_alignment);
+    move_level = max(move_level, behavior_level(&props.move_behavior));
+    copy_level = max(copy_level, behavior_level(&props.copy_behavior));
+    destroy_level = max(destroy_level, behavior_level(&props.destroy_behavior));
+  }
+
+  // TODO(): Ugh.
+  t te_typeexpr = TeEnum(*et);
+
+  // See TeUnion for explanation of final_size.
+  final_size u32 = ceil_aligned(max_size, max_alignment);
+  *out = {final_size, max_alignment,
+          // Enum initialization is always trivial -- initializes to zero-filled invalid tag value.
+          DerivedMethodTrivial(void),
+          level_to_derived(clq, CtorMove, 2, &t, move_level),
+          level_to_derived(clq, CtorCopy, 2, &t, copy_level),
+          level_to_derived(clq, CtorDestroy, 1, &t, destroy_level),
+          IsScalarNo(void)};
+  return NoFail;
+}
+
+// t had better be complete and computed.
 func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_properties) np {
   cs *checkstate = clq->cs;
   switch t {
@@ -973,53 +1026,11 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
       }
     }
 
-    case &TeStruct(a te_struct): {
-      psd partial_struct_data;
-      if case Printed(pm) = compute_partial_struct_data(clq, &a.fields, None, &psd) {
-        return Printed(pm);
-      }
-      final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
-      *out = {final_size, psd.max_alignment,
-              level_to_derived(clq, CtorInit, 1, t, psd.init_level),
-              level_to_derived(clq, CtorMove, 2, t, psd.move_level),
-              level_to_derived(clq, CtorCopy, 2, t, psd.copy_level),
-              level_to_derived(clq, CtorDestroy, 1, t, psd.destroy_level),
-              IsScalarNo(void)};
-      return NoFail;
-    }
+    case &TeStruct(a te_struct):
+      return compute_complete_struct_properties(clq, &a, out);
 
-    case &TeEnum(a te_enum): {
-      tag_size u32 = cs->plat.enum_tag_size;
-      max_size u32 = tag_size;
-      max_alignment u32 = tag_size;
-      move_level u32 = 0;
-      copy_level u32 = 0;
-      destroy_level u32 = 0;
-      n size = count(&a.constructors);
-      for i size = 0; i < n; i = i + 1 {
-        props type_properties;
-        if case Printed(pm) = compute_complete_type_properties(clq, &ref(&a.constructors, i)->type, &props) {
-          return Printed(pm);
-        }
-        tagged_size u32 = ceil_aligned(tag_size, props.flat_alignment) + props.flat_size;
-        max_size = max(max_size, tagged_size);
-        max_alignment = max(max_alignment, props.flat_alignment);
-        move_level = max(move_level, behavior_level(&props.move_behavior));
-        copy_level = max(copy_level, behavior_level(&props.copy_behavior));
-        destroy_level = max(destroy_level, behavior_level(&props.destroy_behavior));
-      }
-
-      // See TeUnion for explanation of final_size.
-      final_size u32 = ceil_aligned(max_size, max_alignment);
-      *out = {final_size, max_alignment,
-              // Enum initialization is always trivial -- initializes to zero-filled invalid tag value.
-              DerivedMethodTrivial(void),
-              level_to_derived(clq, CtorMove, 2, t, move_level),
-              level_to_derived(clq, CtorCopy, 2, t, copy_level),
-              level_to_derived(clq, CtorDestroy, 1, t, destroy_level),
-              IsScalarNo(void)};
-      return NoFail;
-    }
+    case &TeEnum(a te_enum):
+      return compute_complete_enum_properties(clq, &a, out);
 
     case &TeUnion(a te_union): {
       // This is very similar to TeEnum, but TeEnum will change and this will not.
