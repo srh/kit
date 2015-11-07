@@ -31,8 +31,6 @@ func canonicalize_idy_lifetimes(im *identmap, lifetime_names *array[sym], t *te_
       push(&newparams, tmp);
     }
     *out = TeApp({a.typefunc, freeze(&newparams), canonicalized_pack(&a.pack)});
-  case &TeStruct(a te_struct):
-    *out = TeStruct({canonicalize_idy_vardecls(im, lifetime_names, &a.fields)});
   case &TeEnum(a te_enum):
     *out = TeEnum({canonicalize_idy_vardecls(im, lifetime_names, &a.constructors)});
   case &TeUnion(a te_union):

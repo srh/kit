@@ -272,14 +272,6 @@ func check_magic_ctor(clq *clqueue, g *ast_generics, parms *idy_repls, wc which_
         ice(_u8("check_magic_ctor packless app type"));
       }
     }
-    case &TeStruct(a te_struct): {
-      field_insts array[opt[instpair]];
-      if case Printed(pm) = check_vardecl_ctor(clq, &a.fields, wc, &field_insts) {
-        return Printed(pm);
-      }
-      // TODO(): Get rid of this whole case, structs in general.
-      annotate(&mc->info, @[magic_ctor_info]MagicStructInfo({~cac.te, cac_props, {a.fields}, field_insts}));
-    }
     case &TeEnum(a te_enum): {
       field_insts array[opt[instpair]];
       if case Printed(pm) = check_vardecl_ctor(clq, &a.constructors, wc, &field_insts) {

@@ -529,15 +529,6 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
       }
       return NoFail;
     }
-    case &TeStruct(a te_struct): {
-      computed_fields_complete bool;
-      computed_fields array[te_vardecl];
-      if case Printed(pm) = help_check_and_compute_fields(clq, g, parms, &a.fields, &computed_fields, &computed_fields_complete) {
-        return Printed(pm);
-      }
-      *out = {computed_fields_complete, TeStruct({freeze(&computed_fields)})};
-      return NoFail;
-    }
     case &TeEnum(a te_enum): {
       computed_constructors_complete bool;
       computed_constructors array[te_vardecl];
@@ -967,7 +958,7 @@ func mask_level(mask u32, level u32) u32 {
 }
 
 // st had better be complete and computed.
-// Realtype is the name (or app) type (a struct or defclass) whose fields the te_struct specifies.  TODO():  Right now realtype could be a TeStruct.
+// Realtype is the name (or app) type (a struct or defclass) whose fields the te_struct specifies.
 func compute_complete_struct_properties(clq *clqueue, st *te_struct, realtype *te_typeexpr, constructor_mask u32, out *type_properties) np {
   psd partial_struct_data;
   if case Printed(pm) = compute_partial_struct_data(clq, &st->fields, None, &psd) {
@@ -1039,9 +1030,6 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
         return fake();
       }
     }
-
-    case &TeStruct(a te_struct):
-      return compute_complete_struct_properties(clq, &a, t, ComputeAll, out);
 
     case &TeEnum(a te_enum):
       return compute_complete_enum_properties(clq, &a, out);
@@ -1803,7 +1791,6 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
       all complete_computed = all_complete_computed(&a.params);
       return {all.complete, all.computed & isHas(&a.pack)};
     }
-    case &TeStruct(a te_struct): { return all_complete_computed(&a.fields); }
     case &TeEnum(a te_enum): { return all_complete_computed(&a.constructors);    }
     case &TeUnion(a te_union): { return all_complete_computed(&a.fields); }
     case &TeArraytype(a te_arraytype): {
@@ -1889,32 +1876,6 @@ func unify_under_generics(pt *te_typeexpr,
           push(&unified_params, unified);
         }
         *unified_out = TeApp({unified_typefunc, freeze(&unified_params), None});
-        return true;
-      } else {
-        return false;
-      }
-    }
-
-    case &TeStruct(a te_struct): {
-      if case &TeStruct(pa te_struct) = pt {
-        n size = count(&a.fields);
-        if n != count(&pa.fields) {
-          return false;
-        }
-        unified_fields array[te_vardecl];
-        for i size = 0; i < n; i = i + 1 {
-          pd *te_vardecl = ref(&pa.fields, i);
-          d *te_vardecl = ref(&a.fields, i);
-          if pd->name != d->name {
-            return false;
-          }
-          unified te_typeexpr;
-          if !unify_under_generics(&pd->type, names, unif_parms, &d->type, &unified) {
-            return false;
-          }
-          push(&unified_fields, {d->name, unified});
-        }
-        *unified_out = TeStruct({freeze(&unified_fields)});
         return true;
       } else {
         return false;

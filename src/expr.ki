@@ -1776,9 +1776,6 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
     case &TeApp(a te_typeapp): {
       return lookup_name_field(es, unHas(&a.pack), fieldname, fieldtype_out, res_out);
     }
-    case &TeStruct(a te_struct): {
-      return help_lookup_struct_field(es, &a, fieldname, fieldtype_out, res_out);
-    }
     case &TeEnum(a te_enum): {
       return ERR(_u8("field lookup on an enum type"));
     }
