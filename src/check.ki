@@ -1226,13 +1226,11 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(rhs_fields_complete);
 
           check(isBeganComputing(&inst->info));
-          // TODO(): Gross.
           st te_struct = {freeze(&rhs_fields)};
-          rhs_computed_te te_typeexpr = TeStruct(st);
 
           // TODO(): Note that the very concept of computing rhs_properties (in their entirety) is broken because there is no rhs struct type from which to generate non-trivial insts (when level_to_derived calls make_magic_inst)
           rhs_props type_properties;
-          if case Printed(pm) = compute_complete_type_properties(clq, &rhs_computed_te, &rhs_props) {
+          if case Printed(pm) = compute_complete_struct_properties(clq, &st, &rhs_props) {
             inst->info = FailedComputation();
             return Printed(pm);
           }
@@ -1257,12 +1255,11 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(rhs_fields_complete);
 
           check(isBeganComputing(&inst->info));
-          // TODO(): Gross.
+          // TODO(): Gross?
           st te_struct = {freeze(&rhs_fields)};
-          rhs_computed_te te_typeexpr = TeStruct(st);
 
           rhs_props type_properties;
-          if case Printed(pm) = compute_complete_type_properties(clq, &rhs_computed_te, &rhs_props) {
+          if case Printed(pm) = compute_complete_struct_properties(clq, &st, &rhs_props) {
             inst->info = FailedComputation();
             return Printed(pm);
           }
@@ -1281,12 +1278,11 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(rhs_constructors_complete);
 
           check(isBeganComputing(&inst->info));
+          // TODO(): Gross?
           et te_enum = {freeze(&rhs_constructors)};
-          // TODO(): Gross.
-          rhs_computed_te te_typeexpr = TeEnum(et);
 
           rhs_props type_properties;
-          if case Printed(pm) = compute_complete_type_properties(clq, &rhs_computed_te, &rhs_props) {
+          if case Printed(pm) = compute_complete_enum_properties(clq, &et, &rhs_props) {
             inst->info = FailedComputation();
             return Printed(pm);
           }
