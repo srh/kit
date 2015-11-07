@@ -259,7 +259,6 @@ struct deftype_inst_rhsstruct_info {
 struct deftype_inst_rhsenum_info {
   // TODO(): Uh.  At some point maybe this'll be all we use te_enum for.
   rhs_enumspec te_enum;
-  rhs_props type_properties;
 };
 
 enum deftype_inst_rhs_info {
