@@ -1229,16 +1229,10 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           // TODO(): Gross.
           st te_struct = {freeze(&rhs_fields)};
 
-          // TODO(): Note that the very concept of computing rhs_properties (in their entirety) is broken because there is no rhs struct type from which to generate non-trivial insts (when level_to_derived calls make_magic_inst)
-          rhs_props type_properties;
-          if case Printed(pm) = compute_complete_struct_properties(clq, &st, &rhs_props) {
-            inst->info = FailedComputation();
-            return Printed(pm);
-          }
           check(isBeganComputing(&inst->info));
 
           class_props type_properties;
-          if case Printed(pm) = to_defclass_properties(clq, ent_id, id, crs.disposition, rhs_props, &class_props) {
+          if case Printed(pm) = to_defclass_properties(clq, ent_id, id, crs.disposition,&st, &class_props) {
             inst->info = FailedComputation();
             return Printed(pm);
           }
