@@ -974,7 +974,7 @@ func compute_complete_struct_properties(clq *clqueue, st *te_struct, realtype *t
   return NoFail;
 }
 
-func compute_complete_enum_properties(clq *clqueue, et *te_enum, out *type_properties) np {
+func compute_complete_enum_properties(clq *clqueue, et *te_enum, realtype *te_typeexpr, out *type_properties) np {
   tag_size u32 = clq->cs->plat.enum_tag_size;
   max_size u32 = tag_size;
   max_alignment u32 = tag_size;
@@ -995,17 +995,14 @@ func compute_complete_enum_properties(clq *clqueue, et *te_enum, out *type_prope
     destroy_level = max(destroy_level, behavior_level(&props.destroy_behavior));
   }
 
-  // TODO(): Ugh.
-  t te_typeexpr = TeEnum(*et);
-
   // See TeUnion for explanation of final_size.
   final_size u32 = ceil_aligned(max_size, max_alignment);
   *out = {final_size, max_alignment,
           // Enum initialization is always trivial -- initializes to zero-filled invalid tag value.
           DerivedMethodTrivial(void),
-          level_to_derived(clq, CtorMove, 2, &t, move_level),
-          level_to_derived(clq, CtorCopy, 2, &t, copy_level),
-          level_to_derived(clq, CtorDestroy, 1, &t, destroy_level),
+          level_to_derived(clq, CtorMove, 2, realtype, move_level),
+          level_to_derived(clq, CtorCopy, 2, realtype, copy_level),
+          level_to_derived(clq, CtorDestroy, 1, realtype, destroy_level),
           IsScalarNo(void)};
   return NoFail;
 }
@@ -1032,7 +1029,7 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
     }
 
     case &TeEnum(a te_enum):
-      return compute_complete_enum_properties(clq, &a, out);
+      return compute_complete_enum_properties(clq, &a, t, out);
 
     case &TeUnion(a te_union): {
       // This is very similar to TeEnum, but TeEnum will change and this will not.
@@ -1299,8 +1296,9 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           // TODO(): Gross.
           et te_enum = {freeze(&rhs_constructors)};
 
+          it te_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
-          if case Printed(pm) = compute_complete_enum_properties(clq, &et, &rhs_props) {
+          if case Printed(pm) = compute_complete_enum_properties(clq, &et, &it, &rhs_props) {
             inst->info = FailedComputation();
             return Printed(pm);
           }
