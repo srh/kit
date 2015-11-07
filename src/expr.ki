@@ -1619,8 +1619,7 @@ func structural_enum_type(ds *defscope, t *te_typeexpr, et_out **te_enum) struct
   }
 }
 
-// TODO(): This function will become obsolete in the new order.
-func deftype_rhs_accessible(ds *defscope, id deftype_entry_id, result_out *bool) np {
+func deftype_rhs_info_accessible(ds *defscope, id deftype_entry_id, result_out *bool) np {
   ent *deftype_entry = ref_deftype_entry(ds->cs, id);
   if case &Has(np deftype_nonprim) = &ent->nonprim {
     rhs *deftype_rhs_spec;
@@ -1685,7 +1684,7 @@ enum structural_rhs_result {
 
 func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **deftype_inst_rhs_info) structural_rhs_result {
   accessible_result bool;
-  if case Printed(pm) = deftype_rhs_accessible(ds, pack->ent_id, &accessible_result) {
+  if case Printed(pm) = deftype_rhs_info_accessible(ds, pack->ent_id, &accessible_result) {
     return Error(pm);
   }
   if !accessible_result {
@@ -1766,7 +1765,6 @@ func help_lookup_struct_field(es *framescope, st *te_struct, fieldname *ast_iden
   return NoFail;
 }
 
-// TODO(): At some point we won't be passing structs into this.  Update: I think we've reached that point.
 func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   switch &t->x {
     case &TeName(a te_name): {

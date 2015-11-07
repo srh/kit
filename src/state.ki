@@ -252,12 +252,10 @@ struct cu_typrop {
 };
 
 struct deftype_inst_rhsstruct_info {
-  // TODO(): Uh.  At some point maybe this'll be all we use te_struct for.
   rhs_structspec te_struct;
 };
 
 struct deftype_inst_rhsenum_info {
-  // TODO(): Uh.  At some point maybe this'll be all we use te_enum for.
   rhs_enumspec te_enum;
 };
 
