@@ -958,11 +958,11 @@ def ComputeCopy u32 = 4;
 def ComputeDestroy u32 = 8;
 def ComputeAll u32 = 0xf;
 
-func masked_level_to_derived(clq *clqueue, wc which_ctor, mask u32, arity size, type *te_typeexpr, level u32) derived_method_behavior {
+func mask_level(mask u32, level u32) u32 {
   if mask == 0 {
-    return DerivedMethodAbsent;
+    return 2;
   } else {
-    return level_to_derived(clq, wc, arity, type, level);
+    return level;
   }
 }
 
@@ -976,10 +976,10 @@ func compute_complete_struct_properties(clq *clqueue, st *te_struct, constructor
   t te_typeexpr = TeStruct(*st);
   final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
   *out = {final_size, psd.max_alignment,
-          masked_level_to_derived(clq, CtorInit, constructor_mask & ComputeInit, 1, &t, psd.init_level),
-          masked_level_to_derived(clq, CtorMove, constructor_mask & ComputeMove, 2, &t, psd.move_level),
-          masked_level_to_derived(clq, CtorCopy, constructor_mask & ComputeCopy, 2, &t, psd.copy_level),
-          masked_level_to_derived(clq, CtorDestroy, constructor_mask & ComputeDestroy, 1, &t, psd.destroy_level),
+          level_to_derived(clq, CtorInit, 1, &t, mask_level(constructor_mask & ComputeInit, psd.init_level)),
+          level_to_derived(clq, CtorMove, 2, &t, mask_level(constructor_mask & ComputeMove, psd.move_level)),
+          level_to_derived(clq, CtorCopy, 2, &t, mask_level(constructor_mask & ComputeCopy, psd.copy_level)),
+          level_to_derived(clq, CtorDestroy, 1, &t, mask_level(constructor_mask & ComputeDestroy, psd.destroy_level)),
           IsScalarNo(void)};
   return NoFail;
 }
@@ -1167,13 +1167,14 @@ func make_inst(clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_in
   return NoFail;
 }
 
+// TODO(): Fix this stupid un-enumed level system.
 func level_to_derived(clq *clqueue, wc which_ctor, arity size, type *te_typeexpr, level u32) derived_method_behavior {
   if level == 0 {
-    return DerivedMethodTrivial(void);
+    return DerivedMethodTrivial;
   } else if level == 1 {
     return make_nontrivial(clq, wc, arity, type);
   } else if level == 2 {
-    return DerivedMethodAbsent(void);
+    return DerivedMethodAbsent;
   } else {
     ice(_u8("level_to_derived sees impossible level"));
     return fake();
