@@ -951,6 +951,7 @@ func compute_partial_struct_data(clq *clqueue, fields *shray[te_vardecl], name o
   return NoFail;
 }
 
+def ComputeNone u32 = 0;
 def ComputeInit u32 = 1;
 def ComputeMove u32 = 2;
 def ComputeCopy u32 = 4;
