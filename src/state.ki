@@ -225,10 +225,20 @@ enum derived_method_behavior {
 };
 
 func isTrivial(behav derived_method_behavior) bool {
-  if case DerivedMethodTrivial(v void) = behav {
+  if case DerivedMethodTrivial = behav {
     return true;
   }
   return false;
+}
+
+enum behavior_level {
+  TrivialLevel void;
+  NontrivialLevel void;
+  AbsentLevel void;
+};
+
+func `<`(x behavior_level, y behavior_level) bool {
+  return enumnum(&x) < enumnum(&y);
 }
 
 enum type_scalarity {

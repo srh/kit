@@ -890,10 +890,10 @@ struct partial_struct_data {
   found_field bool;
   offset u32;
   max_alignment u32;
-  init_level u32;
-  move_level u32;
-  copy_level u32;
-  destroy_level u32;
+  init_level behavior_level;
+  move_level behavior_level;
+  copy_level behavior_level;
+  destroy_level behavior_level;
 
   // The length of this is the index of the search-for field (-- it doesn't have all the fields if we stopped early.)
   fields array[struct_field_info];
@@ -905,7 +905,7 @@ inline func psd_index(psd *partial_struct_data) size {
 
 // fields had better damn well be complete
 func compute_partial_struct_data(clq *clqueue, fields *shray[te_vardecl], name opt[sym], out *partial_struct_data) np {
-  ret partial_struct_data = {false, 0, 1, 0, 0, 0, 0, mk_array@[struct_field_info]()};
+  ret partial_struct_data = {false, 0, 1, TrivialLevel, TrivialLevel, TrivialLevel, TrivialLevel, mk_array@[struct_field_info]()};
   n size = count(fields);
   for i size = 0; i < n; i = i + 1 {
     vd *te_vardecl = ref(fields, i);
@@ -941,9 +941,9 @@ def ComputeCopy u32 = 4;
 def ComputeDestroy u32 = 8;
 def ComputeAll u32 = 0xf;
 
-func mask_level(mask u32, level u32) u32 {
+func mask_level(mask u32, level behavior_level) behavior_level {
   if mask == 0 {
-    return 2;
+    return AbsentLevel;
   } else {
     return level;
   }
@@ -970,9 +970,9 @@ func compute_complete_enum_properties(clq *clqueue, et *te_enum, realtype *te_ty
   tag_size u32 = clq->cs->plat.enum_tag_size;
   max_size u32 = tag_size;
   max_alignment u32 = tag_size;
-  move_level u32 = 0;
-  copy_level u32 = 0;
-  destroy_level u32 = 0;
+  move_level behavior_level = TrivialLevel;
+  copy_level behavior_level = TrivialLevel;
+  destroy_level behavior_level = TrivialLevel;
   n size = count(&et->constructors);
   for i size = 0; i < n; i = i + 1 {
     props type_properties;
@@ -1075,20 +1075,16 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
   }
 }
 
-func behavior_level(b *derived_method_behavior) u32 {
+func behavior_level(b *derived_method_behavior) behavior_level {
   switch b {
-    case &DerivedMethodAbsent: {
-      return 2;
-    }
-    case &DerivedMethodExplicit(ip instpair): {
-      return 1;
-    }
-    case &DerivedMethodNontrivial(v instpair): {
-      return 1;
-    }
-    case &DerivedMethodTrivial: {
-      return 0;
-    }
+  case &DerivedMethodAbsent:
+    return AbsentLevel;
+  case &DerivedMethodExplicit(ip instpair):
+    return NontrivialLevel;
+  case &DerivedMethodNontrivial(v instpair):
+    return NontrivialLevel;
+  case &DerivedMethodTrivial:
+    return TrivialLevel;
   }
 }
 
@@ -1139,17 +1135,14 @@ func make_inst(clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_in
   return NoFail;
 }
 
-// TODO(): Fix this stupid un-enumed level system.
-func level_to_derived(clq *clqueue, wc which_ctor, arity size, type *te_typeexpr, level u32) derived_method_behavior {
-  if level == 0 {
+func level_to_derived(clq *clqueue, wc which_ctor, arity size, type *te_typeexpr, level behavior_level) derived_method_behavior {
+  switch level {
+  case TrivialLevel:
     return DerivedMethodTrivial;
-  } else if level == 1 {
+  case NontrivialLevel:
     return make_nontrivial(clq, wc, arity, type);
-  } else if level == 2 {
+  case AbsentLevel:
     return DerivedMethodAbsent;
-  } else {
-    ice(_u8("level_to_derived sees impossible level"));
-    return fake();
   }
 }
 
