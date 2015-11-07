@@ -16,7 +16,7 @@ struct magic_struct_info {
 struct magic_enum_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
-  enum_type cu_typeexpr;
+  et te_enum;
   cips array[opt[instpair]];
 };
 
@@ -285,7 +285,7 @@ func check_magic_ctor(clq *clqueue, g *ast_generics, parms *idy_repls, wc which_
         return Printed(pm);
       }
       // TODO(): Uh.  Get rid of this whole case, but also the TeEnum(..) is lame here.
-      annotate(&mc->info, @[magic_ctor_info]MagicEnumInfo({~cac.te, cac_props, ~ @[te_typeexpr]TeEnum({a.constructors}), field_insts}));
+      annotate(&mc->info, @[magic_ctor_info]MagicEnumInfo({~cac.te, cac_props, {a.constructors}, field_insts}));
     }
     case &TeUnion(a te_union): {
       ice(_u8("check_magic_ctor seeing TeUnion"));
@@ -369,7 +369,7 @@ func check_pack_ctor(clq *clqueue, complete_te *te_typeexpr, props *type_propert
       return Printed(pm);
     }
 
-    // TODO():  Uh.  Yeah.  Use MagicStructInfo?  Adapt it to our needs?
+    // TODO():  Uh.  Yeah.  Use MagicStructInfo?  Adapt it to our needs?  Uh, we're using it?
     *info_out = MagicStructInfo({~ *complete_te, *props, field_insts});
   case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
     field_insts array[opt[instpair]];
@@ -377,8 +377,8 @@ func check_pack_ctor(clq *clqueue, complete_te *te_typeexpr, props *type_propert
       return Printed(pm);
     }
 
-    // TODO():  Uh.  Yeah.  No TeEnum wrapper plz.
-    *info_out = MagicEnumInfo({~ *complete_te, *props, ~ @[te_typeexpr]TeEnum(ri.rhs_enumspec), field_insts});
+    // TODO():  Uh.  Seems fine?
+    *info_out = MagicEnumInfo({~ *complete_te, *props, ri.rhs_enumspec, field_insts});
   }
   return NoFail;
 }
