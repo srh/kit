@@ -355,7 +355,6 @@ func check_pack_ctor(clq *clqueue, complete_te *te_typeexpr, props *type_propert
       return Printed(pm);
     }
 
-    // TODO():  Uh.  Yeah.  Use MagicStructInfo?  Adapt it to our needs?  Uh, we're using it?
     *info_out = MagicStructInfo({~ *complete_te, *props, ri.rhs_structspec, field_insts});
   case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
     field_insts array[opt[instpair]];
@@ -363,7 +362,6 @@ func check_pack_ctor(clq *clqueue, complete_te *te_typeexpr, props *type_propert
       return Printed(pm);
     }
 
-    // TODO():  Uh.  Seems fine?
     *info_out = MagicEnumInfo({~ *complete_te, *props, ri.rhs_enumspec, field_insts});
   }
   return NoFail;
