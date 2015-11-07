@@ -225,10 +225,20 @@ enum derived_method_behavior {
 };
 
 func isTrivial(behav derived_method_behavior) bool {
-  if case DerivedMethodTrivial(v void) = behav {
+  if case DerivedMethodTrivial = behav {
     return true;
   }
   return false;
+}
+
+enum behavior_level {
+  TrivialLevel void;
+  NontrivialLevel void;
+  AbsentLevel void;
+};
+
+func `<`(x behavior_level, y behavior_level) bool {
+  return enumnum(&x) < enumnum(&y);
 }
 
 enum type_scalarity {
@@ -251,21 +261,12 @@ struct cu_typrop {
   props type_properties;
 };
 
-struct deftype_inst_rhstype_info {
-  rhs_cu cu_typeexpr;
-  rhs_props type_properties;
-};
-
 struct deftype_inst_rhsstruct_info {
-  // TODO(): Uh.
-  rhs_cu cu_typeexpr;
-  rhs_props type_properties;
+  rhs_structspec te_struct;
 };
 
 struct deftype_inst_rhsenum_info {
-  // TODO(): Uh.
-  rhs_cu cu_typeexpr;
-  rhs_props type_properties;
+  rhs_enumspec te_enum;
 };
 
 enum deftype_inst_rhs_info {
@@ -286,16 +287,15 @@ struct deftype_inst {
 };
 
 struct defstruct_rhs_spec {
-  // TODO(): That this is just a te_typeexpr is a placeholder.
-  type te_typeexpr;
+  fields shray[te_vardecl];
 };
 
 struct defenum_rhs_spec {
-  // TODO(): Yeah.
-  type te_typeexpr;
+  constructors shray[te_vardecl];
 };
 
 struct classexpr_rhs_spec {
+  disposition ast_defclass_disposition;
   drs defstruct_rhs_spec;
 };
 
@@ -647,19 +647,29 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
   }
 }
 
-func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, props type_properties, out *type_properties) np {
+func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *te_struct, out *type_properties) np {
   cs *checkstate = clq->cs;
-  ret type_properties = props;
+  it te_typeexpr = inst_type(cs, ent_id, inst_id);
   switch a {
-    case DefaultCopyMoveDestroy: {
+    case DefaultMoveCopyDestroy: {
+      ret type_properties;
+      if case Printed(pm) = compute_complete_struct_properties(clq, st, &it, (ComputeMove | ComputeCopy) | ComputeDestroy, &ret) {
+        return Printed(pm);
+      }
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
         return Printed(pm);
       }
+      *out = ret;
+      return NoFail;
     }
     case DefaultMove: {
+      ret type_properties;
+      if case Printed(pm) = compute_complete_struct_properties(clq, st, &it, ComputeMove, &ret) {
+        return Printed(pm);
+      }
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
@@ -673,8 +683,14 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior) {
         return Printed(pm);
       }
+      *out = ret;
+      return NoFail;
     }
     case NoDefaults: {
+      ret type_properties;
+      if case Printed(pm) = compute_complete_struct_properties(clq, st, &it, ComputeNone, &ret) {
+        return Printed(pm);
+      }
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
@@ -692,8 +708,8 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
         return Printed(pm);
       }
       ret.is_scalar = IsScalarNo(void);
+      *out = ret;
+      return NoFail;
     }
   }
-  *out = ret;
-  return NoFail;
 }

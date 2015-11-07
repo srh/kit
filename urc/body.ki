@@ -382,9 +382,8 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
     checkobj_out->switchable_type_lifetime = checkobj_out->swartch_lifetime;
   }
   // switchable_type is complete, because swartch type is.
-  enum_type_discard *te_typeexpr;
   et *te_enum;
-  switch structural_enum_type(es->ds, switchable_type, &enum_type_discard, &et) {
+  switch structural_enum_type(es->ds, switchable_type, &et) {
   case Error(pm):
     return Printed(pm);
   case Success: { }

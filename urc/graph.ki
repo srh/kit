@@ -1872,10 +1872,8 @@ func gr_magic_bzero(cs *checkstate, clq *clqueue, mb *magic_bzero, gr_out *frame
 }
 
 func gr_magic_ctor(cs *checkstate, clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
-  info *magic_ctor_info = ref_info(mc);
+  info *magic_ctor_info = unHas(&mc->info);
   switch info {
-  case &MagicWholeFieldInfo(mwfi magic_whole_field_info):
-    return gr_magic_whole_field_info(cs, clq, wc, &mwfi, gr_out, gn_out, return_cell_out, arg_cells_out);
   case &MagicStructInfo(msi magic_struct_info):
     return gr_magic_struct_info(cs, clq, wc, &msi, gr_out, gn_out, return_cell_out, arg_cells_out);
   case &MagicEnumInfo(mei magic_enum_info):
@@ -2041,12 +2039,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
 
-  et *te_enum;
-  if case &TeEnum(t te_enum) = &mei->cu_type.x {
-    et = &t;
-  } else {
-    ice(_u8("gr_magic_enum_info called on non-enum"));
-  }
+  et *te_enum = &mei->et;
 
   tagtype cu_typeexpr;
   tagtype_props type_properties;
@@ -2235,12 +2228,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
 
-  st *te_struct;
-  if case &TeStruct(t te_struct) = &msi->cu_type.x {
-    st = &t;
-  } else {
-    ice(_u8("gr_magic_struct_info called on non-struct"));
-  }
+  st *te_struct = &msi->st;
 
   psd partial_struct_data;
   if case Printed(pm) = compute_partial_struct_data(clq, &st->fields, None, &psd) {
@@ -2414,83 +2402,29 @@ func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *
   *count_out = end - begin;
 }
 
-func gr_magic_whole_field_info(cs *checkstate, clq *clqueue, wc which_ctor, mwfi *magic_whole_field_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
-  gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_whole_field_info")));
-  argtp cu_typrop = compute_prim(clq, ptr_type(cs, mwfi->cu_type.x));
-
-  fieldptrtype cu_typeexpr;
-  fieldptrtype_props type_properties;
-  compute_prim(clq, ptr_type(cs, mwfi->rhs_type.x), &fieldptrtype, &fieldptrtype_props);
-
-  voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
-
-  nargs size = num_args(wc);
-  fntype cu_typeexpr;
-  fntype_props type_properties;
-  compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.x), voidtp.cu.x), &fntype, &fntype_props);
-
-  argcells array[cell_num];
-  fieldptrcells array[cell_num];
-  precs array[gr_num];
-  for i size = 0; i < nargs; i = i + 1 {
-    ac cell_num = add_cell(&gr, {LocationStatic(void), argtp.cu, argtp.props});
-    push(&argcells, ac);
-    pc cell_num = add_cell(&gr, {LocationVirtual(void), mwfi->cu_type, mwfi->cu_props});
-    fc cell_num = add_cell(&gr, {LocationVirtual(void), mwfi->rhs_type, mwfi->rhs_props});
-    fpc cell_num = add_cell(&gr, {LocationStatic(void), fieldptrtype, fieldptrtype_props});
-    push(&fieldptrcells, fpc);
-
-    pointee_gn1 var = addx(&gr, @[gr_xop]GrDeref({pc, ac, OffsetConst(0)}));
-    pointee_gn var = addx(&gr, mk_shray(pointee_gn1), @[gr_xop]GrDead({ac}));
-    fieldcell_gn1 var = addx(&gr, mk_shray(pointee_gn), @[gr_xop]GrSubcell({fc, pc, OffsetConst(0)}));
-    fieldcell_gn var = addx(&gr, mk_shray(fieldcell_gn1), @[gr_xop]GrVirtualDead({pc}));
-    fieldptr_gn1 var = addx(&gr, mk_shray(fieldcell_gn), @[gr_xop]GrAddressof({fpc, fc}));
-    fieldptr_gn var = addx(&gr, mk_shray(fieldptr_gn1), @[gr_xop]GrVirtualDead({fc}));
-    push(&precs, fieldptr_gn);
-  }
-
-  retcell cell_num = add_cell(&gr, {LocationStatic(void), voidtp.cu, voidtp.props});
-  fncell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
-  fn_gn var = addx(&gr, @[gr_xop]GrWriteConst({fncell, ConstDef(mwfi->ip)}));
-  push(&precs, fn_gn);
-
-  ap var = addx(&gr, freeze(&precs), @[gr_xop]GrApply({fncell, freeze(&fieldptrcells), retcell}));
-
-  *gr_out = gr;
-  *gn_out = ap;
-  // We sort of make this look like a "tail call," informally -- is that bad?
-  *return_cell_out = retcell;
-  *arg_cells_out = argcells;
-  return NoFail;
-}
-
 func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cell_out *cell_num) np {
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_construct")));
-  retnum cell_num = add_cell(&gr, {LocationStatic(void), mec->enum_type, mec->enum_type_props});
+  retnum cell_num = add_cell(&gr, {LocationStatic(void), mec->return_type, mec->return_type_props});
 
   tagval enum_tag_value = mk_enum_tag_value(mec->constructor_index);
 
-  argtype *te_typeexpr;
-  field_offset u32;
+  argtype *te_typeexpr = &ref(&mec->et.constructors, mec->constructor_index)->type;
+  field_offset u32 = enum_field_offset(cs, &mec->et, tagval);
   tag_end u32;
   tag_cell cell_num;
-  if case &TeEnum(et te_enum) = &mec->enum_type.x {
-    argtype = &ref(&et.constructors, mec->constructor_index)->type;
-    field_offset = enum_field_offset(cs, &et, tagval);
+  if true {
     cu cu_typeexpr;
     props type_properties;
-    compute_prim(clq, enum_tag_type(cs, &et), &cu, &props);
+    compute_prim(clq, enum_tag_type(cs, &mec->et), &cu, &props);
     tag_end = props.flat_size;
     tag_cell = add_cell(&gr, {LocationVirtual(void), cu, props});
-  } else {
-    ice(_u8("magic_enum_construct on non-enum type"));
   }
 
   prepadding_ogn opt[gr_num]
     = gr_bzero_subcell(clq, &gr, retnum, tag_end, field_offset - tag_end);
   field_end u32 = field_offset + mec->rhs_props.flat_size;
   postpadding_ogn opt[gr_num]
-    = gr_bzero_subcell(clq, &gr, retnum, field_end, mec->enum_type_props.flat_size - field_end);
+    = gr_bzero_subcell(clq, &gr, retnum, field_end, mec->return_type_props.flat_size - field_end);
 
   argnum cell_num = add_cell(&gr, {LocationStatic(void), ~ *argtype, mec->rhs_props});
   retpart cell_num = add_cell(&gr, {LocationVirtual(void), ~ *argtype, mec->rhs_props});

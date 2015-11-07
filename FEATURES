@@ -5,6 +5,7 @@ Some feature differences between s1 and s3:
   - s3 has incr/decr and "+="-type operators.
   - s3 allows negation for overflow types.
   - s3 allows deftype names to shadow def names.
+  - s3 doesn't sanity-check template defs' types.  (It should.)
 
   Subset of s1:
   - s3 disallows assignment except for top-level exprs.

@@ -13,13 +13,10 @@ struct cac_typeexpr {
   te te_typeexpr;
 };
 
-// TODO: Might this still exist in a particular scope?
 // This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics replaced consistently.
 enum te_typeexpr {
   TeName te_name;
   TeApp te_typeapp;
-  TeStruct te_struct;
-  TeEnum te_enum;
   TeUnion te_union;
   TeArraytype te_arraytype;
   TeLifetime te_lifetime;
@@ -116,16 +113,6 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
           }
         }
         ice(_u8("idy_typeexpr_equal on non-pack-having app typeexpr"));
-      }
-    }
-    case &TeStruct(ax te_struct): {
-      if case &TeStruct(bx te_struct) = b {
-        return help_te_vardecl_list_equal(&ax.fields, &bx.fields);
-      }
-    }
-    case &TeEnum(ax te_enum): {
-      if case &TeEnum(bx te_enum) = b {
-        return help_te_vardecl_list_equal(&ax.constructors, &bx.constructors);
       }
     }
     case &TeUnion(ax te_union): {
@@ -225,12 +212,6 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
     case &TeApp(b te_typeapp): {
       wrap_u8str(help, r, _u8("TeApp"), &b);
     }
-    case &TeStruct(b te_struct): {
-      wrap_u8str(help, r, _u8("TeStruct"), &b);
-    }
-    case &TeEnum(b te_enum): {
-      wrap_u8str(help, r, _u8("TeEnum"), &b);
-    }
     case &TeUnion(b te_union): {
       wrap_u8str(help, r, _u8("TeUnion"), &b);
     }
@@ -327,18 +308,14 @@ func help_compute_hash(a *te_typeexpr) osize {
       return ~p.inst_id.x;
     }
     ice(_u8("help_compute_hash on non-pack-having app typeexpr"));
-  case &TeStruct(ax te_struct):
-    return 0x3 ^ help_te_vardecl_list_compute_hash(&ax.fields);
-  case &TeEnum(ax te_enum):
-    return 0x4 ^ help_te_vardecl_list_compute_hash(&ax.constructors);
   case &TeUnion(ax te_union):
-    return 0x5 ^ help_te_vardecl_list_compute_hash(&ax.fields);
+    return 0x3 ^ help_te_vardecl_list_compute_hash(&ax.fields);
   case &TeArraytype(ax te_arraytype):
     if case Has(n u32) = ax.count {
       return (@[osize]~n * 0x3001) + help_compute_hash(oo(&ax.param));
     }
   case &TeLifetime(ax te_lifetime):
-    return 0x6 ^ hash_compute_hash(&ax.name);
+    return 0x4 ^ hash_compute_hash(&ax.name);
   case &TeUnknown:
     ice(_u8("help_compute_hash sees TeUnknown"));
   }
@@ -381,14 +358,6 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
     case TePureUnknown:
       push(r, '_');
     }
-  case &TeStruct(b te_struct):
-    append(r, _u8("struct { "));
-    help_pretty_vardecl(im, r, &b.fields);
-    push(r, '}');
-  case &TeEnum(b te_enum):
-    append(r, _u8("enum { "));
-    help_pretty_vardecl(im, r, &b.constructors);
-    push(r, '}');
   case &TeUnion(b te_union):
     append(r, _u8("struct { "));
     help_pretty_vardecl(im, r, &b.fields);

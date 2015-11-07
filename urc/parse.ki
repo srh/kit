@@ -270,11 +270,11 @@ func parse_rest_of_defclass(p *ps, out *ast_toplevel) parse_result {
   disposition ast_defclass_disposition;
   // NOTE: Honestly this is bad syntax, now that copy and move aren't keywords.
   if +try_skip_specific_ident(p, "copy") {
-    disposition = DefaultCopyMoveDestroy(void);
+    disposition = DefaultMoveCopyDestroy;
   } else if +try_skip_specific_ident(p, "move") {
-    disposition = DefaultMove(void);
+    disposition = DefaultMove;
   } else {
-    disposition = NoDefaults(void);
+    disposition = NoDefaults;
   }
   name ast_ident;
   fields array[ast_vardecl];
@@ -282,7 +282,7 @@ func parse_rest_of_defclass(p *ps, out *ast_toplevel) parse_result {
        && +try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = TypeDef({generics, name, ClassexprRhs({disposition, @[ast_typeexpr]Struct({fields})})});
+  *out = TypeDef({generics, name, ClassexprRhs({disposition, fields})});
   return Success;
 }
 
@@ -296,7 +296,7 @@ func parse_rest_of_defstruct(p *ps, out *ast_toplevel) parse_result {
        && +try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = TypeDef({generics, name, DefstructRhs({@[ast_typeexpr]Struct({fields})})});
+  *out = TypeDef({generics, name, DefstructRhs({fields})});
   return Success;
 }
 
@@ -310,8 +310,7 @@ func parse_rest_of_defenum(p *ps, out *ast_toplevel) parse_result {
        && +try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = TypeDef({generics, name,
-                  DefenumRhs({@[ast_typeexpr]Enum({enumfields})})});
+  *out = TypeDef({generics, name, DefenumRhs({enumfields})});
   return Success;
 }
 
@@ -634,24 +633,6 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_lifetimes, out *ast
   // NOTE: Allow arbitrarily many type applications?
   *out = App({embox(lhs), args});
   return Success(void);
-}
-
-func parse_rest_of_struct(p *ps, out *ast_typeexpr) parse_result {
-  fields array[ast_vardecl];
-  if ! +parse_braced_fields(p, &fields) {
-    return Fail;
-  }
-  *out = Struct({fields});
-  return Success;
-}
-
-func parse_rest_of_enum(p *ps, out *ast_typeexpr) parse_result {
-  fields array[ast_vardecl];
-  if ! +parse_braced_fields(p, &fields) {
-    return Fail;
-  }
-  *out = Enum({fields});
-  return Success;
 }
 
 func parse_rest_of_union(p *ps, out *ast_typeexpr) parse_result {

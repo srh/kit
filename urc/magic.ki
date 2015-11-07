@@ -7,23 +7,17 @@ import shp;
 import typeexpr;
 import u8ast;
 
-struct magic_whole_field_info {
-  ip instpair;
-  cu_type cu_typeexpr;
-  cu_props type_properties;
-  rhs_type cu_typeexpr;
-  rhs_props type_properties;
-};
-
 struct magic_struct_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
+  st te_struct;
   fips array[opt[instpair]];
 };
 
 struct magic_enum_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
+  et te_enum;
   cips array[opt[instpair]];
 };
 
@@ -34,7 +28,6 @@ struct magic_arraytype_info {
 };
 
 enum magic_ctor_info {
-  MagicWholeFieldInfo magic_whole_field_info;
   // These are None for fields that are trivially constructed.  But of course one field is not None.
   MagicStructInfo magic_struct_info;
   MagicEnumInfo magic_enum_info;
@@ -45,11 +38,6 @@ struct magic_ctor {
   type te_typeexpr;
   info nc[magic_ctor_info];
 };
-
-// TODO: Nobody uses this, right?
-func ref_info(a *magic_ctor) *magic_ctor_info {
-  return unHas(&a->info);
-}
 
 struct copy_destroy_desc {
   copy_desc ctor_desc;
@@ -63,8 +51,9 @@ enum magic_enum_construct_op {
 };
 
 struct magic_enum_construct {
-  enum_type cu_typeexpr;
-  enum_type_props type_properties;
+  et te_enum;
+  return_type cu_typeexpr;
+  return_type_props type_properties;
   constructor_index size;
   rhs_props type_properties;
   operational magic_enum_construct_op;
@@ -107,6 +96,8 @@ struct non_magic_prop {
   info nc[u32];
 };
 
+// Used for DefnNonMagic in def_definition in def_entry.
+// Used for InstRhsNonMagic in def_inst_rhs in def_inst, maybe with generics replaced?
 enum def_non_magic {
   NonMagicCtor which_non_magic_ctor;
   NonMagicProp non_magic_prop;
@@ -117,6 +108,8 @@ struct which_magic_ctor {
   mc magic_ctor;
 };
 
+// Used for DefnMagic in def_definition in def_entry.
+// Used for InstRhsMagic in def_inst_rhs in def_inst, maybe with generics replaced?
 enum def_magic {
   MagicBzero magic_bzero;
   MagicMemcopy magic_memcopy;
@@ -280,20 +273,6 @@ func check_magic_ctor(clq *clqueue, g *ast_generics, parms *idy_repls, wc which_
         ice(_u8("check_magic_ctor packless app type"));
       }
     }
-    case &TeStruct(a te_struct): {
-      field_insts array[opt[instpair]];
-      if case Printed(pm) = check_vardecl_ctor(clq, &a.fields, wc, &field_insts) {
-        return Printed(pm);
-      }
-      annotate(&mc->info, @[magic_ctor_info]MagicStructInfo({~cac.te, cac_props, field_insts}));
-    }
-    case &TeEnum(a te_enum): {
-      field_insts array[opt[instpair]];
-      if case Printed(pm) = check_vardecl_ctor(clq, &a.constructors, wc, &field_insts) {
-        return Printed(pm);
-      }
-      annotate(&mc->info, @[magic_ctor_info]MagicEnumInfo({~cac.te, cac_props, field_insts}));
-    }
     case &TeUnion(a te_union): {
       ice(_u8("check_magic_ctor seeing TeUnion"));
     }
@@ -371,11 +350,19 @@ func check_pack_ctor(clq *clqueue, complete_te *te_typeexpr, props *type_propert
   }
   switch rhs_info {
   case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
-    // TODO():  Uh.  Yeah.  Use MagicStructInfo?  Adapt it to our needs?
-    *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, &ri.rhs_props)), ~ *complete_te, *props, ri.rhs_cu, ri.rhs_props});
+    field_insts array[opt[instpair]];
+    if case Printed(pm) = check_vardecl_ctor(clq, &ri.rhs_structspec.fields, wc, &field_insts) {
+      return Printed(pm);
+    }
+
+    *info_out = MagicStructInfo({~ *complete_te, *props, ri.rhs_structspec, field_insts});
   case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
-    // TODO():  Uh.  Yeah.
-    *info_out = MagicWholeFieldInfo({instpair_from_behavior(select_behavior(wc, &ri.rhs_props)), ~ *complete_te, *props, ri.rhs_cu, ri.rhs_props});
+    field_insts array[opt[instpair]];
+    if case Printed(pm) = check_vardecl_ctor(clq, &ri.rhs_enumspec.constructors, wc, &field_insts) {
+      return Printed(pm);
+    }
+
+    *info_out = MagicEnumInfo({~ *complete_te, *props, ri.rhs_enumspec, field_insts});
   }
   return NoFail;
 }
