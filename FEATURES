@@ -4,6 +4,7 @@ Some feature differences between s1 and s3:
   - s3 has o8, o16, o32, diff.
   - s3 has incr/decr and "+="-type operators.
   - s3 allows negation for overflow types.
+  - s3 allows deftype names to shadow def names.
 
   Subset of s1:
   - s3 disallows assignment except for top-level exprs.

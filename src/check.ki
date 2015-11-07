@@ -925,10 +925,10 @@ func compute_partial_struct_data(clq *clqueue, fields *shray[te_vardecl], name o
 
     ret.max_alignment = max(ret.max_alignment, props.flat_alignment);
 
-    ret.init_level = max(ret.init_level, behavior_level(&props.init_behavior));
-    ret.move_level = max(ret.move_level, behavior_level(&props.move_behavior));
-    ret.copy_level = max(ret.copy_level, behavior_level(&props.copy_behavior));
-    ret.destroy_level = max(ret.destroy_level, behavior_level(&props.destroy_behavior));
+    ret.init_level = max(ret.init_level, to_level(&props.init_behavior));
+    ret.move_level = max(ret.move_level, to_level(&props.move_behavior));
+    ret.copy_level = max(ret.copy_level, to_level(&props.copy_behavior));
+    ret.destroy_level = max(ret.destroy_level, to_level(&props.destroy_behavior));
   }
   *out = ret;
   return NoFail;
@@ -982,9 +982,9 @@ func compute_complete_enum_properties(clq *clqueue, et *te_enum, realtype *te_ty
     tagged_size u32 = ceil_aligned(tag_size, props.flat_alignment) + props.flat_size;
     max_size = max(max_size, tagged_size);
     max_alignment = max(max_alignment, props.flat_alignment);
-    move_level = max(move_level, behavior_level(&props.move_behavior));
-    copy_level = max(copy_level, behavior_level(&props.copy_behavior));
-    destroy_level = max(destroy_level, behavior_level(&props.destroy_behavior));
+    move_level = max(move_level, to_level(&props.move_behavior));
+    copy_level = max(copy_level, to_level(&props.copy_behavior));
+    destroy_level = max(destroy_level, to_level(&props.destroy_behavior));
   }
 
   // See TeUnion for explanation of final_size.
@@ -1052,10 +1052,10 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
 
         // We _should_ maintain alignment for a zero-element array because the pointer to such an array might hack in tag-bit logic.
         *out = {props.flat_size * c, props.flat_alignment,
-                level_to_derived(clq, CtorInit, 1, t, behavior_level(&props.init_behavior)),
-                level_to_derived(clq, CtorMove, 2, t, behavior_level(&props.move_behavior)),
-                level_to_derived(clq, CtorCopy, 2, t, behavior_level(&props.copy_behavior)),
-                level_to_derived(clq, CtorDestroy, 1, t, behavior_level(&props.destroy_behavior)),
+                level_to_derived(clq, CtorInit, 1, t, to_level(&props.init_behavior)),
+                level_to_derived(clq, CtorMove, 2, t, to_level(&props.move_behavior)),
+                level_to_derived(clq, CtorCopy, 2, t, to_level(&props.copy_behavior)),
+                level_to_derived(clq, CtorDestroy, 1, t, to_level(&props.destroy_behavior)),
                 IsScalarNo(void)};
         return NoFail;
       } else {
@@ -1075,7 +1075,7 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
   }
 }
 
-func behavior_level(b *derived_method_behavior) behavior_level {
+func to_level(b *derived_method_behavior) behavior_level {
   switch b {
   case &DerivedMethodAbsent:
     return AbsentLevel;
