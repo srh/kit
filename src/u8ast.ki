@@ -79,18 +79,6 @@ func[H] build_u8str(help H, r *array[u8], a *ast_typeapp) void {
   push(r, '}');
 }
 
-func[H] build_u8str(help H, r *array[u8], a *ast_struct) void {
-  append(r, _u8("{fields:"));
-  build_array_u8str(help, r, &a->fields);
-  push(r, '}');
-}
-
-func[H] build_u8str(help H, r *array[u8], a *ast_enum) void {
-  append(r, _u8("{constructors:"));
-  build_array_u8str(help, r, &a->constructors);
-  push(r, '}');
-}
-
 func[H] build_u8str(help H, r *array[u8], a *ast_union) void {
   append(r, _u8("{fields:"));
   build_array_u8str(help, r, &a->fields);
