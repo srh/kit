@@ -772,7 +772,7 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   switch cf_res {
     case InheritsLval(offset u32): {
       // We deref, so it's always an lval.
-      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void), field_lifetime(lifetime)});
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void), field_lifetime(es->cs, lifetime)});
       annotate(&a->info, DerefFieldName(offset));
     }
     case ConstantField(value u32): {
@@ -785,8 +785,9 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
 }
 
 // Right now fields have the same lifetime as what they're part of -- they're part of the same object!  So, having equal lifetimes does not mean you're the same object.
-func field_lifetime(outer_lifetime te_typeexpr) te_typeexpr {
-  return outer_lifetime;
+func field_lifetime(cs *checkstate, outer_lifetime te_typeexpr) te_typeexpr {
+  // TODO: We shouldn't return the fake lifetime.
+  return fake_lifetime(cs);
 }
 
 // Varnames aren't supposed to shadow, so... we have user-friendly lifetime names.  (Note that vars could shadow generic lifetime parameters, for now, so we add the $var_ prefix.)
@@ -822,7 +823,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
     case InheritsLval(offset u32): {
       switch &info->lval {
         case &IsLvalYes(desc lval_description): {
-          lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void), field_lifetime(desc.lifetime)});
+          lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void), field_lifetime(es->cs, desc.lifetime)});
         }
         case &IsLvalNo(desc rval_description): {
           lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, fieldtype, props})});
@@ -1995,7 +1996,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     // TODO: This is totally duplicating field access logic.
     switch &lhs_info->lval {
       case &IsLvalYes(desc lval_description): {
-        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void), field_lifetime(desc.lifetime)});
+        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void), field_lifetime(es->cs, desc.lifetime)});
       }
       case &IsLvalNo(desc rval_description): {
         lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *ixtype, props})});
@@ -2005,7 +2006,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     annotate(&a->info, {None, rhs_later});
   } else {
     // Dereferencing a pointer always makes an lvalue.
-    lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void), field_lifetime(fake_lifetime(es->cs))});
+    lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void), field_lifetime(es->cs, fake_lifetime(es->cs))});
     ie_info_after nc[ast_expr_after_consume] = NotComputed();
     lhs_later ast_later_discard_info = mk_later();
     if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later, None) {
