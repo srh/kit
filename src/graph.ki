@@ -2,7 +2,8 @@ import check;
 
 struct frame_graph {
   informal_name sym;
-  cells array[cell_info];
+  // These should all be isHas when typechecking's succeeded.
+  cells array[opt[cell_info]];
   ops array[gr_node];
 };
 
@@ -122,12 +123,18 @@ func init_frame_graph_from_incomplete(incomplete_graph *opt[frame_graph]) frame_
 }
 
 func init_frame_graph_empty(informal_name sym) frame_graph {
-  return {informal_name, mk_array@[cell_info](), mk_array@[gr_node]()};
+  return {informal_name, mk_array@[opt[cell_info]](), mk_array@[gr_node]()};
+}
+
+func add_cell_raw(gr *frame_graph, info opt[cell_info]) cell_num {
+  num cell_num = ~count(&gr->cells);
+  pushref(&gr->cells, &info);
+  return num;
 }
 
 func add_cellp(gr *frame_graph, info *cell_info) cell_num {
   num cell_num = ~count(&gr->cells);
-  pushref(&gr->cells, info);
+  push(&gr->cells, Has(*info));
   return num;
 }
 
@@ -167,8 +174,11 @@ func mut_qnop_node(gr *frame_graph, ix sq_num, newnode gr_qnode) void {
   }
 }
 
+func count_cells(gr *frame_graph) size {
+  return count(&gr->cells);
+}
 inline func ref_cell(gr *frame_graph, c cell_num) *cell_info {
-  return ref(&gr->cells, c.x);
+  return unHas(ref(&gr->cells, c.x));
 }
 
 inline func ref_node(gr *frame_graph, gn gr_num) *gr_node {
@@ -261,8 +271,6 @@ struct fullbody_state {
   final_node sq_num;
   // count(&label_gn) == count(&info->labels), they start off as nop nodes until we see the label.
   label_gn array[sq_num];
-  // Cells that are used as return cells.
-  return_cells array[cell_num];
 };
 
 func nopq(gr *frame_graph) sq_num {
@@ -293,35 +301,14 @@ func gr_fullbody(clq *clqueue, gr *frame_graph, x *ast_fullbody, out *gr_num, re
     push(&label_gn, ngn);
   }
 
-  fb fullbody_state = {info->all_vars, final_node, label_gn, mk_array@[cell_num]()};
+  fb fullbody_state = {info->all_vars, final_node, label_gn};
 
   body_gn sq_num;
   if case Printed(pm) = gr_bracebody(clq, gr, &fb, None, &x->bb, exit_node, &body_gn) {
     return Printed(pm);
   }
 
-  // This assumes it's okay to have a subcell op produce the identical type -- it's the only place we do that.
-  return_subcell_ops array[gr_num];
-  return_subcell_deads array[gr_num];
-  nreturncells size = count(&fb.return_cells);
-  reserve(&return_subcell_ops, nreturncells);
-  reserve(&return_subcell_deads, nreturncells);
-  for i size = 0; i < nreturncells; i = i + 1 {
-    subn var = addx(gr, @[gr_xop]GrSubcell({get(&fb.return_cells, i), info->return_cell, OffsetConst(0)}));
-    push(&return_subcell_ops, subn);
-    deadn var = addx(gr, @[gr_xop]GrVirtualDead({get(&fb.return_cells, i)}));
-    push(&return_subcell_deads, deadn);
-  }
-
-  nopdep gr_num = addx(gr, freeze(&return_subcell_ops), @[gr_xop]GrXNop(void));
-  seqop sq_num = seqq(gr, {nopdep, body_gn});
-
-  mut_qnop_node(gr, fb.final_node,
-                {@[gr_qop]GrSequence({
-                   addx(gr, freeze(&return_subcell_deads), @[gr_xop]GrXNop(void)),
-                   nopq(gr)})});
-
-  *out = seqop.x;
+  *out = body_gn.x;
   *return_cell_out = info->return_cell;
   return NoFail;
 }
@@ -833,7 +820,6 @@ func gr_return_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *a
     if case Printed(pm) = gr_expr_consume(clq, gr, oo(&b), &gn) {
       return Printed(pm);
     }
-    push(&fb->return_cells, result_cell(oo(&b)));
   } else {
     gn = addx(gr, @[gr_xop]GrXNop(void));
   }
@@ -1026,30 +1012,15 @@ func gr_mk_ternary(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_ternary, o
 
   conjoined cell_num = unHas(&a->info)->conjoined_result_cell;
 
-  then_sn sq_num = seqq(gr, {
-    addx(gr, @[gr_xop]GrSubcell({result_cell(oo(&a->then_clause)), conjoined, OffsetConst(0)})),
-    seqq(gr, {
-      then_gn,
-      seqq(gr, {
-        addx(gr, @[gr_xop]GrVirtualDead({result_cell(oo(&a->then_clause))})),
-        cleanup_tail})})});
-  else_sn sq_num = seqq(gr, {
-    addx(gr, @[gr_xop]GrSubcell({result_cell(oo(&a->else_clause)), conjoined, OffsetConst(0)})),
-    seqq(gr, {
-      else_gn,
-      seqq(gr, {
-        addx(gr, @[gr_xop]GrVirtualDead({result_cell(oo(&a->else_clause))})),
-        cleanup_tail})})});
+  then_sn sq_num = seqq(gr, {then_gn, cleanup_tail});
+  else_sn sq_num = seqq(gr, {else_gn, cleanup_tail});
 
   cond_sn sq_num;
   if case Printed(pm) = gr_expr_condition(clq, gr, oo(&oo(&a->condition)->expr), then_sn, else_sn, &cond_sn) {
     return Printed(pm);
   }
 
-  seq sq_num = seqq(gr, {
-    addx(gr, @[gr_xop]GrWriteNothing({conjoined})),
-    cond_sn});
-  *out = seq.x;
+  *out = cond_sn.x;
   return NoFail;
 }
 

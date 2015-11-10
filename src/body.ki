@@ -37,13 +37,14 @@ struct bodystate {
   im *identmap;
   clq *clqueue;
   return_type *cu_typeexpr;
+  return_cell cell_num;
 
   gotos array[goto_info];
   labels array[label_info];
   statements array[statement_info];
 };
 
-func mk(ds *defscope, return_type *cu_typeexpr) bodystate {
+func mk(ds *defscope, return_type *cu_typeexpr, return_type_props *type_properties) bodystate {
   ret bodystate;
   ret.es = mk(ds);
   ret.ds = ds;
@@ -51,6 +52,10 @@ func mk(ds *defscope, return_type *cu_typeexpr) bodystate {
   ret.im = ds->im;
   ret.clq = ds->clq;
   ret.return_type = return_type;
+
+  return_cell cell_num = add_cell(&ret.es, {LocationStatic, *return_type, *return_type_props});
+
+  ret.return_cell = return_cell;
   return ret;
 }
 
@@ -161,7 +166,7 @@ func make_destructions(es *framescope, vns *array[var_number], out *array[var_de
 }
 
 func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) np {
-  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt, NoDemand) {
     return Printed(pm);
   }
   if case Printed(pm) = annotate_disposal_for_discard(es, &x->expr, &x->after) {
@@ -175,10 +180,10 @@ func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te
   return check_consume_then_discard_expr(es, x, pt, later, None);
 }
 func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) np {
-  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt, NoDemand) {
     return Printed(pm);
   }
-  if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later, later2) {
+  if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, &x->expr, NoDemand, &x->after, later, later2) {
     return Printed(pm);
   }
   return NoFail;
@@ -610,7 +615,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   cell cell_num;
   switch &a->rhs {
     case &HasExpr(x box[ast_expr_consume]): {
-      if case Printed(pm) = check_expr_consume(&bs->es, oo(&x), &computed.te) {
+      if case Printed(pm) = check_expr_consume(&bs->es, oo(&x), &computed.te, NoDemand) {
         return Printed(pm);
       }
       info *ast_expr_complete_info = expr_complete_info(&oo(&x)->expr);
@@ -691,10 +696,9 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
   varcells shray[opt[cell_num]] = compute_varcells(&bs->es, &vars);
   moved_var_ix opt[size];
   if case &Has(c box[ast_expr_consume]) = &a->expr {
-    if case Printed(pm) = check_expr_retconsume(&bs->es, oo(&c), &bs->return_type->x, &varcells, &moved_var_ix) {
+    if case Printed(pm) = check_expr_retconsume(&bs->es, oo(&c), bs->return_type, {bs->return_cell}, &varcells, &moved_var_ix) {
       return Printed(pm);
     }
-    reannotate_static_to_virtual(&bs->es, result_cell(oo(&c)));
   } else {
     if !type_is_void(bs->cs, bs->return_type) {
       return ERR(_u8("Empty return statement with non-void return value."));

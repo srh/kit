@@ -88,7 +88,7 @@ func basic_analyze_fn_body(cs *checkstate, g *graphed_fn_body, bas_out *basic_an
 
 func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_graph) void {
   n_ops size = count(&gr->ops);
-  cellcount size = count(&gr->cells);
+  cellcount size = count_cells(gr);
   grow(&bas->celldisp, cellcount - count(&bas->celldisp), {None, None, None, false, None, NoConstDisp(void), mk_array@[cell_num](), mk_array@[cell_num]()});
 
   for i size = bas->gns_analyzed; i < n_ops; i = i + 1 {
@@ -120,7 +120,7 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
         mark_cell_value_used(bas, a.src);
         mark_cell_not_const(bas, a.dest);
       case &GrWriteConst(a gr_writeconst):
-        if case LocationStatic(v void) = ref(&gr->cells, a.dest.x)->location {
+        if case LocationStatic(v void) = ref_cell(gr, a.dest)->location {
           disp *cell_const_disp = &ref(&bas->celldisp, a.dest.x)->const_value;
           switch disp {
           case &NoConstDisp:
@@ -138,7 +138,7 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
       case &GrSubcell(a gr_subcell):
         set(&ref(&bas->celldisp, a.name.x)->subcell, {gn, a.partof, a.offset});
         push(&ref(&bas->celldisp, a.partof.x)->subcelled, a.name);
-        check(ref(&gr->cells, a.name.x)->location == LocationVirtual(void));
+        check(ref_cell(gr, a.name)->location == LocationVirtual(void));
         mark_cell_not_const(bas, a.partof);
         mark_cell_value_used(bas, a.name);
         mark_cell_value_used(bas, a.partof);
@@ -236,7 +236,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
                   // TODO: Assert that the cell types in g and eg are equal?  The sizes?
                   mapped = a.retcell;
                 } else {
-                  egi *cell_info = ref(&eg.graph.gr.cells, j);
+                  egi *cell_info = ref_cell(&eg.graph.gr, ~j);
                   mapped = add_cell(gr, {egi->location, egi->type, egi->props});
                 }
                 push(&cell_mapping, mapped);
