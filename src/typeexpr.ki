@@ -207,8 +207,7 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
     case &TeLifetime(b te_lifetime):
       wrap_u8str(help, r, _u8("TeLifetime"), &b);
     case &TeTrans(b te_trans):
-      // TODO()
-      append(r, _u8("TeTrans"));
+      wrap_u8str(help, r, _u8("TeTrans"), &b);
     case &TeUnknown: {
       append(r, _u8("TeUnknown"));
     }
@@ -245,6 +244,31 @@ func[H] build_u8str(help H, r *array[u8], a *te_arraytype) void {
 
 func[H] build_u8str(help H, r *array[u8], a *te_lifetime) void {
   build_u8str(help, r, &a->name);
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_trans) void {
+  append(r, _u8("{atoms:"));
+  build_shray_u8str(help, r, &a->atoms);
+  push(r, '}');
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_transatom) void {
+  build_u8str(help, r, &a->before);
+  append(r, _u8(" -> "));
+  build_u8str(help, r, &a->after);
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_statedesc) void {
+  build_u8str(help, r, &a->lifetime);
+  push(r, ' ');
+  build_u8str(help, r, &a->active);
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_activedesc) void {
+  switch a {
+  case &Active: append(r, _u8("active"));
+  case &Inactive: append(r, _u8("inactive"));
+  }
 }
 
 func[H] build_u8str(help H, r *array[u8], a *te_vardecl) void {
