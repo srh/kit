@@ -46,14 +46,6 @@ struct te_typeapp {
   pack opt[te_instpack];
 };
 
-struct te_struct {
-  fields shray[te_vardecl];
-};
-
-struct te_enum {
-  constructors shray[te_vardecl];
-};
-
 struct te_union {
   fields shray[te_vardecl];
 };
@@ -237,18 +229,6 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeapp) void {
   build_u8str(help, r, &a->typefunc);
   append(r, _u8(",params:"));
   build_shray_u8str(help, r, &a->params);
-  push(r, '}');
-}
-
-func[H] build_u8str(help H, r *array[u8], a *te_struct) void {
-  append(r, _u8("{fields:"));
-  build_shray_u8str(help, r, &a->fields);
-  push(r, '}');
-}
-
-func[H] build_u8str(help H, r *array[u8], a *te_enum) void {
-  append(r, _u8("{constructors:"));
-  build_shray_u8str(help, r, &a->constructors);
   push(r, '}');
 }
 
