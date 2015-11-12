@@ -529,8 +529,15 @@ struct rval_description {
   // The cell number of the temporary that this rval is _part of_.
   whole_num cell_num;
 
+  // TODO: As with lval_description, maybe this field should be a te_lifetime or cu_typeexpr.
+  // TODO(): Right now this permits no lifetime to be specified.  Remove the opt[], do whatever refactorings are necessary.
+  whole_lifetime opt[te_typeexpr];
+
   // The cell number of the field (a virtual cell if different from num).
   partial_num cell_num;
+
+  // TODO(): Permits no lifetime to be specified.  Remove the opt[].
+  partial_lifetime opt[te_typeexpr];
 };
 
 // Tells whether the rval would need to get copied out of the temporary, or whether the rval _is_ the whole temporary and can get moved.
@@ -561,7 +568,7 @@ enum is_lval {
 };
 
 inline func wholeRval(num cell_num) is_lval {
-  return IsLvalNo({num, num});
+  return IsLvalNo({num, None, num, None});
 }
 
 // Where the value of the expr is, _before_ after actions are run.

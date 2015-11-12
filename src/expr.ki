@@ -735,7 +735,7 @@ func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt 
 
   annotate(&a->info, {conjoined});
   conj *cell_info = ref_cell(es, conjoined);
-  annotate_info(x, @[ast_expr_info]CompleteCheck({IsLvalNo({conjoined, conjoined}), conj->type, conj->props}));
+  annotate_info(x, @[ast_expr_info]CompleteCheck({IsLvalNo({conjoined, None, conjoined, None}), conj->type, conj->props}));
   return NoFail;
 }
 
@@ -813,6 +813,15 @@ func field_lifetime(cs *checkstate, outer_lifetime te_typeexpr) te_typeexpr {
   return fake_lifetime(cs);
 }
 
+// TODO(): This should be gone once whole_lifetime is no longer opt.
+func field_lifetime_if_has(cs *checkstate, outer_lifetime opt[te_typeexpr]) opt[te_typeexpr] {
+  if case &Has(t te_typeexpr) = &outer_lifetime {
+    return Has(field_lifetime(cs, t));
+  } else {
+    return None;
+  }
+}
+
 // Varnames aren't supposed to shadow, so... we have user-friendly lifetime names.  (Note that vars could shadow generic lifetime parameters, for now, so we add the $var_ prefix.)
 func varname_lifetime(im *identmap, name sym) te_typeexpr {
   n sym = intern(im, _s("$var_") + lookup(im, name));
@@ -849,7 +858,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
           lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void), field_lifetime(es->cs, desc.lifetime)});
         }
         case &IsLvalNo(desc rval_description): {
-          lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, fieldtype, props})});
+          lval = IsLvalNo({desc.whole_num, desc.whole_lifetime, add_cell(es, {LocationVirtual, fieldtype, props}), field_lifetime_if_has(es->cs, desc.whole_lifetime)});
         }
       }
       // There's no disposal, it's a real field access.
@@ -2039,7 +2048,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, demand
         lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void), field_lifetime(es->cs, desc.lifetime)});
       }
       case &IsLvalNo(desc rval_description): {
-        lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *ixtype, props})});
+        lval = IsLvalNo({desc.whole_num, desc.whole_lifetime, add_cell(es, {LocationVirtual, ~ *ixtype, props}), field_lifetime_if_has(es->cs, desc.whole_lifetime)});
       }
     }
     // Nothing to dispose, it's a field access.
