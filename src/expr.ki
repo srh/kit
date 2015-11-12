@@ -323,6 +323,10 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     switch pt {
     case &TeName(te te_name): { }
     case &TeApp(te te_typeapp): { }
+    case &TeLifetime(te te_lifetime):
+      ice(_u8("ds_lookup_constructor TeLifetime"));
+    case &TeTrans(te te_trans):
+      ice(_u8("ds_lookup_constructor TeTrans"));
     case &TeUnknown:
       *res_out = AmbigMatchConstructor(void);
       return NoFail;
@@ -1720,6 +1724,10 @@ func type_pack(t *te_typeexpr) opt[te_instpack] {
       return Has(pack);
     }
     ice(_u8("type_pack called on uncomputed type"));
+  case &TeLifetime(te te_lifetime):
+    ice(_u8("type_pack TeLifetime"));
+  case &TeTrans(te te_trans):
+    ice(_u8("type_pack TeTrans"));
   case &TeUnknown:
     ice(_u8("type_pack called on incomplete type"));
   default:
@@ -1849,7 +1857,9 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
       return NoFail;
     }
     case &TeLifetime(a te_lifetime):
-      return ERR(_u8("ICE: Looking up name field of... a lifetime type?"));
+      return ERR(_u8("ICE: help_lookup_name_field te_lifetime"));
+    case &TeTrans(a te_trans):
+      return ERR(_u8("ICE: help_lookup_name_field te_trans"));
 
     case &TeUnknown: {
       ice(_u8("lookup_field sees incomplete type"));

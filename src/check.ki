@@ -559,6 +559,9 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
       *out = {true, TeLifetime({a.name})};
       return NoFail;
 
+    case &TeTrans(a te_trans):
+      return TODO();
+
     case &TeUnknown: {
       *out = {false, TeUnknown(void)};
       return NoFail;
@@ -1067,6 +1070,9 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
     case &TeLifetime(a te_lifetime):
       // Presumably this should be an ICE.
       return ERR(_u8("ICE: compute_complete_type_properties on TeLifetime"));
+
+    case &TeTrans(a te_trans):
+      return TODO();
 
     case &TeUnknown: {
       ice(_u8("compute_type_properties called on incomplete type."));
@@ -1776,6 +1782,9 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
       // Yes, I guess.
       return {true, true};
 
+    case &TeTrans(a te_trans):
+      return TODO();
+
     case &TeUnknown: {
       return {false, false};
     }
@@ -1929,6 +1938,9 @@ func unify_under_generics(pt *te_typeexpr,
           return false;
         }
       }
+
+    case &TeTrans(a te_trans):
+      return TODO();
 
     case &TeUnknown: {
       // Right now, the only callers are type_matches and unify_types.  From type_matches, t is complete, and from unify_types, there are no generic names.

@@ -20,6 +20,7 @@ enum te_typeexpr {
   TeUnion te_union;
   TeArraytype te_arraytype;
   TeLifetime te_lifetime;
+  TeTrans te_trans;
   TeUnknown void;
 };
 
@@ -58,6 +59,27 @@ struct te_arraytype {
 // We better not allow name shadowing of lifetimes!
 struct te_lifetime {
   name sym;
+};
+
+struct te_trans {
+  // Order doesn't matter -- this defines an unordered set (or bag?).
+  atoms shray[te_transatom];
+};
+
+struct te_transatom {
+  before te_statedesc;
+  after te_statedesc;
+};
+
+enum te_activedesc {
+  Active void;
+  Inactive void;
+};
+
+struct te_statedesc {
+  // (Should this be a te_typeexpr?)
+  lifetime te_lifetime;
+  active te_activedesc;
 };
 
 struct te_vardecl {
@@ -121,6 +143,8 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
       if case &TeLifetime(bx te_lifetime) = b {
         return ax.name == bx.name;
       }
+    case &TeTrans(ax te_trans):
+      return TODO();
     case &TeUnknown: {
       ice(_u8("idy_typeexpr_equal sees TeUnknown"));
     }
@@ -182,6 +206,9 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
     }
     case &TeLifetime(b te_lifetime):
       wrap_u8str(help, r, _u8("TeLifetime"), &b);
+    case &TeTrans(b te_trans):
+      // TODO()
+      append(r, _u8("TeTrans"));
     case &TeUnknown: {
       append(r, _u8("TeUnknown"));
     }
@@ -266,6 +293,8 @@ func help_compute_hash(a *te_typeexpr) osize {
     }
   case &TeLifetime(ax te_lifetime):
     return 0x4 ^ hash_compute_hash(&ax.name);
+  case &TeTrans(ax te_trans):
+    return TODO();
   case &TeUnknown:
     ice(_u8("help_compute_hash sees TeUnknown"));
   }
@@ -324,6 +353,9 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
   case &TeLifetime(b te_lifetime):
     push(r, '\'');
     build_u8str(im, r, &b.name);
+  case &TeTrans(b te_trans):
+    // TODO()
+    append(r, _u8("TeTrans"));
   case &TeUnknown:
     push(r, '_');
   }
