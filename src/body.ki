@@ -179,14 +179,14 @@ func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) np
 }
 
 // For exprs that we use, but then discard.  Conditionals... and switches?  Kinda.
-func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info) np {
-  return check_consume_then_discard_expr(es, x, pt, later, None);
+func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, rc rval_cellnum, later *ast_later_discard_info) np {
+  return check_consume_then_discard_expr(es, x, pt, rc, later, None);
 }
-func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) np {
-  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt, NoDemand) {
+func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, rc rval_cellnum, later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) np {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt, DemandCell(rc)) {
     return Printed(pm);
   }
-  if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, &x->expr, NoDemand, &x->after, later, later2) {
+  if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, &x->expr, DemandCell(rc), &x->after, later, later2) {
     return Printed(pm);
   }
   return NoFail;
@@ -375,14 +375,15 @@ struct swartch_checkobj {
 };
 
 func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard_info, later2 opt[*ast_later_discard_info], checkobj_out *swartch_checkobj) np {
+  swartch_rc rval_cellnum = {add_none_cell(es), unnamed_lifetime(es)};
   unknown te_typeexpr = TeUnknown;
-  if case Printed(pm) = check_consume_then_discard_expr(es, a, &unknown, later, later2) {
+  if case Printed(pm) = check_consume_then_discard_expr(es, a, &unknown, swartch_rc, later, later2) {
     return Printed(pm);
   }
 
   swartch_type *cu_typeexpr = expr_complete_type(&a->expr);
   checkobj_out->swartch_type = swartch_type;
-  checkobj_out->swartch_lifetime = unnamed_lifetime(es);
+  checkobj_out->swartch_lifetime = swartch_rc.lifetime;
   switchable_type *te_typeexpr;
   is_deref bool = decompose_ref_or_ptr(&swartch_type->x, es->cs, &checkobj_out->switchable_type_lifetime, &switchable_type);
   if !is_deref {
@@ -464,7 +465,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
   swartch_vp varpopper;
   init_vp(&swartch_vp, &bs->es);
   swartch_vn var_number;
-  if case Printed(pm) = es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
+  if case Printed(pm) = es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
     return Printed(pm);
   }
   for i size = 0; i < ncases; i = i + 1 {
@@ -497,7 +498,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
           }
 
           vn var_number;
-          if case Printed(pm) = es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
+          if case Printed(pm) = es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
             return Printed(pm);
           }
           ovn = Has(vn);
@@ -566,13 +567,15 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   cond_vp varpopper;
   init_vp(&cond_vp, &bs->es);
   if case &Has(cond ast_expr_condition) = &a->condition {
+    cond_rc rval_cellnum = {add_none_cell(&bs->es), unnamed_lifetime(&bs->es)};
     boolean cu_typeexpr = compute_prim(bs->clq, primitive_bool_type(bs->cs));
-    if case Printed(pm) = check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.x, &cond.discard) {
+    if case Printed(pm) = check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.x, cond_rc, &cond.discard) {
       return Printed(pm);
     }
     connect_statements(bs, loopnum, exitnum);
     cond_vn var_number;
-    if case Printed(pm) = es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, ~unnamed_lifetime(&bs->es), &boolean, VarSelfContained(void), &cond_vn) {
+    check(result_cell(oo(&cond.expr)) == cond_rc.cell);
+    if case Printed(pm) = es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, cond_rc.lifetime, &boolean, VarSelfContained(void), &cond_vn) {
       return Printed(pm);
     }
   }
@@ -616,15 +619,17 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   complete_type *cu_typeexpr;
   note_initter bool;
   cell cell_num;
+  lifetime te_typeexpr = varname_lifetime(bs->im, a->decl.name.value);
   switch &a->rhs {
     case &HasExpr(x box[ast_expr_consume]): {
-      if case Printed(pm) = check_expr_consume(&bs->es, oo(&x), &computed.te, NoDemand) {
+      rc rval_cellnum = {add_none_cell(&bs->es), lifetime};
+      if case Printed(pm) = check_expr_consume(&bs->es, oo(&x), &computed.te, DemandCell(rc)) {
         return Printed(pm);
       }
       info *ast_expr_complete_info = expr_complete_info(&oo(&x)->expr);
       complete_type = &info->cu;
       note_initter = false;
-      cell = result_cell(oo(&x));
+      cell = rc.cell;
     }
     case &AutoInit(x opt[init_action]): {
       if !computed.complete {
@@ -642,7 +647,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   }
 
   vn var_number;
-  if case Printed(pm) = es_push_var(&bs->es, vp, cell, Has(&a->decl.name), ~varname_lifetime(bs->im, a->decl.name.value), complete_type, VarSelfContained(void), &vn) {
+  if case Printed(pm) = es_push_var(&bs->es, vp, cell, Has(&a->decl.name), lifetime, complete_type, VarSelfContained(void), &vn) {
     return Printed(pm);
   }
   annotate(&a->info, {vn});
@@ -765,14 +770,16 @@ func cdi_later(cdo opt[*ast_condition_discard_info]) opt[*ast_later_discard_info
 func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info, cd2 opt[*ast_condition_discard_info]) np {
   switch a {
     case &ExprCondition(b box[ast_expr_consume]): {
+      cond_rc rval_cellnum = {add_none_cell(es), unnamed_lifetime(es)};
       booltype cu_typeexpr = compute_prim(es->clq, primitive_bool_type(es->cs));
-      if case Printed(pm) = check_consume_then_discard_expr(es, oo(&b), &booltype.x, &cd->later, cdi_later(cd2)) {
+      if case Printed(pm) = check_consume_then_discard_expr(es, oo(&b), &booltype.x, cond_rc, &cd->later, cdi_later(cd2)) {
         return Printed(pm);
       }
 
       // We need return statements in the "then" or "else" block to mark the boolean condition dead.  (It would be a smarter graph if we just marked it dead immediately after the branch, but... this way makes the code here handle all cases equivalently.)
       swartch_vn var_number;
-      if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_lifetime(es), &booltype, VarSelfContained(void), &swartch_vn) {
+      check(result_cell(oo(&b)) == cond_rc.cell);
+      if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b)), None, cond_rc.lifetime, &booltype, VarSelfContained(void), &swartch_vn) {
         return Printed(pm);
       }
       annotate(&cd->virtual_cell_dead, None);
@@ -792,7 +799,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
       et *te_enum = chk.enum_type;
       if true {
         swartch_vn var_number;
-        if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
+        if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
           return Printed(pm);
         }
       }
@@ -820,7 +827,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
           annotate(&p->virtual_cell_dead, Has(cell));
         }
         vn var_number;
-        if case Printed(pm) = es_push_var(es, cond_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
+        if case Printed(pm) = es_push_var(es, cond_vp, cell, Has(&vd.name), chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
           return Printed(pm);
         }
 

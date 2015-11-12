@@ -530,7 +530,6 @@ struct rval_description {
   whole_num cell_num;
 
   // TODO: As with lval_description, maybe this field should be a te_lifetime or cu_typeexpr.
-  // TODO(): Right now this permits no lifetime to be specified.  Remove the opt[], do whatever refactorings are necessary.
   whole_lifetime te_typeexpr;
 
   // The cell number of the field (a virtual cell if different from num).

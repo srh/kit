@@ -116,7 +116,8 @@ struct var_info {
   props type_properties;
   cell cell_num;
   name opt[sym];
-  lifetime cu_typeexpr;
+  // TODO: Should this be a cu_typeexpr?  A te_lifetime?  Before, it was a cu_typeexpr, but that seemed freaky.
+  lifetime te_typeexpr;
   // Can a goto statement enter this var's scope and construct the var?  True if the var is self-contained.  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)  This also means the var needs to be destructed by return statements and gotos that leave its scope.  NOTE: What about default cases of switch statements?  You shouldn't be able to goto into one of those?  But you should be able to goto into the else block of an "if case" -- this needs to be fixed?  Should the swartch get destroyed?  Are we treating the "destroy later" of the condition properly?
   binding var_binding;
   initter opt[ctor_desc];
@@ -166,7 +167,7 @@ func do_destroy(vp *varpopper) void {
   vp->es = null;
 }
 
-func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], lifetime cu_typeexpr, computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) np {
+func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], lifetime te_typeexpr, computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) np {
   osymname opt[sym];
   if case Has(ident *ast_ident) = name {
     osymname = Has(ident->value);
@@ -723,8 +724,9 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, demand rval
 }
 
 func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  cond_rc rval_cellnum = {add_none_cell(es), unnamed_lifetime(es)};
   boolean cu_typeexpr = compute_prim(es->clq, primitive_bool_type(es->cs));
-  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&oo(&a->condition)->expr), &boolean.x, &oo(&a->condition)->discard) {
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&oo(&a->condition)->expr), &boolean.x, cond_rc, &oo(&a->condition)->discard) {
     return Printed(pm);
   }
 
@@ -787,8 +789,9 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_exp
 
 func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
   // The fact that our partial type isn't a pointer type is deliberate.
+  pointer_rc rval_cellnum = {add_none_cell(es), unnamed_lifetime(es)};
   unknown te_typeexpr = TeUnknown(void);
-  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->lhs), &unknown, &a->ptr_discard) {
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->lhs), &unknown, pointer_rc, &a->ptr_discard) {
     return Printed(pm);
   }
   info *ast_expr_complete_info = expr_complete_info(&oo(&a->lhs)->expr);
@@ -835,8 +838,6 @@ func varname_lifetime(im *identmap, name sym) te_typeexpr {
   return TeLifetime({n});
 }
 
-// TODO: Most uses of this will get replaced by some rval lifetime getter.  (We'll set rval lifetimes with this value, though.)
-// TODO(): We mustn't be annotating swartch (or variable?) lifetimes directly with this.
 func unnamed_lifetime(es *framescope) te_typeexpr {
   n sym = intern(es->im, _s("$frame_") + from_u8(to_u8str(void, es->lifetime_gen_counter)));
   es->lifetime_gen_counter = es->lifetime_gen_counter + 1;
@@ -886,9 +887,10 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
 }
 
 func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  ptr_rc rval_cellnum = {add_none_cell(es), unnamed_lifetime(es)};
   ptr_pt te_typeexpr = TeUnknown;
   // Let's force the rhs to be a complete type.  Because why not!
-  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->rhs), &ptr_pt, &a->ptr_discard) {
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->rhs), &ptr_pt, ptr_rc, &a->ptr_discard) {
     return Printed(pm);
   }
   rhs_type *cu_typeexpr = expr_complete_type(&oo(&a->rhs)->expr);
@@ -1294,7 +1296,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &OneLocalMatch(v local_info): {
       annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({v.varnum}));
       vi *var_info = ref_var(es, v.varnum);
-      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe(void), vi->lifetime.x}), vi->type, vi->props)));
+      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe(void), vi->lifetime}), vi->type, vi->props)));
       return NoFail;
     }
   }
@@ -1485,7 +1487,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
     push(&arg_cells, cell);
     vn var_number;
     name *ast_ident = &ref(&a->args, i)->name;
-    if case Printed(pm) = es_push_var(&bs->es, &vp, cell, Has(name), ~varname_lifetime(bs->im, name->value), &cu_param, VarSelfContained, &vn) {
+    if case Printed(pm) = es_push_var(&bs->es, &vp, cell, Has(name), varname_lifetime(bs->im, name->value), &cu_param, VarSelfContained, &vn) {
       return Printed(pm);
     }
     if case Printed(pm) = es_note_var_destroyer(&bs->es, vn) {
@@ -2020,8 +2022,10 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, demand
   }
   sizetype cu_typeexpr = compute_prim(es->clq, primitive_size_type(es->cs));
 
+  size_rc rval_cellnum = {add_none_cell(es), unnamed_lifetime(es)};
+
   rhs_later ast_later_discard_info = mk_later();
-  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.x, &rhs_later) {
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.x, size_rc, &rhs_later) {
     return Printed(pm);
   }
 
