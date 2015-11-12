@@ -38,6 +38,8 @@ struct bodystate {
   clq *clqueue;
   return_type *cu_typeexpr;
   return_cell cell_num;
+  // TODO: A problem here is that the return_lifetime will get merged with a variable lifetime if we ever implement construct-in-place return-local-variable semantics.
+  return_lifetime te_typeexpr;
 
   gotos array[goto_info];
   labels array[label_info];
@@ -56,6 +58,7 @@ func mk(ds *defscope, return_type *cu_typeexpr, return_type_props *type_properti
   return_cell cell_num = add_cell(&ret.es, {LocationStatic, *return_type, *return_type_props});
 
   ret.return_cell = return_cell;
+  ret.return_lifetime = unnamed_lifetime(&ret.es);
   return ret;
 }
 
@@ -696,7 +699,7 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
   varcells shray[opt[cell_num]] = compute_varcells(&bs->es, &vars);
   moved_var_ix opt[size];
   if case &Has(c box[ast_expr_consume]) = &a->expr {
-    if case Printed(pm) = check_expr_retconsume(&bs->es, oo(&c), bs->return_type, {bs->return_cell}, &varcells, &moved_var_ix) {
+    if case Printed(pm) = check_expr_retconsume(&bs->es, oo(&c), bs->return_type, {bs->return_cell, bs->return_lifetime}, &varcells, &moved_var_ix) {
       return Printed(pm);
     }
   } else {

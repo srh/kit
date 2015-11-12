@@ -47,19 +47,22 @@ func add_rval_cell(es *framescope, demand rval_celldemand, cu cu_typeexpr, props
   switch demand {
   case NoDemand:
     cell cell_num = add_cell(es, {LocationStatic, cu, props});
-    return {cell};
+    lifetime te_typeexpr = unnamed_lifetime(es);
+    return {cell, lifetime};
   case DemandCell(rc rval_cellnum):
     ensure_cell_typed(es, rc, &cu, &props);
-    return rc;
+    return {rc.cell, rc.lifetime};
   }
 }
 
 inline func wholeRval(num rval_cellnum) is_lval {
-  return IsLvalNo({num.cell, None, num.cell, None});
+  return IsLvalNo({num.cell, Has(num.lifetime), num.cell, Has(num.lifetime)});
 }
 
 struct rval_cellnum {
   cell cell_num;
+  // TODO: Could this (should this) be a te_lifetime?
+  lifetime te_typeexpr;
 };
 
 enum rval_celldemand {
@@ -730,10 +733,11 @@ func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt 
   switch demand {
   case NoDemand:
     conjoined = add_none_cell(es);
-    subdemand = DemandCell({conjoined});
+    lifetime te_typeexpr = unnamed_lifetime(es);
+    subdemand = DemandCell({conjoined, lifetime});
   case DemandCell(rc rval_cellnum):
     conjoined = rc.cell;
-    subdemand = DemandCell({rc.cell});
+    subdemand = DemandCell({rc.cell, rc.lifetime});
   }
 
   if case Printed(pm) = check_expr_consume(es, oo(&a->then_clause), pt, subdemand) {
@@ -844,6 +848,7 @@ func varname_lifetime(im *identmap, name sym) te_typeexpr {
 }
 
 // TODO: Most uses of this will get replaced by some rval lifetime getter.  (We'll set rval lifetimes with this value, though.)
+// TODO(): We mustn't be annotating swartch (or variable?) lifetimes directly with this.
 func unnamed_lifetime(es *framescope) te_typeexpr {
   n sym = intern(es->im, _s("$frame_") + from_u8(to_u8str(void, es->lifetime_gen_counter)));
   es->lifetime_gen_counter = es->lifetime_gen_counter + 1;
@@ -1350,25 +1355,28 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       return Printed(pm);
     }
 
-    for i u32 = 0; i < n; i = i + 1 {
-      x_i *ast_expr_consume = &ref(&a->exprs, ~i)->ec;
-      elem_cell cell_num = add_cell(es, {LocationVirtual, param_cu, param_props});
-      if case Printed(pm) = check_expr_consume(es, x_i, oo(&b.param), @[rval_celldemand]DemandCell({elem_cell})) {
-        return Printed(pm);
-      }
-    }
-
     // We checked is_computed(pt).
     props type_properties;
     if case Printed(pm) = compute_complete_type_properties(es->clq, pt, &props) {
       return Printed(pm);
     }
 
+    array_rc rval_cellnum = add_rval_cell(es, demand, ~ *pt, props);
+
+    for i u32 = 0; i < n; i = i + 1 {
+      x_i *ast_expr_consume = &ref(&a->exprs, ~i)->ec;
+      elem_cell cell_num = add_cell(es, {LocationVirtual, param_cu, param_props});
+      if case Printed(pm) = check_expr_consume(es, x_i, oo(&b.param), @[rval_celldemand]DemandCell({elem_cell, field_lifetime(es->cs, array_rc.lifetime)})) {
+        return Printed(pm);
+      }
+    }
+
+
     for i u32 = 0; i < n; i = i + 1 {
       p_i *ast_strinit_param = ref(&a->exprs, ~i);
       annotate(&p_i->info, {i * param_props.flat_size});
     }
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, ~ *pt, props)), ~ *pt, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(array_rc), ~ *pt, props)));
     return NoFail;
   } else {
     b *te_struct;
@@ -1379,6 +1387,14 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     case NotAccessible:
       return MERR(es->cs, a->meta, _u8("Strinit for inaccessible or non-structural type, "), pretty(es->im, pt));
     }
+
+    // We checked is_computed(pt).
+    props type_properties;
+    if case Printed(pm) = compute_complete_type_properties(es->clq, pt, &props) {
+      return Printed(pm);
+    }
+
+    struct_rc rval_cellnum = add_rval_cell(es, demand, ~ *pt, props);
 
     n size = count(&b->fields);
     if n != count(&a->exprs) {
@@ -1397,7 +1413,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       }
       field_cell cell_num = add_cell(es, {LocationVirtual, field_cu, field_props});
 
-      if case Printed(pm) = check_expr_consume(es, x_i, &field->type, @[rval_celldemand]DemandCell({field_cell})) {
+      if case Printed(pm) = check_expr_consume(es, x_i, &field->type, @[rval_celldemand]DemandCell({field_cell, field_lifetime(es->cs, struct_rc.lifetime)})) {
         return Printed(pm);
       }
       psd partial_struct_data;
@@ -1409,17 +1425,11 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       push(&offsets, psd.offset);
     }
 
-    // We checked is_computed(pt).
-    props type_properties;
-    if case Printed(pm) = compute_complete_type_properties(es->clq, pt, &props) {
-      return Printed(pm);
-    }
-
     for i size = 0; i < n; i = i + 1 {
       p_i *ast_strinit_param = ref(&a->exprs, i);
       annotate(&p_i->info, {get(&offsets, i)});
     }
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, ~ *pt, props)), ~ *pt, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(struct_rc), ~ *pt, props)));
     return NoFail;
   }
 }
