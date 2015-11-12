@@ -56,7 +56,7 @@ func add_rval_cell(es *framescope, demand rval_celldemand, cu cu_typeexpr, props
 }
 
 inline func wholeRval(num rval_cellnum) is_lval {
-  return IsLvalNo({num.cell, Has(num.lifetime), num.cell, Has(num.lifetime)});
+  return IsLvalNo({num.cell, num.lifetime, num.cell, num.lifetime});
 }
 
 struct rval_cellnum {
@@ -728,17 +728,14 @@ func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt 
     return Printed(pm);
   }
 
-  conjoined cell_num;
-  subdemand rval_celldemand;
+  conjoined rval_cellnum;
   switch demand {
   case NoDemand:
-    conjoined = add_none_cell(es);
-    lifetime te_typeexpr = unnamed_lifetime(es);
-    subdemand = DemandCell({conjoined, lifetime});
+    conjoined = {add_none_cell(es), unnamed_lifetime(es)};
   case DemandCell(rc rval_cellnum):
-    conjoined = rc.cell;
-    subdemand = DemandCell({rc.cell, rc.lifetime});
+    conjoined = {rc.cell, rc.lifetime};
   }
+  subdemand rval_celldemand = DemandCell(conjoined);
 
   if case Printed(pm) = check_expr_consume(es, oo(&a->then_clause), pt, subdemand) {
     return Printed(pm);
@@ -752,9 +749,9 @@ func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt 
     return ERR(_u8("then and else clause of ternary operator have different types"));
   }
 
-  annotate(&a->info, {conjoined});
-  conj *cell_info = ref_cell(es, conjoined);
-  annotate_info(x, @[ast_expr_info]CompleteCheck({IsLvalNo({conjoined, None, conjoined, None}), conj->type, conj->props}));
+  annotate(&a->info, {conjoined.cell});
+  conj *cell_info = ref_cell(es, conjoined.cell);
+  annotate_info(x, @[ast_expr_info]CompleteCheck({IsLvalNo({conjoined.cell, conjoined.lifetime, conjoined.cell, conjoined.lifetime}), conj->type, conj->props}));
   return NoFail;
 }
 
@@ -832,15 +829,6 @@ func field_lifetime(cs *checkstate, outer_lifetime te_typeexpr) te_typeexpr {
   return fake_lifetime(cs);
 }
 
-// TODO(): This should be gone once whole_lifetime is no longer opt.
-func field_lifetime_if_has(cs *checkstate, outer_lifetime opt[te_typeexpr]) opt[te_typeexpr] {
-  if case &Has(t te_typeexpr) = &outer_lifetime {
-    return Has(field_lifetime(cs, t));
-  } else {
-    return None;
-  }
-}
-
 // Varnames aren't supposed to shadow, so... we have user-friendly lifetime names.  (Note that vars could shadow generic lifetime parameters, for now, so we add the $var_ prefix.)
 func varname_lifetime(im *identmap, name sym) te_typeexpr {
   n sym = intern(im, _s("$var_") + lookup(im, name));
@@ -878,7 +866,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
           lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void), field_lifetime(es->cs, desc.lifetime)});
         }
         case &IsLvalNo(desc rval_description): {
-          lval = IsLvalNo({desc.whole_num, desc.whole_lifetime, add_cell(es, {LocationVirtual, fieldtype, props}), field_lifetime_if_has(es->cs, desc.whole_lifetime)});
+          lval = IsLvalNo({desc.whole_num, desc.whole_lifetime, add_cell(es, {LocationVirtual, fieldtype, props}), field_lifetime(es->cs, desc.whole_lifetime)});
         }
       }
       // There's no disposal, it's a real field access.
@@ -2063,7 +2051,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, demand
         lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void), field_lifetime(es->cs, desc.lifetime)});
       }
       case &IsLvalNo(desc rval_description): {
-        lval = IsLvalNo({desc.whole_num, desc.whole_lifetime, add_cell(es, {LocationVirtual, ~ *ixtype, props}), field_lifetime_if_has(es->cs, desc.whole_lifetime)});
+        lval = IsLvalNo({desc.whole_num, desc.whole_lifetime, add_cell(es, {LocationVirtual, ~ *ixtype, props}), field_lifetime(es->cs, desc.whole_lifetime)});
       }
     }
     // Nothing to dispose, it's a field access.

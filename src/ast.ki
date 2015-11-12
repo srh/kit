@@ -531,13 +531,12 @@ struct rval_description {
 
   // TODO: As with lval_description, maybe this field should be a te_lifetime or cu_typeexpr.
   // TODO(): Right now this permits no lifetime to be specified.  Remove the opt[], do whatever refactorings are necessary.
-  whole_lifetime opt[te_typeexpr];
+  whole_lifetime te_typeexpr;
 
   // The cell number of the field (a virtual cell if different from num).
   partial_num cell_num;
 
-  // TODO(): Permits no lifetime to be specified.  Remove the opt[].
-  partial_lifetime opt[te_typeexpr];
+  partial_lifetime te_typeexpr;
 };
 
 // Tells whether the rval would need to get copied out of the temporary, or whether the rval _is_ the whole temporary and can get moved.
