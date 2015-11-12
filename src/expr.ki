@@ -43,22 +43,23 @@ inline func ref_cell(es *framescope, num cell_num) *cell_info {
   return ref_cell(&es->gr, num);
 }
 
-func add_rval_cell(es *framescope, demand rval_celldemand, cu cu_typeexpr, props type_properties) cell_num {
+func add_rval_cell(es *framescope, demand rval_celldemand, cu cu_typeexpr, props type_properties) rval_cellnum {
   switch demand {
   case NoDemand:
-    return add_cell(es, {LocationStatic, cu, props});
+    cell cell_num = add_cell(es, {LocationStatic, cu, props});
+    return {cell};
   case DemandCell(rc rval_cellnum):
     ensure_cell_typed(es, rc, &cu, &props);
-    return rc.x;
+    return rc;
   }
 }
 
-inline func wholeRval(num cell_num) is_lval {
-  return IsLvalNo({num, None, num, None});
+inline func wholeRval(num rval_cellnum) is_lval {
+  return IsLvalNo({num.cell, None, num.cell, None});
 }
 
 struct rval_cellnum {
-  x cell_num;
+  cell cell_num;
 };
 
 enum rval_celldemand {
@@ -68,7 +69,7 @@ enum rval_celldemand {
 
 // TODO: This probably could/should compute props itself.
 func ensure_cell_typed(es *framescope, rc rval_cellnum, type *cu_typeexpr, props *type_properties) void {
-  p *opt[cell_info] = ref(&es->gr.cells, rc.x.x);
+  p *opt[cell_info] = ref(&es->gr.cells, rc.cell.x);
   if case &Has(ci cell_info) = p {
     // Do nothing.
     // Don't assert that the types are the same -- we'll leave that to explicit type-checking logic.
@@ -731,8 +732,8 @@ func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt 
     conjoined = add_none_cell(es);
     subdemand = DemandCell({conjoined});
   case DemandCell(rc rval_cellnum):
-    conjoined = rc.x;
-    subdemand = DemandCell({rc.x});
+    conjoined = rc.cell;
+    subdemand = DemandCell({rc.cell});
   }
 
   if case Printed(pm) = check_expr_consume(es, oo(&a->then_clause), pt, subdemand) {
@@ -1052,29 +1053,29 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, demand rval_cell
         if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
           return Printed(pm);
         }
-        dest cell_num = add_rval_cell(es, demand, info->cu, info->cu_props);
+        dest rval_cellnum = add_rval_cell(es, demand, info->cu, info->cu_props);
         annotate(after,
-          mk_after(@[consume_actions]ConsumeByCopyDestroy({+{copy, dest, desc.partial_num},
+          mk_after(@[consume_actions]ConsumeByCopyDestroy({+{copy, dest.cell, desc.partial_num},
                                                            +{destroy, desc.whole_num}}),
-                   dest));
+                   dest.cell));
       }
       *moved_cell_ix_out = None;
     }
     case &IsLvalYes(desc lval_description): {
-      dest cell_num = add_rval_cell(es, demand, info->cu, info->cu_props);
+      dest rval_cellnum = add_rval_cell(es, demand, info->cu, info->cu_props);
       if case Has(ix size) = find(movable_cells, Has(desc.num)) {
         move ctor_desc;
         if case Printed(pm) = get_move_ctor(es->ds, &info->cu, &move) {
           return Printed(pm);
         }
-        annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]+{move, dest, desc.num}), dest));
+        annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]+{move, dest.cell, desc.num}), dest.cell));
         *moved_cell_ix_out = Has(ix);
       } else {
         copy ctor_desc;
         if case Printed(pm) = get_copy_ctor(es->ds, &info->cu, &copy) {
           return Printed(pm);
         }
-        annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]+{copy, dest, desc.num}, desc.deadme)), dest));
+        annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]+{copy, dest.cell, desc.num}, desc.deadme)), dest.cell));
         *moved_cell_ix_out = None;
       }
     }
