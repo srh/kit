@@ -2010,11 +2010,9 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
 
-  et *te_enum = &mei->et;
-
   tagtype cu_typeexpr;
   tagtype_props type_properties;
-  compute_prim(clq, enum_tag_type(cs, et), &tagtype, &tagtype_props);
+  compute_prim(clq, enum_tag_type(cs, &mei->et), &tagtype, &tagtype_props);
 
   argcells array[cell_num];
   pointeecells array[cell_num];
@@ -2054,17 +2052,17 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
   deadseq sq_num = seq1(&gr, addx(&gr, freeze(&deadprecs), @[gr_xop]GrXNop(void)));
 
   cases_gn array[tup[gr_const, sq_num]];
-  nconstructors size = count(&et->constructors);
+  nconstructors size = count(&mei->et.constructors);
   for i size = 0; i < nconstructors; i = i + 1 {
     tagval enum_tag_value = mk_enum_tag_value(i);
 
-    fieldtype cu_typeexpr = ~ref(&et->constructors, i)->type;
+    fieldtype cu_typeexpr = ~ref(&mei->et.constructors, i)->type;
     fieldtype_props type_properties;
     if case Printed(pm) = compute_type_properties(clq, &fieldtype, &fieldtype_props) {
       return Printed(pm);
     }
 
-    field_offset u32 = enum_field_offset(cs, et, tagval);
+    field_offset u32 = enum_field_offset(cs, &mei->et, tagval);
     field_end u32 = field_offset + fieldtype_props.flat_size;
     tag_end u32 = enum_tag_offset + tagtype_props.flat_size;
     prepadding_ogn opt[gr_num]
@@ -2199,10 +2197,8 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
 
-  st *te_struct = &msi->st;
-
   psd partial_struct_data;
-  if case Printed(pm) = compute_partial_struct_data(clq, &st->fields, None, &psd) {
+  if case Printed(pm) = compute_partial_struct_data(clq, &msi->st.fields, None, &psd) {
     return Printed(pm);
   }
 
@@ -2239,7 +2235,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
   bn sq_num = seq1(&gr, addx(&gr, freeze(&deadprecs), @[gr_xop]GrXNop(void)));
 
   nfields size = count(&msi->fips);
-  check(nfields == count(&st->fields));
+  check(nfields == count(&msi->st.fields));
   for i2 size = 0; i2 < nfields; i2 = i2 + 1 {
     i size;
     if reverse_order {
@@ -2251,7 +2247,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
     fieldcella array[cell_num];
     fieldcellgn array[gr_num];
     for j size = 0; j < nargs; j = j + 1 {
-      fc cell_num = add_cell(&gr, {LocationVirtual(void), ~ ref(&st->fields, i)->type, ref(&psd.fields, i)->props});
+      fc cell_num = add_cell(&gr, {LocationVirtual(void), ~ ref(&msi->st.fields, i)->type, ref(&psd.fields, i)->props});
       push(&fieldcella, fc);
 
       gn gr_num = addx(&gr, @[gr_xop]GrSubcell({fc, get(&pointeecells, j), OffsetConst(ref(&psd.fields, i)->offset)}));
@@ -2262,7 +2258,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
     if case Has(ip instpair) = get(&msi->fips, i) {
       fieldptrtype cu_typeexpr;
       fieldptrtype_props type_properties;
-      compute_prim(clq, ptr_type(cs, ref(&st->fields, i)->type), &fieldptrtype, &fieldptrtype_props);
+      compute_prim(clq, ptr_type(cs, ref(&msi->st.fields, i)->type), &fieldptrtype, &fieldptrtype_props);
 
       fieldptrcella array[cell_num];
       precs array[gr_num];

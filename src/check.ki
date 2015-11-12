@@ -950,8 +950,8 @@ func mask_level(mask u32, bit u32, level behavior_level) behavior_level {
 }
 
 // st had better be complete and computed.
-// Realtype is the name (or app) type (a struct or defclass) whose fields the te_struct specifies.
-func compute_complete_struct_properties(clq *clqueue, st *te_struct, realtype *te_typeexpr, constructor_mask u32, out *type_properties) np {
+// Realtype is the name (or app) type (a struct or defclass) whose fields the structspec specifies.
+func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *te_typeexpr, constructor_mask u32, out *type_properties) np {
   psd partial_struct_data;
   if case Printed(pm) = compute_partial_struct_data(clq, &st->fields, None, &psd) {
     return Printed(pm);
@@ -966,7 +966,7 @@ func compute_complete_struct_properties(clq *clqueue, st *te_struct, realtype *t
   return NoFail;
 }
 
-func compute_complete_enum_properties(clq *clqueue, et *te_enum, realtype *te_typeexpr, out *type_properties) np {
+func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_typeexpr, out *type_properties) np {
   tag_size u32 = clq->cs->plat.enum_tag_size;
   max_size u32 = tag_size;
   max_alignment u32 = tag_size;
@@ -1226,7 +1226,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(rhs_fields_complete);
 
           check(isBeganComputing(&inst->info));
-          st te_struct = {freeze(&rhs_fields)};
+          st structspec = {freeze(&rhs_fields)};
 
           class_props type_properties;
           if case Printed(pm) = to_defclass_properties(clq, ent_id, id, crs.disposition,&st, &class_props) {
@@ -1246,7 +1246,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(rhs_fields_complete);
 
           check(isBeganComputing(&inst->info));
-          st te_struct = {freeze(&rhs_fields)};
+          st structspec = {freeze(&rhs_fields)};
 
           it te_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
@@ -1269,7 +1269,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(rhs_constructors_complete);
 
           check(isBeganComputing(&inst->info));
-          et te_enum = {freeze(&rhs_constructors)};
+          et enumspec = {freeze(&rhs_constructors)};
 
           it te_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;

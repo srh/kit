@@ -344,7 +344,7 @@ enum ast_statement_enum {
 struct ast_cp_info {
   ovn opt[var_number];
   tag_value enum_tag_value;
-  // enum_field_offset(cs, et, tag_value) -- annotated here because getting a te_enum in graph.ki is needlessly annoying.
+  // enum_field_offset(cs, et, tag_value) -- annotated here because getting an enumspec in graph.ki is needlessly annoying.  (TODO: Outdated comment?  It's not annoying and we should compute it later?)
   field_offset u32;
 };
 
@@ -452,7 +452,7 @@ struct enum_constructor_info {
 struct enum_voidconstructed_info {
   constructor_tag enum_tag_value;
   // The structural rhs type of the enum being constructed.
-  et te_enum;
+  et enumspec;
 };
 
 enum ast_name_expr_info {

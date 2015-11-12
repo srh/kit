@@ -10,14 +10,14 @@ import u8ast;
 struct magic_struct_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
-  st te_struct;
+  st structspec;
   fips array[opt[instpair]];
 };
 
 struct magic_enum_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
-  et te_enum;
+  et enumspec;
   cips array[opt[instpair]];
 };
 
@@ -51,7 +51,7 @@ enum magic_enum_construct_op {
 };
 
 struct magic_enum_construct {
-  et te_enum;
+  et enumspec;
   return_type cu_typeexpr;
   return_type_props type_properties;
   constructor_index size;

@@ -1,0 +1,41 @@
+import state;
+import typeexpr;
+
+struct structspec {
+  fields shray[te_vardecl];
+};
+
+struct enumspec {
+  constructors shray[te_vardecl];
+};
+
+func enum_tag_type(cs *checkstate, et *enumspec) te_typeexpr {
+  tagsize u32 = cs->plat.enum_tag_size;
+  if tagsize == 4 {
+    return primitive_u32_type(cs);
+  } else if tagsize == 1 {
+    return primitive_u8_type(cs);
+  } else if tagsize == 2 {
+    return primitive_u16_type(cs);
+  } else {
+    ice(_u8("enum_tag_type does not support enum_tag_size value"));
+    return fake();
+  }
+}
+
+struct enum_tag_value { x u32; };
+def `~` fn[u32, enum_tag_value] = wrapconvert;
+
+func enum_field_offset(cs *checkstate, et *enumspec, tag enum_tag_value) u32 {
+  // Things will get more complicated at some point.
+  return cs->plat.enum_tag_size;
+}
+
+func mk_enum_tag_value(constructor_decl_index size) enum_tag_value {
+  return ~(enum_tag_min + ~constructor_decl_index);
+}
+
+func unmk_enum_tag_value(val enum_tag_value) size {
+  return @[size]~(val.x - enum_tag_min);
+}
+

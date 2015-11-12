@@ -9,6 +9,7 @@ import objfile;
 import platform;
 import shp;
 import typeexpr;
+import typespec;
 import u8ast;
 
 struct cs_primitives {
@@ -261,20 +262,12 @@ struct cu_typrop {
   props type_properties;
 };
 
-struct te_struct {
-  fields shray[te_vardecl];
-};
-
 struct deftype_inst_rhsstruct_info {
-  rhs_structspec te_struct;
-};
-
-struct te_enum {
-  constructors shray[te_vardecl];
+  rhs_structspec structspec;
 };
 
 struct deftype_inst_rhsenum_info {
-  rhs_enumspec te_enum;
+  rhs_enumspec enumspec;
 };
 
 enum deftype_inst_rhs_info {
@@ -655,7 +648,7 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
   }
 }
 
-func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *te_struct, out *type_properties) np {
+func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *structspec, out *type_properties) np {
   cs *checkstate = clq->cs;
   it te_typeexpr = inst_type(cs, ent_id, inst_id);
   switch a {

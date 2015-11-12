@@ -300,7 +300,7 @@ struct voidconstructed_info {
   // The actual constructed type, which we need for some reason.
   constructed_type cu_typeexpr;
   // The enum type (the structural rhs of constructed_type).
-  et te_enum;
+  et enumspec;
   constructor_tag enum_tag_value;
 };
 
@@ -335,7 +335,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       *res_out = AmbigMatchConstructor(void);
       return NoFail;
     }
-    et *te_enum;
+    et *enumspec;
     switch structural_enum_type(ds, pt, &et) {
     case Error(pm):
       return Printed(pm);
@@ -368,7 +368,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     *res_out = AmbigMatchConstructor(void);
     return NoFail;
   }
-  et *te_enum;
+  et *enumspec;
   switch structural_enum_type(ds, &cac_return_type.te, &et) {
   case Error(pm):
     return Printed(pm);
@@ -406,7 +406,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
 }
 
 // return_type is the return type of ctor_type.  Both are complete and computed.
-func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, return_type *te_typeexpr, ctor_type *te_typeexpr, decl_index size, out *instpair) np {
+func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type *te_typeexpr, ctor_type *te_typeexpr, decl_index size, out *instpair) np {
   defname_u8 array[u8] = _u8("$magic_enum_ctor_");
   build_u8str(void, &defname_u8, &decl_index);
   defname sym = intern(ds->im, from_u8(defname_u8));
@@ -1369,7 +1369,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     annotate_info(x, CompleteCheck(mk(wholeRval(array_rc), ~ *pt, props)));
     return NoFail;
   } else {
-    b *te_struct;
+    b *structspec;
     switch structural_struct_type(es->ds, pt, &b) {
     case Error(pm):
       return Printed(pm);
@@ -1635,10 +1635,9 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
   return NoFail;
 }
 
-// st_out is just the inside te_struct of struct_type_out.  Some caller wants it.
-func structural_struct_type(ds *defscope, t *te_typeexpr, st_out **te_struct) structural_rhs_result {
+func structural_struct_type(ds *defscope, t *te_typeexpr, st_out **structspec) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
-    st *te_struct;
+    st *structspec;
     switch help_structural_struct_type(ds, &pack, &st) {
     case Error(pm):
       return Error(pm);
@@ -1655,9 +1654,9 @@ func structural_struct_type(ds *defscope, t *te_typeexpr, st_out **te_struct) st
 }
 
 // et_out is set to a complete/computed value.
-func structural_enum_type(ds *defscope, t *te_typeexpr, et_out **te_enum) structural_rhs_result {
+func structural_enum_type(ds *defscope, t *te_typeexpr, et_out **enumspec) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
-    et *te_enum;
+    et *enumspec;
     switch help_structural_enum_type(ds, &pack, &et) {
     case Error(pm):
       return Error(pm);
@@ -1762,7 +1761,7 @@ func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **de
   }
 }
 
-func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **te_enum) structural_rhs_result {
+func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **enumspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
@@ -1780,7 +1779,7 @@ func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **te_enum
   }
 }
 
-func help_structural_struct_type(ds *defscope, pack *te_instpack, st_out **te_struct) structural_rhs_result {
+func help_structural_struct_type(ds *defscope, pack *te_instpack, st_out **structspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
@@ -1799,7 +1798,7 @@ func help_structural_struct_type(ds *defscope, pack *te_instpack, st_out **te_st
 }
 
 func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
-  st *te_struct;
+  st *structspec;
   switch help_structural_struct_type(es->ds, pack, &st) {
   case Error(pm):
     return Printed(pm);
@@ -1810,7 +1809,7 @@ func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, 
   }
 }
 
-func help_lookup_struct_field(es *framescope, st *te_struct, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+func help_lookup_struct_field(es *framescope, st *structspec, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   offset u32;
   if case Printed(pm) = lookup_field_from_list(es->clq, &st->fields, fieldname->value, fieldtype_out, &offset) {
     return Printed(pm);
