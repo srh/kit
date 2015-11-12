@@ -567,10 +567,6 @@ enum is_lval {
   IsLvalYes lval_description;
 };
 
-inline func wholeRval(num cell_num) is_lval {
-  return IsLvalNo({num, None, num, None});
-}
-
 // Where the value of the expr is, _before_ after actions are run.
 func value_cell(x *is_lval) cell_num {
   switch x {

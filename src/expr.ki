@@ -43,6 +43,20 @@ inline func ref_cell(es *framescope, num cell_num) *cell_info {
   return ref_cell(&es->gr, num);
 }
 
+func add_rval_cell(es *framescope, demand rval_celldemand, cu cu_typeexpr, props type_properties) cell_num {
+  switch demand {
+  case NoDemand:
+    return add_cell(es, {LocationStatic, cu, props});
+  case DemandCell(rc rval_cellnum):
+    ensure_cell_typed(es, rc, &cu, &props);
+    return rc.x;
+  }
+}
+
+inline func wholeRval(num cell_num) is_lval {
+  return IsLvalNo({num, None, num, None});
+}
+
 struct rval_cellnum {
   x cell_num;
 };
@@ -1020,16 +1034,6 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, demand rval_cell
   movable_cells shray[opt[cell_num]];
   moved_cell_ix_discard opt[size];
   return annotate_disposal_for_consume(es, a, demand, &movable_cells, after, &moved_cell_ix_discard);
-}
-
-func add_rval_cell(es *framescope, demand rval_celldemand, cu cu_typeexpr, props type_properties) cell_num {
-  switch demand {
-  case NoDemand:
-    return add_cell(es, {LocationStatic, cu, props});
-  case DemandCell(rc rval_cellnum):
-    ensure_cell_typed(es, rc, &cu, &props);
-    return rc.x;
-  }
 }
 
 // Annotates the disposal to "consume" the value -- i.e. what happens if it's a function param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or whatever).
