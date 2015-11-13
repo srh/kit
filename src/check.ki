@@ -1782,7 +1782,7 @@ func type_matches(pt *te_typeexpr, names *array[ast_generik], parms *shray[te_ty
   unif_parms array[te_typeexpr] = mk_copy(parms);
   // Since t is complete, unified is irrelevant and must be identical to t.
   unified te_typeexpr;
-  if !unify_under_generics(pt, names, &unif_parms, t, &unified) {
+  if !unify_under_generics(pt, {names, &unif_parms}, t, &unified) {
     return TypeDoesNotMatch(void);
   }
   frozen_unif_parms shray[te_typeexpr] = freeze(&unif_parms);
@@ -1863,10 +1863,14 @@ func is_complete(t *te_typeexpr) bool {
   return is_complete_computed(t).complete;
 }
 
+struct uug_state {
+  names *array[ast_generik];
+  unif_parms *array[te_typeexpr];
+};
+
 // t references the generic names in "names", whose corresponding values in "unif_parms" might be incomplete.  We update the values in unif_parms when necessary.  t does not need to be complete -- this code is also used by unify_types.
 // "*unified_out" is initialized with the unified type, _except_ when t references a generic name, in which case it's initialized with the value of "*t", the generic name.  (The reason is, we might not have gathered complete information about the generic parameter when we've halfway-processed the type -- the caller can and should reconstruct the correct values later.)
-func unify_under_generics(pt *te_typeexpr,
-                          names *array[ast_generik], unif_parms *array[te_typeexpr],
+func unify_under_generics(pt *te_typeexpr, uug uug_state,
                           t *te_typeexpr, unified_out *te_typeexpr) bool {
   if case &TeUnknown(v void) = pt {
     // It's worth pointing out:  This _is_ correct behavior if t is a generic parameter.
@@ -1875,12 +1879,12 @@ func unify_under_generics(pt *te_typeexpr,
   }
   switch t {
     case &TeName(a te_name): {
-      if case Has(ix size) = lookup_plain_name(names, a.value) {
+      if case Has(ix size) = lookup_plain_name(uug.names, a.value) {
         unified te_typeexpr;
-        if !unify_types(ref(unif_parms, ix), pt, &unified) {
+        if !unify_types(ref(uug.unif_parms, ix), pt, &unified) {
           return false;
         }
-        *ref(unif_parms, ix) = unified;
+        *ref(uug.unif_parms, ix) = unified;
         *unified_out = TeName({a.value, None});
         return true;
       } else {
@@ -1914,7 +1918,7 @@ func unify_under_generics(pt *te_typeexpr,
         reserve(&unified_params, n);
         for i size = 0; i < n; i = i + 1 {
           unified te_typeexpr;
-          if !unify_under_generics(ref(pa_params, i), names, unif_parms, ref(a_params, i), &unified) {
+          if !unify_under_generics(ref(pa_params, i), uug, ref(a_params, i), &unified) {
             return false;
           }
           push(&unified_params, unified);
@@ -1940,7 +1944,7 @@ func unify_under_generics(pt *te_typeexpr,
             return false;
           }
           unified te_typeexpr;
-          if !unify_under_generics(&pd->type, names, unif_parms, &d->type, &unified) {
+          if !unify_under_generics(&pd->type, uug, &d->type, &unified) {
             return false;
           }
           push(&unified_fields, {d->name, unified});
@@ -1969,7 +1973,7 @@ func unify_under_generics(pt *te_typeexpr,
           unified_count = pa.count;
         }
         unified_type te_typeexpr;
-        if !unify_under_generics(oo(&pa.param), names, unif_parms, oo(&a.param), &unified_type) {
+        if !unify_under_generics(oo(&pa.param), uug, oo(&a.param), &unified_type) {
           return false;
         }
         *unified_out = TeArraytype({unified_count, emshp(unified_type)});
@@ -1981,12 +1985,12 @@ func unify_under_generics(pt *te_typeexpr,
 
     case &TeLifetime(a te_lifetime):
       // NOTE: I mimicked the TeName case, and haven't fully thought out how that would affect this function's callers, so treat this code with skepticism.
-      if case Has(ix size) = lookup_lifetime_name(names, a.name) {
+      if case Has(ix size) = lookup_lifetime_name(uug.names, a.name) {
         unified te_typeexpr;
-        if !unify_types(ref(unif_parms, ix), pt, &unified) {
+        if !unify_types(ref(uug.unif_parms, ix), pt, &unified) {
           return false;
         }
-        *ref(unif_parms, ix) = unified;
+        *ref(uug.unif_parms, ix) = unified;
         *unified_out = TeLifetime({a.name});
         return true;
       } else {
@@ -2004,21 +2008,21 @@ func unify_under_generics(pt *te_typeexpr,
 
     case &TeTrans(a te_trans):
       if case &TeTrans(pa te_trans) = pt {
-        return unify_trans_under_generics(&pa, names, unif_parms, &a, unified_out);
+        return unify_trans_under_generics(&pa, uug, &a, unified_out);
       } else {
         return false;
       }
 
     case &TeUnknown: {
       // Right now, the only callers are type_matches and unify_types.  From type_matches, t is complete, and from unify_types, there are no generic names.
-      check(count(names) == 0);
+      check(count(uug.names) == 0);
       *unified_out = *pt;
       return true;
     }
   }
 }
 
-func unify_trans_under_generics(pa *te_trans, names *array[ast_generik], unif_parms *array[te_typeexpr], a *te_trans, unified_out *te_typeexpr) bool {
+func unify_trans_under_generics(pa *te_trans, uug uug_state, a *te_trans, unified_out *te_typeexpr) bool {
   return TODO();
 }
 
@@ -2078,5 +2082,5 @@ func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) boo
 func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
   names array[ast_generik];
   unif_parms array[te_typeexpr];
-  return unify_under_generics(pta, &names, &unif_parms, ptb, out);
+  return unify_under_generics(pta, {&names, &unif_parms}, ptb, out);
 }
