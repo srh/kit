@@ -560,13 +560,40 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
       return NoFail;
 
     case &TeTrans(a te_trans):
-      return TODO();
+      all_complete bool = true;
+      cac_atoms array[te_transatom];
+      // We have to replace the lifetimes with their instantiated generics... for some reason.
+      natoms size = count(&a.atoms);
+      for i size = 0; i < natoms; i = i + 1 {
+        atom *te_transatom = ref(&a.atoms, i);
+        cac_before cac_statedesc;
+        if case Printed(pm) = check_and_compute_statedesc(clq, g, parms, &atom->before, &cac_before) {
+          return Printed(pm);
+        }
+        cac_after cac_statedesc;
+        if case Printed(pm) = check_and_compute_statedesc(clq, g, parms, &atom->after, &cac_after) {
+          return Printed(pm);
+        }
+        all_complete = (all_complete & cac_before.complete) & cac_after.complete;
+        push(&cac_atoms, {cac_before.desc, cac_after.desc});
+      }
+      *out = {all_complete, TeTrans({freeze(&cac_atoms)})};
+      return NoFail;
 
     case &TeUnknown: {
       *out = {false, TeUnknown(void)};
       return NoFail;
     }
   }
+}
+
+func check_and_compute_statedesc(clq *clqueue, g *ast_generics, parms *idy_repls, desc *te_statedesc, out *cac_statedesc) np {
+  cac_lifetime cac_typeexpr;
+  if case Printed(pm) = check_and_compute_typeexpr(clq, g, parms, &desc->lifetime, &cac_lifetime) {
+    return Printed(pm);
+  }
+  *out = {cac_lifetime.complete, {cac_lifetime.te, desc->active}};
+  return NoFail;
 }
 
 func numeric_literal_to_u32(x *ast_numeric_literal, out *u32) bool {

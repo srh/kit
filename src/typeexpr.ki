@@ -13,6 +13,11 @@ struct cac_typeexpr {
   te te_typeexpr;
 };
 
+struct cac_statedesc {
+  complete bool;
+  desc te_statedesc;
+};
+
 // This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics replaced consistently.
 enum te_typeexpr {
   TeName te_name;
