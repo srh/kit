@@ -562,13 +562,11 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
     }
 
     case &TeLifetime(a te_lifetime):
-      if case Has(ix size) = find_lifetime_generic(g, a.name) {
-        *out = {true, ref(&parms->tys, ix)->x};
-        return NoFail;
+      cac_lifetime cac[te_lifetime];
+      if case Printed(pm) = check_and_compute_lifetime(clq, g, parms, &a, &cac_lifetime) {
+        return Printed(pm);
       }
-      // Assume it's a valid lifetime in scope, because what else can we do, keep track of that?
-      // TODO: Make sure that user-defined lifetimes we see are well-scoped... if it still seems worth it.
-      *out = {true, TeLifetime({a.name})};
+      *out = {cac_lifetime.complete, TeLifetime(cac_lifetime.te)};
       return NoFail;
 
     case &TeTrans(a te_trans):
@@ -591,6 +589,21 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
   }
 }
 
+func check_and_compute_lifetime(clq *clqueue, g *ast_generics, parms *idy_repls, a *te_lifetime, out *cac[te_lifetime]) np {
+  if case Has(ix size) = find_lifetime_generic(g, a->name) {
+    if case &TeLifetime(te te_lifetime) = &ref(&parms->tys, ix)->x {
+      *out = {true, te};
+    } else {
+      ice(_u8("check_and_compute_lifetime sees non-lifetime parm for lifetime generic"));
+    }
+    return NoFail;
+  }
+  // Assume it's a valid lifetime in scope, because what else can we do, keep track of that?
+  // TODO: Make sure that user-defined lifetimes we see are well-scoped... if it still seems worth it.
+  *out = {true, {a->name}};
+  return NoFail;
+}
+
 func check_and_compute_statedesc_list(clq *clqueue, g *ast_generics, parms *idy_repls, descs *shray[te_statedesc], out *cac[shray[te_statedesc]]) np {
   n size = count(descs);
   all_complete bool = true;
@@ -608,8 +621,8 @@ func check_and_compute_statedesc_list(clq *clqueue, g *ast_generics, parms *idy_
 }
 
 func check_and_compute_statedesc(clq *clqueue, g *ast_generics, parms *idy_repls, desc *te_statedesc, out *cac[te_statedesc]) np {
-  cac_lifetime cac_typeexpr;
-  if case Printed(pm) = check_and_compute_typeexpr(clq, g, parms, &desc->lifetime, &cac_lifetime) {
+  cac_lifetime cac[te_lifetime];
+  if case Printed(pm) = check_and_compute_lifetime(clq, g, parms, &desc->lifetime, &cac_lifetime) {
     return Printed(pm);
   }
   *out = {cac_lifetime.complete, {cac_lifetime.te, desc->active}};
@@ -1816,8 +1829,7 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
       }
     }
     case &TeLifetime(a te_lifetime):
-      // Yes, I guess.
-      return {true, true};
+      return is_complete_computed(&a);
 
     case &TeTrans(a te_trans):
       before complete_computed = all_complete_computed(&a.before);
@@ -1831,6 +1843,11 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
       return {false, false};
     }
   }
+}
+
+inline func is_complete_computed(a *te_lifetime) complete_computed {
+  // Yes, I guess.
+  return {true, true};
 }
 
 inline func is_complete_computed(a *te_statedesc) complete_computed {
@@ -1986,7 +2003,11 @@ func unify_under_generics(pt *te_typeexpr,
       }
 
     case &TeTrans(a te_trans):
-      return TODO();
+      if case &TeTrans(pa te_trans) = pt {
+        return unify_trans_under_generics(&pa, names, unif_parms, &a, unified_out);
+      } else {
+        return false;
+      }
 
     case &TeUnknown: {
       // Right now, the only callers are type_matches and unify_types.  From type_matches, t is complete, and from unify_types, there are no generic names.
@@ -1995,6 +2016,10 @@ func unify_under_generics(pt *te_typeexpr,
       return true;
     }
   }
+}
+
+func unify_trans_under_generics(pa *te_trans, names *array[ast_generik], unif_parms *array[te_typeexpr], a *te_trans, unified_out *te_typeexpr) bool {
+  return TODO();
 }
 
 func lookup_plain_name(arr *array[ast_generik], x sym) opt[size] {

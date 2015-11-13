@@ -68,7 +68,7 @@ enum te_activedesc {
 
 struct te_statedesc {
   // (Should this be a te_lifetime?)
-  lifetime te_typeexpr;
+  lifetime te_lifetime;
   active te_activedesc;
 };
 
