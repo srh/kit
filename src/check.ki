@@ -1095,14 +1095,13 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
     }
 
     case &TeLifetime(a te_lifetime):
-      // Presumably this should be an ICE.
-      return ERR(_u8("ICE: compute_complete_type_properties on TeLifetime"));
+      return ERR(_u8("ICE: compute_complete_type_properties te_lifetime"));
 
     case &TeTrans(a te_trans):
-      return TODO();
+      return ERR(_u8("ICE: compute_complete_type_properties te_trans"));
 
     case &TeUnknown: {
-      ice(_u8("compute_type_properties called on incomplete type."));
+      ice(_u8("compute_type_properties TeUnknown"));
       return fake();
     }
   }
@@ -1810,12 +1809,34 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
       return {true, true};
 
     case &TeTrans(a te_trans):
-      return TODO();
+      natoms size = count(&a.atoms);
+      all_computed bool = true;
+      for i size = 0; i < natoms; i = i + 1 {
+        cc complete_computed = is_complete_computed(ref(&a.atoms, i));
+        if !cc.complete {
+          return {false, false};
+        }
+        all_computed = all_computed & cc.computed;
+      }
+      return {true, all_computed};
 
     case &TeUnknown: {
       return {false, false};
     }
   }
+}
+
+func is_complete_computed(a *te_transatom) complete_computed {
+  cc complete_computed = is_complete_computed(&a->before);
+  if !cc.complete {
+    return {false, false};
+  }
+  dd complete_computed = is_complete_computed(&a->after);
+  return {dd.complete, cc.computed & dd.computed};
+}
+
+inline func is_complete_computed(a *te_statedesc) complete_computed {
+  return is_complete_computed(&a->lifetime);
 }
 
 struct complete_computed {
