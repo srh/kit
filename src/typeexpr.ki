@@ -7,6 +7,12 @@ struct cu_typeexpr { x te_typeexpr; };
 
 def `~` fn[te_typeexpr, cu_typeexpr] = wrapconvert;
 
+// TODO(): Make this stuff use cac[].
+struct[T] cac {
+  complete bool;
+  te T;
+};
+
 // A "check and computed" typeexpr -- if it's not complete, it should not be converted to a cu_typeexpr.
 struct cac_typeexpr {
   complete bool;
@@ -68,12 +74,8 @@ struct te_lifetime {
 
 struct te_trans {
   // Order doesn't matter -- this defines an unordered set (or bag?).
-  atoms shray[te_transatom];
-};
-
-struct te_transatom {
-  before te_statedesc;
-  after te_statedesc;
+  before shray[te_statedesc];
+  after shray[te_statedesc];
 };
 
 enum te_activedesc {
@@ -253,15 +255,11 @@ func[H] build_u8str(help H, r *array[u8], a *te_lifetime) void {
 }
 
 func[H] build_u8str(help H, r *array[u8], a *te_trans) void {
-  append(r, _u8("{atoms:"));
-  build_shray_u8str(help, r, &a->atoms);
+  append(r, _u8("{before:"));
+  build_shray_u8str(help, r, &a->before);
+  append(r, _u8(",after:"));
+  build_shray_u8str(help, r, &a->after);
   push(r, '}');
-}
-
-func[H] build_u8str(help H, r *array[u8], a *te_transatom) void {
-  build_u8str(help, r, &a->before);
-  append(r, _u8(" -> "));
-  build_u8str(help, r, &a->after);
 }
 
 func[H] build_u8str(help H, r *array[u8], a *te_statedesc) void {
@@ -384,7 +382,9 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
     pretty_u8str(im, r, &b);
   case &TeTrans(b te_trans):
     push(r, '{');
-    pretty_u8str_list(im, r, &b.atoms);
+    pretty_u8str_list(im, r, &b.before);
+    append(r, _u8("->"));
+    pretty_u8str_list(im, r, &b.after);
     push(r, '}');
   case &TeUnknown:
     push(r, '_');
@@ -400,12 +400,6 @@ func[T] pretty_u8str_list(im *identmap, r *array[u8], a *shray[T]) void {
     }
     pretty_u8str(im, r, ref(a, i));
   }
-}
-
-func pretty_u8str(im *identmap, r *array[u8], a *te_transatom) void {
-  pretty_u8str(im, r, &a->before);
-  append(r, _u8(" -> "));
-  pretty_u8str(im, r, &a->after);
 }
 
 func pretty_u8str(im *identmap, r *array[u8], a *te_statedesc) void {

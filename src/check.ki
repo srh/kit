@@ -561,23 +561,15 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
 
     case &TeTrans(a te_trans):
       all_complete bool = true;
-      cac_atoms array[te_transatom];
-      // We have to replace the lifetimes with their instantiated generics... for some reason.
-      natoms size = count(&a.atoms);
-      for i size = 0; i < natoms; i = i + 1 {
-        atom *te_transatom = ref(&a.atoms, i);
-        cac_before cac_statedesc;
-        if case Printed(pm) = check_and_compute_statedesc(clq, g, parms, &atom->before, &cac_before) {
-          return Printed(pm);
-        }
-        cac_after cac_statedesc;
-        if case Printed(pm) = check_and_compute_statedesc(clq, g, parms, &atom->after, &cac_after) {
-          return Printed(pm);
-        }
-        all_complete = (all_complete & cac_before.complete) & cac_after.complete;
-        push(&cac_atoms, {cac_before.desc, cac_after.desc});
+      cac_before cac[shray[te_statedesc]];
+      if case Printed(pm) = check_and_compute_statedesc_list(clq, g, parms, &a.before, &cac_before) {
+        return Printed(pm);
       }
-      *out = {all_complete, TeTrans({freeze(&cac_atoms)})};
+      cac_after cac[shray[te_statedesc]];
+      if case Printed(pm) = check_and_compute_statedesc_list(clq, g, parms, &a.after, &cac_after) {
+        return Printed(pm);
+      }
+      *out = {cac_before.complete & cac_after.complete, TeTrans({cac_before.te, cac_after.te})};
       return NoFail;
 
     case &TeUnknown: {
@@ -585,6 +577,22 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
       return NoFail;
     }
   }
+}
+
+func check_and_compute_statedesc_list(clq *clqueue, g *ast_generics, parms *idy_repls, descs *shray[te_statedesc], out *cac[shray[te_statedesc]]) np {
+  n size = count(descs);
+  all_complete bool = true;
+  all_computed array[te_statedesc];
+  for i size = 0; i < n; i = i + 1 {
+    cac cac_statedesc;
+    if case Printed(pm) = check_and_compute_statedesc(clq, g, parms, ref(descs, i), &cac) {
+      return Printed(pm);
+    }
+    all_complete = all_complete & cac.complete;
+    push(&all_computed, cac.desc);
+  }
+  *out = {all_complete, freeze(&all_computed)};
+  return NoFail;
 }
 
 func check_and_compute_statedesc(clq *clqueue, g *ast_generics, parms *idy_repls, desc *te_statedesc, out *cac_statedesc) np {
@@ -1760,24 +1768,15 @@ func type_matches(pt *te_typeexpr, names *array[ast_generik], parms *shray[te_ty
   }
 }
 
-func all_complete_computed(types *shray[te_typeexpr]) complete_computed {
-  n size = count(types);
-  all_computed bool = true;
-  for i size = 0; i < n; i = i + 1 {
-    cc complete_computed = is_complete_computed(ref(types, i));
-    if !cc.complete {
-      return {false, false};
-    }
-    all_computed = all_computed & cc.computed;
-  }
-  return {true, all_computed};
+inline func is_complete_computed(t *te_vardecl) complete_computed {
+  return is_complete_computed(&t->type);
 }
 
-func all_complete_computed(decls *shray[te_vardecl]) complete_computed {
-  n size = count(decls);
+func[T] all_complete_computed(ts *shray[T]) complete_computed {
+  n size = count(ts);
   all_computed bool = true;
   for i size = 0; i < n; i = i + 1 {
-    cc complete_computed = is_complete_computed(&ref(decls, i)->type);
+    cc complete_computed = is_complete_computed(ref(ts, i));
     if !cc.complete {
       return {false, false};
     }
@@ -1809,30 +1808,17 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
       return {true, true};
 
     case &TeTrans(a te_trans):
-      natoms size = count(&a.atoms);
-      all_computed bool = true;
-      for i size = 0; i < natoms; i = i + 1 {
-        cc complete_computed = is_complete_computed(ref(&a.atoms, i));
-        if !cc.complete {
-          return {false, false};
-        }
-        all_computed = all_computed & cc.computed;
+      before complete_computed = all_complete_computed(&a.before);
+      if !before.complete {
+        return {false, false};
       }
-      return {true, all_computed};
+      after complete_computed = all_complete_computed(&a.after);
+      return {after.complete, before.computed & after.computed};
 
     case &TeUnknown: {
       return {false, false};
     }
   }
-}
-
-func is_complete_computed(a *te_transatom) complete_computed {
-  cc complete_computed = is_complete_computed(&a->before);
-  if !cc.complete {
-    return {false, false};
-  }
-  dd complete_computed = is_complete_computed(&a->after);
-  return {dd.complete, cc.computed & dd.computed};
 }
 
 inline func is_complete_computed(a *te_statedesc) complete_computed {
