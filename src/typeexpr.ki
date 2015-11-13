@@ -144,6 +144,7 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
         return ax.name == bx.name;
       }
     case &TeTrans(ax te_trans):
+      // If we use this at all, order doesn't matter.
       return TODO();
     case &TeUnknown: {
       ice(_u8("idy_typeexpr_equal sees TeUnknown"));
@@ -375,17 +376,17 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
     push(r, ']');
     pretty_u8str(im, r, oo(&b.param));
   case &TeLifetime(b te_lifetime):
-    push(r, '\'');
-    build_u8str(im, r, &b.name);
+    pretty_u8str(im, r, &b);
   case &TeTrans(b te_trans):
-    // TODO()
-    append(r, _u8("TeTrans"));
+    push(r, '{');
+    pretty_u8str_list(im, r, &b.atoms);
+    push(r, '}');
   case &TeUnknown:
     push(r, '_');
   }
 }
 
-func pretty_u8str_list(im *identmap, r *array[u8], a *shray[te_typeexpr]) void {
+func[T] pretty_u8str_list(im *identmap, r *array[u8], a *shray[T]) void {
   n size = count(a);
   for i size = 0; i < n; i = i + 1 {
     if i != 0 {
@@ -393,6 +394,32 @@ func pretty_u8str_list(im *identmap, r *array[u8], a *shray[te_typeexpr]) void {
       push(r, ' ');
     }
     pretty_u8str(im, r, ref(a, i));
+  }
+}
+
+func pretty_u8str(im *identmap, r *array[u8], a *te_transatom) void {
+  pretty_u8str(im, r, &a->before);
+  append(r, _u8(" -> "));
+  pretty_u8str(im, r, &a->after);
+}
+
+func pretty_u8str(im *identmap, r *array[u8], a *te_statedesc) void {
+  pretty_u8str(im, r, &a->lifetime);
+  push(r, ' ');
+  pretty_u8str(im, r, &a->active);
+}
+
+func pretty_u8str(im *identmap, r *array[u8], a *te_lifetime) void {
+  push(r, '\'');
+  build_u8str(im, r, &a->name);
+}
+
+func pretty_u8str(im *identmap, r *array[u8], a *te_activedesc) void {
+  switch a {
+  case &Active:
+    append(r, _u8("active"));
+  case &Inactive:
+    append(r, _u8("inactive"));
   }
 }
 
