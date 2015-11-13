@@ -7,23 +7,6 @@ struct cu_typeexpr { x te_typeexpr; };
 
 def `~` fn[te_typeexpr, cu_typeexpr] = wrapconvert;
 
-// TODO(): Make this stuff use cac[].
-struct[T] cac {
-  complete bool;
-  te T;
-};
-
-// A "check and computed" typeexpr -- if it's not complete, it should not be converted to a cu_typeexpr.
-struct cac_typeexpr {
-  complete bool;
-  te te_typeexpr;
-};
-
-struct cac_statedesc {
-  complete bool;
-  desc te_statedesc;
-};
-
 // This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics replaced consistently.
 enum te_typeexpr {
   TeName te_name;
