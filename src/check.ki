@@ -2141,8 +2141,7 @@ func finish_passed_up(uug uug_state, half_unified *te_typeexpr, out *te_typeexpr
     *out = TeTrans(a);
     return true;
   case &TeUnknown:
-    // We can see this in the case of unify_types, it's OK.
-    // TODO: Maybe unify_types should only call this function if unify_under_generics returns a complete type.
+    // We can see this in the case of unify_types, so it's OK to see.
     *out = TeUnknown;
     return true;
   case &TePassedUp(index size):
@@ -2211,6 +2210,30 @@ func replace_statedesc_list_generics(uug uug_state, a *shray[te_statedesc]) shra
 func canonicalize_statedescs(x *array[te_statedesc]) shray[te_statedesc] {
   sort(x);
   return freeze(x);
+}
+
+// Right now, trans_matches serves as a good equality function.
+inline func trans_equal(a *te_trans, b *te_trans) bool {
+  return trans_matches(a, b);
+}
+
+func trans_hash(a *te_trans) osize {
+  x osize = statedesc_list_hash(&a->before);
+  y osize = statedesc_list_hash(&a->after);
+  return (x * 33) ^ y;
+}
+
+func statedesc_list_hash(a *shray[te_statedesc]) osize {
+  n size = count(a);
+  accum osize = 0x2251795;
+  for i size = 0; i < n; i = i + 1 {
+    accum = (accum * 33) ^ statedesc_hash(ref(a, i));
+  }
+  return accum;
+}
+
+func statedesc_hash(a *te_statedesc) osize {
+  return (lifetime_hash(&a->lifetime) * 33) ^ activedesc_hash(&a->active);
 }
 
 func trans_matches(a *te_trans, b *te_trans) bool {

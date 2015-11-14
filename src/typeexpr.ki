@@ -16,8 +16,7 @@ enum te_typeexpr {
   TeLifetime te_lifetime;
   TeTrans te_trans;
   TeUnknown void;
-  // Only used in unify_under_generics.  Ignored elsewhere.
-  // TODO(): Include in printing functions.
+  // Only used in unify_under_generics.  Ignored elsewhere.  Use of this is solely in unify_under_generics and finish_passed_up, and it's OK to omit this case entirely from other switch statements.
   TePassedUp size;
 };
 
@@ -77,6 +76,9 @@ inline func `!=`(x te_activedesc, y te_activedesc) bool {
 }
 func `<`(x te_activedesc, y te_activedesc) bool {
   return enumnum(&x) < enumnum(&y);
+}
+inline func activedesc_hash(a *te_activedesc) osize {
+  return +enumnum(a);
 }
 
 struct te_statedesc {
@@ -151,8 +153,9 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
         return ax.name == bx.name;
       }
     case &TeTrans(ax te_trans):
-      // If we use this at all, order doesn't matter.
-      return TODO();
+      if case &TeTrans(bx te_trans) = b {
+        return trans_equal(&ax, &bx);
+      }
     case &TeUnknown: {
       ice(_u8("idy_typeexpr_equal sees TeUnknown"));
     }
@@ -200,25 +203,22 @@ func[H] build_u8str(help H, r *array[u8], a *cu_typeexpr) void {
 
 func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
   switch a {
-    case &TeName(b te_name): {
+    case &TeName(b te_name):
       wrap_u8str(help, r, _u8("TeName"), &b);
-    }
-    case &TeApp(b te_typeapp): {
+    case &TeApp(b te_typeapp):
       wrap_u8str(help, r, _u8("TeApp"), &b);
-    }
-    case &TeUnion(b te_union): {
+    case &TeUnion(b te_union):
       wrap_u8str(help, r, _u8("TeUnion"), &b);
-    }
-    case &TeArraytype(b te_arraytype): {
+    case &TeArraytype(b te_arraytype):
       wrap_u8str(help, r, _u8("TeArraytype"), &b);
-    }
     case &TeLifetime(b te_lifetime):
       wrap_u8str(help, r, _u8("TeLifetime"), &b);
     case &TeTrans(b te_trans):
       wrap_u8str(help, r, _u8("TeTrans"), &b);
-    case &TeUnknown: {
+    case &TeUnknown:
       append(r, _u8("TeUnknown"));
-    }
+    case &TePassedUp(index size):
+      wrap_u8str(help, r, _u8("TePassedUp"), &index);
   }
 }
 
@@ -320,13 +320,17 @@ func help_compute_hash(a *te_typeexpr) osize {
       return (@[osize]~n * 0x3001) + help_compute_hash(oo(&ax.param));
     }
   case &TeLifetime(ax te_lifetime):
-    return 0x4 ^ hash_compute_hash(&ax.name);
+    return lifetime_hash(&ax);
   case &TeTrans(ax te_trans):
-    return TODO();
+    return 0x5 ^ trans_hash(&ax);
   case &TeUnknown:
     ice(_u8("help_compute_hash sees TeUnknown"));
   }
   return fake();
+}
+
+inline func lifetime_hash(a *te_lifetime) osize {
+  return 0x4 ^ hash_compute_hash(&a->name);
 }
 
 func help_te_vardecl_list_compute_hash(a *shray[te_vardecl]) osize {

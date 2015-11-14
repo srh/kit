@@ -40,18 +40,40 @@ func canonicalize_idy_lifetimes(im *identmap, lifetime_names *array[sym], t *te_
     canonicalize_idy_lifetimes(im, lifetime_names, oo(&a.param), oo(&param));
     *out = TeArraytype({count, param});
   case &TeLifetime(a te_lifetime):
-    if case Has(ix size) = find(lifetime_names, a.name) {
-      *out = TeLifetime({make_canonicalized_lifetime_name(im, ix)});
-    } else {
-      n size = count(lifetime_names);
-      push(lifetime_names, a.name);
-      *out = TeLifetime({make_canonicalized_lifetime_name(im, n)});
-    }
+    lifetime te_lifetime;
+    canonicalize_idy_lifetime(im, lifetime_names, &a, &lifetime);
+    *out = TeLifetime(lifetime);
   case &TeTrans(a te_trans):
-    return TODO();
+    before shray[te_statedesc];
+    canonicalize_idy_statedesc_lists(im, lifetime_names, &a.before, &before);
+    after shray[te_statedesc];
+    canonicalize_idy_statedesc_lists(im, lifetime_names, &a.after, &after);
+    *out = TeTrans({before, after});
   case &TeUnknown:
     ice(_u8("canonicalize_idy_lifetimes sees TeUnknown."));
   }
+}
+
+func canonicalize_idy_lifetime(im *identmap, lifetime_names *array[sym], a *te_lifetime, out *te_lifetime) void {
+  if case Has(ix size) = find(lifetime_names, a->name) {
+    *out = {make_canonicalized_lifetime_name(im, ix)};
+  } else {
+    n size = count(lifetime_names);
+    push(lifetime_names, a->name);
+    *out = {make_canonicalized_lifetime_name(im, n)};
+  }
+}
+
+func canonicalize_idy_statedesc_lists(im *identmap, lifetime_names *array[sym], a *shray[te_statedesc], out *shray[te_statedesc]) void {
+  build array[te_statedesc];
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    desc *te_statedesc = ref(a, i);
+    lifetime te_lifetime;
+    canonicalize_idy_lifetime(im, lifetime_names, &desc->lifetime, &lifetime);
+    push(&build, {lifetime, desc->active});
+  }
+  *out = freeze(&build);
 }
 
 func canonicalize_idy_vardecls(im *identmap, lifetime_names *array[sym], a *shray[te_vardecl]) shray[te_vardecl] {
