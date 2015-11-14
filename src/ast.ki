@@ -158,6 +158,10 @@ struct ast_lifetime {
   name ast_ident;
 };
 
+struct ast_trans {
+  // TODO(): Implement.
+};
+
 struct ast_unknown {
 };
 
@@ -167,6 +171,7 @@ enum ast_typeexpr {
   Union ast_union;
   Arraytype ast_arraytype;
   Lifetime ast_lifetime;
+  Trans ast_trans;
   Unknown ast_unknown;
 };
 

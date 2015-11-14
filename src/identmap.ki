@@ -79,6 +79,7 @@ struct common_syms {
   lengthsym sym;
   tee_sym sym;
   uee_sym sym;
+  stee_sym sym;
   refofsym sym;
   derefsym sym;
   addressofsym sym;
@@ -133,6 +134,7 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.lengthsym = intern(im, _s("length"));
   ret.tee_sym = intern(im, _s("T"));
   ret.uee_sym = intern(im, _s("U"));
+  ret.stee_sym = intern(im, _s("St"));
   ret.derefsym = intern(im, _s("*"));
   ret.addressofsym = intern(im, _s("&"));
   ret.refofsym = intern(im, _s("&&"));

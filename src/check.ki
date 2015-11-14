@@ -192,6 +192,11 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) np {
       *out = TeLifetime({b.name.value});
       return NoFail;
 
+    case &Trans(b ast_trans):
+      // TODO(): Implement for real.
+      *out = TeTrans({mk_shray(), mk_shray()});
+      return NoFail;
+
     case &Unknown(b ast_unknown): {
       *out = TeUnknown(void);
       return NoFail;
@@ -1225,6 +1230,8 @@ func lambda_declared_type(im *identmap, a *ast_lambda) ast_typeexpr {
     push(&type_params, ref(&a->args, i)->type);
   }
   push(&type_params, a->return_type);
+  // TODO(): Infer a no-change generic type from the generic params in scope, add explicit capabilities.
+  push(&type_params, @[ast_typeexpr]Trans({}));
   return App({embox(@[ast_typeexpr]Name({fake_ast_meta(), im->cym.fnsym})), type_params});
 }
 
