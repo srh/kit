@@ -2141,8 +2141,10 @@ func finish_passed_up(uug uug_state, half_unified *te_typeexpr, out *te_typeexpr
     *out = TeTrans(a);
     return true;
   case &TeUnknown:
-    ice(_u8("finish_passed_up TeUnknown"));
-    return fake();
+    // We can see this in the case of unify_types, it's OK.
+    // TODO: Maybe unify_types should only call this function if unify_under_generics returns a complete type.
+    *out = TeUnknown;
+    return true;
   case &TePassedUp(index size):
     pui *passed_up_info = ref(uug.passed_up, index);
     ga te_trans;
