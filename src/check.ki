@@ -2190,11 +2190,17 @@ func replace_statedesc_list_generics(uug uug_state, a *shray[te_statedesc]) shra
   na size = count(a);
   for i size = 0; i < na; i = i + 1 {
     sd *te_statedesc = ref(a, i);
+    new_lifetime te_lifetime;
     if case Has(ix size) = lookup_lifetime_name(uug.names, sd->lifetime.name) {
-      return TODO();
+      if case &TeLifetime(te te_lifetime) = ref(uug.unif_parms, ix) {
+        new_lifetime = te;
+      } else {
+        ice(_u8("replace_statedesc_list_generics non-lifetime"));
+      }
     } else {
-      return TODO();
+      new_lifetime = sd->lifetime;
     }
+    push(&build, {new_lifetime, sd->active});
   }
 
   return freeze(&build);
