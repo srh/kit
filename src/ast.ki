@@ -767,11 +767,11 @@ func discard(expr ast_expr) ast_expr_discard {
   return {NotComputed@[ast_expr_after_discard](), expr};
 }
 
-// Variadic generics doesn't support lifetime generics (for no particular reason, other than that we have no need for it) yet.
+// TODO: I think we're underchecking the arity of app types, be it for variadic or non-variadic generics.
 struct ast_variadic_generics {
-  before array[ast_ident];
+  before array[ast_generik];
   variadic_name ast_ident;
-  after array[ast_ident];
+  after array[ast_generik];
 };
 
 // This is named with a k to prevent typos with ast_generics.

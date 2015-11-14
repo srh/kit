@@ -464,7 +464,7 @@ func add_function_primitive(cs *checkstate) void {
     cs->im->cym.primitive_module_sym,
     cs->im->cym.fnsym,
     mk_array@[access_entry_id](),
-    VariadicGenerics({mk_array@[ast_ident](), {fake_ast_meta(), cs->im->cym.tee_sym}, mk_array({fake_ast_meta(), cs->im->cym.uee_sym})}),
+    VariadicGenerics({mk_array@[ast_generik](), {fake_ast_meta(), cs->im->cym.tee_sym}, mk_array(@[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.uee_sym}))}),
     None,
     Has({None,
          @[type_properties]{

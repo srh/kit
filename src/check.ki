@@ -877,6 +877,10 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) np {
       // We declare success -- we check non-generic defs.
       return NoFail;
     }
+    case &VariadicGenerics(a ast_variadic_generics):
+      // We can't see variadic generics because there's no way to make your own def with variadic generics.
+      ice(_u8("ensure_def_checked sees variadic generic."));
+      return fake();
   }
 }
 
@@ -1382,6 +1386,10 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) np {
         // We declare success -- we check non-generic defs.
         return NoFail;
       }
+      case &VariadicGenerics(ig):
+        // Right now users' deftypes can't have variadic generics, just fn.
+        ice(_u8("ensure_deftype_checked VariadicGenerics"));
+        return fake();
     }
   } else {
     ice(_u8("ensure_deftype_checked on primitive type"));
@@ -1586,6 +1594,9 @@ func check_generics_unique(cs *checkstate, a *ast_generics) np {
       }
       return NoFail;
     }
+    case &VariadicGenerics(ig):
+      ice(_u8("check_generics_unique VariadicGenerics"));
+      return fake();
   }
 }
 
@@ -1730,7 +1741,7 @@ func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res
 
 func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *genparms, typeexpr *te_typeexpr, matches_out *entry_matches_res) np {
   switch generics {
-    case &NoGenerics: {
+    case &NoGenerics:
       switch gp {
         case &HasParms(parms shray[te_typeexpr]): {
           *matches_out = EntryDoesNotMatch(void);
@@ -1744,8 +1755,8 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
           return NoFail;
         }
       }
-    }
-    case &HasGenerics(names array[ast_generik]): {
+
+    case &HasGenerics(names array[ast_generik]):
       switch gp {
         case &HasParms(parms shray[te_typeexpr]): {
           if count(&parms) != count(&names) {
@@ -1763,7 +1774,11 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
           return NoFail;
         }
       }
-    }
+
+    case &VariadicGenerics(ig):
+      // This is used for def_entry only -- only the fn deftype entry uses variadic generics.
+      ice(_u8("entry_matchees VariadicGenerics"));
+      return fake();
   }
 }
 
