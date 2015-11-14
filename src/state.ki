@@ -597,8 +597,8 @@ access depth_rewinder {
   }
 }
 
-// TODO: The very concept of this function will soon be (when we have true generic non-instantiated parameters) broken?
-// Update: We only use this function in to_defclass_properties, so the question becomes one of whether its use makes sense for that situation.  It does, because we return a type that references lifetimes that are in fact generic parameters, but it's perfectly normal to do name lookup using types that have generic lifetimes without any sort of scopage information on those lifetimes -- that's just how it's done.
+// Makes a type using idy_genparms replacements, including for generics replacements.
+// We only use this function in to_defclass_properties, so the question becomes one of whether its use makes sense for that situation.  It does, because we return a type that references lifetimes that are in fact generic parameters, but it's perfectly normal to do name lookup using types that have generic lifetimes without any sort of scopage information on those lifetimes -- that's just how it's done.
 func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
   ent *deftype_entry = ref_deftype_entry(cs, ent_id);
   name sym = ent->name;
