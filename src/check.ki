@@ -1780,13 +1780,20 @@ func type_matches(pt *te_typeexpr, names *array[ast_generik], parms *shray[te_ty
   check(count(names) == count(parms));
   // We need to retain all new information we gain about the value of the generic param typeexprs as we compare the whole type, in order to make sure we don't match conflicting information about a generic parameter.
   unif_parms array[te_typeexpr] = mk_copy(parms);
-  // Since t is complete, unified is irrelevant and must be identical to t.
-  unified te_typeexpr;
-  if !unify_under_generics(pt, {names, &unif_parms}, t, &unified) {
-    return TypeDoesNotMatch(void);
+  passed_up array[passed_up_info];
+  // Since t is complete, half_unified is irrelevant and must be identical to t.  Except for passed up stuff.
+  half_unified te_typeexpr;
+  uug uug_state = {names, &unif_parms, &passed_up};
+  if !unify_under_generics(pt, uug, t, &half_unified) {
+    return TypeDoesNotMatch;
   }
   frozen_unif_parms shray[te_typeexpr] = freeze(&unif_parms);
   if all_complete_computed(&frozen_unif_parms).complete {
+    // That our outcome depends on whether we can unify the passed up te_trans types means the te_trans parms can affect matching but don't effect computation of generics.
+    unified te_typeexpr;
+    if !finish_passed_up(uug, &half_unified, &unified) {
+      return TypeDoesNotMatch;
+    }
     return TypeMatchesPrecisely(frozen_unif_parms);
   } else {
     return TypeMatchesAmbiguously(frozen_unif_parms);
@@ -1863,9 +1870,21 @@ func is_complete(t *te_typeexpr) bool {
   return is_complete_computed(t).complete;
 }
 
+struct passed_up_info {
+  a *te_trans;
+  pa *te_trans;
+};
+
+func add_passed_up(pu *array[passed_up_info], inf passed_up_info) size {
+  ret size = count(pu);
+  push(pu, inf);
+  return ret;
+}
+
 struct uug_state {
   names *array[ast_generik];
   unif_parms *array[te_typeexpr];
+  passed_up *array[passed_up_info];
 };
 
 // t references the generic names in "names", whose corresponding values in "unif_parms" might be incomplete.  We update the values in unif_parms when necessary.  t does not need to be complete -- this code is also used by unify_types.
@@ -2008,7 +2027,9 @@ func unify_under_generics(pt *te_typeexpr, uug uug_state,
 
     case &TeTrans(a te_trans):
       if case &TeTrans(pa te_trans) = pt {
-        return unify_trans_under_generics(&pa, uug, &a, unified_out);
+        pu_number size = add_passed_up(uug.passed_up, {&a, &pa});
+        *unified_out = TePassedUp(pu_number);
+        return true;
       } else {
         return false;
       }
@@ -2020,10 +2041,6 @@ func unify_under_generics(pt *te_typeexpr, uug uug_state,
       return true;
     }
   }
-}
-
-func unify_trans_under_generics(pa *te_trans, uug uug_state, a *te_trans, unified_out *te_typeexpr) bool {
-  return TODO();
 }
 
 func lookup_plain_name(arr *array[ast_generik], x sym) opt[size] {
@@ -2082,5 +2099,108 @@ func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) boo
 func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
   names array[ast_generik];
   unif_parms array[te_typeexpr];
-  return unify_under_generics(pta, {&names, &unif_parms}, ptb, out);
+  passed_up array[passed_up_info];
+  half_unified te_typeexpr;
+  uug uug_state = {&names, &unif_parms, &passed_up};
+  if !unify_under_generics(pta, uug, ptb, &half_unified) {
+    return false;
+  }
+  return finish_passed_up(uug, &half_unified, out);
+}
+
+func finish_passed_up(uug uug_state, half_unified *te_typeexpr, out *te_typeexpr) bool {
+  switch half_unified {
+  case &TeName(a te_name):
+    *out = TeName({a.value, a.pack});
+    return true;
+  case &TeApp(a te_typeapp):
+    params shray[te_typeexpr];
+    if !finish_passed_up_list(uug, &a.params, &params) {
+      return false;
+    }
+    *out = TeApp({a.typefunc, params, a.pack});
+    return true;
+  case &TeUnion(a te_union):
+    fields shray[te_vardecl];
+    if !finish_passed_up_list(uug, &a.fields, &fields) {
+      return false;
+    }
+    *out = TeUnion({fields});
+    return true;
+  case &TeArraytype(a te_arraytype):
+    param shp[te_typeexpr];
+    if !finish_passed_up(uug, oo(&a.param), oo(&param)) {
+      return false;
+    }
+    *out = TeArraytype({a.count, param});
+    return true;
+  case &TeLifetime(a te_lifetime):
+    *out = TeLifetime({a.name});
+    return true;
+  case &TeTrans(a te_trans):
+    *out = TeTrans(a);
+    return true;
+  case &TeUnknown:
+    ice(_u8("finish_passed_up TeUnknown"));
+    return fake();
+  case &TePassedUp(index size):
+    pui *passed_up_info = ref(uug.passed_up, index);
+    ga te_trans;
+    discard void = replace_trans_generics(uug, pui->a, &ga);
+    if !trans_matches(pui->pa, &ga) {
+      return false;
+    }
+    // We actually go with pua->a in the return value.  This has unreplaced generics, which is correct behavior for unify_under_generics.  (It's also complete, because all te_trans objects are complete.)
+    *out = TeTrans(*pui->a);
+    return true;
+  }
+}
+
+func[T] finish_passed_up_list(uug uug_state, elems *shray[T], out *shray[T]) bool {
+  build array[T];
+  nelems size = count(elems);
+  for i size = 0; i < nelems; i = i + 1 {
+    elem T;
+    if !finish_passed_up(uug, ref(elems, i), &elem) {
+      return false;
+    }
+    push(&build, elem);
+  }
+  *out = freeze(&build);
+  return true;
+}
+
+func finish_passed_up(uug uug_state, vd *te_vardecl, out *te_vardecl) bool {
+  ty te_typeexpr;
+  if !finish_passed_up(uug, &vd->type, &ty) {
+    return false;
+  }
+  *out = {vd->name, ty};
+  return true;
+}
+
+func replace_trans_generics(uug uug_state, a *te_trans, out *te_trans) void {
+  before shray[te_statedesc] = replace_statedesc_list_generics(uug, &a->before);
+  after shray[te_statedesc] = replace_statedesc_list_generics(uug, &a->after);
+  *out = {before, after};
+}
+
+func replace_statedesc_list_generics(uug uug_state, a *shray[te_statedesc]) shray[te_statedesc] {
+  build array[te_statedesc];
+  na size = count(a);
+  for i size = 0; i < na; i = i + 1 {
+    sd *te_statedesc = ref(a, i);
+    if case Has(ix size) = lookup_lifetime_name(uug.names, sd->lifetime.name) {
+      return TODO();
+    } else {
+      return TODO();
+    }
+  }
+
+  return freeze(&build);
+}
+
+func trans_matches(a *te_trans, b *te_trans) bool {
+  ice(_u8("unify_trans not implemented"));
+  return TODO();
 }

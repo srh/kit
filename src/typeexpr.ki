@@ -16,6 +16,9 @@ enum te_typeexpr {
   TeLifetime te_lifetime;
   TeTrans te_trans;
   TeUnknown void;
+  // Only used in unify_under_generics.  Ignored elsewhere.
+  // TODO(): Include in printing functions.
+  TePassedUp size;
 };
 
 enum te_puretype {
