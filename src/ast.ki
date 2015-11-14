@@ -778,6 +778,7 @@ struct ast_variadic_generics {
 enum ast_generik {
   PlainGeneric ast_ident;
   LifetimeGeneric ast_ident;
+  TransGeneric ast_ident;
 };
 
 enum ast_generics {

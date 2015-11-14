@@ -1593,6 +1593,7 @@ func generik_human_name(a *ast_generik) *ast_ident {
   switch a {
   case &PlainGeneric(an ast_ident): return &an;
   case &LifetimeGeneric(an ast_ident): return &an;
+  case &TransGeneric(an ast_ident): return &an;
   }
 }
 
@@ -2052,6 +2053,7 @@ func lookup_plain_name(arr *array[ast_generik], x sym) opt[size] {
         return Has(i);
       }
     case &LifetimeGeneric(b ast_ident): { }
+    case &TransGeneric(b ast_ident): { }
     }
   }
   return None;
@@ -2066,6 +2068,7 @@ func lookup_lifetime_name(arr *array[ast_generik], x sym) opt[size] {
       if b.value == x {
         return Has(i);
       }
+    case &TransGeneric(b ast_ident): { }
     }
   }
   return None;
