@@ -1479,7 +1479,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   vp varpopper;
   init_vp(&vp, &bs->es);
   nargs size = count(&a->args);
-  check(nargs + 1 == count(computed_params));
+  check(nargs + 2 == count(computed_params));
   arg_cells array[cell_num];
   for i size = 0; i < nargs; i = i + 1 {
     cu_param cu_typeexpr = ~get(computed_params, i);
