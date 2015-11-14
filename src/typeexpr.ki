@@ -69,11 +69,25 @@ enum te_activedesc {
   Inactive void;
 };
 
+func `==`(x te_activedesc, y te_activedesc) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+inline func `!=`(x te_activedesc, y te_activedesc) bool {
+  return !(x == y);
+}
+func `<`(x te_activedesc, y te_activedesc) bool {
+  return enumnum(&x) < enumnum(&y);
+}
+
 struct te_statedesc {
   // (Should this be a te_lifetime?)
   lifetime te_lifetime;
   active te_activedesc;
 };
+
+func `<`(x te_statedesc, y te_statedesc) bool {
+  return x.lifetime.name.x < y.lifetime.name.x || (x.lifetime.name == y.lifetime.name && x.active < y.active);
+}
 
 struct te_vardecl {
   name sym;

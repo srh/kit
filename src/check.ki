@@ -2203,10 +2203,45 @@ func replace_statedesc_list_generics(uug uug_state, a *shray[te_statedesc]) shra
     push(&build, {new_lifetime, sd->active});
   }
 
-  return freeze(&build);
+  return canonicalize_statedescs(&build);
+}
+
+func canonicalize_statedescs(x *array[te_statedesc]) shray[te_statedesc] {
+  sort(x);
+  return freeze(x);
 }
 
 func trans_matches(a *te_trans, b *te_trans) bool {
-  ice(_u8("unify_trans not implemented"));
-  return TODO();
+  if !statedesc_list_matches(&a->before, &b->before) {
+    return false;
+  }
+  if !statedesc_list_matches(&a->after, &b->after) {
+    return false;
+  }
+  return true;
+}
+
+func statedesc_list_matches(a *shray[te_statedesc], b *shray[te_statedesc]) bool {
+  n size = count(a);
+  if n != count(b) {
+    return false;
+  }
+  // The lists are already in sorted, canonicalized, comparable order.
+  for i size = 0; i < n; i = i + 1 {
+    if !statedesc_matches(ref(a, i), ref(b, i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+func statedesc_matches(a *te_statedesc, b *te_statedesc) bool {
+  unified_discard te_lifetime;
+  if a->lifetime.name != b->lifetime.name {
+    return false;
+  }
+  if a->active != b->active {
+    return false;
+  }
+  return true;
 }
