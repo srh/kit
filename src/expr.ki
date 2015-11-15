@@ -2179,6 +2179,7 @@ func fn_return_type(cs *checkstate, func_type *te_typeexpr) *te_typeexpr {
     ice(_u8("Expected TeApp for fn-type in fn_return_type."));
   }
   n size = count(params);
-  check(n > 0);
-  return ref(params, n - 1);
+  check(n >= 2);
+  // The trans type is after the return type.
+  return ref(params, n - 2);
 }

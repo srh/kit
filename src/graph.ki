@@ -2469,7 +2469,7 @@ func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_
   }
   argcells array[cell_num];
   ntyparams size = count(typarams);
-  nfn_params size = ntyparams - 1;
+  nfn_params size = ntyparams - 2;
   for i size = 0; i < nfn_params; i = i + 1 {
     ty *te_typeexpr = ref(typarams, i);
     props type_properties;
@@ -2479,7 +2479,7 @@ func add_prim_fn_body(cs *checkstate, clq *clqueue, informal_name sym, type *cu_
     c cell_num = add_cell(&gr, {LocationStatic(void), ~ *ty, props});
     push(&argcells, c);
   }
-  retty *te_typeexpr = ref(typarams, ntyparams - 1);
+  retty *te_typeexpr = ref(typarams, ntyparams - 2);
   retprops type_properties;
   if case Printed(pm) = compute_complete_type_properties(clq, retty, &retprops) {
     ice(_u8("add_prim_fn_body retprops"));
