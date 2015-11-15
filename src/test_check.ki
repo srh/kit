@@ -536,7 +536,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "  y T = @[T](~x);\n"
         "  return y;\n"
         "};\n"
-        "def bar fn[fn[i32, i16], i32, i16, {}] = func(x fn[i32, i16], y i32) i16 {\n"
+        "def bar fn[fn[i32, i16], i32, i16, {}] = func(x fn[i32, i16, {}], y i32) i16 {\n"
         "  return x(y);\n"
         "};\n"
         "def baz fn[i16, {}] = func() i16 {\n"
@@ -548,7 +548,7 @@ func test_check_more_cases(ctx *check_ctx) void {
         "  y T = @[T]~x;\n"
         "  return y;\n"
         "};\n"
-        "def bar fn[fn[i32, i16], i32, i16, {}] = func(x fn[i32, i16], y i32) i16 {\n"
+        "def bar fn[fn[i32, i16], i32, i16, {}] = func(x fn[i32, i16, {}], y i32) i16 {\n"
         "  return x(y);\n"
         "};\n"
         "def baz fn[i16, {}] = func() i16 {\n"
@@ -1239,11 +1239,20 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
   // Fails because of duplicate generics.
   run_check_negtest(ctx, "c129-c",
     _u8("struct[T, T] ty { x i32; };\n"));
-  // Fails because fn type has variadic after-arity of 1.
-  run_check_negtest(ctx, "c130-a",
+  // Fails because fn type has variadic after-arity of 2.
+  run_check_negtest(ctx, "c130-a1",
+    _u8("struct foo { x fn[]; };\n"));
+  // Fails because arity/lack of return type.
+  run_check_negtest(ctx, "c130-a2",
     _u8("struct foo { x fn[{}]; };\n"));
-  run_check_test(ctx, "c130-b",
+  // Fails because arity/lack of return type.
+  run_check_negtest(ctx, "c130-b1",
     _u8("struct foo { x fn[void]; };\n"));
+  run_check_test(ctx, "c130-b2",
+    _u8("struct foo { x fn[void, {}]; };\n"));
+  // TODO: This should fail by kindness.
+  run_check_test(ctx, "c130-c",
+    _u8("struct foo { x fn[{}, {}]; };\n"));
 
   // Fails because we try to assign to an rvalue.
   run_check_negtest(ctx, "c131-a",
