@@ -11,7 +11,7 @@ import typeexpr;
 // This is an index into some ps-specific structure.
 struct ast_meta { x size; };
 
-def `~` fn[size, ast_meta] = wrapconvert;
+def `~` fn[size, ast_meta, {}] = wrapconvert;
 
 inline func fake_ast_meta() ast_meta { return ~0; }
 
@@ -303,8 +303,8 @@ struct ast_continue_statement {
 };
 
 struct label_num { x size; };
-def `~` fn[size, label_num] = wrapconvert;
-def `==` fn[label_num, label_num, bool] = wrapequate;
+def `~` fn[size, label_num, {}] = wrapconvert;
+def `==` fn[label_num, label_num, bool, {}] = wrapequate;
 
 struct ast_label_statement_info {
   label_number label_num;
@@ -610,14 +610,14 @@ struct bi_action {
 struct copy_action { x bi_action; };
 struct move_action { x bi_action; };
 
-def `+` fn[bi_action, copy_action] = wrapconvert;
-def `+` fn[bi_action, move_action] = wrapconvert;
+def `+` fn[bi_action, copy_action, {}] = wrapconvert;
+def `+` fn[bi_action, move_action, {}] = wrapconvert;
 
 struct destroy_action { x uni_action; };
 struct init_action { x uni_action; };
 
-def `+` fn[uni_action, destroy_action] = wrapconvert;
-def `+` fn[uni_action, init_action] = wrapconvert;
+def `+` fn[uni_action, destroy_action, {}] = wrapconvert;
+def `+` fn[uni_action, init_action, {}] = wrapconvert;
 
 struct uni_action {
   ctor ctor_desc;

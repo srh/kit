@@ -4,7 +4,7 @@ import stdlib;
 
 struct sym { x size; };
 
-def `~` fn[size, sym] = wrapconvert;
+def `~` fn[size, sym, {}] = wrapconvert;
 
 inline func `==`(x sym, y sym) bool {
   return x.x == y.x;

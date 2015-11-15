@@ -11,7 +11,7 @@ struct objfile {
 };
 
 struct sti { x u32; };
-def `~` fn[u32, sti] = wrapconvert;
+def `~` fn[u32, sti, {}] = wrapconvert;
 
 struct objfile_symbol_record {
   name sym;

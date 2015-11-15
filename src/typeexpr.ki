@@ -5,7 +5,7 @@ import state;
 // A "computed" typeexpr, which is complete, and which has isHas instpacks.
 struct cu_typeexpr { x te_typeexpr; };
 
-def `~` fn[te_typeexpr, cu_typeexpr] = wrapconvert;
+def `~` fn[te_typeexpr, cu_typeexpr, {}] = wrapconvert;
 
 // This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics replaced consistently.
 enum te_typeexpr {

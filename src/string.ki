@@ -3,7 +3,7 @@ import shray;
 
 struct string { x shray[i32]; };
 
-def `~` fn[shray[i32], string] = wrapconvert;
+def `~` fn[shray[i32], string, {}] = wrapconvert;
 
 inline func data(s *string) *i32 {
   return data(&s->x);

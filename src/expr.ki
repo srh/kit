@@ -95,8 +95,8 @@ struct defscope {
 
 struct var_number { x size; };
 
-def `~` fn[size, var_number] = wrapconvert;
-def `==` fn[var_number, var_number, bool] = wrapequate;
+def `~` fn[size, var_number, {}] = wrapconvert;
+def `==` fn[var_number, var_number, bool, {}] = wrapequate;
 func `!=`(x var_number, y var_number) bool { return !(x == y); }
 func `<`(x var_number, y var_number) bool {
   return x.x < y.x;

@@ -533,4 +533,4 @@ func[T] mk_array(x0 T, x1 T, x2 T, x3 T, x4 T, x5 T, x6 T, x7 T) array[T] {
 }
 
 // Heh.
-def[T] _u8 fn[T, array[u8]] = make;
+def[T] _u8 fn[T, array[u8], {}] = make;

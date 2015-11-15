@@ -76,7 +76,7 @@ struct frame {
 };
 
 struct jmp_targetnum { x size; };
-def `~` fn[size, jmp_targetnum] = wrapconvert;
+def `~` fn[size, jmp_targetnum, {}] = wrapconvert;
 
 struct jmpdata {
   overwrite_location u32;

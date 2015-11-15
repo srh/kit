@@ -64,7 +64,7 @@ func mk(ds *defscope, return_type *cu_typeexpr, return_type_props *type_properti
 
 struct statement_num { x size; };
 
-def `~` fn[size, statement_num] = wrapconvert;
+def `~` fn[size, statement_num, {}] = wrapconvert;
 
 func add_statement(bs *bodystate, s opt[*ast_statement]) statement_num {
   ret size = count(&bs->statements);

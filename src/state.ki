@@ -40,7 +40,7 @@ struct checkstate {
   instantiation_depth u32;
   plat platform_info;
   loader_ctx *void;
-  loader fn[*checkstate, sym, *array[u8], bool];
+  loader fn[*checkstate, sym, *array[u8], bool, {}];
 
   posits positionals;
 
@@ -65,7 +65,7 @@ struct checkstate {
   prims cs_primitives;
 };
 
-func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader fn[*checkstate, sym, *array[u8], bool]) checkstate {
+func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader fn[*checkstate, sym, *array[u8], bool, {}]) checkstate {
   ret checkstate = {
     im,
     0,
@@ -92,33 +92,33 @@ func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader 
 
 // An index into checkstate's modules array.
 struct module_id { x size; };
-def `~` fn[size, module_id] = wrapconvert;
+def `~` fn[size, module_id, {}] = wrapconvert;
 
 // An index into checkstate's instantiations array.
 struct def_inst_id { x size; };
-def `~` fn[size, def_inst_id] = wrapconvert;
+def `~` fn[size, def_inst_id, {}] = wrapconvert;
 
 // An index into checkstate's type_instantiations array.
 struct deftype_inst_id { x size; };
-def `~` fn[size, deftype_inst_id] = wrapconvert;
+def `~` fn[size, deftype_inst_id, {}] = wrapconvert;
 
 // An index into checkstate's defs array.
 struct def_entry_id { x size; };
-def `~` fn[size, def_entry_id] = wrapconvert;
+def `~` fn[size, def_entry_id, {}] = wrapconvert;
 
 // An index into checkstate's deftypes array.
 struct deftype_entry_id { x size; };
-def `~` fn[size, deftype_entry_id] = wrapconvert;
-def `==` fn[deftype_entry_id, deftype_entry_id, bool] = wrapequate;
+def `~` fn[size, deftype_entry_id, {}] = wrapconvert;
+def `==` fn[deftype_entry_id, deftype_entry_id, bool, {}] = wrapequate;
 
 // An index into checkstate's fn_bodies array.
 struct fn_body_id { x size; };
-def `~` fn[size, fn_body_id] = wrapconvert;
-def `==` fn[fn_body_id, fn_body_id, bool] = wrapequate;
+def `~` fn[size, fn_body_id, {}] = wrapconvert;
+def `==` fn[fn_body_id, fn_body_id, bool, {}] = wrapequate;
 
 // An index into checkstate's access_blocks array.
 struct access_entry_id { x size; };
-def `~` fn[size, access_entry_id] = wrapconvert;
+def `~` fn[size, access_entry_id, {}] = wrapconvert;
 
 func ref_module(cs *checkstate, id module_id) *module {
   return oo(ref(&cs->modules, id.x));

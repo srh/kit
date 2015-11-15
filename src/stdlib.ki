@@ -1,22 +1,22 @@
 import array;
 
-extern malloc fn[size, *void];
-extern free fn[*void, void];
-extern abort fn[void];
+extern malloc fn[size, *void, {}];
+extern free fn[*void, void, {}];
+extern abort fn[void, {}];
 defclass FILE { };
-extern Stdout fn[*FILE];
-extern Stdin fn[*FILE];
-extern Stderr fn[*FILE];
-extern putchar fn[i32, i32];
+extern Stdout fn[*FILE, {}];
+extern Stdin fn[*FILE, {}];
+extern Stderr fn[*FILE, {}];
+extern putchar fn[i32, i32, {}];
 // buffer, size, count, stream
-extern fread fn[*void, size, size, *FILE, size];
-extern fwrite fn[*void, size, size, *FILE, size];
+extern fread fn[*void, size, size, *FILE, size, {}];
+extern fwrite fn[*void, size, size, *FILE, size, {}];
 // TODO: Add "int" as a built-in?  "c_int"?
-extern fclose fn[*FILE, i32];  // TODO: actually returns "int"
-extern feof fn[*FILE, i32];  // TODO: actually returns "int"
+extern fclose fn[*FILE, i32, {}];  // TODO: actually returns "int"
+extern feof fn[*FILE, i32, {}];  // TODO: actually returns "int"
 // TODO: Add "char" as a built-in?
-extern fopen fn[*u8, *u8, *FILE];
-extern fflush fn[*FILE, i32];   // TODO: actually returns "int"
+extern fopen fn[*u8, *u8, *FILE, {}];
+extern fflush fn[*FILE, i32, {}];   // TODO: actually returns "int"
 // TODO: Add platform-specific tests for stuff like "is EOF -1"
 def EOF i32 = -1;  // TODO: is actually "int"
 

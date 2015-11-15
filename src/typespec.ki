@@ -24,7 +24,7 @@ func enum_tag_type(cs *checkstate, et *enumspec) te_typeexpr {
 }
 
 struct enum_tag_value { x u32; };
-def `~` fn[u32, enum_tag_value] = wrapconvert;
+def `~` fn[u32, enum_tag_value, {}] = wrapconvert;
 
 func enum_field_offset(cs *checkstate, et *enumspec, tag enum_tag_value) u32 {
   // Things will get more complicated at some point.

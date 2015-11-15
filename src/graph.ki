@@ -9,8 +9,8 @@ struct frame_graph {
 
 struct cell_num { x size; };
 
-def `~` fn[size, cell_num] = wrapconvert;
-def `==` fn[cell_num, cell_num, bool] = wrapequate;
+def `~` fn[size, cell_num, {}] = wrapconvert;
+def `==` fn[cell_num, cell_num, bool, {}] = wrapequate;
 func `!=`(x cell_num, y cell_num) bool { return x.x != y.x; }
 func `<`(x cell_num, y cell_num) bool { return x.x < y.x; }
 func[H] build_u8str(help H, r *array[u8], c *cell_num) void {
@@ -79,7 +79,7 @@ struct gr_qnode {
 };
 
 struct gr_num { x size; };
-def `~` fn[size, gr_num] = wrapconvert;
+def `~` fn[size, gr_num, {}] = wrapconvert;
 func `==`(x gr_num, y gr_num) bool { return x.x == y.x; }
 func `!=`(x gr_num, y gr_num) bool { return x.x != y.x; }
 func `<`(x gr_num, y gr_num) bool { return x.x < y.x; }
@@ -91,7 +91,7 @@ inline func hash_equal(x *gr_num, y *gr_num) bool {
 }
 
 struct sq_num { x gr_num; };
-def `~` fn[gr_num, sq_num] = wrapconvert;
+def `~` fn[gr_num, sq_num, {}] = wrapconvert;
 
 enum gr_xop {
   GrApply gr_apply;
