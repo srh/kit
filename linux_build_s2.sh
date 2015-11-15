@@ -2,6 +2,6 @@
 
 cd urc
 ../out --linux main && gcc -m32 main.o dummy.c -o s2b
-./s3b --linux main && gcc -m32 main.o dummy.c -o s2
+./s2b --linux main && gcc -m32 main.o dummy.c -o s2
 mv s2 ../s2
 cd ..
