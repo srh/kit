@@ -1,0 +1,85 @@
+import array;
+import shray;
+
+struct string { x shray[i32]; };
+
+def `~` fn[shray[i32], string] = wrapconvert;
+
+inline func data(s *string) *i32 {
+  return data(&s->x);
+}
+
+inline func get(s *string, i size) i32 {
+  return get(&s->x , i);
+}
+
+inline func count(s *string) size {
+  return count(&s->x);
+}
+
+func hash_compute_hash(x *string) osize {
+  p *i32 = data(x);
+  accum osize = 0x12345679;
+  nx size = count(x);
+  for i size = 0; i < nx; i = i + 1 {
+    accum = (accum * 33) ^ ~p[i];
+  }
+  return accum;
+}
+
+func hash_equal(x *string, y *string) bool {
+  if count(x) != count(y) {
+    return false;
+  }
+  px *i32 = data(x);
+  py *i32 = data(y);
+  n size = count(x);
+  for i size = 0; i < n; i = i + 1 {
+    if px[i] != py[i] {
+      return false;
+    }
+  }
+  return true;
+}
+
+func[H] build_u8str(help H, r *array[u8], x *string) void {
+  n size = count(x);
+  p *i32 = data(&x->x);
+  for i size = 0; i < n; i = i + 1 {
+    push(r, ~p[i]);
+  }
+}
+
+inline func from_u8(x array[u8]) string {
+  return from_u8(&x);
+}
+
+func from_u8(x *array[u8]) string {
+  build array[i32];
+  n size = count(x);
+  reserve(&build, n);
+  p *u8 = data(x);
+  for i size = 0; i < n; i = i + 1 {
+    push(&build, ~p[i]);
+  }
+  return ~freeze(&build);
+}
+
+func[T] _s(arr T) string {
+  build array[i32];
+  n size = arr.length;
+  reserve(&build, n);
+  p *u8 = &arr[0];
+  for i size = 0; i < n; i = i + 1 {
+    push(&build, ~p[i]);
+  }
+  return ~freeze(&build);
+}
+
+func `+`(x string, y string) string {
+  build array[i32];
+  reserve(&build, count(&x) + count(&y));
+  append_raw(&build, data(&x), count(&x));
+  append_raw(&build, data(&y), count(&y));
+  return ~freeze(&build);
+}

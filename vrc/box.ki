@@ -1,0 +1,32 @@
+import stdlib;
+
+defclass[T] move box {
+  ptr *T;
+};
+
+access box[_] {
+  inline func[T] do_init(u *box[T]) void {
+    u->ptr = @[*T]cast(checkmalloc(sizeof@[T]));
+    init(u->ptr);
+  }
+
+  inline func[T] do_copy(dest *box[T], src *box[T]) void {
+    dest->ptr = @[*T]cast(checkmalloc(sizeof@[T]));
+    copy(dest->ptr, src->ptr);
+  }
+
+  inline func[T] do_destroy(u *box[T]) void {
+    destroy(u->ptr);
+    free(@[*void]cast(u->ptr));
+  }
+
+  inline func[T] oo(x *box[T]) *T {
+    return x->ptr;
+  }
+}
+
+inline func[T] embox(val T) box[T] {
+  ret box[T];
+  *oo(&ret) = val;
+  return ret;
+}

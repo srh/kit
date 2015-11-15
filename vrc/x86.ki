@@ -1,0 +1,735 @@
+import array;
+import dumbgen;
+import kitutil;
+import objfile;
+
+def x86_fillercode_byte u8 = 0xCC;
+
+def X86_EAX u8 = 0;
+def X86_ECX u8 = 1;
+def X86_EDX u8 = 2;
+def X86_EBX u8 = 3;
+def X86_ESP u8 = 4;
+def X86_EBP u8 = 5;
+def X86_ESI u8 = 6;
+def X86_EDI u8 = 7;
+
+def X86_AL u8 = 0;
+def X86_CL u8 = 1;
+def X86_DL u8 = 2;
+def X86_BL u8 = 3;
+def X86_AH u8 = 4;
+def X86_CH u8 = 5;
+def X86_DH u8 = 6;
+def X86_BH u8 = 7;
+
+// Only applicable for 0F-prefixed off32 instructions (I think).  (TODO: What's an off32 instruction?  Update this comment and same in s1.)
+def X86_SETCC_L u8 = 0x9C;
+def X86_SETCC_LE u8 = 0x9E;
+def X86_SETCC_G u8 = 0x9F;
+def X86_SETCC_GE u8 = 0x9D;
+def X86_SETCC_E u8 = 0x94;
+def X86_SETCC_NE u8 = 0x95;
+def X86_SETCC_A u8 = 0x97;
+def X86_SETCC_AE u8 = 0x93;
+def X86_SETCC_B u8 = 0x92;
+def X86_SETCC_BE u8 = 0x96;
+def X86_SETCC_Z u8 = 0x94;
+
+def X86_JCC_O u8 = 0x80;
+def X86_JCC_Z u8 = 0x84;
+def X86_JCC_NE u8 = 0x85;
+def X86_JCC_S u8 = 0x88;
+def X86_JCC_A u8 = 0x87;
+def X86_JCC_AE u8 = 0x83;
+def X86_JCC_C u8 = 0x82;
+def X86_JCC_G u8 = 0x8F;
+def X86_JCC_L u8 = 0x8C;
+
+func mrr(mod u8, reg u8, rm u8) u8 {
+  // TODO: s1 won't parse associative bitwise ops.
+  return ((mod << 6) | (reg << 3)) | rm;
+}
+
+def MOD00 u8 = 0;
+def MOD01 u8 = 1;
+def MOD10 u8 = 2;
+def MOD11 u8 = 3;
+
+func appendtext(f *objfile, x u8) void {
+  append_raw(&f->text, &x, 1);
+}
+
+func appendtext(f *objfile, x0 u8, x1 u8) void {
+  b ^[2]u8 = {x0, x1};
+  append_raw(&f->text, &b[0], 2);
+}
+
+func appendtext(f *objfile, x0 u8, x1 u8, x2 u8) void {
+  b ^[3]u8 = {x0, x1, x2};
+  append_raw(&f->text, &b[0], 3);
+}
+
+func appendtext(f *objfile, x0 u8, x1 u8, x2 u8, x3 u8) void {
+  b ^[4]u8 = {x0, x1, x2, x3};
+  append_raw(&f->text, &b[0], 4);
+}
+
+func appendtext(f *objfile, x0 u8, x1 u8, x2 i32) void {
+  b ^[6]u8 = {x0, x1, 0, 0, 0, 0};
+  write_le_i32(&b[2], x2);
+  append_raw(&f->text, &b[0], 6);
+}
+
+func appendtext(f *objfile, x0 u8, x1 u8, x2 u32) void {
+  b ^[6]u8 = {x0, x1, 0, 0, 0, 0};
+  write_le_u32(&b[2], x2);
+  append_raw(&f->text, &b[0], 6);
+}
+
+func appendtext(f *objfile, x0 u8, x1 u8, x2 u8, x3 u16) void {
+  b ^[5]u8 = {x0, x1, x2, 0, 0};
+  write_le_u16(&b[3], x3);
+  append_raw(&f->text, &b[0], 5);
+}
+
+func appendtext(f *objfile, x0 u8, x1 reg_rm_encoded) void {
+  append_raw(&f->text, &x0, 1);
+  append_raw(&f->text, &x1.buf[0], ~x1.length);
+}
+
+func appendtext(f *objfile, x0 u8, x1 u8, x2 reg_rm_encoded) void {
+  b ^[2]u8 = {x0, x1};
+  append_raw(&f->text, &b[0], 2);
+  append_raw(&f->text, &x2.buf[0], ~x2.length);
+}
+
+func appendtext(f *objfile, x0 u8, x1 reg_rm_encoded, x2 u32) void {
+  append_raw(&f->text, &x0, 1);
+  append_raw(&f->text, &x1.buf[0], ~x1.length);
+  b ^[4]u8;
+  write_le_u32(&b[0], x2);
+  append_raw(&f->text, &b[0], 4);
+}
+
+func appendtext(f *objfile, x0 u8, x1 u8, x2 reg_rm_encoded, x3 u16) void {
+  b ^[2]u8 = {x0, x1};
+  append_raw(&f->text, &b[0], 2);
+  append_raw(&f->text, &x2.buf[0], ~x2.length);
+  c ^[2]u8;
+  write_le_u16(&c[0], x3);
+  append_raw(&f->text, &c[0], 2);
+}
+
+func appendtext(f *objfile, x0 u8, x1 reg_rm_encoded, x2 u8) void {
+  append_raw(&f->text, &x0, 1);
+  append_raw(&f->text, &x1.buf[0], ~x1.length);
+  append_raw(&f->text, &x2, 1);
+}
+
+
+
+func x86_push32(f *objfile, reg u8) void {
+  appendtext(f, 0x50 + reg);
+}
+
+func x86_pop32(f *objfile, reg u8) void {
+  appendtext(f, 0x58 + reg);
+}
+
+func x86_ret(f *objfile) void {
+  appendtext(f, 0xC3);
+}
+
+func x86_retn(f *objfile, x u16) void {
+  // I don't know if the immediate is treated signed or unsigned.
+  check(x < ~ @[u32] 32768);
+  b ^[3]u8;
+  b[0] = 0xC2;
+  write_le_u16(&b[1], x);
+  append_raw(&f->text, &b[0], 3);
+}
+
+func x86_mov_reg32(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x8B, mrr(MOD11, dest, src));
+}
+
+func x86_mov_reg8(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x8A, mrr(MOD11, dest, src));
+}
+
+func x86_test_regs32(f *objfile, r1 u8, r2 u8) void {
+  appendtext(f, 0x85, mrr(MOD11, r2, r1));
+}
+
+func x86_test_regs8(f *objfile, r1 u8, r2 u8) void {
+  appendtext(f, 0x84, mrr(MOD11, r2, r1));
+}
+
+func x86_mov_imm32(f *objfile, dest u8, x i32) void {
+  if x == 0 {
+    x86_xor_w32(f, dest, dest);
+  } else {
+    b ^[5]u8;
+    b[0] = 0xB8 + dest;
+    write_le_i32(&b[1], x);
+    append_raw(&f->text, &b[0], 5);
+  }
+}
+
+func x86_mov_imm32(f *objfile, dest u8, x u32) void {
+  if x == 0 {
+    x86_xor_w32(f, dest, dest);
+  } else {
+    b ^[5]u8;
+    b[0] = 0xB8 + dest;
+    write_le_u32(&b[1], x);
+    append_raw(&f->text, &b[0], 5);
+  }
+}
+
+func x86_mov_stiptr(f *objfile, dest u8, symbol_table_index sti) void {
+  appendtext(f, 0xB8 + dest);
+  append_dir32(&f->text, symbol_table_index);
+}
+
+func x86_int_3(f *objfile) void {
+  appendtext(f, 0xCC);
+}
+
+func x86_shr_imm_w32(f *objfile, dest u8, imm u8) void {
+  check(imm < 32);
+  appendtext(f, 0xC1, mrr(MOD11, 5, dest), imm);
+}
+
+func x86_shl_cl_w32(f *objfile, dest u8) void {
+  // SHL, SHR, SAR have different reg/opcode fields.
+  appendtext(f, 0xD3, mrr(MOD11, 4, dest));
+}
+
+func x86_shl_cl_w16(f *objfile, dest u8) void {
+  // SHL, SHR, SAR have different reg/opcode fields.
+  appendtext(f, 0x66, @[u8]0xD3, mrr(MOD11, 4, dest));
+}
+
+func x86_shl_cl_w8(f *objfile, dest u8) void {
+  // SHL, SHR, SAR have different reg/opcode fields.
+  appendtext(f, 0xD2, mrr(MOD11, 4, dest));
+}
+
+func x86_shr_cl_w32(f *objfile, dest u8) void {
+  // SHL, SHR, SAR have different reg/opcode fileds.
+  appendtext(f, 0xD3, mrr(MOD11, 5, dest));
+}
+
+func x86_shr_cl_w16(f *objfile, dest u8) void {
+  // SHL, SHR, SAR have different reg/opcode fileds.
+  appendtext(f, 0x66, @[u8]0xD3, mrr(MOD11, 5, dest));
+}
+
+func x86_shr_cl_w8(f *objfile, dest u8) void {
+  // SHL, SHR, SAR have different reg/opcode fileds.
+  appendtext(f, 0xD2, mrr(MOD11, 5, dest));
+}
+
+func x86_sar_cl_w32(f *objfile, dest u8) void {
+  // SHL, SHR, SAR have different reg/opcode fileds.
+  appendtext(f, 0xD3, mrr(MOD11, 7, dest));
+}
+
+func x86_sar_cl_w16(f *objfile, dest u8) void {
+  // SHL, SHR, SAR have different reg/opcode fileds.
+  appendtext(f, 0x66, @[u8]0xD3, mrr(MOD11, 7, dest));
+}
+
+func x86_sar_cl_w8(f *objfile, dest u8) void {
+  // SHL, SHR, SAR have different reg/opcode fileds.
+  appendtext(f, 0xD2, mrr(MOD11, 7, dest));
+}
+
+func x86_add_esp_i32(f *objfile, x i32) void {
+  if case Has(x8 u8) = as_imm8(x) {
+    appendtext(f, 0x83, mrr(MOD11, 0, X86_ESP), x8);
+  } else {
+    appendtext(f, 0x81, mrr(MOD11, 0, X86_ESP), x);
+  }
+}
+
+func x86_add_w32(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x01, mrr(MOD11, src, dest));
+}
+
+func x86_add_w16(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x66, @[u8]0x01, mrr(MOD11, src, dest));
+}
+
+func x86_add_w8(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x00, mrr(MOD11, src, dest));
+}
+
+func x86_eaxedx_mul_w32(f *objfile, src u8) void {
+  // MUL, DIV, IDIV have different modr/m opcode.
+  appendtext(f, 0xF7, mrr(MOD11, 4, src));
+}
+
+// TODO: dxax is inconsistent with alah, eaxedx (also in s1).
+func x86_dxax_mul_w16(f *objfile, src u8) void {
+  appendtext(f, 0x66, @[u8]0xF7, mrr(MOD11, 4, src));
+}
+
+func x86_alah_mul_w8(f *objfile, src u8) void {
+  appendtext(f, 0xF6, mrr(MOD11, 4, src));
+}
+
+func x86_imul_w32(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x0F, @[u8]0xAF, mrr(MOD11, dest, src));
+}
+
+func x86_imul_w16(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x66, @[u8]0x0F, @[u8]0xAF, mrr(MOD11, dest, src));
+}
+
+func x86_alah_imul_w8(f *objfile, src u8) void {
+  appendtext(f, 0xF6, mrr(MOD11, 5, src));
+}
+
+func x86_eaxedx_div_w32(f *objfile, denom u8) void {
+  appendtext(f, 0xF7, mrr(MOD11, 6, denom));
+}
+
+func x86_axdx_div_w16(f *objfile, denom u8) void {
+  appendtext(f, 0x66, @[u8]0xF7, mrr(MOD11, 6, denom));
+}
+
+func x86_alah_div_w8(f *objfile, denom u8) void {
+  appendtext(f, 0xF6, mrr(MOD11, 6, denom));
+}
+
+func x86_eaxedx_idiv_w32(f *objfile, denom u8) void {
+  appendtext(f, 0xF7, mrr(MOD11, 7, denom));
+}
+
+func x86_axdx_idiv_w16(f *objfile, denom u8) void {
+  appendtext(f, 0x66, @[u8]0xF7, mrr(MOD11, 7, denom));
+}
+
+func x86_alah_idiv_w8(f *objfile, denom u8) void {
+  appendtext(f, 0xF6, mrr(MOD11, 7, denom));
+}
+
+func x86_cwd_w16(f *objfile) void {
+  appendtext(f, 0x66, @[u8]0x99);
+}
+
+func x86_cdq_w32(f *objfile) void {
+  appendtext(f, 0x99);
+}
+
+func x86_cmp_w32(f *objfile, lhs u8, rhs u8) void {
+  appendtext(f, 0x39, mrr(MOD11, rhs, lhs));
+}
+
+func x86_cmp_w16(f *objfile, lhs u8, rhs u8) void {
+  appendtext(f, 0x66, @[u8]0x39, mrr(MOD11, rhs, lhs));
+}
+
+func x86_cmp_w8(f *objfile, lhs u8, rhs u8) void {
+  appendtext(f, 0x38, mrr(MOD11, rhs, lhs));
+}
+
+func x86_math81_imm32(f *objfile, op u8, lhs u8, x i32) void {
+  if case Has(x8 u8) = as_imm8(x) {
+    appendtext(f, 0x83, mrr(MOD11, op, lhs), x8);
+  } else {
+    appendtext(f, 0x81, mrr(MOD11, op, lhs), x);
+  }
+}
+
+func x86_cmp_imm32(f *objfile, lhs u8, x u32) void {
+  if case Has(x8 u8) = as_imm8(x) {
+    appendtext(f, 0x83, mrr(MOD11, 7, lhs), x8);
+  } else {
+    appendtext(f, 0x81, mrr(MOD11, 7, lhs), x);
+  }
+}
+
+func x86_cmp_imm32(f *objfile, lhs u8, x i32) void {
+  x86_math81_imm32(f, 7, lhs, x);
+}
+
+func x86_cmp_reg16_imm16(f *objfile, lhs u8, x u16) void {
+  if case Has(x8 u8) = as_imm8(x) {
+    appendtext(f, 0x66, 0x83, mrr(MOD11, 7, lhs), x8);
+  } else {
+    appendtext(f, 0x66, 0x81, mrr(MOD11, 7, lhs), x);
+  }
+}
+
+func x86_cmp_reg8_imm8(f *objfile, lhs u8, x u8) void {
+  appendtext(f, 0x80, mrr(MOD11, 7, lhs), x);
+}
+
+func x86_xor_w32(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x31, mrr(MOD11, src, dest));
+}
+
+func x86_or_w32(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x09, mrr(MOD11, src, dest));
+}
+
+func x86_and_w32(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x21, mrr(MOD11, src, dest));
+}
+
+func x86_not_w8(f *objfile, dest u8) void {
+  appendtext(f, 0xF6, mrr(MOD11, 2, dest));
+}
+
+func x86_not_w16(f *objfile, dest u8) void {
+  appendtext(f, 0x66, @[u8]0xF7, mrr(MOD11, 2, dest));
+}
+
+func x86_not_w32(f *objfile, dest u8) void {
+  appendtext(f, 0xF7, mrr(MOD11, 2, dest));
+}
+
+func x86_neg_w32(f *objfile, dest u8) void {
+  appendtext(f, 0xF7, mrr(MOD11, 3, dest));
+}
+
+func x86_sub_w32(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x29, mrr(MOD11, src, dest));
+}
+
+func x86_sub_w16(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x66, @[u8]0x29, mrr(MOD11, src, dest));
+}
+
+func x86_sub_w8(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x28, mrr(MOD11, src, dest));
+}
+
+func x86_setcc_b8(f *objfile, dest u8, setcc_code u8) void {
+  appendtext(f, 0x0F, setcc_code, mrr(MOD11, 0, dest));
+}
+
+func x86_reg32_has_lobyte(reg u8) bool {
+  return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
+}
+
+func x86_load32_zeroextend(f *objfile, dest u8, src_addr u8, src_disp i32, size u32) void {
+  if size == 0 {
+    x86_xor_w32(f, dest, dest);
+  } else if size == 4 {
+    x86_load32(f, dest, src_addr, src_disp);
+  } else if size == 1 {
+    check(x86_reg32_has_lobyte(dest));
+    x86_movzx8(f, dest, src_addr, src_disp);
+  } else if size == 2 {
+    x86_movzx16(f, dest, src_addr, src_disp);
+  } else if size == 3 {
+    x86_load32(f, dest, src_addr, src_disp);
+    x86_and_imm32(f, dest, 0x00FFFFFF);
+  } else {
+    ice(_u8("x86_load32_zeroextend with bad size"));
+  }
+}
+
+func x86_load32_for_primop(f *objfile, dest u8, src cell_loc, size u32) void {
+  switch x86_prep_loc_or_const(f, src, dest) {
+  case Const(b bigint):
+    // TODO: We are on relatively thin ice here -- we should just have an st_value at this point.
+    value u32;
+    if !as_non_negative_u32(&b, &value) {
+      ice(_u8("x86_load32_for_primop has invalid bigint of value "), b);
+    } else {
+      x86_mov_imm32(f, dest, value);
+    }
+  case Regdisp(rd regdisp):
+    x86_load32_zeroextend(f, dest, rd.addr, rd.disp, size);
+  }
+}
+
+func x86_store32_partial_destructively(f *objfile, dest_addr u8, dest_disp i32, src u8, size u32) void {
+  if size == 0 {
+    // Do nothing.
+  } else if size == 4 {
+    x86_store32(f, dest_addr, dest_disp, src);
+  } else if size == 1 {
+    check(src == X86_EAX || src == X86_ECX || src == X86_EDX || src == X86_EBX);
+    x86_store8(f, dest_addr, dest_disp, src);
+  } else if size == 2 {
+    x86_store16(f, dest_addr, dest_disp, src);
+  } else if size == 3 {
+    // Heh!  In s1 we didn't implement this case.
+    x86_store16(f, dest_addr, dest_disp, src);
+    x86_shr_imm_w32(f, src, 16);
+    x86_store8(f, dest_addr, dest_disp + 2, src);
+  } else {
+    ice(_u8("x86_store32_partial_destructively with bad size"));
+  }
+}
+
+func x86_store32_partial_destructively(f *objfile, dest cell_loc, src u8, size u32, scratch u8) void {
+  dest_addr u8;
+  dest_disp i32;
+  x86_prep_loc_use(f, dest, scratch, &dest_addr, &dest_disp);
+  x86_store32_partial_destructively(f, dest_addr, dest_disp, src, size);
+}
+
+func x86_load32_signextend(f *objfile, dest u8, src_addr u8, src_disp i32, size u32) void {
+  if size == 0 {
+    x86_xor_w32(f, dest, dest);
+  } else if size == 4 {
+    x86_load32(f, dest, src_addr, src_disp);
+  } else if size == 1 {
+    check(x86_reg32_has_lobyte(dest));
+    x86_movsx8(f, dest, src_addr, src_disp);
+  } else if size == 2 {
+    x86_movsx16(f, dest, src_addr, src_disp);
+  } else {
+    ice(_u8("x86_load32_signextend with bad size"));
+  }
+}
+
+func x86_load32_signextend_for_primop(f *objfile, dest u8, src cell_loc, size u32) void {
+  switch x86_prep_loc_or_const(f, src, dest) {
+  case Const(b bigint):
+    // TODO: We are on relatively thin ice here -- we should just have an st_value at this point.
+    ivalue i32;
+    if as_i32(&b, &ivalue) {
+      // It doesn't matter whether we sign extend or zero extend.
+      x86_mov_imm32(f, dest, ivalue);
+    } else {
+      ice(_u8("x86_load32_signextend_for_primop has invalid bigint of value "), b);
+    }
+  case Regdisp(rd regdisp):
+    x86_load32_signextend(f, dest, rd.addr, rd.disp, size);
+  }
+}
+
+// NOTE: If this changes buflength, its consumers (like appendtext) will need to change theirs.
+struct reg_rm_encoded {
+  length u8;
+  buf ^[5]u8;
+};
+
+func as_imm8(x u16) opt[u8] {
+  if x <= + @[u8]127 {
+    return Has(~ (x & + @[u8]0xFF));
+  } else {
+    return None;
+  }
+}
+
+func as_imm8(x u32) opt[u8] {
+  if x <= 127 {
+    return Has(~ (x & 0xFF));
+  } else {
+    return None;
+  }
+}
+
+func as_imm8(x i32) opt[u8] {
+  if x >= @[i32] -128 && x <= 127 {
+    return Has(~ (x & 0xFF));
+  } else {
+    return None;
+  }
+}
+
+func encode_reg_rm(reg u8, rm_addr u8, rm_disp i32) reg_rm_encoded {
+  ret reg_rm_encoded;
+  if rm_disp == 0 && rm_addr != X86_ESP && rm_addr != X86_EBP {
+    ret.buf[0] = mrr(MOD00, reg, rm_addr);
+    ret.length = 1;
+  } else if rm_addr == X86_ESP {
+    // TODO: This would be nice.
+    ice(_u8("encode_reg_rm does not support ESP addrs (yet)"));
+  } else if case Has(disp8 u8) = as_imm8(rm_disp) {
+    ret.buf[0] = mrr(MOD01, reg, rm_addr);
+    ret.buf[1] = disp8;
+    ret.length = 2;
+  } else {
+    ret.buf[0] = mrr(MOD10, reg, rm_addr);
+    write_le_i32(&ret.buf[1], rm_disp);
+    ret.length = 5;
+  }
+  return ret;
+}
+
+func x86_load32(f *objfile, dest u8, src_addr u8, src_disp i32) void {
+  appendtext(f, 0x8B, encode_reg_rm(dest, src_addr, src_disp));
+}
+
+func x86_movzx8(f *objfile, dest u8, src_addr u8, src_disp i32) void {
+  appendtext(f, 0x0F, 0xB6, encode_reg_rm(dest, src_addr, src_disp));
+}
+
+func x86_movzx16(f *objfile, dest u8, src_addr u8, src_disp i32) void {
+  appendtext(f, 0x0F, 0xB7, encode_reg_rm(dest, src_addr, src_disp));
+}
+
+func x86_and_imm32(f *objfile, dest u8, x i32) void {
+  x86_math81_imm32(f, 4, dest, x);
+}
+
+func x86_movsx8(f *objfile, dest u8, src_addr u8, src_disp i32) void {
+  appendtext(f, 0x0F, 0xBE, encode_reg_rm(dest, src_addr, src_disp));
+}
+
+func x86_movsx16(f *objfile, dest u8, src_addr u8, src_disp i32) void {
+  appendtext(f, 0x0F, 0xBF, encode_reg_rm(dest, src_addr, src_disp));
+}
+
+func x86_movzx8_reg8(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x0F, @[u8]0xB6, mrr(MOD11, dest, src));
+}
+
+func x86_movsx8_reg8(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x0F, @[u8]0xBE, mrr(MOD11, dest, src));
+}
+
+func x86_movzx16_reg16(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x0F, @[u8]0xB7, mrr(MOD11, dest, src));
+}
+
+func x86_movsx16_reg16(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x0F, @[u8]0xBF, mrr(MOD11, dest, src));
+}
+
+func x86_lea32(f *objfile, dest u8, src_addr u8, src_disp i32) void {
+  appendtext(f, 0x8D, encode_reg_rm(dest, src_addr, src_disp));
+}
+
+// TODO: What?  Why would we not use movzx?  Check s1.
+func x86_load8(f *objfile, dest u8, src_addr u8, src_disp i32) void {
+  appendtext(f, 0x8A, encode_reg_rm(dest, src_addr, src_disp));
+}
+
+func x86_store32(f *objfile, dest_addr u8, dest_disp i32, src u8) void {
+  appendtext(f, 0x89, encode_reg_rm(src, dest_addr, dest_disp));
+}
+
+func x86_store16(f *objfile, dest_addr u8, dest_disp i32, src u8) void {
+  appendtext(f, 0x66, 0x89, encode_reg_rm(src, dest_addr, dest_disp));
+}
+
+func x86_store8(f *objfile, dest_addr u8, dest_disp i32, src u8) void {
+  appendtext(f, 0x88, encode_reg_rm(src, dest_addr, dest_disp));
+}
+
+func x86_store_imm32(f *objfile, dest_addr u8, dest_disp i32, value u32) void {
+  appendtext(f, 0xC7, encode_reg_rm(0, dest_addr, dest_disp), value);
+}
+
+func x86_store_imm16(f *objfile, dest_addr u8, dest_disp i32, value u16) void {
+  appendtext(f, 0x66, 0xC7, encode_reg_rm(0, dest_addr, dest_disp), value);
+}
+
+func x86_store_imm8(f *objfile, dest_addr u8, dest_disp i32, value u8) void {
+  appendtext(f, 0xC6, encode_reg_rm(0, dest_addr, dest_disp), value);
+}
+
+func x86_call(f *objfile, symbol_table_index sti) void {
+  appendtext(f, 0xE8);
+  append_rel32(&f->text, symbol_table_index);
+}
+
+func x86_indirect_call(f *objfile, reg u8) void {
+  appendtext(f, 0xFF, mrr(MOD11, 2, reg));
+}
+
+func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
+  // TODO: For sufficiently large n generate a loop, or call memcpy.
+
+  if size == 0 {
+    return;
+  }
+
+  dest_addr u8;
+  dest_disp i32;
+  x86_prep_loc_use(f, dest, X86_ECX, &dest_addr, &dest_disp);
+  src_addr u8;
+  src_disp i32;
+  x86_prep_loc_use(f, src, X86_EDX, &src_addr, &src_disp);
+
+  while size >= 4 {
+    x86_load32(f, X86_EAX, src_addr, src_disp);
+    x86_store32(f, dest_addr, dest_disp, X86_EAX);
+    src_disp = src_disp + 4;
+    dest_disp = dest_disp + 4;
+    size = size - 4;
+  }
+
+  if size >= 2 {
+    x86_movzx16(f, X86_EAX, src_addr, src_disp);
+    x86_store16(f, dest_addr, dest_disp, X86_EAX);
+    src_disp = src_disp + 2;
+    dest_disp = dest_disp + 2;
+    size = size - 2;
+  }
+
+  if size == 1 {
+    x86_movzx8(f, X86_EAX, src_addr, src_disp);
+    x86_store8(f, dest_addr, dest_disp, X86_EAX);
+  }
+}
+
+struct regdisp { addr u8; disp i32; };
+
+enum regdisp_or_const {
+  Regdisp regdisp;
+  Const bigint;
+};
+
+func x86_prep_loc_or_const(f *objfile, loc cell_loc, avail_reg u8) regdisp_or_const {
+  switch loc {
+  case DirectLoc(off i32):
+    return Regdisp({X86_EBP, off});
+  case IndirectLoc(off i32):
+    x86_load32(f, avail_reg, X86_EBP, off);
+    return Regdisp({avail_reg, 0});
+  case ConstFuncellLoc(fnid fn_body_id):
+    // TODO: Better type safety?
+    ice(_u8("x86_prep_loc_use sees ConstFuncellLoc"));
+    return fake();
+  case ConstIntCellLoc(b bigint):
+    return Const(b);
+  }
+}
+
+func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, disp_out *i32) void {
+  switch loc {
+  case DirectLoc(off i32):
+    *addr_reg_out = X86_EBP;
+    *disp_out = off;
+  case IndirectLoc(off i32):
+    x86_load32(f, avail_reg, X86_EBP, off);
+    *addr_reg_out = avail_reg;
+    *disp_out = 0;
+  case ConstFuncellLoc(fnid fn_body_id):
+    // TODO: Better type safety?
+    ice(_u8("x86_prep_loc_use sees ConstFuncellLoc"));
+  case ConstIntCellLoc(b bigint):
+    ice(_u8("x86_prep_loc_use sees ConstIntCelloc"));
+  }
+}
+
+func x86_store32(f *objfile, dest cell_loc, src u8, scratch u8) void {
+  switch dest {
+  case DirectLoc(off i32):
+    x86_store32(f, X86_EBP, off, src);
+  case IndirectLoc(off i32):
+    x86_load32(f, scratch, X86_EBP, off);
+    x86_store32(f, scratch, 0, src);
+  }
+}
+
+
+func x86_load32(f *objfile, dest u8, src cell_loc) void {
+  src_addr u8;
+  src_disp i32;
+  x86_prep_loc_use(f, src, dest, &src_addr, &src_disp);
+  x86_load32(f, dest, src_addr, src_disp);
+}

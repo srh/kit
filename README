@@ -1,16 +1,19 @@
-        Kit v0.00.2A.x
+        Kit v0.00.2C.x
 
 Current status:  "proto-Kit"
 
 Definitions:
    s1: A compiler, written in C.  It can compile s3.  Located in trc/.
-   s2: No longer exists.
-   s3: A compiler, written in proto-Kit-v0.00.2.x.  It can
-       compile itself.  Located in src/.
-   s3-by-s1: s3, as compiled by s1.
-   s3-self: s3, as compiled by s3.
-   s4-by-s3: s4, asd compiled by s3.
-   s4-self: s4, as compiled by s4.
+   s2: A compiler, written in proto-Kit-v0.00.2A.x.  It can
+       compile itself and s3.  Located in urc/.
+   s3: A compiler, written in proto-Kit-v0.00.2B.x.  It can
+       compile s4.  (Maybe it can't compile itself.)  Located in vrc/.
+   s4: A compiler, to be written in proto-Kit-v0.00.2C.x.  
+
+   s2-by-s1: s2, as compiled by s1.
+   s2-self: s2, as compiled by s2.
+   sX-by-sY: (for any X and Y) sX, as compiled by sY.
+   sX-self: (for any X) sX, as compiled by sX.
 
   BUILD INSTRUCTIONS
 
@@ -22,8 +25,10 @@ Definitions:
 
 # Step 1. Build s1 -- creates executable "out.exe" (or "out")
    windows_build.bat  (or ./linux_build.sh)
-# Step 3. Build s3 -- creates executable "s3.exe" (or "s3")
-   windows_build_s3.bat  (or ./linux_build_s3.sh)
+# Step 2. Build s2 -- creates executable "s2.exe" (or "s2")
+   windows_build_s2.bat  (or ./linux_build_s2.sh)
+# Step 3. Build s3
+   windows_build_s3.bat
 # Step 4. Build s4
    windows_build_s4.bat
 # Step 5. Run parsing/typechecking+codegen tests.
@@ -39,9 +44,10 @@ Definitions:
 
 The current directory structure is:
 
-   trc - s1, implemented in C.  Compiles s3.
-   urc - s3, implemented in proto-Kit, v0.00.2.x.  Compiles s4.
-   src - s4, implemented in proto-Kit, v0.00.2A.x.  Compiles s3 and s4.
+   trc - s1, implemented in C.  Compiles s2.
+   urc - s2, implemented in proto-Kit.  Compiles s2 and s3.
+   vrc - s3, implemented in proto-Kit.  Compiles s4 (and s3?).
+   src - s4, implemented in proto-Kit.  Compiles itself?
    examples - examples to run, disorganized junk
 
   COMMAND USAGE
@@ -50,9 +56,10 @@ The current directory structure is:
 
    out --test    # runs tests.
    out <modulename>    # builds <modulename>.ki and its imports.
-   s3    # runs parsing/typechecking tests without codegen.
-   s3 --build    # runs parsing/typechecking tests with codegen.
-   s3 <modulename>  # builds <modulename>.ki and its imports.
+   s2    # runs parsing/typechecking tests without codegen.
+   s2 --build    # runs parsing/typechecking tests with codegen.
+   s2 <modulename>  # builds <modulename>.ki and its imports.
+   s3 ...    # same as s2.
    s4 ...    # same as s3.
 
   PROJECT TIMELINE
@@ -75,7 +82,7 @@ Here's the project timeline:
    8. Give the self-hosted implementation "respectable" codegen.
    9. Basic cleanup of the language.
       Wishlist:
-       A. defstruct, no more naked structs.
+       A. defstruct, no more naked structs.  (DONE)
        B. type aliases.
        C. a non-truncative conversion operator (prefix +).  (DONE)
        D. negative integer literals.
@@ -104,15 +111,14 @@ Here's the project timeline:
 
   ABOUT THE VERSIONS
 
-s1's language, v0.00.1.x, is merely "C, with templates,
+s1's language, v0.00.2A.x, is merely "C, with templates,
 constructors and destructors, elementary encapsulation, tagged enum
-types, no implicit conversions."  s2's, v0.00.2.x, is the same as
-s1's, but with some basic convenience enhancements that should be
-easy to backport to s1 -- the differences are described in
-FEATURES.  s2 no longer exists.  s3's, v0.00.2A.x, is very similar
-to s2's, I think there might not be any differences.  s4's should
-become quite different from s3's.
+types, no implicit conversions."  s2's, v0.00.2B.x, is very similar
+to s1's, but with some basic convenience enhancements that should
+be easy to backport to s1 -- the differences are described in
+FEATURES.  s3 defines a language with ever-more-advanced features.
+s4 uses (or will use) those features.
 
-Right now, s1 can compile s3, and it can almost compile s4.  In the
-long run, as soon as s5 is the actively developed version, s3 will
+Right now, s1 can compile s2, and it can almost compile s3.  In the
+long run, as soon as s4 is the actively developed version, s2 will
 go away.

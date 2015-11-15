@@ -1,0 +1,439 @@
+import identmap;
+import shray;
+import state;
+
+// A "computed" typeexpr, which is complete, and which has isHas instpacks.
+struct cu_typeexpr { x te_typeexpr; };
+
+def `~` fn[te_typeexpr, cu_typeexpr] = wrapconvert;
+
+// This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics replaced consistently.
+enum te_typeexpr {
+  TeName te_name;
+  TeApp te_typeapp;
+  TeUnion te_union;
+  TeArraytype te_arraytype;
+  TeLifetime te_lifetime;
+  TeTrans te_trans;
+  TeUnknown void;
+  // Only used in unify_under_generics.  Ignored elsewhere.  Use of this is solely in unify_under_generics and finish_passed_up, and it's OK to omit this case entirely from other switch statements.
+  TePassedUp size;
+};
+
+enum te_puretype {
+  TePureName sym;
+  TePureUnknown void;
+};
+
+struct te_instpack {
+  ent_id deftype_entry_id;
+  inst_id deftype_inst_id;
+};
+
+struct te_name {
+  value sym;
+  // Only supplied if the type is complete, the lookup actually happened.
+  pack opt[te_instpack];
+};
+
+struct te_typeapp {
+  typefunc te_puretype;
+  params shray[te_typeexpr];
+  // Only supplied if the type is complete, the lookup actually happened.
+  pack opt[te_instpack];
+};
+
+struct te_union {
+  fields shray[te_vardecl];
+};
+
+struct te_arraytype {
+  count opt[u32];
+  param shp[te_typeexpr];
+};
+
+// We better not allow name shadowing of lifetimes!
+struct te_lifetime {
+  name sym;
+};
+
+struct te_trans {
+  // Order doesn't matter -- this defines an unordered set (or bag?).
+  before shray[te_statedesc];
+  after shray[te_statedesc];
+};
+
+enum te_activedesc {
+  Active void;
+  Inactive void;
+};
+
+func `==`(x te_activedesc, y te_activedesc) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+inline func `!=`(x te_activedesc, y te_activedesc) bool {
+  return !(x == y);
+}
+func `<`(x te_activedesc, y te_activedesc) bool {
+  return enumnum(&x) < enumnum(&y);
+}
+inline func activedesc_hash(a *te_activedesc) osize {
+  return +enumnum(a);
+}
+
+struct te_statedesc {
+  // (Should this be a te_lifetime?)
+  lifetime te_lifetime;
+  active te_activedesc;
+};
+
+func `<`(x te_statedesc, y te_statedesc) bool {
+  return x.lifetime.name.x < y.lifetime.name.x || (x.lifetime.name == y.lifetime.name && x.active < y.active);
+}
+
+struct te_vardecl {
+  name sym;
+  type te_typeexpr;
+};
+
+func idy_typeexpr_list_equal(a *shray[cu_typeexpr], b *shray[cu_typeexpr]) bool {
+  n size = count(a);
+  if n != count(b) {
+    return false;
+  }
+  adata *cu_typeexpr = data(a);
+  bdata *cu_typeexpr = data(b);
+  for i size = 0; i < n; i = i + 1 {
+    if !idy_typeexpr_equal(&adata[i], &bdata[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+func idy_typeexpr_equal(a *cu_typeexpr, b *cu_typeexpr) bool {
+  return help_idy_typeexpr_equal(&a->x, &b->x);
+}
+
+// Must be called on complete, concrete types.
+func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
+  switch a {
+    case &TeName(ax te_name): {
+      if case &TeName(bx te_name) = b {
+        if case &Has(p te_instpack) = &ax.pack {
+          if case &Has(q te_instpack) = &bx.pack {
+            return p.inst_id.x == q.inst_id.x;
+          }
+        }
+        ice(_u8("idy_typeexpr_equal on a non-pack-having name typeexpr"));
+      }
+    }
+    case &TeApp(ax te_typeapp): {
+      if case &TeApp(bx te_typeapp) = b {
+        if case &Has(p te_instpack) = &ax.pack {
+          if case &Has(q te_instpack) = &bx.pack {
+            return p.inst_id.x == q.inst_id.x;
+          }
+        }
+        ice(_u8("idy_typeexpr_equal on non-pack-having app typeexpr"));
+      }
+    }
+    case &TeUnion(ax te_union): {
+      if case &TeUnion(bx te_union) = b {
+        return help_te_vardecl_list_equal(&ax.fields, &bx.fields);
+      }
+    }
+    case &TeArraytype(ax te_arraytype): {
+      if case &TeArraytype(bx te_arraytype) = b {
+        return ax.count == bx.count && help_idy_typeexpr_equal(oo(&ax.param), oo(&bx.param));
+      }
+    }
+    case &TeLifetime(ax te_lifetime):
+      if case &TeLifetime(bx te_lifetime) = b {
+        return ax.name == bx.name;
+      }
+    case &TeTrans(ax te_trans):
+      if case &TeTrans(bx te_trans) = b {
+        return trans_equal(&ax, &bx);
+      }
+    case &TeUnknown: {
+      ice(_u8("idy_typeexpr_equal sees TeUnknown"));
+    }
+  }
+
+  return false;
+}
+
+func te_puretype_equal(cs *checkstate, a *te_puretype, b *te_puretype) bool {
+  switch a {
+    case &TePureName(an sym): {
+      if case &TePureName(bn sym) = b {
+        return an == bn;
+      }
+    }
+    case &TePureUnknown: {
+      if case &TePureUnknown(v void) = b {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+func help_te_vardecl_list_equal(a *shray[te_vardecl], b *shray[te_vardecl]) bool {
+  n size = count(a);
+  if n != count(b) {
+    return false;
+  }
+  adata *te_vardecl = data(a);
+  bdata *te_vardecl = data(b);
+  for i size = 0; i < n; i = i + 1 {
+    adecl *te_vardecl = &adata[i];
+    bdecl *te_vardecl = &bdata[i];
+    if !(adecl->name == bdecl->name && help_idy_typeexpr_equal(&adecl->type, &bdecl->type)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+func[H] build_u8str(help H, r *array[u8], a *cu_typeexpr) void {
+  return build_u8str(help, r, &a->x);
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
+  switch a {
+    case &TeName(b te_name):
+      wrap_u8str(help, r, _u8("TeName"), &b);
+    case &TeApp(b te_typeapp):
+      wrap_u8str(help, r, _u8("TeApp"), &b);
+    case &TeUnion(b te_union):
+      wrap_u8str(help, r, _u8("TeUnion"), &b);
+    case &TeArraytype(b te_arraytype):
+      wrap_u8str(help, r, _u8("TeArraytype"), &b);
+    case &TeLifetime(b te_lifetime):
+      wrap_u8str(help, r, _u8("TeLifetime"), &b);
+    case &TeTrans(b te_trans):
+      wrap_u8str(help, r, _u8("TeTrans"), &b);
+    case &TeUnknown:
+      append(r, _u8("TeUnknown"));
+    case &TePassedUp(index size):
+      wrap_u8str(help, r, _u8("TePassedUp"), &index);
+  }
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_name) void {
+  append(r, _u8("{value:"));
+  build_u8str(help, r, &a->value);
+  append(r, _u8("}"));
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_typeapp) void {
+  append(r, _u8("{typefunc:"));
+  build_u8str(help, r, &a->typefunc);
+  append(r, _u8(",params:"));
+  build_shray_u8str(help, r, &a->params);
+  push(r, '}');
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_union) void {
+  append(r, _u8("{fields:"));
+  build_shray_u8str(help, r, &a->fields);
+  push(r, '}');
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_arraytype) void {
+  append(r, _u8("{count:"));
+  build_u8str(help, r, &a->count);
+  append(r, _u8(",param:"));
+  build_u8str(help, r, &a->param);
+  push(r, '}');
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_lifetime) void {
+  build_u8str(help, r, &a->name);
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_trans) void {
+  append(r, _u8("{before:"));
+  build_shray_u8str(help, r, &a->before);
+  append(r, _u8(",after:"));
+  build_shray_u8str(help, r, &a->after);
+  push(r, '}');
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_statedesc) void {
+  build_u8str(help, r, &a->lifetime);
+  push(r, ' ');
+  build_u8str(help, r, &a->active);
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_activedesc) void {
+  switch a {
+  case &Active: append(r, _u8("active"));
+  case &Inactive: append(r, _u8("inactive"));
+  }
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_vardecl) void {
+  append(r, _u8("{name:"));
+  build_u8str(help ,r, &a->name);
+  append(r, _u8(",type:"));
+  build_u8str(help, r, &a->type);
+  push(r, '}');
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_puretype) void {
+  switch a {
+    case &TePureName(s sym): {
+      append(r, _u8("TePureName("));
+      build_u8str(help, r, &s);
+      push(r, ')');
+    }
+    case &TePureUnknown: {
+      append(r, _u8("TePureUnknown"));
+    }
+  }
+}
+
+func hash_compute_hash(x *cu_typeexpr) osize {
+  return help_compute_hash(&x->x);
+}
+
+// Used for idy_typeexpr types.
+func help_compute_hash(a *te_typeexpr) osize {
+  switch a {
+  case &TeName(ax te_name):
+    if case &Has(p te_instpack) = &ax.pack {
+      return ~p.inst_id.x;
+    }
+    ice(_u8("help_compute_hash on non-pack-having name typeexpr"));
+  case &TeApp(ax te_typeapp):
+    if case &Has(p te_instpack) = &ax.pack {
+      return ~p.inst_id.x;
+    }
+    ice(_u8("help_compute_hash on non-pack-having app typeexpr"));
+  case &TeUnion(ax te_union):
+    return 0x3 ^ help_te_vardecl_list_compute_hash(&ax.fields);
+  case &TeArraytype(ax te_arraytype):
+    if case Has(n u32) = ax.count {
+      return (@[osize]~n * 0x3001) + help_compute_hash(oo(&ax.param));
+    }
+  case &TeLifetime(ax te_lifetime):
+    return lifetime_hash(&ax);
+  case &TeTrans(ax te_trans):
+    return 0x5 ^ trans_hash(&ax);
+  case &TeUnknown:
+    ice(_u8("help_compute_hash sees TeUnknown"));
+  }
+  return fake();
+}
+
+inline func lifetime_hash(a *te_lifetime) osize {
+  return 0x4 ^ hash_compute_hash(&a->name);
+}
+
+func help_te_vardecl_list_compute_hash(a *shray[te_vardecl]) osize {
+  n size = count(a);
+  adata *te_vardecl = data(a);
+  accum osize = 0x84ac113;
+  for i size = 0; i < n; i = i + 1 {
+    adecl *te_vardecl = &adata[i];
+    accum = (accum * 33) ^ ~adecl->name.x;
+    accum = (accum * 3) ^ help_compute_hash(&adecl->type);
+  }
+  return accum;
+}
+
+func[H, T] pretty(help H, x *T) array[u8] {
+  ret array[u8];
+  pretty_u8str(help, &ret, x);
+  return ret;
+}
+
+func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
+  switch a {
+  case &TeName(b te_name):
+    build_u8str(im, r, &b.value);
+  case &TeApp(b te_typeapp):
+    switch b.typefunc {
+    case TePureName(s sym):
+      build_u8str(im, r, &s);
+      if s == im->cym.ptrtype_sym && count(&b.params) == 1 {
+        pretty_u8str(im, r, ref(&b.params, 0));
+      } else {
+        push(r, '[');
+        pretty_u8str_list(im, r, &b.params);
+        push(r, ']');
+      }
+    case TePureUnknown:
+      push(r, '_');
+    }
+  case &TeUnion(b te_union):
+    append(r, _u8("struct { "));
+    help_pretty_vardecl(im, r, &b.fields);
+    push(r, '}');
+  case &TeArraytype(b te_arraytype):
+    push(r, '[');
+    if case Has(n u32) = b.count {
+      build_u8str(void, r, &n);
+    } else {
+      push(r, '_');
+    }
+    push(r, ']');
+    pretty_u8str(im, r, oo(&b.param));
+  case &TeLifetime(b te_lifetime):
+    pretty_u8str(im, r, &b);
+  case &TeTrans(b te_trans):
+    push(r, '{');
+    pretty_u8str_list(im, r, &b.before);
+    append(r, _u8("->"));
+    pretty_u8str_list(im, r, &b.after);
+    push(r, '}');
+  case &TeUnknown:
+    push(r, '_');
+  }
+}
+
+func[T] pretty_u8str_list(im *identmap, r *array[u8], a *shray[T]) void {
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    if i != 0 {
+      push(r, ',');
+      push(r, ' ');
+    }
+    pretty_u8str(im, r, ref(a, i));
+  }
+}
+
+func pretty_u8str(im *identmap, r *array[u8], a *te_statedesc) void {
+  pretty_u8str(im, r, &a->lifetime);
+  push(r, ' ');
+  pretty_u8str(im, r, &a->active);
+}
+
+func pretty_u8str(im *identmap, r *array[u8], a *te_lifetime) void {
+  push(r, '\'');
+  build_u8str(im, r, &a->name);
+}
+
+func pretty_u8str(im *identmap, r *array[u8], a *te_activedesc) void {
+  switch a {
+  case &Active:
+    append(r, _u8("active"));
+  case &Inactive:
+    append(r, _u8("inactive"));
+  }
+}
+
+func help_pretty_vardecl(im *identmap, r *array[u8], a *shray[te_vardecl]) void {
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    v *te_vardecl = ref(a, i);
+    build_u8str(im, r, &v->name);
+    push(r, ' ');
+    pretty_u8str(im, r, &v->type);
+    push(r, ';');
+    push(r, ' ');
+  }
+}

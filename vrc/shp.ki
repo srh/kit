@@ -1,0 +1,50 @@
+import stdlib;
+
+// Shared pointers.  Right now many users of these just don't want to
+// copy, the way box does, because non-copying movable types are not
+// practical yet.
+
+struct[T] shp_pointee {
+  refcount size;
+  value T;
+};
+
+defclass[T] move shp {
+  ptr *shp_pointee[T];
+};
+
+access shp[_] {
+  func[T] do_init(u *shp[T]) void {
+    u->ptr = @[*shp_pointee[T]]cast(checkmalloc(sizeof@[shp_pointee[T]]));
+    init(&u->ptr->value);
+    u->ptr->refcount = 1;
+  }
+
+  inline func[T] do_copy(dest *shp[T], src *shp[T]) void {
+    src->ptr->refcount = src->ptr->refcount + 1;
+    dest->ptr = src->ptr;
+  }
+
+  func[T] do_destroy(u *shp[T]) void {
+    rc size = u->ptr->refcount - 1;
+    u->ptr->refcount = rc;
+    if rc == 0 {
+      destroy(u->ptr);
+      free(@[*void]cast(u->ptr));
+    }
+  }
+
+  inline func[T] oo(x *shp[T]) *T {
+    return &x->ptr->value;
+  }
+
+  inline func[T] oo(x shp[T]) *T {
+    return &x.ptr->value;
+  }
+}
+
+inline func[T] emshp(val T) shp[T] {
+  ret shp[T];
+  *oo(&ret) = val;
+  return ret;
+}

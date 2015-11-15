@@ -1,0 +1,169 @@
+import stdlib;
+import state;
+
+// Tells (a) if the operation failed, and (b) if it did, whether location info was printed.  Might be expanded to include other info.
+// TODO: Possibly deprecated in favor of np[T].
+enum np {
+  // No failure happened.
+  NoFail void;
+  // We had a failure, and an error message was printed.  True if location info was printed.
+  Printed bool;
+};
+
+// Callers of this are OK with discarding Printed info (presumably).
+func from_np(x np) bool {
+  switch x {
+  case NoFail: return true;
+  case Printed(b bool): return false;
+  }
+}
+
+// cr = check result.
+enum[T] cr {
+  NoFail T;
+  Printed bool;
+};
+
+// This exists for code that needs to return an np when it's passing along a failure where a callee returned a boolean.  We know the callee printed an error message, we assume it didn't print the location, and the callee should be updated to return an np.
+// TODO: Get rid of this (and fix it callers).
+func Printed() np {
+  return Printed(false);
+}
+
+func[T] Printed() cr[T] {
+  return Printed(false);
+}
+
+func[T] ERR(x T) np { DBG(x); return Printed(false); }
+func[T, U] ERR(x T, y U) np { DBG(x, y); return Printed(false); }
+func[T, U, V] ERR(x T, y U, z V) np { DBG(x, y, z); return Printed(false); }
+func[T, U, V, W] ERR(x T, y U, z V, p W) np { DBG(x, y, z, p); return Printed(false); }
+func[T, U, V, W, X] ERR(x T, y U, z V, p W, q X) np { DBG(x, y, z, p, q); return Printed(false); }
+func[T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) np { DBG(x, y, z, p, q, r); return Printed(false); }
+func[T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) np { DBG(x, y, z, p, q, r, s); return Printed(false); }
+func[T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) np { DBG(x, y, z, p, q, r, s, t); return Printed(false); }
+
+func[R, T] ERR(x T) cr[R] { DBG(x); return Printed(false); }
+func[R, T, U] ERR(x T, y U) cr[R] { DBG(x, y); return Printed(false); }
+func[R, T, U, V] ERR(x T, y U, z V) cr[R] { DBG(x, y, z); return Printed(false); }
+func[R, T, U, V, W] ERR(x T, y U, z V, p W) cr[R] { DBG(x, y, z, p); return Printed(false); }
+func[R, T, U, V, W, X] ERR(x T, y U, z V, p W, q X) cr[R] { DBG(x, y, z, p, q); return Printed(false); }
+func[R, T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) cr[R] { DBG(x, y, z, p, q, r); return Printed(false); }
+func[R, T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) cr[R] { DBG(x, y, z, p, q, r, s); return Printed(false); }
+func[R, T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) cr[R] { DBG(x, y, z, p, q, r, s, t); return Printed(false); }
+
+
+func[T, U, V, W, X, Y, Z, A] DBG(x T, y U, z V, p W, q X, r Y, s Z, t A) void {
+  DBG(cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), cons(s, t))));
+}
+
+func[T, U, V, W, X, Y, Z] DBG(x T, y U, z V, p W, q X, r Y, s Z) void {
+  DBG(cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), s)));
+}
+
+func[T, U, V, W, X, Y] DBG(x T, y U, z V, p W, q X, r Y) void {
+  DBG(cons(cons(cons(x, y), cons(z, p)), cons(q, r)));
+}
+
+func[T, U, V, W, X] DBG(x T, y U, z V, p W, q X) void {
+  DBG(cons(cons(cons(x, y), cons(z, p)), q));
+}
+
+func[T, U, V, W] DBG(x T, y U, z V, p W) void {
+  DBG(cons(cons(x, y), cons(z, p)));
+}
+
+func[T, U, V] DBG(x T, y U, z V) void {
+  DBG(cons(cons(x, y), z));
+}
+
+func[T, U] DBG(x T, y U) void {
+  DBG(cons(x, y));
+}
+
+func[T] DBG(x T) void {
+  r array[u8];
+  build_u8str(void, &r, &x);
+  push(&r, '\n');
+  print(Stderr(), r);
+  fflush(Stderr());
+}
+
+func[T, U, V, W, X, Y, Z, A] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z, t A) np {
+  return MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), cons(s, t))));
+}
+
+func[T, U, V, W, X, Y, Z] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z) np {
+  return MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), s)));
+}
+
+func[T, U, V, W, X, Y] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y) np {
+  return MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(q, r)));
+}
+
+func[T, U, V, W, X] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X) np {
+  return MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), q));
+}
+
+func[T, U, V, W] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W) np {
+  return MERR(cs, m, cons(cons(x, y), cons(z, p)));
+}
+
+func[T, U, V] MERR(cs *checkstate, m ast_meta, x T, y U, z V) np {
+  return MERR(cs, m, cons(cons(x, y), z));
+}
+
+func[T, U] MERR(cs *checkstate, m ast_meta, x T, y U) np {
+  return MERR(cs, m, cons(x, y));
+}
+
+func[T] MERR(cs *checkstate, m ast_meta, x T) np {
+  r array[u8];
+  if case Has(p pos) = ref(&cs->posits.metas, m.x)->left {
+    hp human_pos = to_human_pos(cs, p);
+    build_u8str(cs->im, &r, &hp);
+    append(&r, _u8(": "));
+  } else {
+    append(&r, _u8("At ??: "));
+  }
+  build_u8str(cs->im, &r, &x);
+  push(&r, '\n');
+  print(Stderr(), r);
+  fflush(Stderr());
+  return Printed(true);
+}
+
+func[T] ice(x T) void {
+  DBG(_u8("ICE: "), x);
+  abort();
+}
+
+func[T, U] ice(x T, y U) void {
+  DBG(_u8("ICE: "), x, y);
+  abort();
+}
+
+func[T, U, V] ice(x T, y U, z V) void {
+  DBG(_u8("ICE: "), x, y, z);
+  abort();
+}
+
+func[T, U, V, W] ice(x T, y U, z V, p W) void {
+  DBG(_u8("ICE: "), x, y, z, p);
+  abort();
+}
+
+func[T, U, V, W, X] ice(x T, y U, z V, p W, q X) void {
+  DBG(_u8("ICE: "), x, y, z, p, q);
+  abort();
+}
+
+func[T, U, V, W, X, Y] ice(x T, y U, z V, p W, q X, r Y) void {
+  DBG(_u8("ICE: "), x, y, z, p, q, r);
+  abort();
+}
+
+func[T, U, V, W, X, Y, Z] ice(x T, y U, z V, p W, q X, r Y, s Z) void {
+  DBG(_u8("ICE: "), x, y, z, p, q, r, s);
+  abort();
+}

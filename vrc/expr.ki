@@ -1,0 +1,2200 @@
+import bigint;
+import body;
+import check;
+import primitives;
+
+// Used with the variable name "es" -- its name used to be different.
+struct framescope {
+  ds *defscope;
+  // Same as ds->cs.
+  cs *checkstate;
+  // Same as ds->im, same as cs->im.
+  im *identmap;
+  // Same as ds->clq.
+  clq *clqueue;
+
+  all_vars array[var_info];
+
+  // These var_numbers are always in increasing order.
+  current_vars array[var_number];
+
+  // Used for auto-generating $frame_1, $frame_2, ... lifetimes.
+  lifetime_gen_counter size;
+
+  gr frame_graph;
+};
+
+func mk(ds *defscope) framescope {
+  return {ds, ds->cs, ds->im, ds->clq,
+          mk_array@[var_info](), mk_array@[var_number](),
+          0,
+          init_frame_graph_empty(ds->def_informal_name)};
+}
+
+inline func add_cell(es *framescope, info cell_info) cell_num {
+  return add_cellp(&es->gr, &info);
+}
+
+inline func add_none_cell(es *framescope) cell_num {
+  return add_cell_raw(&es->gr, None);
+}
+
+inline func ref_cell(es *framescope, num cell_num) *cell_info {
+  return ref_cell(&es->gr, num);
+}
+
+func add_rval_cell(es *framescope, demand rval_celldemand, cu cu_typeexpr, props type_properties) rval_cellnum {
+  switch demand {
+  case NoDemand:
+    cell cell_num = add_cell(es, {LocationStatic, cu, props});
+    lifetime te_typeexpr = unnamed_lifetime(es);
+    return {cell, lifetime};
+  case DemandCell(rc rval_cellnum):
+    ensure_cell_typed(es, rc, &cu, &props);
+    return {rc.cell, rc.lifetime};
+  }
+}
+
+inline func wholeRval(num rval_cellnum) is_lval {
+  return IsLvalNo({num.cell, num.lifetime, num.cell, num.lifetime});
+}
+
+struct rval_cellnum {
+  cell cell_num;
+  // TODO: Could this (should this) be a te_lifetime?
+  lifetime te_typeexpr;
+};
+
+enum rval_celldemand {
+  NoDemand void;
+  DemandCell rval_cellnum;
+};
+
+// TODO: This probably could/should compute props itself.
+func ensure_cell_typed(es *framescope, rc rval_cellnum, type *cu_typeexpr, props *type_properties) void {
+  p *opt[cell_info] = ref(&es->gr.cells, rc.cell.x);
+  if case &Has(ci cell_info) = p {
+    // Do nothing.
+    // Don't assert that the types are the same -- we'll leave that to explicit type-checking logic.
+  } else {
+    *p = Has({LocationStatic, *type, *props});
+  }
+}
+
+struct defscope {
+  cs *checkstate;
+  // Same as cs->im.
+  im *identmap;
+  clq *clqueue;
+  accessible array[access_entry_id];
+  // Generics and their _complete_ replacements.
+  generics *ast_generics;
+  repls *idy_repls;
+  def_informal_name sym;
+};
+
+struct var_number { x size; };
+
+def `~` fn[size, var_number] = wrapconvert;
+def `==` fn[var_number, var_number, bool] = wrapequate;
+func `!=`(x var_number, y var_number) bool { return !(x == y); }
+func `<`(x var_number, y var_number) bool {
+  return x.x < y.x;
+}
+
+enum var_binding {
+  // The variable overlays some other object, in a switch/etc.  It's bound _to_ some object, or partt of one, and we can't auto-initialize it (and it doesn't get destructed on its own when it goes out of scope).
+  VarOverlay void;
+  // The variable's a self-contained object -- it gets destroyed or not, it can be autoinitialized.
+  VarSelfContained void;
+};
+
+struct var_info {
+  num var_number;
+  // A complete, checked, type, with generics replaced.
+  type cu_typeexpr;
+  props type_properties;
+  cell cell_num;
+  name opt[sym];
+  // TODO: Should this be a cu_typeexpr?  A te_lifetime?  Before, it was a cu_typeexpr, but that seemed freaky.
+  lifetime te_typeexpr;
+  // Can a goto statement enter this var's scope and construct the var?  True if the var is self-contained.  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)  This also means the var needs to be destructed by return statements and gotos that leave its scope.  NOTE: What about default cases of switch statements?  You shouldn't be able to goto into one of those?  But you should be able to goto into the else block of an "if case" -- this needs to be fixed?  Should the swartch get destroyed?  Are we treating the "destroy later" of the condition properly?
+  binding var_binding;
+  initter opt[ctor_desc];
+  destroyer opt[ctor_desc];
+};
+
+func ref_var(es *framescope, num var_number) *var_info {
+  return ref(&es->all_vars, num.x);
+}
+
+func vars_in_scope(es *framescope) array[var_number] {
+  return es->current_vars;
+}
+
+
+enum allow_incomplete {
+  AllowIncompleteNo void;
+  AllowIncompleteYes void;
+};
+
+func `==`(x allow_incomplete, y allow_incomplete) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+
+defclass move varpopper {
+  es *framescope;
+  nums array[var_number];
+};
+
+access varpopper {
+
+func do_init(vp *varpopper) void {
+  init(&vp->es);
+  init(&vp->nums);
+}
+
+func init_vp(vp *varpopper, es *framescope) void {
+  check(vp->es == null);
+  vp->es = es;
+}
+
+func do_destroy(vp *varpopper) void {
+  if vp->es != null {
+    descope_vars(vp);
+  }
+  destroy(&vp->nums);
+  vp->es = null;
+}
+
+func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], lifetime te_typeexpr, computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) np {
+  osymname opt[sym];
+  if case Has(ident *ast_ident) = name {
+    osymname = Has(ident->value);
+    if case Has(num var_number) = es_find_current_local(es, ident->value) {
+      return ERR(_u8("Local variable '"), lookup(es->im, ident->value), _u8("' shadows another"));
+    }
+  } else {
+    osymname = None;
+  }
+  props type_properties;
+  if case Printed(pm) = compute_type_properties(es->clq, computed_type, &props) {
+    return Printed(pm);
+  }
+  num var_number = ~count(&es->all_vars);
+  push(&es->all_vars, {num, *computed_type, props, cell, osymname, lifetime, binding, None, None});
+  push(&es->current_vars, num);
+  push(&vp->nums, num);
+  *vn_out = num;
+  return NoFail;
+}
+
+func descope_vars(vp *varpopper) void {
+  es *framescope = vp->es;
+  check(es != null);
+  while case Has(expected var_number) = popval(&vp->nums) {
+    num var_number;
+    if !popval(&es->current_vars, &num) {
+      ice(_u8("varpopper sees empty local_vars"));
+    }
+    if num != expected {
+      ice(_u8("varpopper sees mismatch"));
+    }
+  }
+}
+
+func read_nums(vp *varpopper) *array[var_number] {
+  return &vp->nums;
+}
+
+}  // access varpopper
+
+func es_note_var_initter(es *framescope, vn var_number) np {
+  info *var_info = ref_var(es, vn);
+  if case &Has(desc ctor_desc) = &info->initter {
+    return NoFail;
+  }
+  desc ctor_desc;
+  if case Printed(pm) = get_init_ctor(es->ds, &info->type, &desc) {
+    return Printed(pm);
+  }
+  info->initter = Has(desc);
+  return NoFail;
+}
+
+func es_note_var_destroyer(es *framescope, vn var_number) np {
+  info *var_info = ref_var(es, vn);
+  if case &Has(desc ctor_desc) = &info->destroyer {
+    return NoFail;
+  }
+  desc ctor_desc;
+  if case Printed(pm) = get_destroy_ctor(es->ds, &info->type, &desc) {
+    return Printed(pm);
+  }
+  info->destroyer = Has(desc);
+  return NoFail;
+}
+
+func check_expr(clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *idy_repls, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
+  ds defscope = {clq->cs, clq->im, clq, accessible, g, parms, def_informal_name};
+  es framescope = mk(&ds);
+  if case Printed(pm) = check_expr_consume(&es, x, pt, NoDemand) {
+    return Printed(pm);
+  }
+  *frame_info_out = {Has(move(&es.gr))};
+  return NoFail;
+}
+
+func check_expr_consume(es *framescope, x *ast_expr_consume, pt *te_typeexpr, demand rval_celldemand) np {
+  // If you change this, see also check_expr_retconsume.
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, &x->expr, pt, demand) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = annotate_disposal_for_consume(es, &x->expr, demand, &x->after) {
+    return Printed(pm);
+  }
+  return NoFail;
+}
+
+func check_expr_retconsume(es *framescope, x *ast_expr_consume, return_type *cu_typeexpr, return_cell rval_cellnum, movable_cells *shray[opt[cell_num]], moved_cell_ix_out *opt[size]) np {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, &x->expr, &return_type->x, DemandCell(return_cell)) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = annotate_disposal_for_consume(es, &x->expr, DemandCell(return_cell), movable_cells, &x->after, moved_cell_ix_out) {
+    return Printed(pm);
+  }
+  return NoFail;
+}
+
+func replaced_name_parms(ds *defscope, a *ast_name_expr, out *genparms) np {
+  if case &Has(arr array[ast_typeexpr]) = &a->generic_params {
+    replaced array[te_typeexpr];
+    n size = count(&arr);
+    for i size = 0; i < n; i = i + 1 {
+      converted te_typeexpr;
+      if case Printed(pm) = convert_typeexpr(ds->cs, ref(&arr, i), &converted) {
+        return Printed(pm);
+      }
+      computed cac_typeexpr;
+      if case Printed(pm) = check_and_compute_typeexpr(ds->clq, ds->generics, ds->repls, &converted, &computed) {
+        return Printed(pm);
+      }
+      push(&replaced, computed.te);
+    }
+    *out = HasParms(freeze(&replaced));
+    return NoFail;
+  } else {
+    *out = NoParms(void);
+    return NoFail;
+  }
+}
+
+struct constructor_info {
+  // A fn type.
+  type cu_typeexpr;
+  constructor_tag enum_tag_value;
+  ip instpair;
+};
+
+struct voidconstructed_info {
+  // The actual constructed type, which we need for some reason.
+  constructed_type cu_typeexpr;
+  // The enum type (the structural rhs of constructed_type).
+  et enumspec;
+  constructor_tag enum_tag_value;
+};
+
+enum ds_constructor_res {
+  NoMatchConstructor void;
+  AmbigMatchConstructor void;
+  MatchedConstructor constructor_info;
+  MatchedVoidConstructed voidconstructed_info;
+};
+
+// Like any pt, pt is either (a) incomplete, or (b) complete and computed.
+func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_out *ds_constructor_res) np {
+  if case &HasParms(a) = gp {
+    *res_out = NoMatchConstructor(void);
+    return NoFail;
+  }
+  arg_type *te_typeexpr;
+  return_type *te_typeexpr;
+  trans_type *te_typeexpr;
+  if !decompose_typeapp(pt, primitive_function_puretype(ds->cs), &arg_type, &return_type, &trans_type) {
+    switch pt {
+    case &TeName(te te_name): { }
+    case &TeApp(te te_typeapp): { }
+    case &TeLifetime(te te_lifetime):
+      ice(_u8("ds_lookup_constructor TeLifetime"));
+    case &TeTrans(te te_trans):
+      ice(_u8("ds_lookup_constructor TeTrans"));
+    case &TeUnknown:
+      *res_out = AmbigMatchConstructor(void);
+      return NoFail;
+    default:
+      *res_out = NoMatchConstructor(void);
+      return NoFail;
+    }
+    // TODO: Dedup some of the code from here on?
+    if !is_complete(pt) {
+      *res_out = AmbigMatchConstructor(void);
+      return NoFail;
+    }
+    et *enumspec;
+    switch structural_enum_type(ds, pt, &et) {
+    case Error(pm):
+      return Printed(pm);
+    case Success: { }
+    case NotAccessible:
+      *res_out = NoMatchConstructor;
+      return NoFail;
+    }
+
+    rhs_type *te_typeexpr;
+    decl_index size;
+    if !find_vardecl(&et->constructors, name, &rhs_type, &decl_index) {
+      *res_out = NoMatchConstructor(void);
+      return NoFail;
+    }
+    void_type te_typeexpr = primitive_void_type(ds->cs);
+    unified te_typeexpr;
+    if !unify_types(&void_type, rhs_type, &unified) {
+      *res_out = NoMatchConstructor(void);
+      return NoFail;
+    }
+    *res_out = MatchedVoidConstructed({~ *pt, *et, mk_enum_tag_value(decl_index)});
+    return NoFail;
+  }
+  cac_return_type cac_typeexpr;
+  if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->clq, return_type, &cac_return_type) {
+    return Printed(pm);
+  }
+  if !cac_return_type.complete {
+    *res_out = AmbigMatchConstructor(void);
+    return NoFail;
+  }
+  et *enumspec;
+  switch structural_enum_type(ds, &cac_return_type.te, &et) {
+  case Error(pm):
+    return Printed(pm);
+  case Success: { }
+  case NotAccessible:
+    *res_out = NoMatchConstructor;
+    return NoFail;
+  }
+  rhs_type *te_typeexpr;
+  decl_index size;
+  if !find_vardecl(&et->constructors, name, &rhs_type, &decl_index) {
+    *res_out = NoMatchConstructor(void);
+    return NoFail;
+  }
+  // rhs_type is complete.
+  unified te_typeexpr;
+  if !unify_types(arg_type, rhs_type, &unified) {
+    *res_out = NoMatchConstructor(void);
+    return NoFail;
+  }
+  // The enum constructor and enum rhs type _could_ have generic lifetimes in it.
+  // TODO(): This trans really is fake, what about generics in the rhs type, or return type.
+  ctor_type te_typeexpr = sfn_type(ds->cs, *rhs_type, cac_return_type.te, fake_trans());
+  cac_ctor_type cac_typeexpr;
+  if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->clq, &ctor_type, &cac_ctor_type) {
+    return Printed(pm);
+  }
+  check(cac_ctor_type.complete);
+
+  ip instpair;
+  if case Printed(pm) = lookup_or_make_enum_constructor_def(ds, et, &cac_return_type.te, &cac_ctor_type.te, decl_index, &ip) {
+    return Printed(pm);
+  }
+
+  *res_out = MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index), ip});
+  return NoFail;
+}
+
+// return_type is the return type of ctor_type.  Both are complete and computed.
+func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type *te_typeexpr, ctor_type *te_typeexpr, decl_index size, out *instpair) np {
+  defname_u8 array[u8] = _u8("$magic_enum_ctor_");
+  build_u8str(void, &defname_u8, &decl_index);
+  defname sym = intern(ds->im, from_u8(defname_u8));
+
+  nogp genparms = NoParms(void);
+  if true {
+    res match_def_res;
+    if case Printed(pm) = match_def(ds->cs, defname, &nogp, ctor_type, &res) {
+      return Printed(pm);
+    }
+    switch &res {
+      case &NoMatch: {
+        // Do nothing.
+      }
+      case &MultiMatch: {
+        ice(_u8("magic_enum_ctor lookup sees MultiMatch"));
+      }
+      case &OneMatch(m ent_and_parms): {
+        inst_id def_inst_id;
+        if !from_np(make_inst(ds->clq, m.ent, &m.parms, &inst_id)) {
+          ice(_u8("lookup_or_make_enum_constructor_def make_inst failed after match"));
+        }
+        *out = {m.ent, inst_id};
+        return NoFail;
+      }
+    }
+  }
+
+  // There was no match -- so we make the def ourselves.
+  rhs_type *te_typeexpr = &ref(&et->constructors, decl_index)->type;
+  rhs_props type_properties;
+  if case Printed(pm) = compute_complete_type_properties(ds->clq, rhs_type, &rhs_props) {
+    return Printed(pm);
+  }
+
+  meco magic_enum_construct_op;
+  switch &rhs_props.move_behavior {
+    case &DerivedMethodAbsent: {
+      copy_desc ctor_desc;
+      if case Printed(pm) = behavior_to_desc(&rhs_props.copy_behavior, &copy_desc) {
+        return Printed(pm);
+      }
+      destroy_desc ctor_desc;
+      if case Printed(pm) = behavior_to_desc(&rhs_props.destroy_behavior, &destroy_desc) {
+        return Printed(pm);
+      }
+      meco = EnumConstructCopyDestroy({copy_desc, destroy_desc});
+    }
+    case &DerivedMethodExplicit(ip instpair): {
+      meco = EnumConstructMove(FunCtor(ip));
+    }
+    case &DerivedMethodNontrivial(ip instpair): {
+      meco = EnumConstructMove(FunCtor(ip));
+    }
+    case &DerivedMethodTrivial: {
+      meco = EnumConstructMove(TrivialCtor(void));
+    }
+  }
+
+  return_type_props type_properties;
+  if case Printed(pm) = compute_complete_type_properties(ds->clq, return_type, &return_type_props) {
+    return Printed(pm);
+  }
+
+  mec magic_enum_construct = {*et, ~ *return_type, return_type_props, decl_index, rhs_props, meco};
+
+  ent def_entry_id = add_def_primitive(ds->cs, defname, NoGenerics(void), *ctor_type, @[def_definition]DefnMagic(MagicEnumConstruct(mec)));
+  inst_id def_inst_id;
+  if !from_np(make_inst(ds->clq, ent, &nogp, &inst_id)) {
+    ice(_u8("lookup_or_make_enum_constructor_def make_inst failed on fresh def"));
+  }
+
+  *out = {ent, inst_id};
+  return NoFail;
+}
+
+struct es_global_match {
+  ent_id def_entry_id;
+  inst_id def_inst_id;
+  parms genparms;
+};
+
+enum es_match_res {
+  NoMatch void;
+  AmbigGlobalMatch void;
+  OneGlobalMatch es_global_match;
+  OneLocalMatch local_info;
+  OneEnumConstructorMatch constructor_info;
+  EnumVoidConstructedMatch voidconstructed_info;
+};
+
+func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_match_res) np {
+  if case &NoParms(v void) = gp {
+    if case Has(num var_number) = es_find_current_local(es, name) {
+      type te_typeexpr;
+      vartype *cu_typeexpr = &ref_var(es, num)->type;
+      if !unify_types(pt, &vartype->x, &type) {
+        return ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"), to_u8str(es->im, *vartype), _u8("' where '"), to_u8str(es->im, *pt), _u8("' expected"));
+      }
+      *res_out = OneLocalMatch({num});
+      return NoFail;
+    }
+  }
+
+  res match_def_res;
+  if case Printed(pm) = match_def(es->cs, name, gp, pt, &res) {
+    return Printed(pm);
+  }
+
+  switch &res {
+    case &NoMatch: {
+      constructor_res ds_constructor_res;
+      if case Printed(pm) = ds_lookup_constructor(es->ds, name, gp, pt, &constructor_res) {
+        return Printed(pm);
+      }
+      switch &constructor_res {
+      case &NoMatchConstructor:
+        *res_out = NoMatch(void);
+      case &AmbigMatchConstructor:
+        *res_out = AmbigGlobalMatch(void);
+      case &MatchedConstructor(inf constructor_info):
+        *res_out = OneEnumConstructorMatch(inf);
+      case &MatchedVoidConstructed(inf voidconstructed_info):
+        *res_out = EnumVoidConstructedMatch(inf);
+      }
+      return NoFail;
+    }
+    case &MultiMatch: {
+      *res_out = AmbigGlobalMatch(void);
+      return NoFail;
+    }
+    case &OneMatch(m ent_and_parms): {
+      inst_id def_inst_id;
+      if case Printed(pm) = make_inst(es->clq, m.ent, &m.parms, &inst_id) {
+        return Printed(pm);
+      }
+      *res_out = OneGlobalMatch({m.ent, inst_id, m.parms});
+      return NoFail;
+    }
+  }
+}
+
+func es_find_current_local(es *framescope, name sym) opt[var_number] {
+  n size = count(&es->current_vars);
+  for i size = 0; i < n; i = i + 1 {
+    num var_number = get(&es->current_vars, i);
+    inf *var_info = ref_var(es, num);
+    if case Has(s sym) = inf->name {
+      if s == name {
+        return Has(num);
+      }
+    }
+  }
+  return None;
+}
+
+func help_check_simple_literal(es *framescope, pt *te_typeexpr, demand rval_celldemand, type te_typeexpr, errmsg_name array[u8], x *ast_expr) np {
+  unified te_typeexpr;
+  if !unify_types(pt, &type, &unified) {
+    return ERR(errmsg_name, _u8(" literal in bad place"));
+  }
+  if is_complete(&unified) {
+    c cac_typeexpr;
+    if !from_np(noscoped_check_and_compute_typeexpr(es->clq, &unified, &c)) {
+      ice(_u8("help_check_simple_literal passed bad type"));
+    }
+    check(c.complete);
+    props type_properties;
+    if !from_np(compute_complete_type_properties(es->clq, &c.te, &props)) {
+      ice(_u8("help_check_simple_literal passed type with bad properties"));
+    }
+
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, ~c.te, props)), ~c.te, props)));
+  } else {
+    annotate_info(x, @[ast_expr_info]IncompleteCheck(type));
+  }
+  return NoFail;
+}
+
+// pt is either (a) incomplete, or (b) complete and computed.
+func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr, demand rval_celldemand) np {
+  if case &CompleteCheck(t ast_expr_complete_info) = &x->info {
+    return NoFail;
+  }
+
+  if case Printed(printed_meta bool) = help_check_expr_ai(es, ai, x, pt, demand) {
+    if !printed_meta {
+      // TODO: Get rid of this terrible hackish way to error message.
+      return MERR(es->cs, x->meta, _u8(" in this expression"));
+    } else {
+      return Printed(printed_meta);
+    }
+  }
+
+  return NoFail;
+}
+
+func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr, demand rval_celldemand) np {
+  switch &x->u {
+    case &NameExpr(a ast_name_expr):
+      return check_expr_name(es, ai, &a, pt, demand, x);
+
+    case &ParenExpr(a ast_paren_expr):
+      if case Printed(pm) = check_expr_ai(es, ai, oo(&a.expr), pt, demand) {
+        return Printed(pm);
+      }
+      annotate_info(x, oo(&a.expr)->info);
+      return NoFail;
+
+    case &NumericLiteral(a ast_numeric_literal):
+      return check_numeric_literal(es, ai, pt, demand, numeric_literal_value(&a), x);
+
+    case &BoolLiteral(a ast_bool_literal):
+      return help_check_simple_literal(es, pt, demand, primitive_bool_type(es->cs), _u8("bool"), x);
+
+    case &VoidLiteral(a ast_void_literal):
+      return help_check_simple_literal(es, pt, demand, primitive_void_type(es->cs), _u8("void"), x);
+
+    case &NullLiteral(a ast_null_literal):
+      return help_check_simple_literal(es, pt, demand, ptr_type(es->cs, TeUnknown(void)), _u8("null"), x);
+
+    case &CharLiteral(a ast_char_literal):
+      return check_numeric_literal(es, ai, pt, demand, ~a.charspec.value, x);
+
+    case &StringLiteral(a ast_string_literal):
+      return check_expr_string_literal(es, &a, pt, demand, x);
+
+    case &Funcall(a ast_funcall):
+      return check_expr_funcall(es, ai, &a, pt, demand, x);
+
+    case &LogicalConjunction(a ast_logical_conjunction):
+      return check_expr_logical_conjunction(es, &a, pt, demand, x);
+
+    case &Assignment(a ast_assignment):
+      return check_expr_assignment(es, &a, pt, demand, x);
+
+    case &RefOf(a ast_refof):
+      return check_expr_refof(es, &a, pt, demand, x);
+
+    case &AddressOf(a ast_addressof):
+      return check_expr_addressof(es, &a, pt, demand, x);
+
+    case &Deref(a ast_deref):
+      return check_expr_deref(es, &a, pt, demand, x);
+
+    case &IndexExpr(a ast_index_expr):
+      return check_expr_index(es, &a, pt, demand, x);
+
+    case &Lambda(a ast_lambda):
+      return check_expr_lambda(es, &a, pt, demand, x);
+
+    case &LocalField(a ast_local_field):
+      return check_expr_local_field(es, &a, pt, demand, x);
+
+    case &DerefField(a ast_deref_field):
+      return check_expr_deref_field(es, &a, pt, demand, x);
+
+    case &TypedExpr(a ast_typed_expr):
+      return check_expr_typed_expr(es, ai, &a, pt, demand, x);
+
+    case &Strinit(a ast_strinit):
+      return check_expr_strinit(es, ai, &a, pt, demand, x);
+
+    case &Ternary(a ast_ternary):
+      return check_expr_ternary(es, ai, &a, pt, demand, x);
+  }
+}
+
+func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  ref_skeleton te_typeexpr = mk_ref_type(es->cs, TeUnknown, TeUnknown);
+  unif_pt te_typeexpr;
+  if !unify_types(pt, &ref_skeleton, &unif_pt) {
+    return ERR(_u8("RefOf expr in non-ref context"));
+  }
+
+  pt_lifetime *te_typeexpr;
+  pt_param *te_typeexpr;
+  if !decompose_ref(&unif_pt, es->cs, &pt_lifetime, &pt_param) {
+    ice(_u8("RefOf sees non-ref after unifying with ref."));
+  }
+
+  // We require complete matching because addressof requires it.  Addressof says meh, the rhs should be some crystal clear lvalue anyway.
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), pt_param, NoDemand) {
+    return Printed(pm);
+  }
+
+  rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
+  switch &rhs_info->lval {
+  case &IsLvalNo(desc rval_description):
+    // TODO: Support taking reference of an rvalue -- have it become a temporary that expires... when it can.
+    return ERR(_u8("Taking reference of a non-lvalue"));
+  case &IsLvalYes(desc lval_description):
+    unified_lifetime te_typeexpr;
+    if !unify_types(pt_lifetime, &desc.lifetime, &unified_lifetime) {
+      return ERR(_u8("Refof lifetime types do not match."));
+    }
+
+    ref_type te_typeexpr = mk_ref_type(es->cs, unified_lifetime, rhs_info->cu.x);
+    ref_computed cac_typeexpr;
+    if case Printed(pm) = noscoped_check_and_compute_typeexpr(es->clq, &ref_type, &ref_computed) {
+      return Printed(pm);
+    }
+    // (TODO: Make lval desc.lifetime be a te_lifetime, so it can't be incomplete?)
+    if !ref_computed.complete {
+      return ERR(_u8("ICE?  lval desc.lifetime must have been incomplete (after complete type-check)."));
+    }
+
+    ref_props type_properties;
+    if case Printed(pm) = compute_complete_type_properties(es->clq, &ref_computed.te, &ref_props) {
+      return Printed(pm);
+    }
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, ~ref_computed.te, ref_props)), ~ref_computed.te, ref_props)));
+    return NoFail;
+  }
+}
+
+func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  cond_rc rval_cellnum = {add_none_cell(es), unnamed_lifetime(es)};
+  boolean cu_typeexpr = compute_prim(es->clq, primitive_bool_type(es->cs));
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&oo(&a->condition)->expr), &boolean.x, cond_rc, &oo(&a->condition)->discard) {
+    return Printed(pm);
+  }
+
+  conjoined rval_cellnum;
+  switch demand {
+  case NoDemand:
+    conjoined = {add_none_cell(es), unnamed_lifetime(es)};
+  case DemandCell(rc rval_cellnum):
+    conjoined = {rc.cell, rc.lifetime};
+  }
+  subdemand rval_celldemand = DemandCell(conjoined);
+
+  if case Printed(pm) = check_expr_consume(es, oo(&a->then_clause), pt, subdemand) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = check_expr_consume(es, oo(&a->else_clause), pt, subdemand) {
+    return Printed(pm);
+  }
+
+  unified te_typeexpr;
+  if !unify_types(&expr_complete_type(&oo(&a->then_clause)->expr)->x, &expr_complete_type(&oo(&a->else_clause)->expr)->x, &unified) {
+    return ERR(_u8("then and else clause of ternary operator have different types"));
+  }
+
+  annotate(&a->info, {conjoined.cell});
+  conj *cell_info = ref_cell(es, conjoined.cell);
+  annotate_info(x, @[ast_expr_info]CompleteCheck({IsLvalNo({conjoined.cell, conjoined.lifetime, conjoined.cell, conjoined.lifetime}), conj->type, conj->props}));
+  return NoFail;
+}
+
+func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_expr, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  // TODO: Cache converted.
+  converted te_typeexpr;
+  if case Printed(pm) = convert_typeexpr(es->cs, &a->type, &converted) {
+    return Printed(pm);
+  }
+  // We call check_and_compute_typeexpr to disallow totally bogus typeexprs more directly than the eventual type error that would happen.
+  computed cac_typeexpr;
+  if case Printed(pm) = check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &computed) {
+    return Printed(pm);
+  }
+  unified te_typeexpr;
+  if !unify_types(pt, &computed.te, &unified) {
+    return ERR(_u8("TypedExpr is incompatible with contextual type."));
+  }
+  unified_computed cac_typeexpr;
+  if computed.complete {
+    unified_computed = computed;
+  } else {
+    if !from_np(noscoped_check_and_compute_typeexpr(es->clq, &unified, &unified_computed)) {
+      return ERR(_u8("TypedExpr encounters un-computable unified type."));
+    }
+  }
+  if case Printed(pm) = check_expr_ai(es, ai, oo(&a->expr), &unified_computed.te, demand) {
+    return Printed(pm);
+  }
+  annotate_info(x, oo(&a->expr)->info);
+  return NoFail;
+}
+
+func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  // The fact that our partial type isn't a pointer type is deliberate.
+  pointer_rc rval_cellnum = {add_none_cell(es), unnamed_lifetime(es)};
+  unknown te_typeexpr = TeUnknown(void);
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->lhs), &unknown, pointer_rc, &a->ptr_discard) {
+    return Printed(pm);
+  }
+  info *ast_expr_complete_info = expr_complete_info(&oo(&a->lhs)->expr);
+  lifetime te_typeexpr;
+  param *te_typeexpr;
+  if !decompose_ref_or_ptr(&info->cu.x, es->cs, &lifetime, &param) {
+    return ERR(_u8("Expected pointer for lhs of deref field"));
+  }
+  cu_param cu_typeexpr = ~ *param;
+  fieldtype cu_typeexpr;
+  cf_res check_field_result;
+  if case Printed(pm) = check_field(es, &cu_param, &a->fieldname, pt, &fieldtype, &cf_res) {
+    return Printed(pm);
+  }
+  props type_properties;
+  if case Printed(pm) = compute_type_properties(es->clq, &fieldtype, &props) {
+    return Printed(pm);
+  }
+  lval is_lval;
+  switch cf_res {
+    case InheritsLval(offset u32): {
+      // We deref, so it's always an lval.
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void), field_lifetime(es->cs, lifetime)});
+      annotate(&a->info, DerefFieldName(offset));
+    }
+    case ConstantField(value u32): {
+      lval = wholeRval(add_rval_cell(es, demand, fieldtype, props));
+      annotate(&a->info, DerefArrayLength(value));
+    }
+  }
+  annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
+  return NoFail;
+}
+
+// Right now fields have the same lifetime as what they're part of -- they're part of the same object!  So, having equal lifetimes does not mean you're the same object.
+func field_lifetime(cs *checkstate, outer_lifetime te_typeexpr) te_typeexpr {
+  // TODO: We shouldn't return the fake lifetime.
+  return fake_lifetime(cs);
+}
+
+// Varnames aren't supposed to shadow, so... we have user-friendly lifetime names.  (Note that vars could shadow generic lifetime parameters, for now, so we add the $var_ prefix.)
+func varname_lifetime(im *identmap, name sym) te_typeexpr {
+  n sym = intern(im, _s("$var_") + lookup(im, name));
+  return TeLifetime({n});
+}
+
+func unnamed_lifetime(es *framescope) te_typeexpr {
+  n sym = intern(es->im, _s("$frame_") + from_u8(to_u8str(void, es->lifetime_gen_counter)));
+  es->lifetime_gen_counter = es->lifetime_gen_counter + 1;
+  return TeLifetime({n});
+}
+
+func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  unknown te_typeexpr = TeUnknown(void);
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, oo(&a->lhs), &unknown, NoDemand) {
+    return Printed(pm);
+  }
+  info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
+  fieldtype cu_typeexpr;
+  cf_res check_field_result;
+  if case Printed(pm) = check_field(es, &info->cu, &a->fieldname, pt, &fieldtype, &cf_res) {
+    return Printed(pm);
+  }
+  props type_properties;
+  if case Printed(pm) = compute_type_properties(es->clq, &fieldtype, &props) {
+    return Printed(pm);
+  }
+  lval is_lval;
+  switch cf_res {
+    case InheritsLval(offset u32): {
+      switch &info->lval {
+        case &IsLvalYes(desc lval_description): {
+          lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe(void), field_lifetime(es->cs, desc.lifetime)});
+        }
+        case &IsLvalNo(desc rval_description): {
+          lval = IsLvalNo({desc.whole_num, desc.whole_lifetime, add_cell(es, {LocationVirtual, fieldtype, props}), field_lifetime(es->cs, desc.whole_lifetime)});
+        }
+      }
+      // There's no disposal, it's a real field access.
+      annotate(&a->info, FieldName(offset));
+    }
+    case ConstantField(value u32): {
+      after nc[ast_expr_after_discard] = NotComputed();
+      if case Printed(pm) = annotate_disposal_for_discard(es, oo(&a->lhs), &after) {
+        return Printed(pm);
+      }
+      annotate(&a->info, @[ast_local_field_info]ArrayLength({*unHas(&after), value}));
+      lval = wholeRval(add_rval_cell(es, demand, fieldtype, props));
+    }
+  }
+  annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
+  return NoFail;
+}
+
+func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  ptr_rc rval_cellnum = {add_none_cell(es), unnamed_lifetime(es)};
+  ptr_pt te_typeexpr = TeUnknown;
+  // Let's force the rhs to be a complete type.  Because why not!
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->rhs), &ptr_pt, ptr_rc, &a->ptr_discard) {
+    return Printed(pm);
+  }
+  rhs_type *cu_typeexpr = expr_complete_type(&oo(&a->rhs)->expr);
+  lifetime te_typeexpr;
+  param *te_typeexpr;
+  if decompose_ref_or_ptr(&rhs_type->x, es->cs, &lifetime, &param) {
+    // param is already complete.
+    unified_discard te_typeexpr;
+    if !unify_types(pt, param, &unified_discard) {
+      return ERR(_u8("Pointer dereferences into wrong type."));
+    }
+
+    props type_properties;
+    if case Printed(pm) = compute_complete_type_properties(es->clq, param, &props) {
+      return Printed(pm);
+    }
+    annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}), DeadMe(void), lifetime}), ~ *param, props)));
+    return NoFail;
+  }
+  return ERR(_u8("Trying to deref a non-pointer, non-reference."));
+}
+
+func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  ptr_skeleton te_typeexpr = ptr_type(es->cs, TeUnknown);
+  unif_pt te_typeexpr;
+  if !unify_types(pt, &ptr_skeleton, &unif_pt) {
+    return ERR(_u8("AddressOf expr in non-pointer context"));
+  }
+  param *te_typeexpr;
+  if !decompose_typeapp(&unif_pt, primitive_pointer_puretype(es->cs), &param) {
+    ice(_u8("AddressOf sees non-pointer after unifying with pointer."));
+  }
+  // We require complete matching, because, meh, the rhs should be some crystal clear lvalue anyway.
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), param, NoDemand) {
+    return Printed(pm);
+  }
+  rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
+  if case &IsLvalNo(desc rval_description) = &rhs_info->lval {
+    // TODO: Support taking address of an rvalue -- have it become a temporary that expires at the end of the full expression.
+    return ERR(_u8("Taking address of a non-lvalue"));
+  }
+
+  ptr_type te_typeexpr = ptr_type(es->cs, rhs_info->cu.x);
+  ptr_computed cac_typeexpr;
+  if case Printed(pm) = noscoped_check_and_compute_typeexpr(es->clq, &ptr_type, &ptr_computed) {
+    return Printed(pm);
+  }
+  check(ptr_computed.complete);
+  ptr_props type_properties;
+  if case Printed(pm) = compute_complete_type_properties(es->clq, &ptr_computed.te, &ptr_props) {
+    return Printed(pm);
+  }
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, ~ptr_computed.te, ptr_props)), ~ptr_computed.te, ptr_props)));
+  return NoFail;
+}
+
+func check_expr_assignment(es *framescope, a *ast_assignment, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  // We check the lhs independently of the rhs, deliberately, to ensure clarity.
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, oo(&a->lhs), pt, NoDemand) {
+    return Printed(pm);
+  }
+  lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
+  switch &lhs_info->lval {
+    case &IsLvalNo(desc rval_description): {
+      return ERR(_u8("Assigning to non-lvalue"));
+    }
+    case &IsLvalYes(desc lval_description): {
+      if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), &lhs_info->cu.x, NoDemand) {
+        return Printed(pm);
+      }
+      if case Printed(pm) = annotate_disposal_for_assignment(es, desc.num, oo(&a->rhs), a) {
+        return Printed(pm);
+      }
+      annotate_info(x, CompleteCheck(mk(lhs_info->lval, lhs_info->cu, lhs_info->cu_props)));
+      return NoFail;
+    }
+  }
+}
+
+func behavior_to_desc(b *derived_method_behavior, out *ctor_desc) np {
+  switch b {
+    case &DerivedMethodAbsent: {
+      return ERR(_u8("Cannot find derived method."));
+    }
+    case &DerivedMethodExplicit(ip instpair): {
+      *out = FunCtor(ip);
+      return NoFail;
+    }
+    case &DerivedMethodNontrivial(ip instpair): {
+      *out = FunCtor(ip);
+      return NoFail;
+    }
+    case &DerivedMethodTrivial: {
+      *out = TrivialCtor(void);
+      return NoFail;
+    }
+  }
+}
+
+func computed_ptr_type(clq *clqueue, t *cu_typeexpr) cu_typrop {
+  return compute_prim(clq, ptr_type(clq->cs, t->x));
+}
+
+func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
+  props type_properties;
+  if case Printed(pm) = compute_type_properties(ds->clq, t, &props) {
+    return Printed(pm);
+  }
+  return behavior_to_desc(&props.init_behavior, out);
+}
+
+func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
+  props type_properties;
+  if case Printed(pm) = compute_type_properties(ds->clq, t, &props) {
+    return Printed(pm);
+  }
+  return behavior_to_desc(&props.copy_behavior, out);
+}
+
+func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
+  props type_properties;
+  if case Printed(pm) = compute_type_properties(ds->clq, t, &props) {
+    return Printed(pm);
+  }
+  return behavior_to_desc(&props.move_behavior, out);
+}
+
+func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
+  props type_properties;
+  if case Printed(pm) = compute_type_properties(ds->clq, t, &props) {
+    return Printed(pm);
+  }
+  return behavior_to_desc(&props.destroy_behavior, out);
+}
+
+func annotate_disposal_for_consume(es *framescope, a *ast_expr, demand rval_celldemand, after *nc[ast_expr_after_consume]) np {
+  movable_cells shray[opt[cell_num]];
+  moved_cell_ix_discard opt[size];
+  return annotate_disposal_for_consume(es, a, demand, &movable_cells, after, &moved_cell_ix_discard);
+}
+
+// Annotates the disposal to "consume" the value -- i.e. what happens if it's a function param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or whatever).
+func annotate_disposal_for_consume(es *framescope, a *ast_expr, demand rval_celldemand, movable_cells *shray[opt[cell_num]], after *nc[ast_expr_after_consume], moved_cell_ix_out *opt[size]) np {
+  info *ast_expr_complete_info = expr_complete_info(a);
+  switch &info->lval {
+    case &IsLvalNo(desc rval_description): {
+      if whole_temporary(&desc) {
+        annotate(after, mk_after(@[consume_actions]ConsumeByInPlace(void), desc.whole_num));
+      } else {
+        copy ctor_desc;
+        if case Printed(pm) = get_copy_ctor(es->ds, &info->cu, &copy) {
+          return Printed(pm);
+        }
+        destroy ctor_desc;
+        if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
+          return Printed(pm);
+        }
+        dest rval_cellnum = add_rval_cell(es, demand, info->cu, info->cu_props);
+        annotate(after,
+          mk_after(@[consume_actions]ConsumeByCopyDestroy({+{copy, dest.cell, desc.partial_num},
+                                                           +{destroy, desc.whole_num}}),
+                   dest.cell));
+      }
+      *moved_cell_ix_out = None;
+    }
+    case &IsLvalYes(desc lval_description): {
+      dest rval_cellnum = add_rval_cell(es, demand, info->cu, info->cu_props);
+      if case Has(ix size) = find(movable_cells, Has(desc.num)) {
+        move ctor_desc;
+        if case Printed(pm) = get_move_ctor(es->ds, &info->cu, &move) {
+          return Printed(pm);
+        }
+        annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]+{move, dest.cell, desc.num}), dest.cell));
+        *moved_cell_ix_out = Has(ix);
+      } else {
+        copy ctor_desc;
+        if case Printed(pm) = get_copy_ctor(es->ds, &info->cu, &copy) {
+          return Printed(pm);
+        }
+        annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]+{copy, dest.cell, desc.num}, desc.deadme)), dest.cell));
+        *moved_cell_ix_out = None;
+      }
+    }
+  }
+  return NoFail;
+}
+
+// Annotates the disposal of an Expr statement's expr, or some other value we are done using.
+func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_discard]) np {
+  info *ast_expr_complete_info = expr_complete_info(a);
+  switch &info->lval {
+    case &IsLvalNo(desc rval_description): {
+      destroy ctor_desc;
+      if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
+        return Printed(pm);
+      }
+      annotate(after, mk_after_discard(@[destroy_action]+{destroy, desc.whole_num}));
+    }
+    case &IsLvalYes(desc lval_description): {
+      if case DeadMe(v void) = desc.deadme {
+        // This could ostensibly be Has(desc.num), but there's no reason to be inconsistent with the rvalue case.
+        annotate(after, mk_virtualdead_discard(desc.num));
+      } else {
+        annotate(after, mk_nothing_discard());
+      }
+    }
+  }
+  return NoFail;
+}
+
+// Annotates the disposal for a value we'll use but then discard.
+func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, demand rval_celldemand, after *nc[ast_expr_after_consume], later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) np {
+  if case Printed(pm) = annotate_disposal_for_consume(es, a, demand, after) {
+    return Printed(pm);
+  }
+
+  // TODO: Dedup this code or stop generating all cells at check-time.
+  if true {
+    info *ast_expr_complete_info = expr_complete_info(a);
+    destroy ctor_desc;
+    if case Printed(pm) = get_destroy_ctor(es->ds, &info->cu, &destroy) {
+      return Printed(pm);
+    }
+    annotate(&later->action, @[destroy_action]+{destroy, result_cell(unHas(after))});
+  }
+
+  if case Has(p *ast_later_discard_info) = later2 {
+    info *ast_expr_complete_info = expr_complete_info(a);
+    destroy ctor_desc;
+    if case Printed(pm) = get_destroy_ctor(es->ds, &info->cu, &destroy) {
+      return Printed(pm);
+    }
+    annotate(&p->action, @[destroy_action]+{destroy, result_cell(unHas(after))});
+  }
+  return NoFail;
+}
+
+func make_comparecells(es *framescope, dest cell_num) instpair {
+  if case Has(ent def_entry_id) = es->cs->prims.ptr_eq {
+    lifetime_names array[sym];
+    canonical te_typeexpr;
+    canonicalize_idy_lifetimes(es->im, &lifetime_names, &ref_cell(es, dest)->type.x, &canonical);
+    parms idy_genparms = {count(&lifetime_names), {mk_shray(~canonical)}};
+    inst_id def_inst_id = enqueue_def_inst(es->clq, ent, &parms);
+    return {ent, inst_id};
+  } else {
+    ice(_u8("cs->prims.ptr_eq not initialized"));
+    return fake();
+  }
+}
+
+func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr, assignment *ast_assignment) np {
+  info *ast_expr_complete_info = expr_complete_info(a);
+  switch &info->lval {
+    case &IsLvalNo(desc rval_description): {
+      target_destroy ctor_desc;
+      if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
+        return Printed(pm);
+      }
+      if whole_temporary(&desc) {
+        move ctor_desc;
+        if case Printed(pm) = get_move_ctor(es->ds, &ref_cell(es, dest)->type, &move) {
+          return Printed(pm);
+        }
+        annotate(&assignment->info,
+          @[ast_assignment_info]
+          SimpleMoveAssignment({@[destroy_action]+{target_destroy, dest},
+                                @[move_action]+{move, dest, desc.whole_num}}));
+      } else {
+        // TODO: This dups code with other makers of DisposeCopyAndDestroy.
+        copy ctor_desc;
+        if case Printed(pm) = get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
+          return Printed(pm);
+        }
+        destroy ctor_desc;
+        if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
+          return Printed(pm);
+        }
+
+        annotate(&assignment->info,
+          @[ast_assignment_info]
+          SimpleCopyDestroyAssignment({@[destroy_action]+{target_destroy, dest},
+                                       @[copy_action]+{copy, dest, desc.partial_num},
+                                       @[destroy_action]+{destroy, desc.whole_num}}));
+      }
+    }
+    case &IsLvalYes(desc lval_description): {
+      if dest == desc.num {
+        // Static self-assignment!
+        annotate(&assignment->info, StaticSelfAssignment(void));
+      } else {
+        target_destroy ctor_desc;
+        if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
+          return Printed(pm);
+        }
+        copy ctor_desc;
+        if case Printed(pm) = get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
+          return Printed(pm);
+        }
+        do_conditional bool;
+        switch &target_destroy {
+        case &TrivialCtor:
+          switch &copy {
+          case &TrivialCtor:
+            do_conditional = false;
+          case &FunCtor(bfcd):
+            do_conditional = true;
+          }
+        case &FunCtor(ip instpair):
+          do_conditional = true;
+        }
+        if do_conditional {
+          annotate(&assignment->info,
+            @[ast_assignment_info]
+            ConditionalAssignment({make_comparecells(es, dest),
+                                   @[destroy_action]+{target_destroy, dest},
+                                   @[copy_action]+{copy, dest, desc.num},
+                                   desc.deadme}));
+        } else {
+          annotate(&assignment->info,
+            @[ast_assignment_info]
+            SimpleCopyAssignment({@[destroy_action]+{target_destroy, dest},
+                                  @[copy_action]+{copy, dest, desc.num},
+                                  desc.deadme}));
+        }
+      }
+    }
+  }
+  return NoFail;
+}
+
+func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  parms genparms;
+  if case Printed(pm) = replaced_name_parms(es->ds, a, &parms) {
+    return Printed(pm);
+  }
+  match_res es_match_res;
+  if case Printed(pm) = es_lookup_name(es, a->ident.value, &parms, pt, &match_res) {
+    return Printed(pm);
+  }
+  switch &match_res {
+    case &NoMatch: {
+      return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, matching type '"), pretty(es->im, pt), _u8("'"));
+    }
+    case &AmbigGlobalMatch: {
+      if ai == AllowIncompleteYes(void) {
+        // NOTE: We could annotate this more precisely in ambiguous-single-match cases.
+        annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
+        return NoFail;
+      } else {
+        return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), pretty(es->im, pt));
+      }
+    }
+    case &OneEnumConstructorMatch(ci constructor_info): {
+      annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip}));
+      props type_properties;
+      if case Printed(pm) = compute_type_properties(es->clq, &ci.type, &props) {
+        return Printed(pm);
+      }
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, ci.type, props)), ci.type, props)));
+      return NoFail;
+    }
+    case &EnumVoidConstructedMatch(vci voidconstructed_info): {
+      annotate(&a->name_info, @[ast_name_expr_info]EnumVoidConstructed({vci.constructor_tag, vci.et}));
+      props type_properties;
+      if case Printed(pm) = compute_type_properties(es->clq, &vci.constructed_type, &props) {
+        return Printed(pm);
+      }
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, vci.constructed_type, props)), vci.constructed_type, props)));
+      return NoFail;
+    }
+    case &OneGlobalMatch(egm es_global_match): {
+      ent *def_entry = ref_def_entry(es->cs, egm.ent_id);
+
+      // This parallels or plagairizes ensure_def_inst_type_computed.
+      // TODO: Dedup anything?
+      matched_parms idy_repls;
+      if case Printed(pm) = check_and_compute_parms_no_canonicalize(es->clq, &egm.parms, &matched_parms) {
+        return Printed(pm);
+      }
+
+      ent_typeexpr *te_typeexpr;
+      if case Printed(pm) = def_converted_typeexpr(es->cs, ent, &ent_typeexpr) {
+        return Printed(pm);
+      }
+
+      computed cac_typeexpr;
+      if case Printed(pm) = check_and_compute_typeexpr(es->clq, &ent->generics, &matched_parms, ent_typeexpr, &computed) {
+        return Printed(pm);
+      }
+
+      check(computed.complete);
+      cu_computed cu_typeexpr = ~computed.te;
+      props type_properties;
+      if case Printed(pm) = compute_type_properties(es->clq, &cu_computed, &props) {
+        return Printed(pm);
+      }
+
+      annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id}));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, cu_computed, props)), cu_computed, props)));
+      return NoFail;
+    }
+    case &OneLocalMatch(v local_info): {
+      annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({v.varnum}));
+      vi *var_info = ref_var(es, v.varnum);
+      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe(void), vi->lifetime}), vi->type, vi->props)));
+      return NoFail;
+    }
+  }
+}
+
+func check_expr_string_literal(es *framescope, a *ast_string_literal, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  type cu_typeexpr;
+  props type_properties;
+  compute_prim(es->clq, primitive_string_literal_type(es->cs, count(&a->charspecs)),
+               &type, &props);
+  unified te_typeexpr;
+  if !unify_types(pt, &type.x, &unified) {
+    return ERR(_u8("string literal in bad place"));
+  }
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, type, props)), type, props)));
+  return NoFail;
+}
+
+func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  if !is_complete(pt) {
+    if ai == AllowIncompleteYes(void) {
+      // NOTE: We could have more specific info, like number of fields and their incomplete types.
+      annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
+      return NoFail;
+    } else {
+      return ERR(_u8("Structure literal used ambiguously."));
+    }
+  }
+
+  // Since pt is complete, and since it's a pt, it's computed.
+  if !is_complete_computed(pt).computed {
+    ice(_u8("check_expr_strinit has non-computed pt"));
+  }
+
+  if case &TeArraytype(b te_arraytype) = pt {
+    n u32 = *unHas(&b.count);  // We checked is_complete(pt).
+    if n != ~count(&a->exprs) {
+      return MERR(es->cs, a->meta, _u8("Structure literal has wrong number of fields."));
+    }
+
+    param_cu cu_typeexpr = ~ *oo(&b.param);
+
+    // We checked is_computed(pt)
+    param_props type_properties;
+    if case Printed(pm) = compute_type_properties(es->clq, &param_cu, &param_props) {
+      return Printed(pm);
+    }
+
+    // We checked is_computed(pt).
+    props type_properties;
+    if case Printed(pm) = compute_complete_type_properties(es->clq, pt, &props) {
+      return Printed(pm);
+    }
+
+    array_rc rval_cellnum = add_rval_cell(es, demand, ~ *pt, props);
+
+    for i u32 = 0; i < n; i = i + 1 {
+      x_i *ast_expr_consume = &ref(&a->exprs, ~i)->ec;
+      elem_cell cell_num = add_cell(es, {LocationVirtual, param_cu, param_props});
+      if case Printed(pm) = check_expr_consume(es, x_i, oo(&b.param), @[rval_celldemand]DemandCell({elem_cell, field_lifetime(es->cs, array_rc.lifetime)})) {
+        return Printed(pm);
+      }
+    }
+
+
+    for i u32 = 0; i < n; i = i + 1 {
+      p_i *ast_strinit_param = ref(&a->exprs, ~i);
+      annotate(&p_i->info, {i * param_props.flat_size});
+    }
+    annotate_info(x, CompleteCheck(mk(wholeRval(array_rc), ~ *pt, props)));
+    return NoFail;
+  } else {
+    b *structspec;
+    switch structural_struct_type(es->ds, pt, &b) {
+    case Error(pm):
+      return Printed(pm);
+    case Success: { }
+    case NotAccessible:
+      return MERR(es->cs, a->meta, _u8("Strinit for inaccessible or non-structural type, "), pretty(es->im, pt));
+    }
+
+    // We checked is_computed(pt).
+    props type_properties;
+    if case Printed(pm) = compute_complete_type_properties(es->clq, pt, &props) {
+      return Printed(pm);
+    }
+
+    struct_rc rval_cellnum = add_rval_cell(es, demand, ~ *pt, props);
+
+    n size = count(&b->fields);
+    if n != count(&a->exprs) {
+      return MERR(es->cs, a->meta, _u8("Structure literal has wrong number of fields."));
+    }
+
+    offsets array[u32];
+    for i size = 0; i < n; i = i + 1 {
+      x_i *ast_expr_consume = &ref(&a->exprs, i)->ec;
+      field *te_vardecl = ref(&b->fields, i);
+      // We checked is_computed(pt).
+      field_cu cu_typeexpr = ~field->type;
+      field_props type_properties;
+      if case Printed(pm) = compute_type_properties(es->clq, &field_cu, &field_props) {
+        return Printed(pm);
+      }
+      field_cell cell_num = add_cell(es, {LocationVirtual, field_cu, field_props});
+
+      if case Printed(pm) = check_expr_consume(es, x_i, &field->type, @[rval_celldemand]DemandCell({field_cell, field_lifetime(es->cs, struct_rc.lifetime)})) {
+        return Printed(pm);
+      }
+      psd partial_struct_data;
+      if case Printed(pm) = compute_partial_struct_data(es->clq, &b->fields, Has(field->name), &psd) {
+        return Printed(pm);
+      }
+      check(psd.found_field);
+      // TODO: This way of building offsets is so bad.  Just call compute_psd once.
+      push(&offsets, psd.offset);
+    }
+
+    for i size = 0; i < n; i = i + 1 {
+      p_i *ast_strinit_param = ref(&a->exprs, i);
+      annotate(&p_i->info, {get(&offsets, i)});
+    }
+    annotate_info(x, CompleteCheck(mk(wholeRval(struct_rc), ~ *pt, props)));
+    return NoFail;
+  }
+}
+
+func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  // TODO: Cache type.
+  type ast_typeexpr = lambda_declared_type(es->im, a);
+  // TODO: Cache converted.
+  converted te_typeexpr;
+  if case Printed(pm) = convert_typeexpr(es->cs, &type, &converted) {
+    return Printed(pm);
+  }
+  // TODO: I see some duplicated logic with the TypedExpr case.
+  computed cac_typeexpr;
+  if case Printed(pm) = check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &computed) {
+    return Printed(pm);
+  }
+  // Lambda exprs can't have partial types (yet!).
+  check(computed.complete);
+  unified te_typeexpr;
+  if !unify_types(pt, &computed.te, &unified) {
+    return ERR(_u8("Lambda is incompatible with contextual type."));
+  }
+
+  computed_params *shray[te_typeexpr];
+  if !decompose_typeapp(&computed.te, primitive_function_puretype(es->cs), &computed_params) {
+    ice(_u8("lambda type is not a function type"));
+  }
+
+  if true {
+    nargs size = count(&a->args);
+    return_type cu_typeexpr = ~get(computed_params, nargs);
+    return_type_props type_properties;
+    if case Printed(pm) = compute_type_properties(es->clq, &return_type, &return_type_props) {
+      return Printed(pm);
+    }
+    bs bodystate = mk(es->ds, &return_type, &return_type_props);
+    if case Printed(pm) = help_check_lambda_body(&bs, a, computed_params) {
+      return Printed(pm);
+    }
+  }
+
+  props type_properties;
+  if case Printed(pm) = compute_complete_type_properties(es->clq, &computed.te, &props) {
+    return Printed(pm);
+  }
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, ~computed.te, props)), ~computed.te, props)));
+  return NoFail;
+}
+
+// This helper method shields its code from using the wrong (outer) framescope variable in check_expr_lambda.
+func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray[te_typeexpr]) np {
+  vp varpopper;
+  init_vp(&vp, &bs->es);
+  nargs size = count(&a->args);
+  check(nargs + 2 == count(computed_params));
+  arg_cells array[cell_num];
+  for i size = 0; i < nargs; i = i + 1 {
+    cu_param cu_typeexpr = ~get(computed_params, i);
+    cu_param_props type_properties;
+    if case Printed(pm) = compute_type_properties(bs->clq, &cu_param, &cu_param_props) {
+      return Printed(pm);
+    }
+    cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
+    push(&arg_cells, cell);
+    vn var_number;
+    name *ast_ident = &ref(&a->args, i)->name;
+    if case Printed(pm) = es_push_var(&bs->es, &vp, cell, Has(name), varname_lifetime(bs->im, name->value), &cu_param, VarSelfContained, &vn) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = es_note_var_destroyer(&bs->es, vn) {
+      return Printed(pm);
+    }
+  }
+
+  ee entryexit;
+  if case Printed(pm) = check_body(bs, None, &a->body.bb, &ee) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = finish_lambda_body(bs, ee) {
+    return Printed(pm);
+  }
+
+  destructions array[var_destruction];
+  if case Printed(pm) = make_destructions(&bs->es, read_nums(&vp), &destructions) {
+    return Printed(pm);
+  }
+
+  info ast_fullbody_info = {destructions, bs->es.all_vars, Has(bs->es.gr), bs->gotos, bs->labels, bs->statements, bs->return_cell, arg_cells};
+  annotate(&a->body.info, info);
+
+  return NoFail;
+}
+
+func numeric_literal_value(a *ast_numeric_literal) bigint {
+  switch a {
+    case &HexLiteral(b ast_hex_literal): {
+      return convert_to_bigint(16, &b.digits);
+    }
+    case &DecLiteral(b ast_dec_literal): {
+      return convert_to_bigint(10, &b.digits);
+    }
+  }
+}
+
+func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr, demand rval_celldemand, n bigint, x *ast_expr) np {
+  if case &TeUnknown(v void) = pt {
+    if ai == AllowIncompleteYes(void) {
+      annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
+      return NoFail;
+    } else {
+      return ERR(_u8("Numeric literal usage is ambiguous."));
+    }
+  }
+
+  facts numeric_traits;
+  if !is_numeric_type(es->cs, pt, &facts) {
+    return ERR(_u8("Numeric literal in bad place."));
+  }
+  if n < facts.minval || n > facts.maxval {
+    return ERR(_u8("Numeric literal out of range."));
+  }
+  // It's a pt, and it's a numeric type, which means it must be a complete pt, which means it's computed.
+  check(is_complete_computed(pt).computed);
+  props type_properties;
+  if case Printed(pm) = compute_complete_type_properties(es->clq, pt, &props) {
+    return Printed(pm);
+  }
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, ~ *pt, props)), ~ *pt, props)));
+  return NoFail;
+}
+
+// You really should use this, in case we decide to rearrange the order of parameters of the ref type.
+func decompose_ref(t *te_typeexpr, cs *checkstate, lifetime_out **te_typeexpr, param_out **te_typeexpr) bool {
+  return decompose_typeapp(t, primitive_ref_puretype(cs), lifetime_out, param_out);
+}
+
+// Writes a fake lifetime in the case of pointer, a real lifetime in the case of a reference.
+func decompose_ref_or_ptr(t *te_typeexpr, cs *checkstate, lifetime_out *te_typeexpr, param_out **te_typeexpr) bool {
+  lt *te_typeexpr;
+  param *te_typeexpr;
+  if decompose_ref(t, cs, &lt, &param) {
+    *lifetime_out = *lt;
+    *param_out = param;
+    return true;
+  }
+  if decompose_typeapp(t, primitive_pointer_puretype(cs), &param) {
+    *lifetime_out = fake_lifetime(cs);
+    *param_out = param;
+    return true;
+  }
+  return false;
+}
+
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, params_out **shray[te_typeexpr]) bool {
+  // This could be implemented in terms of unify_under_generics, you know.
+  if case &TeApp(app te_typeapp) = t {
+    unified te_puretype;
+    if !unify_puretypes(&app.typefunc, &expected_puretype, &unified) {
+      return false;
+    }
+    *params_out = &app.params;
+    return true;
+  } else {
+    return false;
+  }
+}
+
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr) bool {
+  params *shray[te_typeexpr];
+  if !decompose_typeapp(t, expected_puretype, &params) {
+    return false;
+  }
+  if count(params) != 1 {
+    return false;
+  }
+  *oneparam_out = ref(params, 0);
+  return true;
+}
+
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr, twoparam_out **te_typeexpr) bool {
+  params *shray[te_typeexpr];
+  if !decompose_typeapp(t, expected_puretype, &params) {
+    return false;
+  }
+  if count(params) != 2 {
+    return false;
+  }
+  *oneparam_out = ref(params, 0);
+  *twoparam_out = ref(params, 1);
+  return true;
+}
+
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr, twoparam_out **te_typeexpr, threeparam_out **te_typeexpr) bool {
+  params *shray[te_typeexpr];
+  if !decompose_typeapp(t, expected_puretype, &params) {
+    return false;
+  }
+  if count(params) != 3 {
+    return false;
+  }
+  *oneparam_out = ref(params, 0);
+  *twoparam_out = ref(params, 1);
+  *threeparam_out = ref(params, 2);
+  return true;
+}
+
+enum check_field_result {
+  // Inherits the lvalue-ness of the thing it's a field of.  Includes the field's offset (in bnnos).
+  InheritsLval u32;
+  // Doesn't inherit the lvalue-ness.  In fact it's a compile-time constant (for the array ".length" field).
+  ConstantField u32;
+};
+
+func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+  fieldtype cu_typeexpr;
+  res check_field_result;
+  if case Printed(pm) = lookup_field(es, t, a, &fieldtype, &res) {
+    return Printed(pm);
+  }
+  unified te_typeexpr;
+  if !unify_types(pt, &fieldtype.x, &unified) {
+    return ERR(_u8("field has wrong type."));
+  }
+  *fieldtype_out = fieldtype;
+  *res_out = res;
+  return NoFail;
+}
+
+func structural_struct_type(ds *defscope, t *te_typeexpr, st_out **structspec) structural_rhs_result {
+  if case Has(pack te_instpack) = type_pack(t) {
+    st *structspec;
+    switch help_structural_struct_type(ds, &pack, &st) {
+    case Error(pm):
+      return Error(pm);
+    case Success:
+      *st_out = st;
+      return Success;
+    case NotAccessible:
+      return NotAccessible;
+    }
+  } else {
+    // We don't allow strinit exprs on raw struct types anymore.
+    return NotAccessible;
+  }
+}
+
+// et_out is set to a complete/computed value.
+func structural_enum_type(ds *defscope, t *te_typeexpr, et_out **enumspec) structural_rhs_result {
+  if case Has(pack te_instpack) = type_pack(t) {
+    et *enumspec;
+    switch help_structural_enum_type(ds, &pack, &et) {
+    case Error(pm):
+      return Error(pm);
+    case Success:
+      *et_out = et;
+      return Success;
+    case NotAccessible:
+      return NotAccessible;
+    }
+  } else {
+    // We don't allow constructors/switching on raw enum types anymore.
+    return NotAccessible;
+  }
+}
+
+func deftype_rhs_info_accessible(ds *defscope, id deftype_entry_id, result_out *bool) np {
+  ent *deftype_entry = ref_deftype_entry(ds->cs, id);
+  if case &Has(np deftype_nonprim) = &ent->nonprim {
+    rhs *deftype_rhs_spec;
+    if case Printed(pm) = deftype_converted_rhs(ds->cs, &np, &rhs) {
+      return Printed(pm);
+    }
+    switch rhs {
+    case &ClassexprRhsSpec(crs classexpr_rhs_spec):
+      n size = count(&ds->accessible);
+      for i size = 0; i < n; i = i + 1 {
+        aid access_entry_id = get(&ds->accessible, i);
+        dti deftype_entry_id;
+        if case Printed(pm) = get_accessible_deftype(ds->cs, aid, &dti) {
+          return Printed(pm);
+        }
+        if dti == id {
+          *result_out = true;
+          return NoFail;
+        }
+      }
+      *result_out = false;
+      return NoFail;
+    case &DefstructRhsSpec(drs defstruct_rhs_spec):
+      *result_out = true;
+      return NoFail;
+    case &DefenumRhsSpec(drs defenum_rhs_spec):
+      *result_out = true;
+      return NoFail;
+    }
+  } else {
+    *result_out = false;
+    return NoFail;
+  }
+}
+
+func type_pack(t *te_typeexpr) opt[te_instpack] {
+  switch t {
+  case &TeName(a te_name):
+    if case &Has(pack te_instpack) = &a.pack {
+      return Has(pack);
+    }
+    ice(_u8("type_pack called on uncomputed type"));
+  case &TeApp(a te_typeapp):
+    if case &Has(pack te_instpack) = &a.pack {
+      return Has(pack);
+    }
+    ice(_u8("type_pack called on uncomputed type"));
+  case &TeLifetime(te te_lifetime):
+    ice(_u8("type_pack TeLifetime"));
+  case &TeTrans(te te_trans):
+    ice(_u8("type_pack TeTrans"));
+  case &TeUnknown:
+    ice(_u8("type_pack called on incomplete type"));
+  default:
+    return None;
+  }
+  return fake();
+}
+
+enum structural_rhs_result {
+  // An error was printed.  True if location info was printed.
+  Error bool;
+  Success void;
+  NotAccessible void;
+};
+
+func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **deftype_inst_rhs_info) structural_rhs_result {
+  accessible_result bool;
+  if case Printed(pm) = deftype_rhs_info_accessible(ds, pack->ent_id, &accessible_result) {
+    return Error(pm);
+  }
+  if !accessible_result {
+    return NotAccessible;
+  }
+  if case Printed(pm) = ensure_deftype_inst_checked(ds->clq, pack->ent_id, pack->inst_id) {
+    return Error(pm);
+  }
+  inst *deftype_inst = ref_deftype_inst(ds->cs, pack->inst_id);
+  if case &Computed(info deftype_inst_info) = &inst->info {
+    if case &Has(rhs_info deftype_inst_rhs_info) = &info.rhs {
+      *rhs_info_out = &rhs_info;
+      return Success;
+    } else {
+      ice(_u8("deftype_rhs_accessible permitted a primitive type."));
+      return fake();
+    }
+  } else {
+    ice(_u8("inst checked, info still None"));
+    return fake();
+  }
+}
+
+func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **enumspec) structural_rhs_result {
+  rhs_info *deftype_inst_rhs_info;
+  switch help_structural_rhs_info(ds, pack, &rhs_info) {
+  case Error(pm):
+    return Error(pm);
+  case Success:
+    switch rhs_info {
+    case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
+      return NotAccessible;
+    case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
+      *et_out = &ri.rhs_enumspec;
+      return Success;
+    }
+  case NotAccessible:
+    return NotAccessible;
+  }
+}
+
+func help_structural_struct_type(ds *defscope, pack *te_instpack, st_out **structspec) structural_rhs_result {
+  rhs_info *deftype_inst_rhs_info;
+  switch help_structural_rhs_info(ds, pack, &rhs_info) {
+  case Error(pm):
+    return Error(pm);
+  case Success:
+    switch rhs_info {
+    case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
+      *st_out = &ri.rhs_structspec;
+      return Success;
+    case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
+      return NotAccessible;
+    }
+  case NotAccessible:
+    return NotAccessible;
+  }
+}
+
+func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+  st *structspec;
+  switch help_structural_struct_type(es->ds, pack, &st) {
+  case Error(pm):
+    return Printed(pm);
+  case Success:
+    return help_lookup_struct_field(es, st, fieldname, fieldtype_out, res_out);
+  case NotAccessible:
+    return ERR(_u8("Looking up field on inaccessible defclass or primitive type"));
+  }
+}
+
+func help_lookup_struct_field(es *framescope, st *structspec, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+  offset u32;
+  if case Printed(pm) = lookup_field_from_list(es->clq, &st->fields, fieldname->value, fieldtype_out, &offset) {
+    return Printed(pm);
+  }
+  *res_out = InheritsLval(offset);
+  return NoFail;
+}
+
+func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+  switch &t->x {
+    case &TeName(a te_name): {
+      return lookup_name_field(es, unHas(&a.pack), fieldname, fieldtype_out, res_out);
+    }
+    case &TeApp(a te_typeapp): {
+      return lookup_name_field(es, unHas(&a.pack), fieldname, fieldtype_out, res_out);
+    }
+    case &TeUnion(a te_union): {
+      // The offset's what it would be for a struct.
+      offset_discard u32;
+      if case Printed(pm) = lookup_field_from_list(es->clq, &a.fields, fieldname->value, fieldtype_out, &offset_discard) {
+        return Printed(pm);
+      }
+      // Offset's always 0 for a union.
+      *res_out = InheritsLval(0);
+      return NoFail;
+    }
+    case &TeArraytype(a te_arraytype): {
+      if fieldname->value != es->im->cym.lengthsym {
+        return ERR(_u8("field lookup (not .length) on array type"));
+      }
+      *fieldtype_out = compute_prim(es->clq, primitive_size_type(es->cs));
+      if case Has(n u32) = a.count {
+        *res_out = ConstantField(n);
+      } else {
+        ice(_u8("Complete arraytype has incomplete count"));
+      }
+      return NoFail;
+    }
+    case &TeLifetime(a te_lifetime):
+      return ERR(_u8("ICE: help_lookup_name_field te_lifetime"));
+    case &TeTrans(a te_trans):
+      return ERR(_u8("ICE: help_lookup_name_field te_trans"));
+
+    case &TeUnknown: {
+      ice(_u8("lookup_field sees incomplete type"));
+      return fake();
+    }
+  }
+}
+
+func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+  return help_lookup_name_field(es, t, &f->name, fieldtype_out, res_out);
+}
+
+func find_vardecl(a *shray[te_vardecl], name sym, out **te_typeexpr, index_out *size) bool {
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    d *te_vardecl = ref(a, i);
+    if d->name == name {
+      *out = &d->type;
+      *index_out = i;
+      return true;
+    }
+  }
+  return false;
+}
+
+// fields is supposed to be complete.
+func lookup_field_from_list(clq *clqueue, fields *shray[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr, offset_out *u32) np {
+  psd partial_struct_data;
+  if case Printed(pm) = compute_partial_struct_data(clq, fields, Has(fieldname), &psd) {
+    return Printed(pm);
+  }
+
+  if !psd.found_field {
+    return ERR(_u8("fieldname '"), lookup(clq->im, fieldname), _u8("' not found"));
+  }
+
+  *fieldtype_out = ~ ref(fields, psd_index(&psd))->type;
+  *offset_out = psd.offset;
+  return NoFail;
+}
+
+func check_expr_logical_conjunction(es *framescope, a *ast_logical_conjunction, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  type cu_typeexpr;
+  props type_properties;
+  compute_prim(es->clq, primitive_bool_type(es->cs), &type, &props);
+
+  unified te_typeexpr;
+  if !unify_types(pt, &type.x, &unified) {
+    return ERR(_u8("logical conjunction in bad place"));
+  }
+  if case Printed(pm) = check_expr_consume(es, oo(&a->lhs), &type.x, NoDemand) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = check_expr_consume(es, oo(&a->rhs), &type.x, NoDemand) {
+    return Printed(pm);
+  }
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, type, props)), type, props)));
+  return NoFail;
+}
+
+func ai_incomplete(yes bool) allow_incomplete {
+  if yes {
+    return AllowIncompleteYes(void);
+  } else {
+    return AllowIncompleteNo(void);
+  }
+}
+
+func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  a_param_incomplete bool;
+  if case Printed(pm) = check_funcall_params_firsttime(es, &a->params, &a_param_incomplete) {
+    return Printed(pm);
+  }
+
+  func_pt te_typeexpr;
+  if case Printed(pm) = make_fn_partial_type(es->clq, pt, &a->params, &func_pt) {
+    return Printed(pm);
+  }
+  funec_demand rval_celldemand = NoDemand;
+  funec *ast_expr_consume = oo(&a->fun);
+  if case Printed(pm) = check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes(void)), &funec->expr, &func_pt, funec_demand) {
+    return Printed(pm);
+  }
+
+  if expr_type_incomplete(&funec->expr) {
+    check(ai == AllowIncompleteYes(void));
+    annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown(void)));
+    return NoFail;
+  }
+
+  if case Printed(pm) = check_funcall_params_secondtime(es, expr_complete_type(&funec->expr), &a->params) {
+    return Printed(pm);
+  }
+
+  if case Printed(pm) = annotate_disposal_for_consume(es, &funec->expr, funec_demand, &funec->after) {
+    return Printed(pm);
+  }
+
+  return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(&oo(&a->fun)->expr)->x);
+  props type_properties;
+  if case Printed(pm) = compute_complete_type_properties(es->clq, return_type, &props) {
+    return Printed(pm);
+  }
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_rval_cell(es, demand, ~ *return_type, props)), ~ *return_type, props)));
+  return NoFail;
+}
+
+func check_funcall_params_firsttime(es *framescope, params *array[ast_expr_consume], a_param_incomplete_out *bool) np {
+  n size = count(params);
+  unknown te_typeexpr = TeUnknown(void);
+  all_params_complete bool = true;
+  for i size = 0; i < n; i = i + 1 {
+    expr *ast_expr = &ref(params, i)->expr;
+    if case Printed(pm) = check_expr_ai(es, AllowIncompleteYes, expr, &unknown, NoDemand) {
+      return Printed(pm);
+    }
+    complete bool = expr_type_complete(expr);
+    all_params_complete = all_params_complete & complete;
+  }
+  *a_param_incomplete_out = !all_params_complete;
+  return NoFail;
+}
+
+func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, params *array[ast_expr_consume]) np {
+  n size = count(params);
+
+  type_params *shray[te_typeexpr];
+  if !decompose_typeapp(&functype->x, primitive_function_puretype(es->cs), &type_params) {
+    ice(_u8("Expecting a TeApp for fn-type."));
+  }
+  check(count(type_params) == n + 2);
+
+  for i size = 0; i < n; i = i + 1 {
+    ec *ast_expr_consume = ref(params, i);
+    if case Printed(pm) = check_expr_consume(es, ec, ref(type_params, i), NoDemand) {
+      return Printed(pm);
+    }
+  }
+  return NoFail;
+}
+
+func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
+  cac cac_typeexpr;
+  if !from_np(noscoped_check_and_compute_typeexpr(clq, &t, &cac)) {
+    ice(_u8("compute_prim encounters uncomputable type"));
+  }
+  check(cac.complete);
+  return ~cac.te;
+}
+
+func compute_prim(clq *clqueue, t te_typeexpr) cu_typrop {
+  ret cu_typrop;
+  compute_prim(clq, t, &ret.cu, &ret.props);
+  return ret;
+}
+
+func compute_prim(clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
+  type cu_typeexpr = compute_prim(clq, t);
+  if !from_np(compute_type_properties(clq, &type, props_out)) {
+    ice(_u8("compute_prim fails to compute type properties"));
+  }
+  *out = type;
+}
+
+func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
+  unknown te_typeexpr = TeUnknown(void);
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, oo(&a->lhs), &unknown, NoDemand) {
+    return Printed(pm);
+  }
+  sizetype cu_typeexpr = compute_prim(es->clq, primitive_size_type(es->cs));
+
+  size_rc rval_cellnum = {add_none_cell(es), unnamed_lifetime(es)};
+
+  rhs_later ast_later_discard_info = mk_later();
+  if case Printed(pm) = check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.x, size_rc, &rhs_later) {
+    return Printed(pm);
+  }
+
+  lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
+
+  ixtype *te_typeexpr;
+  is_arraytype bool;
+  if !decompose_indexable(es->cs, &lhs_info->cu.x, &ixtype, &is_arraytype) {
+    return ERR(_u8("indexing on non-indexable type"));
+  }
+
+  unified te_typeexpr;
+  if !unify_types(pt, ixtype, &unified) {
+    return ERR(_u8("index expr returns wrong type"));
+  }
+
+  props type_properties;
+  if case Printed(pm) = compute_complete_type_properties(es->clq, ixtype, &props) {
+    return Printed(pm);
+  }
+
+  lval is_lval;
+  if is_arraytype {
+    // TODO: This is totally duplicating field access logic.
+    switch &lhs_info->lval {
+      case &IsLvalYes(desc lval_description): {
+        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void), field_lifetime(es->cs, desc.lifetime)});
+      }
+      case &IsLvalNo(desc rval_description): {
+        lval = IsLvalNo({desc.whole_num, desc.whole_lifetime, add_cell(es, {LocationVirtual, ~ *ixtype, props}), field_lifetime(es->cs, desc.whole_lifetime)});
+      }
+    }
+    // Nothing to dispose, it's a field access.
+    annotate(&a->info, {None, rhs_later});
+  } else {
+    // Dereferencing a pointer always makes an lvalue.
+    lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void), field_lifetime(es->cs, fake_lifetime(es->cs))});
+    ie_info_after nc[ast_expr_after_consume] = NotComputed();
+    lhs_later ast_later_discard_info = mk_later();
+    if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), NoDemand, &ie_info_after, &lhs_later, None) {
+      return Printed(pm);
+    }
+
+    annotate(&a->info, {Has({*unHas(&ie_info_after), lhs_later}), rhs_later});
+  }
+
+  annotate_info(x, CompleteCheck(mk(lval, ~ *ixtype, props)));
+  return NoFail;
+}
+
+func decompose_indexable(cs *checkstate, t *te_typeexpr, out **te_typeexpr, is_arraytype_out *bool) bool {
+  // We specifically do _not_ support references here.  You can't index into a reference... you'd need a slice type or something like that.
+  if decompose_typeapp(t, primitive_pointer_puretype(cs), out) {
+    *is_arraytype_out = false;
+    return true;
+  }
+  if decompose_arraytype(t, out) {
+    *is_arraytype_out = true;
+    return true;
+  }
+  return false;
+}
+
+func decompose_arraytype(t *te_typeexpr, out **te_typeexpr) bool {
+  if case &TeArraytype(a te_arraytype) = t {
+    *out = oo(&a.param);
+    return true;
+  } else {
+    return false;
+  }
+}
+
+func expr_type(a *ast_expr) te_typeexpr {
+  switch &a->info {
+    case &NoInfo: {
+      ice(_u8("expr_type sees NoInfo"));
+      return fake();
+    }
+    case &IncompleteCheck(t te_typeexpr): {
+      return t;
+    }
+    case &CompleteCheck(t ast_expr_complete_info): {
+      return t.cu.x;
+    }
+  }
+}
+
+func expr_complete_info(a *ast_expr) *ast_expr_complete_info {
+  if case &CompleteCheck(inf ast_expr_complete_info) = &a->info {
+    return &inf;
+  } else {
+    ice(_u8("expr_complete_info sees... not a complete type"));
+    return fake();
+  }
+}
+
+func expr_complete_type(a *ast_expr) *cu_typeexpr {
+  return &expr_complete_info(a)->cu;
+}
+
+func expr_type_complete(a *ast_expr) bool {
+  switch &a->info {
+    case &NoInfo: {
+      ice(_u8("expr_type_complete sees NoInfo"));
+      return fake();
+    }
+    case &IncompleteCheck(t te_typeexpr): { return false; }
+    case &CompleteCheck(t ast_expr_complete_info): { return true; }
+  }
+}
+
+
+func expr_type_incomplete(a *ast_expr) bool {
+  return !expr_type_complete(a);
+}
+
+// Specifically, for checking funcalls, uses TeUnknown for the transDesc.
+func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[ast_expr_consume], out *te_typeexpr) np {
+  type_params array[te_typeexpr];
+  n size = count(params);
+  reserve(&type_params, n + 1);
+  for i size = 0; i < n; i = i + 1 {
+    push(&type_params, expr_type(&ref(params, i)->expr));
+  }
+  push(&type_params, *return_type);
+  // TeUnknown for the transDesc.
+  push(&type_params, TeUnknown);
+  fntype te_typeexpr = TeApp({primitive_function_puretype(clq->cs), freeze(&type_params), None});
+  cac cac_typeexpr;
+  if case Printed(pm) = noscoped_check_and_compute_typeexpr(clq, &fntype, &cac) {
+    return Printed(pm);
+  }
+  *out = cac.te;
+  return NoFail;
+}
+
+func fn_return_type(cs *checkstate, func_type *te_typeexpr) *te_typeexpr {
+  params *shray[te_typeexpr];
+  if !decompose_typeapp(func_type, primitive_function_puretype(cs), &params) {
+    ice(_u8("Expected TeApp for fn-type in fn_return_type."));
+  }
+  n size = count(params);
+  check(n >= 2);
+  // The trans type is after the return type.
+  return ref(params, n - 2);
+}
