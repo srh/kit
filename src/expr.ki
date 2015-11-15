@@ -319,7 +319,8 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   }
   arg_type *te_typeexpr;
   return_type *te_typeexpr;
-  if !decompose_typeapp(pt, primitive_function_puretype(ds->cs), &arg_type, &return_type) {
+  trans_type *te_typeexpr;
+  if !decompose_typeapp(pt, primitive_function_puretype(ds->cs), &arg_type, &return_type, &trans_type) {
     switch pt {
     case &TeName(te te_name): { }
     case &TeApp(te te_typeapp): { }
@@ -1616,6 +1617,20 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
   }
   *oneparam_out = ref(params, 0);
   *twoparam_out = ref(params, 1);
+  return true;
+}
+
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr, twoparam_out **te_typeexpr, threeparam_out **te_typeexpr) bool {
+  params *shray[te_typeexpr];
+  if !decompose_typeapp(t, expected_puretype, &params) {
+    return false;
+  }
+  if count(params) != 3 {
+    return false;
+  }
+  *oneparam_out = ref(params, 0);
+  *twoparam_out = ref(params, 1);
+  *threeparam_out = ref(params, 2);
   return true;
 }
 
