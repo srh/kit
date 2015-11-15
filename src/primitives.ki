@@ -269,8 +269,10 @@ func add_op_primitive(cs *checkstate, oper sym, typename sym, arity size, op pri
   add_def_primitive(cs, oper, NoGenerics, type, op);
 }
 
+// generics must only have plain types.
 func add_comparison_primitive(cs *checkstate, oper sym, generics ast_generics, type te_typeexpr, op primitive_op) def_entry_id {
-  f te_typeexpr = sfn_type(cs, type, type, primitive_bool_type(cs));
+  // empty_trans is OK because generics only has plain types (pointer targets, specifically)
+  f te_typeexpr = sfn_type(cs, type, type, primitive_bool_type(cs), empty_trans());
   return add_def_primitive(cs, oper, generics, f, op);
 }
 
