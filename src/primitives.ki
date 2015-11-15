@@ -160,14 +160,18 @@ func is_fn_type(cs *checkstate, t *te_typeexpr) bool {
   return decompose_typeapp(t, primitive_function_puretype(cs), &typarams);
 }
 
+func empty_trans() te_typeexpr {
+  return TeTrans({mk_shray@[te_statedesc](), mk_shray@[te_statedesc]()});
+}
+
 func add_conversion(cs *checkstate, from tup[sym, integral_traits], to tup[sym, integral_traits]) void {
-  type te_typeexpr = fn_type(cs, @[te_typeexpr]TeName({from.car, None}), @[te_typeexpr]TeName({to.car, None}));
-  add_def_primitive(cs, cs->im->cym.convertsym, type, @[primitive_op]PrimConversion({from.cdr.flat.size, from.cdr.numeric, to.cdr.flat.size, to.cdr.numeric}));
+  type te_typeexpr = sfn_type(cs, @[te_typeexpr]TeName({from.car, None}), @[te_typeexpr]TeName({to.car, None}), empty_trans());
+  add_def_primitive(cs, cs->im->cym.convertsym, NoGenerics, type, @[primitive_op]PrimConversion({from.cdr.flat.size, from.cdr.numeric, to.cdr.flat.size, to.cdr.numeric}));
 }
 
 func add_nonlossy_conversion(cs *checkstate, from tup[sym, integral_traits], to tup[sym, integral_traits]) void {
-  type te_typeexpr = fn_type(cs, @[te_typeexpr]TeName({from.car, None}), @[te_typeexpr]TeName({to.car, None}));
-  add_def_primitive(cs, cs->im->cym.nonlossyconvertsym, type, @[primitive_op]PrimConversion({from.cdr.flat.size, from.cdr.numeric, to.cdr.flat.size, to.cdr.numeric}));
+  type te_typeexpr = sfn_type(cs, @[te_typeexpr]TeName({from.car, None}), @[te_typeexpr]TeName({to.car, None}), empty_trans());
+  add_def_primitive(cs, cs->im->cym.nonlossyconvertsym, NoGenerics, type, @[primitive_op]PrimConversion({from.cdr.flat.size, from.cdr.numeric, to.cdr.flat.size, to.cdr.numeric}));
 }
 
 
@@ -257,17 +261,16 @@ func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_
   return add_def_primitive(cs, name, generics, type, @[def_definition]DefnPrim(op));
 }
 
-func add_def_primitive(cs *checkstate, name sym, type te_typeexpr, op primitive_op) void {
-  add_def_primitive(cs, name, NoGenerics(void), type, op);
-}
-
 func add_op_primitive(cs *checkstate, oper sym, typename sym, arity size, op primitive_op) void {
-  type te_typeexpr = fn_type(cs, repeat(arity + 1, @[te_typeexpr]TeName({typename, None})));
-  add_def_primitive(cs, oper, type, op);
+  typarms array[te_typeexpr] = repeat(arity + 1, @[te_typeexpr]TeName({typename, None}));
+  // For math ops, no generics, so an empty trans.
+  push(&typarms, empty_trans());
+  type te_typeexpr = sfn_type(cs, freeze(&typarms));
+  add_def_primitive(cs, oper, NoGenerics, type, op);
 }
 
 func add_comparison_primitive(cs *checkstate, oper sym, generics ast_generics, type te_typeexpr, op primitive_op) def_entry_id {
-  f te_typeexpr = fn_type(cs, type, type, primitive_bool_type(cs));
+  f te_typeexpr = sfn_type(cs, type, type, primitive_bool_type(cs));
   return add_def_primitive(cs, oper, generics, f, op);
 }
 
@@ -365,22 +368,23 @@ func tee_generic(cs *checkstate) ast_generics {
   return HasGenerics(mk_array(@[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym})));
 }
 
-func fn_type(cs *checkstate, params shray[te_typeexpr]) te_typeexpr {
+func sfn_type(cs *checkstate, params shray[te_typeexpr]) te_typeexpr {
   return TeApp({primitive_function_puretype(cs), params, None});
 }
 
-func fn_type(cs *checkstate, params shray[te_typeexpr], return_type te_typeexpr) te_typeexpr {
+func sfn_type(cs *checkstate, params shray[te_typeexpr], return_type te_typeexpr, trans_type te_typeexpr) te_typeexpr {
   par array[te_typeexpr] = mk_copy(&params);
   push(&par, return_type);
-  return fn_type(cs, freeze(&par));
+  push(&par, trans_type);
+  return sfn_type(cs, freeze(&par));
 }
 
-func fn_type(cs *checkstate, t te_typeexpr, u te_typeexpr) te_typeexpr {
-  return fn_type(cs, mk_shray(t, u));
+func sfn_type(cs *checkstate, t te_typeexpr, u te_typeexpr, trans te_typeexpr) te_typeexpr {
+  return sfn_type(cs, mk_shray(t, u, trans));
 }
 
-func fn_type(cs *checkstate, t te_typeexpr, u te_typeexpr, v te_typeexpr) te_typeexpr {
-  return fn_type(cs, mk_shray(t, u, v));
+func sfn_type(cs *checkstate, t te_typeexpr, u te_typeexpr, v te_typeexpr, trans te_typeexpr) te_typeexpr {
+  return sfn_type(cs, mk_shray(t, u, v, trans));
 }
 
 func ptr_type(cs *checkstate, t te_typeexpr) te_typeexpr {
@@ -485,14 +489,18 @@ func add_function_primitive(cs *checkstate) void {
 func add_non_magic_fn_primitive(cs *checkstate, name sym, args size, nonmag def_non_magic) void {
   parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None})));
   push(&parms, primitive_void_type(cs));
-  type te_typeexpr = fn_type(cs, freeze(&parms));
+  // TODO(): How is a generic function like this supposed to define a trans?  Likewise below.
+  push(&parms, fake_trans());
+  type te_typeexpr = sfn_type(cs, freeze(&parms));
   add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnNonMagic(nonmag));
 }
 
 func add_magic_constructor_primitive(cs *checkstate, name sym, args size, mag def_magic) void {
   parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None})));
   push(&parms, primitive_void_type(cs));
-  type te_typeexpr = fn_type(cs, freeze(&parms));
+  // TODO(): How is a generic function like this supposed to define a trans?  Likewise above.
+  push(&parms, fake_trans());
+  type te_typeexpr = sfn_type(cs, freeze(&parms));
   add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnMagic(mag));
 }
 

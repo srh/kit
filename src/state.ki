@@ -639,7 +639,8 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       }
       type te_typeexpr = inst_type(cs, ent_id, inst_id);
       ptrtype te_typeexpr = ptr_type(cs, type);
-      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+      // Unknown trans type.
+      fntype1 te_typeexpr = sfn_type(cs, ptrtype, primitive_void_type(cs), TeUnknown);
       if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
         return Printed(pm);
       }
@@ -653,8 +654,9 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       }
       type te_typeexpr = inst_type(cs, ent_id, inst_id);
       ptrtype te_typeexpr = ptr_type(cs, type);
-      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
+      // Unknown trans types.
+      fntype1 te_typeexpr = sfn_type(cs, ptrtype, primitive_void_type(cs), TeUnknown);
+      fntype2 te_typeexpr = sfn_type(cs, ptrtype, ptrtype, primitive_void_type(cs), TeUnknown);
       if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
         return Printed(pm);
       }
@@ -674,8 +676,9 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       }
       type te_typeexpr = inst_type(cs, ent_id, inst_id);
       ptrtype te_typeexpr = ptr_type(cs, type);
-      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
+      // Unknown trans types.
+      fntype1 te_typeexpr = sfn_type(cs, ptrtype, primitive_void_type(cs), TeUnknown);
+      fntype2 te_typeexpr = sfn_type(cs, ptrtype, ptrtype, primitive_void_type(cs), TeUnknown);
       if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
         return Printed(pm);
       }

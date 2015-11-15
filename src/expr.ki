@@ -393,7 +393,9 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     *res_out = NoMatchConstructor(void);
     return NoFail;
   }
-  ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
+  // The enum constructor and enum rhs type _could_ have generic lifetimes in it.
+  // TODO(): This trans really is fake, what about generics in the rhs type, or return type.
+  ctor_type te_typeexpr = sfn_type(ds->cs, *rhs_type, cac_return_type.te, fake_trans());
   cac_ctor_type cac_typeexpr;
   if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->clq, &ctor_type, &cac_ctor_type) {
     return Printed(pm);
@@ -1990,7 +1992,7 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
   if !decompose_typeapp(&functype->x, primitive_function_puretype(es->cs), &type_params) {
     ice(_u8("Expecting a TeApp for fn-type."));
   }
-  check(count(type_params) == n + 1);
+  check(count(type_params) == n + 2);
 
   for i size = 0; i < n; i = i + 1 {
     ec *ast_expr_consume = ref(params, i);
@@ -2151,6 +2153,7 @@ func expr_type_incomplete(a *ast_expr) bool {
   return !expr_type_complete(a);
 }
 
+// Specifically, for checking funcalls, uses TeUnknown for the transDesc.
 func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[ast_expr_consume], out *te_typeexpr) np {
   type_params array[te_typeexpr];
   n size = count(params);
@@ -2159,6 +2162,8 @@ func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[
     push(&type_params, expr_type(&ref(params, i)->expr));
   }
   push(&type_params, *return_type);
+  // TeUnknown for the transDesc.
+  push(&type_params, TeUnknown);
   fntype te_typeexpr = TeApp({primitive_function_puretype(clq->cs), freeze(&type_params), None});
   cac cac_typeexpr;
   if case Printed(pm) = noscoped_check_and_compute_typeexpr(clq, &fntype, &cac) {

@@ -1166,7 +1166,9 @@ func make_magic_inst(clq *clqueue, magic_name sym, arity size, type *te_typeexpr
   cs *checkstate = clq->cs;
   params array[te_typeexpr] = repeat(arity, ptr_type(cs, *type));
   push(&params, primitive_void_type(cs));
-  fntype te_typeexpr = fn_type(cs, freeze(&params));
+  // Use unknown transformation type for matching function lookup.
+  push(&params, TeUnknown);
+  fntype te_typeexpr = sfn_type(cs, freeze(&params));
 
   parms genparms = HasParms(mk_shray(*type));
 

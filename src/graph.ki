@@ -1326,7 +1326,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       valuetype *cu_typeexpr = &ref_cell(gr, destcell)->type;
       ptrtype cu_typrop = computed_ptr_type(clq, valuetype);
       booltype cu_typrop = compute_prim(clq, primitive_bool_type(clq->cs));
-      fntype cu_typrop = compute_prim(clq, fn_type(clq->cs, ptrtype.cu.x, ptrtype.cu.x, booltype.cu.x));
+      fntype cu_typrop = compute_prim(clq, sfn_type(clq->cs, ptrtype.cu.x, ptrtype.cu.x, booltype.cu.x, fake_trans()));
 
       funcell cell_num = add_cell(gr, {LocationStatic, fntype.cu, fntype.props});
       destptr cell_num = add_cell(gr, {LocationStatic, ptrtype.cu, ptrtype.props});
@@ -1608,10 +1608,14 @@ func gr_move_action(clq *clqueue, gr *frame_graph, x *move_action, out *gr_num) 
   return NoFail;
 }
 
+func fake_trans() te_typeexpr {
+  return empty_trans();
+}
+
 func gr_uni_fun(clq *clqueue, gr *frame_graph, ip instpair, arg cell_num) gr_num {
   argptr cu_typrop = computed_ptr_type(clq, &ref_cell(gr, arg)->type);
   voidret cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
-  fnptr cu_typrop = compute_prim(clq, fn_type(clq->cs, argptr.cu.x, voidret.cu.x));
+  fnptr cu_typrop = compute_prim(clq, sfn_type(clq->cs, argptr.cu.x, voidret.cu.x, fake_trans()));
   funcell cell_num = add_cell(gr, {LocationStatic, fnptr.cu, fnptr.props});
   argptrcell cell_num = add_cell(gr, {LocationStatic, argptr.cu, argptr.props});
   retvoid cell_num = add_cell(gr, {LocationStatic, voidret.cu, voidret.props});
@@ -1669,7 +1673,7 @@ func gr_bi_fun(clq *clqueue, gr *frame_graph, ip instpair, dest cell_num, src ce
   destptr cu_typrop = computed_ptr_type(clq, &ref_cell(gr, dest)->type);
   srcptr cu_typrop = computed_ptr_type(clq, &ref_cell(gr, src)->type);
   voidret cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
-  fnptr cu_typrop = compute_prim(clq, fn_type(clq->cs, destptr.cu.x, srcptr.cu.x, voidret.cu.x));
+  fnptr cu_typrop = compute_prim(clq, sfn_type(clq->cs, destptr.cu.x, srcptr.cu.x, voidret.cu.x, fake_trans()));
   funcell cell_num = add_cell(gr, {LocationStatic, fnptr.cu, fnptr.props});
   destptrcell cell_num = add_cell(gr, {LocationStatic, destptr.cu, destptr.props});
   srcptrcell cell_num = add_cell(gr, {LocationStatic, srcptr.cu, srcptr.props});
@@ -1886,7 +1890,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 
   fntype cu_typeexpr;
   fntype_props type_properties;
-  compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, elemptrtype.x), voidtp.cu.x), &fntype, &fntype_props);
+  compute_prim(clq, sfn_type(cs, @[shray[_]]repeat(nargs, elemptrtype.x), voidtp.cu.x, fake_trans()), &fntype, &fntype_props);
 
   size_type cu_typeexpr;
   size_type_props type_properties;
@@ -2099,7 +2103,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
       fntype cu_typeexpr;
       fntype_props type_properties;
-      compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.x), voidtp.cu.x), &fntype, &fntype_props);
+      compute_prim(clq, sfn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.x), voidtp.cu.x, fake_trans()), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
       func_gn gr_num = addx(&gr, @[gr_xop]GrWriteConst({func_cell, ConstDef(ip)}));
@@ -2274,7 +2278,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
       fntype cu_typeexpr;
       fntype_props type_properties;
-      compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.x), voidtp.cu.x), &fntype, &fntype_props);
+      compute_prim(clq, sfn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.x), voidtp.cu.x, fake_trans()), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {LocationStatic(void), fntype, fntype_props});
 
