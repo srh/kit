@@ -159,7 +159,14 @@ struct ast_lifetime {
 };
 
 struct ast_trans {
-  // TODO(): Implement.
+  before array[ast_statedesc];
+  after array[ast_statedesc];
+};
+
+struct ast_statedesc {
+  lifetime ast_lifetime;
+  // Parsing doesn't check that this is "active" or "inactive".
+  active ast_ident;
 };
 
 struct ast_unknown {

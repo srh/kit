@@ -462,7 +462,7 @@ func grab_tok(p *ps) tok {
         ps_step(p);
         return mk_res(p, left, mk_oper(ch));
       } else if ch == '=' {
-        return grab_oper2(p, left, ch, '=');
+        return grab_oper2(p, left, ch, '=', '>');
       } else if ch == '/' {
         ps_step(p);
         ch = ps_peek(p);

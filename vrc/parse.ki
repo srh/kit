@@ -723,10 +723,58 @@ func triparse_trans(p *ps, out *ast_trans) triparse_result {
   if ! +try_skip_token(p, @[tokval]Grouper(LBrace)) {
     return Quickfail;
   }
+  before array[ast_statedesc];
+  if ! +parse_statedesc_list(p, &before) {
+    return Error;
+  }
+  if empty(&before) && +try_skip_token(p, @[tokval]Grouper(RBrace)) {
+    *out = {before, mk_array()};
+    return Success;
+  }
+  if ! +try_skip_oper(p, '=', '>') {
+    return Error;
+  }
+  after array[ast_statedesc];
+  if ! +parse_statedesc_list(p, &after) {
+    return Error;
+  }
   if ! +try_skip_token(p, @[tokval]Grouper(RBrace)) {
     return Error;
   }
-  *out = {};
+  *out = {before, after};
+  return Success;
+}
+
+func parse_statedesc_list(p *ps, out *array[ast_statedesc]) parse_result {
+  build array[ast_statedesc];
+  for ;; {
+    desc ast_statedesc;
+    switch triparse_statedesc(p, &desc) {
+    case Success:
+      pushref(&build, &desc);
+    case Quickfail:
+      swap(out, &build);
+      return Success;
+    case Error:
+      return Fail;
+    }
+  }
+}
+
+func triparse_statedesc(p *ps, out *ast_statedesc) triparse_result {
+  lifetime ast_lifetime;
+  switch triparse_lifetime(p, &lifetime) {
+  case Quickfail:
+    return Quickfail;
+  case Error:
+    return Error;
+  case Success: { }
+  }
+  active ast_ident;
+  if ! +parse_ident(p, &active) {
+    return Error;
+  }
+  *out = {lifetime, active};
   return Success;
 }
 

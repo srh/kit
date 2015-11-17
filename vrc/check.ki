@@ -143,6 +143,35 @@ func convert_vardecl(cs *checkstate, a *ast_vardecl, out *te_vardecl) np {
   return NoFail;
 }
 
+func convert_lifetime(cs *checkstate, a *ast_lifetime, out *te_lifetime) np {
+  *out = {a->name.value};
+  return NoFail;
+}
+
+func convert_statedesc_list(cs *checkstate, a *array[ast_statedesc], out *shray[te_statedesc]) np {
+  build array[te_statedesc];
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    desc *ast_statedesc = ref(a, i);
+    lifetime te_lifetime;
+    if case Printed(pm) = convert_lifetime(cs, &desc->lifetime, &lifetime) {
+      return Printed(pm);
+    }
+    // TODO: Hardcoded strings here.
+    active te_activedesc;
+    if desc->active.value == intern(cs->im, _s("active")) {
+      active = Active;
+    } else if desc->active.value == intern(cs->im, _s("inactive")) {
+      active = Inactive;
+    } else {
+      return ERR(_u8("Only valid statedescs are active/inactive at this time."));
+    }
+    push(&build, {lifetime, active});
+  }
+  *out = freeze(&build);
+  return NoFail;
+}
+
 // NOTE: Callers of this might expect this function to also lookup names, check arity, etc.  Or they need to do such things themselves.
 func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) np {
   switch a {
@@ -189,12 +218,24 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) np {
       return NoFail;
     }
     case &Lifetime(b ast_lifetime):
-      *out = TeLifetime({b.name.value});
+      lifetime te_lifetime;
+      if case Printed(pm) = convert_lifetime(cs, &b, &lifetime) {
+        return Printed(pm);
+      }
+      *out = TeLifetime(lifetime);
       return NoFail;
 
     case &Trans(b ast_trans):
-      // TODO(): Implement for real.
-      *out = TeTrans({mk_shray(), mk_shray()});
+      before shray[te_statedesc];
+      if case Printed(pm) = convert_statedesc_list(cs, &b.before, &before) {
+        return Printed(pm);
+      }
+      after shray[te_statedesc];
+      if case Printed(pm) = convert_statedesc_list(cs, &b.after, &after) {
+        return Printed(pm);
+      }
+
+      *out = TeTrans({before, after});
       return NoFail;
 
     case &Unknown(b ast_unknown): {
@@ -1233,7 +1274,7 @@ func lambda_declared_type(im *identmap, a *ast_lambda) ast_typeexpr {
   }
   push(&type_params, a->return_type);
   // TODO(): Infer a no-change generic type from the generic params in scope, add explicit capabilities.
-  push(&type_params, @[ast_typeexpr]Trans({}));
+  push(&type_params, @[ast_typeexpr]Trans({mk_array(), mk_array()}));
   return App({embox(@[ast_typeexpr]Name({fake_ast_meta(), im->cym.fnsym})), type_params});
 }
 
