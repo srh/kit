@@ -403,6 +403,7 @@ struct ast_lambda {
   is_inline ast_isinline;
   args array[ast_vardecl];
   return_type ast_typeexpr;
+  trans opt[ast_trans];
   body ast_fullbody;
 };
 

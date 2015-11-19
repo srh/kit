@@ -197,18 +197,19 @@ func parse_rest_of_func(p *ps, is_export ast_isexport, is_inline ast_isinline, o
   name ast_ident;
   params array[ast_vardecl];
   return_type ast_typeexpr;
+  trans opt[ast_trans];
   body ast_bracebody;
   if ! +parse_def_generics_and_name(p, is_export, IsNotVar(void), &generics, &name) {
     return Fail;
   }
   lambda_expr_meta ast_meta = start(p);
-  if ! +parse_lambdaspec(p, &params, &return_type, &body) {
+  if ! +parse_lambdaspec(p, &params, &return_type, &trans, &body) {
     return Fail;
   }
   end(p, lambda_expr_meta);
 
   *out = Def({is_export, IsNotVar(void), generics, name, None,
-              consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({is_inline, params, return_type, {NotComputed@[ast_fullbody_info](), body}})))});
+              consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({is_inline, params, return_type, trans, {NotComputed@[ast_fullbody_info](), body}})))});
   return Success;
 }
 
@@ -376,8 +377,23 @@ func parse_def_generics_and_name(p *ps, is_export ast_isexport, is_var ast_isvar
   return Success;
 }
 
-func parse_lambdaspec(p *ps, params_out *array[ast_vardecl], return_type_out *ast_typeexpr, body_out *ast_bracebody) parse_result {
-  if !(+parse_args_list(p, params_out) && +parse_typeexpr(p, return_type_out) && +parse_bracebody(p, body_out)) {
+func parse_lambda_optional_transdesc(p *ps, out *opt[ast_trans]) parse_result {
+  if ! +try_skip_keyw(p, With) {
+    *out = None;
+    return Success;
+  }
+  trans ast_trans;
+  switch triparse_trans(p, &trans) {
+  case Success:
+    *out = Has(trans);
+    return Success;
+  default:
+    return Fail;
+  }
+}
+
+func parse_lambdaspec(p *ps, params_out *array[ast_vardecl], return_type_out *ast_typeexpr, trans_out *opt[ast_trans], body_out *ast_bracebody) parse_result {
+  if !(+parse_args_list(p, params_out) && +parse_typeexpr(p, return_type_out) && +parse_lambda_optional_transdesc(p, trans_out) && +parse_bracebody(p, body_out)) {
     return Fail;
   }
   return Success;
@@ -1316,12 +1332,13 @@ def at_sign i32 = '@';
 func parse_rest_of_lambda(p *ps, lambda_expr_meta ast_meta, out *ast_expr) parse_result {
   args array[ast_vardecl];
   return_type ast_typeexpr;
+  trans opt[ast_trans];
   body ast_bracebody;
-  if ! +parse_lambdaspec(p, &args, &return_type, &body) {
+  if ! +parse_lambdaspec(p, &args, &return_type, &trans, &body) {
     return Fail;
   }
   end(p, lambda_expr_meta);
-  *out = mk(lambda_expr_meta, @[ast_expr_enum]Lambda({IsNotInline(void), args, return_type, {NotComputed@[ast_fullbody_info](), body}}));
+  *out = mk(lambda_expr_meta, @[ast_expr_enum]Lambda({IsNotInline(void), args, return_type, trans, {NotComputed@[ast_fullbody_info](), body}}));
   return Success;
 }
 

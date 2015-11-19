@@ -121,6 +121,7 @@ enum keyw {
   Var void;
   Void void;
   While void;
+  With void;
 };
 
 enum numlit {
@@ -394,7 +395,8 @@ func grab_tok(p *ps) tok {
               || grab_keyword(p, "union", Union(void), &ret)
               || grab_keyword(p, "var", Var(void), &ret)
               || grab_keyword(p, "void", Void(void), &ret)
-              || grab_keyword(p, "while", While(void), &ret)) {
+              || grab_keyword(p, "while", While(void), &ret)
+              || grab_keyword(p, "with", With, &ret)) {
             return ret;
           }
         }
