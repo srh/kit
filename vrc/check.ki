@@ -1273,8 +1273,12 @@ func lambda_declared_type(im *identmap, a *ast_lambda) ast_typeexpr {
     push(&type_params, ref(&a->args, i)->type);
   }
   push(&type_params, a->return_type);
-  // TODO(): Infer a no-change generic type from the generic params in scope, add explicit capabilities.
-  push(&type_params, @[ast_typeexpr]Trans({mk_array(), mk_array()}));
+  if case &Has(tr ast_trans) = &a->trans {
+    push(&type_params, @[ast_typeexpr]Trans(tr));
+  } else {
+    // TODO(): Infer a no-change generic type from the generic params in scope, add explicit capabilities.
+    push(&type_params, @[ast_typeexpr]Trans({mk_array(), mk_array()}));
+  }
   return App({embox(@[ast_typeexpr]Name({fake_ast_meta(), im->cym.fnsym})), type_params});
 }
 
