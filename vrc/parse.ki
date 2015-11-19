@@ -383,7 +383,7 @@ func parse_lambda_optional_transdesc(p *ps, out *opt[ast_trans]) parse_result {
     return Success;
   }
   trans ast_trans;
-  if ! +parse_lambda_trans(p, &trans) {
+  if ! +parse_trans_inner(p, &trans) {
     return Fail;
   }
   *out = Has(trans);
@@ -733,7 +733,7 @@ func triparse_lifetime(p *ps, out *ast_lifetime) triparse_result {
   return Success;
 }
 
-func parse_lambda_trans(p *ps, out *ast_trans) parse_result {
+func parse_trans_inner(p *ps, out *ast_trans) parse_result {
   before array[ast_statedesc];
   if ! +parse_statedesc_list(p, &before) {
     return Fail;
@@ -753,25 +753,18 @@ func triparse_trans(p *ps, out *ast_trans) triparse_result {
   if ! +try_skip_token(p, @[tokval]Grouper(LBrace)) {
     return Quickfail;
   }
-  before array[ast_statedesc];
-  if ! +parse_statedesc_list(p, &before) {
-    return Error;
-  }
-  if empty(&before) && +try_skip_token(p, @[tokval]Grouper(RBrace)) {
-    *out = {before, mk_array()};
+  if +try_skip_token(p, @[tokval]Grouper(RBrace)) {
+    *out = {mk_array(), mk_array()};
     return Success;
   }
-  if ! +try_skip_oper(p, '=', '>') {
-    return Error;
-  }
-  after array[ast_statedesc];
-  if ! +parse_statedesc_list(p, &after) {
+  trans ast_trans;
+  if ! +parse_trans_inner(p, &trans) {
     return Error;
   }
   if ! +try_skip_token(p, @[tokval]Grouper(RBrace)) {
     return Error;
   }
-  *out = {before, after};
+  *out = trans;
   return Success;
 }
 
