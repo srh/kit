@@ -395,8 +395,9 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     return NoFail;
   }
   // The enum constructor and enum rhs type _could_ have generic lifetimes in it.
-  // TODO(): This trans really is fake, what about generics in the rhs type, or return type.
-  ctor_type te_typeexpr = sfn_type(ds->cs, *rhs_type, cac_return_type.te, fake_trans());
+  // We really do use the empty trans here.  Why?  Enum constructors call the copy or move/destroy constructor, and they should not affect in-scope generics.
+  // NOTE: It'd be super-cool if we inherited the trans desc directly from copy/move.  How is our ref copy going to get "accounted for" (if it's counted or something)?
+  ctor_type te_typeexpr = sfn_type(ds->cs, *rhs_type, cac_return_type.te, empty_trans());
   cac_ctor_type cac_typeexpr;
   if case Printed(pm) = noscoped_check_and_compute_typeexpr(ds->clq, &ctor_type, &cac_ctor_type) {
     return Printed(pm);
