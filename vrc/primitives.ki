@@ -491,7 +491,9 @@ func add_function_primitive(cs *checkstate) void {
 func add_non_magic_fn_primitive(cs *checkstate, name sym, args size, nonmag def_non_magic) void {
   parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None})));
   push(&parms, primitive_void_type(cs));
-  // TODO(): How is a generic function like this supposed to define a trans?  Likewise below.
+  // NOTE: Some of these might have to emit information at some point -- if a ref[T, 'a] gets destroyed (that is, if "&'a T" gets destroyed) somehow we're supposed to account for that, to avoid memory leaks, to deref some count, and the like.
+  // I mean it is just wrong to say that init/copy/move/destroy don't emit effects.
+  // TODO(): So this is garbage.
   push(&parms, fake_trans());
   type te_typeexpr = sfn_type(cs, freeze(&parms));
   add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnNonMagic(nonmag));
@@ -500,7 +502,7 @@ func add_non_magic_fn_primitive(cs *checkstate, name sym, args size, nonmag def_
 func add_magic_constructor_primitive(cs *checkstate, name sym, args size, mag def_magic) void {
   parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None})));
   push(&parms, primitive_void_type(cs));
-  // TODO(): How is a generic function like this supposed to define a trans?  Likewise above.
+  // TODO(): This should at some point inherit the trans from its copyees.  For example, suppose one field is a "&'a T".  Then maybe we'd need to update the compile-time reference count of 'a?
   push(&parms, fake_trans());
   type te_typeexpr = sfn_type(cs, freeze(&parms));
   add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnMagic(mag));
