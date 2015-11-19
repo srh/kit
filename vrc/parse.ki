@@ -762,17 +762,23 @@ func triparse_trans(p *ps, out *ast_trans) triparse_result {
 }
 
 func parse_statedesc_list(p *ps, out *array[ast_statedesc]) parse_result {
+  if +try_skip_keyw(p, Void) {
+    *out = mk_array();
+    return Success;
+  }
+
   build array[ast_statedesc];
   for ;; {
     desc ast_statedesc;
     switch triparse_statedesc(p, &desc) {
     case Success:
       pushref(&build, &desc);
-    case Quickfail:
+    default:
+      return Fail;
+    }
+    if ! +try_skip_oper(p, '&') {
       swap(out, &build);
       return Success;
-    case Error:
-      return Fail;
     }
   }
 }
