@@ -1433,7 +1433,8 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
 
 func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, demand rval_celldemand, x *ast_expr) np {
   // TODO: Cache type.
-  type ast_typeexpr = lambda_declared_type(es->im, a);
+  // NOTE: That we pass in generics for some rando lambda is kind of lame.  Could we be smarter and figure out the constraints more loosely?  (Some generics in scope might have nothing to do with the lambda expression.)
+  type ast_typeexpr = lambda_declared_type(es->im, es->ds->generics, a);
   // TODO: Cache converted.
   converted te_typeexpr;
   if case Printed(pm) = convert_typeexpr(es->cs, &type, &converted) {

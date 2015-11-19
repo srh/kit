@@ -1266,18 +1266,35 @@ func level_to_derived(clq *clqueue, wc which_ctor, arity size, type *te_typeexpr
 
 
 
-func lambda_declared_type(im *identmap, a *ast_lambda) ast_typeexpr {
+func lambda_declared_type(im *identmap, g *ast_generics, a *ast_lambda) ast_typeexpr {
   type_params array[ast_typeexpr];
-  n size = count(&a->args);
-  for i size = 0; i < n; i = i + 1 {
+  nargs size = count(&a->args);
+  for i size = 0; i < nargs; i = i + 1 {
     push(&type_params, ref(&a->args, i)->type);
   }
   push(&type_params, a->return_type);
   if case &Has(tr ast_trans) = &a->trans {
     push(&type_params, @[ast_typeexpr]Trans(tr));
   } else {
-    // TODO(): Infer a no-change generic type from the generic params in scope, add explicit capabilities.
-    push(&type_params, @[ast_typeexpr]Trans({mk_array(), mk_array()}));
+    before array[ast_statedesc];
+    after array[ast_statedesc];
+    switch g {
+    case &NoGenerics: { }
+    case &HasGenerics(ag array[ast_generik]):
+      nag size = count(&ag);
+      for i size = 0; i < nag; i = i + 1 {
+        switch ref(&ag, i) {
+        case &LifetimeGeneric(name ast_ident):
+          sd ast_statedesc = {{name}, {fake_ast_meta(), intern(im, _s("active"))}};
+          push(&before, sd);
+          push(&after, sd);
+        default: { }
+        }
+      }
+    case &VariadicGenerics(v ast_variadic_generics):
+      ice(_u8("lambda_declared_type variadic generics"));
+    }
+    push(&type_params, @[ast_typeexpr]Trans({before, after}));
   }
   return App({embox(@[ast_typeexpr]Name({fake_ast_meta(), im->cym.fnsym})), type_params});
 }
@@ -1289,7 +1306,7 @@ func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) np {
   } else {
     switch &a->rhs.expr.u {
       case &Lambda(b ast_lambda): {
-        *out = lambda_declared_type(im, &b);
+        *out = lambda_declared_type(im, &a->generics, &b);
         return NoFail;
       }
       default: {
