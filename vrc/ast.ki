@@ -182,7 +182,12 @@ enum ast_typeexpr {
   Unknown ast_unknown;
 };
 
+struct ast_vardecl_info {
+  vn var_number;
+};
+
 struct ast_vardecl {
+  info nc[ast_vardecl_info];
   name ast_ident;
   type ast_typeexpr;
 };

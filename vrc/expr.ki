@@ -2,6 +2,7 @@ import bigint;
 import body;
 import check;
 import primitives;
+import walk;
 
 // Used with the variable name "es" -- its name used to be different.
 struct framescope {
@@ -1469,6 +1470,9 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, demand rv
     if case Printed(pm) = help_check_lambda_body(&bs, computed_params, a) {
       return Printed(pm);
     }
+    if case Printed(pm) = walk_lambda_state(&bs, computed_params, a) {
+      return Printed(pm);
+    }
   }
 
   props type_properties;
@@ -1515,10 +1519,6 @@ func help_check_lambda_body(bs *bodystate, computed_params *shray[te_typeexpr], 
 
   destructions array[var_destruction];
   if case Printed(pm) = make_destructions(&bs->es, read_nums(&vp), &destructions) {
-    return Printed(pm);
-  }
-
-  if case Printed(pm) = walk_state(&bs, computed_params, a) {
     return Printed(pm);
   }
 

@@ -1,0 +1,119 @@
+import ast;
+import expr;
+
+// We have a set of lifetimes that pop in and out of existence over time.  They all have interesting state that needs to be tracked.  We want to chase state through everything.
+
+// How should we represent state?  We've got facts.  A big bag of facts.  Okay then.  I hope they aren't self-contradictory!
+
+struct walkdesc {
+  facts array[te_statedesc];
+};
+
+// There's just one of these (for any given walk).
+struct walkstate {
+  bs *bodystate;
+  es *framescope;
+  ds *defscope;
+  clq *clqueue;
+  cs *checkstate;
+  im *identmap;
+
+  current_desc walkdesc;
+};
+
+func mk(bs *bodystate) walkstate {
+  ret walkstate = {bs, &bs->es, bs->ds, bs->clq, bs->cs, bs->im, {mk_array()}};
+  return ret;
+}
+
+// computed_params is the fn[...] params (including return type and transdesc)
+func walk_lambda_state(bs *bodystate, computed_params *shray[te_typeexpr], a *ast_lambda) np {
+  ws walkstate = mk(bs);
+
+  nargs size = count(&a->args);
+  for i size = 0; i < nargs; i++ {
+    vn var_number = unHas(&ref(&a->args, i)->info)->vn;
+    vi *var_info = ref_var(&bs->es, vn);
+    // Okay, and?
+  }
+
+  if case Printed(pm) = walk_body(&ws, &a->body.bb) {
+    return Printed(pm);
+  }
+
+  // TODO(): Something must be done.
+  return NoFail;
+}
+
+func walk_body(ws *walkstate, a *ast_bracebody) np {
+  nstatements size = count(&a->statements);
+  for i size = 0; i < nstatements; i++ {
+    s *ast_statement = ref(&a->statements, i);
+    if case Printed(pm) = walk_statement(ws, s) {
+      return Printed(pm);
+    }
+  }
+  // TODO(): Now walk the destructions.
+  return NoFail;
+}
+
+func walk_statement(ws *walkstate, a *ast_statement) np {
+  switch &a->u {
+  case &Expr(b ast_expr_discard):
+    if case Printed(pm) = walk_discard_expr(ws, &b) {
+      return Printed(pm);
+    }
+
+  case &Return(b ast_return_statement):
+    if case Printed(pm) = walk_return_statement(ws, &b) {
+      return Printed(pm);
+    }
+
+  case &Var(b ast_var_statement):
+    if case Printed(pm) = walk_var_statement(ws, &b) {
+      return Printed(pm);
+    }
+
+  case &IfThen(b ast_ifthen_statement):
+    return TODO();
+
+  case &IfThenElse(b ast_ifthenelse_statement):
+    return TODO();
+
+  case &While(b ast_while_statement):
+    return TODO();
+
+  case &For(b ast_for_statement):
+    return TODO();
+
+  case &Switch(b ast_switch_statement):
+    return TODO();
+
+  case &Break(b ast_break_statement):
+    return TODO();
+
+  case &Continue(b ast_continue_statement):
+    return TODO();
+
+  case &Label(b ast_label_statement):
+    return TODO();
+
+  case &Goto(b ast_goto_statement):
+    return TODO();
+  }
+
+  return NoFail;
+}
+
+func walk_discard_expr(ws *walkstate, a *ast_expr_discard) np {
+  return TODO();
+}
+
+func walk_return_statement(ws *walkstate, a *ast_return_statement) np {
+  return TODO();
+}
+
+func walk_var_statement(ws *walkstate, a *ast_var_statement) np {
+  return TODO();
+}
+

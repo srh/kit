@@ -88,7 +88,7 @@ func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *en
   exit statement_num = entry;
   vp varpopper;
   init_vp(&vp, &bs->es);
-  for i size = 0; i < nstatements; i = i + 1 {
+  for i size = 0; i < nstatements; i++ {
     s *ast_statement = ref(&a->statements, i);
     ee entryexit;
     if case Printed(pm) = check_statement(bs, &vp, obp, s, &ee) {
@@ -214,30 +214,27 @@ func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_s
 func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) np {
   num statement_num = add_statement(bs, Has(s));
   switch &s->u {
-    case &Expr(b ast_expr_discard): {
+    case &Expr(b ast_expr_discard):
       pt te_typeexpr = TeUnknown(void);
       if case Printed(pm) = check_discard_expr(&bs->es, &b, &pt) {
         return Printed(pm);
       }
       *ee_out = {num, num};
-    }
 
-    case &Return(b ast_return_statement): {
+    case &Return(b ast_return_statement):
       exit_num statement_num;
       if case Printed(pm) = check_return_statement(bs, &b, &exit_num) {
         return Printed(pm);
       }
       *ee_out = {num, exit_num};
-    }
 
-    case &Var(b ast_var_statement): {
+    case &Var(b ast_var_statement):
       if case Printed(pm) = check_var_statement(bs, vp, &b) {
         return Printed(pm);
       }
       *ee_out = {num, num};
-    }
 
-    case &IfThen(b ast_ifthen_statement): {
+    case &IfThen(b ast_ifthen_statement):
       swartch_vp varpopper;
       init_vp(&swartch_vp, &bs->es);
 
@@ -255,9 +252,8 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       connect_statements(bs, num, body_ee.entry);
       connect_statements(bs, body_ee.exit, tailnum);
       *ee_out = {num, tailnum};
-    }
 
-    case &IfThenElse(b ast_ifthenelse_statement): {
+    case &IfThenElse(b ast_ifthenelse_statement):
       swartch_vp varpopper;
       init_vp(&swartch_vp, &bs->es);
 
@@ -281,9 +277,8 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       connect_statements(bs, then_ee.exit, tailnum);
       connect_statements(bs, else_ee.exit, tailnum);
       *ee_out = {num, tailnum};
-    }
 
-    case &While(b ast_while_statement): {
+    case &While(b ast_while_statement):
       swartch_vp varpopper;
       init_vp(&swartch_vp, &bs->es);
 
@@ -302,23 +297,20 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       connect_statements(bs, body_ee.exit, num);
       connect_statements(bs, num, tailnum);
       *ee_out = {num, tailnum};
-    }
 
-    case &For(b ast_for_statement): {
+    case &For(b ast_for_statement):
       exitnum statement_num;
       if case Printed(pm) = check_for_statement(bs, vp, &b, num, &exitnum) {
         return Printed(pm);
       }
       *ee_out = {num, exitnum};
-    }
 
-    case &Switch(b ast_switch_statement): {
+    case &Switch(b ast_switch_statement):
       exitnum statement_num;
       if case Printed(pm) = check_switch_statement(bs, vp, obp, &b, num, &exitnum) {
         return Printed(pm);
       }
       *ee_out = {num, exitnum};
-    }
 
     case &Break(b ast_break_statement):
       if case Has(bp *breakpack) = obp {
@@ -346,7 +338,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
         return ERR(_u8("continue statement in bad place."));
       }
 
-    case &Label(b ast_label_statement): {
+    case &Label(b ast_label_statement):
       if case Has(ix size) = lookup_label(bs, b.name.value) {
         return ERR(_u8("Duplicate label name."));
       }
@@ -355,12 +347,10 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       push(&bs->labels, {num, &b, b.name.value, vars_in_scope(&bs->es), false});
       annotate(&b.info, {label_number});
       *ee_out = {num, num};
-    }
 
-    case &Goto(b ast_goto_statement): {
+    case &Goto(b ast_goto_statement):
       push(&bs->gotos, {num, &b, b.target.value, vars_in_scope(&bs->es)});
       *ee_out = {num, add_statement(bs, None)};
-    }
   }
   return NoFail;
 }
@@ -868,15 +858,6 @@ func finish_lambda_body(bs *bodystate, ee entryexit) np {
   }
 
   return NoFail;
-}
-
-// computed_params is the fn[...] params (including return type and transdesc)
-func walk_state(bs *bodystate, computed_params *shray[te_typeexpr], a *ast_lambda) np {
-  // We have a set of lifetimes that pop in and out of existence over time.  They all have interesting state that needs to be tracked.  We want to chase state through everything.
-
-
-
-  return TODO();
 }
 
 func mark_reachable(bs *bodystate, entry statement_num) void {

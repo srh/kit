@@ -861,11 +861,11 @@ func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) parse_result {
       type ast_typeexpr;
       switch help_triparse_typeexpr(p, ab, AllowSpecialsNo, &type) {
         case Success: {
-          *out = {name, type};
+          *out = {NotComputed, name, type};
           return Success;
         }
         case Quickfail: {
-          *out = {name, Unknown({})};
+          *out = {NotComputed, name, Unknown({})};
           return Success;
         }
         case Error: {
@@ -878,7 +878,7 @@ func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) parse_result {
       if ! +help_parse_typeexpr(p, ab, AllowSpecialsNo, &type) {
         return Fail;
       }
-      *out = {name, type};
+      *out = {NotComputed, name, type};
       return Success;
     }
   }
@@ -1741,7 +1741,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
 
   decl ast_vardecl;
   if +try_skip_keyw(p, Var(void)) {
-    decl = {name, Unknown({})};
+    decl = {NotComputed, name, Unknown({})};
   } else if +try_skip_oper(p, at_sign) {
     lhs ast_expr;
     if ! +parse_finish_name_expr(p, name, &lhs) {
@@ -1772,7 +1772,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
         return Fail;
       }
       case Success: {
-        decl = {name, type};
+        decl = {NotComputed, name, type};
       }
     }
   }
