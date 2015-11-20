@@ -866,7 +866,17 @@ func finish_lambda_body(bs *bodystate, ee entryexit) np {
   if ref(&bs->statements, ee.exit.x)->marked_reachable && !type_is_void(bs->cs, bs->return_type) {
     return ERR(_u8("Body can exit without return"));
   }
+
   return NoFail;
+}
+
+// computed_params is the fn[...] params (including return type and transdesc)
+func walk_state(bs *bodystate, computed_params *shray[te_typeexpr], a *ast_lambda) np {
+  // We have a set of lifetimes that pop in and out of existence over time.  They all have interesting state that needs to be tracked.  We want to chase state through everything.
+
+
+
+  return TODO();
 }
 
 func mark_reachable(bs *bodystate, entry statement_num) void {

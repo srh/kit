@@ -1466,7 +1466,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, demand rv
       return Printed(pm);
     }
     bs bodystate = mk(es->ds, &return_type, &return_type_props);
-    if case Printed(pm) = help_check_lambda_body(&bs, a, computed_params) {
+    if case Printed(pm) = help_check_lambda_body(&bs, computed_params, a) {
       return Printed(pm);
     }
   }
@@ -1480,7 +1480,8 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, demand rv
 }
 
 // This helper method shields its code from using the wrong (outer) framescope variable in check_expr_lambda.
-func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray[te_typeexpr]) np {
+// computed_params is the fn[...] params (including return type and transdesc)
+func help_check_lambda_body(bs *bodystate, computed_params *shray[te_typeexpr], a *ast_lambda) np {
   vp varpopper;
   init_vp(&vp, &bs->es);
   nargs size = count(&a->args);
@@ -1514,6 +1515,10 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
 
   destructions array[var_destruction];
   if case Printed(pm) = make_destructions(&bs->es, read_nums(&vp), &destructions) {
+    return Printed(pm);
+  }
+
+  if case Printed(pm) = walk_state(&bs, computed_params, a) {
     return Printed(pm);
   }
 
