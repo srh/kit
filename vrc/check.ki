@@ -97,7 +97,7 @@ func convert_typefunc(cs *checkstate, a *ast_typeexpr, out *te_puretype) np {
     *out = TePureName(b.value);
     return NoFail;
   case &Unknown(b ast_unknown):
-    *out = TePureUnknown(void);
+    *out = TePureUnknown;
     return NoFail;
   default:
     return ERR(_u8("Fancy type expression '"), to_u8str(a), _u8("' in typefunc"));
@@ -239,7 +239,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) np {
       return NoFail;
 
     case &Unknown(b ast_unknown): {
-      *out = TeUnknown(void);
+      *out = TeUnknown;
       return NoFail;
     }
   }
@@ -378,7 +378,7 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms) id_and
         case &Def(a ast_def): {
           rhs = InstRhsExpr({a.rhs, NotComputed});
         }
-        case &ExternDef(a ast_extern_def): { rhs = InstRhsExtern(void); }
+        case &ExternDef(a ast_extern_def): { rhs = InstRhsExtern; }
         default: {
           ice(_u8("def_entry has invalid toplevel\n"));
         }
@@ -458,7 +458,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
       if case Printed(pm) = set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms.repls), &rw) {
         return Printed(pm);
       }
-      inst->rhs_status = BeganCheckingRhs(void);
+      inst->rhs_status = BeganCheckingRhs;
       switch &inst->rhs {
         case &InstRhsPrim(op primitive_op): {
           // Do nothing.
@@ -484,7 +484,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           }
         }
       }
-      inst->rhs_status = FinishedCheckingRhs(void);
+      inst->rhs_status = FinishedCheckingRhs;
       return NoFail;
     }
     case BeganCheckingRhs: {
@@ -565,7 +565,7 @@ func check_and_compute_parms(clq *clqueue, t *genparms, out *idy_genparms) np {
 }
 
 func noscoped_check_and_compute_typeexpr(clq *clqueue, t *te_typeexpr, out *cac_typeexpr) np {
-  ng ast_generics = NoGenerics(void);
+  ng ast_generics = NoGenerics;
   np idy_repls = blank_idyrepls();
   return check_and_compute_typeexpr(clq, &ng, &np, t, out);
 }
@@ -629,7 +629,7 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
       return NoFail;
 
     case &TeUnknown: {
-      *out = {false, TeUnknown(void)};
+      *out = {false, TeUnknown};
       return NoFail;
     }
   }
@@ -807,7 +807,7 @@ func check_and_compute_app_type(clq *clqueue, g *ast_generics, parms *idy_repls,
       return NoFail;
     }
     case &TePureUnknown: {
-      *out = {false, TeApp({TePureUnknown(void), params, None})};
+      *out = {false, TeApp({TePureUnknown, params, None})};
       return NoFail;
     }
   }
@@ -1075,7 +1075,7 @@ func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *
           level_to_derived(clq, CtorMove, 2, realtype, mask_level(constructor_mask, ComputeMove, psd.move_level)),
           level_to_derived(clq, CtorCopy, 2, realtype, mask_level(constructor_mask, ComputeCopy, psd.copy_level)),
           level_to_derived(clq, CtorDestroy, 1, realtype, mask_level(constructor_mask, ComputeDestroy, psd.destroy_level)),
-          IsScalarNo(void)};
+          IsScalarNo};
   return NoFail;
 }
 
@@ -1104,11 +1104,11 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_t
   final_size u32 = ceil_aligned(max_size, max_alignment);
   *out = {final_size, max_alignment,
           // Enum initialization is always trivial -- initializes to zero-filled invalid tag value.
-          DerivedMethodTrivial(void),
+          DerivedMethodTrivial,
           level_to_derived(clq, CtorMove, 2, realtype, move_level),
           level_to_derived(clq, CtorCopy, 2, realtype, copy_level),
           level_to_derived(clq, CtorDestroy, 1, realtype, destroy_level),
-          IsScalarNo(void)};
+          IsScalarNo};
   return NoFail;
 }
 
@@ -1150,9 +1150,9 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
       }
       // Consider the case where you have a union of {uint32_t, uint32_t, uint32_t} and {uint64_t}.  We have alignment 8, thus we need size 16.
       final_size u32 = ceil_aligned(max_size, max_alignment);
-      *out = {final_size, max_alignment, DerivedMethodTrivial(void),
-              DerivedMethodTrivial(void), DerivedMethodTrivial(void),
-              DerivedMethodTrivial(void), IsScalarNo(void)};
+      *out = {final_size, max_alignment, DerivedMethodTrivial,
+              DerivedMethodTrivial, DerivedMethodTrivial,
+              DerivedMethodTrivial, IsScalarNo};
       return NoFail;
     }
 
@@ -1169,7 +1169,7 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
                 level_to_derived(clq, CtorMove, 2, t, to_level(&props.move_behavior)),
                 level_to_derived(clq, CtorCopy, 2, t, to_level(&props.copy_behavior)),
                 level_to_derived(clq, CtorDestroy, 1, t, to_level(&props.destroy_behavior)),
-                IsScalarNo(void)};
+                IsScalarNo};
         return NoFail;
       } else {
         ice(_u8("compute_type_properties called on incomplete arraytype."));
@@ -1535,7 +1535,7 @@ func load_module(cs *checkstate, mod_name sym) cr[module_id] {
       arr array[u8];
       if (cs->loader)(cs, mod_name, &arr) {
         mod shp[module];
-        oo(&mod)->process_state = Unprocessed(void);
+        oo(&mod)->process_state = Unprocessed;
         oo(&mod)->module_name = mod_name;
         oo(&mod)->base_offset = modules_next_base_offset(cs);
         swap(&oo(&mod)->buf, &arr);
@@ -1564,7 +1564,7 @@ func process_module(cs *checkstate, mod_name sym) cr[module_id] {
     }
     case NoFail(id module_id): {
       mod *module = ref_module(cs, id);
-      if mod->process_state == Unprocessed(void) {
+      if mod->process_state == Unprocessed {
          if case Printed(pm) = process_module_toplevels(cs, mod) {
            return Printed(pm);
          }
@@ -1575,13 +1575,13 @@ func process_module(cs *checkstate, mod_name sym) cr[module_id] {
 }
 
 func process_module_toplevels(cs *checkstate, mod *module) np {
-  check_mutate(&mod->process_state, Unprocessed(void), Processing(void));
+  check_mutate(&mod->process_state, Unprocessed, Processing);
   // We start the module outside of any access blocks, so the scope is empty, of course.
   access_scope array[access_entry_id];
   if case Printed(pm) = process_toplevels(cs, access_scope, mod, &mod->file.toplevels) {
     return Printed(pm);
   }
-  check_mutate(&mod->process_state, Processing(void), DoneProcessing(void));
+  check_mutate(&mod->process_state, Processing, DoneProcessing);
   return NoFail;
 }
 
@@ -1623,7 +1623,7 @@ func process_toplevels(cs *checkstate,
         add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
       }
       case &ExternDef(a ast_extern_def): {
-        ent def_entry = mk(mod->module_name, a.name.value, access_scope, NoGenerics(void), a.type, toplevel);
+        ent def_entry = mk(mod->module_name, a.name.value, access_scope, NoGenerics, a.type, toplevel);
         add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
       }
       case &TypeDef(a ast_type_def): {
@@ -1700,7 +1700,7 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
           return NoFail;
         }
         case AccessArityFinite(n u32): {
-          params shray[te_typeexpr] = repeat(~n, TeUnknown(void));
+          params shray[te_typeexpr] = repeat(~n, TeUnknown);
           id deftype_entry_id;
           if case Printed(pm) = match_deftype(cs, fake_ast_meta(), ent->name, Has(&params), &id) {
             ent->ent_id = FailedComputation;
@@ -1760,7 +1760,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
         case EntryMatchesAmbigously: {
           // NOTE: We could see if we have _one_ ambiguously matching entry, and extract any type information that we learned, to help the next match attempt (see check_expr and its allow_ambiguous parameter).  (Maybe we should, but maybe we shouldn't to keep the type checking algorithm simple and describable.)
           // Certainly the error message (somewhere) could be improved.
-          *res_out = MultiMatch(void);
+          *res_out = MultiMatch;
           return NoFail;
         }
         case EntryMatchesPrecisely(complete_parms genparms): {
@@ -1770,17 +1770,17 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
     }
     num_matches size = count(&matches);
     if num_matches == 0 {
-      *res_out = NoMatch(void);
+      *res_out = NoMatch;
       return NoFail;
     } else if num_matches == 1 {
       *res_out = OneMatch(get(&matches, 0));
       return NoFail;
     } else {
-      *res_out = MultiMatch(void);
+      *res_out = MultiMatch;
       return NoFail;
     }
   } else {
-    *res_out = NoMatch(void);
+    *res_out = NoMatch;
     return NoFail;
   }
 }
@@ -1794,17 +1794,17 @@ enum entry_matches_res {
 func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res {
   switch x {
     case &TypeDoesNotMatch: {
-      return EntryDoesNotMatch(void);
+      return EntryDoesNotMatch;
     }
     case &TypeMatchesAmbiguously(a): {
-      return EntryMatchesAmbigously(void);
+      return EntryMatchesAmbigously;
     }
     case &TypeMatchesPrecisely(a shray[te_typeexpr]): {
       if hasparms {
         return EntryMatchesPrecisely(HasParms(a));
       } else {
         check(count(&a) == 0);
-        return EntryMatchesPrecisely(NoParms(void));
+        return EntryMatchesPrecisely(NoParms);
       }
     }
   }
@@ -1815,7 +1815,7 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
     case &NoGenerics:
       switch gp {
         case &HasParms(parms shray[te_typeexpr]): {
-          *matches_out = EntryDoesNotMatch(void);
+          *matches_out = EntryDoesNotMatch;
           return NoFail;
         }
         case &NoParms: {
@@ -1831,7 +1831,7 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
       switch gp {
         case &HasParms(parms shray[te_typeexpr]): {
           if count(&parms) != count(&names) {
-            *matches_out = EntryDoesNotMatch(void);
+            *matches_out = EntryDoesNotMatch;
             return NoFail;
           }
           res var = type_matches(pt, &names, &parms, typeexpr);
@@ -1839,7 +1839,7 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
           return NoFail;
         }
         case &NoParms: {
-          parms shray[te_typeexpr] = repeat(count(&names), TeUnknown(void));
+          parms shray[te_typeexpr] = repeat(count(&names), TeUnknown);
           res var = type_matches(pt, &names, &parms, typeexpr);
           *matches_out = from_type_matches_res(true, &res);
           return NoFail;

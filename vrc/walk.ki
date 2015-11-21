@@ -124,6 +124,8 @@ func walk_statement(ws *walkstate, a *ast_statement) np {
 }
 
 func walk_goto_statement(ws *walkstate, a *ast_goto_statement) np {
+  // NOTE: We should think about how we do our variable unwindings (and in particular, windings).  We could overlap with other variable unwindings/windings, heading towards the same label.  Should we overlap the typestate, too?  For now, the answer is, nah.
+
   return TODO();
 }
 
