@@ -439,7 +439,7 @@ struct ast_local_field {
 };
 
 func mk(lhs box[ast_expr], fieldname ast_fieldname) ast_local_field {
-  return {NotComputed@[ast_local_field_info](), lhs, fieldname};
+  return {NotComputed, lhs, fieldname};
 }
 
 enum ast_deref_field_info {
@@ -491,7 +491,7 @@ struct ast_name_expr {
 };
 
 func mk(ident ast_ident, generic_params opt[array[ast_typeexpr]]) ast_name_expr {
-  return {NotComputed(), ident, generic_params};
+  return {NotComputed, ident, generic_params};
 }
 
 struct ast_paren_expr {
@@ -511,7 +511,7 @@ struct ast_index_expr {
 };
 
 func mk(lhs box[ast_expr], rhs box[ast_expr_consume]) ast_index_expr {
-  return {NotComputed@[ast_index_expr_info](), lhs, rhs};
+  return {NotComputed, lhs, rhs};
 }
 
 
@@ -605,7 +605,7 @@ struct ast_later_discard_info {
 };
 
 inline func mk_later() ast_later_discard_info {
-  return {NotComputed()};
+  return {NotComputed};
 }
 
 struct instpair {
@@ -782,11 +782,11 @@ struct ast_expr_discard {
 
 // TODO: Remove once we can costlessly pass by value.
 func discard(expr *ast_expr) ast_expr_discard {
-  return {*expr, NotComputed@[ast_expr_after_discard]()};
+  return {*expr, NotComputed};
 }
 
 func discard(expr ast_expr) ast_expr_discard {
-  return {expr, NotComputed@[ast_expr_after_discard]()};
+  return {expr, NotComputed};
 }
 
 // TODO: I think we're underchecking the arity of app types, be it for variadic or non-variadic generics.

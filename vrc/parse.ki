@@ -208,7 +208,7 @@ func parse_rest_of_func(p *ps, is_export ast_isexport, is_inline ast_isinline, o
   end(p, lambda_expr_meta);
 
   *out = Def({is_export, IsNotVar(void), generics, name, None,
-              consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({is_inline, args, return_type, trans, {NotComputed@[ast_fullbody_info](), body}})))});
+              consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({is_inline, args, return_type, trans, {NotComputed, body}})))});
   return Success;
 }
 
@@ -539,7 +539,7 @@ func triparse_bracebody(p *ps, out *ast_bracebody) triparse_result {
   statements array[ast_statement];
   for ;; {
     if +try_skip_token(p, @[tokval]Grouper(RBrace(void))) {
-      *out = {NotComputed@[ast_bracebody_info](), statements};
+      *out = {NotComputed, statements};
       return Success(void);
     }
     statement ast_statement;
@@ -922,7 +922,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
         return Fail;
       }
       m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed@[ast_deref_field_info](), mk_later(), embox(consume(&lhs)), {fieldname}}));
+      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed, mk_later(), embox(consume(&lhs)), {fieldname}}));
     } else if is_keyw(&peek(p)->val, Then) {
       switch compare_prec(prec_ctx, thenexpr_then_prec().left) {
       case Conflicts:
@@ -944,7 +944,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
           return Fail;
         }
         m ast_meta = copyend(p, lhs.meta);
-        lhs = mk(m, @[ast_expr_enum]Ternary({NotComputed(), embox(@[ast_expr_condition]{mk_later(), embox(consume(&lhs))}), embox(consume(&then_clause)), embox(consume(&else_clause))}));
+        lhs = mk(m, @[ast_expr_enum]Ternary({NotComputed, embox(@[ast_expr_condition]{mk_later(), embox(consume(&lhs))}), embox(consume(&then_clause)), embox(consume(&else_clause))}));
       }
     } else if case Has(is_incr bool) = is_postfix_incrdecr(peek(p)->val) {
       oper_meta ast_meta = startend(p);
@@ -1109,7 +1109,7 @@ func build_binop_expr(p *ps, se statement_expr, m ast_meta, user_assignment bool
     if case IsNotStatementExpr(v void) = se {
       return Fail;
     }
-    *out = mk(m, @[ast_expr_enum]Assignment({NotComputed@[ast_assignment_info](), embox(lhs), embox(rhs)}));
+    *out = mk(m, @[ast_expr_enum]Assignment({NotComputed, embox(lhs), embox(rhs)}));
   } else if op.value == p->im->cym.logical_and_sym {
     *out = mk(m, @[ast_expr_enum]LogicalConjunction({false, embox(consume(&lhs)), embox(consume(&rhs))}));
   } else if op.value == p->im->cym.logical_or_sym {
@@ -1350,7 +1350,7 @@ func parse_rest_of_lambda(p *ps, lambda_expr_meta ast_meta, out *ast_expr) parse
     return Fail;
   }
   end(p, lambda_expr_meta);
-  *out = mk(lambda_expr_meta, @[ast_expr_enum]Lambda({IsNotInline(void), args, return_type, trans, {NotComputed@[ast_fullbody_info](), body}}));
+  *out = mk(lambda_expr_meta, @[ast_expr_enum]Lambda({IsNotInline(void), args, return_type, trans, {NotComputed, body}}));
   return Success;
 }
 
@@ -1362,7 +1362,7 @@ func parse_rest_of_strinit(p *ps, m ast_meta, out *ast_expr) parse_result {
   params array[ast_strinit_param];
   necs size = count(&ecs);
   for i size = 0; i < necs; i = i + 1 {
-    push(&params, {NotComputed@[ast_strinit_param_info](), get(&ecs, i)});
+    push(&params, {NotComputed, get(&ecs, i)});
   }
   end(p, m);
   *out = mk(m, @[ast_expr_enum]Strinit({m, params}));
@@ -1455,7 +1455,7 @@ func parse_rest_of_continue_statement_enum(p *ps, out *ast_statement_enum) parse
   if ! +try_skip_oper(p, ';') {
     return Fail;
   }
-  *out = Continue({NotComputed@[ast_continue_statement_info]()});
+  *out = Continue({NotComputed});
   return Success;
 }
 
@@ -1463,7 +1463,7 @@ func parse_rest_of_break_statement_enum(p *ps, out *ast_statement_enum) parse_re
   if ! +try_skip_oper(p, ';') {
     return Fail;
   }
-  *out = Break({NotComputed@[ast_break_statement_info]()});
+  *out = Break({NotComputed});
   return Success;
 }
 
@@ -1472,7 +1472,7 @@ func parse_rest_of_label_statement_enum(p *ps, out *ast_statement_enum) parse_re
   if !(+parse_ident(p, &name) && +try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = Label({NotComputed@[ast_label_statement_info](), name});
+  *out = Label({NotComputed, name});
   return Success;
 }
 
@@ -1481,7 +1481,7 @@ func parse_rest_of_goto_statement_enum(p *ps, out *ast_statement_enum) parse_res
   if !(+parse_ident(p, &target) && +try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = Goto({NotComputed@[ast_goto_statement_info](), target});
+  *out = Goto({NotComputed, target});
   return Success;
 }
 
@@ -1509,7 +1509,7 @@ func parse_condition(p *ps, ab allow_braces, out *ast_condition) parse_result {
          && +parse_expr(p, kConditionPrec, ab, IsNotStatementExpr(void), &rhs)) {
       return Fail;
     }
-    *out = PatternCondition({NotComputed@[ast_pattern_assign_info](), conspatt, embox(consume(&rhs))});
+    *out = PatternCondition({NotComputed, conspatt, embox(consume(&rhs))});
     return Success;
   } else {
     condition ast_expr;
@@ -1546,7 +1546,7 @@ func parse_rest_of_if_statement_enum(p *ps, out *ast_statement_enum) parse_resul
     }
     end(p, m);
     elseif ast_statement = {m, elseif_u};
-    *out = IfThenElse({mk_condition_discard_info(), condition, thenbody, {NotComputed@[ast_bracebody_info](), mk_array(elseif)}});
+    *out = IfThenElse({mk_condition_discard_info(), condition, thenbody, {NotComputed, mk_array(elseif)}});
     return Success;
   }
   elsebody ast_bracebody;
@@ -1608,7 +1608,7 @@ func parse_rest_of_for_statement_enum(p *ps, out *ast_statement_enum) parse_resu
   if ! +parse_bracebody(p, &body) {
     return Fail;
   }
-  *out = For({NotComputed@[ast_for_statement_info](), initializer, condition, increment, body});
+  *out = For({NotComputed, initializer, condition, increment, body});
   return Success;
 }
 
@@ -1622,7 +1622,7 @@ func parse_rest_of_switch_statement_enum(p *ps, out *ast_statement_enum) parse_r
   cases array[ast_switch_case];
   for ;; {
     if +try_skip_token(p, @[tokval]Grouper(RBrace(void))) {
-      *out = Switch({NotComputed@[ast_enum_deconstruction_info](), mk_later(), embox(consume(&swartch)), cases});
+      *out = Switch({NotComputed, mk_later(), embox(consume(&swartch)), cases});
       return Success;
     }
     cas ast_switch_case;
@@ -1654,7 +1654,7 @@ func parse_switch_case(p *ps, out *ast_switch_case) parse_result {
           if count(&statements) == 0 {
             return Fail;
           }
-          body = {NotComputed@[ast_bracebody_info](), statements};
+          body = {NotComputed, statements};
           done = true;
         } else {
           st ast_statement;
@@ -1696,7 +1696,7 @@ func parse_rest_of_constructor_pattern(p *ps, m ast_meta,
     decl = None;
   }
   end(p, m);
-  *out = {m, NotComputed@[ast_cp_info](), addressof_constructor, constructor_name, decl};
+  *out = {m, NotComputed, addressof_constructor, constructor_name, decl};
   return Success;
 }
 
@@ -1782,7 +1782,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
       case ForceAssignmentYes: { return Fail; }
       case ForceAssignmentNo: {
         step(p);
-        *out = Var({NotComputed@[ast_var_info](), decl, AutoInit(None)});
+        *out = Var({NotComputed, decl, AutoInit(None)});
         return Success;
       }
     }
@@ -1794,7 +1794,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
        && +try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = Var({NotComputed@[ast_var_info](), decl, HasExpr(embox(consume(&rhs)))});
+  *out = Var({NotComputed, decl, HasExpr(embox(consume(&rhs)))});
   return Success;
 }
 

@@ -510,19 +510,19 @@ func add_magic_constructor_primitive(cs *checkstate, name sym, args size, mag de
 
 func add_magic_constructor_primitives(cs *checkstate) void {
   teetype te_typeexpr = TeName({cs->im->cym.tee_sym, None});
-  add_non_magic_fn_primitive(cs, cs->im->cym.init, 1, @[def_non_magic]NonMagicCtor({CtorInit(void), {teetype, NotComputed@[non_magic_ctor_info]()}}));
-  add_non_magic_fn_primitive(cs, cs->im->cym.copy, 2, @[def_non_magic]NonMagicCtor({CtorCopy(void), {teetype, NotComputed@[non_magic_ctor_info]()}}));
-  add_non_magic_fn_primitive(cs, cs->im->cym.move, 2, @[def_non_magic]NonMagicCtor({CtorMove(void), {teetype, NotComputed@[non_magic_ctor_info]()}}));
-  add_non_magic_fn_primitive(cs, cs->im->cym.destroy, 1, @[def_non_magic]NonMagicCtor({CtorDestroy(void), {teetype, NotComputed@[non_magic_ctor_info]()}}));
+  add_non_magic_fn_primitive(cs, cs->im->cym.init, 1, @[def_non_magic]NonMagicCtor({CtorInit(void), {teetype, NotComputed}}));
+  add_non_magic_fn_primitive(cs, cs->im->cym.copy, 2, @[def_non_magic]NonMagicCtor({CtorCopy(void), {teetype, NotComputed}}));
+  add_non_magic_fn_primitive(cs, cs->im->cym.move, 2, @[def_non_magic]NonMagicCtor({CtorMove(void), {teetype, NotComputed}}));
+  add_non_magic_fn_primitive(cs, cs->im->cym.destroy, 1, @[def_non_magic]NonMagicCtor({CtorDestroy(void), {teetype, NotComputed}}));
 
-  add_def_primitive(cs, cs->im->cym.sizeofsym, tee_generic(cs), primitive_size_type(cs), @[def_definition]DefnNonMagic(@[def_non_magic]NonMagicProp({PropSizeof(void), teetype, NotComputed@[u32]()})));
-  add_def_primitive(cs, cs->im->cym.alignofsym, tee_generic(cs), primitive_size_type(cs), @[def_definition]DefnNonMagic(@[def_non_magic]NonMagicProp({PropAlignof(void), teetype, NotComputed@[u32]()})));
+  add_def_primitive(cs, cs->im->cym.sizeofsym, tee_generic(cs), primitive_size_type(cs), @[def_definition]DefnNonMagic(@[def_non_magic]NonMagicProp({PropSizeof(void), teetype, NotComputed})));
+  add_def_primitive(cs, cs->im->cym.alignofsym, tee_generic(cs), primitive_size_type(cs), @[def_definition]DefnNonMagic(@[def_non_magic]NonMagicProp({PropAlignof(void), teetype, NotComputed})));
 
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_bzero, 1, @[def_magic]MagicBzero({NotComputed@[u32]()}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_memcopy, 2, @[def_magic]MagicMemcopy({NotComputed@[u32]()}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_bzero, 1, @[def_magic]MagicBzero({NotComputed}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_memcopy, 2, @[def_magic]MagicMemcopy({NotComputed}));
   add_magic_constructor_primitive(cs, cs->im->cym.magic_nopdestroy, 1, @[def_magic]MagicNopdestroy(void));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_init, 1, @[def_magic]MagicCtor({CtorInit(void), {teetype, NotComputed@[magic_ctor_info]()}}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_copy, 2, @[def_magic]MagicCtor({CtorCopy(void), {teetype, NotComputed@[magic_ctor_info]()}}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_move, 2, @[def_magic]MagicCtor({CtorMove(void), {teetype, NotComputed@[magic_ctor_info]()}}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_destroy, 1, @[def_magic]MagicCtor({CtorDestroy(void), {teetype, NotComputed@[magic_ctor_info]()}}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_init, 1, @[def_magic]MagicCtor({CtorInit(void), {teetype, NotComputed}}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_copy, 2, @[def_magic]MagicCtor({CtorCopy(void), {teetype, NotComputed}}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_move, 2, @[def_magic]MagicCtor({CtorMove(void), {teetype, NotComputed}}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_destroy, 1, @[def_magic]MagicCtor({CtorDestroy(void), {teetype, NotComputed}}));
 }

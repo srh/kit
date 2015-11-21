@@ -883,7 +883,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
       annotate(&a->info, FieldName(offset));
     }
     case ConstantField(value u32): {
-      after nc[ast_expr_after_discard] = NotComputed();
+      after nc[ast_expr_after_discard] = NotComputed;
       if case Printed(pm) = annotate_disposal_for_discard(es, oo(&a->lhs), &after) {
         return Printed(pm);
       }
@@ -2096,7 +2096,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, demand
   } else {
     // Dereferencing a pointer always makes an lvalue.
     lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe(void), field_lifetime(es->cs, fake_lifetime(es->cs))});
-    ie_info_after nc[ast_expr_after_consume] = NotComputed();
+    ie_info_after nc[ast_expr_after_consume] = NotComputed;
     lhs_later ast_later_discard_info = mk_later();
     if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), NoDemand, &ie_info_after, &lhs_later, None) {
       return Printed(pm);

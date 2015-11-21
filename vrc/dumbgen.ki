@@ -87,7 +87,7 @@ struct jmpdata {
 
 func frame_create_target(h *frame) jmp_targetnum {
   ret jmp_targetnum = ~count(&h->jmp_targets);
-  push(&h->jmp_targets, NotComputed());
+  push(&h->jmp_targets, NotComputed);
   return ret;
 }
 
@@ -96,7 +96,7 @@ func frame_define_target(h *frame, jt jmp_targetnum, text_offset u32) void {
 }
 
 func mk_gn_annot() gn_annot {
-  return {NotComputed(), NotComputed(), mk_hash@[gr_num, void](), NotComputed@[lives](), NotComputed@[i32](), false, NotComputed@[jmp_targetnum]()};
+  return {NotComputed, NotComputed, mk_hash@[gr_num, void](), NotComputed, NotComputed, false, NotComputed};
 }
 
 func unIndirect(loc cell_loc) i32 {
@@ -135,7 +135,7 @@ func get_size_loc(h *frame, c cell_num) cell_loc {
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) np {
   bas *basic_analyze_state = un(&g->inline_state);
-  h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed(), NotComputed@[i32](), mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed@[jmp_targetnum]()};
+  h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed, NotComputed, mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed};
 
   liveset lives;
   nargcells size = count(&g->argcells);
