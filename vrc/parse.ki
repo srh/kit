@@ -191,11 +191,10 @@ func parse_toplevel(p *ps, out *ast_toplevel) parse_result {
   }
 }
 
-// NOTE: Have a specific AST datatype for funcs instead of munging them into ast_def.  (Why?)
 func parse_rest_of_func(p *ps, is_export ast_isexport, is_inline ast_isinline, out *ast_toplevel) parse_result {
   generics ast_generics;
   name ast_ident;
-  params array[ast_vardecl];
+  args array[ast_lambda_arg];
   return_type ast_typeexpr;
   trans opt[ast_trans];
   body ast_bracebody;
@@ -203,13 +202,13 @@ func parse_rest_of_func(p *ps, is_export ast_isexport, is_inline ast_isinline, o
     return Fail;
   }
   lambda_expr_meta ast_meta = start(p);
-  if ! +parse_lambdaspec(p, &params, &return_type, &trans, &body) {
+  if ! +parse_lambdaspec(p, &args, &return_type, &trans, &body) {
     return Fail;
   }
   end(p, lambda_expr_meta);
 
   *out = Def({is_export, IsNotVar(void), generics, name, None,
-              consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({is_inline, params, return_type, trans, {NotComputed@[ast_fullbody_info](), body}})))});
+              consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({is_inline, args, return_type, trans, {NotComputed@[ast_fullbody_info](), body}})))});
   return Success;
 }
 
@@ -390,8 +389,8 @@ func parse_lambda_optional_transdesc(p *ps, out *opt[ast_trans]) parse_result {
   return Success;
 }
 
-func parse_lambdaspec(p *ps, params_out *array[ast_vardecl], return_type_out *ast_typeexpr, trans_out *opt[ast_trans], body_out *ast_bracebody) parse_result {
-  if !(+parse_args_list(p, params_out) && +parse_typeexpr(p, return_type_out) && +parse_lambda_optional_transdesc(p, trans_out) && +parse_bracebody(p, body_out)) {
+func parse_lambdaspec(p *ps, args_out *array[ast_lambda_arg], return_type_out *ast_typeexpr, trans_out *opt[ast_trans], body_out *ast_bracebody) parse_result {
+  if !(+parse_args_list(p, args_out) && +parse_typeexpr(p, return_type_out) && +parse_lambda_optional_transdesc(p, trans_out) && +parse_bracebody(p, body_out)) {
     return Fail;
   }
   return Success;
@@ -510,14 +509,14 @@ func parse_generik(p *ps, out *ast_generik) parse_result {
   return Success;
 }
 
-func parse_args_list(p *ps, out *array[ast_vardecl]) parse_result {
+func parse_args_list(p *ps, out *array[ast_lambda_arg]) parse_result {
   if ! +try_skip_token(p, @[tokval]Grouper(LParen(void))) {
     return Fail;
   }
-  args array[ast_vardecl];
+  args array[ast_lambda_arg];
   for ;; {
     if +try_skip_token(p, @[tokval]Grouper(RParen(void))) {
-      *out = args;
+      swap(out, &args);
       return Success;
     }
     if count(&args) != 0 {
@@ -529,7 +528,7 @@ func parse_args_list(p *ps, out *array[ast_vardecl]) parse_result {
     if ! +parse_vardecl(p, AllowBlanksNo(void), &decl) {
       return Fail;
     }
-    push(&args, decl);
+    push(&args, {NotComputed, decl});
   }
 }
 
@@ -861,11 +860,11 @@ func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) parse_result {
       type ast_typeexpr;
       switch help_triparse_typeexpr(p, ab, AllowSpecialsNo, &type) {
         case Success: {
-          *out = {NotComputed, name, type};
+          *out = {name, type};
           return Success;
         }
         case Quickfail: {
-          *out = {NotComputed, name, Unknown({})};
+          *out = {name, Unknown({})};
           return Success;
         }
         case Error: {
@@ -878,7 +877,7 @@ func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) parse_result {
       if ! +help_parse_typeexpr(p, ab, AllowSpecialsNo, &type) {
         return Fail;
       }
-      *out = {NotComputed, name, type};
+      *out = {name, type};
       return Success;
     }
   }
@@ -1343,7 +1342,7 @@ func is_at_sign(operch *shray[i32]) bool {
 def at_sign i32 = '@';
 
 func parse_rest_of_lambda(p *ps, lambda_expr_meta ast_meta, out *ast_expr) parse_result {
-  args array[ast_vardecl];
+  args array[ast_lambda_arg];
   return_type ast_typeexpr;
   trans opt[ast_trans];
   body ast_bracebody;
@@ -1523,7 +1522,7 @@ func parse_condition(p *ps, ab allow_braces, out *ast_condition) parse_result {
 }
 
 func mk_condition_discard_info() ast_condition_discard_info {
-  return {NotComputed(), mk_later()};
+  return {NotComputed, mk_later()};
 }
 
 func parse_rest_of_if_statement_enum(p *ps, out *ast_statement_enum) parse_result {
@@ -1741,7 +1740,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
 
   decl ast_vardecl;
   if +try_skip_keyw(p, Var(void)) {
-    decl = {NotComputed, name, Unknown({})};
+    decl = {name, Unknown({})};
   } else if +try_skip_oper(p, at_sign) {
     lhs ast_expr;
     if ! +parse_finish_name_expr(p, name, &lhs) {
@@ -1772,7 +1771,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
         return Fail;
       }
       case Success: {
-        decl = {NotComputed, name, type};
+        decl = {name, type};
       }
     }
   }

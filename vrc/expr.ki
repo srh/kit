@@ -1500,7 +1500,7 @@ func help_check_lambda_body(bs *bodystate, computed_params *shray[te_typeexpr], 
     cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
     push(&arg_cells, cell);
     vn var_number;
-    name *ast_ident = &ref(&a->args, i)->name;
+    name *ast_ident = &ref(&a->args, i)->decl.name;
     if case Printed(pm) = es_push_var(&bs->es, &vp, cell, Has(name), varname_lifetime(bs->im, name->value), &cu_param, VarSelfContained, &vn) {
       return Printed(pm);
     }

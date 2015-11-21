@@ -187,7 +187,6 @@ struct ast_vardecl_info {
 };
 
 struct ast_vardecl {
-  info nc[ast_vardecl_info];
   name ast_ident;
   type ast_typeexpr;
 };
@@ -211,7 +210,6 @@ enum ast_var_rhs {
 };
 
 struct ast_var_statement {
-  // TODO: Can we get rid of info, now that decl has the vn?  (By the way, some uses of ast_vardecl shouldn't have a vn, like in a struct type.)
   info nc[ast_var_info];
   decl ast_vardecl;
   rhs ast_var_rhs;
@@ -404,10 +402,15 @@ struct ast_fullbody {
   bb ast_bracebody;
 };
 
+struct ast_lambda_arg {
+  vn nc[var_number];
+  decl ast_vardecl;
+};
+
 struct ast_lambda {
   // TODO: We put is_inline here mainly for convenience of implementation (in gr_lambda_expr), it is unprincipled in the long run (I think?).
   is_inline ast_isinline;
-  args array[ast_vardecl];
+  args array[ast_lambda_arg];
   return_type ast_typeexpr;
   trans opt[ast_trans];
   body ast_fullbody;

@@ -1270,7 +1270,7 @@ func lambda_declared_type(im *identmap, g *ast_generics, a *ast_lambda) ast_type
   type_params array[ast_typeexpr];
   nargs size = count(&a->args);
   for i size = 0; i < nargs; i = i + 1 {
-    push(&type_params, ref(&a->args, i)->type);
+    push(&type_params, ref(&a->args, i)->decl.type);
   }
   push(&type_params, a->return_type);
   if case &Has(tr ast_trans) = &a->trans {
