@@ -1470,9 +1470,12 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, demand rv
     if case Printed(pm) = help_check_lambda_body(&bs, computed_params, a) {
       return Printed(pm);
     }
+    /*
+    TODO(): Walk.
     if case Printed(pm) = walk_lambda_state(&bs, computed_params, a) {
       return Printed(pm);
     }
+    */
   }
 
   props type_properties;
