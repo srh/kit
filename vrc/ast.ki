@@ -211,6 +211,7 @@ enum ast_var_rhs {
 };
 
 struct ast_var_statement {
+  // TODO: Can we get rid of info, now that decl has the vn?  (By the way, some uses of ast_vardecl shouldn't have a vn, like in a struct type.)
   info nc[ast_var_info];
   decl ast_vardecl;
   rhs ast_var_rhs;
@@ -293,9 +294,9 @@ struct ast_return_statement_info {
 };
 
 struct ast_return_statement {
-  info nc[ast_return_statement_info];
   // If no expr, it returns void.
   expr opt[box[ast_expr_consume]];
+  info nc[ast_return_statement_info];
 };
 
 struct ast_break_statement_info {
@@ -758,17 +759,17 @@ func mk(m ast_meta, x ast_expr_enum) ast_expr {
 }
 
 struct ast_expr_consume {
-  after nc[ast_expr_after_consume];
   expr ast_expr;
+  after nc[ast_expr_after_consume];
 };
 
 // TODO: Remove once we can costlessly pass by value.
 func consume(expr *ast_expr) ast_expr_consume {
-  return {NotComputed@[ast_expr_after_consume](), *expr};
+  return {*expr, NotComputed};
 }
 
 func consume(expr ast_expr) ast_expr_consume {
-  return {NotComputed@[ast_expr_after_consume](), expr};
+  return {expr, NotComputed};
 }
 
 struct ast_expr_discard {

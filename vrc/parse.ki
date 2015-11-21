@@ -1488,7 +1488,7 @@ func parse_rest_of_goto_statement_enum(p *ps, out *ast_statement_enum) parse_res
 
 func parse_rest_of_return_statement_enum(p *ps, out *ast_statement_enum) parse_result {
   if +try_skip_oper(p, ';') {
-    *out = Return({NotComputed@[ast_return_statement_info](), None});
+    *out = Return({None, NotComputed});
     return Success;
   }
   expr ast_expr;
@@ -1496,7 +1496,7 @@ func parse_rest_of_return_statement_enum(p *ps, out *ast_statement_enum) parse_r
        && +try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = Return({NotComputed@[ast_return_statement_info](), Has(embox(consume(&expr)))});
+  *out = Return({Has(embox(consume(&expr))), NotComputed});
   return Success;
 }
 

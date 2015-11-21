@@ -216,6 +216,13 @@ func walk_strinit_param(ws *walkstate, a *ast_strinit_param) np {
 }
 
 func walk_expr_consume(ws *walkstate, a *ast_expr_consume) np {
+  if case Printed(pm) = walk_expr(ws, &a->expr) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = walk_expr_after_consume(ws, un(&a->after)) {
+    return Printed(pm);
+  }
+  // TODO: idk.
   return TODO();
 }
 
@@ -223,11 +230,34 @@ func walk_expr_after_discard(ws *walkstate, a *ast_expr_after_discard) np {
   return TODO();
 }
 
+func walk_expr_after_consume(ws *walkstate, a *ast_expr_after_consume) np {
+  return TODO();
+}
+
 func walk_return_statement(ws *walkstate, a *ast_return_statement) np {
+  if case &Has(b box[ast_expr_consume]) = &a->expr {
+    if case Printed(pm) = walk_expr_consume(ws, oo(&b)) {
+      return Printed(pm);
+    }
+  } else {
+    // TODO(): Model assignment of void to return cell.
+  }
+
+  // TODO(): We exit the function, also we have a->destructions.
   return TODO();
 }
 
 func walk_var_statement(ws *walkstate, a *ast_var_statement) np {
+  switch &a->rhs {
+  case &HasExpr(b box[ast_expr_consume]):
+    if case Printed(pm) = walk_expr_consume(ws, oo(&b)) {
+      return Printed(pm);
+    }
+  case &AutoInit(act opt[init_action]):
+    // TODO(): Why is act optional?  Should it be nc?
+    return TODO();
+  }
+
+  // TODO: idk.
   return TODO();
 }
-
