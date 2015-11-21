@@ -772,17 +772,17 @@ func consume(expr ast_expr) ast_expr_consume {
 }
 
 struct ast_expr_discard {
-  after nc[ast_expr_after_discard];
   expr ast_expr;
+  after nc[ast_expr_after_discard];
 };
 
 // TODO: Remove once we can costlessly pass by value.
 func discard(expr *ast_expr) ast_expr_discard {
-  return {NotComputed@[ast_expr_after_discard](), *expr};
+  return {*expr, NotComputed@[ast_expr_after_discard]()};
 }
 
 func discard(expr ast_expr) ast_expr_discard {
-  return {NotComputed@[ast_expr_after_discard](), expr};
+  return {expr, NotComputed@[ast_expr_after_discard]()};
 }
 
 // TODO: I think we're underchecking the arity of app types, be it for variadic or non-variadic generics.
