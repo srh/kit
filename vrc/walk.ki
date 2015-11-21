@@ -106,6 +106,21 @@ func walk_statement(ws *walkstate, a *ast_statement) np {
 }
 
 func walk_discard_expr(ws *walkstate, a *ast_expr_discard) np {
+  if case Printed(pm) = walk_expr(ws, &a->expr) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = walk_expr_after_discard(ws, unHas(&a->after)) {
+    return Printed(pm);
+  }
+  // TODO(): Something must be done?
+  return NoFail;
+}
+
+func walk_expr(ws *walkstate, a *ast_expr) np {
+  return TODO();
+}
+
+func walk_expr_after_discard(ws *walkstate, a *ast_expr_after_discard) np {
   return TODO();
 }
 
