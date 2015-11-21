@@ -429,7 +429,7 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       }
 
       inst->typrop = Computed({cu_computed, props});
-      *out = unHas(&inst->typrop);
+      *out = un(&inst->typrop);
       return NoFail;
     }
     case &BeganComputing: {

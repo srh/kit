@@ -288,7 +288,7 @@ func seq1(gr *frame_graph, gn gr_num) sq_num {
 func gr_fullbody(clq *clqueue, gr *frame_graph, x *ast_fullbody, out *gr_num, return_cell_out *cell_num) np {
   final_node sq_num = nopq(gr);
 
-  info *ast_fullbody_info = unHas(&x->info);
+  info *ast_fullbody_info = un(&x->info);
   exit_node sq_num;
   if case Printed(pm) = gr_unwind_vars(clq, gr, &info->parameter_destructions, final_node, &exit_node) {
     return Printed(pm);
@@ -321,7 +321,7 @@ struct breakgrack {
 
 func gr_bracebody(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, outflow sq_num, out *sq_num) np {
   bn sq_num;
-  if case Printed(pm) = gr_unwind_vars(clq, gr, &unHas(&x->info)->destructions, outflow, &bn) {
+  if case Printed(pm) = gr_unwind_vars(clq, gr, &un(&x->info)->destructions, outflow, &bn) {
     return Printed(pm);
   }
   n size = count(&x->statements);
@@ -422,7 +422,7 @@ func gr_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[bre
 }
 
 func gr_break_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, outflow sq_num, out *sq_num) np {
-  info *ast_break_statement_info = unHas(&a->info);
+  info *ast_break_statement_info = un(&a->info);
   un sq_num;
   if case Printed(pm) = gr_unwind_vars(clq, gr, &info->destructions, unHas(&obg)->break_target, &un) {
     return Printed(pm);
@@ -432,7 +432,7 @@ func gr_break_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg o
 }
 
 func gr_continue_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, outflow sq_num, out *sq_num) np {
-  info *ast_continue_statement_info = unHas(&a->info);
+  info *ast_continue_statement_info = un(&a->info);
   un sq_num;
   if case Printed(pm) = gr_unwind_vars(clq, gr, &info->destructions, unHas(&obg)->continue_target, &un) {
     return Printed(pm);
@@ -442,7 +442,7 @@ func gr_continue_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, ob
 }
 
 func gr_goto_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_goto_statement, outflow sq_num, out *sq_num) np {
-  info *ast_goto_statement_info = unHas(&a->info);
+  info *ast_goto_statement_info = un(&a->info);
   jmp sq_num = get(&fb->label_gn, info->label_number.x);
   wn sq_num;
   if case Printed(pm) = gr_wind_vars(clq, gr, &info->initializations, jmp, &wn) {
@@ -457,7 +457,7 @@ func gr_goto_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast
 }
 
 func gr_label_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_label_statement, outflow sq_num, out *sq_num) np {
-  gn sq_num = get(&fb->label_gn, unHas(&a->info)->label_number.x);
+  gn sq_num = get(&fb->label_gn, un(&a->info)->label_number.x);
   mut_qnop_node(gr, gn, {@[gr_qop]GrJmp({outflow})});
   // Should we set *out to gn or outflow?  When labels get fancier, the answer will matter.
   *out = gn;
@@ -475,7 +475,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg 
 
   exitseq var = seqq(gr, {swartch_discard_gn, outflow});
 
-  info *ast_enum_deconstruction_info = unHas(&a->info);
+  info *ast_enum_deconstruction_info = un(&a->info);
   // TODO: Rename field
   cases array[opt[sq_num]] = repeat(info->num_enum_constructors, None);
   default_case opt[sq_num] = None;
@@ -486,7 +486,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg 
 
     switch &sc->pattern {
       case &Case(cp ast_constructor_pattern): {
-        cp_info *ast_cp_info = unHas(&cp.cp_info);
+        cp_info *ast_cp_info = un(&cp.cp_info);
         if case Has(vn var_number) = cp_info->ovn {
           vi *var_info = ref(&fb->all_vars, vn.x);
 
@@ -606,7 +606,7 @@ func gr_for_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_
     }
 
     initseq sq_num;
-    if case Printed(pm) = gr_unwind_vars(clq, gr, &unHas(&a->info)->initter_destructions, outflow, &initseq) {
+    if case Printed(pm) = gr_unwind_vars(clq, gr, &un(&a->info)->initter_destructions, outflow, &initseq) {
       return Printed(pm);
     }
 
@@ -699,7 +699,7 @@ func gr_ifthenelse_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, 
 }
 
 func gr_condition_body(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], cd *ast_condition_discard_info, body *ast_bracebody, outflow sq_num, out *sq_num) np {
-  if case &Has(c cell_num) = unHas(&cd->virtual_cell_dead) {
+  if case &Has(c cell_num) = un(&cd->virtual_cell_dead) {
     vd gr_num = addx(gr, @[gr_xop]GrVirtualDead({c}));
     outflow = seqq(gr, {vd, outflow});
   }
@@ -751,7 +751,7 @@ func gr_condition(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_cond
         return Printed(pm);
       }
 
-      info *ast_pattern_assign_info = unHas(&pa.info);
+      info *ast_pattern_assign_info = un(&pa.info);
       // TODO: Avoid the duplicate checks for addressof_constructor, only do one GrDeref.
       taggn gr_num;
       if isHas(&pa.pattern.addressof_constructor) {
@@ -765,7 +765,7 @@ func gr_condition(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_cond
       for i size = 0; i < n; i = i + 1 {
         tag enum_tag_value = mk_enum_tag_value(i);
         if info->matching_tag_value.x == tag.x {
-          cp_info *ast_cp_info = unHas(&pa.pattern.cp_info);
+          cp_info *ast_cp_info = un(&pa.pattern.cp_info);
           if case Has(vn var_number) = cp_info->ovn {
             vi *var_info = ref(&fb->all_vars, vn.x);
             vcgn gr_num;
@@ -823,7 +823,7 @@ func gr_return_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *a
   } else {
     gn = addx(gr, @[gr_xop]GrXNop);
   }
-  info *ast_return_statement_info = unHas(&a->info);
+  info *ast_return_statement_info = un(&a->info);
   uw sq_num;
   if case Printed(pm) = gr_unwind_vars(clq, gr, &info->destructions, fb->final_node, &uw) {
     return Printed(pm);
@@ -875,7 +875,7 @@ func gr_expr_discard(clq *clqueue, gr *frame_graph, x *ast_expr_discard, out *gr
     return Printed(pm);
   }
   after_gn gr_num;
-  if case Printed(pm) = gr_expr_after_discard(clq, gr, unHas(&x->after), &after_gn) {
+  if case Printed(pm) = gr_expr_after_discard(clq, gr, un(&x->after), &after_gn) {
     return Printed(pm);
   }
   gn sq_num = seqq(gr, {dp, seq1(gr, after_gn)});
@@ -900,7 +900,7 @@ func gr_expr_after_discard(clq *clqueue, gr *frame_graph, aft *ast_expr_after_di
 }
 
 func gr_expr_consume(clq *clqueue, gr *frame_graph, x *ast_expr_consume, out *gr_num) np {
-  return gr_expr_and_consume(clq, gr, &x->expr, unHas(&x->after), out);
+  return gr_expr_and_consume(clq, gr, &x->expr, un(&x->after), out);
 }
 
 func gr_expr_and_consume(clq *clqueue, gr *frame_graph, x *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
@@ -1010,7 +1010,7 @@ func gr_mk_ternary(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_ternary, o
     return Printed(pm);
   }
 
-  conjoined cell_num = unHas(&a->info)->conjoined_result_cell;
+  conjoined cell_num = un(&a->info)->conjoined_result_cell;
 
   then_sn sq_num = seqq(gr, {then_gn, cleanup_tail});
   else_sn sq_num = seqq(gr, {else_gn, cleanup_tail});
@@ -1032,7 +1032,7 @@ func gr_mk_strinit(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_strinit, o
   reserve(&precs, nparams);
   for i size = 0; i < nparams; i = i + 1 {
     param *ast_strinit_param = ref(&a->exprs, i);
-    befdep gr_num = addx(gr, @[gr_xop]GrSubcell({result_cell(&param->ec), rval_cell(x), OffsetConst(unHas(&param->info)->offset)}));
+    befdep gr_num = addx(gr, @[gr_xop]GrSubcell({result_cell(&param->ec), rval_cell(x), OffsetConst(un(&param->info)->offset)}));
     dep gr_num;
     if case Printed(pm) = gr_expr_consume(clq, gr, &param->ec, &dep) {
       return Printed(pm);
@@ -1054,7 +1054,7 @@ func gr_deref_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_deref_fie
   if case Printed(pm) = gr_expr_consume(clq, gr, oo(&a->lhs), &rp) {
     return Printed(pm);
   }
-  info *ast_deref_field_info = unHas(&a->info);
+  info *ast_deref_field_info = un(&a->info);
   ap gr_num;
   if case Printed(pm) = gr_later_discard(clq, gr, &a->ptr_discard, &ap) {
     return Printed(pm);
@@ -1078,7 +1078,7 @@ func gr_deref_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_deref_fie
 }
 
 func gr_local_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_local_field, out *gr_num) np {
-  info *ast_local_field_info = unHas(&a->info);
+  info *ast_local_field_info = un(&a->info);
   lp gr_num;
   if case Printed(pm) = gr_expr(clq, gr, oo(&a->lhs), &lp) {
     return Printed(pm);
@@ -1117,7 +1117,7 @@ func gr_local_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_local_fie
 }
 
 func gr_lambda_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_lambda, out *gr_num) np {
-  info *ast_fullbody_info = unHas(&a->body.info);
+  info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
   fullbody_gn gr_num;
   return_cell cell_num;
@@ -1139,7 +1139,7 @@ func parsed_inline_to_state_inline(a ast_isinline) should_inline {
 }
 
 func gr_index_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_index_expr, out *gr_num) np {
-  info *ast_index_expr_info = unHas(&a->info);
+  info *ast_index_expr_info = un(&a->info);
   rp gr_num;
   if case Printed(pm) = gr_expr_consume(clq, gr, oo(&a->rhs), &rp) {
     return Printed(pm);
@@ -1194,7 +1194,7 @@ func gr_index_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_index_expr
 }
 
 func gr_later_discard(clq *clqueue, gr *frame_graph, a *ast_later_discard_info, out *gr_num) np {
-  da *destroy_action = unHas(&a->action);
+  da *destroy_action = un(&a->action);
   return gr_destroy_action(clq, gr, da, DeadAfterDestroyYes, out);
 }
 
@@ -1259,7 +1259,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
     return Printed(pm);
   }
   lp_rp_nop gr_num = addx(gr, mk_shray(lp, rp), @[gr_xop]GrXNop);
-  switch unHas(&a->info) {
+  switch un(&a->info) {
     case &StaticSelfAssignment: {
       *out = lp_rp_nop;
       return NoFail;
@@ -1455,7 +1455,7 @@ func gr_literal(clq *clqueue, gr *frame_graph, x *ast_expr, value bigint, out *g
 }
 
 func gr_name_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_name_expr, out *gr_num) np {
-  switch unHas(&a->name_info) {
+  switch un(&a->name_info) {
     case &LocalResolve(li local_info): {
       *out = addx(gr, @[gr_xop]GrXNop);
       return NoFail;
@@ -1831,7 +1831,7 @@ func gr_magic_nopdestroy(cs *checkstate, clq *clqueue, gr_out *frame_graph, gn_o
 func gr_magic_memcopy(cs *checkstate, clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_memcopy")));
   bas gr_basics;
-  add_basics(cs, clq, &gr, *unHas(&mm->size), 2, &bas);
+  add_basics(cs, clq, &gr, *un(&mm->size), 2, &bas);
   gn gr_num = addx(&gr, bas.derefs, @[gr_xop]GrMemCopy({get(&bas.pointeecells, 0), get(&bas.pointeecells, 1)}));
   basics_cleanup(cs, clq, &gr, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
   return NoFail;
@@ -1840,14 +1840,14 @@ func gr_magic_memcopy(cs *checkstate, clq *clqueue, mm *magic_memcopy, gr_out *f
 func gr_magic_bzero(cs *checkstate, clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_bzero")));
   bas gr_basics;
-  add_basics(cs, clq, &gr, *unHas(&mb->size), 1, &bas);
+  add_basics(cs, clq, &gr, *un(&mb->size), 1, &bas);
   gn gr_num = addx(&gr, bas.derefs, @[gr_xop]GrWriteConst({get(&bas.pointeecells, 0), ConstInt(bigu(0))}));
   basics_cleanup(cs, clq, &gr, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
   return NoFail;
 }
 
 func gr_magic_ctor(cs *checkstate, clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
-  info *magic_ctor_info = unHas(&mc->info);
+  info *magic_ctor_info = un(&mc->info);
   switch info {
   case &MagicStructInfo(msi magic_struct_info):
     return gr_magic_struct_info(cs, clq, wc, &msi, gr_out, gn_out, return_cell_out, arg_cells_out);
@@ -2499,7 +2499,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
 
   ent *def_entry = ref_def_entry(cs, ent_id);
   inst *def_inst = ref_inst(cs, inst_id);
-  inst_typrop *cu_typrop = unHas(&inst->typrop);
+  inst_typrop *cu_typrop = un(&inst->typrop);
   switch &inst->graph {
     case &NotComputed: {
       inst->graph = BeganComputing();
@@ -2537,12 +2537,12 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         case &InstRhsNonMagic(nonmag def_non_magic): {
           switch &nonmag {
           case &NonMagicCtor(wnmc which_non_magic_ctor):
-            info *non_magic_ctor_info = unHas(&wnmc.nmc.info);
+            info *non_magic_ctor_info = un(&wnmc.nmc.info);
             frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstDef(info->ip));
             inst->graph = Computed(Has(frg));
             return NoFail;
           case &NonMagicProp(nmp non_magic_prop):
-            info u32 = *unHas(&nmp.info);
+            info u32 = *un(&nmp.info);
             frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, @[gr_const]ConstInt(~info));
             inst->graph = Computed(Has(frg));
             return NoFail;

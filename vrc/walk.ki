@@ -32,7 +32,7 @@ func walk_lambda_state(bs *bodystate, computed_params *shray[te_typeexpr], a *as
 
   nargs size = count(&a->args);
   for i size = 0; i < nargs; i++ {
-    vn var_number = unHas(&ref(&a->args, i)->info)->vn;
+    vn var_number = un(&ref(&a->args, i)->info)->vn;
     vi *var_info = ref_var(&bs->es, vn);
     // Okay, and?
   }
@@ -109,7 +109,7 @@ func walk_discard_expr(ws *walkstate, a *ast_expr_discard) np {
   if case Printed(pm) = walk_expr(ws, &a->expr) {
     return Printed(pm);
   }
-  if case Printed(pm) = walk_expr_after_discard(ws, unHas(&a->after)) {
+  if case Printed(pm) = walk_expr_after_discard(ws, un(&a->after)) {
     return Printed(pm);
   }
   // TODO(): Something must be done?

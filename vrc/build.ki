@@ -75,7 +75,7 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) np {
     fillercode_align_double_quadword(f);
     // DBG(_u8("gen graphed fn body for "), lookup(cs->im, g.graph.gr.informal_name));
     text_offset u32 = secsize(&f->text);
-    set_symbol_value(f, *unHas(&ent->symbol_table_index), text_offset);
+    set_symbol_value(f, *un(&ent->symbol_table_index), text_offset);
     annotate(&ent->body_text_offset, text_offset);
     return dumbly_gen_graphed_fn_body(cs, f, &g);
   case &ExternFnBody(e extern_fn_body):
@@ -95,7 +95,7 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
       idyparms idy_genparms = blank_idyparms();
       if case Has(inst_id def_inst_id) = lookup_sole_value(&ent->insts, &idyparms) {
         inst *def_inst = ref_inst(cs, inst_id);
-        if !is_fn_type(cs, &unHas(&inst->typrop)->cu.x) {
+        if !is_fn_type(cs, &un(&inst->typrop)->cu.x) {
           return ERR(_u8("Cannot codegen export symbols for non-fn def (can only export functions)"));
         }
         if case &Computed(val st_value) = &inst->evaled_value {
@@ -104,7 +104,7 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
             @[np]ERR(_u8("Export fn-symbol has invalid value (zero-initialized fn[...] value, I bet)"));
             return Printed(pm);
           }
-          body_text_offset u32 = *unHas(&ref_fn_body(cs, fnid)->body_text_offset);
+          body_text_offset u32 = *un(&ref_fn_body(cs, fnid)->body_text_offset);
           name string = lookup(cs->im, ent->def_name);
           switch cs->plat.opsys {
           case Linux32: { }

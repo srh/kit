@@ -53,7 +53,7 @@ struct gn_annot {
 };
 
 func live_for_funcall(annot *gn_annot) *array[cell_num] {
-  return &unHas(&annot->app_time_live)->all;
+  return &un(&annot->app_time_live)->all;
 }
 
 struct frame {
@@ -118,7 +118,7 @@ func un_Direct(loc cell_loc) i32 {
 }
 
 func get_loc(h *frame, c cell_num) cell_loc {
-  return get(unHas(&h->offsets), c.x);
+  return get(un(&h->offsets), c.x);
 }
 
 func get_ptr_loc(h *frame, c cell_num) cell_loc {
@@ -134,7 +134,7 @@ func get_size_loc(h *frame, c cell_num) cell_loc {
 // Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) np {
-  bas *basic_analyze_state = unComputed(&g->inline_state);
+  bas *basic_analyze_state = un(&g->inline_state);
   h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed(), NotComputed@[i32](), mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed@[jmp_targetnum]()};
 
   liveset lives;
@@ -517,7 +517,7 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
     // Nodes without lower_paramlists are unreachable.  So we don't need to worry about those!
     // TODO: Maybe, don't gen graphs with dead nodes!
     if case &Computed(arr array[gr_num]) = &ref(&h->by_gn, gn.x)->lower_paramlists {
-      nlower size = count(unHas(&ref(&h->by_gn, gn.x)->lower_paramlists));
+      nlower size = count(un(&ref(&h->by_gn, gn.x)->lower_paramlists));
       if nlower == 0 {
         check_insert(&zeroset, &gn, void);
       }
@@ -624,7 +624,7 @@ func dumbly_gen_function_exit(f *objfile, h *frame) void {
     njumps size = count(&h->placeholder_jumps);
     for i size = 0; i < njumps; i = i + 1 {
       p *jmpdata = ref(&h->placeholder_jumps, i);
-      target u32 = *unHas(ref(&h->jmp_targets, p->target.x));
+      target u32 = *un(ref(&h->jmp_targets, p->target.x));
       diff i32 = @[i32]~target - @[i32]~p->relative_mathpoint;
       le le_i32 = ~diff;
       overwrite_raw(&f->text, ~p->overwrite_location, &le.buf[0], 4);
@@ -717,7 +717,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           case UniversalCdeclConvention:
             ret_ci *cell_info = ref_cell(h->gr, a.retcell);
             hrp bool = for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props);
-            framelist_bottom i32 = *unHas(&ref_annot(h, gn)->paramlist_bottom_frame_offset);
+            framelist_bottom i32 = *un(&ref_annot(h, gn)->paramlist_bottom_frame_offset);
             if hrp {
               hrp_bottom i32 = framelist_bottom - 4;
               x86_load_cell_address(f, h, X86_EAX, a.retcell);
@@ -729,7 +729,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
                 set_esp_to_frame_offset(f, h, hrp_bottom);
                 x86_indirect_call(f, X86_EAX);
               case ConstFuncellLoc(fnid fn_body_id):
-                symbol_table_index sti = *unHas(&ref_fn_body(h->cs, fnid)->symbol_table_index);
+                symbol_table_index sti = *un(&ref_fn_body(h->cs, fnid)->symbol_table_index);
                 set_esp_to_frame_offset(f, h, hrp_bottom);
                 x86_call(f, symbol_table_index);
               }
@@ -741,7 +741,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
                 set_esp_to_frame_offset(f, h, framelist_bottom);
                 x86_indirect_call(f, X86_EAX);
               case ConstFuncellLoc(fnid fn_body_id):
-                symbol_table_index sti = *unHas(&ref_fn_body(h->cs, fnid)->symbol_table_index);
+                symbol_table_index sti = *un(&ref_fn_body(h->cs, fnid)->symbol_table_index);
                 set_esp_to_frame_offset(f, h, framelist_bottom);
                 x86_call(f, symbol_table_index);
               }
@@ -949,7 +949,7 @@ func set_esp_to_frame_offset(f *objfile, h *frame, offset i32) void {
 }
 
 func restore_esp_to_default_position(f *objfile, h *frame) void {
-  set_esp_to_frame_offset(f, h, *unHas(&h->low_offset));
+  set_esp_to_frame_offset(f, h, *un(&h->low_offset));
 }
 
 func x86_gen_write_value(f *objfile, h *frame, dest_loc cell_loc, value *st_value) void {
@@ -974,7 +974,7 @@ func x86_gen_write_value(f *objfile, h *frame, dest_loc cell_loc, value *st_valu
     sref *tup[u32, st_symbolref] = ref(&srefs, i);
     check(w <= sref->car);
     x86_gen_write_data(f, h, dest_addr, dest_disp, &value->words, w, sref->car);
-    symbol_table_index sti = *unHas(&ref_fn_body(h->cs, sref->cdr.fnid)->symbol_table_index);
+    symbol_table_index sti = *un(&ref_fn_body(h->cs, sref->cdr.fnid)->symbol_table_index);
     x86_mov_stiptr(f, X86_ECX, symbol_table_index);
     check(st_symbolref_size(&h->cs->plat, &sref->cdr) == 4);
     x86_store32(f, dest_addr, dest_disp + ~sref->car, X86_ECX);
@@ -1048,7 +1048,7 @@ func x86_cmp_imm_sized(cs *checkstate, f *objfile, lhs u8, rhs *st_value, avail 
     if !from_np(x86_simple_symbolref(cs, rhs, &fnid)) {
       ice(_u8("x86_cmp_imm_sized sees non-simple (impossible) symbolref"));
     }
-    x86_mov_stiptr(f, avail, *unHas(&ref_fn_body(cs, fnid)->symbol_table_index));
+    x86_mov_stiptr(f, avail, *un(&ref_fn_body(cs, fnid)->symbol_table_index));
     x86_cmp_w32(f, lhs, avail);
   } else {
     val u32 = get(&rhs->words, 0);

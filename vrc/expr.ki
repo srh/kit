@@ -887,7 +887,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
       if case Printed(pm) = annotate_disposal_for_discard(es, oo(&a->lhs), &after) {
         return Printed(pm);
       }
-      annotate(&a->info, @[ast_local_field_info]ArrayLength({*unHas(&after), value}));
+      annotate(&a->info, @[ast_local_field_info]ArrayLength({*un(&after), value}));
       lval = wholeRval(add_rval_cell(es, demand, fieldtype, props));
     }
   }
@@ -1123,7 +1123,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, dem
     if case Printed(pm) = get_destroy_ctor(es->ds, &info->cu, &destroy) {
       return Printed(pm);
     }
-    annotate(&later->action, @[destroy_action]+{destroy, result_cell(unHas(after))});
+    annotate(&later->action, @[destroy_action]+{destroy, result_cell(un(after))});
   }
 
   if case Has(p *ast_later_discard_info) = later2 {
@@ -1132,7 +1132,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, dem
     if case Printed(pm) = get_destroy_ctor(es->ds, &info->cu, &destroy) {
       return Printed(pm);
     }
-    annotate(&p->action, @[destroy_action]+{destroy, result_cell(unHas(after))});
+    annotate(&p->action, @[destroy_action]+{destroy, result_cell(un(after))});
   }
   return NoFail;
 }
@@ -2102,7 +2102,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, demand
       return Printed(pm);
     }
 
-    annotate(&a->info, {Has({*unHas(&ie_info_after), lhs_later}), rhs_later});
+    annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), rhs_later});
   }
 
   annotate_info(x, CompleteCheck(mk(lval, ~ *ixtype, props)));
