@@ -65,6 +65,7 @@ func walk_statement(ws *walkstate, a *ast_statement) np {
     }
 
   case &Return(b ast_return_statement):
+    // TODO(): We shouldn't keep going _past_ the return statement.
     if case Printed(pm) = walk_return_statement(ws, &b) {
       return Printed(pm);
     }
