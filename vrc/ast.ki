@@ -688,7 +688,7 @@ inline func mk_virtualdead_discard(lvalue_cell cell_num) ast_expr_after_discard 
 }
 
 inline func mk_nothing_discard() ast_expr_after_discard {
-  return DiscardNothing(void);
+  return DiscardNothing;
 }
 
 struct ast_expr_complete_info {
@@ -758,7 +758,7 @@ enum ast_expr_enum {
 };
 
 func mk(m ast_meta, x ast_expr_enum) ast_expr {
-  return {m, NoInfo(void), x};
+  return {m, NoInfo, x};
 }
 
 struct ast_expr_consume {
