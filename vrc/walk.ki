@@ -117,6 +117,105 @@ func walk_discard_expr(ws *walkstate, a *ast_expr_discard) np {
 }
 
 func walk_expr(ws *walkstate, a *ast_expr) np {
+  switch &a->u {
+  case &NameExpr(b ast_name_expr):
+    return TODO();
+  case &ParenExpr(b ast_paren_expr):
+    return walk_expr(ws, oo(&b.expr));
+  case &NumericLiteral(b ast_numeric_literal):
+    return TODO();
+  case &BoolLiteral(b ast_bool_literal):
+    return TODO();
+  case &VoidLiteral(b ast_void_literal):
+    return TODO();
+  case &NullLiteral(b ast_null_literal):
+    return TODO();
+  case &CharLiteral(b ast_char_literal):
+    return TODO();
+  case &StringLiteral(b ast_string_literal):
+    return TODO();
+  case &Funcall(b ast_funcall):
+    nparams size = count(&b.params);
+    for i size = 0; i < nparams; i++ {
+      if case Printed(pm) = walk_expr_consume(ws, ref(&b.params, i)) {
+        return Printed(pm);
+      }
+    }
+    // TODO: Handle funcall state.
+    return TODO();
+  case &LogicalConjunction(b ast_logical_conjunction):
+    return TODO();
+  case &Assignment(b ast_assignment):
+    if case Printed(pm) = walk_expr(ws, oo(&b.lhs)) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_expr(ws, oo(&b.rhs)) {
+      return Printed(pm);
+    }
+    // TODO: Uh... assignment_info, value effects.
+    return TODO();
+  case &RefOf(b ast_refof):
+    if case Printed(pm) = walk_expr(ws, oo(&b.rhs)) {
+      return Printed(pm);
+    }
+    // TODO: idk.
+    return TODO();
+  case &AddressOf(b ast_addressof):
+    if case Printed(pm) = walk_expr(ws, oo(&b.rhs)) {
+      return Printed(pm);
+    }
+    // TODO: idk.
+    return TODO();
+  case &Deref(b ast_deref):
+    if case Printed(pm) = walk_expr_consume(ws, oo(&b.rhs)) {
+      return Printed(pm);
+    }
+    // TODO(): Handle pointer discard.
+    return TODO();
+  case &IndexExpr(b ast_index_expr):
+    if case Printed(pm) = walk_expr(ws, oo(&b.lhs)) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_expr_consume(ws, oo(&b.rhs)) {
+      return Printed(pm);
+    }
+    // TODO(): idk.
+    return TODO();
+  case &Lambda(b ast_lambda):
+    return TODO();
+  case &LocalField(b ast_local_field):
+    if case Printed(pm) = walk_expr(ws, oo(&b.lhs)) {
+      return Printed(pm);
+    }
+    // TODO: idk.
+    return TODO();
+  case &DerefField(b ast_deref_field):
+    if case Printed(pm) = walk_expr_consume(ws, oo(&b.lhs)) {
+      return Printed(pm);
+    }
+    // TODO(): Handle pointer discard.
+    return TODO();
+  case &TypedExpr(b ast_typed_expr):
+    return walk_expr(ws, oo(&b.expr));
+  case &Strinit(b ast_strinit):
+    nexprs size = count(&b.exprs);
+    for i size = 0; i < nexprs; i++ {
+      if case Printed(pm) = walk_strinit_param(ws, ref(&b.exprs, i)) {
+        return Printed(pm);
+      }
+    }
+    // TODO: idk.  Activate something?
+    return TODO();
+  case &Ternary(b ast_ternary):
+    return TODO();
+  }
+}
+
+func walk_strinit_param(ws *walkstate, a *ast_strinit_param) np {
+  return walk_expr_consume(ws, &a->ec);
+}
+
+func walk_expr_consume(ws *walkstate, a *ast_expr_consume) np {
   return TODO();
 }
 
