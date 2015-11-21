@@ -909,24 +909,24 @@ func lookup_plain_generic(g *ast_generics, parms *idy_repls, name sym, out *cu_t
 func ensure_def_checked(cs *checkstate, id def_entry_id) np {
   ent *def_entry = ref_def_entry(cs, id);
   switch &ent->generics {
-    case &NoGenerics: {
-      parms idy_genparms = blank_idyparms();
-      clq clqueue = mk(cs);
-      discard_inst_id def_inst_id = enqueue_def_inst(&clq, id, &parms);
-      return finish_checking(cs, &clq);
+  case &NoGenerics:
+    parms idy_genparms = blank_idyparms();
+    clq clqueue = mk(cs);
+    discard_inst_id def_inst_id = enqueue_def_inst(&clq, id, &parms);
+    return finish_checking(cs, &clq);
+
+  case &HasGenerics(ig):
+    discard *te_typeexpr;
+    if case Printed(pm) = def_converted_typeexpr(cs, ent, &discard) {
+      return Printed(pm);
     }
-    case &HasGenerics(ig): {
-      discard *te_typeexpr;
-      if case Printed(pm) = def_converted_typeexpr(cs, ent, &discard) {
-        return Printed(pm);
-      }
-      // We declare success -- we check non-generic defs.
-      return NoFail;
-    }
-    case &VariadicGenerics(a ast_variadic_generics):
-      // We can't see variadic generics because there's no way to make your own def with variadic generics.
-      ice(_u8("ensure_def_checked sees variadic generic."));
-      return fake();
+    // We declare success -- we check non-generic defs.
+    return NoFail;
+
+  case &VariadicGenerics(a ast_variadic_generics):
+    // We can't see variadic generics because there's no way to make your own def with variadic generics.
+    ice(_u8("ensure_def_checked sees variadic generic."));
+    return fake();
   }
 }
 
@@ -1219,22 +1219,21 @@ func make_magic_inst(clq *clqueue, magic_name sym, arity size, type *te_typeexpr
   }
 
   switch &res {
-    case &NoMatch: {
-      ice(_u8("No match for magic def"));
-      return fake();
+  case &NoMatch:
+    ice(_u8("No match for magic def"));
+    return fake();
+
+  case &MultiMatch:
+    // NOTE: This should be impossible.  Pick a less likely name...
+    ice(_u8("Multiple matches for magic def (is there a user-defined one?"));
+    return fake();
+
+  case &OneMatch(m ent_and_parms):
+    inst_id def_inst_id;
+    if !from_np(make_inst(clq, m.ent, &m.parms, &inst_id)) {
+      ice(_u8("make_inst (check_and_compute_parms) seeing error in match_def"));
     }
-    case &MultiMatch: {
-      // NOTE: This should be impossible.  Pick a less likely name...
-      ice(_u8("Multiple matches for magic def (is there a user-defined one?"));
-      return fake();
-    }
-    case &OneMatch(m ent_and_parms): {
-      inst_id def_inst_id;
-      if !from_np(make_inst(clq, m.ent, &m.parms, &inst_id)) {
-        ice(_u8("make_inst (check_and_compute_parms) seeing error in match_def"));
-      }
-      return {m.ent, inst_id};
-    }
+    return {m.ent, inst_id};
   }
 }
 
@@ -1447,20 +1446,20 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) np {
       return Printed(pm);
     }
     switch &np.tl->generics {
-      case &NoGenerics: {
-        parms idy_genparms = blank_idyparms();
-        clq clqueue = mk(cs);
-        discard_id deftype_inst_id = enqueue_deftype_inst(&clq, id, &parms);
-        return finish_checking(cs, &clq);
-      }
-      case &HasGenerics(ig): {
-        // We declare success -- we check non-generic defs.
-        return NoFail;
-      }
-      case &VariadicGenerics(ig):
-        // Right now users' deftypes can't have variadic generics, just fn.
-        ice(_u8("ensure_deftype_checked VariadicGenerics"));
-        return fake();
+    case &NoGenerics:
+      parms idy_genparms = blank_idyparms();
+      clq clqueue = mk(cs);
+      discard_id deftype_inst_id = enqueue_deftype_inst(&clq, id, &parms);
+      return finish_checking(cs, &clq);
+
+    case &HasGenerics(ig):
+      // We declare success -- we check non-generic defs.
+      return NoFail;
+
+    case &VariadicGenerics(ig):
+      // Right now users' deftypes can't have variadic generics, just fn.
+      ice(_u8("ensure_deftype_checked VariadicGenerics"));
+      return fake();
     }
   } else {
     ice(_u8("ensure_deftype_checked on primitive type"));
@@ -1559,18 +1558,16 @@ func load_module(cs *checkstate, mod_name sym) cr[module_id] {
 
 func process_module(cs *checkstate, mod_name sym) cr[module_id] {
   switch load_module(cs, mod_name) {
-    case Printed(pm): {
-      return Printed(pm);
+  case Printed(pm):
+    return Printed(pm);
+  case NoFail(id module_id):
+    mod *module = ref_module(cs, id);
+    if mod->process_state == Unprocessed {
+       if case Printed(pm) = process_module_toplevels(cs, mod) {
+         return Printed(pm);
+       }
     }
-    case NoFail(id module_id): {
-      mod *module = ref_module(cs, id);
-      if mod->process_state == Unprocessed {
-         if case Printed(pm) = process_module_toplevels(cs, mod) {
-           return Printed(pm);
-         }
-      }
-      return NoFail(id);
-    }
+    return NoFail(id);
   }
 }
 
@@ -1603,12 +1600,10 @@ func process_toplevels(cs *checkstate,
     switch toplevel {
       case &Import(a ast_import): {
         switch process_module(cs, a.name.value) {
-          case Printed(pm): {
-            return Printed(pm);
-          }
-          case NoFail(id module_id): {
-            // Do nothing!  We've processed the module successfully.
-          }
+        case Printed(pm):
+          return Printed(pm);
+        case NoFail(id module_id): { }
+          // Do nothing!  We've processed the module successfully.
         }
       }
       case &Def(a ast_def): {
@@ -1649,25 +1644,25 @@ func process_toplevels(cs *checkstate,
 
 func check_generics_unique(cs *checkstate, a *ast_generics) np {
   switch a {
-    case &NoGenerics: {
-      return NoFail;
-    }
-    case &HasGenerics(b array[ast_generik]): {
-      n size = count(&b);
-      for i size = 0; i < n; i = i + 1 {
-        xi *ast_generik = ref(&b, i);
-        for j size = 0; j < i; j = j + 1 {
-          yi *ast_generik = ref(&b, j);
-          if generiks_same_human_name(xi, yi) {
-            return ERR(_u8("Generic params are self-shadowing."));
-          }
+  case &NoGenerics:
+    return NoFail;
+
+  case &HasGenerics(b array[ast_generik]):
+    n size = count(&b);
+    for i size = 0; i < n; i = i + 1 {
+      xi *ast_generik = ref(&b, i);
+      for j size = 0; j < i; j = j + 1 {
+        yi *ast_generik = ref(&b, j);
+        if generiks_same_human_name(xi, yi) {
+          return ERR(_u8("Generic params are self-shadowing."));
         }
       }
-      return NoFail;
     }
-    case &VariadicGenerics(ig):
-      ice(_u8("check_generics_unique VariadicGenerics"));
-      return fake();
+    return NoFail;
+
+  case &VariadicGenerics(ig):
+    ice(_u8("check_generics_unique VariadicGenerics"));
+    return fake();
   }
 }
 
@@ -1686,42 +1681,39 @@ func generiks_same_human_name(a *ast_generik, b *ast_generik) bool {
 func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_entry_id) np {
   ent *access_entry = ref_access_entry(cs, aid);
   switch ent->ent_id {
-    case NotComputed: {
-      ent->ent_id = BeganComputing;
-      switch ent->arity {
-        case AccessArityNone: {
-          id deftype_entry_id;
-          if case Printed(pm) = match_deftype(cs, fake_ast_meta(), ent->name, None, &id) {
-            ent->ent_id = FailedComputation;
-            return Printed(pm);
-          }
-          *out = id;
-          ent->ent_id = Computed(id);
-          return NoFail;
-        }
-        case AccessArityFinite(n u32): {
-          params shray[te_typeexpr] = repeat(~n, TeUnknown);
-          id deftype_entry_id;
-          if case Printed(pm) = match_deftype(cs, fake_ast_meta(), ent->name, Has(&params), &id) {
-            ent->ent_id = FailedComputation;
-            return Printed(pm);
-          }
-          *out = id;
-          ent->ent_id = Computed(id);
-          return NoFail;
-        }
+  case NotComputed:
+    ent->ent_id = BeganComputing;
+    switch ent->arity {
+    case AccessArityNone:
+      id deftype_entry_id;
+      if case Printed(pm) = match_deftype(cs, fake_ast_meta(), ent->name, None, &id) {
+        ent->ent_id = FailedComputation;
+        return Printed(pm);
       }
-    }
-    case BeganComputing: {
-      return ERR(_u8("Recursively computing access block reference"));
-    }
-    case FailedComputation: {
-      return ERR(_u8("Repeated get_accessible_deftype error"));
-    }
-    case Computed(x deftype_entry_id): {
-      *out = x;
+      *out = id;
+      ent->ent_id = Computed(id);
+      return NoFail;
+    case AccessArityFinite(n u32):
+      params shray[te_typeexpr] = repeat(~n, TeUnknown);
+      id deftype_entry_id;
+      if case Printed(pm) = match_deftype(cs, fake_ast_meta(), ent->name, Has(&params), &id) {
+        ent->ent_id = FailedComputation;
+        return Printed(pm);
+      }
+      *out = id;
+      ent->ent_id = Computed(id);
       return NoFail;
     }
+
+  case BeganComputing:
+    return ERR(_u8("Recursively computing access block reference"));
+
+  case FailedComputation:
+    return ERR(_u8("Repeated get_accessible_deftype error"));
+
+  case Computed(x deftype_entry_id):
+    *out = x;
+    return NoFail;
   }
 }
 
