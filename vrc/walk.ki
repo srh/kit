@@ -75,34 +75,88 @@ func walk_statement(ws *walkstate, a *ast_statement) np {
     }
 
   case &IfThen(b ast_ifthen_statement):
-    return TODO();
+    if case Printed(pm) = walk_ifthen_statement(ws, &b) {
+      return Printed(pm);
+    }
 
   case &IfThenElse(b ast_ifthenelse_statement):
-    return TODO();
+    if case Printed(pm) = walk_ifthenelse_statement(ws, &b) {
+      return Printed(pm);
+    }
 
   case &While(b ast_while_statement):
-    return TODO();
+    if case Printed(pm) = walk_while_statement(ws, &b) {
+      return Printed(pm);
+    }
 
   case &For(b ast_for_statement):
-    return TODO();
+    if case Printed(pm) = walk_for_statement(ws, &b) {
+      return Printed(pm);
+    }
 
   case &Switch(b ast_switch_statement):
-    return TODO();
+    if case Printed(pm) = walk_switch_statement(ws, &b) {
+      return Printed(pm);
+    }
 
   case &Break(b ast_break_statement):
-    return TODO();
+    if case Printed(pm) = walk_break_statement(ws, &b) {
+      return Printed(pm);
+    }
 
   case &Continue(b ast_continue_statement):
-    return TODO();
+    if case Printed(pm) = walk_continue_statement(ws, &b) {
+      return Printed(pm);
+    }
 
   case &Label(b ast_label_statement):
-    return TODO();
+    if case Printed(pm) = walk_label_statement(ws, &b) {
+      return Printed(pm);
+    }
 
   case &Goto(b ast_goto_statement):
-    return TODO();
+    if case Printed(pm) = walk_goto_statement(ws, &b) {
+      return Printed(pm);
+    }
   }
 
   return NoFail;
+}
+
+func walk_goto_statement(ws *walkstate, a *ast_goto_statement) np {
+  return TODO();
+}
+
+func walk_ifthen_statement(ws *walkstate, a *ast_ifthen_statement) np {
+  return TODO();
+}
+
+func walk_ifthenelse_statement(ws *walkstate, a *ast_ifthenelse_statement) np {
+  return TODO();
+}
+
+func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
+  return TODO();
+}
+
+func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
+  return TODO();
+}
+
+func walk_switch_statement(ws *walkstate, a *ast_switch_statement) np {
+  return TODO();
+}
+
+func walk_break_statement(ws *walkstate, a *ast_break_statement) np {
+  return TODO();
+}
+
+func walk_continue_statement(ws *walkstate, a *ast_continue_statement) np {
+  return TODO();
+}
+
+func walk_label_statement(ws *walkstate, a *ast_label_statement) np {
+  return TODO();
 }
 
 func walk_discard_expr(ws *walkstate, a *ast_expr_discard) np {
