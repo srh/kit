@@ -28,16 +28,16 @@ func st_eval_prim_conversion(clq *clqueue, env *st_env, paramorefs *array[st_obj
   // We don't trap overflow if _either_ numeric type is non-trapping.
   nevertrap never_trap;
   if op->from_numtraits.trap_overflow {
-    nevertrap = NeverTrapNo(void);
+    nevertrap = NeverTrapNo;
   } else {
-    nevertrap = NeverTrapYes(void);
+    nevertrap = NeverTrapYes;
   }
   return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0), op->to_size, &op->to_numtraits, nevertrap);
 }
 
 func st_eval_prim_logical(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, op primitive_logical_op) np {
   ps array[bigint];
-  if case Printed(pm) = st_nums(env, paramorefs, op_arity(op), env->plat.bnno_size, Unsigned(void), &ps) {
+  if case Printed(pm) = st_nums(env, paramorefs, op_arity(op), env->plat.bnno_size, Unsigned, &ps) {
     return Printed(pm);
   }
   if retvalref.count != env->plat.booltraits.size {
@@ -196,7 +196,7 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
   case NumBitXor:
     return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) ^ get(&ps, 1), op);
   case NumBitNot:
-    return st_num_rangechecked_output(clq, env, retvalref, ^get(&ps, 0), op, NeverTrapYes(void));
+    return st_num_rangechecked_output(clq, env, retvalref, ^get(&ps, 0), op, NeverTrapYes);
   case NumShiftLeft:
     switch op->op_numtraits.shifting {
     case JustRangecheckRhs:
@@ -206,7 +206,7 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
       if !as_non_negative_u32(&rhs, &rhs32) || rhs32 >= bitsize {
         return ERR(_u8("Leftshift rhs out of range"));
       }
-      return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) << rhs32, op, NeverTrapYes(void));
+      return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) << rhs32, op, NeverTrapYes);
     }
   case NumShiftRight:
     switch op->op_numtraits.shifting {
@@ -217,7 +217,7 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
       if !as_non_negative_u32(&rhs, &rhs32) || rhs32 >= bitsize {
         return ERR(_u8("Rightshift rhs out of range"));
       }
-      return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) >> rhs32, op, NeverTrapYes(void));
+      return st_num_rangechecked_output(clq, env, retvalref, get(&ps, 0) >> rhs32, op, NeverTrapYes);
     }
   }
 }
@@ -260,7 +260,7 @@ enum never_trap {
 };
 
 func st_num_rangechecked_output(clq *clqueue, env *st_env, retvalref st_obj_ref, num bigint, op *primitive_numeric_op) np {
-  return st_num_rangechecked_output(clq, env, retvalref, num, op, NeverTrapNo(void));
+  return st_num_rangechecked_output(clq, env, retvalref, num, op, NeverTrapNo);
 }
 
 func st_num_rangechecked_output(clq *clqueue, env *st_env, retvalref st_obj_ref, num bigint, op *primitive_numeric_op, nevertrap never_trap) np {

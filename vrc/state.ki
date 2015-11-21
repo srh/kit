@@ -467,7 +467,7 @@ struct frame_info {
 
 struct def_inst_rhs_expr {
   ec ast_expr_consume;
-  // This becomes Computed(...) when the def_inst status == FinishedCheckingRhs(void).
+  // This becomes Computed(...) when the def_inst status == FinishedCheckingRhs.
   frame_info nc[frame_info];
 };
 
@@ -502,7 +502,7 @@ struct def_inst {
 };
 
 func mk(parms idy_genparms, rhs def_inst_rhs) def_inst {
-  return {parms, rhs, NotComputed, DidNotCheckRhs(void), NotComputed, NotComputed};
+  return {parms, rhs, NotComputed, DidNotCheckRhs, NotComputed, NotComputed};
 }
 
 struct def_nonprim {
@@ -604,14 +604,14 @@ func is_defwise_trivial(props *type_properties) bool {
 
 func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, impl_name sym, behavior_out *derived_method_behavior) np {
   res match_def_res;
-  gp genparms = NoParms(void);
+  gp genparms = NoParms;
   if case Printed(pm) = match_def(clq->cs, impl_name, &gp, fntype, &res) {
     return Printed(pm);
   }
 
   switch &res {
     case &NoMatch: {
-      *behavior_out = DerivedMethodAbsent(void);
+      *behavior_out = DerivedMethodAbsent;
       return NoFail;
     }
     case &MultiMatch: {
@@ -691,7 +691,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior) {
         return Printed(pm);
       }
-      ret.is_scalar = IsScalarNo(void);
+      ret.is_scalar = IsScalarNo;
       *out = ret;
       return NoFail;
     }
