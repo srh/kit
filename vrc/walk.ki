@@ -227,11 +227,37 @@ func walk_expr_consume(ws *walkstate, a *ast_expr_consume) np {
 }
 
 func walk_expr_after_discard(ws *walkstate, a *ast_expr_after_discard) np {
-  return TODO();
+  switch a {
+  case &DiscardTemporary(act destroy_action):
+    return walk_destroy_action(ws, &act);
+  case &DiscardVirtualDead(c cell_num):
+    // TODO: idk.
+    return TODO();
+  case &DiscardNothing:
+    // TODO(): How does this case exist?
+    return NoFail;
+  }
 }
 
 func walk_expr_after_consume(ws *walkstate, a *ast_expr_after_consume) np {
-  return TODO();
+  switch &a->actions {
+  case &ConsumeByInPlace:
+    return NoFail;
+  case &ConsumeByCopyDestroy(act copy_destroy_action):
+    if case Printed(pm) = walk_copy_action(ws, &act.copy) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_destroy_action(ws, &act.destroy) {
+      return Printed(pm);
+    }
+    return NoFail;
+  case &ConsumeByCopy(act tup[copy_action, lval_deadme]):
+    if case Printed(pm) = walk_copy_action(ws, &act.car) {
+      return Printed(pm);
+    }
+    // TODO(): Handle lval_deadme.
+    return TODO();
+  }
 }
 
 func walk_return_statement(ws *walkstate, a *ast_return_statement) np {
@@ -259,5 +285,13 @@ func walk_var_statement(ws *walkstate, a *ast_var_statement) np {
   }
 
   // TODO: idk.
+  return TODO();
+}
+
+func walk_copy_action(ws *walkstate, a *copy_action) np {
+  return TODO();
+}
+
+func walk_destroy_action(ws *walkstate, a *destroy_action) np {
   return TODO();
 }
