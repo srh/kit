@@ -261,13 +261,13 @@ struct ast_while_statement {
   body ast_bracebody;
 };
 
-struct ast_for_statement_info {
-  initter_destructions array[var_destruction];
-};
-
 struct ast_expr_condition {
   discard ast_later_discard_info;
   expr box[ast_expr_consume];
+};
+
+struct ast_for_statement_info {
+  initter_destructions array[var_destruction];
 };
 
 struct ast_for_statement {

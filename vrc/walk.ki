@@ -53,7 +53,10 @@ func walk_body(ws *walkstate, a *ast_bracebody) np {
       return Printed(pm);
     }
   }
-  // TODO(): Now walk the destructions.
+  if case Printed(pm) = walk_var_destructions(ws, &un(&a->info)->destructions) {
+    return Printed(pm);
+  }
+  // TODO(): Cycle back?
   return NoFail;
 }
 
@@ -65,7 +68,7 @@ func walk_statement(ws *walkstate, a *ast_statement) np {
     }
 
   case &Return(b ast_return_statement):
-    // TODO(): We shouldn't keep going _past_ the return statement.
+    // TODO(): We should only keep going _past_ the return statement in order to look for dirty markings.
     if case Printed(pm) = walk_return_statement(ws, &b) {
       return Printed(pm);
     }
@@ -130,24 +133,129 @@ func walk_goto_statement(ws *walkstate, a *ast_goto_statement) np {
   return TODO();
 }
 
+func walk_pattern_assign(ws *walkstate, a *ast_pattern_assign) np {
+  if case Printed(pm) = walk_expr_consume(ws, oo(&a->rhs)) {
+    return Printed(pm);
+  }
+  // TODO(): That's it?  Do some tag cell / enum cell / deref cell logic?
+  return NoFail;
+}
+
+func walk_condition(ws *walkstate, a *ast_condition) np {
+  switch a {
+  case &ExprCondition(b box[ast_expr_consume]):
+    return walk_expr_consume(ws, oo(&b));
+  case &PatternCondition(b ast_pattern_assign):
+    return walk_pattern_assign(ws, &b);
+  }
+}
+
+func walk_condition_discard(ws *walkstate, a *ast_condition_discard_info) np {
+  if case &Has(c cell_num) = un(&a->virtual_cell_dead) {
+    // TODO(): What is this, and how the heck do we handle this?
+  }
+  if case Printed(pm) = walk_later_discard_info(ws, &a->later) {
+    return Printed(pm);
+  }
+  return NoFail;
+}
+
 func walk_ifthen_statement(ws *walkstate, a *ast_ifthen_statement) np {
-  return TODO();
+  // TODO(): Connect condition discard, and body, correctly.
+  // TODO(): Cycle correctly.
+  if case Printed(pm) = walk_condition(ws, &a->condition) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = walk_body(ws, &a->body) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard) {
+    return Printed(pm);
+  }
+  return NoFail;
 }
 
 func walk_ifthenelse_statement(ws *walkstate, a *ast_ifthenelse_statement) np {
-  return TODO();
+  // TODO(): Connect condition discard, and body, correctly.  (Discard before/after elsebody correctly.)
+  // TODO(): Cycle correctly.
+  // TODO(): Walk condition correctly.
+  if case Printed(pm) = walk_condition(ws, &a->condition) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = walk_body(ws, &a->thenbody) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = walk_body(ws, &a->elsebody) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard) {
+    return Printed(pm);
+  }
+  return NoFail;
 }
 
 func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
-  return TODO();
+  // TODO(): Connect the condition discards, and body, correctly.
+  // TODO(): Cycle correctly.
+  if case Printed(pm) = walk_condition(ws, &a->condition) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = walk_body(ws, &a->body) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard_continue) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard_exit) {
+    return Printed(pm);
+  }
+  return NoFail;
 }
 
 func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
-  return TODO();
+  if case &Has(b box[ast_statement]) = &a->initializer {
+    if case Printed(pm) = walk_statement(ws, oo(&b)) {
+      return Printed(pm);
+    }
+  }
+  if case &Has(b ast_expr_condition) = &a->condition {
+    if case Printed(pm) = walk_expr_condition(ws, &b) {
+      return Printed(pm);
+    }
+  }
+  if case &Has(b box[ast_expr_discard]) = &a->increment {
+    if case Printed(pm) = walk_expr_discard(ws, oo(&b)) {
+      return Printed(pm);
+    }
+  }
+
+  if case Printed(pm) = walk_body(ws, &a->body) {
+    return Printed(pm);
+  }
 }
 
 func walk_switch_statement(ws *walkstate, a *ast_switch_statement) np {
-  return TODO();
+  // TODO(): Cycle properly.
+  // TODO(): Connect switch cases properly, swartch discard.
+  // TODO(): Handle default case/swartch discard properly.
+  if case Printed(pm) = walk_expr_consume(ws, oo(&a->swartch)) {
+    return Printed(pm);
+  }
+  // TODO(): Process swartch deconstruction info / tag cell properly?
+  ncases size = count(&a->cases);
+  for i size = 0; i < ncases; i++ {
+    cas *ast_switch_case = ref(&a->cases, i);
+    // TODO(): Process case pattern... somehow.
+    if case Printed(pm) = walk_body(ws, &cas->body) {
+      return Printed(pm);
+    }
+  }
+
+  if case Printed(pm) = walk_later_discard_info(ws, &cas->swartch_discard) {
+    return Printed(pm);
+  }
+
+  return NoFail;
 }
 
 func walk_break_statement(ws *walkstate, a *ast_break_statement) np {
@@ -201,6 +309,13 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     // TODO: Handle funcall state.
     return TODO();
   case &LogicalConjunction(b ast_logical_conjunction):
+    // TODO(): Connect premature return/postmature return.  (And isn't there a lhs discard / move op?)
+    if case Printed(pm) = walk_expr_consume(ws, oo(&b.lhs)) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_expr_consume(ws, oo(&b.rhs)) {
+      return Printed(pm);
+    }
     return TODO();
   case &Assignment(b ast_assignment):
     if case Printed(pm) = walk_expr(ws, oo(&b.lhs)) {
@@ -264,8 +379,26 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     // TODO: idk.  Activate something?
     return TODO();
   case &Ternary(b ast_ternary):
+    // TODO(): Connect entry and exit of cases properly.
+    if case Printed(pm) = walk_expr_consume(ws, oo(&oo(&b.condition)->expr)) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_expr_consume(ws, oo(&b.then_clause)) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_expr_consume(ws, oo(&b.else_clause)) {
+      return Printed(pm);
+    }
+    // TODO(): Make sure condition discard happens before/after then/else clauses, correctly.
+    if case Printed(pm) = walk_later_discard_info(ws, &oo(&b.condition)->discard) {
+      return Printed(pm);
+    }
     return TODO();
   }
+}
+
+func walk_later_discard_info(ws *walkstate, a *ast_later_discard_info) np {
+  return walk_destroy_action(ws, un(&a->action));
 }
 
 func walk_strinit_param(ws *walkstate, a *ast_strinit_param) np {
@@ -351,4 +484,25 @@ func walk_copy_action(ws *walkstate, a *copy_action) np {
 
 func walk_destroy_action(ws *walkstate, a *destroy_action) np {
   return TODO();
+}
+
+func walk_var_destructions(ws *walkstate, a *array[var_destruction]) np {
+  // TODO(): Are we traversing these in the right order?  (Left-to-right or right-to-left?)
+  n size = count(a);
+  for i size = 0; i < n; i++ {
+    if case Printed(pm) = walk_var_destruction(ws, ref(a, i)) {
+      return Printed(pm);
+    }
+  }
+  return NoFail;
+}
+
+func walk_var_destruction(ws *walkstate, a *var_destruction) np {
+  switch a {
+  case &VarSelfContainedDestruction(da destroy_action):
+    return walk_destroy_action(ws, &da);
+  case &VarVirtualCellDead(c cell_num):
+    // TODO(): Mark cell/lifetime deceased?
+    return TODO();
+  }
 }
