@@ -271,8 +271,8 @@ struct ast_for_statement_info {
 };
 
 struct ast_for_statement {
-  // Can only be an ast_expr or ast_statement_var.
   info nc[ast_for_statement_info];
+  // Can only be an ast_expr or ast_statement_var.
   initializer opt[box[ast_statement]];
   condition opt[ast_expr_condition];
   increment opt[box[ast_expr_discard]];
