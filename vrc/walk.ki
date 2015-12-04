@@ -213,18 +213,24 @@ func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
 }
 
 func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
+  // TODO(): Connect the condition discard, body, etc, correctly.
+  // TODO(): Cycle correctly.
   if case &Has(b box[ast_statement]) = &a->initializer {
     if case Printed(pm) = walk_statement(ws, oo(&b)) {
       return Printed(pm);
     }
   }
   if case &Has(b ast_expr_condition) = &a->condition {
-    if case Printed(pm) = walk_expr_condition(ws, &b) {
+    // TODO(): Uh.. walk b.discard more properly.
+    if case Printed(pm) = walk_expr_consume(ws, oo(&b.expr)) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_later_discard_info(ws, &b.discard) {
       return Printed(pm);
     }
   }
   if case &Has(b box[ast_expr_discard]) = &a->increment {
-    if case Printed(pm) = walk_expr_discard(ws, oo(&b)) {
+    if case Printed(pm) = walk_discard_expr(ws, oo(&b)) {
       return Printed(pm);
     }
   }
@@ -232,6 +238,7 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
   if case Printed(pm) = walk_body(ws, &a->body) {
     return Printed(pm);
   }
+  return NoFail;
 }
 
 func walk_switch_statement(ws *walkstate, a *ast_switch_statement) np {
@@ -251,7 +258,7 @@ func walk_switch_statement(ws *walkstate, a *ast_switch_statement) np {
     }
   }
 
-  if case Printed(pm) = walk_later_discard_info(ws, &cas->swartch_discard) {
+  if case Printed(pm) = walk_later_discard_info(ws, &a->swartch_discard) {
     return Printed(pm);
   }
 
@@ -318,14 +325,7 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     }
     return TODO();
   case &Assignment(b ast_assignment):
-    if case Printed(pm) = walk_expr(ws, oo(&b.lhs)) {
-      return Printed(pm);
-    }
-    if case Printed(pm) = walk_expr(ws, oo(&b.rhs)) {
-      return Printed(pm);
-    }
-    // TODO: Uh... assignment_info, value effects.
-    return TODO();
+    return walk_assignment(ws, &b);
   case &RefOf(b ast_refof):
     if case Printed(pm) = walk_expr(ws, oo(&b.rhs)) {
       return Printed(pm);
@@ -395,6 +395,66 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     }
     return TODO();
   }
+}
+
+func walk_assignment_info(ws *walkstate, a *ast_assignment_info) np {
+  // NOTE(): This all makes sense, right?
+  switch a {
+  case &StaticSelfAssignment:
+    return NoFail;
+  case &SimpleMoveAssignment(b ast_simple_move_assignment_info):
+    if case Printed(pm) = walk_destroy_action(ws, &b.target_destroy) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_move_action(ws, &b.rhs_move) {
+      return Printed(pm);
+    }
+    return NoFail;
+  case &SimpleCopyDestroyAssignment(b ast_simple_copydestroy_assignment_info):
+    if case Printed(pm) = walk_destroy_action(ws, &b.target_destroy) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_copy_action(ws, &b.rhs_copy) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_destroy_action(ws, &b.rhs_cleanup) {
+      return Printed(pm);
+    }
+    return NoFail;
+  case &SimpleCopyAssignment(b ast_simple_copy_assignment_info):
+    if case Printed(pm) = walk_destroy_action(ws, &b.target_destroy) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_copy_action(ws, &b.rhs_copy) {
+      return Printed(pm);
+    }
+    // TODO(): Do we do anything with rhs_deadme?  No?
+    return NoFail;
+  case &ConditionalAssignment(b ast_conditional_assignment_info):
+    // TODO(): We're missing the conditional operation entirely.  This needs to get celled and lifetimed out like anything else (the way it used to be, instead of just being an instpair).
+
+    if case Printed(pm) = walk_destroy_action(ws, &b.conditional_destroy) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_copy_action(ws, &b.conditional_copy) {
+      return Printed(pm);
+    }
+    // TODO(): Do we do anything with rhs_deadme?  No?
+    return TODO();
+  }
+}
+
+func walk_assignment(ws *walkstate, a *ast_assignment) np {
+  if case Printed(pm) = walk_expr(ws, oo(&a->lhs)) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = walk_expr(ws, oo(&a->rhs)) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = walk_assignment_info(ws, un(&a->info)) {
+    return Printed(pm);
+  }
+  return NoFail;
 }
 
 func walk_later_discard_info(ws *walkstate, a *ast_later_discard_info) np {
@@ -479,6 +539,10 @@ func walk_var_statement(ws *walkstate, a *ast_var_statement) np {
 }
 
 func walk_copy_action(ws *walkstate, a *copy_action) np {
+  return TODO();
+}
+
+func walk_move_action(ws *walkstate, a *move_action) np {
   return TODO();
 }
 
