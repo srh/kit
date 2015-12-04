@@ -550,10 +550,11 @@ func walk_destroy_action(ws *walkstate, a *destroy_action) np {
   return TODO();
 }
 
+// "a" is in variable declaration order -- the _opposite_ of destruction order.
 func walk_var_destructions(ws *walkstate, a *array[var_destruction]) np {
-  // TODO(): Are we traversing these in the right order?  (Left-to-right or right-to-left?)
   n size = count(a);
-  for i size = 0; i < n; i++ {
+  for i size = count(a); i > 0; {
+    i--;
     if case Printed(pm) = walk_var_destruction(ws, ref(a, i)) {
       return Printed(pm);
     }
