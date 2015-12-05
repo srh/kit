@@ -539,7 +539,7 @@ func triparse_bracebody(p *ps, out *ast_bracebody) triparse_result {
   statements array[ast_statement];
   for ;; {
     if +try_skip_token(p, @[tokval]Grouper(RBrace)) {
-      *out = {NotComputed, statements};
+      *out = {NotComputed, mk_walk_marking(), statements};
       return Success;
     }
     statement ast_statement;
@@ -1546,7 +1546,7 @@ func parse_rest_of_if_statement_enum(p *ps, out *ast_statement_enum) parse_resul
     }
     end(p, m);
     elseif ast_statement = {m, elseif_u};
-    *out = IfThenElse({mk_condition_discard_info(), condition, thenbody, {NotComputed, mk_array(elseif)}});
+    *out = IfThenElse({mk_condition_discard_info(), condition, thenbody, {NotComputed, mk_walk_marking(), mk_array(elseif)}});
     return Success;
   }
   elsebody ast_bracebody;
@@ -1654,7 +1654,7 @@ func parse_switch_case(p *ps, out *ast_switch_case) parse_result {
           if count(&statements) == 0 {
             return Fail;
           }
-          body = {NotComputed, statements};
+          body = {NotComputed, mk_walk_marking(), statements};
           done = true;
         } else {
           st ast_statement;

@@ -22,6 +22,11 @@ struct framescope {
   // Used for auto-generating $frame_1, $frame_2, ... lifetimes.
   lifetime_gen_counter size;
 
+  // The zeroth entry is null, so that walk marking counters start at 1.
+  walk_markings array[*ast_walk_marking];
+
+  bottom_walk_marking ast_walk_marking_number;
+
   gr frame_graph;
 };
 
@@ -29,7 +34,45 @@ func mk(ds *defscope) framescope {
   return {ds, ds->cs, ds->im, ds->clq,
           mk_array@[var_info](), mk_array@[var_number](),
           0,
+          mk_array@[*ast_walk_marking](null),
+          @[ast_walk_marking_number]{0},
           init_frame_graph_empty(ds->def_informal_name)};
+}
+
+defclass walk_marking_connector {
+  es *framescope;
+  wm *ast_walk_marking;
+};
+
+access walk_marking_connector {
+  func do_init(wmc *walk_marking_connector) void {
+    init(&wmc->es);
+    init(&wmc->wm);
+  }
+  func do_destroy(wmc *walk_marking_connector) void {
+    es *framescope = wmc->es;
+    if es != null {
+      conn *ast_walk_marking_connection = un(&wmc->wm->conn);
+      check(es->bottom_walk_marking.x == conn->number.x);
+      es->bottom_walk_marking = conn->parent;
+      wmc->es = null;
+      wmc->wm = null;
+    }
+  }
+
+  func init_wmc(wmc *walk_marking_connector, es *framescope, wm *ast_walk_marking) void {
+    new_bottom ast_walk_marking_number = connect_walk_marking(es, es->bottom_walk_marking, wm);
+    es->bottom_walk_marking = new_bottom;
+    wmc->es = es;
+    wmc->wm = wm;
+  }
+}
+
+func connect_walk_marking(es *framescope, parent ast_walk_marking_number, wm *ast_walk_marking) ast_walk_marking_number {
+  ret ast_walk_marking_number = {count(&es->walk_markings)};
+  push(&es->walk_markings, wm);
+  annotate(&wm->conn, {ret, parent});
+  return ret;
 }
 
 inline func add_cell(es *framescope, info cell_info) cell_num {

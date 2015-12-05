@@ -83,6 +83,9 @@ func connect_statements(bs *bodystate, from statement_num, to statement_num) voi
 struct entryexit { entry statement_num; exit statement_num; };
 
 func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *entryexit) np {
+  wmc walk_marking_connector;
+  init_wmc(&wmc, &bs->es, &a->walk_marking);
+
   nstatements size = count(&a->statements);
   entry statement_num = add_statement(bs, None);
   exit statement_num = entry;

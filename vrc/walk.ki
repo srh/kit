@@ -5,6 +5,31 @@ import expr;
 
 // How should we represent state?  We've got facts.  A big bag of facts.  Okay then.  I hope they aren't self-contradictory!
 
+defclass walk_hold {
+  wm *ast_walk_marking;
+};
+
+access walk_hold {
+  func do_init(wh *walk_hold) void {
+    init(&wh->wm);
+  }
+  func do_destroy(wh *walk_hold) void {
+    wm *_ = wh->wm;
+    if wm != null {
+      wm->cycle_back = false;
+      check(wm->walking);
+      wm->walking = false;
+    }
+  }
+
+  func wh_init(wh *walk_hold, wm *ast_walk_marking) void {
+    check(wh->wm == null);
+    check(!wm->walking);
+    wm->walking = true;
+    wh->wm = wm;
+  }
+}
+
 struct walkdesc {
   facts array[te_statedesc];
 };
@@ -51,6 +76,9 @@ func walk_lambda_state(bs *bodystate, computed_params *shray[te_typeexpr], a *as
 }
 
 func walk_body(ws *walkstate, a *ast_bracebody) np {
+  wh walk_hold;
+  wh_init(&wh, &a->walk_marking);
+
   nstatements size = count(&a->statements);
   for i size = 0; i < nstatements; i++ {
     s *ast_statement = ref(&a->statements, i);

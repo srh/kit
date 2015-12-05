@@ -197,6 +197,7 @@ struct ast_bracebody_info {
 
 struct ast_bracebody {
   info nc[ast_bracebody_info];
+  walk_marking ast_walk_marking;
   statements array[ast_statement];
 };
 
@@ -337,15 +338,28 @@ struct ast_goto_statement {
   target ast_ident;
 };
 
+struct ast_walk_marking_number {
+  x size;
+};
+
+struct ast_walk_marking_connection {
+  // What is my number?  Can never be zero.
+  number ast_walk_marking_number;
+  // What is my parent's number?  0 means there is no parent.
+  parent ast_walk_marking_number;
+};
+
 struct ast_walk_marking {
   // True while we are in the middle of "walk"ing a subtree.
   walking bool;
   // True if a cycle-back to a location within this subtree was requested, _and_ no lower subtree has walking=true, cycle_back=true.  (I.e. we only mark the cycle_back field of the deepest node that we're walking, and its descendents.  We mark its descendents so that we can more efficiently cycle back (without marking everything).
   cycle_back bool;
+
+  conn nc[ast_walk_marking_connection];
 };
 
 func mk_walk_marking() ast_walk_marking {
-  return {false, false};
+  return {false, false, NotComputed};
 }
 
 struct ast_statement {
