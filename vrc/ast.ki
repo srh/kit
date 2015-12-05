@@ -337,20 +337,19 @@ struct ast_goto_statement {
   target ast_ident;
 };
 
-struct ast_walk_info {
+struct ast_walk_marking {
   // True while we are in the middle of "walk"ing a subtree.
   walking bool;
   // True if a cycle-back to a location within this subtree was requested, _and_ no lower subtree has walking=true, cycle_back=true.  (I.e. we only mark the cycle_back field of the deepest node that we're walking, and its descendents.  We mark its descendents so that we can more efficiently cycle back (without marking everything).
   cycle_back bool;
 };
 
-func mk_walk_info() ast_walk_info {
+func mk_walk_marking() ast_walk_marking {
   return {false, false};
 }
 
 struct ast_statement {
   meta ast_meta;
-  walk_marking ast_walk_info;
   u ast_statement_enum;
 };
 
