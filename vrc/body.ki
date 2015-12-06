@@ -282,6 +282,9 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       *ee_out = {num, tailnum};
 
     case &While(b ast_while_statement):
+      wmc walk_marking_connector;
+      init_wmc(&wmc, &bs->es, &b.walk_marking);
+
       swartch_vp varpopper;
       init_vp(&swartch_vp, &bs->es);
 
@@ -557,36 +560,44 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   loop_in_scope array[var_number] = vars_in_scope(&bs->es);
 
   exitnum statement_num = add_statement(bs, None);
-  cond_vp varpopper;
-  init_vp(&cond_vp, &bs->es);
-  if case &Has(cond ast_expr_condition) = &a->condition {
-    cond_rc rval_cellnum = {add_none_cell(&bs->es), unnamed_lifetime(&bs->es)};
-    boolean cu_typeexpr = compute_prim(bs->clq, primitive_bool_type(bs->cs));
-    if case Printed(pm) = check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.x, cond_rc, &cond.discard) {
+
+  if true {
+    // This excludes initter stuff, just like walk_for_statement.
+    wmc walk_marking_connector;
+    init_wmc(&wmc, &bs->es, &a->walk_marking);
+
+    cond_vp varpopper;
+    init_vp(&cond_vp, &bs->es);
+    if case &Has(cond ast_expr_condition) = &a->condition {
+      cond_rc rval_cellnum = {add_none_cell(&bs->es), unnamed_lifetime(&bs->es)};
+      boolean cu_typeexpr = compute_prim(bs->clq, primitive_bool_type(bs->cs));
+      if case Printed(pm) = check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.x, cond_rc, &cond.discard) {
+        return Printed(pm);
+      }
+      connect_statements(bs, loopnum, exitnum);
+      cond_vn var_number;
+      check(result_cell(oo(&cond.expr)) == cond_rc.cell);
+      if case Printed(pm) = es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, cond_rc.lifetime, &boolean, VarSelfContained, &cond_vn) {
+        return Printed(pm);
+      }
+    }
+    if case &Has(incr box[ast_expr_discard]) = &a->increment {
+      unknown te_typeexpr = TeUnknown;
+      if case Printed(pm) = check_discard_expr(&bs->es, oo(&incr), &unknown) {
+        return Printed(pm);
+      }
+    }
+
+    bp breakpack = {exitnum, break_in_scope, loopnum, loop_in_scope};
+
+    body_ee entryexit;
+    if case Printed(pm) = check_body(bs, Has(&bp), &a->body, &body_ee) {
       return Printed(pm);
     }
-    connect_statements(bs, loopnum, exitnum);
-    cond_vn var_number;
-    check(result_cell(oo(&cond.expr)) == cond_rc.cell);
-    if case Printed(pm) = es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, cond_rc.lifetime, &boolean, VarSelfContained, &cond_vn) {
-      return Printed(pm);
-    }
-  }
-  if case &Has(incr box[ast_expr_discard]) = &a->increment {
-    unknown te_typeexpr = TeUnknown;
-    if case Printed(pm) = check_discard_expr(&bs->es, oo(&incr), &unknown) {
-      return Printed(pm);
-    }
+    connect_statements(bs, loopnum, body_ee.entry);
+    connect_statements(bs, body_ee.exit, loopnum);
   }
 
-  bp breakpack = {exitnum, break_in_scope, loopnum, loop_in_scope};
-
-  body_ee entryexit;
-  if case Printed(pm) = check_body(bs, Has(&bp), &a->body, &body_ee) {
-    return Printed(pm);
-  }
-  connect_statements(bs, loopnum, body_ee.entry);
-  connect_statements(bs, body_ee.exit, loopnum);
   initter_destructions array[var_destruction];
   if case Printed(pm) = make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions) {
     return Printed(pm);

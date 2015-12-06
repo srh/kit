@@ -256,6 +256,7 @@ struct ast_ifthenelse_statement {
 };
 
 struct ast_while_statement {
+  walk_marking ast_walk_marking;
   condition_discard_continue ast_condition_discard_info;
   condition_discard_exit ast_condition_discard_info;
   condition ast_condition;
@@ -271,10 +272,12 @@ struct ast_for_statement_info {
   initter_destructions array[var_destruction];
 };
 
+// TODO(): Rename initter_destructions to initializer_destructions, or vice versa.
 struct ast_for_statement {
   info nc[ast_for_statement_info];
   // Can only be an ast_expr or ast_statement_var.
   initializer opt[box[ast_statement]];
+  walk_marking ast_walk_marking;
   condition opt[ast_expr_condition];
   increment opt[box[ast_expr_discard]];
   body ast_bracebody;

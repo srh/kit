@@ -1564,7 +1564,7 @@ func parse_rest_of_while_statement_enum(p *ps, out *ast_statement_enum) parse_re
        && +parse_bracebody(p, &body)) {
     return Fail;
   }
-  *out = While({mk_condition_discard_info(), mk_condition_discard_info(), condition, body});
+  *out = While({mk_walk_marking(), mk_condition_discard_info(), mk_condition_discard_info(), condition, body});
   return Success;
 }
 
@@ -1608,7 +1608,7 @@ func parse_rest_of_for_statement_enum(p *ps, out *ast_statement_enum) parse_resu
   if ! +parse_bracebody(p, &body) {
     return Fail;
   }
-  *out = For({NotComputed, initializer, condition, increment, body});
+  *out = For({NotComputed, initializer, mk_walk_marking(), condition, increment, body});
   return Success;
 }
 
