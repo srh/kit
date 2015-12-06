@@ -34,6 +34,7 @@ struct walkdesc {
   facts array[te_statedesc];
 };
 
+// TODO(): Have some counter for 'number of dirty markings made' and 'number of dirty markings walked from', have an assertion that these numbers match.
 // There's just one of these (for any given walk).
 struct walkstate {
   bs *bodystate;
@@ -389,6 +390,7 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.rhs)) {
       return Printed(pm);
     }
+    // TODO(): Also, cycle correctly.
     return TODO();
   case &Assignment(b ast_assignment):
     return walk_assignment(ws, &b);
@@ -408,17 +410,39 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.rhs)) {
       return Printed(pm);
     }
-    // TODO(): Handle pointer discard.
+    if case Printed(pm) = walk_later_discard_info(ws, &b.ptr_discard) {
+      return Printed(pm);
+    }
+    // TODO(): Process... the act of dereffing?
     return TODO();
   case &IndexExpr(b ast_index_expr):
     if case Printed(pm) = walk_expr(ws, oo(&b.lhs)) {
       return Printed(pm);
     }
+    info *ast_index_expr_info = un(&b.info);
+    if case &Has(p tup[ast_expr_after_consume, ast_later_discard_info]) = &info->lhs_after {
+      if case Printed(pm) = walk_expr_after_consume(ws, &p.car) {
+        return Printed(pm);
+      }
+    }
+
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.rhs)) {
       return Printed(pm);
     }
-    // TODO(): idk.
-    return TODO();
+
+    // TODO(): Do index expr walkstate stuff.
+
+    // TODO(): This assumes we discard lhs before discarding rhs -- do we?
+    if case &Has(p tup[ast_expr_after_consume, ast_later_discard_info]) = &info->lhs_after {
+      if case Printed(pm) = walk_later_discard_info(ws, &p.cdr) {
+        return Printed(pm);
+      }
+    }
+    if case Printed(pm) = walk_later_discard_info(ws, &info->rhs_later) {
+      return Printed(pm);
+    }
+
+    return NoFail;
   case &Lambda(b ast_lambda):
     return TODO();
   case &LocalField(b ast_local_field):
@@ -431,6 +455,10 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.lhs)) {
       return Printed(pm);
     }
+    if case Printed(pm) = walk_later_discard_info(ws, &b.ptr_discard) {
+      return Printed(pm);
+    }
+    // TODO(): Process... the act of dereffing?
     // TODO(): Handle pointer discard.
     return TODO();
   case &TypedExpr(b ast_typed_expr):
