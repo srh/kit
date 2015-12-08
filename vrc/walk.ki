@@ -280,7 +280,6 @@ func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
   if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard_exit) {
     return Printed(pm);
   }
-  // TODO(): Cycle correctly.
   return NoFail;
 }
 
@@ -294,27 +293,33 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
 
   // Scoped so the walk-hold applies to the cycling part of the loop.  This fact has to be kept in sync with the type-checking code in body.ki.
   if true {
-    // TODO(): Cycle correctly.
     wh walk_hold;
     wh_init(&wh, &a->walk_marking);
 
-    if case &Has(b ast_expr_condition) = &a->condition {
-      // TODO(): Uh.. walk b.discard more properly.
-      if case Printed(pm) = walk_expr_consume(ws, oo(&b.expr)) {
-        return Printed(pm);
-      }
-      if case Printed(pm) = walk_later_discard_info(ws, &b.discard) {
-        return Printed(pm);
-      }
-    }
-    if case &Has(b box[ast_expr_discard]) = &a->increment {
-      if case Printed(pm) = walk_discard_expr(ws, oo(&b)) {
-        return Printed(pm);
-      }
-    }
+    again bool = true;
+    while again {
+      a->walk_marking.cycle_back = false;
 
-    if case Printed(pm) = walk_bracebody(ws, &a->body) {
-      return Printed(pm);
+      if case &Has(b ast_expr_condition) = &a->condition {
+        // TODO(): Uh.. walk b.discard more properly.
+        if case Printed(pm) = walk_expr_consume(ws, oo(&b.expr)) {
+          return Printed(pm);
+        }
+        if case Printed(pm) = walk_later_discard_info(ws, &b.discard) {
+          return Printed(pm);
+        }
+      }
+      if case &Has(b box[ast_expr_discard]) = &a->increment {
+        if case Printed(pm) = walk_discard_expr(ws, oo(&b)) {
+          return Printed(pm);
+        }
+      }
+
+      if case Printed(pm) = walk_bracebody(ws, &a->body) {
+        return Printed(pm);
+      }
+
+      again = cycle_again(ws, &a->walk_marking);
     }
   }
 
@@ -327,7 +332,6 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
 }
 
 func walk_switch_statement(ws *walkstate, a *ast_switch_statement) np {
-  // TODO(): Cycle properly.
   // TODO(): Connect switch cases properly, swartch discard.
   // NOTE(): Handle default case/swartch discard properly.
   if case Printed(pm) = walk_expr_consume(ws, oo(&a->swartch)) {
@@ -416,7 +420,6 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.rhs)) {
       return Printed(pm);
     }
-    // TODO(): Also, cycle correctly.
     return TODO();
   case &Assignment(b ast_assignment):
     return walk_assignment(ws, &b);
