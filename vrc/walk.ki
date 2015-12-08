@@ -112,7 +112,6 @@ func walk_statement(ws *walkstate, a *ast_statement) np {
     }
 
   case &Return(b ast_return_statement):
-    // TODO(): We should only keep going _past_ the return statement in order to look for dirty markings.
     if case Printed(pm) = walk_return_statement(ws, &b) {
       return Printed(pm);
     }
@@ -172,6 +171,7 @@ func walk_statement(ws *walkstate, a *ast_statement) np {
 }
 
 func walk_goto_statement(ws *walkstate, a *ast_goto_statement) np {
+  // TODO(): Should we walk these constructors when cycling?  No.
   info *ast_goto_statement_info = un(&a->info);
   if case Printed(pm) = walk_var_destructions(ws, &info->destructions) {
     return Printed(pm);
@@ -179,9 +179,12 @@ func walk_goto_statement(ws *walkstate, a *ast_goto_statement) np {
   if case Printed(pm) = walk_var_initters(ws, &info->initializations) {
     return Printed(pm);
   }
-  // TODO(): Connect state to other end.  Also treat subsequent statements like dead post-return statement statements, looking only for marked labels.
+  // TODO(): Connect state to other end.
 
   // NOTE(): We should think about how we do our variable unwindings (and in particular, windings).  We could overlap with other variable unwindings/windings, heading towards the same label.  Should we overlap the typestate, too?  For now, the answer is, nah.
+
+  // Just like with return statements, we enter cycling-state.
+  ws->cycling = true;
 
   return TODO();
 }
@@ -246,8 +249,8 @@ func walk_ifthenelse_statement(ws *walkstate, a *ast_ifthenelse_statement) np {
 }
 
 func cycle_again(ws *walkstate, a *ast_walk_marking) bool {
+  /* ws->cycling could be in either state when we get to cycle_again.  For example, if we have { blah; return 3; } then the return statement will put us in a cycling state, no matter what. */
   if a->cycle_back {
-    check(!ws->cycling);
     ws->cycling = true;
     return true;
   } else {
@@ -642,12 +645,15 @@ func walk_return_statement(ws *walkstate, a *ast_return_statement) np {
     // TODO(): Model assignment of void to return cell.
   }
 
+  // TODO(): Tie walkstate to end-of-function walkstate.
   if case Printed(pm) = walk_var_destructions(ws, &un(&a->info)->destructions) {
     return Printed(pm);
   }
 
-  // TODO(): We exit the function.  So?
-  return TODO();
+  // We continue walking the bracebody, but in a cycling state.
+  ws->cycling = true;
+
+  return NoFail;
 }
 
 func walk_var_statement(ws *walkstate, a *ast_var_statement) np {
