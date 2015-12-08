@@ -45,10 +45,13 @@ struct walkstate {
   im *identmap;
 
   current_desc walkdesc;
+  // True if we shouldn't be maintaining state -- we're cycling back.
+  // NOTE(): We could/should replace current_desc/cyclic with an opt[walkdesc].
+  cycling bool;
 };
 
 func mk(bs *bodystate) walkstate {
-  ret walkstate = {bs, &bs->es, bs->ds, bs->clq, bs->cs, bs->im, {mk_array()}};
+  ret walkstate = {bs, &bs->es, bs->ds, bs->clq, bs->cs, bs->im, {mk_array()}, false};
   return ret;
 }
 
@@ -72,7 +75,7 @@ func walk_lambda_state(bs *bodystate, computed_params *shray[te_typeexpr], a *as
     return Printed(pm);
   }
 
-  // TODO(): Something must be done.
+  // TODO(): Something must be done.  Tie return state down?
   return NoFail;
 }
 
@@ -80,17 +83,30 @@ func walk_bracebody(ws *walkstate, a *ast_bracebody) np {
   wh walk_hold;
   wh_init(&wh, &a->walk_marking);
 
-  nstatements size = count(&a->statements);
-  for i size = 0; i < nstatements; i++ {
-    s *ast_statement = ref(&a->statements, i);
-    if case Printed(pm) = walk_statement(ws, s) {
+  again bool = true;
+  while again {
+    a->walk_marking.cycle_back = false;
+
+    nstatements size = count(&a->statements);
+    for i size = 0; i < nstatements; i++ {
+      s *ast_statement = ref(&a->statements, i);
+      if case Printed(pm) = walk_statement(ws, s) {
+        return Printed(pm);
+      }
+    }
+    if case Printed(pm) = walk_var_destructions(ws, &un(&a->info)->destructions) {
       return Printed(pm);
     }
+
+    if a->walk_marking.cycle_back {
+      check(!ws->cycling);
+      ws->cycling = true;
+      again = true;
+    } else {
+      again = false;
+    }
   }
-  if case Printed(pm) = walk_var_destructions(ws, &un(&a->info)->destructions) {
-    return Printed(pm);
-  }
-  // TODO(): Cycle correctly.
+
   return NoFail;
 }
 
