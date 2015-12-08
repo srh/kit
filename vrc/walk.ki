@@ -186,7 +186,7 @@ func walk_goto_statement(ws *walkstate, a *ast_goto_statement) np {
   // Just like with return statements, we enter cycling-state.
   ws->cycling = true;
 
-  return TODO();
+  return NoFail;
 }
 
 func walk_pattern_assign(ws *walkstate, a *ast_pattern_assign) np {
@@ -374,7 +374,8 @@ func walk_continue_statement(ws *walkstate, a *ast_continue_statement) np {
 }
 
 func walk_label_statement(ws *walkstate, a *ast_label_statement) np {
-  return TODO();
+  // TODO(): Uh, check for cycling, notate the current statedesc, and other stuff?
+  return NoFail;
 }
 
 func walk_discard_expr(ws *walkstate, a *ast_expr_discard) np {
@@ -388,24 +389,29 @@ func walk_discard_expr(ws *walkstate, a *ast_expr_discard) np {
   return NoFail;
 }
 
+// TODO(): Remove all uses of this.
+func walk_TODO() np {
+  return NoFail;
+}
+
 func walk_expr(ws *walkstate, a *ast_expr) np {
   switch &a->u {
   case &NameExpr(b ast_name_expr):
-    return TODO();
+    return walk_TODO();
   case &ParenExpr(b ast_paren_expr):
     return walk_expr(ws, oo(&b.expr));
   case &NumericLiteral(b ast_numeric_literal):
-    return TODO();
+    return walk_TODO();
   case &BoolLiteral(b ast_bool_literal):
-    return TODO();
+    return walk_TODO();
   case &VoidLiteral(b ast_void_literal):
-    return TODO();
+    return walk_TODO();
   case &NullLiteral(b ast_null_literal):
-    return TODO();
+    return walk_TODO();
   case &CharLiteral(b ast_char_literal):
-    return TODO();
+    return walk_TODO();
   case &StringLiteral(b ast_string_literal):
-    return TODO();
+    return walk_TODO();
   case &Funcall(b ast_funcall):
     nparams size = count(&b.params);
     for i size = 0; i < nparams; i++ {
@@ -414,7 +420,7 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
       }
     }
     // TODO: Handle funcall state.
-    return TODO();
+    return walk_TODO();
   case &LogicalConjunction(b ast_logical_conjunction):
     // TODO(): Connect premature return/postmature return.  (And isn't there a lhs discard / move op?)
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.lhs)) {
@@ -423,7 +429,7 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.rhs)) {
       return Printed(pm);
     }
-    return TODO();
+    return walk_TODO();
   case &Assignment(b ast_assignment):
     return walk_assignment(ws, &b);
   case &RefOf(b ast_refof):
@@ -431,13 +437,13 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
       return Printed(pm);
     }
     // TODO: idk.
-    return TODO();
+    return walk_TODO();
   case &AddressOf(b ast_addressof):
     if case Printed(pm) = walk_expr(ws, oo(&b.rhs)) {
       return Printed(pm);
     }
     // TODO: idk.
-    return TODO();
+    return walk_TODO();
   case &Deref(b ast_deref):
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.rhs)) {
       return Printed(pm);
@@ -446,7 +452,7 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
       return Printed(pm);
     }
     // TODO(): Process... the act of dereffing?
-    return TODO();
+    return walk_TODO();
   case &IndexExpr(b ast_index_expr):
     if case Printed(pm) = walk_expr(ws, oo(&b.lhs)) {
       return Printed(pm);
@@ -476,13 +482,13 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
 
     return NoFail;
   case &Lambda(b ast_lambda):
-    return TODO();
+    return walk_TODO();
   case &LocalField(b ast_local_field):
     if case Printed(pm) = walk_expr(ws, oo(&b.lhs)) {
       return Printed(pm);
     }
     // TODO: idk.
-    return TODO();
+    return walk_TODO();
   case &DerefField(b ast_deref_field):
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.lhs)) {
       return Printed(pm);
@@ -492,7 +498,7 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     }
     // TODO(): Process... the act of dereffing?
     // TODO(): Handle pointer discard.
-    return TODO();
+    return walk_TODO();
   case &TypedExpr(b ast_typed_expr):
     return walk_expr(ws, oo(&b.expr));
   case &Strinit(b ast_strinit):
@@ -503,7 +509,7 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
       }
     }
     // TODO: idk.  Activate something?
-    return TODO();
+    return walk_TODO();
   case &Ternary(b ast_ternary):
     // TODO(): Connect entry and exit of cases properly.
     if case Printed(pm) = walk_expr_consume(ws, oo(&oo(&b.condition)->expr)) {
@@ -519,7 +525,7 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     if case Printed(pm) = walk_later_discard_info(ws, &oo(&b.condition)->discard) {
       return Printed(pm);
     }
-    return TODO();
+    return walk_TODO();
   }
 }
 
@@ -566,7 +572,7 @@ func walk_assignment_info(ws *walkstate, a *ast_assignment_info) np {
       return Printed(pm);
     }
     // TODO(): Do we do anything with rhs_deadme?  No?
-    return TODO();
+    return walk_TODO();
   }
 }
 
@@ -598,8 +604,8 @@ func walk_expr_consume(ws *walkstate, a *ast_expr_consume) np {
   if case Printed(pm) = walk_expr_after_consume(ws, un(&a->after)) {
     return Printed(pm);
   }
-  // TODO: idk.
-  return TODO();
+  // TODO(): idk.
+  return walk_TODO();
 }
 
 func walk_expr_after_discard(ws *walkstate, a *ast_expr_after_discard) np {
@@ -607,8 +613,8 @@ func walk_expr_after_discard(ws *walkstate, a *ast_expr_after_discard) np {
   case &DiscardTemporary(act destroy_action):
     return walk_destroy_action(ws, &act);
   case &DiscardVirtualDead(c cell_num):
-    // TODO: idk.
-    return TODO();
+    // TODO(): idk.
+    return walk_TODO();
   case &DiscardNothing:
     // TODO(): How does this case exist?
     return NoFail;
@@ -632,7 +638,7 @@ func walk_expr_after_consume(ws *walkstate, a *ast_expr_after_consume) np {
       return Printed(pm);
     }
     // TODO(): Handle lval_deadme.
-    return TODO();
+    return walk_TODO();
   }
 }
 
@@ -664,27 +670,27 @@ func walk_var_statement(ws *walkstate, a *ast_var_statement) np {
     }
   case &AutoInit(act opt[init_action]):
     // TODO(): Why is act optional?  Should it be nc?
-    return TODO();
+    return walk_TODO();
   }
 
   // TODO: idk.
-  return TODO();
+  return walk_TODO();
 }
 
 func walk_init_action(ws *walkstate, a *init_action) np {
-  return TODO();
+  return walk_TODO();
 }
 
 func walk_copy_action(ws *walkstate, a *copy_action) np {
-  return TODO();
+  return walk_TODO();
 }
 
 func walk_move_action(ws *walkstate, a *move_action) np {
-  return TODO();
+  return walk_TODO();
 }
 
 func walk_destroy_action(ws *walkstate, a *destroy_action) np {
-  return TODO();
+  return walk_TODO();
 }
 
 // "a" is in variable declaration order -- the _opposite_ of destruction order.
@@ -715,6 +721,6 @@ func walk_var_destruction(ws *walkstate, a *var_destruction) np {
     return walk_destroy_action(ws, &da);
   case &VarVirtualCellDead(c cell_num):
     // TODO(): Mark cell/lifetime deceased?
-    return TODO();
+    return walk_TODO();
   }
 }
