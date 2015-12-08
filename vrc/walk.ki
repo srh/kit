@@ -639,6 +639,11 @@ func walk_expr_after_consume(ws *walkstate, a *ast_expr_after_consume) np {
     }
     // TODO(): Handle lval_deadme.
     return walk_TODO();
+  case &ConsumeByMove(act move_action):
+    if case Printed(pm) = walk_move_action(ws, &act) {
+      return Printed(pm);
+    }
+    return NoFail;
   }
 }
 

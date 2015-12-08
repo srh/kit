@@ -1513,12 +1513,10 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, demand rv
     if case Printed(pm) = help_check_lambda_body(&bs, computed_params, a) {
       return Printed(pm);
     }
-    /*
-    TODO(): Walk.
+    // TODO(): Is that it?  Is there more to do here?  Tie ending state?
     if case Printed(pm) = walk_lambda_state(&bs, computed_params, a) {
       return Printed(pm);
     }
-    */
   }
 
   props type_properties;
@@ -1546,10 +1544,12 @@ func help_check_lambda_body(bs *bodystate, computed_params *shray[te_typeexpr], 
     cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
     push(&arg_cells, cell);
     vn var_number;
-    name *ast_ident = &ref(&a->args, i)->decl.name;
+    lam_arg *ast_lambda_arg = ref(&a->args, i);
+    name *ast_ident = &lam_arg->decl.name;
     if case Printed(pm) = es_push_var(&bs->es, &vp, cell, Has(name), varname_lifetime(bs->im, name->value), &cu_param, VarSelfContained, &vn) {
       return Printed(pm);
     }
+    annotate(&lam_arg->vn, vn);
     if case Printed(pm) = es_note_var_destroyer(&bs->es, vn) {
       return Printed(pm);
     }
