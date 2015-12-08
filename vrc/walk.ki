@@ -98,13 +98,7 @@ func walk_bracebody(ws *walkstate, a *ast_bracebody) np {
       return Printed(pm);
     }
 
-    if a->walk_marking.cycle_back {
-      check(!ws->cycling);
-      ws->cycling = true;
-      again = true;
-    } else {
-      again = false;
-    }
+    again = cycle_again(ws, &a->walk_marking);
   }
 
   return NoFail;
@@ -221,7 +215,6 @@ func walk_condition_discard(ws *walkstate, a *ast_condition_discard_info) np {
 
 func walk_ifthen_statement(ws *walkstate, a *ast_ifthen_statement) np {
   // TODO(): Connect condition discard, and body, correctly.
-  // TODO(): Cycle correctly.
   if case Printed(pm) = walk_condition(ws, &a->condition) {
     return Printed(pm);
   }
@@ -236,7 +229,6 @@ func walk_ifthen_statement(ws *walkstate, a *ast_ifthen_statement) np {
 
 func walk_ifthenelse_statement(ws *walkstate, a *ast_ifthenelse_statement) np {
   // TODO(): Connect condition discard, and body, correctly.  (Discard before/after elsebody correctly.)
-  // TODO(): Cycle correctly.
   // TODO(): Walk condition correctly.
   if case Printed(pm) = walk_condition(ws, &a->condition) {
     return Printed(pm);
@@ -253,20 +245,38 @@ func walk_ifthenelse_statement(ws *walkstate, a *ast_ifthenelse_statement) np {
   return NoFail;
 }
 
+func cycle_again(ws *walkstate, a *ast_walk_marking) bool {
+  if a->cycle_back {
+    check(!ws->cycling);
+    ws->cycling = true;
+    return true;
+  } else {
+    return false;
+  }
+}
+
 func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
   wh walk_hold;
   wh_init(&wh, &a->walk_marking);
 
-  // TODO(): Connect the condition discards, and body, correctly.
-  if case Printed(pm) = walk_condition(ws, &a->condition) {
-    return Printed(pm);
+  again bool = true;
+  while again {
+    a->walk_marking.cycle_back = false;
+
+    // TODO(): Connect the condition discards, and body, correctly.
+    if case Printed(pm) = walk_condition(ws, &a->condition) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_bracebody(ws, &a->body) {
+      return Printed(pm);
+    }
+    if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard_continue) {
+      return Printed(pm);
+    }
+
+    again = cycle_again(ws, &a->walk_marking);
   }
-  if case Printed(pm) = walk_bracebody(ws, &a->body) {
-    return Printed(pm);
-  }
-  if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard_continue) {
-    return Printed(pm);
-  }
+
   if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard_exit) {
     return Printed(pm);
   }
