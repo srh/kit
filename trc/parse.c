@@ -895,7 +895,7 @@ int parse_rest_of_for_statement(struct ps *p, struct pos pos_start,
   }
 
   int has_initializer;
-  struct ast_statement initializer = { 0 };
+  struct ast_statement initializer;
   if (try_skip_semicolon(p)) {
     has_initializer = 0;
   } else {
@@ -910,7 +910,7 @@ int parse_rest_of_for_statement(struct ps *p, struct pos pos_start,
   }
 
   int has_condition;
-  struct ast_expr condition = { 0 };
+  struct ast_expr condition;
   if (try_skip_semicolon(p)) {
     has_condition = 0;
   } else {
@@ -929,7 +929,7 @@ int parse_rest_of_for_statement(struct ps *p, struct pos pos_start,
   }
 
   int has_increment;
-  struct ast_expr increment = { 0 };
+  struct ast_expr increment;
   if (ps_peek(p) == '{') {
     has_increment = 0;
   } else {
@@ -2307,7 +2307,7 @@ int parse_def_generics_and_name(struct ps *p,
                                 int is_export,
                                 struct ast_generics *generics_out,
                                 struct ast_ident *name_out) {
-  struct ast_generics generics = { 0 };
+  struct ast_generics generics;
   if (is_export) {
     ast_generics_init_no_params(&generics);
   } else {
@@ -2344,7 +2344,7 @@ int parse_rest_of_def(struct ps *p, struct pos pos_start,
   }
 
   int has_typeexpr;
-  struct ast_typeexpr typeexpr = { 0 };
+  struct ast_typeexpr typeexpr;
   if (try_skip_oper(p, "=")) {
     has_typeexpr = 0;
   } else {

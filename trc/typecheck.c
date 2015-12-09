@@ -1387,7 +1387,7 @@ int finish_checking_name_traits(struct checkstate *cs,
   int lookup_init;
   deftype_trait_strategies(deftype_disposition, &lookup_move, &lookup_copy, &lookup_init);
 
-  struct typeexpr_traits rhs_traits = { 0 };
+  struct typeexpr_traits rhs_traits;
   if (!(lookup_move && lookup_copy && lookup_init)) {
     switch (concrete_deftype_rhs->tag) {
     case AST_DEFTYPE_RHS_TYPE:
@@ -2985,7 +2985,7 @@ int check_statement(struct bodystate *bs,
   } break;
   case AST_STATEMENT_RETURN: {
     int has_expr = s->u.return_statement.has_expr;
-    struct ast_typeexpr void_type = { 0 };
+    struct ast_typeexpr void_type;
     struct ast_typeexpr *expr_type;
     if (has_expr) {
       if (!check_expr(bs->es, s->u.return_statement.expr, bs->partial_type)) {

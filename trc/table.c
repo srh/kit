@@ -1177,7 +1177,7 @@ enum match_result name_table_match_def(
     struct def_entry **entry_out,
     struct def_instantiation **instantiation_out) {
   /* matched_type is initialized if matched_ent is non-null. */
-  struct ast_typeexpr matched_type = { 0 };  /* Initialized to appease cl. */
+  struct ast_typeexpr matched_type;
   struct def_instantiation *matched_instantiation = NULL;
   struct def_entry *matched_ent = NULL;
 
@@ -1363,4 +1363,3 @@ void deftype_entry_mark_generic_flatly_held(struct deftype_entry *ent,
   CHECK(which_generic < ent->flatly_held_count);
   ent->flatly_held[which_generic] = 1;
 }
-

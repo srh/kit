@@ -88,6 +88,19 @@ int x86_reg_has_lowbyte(enum x86_reg reg) {
   return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
 }
 
+int x86_reg8_is_lowbyte(enum x86_reg8 reg) {
+  return reg == X86_AL || reg == X86_CL || reg == X86_DL || reg == X86_BL;
+}
+
+enum x86_reg8 lowbytereg(enum x86_reg reg) {
+  CHECK(x86_reg_has_lowbyte(reg));
+  return (enum x86_reg8)reg;
+}
+
+enum x86_reg16 halfwidthreg(enum x86_reg reg) {
+  return (enum x86_reg16)reg;
+}
+
 void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
                     struct def_instantiation *inst, struct expr_return *er);
 
@@ -737,7 +750,7 @@ void x86_gen_test_regs32(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-void x86_gen_test_regs8(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2) {
+void x86_gen_test_regs8(struct objfile *f, enum x86_reg8 reg1, enum x86_reg8 reg2) {
   uint8_t b[2];
   b[0] = 0x84;
   b[1] = mod_reg_rm(MOD11, reg2, reg1);
@@ -1095,7 +1108,7 @@ void x86_gen_not_w16(struct objfile *f, enum x86_reg16 dest) {
   objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
-void x86_gen_not_w32(struct objfile *f, enum x86_reg16 dest) {
+void x86_gen_not_w32(struct objfile *f, enum x86_reg dest) {
   uint8_t b[2];
   b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 2, dest);
@@ -1287,7 +1300,6 @@ void x86_gen_lea32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
 
 void x86_gen_load8(struct objfile *f, enum x86_reg8 dest, enum x86_reg src_addr,
                    int32_t src_disp) {
-  CHECK(x86_reg_has_lowbyte(dest));
   uint8_t b[10];
   b[0] = 0x8A;
   size_t count = x86_encode_reg_rm(b + 1, dest, src_addr, src_disp);
@@ -1315,8 +1327,7 @@ void x86_gen_store16(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
 }
 
 void x86_gen_store8(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
-                    enum x86_reg src) {
-  CHECK(x86_reg_has_lowbyte(src));
+                    enum x86_reg8 src) {
   uint8_t b[10];
   b[0] = 0x88;
   size_t count = x86_encode_reg_rm(b + 1, src, dest_addr, dest_disp);
@@ -1939,8 +1950,9 @@ void gen_memmem_mov(struct objfile *f,
       x86_gen_store32(f, dest_reg, int32_add(n, dest_disp), reg);
       n += DWORD_SIZE;
     } else {
-      x86_gen_load8(f, reg, src_reg, int32_add(n, src_disp));
-      x86_gen_store8(f, dest_reg, int32_add(n, dest_disp), reg);
+      enum x86_reg8 lowreg = lowbytereg(reg);
+      x86_gen_load8(f, lowreg, src_reg, int32_add(n, src_disp));
+      x86_gen_store8(f, dest_reg, int32_add(n, dest_disp), lowreg);
       n += 1;
     }
   }
@@ -2003,7 +2015,7 @@ void gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32_t u
       x86_gen_store32(f, reg, int32_add(n, disp), zreg);
       n += DWORD_SIZE;
     } else {
-      x86_gen_store8(f, reg, int32_add(n, disp), zreg);
+      x86_gen_store8(f, reg, int32_add(n, disp), lowbytereg(zreg));
       n += 1;
     }
   }
@@ -2046,10 +2058,10 @@ void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
     x86_gen_store32(f, dest_addr, dest_disp, reg);
     break;
   case 2:
-    x86_gen_store16(f, dest_addr, dest_disp, reg);
+    x86_gen_store16(f, dest_addr, dest_disp, halfwidthreg(reg));
     break;
   case 1:
-    x86_gen_store8(f, dest_addr, dest_disp, reg);
+    x86_gen_store8(f, dest_addr, dest_disp, lowbytereg(reg));
     break;
   default:
     CRASH("not implemented or unreachable.");
@@ -2463,7 +2475,7 @@ void gen_cmp8_behavior(struct objfile *f,
                        enum x86_setcc setcc_code) {
   x86_gen_movzx8(f, X86_EDX, X86_EBP, off0);
   x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-  x86_gen_cmp_w8(f, X86_EDX, X86_ECX);
+  x86_gen_cmp_w8(f, X86_DL, X86_CL);
   x86_gen_setcc_b8(f, X86_AL, setcc_code);
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }

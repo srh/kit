@@ -1669,6 +1669,7 @@ struct ast_typeexpr ast_numeric_garbage(void) {
   return ret;
 }
 
+
 void ast_generics_init_no_params(struct ast_generics *a) {
   a->has_type_params = 0;
   /* Dummy values for irrelevant fields. */
