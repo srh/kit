@@ -1,5 +1,6 @@
 import ast;
 import expr;
+import walkdesc;
 
 // We have a set of lifetimes that pop in and out of existence over time.  They all have interesting state that needs to be tracked.  We want to chase state through everything.
 
@@ -29,10 +30,6 @@ access walk_hold {
     wh->wm = wm;
   }
 }
-
-struct walkdesc {
-  facts array[te_statedesc];
-};
 
 // TODO(): Have some counter for 'number of dirty markings made' and 'number of dirty markings walked from', have an assertion that these numbers match.
 // There's just one of these (for any given walk).
@@ -70,12 +67,12 @@ func walk_lambda_state(bs *bodystate, computed_params *shray[te_typeexpr], a *as
     return Printed(pm);
   }
 
-  // TODO(): Do return statements already walk these destructions?  Is this redundant?  Only useful when the body falls off the end?  When is it?
+  // Return statements' destructions cover these func params too -- they connect to the end of these destructions.
   if case Printed(pm) = walk_var_destructions(&ws, &un(&a->body.info)->parameter_destructions) {
     return Printed(pm);
   }
 
-  // TODO(): Something must be done.  Tie return state down?
+  // TODO(): Tie return state down.
   return NoFail;
 }
 

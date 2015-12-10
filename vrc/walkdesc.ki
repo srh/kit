@@ -1,0 +1,6 @@
+
+// Not sure yet whether we want this to be an immutable data structure (slow) or a mutated one (taking advantage of LIFO order of cells and such -- e.g. deceased cells get moved to a separate array).
+struct walkdesc {
+  facts array[te_statedesc];
+};
+
