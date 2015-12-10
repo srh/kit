@@ -38,7 +38,7 @@ struct bodystate {
   clq *clqueue;
   return_type *cu_typeexpr;
   return_cell cell_num;
-  // TODO: A problem here is that the return_lifetime will get merged with a variable lifetime if we ever implement construct-in-place return-local-variable semantics.
+  // NOTE: A problem here is that the return_lifetime will get merged with a variable lifetime if we ever implement construct-in-place return-local-variable semantics.
   return_lifetime te_typeexpr;
 
   gotos array[goto_info];
