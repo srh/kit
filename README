@@ -2,13 +2,48 @@
 
 Current status:  "This is a test!  Ignore!!!"
 
+TEMPORARY BUILD INSTRUCTIONS:
+
+0. Works on Windows, or i386 Linux or i386 FreeBSD.  Install
+gcc-multilib if on amd64 Linux.  I know nothing about amd64 FreeBSD.
+
+1. Open a VS command prompt (or a command prompt, on Linux or FreeBSD).
+
+2. Do this:
+
+  windows_build.bat     (or ./linux_build.sh)        (or ./clang_build.sh)
+  windows_build_s2.bat  (or ./linux_build_s2.sh)     (or ./clang_build_s2.sh)
+  cd vrc
+  ../s2 main            (or ../s2 --linux main, even on FreeBSD)
+  cl main.obj dummy.c   (or gcc -m32 main.o dummy.c) (or clang -m32 main.o dummy.c)
+
+3. This puts an executable in vrc\main (or vrc/a.out)
+
+4. Run tests:
+
+  main --build  (or ./a.out --build)
+
+5. Try compiling s4 with s3.
+
+  cd ..\src  (or cd ../src)
+  ..\vrc\main main  (or ../vrc/a.out --linux main)
+  cl main.obj dummy.c
+
+5. The actively developed code ("s3") is in ./vrc.  It can't
+   compile itself right now, so the instructions below stop working
+   at windows_build_s3.  The code in ./src is an old version of s3
+   that's kept up to date so that it can be compiled by s3.
+
+
+
+
 Definitions:
    s1: A compiler, written in C.  It can compile s3.  Located in trc/.
    s2: A compiler, written in proto-Kit-v0.00.2A.x.  It can
        compile itself and s3.  Located in urc/.
    s3: A compiler, written in proto-Kit-v0.00.2B.x.  It can
        compile s4.  (Maybe it can't compile itself.)  Located in vrc/.
-   s4: A compiler, to be written in proto-Kit-v0.00.2C.x.  
+   s4: A compiler, to be written in proto-Kit-v0.00.2C.x.
 
    s2-by-s1: s2, as compiled by s1.
    s2-self: s2, as compiled by s2.
