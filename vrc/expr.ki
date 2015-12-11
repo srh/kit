@@ -1570,6 +1570,7 @@ func help_check_lambda_body(bs *bodystate, computed_params *shray[te_typeexpr], 
     return Printed(pm);
   }
 
+  // NOTE(): Make the goto_info, label_info, etc, other arrays in ast_fullbody_info, be a shray, and freeze it here?
   info ast_fullbody_info = {destructions, bs->es.all_vars, Has(bs->es.gr), bs->gotos, bs->labels, bs->statements, bs->return_cell, arg_cells, None};
   annotate(&a->body.info, info);
 
