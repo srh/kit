@@ -9,6 +9,7 @@ import expr;
 
 struct goto_info {
   stnum statement_num;
+  // TODO: This (stored in fullbody) is a self-reference to the AST.
   st *ast_goto_statement;
   label_name sym;
   in_scope array[var_number];
@@ -16,6 +17,7 @@ struct goto_info {
 
 struct label_info {
   stnum statement_num;
+  // TODO: This (stored in fullbody) is a self-reference to the AST.
   st *ast_label_statement;
   label_name sym;
   in_scope array[var_number];
