@@ -1,6 +1,6 @@
 import ast;
 import expr;
-import walkdesc;
+import transtrack;
 
 // We have a set of lifetimes that pop in and out of existence over time.  They all have interesting state that needs to be tracked.  We want to chase state through everything.
 
@@ -41,20 +41,36 @@ struct walkstate {
   cs *checkstate;
   im *identmap;
 
+  // NOTE(): This can be null.  This is gross.  (It can't yet be null because we haven't hooked up walking of top-level defs.)
+  fb *ast_fullbody;
+
   current_desc walkdesc;
   // True if we shouldn't be maintaining state -- we're cycling back.
   // NOTE(): We could/should replace current_desc/cyclic with an opt[walkdesc].
   cycling bool;
 };
 
-func mk(bs *bodystate) walkstate {
-  ret walkstate = {bs, &bs->es, bs->ds, bs->clq, bs->cs, bs->im, {mk_array()}, false};
+func mk_from_bs(bs *bodystate, fb *ast_fullbody) walkstate {
+  ret walkstate = {bs, &bs->es, bs->ds, bs->clq, bs->cs, bs->im, fb, {mk_array()}, false};
   return ret;
+}
+
+func tie_return_state(ws *walkstate) np {
+  info *ast_fullbody_info = un(&ws->fb->info);
+  if case &Has(d walkdesc) = &info->post_return_unified_desc {
+    // NOTE(): Gratuitous copying of ws->current_desc, and arguably, d, here.
+    if case Printed(pm) = unify_walkdesc(d, ws->current_desc, &d) {
+      return Printed(pm);
+    }
+  } else {
+    info->post_return_unified_desc = Has(ws->current_desc);
+  }
+  return NoFail;
 }
 
 // computed_params is the fn[...] params (including return type and transdesc)
 func walk_lambda_state(bs *bodystate, computed_params *shray[te_typeexpr], a *ast_lambda) np {
-  ws walkstate = mk(bs);
+  ws walkstate = mk_from_bs(bs, &a->body);
 
   nargs size = count(&a->args);
   for i size = 0; i < nargs; i++ {
@@ -72,7 +88,10 @@ func walk_lambda_state(bs *bodystate, computed_params *shray[te_typeexpr], a *as
     return Printed(pm);
   }
 
-  // TODO(): Tie return state down.
+  if case Printed(pm) = tie_return_state(&ws) {
+    return Printed(pm);
+  }
+
   return NoFail;
 }
 
@@ -653,8 +672,11 @@ func walk_return_statement(ws *walkstate, a *ast_return_statement) np {
     // TODO(): Model assignment of void to return cell.
   }
 
-  // TODO(): Tie walkstate to end-of-function walkstate.
   if case Printed(pm) = walk_var_destructions(ws, &un(&a->info)->destructions) {
+    return Printed(pm);
+  }
+
+  if case Printed(pm) = tie_return_state(ws) {
     return Printed(pm);
   }
 

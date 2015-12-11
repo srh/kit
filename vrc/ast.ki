@@ -423,6 +423,9 @@ struct ast_fullbody_info {
 
   return_cell cell_num;
   arg_cells array[cell_num];
+
+  // This gets set to non-None as soon as we walk a return statement (or walk off the end of the fullbody's bracebody).
+  post_return_unified_desc opt[walkdesc];
 };
 
 struct ast_fullbody {
