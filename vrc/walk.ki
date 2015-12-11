@@ -56,6 +56,7 @@ func mk_from_bs(bs *bodystate, fb *ast_fullbody) walkstate {
 }
 
 func tie_return_state(ws *walkstate) np {
+  check(!ws->cycling);
   // NOTE(): Implement in terms of tie_walkstate?  Use an ast_walkstate_recording?
   if case &Has(d walkdesc) = &ws->fb->post_return_unified_desc {
     changed_discard bool;
@@ -83,6 +84,7 @@ func mark_cycleback(ws *walkstate, num ast_walk_marking_number) void {
 }
 
 func tie_walkstate(ws *walkstate, wrec *ast_walkstate_recording) np {
+  check(!ws->cycling);
   if case &Has(d walkdesc) = &wrec->unified_desc {
     changed bool;
     if case Printed(pm) = unify_walkdesc(&d, &ws->current_desc, &changed) {
@@ -112,13 +114,16 @@ func walk_lambda_state(bs *bodystate, computed_params *shray[te_typeexpr], a *as
     return Printed(pm);
   }
 
-  // Return statements' destructions cover these func params too -- they connect to the end of these destructions.
-  if case Printed(pm) = walk_var_destructions(&ws, &un(&a->body.info)->parameter_destructions) {
-    return Printed(pm);
-  }
+  // NOTE: Hm.  The cycling check seems like it would be usable for dead code / no-return logic.
+  if !ws.cycling {
+    // Return statements' destructions cover these func params too -- they connect to the end of these destructions.
+    if case Printed(pm) = walk_var_destructions(&ws, &un(&a->body.info)->parameter_destructions) {
+      return Printed(pm);
+    }
 
-  if case Printed(pm) = tie_return_state(&ws) {
-    return Printed(pm);
+    if case Printed(pm) = tie_return_state(&ws) {
+      return Printed(pm);
+    }
   }
 
   return NoFail;
@@ -216,7 +221,11 @@ func walk_statement(ws *walkstate, a *ast_statement) np {
 }
 
 func walk_goto_statement(ws *walkstate, a *ast_goto_statement) np {
-  // TODO(): Should we walk these constructors when cycling?  No.
+  // There isn't exactly an "expr" to cycle into -- but maybe the destructor/constructor function calls could at some point count.
+  if ws->cycling && NO_CYCLE_EXPRS {
+    return NoFail;
+  }
+
   info *ast_goto_statement_info = un(&a->info);
   if case Printed(pm) = walk_var_destructions(ws, &info->destructions) {
     return Printed(pm);
@@ -297,6 +306,7 @@ func walk_ifthenelse_statement(ws *walkstate, a *ast_ifthenelse_statement) np {
   return NoFail;
 }
 
+// TODO(): Do cycle-forward logic -- if we aren't cycling at the end of a bracebody at any point in the cycle -- we need to continue in a non-cycling state.
 func cycle_again(ws *walkstate, a *ast_walk_marking) bool {
   /* ws->cycling could be in either state when we get to cycle_again.  For example, if we have { blah; return 3; } then the return statement will put us in a cycling state, no matter what. */
   if a->cycle_back {
@@ -696,7 +706,14 @@ func walk_expr_after_consume(ws *walkstate, a *ast_expr_after_consume) np {
   }
 }
 
+// NOTE(): Used to mark code that assumes there's no reason to cycle into exprs, because there are no "upward" jumps that enter exprs.  This MUST be true.  Don't mark it false, remove it and look at the code that uses it.
+def NO_CYCLE_EXPRS bool = true;
+
 func walk_return_statement(ws *walkstate, a *ast_return_statement) np {
+  if ws->cycling && NO_CYCLE_EXPRS {
+    return NoFail;
+  }
+
   if case &Has(b box[ast_expr_consume]) = &a->expr {
     if case Printed(pm) = walk_expr_consume(ws, oo(&b)) {
       return Printed(pm);
