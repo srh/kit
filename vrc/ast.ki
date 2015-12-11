@@ -323,6 +323,7 @@ def `==` fn[label_num, label_num, bool] = wrapequate;
 
 struct ast_label_statement_info {
   label_number label_num;
+  wrec ast_walkstate_recording;
 };
 
 struct ast_label_statement {
@@ -364,6 +365,14 @@ struct ast_walk_marking {
 func mk_walk_marking() ast_walk_marking {
   return {false, false, NotComputed};
 }
+
+// The fields of type nc[ast_walkstate_recording] get initialized in checking (when the parents get connected).
+struct ast_walkstate_recording {
+  // What walk marking's aegis are we under?
+  parent ast_walk_marking_number;
+  // The conjoined walkstate marking.
+  unified_desc opt[walkstate];
+};
 
 struct ast_statement {
   meta ast_meta;

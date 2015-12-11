@@ -352,7 +352,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
 
       label_number label_num = ~count(&bs->labels);
       push(&bs->labels, {num, &b, b.name.value, vars_in_scope(&bs->es), false});
-      annotate(&b.info, {label_number});
+      annotate(&b.info, {label_number, mk_walkstate_recording(&bs->es)});
       *ee_out = {num, num};
 
     case &Goto(b ast_goto_statement):
@@ -360,6 +360,10 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       *ee_out = {num, add_statement(bs, None)};
   }
   return NoFail;
+}
+
+func mk_walkstate_recording(es *framescope) ast_walkstate_recording {
+  return {es->bottom_walk_marking, None};
 }
 
 struct swartch_checkobj {
