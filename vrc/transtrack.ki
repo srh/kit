@@ -4,8 +4,8 @@ struct walkdesc {
   facts array[te_statedesc];
 };
 
-func unify_walkdesc(x walkdesc, y walkdesc, out *walkdesc) np {
+func unify_walkdesc(onto *walkdesc, from *walkdesc, changed_out *bool) np {
   // TODO(): Implement this.
-  *out = x;
+  *changed_out = false;
   return NoFail;
 }

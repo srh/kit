@@ -323,6 +323,7 @@ def `==` fn[label_num, label_num, bool] = wrapequate;
 
 struct ast_label_statement_info {
   label_number label_num;
+  // NOTE(): Should we store this here, or with the label_info?  Who cares?
   wrec ast_walkstate_recording;
 };
 
@@ -371,7 +372,7 @@ struct ast_walkstate_recording {
   // What walk marking's aegis are we under?
   parent ast_walk_marking_number;
   // The conjoined walkstate marking.
-  unified_desc opt[walkstate];
+  unified_desc opt[walkdesc];
 };
 
 struct ast_statement {

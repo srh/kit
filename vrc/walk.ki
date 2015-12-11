@@ -42,7 +42,7 @@ struct walkstate {
   im *identmap;
 
   // NOTE(): This can be null.  This is gross.  (It can't yet be null because we haven't hooked up walking of top-level defs.)
-  fb *ast_fullbody;
+  fb *ast_fullbody_info;
 
   current_desc walkdesc;
   // True if we shouldn't be maintaining state -- we're cycling back.
@@ -51,19 +51,48 @@ struct walkstate {
 };
 
 func mk_from_bs(bs *bodystate, fb *ast_fullbody) walkstate {
-  ret walkstate = {bs, &bs->es, bs->ds, bs->clq, bs->cs, bs->im, fb, {mk_array()}, false};
+  ret walkstate = {bs, &bs->es, bs->ds, bs->clq, bs->cs, bs->im, un(&fb->info), {mk_array()}, false};
   return ret;
 }
 
 func tie_return_state(ws *walkstate) np {
-  info *ast_fullbody_info = un(&ws->fb->info);
-  if case &Has(d walkdesc) = &info->post_return_unified_desc {
-    // NOTE(): Gratuitous copying of ws->current_desc, and arguably, d, here.
-    if case Printed(pm) = unify_walkdesc(d, ws->current_desc, &d) {
+  // NOTE(): Implement in terms of tie_walkstate?  Use an ast_walkstate_recording?
+  if case &Has(d walkdesc) = &ws->fb->post_return_unified_desc {
+    changed_discard bool;
+    if case Printed(pm) = unify_walkdesc(&d, &ws->current_desc, &changed_discard) {
       return Printed(pm);
     }
   } else {
-    info->post_return_unified_desc = Has(ws->current_desc);
+    ws->fb->post_return_unified_desc = Has(ws->current_desc);
+  }
+  return NoFail;
+}
+
+func mark_cycleback(ws *walkstate, num ast_walk_marking_number) void {
+  ix size = num.x;
+  // 0 means there's no parent.
+  while ix != 0 {
+    cur *ast_walk_marking = get(&ws->es->walk_markings, ix);
+    cur->cycle_back = true;
+    if cur->walking {
+      ix = 0;
+    } else {
+      ix = un(&cur->conn)->parent.x;
+    }
+  }
+}
+
+func tie_walkstate(ws *walkstate, wrec *ast_walkstate_recording) np {
+  if case &Has(d walkdesc) = &wrec->unified_desc {
+    changed bool;
+    if case Printed(pm) = unify_walkdesc(&d, &ws->current_desc, &changed) {
+      return Printed(pm);
+    }
+    if changed {
+      mark_cycleback(ws, wrec->parent);
+    }
+  } else {
+    wrec->unified_desc = Has(ws->current_desc);
   }
   return NoFail;
 }
@@ -195,7 +224,11 @@ func walk_goto_statement(ws *walkstate, a *ast_goto_statement) np {
   if case Printed(pm) = walk_var_initters(ws, &info->initializations) {
     return Printed(pm);
   }
-  // TODO(): Connect state to other end.
+
+  wrec *ast_walkstate_recording = &un(&ref(&ws->fb->labels, info->label_number.x)->st->info)->wrec;
+  if case Printed(pm) = tie_walkstate(ws, wrec) {
+    return Printed(pm);
+  }
 
   // NOTE(): We should think about how we do our variable unwindings (and in particular, windings).  We could overlap with other variable unwindings/windings, heading towards the same label.  Should we overlap the typestate, too?  For now, the answer is, nah.
 
