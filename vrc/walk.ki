@@ -136,18 +136,29 @@ func mark_cycleback(ws *walkstate, num ast_walk_marking_number) void {
   }
 }
 
+func unify_opt_walkdesc(ws *walkstate, record *opt[walkdesc], changed_out *bool) np {
+  if ws->cycling {
+    *changed_out = false;
+    return NoFail;
+  } else {
+    if case &Has(d walkdesc) = record {
+      return unify_walkdesc(&d, &ws->current_desc, changed_out);
+    } else {
+      *record = Has(ws->current_desc);
+      *changed_out = true;
+      return NoFail;
+    }
+  }
+}
+
 func tie_walkstate(ws *walkstate, wrec *ast_walkstate_recording) np {
   check(!ws->cycling);
-  if case &Has(d walkdesc) = &wrec->unified_desc {
-    changed bool;
-    if case Printed(pm) = unify_walkdesc(&d, &ws->current_desc, &changed) {
-      return Printed(pm);
-    }
-    if changed {
-      mark_cycleback(ws, wrec->parent);
-    }
-  } else {
-    wrec->unified_desc = Has(ws->current_desc);
+  changed bool;
+  if case Printed(pm) = unify_opt_walkdesc(ws, &wrec->unified_desc, &changed) {
+    return Printed(pm);
+  }
+  if changed {
+    mark_cycleback(ws, wrec->parent);
   }
   return NoFail;
 }

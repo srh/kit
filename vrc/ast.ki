@@ -367,7 +367,7 @@ func mk_walk_marking() ast_walk_marking {
   return {false, false, NotComputed};
 }
 
-// The fields of type nc[ast_walkstate_recording] get initialized in checking (when the parents get connected).
+// The fields of type nc[ast_walkstate_recording] (or in some other nc) get initialized in checking (when the parents get connected).
 struct ast_walkstate_recording {
   // What walk marking's aegis are we under?
   parent ast_walk_marking_number;
