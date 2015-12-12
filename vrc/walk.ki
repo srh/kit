@@ -136,6 +136,15 @@ func mark_cycleback(ws *walkstate, num ast_walk_marking_number) void {
   }
 }
 
+func adopt_opt_walkdesc(ws *walkstate, record *opt[walkdesc]) void {
+  if case &Has(d walkdesc) = record {
+    ws->current_desc = d;
+    ws->cycling = false;
+  } else {
+    ws->cycling = true;
+  }
+}
+
 func unify_opt_walkdesc(ws *walkstate, record *opt[walkdesc], changed_out *bool) np {
   if ws->cycling {
     *changed_out = false;
@@ -197,6 +206,8 @@ func walk_bracebody(ws *walkstate, a *ast_bracebody) np {
   wh walk_hold;
   wh_init(&wh, &a->walk_marking);
 
+  bottom_desc opt[walkdesc];
+
   again bool = true;
   while again {
     a->walk_marking.cycle_back = false;
@@ -212,8 +223,14 @@ func walk_bracebody(ws *walkstate, a *ast_bracebody) np {
       return Printed(pm);
     }
 
+    changed_discard bool;
+    if case Printed(pm) = unify_opt_walkdesc(ws, &bottom_desc, &changed_discard) {
+      return Printed(pm);
+    }
+
     again = cycle_again(ws, &a->walk_marking);
   }
+  adopt_opt_walkdesc(ws, &bottom_desc);
 
   return NoFail;
 }
@@ -375,7 +392,6 @@ func walk_ifthenelse_statement(ws *walkstate, a *ast_ifthenelse_statement) np {
   return NoFail;
 }
 
-// TODO(): Do cycle-forward logic -- if we aren't cycling at the end of a bracebody at any point in the cycle -- we need to continue in a non-cycling state.
 func cycle_again(ws *walkstate, a *ast_walk_marking) bool {
   /* ws->cycling could be in either state when we get to cycle_again.  For example, if we have { blah; return 3; } then the return statement will put us in a cycling state, no matter what. */
   if a->cycle_back {
