@@ -6,6 +6,20 @@ import transtrack;
 
 // How should we represent state?  We've got facts.  A big bag of facts.  Okay then.  I hope they aren't self-contradictory!
 
+/* A general description of walking:
+
+We have an AST we need to "walk" over, calculating a "walkdesc," which contains facts about stuff, as we execute the function, at the current point in time, i.e. the current point in the AST.  The computed walkdesc becomes a function of your location within the AST.
+
+We do this by propogating the walkdesc *forward* through the AST, along lines of control flow.  Whenever we branch, we have to note down what the walkdesc is, go down the other branch, and then continue back from the marking later.  When we revisit a previously traversed marking, we need to update it with new information, and then consider whether we need to retraverse forward from that marking.
+
+We update markings with new information by _combining_ the information with the old information.
+
+We could maintain a list of points in the AST and their associated markings, that we need to walk forward from.  Instead, we mark the AST itself, and we traverse the AST in the following order:  We walk from top to bottom, occasionally retraversing certain sub-trees repeatedly.  We call a retraversal "cycling back," where we look for markings that we need to walk forward from.  If we see one, we exit "cycling back" mode, and walk forward from it, tracing its state.  We also need to make markings for the end of any sub-AST that we could cycle back over, so that when we continue forward, we have a state to continue forward from.
+
+That means we don't chase through gotos (even though it's not a branch).  We mark the label, and hit it when cycling back (or in non-cycling mode) later.
+
+*/
+
 defclass walk_hold {
   wm *ast_walk_marking;
 };
