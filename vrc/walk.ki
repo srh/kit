@@ -69,6 +69,45 @@ func tie_return_state(ws *walkstate) np {
   return NoFail;
 }
 
+struct walk_descnote {
+  // None if we were cycling when we noted the desc.
+  saved_desc opt[walkdesc];
+};
+
+func note_desc(ws *walkstate) walk_descnote {
+  if ws->cycling {
+    return {None};
+  } else {
+    return {Has(ws->current_desc)};
+  }
+}
+
+// This is supposed to be symmetric w.r.t ws->current_desc's state and descnote's state.
+func join_descnote(ws *walkstate, descnote *walk_descnote) np {
+  if ws->cycling {
+    if case &Has(d) = &descnote->saved_desc {
+      ws->current_desc = d;
+      ws->cycling = false;
+      return NoFail;
+    } else {
+      // Cycling the whole way, except maybe for some label/goto interlude.  Keep cycling.
+      return NoFail;
+    }
+  } else {
+    if case &Has(d) = &descnote->saved_desc {
+      // NOTE(): Probably we'll have to output changedness information and use it, for loops and such.
+      changed bool;
+      if case Printed(pm) = unify_walkdesc(&ws->current_desc, &d, &changed) {
+        return Printed(pm);
+      }
+      return NoFail;
+    } else {
+      // Retain non-cycling state.
+      return NoFail;
+    }
+  }
+}
+
 func mark_cycleback(ws *walkstate, num ast_walk_marking_number) void {
   ix size = num.x;
   // 0 means there's no parent.
@@ -279,7 +318,12 @@ func walk_ifthen_statement(ws *walkstate, a *ast_ifthen_statement) np {
   if case Printed(pm) = walk_condition(ws, &a->condition) {
     return Printed(pm);
   }
+  descnote var = note_desc(ws);
   if case Printed(pm) = walk_bracebody(ws, &a->body) {
+    return Printed(pm);
+  }
+  // NOTE(): At some point we'll be chasing which-branch-was-which information.
+  if case Printed(pm) = join_descnote(ws, &descnote) {
     return Printed(pm);
   }
   if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard) {
