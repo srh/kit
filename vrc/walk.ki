@@ -353,15 +353,20 @@ func walk_ifthen_statement(ws *walkstate, a *ast_ifthen_statement) np {
 }
 
 func walk_ifthenelse_statement(ws *walkstate, a *ast_ifthenelse_statement) np {
-  // TODO(): Connect condition discard, and body, correctly.  (Discard before/after elsebody correctly.)
-  // TODO(): Walk condition correctly.
+  // NOTE(): At some point we'll be chasing which-branch-was-which information.
   if case Printed(pm) = walk_condition(ws, &a->condition) {
     return Printed(pm);
   }
+  post_condition_descnote opt[walkdesc] = note_opt_walkdesc(ws);
   if case Printed(pm) = walk_bracebody(ws, &a->thenbody) {
     return Printed(pm);
   }
+  post_body_descnote opt[walkdesc] = note_opt_walkdesc(ws);
+  adopt_opt_walkdesc(ws, &post_condition_descnote);
   if case Printed(pm) = walk_bracebody(ws, &a->elsebody) {
+    return Printed(pm);
+  }
+  if case Printed(pm) = join_opt_walkdesc(ws, &post_body_descnote) {
     return Printed(pm);
   }
   if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard) {
