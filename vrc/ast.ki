@@ -257,6 +257,7 @@ struct ast_ifthenelse_statement {
 
 struct ast_while_statement {
   walk_marking ast_walk_marking;
+  pre_condition_wrec nc[ast_walkstate_recording];
   condition_discard_continue ast_condition_discard_info;
   condition_discard_exit ast_condition_discard_info;
   condition ast_condition;
@@ -373,6 +374,8 @@ struct ast_walkstate_recording {
   parent ast_walk_marking_number;
   // The conjoined walkstate marking.
   unified_desc opt[walkdesc];
+  // Are we dirty?  (Do we need to walk forward from this recording?)
+  dirty bool;
 };
 
 struct ast_statement {

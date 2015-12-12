@@ -287,6 +287,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       // TODO(): The condition_discard should be _outside_ the walk marking's extent.
       wmc walk_marking_connector;
       init_wmc(&wmc, &bs->es, &b.walk_marking);
+      annotate(&b.pre_condition_wrec, mk_walkstate_recording(&bs->es));
 
       swartch_vp varpopper;
       init_vp(&swartch_vp, &bs->es);
@@ -365,7 +366,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
 }
 
 func mk_walkstate_recording(es *framescope) ast_walkstate_recording {
-  return {es->bottom_walk_marking, None};
+  return {es->bottom_walk_marking, None, false};
 }
 
 struct swartch_checkobj {

@@ -139,15 +139,37 @@ func unify_opt_walkdesc(ws *walkstate, record *opt[walkdesc], changed_out *bool)
 }
 
 func tie_walkstate(ws *walkstate, wrec *ast_walkstate_recording) np {
-  check(!ws->cycling);
   changed bool;
   if case Printed(pm) = unify_opt_walkdesc(ws, &wrec->unified_desc, &changed) {
     return Printed(pm);
   }
   if changed {
+    wrec->dirty = true;
     mark_cycleback(ws, wrec->parent);
   }
   return NoFail;
+}
+
+func join_walkstate(ws *walkstate, wrec *ast_walkstate_recording) np {
+  if ws->cycling {
+    if wrec->dirty {
+      ws->current_desc = *unHas(&wrec->unified_desc);
+      ws->cycling = false;
+      wrec->dirty = false;
+      return NoFail;
+    } else {
+      return NoFail;
+    }
+  } else {
+    // This replicates tie_walkstate behavior, only without setting it dirty (instead we unset it dirty) or marking the cycleback (since we're right here).
+    changed bool;
+    if case Printed(pm) = unify_opt_walkdesc(ws, &wrec->unified_desc, &changed) {
+      return Printed(pm);
+    }
+    // NOTE(): This could be smarter -- if there's no change, and it wasn't dirty, then we can go into cycling mode.
+    wrec->dirty = false;
+    return NoFail;
+  }
 }
 
 // computed_params is the fn[...] params (including return type and transdesc)
@@ -334,7 +356,6 @@ func walk_condition_discard(ws *walkstate, a *ast_condition_discard_info) np {
 }
 
 func walk_ifthen_statement(ws *walkstate, a *ast_ifthen_statement) np {
-  // TODO(): Connect condition discard, and body, correctly.
   if case Printed(pm) = walk_condition(ws, &a->condition) {
     return Printed(pm);
   }
@@ -393,6 +414,10 @@ func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
   while again {
     a->walk_marking.cycle_back = false;
 
+    if case Printed(pm) = join_walkstate(ws, un(&a->pre_condition_wrec)) {
+      return Printed(pm);
+    }
+
     // TODO(): Connect the condition discards, and body, correctly.
     if case Printed(pm) = walk_condition(ws, &a->condition) {
       return Printed(pm);
@@ -400,7 +425,12 @@ func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
     if case Printed(pm) = walk_bracebody(ws, &a->body) {
       return Printed(pm);
     }
+
     if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard_continue) {
+      return Printed(pm);
+    }
+
+    if case Printed(pm) = tie_walkstate(ws, un(&a->pre_condition_wrec)) {
       return Printed(pm);
     }
 
@@ -501,7 +531,7 @@ func walk_continue_statement(ws *walkstate, a *ast_continue_statement) np {
 }
 
 func walk_label_statement(ws *walkstate, a *ast_label_statement) np {
-  // TODO(): Uh, check for cycling, notate the current statedesc, and other stuff?
+  // TODO(): Uh, check for cycling, notate the current statedesc, and other stuff?  Yes.  Notate the current statedesc, for sure.
   return NoFail;
 }
 
