@@ -259,7 +259,7 @@ struct ast_while_statement {
   walk_marking ast_walk_marking;
   // Records walkstate before evaluating the condition.  The target walkstate of continue.
   pre_condition_wrec nc[ast_walkstate_recording];
-  // Records walkstate before evaluating the condition_discard_exit.  The target walkstate of break.  (Is that so?)
+  // Records walkstate after evaluating the condition_discard_exit.  The target walkstate of break.
   post_exit_wrec nc[ast_walkstate_recording];
   condition_discard_continue ast_condition_discard_info;
   condition_discard_exit ast_condition_discard_info;

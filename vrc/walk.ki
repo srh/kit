@@ -60,14 +60,21 @@ struct walkstate {
   // NOTE(): This can be null.  This is gross.  (It can't yet be null because we haven't hooked up walking of top-level defs.)
   fb *ast_fullbody_info;
 
+  bp opt[walk_breakpack];
+
   current_desc walkdesc;
   // True if we shouldn't be maintaining state -- we're cycling back.
   // NOTE(): We could/should replace current_desc/cyclic with an opt[walkdesc].
   cycling bool;
 };
 
+struct walk_breakpack {
+  continue_target_wrec *ast_walkstate_recording;
+  break_target_wrec *ast_walkstate_recording;
+};
+
 func mk_from_bs(bs *bodystate, fb *ast_fullbody) walkstate {
-  ret walkstate = {bs, &bs->es, bs->ds, bs->clq, bs->cs, bs->im, un(&fb->info), {mk_array()}, false};
+  ret walkstate = {bs, &bs->es, bs->ds, bs->clq, bs->cs, bs->im, un(&fb->info), None, {mk_array()}, false};
   return ret;
 }
 
@@ -433,9 +440,14 @@ func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
       return Printed(pm);
     }
 
+    outer_bp opt[walk_breakpack] = ws->bp;
+    ws->bp = Has({un(&a->pre_condition_wrec), un(&a->post_exit_wrec)});
+
     if case Printed(pm) = walk_bracebody(ws, &a->body) {
       return Printed(pm);
     }
+
+    ws->bp = outer_bp;
 
     if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard_continue) {
       return Printed(pm);
