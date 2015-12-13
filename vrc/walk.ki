@@ -457,7 +457,6 @@ func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
 func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
   info *ast_for_statement_info = un(&a->info);
 
-  // TODO(): Connect the condition discard, body, etc, correctly.
   if case &Has(b box[ast_statement]) = &a->initializer {
     if case Printed(pm) = walk_statement(ws, oo(&b)) {
       return Printed(pm);
@@ -469,6 +468,8 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
     wh walk_hold;
     wh_init(&wh, &a->walk_marking);
 
+    bottom_desc opt[walkdesc] = None;
+
     again bool = true;
     while again {
       a->walk_marking.cycle_back = false;
@@ -478,15 +479,21 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
       }
 
       if case &Has(b ast_expr_condition) = &a->condition {
-        // TODO(): Uh.. walk b.discard more properly.  We should have two condition discards.
+        // TODO(): Uh.. walk b.discard more properly.  We should have two condition discards.  (Should we?  It's an expr condition.  A boolean.  So why should we?)
         if case Printed(pm) = walk_expr_consume(ws, oo(&b.expr)) {
           return Printed(pm);
         }
         if case Printed(pm) = walk_later_discard_info(ws, &b.discard) {
           return Printed(pm);
         }
+
+        changed_discard bool;
+        if case Printed(pm) = unify_opt_walkdesc(ws, &bottom_desc, &changed_discard) {
+          return Printed(pm);
+        }
       }
 
+      // TODO(): Make sure break/continue will get hooked up properly.  (That means bottom_desc will get hooked up as a jump point?)
       if case Printed(pm) = walk_bracebody(ws, &a->body) {
         return Printed(pm);
       }
@@ -503,6 +510,8 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
 
       again = cycle_again(ws, &a->walk_marking);
     }
+
+    adopt_opt_walkdesc(ws, &bottom_desc);
   }
 
   // TODO(): Connect initter destructions properly.
