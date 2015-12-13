@@ -555,6 +555,7 @@ func add_virtual_tag_cell(es *framescope, et *enumspec) cell_num {
 }
 
 func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num statement_num, exit_out *statement_num) np {
+  // NOTE(): Why not make break_in_scope be _before_ the initter destructions?
   break_in_scope array[var_number] = vars_in_scope(&bs->es);
 
   initter_vp varpopper;
@@ -574,7 +575,9 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
 
   exitnum statement_num = add_statement(bs, None);
 
+  post_exit_recording ast_walkstate_recording = mk_walkstate_recording(&bs->es);
   pre_condition_recording ast_walkstate_recording;
+  pre_increment_recording ast_walkstate_recording;
 
   if true {
     // This excludes initter stuff, just like walk_for_statement.
@@ -582,6 +585,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
     init_wmc(&wmc, &bs->es, &a->walk_marking);
 
     pre_condition_recording = mk_walkstate_recording(&bs->es);
+    pre_increment_recording = mk_walkstate_recording(&bs->es);
 
     cond_vp varpopper;
     init_vp(&cond_vp, &bs->es);
@@ -620,7 +624,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   if case Printed(pm) = make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions) {
     return Printed(pm);
   }
-  annotate(&a->info, {initter_destructions, pre_condition_recording});
+  annotate(&a->info, {initter_destructions, pre_condition_recording, pre_increment_recording, post_exit_recording});
   *exit_out = exitnum;
   return NoFail;
 }

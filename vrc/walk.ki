@@ -512,10 +512,15 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
         }
       }
 
+      outer_bp opt[walk_breakpack] = ws->bp;
+      ws->bp = Has({&info->pre_increment_wrec, &info->post_exit_wrec});
+
       // TODO(): Make sure break/continue will get hooked up properly.  (That means bottom_desc will get hooked up as a jump point?)
       if case Printed(pm) = walk_bracebody(ws, &a->body) {
         return Printed(pm);
       }
+
+      ws->bp = outer_bp;
 
       if case &Has(b box[ast_expr_discard]) = &a->increment {
         if case Printed(pm) = walk_discard_expr(ws, oo(&b)) {
@@ -538,6 +543,11 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
   if case Printed(pm) = walk_var_destructions(ws, &info->initter_destructions) {
     return Printed(pm);
   }
+
+  if case Printed(pm) = join_walkstate(ws, &info->post_exit_wrec) {
+    return Printed(pm);
+  }
+
   return NoFail;
 }
 

@@ -274,7 +274,12 @@ struct ast_expr_condition {
 
 struct ast_for_statement_info {
   initter_destructions array[var_destruction];
+  // After the initter, before the condition.
   pre_condition_wrec ast_walkstate_recording;
+  // After the body, after condition discard (which is before the body, right now), before the increment.  The target of continue.
+  pre_increment_wrec ast_walkstate_recording;
+  // After the condition, after destructing the initter.  The target of break.
+  post_exit_wrec ast_walkstate_recording;
 };
 
 // TODO(): Rename initter_destructions to initializer_destructions, or vice versa.
