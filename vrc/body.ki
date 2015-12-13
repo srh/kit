@@ -284,7 +284,10 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       *ee_out = {num, tailnum};
 
     case &While(b ast_while_statement):
-      // TODO(): The condition_discard should be _outside_ the walk marking's extent.
+      // This is outside the while loop's cycle-back cycling.
+      annotate(&b.post_exit_wrec, mk_walkstate_recording(&bs->es));
+
+      // TODO(): The condition_discard for exiting should be _outside_ the walk marking's extent.
       wmc walk_marking_connector;
       init_wmc(&wmc, &bs->es, &b.walk_marking);
       annotate(&b.pre_condition_wrec, mk_walkstate_recording(&bs->es));
@@ -292,6 +295,8 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       swartch_vp varpopper;
       init_vp(&swartch_vp, &bs->es);
 
+      // TODO(): Verify that continue statements are compiled to target _after_ the condition discard -- becasue the condition isn't in scope here -- so it'll get destructed by a continue statement.
+      // TODO(): Maybe break statements should target just before the exiting condition-discard -- so break-in-scope vars should include the condition.
       tailnum statement_num = add_statement(bs, None);
       bp breakpack = {tailnum, vars_in_scope(&bs->es), num, vars_in_scope(&bs->es)};
       cond_vp varpopper;

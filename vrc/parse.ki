@@ -1564,7 +1564,7 @@ func parse_rest_of_while_statement_enum(p *ps, out *ast_statement_enum) parse_re
        && +parse_bracebody(p, &body)) {
     return Fail;
   }
-  *out = While({mk_walk_marking(), NotComputed, mk_condition_discard_info(), mk_condition_discard_info(), condition, body});
+  *out = While({mk_walk_marking(), NotComputed, NotComputed, mk_condition_discard_info(), mk_condition_discard_info(), condition, body});
   return Success;
 }
 

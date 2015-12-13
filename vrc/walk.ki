@@ -20,6 +20,8 @@ That means we don't chase through gotos (even though it's not a branch).  We mar
 
 */
 
+// TODO(): Replace cycle-back marking with some sort of refcount, so that we don't wastefully cycle back.
+
 defclass walk_hold {
   wm *ast_walk_marking;
 };
@@ -451,6 +453,11 @@ func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
   if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard_exit) {
     return Printed(pm);
   }
+
+  if case Printed(pm) = join_walkstate(ws, un(&a->post_exit_wrec)) {
+    return Printed(pm);
+  }
+
   return NoFail;
 }
 
