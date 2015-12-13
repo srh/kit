@@ -206,7 +206,7 @@ func walk_bracebody(ws *walkstate, a *ast_bracebody) np {
   wh walk_hold;
   wh_init(&wh, &a->walk_marking);
 
-  bottom_desc opt[walkdesc];
+  bottom_desc opt[walkdesc] = None;
 
   again bool = true;
   while again {
@@ -230,6 +230,7 @@ func walk_bracebody(ws *walkstate, a *ast_bracebody) np {
 
     again = cycle_again(ws, &a->walk_marking);
   }
+
   adopt_opt_walkdesc(ws, &bottom_desc);
 
   return NoFail;
@@ -410,6 +411,8 @@ func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
   wh walk_hold;
   wh_init(&wh, &a->walk_marking);
 
+  bottom_desc opt[walkdesc] = None;
+
   again bool = true;
   while again {
     a->walk_marking.cycle_back = false;
@@ -418,10 +421,16 @@ func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
       return Printed(pm);
     }
 
-    // TODO(): Connect the condition discards, and body, correctly.
+    // TODO(): Make sure break/continue will get hooked up properly.
     if case Printed(pm) = walk_condition(ws, &a->condition) {
       return Printed(pm);
     }
+
+    changed_discard bool;
+    if case Printed(pm) = unify_opt_walkdesc(ws, &bottom_desc, &changed_discard) {
+      return Printed(pm);
+    }
+
     if case Printed(pm) = walk_bracebody(ws, &a->body) {
       return Printed(pm);
     }
@@ -437,6 +446,8 @@ func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
     again = cycle_again(ws, &a->walk_marking);
   }
 
+  adopt_opt_walkdesc(ws, &bottom_desc);
+
   if case Printed(pm) = walk_condition_discard(ws, &a->condition_discard_exit) {
     return Printed(pm);
   }
@@ -444,6 +455,8 @@ func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
 }
 
 func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
+  info *ast_for_statement_info = un(&a->info);
+
   // TODO(): Connect the condition discard, body, etc, correctly.
   if case &Has(b box[ast_statement]) = &a->initializer {
     if case Printed(pm) = walk_statement(ws, oo(&b)) {
@@ -460,8 +473,12 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
     while again {
       a->walk_marking.cycle_back = false;
 
+      if case Printed(pm) = join_walkstate(ws, &info->pre_condition_wrec) {
+        return Printed(pm);
+      }
+
       if case &Has(b ast_expr_condition) = &a->condition {
-        // TODO(): Uh.. walk b.discard more properly.
+        // TODO(): Uh.. walk b.discard more properly.  We should have two condition discards.
         if case Printed(pm) = walk_expr_consume(ws, oo(&b.expr)) {
           return Printed(pm);
         }
@@ -469,13 +486,18 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
           return Printed(pm);
         }
       }
+
+      if case Printed(pm) = walk_bracebody(ws, &a->body) {
+        return Printed(pm);
+      }
+
       if case &Has(b box[ast_expr_discard]) = &a->increment {
         if case Printed(pm) = walk_discard_expr(ws, oo(&b)) {
           return Printed(pm);
         }
       }
 
-      if case Printed(pm) = walk_bracebody(ws, &a->body) {
+      if case Printed(pm) = tie_walkstate(ws, &info->pre_condition_wrec) {
         return Printed(pm);
       }
 
@@ -485,7 +507,7 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
 
   // TODO(): Connect initter destructions properly.
   // TODO(): Is info set when there's no initter?
-  if case Printed(pm) = walk_var_destructions(ws, &un(&a->info)->initter_destructions) {
+  if case Printed(pm) = walk_var_destructions(ws, &info->initter_destructions) {
     return Printed(pm);
   }
   return NoFail;

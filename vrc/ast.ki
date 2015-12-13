@@ -271,6 +271,7 @@ struct ast_expr_condition {
 
 struct ast_for_statement_info {
   initter_destructions array[var_destruction];
+  pre_condition_wrec ast_walkstate_recording;
 };
 
 // TODO(): Rename initter_destructions to initializer_destructions, or vice versa.

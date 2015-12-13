@@ -569,16 +569,21 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
 
   exitnum statement_num = add_statement(bs, None);
 
+  pre_condition_recording ast_walkstate_recording;
+
   if true {
     // This excludes initter stuff, just like walk_for_statement.
     wmc walk_marking_connector;
     init_wmc(&wmc, &bs->es, &a->walk_marking);
+
+    pre_condition_recording = mk_walkstate_recording(&bs->es);
 
     cond_vp varpopper;
     init_vp(&cond_vp, &bs->es);
     if case &Has(cond ast_expr_condition) = &a->condition {
       cond_rc rval_cellnum = {add_none_cell(&bs->es), unnamed_lifetime(&bs->es)};
       boolean cu_typeexpr = compute_prim(bs->clq, primitive_bool_type(bs->cs));
+      // TODO(): One condition discard is inside the wmc, another one (that we need to create) is outside.
       if case Printed(pm) = check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.x, cond_rc, &cond.discard) {
         return Printed(pm);
       }
@@ -610,7 +615,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   if case Printed(pm) = make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions) {
     return Printed(pm);
   }
-  annotate(&a->info, {initter_destructions});
+  annotate(&a->info, {initter_destructions, pre_condition_recording});
   *exit_out = exitnum;
   return NoFail;
 }
