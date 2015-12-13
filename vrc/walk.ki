@@ -20,7 +20,7 @@ That means we don't chase through gotos (even though it's not a branch).  We mar
 
 */
 
-// TODO(): Replace cycle-back marking with some sort of refcount, so that we don't wastefully cycle back.
+// NOTE(): Replace cycle-back marking with some sort of refcount, so that we don't wastefully cycle back.
 
 defclass walk_hold {
   wm *ast_walk_marking;
@@ -47,7 +47,7 @@ access walk_hold {
   }
 }
 
-// TODO(): Have some counter for 'number of dirty markings made' and 'number of dirty markings walked from', have an assertion that these numbers match.
+// NOTE(): Have some counter for 'number of dirty markings made' and 'number of dirty markings walked from', have an assertion that these numbers match.
 // There's just one of these (for any given walk).
 struct walkstate {
   bs *bodystate;
@@ -430,7 +430,6 @@ func walk_while_statement(ws *walkstate, a *ast_while_statement) np {
       return Printed(pm);
     }
 
-    // TODO(): Make sure break/continue will get hooked up properly.
     if case Printed(pm) = walk_condition(ws, &a->condition) {
       return Printed(pm);
     }
@@ -498,7 +497,6 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
       }
 
       if case &Has(b ast_expr_condition) = &a->condition {
-        // TODO(): Uh.. walk b.discard more properly.  We should have two condition discards.  (Should we?  It's an expr condition.  A boolean.  So why should we?)
         if case Printed(pm) = walk_expr_consume(ws, oo(&b.expr)) {
           return Printed(pm);
         }
@@ -515,7 +513,6 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
       outer_bp opt[walk_breakpack] = ws->bp;
       ws->bp = Has({&info->pre_increment_wrec, &info->post_exit_wrec});
 
-      // TODO(): Make sure break/continue will get hooked up properly.  (That means bottom_desc will get hooked up as a jump point?)
       if case Printed(pm) = walk_bracebody(ws, &a->body) {
         return Printed(pm);
       }
@@ -538,8 +535,6 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
     adopt_opt_walkdesc(ws, &bottom_desc);
   }
 
-  // TODO(): Connect initter destructions properly.
-  // TODO(): Is info set when there's no initter?
   if case Printed(pm) = walk_var_destructions(ws, &info->initter_destructions) {
     return Printed(pm);
   }
