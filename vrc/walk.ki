@@ -659,27 +659,28 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     return walk_TODO();
   case &LogicalConjunction(b ast_logical_conjunction):
     // TODO(): Connect premature return/postmature return.  (And isn't there a lhs discard / move op?)
+    // TODO(): There's some sort of lhs discard / move op that needs to be modeled.
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.lhs)) {
       return Printed(pm);
     }
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.rhs)) {
       return Printed(pm);
     }
-    return walk_TODO();
+    return NoFail;
   case &Assignment(b ast_assignment):
     return walk_assignment(ws, &b);
   case &RefOf(b ast_refof):
     if case Printed(pm) = walk_expr(ws, oo(&b.rhs)) {
       return Printed(pm);
     }
-    // TODO: idk.
-    return walk_TODO();
+    // TODO(): Model properly.
+    return NoFail;
   case &AddressOf(b ast_addressof):
     if case Printed(pm) = walk_expr(ws, oo(&b.rhs)) {
       return Printed(pm);
     }
-    // TODO: idk.
-    return walk_TODO();
+    // TODO(): Model properly.
+    return NoFail;
   case &Deref(b ast_deref):
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.rhs)) {
       return Printed(pm);
@@ -687,8 +688,8 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     if case Printed(pm) = walk_later_discard_info(ws, &b.ptr_discard) {
       return Printed(pm);
     }
-    // TODO(): Process... the act of dereffing?
-    return walk_TODO();
+    // TODO(): Model properly.
+    return NoFail;
   case &IndexExpr(b ast_index_expr):
     if case Printed(pm) = walk_expr(ws, oo(&b.lhs)) {
       return Printed(pm);
@@ -706,7 +707,7 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
 
     // TODO(): Do index expr walkstate stuff.
 
-    // TODO(): This assumes we discard lhs before discarding rhs -- do we?
+    // TODO(): This assumes we discard lhs before discarding rhs -- do we?  And if anything, shouldn't it just be the opposite order of creation?
     if case &Has(p tup[ast_expr_after_consume, ast_later_discard_info]) = &info->lhs_after {
       if case Printed(pm) = walk_later_discard_info(ws, &p.cdr) {
         return Printed(pm);
@@ -723,8 +724,8 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     if case Printed(pm) = walk_expr(ws, oo(&b.lhs)) {
       return Printed(pm);
     }
-    // TODO: idk.
-    return walk_TODO();
+    // TODO(): model behavior.  That means: do nothing, because we don't really do anything here?
+    return NoFail;
   case &DerefField(b ast_deref_field):
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.lhs)) {
       return Printed(pm);
@@ -744,24 +745,28 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
         return Printed(pm);
       }
     }
-    // TODO: idk.  Activate something?
-    return walk_TODO();
+    // TODO(): idk.  Activate something?
+    return NoFail;
   case &Ternary(b ast_ternary):
-    // TODO(): Connect entry and exit of cases properly.
     if case Printed(pm) = walk_expr_consume(ws, oo(&oo(&b.condition)->expr)) {
       return Printed(pm);
     }
+    post_condition_descnote opt[walkdesc] = note_opt_walkdesc(ws);
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.then_clause)) {
       return Printed(pm);
     }
+    post_then_descnote opt[walkdesc] = note_opt_walkdesc(ws);
+    adopt_opt_walkdesc(ws, &post_condition_descnote);
     if case Printed(pm) = walk_expr_consume(ws, oo(&b.else_clause)) {
       return Printed(pm);
     }
-    // TODO(): Make sure condition discard happens before/after then/else clauses, correctly.
+    if case Printed(pm) = join_opt_walkdesc(ws, &post_then_descnote) {
+      return Printed(pm);
+    }
     if case Printed(pm) = walk_later_discard_info(ws, &oo(&b.condition)->discard) {
       return Printed(pm);
     }
-    return walk_TODO();
+    return NoFail;
   }
 }
 
