@@ -632,6 +632,7 @@ struct lval_description {
   // TODO: Maybe deadme could be obviated by the lifetime field.
   // TODO: Maybe this field should be a te_lifetime.
   // TODO: Maybe this field should be a cu_typeexpr.
+  // TODO(): This field is garbage.  When we deref a pointer, the specific lifetime is not a static function of the AST.
   lifetime te_typeexpr;
 };
 
