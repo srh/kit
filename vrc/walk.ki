@@ -655,8 +655,8 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
         return Printed(pm);
       }
     }
-    // TODO: Handle funcall state.
-    return walk_TODO();
+    // TODO(): Handle funcall state.
+    return NoFail;
   case &LogicalConjunction(b ast_logical_conjunction):
     // TODO(): Connect premature return/postmature return.  (And isn't there a lhs discard / move op?)
     // TODO(): There's some sort of lhs discard / move op that needs to be modeled.
@@ -735,7 +735,7 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
     }
     // TODO(): Process... the act of dereffing?
     // TODO(): Handle pointer discard.
-    return walk_TODO();
+    return NoFail;
   case &TypedExpr(b ast_typed_expr):
     return walk_expr(ws, oo(&b.expr));
   case &Strinit(b ast_strinit):
@@ -813,7 +813,7 @@ func walk_assignment_info(ws *walkstate, a *ast_assignment_info) np {
       return Printed(pm);
     }
     // TODO(): Do we do anything with rhs_deadme?  No?
-    return walk_TODO();
+    return NoFail;
   }
 }
 
@@ -846,7 +846,7 @@ func walk_expr_consume(ws *walkstate, a *ast_expr_consume) np {
     return Printed(pm);
   }
   // TODO(): idk.
-  return walk_TODO();
+  return NoFail;
 }
 
 func walk_expr_after_discard(ws *walkstate, a *ast_expr_after_discard) np {
@@ -855,7 +855,7 @@ func walk_expr_after_discard(ws *walkstate, a *ast_expr_after_discard) np {
     return walk_destroy_action(ws, &act);
   case &DiscardVirtualDead(c cell_num):
     // TODO(): idk.
-    return walk_TODO();
+    return NoFail;
   case &DiscardNothing:
     // TODO(): How does this case exist?
     return NoFail;
@@ -879,7 +879,7 @@ func walk_expr_after_consume(ws *walkstate, a *ast_expr_after_consume) np {
       return Printed(pm);
     }
     // TODO(): Handle lval_deadme.
-    return walk_TODO();
+    return NoFail;
   case &ConsumeByMove(act move_action):
     if case Printed(pm) = walk_move_action(ws, &act) {
       return Printed(pm);
@@ -926,11 +926,11 @@ func walk_var_statement(ws *walkstate, a *ast_var_statement) np {
     }
   case &AutoInit(act opt[init_action]):
     // TODO(): Why is act optional?  Should it be nc?
-    return walk_TODO();
+    return NoFail;
   }
 
-  // TODO: idk.
-  return walk_TODO();
+  // TODO(): idk.
+  return NoFail;
 }
 
 func walk_init_action(ws *walkstate, a *init_action) np {
@@ -977,6 +977,6 @@ func walk_var_destruction(ws *walkstate, a *var_destruction) np {
     return walk_destroy_action(ws, &da);
   case &VarVirtualCellDead(c cell_num):
     // TODO(): Mark cell/lifetime deceased?
-    return walk_TODO();
+    return NoFail;
   }
 }
