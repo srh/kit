@@ -171,11 +171,11 @@ func join_walkstate(ws *walkstate, wrec *ast_walkstate_recording) np {
     }
   } else {
     // This replicates tie_walkstate behavior, only without setting it dirty (instead we unset it dirty) or marking the cycleback (since we're right here).
-    changed bool;
-    if case Printed(pm) = unify_opt_walkdesc(ws, &wrec->unified_desc, &changed) {
+    if case Printed(pm) = join_opt_walkdesc(ws, &wrec->unified_desc) {
       return Printed(pm);
     }
-    // NOTE(): This could be smarter -- if there's no change, and it wasn't dirty, then we can go into cycling mode.
+
+    // NOTE(): This could be smarter -- if there's no change (which join_opt_walkdesc could emit), and it wasn't dirty, then we can go into cycling mode.
     wrec->dirty = false;
     return NoFail;
   }
@@ -607,7 +607,12 @@ func walk_continue_statement(ws *walkstate, a *ast_continue_statement) np {
 }
 
 func walk_label_statement(ws *walkstate, a *ast_label_statement) np {
-  // TODO(): Uh, check for cycling, notate the current statedesc, and other stuff?  Yes.  Notate the current statedesc, for sure.
+  info *ast_label_statement_info = un(&a->info);
+
+  if case Printed(pm) = join_walkstate(ws, &info->wrec) {
+    return Printed(pm);
+  }
+
   return NoFail;
 }
 
