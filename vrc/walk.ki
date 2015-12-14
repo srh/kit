@@ -623,11 +623,9 @@ func walk_discard_expr(ws *walkstate, a *ast_expr_discard) np {
   if case Printed(pm) = walk_expr_after_discard(ws, un(&a->after)) {
     return Printed(pm);
   }
-  // TODO(): Something must be done?
   return NoFail;
 }
 
-// TODO(): Remove all uses of this.
 func walk_TODO() np {
   return NoFail;
 }
