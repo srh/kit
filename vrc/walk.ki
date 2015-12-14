@@ -547,11 +547,15 @@ func walk_for_statement(ws *walkstate, a *ast_for_statement) np {
 }
 
 func walk_switch_statement(ws *walkstate, a *ast_switch_statement) np {
-  // TODO(): Connect switch cases properly, swartch discard.
   // NOTE(): Handle default case/swartch discard properly.
   if case Printed(pm) = walk_expr_consume(ws, oo(&a->swartch)) {
     return Printed(pm);
   }
+
+  post_condition_descnote opt[walkdesc] = note_opt_walkdesc(ws);
+
+  post_body_descnote opt[walkdesc] = None;
+
   // TODO(): Process swartch deconstruction info / tag cell properly?
   ncases size = count(&a->cases);
   for i size = 0; i < ncases; i++ {
@@ -560,7 +564,14 @@ func walk_switch_statement(ws *walkstate, a *ast_switch_statement) np {
     if case Printed(pm) = walk_bracebody(ws, &cas->body) {
       return Printed(pm);
     }
+    changed_discard bool;
+    if case Printed(pm) = unify_opt_walkdesc(ws, &post_body_descnote, &changed_discard) {
+      return Printed(pm);
+    }
+    adopt_opt_walkdesc(ws, &post_condition_descnote);
   }
+
+  adopt_opt_walkdesc(ws, &post_body_descnote);
 
   if case Printed(pm) = walk_later_discard_info(ws, &a->swartch_discard) {
     return Printed(pm);
