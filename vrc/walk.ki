@@ -560,7 +560,7 @@ func walk_switch_statement(ws *walkstate, a *ast_switch_statement) np {
   ncases size = count(&a->cases);
   for i size = 0; i < ncases; i++ {
     cas *ast_switch_case = ref(&a->cases, i);
-    // TODO(): Process case pattern... somehow.
+    // TODO(): Process case pattern... somehow?
     if case Printed(pm) = walk_bracebody(ws, &cas->body) {
       return Printed(pm);
     }
@@ -637,17 +637,17 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
   case &ParenExpr(b ast_paren_expr):
     return walk_expr(ws, oo(&b.expr));
   case &NumericLiteral(b ast_numeric_literal):
-    return walk_TODO();
+    return walk_const_literal_expr(ws, a);
   case &BoolLiteral(b ast_bool_literal):
-    return walk_TODO();
+    return walk_const_literal_expr(ws, a);
   case &VoidLiteral(b ast_void_literal):
-    return walk_TODO();
+    return walk_const_literal_expr(ws, a);
   case &NullLiteral(b ast_null_literal):
-    return walk_TODO();
+    return walk_const_literal_expr(ws, a);
   case &CharLiteral(b ast_char_literal):
-    return walk_TODO();
+    return walk_const_literal_expr(ws, a);
   case &StringLiteral(b ast_string_literal):
-    return walk_TODO();
+    return walk_const_literal_expr(ws, a);
   case &Funcall(b ast_funcall):
     nparams size = count(&b.params);
     for i size = 0; i < nparams; i++ {
@@ -719,7 +719,7 @@ func walk_expr(ws *walkstate, a *ast_expr) np {
 
     return NoFail;
   case &Lambda(b ast_lambda):
-    return walk_TODO();
+    return walk_const_literal_expr(ws, a);
   case &LocalField(b ast_local_field):
     if case Printed(pm) = walk_expr(ws, oo(&b.lhs)) {
       return Printed(pm);
@@ -946,6 +946,11 @@ func walk_move_action(ws *walkstate, a *move_action) np {
 
 func walk_destroy_action(ws *walkstate, a *destroy_action) np {
   return walk_TODO();
+}
+
+func walk_const_literal_expr(ws *walkstate, a *ast_expr) np {
+  // TODO(): Model this?  We just mark the rval cell active?
+  return NoFail;
 }
 
 // "a" is in variable declaration order -- the _opposite_ of destruction order.
