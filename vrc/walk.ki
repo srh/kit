@@ -857,7 +857,6 @@ func walk_expr_after_discard(ws *walkstate, a *ast_expr_after_discard) np {
     // TODO(): idk.
     return NoFail;
   case &DiscardNothing:
-    // TODO(): How does this case exist?
     return NoFail;
   }
 }
