@@ -581,18 +581,28 @@ func walk_switch_statement(ws *walkstate, a *ast_switch_statement) np {
 }
 
 func walk_break_statement(ws *walkstate, a *ast_break_statement) np {
-  // TODO(): Connect to the right place.  Also treat subsequent statements like after a return -- look for marked labels.
   if case Printed(pm) = walk_var_destructions(ws, &un(&a->info)->destructions) {
     return Printed(pm);
   }
+  if case Printed(pm) = tie_walkstate(ws, unHas(&ws->bp)->break_target_wrec) {
+    return Printed(pm);
+  }
+
+  // Just like with return statements, we enter cycling-state.
+  ws->cycling = true;
   return NoFail;
 }
 
 func walk_continue_statement(ws *walkstate, a *ast_continue_statement) np {
-  // TODO(): Connect to the right place.  Also treat subsequent statements like after a return -- look for marked labels.
   if case Printed(pm) = walk_var_destructions(ws, &un(&a->info)->destructions) {
     return Printed(pm);
   }
+  if case Printed(pm) = tie_walkstate(ws, unHas(&ws->bp)->continue_target_wrec) {
+    return Printed(pm);
+  }
+
+  // Just like with return/break/goto statements.
+  ws->cycling = true;
   return NoFail;
 }
 
