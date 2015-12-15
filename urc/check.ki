@@ -190,7 +190,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) np {
 func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) np {
   switch &ent->converted_typeexpr {
     case &NotComputed: {
-      ent->converted_typeexpr = BeganComputing();
+      ent->converted_typeexpr = BeganComputing;
       switch &ent->definition {
         case &DefnPrim(op primitive_op): {
           ice(_u8("def_entry for primitive has converted_typeexpr NotComputed."));
@@ -199,7 +199,7 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) n
         case &DefnHasRhs(np def_nonprim): {
           converted te_typeexpr;
           if case Printed(pm) = convert_typeexpr(cs, &np.quick_typeexpr, &converted) {
-            ent->converted_typeexpr = FailedComputation();
+            ent->converted_typeexpr = FailedComputation;
             return Printed(pm);
           }
           ent->converted_typeexpr = Computed(converted);
@@ -236,12 +236,12 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) n
 func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rhs_spec) np {
   switch &np->rhs {
     case &NotComputed: {
-      np->rhs = BeganComputing();
+      np->rhs = BeganComputing;
       switch &np->tl->rhs {
       case &ClassexprRhs(a ast_classexpr_rhs):
         fields array[te_vardecl];
         if case Printed(pm) = convert_vardecl_list(cs, &a.fields, &fields) {
-          np->rhs = FailedComputation();
+          np->rhs = FailedComputation;
           return Printed(pm);
         }
         np->rhs = Computed(@[deftype_rhs_spec]ClassexprRhsSpec({a.disposition, {freeze(&fields)}}));
@@ -318,7 +318,7 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms) id_and
     case &DefnHasRhs(np def_nonprim):
       switch np.tl {
         case &Def(a ast_def): {
-          rhs = InstRhsExpr({a.rhs, NotComputed@[frame_info]()});
+          rhs = InstRhsExpr({a.rhs, NotComputed});
         }
         case &ExternDef(a ast_extern_def): { rhs = InstRhsExtern; }
         default: {
@@ -847,7 +847,7 @@ func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *idy_genparms
   if case &Has(info deftype_inst_info) = &ent->default_info {
     inst = {*parms, Computed(info)};
   } else {
-    inst = {*parms, NotComputed@[deftype_inst_info]()};
+    inst = {*parms, NotComputed};
   }
   id deftype_inst_id = add_deftype_inst(cs, inst);
   check_insert(&ent->insts, parms, id);
@@ -1207,7 +1207,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
       if case Printed(pm) = set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms.repls), &rw) {
         return Printed(pm);
       }
-      inst->info = BeganComputing();
+      inst->info = BeganComputing;
 
       if case &Has(np deftype_nonprim) = &ent->nonprim {
         ent_rhs *deftype_rhs_spec;
@@ -1230,7 +1230,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
 
           class_props type_properties;
           if case Printed(pm) = to_defclass_properties(clq, ent_id, id, crs.disposition,&st, &class_props) {
-            inst->info = FailedComputation();
+            inst->info = FailedComputation;
             return Printed(pm);
           }
           inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({st})), class_props});
@@ -1240,7 +1240,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           rhs_fields_complete bool;
 
           if case Printed(pm) = help_check_and_compute_fields(clq, &ent->generics, &inst->parms.repls, &drs.fields, &rhs_fields, &rhs_fields_complete) {
-            inst->info = FailedComputation();
+            inst->info = FailedComputation;
             return Printed(pm);
           }
           check(rhs_fields_complete);
@@ -1251,7 +1251,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           it te_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
           if case Printed(pm) = compute_complete_struct_properties(clq, &st, &it, ComputeAll, &rhs_props) {
-            inst->info = FailedComputation();
+            inst->info = FailedComputation;
             return Printed(pm);
           }
           check(isBeganComputing(&inst->info));
@@ -1263,7 +1263,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           rhs_constructors_complete bool;
 
           if case Printed(pm) = help_check_and_compute_fields(clq, &ent->generics, &inst->parms.repls, &drs.constructors, &rhs_constructors, &rhs_constructors_complete) {
-            inst->info = FailedComputation();
+            inst->info = FailedComputation;
             return Printed(pm);
           }
           check(rhs_constructors_complete);
@@ -1274,7 +1274,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           it te_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
           if case Printed(pm) = compute_complete_enum_properties(clq, &et, &it, &rhs_props) {
-            inst->info = FailedComputation();
+            inst->info = FailedComputation;
             return Printed(pm);
           }
           check(isBeganComputing(&inst->info));
@@ -1539,12 +1539,12 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
   ent *access_entry = ref_access_entry(cs, aid);
   switch ent->ent_id {
     case NotComputed: {
-      ent->ent_id = BeganComputing();
+      ent->ent_id = BeganComputing;
       switch ent->arity {
         case AccessArityNone: {
           id deftype_entry_id;
           if case Printed(pm) = match_deftype(cs, fake_ast_meta(), ent->name, None, &id) {
-            ent->ent_id = FailedComputation();
+            ent->ent_id = FailedComputation;
             return Printed(pm);
           }
           *out = id;
@@ -1555,7 +1555,7 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
           params shray[te_typeexpr] = repeat(~n, TeUnknown);
           id deftype_entry_id;
           if case Printed(pm) = match_deftype(cs, fake_ast_meta(), ent->name, Has(&params), &id) {
-            ent->ent_id = FailedComputation();
+            ent->ent_id = FailedComputation;
             return Printed(pm);
           }
           *out = id;

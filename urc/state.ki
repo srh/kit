@@ -324,7 +324,7 @@ struct deftype_entry {
 };
 
 func mk(module_name sym, name sym, accessible array[access_entry_id], g ast_generics, tl *ast_type_def) deftype_entry {
-  return {module_name, name, accessible, g, Has({tl, NotComputed()}), None, mk_hash@[idy_genparms, deftype_inst_id]()};
+  return {module_name, name, accessible, g, Has({tl, NotComputed}), None, mk_hash@[idy_genparms, deftype_inst_id]()};
 }
 
 enum fn_body_spec {
@@ -378,7 +378,7 @@ struct access_entry {
 };
 
 func mk(name sym, arity ast_access_arity) access_entry {
-  return {name, arity, NotComputed()};
+  return {name, arity, NotComputed};
 }
 
 enum genparms {
@@ -501,7 +501,7 @@ struct def_inst {
 };
 
 func mk(parms idy_genparms, rhs def_inst_rhs) def_inst {
-  return {parms, rhs, NotComputed@[cu_typrop](), DidNotCheckRhs, NotComputed@[opt[frame_regraphed]](), NotComputed@[st_value]()};
+  return {parms, rhs, NotComputed, DidNotCheckRhs, NotComputed, NotComputed};
 }
 
 struct def_nonprim {
@@ -532,7 +532,7 @@ struct def_entry {
 };
 
 func mk(module_name sym, def_name sym, accessible array[access_entry_id], generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
-  return {module_name, def_name, accessible, generics, DefnHasRhs({quick_typeexpr, tl}), NotComputed(), mk_hash@[idy_genparms, def_inst_id]()};
+  return {module_name, def_name, accessible, generics, DefnHasRhs({quick_typeexpr, tl}), NotComputed, mk_hash@[idy_genparms, def_inst_id]()};
 }
 
 struct clqueue_deftype_entry {

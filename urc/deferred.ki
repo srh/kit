@@ -5,19 +5,6 @@ enum[T] nbfc {
   Computed T;
 };
 
-// TODO: Get rid of these functions (once cute void enums are in s1).
-inline func[T] NotComputed() nbfc[T] {
-  return NotComputed;
-}
-
-inline func[T] BeganComputing() nbfc[T] {
-  return BeganComputing;
-}
-
-inline func[T] FailedComputation() nbfc[T] {
-  return NotComputed;
-}
-
 func[T] isBeganComputing(x *nbfc[T]) bool {
   if case &BeganComputing = x {
     return true;
@@ -43,10 +30,6 @@ enum[T] nc {
   NotComputed void;
   Computed T;
 };
-
-inline func[T] NotComputed() nc[T] {
-  return NotComputed;
-}
 
 func[T] annotate(x *nc[T], y T) void {
   if case &Computed(already T) = x {
