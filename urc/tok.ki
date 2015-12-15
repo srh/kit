@@ -355,46 +355,46 @@ func grab_tok(p *ps) tok {
     if ch >= '_' && ch <= 'w' {
       if ch < 'f' {
         if ch < 'd' {
-          if (grab_keyword(p, "_", Underscore, &ret)
-              || grab_keyword(p, "access", Access, &ret)
-              || grab_keyword(p, "break", Break, &ret)
-              || grab_keyword(p, "case", Case, &ret)
-              || grab_keyword(p, "continue", Continue, &ret)) {
+          if grab_keyword(p, "_", Underscore, &ret)
+             || grab_keyword(p, "access", Access, &ret)
+             || grab_keyword(p, "break", Break, &ret)
+             || grab_keyword(p, "case", Case, &ret)
+             || grab_keyword(p, "continue", Continue, &ret) {
             return ret;
           }
         } else {
-          if (grab_keyword(p, "def", Def, &ret)
-              || grab_keyword(p, "default", Default, &ret)
-              || grab_keyword(p, "defclass", Defclass, &ret)
-              || grab_keyword(p, "else", Else, &ret)
-              || grab_keyword(p, "enum", Enum, &ret)
-              || grab_keyword(p, "export", Export, &ret)
-              || grab_keyword(p, "extern", Extern, &ret)) {
+          if grab_keyword(p, "def", Def, &ret)
+             || grab_keyword(p, "default", Default, &ret)
+             || grab_keyword(p, "defclass", Defclass, &ret)
+             || grab_keyword(p, "else", Else, &ret)
+             || grab_keyword(p, "enum", Enum, &ret)
+             || grab_keyword(p, "export", Export, &ret)
+             || grab_keyword(p, "extern", Extern, &ret) {
             return ret;
           }
         }
       } else {
         if ch < 'r' {
-          if (grab_keyword(p, "false", False, &ret)
-              || grab_keyword(p, "for", For, &ret)
-              || grab_keyword(p, "func", Func, &ret)
-              || grab_keyword(p, "goto", Goto, &ret)
-              || grab_keyword(p, "if", If, &ret)
-              || grab_keyword(p, "import", Import, &ret)
-              || grab_keyword(p, "label", Label, &ret)
-              || grab_keyword(p, "null", Null, &ret)) {
+          if grab_keyword(p, "false", False, &ret)
+             || grab_keyword(p, "for", For, &ret)
+             || grab_keyword(p, "func", Func, &ret)
+             || grab_keyword(p, "goto", Goto, &ret)
+             || grab_keyword(p, "if", If, &ret)
+             || grab_keyword(p, "import", Import, &ret)
+             || grab_keyword(p, "label", Label, &ret)
+             || grab_keyword(p, "null", Null, &ret) {
             return ret;
           }
         } else {
-          if (grab_keyword(p, "return", Return, &ret)
-              || grab_keyword(p, "struct", Struct, &ret)
-              || grab_keyword(p, "switch", Switch, &ret)
-              || grab_keyword(p, "then", Then, &ret)
-              || grab_keyword(p, "true", True, &ret)
-              || grab_keyword(p, "union", Union, &ret)
-              || grab_keyword(p, "var", Var, &ret)
-              || grab_keyword(p, "void", Void, &ret)
-              || grab_keyword(p, "while", While, &ret)) {
+          if grab_keyword(p, "return", Return, &ret)
+             || grab_keyword(p, "struct", Struct, &ret)
+             || grab_keyword(p, "switch", Switch, &ret)
+             || grab_keyword(p, "then", Then, &ret)
+             || grab_keyword(p, "true", True, &ret)
+             || grab_keyword(p, "union", Union, &ret)
+             || grab_keyword(p, "var", Var, &ret)
+             || grab_keyword(p, "void", Void, &ret)
+             || grab_keyword(p, "while", While, &ret) {
             return ret;
           }
         }
