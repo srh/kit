@@ -4,13 +4,28 @@ Current status:  "This is a test!  Ignore!!!"
 
   BUILD INSTRUCTIONS
 
-   ./linux_build.sh; ./linux_build_s2.sh; ./linux_build_s3.sh
-
-or
+(From a Visual Studio command line:)
 
    windows_build.bat
    windows_build_s2.bat
    windows_build_s3.bat
+
+or  (on 32-bit Linux, or 64-bit with gcc-multilib)
+
+   ./linux_build.sh; ./linux_build_s2.sh; ./linux_build_s3.sh
+
+
+  RUN INSTRUCTIONS
+
+   # Run tests.
+   s3 --build
+
+   # Build modulename.ki and its imports, outputting modulename.obj
+   s3 <modulename>
+
+   # Build modulename.ki and its imports, outputting modulename.o
+   s3 --linux <modulename>
+
 
 Again:
 
@@ -65,61 +80,14 @@ The current directory structure is:
    s2 <modulename>  # builds <modulename>.ki and its imports.
    s3 ...    # same as s2.
 
-  PROJECT TIMELINE
-
-Here's the project timeline:
-
-   1. Parsing.  (DONE)
-   2. Typechecking/name-resolving.  (DONE)
-   3. Generate code, i.e. have a working compiler.  (DONE)
-   4. Cleanup error messages to have useful source information. (BETTER)
-   5. Cleanup the language to make it more usable. (GOOD ENOUGH)
-      Wishlist (waiting for these features specifically needed):
-       A. Structure / array initialization syntax. (DONE)
-       B. Packed struct types.  (DON'T CARE for now -- use le_u32)
-       C. Destructuring assignment.
-       D. Incr/decr and "+="-type operators. (DONE in s2 but user-defined)
-   6. Linux support. (DONE)
-   7. Make a self-hosted implementation (adding improvements and
-      fixes to the C implementation when useful). (DONE)
-   8. Give the self-hosted implementation "respectable" codegen.
-   9. Basic cleanup of the language.
-      Wishlist:
-       A. defstruct, no more naked structs.  (DONE)
-       B. type aliases.
-       C. a non-truncative conversion operator (prefix +).  (DONE)
-       D. negative integer literals.
-       E. var keyword after variable.  (DONE)
-       F. o8, o16, o32.  (DONE in s2)
-       G. u64, i64, o64.
-       H. a signed size type ("diff").  (DONE in s2)
-       I. negation for o-verflow types.  (DONE in s2)
-       J. smart move/allocate-in-the-spot semantics.
-       K. scoped types or scoped vars.
-       L. better syntax for defining copy/init/move/destroy.
-       M. defer statements (or scoped statements).
-       N. handlers for overflow errors.
-       O. enum types with "default" values instead of zero-tag.
-       P. cute enum syntax for voids.  (DONE)
-       Q. better type-checking, see-through-negation.
-       R. explicit overloading/specialization.
-       S. support for multiple calling conventions.
-       T. cross-function goto statements of the IInd kind.
-       U. capturing closures.
-       V. actual modules/namespaces.
-       W. pretentious quotes in the binaries.
-       X. removal of pretentious quotes in the binaries.
-       Y. field names in struct literals.
-       Z. array literals (struct literals in an array place).  (DONE)
-
   ABOUT THE VERSIONS
 
-s1's language, v0.00.2A.x, is merely "C, with templates,
-constructors and destructors, elementary encapsulation, tagged enum
-types, no implicit conversions."  s2's, v0.00.2B.x, is very similar
-to s1's, but with some basic convenience enhancements that should
-be easy to backport to s1 -- the differences are described in
-FEATURES.  s3 defines a language with ever-more-advanced features.
+s1's language is merely "C, with templates, constructors and
+destructors, elementary encapsulation, tagged enum types, no
+implicit conversions."  s2's is very similar to s1's, but with some
+basic convenience enhancements that should be easy to backport to
+s1 -- the differences are described in FEATURES.  s3 defines a
+language with ever-more-advanced features.
 
 Right now, s1 can compile s2, and it can almost compile s3.  In the
 long run, as soon as s4 is the actively developed version, s2 will
