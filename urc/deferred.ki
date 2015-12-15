@@ -13,17 +13,13 @@ func[T] isBeganComputing(x *nbfc[T]) bool {
   }
 }
 
-func[T] unHas(x *nbfc[T]) *T {
+func[T] un(x *nbfc[T]) *T {
   if case &Computed(t T) = x {
     return &t;
   } else {
     ice(_u8("unComputed failed"));
     return fake();
   }
-}
-
-inline func[T] unComputed(x *nbfc[T]) *T {
-  return unHas(x);
 }
 
 enum[T] nc {
@@ -56,11 +52,11 @@ func[T] annotate_move(x *nc[T], y *T) void {
   }
 }
 
-func[T] unHas(x *nc[T]) *T {
+func[T] un(x *nc[T]) *T {
   if case &Computed(y T) = x {
     return &y;
   } else {
-    ice(_u8("unHas(nc) sees not-computed"));
+    ice(_u8("un(nc) sees not-computed"));
     return fake();
   }
 }

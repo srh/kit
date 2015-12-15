@@ -649,7 +649,7 @@ inline func result_cell(a *ast_expr_after_consume) cell_num {
 }
 
 inline func result_cell(a *ast_expr_consume) cell_num {
-  return result_cell(unHas(&a->after));
+  return result_cell(un(&a->after));
 }
 
 inline func mk_after(actions consume_actions, result cell_num) ast_expr_after_consume {
