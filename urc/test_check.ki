@@ -16,40 +16,40 @@ func test_loader(cs *checkstate, name sym, out *array[u8]) bool {
 }
 
 func x86_32_platform(opsys platform_os) platform_info {
-  jrr shift_behavior = JustRangecheckRhs(void);
+  jrr shift_behavior = JustRangecheckRhs;
   ret platform_info = {
-    LittleEndian(void),
+    LittleEndian,
     4,
     8,
     4,
     {0, 1},
     {1, 1},
-    {{1, 1}, {SignedTwos(void), jrr, true, -bigu(128), bigu(127)}},
-    {{1, 1}, {Unsigned(void), jrr, true, bigu(0), bigu(255)}},
-    {{1, 1}, {Unsigned(void), jrr, false, bigu(0), bigu(255)}},
-    {{2, 2}, {SignedTwos(void), jrr, true, -bigu(32768), bigu(32767)}},
-    {{2, 2}, {Unsigned(void), jrr, true, bigu(0), bigu(65535)}},
-    {{2, 2}, {Unsigned(void), jrr, false, bigu(0), bigu(65535)}},
-    {{4, 4}, {SignedTwos(void), jrr, true, -bigu(2147483648), bigu(2147483647)}},
-    {{4, 4}, {Unsigned(void), jrr, true, bigu(0), bigu(4294967295)}},
-    {{4, 4}, {Unsigned(void), jrr, false, bigu(0), bigu(4294967295)}},
-    {{4, 4}, {SignedTwos(void), jrr, true, -bigu(2147483648), bigu(2147483647)}},
-    {{4, 4}, {Unsigned(void), jrr, true, bigu(0), bigu(4294967295)}},
-    {{4, 4}, {Unsigned(void), jrr, false, bigu(0), bigu(4294967295)}},
+    {{1, 1}, {SignedTwos, jrr, true, -bigu(128), bigu(127)}},
+    {{1, 1}, {Unsigned, jrr, true, bigu(0), bigu(255)}},
+    {{1, 1}, {Unsigned, jrr, false, bigu(0), bigu(255)}},
+    {{2, 2}, {SignedTwos, jrr, true, -bigu(32768), bigu(32767)}},
+    {{2, 2}, {Unsigned, jrr, true, bigu(0), bigu(65535)}},
+    {{2, 2}, {Unsigned, jrr, false, bigu(0), bigu(65535)}},
+    {{4, 4}, {SignedTwos, jrr, true, -bigu(2147483648), bigu(2147483647)}},
+    {{4, 4}, {Unsigned, jrr, true, bigu(0), bigu(4294967295)}},
+    {{4, 4}, {Unsigned, jrr, false, bigu(0), bigu(4294967295)}},
+    {{4, 4}, {SignedTwos, jrr, true, -bigu(2147483648), bigu(2147483647)}},
+    {{4, 4}, {Unsigned, jrr, true, bigu(0), bigu(4294967295)}},
+    {{4, 4}, {Unsigned, jrr, false, bigu(0), bigu(4294967295)}},
     {4, 4},
     {4, 4},
     opsys,
-    UniversalCdeclConvention(void)
+    UniversalCdeclConvention
   };
   return ret;
 }
 
 func x86_linux32_platform() platform_info {
-  return x86_32_platform(Linux32(void));
+  return x86_32_platform(Linux32);
 }
 
 func x86_win32_platform() platform_info {
-  return x86_32_platform(Win32(void));
+  return x86_32_platform(Win32);
 }
 
 func test_platform() platform_info {
@@ -1554,7 +1554,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  None void;\n"
         "};\n"
         "func foo() i32 {\n"
-        "  x opt[i32] = None(void);\n"
+        "  x opt[i32] = None;\n"
         "  if case Has(y i32) = x {\n"
         "    return y + 1;\n"
         "  } else {\n"
@@ -1600,7 +1600,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  None void;\n"
         "};\n"
         "func foo() i32 {\n"
-        "  x opt[i32] = None(void);\n"
+        "  x opt[i32] = None;\n"
         "  if case &Has(y i32) = &x {\n"
         "    return y + 1;\n"
         "  } else {\n"
@@ -1621,7 +1621,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  while case Has(y i32) = x {\n"
         "    acc = acc * y;\n"
         "    if y == 1 {\n"
-        "      x = None(void);\n"
+        "      x = None;\n"
         "    } else {\n"
         "      x = Has(y - 1);\n"
         "    }\n"
@@ -1640,7 +1640,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  while case &Has(y i32) = &x {\n"
         "    acc = acc * y;\n"
         "    if y == 1 {\n"
-        "      x = None(void);\n"
+        "      x = None;\n"
         "    } else {\n"
         "      x = Has(y - 1);\n"
         "    }\n"

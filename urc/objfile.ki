@@ -78,11 +78,11 @@ func mk_objfile_section() objfile_section {
 }
 
 func append_dir32(s *objfile_section, sti sti) void {
-  append_32bit_reloc(s, sti, Dir32(void));
+  append_32bit_reloc(s, sti, Dir32);
 }
 
 func append_rel32(s *objfile_section, sti sti) void {
-  append_32bit_reloc(s, sti, Rel32(void));
+  append_32bit_reloc(s, sti, Rel32);
 }
 
 func append_32bit_reloc(s *objfile_section, sti sti, type objfile_relocation_type) void {
@@ -133,9 +133,9 @@ func set_symbol_value(f *objfile, sti sti, value u32) void {
 
 func `~`(sec section) objfile_symbol_section {
   switch sec {
-  case SectionData: return SymbolSectionData(void);
-  case SectionRdata: return SymbolSectionRdata(void);
-  case SectionText: return SymbolSectionText(void);
+  case SectionData: return SymbolSectionData;
+  case SectionRdata: return SymbolSectionRdata;
+  case SectionText: return SymbolSectionText;
   }
 }
 
@@ -145,10 +145,10 @@ func `==`(a section, b section) bool {
 
 func add_local_symbol(f *objfile, name sym, value u32, section section, is_static is_static) sti {
   is_function is_function;
-  if case SectionText(v void) = section {
-    is_function = IsFunctionYes(void);
+  if case SectionText = section {
+    is_function = IsFunctionYes;
   } else {
-    is_function = IsFunctionNo(void);
+    is_function = IsFunctionNo;
   }
   rec objfile_symbol_record = {name, value, ~section, is_function, is_static};
   ret sti = ~ @[u32] ~count(&f->symbol_table);
@@ -157,7 +157,7 @@ func add_local_symbol(f *objfile, name sym, value u32, section section, is_stati
 }
 
 func add_remote_symbol(f *objfile, name sym, is_function is_function) sti {
-  rec objfile_symbol_record = {name, 0, SymbolSectionUndefined(void), is_function, IsStaticNo(void)};
+  rec objfile_symbol_record = {name, 0, SymbolSectionUndefined, is_function, IsStaticNo};
   ret sti = ~ @[u32] ~count(&f->symbol_table);
   push(&f->symbol_table, rec);
   return ret;

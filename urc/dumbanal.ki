@@ -30,7 +30,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     if !(liveset->xored == live.xored && liveset->summed == live.summed) {
       return ERR(_u8("ICE: Inconsistent liveness state when revisiting node, liveset="), *liveset);
     }
-    *out = NonTerminal(void);
+    *out = NonTerminal;
     return NoFail;
   }
 
@@ -58,7 +58,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       for i size = 0; i < nparams; i = i + 1 {
         deaden(liveset, get(&a.params, i));
       }
-      *out = Terminal(void);
+      *out = Terminal;
       return NoFail;
 
     case &GrPrimApply(a gr_prim_apply):
@@ -68,58 +68,58 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       for i size = 0; i < nparams; i = i + 1 {
         deaden(liveset, get(&a.params, i));
       }
-      *out = Terminal(void);
+      *out = Terminal;
       return NoFail;
 
     case &GrMemCopy(a gr_memcopy):
       output(h, liveset, a.dest);
       input(liveset, a.src);
-      *out = Terminal(void);
+      *out = Terminal;
       return NoFail;
 
     case &GrWriteConst(a gr_writeconst):
       output(h, liveset, a.dest);
-      *out = Terminal(void);
+      *out = Terminal;
       return NoFail;
 
     case &GrAddressof(a gr_addressof):
       // Yes, addressee is an _output_ -- if it is not live -- we make it live.
       output(h, liveset, a.addressee);
       output(h, liveset, a.dest);
-      *out = Terminal(void);
+      *out = Terminal;
       return NoFail;
 
     case &GrDeref(a gr_deref):
       input(liveset, a.pointer);
       check(!isLocationStatic(ref_cell(gr, a.name)->location));
       create(h, liveset, a.name);
-      *out = Terminal(void);
+      *out = Terminal;
       return NoFail;
 
     case &GrSubcell(a gr_subcell):
       input(liveset, a.partof);
       check(!isLocationStatic(ref_cell(gr, a.name)->location));
       create(h, liveset, a.name);
-      *out = Terminal(void);
+      *out = Terminal;
       return NoFail;
 
     case &GrWriteNothing(a gr_writenothing):
       output(h, liveset, a.dest);
-      *out = Terminal(void);
+      *out = Terminal;
       return NoFail;
 
     case &GrDead(a gr_dead):
       deaden(liveset, a.cell);
-      *out = Terminal(void);
+      *out = Terminal;
       return NoFail;
 
     case &GrVirtualDead(a gr_virtual_dead):
       deaden(liveset, a.cell);
-      *out = Terminal(void);
+      *out = Terminal;
       return NoFail;
 
     case &GrXNop:
-      *out = Terminal(void);
+      *out = Terminal;
       return NoFail;
     }
   case &QOp(qn gr_qnode):
@@ -128,7 +128,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       input(liveset, a.src);
 
       end_lives lives;
-      combined_mut genexpr_result = NonTerminal(void);
+      combined_mut genexpr_result = NonTerminal;
       ncases size = count(&a.cases);
       for i size = 0; i < ncases; i = i + 1 {
         cas *tup[gr_const, sq_num] = ref(&a.cases, i);
@@ -164,7 +164,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       return dumbly_analyze_expression(h, gr, liveset, a.next.x, out);
 
     case &GrQNop:
-      *out = Terminal(void);
+      *out = Terminal;
       return NoFail;
     }
   }
@@ -197,7 +197,7 @@ func combine_branch_mut(new_live *lives, onto *genexpr_result, case_mut genexpr_
         ice(_u8("terminal/terminal new_live not equal, end_lives="), *end_lives, _u8(", new_live="), *new_live);
       }
     case NonTerminal:
-      *onto = Terminal(void);
+      *onto = Terminal;
       *end_lives = *new_live;
     }
   case NonTerminal: { }

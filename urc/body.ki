@@ -161,7 +161,7 @@ func make_destructions(es *framescope, vns *array[var_number], out *array[var_de
 }
 
 func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) np {
-  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, &x->expr, pt) {
     return Printed(pm);
   }
   if case Printed(pm) = annotate_disposal_for_discard(es, &x->expr, &x->after) {
@@ -175,7 +175,7 @@ func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te
   return check_consume_then_discard_expr(es, x, pt, later, None);
 }
 func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) np {
-  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo(void), &x->expr, pt) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, &x->expr, pt) {
     return Printed(pm);
   }
   if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later, later2) {
@@ -207,7 +207,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
   num statement_num = add_statement(bs, Has(s));
   switch &s->u {
     case &Expr(b ast_expr_discard): {
-      pt te_typeexpr = TeUnknown(void);
+      pt te_typeexpr = TeUnknown;
       if case Printed(pm) = check_discard_expr(&bs->es, &b, &pt) {
         return Printed(pm);
       }
@@ -564,12 +564,12 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
     }
     connect_statements(bs, loopnum, exitnum);
     cond_vn var_number;
-    if case Printed(pm) = es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, ~unnamed_lifetime(&bs->es), &boolean, VarSelfContained(void), &cond_vn) {
+    if case Printed(pm) = es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, ~unnamed_lifetime(&bs->es), &boolean, VarSelfContained, &cond_vn) {
       return Printed(pm);
     }
   }
   if case &Has(incr box[ast_expr_discard]) = &a->increment {
-    unknown te_typeexpr = TeUnknown(void);
+    unknown te_typeexpr = TeUnknown;
     if case Printed(pm) = check_discard_expr(&bs->es, oo(&incr), &unknown) {
       return Printed(pm);
     }
@@ -634,7 +634,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   }
 
   vn var_number;
-  if case Printed(pm) = es_push_var(&bs->es, vp, cell, Has(&a->decl.name), ~varname_lifetime(bs->im, a->decl.name.value), complete_type, VarSelfContained(void), &vn) {
+  if case Printed(pm) = es_push_var(&bs->es, vp, cell, Has(&a->decl.name), ~varname_lifetime(bs->im, a->decl.name.value), complete_type, VarSelfContained, &vn) {
     return Printed(pm);
   }
   annotate(&a->info, {vn});
@@ -735,7 +735,7 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
       }
     }
     case &Default: {
-      if case &Default(u void) = b {
+      if case &Default = b {
         return true;
       }
     }
@@ -765,7 +765,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
       // We need return statements in the "then" or "else" block to mark the boolean condition dead.  (It would be a smarter graph if we just marked it dead immediately after the branch, but... this way makes the code here handle all cases equivalently.)
       swartch_vn var_number;
-      if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_lifetime(es), &booltype, VarSelfContained(void), &swartch_vn) {
+      if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_lifetime(es), &booltype, VarSelfContained, &swartch_vn) {
         return Printed(pm);
       }
       annotate(&cd->virtual_cell_dead, None);

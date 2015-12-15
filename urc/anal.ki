@@ -89,7 +89,7 @@ func basic_analyze_fn_body(cs *checkstate, g *graphed_fn_body, bas_out *basic_an
 func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_graph) void {
   n_ops size = count(&gr->ops);
   cellcount size = count(&gr->cells);
-  grow(&bas->celldisp, cellcount - count(&bas->celldisp), {None, None, None, false, None, NoConstDisp(void), mk_array@[cell_num](), mk_array@[cell_num]()});
+  grow(&bas->celldisp, cellcount - count(&bas->celldisp), {None, None, None, false, None, NoConstDisp, mk_array@[cell_num](), mk_array@[cell_num]()});
 
   for i size = bas->gns_analyzed; i < n_ops; i = i + 1 {
     gn gr_num = ~i;
@@ -120,13 +120,13 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
         mark_cell_value_used(bas, a.src);
         mark_cell_not_const(bas, a.dest);
       case &GrWriteConst(a gr_writeconst):
-        if case LocationStatic(v void) = ref(&gr->cells, a.dest.x)->location {
+        if case LocationStatic = ref(&gr->cells, a.dest.x)->location {
           disp *cell_const_disp = &ref(&bas->celldisp, a.dest.x)->const_value;
           switch disp {
           case &NoConstDisp:
             *disp = HasConstValue(a.value);
           case &HasConstValue(gc gr_const):
-            *disp = NotConst(void);
+            *disp = NotConst;
           case &NotConst: { }
           }
         }
@@ -138,7 +138,7 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
       case &GrSubcell(a gr_subcell):
         set(&ref(&bas->celldisp, a.name.x)->subcell, {gn, a.partof, a.offset});
         push(&ref(&bas->celldisp, a.partof.x)->subcelled, a.name);
-        check(ref(&gr->cells, a.name.x)->location == LocationVirtual(void));
+        check(ref(&gr->cells, a.name.x)->location == LocationVirtual);
         mark_cell_not_const(bas, a.partof);
         mark_cell_value_used(bas, a.name);
         mark_cell_value_used(bas, a.partof);
@@ -175,7 +175,7 @@ func mark_cell_prim_paramlist(bas *basic_analyze_state, c cell_num, apply_opnum 
 }
 
 func mark_cell_not_const(bas *basic_analyze_state, c cell_num) void {
-  ref(&bas->celldisp, c.x)->const_value = NotConst(void);
+  ref(&bas->celldisp, c.x)->const_value = NotConst;
 }
 
 func basic_and_inline(cs *checkstate, g *graphed_fn_body) np {
@@ -262,7 +262,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
               // It's important to note that GrXNop would be ignored by help_basic_analyze.
               // TODO: It'd be nice if we could undo the mark_cell_not_const of a.retcell (that happened when we processed GrApply in help_basic_analyze before).
 
-              *ref(&gr->ops, gn.x) = XOp({mk_shray(seqer.x), GrXNop(void)});
+              *ref(&gr->ops, gn.x) = XOp({mk_shray(seqer.x), GrXNop});
 
               // And since there's no apply op, we update the arg/funcell cell_disps.
               // Actually, we don't update the funcell disp, so that we don't allocate/write its cell needlessly.
@@ -324,7 +324,7 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
     case &GrVirtualDead(a gr_virtual_dead):
       return XOp({newprecs, GrVirtualDead({get(cm, a.cell.x)})});
     case &GrXNop:
-      return XOp({newprecs, GrXNop(void)});
+      return XOp({newprecs, GrXNop});
     }
   case QOp(qn gr_qnode):
     switch &qn.op {
@@ -347,7 +347,7 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
     case &GrJmp(a gr_jmp):
       return QOp({GrJmp({~ ~(a.next.x.x + op_addend)})});
     case &GrQNop:
-      return QOp({GrQNop(void)});
+      return QOp({GrQNop});
     }
   }
 }

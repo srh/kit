@@ -303,7 +303,7 @@ func grab_tok(p *ps) tok {
   }
   left pos = ps_pos(p);
   if ch < 0 {
-    return {{left, left}, Eof(void)};
+    return {{left, left}, Eof};
   }
   if ch == '0' {
     ps_step(p);
@@ -322,7 +322,7 @@ func grab_tok(p *ps) tok {
       if is_numeric_postchar(ch) {
         return mk_res(p, left, @[tokval]Num(HexNum(freeze(&digits))));
       } else {
-        return {{left, ps_pos(p)}, Bad(void)};
+        return {{left, ps_pos(p)}, Bad};
       }
     } else {
       if is_numeric_postchar(ch) {
@@ -330,7 +330,7 @@ func grab_tok(p *ps) tok {
         push(&digits, 0);
         return mk_res(p, left, @[tokval]Num(DecNum(freeze(&digits))));
       } else {
-        return {{left, ps_pos(p)}, Bad(void)};
+        return {{left, ps_pos(p)}, Bad};
       }
     }
   } else if is_digit(ch) {
@@ -346,7 +346,7 @@ func grab_tok(p *ps) tok {
     if is_numeric_postchar(ch) {
       return mk_res(p, left, @[tokval]Num(DecNum(freeze(&digits))));
     } else {
-      return {{left, ps_pos(p)}, Bad(void)};
+      return {{left, ps_pos(p)}, Bad};
     }
   } else if is_ident_firstchar(ch) {
     ret tok;
@@ -355,46 +355,46 @@ func grab_tok(p *ps) tok {
     if ch >= '_' && ch <= 'w' {
       if ch < 'f' {
         if ch < 'd' {
-          if (grab_keyword(p, "_", Underscore(void), &ret)
-              || grab_keyword(p, "access", Access(void), &ret)
-              || grab_keyword(p, "break", Break(void), &ret)
-              || grab_keyword(p, "case", Case(void), &ret)
-              || grab_keyword(p, "continue", Continue(void), &ret)) {
+          if (grab_keyword(p, "_", Underscore, &ret)
+              || grab_keyword(p, "access", Access, &ret)
+              || grab_keyword(p, "break", Break, &ret)
+              || grab_keyword(p, "case", Case, &ret)
+              || grab_keyword(p, "continue", Continue, &ret)) {
             return ret;
           }
         } else {
-          if (grab_keyword(p, "def", Def(void), &ret)
-              || grab_keyword(p, "default", Default(void), &ret)
-              || grab_keyword(p, "defclass", Defclass(void), &ret)
-              || grab_keyword(p, "else", Else(void), &ret)
-              || grab_keyword(p, "enum", Enum(void), &ret)
-              || grab_keyword(p, "export", Export(void), &ret)
-              || grab_keyword(p, "extern", Extern(void), &ret)) {
+          if (grab_keyword(p, "def", Def, &ret)
+              || grab_keyword(p, "default", Default, &ret)
+              || grab_keyword(p, "defclass", Defclass, &ret)
+              || grab_keyword(p, "else", Else, &ret)
+              || grab_keyword(p, "enum", Enum, &ret)
+              || grab_keyword(p, "export", Export, &ret)
+              || grab_keyword(p, "extern", Extern, &ret)) {
             return ret;
           }
         }
       } else {
         if ch < 'r' {
-          if (grab_keyword(p, "false", False(void), &ret)
-              || grab_keyword(p, "for", For(void), &ret)
-              || grab_keyword(p, "func", Func(void), &ret)
-              || grab_keyword(p, "goto", Goto(void), &ret)
-              || grab_keyword(p, "if", If(void), &ret)
-              || grab_keyword(p, "import", Import(void), &ret)
-              || grab_keyword(p, "label", Label(void), &ret)
-              || grab_keyword(p, "null", Null(void), &ret)) {
+          if (grab_keyword(p, "false", False, &ret)
+              || grab_keyword(p, "for", For, &ret)
+              || grab_keyword(p, "func", Func, &ret)
+              || grab_keyword(p, "goto", Goto, &ret)
+              || grab_keyword(p, "if", If, &ret)
+              || grab_keyword(p, "import", Import, &ret)
+              || grab_keyword(p, "label", Label, &ret)
+              || grab_keyword(p, "null", Null, &ret)) {
             return ret;
           }
         } else {
-          if (grab_keyword(p, "return", Return(void), &ret)
-              || grab_keyword(p, "struct", Struct(void), &ret)
-              || grab_keyword(p, "switch", Switch(void), &ret)
-              || grab_keyword(p, "then", Then(void), &ret)
-              || grab_keyword(p, "true", True(void), &ret)
-              || grab_keyword(p, "union", Union(void), &ret)
-              || grab_keyword(p, "var", Var(void), &ret)
-              || grab_keyword(p, "void", Void(void), &ret)
-              || grab_keyword(p, "while", While(void), &ret)) {
+          if (grab_keyword(p, "return", Return, &ret)
+              || grab_keyword(p, "struct", Struct, &ret)
+              || grab_keyword(p, "switch", Switch, &ret)
+              || grab_keyword(p, "then", Then, &ret)
+              || grab_keyword(p, "true", True, &ret)
+              || grab_keyword(p, "union", Union, &ret)
+              || grab_keyword(p, "var", Var, &ret)
+              || grab_keyword(p, "void", Void, &ret)
+              || grab_keyword(p, "while", While, &ret)) {
             return ret;
           }
         }
@@ -411,7 +411,7 @@ func grab_tok(p *ps) tok {
       ch = ps_peek(p);
     }
     if !is_ident_postchar(ch) {
-      return {{left, ps_pos(p)}, Bad(void)};
+      return {{left, ps_pos(p)}, Bad};
     }
     return mk_res(p, left, Ident(freeze(&arr)));
   } else {
@@ -430,10 +430,10 @@ func grab_tok(p *ps) tok {
         return mk_res(p, left, @[tokval]Grouper(SingleQuote));
       } else if ch == '(' {
         ps_step(p);
-        return mk_res(p, left, @[tokval]Grouper(LParen(void)));
+        return mk_res(p, left, @[tokval]Grouper(LParen));
       } else if ch == ')' {
         ps_step(p);
-        return mk_res(p, left, @[tokval]Grouper(RParen(void)));
+        return mk_res(p, left, @[tokval]Grouper(RParen));
       } else if ch == '*' {
         return grab_oper2(p, left, ch, '=');
       } else if ch == '+' {
@@ -459,7 +459,7 @@ func grab_tok(p *ps) tok {
         }
         return mk_res(p, left, Oper(freeze(&arr)));
       } else {
-        return {{left, ps_pos(p)}, Bad(void)};
+        return {{left, ps_pos(p)}, Bad};
       }
 
     } else if ch < '[' {
@@ -478,7 +478,7 @@ func grab_tok(p *ps) tok {
             ch = ps_peek(p);
           }
           ps_step(p);
-          return mk_res(p, left, Comment(void));
+          return mk_res(p, left, Comment);
         } else if ch == '*' {
           ps_step(p);
           ch = ps_peek(p);
@@ -491,7 +491,7 @@ func grab_tok(p *ps) tok {
             ch = ps_peek(p);
             if ch == '/' {
               ps_step(p);
-              return mk_res(p, left, Comment(void));
+              return mk_res(p, left, Comment);
             }
           }
         } else if ch == '=' {
@@ -514,16 +514,16 @@ func grab_tok(p *ps) tok {
         ps_step(p);
         return mk_res(p, left, Oper(mk_shray(ch)));
       } else {
-        return {{left, ps_pos(p)}, Bad(void)};
+        return {{left, ps_pos(p)}, Bad};
       }
 
     } else {
       if ch == '[' {
         ps_step(p);
-        return mk_res(p, left, @[tokval]Grouper(LBracket(void)));
+        return mk_res(p, left, @[tokval]Grouper(LBracket));
       } else if ch == ']' {
         ps_step(p);
-        return mk_res(p, left, @[tokval]Grouper(RBracket(void)));
+        return mk_res(p, left, @[tokval]Grouper(RBracket));
       } else if ch == '^' {
         return grab_oper2(p, left, ch, '=');
       } else if ch == '`' {
@@ -531,17 +531,17 @@ func grab_tok(p *ps) tok {
         return mk_res(p, left, @[tokval]Grouper(Backtick));
       } else if ch == '{' {
         ps_step(p);
-        return mk_res(p, left, @[tokval]Grouper(LBrace(void)));
+        return mk_res(p, left, @[tokval]Grouper(LBrace));
       } else if ch == '|' {
         return grab_oper2(p, left, ch, '=', '|');
       } else if ch == '}' {
         ps_step(p);
-        return mk_res(p, left, @[tokval]Grouper(RBrace(void)));
+        return mk_res(p, left, @[tokval]Grouper(RBrace));
       } else if ch == '~' {
         ps_step(p);
         return mk_res(p, left, Oper(mk_shray(ch)));
       } else {
-        return {{left, ps_pos(p)}, Bad(void)};
+        return {{left, ps_pos(p)}, Bad};
       }
     }
   }
@@ -660,7 +660,7 @@ func string_grab_tok(p *ps, stop i32) tok {
   // TODO: ASCII static assertions.
   // If ch is -1, we return Bad (not Eof).
   if ch < ' ' || ch > '~' {
-    return {{left, left}, Bad(void)};
+    return {{left, left}, Bad};
   }
 
   ps_step(p);
@@ -677,7 +677,7 @@ func string_grab_tok(p *ps, stop i32) tok {
           return {{left, ps_pos(p)}, @[tokval]Grouper(SingleQuote)};
         }
       } else {
-        return {{left, ps_pos(p)}, Bad(void)};
+        return {{left, ps_pos(p)}, Bad};
       }
     }
   }
@@ -703,19 +703,19 @@ func string_grab_tok(p *ps, stop i32) tok {
     ch = ps_peek(p);
     sixteens_value i8;
     if !is_hexdigit(ch, &sixteens_value) {
-      return {{left, ps_pos(p)}, Bad(void)};
+      return {{left, ps_pos(p)}, Bad};
     }
     ps_step(p);
     ch = ps_peek(p);
     units_value i8;
     if !is_hexdigit(ch, &units_value) {
-      return {{left, ps_pos(p)}, Bad(void)};
+      return {{left, ps_pos(p)}, Bad};
     }
     ps_step(p);
 
     combined i32 = 16 * (@[i32]~sixteens_value) + @[i32]~units_value;
     return {{left, ps_pos(p)}, StringChar(combined)};
   } else {
-    return {{left, ps_pos(p)}, Bad(void)};
+    return {{left, ps_pos(p)}, Bad};
   }
 }

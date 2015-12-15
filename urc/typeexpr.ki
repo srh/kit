@@ -145,7 +145,7 @@ func te_puretype_equal(cs *checkstate, a *te_puretype, b *te_puretype) bool {
       }
     }
     case &TePureUnknown: {
-      if case &TePureUnknown(v void) = b {
+      if case &TePureUnknown = b {
         return true;
       }
     }

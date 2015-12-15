@@ -32,7 +32,7 @@ access hash[_, _] {
     check(0 == (new_limit & new_mask));
     check(h->cell_count * 2 < new_limit);
 
-    new_array array[hash_entry[K, V]] = repeat(new_limit, HashEmpty(void));
+    new_array array[hash_entry[K, V]] = repeat(new_limit, HashEmpty);
     old_limit size = count(&h->arr);
     for i size = 0; i < old_limit; i = i + 1 {
       if case &HashValue(p tup[K, V]) = ref(&h->arr, i) {
@@ -120,7 +120,7 @@ access hash[_, _] {
         return false;
       case &HashValue(p tup[K, V]):
         if hash_equal(&p.car, key) {
-          *ref(&h->arr, offset) = HashErased(void);
+          *ref(&h->arr, offset) = HashErased;
           h->user_count = h->user_count - 1;
           return true;
         }
@@ -251,7 +251,7 @@ func[T] sets_union(xs *shray[hash[T, void]], out *hash[T, void]) void {
 func[T] add_union_difference(onto *hash[T, void], a *hash[T, void], b *hash[T, void]) void {
   it hash_iter[T, void] = iter(a);
   while case Has(p *tup[T, void]) = next(&it) {
-    if case None(v void) = lookup_ref(b, &p->car) {
+    if case None = lookup_ref(b, &p->car) {
       discard bool = try_insert(onto, &p->car, void);
     }
   }

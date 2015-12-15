@@ -395,7 +395,7 @@ func linux32_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *ar
   n_symbol_table size = count(&f->symbol_table);
   for i size = 0; i < n_symbol_table; i = i + 1 {
     rec *objfile_symbol_record = ref(&f->symbol_table, i);
-    if case IsStaticYes(v void) = rec->is_static {
+    if case IsStaticYes = rec->is_static {
       push_symbol(im, rec, &symbols, &strings);
       *ref(&sti_map, i) = symbols_count;
       symbols_count = symbols_count + 1;
@@ -406,7 +406,7 @@ func linux32_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *ar
 
   for i size = 0; i < n_symbol_table; i = i + 1 {
     rec *objfile_symbol_record = ref(&f->symbol_table, i);
-    if case IsStaticNo(v void) = rec->is_static {
+    if case IsStaticNo = rec->is_static {
       push_symbol(im, rec, &symbols, &strings);
       *ref(&sti_map, i) = symbols_count;
       symbols_count = symbols_count + 1;
@@ -440,12 +440,12 @@ func push_symbol(im *identmap, symbol *objfile_symbol_record, symbols *array[u8]
   // TODO: (Also in s1:) It's OK to just use zero for everything?
   ent.st_size = ~ @[u32] 0;
   st_info u8;
-  if case IsFunctionYes(v void) = symbol->is_function {
+  if case IsFunctionYes = symbol->is_function {
     st_info = ~kSTT_FUNC;
   } else {
     st_info = ~kSTT_OBJECT;
   }
-  if case IsStaticYes(v void) = symbol->is_static {
+  if case IsStaticYes = symbol->is_static {
     st_info = st_info | ~(kSTB_LOCAL << 4);
   } else {
     st_info = st_info | ~(kSTB_GLOBAL << 4);

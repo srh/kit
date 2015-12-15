@@ -111,7 +111,7 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
           case Win32:
             name = _s("_") + name;
           }
-          discard sti = add_local_symbol(f, intern(cs->im, name), body_text_offset, SectionText(void), IsStaticNo(void));
+          discard sti = add_local_symbol(f, intern(cs->im, name), body_text_offset, SectionText, IsStaticNo);
         } else {
           ice(_u8("add_export_symbols sees unevaled inst"));
         }
@@ -127,7 +127,7 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
 func def_is_export(ent *def_entry) bool {
   if case &DefnHasRhs(np def_nonprim) = &ent->definition {
     if case &Def(d ast_def) = np.tl {
-      if case IsExport(v void) = d.is_export {
+      if case IsExport = d.is_export {
         return true;
       }
     }
@@ -158,11 +158,11 @@ func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) void {
     arg_types shray[cu_typeexpr] = argcell_types(cs, &g);
     // We do make symbol names for prim fn bodies, but maybe we won't actually generate them.
     name sym = generate_kit_name(cs, ent->informal_name, arg_types);
-    symbol_table_index sti = add_local_symbol(f, name, 0 /* We'll overwrite the value later. */, SectionText(void), IsStaticNo(void));
+    symbol_table_index sti = add_local_symbol(f, name, 0 /* We'll overwrite the value later. */, SectionText, IsStaticNo);
     annotate(&ent->symbol_table_index, symbol_table_index);
   case &ExternFnBody(e extern_fn_body):
     c_name sym = c_symbol_name(cs, e.name);
-    symbol_table_index sti = add_remote_symbol(f, c_name, IsFunctionYes(void));
+    symbol_table_index sti = add_remote_symbol(f, c_name, IsFunctionYes);
     annotate(&ent->symbol_table_index, symbol_table_index);
   }
 }

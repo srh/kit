@@ -49,7 +49,7 @@ func `==`(x endianness, y endianness) bool { return enumnum(&x) == enumnum(&y); 
 func `!=`(x endianness, y endianness) bool { return enumnum(&x) != enumnum(&y); }
 
 func check_littleendian(plat *platform_info) void {
-  if plat->endian != LittleEndian(void) {
+  if plat->endian != LittleEndian {
     ice(_u8("check_littleendian fail"));
   }
 }

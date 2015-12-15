@@ -17,7 +17,7 @@ enum generics_arity {
 // TODO: The so-called "arity" might need to include information whether it's a lifetime generic or plain generic.
 func arity(a *ast_generics) generics_arity {
   switch a {
-    case &NoGenerics: { return NoParamsArity(void); }
+    case &NoGenerics: { return NoParamsArity; }
     case &HasGenerics(arr array[ast_generik]): {
       return FiniteArity(~count(&arr));
     }

@@ -258,7 +258,7 @@ func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_
 }
 
 func add_def_primitive(cs *checkstate, name sym, type te_typeexpr, op primitive_op) void {
-  add_def_primitive(cs, name, NoGenerics(void), type, op);
+  add_def_primitive(cs, name, NoGenerics, type, op);
 }
 
 func add_op_primitive(cs *checkstate, oper sym, typename sym, arity size, op primitive_op) void {
@@ -272,7 +272,7 @@ func add_comparison_primitive(cs *checkstate, oper sym, generics ast_generics, t
 }
 
 func add_comparison_primitive(cs *checkstate, oper sym, typename sym, op primitive_op) void {
-  add_comparison_primitive(cs, oper, NoGenerics(void), @[te_typeexpr]TeName({typename, None}), op);
+  add_comparison_primitive(cs, oper, NoGenerics, @[te_typeexpr]TeName({typename, None}), op);
 }
 
 func add_binop_primitive(cs *checkstate, oper sym, typename sym, op primitive_op) void {
@@ -293,31 +293,31 @@ func mk_op(traits integral_traits, action primitive_comparison_op_action) primit
 
 func add_integral_primitive(cs *checkstate, name sym, traits integral_traits) void {
   add_scalar_primitive(cs, name, traits.flat);
-  add_binop_primitive(cs, intern(cs->im, _s("+")), name, mk_numop(traits, NumAdd(void)));
-  add_binop_primitive(cs, intern(cs->im, _s("-")), name, mk_numop(traits, NumSub(void)));
-  add_binop_primitive(cs, intern(cs->im, _s("*")), name, mk_numop(traits, NumMul(void)));
-  add_binop_primitive(cs, intern(cs->im, _s("/")), name, mk_numop(traits, NumDiv(void)));
-  add_binop_primitive(cs, intern(cs->im, _s("%")), name, mk_numop(traits, NumMod(void)));
-  add_binop_primitive(cs, intern(cs->im, _s("&")), name, mk_numop(traits, NumBitAnd(void)));
-  add_binop_primitive(cs, intern(cs->im, _s("|")), name, mk_numop(traits, NumBitOr(void)));
-  add_binop_primitive(cs, intern(cs->im, _s("^")), name, mk_numop(traits, NumBitXor(void)));
-  add_unop_primitive(cs, intern(cs->im, _s("^")), name, mk_numop(traits, NumBitNot(void)));
-  add_binop_primitive(cs, intern(cs->im, _s("<<")), name, mk_numop(traits, NumShiftLeft(void)));
-  add_binop_primitive(cs, intern(cs->im, _s(">>")), name, mk_numop(traits, NumShiftRight(void)));
-  add_comparison_primitive(cs, intern(cs->im, _s("==")), name, mk_op(traits, CmpEq(void)));
-  add_comparison_primitive(cs, intern(cs->im, _s("!=")), name, mk_op(traits, CmpNe(void)));
-  add_comparison_primitive(cs, intern(cs->im, _s("<")), name, mk_op(traits, CmpLt(void)));
-  add_comparison_primitive(cs, intern(cs->im, _s(">")), name, mk_op(traits, CmpGt(void)));
-  add_comparison_primitive(cs, intern(cs->im, _s("<=")), name, mk_op(traits, CmpLe(void)));
-  add_comparison_primitive(cs, intern(cs->im, _s(">=")), name, mk_op(traits, CmpGe(void)));
+  add_binop_primitive(cs, intern(cs->im, _s("+")), name, mk_numop(traits, NumAdd));
+  add_binop_primitive(cs, intern(cs->im, _s("-")), name, mk_numop(traits, NumSub));
+  add_binop_primitive(cs, intern(cs->im, _s("*")), name, mk_numop(traits, NumMul));
+  add_binop_primitive(cs, intern(cs->im, _s("/")), name, mk_numop(traits, NumDiv));
+  add_binop_primitive(cs, intern(cs->im, _s("%")), name, mk_numop(traits, NumMod));
+  add_binop_primitive(cs, intern(cs->im, _s("&")), name, mk_numop(traits, NumBitAnd));
+  add_binop_primitive(cs, intern(cs->im, _s("|")), name, mk_numop(traits, NumBitOr));
+  add_binop_primitive(cs, intern(cs->im, _s("^")), name, mk_numop(traits, NumBitXor));
+  add_unop_primitive(cs, intern(cs->im, _s("^")), name, mk_numop(traits, NumBitNot));
+  add_binop_primitive(cs, intern(cs->im, _s("<<")), name, mk_numop(traits, NumShiftLeft));
+  add_binop_primitive(cs, intern(cs->im, _s(">>")), name, mk_numop(traits, NumShiftRight));
+  add_comparison_primitive(cs, intern(cs->im, _s("==")), name, mk_op(traits, CmpEq));
+  add_comparison_primitive(cs, intern(cs->im, _s("!=")), name, mk_op(traits, CmpNe));
+  add_comparison_primitive(cs, intern(cs->im, _s("<")), name, mk_op(traits, CmpLt));
+  add_comparison_primitive(cs, intern(cs->im, _s(">")), name, mk_op(traits, CmpGt));
+  add_comparison_primitive(cs, intern(cs->im, _s("<=")), name, mk_op(traits, CmpLe));
+  add_comparison_primitive(cs, intern(cs->im, _s(">=")), name, mk_op(traits, CmpGe));
 
   switch traits.numeric.repr {
   case Unsigned:
     if !traits.numeric.trap_overflow {
-      add_unop_primitive(cs, intern(cs->im, _s("-")), name, mk_numop(traits, NumNegate(void)));
+      add_unop_primitive(cs, intern(cs->im, _s("-")), name, mk_numop(traits, NumNegate));
     }
   case SignedTwos:
-    add_unop_primitive(cs, intern(cs->im, _s("-")), name, mk_numop(traits, NumNegate(void)));
+    add_unop_primitive(cs, intern(cs->im, _s("-")), name, mk_numop(traits, NumNegate));
   }
 }
 
@@ -327,11 +327,11 @@ func add_void_primitive(cs *checkstate) void {
 
 func add_bool_primitive(cs *checkstate) void {
   add_scalar_primitive(cs, cs->im->cym.boolsym, cs->plat.booltraits);
-  add_unop_primitive(cs, intern(cs->im, _s("!")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(LogicalNot(void)));
-  add_comparison_primitive(cs, intern(cs->im, _s("==")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolEq(void)));
-  add_comparison_primitive(cs, intern(cs->im, _s("!=")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolNe(void)));
-  add_binop_primitive(cs, intern(cs->im, _s("&")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolBitAnd(void)));
-  add_binop_primitive(cs, intern(cs->im, _s("|")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolBitOr(void)));
+  add_unop_primitive(cs, intern(cs->im, _s("!")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(LogicalNot));
+  add_comparison_primitive(cs, intern(cs->im, _s("==")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolEq));
+  add_comparison_primitive(cs, intern(cs->im, _s("!=")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolNe));
+  add_binop_primitive(cs, intern(cs->im, _s("&")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolBitAnd));
+  add_binop_primitive(cs, intern(cs->im, _s("|")), cs->im->cym.boolsym, @[primitive_op]PrimLogical(BoolBitOr));
 }
 
 func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) void {
@@ -340,11 +340,11 @@ func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
     @[type_properties]{
       flat_traits.size,
       flat_traits.alignment,
-      DerivedMethodTrivial(void),
-      DerivedMethodTrivial(void),
-      DerivedMethodTrivial(void),
-      DerivedMethodTrivial(void),
-      IsScalarYes(void)
+      DerivedMethodTrivial,
+      DerivedMethodTrivial,
+      DerivedMethodTrivial,
+      DerivedMethodTrivial,
+      IsScalarYes
     }
   };
   instparms idy_genparms = blank_idyparms();
@@ -399,13 +399,13 @@ func add_pointer_primitive(cs *checkstate) void {
   add_pointer_primitive_type(cs);
   tee_type te_typeexpr = TeName({cs->im->cym.tee_sym, None});
   bool_type te_typeexpr = primitive_bool_type(cs);
-  ent def_entry_id = add_comparison_primitive(cs, intern(cs->im, _s("==")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpEq(void)}));
+  ent def_entry_id = add_comparison_primitive(cs, intern(cs->im, _s("==")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpEq}));
   set(&cs->prims.ptr_eq, ent);
-  add_comparison_primitive(cs, intern(cs->im, _s("!=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpNe(void)}));
-  add_comparison_primitive(cs, intern(cs->im, _s("<")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpLt(void)}));
-  add_comparison_primitive(cs, intern(cs->im, _s(">")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpGt(void)}));
-  add_comparison_primitive(cs, intern(cs->im, _s("<=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpLe(void)}));
-  add_comparison_primitive(cs, intern(cs->im, _s(">=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpGe(void)}));
+  add_comparison_primitive(cs, intern(cs->im, _s("!=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpNe}));
+  add_comparison_primitive(cs, intern(cs->im, _s("<")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpLt}));
+  add_comparison_primitive(cs, intern(cs->im, _s(">")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpGt}));
+  add_comparison_primitive(cs, intern(cs->im, _s("<=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpLe}));
+  add_comparison_primitive(cs, intern(cs->im, _s(">=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpGe}));
 }
 
 func add_pointer_primitive_type(cs *checkstate) void {
@@ -421,11 +421,11 @@ func add_pointer_primitive_type(cs *checkstate) void {
          @[type_properties]{
            cs->plat.ptrtraits.size,
            cs->plat.ptrtraits.alignment,
-           DerivedMethodTrivial(void),
-           DerivedMethodTrivial(void),
-           DerivedMethodTrivial(void),
-           DerivedMethodTrivial(void),
-           IsScalarYes(void)
+           DerivedMethodTrivial,
+           DerivedMethodTrivial,
+           DerivedMethodTrivial,
+           DerivedMethodTrivial,
+           IsScalarYes
          }}),
     mk_hash@[idy_genparms, deftype_inst_id]()
   };
@@ -470,11 +470,11 @@ func add_function_primitive(cs *checkstate) void {
          @[type_properties]{
            cs->plat.fntraits.size,
            cs->plat.fntraits.alignment,
-           DerivedMethodTrivial(void),
-           DerivedMethodTrivial(void),
-           DerivedMethodTrivial(void),
-           DerivedMethodTrivial(void),
-           IsScalarYes(void)
+           DerivedMethodTrivial,
+           DerivedMethodTrivial,
+           DerivedMethodTrivial,
+           DerivedMethodTrivial,
+           IsScalarYes
          }}),
     mk_hash@[idy_genparms, deftype_inst_id]()
   };
@@ -498,19 +498,19 @@ func add_magic_constructor_primitive(cs *checkstate, name sym, args size, mag de
 
 func add_magic_constructor_primitives(cs *checkstate) void {
   teetype te_typeexpr = TeName({cs->im->cym.tee_sym, None});
-  add_non_magic_fn_primitive(cs, cs->im->cym.init, 1, @[def_non_magic]NonMagicCtor({CtorInit(void), {teetype, NotComputed@[non_magic_ctor_info]()}}));
-  add_non_magic_fn_primitive(cs, cs->im->cym.copy, 2, @[def_non_magic]NonMagicCtor({CtorCopy(void), {teetype, NotComputed@[non_magic_ctor_info]()}}));
-  add_non_magic_fn_primitive(cs, cs->im->cym.move, 2, @[def_non_magic]NonMagicCtor({CtorMove(void), {teetype, NotComputed@[non_magic_ctor_info]()}}));
-  add_non_magic_fn_primitive(cs, cs->im->cym.destroy, 1, @[def_non_magic]NonMagicCtor({CtorDestroy(void), {teetype, NotComputed@[non_magic_ctor_info]()}}));
+  add_non_magic_fn_primitive(cs, cs->im->cym.init, 1, @[def_non_magic]NonMagicCtor({CtorInit, {teetype, NotComputed@[non_magic_ctor_info]()}}));
+  add_non_magic_fn_primitive(cs, cs->im->cym.copy, 2, @[def_non_magic]NonMagicCtor({CtorCopy, {teetype, NotComputed@[non_magic_ctor_info]()}}));
+  add_non_magic_fn_primitive(cs, cs->im->cym.move, 2, @[def_non_magic]NonMagicCtor({CtorMove, {teetype, NotComputed@[non_magic_ctor_info]()}}));
+  add_non_magic_fn_primitive(cs, cs->im->cym.destroy, 1, @[def_non_magic]NonMagicCtor({CtorDestroy, {teetype, NotComputed@[non_magic_ctor_info]()}}));
 
-  add_def_primitive(cs, cs->im->cym.sizeofsym, tee_generic(cs), primitive_size_type(cs), @[def_definition]DefnNonMagic(@[def_non_magic]NonMagicProp({PropSizeof(void), teetype, NotComputed@[u32]()})));
-  add_def_primitive(cs, cs->im->cym.alignofsym, tee_generic(cs), primitive_size_type(cs), @[def_definition]DefnNonMagic(@[def_non_magic]NonMagicProp({PropAlignof(void), teetype, NotComputed@[u32]()})));
+  add_def_primitive(cs, cs->im->cym.sizeofsym, tee_generic(cs), primitive_size_type(cs), @[def_definition]DefnNonMagic(@[def_non_magic]NonMagicProp({PropSizeof, teetype, NotComputed@[u32]()})));
+  add_def_primitive(cs, cs->im->cym.alignofsym, tee_generic(cs), primitive_size_type(cs), @[def_definition]DefnNonMagic(@[def_non_magic]NonMagicProp({PropAlignof, teetype, NotComputed@[u32]()})));
 
   add_magic_constructor_primitive(cs, cs->im->cym.magic_bzero, 1, @[def_magic]MagicBzero({NotComputed@[u32]()}));
   add_magic_constructor_primitive(cs, cs->im->cym.magic_memcopy, 2, @[def_magic]MagicMemcopy({NotComputed@[u32]()}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_nopdestroy, 1, @[def_magic]MagicNopdestroy(void));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_init, 1, @[def_magic]MagicCtor({CtorInit(void), {teetype, NotComputed@[magic_ctor_info]()}}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_copy, 2, @[def_magic]MagicCtor({CtorCopy(void), {teetype, NotComputed@[magic_ctor_info]()}}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_move, 2, @[def_magic]MagicCtor({CtorMove(void), {teetype, NotComputed@[magic_ctor_info]()}}));
-  add_magic_constructor_primitive(cs, cs->im->cym.magic_destroy, 1, @[def_magic]MagicCtor({CtorDestroy(void), {teetype, NotComputed@[magic_ctor_info]()}}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_nopdestroy, 1, @[def_magic]MagicNopdestroy);
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_init, 1, @[def_magic]MagicCtor({CtorInit, {teetype, NotComputed@[magic_ctor_info]()}}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_copy, 2, @[def_magic]MagicCtor({CtorCopy, {teetype, NotComputed@[magic_ctor_info]()}}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_move, 2, @[def_magic]MagicCtor({CtorMove, {teetype, NotComputed@[magic_ctor_info]()}}));
+  add_magic_constructor_primitive(cs, cs->im->cym.magic_destroy, 1, @[def_magic]MagicCtor({CtorDestroy, {teetype, NotComputed@[magic_ctor_info]()}}));
 }
