@@ -145,7 +145,7 @@ func `==`(a section, b section) bool {
 
 func add_local_symbol(f *objfile, name sym, value u32, section section, is_static is_static) sti {
   is_function is_function;
-  if case SectionText(v void) = section {
+  if case SectionText = section {
     is_function = IsFunctionYes;
   } else {
     is_function = IsFunctionNo;

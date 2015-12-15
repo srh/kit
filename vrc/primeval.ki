@@ -269,7 +269,7 @@ func st_num_rangechecked_output(clq *clqueue, env *st_env, retvalref st_obj_ref,
 
 func st_num_rangechecked_output(clq *clqueue, env *st_env, retvalref st_obj_ref, num bigint, op_size u32, op_numtraits *numeric_traits, nevertrap never_trap) np {
   if num < op_numtraits->minval || num > op_numtraits->maxval {
-    if case NeverTrapNo(v void) = nevertrap {
+    if case NeverTrapNo = nevertrap {
       if op_numtraits->trap_overflow {
         return ERR(_u8("Result out of range."));
       }

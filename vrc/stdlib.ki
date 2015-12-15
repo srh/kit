@@ -176,7 +176,7 @@ func[T] isHas(x opt[T]) bool {
 }
 
 func[T] isNone(p *opt[T]) bool {
-  if case &None(v void) = p {
+  if case &None = p {
     return true;
   }
   return false;
@@ -216,7 +216,7 @@ func[T] set(dest *opt[T], y T) void {
 }
 
 func[T] unSet(dest *opt[T]) void {
-  if case &None(v void) = dest {
+  if case &None = dest {
     crash(_u8("unset sees None"));
   }
   *dest = None;
@@ -391,16 +391,3 @@ func[T] move(x *T) T {
   init(x);
   return ret;
 }
-
-inline func[T] `++`(x *T) void { *x = *x + 1; }
-inline func[T] `--`(x *T) void { *x = *x - 1; }
-inline func[T] `+=`(x *T, y T) void { *x = *x + y; }
-inline func[T] `-=`(x *T, y T) void { *x = *x - y; }
-inline func[T] `*=`(x *T, y T) void { *x = *x * y; }
-inline func[T] `/=`(x *T, y T) void { *x = *x / y; }
-inline func[T] `%=`(x *T, y T) void { *x = *x % y; }
-inline func[T] `>>=`(x *T, y T) void { *x = *x >> y; }
-inline func[T] `<<=`(x *T, y T) void { *x = *x << y; }
-inline func[T] `&=`(x *T, y T) void { *x = *x & y; }
-inline func[T] `|=`(x *T, y T) void { *x = *x | y; }
-inline func[T] `^=`(x *T, y T) void { *x = *x ^ y; }

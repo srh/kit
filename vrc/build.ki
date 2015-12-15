@@ -127,7 +127,7 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
 func def_is_export(ent *def_entry) bool {
   if case &DefnHasRhs(np def_nonprim) = &ent->definition {
     if case &Def(d ast_def) = np.tl {
-      if case IsExport(v void) = d.is_export {
+      if case IsExport = d.is_export {
         return true;
       }
     }

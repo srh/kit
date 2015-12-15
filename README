@@ -2,55 +2,17 @@
 
 Current status:  "This is a test!  Ignore!!!"
 
-TEMPORARY BUILD INSTRUCTIONS:
-
-0. Works on Windows, or i386 Linux or i386 FreeBSD.  Install
-gcc-multilib if on amd64 Linux.  I know nothing about amd64 FreeBSD.
-
-1. Open a VS command prompt (or a command prompt, on Linux or FreeBSD).
-
-2. Do this:
-
-  windows_build.bat     (or ./linux_build.sh)        (or ./clang_build.sh)
-  windows_build_s2.bat  (or ./linux_build_s2.sh)     (or ./clang_build_s2.sh)
-  cd vrc
-  ../s2 main            (or ../s2 --linux main, even on FreeBSD)
-  cl main.obj dummy.c   (or gcc -m32 main.o dummy.c) (or clang -m32 main.o dummy.c)
-
-3. This puts an executable in vrc\main (or vrc/a.out)
-
-4. Run tests:
-
-  main --build  (or ./a.out --build)
-
-5. Try compiling s4 with s3.
-
-  cd ..\src  (or cd ../src)
-  ..\vrc\main main  (or ../vrc/a.out --linux main)
-  cl main.obj dummy.c
-
-5. The actively developed code ("s3") is in ./vrc.  It can't
-   compile itself right now, so the instructions below stop working
-   at windows_build_s3.  The code in ./src is an old version of s3
-   that's kept up to date so that it can be compiled by s3.
-
-
-
-
-Definitions:
-   s1: A compiler, written in C.  It can compile s3.  Located in trc/.
-   s2: A compiler, written in proto-Kit-v0.00.2A.x.  It can
-       compile itself and s3.  Located in urc/.
-   s3: A compiler, written in proto-Kit-v0.00.2B.x.  It can
-       compile s4.  (Maybe it can't compile itself.)  Located in vrc/.
-   s4: A compiler, to be written in proto-Kit-v0.00.2C.x.
-
-   s2-by-s1: s2, as compiled by s1.
-   s2-self: s2, as compiled by s2.
-   sX-by-sY: (for any X and Y) sX, as compiled by sY.
-   sX-self: (for any X) sX, as compiled by sX.
-
   BUILD INSTRUCTIONS
+
+   ./linux_build.sh; ./linux_build_s2.sh; ./linux_build_s3.sh
+
+or
+
+   windows_build.bat
+   windows_build_s2.bat
+   windows_build_s3.bat
+
+Again:
 
 # Prerequisites: An x86 CPU.  Windows or Linux.  On Windows, MSVC
 # 2013 or 2015 (something with basic C99 support) -- for example,
@@ -59,20 +21,28 @@ Definitions:
 # gcc-multilib package.  Maybe clang works too.
 
 # Step 1. Build s1 -- creates executable "out.exe" (or "out")
+
    windows_build.bat  (or ./linux_build.sh)
+
 # Step 2. Build s2 -- creates executable "s2.exe" (or "s2")
+
    windows_build_s2.bat  (or ./linux_build_s2.sh)
+
 # Step 3. Build s3
+
    windows_build_s3.bat
-# Step 4. Build s4
-   windows_build_s4.bat
+
 # Step 5. Run parsing/typechecking+codegen tests.
-   s4 --build  (or ./s4 --build)
-# Step 6. If you wish, run s4-self on itself
-   cd src
+
+   s3 --build  (or ./s3 --build)
+
+# Step 6. If you wish, run s3-self on itself
+
+   cd vrc
    move main.obj old_main.obj
-   ..\s4 main
+   ..\s3 main
    sha1sum old_main.obj main.obj
+
 # The sha1sums should match.
 
   DIRECTORY STRUCTURE
@@ -81,8 +51,7 @@ The current directory structure is:
 
    trc - s1, implemented in C.  Compiles s2.
    urc - s2, implemented in proto-Kit.  Compiles s2 and s3.
-   vrc - s3, implemented in proto-Kit.  Compiles s4 (and s3?).
-   src - s4, implemented in proto-Kit.  Compiles itself?
+   vrc - s3, implemented in proto-Kit.  Compiles s3.
    examples - examples to run, disorganized junk
 
   COMMAND USAGE
@@ -95,7 +64,6 @@ The current directory structure is:
    s2 --build    # runs parsing/typechecking tests with codegen.
    s2 <modulename>  # builds <modulename>.ki and its imports.
    s3 ...    # same as s2.
-   s4 ...    # same as s3.
 
   PROJECT TIMELINE
 
@@ -152,7 +120,6 @@ types, no implicit conversions."  s2's, v0.00.2B.x, is very similar
 to s1's, but with some basic convenience enhancements that should
 be easy to backport to s1 -- the differences are described in
 FEATURES.  s3 defines a language with ever-more-advanced features.
-s4 uses (or will use) those features.
 
 Right now, s1 can compile s2, and it can almost compile s3.  In the
 long run, as soon as s4 is the actively developed version, s2 will

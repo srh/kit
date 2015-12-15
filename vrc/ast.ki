@@ -158,17 +158,6 @@ struct ast_lifetime {
   name ast_ident;
 };
 
-struct ast_trans {
-  before array[ast_statedesc];
-  after array[ast_statedesc];
-};
-
-struct ast_statedesc {
-  lifetime ast_lifetime;
-  // Parsing doesn't check that this is "active" or "inactive".
-  active ast_ident;
-};
-
 struct ast_unknown {
 };
 
@@ -178,12 +167,7 @@ enum ast_typeexpr {
   Union ast_union;
   Arraytype ast_arraytype;
   Lifetime ast_lifetime;
-  Trans ast_trans;
   Unknown ast_unknown;
-};
-
-struct ast_vardecl_info {
-  vn var_number;
 };
 
 struct ast_vardecl {
@@ -197,7 +181,6 @@ struct ast_bracebody_info {
 
 struct ast_bracebody {
   info nc[ast_bracebody_info];
-  walk_marking ast_walk_marking;
   statements array[ast_statement];
 };
 
@@ -256,15 +239,14 @@ struct ast_ifthenelse_statement {
 };
 
 struct ast_while_statement {
-  walk_marking ast_walk_marking;
-  // Records walkstate before evaluating the condition.  The target walkstate of continue.
-  pre_condition_wrec nc[ast_walkstate_recording];
-  // Records walkstate after evaluating the condition_discard_exit.  The target walkstate of break.
-  post_exit_wrec nc[ast_walkstate_recording];
   condition_discard_continue ast_condition_discard_info;
   condition_discard_exit ast_condition_discard_info;
   condition ast_condition;
   body ast_bracebody;
+};
+
+struct ast_for_statement_info {
+  initter_destructions array[var_destruction];
 };
 
 struct ast_expr_condition {
@@ -272,22 +254,10 @@ struct ast_expr_condition {
   expr box[ast_expr_consume];
 };
 
-struct ast_for_statement_info {
-  initter_destructions array[var_destruction];
-  // After the initter, before the condition.
-  pre_condition_wrec ast_walkstate_recording;
-  // After the body, after condition discard (which is before the body, right now), before the increment.  The target of continue.
-  pre_increment_wrec ast_walkstate_recording;
-  // After the condition, after destructing the initter.  The target of break.
-  post_exit_wrec ast_walkstate_recording;
-};
-
-// TODO(): Rename initter_destructions to initializer_destructions, or vice versa.
 struct ast_for_statement {
-  info nc[ast_for_statement_info];
   // Can only be an ast_expr or ast_statement_var.
+  info nc[ast_for_statement_info];
   initializer opt[box[ast_statement]];
-  walk_marking ast_walk_marking;
   condition opt[ast_expr_condition];
   increment opt[box[ast_expr_discard]];
   body ast_bracebody;
@@ -306,9 +276,9 @@ struct ast_return_statement_info {
 };
 
 struct ast_return_statement {
+  info nc[ast_return_statement_info];
   // If no expr, it returns void.
   expr opt[box[ast_expr_consume]];
-  info nc[ast_return_statement_info];
 };
 
 struct ast_break_statement_info {
@@ -333,8 +303,6 @@ def `==` fn[label_num, label_num, bool] = wrapequate;
 
 struct ast_label_statement_info {
   label_number label_num;
-  // NOTE(): Should we store this here, or with the label_info?  Who cares?
-  wrec ast_walkstate_recording;
 };
 
 struct ast_label_statement {
@@ -351,40 +319,6 @@ struct ast_goto_statement_info {
 struct ast_goto_statement {
   info nc[ast_goto_statement_info];
   target ast_ident;
-};
-
-struct ast_walk_marking_number {
-  x size;
-};
-
-struct ast_walk_marking_connection {
-  // What is my number?  Can never be zero.
-  number ast_walk_marking_number;
-  // What is my parent's number?  0 means there is no parent.
-  parent ast_walk_marking_number;
-};
-
-struct ast_walk_marking {
-  // True while we are in the middle of "walk"ing a subtree.
-  walking bool;
-  // True if a cycle-back to a location within this subtree was requested, _and_ no lower subtree has walking=true, cycle_back=true.  (I.e. we only mark the cycle_back field of the deepest node that we're walking, and its descendents.  We mark its descendents so that we can more efficiently cycle back (without marking everything).
-  cycle_back bool;
-
-  conn nc[ast_walk_marking_connection];
-};
-
-func mk_walk_marking() ast_walk_marking {
-  return {false, false, NotComputed};
-}
-
-// The fields of type nc[ast_walkstate_recording] (or in some other nc) get initialized in checking (when the parents get connected).
-struct ast_walkstate_recording {
-  // What walk marking's aegis are we under?
-  parent ast_walk_marking_number;
-  // The conjoined walkstate marking.
-  unified_desc opt[walkdesc];
-  // Are we dirty?  (Do we need to walk forward from this recording?)
-  dirty bool;
 };
 
 struct ast_statement {
@@ -410,7 +344,7 @@ enum ast_statement_enum {
 struct ast_cp_info {
   ovn opt[var_number];
   tag_value enum_tag_value;
-  // enum_field_offset(cs, et, tag_value) -- annotated here because getting an enumspec in graph.ki is needlessly annoying.  (TODO: Outdated comment?  It's not annoying and we should compute it later?)
+  // enum_field_offset(cs, et, tag_value) -- annotated here because getting a te_enum in graph.ki is needlessly annoying.
   field_offset u32;
 };
 
@@ -445,9 +379,6 @@ struct ast_fullbody_info {
 
   return_cell cell_num;
   arg_cells array[cell_num];
-
-  // This gets set to non-None as soon as we walk a return statement (or walk off the end of the fullbody's bracebody).
-  post_return_unified_desc opt[walkdesc];
 };
 
 struct ast_fullbody {
@@ -455,17 +386,11 @@ struct ast_fullbody {
   bb ast_bracebody;
 };
 
-struct ast_lambda_arg {
-  vn nc[var_number];
-  decl ast_vardecl;
-};
-
 struct ast_lambda {
   // TODO: We put is_inline here mainly for convenience of implementation (in gr_lambda_expr), it is unprincipled in the long run (I think?).
   is_inline ast_isinline;
-  args array[ast_lambda_arg];
+  args array[ast_vardecl];
   return_type ast_typeexpr;
-  trans opt[ast_trans];
   body ast_fullbody;
 };
 
@@ -527,7 +452,7 @@ struct enum_constructor_info {
 struct enum_voidconstructed_info {
   constructor_tag enum_tag_value;
   // The structural rhs type of the enum being constructed.
-  et enumspec;
+  et te_enum;
 };
 
 enum ast_name_expr_info {
@@ -604,13 +529,8 @@ struct rval_description {
   // The cell number of the temporary that this rval is _part of_.
   whole_num cell_num;
 
-  // TODO: As with lval_description, maybe this field should be a te_lifetime or cu_typeexpr.
-  whole_lifetime te_typeexpr;
-
   // The cell number of the field (a virtual cell if different from num).
   partial_num cell_num;
-
-  partial_lifetime te_typeexpr;
 };
 
 // Tells whether the rval would need to get copied out of the temporary, or whether the rval _is_ the whole temporary and can get moved.
@@ -632,7 +552,6 @@ struct lval_description {
   // TODO: Maybe deadme could be obviated by the lifetime field.
   // TODO: Maybe this field should be a te_lifetime.
   // TODO: Maybe this field should be a cu_typeexpr.
-  // TODO(): This field is garbage.  When we deref a pointer, the specific lifetime is not a static function of the AST.
   lifetime te_typeexpr;
 };
 
@@ -640,6 +559,10 @@ enum is_lval {
   IsLvalNo rval_description;
   IsLvalYes lval_description;
 };
+
+inline func wholeRval(num cell_num) is_lval {
+  return IsLvalNo({num, num});
+}
 
 // Where the value of the expr is, _before_ after actions are run.
 func value_cell(x *is_lval) cell_num {
@@ -816,45 +739,44 @@ func mk(m ast_meta, x ast_expr_enum) ast_expr {
 }
 
 struct ast_expr_consume {
-  expr ast_expr;
   after nc[ast_expr_after_consume];
+  expr ast_expr;
 };
 
 // TODO: Remove once we can costlessly pass by value.
 func consume(expr *ast_expr) ast_expr_consume {
-  return {*expr, NotComputed};
+  return {NotComputed, *expr};
 }
 
 func consume(expr ast_expr) ast_expr_consume {
-  return {expr, NotComputed};
+  return {NotComputed, expr};
 }
 
 struct ast_expr_discard {
-  expr ast_expr;
   after nc[ast_expr_after_discard];
+  expr ast_expr;
 };
 
 // TODO: Remove once we can costlessly pass by value.
 func discard(expr *ast_expr) ast_expr_discard {
-  return {*expr, NotComputed};
+  return {NotComputed, *expr};
 }
 
 func discard(expr ast_expr) ast_expr_discard {
-  return {expr, NotComputed};
+  return {NotComputed, expr};
 }
 
-// TODO: I think we're underchecking the arity of app types, be it for variadic or non-variadic generics.
+// Variadic generics doesn't support lifetime generics (for no particular reason, other than that we have no need for it) yet.  NOTE: type_from_inst assumes the fact that this doesn't support lifetime generics.
 struct ast_variadic_generics {
-  before array[ast_generik];
+  before array[ast_ident];
   variadic_name ast_ident;
-  after array[ast_generik];
+  after array[ast_ident];
 };
 
 // This is named with a k to prevent typos with ast_generics.
 enum ast_generik {
   PlainGeneric ast_ident;
   LifetimeGeneric ast_ident;
-  TransGeneric ast_ident;
 };
 
 enum ast_generics {

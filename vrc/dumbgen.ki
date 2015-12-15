@@ -184,7 +184,7 @@ enum tmp_offsets_val {
 };
 
 func set(dest *tmp_offsets_val, c cell_loc) void {
-  if case &Nope(v void) = dest {
+  if case &Nope = dest {
     *dest = Has(c);
   } else {
     ice(_u8("set(*tmp_offsets_val, cell_loc) sees non-Nope"));
@@ -192,7 +192,7 @@ func set(dest *tmp_offsets_val, c cell_loc) void {
 }
 
 func isNope(p *tmp_offsets_val) bool {
-  if case &Nope(v void) = p {
+  if case &Nope = p {
     return true;
   } else {
     return false;
@@ -473,7 +473,7 @@ func st_def_to_fnid(cs *checkstate, ip instpair) opt[fn_body_id] {
 func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *type_properties) bool {
   switch plat->opsys {
   case Linux32:
-    if case IsScalarNo(v2 void) = props->is_scalar {
+    if case IsScalarNo = props->is_scalar {
       return true;
     } else {
       return false;
@@ -481,7 +481,7 @@ func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *typ
   case Win32:
     n u32 = props->flat_size;
     if n <= 2 || n == 4 || n == 8 {
-      if case &DerivedMethodTrivial(v2 void) = &props->move_behavior {
+      if case &DerivedMethodTrivial = &props->move_behavior {
         return false;
       } else {
         return true;

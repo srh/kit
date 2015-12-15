@@ -251,7 +251,7 @@ func[T] sets_union(xs *shray[hash[T, void]], out *hash[T, void]) void {
 func[T] add_union_difference(onto *hash[T, void], a *hash[T, void], b *hash[T, void]) void {
   it hash_iter[T, void] = iter(a);
   while case Has(p *tup[T, void]) = next(&it) {
-    if case None(v void) = lookup_ref(b, &p->car) {
+    if case None = lookup_ref(b, &p->car) {
       discard bool = try_insert(onto, &p->car, void);
     }
   }

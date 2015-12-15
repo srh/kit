@@ -6,7 +6,7 @@ enum[T] nbfc {
 };
 
 func[T] isBeganComputing(x *nbfc[T]) bool {
-  if case &BeganComputing(v void) = x {
+  if case &BeganComputing = x {
     return true;
   } else {
     return false;

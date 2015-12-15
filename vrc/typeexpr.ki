@@ -7,6 +7,12 @@ struct cu_typeexpr { x te_typeexpr; };
 
 def `~` fn[te_typeexpr, cu_typeexpr] = wrapconvert;
 
+// A "check and computed" typeexpr -- if it's not complete, it should not be converted to a cu_typeexpr.
+struct cac_typeexpr {
+  complete bool;
+  te te_typeexpr;
+};
+
 // This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics replaced consistently.
 enum te_typeexpr {
   TeName te_name;
@@ -14,10 +20,7 @@ enum te_typeexpr {
   TeUnion te_union;
   TeArraytype te_arraytype;
   TeLifetime te_lifetime;
-  TeTrans te_trans;
   TeUnknown void;
-  // Only used in unify_under_generics.  Ignored elsewhere.  Use of this is solely in unify_under_generics and finish_passed_up, and it's OK to omit this case entirely from other switch statements.
-  TePassedUp size;
 };
 
 enum te_puretype {
@@ -43,6 +46,14 @@ struct te_typeapp {
   pack opt[te_instpack];
 };
 
+struct te_struct {
+  fields shray[te_vardecl];
+};
+
+struct te_enum {
+  constructors shray[te_vardecl];
+};
+
 struct te_union {
   fields shray[te_vardecl];
 };
@@ -56,40 +67,6 @@ struct te_arraytype {
 struct te_lifetime {
   name sym;
 };
-
-struct te_trans {
-  // Order doesn't matter -- this defines an unordered set (or bag?).
-  before shray[te_statedesc];
-  after shray[te_statedesc];
-};
-
-enum te_activedesc {
-  Active void;
-  Inactive void;
-};
-
-func `==`(x te_activedesc, y te_activedesc) bool {
-  return enumnum(&x) == enumnum(&y);
-}
-inline func `!=`(x te_activedesc, y te_activedesc) bool {
-  return !(x == y);
-}
-func `<`(x te_activedesc, y te_activedesc) bool {
-  return enumnum(&x) < enumnum(&y);
-}
-inline func activedesc_hash(a *te_activedesc) osize {
-  return +enumnum(a);
-}
-
-struct te_statedesc {
-  // (Should this be a te_lifetime?)
-  lifetime te_lifetime;
-  active te_activedesc;
-};
-
-func `<`(x te_statedesc, y te_statedesc) bool {
-  return x.lifetime.name.x < y.lifetime.name.x || (x.lifetime.name == y.lifetime.name && x.active < y.active);
-}
 
 struct te_vardecl {
   name sym;
@@ -152,10 +129,6 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
       if case &TeLifetime(bx te_lifetime) = b {
         return ax.name == bx.name;
       }
-    case &TeTrans(ax te_trans):
-      if case &TeTrans(bx te_trans) = b {
-        return trans_equal(&ax, &bx);
-      }
     case &TeUnknown: {
       ice(_u8("idy_typeexpr_equal sees TeUnknown"));
     }
@@ -172,7 +145,7 @@ func te_puretype_equal(cs *checkstate, a *te_puretype, b *te_puretype) bool {
       }
     }
     case &TePureUnknown: {
-      if case &TePureUnknown(v void) = b {
+      if case &TePureUnknown = b {
         return true;
       }
     }
@@ -197,28 +170,59 @@ func help_te_vardecl_list_equal(a *shray[te_vardecl], b *shray[te_vardecl]) bool
   return true;
 }
 
+func enum_tag_type(cs *checkstate, et *te_enum) te_typeexpr {
+  tagsize u32 = cs->plat.enum_tag_size;
+  if tagsize == 4 {
+    return primitive_u32_type(cs);
+  } else if tagsize == 1 {
+    return primitive_u8_type(cs);
+  } else if tagsize == 2 {
+    return primitive_u16_type(cs);
+  } else {
+    ice(_u8("enum_tag_type does not support enum_tag_size value"));
+    return fake();
+  }
+}
+
+struct enum_tag_value { x u32; };
+def `~` fn[u32, enum_tag_value] = wrapconvert;
+
+func enum_field_offset(cs *checkstate, et *te_enum, tag enum_tag_value) u32 {
+  // Things will get more complicated at some point.
+  return cs->plat.enum_tag_size;
+}
+
+func mk_enum_tag_value(constructor_decl_index size) enum_tag_value {
+  return ~(enum_tag_min + ~constructor_decl_index);
+}
+
+func unmk_enum_tag_value(val enum_tag_value) size {
+  return @[size]~(val.x - enum_tag_min);
+}
+
 func[H] build_u8str(help H, r *array[u8], a *cu_typeexpr) void {
   return build_u8str(help, r, &a->x);
 }
 
 func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
   switch a {
-    case &TeName(b te_name):
+    case &TeName(b te_name): {
       wrap_u8str(help, r, _u8("TeName"), &b);
-    case &TeApp(b te_typeapp):
+    }
+    case &TeApp(b te_typeapp): {
       wrap_u8str(help, r, _u8("TeApp"), &b);
-    case &TeUnion(b te_union):
+    }
+    case &TeUnion(b te_union): {
       wrap_u8str(help, r, _u8("TeUnion"), &b);
-    case &TeArraytype(b te_arraytype):
+    }
+    case &TeArraytype(b te_arraytype): {
       wrap_u8str(help, r, _u8("TeArraytype"), &b);
+    }
     case &TeLifetime(b te_lifetime):
       wrap_u8str(help, r, _u8("TeLifetime"), &b);
-    case &TeTrans(b te_trans):
-      wrap_u8str(help, r, _u8("TeTrans"), &b);
-    case &TeUnknown:
+    case &TeUnknown: {
       append(r, _u8("TeUnknown"));
-    case &TePassedUp(index size):
-      wrap_u8str(help, r, _u8("TePassedUp"), &index);
+    }
   }
 }
 
@@ -233,6 +237,18 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeapp) void {
   build_u8str(help, r, &a->typefunc);
   append(r, _u8(",params:"));
   build_shray_u8str(help, r, &a->params);
+  push(r, '}');
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_struct) void {
+  append(r, _u8("{fields:"));
+  build_shray_u8str(help, r, &a->fields);
+  push(r, '}');
+}
+
+func[H] build_u8str(help H, r *array[u8], a *te_enum) void {
+  append(r, _u8("{constructors:"));
+  build_shray_u8str(help, r, &a->constructors);
   push(r, '}');
 }
 
@@ -252,27 +268,6 @@ func[H] build_u8str(help H, r *array[u8], a *te_arraytype) void {
 
 func[H] build_u8str(help H, r *array[u8], a *te_lifetime) void {
   build_u8str(help, r, &a->name);
-}
-
-func[H] build_u8str(help H, r *array[u8], a *te_trans) void {
-  append(r, _u8("{before:"));
-  build_shray_u8str(help, r, &a->before);
-  append(r, _u8(",after:"));
-  build_shray_u8str(help, r, &a->after);
-  push(r, '}');
-}
-
-func[H] build_u8str(help H, r *array[u8], a *te_statedesc) void {
-  build_u8str(help, r, &a->lifetime);
-  push(r, ' ');
-  build_u8str(help, r, &a->active);
-}
-
-func[H] build_u8str(help H, r *array[u8], a *te_activedesc) void {
-  switch a {
-  case &Active: append(r, _u8("active"));
-  case &Inactive: append(r, _u8("inactive"));
-  }
 }
 
 func[H] build_u8str(help H, r *array[u8], a *te_vardecl) void {
@@ -320,17 +315,11 @@ func help_compute_hash(a *te_typeexpr) osize {
       return (@[osize]~n * 0x3001) + help_compute_hash(oo(&ax.param));
     }
   case &TeLifetime(ax te_lifetime):
-    return lifetime_hash(&ax);
-  case &TeTrans(ax te_trans):
-    return 0x5 ^ trans_hash(&ax);
+    return 0x4 ^ hash_compute_hash(&ax.name);
   case &TeUnknown:
     ice(_u8("help_compute_hash sees TeUnknown"));
   }
   return fake();
-}
-
-inline func lifetime_hash(a *te_lifetime) osize {
-  return 0x4 ^ hash_compute_hash(&a->name);
 }
 
 func help_te_vardecl_list_compute_hash(a *shray[te_vardecl]) osize {
@@ -383,19 +372,14 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
     push(r, ']');
     pretty_u8str(im, r, oo(&b.param));
   case &TeLifetime(b te_lifetime):
-    pretty_u8str(im, r, &b);
-  case &TeTrans(b te_trans):
-    push(r, '{');
-    pretty_u8str_list(im, r, &b.before);
-    append(r, _u8("->"));
-    pretty_u8str_list(im, r, &b.after);
-    push(r, '}');
+    push(r, '\'');
+    build_u8str(im, r, &b.name);
   case &TeUnknown:
     push(r, '_');
   }
 }
 
-func[T] pretty_u8str_list(im *identmap, r *array[u8], a *shray[T]) void {
+func pretty_u8str_list(im *identmap, r *array[u8], a *shray[te_typeexpr]) void {
   n size = count(a);
   for i size = 0; i < n; i = i + 1 {
     if i != 0 {
@@ -403,26 +387,6 @@ func[T] pretty_u8str_list(im *identmap, r *array[u8], a *shray[T]) void {
       push(r, ' ');
     }
     pretty_u8str(im, r, ref(a, i));
-  }
-}
-
-func pretty_u8str(im *identmap, r *array[u8], a *te_statedesc) void {
-  pretty_u8str(im, r, &a->lifetime);
-  push(r, ' ');
-  pretty_u8str(im, r, &a->active);
-}
-
-func pretty_u8str(im *identmap, r *array[u8], a *te_lifetime) void {
-  push(r, '\'');
-  build_u8str(im, r, &a->name);
-}
-
-func pretty_u8str(im *identmap, r *array[u8], a *te_activedesc) void {
-  switch a {
-  case &Active:
-    append(r, _u8("active"));
-  case &Inactive:
-    append(r, _u8("inactive"));
   }
 }
 

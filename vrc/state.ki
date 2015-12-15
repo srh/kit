@@ -9,7 +9,6 @@ import objfile;
 import platform;
 import shp;
 import typeexpr;
-import typespec;
 import u8ast;
 
 struct cs_primitives {
@@ -263,11 +262,11 @@ struct cu_typrop {
 };
 
 struct deftype_inst_rhsstruct_info {
-  rhs_structspec structspec;
+  rhs_structspec te_struct;
 };
 
 struct deftype_inst_rhsenum_info {
-  rhs_enumspec enumspec;
+  rhs_enumspec te_enum;
 };
 
 enum deftype_inst_rhs_info {
@@ -597,6 +596,26 @@ access depth_rewinder {
   }
 }
 
+// TODO: The very concept of this function will soon be (when we have true generic non-instantiated parameters) broken?
+// Update: We only use this function in to_defclass_properties, so the question becomes one of whether its use makes sense for that situation.  It does, because we return a type that references lifetimes that are in fact generic parameters, but it's perfectly normal to do name lookup using types that have generic lifetimes without any sort of scopage information on those lifetimes -- that's just how it's done.
+func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
+  ent *deftype_entry = ref_deftype_entry(cs, ent_id);
+  name sym = ent->name;
+  switch &ent->generics {
+  case &NoGenerics:
+    return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
+  default:
+    parms *idy_genparms = &ref_deftype_inst(cs, inst_id)->parms;
+    converted array[te_typeexpr];
+    n size = count(&parms->repls.tys);
+    reserve(&converted, n);
+    for i size = 0; i < n; i = i + 1 {
+      push(&converted, ref(&parms->repls.tys, i)->x);
+    }
+    return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
+  }
+}
+
 // True if the type is trivial enough to be used in a def.  In other words, it has trivial copy/move/destroy constructors, but initialization could be non-trivial.  (It could default-initialize to a nonzero value.)
 func is_defwise_trivial(props *type_properties) bool {
   return isTrivial(props->move_behavior) && isTrivial(props->copy_behavior) && isTrivial(props->destroy_behavior);
@@ -628,7 +647,7 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
   }
 }
 
-func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *structspec, out *type_properties) np {
+func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *te_struct, out *type_properties) np {
   cs *checkstate = clq->cs;
   it te_typeexpr = inst_type(cs, ent_id, inst_id);
   switch a {
@@ -637,10 +656,9 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       if case Printed(pm) = compute_complete_struct_properties(clq, st, &it, (ComputeMove | ComputeCopy) | ComputeDestroy, &ret) {
         return Printed(pm);
       }
-      type te_typeexpr = inst_type(cs, ent_id, inst_id);
-      ptrtype te_typeexpr = ptr_type(cs, type);
-      // Unknown trans type.
-      fntype1 te_typeexpr = sfn_type(cs, ptrtype, primitive_void_type(cs), TeUnknown);
+      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      ptrtype te_typeexpr = ptr_type(cs, type.x);
+      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
         return Printed(pm);
       }
@@ -652,11 +670,10 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       if case Printed(pm) = compute_complete_struct_properties(clq, st, &it, ComputeMove, &ret) {
         return Printed(pm);
       }
-      type te_typeexpr = inst_type(cs, ent_id, inst_id);
-      ptrtype te_typeexpr = ptr_type(cs, type);
-      // Unknown trans types.
-      fntype1 te_typeexpr = sfn_type(cs, ptrtype, primitive_void_type(cs), TeUnknown);
-      fntype2 te_typeexpr = sfn_type(cs, ptrtype, ptrtype, primitive_void_type(cs), TeUnknown);
+      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      ptrtype te_typeexpr = ptr_type(cs, type.x);
+      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
       if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
         return Printed(pm);
       }
@@ -674,11 +691,10 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       if case Printed(pm) = compute_complete_struct_properties(clq, st, &it, ComputeNone, &ret) {
         return Printed(pm);
       }
-      type te_typeexpr = inst_type(cs, ent_id, inst_id);
-      ptrtype te_typeexpr = ptr_type(cs, type);
-      // Unknown trans types.
-      fntype1 te_typeexpr = sfn_type(cs, ptrtype, primitive_void_type(cs), TeUnknown);
-      fntype2 te_typeexpr = sfn_type(cs, ptrtype, ptrtype, primitive_void_type(cs), TeUnknown);
+      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      ptrtype te_typeexpr = ptr_type(cs, type.x);
+      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
       if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
         return Printed(pm);
       }

@@ -10,14 +10,14 @@ import u8ast;
 struct magic_struct_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
-  st structspec;
+  st te_struct;
   fips array[opt[instpair]];
 };
 
 struct magic_enum_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
-  et enumspec;
+  et te_enum;
   cips array[opt[instpair]];
 };
 
@@ -51,7 +51,7 @@ enum magic_enum_construct_op {
 };
 
 struct magic_enum_construct {
-  et enumspec;
+  et te_enum;
   return_type cu_typeexpr;
   return_type_props type_properties;
   constructor_index size;
@@ -284,9 +284,7 @@ func check_magic_ctor(clq *clqueue, g *ast_generics, parms *idy_repls, wc which_
       annotate(&mc->info, @[magic_ctor_info]MagicArraytypeInfo({~cac.te, cac_props, instpair_from_behavior(select_behavior(wc, &props))}));
     }
     case &TeLifetime(a te_lifetime):
-      return ERR(_u8("ICE: check_magic_ctor te_lifetime."));
-    case &TeTrans(a te_trans):
-      return ERR(_u8("ICE: check_magic_ctor te_trans."));
+      return ERR(_u8("ICE: check_magic_ctor seeing TeLifetime."));
     case &TeUnknown: {
       ice(_u8("check_magic_ctor seeing TeUnknown"));
     }

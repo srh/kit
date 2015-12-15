@@ -427,7 +427,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
             c cell_num = get(&a.params, i);
             param_oref st_obj_ref = cell_obj_ref(env, c, "in II");
             if !is_full_oref(env, param_oref) {
-              ice(_u8("Function parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref_cell(&fg->gr, c)->type), _u8(")"));
+              ice(_u8("Function parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.x)->type), _u8(")"));
             }
             push(&paramorefs, param_oref);
             *ref(&env->framecells, c.x) = None;
@@ -449,7 +449,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
             param_oref st_obj_ref = cell_obj_ref(env, c, "in IIIa");
             if !is_full_oref(env, param_oref) {
               // TODO: Kind of code duplication with GrApply case.
-              ice(_u8("Primitive op parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref_cell(&fg->gr, c)->type), _u8(")"));
+              ice(_u8("Primitive op parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.x)->type), _u8(")"));
             }
             push(&paramorefs, param_oref);
             *ref(&env->framecells, c.x) = None;

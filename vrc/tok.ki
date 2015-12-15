@@ -121,7 +121,6 @@ enum keyw {
   Var void;
   Void void;
   While void;
-  With void;
 };
 
 enum numlit {
@@ -395,8 +394,7 @@ func grab_tok(p *ps) tok {
              || grab_keyword(p, "union", Union, &ret)
              || grab_keyword(p, "var", Var, &ret)
              || grab_keyword(p, "void", Void, &ret)
-             || grab_keyword(p, "while", While, &ret)
-             || grab_keyword(p, "with", With, &ret) {
+             || grab_keyword(p, "while", While, &ret) {
             return ret;
           }
         }
@@ -442,7 +440,7 @@ func grab_tok(p *ps) tok {
         return grab_oper2(p, left, ch, '=', '+');
       } else if ch == ',' {
         ps_step(p);
-        return mk_res(p, left, mk_oper(ch));
+        return mk_res(p, left, Oper(mk_shray(ch)));
       } else if ch == '-' {
         arr array[i32] = mk_array(ch);
         ps_step(p);
@@ -453,6 +451,11 @@ func grab_tok(p *ps) tok {
         } else if ch == '>' {
           push(&arr, ch);
           ps_step(p);
+          ch = ps_peek(p);
+          if ch == '~' {
+            push(&arr, ch);
+            ps_step(p);
+          }
         }
         return mk_res(p, left, Oper(freeze(&arr)));
       } else {
@@ -461,10 +464,9 @@ func grab_tok(p *ps) tok {
 
     } else if ch < '[' {
       if ch == '.' {
-        ps_step(p);
-        return mk_res(p, left, mk_oper(ch));
+        return grab_oper2(p, left, ch, '~');
       } else if ch == '=' {
-        return grab_oper2(p, left, ch, '=', '>');
+        return grab_oper2(p, left, ch, '=');
       } else if ch == '/' {
         ps_step(p);
         ch = ps_peek(p);
@@ -500,17 +502,17 @@ func grab_tok(p *ps) tok {
         }
       } else if ch == ':' {
         ps_step(p);
-        return mk_res(p, left, mk_oper(ch));
+        return mk_res(p, left, Oper(mk_shray(ch)));
       } else if ch == ';' {
         ps_step(p);
-        return mk_res(p, left, mk_oper(ch));
+        return mk_res(p, left, Oper(mk_shray(ch)));
       } else if ch == '<' {
         return grab_angly(p, left, ch);
       } else if ch == '>' {
         return grab_angly(p, left, ch);
       } else if ch == '@' {
         ps_step(p);
-        return mk_res(p, left, mk_oper(ch));
+        return mk_res(p, left, Oper(mk_shray(ch)));
       } else {
         return {{left, ps_pos(p)}, Bad};
       }
@@ -537,7 +539,7 @@ func grab_tok(p *ps) tok {
         return mk_res(p, left, @[tokval]Grouper(RBrace));
       } else if ch == '~' {
         ps_step(p);
-        return mk_res(p, left, mk_oper(ch));
+        return mk_res(p, left, Oper(mk_shray(ch)));
       } else {
         return {{left, ps_pos(p)}, Bad};
       }
