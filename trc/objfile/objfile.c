@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "arith.h"
+#include "build.h"
 #include "databuf.h"
 #include "objfile/structs.h"
 #include "objfile/win.h"
@@ -203,17 +204,12 @@ int objfile_c_symbol_name(enum target_platform platform,
                           const void *name, size_t name_count,
                           void **c_name_out, size_t *c_name_count_out) {
   char *c_name;
-  switch (platform) {
-  case TARGET_PLATFORM_WIN_32BIT:
+  if (platform_prefix_underscore(platform)) {
     alloc_memcat("_", 1, name, name_count,
                  &c_name, c_name_count_out);
-    break;
-  case TARGET_PLATFORM_LINUX_32BIT:
+  } else {
     alloc_memcat("", 0, name, name_count,
                  &c_name, c_name_count_out);
-    break;
-  default:
-    UNREACHABLE();
   }
   *c_name_out = c_name;
   return 1;

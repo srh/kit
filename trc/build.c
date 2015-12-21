@@ -8,10 +8,11 @@
 #include "checkstate.h"
 #include "databuf.h"
 #include "io.h"
-#include "slice.h"
-#include "objfile/objfile.h"
 #include "objfile/linux.h"
+#include "objfile/objfile.h"
+#include "objfile/osx.h"
 #include "objfile/win.h"
+#include "slice.h"
 #include "print.h"
 #include "x86.h"
 
@@ -143,12 +144,14 @@ void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number);
 void gen_crash_jmp(struct objfile *f, struct frame *h);
 
-int platform_prefix_underscore(struct checkstate *cs) {
-  switch (cs->platform) {
+int platform_prefix_underscore(enum target_platform platform) {
+  switch (platform) {
   case TARGET_PLATFORM_WIN_32BIT:
     return 1;
   case TARGET_PLATFORM_LINUX_32BIT:
     return 0;
+  case TARGET_PLATFORM_OSX_32BIT:
+    return 1;
   default:
     UNREACHABLE();
   }
@@ -167,12 +170,12 @@ void generate_kit_name(struct checkstate *cs,
   struct databuf b;
   databuf_init(&b);
   if (is_export) {
-    if (platform_prefix_underscore(cs)) {
+    if (platform_prefix_underscore(cs->platform)) {
       databuf_append(&b, "_", 1);
     }
     databuf_append(&b, name, name_count);
   } else {
-    if (platform_prefix_underscore(cs)) {
+    if (platform_prefix_underscore(cs->platform)) {
       databuf_append_c_str(&b, "_kit_");
     } else {
       databuf_append_c_str(&b, "kit_");
@@ -646,7 +649,8 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
       return traits.movable != TYPEEXPR_TRAIT_TRIVIALLY_HAD;
     }
   } break;
-  case TARGET_PLATFORM_LINUX_32BIT: {
+  case TARGET_PLATFORM_LINUX_32BIT: /* fallthrough */
+  case TARGET_PLATFORM_OSX_32BIT: {
     *return_type_size_out = return_type_attrs.size;
     return !return_type_attrs.is_primitive;
   } break;
@@ -1367,7 +1371,8 @@ int platform_ret4_hrp(struct checkstate *cs) {
   switch (cs->platform) {
   case TARGET_PLATFORM_WIN_32BIT:
     return 0;
-  case TARGET_PLATFORM_LINUX_32BIT:
+  case TARGET_PLATFORM_LINUX_32BIT: /* fallthrough */
+  case TARGET_PLATFORM_OSX_32BIT:
     return 1;
   default:
     UNREACHABLE();
@@ -3433,7 +3438,8 @@ int platform_can_return_in_eaxedx(struct checkstate *cs) {
   switch (cs->platform) {
   case TARGET_PLATFORM_WIN_32BIT:
     return 1;
-  case TARGET_PLATFORM_LINUX_32BIT:
+  case TARGET_PLATFORM_LINUX_32BIT: /* fallthrough */
+  case TARGET_PLATFORM_OSX_32BIT:
     return 0;
   default:
     UNREACHABLE();
@@ -4958,7 +4964,8 @@ const char *platform_objfile_suffix(enum target_platform platform) {
   switch (platform) {
   case TARGET_PLATFORM_WIN_32BIT:
     return ".obj";
-  case TARGET_PLATFORM_LINUX_32BIT:
+  case TARGET_PLATFORM_LINUX_32BIT: /* fallthrough */
+  case TARGET_PLATFORM_OSX_32BIT:
     return ".o";
   default:
     UNREACHABLE();
@@ -5005,6 +5012,9 @@ int build_module(struct identmap *im,
     break;
   case TARGET_PLATFORM_LINUX_32BIT:
     linux32_flatten(cs.im, objfile, &databuf);
+    break;
+  case TARGET_PLATFORM_OSX_32BIT:
+    osx32_flatten(cs.im, objfile, &databuf);
     break;
   default:
     UNREACHABLE();

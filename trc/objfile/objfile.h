@@ -13,6 +13,7 @@ struct objfile_section;
 enum target_platform {
   TARGET_PLATFORM_WIN_32BIT,
   TARGET_PLATFORM_LINUX_32BIT,
+  TARGET_PLATFORM_OSX_32BIT,
 };
 
 enum is_function {
