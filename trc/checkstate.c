@@ -71,12 +71,12 @@ void checkstate_destroy(struct checkstate *cs) {
 
 void checkstate_init(struct checkstate *cs, struct identmap *im,
                      void *loader_ctx, module_loader *loader,
-                     int target_linux32) {
+                     enum target_platform platform) {
   cs->im = im;
   cs->cm = compute_common_idents(im);
   cs->loader_ctx = loader_ctx;
   cs->loader = loader;
-  cs->target_linux32 = target_linux32;
+  cs->platform = platform;
   cs->imports = NULL;
   cs->imports_count = 0;
   cs->imports_limit = 0;

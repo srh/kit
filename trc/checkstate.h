@@ -71,7 +71,7 @@ struct checkstate {
   void *loader_ctx;
   module_loader *loader;
 
-  int target_linux32;
+  enum target_platform platform;
 
   struct import *imports;
   size_t imports_count;
@@ -105,7 +105,7 @@ struct checkstate {
   size_t typetrav_symbol_infos_first_ungenerated;
 };
 
-void checkstate_init(struct checkstate *cs, struct identmap *im, void *loader_ctx, module_loader *loader, int target_linux32);
+void checkstate_init(struct checkstate *cs, struct identmap *im, void *loader_ctx, module_loader *loader, enum target_platform platform);
 
 void checkstate_destroy(struct checkstate *cs);
 

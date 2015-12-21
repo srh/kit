@@ -5364,9 +5364,9 @@ int test_check_module_with_ctx(struct identmap *im,
                                void *loader_ctx,
                                module_loader *loader,
                                ident_value name) {
-  int target_linux32 = 0;
+  enum target_platform platform = TARGET_PLATFORM_WIN_32BIT;
   struct checkstate cs;
-  checkstate_init(&cs, im, loader_ctx, loader, target_linux32);
+  checkstate_init(&cs, im, loader_ctx, loader, platform);
 
   int ret = chase_modules_and_typecheck(&cs, name);
 

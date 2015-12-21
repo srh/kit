@@ -2,8 +2,9 @@
 #define KIT_BUILD_H_
 
 #include "typecheck.h"
+#include "objfile/objfile.h"
 
-int build_module(struct identmap *im, int target_linux32,
+int build_module(struct identmap *im, enum target_platform platform,
                  void *loader_ctx, module_loader *loader,
                  ident_value name);
 

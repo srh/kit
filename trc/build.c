@@ -143,6 +143,17 @@ void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number);
 void gen_crash_jmp(struct objfile *f, struct frame *h);
 
+int platform_prefix_underscore(struct checkstate *cs) {
+  switch (cs->platform) {
+  case TARGET_PLATFORM_WIN_32BIT:
+    return 1;
+  case TARGET_PLATFORM_LINUX_32BIT:
+    return 0;
+  default:
+    UNREACHABLE();
+  }
+}
+
 /* Right now we don't worry about generating multiple objfiles, so we
 just blithely attach a serial number to each name to make them
 unique. */
@@ -156,15 +167,15 @@ void generate_kit_name(struct checkstate *cs,
   struct databuf b;
   databuf_init(&b);
   if (is_export) {
-    if (!cs->target_linux32) {
+    if (platform_prefix_underscore(cs)) {
       databuf_append(&b, "_", 1);
     }
     databuf_append(&b, name, name_count);
   } else {
-    if (cs->target_linux32) {
-      databuf_append_c_str(&b, "kit_");
-    } else {
+    if (platform_prefix_underscore(cs)) {
       databuf_append_c_str(&b, "_kit_");
+    } else {
+      databuf_append_c_str(&b, "kit_");
     }
 
     /* I just don't want to lookup the stdarg documentation and
@@ -247,7 +258,7 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
 
       void *c_name;
       size_t c_name_count;
-      if (!objfile_c_symbol_name(cs->target_linux32, name, name_count,
+      if (!objfile_c_symbol_name(cs->platform, name, name_count,
                                  &c_name, &c_name_count)) {
         return 0;
       }
@@ -619,10 +630,12 @@ void frame_pop(struct frame *h, uint32_t size) {
 int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *return_type,
                                uint32_t *return_type_size_out) {
   struct type_attrs return_type_attrs = x86_attrsof(&cs->nt, return_type);
-  if (cs->target_linux32) {
+  switch (cs->platform) {
+  case TARGET_PLATFORM_LINUX_32BIT: {
     *return_type_size_out = return_type_attrs.size;
     return !return_type_attrs.is_primitive;
-  } else {
+  } break;
+  case TARGET_PLATFORM_WIN_32BIT: {
     uint32_t return_type_size = return_type_attrs.size;
     *return_type_size_out = return_type_size;
     if (!(return_type_size <= 2 || return_type_size == DWORD_SIZE
@@ -636,6 +649,9 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
       Windows calling convention regarding non-pod (for C++03) types. */
       return traits.movable != TYPEEXPR_TRAIT_TRIVIALLY_HAD;
     }
+  } break;
+  default:
+    UNREACHABLE();
   }
 }
 
@@ -1347,6 +1363,17 @@ void push_address(struct objfile *f, struct frame *h, struct loc loc) {
   gen_mov_addressof(f, dest, loc);
 }
 
+int platform_ret4_hrp(struct checkstate *cs) {
+  switch (cs->platform) {
+  case TARGET_PLATFORM_WIN_32BIT:
+    return 0;
+  case TARGET_PLATFORM_LINUX_32BIT:
+    return 1;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
                   struct immediate imm,
                   int hidden_return_param) {
@@ -1355,7 +1382,7 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
     /* Dupes code with typetrav_call_func. */
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_call(f, imm.u.func_sti);
-    if (hidden_return_param && cs->target_linux32) {
+    if (hidden_return_param && platform_ret4_hrp(cs)) {
       /* TODO: We could do this more elegantly, but right now undo the
       callee's pop of esp. */
       x86_gen_add_esp_i32(f, -4);
@@ -1876,12 +1903,8 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
 
   x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
   x86_gen_pop32(f, X86_EBP);
-  if (cs->target_linux32) {
-    if (hidden_return_param) {
-      x86_gen_retn(f, 4);
-    } else {
-      x86_gen_ret(f);
-    }
+  if (hidden_return_param && platform_ret4_hrp(cs)) {
+    x86_gen_retn(f, 4);
   } else {
     x86_gen_ret(f);
   }
@@ -3406,6 +3429,17 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   }
 }
 
+int platform_can_return_in_eaxedx(struct checkstate *cs) {
+  switch (cs->platform) {
+  case TARGET_PLATFORM_WIN_32BIT:
+    return 1;
+  case TARGET_PLATFORM_LINUX_32BIT:
+    return 0;
+  default:
+    UNREACHABLE();
+  }
+}
+
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
@@ -3472,7 +3506,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     gen_load_register(f, X86_EAX, func_loc);
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_indirect_call_reg(f, X86_EAX);
-    if (hidden_return_param && cs->target_linux32) {
+    if (hidden_return_param && platform_ret4_hrp(cs)) {
       /* TODO: We could do this more elegantly, but right now undo the
       callee's pop of esp. */
       x86_gen_add_esp_i32(f, -4);
@@ -3507,7 +3541,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     expr_return_set(cs, f, h, er, return_loc, return_type,
                     temp_exists(return_loc, return_type, 1));
   } else {
-    CHECK(!cs->target_linux32);
+    CHECK(platform_can_return_in_eaxedx(cs));
     CHECK(return_size == 2 * DWORD_SIZE);
     gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
     expr_return_set(cs, f, h, er, return_loc, return_type,
@@ -4920,15 +4954,25 @@ void build_typetrav_defs(struct checkstate *cs,
   }
 }
 
+const char *platform_objfile_suffix(enum target_platform platform) {
+  switch (platform) {
+  case TARGET_PLATFORM_WIN_32BIT:
+    return ".obj";
+  case TARGET_PLATFORM_LINUX_32BIT:
+    return ".o";
+  default:
+    UNREACHABLE();
+  }
+}
 
 int build_module(struct identmap *im,
-                 int target_linux32,
+                 enum target_platform platform,
                  void *loader_ctx,
                  module_loader *loader,
                  ident_value name) {
   int ret = 0;
   struct checkstate cs;
-  checkstate_init(&cs, im, loader_ctx, loader, target_linux32);
+  checkstate_init(&cs, im, loader_ctx, loader, platform);
 
   if (!chase_modules_and_typecheck(&cs, name)) {
     DBG("(Fail.)\n");
@@ -4955,10 +4999,15 @@ int build_module(struct identmap *im,
   build_typetrav_defs(&cs, objfile);
 
   struct databuf *databuf = NULL;
-  if (target_linux32) {
+  switch (platform) {
+  case TARGET_PLATFORM_LINUX_32BIT:
     linux32_flatten(cs.im, objfile, &databuf);
-  } else {
+    break;
+  case TARGET_PLATFORM_WIN_32BIT:
     win_flatten(cs.im, objfile, &databuf);
+    break;
+  default:
+    UNREACHABLE();
   }
 
   void *buf;
@@ -4971,7 +5020,7 @@ int build_module(struct identmap *im,
   identmap_lookup(im, name, &name_buf, &name_count);
   char *path;
   size_t path_count;
-  alloc_half_strcat(name_buf, name_count, target_linux32 ? ".o" : ".obj",
+  alloc_half_strcat(name_buf, name_count, platform_objfile_suffix(platform),
                     &path, &path_count);
   if (!write_file(path, buf, buf_size)) {
     ERR("Could not write object file\n");

@@ -199,15 +199,21 @@ void objfile_section_append_rel32(struct objfile_section *s,
                                      OBJFILE_RELOCATION_TYPE_REL32);
 }
 
-int objfile_c_symbol_name(int target_linux32, const void *name, size_t name_count,
+int objfile_c_symbol_name(enum target_platform platform,
+                          const void *name, size_t name_count,
                           void **c_name_out, size_t *c_name_count_out) {
   char *c_name;
-  if (target_linux32) {
+  switch (platform) {
+  case TARGET_PLATFORM_LINUX_32BIT:
     alloc_memcat("", 0, name, name_count,
                  &c_name, c_name_count_out);
-  } else {
+    break;
+  case TARGET_PLATFORM_WIN_32BIT:
     alloc_memcat("_", 1, name, name_count,
                  &c_name, c_name_count_out);
+    break;
+  default:
+    UNREACHABLE();
   }
   *c_name_out = c_name;
   return 1;

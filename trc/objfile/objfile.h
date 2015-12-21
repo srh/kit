@@ -10,6 +10,11 @@ struct databuf;
 struct objfile;
 struct objfile_section;
 
+enum target_platform {
+  TARGET_PLATFORM_WIN_32BIT,
+  TARGET_PLATFORM_LINUX_32BIT,
+};
+
 enum is_function {
   IS_FUNCTION_NO,
   IS_FUNCTION_YES,
@@ -67,7 +72,7 @@ struct sti objfile_add_remote_symbol(struct objfile *f,
                                      ident_value name,
                                      enum is_function is_function);
 
-int objfile_c_symbol_name(int target_linux32,
+int objfile_c_symbol_name(enum target_platform platform,
                           const void *name, size_t name_count,
                           void **c_name_out, size_t *c_name_count_out);
 

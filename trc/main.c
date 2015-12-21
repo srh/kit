@@ -32,7 +32,7 @@ void print_usage(const char *arg0) {
 
 int main(int argc, char **argv) {
   int test = 0;
-  int linux = 0;
+  enum target_platform platform = TARGET_PLATFORM_WIN_32BIT;
   const char *module = NULL;
   for (int i = 1; i < argc; i++) {
     if (test || module) {
@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
     if (0 == strcmp(argv[i], "--test")) {
       test = 1;
     } else if (0 == strcmp(argv[i], "--linux")) {
-      linux = 1;
+      platform = TARGET_PLATFORM_LINUX_32BIT;
     } else {
       module = argv[i];
     }
@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
     struct identmap im;
     identmap_init(&im);
     ident_value ident_module = identmap_intern(&im, module, strlen(module));
-    if (!build_module(&im, linux, NULL, &read_module_file, ident_module)) {
+    if (!build_module(&im, platform, NULL, &read_module_file, ident_module)) {
       goto cleanup_im;
     }
 
