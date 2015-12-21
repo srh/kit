@@ -3,6 +3,7 @@
 *.exe
 a.out
 out
+*.dSYM/
 s2
 /urc/s2b
 s3
