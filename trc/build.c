@@ -631,10 +631,6 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
                                uint32_t *return_type_size_out) {
   struct type_attrs return_type_attrs = x86_attrsof(&cs->nt, return_type);
   switch (cs->platform) {
-  case TARGET_PLATFORM_LINUX_32BIT: {
-    *return_type_size_out = return_type_attrs.size;
-    return !return_type_attrs.is_primitive;
-  } break;
   case TARGET_PLATFORM_WIN_32BIT: {
     uint32_t return_type_size = return_type_attrs.size;
     *return_type_size_out = return_type_size;
@@ -649,6 +645,10 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
       Windows calling convention regarding non-pod (for C++03) types. */
       return traits.movable != TYPEEXPR_TRAIT_TRIVIALLY_HAD;
     }
+  } break;
+  case TARGET_PLATFORM_LINUX_32BIT: {
+    *return_type_size_out = return_type_attrs.size;
+    return !return_type_attrs.is_primitive;
   } break;
   default:
     UNREACHABLE();
@@ -5000,11 +5000,11 @@ int build_module(struct identmap *im,
 
   struct databuf *databuf = NULL;
   switch (platform) {
-  case TARGET_PLATFORM_LINUX_32BIT:
-    linux32_flatten(cs.im, objfile, &databuf);
-    break;
   case TARGET_PLATFORM_WIN_32BIT:
     win_flatten(cs.im, objfile, &databuf);
+    break;
+  case TARGET_PLATFORM_LINUX_32BIT:
+    linux32_flatten(cs.im, objfile, &databuf);
     break;
   default:
     UNREACHABLE();

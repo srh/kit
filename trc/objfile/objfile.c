@@ -204,12 +204,12 @@ int objfile_c_symbol_name(enum target_platform platform,
                           void **c_name_out, size_t *c_name_count_out) {
   char *c_name;
   switch (platform) {
-  case TARGET_PLATFORM_LINUX_32BIT:
-    alloc_memcat("", 0, name, name_count,
-                 &c_name, c_name_count_out);
-    break;
   case TARGET_PLATFORM_WIN_32BIT:
     alloc_memcat("_", 1, name, name_count,
+                 &c_name, c_name_count_out);
+    break;
+  case TARGET_PLATFORM_LINUX_32BIT:
+    alloc_memcat("", 0, name, name_count,
                  &c_name, c_name_count_out);
     break;
   default:
