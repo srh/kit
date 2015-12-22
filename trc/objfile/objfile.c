@@ -32,7 +32,7 @@ void objfile_section_destroy(struct objfile_section *s) {
   s->relocs_limit = 0;
 }
 
-void objfile_init(struct objfile *f) {
+void objfile_init(struct objfile *f, enum target_platform platform) {
   objfile_section_init(&f->data);
   objfile_section_init(&f->rdata);
   objfile_section_init(&f->text);
@@ -40,6 +40,8 @@ void objfile_init(struct objfile *f) {
   f->symbol_table = NULL;
   f->symbol_table_count = 0;
   f->symbol_table_limit = 0;
+
+  f->platform = platform;
 }
 
 void objfile_destroy(struct objfile *f) {
@@ -51,13 +53,15 @@ void objfile_destroy(struct objfile *f) {
   f->symbol_table = NULL;
   f->symbol_table_count = 0;
   f->symbol_table_limit = 0;
+
+  f->platform = (enum target_platform)-1;
 }
 
-void objfile_alloc(struct objfile **p_out) {
+void objfile_alloc(struct objfile **p_out, enum target_platform platform) {
   CHECK(*p_out == NULL);
   struct objfile *p = malloc(sizeof(*p));
   CHECK(p);
-  objfile_init(p);
+  objfile_init(p, platform);
   *p_out = p;
 }
 
@@ -66,6 +70,10 @@ void objfile_free(struct objfile **p_ref) {
   objfile_destroy(*p_ref);
   free(*p_ref);
   *p_ref = NULL;
+}
+
+enum target_platform objfile_platform(struct objfile *f) {
+  return f->platform;
 }
 
 void append_fillercode_to_align(struct databuf *d, size_t alignment) {
@@ -179,9 +187,11 @@ void objfile_set_symbol_value(struct objfile *f,
 void objfile_section_append_32bit_reloc(struct objfile_section *s,
                                         struct sti symbol_table_index,
                                         enum objfile_relocation_type type) {
+  CHECK(type != OBJFILE_RELOCATION_TYPE_DIFF32);
   struct objfile_relocation reloc;
   reloc.virtual_address = s->raw.count;
   reloc.symbol_table_index = symbol_table_index;
+  reloc.subtracted_offset = 0;  /* garbage, only used for DIFF32 */
   reloc.type = type;
   SLICE_PUSH(s->relocs, s->relocs_count, s->relocs_limit, reloc);
   struct le_u32 zero = to_le_u32(0);
@@ -198,6 +208,19 @@ void objfile_section_append_rel32(struct objfile_section *s,
                                   struct sti symbol_table_index) {
   objfile_section_append_32bit_reloc(s, symbol_table_index,
                                      OBJFILE_RELOCATION_TYPE_REL32);
+}
+
+void objfile_section_note_diff32(struct objfile_section *s,
+                                 struct sti symbol_table_index,
+                                 size_t subtracted_offset,
+                                 size_t adjusted_offset) {
+  struct objfile_relocation reloc;
+  reloc.virtual_address = adjusted_offset;
+  reloc.symbol_table_index = symbol_table_index;
+  reloc.subtracted_offset = subtracted_offset;
+  reloc.type = OBJFILE_RELOCATION_TYPE_DIFF32;
+  SLICE_PUSH(s->relocs, s->relocs_count, s->relocs_limit, reloc);
+  s->diff32_count = uint32_add(s->diff32_count, 1);
 }
 
 int objfile_c_symbol_name(enum target_platform platform,

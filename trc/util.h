@@ -90,11 +90,28 @@ struct le_u32 {
 struct le_u32 to_le_u32(uint32_t x);
 uint32_t from_le_u32(struct le_u32 x);
 
+/* This is always two's complement (of course). */
+struct le_i32 {
+  char bytes[4];
+};
+
+struct le_i32 to_le_i32(int32_t x);
+int32_t from_le_i32(struct le_i32 x);
+
 struct le_u16 {
   char bytes[2];
 };
 
 struct le_u16 to_le_u16(uint16_t x);
 uint16_t from_le_u16(struct le_u16 x);
+
+/* This is always two's complement (of course). */
+struct le_i16 {
+  char bytes[2];
+};
+
+struct le_i16 to_le_i16(int16_t x);
+int16_t from_le_i16(struct le_i16 x);
+
 
 #endif /* KIT_UTIL_H_ */

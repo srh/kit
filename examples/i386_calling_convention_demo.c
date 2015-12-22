@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #ifdef _WIN32
 #define PACK_PUSH __pragma(pack(push, 1))
 #define PACK_POP __pragma(pack(pop))
@@ -127,7 +129,18 @@ float floatfunc(void) {
   return 3.0;
 }
 
+double blahfunc(void) {
+  return 4.0;
+}
+
+float call_floatfunc(void) {
+  blahfunc();
+  return floatfunc();
+}
+
 struct b10 b10_declared(void);
+
+double blah = 1.0/3;
 
 /* Allocates a spot on its own stack frame, and then copies to its
    return pointer, under any optimization setting I've tried.  I don't
@@ -135,5 +148,6 @@ struct b10 b10_declared(void);
    upward.  LINUX: It passes the hidden param to the callee, but
    doesn't assume the callee returns the right return value. */
 struct b10 b10_call_declared(void) {
+  printf("%f", blah);
   return b10_declared();
 }

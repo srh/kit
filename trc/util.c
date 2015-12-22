@@ -86,6 +86,25 @@ uint32_t from_le_u32(struct le_u32 x) {
   return read_le_u32(x.bytes);
 }
 
+struct le_i32 to_le_i32(int32_t x) {
+  /* We convert to uint32_t, adding 2**32 to x if it's negative. */
+  uint32_t xu = x;
+  struct le_i32 ret;
+  write_le_u32(ret.bytes, xu);
+  return ret;
+}
+int32_t from_le_i32(struct le_i32 x) {
+  /* We can't just convert unsigned->signed, it's
+  implementation-defined.  We use int64_t to safely subtract 2**32. */
+  uint32_t retu = read_le_u32(x.bytes);
+  int64_t reti64 = retu;
+  if (reti64 > INT32_MAX) {
+    reti64 -= 1 + (int64_t)UINT32_MAX;
+  }
+  int32_t reti32 = reti64;
+  return reti32;
+}
+
 struct le_u16 to_le_u16(uint16_t x) {
   struct le_u16 ret;
   write_le_u16(ret.bytes, x);
@@ -93,4 +112,23 @@ struct le_u16 to_le_u16(uint16_t x) {
 }
 uint16_t from_le_u16(struct le_u16 x) {
   return read_le_u16(x.bytes);
+}
+
+struct le_i16 to_le_i16(int16_t x) {
+  /* We convert to uint64_t, adding 2**16 to x if it's negative. */
+  uint16_t xu = x;
+  struct le_i16 ret;
+  write_le_u16(ret.bytes, xu);
+  return ret;
+}
+
+int16_t from_le_i16(struct le_i16 x) {
+  /* We can't convert unsigned->signed, just like in from_le_i32. */
+  uint16_t retu = read_le_u16(x.bytes);
+  int32_t reti32 = retu;
+  if (reti32 > INT16_MAX) {
+    reti32 -= 1 + (int32_t)UINT16_MAX;
+  }
+  int16_t reti16 = reti32;
+  return reti16;
 }

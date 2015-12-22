@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "databuf.h"
+#include "platform.h"
 #include "table.h"
 
 struct identmap;

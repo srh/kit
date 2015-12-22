@@ -96,6 +96,7 @@ uint32_t uint32_ceil_aligned(uint32_t x, uint32_t m) {
   }
 }
 
+
 uint32_t size_to_uint32(size_t x) {
   CHECK(x <= UINT32_MAX);
   return x;

@@ -511,7 +511,12 @@ struct frame {
 
   /* The offset (relative to ebp) of "free space" available --
   e.g. esp is at or below this address, but you could wipe anywhere
-  below here without harm. */
+  below here without harm.
+
+  Function calls (for our x86 ABIs, at least for OS X 32-bit) most
+  happen at 16-byte alignment, which means a stack_offset value which
+  is 8 (MOD 16), because it's relative to ebp.
+  */
   int32_t stack_offset;
   /* min_stack_offset tells us where to put esp.  TODO: Must esp be 8-
   or 16-byte aligned?  For function calls?  Remember that ret ptr
@@ -602,13 +607,22 @@ void frame_define_target(struct frame *h, size_t target_number, uint32_t target_
   td->target_offset = target_offset;
 }
 
-struct loc frame_push_loc(struct frame *h, uint32_t size) {
+uint32_t frame_padded_push_size(uint32_t size) {
   /* X86 */
-  uint32_t padded_size = uint32_ceil_aligned(size, DWORD_SIZE);
-  h->stack_offset = int32_sub(h->stack_offset, uint32_to_int32(padded_size));
+  return uint32_ceil_aligned(size, DWORD_SIZE);
+}
+
+/* Pushes an exact amount to the frame. */
+void frame_push_exact_amount(struct frame *h, uint32_t size) {
+  h->stack_offset = int32_sub(h->stack_offset, uint32_to_int32(size));
   if (h->stack_offset < h->min_stack_offset) {
     h->min_stack_offset = h->stack_offset;
   }
+}
+
+struct loc frame_push_loc(struct frame *h, uint32_t size) {
+  uint32_t padded_size = frame_padded_push_size(size);
+  frame_push_exact_amount(h, padded_size);
   return ebp_loc(size, padded_size, h->stack_offset);
 }
 
@@ -777,34 +791,6 @@ void x86_gen_test_regs8(struct objfile *f, enum x86_reg8 reg1, enum x86_reg8 reg
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-/* Appends funcaddrs with dir32 -- not suitable for relative address
-call instructions. */
-void append_immediate(struct objfile *f, struct immediate imm) {
-  switch (imm.tag) {
-  case IMMEDIATE_FUNC: {
-    objfile_section_append_dir32(objfile_text(f), imm.u.func_sti);
-  } break;
-  case IMMEDIATE_U32: {
-    char buf[4];
-    write_le_u32(buf, imm.u.u32);
-    objfile_section_append_raw(objfile_text(f), buf, sizeof(buf));
-  } break;
-  case IMMEDIATE_I32: {
-    char buf[4];
-    write_le_i32(buf, imm.u.i32);
-    objfile_section_append_raw(objfile_text(f), buf, sizeof(buf));
-  } break;
-  case IMMEDIATE_U8:
-    UNREACHABLE();
-  case IMMEDIATE_I8:
-    UNREACHABLE();
-  case IMMEDIATE_VOID:
-    UNREACHABLE();
-  default:
-    UNREACHABLE();
-  }
-}
-
 void x86_gen_xor_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src);
 
 void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
@@ -819,11 +805,35 @@ void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
   }
 }
 
+size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest);
+
 void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
                             struct sti symbol_table_index) {
-  uint8_t b = 0xB8 + (uint8_t)dest;
-  objfile_section_append_raw(objfile_text(f), &b, 1);
-  objfile_section_append_dir32(objfile_text(f), symbol_table_index);
+  switch (objfile_platform(f)) {
+  case TARGET_PLATFORM_WIN_32BIT: /* fallthrough */
+  case TARGET_PLATFORM_LINUX_32BIT: {
+    uint8_t b = 0xB8 + (uint8_t)dest;
+    objfile_section_append_raw(objfile_text(f), &b, 1);
+    objfile_section_append_dir32(objfile_text(f), symbol_table_index);
+  } break;
+  case TARGET_PLATFORM_OSX_32BIT: {
+    /* This is how things are done on OS X 32-bit! */
+    /* We generate a call/pop pair.  The zero dword is supposed to be
+    that way -- the target addr's the next instruction (it's a
+    relative address). */
+    /* Fortunately we don't have "extern" data decls, that'd be even
+    more complicated. */
+    uint8_t b[5] = { 0xE8, 0, 0, 0, 0 };
+    objfile_section_append_raw(objfile_text(f), b, 5);
+    size_t subtracted_offset = objfile_section_size(objfile_text(f));
+    x86_gen_pop32(f, dest);
+    size_t adjusted_offset = x86_gen_placeholder_lea32(f, dest);
+    objfile_section_note_diff32(objfile_text(f), symbol_table_index,
+                                subtracted_offset, adjusted_offset);
+  } break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void x86_gen_int_3(struct objfile *f) {
@@ -1228,16 +1238,64 @@ size_t x86_encode_reg_rm(uint8_t *b, int reg, enum x86_reg rm_addr,
   }
 }
 
-void x86_gen_mov_mem_imm32(struct objfile *f,
-                           enum x86_reg dest,
-                           int32_t dest_disp,
-                           struct immediate imm) {
+size_t x86_encode_placeholder_reg_rm(uint8_t *b, enum x86_reg reg_and_rm_addr,
+                                     size_t *reloc_offset_out) {
+  if (reg_and_rm_addr == X86_ESP) {
+    CRASH("esp for placeholder_reg_rm not supported");
+  } else {
+    b[0] = mod_reg_rm(MOD10, reg_and_rm_addr, reg_and_rm_addr);
+    write_le_i32(b + 1, 0);
+    *reloc_offset_out = 1;
+    return 5;
+  }
+}
+
+void x86_help_gen_mov_mem_imm32(struct objfile *f,
+                                enum x86_reg dest,
+                                int32_t dest_disp,
+                                char buf[4]) {
   uint8_t b[10];
   b[0] = 0xC7;
   size_t count = x86_encode_reg_rm(b + 1, 0, dest, dest_disp);
   CHECK(count <= 9);
   objfile_section_append_raw(objfile_text(f), b, count + 1);
-  append_immediate(f, imm);
+  objfile_section_append_raw(objfile_text(f), buf, 4);
+}
+
+void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
+                     enum x86_reg src);
+
+void x86_gen_mov_mem_imm32(struct objfile *f,
+                           enum x86_reg dest,
+                           int32_t dest_disp,
+                           enum x86_reg aux,
+                           struct immediate imm) {
+  switch (imm.tag) {
+  case IMMEDIATE_FUNC: {
+    /* Doesn't just use an immediate because OS X 32-bit won't work
+    that way. */
+    x86_gen_mov_reg_stiptr(f, aux, imm.u.func_sti);
+    x86_gen_store32(f, dest, dest_disp, aux);
+  } break;
+  case IMMEDIATE_U32: {
+    char buf[4];
+    write_le_u32(buf, imm.u.u32);
+    x86_help_gen_mov_mem_imm32(f, dest, dest_disp, buf);
+  } break;
+  case IMMEDIATE_I32: {
+    char buf[4];
+    write_le_i32(buf, imm.u.i32);
+    x86_help_gen_mov_mem_imm32(f, dest, dest_disp, buf);
+  } break;
+  case IMMEDIATE_U8:
+    UNREACHABLE();
+  case IMMEDIATE_I8:
+    UNREACHABLE();
+  case IMMEDIATE_VOID:
+    UNREACHABLE();
+  default:
+    UNREACHABLE();
+  }
 }
 
 void x86_gen_mov_mem_imm8(struct objfile *f,
@@ -1318,6 +1376,19 @@ void x86_gen_lea32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
+/* Used for OS X 32-bit position-independent code.  Assigns X+srcdest to srcdest*/
+size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest) {
+  uint8_t b[10];
+  b[0] = 0x8D;
+  size_t reg_rm_reloc;
+  size_t count = x86_encode_placeholder_reg_rm(b + 1, srcdest, &reg_rm_reloc);
+  CHECK(count <= 9);
+  /* The index into objfile_text() of the relocatable dword. */
+  size_t ix = objfile_section_size(objfile_text(f)) + 1 + reg_rm_reloc;
+  objfile_section_append_raw(objfile_text(f), b, count + 1);
+  return ix;
+}
+
 void x86_gen_load8(struct objfile *f, enum x86_reg8 dest, enum x86_reg src_addr,
                    int32_t src_disp) {
   uint8_t b[10];
@@ -1379,20 +1450,26 @@ int platform_ret4_hrp(struct checkstate *cs) {
   }
 }
 
+void gen_call_imm_func(struct checkstate *cs, struct objfile *f, struct frame *h,
+                       struct sti func_sti,
+                       int hidden_return_param) {
+  /* Dupes code with typetrav_call_func. */
+  gen_placeholder_stack_adjustment(f, h, 0);
+  x86_gen_call(f, func_sti);
+  if (hidden_return_param && platform_ret4_hrp(cs)) {
+    /* TODO: We could do this more elegantly, but right now undo the
+    callee's pop of esp. */
+    x86_gen_add_esp_i32(f, -4);
+  }
+  gen_placeholder_stack_adjustment(f, h, 1);
+}
+
 void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
                   struct immediate imm,
                   int hidden_return_param) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC:
-    /* Dupes code with typetrav_call_func. */
-    gen_placeholder_stack_adjustment(f, h, 0);
-    x86_gen_call(f, imm.u.func_sti);
-    if (hidden_return_param && platform_ret4_hrp(cs)) {
-      /* TODO: We could do this more elegantly, but right now undo the
-      callee's pop of esp. */
-      x86_gen_add_esp_i32(f, -4);
-    }
-    gen_placeholder_stack_adjustment(f, h, 1);
+    gen_call_imm_func(cs, f, h, imm.u.func_sti, hidden_return_param);
     break;
   case IMMEDIATE_U32:
     UNREACHABLE();
@@ -1409,12 +1486,29 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
   }
 }
 
+/* Put this right beneath where you save the stack offset. */
+void adjust_frame_for_callsite_alignment(struct frame *h, uint32_t arglist_size) {
+  /* X86 - particularly for 32-bit OS X's 16-byte alignment. */
+  int32_t unadjusted_callsite_offset
+    = int32_sub(h->stack_offset, uint32_to_int32(arglist_size));
+  /* We want to lower the stack so that the callsite will be 8-mod-16
+  (because we start counting below the ret-ptr and ebp-ptr). */
+  /* We specifically _don't_ want overflow checking on this addition
+  -- unadjusted_callsite_offset could easily be -4, or -8. */
+  uint32_t callsite_adjustment
+    = (8 + (uint32_t)unadjusted_callsite_offset) % 16;
+  CHECK(callsite_adjustment % DWORD_SIZE == 0);
+  frame_push_exact_amount(h, callsite_adjustment);
+}
+
 void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                         struct def_instantiation *inst);
 
 void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f, struct frame *h,
                               struct loc loc, struct def_instantiation *inst) {
   int32_t stack_offset = frame_save_offset(h);
+  /* X86 - assumes pointer is dword-sized */
+  adjust_frame_for_callsite_alignment(h, DWORD_SIZE);
   push_address(f, h, loc);
   typetrav_call_func(cs, f, h, inst);
   frame_restore_offset(h, stack_offset);
@@ -1423,6 +1517,8 @@ void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f, struct f
 void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f, struct frame *h,
                               struct loc dest, struct loc src, struct def_instantiation *inst) {
   int32_t stack_offset = frame_save_offset(h);
+  /* X86 - assumes pointer is dword-sized */
+  adjust_frame_for_callsite_alignment(h, 2 * DWORD_SIZE);
   push_address(f, h, src);
   push_address(f, h, dest);
   typetrav_call_func(cs, f, h, inst);
@@ -1831,13 +1927,15 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
 
   int32_t saved_offset = frame_save_offset(h);
   if (has_src) {
+    /* X86 - pointer size */
+    adjust_frame_for_callsite_alignment(h, 2 * DWORD_SIZE);
     push_address(f, h, src);
+  } else {
+    /* X86 - pointer size */
+    adjust_frame_for_callsite_alignment(h, DWORD_SIZE);
   }
   push_address(f, h, dest);
-  struct immediate imm;
-  imm.tag = IMMEDIATE_FUNC;
-  imm.u.func_sti = sti;
-  gen_call_imm(cs, f, h, imm, 0);
+  gen_call_imm_func(cs, f, h, sti, 0);
   frame_restore_offset(h, saved_offset);
 }
 
@@ -2161,10 +2259,11 @@ void gen_store_biregister(struct objfile *f, struct loc dest, enum x86_reg lo, e
 }
 
 void gen_mov_mem_imm(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
+                     enum x86_reg aux,
                      struct immediate src) {
   switch (immediate_size(src)) {
   case DWORD_SIZE:
-    x86_gen_mov_mem_imm32(f, dest_addr, dest_disp, src);
+    x86_gen_mov_mem_imm32(f, dest_addr, dest_disp, aux, src);
     break;
   case 1:
     switch (src.tag) {
@@ -2191,11 +2290,11 @@ void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src)
 
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
-    gen_mov_mem_imm(f, X86_EBP, dest.u.ebp_offset, src);
+    gen_mov_mem_imm(f, X86_EBP, dest.u.ebp_offset, X86_EDX, src);
     break;
   case LOC_EBP_INDIRECT:
     x86_gen_load32(f, X86_EAX, X86_EBP, dest.u.ebp_indirect);
-    gen_mov_mem_imm(f, X86_EAX, 0, src);
+    gen_mov_mem_imm(f, X86_EAX, 0, X86_EDX, src);
     break;
   case LOC_GLOBAL:
     CRASH("Global mutation should be impossible.");
@@ -3446,6 +3545,27 @@ int platform_can_return_in_eaxedx(struct checkstate *cs) {
   }
 }
 
+/* Used to precompute arglist size, so that we can align the stack to
+16-bit boundary at the function call. */
+uint32_t funcall_arglist_size(struct checkstate *cs,
+                              struct ast_expr *a) {
+  /* We specifically process our calculations _up_ from the call site
+  -- if fields ever need alignment calculations, we'll be ready. */
+  uint32_t return_size_discard;
+  int hidden_return_param
+    = exists_hidden_return_param(cs, ast_expr_type(a), &return_size_discard);
+
+  uint32_t total_size = (hidden_return_param ? DWORD_SIZE : 0);
+  for (size_t i = 0, e = a->u.funcall.args_count; i < e; i++) {
+    struct ast_expr *arg = &a->u.funcall.args[i].expr;
+    uint32_t arg_size = x86_sizeof(&cs->nt, ast_expr_type(arg));
+    uint32_t padded_size = frame_padded_push_size(arg_size);
+    /* No alignment concerns, (yet!)! */
+    total_size = uint32_add(total_size, padded_size);
+  }
+  return total_size;
+}
+
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
@@ -3477,6 +3597,8 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   }
 
   int32_t saved_offset = frame_save_offset(h);
+
+  adjust_frame_for_callsite_alignment(h, funcall_arglist_size(cs, a));
 
   for (size_t i = args_count; i > 0;) {
     i--;
@@ -4987,7 +5109,7 @@ int build_module(struct identmap *im,
   }
 
   struct objfile *objfile = NULL;
-  objfile_alloc(&objfile);
+  objfile_alloc(&objfile, platform);
 
   for (size_t i = 0, e = cs.nt.defs_count; i < e; i++) {
     if (!add_def_symbols(&cs, objfile, cs.nt.defs[i])) {

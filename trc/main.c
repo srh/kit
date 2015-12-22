@@ -7,6 +7,7 @@
 #include "identmap.h"
 #include "io.h"
 #include "parse.h"
+#include "platform.h"
 #include "build.h"
 #include "typecheck.h"
 #include "util.h"

@@ -5,16 +5,11 @@
 #include <stdint.h>
 
 #include "identmap.h"
+#include "platform.h"
 
 struct databuf;
 struct objfile;
 struct objfile_section;
-
-enum target_platform {
-  TARGET_PLATFORM_WIN_32BIT,
-  TARGET_PLATFORM_LINUX_32BIT,
-  TARGET_PLATFORM_OSX_32BIT,
-};
 
 enum is_function {
   IS_FUNCTION_NO,
@@ -26,7 +21,10 @@ enum is_static {
   IS_STATIC_YES,
 };
 
-/* 1-based index into the section header table, for that matter. */
+/* 1-based index into the win/linux section header table, for that
+matter.  But not OS X.  There's no particular reason why not OS X --
+it shouldn't be too hard to set straight. */
+/* Overlaps objfile_symbol_section in struct.h. */
 enum section {
   SECTION_DATA = 1,
   SECTION_RDATA = 2,
@@ -37,8 +35,13 @@ struct sti {
   uint32_t value;
 };
 
-void objfile_alloc(struct objfile **p_out);
+/* platform is purely informational, it doesn't affect the inner
+workings of an objfile object at all -- I don't want to have to thread
+the parameter through 50 different codegen functions (yet) */
+void objfile_alloc(struct objfile **p_out, enum target_platform platform);
 void objfile_free(struct objfile **p_ref);
+
+enum target_platform objfile_platform(struct objfile *f);
 
 struct objfile_section *objfile_data(struct objfile *f);
 struct objfile_section *objfile_rdata(struct objfile *f);
@@ -47,9 +50,13 @@ struct objfile_section *objfile_text(struct objfile *f);
 uint32_t objfile_section_size(struct objfile_section *s);
 
 void objfile_section_append_dir32(struct objfile_section *s,
-                                  struct sti SymbolTableIndex);
+                                  struct sti symbol_table_index);
 void objfile_section_append_rel32(struct objfile_section *s,
-                                  struct sti SymbolTableIndex);
+                                  struct sti symbol_table_index);
+void objfile_section_note_diff32(struct objfile_section *s,
+                                 struct sti symbol_table_index,
+                                 size_t subtracted_offset,
+                                 size_t adjusted_offset);
 void objfile_section_append_raw(struct objfile_section *s,
                                 const void *buf, size_t n);
 void objfile_section_overwrite_raw(struct objfile_section *s,
@@ -60,7 +67,7 @@ void objfile_fillercode_align_double_quadword(struct objfile *f);
 void objfile_section_append_zeros(struct objfile_section *s, size_t count);
 
 void objfile_set_symbol_value(struct objfile *f,
-                              struct sti SymbolTableIndex,
+                              struct sti symbol_table_index,
                               uint32_t value);
 
 struct sti objfile_add_local_symbol(struct objfile *f,

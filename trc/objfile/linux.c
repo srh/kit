@@ -278,6 +278,7 @@ void linux32_append_relocations_and_mutate_section(
     struct databuf *d, struct objfile_section *s) {
   struct objfile_relocation *relocs = s->relocs;
   for (size_t i = 0, e = s->relocs_count; i < e; i++) {
+    CHECK(relocs[i].type != OBJFILE_RELOCATION_TYPE_DIFF32);
     struct elf32_Rel rel;
     rel.r_offset = to_le_u32(relocs[i].virtual_address);
     uint32_t sti = relocs[i].symbol_table_index.value;
@@ -287,6 +288,7 @@ void linux32_append_relocations_and_mutate_section(
     static const uint32_t rel_types[] = {
       [OBJFILE_RELOCATION_TYPE_DIR32] = kR_386_32,
       [OBJFILE_RELOCATION_TYPE_REL32] = kR_386_PC32,
+      [OBJFILE_RELOCATION_TYPE_DIFF32] = 0, /* garbage */
     };
 
     uint32_t rel_type = rel_types[relocs[i].type];
@@ -296,6 +298,7 @@ void linux32_append_relocations_and_mutate_section(
     static const int32_t rel_addends[] = {
       [OBJFILE_RELOCATION_TYPE_DIR32] = 0,
       [OBJFILE_RELOCATION_TYPE_REL32] = -4,
+      [OBJFILE_RELOCATION_TYPE_DIFF32] = 0, /* garbage */
     };
     struct le_u32 addend_le = to_le_u32((uint32_t)rel_addends[relocs[i].type]);
     databuf_overwrite(&s->raw, from_le_u32(rel.r_offset), &addend_le, sizeof(addend_le));

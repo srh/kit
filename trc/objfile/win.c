@@ -329,9 +329,11 @@ void win_append_relocs(struct databuf *d, struct objfile_relocation *relocs,
   static const uint16_t win_Type[] = {
     [OBJFILE_RELOCATION_TYPE_DIR32] = IMAGE_REL_I386_DIR32,
     [OBJFILE_RELOCATION_TYPE_REL32] = IMAGE_REL_I386_REL32,
+    [OBJFILE_RELOCATION_TYPE_DIFF32] = 0, /* garbage */
   };
 
   for (size_t i = 0; i < relocs_count; i++) {
+    CHECK(relocs[i].type != OBJFILE_RELOCATION_TYPE_DIFF32);
     struct COFF_Relocation coff_reloc;
     coff_reloc.VirtualAddress = to_le_u32(relocs[i].virtual_address);
     coff_reloc.SymbolTableIndex = to_le_u32(relocs[i].symbol_table_index.value);
