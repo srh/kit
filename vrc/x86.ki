@@ -188,9 +188,31 @@ func x86_mov_imm32(f *objfile, dest u8, x u32) void {
   }
 }
 
-func x86_mov_stiptr(f *objfile, dest u8, symbol_table_index sti) void {
+func x86_mov_stiptr_with_dir32(plat *platform_info, f *objfile, dest u8, symbol_table_index sti) void {
   appendtext(f, 0xB8 + dest);
   append_dir32(&f->text, symbol_table_index);
+}
+
+func x86_mov_stiptr(plat *platform_info, f *objfile, dest u8, symbol_table_index sti) void {
+  switch plat->opsys {
+  case Linux32:
+    x86_mov_stiptr_with_dir32(plat, f, dest, symbol_table_index);
+  case Win32:
+    x86_mov_stiptr_with_dir32(plat, f, dest, symbol_table_index);
+  case Osx32:
+    /* This is how things are done on OS X 32-bit! */
+    /* We generate a call/pop pair.  The zero dword is supposed to be
+    that way -- the target addr's the next instruction (it's a
+    relative address). */
+    /* Fortunately we don't have "extern" data decls, that'd be even
+    more complicated. */
+    b ^[5]u8 = {0xE8, 0, 0, 0, 0 };
+    append_raw(&f->text, &b[0], 5);
+    subtracted_offset size = count(&f->text.raw);
+    x86_pop32(f, dest);
+    adjusted_offset size = x86_placeholder_lea32(f, dest);
+    note_diff32(&f->text, symbol_table_index, subtracted_offset, adjusted_offset);
+  }
 }
 
 func x86_int_3(f *objfile) void {
@@ -558,6 +580,18 @@ func encode_reg_rm(reg u8, rm_addr u8, rm_disp i32) reg_rm_encoded {
   return ret;
 }
 
+func encode_placeholder_reg_rm(reg_and_rm_addr u8, reloc_offset_out *size) reg_rm_encoded {
+  if reg_and_rm_addr == X86_ESP {
+    ice(_u8("encode_placeholder_reg_rm does not support ESP addrs (yet)"));
+  }
+  ret reg_rm_encoded;
+  ret.buf[0] = mrr(MOD10, reg_and_rm_addr, reg_and_rm_addr);
+  write_le_i32(&ret.buf[1], 0);
+  *reloc_offset_out = 1;
+  ret.length = 5;
+  return ret;
+}
+
 func x86_load32(f *objfile, dest u8, src_addr u8, src_disp i32) void {
   appendtext(f, 0x8B, encode_reg_rm(dest, src_addr, src_disp));
 }
@@ -600,6 +634,14 @@ func x86_movsx16_reg16(f *objfile, dest u8, src u8) void {
 
 func x86_lea32(f *objfile, dest u8, src_addr u8, src_disp i32) void {
   appendtext(f, 0x8D, encode_reg_rm(dest, src_addr, src_disp));
+}
+
+/* Used for OS X 32-bit position-independent code.  Assigns X+srcdest to srcdest. */
+func x86_placeholder_lea32(f *objfile, srcdest u8) size {
+  reg_rm_reloc size;
+  precount size = count(&f->text.raw);
+  appendtext(f, 0x8D, encode_placeholder_reg_rm(srcdest, &reg_rm_reloc));
+  return precount + 1 + reg_rm_reloc;
 }
 
 // TODO: What?  Why would we not use movzx?  Check s1.

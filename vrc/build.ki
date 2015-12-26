@@ -4,6 +4,7 @@ import dumbgen;
 import io;
 import linux_objfile;
 import win_objfile;
+import osx_objfile;
 import objfile;
 
 func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u8]) np {
@@ -28,6 +29,8 @@ func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u
     *flattened_out = linux32_flatten(cs->im, &f);
   case Win32:
     *flattened_out = win_flatten(cs->im, &f);
+  case Osx32:
+    *flattened_out = osx32_flatten(cs->im, &f);
   }
 
   return NoFail;
@@ -45,6 +48,8 @@ func build_module(cs *checkstate, modulename sym) np {
     append(&path, _u8(".o"));
   case Win32:
     append(&path, _u8(".obj"));
+  case Osx32:
+    append(&path, _u8(".o"));
   }
 
   if !write_file(path, &flattened) {
@@ -109,6 +114,8 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
           switch cs->plat.opsys {
           case Linux32: { }
           case Win32:
+            name = _s("_") + name;
+          case Osx32:
             name = _s("_") + name;
           }
           discard sti = add_local_symbol(f, intern(cs->im, name), body_text_offset, SectionText, IsStaticNo);
@@ -188,11 +195,15 @@ func generate_kit_name(cs *checkstate, informal_name sym, arg_types shray[cu_typ
   return intern(cs->im, build + from_u8(&btmp));
 }
 
+// TODO: There is some other underscore logic elsewhere in this file.
 func c_symbol_name(cs *checkstate, name sym) sym {
   switch cs->plat.opsys {
   case Linux32:
     return name;
   case Win32:
+    namestr string = lookup(cs->im, name);
+    return intern(cs->im, _s("_") + namestr);
+  case Osx32:
     namestr string = lookup(cs->im, name);
     return intern(cs->im, _s("_") + namestr);
   }

@@ -57,6 +57,7 @@ func check_littleendian(plat *platform_info) void {
 enum platform_os {
   Linux32 void;
   Win32 void;
+  Osx32 void;
 };
 
 enum universal_calling_convention {
@@ -91,3 +92,16 @@ struct platform_info {
   // There's no such thing as a universal calling convention, and as soon as this fiction goes away we'll remove/change this.
   callconv universal_calling_convention;
 };
+
+enum callconv {
+  Gcc32Cdecl void;
+  Win32Cdecl void;
+};
+
+func callconv_style(p *platform_info) callconv {
+  switch p->opsys {
+  case Linux32: return Gcc32Cdecl;
+  case Win32: return Win32Cdecl;
+  case Osx32: return Gcc32Cdecl;
+  }
+}

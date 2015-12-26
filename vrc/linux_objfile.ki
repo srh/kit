@@ -327,6 +327,8 @@ func linux32_append_relocations_and_mutate_section(sti_map *array[u32], d *array
     case Rel32:
       rel_type = kR_386_PC32;
       addend_le = ~ - @[i32] 4;  // (There's a negative sign!)
+    case Diff32:
+      crash(_u8("linux sees Diff32 reloc"));
     }
     rel.r_info = ~((new_sti << 8) | rel_type);
     append_reinterpret(d, &rel);
@@ -421,20 +423,13 @@ func linux32_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *ar
   *end_locals_out = end_locals;
 }
 
-func linux_string_to_u8symbol(s *string) array[u8] {
-  ret array[u8];
-  build_u8str(void, &ret, s);
-  check_no_zeros(data(&ret), count(&ret));
-  return ret;
-}
-
 func push_symbol(im *identmap, symbol *objfile_symbol_record, symbols *array[u8], strings *array[u8]) void {
   // TODO: (Also in s1:) This and the for loop below is just a copy/paste job.
   ent elf32_Symtab_Entry;
   name sym = symbol->name;
   name_buf string = lookup(im, name);
 
-  offset u32 = strtab_add(strings, linux_string_to_u8symbol(&name_buf));
+  offset u32 = strtab_add(strings, zeroless_string_to_u8symbol(&name_buf));
   ent.st_name = ~offset;
   ent.st_value = ~symbol->value;
   // TODO: (Also in s1:) It's OK to just use zero for everything?

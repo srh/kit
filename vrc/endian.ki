@@ -54,6 +54,16 @@ func write_le_u16(dest *u8, x u16) void {
   dest[1] = ~ ((x >> ~ @[u8] 8) & ff);
 }
 
+struct le_i16 {
+  buf ^[2]u8;
+};
+
+func `~`(x i16) le_i16 {
+  ret le_i16;
+  write_le_i16(&ret.buf[0], x);
+  return ret;
+}
+
 func write_le_i16(dest *u8, x i16) void {
   ff i16 = ~ @[u8] 0xFF;
   dest[0] = ~ (x & ff);

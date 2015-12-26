@@ -52,6 +52,7 @@ struct objfile_section {
   // Relevant for .data and .rdata sections.  Not relevant for .text, which just uses 16.
   max_requested_alignment u32;
   relocs array[objfile_relocation];
+  diff32_count size;
 };
 
 struct objfile_relocation {
@@ -59,6 +60,8 @@ struct objfile_relocation {
   virtual_address u32;
   // Index into the symbol table.
   symbol_table_index sti;
+  // Only relevant for Diff32 -- the offset into the relocation's section that the relocation is relative to.
+  subtracted_offset u32;
   // What kind of relocation should be performed?
   type objfile_relocation_type;
 };
@@ -66,6 +69,7 @@ struct objfile_relocation {
 enum objfile_relocation_type {
   Dir32 void;
   Rel32 void;
+  Diff32 void;
 };
 
 func mk_objfile() objfile {
@@ -74,7 +78,7 @@ func mk_objfile() objfile {
 
 func mk_objfile_section() objfile_section {
   // Just start off with max_requested_alignment = 4, that's good.
-  return {mk_array@[u8](), 4, mk_array@[objfile_relocation]()};
+  return {mk_array@[u8](), 4, mk_array@[objfile_relocation](), 0};
 }
 
 func append_dir32(s *objfile_section, sti sti) void {
@@ -86,10 +90,16 @@ func append_rel32(s *objfile_section, sti sti) void {
 }
 
 func append_32bit_reloc(s *objfile_section, sti sti, type objfile_relocation_type) void {
-  reloc objfile_relocation = {~count(&s->raw), sti, type};
+  reloc objfile_relocation = {~count(&s->raw), sti, 0, type};
   push(&s->relocs, reloc);
   zero le_u32 = ~ @[u32] 0;
   append_raw(s, &zero.buf[0], 4);
+}
+
+func note_diff32(s *objfile_section, sti sti, subtracted_offset size, adjusted_offset size) void {
+  reloc objfile_relocation = {~adjusted_offset, sti, ~subtracted_offset, Diff32};
+  push(&s->relocs, reloc);
+  s->diff32_count = s->diff32_count + 1;
 }
 
 func append_raw(s *objfile_section, p *u8, n size) void {
@@ -195,3 +205,10 @@ func[T] append_reinterpret(arr *array[u8], p *T) void {
   append_raw(arr, d, n);
 }
 
+// A general utility.
+func zeroless_string_to_u8symbol(s *string) array[u8] {
+  ret array[u8];
+  build_u8str(void, &ret, s);
+  check_no_zeros(data(&ret), count(&ret));
+  return ret;
+}

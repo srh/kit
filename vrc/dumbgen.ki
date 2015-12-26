@@ -167,14 +167,22 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
   return NoFail;
 }
 
-func paramlist_cells(gr *frame_graph, gn gr_num) *shray[cell_num] {
-  if case &XOp(xn gr_xnode) = ref_node(gr, gn) {
+func as_gr_apply(nod *gr_node) *gr_apply {
+  if case &XOp(xn gr_xnode) = nod {
     if case &GrApply(a gr_apply) = &xn.op {
-      return &a.params;
+      return &a;
     }
   }
-  ice(_u8("paramlist_cells called on non-paramlist op"));
+  ice(_u8("as_gr_apply called on non-GrApply"));
   return fake();
+}
+
+func paramlist_cells(gr *frame_graph, gn gr_num) *shray[cell_num] {
+  return &as_gr_apply(ref_node(gr, gn))->params;
+}
+
+func paramlist_retcell(gr *frame_graph, gn gr_num) cell_num {
+  return as_gr_apply(ref_node(gr, gn))->retcell;
 }
 
 enum tmp_offsets_val {
@@ -272,6 +280,9 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
       duck_conflicting_cells(h, get(pcells, j), &bumpline, &offsets);
     }
 
+    // TODO(): We need the return cell info to figure out whether there's an hrp in the arglist_size.
+    bumpline = adjust_for_callsite_alignment(bumpline, funcall_arglist_size(h, pcells, paramlist_retcell(h->gr, gn)));
+
     for j size = npcells; j > 0; {
       j = j - 1;
       c cell_num = get(pcells, j);
@@ -310,6 +321,34 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
   // We subtract 4 because we haven't accounted for the possible need to make a hidden return pointer for the x86 callconv.
   annotate(&h->low_offset, low_offset - 4);
   return NoFail;
+}
+
+func funcall_arglist_size(h *frame, pcells *shray[cell_num], retcell cell_num) u32 {
+  /* X86 -- 16-byte inital alignment. */
+  offset u32 = 0;
+  ret_ci *cell_info = ref_cell(h->gr, retcell);
+  if for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props) {
+    offset = offset + 4;
+  }
+
+  n size = count(pcells);
+  for i size = 0; i < n; i = i + 1 {
+    ci *cell_info = ref_cell(h->gr, get(pcells, i));
+    check(LocationStatic == ci->location);
+    alignment u32 = max(h->cs->plat.min_stackvar_alignment, ci->props.flat_alignment);
+    offset = ceil_aligned(offset, alignment);
+    offset = offset + ci->props.flat_size;
+  }
+  offset = ceil_aligned(offset, h->cs->plat.min_stackvar_alignment);
+  return offset;
+}
+
+func adjust_for_callsite_alignment(bumpline i32, arglist_size u32) i32 {
+  // X86
+  // When bumpline is 0 we're at 8-mod-16 alignment (beneath ret and frame pointer).
+
+  provisional_line i32 = bumpline - ~arglist_size;
+  return bumpline - ((provisional_line + 8) & 15);
 }
 
 func duck_conflicting_cells(h *frame, c cell_num, bumpline *i32, offsets *array[tmp_offsets_val]) void {
@@ -471,14 +510,14 @@ func st_def_to_fnid(cs *checkstate, ip instpair) opt[fn_body_id] {
 
 // Props is the type properties of the return type.
 func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *type_properties) bool {
-  switch plat->opsys {
-  case Linux32:
+  switch callconv_style(plat) {
+  case Gcc32Cdecl:
     if case IsScalarNo = props->is_scalar {
       return true;
     } else {
       return false;
     }
-  case Win32:
+  case Win32Cdecl:
     n u32 = props->flat_size;
     if n <= 2 || n == 4 || n == 8 {
       if case &DerivedMethodTrivial = &props->move_behavior {
@@ -592,7 +631,7 @@ func dumbly_gen_function_exit(f *objfile, h *frame) void {
       if retsize <= 4 {
         x86_load32_zeroextend(f, X86_EAX, X86_EBP, loc, retsize);
       } else if retsize <= 8 {
-        // TODO: This should not even be theoretically reachable on Linux32.
+        // TODO: This should not even be theoretically reachable on Linux32/Osx32.
         x86_load32(f, X86_EAX, X86_EBP, loc);
         x86_load32_zeroextend(f, X86_EDX, X86_EBP, loc + 4, retsize - 4);
       } else {
@@ -602,14 +641,14 @@ func dumbly_gen_function_exit(f *objfile, h *frame) void {
 
     x86_mov_reg32(f, X86_ESP, X86_EBP);
     x86_pop32(f, X86_EBP);
-    switch h->cs->plat.opsys {
-    case Linux32:
+    switch callconv_style(&h->cs->plat) {
+    case Gcc32Cdecl:
       if hrp {
         x86_retn(f, ~ @[u32] 4);
       } else {
         x86_ret(f);
       }
-    case Win32:
+    case Win32Cdecl:
       x86_ret(f);
     }
 
@@ -975,7 +1014,7 @@ func x86_gen_write_value(f *objfile, h *frame, dest_loc cell_loc, value *st_valu
     check(w <= sref->car);
     x86_gen_write_data(f, h, dest_addr, dest_disp, &value->words, w, sref->car);
     symbol_table_index sti = *un(&ref_fn_body(h->cs, sref->cdr.fnid)->symbol_table_index);
-    x86_mov_stiptr(f, X86_ECX, symbol_table_index);
+    x86_mov_stiptr(&h->cs->plat, f, X86_ECX, symbol_table_index);
     check(st_symbolref_size(&h->cs->plat, &sref->cdr) == 4);
     x86_store32(f, dest_addr, dest_disp + ~sref->car, X86_ECX);
     w = sref->car + 4;
@@ -1048,7 +1087,7 @@ func x86_cmp_imm_sized(cs *checkstate, f *objfile, lhs u8, rhs *st_value, avail 
     if !from_np(x86_simple_symbolref(cs, rhs, &fnid)) {
       ice(_u8("x86_cmp_imm_sized sees non-simple (impossible) symbolref"));
     }
-    x86_mov_stiptr(f, avail, *un(&ref_fn_body(cs, fnid)->symbol_table_index));
+    x86_mov_stiptr(&cs->plat, f, avail, *un(&ref_fn_body(cs, fnid)->symbol_table_index));
     x86_cmp_w32(f, lhs, avail);
   } else {
     val u32 = get(&rhs->words, 0);
