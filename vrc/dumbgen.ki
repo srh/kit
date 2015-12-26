@@ -280,7 +280,6 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
       duck_conflicting_cells(h, get(pcells, j), &bumpline, &offsets);
     }
 
-    // TODO(): We need the return cell info to figure out whether there's an hrp in the arglist_size.
     bumpline = adjust_for_callsite_alignment(bumpline, funcall_arglist_size(h, pcells, paramlist_retcell(h->gr, gn)));
 
     for j size = npcells; j > 0; {
