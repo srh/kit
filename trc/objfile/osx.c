@@ -105,12 +105,16 @@ enum {
   MACH32_SECTION_CONST_FLAGS = 0,
   MACH32_SECTION_DATA_FLAGS = 0,
 
-/* i.e. these values are sizeof(struct mach32_relocation_info). */
+  /* i.e. these values are sizeof(struct mach32_relocation_info). */
   MACH32_RELOC_ALIGNMENT = 8,
   MACH32_RELOC_SIZE = 8,
 
-/* mach32_nlist is 12 bytes. */
+  /* mach32_nlist is 12 bytes. */
   MACH32_SYMTAB_ALIGNMENT = 4,
+
+  /* More file format constants. */
+  MACH32_RELOCATION_SECTDIF = 2,
+  MACH32_RELOCATION_PAIR = 1,
 };
 
 void set_fixstr(uint8_t *dest, const char *src, size_t n) {
@@ -170,11 +174,6 @@ struct le_u32 mach32_r_scattered_mask(uint32_t r_address,
   return to_le_u32(x);
 }
 
-enum {
-  MACH32_RELOCATION_SECTDIF = 2,
-  MACH32_RELOCATION_PAIR = 1,
-};
-
 struct section_addrs {
   uint32_t data_addr;
   uint32_t rdata_addr;
@@ -208,13 +207,13 @@ void osx32_append_relocations_and_mutate_output(
     uint32_t segment_file_offset) {
   for (size_t i = 0, e = s->relocs_count; i < e; i++) {
     struct objfile_relocation *reloc = &s->relocs[i];
+    struct objfile_symbol_record *symbol
+      = &f->symbol_table[uint32_to_size(reloc->symbol_table_index.value)];
     switch (reloc->type) {
     case OBJFILE_RELOCATION_TYPE_DIR32:
       /* Globals use call/pop to get eip. */
       CRASH("osx32 only uses rel32 relocations");
     case OBJFILE_RELOCATION_TYPE_REL32: {
-      struct objfile_symbol_record *symbol
-        = &f->symbol_table[uint32_to_size(reloc->symbol_table_index.value)];
       struct mach32_relocation_info info;
       const uint32_t r_address
         = osx32_adjusted_addr(addrs, (enum objfile_symbol_section)sect,
@@ -259,8 +258,6 @@ void osx32_append_relocations_and_mutate_output(
       const uint32_t virtual_address
         = osx32_adjusted_addr(addrs, (enum objfile_symbol_section)sect,
                               reloc->virtual_address);
-      struct objfile_symbol_record *symbol
-        = &f->symbol_table[uint32_to_size(reloc->symbol_table_index.value)];
       const int32_t target_offset
         = uint32_to_int32(osx32_adjusted_addr(addrs, symbol->section, symbol->value));
       const int32_t subtracted_offset
@@ -295,8 +292,8 @@ void osx32_append_relocations_and_mutate_output(
         databuf_append(d, &info2, sizeof(info2));
       }
 
-      uint32_t displacement = int32_sub(target_offset, subtracted_offset);
-      struct le_u32 le_displacement = to_le_u32(displacement);
+      int32_t displacement = int32_sub(target_offset, subtracted_offset);
+      struct le_i32 le_displacement = to_le_i32(displacement);
       databuf_overwrite(d, uint32_to_size(uint32_add(segment_file_offset, virtual_address)),
                         &le_displacement, sizeof(le_displacement));
     } break;
@@ -482,7 +479,6 @@ void osx32_flatten(struct identmap *im, struct objfile *f, struct databuf **out)
   }
 
   const uint32_t text_offset = uint32_add(segment_fileoff, text_addr);
-
   /* 1st section */
   {
     STATIC_CHECK(kOSX32TextSectionNumber == 1);

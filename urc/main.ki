@@ -88,6 +88,10 @@ func main_u8(args *array[array[u8]]) i32 {
     if !run_on_file(x86_linux32_platform(), get(args, 2)) {
       return 1;
     }
+  } else if argc == 3 && u8_equal(get(args, 1), _u8("--osx")) {
+    if !run_on_file(x86_osx32_platform(), get(args, 2)) {
+      return 1;
+    }
   } else {
     print(Stderr(), _u8("Usage: "), get(args, 0), _u8(" [[--linux] <module>]\n"));
     return 1;

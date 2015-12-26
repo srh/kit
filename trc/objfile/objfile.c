@@ -189,7 +189,7 @@ void objfile_section_append_32bit_reloc(struct objfile_section *s,
                                         enum objfile_relocation_type type) {
   CHECK(type != OBJFILE_RELOCATION_TYPE_DIFF32);
   struct objfile_relocation reloc;
-  reloc.virtual_address = s->raw.count;
+  reloc.virtual_address = size_to_uint32(s->raw.count);
   reloc.symbol_table_index = symbol_table_index;
   reloc.subtracted_offset = 0;  /* garbage, only used for DIFF32 */
   reloc.type = type;
@@ -215,9 +215,9 @@ void objfile_section_note_diff32(struct objfile_section *s,
                                  size_t subtracted_offset,
                                  size_t adjusted_offset) {
   struct objfile_relocation reloc;
-  reloc.virtual_address = adjusted_offset;
+  reloc.virtual_address = size_to_uint32(adjusted_offset);
   reloc.symbol_table_index = symbol_table_index;
-  reloc.subtracted_offset = subtracted_offset;
+  reloc.subtracted_offset = size_to_uint32(subtracted_offset);
   reloc.type = OBJFILE_RELOCATION_TYPE_DIFF32;
   SLICE_PUSH(s->relocs, s->relocs_count, s->relocs_limit, reloc);
   s->diff32_count = uint32_add(s->diff32_count, 1);

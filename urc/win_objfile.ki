@@ -333,6 +333,8 @@ func win_append_relocs(d *array[u8], relocs *array[objfile_relocation]) void {
       coff_reloc.Type = ~ @[u16] ~IMAGE_REL_I386_DIR32;
     case Rel32:
       coff_reloc.Type = ~ @[u16] ~IMAGE_REL_I386_REL32;
+    case Diff32:
+      crash(_u8("win32 sees Diff32 reloc"));
     }
     append_reinterpret(d, &coff_reloc);
   }

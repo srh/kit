@@ -1376,7 +1376,7 @@ void x86_gen_lea32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
-/* Used for OS X 32-bit position-independent code.  Assigns X+srcdest to srcdest*/
+/* Used for OS X 32-bit position-independent code.  Assigns X+srcdest to srcdest. */
 size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest) {
   uint8_t b[10];
   b[0] = 0x8D;
