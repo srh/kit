@@ -14,6 +14,10 @@ or  (on 32-bit Linux, or 64-bit with gcc-multilib)
 
    ./linux_build.sh; ./linux_build_s2.sh; ./linux_build_s3.sh
 
+or  (on OS X, with XCode tools (i.e. clang) installed)
+
+   ./osx_build.sh; ./osx_build_s2.sh; ./osx_build_s3.sh
+
 
   RUN INSTRUCTIONS
 
@@ -25,23 +29,26 @@ or  (on 32-bit Linux, or 64-bit with gcc-multilib)
 
    # Build modulename.ki and its imports, outputting modulename.o
    s3 --linux <modulename>
+   s3 --osx <modulename>
 
 
 Again:
 
-# Prerequisites: An x86 CPU.  Windows or Linux.  On Windows, MSVC
-# 2013 or 2015 (something with basic C99 support) -- for example,
-# run these commands from a "Developer Command Prompt for VS2015".
-# On Linux, gcc with 32-bit support, which usually means some
-# gcc-multilib package.  Maybe clang works too.
+# Prerequisites: An x86 CPU.  Windows, Linux, FreeBSD, or OS X.  On
+# Windows, MSVC 2013 or 2015 (something with basic C99 support) --
+# for example, run these commands from a "Developer Command Prompt
+# for VS2015".  On Linux, gcc with 32-bit support, which usually
+# means some gcc-multilib package.  On OS X, clang (i.e. XCode's
+# command line tools).  FreeBSD works out of the box with "--linux"
+# (because we use vanilla libc).
 
 # Step 1. Build s1 -- creates executable "out.exe" (or "out")
 
-   windows_build.bat  (or ./linux_build.sh)
+   windows_build.bat  (or ./linux_build.sh, or ./osx_build.sh)
 
 # Step 2. Build s2 -- creates executable "s2.exe" (or "s2")
 
-   windows_build_s2.bat  (or ./linux_build_s2.sh)
+   windows_build_s2.bat  (or ./linux_..., or ...)
 
 # Step 3. Build s3
 
