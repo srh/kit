@@ -85,6 +85,8 @@ The current directory structure is:
    s2    # runs parsing/typechecking tests without codegen.
    s2 --build    # runs parsing/typechecking tests with codegen.
    s2 <modulename>  # builds <modulename>.ki and its imports.
+   s2 --linux <modulename>  # same but outputs a Linux .o file.
+   s2 --osx <modulename>  # same but outputs an OS X .o file.
    s3 ...    # same as s2.
 
   ABOUT THE VERSIONS

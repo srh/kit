@@ -1,6 +1,6 @@
 // TODO: c_int.
 
-defclass FILE void;
+defclass FILE { };
 extern Stdout fn[*FILE];
 extern putchar fn[i32, i32];
 // buffer, size, count, stream
@@ -8,7 +8,7 @@ extern fwrite fn[*void, size, size, *FILE, size];
 extern fflush fn[*FILE, i32];
 
 export func main() i32 {
-  arr [_]u8 = "Hello, world!\n";
+  arr ^[_]u8 = "Hello, world!\n";
   fwrite(@[*void]cast(&arr[0]), 1, arr.length, Stdout());
   fflush(Stdout());
   return 0;
