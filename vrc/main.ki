@@ -45,6 +45,10 @@ func file_loader(cs *checkstate, name sym, out *array[u8]) bool {
 }
 
 func run_on_file(plat platform_info, modulename array[u8]) bool {
+  if ends_with(_u8(".ki"), modulename) {
+    truncate(&modulename, count(&modulename) - 3);
+    print(Stderr(), _u8("(Removed '.ki' suffix...)\n"));
+  }
   im identmap = make_im();
   cs checkstate = make_checkstate(&im, plat, null, file_loader);
   add_primitives(&cs);
