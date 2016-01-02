@@ -21,6 +21,8 @@ void objfile_section_init(struct objfile_section *s) {
   s->relocs = NULL;
   s->relocs_count = 0;
   s->relocs_limit = 0;
+
+  s->diff32_count = 0;
 }
 
 void objfile_section_destroy(struct objfile_section *s) {
