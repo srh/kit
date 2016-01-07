@@ -62,7 +62,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       return NoFail;
 
     case &GrPrimApply(a gr_prim_apply):
-      output(h, liveset, a.retcell);
+      input(liveset, a.retcell);
 
       nparams size = count(&a.params);
       for i size = 0; i < nparams; i = i + 1 {
