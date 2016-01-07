@@ -253,6 +253,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
 
               // Now we overwrite the apply op.
               // TODO: It would be nice if function bodies always had to set their return cell live, instead of having it be done for them with our GrWriteNothing statement.
+              // TODO(): Would it?  It seems like the return cell is live (but inactive) when we enter the function.  The definition of "live" might have gotten more refined since the previous comment.  The return cell should be made live _before_ the gr_apply statement.  Thus this GrWriteNothing should go away.  For example, a return cell in a strinit is made live by a GrSubcell op.  A return cell in a typical rvalue is made live by a GrLive op.
               precs_op gr_num = addx(gr, xn.precs, @[gr_xop]GrDead({a.funcell}));
               seqer sq_num = seqq(gr, {precs_op,
                                        seqq(gr, {addx(gr, @[gr_xop]GrWriteNothing({a.retcell})),
@@ -319,6 +320,8 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
       return XOp({newprecs, GrSubcell({get(cm, a.name.x), get(cm, a.partof.x), help_adjust_offset(cm, &a.offset)})});
     case &GrWriteNothing(a gr_writenothing):
       return XOp({newprecs, GrWriteNothing({get(cm, a.dest.x)})});
+    case &GrLive(a gr_live):
+      return XOp({newprecs, GrLive({get(cm, a.cell.x)})});
     case &GrDead(a gr_dead):
       return XOp({newprecs, GrDead({get(cm, a.cell.x)})});
     case &GrVirtualDead(a gr_virtual_dead):

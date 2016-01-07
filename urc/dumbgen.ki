@@ -833,6 +833,9 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         case &GrWriteNothing(a gr_writenothing):
           DUMBGEN("GrWriteNothing");
           // Do nothing.  (This graph node is used for static eval, book keeping, etc.)
+        case &GrLive(a gr_live):
+          DUMBGEN("GrLive");
+          // Do nothing.  (This graph node is used for static eval, book keeping, etc.)
         case &GrDead(a gr_dead):
           DUMBGEN("GrDead");
           // Do nothing.  (Likewise.)

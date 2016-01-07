@@ -549,9 +549,29 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
             return ERR(_u8("Accessing subcell of dead object"));
           }
           *ref(&env->framecells, a.name.x) = Has(@[st_obj_ref]{partof_obj.num, new_offset, deref_size});
+
         case &GrWriteNothing(a gr_writenothing):
           st_maybe_init_static(&fg->gr, env, a.dest);
           destref st_obj_ref = cell_obj_ref(env, a.dest, "in XII");
+          value st_value = mk_st_value(&env->plat, destref.count);
+          if case Printed(pm) = obj_write(env, destref, &value) {
+            return Printed(pm);
+          }
+
+        case &GrLive(a gr_live):
+          // TODO(): This duplicates a lot of logic with st_maybe_init_static?
+          if isHas(ref(&env->framecells, a.cell.x)) {
+            return ERR(_u8("GrLive sees already-live cell"));
+          }
+          info *cell_info = ref_cell(&fg->gr, a.cell);
+          if !isLocationStatic(location(info)) {
+            return ERR(_u8("GrLive on non-static cell"));
+          }
+
+          objnum st_obj_num = add_obj(env, info->props.flat_size);
+          *ref(&env->framecells, a.cell.x) = Has(@[st_obj_ref]{objnum, 0, info->props.flat_size});
+
+          destref st_obj_ref = cell_obj_ref(env, a.cell, "in XII");
           value st_value = mk_st_value(&env->plat, destref.count);
           if case Printed(pm) = obj_write(env, destref, &value) {
             return Printed(pm);
@@ -581,6 +601,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
         case &GrXNop: { }
 
         }
+
       case &QOp(qn gr_qnode):
         switch &qn.op {
         case &GrBranch(a gr_branch):
@@ -902,6 +923,7 @@ func st_maybe_init_static(gr *frame_graph, env *st_env, cell cell_num) void {
   if isHas(ref(&env->framecells, cell.x)) {
     return;
   }
+
   info *cell_info = ref_cell(gr, cell);
   if !isLocationStatic(location(info)) {
     return;

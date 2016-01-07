@@ -108,6 +108,11 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       *out = Terminal;
       return NoFail;
 
+    case &GrLive(a gr_live):
+      create(h, liveset, a.cell);
+      *out = Terminal;
+      return NoFail;
+
     case &GrDead(a gr_dead):
       deaden(liveset, a.cell);
       *out = Terminal;
@@ -122,6 +127,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       *out = Terminal;
       return NoFail;
     }
+
   case &QOp(qn gr_qnode):
     switch &qn.op {
     case &GrBranch(a gr_branch):
@@ -221,7 +227,7 @@ func input(liveset *lives, c cell_num) void {
 }
 
 // output either makes the cell live, if it wasn't already, or it means we use the cell.
-// (Yes, that's so lame -- we should add GrMakeLive.)
+// (TODO(): We're adding GrLive, so this should become obsolete.)
 func output(h *frame, liveset *lives, c cell_num) void {
   if try_insert(&liveset->all, c) {
     liveset->xored = liveset->xored ^ ~c.x;
@@ -233,7 +239,7 @@ func output(h *frame, liveset *lives, c cell_num) void {
 func create(h *frame, liveset *lives, c cell_num) void {
   // Both these places define the virtual cell.  So it should not be live.
   if !try_insert(&liveset->all, c) {
-    ice(_u8("virtual on live cell "), c.x);
+    ice(_u8("create on live cell "), c.x);
   }
   liveset->xored = liveset->xored ^ ~c.x;
   liveset->summed = liveset->summed + ~c.x;

@@ -101,6 +101,7 @@ enum gr_xop {
   GrDeref gr_deref;
   GrSubcell gr_subcell;
   GrWriteNothing gr_writenothing;
+  GrLive gr_live;
   GrDead gr_dead;
   GrVirtualDead gr_virtual_dead;
   GrXNop void;
@@ -234,8 +235,14 @@ struct gr_jmp {
   next sq_num;
 };
 
+// TODO(): Get rid of gr_writenothing.
 struct gr_writenothing {
   dest cell_num;
+};
+
+// Declares a cell to be live.  The cell may not have previously been live.  The cell location must be static -- otherwise, gr_deref or gr_subcell will make the cell live.
+struct gr_live {
+  cell cell_num;
 };
 
 struct gr_dead {
