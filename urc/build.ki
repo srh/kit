@@ -73,12 +73,12 @@ func build_fn_bodies(cs *checkstate, f *objfile) np {
 func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) np {
   switch &ent->u {
   case &GraphedFnBody(g graphed_fn_body):
+    // DBG(_u8("build fn body for "), lookup(cs->im, g.graph.gr.informal_name));
     if case Printed(pm) = basic_and_inline(cs, &g) {
       return Printed(pm);
     }
 
     fillercode_align_double_quadword(f);
-    // DBG(_u8("gen graphed fn body for "), lookup(cs->im, g.graph.gr.informal_name));
     text_offset u32 = secsize(&f->text);
     set_symbol_value(f, *un(&ent->symbol_table_index), text_offset);
     annotate(&ent->body_text_offset, text_offset);
