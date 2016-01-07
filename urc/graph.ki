@@ -966,6 +966,7 @@ func gr_assert_live_before(gr *frame_graph, cell cell_num, after gr_num) gr_num 
 }
 
 func gr_expr_and_consume(clq *clqueue, gr *frame_graph, x *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
+  // TODO(): Oh boy do we need to fix this.  If we consume a non-whole rvalue, how does the whole val get made live?
   expr_gn gr_num;
   if case Printed(pm) = gr_expr(clq, gr, x, &expr_gn) {
     return Printed(pm);
@@ -1103,8 +1104,6 @@ func gr_mk_ternary(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_ternary, o
 }
 
 func gr_mk_strinit(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_strinit, out *gr_num) np {
-  ngn gr_num = addx(gr, @[gr_xop]GrWriteNothing({rval_cell(x)}));
-
   precs array[gr_num];
   nparams size = count(&a->exprs);
   reserve(&precs, nparams);
@@ -1122,8 +1121,7 @@ func gr_mk_strinit(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_strinit, o
     push(&precs, prec.x);
   }
   np var = addx(gr, freeze(&precs), @[gr_xop]GrXNop);
-  gn sq_num = seqq(gr, {ngn, seq1(gr, np)});
-  *out = gn.x;
+  *out = np;
   return NoFail;
 }
 
