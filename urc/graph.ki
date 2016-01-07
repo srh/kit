@@ -1098,10 +1098,7 @@ func gr_mk_ternary(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_ternary, o
     return Printed(pm);
   }
 
-  seq sq_num = seqq(gr, {
-    addx(gr, @[gr_xop]GrWriteNothing({conjoined})),
-    cond_sn});
-  *out = seq.x;
+  *out = cond_sn.x;
   return NoFail;
 }
 
@@ -1332,6 +1329,8 @@ func gr_mk_refof(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_refof, out *
 }
 
 func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment, out *gr_num) np {
+  // The lhs is an lvalue.  If the rhs is an rvalue, we need to make its cell live.
+
   lp gr_num;
   if case Printed(pm) = gr_expr(clq, gr, oo(&a->lhs), &lp) {
     return Printed(pm);
@@ -1340,13 +1339,14 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
   if case Printed(pm) = gr_expr(clq, gr, oo(&a->rhs), &rp) {
     return Printed(pm);
   }
-  lp_rp_nop gr_num = addx(gr, mk_shray(lp, rp), @[gr_xop]GrXNop);
   switch un(&a->info) {
     case &StaticSelfAssignment: {
-      *out = lp_rp_nop;
+      // rhs is an lvalue.
+      *out = addx(gr, mk_shray(lp, rp), @[gr_xop]GrXNop);
       return NoFail;
     }
     case &SimpleMoveAssignment(smi ast_simple_move_assignment_info): {
+      // rhs is an rvalue.
       dgn gr_num;
       if case Printed(pm) = gr_destroy_action(clq, gr, &smi.target_destroy, DeadAfterDestroyNo, &dgn) {
         return Printed(pm);
@@ -1356,6 +1356,8 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
         return Printed(pm);
       }
       gn1 sq_num = seqq(gr, {dgn, seq1(gr, mgn)});
+      // rhs is an rvalue.
+      lp_rp_nop gr_num = addx(gr, mk_shray(lp, gr_live_before(gr, whole_cell(oo(&a->rhs)), rp)), @[gr_xop]GrXNop);
       gn2 sq_num = seqq(gr, {lp_rp_nop, gn1});
       *out = gn2.x;
       return NoFail;
@@ -1379,6 +1381,8 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       }
       gn1 sq_num = seqq(gr, {mgn, seq1(gr, drgn)});
       gn2 sq_num = seqq(gr, {dgn, gn1});
+      // rhs is an rvalue.
+      lp_rp_nop gr_num = addx(gr, mk_shray(lp, gr_live_before(gr, whole_cell(oo(&a->rhs)), rp)), @[gr_xop]GrXNop);
       gn3 sq_num = seqq(gr, {lp_rp_nop, gn2});
       *out = gn3.x;
       return NoFail;
@@ -1399,6 +1403,8 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
         }
       }
       gn1 sq_num = seqq(gr, {dgn, seq1(gr, mgn)});
+      // rhs is an lvalue.
+      lp_rp_nop gr_num = addx(gr, mk_shray(lp, rp), @[gr_xop]GrXNop);
       gn2 sq_num = seqq(gr, {lp_rp_nop, gn1});
       *out = gn2.x;
       return NoFail;
@@ -1448,6 +1454,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
 
       br var = seqq(gr, {ap,
         addq(gr, @[gr_qop]GrBranch({cmp_result, cases, None}))});
+      lp_rp_nop gr_num = addx(gr, mk_shray(lp, rp), @[gr_xop]GrXNop);
       seq_lp_rp_nop var = seqq(gr, {lp_rp_nop, br});
       *out = seq_lp_rp_nop.x;
       return NoFail;
@@ -1609,6 +1616,20 @@ func rval_cell(x *is_lval) cell_num {
       ice(_u8("rval_cell sees lvalue"));
       return fake();
     }
+  }
+}
+
+func whole_cell(x *ast_expr) cell_num {
+  return whole_cell(&expr_complete_info(x)->lval);
+}
+
+func whole_cell(x *is_lval) cell_num {
+  switch x {
+  case &IsLvalNo(desc rval_description):
+    return desc.whole_num;
+  case &IsLvalYes(desc lval_description):
+    ice(_u8("whole_cell sees lvalue"));
+    return fake();
   }
 }
 
