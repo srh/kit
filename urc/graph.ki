@@ -1076,7 +1076,7 @@ func gr_mk_ternary(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_ternary, o
     return Printed(pm);
   }
 
-  conjoined cell_num = un(&a->info)->conjoined_result_cell;
+  conjoined cell_num = rval_cell(x);
 
   then_sn sq_num = seqq(gr, {
     addx(gr, @[gr_xop]GrSubcell({result_cell(oo(&a->then_clause)), conjoined, OffsetConst(0)})),
