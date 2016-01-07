@@ -78,7 +78,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       return NoFail;
 
     case &GrWriteConst(a gr_writeconst):
-      output(h, liveset, a.dest);
+      input(liveset, a.dest);
       *out = Terminal;
       return NoFail;
 
