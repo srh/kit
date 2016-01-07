@@ -944,10 +944,6 @@ func gr_live_and_expr_consume(clq *clqueue, gr *frame_graph, x *ast_expr_consume
   return NoFail;
 }
 
-func gr_expr_consume(clq *clqueue, gr *frame_graph, x *ast_expr_consume, out *gr_num) np {
-  return gr_expr_and_consume(clq, gr, &x->expr, un(&x->after), out);
-}
-
 func gr_xop_before(gr *frame_graph, op gr_xop, after gr_num) gr_num {
   assert_gn sq_num = seqq(gr, {addx(gr, op), seq1(gr, after)});
   return assert_gn.x;
@@ -965,21 +961,21 @@ func gr_assert_live_before(gr *frame_graph, cell cell_num, after gr_num) gr_num 
   return gr_xop_before(gr, @[gr_xop]GrAssertLive({cell}), after);
 }
 
+func gr_expr_consume(clq *clqueue, gr *frame_graph, x *ast_expr_consume, out *gr_num) np {
+  return gr_expr_and_consume(clq, gr, &x->expr, un(&x->after), out);
+}
+
 func gr_expr_and_consume(clq *clqueue, gr *frame_graph, x *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
-  // TODO(): Oh boy do we need to fix this.  If we consume a non-whole rvalue, how does the whole val get made live?
   expr_gn gr_num;
   if case Printed(pm) = gr_expr(clq, gr, x, &expr_gn) {
     return Printed(pm);
   }
   after_gn gr_num;
-  if case Printed(pm) = gr_consume_actions(clq, gr, expr_gn, &aft->actions, &after_gn) {
+  if case Printed(pm) = gr_consume_actions(clq, gr, expr_gn, x, aft, &after_gn) {
     return Printed(pm);
   }
 
-  // gr_expr_consume isn't supposed to make the result cell live.
-  assert_gn gr_num = gr_assert_live_before(gr, result_cell(aft), after_gn);
-
-  *out = assert_gn;
+  *out = after_gn;
   return NoFail;
 }
 
@@ -1233,7 +1229,7 @@ func gr_index_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_index_expr
     name cell_num = ellval_cell(x);
     flat_size u32 = ref_cell(gr, name)->props.flat_size;
     lgn gr_num;
-    if case Printed(pm) = gr_consume_actions(clq, gr, lp, &aft.car.actions, &lgn) {
+    if case Printed(pm) = gr_consume_actions(clq, gr, lp, oo(&a->lhs), &aft.car, &lgn) {
       return Printed(pm);
     }
     live_before_lgn gr_num = gr_live_before(gr, result_cell(&aft.car), lgn);
@@ -1658,8 +1654,8 @@ func gr_chain_virtualdead(clq *clqueue, gr *frame_graph, prec gr_num, c cell_num
   return NoFail;
 }
 
-func gr_consume_actions(clq *clqueue, gr *frame_graph, prec gr_num, x *consume_actions, out *gr_num) np {
-  switch x {
+func gr_consume_actions(clq *clqueue, gr *frame_graph, prec gr_num, expr *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
+  switch &aft->actions {
   case &ConsumeByInPlace: { }
   case &ConsumeByCopyDestroy(cd copy_destroy_action):
     dep gr_num;
@@ -1674,6 +1670,9 @@ func gr_consume_actions(clq *clqueue, gr *frame_graph, prec gr_num, x *consume_a
       return Printed(pm);
     }
     prec = seqq(gr, {prec, seq1(gr, dep)}).x;
+    // TODO(): This is so gross.
+    // It's an rvalue, we make the whole cell live before evaling.
+    prec = gr_live_before(gr, whole_cell(expr), prec);
   case &ConsumeByCopy(cc tup[copy_action, lval_deadme]):
     dep gr_num;
     if case Printed(pm) = gr_copy_action(clq, gr, &cc.car, &dep) {
@@ -1692,6 +1691,7 @@ func gr_consume_actions(clq *clqueue, gr *frame_graph, prec gr_num, x *consume_a
     }
     prec = seqq(gr, {prec, seq1(gr, dep)}).x;
   }
+  live_before_prec gr_num = gr_assert_live_before(gr, result_cell(aft), prec);
   *out = prec;
   return NoFail;
 }
