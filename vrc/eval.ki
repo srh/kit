@@ -407,7 +407,6 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
       case &XOp(xn gr_xnode):
         switch &xn.op {
         case &GrApply(a gr_apply):
-          // TODO: GrApply (and maybe some other things) should deaden parameters.  (But we do already with parameters?)
           funref st_obj_ref = cell_obj_ref(env, a.funcell, "in I");
           if !is_full_oref(env, funref) {
             ice(_u8("Function apply funptr cell is sub-object"));
@@ -416,6 +415,8 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           if case Printed(pm) = obj_read(env, funref, &funvalue) {
             return Printed(pm);
           }
+          st_deaden(env, a.funcell);
+
           funcval st_symbolref;
           if case Printed(pm) = st_value_as_symbolref(&env->plat, &funvalue, &funcval) {
             return Printed(pm);
@@ -549,26 +550,33 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
             return ERR(_u8("Accessing subcell of dead object"));
           }
           *ref(&env->framecells, a.name.x) = Has(@[st_obj_ref]{partof_obj.num, new_offset, deref_size});
-        case &GrWriteNothing(a gr_writenothing):
-          st_maybe_init_static(&fg->gr, env, a.dest);
-          destref st_obj_ref = cell_obj_ref(env, a.dest, "in XII");
+
+        case &GrLive(a gr_live):
+          // TODO(): This duplicates a lot of logic with st_maybe_init_static?
+          if isHas(ref(&env->framecells, a.cell.x)) {
+            return ERR(_u8("GrLive sees already-live cell "), to_u8str(a.cell.x));
+          }
+          info *cell_info = ref_cell(&fg->gr, a.cell);
+          if !isLocationStatic(location(info)) {
+            return ERR(_u8("GrLive on non-static cell"));
+          }
+
+          objnum st_obj_num = add_obj(env, info->props.flat_size);
+          *ref(&env->framecells, a.cell.x) = Has(@[st_obj_ref]{objnum, 0, info->props.flat_size});
+
+          destref st_obj_ref = cell_obj_ref(env, a.cell, "in XII");
           value st_value = mk_st_value(&env->plat, destref.count);
           if case Printed(pm) = obj_write(env, destref, &value) {
             return Printed(pm);
           }
 
-        case &GrDead(a gr_dead):
-          // We make the object destroyed and mark its cell inactive.
-          if case &Has(objref st_obj_ref) = ref(&env->framecells, a.cell.x) {
-            // (We should only be using GrDead for cells that own the whole object.)
-            if !is_full_oref(env, objref) {
-              ice(_u8("GrDead sees non-full objref"));
-            }
-            *ref(&env->pool->objects, objref.num.x) = None;
-          } else {
-            ice(_u8("GrDead deading inactive cell"));
+        case &GrAssertLive(a gr_assert_live):
+          if !isHas(ref(&env->framecells, a.cell.x)) {
+            return ERR(_u8("GrAssertLive sees un-live cell."));
           }
-          *ref(&env->framecells, a.cell.x) = None;
+
+        case &GrDead(a gr_dead):
+          st_deaden(env, a.cell);
 
         case &GrVirtualDead(a gr_virtual_dead):
           // TODO: At some point we'll want to assert that virtual cells (and static cells) dead when we define them _active_.
@@ -580,7 +588,10 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
 
         case &GrXNop: { }
 
+        case &GrPrint(a gr_print):
+          DBG(_u8("GrPrint: "), a.msg);
         }
+
       case &QOp(qn gr_qnode):
         switch &qn.op {
         case &GrBranch(a gr_branch):
@@ -631,6 +642,20 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
   return NoFail;
 }
 
+func st_deaden(env *st_env, cell cell_num) void {
+  // We make the object destroyed and mark the cell inactive.
+  if case &Has(objref st_obj_ref) = ref(&env->framecells, cell.x) {
+    // (We should only be using GrDead and st_deaden for cells that own the whole object.)
+    if !is_full_oref(env, objref) {
+      ice(_u8("st_deaden sees non-full objref"));
+    }
+    *ref(&env->pool->objects, objref.num.x) = None;
+  } else {
+    ice(_u8("deading unlive cell"));
+  }
+  *ref(&env->framecells, cell.x) = None;
+}
+
 func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, fnid fn_body_id) np {
   nparams size = count(paramorefs);
   switch &ref_fn_body(clq->cs, fnid)->u {
@@ -654,6 +679,10 @@ func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], r
   case &ExternFnBody(exent extern_fn_body):
     return ERR(_u8("st_eval_fn_body cannot eval extern fn body named "), lookup(clq->im, exent.name));
   }
+}
+
+func is_dead_oref(env *st_env, oref st_obj_ref) bool {
+  return !isHas(ref(&env->pool->objects, oref.num.x));
 }
 
 func is_full_oref(env *st_env, oref st_obj_ref) bool {
@@ -902,6 +931,7 @@ func st_maybe_init_static(gr *frame_graph, env *st_env, cell cell_num) void {
   if isHas(ref(&env->framecells, cell.x)) {
     return;
   }
+
   info *cell_info = ref_cell(gr, cell);
   if !isLocationStatic(location(info)) {
     return;

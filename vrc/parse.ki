@@ -847,7 +847,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
           return Fail;
         }
         m ast_meta = copyend(p, lhs.meta);
-        lhs = mk(m, @[ast_expr_enum]Ternary({NotComputed, embox(@[ast_expr_condition]{mk_later(), embox(consume(&lhs))}), embox(consume(&then_clause)), embox(consume(&else_clause))}));
+        lhs = mk(m, @[ast_expr_enum]Ternary({embox(@[ast_expr_condition]{mk_later(), embox(consume(&lhs))}), embox(consume(&then_clause)), embox(consume(&else_clause))}));
       }
     } else if case Has(is_incr bool) = is_postfix_incrdecr(peek(p)->val) {
       oper_meta ast_meta = startend(p);

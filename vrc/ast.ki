@@ -512,12 +512,7 @@ struct ast_strinit {
   exprs array[ast_strinit_param];
 };
 
-struct ast_ternary_info {
-  conjoined_result_cell cell_num;
-};
-
 struct ast_ternary {
-  info nc[ast_ternary_info];
   // I'm not crazy enough to support case patterns in ternary operators yet.
   condition box[ast_expr_condition];
   then_clause box[ast_expr_consume];

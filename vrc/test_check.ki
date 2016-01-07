@@ -1931,7 +1931,26 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
     _u8("func blah(x i32) u32 {\n"
         "  return x == 3 then 99 else 66;\n"
         "}\n"));
-}
+  run_check_test(ctx, "c156",
+    _u8("func blah(x i32) u32 {\n"
+        "  y u32 = x == 3 then 99 else 66;\n"
+        "  y = y == 3 then 0 else 1;\n"
+        "  return y;\n"
+        "}\n"));
+
+  run_check_test(ctx, "c157",
+    _u8("struct foo { a i32; b i32; };\n"
+        "func blah(x i32) i32 {\n"
+        "  y foo = {x, 3};\n"
+        "  return y.a;\n"
+        "}\n"));
+  run_check_test(ctx, "c158",
+    _u8("struct foo { a i32; b i32; };\n"
+        "func blah(x i32) i32 {\n"
+        "  y i32 = (@[foo]{x, 3}).a;\n"
+        "  return y;\n"
+        "}\n"
+        "def glob i32 = blah(1);\n"));}
 
 func mk_ctx(build bool, name opt[array[u8]]) check_ctx { return {build, name, 0}; }
 
