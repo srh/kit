@@ -830,9 +830,6 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
             x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
             x86_store32(f, X86_EBP, off, X86_EAX);
           }
-        case &GrWriteNothing(a gr_writenothing):
-          DUMBGEN("GrWriteNothing");
-          // Do nothing.  (This graph node is used for static eval, book keeping, etc.)
         case &GrLive(a gr_live):
           DUMBGEN("GrLive");
           // Do nothing.  (This graph node is used for static eval, book keeping, etc.)

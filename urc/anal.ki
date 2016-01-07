@@ -252,11 +252,10 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
               base_op_adjusted gr_num = ~(eg.graph.gn.x + op_addend);
 
               // Now we overwrite the apply op.
-              // TODO: It would be nice if function bodies always had to set their return cell live, instead of having it be done for them with our GrWriteNothing statement.
-              // TODO(): Would it?  It seems like the return cell is live (but inactive) when we enter the function.  The definition of "live" might have gotten more refined since the previous comment.  The return cell should be made live _before_ the gr_apply statement.  Thus this GrWriteNothing should go away.  For example, a return cell in a strinit is made live by a GrSubcell op.  A return cell in a typical rvalue is made live by a GrLive op.
+              // A GrApply always needs the return cell to be live before it's called.  So we add GrAssertLive to verify that's the case.
               precs_op gr_num = addx(gr, xn.precs, @[gr_xop]GrDead({a.funcell}));
               seqer sq_num = seqq(gr, {precs_op,
-                                       seqq(gr, {addx(gr, @[gr_xop]GrWriteNothing({a.retcell})),
+                                       seqq(gr, {addx(gr, @[gr_xop]GrAssertLive({a.retcell})),
                                                  seqq(gr, {base_op_adjusted,
                                                            nopq(gr)})})});
 
@@ -319,8 +318,6 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
       return XOp({newprecs, GrDeref({get(cm, a.name.x), get(cm, a.pointer.x), help_adjust_offset(cm, &a.offset)})});
     case &GrSubcell(a gr_subcell):
       return XOp({newprecs, GrSubcell({get(cm, a.name.x), get(cm, a.partof.x), help_adjust_offset(cm, &a.offset)})});
-    case &GrWriteNothing(a gr_writenothing):
-      return XOp({newprecs, GrWriteNothing({get(cm, a.dest.x)})});
     case &GrLive(a gr_live):
       return XOp({newprecs, GrLive({get(cm, a.cell.x)})});
     case &GrAssertLive(a gr_assert_live):

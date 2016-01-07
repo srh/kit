@@ -100,7 +100,6 @@ enum gr_xop {
   GrAddressof gr_addressof;
   GrDeref gr_deref;
   GrSubcell gr_subcell;
-  GrWriteNothing gr_writenothing;
   GrLive gr_live;
   // TODO(): This just exists to make us more confident about our new GrLive changes.  Get rid of this.
   GrAssertLive gr_assert_live;
@@ -1418,7 +1417,8 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       fc var = addx(gr, @[gr_xop]GrWriteConst({funcell, ConstDef(ci.comparecells)}));
       dp var = addx(gr, @[gr_xop]GrAddressof({destptr, destcell}));
       sp var = addx(gr, @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
-      ap var = addx(gr, mk_shray(fc, dp, sp), @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result}));
+      cmp_result_live var = addx(gr, @[gr_xop]GrLive({cmp_result}));
+      ap var = addx(gr, mk_shray(fc, dp, sp, cmp_result_live), @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result}));
 
       just_dead var = addx(gr, @[gr_xop]GrDead({cmp_result}));
       if case DeadMe = ci.rhs_deadme {

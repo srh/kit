@@ -551,14 +551,6 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           }
           *ref(&env->framecells, a.name.x) = Has(@[st_obj_ref]{partof_obj.num, new_offset, deref_size});
 
-        case &GrWriteNothing(a gr_writenothing):
-          st_maybe_init_static(&fg->gr, env, a.dest);
-          destref st_obj_ref = cell_obj_ref(env, a.dest, "in XII");
-          value st_value = mk_st_value(&env->plat, destref.count);
-          if case Printed(pm) = obj_write(env, destref, &value) {
-            return Printed(pm);
-          }
-
         case &GrLive(a gr_live):
           // TODO(): This duplicates a lot of logic with st_maybe_init_static?
           if isHas(ref(&env->framecells, a.cell.x)) {
