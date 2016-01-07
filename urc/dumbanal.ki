@@ -109,9 +109,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       return NoFail;
 
     case &GrAssertLive(a gr_assert_live):
-      if case None = lookup(&liveset->all, a.cell) {
-        ice(_u8("GrAssertLive fails on "), a.cell);
-      }
+      input(liveset, a.cell);
       *out = Terminal;
       return NoFail;
 
@@ -227,7 +225,6 @@ func deaden(liveset *lives, c cell_num) void {
 
 // input requires that the cell already be live.
 func input(liveset *lives, c cell_num) void {
-  // TODO(): GrAssertLive copies this.
   if case None = lookup(&liveset->all, c) {
     ice(_u8("input on unlive cell "), c);
   }
