@@ -1559,8 +1559,7 @@ func gr_name_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_name_expr, 
       compute_prim(clq, enum_tag_type(clq->cs, &vi.et), &cu, &props);
       tag_cell cell_num = add_cell(gr, {LocationVirtual, cu, props});
       field_offset u32 = enum_field_offset(clq->cs, &vi.et, vi.constructor_tag);
-      backtick_gn var = addx(gr, @[gr_xop]GrWriteNothing({x_cell}));
-      a_gn var = addx(gr, mk_shray(backtick_gn), @[gr_xop]GrSubcell({tag_cell, x_cell, OffsetConst(enum_tag_offset)}));
+      a_gn var = addx(gr, @[gr_xop]GrSubcell({tag_cell, x_cell, OffsetConst(enum_tag_offset)}));
       b_gn var = addx(gr, mk_shray(a_gn), @[gr_xop]GrWriteConst({tag_cell, ConstInt(~vi.constructor_tag.x)}));
       tag_end u32 = enum_tag_offset + props.flat_size;
       postpadding_ogn opt[gr_num]
