@@ -72,7 +72,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       return NoFail;
 
     case &GrMemCopy(a gr_memcopy):
-      output(h, liveset, a.dest);
+      input(liveset, a.dest);
       input(liveset, a.src);
       *out = Terminal;
       return NoFail;

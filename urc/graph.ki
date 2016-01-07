@@ -2036,7 +2036,8 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   for j size = 0; j < nargs; j = j + 1 {
     ec cell_num = add_cell(&gr, {LocationVirtual, ~ *param, param_props});
     indexcopycell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
-    copygn gr_num = addx(&gr, @[gr_xop]GrMemCopy({indexcopycell, indexcell}));
+    copycell_live gr_num = addx(&gr, @[gr_xop]GrLive({indexcopycell}));
+    copygn gr_num = addx(&gr, mk_shray(copycell_live), @[gr_xop]GrMemCopy({indexcopycell, indexcell}));
     gn gr_num = addx(&gr, mk_shray(copygn), @[gr_xop]GrSubcell({ec, get(&pointeecells, j), OffsetComputed({param_props.flat_size, indexcopycell})}));
     deadcopy gr_num = addx(&gr, mk_shray(gn), @[gr_xop]GrDead({indexcopycell}));
     epc cell_num = add_cell(&gr, {LocationStatic, elemptrtype, elemptrtype_props});
@@ -2057,7 +2058,8 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   vd gr_num = addx(&gr, mk_shray(ap), @[gr_xop]GrDead({elemretcell}));
 
   ic2cell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
-  ic2gn gr_num = addx(&gr, @[gr_xop]GrMemCopy({ic2cell, indexcell}));
+  ic2cell_live gr_num = addx(&gr, @[gr_xop]GrLive({ic2cell}));
+  ic2gn gr_num = addx(&gr, mk_shray(ic2cell_live), @[gr_xop]GrMemCopy({ic2cell, indexcell}));
   onecell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
   onegn gr_num = addx(&gr, @[gr_xop]GrWriteConst({onecell, ConstInt(bigu(1))}));
   op_action primitive_numeric_op_action;
