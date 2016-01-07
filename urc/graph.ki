@@ -107,6 +107,9 @@ enum gr_xop {
   GrDead gr_dead;
   GrVirtualDead gr_virtual_dead;
   GrXNop void;
+  // A debugging xop for compiler devs.
+  // TODO(): Remove uses of this.
+  GrPrint gr_print;
 };
 
 enum gr_qop {
@@ -258,6 +261,11 @@ struct gr_dead {
 
 struct gr_virtual_dead {
   cell cell_num;
+};
+
+// TODO(): Get rid of this.
+struct gr_print {
+  msg array[u8];
 };
 
 enum gr_const {
@@ -571,7 +579,7 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg 
   }
 
   swartch_gn gr_num;
-  if case Printed(pm) = gr_expr_consume(clq, gr, oo(&a->swartch), &swartch_gn) {
+  if case Printed(pm) = gr_live_and_expr_consume(clq, gr, oo(&a->swartch), &swartch_gn) {
     return Printed(pm);
   }
 
@@ -755,7 +763,7 @@ func gr_ifthen_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg 
 
 func gr_expr_condition(clq *clqueue, gr *frame_graph, a *ast_expr_consume, thengn sq_num, elsegn sq_num, out *sq_num) np {
   congn gr_num;
-  if case Printed(pm) = gr_expr_consume(clq, gr, a, &congn) {
+  if case Printed(pm) = gr_live_and_expr_consume(clq, gr, a, &congn) {
     return Printed(pm);
   }
   cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(~ @[u32] 0), elsegn});
@@ -774,7 +782,7 @@ func gr_condition(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_cond
 
     case &PatternCondition(pa ast_pattern_assign): {
       rhs gr_num;
-      if case Printed(pm) = gr_expr_consume(clq, gr, oo(&pa.rhs), &rhs) {
+      if case Printed(pm) = gr_live_and_expr_consume(clq, gr, oo(&pa.rhs), &rhs) {
         return Printed(pm);
       }
 
@@ -828,7 +836,7 @@ func gr_condition(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_cond
 func gr_var_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, a *ast_var_statement, out *gr_num) np {
   switch &a->rhs {
     case &HasExpr(be box[ast_expr_consume]): {
-      return gr_expr_consume(clq, gr, oo(&be), out);
+      return gr_live_and_expr_consume(clq, gr, oo(&be), out);
     }
     case &AutoInit(x opt[init_action]): {
       if case &Has(ia init_action) = &x {
@@ -927,8 +935,34 @@ func gr_expr_after_discard(clq *clqueue, gr *frame_graph, aft *ast_expr_after_di
   return NoFail;
 }
 
+func gr_live_and_expr_consume(clq *clqueue, gr *frame_graph, x *ast_expr_consume, out *gr_num) np {
+  ec gr_num;
+  if case Printed(pm) = gr_expr_consume(clq, gr, x, &ec) {
+    return Printed(pm);
+  }
+  *out = gr_live_before(gr, result_cell(x), ec);
+  return NoFail;
+}
+
 func gr_expr_consume(clq *clqueue, gr *frame_graph, x *ast_expr_consume, out *gr_num) np {
   return gr_expr_and_consume(clq, gr, &x->expr, un(&x->after), out);
+}
+
+func gr_xop_before(gr *frame_graph, op gr_xop, after gr_num) gr_num {
+  assert_gn sq_num = seqq(gr, {addx(gr, op), seq1(gr, after)});
+  return assert_gn.x;
+}
+
+func gr_print_before(gr *frame_graph, msg array[u8], after gr_num) gr_num {
+  return gr_xop_before(gr, @[gr_xop]GrPrint({msg}), after);
+}
+
+func gr_live_before(gr *frame_graph, cell cell_num, after gr_num) gr_num {
+  return gr_xop_before(gr, @[gr_xop]GrLive({cell}), after);
+}
+
+func gr_assert_live_before(gr *frame_graph, cell cell_num, after gr_num) gr_num {
+  return gr_xop_before(gr, @[gr_xop]GrAssertLive({cell}), after);
 }
 
 func gr_expr_and_consume(clq *clqueue, gr *frame_graph, x *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
@@ -940,7 +974,11 @@ func gr_expr_and_consume(clq *clqueue, gr *frame_graph, x *ast_expr, aft *ast_ex
   if case Printed(pm) = gr_consume_actions(clq, gr, expr_gn, &aft->actions, &after_gn) {
     return Printed(pm);
   }
-  *out = after_gn;
+
+  // gr_expr_consume isn't supposed to make the result cell live.
+  assert_gn gr_num = gr_assert_live_before(gr, result_cell(aft), after_gn);
+
+  *out = assert_gn;
   return NoFail;
 }
 
@@ -1094,7 +1132,7 @@ func gr_mk_strinit(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_strinit, o
 
 func gr_deref_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_deref_field, out *gr_num) np {
   rp gr_num;
-  if case Printed(pm) = gr_expr_consume(clq, gr, oo(&a->lhs), &rp) {
+  if case Printed(pm) = gr_live_and_expr_consume(clq, gr, oo(&a->lhs), &rp) {
     return Printed(pm);
   }
   info *ast_deref_field_info = un(&a->info);
@@ -1184,7 +1222,7 @@ func parsed_inline_to_state_inline(a ast_isinline) should_inline {
 func gr_index_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_index_expr, out *gr_num) np {
   info *ast_index_expr_info = un(&a->info);
   rp gr_num;
-  if case Printed(pm) = gr_expr_consume(clq, gr, oo(&a->rhs), &rp) {
+  if case Printed(pm) = gr_live_and_expr_consume(clq, gr, oo(&a->rhs), &rp) {
     return Printed(pm);
   }
   lp gr_num;
@@ -1203,7 +1241,8 @@ func gr_index_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_index_expr
     if case Printed(pm) = gr_consume_actions(clq, gr, lp, &aft.car.actions, &lgn) {
       return Printed(pm);
     }
-    gp var = addx(gr, mk_shray(rp, lgn), @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
+    live_before_lgn gr_num = gr_live_before(gr, result_cell(&aft.car), lgn);
+    gp var = addx(gr, mk_shray(rp, live_before_lgn), @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
     lhs_later gr_num;
     if case Printed(pm) = gr_later_discard(clq, gr, &aft.cdr, &lhs_later) {
       return Printed(pm);
@@ -1243,7 +1282,7 @@ func gr_later_discard(clq *clqueue, gr *frame_graph, a *ast_later_discard_info, 
 
 func gr_mk_deref(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_deref, out *gr_num) np {
   rp gr_num;
-  if case Printed(pm) = gr_expr_consume(clq, gr, oo(&a->rhs), &rp) {
+  if case Printed(pm) = gr_live_and_expr_consume(clq, gr, oo(&a->rhs), &rp) {
     return Printed(pm);
   }
   dp var = addx(gr, mk_shray(rp), @[gr_xop]GrDeref({ellval_cell(x), result_cell(oo(&a->rhs)), OffsetConst(0)}));
@@ -1418,11 +1457,11 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
 
 func gr_logical_conjunction(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_logical_conjunction, out *gr_num) np {
   lhs_dep gr_num;
-  if case Printed(pm) = gr_expr_consume(clq, gr, oo(&a->lhs), &lhs_dep) {
+  if case Printed(pm) = gr_live_and_expr_consume(clq, gr, oo(&a->lhs), &lhs_dep) {
     return Printed(pm);
   }
   rhs_dep gr_num;
-  if case Printed(pm) = gr_expr_consume(clq, gr, oo(&a->rhs), &rhs_dep) {
+  if case Printed(pm) = gr_live_and_expr_consume(clq, gr, oo(&a->rhs), &rhs_dep) {
     return Printed(pm);
   }
 
@@ -1456,7 +1495,7 @@ func gr_funcall(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_funcall, out 
   precs array[gr_num];
   reserve(&precs, nparams + 1);
   dep gr_num;
-  if case Printed(pm) = gr_expr_consume(clq, gr, oo(&a->fun), &dep) {
+  if case Printed(pm) = gr_live_and_expr_consume(clq, gr, oo(&a->fun), &dep) {
     return Printed(pm);
   }
   push(&precs, dep);
@@ -1464,7 +1503,7 @@ func gr_funcall(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_funcall, out 
   reserve(&paramcells, nparams);
   for i size = 0; i < nparams; i = i + 1 {
     param *ast_expr_consume = ref(&a->params, i);
-    if case Printed(pm) = gr_expr_consume(clq, gr, param, &dep) {
+    if case Printed(pm) = gr_live_and_expr_consume(clq, gr, param, &dep) {
       return Printed(pm);
     }
     push(&precs, dep);
@@ -2569,7 +2608,7 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           }
           gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
           gn gr_num;
-          if case Printed(pm) = gr_expr_consume(clq, &gr, &dire.ec, &gn) {
+          if case Printed(pm) = gr_live_and_expr_consume(clq, &gr, &dire.ec, &gn) {
             inst->graph = FailedComputation;
             return Printed(pm);
           }

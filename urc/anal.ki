@@ -330,6 +330,8 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
       return XOp({newprecs, GrVirtualDead({get(cm, a.cell.x)})});
     case &GrXNop:
       return XOp({newprecs, GrXNop});
+    case &GrPrint(a gr_print):
+      return XOp({newprecs, GrPrint({a.msg})});
     }
   case QOp(qn gr_qnode):
     switch &qn.op {
