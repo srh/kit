@@ -260,6 +260,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
                                                  seqq(gr, {base_op_adjusted,
                                                            nopq(gr)})})});
 
+
               // It's important to note that GrXNop would be ignored by help_basic_analyze.
               // TODO: It'd be nice if we could undo the mark_cell_not_const of a.retcell (that happened when we processed GrApply in help_basic_analyze before).
 

@@ -911,27 +911,28 @@ func gr_expr_discard(clq *clqueue, gr *frame_graph, x *ast_expr_discard, out *gr
     return Printed(pm);
   }
   after_gn gr_num;
-  if case Printed(pm) = gr_expr_after_discard(clq, gr, un(&x->after), &after_gn) {
+  if case Printed(pm) = gr_expr_after_discard(clq, gr, &x->expr, un(&x->after), dp, &after_gn) {
     return Printed(pm);
   }
-  gn sq_num = seqq(gr, {dp, seq1(gr, after_gn)});
-  *out = gn.x;
+  *out = after_gn;
   return NoFail;
 }
 
-func gr_expr_after_discard(clq *clqueue, gr *frame_graph, aft *ast_expr_after_discard, out *gr_num) np {
+func gr_expr_after_discard(clq *clqueue, gr *frame_graph, x *ast_expr, aft *ast_expr_after_discard, xp gr_num, out *gr_num) np {
+  // TODO(): This can't be right, can it?  What if we have the statement "x().y;".  Do we discard both the virtual cell and the temporary?
   after_gn gr_num;
   switch aft {
   case &DiscardTemporary(da destroy_action):
     if case Printed(pm) = gr_destroy_action(clq, gr, &da, DeadAfterDestroyYes, &after_gn) {
       return Printed(pm);
     }
+    xp = gr_live_before(gr, whole_cell(x), xp);
   case &DiscardVirtualDead(c cell_num):
     after_gn = addx(gr, @[gr_xop]GrVirtualDead({c}));
   case &DiscardNothing:
     after_gn = addx(gr, @[gr_xop]GrXNop);
   }
-  *out = after_gn;
+  *out = seqq(gr, {xp, seq1(gr, after_gn)}).x;
   return NoFail;
 }
 
@@ -1157,13 +1158,12 @@ func gr_local_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_local_fie
   }
   switch info {
     case &ArrayLength(alinfo ast_arraylength_info): {
-      dp1 gr_num;
-      if case Printed(pm) = gr_expr_after_discard(clq, gr, &alinfo.after, &dp1) {
+      dp gr_num;
+      if case Printed(pm) = gr_expr_after_discard(clq, gr, oo(&a->lhs), &alinfo.after, lp, &dp) {
         return Printed(pm);
       }
-      dp var = seqq(gr, {lp, seq1(gr, dp1)});
       cp var = addx(gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)}));
-      gn var = addx(gr, mk_shray(dp.x, cp), @[gr_xop]GrXNop);
+      gn var = addx(gr, mk_shray(dp, cp), @[gr_xop]GrXNop);
       *out = gn;
       return NoFail;
     }
