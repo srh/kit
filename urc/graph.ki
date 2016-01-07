@@ -1416,8 +1416,10 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
 
       funcell_live var = addx(gr, @[gr_xop]GrLive({funcell}));
       fc var = addx(gr, mk_shray(funcell_live), @[gr_xop]GrWriteConst({funcell, ConstDef(ci.comparecells)}));
-      dp var = addx(gr, @[gr_xop]GrAddressof({destptr, destcell}));
-      sp var = addx(gr, @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
+      destptr_live var = addx(gr, @[gr_xop]GrLive({destptr}));
+      dp var = addx(gr, mk_shray(destptr_live), @[gr_xop]GrAddressof({destptr, destcell}));
+      srcptr_live var = addx(gr, @[gr_xop]GrLive({srcptr}));
+      sp var = addx(gr, mk_shray(srcptr_live), @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
       cmp_result_live var = addx(gr, @[gr_xop]GrLive({cmp_result}));
       ap var = addx(gr, mk_shray(fc, dp, sp, cmp_result_live), @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result}));
 
@@ -1719,7 +1721,8 @@ func gr_uni_fun(clq *clqueue, gr *frame_graph, ip instpair, arg cell_num) gr_num
 
   funcell_live gr_num = addx(gr, @[gr_xop]GrLive({funcell}));
   fc gr_num = addx(gr, mk_shray(funcell_live), @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
-  arp gr_num = addx(gr, @[gr_xop]GrAddressof({argptrcell, arg}));
+  argptrcell_live gr_num = addx(gr, @[gr_xop]GrLive({argptrcell}));
+  arp gr_num = addx(gr, mk_shray(argptrcell_live), @[gr_xop]GrAddressof({argptrcell, arg}));
   retinit gr_num = addx(gr, @[gr_xop]GrLive({retvoid}));
   ap gr_num = addx(gr, mk_shray(fc, arp, retinit), @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid}));
   deadret gr_num = addx(gr, mk_shray(ap), @[gr_xop]GrDead({retvoid}));
@@ -1781,8 +1784,10 @@ func gr_bi_fun(clq *clqueue, gr *frame_graph, ip instpair, dest cell_num, src ce
 
   funcell_live gr_num = addx(gr, @[gr_xop]GrLive({funcell}));
   fc gr_num = addx(gr, mk_shray(funcell_live), @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
-  dp gr_num = addx(gr, @[gr_xop]GrAddressof({destptrcell, dest}));
-  sp gr_num = addx(gr, @[gr_xop]GrAddressof({srcptrcell, src}));
+  destptrcell_live gr_num = addx(gr, @[gr_xop]GrLive({destptrcell}));
+  dp gr_num = addx(gr, mk_shray(destptrcell_live), @[gr_xop]GrAddressof({destptrcell, dest}));
+  srcptrcell_live gr_num = addx(gr, @[gr_xop]GrLive({srcptrcell}));
+  sp gr_num = addx(gr, mk_shray(srcptrcell_live), @[gr_xop]GrAddressof({srcptrcell, src}));
   retinit gr_num = addx(gr, @[gr_xop]GrLive({retvoid}));
   ap gr_num = addx(gr, mk_shray(fc, dp, sp, retinit), @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid}));
   deadret var = addx(gr, mk_shray(ap), @[gr_xop]GrDead({retvoid}));
@@ -2046,7 +2051,8 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
     deadcopy gr_num = addx(&gr, mk_shray(gn), @[gr_xop]GrDead({indexcopycell}));
     epc cell_num = add_cell(&gr, {LocationStatic, elemptrtype, elemptrtype_props});
     push(&elemptrcells, epc);
-    ptrgn gr_num = addx(&gr, mk_shray(deadcopy), @[gr_xop]GrAddressof({epc, ec}));
+    epc_live gr_num = addx(&gr, @[gr_xop]GrLive({epc}));
+    ptrgn gr_num = addx(&gr, mk_shray(epc_live, deadcopy), @[gr_xop]GrAddressof({epc, ec}));
     ecdeadgn gr_num = addx(&gr, mk_shray(ptrgn), @[gr_xop]GrVirtualDead({ec}));
     push(&precs, ecdeadgn);
   }
@@ -2204,7 +2210,8 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       for j size = 0; j < nargs; j = j + 1 {
         fpc cell_num = add_cell(&gr, {LocationStatic, fieldptrtype, fieldptrtype_props});
         push(&fieldptrcella, fpc);
-        an1 gr_num = addx(&gr, mk_shray(get(&fieldcellgn, j)), @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
+        fpc_live gr_num = addx(&gr, @[gr_xop]GrLive({fpc}));
+        an1 gr_num = addx(&gr, mk_shray(fpc_live, get(&fieldcellgn, j)), @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
         an gr_num = addx(&gr, mk_shray(an1), @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
         push(&precs, an);
       }
@@ -2383,7 +2390,8 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       for j size = 0; j < nargs; j = j + 1 {
         fpc cell_num = add_cell(&gr, {LocationStatic, fieldptrtype, fieldptrtype_props});
         push(&fieldptrcella, fpc);
-        gn1 gr_num = addx(&gr, mk_shray(get(&fieldcellgn, j)), @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
+        fpc_live gr_num = addx(&gr, @[gr_xop]GrLive({fpc}));
+        gn1 gr_num = addx(&gr, mk_shray(fpc_live, get(&fieldcellgn, j)), @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
         gn gr_num = addx(&gr, mk_shray(gn1), @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
         push(&precs, gn);
       }

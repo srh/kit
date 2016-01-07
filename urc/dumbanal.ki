@@ -84,7 +84,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
 
     case &GrAddressof(a gr_addressof):
       input(liveset, a.addressee);
-      output(h, liveset, a.dest);
+      input(liveset, a.dest);
       *out = Terminal;
       return NoFail;
 
@@ -226,16 +226,6 @@ func deaden(liveset *lives, c cell_num) void {
 func input(liveset *lives, c cell_num) void {
   if case None = lookup(&liveset->all, c) {
     ice(_u8("input on unlive cell "), c);
-  }
-}
-
-// output either makes the cell live, if it wasn't already, or it means we use the cell.
-// (TODO(): We're adding GrLive, so this should become obsolete.)
-func output(h *frame, liveset *lives, c cell_num) void {
-  if try_insert(&liveset->all, c) {
-    liveset->xored = liveset->xored ^ ~c.x;
-    liveset->summed = liveset->summed + ~c.x;
-    note_conflicting(h, &liveset->all, c);
   }
 }
 
