@@ -1718,7 +1718,8 @@ func gr_uni_fun(clq *clqueue, gr *frame_graph, ip instpair, arg cell_num) gr_num
 
   fc gr_num = addx(gr, @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
   arp gr_num = addx(gr, @[gr_xop]GrAddressof({argptrcell, arg}));
-  ap gr_num = addx(gr, mk_shray(fc, arp), @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid}));
+  retinit gr_num = addx(gr, @[gr_xop]GrLive({retvoid}));
+  ap gr_num = addx(gr, mk_shray(fc, arp, retinit), @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid}));
   deadret gr_num = addx(gr, mk_shray(ap), @[gr_xop]GrDead({retvoid}));
   return deadret;
 }
@@ -1778,7 +1779,8 @@ func gr_bi_fun(clq *clqueue, gr *frame_graph, ip instpair, dest cell_num, src ce
   fc gr_num = addx(gr, @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
   dp gr_num = addx(gr, @[gr_xop]GrAddressof({destptrcell, dest}));
   sp gr_num = addx(gr, @[gr_xop]GrAddressof({srcptrcell, src}));
-  ap gr_num = addx(gr, mk_shray(fc, dp, sp), @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid}));
+  retinit gr_num = addx(gr, @[gr_xop]GrLive({retvoid}));
+  ap gr_num = addx(gr, mk_shray(fc, dp, sp, retinit), @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid}));
   deadret var = addx(gr, mk_shray(ap), @[gr_xop]GrDead({retvoid}));
   return deadret;
 }
@@ -2045,6 +2047,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   }
 
   elemretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
+  push(&precs, addx(&gr, @[gr_xop]GrLive({elemretcell})));
   func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
 
   func_gn gr_num = addx(&gr, @[gr_xop]GrWriteConst({func_cell, ConstDef(mai->ip)}));
@@ -2198,6 +2201,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       }
 
       fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
+      push(&precs, addx(&gr, @[gr_xop]GrLive({fieldretcell})));
 
       fntype cu_typeexpr;
       fntype_props type_properties;
@@ -2375,6 +2379,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       }
 
       fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
+      push(&precs, addx(&gr, @[gr_xop]GrLive({fieldretcell})));
 
       fntype cu_typeexpr;
       fntype_props type_properties;

@@ -205,3 +205,13 @@ func[T] mk_shray(x T, y T, z T) shray[T] {
   push(&ret, z);
   return freeze(&ret);
 }
+
+func[T] mk_shray(x T, y T, z T, t T) shray[T] {
+  ret array[T];
+  reserve(&ret, 3);
+  push(&ret, x);
+  push(&ret, y);
+  push(&ret, z);
+  push(&ret, t);
+  return freeze(&ret);
+}

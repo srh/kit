@@ -47,8 +47,8 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     }
     switch &xn.op {
     case &GrApply(a gr_apply):
-      // Retcell is activated _before_ the param cells are dead -- though we shouldn't be generating graphs where this matters for the purposes of this analysis _except_ that we need it for computing lower param lists.
-      output(h, liveset, a.retcell);
+      // Retcell needs to be live _before_ the funcall happens.
+      input(liveset, a.retcell);
 
       note_lower_paramlists(h, gn, liveset);
       annotate_ref(&gnc->app_time_live, liveset);
