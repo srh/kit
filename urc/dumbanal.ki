@@ -113,6 +113,11 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       *out = Terminal;
       return NoFail;
 
+    case &GrAssertLive(a gr_assert_live):
+      input(liveset, a.cell);
+      *out = Terminal;
+      return NoFail;
+
     case &GrDead(a gr_dead):
       deaden(liveset, a.cell);
       *out = Terminal;

@@ -322,6 +322,8 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
       return XOp({newprecs, GrWriteNothing({get(cm, a.dest.x)})});
     case &GrLive(a gr_live):
       return XOp({newprecs, GrLive({get(cm, a.cell.x)})});
+    case &GrAssertLive(a gr_assert_live):
+      return XOp({newprecs, GrAssertLive({get(cm, a.cell.x)})});
     case &GrDead(a gr_dead):
       return XOp({newprecs, GrDead({get(cm, a.cell.x)})});
     case &GrVirtualDead(a gr_virtual_dead):

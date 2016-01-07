@@ -577,6 +577,11 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
             return Printed(pm);
           }
 
+        case &GrAssertLive(a gr_assert_live):
+          if !isHas(ref(&env->framecells, a.cell.x)) {
+            return ERR(_u8("GrAssertLive sees un-live cell."));
+          }
+
         case &GrDead(a gr_dead):
           // We make the object destroyed and mark its cell inactive.
           if case &Has(objref st_obj_ref) = ref(&env->framecells, a.cell.x) {
