@@ -83,8 +83,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       return NoFail;
 
     case &GrAddressof(a gr_addressof):
-      // Yes, addressee is an _output_ -- if it is not live -- we make it live.
-      output(h, liveset, a.addressee);
+      input(liveset, a.addressee);
       output(h, liveset, a.dest);
       *out = Terminal;
       return NoFail;

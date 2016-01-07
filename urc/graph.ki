@@ -1729,13 +1729,13 @@ func gr_uni_fun(clq *clqueue, gr *frame_graph, ip instpair, arg cell_num) gr_num
 func gr_init_action(clq *clqueue, gr *frame_graph, x *init_action, out *gr_num) np {
   switch &x->x.ctor {
     case &TrivialCtor: {
-      mk_live gr_num = addx(gr, @[gr_xop]GrLive({x->x.arg}));
-      dp gr_num = addx(gr, mk_shray(mk_live), @[gr_xop]GrWriteConst({x->x.arg, ConstInt(~ @[u32] 0)}));
-      *out = dp;
+      dp gr_num = addx(gr, @[gr_xop]GrWriteConst({x->x.arg, ConstInt(~ @[u32] 0)}));
+      *out = gr_live_before(gr, x->x.arg, dp);
       return NoFail;
     }
     case &FunCtor(ip instpair): {
-      *out = gr_uni_fun(clq, gr, ip, x->x.arg);
+      dp gr_num = gr_uni_fun(clq, gr, ip, x->x.arg);
+      *out = gr_live_before(gr, x->x.arg, dp);
       return NoFail;
     }
   }
