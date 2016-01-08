@@ -904,12 +904,14 @@ func gr_expr_discard(clq *clqueue, gr *frame_graph, x *ast_expr_discard, out *gr
 }
 
 func gr_expr_after_discard(clq *clqueue, gr *frame_graph, x *ast_expr, aft *ast_expr_after_discard, xp gr_num, out *gr_num) np {
-  // TODO(): This can't be right, can it?  What if we have the statement "x().y;".  Do we discard both the virtual cell and the temporary?
   after_gn gr_num;
   switch aft {
   case &DiscardTemporary(da destroy_action):
     if case Printed(pm) = gr_destroy_action(clq, gr, &da, DeadAfterDestroyYes, &after_gn) {
       return Printed(pm);
+    }
+    if whole_cell(x) != partial_cell(x) {
+      after_gn = seqq(gr, {addx(gr, @[gr_xop]GrVirtualDead({partial_cell(x)})), seq1(gr, after_gn)}).x;
     }
     xp = gr_live_before(gr, whole_cell(x), xp);
   case &DiscardVirtualDead(c cell_num):
@@ -1607,6 +1609,20 @@ func whole_cell(x *is_lval) cell_num {
     return desc.whole_num;
   case &IsLvalYes(desc lval_description):
     ice(_u8("whole_cell sees lvalue"));
+    return fake();
+  }
+}
+
+func partial_cell(x *ast_expr) cell_num {
+  return partial_cell(&expr_complete_info(x)->lval);
+}
+
+func partial_cell(x *is_lval) cell_num {
+  switch x {
+  case &IsLvalNo(desc rval_description):
+    return desc.partial_num;
+  case &IsLvalYes(desc lval_description):
+    ice(_u8("partial_cell sees lvalue"));
     return fake();
   }
 }
