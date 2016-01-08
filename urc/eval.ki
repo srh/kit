@@ -434,7 +434,6 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
             *ref(&env->framecells, c.x) = None;
           }
 
-          st_maybe_init_static(&fg->gr, env, a.retcell);
           retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in III");
 
           if case Printed(pm) = st_eval_fn_body(clq, env, &paramorefs, retvalref, funcval.fnid) {
@@ -456,7 +455,6 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
             *ref(&env->framecells, c.x) = None;
           }
 
-          st_maybe_init_static(&fg->gr, env, a.retcell);
           retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in IIIb");
 
           if case Printed(pm) = st_eval_prim_op(clq, env, &paramorefs, retvalref, &a.primop) {
@@ -464,7 +462,6 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           }
 
         case &GrMemCopy(a gr_memcopy):
-          st_maybe_init_static(&fg->gr, env, a.dest);
           destref st_obj_ref = cell_obj_ref(env, a.dest, "in IV");
           srcref st_obj_ref;
           if !try_cell_obj_ref(env, a.src, &srcref) {
@@ -479,7 +476,6 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           }
 
         case &GrWriteConst(a gr_writeconst):
-          st_maybe_init_static(&fg->gr, env, a.dest);
           destref st_obj_ref;
           if !try_cell_obj_ref(env, a.dest, &destref) {
             return ERR(_u8("ICE: cell obj cannot be reffed (in VI) (cell num = "), a.dest.x, _u8(")"));
@@ -493,10 +489,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           }
 
         case &GrAddressof(a gr_addressof):
-          st_maybe_init_static(&fg->gr, env, a.dest);
           destref st_obj_ref = cell_obj_ref(env, a.dest, "in VII");
-          // TODO: Don't do this.  Change other stuff so that the cell isn't dead?  Such as in assignment, after destroying, before copying/moving.
-          st_maybe_init_static(&fg->gr, env, a.addressee);
           addressee_ref st_obj_ref = cell_obj_ref(env, a.addressee, "in VIII");
           value st_value = mk_st_value_pointer(&env->plat, {addressee_ref.num, addressee_ref.offset});
           if case Printed(pm) = obj_write(env, destref, &value) {
@@ -552,7 +545,6 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           *ref(&env->framecells, a.name.x) = Has(@[st_obj_ref]{partof_obj.num, new_offset, deref_size});
 
         case &GrLive(a gr_live):
-          // TODO(): This duplicates a lot of logic with st_maybe_init_static?
           if isHas(ref(&env->framecells, a.cell.x)) {
             return ERR(_u8("GrLive sees already-live cell "), to_u8str(a.cell.x));
           }
@@ -925,20 +917,6 @@ func bnno_index_bigint(plat *platform_info, b *bigint, ix u32) u32 {
   bigdig u32 = getbigdigit(b, ~ ((ix * plat->bnno_size) / 32));
   ret u32 = bnno_mask(plat) & (bigdig >> ((ix * plat->bnno_size) % 32));
   return ret;
-}
-
-func st_maybe_init_static(gr *frame_graph, env *st_env, cell cell_num) void {
-  if isHas(ref(&env->framecells, cell.x)) {
-    return;
-  }
-
-  info *cell_info = ref_cell(gr, cell);
-  if !isLocationStatic(location(info)) {
-    return;
-  }
-
-  objnum st_obj_num = add_obj(env, info->props.flat_size);
-  *ref(&env->framecells, cell.x) = Has(@[st_obj_ref]{objnum, 0, info->props.flat_size});
 }
 
 func err_nonpointer() np {
