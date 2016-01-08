@@ -125,10 +125,6 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     case &GrXNop:
       *out = Terminal;
       return NoFail;
-
-    case &GrPrint(a gr_print):
-      *out = Terminal;
-      return NoFail;
     }
 
   case &QOp(qn gr_qnode):

@@ -1950,7 +1950,17 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  y i32 = (@[foo]{x, 3}).a;\n"
         "  return y;\n"
         "}\n"
-        "def glob i32 = blah(1);\n"));}
+        "def glob i32 = blah(1);\n"));
+  run_check_test(ctx, "c159",
+    _u8("struct foo { a i32; b i32; };\n"
+        "func bar() foo {\n"
+        "  return {1, 2};\n"
+        "}\n"
+        "func blah() void {\n"
+        "  bar().b;\n"
+        "}\n"
+        "def glob void = blah();\n"));
+}
 
 func mk_ctx(build bool, name opt[array[u8]]) check_ctx { return {build, name, 0}; }
 
