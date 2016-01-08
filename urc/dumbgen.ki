@@ -845,9 +845,6 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         case &GrXNop:
           DUMBGEN("GrXNop");
           // Do nothing (but do it less glamorously).
-        case &GrPrint(a gr_print):
-          DUMBGEN("GrPrint");
-          // Do nothing (this is for static eval).
         }
 
       case &QOp(qn gr_qnode):

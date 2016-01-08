@@ -101,14 +101,11 @@ enum gr_xop {
   GrDeref gr_deref;
   GrSubcell gr_subcell;
   GrLive gr_live;
-  // TODO(): This just exists to make us more confident about our new GrLive changes.  Get rid of this.
   GrAssertLive gr_assert_live;
   GrDead gr_dead;
   GrVirtualDead gr_virtual_dead;
   GrXNop void;
   // A debugging xop for compiler devs.
-  // TODO(): Remove uses of this.
-  GrPrint gr_print;
 };
 
 enum gr_qop {
@@ -239,17 +236,11 @@ struct gr_jmp {
   next sq_num;
 };
 
-// TODO(): Get rid of gr_writenothing.
-struct gr_writenothing {
-  dest cell_num;
-};
-
 // Declares a cell to be live.  The cell may not have previously been live.  The cell location must be static -- otherwise, gr_deref or gr_subcell will make the cell live.
 struct gr_live {
   cell cell_num;
 };
 
-// TODO(): Get rid of gr_assert_live.
 struct gr_assert_live {
   cell cell_num;
 };
@@ -260,11 +251,6 @@ struct gr_dead {
 
 struct gr_virtual_dead {
   cell cell_num;
-};
-
-// TODO(): Get rid of this.
-struct gr_print {
-  msg array[u8];
 };
 
 enum gr_const {
@@ -947,10 +933,6 @@ func gr_live_and_expr_consume(clq *clqueue, gr *frame_graph, x *ast_expr_consume
 func gr_xop_before(gr *frame_graph, op gr_xop, after gr_num) gr_num {
   assert_gn sq_num = seqq(gr, {addx(gr, op), seq1(gr, after)});
   return assert_gn.x;
-}
-
-func gr_print_before(gr *frame_graph, msg array[u8], after gr_num) gr_num {
-  return gr_xop_before(gr, @[gr_xop]GrPrint({msg}), after);
 }
 
 func gr_live_before(gr *frame_graph, cell cell_num, after gr_num) gr_num {
@@ -1672,7 +1654,6 @@ func gr_consume_actions(clq *clqueue, gr *frame_graph, prec gr_num, expr *ast_ex
       return Printed(pm);
     }
     prec = seqq(gr, {prec, seq1(gr, dep)}).x;
-    // TODO(): This is so gross.
     // It's an rvalue, we make the whole cell live before evaling.
     prec = gr_live_before(gr, whole_cell(expr), prec);
   case &ConsumeByCopy(cc tup[copy_action, lval_deadme]):

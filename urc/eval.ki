@@ -579,9 +579,6 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           *ref(&env->framecells, a.cell.x) = None;
 
         case &GrXNop: { }
-
-        case &GrPrint(a gr_print):
-          DBG(_u8("GrPrint: "), a.msg);
         }
 
       case &QOp(qn gr_qnode):
