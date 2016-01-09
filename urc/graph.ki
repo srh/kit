@@ -1157,8 +1157,8 @@ func gr_local_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_local_fie
       if case Printed(pm) = gr_expr_after_discard(clq, gr, oo(&a->lhs), &alinfo.after, lp, &dp) {
         return Printed(pm);
       }
-      cp var = addx(gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)}));
-      gn var = addx(gr, mk_shray(dp, cp), @[gr_xop]GrXNop);
+      cp gr_num = addx(gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)}));
+      gn gr_num = seq2(gr, dp, cp).x;
       *out = gn;
       return NoFail;
     }
