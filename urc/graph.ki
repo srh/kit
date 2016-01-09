@@ -143,10 +143,6 @@ func help_add_node(gr *frame_graph, node gr_node) gr_num {
   return ret;
 }
 
-func addx(gr *frame_graph, precs shray[gr_num], op gr_xop) gr_num {
-  return help_add_node(gr, @[gr_node]XOp({precs, op}));
-}
-
 func addx(gr *frame_graph, op gr_xop) gr_num {
   return help_add_node(gr, @[gr_node]XOp({mk_shray(), op}));
 }
@@ -2265,10 +2261,10 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       case CtorInit:
         ice(_u8("CtorInit on enum type"));
       case CtorCopy:
-        cgn var = addx(&gr, freeze(&fieldcellgn), @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
+        cgn var = addx(&gr, seqN(&gr, &fieldcellgn).x, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
         ogn = Has(cgn);
       case CtorMove:
-        cgn var = addx(&gr, freeze(&fieldcellgn), @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
+        cgn var = addx(&gr, seqN(&gr, &fieldcellgn).x, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
         ogn = Has(cgn);
       case CtorDestroy:
         ogn = None;
