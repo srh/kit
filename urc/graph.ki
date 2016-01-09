@@ -316,24 +316,23 @@ func gr_fullbody(clq *clqueue, gr *frame_graph, x *ast_fullbody, out *gr_num, re
   }
 
   // This assumes it's okay to have a subcell op produce the identical type -- it's the only place we do that.
-  return_subcell_ops array[gr_num];
-  return_subcell_deads array[gr_num];
-  nreturncells size = count(&fb.return_cells);
-  reserve(&return_subcell_ops, nreturncells);
-  reserve(&return_subcell_deads, nreturncells);
-  for i size = 0; i < nreturncells; i = i + 1 {
-    subn var = addx(gr, @[gr_xop]GrSubcell({get(&fb.return_cells, i), info->return_cell, OffsetConst(0)}));
-    push(&return_subcell_ops, subn);
+  return_subcells_op sq_num = nopq(gr);
+  return_subcells_dead sq_num = nopq(gr);
+  nreturn_cells size = count(&fb.return_cells);
+  for i size = 0; i < nreturn_cells; i = i + 1 {
+    // We pop the subcells in the opposite order that we push them... which might improve compile-times somehow.
+    j size = nreturn_cells - 1 - i;
+    subn var = addx(gr, @[gr_xop]GrSubcell({get(&fb.return_cells, j), info->return_cell, OffsetConst(0)}));
+    return_subcells_op = seqq(gr, {subn, return_subcells_op});
     deadn var = addx(gr, @[gr_xop]GrVirtualDead({get(&fb.return_cells, i)}));
-    push(&return_subcell_deads, deadn);
+    return_subcells_dead = seqq(gr, {deadn, return_subcells_dead});
   }
 
-  nopdep gr_num = addx(gr, freeze(&return_subcell_ops), @[gr_xop]GrXNop);
-  seqop sq_num = seqq(gr, {nopdep, body_gn});
+  seqop sq_num = seqq(gr, {return_subcells_op.x, body_gn});
 
   mut_qnop_node(gr, fb.final_node,
                 {@[gr_qop]GrSequence({
-                   addx(gr, freeze(&return_subcell_deads), @[gr_xop]GrXNop),
+                   return_subcells_dead.x,
                    nopq(gr)})});
 
   *out = seqop.x;
