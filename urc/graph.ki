@@ -1567,7 +1567,13 @@ func gr_name_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_name_expr, 
       tag_end u32 = enum_tag_offset + props.flat_size;
       postpadding_ogn opt[gr_num]
         = gr_bzero_subcell(clq, gr, x_cell, tag_end, info->cu_props.flat_size - tag_end);
-      c_gn var = addx(gr, concat(@[opt[gr_num]]Has(b_gn), postpadding_ogn), @[gr_xop]GrVirtualDead({tag_cell}));
+      prec gr_num;
+      if case Has(postpadding_gn) = postpadding_ogn {
+        prec = seq2(gr, b_gn, postpadding_gn).x;
+      } else {
+        prec = b_gn;
+      }
+      c_gn var = addx(gr, prec, @[gr_xop]GrVirtualDead({tag_cell}));
       *out = c_gn;
       return NoFail;
     }
