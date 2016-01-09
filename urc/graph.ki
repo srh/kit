@@ -1130,17 +1130,16 @@ func gr_deref_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_deref_fie
   }
   switch info {
     case &DerefArrayLength(count u32): {
-      cp var = addx(gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~count)}));
-      sp var = seq2(gr, rp, ap);
-      gn var = addx(gr, mk_shray(sp.x, cp), @[gr_xop]GrXNop);
+      cp gr_num = addx(gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~count)}));
+      gn gr_num = seq3(gr, rp, ap, cp).x;
       *out = gn;
       return NoFail;
     }
     case &DerefFieldName(offset u32): {
       name cell_num = ellval_cell(x);
-      dp var = addx(gr, rp, @[gr_xop]GrDeref({name, result_cell(oo(&a->lhs)), OffsetConst(offset)}));
-      sp sq_num = seq2(gr, dp, ap);
-      *out = sp.x;
+      dp gr_num = addx(gr, @[gr_xop]GrDeref({name, result_cell(oo(&a->lhs)), OffsetConst(offset)}));
+      gn gr_num = seq3(gr, rp, dp, ap).x;
+      *out = gn;
       return NoFail;
     }
   }
