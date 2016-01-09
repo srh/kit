@@ -1808,7 +1808,7 @@ func gr_bi_fun(clq *clqueue, gr *frame_graph, ip instpair, dest cell_num, src ce
   srcptrcell_live gr_num = addx(gr, @[gr_xop]GrLive({srcptrcell}));
   sp gr_num = addx(gr, srcptrcell_live, @[gr_xop]GrAddressof({srcptrcell, src}));
   retinit gr_num = addx(gr, @[gr_xop]GrLive({retvoid}));
-  ap gr_num = addx(gr, mk_shray(fc, dp, sp, retinit), @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid}));
+  ap gr_num = addx(gr, seq4(gr, retinit, fc, dp, sp).x, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid}));
   deadret var = addx(gr, ap, @[gr_xop]GrDead({retvoid}));
   return deadret;
 }
