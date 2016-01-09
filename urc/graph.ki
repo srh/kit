@@ -1498,24 +1498,22 @@ func gr_logical_conjunction(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_l
 
 func gr_funcall(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_funcall, out *gr_num) np {
   nparams size = count(&a->params);
-  precs array[gr_num];
-  reserve(&precs, nparams + 1);
   dep gr_num;
   if case Printed(pm) = gr_live_and_expr_consume(clq, gr, oo(&a->fun), &dep) {
     return Printed(pm);
   }
-  push(&precs, dep);
   paramcells array[cell_num];
   reserve(&paramcells, nparams);
   for i size = 0; i < nparams; i = i + 1 {
     param *ast_expr_consume = ref(&a->params, i);
-    if case Printed(pm) = gr_live_and_expr_consume(clq, gr, param, &dep) {
+    gn gr_num;
+    if case Printed(pm) = gr_live_and_expr_consume(clq, gr, param, &gn) {
       return Printed(pm);
     }
-    push(&precs, dep);
+    dep = seq2(gr, dep, gn).x;
     push(&paramcells, result_cell(param));
   }
-  ap var = addx(gr, freeze(&precs), @[gr_xop]GrApply({result_cell(oo(&a->fun)), freeze(&paramcells), rval_cell(x)}));
+  ap var = addx(gr, dep, @[gr_xop]GrApply({result_cell(oo(&a->fun)), freeze(&paramcells), rval_cell(x)}));
   *out = ap;
   return NoFail;
 }
