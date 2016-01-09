@@ -1743,7 +1743,7 @@ func gr_uni_fun(clq *clqueue, gr *frame_graph, ip instpair, arg cell_num) gr_num
   argptrcell_live gr_num = addx(gr, @[gr_xop]GrLive({argptrcell}));
   arp gr_num = addx(gr, argptrcell_live, @[gr_xop]GrAddressof({argptrcell, arg}));
   retinit gr_num = addx(gr, @[gr_xop]GrLive({retvoid}));
-  ap gr_num = addx(gr, mk_shray(fc, arp, retinit), @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid}));
+  ap gr_num = addx(gr, seq3(gr, retinit, fc, arp).x, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid}));
   deadret gr_num = addx(gr, ap, @[gr_xop]GrDead({retvoid}));
   return deadret;
 }
