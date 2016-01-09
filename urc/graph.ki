@@ -300,6 +300,16 @@ func seq4(gr *frame_graph, gn1 gr_num, gn2 gr_num, gn3 gr_num, gn4 gr_num) sq_nu
   return seqq(gr, {gn1, seq3(gr, gn2, gn3, gn4)});
 }
 
+func seqN(gr *frame_graph, arr *array[gr_num]) sq_num {
+  build sq_num = nopq(gr);
+  n size = count(arr);
+  for i size = n; i > 0; {
+    i = i - 1;
+    build = seqq(gr, {get(arr, i), build});
+  }
+  return build;
+}
+
 func gr_fullbody(clq *clqueue, gr *frame_graph, x *ast_fullbody, out *gr_num, return_cell_out *cell_num) np {
   final_node sq_num = nopq(gr);
 
@@ -2363,7 +2373,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
   argcells array[cell_num];
   pointeecells array[cell_num];
-  derefgns array[gr_num];
+  derefgn gr_num = nopq(&gr).x;
   nargs size = num_args(wc);
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = add_cell(&gr, {LocationStatic, argtp.cu, argtp.props});
@@ -2373,25 +2383,22 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
     gn1 gr_num = addx(&gr, @[gr_xop]GrDeref({pc, ac, OffsetConst(0)}));
     gn gr_num = addx(&gr, gn1, @[gr_xop]GrDead({ac}));
-    push(&derefgns, gn);
+    derefgn = seq2(&gr, derefgn, gn).x;
   }
-
-  derefgn gr_num = addx(&gr, freeze(&derefgns), @[gr_xop]GrXNop);
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
 
-  deadprecs array[gr_num];
+  deadprec gr_num;
   if true {
-    setret gr_num = addx(&gr, @[gr_xop]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)}));
-    push(&deadprecs, setret);
+    deadprec = addx(&gr, @[gr_xop]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)}));
 
     for i size = 0; i < nargs; i = i + 1 {
       pd gr_num = addx(&gr, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
-      push(&deadprecs, pd);
+      deadprec = seq2(&gr, pd, deadprec).x;
     }
   }
 
-  bn sq_num = seq1(&gr, addx(&gr, freeze(&deadprecs), @[gr_xop]GrXNop));
+  bn sq_num = seq1(&gr, deadprec);
 
   nfields size = count(&msi->fips);
   check(nfields == count(&st->fields));
@@ -2420,18 +2427,15 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       compute_prim(clq, ptr_type(cs, ref(&st->fields, i)->type), &fieldptrtype, &fieldptrtype_props);
 
       fieldptrcella array[cell_num];
-      precs array[gr_num];
+      prec gr_num = nopq(&gr).x;
       for j size = 0; j < nargs; j = j + 1 {
         fpc cell_num = add_cell(&gr, {LocationStatic, fieldptrtype, fieldptrtype_props});
         push(&fieldptrcella, fpc);
         fpc_live gr_num = addx(&gr, @[gr_xop]GrLive({fpc}));
-        gn1 gr_num = addx(&gr, mk_shray(fpc_live, get(&fieldcellgn, j)), @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
+        gn1 gr_num = addx(&gr, seq2(&gr, fpc_live, get(&fieldcellgn, j)).x, @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
         gn gr_num = addx(&gr, gn1, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
-        push(&precs, gn);
+        prec = seq2(&gr, prec, gn).x;
       }
-
-      fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-      push(&precs, addx(&gr, @[gr_xop]GrLive({fieldretcell})));
 
       fntype cu_typeexpr;
       fntype_props type_properties;
@@ -2440,9 +2444,12 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
       func_cell_live gr_num = addx(&gr, @[gr_xop]GrLive({func_cell}));
       func_gn gr_num = addx(&gr, func_cell_live, @[gr_xop]GrWriteConst({func_cell, ConstDef(ip)}));
-      push(&precs, func_gn);
+      prec = seq2(&gr, func_gn, prec).x;
 
-      ap gr_num = addx(&gr, freeze(&precs), @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
+      fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
+      prec = seq2(&gr, addx(&gr, @[gr_xop]GrLive({fieldretcell})), prec).x;
+
+      ap gr_num = addx(&gr, prec, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
 
       vd gr_num = addx(&gr, ap, @[gr_xop]GrDead({fieldretcell}));
 
@@ -2452,13 +2459,13 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       switch wc {
       case CtorInit:
         // zero-initialize.
-        gn1 var = addx(&gr, freeze(&fieldcellgn), @[gr_xop]GrWriteConst({get(&fieldcella, 0), ConstInt(~ @[u32] 0)}));
+        gn1 var = addx(&gr, seqN(&gr, &fieldcellgn).x, @[gr_xop]GrWriteConst({get(&fieldcella, 0), ConstInt(~ @[u32] 0)}));
         ogn = Has(gn1);
       case CtorCopy:
-        gn1 var = addx(&gr, freeze(&fieldcellgn), @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
+        gn1 var = addx(&gr, seqN(&gr, &fieldcellgn).x, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
         ogn = Has(gn1);
       case CtorMove:
-        gn1 var = addx(&gr, freeze(&fieldcellgn), @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
+        gn1 var = addx(&gr, seqN(&gr, &fieldcellgn).x, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
         ogn = Has(gn1);
       case CtorDestroy:
         // do nothing.
@@ -2466,13 +2473,12 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       }
 
       if case Has(gn gr_num) = ogn {
-        dfcprecs array[gr_num];
+        dfcprec gr_num = nopq(&gr).x;
         for j size = 0; j < nargs; j = j + 1 {
           dfc var = addx(&gr, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
-          push(&dfcprecs, dfc);
+          dfcprec = seq2(&gr, dfc, dfcprec).x;
         }
-        dfcnop gr_num = addx(&gr, freeze(&dfcprecs), @[gr_xop]GrXNop);
-        field_gn = seq2(&gr, gn, dfcnop).x;
+        field_gn = seq2(&gr, gn, dfcprec).x;
       } else {
         field_gn = addx(&gr, @[gr_xop]GrXNop);
       }
@@ -2484,7 +2490,8 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
       padding_count u32;
       postpadding_offset_and_count(&psd, i, &padding_offset, &padding_count);
       if case Has(bzero_gn gr_num) = gr_bzero_subcell(clq, &gr, get(&pointeecells, 0), padding_offset, padding_count) {
-        nop2_gn var = addx(&gr, mk_shray(bzero_gn, field_gn), @[gr_xop]GrXNop);
+        // Should we bzero first or get the fields first?  I'm guessing a naive impl's bzero first is better for CPUs.
+        nop2_gn var = seq2(&gr, bzero_gn, field_gn).x;
         field_and_padding_gn = nop2_gn;
       } else {
         field_and_padding_gn = field_gn;
