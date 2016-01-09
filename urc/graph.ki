@@ -1905,22 +1905,24 @@ func add_basics(cs *checkstate, clq *clqueue, gr *frame_graph, size u32, arity s
   *out = ret;
 }
 
-func minimal_basics_cleanup_precs(gr *frame_graph, bas *gr_minimal_basics, out *array[gr_num]) void {
-  precs array[gr_num];
+func minimal_basics_cleanup_prec(gr *frame_graph, bas *gr_minimal_basics, out *gr_num) void {
+  prec gr_num = nopq(gr).x;
   ncells size = count(&bas->argcells);
   for i size = 0; i < ncells; i = i + 1 {
     gd gr_num = addx(gr, @[gr_xop]GrDead({get(&bas->argcells, i)}));
-    push(&precs, gd);
+    // This causes us to deaden argcells in reverse order, yes.
+    prec = seq2(gr, gd, prec).x;
   }
   retset var = addx(gr, @[gr_xop]GrWriteConst({bas->return_cell, ConstInt(bigu(0))}));
-  push(&precs, retset);
-  swap(out, &precs);
+  // A wild guess that it's better to set the return cell _after_.
+  prec = seq2(gr, prec, retset).x;
+  *out = prec;
 }
 
 func minimal_basics_cleanup(cs *checkstate, clq *clqueue, gr *frame_graph, bas *gr_minimal_basics, gn gr_num, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
-  precs array[gr_num];
-  minimal_basics_cleanup_precs(gr, bas, &precs);
-  nopgn var = addx(gr, freeze(&precs), @[gr_xop]GrXNop);
+  prec gr_num;
+  minimal_basics_cleanup_prec(gr, bas, &prec);
+  nopgn var = addx(gr, prec, @[gr_xop]GrXNop);
   fingn var = seq2(gr, gn, nopgn);
   *gr_out = *gr;
   *gn_out = fingn.x;
@@ -1929,15 +1931,15 @@ func minimal_basics_cleanup(cs *checkstate, clq *clqueue, gr *frame_graph, bas *
 }
 
 func basics_cleanup(cs *checkstate, clq *clqueue, gr *frame_graph, bas *gr_basics, gn gr_num, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
-  precs array[gr_num];
-  minimal_basics_cleanup_precs(gr, &bas->minimal, &precs);
+  prec gr_num;
+  minimal_basics_cleanup_prec(gr, &bas->minimal, &prec);
   ncells size = count(&bas->pointeecells);
   for i size = 0; i < ncells; i = i + 1 {
     pd gr_num = addx(gr, @[gr_xop]GrVirtualDead({get(&bas->pointeecells, i)}));
-    push(&precs, pd);
+    // TODO: Think about this order a bit more?  Idk.
+    prec = seq2(gr, prec, pd).x;
   }
-  nopgn var = addx(gr, freeze(&precs), @[gr_xop]GrXNop);
-  fingn var = seq2(gr, gn, nopgn);
+  fingn var = seq2(gr, gn, prec);
   *gr_out = *gr;
   *gn_out = fingn.x;
   *return_cell_out = bas->minimal.return_cell;
