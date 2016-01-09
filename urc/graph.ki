@@ -2594,7 +2594,7 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
   tagcell_gn var = addx(&gr, @[gr_xop]GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)}));
   tag_gn1 var = addx(&gr, tagcell_gn, @[gr_xop]GrWriteConst({tag_cell, ConstInt(~tagval.x)}));
   tag_gn var = addx(&gr, tag_gn1, @[gr_xop]GrVirtualDead({tag_cell}));
-  gn var = addx(&gr, concat(@[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn.x), postpadding_ogn), @[gr_xop]GrXNop);
+  gn var = addx(&gr, seq_ogn(&gr, @[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn.x), postpadding_ogn).x, @[gr_xop]GrXNop);
   *gr_out = gr;
   *gn_out = gn;
   *return_cell_out = retnum;
