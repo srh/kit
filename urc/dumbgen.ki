@@ -36,20 +36,21 @@ func swap(x *lives, y *lives) void {
 }
 
 struct gn_annot {
+  // A checksum for the liveset before this node is evaluated. (Used for assertions.) Is also the checksum for app_time_live.
   plainly_live nc[lives_checksum];
 
-  // Only for GrApply and GrPrimApply.
+  // Only for GrApply.
   // lower_paramlists and higher_paramlists are set on the second pass.
   // TODO: Reorder these fields.
   lower_paramlists nc[array[gr_num]];
   higher_paramlists hash[gr_num, void];
-  // What's live when we evaluate... which now must include the return cell.  Is this the same as plainly_live now?
-  // TODO(): There are no precs, and at this point the return cell is always live.
+  // What's live when we evaluate... which now must include the return cell
+  // This is only annotated for GrApply, and is checkedsummed by plainly_live.
   app_time_live nc[lives];
   paramlist_bottom_frame_offset nc[i32];
 
   dumbgen_gen_function_body_visited bool;
-  // The jmp target number for evaluating the node.
+  // The jmp target number for evaluating the node _and_ its precs.
   this_targetnum nc[jmp_targetnum];
 };
 
