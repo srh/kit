@@ -62,14 +62,12 @@ func location(info *cell_info) cell_location {
   return info->location;
 }
 
-// To "evaluate" an op, first we evaluate its precs (in unspecified order), then we ealuate the op.
 enum gr_node {
   XOp gr_xnode;
   QOp gr_qnode;
 };
 
 struct gr_xnode {
-  precs shray[gr_num];
   op gr_xop;
 };
 
@@ -144,7 +142,7 @@ func help_add_node(gr *frame_graph, node gr_node) gr_num {
 }
 
 func addx(gr *frame_graph, op gr_xop) gr_num {
-  return help_add_node(gr, @[gr_node]XOp({mk_shray(), op}));
+  return help_add_node(gr, @[gr_node]XOp({op}));
 }
 
 func addx(gr *frame_graph, prec gr_num, op gr_xop) gr_num {

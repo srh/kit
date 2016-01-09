@@ -379,251 +379,231 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
   }
 }
 
-enum gr_stackent {
-  EvalOpAndPrecs gr_num;
-  EvalOp gr_num;
-};
-
 func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np {
   // A stack of gr_num's to evaluate, in order.
-  stack array[gr_stackent];
-  push(&stack, EvalOpAndPrecs(fg->gn));
-  while case Has(se gr_stackent) = popval(&stack) {
-    switch se {
-    case EvalOpAndPrecs(gn gr_num):
-      push(&stack, EvalOp(gn));
-      // Push the stack such that we eval the precs left-to-right in static eval.
-      switch ref_node(&fg->gr, gn) {
-      case &XOp(xn gr_xnode):
-        nprecs size = count(&xn.precs);
-        for i size = nprecs; i > 0; {
-          i = i - 1;
-          push(&stack, EvalOpAndPrecs(get(&xn.precs, i)));
+  stack array[gr_num];
+  push(&stack, fg->gn);
+  while case Has(gn gr_num) = popval(&stack) {
+    switch ref_node(&fg->gr, gn) {
+    case &XOp(xn gr_xnode):
+      switch &xn.op {
+      case &GrApply(a gr_apply):
+        funref st_obj_ref = cell_obj_ref(env, a.funcell, "in I");
+        if !is_full_oref(env, funref) {
+          ice(_u8("Function apply funptr cell is sub-object"));
         }
-      case &QOp(qn gr_qnode): { }
+        funvalue st_value;
+        if case Printed(pm) = obj_read(env, funref, &funvalue) {
+          return Printed(pm);
+        }
+        st_deaden(env, a.funcell);
+
+        funcval st_symbolref;
+        if case Printed(pm) = st_value_as_symbolref(&env->plat, &funvalue, &funcval) {
+          return Printed(pm);
+        }
+        nparams size = count(&a.params);
+        paramorefs array[st_obj_ref];
+        reserve(&paramorefs, nparams);
+        for i size = 0; i < nparams; i = i + 1 {
+          c cell_num = get(&a.params, i);
+          param_oref st_obj_ref = cell_obj_ref(env, c, "in II");
+          if !is_full_oref(env, param_oref) {
+            ice(_u8("Function parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.x)->type), _u8(")"));
+          }
+          push(&paramorefs, param_oref);
+          *ref(&env->framecells, c.x) = None;
+        }
+
+        retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in III");
+
+        if case Printed(pm) = st_eval_fn_body(clq, env, &paramorefs, retvalref, funcval.fnid) {
+          return Printed(pm);
+        }
+
+      case &GrPrimApply(a gr_prim_apply):
+        nparams size = count(&a.params);
+        paramorefs array[st_obj_ref];
+        reserve(&paramorefs, nparams);
+        for i size = 0; i < nparams; i = i + 1 {
+          c cell_num = get(&a.params, i);
+          param_oref st_obj_ref = cell_obj_ref(env, c, "in IIIa");
+          if !is_full_oref(env, param_oref) {
+            // TODO: Kind of code duplication with GrApply case.
+            ice(_u8("Primitive op parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.x)->type), _u8(")"));
+          }
+          push(&paramorefs, param_oref);
+          *ref(&env->framecells, c.x) = None;
+        }
+
+        retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in IIIb");
+
+        if case Printed(pm) = st_eval_prim_op(clq, env, &paramorefs, retvalref, &a.primop) {
+          return Printed(pm);
+        }
+
+      case &GrMemCopy(a gr_memcopy):
+        destref st_obj_ref = cell_obj_ref(env, a.dest, "in IV");
+        srcref st_obj_ref;
+        if !try_cell_obj_ref(env, a.src, &srcref) {
+          return ERR(_u8("ICE: cell obj cannot be reffed (in V) (cell num = "), a.src.x, _u8(")"));
+        }
+        value st_value;
+        if case Printed(pm) = obj_read(env, srcref, &value) {
+          return Printed(pm);
+        }
+        if case Printed(pm) = obj_write(env, destref, &value) {
+          return Printed(pm);
+        }
+
+      case &GrWriteConst(a gr_writeconst):
+        destref st_obj_ref;
+        if !try_cell_obj_ref(env, a.dest, &destref) {
+          return ERR(_u8("ICE: cell obj cannot be reffed (in VI) (cell num = "), a.dest.x, _u8(")"));
+        }
+        value st_value;
+        if case Printed(pm) = st_const_compute(clq, &env->plat, &a.value, destref.count, &value) {
+          return Printed(pm);
+        }
+        if case Printed(pm) = obj_write(env, destref, &value) {
+          return Printed(pm);
+        }
+
+      case &GrAddressof(a gr_addressof):
+        destref st_obj_ref = cell_obj_ref(env, a.dest, "in VII");
+        addressee_ref st_obj_ref = cell_obj_ref(env, a.addressee, "in VIII");
+        value st_value = mk_st_value_pointer(&env->plat, {addressee_ref.num, addressee_ref.offset});
+        if case Printed(pm) = obj_write(env, destref, &value) {
+          return Printed(pm);
+        }
+
+      case &GrDeref(a gr_deref):
+        pointer_obj st_obj_ref = cell_obj_ref(env, a.pointer, "in IX");
+        pointer_value st_value;
+        if case Printed(pm) = obj_read(env, pointer_obj, &pointer_value) {
+          return Printed(pm);
+        }
+        pointer st_pointer;
+        if case Printed(pm) = st_value_as_pointer(&env->plat, &pointer_value, &pointer) {
+          return Printed(pm);
+        }
+        info *cell_info = ref_cell(&fg->gr, a.name);
+        deref_size u32 = info->props.flat_size;
+        // We add offset to pointer.offset.
+        offset u32;
+        if case Printed(pm) = st_offset_compute(env, a.offset, &offset) {
+          return Printed(pm);
+        }
+        new_offset u32 = pointer.offset + offset;
+        if case &Has(referee_val st_value) = ref(&env->pool->objects, pointer.num.x) {
+          if new_offset > referee_val.length {
+            return ERR(_u8("Dereferencing pointer out of range"));
+          }
+        } else {
+          return ERR(_u8("Dereferencing pointer to dead object"));
+        }
+        *ref(&env->framecells, a.name.x) = Has(@[st_obj_ref]{pointer.num, new_offset, deref_size});
+
+      case &GrSubcell(a gr_subcell):
+        partof_obj st_obj_ref = cell_obj_ref(env, a.partof, "in X");
+        offset u32;
+        if case Printed(pm) = st_offset_compute(env, a.offset, &offset) {
+          return Printed(pm);
+        }
+        if offset > partof_obj.count {
+          return ERR(_u8("Subcell index out of range (for cell)"));
+        }
+        info *cell_info = ref_cell(&fg->gr, a.name);
+        deref_size u32 = info->props.flat_size;
+        new_offset u32 = partof_obj.offset + offset;
+        if case &Has(referee_val st_value) = ref(&env->pool->objects, partof_obj.num.x) {
+          if new_offset > referee_val.length {
+            return ERR(_u8("Subcell index out of range (for object)"));
+          }
+        } else {
+          return ERR(_u8("Accessing subcell of dead object"));
+        }
+        *ref(&env->framecells, a.name.x) = Has(@[st_obj_ref]{partof_obj.num, new_offset, deref_size});
+
+      case &GrLive(a gr_live):
+        if isHas(ref(&env->framecells, a.cell.x)) {
+          return ERR(_u8("GrLive sees already-live cell "), to_u8str(a.cell.x));
+        }
+        info *cell_info = ref_cell(&fg->gr, a.cell);
+        if !isLocationStatic(location(info)) {
+          return ERR(_u8("GrLive on non-static cell"));
+        }
+
+        objnum st_obj_num = add_obj(env, info->props.flat_size);
+        *ref(&env->framecells, a.cell.x) = Has(@[st_obj_ref]{objnum, 0, info->props.flat_size});
+
+        destref st_obj_ref = cell_obj_ref(env, a.cell, "in XII");
+        value st_value = mk_st_value(&env->plat, destref.count);
+        if case Printed(pm) = obj_write(env, destref, &value) {
+          return Printed(pm);
+        }
+
+      case &GrAssertLive(a gr_assert_live):
+        if !isHas(ref(&env->framecells, a.cell.x)) {
+          return ERR(_u8("GrAssertLive sees un-live cell."));
+        }
+
+      case &GrDead(a gr_dead):
+        st_deaden(env, a.cell);
+
+      case &GrVirtualDead(a gr_virtual_dead):
+        // TODO: At some point we'll want to assert that virtual cells (and static cells) dead when we define them _active_.
+        // We mark the cell inactive.
+        if !isHas(ref(&env->framecells, a.cell.x)) {
+          ice(_u8("GrVirtualDead deading inactive cell "), a.cell.x);
+        }
+        *ref(&env->framecells, a.cell.x) = None;
+
+      case &GrXNop: { }
       }
-    case EvalOp(gn gr_num):
-      switch ref_node(&fg->gr, gn) {
-      case &XOp(xn gr_xnode):
-        switch &xn.op {
-        case &GrApply(a gr_apply):
-          funref st_obj_ref = cell_obj_ref(env, a.funcell, "in I");
-          if !is_full_oref(env, funref) {
-            ice(_u8("Function apply funptr cell is sub-object"));
-          }
-          funvalue st_value;
-          if case Printed(pm) = obj_read(env, funref, &funvalue) {
-            return Printed(pm);
-          }
-          st_deaden(env, a.funcell);
 
-          funcval st_symbolref;
-          if case Printed(pm) = st_value_as_symbolref(&env->plat, &funvalue, &funcval) {
+    case &QOp(qn gr_qnode):
+      switch &qn.op {
+      case &GrBranch(a gr_branch):
+        src_obj st_obj_ref = cell_obj_ref(env, a.src, "in XI");
+        src_value st_value;
+        if case Printed(pm) = obj_read(env, src_obj, &src_value) {
+          return Printed(pm);
+        }
+        ncases size = count(&a.cases);
+        found bool = false;
+        for i size = 0; i < ncases && !found; i = i + 1 {
+          case_i *tup[gr_const, sq_num] = ref(&a.cases, i);
+          case_value st_value;
+          if case Printed(pm) = st_const_compute(clq, &env->plat, &case_i->car, src_obj.count, &case_value) {
             return Printed(pm);
           }
-          nparams size = count(&a.params);
-          paramorefs array[st_obj_ref];
-          reserve(&paramorefs, nparams);
-          for i size = 0; i < nparams; i = i + 1 {
-            c cell_num = get(&a.params, i);
-            param_oref st_obj_ref = cell_obj_ref(env, c, "in II");
-            if !is_full_oref(env, param_oref) {
-              ice(_u8("Function parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.x)->type), _u8(")"));
-            }
-            push(&paramorefs, param_oref);
-            *ref(&env->framecells, c.x) = None;
-          }
-
-          retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in III");
-
-          if case Printed(pm) = st_eval_fn_body(clq, env, &paramorefs, retvalref, funcval.fnid) {
+          case_matches bool;
+          if case Printed(pm) = st_values_selfcontained_equal(&env->plat, &src_value, &case_value, &case_matches) {
             return Printed(pm);
           }
-
-        case &GrPrimApply(a gr_prim_apply):
-          nparams size = count(&a.params);
-          paramorefs array[st_obj_ref];
-          reserve(&paramorefs, nparams);
-          for i size = 0; i < nparams; i = i + 1 {
-            c cell_num = get(&a.params, i);
-            param_oref st_obj_ref = cell_obj_ref(env, c, "in IIIa");
-            if !is_full_oref(env, param_oref) {
-              // TODO: Kind of code duplication with GrApply case.
-              ice(_u8("Primitive op parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.x)->type), _u8(")"));
-            }
-            push(&paramorefs, param_oref);
-            *ref(&env->framecells, c.x) = None;
+          if case_matches {
+            push(&stack, case_i->cdr.x);
+            found = true;
           }
-
-          retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in IIIb");
-
-          if case Printed(pm) = st_eval_prim_op(clq, env, &paramorefs, retvalref, &a.primop) {
-            return Printed(pm);
-          }
-
-        case &GrMemCopy(a gr_memcopy):
-          destref st_obj_ref = cell_obj_ref(env, a.dest, "in IV");
-          srcref st_obj_ref;
-          if !try_cell_obj_ref(env, a.src, &srcref) {
-            return ERR(_u8("ICE: cell obj cannot be reffed (in V) (cell num = "), a.src.x, _u8(")"));
-          }
-          value st_value;
-          if case Printed(pm) = obj_read(env, srcref, &value) {
-            return Printed(pm);
-          }
-          if case Printed(pm) = obj_write(env, destref, &value) {
-            return Printed(pm);
-          }
-
-        case &GrWriteConst(a gr_writeconst):
-          destref st_obj_ref;
-          if !try_cell_obj_ref(env, a.dest, &destref) {
-            return ERR(_u8("ICE: cell obj cannot be reffed (in VI) (cell num = "), a.dest.x, _u8(")"));
-          }
-          value st_value;
-          if case Printed(pm) = st_const_compute(clq, &env->plat, &a.value, destref.count, &value) {
-            return Printed(pm);
-          }
-          if case Printed(pm) = obj_write(env, destref, &value) {
-            return Printed(pm);
-          }
-
-        case &GrAddressof(a gr_addressof):
-          destref st_obj_ref = cell_obj_ref(env, a.dest, "in VII");
-          addressee_ref st_obj_ref = cell_obj_ref(env, a.addressee, "in VIII");
-          value st_value = mk_st_value_pointer(&env->plat, {addressee_ref.num, addressee_ref.offset});
-          if case Printed(pm) = obj_write(env, destref, &value) {
-            return Printed(pm);
-          }
-
-        case &GrDeref(a gr_deref):
-          pointer_obj st_obj_ref = cell_obj_ref(env, a.pointer, "in IX");
-          pointer_value st_value;
-          if case Printed(pm) = obj_read(env, pointer_obj, &pointer_value) {
-            return Printed(pm);
-          }
-          pointer st_pointer;
-          if case Printed(pm) = st_value_as_pointer(&env->plat, &pointer_value, &pointer) {
-            return Printed(pm);
-          }
-          info *cell_info = ref_cell(&fg->gr, a.name);
-          deref_size u32 = info->props.flat_size;
-          // We add offset to pointer.offset.
-          offset u32;
-          if case Printed(pm) = st_offset_compute(env, a.offset, &offset) {
-            return Printed(pm);
-          }
-          new_offset u32 = pointer.offset + offset;
-          if case &Has(referee_val st_value) = ref(&env->pool->objects, pointer.num.x) {
-            if new_offset > referee_val.length {
-              return ERR(_u8("Dereferencing pointer out of range"));
-            }
+        }
+        if !found {
+          if case Has(default_gn sq_num) = a.default_case {
+            push(&stack, default_gn.x);
           } else {
-            return ERR(_u8("Dereferencing pointer to dead object"));
+            return ERR(_u8("GrBranch meets unhandled case"));
           }
-          *ref(&env->framecells, a.name.x) = Has(@[st_obj_ref]{pointer.num, new_offset, deref_size});
-
-        case &GrSubcell(a gr_subcell):
-          partof_obj st_obj_ref = cell_obj_ref(env, a.partof, "in X");
-          offset u32;
-          if case Printed(pm) = st_offset_compute(env, a.offset, &offset) {
-            return Printed(pm);
-          }
-          if offset > partof_obj.count {
-            return ERR(_u8("Subcell index out of range (for cell)"));
-          }
-          info *cell_info = ref_cell(&fg->gr, a.name);
-          deref_size u32 = info->props.flat_size;
-          new_offset u32 = partof_obj.offset + offset;
-          if case &Has(referee_val st_value) = ref(&env->pool->objects, partof_obj.num.x) {
-            if new_offset > referee_val.length {
-              return ERR(_u8("Subcell index out of range (for object)"));
-            }
-          } else {
-            return ERR(_u8("Accessing subcell of dead object"));
-          }
-          *ref(&env->framecells, a.name.x) = Has(@[st_obj_ref]{partof_obj.num, new_offset, deref_size});
-
-        case &GrLive(a gr_live):
-          if isHas(ref(&env->framecells, a.cell.x)) {
-            return ERR(_u8("GrLive sees already-live cell "), to_u8str(a.cell.x));
-          }
-          info *cell_info = ref_cell(&fg->gr, a.cell);
-          if !isLocationStatic(location(info)) {
-            return ERR(_u8("GrLive on non-static cell"));
-          }
-
-          objnum st_obj_num = add_obj(env, info->props.flat_size);
-          *ref(&env->framecells, a.cell.x) = Has(@[st_obj_ref]{objnum, 0, info->props.flat_size});
-
-          destref st_obj_ref = cell_obj_ref(env, a.cell, "in XII");
-          value st_value = mk_st_value(&env->plat, destref.count);
-          if case Printed(pm) = obj_write(env, destref, &value) {
-            return Printed(pm);
-          }
-
-        case &GrAssertLive(a gr_assert_live):
-          if !isHas(ref(&env->framecells, a.cell.x)) {
-            return ERR(_u8("GrAssertLive sees un-live cell."));
-          }
-
-        case &GrDead(a gr_dead):
-          st_deaden(env, a.cell);
-
-        case &GrVirtualDead(a gr_virtual_dead):
-          // TODO: At some point we'll want to assert that virtual cells (and static cells) dead when we define them _active_.
-          // We mark the cell inactive.
-          if !isHas(ref(&env->framecells, a.cell.x)) {
-            ice(_u8("GrVirtualDead deading inactive cell "), a.cell.x);
-          }
-          *ref(&env->framecells, a.cell.x) = None;
-
-        case &GrXNop: { }
         }
 
-      case &QOp(qn gr_qnode):
-        switch &qn.op {
-        case &GrBranch(a gr_branch):
-          src_obj st_obj_ref = cell_obj_ref(env, a.src, "in XI");
-          src_value st_value;
-          if case Printed(pm) = obj_read(env, src_obj, &src_value) {
-            return Printed(pm);
-          }
-          ncases size = count(&a.cases);
-          found bool = false;
-          for i size = 0; i < ncases && !found; i = i + 1 {
-            case_i *tup[gr_const, sq_num] = ref(&a.cases, i);
-            case_value st_value;
-            if case Printed(pm) = st_const_compute(clq, &env->plat, &case_i->car, src_obj.count, &case_value) {
-              return Printed(pm);
-            }
-            case_matches bool;
-            if case Printed(pm) = st_values_selfcontained_equal(&env->plat, &src_value, &case_value, &case_matches) {
-              return Printed(pm);
-            }
-            if case_matches {
-              push(&stack, EvalOpAndPrecs(case_i->cdr.x));
-              found = true;
-            }
-          }
-          if !found {
-            if case Has(default_gn sq_num) = a.default_case {
-              push(&stack, EvalOpAndPrecs(default_gn.x));
-            } else {
-              return ERR(_u8("GrBranch meets unhandled case"));
-            }
-          }
+      case &GrSequence(a gr_sequence):
+        // first gets evaluated before second (because it gets pushed after)
+        push(&stack, a.second.x);
+        push(&stack, a.first);
 
-        case &GrSequence(a gr_sequence):
-          // first gets evaluated before second (because it gets pushed after)
-          push(&stack, EvalOpAndPrecs(a.second.x));
-          push(&stack, EvalOpAndPrecs(a.first));
+      case &GrJmp(a gr_jmp):
+        push(&stack, a.next.x);
 
-        case &GrJmp(a gr_jmp):
-          push(&stack, EvalOpAndPrecs(a.next.x));
-
-        case &GrQNop: { }
-        }
+      case &GrQNop: { }
       }
     }
   }
