@@ -2159,8 +2159,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
   argcells array[cell_num];
   pointeecells array[cell_num];
   tagcells array[cell_num];
-  deref_gns array[gr_num];
-  tagcell_gns array[gr_num];
+  tagcell_gn gr_num = nopq(&gr).x;
   nargs size = num_args(wc);
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = add_cell(&gr, {LocationStatic, argtp.cu, argtp.props});
@@ -2172,26 +2171,23 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
     derefgn1 gr_num = addx(&gr, @[gr_xop]GrDeref({pc, ac, OffsetConst(0)}));
     derefgn gr_num = addx(&gr, derefgn1, @[gr_xop]GrDead({ac}));
-    push(&deref_gns, derefgn);
     tcgn gr_num = addx(&gr, derefgn, @[gr_xop]GrSubcell({tc, pc, OffsetConst(enum_tag_offset)}));
-    push(&tagcell_gns, tcgn);
+    tagcell_gn = seq2(&gr, tagcell_gn, tcgn).x;
   }
 
-  deref_gn gr_num = addx(&gr, freeze(&tagcell_gns), @[gr_xop]GrXNop);
+  deref_gn gr_num = tagcell_gn;
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-  deadprecs array[gr_num];
+  deadprec gr_num;
   if true {
-    setret gr_num = addx(&gr, @[gr_xop]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)}));
-    push(&deadprecs, setret);
+    deadprec = addx(&gr, @[gr_xop]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)}));
     for i size = 0; i < nargs; i = i + 1 {
       pd gr_num = addx(&gr, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
-      push(&deadprecs, pd);
       td gr_num = addx(&gr, @[gr_xop]GrVirtualDead({get(&tagcells, i)}));
-      push(&deadprecs, td);
+      deadprec = seq2(&gr, seq2(&gr, pd, td).x, deadprec).x;
     }
   }
-  deadseq sq_num = seq1(&gr, addx(&gr, freeze(&deadprecs), @[gr_xop]GrXNop));
+  deadseq sq_num = seq1(&gr, deadprec);
 
   cases_gn array[tup[gr_const, sq_num]];
   nconstructors size = count(&et->constructors);
@@ -2228,18 +2224,15 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       compute_prim(clq, ptr_type(cs, fieldtype.x), &fieldptrtype, &fieldptrtype_props);
 
       fieldptrcella array[cell_num];
-      precs array[gr_num];
+      prec gr_num = nopq(&gr).x;
       for j size = 0; j < nargs; j = j + 1 {
         fpc cell_num = add_cell(&gr, {LocationStatic, fieldptrtype, fieldptrtype_props});
         push(&fieldptrcella, fpc);
         fpc_live gr_num = addx(&gr, @[gr_xop]GrLive({fpc}));
-        an1 gr_num = addx(&gr, mk_shray(fpc_live, get(&fieldcellgn, j)), @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
+        an1 gr_num = addx(&gr, seq2(&gr, fpc_live, get(&fieldcellgn, j)).x, @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
         an gr_num = addx(&gr, an1, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
-        push(&precs, an);
+        prec = seq2(&gr, prec, an).x;
       }
-
-      fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-      push(&precs, addx(&gr, @[gr_xop]GrLive({fieldretcell})));
 
       fntype cu_typeexpr;
       fntype_props type_properties;
@@ -2248,9 +2241,12 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
       func_cell_live gr_num = addx(&gr, @[gr_xop]GrLive({func_cell}));
       func_gn gr_num = addx(&gr, func_cell_live, @[gr_xop]GrWriteConst({func_cell, ConstDef(ip)}));
-      push(&precs, func_gn);
+      prec = seq2(&gr, func_gn, prec).x;
 
-      ap gr_num = addx(&gr, freeze(&precs), @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
+      fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
+      prec = seq2(&gr, addx(&gr, @[gr_xop]GrLive({fieldretcell})), prec).x;
+
+      ap gr_num = addx(&gr, prec, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
       vd gr_num = addx(&gr, ap, @[gr_xop]GrDead({fieldretcell}));
       last_ogn = vd;
     } else {
@@ -2269,13 +2265,12 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
         // do nothing.
       }
       if case Has(gn gr_num) = ogn {
-        dfcprecs array[gr_num];
+        dfcprec gr_num = nopq(&gr).x;
         for j size = 0; j < nargs; j = j + 1 {
           dfc var = addx(&gr, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
-          push(&dfcprecs, dfc);
+          dfcprec = seq2(&gr, dfc, dfcprec).x;
         }
-        dfcnop gr_num = addx(&gr, freeze(&dfcprecs), @[gr_xop]GrXNop);
-        last_ogn = seq2(&gr, gn, dfcnop).x;
+        last_ogn = seq2(&gr, gn, dfcprec).x;
       } else {
         // The nodes that create fieldcella were never added to the graph, so we don't dead them.
         last_ogn = nopq(&gr).x;
@@ -2296,7 +2291,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       tagset_ogn = None;
     }
 
-    finalgn gr_num = addx(&gr, concat(tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn), @[gr_xop]GrXNop);
+    finalgn gr_num = addx(&gr, seq_ogn(&gr, tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn).x, @[gr_xop]GrXNop);
 
     finalseqgn sq_num = seqq(&gr, {finalgn, deadseq});
     push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), finalseqgn});
@@ -2319,6 +2314,23 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
   *return_cell_out = return_cell;
   *arg_cells_out = argcells;
   return NoFail;
+}
+
+func seqqo(gr *frame_graph, a opt[gr_num], onto sq_num) sq_num {
+  if case Has(gn gr_num) = a {
+    return seqq(gr, {gn, onto});
+  } else {
+    return onto;
+  }
+}
+
+func seq_ogn(gr *frame_graph, a opt[gr_num], b opt[gr_num], c opt[gr_num], d opt[gr_num]) sq_num {
+  build sq_num = nopq(gr);
+  build = seqqo(gr, d, build);
+  build = seqqo(gr, c, build);
+  build = seqqo(gr, b, build);
+  build = seqqo(gr, a, build);
+  return build;
 }
 
 func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magic_struct_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
