@@ -1873,7 +1873,7 @@ struct gr_minimal_basics {
 struct gr_basics {
   minimal gr_minimal_basics;
   pointeecells array[cell_num];
-  derefs shray[gr_num];
+  deref_prec gr_num;
 };
 
 func add_minimal_basics(cs *checkstate, clq *clqueue, gr *frame_graph, size u32, arity size, out *gr_minimal_basics) void {
@@ -1894,14 +1894,14 @@ func add_basics(cs *checkstate, clq *clqueue, gr *frame_graph, size u32, arity s
   add_minimal_basics(cs, clq, gr, size, arity, &ret.minimal);
 
   pointee_tp cu_typrop = compute_prim(clq, primitive_padding_type(cs, size));
-  derefs array[gr_num];
+  deref_prec gr_num = nopq(gr).x;
   for i size = 0; i < arity; i = i + 1 {
     pc cell_num = add_cell(gr, {LocationVirtual, pointee_tp.cu, pointee_tp.props});
     push(&ret.pointeecells, pc);
     dn gr_num = addx(gr, @[gr_xop]GrDeref({pc, get(&ret.minimal.argcells, i), OffsetConst(0)}));
-    push(&derefs, dn);
+    deref_prec = seq2(gr, deref_prec, dn).x;
   }
-  ret.derefs = freeze(&derefs);
+  ret.deref_prec = deref_prec;
   *out = ret;
 }
 
@@ -1960,7 +1960,7 @@ func gr_magic_memcopy(cs *checkstate, clq *clqueue, mm *magic_memcopy, gr_out *f
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_memcopy")));
   bas gr_basics;
   add_basics(cs, clq, &gr, *un(&mm->size), 2, &bas);
-  gn gr_num = addx(&gr, bas.derefs, @[gr_xop]GrMemCopy({get(&bas.pointeecells, 0), get(&bas.pointeecells, 1)}));
+  gn gr_num = addx(&gr, bas.deref_prec, @[gr_xop]GrMemCopy({get(&bas.pointeecells, 0), get(&bas.pointeecells, 1)}));
   basics_cleanup(cs, clq, &gr, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
   return NoFail;
 }
@@ -1969,7 +1969,7 @@ func gr_magic_bzero(cs *checkstate, clq *clqueue, mb *magic_bzero, gr_out *frame
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_bzero")));
   bas gr_basics;
   add_basics(cs, clq, &gr, *un(&mb->size), 1, &bas);
-  gn gr_num = addx(&gr, bas.derefs, @[gr_xop]GrWriteConst({get(&bas.pointeecells, 0), ConstInt(bigu(0))}));
+  gn gr_num = addx(&gr, bas.deref_prec, @[gr_xop]GrWriteConst({get(&bas.pointeecells, 0), ConstInt(bigu(0))}));
   basics_cleanup(cs, clq, &gr, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
   return NoFail;
 }
@@ -2026,7 +2026,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 
   argcells array[cell_num];
   pointeecells array[cell_num];
-  derefgns array[gr_num];
+  derefgn gr_num = nopq(&gr).x;
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = add_cell(&gr, {LocationStatic, argtp.cu, argtp.props});
     push(&argcells, ac);
@@ -2035,34 +2035,32 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
 
     gn1 gr_num = addx(&gr, @[gr_xop]GrDeref({pc, ac, OffsetConst(0)}));
     gn gr_num = addx(&gr, gn1, @[gr_xop]GrDead({ac}));
-    push(&derefgns, gn);
+    derefgn = seq2(&gr, derefgn, gn).x;
   }
-
-  derefgn gr_num = addx(&gr, freeze(&derefgns), @[gr_xop]GrXNop);
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
 
   indexcell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
 
-  deadprecs array[gr_num];
+  deadprec gr_num;
   if true {
     setret gr_num = addx(&gr, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
-    push(&deadprecs, setret);
     indexdead gr_num = addx(&gr, @[gr_xop]GrDead({indexcell}));
-    push(&deadprecs, indexdead);
+    deadprec = seq2(&gr, indexdead, setret).x;
 
     for i size = 0; i < nargs; i = i + 1 {
       pd gr_num = addx(&gr, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
-      push(&deadprecs, pd);
+      // We end up doing GrVirtualDead in reverse order, yes.
+      deadprec = seq2(&gr, pd, deadprec).x;
     }
   }
 
-  deadseq sq_num = seq1(&gr, addx(&gr, freeze(&deadprecs), @[gr_xop]GrXNop));
+  deadseq sq_num = seq1(&gr, deadprec);
 
   topgn sq_num = nopq(&gr);
 
   elemptrcells array[cell_num];
-  precs array[gr_num];
+  prec gr_num = nopq(&gr).x;
   for j size = 0; j < nargs; j = j + 1 {
     ec cell_num = add_cell(&gr, {LocationVirtual, ~ *param, param_props});
     indexcopycell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
@@ -2073,20 +2071,23 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
     epc cell_num = add_cell(&gr, {LocationStatic, elemptrtype, elemptrtype_props});
     push(&elemptrcells, epc);
     epc_live gr_num = addx(&gr, @[gr_xop]GrLive({epc}));
-    ptrgn gr_num = addx(&gr, mk_shray(epc_live, deadcopy), @[gr_xop]GrAddressof({epc, ec}));
+    ptrgn gr_num = addx(&gr, seq2(&gr, deadcopy, epc_live).x, @[gr_xop]GrAddressof({epc, ec}));
     ecdeadgn gr_num = addx(&gr, ptrgn, @[gr_xop]GrVirtualDead({ec}));
-    push(&precs, ecdeadgn);
+    prec = seq2(&gr, prec, ecdeadgn).x;
   }
 
-  elemretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-  push(&precs, addx(&gr, @[gr_xop]GrLive({elemretcell})));
   func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
 
   func_cell_live gr_num = addx(&gr, @[gr_xop]GrLive({func_cell}));
   func_gn gr_num = addx(&gr, func_cell_live, @[gr_xop]GrWriteConst({func_cell, ConstDef(mai->ip)}));
-  push(&precs, func_gn);
+  // Order here doesn't matter, but we do func cell before arg cells.
+  prec = seq2(&gr, func_gn, prec).x;
 
-  ap gr_num = addx(&gr, freeze(&precs), @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell}));
+  elemretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
+  // Order here doesn't matter, but we do ret cell before the others.
+  prec = seq2(&gr, addx(&gr, @[gr_xop]GrLive({elemretcell})), prec).x;
+
+  ap gr_num = addx(&gr, prec, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell}));
   vd gr_num = addx(&gr, ap, @[gr_xop]GrDead({elemretcell}));
 
   ic2cell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
@@ -2101,7 +2102,7 @@ func gr_magic_arraytype_info(cs *checkstate, clq *clqueue, wc which_ctor, mai *m
   } else {
     op_action = NumAdd;
   }
-  incrgn gr_num = addx(&gr, mk_shray(ic2gn, onegn), @[gr_xop]GrPrimApply({PrimNum({cs->plat.sizetraits.flat.size, cs->plat.sizetraits.numeric, op_action}), mk_shray(ic2cell, onecell), indexcell}));
+  incrgn gr_num = addx(&gr, seq2(&gr, ic2gn, onegn).x, @[gr_xop]GrPrimApply({PrimNum({cs->plat.sizetraits.flat.size, cs->plat.sizetraits.numeric, op_action}), mk_shray(ic2cell, onecell), indexcell}));
 
   terminal_case u32;
   init_value u32;
