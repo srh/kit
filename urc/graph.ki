@@ -1227,20 +1227,24 @@ func gr_index_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_index_expr
     if case Printed(pm) = gr_consume_actions(clq, gr, lp, oo(&a->lhs), &aft.car, &lgn) {
       return Printed(pm);
     }
-    live_before_lgn gr_num = gr_live_before(gr, result_cell(&aft.car), lgn);
-    gp var = addx(gr, mk_shray(rp, live_before_lgn), @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
+    live_before_lgn var = gr_live_before(gr, result_cell(&aft.car), lgn);
+    // Important: lhs is evaluated before rhs here.
+    before_deref var = seq2(gr, live_before_lgn, rp).x;
+    gp var = addx(gr, before_deref, @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
     lhs_later gr_num;
     if case Printed(pm) = gr_later_discard(clq, gr, &aft.cdr, &lhs_later) {
       return Printed(pm);
     }
-    laters var = addx(gr, mk_shray(lhs_later, rhs_later), @[gr_xop]GrXNop);
+    laters var = seq2(gr, rhs_later, lhs_later).x;
     gp_laters var = seq2(gr, gp, laters);
     *out = gp_laters.x;
     return NoFail;
   } else {
     name cell_num = value_cell(x);
     flat_size u32 = ref_cell(gr, name)->props.flat_size;
-    gp1 var = addx(gr, mk_shray(rp, lp), @[gr_xop]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
+    // Important: lhs is evaluated before rhs here.
+    before_subcell var = seq2(gr, lp, rp).x;
+    gp1 var = addx(gr, before_subcell, @[gr_xop]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
     gp gr_num;
     // TODO: Dedup with local_field code?
     switch &expr_complete_info(oo(&a->lhs))->lval {
