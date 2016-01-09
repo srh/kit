@@ -253,8 +253,8 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
 
               // Now we overwrite the apply op.
               // A GrApply always needs the return cell to be live before it's called.  So we add GrAssertLive to verify that's the case.
-              precs_op gr_num = addx(gr, xn.precs, @[gr_xop]GrDead({a.funcell}));
-              seqer sq_num = seqq(gr, {precs_op,
+              funcell_dead_op gr_num = help_add_node(gr, @[gr_node]XOp({@[gr_xop]GrDead({a.funcell})}));
+              seqer sq_num = seqq(gr, {funcell_dead_op,
                                        seqq(gr, {addx(gr, @[gr_xop]GrAssertLive({a.retcell})),
                                                  seqq(gr, {base_op_adjusted,
                                                            nopq(gr)})})});
@@ -263,7 +263,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
               // It's important to note that GrXNop would be ignored by help_basic_analyze.
               // TODO: It'd be nice if we could undo the mark_cell_not_const of a.retcell (that happened when we processed GrApply in help_basic_analyze before).
 
-              *ref(&gr->ops, gn.x) = XOp({mk_shray(seqer.x), GrXNop});
+              *ref(&gr->ops, gn.x) = QOp({GrJmp({seqer})});
 
               // And since there's no apply op, we update the arg/funcell cell_disps.
               // Actually, we don't update the funcell disp, so that we don't allocate/write its cell needlessly.
@@ -297,37 +297,31 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
 func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_node {
   switch node {
   case XOp(xn gr_xnode):
-    build array[gr_num];
-    nprecs size = count(&xn.precs);
-    for i size = 0; i < nprecs; i = i + 1 {
-      push(&build, ~(get(&xn.precs, i).x + op_addend));
-    }
-    newprecs shray[gr_num] = freeze(&build);
     switch &xn.op {
     case &GrApply(a gr_apply):
-      return XOp({newprecs, GrApply({get(cm, a.funcell.x), help_adjust_params(cm, &a.params), get(cm, a.retcell.x)})});
+      return XOp({GrApply({get(cm, a.funcell.x), help_adjust_params(cm, &a.params), get(cm, a.retcell.x)})});
     case &GrPrimApply(a gr_prim_apply):
-      return XOp({newprecs, GrPrimApply({a.primop, help_adjust_params(cm, &a.params), get(cm, a.retcell.x)})});
+      return XOp({GrPrimApply({a.primop, help_adjust_params(cm, &a.params), get(cm, a.retcell.x)})});
     case &GrMemCopy(a gr_memcopy):
-      return XOp({newprecs, GrMemCopy({get(cm, a.dest.x), get(cm, a.src.x)})});
+      return XOp({GrMemCopy({get(cm, a.dest.x), get(cm, a.src.x)})});
     case &GrWriteConst(a gr_writeconst):
-      return XOp({newprecs, GrWriteConst({get(cm, a.dest.x), a.value})});
+      return XOp({GrWriteConst({get(cm, a.dest.x), a.value})});
     case &GrAddressof(a gr_addressof):
-      return XOp({newprecs, GrAddressof({get(cm, a.dest.x), get(cm, a.addressee.x)})});
+      return XOp({GrAddressof({get(cm, a.dest.x), get(cm, a.addressee.x)})});
     case &GrDeref(a gr_deref):
-      return XOp({newprecs, GrDeref({get(cm, a.name.x), get(cm, a.pointer.x), help_adjust_offset(cm, &a.offset)})});
+      return XOp({GrDeref({get(cm, a.name.x), get(cm, a.pointer.x), help_adjust_offset(cm, &a.offset)})});
     case &GrSubcell(a gr_subcell):
-      return XOp({newprecs, GrSubcell({get(cm, a.name.x), get(cm, a.partof.x), help_adjust_offset(cm, &a.offset)})});
+      return XOp({GrSubcell({get(cm, a.name.x), get(cm, a.partof.x), help_adjust_offset(cm, &a.offset)})});
     case &GrLive(a gr_live):
-      return XOp({newprecs, GrLive({get(cm, a.cell.x)})});
+      return XOp({GrLive({get(cm, a.cell.x)})});
     case &GrAssertLive(a gr_assert_live):
-      return XOp({newprecs, GrAssertLive({get(cm, a.cell.x)})});
+      return XOp({GrAssertLive({get(cm, a.cell.x)})});
     case &GrDead(a gr_dead):
-      return XOp({newprecs, GrDead({get(cm, a.cell.x)})});
+      return XOp({GrDead({get(cm, a.cell.x)})});
     case &GrVirtualDead(a gr_virtual_dead):
-      return XOp({newprecs, GrVirtualDead({get(cm, a.cell.x)})});
+      return XOp({GrVirtualDead({get(cm, a.cell.x)})});
     case &GrXNop:
-      return XOp({newprecs, GrXNop});
+      return XOp({GrXNop});
     }
   case QOp(qn gr_qnode):
     switch &qn.op {

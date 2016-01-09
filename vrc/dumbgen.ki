@@ -36,14 +36,16 @@ func swap(x *lives, y *lives) void {
 }
 
 struct gn_annot {
+  // A checksum for the liveset before this node is evaluated. (Used for assertions.) Is also the checksum for app_time_live.
   plainly_live nc[lives_checksum];
 
-  // Only for GrApply and GrPrimApply.
+  // Only for GrApply.
   // lower_paramlists and higher_paramlists are set on the second pass.
   // TODO: Reorder these fields.
   lower_paramlists nc[array[gr_num]];
   higher_paramlists hash[gr_num, void];
-  // What's live after the precs are evaluated, plus the return cell if that's not live yet.
+  // What's live when we evaluate... which now must include the return cell
+  // This is only annotated for GrApply, and is checkedsummed by plainly_live.
   app_time_live nc[lives];
   paramlist_bottom_frame_offset nc[i32];
 
@@ -692,60 +694,27 @@ func universal_cc_write_to_retcell(f *objfile, h *frame, c cell_num) void {
   }
 }
 
-struct gn_and_jmpaft {
+struct dumbgen_stackent {
   gn gr_num;
   jmpaft jmp_targetnum;
   jmp_necessary bool;
-};
-
-struct op_targ_gn_jmpaft {
-  op_targ jmp_targetnum;
-  gn gr_num;
-  jmpaft jmp_targetnum;
-  jmp_necessary bool;
-};
-
-enum dumbgen_stackent {
-  DumbgenOpAndPrecs gn_and_jmpaft;
-  DumbgenOp op_targ_gn_jmpaft;
 };
 
 func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp_targetnum) void {
   stack array[dumbgen_stackent];
-  push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({entry_gn, bodyaft, false}));
+  push(&stack, @[dumbgen_stackent]{entry_gn, bodyaft, false});
   while case Has(se dumbgen_stackent) = popval(&stack) {
-    switch se {
-    case DumbgenOpAndPrecs(gna gn_and_jmpaft):
-      gn gr_num = gna.gn;
-      annot *gn_annot = ref_annot(h, gn);
-      if annot->dumbgen_gen_function_body_visited {
-        // TODO: Just gen the jmp directly -- no need for a placeholder, we know the offset.
-        x86_gen_placeholder_jmp(f, h, frame_gn_targetnum(h, gn));
-      } else {
-        annot->dumbgen_gen_function_body_visited = true;
-        frame_define_target(h, frame_gn_targetnum(h, gn), secsize(&f->text));
-        op_targ jmp_targetnum = frame_create_target(h);
-        push(&stack, @[dumbgen_stackent]DumbgenOp({op_targ, gn, gna.jmpaft, gna.jmp_necessary}));
-        node *gr_node = ref_node(h->gr, gn);
+    gn gr_num = se.gn;
+    annot *gn_annot = ref_annot(h, gn);
+    if annot->dumbgen_gen_function_body_visited {
+      // TODO: Just gen the jmp directly -- no need for a placeholder, we know the offset.
+      x86_gen_placeholder_jmp(f, h, frame_gn_targetnum(h, gn));
+    } else {
+      annot->dumbgen_gen_function_body_visited = true;
+      frame_define_target(h, frame_gn_targetnum(h, gn), secsize(&f->text));
+      op_targ jmp_targetnum = frame_create_target(h);
+      frame_define_target(h, op_targ, secsize(&f->text));
 
-        // For now we eval precs left-to-right, just like in static eval.  This means behavior differences must be the result of bugs.
-
-        switch node {
-        case &XOp(xn gr_xnode):
-          precaft jmp_targetnum = op_targ;
-          nprecs size = count(&xn.precs);
-          for i size = nprecs; i > 0; {
-            i = i - 1;
-            prec_gn gr_num = get(&xn.precs, i);
-            push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({prec_gn, precaft, false}));
-            precaft = frame_gn_targetnum(h, prec_gn);
-          }
-        case &QOp(qn gr_qnode): { }
-        }
-      }
-    case DumbgenOp(otgna op_targ_gn_jmpaft):
-      frame_define_target(h, otgna.op_targ, secsize(&f->text));
-      gn gr_num = otgna.gn;
       switch ref_node(h->gr, gn) {
       case &XOp(xn gr_xnode):
         switch &xn.op {
@@ -868,12 +837,12 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
             st_const_compute_for_gen(h->cs, &cas->car, src_size, &expected);
             x86_cmp_imm_sized(h->cs, f, X86_EAX, &expected, X86_ECX);
             x86_gen_placeholder_jcc(f, h, X86_JCC_Z, frame_gn_targetnum(h, cas->cdr.x));
-            push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({cas->cdr.x, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
+            push(&stack, @[dumbgen_stackent]{cas->cdr.x, se.jmpaft, done_a_push | se.jmp_necessary});
             done_a_push = true;
           }
           if case Has(default_gn sq_num) = a.default_case {
             // No jmp for this case, since it's code-genned right after.  (Just like a.first in GrSequence.)
-            push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({default_gn.x, otgna.jmpaft, done_a_push | otgna.jmp_necessary}));
+            push(&stack, @[dumbgen_stackent]{default_gn.x, se.jmpaft, done_a_push | se.jmp_necessary});
             done_a_push = true;
           } else {
             x86_gen_crash(f, h);
@@ -881,17 +850,17 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         case &GrSequence(a gr_sequence):
           DUMBGEN("GrSequence");
           // first gets evaluated before second (because it gets pushed after)
-          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.second.x, otgna.jmpaft, otgna.jmp_necessary}));
-          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.first, frame_gn_targetnum(h, a.second.x), false}));
+          push(&stack, @[dumbgen_stackent]{a.second.x, se.jmpaft, se.jmp_necessary});
+          push(&stack, @[dumbgen_stackent]{a.first, frame_gn_targetnum(h, a.second.x), false});
         case &GrJmp(a gr_jmp):
           DUMBGEN("GrJmp");
-          push(&stack, @[dumbgen_stackent]DumbgenOpAndPrecs({a.next.x, otgna.jmpaft, otgna.jmp_necessary}));
+          push(&stack, @[dumbgen_stackent]{a.next.x, se.jmpaft, se.jmp_necessary});
         case &GrQNop:
           DUMBGEN("GrQNop");
           // Do nothing (but do it less glamorously).
           // TODO: Ugh.
-          if otgna.jmp_necessary {
-            x86_gen_placeholder_jmp(f, h, otgna.jmpaft);
+          if se.jmp_necessary {
+            x86_gen_placeholder_jmp(f, h, se.jmpaft);
           }
         }
       }
@@ -934,7 +903,7 @@ func frame_get_or_create_targetnum(h *frame, tn *nc[jmp_targetnum]) jmp_targetnu
   return ret;
 }
 
-// The targetnum for evaluating the op _and_ its precs.
+// The targetnum for evaluating the op.
 func frame_gn_targetnum(h *frame, gn gr_num) jmp_targetnum {
   return frame_get_or_create_targetnum(h, &ref_annot(h, gn)->this_targetnum);
 }
