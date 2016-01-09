@@ -292,6 +292,14 @@ func seq2(gr *frame_graph, gn1 gr_num, gn2 gr_num) sq_num {
   return seqq(gr, {gn1, seq1(gr, gn2)});
 }
 
+func seq3(gr *frame_graph, gn1 gr_num, gn2 gr_num, gn3 gr_num) sq_num {
+  return seqq(gr, {gn1, seq2(gr, gn2, gn3)});
+}
+
+func seq4(gr *frame_graph, gn1 gr_num, gn2 gr_num, gn3 gr_num, gn4 gr_num) sq_num {
+  return seqq(gr, {gn1, seq3(gr, gn2, gn3, gn4)});
+}
+
 func gr_fullbody(clq *clqueue, gr *frame_graph, x *ast_fullbody, out *gr_num, return_cell_out *cell_num) np {
   final_node sq_num = nopq(gr);
 
@@ -1091,10 +1099,11 @@ func gr_mk_ternary(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_ternary, o
 }
 
 func gr_mk_strinit(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_strinit, out *gr_num) np {
-  precs array[gr_num];
+  build gr_num = addx(gr, @[gr_xop]GrXNop);
   nparams size = count(&a->exprs);
-  reserve(&precs, nparams);
-  for i size = 0; i < nparams; i = i + 1 {
+  for i size = nparams; i > 0; {
+    // We declare virtual cells left-to-right and keep them around until every subexpr is evaluated.  (Unwinding will need such.)
+    i = i - 1;
     param *ast_strinit_param = ref(&a->exprs, i);
     befdep gr_num = addx(gr, @[gr_xop]GrSubcell({result_cell(&param->ec), rval_cell(x), OffsetConst(un(&param->info)->offset)}));
     dep gr_num;
@@ -1103,12 +1112,9 @@ func gr_mk_strinit(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_strinit, o
     }
     aftdep gr_num = addx(gr, @[gr_xop]GrVirtualDead({result_cell(&param->ec)}));
 
-    prec1 sq_num = seq2(gr, dep, aftdep);
-    prec sq_num = seqq(gr, {befdep, prec1});
-    push(&precs, prec.x);
+    build = seq4(gr, befdep, dep, build, aftdep).x;
   }
-  np var = addx(gr, freeze(&precs), @[gr_xop]GrXNop);
-  *out = np;
+  *out = build;
   return NoFail;
 }
 
