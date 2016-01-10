@@ -515,7 +515,6 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg 
   exitseq var = seqq(gr, {swartch_discard_gn, outflow});
 
   info *ast_enum_deconstruction_info = un(&a->info);
-  // TODO: Rename field
   cases array[opt[sq_num]] = repeat(info->num_enum_constructors, None);
   default_case opt[sq_num] = None;
   ncases size = count(&a->cases);
@@ -1187,6 +1186,8 @@ func gr_local_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_local_fie
   }
 }
 
+
+
 func gr_lambda_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_lambda, out *gr_num) np {
   info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
@@ -1386,7 +1387,6 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       return NoFail;
     }
     case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): {
-      // TODO: This is disgusting.  We have a trivial destructor, trivial copy assignment.  Why go through this rigamarole?
       dgn gr_num;
       if case Printed(pm) = gr_destroy_action(clq, gr, &sci.target_destroy, DeadAfterDestroyNo, &dgn) {
         return Printed(pm);
