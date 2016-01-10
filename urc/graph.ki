@@ -113,7 +113,6 @@ enum gr_qop {
   GrQNop void;
 };
 
-// TODO: What's the deal with informal_name and the incomplete_graph's informal name?
 func init_frame_graph_from_incomplete(incomplete_graph *opt[frame_graph]) frame_graph {
   incomplete *frame_graph = unHas(incomplete_graph);
   ret frame_graph = move(incomplete);
@@ -1328,7 +1327,7 @@ func gr_mk_refof(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_refof, out *
 
 func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment, out *gr_num) np {
   // The lhs is an lvalue.  If the rhs is an rvalue, we need to make its cell live.
-  // The lhs is evaluated before the rhs.  (TODO: Oh really, is it?  Oughtn't its destruction go before the rhs's, too?)
+  // The lhs is evaluated before the rhs.  For now.
 
   lp gr_num;
   if case Printed(pm) = gr_expr(clq, gr, oo(&a->lhs), &lp) {
@@ -1933,8 +1932,7 @@ func basics_cleanup(cs *checkstate, clq *clqueue, gr *frame_graph, bas *gr_basic
   ncells size = count(&bas->pointeecells);
   for i size = 0; i < ncells; i = i + 1 {
     pd gr_num = addx(gr, @[gr_xop]GrVirtualDead({get(&bas->pointeecells, i)}));
-    // TODO: Think about this order a bit more?  Idk.
-    prec = seq2(gr, prec, pd).x;
+    prec = seq2(gr, pd, prec).x;
   }
   fingn var = seq2(gr, gn, prec);
   *gr_out = *gr;
@@ -2677,7 +2675,6 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           return NoFail;
         }
         case &InstRhsExtern: {
-          // TODO: What if an extern def isn't a function?
           id fn_body_id = add_fn_body(cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
           frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
           inst->graph = Computed(Has(frg));
