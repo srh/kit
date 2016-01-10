@@ -8,7 +8,7 @@ enum np {
   NoFail void;
   // We had a failure, and an error message was printed.  True if location info was printed.
   Printed bool;
-};
+}
 
 // Callers of this are OK with discarding Printed info (presumably).
 func from_np(x np) bool {
@@ -22,7 +22,7 @@ func from_np(x np) bool {
 enum[T] cr {
   NoFail T;
   Printed bool;
-};
+}
 
 // This exists for code that needs to return an np when it's passing along a failure where a callee returned a boolean.  We know the callee printed an error message, we assume it didn't print the location, and the callee should be updated to return an np.
 // TODO: Get rid of this (and fix it callers).

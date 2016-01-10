@@ -117,7 +117,7 @@ struct check_ctx {
   build bool;
   specific_run opt[array[u8]];
   failures u32;
-};
+}
 
 
 func test_check_basic_cases(ctx *check_ctx) void {

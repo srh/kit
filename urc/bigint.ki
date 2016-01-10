@@ -5,7 +5,7 @@ defclass copy bigint {
   negative bool;
   // We use a 2's complement representation.  (So -2 is represented by [0xFFFFFFFE], -1 is represented by [].)
   parts shray[u32];
-};
+}
 
 access bigint {
   inline func do_init(b *bigint) void {
@@ -540,7 +540,7 @@ func[T] big(arr T) bigint {
 
 struct big_ctx {
   failures u32;
-};
+}
 
 func[T] add_test(ctx *big_ctx, name T, result bool) void {
   name8 array[u8] = _u8(name);

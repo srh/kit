@@ -31,7 +31,7 @@ struct elf32_Header {
   e_shnum le_u16;
   // Section header table index of the entry associated with the section name string table.  Or SHN_UNDEF, if the file has no section name string table.  Must be less than SHN_LORESERVE (0xff00), otherwise the value is stored elsewhere.
   e_shstrndx le_u16;
-};
+}
 
 struct elf32_Section_Header {
   // An index into the section header string table section.
@@ -62,7 +62,7 @@ struct elf32_Section_Header {
   /* For sections that hold a table of fixed-size entries: The size in
   bytes for each entry. */
   sh_entsize le_u32;
-};
+}
 
 struct elf32_Symtab_Entry {
   st_name le_u32;
@@ -71,12 +71,12 @@ struct elf32_Symtab_Entry {
   st_info u8;
   st_other u8;
   st_shndx le_u16;
-};
+}
 
 struct elf32_Rel {
   r_offset le_u32;
   r_info le_u32;
-};
+}
 
 /* Seems like a good idea. */
 // These are all def'd to be u32's because I don't know what to define them as.

@@ -6,7 +6,7 @@ import stdlib;
 enum numeric_representation {
   Unsigned void;
   SignedTwos void;
-};
+}
 
 enum shift_behavior {
   // When shifting, we merely range-check the RHS (that it's >= 0 and < bitsize), and then we perform a bitshift that,
@@ -18,7 +18,7 @@ enum shift_behavior {
   //      -- if repr is SignedTwos, shifting can change the sign bit
   // We range-check the RHS even if it has trap_overflow false.
   JustRangecheckRhs void;
-};
+}
 
 struct numeric_traits {
   repr numeric_representation;
@@ -26,24 +26,24 @@ struct numeric_traits {
   trap_overflow bool;
   minval bigint;
   maxval bigint;
-};
+}
 
 struct flat_traits {
   size u32;
   alignment u32;
-};
+}
 
 struct integral_traits {
   flat flat_traits;
   numeric numeric_traits;
-};
+}
 
 def enum_tag_offset u32 = 0;
 def enum_tag_min u32 = 1;
 
 enum endianness {
   LittleEndian void;
-};
+}
 
 func `==`(x endianness, y endianness) bool { return enumnum(&x) == enumnum(&y); }
 func `!=`(x endianness, y endianness) bool { return enumnum(&x) != enumnum(&y); }
@@ -58,11 +58,11 @@ enum platform_os {
   Linux32 void;
   Win32 void;
   Osx32 void;
-};
+}
 
 enum universal_calling_convention {
   UniversalCdeclConvention void;
-};
+}
 
 struct platform_info {
   endian endianness;
@@ -91,12 +91,12 @@ struct platform_info {
   opsys platform_os;
   // There's no such thing as a universal calling convention, and as soon as this fiction goes away we'll remove/change this.
   callconv universal_calling_convention;
-};
+}
 
 enum callconv {
   Gcc32Cdecl void;
   Win32Cdecl void;
-};
+}
 
 func callconv_style(p *platform_info) callconv {
   switch p->opsys {

@@ -2,7 +2,7 @@ import hash;
 import string;
 import stdlib;
 
-struct sym { x size; };
+struct sym { x size; }
 
 def `~` fn[size, sym] = wrapconvert;
 
@@ -26,7 +26,7 @@ defclass[T] copy symmap {
   table hash[T, sym];
   // A map from ident values to T's.
   backmap array[T];
-};
+}
 
 access symmap[_] {
   inline func[T] do_init(im *symmap[T]) void {
@@ -103,12 +103,12 @@ struct common_syms {
   postfix_incrsym sym;
   postfix_decrsym sym;
   fakesym sym;
-};
+}
 
 struct identmap {
   sm symmap[string];
   cym common_syms;
-};
+}
 
 func make_common_syms(im *symmap[string]) common_syms {
   ret common_syms;

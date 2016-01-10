@@ -5,14 +5,14 @@ struct variadic_arity {
   // foo[a_1, ..., a_before, vararg_1, ..., vararg_n, b_1, ..., b_after].
   before u32;
   after u32;
-};
+}
 
 enum generics_arity {
   NoParamsArity void;
   FiniteArity u32;
   // The number's the minimal arity, variadics always go at the end.
   VariadicArity variadic_arity;
-};
+}
 
 // TODO: The so-called "arity" might need to include information whether it's a lifetime generic or plain generic.
 func arity(a *ast_generics) generics_arity {

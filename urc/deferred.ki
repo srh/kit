@@ -3,7 +3,7 @@ enum[T] nbfc {
   BeganComputing void;
   FailedComputation void;
   Computed T;
-};
+}
 
 func[T] isBeganComputing(x *nbfc[T]) bool {
   if case &BeganComputing = x {
@@ -25,7 +25,7 @@ func[T] un(x *nbfc[T]) *T {
 enum[T] nc {
   NotComputed void;
   Computed T;
-};
+}
 
 func[T] annotate(x *nc[T], y T) void {
   if case &Computed(already T) = x {

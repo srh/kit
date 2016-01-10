@@ -8,9 +8,9 @@ struct objfile {
   text objfile_section;
 
   symbol_table array[objfile_symbol_record];
-};
+}
 
-struct sti { x u32; };
+struct sti { x u32; }
 def `~` fn[u32, sti] = wrapconvert;
 
 struct objfile_symbol_record {
@@ -19,7 +19,7 @@ struct objfile_symbol_record {
   section objfile_symbol_section;
   is_function is_function;
   is_static is_static;
-};
+}
 
 enum objfile_symbol_section {
   // For external symbols.
@@ -28,24 +28,24 @@ enum objfile_symbol_section {
   SymbolSectionData void;
   SymbolSectionRdata void;
   SymbolSectionText void;
-};
+}
 
 // TODO: I'm not sure we need both objfile_symbol_section and section.  Likewise in s1.
 enum section {
   SectionData void;
   SectionRdata void;
   SectionText void;
-};
+}
 
 enum is_function {
   IsFunctionNo void;
   IsFunctionYes void;
-};
+}
 
 enum is_static {
   IsStaticNo void;
   IsStaticYes void;
-};
+}
 
 struct objfile_section {
   raw array[u8];
@@ -53,7 +53,7 @@ struct objfile_section {
   max_requested_alignment u32;
   relocs array[objfile_relocation];
   diff32_count size;
-};
+}
 
 struct objfile_relocation {
   // Offset from beginning of section.
@@ -64,13 +64,13 @@ struct objfile_relocation {
   subtracted_offset u32;
   // What kind of relocation should be performed?
   type objfile_relocation_type;
-};
+}
 
 enum objfile_relocation_type {
   Dir32 void;
   Rel32 void;
   Diff32 void;
-};
+}
 
 func mk_objfile() objfile {
   return {mk_objfile_section(), mk_objfile_section(), mk_objfile_section(), mk_array@[objfile_symbol_record]()};

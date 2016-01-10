@@ -12,43 +12,43 @@ struct magic_struct_info {
   cu_props type_properties;
   st te_struct;
   fips array[opt[instpair]];
-};
+}
 
 struct magic_enum_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
   et te_enum;
   cips array[opt[instpair]];
-};
+}
 
 struct magic_arraytype_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
   ip instpair;
-};
+}
 
 enum magic_ctor_info {
   // These are None for fields that are trivially constructed.  But of course one field is not None.
   MagicStructInfo magic_struct_info;
   MagicEnumInfo magic_enum_info;
   MagicArraytypeInfo magic_arraytype_info;
-};
+}
 
 struct magic_ctor {
   type te_typeexpr;
   info nc[magic_ctor_info];
-};
+}
 
 struct copy_destroy_desc {
   copy_desc ctor_desc;
   destroy_desc ctor_desc;
-};
+}
 
 // This'll be obsolete as soon as we construct enums inline.
 enum magic_enum_construct_op {
   EnumConstructMove ctor_desc;
   EnumConstructCopyDestroy copy_destroy_desc;
-};
+}
 
 struct magic_enum_construct {
   et te_enum;
@@ -57,56 +57,56 @@ struct magic_enum_construct {
   constructor_index size;
   rhs_props type_properties;
   operational magic_enum_construct_op;
-};
+}
 
 struct non_magic_ctor_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
   ip instpair;
-};
+}
 
 struct non_magic_ctor {
   type te_typeexpr;
   info nc[non_magic_ctor_info];
-};
+}
 
 struct magic_bzero {
   // size of buf to bzero in bnnos.
   size nc[u32];
-};
+}
 
 struct magic_memcopy {
   // size of buf to memcopy in bnnos.
   size nc[u32];
-};
+}
 
 struct which_non_magic_ctor {
   wc which_ctor;
   nmc non_magic_ctor;
-};
+}
 
 enum which_prop {
   PropSizeof void;
   PropAlignof void;
-};
+}
 
 struct non_magic_prop {
   wp which_prop;
   type te_typeexpr;
   info nc[u32];
-};
+}
 
 // Used for DefnNonMagic in def_definition in def_entry.
 // Used for InstRhsNonMagic in def_inst_rhs in def_inst, maybe with generics replaced?
 enum def_non_magic {
   NonMagicCtor which_non_magic_ctor;
   NonMagicProp non_magic_prop;
-};
+}
 
 struct which_magic_ctor {
   wc which_ctor;
   mc magic_ctor;
-};
+}
 
 // Used for DefnMagic in def_definition in def_entry.
 // Used for InstRhsMagic in def_inst_rhs in def_inst, maybe with generics replaced?
@@ -116,14 +116,14 @@ enum def_magic {
   MagicNopdestroy void;
   MagicCtor which_magic_ctor;
   MagicEnumConstruct magic_enum_construct;
-};
+}
 
 enum which_ctor {
   CtorInit void;
   CtorCopy void;
   CtorMove void;
   CtorDestroy void;
-};
+}
 
 func num_args(wc which_ctor) size {
   switch wc {

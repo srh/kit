@@ -20,7 +20,7 @@ func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, liveset *liv
 enum genexpr_result {
   Terminal void;
   NonTerminal void;
-};
+}
 
 
 func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_num, out *genexpr_result) np {

@@ -39,13 +39,13 @@ struct subcell_disp {
   subcell_opnum gr_num;
   partof cell_num;
   offset gr_offset;
-};
+}
 
 enum cell_const_disp {
   NoConstDisp void;
   HasConstValue gr_const;
   NotConst void;
-};
+}
 
 struct cell_disp {
   // If the cell's part of a function param list, tells what paramlist it's part of.
@@ -67,14 +67,14 @@ struct cell_disp {
 
   // Which cells are subcells of this one.
   subcelled array[cell_num];
-};
+}
 
 struct basic_analyze_state {
   // This means we've analyzed gns [0, gns_analyzed).  But we haven't analyzed further gns.
   gns_analyzed size;
   paramlists array[gr_num];
   celldisp array[cell_disp];
-};
+}
 
 func basic_analyze_fn_body(cs *checkstate, g *graphed_fn_body, bas_out *basic_analyze_state) void {
   bas basic_analyze_state = {0, mk_array@[gr_num](), mk_array@[cell_disp]()};

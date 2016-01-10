@@ -18,7 +18,7 @@ struct ps {
   metas *array[meta_datum];
 
   im *identmap;
-};
+}
 
 func make_ps(im *identmap, posits *positionals, base_offset size, data *u8, length size) ps {
   p ps;
@@ -121,12 +121,12 @@ enum keyw {
   Var void;
   Void void;
   While void;
-};
+}
 
 enum numlit {
   DecNum shray[i8];
   HexNum shray[i8];
-};
+}
 
 enum grouper {
   LParen void;
@@ -138,7 +138,7 @@ enum grouper {
   DoubleQuote void;
   SingleQuote void;
   Backtick void;
-};
+}
 
 enum tokval {
   Keyw keyw;
@@ -150,7 +150,7 @@ enum tokval {
   Bad void;
   Eof void;
   Comment void;
-};
+}
 
 inline func `==`(a keyw, b keyw) bool {
   return enumnum(&a) == enumnum(&b);
@@ -194,7 +194,7 @@ func equal(a *tokval, b *tokval) bool {
 struct tok {
   interval interval;
   val tokval;
-};
+}
 
 func mk_tok(left pos, right pos, val tokval) tok {
   return {{left, right}, val};

@@ -534,7 +534,7 @@ func x86_load32_signextend_for_primop(f *objfile, dest u8, src cell_loc, size u3
 struct reg_rm_encoded {
   length u8;
   buf ^[5]u8;
-};
+}
 
 func as_imm8(x u16) opt[u8] {
   if x <= + @[u8]127 {
@@ -718,12 +718,12 @@ func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
   }
 }
 
-struct regdisp { addr u8; disp i32; };
+struct regdisp { addr u8; disp i32; }
 
 enum regdisp_or_const {
   Regdisp regdisp;
   Const bigint;
-};
+}
 
 func x86_prep_loc_or_const(f *objfile, loc cell_loc, avail_reg u8) regdisp_or_const {
   switch loc {
