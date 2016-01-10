@@ -113,7 +113,6 @@ enum gr_qop {
   GrQNop void;
 };
 
-// TODO: What's the deal with informal_name and the incomplete_graph's informal name?
 func init_frame_graph_from_incomplete(incomplete_graph *opt[frame_graph]) frame_graph {
   incomplete *frame_graph = unHas(incomplete_graph);
   ret frame_graph = move(incomplete);
@@ -515,7 +514,6 @@ func gr_switch_statement(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg 
   exitseq var = seqq(gr, {swartch_discard_gn, outflow});
 
   info *ast_enum_deconstruction_info = un(&a->info);
-  // TODO: Rename field
   cases array[opt[sq_num]] = repeat(info->num_enum_constructors, None);
   default_case opt[sq_num] = None;
   ncases size = count(&a->cases);
@@ -1187,6 +1185,8 @@ func gr_local_field(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_local_fie
   }
 }
 
+
+
 func gr_lambda_expr(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_lambda, out *gr_num) np {
   info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
@@ -1327,7 +1327,7 @@ func gr_mk_refof(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_refof, out *
 
 func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment, out *gr_num) np {
   // The lhs is an lvalue.  If the rhs is an rvalue, we need to make its cell live.
-  // The lhs is evaluated before the rhs.  (TODO: Oh really, is it?  Oughtn't its destruction go before the rhs's, too?)
+  // The lhs is evaluated before the rhs.  For now.
 
   lp gr_num;
   if case Printed(pm) = gr_expr(clq, gr, oo(&a->lhs), &lp) {
@@ -1386,7 +1386,6 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       return NoFail;
     }
     case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): {
-      // TODO: This is disgusting.  We have a trivial destructor, trivial copy assignment.  Why go through this rigamarole?
       dgn gr_num;
       if case Printed(pm) = gr_destroy_action(clq, gr, &sci.target_destroy, DeadAfterDestroyNo, &dgn) {
         return Printed(pm);
@@ -1767,31 +1766,24 @@ func gr_init_action(clq *clqueue, gr *frame_graph, x *init_action, out *gr_num) 
   }
 }
 
-// TODO: The dead_after_destroy parameter here is definitely unnecessary, but not too harmful now.
 func gr_destroy_action(clq *clqueue, gr *frame_graph, x *destroy_action, dad dead_after_destroy, out *gr_num) np {
+  deactivate_gn opt[gr_num];
   switch &x->x.ctor {
-    case &TrivialCtor: {
-      dp gr_num;
-      if case DeadAfterDestroyYes = dad {
-        dp = addx(gr, @[gr_xop]GrDead({x->x.arg}));
-      } else {
-        dp = addx(gr, @[gr_xop]GrXNop);
-      }
-      *out = dp;
-      return NoFail;
-    }
-    case &FunCtor(ip instpair): {
-      gn gr_num = gr_uni_fun(clq, gr, ip, x->x.arg);
-      dp gr_num;
-      if case DeadAfterDestroyYes = dad {
-        dp = addx(gr, gn, @[gr_xop]GrDead({x->x.arg}));
-      } else {
-        dp = gn;
-      }
-      *out = dp;
-      return NoFail;
-    }
+  case &TrivialCtor:
+    deactivate_gn = None;
+  case &FunCtor(ip instpair):
+    gn gr_num = gr_uni_fun(clq, gr, ip, x->x.arg);
+    deactivate_gn = Has(gn);
   }
+  dp opt[gr_num];
+  if case DeadAfterDestroyYes = dad {
+    dp = Has(addx(gr, @[gr_xop]GrDead({x->x.arg})));
+  } else {
+    dp = None;
+  }
+
+  *out = seq(gr, deactivate_gn, dp).x;
+  return NoFail;
 }
 
 func gr_bi_fun(clq *clqueue, gr *frame_graph, ip instpair, dest cell_num, src cell_num) gr_num {
@@ -1940,8 +1932,7 @@ func basics_cleanup(cs *checkstate, clq *clqueue, gr *frame_graph, bas *gr_basic
   ncells size = count(&bas->pointeecells);
   for i size = 0; i < ncells; i = i + 1 {
     pd gr_num = addx(gr, @[gr_xop]GrVirtualDead({get(&bas->pointeecells, i)}));
-    // TODO: Think about this order a bit more?  Idk.
-    prec = seq2(gr, prec, pd).x;
+    prec = seq2(gr, pd, prec).x;
   }
   fingn var = seq2(gr, gn, prec);
   *gr_out = *gr;
@@ -2295,7 +2286,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       tagset_ogn = None;
     }
 
-    finalgn gr_num = addx(&gr, seq_ogn(&gr, tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn).x, @[gr_xop]GrXNop);
+    finalgn gr_num = addx(&gr, seq(&gr, tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn).x, @[gr_xop]GrXNop);
 
     finalseqgn sq_num = seqq(&gr, {finalgn, deadseq});
     push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), finalseqgn});
@@ -2328,10 +2319,25 @@ func seqqo(gr *frame_graph, a opt[gr_num], onto sq_num) sq_num {
   }
 }
 
-func seq_ogn(gr *frame_graph, a opt[gr_num], b opt[gr_num], c opt[gr_num], d opt[gr_num]) sq_num {
+func seq(gr *frame_graph, a opt[gr_num], b opt[gr_num], c opt[gr_num], d opt[gr_num]) sq_num {
   build sq_num = nopq(gr);
   build = seqqo(gr, d, build);
   build = seqqo(gr, c, build);
+  build = seqqo(gr, b, build);
+  build = seqqo(gr, a, build);
+  return build;
+}
+
+func seq(gr *frame_graph, a opt[gr_num], b opt[gr_num], c opt[gr_num]) sq_num {
+  build sq_num = nopq(gr);
+  build = seqqo(gr, c, build);
+  build = seqqo(gr, b, build);
+  build = seqqo(gr, a, build);
+  return build;
+}
+
+func seq(gr *frame_graph, a opt[gr_num], b opt[gr_num]) sq_num {
+  build sq_num = nopq(gr);
   build = seqqo(gr, b, build);
   build = seqqo(gr, a, build);
   return build;
@@ -2588,7 +2594,7 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
   tagcell_gn var = addx(&gr, @[gr_xop]GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)}));
   tag_gn1 var = addx(&gr, tagcell_gn, @[gr_xop]GrWriteConst({tag_cell, ConstInt(~tagval.x)}));
   tag_gn var = addx(&gr, tag_gn1, @[gr_xop]GrVirtualDead({tag_cell}));
-  gn var = addx(&gr, seq_ogn(&gr, @[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn.x), postpadding_ogn).x, @[gr_xop]GrXNop);
+  gn var = addx(&gr, seq(&gr, @[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn.x), postpadding_ogn).x, @[gr_xop]GrXNop);
   *gr_out = gr;
   *gn_out = gn;
   *return_cell_out = retnum;
@@ -2669,7 +2675,6 @@ func ensure_def_inst_graphed(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           return NoFail;
         }
         case &InstRhsExtern: {
-          // TODO: What if an extern def isn't a function?
           id fn_body_id = add_fn_body(cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
           frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
           inst->graph = Computed(Has(frg));
