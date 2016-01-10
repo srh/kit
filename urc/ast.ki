@@ -519,6 +519,10 @@ struct ast_ternary {
   else_clause box[ast_expr_consume];
 }
 
+struct ast_quickreturn {
+  rhs box[ast_expr];
+}
+
 // Is a non-lval an rval?  Okay.
 struct rval_description {
   // The cell number of the temporary that this rval is _part of_.
@@ -727,6 +731,7 @@ enum ast_expr_enum {
   TypedExpr ast_typed_expr;
   Strinit ast_strinit;
   Ternary ast_ternary;
+  QuickReturn ast_quickreturn;
 }
 
 func mk(m ast_meta, x ast_expr_enum) ast_expr {

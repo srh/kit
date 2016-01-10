@@ -1053,6 +1053,8 @@ func gr_expr(clq *clqueue, gr *frame_graph, x *ast_expr, out *gr_num) np {
       return gr_mk_strinit(clq, gr, x, &a, out);
     case &Ternary(a ast_ternary):
       return gr_mk_ternary(clq, gr, x, &a, out);
+    case &QuickReturn(a ast_quickreturn):
+      return TODO();
   }
 }
 

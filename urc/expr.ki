@@ -640,7 +640,21 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
 
     case &Ternary(a ast_ternary):
       return check_expr_ternary(es, ai, &a, pt, x);
+
+    case &QuickReturn(a ast_quickreturn):
+      return check_expr_quickreturn(es, ai, &a, pt, x);
   }
+}
+
+func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickreturn, pt *te_typeexpr, x *ast_expr) np {
+  // In order for a quickreturn expression to be valid, the following must be true:
+  //   a. the rhs must be an enum type with a success case
+  //   b. the pt must be the success case's inside type
+  //   c. the return type of the fullbody we're in must be an enum type that is "structurally convertible in the non-success cases" from the rhs enum type.  For example, opt[foo] is structurally convertible (in the non-success cases) from opt[bar].
+  //
+  // Because the rhs can be _any_ enum type, for now we'll evaluate the rhs with no pt, and AllowIncompleteNo, and then see if that matches up with the lhs.  Eventually we can implement "looking through the enum" logic -- that will be necessary for arithmetic overflow.
+
+  return TODO();
 }
 
 func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr) np {
