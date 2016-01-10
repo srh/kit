@@ -1337,11 +1337,11 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
   if case Printed(pm) = gr_expr(clq, gr, oo(&a->rhs), &rp) {
     return Printed(pm);
   }
+  assignop_gn gr_num;
   switch un(&a->info) {
     case &StaticSelfAssignment: {
       // rhs is an lvalue.
-      *out = seq2(gr, lp, rp).x;
-      return NoFail;
+      assignop_gn = seq2(gr, lp, rp).x;
     }
     case &SimpleMoveAssignment(smi ast_simple_move_assignment_info): {
       // rhs is an rvalue.
@@ -1357,8 +1357,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       // rhs is an rvalue.
       lp_rp gr_num = seq2(gr, lp, gr_live_before(gr, whole_cell(oo(&a->rhs)), rp)).x;
       gn2 sq_num = seqq(gr, {lp_rp, gn1});
-      *out = gn2.x;
-      return NoFail;
+      assignop_gn = gn2.x;
     }
     case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info): {
       dgn gr_num;
@@ -1382,8 +1381,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       // rhs is an rvalue.
       lp_rp gr_num = seq2(gr, lp, gr_live_before(gr, whole_cell(oo(&a->rhs)), rp)).x;
       gn3 sq_num = seqq(gr, {lp_rp, gn2});
-      *out = gn3.x;
-      return NoFail;
+      assignop_gn = gn3.x;
     }
     case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): {
       dgn gr_num;
@@ -1403,8 +1401,7 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
       // rhs is an lvalue.
       lp_rp_nop gr_num = seq2(gr, lp, rp).x;
       gn2 sq_num = seqq(gr, {lp_rp_nop, gn1});
-      *out = gn2.x;
-      return NoFail;
+      assignop_gn = gn2.x;
     }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
       destcell cell_num = value_cell(oo(&a->lhs));
@@ -1458,10 +1455,27 @@ func gr_assignment(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_assignment
         addq(gr, @[gr_qop]GrBranch({cmp_result, cases, None}))});
       lp_rp gr_num = seq2(gr, lp, rp).x;
       seq_lp_rp_nop var = seqq(gr, {lp_rp, br});
-      *out = seq_lp_rp_nop.x;
-      return NoFail;
+      assignop_gn = seq_lp_rp_nop.x;
     }
   }
+
+  // TODO: Dedup with local_field code and the other one?
+  deaden_lhs opt[gr_num];
+  switch &expr_complete_info(oo(&a->lhs))->lval {
+  case &IsLvalNo(desc rval_description):
+    ice(_u8("gr_assignment into rvalue wtf"));
+  case &IsLvalYes(desc lval_description):
+    if case DeadMe = desc.deadme {
+      deaden_lhs = Has(addx(gr, @[gr_xop]GrVirtualDead({desc.num})));
+    } else {
+      deaden_lhs = None;
+    }
+  }
+
+  // TODO: Having to set this void cell is grotesque -- assignment should be a statement.
+  set_voidcell gr_num = addx(gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(bigu(0))}));
+  *out = seq(gr, Has(assignop_gn), deaden_lhs, Has(set_voidcell)).x;
+  return NoFail;
 }
 
 func gr_logical_conjunction(clq *clqueue, gr *frame_graph, x *ast_expr, a *ast_logical_conjunction, out *gr_num) np {

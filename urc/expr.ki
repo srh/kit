@@ -904,8 +904,29 @@ func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *
 }
 
 func check_expr_assignment(es *framescope, a *ast_assignment, pt *te_typeexpr, x *ast_expr) np {
+  void_type te_typeexpr = primitive_void_type(es->cs);
+  unified te_typeexpr;
+  if !unify_types(pt, &void_type, &unified) {
+    return ERR(_u8("ICE: assignment in non-void place"));
+  }
+
+  if !is_complete(&unified) {
+    ice(_u8("check_expr_assignment incomplete successful unification with void"));
+  }
+
+  c cac_typeexpr;
+  if !from_np(noscoped_check_and_compute_typeexpr(es->clq, &unified, &c)) {
+    ice(_u8("check_expr_assignment sees void bad type"));
+  }
+  check(c.complete);
+  props type_properties;
+  if !from_np(compute_complete_type_properties(es->clq, &c.te, &props)) {
+    ice(_u8("check_expr_assignment void bad props"));
+  }
+
+  unknown te_typeexpr = TeUnknown;
   // We check the lhs independently of the rhs, deliberately, to ensure clarity.
-  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, oo(&a->lhs), pt) {
+  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, oo(&a->lhs), &unknown) {
     return Printed(pm);
   }
   lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
@@ -920,7 +941,7 @@ func check_expr_assignment(es *framescope, a *ast_assignment, pt *te_typeexpr, x
       if case Printed(pm) = annotate_disposal_for_assignment(es, desc.num, oo(&a->rhs), a) {
         return Printed(pm);
       }
-      annotate_info(x, CompleteCheck(mk(lhs_info->lval, lhs_info->cu, lhs_info->cu_props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~c.te, props})), ~c.te, props)));
       return NoFail;
     }
   }
