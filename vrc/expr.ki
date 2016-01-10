@@ -22,7 +22,7 @@ struct framescope {
   lifetime_gen_counter size;
 
   gr frame_graph;
-};
+}
 
 func mk(ds *defscope) framescope {
   return {ds, ds->cs, ds->im, ds->clq,
@@ -39,7 +39,7 @@ inline func ref_cell(es *framescope, num cell_num) *cell_info {
   return ref_cell(&es->gr, num);
 }
 
-struct frame_cell_count { x size; };
+struct frame_cell_count { x size; }
 
 func reannotate_static_to_virtual(es *framescope, num cell_num) void {
   info *cell_info = ref_cell(es, num);
@@ -60,9 +60,9 @@ struct defscope {
   generics *ast_generics;
   repls *idy_repls;
   def_informal_name sym;
-};
+}
 
-struct var_number { x size; };
+struct var_number { x size; }
 
 def `~` fn[size, var_number] = wrapconvert;
 def `==` fn[var_number, var_number, bool] = wrapequate;
@@ -76,7 +76,7 @@ enum var_binding {
   VarOverlay void;
   // The variable's a self-contained object -- it gets destroyed or not, it can be autoinitialized.
   VarSelfContained void;
-};
+}
 
 struct var_info {
   num var_number;
@@ -90,7 +90,7 @@ struct var_info {
   binding var_binding;
   initter opt[ctor_desc];
   destroyer opt[ctor_desc];
-};
+}
 
 func ref_var(es *framescope, num var_number) *var_info {
   return ref(&es->all_vars, num.x);
@@ -104,7 +104,7 @@ func vars_in_scope(es *framescope) array[var_number] {
 enum allow_incomplete {
   AllowIncompleteNo void;
   AllowIncompleteYes void;
-};
+}
 
 func `==`(x allow_incomplete, y allow_incomplete) bool {
   return enumnum(&x) == enumnum(&y);
@@ -113,7 +113,7 @@ func `==`(x allow_incomplete, y allow_incomplete) bool {
 defclass move varpopper {
   es *framescope;
   nums array[var_number];
-};
+}
 
 access varpopper {
 
@@ -262,7 +262,7 @@ struct constructor_info {
   type cu_typeexpr;
   constructor_tag enum_tag_value;
   ip instpair;
-};
+}
 
 struct voidconstructed_info {
   // The actual constructed type, which we need for some reason.
@@ -270,14 +270,14 @@ struct voidconstructed_info {
   // The enum type (the structural rhs of constructed_type).
   et te_enum;
   constructor_tag enum_tag_value;
-};
+}
 
 enum ds_constructor_res {
   NoMatchConstructor void;
   AmbigMatchConstructor void;
   MatchedConstructor constructor_info;
   MatchedVoidConstructed voidconstructed_info;
-};
+}
 
 // Like any pt, pt is either (a) incomplete, or (b) complete and computed.
 func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_out *ds_constructor_res) np {
@@ -455,7 +455,7 @@ struct es_global_match {
   ent_id def_entry_id;
   inst_id def_inst_id;
   parms genparms;
-};
+}
 
 enum es_match_res {
   NoMatch void;
@@ -464,7 +464,7 @@ enum es_match_res {
   OneLocalMatch local_info;
   OneEnumConstructorMatch constructor_info;
   EnumVoidConstructedMatch voidconstructed_info;
-};
+}
 
 func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_match_res) np {
   if case &NoParms = gp {
@@ -1584,7 +1584,7 @@ enum check_field_result {
   InheritsLval u32;
   // Doesn't inherit the lvalue-ness.  In fact it's a compile-time constant (for the array ".length" field).
   ConstantField u32;
-};
+}
 
 func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   fieldtype cu_typeexpr;
@@ -1700,7 +1700,7 @@ enum structural_rhs_result {
   Error bool;
   Success void;
   NotAccessible void;
-};
+}
 
 func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **deftype_inst_rhs_info) structural_rhs_result {
   accessible_result bool;

@@ -4,7 +4,7 @@ defclass[T] move array {
   count size;
   cap size;
   ptr *T;
-};
+}
 
 access array[_] {
   inline func[T] do_init(r *array[T]) void {

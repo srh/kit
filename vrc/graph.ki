@@ -4,9 +4,9 @@ struct frame_graph {
   informal_name sym;
   cells array[cell_info];
   ops array[gr_node];
-};
+}
 
-struct cell_num { x size; };
+struct cell_num { x size; }
 
 def `~` fn[size, cell_num] = wrapconvert;
 def `==` fn[cell_num, cell_num, bool] = wrapequate;
@@ -34,7 +34,7 @@ enum cell_location {
   // The "cell" is actually caused by dereferencing something, or maybe accessing something's field?
   LocationVirtual void;
   LocationStatic void;
-};
+}
 
 func `==`(x cell_location, y cell_location) bool {
   return enumnum(&x) == enumnum(&y);
@@ -56,7 +56,7 @@ struct cell_info {
   location cell_location;
   type cu_typeexpr;
   props type_properties;
-};
+}
 
 func location(info *cell_info) cell_location {
   return info->location;
@@ -65,17 +65,17 @@ func location(info *cell_info) cell_location {
 enum gr_node {
   XOp gr_xnode;
   QOp gr_qnode;
-};
+}
 
 struct gr_xnode {
   op gr_xop;
-};
+}
 
 struct gr_qnode {
   op gr_qop;
-};
+}
 
-struct gr_num { x size; };
+struct gr_num { x size; }
 def `~` fn[size, gr_num] = wrapconvert;
 func `==`(x gr_num, y gr_num) bool { return x.x == y.x; }
 func `!=`(x gr_num, y gr_num) bool { return x.x != y.x; }
@@ -87,7 +87,7 @@ inline func hash_equal(x *gr_num, y *gr_num) bool {
   return x->x == y->x;
 }
 
-struct sq_num { x gr_num; };
+struct sq_num { x gr_num; }
 def `~` fn[gr_num, sq_num] = wrapconvert;
 
 enum gr_xop {
@@ -104,14 +104,14 @@ enum gr_xop {
   GrVirtualDead gr_virtual_dead;
   GrXNop void;
   // A debugging xop for compiler devs.
-};
+}
 
 enum gr_qop {
   GrBranch gr_branch;
   GrSequence gr_sequence;
   GrJmp gr_jmp;
   GrQNop void;
-};
+}
 
 func init_frame_graph_from_incomplete(incomplete_graph *opt[frame_graph]) frame_graph {
   incomplete *frame_graph = unHas(incomplete_graph);
@@ -178,84 +178,84 @@ struct gr_apply {
   funcell cell_num;
   params shray[cell_num];
   retcell cell_num;
-};
+}
 
 struct gr_prim_apply {
   primop primitive_op;
   params shray[cell_num];
   retcell cell_num;
-};
+}
 
 struct gr_memcopy {
   dest cell_num;
   src cell_num;
-};
+}
 
 struct gr_writeconst {
   dest cell_num;
   value gr_const;
-};
+}
 
 struct gr_addressof {
   dest cell_num;
   addressee cell_num;
-};
+}
 
 struct gr_deref {
   name cell_num;
   pointer cell_num;
   offset gr_offset;
-};
+}
 
 struct gr_subcell {
   name cell_num;
   partof cell_num;
   offset gr_offset;
-};
+}
 
 enum gr_offset {
   OffsetConst u32;
   OffsetComputed tup[u32, cell_num];
-};
+}
 
 struct gr_branch {
   src cell_num;
   cases shray[tup[gr_const, sq_num]];
   default_case opt[sq_num];
-};
+}
 
 struct gr_sequence {
   first gr_num;
   second sq_num;
-};
+}
 
 struct gr_jmp {
   next sq_num;
-};
+}
 
 // Declares a cell to be live.  The cell may not have previously been live.  The cell location must be static -- otherwise, gr_deref or gr_subcell will make the cell live.
 struct gr_live {
   cell cell_num;
-};
+}
 
 struct gr_assert_live {
   cell cell_num;
-};
+}
 
 struct gr_dead {
   cell cell_num;
-};
+}
 
 struct gr_virtual_dead {
   cell cell_num;
-};
+}
 
 enum gr_const {
   ConstInt bigint;
   ConstDef instpair;
   ConstFnBody fn_body_id;
   ConstBytes shray[u8];
-};
+}
 
 struct fullbody_state {
   // all_vars and labels is from the ast_fullbody_info.
@@ -267,7 +267,7 @@ struct fullbody_state {
   label_gn array[sq_num];
   // Cells that are used as return cells.
   return_cells array[cell_num];
-};
+}
 
 func nopq(gr *frame_graph) sq_num {
   return addq(gr, GrQNop);
@@ -355,7 +355,7 @@ func gr_fullbody(clq *clqueue, gr *frame_graph, x *ast_fullbody, out *gr_num, re
 struct breakgrack {
   break_target sq_num;
   continue_target sq_num;
-};
+}
 
 func gr_bracebody(clq *clqueue, gr *frame_graph, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, outflow sq_num, out *sq_num) np {
   bn sq_num;
@@ -1669,7 +1669,7 @@ func partial_cell(x *is_lval) cell_num {
 enum dead_after_destroy {
   DeadAfterDestroyYes void;
   DeadAfterDestroyNo void;
-};
+}
 
 func gr_after_actions(clq *clqueue, gr *frame_graph, prec gr_num, x *opt[destroy_action], out *gr_num) np {
   if case &Has(da destroy_action) = x {
@@ -1878,13 +1878,13 @@ func gr_magic(cs *checkstate, clq *clqueue, mag *def_magic, gr_out *frame_graph,
 struct gr_minimal_basics {
   return_cell cell_num;
   argcells array[cell_num];
-};
+}
 
 struct gr_basics {
   minimal gr_minimal_basics;
   pointeecells array[cell_num];
   deref_prec gr_num;
-};
+}
 
 func add_minimal_basics(cs *checkstate, clq *clqueue, gr *frame_graph, size u32, arity size, out *gr_minimal_basics) void {
   pointee_tp cu_typrop = compute_prim(clq, primitive_padding_type(cs, size));

@@ -1,7 +1,7 @@
 import array;
 import shray;
 
-struct string { x shray[i32]; };
+struct string { x shray[i32]; }
 
 def `~` fn[shray[i32], string] = wrapconvert;
 

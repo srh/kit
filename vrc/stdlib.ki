@@ -3,7 +3,7 @@ import array;
 extern malloc fn[size, *void];
 extern free fn[*void, void];
 extern abort fn[void];
-defclass FILE { };
+defclass FILE { }
 extern Stdout fn[*FILE];
 extern Stdin fn[*FILE];
 extern Stderr fn[*FILE];
@@ -159,7 +159,7 @@ func[T] fake() T {
 enum[T] opt {
   None void;
   Has T;
-};
+}
 
 func[T] isHas(p *opt[T]) bool {
   if case &Has(x) = p {
@@ -225,7 +225,7 @@ func[T] unSet(dest *opt[T]) void {
 struct[S, T] tup {
   car S;
   cdr T;
-};
+}
 
 inline func[S, T] cons(s S, t T) tup[S, T] {
   return {s, t};

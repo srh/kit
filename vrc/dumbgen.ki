@@ -10,7 +10,7 @@ enum cell_loc {
   ConstIntCellLoc bigint;
   // The cell is completely unused, it's never made live.  It's in a dead code part of the graph.
   UnusedLoc void;
-};
+}
 
 struct lives {
   // Maintained in sorted order.
@@ -18,12 +18,12 @@ struct lives {
   // The xor and sum of the cell nums -- makes for a quick commutative hash.
   xored osize;
   summed osize;
-};
+}
 
 struct lives_checksum {
   xored osize;
   summed osize;
-};
+}
 
 func swap(x *lives, y *lives) void {
   swap(&x->all, &y->all);
@@ -52,7 +52,7 @@ struct gn_annot {
   dumbgen_gen_function_body_visited bool;
   // The jmp target number for evaluating the node _and_ its precs.
   this_targetnum nc[jmp_targetnum];
-};
+}
 
 func live_for_funcall(annot *gn_annot) *array[cell_num] {
   return &un(&annot->app_time_live)->all;
@@ -75,9 +75,9 @@ struct frame {
   placeholder_jumps array[jmpdata];
 
   crash_target nc[jmp_targetnum];
-};
+}
 
-struct jmp_targetnum { x size; };
+struct jmp_targetnum { x size; }
 def `~` fn[size, jmp_targetnum] = wrapconvert;
 
 struct jmpdata {
@@ -85,7 +85,7 @@ struct jmpdata {
   // On x86, this is overwrite_location + 4 for imm32 jmp and jcc instructions -- the location of the end of the instruction.
   relative_mathpoint u32;
   target jmp_targetnum;
-};
+}
 
 func frame_create_target(h *frame) jmp_targetnum {
   ret jmp_targetnum = ~count(&h->jmp_targets);
@@ -191,7 +191,7 @@ enum tmp_offsets_val {
   Nope void;
   Has cell_loc;
   StaticSubcell tup[cell_num, u32];
-};
+}
 
 func set(dest *tmp_offsets_val, c cell_loc) void {
   if case &Nope = dest {
@@ -698,7 +698,7 @@ struct dumbgen_stackent {
   gn gr_num;
   jmpaft jmp_targetnum;
   jmp_necessary bool;
-};
+}
 
 func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp_targetnum) void {
   stack array[dumbgen_stackent];

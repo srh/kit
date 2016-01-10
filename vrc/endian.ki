@@ -1,6 +1,6 @@
 struct le_u32 {
   buf ^[4]u8;
-};
+}
 
 func `~`(x u32) le_u32 {
   ret le_u32;
@@ -22,7 +22,7 @@ func `~`(x le_u32) u32 {
 
 struct le_i32 {
   buf ^[4]u8;
-};
+}
 
 func `~`(x i32) le_i32 {
   ret le_i32;
@@ -39,7 +39,7 @@ func write_le_i32(dest *u8, x i32) void {
 
 struct le_u16 {
   buf ^[2]u8;
-};
+}
 
 func `~`(x u16) le_u16 {
   ret le_u16;
@@ -56,7 +56,7 @@ func write_le_u16(dest *u8, x u16) void {
 
 struct le_i16 {
   buf ^[2]u8;
-};
+}
 
 func `~`(x i16) le_i16 {
   ret le_i16;

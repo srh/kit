@@ -2,7 +2,7 @@ import stdlib;
 
 defclass[T] move box {
   ptr *T;
-};
+}
 
 access box[_] {
   inline func[T] do_init(u *box[T]) void {

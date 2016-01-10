@@ -1,7 +1,7 @@
 import stdlib;
 import identmap;
 
-struct pos { x size; };
+struct pos { x size; }
 
 inline func mk_pos(base_offset size, n size) pos {
   p pos;
@@ -14,7 +14,7 @@ struct human_pos {
   line size;
   column size;
   bytes size;
-};
+}
 
 func build_u8str(im *identmap, r *array[u8], hp *human_pos) void {
   build_u8str(im, r, &hp->module);

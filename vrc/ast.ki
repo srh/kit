@@ -9,7 +9,7 @@ import typeexpr;
 // ATTENTION!  "ast" types must use UNSHARED data structures.
 
 // This is an index into some ps-specific structure.
-struct ast_meta { x size; };
+struct ast_meta { x size; }
 
 def `~` fn[size, ast_meta] = wrapconvert;
 
@@ -18,71 +18,71 @@ inline func fake_ast_meta() ast_meta { return ~0; }
 enum ast_original_syntax {
   UserAssignment void;
   IncrDecr void;
-};
+}
 
 struct interval {
   left pos;
   right pos;
-};
+}
 
 struct ast_ident {
   meta ast_meta;
   value sym;
-};
+}
 
 // Add pos info below.
 
 struct ast_hex_literal {
   meta ast_meta;
   digits shray[i8];
-};
+}
 
 struct ast_dec_literal {
   meta ast_meta;
   digits shray[i8];
-};
+}
 
 enum ast_numeric_literal {
   HexLiteral ast_hex_literal;
   DecLiteral ast_dec_literal;
-};
+}
 
 struct ast_bool_literal {
   meta ast_meta;
   value bool;
-};
+}
 
 struct ast_void_literal {
   meta ast_meta;
-};
+}
 
 struct ast_null_literal {
   meta ast_meta;
-};
+}
 
 struct ast_charspec {
   value i32;
-};
+}
 
 struct ast_char_literal {
   charspec ast_charspec;
-};
+}
 
 struct ast_string_literal {
   charspecs array[ast_charspec];
-};
+}
 
 struct ast_funcall {
   fun box[ast_expr_consume];
   params array[ast_expr_consume];
-};
+}
 
 struct ast_logical_conjunction {
   // True if this is a '||' expr, false if '&&'.
   is_logical_or bool;
   lhs box[ast_expr_consume];
   rhs box[ast_expr_consume];
-};
+}
 
 struct ast_conditional_assignment_info {
   comparecells instpair;
@@ -93,25 +93,25 @@ struct ast_conditional_assignment_info {
   conditional_copy copy_action;
   // Should we dead the rhs virtual cell?
   rhs_deadme lval_deadme;
-};
+}
 
 struct ast_simple_copy_assignment_info {
   target_destroy destroy_action;
   rhs_copy copy_action;
   // Should we dead the rhs virtual cell?
   rhs_deadme lval_deadme;
-};
+}
 
 struct ast_simple_move_assignment_info {
   target_destroy destroy_action;
   rhs_move move_action;
-};
+}
 
 struct ast_simple_copydestroy_assignment_info {
   target_destroy destroy_action;
   rhs_copy copy_action;
   rhs_cleanup destroy_action;
-};
+}
 
 enum ast_assignment_info {
   StaticSelfAssignment void;
@@ -119,47 +119,47 @@ enum ast_assignment_info {
   SimpleCopyDestroyAssignment ast_simple_copydestroy_assignment_info;
   SimpleCopyAssignment ast_simple_copy_assignment_info;
   ConditionalAssignment ast_conditional_assignment_info;
-};
+}
 
 struct ast_assignment {
   info nc[ast_assignment_info];
   lhs box[ast_expr];
   rhs box[ast_expr];
-};
+}
 
 struct ast_addressof {
   rhs box[ast_expr];
-};
+}
 
 struct ast_refof {
   rhs box[ast_expr];
-};
+}
 
 struct ast_deref {
   ptr_discard ast_later_discard_info;
   rhs box[ast_expr_consume];
-};
+}
 
 struct ast_typeapp {
   typefunc box[ast_typeexpr];
   params array[ast_typeexpr];
-};
+}
 
 struct ast_union {
   fields array[ast_vardecl];
-};
+}
 
 struct ast_arraytype {
   count opt[box[ast_expr]];
   param box[ast_typeexpr];
-};
+}
 
 struct ast_lifetime {
   name ast_ident;
-};
+}
 
 struct ast_unknown {
-};
+}
 
 enum ast_typeexpr {
   Name ast_ident;
@@ -168,91 +168,91 @@ enum ast_typeexpr {
   Arraytype ast_arraytype;
   Lifetime ast_lifetime;
   Unknown ast_unknown;
-};
+}
 
 struct ast_vardecl {
   name ast_ident;
   type ast_typeexpr;
-};
+}
 
 struct ast_bracebody_info {
   destructions array[var_destruction];
-};
+}
 
 struct ast_bracebody {
   info nc[ast_bracebody_info];
   statements array[ast_statement];
-};
+}
 
 struct ast_var_info {
   vn var_number;
-};
+}
 
 enum ast_var_rhs {
   HasExpr box[ast_expr_consume];
   AutoInit opt[init_action];
-};
+}
 
 struct ast_var_statement {
   info nc[ast_var_info];
   decl ast_vardecl;
   rhs ast_var_rhs;
-};
+}
 
 struct ast_pattern_assign_info {
   deconstruct ast_enum_deconstruction_info;
   matching_tag_value enum_tag_value;
-};
+}
 
 struct ast_enum_deconstruction_info {
   tag_cell cell_num;
   num_enum_constructors size;
-};
+}
 
 struct ast_pattern_assign {
   info nc[ast_pattern_assign_info];
   pattern ast_constructor_pattern;
   rhs box[ast_expr_consume];
-};
+}
 
 enum ast_condition {
   ExprCondition box[ast_expr_consume];
   PatternCondition ast_pattern_assign;
-};
+}
 
 struct ast_condition_discard_info {
   virtual_cell_dead nc[opt[cell_num]];
   later ast_later_discard_info;
-};
+}
 
 struct ast_ifthen_statement {
   condition_discard ast_condition_discard_info;
   condition ast_condition;
   body ast_bracebody;
-};
+}
 
 struct ast_ifthenelse_statement {
   condition_discard ast_condition_discard_info;
   condition ast_condition;
   thenbody ast_bracebody;
   elsebody ast_bracebody;
-};
+}
 
 struct ast_while_statement {
   condition_discard_continue ast_condition_discard_info;
   condition_discard_exit ast_condition_discard_info;
   condition ast_condition;
   body ast_bracebody;
-};
+}
 
 struct ast_for_statement_info {
   initter_destructions array[var_destruction];
-};
+}
 
 struct ast_expr_condition {
   discard ast_later_discard_info;
   expr box[ast_expr_consume];
-};
+}
 
 struct ast_for_statement {
   // Can only be an ast_expr or ast_statement_var.
@@ -261,70 +261,70 @@ struct ast_for_statement {
   condition opt[ast_expr_condition];
   increment opt[box[ast_expr_discard]];
   body ast_bracebody;
-};
+}
 
 struct ast_switch_statement {
   info nc[ast_enum_deconstruction_info];
   swartch_discard ast_later_discard_info;
   swartch box[ast_expr_consume];
   cases array[ast_switch_case];
-};
+}
 
 
 struct ast_return_statement_info {
   destructions array[var_destruction];
-};
+}
 
 struct ast_return_statement {
   info nc[ast_return_statement_info];
   // If no expr, it returns void.
   expr opt[box[ast_expr_consume]];
-};
+}
 
 struct ast_break_statement_info {
   destructions array[var_destruction];
-};
+}
 
 struct ast_break_statement {
   info nc[ast_break_statement_info];
-};
+}
 
 struct ast_continue_statement_info {
   destructions array[var_destruction];
-};
+}
 
 struct ast_continue_statement {
   info nc[ast_continue_statement_info];
-};
+}
 
-struct label_num { x size; };
+struct label_num { x size; }
 def `~` fn[size, label_num] = wrapconvert;
 def `==` fn[label_num, label_num, bool] = wrapequate;
 
 struct ast_label_statement_info {
   label_number label_num;
-};
+}
 
 struct ast_label_statement {
   info nc[ast_label_statement_info];
   name ast_ident;
-};
+}
 
 struct ast_goto_statement_info {
   label_number label_num;
   destructions array[var_destruction];
   initializations array[init_action];
-};
+}
 
 struct ast_goto_statement {
   info nc[ast_goto_statement_info];
   target ast_ident;
-};
+}
 
 struct ast_statement {
   meta ast_meta;
   u ast_statement_enum;
-};
+}
 
 enum ast_statement_enum {
   Expr ast_expr_discard;
@@ -339,14 +339,14 @@ enum ast_statement_enum {
   Continue ast_continue_statement;
   Label ast_label_statement;
   Goto ast_goto_statement;
-};
+}
 
 struct ast_cp_info {
   ovn opt[var_number];
   tag_value enum_tag_value;
   // enum_field_offset(cs, et, tag_value) -- annotated here because getting a te_enum in graph.ki is needlessly annoying.
   field_offset u32;
-};
+}
 
 struct ast_constructor_pattern {
   meta ast_meta;
@@ -354,18 +354,18 @@ struct ast_constructor_pattern {
   addressof_constructor opt[ast_ident];
   constructor_name ast_ident;
   decl opt[ast_vardecl];
-};
+}
 
 
 enum ast_case_pattern {
   Case ast_constructor_pattern;
   Default void;
-};
+}
 
 struct ast_switch_case {
   pattern ast_case_pattern;
   body ast_bracebody;
-};
+}
 
 struct ast_fullbody_info {
   parameter_destructions array[var_destruction];
@@ -379,12 +379,12 @@ struct ast_fullbody_info {
 
   return_cell cell_num;
   arg_cells array[cell_num];
-};
+}
 
 struct ast_fullbody {
   info nc[ast_fullbody_info];
   bb ast_bracebody;
-};
+}
 
 struct ast_lambda {
   // TODO: We put is_inline here mainly for convenience of implementation (in gr_lambda_expr), it is unprincipled in the long run (I think?).
@@ -392,29 +392,29 @@ struct ast_lambda {
   args array[ast_vardecl];
   return_type ast_typeexpr;
   body ast_fullbody;
-};
+}
 
 struct ast_fieldname {
   name ast_ident;
-};
+}
 
 struct ast_arraylength_info {
   // After actions to discard the array.
   after ast_expr_after_discard;
   count u32;
-};
+}
 
 enum ast_local_field_info {
   ArrayLength ast_arraylength_info;
   // Holds the offset.
   FieldName u32;
-};
+}
 
 struct ast_local_field {
   info nc[ast_local_field_info];
   lhs box[ast_expr];
   fieldname ast_fieldname;
-};
+}
 
 func mk(lhs box[ast_expr], fieldname ast_fieldname) ast_local_field {
   return {NotComputed, lhs, fieldname};
@@ -425,48 +425,48 @@ enum ast_deref_field_info {
   DerefArrayLength u32;
   // The field's offset.
   DerefFieldName u32;
-};
+}
 
 struct ast_deref_field {
   info nc[ast_deref_field_info];
   ptr_discard ast_later_discard_info;
   lhs box[ast_expr_consume];
   fieldname ast_fieldname;
-};
+}
 
 // This could just have an instpair.
 struct global_info {
   ent def_entry_id;
   inst def_inst_id;
-};
+}
 
 struct local_info {
   varnum var_number;
-};
+}
 
 struct enum_constructor_info {
   constructor_tag enum_tag_value;
   ip instpair;
-};
+}
 
 struct enum_voidconstructed_info {
   constructor_tag enum_tag_value;
   // The structural rhs type of the enum being constructed.
   et te_enum;
-};
+}
 
 enum ast_name_expr_info {
   LocalResolve local_info;
   GlobalResolve global_info;
   EnumConstructor enum_constructor_info;
   EnumVoidConstructed enum_voidconstructed_info;
-};
+}
 
 struct ast_name_expr {
   name_info nc[ast_name_expr_info];
   ident ast_ident;
   generic_params opt[array[ast_typeexpr]];
-};
+}
 
 func mk(ident ast_ident, generic_params opt[array[ast_typeexpr]]) ast_name_expr {
   return {NotComputed, ident, generic_params};
@@ -474,19 +474,19 @@ func mk(ident ast_ident, generic_params opt[array[ast_typeexpr]]) ast_name_expr 
 
 struct ast_paren_expr {
   expr box[ast_expr];
-};
+}
 
 struct ast_index_expr_info {
   // isHas if the lhs needs consuming/discarding (if it's a ptr).
   lhs_after opt[tup[ast_expr_after_consume, ast_later_discard_info]];
   rhs_later ast_later_discard_info;
-};
+}
 
 struct ast_index_expr {
   info nc[ast_index_expr_info];
   lhs box[ast_expr];
   rhs box[ast_expr_consume];
-};
+}
 
 func mk(lhs box[ast_expr], rhs box[ast_expr_consume]) ast_index_expr {
   return {NotComputed, lhs, rhs};
@@ -496,28 +496,28 @@ func mk(lhs box[ast_expr], rhs box[ast_expr_consume]) ast_index_expr {
 struct ast_typed_expr {
   type ast_typeexpr;
   expr box[ast_expr];
-};
+}
 
 struct ast_strinit_param_info {
   offset u32;
-};
+}
 
 struct ast_strinit_param {
   info nc[ast_strinit_param_info];
   ec ast_expr_consume;
-};
+}
 
 struct ast_strinit {
   meta ast_meta;
   exprs array[ast_strinit_param];
-};
+}
 
 struct ast_ternary {
   // I'm not crazy enough to support case patterns in ternary operators yet.
   condition box[ast_expr_condition];
   then_clause box[ast_expr_consume];
   else_clause box[ast_expr_consume];
-};
+}
 
 // Is a non-lval an rval?  Okay.
 struct rval_description {
@@ -526,7 +526,7 @@ struct rval_description {
 
   // The cell number of the field (a virtual cell if different from num).
   partial_num cell_num;
-};
+}
 
 // Tells whether the rval would need to get copied out of the temporary, or whether the rval _is_ the whole temporary and can get moved.
 inline func whole_temporary(d *rval_description) bool {
@@ -536,7 +536,7 @@ inline func whole_temporary(d *rval_description) bool {
 enum lval_deadme {
   DontDeadMe void;
   DeadMe void;
-};
+}
 
 struct lval_description {
   // The cell number of the lvalue.  Be it part of a bigger object or not.
@@ -548,12 +548,12 @@ struct lval_description {
   // TODO: Maybe this field should be a te_lifetime.
   // TODO: Maybe this field should be a cu_typeexpr.
   lifetime te_typeexpr;
-};
+}
 
 enum is_lval {
   IsLvalNo rval_description;
   IsLvalYes lval_description;
-};
+}
 
 inline func wholeRval(num cell_num) is_lval {
   return IsLvalNo({num, num});
@@ -574,7 +574,7 @@ inline func value_cell(a *ast_expr) cell_num {
 struct ast_later_discard_info {
   // typechecking always leaves this in a computed state.
   action nc[destroy_action];
-};
+}
 
 inline func mk_later() ast_later_discard_info {
   return {NotComputed};
@@ -583,27 +583,27 @@ inline func mk_later() ast_later_discard_info {
 struct instpair {
   ent_id def_entry_id;
   inst_id def_inst_id;
-};
+}
 
 enum ctor_desc {
   TrivialCtor void;
   FunCtor instpair;
-};
+}
 
 struct bi_action {
   ctor ctor_desc;
   dest cell_num;
   src cell_num;
-};
+}
 
-struct copy_action { x bi_action; };
-struct move_action { x bi_action; };
+struct copy_action { x bi_action; }
+struct move_action { x bi_action; }
 
 def `+` fn[bi_action, copy_action] = wrapconvert;
 def `+` fn[bi_action, move_action] = wrapconvert;
 
-struct destroy_action { x uni_action; };
-struct init_action { x uni_action; };
+struct destroy_action { x uni_action; }
+struct init_action { x uni_action; }
 
 def `+` fn[uni_action, destroy_action] = wrapconvert;
 def `+` fn[uni_action, init_action] = wrapconvert;
@@ -611,12 +611,12 @@ def `+` fn[uni_action, init_action] = wrapconvert;
 struct uni_action {
   ctor ctor_desc;
   arg cell_num;
-};
+}
 
 struct copy_destroy_action {
   copy copy_action;
   destroy destroy_action;
-};
+}
 
 enum consume_actions {
   ConsumeByInPlace void;
@@ -624,20 +624,20 @@ enum consume_actions {
   ConsumeByCopy tup[copy_action, lval_deadme];
   // Only used for return statements, but later will be used for other exprs.
   ConsumeByMove move_action;
-};
+}
 
 struct ast_expr_after_consume {
   actions consume_actions;
   // The cell the expr's result... goes.
   // TODO: We should prohibit exprs where a non-whole_field result (or any result?) is discarded.  This will mean we don't need to handle the case where we discard a field lookup without copying it out first.
   result cell_num;
-};
+}
 
 enum ast_expr_after_discard {
   DiscardTemporary destroy_action;
   DiscardVirtualDead cell_num;
   DiscardNothing void;
-};
+}
 
 inline func result_cell(a *ast_expr_after_consume) cell_num {
   return a->result;
@@ -667,7 +667,7 @@ struct ast_expr_complete_info {
   lval is_lval;
   cu cu_typeexpr;
   cu_props type_properties;
-};
+}
 
 func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties) ast_expr_complete_info {
   return {lval, cu, cu_props};
@@ -677,13 +677,13 @@ enum ast_expr_info {
   NoInfo void;
   IncompleteCheck te_typeexpr;
   CompleteCheck ast_expr_complete_info;
-};
+}
 
 struct ast_expr {
   meta ast_meta;
   info ast_expr_info;
   u ast_expr_enum;
-};
+}
 
 func annotate_info(a *ast_expr, info ast_expr_info) void {
   switch &a->info {
@@ -727,7 +727,7 @@ enum ast_expr_enum {
   TypedExpr ast_typed_expr;
   Strinit ast_strinit;
   Ternary ast_ternary;
-};
+}
 
 func mk(m ast_meta, x ast_expr_enum) ast_expr {
   return {m, NoInfo, x};
@@ -736,7 +736,7 @@ func mk(m ast_meta, x ast_expr_enum) ast_expr {
 struct ast_expr_consume {
   after nc[ast_expr_after_consume];
   expr ast_expr;
-};
+}
 
 // TODO: Remove once we can costlessly pass by value.
 func consume(expr *ast_expr) ast_expr_consume {
@@ -750,7 +750,7 @@ func consume(expr ast_expr) ast_expr_consume {
 struct ast_expr_discard {
   after nc[ast_expr_after_discard];
   expr ast_expr;
-};
+}
 
 // TODO: Remove once we can costlessly pass by value.
 func discard(expr *ast_expr) ast_expr_discard {
@@ -766,35 +766,35 @@ struct ast_variadic_generics {
   before array[ast_ident];
   variadic_name ast_ident;
   after array[ast_ident];
-};
+}
 
 // This is named with a k to prevent typos with ast_generics.
 enum ast_generik {
   PlainGeneric ast_ident;
   LifetimeGeneric ast_ident;
-};
+}
 
 enum ast_generics {
   NoGenerics void;
   HasGenerics array[ast_generik];
   // Right now VariadicGenerics can't be parsed.
   VariadicGenerics ast_variadic_generics;
-};
+}
 
 enum ast_isexport {
   IsExport void;
   IsNotExport void;
-};
+}
 
 enum ast_isinline {
   IsInline void;
   IsNotInline void;
-};
+}
 
 enum ast_isvar {
   IsVar void;
   IsNotVar void;
-};
+}
 
 struct ast_def {
   is_export ast_isexport;
@@ -803,58 +803,58 @@ struct ast_def {
   name ast_ident;
   syntactic_typeexpr opt[ast_typeexpr];
   rhs ast_expr_consume;
-};
+}
 
 struct ast_extern_def {
   name ast_ident;
   type ast_typeexpr;
-};
+}
 
 struct ast_import {
   name ast_ident;
-};
+}
 
 enum ast_defclass_disposition {
   DefaultMoveCopyDestroy void;
   DefaultMove void;
   NoDefaults void;
-};
+}
 
 struct ast_classexpr_rhs {
   disposition ast_defclass_disposition;
   fields array[ast_vardecl];
-};
+}
 
 struct ast_defstruct_rhs {
   fields array[ast_vardecl];
-};
+}
 
 struct ast_defenum_rhs {
   constructors array[ast_vardecl];
-};
+}
 
 enum ast_type_def_rhs {
   ClassexprRhs ast_classexpr_rhs;
   DefstructRhs ast_defstruct_rhs;
   DefenumRhs ast_defenum_rhs;
-};
+}
 
 struct ast_type_def {
   generics ast_generics;
   name ast_ident;
   rhs ast_type_def_rhs;
-};
+}
 
 enum ast_access_arity {
   AccessArityNone void;
   AccessArityFinite u32;
-};
+}
 
 struct ast_access {
   name ast_ident;
   arity ast_access_arity;
   toplevels array[ast_toplevel];
-};
+}
 
 enum ast_toplevel {
   Import ast_import;
@@ -862,9 +862,9 @@ enum ast_toplevel {
   ExternDef ast_extern_def;
   TypeDef ast_type_def;
   Access ast_access;
-};
+}
 
 struct ast_file {
   toplevels array[ast_toplevel];
-};
+}
 

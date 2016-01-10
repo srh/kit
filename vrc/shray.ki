@@ -5,7 +5,7 @@ defclass[T] move shray {
   cap size;
   refp *size;
   ptr *T;
-};
+}
 
 access shray[_] {
   inline func[T] do_init(r *shray[T]) void {

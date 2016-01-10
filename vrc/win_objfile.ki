@@ -11,7 +11,7 @@ struct COFF_Header {
   NumberOfSymbols le_u32;
   SizeOfOptionalHeader le_u16;
   Characteristics le_u16;
-};
+}
 
 def COFF_Header_EXPECTED_SIZE u32 = 20;
 
@@ -26,7 +26,7 @@ struct Section_Header {
   NumberOfRelocations le_u16;
   NumberOfLineNumbers le_u16;
   Characteristics le_u32;
-};
+}
 
 def Section_Header_EXPECTED_SIZE u32 = 40;
 
@@ -172,19 +172,19 @@ struct COFF_Relocation {
   */
   /* Looking at cl output, I see a bunch of use of 6h and 14h. */
   Type le_u16;
-};
+}
 
 struct long_name {
   Zeroes le_u32;
   Offset le_u32;
-};
+}
 
 struct name_eight {
   u union {
     ShortName ^[8]u8;
     LongName long_name;
   };
-};
+}
 
 struct COFF_symbol_standard_record {
   Name name_eight;
@@ -209,7 +209,7 @@ struct COFF_symbol_standard_record {
   StorageClass u8;
   /* How many aux records follow this record. */
   NumberOfAuxSymbols u8;
-};
+}
 
 struct COFF_symbol_aux_sectiondef {
   Length le_u32;
@@ -223,7 +223,7 @@ struct COFF_symbol_aux_sectiondef {
   /* COMDAT selection number, set to zero. */
   Selection u8;
   Unused ^[3]u8;
-};
+}
 
 def kNumberOfSections u32 = 3;
 def kNumSectionSymbolsPerSection u32 = 2;

@@ -12,7 +12,7 @@ struct goto_info {
   st *ast_goto_statement;
   label_name sym;
   in_scope array[var_number];
-};
+}
 
 struct label_info {
   stnum statement_num;
@@ -20,7 +20,7 @@ struct label_info {
   label_name sym;
   in_scope array[var_number];
   hit bool;
-};
+}
 
 struct statement_info {
   // TODO: Nobody uses st.
@@ -28,7 +28,7 @@ struct statement_info {
   incoming array[statement_num];
   outgoing array[statement_num];
   marked_reachable bool;
-};
+}
 
 struct bodystate {
   es framescope;
@@ -41,7 +41,7 @@ struct bodystate {
   gotos array[goto_info];
   labels array[label_info];
   statements array[statement_info];
-};
+}
 
 func mk(ds *defscope, return_type *cu_typeexpr) bodystate {
   ret bodystate;
@@ -54,7 +54,7 @@ func mk(ds *defscope, return_type *cu_typeexpr) bodystate {
   return ret;
 }
 
-struct statement_num { x size; };
+struct statement_num { x size; }
 
 def `~` fn[size, statement_num] = wrapconvert;
 
@@ -72,7 +72,7 @@ func connect_statements(bs *bodystate, from statement_num, to statement_num) voi
 }
 
 // Returns the fall-through entry node and the fall-through exit node of a body or statement.  A body or statement might not have a fall-through exit, if e.g. it has a return statement.
-struct entryexit { entry statement_num; exit statement_num; };
+struct entryexit { entry statement_num; exit statement_num; }
 
 func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *entryexit) np {
   nstatements size = count(&a->statements);
@@ -137,7 +137,7 @@ func make_destroy_action(es *framescope, vn var_number, out *destroy_action) np 
 enum var_destruction {
   VarSelfContainedDestruction destroy_action;
   VarVirtualCellDead cell_num;
-};
+}
 
 func make_destructions(es *framescope, vns *array[var_number], out *array[var_destruction]) np {
   destructions array[var_destruction];
@@ -190,7 +190,7 @@ struct breakpack {
   break_in_scope array[var_number];
   continue_target statement_num;
   continue_in_scope array[var_number];
-};
+}
 
 func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) np {
   if case Printed(printed_meta bool) = help_check_statement(bs, vp, obp, s, ee_out) {
@@ -365,7 +365,7 @@ struct swartch_checkobj {
   // Will be initialized to a complete type.
   enum_type *te_enum;
   is_deref bool;
-};
+}
 
 func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard_info, later2 opt[*ast_later_discard_info], checkobj_out *swartch_checkobj) np {
   unknown te_typeexpr = TeUnknown;

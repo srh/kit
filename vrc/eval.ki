@@ -10,7 +10,7 @@ misinterpreted. */
 
 struct st_objpool {
   objects array[opt[st_value]];
-};
+}
 
 func mk_objpool() st_objpool {
   return {mk_array@[opt[st_value]]()};
@@ -23,14 +23,14 @@ struct st_env {
 
   // Indexed by cell_num.  Contains the number of the object representing the cell -- if the cell/object currently exists.
   framecells array[opt[st_obj_ref]];
-};
+}
 
 func mk_env(pool *st_objpool, plat platform_info, num_cells size) st_env {
   ret st_env = {pool, plat, repeat(num_cells, None)};
   return ret;
 }
 
-struct st_obj_num { x size; };
+struct st_obj_num { x size; }
 func `==`(a st_obj_num, b st_obj_num) bool { return a.x == b.x; }
 func `!=`(a st_obj_num, b st_obj_num) bool { return a.x != b.x; }
 
@@ -40,17 +40,17 @@ struct st_obj_ref {
   offset u32;
   // The size, in terms of bnnos
   count u32;
-};
+}
 
 struct st_pointer {
   num st_obj_num;
   // The offset, in terms of bnnos.
   offset u32;
-};
+}
 
 struct st_symbolref {
   fnid fn_body_id;
-};
+}
 
 struct st_value {
   // Note: Even when targeting big-endian systems, the lsB of a word is the still the least-addressable byte of that chunk of memory in this code here.  So, a 32-bit value of "5" would be represented by the array {0x05000000} when we target big-endian systems.  (Middle-endian on 16-bit systems could be a thing too.)
@@ -63,7 +63,7 @@ struct st_value {
   symbolrefs array[tup[u32, st_symbolref]];
   // Pointers to other objects -- they start at a bnno offset, and have a specific size (on the HP Saturn, 5 bnnos, or 20 bits).
   objrefs array[tup[u32, st_pointer]];
-};
+}
 
 func is_selfcontained(val *st_value) bool {
   return empty(&val->symbolrefs) && empty(&val->objrefs);

@@ -9,7 +9,7 @@ enum[K, V] hash_entry {
   HashEmpty void;
   HashValue tup[K, V];
   HashErased void;
-};
+}
 
 defclass[K, V] copy hash {
   // count(&arr) is zero or a power of two.
@@ -18,7 +18,7 @@ defclass[K, V] copy hash {
   cell_count size;
   // user_count, the number of HashValue entries, is just for a user-facing count(...) function.
   user_count size;
-};
+}
 
 access hash[_, _] {
   inline func[K, V] do_init(h *hash[K, V]) void {
@@ -164,7 +164,7 @@ access hash[_, _] {
   struct[K, V] hash_iter {
     h *hash[K, V];
     index size;
-  };
+  }
 
   inline func[K, V] iter(a *hash[K, V]) hash_iter[K, V] {
     ret hash_iter[K, V] = {a, 0};

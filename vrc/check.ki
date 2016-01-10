@@ -304,7 +304,7 @@ func enqueue_def_inst(clq *clqueue, id def_entry_id, parms *idy_genparms) def_in
 struct id_and_created {
   id def_inst_id;
   created bool;
-};
+}
 
 // rhs is "None" for extern defs and primitive defs.
 func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms) id_and_created {
@@ -837,7 +837,7 @@ func enqueue_deftype_inst(clq *clqueue, id deftype_entry_id, parms *idy_genparms
 struct type_id_and_created {
   id deftype_inst_id;
   created bool;
-};
+}
 
 func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *idy_genparms) type_id_and_created {
   if case Has(id deftype_inst_id) = lookup(&ent->insts, parms) {
@@ -884,7 +884,7 @@ func compute_type_properties(clq *clqueue, t *cu_typeexpr, out *type_properties)
 struct struct_field_info {
   offset u32;
   props type_properties;
-};
+}
 
 struct partial_struct_data {
   found_field bool;
@@ -897,7 +897,7 @@ struct partial_struct_data {
 
   // The length of this is the index of the search-for field (-- it doesn't have all the fields if we stopped early.)
   fields array[struct_field_info];
-};
+}
 
 inline func psd_index(psd *partial_struct_data) size {
   return count(&psd->fields);
@@ -1581,13 +1581,13 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
 struct ent_and_parms {
   ent def_entry_id;
   parms genparms;
-};
+}
 
 enum match_def_res {
   NoMatch void;
   MultiMatch void;
   OneMatch ent_and_parms;
-};
+}
 
 // Note that gp could be incomplete.
 func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
@@ -1642,7 +1642,7 @@ enum entry_matches_res {
   EntryDoesNotMatch void;
   EntryMatchesAmbigously void;
   EntryMatchesPrecisely genparms;
-};
+}
 
 func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res {
   switch x {
@@ -1708,7 +1708,7 @@ enum type_matches_res {
   TypeMatchesAmbiguously shray[te_typeexpr];
   // Provides complete types of all generic names.
   TypeMatchesPrecisely shray[te_typeexpr];
-};
+}
 
 // t is complete, but it references the generic names in "names", whose corresponding values in "parms" could be incomplete.  pt is the partial type of an expression we're matching against this generic definition.  count(parms) == count(names).
 func type_matches(pt *te_typeexpr, names *array[ast_generik], parms *shray[te_typeexpr],
@@ -1786,7 +1786,7 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
 struct complete_computed {
   complete bool;
   computed bool;
-};
+}
 
 func is_complete(t *te_typeexpr) bool {
   return is_complete_computed(t).complete;

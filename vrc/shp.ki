@@ -7,11 +7,11 @@ import stdlib;
 struct[T] shp_pointee {
   refcount size;
   value T;
-};
+}
 
 defclass[T] move shp {
   ptr *shp_pointee[T];
-};
+}
 
 access shp[_] {
   func[T] do_init(u *shp[T]) void {

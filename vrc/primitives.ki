@@ -15,7 +15,7 @@ enum primitive_numeric_op_action {
   NumBitNot void;
   NumShiftLeft void;
   NumShiftRight void;
-};
+}
 
 enum primitive_comparison_op_action {
   CmpEq void;
@@ -24,7 +24,7 @@ enum primitive_comparison_op_action {
   CmpGt void;
   CmpLe void;
   CmpGe void;
-};
+}
 
 func op_arity(act primitive_numeric_op_action) u32 {
   switch act {
@@ -40,7 +40,7 @@ enum primitive_logical_op {
   BoolNe void;
   BoolBitAnd void;
   BoolBitOr void;
-};
+}
 
 func op_arity(op primitive_logical_op) u32 {
   switch op {
@@ -51,21 +51,21 @@ func op_arity(op primitive_logical_op) u32 {
 
 struct primitive_ptr_comparison_op {
   op_action primitive_comparison_op_action;
-};
+}
 
 struct primitive_numeric_op {
   // Size in bnnos.
   op_size u32;
   op_numtraits numeric_traits;
   op_action primitive_numeric_op_action;
-};
+}
 
 struct primitive_numeric_comparison_op {
   // Size in bnnos.
   op_size u32;
   op_numtraits numeric_traits;
   op_action primitive_comparison_op_action;
-};
+}
 
 // This conversion op checks overflow depending on both from_numtraits and to_numtraits.
 struct primitive_conversion_op {
@@ -74,7 +74,7 @@ struct primitive_conversion_op {
   from_numtraits numeric_traits;
   to_size u32;
   to_numtraits numeric_traits;
-};
+}
 
 enum primitive_op {
   PrimNum primitive_numeric_op;
@@ -82,7 +82,7 @@ enum primitive_op {
   PrimLogical primitive_logical_op;
   PrimPtrCompare primitive_ptr_comparison_op;
   PrimConversion primitive_conversion_op;
-};
+}
 
 func primitive_bool_type(cs *checkstate) te_typeexpr {
   return TeName({cs->im->cym.boolsym, None});

@@ -3,23 +3,23 @@ import tok;
 enum allow_blanks {
   AllowBlanksNo void;
   AllowBlanksYes void;
-};
+}
 
 // This isn't passed recursively -- "No" is used whenever parsing always expects a concrete type anyway.
 enum allow_lifetimes {
   AllowLifetimesNo void;
   AllowLifetimesYes void;
-};
+}
 
 enum force_assignment {
   ForceAssignmentNo void;
   ForceAssignmentYes void;
-};
+}
 
 enum parse_result {
   Fail void;
   Success void;
-};
+}
 
 // NOTE: This can fail if x is unininitialized.  Should this be "~"?  In the long run the uninitialized value should be impossible.  If that does not happen, this should be changed to "~".
 func `+`(x parse_result) bool {
@@ -32,13 +32,13 @@ func `+`(x parse_result) bool {
 struct prec_pair {
   left i32;
   right i32;
-};
+}
 
 enum prec_cmp {
   Conflicts void;
   PullsLeft void;
   PullsRight void;
-};
+}
 
 // def[T] dbgparse fn[T, void] = debugstr;
 inline func[T] dbgparse(x T) void { }
@@ -928,7 +928,7 @@ def thenexpr_else_right_prec i32 = 314;
 struct binop_facts {
   op_prec prec_pair;
   user_assignment bool;
-};
+}
 
 func binop_info(t tokval) opt[binop_facts] {
   switch t {
@@ -1005,7 +1005,7 @@ func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_e
 enum statement_expr {
   IsNotStatementExpr void;
   IsStatementExpr void;
-};
+}
 
 func build_binop_expr(p *ps, se statement_expr, m ast_meta, user_assignment bool, op ast_ident, lhs ast_expr, rhs ast_expr, out *ast_expr) parse_result {
   if op.value == p->im->cym.assignmentsym {
@@ -1109,7 +1109,7 @@ func parse_atomic_expr_upon_num(p *ps, n *numlit, out *ast_expr) parse_result {
 enum allow_braces {
   AllowBracesNo void;
   AllowBracesYes void;
-};
+}
 
 func parse_atomic_expr_upon_grouper(p *ps, ab allow_braces, g grouper, out *ast_expr) parse_result {
   m ast_meta = start(p);
@@ -1621,7 +1621,7 @@ enum triparse_result {
   Success void;
   Quickfail void;
   Error void;
-};
+}
 
 func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_assignment, out *ast_statement_enum) parse_result {
   name ast_ident;
