@@ -829,7 +829,14 @@ struct ast_defstruct_rhs {
   fields array[ast_vardecl];
 }
 
+enum ast_defenum_constructor_disposition {
+  SuccessCase void;
+  GeneralCase void;
+}
+
 struct ast_defenum_constructor {
+  // Only one constructor is allowed to have one of these be Success.
+  disposition ast_defenum_constructor_disposition;
   decl ast_vardecl;
 }
 

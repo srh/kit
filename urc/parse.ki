@@ -410,7 +410,7 @@ func parse_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) parse_resu
 }
 
 func triparse_ident(p *ps, out *ast_ident) triparse_result {
-  dbgparse("try_parse_ident\n");
+  dbgparse("triparse_ident\n");
   switch peek(p)->val {
   case Ident(text shray[i32]):
     m ast_meta = startend(p);
@@ -753,6 +753,7 @@ func parse_defenum_constructors(p *ps, out *array[ast_defenum_constructor]) pars
   if ! +try_skip_token(p, @[tokval]Grouper(LBrace)) {
     return Fail;
   }
+  seen_success_disposition bool = false;
   constructors array[ast_defenum_constructor];
   for ;; {
     if +try_skip_token(p, @[tokval]Grouper(RBrace)) {
@@ -760,12 +761,23 @@ func parse_defenum_constructors(p *ps, out *array[ast_defenum_constructor]) pars
       return Success;
     }
 
+    disposition ast_defenum_constructor_disposition;
+    if +try_skip_oper(p, '#') {
+      if seen_success_disposition {
+        return Fail;
+      }
+      seen_success_disposition = true;
+      disposition = SuccessCase;
+    } else {
+      disposition = GeneralCase;
+    }
+
     decl ast_vardecl;
     if !(+parse_vardecl(p, AllowBlanksNo, &decl)
          && +try_skip_oper(p, ';')) {
       return Fail;
     }
-    push(&constructors, {decl});
+    push(&constructors, {disposition, decl});
   }
 }
 
@@ -1951,6 +1963,10 @@ func test_parse() bool {
                                _u8("enum foo { x y; z int; t fn[beh]; }"));
   pass = pass & run_parse_test(_u8("p046-c"),
                                _u8("enum foo { x y; z int; t fn[beh]; }"));
+  pass = pass & run_parse_test(_u8("p046-d"),
+                               _u8("enum foo { x y; #z int; t fn[beh]; }"));
+  pass = pass & run_parse_negtest(_u8("p046-e"),
+                                  _u8("enum foo { x y; #z int; #t fn[beh]; }"));
   pass = pass & run_parse_test(_u8("p048-a"),
                                _u8("struct[] foo {x bar [quux]; }\n"));
   pass = pass & run_parse_negtest(_u8("p048-b"),
