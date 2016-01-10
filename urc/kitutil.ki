@@ -86,7 +86,7 @@ func[T] DBG(x T) void {
   build_u8str(void, &r, &x);
   push(&r, '\n');
   print(Stderr(), r);
-  fflush(Stderr());
+  ign var = fflush(Stderr());
 }
 
 func[T, U, V, W, X, Y, Z, A] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z, t A) np {
@@ -129,7 +129,7 @@ func[T] MERR(cs *checkstate, m ast_meta, x T) np {
   build_u8str(cs->im, &r, &x);
   push(&r, '\n');
   print(Stderr(), r);
-  fflush(Stderr());
+  ign var = fflush(Stderr());
   return Printed(true);
 }
 

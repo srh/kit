@@ -25,13 +25,13 @@ func read_file(path array[u8], out *array[u8]) bool {
         truncate(&dat, totread);
         done = true;
       } else {
-        fclose(fp);
+        ign var = fclose(fp);
         return false;
       }
     }
   }
 
-  fclose(fp);
+  ign var = fclose(fp);
   swap(&dat, out);
   return true;
 }

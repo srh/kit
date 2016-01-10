@@ -550,7 +550,7 @@ func[T] add_test(ctx *big_ctx, name T, result bool) void {
   } else {
     print(Stdout(), _u8("bigint test "), name8, _u8(" PASS\n"));
   }
-  fflush(Stdout());
+  ign var = fflush(Stdout());
 }
 
 func test_bigint() bool {

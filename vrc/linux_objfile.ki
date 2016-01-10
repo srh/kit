@@ -117,7 +117,7 @@ func linux32_flatten(im *identmap, f *objfile) array[u8] {
   sh_strtab_offset u32 = end_of_section_headers;
 
   sh_strtab array[u8];
-  strtab_add(&sh_strtab, _u8(""));
+  ign u32 = strtab_add(&sh_strtab, _u8(""));
   dot_shstrtab_index u32 = strtab_add(&sh_strtab, _u8(".shstrtab"));
   dot_strtab_index u32 = strtab_add(&sh_strtab, _u8(".strtab"));
   dot_symtab_index u32 = strtab_add(&sh_strtab, _u8(".symtab"));
@@ -127,7 +127,7 @@ func linux32_flatten(im *identmap, f *objfile) array[u8] {
   dot_rodata_index u32 = strtab_add(&sh_strtab, _u8(".rodata"));
   dot_rel_text_index u32 = strtab_add(&sh_strtab, _u8(".rel.text"));
   dot_text_index u32 = strtab_add(&sh_strtab, _u8(".text"));
-  strtab_add(&sh_strtab, _u8(""));
+  ign = strtab_add(&sh_strtab, _u8(""));
 
   sym_strtab_offset u32 = sh_strtab_offset + ~count(&sh_strtab);
 
@@ -377,7 +377,7 @@ func linux32_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *ar
   symbols array[u8];
   symbols_count u32 = 0;
   strings array[u8];
-  strtab_add(&strings, _u8(""));
+  ign var = strtab_add(&strings, _u8(""));
 
   // Maps from f->symbol_table's indexes to symbols indexes, because they get reordered (and index zero cannot be used).
   sti_map array[u32] = repeat(count(&f->symbol_table), @[u32] 0);
@@ -415,7 +415,7 @@ func linux32_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *ar
     }
   }
 
-  strtab_add(&strings, _u8(""));
+  ign = strtab_add(&strings, _u8(""));
 
   *symbols_out = symbols;
   *strings_out = strings;

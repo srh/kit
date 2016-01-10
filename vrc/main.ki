@@ -14,28 +14,28 @@ func run_tests(build bool) bool {
   } else {
     print(Stdout(), _u8("parse_test FAIL\n"));
   }
-  fflush(Stdout());
+  ign var = fflush(Stdout());
   test_check_res tup[bool, u32] = test_check(build);
   if test_check_res.car {
     print(Stdout(), _u8("check_test passes\n"));
   } else {
     print(Stdout(), _u8("check_test FAIL ("), to_u8str(test_check_res.cdr), _u8(" failures)\n"));
   }
-  fflush(Stdout());
+  ign = fflush(Stdout());
   test_bigint_passed bool = test_bigint();
   if test_bigint_passed {
     print(Stdout(), _u8("check_bigint passes\n"));
   } else {
     print(Stdout(), _u8("check_bigint FAIL\n"));
   }
-  fflush(Stdout());
+  ign = fflush(Stdout());
   all_success bool = test_parse_passed && test_check_res.car && test_bigint_passed;
   if all_success {
     print(Stdout(), _u8("All tests PASS!\n"));
   } else {
     print(Stdout(), _u8("FAIL FAIL FAIL\n"));
   }
-  fflush(Stdout());
+  ign = fflush(Stdout());
   return all_success;
 }
 
@@ -54,11 +54,11 @@ func run_on_file(plat platform_info, modulename array[u8]) bool {
   add_primitives(&cs);
   if !from_np(build_module(&cs, intern(&im, from_u8(modulename)))) {
     print(Stdout(), _u8("Failed.\n"));
-    fflush(Stdout());
+    ign var = fflush(Stdout());
     return false;
   } else {
     print(Stdout(), _u8("Success.\n"));
-    fflush(Stdout());
+    ign var = fflush(Stdout());
     return true;
   }
 }

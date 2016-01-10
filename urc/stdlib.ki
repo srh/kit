@@ -22,7 +22,7 @@ def EOF i32 = -1;  // TODO: is actually "int"
 
 func print(fp *FILE, arr array[u8]) void {
   c size = count(&arr);
-  fwrite(@[*void]cast(data(&arr)), sizeof@[u8], count(&arr), fp);
+  ign var = fwrite(@[*void]cast(data(&arr)), sizeof@[u8], count(&arr), fp);
 }
 
 func print(fp *FILE, arr1 array[u8], arr2 array[u8]) void {
@@ -37,8 +37,8 @@ func print(fp *FILE, arr1 array[u8], arr2 array[u8], arr3 array[u8]) void {
 }
 
 func[T] debugstr(arr T) void {
-  fwrite(cast(@[*u8]&arr[0]), sizeof@[u8], arr.length, Stderr());
-  fflush(Stderr());
+  ign var = fwrite(cast(@[*u8]&arr[0]), sizeof@[u8], arr.length, Stderr());
+  ign2 var = fflush(Stderr());
 }
 
 func lpz_as_u8str(s *u8) array[u8] {
@@ -278,7 +278,7 @@ func crash() void {
 
 func crash(msg array[u8]) void {
   print(Stderr(), msg, make("\n"));
-  fflush(Stderr());
+  ign var = fflush(Stderr());
   abort();
 }
 

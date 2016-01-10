@@ -258,7 +258,7 @@ func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_
 }
 
 func add_def_primitive(cs *checkstate, name sym, type te_typeexpr, op primitive_op) void {
-  add_def_primitive(cs, name, NoGenerics, type, op);
+  ign var = add_def_primitive(cs, name, NoGenerics, type, op);
 }
 
 func add_op_primitive(cs *checkstate, oper sym, typename sym, arity size, op primitive_op) void {
@@ -272,7 +272,7 @@ func add_comparison_primitive(cs *checkstate, oper sym, generics ast_generics, t
 }
 
 func add_comparison_primitive(cs *checkstate, oper sym, typename sym, op primitive_op) void {
-  add_comparison_primitive(cs, oper, NoGenerics, @[te_typeexpr]TeName({typename, None}), op);
+  ign var = add_comparison_primitive(cs, oper, NoGenerics, @[te_typeexpr]TeName({typename, None}), op);
 }
 
 func add_binop_primitive(cs *checkstate, oper sym, typename sym, op primitive_op) void {
@@ -401,11 +401,11 @@ func add_pointer_primitive(cs *checkstate) void {
   bool_type te_typeexpr = primitive_bool_type(cs);
   ent def_entry_id = add_comparison_primitive(cs, intern(cs->im, _s("==")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpEq}));
   set(&cs->prims.ptr_eq, ent);
-  add_comparison_primitive(cs, intern(cs->im, _s("!=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpNe}));
-  add_comparison_primitive(cs, intern(cs->im, _s("<")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpLt}));
-  add_comparison_primitive(cs, intern(cs->im, _s(">")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpGt}));
-  add_comparison_primitive(cs, intern(cs->im, _s("<=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpLe}));
-  add_comparison_primitive(cs, intern(cs->im, _s(">=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpGe}));
+  ign var = add_comparison_primitive(cs, intern(cs->im, _s("!=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpNe}));
+  ign = add_comparison_primitive(cs, intern(cs->im, _s("<")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpLt}));
+  ign = add_comparison_primitive(cs, intern(cs->im, _s(">")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpGt}));
+  ign = add_comparison_primitive(cs, intern(cs->im, _s("<=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpLe}));
+  ign = add_comparison_primitive(cs, intern(cs->im, _s(">=")), tee_generic(cs), ptr_type(cs, tee_type), @[primitive_op]PrimPtrCompare({CmpGe}));
 }
 
 func add_pointer_primitive_type(cs *checkstate) void {
@@ -486,14 +486,14 @@ func add_non_magic_fn_primitive(cs *checkstate, name sym, args size, nonmag def_
   parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None})));
   push(&parms, primitive_void_type(cs));
   type te_typeexpr = fn_type(cs, freeze(&parms));
-  add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnNonMagic(nonmag));
+  ign var = add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnNonMagic(nonmag));
 }
 
 func add_magic_constructor_primitive(cs *checkstate, name sym, args size, mag def_magic) void {
   parms array[_] = repeat(args, ptr_type(cs, @[te_typeexpr]TeName({cs->im->cym.tee_sym, None})));
   push(&parms, primitive_void_type(cs));
   type te_typeexpr = fn_type(cs, freeze(&parms));
-  add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnMagic(mag));
+  ign var = add_def_primitive(cs, name, tee_generic(cs), type, @[def_definition]DefnMagic(mag));
 }
 
 func add_magic_constructor_primitives(cs *checkstate) void {
@@ -503,8 +503,8 @@ func add_magic_constructor_primitives(cs *checkstate) void {
   add_non_magic_fn_primitive(cs, cs->im->cym.move, 2, @[def_non_magic]NonMagicCtor({CtorMove, {teetype, NotComputed}}));
   add_non_magic_fn_primitive(cs, cs->im->cym.destroy, 1, @[def_non_magic]NonMagicCtor({CtorDestroy, {teetype, NotComputed}}));
 
-  add_def_primitive(cs, cs->im->cym.sizeofsym, tee_generic(cs), primitive_size_type(cs), @[def_definition]DefnNonMagic(@[def_non_magic]NonMagicProp({PropSizeof, teetype, NotComputed})));
-  add_def_primitive(cs, cs->im->cym.alignofsym, tee_generic(cs), primitive_size_type(cs), @[def_definition]DefnNonMagic(@[def_non_magic]NonMagicProp({PropAlignof, teetype, NotComputed})));
+  ign var = add_def_primitive(cs, cs->im->cym.sizeofsym, tee_generic(cs), primitive_size_type(cs), @[def_definition]DefnNonMagic(@[def_non_magic]NonMagicProp({PropSizeof, teetype, NotComputed})));
+  ign = add_def_primitive(cs, cs->im->cym.alignofsym, tee_generic(cs), primitive_size_type(cs), @[def_definition]DefnNonMagic(@[def_non_magic]NonMagicProp({PropAlignof, teetype, NotComputed})));
 
   add_magic_constructor_primitive(cs, cs->im->cym.magic_bzero, 1, @[def_magic]MagicBzero({NotComputed}));
   add_magic_constructor_primitive(cs, cs->im->cym.magic_memcopy, 2, @[def_magic]MagicMemcopy({NotComputed}));

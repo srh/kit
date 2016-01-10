@@ -207,7 +207,8 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
   num statement_num = add_statement(bs, Has(s));
   switch &s->u {
     case &Expr(b ast_expr_discard): {
-      pt te_typeexpr = TeUnknown;
+      // This is a bit restrictive and anal, especially for a language designed to interact with C API's that might have "helpful" but ignorable return values.  We'll want a slicker way to discard return values.
+      pt te_typeexpr = primitive_void_type(bs->cs);
       if case Printed(pm) = check_discard_expr(&bs->es, &b, &pt) {
         return Printed(pm);
       }

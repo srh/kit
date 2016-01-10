@@ -12,4 +12,6 @@ Some feature differences between s1 and s2:
   - s2 disallows strinits nakedly in conditionals/swartch locations.
   - s2 enum constructor type-checking/lookup is different.
   - s2 disallows whole field lookup.
+  - s2 requires expression statements be void.
+
 

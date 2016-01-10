@@ -1776,7 +1776,7 @@ func see_if_parse(file array[u8]) bool {
     print(Stdout(), _u8("at offset "));
     print(Stdout(), to_u8str(peek(&p)->interval.left.x));
     print(Stdout(), _u8("..."));
-    fflush(Stdout());
+    ign var = fflush(Stdout());
   }
   return ret;
 }
@@ -1796,14 +1796,14 @@ func help_run_parse_test(test_name array[u8], file array[u8], expected_success b
   }
   print(Stdout(), test_name);
   print(Stdout(), _u8("..."));
-  fflush(Stdout());
+  ign var = fflush(Stdout());
   if expected_success != see_if_parse(file) {
     print(Stdout(), _u8("FAIL\n"));
-    fflush(Stdout());
+    ign = fflush(Stdout());
     return false;
   } else {
     print(Stdout(), _u8("PASS\n"));
-    fflush(Stdout());
+    ign = fflush(Stdout());
     return true;
   }
 }

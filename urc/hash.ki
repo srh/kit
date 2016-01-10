@@ -322,7 +322,7 @@ func[K, V] try_insert_lookup(h *hash[K, V], key *K, value V) *V {
   switch lookup_ref(h, key) {
     case Has(p *V): { return p; }
     case None: {
-      try_insert(h, key, value);
+      ign var = try_insert(h, key, value);
       switch lookup_ref(h, key) {
         case Has(p *V): { return p; }
         case None: {

@@ -1397,7 +1397,8 @@ func load_module(cs *checkstate, mod_name sym) cr[module_id] {
         swap(&oo(&mod)->buf, &arr);
         p ps = make_ps(cs->im, &cs->posits, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
         if ! +parse_file(&p, &oo(&mod)->file) {
-          @[np]ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p)->interval.left)));
+          // The @[np] was something to grep for at one point.  TODO: Something about this is bad?
+          ign np = @[np]ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p)->interval.left)));
           return Printed(true);
         }
         mod_id module_id = ~count(&cs->modules);

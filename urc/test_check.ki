@@ -68,7 +68,7 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
     }
   }
   print(Stdout(), _u8("test "), _u8(name), _u8("..."));
-  fflush(Stdout());
+  ign var = fflush(Stdout());
   im identmap = make_im();
   cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
   add_primitives(&cs);
@@ -81,11 +81,11 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
   }
   if !success {
     print(Stdout(), _u8("FAIL\n"));
-    fflush(Stdout());
+    ign = fflush(Stdout());
     ctx->failures = ctx->failures + 1;
   } else {
     print(Stdout(), _u8("PASS\n"));
-    fflush(Stdout());
+    ign = fflush(Stdout());
   }
 }
 
@@ -97,17 +97,17 @@ func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
     }
   }
   print(Stdout(), _u8("test !"), _u8(name), _u8("..."));
-  fflush(Stdout());
+  ign var = fflush(Stdout());
   im identmap = make_im();
   cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
   add_primitives(&cs);
   if from_np(check_module(&cs, intern(&im, testmodule_name()))) {
     print(Stdout(), _u8("FAIL\n"));
-    fflush(Stdout());
+    ign = fflush(Stdout());
     ctx->failures = ctx->failures + 1;
   } else {
     print(Stdout(), _u8("PASS\n"));
-    fflush(Stdout());
+    ign = fflush(Stdout());
   }
 }
 
@@ -881,12 +881,12 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"));
   run_check_test(ctx, "c095",
     _u8("def foo = func(x i32, y u32) void {\n"
-        "  @[i32] 1;\n"
+        "  z var = @[i32] 1;\n"
         "};\n"));
 
   run_check_test(ctx, "c096",
     _u8("func foo(x i32, y u32) void {\n"
-        "  @[i32] 1;\n"
+        "  z var = @[i32] 1;\n"
         "}\n"));
   run_check_test(ctx, "c097",
     _u8("struct notsize { x u32; };\n"
@@ -1951,10 +1951,12 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  return y;\n"
         "}\n"
         "def glob i32 = blah(1);\n"));
+
+  // b is made void because statements require a void type.  For now.
   run_check_test(ctx, "c159",
-    _u8("struct foo { a i32; b i32; };\n"
+    _u8("struct foo { a i32; b void; };\n"
         "func bar() foo {\n"
-        "  return {1, 2};\n"
+        "  return {1, void};\n"
         "}\n"
         "func blah() void {\n"
         "  bar().b;\n"
