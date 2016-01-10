@@ -122,6 +122,21 @@ func convert_vardecl_list(cs *checkstate, arr *array[ast_vardecl], out *array[te
   return NoFail;
 }
 
+func convert_defenum_constructor_list(cs *checkstate, arr *array[ast_defenum_constructor], out *array[te_vardecl]) np {
+  build array[te_vardecl];
+  n size = count(arr);
+  reserve(&build, n);
+  for i size = 0; i < n; i = i + 1 {
+    vd te_vardecl;
+    if case Printed(pm) = convert_vardecl(cs, &ref(arr, i)->decl, &vd) {
+      return Printed(pm);
+    }
+    push(&build, vd);
+  }
+  swap(out, &build);
+  return NoFail;
+}
+
 func convert_vardecl(cs *checkstate, a *ast_vardecl, out *te_vardecl) np {
   type te_typeexpr;
   if case Printed(pm) = convert_typeexpr(cs, &a->type, &type) {
@@ -266,7 +281,7 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
         return NoFail;
       case &DefenumRhs(a ast_defenum_rhs):
         constructors array[te_vardecl];
-        if case Printed(pm) = convert_vardecl_list(cs, &a.constructors, &constructors) {
+        if case Printed(pm) = convert_defenum_constructor_list(cs, &a.constructors, &constructors) {
           np->rhs = FailedComputation;
           return Printed(pm);
         }

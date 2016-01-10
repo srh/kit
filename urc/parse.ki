@@ -301,13 +301,13 @@ func parse_rest_of_defstruct(p *ps, out *ast_toplevel) parse_result {
 func parse_rest_of_defenum(p *ps, out *ast_toplevel) parse_result {
   generics ast_generics;
   name ast_ident;
-  enumfields array[ast_vardecl];
+  constructors array[ast_defenum_constructor];
   if !(+parse_generics_if_present(p, &generics)
        && +parse_ident(p, &name)
-       && +parse_braced_fields(p, &enumfields)) {
+       && +parse_defenum_constructors(p, &constructors)) {
     return Fail;
   }
-  *out = TypeDef({generics, name, DefenumRhs({enumfields})});
+  *out = TypeDef({generics, name, DefenumRhs({constructors})});
   return Success;
 }
 
@@ -746,6 +746,26 @@ func parse_braced_fields(p *ps, out *array[ast_vardecl]) parse_result {
       return Fail;
     }
     push(&fields, field);
+  }
+}
+
+func parse_defenum_constructors(p *ps, out *array[ast_defenum_constructor]) parse_result {
+  if ! +try_skip_token(p, @[tokval]Grouper(LBrace)) {
+    return Fail;
+  }
+  constructors array[ast_defenum_constructor];
+  for ;; {
+    if +try_skip_token(p, @[tokval]Grouper(RBrace)) {
+      swap(out, &constructors);
+      return Success;
+    }
+
+    decl ast_vardecl;
+    if !(+parse_vardecl(p, AllowBlanksNo, &decl)
+         && +try_skip_oper(p, ';')) {
+      return Fail;
+    }
+    push(&constructors, {decl});
   }
 }
 

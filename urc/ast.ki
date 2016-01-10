@@ -829,8 +829,12 @@ struct ast_defstruct_rhs {
   fields array[ast_vardecl];
 }
 
+struct ast_defenum_constructor {
+  decl ast_vardecl;
+}
+
 struct ast_defenum_rhs {
-  constructors array[ast_vardecl];
+  constructors array[ast_defenum_constructor];
 }
 
 enum ast_type_def_rhs {
