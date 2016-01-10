@@ -1767,31 +1767,24 @@ func gr_init_action(clq *clqueue, gr *frame_graph, x *init_action, out *gr_num) 
   }
 }
 
-// TODO: The dead_after_destroy parameter here is definitely unnecessary, but not too harmful now.
 func gr_destroy_action(clq *clqueue, gr *frame_graph, x *destroy_action, dad dead_after_destroy, out *gr_num) np {
+  deactivate_gn opt[gr_num];
   switch &x->x.ctor {
-    case &TrivialCtor: {
-      dp gr_num;
-      if case DeadAfterDestroyYes = dad {
-        dp = addx(gr, @[gr_xop]GrDead({x->x.arg}));
-      } else {
-        dp = addx(gr, @[gr_xop]GrXNop);
-      }
-      *out = dp;
-      return NoFail;
-    }
-    case &FunCtor(ip instpair): {
-      gn gr_num = gr_uni_fun(clq, gr, ip, x->x.arg);
-      dp gr_num;
-      if case DeadAfterDestroyYes = dad {
-        dp = addx(gr, gn, @[gr_xop]GrDead({x->x.arg}));
-      } else {
-        dp = gn;
-      }
-      *out = dp;
-      return NoFail;
-    }
+  case &TrivialCtor:
+    deactivate_gn = None;
+  case &FunCtor(ip instpair):
+    gn gr_num = gr_uni_fun(clq, gr, ip, x->x.arg);
+    deactivate_gn = Has(gn);
   }
+  dp opt[gr_num];
+  if case DeadAfterDestroyYes = dad {
+    dp = Has(addx(gr, @[gr_xop]GrDead({x->x.arg})));
+  } else {
+    dp = None;
+  }
+
+  *out = seq(gr, deactivate_gn, dp).x;
+  return NoFail;
 }
 
 func gr_bi_fun(clq *clqueue, gr *frame_graph, ip instpair, dest cell_num, src cell_num) gr_num {
@@ -2295,7 +2288,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
       tagset_ogn = None;
     }
 
-    finalgn gr_num = addx(&gr, seq_ogn(&gr, tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn).x, @[gr_xop]GrXNop);
+    finalgn gr_num = addx(&gr, seq(&gr, tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn).x, @[gr_xop]GrXNop);
 
     finalseqgn sq_num = seqq(&gr, {finalgn, deadseq});
     push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), finalseqgn});
@@ -2328,10 +2321,25 @@ func seqqo(gr *frame_graph, a opt[gr_num], onto sq_num) sq_num {
   }
 }
 
-func seq_ogn(gr *frame_graph, a opt[gr_num], b opt[gr_num], c opt[gr_num], d opt[gr_num]) sq_num {
+func seq(gr *frame_graph, a opt[gr_num], b opt[gr_num], c opt[gr_num], d opt[gr_num]) sq_num {
   build sq_num = nopq(gr);
   build = seqqo(gr, d, build);
   build = seqqo(gr, c, build);
+  build = seqqo(gr, b, build);
+  build = seqqo(gr, a, build);
+  return build;
+}
+
+func seq(gr *frame_graph, a opt[gr_num], b opt[gr_num], c opt[gr_num]) sq_num {
+  build sq_num = nopq(gr);
+  build = seqqo(gr, c, build);
+  build = seqqo(gr, b, build);
+  build = seqqo(gr, a, build);
+  return build;
+}
+
+func seq(gr *frame_graph, a opt[gr_num], b opt[gr_num]) sq_num {
+  build sq_num = nopq(gr);
   build = seqqo(gr, b, build);
   build = seqqo(gr, a, build);
   return build;
@@ -2588,7 +2596,7 @@ func gr_magic_enum_construct(cs *checkstate, clq *clqueue, mec *magic_enum_const
   tagcell_gn var = addx(&gr, @[gr_xop]GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)}));
   tag_gn1 var = addx(&gr, tagcell_gn, @[gr_xop]GrWriteConst({tag_cell, ConstInt(~tagval.x)}));
   tag_gn var = addx(&gr, tag_gn1, @[gr_xop]GrVirtualDead({tag_cell}));
-  gn var = addx(&gr, seq_ogn(&gr, @[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn.x), postpadding_ogn).x, @[gr_xop]GrXNop);
+  gn var = addx(&gr, seq(&gr, @[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn.x), postpadding_ogn).x, @[gr_xop]GrXNop);
   *gr_out = gr;
   *gn_out = gn;
   *return_cell_out = retnum;
