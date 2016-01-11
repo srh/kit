@@ -45,7 +45,7 @@ struct bodystate {
 
 func mk(ds *defscope, return_type *cu_typeexpr) bodystate {
   ret bodystate;
-  ret.es = mk(ds);
+  ret.es = mk(ds, Has(return_type));
   ret.ds = ds;
   ret.cs = ds->cs;
   ret.im = ds->im;

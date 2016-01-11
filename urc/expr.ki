@@ -21,13 +21,17 @@ struct framescope {
   // Used for auto-generating $frame_1, $frame_2, ... lifetimes.
   lifetime_gen_counter size;
 
+  // The return type... if we're in a body that has a return type -- used for QuickReturn expressions.
+  return_type opt[*cu_typeexpr];
+
   gr frame_graph;
 }
 
-func mk(ds *defscope) framescope {
+func mk(ds *defscope, return_type opt[*cu_typeexpr]) framescope {
   return {ds, ds->cs, ds->im, ds->clq,
           mk_array@[var_info](), mk_array@[var_number](),
           0,
+          return_type,
           init_frame_graph_empty(ds->def_informal_name)};
 }
 
@@ -203,9 +207,9 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
   return NoFail;
 }
 
-func check_expr(clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *idy_repls, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
+func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *idy_repls, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
   ds defscope = {clq->cs, clq->im, clq, accessible, g, parms, def_informal_name};
-  es framescope = mk(&ds);
+  es framescope = mk(&ds, None);
   if case Printed(pm) = check_expr_consume(&es, x, pt) {
     return Printed(pm);
   }
@@ -646,15 +650,49 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
   }
 }
 
-func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickreturn, pt *te_typeexpr, x *ast_expr) np {
-  // In order for a quickreturn expression to be valid, the following must be true:
-  //   a. the rhs must be an enum type with a success case
-  //   b. the pt must be the success case's inside type
-  //   c. the return type of the fullbody we're in must be an enum type that is "structurally convertible in the non-success cases" from the rhs enum type.  For example, opt[foo] is structurally convertible (in the non-success cases) from opt[bar].
-  //
-  // Because the rhs can be _any_ enum type, for now we'll evaluate the rhs with no pt, and AllowIncompleteNo, and then see if that matches up with the lhs.  Eventually we can implement "looking through the enum" logic -- that will be necessary for arithmetic overflow.
-
+func success_enum_case_type(es *framescope, cu *cu_typeexpr, success_case_ix_out *size, success_type_out **te_typeexpr) bool {
   return TODO();
+}
+
+func structurally_convertible_in_non_success(es *framescope, cu *cu_typeexpr, return_type *cu_typeexpr) bool {
+  return TODO();
+}
+
+func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickreturn, pt *te_typeexpr, x *ast_expr) np {
+  if case Has(return_type *cu_typeexpr) = es->return_type {
+    // In order for a quickreturn expression to be valid, the following must be true:
+    //   a. the rhs must be an enum type with a success case
+    //   b. the pt must be the success case's inside type
+    //   c. the return type of the fullbody we're in must be an enum type that is "structurally convertible in the non-success cases" from the rhs enum type.  For example, opt[foo] is structurally convertible (in the non-success cases) from opt[bar].
+    //
+    // Because the rhs can be _any_ enum type, for now we'll evaluate the rhs with no pt, and AllowIncompleteNo, and then see if that matches up with the lhs.  Eventually we can implement "looking through the enum" logic -- that will be necessary for arithmetic overflow.
+
+    rhs_pt te_typeexpr = TeUnknown;
+    if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), &rhs_pt) {
+      return Printed(pm);
+    }
+
+    rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
+
+    success_case_ix size;
+    success_type *te_typeexpr;
+    if !success_enum_case_type(es, &rhs_info->cu, &success_case_ix, &success_type) {
+      return ERR(_u8("bad rhs type in quick-return"));
+    }
+
+    unified te_typeexpr;
+    if !unify_types(pt, success_type, &unified) {
+      return ERR(_u8("quick-return expr has bad type"));
+    }
+
+    if !structurally_convertible_in_non_success(es, &rhs_info->cu, return_type) {
+      return ERR(_u8("quick-return type cannot convert to return type in error case"));
+    }
+
+    return TODO();
+  } else {
+    return ERR(_u8("quick-return expression outside body"));
+  }
 }
 
 func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr) np {
