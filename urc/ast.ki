@@ -452,7 +452,7 @@ struct enum_constructor_info {
 struct enum_voidconstructed_info {
   constructor_tag enum_tag_value;
   // The structural rhs type of the enum being constructed.
-  et deftype_inst_rhsenum_info;
+  et enumspec;
 }
 
 enum ast_name_expr_info {

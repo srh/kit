@@ -265,14 +265,14 @@ struct structspec {
   fields shray[te_vardecl];
 }
 
-struct deftype_inst_rhsenum_info {
+struct enumspec {
   constructors shray[te_vardecl];
 }
 
 enum deftype_inst_rhs_info {
   // Also used for defclasses.
   RhsStructInfo structspec;
-  RhsEnumInfo deftype_inst_rhsenum_info;
+  RhsEnumInfo enumspec;
 }
 
 struct deftype_inst_info {

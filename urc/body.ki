@@ -363,7 +363,7 @@ struct swartch_checkobj {
   swartch_lifetime te_typeexpr;
   switchable_type_lifetime te_typeexpr;
   // Will be initialized to a complete type.
-  enum_type *deftype_inst_rhsenum_info;
+  enum_type *enumspec;
   is_deref bool;
 }
 
@@ -383,7 +383,7 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
     checkobj_out->switchable_type_lifetime = checkobj_out->swartch_lifetime;
   }
   // switchable_type is complete, because swartch type is.
-  et *deftype_inst_rhsenum_info;
+  et *enumspec;
   switch structural_enum_type(es->ds, switchable_type, &et) {
   case Error(pm):
     return Printed(pm);
@@ -398,7 +398,7 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
 }
 
 // expected_type_out is complete (et must be complete).
-func check_pattern(es *framescope, chk *swartch_checkobj, et *deftype_inst_rhsenum_info, patt *ast_constructor_pattern, expected_type_out **te_typeexpr, decl_index_out *size) np {
+func check_pattern(es *framescope, chk *swartch_checkobj, et *enumspec, patt *ast_constructor_pattern, expected_type_out **te_typeexpr, decl_index_out *size) np {
   if isHas(&patt->addressof_constructor) != chk->is_deref {
     return ERR(_u8("swartch/pattern pointeriness mismatch"));
   }
@@ -451,7 +451,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
 
   exitnum statement_num = add_statement(bs, None);
 
-  et *deftype_inst_rhsenum_info = chk.enum_type;
+  et *enumspec = chk.enum_type;
 
   ncases size = count(&a->cases);
   swartch_vp varpopper;
@@ -532,7 +532,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
   return NoFail;
 }
 
-func add_virtual_tag_cell(es *framescope, et *deftype_inst_rhsenum_info) cell_num {
+func add_virtual_tag_cell(es *framescope, et *enumspec) cell_num {
   tp cu_typrop = compute_prim(es->clq, enum_tag_type(es->cs, et));
   return add_cell(es, {LocationVirtual, tp.cu, tp.props});
 }
@@ -783,7 +783,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
       // enum_type is complete, because check_swartch says so.
 
-      et *deftype_inst_rhsenum_info = chk.enum_type;
+      et *enumspec = chk.enum_type;
       if true {
         swartch_vn var_number;
         if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {

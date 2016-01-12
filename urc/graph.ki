@@ -2161,7 +2161,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
 
-  et *deftype_inst_rhsenum_info = &mei->et;
+  et *enumspec = &mei->et;
 
   tagtype cu_typeexpr;
   tagtype_props type_properties;
