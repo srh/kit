@@ -308,7 +308,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       return NoFail;
     }
     et *enumspec;
-    switch structural_enum_type(ds, pt, &et) {
+    switch structural_enumspec(ds, pt, &et) {
     case Error(pm):
       return Printed(pm);
     case Success: { }
@@ -341,7 +341,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     return NoFail;
   }
   et *enumspec;
-  switch structural_enum_type(ds, &cac_return_type.te, &et) {
+  switch structural_enumspec(ds, &cac_return_type.te, &et) {
   case Error(pm):
     return Printed(pm);
   case Success: { }
@@ -652,7 +652,7 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
 
 func success_enum_case_type(es *framescope, cu *cu_typeexpr, success_case_ix_out *size, success_type_out **te_typeexpr) np {
   et *enumspec;
-  switch structural_enum_type(es->ds, &cu->x, &et) {
+  switch structural_enumspec(es->ds, &cu->x, &et) {
   case Error(pm):
     return Printed(pm);
   case Success:
@@ -1409,7 +1409,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     return NoFail;
   } else {
     b *structspec;
-    switch structural_struct_type(es->ds, pt, &b) {
+    switch structural_structspec(es->ds, pt, &b) {
     case Error(pm):
       return Printed(pm);
     case Success: { }
@@ -1667,10 +1667,10 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
   return NoFail;
 }
 
-func structural_struct_type(ds *defscope, t *te_typeexpr, st_out **structspec) structural_rhs_result {
+func structural_structspec(ds *defscope, t *te_typeexpr, st_out **structspec) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
     st *structspec;
-    switch help_structural_struct_type(ds, &pack, &st) {
+    switch help_structural_structspec(ds, &pack, &st) {
     case Error(pm):
       return Error(pm);
     case Success:
@@ -1686,10 +1686,10 @@ func structural_struct_type(ds *defscope, t *te_typeexpr, st_out **structspec) s
 }
 
 // et_out is set to a complete/computed value.
-func structural_enum_type(ds *defscope, t *te_typeexpr, et_out **enumspec) structural_rhs_result {
+func structural_enumspec(ds *defscope, t *te_typeexpr, et_out **enumspec) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
     et *enumspec;
-    switch help_structural_enum_type(ds, &pack, &et) {
+    switch help_structural_enumspec(ds, &pack, &et) {
     case Error(pm):
       return Error(pm);
     case Success:
@@ -1793,7 +1793,7 @@ func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **de
   }
 }
 
-func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **enumspec) structural_rhs_result {
+func help_structural_enumspec(ds *defscope, pack *te_instpack, et_out **enumspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
@@ -1811,7 +1811,7 @@ func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **enumspe
   }
 }
 
-func help_structural_struct_type(ds *defscope, pack *te_instpack, st_out **structspec) structural_rhs_result {
+func help_structural_structspec(ds *defscope, pack *te_instpack, st_out **structspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
@@ -1831,7 +1831,7 @@ func help_structural_struct_type(ds *defscope, pack *te_instpack, st_out **struc
 
 func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   st *structspec;
-  switch help_structural_struct_type(es->ds, pack, &st) {
+  switch help_structural_structspec(es->ds, pack, &st) {
   case Error(pm):
     return Printed(pm);
   case Success:
