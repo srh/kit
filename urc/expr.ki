@@ -1713,7 +1713,7 @@ func deftype_rhs_info_accessible(ds *defscope, id deftype_entry_id, result_out *
       }
       *result_out = false;
       return NoFail;
-    case &DefstructRhsSpec(drs defstruct_rhs_spec):
+    case &DefstructRhsSpec(drs structspec):
       *result_out = true;
       return NoFail;
     case &DefenumRhsSpec(drs defenum_rhs_spec):

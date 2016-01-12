@@ -286,10 +286,6 @@ struct deftype_inst {
   info nbfc[deftype_inst_info];
 }
 
-struct defstruct_rhs_spec {
-  fields shray[te_vardecl];
-}
-
 struct defenum_rhs_spec {
   constructors shray[te_vardecl];
   success_case_ix opt[size];
@@ -297,12 +293,12 @@ struct defenum_rhs_spec {
 
 struct classexpr_rhs_spec {
   disposition ast_defclass_disposition;
-  drs defstruct_rhs_spec;
+  drs structspec;
 }
 
 enum deftype_rhs_spec {
   ClassexprRhsSpec classexpr_rhs_spec;
-  DefstructRhsSpec defstruct_rhs_spec;
+  DefstructRhsSpec structspec;
   DefenumRhsSpec defenum_rhs_spec;
 }
 
