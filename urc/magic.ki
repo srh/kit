@@ -10,7 +10,7 @@ import u8ast;
 struct magic_struct_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
-  st te_struct;
+  st deftype_inst_rhsstruct_info;
   fips array[opt[instpair]];
 }
 
@@ -351,11 +351,11 @@ func check_pack_ctor(clq *clqueue, complete_te *te_typeexpr, props *type_propert
   switch rhs_info {
   case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
     field_insts array[opt[instpair]];
-    if case Printed(pm) = check_vardecl_ctor(clq, &ri.rhs_structspec.fields, wc, &field_insts) {
+    if case Printed(pm) = check_vardecl_ctor(clq, &ri.fields, wc, &field_insts) {
       return Printed(pm);
     }
 
-    *info_out = MagicStructInfo({~ *complete_te, *props, ri.rhs_structspec, field_insts});
+    *info_out = MagicStructInfo({~ *complete_te, *props, ri, field_insts});
   case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
     field_insts array[opt[instpair]];
     if case Printed(pm) = check_vardecl_ctor(clq, &ri.rhs_enumspec.constructors, wc, &field_insts) {

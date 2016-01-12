@@ -973,8 +973,8 @@ func mask_level(mask u32, bit u32, level behavior_level) behavior_level {
 }
 
 // st had better be complete and computed.
-// Realtype is the name (or app) type (a struct or defclass) whose fields the te_struct specifies.
-func compute_complete_struct_properties(clq *clqueue, st *te_struct, realtype *te_typeexpr, constructor_mask u32, out *type_properties) np {
+// Realtype is the name (or app) type (a struct or defclass) whose fields the deftype_inst_rhsstruct_info specifies.
+func compute_complete_struct_properties(clq *clqueue, st *deftype_inst_rhsstruct_info, realtype *te_typeexpr, constructor_mask u32, out *type_properties) np {
   psd partial_struct_data;
   if case Printed(pm) = compute_partial_struct_data(clq, &st->fields, None, &psd) {
     return Printed(pm);
@@ -1249,14 +1249,14 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(rhs_fields_complete);
 
           check(isBeganComputing(&inst->info));
-          st te_struct = {freeze(&rhs_fields)};
+          st deftype_inst_rhsstruct_info = {freeze(&rhs_fields)};
 
           class_props type_properties;
           if case Printed(pm) = to_defclass_properties(clq, ent_id, id, crs.disposition,&st, &class_props) {
             inst->info = FailedComputation;
             return Printed(pm);
           }
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({st})), class_props});
+          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo(st)), class_props});
 
         case &DefstructRhsSpec(drs defstruct_rhs_spec):
           rhs_fields array[te_vardecl];
@@ -1269,7 +1269,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(rhs_fields_complete);
 
           check(isBeganComputing(&inst->info));
-          st te_struct = {freeze(&rhs_fields)};
+          st deftype_inst_rhsstruct_info = {freeze(&rhs_fields)};
 
           it te_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
@@ -1279,7 +1279,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           }
           check(isBeganComputing(&inst->info));
 
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({st})), rhs_props});
+          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo(st)), rhs_props});
 
         case &DefenumRhsSpec(drs defenum_rhs_spec):
           rhs_constructors array[te_vardecl];
