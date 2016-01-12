@@ -66,7 +66,6 @@ int main(int argc, char **argv) {
     }
 
 
-    DBG("Success?\n");
     ret = EXIT_SUCCESS;
 
   cleanup_im:

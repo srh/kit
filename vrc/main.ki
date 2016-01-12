@@ -57,7 +57,6 @@ func run_on_file(plat platform_info, modulename array[u8]) bool {
     ign var = fflush(Stdout());
     return false;
   } else {
-    print(Stdout(), _u8("Success.\n"));
     ign var = fflush(Stdout());
     return true;
   }
