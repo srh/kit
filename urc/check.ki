@@ -122,18 +122,25 @@ func convert_vardecl_list(cs *checkstate, arr *array[ast_vardecl], out *array[te
   return NoFail;
 }
 
-func convert_defenum_constructor_list(cs *checkstate, arr *array[ast_defenum_constructor], out *array[te_vardecl]) np {
+func convert_defenum_constructor_list(cs *checkstate, arr *array[ast_defenum_constructor], decls_out *array[te_vardecl], success_case_ix_out *opt[size]) np {
   build array[te_vardecl];
   n size = count(arr);
   reserve(&build, n);
+  success_case_ix opt[size] = None;
   for i size = 0; i < n; i = i + 1 {
+    elem *ast_defenum_constructor = ref(arr, i);
     vd te_vardecl;
-    if case Printed(pm) = convert_vardecl(cs, &ref(arr, i)->decl, &vd) {
+    if case Printed(pm) = convert_vardecl(cs, &elem->decl, &vd) {
       return Printed(pm);
+    }
+    if case SuccessCase = elem->disposition {
+      // Parsing's supposed to only allow one success case, this assert verifies.
+      set(&success_case_ix, i);
     }
     push(&build, vd);
   }
-  swap(out, &build);
+  swap(decls_out, &build);
+  *success_case_ix_out = success_case_ix;
   return NoFail;
 }
 
@@ -280,12 +287,13 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
         }
         return NoFail;
       case &DefenumRhs(a ast_defenum_rhs):
+        success_case_ix opt[size];
         constructors array[te_vardecl];
-        if case Printed(pm) = convert_defenum_constructor_list(cs, &a.constructors, &constructors) {
+        if case Printed(pm) = convert_defenum_constructor_list(cs, &a.constructors, &constructors, &success_case_ix) {
           np->rhs = FailedComputation;
           return Printed(pm);
         }
-        np->rhs = Computed(@[deftype_rhs_spec]DefenumRhsSpec({freeze(&constructors)}));
+        np->rhs = Computed(@[deftype_rhs_spec]DefenumRhsSpec({freeze(&constructors), success_case_ix}));
         if case &Computed(b deftype_rhs_spec) = &np->rhs {
           *out = &b;
         } else {

@@ -292,6 +292,7 @@ struct defstruct_rhs_spec {
 
 struct defenum_rhs_spec {
   constructors shray[te_vardecl];
+  success_case_ix opt[size];
 }
 
 struct classexpr_rhs_spec {
