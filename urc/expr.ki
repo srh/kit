@@ -650,8 +650,22 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
   }
 }
 
-func success_enum_case_type(es *framescope, cu *cu_typeexpr, success_case_ix_out *size, success_type_out **te_typeexpr) bool {
-  return TODO();
+func success_enum_case_type(es *framescope, cu *cu_typeexpr, success_case_ix_out *size, success_type_out **te_typeexpr) np {
+  et *enumspec;
+  switch structural_enum_type(es->ds, &cu->x, &et) {
+  case Error(pm):
+    return Printed(pm);
+  case Success:
+    if case Has(ix size) = et->success_case_ix {
+      *success_case_ix_out = ix;
+      *success_type_out = &ref(&et->constructors, ix)->type;
+      return NoFail;
+    } else {
+      return ERR(_u8("Bad rhs type (enum without success case) in quick-return"));
+    }
+  case NotAccessible:
+    return ERR(_u8("Bad rhs type (not enum) in quick-return"));
+  }
 }
 
 func structurally_convertible_in_non_success(es *framescope, cu *cu_typeexpr, return_type *cu_typeexpr) bool {
@@ -676,8 +690,8 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
 
     success_case_ix size;
     success_type *te_typeexpr;
-    if !success_enum_case_type(es, &rhs_info->cu, &success_case_ix, &success_type) {
-      return ERR(_u8("bad rhs type in quick-return"));
+    if case Printed(pm) = success_enum_case_type(es, &rhs_info->cu, &success_case_ix, &success_type) {
+      return Printed(pm);
     }
 
     unified te_typeexpr;
