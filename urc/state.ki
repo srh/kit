@@ -261,16 +261,12 @@ struct cu_typrop {
   props type_properties;
 }
 
-struct te_enum {
-  constructors shray[te_vardecl];
-}
-
 struct deftype_inst_rhsstruct_info {
   fields shray[te_vardecl];
 }
 
 struct deftype_inst_rhsenum_info {
-  rhs_enumspec te_enum;
+  constructors shray[te_vardecl];
 }
 
 enum deftype_inst_rhs_info {

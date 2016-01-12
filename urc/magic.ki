@@ -17,7 +17,7 @@ struct magic_struct_info {
 struct magic_enum_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
-  et te_enum;
+  et deftype_inst_rhsenum_info;
   cips array[opt[instpair]];
 }
 
@@ -51,7 +51,7 @@ enum magic_enum_construct_op {
 }
 
 struct magic_enum_construct {
-  et te_enum;
+  et deftype_inst_rhsenum_info;
   return_type cu_typeexpr;
   return_type_props type_properties;
   constructor_index size;
@@ -358,11 +358,11 @@ func check_pack_ctor(clq *clqueue, complete_te *te_typeexpr, props *type_propert
     *info_out = MagicStructInfo({~ *complete_te, *props, ri, field_insts});
   case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
     field_insts array[opt[instpair]];
-    if case Printed(pm) = check_vardecl_ctor(clq, &ri.rhs_enumspec.constructors, wc, &field_insts) {
+    if case Printed(pm) = check_vardecl_ctor(clq, &ri.constructors, wc, &field_insts) {
       return Printed(pm);
     }
 
-    *info_out = MagicEnumInfo({~ *complete_te, *props, ri.rhs_enumspec, field_insts});
+    *info_out = MagicEnumInfo({~ *complete_te, *props, ri, field_insts});
   }
   return NoFail;
 }

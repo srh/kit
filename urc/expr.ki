@@ -272,7 +272,7 @@ struct voidconstructed_info {
   // The actual constructed type, which we need for some reason.
   constructed_type cu_typeexpr;
   // The enum type (the structural rhs of constructed_type).
-  et te_enum;
+  et deftype_inst_rhsenum_info;
   constructor_tag enum_tag_value;
 }
 
@@ -307,7 +307,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       *res_out = AmbigMatchConstructor;
       return NoFail;
     }
-    et *te_enum;
+    et *deftype_inst_rhsenum_info;
     switch structural_enum_type(ds, pt, &et) {
     case Error(pm):
       return Printed(pm);
@@ -340,7 +340,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     *res_out = AmbigMatchConstructor;
     return NoFail;
   }
-  et *te_enum;
+  et *deftype_inst_rhsenum_info;
   switch structural_enum_type(ds, &cac_return_type.te, &et) {
   case Error(pm):
     return Printed(pm);
@@ -378,7 +378,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
 }
 
 // return_type is the return type of ctor_type.  Both are complete and computed.
-func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, return_type *te_typeexpr, ctor_type *te_typeexpr, decl_index size, out *instpair) np {
+func lookup_or_make_enum_constructor_def(ds *defscope, et *deftype_inst_rhsenum_info, return_type *te_typeexpr, ctor_type *te_typeexpr, decl_index size, out *instpair) np {
   defname_u8 array[u8] = _u8("$magic_enum_ctor_");
   build_u8str(void, &defname_u8, &decl_index);
   defname sym = intern(ds->im, from_u8(defname_u8));
@@ -1672,9 +1672,9 @@ func structural_struct_type(ds *defscope, t *te_typeexpr, st_out **deftype_inst_
 }
 
 // et_out is set to a complete/computed value.
-func structural_enum_type(ds *defscope, t *te_typeexpr, et_out **te_enum) structural_rhs_result {
+func structural_enum_type(ds *defscope, t *te_typeexpr, et_out **deftype_inst_rhsenum_info) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
-    et *te_enum;
+    et *deftype_inst_rhsenum_info;
     switch help_structural_enum_type(ds, &pack, &et) {
     case Error(pm):
       return Error(pm);
@@ -1779,7 +1779,7 @@ func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **de
   }
 }
 
-func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **te_enum) structural_rhs_result {
+func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **deftype_inst_rhsenum_info) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
@@ -1789,7 +1789,7 @@ func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **te_enum
     case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
       return NotAccessible;
     case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
-      *et_out = &ri.rhs_enumspec;
+      *et_out = &ri;
       return Success;
     }
   case NotAccessible:
