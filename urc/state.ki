@@ -261,10 +261,12 @@ struct cu_typrop {
   props type_properties;
 }
 
+// structspec and enumspec have to be "value types" like the te_... types.
 struct structspec {
   fields shray[te_vardecl];
 }
 
+// enumspec has to be a "value type" like the te_... types.  See how it's used in ast.ki.
 struct enumspec {
   constructors shray[te_vardecl];
   success_case_ix opt[size];
