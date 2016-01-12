@@ -267,6 +267,7 @@ struct structspec {
 
 struct enumspec {
   constructors shray[te_vardecl];
+  success_case_ix opt[size];
 }
 
 enum deftype_inst_rhs_info {
