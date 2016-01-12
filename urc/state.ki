@@ -261,7 +261,7 @@ struct cu_typrop {
   props type_properties;
 }
 
-struct deftype_inst_rhsstruct_info {
+struct structspec {
   fields shray[te_vardecl];
 }
 
@@ -271,7 +271,7 @@ struct deftype_inst_rhsenum_info {
 
 enum deftype_inst_rhs_info {
   // Also used for defclasses.
-  RhsStructInfo deftype_inst_rhsstruct_info;
+  RhsStructInfo structspec;
   RhsEnumInfo deftype_inst_rhsenum_info;
 }
 
@@ -648,7 +648,7 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
   }
 }
 
-func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *deftype_inst_rhsstruct_info, out *type_properties) np {
+func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *structspec, out *type_properties) np {
   cs *checkstate = clq->cs;
   it te_typeexpr = inst_type(cs, ent_id, inst_id);
   switch a {

@@ -1394,7 +1394,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
     return NoFail;
   } else {
-    b *deftype_inst_rhsstruct_info;
+    b *structspec;
     switch structural_struct_type(es->ds, pt, &b) {
     case Error(pm):
       return Printed(pm);
@@ -1653,9 +1653,9 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
   return NoFail;
 }
 
-func structural_struct_type(ds *defscope, t *te_typeexpr, st_out **deftype_inst_rhsstruct_info) structural_rhs_result {
+func structural_struct_type(ds *defscope, t *te_typeexpr, st_out **structspec) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
-    st *deftype_inst_rhsstruct_info;
+    st *structspec;
     switch help_structural_struct_type(ds, &pack, &st) {
     case Error(pm):
       return Error(pm);
@@ -1786,7 +1786,7 @@ func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **deftype
     return Error(pm);
   case Success:
     switch rhs_info {
-    case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
+    case &RhsStructInfo(ri structspec):
       return NotAccessible;
     case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
       *et_out = &ri;
@@ -1797,14 +1797,14 @@ func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **deftype
   }
 }
 
-func help_structural_struct_type(ds *defscope, pack *te_instpack, st_out **deftype_inst_rhsstruct_info) structural_rhs_result {
+func help_structural_struct_type(ds *defscope, pack *te_instpack, st_out **structspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
     return Error(pm);
   case Success:
     switch rhs_info {
-    case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
+    case &RhsStructInfo(ri structspec):
       *st_out = &ri;
       return Success;
     case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
@@ -1816,7 +1816,7 @@ func help_structural_struct_type(ds *defscope, pack *te_instpack, st_out **defty
 }
 
 func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
-  st *deftype_inst_rhsstruct_info;
+  st *structspec;
   switch help_structural_struct_type(es->ds, pack, &st) {
   case Error(pm):
     return Printed(pm);
@@ -1827,7 +1827,7 @@ func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, 
   }
 }
 
-func help_lookup_struct_field(es *framescope, st *deftype_inst_rhsstruct_info, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+func help_lookup_struct_field(es *framescope, st *structspec, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   offset u32;
   if case Printed(pm) = lookup_field_from_list(es->clq, &st->fields, fieldname->value, fieldtype_out, &offset) {
     return Printed(pm);
