@@ -909,17 +909,16 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
 
 // "initializations" is in variable declaration order -- the _same_ order as evaluation.
 func gr_winding(gs gr_statep, initializations *array[init_action], out *gr_num) np {
-  bn sq_num = nopq(gs.gr);
+  bu sq_builder = mk_builder(gs.gr);
   n size = count(initializations);
-  for i size = n; i > 0; {
-    i = i - 1;
+  for i size = 0; i < n; i = i + 1 {
     gn gr_num;
     if case Printed(pm) = gr_init_action(gs, ref(initializations, i), &gn) {
       return Printed(pm);
     }
-    bn = seqq(gs.gr, {gn, bn});
+    add(&bu, gn);
   }
-  *out = bn.x;
+  *out = done(&bu);
   return NoFail;
 }
 
