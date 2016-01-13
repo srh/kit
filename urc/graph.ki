@@ -867,11 +867,11 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
     gn = addx(gs.gr, @[gr_xop]GrXNop);
   }
   info *ast_return_statement_info = un(&a->info);
-  uw sq_num;
-  if case Printed(pm) = gr_unwind_vars(gs, &info->destructions, fb->final_node, &uw) {
+  uw_op gr_num;
+  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw_op) {
     return Printed(pm);
   }
-  sn var = seqq(gs.gr, {gn, uw});
+  sn sq_num = seqq(gs.gr, {seq2(gs.gr, gn, uw_op).x, fb->final_node});
   *out = sn;
   return NoFail;
 }
