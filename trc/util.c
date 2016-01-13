@@ -101,7 +101,7 @@ int32_t from_le_i32(struct le_i32 x) {
   if (reti64 > INT32_MAX) {
     reti64 -= 1 + (int64_t)UINT32_MAX;
   }
-  int32_t reti32 = reti64;
+  int32_t reti32 = (int32_t)reti64;
   return reti32;
 }
 
@@ -129,6 +129,6 @@ int16_t from_le_i16(struct le_i16 x) {
   if (reti32 > INT16_MAX) {
     reti32 -= 1 + (int32_t)UINT16_MAX;
   }
-  int16_t reti16 = reti32;
+  int16_t reti16 = (int16_t)reti32;
   return reti16;
 }
