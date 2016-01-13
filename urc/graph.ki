@@ -326,12 +326,6 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   final_node sq_num = nopq(gs.gr);
 
   info *ast_fullbody_info = un(&x->info);
-  parameter_unwinding gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &info->parameter_destructions, &parameter_unwinding) {
-    return Printed(pm);
-  }
-
-  exit_node sq_num = nopq(gs.gr);
 
   label_gn array[sq_num];
   n size = count(&info->labels);
@@ -342,10 +336,18 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
 
   fb fullbody_state = {info->all_vars, final_node, label_gn, mk_array@[cell_num]()};
 
+  exit_node sq_num = nopq(gs.gr);
   body_gn sq_num;
   if case Printed(pm) = gr_bracebody(gs, &fb, None, &x->bb, exit_node, &body_gn) {
     return Printed(pm);
   }
+
+  parameter_unwinding gr_num;
+  if case Printed(pm) = gr_unwinding(gs, &info->parameter_destructions, &parameter_unwinding) {
+    return Printed(pm);
+  }
+
+  mut_qnop_node(gs.gr, exit_node, parameter_unwinding, final_node);
 
   // This assumes it's okay to have a subcell op produce the identical type -- it's the only place we do that.
   return_subcells_op sq_num = nopq(gs.gr);
@@ -362,7 +364,6 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
 
   seqop sq_num = seqq(gs.gr, {return_subcells_op.x, body_gn});
 
-  mut_qnop_node(gs.gr, exit_node, parameter_unwinding, final_node);
   mut_qnop_node(gs.gr, fb.final_node, return_subcells_dead.x, nopq(gs.gr));
 
   *out = seqop.x;
