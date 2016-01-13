@@ -257,9 +257,18 @@ enum gr_const {
   ConstBytes shray[u8];
 }
 
+struct gr_celltrack {
+
+}
+
+func mk_celltrack() gr_celltrack {
+  return { };
+}
+
 struct gr_statep {
   clq *clqueue;
   gr *frame_graph;
+  cell_tracker *gr_celltrack;
 }
 
 struct fullbody_state {
@@ -1180,9 +1189,12 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, out *gr_num) 
 func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
+  lambda_celltrack gr_celltrack = mk_celltrack();
+  lambda_gs gr_statep = {gs.clq, &lambda_gr, &lambda_celltrack};
+
   fullbody_gn gr_num;
   return_cell cell_num;
-  if case Printed(pm) = gr_fullbody({gs.clq, &lambda_gr}, &a->body, &fullbody_gn, &return_cell) {
+  if case Printed(pm) = gr_fullbody(lambda_gs, &a->body, &fullbody_gn, &return_cell) {
     return Printed(pm);
   }
 
@@ -1949,29 +1961,35 @@ func basics_cleanup(gs gr_statep, bas *gr_basics, gn gr_num, gr_out *frame_graph
 
 func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_nopdestroy")));
+  celltrack gr_celltrack = mk_celltrack();
+  gs gr_statep = {clq, &gr, &celltrack};
   bas gr_minimal_basics;
   // TODO: How about make the size parameter opt[u32], don't deref if no size.
-  add_minimal_basics({clq, &gr}, 0 /* Pass a made-up size. */, 1, &bas);
+  add_minimal_basics(gs, 0 /* Pass a made-up size. */, 1, &bas);
   gn gr_num = addx(&gr, @[gr_xop]GrXNop);
-  minimal_basics_cleanup({clq, &gr}, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
+  minimal_basics_cleanup(gs, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
   return NoFail;
 }
 
 func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_memcopy")));
+  celltrack gr_celltrack = mk_celltrack();
+  gs gr_statep = {clq, &gr, &celltrack};
   bas gr_basics;
-  add_basics({clq, &gr}, *un(&mm->size), 2, &bas);
+  add_basics(gs, *un(&mm->size), 2, &bas);
   gn gr_num = addx(&gr, bas.deref_prec, @[gr_xop]GrMemCopy({get(&bas.pointeecells, 0), get(&bas.pointeecells, 1)}));
-  basics_cleanup({clq, &gr}, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
+  basics_cleanup(gs, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
   return NoFail;
 }
 
 func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_bzero")));
+  celltrack gr_celltrack = mk_celltrack();
+  gs gr_statep = {clq, &gr, &celltrack};
   bas gr_basics;
-  add_basics({clq, &gr}, *un(&mb->size), 1, &bas);
+  add_basics(gs, *un(&mb->size), 1, &bas);
   gn gr_num = addx(&gr, bas.deref_prec, @[gr_xop]GrWriteConst({get(&bas.pointeecells, 0), ConstInt(bigu(0))}));
-  basics_cleanup({clq, &gr}, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
+  basics_cleanup(gs, &bas, gn, gr_out, gn_out, return_cell_out, arg_cells_out);
   return NoFail;
 }
 
@@ -2149,6 +2167,9 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   case CtorDestroy: { /* don't init padding. */ }
   }
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_info")));
+  celltrack gr_celltrack = mk_celltrack();
+  gs gr_statep = {clq, &gr, &celltrack};
+
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mei->cu_type.x));
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
@@ -2207,9 +2228,9 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     field_end u32 = field_offset + fieldtype_props.flat_size;
     tag_end u32 = enum_tag_offset + tagtype_props.flat_size;
     prepadding_ogn opt[gr_num]
-      = gr_bzero_subcell({clq, &gr}, get(&pointeecells, 0), tag_end, field_offset - tag_end);
+      = gr_bzero_subcell(gs, get(&pointeecells, 0), tag_end, field_offset - tag_end);
     postpadding_ogn opt[gr_num]
-      = gr_bzero_subcell({clq, &gr}, get(&pointeecells, 0), field_end, mei->cu_props.flat_size - field_end);
+      = gr_bzero_subcell(gs, get(&pointeecells, 0), field_end, mei->cu_props.flat_size - field_end);
 
     fieldcella array[cell_num];
     fieldcellgn array[gr_num];
@@ -2369,6 +2390,9 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
   }
 
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_struct_info")));
+  celltrack gr_celltrack = mk_celltrack();
+  gs gr_statep = {clq, &gr, &celltrack};
+
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, msi->cu_type.x));
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
@@ -2498,7 +2522,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
       padding_offset u32;
       padding_count u32;
       postpadding_offset_and_count(&psd, i, &padding_offset, &padding_count);
-      if case Has(bzero_gn gr_num) = gr_bzero_subcell({clq, &gr}, get(&pointeecells, 0), padding_offset, padding_count) {
+      if case Has(bzero_gn gr_num) = gr_bzero_subcell(gs, get(&pointeecells, 0), padding_offset, padding_count) {
         // Should we bzero first or get the fields first?  I'm guessing a naive impl's bzero first is better for CPUs.
         nop2_gn var = seq2(&gr, bzero_gn, field_gn).x;
         field_and_padding_gn = nop2_gn;
@@ -2548,6 +2572,9 @@ func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *
 
 func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cell_out *cell_num) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_enum_construct")));
+  celltrack gr_celltrack = mk_celltrack();
+  gs gr_statep = {clq, &gr, &celltrack};
+
   retnum cell_num = add_cell(&gr, {LocationStatic, mec->return_type, mec->return_type_props});
 
   tagval enum_tag_value = mk_enum_tag_value(mec->constructor_index);
@@ -2565,10 +2592,10 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
   }
 
   prepadding_ogn opt[gr_num]
-    = gr_bzero_subcell({clq, &gr}, retnum, tag_end, field_offset - tag_end);
+    = gr_bzero_subcell(gs, retnum, tag_end, field_offset - tag_end);
   field_end u32 = field_offset + mec->rhs_props.flat_size;
   postpadding_ogn opt[gr_num]
-    = gr_bzero_subcell({clq, &gr}, retnum, field_end, mec->return_type_props.flat_size - field_end);
+    = gr_bzero_subcell(gs, retnum, field_end, mec->return_type_props.flat_size - field_end);
 
   argnum cell_num = add_cell(&gr, {LocationStatic, ~ *argtype, mec->rhs_props});
   retpart cell_num = add_cell(&gr, {LocationVirtual, ~ *argtype, mec->rhs_props});
@@ -2579,7 +2606,7 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
   switch &mec->operational {
   case &EnumConstructMove(cd ctor_desc):
     bi_ctor_gn1 gr_num;
-    if case Printed(pm) = gr_bi_ctor({clq, &gr}, argtype, retpart, argnum, &cd, &bi_ctor_gn1) {
+    if case Printed(pm) = gr_bi_ctor(gs, argtype, retpart, argnum, &cd, &bi_ctor_gn1) {
       return Printed(pm);
     }
     bi_ctor_gn gr_num = addx(&gr, bi_ctor_gn1, @[gr_xop]GrVirtualDead({retpart}));
@@ -2587,12 +2614,12 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   case &EnumConstructCopyDestroy(cdd copy_destroy_desc):
     cpgn1 gr_num;
-    if case Printed(pm) = gr_bi_ctor({clq, &gr}, argtype, retpart, argnum, &cdd.copy_desc, &cpgn1) {
+    if case Printed(pm) = gr_bi_ctor(gs, argtype, retpart, argnum, &cdd.copy_desc, &cpgn1) {
       return Printed(pm);
     }
     cpgn gr_num = addx(&gr, cpgn1, @[gr_xop]GrVirtualDead({retpart}));
     destgn gr_num;
-    if case Printed(pm) = gr_destroy_ctor({clq, &gr}, argtype, argnum, &cdd.destroy_desc, &destgn) {
+    if case Printed(pm) = gr_destroy_ctor(gs, argtype, argnum, &cdd.destroy_desc, &destgn) {
       return Printed(pm);
     }
     ctor_gn = seq2(&gr, cpgn, destgn).x;
@@ -2697,8 +2724,9 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
             ice(_u8("ensure_def_inst_graphed missing 'dire' info"));
           }
           gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
+          celltrack gr_celltrack = { };
           gn gr_num;
-          if case Printed(pm) = gr_live_and_expr_consume({clq, &gr}, &dire.ec, &gn) {
+          if case Printed(pm) = gr_live_and_expr_consume({clq, &gr, &celltrack}, &dire.ec, &gn) {
             inst->graph = FailedComputation;
             return Printed(pm);
           }
