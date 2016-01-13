@@ -487,15 +487,15 @@ func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack]
 func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, outflow sq_num, out *sq_num) np {
   info *ast_goto_statement_info = un(&a->info);
   jmp sq_num = get(&fb->label_gn, info->label_number.x);
-  wn sq_num;
-  if case Printed(pm) = gr_wind_vars(gs, &info->initializations, jmp, &wn) {
+  ww gr_num;
+  if case Printed(pm) = gr_winding(gs, &info->initializations, &ww) {
     return Printed(pm);
   }
   uw gr_num;
   if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
-  un sq_num = seqq(gs.gr, {uw, wn});
+  un sq_num = seqq(gs.gr, {uw, seqq(gs.gr, {ww, jmp})});
   *out = un;
   return NoFail;
 }
@@ -883,8 +883,8 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
 }
 
 // "initializations" is in variable declaration order -- the _same_ order as evaluation.
-func gr_wind_vars(gs gr_statep, initializations *array[init_action], outflow sq_num, out *sq_num) np {
-  bn sq_num = outflow;
+func gr_winding(gs gr_statep, initializations *array[init_action], out *gr_num) np {
+  bn sq_num = nopq(gs.gr);
   n size = count(initializations);
   for i size = n; i > 0; {
     i = i - 1;
@@ -894,7 +894,7 @@ func gr_wind_vars(gs gr_statep, initializations *array[init_action], outflow sq_
     }
     bn = seqq(gs.gr, {gn, bn});
   }
-  *out = bn;
+  *out = bn.x;
   return NoFail;
 }
 
