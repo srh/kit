@@ -322,7 +322,7 @@ func seqN(gr *frame_graph, arr *array[gr_num]) sq_num {
   return build;
 }
 
-func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num, return_cell_out *cell_num) np {
+func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   final_node sq_num = nopq(gs.gr);
 
   info *ast_fullbody_info = un(&x->info);
@@ -366,7 +366,6 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num, return_cell_out *ce
   mut_qnop_node(gs.gr, fb.final_node, return_subcells_dead.x, nopq(gs.gr));
 
   *out = seqop.x;
-  *return_cell_out = info->return_cell;
   return NoFail;
 }
 
@@ -1220,8 +1219,7 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   }
 
   fullbody_gn gr_num;
-  return_cell cell_num;
-  if case Printed(pm) = gr_fullbody(lambda_gs, &a->body, &fullbody_gn, &return_cell) {
+  if case Printed(pm) = gr_fullbody(lambda_gs, &a->body, &fullbody_gn) {
     return Printed(pm);
   }
 
@@ -1232,7 +1230,7 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
     // DBG(_u8("gr_lambda_expr sees leftover live cells"));
   }
 
-  id fn_body_id = add_fn_body(gs.clq->cs, {gs.gr->informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, return_cell}, info->arg_cells, parsed_inline_to_state_inline(a->is_inline), NotComputed})});
+  id fn_body_id = add_fn_body(gs.clq->cs, {gs.gr->informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, info->return_cell}, info->arg_cells, parsed_inline_to_state_inline(a->is_inline), NotComputed})});
   gn var = addx(gs.gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstFnBody(id)}));
   *out = gn;
   return NoFail;
