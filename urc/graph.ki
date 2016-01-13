@@ -284,8 +284,7 @@ struct fullbody_state {
   final_node sq_num;
   // count(&label_gn) == count(&info->labels), they start off as nop nodes until we see the label.
   label_gn array[sq_num];
-  // Cells that are used as return cells.
-  return_cells array[cell_num];
+  return_cell cell_num;
 }
 
 func nopq(gr *frame_graph) sq_num {
@@ -334,7 +333,7 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
     push(&label_gn, ngn);
   }
 
-  fb fullbody_state = {info->all_vars, final_node, label_gn, mk_array@[cell_num]()};
+  fb fullbody_state = {info->all_vars, final_node, label_gn, info->return_cell};
 
   exit_node sq_num = nopq(gs.gr);
   body_gn sq_num;
@@ -349,24 +348,7 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
 
   mut_qnop_node(gs.gr, exit_node, parameter_unwinding, final_node);
 
-  // This assumes it's okay to have a subcell op produce the identical type -- it's the only place we do that.
-  return_subcells_op sq_num = nopq(gs.gr);
-  return_subcells_dead sq_num = nopq(gs.gr);
-  nreturn_cells size = count(&fb.return_cells);
-  for i size = 0; i < nreturn_cells; i = i + 1 {
-    // We pop the subcells in the opposite order that we push them... which might improve compile-times somehow.
-    j size = nreturn_cells - 1 - i;
-    subn var = addx(gs.gr, @[gr_xop]GrSubcell({get(&fb.return_cells, j), info->return_cell, OffsetConst(0)}));
-    return_subcells_op = seqq(gs.gr, {subn, return_subcells_op});
-    deadn var = addx(gs.gr, @[gr_xop]GrVirtualDead({get(&fb.return_cells, i)}));
-    return_subcells_dead = seqq(gs.gr, {deadn, return_subcells_dead});
-  }
-
-  seqop sq_num = seqq(gs.gr, {return_subcells_op.x, body_gn});
-
-  mut_qnop_node(gs.gr, fb.final_node, return_subcells_dead.x, nopq(gs.gr));
-
-  *out = seqop.x;
+  *out = body_gn.x;
   return NoFail;
 }
 
@@ -873,10 +855,14 @@ func gr_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, ou
 func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_statement, out *sq_num) np {
   gn gr_num;
   if case &Has(b box[ast_expr_consume]) = &a->expr {
-    if case Printed(pm) = gr_expr_consume(gs, oo(&b), &gn) {
+    subcell cell_num = result_cell(oo(&b));
+    subcell_live gr_num = addx(gs.gr, @[gr_xop]GrSubcell({subcell, fb->return_cell, OffsetConst(0)}));
+    expr_gn gr_num;
+    if case Printed(pm) = gr_expr_consume(gs, oo(&b), &expr_gn) {
       return Printed(pm);
     }
-    push(&fb->return_cells, result_cell(oo(&b)));
+    subcell_dead gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({subcell}));
+    gn = seq3(gs.gr, subcell_live, expr_gn, subcell_dead).x;
   } else {
     gn = addx(gs.gr, @[gr_xop]GrXNop);
   }
