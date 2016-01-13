@@ -1054,7 +1054,8 @@ func gr_expr(clq *clqueue, gr *frame_graph, x *ast_expr, out *gr_num) np {
     case &Ternary(a ast_ternary):
       return gr_mk_ternary(clq, gr, x, &a, out);
     case &QuickReturn(a ast_quickreturn):
-      return TODO();
+      // TODO(): Implement quick-return graphing.
+      return ERR(_u8("ICE: quick-return expressions not fully implemented"));
   }
 }
 
