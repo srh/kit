@@ -983,79 +983,61 @@ func gr_expr_and_consume(clq *clqueue, gr *frame_graph, x *ast_expr, aft *ast_ex
 func gr_expr(clq *clqueue, gr *frame_graph, x *ast_expr, out *gr_num) np {
   cs *checkstate = clq->cs;
   switch &x->u {
-    case &NameExpr(a ast_name_expr): {
-      return gr_name_expr(clq, gr, x, &a, out);
+  case &NameExpr(a ast_name_expr):
+    return gr_name_expr(clq, gr, x, &a, out);
+  case &ParenExpr(a ast_paren_expr):
+    return gr_expr(clq, gr, oo(&a.expr), out);
+  case &NumericLiteral(a ast_numeric_literal):
+    return gr_literal(clq, gr, x, numeric_literal_value(&a), out);
+  case &BoolLiteral(a ast_bool_literal):
+    value bigint;
+    if a.value {
+      value = ~ @[u32] 1;
+    } else {
+      value = ~ @[u32] 0;
     }
-    case &ParenExpr(a ast_paren_expr): {
-      return gr_expr(clq, gr, oo(&a.expr), out);
-    }
-    case &NumericLiteral(a ast_numeric_literal): {
-      return gr_literal(clq, gr, x, numeric_literal_value(&a), out);
-    }
-    case &BoolLiteral(a ast_bool_literal): {
-      value bigint;
-      if a.value {
-        value = ~ @[u32] 1;
-      } else {
-        value = ~ @[u32] 0;
-      }
-      return gr_literal(clq, gr, x, value, out);
-    }
-    case &VoidLiteral(a ast_void_literal): {
-      value bigint = ~ @[u32] 0;
-      return gr_literal(clq, gr, x, value, out);
-    }
-    case &NullLiteral(a ast_null_literal): {
-      value bigint = ~ @[u32] 0;
-      return gr_literal(clq, gr, x, value, out);
-    }
-    case &CharLiteral(a ast_char_literal): {
-      value bigint = ~ a.charspec.value;
-      return gr_literal(clq, gr, x, value, out);
-    }
+    return gr_literal(clq, gr, x, value, out);
+  case &VoidLiteral(a ast_void_literal):
+    value bigint = ~ @[u32] 0;
+    return gr_literal(clq, gr, x, value, out);
+  case &NullLiteral(a ast_null_literal):
+    value bigint = ~ @[u32] 0;
+    return gr_literal(clq, gr, x, value, out);
+  case &CharLiteral(a ast_char_literal):
+    value bigint = ~ a.charspec.value;
+    return gr_literal(clq, gr, x, value, out);
 
-    case &StringLiteral(a ast_string_literal): {
-      return gr_string_literal(clq, gr, x, &a, out);
-    }
-    case &Funcall(a ast_funcall): {
-      return gr_funcall(clq, gr, x, &a, out);
-    }
-    case &LogicalConjunction(a ast_logical_conjunction): {
-      return gr_logical_conjunction(clq, gr, x, &a, out);
-    }
-    case &Assignment(a ast_assignment): {
-      return gr_assignment(clq, gr, x, &a, out);
-    }
-    case &RefOf(a ast_refof):
-      return gr_mk_refof(clq, gr, x, &a, out);
-    case &AddressOf(a ast_addressof): {
-      return gr_mk_addressof(clq, gr, x, &a, out);
-    }
-    case &Deref(a ast_deref): {
-      return gr_mk_deref(clq, gr, x, &a, out);
-    }
-    case &IndexExpr(a ast_index_expr): {
-      return gr_index_expr(clq, gr, x, &a, out);
-    }
-    case &Lambda(a ast_lambda): {
-      return gr_lambda_expr(clq, gr, x, &a, out);
-    }
-    case &LocalField(a ast_local_field): {
-      return gr_local_field(clq, gr, x, &a, out);
-    }
-    case &DerefField(a ast_deref_field): {
-      return gr_deref_field(clq, gr, x, &a, out);
-    }
-    case &TypedExpr(a ast_typed_expr): {
-      return gr_expr(clq, gr, oo(&a.expr), out);
-    }
-    case &Strinit(a ast_strinit):
-      return gr_mk_strinit(clq, gr, x, &a, out);
-    case &Ternary(a ast_ternary):
-      return gr_mk_ternary(clq, gr, x, &a, out);
-    case &QuickReturn(a ast_quickreturn):
-      // TODO(): Implement quick-return graphing.
-      return ERR(_u8("ICE: quick-return expressions not fully implemented"));
+  case &StringLiteral(a ast_string_literal):
+    return gr_string_literal(clq, gr, x, &a, out);
+  case &Funcall(a ast_funcall):
+    return gr_funcall(clq, gr, x, &a, out);
+  case &LogicalConjunction(a ast_logical_conjunction):
+    return gr_logical_conjunction(clq, gr, x, &a, out);
+  case &Assignment(a ast_assignment):
+    return gr_assignment(clq, gr, x, &a, out);
+  case &RefOf(a ast_refof):
+    return gr_mk_refof(clq, gr, x, &a, out);
+  case &AddressOf(a ast_addressof):
+    return gr_mk_addressof(clq, gr, x, &a, out);
+  case &Deref(a ast_deref):
+    return gr_mk_deref(clq, gr, x, &a, out);
+  case &IndexExpr(a ast_index_expr):
+    return gr_index_expr(clq, gr, x, &a, out);
+  case &Lambda(a ast_lambda):
+    return gr_lambda_expr(clq, gr, x, &a, out);
+  case &LocalField(a ast_local_field):
+    return gr_local_field(clq, gr, x, &a, out);
+  case &DerefField(a ast_deref_field):
+    return gr_deref_field(clq, gr, x, &a, out);
+  case &TypedExpr(a ast_typed_expr):
+    return gr_expr(clq, gr, oo(&a.expr), out);
+  case &Strinit(a ast_strinit):
+    return gr_mk_strinit(clq, gr, x, &a, out);
+  case &Ternary(a ast_ternary):
+    return gr_mk_ternary(clq, gr, x, &a, out);
+  case &QuickReturn(a ast_quickreturn):
+    // TODO(): Implement quick-return graphing.
+    return ERR(_u8("ICE: quick-return expressions not fully implemented"));
   }
 }
 
