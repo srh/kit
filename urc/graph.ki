@@ -902,9 +902,8 @@ func gr_wind_vars(gs gr_statep, initializations *array[init_action], outflow sq_
   return NoFail;
 }
 
-// "destructions" is in variable declaration order -- the _opposite_ order of evaluation.
-func gr_unwind_vars(gs gr_statep, destructions *array[var_destruction], outflow sq_num, out *sq_num) np {
-  bn sq_num = outflow;
+func gr_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_num) np {
+  bn sq_num = nopq(gs.gr);
   n size = count(destructions);
   for i size = 0; i < n; i = i + 1 {
     gn gr_num;
@@ -918,7 +917,17 @@ func gr_unwind_vars(gs gr_statep, destructions *array[var_destruction], outflow 
     }
     bn = seqq(gs.gr, {gn, bn});
   }
-  *out = bn;
+  *out = bn.x;
+  return NoFail;
+}
+
+// "destructions" is in variable declaration order -- the _opposite_ order of evaluation.
+func gr_unwind_vars(gs gr_statep, destructions *array[var_destruction], outflow sq_num, out *sq_num) np {
+  un gr_num;
+  if case Printed(pm) = gr_unwinding(gs, destructions, &un) {
+    return Printed(pm);
+  }
+  *out = seqq(gs.gr, {un, outflow});
   return NoFail;
 }
 
