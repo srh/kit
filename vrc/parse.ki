@@ -301,13 +301,13 @@ func parse_rest_of_defstruct(p *ps, out *ast_toplevel) parse_result {
 func parse_rest_of_defenum(p *ps, out *ast_toplevel) parse_result {
   generics ast_generics;
   name ast_ident;
-  enumfields array[ast_vardecl];
+  constructors array[ast_defenum_constructor];
   if !(+parse_generics_if_present(p, &generics)
        && +parse_ident(p, &name)
-       && +parse_braced_fields(p, &enumfields)) {
+       && +parse_defenum_constructors(p, &constructors)) {
     return Fail;
   }
-  *out = TypeDef({generics, name, DefenumRhs({enumfields})});
+  *out = TypeDef({generics, name, DefenumRhs({constructors})});
   return Success;
 }
 
@@ -410,7 +410,7 @@ func parse_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) parse_resu
 }
 
 func triparse_ident(p *ps, out *ast_ident) triparse_result {
-  dbgparse("try_parse_ident\n");
+  dbgparse("triparse_ident\n");
   switch peek(p)->val {
   case Ident(text shray[i32]):
     m ast_meta = startend(p);
@@ -749,6 +749,38 @@ func parse_braced_fields(p *ps, out *array[ast_vardecl]) parse_result {
   }
 }
 
+func parse_defenum_constructors(p *ps, out *array[ast_defenum_constructor]) parse_result {
+  if ! +try_skip_token(p, @[tokval]Grouper(LBrace)) {
+    return Fail;
+  }
+  seen_success_disposition bool = false;
+  constructors array[ast_defenum_constructor];
+  for ;; {
+    if +try_skip_token(p, @[tokval]Grouper(RBrace)) {
+      swap(out, &constructors);
+      return Success;
+    }
+
+    disposition ast_defenum_constructor_disposition;
+    if +try_skip_oper(p, '#') {
+      if seen_success_disposition {
+        return Fail;
+      }
+      seen_success_disposition = true;
+      disposition = SuccessCase;
+    } else {
+      disposition = GeneralCase;
+    }
+
+    decl ast_vardecl;
+    if !(+parse_vardecl(p, AllowBlanksNo, &decl)
+         && +try_skip_oper(p, ';')) {
+      return Fail;
+    }
+    push(&constructors, {disposition, decl});
+  }
+}
+
 func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) parse_result {
   name ast_ident;
   if ! +parse_ident(p, &name) {
@@ -994,6 +1026,8 @@ func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_e
     return mk(m, @[ast_expr_enum]RefOf({embox(rhs)}));
   } else if op.value == im->cym.derefsym {
     return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(&rhs))}));
+  } else if op.value == im->cym.quickreturnsym {
+    return mk(m, @[ast_expr_enum]QuickReturn({embox(rhs)}));
   } else {
     return mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))), mk_array(consume(&rhs))}));
   }
@@ -1220,10 +1254,10 @@ func unop_info(operch *shray[i32]) opt[i32] {
   if nch == 1 {
     ch0 i32 = get(operch, 0);
     if ch0 == '~' || ch0 == '*' || ch0 == '&'
-       || ch0 == '-' || ch0 == '!' || ch0 == '^' || ch0 == '+' {
+       || ch0 == '-' || ch0 == '!' || ch0 == '^' || ch0 == '+' || ch0 == '#' {
       return Has(905);
     }
-  } else if nch == 2{
+  } else if nch == 2 {
     if get(operch, 0) == '&' && get(operch, 1) == '&' {
       return Has(905);
     }
@@ -1931,6 +1965,10 @@ func test_parse() bool {
                                _u8("enum foo { x y; z int; t fn[beh]; }"));
   pass = pass & run_parse_test(_u8("p046-c"),
                                _u8("enum foo { x y; z int; t fn[beh]; }"));
+  pass = pass & run_parse_test(_u8("p046-d"),
+                               _u8("enum foo { x y; #z int; t fn[beh]; }"));
+  pass = pass & run_parse_negtest(_u8("p046-e"),
+                                  _u8("enum foo { x y; #z int; #t fn[beh]; }"));
   pass = pass & run_parse_test(_u8("p048-a"),
                                _u8("struct[] foo {x bar [quux]; }\n"));
   pass = pass & run_parse_negtest(_u8("p048-b"),

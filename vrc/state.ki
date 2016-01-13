@@ -261,18 +261,21 @@ struct cu_typrop {
   props type_properties;
 }
 
-struct deftype_inst_rhsstruct_info {
-  rhs_structspec te_struct;
+// structspec and enumspec have to be "value types" like the te_... types.
+struct structspec {
+  fields shray[te_vardecl];
 }
 
-struct deftype_inst_rhsenum_info {
-  rhs_enumspec te_enum;
+// enumspec has to be a "value type" like the te_... types.  See how it's used in ast.ki.
+struct enumspec {
+  constructors shray[te_vardecl];
+  success_case_ix opt[size];
 }
 
 enum deftype_inst_rhs_info {
   // Also used for defclasses.
-  RhsStructInfo deftype_inst_rhsstruct_info;
-  RhsEnumInfo deftype_inst_rhsenum_info;
+  RhsStructInfo structspec;
+  RhsEnumInfo enumspec;
 }
 
 struct deftype_inst_info {
@@ -286,23 +289,15 @@ struct deftype_inst {
   info nbfc[deftype_inst_info];
 }
 
-struct defstruct_rhs_spec {
-  fields shray[te_vardecl];
-}
-
-struct defenum_rhs_spec {
-  constructors shray[te_vardecl];
-}
-
 struct classexpr_rhs_spec {
   disposition ast_defclass_disposition;
-  drs defstruct_rhs_spec;
+  drs structspec;
 }
 
 enum deftype_rhs_spec {
   ClassexprRhsSpec classexpr_rhs_spec;
-  DefstructRhsSpec defstruct_rhs_spec;
-  DefenumRhsSpec defenum_rhs_spec;
+  DefstructRhsSpec structspec;
+  DefenumRhsSpec enumspec;
 }
 
 struct deftype_nonprim {
@@ -647,7 +642,7 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
   }
 }
 
-func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *te_struct, out *type_properties) np {
+func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *structspec, out *type_properties) np {
   cs *checkstate = clq->cs;
   it te_typeexpr = inst_type(cs, ent_id, inst_id);
   switch a {

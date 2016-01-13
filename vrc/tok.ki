@@ -421,6 +421,9 @@ func grab_tok(p *ps) tok {
       } else if ch == '\"' {
         ps_step(p);
         return mk_res(p, left, @[tokval]Grouper(DoubleQuote));
+      } else if ch == '#' {
+        ps_step(p);
+        return mk_res(p, left, @[tokval]Oper(mk_shray(ch)));
       } else if ch == '%' {
         return grab_oper2(p, left, ch, '=');
       } else if ch == '&' {

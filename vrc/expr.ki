@@ -21,13 +21,17 @@ struct framescope {
   // Used for auto-generating $frame_1, $frame_2, ... lifetimes.
   lifetime_gen_counter size;
 
+  // The return type... if we're in a body that has a return type -- used for QuickReturn expressions.
+  return_type opt[*cu_typeexpr];
+
   gr frame_graph;
 }
 
-func mk(ds *defscope) framescope {
+func mk(ds *defscope, return_type opt[*cu_typeexpr]) framescope {
   return {ds, ds->cs, ds->im, ds->clq,
           mk_array@[var_info](), mk_array@[var_number](),
           0,
+          return_type,
           init_frame_graph_empty(ds->def_informal_name)};
 }
 
@@ -203,9 +207,9 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
   return NoFail;
 }
 
-func check_expr(clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *idy_repls, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
+func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *idy_repls, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
   ds defscope = {clq->cs, clq->im, clq, accessible, g, parms, def_informal_name};
-  es framescope = mk(&ds);
+  es framescope = mk(&ds, None);
   if case Printed(pm) = check_expr_consume(&es, x, pt) {
     return Printed(pm);
   }
@@ -268,7 +272,7 @@ struct voidconstructed_info {
   // The actual constructed type, which we need for some reason.
   constructed_type cu_typeexpr;
   // The enum type (the structural rhs of constructed_type).
-  et te_enum;
+  et enumspec;
   constructor_tag enum_tag_value;
 }
 
@@ -303,8 +307,8 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       *res_out = AmbigMatchConstructor;
       return NoFail;
     }
-    et *te_enum;
-    switch structural_enum_type(ds, pt, &et) {
+    et *enumspec;
+    switch structural_enumspec(ds, pt, &et) {
     case Error(pm):
       return Printed(pm);
     case Success: { }
@@ -336,8 +340,8 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     *res_out = AmbigMatchConstructor;
     return NoFail;
   }
-  et *te_enum;
-  switch structural_enum_type(ds, &cac_return_type.te, &et) {
+  et *enumspec;
+  switch structural_enumspec(ds, &cac_return_type.te, &et) {
   case Error(pm):
     return Printed(pm);
   case Success: { }
@@ -374,7 +378,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
 }
 
 // return_type is the return type of ctor_type.  Both are complete and computed.
-func lookup_or_make_enum_constructor_def(ds *defscope, et *te_enum, return_type *te_typeexpr, ctor_type *te_typeexpr, decl_index size, out *instpair) np {
+func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type *te_typeexpr, ctor_type *te_typeexpr, decl_index size, out *instpair) np {
   defname_u8 array[u8] = _u8("$magic_enum_ctor_");
   build_u8str(void, &defname_u8, &decl_index);
   defname sym = intern(ds->im, from_u8(defname_u8));
@@ -640,6 +644,120 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
 
     case &Ternary(a ast_ternary):
       return check_expr_ternary(es, ai, &a, pt, x);
+
+    case &QuickReturn(a ast_quickreturn):
+      return check_expr_quickreturn(es, ai, &a, pt, x);
+  }
+}
+
+func success_enum_case_info(es *framescope, cu *cu_typeexpr, success_case_ix_out *size, constructors **shray[te_vardecl]) np {
+  et *enumspec;
+  switch structural_enumspec(es->ds, &cu->x, &et) {
+  case Error(pm):
+    return Printed(pm);
+  case Success:
+    if case Has(ix size) = et->success_case_ix {
+      *success_case_ix_out = ix;
+      *constructors = &et->constructors;
+      return NoFail;
+    } else {
+      return ERR(_u8("Bad type (enum without success case) in quick-return"));
+    }
+  case NotAccessible:
+    return ERR(_u8("Bad type (not enum) in quick-return"));
+  }
+}
+
+func structurally_convertible_in_non_success(es *framescope, rhs_success_ix size, rhs_constructors *shray[te_vardecl], return_type *cu_typeexpr, out *bool) np {
+  return_success_ix size;
+  return_constructors *shray[te_vardecl];
+  if case Printed(pm) = success_enum_case_info(es, return_type, &return_success_ix, &return_constructors) {
+    return Printed(pm);
+  }
+
+  // For now we're going to be uber-restrictive and require exactly the same constructor ordering (and of course exactly the same enum case types).  "Structurally convertible" is designed around generic enum types like opt[T] or cr[T].
+
+  n size = count(rhs_constructors);
+  if n != count(return_constructors) || rhs_success_ix != return_success_ix {
+    *out = false;
+    return NoFail;
+  }
+
+  for i size = 0; i < n; i = i + 1 {
+    if i != rhs_success_ix {
+      rhs_constructor *te_vardecl = ref(rhs_constructors, i);
+      return_constructor *te_vardecl = ref(return_constructors, i);
+      if rhs_constructor->name != return_constructor->name {
+        *out = false;
+        return NoFail;
+      }
+      if !help_idy_typeexpr_equal(&rhs_constructor->type, &return_constructor->type) {
+        *out = false;
+        return NoFail;
+      }
+    }
+  }
+
+  *out = true;
+  return NoFail;
+}
+
+func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickreturn, pt *te_typeexpr, x *ast_expr) np {
+  if case Has(return_type *cu_typeexpr) = es->return_type {
+    // In order for a quickreturn expression to be valid, the following must be true:
+    //   a. the rhs must be an enum type with a success case
+    //   b. the pt must be the success case's inside type
+    //   c. the return type of the fullbody we're in must be an enum type that is "structurally convertible in the non-success cases" from the rhs enum type.  For example, opt[foo] is structurally convertible (in the non-success cases) from opt[bar].
+    //
+    // Because the rhs can be _any_ enum type, for now we'll evaluate the rhs with no pt, and AllowIncompleteNo, and then see if that matches up with the lhs.  Eventually we can implement "looking through the enum" logic -- that will be necessary for arithmetic overflow.
+
+    rhs_pt te_typeexpr = TeUnknown;
+    if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), &rhs_pt) {
+      return Printed(pm);
+    }
+
+    rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
+
+    success_case_ix size;
+    constructors *shray[te_vardecl];
+    if case Printed(pm) = success_enum_case_info(es, &rhs_info->cu, &success_case_ix, &constructors) {
+      return Printed(pm);
+    }
+
+    success_case_type *te_typeexpr = &ref(constructors, success_case_ix)->type;
+
+    unified te_typeexpr;
+    if !unify_types(pt, success_case_type, &unified) {
+      return ERR(_u8("quick-return expr has bad type"));
+    }
+
+    is_structurally_convertible bool;
+    if case Printed(pm) = structurally_convertible_in_non_success(es, success_case_ix, constructors, return_type, &is_structurally_convertible) {
+      return Printed(pm);
+    }
+    if !is_structurally_convertible {
+      return ERR(_u8("quick-return types not structurally convertible"));
+    }
+
+    success_case_cu cu_typeexpr = ~ *success_case_type;
+    success_case_props type_properties;
+    if case Printed(pm) = compute_type_properties(es->clq, &success_case_cu, &success_case_props) {
+      return Printed(pm);
+    }
+
+    lval is_lval;
+    switch &rhs_info->lval {
+    case &IsLvalYes(desc lval_description):
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, success_case_cu, success_case_props}), DeadMe, enum_field_lifetime(desc.lifetime)});
+    case &IsLvalNo(desc rval_description):
+      lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, success_case_cu, success_case_props})});
+    }
+
+    annotate_info(x, CompleteCheck(mk(lval, success_case_cu, success_case_props)));
+    // TODO(): We'll need some more info for graph gen to use, I think.
+    return NoFail;
+  } else {
+    return ERR(_u8("quick-return expression outside body"));
   }
 }
 
@@ -785,6 +903,11 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
 
 // Right now fields have the same lifetime as what they're part of -- they're part of the same object!  So, having equal lifetimes does not mean you're the same object.
 func field_lifetime(outer_lifetime te_typeexpr) te_typeexpr {
+  return outer_lifetime;
+}
+
+// This is halfway B.S. the same way that field_lifetime is.
+func enum_field_lifetime(outer_lifetime te_typeexpr) te_typeexpr {
   return outer_lifetime;
 }
 
@@ -1342,8 +1465,8 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
     return NoFail;
   } else {
-    b *te_struct;
-    switch structural_struct_type(es->ds, pt, &b) {
+    b *structspec;
+    switch structural_structspec(es->ds, pt, &b) {
     case Error(pm):
       return Printed(pm);
     case Success: { }
@@ -1601,11 +1724,10 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
   return NoFail;
 }
 
-// st_out is just the inside te_struct of struct_type_out.  Some caller wants it.
-func structural_struct_type(ds *defscope, t *te_typeexpr, st_out **te_struct) structural_rhs_result {
+func structural_structspec(ds *defscope, t *te_typeexpr, st_out **structspec) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
-    st *te_struct;
-    switch help_structural_struct_type(ds, &pack, &st) {
+    st *structspec;
+    switch help_structural_structspec(ds, &pack, &st) {
     case Error(pm):
       return Error(pm);
     case Success:
@@ -1621,10 +1743,10 @@ func structural_struct_type(ds *defscope, t *te_typeexpr, st_out **te_struct) st
 }
 
 // et_out is set to a complete/computed value.
-func structural_enum_type(ds *defscope, t *te_typeexpr, et_out **te_enum) structural_rhs_result {
+func structural_enumspec(ds *defscope, t *te_typeexpr, et_out **enumspec) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
-    et *te_enum;
-    switch help_structural_enum_type(ds, &pack, &et) {
+    et *enumspec;
+    switch help_structural_enumspec(ds, &pack, &et) {
     case Error(pm):
       return Error(pm);
     case Success:
@@ -1662,10 +1784,10 @@ func deftype_rhs_info_accessible(ds *defscope, id deftype_entry_id, result_out *
       }
       *result_out = false;
       return NoFail;
-    case &DefstructRhsSpec(drs defstruct_rhs_spec):
+    case &DefstructRhsSpec(drs structspec):
       *result_out = true;
       return NoFail;
-    case &DefenumRhsSpec(drs defenum_rhs_spec):
+    case &DefenumRhsSpec(drs enumspec):
       *result_out = true;
       return NoFail;
     }
@@ -1728,17 +1850,17 @@ func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **de
   }
 }
 
-func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **te_enum) structural_rhs_result {
+func help_structural_enumspec(ds *defscope, pack *te_instpack, et_out **enumspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
     return Error(pm);
   case Success:
     switch rhs_info {
-    case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
+    case &RhsStructInfo(ri structspec):
       return NotAccessible;
-    case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
-      *et_out = &ri.rhs_enumspec;
+    case &RhsEnumInfo(ri enumspec):
+      *et_out = &ri;
       return Success;
     }
   case NotAccessible:
@@ -1746,17 +1868,17 @@ func help_structural_enum_type(ds *defscope, pack *te_instpack, et_out **te_enum
   }
 }
 
-func help_structural_struct_type(ds *defscope, pack *te_instpack, st_out **te_struct) structural_rhs_result {
+func help_structural_structspec(ds *defscope, pack *te_instpack, st_out **structspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
     return Error(pm);
   case Success:
     switch rhs_info {
-    case &RhsStructInfo(ri deftype_inst_rhsstruct_info):
-      *st_out = &ri.rhs_structspec;
+    case &RhsStructInfo(ri structspec):
+      *st_out = &ri;
       return Success;
-    case &RhsEnumInfo(ri deftype_inst_rhsenum_info):
+    case &RhsEnumInfo(ri enumspec):
       return NotAccessible;
     }
   case NotAccessible:
@@ -1765,8 +1887,8 @@ func help_structural_struct_type(ds *defscope, pack *te_instpack, st_out **te_st
 }
 
 func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
-  st *te_struct;
-  switch help_structural_struct_type(es->ds, pack, &st) {
+  st *structspec;
+  switch help_structural_structspec(es->ds, pack, &st) {
   case Error(pm):
     return Printed(pm);
   case Success:
@@ -1776,7 +1898,7 @@ func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, 
   }
 }
 
-func help_lookup_struct_field(es *framescope, st *te_struct, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+func help_lookup_struct_field(es *framescope, st *structspec, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   offset u32;
   if case Printed(pm) = lookup_field_from_list(es->clq, &st->fields, fieldname->value, fieldtype_out, &offset) {
     return Printed(pm);

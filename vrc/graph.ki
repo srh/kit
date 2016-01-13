@@ -1053,6 +1053,9 @@ func gr_expr(clq *clqueue, gr *frame_graph, x *ast_expr, out *gr_num) np {
       return gr_mk_strinit(clq, gr, x, &a, out);
     case &Ternary(a ast_ternary):
       return gr_mk_ternary(clq, gr, x, &a, out);
+    case &QuickReturn(a ast_quickreturn):
+      // TODO(): Implement quick-return graphing.
+      return ERR(_u8("ICE: quick-return expressions not fully implemented"));
   }
 }
 
@@ -2159,7 +2162,7 @@ func gr_magic_enum_info(cs *checkstate, clq *clqueue, wc which_ctor, mei *magic_
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
 
-  et *te_enum = &mei->et;
+  et *enumspec = &mei->et;
 
   tagtype cu_typeexpr;
   tagtype_props type_properties;
@@ -2378,7 +2381,7 @@ func gr_magic_struct_info(cs *checkstate, clq *clqueue, wc which_ctor, msi *magi
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(clq->cs));
 
-  st *te_struct = &msi->st;
+  st *structspec = &msi->st;
 
   psd partial_struct_data;
   if case Printed(pm) = compute_partial_struct_data(clq, &st->fields, None, &psd) {

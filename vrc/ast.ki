@@ -344,7 +344,7 @@ enum ast_statement_enum {
 struct ast_cp_info {
   ovn opt[var_number];
   tag_value enum_tag_value;
-  // enum_field_offset(cs, et, tag_value) -- annotated here because getting a te_enum in graph.ki is needlessly annoying.
+  // enum_field_offset(cs, et, tag_value) -- annotated here because getting a enum constructors info in graph.ki is needlessly annoying.
   field_offset u32;
 }
 
@@ -452,7 +452,7 @@ struct enum_constructor_info {
 struct enum_voidconstructed_info {
   constructor_tag enum_tag_value;
   // The structural rhs type of the enum being constructed.
-  et te_enum;
+  et enumspec;
 }
 
 enum ast_name_expr_info {
@@ -517,6 +517,10 @@ struct ast_ternary {
   condition box[ast_expr_condition];
   then_clause box[ast_expr_consume];
   else_clause box[ast_expr_consume];
+}
+
+struct ast_quickreturn {
+  rhs box[ast_expr];
 }
 
 // Is a non-lval an rval?  Okay.
@@ -727,6 +731,7 @@ enum ast_expr_enum {
   TypedExpr ast_typed_expr;
   Strinit ast_strinit;
   Ternary ast_ternary;
+  QuickReturn ast_quickreturn;
 }
 
 func mk(m ast_meta, x ast_expr_enum) ast_expr {
@@ -829,8 +834,19 @@ struct ast_defstruct_rhs {
   fields array[ast_vardecl];
 }
 
+enum ast_defenum_constructor_disposition {
+  SuccessCase void;
+  GeneralCase void;
+}
+
+struct ast_defenum_constructor {
+  // Only one constructor is allowed to have one of these be Success.
+  disposition ast_defenum_constructor_disposition;
+  decl ast_vardecl;
+}
+
 struct ast_defenum_rhs {
-  constructors array[ast_vardecl];
+  constructors array[ast_defenum_constructor];
 }
 
 enum ast_type_def_rhs {

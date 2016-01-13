@@ -46,14 +46,6 @@ struct te_typeapp {
   pack opt[te_instpack];
 }
 
-struct te_struct {
-  fields shray[te_vardecl];
-}
-
-struct te_enum {
-  constructors shray[te_vardecl];
-}
-
 struct te_union {
   fields shray[te_vardecl];
 }
@@ -170,7 +162,7 @@ func help_te_vardecl_list_equal(a *shray[te_vardecl], b *shray[te_vardecl]) bool
   return true;
 }
 
-func enum_tag_type(cs *checkstate, et *te_enum) te_typeexpr {
+func enum_tag_type(cs *checkstate, et *enumspec) te_typeexpr {
   tagsize u32 = cs->plat.enum_tag_size;
   if tagsize == 4 {
     return primitive_u32_type(cs);
@@ -187,7 +179,7 @@ func enum_tag_type(cs *checkstate, et *te_enum) te_typeexpr {
 struct enum_tag_value { x u32; }
 def `~` fn[u32, enum_tag_value] = wrapconvert;
 
-func enum_field_offset(cs *checkstate, et *te_enum, tag enum_tag_value) u32 {
+func enum_field_offset(cs *checkstate, et *enumspec, tag enum_tag_value) u32 {
   // Things will get more complicated at some point.
   return cs->plat.enum_tag_size;
 }
@@ -237,18 +229,6 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeapp) void {
   build_u8str(help, r, &a->typefunc);
   append(r, _u8(",params:"));
   build_shray_u8str(help, r, &a->params);
-  push(r, '}');
-}
-
-func[H] build_u8str(help H, r *array[u8], a *te_struct) void {
-  append(r, _u8("{fields:"));
-  build_shray_u8str(help, r, &a->fields);
-  push(r, '}');
-}
-
-func[H] build_u8str(help H, r *array[u8], a *te_enum) void {
-  append(r, _u8("{constructors:"));
-  build_shray_u8str(help, r, &a->constructors);
   push(r, '}');
 }
 

@@ -122,6 +122,28 @@ func convert_vardecl_list(cs *checkstate, arr *array[ast_vardecl], out *array[te
   return NoFail;
 }
 
+func convert_defenum_constructor_list(cs *checkstate, arr *array[ast_defenum_constructor], decls_out *array[te_vardecl], success_case_ix_out *opt[size]) np {
+  build array[te_vardecl];
+  n size = count(arr);
+  reserve(&build, n);
+  success_case_ix opt[size] = None;
+  for i size = 0; i < n; i = i + 1 {
+    elem *ast_defenum_constructor = ref(arr, i);
+    vd te_vardecl;
+    if case Printed(pm) = convert_vardecl(cs, &elem->decl, &vd) {
+      return Printed(pm);
+    }
+    if case SuccessCase = elem->disposition {
+      // Parsing's supposed to only allow one success case, this assert verifies.
+      set(&success_case_ix, i);
+    }
+    push(&build, vd);
+  }
+  swap(decls_out, &build);
+  *success_case_ix_out = success_case_ix;
+  return NoFail;
+}
+
 func convert_vardecl(cs *checkstate, a *ast_vardecl, out *te_vardecl) np {
   type te_typeexpr;
   if case Printed(pm) = convert_typeexpr(cs, &a->type, &type) {
@@ -265,12 +287,13 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
         }
         return NoFail;
       case &DefenumRhs(a ast_defenum_rhs):
+        success_case_ix opt[size];
         constructors array[te_vardecl];
-        if case Printed(pm) = convert_vardecl_list(cs, &a.constructors, &constructors) {
+        if case Printed(pm) = convert_defenum_constructor_list(cs, &a.constructors, &constructors, &success_case_ix) {
           np->rhs = FailedComputation;
           return Printed(pm);
         }
-        np->rhs = Computed(@[deftype_rhs_spec]DefenumRhsSpec({freeze(&constructors)}));
+        np->rhs = Computed(@[deftype_rhs_spec]DefenumRhsSpec({freeze(&constructors), success_case_ix}));
         if case &Computed(b deftype_rhs_spec) = &np->rhs {
           *out = &b;
         } else {
@@ -410,7 +433,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         }
         case &InstRhsExpr(rhs def_inst_rhs_expr): {
           info frame_info;
-          if case Printed(pm) = check_expr(clq, ent->accessible, &ent->generics, &inst->parms.repls, &rhs.ec, &typrop->cu.x, ent->def_name, &info) {
+          if case Printed(pm) = check_def_expr(clq, ent->accessible, &ent->generics, &inst->parms.repls, &rhs.ec, &typrop->cu.x, ent->def_name, &info) {
             return Printed(pm);
           }
           annotate(&rhs.frame_info, move(&info));
@@ -950,8 +973,8 @@ func mask_level(mask u32, bit u32, level behavior_level) behavior_level {
 }
 
 // st had better be complete and computed.
-// Realtype is the name (or app) type (a struct or defclass) whose fields the te_struct specifies.
-func compute_complete_struct_properties(clq *clqueue, st *te_struct, realtype *te_typeexpr, constructor_mask u32, out *type_properties) np {
+// Realtype is the name (or app) type (a struct or defclass) whose fields the structspec specifies.
+func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *te_typeexpr, constructor_mask u32, out *type_properties) np {
   psd partial_struct_data;
   if case Printed(pm) = compute_partial_struct_data(clq, &st->fields, None, &psd) {
     return Printed(pm);
@@ -966,7 +989,7 @@ func compute_complete_struct_properties(clq *clqueue, st *te_struct, realtype *t
   return NoFail;
 }
 
-func compute_complete_enum_properties(clq *clqueue, et *te_enum, realtype *te_typeexpr, out *type_properties) np {
+func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_typeexpr, out *type_properties) np {
   tag_size u32 = clq->cs->plat.enum_tag_size;
   max_size u32 = tag_size;
   max_alignment u32 = tag_size;
@@ -1226,16 +1249,16 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(rhs_fields_complete);
 
           check(isBeganComputing(&inst->info));
-          st te_struct = {freeze(&rhs_fields)};
+          st structspec = {freeze(&rhs_fields)};
 
           class_props type_properties;
           if case Printed(pm) = to_defclass_properties(clq, ent_id, id, crs.disposition,&st, &class_props) {
             inst->info = FailedComputation;
             return Printed(pm);
           }
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({st})), class_props});
+          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo(st)), class_props});
 
-        case &DefstructRhsSpec(drs defstruct_rhs_spec):
+        case &DefstructRhsSpec(drs structspec):
           rhs_fields array[te_vardecl];
           rhs_fields_complete bool;
 
@@ -1246,7 +1269,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(rhs_fields_complete);
 
           check(isBeganComputing(&inst->info));
-          st te_struct = {freeze(&rhs_fields)};
+          st structspec = {freeze(&rhs_fields)};
 
           it te_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
@@ -1256,9 +1279,9 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           }
           check(isBeganComputing(&inst->info));
 
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo({st})), rhs_props});
+          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo(st)), rhs_props});
 
-        case &DefenumRhsSpec(drs defenum_rhs_spec):
+        case &DefenumRhsSpec(drs enumspec):
           rhs_constructors array[te_vardecl];
           rhs_constructors_complete bool;
 
@@ -1269,7 +1292,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(rhs_constructors_complete);
 
           check(isBeganComputing(&inst->info));
-          et te_enum = {freeze(&rhs_constructors)};
+          et enumspec = {freeze(&rhs_constructors), drs.success_case_ix};
 
           it te_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
@@ -1279,7 +1302,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           }
           check(isBeganComputing(&inst->info));
 
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsEnumInfo({et})), rhs_props});
+          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsEnumInfo(et)), rhs_props});
 
         }
       } else {
