@@ -360,9 +360,11 @@ struct breakgrack {
 
 func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, outflow sq_num, out *sq_num) np {
   bn sq_num;
-  if case Printed(pm) = gr_unwind_vars(gs, &un(&x->info)->destructions, outflow, &bn) {
+  uw gr_num;
+  if case Printed(pm) = gr_unwinding(gs, &un(&x->info)->destructions, &uw) {
     return Printed(pm);
   }
+  bn = seqq(gs.gr, {uw, outflow});
   n size = count(&x->statements);
   for i size = n; i > 0; {
     i = i - 1;
@@ -462,20 +464,22 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
 
 func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, outflow sq_num, out *sq_num) np {
   info *ast_break_statement_info = un(&a->info);
-  un sq_num;
-  if case Printed(pm) = gr_unwind_vars(gs, &info->destructions, unHas(&obg)->break_target, &un) {
+  uw gr_num;
+  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
+  un sq_num = seqq(gs.gr, {uw, unHas(&obg)->break_target});
   *out = un;
   return NoFail;
 }
 
 func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, outflow sq_num, out *sq_num) np {
   info *ast_continue_statement_info = un(&a->info);
-  un sq_num;
-  if case Printed(pm) = gr_unwind_vars(gs, &info->destructions, unHas(&obg)->continue_target, &un) {
+  uw gr_num;
+  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
+  un sq_num= seqq(gs.gr, {uw, unHas(&obg)->continue_target});
   *out = un;
   return NoFail;
 }
@@ -487,10 +491,11 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
   if case Printed(pm) = gr_wind_vars(gs, &info->initializations, jmp, &wn) {
     return Printed(pm);
   }
-  un sq_num;
-  if case Printed(pm) = gr_unwind_vars(gs, &info->destructions, wn, &un) {
+  uw gr_num;
+  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
+  un sq_num = seqq(gs.gr, {uw, wn});
   *out = un;
   return NoFail;
 }
@@ -643,10 +648,11 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
       return Printed(pm);
     }
 
-    initseq sq_num;
-    if case Printed(pm) = gr_unwind_vars(gs, &un(&a->info)->initter_destructions, outflow, &initseq) {
+    initter_uw gr_num;
+    if case Printed(pm) = gr_unwinding(gs, &un(&a->info)->initter_destructions, &initter_uw) {
       return Printed(pm);
     }
+    initseq sq_num = seqq(gs.gr, {initter_uw, outflow});
 
     exitseq var = seqq(gs.gr, {loopexitgn, initseq});
 
@@ -892,6 +898,7 @@ func gr_wind_vars(gs gr_statep, initializations *array[init_action], outflow sq_
   return NoFail;
 }
 
+// "destructions" is in variable declaration order -- the _opposite_ order of evaluation.
 func gr_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_num) np {
   bn sq_num = nopq(gs.gr);
   n size = count(destructions);
@@ -908,16 +915,6 @@ func gr_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_nu
     bn = seqq(gs.gr, {gn, bn});
   }
   *out = bn.x;
-  return NoFail;
-}
-
-// "destructions" is in variable declaration order -- the _opposite_ order of evaluation.
-func gr_unwind_vars(gs gr_statep, destructions *array[var_destruction], outflow sq_num, out *sq_num) np {
-  un gr_num;
-  if case Printed(pm) = gr_unwinding(gs, destructions, &un) {
-    return Printed(pm);
-  }
-  *out = seqq(gs.gr, {un, outflow});
   return NoFail;
 }
 
