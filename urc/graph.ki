@@ -190,6 +190,13 @@ func add(bu *sq_builder, gn gr_num) void {
   bu->last = next;
 }
 
+func mut_connect(bu *sq_builder, outflow sq_num) void {
+  gr *frame_graph = bu->gr;
+  check(gr != null);
+  mut_qnop_node(gr, bu->last, {@[gr_qop]GrJmp({outflow})});
+  bu->gr = null;
+}
+
 func done(bu *sq_builder) gr_num {
   bu->gr = null;
   return bu->first.x;
@@ -384,12 +391,9 @@ struct breakgrack {
 }
 
 func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, outflow sq_num, out *sq_num) np {
-  bn sq_num;
-  uw gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &un(&x->info)->destructions, &uw) {
-    return Printed(pm);
-  }
-  bn = seqq(gs.gr, {uw, outflow});
+  bu sq_builder = mk_builder(gs.gr);
+
+  bn sq_num = bu.first;
   n size = count(&x->statements);
   for i size = n; i > 0; {
     i = i - 1;
@@ -399,6 +403,14 @@ func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     }
     bn = gn;
   }
+
+  uw gr_num;
+  if case Printed(pm) = gr_unwinding(gs, &un(&x->info)->destructions, &uw) {
+    return Printed(pm);
+  }
+
+  add(&bu, uw);
+  mut_connect(&bu, outflow);
   *out = bn;
   return NoFail;
 }
