@@ -170,6 +170,31 @@ func mut_qnop_node(gr *frame_graph, ix sq_num, op gr_num, outflow sq_num) void {
   mut_qnop_node(gr, ix, {@[gr_qop]GrSequence({op, outflow})});
 }
 
+struct sq_builder {
+  // Stored here mostly because if it's null we know we didn't use mk_builder.
+  gr *frame_graph;
+  first sq_num;
+  last sq_num;
+}
+
+func mk_builder(gr *frame_graph) sq_builder {
+  sq sq_num = nopq(gr);
+  return {gr, sq, sq};
+}
+
+func add(bu *sq_builder, gn gr_num) void {
+  gr *frame_graph = bu->gr;
+  check(gr != null);
+  next sq_num = nopq(gr);
+  mut_qnop_node(gr, bu->last, gn, next);
+  bu->last = next;
+}
+
+func done(bu *sq_builder) gr_num {
+  bu->gr = null;
+  return bu->first.x;
+}
+
 inline func ref_cell(gr *frame_graph, c cell_num) *cell_info {
   return ref(&gr->cells, c.x);
 }
@@ -900,9 +925,10 @@ func gr_winding(gs gr_statep, initializations *array[init_action], out *gr_num) 
 
 // "destructions" is in variable declaration order -- the _opposite_ order of evaluation.
 func gr_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_num) np {
-  bn sq_num = nopq(gs.gr);
+  bu sq_builder = mk_builder(gs.gr);
   n size = count(destructions);
-  for i size = 0; i < n; i = i + 1 {
+  for i size = n; i > 0; {
+    i = i - 1;
     gn gr_num;
     switch get(destructions, i) {
     case VarSelfContainedDestruction(da destroy_action):
@@ -912,9 +938,9 @@ func gr_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_nu
     case VarVirtualCellDead(c cell_num):
       gn = addx(gs.gr, @[gr_xop]GrVirtualDead({c}));
     }
-    bn = seqq(gs.gr, {gn, bn});
+    add(&bu, gn);
   }
-  *out = bn.x;
+  *out = done(&bu);
   return NoFail;
 }
 
