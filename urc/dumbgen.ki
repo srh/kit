@@ -140,11 +140,11 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
   h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed, NotComputed, mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed};
 
   liveset lives;
+  create(&h, &liveset, g->graph.cell);
   nargcells size = count(&g->argcells);
   for i size = 0; i < nargcells; i = i + 1 {
     create(&h, &liveset, get(&g->argcells, i));
   }
-  create(&h, &liveset, g->graph.cell);
 
   mut genexpr_result;
   if case Printed(pm) = dumbly_analyze_expression(&h, &g->graph.gr, &liveset, g->graph.gn, &mut) {
