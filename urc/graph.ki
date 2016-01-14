@@ -495,22 +495,28 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
       return NoFail;
     }
     case &While(a ast_while_statement): {
-      if case Printed(pm) = gr_while_statement(gs, fb, &a, outflow, out) {
+      bu sq_builder = mk_builder(gs.gr);
+      if case Printed(pm) = gr_while_statement(gs, fb, &a, &bu) {
         return Printed(pm);
       }
+      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
 
     case &For(a ast_for_statement): {
-      if case Printed(pm) = gr_for_statement(gs, fb, &a, outflow, out) {
+      bu sq_builder = mk_builder(gs.gr);
+      if case Printed(pm) = gr_for_statement(gs, fb, &a, &bu) {
         return Printed(pm);
       }
+      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
     case &Switch(a ast_switch_statement): {
-      if case Printed(pm) = gr_switch_statement(gs, fb, obg, &a, outflow, out) {
+      bu sq_builder = mk_builder(gs.gr);
+      if case Printed(pm) = gr_switch_statement(gs, fb, obg, &a, &bu) {
         return Printed(pm);
       }
+      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
 
@@ -584,6 +590,19 @@ func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement
   mut_qnop_node(gs.gr, gn, {@[gr_qop]GrJmp({outflow})});
   // Should we set *out to gn or outflow?  When labels get fancier, the answer will matter.
   *out = gn;
+  return NoFail;
+}
+
+func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_switch_statement, bu *sq_builder) np {
+  st_bu sq_builder = mk_builder(gs.gr);
+  bn sq_num = st_bu.first;
+  gn sq_num;
+  if case Printed(pm) = gr_switch_statement(gs, fb, obg, a, bn, &gn) {
+    return Printed(pm);
+  }
+  st_bu.first = gn;
+  append(bu, &st_bu);
+  // TODO(): Stop this awful surgery.
   return NoFail;
 }
 
@@ -684,6 +703,19 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   return NoFail;
 }
 
+func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu *sq_builder) np {
+  st_bu sq_builder = mk_builder(gs.gr);
+  bn sq_num = st_bu.first;
+  gn sq_num;
+  if case Printed(pm) = gr_for_statement(gs, fb, a, bn, &gn) {
+    return Printed(pm);
+  }
+  st_bu.first = gn;
+  append(bu, &st_bu);
+  // TODO(): Stop this awful surgery.
+  return NoFail;
+}
+
 func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, outflow sq_num, out *sq_num) np {
   topgn var = nopq(gs.gr);
 
@@ -762,6 +794,19 @@ func gr_condition_discard(gs gr_statep, a *ast_condition_discard_info, out *gr_n
     return Printed(pm);
   }
   *out = disc;
+  return NoFail;
+}
+
+func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement, bu *sq_builder) np {
+  st_bu sq_builder = mk_builder(gs.gr);
+  bn sq_num = st_bu.first;
+  gn sq_num;
+  if case Printed(pm) = gr_while_statement(gs, fb, a, bn, &gn) {
+    return Printed(pm);
+  }
+  st_bu.first = gn;
+  append(bu, &st_bu);
+  // TODO(): Stop this awful surgery.
   return NoFail;
 }
 
