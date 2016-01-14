@@ -897,18 +897,19 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthen_statement, outflow sq_num, out *sq_num) np {
   join_target sq_num = nopq(gs.gr);
 
-  then_bu sq_builder = mk_builder(gs.gr);
-  if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu) {
-    return Printed(pm);
-  }
-  bodygn sq_num = mut_connect(&then_bu, join_target);
-
   then_nop sq_num;
   else_nop sq_num;
   gn sq_num;
   if case Printed(pm) = gr_condition(gs, fb, &a->condition, &then_nop, &else_nop, &gn) {
     return Printed(pm);
   }
+
+  then_bu sq_builder = mk_builder(gs.gr);
+  if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu) {
+    return Printed(pm);
+  }
+  bodygn sq_num = mut_connect(&then_bu, join_target);
+
   jmp_qnop_node(gs.gr, then_nop, bodygn);
   jmp_qnop_node(gs.gr, else_nop, join_target);
 
