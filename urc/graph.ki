@@ -441,85 +441,72 @@ func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
 
 func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_statement, bu *sq_builder) np {
   switch &x->u {
-    case &Expr(a ast_expr_discard): {
-      gn gr_num;
-      if case Printed(pm) = gr_expr_discard(gs, &a, &gn) {
-        return Printed(pm);
-      }
-      add(bu, gn);
-      return NoFail;
+  case &Expr(a ast_expr_discard):
+    gn gr_num;
+    if case Printed(pm) = gr_expr_discard(gs, &a, &gn) {
+      return Printed(pm);
     }
-    case &Return(a ast_return_statement): {
-      if case Printed(pm) = gr_return_statement(gs, fb, &a, bu) {
-        return Printed(pm);
-      }
-      return NoFail;
+    add(bu, gn);
+    return NoFail;
+  case &Return(a ast_return_statement):
+    if case Printed(pm) = gr_return_statement(gs, fb, &a, bu) {
+      return Printed(pm);
     }
-    case &Var(a ast_var_statement): {
-      gn gr_num;
-      if case Printed(pm) = gr_var_statement(gs, fb, &a, &gn) {
-        return Printed(pm);
-      }
-      add(bu, gn);
-      return NoFail;
+    return NoFail;
+  case &Var(a ast_var_statement):
+    gn gr_num;
+    if case Printed(pm) = gr_var_statement(gs, fb, &a, &gn) {
+      return Printed(pm);
     }
+    add(bu, gn);
+    return NoFail;
+  case &IfThen(a ast_ifthen_statement):
+    if case Printed(pm) = gr_ifthen_statement(gs, fb, obg, &a, bu) {
+      return Printed(pm);
+    }
+    return NoFail;
 
-    case &IfThen(a ast_ifthen_statement): {
-      if case Printed(pm) = gr_ifthen_statement(gs, fb, obg, &a, bu) {
-        return Printed(pm);
-      }
-      return NoFail;
+  case &IfThenElse(a ast_ifthenelse_statement):
+    if case Printed(pm) = gr_ifthenelse_statement(gs, fb, obg, &a, bu) {
+      return Printed(pm);
     }
-    case &IfThenElse(a ast_ifthenelse_statement): {
-      if case Printed(pm) = gr_ifthenelse_statement(gs, fb, obg, &a, bu) {
-        return Printed(pm);
-      }
-      return NoFail;
+    return NoFail;
+  case &While(a ast_while_statement):
+    if case Printed(pm) = gr_while_statement(gs, fb, &a, bu) {
+      return Printed(pm);
     }
-    case &While(a ast_while_statement): {
-      if case Printed(pm) = gr_while_statement(gs, fb, &a, bu) {
-        return Printed(pm);
-      }
-      return NoFail;
+    return NoFail;
+  case &For(a ast_for_statement):
+    if case Printed(pm) = gr_for_statement(gs, fb, &a, bu) {
+      return Printed(pm);
     }
+    return NoFail;
+  case &Switch(a ast_switch_statement):
+    if case Printed(pm) = gr_switch_statement(gs, fb, obg, &a, bu) {
+      return Printed(pm);
+    }
+    return NoFail;
 
-    case &For(a ast_for_statement): {
-      if case Printed(pm) = gr_for_statement(gs, fb, &a, bu) {
-        return Printed(pm);
-      }
-      return NoFail;
+  case &Break(a ast_break_statement):
+    if case Printed(pm) = gr_break_statement(gs, fb, obg, &a, bu) {
+      return Printed(pm);
     }
-    case &Switch(a ast_switch_statement): {
-      if case Printed(pm) = gr_switch_statement(gs, fb, obg, &a, bu) {
-        return Printed(pm);
-      }
-      return NoFail;
+    return NoFail;
+  case &Continue(a ast_continue_statement):
+    if case Printed(pm) = gr_continue_statement(gs, fb, obg, &a, bu) {
+      return Printed(pm);
     }
-
-    case &Break(a ast_break_statement):
-      if case Printed(pm) = gr_break_statement(gs, fb, obg, &a, bu) {
-        return Printed(pm);
-      }
-      return NoFail;
-
-    case &Continue(a ast_continue_statement):
-      if case Printed(pm) = gr_continue_statement(gs, fb, obg, &a, bu) {
-        return Printed(pm);
-      }
-      return NoFail;
-
-    case &Label(a ast_label_statement): {
-      if case Printed(pm) = gr_label_statement(gs, fb, &a, bu) {
-        return Printed(pm);
-      }
-      return NoFail;
+    return NoFail;
+  case &Label(a ast_label_statement):
+    if case Printed(pm) = gr_label_statement(gs, fb, &a, bu) {
+      return Printed(pm);
     }
-    case &Goto(a ast_goto_statement): {
-      if case Printed(pm) = gr_goto_statement(gs, fb, &a, bu) {
-        return Printed(pm);
-      }
-      return NoFail;
+    return NoFail;
+  case &Goto(a ast_goto_statement):
+    if case Printed(pm) = gr_goto_statement(gs, fb, &a, bu) {
+      return Printed(pm);
     }
+    return NoFail;
   }
 }
 
