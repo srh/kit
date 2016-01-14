@@ -810,10 +810,12 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   exitseq var = seqq(gs.gr, {loopexitgn, outflow});
 
   continuegn var = seqq(gs.gr, {loopcleanupgn, topgn});
-  thengn sq_num;
-  if case Printed(pm) = gr_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, continuegn, &thengn) {
+
+  body_bu sq_builder = mk_builder(gs.gr);
+  if case Printed(pm) = gr_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu) {
     return Printed(pm);
   }
+  thengn sq_num = mut_connect(&body_bu, continuegn);
   gn sq_num;
   if case Printed(pm) = gr_condition(gs, fb, &a->condition, thengn, exitseq, &gn) {
     return Printed(pm);
