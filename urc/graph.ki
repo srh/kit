@@ -847,6 +847,13 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
 func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, outflow sq_num, out *sq_num) np {
   join_target sq_num = nopq(gs.gr);
 
+  then_nop sq_num;
+  else_nop sq_num;
+  gn sq_num;
+  if case Printed(pm) = gr_condition(gs, fb, &a->condition, &then_nop, &else_nop, &gn) {
+    return Printed(pm);
+  }
+
   then_bu sq_builder = mk_builder(gs.gr);
   if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu) {
     return Printed(pm);
@@ -856,10 +863,10 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   if case Printed(pm) = gr_bracebody(gs, fb, obg, &a->elsebody, join_target, &elsegn) {
     return Printed(pm);
   }
-  gn sq_num;
-  if case Printed(pm) = gr_condition(gs, fb, &a->condition, thengn, elsegn, &gn) {
-    return Printed(pm);
-  }
+
+  jmp_qnop_node(gs.gr, then_nop, thengn);
+  jmp_qnop_node(gs.gr, else_nop, elsegn);
+
   condition_discard_gn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
     return Printed(pm);
