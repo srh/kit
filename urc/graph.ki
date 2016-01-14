@@ -839,25 +839,27 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
 }
 
 func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, outflow sq_num, out *sq_num) np {
-  latergn gr_num;
-  if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard, &latergn) {
+  join_target sq_num = nopq(gs.gr);
+
+  then_bu sq_builder = mk_builder(gs.gr);
+  if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu) {
     return Printed(pm);
   }
-
-  latseq var = seqq(gs.gr, {latergn, outflow});
-
-  thengn sq_num;
-  if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, latseq, &thengn) {
-    return Printed(pm);
-  }
+  thengn sq_num = mut_connect(&then_bu, join_target);
   elsegn sq_num;
-  if case Printed(pm) = gr_bracebody(gs, fb, obg, &a->elsebody, latseq, &elsegn) {
+  if case Printed(pm) = gr_bracebody(gs, fb, obg, &a->elsebody, join_target, &elsegn) {
     return Printed(pm);
   }
   gn sq_num;
   if case Printed(pm) = gr_condition(gs, fb, &a->condition, thengn, elsegn, &gn) {
     return Printed(pm);
   }
+  condition_discard_gn gr_num;
+  if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
+    return Printed(pm);
+  }
+
+  mut_qnop_node(gs.gr, join_target, condition_discard_gn, outflow);
   *out = gn;
   return NoFail;
 }
