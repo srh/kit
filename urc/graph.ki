@@ -818,16 +818,15 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
     return Printed(pm);
   }
 
+  add(&body_bu, loopcleanupgn);
+  thengn sq_num = mut_connect(&body_bu, topgn);
+
   loopexitgn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard_exit, &loopexitgn) {
     return Printed(pm);
   }
 
   exitseq var = seqq(gs.gr, {loopexitgn, outflow});
-
-  continuegn var = seqq(gs.gr, {loopcleanupgn, topgn});
-
-  thengn sq_num = mut_connect(&body_bu, continuegn);
 
   jmp_qnop_node(gs.gr, then_nop, thengn);
   jmp_qnop_node(gs.gr, else_nop, exitseq);
