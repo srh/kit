@@ -521,30 +521,51 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     }
 
     case &Break(a ast_break_statement):
-      if case Printed(pm) = gr_break_statement(gs, fb, obg, &a, outflow, out) {
+      bu sq_builder = mk_builder(gs.gr);
+      if case Printed(pm) = gr_break_statement(gs, fb, obg, &a, &bu) {
         return Printed(pm);
       }
+      *out = mut_connect(&bu, outflow);
       return NoFail;
 
     case &Continue(a ast_continue_statement):
-      if case Printed(pm) = gr_continue_statement(gs, fb, obg, &a, outflow, out) {
+      bu sq_builder = mk_builder(gs.gr);
+      if case Printed(pm) = gr_continue_statement(gs, fb, obg, &a, &bu) {
         return Printed(pm);
       }
+      *out = mut_connect(&bu, outflow);
       return NoFail;
 
     case &Label(a ast_label_statement): {
-      if case Printed(pm) = gr_label_statement(gs, fb, &a, outflow, out) {
+      bu sq_builder = mk_builder(gs.gr);
+      if case Printed(pm) = gr_label_statement(gs, fb, &a, &bu) {
         return Printed(pm);
       }
+      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
     case &Goto(a ast_goto_statement): {
-      if case Printed(pm) = gr_goto_statement(gs, fb, &a, outflow, out) {
+      bu sq_builder = mk_builder(gs.gr);
+      if case Printed(pm) = gr_goto_statement(gs, fb, &a, &bu) {
         return Printed(pm);
       }
+      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
   }
+}
+
+func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, bu *sq_builder) np {
+  st_bu sq_builder = mk_builder(gs.gr);
+  bn sq_num = st_bu.first;
+  gn sq_num;
+  if case Printed(pm) = gr_break_statement(gs, fb, obg, a, bn, &gn) {
+    return Printed(pm);
+  }
+  st_bu.first = gn;
+  append(bu, &st_bu);
+  // TODO(): Stop this awful surgery.
+  return NoFail;
 }
 
 func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, outflow sq_num, out *sq_num) np {
@@ -558,6 +579,19 @@ func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a
   return NoFail;
 }
 
+func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) np {
+  st_bu sq_builder = mk_builder(gs.gr);
+  bn sq_num = st_bu.first;
+  gn sq_num;
+  if case Printed(pm) = gr_continue_statement(gs, fb, obg, a, bn, &gn) {
+    return Printed(pm);
+  }
+  st_bu.first = gn;
+  append(bu, &st_bu);
+  // TODO(): Stop this awful surgery.
+  return NoFail;
+}
+
 func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, outflow sq_num, out *sq_num) np {
   info *ast_continue_statement_info = un(&a->info);
   uw gr_num;
@@ -566,6 +600,19 @@ func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack]
   }
   un sq_num= seqq(gs.gr, {uw, unHas(&obg)->continue_target});
   *out = un;
+  return NoFail;
+}
+
+func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, bu *sq_builder) np {
+  st_bu sq_builder = mk_builder(gs.gr);
+  bn sq_num = st_bu.first;
+  gn sq_num;
+  if case Printed(pm) = gr_goto_statement(gs, fb, a, bn, &gn) {
+    return Printed(pm);
+  }
+  st_bu.first = gn;
+  append(bu, &st_bu);
+  // TODO(): Stop this awful surgery.
   return NoFail;
 }
 
@@ -582,6 +629,19 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
   }
   un sq_num = seqq(gs.gr, {uw, seqq(gs.gr, {ww, jmp})});
   *out = un;
+  return NoFail;
+}
+
+func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) np {
+  st_bu sq_builder = mk_builder(gs.gr);
+  bn sq_num = st_bu.first;
+  gn sq_num;
+  if case Printed(pm) = gr_label_statement(gs, fb, a, bn, &gn) {
+    return Printed(pm);
+  }
+  st_bu.first = gn;
+  append(bu, &st_bu);
+  // TODO(): Stop this awful surgery.
   return NoFail;
 }
 
