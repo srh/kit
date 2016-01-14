@@ -599,7 +599,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   param_discard *te_typeexpr;
   is_ptr bool = decompose_typeapp(&expr_complete_type(&oo(&a->swartch)->expr)->x, primitive_pointer_puretype(gs.clq->cs), &param_discard);
 
-  exitseq var = seqq(gs.gr, {swartch_discard_gn, outflow});
+  exitseq sq_num = seqq(gs.gr, {swartch_discard_gn, outflow});
 
   info *ast_enum_deconstruction_info = un(&a->info);
   cases array[opt[sq_num]] = repeat(info->num_enum_constructors, None);
@@ -615,42 +615,41 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
         if case Has(vn var_number) = cp_info->ovn {
           vi *var_info = ref(&fb->all_vars, vn.x);
 
-          kill_var gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({vi->cell}));
-          bodyexit sq_num = seqq(gs.gr, {kill_var, exitseq});
+          bu sq_builder = mk_builder(gs.gr);
+          add(&bu, addx(gs.gr, @[gr_xop]GrVirtualDead({info->tag_cell})));
+          if is_ptr {
+            vcgn gr_num = addx(gs.gr, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
+            add(&bu, vcgn);
+          } else {
+            vcgn gr_num = addx(gs.gr, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
+            add(&bu, vcgn);
+          }
 
-          body_gn sq_num;
-          if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, bodyexit, &body_gn) {
+          if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &bu) {
             return Printed(pm);
           }
+          add(&bu, addx(gs.gr, @[gr_xop]GrVirtualDead({vi->cell})));
 
-          vcgn gr_num;
-          if is_ptr {
-            vcgn = addx(gs.gr, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
-          } else {
-            vcgn = addx(gs.gr, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
-          }
-          gn1 var = seqq(gs.gr, {vcgn, body_gn});
-          kill_tag gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({info->tag_cell}));
-          gn var = seqq(gs.gr, {kill_tag, gn1});
+          gn sq_num = mut_connect(&bu, exitseq);
           set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         } else {
-          body_gn sq_num;
-          if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, exitseq, &body_gn) {
+          bu sq_builder = mk_builder(gs.gr);
+          add(&bu, addx(gs.gr, @[gr_xop]GrVirtualDead({info->tag_cell})));
+          if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &bu) {
             return Printed(pm);
           }
-          kill_tag gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({info->tag_cell}));
-          gn var = seqq(gs.gr, {kill_tag, body_gn});
+          gn sq_num = mut_connect(&bu, exitseq);
           set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         }
       }
       case &Default: {
-        body_gn sq_num;
-        if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, exitseq, &body_gn) {
+        bu sq_builder = mk_builder(gs.gr);
+        add(&bu, addx(gs.gr, @[gr_xop]GrVirtualDead({info->tag_cell})));
+        if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &bu) {
           return Printed(pm);
         }
 
-        kill_tag gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({info->tag_cell}));
-        gn var = seqq(gs.gr, {kill_tag, body_gn});
+        gn var = mut_connect(&bu, exitseq);
         set(&default_case, gn);
       }
     }
