@@ -522,26 +522,13 @@ func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a
 }
 
 func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) np {
-  st_bu sq_builder = mk_builder(gs.gr);
-  bn sq_num = st_bu.first;
-  gn sq_num;
-  if case Printed(pm) = gr_continue_statement(gs, fb, obg, a, bn, &gn) {
-    return Printed(pm);
-  }
-  st_bu.first = gn;
-  append(bu, &st_bu);
-  // TODO(): Stop this awful surgery.
-  return NoFail;
-}
-
-func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, outflow sq_num, out *sq_num) np {
   info *ast_continue_statement_info = un(&a->info);
   uw gr_num;
   if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
-  un sq_num= seqq(gs.gr, {uw, unHas(&obg)->continue_target});
-  *out = un;
+  add(bu, uw);
+  append(bu, unHas(&obg)->continue_target, nopq(gs.gr));
   return NoFail;
 }
 
