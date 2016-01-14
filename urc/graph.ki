@@ -190,6 +190,16 @@ func add(bu *sq_builder, gn gr_num) void {
   bu->last = next;
 }
 
+func append(bu *sq_builder, rhs *sq_builder) void {
+  gr *frame_graph = bu->gr;
+  rhs_gr *frame_graph = rhs->gr;
+  check(bu != rhs);
+  check(gr != null && rhs_gr != null && gr == rhs_gr);
+  mut_qnop_node(gr, bu->last, {@[gr_qop]GrJmp({rhs->first})});
+  bu->last = rhs->last;
+  rhs->gr = null;
+}
+
 func mut_connect(bu *sq_builder, outflow sq_num) void {
   gr *frame_graph = bu->gr;
   check(gr != null);
@@ -393,15 +403,21 @@ struct breakgrack {
 func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, outflow sq_num, out *sq_num) np {
   bu sq_builder = mk_builder(gs.gr);
 
-  bn sq_num = bu.first;
+  if case Printed(pm) = gr_bracebody(gs, fb, obg, x, &bu) {
+    return Printed(pm);
+  }
+
+  mut_connect(&bu, outflow);
+  *out = bu.first;
+  return NoFail;
+}
+
+func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, bu *sq_builder) np {
   n size = count(&x->statements);
-  for i size = n; i > 0; {
-    i = i - 1;
-    gn sq_num;
-    if case Printed(pm) = gr_statement(gs, fb, obg, ref(&x->statements, i), bn, &gn) {
+  for i size = 0; i < n; i = i + 1 {
+    if case Printed(pm) = gr_statement(gs, fb, obg, ref(&x->statements, i), bu) {
       return Printed(pm);
     }
-    bn = gn;
   }
 
   uw gr_num;
@@ -409,9 +425,20 @@ func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     return Printed(pm);
   }
 
-  add(&bu, uw);
-  mut_connect(&bu, outflow);
-  *out = bn;
+  add(bu, uw);
+  return NoFail;
+}
+
+func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_statement, bu *sq_builder) np {
+  st_bu sq_builder = mk_builder(gs.gr);
+  bn sq_num = st_bu.first;
+  gn sq_num;
+  if case Printed(pm) = gr_statement(gs, fb, obg, x, bn, &gn) {
+    return Printed(pm);
+  }
+  st_bu.first = gn;
+  append(bu, &st_bu);
+  // TODO(): Stop this awful surgery.
   return NoFail;
 }
 
