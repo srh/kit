@@ -207,6 +207,7 @@ func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
   bu->last = rhs_nopq;
 }
 
+// TODO(): Any use of this is a mix of old-style vs. new-style.
 func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
   gr *frame_graph = bu->gr;
   check(gr != null);
@@ -439,34 +440,19 @@ func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
 }
 
 func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_statement, bu *sq_builder) np {
-  st_bu sq_builder = mk_builder(gs.gr);
-  bn sq_num = st_bu.first;
-  gn sq_num;
-  if case Printed(pm) = gr_statement(gs, fb, obg, x, bn, &gn) {
-    return Printed(pm);
-  }
-  st_bu.first = gn;
-  append(bu, &st_bu);
-  // TODO(): Stop this awful surgery.
-  return NoFail;
-}
-
-func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_statement, outflow sq_num, out *sq_num) np {
   switch &x->u {
     case &Expr(a ast_expr_discard): {
       gn gr_num;
       if case Printed(pm) = gr_expr_discard(gs, &a, &gn) {
         return Printed(pm);
       }
-      *out = seqq(gs.gr, {gn, outflow});
+      add(bu, gn);
       return NoFail;
     }
     case &Return(a ast_return_statement): {
-      bu sq_builder = mk_builder(gs.gr);
-      if case Printed(pm) = gr_return_statement(gs, fb, &a, &bu) {
+      if case Printed(pm) = gr_return_statement(gs, fb, &a, bu) {
         return Printed(pm);
       }
-      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
     case &Var(a ast_var_statement): {
@@ -474,82 +460,64 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
       if case Printed(pm) = gr_var_statement(gs, fb, &a, &gn) {
         return Printed(pm);
       }
-      *out = seqq(gs.gr, {gn, outflow});
+      add(bu, gn);
       return NoFail;
     }
 
     case &IfThen(a ast_ifthen_statement): {
-      bu sq_builder = mk_builder(gs.gr);
-      if case Printed(pm) = gr_ifthen_statement(gs, fb, obg, &a, &bu) {
+      if case Printed(pm) = gr_ifthen_statement(gs, fb, obg, &a, bu) {
         return Printed(pm);
       }
-      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
     case &IfThenElse(a ast_ifthenelse_statement): {
-      bu sq_builder = mk_builder(gs.gr);
-      if case Printed(pm) = gr_ifthenelse_statement(gs, fb, obg, &a, &bu) {
+      if case Printed(pm) = gr_ifthenelse_statement(gs, fb, obg, &a, bu) {
         return Printed(pm);
       }
-      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
     case &While(a ast_while_statement): {
-      bu sq_builder = mk_builder(gs.gr);
-      if case Printed(pm) = gr_while_statement(gs, fb, &a, &bu) {
+      if case Printed(pm) = gr_while_statement(gs, fb, &a, bu) {
         return Printed(pm);
       }
-      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
 
     case &For(a ast_for_statement): {
-      bu sq_builder = mk_builder(gs.gr);
-      if case Printed(pm) = gr_for_statement(gs, fb, &a, &bu) {
+      if case Printed(pm) = gr_for_statement(gs, fb, &a, bu) {
         return Printed(pm);
       }
-      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
     case &Switch(a ast_switch_statement): {
-      bu sq_builder = mk_builder(gs.gr);
-      if case Printed(pm) = gr_switch_statement(gs, fb, obg, &a, &bu) {
+      if case Printed(pm) = gr_switch_statement(gs, fb, obg, &a, bu) {
         return Printed(pm);
       }
-      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
 
     case &Break(a ast_break_statement):
-      bu sq_builder = mk_builder(gs.gr);
-      if case Printed(pm) = gr_break_statement(gs, fb, obg, &a, &bu) {
+      if case Printed(pm) = gr_break_statement(gs, fb, obg, &a, bu) {
         return Printed(pm);
       }
-      *out = mut_connect(&bu, outflow);
       return NoFail;
 
     case &Continue(a ast_continue_statement):
-      bu sq_builder = mk_builder(gs.gr);
-      if case Printed(pm) = gr_continue_statement(gs, fb, obg, &a, &bu) {
+      if case Printed(pm) = gr_continue_statement(gs, fb, obg, &a, bu) {
         return Printed(pm);
       }
-      *out = mut_connect(&bu, outflow);
       return NoFail;
 
     case &Label(a ast_label_statement): {
-      bu sq_builder = mk_builder(gs.gr);
-      if case Printed(pm) = gr_label_statement(gs, fb, &a, &bu) {
+      if case Printed(pm) = gr_label_statement(gs, fb, &a, bu) {
         return Printed(pm);
       }
-      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
     case &Goto(a ast_goto_statement): {
-      bu sq_builder = mk_builder(gs.gr);
-      if case Printed(pm) = gr_goto_statement(gs, fb, &a, &bu) {
+      if case Printed(pm) = gr_goto_statement(gs, fb, &a, bu) {
         return Printed(pm);
       }
-      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
   }
@@ -838,9 +806,11 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
 
   fingn sq_num;
   if case &Has(bi box[ast_statement]) = &a->initializer {
-    if case Printed(pm) = gr_statement(gs, fb, None, oo(&bi), topgn, &fingn) {
+    bu sq_builder = mk_builder(gs.gr);
+    if case Printed(pm) = gr_statement(gs, fb, None, oo(&bi), &bu) {
       return Printed(pm);
     }
+    fingn = mut_connect(&bu, topgn);
   } else {
     fingn = topgn;
   }
