@@ -170,6 +170,10 @@ func mut_qnop_node(gr *frame_graph, ix sq_num, op gr_num, outflow sq_num) void {
   mut_qnop_node(gr, ix, {@[gr_qop]GrSequence({op, outflow})});
 }
 
+func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
+  mut_qnop_node(gr, ix, {@[gr_qop]GrJmp({outflow})});
+}
+
 struct sq_builder {
   // Stored here mostly because if it's null we know we didn't use mk_builder.
   gr *frame_graph;
@@ -898,10 +902,16 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
     return Printed(pm);
   }
   bodygn sq_num = mut_connect(&then_bu, join_target);
+
+  then_nop sq_num;
+  else_nop sq_num;
   gn sq_num;
-  if case Printed(pm) = gr_condition(gs, fb, &a->condition, bodygn, join_target, &gn) {
+  if case Printed(pm) = gr_condition(gs, fb, &a->condition, &then_nop, &else_nop, &gn) {
     return Printed(pm);
   }
+  jmp_qnop_node(gs.gr, then_nop, bodygn);
+  jmp_qnop_node(gs.gr, else_nop, join_target);
+
   condition_discard_gn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
     return Printed(pm);
@@ -925,6 +935,20 @@ func gr_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn 
   return NoFail;
 }
 
+func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn_out *sq_num, elsegn_out *sq_num, out *sq_num) np {
+  thengn sq_num = nopq(gs.gr);
+  elsegn sq_num = nopq(gs.gr);
+  gn sq_num;
+  if case Printed(pm) = gr_condition(gs, fb, a, thengn, elsegn, &gn) {
+    return Printed(pm);
+  }
+  *thengn_out = thengn;
+  *elsegn_out = elsegn;
+  *out = gn;
+  return NoFail;
+}
+
+// TODO(): Only have one of these.
 func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, out *sq_num) np {
   switch a {
     case &ExprCondition(bec box[ast_expr_consume]): {
