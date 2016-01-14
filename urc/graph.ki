@@ -200,6 +200,13 @@ func append(bu *sq_builder, rhs *sq_builder) void {
   rhs->gr = null;
 }
 
+func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
+  gr *frame_graph = bu->gr;
+  check(gr != null);
+  mut_qnop_node(gr, bu->last, {@[gr_qop]GrJmp({enter_rhs})});
+  bu->last = rhs_nopq;
+}
+
 func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
   gr *frame_graph = bu->gr;
   check(gr != null);
@@ -402,7 +409,7 @@ struct breakgrack {
   continue_target sq_num;
 }
 
-// TODO(): Get rid ofthis wrapper.
+// TODO(): Remove.
 func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, outflow sq_num, out *sq_num) np {
   bu sq_builder = mk_builder(gs.gr);
 
@@ -455,9 +462,11 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
       return NoFail;
     }
     case &Return(a ast_return_statement): {
-      if case Printed(pm) = gr_return_statement(gs, fb, &a, out) {
+      bu sq_builder = mk_builder(gs.gr);
+      if case Printed(pm) = gr_return_statement(gs, fb, &a, &bu) {
         return Printed(pm);
       }
+      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
     case &Var(a ast_var_statement): {
@@ -924,7 +933,8 @@ func gr_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, ou
   }
 }
 
-func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_statement, out *sq_num) np {
+func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_statement, bu *sq_builder) np {
+  // TODO(): Use bu better.
   gn gr_num;
   if case &Has(b box[ast_expr_consume]) = &a->expr {
     subcell cell_num = result_cell(oo(&b));
@@ -943,8 +953,9 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
   if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw_op) {
     return Printed(pm);
   }
-  sn sq_num = seqq(gs.gr, {seq2(gs.gr, gn, uw_op).x, fb->final_node});
-  *out = sn;
+  add(bu, gn);
+  add(bu, uw_op);
+  append(bu, fb->final_node, nopq(gs.gr));
   return NoFail;
 }
 
