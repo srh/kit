@@ -806,6 +806,13 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
     return Printed(pm);
   }
 
+  bp breakgrack = {outflow, topgn};
+
+  body_bu sq_builder = mk_builder(gs.gr);
+  if case Printed(pm) = gr_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu) {
+    return Printed(pm);
+  }
+
   loopcleanupgn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard_continue, &loopcleanupgn) {
     return Printed(pm);
@@ -816,16 +823,10 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
     return Printed(pm);
   }
 
-  bp breakgrack = {outflow, topgn};
-
   exitseq var = seqq(gs.gr, {loopexitgn, outflow});
 
   continuegn var = seqq(gs.gr, {loopcleanupgn, topgn});
 
-  body_bu sq_builder = mk_builder(gs.gr);
-  if case Printed(pm) = gr_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu) {
-    return Printed(pm);
-  }
   thengn sq_num = mut_connect(&body_bu, continuegn);
 
   jmp_qnop_node(gs.gr, then_nop, thengn);
