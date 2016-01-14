@@ -667,20 +667,23 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
     }
   }
 
+  switch_bu sq_builder = mk_builder(gs.gr);
   swartch_gn gr_num;
   if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->swartch), &swartch_gn) {
     return Printed(pm);
   }
+  add(&switch_bu, swartch_gn);
 
-  taggn gr_num;
   if is_ptr {
-    taggn = addx(gs.gr, swartch_gn, @[gr_xop]GrDeref({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
+    taggn gr_num = addx(gs.gr, @[gr_xop]GrDeref({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
+    add(&switch_bu, taggn);
   } else {
-    taggn = addx(gs.gr, swartch_gn, @[gr_xop]GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
+    taggn gr_num = addx(gs.gr, @[gr_xop]GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
+    add(&switch_bu, taggn);
   }
 
-  br var = seqq(gs.gr, {taggn,
-    addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&branch_cases), None}))});
+  br_point sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&branch_cases), None}));
+  br sq_num = mut_connect(&switch_bu, br_point);
 
   *out = br;
   return NoFail;
