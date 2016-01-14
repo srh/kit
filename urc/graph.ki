@@ -200,11 +200,13 @@ func append(bu *sq_builder, rhs *sq_builder) void {
   rhs->gr = null;
 }
 
-func mut_connect(bu *sq_builder, outflow sq_num) void {
+func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
   gr *frame_graph = bu->gr;
   check(gr != null);
   mut_qnop_node(gr, bu->last, {@[gr_qop]GrJmp({outflow})});
+  ret sq_num = bu->first;
   bu->gr = null;
+  return ret;
 }
 
 func done(bu *sq_builder) gr_num {
@@ -400,6 +402,7 @@ struct breakgrack {
   continue_target sq_num;
 }
 
+// TODO(): Get rid ofthis wrapper.
 func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, outflow sq_num, out *sq_num) np {
   bu sq_builder = mk_builder(gs.gr);
 
@@ -407,8 +410,7 @@ func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     return Printed(pm);
   }
 
-  mut_connect(&bu, outflow);
-  *out = bu.first;
+  *out = mut_connect(&bu, outflow);
   return NoFail;
 }
 
