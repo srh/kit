@@ -877,15 +877,6 @@ func gr_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd
   return NoFail;
 }
 
-// TODO(): Remove this.
-func gr_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd *ast_condition_discard_info, body *ast_bracebody, outflow sq_num, out *sq_num) np {
-  if case &Has(c cell_num) = un(&cd->virtual_cell_dead) {
-    vd gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({c}));
-    outflow = seqq(gs.gr, {vd, outflow});
-  }
-  return gr_bracebody(gs, fb, obg, body, outflow, out);
-}
-
 func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthen_statement, bu *sq_builder) np {
   st_bu sq_builder = mk_builder(gs.gr);
   bn sq_num = st_bu.first;
