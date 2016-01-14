@@ -487,9 +487,11 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
       return NoFail;
     }
     case &IfThenElse(a ast_ifthenelse_statement): {
-      if case Printed(pm) = gr_ifthenelse_statement(gs, fb, obg, &a, outflow, out) {
+      bu sq_builder = mk_builder(gs.gr);
+      if case Printed(pm) = gr_ifthenelse_statement(gs, fb, obg, &a, &bu) {
         return Printed(pm);
       }
+      *out = mut_connect(&bu, outflow);
       return NoFail;
     }
     case &While(a ast_while_statement): {
@@ -792,6 +794,20 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
 
   mut_qnop_node(gs.gr, topgn, {@[gr_qop]GrJmp({gn})});
   *out = topgn;
+  return NoFail;
+}
+
+
+func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, bu *sq_builder) np {
+  st_bu sq_builder = mk_builder(gs.gr);
+  bn sq_num = st_bu.first;
+  gn sq_num;
+  if case Printed(pm) = gr_ifthenelse_statement(gs, fb, obg, a, bn, &gn) {
+    return Printed(pm);
+  }
+  st_bu.first = gn;
+  append(bu, &st_bu);
+  // TODO(): Stop this awful surgery.
   return NoFail;
 }
 
