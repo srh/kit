@@ -1027,8 +1027,6 @@ func gr_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, ou
 }
 
 func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_statement, bu *sq_builder) np {
-  // TODO(): Use bu better.
-  gn gr_num;
   if case &Has(b box[ast_expr_consume]) = &a->expr {
     subcell cell_num = result_cell(oo(&b));
     subcell_live gr_num = addx(gs.gr, @[gr_xop]GrSubcell({subcell, fb->return_cell, OffsetConst(0)}));
@@ -1037,16 +1035,14 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
       return Printed(pm);
     }
     subcell_dead gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({subcell}));
-    gn = seq3(gs.gr, subcell_live, expr_gn, subcell_dead).x;
-  } else {
-    gn = addx(gs.gr, @[gr_xop]GrXNop);
+    gn gr_num = seq3(gs.gr, subcell_live, expr_gn, subcell_dead).x;
+    add(bu, gn);
   }
   info *ast_return_statement_info = un(&a->info);
   uw_op gr_num;
   if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw_op) {
     return Printed(pm);
   }
-  add(bu, gn);
   add(bu, uw_op);
   append(bu, fb->final_node, nopq(gs.gr));
   return NoFail;
