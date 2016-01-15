@@ -1511,7 +1511,7 @@ func sq_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       }
       add(&assign_bu, dgn);
       mgn gr_num;
-      if case Printed(pm) = gr_move_action(gs, &smi.rhs_move, &mgn) {
+      if case Printed(pm) = sq_move_action(gs, &smi.rhs_move, &mgn) {
         return Printed(pm);
       }
       add(&assign_bu, mgn);
@@ -1523,7 +1523,7 @@ func sq_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       }
       add(&assign_bu, dgn);
       mgn1 gr_num;
-      if case Printed(pm) = gr_copy_action(gs, &scdi.rhs_copy, &mgn1) {
+      if case Printed(pm) = sq_copy_action(gs, &scdi.rhs_copy, &mgn1) {
         return Printed(pm);
       }
       add(&assign_bu, mgn1);
@@ -1541,7 +1541,7 @@ func sq_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       }
       add(&assign_bu, dgn);
       mgn gr_num;
-      if case Printed(pm) = gr_copy_action(gs, &sci.rhs_copy, &mgn) {
+      if case Printed(pm) = sq_copy_action(gs, &sci.rhs_copy, &mgn) {
         return Printed(pm);
       }
       add(&assign_bu, mgn);
@@ -1583,7 +1583,7 @@ func sq_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       }
       add(&do_assign_bu, assign_destroy);
       assign_copy gr_num;
-      if case Printed(pm) = gr_copy_action(gs, &ci.conditional_copy, &assign_copy) {
+      if case Printed(pm) = sq_copy_action(gs, &ci.conditional_copy, &assign_copy) {
         return Printed(pm);
       }
       add(&do_assign_bu, assign_copy);
@@ -1819,7 +1819,7 @@ func sq_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
   case &ConsumeByInPlace: { }
   case &ConsumeByCopyDestroy(cd copy_destroy_action):
     dep gr_num;
-    if case Printed(pm) = gr_copy_action(gs, &cd.copy, &dep) {
+    if case Printed(pm) = sq_copy_action(gs, &cd.copy, &dep) {
       return Printed(pm);
     }
     add(bu, dep);
@@ -1831,7 +1831,7 @@ func sq_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
     add(bu, destroy_gn);
   case &ConsumeByCopy(cc tup[copy_action, lval_deadme]):
     dep gr_num;
-    if case Printed(pm) = gr_copy_action(gs, &cc.car, &dep) {
+    if case Printed(pm) = sq_copy_action(gs, &cc.car, &dep) {
       return Printed(pm);
     }
     add(bu, dep);
@@ -1840,7 +1840,7 @@ func sq_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
     }
   case &ConsumeByMove(m move_action):
     dep gr_num;
-    if case Printed(pm) = gr_move_action(gs, &m, &dep) {
+    if case Printed(pm) = sq_move_action(gs, &m, &dep) {
       return Printed(pm);
     }
     add(bu, dep);
@@ -1848,13 +1848,13 @@ func sq_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
   return NoFail;
 }
 
-func gr_copy_action(gs gr_statep, x *copy_action, out *gr_num) np {
-  return gr_bi_action(gs, &x->x, out);
+func sq_copy_action(gs gr_statep, x *copy_action, out *gr_num) np {
+  return sq_bi_action(gs, &x->x, out);
 }
 
-func gr_move_action(gs gr_statep, x *move_action, out *gr_num) np {
+func sq_move_action(gs gr_statep, x *move_action, out *gr_num) np {
   dep gr_num;
-  if case Printed(pm) = gr_bi_action(gs, &x->x, &dep) {
+  if case Printed(pm) = sq_bi_action(gs, &x->x, &dep) {
     return Printed(pm);
   }
   *out = addx(gs.gr, dep, @[gr_xop]GrDead({x->x.src}));
@@ -1913,7 +1913,7 @@ func sq_destroy_action(gs gr_statep, x *destroy_action, dad dead_after_destroy, 
   return NoFail;
 }
 
-func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num) gr_num {
+func sq_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num) gr_num {
   // In our "bi_fun" uses the dest and src have the same type.  It seems wrong for this menial code to know that, though.
   destptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, dest)->type);
   srcptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, src)->type);
@@ -1924,19 +1924,26 @@ func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num) gr_num {
   srcptrcell cell_num = add_cell(gs.gr, {LocationStatic, srcptr.cu, srcptr.props});
   retvoid cell_num = add_cell(gs.gr, {LocationStatic, voidret.cu, voidret.props});
 
-  funcell_live gr_num = addx(gs.gr, @[gr_xop]GrLive({funcell}));
-  fc gr_num = addx(gs.gr, funcell_live, @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
-  destptrcell_live gr_num = addx(gs.gr, @[gr_xop]GrLive({destptrcell}));
-  dp gr_num = addx(gs.gr, destptrcell_live, @[gr_xop]GrAddressof({destptrcell, dest}));
-  srcptrcell_live gr_num = addx(gs.gr, @[gr_xop]GrLive({srcptrcell}));
-  spgn gr_num = addx(gs.gr, srcptrcell_live, @[gr_xop]GrAddressof({srcptrcell, src}));
-  retinit gr_num = addx(gs.gr, @[gr_xop]GrLive({retvoid}));
-  ap gr_num = addx(gs.gr, seq4(gs.gr, retinit, fc, dp, spgn).x, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid}));
-  deadret var = addx(gs.gr, ap, @[gr_xop]GrDead({retvoid}));
-  return deadret;
+  bu sq_builder = mk_builder(gs.gr);
+  add(&bu, @[gr_xop]GrLive({retvoid}));
+
+  add(&bu, @[gr_xop]GrLive({funcell}));
+  add(&bu, @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
+
+  add(&bu, @[gr_xop]GrLive({destptrcell}));
+  add(&bu, @[gr_xop]GrAddressof({destptrcell, dest}));
+
+  add(&bu, @[gr_xop]GrLive({srcptrcell}));
+  add(&bu, @[gr_xop]GrAddressof({srcptrcell, src}));
+
+  add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid}));
+
+  add(&bu, @[gr_xop]GrDead({retvoid}));
+
+  return done(&bu);
 }
 
-func gr_bi_action(gs gr_statep, x *bi_action, out *gr_num) np {
+func sq_bi_action(gs gr_statep, x *bi_action, out *gr_num) np {
   switch &x->ctor {
     case &TrivialCtor: {
       cp var = addx(gs.gr, @[gr_xop]GrMemCopy({x->dest, x->src}));
@@ -1944,7 +1951,7 @@ func gr_bi_action(gs gr_statep, x *bi_action, out *gr_num) np {
       return NoFail;
     }
     case &FunCtor(ip instpair): {
-      *out = gr_bi_fun(gs, ip, x->dest, x->src);
+      *out = sq_bi_fun(gs, ip, x->dest, x->src);
       return NoFail;
     }
   }
@@ -2717,7 +2724,7 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
   switch &mec->operational {
   case &EnumConstructMove(cd ctor_desc):
     bi_ctor_gn1 gr_num;
-    if case Printed(pm) = gr_bi_ctor(gs, argtype, retpart, argnum, &cd, &bi_ctor_gn1) {
+    if case Printed(pm) = sq_bi_ctor(gs, argtype, retpart, argnum, &cd, &bi_ctor_gn1) {
       return Printed(pm);
     }
     bi_ctor_gn gr_num = addx(&gr, bi_ctor_gn1, @[gr_xop]GrVirtualDead({retpart}));
@@ -2725,12 +2732,12 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   case &EnumConstructCopyDestroy(cdd copy_destroy_desc):
     cpgn1 gr_num;
-    if case Printed(pm) = gr_bi_ctor(gs, argtype, retpart, argnum, &cdd.copy_desc, &cpgn1) {
+    if case Printed(pm) = sq_bi_ctor(gs, argtype, retpart, argnum, &cdd.copy_desc, &cpgn1) {
       return Printed(pm);
     }
     cpgn gr_num = addx(&gr, cpgn1, @[gr_xop]GrVirtualDead({retpart}));
     destgn gr_num;
-    if case Printed(pm) = gr_destroy_ctor(gs, argtype, argnum, &cdd.destroy_desc, &destgn) {
+    if case Printed(pm) = sq_destroy_ctor(gs, argtype, argnum, &cdd.destroy_desc, &destgn) {
       return Printed(pm);
     }
     ctor_gn = seq2(&gr, cpgn, destgn).x;
@@ -2749,17 +2756,17 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
   return NoFail;
 }
 
-func gr_bi_ctor(gs gr_statep, ty *te_typeexpr, destnum cell_num, srcnum cell_num, cd *ctor_desc, gn_out *gr_num) np {
+func sq_bi_ctor(gs gr_statep, ty *te_typeexpr, destnum cell_num, srcnum cell_num, cd *ctor_desc, gn_out *gr_num) np {
   switch cd {
   case &TrivialCtor:
     *gn_out = addx(gs.gr, @[gr_xop]GrMemCopy({destnum, srcnum}));
   case &FunCtor(ip instpair):
-    *gn_out = gr_bi_fun(gs, ip, destnum, srcnum);
+    *gn_out = sq_bi_fun(gs, ip, destnum, srcnum);
   }
   return NoFail;
 }
 
-func gr_destroy_ctor(gs gr_statep, ty *te_typeexpr, argnum cell_num, cd *ctor_desc, gn_out *gr_num) np {
+func sq_destroy_ctor(gs gr_statep, ty *te_typeexpr, argnum cell_num, cd *ctor_desc, gn_out *gr_num) np {
   switch cd {
   case &TrivialCtor:
     dp var = addx(gs.gr, @[gr_xop]GrDead({argnum}));
