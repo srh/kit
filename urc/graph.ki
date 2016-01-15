@@ -457,13 +457,13 @@ func sq_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     add(bu, gn);
     return NoFail;
   case &Return(a ast_return_statement):
-    if case Printed(pm) = gr_return_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = sq_return_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &Var(a ast_var_statement):
     gn gr_num;
-    if case Printed(pm) = gr_var_statement(gs, fb, &a, &gn) {
+    if case Printed(pm) = sq_var_statement(gs, fb, &a, &gn) {
       return Printed(pm);
     }
     add(bu, gn);
@@ -733,7 +733,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
 
     exitseq var = seqq(gs.gr, {loopexitgn, initseq});
 
-    if case Printed(pm) = gr_expr_condition(gs, oo(&cond.expr), thengn, exitseq, &gn) {
+    if case Printed(pm) = sq_expr_condition(gs, oo(&cond.expr), thengn, exitseq, &gn) {
       return Printed(pm);
     }
   } else {
@@ -769,7 +769,7 @@ func sq_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   bp breakgrack = {outflow, topgn};
 
   body_bu sq_builder = mk_builder(gs.gr);
-  if case Printed(pm) = gr_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu) {
+  if case Printed(pm) = sq_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu) {
     return Printed(pm);
   }
 
@@ -807,7 +807,7 @@ func sq_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   }
 
   then_bu sq_builder = mk_builder(gs.gr);
-  if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu) {
+  if case Printed(pm) = sq_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu) {
     return Printed(pm);
   }
   thengn sq_num = mut_connect(&then_bu, join_target);
@@ -830,7 +830,7 @@ func sq_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   return NoFail;
 }
 
-func gr_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd *ast_condition_discard_info, body *ast_bracebody, bu *sq_builder) np {
+func sq_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd *ast_condition_discard_info, body *ast_bracebody, bu *sq_builder) np {
   if case Printed(pm) = sq_bracebody(gs, fb, obg, body, bu) {
     return Printed(pm);
   }
@@ -851,7 +851,7 @@ func sq_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   }
 
   then_bu sq_builder = mk_builder(gs.gr);
-  if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu) {
+  if case Printed(pm) = sq_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu) {
     return Printed(pm);
   }
   bodygn sq_num = mut_connect(&then_bu, join_target);
@@ -869,7 +869,7 @@ func sq_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   return NoFail;
 }
 
-func gr_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn sq_num, out *sq_num) np {
+func sq_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn sq_num, out *sq_num) np {
   congn gr_num;
   if case Printed(pm) = gr_live_and_expr_consume(gs, a, &congn) {
     return Printed(pm);
@@ -898,7 +898,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn_out
 func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, out *sq_num) np {
   switch a {
     case &ExprCondition(bec box[ast_expr_consume]): {
-      return gr_expr_condition(gs, oo(&bec), thengn, elsegn, out);
+      return sq_expr_condition(gs, oo(&bec), thengn, elsegn, out);
     }
 
     case &PatternCondition(pa ast_pattern_assign): {
@@ -954,7 +954,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
   }
 }
 
-func gr_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, out *gr_num) np {
+func sq_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, out *gr_num) np {
   switch &a->rhs {
     case &HasExpr(be box[ast_expr_consume]): {
       return gr_live_and_expr_consume(gs, oo(&be), out);
@@ -970,17 +970,18 @@ func gr_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, ou
   }
 }
 
-func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_statement, bu *sq_builder) np {
+func sq_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_statement, bu *sq_builder) np {
   if case &Has(b box[ast_expr_consume]) = &a->expr {
+    sub_bu sq_builder = mk_builder(gs.gr);
     subcell cell_num = result_cell(oo(&b));
-    subcell_live gr_num = addx(gs.gr, @[gr_xop]GrSubcell({subcell, fb->return_cell, OffsetConst(0)}));
+    add(&sub_bu, @[gr_xop]GrSubcell({subcell, fb->return_cell, OffsetConst(0)}));
     expr_gn gr_num;
     if case Printed(pm) = gr_expr_consume(gs, oo(&b), &expr_gn) {
       return Printed(pm);
     }
-    subcell_dead gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({subcell}));
-    gn gr_num = seq3(gs.gr, subcell_live, expr_gn, subcell_dead).x;
-    add(bu, gn);
+    add(&sub_bu, expr_gn);
+    add(&sub_bu, @[gr_xop]GrVirtualDead({subcell}));
+    add(bu, done(&sub_bu));
   }
   info *ast_return_statement_info = un(&a->info);
   uw_op gr_num;
@@ -1198,7 +1199,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, out *gr_num) np {
         cleanup_tail})})});
 
   cond_sn sq_num;
-  if case Printed(pm) = gr_expr_condition(gs, oo(&oo(&a->condition)->expr), then_sn, else_sn, &cond_sn) {
+  if case Printed(pm) = sq_expr_condition(gs, oo(&oo(&a->condition)->expr), then_sn, else_sn, &cond_sn) {
     return Printed(pm);
   }
 
