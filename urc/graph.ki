@@ -1114,11 +1114,11 @@ func gr_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume,
     return Printed(pm);
   }
   after_gn gr_num;
-  if case Printed(pm) = gr_consume_actions(gs, expr_gn, x, aft, &after_gn) {
+  if case Printed(pm) = gr_consume_actions(gs, x, aft, &after_gn) {
     return Printed(pm);
   }
 
-  *out = seq2(gs.gr, bef_gn, after_gn).x;
+  *out = seq3(gs.gr, bef_gn, expr_gn, after_gn).x;
   return NoFail;
 }
 
@@ -1392,11 +1392,11 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, out *gr_num) np
       return Printed(pm);
     }
 
-    lgn gr_num;
-    if case Printed(pm) = gr_consume_actions(gs, lp, oo(&a->lhs), &aft.car, &lgn) {
+    consume_gn gr_num;
+    if case Printed(pm) = gr_consume_actions(gs, oo(&a->lhs), &aft.car, &consume_gn) {
       return Printed(pm);
     }
-    lgn = seq2(gs.gr, bef_lp, lgn).x;
+    lgn gr_num = seq3(gs.gr, bef_lp, lp, consume_gn).x;
     live_before_lgn var = gr_live_before(gs.gr, result_cell(&aft.car), lgn);
     // Important: lhs is evaluated before rhs here.
     before_deref var = seq2(gs.gr, live_before_lgn, rp).x;
@@ -1863,8 +1863,8 @@ func gr_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after
   return NoFail;
 }
 
-// TODO(): Remove prec param, thx.
-func gr_consume_actions(gs gr_statep, prec gr_num, expr *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
+func gr_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
+  prec gr_num = addx(gs.gr, @[gr_xop]GrXNop);
   switch &aft->actions {
   case &ConsumeByInPlace: { }
   case &ConsumeByCopyDestroy(cd copy_destroy_action):
