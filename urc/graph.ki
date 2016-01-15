@@ -1106,7 +1106,7 @@ func gr_expr_consume(gs gr_statep, x *ast_expr_consume, out *gr_num) np {
 func gr_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
   // TODO(): Definitely use sq_builder.
   bef_gn gr_num;
-  if case Printed(pm) = gr_consume_actions_before(gs, x, aft, &bef_gn) {
+  if case Printed(pm) = sq_consume_actions_before(gs, x, aft, &bef_gn) {
     return Printed(pm);
   }
   expr_gn gr_num;
@@ -1114,7 +1114,7 @@ func gr_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume,
     return Printed(pm);
   }
   after_gn gr_num;
-  if case Printed(pm) = gr_consume_actions(gs, x, aft, &after_gn) {
+  if case Printed(pm) = sq_consume_actions(gs, x, aft, &after_gn) {
     return Printed(pm);
   }
 
@@ -1388,12 +1388,12 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, out *gr_num) np
     name cell_num = ellval_cell(x);
     flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
     bef_lp gr_num;
-    if case Printed(pm) = gr_consume_actions_before(gs, oo(&a->lhs), &aft.car, &bef_lp) {
+    if case Printed(pm) = sq_consume_actions_before(gs, oo(&a->lhs), &aft.car, &bef_lp) {
       return Printed(pm);
     }
 
     consume_gn gr_num;
-    if case Printed(pm) = gr_consume_actions(gs, oo(&a->lhs), &aft.car, &consume_gn) {
+    if case Printed(pm) = sq_consume_actions(gs, oo(&a->lhs), &aft.car, &consume_gn) {
       return Printed(pm);
     }
     lgn gr_num = seq3(gs.gr, bef_lp, lp, consume_gn).x;
@@ -1848,7 +1848,7 @@ func gr_maybe_virtualdead(gs gr_statep, c cell_num) gr_num {
   }
 }
 
-func gr_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
+func sq_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
   bu sq_builder = mk_builder(gs.gr);
   add(&bu, @[gr_xop]GrAssertLive({result_cell(aft)}));
   switch &aft->actions {
@@ -1863,8 +1863,8 @@ func gr_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after
   return NoFail;
 }
 
-func gr_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
-  prec gr_num = addx(gs.gr, @[gr_xop]GrXNop);
+func sq_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
+  bu sq_builder = mk_builder(gs.gr);
   switch &aft->actions {
   case &ConsumeByInPlace: { }
   case &ConsumeByCopyDestroy(cd copy_destroy_action):
@@ -1872,29 +1872,30 @@ func gr_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
     if case Printed(pm) = gr_copy_action(gs, &cd.copy, &dep) {
       return Printed(pm);
     }
-    dep = seq2(gs.gr, dep, gr_maybe_virtualdead(gs, cd.copy.x.src)).x;
-    prec = seq2(gs.gr, prec, dep).x;
-    if case Printed(pm) = sq_destroy_action(gs, &cd.destroy, DeadAfterDestroyYes, &dep) {
+    add(&bu, dep);
+    add(&bu, gr_maybe_virtualdead(gs, cd.copy.x.src));
+    destroy_gn gr_num;
+    if case Printed(pm) = sq_destroy_action(gs, &cd.destroy, DeadAfterDestroyYes, &destroy_gn) {
       return Printed(pm);
     }
-    prec = seq2(gs.gr, prec, dep).x;
+    add(&bu, destroy_gn);
   case &ConsumeByCopy(cc tup[copy_action, lval_deadme]):
     dep gr_num;
     if case Printed(pm) = gr_copy_action(gs, &cc.car, &dep) {
       return Printed(pm);
     }
+    add(&bu, dep);
     if case DeadMe = cc.cdr {
-      dep = seq2(gs.gr, dep, gr_maybe_virtualdead(gs, cc.car.x.src)).x;
+      add(&bu, gr_maybe_virtualdead(gs, cc.car.x.src));
     }
-    prec = seq2(gs.gr, prec, dep).x;
   case &ConsumeByMove(m move_action):
     dep gr_num;
     if case Printed(pm) = gr_move_action(gs, &m, &dep) {
       return Printed(pm);
     }
-    prec = seq2(gs.gr, prec, dep).x;
+    add(&bu, dep);
   }
-  *out = prec;
+  *out = done(&bu);
   return NoFail;
 }
 
