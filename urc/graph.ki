@@ -894,7 +894,6 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn_out
   return NoFail;
 }
 
-// TODO(): Only have one of these.
 func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, out *sq_num) np {
   switch a {
     case &ExprCondition(bec box[ast_expr_consume]): {
