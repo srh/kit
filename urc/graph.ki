@@ -1181,6 +1181,8 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     }
     add(bu, gn);
     return NoFail;
+  case &LocalField(a ast_local_field):
+    return sq_local_field(gs, x, &a, bu);
   default:
     // TODO(): Remove.
     gn gr_num;
@@ -1195,8 +1197,6 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
 func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   cs *checkstate = gs.clq->cs;
   switch &x->u {
-  case &LocalField(a ast_local_field):
-    return gr_local_field(gs, x, &a, out);
   case &DerefField(a ast_deref_field):
     return gr_deref_field(gs, x, &a, out);
   case &TypedExpr(a ast_typed_expr):
@@ -1309,50 +1309,41 @@ func gr_deref_field(gs gr_statep, x *ast_expr, a *ast_deref_field, out *gr_num) 
   }
 }
 
-func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, out *gr_num) np {
+func sq_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builder) np {
   info *ast_local_field_info = un(&a->info);
 
   switch info {
     case &ArrayLength(alinfo ast_arraylength_info): {
-      bu sq_builder = mk_builder(gs.gr);
-      if case Printed(pm) = sq_expr_after_discard_before(gs, oo(&a->lhs), &alinfo.after, &bu) {
+      if case Printed(pm) = sq_expr_after_discard_before(gs, oo(&a->lhs), &alinfo.after, bu) {
         return Printed(pm);
       }
 
-      lp gr_num;
-      if case Printed(pm) = gr_expr(gs, oo(&a->lhs), &lp) {
-        return Printed(pm);
-      }
-      add(&bu, lp);
-
-      if case Printed(pm) = sq_expr_after_discard(gs, oo(&a->lhs), &alinfo.after, &bu) {
+      if case Printed(pm) = sq_expr(gs, oo(&a->lhs), bu) {
         return Printed(pm);
       }
 
-      add(&bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)}));
+      if case Printed(pm) = sq_expr_after_discard(gs, oo(&a->lhs), &alinfo.after, bu) {
+        return Printed(pm);
+      }
 
-      *out = done(&bu);
+      add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)}));
       return NoFail;
     }
     case &FieldName(offset u32): {
-      lp gr_num;
-      if case Printed(pm) = gr_expr(gs, oo(&a->lhs), &lp) {
+      if case Printed(pm) = sq_expr(gs, oo(&a->lhs), bu) {
         return Printed(pm);
       }
 
-      gn1 var = addx(gs.gr, lp, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst(offset)}));
+      add(bu, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst(offset)}));
       gn gr_num;
       switch &expr_complete_info(oo(&a->lhs))->lval {
       case &IsLvalYes(desc lval_description):
         if case DeadMe = desc.deadme {
-          gn = addx(gs.gr, gn1, @[gr_xop]GrVirtualDead({desc.num}));
-        } else {
-          gn = gn1;
+          add(bu, @[gr_xop]GrVirtualDead({desc.num}));
         }
       case &IsLvalNo(desc rval_description):
-        gn = seq2(gs.gr, gn1, gr_maybe_virtualdead(gs, desc.partial_num)).x;
+        add(bu, gr_maybe_virtualdead(gs, desc.partial_num));
       }
-      *out = gn;
       return NoFail;
     }
   }
