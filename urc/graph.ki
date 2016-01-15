@@ -879,7 +879,6 @@ func sq_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   return NoFail;
 }
 
-
 func sq_expr_condition(gs gr_statep, a *ast_expr_consume, thengn_out *sq_num, elsegn_out *sq_num, out *sq_num) np {
   thengn sq_num = nopq(gs.gr);
   elsegn sq_num = nopq(gs.gr);
@@ -1201,6 +1200,8 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return sq_expr(gs, oo(&a.expr), bu);
   case &Strinit(a ast_strinit):
     return sq_mk_strinit(gs, x, &a, bu);
+  case &Ternary(a ast_ternary):
+    return sq_mk_ternary(gs, x, &a, bu);
   default:
     // TODO(): Remove.
     gn gr_num;
@@ -1215,8 +1216,6 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
 func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   cs *checkstate = gs.clq->cs;
   switch &x->u {
-  case &Ternary(a ast_ternary):
-    return gr_mk_ternary(gs, x, &a, out);
   case &QuickReturn(a ast_quickreturn):
     // TODO(): Implement quick-return graphing.
     return ERR(_u8("ICE: quick-return expressions not fully implemented"));
@@ -1230,8 +1229,8 @@ func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   }
 }
 
-func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, out *gr_num) np {
-  cleanup_tail sq_num = nopq(gs.gr);
+func sq_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
+  join_target sq_num = nopq(gs.gr);
 
   conjoined cell_num = rval_cell(x);
 
@@ -1248,7 +1247,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, out *gr_num) np {
     return Printed(pm);
   }
   add(&then_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->then_clause))}));
-  then_sn sq_num = mut_connect(&then_bu, cleanup_tail);
+  then_sn sq_num = mut_connect(&then_bu, join_target);
 
   else_bu sq_builder = mk_builder(gs.gr);
   add(&else_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->else_clause)), conjoined, OffsetConst(0)}));
@@ -1256,20 +1255,19 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, out *gr_num) np {
     return Printed(pm);
   }
   add(&else_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->else_clause))}));
-  else_sn sq_num = mut_connect(&else_bu, cleanup_tail);
+  else_sn sq_num = mut_connect(&else_bu, join_target);
+
+  jmp_qnop_node(gs.gr, then_nop, then_sn);
+  jmp_qnop_node(gs.gr, else_nop, else_sn);
+  append(bu, cond_sn, join_target);
 
   // TODO: We do the condcleanup at the end instead of repeating it twice right after the branch... do it right after the branch.
   condcleanupgn gr_num;
   if case Printed(pm) = sq_later_discard(gs, &oo(&a->condition)->discard, &condcleanupgn) {
     return Printed(pm);
   }
+  add(bu, condcleanupgn);
 
-  mut_qnop_node(gs.gr, cleanup_tail, condcleanupgn, nopq(gs.gr));
-
-  jmp_qnop_node(gs.gr, then_nop, then_sn);
-  jmp_qnop_node(gs.gr, else_nop, else_sn);
-
-  *out = cond_sn.x;
   return NoFail;
 }
 
