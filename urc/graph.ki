@@ -460,11 +460,9 @@ func sq_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
 func sq_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_statement, bu *sq_builder) np {
   switch &x->u {
   case &Expr(a ast_expr_discard):
-    gn gr_num;
-    if case Printed(pm) = sq_expr_discard(gs, &a, &gn) {
+    if case Printed(pm) = sq_expr_discard(gs, &a, bu) {
       return Printed(pm);
     }
-    add(bu, gn);
     return NoFail;
   case &Return(a ast_return_statement):
     if case Printed(pm) = sq_return_statement(gs, fb, &a, bu) {
@@ -707,11 +705,11 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
 
   continuegn sq_num;
   if case &Has(increment box[ast_expr_discard]) = &a->increment {
-    incrgn gr_num;
-    if case Printed(pm) = sq_expr_discard(gs, oo(&increment), &incrgn) {
+    incr_bu sq_builder = mk_builder(gs.gr);
+    if case Printed(pm) = sq_expr_discard(gs, oo(&increment), &incr_bu) {
       return Printed(pm);
     }
-    totopgn var = seqq(gs.gr, {incrgn, topgn});
+    totopgn sq_num = mut_connect(&incr_bu, topgn);
     continue_target = totopgn;
     continuegn = seqq(gs.gr, {loopcleanupgn, totopgn});
   } else {
@@ -1051,20 +1049,16 @@ func sq_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_nu
   return NoFail;
 }
 
-func sq_expr_discard(gs gr_statep, x *ast_expr_discard, out *gr_num) np {
-  bu sq_builder = mk_builder(gs.gr);
-  if case Printed(pm) = sq_expr_after_discard_before(gs, &x->expr, un(&x->after), &bu) {
+func sq_expr_discard(gs gr_statep, x *ast_expr_discard, bu *sq_builder) np {
+  if case Printed(pm) = sq_expr_after_discard_before(gs, &x->expr, un(&x->after), bu) {
     return Printed(pm);
   }
-  dp gr_num;
-  if case Printed(pm) = gr_expr(gs, &x->expr, &dp) {
+  if case Printed(pm) = sq_expr(gs, &x->expr, bu) {
     return Printed(pm);
   }
-  add(&bu, dp);
-  if case Printed(pm) = sq_expr_after_discard(gs, &x->expr, un(&x->after), &bu) {
+  if case Printed(pm) = sq_expr_after_discard(gs, &x->expr, un(&x->after), bu) {
     return Printed(pm);
   }
-  *out = done(&bu);
   return NoFail;
 }
 
@@ -1206,16 +1200,6 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     // TODO(): Implement quick-return graphing.
     return ERR(_u8("ICE: quick-return expressions not fully implemented"));
   }
-}
-
-// TODO(): Remove.
-func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
-  bu sq_builder = mk_builder(gs.gr);
-  if case Printed(pm) = sq_expr(gs, x, &bu) {
-    return Printed(pm);
-  }
-  *out = done(&bu);
-  return NoFail;
 }
 
 func sq_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
