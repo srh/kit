@@ -762,7 +762,7 @@ func sq_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   then_nop sq_num;
   else_nop sq_num;
   gn sq_num;
-  if case Printed(pm) = gr_condition(gs, fb, &a->condition, &then_nop, &else_nop, &gn) {
+  if case Printed(pm) = sq_condition(gs, fb, &a->condition, &then_nop, &else_nop, &gn) {
     return Printed(pm);
   }
 
@@ -802,7 +802,7 @@ func sq_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   then_nop sq_num;
   else_nop sq_num;
   gn sq_num;
-  if case Printed(pm) = gr_condition(gs, fb, &a->condition, &then_nop, &else_nop, &gn) {
+  if case Printed(pm) = sq_condition(gs, fb, &a->condition, &then_nop, &else_nop, &gn) {
     return Printed(pm);
   }
 
@@ -846,7 +846,7 @@ func sq_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   then_nop sq_num;
   else_nop sq_num;
   gn sq_num;
-  if case Printed(pm) = gr_condition(gs, fb, &a->condition, &then_nop, &else_nop, &gn) {
+  if case Printed(pm) = sq_condition(gs, fb, &a->condition, &then_nop, &else_nop, &gn) {
     return Printed(pm);
   }
 
@@ -882,11 +882,11 @@ func sq_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn 
   return NoFail;
 }
 
-func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn_out *sq_num, elsegn_out *sq_num, out *sq_num) np {
+func sq_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn_out *sq_num, elsegn_out *sq_num, out *sq_num) np {
   thengn sq_num = nopq(gs.gr);
   elsegn sq_num = nopq(gs.gr);
   gn sq_num;
-  if case Printed(pm) = gr_condition(gs, fb, a, thengn, elsegn, &gn) {
+  if case Printed(pm) = sq_condition(gs, fb, a, thengn, elsegn, &gn) {
     return Printed(pm);
   }
   *thengn_out = thengn;
@@ -895,25 +895,26 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn_out
   return NoFail;
 }
 
-func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, out *sq_num) np {
+func sq_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, out *sq_num) np {
   switch a {
     case &ExprCondition(bec box[ast_expr_consume]): {
       return sq_expr_condition(gs, oo(&bec), thengn, elsegn, out);
     }
 
     case &PatternCondition(pa ast_pattern_assign): {
+      bef_bu sq_builder = mk_builder(gs.gr);
       rhs gr_num;
       if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&pa.rhs), &rhs) {
         return Printed(pm);
       }
+      add(&bef_bu, rhs);
 
       info *ast_pattern_assign_info = un(&pa.info);
       // TODO: Avoid the duplicate checks for addressof_constructor, only do one GrDeref.
-      taggn gr_num;
       if isHas(&pa.pattern.addressof_constructor) {
-        taggn = addx(gs.gr, rhs, @[gr_xop]GrDeref({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)}));
+        add(&bef_bu, @[gr_xop]GrDeref({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)}));
       } else {
-        taggn = addx(gs.gr, rhs, @[gr_xop]GrSubcell({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)}));
+        add(&bef_bu, @[gr_xop]GrSubcell({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)}));
       }
       cases array[tup[gr_const, sq_num]];
       n size = info->deconstruct.num_enum_constructors;
@@ -942,8 +943,8 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
           push(&cases, {@[gr_const]ConstInt(~tag.x), elseseq});
         }
       }
-      br var = seqq(gs.gr, {taggn,
-        addq(gs.gr, @[gr_qop]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None}))});
+      br_point sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None}));
+      br sq_num = mut_connect(&bef_bu, br_point);
 
       *out = br;
       return NoFail;
