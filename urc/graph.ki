@@ -144,6 +144,11 @@ func addx(gr *frame_graph, op gr_xop) gr_num {
   return help_add_node(gr, @[gr_node]XOp({op}));
 }
 
+func add(bu *sq_builder, op gr_xop) void {
+  num gr_num = addx(bu->gr, op);
+  add(bu, num);
+}
+
 func addx(gr *frame_graph, prec gr_num, op gr_xop) gr_num {
   return seq2(gr, prec, addx(gr, op)).x;
 }
@@ -604,25 +609,23 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
           vi *var_info = ref(&fb->all_vars, vn.x);
 
           bu sq_builder = mk_builder(gs.gr);
-          add(&bu, addx(gs.gr, @[gr_xop]GrVirtualDead({info->tag_cell})));
+          add(&bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
           if is_ptr {
-            vcgn gr_num = addx(gs.gr, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
-            add(&bu, vcgn);
+            add(&bu, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
           } else {
-            vcgn gr_num = addx(gs.gr, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
-            add(&bu, vcgn);
+            add(&bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
           }
 
           if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &bu) {
             return Printed(pm);
           }
-          add(&bu, addx(gs.gr, @[gr_xop]GrVirtualDead({vi->cell})));
+          add(&bu, @[gr_xop]GrVirtualDead({vi->cell}));
 
           gn sq_num = mut_connect(&bu, exitseq);
           set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         } else {
           bu sq_builder = mk_builder(gs.gr);
-          add(&bu, addx(gs.gr, @[gr_xop]GrVirtualDead({info->tag_cell})));
+          add(&bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
           if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &bu) {
             return Printed(pm);
           }
@@ -632,7 +635,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
       }
       case &Default: {
         bu sq_builder = mk_builder(gs.gr);
-        add(&bu, addx(gs.gr, @[gr_xop]GrVirtualDead({info->tag_cell})));
+        add(&bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
         if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &bu) {
           return Printed(pm);
         }
@@ -663,11 +666,9 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   add(&switch_bu, swartch_gn);
 
   if is_ptr {
-    taggn gr_num = addx(gs.gr, @[gr_xop]GrDeref({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
-    add(&switch_bu, taggn);
+    add(&switch_bu, @[gr_xop]GrDeref({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
   } else {
-    taggn gr_num = addx(gs.gr, @[gr_xop]GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
-    add(&switch_bu, taggn);
+    add(&switch_bu, @[gr_xop]GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
   }
 
   br_point sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&branch_cases), None}));
@@ -880,8 +881,7 @@ func gr_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd
     return Printed(pm);
   }
   if case &Has(c cell_num) = un(&cd->virtual_cell_dead) {
-    vd gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({c}));
-    add(bu, vd);
+    add(bu, @[gr_xop]GrVirtualDead({c}));
   }
   return NoFail;
 }
