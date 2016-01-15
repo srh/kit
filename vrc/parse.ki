@@ -1812,213 +1812,221 @@ func see_if_parse(file array[u8]) bool {
   return ret;
 }
 
-func run_parse_negtest(test_name array[u8], file array[u8]) bool {
-  return help_run_parse_test(test_name, file, false);
+func run_parse_negtest(ctx *parse_test_ctx, test_name array[u8], file array[u8]) void {
+  help_run_parse_test(ctx, test_name, file, false);
 }
 
-func run_parse_test(test_name array[u8], file array[u8]) bool {
-  return help_run_parse_test(test_name, file, true);
+func run_parse_test(ctx *parse_test_ctx, test_name array[u8], file array[u8]) void {
+  help_run_parse_test(ctx, test_name, file, true);
 }
 
-func help_run_parse_test(test_name array[u8], file array[u8], expected_success bool) bool {
-  print(Stdout(), _u8("test "));
-  if !expected_success {
-    print(Stdout(), _u8("!"));
+func help_run_parse_test(ctx *parse_test_ctx, test_name array[u8], file array[u8], expected_success bool) void {
+  if ctx->verbose {
+    print(Stdout(), _u8("test "));
+    if !expected_success {
+      print(Stdout(), _u8("!"));
+    }
+    print(Stdout(), test_name);
+    print(Stdout(), _u8("..."));
+    ign var = fflush(Stdout());
   }
-  print(Stdout(), test_name);
-  print(Stdout(), _u8("..."));
-  ign var = fflush(Stdout());
   if expected_success != see_if_parse(file) {
     print(Stdout(), _u8("FAIL\n"));
-    ign = fflush(Stdout());
-    return false;
+    ign var = fflush(Stdout());
+    ctx->failures = ctx->failures + 1;
   } else {
-    print(Stdout(), _u8("PASS\n"));
-    ign = fflush(Stdout());
-    return true;
+    if ctx->verbose {
+      print(Stdout(), _u8("PASS\n"));
+      ign var = fflush(Stdout());
+    }
   }
 }
 
-func test_parse() bool {
-  pass bool = true;
-  pass = pass & run_parse_test(_u8("p001"), _u8("import foo;"));
-  pass = pass & run_parse_test(_u8("p002"), _u8("def a int = 0;"));
-  pass = pass & run_parse_test(_u8("p003"), _u8("def abc int = 1;\n"));
-  pass = pass & run_parse_test(_u8("p004"), _u8("def _ab int =0x1;\n"));
-  pass = pass & run_parse_test(_u8("p005"), _u8("def ab_ int = 0x1AF2;\n"));
-  pass = pass & run_parse_test(_u8("p006"), _u8("def a_b int=\n0x1AF2 ;\n"));
-  pass = pass & run_parse_test(_u8("p007"), _u8("def a int=0x1AF2 ;"));
-  pass = pass & run_parse_test(_u8("p008"), _u8("def a fn[int, int] = 1;"));
-  pass = pass & run_parse_test(_u8("p009"),
-                               _u8("def a b = func(x int, y int) int { 3; };"));
-  pass = pass & run_parse_test(_u8("p010"),
-                               _u8("def a = func(x int, y int) int { return 3; };"));
-  pass = pass & run_parse_test(_u8("p011"),
-                               _u8("def a =\n"
-                                   "\tfunc(x int, y int) int { *x; };"));
-  pass = pass & run_parse_test(_u8("p012"),
-                               _u8("def foo bar = 2 + 3;"));
-  pass = pass & run_parse_test(_u8("p013"),
-                               _u8("def foo bar = 2+*3-4;"));
-  pass = pass & run_parse_test(_u8("p014"),
-                               _u8("def foo bar = (2 ^ 3) - 4 && x -> quux;"));
-  pass = pass & run_parse_negtest(_u8("p015"),
-                               _u8("def[] foo fn[int] = func() int {\n"
-                                   "var x int = 3;\n"
-                                   "  return x;};"));
-  pass = pass & run_parse_negtest(_u8("p016-a-a"),
-                               _u8("def[] foo/*heh*/fn[int] = func() int {\n"
-                                   "//blah blah\n"
-                                   "  var x int =-3;return x;};"));
-  pass = pass & run_parse_test(_u8("p016-a-b"),
-                               _u8("def[] foo/*heh*/fn[int] = func() int {\n"
-                                   "//blah blah\n"
-                                   "  x int =-3;return x;};"));
-  pass = pass & run_parse_test(_u8("p016-b"),
-                               _u8("def[] foo fn[int] = func() int {\n"
-                                   "  x var = -3;\n"
-                                   "};"));
-  pass = pass & run_parse_test(_u8("p017"),
-                               _u8("def a b = 1 == 1 || 2 == 1;\n"));
-  pass = pass & run_parse_test(_u8("p018"),
-                               _u8("def a b = 1 + - 1;"));
-  pass = pass & run_parse_test(_u8("p019"),
-                               _u8("def a b = 1 + -1;"));
-  pass = pass & run_parse_test(_u8("p020"),
-                               _u8("def a b = 1 +- 1;"));
-  pass = pass & run_parse_test(_u8("p021"),
-                               _u8("def a b = 1 +-1;"));
-  pass = pass & run_parse_negtest(_u8("p022"),
-                               _u8("func a() int {var x int;}"));
-  pass = pass & run_parse_test(_u8("p023"),
-                               _u8("func a() int {\n"
-                                   "  (x+3)[y(z)] = 3;\n"
-                                   "  return x[y];  }"));
-  pass = pass & run_parse_test(_u8("p024"),
-                               _u8("func a() int {\n"
-                                   "  x[y(z)] = 3;\n"
-                                   "  return x[y];  }"));
-  pass = pass & run_parse_test(_u8("p025"),
-                               _u8("func a() int {\n"
-                                   "  x *^[y(z)]t = 3;\n"
-                                   "  return x[y]; }"));
-  pass = pass & run_parse_test(_u8("p026"),
-                               _u8("func a() int {\n"
-                                   "  x ^[y(z)]^[1]^[2]t = 3;\n"
-                                   "  return x[y]; }"));
-  pass = pass & run_parse_test(_u8("p027"),
-                               _u8("func a() int {\n"
-                                   "  x [y(z)][1][2] = 3;\n"
-                                   "  return x[y]; }"));
-  pass = pass & run_parse_test(_u8("p028"),
-                               _u8("func a() int {\n"
-                                   "  x [y(z)][1][2];\n"
-                                   "  return x[y];  }"));
-  pass = pass & run_parse_negtest(_u8("p029-a"),
-                               _u8("func a() int {\n"
-                                   "  for var i i32 = 3; i < 3; i = i + 1 {}}"));
-  pass = pass & run_parse_test(_u8("p029-b"),
-                               _u8("func a() int {\n"
-                                   "  for i i32 = 3; i < 3; i = i + 1 {}}"));
-  pass = pass & run_parse_test(_u8("p030"),
-                               _u8("func a() int {\n"
-                                   "  for i i32 = 3; i < 3; i = i + 1 { x = 2; }}"));
-  pass = pass & run_parse_test(_u8("p031"),
-                               _u8("def foo = baz@[a, b](1, 2, 3);"));
-  pass = pass & run_parse_test(_u8("p032-a"),
-                               _u8("def foo u8 = 'a';\n"));
-  pass = pass & run_parse_test(_u8("p032-b"),
-                               _u8("var foo u8 = 'a';\n"));
-  pass = pass & run_parse_test(_u8("p033"),
-                               _u8("def foo u8 = '\\n';\n"));
-  pass = pass & run_parse_test(_u8("p034"),
-                               _u8("def foo u8 = '\\x2A';\n"));
-  pass = pass & run_parse_test(_u8("p035-a"),
-                               _u8("def foo u8 = \"\\x2Azq\";\n"));
-  pass = pass & run_parse_test(_u8("p035-b"),
-                               _u8("def foo u8 = \"\";\n"));
-  pass = pass & run_parse_test(_u8("p035-c"),
-                               _u8("def foo u8 = \"abc\" \"def\";\n"));
-  pass = pass & run_parse_test(_u8("p036-a"),
-                               _u8("func a() b { switch c { case e(f g): { } case h(i): { j; } default: { } } }"));
-  pass = pass & run_parse_test(_u8("p036-b"),
-                               _u8("func a() b { switch c { case &e(f g): { } case h(i): { j; } default: { } } }"));
-  pass = pass & run_parse_negtest(_u8("p036-c"),
-                               _u8("func a() b { switch c { case &e(f g): case h(i): j; default: } }"));
-  pass = pass & run_parse_test(_u8("p037"),
-                               _u8("func `~`(x u32) size { }"));
-  pass = pass & run_parse_test(_u8("p038"),
-                               _u8("func foo() a { x int; }"));
-  pass = pass & run_parse_test(_u8("p039"),
-                               _u8("func foo() a { x int = 3; }"));
-  pass = pass & run_parse_test(_u8("p040"),
-                               _u8("func foo() a { for i i32 = 3; i < 3; i = i + 1 { } }"));
-  pass = pass & run_parse_test(_u8("p041"),
-                               _u8("func foo() a { if x { } else if y { } else { } }"));
-  pass = pass & run_parse_test(_u8("p042"),
-                               _u8("func foo() a { label foo; goto bar; }"));
-  pass = pass & run_parse_test(_u8("p043"),
-                               _u8("func foo() a { y union { }; }"));
-  pass = pass & run_parse_test(_u8("p046-a"),
-                               _u8("struct foo { x y; z int; t fn[beh]; }"));
-  pass = pass & run_parse_test(_u8("p046-b"),
-                               _u8("enum foo { x y; z int; t fn[beh]; }"));
-  pass = pass & run_parse_test(_u8("p046-c"),
-                               _u8("enum foo { x y; z int; t fn[beh]; }"));
-  pass = pass & run_parse_test(_u8("p046-d"),
-                               _u8("enum foo { x y; #z int; t fn[beh]; }"));
-  pass = pass & run_parse_negtest(_u8("p046-e"),
-                                  _u8("enum foo { x y; #z int; #t fn[beh]; }"));
-  pass = pass & run_parse_test(_u8("p048-a"),
-                               _u8("struct[] foo {x bar [quux]; }\n"));
-  pass = pass & run_parse_negtest(_u8("p048-b"),
-                                  _u8("struct[] foo {x bar [quux]; };\n"));
-  pass = pass & run_parse_test(_u8("p049-a"),
-                               _u8("struct[] foo {x ^[2 + 3]bar; }\n"));
-  pass = pass & run_parse_test(_u8("p049-b"),
-                               _u8("struct[T, U] foo {x ^[2 + 3]bar; }\n"));
-  pass = pass & run_parse_test(_u8("p050-a"),
-                               _u8("defclass move foo { field ^[7]bar; }\n"
-                                   "struct[T] foo { count u32; p ^[3]T; }\n"));
-  pass = pass & run_parse_test(_u8("p050-b"),
-                               _u8("defclass move foo { field ^[7]bar; }\n"
-                                   "struct[T] foo { count u32; p ^[3]T; }\n"));
-  pass = pass & run_parse_test(_u8("p051"),
-                               _u8("defclass copy foo { field bar; }"));
-  pass = pass & run_parse_test(_u8("p052"),
-                               _u8("extern putchar fn[i32, i32];"));
-  pass = pass & run_parse_test(_u8("p053-a"),
-                               _u8("export def blah fn[i32, i32] = 3;"));
-  pass = pass & run_parse_test(_u8("p053-b"),
-                               _u8("export var blah fn[i32, i32] = 3;"));
-  pass = pass & run_parse_test(_u8("p054"),
-                               _u8("access string { def foo i32 = 3; }\n"));
-  pass = pass & run_parse_test(_u8("p054"),
-                               _u8("access vec[_] { def foo i32 = 3; }\n"));
-  pass = pass & run_parse_test(_u8("p055"),
-                               _u8("func foo() a { if case foo(x) = bar { } else if y { } else { } }"));
-  pass = pass & run_parse_test(_u8("p056"),
+struct parse_test_ctx {
+  verbose bool;
+  failures u32;
+}
+
+func test_parse(verbose bool) bool {
+  ctx parse_test_ctx = {verbose, 0};
+  run_parse_test(&ctx, _u8("p001"), _u8("import foo;"));
+  run_parse_test(&ctx, _u8("p002"), _u8("def a int = 0;"));
+  run_parse_test(&ctx, _u8("p003"), _u8("def abc int = 1;\n"));
+  run_parse_test(&ctx, _u8("p004"), _u8("def _ab int =0x1;\n"));
+  run_parse_test(&ctx, _u8("p005"), _u8("def ab_ int = 0x1AF2;\n"));
+  run_parse_test(&ctx, _u8("p006"), _u8("def a_b int=\n0x1AF2 ;\n"));
+  run_parse_test(&ctx, _u8("p007"), _u8("def a int=0x1AF2 ;"));
+  run_parse_test(&ctx, _u8("p008"), _u8("def a fn[int, int] = 1;"));
+  run_parse_test(&ctx, _u8("p009"),
+                 _u8("def a b = func(x int, y int) int { 3; };"));
+  run_parse_test(&ctx, _u8("p010"),
+                 _u8("def a = func(x int, y int) int { return 3; };"));
+  run_parse_test(&ctx, _u8("p011"),
+                 _u8("def a =\n"
+                     "\tfunc(x int, y int) int { *x; };"));
+  run_parse_test(&ctx, _u8("p012"),
+                 _u8("def foo bar = 2 + 3;"));
+  run_parse_test(&ctx, _u8("p013"),
+                 _u8("def foo bar = 2+*3-4;"));
+  run_parse_test(&ctx, _u8("p014"),
+                 _u8("def foo bar = (2 ^ 3) - 4 && x -> quux;"));
+  run_parse_negtest(&ctx, _u8("p015"),
+                 _u8("def[] foo fn[int] = func() int {\n"
+                     "var x int = 3;\n"
+                     "  return x;};"));
+  run_parse_negtest(&ctx, _u8("p016-a-a"),
+                 _u8("def[] foo/*heh*/fn[int] = func() int {\n"
+                     "//blah blah\n"
+                     "  var x int =-3;return x;};"));
+  run_parse_test(&ctx, _u8("p016-a-b"),
+                 _u8("def[] foo/*heh*/fn[int] = func() int {\n"
+                     "//blah blah\n"
+                     "  x int =-3;return x;};"));
+  run_parse_test(&ctx, _u8("p016-b"),
+                 _u8("def[] foo fn[int] = func() int {\n"
+                     "  x var = -3;\n"
+                     "};"));
+  run_parse_test(&ctx, _u8("p017"),
+                 _u8("def a b = 1 == 1 || 2 == 1;\n"));
+  run_parse_test(&ctx, _u8("p018"),
+                 _u8("def a b = 1 + - 1;"));
+  run_parse_test(&ctx, _u8("p019"),
+                 _u8("def a b = 1 + -1;"));
+  run_parse_test(&ctx, _u8("p020"),
+                 _u8("def a b = 1 +- 1;"));
+  run_parse_test(&ctx, _u8("p021"),
+                 _u8("def a b = 1 +-1;"));
+  run_parse_negtest(&ctx, _u8("p022"),
+                 _u8("func a() int {var x int;}"));
+  run_parse_test(&ctx, _u8("p023"),
+                 _u8("func a() int {\n"
+                     "  (x+3)[y(z)] = 3;\n"
+                     "  return x[y];  }"));
+  run_parse_test(&ctx, _u8("p024"),
+                 _u8("func a() int {\n"
+                     "  x[y(z)] = 3;\n"
+                     "  return x[y];  }"));
+  run_parse_test(&ctx, _u8("p025"),
+                 _u8("func a() int {\n"
+                     "  x *^[y(z)]t = 3;\n"
+                     "  return x[y]; }"));
+  run_parse_test(&ctx, _u8("p026"),
+                 _u8("func a() int {\n"
+                     "  x ^[y(z)]^[1]^[2]t = 3;\n"
+                     "  return x[y]; }"));
+  run_parse_test(&ctx, _u8("p027"),
+                 _u8("func a() int {\n"
+                     "  x [y(z)][1][2] = 3;\n"
+                     "  return x[y]; }"));
+  run_parse_test(&ctx, _u8("p028"),
+                 _u8("func a() int {\n"
+                     "  x [y(z)][1][2];\n"
+                     "  return x[y];  }"));
+  run_parse_negtest(&ctx, _u8("p029-a"),
+                 _u8("func a() int {\n"
+                     "  for var i i32 = 3; i < 3; i = i + 1 {}}"));
+  run_parse_test(&ctx, _u8("p029-b"),
+                 _u8("func a() int {\n"
+                     "  for i i32 = 3; i < 3; i = i + 1 {}}"));
+  run_parse_test(&ctx, _u8("p030"),
+                 _u8("func a() int {\n"
+                     "  for i i32 = 3; i < 3; i = i + 1 { x = 2; }}"));
+  run_parse_test(&ctx, _u8("p031"),
+                 _u8("def foo = baz@[a, b](1, 2, 3);"));
+  run_parse_test(&ctx, _u8("p032-a"),
+                 _u8("def foo u8 = 'a';\n"));
+  run_parse_test(&ctx, _u8("p032-b"),
+                 _u8("var foo u8 = 'a';\n"));
+  run_parse_test(&ctx, _u8("p033"),
+                 _u8("def foo u8 = '\\n';\n"));
+  run_parse_test(&ctx, _u8("p034"),
+                 _u8("def foo u8 = '\\x2A';\n"));
+  run_parse_test(&ctx, _u8("p035-a"),
+                 _u8("def foo u8 = \"\\x2Azq\";\n"));
+  run_parse_test(&ctx, _u8("p035-b"),
+                 _u8("def foo u8 = \"\";\n"));
+  run_parse_test(&ctx, _u8("p035-c"),
+                 _u8("def foo u8 = \"abc\" \"def\";\n"));
+  run_parse_test(&ctx, _u8("p036-a"),
+                 _u8("func a() b { switch c { case e(f g): { } case h(i): { j; } default: { } } }"));
+  run_parse_test(&ctx, _u8("p036-b"),
+                 _u8("func a() b { switch c { case &e(f g): { } case h(i): { j; } default: { } } }"));
+  run_parse_negtest(&ctx, _u8("p036-c"),
+                 _u8("func a() b { switch c { case &e(f g): case h(i): j; default: } }"));
+  run_parse_test(&ctx, _u8("p037"),
+                 _u8("func `~`(x u32) size { }"));
+  run_parse_test(&ctx, _u8("p038"),
+                 _u8("func foo() a { x int; }"));
+  run_parse_test(&ctx, _u8("p039"),
+                 _u8("func foo() a { x int = 3; }"));
+  run_parse_test(&ctx, _u8("p040"),
+                 _u8("func foo() a { for i i32 = 3; i < 3; i = i + 1 { } }"));
+  run_parse_test(&ctx, _u8("p041"),
+                 _u8("func foo() a { if x { } else if y { } else { } }"));
+  run_parse_test(&ctx, _u8("p042"),
+                 _u8("func foo() a { label foo; goto bar; }"));
+  run_parse_test(&ctx, _u8("p043"),
+                 _u8("func foo() a { y union { }; }"));
+  run_parse_test(&ctx, _u8("p046-a"),
+                 _u8("struct foo { x y; z int; t fn[beh]; }"));
+  run_parse_test(&ctx, _u8("p046-b"),
+                 _u8("enum foo { x y; z int; t fn[beh]; }"));
+  run_parse_test(&ctx, _u8("p046-c"),
+                 _u8("enum foo { x y; z int; t fn[beh]; }"));
+  run_parse_test(&ctx, _u8("p046-d"),
+                 _u8("enum foo { x y; #z int; t fn[beh]; }"));
+  run_parse_negtest(&ctx, _u8("p046-e"),
+                    _u8("enum foo { x y; #z int; #t fn[beh]; }"));
+  run_parse_test(&ctx, _u8("p048-a"),
+                 _u8("struct[] foo {x bar [quux]; }\n"));
+  run_parse_negtest(&ctx, _u8("p048-b"),
+                    _u8("struct[] foo {x bar [quux]; };\n"));
+  run_parse_test(&ctx, _u8("p049-a"),
+                 _u8("struct[] foo {x ^[2 + 3]bar; }\n"));
+  run_parse_test(&ctx, _u8("p049-b"),
+                 _u8("struct[T, U] foo {x ^[2 + 3]bar; }\n"));
+  run_parse_test(&ctx, _u8("p050-a"),
+                 _u8("defclass move foo { field ^[7]bar; }\n"
+                     "struct[T] foo { count u32; p ^[3]T; }\n"));
+  run_parse_test(&ctx, _u8("p050-b"),
+                 _u8("defclass move foo { field ^[7]bar; }\n"
+                     "struct[T] foo { count u32; p ^[3]T; }\n"));
+  run_parse_test(&ctx, _u8("p051"),
+                 _u8("defclass copy foo { field bar; }"));
+  run_parse_test(&ctx, _u8("p052"),
+                 _u8("extern putchar fn[i32, i32];"));
+  run_parse_test(&ctx, _u8("p053-a"),
+                 _u8("export def blah fn[i32, i32] = 3;"));
+  run_parse_test(&ctx, _u8("p053-b"),
+                 _u8("export var blah fn[i32, i32] = 3;"));
+  run_parse_test(&ctx, _u8("p054"),
+                 _u8("access string { def foo i32 = 3; }\n"));
+  run_parse_test(&ctx, _u8("p054"),
+                 _u8("access vec[_] { def foo i32 = 3; }\n"));
+  run_parse_test(&ctx, _u8("p055"),
+                 _u8("func foo() a { if case foo(x) = bar { } else if y { } else { } }"));
+  run_parse_test(&ctx, _u8("p056"),
     _u8("func foo() a { if x == 0 { return 1; } else { return 2; } }"));
-  pass = pass & run_parse_negtest(_u8("p057-a"),
+  run_parse_negtest(&ctx, _u8("p057-a"),
     _u8("func foo() a { if a = 3 { } }"));
-  pass = pass & run_parse_negtest(_u8("p057-b"),
+  run_parse_negtest(&ctx, _u8("p057-b"),
     _u8("func foo() a { (a = 3); }"));
-  pass = pass & run_parse_test(_u8("p057-c"),
+  run_parse_test(&ctx, _u8("p057-c"),
     _u8("func foo() a { a = 3; }"));
-  pass = pass & run_parse_negtest(_u8("p058-a"),
+  run_parse_negtest(&ctx, _u8("p058-a"),
     _u8("func foo() a { if a == {1, 2} { return; } }"));
-  pass = pass & run_parse_test(_u8("p058-b"),
+  run_parse_test(&ctx, _u8("p058-b"),
     _u8("func foo() a { if a == ({1, 2}) { return; } }"));
-  pass = pass & run_parse_test(_u8("p058-c"),
+  run_parse_test(&ctx, _u8("p058-c"),
     _u8("func foo() a { if (a == {1, 2}) { return; } }"));
-  pass = pass & run_parse_test(_u8("p059"),
+  run_parse_test(&ctx, _u8("p059"),
     _u8("func foo() a { return x == y then 23 else 45; }"));
-  pass = pass & run_parse_test(_u8("p060"),
+  run_parse_test(&ctx, _u8("p060"),
     _u8("func foo() a { return x == y then blarg then 23 else 64 else 45; }"));
-  pass = pass & run_parse_test(_u8("p061"),
+  run_parse_test(&ctx, _u8("p061"),
     _u8("func foo() a { return x == y then 64 else hey & jay then feh else 45; }"));
-  pass = pass & run_parse_negtest(_u8("p062"),
+  run_parse_negtest(&ctx, _u8("p062"),
     _u8("func `  + `() a { return b; }"));
-  return pass;
+  return ctx.failures == 0;
 }
 

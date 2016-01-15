@@ -60,6 +60,17 @@ func test_platform() platform_info {
   return x86_linux32_platform();
 }
 
+func print_test_announce(neg bool, name array[u8]) void {
+  s array[u8];
+  if neg {
+    s = _u8("test !");
+  } else {
+    s = _u8("test ");
+  }
+  print(Stdout(), s, name, _u8("..."));
+  ign var = fflush(Stdout());
+}
+
 func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
   if case &Has(sname array[u8]) = &ctx->specific_run {
     u8name array[u8] = _u8(name);
@@ -67,8 +78,9 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
       return;
     }
   }
-  print(Stdout(), _u8("test "), _u8(name), _u8("..."));
-  ign var = fflush(Stdout());
+  if ctx->verbose {
+    print_test_announce(false, _u8(name));
+  }
   im identmap = make_im();
   cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
   add_primitives(&cs);
@@ -80,12 +92,17 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
     success = from_np(check_module(&cs, intern(&im, testmodule_name())));
   }
   if !success {
+    if !ctx->verbose {
+      print_test_announce(false, _u8(name));
+    }
     print(Stdout(), _u8("FAIL\n"));
-    ign = fflush(Stdout());
+    ign var = fflush(Stdout());
     ctx->failures = ctx->failures + 1;
   } else {
-    print(Stdout(), _u8("PASS\n"));
-    ign = fflush(Stdout());
+    if ctx->verbose {
+      print(Stdout(), _u8("PASS\n"));
+      ign var = fflush(Stdout());
+    }
   }
 }
 
@@ -96,24 +113,31 @@ func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
       return;
     }
   }
-  print(Stdout(), _u8("test !"), _u8(name), _u8("..."));
-  ign var = fflush(Stdout());
+  if ctx->verbose {
+    print_test_announce(true, _u8(name));
+  }
   im identmap = make_im();
   cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
   add_primitives(&cs);
   if from_np(check_module(&cs, intern(&im, testmodule_name()))) {
+    if !ctx->verbose {
+      print_test_announce(true, _u8(name));
+    }
     print(Stdout(), _u8("FAIL\n"));
-    ign = fflush(Stdout());
+    ign var = fflush(Stdout());
     ctx->failures = ctx->failures + 1;
   } else {
-    print(Stdout(), _u8("PASS\n"));
-    ign = fflush(Stdout());
+    if ctx->verbose {
+      print(Stdout(), _u8("PASS\n"));
+      ign var = fflush(Stdout());
+    }
   }
 }
 
 // TODO: Make test output not go directly to stdout/stderr.
 
 struct check_ctx {
+  verbose bool;
   build bool;
   specific_run opt[array[u8]];
   failures u32;
@@ -1972,13 +1996,15 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"));
 }
 
-func mk_ctx(build bool, name opt[array[u8]]) check_ctx { return {build, name, 0}; }
+func mk_ctx(verbose bool, build bool, name opt[array[u8]]) check_ctx {
+  return {verbose, build, name, 0};
+}
 
-func test_check(build bool) tup[bool, u32] {
-  ctx check_ctx = mk_ctx(build, None);
+func test_check(verbose bool, build bool) tup[bool, u32] {
+  ctx check_ctx = mk_ctx(verbose, build, None);
   test_check_basic_cases(&ctx);
   test_check_lambda_cases(&ctx);
   test_check_more_cases(&ctx);
   test_check_yet_more_cases(&ctx);
-  return cons(ctx.failures == 0, ctx.failures);
+  return {ctx.failures == 0, ctx.failures};
 }

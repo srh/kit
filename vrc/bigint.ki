@@ -539,6 +539,7 @@ func[T] big(arr T) bigint {
 }
 
 struct big_ctx {
+  verbose bool;
   failures u32;
 }
 
@@ -546,15 +547,18 @@ func[T] add_test(ctx *big_ctx, name T, result bool) void {
   name8 array[u8] = _u8(name);
   if !result {
     print(Stdout(), _u8("bigint test "), name8, _u8(" FAIL\n"));
+    ign var = fflush(Stdout());
     ctx->failures = ctx->failures + 1;
   } else {
-    print(Stdout(), _u8("bigint test "), name8, _u8(" PASS\n"));
+    if ctx->verbose {
+      print(Stdout(), _u8("bigint test "), name8, _u8(" PASS\n"));
+      ign var = fflush(Stdout());
+    }
   }
-  ign var = fflush(Stdout());
 }
 
-func test_bigint() bool {
-  ctx big_ctx;
+func test_bigint(verbose bool) bool {
+  ctx big_ctx = {verbose, 0};
   fourg bigint = multiply(@[bigint]~ @[u32]2, ~ @[u32]0x80000000);
   add_test(&ctx, "b001", big("1") + big("2") == big("3"));
   add_test(&ctx, "b002", big("20") + big("30") == big("50"));

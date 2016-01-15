@@ -56,7 +56,9 @@ Again:
 
 # Step 5. Run parsing/typechecking+codegen tests.
 
-   s3 --build  (or ./s3 --build)
+   s3 --build     (or ./s3 --build)
+   s3 --no-build  (removes codegen part of tests)
+   s3             (same as s3 --build, less verbosely)
 
 # Step 6. If you wish, run s3-self on itself
 
@@ -82,8 +84,9 @@ The current directory structure is:
 
    out --test    # runs tests.
    out <modulename>    # builds <modulename>.ki and its imports.
-   s2    # runs parsing/typechecking tests without codegen.
-   s2 --build    # runs parsing/typechecking tests with codegen.
+   s2    # runs parsing/typechecking tests with codegen.
+   s2 --build    # same, verbosely
+   s2 --no-build    # same, verbosely, and without codegen.
    s2 <modulename>  # builds <modulename>.ki and its imports.
    s2 --linux <modulename>  # same but outputs a Linux .o file.
    s2 --osx <modulename>  # same but outputs an OS X .o file.
