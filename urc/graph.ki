@@ -395,21 +395,20 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
 
   fb fullbody_state = {info->all_vars, final_node, label_gn, info->return_cell};
 
-  exit_node sq_num = nopq(gs.gr);
-  body_bu sq_builder = mk_builder(gs.gr);
-  if case Printed(pm) = gr_bracebody(gs, &fb, None, &x->bb, &body_bu) {
+  bu sq_builder = mk_builder(gs.gr);
+  if case Printed(pm) = gr_bracebody(gs, &fb, None, &x->bb, &bu) {
     return Printed(pm);
   }
-  body_gn sq_num = mut_connect(&body_bu, exit_node);
 
   parameter_unwinding gr_num;
   if case Printed(pm) = gr_unwinding(gs, &info->parameter_destructions, &parameter_unwinding) {
     return Printed(pm);
   }
+  add(&bu, parameter_unwinding);
 
-  mut_qnop_node(gs.gr, exit_node, parameter_unwinding, final_node);
+  gn sq_num = mut_connect(&bu, final_node);
 
-  *out = body_gn.x;
+  *out = gn.x;
   return NoFail;
 }
 
