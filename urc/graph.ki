@@ -1202,31 +1202,20 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return sq_mk_strinit(gs, x, &a, bu);
   case &Ternary(a ast_ternary):
     return sq_mk_ternary(gs, x, &a, bu);
-  default:
-    // TODO(): Remove.
-    gn gr_num;
-    if case Printed(pm) = gr_expr(gs, x, &gn) {
-      return Printed(pm);
-    }
-    add(bu, gn);
-    return NoFail;
-  }
-}
-
-func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
-  cs *checkstate = gs.clq->cs;
-  switch &x->u {
   case &QuickReturn(a ast_quickreturn):
     // TODO(): Implement quick-return graphing.
     return ERR(_u8("ICE: quick-return expressions not fully implemented"));
-  default:
-    bu sq_builder = mk_builder(gs.gr);
-    if case Printed(pm) = sq_expr(gs, x, &bu) {
-      return Printed(pm);
-    }
-    *out = done(&bu);
-    return NoFail;
   }
+}
+
+// TODO(): Remove.
+func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
+  bu sq_builder = mk_builder(gs.gr);
+  if case Printed(pm) = sq_expr(gs, x, &bu) {
+    return Printed(pm);
+  }
+  *out = done(&bu);
+  return NoFail;
 }
 
 func sq_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
