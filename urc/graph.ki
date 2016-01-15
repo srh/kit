@@ -1545,11 +1545,9 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
   // The lhs is evaluated before the rhs.  For now.
 
   bu sq_builder = mk_builder(gs.gr);
-  lp gr_num;
-  if case Printed(pm) = gr_expr(gs, oo(&a->lhs), &lp) {
+  if case Printed(pm) = sq_expr(gs, oo(&a->lhs), &bu) {
     return Printed(pm);
   }
-  add(&bu, lp);
   switch un(&a->info) {
   case &StaticSelfAssignment: { }
   case &SimpleMoveAssignment(smi ast_simple_move_assignment_info):
@@ -1562,12 +1560,12 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
   case &ConditionalAssignment(ci ast_conditional_assignment_info): { }
   }
 
-  rp gr_num;
-  if case Printed(pm) = gr_expr(gs, oo(&a->rhs), &rp) {
+  if case Printed(pm) = sq_expr(gs, oo(&a->rhs), &bu) {
     return Printed(pm);
   }
-  add(&bu, rp);
 
+  // We can't early-exit out of these ops (yet?) so we use a sub-bu.
+  assign_bu sq_builder = mk_builder(gs.gr);
   switch un(&a->info) {
     case &StaticSelfAssignment: {
       // Do nothing.
@@ -1578,45 +1576,45 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
       if case Printed(pm) = sq_destroy_action(gs, &smi.target_destroy, DeadAfterDestroyNo, &dgn) {
         return Printed(pm);
       }
+      add(&assign_bu, dgn);
       mgn gr_num;
       if case Printed(pm) = gr_move_action(gs, &smi.rhs_move, &mgn) {
         return Printed(pm);
       }
-      gn1 sq_num = seq2(gs.gr, dgn, mgn);
-      add(&bu, gn1.x);
+      add(&assign_bu, mgn);
     }
     case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info): {
       dgn gr_num;
       if case Printed(pm) = sq_destroy_action(gs, &scdi.target_destroy, DeadAfterDestroyNo, &dgn) {
         return Printed(pm);
       }
+      add(&assign_bu, dgn);
       mgn1 gr_num;
       if case Printed(pm) = gr_copy_action(gs, &scdi.rhs_copy, &mgn1) {
         return Printed(pm);
       }
-      mgn gr_num = seq2(gs.gr, mgn1, gr_maybe_virtualdead(gs, scdi.rhs_copy.x.src)).x;
+      add(&assign_bu, mgn1);
+      add(&assign_bu, gr_maybe_virtualdead(gs, scdi.rhs_copy.x.src));
       drgn gr_num;
       if case Printed(pm) = sq_destroy_action(gs, &scdi.rhs_cleanup, DeadAfterDestroyYes, &drgn) {
         return Printed(pm);
       }
-      gn1 sq_num = seq2(gs.gr, mgn, drgn);
-      gn2 sq_num = seqq(gs.gr, {dgn, gn1});
-      add(&bu, gn2.x);
+      add(&assign_bu, drgn);
     }
     case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): {
       dgn gr_num;
       if case Printed(pm) = sq_destroy_action(gs, &sci.target_destroy, DeadAfterDestroyNo, &dgn) {
         return Printed(pm);
       }
+      add(&assign_bu, dgn);
       mgn gr_num;
       if case Printed(pm) = gr_copy_action(gs, &sci.rhs_copy, &mgn) {
         return Printed(pm);
       }
+      add(&assign_bu, mgn);
       if case DeadMe = sci.rhs_deadme {
-        mgn = seq2(gs.gr, mgn, gr_maybe_virtualdead(gs, sci.rhs_copy.x.src)).x;
+        add(&assign_bu, gr_maybe_virtualdead(gs, sci.rhs_copy.x.src));
       }
-      gn1 sq_num = seq2(gs.gr, dgn, mgn);
-      add(&bu, gn1.x);
     }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
       destcell cell_num = value_cell(oo(&a->lhs));
@@ -1630,44 +1628,49 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
       srcptr cell_num = add_cell(gs.gr, {LocationStatic, ptrtype.cu, ptrtype.props});
       cmp_result cell_num = add_cell(gs.gr, {LocationStatic, booltype.cu, booltype.props});
 
-      funcell_live var = addx(gs.gr, @[gr_xop]GrLive({funcell}));
-      fc var = addx(gs.gr, funcell_live, @[gr_xop]GrWriteConst({funcell, ConstDef(ci.comparecells)}));
-      destptr_live var = addx(gs.gr, @[gr_xop]GrLive({destptr}));
-      dp var = addx(gs.gr, destptr_live, @[gr_xop]GrAddressof({destptr, destcell}));
-      srcptr_live var = addx(gs.gr, @[gr_xop]GrLive({srcptr}));
-      spgn var = addx(gs.gr, srcptr_live, @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
-      cmp_result_live var = addx(gs.gr, @[gr_xop]GrLive({cmp_result}));
-      before_apply var = seq4(gs.gr, cmp_result_live, fc, dp, spgn).x;
-      ap var = addx(gs.gr, before_apply, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result}));
+      add(&assign_bu, @[gr_xop]GrLive({cmp_result}));
+      add(&assign_bu, @[gr_xop]GrLive({funcell}));
+      add(&assign_bu, @[gr_xop]GrWriteConst({funcell, ConstDef(ci.comparecells)}));
+      add(&assign_bu, @[gr_xop]GrLive({destptr}));
+      add(&assign_bu, @[gr_xop]GrAddressof({destptr, destcell}));
+      add(&assign_bu, @[gr_xop]GrLive({srcptr}));
+      add(&assign_bu, @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
+      add(&assign_bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result}));
 
-      just_dead var = addx(gs.gr, @[gr_xop]GrDead({cmp_result}));
+      exit_nopq sq_num = nopq(gs.gr);
+
+      just_dead_bu sq_builder = mk_builder(gs.gr);
+      add(&just_dead_bu, @[gr_xop]GrDead({cmp_result}));
       if case DeadMe = ci.rhs_deadme {
         // TODO: It would be nice if we just had a closing node for virtualdead, maybe also for just_dead, instead of these duplicate tails.
-        just_dead = seq2(gs.gr, just_dead, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src)).x;
+        add(&just_dead_bu, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src));
       }
 
+      do_assign_bu sq_builder = mk_builder(gs.gr);
+      add(&do_assign_bu, @[gr_xop]GrDead({cmp_result}));
       assign_destroy gr_num;
       if case Printed(pm) = sq_destroy_action(gs, &ci.conditional_destroy, DeadAfterDestroyNo, &assign_destroy) {
         return Printed(pm);
       }
+      add(&do_assign_bu, assign_destroy);
       assign_copy gr_num;
       if case Printed(pm) = gr_copy_action(gs, &ci.conditional_copy, &assign_copy) {
         return Printed(pm);
       }
-      assign sq_num = seq2(gs.gr, assign_destroy, assign_copy);
-      dead_before_assign gr_num = addx(gs.gr, @[gr_xop]GrDead({cmp_result}));
-      dead_then_assign gr_num = seqq(gs.gr, {dead_before_assign, assign}).x;
+      add(&do_assign_bu, assign_copy);
       if case DeadMe = ci.rhs_deadme {
-        dead_then_assign = seq2(gs.gr, dead_then_assign, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src)).x;
+        add(&do_assign_bu, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src));
       }
-      cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(~ @[u32] 0), seq1(gs.gr, dead_then_assign)}, {@[gr_const]ConstInt(~ @[u32] 1), seq1(gs.gr, just_dead)});
+      cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(~ @[u32] 0), mut_connect(&do_assign_bu, exit_nopq)}, {@[gr_const]ConstInt(~ @[u32] 1), mut_connect(&just_dead_bu, exit_nopq)});
 
-      br sq_num = seqq(gs.gr, {ap,
-        addq(gs.gr, @[gr_qop]GrBranch({cmp_result, cases, None}))});
+      br sq_num = addq(gs.gr, @[gr_qop]GrBranch({cmp_result, cases, None}));
+
       // br is an expression node -- the cases attach to nopq's -- they're made by seq1 just above.
-      add(&bu, br.x);
+      append(&assign_bu, br, exit_nopq);
     }
   }
+
+  add(&bu, done(&assign_bu));
 
   // TODO: Dedup with local_field code and the other one?
   switch &expr_complete_info(oo(&a->lhs))->lval {
