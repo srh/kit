@@ -1084,12 +1084,9 @@ func sq_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
 
 func sq_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
   add(bu, @[gr_xop]GrLive({result_cell(x)}));
-  // TODO(): Pass bu through.
-  ec gr_num;
-  if case Printed(pm) = sq_expr_consume(gs, x, &ec) {
+  if case Printed(pm) = sq_expr_consume(gs, x, bu) {
     return Printed(pm);
   }
-  add(bu, ec);
   return NoFail;
 }
 
