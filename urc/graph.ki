@@ -202,6 +202,12 @@ func add(bu *sq_builder, gn gr_num) void {
   bu->last = next;
 }
 
+func addo(bu *sq_builder, ogn opt[gr_num]) void {
+  if case Has(gn gr_num) = ogn {
+    add(bu, gn);
+  }
+}
+
 func append(bu *sq_builder, rhs *sq_builder) void {
   gr *frame_graph = bu->gr;
   rhs_gr *frame_graph = rhs->gr;
@@ -1085,10 +1091,10 @@ func sq_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, out *gr_num) np
 }
 
 func sq_expr_consume(gs gr_statep, x *ast_expr_consume, out *gr_num) np {
-  return gr_expr_and_consume(gs, &x->expr, un(&x->after), out);
+  return sq_expr_and_consume(gs, &x->expr, un(&x->after), out);
 }
 
-func gr_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
+func sq_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
   bu sq_builder = mk_builder(gs.gr);
   if case Printed(pm) = sq_consume_actions_before(gs, x, aft, &bu) {
     return Printed(pm);
@@ -1106,15 +1112,14 @@ func gr_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume,
   return NoFail;
 }
 
-func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
+// TODO(): Use bigu.
+func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   cs *checkstate = gs.clq->cs;
   switch &x->u {
   case &NameExpr(a ast_name_expr):
-    return gr_name_expr(gs, x, &a, out);
-  case &ParenExpr(a ast_paren_expr):
-    return gr_expr(gs, oo(&a.expr), out);
+    return sq_name_expr(gs, x, &a, bu);
   case &NumericLiteral(a ast_numeric_literal):
-    return gr_literal(gs, x, numeric_literal_value(&a), out);
+    return sq_literal(gs, x, numeric_literal_value(&a), bu);
   case &BoolLiteral(a ast_bool_literal):
     value bigint;
     if a.value {
@@ -1122,16 +1127,38 @@ func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
     } else {
       value = ~ @[u32] 0;
     }
-    return gr_literal(gs, x, value, out);
+    return sq_literal(gs, x, value, bu);
   case &VoidLiteral(a ast_void_literal):
     value bigint = ~ @[u32] 0;
-    return gr_literal(gs, x, value, out);
+    return sq_literal(gs, x, value, bu);
   case &NullLiteral(a ast_null_literal):
     value bigint = ~ @[u32] 0;
-    return gr_literal(gs, x, value, out);
+    return sq_literal(gs, x, value, bu);
   case &CharLiteral(a ast_char_literal):
     value bigint = ~ a.charspec.value;
-    return gr_literal(gs, x, value, out);
+    return sq_literal(gs, x, value, bu);
+  default:
+    // TODO(): Remove.
+    gn gr_num;
+    if case Printed(pm) = gr_expr(gs, x, &gn) {
+      return Printed(pm);
+    }
+    add(bu, gn);
+    return NoFail;
+  }
+}
+
+func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
+  cs *checkstate = gs.clq->cs;
+  switch &x->u {
+  // case &NameExpr
+  case &ParenExpr(a ast_paren_expr):
+    return gr_expr(gs, oo(&a.expr), out);
+  // case &NumericLiteral
+  // case &BoolLiteral
+  // case &VoidLiteral
+  // case &NullLiteral
+  // case &CharLiteral
 
   case &StringLiteral(a ast_string_literal):
     return gr_string_literal(gs, x, &a, out);
@@ -1164,6 +1191,13 @@ func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   case &QuickReturn(a ast_quickreturn):
     // TODO(): Implement quick-return graphing.
     return ERR(_u8("ICE: quick-return expressions not fully implemented"));
+  default:
+    bu sq_builder = mk_builder(gs.gr);
+    if case Printed(pm) = sq_expr(gs, x, &bu) {
+      return Printed(pm);
+    }
+    *out = done(&bu);
+    return NoFail;
   }
 }
 
@@ -1711,50 +1745,37 @@ func gr_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, out *gr
   return NoFail;
 }
 
-func gr_literal(gs gr_statep, x *ast_expr, value bigint, out *gr_num) np {
-  gn var = addx(gs.gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(value)}));
-  *out = gn;
+func sq_literal(gs gr_statep, x *ast_expr, value bigint, bu *sq_builder) np {
+  add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(value)}));
   return NoFail;
 }
 
-func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, out *gr_num) np {
+func sq_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) np {
   switch un(&a->name_info) {
-    case &LocalResolve(li local_info): {
-      *out = addx(gs.gr, @[gr_xop]GrXNop);
-      return NoFail;
-    }
-    case &GlobalResolve(gi global_info): {
-      *out = addx(gs.gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstDef({gi.ent, gi.inst})}));
-      return NoFail;
-    }
-    case &EnumConstructor(ei enum_constructor_info): {
-      *out = addx(gs.gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstDef(ei.ip)}));
-      return NoFail;
-    }
-    case &EnumVoidConstructed(vi enum_voidconstructed_info): {
-      info var = expr_complete_info(x);
-      x_cell cell_num = rval_cell(x);
-      cu cu_typeexpr;
-      props type_properties;
-      compute_prim(gs.clq, enum_tag_type(gs.clq->cs, &vi.et), &cu, &props);
-      tag_cell cell_num = add_cell(gs.gr, {LocationVirtual, cu, props});
-      field_offset u32 = enum_field_offset(gs.clq->cs, &vi.et, vi.constructor_tag);
-      a_gn var = addx(gs.gr, @[gr_xop]GrSubcell({tag_cell, x_cell, OffsetConst(enum_tag_offset)}));
-      b_gn var = addx(gs.gr, a_gn, @[gr_xop]GrWriteConst({tag_cell, ConstInt(~vi.constructor_tag.x)}));
-      tag_end u32 = enum_tag_offset + props.flat_size;
-      postpadding_ogn opt[gr_num]
-        = gr_bzero_subcell(gs, x_cell, tag_end, info->cu_props.flat_size - tag_end);
-      prec gr_num;
-      if case Has(postpadding_gn) = postpadding_ogn {
-        prec = seq2(gs.gr, b_gn, postpadding_gn).x;
-      } else {
-        prec = b_gn;
-      }
-      c_gn var = addx(gs.gr, prec, @[gr_xop]GrVirtualDead({tag_cell}));
-      *out = c_gn;
-      return NoFail;
-    }
+  case &LocalResolve(li local_info): { }
+  case &GlobalResolve(gi global_info):
+    add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstDef({gi.ent, gi.inst})}));
+  case &EnumConstructor(ei enum_constructor_info):
+    add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstDef(ei.ip)}));
+  case &EnumVoidConstructed(vi enum_voidconstructed_info):
+    sub_bu sq_builder = mk_builder(gs.gr);
+    info *ast_expr_complete_info = expr_complete_info(x);
+    x_cell cell_num = rval_cell(x);
+    cu cu_typeexpr;
+    props type_properties;
+    compute_prim(gs.clq, enum_tag_type(gs.clq->cs, &vi.et), &cu, &props);
+    tag_cell cell_num = add_cell(gs.gr, {LocationVirtual, cu, props});
+    field_offset u32 = enum_field_offset(gs.clq->cs, &vi.et, vi.constructor_tag);
+    add(&sub_bu, @[gr_xop]GrSubcell({tag_cell, x_cell, OffsetConst(enum_tag_offset)}));
+    add(&sub_bu, @[gr_xop]GrWriteConst({tag_cell, ConstInt(~vi.constructor_tag.x)}));
+    tag_end u32 = enum_tag_offset + props.flat_size;
+    postpadding_ogn opt[gr_num]
+      = gr_bzero_subcell(gs, x_cell, tag_end, info->cu_props.flat_size - tag_end);
+    addo(&sub_bu, postpadding_ogn);
+    add(&sub_bu, @[gr_xop]GrVirtualDead({tag_cell}));
+    add(bu, done(&sub_bu));
   }
+  return NoFail;
 }
 
 func ellval_desc(x *is_lval) *lval_description {
