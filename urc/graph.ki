@@ -1316,7 +1316,7 @@ func sq_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
           add(bu, @[gr_xop]GrVirtualDead({desc.num}));
         }
       case &IsLvalNo(desc rval_description):
-        add(bu, gr_maybe_virtualdead(gs, desc.partial_num));
+        addo(bu, sq_maybe_virtualdead(gs, desc.partial_num));
       }
       return NoFail;
     }
@@ -1419,7 +1419,7 @@ func sq_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
         add(bu, @[gr_xop]GrVirtualDead({desc.num}));
       }
     case &IsLvalNo(desc rval_description):
-      add(bu, gr_maybe_virtualdead(gs, desc.partial_num));
+      addo(bu, sq_maybe_virtualdead(gs, desc.partial_num));
     }
     rhs_later gr_num;
     if case Printed(pm) = sq_later_discard(gs, &info->rhs_later, &rhs_later) {
@@ -1527,7 +1527,7 @@ func sq_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
         return Printed(pm);
       }
       add(&assign_bu, mgn1);
-      add(&assign_bu, gr_maybe_virtualdead(gs, scdi.rhs_copy.x.src));
+      addo(&assign_bu, sq_maybe_virtualdead(gs, scdi.rhs_copy.x.src));
       drgn gr_num;
       if case Printed(pm) = sq_destroy_action(gs, &scdi.rhs_cleanup, DeadAfterDestroyYes, &drgn) {
         return Printed(pm);
@@ -1546,7 +1546,7 @@ func sq_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       }
       add(&assign_bu, mgn);
       if case DeadMe = sci.rhs_deadme {
-        add(&assign_bu, gr_maybe_virtualdead(gs, sci.rhs_copy.x.src));
+        addo(&assign_bu, sq_maybe_virtualdead(gs, sci.rhs_copy.x.src));
       }
     }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
@@ -1594,7 +1594,7 @@ func sq_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       // br is an expression node -- the cases attach to nopq's -- they're made by seq1 just above.
       append(&assign_bu, br, exit_nopq);
       if case DeadMe = ci.rhs_deadme {
-        add(&assign_bu, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src));
+        addo(&assign_bu, sq_maybe_virtualdead(gs, ci.conditional_copy.x.src));
       }
     }
   }
@@ -1792,13 +1792,12 @@ enum dead_after_destroy {
   DeadAfterDestroyNo void;
 }
 
-// TODO(): Probably this can use sq_builder pretty well.
-func gr_maybe_virtualdead(gs gr_statep, c cell_num) gr_num {
+func sq_maybe_virtualdead(gs gr_statep, c cell_num) opt[gr_num] {
   switch location(ref_cell(gs.gr, c)) {
   case LocationVirtual:
-    return addx(gs.gr, @[gr_xop]GrVirtualDead({c}));
+    return Has(addx(gs.gr, @[gr_xop]GrVirtualDead({c})));
   case LocationStatic:
-    return addx(gs.gr, @[gr_xop]GrXNop);
+    return None;
   }
 }
 
@@ -1824,7 +1823,7 @@ func sq_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
       return Printed(pm);
     }
     add(bu, dep);
-    add(bu, gr_maybe_virtualdead(gs, cd.copy.x.src));
+    addo(bu, sq_maybe_virtualdead(gs, cd.copy.x.src));
     destroy_gn gr_num;
     if case Printed(pm) = sq_destroy_action(gs, &cd.destroy, DeadAfterDestroyYes, &destroy_gn) {
       return Printed(pm);
@@ -1837,7 +1836,7 @@ func sq_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
     }
     add(bu, dep);
     if case DeadMe = cc.cdr {
-      add(bu, gr_maybe_virtualdead(gs, cc.car.x.src));
+      addo(bu, sq_maybe_virtualdead(gs, cc.car.x.src));
     }
   case &ConsumeByMove(m move_action):
     dep gr_num;
