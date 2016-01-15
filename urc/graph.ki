@@ -1792,18 +1792,6 @@ enum dead_after_destroy {
   DeadAfterDestroyNo void;
 }
 
-func gr_after_actions(gs gr_statep, prec gr_num, x *opt[destroy_action], out *gr_num) np {
-  if case &Has(da destroy_action) = x {
-    dep gr_num;
-    if case Printed(pm) = sq_destroy_action(gs, &da, DeadAfterDestroyYes, &dep) {
-      return Printed(pm);
-    }
-    prec = seq2(gs.gr, prec, dep).x;
-  }
-  *out = prec;
-  return NoFail;
-}
-
 // TODO(): Probably this can use sq_builder pretty well.
 func gr_maybe_virtualdead(gs gr_statep, c cell_num) gr_num {
   switch location(ref_cell(gs.gr, c)) {
