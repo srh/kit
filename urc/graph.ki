@@ -1030,19 +1030,36 @@ func sq_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_nu
 }
 
 func gr_expr_discard(gs gr_statep, x *ast_expr_discard, out *gr_num) np {
+  befaft_gn gr_num;
+  if case Printed(pm) = gr_expr_after_discard_before(gs, &x->expr, un(&x->after), &befaft_gn) {
+    return Printed(pm);
+  }
   dp gr_num;
   if case Printed(pm) = gr_expr(gs, &x->expr, &dp) {
     return Printed(pm);
   }
   after_gn gr_num;
-  if case Printed(pm) = gr_expr_after_discard(gs, &x->expr, un(&x->after), dp, &after_gn) {
+  if case Printed(pm) = gr_expr_after_discard(gs, &x->expr, un(&x->after), &after_gn) {
     return Printed(pm);
   }
-  *out = after_gn;
+  *out = seq3(gs.gr, befaft_gn, dp, after_gn).x;
   return NoFail;
 }
 
-func gr_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, xp gr_num, out *gr_num) np {
+// TODO(): I think this could use sq_builder?
+func gr_expr_after_discard_before(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, out *gr_num) np {
+  switch aft {
+  case &DiscardTemporary(da destroy_action):
+    *out = addx(gs.gr, @[gr_xop]GrLive({whole_cell(x)}));
+  case &DiscardVirtualDead(c cell_num):
+    *out = addx(gs.gr, @[gr_xop]GrXNop);
+  case &DiscardNothing:
+    *out = addx(gs.gr, @[gr_xop]GrXNop);
+  }
+  return NoFail;
+}
+
+func gr_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, out *gr_num) np {
   after_gn gr_num;
   switch aft {
   case &DiscardTemporary(da destroy_action):
@@ -1052,13 +1069,12 @@ func gr_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
     if whole_cell(x) != partial_cell(x) {
       after_gn = seqq(gs.gr, {addx(gs.gr, @[gr_xop]GrVirtualDead({partial_cell(x)})), seq1(gs.gr, after_gn)}).x;
     }
-    xp = gr_live_before(gs.gr, whole_cell(x), xp);
   case &DiscardVirtualDead(c cell_num):
     after_gn = addx(gs.gr, @[gr_xop]GrVirtualDead({c}));
   case &DiscardNothing:
     after_gn = addx(gs.gr, @[gr_xop]GrXNop);
   }
-  *out = seq2(gs.gr, xp, after_gn).x;
+  *out = after_gn;
   return NoFail;
 }
 
@@ -1256,22 +1272,35 @@ func gr_deref_field(gs gr_statep, x *ast_expr, a *ast_deref_field, out *gr_num) 
 
 func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, out *gr_num) np {
   info *ast_local_field_info = un(&a->info);
-  lp gr_num;
-  if case Printed(pm) = gr_expr(gs, oo(&a->lhs), &lp) {
-    return Printed(pm);
-  }
+
   switch info {
     case &ArrayLength(alinfo ast_arraylength_info): {
-      dp gr_num;
-      if case Printed(pm) = gr_expr_after_discard(gs, oo(&a->lhs), &alinfo.after, lp, &dp) {
+      bef_lp gr_num;
+      if case Printed(pm) = gr_expr_after_discard_before(gs, oo(&a->lhs), &alinfo.after, &bef_lp) {
         return Printed(pm);
       }
+
+      lp gr_num;
+      if case Printed(pm) = gr_expr(gs, oo(&a->lhs), &lp) {
+        return Printed(pm);
+      }
+
+      dp gr_num;
+      if case Printed(pm) = gr_expr_after_discard(gs, oo(&a->lhs), &alinfo.after, &dp) {
+        return Printed(pm);
+      }
+
       cp gr_num = addx(gs.gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)}));
-      gn gr_num = seq2(gs.gr, dp, cp).x;
+      gn gr_num = seq4(gs.gr, bef_lp, lp, dp, cp).x;
       *out = gn;
       return NoFail;
     }
     case &FieldName(offset u32): {
+      lp gr_num;
+      if case Printed(pm) = gr_expr(gs, oo(&a->lhs), &lp) {
+        return Printed(pm);
+      }
+
       gn1 var = addx(gs.gr, lp, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst(offset)}));
       gn gr_num;
       switch &expr_complete_info(oo(&a->lhs))->lval {
