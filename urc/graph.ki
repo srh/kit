@@ -583,7 +583,7 @@ func sq_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 
   switch_bu sq_builder = mk_builder(gs.gr);
   swartch_gn gr_num;
-  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->swartch), &swartch_gn) {
+  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->swartch), &swartch_gn) {
     return Printed(pm);
   }
   add(&switch_bu, swartch_gn);
@@ -871,7 +871,7 @@ func sq_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 
 func sq_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn sq_num, out *sq_num) np {
   congn gr_num;
-  if case Printed(pm) = gr_live_and_expr_consume(gs, a, &congn) {
+  if case Printed(pm) = sq_live_and_expr_consume(gs, a, &congn) {
     return Printed(pm);
   }
   cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(~ @[u32] 0), elsegn});
@@ -903,7 +903,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
 
     case &PatternCondition(pa ast_pattern_assign): {
       rhs gr_num;
-      if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&pa.rhs), &rhs) {
+      if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&pa.rhs), &rhs) {
         return Printed(pm);
       }
 
@@ -957,11 +957,11 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
 func sq_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, out *gr_num) np {
   switch &a->rhs {
     case &HasExpr(be box[ast_expr_consume]): {
-      return gr_live_and_expr_consume(gs, oo(&be), out);
+      return sq_live_and_expr_consume(gs, oo(&be), out);
     }
     case &AutoInit(x opt[init_action]): {
       if case &Has(ia init_action) = &x {
-        return gr_init_action(gs, &ia, out);
+        return sq_init_action(gs, &ia, out);
       } else {
         ice(_u8("AutoInit action not annotated"));
         return fake();
@@ -999,7 +999,7 @@ func sq_winding(gs gr_statep, initializations *array[init_action], out *gr_num) 
   n size = count(initializations);
   for i size = 0; i < n; i = i + 1 {
     gn gr_num;
-    if case Printed(pm) = gr_init_action(gs, ref(initializations, i), &gn) {
+    if case Printed(pm) = sq_init_action(gs, ref(initializations, i), &gn) {
       return Printed(pm);
     }
     add(&bu, gn);
@@ -1074,12 +1074,15 @@ func sq_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
   return NoFail;
 }
 
-func gr_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, out *gr_num) np {
+func sq_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, out *gr_num) np {
+  bu sq_builder = mk_builder(gs.gr);
+  add(&bu, @[gr_xop]GrLive({result_cell(x)}));
   ec gr_num;
   if case Printed(pm) = gr_expr_consume(gs, x, &ec) {
     return Printed(pm);
   }
-  *out = gr_live_before(gs.gr, result_cell(x), ec);
+  add(&bu, ec);
+  *out = done(&bu);
   return NoFail;
 }
 
@@ -1241,7 +1244,7 @@ func gr_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, out *gr_num) np {
 
 func gr_deref_field(gs gr_statep, x *ast_expr, a *ast_deref_field, out *gr_num) np {
   rp gr_num;
-  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->lhs), &rp) {
+  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->lhs), &rp) {
     return Printed(pm);
   }
   info *ast_deref_field_info = un(&a->info);
@@ -1366,7 +1369,7 @@ func parsed_inline_to_state_inline(a ast_isinline) should_inline {
 func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, out *gr_num) np {
   info *ast_index_expr_info = un(&a->info);
   rp gr_num;
-  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), &rp) {
+  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), &rp) {
     return Printed(pm);
   }
   lp gr_num;
@@ -1430,7 +1433,7 @@ func sq_later_discard(gs gr_statep, a *ast_later_discard_info, out *gr_num) np {
 
 func gr_mk_deref(gs gr_statep, x *ast_expr, a *ast_deref, out *gr_num) np {
   rp gr_num;
-  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), &rp) {
+  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), &rp) {
     return Printed(pm);
   }
   dp var = addx(gs.gr, rp, @[gr_xop]GrDeref({ellval_cell(x), result_cell(oo(&a->rhs)), OffsetConst(0)}));
@@ -1634,11 +1637,11 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
 
 func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunction, out *gr_num) np {
   lhs_dep gr_num;
-  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->lhs), &lhs_dep) {
+  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->lhs), &lhs_dep) {
     return Printed(pm);
   }
   rhs_dep gr_num;
-  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), &rhs_dep) {
+  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), &rhs_dep) {
     return Printed(pm);
   }
 
@@ -1670,7 +1673,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
 func gr_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, out *gr_num) np {
   nparams size = count(&a->params);
   dep gr_num;
-  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->fun), &dep) {
+  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->fun), &dep) {
     return Printed(pm);
   }
   paramcells array[cell_num];
@@ -1678,7 +1681,7 @@ func gr_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, out *gr_num) np {
   for i size = 0; i < nparams; i = i + 1 {
     param *ast_expr_consume = ref(&a->params, i);
     gn gr_num;
-    if case Printed(pm) = gr_live_and_expr_consume(gs, param, &gn) {
+    if case Printed(pm) = sq_live_and_expr_consume(gs, param, &gn) {
       return Printed(pm);
     }
     dep = seq2(gs.gr, dep, gn).x;
@@ -1919,19 +1922,18 @@ func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num) gr_num {
   return deadret;
 }
 
-func gr_init_action(gs gr_statep, x *init_action, out *gr_num) np {
+func sq_init_action(gs gr_statep, x *init_action, out *gr_num) np {
+  bu sq_builder = mk_builder(gs.gr);
+  add(&bu, @[gr_xop]GrLive({x->x.arg}));
   switch &x->x.ctor {
-    case &TrivialCtor: {
-      dp gr_num = addx(gs.gr, @[gr_xop]GrWriteConst({x->x.arg, ConstInt(~ @[u32] 0)}));
-      *out = gr_live_before(gs.gr, x->x.arg, dp);
-      return NoFail;
-    }
-    case &FunCtor(ip instpair): {
-      dp gr_num = gr_uni_fun(gs, ip, x->x.arg);
-      *out = gr_live_before(gs.gr, x->x.arg, dp);
-      return NoFail;
-    }
+  case &TrivialCtor:
+    add(&bu, @[gr_xop]GrWriteConst({x->x.arg, ConstInt(bigu(0))}));
+  case &FunCtor(ip instpair):
+    dp gr_num = gr_uni_fun(gs, ip, x->x.arg);
+    add(&bu, dp);
   }
+  *out = done(&bu);
+  return NoFail;
 }
 
 func sq_destroy_action(gs gr_statep, x *destroy_action, dad dead_after_destroy, out *gr_num) np {
@@ -2874,7 +2876,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
           celltrack gr_celltrack = mk_celltrack();
           gn gr_num;
-          if case Printed(pm) = gr_live_and_expr_consume({clq, &gr, &celltrack}, &dire.ec, &gn) {
+          if case Printed(pm) = sq_live_and_expr_consume({clq, &gr, &celltrack}, &dire.ec, &gn) {
             inst->graph = FailedComputation;
             return Printed(pm);
           }
