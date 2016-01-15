@@ -1091,10 +1091,6 @@ func gr_xop_before(gr *frame_graph, op gr_xop, after gr_num) gr_num {
   return assert_gn.x;
 }
 
-func gr_live_before(gr *frame_graph, cell cell_num, after gr_num) gr_num {
-  return gr_xop_before(gr, @[gr_xop]GrLive({cell}), after);
-}
-
 func gr_assert_live_before(gr *frame_graph, cell cell_num, after gr_num) gr_num {
   return gr_xop_before(gr, @[gr_xop]GrAssertLive({cell}), after);
 }
@@ -1507,19 +1503,37 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
   // The lhs is an lvalue.  If the rhs is an rvalue, we need to make its cell live.
   // The lhs is evaluated before the rhs.  For now.
 
+  bu sq_builder = mk_builder(gs.gr);
   lp gr_num;
   if case Printed(pm) = gr_expr(gs, oo(&a->lhs), &lp) {
     return Printed(pm);
   }
+  add(&bu, lp);
+  switch un(&a->info) {
+  case &StaticSelfAssignment: { }
+  case &SimpleMoveAssignment(smi ast_simple_move_assignment_info):
+    // rhs is an rvalue.
+    add(&bu, @[gr_xop]GrLive({whole_cell(oo(&a->rhs))}));
+  case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info):
+    // rhs is an rvalue.
+    add(&bu, @[gr_xop]GrLive({whole_cell(oo(&a->rhs))}));
+  case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): { }
+  case &ConditionalAssignment(ci ast_conditional_assignment_info): { }
+  }
+
   rp gr_num;
   if case Printed(pm) = gr_expr(gs, oo(&a->rhs), &rp) {
     return Printed(pm);
   }
+  add(&bu, rp);
+
+  lp_rp gr_num = done(&bu);
+
   assignop_gn gr_num;
   switch un(&a->info) {
     case &StaticSelfAssignment: {
       // rhs is an lvalue.
-      assignop_gn = seq2(gs.gr, lp, rp).x;
+      assignop_gn = lp_rp;
     }
     case &SimpleMoveAssignment(smi ast_simple_move_assignment_info): {
       // rhs is an rvalue.
@@ -1532,8 +1546,6 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
         return Printed(pm);
       }
       gn1 sq_num = seq2(gs.gr, dgn, mgn);
-      // rhs is an rvalue.
-      lp_rp gr_num = seq2(gs.gr, lp, gr_live_before(gs.gr, whole_cell(oo(&a->rhs)), rp)).x;
       gn2 sq_num = seqq(gs.gr, {lp_rp, gn1});
       assignop_gn = gn2.x;
     }
@@ -1553,8 +1565,6 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
       }
       gn1 sq_num = seq2(gs.gr, mgn, drgn);
       gn2 sq_num = seqq(gs.gr, {dgn, gn1});
-      // rhs is an rvalue.
-      lp_rp gr_num = seq2(gs.gr, lp, gr_live_before(gs.gr, whole_cell(oo(&a->rhs)), rp)).x;
       gn3 sq_num = seqq(gs.gr, {lp_rp, gn2});
       assignop_gn = gn3.x;
     }
@@ -1571,9 +1581,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
         mgn = seq2(gs.gr, mgn, gr_maybe_virtualdead(gs, sci.rhs_copy.x.src)).x;
       }
       gn1 sq_num = seq2(gs.gr, dgn, mgn);
-      // rhs is an lvalue.
-      lp_rp_nop gr_num = seq2(gs.gr, lp, rp).x;
-      gn2 sq_num = seqq(gs.gr, {lp_rp_nop, gn1});
+      gn2 sq_num = seqq(gs.gr, {lp_rp, gn1});
       assignop_gn = gn2.x;
     }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
@@ -1622,7 +1630,6 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
 
       br var = seqq(gs.gr, {ap,
         addq(gs.gr, @[gr_qop]GrBranch({cmp_result, cases, None}))});
-      lp_rp gr_num = seq2(gs.gr, lp, rp).x;
       seq_lp_rp_nop var = seqq(gs.gr, {lp_rp, br});
       assignop_gn = seq_lp_rp_nop.x;
     }
