@@ -1172,6 +1172,8 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return sq_mk_addressof(gs, x, &a, bu);
   case &Deref(a ast_deref):
     return sq_mk_deref(gs, x, &a, bu);
+  case &IndexExpr(a ast_index_expr):
+    return sq_index_expr(gs, x, &a, bu);
   default:
     // TODO(): Remove.
     gn gr_num;
@@ -1186,8 +1188,6 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
 func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   cs *checkstate = gs.clq->cs;
   switch &x->u {
-  case &IndexExpr(a ast_index_expr):
-    return sq_index_expr(gs, x, &a, out);
   case &Lambda(a ast_lambda):
     return gr_lambda_expr(gs, x, &a, out);
   case &LocalField(a ast_local_field):
@@ -1399,78 +1399,65 @@ func parsed_inline_to_state_inline(a ast_isinline) should_inline {
   }
 }
 
-func sq_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, out *gr_num) np {
+func sq_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder) np {
   info *ast_index_expr_info = un(&a->info);
   if case &Has(aft tup[ast_expr_after_consume, ast_later_discard_info]) = &info->lhs_after {
     // It's a pointer.
     name cell_num = ellval_cell(x);
     flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
-    bu sq_builder = mk_builder(gs.gr);
-    add(&bu, @[gr_xop]GrLive({result_cell(&aft.car)}));
-    if case Printed(pm) = sq_consume_actions_before(gs, oo(&a->lhs), &aft.car, &bu) {
+    add(bu, @[gr_xop]GrLive({result_cell(&aft.car)}));
+    if case Printed(pm) = sq_consume_actions_before(gs, oo(&a->lhs), &aft.car, bu) {
       return Printed(pm);
     }
 
-    lp gr_num;
-    if case Printed(pm) = gr_expr(gs, oo(&a->lhs), &lp) {
+    if case Printed(pm) = sq_expr(gs, oo(&a->lhs), bu) {
       return Printed(pm);
     }
-    add(&bu, lp);
 
-    if case Printed(pm) = sq_consume_actions(gs, oo(&a->lhs), &aft.car, &bu) {
+    if case Printed(pm) = sq_consume_actions(gs, oo(&a->lhs), &aft.car, bu) {
       return Printed(pm);
     }
-    rp gr_num;
-    if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), &rp) {
+    if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), bu) {
       return Printed(pm);
     }
-    add(&bu, rp);
-    add(&bu, @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
+    add(bu, @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
     rhs_later gr_num;
     if case Printed(pm) = sq_later_discard(gs, &info->rhs_later, &rhs_later) {
       return Printed(pm);
     }
-    add(&bu, rhs_later);
+    add(bu, rhs_later);
     lhs_later gr_num;
     if case Printed(pm) = sq_later_discard(gs, &aft.cdr, &lhs_later) {
       return Printed(pm);
     }
-    add(&bu, lhs_later);
-    *out = done(&bu);
-    return NoFail;
+    add(bu, lhs_later);
   } else {
-    bu sq_builder = mk_builder(gs.gr);
-    lp gr_num;
-    if case Printed(pm) = gr_expr(gs, oo(&a->lhs), &lp) {
+    if case Printed(pm) = sq_expr(gs, oo(&a->lhs), bu) {
       return Printed(pm);
     }
-    add(&bu, lp);
-    rp gr_num;
-    if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), &rp) {
+    if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), bu) {
       return Printed(pm);
     }
-    add(&bu, rp);
     name cell_num = value_cell(x);
     flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
-    add(&bu, @[gr_xop]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
+    add(bu, @[gr_xop]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
     gp gr_num;
     // TODO: Dedup with local_field code?
     switch &expr_complete_info(oo(&a->lhs))->lval {
     case &IsLvalYes(desc lval_description):
       if case DeadMe = desc.deadme {
-        add(&bu, @[gr_xop]GrVirtualDead({desc.num}));
+        add(bu, @[gr_xop]GrVirtualDead({desc.num}));
       }
     case &IsLvalNo(desc rval_description):
-      add(&bu, gr_maybe_virtualdead(gs, desc.partial_num));
+      add(bu, gr_maybe_virtualdead(gs, desc.partial_num));
     }
     rhs_later gr_num;
     if case Printed(pm) = sq_later_discard(gs, &info->rhs_later, &rhs_later) {
       return Printed(pm);
     }
-    add(&bu, rhs_later);
-    *out = done(&bu);
-    return NoFail;
+    add(bu, rhs_later);
   }
+  return NoFail;
 }
 
 func sq_later_discard(gs gr_statep, a *ast_later_discard_info, out *gr_num) np {
