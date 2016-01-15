@@ -236,8 +236,12 @@ func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
 }
 
 func done(bu *sq_builder) gr_num {
+  return doneq(bu).x;
+}
+
+func doneq(bu *sq_builder) sq_num {
   bu->gr = null;
-  return bu->first.x;
+  return bu->first;
 }
 
 func front(bu *sq_builder) sq_num {
@@ -1695,19 +1699,20 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->lhs), &lhs_dep) {
     return Printed(pm);
   }
-  rhs_dep gr_num;
-  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), &rhs_dep) {
+
+  rhs_bu sq_builder = mk_builder(gs.gr);
+  add(&rhs_bu, @[gr_xop]GrDead({result_cell(oo(&a->lhs))}));
+
+  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), &rhs_bu) {
     return Printed(pm);
   }
 
-  rhs_cp_gn gr_num = addx(gs.gr, rhs_dep, @[gr_xop]GrMemCopy({rval_cell(x), result_cell(oo(&a->rhs))}));
-  rhs_dead_gn gr_num = addx(gs.gr, rhs_cp_gn, @[gr_xop]GrDead({result_cell(oo(&a->rhs))}));
+  add(&rhs_bu, @[gr_xop]GrMemCopy({rval_cell(x), result_cell(oo(&a->rhs))}));
+  add(&rhs_bu, @[gr_xop]GrDead({result_cell(oo(&a->rhs))}));
 
-  rhs_lhs_dead_gn gr_num = addx(gs.gr, @[gr_xop]GrDead({result_cell(oo(&a->lhs))}));
-  lhs_dead_then_rhs sq_num = seq2(gs.gr, rhs_lhs_dead_gn, rhs_dead_gn);
-
-  lhs_cp_gn gr_num = addx(gs.gr, @[gr_xop]GrMemCopy({rval_cell(x), result_cell(oo(&a->lhs))}));
-  lhs_dead_gn gr_num = addx(gs.gr, lhs_cp_gn, @[gr_xop]GrDead({result_cell(oo(&a->lhs))}));
+  lhs_bu sq_builder = mk_builder(gs.gr);
+  add(&lhs_bu, @[gr_xop]GrMemCopy({rval_cell(x), result_cell(oo(&a->lhs))}));
+  add(&lhs_bu, @[gr_xop]GrDead({result_cell(oo(&a->lhs))}));
 
   cases array[tup[gr_const, gr_num]];
   short_circuit_case gr_const;
@@ -1720,7 +1725,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
     eval_rhs_case = ConstInt(~ @[u32] 1);
   }
   bn sq_num = seqq(gs.gr, {lhs_dep,
-    addq(gs.gr, @[gr_qop]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, seq1(gs.gr, lhs_dead_gn)}, {eval_rhs_case, lhs_dead_then_rhs}), None}))});
+    addq(gs.gr, @[gr_qop]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, doneq(&lhs_bu)}, {eval_rhs_case, doneq(&rhs_bu)}), None}))});
   *out = bn.x;
   return NoFail;
 }
