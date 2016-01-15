@@ -581,7 +581,8 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   param_discard *te_typeexpr;
   is_ptr bool = decompose_typeapp(&expr_complete_type(&oo(&a->swartch)->expr)->x, primitive_pointer_puretype(gs.clq->cs), &param_discard);
 
-  exitseq sq_num = seqq(gs.gr, {swartch_discard_gn, outflow});
+  swartch_discard_seq sq_num = seqq(gs.gr, {swartch_discard_gn, outflow});
+  exitseq sq_num = nopq(gs.gr);
 
   info *ast_enum_deconstruction_info = un(&a->info);
   cases array[opt[sq_num]] = repeat(info->num_enum_constructors, None);
@@ -634,6 +635,8 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
       }
     }
   }
+
+  mut_qnop_node(gs.gr, exitseq, {@[gr_qop]GrJmp({swartch_discard_seq})});
 
   branch_cases array[tup[gr_const, sq_num]];
   nconstructors size = count(&cases);
