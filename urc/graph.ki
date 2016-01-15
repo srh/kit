@@ -1184,6 +1184,8 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return sq_deref_field(gs, x, &a, bu);
   case &TypedExpr(a ast_typed_expr):
     return sq_expr(gs, oo(&a.expr), bu);
+  case &Strinit(a ast_strinit):
+    return sq_mk_strinit(gs, x, &a, bu);
   default:
     // TODO(): Remove.
     gn gr_num;
@@ -1198,8 +1200,6 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
 func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   cs *checkstate = gs.clq->cs;
   switch &x->u {
-  case &Strinit(a ast_strinit):
-    return gr_mk_strinit(gs, x, &a, out);
   case &Ternary(a ast_ternary):
     return gr_mk_ternary(gs, x, &a, out);
   case &QuickReturn(a ast_quickreturn):
@@ -1259,23 +1259,22 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, out *gr_num) np {
   return NoFail;
 }
 
-func gr_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, out *gr_num) np {
+func sq_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np {
   build gr_num = addx(gs.gr, @[gr_xop]GrXNop);
   nparams size = count(&a->exprs);
-  for i size = nparams; i > 0; {
-    // We declare virtual cells left-to-right and keep them around until every subexpr is evaluated.  (Unwinding will need such.)
-    i = i - 1;
+  for i size = 0; i < nparams; i = i + 1 {
     param *ast_strinit_param = ref(&a->exprs, i);
-    befdep gr_num = addx(gs.gr, @[gr_xop]GrSubcell({result_cell(&param->ec), rval_cell(x), OffsetConst(un(&param->info)->offset)}));
-    dep gr_num;
-    if case Printed(pm) = sq_expr_consume(gs, &param->ec, &dep) {
+    add(bu, @[gr_xop]GrSubcell({result_cell(&param->ec), rval_cell(x), OffsetConst(un(&param->info)->offset)}));
+    if case Printed(pm) = sq_expr_consume(gs, &param->ec, bu) {
       return Printed(pm);
     }
-    aftdep gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({result_cell(&param->ec)}));
-
-    build = seq4(gs.gr, befdep, dep, build, aftdep).x;
   }
-  *out = build;
+  // We declare the virtual cells dead after we're done the whole thing -- because we'll need them for unwinding.
+  for i size = nparams; i > 0; {
+    i = i - 1;
+    param *ast_strinit_param = ref(&a->exprs, i);
+    add(bu, @[gr_xop]GrVirtualDead({result_cell(&param->ec)}));
+  }
   return NoFail;
 }
 
