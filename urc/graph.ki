@@ -1164,6 +1164,8 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return sq_funcall(gs, x, &a, bu);
   case &LogicalConjunction(a ast_logical_conjunction):
     return sq_logical_conjunction(gs, x, &a, bu);
+  case &Assignment(a ast_assignment):
+    return sq_assignment(gs, x, &a, bu);
   default:
     // TODO(): Remove.
     gn gr_num;
@@ -1189,8 +1191,7 @@ func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   // case &StringLiteral
   // case &Funcall
   // case &LogicalConjunction
-  case &Assignment(a ast_assignment):
-    return gr_assignment(gs, x, &a, out);
+  // case &Assignment
   case &RefOf(a ast_refof):
     return gr_mk_refof(gs, x, &a, out);
   case &AddressOf(a ast_addressof):
@@ -1540,27 +1541,26 @@ func gr_mk_refof(gs gr_statep, x *ast_expr, a *ast_refof, out *gr_num) np {
   return NoFail;
 }
 
-func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np {
+func sq_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder) np {
   // The lhs is an lvalue.  If the rhs is an rvalue, we need to make its cell live.
   // The lhs is evaluated before the rhs.  For now.
 
-  bu sq_builder = mk_builder(gs.gr);
-  if case Printed(pm) = sq_expr(gs, oo(&a->lhs), &bu) {
+  if case Printed(pm) = sq_expr(gs, oo(&a->lhs), bu) {
     return Printed(pm);
   }
   switch un(&a->info) {
   case &StaticSelfAssignment: { }
   case &SimpleMoveAssignment(smi ast_simple_move_assignment_info):
     // rhs is an rvalue.
-    add(&bu, @[gr_xop]GrLive({whole_cell(oo(&a->rhs))}));
+    add(bu, @[gr_xop]GrLive({whole_cell(oo(&a->rhs))}));
   case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info):
     // rhs is an rvalue.
-    add(&bu, @[gr_xop]GrLive({whole_cell(oo(&a->rhs))}));
+    add(bu, @[gr_xop]GrLive({whole_cell(oo(&a->rhs))}));
   case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): { }
   case &ConditionalAssignment(ci ast_conditional_assignment_info): { }
   }
 
-  if case Printed(pm) = sq_expr(gs, oo(&a->rhs), &bu) {
+  if case Printed(pm) = sq_expr(gs, oo(&a->rhs), bu) {
     return Printed(pm);
   }
 
@@ -1641,10 +1641,6 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
 
       just_dead_bu sq_builder = mk_builder(gs.gr);
       add(&just_dead_bu, @[gr_xop]GrDead({cmp_result}));
-      if case DeadMe = ci.rhs_deadme {
-        // TODO: It would be nice if we just had a closing node for virtualdead, maybe also for just_dead, instead of these duplicate tails.
-        add(&just_dead_bu, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src));
-      }
 
       do_assign_bu sq_builder = mk_builder(gs.gr);
       add(&do_assign_bu, @[gr_xop]GrDead({cmp_result}));
@@ -1658,19 +1654,19 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
         return Printed(pm);
       }
       add(&do_assign_bu, assign_copy);
-      if case DeadMe = ci.rhs_deadme {
-        add(&do_assign_bu, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src));
-      }
       cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(~ @[u32] 0), mut_connect(&do_assign_bu, exit_nopq)}, {@[gr_const]ConstInt(~ @[u32] 1), mut_connect(&just_dead_bu, exit_nopq)});
 
       br sq_num = addq(gs.gr, @[gr_qop]GrBranch({cmp_result, cases, None}));
 
       // br is an expression node -- the cases attach to nopq's -- they're made by seq1 just above.
       append(&assign_bu, br, exit_nopq);
+      if case DeadMe = ci.rhs_deadme {
+        add(&assign_bu, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src));
+      }
     }
   }
 
-  add(&bu, done(&assign_bu));
+  add(bu, done(&assign_bu));
 
   // TODO: Dedup with local_field code and the other one?
   switch &expr_complete_info(oo(&a->lhs))->lval {
@@ -1678,13 +1674,12 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
     ice(_u8("gr_assignment into rvalue wtf"));
   case &IsLvalYes(desc lval_description):
     if case DeadMe = desc.deadme {
-      add(&bu, @[gr_xop]GrVirtualDead({desc.num}));
+      add(bu, @[gr_xop]GrVirtualDead({desc.num}));
     }
   }
 
   // TODO: Having to set this void cell is grotesque -- assignment should be a statement.
-  add(&bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(bigu(0))}));
-  *out = done(&bu);
+  add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(bigu(0))}));
   return NoFail;
 }
 
