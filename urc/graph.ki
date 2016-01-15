@@ -1315,9 +1315,7 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, out *gr_num) 
           gn = gn1;
         }
       case &IsLvalNo(desc rval_description):
-        if case Printed(pm) = gr_chain_virtualdead(gs, gn1, desc.partial_num, &gn) {
-          return Printed(pm);
-        }
+        gn = seq2(gs.gr, gn1, gr_maybe_virtualdead(gs, desc.partial_num)).x;
       }
       *out = gn;
       return NoFail;
@@ -1427,9 +1425,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, out *gr_num) np
         gp = gp1;
       }
     case &IsLvalNo(desc rval_description):
-      if case Printed(pm) = gr_chain_virtualdead(gs, gp1, desc.partial_num, &gp) {
-        return Printed(pm);
-      }
+      gp = seq2(gs.gr, gp1, gr_maybe_virtualdead(gs, desc.partial_num)).x;
     }
     gp_later sq_num = seq2(gs.gr, gp, rhs_later);
     *out = gp_later.x;
@@ -1536,10 +1532,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
       if case Printed(pm) = gr_copy_action(gs, &scdi.rhs_copy, &mgn1) {
         return Printed(pm);
       }
-      mgn gr_num;
-      if case Printed(pm) = gr_chain_virtualdead(gs, mgn1, scdi.rhs_copy.x.src, &mgn) {
-        return Printed(pm);
-      }
+      mgn gr_num = seq2(gs.gr, mgn1, gr_maybe_virtualdead(gs, scdi.rhs_copy.x.src)).x;
       drgn gr_num;
       if case Printed(pm) = sq_destroy_action(gs, &scdi.rhs_cleanup, DeadAfterDestroyYes, &drgn) {
         return Printed(pm);
@@ -1561,9 +1554,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
         return Printed(pm);
       }
       if case DeadMe = sci.rhs_deadme {
-        if case Printed(pm) = gr_chain_virtualdead(gs, mgn, sci.rhs_copy.x.src, &mgn) {
-          return Printed(pm);
-        }
+        mgn = seq2(gs.gr, mgn, gr_maybe_virtualdead(gs, sci.rhs_copy.x.src)).x;
       }
       gn1 sq_num = seq2(gs.gr, dgn, mgn);
       // rhs is an lvalue.
@@ -1596,9 +1587,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
       just_dead var = addx(gs.gr, @[gr_xop]GrDead({cmp_result}));
       if case DeadMe = ci.rhs_deadme {
         // TODO: It would be nice if we just had a closing node for virtualdead, maybe also for just_dead, instead of these duplicate tails.
-        if case Printed(pm) = gr_chain_virtualdead(gs, just_dead, ci.conditional_copy.x.src, &just_dead) {
-          return Printed(pm);
-        }
+        just_dead = seq2(gs.gr, just_dead, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src)).x;
       }
 
       assign_destroy gr_num;
@@ -1613,9 +1602,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
       dead_before_assign gr_num = addx(gs.gr, @[gr_xop]GrDead({cmp_result}));
       dead_then_assign gr_num = seqq(gs.gr, {dead_before_assign, assign}).x;
       if case DeadMe = ci.rhs_deadme {
-        if case Printed(pm) = gr_chain_virtualdead(gs, dead_then_assign, ci.conditional_copy.x.src, &dead_then_assign) {
-          return Printed(pm);
-        }
+        dead_then_assign = seq2(gs.gr, dead_then_assign, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src)).x;
       }
       cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(~ @[u32] 0), seq1(gs.gr, dead_then_assign)}, {@[gr_const]ConstInt(~ @[u32] 1), seq1(gs.gr, just_dead)});
 
@@ -1851,14 +1838,14 @@ func gr_after_actions(gs gr_statep, prec gr_num, x *opt[destroy_action], out *gr
   return NoFail;
 }
 
-func gr_chain_virtualdead(gs gr_statep, prec gr_num, c cell_num, out *gr_num) np {
+// TODO(): Probably this can use sq_builder pretty well.
+func gr_maybe_virtualdead(gs gr_statep, c cell_num) gr_num {
   switch location(ref_cell(gs.gr, c)) {
   case LocationVirtual:
-    *out = addx(gs.gr, prec, @[gr_xop]GrVirtualDead({c}));
+    return addx(gs.gr, @[gr_xop]GrVirtualDead({c}));
   case LocationStatic:
-    *out = prec;
+    return addx(gs.gr, @[gr_xop]GrXNop);
   }
-  return NoFail;
 }
 
 func gr_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, out *gr_num) np {
@@ -1885,9 +1872,7 @@ func gr_consume_actions(gs gr_statep, prec gr_num, expr *ast_expr, aft *ast_expr
     if case Printed(pm) = gr_copy_action(gs, &cd.copy, &dep) {
       return Printed(pm);
     }
-    if case Printed(pm) = gr_chain_virtualdead(gs, dep, cd.copy.x.src, &dep) {
-      return Printed(pm);
-    }
+    dep = seq2(gs.gr, dep, gr_maybe_virtualdead(gs, cd.copy.x.src)).x;
     prec = seq2(gs.gr, prec, dep).x;
     if case Printed(pm) = sq_destroy_action(gs, &cd.destroy, DeadAfterDestroyYes, &dep) {
       return Printed(pm);
@@ -1899,9 +1884,7 @@ func gr_consume_actions(gs gr_statep, prec gr_num, expr *ast_expr, aft *ast_expr
       return Printed(pm);
     }
     if case DeadMe = cc.cdr {
-      if case Printed(pm) = gr_chain_virtualdead(gs, dep, cc.car.x.src, &dep) {
-        return Printed(pm);
-      }
+      dep = seq2(gs.gr, dep, gr_maybe_virtualdead(gs, cc.car.x.src)).x;
     }
     prec = seq2(gs.gr, prec, dep).x;
   case &ConsumeByMove(m move_action):
