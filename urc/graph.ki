@@ -1182,6 +1182,8 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return sq_local_field(gs, x, &a, bu);
   case &DerefField(a ast_deref_field):
     return sq_deref_field(gs, x, &a, bu);
+  case &TypedExpr(a ast_typed_expr):
+    return sq_expr(gs, oo(&a.expr), bu);
   default:
     // TODO(): Remove.
     gn gr_num;
@@ -1196,8 +1198,6 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
 func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   cs *checkstate = gs.clq->cs;
   switch &x->u {
-  case &TypedExpr(a ast_typed_expr):
-    return gr_expr(gs, oo(&a.expr), out);
   case &Strinit(a ast_strinit):
     return gr_mk_strinit(gs, x, &a, out);
   case &Ternary(a ast_ternary):
