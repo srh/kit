@@ -1086,15 +1086,6 @@ func sq_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, out *gr_num) np
   return NoFail;
 }
 
-func gr_xop_before(gr *frame_graph, op gr_xop, after gr_num) gr_num {
-  assert_gn sq_num = seq2(gr, addx(gr, op), after);
-  return assert_gn.x;
-}
-
-func gr_assert_live_before(gr *frame_graph, cell cell_num, after gr_num) gr_num {
-  return gr_xop_before(gr, @[gr_xop]GrAssertLive({cell}), after);
-}
-
 func gr_expr_consume(gs gr_statep, x *ast_expr_consume, out *gr_num) np {
   return gr_expr_and_consume(gs, &x->expr, un(&x->after), out);
 }
