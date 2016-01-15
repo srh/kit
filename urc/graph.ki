@@ -396,10 +396,11 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   fb fullbody_state = {info->all_vars, final_node, label_gn, info->return_cell};
 
   exit_node sq_num = nopq(gs.gr);
-  body_gn sq_num;
-  if case Printed(pm) = gr_bracebody(gs, &fb, None, &x->bb, exit_node, &body_gn) {
+  body_bu sq_builder = mk_builder(gs.gr);
+  if case Printed(pm) = gr_bracebody(gs, &fb, None, &x->bb, &body_bu) {
     return Printed(pm);
   }
+  body_gn sq_num = mut_connect(&body_bu, exit_node);
 
   parameter_unwinding gr_num;
   if case Printed(pm) = gr_unwinding(gs, &info->parameter_destructions, &parameter_unwinding) {
@@ -416,18 +417,6 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
 struct breakgrack {
   break_target sq_num;
   continue_target sq_num;
-}
-
-// TODO(): Remove.
-func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, outflow sq_num, out *sq_num) np {
-  bu sq_builder = mk_builder(gs.gr);
-
-  if case Printed(pm) = gr_bracebody(gs, fb, obg, x, &bu) {
-    return Printed(pm);
-  }
-
-  *out = mut_connect(&bu, outflow);
-  return NoFail;
 }
 
 func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, bu *sq_builder) np {
@@ -732,10 +721,11 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
 
   bp breakgrack = {outflow, continue_target};
 
-  thengn sq_num;
-  if case Printed(pm) = gr_bracebody(gs, fb, Has(bp), &a->body, continuegn, &thengn) {
+  body_bu sq_builder = mk_builder(gs.gr);
+  if case Printed(pm) = gr_bracebody(gs, fb, Has(bp), &a->body, &body_bu) {
     return Printed(pm);
   }
+  thengn sq_num = mut_connect(&body_bu, continuegn);
 
   gn sq_num;
   if case &Has(cond ast_expr_condition) = &a->condition {
@@ -867,10 +857,11 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
     return Printed(pm);
   }
   thengn sq_num = mut_connect(&then_bu, join_target);
-  elsegn sq_num;
-  if case Printed(pm) = gr_bracebody(gs, fb, obg, &a->elsebody, join_target, &elsegn) {
+  else_bu sq_builder = mk_builder(gs.gr);
+  if case Printed(pm) = gr_bracebody(gs, fb, obg, &a->elsebody, &else_bu) {
     return Printed(pm);
   }
+  elsegn sq_num = mut_connect(&else_bu, join_target);
 
   jmp_qnop_node(gs.gr, then_nop, thengn);
   jmp_qnop_node(gs.gr, else_nop, elsegn);
