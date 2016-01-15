@@ -573,18 +573,25 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 }
 
 func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_switch_statement, outflow sq_num, out *sq_num) np {
-  swartch_discard_gn gr_num;
-  if case Printed(pm) = gr_later_discard(gs, &a->swartch_discard, &swartch_discard_gn) {
-    return Printed(pm);
-  }
-
   param_discard *te_typeexpr;
   is_ptr bool = decompose_typeapp(&expr_complete_type(&oo(&a->swartch)->expr)->x, primitive_pointer_puretype(gs.clq->cs), &param_discard);
 
-  swartch_discard_seq sq_num = seqq(gs.gr, {swartch_discard_gn, outflow});
-  exitseq sq_num = nopq(gs.gr);
+  switch_bu sq_builder = mk_builder(gs.gr);
+  swartch_gn gr_num;
+  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->swartch), &swartch_gn) {
+    return Printed(pm);
+  }
+  add(&switch_bu, swartch_gn);
 
   info *ast_enum_deconstruction_info = un(&a->info);
+  if is_ptr {
+    add(&switch_bu, @[gr_xop]GrDeref({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
+  } else {
+    add(&switch_bu, @[gr_xop]GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
+  }
+
+  exitseq sq_num = nopq(gs.gr);
+
   cases array[opt[sq_num]] = repeat(info->num_enum_constructors, None);
   default_case opt[sq_num] = None;
   ncases size = count(&a->cases);
@@ -636,7 +643,12 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
     }
   }
 
-  mut_qnop_node(gs.gr, exitseq, {@[gr_qop]GrJmp({swartch_discard_seq})});
+  swartch_discard_gn gr_num;
+  if case Printed(pm) = gr_later_discard(gs, &a->swartch_discard, &swartch_discard_gn) {
+    return Printed(pm);
+  }
+
+  mut_qnop_node(gs.gr, exitseq, swartch_discard_gn, outflow);
 
   branch_cases array[tup[gr_const, sq_num]];
   nconstructors size = count(&cases);
@@ -648,19 +660,6 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
         push(&branch_cases, {ConstInt(bigu(mk_enum_tag_value(i).x)), dq});
       }
     }
-  }
-
-  switch_bu sq_builder = mk_builder(gs.gr);
-  swartch_gn gr_num;
-  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->swartch), &swartch_gn) {
-    return Printed(pm);
-  }
-  add(&switch_bu, swartch_gn);
-
-  if is_ptr {
-    add(&switch_bu, @[gr_xop]GrDeref({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
-  } else {
-    add(&switch_bu, @[gr_xop]GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
   }
 
   br_point sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&branch_cases), None}));
