@@ -235,6 +235,10 @@ func front(bu *sq_builder) sq_num {
   return bu->first;
 }
 
+func last(bu *sq_builder) sq_num {
+  return bu->last;
+}
+
 inline func ref_cell(gr *frame_graph, c cell_num) *cell_info {
   return ref(&gr->cells, c.x);
 }
@@ -550,23 +554,8 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
 }
 
 func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) np {
-  st_bu sq_builder = mk_builder(gs.gr);
-  bn sq_num = st_bu.first;
-  gn sq_num;
-  if case Printed(pm) = gr_label_statement(gs, fb, a, bn, &gn) {
-    return Printed(pm);
-  }
-  st_bu.first = gn;
-  append(bu, &st_bu);
-  // TODO(): Stop this awful surgery.
-  return NoFail;
-}
-
-func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, outflow sq_num, out *sq_num) np {
   gn sq_num = get(&fb->label_gn, un(&a->info)->label_number.x);
-  mut_qnop_node(gs.gr, gn, {@[gr_qop]GrJmp({outflow})});
-  // Should we set *out to gn or outflow?  When labels get fancier, the answer will matter.
-  *out = gn;
+  mut_qnop_node(gs.gr, gn, {@[gr_qop]GrJmp({last(bu)})});
   return NoFail;
 }
 
