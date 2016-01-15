@@ -1078,14 +1078,23 @@ func sq_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
   return NoFail;
 }
 
-func sq_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, out *gr_num) np {
-  bu sq_builder = mk_builder(gs.gr);
-  add(&bu, @[gr_xop]GrLive({result_cell(x)}));
+func sq_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
+  add(bu, @[gr_xop]GrLive({result_cell(x)}));
+  // TODO(): Pass bu through.
   ec gr_num;
   if case Printed(pm) = sq_expr_consume(gs, x, &ec) {
     return Printed(pm);
   }
-  add(&bu, ec);
+  add(bu, ec);
+  return NoFail;
+}
+
+// TODO(): Remove this.
+func sq_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, out *gr_num) np {
+  bu sq_builder = mk_builder(gs.gr);
+  if case Printed(pm) = sq_live_and_expr_consume(gs, x, &bu) {
+    return Printed(pm);
+  }
   *out = done(&bu);
   return NoFail;
 }
@@ -1118,6 +1127,8 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   switch &x->u {
   case &NameExpr(a ast_name_expr):
     return sq_name_expr(gs, x, &a, bu);
+  case &ParenExpr(a ast_paren_expr):
+    return sq_expr(gs, oo(&a.expr), bu);
   case &NumericLiteral(a ast_numeric_literal):
     return sq_literal(gs, x, numeric_literal_value(&a), bu);
   case &BoolLiteral(a ast_bool_literal):
@@ -1137,6 +1148,10 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   case &CharLiteral(a ast_char_literal):
     value bigint = ~ a.charspec.value;
     return sq_literal(gs, x, value, bu);
+  case &StringLiteral(a ast_string_literal):
+    return sq_string_literal(gs, x, &a, bu);
+  case &Funcall(a ast_funcall):
+    return sq_funcall(gs, x, &a, bu);
   default:
     // TODO(): Remove.
     gn gr_num;
@@ -1152,18 +1167,15 @@ func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   cs *checkstate = gs.clq->cs;
   switch &x->u {
   // case &NameExpr
-  case &ParenExpr(a ast_paren_expr):
-    return gr_expr(gs, oo(&a.expr), out);
+  // case &ParenExpr
   // case &NumericLiteral
   // case &BoolLiteral
   // case &VoidLiteral
   // case &NullLiteral
   // case &CharLiteral
 
-  case &StringLiteral(a ast_string_literal):
-    return gr_string_literal(gs, x, &a, out);
-  case &Funcall(a ast_funcall):
-    return gr_funcall(gs, x, &a, out);
+  // case &StringLiteral
+  // case &Funcall
   case &LogicalConjunction(a ast_logical_conjunction):
     return gr_logical_conjunction(gs, x, &a, out);
   case &Assignment(a ast_assignment):
@@ -1707,29 +1719,25 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   return NoFail;
 }
 
-func gr_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, out *gr_num) np {
+func sq_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, bu *sq_builder) np {
   nparams size = count(&a->params);
-  dep gr_num;
-  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->fun), &dep) {
+  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->fun), bu) {
     return Printed(pm);
   }
   paramcells array[cell_num];
   reserve(&paramcells, nparams);
   for i size = 0; i < nparams; i = i + 1 {
     param *ast_expr_consume = ref(&a->params, i);
-    gn gr_num;
-    if case Printed(pm) = sq_live_and_expr_consume(gs, param, &gn) {
+    if case Printed(pm) = sq_live_and_expr_consume(gs, param, bu) {
       return Printed(pm);
     }
-    dep = seq2(gs.gr, dep, gn).x;
     push(&paramcells, result_cell(param));
   }
-  ap var = addx(gs.gr, dep, @[gr_xop]GrApply({result_cell(oo(&a->fun)), freeze(&paramcells), rval_cell(x)}));
-  *out = ap;
+  add(bu, @[gr_xop]GrApply({result_cell(oo(&a->fun)), freeze(&paramcells), rval_cell(x)}));
   return NoFail;
 }
 
-func gr_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, out *gr_num) np {
+func sq_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_builder) np {
   bytes array[u8];
   nchars size = count(&a->charspecs);
   reserve(&bytes, nchars);
@@ -1740,8 +1748,7 @@ func gr_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, out *gr
     }
     push(&bytes, ~ch);
   }
-  gn var = addx(gs.gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstBytes(freeze(&bytes))}));
-  *out = gn;
+  add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstBytes(freeze(&bytes))}));
   return NoFail;
 }
 
