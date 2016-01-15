@@ -1164,7 +1164,7 @@ func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   case &Deref(a ast_deref):
     return gr_mk_deref(gs, x, &a, out);
   case &IndexExpr(a ast_index_expr):
-    return gr_index_expr(gs, x, &a, out);
+    return sq_index_expr(gs, x, &a, out);
   case &Lambda(a ast_lambda):
     return gr_lambda_expr(gs, x, &a, out);
   case &LocalField(a ast_local_field):
@@ -1369,20 +1369,8 @@ func parsed_inline_to_state_inline(a ast_isinline) should_inline {
   }
 }
 
-func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, out *gr_num) np {
+func sq_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, out *gr_num) np {
   info *ast_index_expr_info = un(&a->info);
-  rp gr_num;
-  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), &rp) {
-    return Printed(pm);
-  }
-  lp gr_num;
-  if case Printed(pm) = gr_expr(gs, oo(&a->lhs), &lp) {
-    return Printed(pm);
-  }
-  rhs_later gr_num;
-  if case Printed(pm) = sq_later_discard(gs, &info->rhs_later, &rhs_later) {
-    return Printed(pm);
-  }
   if case &Has(aft tup[ast_expr_after_consume, ast_later_discard_info]) = &info->lhs_after {
     // It's a pointer.
     name cell_num = ellval_cell(x);
@@ -1395,7 +1383,10 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, out *gr_num) np
     }
     add(&bu, bef_lp);
 
-    // TODO(): lp must be evaled in order.
+    lp gr_num;
+    if case Printed(pm) = gr_expr(gs, oo(&a->lhs), &lp) {
+      return Printed(pm);
+    }
     add(&bu, lp);
 
     consume_gn gr_num;
@@ -1403,38 +1394,55 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, out *gr_num) np
       return Printed(pm);
     }
     add(&bu, consume_gn);
-    // Important: lhs is evaluated before rhs here.
+    rp gr_num;
+    if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), &rp) {
+      return Printed(pm);
+    }
     add(&bu, rp);
     add(&bu, @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
+    rhs_later gr_num;
+    if case Printed(pm) = sq_later_discard(gs, &info->rhs_later, &rhs_later) {
+      return Printed(pm);
+    }
+    add(&bu, rhs_later);
     lhs_later gr_num;
     if case Printed(pm) = sq_later_discard(gs, &aft.cdr, &lhs_later) {
       return Printed(pm);
     }
-    // TODO(): Compute rhs_later here, in the right order.
-    laters var = seq2(gs.gr, rhs_later, lhs_later).x;
-    add(&bu, laters);
+    add(&bu, lhs_later);
     *out = done(&bu);
     return NoFail;
   } else {
+    bu sq_builder = mk_builder(gs.gr);
+    lp gr_num;
+    if case Printed(pm) = gr_expr(gs, oo(&a->lhs), &lp) {
+      return Printed(pm);
+    }
+    add(&bu, lp);
+    rp gr_num;
+    if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), &rp) {
+      return Printed(pm);
+    }
+    add(&bu, rp);
     name cell_num = value_cell(x);
     flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
-    // Important: lhs is evaluated before rhs here.
-    before_subcell var = seq2(gs.gr, lp, rp).x;
-    gp1 var = addx(gs.gr, before_subcell, @[gr_xop]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
+    add(&bu, @[gr_xop]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
     gp gr_num;
     // TODO: Dedup with local_field code?
     switch &expr_complete_info(oo(&a->lhs))->lval {
     case &IsLvalYes(desc lval_description):
       if case DeadMe = desc.deadme {
-        gp = addx(gs.gr, gp1, @[gr_xop]GrVirtualDead({desc.num}));
-      } else {
-        gp = gp1;
+        add(&bu, @[gr_xop]GrVirtualDead({desc.num}));
       }
     case &IsLvalNo(desc rval_description):
-      gp = seq2(gs.gr, gp1, gr_maybe_virtualdead(gs, desc.partial_num)).x;
+      add(&bu, gr_maybe_virtualdead(gs, desc.partial_num));
     }
-    gp_later sq_num = seq2(gs.gr, gp, rhs_later);
-    *out = gp_later.x;
+    rhs_later gr_num;
+    if case Printed(pm) = sq_later_discard(gs, &info->rhs_later, &rhs_later) {
+      return Printed(pm);
+    }
+    add(&bu, rhs_later);
+    *out = done(&bu);
     return NoFail;
   }
 }
