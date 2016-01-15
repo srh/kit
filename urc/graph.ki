@@ -1387,27 +1387,33 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, out *gr_num) np
     // It's a pointer.
     name cell_num = ellval_cell(x);
     flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
+    bu sq_builder = mk_builder(gs.gr);
+    add(&bu, @[gr_xop]GrLive({result_cell(&aft.car)}));
     bef_lp gr_num;
     if case Printed(pm) = sq_consume_actions_before(gs, oo(&a->lhs), &aft.car, &bef_lp) {
       return Printed(pm);
     }
+    add(&bu, bef_lp);
+
+    // TODO(): lp must be evaled in order.
+    add(&bu, lp);
 
     consume_gn gr_num;
     if case Printed(pm) = sq_consume_actions(gs, oo(&a->lhs), &aft.car, &consume_gn) {
       return Printed(pm);
     }
-    lgn gr_num = seq3(gs.gr, bef_lp, lp, consume_gn).x;
-    live_before_lgn var = gr_live_before(gs.gr, result_cell(&aft.car), lgn);
+    add(&bu, consume_gn);
     // Important: lhs is evaluated before rhs here.
-    before_deref var = seq2(gs.gr, live_before_lgn, rp).x;
-    gp var = addx(gs.gr, before_deref, @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
+    add(&bu, rp);
+    add(&bu, @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
     lhs_later gr_num;
     if case Printed(pm) = sq_later_discard(gs, &aft.cdr, &lhs_later) {
       return Printed(pm);
     }
+    // TODO(): Compute rhs_later here, in the right order.
     laters var = seq2(gs.gr, rhs_later, lhs_later).x;
-    gp_laters var = seq2(gs.gr, gp, laters);
-    *out = gp_laters.x;
+    add(&bu, laters);
+    *out = done(&bu);
     return NoFail;
   } else {
     name cell_num = value_cell(x);
