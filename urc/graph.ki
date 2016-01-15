@@ -1166,6 +1166,10 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return sq_logical_conjunction(gs, x, &a, bu);
   case &Assignment(a ast_assignment):
     return sq_assignment(gs, x, &a, bu);
+  case &RefOf(a ast_refof):
+    return sq_mk_refof(gs, x, &a, bu);
+  case &AddressOf(a ast_addressof):
+    return sq_mk_addressof(gs, x, &a, bu);
   default:
     // TODO(): Remove.
     gn gr_num;
@@ -1180,22 +1184,6 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
 func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   cs *checkstate = gs.clq->cs;
   switch &x->u {
-  // case &NameExpr
-  // case &ParenExpr
-  // case &NumericLiteral
-  // case &BoolLiteral
-  // case &VoidLiteral
-  // case &NullLiteral
-  // case &CharLiteral
-
-  // case &StringLiteral
-  // case &Funcall
-  // case &LogicalConjunction
-  // case &Assignment
-  case &RefOf(a ast_refof):
-    return gr_mk_refof(gs, x, &a, out);
-  case &AddressOf(a ast_addressof):
-    return gr_mk_addressof(gs, x, &a, out);
   case &Deref(a ast_deref):
     return gr_mk_deref(gs, x, &a, out);
   case &IndexExpr(a ast_index_expr):
@@ -1505,39 +1493,29 @@ func gr_mk_deref(gs gr_statep, x *ast_expr, a *ast_deref, out *gr_num) np {
   return NoFail;
 }
 
-func gr_mk_addressof(gs gr_statep, x *ast_expr, a *ast_addressof, out *gr_num) np {
+func sq_mk_addressof(gs gr_statep, x *ast_expr, a *ast_addressof, bu *sq_builder) np {
   // This is a total copy/paste of gr_mk_refof.
-  rp gr_num;
-  if case Printed(pm) = gr_expr(gs, oo(&a->rhs), &rp) {
+  if case Printed(pm) = sq_expr(gs, oo(&a->rhs), bu) {
     return Printed(pm);
   }
   desc *lval_description = ellval_desc(oo(&a->rhs));
-  ap1 gr_num = addx(gs.gr, rp, @[gr_xop]GrAddressof({rval_cell(x), desc->num}));
-  ap gr_num;
+  add(bu, @[gr_xop]GrAddressof({rval_cell(x), desc->num}));
   if case DeadMe = desc->deadme {
-    ap = addx(gs.gr, ap1, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->rhs))}));
-  } else {
-    ap = ap1;
+    add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->rhs))}));
   }
-  *out = ap;
   return NoFail;
 }
 
-func gr_mk_refof(gs gr_statep, x *ast_expr, a *ast_refof, out *gr_num) np {
+func sq_mk_refof(gs gr_statep, x *ast_expr, a *ast_refof, bu *sq_builder) np {
   // This is a total copy/paste of gr_mk_addressof.
-  rp gr_num;
-  if case Printed(pm) = gr_expr(gs, oo(&a->rhs), &rp) {
+  if case Printed(pm) = sq_expr(gs, oo(&a->rhs), bu) {
     return Printed(pm);
   }
   desc *lval_description = ellval_desc(oo(&a->rhs));
-  ap1 gr_num = addx(gs.gr, rp, @[gr_xop]GrAddressof({rval_cell(x), desc->num}));
-  ap gr_num;
+  add(bu, @[gr_xop]GrAddressof({rval_cell(x), desc->num}));
   if case DeadMe = desc->deadme {
-    ap = addx(gs.gr, ap1, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->rhs))}));
-  } else {
-    ap = ap1;
+    add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->rhs))}));
   }
-  *out = ap;
   return NoFail;
 }
 
