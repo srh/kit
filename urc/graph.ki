@@ -1174,6 +1174,13 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return sq_mk_deref(gs, x, &a, bu);
   case &IndexExpr(a ast_index_expr):
     return sq_index_expr(gs, x, &a, bu);
+  case &Lambda(a ast_lambda):
+    gn gr_num;
+    if case Printed(pm) = sq_lambda_expr(gs, x, &a, &gn) {
+      return Printed(pm);
+    }
+    add(bu, gn);
+    return NoFail;
   default:
     // TODO(): Remove.
     gn gr_num;
@@ -1188,8 +1195,6 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
 func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   cs *checkstate = gs.clq->cs;
   switch &x->u {
-  case &Lambda(a ast_lambda):
-    return gr_lambda_expr(gs, x, &a, out);
   case &LocalField(a ast_local_field):
     return gr_local_field(gs, x, &a, out);
   case &DerefField(a ast_deref_field):
@@ -1362,7 +1367,7 @@ func gr_deaden(gs gr_statep, c cell_num) void {
   return deaden(&gs.celltrack->liveset, c);
 }
 
-func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
+func sq_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
   lambda_celltrack gr_celltrack = mk_celltrack();
