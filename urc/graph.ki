@@ -1568,13 +1568,9 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
   }
   add(&bu, rp);
 
-  lp_rp gr_num = done(&bu);
-
-  assignop_gn gr_num;
   switch un(&a->info) {
     case &StaticSelfAssignment: {
-      // rhs is an lvalue.
-      assignop_gn = lp_rp;
+      // Do nothing.
     }
     case &SimpleMoveAssignment(smi ast_simple_move_assignment_info): {
       // rhs is an rvalue.
@@ -1587,8 +1583,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
         return Printed(pm);
       }
       gn1 sq_num = seq2(gs.gr, dgn, mgn);
-      gn2 sq_num = seqq(gs.gr, {lp_rp, gn1});
-      assignop_gn = gn2.x;
+      add(&bu, gn1.x);
     }
     case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info): {
       dgn gr_num;
@@ -1606,8 +1601,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
       }
       gn1 sq_num = seq2(gs.gr, mgn, drgn);
       gn2 sq_num = seqq(gs.gr, {dgn, gn1});
-      gn3 sq_num = seqq(gs.gr, {lp_rp, gn2});
-      assignop_gn = gn3.x;
+      add(&bu, gn2.x);
     }
     case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): {
       dgn gr_num;
@@ -1622,8 +1616,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
         mgn = seq2(gs.gr, mgn, gr_maybe_virtualdead(gs, sci.rhs_copy.x.src)).x;
       }
       gn1 sq_num = seq2(gs.gr, dgn, mgn);
-      gn2 sq_num = seqq(gs.gr, {lp_rp, gn1});
-      assignop_gn = gn2.x;
+      add(&bu, gn1.x);
     }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
       destcell cell_num = value_cell(oo(&a->lhs));
@@ -1669,29 +1662,26 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
       }
       cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(~ @[u32] 0), seq1(gs.gr, dead_then_assign)}, {@[gr_const]ConstInt(~ @[u32] 1), seq1(gs.gr, just_dead)});
 
-      br var = seqq(gs.gr, {ap,
+      br sq_num = seqq(gs.gr, {ap,
         addq(gs.gr, @[gr_qop]GrBranch({cmp_result, cases, None}))});
-      seq_lp_rp_nop var = seqq(gs.gr, {lp_rp, br});
-      assignop_gn = seq_lp_rp_nop.x;
+      // br is an expression node -- the cases attach to nopq's -- they're made by seq1 just above.
+      add(&bu, br.x);
     }
   }
 
   // TODO: Dedup with local_field code and the other one?
-  deaden_lhs opt[gr_num];
   switch &expr_complete_info(oo(&a->lhs))->lval {
   case &IsLvalNo(desc rval_description):
     ice(_u8("gr_assignment into rvalue wtf"));
   case &IsLvalYes(desc lval_description):
     if case DeadMe = desc.deadme {
-      deaden_lhs = Has(addx(gs.gr, @[gr_xop]GrVirtualDead({desc.num})));
-    } else {
-      deaden_lhs = None;
+      add(&bu, @[gr_xop]GrVirtualDead({desc.num}));
     }
   }
 
   // TODO: Having to set this void cell is grotesque -- assignment should be a statement.
-  set_voidcell gr_num = addx(gs.gr, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(bigu(0))}));
-  *out = seq(gs.gr, Has(assignop_gn), deaden_lhs, Has(set_voidcell)).x;
+  add(&bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(bigu(0))}));
+  *out = done(&bu);
   return NoFail;
 }
 
