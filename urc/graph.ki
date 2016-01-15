@@ -1170,6 +1170,8 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return sq_mk_refof(gs, x, &a, bu);
   case &AddressOf(a ast_addressof):
     return sq_mk_addressof(gs, x, &a, bu);
+  case &Deref(a ast_deref):
+    return sq_mk_deref(gs, x, &a, bu);
   default:
     // TODO(): Remove.
     gn gr_num;
@@ -1184,8 +1186,6 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
 func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
   cs *checkstate = gs.clq->cs;
   switch &x->u {
-  case &Deref(a ast_deref):
-    return gr_mk_deref(gs, x, &a, out);
   case &IndexExpr(a ast_index_expr):
     return sq_index_expr(gs, x, &a, out);
   case &Lambda(a ast_lambda):
@@ -1478,18 +1478,16 @@ func sq_later_discard(gs gr_statep, a *ast_later_discard_info, out *gr_num) np {
   return sq_destroy_action(gs, da, DeadAfterDestroyYes, out);
 }
 
-func gr_mk_deref(gs gr_statep, x *ast_expr, a *ast_deref, out *gr_num) np {
-  rp gr_num;
-  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), &rp) {
+func sq_mk_deref(gs gr_statep, x *ast_expr, a *ast_deref, bu *sq_builder) np {
+  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->rhs), bu) {
     return Printed(pm);
   }
-  dp var = addx(gs.gr, rp, @[gr_xop]GrDeref({ellval_cell(x), result_cell(oo(&a->rhs)), OffsetConst(0)}));
+  add(bu, @[gr_xop]GrDeref({ellval_cell(x), result_cell(oo(&a->rhs)), OffsetConst(0)}));
   ap gr_num;
   if case Printed(pm) = sq_later_discard(gs, &a->ptr_discard, &ap) {
     return Printed(pm);
   }
-  gn sq_num = seq2(gs.gr, dp, ap);
-  *out = gn.x;
+  add(bu, ap);
   return NoFail;
 }
 
