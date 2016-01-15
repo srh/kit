@@ -921,7 +921,9 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
       for i size = 0; i < n; i = i + 1 {
         tag enum_tag_value = mk_enum_tag_value(i);
         if info->matching_tag_value.x == tag.x {
+          case_bu sq_builder = mk_builder(gs.gr);
           cp_info *ast_cp_info = un(&pa.pattern.cp_info);
+          add(&case_bu, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
           if case Has(vn var_number) = cp_info->ovn {
             vi *var_info = ref(&fb->all_vars, vn.x);
             vcgn gr_num;
@@ -930,15 +932,10 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
             } else {
               vcgn = addx(gs.gr, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)}));
             }
-            gn var = seqq(gs.gr, {vcgn, thengn});
-            tagdead gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
-            thenseq sq_num = seqq(gs.gr, {tagdead, gn});
-            push(&cases, {@[gr_const]ConstInt(~tag.x), thenseq});
-          } else {
-            tagdead gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
-            thenseq sq_num = seqq(gs.gr, {tagdead, thengn});
-            push(&cases, {@[gr_const]ConstInt(~tag.x), thenseq});
+            add(&case_bu, vcgn);
           }
+          thenseq sq_num = mut_connect(&case_bu, thengn);
+          push(&cases, {@[gr_const]ConstInt(~tag.x), thenseq});
         } else {
           tagdead gr_num = addx(gs.gr, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
           elseseq sq_num = seqq(gs.gr, {tagdead, elsegn});
