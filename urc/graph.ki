@@ -1162,6 +1162,8 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return sq_string_literal(gs, x, &a, bu);
   case &Funcall(a ast_funcall):
     return sq_funcall(gs, x, &a, bu);
+  case &LogicalConjunction(a ast_logical_conjunction):
+    return sq_logical_conjunction(gs, x, &a, bu);
   default:
     // TODO(): Remove.
     gn gr_num;
@@ -1186,8 +1188,7 @@ func gr_expr(gs gr_statep, x *ast_expr, out *gr_num) np {
 
   // case &StringLiteral
   // case &Funcall
-  case &LogicalConjunction(a ast_logical_conjunction):
-    return gr_logical_conjunction(gs, x, &a, out);
+  // case &LogicalConjunction
   case &Assignment(a ast_assignment):
     return gr_assignment(gs, x, &a, out);
   case &RefOf(a ast_refof):
@@ -1694,9 +1695,10 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, out *gr_num) np
   return NoFail;
 }
 
-func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunction, out *gr_num) np {
-  lhs_dep gr_num;
-  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->lhs), &lhs_dep) {
+func sq_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunction, bu *sq_builder) np {
+  end_nopq sq_num = nopq(gs.gr);
+
+  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->lhs), bu) {
     return Printed(pm);
   }
 
@@ -1724,9 +1726,8 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
     short_circuit_case = ConstInt(~ @[u32] 0);
     eval_rhs_case = ConstInt(~ @[u32] 1);
   }
-  bn sq_num = seqq(gs.gr, {lhs_dep,
-    addq(gs.gr, @[gr_qop]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, doneq(&lhs_bu)}, {eval_rhs_case, doneq(&rhs_bu)}), None}))});
-  *out = bn.x;
+  bn sq_num = addq(gs.gr, @[gr_qop]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, mut_connect(&lhs_bu, end_nopq)}, {eval_rhs_case, mut_connect(&rhs_bu, end_nopq)}), None}));
+  append(bu, bn, end_nopq);
   return NoFail;
 }
 
