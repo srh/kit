@@ -2003,7 +2003,6 @@ struct gr_minimal_basics {
 struct gr_basics {
   minimal gr_minimal_basics;
   pointeecells array[cell_num];
-  deref_prec gr_num;
 }
 
 func add_minimal_basics(gs gr_statep, size u32, arity size, out *gr_minimal_basics) void {
@@ -2020,20 +2019,18 @@ func add_minimal_basics(gs gr_statep, size u32, arity size, out *gr_minimal_basi
   *out = ret;
 }
 
-func sq_add_basics(gs gr_statep, size u32, arity size, out *gr_basics) void {
+func sq_add_basics(gs gr_statep, size u32, arity size, out *gr_basics, bu *sq_builder) void {
   cs *checkstate = gs.clq->cs;
   ret gr_basics;
   add_minimal_basics(gs, size, arity, &ret.minimal);
 
   pointee_tp cu_typrop = compute_prim(gs.clq, primitive_padding_type(cs, size));
-  bu sq_builder = mk_builder(gs.gr);
   for i size = 0; i < arity; i = i + 1 {
     pc cell_num = add_cell(gs.gr, {LocationVirtual, pointee_tp.cu, pointee_tp.props});
     push(&ret.pointeecells, pc);
     dn gr_num = addx(gs.gr, @[gr_xop]GrDeref({pc, get(&ret.minimal.argcells, i), OffsetConst(0)}));
-    add(&bu, dn);
+    add(bu, dn);
   }
-  ret.deref_prec = done(&bu);
   *out = ret;
 }
 
@@ -2074,9 +2071,8 @@ func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_o
   celltrack gr_celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &celltrack};
   bas gr_basics;
-  sq_add_basics(gs, *un(&mm->size), 2, &bas);
   bu sq_builder = mk_builder(gs.gr);
-  add(&bu, bas.deref_prec);
+  sq_add_basics(gs, *un(&mm->size), 2, &bas, &bu);
   add(&bu, @[gr_xop]GrMemCopy({get(&bas.pointeecells, 0), get(&bas.pointeecells, 1)}));
   sq_basics_cleanup(gs, &bas, &bu);
   *gn_out = done(&bu);
@@ -2091,9 +2087,8 @@ func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *
   celltrack gr_celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &celltrack};
   bas gr_basics;
-  sq_add_basics(gs, *un(&mb->size), 1, &bas);
   bu sq_builder = mk_builder(gs.gr);
-  add(&bu, bas.deref_prec);
+  sq_add_basics(gs, *un(&mb->size), 1, &bas, &bu);
   add(&bu, @[gr_xop]GrWriteConst({get(&bas.pointeecells, 0), ConstInt(bigu(0))}));
   sq_basics_cleanup(gs, &bas, &bu);
   *gn_out = done(&bu);
