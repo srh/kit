@@ -2548,7 +2548,6 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
       push(&fieldcellgn, gn);
     }
 
-    sub_bu sq_builder = mk_builder(&gr);
     field_gn gr_num;
     if case Has(ip instpair) = get(&msi->fips, i) {
       fieldptrtype cu_typeexpr;
@@ -2556,7 +2555,8 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
       compute_prim(clq, ptr_type(cs, ref(&st->fields, i)->type), &fieldptrtype, &fieldptrtype_props);
 
       fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-      fieldretgn gr_num = addx(&gr, @[gr_xop]GrLive({fieldretcell}));
+      sub_bu sq_builder = mk_builder(&gr);
+      add(&sub_bu, @[gr_xop]GrLive({fieldretcell}));
 
       fntype cu_typeexpr;
       fntype_props type_properties;
@@ -2564,8 +2564,8 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
 
       func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
 
-      func_cell_live gr_num = addx(&gr, @[gr_xop]GrLive({func_cell}));
-      func_gn gr_num = addx(&gr, func_cell_live, @[gr_xop]GrWriteConst({func_cell, ConstDef(ip)}));
+      add(&sub_bu, @[gr_xop]GrLive({func_cell}));
+      add(&sub_bu, @[gr_xop]GrWriteConst({func_cell, ConstDef(ip)}));
 
       fieldptrcella array[cell_num];
       prec gr_num = nopq(&gr).x;
@@ -2575,18 +2575,14 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
         fpc_live gr_num = addx(&gr, @[gr_xop]GrLive({fpc}));
         gn1 gr_num = addx(&gr, seq2(&gr, fpc_live, get(&fieldcellgn, j)).x, @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
         gn gr_num = addx(&gr, gn1, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
-        prec = seq2(&gr, prec, gn).x;
+        add(&sub_bu, gn);
       }
 
-      prec = seq2(&gr, func_gn, prec).x;
+      add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
 
-      prec = seq2(&gr, fieldretgn, prec).x;
+      add(&sub_bu, @[gr_xop]GrDead({fieldretcell}));
 
-      ap gr_num = addx(&gr, prec, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
-
-      vd gr_num = addx(&gr, ap, @[gr_xop]GrDead({fieldretcell}));
-
-      field_gn = vd;
+      field_gn = done(&sub_bu);
     } else {
       ogn opt[gr_num];
       switch wc {
