@@ -2342,9 +2342,8 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
       push(&fieldcellgn, sn);
     }
 
-    last_ogn gr_num;
+    sub_bu sq_builder = mk_builder(&gr);
     if case &Has(ip instpair) = ref(&mei->cips, i) {
-      sub_bu sq_builder = mk_builder(&gr);
       fieldptrtype cu_typeexpr;
       fieldptrtype_props type_properties;
       compute_prim(clq, ptr_type(cs, fieldtype.x), &fieldptrtype, &fieldptrtype_props);
@@ -2372,9 +2371,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
 
       add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
       add(&sub_bu, @[gr_xop]GrDead({fieldretcell}));
-      last_ogn = done(&sub_bu);
     } else {
-      sub_bu sq_builder = mk_builder(&gr);
       evaled_fieldcellops bool = true;
       if case CtorDestroy = wc {
         evaled_fieldcellops = false;
@@ -2398,24 +2395,22 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
           add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
         }
       }
-      last_ogn = done(&sub_bu);
     }
 
-    tagset_ogn opt[gr_num];
     switch wc {
     case CtorInit:
       ice(_u8("CtorInit on wc type"));
     case CtorCopy:
-      tgn var = addx(&gr, @[gr_xop]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.x)}));
-      tagset_ogn = Has(tgn);
+      add(&sub_bu, @[gr_xop]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.x)}));
     case CtorMove:
-      tgn var = addx(&gr, @[gr_xop]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.x)}));
-      tagset_ogn = Has(tgn);
-    case CtorDestroy:
-      tagset_ogn = None;
+      add(&sub_bu, @[gr_xop]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.x)}));
+    case CtorDestroy: { }
     }
 
-    finalgn gr_num = addx(&gr, seq(&gr, tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn).x, @[gr_xop]GrXNop);
+    addo(&sub_bu, prepadding_ogn);
+    addo(&sub_bu, postpadding_ogn);
+
+    finalgn gr_num = done(&sub_bu);
 
     finalseqgn sq_num = seqq(&gr, {finalgn, join_target});
     push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), finalseqgn});
