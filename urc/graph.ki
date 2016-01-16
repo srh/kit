@@ -2291,7 +2291,8 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   argcells array[cell_num];
   pointeecells array[cell_num];
   tagcells array[cell_num];
-  tagcell_gn gr_num = nopq(&gr).x;
+
+  deref_bu sq_builder = mk_builder(&gr);
   nargs size = num_args(wc);
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = add_cell(&gr, {LocationStatic, argtp.cu, argtp.props});
@@ -2301,13 +2302,12 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     tc cell_num = add_cell(&gr, {LocationVirtual, tagtype, tagtype_props});
     push(&tagcells, tc);
 
-    derefgn1 gr_num = addx(&gr, @[gr_xop]GrDeref({pc, ac, OffsetConst(0)}));
-    derefgn gr_num = addx(&gr, derefgn1, @[gr_xop]GrDead({ac}));
-    tcgn gr_num = addx(&gr, derefgn, @[gr_xop]GrSubcell({tc, pc, OffsetConst(enum_tag_offset)}));
-    tagcell_gn = seq2(&gr, tagcell_gn, tcgn).x;
+    add(&deref_bu, @[gr_xop]GrDeref({pc, ac, OffsetConst(0)}));
+    add(&deref_bu, @[gr_xop]GrDead({ac}));
+    add(&deref_bu, @[gr_xop]GrSubcell({tc, pc, OffsetConst(enum_tag_offset)}));
   }
 
-  deref_gn gr_num = tagcell_gn;
+  deref_gn gr_num = done(&deref_bu);
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
   deadprec gr_num;
