@@ -1284,11 +1284,15 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
 
 // NOTE(): gr_statep wasteful.
 func gr_create(gs gr_statep, c cell_num) void {
-  return gr_create(&gs.celltrack->liveset, c);
+  gr_create(&gs.celltrack->liveset, c);
 }
 
 func gr_deaden(gs gr_statep, c cell_num) void {
-  return deaden(&gs.celltrack->liveset, c);
+  deaden(&gs.celltrack->liveset, c);
+}
+
+func gr_expect_live(gs gr_statep, c cell_num) void {
+  expect_live(&gs.celltrack->liveset, c);
 }
 
 func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
