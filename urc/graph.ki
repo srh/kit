@@ -147,19 +147,49 @@ func untracked_addx(gr *frame_graph, op gr_xop) gr_num {
 }
 
 func addx(gs gr_statep, op gr_xop) gr_num {
+  if false {
   switch &op {
-  case &GrApply(a gr_apply): { }
-  case &GrPrimApply(a gr_prim_apply): { }
-  case &GrMemCopy(a gr_memcopy): { }
-  case &GrWriteConst(a gr_writeconst): { }
-  case &GrAddressof(a gr_addressof): { }
-  case &GrDeref(a gr_deref): { }
-  case &GrSubcell(a gr_subcell): { }
-  case &GrLive(a gr_live): { }
-  case &GrAssertLive(a gr_assert_live): { }
-  case &GrDead(a gr_dead): { }
-  case &GrVirtualDead(a gr_virtual_dead): { }
+  case &GrApply(a gr_apply):
+    gr_expect_live(gs, a.retcell);
+
+    gr_deaden(gs, a.funcell);
+    nparams size = count(&a.params);
+    for i size = 0; i < nparams; i = i + 1 {
+      gr_deaden(gs, get(&a.params, i));
+    }
+  case &GrPrimApply(a gr_prim_apply):
+    gr_expect_live(gs, a.retcell);
+
+    nparams size = count(&a.params);
+    for i size = 0; i < nparams; i = i + 1 {
+      gr_deaden(gs, get(&a.params, i));
+    }
+  case &GrMemCopy(a gr_memcopy):
+    gr_expect_live(gs, a.dest);
+    gr_expect_live(gs, a.src);
+  case &GrWriteConst(a gr_writeconst):
+    gr_expect_live(gs, a.dest);
+  case &GrAddressof(a gr_addressof):
+    gr_expect_live(gs, a.addressee);
+    gr_expect_live(gs, a.dest);
+  case &GrDeref(a gr_deref):
+    gr_expect_live(gs, a.pointer);
+    check(!isLocationStatic(ref_cell(gs.gr, a.name)->location));
+    gr_create(gs, a.name);
+  case &GrSubcell(a gr_subcell):
+    gr_expect_live(gs, a.partof);
+    check(!isLocationStatic(ref_cell(gs.gr, a.name)->location));
+    gr_create(gs, a.name);
+  case &GrLive(a gr_live):
+    gr_create(gs, a.cell);
+  case &GrAssertLive(a gr_assert_live):
+    gr_expect_live(gs, a.cell);
+  case &GrDead(a gr_dead):
+    gr_deaden(gs, a.cell);
+  case &GrVirtualDead(a gr_virtual_dead):
+    gr_deaden(gs, a.cell);
   }
+  }  // if false
 
   return untracked_addx(gs.gr, op);
 }
