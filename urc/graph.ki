@@ -2102,7 +2102,7 @@ func sq_magic_ctor(clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_gr
   info *magic_ctor_info = un(&mc->info);
   switch info {
   case &MagicStructInfo(msi magic_struct_info):
-    return gr_magic_struct_info(clq, wc, &msi, gr_out, gn_out, return_cell_out, arg_cells_out);
+    return sq_magic_struct_info(clq, wc, &msi, gr_out, gn_out, return_cell_out, arg_cells_out);
   case &MagicEnumInfo(mei magic_enum_info):
     return gr_magic_enum_info(clq, wc, &mei, gr_out, gn_out, return_cell_out, arg_cells_out);
   case &MagicArraytypeInfo(mai magic_arraytype_info):
@@ -2477,7 +2477,7 @@ func seq(gr *frame_graph, a opt[gr_num], b opt[gr_num]) sq_num {
   return build;
 }
 
-func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
+func sq_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   cs *checkstate = clq->cs;
   // Destructors go in reverse order (which means we prepend them in the reverse of reverse order).
   reverse_order bool = false;
