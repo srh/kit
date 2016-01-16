@@ -924,13 +924,11 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
           add(&case_bu, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
           if case Has(vn var_number) = cp_info->ovn {
             vi *var_info = ref(&fb->all_vars, vn.x);
-            vcgn gr_num;
             if isHas(&pa.pattern.addressof_constructor) {
-              vcgn = addx(gs.gr, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)}));
+              add(&case_bu, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)}));
             } else {
-              vcgn = addx(gs.gr, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)}));
+              add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)}));
             }
-            add(&case_bu, vcgn);
           }
           thenseq sq_num = mut_connect(&case_bu, thengn);
           push(&cases, {@[gr_const]ConstInt(~tag.x), thenseq});
