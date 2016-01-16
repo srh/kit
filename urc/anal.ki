@@ -255,7 +255,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
               // A GrApply always needs the return cell to be live before it's called.  So we add GrAssertLive to verify that's the case.
               funcell_dead_op gr_num = help_add_node(gr, @[gr_node]XOp({@[gr_xop]GrDead({a.funcell})}));
               seqer sq_num = seqq(gr, {funcell_dead_op,
-                                       seqq(gr, {addx(gr, @[gr_xop]GrAssertLive({a.retcell})),
+                                       seqq(gr, {untracked_addx(gr, @[gr_xop]GrAssertLive({a.retcell})),
                                                  seqq(gr, {base_op_adjusted,
                                                            nopq(gr)})})});
 
