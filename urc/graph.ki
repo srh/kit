@@ -2334,12 +2334,11 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
       = gr_bzero_subcell(gs, get(&pointeecells, 0), field_end, mei->cu_props.flat_size - field_end);
 
     fieldcella array[cell_num];
-    fieldcellgn array[gr_num];
+    fieldcellops array[gr_xop];
     for j size = 0; j < nargs; j = j + 1 {
       fc cell_num = add_cell(&gr, {LocationVirtual, fieldtype, fieldtype_props});
       push(&fieldcella, fc);
-      sn gr_num = addx(&gr, @[gr_xop]GrSubcell({get(&fieldcella, j), get(&pointeecells, j), OffsetConst(field_offset)}));
-      push(&fieldcellgn, sn);
+      push(&fieldcellops, @[gr_xop]GrSubcell({get(&fieldcella, j), get(&pointeecells, j), OffsetConst(field_offset)}));
     }
 
     sub_bu sq_builder = mk_builder(&gr);
@@ -2364,7 +2363,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
         fpc cell_num = add_cell(&gr, {LocationStatic, fieldptrtype, fieldptrtype_props});
         push(&fieldptrcella, fpc);
         add(&sub_bu, @[gr_xop]GrLive({fpc}));
-        add(&sub_bu, get(&fieldcellgn, j));
+        add(&sub_bu, get(&fieldcellops, j));
         add(&sub_bu, @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
         add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
@@ -2377,7 +2376,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
         evaled_fieldcellops = false;
       } else {
         for j size = 0; j < nargs; j = j + 1 {
-          add(&sub_bu, get(&fieldcellgn, j));
+          add(&sub_bu, get(&fieldcellops, j));
         }
         switch wc {
         case CtorInit:
