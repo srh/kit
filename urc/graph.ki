@@ -712,15 +712,6 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     condition_else_gn = None;
   }
 
-  loopcleanupgn gr_num;
-  if case &Has(cond ast_expr_condition) = &a->condition {
-    if case Printed(pm) = sq_later_discard(gs, &cond.discard, &loopcleanupgn) {
-      return Printed(pm);
-    }
-  } else {
-    loopcleanupgn = addx(gs.gr, @[gr_xop]GrXNop);
-  }
-
   continue_target sq_num;
   continue_nopq sq_num = nopq(gs.gr);
 
@@ -729,6 +720,15 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
   body_bu sq_builder = mk_builder(gs.gr);
   if case Printed(pm) = sq_bracebody(gs, fb, Has(bp), &a->body, &body_bu) {
     return Printed(pm);
+  }
+
+  loopcleanupgn gr_num;
+  if case &Has(cond ast_expr_condition) = &a->condition {
+    if case Printed(pm) = sq_later_discard(gs, &cond.discard, &loopcleanupgn) {
+      return Printed(pm);
+    }
+  } else {
+    loopcleanupgn = addx(gs.gr, @[gr_xop]GrXNop);
   }
 
   continuegn sq_num;
