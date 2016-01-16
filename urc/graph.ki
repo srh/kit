@@ -2165,9 +2165,24 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   bu sq_builder = mk_builder(&gr);
   add(&bu, done(&deref_bu));
 
-  return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
+  terminal_case u32;
+  init_value u32;
+  if case CtorDestroy = wc {
+    init_value = arraycount;
+    terminal_case = 0;
+  } else {
+    init_value = 0;
+    terminal_case = arraycount;
+  }
 
   indexcell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
+  add(&bu, @[gr_xop]GrLive({indexcell}));
+  add(&bu, @[gr_xop]GrWriteConst({indexcell, ConstInt(bigu(init_value))}));
+  
+
+
+  return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
+
 
   deadseq_nopq sq_num = nopq(&gr);
 
@@ -2218,17 +2233,11 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   }
   incrgn gr_num = addx(&gr, seq2(&gr, ic2gn, onegn).x, @[gr_xop]GrPrimApply({PrimNum({cs->plat.sizetraits.flat.size, cs->plat.sizetraits.numeric, op_action}), mk_shray(ic2cell, onecell), indexcell}));
 
-  terminal_case u32;
-  init_value u32;
   body_gn sq_num;
   if case CtorDestroy = wc {
     body_gn = seq2(&gr, incrgn, vd);
-    init_value = arraycount;
-    terminal_case = 0;
   } else {
     body_gn = seq2(&gr, vd, incrgn);
-    init_value = 0;
-    terminal_case = arraycount;
   }
 
   tie_gn sq_num = seqq(&gr, {body_gn.x, topgn});
@@ -2247,10 +2256,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
 
   mut_qnop_node(&gr, deadseq_nopq, done(&deadprec_bu), nopq(&gr));
 
-  indexcell_live_gn gr_num = addx(&gr, @[gr_xop]GrLive({indexcell}));
-  init_indexcell_gn gr_num = addx(&gr, indexcell_live_gn, @[gr_xop]GrWriteConst({indexcell, ConstInt(bigu(init_value))}));
-  it_gn sq_num = seqq(&gr, {init_indexcell_gn, topgn});
-  add(&bu, it_gn.x);
+  add(&bu, topgn.x);
   *gr_out = gr;
   *gn_out = done(&bu);
   *return_cell_out = return_cell;
