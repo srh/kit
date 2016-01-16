@@ -2106,11 +2106,11 @@ func sq_magic_ctor(clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_gr
   case &MagicEnumInfo(mei magic_enum_info):
     return gr_magic_enum_info(clq, wc, &mei, gr_out, gn_out, return_cell_out, arg_cells_out);
   case &MagicArraytypeInfo(mai magic_arraytype_info):
-    return gr_magic_arraytype_info(clq, wc, &mai, gr_out, gn_out, return_cell_out, arg_cells_out);
+    return sq_magic_arraytype_info(clq, wc, &mai, gr_out, gn_out, return_cell_out, arg_cells_out);
   }
 }
 
-func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
+func sq_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   cs *checkstate = clq->cs;
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_arraytype")));
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mai->cu_type.x));
@@ -2205,16 +2205,16 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
       incrgn gr_num = done(&incr_bu);
       add(&loop_bu, incrgn);
     } else {
-      prec_bu sq_builder = mk_builder(&gr);
+      vd_bu sq_builder = mk_builder(&gr);
 
       elemretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
       // Order here doesn't matter, but we do ret cell before the others.
-      add(&prec_bu, @[gr_xop]GrLive({elemretcell}));
+      add(&vd_bu, @[gr_xop]GrLive({elemretcell}));
 
       func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
 
-      add(&prec_bu, @[gr_xop]GrLive({func_cell}));
-      add(&prec_bu, @[gr_xop]GrWriteConst({func_cell, ConstDef(mai->ip)}));
+      add(&vd_bu, @[gr_xop]GrLive({func_cell}));
+      add(&vd_bu, @[gr_xop]GrWriteConst({func_cell, ConstDef(mai->ip)}));
 
       elemptrcells array[cell_num];
       for j size = 0; j < nargs; j = j + 1 {
@@ -2229,19 +2229,17 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
         epc_live gr_num = addx(&gr, @[gr_xop]GrLive({epc}));
         ptrgn gr_num = addx(&gr, seq2(&gr, deadcopy, epc_live).x, @[gr_xop]GrAddressof({epc, ec}));
         ecdeadgn gr_num = addx(&gr, ptrgn, @[gr_xop]GrVirtualDead({ec}));
-        add(&prec_bu, ecdeadgn);
+        add(&vd_bu, ecdeadgn);
       }
 
-      add(&prec_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell}));
-      add(&prec_bu, @[gr_xop]GrDead({elemretcell}));
-      vd gr_num = done(&prec_bu);
+      add(&vd_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell}));
+      add(&vd_bu, @[gr_xop]GrDead({elemretcell}));
+      vd gr_num = done(&vd_bu);
       add(&loop_bu, vd);
     }
   }
 
-  body_gn gr_num = done(&loop_bu);
-
-  tie_gn sq_num = seqq(&gr, {body_gn, topgn});
+  tie_gn sq_num = mut_connect(&loop_bu, topgn);
 
   branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray({@[gr_const]ConstInt(bigu(terminal_case)), deadseq_nopq}), Has(tie_gn)}));
 
