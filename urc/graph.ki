@@ -2572,10 +2572,10 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
       for j size = 0; j < nargs; j = j + 1 {
         fpc cell_num = add_cell(&gr, {LocationStatic, fieldptrtype, fieldptrtype_props});
         push(&fieldptrcella, fpc);
-        fpc_live gr_num = addx(&gr, @[gr_xop]GrLive({fpc}));
-        gn1 gr_num = addx(&gr, seq2(&gr, fpc_live, get(&fieldcellgn, j)).x, @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
-        gn gr_num = addx(&gr, gn1, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
-        add(&sub_bu, gn);
+        add(&sub_bu, @[gr_xop]GrLive({fpc}));
+        add(&sub_bu, get(&fieldcellgn, j));
+        add(&sub_bu, @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
+        add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 
       add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
