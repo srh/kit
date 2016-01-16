@@ -2665,11 +2665,11 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
     tag_cell = add_cell(&gr, {LocationVirtual, cu, props});
   }
 
-  prepadding_ogn opt[gr_num]
-    = sq_bzero_subcell(gs, retnum, tag_end, field_offset - tag_end);
-  field_end u32 = field_offset + mec->rhs_props.flat_size;
-  postpadding_ogn opt[gr_num]
-    = sq_bzero_subcell(gs, retnum, field_end, mec->return_type_props.flat_size - field_end);
+  bu sq_builder = mk_builder(&gr);
+
+  add(&bu, @[gr_xop]GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)}));
+  add(&bu, @[gr_xop]GrWriteConst({tag_cell, ConstInt(~tagval.x)}));
+  add(&bu, @[gr_xop]GrVirtualDead({tag_cell}));
 
   argnum cell_num = add_cell(&gr, {LocationStatic, ~ *argtype, mec->rhs_props});
   retpart cell_num = add_cell(&gr, {LocationVirtual, ~ *argtype, mec->rhs_props});
@@ -2701,12 +2701,19 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   assign_gn var = seq2(&gr, retpart_gn, ctor_gn);
 
-  tagcell_gn var = addx(&gr, @[gr_xop]GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)}));
-  tag_gn1 var = addx(&gr, tagcell_gn, @[gr_xop]GrWriteConst({tag_cell, ConstInt(~tagval.x)}));
-  tag_gn var = addx(&gr, tag_gn1, @[gr_xop]GrVirtualDead({tag_cell}));
-  gn var = addx(&gr, seq(&gr, @[opt[gr_num]]Has(tag_gn), prepadding_ogn, @[opt[gr_num]]Has(assign_gn.x), postpadding_ogn).x, @[gr_xop]GrXNop);
+
+  add(&bu, assign_gn.x);
+
+  prepadding_ogn opt[gr_num]
+    = sq_bzero_subcell(gs, retnum, tag_end, field_offset - tag_end);
+
+  addo(&bu, prepadding_ogn);
+  field_end u32 = field_offset + mec->rhs_props.flat_size;
+  postpadding_ogn opt[gr_num]
+    = sq_bzero_subcell(gs, retnum, field_end, mec->return_type_props.flat_size - field_end);
+  addo(&bu, postpadding_ogn);
   *gr_out = gr;
-  *gn_out = gn;
+  *gn_out = done(&bu);
   *return_cell_out = retnum;
   *arg_cell_out = argnum;
   return NoFail;
