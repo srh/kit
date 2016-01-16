@@ -35,6 +35,14 @@ func swap(x *lives, y *lives) void {
   y->summed = tmps;
 }
 
+func matches_checksum(a *lives, b *lives_checksum) bool {
+  return a->xored == b->xored && a->summed == b->summed;
+}
+
+func matches_checksum(a *lives, b *lives) bool {
+  return a->xored == b->xored && a->summed == b->summed;
+}
+
 struct gn_annot {
   // A checksum for the liveset before this node is evaluated. (Used for assertions.) Is also the checksum for app_time_live.
   plainly_live nc[lives_checksum];
