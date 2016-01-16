@@ -690,8 +690,6 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     }
   }
 
-  exit_target sq_num = nopq(gs.gr);
-
   body_entry_gn sq_num;
 
   condition_else_gn opt[sq_num];
@@ -747,6 +745,8 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
 
   thengn sq_num = mut_connect(&body_bu, continuegn);
 
+  jmp_qnop_node(gs.gr, body_entry_gn, thengn);
+
   if case &Has(cond ast_expr_condition) = &a->condition {
     exit_bu sq_builder = mk_builder(gs.gr);
 
@@ -763,13 +763,10 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     }
     add(&exit_bu, loopexitgn);
 
-    exitseq sq_num = mut_connect(&exit_bu, exit_target);
+    exitseq sq_num = mut_connect(&exit_bu, outflow);
 
     jmp_qnop_node(gs.gr, unHas(condition_else_gn), exitseq);
   }
-
-  jmp_qnop_node(gs.gr, body_entry_gn, thengn);
-  jmp_qnop_node(gs.gr, exit_target, outflow);
 
   fingn sq_num = mut_connect(&init_bu, topgn);
   *out = fingn;
