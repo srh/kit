@@ -494,12 +494,9 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     }
     return NoFail;
   case &For(a ast_for_statement):
-    outflow sq_num = nopq(gs.gr);
-    gn sq_num;
-    if case Printed(pm) = gr_for_statement(gs, fb, &a, outflow, &gn) {
+    if case Printed(pm) = gr_for_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
-    append(bu, gn, outflow);
     return NoFail;
   case &Switch(a ast_switch_statement):
     outflow sq_num = nopq(gs.gr);
@@ -673,10 +670,9 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   return NoFail;
 }
 
-func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, outflow sq_num, out *sq_num) np {
-  init_bu sq_builder = mk_builder(gs);
+func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu *sq_builder) np {
   if case &Has(bi box[ast_statement]) = &a->initializer {
-    if case Printed(pm) = gr_statement(gs, fb, None, oo(&bi), &init_bu) {
+    if case Printed(pm) = gr_statement(gs, fb, None, oo(&bi), bu) {
       return Printed(pm);
     }
   }
@@ -699,6 +695,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
 
   continue_nopq sq_num = nopq(gs.gr);
 
+  outflow sq_num = nopq(gs.gr);
   bp breakgrack = {outflow, continue_nopq};
 
   body_bu sq_builder = mk_builder(gs);
@@ -767,8 +764,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     jmp_qnop_node(gs.gr, unHas(condition_else_gn), exitseq);
   }
 
-  fingn sq_num = mut_connect(&init_bu, topgn);
-  *out = fingn;
+  append(bu, topgn, outflow);
   return NoFail;
 }
 
