@@ -2374,31 +2374,31 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
       add(&sub_bu, @[gr_xop]GrDead({fieldretcell}));
       last_ogn = done(&sub_bu);
     } else {
-      ogn opt[gr_num];
-      switch wc {
-      case CtorInit:
-        ice(_u8("CtorInit on enum type"));
-      case CtorCopy:
-        cgn var = addx(&gr, seqN(&gr, &fieldcellgn).x, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
-        ogn = Has(cgn);
-      case CtorMove:
-        cgn var = addx(&gr, seqN(&gr, &fieldcellgn).x, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
-        ogn = Has(cgn);
-      case CtorDestroy:
-        ogn = None;
-        // do nothing.
-      }
-      if case Has(gn gr_num) = ogn {
-        dfcprec gr_num = nopq(&gr).x;
-        for j size = 0; j < nargs; j = j + 1 {
-          dfc var = addx(&gr, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
-          dfcprec = seq2(&gr, dfc, dfcprec).x;
-        }
-        last_ogn = seq2(&gr, gn, dfcprec).x;
+      sub_bu sq_builder = mk_builder(&gr);
+      evaled_fieldcellops bool = true;
+      if case CtorDestroy = wc {
+        evaled_fieldcellops = false;
       } else {
-        // The nodes that create fieldcella were never added to the graph, so we don't dead them.
-        last_ogn = nopq(&gr).x;
+        for j size = 0; j < nargs; j = j + 1 {
+          add(&sub_bu, get(&fieldcellgn, j));
+        }
+        switch wc {
+        case CtorInit:
+          ice(_u8("CtorInit on enum type"));
+        case CtorCopy:
+          add(&sub_bu, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
+        case CtorMove:
+          add(&sub_bu, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
+        }
       }
+
+      if evaled_fieldcellops {
+        for j size = nargs; j > 0; {
+          j = j - 1;
+          add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
+        }
+      }
+      last_ogn = done(&sub_bu);
     }
 
     tagset_ogn opt[gr_num];
