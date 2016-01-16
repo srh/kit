@@ -2185,61 +2185,63 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
 
   topgn sq_num = nopq(&gr);
 
-  prec_bu sq_builder = mk_builder(&gr);
+  loop_bu sq_builder = mk_builder(&gr);
+  for i size = 0; i < 2; i = i + 1 {
+    if (CtorDestroy == wc) == (i == 0) {
+      incr_bu sq_builder = mk_builder(&gr);
+      ic2cell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
+      add(&incr_bu, @[gr_xop]GrLive({ic2cell}));
+      add(&incr_bu, @[gr_xop]GrMemCopy({ic2cell, indexcell}));
+      onecell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
+      add(&incr_bu, @[gr_xop]GrLive({onecell}));
+      add(&incr_bu, @[gr_xop]GrWriteConst({onecell, ConstInt(bigu(1))}));
+      op_action primitive_numeric_op_action;
+      if case CtorDestroy = wc {
+        op_action = NumSub;
+      } else {
+        op_action = NumAdd;
+      }
+      add(&incr_bu, @[gr_xop]GrPrimApply({PrimNum({cs->plat.sizetraits.flat.size, cs->plat.sizetraits.numeric, op_action}), mk_shray(ic2cell, onecell), indexcell}));
+      incrgn gr_num = done(&incr_bu);
+      add(&loop_bu, incrgn);
+    } else {
+      prec_bu sq_builder = mk_builder(&gr);
 
-  elemretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-  // Order here doesn't matter, but we do ret cell before the others.
-  add(&prec_bu, @[gr_xop]GrLive({elemretcell}));
+      elemretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
+      // Order here doesn't matter, but we do ret cell before the others.
+      add(&prec_bu, @[gr_xop]GrLive({elemretcell}));
 
-  func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
+      func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
 
-  add(&prec_bu, @[gr_xop]GrLive({func_cell}));
-  add(&prec_bu, @[gr_xop]GrWriteConst({func_cell, ConstDef(mai->ip)}));
+      add(&prec_bu, @[gr_xop]GrLive({func_cell}));
+      add(&prec_bu, @[gr_xop]GrWriteConst({func_cell, ConstDef(mai->ip)}));
 
-  elemptrcells array[cell_num];
-  for j size = 0; j < nargs; j = j + 1 {
-    ec cell_num = add_cell(&gr, {LocationVirtual, ~ *param, param_props});
-    indexcopycell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
-    copycell_live gr_num = addx(&gr, @[gr_xop]GrLive({indexcopycell}));
-    copygn gr_num = addx(&gr, copycell_live, @[gr_xop]GrMemCopy({indexcopycell, indexcell}));
-    gn gr_num = addx(&gr, copygn, @[gr_xop]GrSubcell({ec, get(&pointeecells, j), OffsetComputed({param_props.flat_size, indexcopycell})}));
-    deadcopy gr_num = addx(&gr, gn, @[gr_xop]GrDead({indexcopycell}));
-    epc cell_num = add_cell(&gr, {LocationStatic, elemptrtype, elemptrtype_props});
-    push(&elemptrcells, epc);
-    epc_live gr_num = addx(&gr, @[gr_xop]GrLive({epc}));
-    ptrgn gr_num = addx(&gr, seq2(&gr, deadcopy, epc_live).x, @[gr_xop]GrAddressof({epc, ec}));
-    ecdeadgn gr_num = addx(&gr, ptrgn, @[gr_xop]GrVirtualDead({ec}));
-    add(&prec_bu, ecdeadgn);
+      elemptrcells array[cell_num];
+      for j size = 0; j < nargs; j = j + 1 {
+        ec cell_num = add_cell(&gr, {LocationVirtual, ~ *param, param_props});
+        indexcopycell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
+        copycell_live gr_num = addx(&gr, @[gr_xop]GrLive({indexcopycell}));
+        copygn gr_num = addx(&gr, copycell_live, @[gr_xop]GrMemCopy({indexcopycell, indexcell}));
+        gn gr_num = addx(&gr, copygn, @[gr_xop]GrSubcell({ec, get(&pointeecells, j), OffsetComputed({param_props.flat_size, indexcopycell})}));
+        deadcopy gr_num = addx(&gr, gn, @[gr_xop]GrDead({indexcopycell}));
+        epc cell_num = add_cell(&gr, {LocationStatic, elemptrtype, elemptrtype_props});
+        push(&elemptrcells, epc);
+        epc_live gr_num = addx(&gr, @[gr_xop]GrLive({epc}));
+        ptrgn gr_num = addx(&gr, seq2(&gr, deadcopy, epc_live).x, @[gr_xop]GrAddressof({epc, ec}));
+        ecdeadgn gr_num = addx(&gr, ptrgn, @[gr_xop]GrVirtualDead({ec}));
+        add(&prec_bu, ecdeadgn);
+      }
+
+      add(&prec_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell}));
+      add(&prec_bu, @[gr_xop]GrDead({elemretcell}));
+      vd gr_num = done(&prec_bu);
+      add(&loop_bu, vd);
+    }
   }
 
-  add(&prec_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell}));
-  add(&prec_bu, @[gr_xop]GrDead({elemretcell}));
-  vd gr_num = done(&prec_bu);
+  body_gn gr_num = done(&loop_bu);
 
-  incr_bu sq_builder = mk_builder(&gr);
-  ic2cell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
-  add(&incr_bu, @[gr_xop]GrLive({ic2cell}));
-  add(&incr_bu, @[gr_xop]GrMemCopy({ic2cell, indexcell}));
-  onecell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
-  add(&incr_bu, @[gr_xop]GrLive({onecell}));
-  add(&incr_bu, @[gr_xop]GrWriteConst({onecell, ConstInt(bigu(1))}));
-  op_action primitive_numeric_op_action;
-  if case CtorDestroy = wc {
-    op_action = NumSub;
-  } else {
-    op_action = NumAdd;
-  }
-  add(&incr_bu, @[gr_xop]GrPrimApply({PrimNum({cs->plat.sizetraits.flat.size, cs->plat.sizetraits.numeric, op_action}), mk_shray(ic2cell, onecell), indexcell}));
-  incrgn gr_num = done(&incr_bu);
-
-  body_gn sq_num;
-  if case CtorDestroy = wc {
-    body_gn = seq2(&gr, incrgn, vd);
-  } else {
-    body_gn = seq2(&gr, vd, incrgn);
-  }
-
-  tie_gn sq_num = seqq(&gr, {body_gn.x, topgn});
+  tie_gn sq_num = seqq(&gr, {body_gn, topgn});
 
   branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray({@[gr_const]ConstInt(bigu(terminal_case)), deadseq_nopq}), Has(tie_gn)}));
 
