@@ -1986,7 +1986,7 @@ func sq_magic(clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num,
     return NoFail;
   case &MagicEnumConstruct(mec magic_enum_construct):
     arg_cell cell_num;
-    if case Printed(pm) = gr_magic_enum_construct(clq, &mec, gr_out, gn_out, return_cell_out, &arg_cell) {
+    if case Printed(pm) = sq_magic_enum_construct(clq, &mec, gr_out, gn_out, return_cell_out, &arg_cell) {
       return Printed(pm);
     }
     *arg_cells_out = mk_array(arg_cell);
@@ -2644,7 +2644,7 @@ func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *
   *count_out = end - begin;
 }
 
-func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cell_out *cell_num) np {
+func sq_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cell_out *cell_num) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_enum_construct")));
   celltrack gr_celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &celltrack};
@@ -2665,44 +2665,45 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
     tag_cell = add_cell(&gr, {LocationVirtual, cu, props});
   }
 
+  argnum cell_num = add_cell(&gr, {LocationStatic, ~ *argtype, mec->rhs_props});
+  retpart cell_num = add_cell(&gr, {LocationVirtual, ~ *argtype, mec->rhs_props});
+
   bu sq_builder = mk_builder(&gr);
 
   add(&bu, @[gr_xop]GrSubcell({tag_cell, retnum, OffsetConst(enum_tag_offset)}));
   add(&bu, @[gr_xop]GrWriteConst({tag_cell, ConstInt(~tagval.x)}));
   add(&bu, @[gr_xop]GrVirtualDead({tag_cell}));
 
-  argnum cell_num = add_cell(&gr, {LocationStatic, ~ *argtype, mec->rhs_props});
-  retpart cell_num = add_cell(&gr, {LocationVirtual, ~ *argtype, mec->rhs_props});
+  assign_bu sq_builder = mk_builder(&gr);
 
-  retpart_gn var = addx(&gr, @[gr_xop]GrSubcell({retpart, retnum, OffsetConst(field_offset)}));
+  add(&assign_bu, @[gr_xop]GrSubcell({retpart, retnum, OffsetConst(field_offset)}));
 
-  ctor_gn gr_num;
   switch &mec->operational {
   case &EnumConstructMove(cd ctor_desc):
-    bi_ctor_gn1 gr_num;
-    if case Printed(pm) = sq_bi_ctor(gs, argtype, retpart, argnum, &cd, &bi_ctor_gn1) {
+    bi_ctor_gn gr_num;
+    if case Printed(pm) = sq_bi_ctor(gs, argtype, retpart, argnum, &cd, &bi_ctor_gn) {
       return Printed(pm);
     }
-    bi_ctor_gn gr_num = addx(&gr, bi_ctor_gn1, @[gr_xop]GrVirtualDead({retpart}));
-    ctor_gn = addx(&gr, bi_ctor_gn, @[gr_xop]GrDead({argnum}));
+    add(&assign_bu, bi_ctor_gn);
+    add(&assign_bu, @[gr_xop]GrVirtualDead({retpart}));
+    add(&assign_bu, @[gr_xop]GrDead({argnum}));
 
   case &EnumConstructCopyDestroy(cdd copy_destroy_desc):
-    cpgn1 gr_num;
-    if case Printed(pm) = sq_bi_ctor(gs, argtype, retpart, argnum, &cdd.copy_desc, &cpgn1) {
+    cpgn gr_num;
+    if case Printed(pm) = sq_bi_ctor(gs, argtype, retpart, argnum, &cdd.copy_desc, &cpgn) {
       return Printed(pm);
     }
-    cpgn gr_num = addx(&gr, cpgn1, @[gr_xop]GrVirtualDead({retpart}));
+    add(&assign_bu, cpgn);
+    add(&assign_bu, @[gr_xop]GrVirtualDead({retpart}));
     destgn gr_num;
     if case Printed(pm) = sq_destroy_ctor(gs, argtype, argnum, &cdd.destroy_desc, &destgn) {
       return Printed(pm);
     }
-    ctor_gn = seq2(&gr, cpgn, destgn).x;
+    add(&assign_bu, destgn);
   }
 
-  assign_gn var = seq2(&gr, retpart_gn, ctor_gn);
 
-
-  add(&bu, assign_gn.x);
+  add(&bu, done(&assign_bu));
 
   prepadding_ogn opt[gr_num]
     = sq_bzero_subcell(gs, retnum, tag_end, field_offset - tag_end);
