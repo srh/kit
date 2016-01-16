@@ -2307,7 +2307,8 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     add(&deref_bu, @[gr_xop]GrSubcell({tc, pc, OffsetConst(enum_tag_offset)}));
   }
 
-  deref_gn gr_num = done(&deref_bu);
+  bu sq_builder = mk_builder(&gr);
+  add(&bu, done(&deref_bu));
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
   deadprec gr_num;
@@ -2319,7 +2320,8 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
       deadprec = seq2(&gr, seq2(&gr, pd, td).x, deadprec).x;
     }
   }
-  deadseq sq_num = seq1(&gr, deadprec);
+
+  deadseq_nopq sq_num = nopq(&gr);
 
   cases_gn array[tup[gr_const, sq_num]];
   nconstructors size = count(&et->constructors);
@@ -2425,24 +2427,25 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
 
     finalgn gr_num = addx(&gr, seq(&gr, tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn).x, @[gr_xop]GrXNop);
 
-    finalseqgn sq_num = seqq(&gr, {finalgn, deadseq});
+    finalseqgn sq_num = seqq(&gr, {finalgn, deadseq_nopq});
     push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), finalseqgn});
   }
 
   if true {
     if case CtorDestroy = wc {
-      push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), deadseq});
+      push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), deadseq_nopq});
     } else {
       ztgn gr_num = addx(&gr, @[gr_xop]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))}));
-      ztseq sq_num = seqq(&gr, {ztgn, deadseq});
+      ztseq sq_num = seqq(&gr, {ztgn, deadseq_nopq});
       push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), ztseq});
     }
   }
 
   br sq_num = addq(&gr, @[gr_qop]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None}));
-  sqr sq_num = seqq(&gr, {deref_gn, br});
+  append(&bu, br, deadseq_nopq);
+  add(&bu, deadprec);
   *gr_out = gr;
-  *gn_out = sqr.x;
+  *gn_out = done(&bu);
   *return_cell_out = return_cell;
   *arg_cells_out = argcells;
   return NoFail;
