@@ -104,7 +104,6 @@ enum gr_xop {
   GrAssertLive gr_assert_live;
   GrDead gr_dead;
   GrVirtualDead gr_virtual_dead;
-  GrXNop void;
   // A debugging xop for compiler devs.
 }
 
@@ -159,7 +158,6 @@ func help_addx(gr *frame_graph, celltrack *gr_celltrack, op gr_xop) gr_num {
   case &GrAssertLive(a gr_assert_live): { }
   case &GrDead(a gr_dead): { }
   case &GrVirtualDead(a gr_virtual_dead): { }
-  case &GrXNop: { }
   }
 
   return untracked_addx(gr, op);
@@ -734,13 +732,15 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     return Printed(pm);
   }
 
-  loopcleanupgn gr_num;
+  loopcleanupgn opt[gr_num];
   if case &Has(cond ast_expr_condition) = &a->condition {
-    if case Printed(pm) = gr_later_discard(gs, &cond.discard, &loopcleanupgn) {
+    gn gr_num;
+    if case Printed(pm) = gr_later_discard(gs, &cond.discard, &gn) {
       return Printed(pm);
     }
+    loopcleanupgn = Has(gn);
   } else {
-    loopcleanupgn = addx(gs, @[gr_xop]GrXNop);
+    loopcleanupgn = None;
   }
 
   continue_target sq_num;
@@ -752,9 +752,17 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     }
     totopgn sq_num = mut_connect(&incr_bu, topgn);
     continue_target = totopgn;
-    continuegn = seqq(gs.gr, {loopcleanupgn, totopgn});
+    if case Has(gn gr_num) = loopcleanupgn {
+      continuegn = seqq(gs.gr, {gn, totopgn});
+    } else {
+      continuegn = totopgn;
+    }
   } else {
-    continuegn = seqq(gs.gr, {loopcleanupgn, topgn});
+    if case Has(gn gr_num) = loopcleanupgn {
+      continuegn = seqq(gs.gr, {gn, topgn});
+    } else {
+      continuegn = topgn;
+    }
     continue_target = topgn;
   }
 

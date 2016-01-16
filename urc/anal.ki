@@ -260,7 +260,6 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
                                                            nopq(gr)})})});
 
 
-              // It's important to note that GrXNop would be ignored by help_basic_analyze.
               // TODO: It'd be nice if we could undo the mark_cell_not_const of a.retcell (that happened when we processed GrApply in help_basic_analyze before).
 
               *ref(&gr->ops, gn.x) = QOp({GrJmp({seqer})});
@@ -320,8 +319,6 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
       return XOp({GrDead({get(cm, a.cell.x)})});
     case &GrVirtualDead(a gr_virtual_dead):
       return XOp({GrVirtualDead({get(cm, a.cell.x)})});
-    case &GrXNop:
-      return XOp({GrXNop});
     }
   case QOp(qn gr_qnode):
     switch &qn.op {
