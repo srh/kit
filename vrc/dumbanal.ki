@@ -219,13 +219,17 @@ func expect_live(liveset *lives, c cell_num) void {
 }
 
 func create(h *frame, liveset *lives, c cell_num) void {
-  // Both these places define the virtual cell.  So it should not be live.
+  gr_create(liveset, c);
+  note_conflicting(h, &liveset->all, c);
+}
+
+// Used in graph code because we don't note conflicting and don't have a frame (yet).
+func gr_create(liveset *lives, c cell_num) void {
   if !try_insert(&liveset->all, c) {
     ice(_u8("create on live cell "), c);
   }
   liveset->xored = liveset->xored ^ ~c.x;
   liveset->summed = liveset->summed + ~c.x;
-  note_conflicting(h, &liveset->all, c);
 }
 
 func note_conflicting(h *frame, all *array[cell_num], c cell_num) void {

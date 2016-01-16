@@ -1994,6 +1994,19 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  r u32 = #x;\n"
         "  return Pass(@[i32]~r);\n"
         "}\n"));
+
+  run_check_test(ctx, "c161",
+    _u8("enum en { Foo void; }\n"
+        "func foo() i32 {\n"
+        "  r i32 = 5;\n"
+        "  while case Foo(v void) = @[en]Foo {\n"
+        "    if r == 5 {\n"
+        "      break;\n"
+        "    }\n"
+        "  }\n"
+        "  return r;\n"
+        "}\n"
+        "def x i32 = foo();\n"));
 }
 
 func mk_ctx(verbose bool, build bool, name opt[array[u8]]) check_ctx {

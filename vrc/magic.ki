@@ -125,6 +125,10 @@ enum which_ctor {
   CtorDestroy void;
 }
 
+func `==`(x which_ctor, y which_ctor) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+
 func num_args(wc which_ctor) size {
   switch wc {
   case CtorInit: return 1;
