@@ -2482,16 +2482,10 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
   // Destructors go in reverse order (which means we prepend them in the reverse of reverse order).
   reverse_order bool = false;
   // Init, copy, and move requires initializing intervening padding.
-  init_padding bool = false;
-  switch wc {
-  case CtorInit:
-    init_padding = true;
-  case CtorCopy:
-    init_padding = true;
-  case CtorMove:
-    init_padding = true;
-  case CtorDestroy:
+  init_padding bool = true;
+  if case CtorDestroy = wc {
     reverse_order = true;
+    init_padding = false;
   }
 
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_struct_info")));
@@ -2539,23 +2533,21 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
     }
 
     fieldcella array[cell_num];
-    fieldcellgn array[gr_num];
+    fieldcellops array[gr_xop];
     for j size = 0; j < nargs; j = j + 1 {
       fc cell_num = add_cell(&gr, {LocationVirtual, ~ ref(&st->fields, i)->type, ref(&psd.fields, i)->props});
       push(&fieldcella, fc);
 
-      gn gr_num = addx(&gr, @[gr_xop]GrSubcell({fc, get(&pointeecells, j), OffsetConst(ref(&psd.fields, i)->offset)}));
-      push(&fieldcellgn, gn);
+      push(&fieldcellops, @[gr_xop]GrSubcell({fc, get(&pointeecells, j), OffsetConst(ref(&psd.fields, i)->offset)}));
     }
 
-    field_gn gr_num;
+    sub_bu sq_builder = mk_builder(&gr);
     if case Has(ip instpair) = get(&msi->fips, i) {
       fieldptrtype cu_typeexpr;
       fieldptrtype_props type_properties;
       compute_prim(clq, ptr_type(cs, ref(&st->fields, i)->type), &fieldptrtype, &fieldptrtype_props);
 
       fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-      sub_bu sq_builder = mk_builder(&gr);
       add(&sub_bu, @[gr_xop]GrLive({fieldretcell}));
 
       fntype cu_typeexpr;
@@ -2573,60 +2565,51 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
         fpc cell_num = add_cell(&gr, {LocationStatic, fieldptrtype, fieldptrtype_props});
         push(&fieldptrcella, fpc);
         add(&sub_bu, @[gr_xop]GrLive({fpc}));
-        add(&sub_bu, get(&fieldcellgn, j));
+        add(&sub_bu, get(&fieldcellops, j));
         add(&sub_bu, @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
         add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 
       add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
       add(&sub_bu, @[gr_xop]GrDead({fieldretcell}));
-
-      field_gn = done(&sub_bu);
     } else {
-      sub_bu sq_builder = mk_builder(&gr);
-
-      evaled_fieldcellgn bool = true;
-      switch wc {
-      case CtorInit:
-        // zero-initialize.
-        add(&sub_bu, seqN(&gr, &fieldcellgn).x);
-        add(&sub_bu, @[gr_xop]GrWriteConst({get(&fieldcella, 0), ConstInt(~ @[u32] 0)}));
-      case CtorCopy:
-        add(&sub_bu, seqN(&gr, &fieldcellgn).x);
-        add(&sub_bu, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
-      case CtorMove:
-        add(&sub_bu, seqN(&gr, &fieldcellgn).x);
-        add(&sub_bu, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
-      case CtorDestroy:
-        evaled_fieldcellgn = false;
+      evaled_fieldcellops bool = true;
+      if case CtorDestroy = wc {
+        evaled_fieldcellops = false;
+      } else {
+        for j size = 0; j < nargs; j = j + 1 {
+          add(&sub_bu, get(&fieldcellops, j));
+        }
+        switch wc {
+        case CtorInit:
+          // zero-initialize.
+          add(&sub_bu, @[gr_xop]GrWriteConst({get(&fieldcella, 0), ConstInt(~ @[u32] 0)}));
+        case CtorCopy:
+          add(&sub_bu, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
+        case CtorMove:
+          add(&sub_bu, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
+        }
       }
 
-      if evaled_fieldcellgn {
+      if evaled_fieldcellops {
         for j size = nargs; j > 0; {
           j = j - 1;
           add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
         }
       }
-      field_gn = done(&sub_bu);
     }
 
-    field_and_padding_gn gr_num;
+    // There is no particular reason why we bzero the padding _after_ we do the fields.
     if init_padding {
       padding_offset u32;
       padding_count u32;
       postpadding_offset_and_count(&psd, i, &padding_offset, &padding_count);
       if case Has(bzero_gn gr_num) = gr_bzero_subcell(gs, get(&pointeecells, 0), padding_offset, padding_count) {
-        // Should we bzero first or get the fields first?  I'm guessing a naive impl's bzero first is better for CPUs.
-        nop2_gn var = seq2(&gr, bzero_gn, field_gn).x;
-        field_and_padding_gn = nop2_gn;
-      } else {
-        field_and_padding_gn = field_gn;
+        add(&sub_bu, bzero_gn);
       }
-    } else {
-      field_and_padding_gn = field_gn;
     }
 
-    add(&bu, field_and_padding_gn);
+    add(&bu, done(&sub_bu));
   }
 
   for i size = nargs; i > 0; {
