@@ -2328,10 +2328,6 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     field_offset u32 = enum_field_offset(cs, et, tagval);
     field_end u32 = field_offset + fieldtype_props.flat_size;
     tag_end u32 = enum_tag_offset + tagtype_props.flat_size;
-    prepadding_ogn opt[gr_num]
-      = gr_bzero_subcell(gs, get(&pointeecells, 0), tag_end, field_offset - tag_end);
-    postpadding_ogn opt[gr_num]
-      = gr_bzero_subcell(gs, get(&pointeecells, 0), field_end, mei->cu_props.flat_size - field_end);
 
     fieldcella array[cell_num];
     fieldcellops array[gr_xop];
@@ -2406,7 +2402,12 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     case CtorDestroy: { }
     }
 
+    prepadding_ogn opt[gr_num]
+      = gr_bzero_subcell(gs, get(&pointeecells, 0), tag_end, field_offset - tag_end);
     addo(&sub_bu, prepadding_ogn);
+
+    postpadding_ogn opt[gr_num]
+      = gr_bzero_subcell(gs, get(&pointeecells, 0), field_end, mei->cu_props.flat_size - field_end);
     addo(&sub_bu, postpadding_ogn);
 
     finalgn gr_num = done(&sub_bu);
