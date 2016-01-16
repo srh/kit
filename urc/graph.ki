@@ -151,10 +151,6 @@ func add(bu *sq_builder, op gr_xop) void {
   add(bu, num);
 }
 
-func addx(gr *frame_graph, prec gr_num, op gr_xop) gr_num {
-  return seq2(gr, prec, addx(gr, op)).x;
-}
-
 func addq(gr *frame_graph, op gr_qop) sq_num {
   return ~help_add_node(gr, @[gr_node]QOp({op}));
 }
@@ -1816,11 +1812,14 @@ func gr_copy_action(gs gr_statep, x *copy_action, out *gr_num) np {
 }
 
 func gr_move_action(gs gr_statep, x *move_action, out *gr_num) np {
+  bu sq_builder = mk_builder(gs.gr);
   dep gr_num;
   if case Printed(pm) = gr_bi_action(gs, &x->x, &dep) {
     return Printed(pm);
   }
-  *out = addx(gs.gr, dep, @[gr_xop]GrDead({x->x.src}));
+  add(&bu, dep);
+  add(&bu, @[gr_xop]GrDead({x->x.src}));
+  *out = done(&bu);
   return NoFail;
 }
 
@@ -2586,12 +2585,13 @@ func gr_bzero_subcell(gs gr_statep, c cell_num, offset u32, size u32) opt[gr_num
   if size == 0 {
     return None;
   }
+  bu sq_builder = mk_builder(gs.gr);
   padtype cu_typrop = compute_prim(gs.clq, primitive_padding_type(gs.clq->cs, size));
   pad_cell cell_num = add_cell(gs.gr, {LocationVirtual, padtype.cu, padtype.props});
-  subcell_gn var = addx(gs.gr, @[gr_xop]GrSubcell({pad_cell, c, OffsetConst(offset)}));
-  bzero_gn var = addx(gs.gr, subcell_gn, @[gr_xop]GrWriteConst({pad_cell, ConstInt(bigu(0))}));
-  vd_gn var = addx(gs.gr, bzero_gn, @[gr_xop]GrVirtualDead({pad_cell}));
-  return Has(vd_gn);
+  add(&bu, @[gr_xop]GrSubcell({pad_cell, c, OffsetConst(offset)}));
+  add(&bu, @[gr_xop]GrWriteConst({pad_cell, ConstInt(bigu(0))}));
+  add(&bu, @[gr_xop]GrVirtualDead({pad_cell}));
+  return Has(done(&bu));
 }
 
 func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *u32, count_out *u32) void {
@@ -2699,9 +2699,11 @@ func gr_destroy_ctor(gs gr_statep, ty *te_typeexpr, argnum cell_num, cd *ctor_de
     dp var = addx(gs.gr, @[gr_xop]GrDead({argnum}));
     *gn_out = dp;
   case &FunCtor(ip instpair):
+    bu sq_builder = mk_builder(gs.gr);
     gn gr_num = gr_uni_fun(gs, ip, argnum);
-    dp var = addx(gs.gr, gn, @[gr_xop]GrDead({argnum}));
-    *gn_out = dp;
+    add(&bu, gn);
+    add(&bu, @[gr_xop]GrDead({argnum}));
+    *gn_out = done(&bu);
   }
   return NoFail;
 }
@@ -2830,8 +2832,9 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
 
 func mk_const_frame_regraphed(informal_name sym, type *cu_typeexpr, props *type_properties, c gr_const) frame_regraphed {
   gr frame_graph = init_frame_graph_empty(informal_name);
+  bu sq_builder = mk_builder(&gr);
   cell cell_num = add_cell(&gr, {LocationStatic, *type, *props});
-  cell_live gr_num = addx(&gr, @[gr_xop]GrLive({cell}));
-  gn gr_num = addx(&gr, cell_live, @[gr_xop]GrWriteConst({cell, c}));
-  return {gr, gn, cell};
+  add(&bu, @[gr_xop]GrLive({cell}));
+  add(&bu, @[gr_xop]GrWriteConst({cell, c}));
+  return {gr, done(&bu), cell};
 }
