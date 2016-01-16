@@ -489,12 +489,9 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     }
     return NoFail;
   case &While(a ast_while_statement):
-    outflow sq_num = nopq(gs.gr);
-    gn sq_num;
-    if case Printed(pm) = gr_while_statement(gs, fb, &a, outflow, &gn) {
+    if case Printed(pm) = gr_while_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
-    append(bu, gn, outflow);
     return NoFail;
   case &For(a ast_for_statement):
     outflow sq_num = nopq(gs.gr);
@@ -784,13 +781,13 @@ func gr_condition_discard(gs gr_statep, a *ast_condition_discard_info, out *gr_n
   return NoFail;
 }
 
-func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement, outflow sq_num, out *sq_num) np {
-  topgn var = nopq(gs.gr);
+func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement, bu *sq_builder) np {
+  outflow sq_num = nopq(gs.gr);
 
   then_nop sq_num = nopq(gs.gr);
   else_nop sq_num = nopq(gs.gr);
-  gn sq_num;
-  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &gn) {
+  topgn sq_num;
+  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &topgn) {
     return Printed(pm);
   }
 
@@ -819,8 +816,7 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   jmp_qnop_node(gs.gr, then_nop, thengn);
   jmp_qnop_node(gs.gr, else_nop, exitseq);
 
-  jmp_qnop_node(gs.gr, topgn, gn);
-  *out = topgn;
+  append(bu, topgn, outflow);
   return NoFail;
 }
 
