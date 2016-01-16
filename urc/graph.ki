@@ -2511,7 +2511,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
 
   argcells array[cell_num];
   pointeecells array[cell_num];
-  derefgn gr_num = nopq(&gr).x;
+  deref_bu sq_builder = mk_builder(&gr);
   nargs size = num_args(wc);
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = add_cell(&gr, {LocationStatic, argtp.cu, argtp.props});
@@ -2519,14 +2519,14 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
     pc cell_num = add_cell(&gr, {LocationVirtual, msi->cu_type, msi->cu_props});
     push(&pointeecells, pc);
 
-    gn1 gr_num = addx(&gr, @[gr_xop]GrDeref({pc, ac, OffsetConst(0)}));
-    gn gr_num = addx(&gr, gn1, @[gr_xop]GrDead({ac}));
-    derefgn = seq2(&gr, derefgn, gn).x;
+    add(&deref_bu, @[gr_xop]GrDeref({pc, ac, OffsetConst(0)}));
+    add(&deref_bu, @[gr_xop]GrDead({ac}));
   }
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
 
   bu sq_builder = mk_builder(&gr);
+  add(&bu, done(&deref_bu));
 
   nfields size = count(&msi->fips);
   check(nfields == count(&st->fields));
@@ -2548,11 +2548,24 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
       push(&fieldcellgn, gn);
     }
 
+    sub_bu sq_builder = mk_builder(&gr);
     field_gn gr_num;
     if case Has(ip instpair) = get(&msi->fips, i) {
       fieldptrtype cu_typeexpr;
       fieldptrtype_props type_properties;
       compute_prim(clq, ptr_type(cs, ref(&st->fields, i)->type), &fieldptrtype, &fieldptrtype_props);
+
+      fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
+      fieldretgn gr_num = addx(&gr, @[gr_xop]GrLive({fieldretcell}));
+
+      fntype cu_typeexpr;
+      fntype_props type_properties;
+      compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.x), voidtp.cu.x), &fntype, &fntype_props);
+
+      func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
+
+      func_cell_live gr_num = addx(&gr, @[gr_xop]GrLive({func_cell}));
+      func_gn gr_num = addx(&gr, func_cell_live, @[gr_xop]GrWriteConst({func_cell, ConstDef(ip)}));
 
       fieldptrcella array[cell_num];
       prec gr_num = nopq(&gr).x;
@@ -2565,17 +2578,9 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
         prec = seq2(&gr, prec, gn).x;
       }
 
-      fntype cu_typeexpr;
-      fntype_props type_properties;
-      compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.x), voidtp.cu.x), &fntype, &fntype_props);
-
-      func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
-      func_cell_live gr_num = addx(&gr, @[gr_xop]GrLive({func_cell}));
-      func_gn gr_num = addx(&gr, func_cell_live, @[gr_xop]GrWriteConst({func_cell, ConstDef(ip)}));
       prec = seq2(&gr, func_gn, prec).x;
 
-      fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-      prec = seq2(&gr, addx(&gr, @[gr_xop]GrLive({fieldretcell})), prec).x;
+      prec = seq2(&gr, fieldretgn, prec).x;
 
       ap gr_num = addx(&gr, prec, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
 
@@ -2631,21 +2636,16 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
     add(&bu, field_and_padding_gn);
   }
 
-  deadprec gr_num;
-  if true {
-    deadprec = addx(&gr, @[gr_xop]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)}));
-
-    for i size = 0; i < nargs; i = i + 1 {
-      pd gr_num = addx(&gr, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
-      deadprec = seq2(&gr, pd, deadprec).x;
-    }
+  for i size = nargs; i > 0; {
+    i = i - 1;
+    add(&bu, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
   }
+  add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)}));
 
-  add(&bu, deadprec);
-  gn var = seqq(&gr, {derefgn, doneq(&bu)});
+  gn gr_num = done(&bu);
 
   *gr_out = gr;
-  *gn_out = gn.x;
+  *gn_out = gn;
   *return_cell_out = return_cell;
   *arg_cells_out = argcells;
   return NoFail;
