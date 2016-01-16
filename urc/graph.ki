@@ -141,11 +141,12 @@ func help_add_node(gr *frame_graph, node gr_node) gr_num {
   return ret;
 }
 
+// Used in dumbgen for inlining, maybe some other manipulations.
 func untracked_addx(gr *frame_graph, op gr_xop) gr_num {
   return help_add_node(gr, @[gr_node]XOp({op}));
 }
 
-func help_addx(gr *frame_graph, celltrack *gr_celltrack, op gr_xop) gr_num {
+func addx(gs gr_statep, op gr_xop) gr_num {
   switch &op {
   case &GrApply(a gr_apply): { }
   case &GrPrimApply(a gr_prim_apply): { }
@@ -160,15 +161,11 @@ func help_addx(gr *frame_graph, celltrack *gr_celltrack, op gr_xop) gr_num {
   case &GrVirtualDead(a gr_virtual_dead): { }
   }
 
-  return untracked_addx(gr, op);
-}
-
-func addx(gs gr_statep, op gr_xop) gr_num {
-  return help_addx(gs.gr, gs.celltrack, op);
+  return untracked_addx(gs.gr, op);
 }
 
 func add(bu *sq_builder, op gr_xop) void {
-  num gr_num = help_addx(bu->gr, bu->celltrack, op);
+  num gr_num = addx(bu->gs, op);
   add(bu, num);
 }
 
@@ -199,25 +196,19 @@ func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
 }
 
 struct sq_builder {
-  // Stored here for "convenience", this is awful.
-  gr *frame_graph;
-  celltrack *gr_celltrack;
+  // Stored here for "convenience," also gs.gr being null means this object is dead.
+  gs gr_statep;
   first sq_num;
   last sq_num;
 }
 
 func mk_builder(gs gr_statep) sq_builder {
   sq sq_num = nopq(gs.gr);
-  return {gs.gr, gs.celltrack, sq, sq};
-}
-
-func mk_builder(gr *frame_graph, celltrack *gr_celltrack) sq_builder {
-  sq sq_num = nopq(gr);
-  return {gr, celltrack, sq, sq};
+  return {gs, sq, sq};
 }
 
 func add(bu *sq_builder, gn gr_num) void {
-  gr *frame_graph = bu->gr;
+  gr *frame_graph = bu->gs.gr;
   check(gr != null);
   next sq_num = nopq(gr);
   mut_qnop_node(gr, bu->last, gn, next);
@@ -231,28 +222,28 @@ func addo(bu *sq_builder, ogn opt[gr_num]) void {
 }
 
 func append(bu *sq_builder, rhs *sq_builder) void {
-  gr *frame_graph = bu->gr;
-  rhs_gr *frame_graph = rhs->gr;
+  gr *frame_graph = bu->gs.gr;
+  rhs_gr *frame_graph = rhs->gs.gr;
   check(bu != rhs);
   check(gr != null && rhs_gr != null && gr == rhs_gr);
   mut_qnop_node(gr, bu->last, {@[gr_qop]GrJmp({rhs->first})});
   bu->last = rhs->last;
-  rhs->gr = null;
+  rhs->gs = {null, null, null};
 }
 
 func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
-  gr *frame_graph = bu->gr;
+  gr *frame_graph = bu->gs.gr;
   check(gr != null);
   mut_qnop_node(gr, bu->last, {@[gr_qop]GrJmp({enter_rhs})});
   bu->last = rhs_nopq;
 }
 
 func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
-  gr *frame_graph = bu->gr;
+  gr *frame_graph = bu->gs.gr;
   check(gr != null);
   mut_qnop_node(gr, bu->last, {@[gr_qop]GrJmp({outflow})});
   ret sq_num = bu->first;
-  bu->gr = null;
+  bu->gs = {null, null, null};
   return ret;
 }
 
@@ -261,10 +252,11 @@ func done(bu *sq_builder) gr_num {
 }
 
 func doneq(bu *sq_builder) sq_num {
-  bu->gr = null;
+  bu->gs = {null, null, null};
   return bu->first;
 }
 
+// NOTE(): front and last aren't really used, are they.
 func front(bu *sq_builder) sq_num {
   return bu->first;
 }
@@ -2108,6 +2100,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   cs *checkstate = clq->cs;
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_arraytype")));
   celltrack gr_celltrack = mk_celltrack();
+  gs gr_statep = {clq, &gr, &celltrack};
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mai->cu_type.x));
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
@@ -2146,7 +2139,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
 
   argcells array[cell_num];
   pointeecells array[cell_num];
-  deref_bu sq_builder = mk_builder(&gr, &celltrack);
+  deref_bu sq_builder = mk_builder(gs);
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = add_cell(&gr, {LocationStatic, argtp.cu, argtp.props});
     push(&argcells, ac);
@@ -2157,7 +2150,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
     add(&deref_bu, @[gr_xop]GrDead({ac}));
   }
 
-  bu sq_builder = mk_builder(&gr, &celltrack);
+  bu sq_builder = mk_builder(gs);
   add(&bu, done(&deref_bu));
 
   terminal_case u32;
@@ -2180,10 +2173,10 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
 
   topgn sq_num = nopq(&gr);
 
-  loop_bu sq_builder = mk_builder(&gr, &celltrack);
+  loop_bu sq_builder = mk_builder(gs);
   for i size = 0; i < 2; i = i + 1 {
     if (CtorDestroy == wc) == (i == 0) {
-      incr_bu sq_builder = mk_builder(&gr, &celltrack);
+      incr_bu sq_builder = mk_builder(gs);
       ic2cell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
       add(&incr_bu, @[gr_xop]GrLive({ic2cell}));
       add(&incr_bu, @[gr_xop]GrMemCopy({ic2cell, indexcell}));
@@ -2200,7 +2193,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
       incrgn gr_num = done(&incr_bu);
       add(&loop_bu, incrgn);
     } else {
-      vd_bu sq_builder = mk_builder(&gr, &celltrack);
+      vd_bu sq_builder = mk_builder(gs);
 
       elemretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
       // Order here doesn't matter, but we do ret cell before the others.
@@ -2239,7 +2232,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
 
   mut_qnop_node(&gr, topgn, {@[gr_qop]GrJmp({branch_gn})});
 
-  deadprec_bu sq_builder = mk_builder(&gr, &celltrack);
+  deadprec_bu sq_builder = mk_builder(gs);
   for i size = nargs; i > 0; {
     i = i - 1;
     add(&deadprec_bu, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
@@ -2788,13 +2781,13 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
       switch &inst->rhs {
         case &InstRhsPrim(op primitive_op): {
           id fn_body_id = add_prim_fn_body(clq, ent->def_name, &inst_typrop->cu, op);
-          frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
+          frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
           inst->graph = Computed(Has(frg));
           return NoFail;
         }
         case &InstRhsExtern: {
           id fn_body_id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
-          frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
+          frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
           inst->graph = Computed(Has(frg));
           return NoFail;
         }
@@ -2822,12 +2815,12 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           switch &nonmag {
           case &NonMagicCtor(wnmc which_non_magic_ctor):
             info *non_magic_ctor_info = un(&wnmc.nmc.info);
-            frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstDef(info->ip));
+            frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstDef(info->ip));
             inst->graph = Computed(Has(frg));
             return NoFail;
           case &NonMagicProp(nmp non_magic_prop):
             info u32 = *un(&nmp.info);
-            frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, @[gr_const]ConstInt(~info));
+            frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typrop->cu, &inst_typrop->props, @[gr_const]ConstInt(~info));
             inst->graph = Computed(Has(frg));
             return NoFail;
           }
@@ -2847,7 +2840,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
             id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells, inline, NotComputed})});
           }
 
-          frg frame_regraphed = mk_const_frame_regraphed(ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
+          frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
           inst->graph = Computed(Has(frg));
           return NoFail;
         }
@@ -2866,10 +2859,12 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
   }
 }
 
-func mk_const_frame_regraphed(informal_name sym, type *cu_typeexpr, props *type_properties, c gr_const) frame_regraphed {
+func mk_const_frame_regraphed(clq *clqueue, informal_name sym, type *cu_typeexpr, props *type_properties, c gr_const) frame_regraphed {
+  // I don't think we _actually_ use clq for anything.
   gr frame_graph = init_frame_graph_empty(informal_name);
   celltrack gr_celltrack = mk_celltrack();
-  bu sq_builder = mk_builder(&gr, &celltrack);
+  gs gr_statep = {clq, &gr, &celltrack};
+  bu sq_builder = mk_builder(gs);
   cell cell_num = add_cell(&gr, {LocationStatic, *type, *props});
   add(&bu, @[gr_xop]GrLive({cell}));
   add(&bu, @[gr_xop]GrWriteConst({cell, c}));
