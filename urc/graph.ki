@@ -252,16 +252,6 @@ func addo(bu *sq_builder, ogn opt[gr_num]) void {
   }
 }
 
-func append(bu *sq_builder, rhs *sq_builder) void {
-  gr *frame_graph = bu->gs.gr;
-  rhs_gr *frame_graph = rhs->gs.gr;
-  check(bu != rhs);
-  check(gr != null && rhs_gr != null && gr == rhs_gr);
-  mut_qnop_node(gr, bu->last, {@[gr_qop]GrJmp({rhs->first})});
-  bu->last = rhs->last;
-  rhs->gs = {null, null, null};
-}
-
 func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
   gr *frame_graph = bu->gs.gr;
   check(gr != null);
@@ -279,19 +269,11 @@ func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
 }
 
 func done(bu *sq_builder) gr_num {
-  return doneq(bu).x;
-}
-
-func doneq(bu *sq_builder) sq_num {
   bu->gs = {null, null, null};
-  return bu->first;
+  return bu->first.x;
 }
 
-// NOTE(): front and last aren't really used, are they.
-func front(bu *sq_builder) sq_num {
-  return bu->first;
-}
-
+// last(.) is used to identify the label target for gr_label_statement.
 func last(bu *sq_builder) sq_num {
   return bu->last;
 }
