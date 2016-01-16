@@ -204,7 +204,7 @@ func addq(gr *frame_graph, op gr_qop) sq_num {
   return ~help_add_node(gr, @[gr_node]QOp({op}));
 }
 
-func mut_qnop_node(gr *frame_graph, ix sq_num, newnode gr_qnode) void {
+func help_mut_qnop_node(gr *frame_graph, ix sq_num, newnode gr_qnode) void {
   node *gr_node = ref_node(gr, ix.x);
   switch node {
   case &XOp(xn gr_xnode):
@@ -219,11 +219,11 @@ func mut_qnop_node(gr *frame_graph, ix sq_num, newnode gr_qnode) void {
 }
 
 func mut_qnop_node(gr *frame_graph, ix sq_num, op gr_num, outflow sq_num) void {
-  mut_qnop_node(gr, ix, {@[gr_qop]GrSequence({op, outflow})});
+  help_mut_qnop_node(gr, ix, {@[gr_qop]GrSequence({op, outflow})});
 }
 
 func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
-  mut_qnop_node(gr, ix, {@[gr_qop]GrJmp({outflow})});
+  help_mut_qnop_node(gr, ix, {@[gr_qop]GrJmp({outflow})});
 }
 
 struct sq_builder {
@@ -255,14 +255,14 @@ func addo(bu *sq_builder, ogn opt[gr_num]) void {
 func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
   gr *frame_graph = bu->gs.gr;
   check(gr != null);
-  mut_qnop_node(gr, bu->last, {@[gr_qop]GrJmp({enter_rhs})});
+  jmp_qnop_node(gr, bu->last, enter_rhs);
   bu->last = rhs_nopq;
 }
 
 func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
   gr *frame_graph = bu->gs.gr;
   check(gr != null);
-  mut_qnop_node(gr, bu->last, {@[gr_qop]GrJmp({outflow})});
+  jmp_qnop_node(gr, bu->last, outflow);
   ret sq_num = bu->first;
   bu->gs = {null, null, null};
   return ret;
@@ -580,7 +580,7 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
 
 func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) np {
   gn sq_num = get(&fb->label_gn, un(&a->info)->label_number.x);
-  mut_qnop_node(gs.gr, gn, {@[gr_qop]GrJmp({last(bu)})});
+  jmp_qnop_node(gs.gr, gn, last(bu));
   return NoFail;
 }
 
@@ -2218,7 +2218,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
 
   branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray({@[gr_const]ConstInt(bigu(terminal_case)), deadseq_nopq}), Has(tie_gn)}));
 
-  mut_qnop_node(&gr, topgn, {@[gr_qop]GrJmp({branch_gn})});
+  jmp_qnop_node(&gr, topgn, branch_gn);
 
   deadprec_bu sq_builder = mk_builder(gs);
   for i size = nargs; i > 0; {
