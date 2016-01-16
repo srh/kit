@@ -395,6 +395,18 @@ struct gr_statep {
   celltrack *gr_celltrack;
 }
 
+struct gr_savetrack {
+  celltrack gr_celltrack;
+}
+
+func save_celltrack(gs gr_statep) gr_savetrack {
+  return {*gs.celltrack};
+}
+
+func restore_celltrack(gs gr_statep, savetrack *gr_savetrack) void {
+  *gs.celltrack = savetrack;
+}
+
 struct fullbody_state {
   // all_vars and labels is from the ast_fullbody_info.
   // We use the cell field, to know the name of the var's cell.
