@@ -690,7 +690,9 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     }
   }
 
-  topgn var = nopq(gs.gr);
+  topgn sq_num = nopq(gs.gr);
+
+  exit_target sq_num = nopq(gs.gr);
 
   loopcleanupgn gr_num;
   if case &Has(cond ast_expr_condition) = &a->condition {
@@ -727,19 +729,22 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
 
   gn sq_num;
   if case &Has(cond ast_expr_condition) = &a->condition {
-    // TODO: This would be using the same cells in different nodes.
-    loopexitgn gr_num;
-    if case Printed(pm) = sq_later_discard(gs, &cond.discard, &loopexitgn) {
-      return Printed(pm);
-    }
+    exit_bu sq_builder = mk_builder(gs.gr);
 
     initter_uw gr_num;
     if case Printed(pm) = sq_unwinding(gs, &un(&a->info)->initter_destructions, &initter_uw) {
       return Printed(pm);
     }
-    initseq sq_num = seqq(gs.gr, {initter_uw, outflow});
+    add(&exit_bu, initter_uw);
 
-    exitseq var = seqq(gs.gr, {loopexitgn, initseq});
+    // TODO: This would be using the same cells in different nodes.
+    loopexitgn gr_num;
+    if case Printed(pm) = sq_later_discard(gs, &cond.discard, &loopexitgn) {
+      return Printed(pm);
+    }
+    add(&exit_bu, loopexitgn);
+
+    exitseq sq_num = mut_connect(&exit_bu, exit_target);
 
     if case Printed(pm) = sq_expr_condition(gs, oo(&cond.expr), thengn, exitseq, &gn) {
       return Printed(pm);
@@ -748,7 +753,8 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     gn = thengn;
   }
 
-  mut_qnop_node(gs.gr, topgn, {@[gr_qop]GrJmp({gn})});
+  jmp_qnop_node(gs.gr, topgn, gn);
+  jmp_qnop_node(gs.gr, exit_target, outflow);
 
   fingn sq_num = mut_connect(&init_bu, topgn);
   *out = fingn;
