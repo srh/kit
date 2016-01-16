@@ -218,14 +218,6 @@ func help_mut_qnop_node(gr *frame_graph, ix sq_num, newnode gr_qnode) void {
   }
 }
 
-func mut_qnop_node(gr *frame_graph, ix sq_num, op gr_num, outflow sq_num) void {
-  help_mut_qnop_node(gr, ix, {@[gr_qop]GrSequence({op, outflow})});
-}
-
-func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
-  help_mut_qnop_node(gr, ix, {@[gr_qop]GrJmp({outflow})});
-}
-
 struct sq_builder {
   // Stored here for "convenience," also gs.gr being null means this object is dead.
   gs gr_statep;
@@ -252,6 +244,25 @@ func addo(bu *sq_builder, ogn opt[gr_num]) void {
   }
 }
 
+
+// Control flow connecting functions.  Every place we use these, we need to save/connect celltracking info.  They are:  mut_qnop_node, jmp_qnop_node, append, mut_connect, last, nopq, and seqq.
+
+func nopq(gr *frame_graph) sq_num {
+  return addq(gr, GrQNop);
+}
+
+func seqq(gr *frame_graph, gsq gr_sequence) sq_num {
+  return addq(gr, GrSequence(gsq));
+}
+
+func mut_qnop_node(gr *frame_graph, ix sq_num, op gr_num, outflow sq_num) void {
+  help_mut_qnop_node(gr, ix, {@[gr_qop]GrSequence({op, outflow})});
+}
+
+func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
+  help_mut_qnop_node(gr, ix, {@[gr_qop]GrJmp({outflow})});
+}
+
 func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
   gr *frame_graph = bu->gs.gr;
   check(gr != null);
@@ -268,14 +279,14 @@ func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
   return ret;
 }
 
-func done(bu *sq_builder) gr_num {
-  bu->gs = {null, null, null};
-  return bu->first.x;
-}
-
 // last(.) is used to identify the label target for gr_label_statement.
 func last(bu *sq_builder) sq_num {
   return bu->last;
+}
+
+func done(bu *sq_builder) gr_num {
+  bu->gs = {null, null, null};
+  return bu->first.x;
 }
 
 inline func ref_cell(gr *frame_graph, c cell_num) *cell_info {
@@ -393,14 +404,6 @@ struct fullbody_state {
   // count(&label_gn) == count(&info->labels), they start off as nop nodes until we see the label.
   label_gn array[sq_num];
   return_cell cell_num;
-}
-
-func nopq(gr *frame_graph) sq_num {
-  return addq(gr, GrQNop);
-}
-
-func seqq(gr *frame_graph, gsq gr_sequence) sq_num {
-  return addq(gr, GrSequence(gsq));
 }
 
 func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
@@ -2413,38 +2416,6 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   *return_cell_out = return_cell;
   *arg_cells_out = argcells;
   return NoFail;
-}
-
-func seqqo(gr *frame_graph, a opt[gr_num], onto sq_num) sq_num {
-  if case Has(gn gr_num) = a {
-    return seqq(gr, {gn, onto});
-  } else {
-    return onto;
-  }
-}
-
-func seq(gr *frame_graph, a opt[gr_num], b opt[gr_num], c opt[gr_num], d opt[gr_num]) sq_num {
-  build sq_num = nopq(gr);
-  build = seqqo(gr, d, build);
-  build = seqqo(gr, c, build);
-  build = seqqo(gr, b, build);
-  build = seqqo(gr, a, build);
-  return build;
-}
-
-func seq(gr *frame_graph, a opt[gr_num], b opt[gr_num], c opt[gr_num]) sq_num {
-  build sq_num = nopq(gr);
-  build = seqqo(gr, c, build);
-  build = seqqo(gr, b, build);
-  build = seqqo(gr, a, build);
-  return build;
-}
-
-func seq(gr *frame_graph, a opt[gr_num], b opt[gr_num]) sq_num {
-  build sq_num = nopq(gr);
-  build = seqqo(gr, b, build);
-  build = seqqo(gr, a, build);
-  return build;
 }
 
 func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
