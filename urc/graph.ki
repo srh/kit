@@ -2311,15 +2311,6 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   add(&bu, done(&deref_bu));
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-  deadprec gr_num;
-  if true {
-    deadprec = addx(&gr, @[gr_xop]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)}));
-    for i size = 0; i < nargs; i = i + 1 {
-      pd gr_num = addx(&gr, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
-      td gr_num = addx(&gr, @[gr_xop]GrVirtualDead({get(&tagcells, i)}));
-      deadprec = seq2(&gr, seq2(&gr, pd, td).x, deadprec).x;
-    }
-  }
 
   deadseq_nopq sq_num = nopq(&gr);
 
@@ -2443,7 +2434,12 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
 
   br sq_num = addq(&gr, @[gr_qop]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None}));
   append(&bu, br, deadseq_nopq);
-  add(&bu, deadprec);
+  for i size = nargs; i > 0; {
+    i = i - 1;
+    add(&bu, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
+    add(&bu, @[gr_xop]GrVirtualDead({get(&tagcells, i)}));
+  }
+  add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)}));
   *gr_out = gr;
   *gn_out = done(&bu);
   *return_cell_out = return_cell;
