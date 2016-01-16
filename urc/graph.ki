@@ -2220,16 +2220,15 @@ func sq_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
       for j size = 0; j < nargs; j = j + 1 {
         ec cell_num = add_cell(&gr, {LocationVirtual, ~ *param, param_props});
         indexcopycell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
-        copycell_live gr_num = addx(&gr, @[gr_xop]GrLive({indexcopycell}));
-        copygn gr_num = addx(&gr, copycell_live, @[gr_xop]GrMemCopy({indexcopycell, indexcell}));
-        gn gr_num = addx(&gr, copygn, @[gr_xop]GrSubcell({ec, get(&pointeecells, j), OffsetComputed({param_props.flat_size, indexcopycell})}));
-        deadcopy gr_num = addx(&gr, gn, @[gr_xop]GrDead({indexcopycell}));
+        add(&vd_bu, @[gr_xop]GrLive({indexcopycell}));
+        add(&vd_bu, @[gr_xop]GrMemCopy({indexcopycell, indexcell}));
+        add(&vd_bu, @[gr_xop]GrSubcell({ec, get(&pointeecells, j), OffsetComputed({param_props.flat_size, indexcopycell})}));
+        add(&vd_bu, @[gr_xop]GrDead({indexcopycell}));
         epc cell_num = add_cell(&gr, {LocationStatic, elemptrtype, elemptrtype_props});
         push(&elemptrcells, epc);
-        epc_live gr_num = addx(&gr, @[gr_xop]GrLive({epc}));
-        ptrgn gr_num = addx(&gr, seq2(&gr, deadcopy, epc_live).x, @[gr_xop]GrAddressof({epc, ec}));
-        ecdeadgn gr_num = addx(&gr, ptrgn, @[gr_xop]GrVirtualDead({ec}));
-        add(&vd_bu, ecdeadgn);
+        add(&vd_bu, @[gr_xop]GrLive({epc}));
+        add(&vd_bu, @[gr_xop]GrAddressof({epc, ec}));
+        add(&vd_bu, @[gr_xop]GrVirtualDead({ec}));
       }
 
       add(&vd_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell}));
