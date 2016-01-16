@@ -2188,8 +2188,18 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
 
   topgn sq_num = nopq(&gr);
 
+  prec_bu sq_builder = mk_builder(&gr);
+
+  elemretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
+  // Order here doesn't matter, but we do ret cell before the others.
+  add(&prec_bu, @[gr_xop]GrLive({elemretcell}));
+
+  func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
+
+  add(&prec_bu, @[gr_xop]GrLive({func_cell}));
+  add(&prec_bu, @[gr_xop]GrWriteConst({func_cell, ConstDef(mai->ip)}));
+
   elemptrcells array[cell_num];
-  prec gr_num = nopq(&gr).x;
   for j size = 0; j < nargs; j = j + 1 {
     ec cell_num = add_cell(&gr, {LocationVirtual, ~ *param, param_props});
     indexcopycell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
@@ -2202,22 +2212,12 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
     epc_live gr_num = addx(&gr, @[gr_xop]GrLive({epc}));
     ptrgn gr_num = addx(&gr, seq2(&gr, deadcopy, epc_live).x, @[gr_xop]GrAddressof({epc, ec}));
     ecdeadgn gr_num = addx(&gr, ptrgn, @[gr_xop]GrVirtualDead({ec}));
-    prec = seq2(&gr, prec, ecdeadgn).x;
+    add(&prec_bu, ecdeadgn);
   }
 
-  func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
-
-  func_cell_live gr_num = addx(&gr, @[gr_xop]GrLive({func_cell}));
-  func_gn gr_num = addx(&gr, func_cell_live, @[gr_xop]GrWriteConst({func_cell, ConstDef(mai->ip)}));
-  // Order here doesn't matter, but we do func cell before arg cells.
-  prec = seq2(&gr, func_gn, prec).x;
-
-  elemretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-  // Order here doesn't matter, but we do ret cell before the others.
-  prec = seq2(&gr, addx(&gr, @[gr_xop]GrLive({elemretcell})), prec).x;
-
-  ap gr_num = addx(&gr, prec, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell}));
-  vd gr_num = addx(&gr, ap, @[gr_xop]GrDead({elemretcell}));
+  add(&prec_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell}));
+  add(&prec_bu, @[gr_xop]GrDead({elemretcell}));
+  vd gr_num = done(&prec_bu);
 
   ic2cell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
   ic2cell_live gr_num = addx(&gr, @[gr_xop]GrLive({ic2cell}));
