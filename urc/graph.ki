@@ -722,6 +722,14 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
   }
 
   continue_target sq_num;
+  continue_nopq sq_num = nopq(gs.gr);
+
+  bp breakgrack = {outflow, continue_nopq};
+
+  body_bu sq_builder = mk_builder(gs.gr);
+  if case Printed(pm) = sq_bracebody(gs, fb, Has(bp), &a->body, &body_bu) {
+    return Printed(pm);
+  }
 
   continuegn sq_num;
   if case &Has(increment box[ast_expr_discard]) = &a->increment {
@@ -737,12 +745,8 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     continue_target = continuegn;
   }
 
-  bp breakgrack = {outflow, continue_target};
+  jmp_qnop_node(gs.gr, continue_nopq, continue_target);
 
-  body_bu sq_builder = mk_builder(gs.gr);
-  if case Printed(pm) = sq_bracebody(gs, fb, Has(bp), &a->body, &body_bu) {
-    return Printed(pm);
-  }
   thengn sq_num = mut_connect(&body_bu, continuegn);
 
   if case &Has(cond ast_expr_condition) = &a->condition {
