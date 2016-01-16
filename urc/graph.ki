@@ -478,21 +478,15 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     }
     return NoFail;
   case &IfThen(a ast_ifthen_statement):
-    outflow sq_num = nopq(gs.gr);
-    gn sq_num;
-    if case Printed(pm) = gr_ifthen_statement(gs, fb, obg, &a, outflow, &gn) {
+    if case Printed(pm) = gr_ifthen_statement(gs, fb, obg, &a, bu) {
       return Printed(pm);
     }
-    append(bu, gn, outflow);
     return NoFail;
 
   case &IfThenElse(a ast_ifthenelse_statement):
-    outflow sq_num = nopq(gs.gr);
-    gn sq_num;
-    if case Printed(pm) = gr_ifthenelse_statement(gs, fb, obg, &a, outflow, &gn) {
+    if case Printed(pm) = gr_ifthenelse_statement(gs, fb, obg, &a, bu) {
       return Printed(pm);
     }
-    append(bu, gn, outflow);
     return NoFail;
   case &While(a ast_while_statement):
     outflow sq_num = nopq(gs.gr);
@@ -830,7 +824,7 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   return NoFail;
 }
 
-func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, outflow sq_num, out *sq_num) np {
+func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, bu *sq_builder) np {
   join_target sq_num = nopq(gs.gr);
 
   then_nop sq_num = nopq(gs.gr);
@@ -854,13 +848,14 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   jmp_qnop_node(gs.gr, then_nop, thengn);
   jmp_qnop_node(gs.gr, else_nop, elsegn);
 
+  append(bu, gn, join_target);
+
   condition_discard_gn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
     return Printed(pm);
   }
+  add(bu, condition_discard_gn);
 
-  mut_qnop_node(gs.gr, join_target, condition_discard_gn, outflow);
-  *out = gn;
   return NoFail;
 }
 
@@ -874,7 +869,7 @@ func gr_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd
   return NoFail;
 }
 
-func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthen_statement, outflow sq_num, out *sq_num) np {
+func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthen_statement, bu *sq_builder) np {
   join_target sq_num = nopq(gs.gr);
 
   then_nop sq_num = nopq(gs.gr);
@@ -893,13 +888,13 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   jmp_qnop_node(gs.gr, then_nop, bodygn);
   jmp_qnop_node(gs.gr, else_nop, join_target);
 
+  append(bu, gn, join_target);
+
   condition_discard_gn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
     return Printed(pm);
   }
-  mut_qnop_node(gs.gr, join_target, condition_discard_gn, outflow);
-
-  *out = gn;
+  add(bu, condition_discard_gn);
   return NoFail;
 }
 
