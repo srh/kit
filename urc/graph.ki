@@ -2312,7 +2312,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
 
-  deadseq_nopq sq_num = nopq(&gr);
+  join_target sq_num = nopq(&gr);
 
   cases_gn array[tup[gr_const, sq_num]];
   nconstructors size = count(&et->constructors);
@@ -2344,36 +2344,35 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
 
     last_ogn gr_num;
     if case &Has(ip instpair) = ref(&mei->cips, i) {
+      sub_bu sq_builder = mk_builder(&gr);
       fieldptrtype cu_typeexpr;
       fieldptrtype_props type_properties;
       compute_prim(clq, ptr_type(cs, fieldtype.x), &fieldptrtype, &fieldptrtype_props);
 
-      fieldptrcella array[cell_num];
-      prec gr_num = nopq(&gr).x;
-      for j size = 0; j < nargs; j = j + 1 {
-        fpc cell_num = add_cell(&gr, {LocationStatic, fieldptrtype, fieldptrtype_props});
-        push(&fieldptrcella, fpc);
-        fpc_live gr_num = addx(&gr, @[gr_xop]GrLive({fpc}));
-        an1 gr_num = addx(&gr, seq2(&gr, fpc_live, get(&fieldcellgn, j)).x, @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
-        an gr_num = addx(&gr, an1, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
-        prec = seq2(&gr, prec, an).x;
-      }
+      fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
+      add(&sub_bu, @[gr_xop]GrLive({fieldretcell}));
 
       fntype cu_typeexpr;
       fntype_props type_properties;
       compute_prim(clq, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrtype.x), voidtp.cu.x), &fntype, &fntype_props);
 
       func_cell cell_num = add_cell(&gr, {LocationStatic, fntype, fntype_props});
-      func_cell_live gr_num = addx(&gr, @[gr_xop]GrLive({func_cell}));
-      func_gn gr_num = addx(&gr, func_cell_live, @[gr_xop]GrWriteConst({func_cell, ConstDef(ip)}));
-      prec = seq2(&gr, func_gn, prec).x;
+      add(&sub_bu, @[gr_xop]GrLive({func_cell}));
+      add(&sub_bu, @[gr_xop]GrWriteConst({func_cell, ConstDef(ip)}));
 
-      fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-      prec = seq2(&gr, addx(&gr, @[gr_xop]GrLive({fieldretcell})), prec).x;
+      fieldptrcella array[cell_num];
+      for j size = 0; j < nargs; j = j + 1 {
+        fpc cell_num = add_cell(&gr, {LocationStatic, fieldptrtype, fieldptrtype_props});
+        push(&fieldptrcella, fpc);
+        add(&sub_bu, @[gr_xop]GrLive({fpc}));
+        add(&sub_bu, get(&fieldcellgn, j));
+        add(&sub_bu, @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
+        add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
+      }
 
-      ap gr_num = addx(&gr, prec, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
-      vd gr_num = addx(&gr, ap, @[gr_xop]GrDead({fieldretcell}));
-      last_ogn = vd;
+      add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
+      add(&sub_bu, @[gr_xop]GrDead({fieldretcell}));
+      last_ogn = done(&sub_bu);
     } else {
       ogn opt[gr_num];
       switch wc {
@@ -2418,22 +2417,20 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
 
     finalgn gr_num = addx(&gr, seq(&gr, tagset_ogn, prepadding_ogn, @[opt[gr_num]]Has(last_ogn), postpadding_ogn).x, @[gr_xop]GrXNop);
 
-    finalseqgn sq_num = seqq(&gr, {finalgn, deadseq_nopq});
+    finalseqgn sq_num = seqq(&gr, {finalgn, join_target});
     push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), finalseqgn});
   }
 
-  if true {
-    if case CtorDestroy = wc {
-      push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), deadseq_nopq});
-    } else {
-      ztgn gr_num = addx(&gr, @[gr_xop]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))}));
-      ztseq sq_num = seqq(&gr, {ztgn, deadseq_nopq});
-      push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), ztseq});
-    }
+  if case CtorDestroy = wc {
+    push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), join_target});
+  } else {
+    ztgn gr_num = addx(&gr, @[gr_xop]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))}));
+    ztseq sq_num = seqq(&gr, {ztgn, join_target});
+    push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), ztseq});
   }
 
   br sq_num = addq(&gr, @[gr_qop]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None}));
-  append(&bu, br, deadseq_nopq);
+  append(&bu, br, join_target);
   for i size = nargs; i > 0; {
     i = i - 1;
     add(&bu, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
