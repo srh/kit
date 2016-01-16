@@ -690,29 +690,26 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     }
   }
 
-  topgn sq_num = nopq(gs.gr);
-
   exit_target sq_num = nopq(gs.gr);
 
   body_entry_gn sq_num;
 
   condition_else_gn opt[sq_num];
 
-  gn sq_num;
+  topgn sq_num;
   if case &Has(cond ast_expr_condition) = &a->condition {
     else_gn sq_num;
 
-    if case Printed(pm) = sq_expr_condition(gs, oo(&cond.expr), &body_entry_gn, &else_gn, &gn) {
+    if case Printed(pm) = sq_expr_condition(gs, oo(&cond.expr), &body_entry_gn, &else_gn, &topgn) {
       return Printed(pm);
     }
     condition_else_gn = Has(else_gn);
   } else {
     body_entry_gn = nopq(gs.gr);
-    gn = body_entry_gn;
+    topgn = body_entry_gn;
     condition_else_gn = None;
   }
 
-  continue_target sq_num;
   continue_nopq sq_num = nopq(gs.gr);
 
   bp breakgrack = {outflow, continue_nopq};
@@ -731,6 +728,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     loopcleanupgn = addx(gs.gr, @[gr_xop]GrXNop);
   }
 
+  continue_target sq_num;
   continuegn sq_num;
   if case &Has(increment box[ast_expr_discard]) = &a->increment {
     incr_bu sq_builder = mk_builder(gs.gr);
@@ -771,7 +769,6 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
   }
 
   jmp_qnop_node(gs.gr, body_entry_gn, thengn);
-  jmp_qnop_node(gs.gr, topgn, gn);
   jmp_qnop_node(gs.gr, exit_target, outflow);
 
   fingn sq_num = mut_connect(&init_bu, topgn);
