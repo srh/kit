@@ -225,7 +225,6 @@ func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
   bu->last = rhs_nopq;
 }
 
-// TODO(): Any use of this is a mix of old-style vs. new-style.
 func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
   gr *frame_graph = bu->gr;
   check(gr != null);
@@ -470,11 +469,9 @@ func sq_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     }
     return NoFail;
   case &Var(a ast_var_statement):
-    gn gr_num;
-    if case Printed(pm) = sq_var_statement(gs, fb, &a, &gn) {
+    if case Printed(pm) = sq_var_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
-    add(bu, gn);
     return NoFail;
   case &IfThen(a ast_ifthen_statement):
     outflow sq_num = nopq(gs.gr);
@@ -590,11 +587,9 @@ func sq_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   is_ptr bool = decompose_typeapp(&expr_complete_type(&oo(&a->swartch)->expr)->x, primitive_pointer_puretype(gs.clq->cs), &param_discard);
 
   switch_bu sq_builder = mk_builder(gs.gr);
-  swartch_gn gr_num;
-  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->swartch), &swartch_gn) {
+  if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&a->swartch), &switch_bu) {
     return Printed(pm);
   }
-  add(&switch_bu, swartch_gn);
 
   info *ast_enum_deconstruction_info = un(&a->info);
   if is_ptr {
@@ -690,20 +685,18 @@ func sq_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     }
   }
 
-  body_entry_gn sq_num;
+  body_entry_gn sq_num = nopq(gs.gr);
 
   condition_else_gn opt[sq_num];
 
   topgn sq_num;
   if case &Has(cond ast_expr_condition) = &a->condition {
-    else_gn sq_num;
-
-    if case Printed(pm) = sq_expr_condition(gs, oo(&cond.expr), &body_entry_gn, &else_gn, &topgn) {
+    else_gn sq_num = nopq(gs.gr);
+    if case Printed(pm) = sq_expr_condition(gs, oo(&cond.expr), body_entry_gn, else_gn, &topgn) {
       return Printed(pm);
     }
     condition_else_gn = Has(else_gn);
   } else {
-    body_entry_gn = nopq(gs.gr);
     topgn = body_entry_gn;
     condition_else_gn = None;
   }
@@ -785,10 +778,10 @@ func sq_condition_discard(gs gr_statep, a *ast_condition_discard_info, out *gr_n
 func sq_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement, outflow sq_num, out *sq_num) np {
   topgn var = nopq(gs.gr);
 
-  then_nop sq_num;
-  else_nop sq_num;
+  then_nop sq_num = nopq(gs.gr);
+  else_nop sq_num = nopq(gs.gr);
   gn sq_num;
-  if case Printed(pm) = sq_condition(gs, fb, &a->condition, &then_nop, &else_nop, &gn) {
+  if case Printed(pm) = sq_condition(gs, fb, &a->condition, then_nop, else_nop, &gn) {
     return Printed(pm);
   }
 
@@ -825,10 +818,10 @@ func sq_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
 func sq_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, outflow sq_num, out *sq_num) np {
   join_target sq_num = nopq(gs.gr);
 
-  then_nop sq_num;
-  else_nop sq_num;
+  then_nop sq_num = nopq(gs.gr);
+  else_nop sq_num = nopq(gs.gr);
   gn sq_num;
-  if case Printed(pm) = sq_condition(gs, fb, &a->condition, &then_nop, &else_nop, &gn) {
+  if case Printed(pm) = sq_condition(gs, fb, &a->condition, then_nop, else_nop, &gn) {
     return Printed(pm);
   }
 
@@ -869,10 +862,10 @@ func sq_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd
 func sq_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthen_statement, outflow sq_num, out *sq_num) np {
   join_target sq_num = nopq(gs.gr);
 
-  then_nop sq_num;
-  else_nop sq_num;
+  then_nop sq_num = nopq(gs.gr);
+  else_nop sq_num = nopq(gs.gr);
   gn sq_num;
-  if case Printed(pm) = sq_condition(gs, fb, &a->condition, &then_nop, &else_nop, &gn) {
+  if case Printed(pm) = sq_condition(gs, fb, &a->condition, then_nop, else_nop, &gn) {
     return Printed(pm);
   }
 
@@ -895,43 +888,14 @@ func sq_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   return NoFail;
 }
 
-func sq_expr_condition(gs gr_statep, a *ast_expr_consume, thengn_out *sq_num, elsegn_out *sq_num, out *sq_num) np {
-  thengn sq_num = nopq(gs.gr);
-  elsegn sq_num = nopq(gs.gr);
-  gn sq_num;
-  if case Printed(pm) = sq_expr_condition(gs, a, thengn, elsegn, &gn) {
-    return Printed(pm);
-  }
-  *thengn_out = thengn;
-  *elsegn_out = elsegn;
-  *out = gn;
-  return NoFail;
-}
-
-// TODO(): Probably get rid of this.
 func sq_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn sq_num, out *sq_num) np {
-  congn gr_num;
-  if case Printed(pm) = sq_live_and_expr_consume(gs, a, &congn) {
+  bu sq_builder = mk_builder(gs.gr);
+  if case Printed(pm) = sq_live_and_expr_consume(gs, a, &bu) {
     return Printed(pm);
   }
-  cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(~ @[u32] 0), elsegn});
-  br var = seqq(gs.gr, {congn,
-    addq(gs.gr, @[gr_qop]GrBranch({result_cell(a), cases, Has(thengn)}))});
-
-  *out = br;
-  return NoFail;
-}
-
-func sq_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn_out *sq_num, elsegn_out *sq_num, out *sq_num) np {
-  thengn sq_num = nopq(gs.gr);
-  elsegn sq_num = nopq(gs.gr);
-  gn sq_num;
-  if case Printed(pm) = sq_condition(gs, fb, a, thengn, elsegn, &gn) {
-    return Printed(pm);
-  }
-  *thengn_out = thengn;
-  *elsegn_out = elsegn;
-  *out = gn;
+  cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(bigu(0)), elsegn});
+  br var = addq(gs.gr, @[gr_qop]GrBranch({result_cell(a), cases, Has(thengn)}));
+  *out = mut_connect(&bu, br);
   return NoFail;
 }
 
@@ -943,11 +907,9 @@ func sq_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
 
     case &PatternCondition(pa ast_pattern_assign): {
       bef_bu sq_builder = mk_builder(gs.gr);
-      rhs gr_num;
-      if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&pa.rhs), &rhs) {
+      if case Printed(pm) = sq_live_and_expr_consume(gs, oo(&pa.rhs), &bef_bu) {
         return Printed(pm);
       }
-      add(&bef_bu, rhs);
 
       info *ast_pattern_assign_info = un(&pa.info);
       // TODO: Avoid the duplicate checks for addressof_constructor, only do one GrDeref.
@@ -992,18 +954,21 @@ func sq_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
   }
 }
 
-func sq_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, out *gr_num) np {
+func sq_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, bu *sq_builder) np {
   switch &a->rhs {
-    case &HasExpr(be box[ast_expr_consume]): {
-      return sq_live_and_expr_consume(gs, oo(&be), out);
-    }
-    case &AutoInit(x opt[init_action]): {
-      if case &Has(ia init_action) = &x {
-        return sq_init_action(gs, &ia, out);
-      } else {
-        ice(_u8("AutoInit action not annotated"));
-        return fake();
+  case &HasExpr(be box[ast_expr_consume]):
+    return sq_live_and_expr_consume(gs, oo(&be), bu);
+  case &AutoInit(x opt[init_action]):
+    if case &Has(ia init_action) = &x {
+      gn gr_num;
+      if case Printed(pm) = sq_init_action(gs, &ia, &gn) {
+        return Printed(pm);
       }
+      add(bu, gn);
+      return NoFail;
+    } else {
+      ice(_u8("AutoInit action not annotated"));
+      return fake();
     }
   }
 }
@@ -1013,11 +978,9 @@ func sq_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
     sub_bu sq_builder = mk_builder(gs.gr);
     subcell cell_num = result_cell(oo(&b));
     add(&sub_bu, @[gr_xop]GrSubcell({subcell, fb->return_cell, OffsetConst(0)}));
-    expr_gn gr_num;
-    if case Printed(pm) = sq_expr_consume(gs, oo(&b), &expr_gn) {
+    if case Printed(pm) = sq_expr_consume(gs, oo(&b), &sub_bu) {
       return Printed(pm);
     }
-    add(&sub_bu, expr_gn);
     add(&sub_bu, @[gr_xop]GrVirtualDead({subcell}));
     add(bu, done(&sub_bu));
   }
@@ -1116,28 +1079,8 @@ func sq_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder)
   return NoFail;
 }
 
-// TODO(): Remove this.
-func sq_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, out *gr_num) np {
-  bu sq_builder = mk_builder(gs.gr);
-  if case Printed(pm) = sq_live_and_expr_consume(gs, x, &bu) {
-    return Printed(pm);
-  }
-  *out = done(&bu);
-  return NoFail;
-}
-
 func sq_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
   return sq_expr_and_consume(gs, &x->expr, un(&x->after), bu);
-}
-
-// TODO(): Remove this.
-func sq_expr_consume(gs gr_statep, x *ast_expr_consume, out *gr_num) np {
-  bu sq_builder = mk_builder(gs.gr);
-  if case Printed(pm) = sq_expr_and_consume(gs, &x->expr, un(&x->after), &bu) {
-    return Printed(pm);
-  }
-  *out = done(&bu);
-  return NoFail;
 }
 
 func sq_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
@@ -1154,7 +1097,6 @@ func sq_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume,
   return NoFail;
 }
 
-// TODO(): Use bigu.
 func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   cs *checkstate = gs.clq->cs;
   switch &x->u {
@@ -1167,16 +1109,16 @@ func sq_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   case &BoolLiteral(a ast_bool_literal):
     value bigint;
     if a.value {
-      value = ~ @[u32] 1;
+      value = bigu(1);
     } else {
-      value = ~ @[u32] 0;
+      value = bigu(0);
     }
     return sq_literal(gs, x, value, bu);
   case &VoidLiteral(a ast_void_literal):
-    value bigint = ~ @[u32] 0;
+    value bigint = bigu(0);
     return sq_literal(gs, x, value, bu);
   case &NullLiteral(a ast_null_literal):
-    value bigint = ~ @[u32] 0;
+    value bigint = bigu(0);
     return sq_literal(gs, x, value, bu);
   case &CharLiteral(a ast_char_literal):
     value bigint = ~ a.charspec.value;
@@ -1225,10 +1167,10 @@ func sq_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
 
   conjoined cell_num = rval_cell(x);
 
-  then_nop sq_num;
-  else_nop sq_num;
+  then_nop sq_num = nopq(gs.gr);
+  else_nop sq_num = nopq(gs.gr);
   cond_sn sq_num;
-  if case Printed(pm) = sq_expr_condition(gs, oo(&oo(&a->condition)->expr), &then_nop, &else_nop, &cond_sn) {
+  if case Printed(pm) = sq_expr_condition(gs, oo(&oo(&a->condition)->expr), then_nop, else_nop, &cond_sn) {
     return Printed(pm);
   }
 
@@ -1605,7 +1547,7 @@ func sq_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
         return Printed(pm);
       }
       add(&do_assign_bu, assign_copy);
-      cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(~ @[u32] 0), mut_connect(&do_assign_bu, exit_nopq)}, {@[gr_const]ConstInt(~ @[u32] 1), mut_connect(&just_dead_bu, exit_nopq)});
+      cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(bigu(0)), mut_connect(&do_assign_bu, exit_nopq)}, {@[gr_const]ConstInt(bigu(1)), mut_connect(&just_dead_bu, exit_nopq)});
 
       br sq_num = addq(gs.gr, @[gr_qop]GrBranch({cmp_result, cases, None}));
 
@@ -1659,11 +1601,11 @@ func sq_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   short_circuit_case gr_const;
   eval_rhs_case gr_const;
   if a->is_logical_or {
-    short_circuit_case = ConstInt(~ @[u32] 1);
-    eval_rhs_case = ConstInt(~ @[u32] 0);
+    short_circuit_case = ConstInt(bigu(1));
+    eval_rhs_case = ConstInt(bigu(0));
   } else {
-    short_circuit_case = ConstInt(~ @[u32] 0);
-    eval_rhs_case = ConstInt(~ @[u32] 1);
+    short_circuit_case = ConstInt(bigu(0));
+    eval_rhs_case = ConstInt(bigu(1));
   }
   bn sq_num = addq(gs.gr, @[gr_qop]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, mut_connect(&lhs_bu, end_nopq)}, {eval_rhs_case, mut_connect(&rhs_bu, end_nopq)}), None}));
   append(bu, bn, end_nopq);
@@ -2449,7 +2391,7 @@ func sq_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     add(&bu, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
     add(&bu, @[gr_xop]GrVirtualDead({get(&tagcells, i)}));
   }
-  add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)}));
+  add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
   *gr_out = gr;
   *gn_out = done(&bu);
   *return_cell_out = return_cell;
@@ -2595,7 +2537,7 @@ func sq_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
         switch wc {
         case CtorInit:
           // zero-initialize.
-          add(&sub_bu, @[gr_xop]GrWriteConst({get(&fieldcella, 0), ConstInt(~ @[u32] 0)}));
+          add(&sub_bu, @[gr_xop]GrWriteConst({get(&fieldcella, 0), ConstInt(bigu(0))}));
         case CtorCopy:
           add(&sub_bu, @[gr_xop]GrMemCopy({get(&fieldcella, 0), get(&fieldcella, 1)}));
         case CtorMove:
@@ -2626,7 +2568,7 @@ func sq_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
     i = i - 1;
     add(&bu, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
   }
-  add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(~ @[u32] 0)}));
+  add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
 
   gn gr_num = done(&bu);
 
@@ -2825,11 +2767,12 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           }
           gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
           celltrack gr_celltrack = mk_celltrack();
-          gn gr_num;
-          if case Printed(pm) = sq_live_and_expr_consume({clq, &gr, &celltrack}, &dire.ec, &gn) {
+          bu sq_builder = mk_builder(&gr);
+          if case Printed(pm) = sq_live_and_expr_consume({clq, &gr, &celltrack}, &dire.ec, &bu) {
             inst->graph = FailedComputation;
             return Printed(pm);
           }
+          gn gr_num = done(&bu);
           inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, result_cell(&dire.ec)}));
           return NoFail;
         }
