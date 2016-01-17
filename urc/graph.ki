@@ -657,13 +657,18 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
     add(bu, @[gr_xop]GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
   }
 
-  exitseq sq_num = nopq(gs.gr);
+  exit_target tracked_target = mk_tracked(nopq(gs.gr));
+
+  saved_afterswartch gr_savetrack = save_celltrack(gs);
 
   cases array[opt[sq_num]] = repeat(info->num_enum_constructors, None);
   default_case opt[sq_num] = None;
   ncases size = count(&a->cases);
   reserve(&cases, ncases);
   for i size = 0; i < ncases; i = i + 1 {
+    if i != 0 {
+      restore_celltrack(gs, &saved_afterswartch);
+    }
     sc *ast_switch_case = ref(&a->cases, i);
 
     switch &sc->pattern {
@@ -685,7 +690,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
           }
           add(&case_bu, @[gr_xop]GrVirtualDead({vi->cell}));
 
-          gn sq_num = mut_connect(&case_bu, exitseq);
+          gn sq_num = sq_mut_connect(gs, &case_bu, &exit_target);
           set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         } else {
           case_bu sq_builder = mk_builder(gs);
@@ -693,7 +698,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
           if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &case_bu) {
             return Printed(pm);
           }
-          gn sq_num = mut_connect(&case_bu, exitseq);
+          gn sq_num = sq_mut_connect(gs, &case_bu, &exit_target);
           set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         }
       }
@@ -704,7 +709,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
           return Printed(pm);
         }
 
-        gn var = mut_connect(&case_bu, exitseq);
+        gn var = sq_mut_connect(gs, &case_bu, &exit_target);
         set(&default_case, gn);
       }
     }
@@ -724,7 +729,8 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 
   br sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&branch_cases), None}));
 
-  append(bu, br, exitseq);
+  note_celltrack(&exit_target, gs.celltrack);
+  sq_append(bu, br, exit_target.sn);
 
   swartch_discard_gn gr_num;
   if case Printed(pm) = gr_later_discard(gs, &a->swartch_discard, &swartch_discard_gn) {
