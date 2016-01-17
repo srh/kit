@@ -245,22 +245,36 @@ func addo(bu *sq_builder, ogn opt[gr_num]) void {
 }
 
 
-// Control flow connecting functions.  Every place we use these, we need to save/connect celltracking info.  They are:  mut_qnop_node, jmp_qnop_node, append, mut_connect, last, nopq, and seqq.
+// Control flow connecting functions.  Every place we use these, we need to save/connect celltracking info.  They are:  mut_qnop_node, jmp_qnop_node, append, mut_connect, last, nopq, and seqq.  The sq_ versions are ones that we've done the save/connecting celltracking modifications for.
+// TODO(): Rename the sq_ versions back to the original names.
 
 func nopq(gr *frame_graph) sq_num {
   return addq(gr, GrQNop);
 }
 
+func sq_nopq(gr *frame_graph) sq_num { return nopq(gr); }
+
+
 func seqq(gr *frame_graph, gsq gr_sequence) sq_num {
   return addq(gr, GrSequence(gsq));
 }
+
+func sq_seqq(gr *frame_graph, gsq gr_sequence) sq_num { return seqq(gr, gsq); }
 
 func mut_qnop_node(gr *frame_graph, ix sq_num, op gr_num, outflow sq_num) void {
   help_mut_qnop_node(gr, ix, {@[gr_qop]GrSequence({op, outflow})});
 }
 
+func sq_mut_qnop_node(gr *frame_graph, ix sq_num, op gr_num, outflow sq_num) void {
+  return mut_qnop_node(gr, ix, op, outflow);
+}
+
 func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
   help_mut_qnop_node(gr, ix, {@[gr_qop]GrJmp({outflow})});
+}
+
+func sq_jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
+  return jmp_qnop_node(gr, ix, outflow);
 }
 
 func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
@@ -268,6 +282,10 @@ func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
   check(gr != null);
   jmp_qnop_node(gr, bu->last, enter_rhs);
   bu->last = rhs_nopq;
+}
+
+func sq_append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
+  return append(bu, enter_rhs, rhs_nopq);
 }
 
 func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
@@ -279,9 +297,17 @@ func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
   return ret;
 }
 
+func sq_mut_connect(bu *sq_builder, outflow sq_num) sq_num {
+  return mut_connect(bu, outflow);
+}
+
 // last(.) is used to identify the label target for gr_label_statement.
 func last(bu *sq_builder) sq_num {
   return bu->last;
+}
+
+func sq_last(bu *sq_builder) sq_num {
+  return last(bu);
 }
 
 func done(bu *sq_builder) gr_num {
