@@ -730,7 +730,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, ou
     continuegn = seqq(gs.gr, {loopcleanupgn, totopgn});
   } else {
     continuegn = seqq(gs.gr, {loopcleanupgn, topgn});
-    continue_target = continuegn;
+    continue_target = topgn;
   }
 
   jmp_qnop_node(gs.gr, continue_nopq, continue_target);

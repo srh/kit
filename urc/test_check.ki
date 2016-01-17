@@ -2007,6 +2007,44 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  return r;\n"
         "}\n"
         "def x i32 = foo();\n"));
+
+  run_check_test(ctx, "c162",
+    _u8("func foo() i32 {\n"
+        "  k i32 = 0;\n"
+        "  for i size = 0; i < 20; i = i + 1 {\n"
+        "    k = k + 1;\n"
+        "    continue;\n"
+        "  }\n"
+        "  return k;\n"
+        "}\n"
+        "def x i32 = foo();\n"));
+  run_check_test(ctx, "c163",
+    _u8("func foo() i32 {\n"
+        "  k i32 = 0;\n"
+        "  for ;; {\n"
+        "    k = k + 1;\n"
+        "    continue;\n"
+        "  }\n"
+        "  return k;\n"
+        "}\n"));
+  run_check_test(ctx, "c164",
+    _u8("func foo() i32 {\n"
+        "  k i32 = 0;\n"
+        "  for ;; k = k - 1 {\n"
+        "    k = k + 1;\n"
+        "    continue;\n"
+        "  }\n"
+        "  return k;\n"
+        "}\n"));
+  run_check_test(ctx, "c165",
+    _u8("func foo() i32 {\n"
+        "  k i32 = 0;\n"
+        "  for i size = 0 ; i < 20; {\n"
+        "    k = k + 1;\n"
+        "    continue;\n"
+        "  }\n"
+        "  return k;\n"
+        "}\n"));
 }
 
 func mk_ctx(verbose bool, build bool, name opt[array[u8]]) check_ctx {
