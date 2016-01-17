@@ -291,7 +291,7 @@ func sq_append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
 
 // Adds an unattached nopq afterward, with the given saved state restored (typically the variables-in-scope state before a return, break, continue, or goto statement).
 func sq_append_and_nopq(bu *sq_builder, outflow *tracked_target, saved *gr_savetrack) void {
-  note_celltrack(outflow, bu->gs.celltrack);
+  note_celltrack(&outflow->note, bu->gs.celltrack);
   append(bu, outflow->sn, nopq(bu->gs.gr));
   restore_celltrack(bu->gs, saved);
 }
@@ -310,8 +310,13 @@ func sq_mut_connect(bu *sq_builder, outflow sq_num) sq_num {
 }
 
 func sq_mut_connect(gs gr_statep, bu *sq_builder, outflow *tracked_target) sq_num {
-  note_celltrack(outflow, gs.celltrack);
+  note_celltrack(&outflow->note, gs.celltrack);
   return mut_connect(bu, outflow->sn);
+}
+
+func sq_uni_connect(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
+  note_celltrack(&outflow->note, gs.celltrack);
+  return seqq(gs.gr, {gn, outflow->sn});
 }
 
 // last(.) is used to identify the label target for gr_label_statement.
@@ -446,16 +451,28 @@ func restore_celltrack(gs gr_statep, savetrack *gr_savetrack) void {
   *gs.celltrack = savetrack->celltrack;
 }
 
-struct tracked_target {
+struct noted_celltrack {
   celltrack opt[gr_celltrack];
+}
+
+func mk_noted() noted_celltrack {
+  return {None};
+}
+
+func mk_noted(gs gr_statep) noted_celltrack {
+  return {Has(*gs.celltrack)};
+}
+
+struct tracked_target {
+  note noted_celltrack;
   sn sq_num;
 }
 
 func mk_tracked(gn sq_num) tracked_target {
-  return {None, gn};
+  return {mk_noted(), gn};
 }
 
-func note_celltrack(targ *tracked_target, current *gr_celltrack) void {
+func note_celltrack(targ *noted_celltrack, current *gr_celltrack) void {
   if case &Has(ct gr_celltrack) = &targ->celltrack {
     if !matches_checksum(&ct.liveset, &current->liveset) {
       ice(_u8("Inconsistent liveness state, liveset="), current->liveset);
@@ -479,7 +496,6 @@ struct fullbody_state {
 func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   info *ast_fullbody_info = un(&x->info);
 
-  // TODO(): Make these label targets be tracked_target.
   label_gn array[tracked_target];
   n size = count(&info->labels);
   for i size = 0; i < n; i = i + 1 {
@@ -507,8 +523,8 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
 
 // TODO: Stop needing this -- make label_info and goto_info more general and use that, or make some other sort of annotation.  The use of breakgrack duplicates the usage of breakpack in body.ki.  It's not _particularly_ unsafe though.
 struct breakgrack {
-  break_target sq_num;
-  continue_target sq_num;
+  break_target *tracked_target;
+  continue_target *tracked_target;
 }
 
 func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, bu *sq_builder) np {
@@ -596,24 +612,26 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
 }
 
 func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, bu *sq_builder) np {
+  saved gr_savetrack = save_celltrack(gs);
   info *ast_break_statement_info = un(&a->info);
   uw gr_num;
   if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
   add(bu, uw);
-  append(bu, unHas(&obg)->break_target, nopq(gs.gr));
+  sq_append_and_nopq(bu, unHas(&obg)->break_target, &saved);
   return NoFail;
 }
 
 func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) np {
+  saved gr_savetrack = save_celltrack(gs);
   info *ast_continue_statement_info = un(&a->info);
   uw gr_num;
   if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
   add(bu, uw);
-  append(bu, unHas(&obg)->continue_target, nopq(gs.gr));
+  sq_append_and_nopq(bu, unHas(&obg)->continue_target, &saved);
   return NoFail;
 }
 
@@ -637,7 +655,7 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
 
 func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) np {
   targ *tracked_target = ref(&fb->label_gn, un(&a->info)->label_number.x);
-  note_celltrack(targ, gs.celltrack);
+  note_celltrack(&targ->note, gs.celltrack);
   sq_jmp_qnop_node(gs.gr, targ->sn, last(bu));
   return NoFail;
 }
@@ -729,7 +747,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 
   br sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&branch_cases), None}));
 
-  note_celltrack(&exit_target, gs.celltrack);
+  note_celltrack(&exit_target.note, gs.celltrack);
   sq_append(bu, br, exit_target.sn);
 
   swartch_discard_gn gr_num;
@@ -766,7 +784,9 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
   continue_nopq sq_num = nopq(gs.gr);
 
   outflow sq_num = nopq(gs.gr);
-  bp breakgrack = {outflow, continue_nopq};
+  // TODO(): Holy shit fix this.
+  // outflow, continue_nopq
+  bp breakgrack = {null, null};
 
   body_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_bracebody(gs, fb, Has(bp), &a->body, &body_bu) {
@@ -848,16 +868,21 @@ func gr_condition_discard(gs gr_statep, a *ast_condition_discard_info, out *gr_n
 }
 
 func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement, bu *sq_builder) np {
-  outflow sq_num = nopq(gs.gr);
+  outflow tracked_target = mk_tracked(nopq(gs.gr));
 
   then_nop sq_num = nopq(gs.gr);
   else_nop sq_num = nopq(gs.gr);
-  topgn sq_num;
-  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &topgn) {
+
+  top tracked_target;
+  top.note = mk_noted(gs);
+
+  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &top.sn) {
     return Printed(pm);
   }
 
-  bp breakgrack = {outflow, topgn};
+  postcond_save gr_savetrack = save_celltrack(gs);
+
+  bp breakgrack = {&outflow, &top};
 
   body_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu) {
@@ -870,19 +895,22 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   }
 
   add(&body_bu, loopcleanupgn);
-  thengn sq_num = mut_connect(&body_bu, topgn);
+  thengn sq_num = sq_mut_connect(gs, &body_bu, &top);
+
+  restore_celltrack(gs, &postcond_save);
 
   loopexitgn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard_exit, &loopexitgn) {
     return Printed(pm);
   }
 
-  exitseq var = seqq(gs.gr, {loopexitgn, outflow});
+  // TODO: Would be kinda nice if break (or continue) targeted _before_ the condition discard.
+  exitseq sq_num = sq_uni_connect(gs, loopexitgn, &outflow);
 
-  jmp_qnop_node(gs.gr, then_nop, thengn);
-  jmp_qnop_node(gs.gr, else_nop, exitseq);
+  sq_jmp_qnop_node(gs.gr, then_nop, thengn);
+  sq_jmp_qnop_node(gs.gr, else_nop, exitseq);
 
-  append(bu, topgn, outflow);
+  append(bu, top.sn, outflow.sn);
   return NoFail;
 }
 
