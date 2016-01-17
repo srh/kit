@@ -1,6 +1,7 @@
 import check;
 
-// Function naming scheme:  Functions started out prefixed gr_.  Those which have been updated to build their arguments in order of evaluation (to be ready for as-we-construct-the-graph liveness/activeness tracing) have been renamed to have sq_.  (They could still call gr_ functions that have not yet been updated.)
+// After goto, return statements, etc, "what cells are live" is faked -- the set of cells that are live (or soon, active) should be identical to that before the goto/return statement.  Once we control flow into something reachable, we'll have a consistent liveness state.
+
 
 struct frame_graph {
   informal_name sym;
@@ -285,7 +286,14 @@ func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
 }
 
 func sq_append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
-  return append(bu, enter_rhs, rhs_nopq);
+  append(bu, enter_rhs, rhs_nopq);
+}
+
+// Adds an unattached nopq afterward, with the given saved state restored (typically the variables-in-scope state before a return, break, continue, or goto statement).
+func sq_append_and_nopq(bu *sq_builder, outflow *tracked_target, saved *gr_savetrack) void {
+  note_celltrack(outflow, bu->gs.celltrack);
+  append(bu, outflow->sn, nopq(bu->gs.gr));
+  restore_celltrack(bu->gs, saved);
 }
 
 func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
@@ -299,6 +307,11 @@ func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
 
 func sq_mut_connect(bu *sq_builder, outflow sq_num) sq_num {
   return mut_connect(bu, outflow);
+}
+
+func sq_mut_connect(gs gr_statep, bu *sq_builder, outflow *tracked_target) sq_num {
+  note_celltrack(outflow, gs.celltrack);
+  return mut_connect(bu, outflow->sn);
 }
 
 // last(.) is used to identify the label target for gr_label_statement.
@@ -430,7 +443,26 @@ func save_celltrack(gs gr_statep) gr_savetrack {
 }
 
 func restore_celltrack(gs gr_statep, savetrack *gr_savetrack) void {
-  *gs.celltrack = savetrack;
+  *gs.celltrack = savetrack->celltrack;
+}
+
+struct tracked_target {
+  celltrack opt[gr_celltrack];
+  sn sq_num;
+}
+
+func mk_tracked(gn sq_num) tracked_target {
+  return {None, gn};
+}
+
+func note_celltrack(targ *tracked_target, current *gr_celltrack) void {
+  if case &Has(ct gr_celltrack) = &targ->celltrack {
+    if !matches_checksum(&ct.liveset, &current->liveset) {
+      ice(_u8("Inconsistent liveness state, liveset="), current->liveset);
+    }
+  } else {
+    targ->celltrack = Has(*current);
+  }
 }
 
 struct fullbody_state {
@@ -438,25 +470,23 @@ struct fullbody_state {
   // We use the cell field, to know the name of the var's cell.
   all_vars array[var_info];
 
-  final_node sq_num;
+  final_node tracked_target;
   // count(&label_gn) == count(&info->labels), they start off as nop nodes until we see the label.
-  label_gn array[sq_num];
+  label_gn array[tracked_target];
   return_cell cell_num;
 }
 
 func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
-  final_node sq_num = nopq(gs.gr);
-
   info *ast_fullbody_info = un(&x->info);
 
-  label_gn array[sq_num];
+  // TODO(): Make these label targets be tracked_target.
+  label_gn array[tracked_target];
   n size = count(&info->labels);
   for i size = 0; i < n; i = i + 1 {
-    ngn sq_num = nopq(gs.gr);
-    push(&label_gn, ngn);
+    push(&label_gn, mk_tracked(nopq(gs.gr)));
   }
 
-  fb fullbody_state = {info->all_vars, final_node, label_gn, info->return_cell};
+  fb fullbody_state = {info->all_vars, mk_tracked(nopq(gs.gr)), label_gn, info->return_cell};
 
   bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_bracebody(gs, &fb, None, &x->bb, &bu) {
@@ -469,7 +499,7 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   }
   add(&bu, parameter_unwinding);
 
-  gn sq_num = mut_connect(&bu, final_node);
+  gn sq_num = sq_mut_connect(gs, &bu, &fb.final_node);
 
   *out = gn.x;
   return NoFail;
@@ -588,25 +618,27 @@ func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack]
 }
 
 func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, bu *sq_builder) np {
+  saved gr_savetrack = save_celltrack(gs);
   info *ast_goto_statement_info = un(&a->info);
-  jmp sq_num = get(&fb->label_gn, info->label_number.x);
+  jmp *tracked_target = ref(&fb->label_gn, info->label_number.x);
   uw gr_num;
   if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
+  add(bu, uw);
   ww gr_num;
   if case Printed(pm) = gr_winding(gs, &info->initializations, &ww) {
     return Printed(pm);
   }
-  add(bu, uw);
   add(bu, ww);
-  append(bu, jmp, nopq(gs.gr));
+  sq_append_and_nopq(bu, jmp, &saved);
   return NoFail;
 }
 
 func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) np {
-  gn sq_num = get(&fb->label_gn, un(&a->info)->label_number.x);
-  jmp_qnop_node(gs.gr, gn, last(bu));
+  targ *tracked_target = ref(&fb->label_gn, un(&a->info)->label_number.x);
+  note_celltrack(targ, gs.celltrack);
+  sq_jmp_qnop_node(gs.gr, targ->sn, last(bu));
   return NoFail;
 }
 
@@ -624,7 +656,6 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   } else {
     add(bu, @[gr_xop]GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
   }
-  
 
   exitseq sq_num = nopq(gs.gr);
 
@@ -1007,6 +1038,7 @@ func gr_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, bu
 }
 
 func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_statement, bu *sq_builder) np {
+  saved gr_savetrack = save_celltrack(gs);
   if case &Has(b box[ast_expr_consume]) = &a->expr {
     subcell cell_num = result_cell(oo(&b));
     add(bu, @[gr_xop]GrSubcell({subcell, fb->return_cell, OffsetConst(0)}));
@@ -1021,7 +1053,7 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
     return Printed(pm);
   }
   add(bu, uw_op);
-  append(bu, fb->final_node, nopq(gs.gr));
+  sq_append_and_nopq(bu, &fb->final_node, &saved);
   return NoFail;
 }
 
