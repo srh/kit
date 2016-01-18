@@ -886,14 +886,17 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   then_nop sq_num = nopq(gs.gr);
   else_nop sq_num = nopq(gs.gr);
 
+  then_save gr_savetrack;
+  else_save gr_savetrack;
+
   top tracked_target;
   top.note = mk_noted(gs);
 
-  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &top.sn) {
+  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save, &top.sn) {
     return Printed(pm);
   }
 
-  postcond_save gr_savetrack = save_celltrack(gs);
+  restore_celltrack(gs, &then_save);
 
   bp breakgrack = {&outflow, &top};
 
@@ -910,7 +913,7 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   add(&body_bu, loopcleanupgn);
   thengn sq_num = sq_mut_connect(gs, &body_bu, &top);
 
-  restore_celltrack(gs, &postcond_save);
+  restore_celltrack(gs, &else_save);
 
   loopexitgn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard_exit, &loopexitgn) {
@@ -932,12 +935,16 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
 
   then_nop sq_num = nopq(gs.gr);
   else_nop sq_num = nopq(gs.gr);
+
+  then_save gr_savetrack;
+  else_save gr_savetrack;
+
   gn sq_num;
-  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &gn) {
+  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save, &gn) {
     return Printed(pm);
   }
 
-  postcond_save gr_savetrack = save_celltrack(gs);
+  restore_celltrack(gs, &then_save);
 
   then_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu) {
@@ -945,7 +952,7 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   }
   thengn sq_num = sq_mut_connect(gs, &then_bu, &join_target);
 
-  restore_celltrack(gs, &postcond_save);
+  restore_celltrack(gs, &else_save);
   else_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_bracebody(gs, fb, obg, &a->elsebody, &else_bu) {
     return Printed(pm);
@@ -981,18 +988,25 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 
   then_nop sq_num = nopq(gs.gr);
   else_nop sq_num = nopq(gs.gr);
+
+  then_save gr_savetrack;
+  else_save gr_savetrack;
+
   gn sq_num;
-  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &gn) {
+  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save, &gn) {
     return Printed(pm);
   }
 
-  note_celltrack(&join_target.note, gs.celltrack);
+  restore_celltrack(gs, &then_save);
 
   then_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu) {
     return Printed(pm);
   }
   bodygn sq_num = sq_mut_connect(gs, &then_bu, &join_target);
+
+  restore_celltrack(gs, &else_save);
+  note_celltrack(&join_target.note, gs.celltrack);
 
   sq_jmp_qnop_node(gs.gr, then_nop, bodygn);
   sq_jmp_qnop_node(gs.gr, else_nop, join_target.sn);
@@ -1014,15 +1028,20 @@ func gr_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn 
   }
   cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(bigu(0)), elsegn});
   br var = addq(gs.gr, @[gr_qop]GrBranch({result_cell(a), cases, Has(thengn)}));
-  *out = mut_connect(&bu, br);
+  *out = sq_mut_connect(&bu, br);
   return NoFail;
 }
 
-// TODO(): Okay, we've got a problem.  gr_condition, with a PatternCondition, will leave the liveness state in two different states depending on whether it's a then branch or else branch.  (In the then branch, the variable is visible.)  So we need to output the states for then and else.  thengn and elsegn should be *tracked_target values or something like that.  Callers should get updated.
-func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, out *sq_num) np {
+// Leaves the celltrack state in a garbage state -- caller needs to restore thentrack or elsetrack, depending on which it processes first.
+func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, thentrack_out *gr_savetrack, elsetrack_out *gr_savetrack, out *sq_num) np {
   switch a {
     case &ExprCondition(bec box[ast_expr_consume]): {
-      return gr_expr_condition(gs, oo(&bec), thengn, elsegn, out);
+      if case Printed(pm) = gr_expr_condition(gs, oo(&bec), thengn, elsegn, out) {
+        return Printed(pm);
+      }
+      *thentrack_out = save_celltrack(gs);
+      *elsetrack_out = save_celltrack(gs);
+      return NoFail;
     }
 
     case &PatternCondition(pa ast_pattern_assign): {
@@ -1038,10 +1057,15 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
       } else {
         add(&bef_bu, @[gr_xop]GrSubcell({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)}));
       }
+      postcond_save gr_savetrack = save_celltrack(gs);
+      saved_elsecase bool = false;
       cases array[tup[gr_const, sq_num]];
       n size = info->deconstruct.num_enum_constructors;
       reserve(&cases, n);
       for i size = 0; i < n; i = i + 1 {
+        if i != 0 {
+          restore_celltrack(gs, &postcond_save);
+        }
         tag enum_tag_value = mk_enum_tag_value(i);
         if info->matching_tag_value.x == tag.x {
           case_bu sq_builder = mk_builder(gs);
@@ -1055,16 +1079,28 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
               add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)}));
             }
           }
-          thenseq sq_num = mut_connect(&case_bu, thengn);
+          *thentrack_out = save_celltrack(gs);
+          thenseq sq_num = sq_mut_connect(&case_bu, thengn);
           push(&cases, {@[gr_const]ConstInt(~tag.x), thenseq});
         } else {
           tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
           elseseq sq_num = seqq(gs.gr, {tagdead, elsegn});
+          if !saved_elsecase {
+            *elsetrack_out = save_celltrack(gs);
+            saved_elsecase = true;
+          }
           push(&cases, {@[gr_const]ConstInt(~tag.x), elseseq});
         }
       }
+      if !saved_elsecase {
+        // We need to output an elsecase savetrack even if it's never reachable, because this function's API doesn't have a way to tell the caller the elsecase is not reachable.
+        restore_celltrack(gs, &postcond_save);
+        tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
+        *elsetrack_out = save_celltrack(gs);
+      }
+
       br_point sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None}));
-      br sq_num = mut_connect(&bef_bu, br_point);
+      br sq_num = sq_mut_connect(&bef_bu, br_point);
 
       *out = br;
       return NoFail;
