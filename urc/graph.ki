@@ -1687,10 +1687,16 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       add(bu, @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
       add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result}));
 
-      exit_nopq sq_num = nopq(gs.gr);
+      postbranch_save gr_savetrack = save_celltrack(gs);
+
+      exit_nopq tracked_target = mk_tracked(nopq(gs.gr));
 
       just_dead_bu sq_builder = mk_builder(gs);
       add(&just_dead_bu, @[gr_xop]GrDead({cmp_result}));
+
+      just_dead_sn sq_num = sq_mut_connect(gs, &just_dead_bu, &exit_nopq);
+
+      restore_celltrack(gs, &postbranch_save);
 
       do_assign_bu sq_builder = mk_builder(gs);
       add(&do_assign_bu, @[gr_xop]GrDead({cmp_result}));
@@ -1704,12 +1710,15 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
         return Printed(pm);
       }
       add(&do_assign_bu, assign_copy);
-      cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(bigu(0)), mut_connect(&do_assign_bu, exit_nopq)}, {@[gr_const]ConstInt(bigu(1)), mut_connect(&just_dead_bu, exit_nopq)});
+
+      do_assign_sn sq_num = sq_mut_connect(gs, &do_assign_bu, &exit_nopq);
+
+      cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(bigu(0)), do_assign_sn}, {@[gr_const]ConstInt(bigu(1)), just_dead_sn});
 
       br sq_num = addq(gs.gr, @[gr_qop]GrBranch({cmp_result, cases, None}));
 
       // br is an expression node -- the cases attach to nopq's
-      append(bu, br, exit_nopq);
+      sq_append(bu, br, exit_nopq.sn);
       if case DeadMe = ci.rhs_deadme {
         addo(bu, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src));
       }
