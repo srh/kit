@@ -923,12 +923,12 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   sq_jmp_qnop_node(gs.gr, then_nop, thengn);
   sq_jmp_qnop_node(gs.gr, else_nop, exitseq);
 
-  append(bu, top.sn, outflow.sn);
+  sq_append(bu, top.sn, outflow.sn);
   return NoFail;
 }
 
 func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, bu *sq_builder) np {
-  join_target sq_num = nopq(gs.gr);
+  join_target tracked_target = mk_tracked(nopq(gs.gr));
 
   then_nop sq_num = nopq(gs.gr);
   else_nop sq_num = nopq(gs.gr);
@@ -937,21 +937,25 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
     return Printed(pm);
   }
 
+  postcond_save gr_savetrack = save_celltrack(gs);
+
   then_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu) {
     return Printed(pm);
   }
-  thengn sq_num = mut_connect(&then_bu, join_target);
+  thengn sq_num = sq_mut_connect(gs, &then_bu, &join_target);
+
+  restore_celltrack(gs, &postcond_save);
   else_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_bracebody(gs, fb, obg, &a->elsebody, &else_bu) {
     return Printed(pm);
   }
-  elsegn sq_num = mut_connect(&else_bu, join_target);
+  elsegn sq_num = sq_mut_connect(gs, &else_bu, &join_target);
 
-  jmp_qnop_node(gs.gr, then_nop, thengn);
-  jmp_qnop_node(gs.gr, else_nop, elsegn);
+  sq_jmp_qnop_node(gs.gr, then_nop, thengn);
+  sq_jmp_qnop_node(gs.gr, else_nop, elsegn);
 
-  append(bu, gn, join_target);
+  sq_append(bu, gn, join_target.sn);
 
   condition_discard_gn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
@@ -973,7 +977,7 @@ func gr_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd
 }
 
 func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthen_statement, bu *sq_builder) np {
-  join_target sq_num = nopq(gs.gr);
+  join_target tracked_target = mk_tracked(nopq(gs.gr));
 
   then_nop sq_num = nopq(gs.gr);
   else_nop sq_num = nopq(gs.gr);
@@ -982,16 +986,18 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
     return Printed(pm);
   }
 
+  note_celltrack(&join_target.note, gs.celltrack);
+
   then_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu) {
     return Printed(pm);
   }
-  bodygn sq_num = mut_connect(&then_bu, join_target);
+  bodygn sq_num = sq_mut_connect(gs, &then_bu, &join_target);
 
-  jmp_qnop_node(gs.gr, then_nop, bodygn);
-  jmp_qnop_node(gs.gr, else_nop, join_target);
+  sq_jmp_qnop_node(gs.gr, then_nop, bodygn);
+  sq_jmp_qnop_node(gs.gr, else_nop, join_target.sn);
 
-  append(bu, gn, join_target);
+  sq_append(bu, gn, join_target.sn);
 
   condition_discard_gn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
