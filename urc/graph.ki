@@ -1018,6 +1018,7 @@ func gr_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn 
   return NoFail;
 }
 
+// TODO(): Okay, we've got a problem.  gr_condition, with a PatternCondition, will leave the liveness state in two different states depending on whether it's a then branch or else branch.  (In the then branch, the variable is visible.)  So we need to output the states for then and else.  thengn and elsegn should be *tracked_target values or something like that.  Callers should get updated.
 func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, out *sq_num) np {
   switch a {
     case &ExprCondition(bec box[ast_expr_consume]): {
