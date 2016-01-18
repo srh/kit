@@ -1316,7 +1316,7 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
 }
 
 func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
-  join_target sq_num = nopq(gs.gr);
+  join_target tracked_target = mk_tracked(nopq(gs.gr));
 
   conjoined cell_num = rval_cell(x);
 
@@ -1327,13 +1327,17 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
     return Printed(pm);
   }
 
+  postcond_save gr_savetrack = save_celltrack(gs);
+
   then_bu sq_builder = mk_builder(gs);
   add(&then_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->then_clause)), conjoined, OffsetConst(0)}));
   if case Printed(pm) = gr_expr_consume(gs, oo(&a->then_clause), &then_bu) {
     return Printed(pm);
   }
   add(&then_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->then_clause))}));
-  then_sn sq_num = mut_connect(&then_bu, join_target);
+  then_sn sq_num = sq_mut_connect(gs, &then_bu, &join_target);
+
+  restore_celltrack(gs, &postcond_save);
 
   else_bu sq_builder = mk_builder(gs);
   add(&else_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->else_clause)), conjoined, OffsetConst(0)}));
@@ -1341,11 +1345,11 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
     return Printed(pm);
   }
   add(&else_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->else_clause))}));
-  else_sn sq_num = mut_connect(&else_bu, join_target);
+  else_sn sq_num = sq_mut_connect(gs, &else_bu, &join_target);
 
-  jmp_qnop_node(gs.gr, then_nop, then_sn);
-  jmp_qnop_node(gs.gr, else_nop, else_sn);
-  append(bu, cond_sn, join_target);
+  sq_jmp_qnop_node(gs.gr, then_nop, then_sn);
+  sq_jmp_qnop_node(gs.gr, else_nop, else_sn);
+  sq_append(bu, cond_sn, join_target.sn);
 
   // TODO: We do the condcleanup at the end instead of repeating it twice right after the branch... do it right after the branch.
   condcleanupgn gr_num;
