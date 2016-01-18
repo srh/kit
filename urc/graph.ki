@@ -759,6 +759,10 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 }
 
 func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu *sq_builder) np {
+  pre_loop_save gr_savetrack = save_celltrack(gs);
+  outflow tracked_target = mk_tracked(nopq(gs.gr));
+  note_celltrack(&outflow.note, gs.celltrack);
+
   if case &Has(bi box[ast_statement]) = &a->initializer {
     if case Printed(pm) = gr_statement(gs, fb, None, oo(&bi), bu) {
       return Printed(pm);
@@ -769,24 +773,26 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
 
   condition_else_gn opt[sq_num];
 
-  topgn sq_num;
+  top tracked_target;
+  top.note = mk_noted(gs);
+
   if case &Has(cond ast_expr_condition) = &a->condition {
     else_gn sq_num = nopq(gs.gr);
-    if case Printed(pm) = gr_expr_condition(gs, oo(&cond.expr), body_entry_gn, else_gn, &topgn) {
+    if case Printed(pm) = gr_expr_condition(gs, oo(&cond.expr), body_entry_gn, else_gn, &top.sn) {
       return Printed(pm);
     }
     condition_else_gn = Has(else_gn);
   } else {
-    topgn = body_entry_gn;
+    top.sn= body_entry_gn;
     condition_else_gn = None;
   }
 
-  continue_nopq sq_num = nopq(gs.gr);
+  postcond_save gr_savetrack = save_celltrack(gs);
 
-  outflow sq_num = nopq(gs.gr);
+  continue_nopq tracked_target = mk_tracked(nopq(gs.gr));
+
   // TODO(): Holy shit fix this.
-  // outflow, continue_nopq
-  bp breakgrack = {null, null};
+  bp breakgrack = {&outflow, &continue_nopq};
 
   body_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_bracebody(gs, fb, Has(bp), &a->body, &body_bu) {
@@ -804,6 +810,8 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     loopcleanupgn = None;
   }
 
+  note_celltrack(&continue_nopq.note, gs.celltrack);
+
   continue_target sq_num;
   continuegn sq_num;
   if case &Has(increment box[ast_expr_discard]) = &a->increment {
@@ -811,7 +819,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     if case Printed(pm) = gr_expr_discard(gs, oo(&increment), &incr_bu) {
       return Printed(pm);
     }
-    totopgn sq_num = mut_connect(&incr_bu, topgn);
+    totopgn sq_num = sq_mut_connect(gs, &incr_bu, &top);
     continue_target = totopgn;
     if case Has(gn gr_num) = loopcleanupgn {
       continuegn = seqq(gs.gr, {gn, totopgn});
@@ -819,21 +827,24 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
       continuegn = totopgn;
     }
   } else {
+    note_celltrack(&top.note, gs.celltrack);
     if case Has(gn gr_num) = loopcleanupgn {
-      continuegn = seqq(gs.gr, {gn, topgn});
+      continuegn = seqq(gs.gr, {gn, top.sn});
     } else {
-      continuegn = topgn;
+      continuegn = top.sn;
     }
-    continue_target = topgn;
+    continue_target = top.sn;
   }
 
-  jmp_qnop_node(gs.gr, continue_nopq, continue_target);
+  sq_jmp_qnop_node(gs.gr, continue_nopq.sn, continue_target);
 
-  thengn sq_num = mut_connect(&body_bu, continuegn);
+  thengn sq_num = sq_mut_connect(&body_bu, continuegn);
 
-  jmp_qnop_node(gs.gr, body_entry_gn, thengn);
+  sq_jmp_qnop_node(gs.gr, body_entry_gn, thengn);
 
   if case &Has(cond ast_expr_condition) = &a->condition {
+    restore_celltrack(gs, &postcond_save);
+
     exit_bu sq_builder = mk_builder(gs);
 
     initter_uw gr_num;
@@ -849,12 +860,14 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     }
     add(&exit_bu, loopexitgn);
 
-    exitseq sq_num = mut_connect(&exit_bu, outflow);
+    exitseq sq_num = sq_mut_connect(gs, &exit_bu, &outflow);
 
-    jmp_qnop_node(gs.gr, unHas(condition_else_gn), exitseq);
+    sq_jmp_qnop_node(gs.gr, unHas(condition_else_gn), exitseq);
+  } else {
+    restore_celltrack(gs, &pre_loop_save);
   }
 
-  append(bu, topgn, outflow);
+  sq_append(bu, top.sn, outflow.sn);
   return NoFail;
 }
 
