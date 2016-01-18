@@ -267,7 +267,7 @@ void win_append_section_symbols(
     size_t name_len = strlen(name);
     CHECK(name_len <= 8);
     memset(standard.Name.ShortName, 0, 8);
-    memcpy(standard.Name.ShortName, name, name_len);
+    ok_memcpy(standard.Name.ShortName, name, name_len);
     standard.Value = to_le_u32(0);
     standard.SectionNumber = to_le_u16(SectionNumber);
     standard.Type = to_le_u16(0);
@@ -356,7 +356,7 @@ void win_write_section_header(
   size_t name_len = strlen(name);
   CHECK(name_len <= 8);
   memset(h.Name, 0, 8);
-  memcpy(h.Name, name, name_len);
+  ok_memcpy(h.Name, name, name_len);
   /* Should be set to zero for object files. */
   h.VirtualSize = to_le_u32(0);
   /* For simplicity, should be set to zero for object files. */
@@ -415,7 +415,7 @@ void win_write_symbols_and_strings(struct identmap *im,
     if (name_count <= 8) {
       STATIC_CHECK(sizeof(standard.Name.ShortName) == 8);
       memset(standard.Name.ShortName, 0, 8);
-      memcpy(standard.Name.ShortName, name_buf, name_count);
+      ok_memcpy(standard.Name.ShortName, name_buf, name_count);
     } else {
       /* The offset includes the leading 4 bytes -- the minimimum
          possible offset is 4. */
