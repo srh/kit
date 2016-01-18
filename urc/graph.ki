@@ -235,7 +235,7 @@ func add(bu *sq_builder, gn gr_num) void {
   gr *frame_graph = bu->gs.gr;
   check(gr != null);
   next sq_num = nopq(gr);
-  mut_qnop_node(gr, bu->last, gn, next);
+  help_mut_qnop_node(gr, bu->last, {@[gr_qop]GrSequence({gn, next})});
   bu->last = next;
 }
 
@@ -246,7 +246,7 @@ func addo(bu *sq_builder, ogn opt[gr_num]) void {
 }
 
 
-// Control flow connecting functions.  Every place we use these, we need to save/connect celltracking info.  They are:  mut_qnop_node, jmp_qnop_node, append, mut_connect, last, nopq, and seqq.  The sq_ versions are ones that we've done the save/connecting celltracking modifications for.
+// Control flow connecting functions.  Every place we use these, we need to save/connect celltracking info.  They are:  jmp_qnop_node, append, mut_connect, last, nopq, and seqq.  The sq_ versions are ones that we've done the save/connecting celltracking modifications for.
 // TODO(): Rename the sq_ versions back to the original names.
 
 func nopq(gr *frame_graph) sq_num {
@@ -261,14 +261,6 @@ func seqq(gr *frame_graph, gsq gr_sequence) sq_num {
 }
 
 func sq_seqq(gr *frame_graph, gsq gr_sequence) sq_num { return seqq(gr, gsq); }
-
-func mut_qnop_node(gr *frame_graph, ix sq_num, op gr_num, outflow sq_num) void {
-  help_mut_qnop_node(gr, ix, {@[gr_qop]GrSequence({op, outflow})});
-}
-
-func sq_mut_qnop_node(gr *frame_graph, ix sq_num, op gr_num, outflow sq_num) void {
-  return mut_qnop_node(gr, ix, op, outflow);
-}
 
 func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
   help_mut_qnop_node(gr, ix, {@[gr_qop]GrJmp({outflow})});
