@@ -296,7 +296,7 @@ func sq_append_and_nopq(bu *sq_builder, outflow *tracked_target, saved *gr_savet
   restore_celltrack(bu->gs, saved);
 }
 
-func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
+func help_mut_connect(bu *sq_builder, outflow sq_num) sq_num {
   gr *frame_graph = bu->gs.gr;
   check(gr != null);
   jmp_qnop_node(gr, bu->last, outflow);
@@ -306,12 +306,12 @@ func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
 }
 
 func sq_mut_connect(bu *sq_builder, outflow sq_num) sq_num {
-  return mut_connect(bu, outflow);
+  return help_mut_connect(bu, outflow);
 }
 
 func sq_mut_connect(gs gr_statep, bu *sq_builder, outflow *tracked_target) sq_num {
   note_celltrack(&outflow->note, gs.celltrack);
-  return mut_connect(bu, outflow->sn);
+  return help_mut_connect(bu, outflow->sn);
 }
 
 func sq_uni_connect(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
@@ -2378,17 +2378,15 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
 
   sq_jmp_qnop_node(&gr, top.sn, branch_gn);
 
-  deadprec_bu sq_builder = mk_builder(gs);
+  sq_append(&bu, top.sn, deadseq_nopq);
+
   for i size = nargs; i > 0; {
     i = i - 1;
-    add(&deadprec_bu, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
+    add(&bu, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
   }
-  add(&deadprec_bu, @[gr_xop]GrDead({indexcell}));
-  add(&deadprec_bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
+  add(&bu, @[gr_xop]GrDead({indexcell}));
+  add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
 
-  mut_qnop_node(&gr, deadseq_nopq, done(&deadprec_bu), nopq(&gr));
-
-  add(&bu, top.sn.x);
   *gr_out = gr;
   *gn_out = done(&bu);
   *return_cell_out = return_cell;
