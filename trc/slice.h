@@ -34,6 +34,7 @@
 #define SLICE_INIT_COPY(dest_ptr, dest_count, src_ptr, src_count, copier) do { \
     size_t SLICE_INIT_COPY_count = (src_count); \
     (dest_ptr) = malloc(size_mul(sizeof(*(dest_ptr)), SLICE_INIT_COPY_count)); \
+    CHECK(dest_ptr); \
     (dest_count) = SLICE_INIT_COPY_count; \
     for (size_t SLICE_INIT_COPY_i = 0; \
          SLICE_INIT_COPY_i < SLICE_INIT_COPY_count; \
@@ -45,6 +46,7 @@
 #define SLICE_INIT_COPY_PRIM(dest_ptr, dest_count, src_ptr, src_count) do { \
     size_t SLICE_INIT_COPY_count = (src_count); \
     (dest_ptr) = malloc(size_mul(sizeof(*(dest_ptr)), SLICE_INIT_COPY_count)); \
+    CHECK(dest_ptr); \
     (dest_count) = SLICE_INIT_COPY_count; \
     for (size_t SLICE_INIT_COPY_i = 0; \
          SLICE_INIT_COPY_i < SLICE_INIT_COPY_count; \
