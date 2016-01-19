@@ -2128,6 +2128,7 @@ func ac_init_action(gs gr_statep, x *init_action, out *gr_num) np {
   return NoFail;
 }
 
+// TODO(): This should be combined with gr_destroy_ctor.
 func ac_destroy_action(gs gr_statep, x *destroy_action, dad deadact_after_destroy, out *gr_num) np {
   bu sq_builder = mk_builder(gs);
   switch &x->x.ctor {
@@ -2181,18 +2182,10 @@ func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num) gr_num {
   return done(&bu);
 }
 
+// TODO(): Maybe just get rid of this function.
 func gr_bi_action(gs gr_statep, x *bi_action, out *gr_num) np {
-  switch &x->ctor {
-    case &TrivialCtor: {
-      cp var = addx(gs, @[gr_xop]GrMemCopy({x->dest, x->src}));
-      *out = cp;
-      return NoFail;
-    }
-    case &FunCtor(ip instpair): {
-      *out = gr_bi_fun(gs, ip, x->dest, x->src);
-      return NoFail;
-    }
-  }
+  *out = gr_bi_ctor(gs, x->dest, x->src, &x->ctor, TODOBiNothing);
+  return NoFail;
 }
 
 // TODO: There's a lot of duplicated code in the splay-out of this function.
