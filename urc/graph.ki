@@ -2,8 +2,6 @@ import check;
 
 // After goto, return statements, etc, "what cells are live" is faked -- the set of cells that are live (or soon, active) should be identical to that before the goto/return statement.  Once we control flow into something reachable, we'll have a consistent liveness state.
 
-// TODO(): Generally in places where we create whole functions (any place we gr_create argcells) we need to check that all the cells are dead afterwards.
-
 struct frame_graph {
   informal_name sym;
   cells array[cell_info];
@@ -2164,12 +2162,17 @@ func gr_add_basics(gs gr_statep, size u32, arity size, out *gr_basics, bu *sq_bu
   *out = ret;
 }
 
-func gr_minimal_basics_cleanup(gr *frame_graph, bas *gr_minimal_basics, bu *sq_builder) void {
+func gr_minimal_basics_cleanup(gs gr_statep, bas *gr_minimal_basics, bu *sq_builder) void {
   for i size = count(&bas->argcells); i > 0; {
     i = i - 1;
     add(bu, @[gr_xop]GrDead({get(&bas->argcells, i)}));
   }
   add(bu, @[gr_xop]GrWriteConst({bas->return_cell, ConstInt(bigu(0))}));
+
+  gr_deaden(gs, bas->return_cell);
+  if count(&gs.celltrack->liveset.all) != 0 {
+    ice(_u8("gr_minimal_basics_cleanup sees leftover live cells"));
+  }
 }
 
 func gr_basics_cleanup(gs gr_statep, bas *gr_basics, bu *sq_builder) void {
@@ -2177,7 +2180,7 @@ func gr_basics_cleanup(gs gr_statep, bas *gr_basics, bu *sq_builder) void {
     i = i - 1;
     add(bu, @[gr_xop]GrVirtualDead({get(&bas->pointeecells, i)}));
   }
-  gr_minimal_basics_cleanup(gs.gr, &bas->minimal, bu);
+  gr_minimal_basics_cleanup(gs, &bas->minimal, bu);
 }
 
 func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
@@ -2188,7 +2191,7 @@ func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num, retu
   // TODO: How about make the size parameter opt[u32], don't deref if no size.
   add_minimal_basics(gs, 0 /* Pass a made-up size. */, 1, &bas);
   bu sq_builder = mk_builder(gs);
-  gr_minimal_basics_cleanup(gs.gr, &bas, &bu);
+  gr_minimal_basics_cleanup(gs, &bas, &bu);
   *gn_out = done(&bu);
   *gr_out = *gs.gr;
   *return_cell_out = bas.return_cell;
@@ -2390,6 +2393,11 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   add(&bu, @[gr_xop]GrDead({indexcell}));
   add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
 
+  gr_deaden(gs, return_cell);
+  if count(&celltrack.liveset.all) != 0 {
+    ice(_u8("gr_magic_arraytype_info leaves behind live cells"));
+  }
+
   *gr_out = gr;
   *gn_out = done(&bu);
   *return_cell_out = return_cell;
@@ -2578,6 +2586,12 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     add(&bu, @[gr_xop]GrVirtualDead({get(&tagcells, i)}));
   }
   add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
+
+  gr_deaden(gs, return_cell);
+  if count(&celltrack.liveset.all) != 0 {
+    ice(_u8("gr_magic_enum_info leaves behind live cells"));
+  }
+
   *gr_out = gr;
   *gn_out = done(&bu);
   *return_cell_out = return_cell;
@@ -2727,6 +2741,11 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
 
   gn gr_num = done(&bu);
 
+  gr_deaden(gs, return_cell);
+  if count(&celltrack.liveset.all) != 0 {
+    ice(_u8("gr_magic_struct_info leaves behind live cells"));
+  }
+
   *gr_out = gr;
   *gn_out = gn;
   *return_cell_out = return_cell;
@@ -2829,6 +2848,12 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
   postpadding_ogn opt[gr_num]
     = gr_bzero_subcell(gs, retnum, field_end, mec->return_type_props.flat_size - field_end);
   addo(&bu, postpadding_ogn);
+
+  gr_deaden(gs, retnum);
+  if count(&celltrack.liveset.all) != 0 {
+    ice(_u8("gr_magic_enum_construct leaves behind live cells"));
+  }
+
   *gr_out = gr;
   *gn_out = done(&bu);
   *return_cell_out = retnum;
