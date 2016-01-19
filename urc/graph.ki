@@ -1377,7 +1377,7 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   case &TypedExpr(a ast_typed_expr):
     return gr_expr(gs, oo(&a.expr), bu);
   case &Strinit(a ast_strinit):
-    return gr_mk_strinit(gs, x, &a, bu);
+    return ac_mk_strinit(gs, x, &a, bu);
   case &Ternary(a ast_ternary):
     return gr_mk_ternary(gs, x, &a, bu);
   case &QuickReturn(a ast_quickreturn):
@@ -1432,7 +1432,10 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   return NoFail;
 }
 
-func gr_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np {
+func ac_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np {
+  activation_ops array[gr_active_op];
+  push(&activation_ops, Activate(rval_cell(x)));
+
   nparams size = count(&a->exprs);
   for i size = 0; i < nparams; i = i + 1 {
     param *ast_strinit_param = ref(&a->exprs, i);
@@ -1440,7 +1443,11 @@ func gr_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np
     if case Printed(pm) = gr_expr_consume(gs, &param->ec, bu) {
       return Printed(pm);
     }
+    push(&activation_ops, Deactivate(result_cell(&param->ec)));
   }
+  // Now switch activations over to the whole thing.
+  add(bu, @[gr_xop]GrManyActiveXop({freeze(&activation_ops)}));
+
   // We declare the virtual cells dead after we're done the whole thing -- because we'll need them for unwinding.
   for i size = nparams; i > 0; {
     i = i - 1;
