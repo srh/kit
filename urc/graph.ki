@@ -159,7 +159,6 @@ func addx(gs gr_statep, op gr_xop) gr_num {
     nparams size = count(&a.params);
 
     switch a.act {
-    case TODOApplyNothing: { }
     case TwoActiveOps(ops gr_two_active_ops):
       gr_track_active_op(gs, ops.one);
       gr_track_active_op(gs, ops.two);
@@ -185,14 +184,11 @@ func addx(gs gr_statep, op gr_xop) gr_num {
     }
 
   case &GrMemCopy(a gr_memcopy):
-    // TODO(): We'll probably need some activation annotation at some point.
     gr_expect_live(gs, a.dest);
     gr_expect_live(gs, a.src);
   case &GrWriteConst(a gr_writeconst):
-    // TODO(): We'll probably need some activation annotation at some point.
     gr_expect_live(gs, a.dest);
   case &GrAddressof(a gr_addressof):
-    // TODO(): We'll probably need some activation annotation at some point.
     gr_expect_live(gs, a.addressee);
     gr_expect_live(gs, a.dest);
   case &GrDeref(a gr_deref):
@@ -200,7 +196,6 @@ func addx(gs gr_statep, op gr_xop) gr_num {
     check(!isLocationStatic(ref_cell(gs.gr, a.name)->location));
     gr_create(gs, a.name);
   case &GrSubcell(a gr_subcell):
-    // TODO(): We'll probably need some activation annotation at some point.
     gr_expect_live(gs, a.partof);
     check(!isLocationStatic(ref_cell(gs.gr, a.name)->location));
     gr_create(gs, a.name);
@@ -363,7 +358,6 @@ struct gr_two_active_ops {
 }
 
 enum gr_apply_active_change {
-  TODOApplyNothing void;  // TODO()
   TwoActiveOps gr_two_active_ops;
   StandardApply void;
 }
@@ -1794,7 +1788,7 @@ func ac_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       add(bu, @[gr_xop]GrAddressof({destptr, destcell}));
       add(bu, @[gr_xop]GrLive({srcptr}));
       add(bu, @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
-      add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result, TODOApplyNothing}));
+      add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result, TwoActiveOps({Nothing, Nothing})}));
 
       postbranch_save gr_savetrack = save_celltrack(gs);
 
@@ -2357,6 +2351,7 @@ func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *
   return NoFail;
 }
 
+// Note that generally these magic ops have "holes" in active-tracking.  If constructors could throw exceptions, we wouldn't unwind properly.  Same with assignment.
 func gr_magic_ctor(clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   info *magic_ctor_info = un(&mc->info);
   switch info {
@@ -2496,7 +2491,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
         add(&vd_bu, @[gr_xop]GrVirtualDead({ec}));
       }
 
-      add(&vd_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell, TODOApplyNothing}));
+      add(&vd_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell, TwoActiveOps({Nothing, Nothing})}));
       add(&vd_bu, @[gr_xop]GrDead({elemretcell}));
       vd gr_num = done(&vd_bu);
       add(&loop_bu, vd);
@@ -2642,7 +2637,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
         add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 
-      add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, TODOApplyNothing}));
+      add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, TwoActiveOps({Nothing, Nothing})}));
       add(&sub_bu, @[gr_xop]GrDead({fieldretcell}));
     } else {
       evaled_fieldcellops bool = true;
@@ -2821,7 +2816,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
         add(&bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 
-      add(&bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, TODOApplyNothing}));
+      add(&bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, TwoActiveOps({Nothing, Nothing})}));
       add(&bu, @[gr_xop]GrDead({fieldretcell}));
     } else {
       evaled_fieldcellops bool = true;
