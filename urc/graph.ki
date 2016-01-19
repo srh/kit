@@ -1216,19 +1216,23 @@ func ac_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_nu
 }
 
 func gr_expr_discard(gs gr_statep, x *ast_expr_discard, bu *sq_builder) np {
-  if case Printed(pm) = gr_expr_after_discard_before(gs, &x->expr, un(&x->after), bu) {
+  return gr_expr_and_discard(gs, &x->expr, un(&x->after), bu);
+}
+
+func gr_expr_and_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
+  if case Printed(pm) = ac_expr_after_discard_before(gs, x, aft, bu) {
     return Printed(pm);
   }
-  if case Printed(pm) = gr_expr(gs, &x->expr, bu) {
+  if case Printed(pm) = gr_expr(gs, x, bu) {
     return Printed(pm);
   }
-  if case Printed(pm) = gr_expr_after_discard(gs, &x->expr, un(&x->after), bu) {
+  if case Printed(pm) = ac_expr_after_discard(gs, x, aft, bu) {
     return Printed(pm);
   }
   return NoFail;
 }
 
-func gr_expr_after_discard_before(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
+func ac_expr_after_discard_before(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
   switch aft {
   case &DiscardTemporary(da destroy_action):
     add(bu, @[gr_xop]GrLive({whole_cell(x)}));
@@ -1238,7 +1242,7 @@ func gr_expr_after_discard_before(gs gr_statep, x *ast_expr, aft *ast_expr_after
   return NoFail;
 }
 
-func gr_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
+func ac_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
   switch aft {
   case &DiscardTemporary(da destroy_action):
     if whole_cell(x) != partial_cell(x) {
@@ -1436,15 +1440,7 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
 
   switch info {
     case &ArrayLength(alinfo ast_arraylength_info): {
-      if case Printed(pm) = gr_expr_after_discard_before(gs, oo(&a->lhs), &alinfo.after, bu) {
-        return Printed(pm);
-      }
-
-      if case Printed(pm) = gr_expr(gs, oo(&a->lhs), bu) {
-        return Printed(pm);
-      }
-
-      if case Printed(pm) = gr_expr_after_discard(gs, oo(&a->lhs), &alinfo.after, bu) {
+      if case Printed(pm) = gr_expr_and_discard(gs, oo(&a->lhs), &alinfo.after, bu) {
         return Printed(pm);
       }
 
