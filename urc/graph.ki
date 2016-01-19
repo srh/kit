@@ -1077,7 +1077,7 @@ func ac_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 
 func ac_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn sq_num, out *sq_num) np {
   bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = gr_live_and_expr_consume(gs, a, &bu) {
+  if case Printed(pm) = ac_live_and_expr_consume(gs, a, &bu) {
     return Printed(pm);
   }
   cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(bigu(0)), elsegn});
@@ -1186,7 +1186,7 @@ func ac_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
   if case &Has(b box[ast_expr_consume]) = &a->expr {
     subcell cell_num = result_cell(oo(&b));
     add(bu, @[gr_xop]GrSubcell({subcell, fb->return_cell, OffsetConst(0)}));
-    if case Printed(pm) = gr_expr_consume(gs, oo(&b), bu) {
+    if case Printed(pm) = ac_expr_consume(gs, oo(&b), bu) {
       return Printed(pm);
     }
     add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(subcell)}));
@@ -1287,22 +1287,17 @@ func ac_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
   return NoFail;
 }
 
-// Callees of this have to deactivate the result_cell later, of course.  As with gr_expr_consume..
+// Callees of this have to deactivate the result_cell later, of course.
 func ac_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
-  return gr_live_and_expr_consume(gs, x, bu);
-}
-
-// TODO(): Replace uses with ac_live_and_expr_consume (i.e. look at callers and check that they deactivate the thing.)
-func gr_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
   // TODO(): We could certainly assert that result_cell is the only one made live or active.  (If that remains a valid assertion.)
   add(bu, @[gr_xop]GrLive({result_cell(x)}));
-  if case Printed(pm) = gr_expr_consume(gs, x, bu) {
+  if case Printed(pm) = ac_expr_consume(gs, x, bu) {
     return Printed(pm);
   }
   return NoFail;
 }
 
-func gr_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
+func ac_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
   return ac_expr_and_consume(gs, &x->expr, un(&x->after), bu);
 }
 
@@ -1402,7 +1397,7 @@ func ac_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
 
   then_bu sq_builder = mk_builder(gs);
   add(&then_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->then_clause)), conjoined, OffsetConst(0)}));
-  if case Printed(pm) = gr_expr_consume(gs, oo(&a->then_clause), &then_bu) {
+  if case Printed(pm) = ac_expr_consume(gs, oo(&a->then_clause), &then_bu) {
     return Printed(pm);
   }
   add(&then_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->then_clause)))}));
@@ -1413,7 +1408,7 @@ func ac_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
 
   else_bu sq_builder = mk_builder(gs);
   add(&else_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->else_clause)), conjoined, OffsetConst(0)}));
-  if case Printed(pm) = gr_expr_consume(gs, oo(&a->else_clause), &else_bu) {
+  if case Printed(pm) = ac_expr_consume(gs, oo(&a->else_clause), &else_bu) {
     return Printed(pm);
   }
   add(&else_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->else_clause)))}));
@@ -1442,7 +1437,7 @@ func ac_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np
   for i size = 0; i < nparams; i = i + 1 {
     param *ast_strinit_param = ref(&a->exprs, i);
     add(bu, @[gr_xop]GrSubcell({result_cell(&param->ec), rval_cell(x), OffsetConst(un(&param->info)->offset)}));
-    if case Printed(pm) = gr_expr_consume(gs, &param->ec, bu) {
+    if case Printed(pm) = ac_expr_consume(gs, &param->ec, bu) {
       return Printed(pm);
     }
     push(&activation_ops, Deactivate(result_cell(&param->ec)));
@@ -3125,11 +3120,13 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           celltrack gr_celltrack = mk_celltrack();
           gs gr_statep = {clq, &gr, &celltrack};
           bu sq_builder = mk_builder(gs);
-          if case Printed(pm) = gr_live_and_expr_consume(gs, &dire.ec, &bu) {
+          if case Printed(pm) = ac_live_and_expr_consume(gs, &dire.ec, &bu) {
             inst->graph = FailedComputation;
             return Printed(pm);
           }
           gn gr_num = done(&bu);
+
+          // NOTE(): Deaden, deactivate, and assert.
           inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, result_cell(&dire.ec)}));
           return NoFail;
         }
