@@ -2945,6 +2945,7 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   gr_create(gs, retnum);
   gr_create(gs, argnum);
+  gr_activate(gs, argnum);
 
   retpart cell_num = add_cell(&gr, {LocationVirtual, ~ *argtype, mec->rhs_props});
 
@@ -2985,6 +2986,7 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
   add(&bu, @[gr_xop]GrActiveXop({Activate(retnum), Deactivate(retpart)}));
   add(&bu, @[gr_xop]GrVirtualDead({retpart}));
 
+  gr_deactivate(gs, retnum);
   gr_deaden(gs, retnum);
   ac_check_empty(&celltrack);
 
