@@ -12,7 +12,7 @@ enum cell_loc {
   UnusedLoc void;
 }
 
-struct lives {
+struct cellset {
   // Maintained in sorted order.
   all array[cell_num];
   // The xor and sum of the cell nums -- makes for a quick commutative hash.
@@ -20,12 +20,12 @@ struct lives {
   summed osize;
 }
 
-struct lives_checksum {
+struct cellset_checksum {
   xored osize;
   summed osize;
 }
 
-func swap(x *lives, y *lives) void {
+func swap(x *cellset, y *cellset) void {
   swap(&x->all, &y->all);
   tmpx osize = x->xored;
   x->xored = y->xored;
@@ -35,17 +35,17 @@ func swap(x *lives, y *lives) void {
   y->summed = tmps;
 }
 
-func matches_checksum(a *lives, b *lives_checksum) bool {
+func matches_checksum(a *cellset, b *cellset_checksum) bool {
   return a->xored == b->xored && a->summed == b->summed;
 }
 
-func matches_checksum(a *lives, b *lives) bool {
+func matches_checksum(a *cellset, b *cellset) bool {
   return a->xored == b->xored && a->summed == b->summed;
 }
 
 struct gn_annot {
   // A checksum for the liveset before this node is evaluated. (Used for assertions.) Is also the checksum for app_time_live.
-  plainly_live nc[lives_checksum];
+  plainly_live nc[cellset_checksum];
 
   // Only for GrApply.
   // lower_paramlists and higher_paramlists are set on the second pass.
@@ -54,7 +54,7 @@ struct gn_annot {
   higher_paramlists hash[gr_num, void];
   // What's live when we evaluate... which now must include the return cell
   // This is only annotated for GrApply, and is checkedsummed by plainly_live.
-  app_time_live nc[lives];
+  app_time_live nc[cellset];
   paramlist_bottom_frame_offset nc[i32];
 
   dumbgen_gen_function_body_visited bool;
@@ -147,7 +147,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
   bas *basic_analyze_state = un(&g->inline_state);
   h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed, NotComputed, mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed};
 
-  liveset lives;
+  liveset cellset;
   create(&h, &liveset, g->graph.cell);
   nargcells size = count(&g->argcells);
   for i size = 0; i < nargcells; i = i + 1 {

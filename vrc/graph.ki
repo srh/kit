@@ -400,11 +400,11 @@ enum gr_const {
 }
 
 struct gr_celltrack {
-  liveset lives;
+  liveset cellset;
 }
 
 func mk_celltrack() gr_celltrack {
-  liveset lives;
+  liveset cellset;
   return {liveset};
 }
 

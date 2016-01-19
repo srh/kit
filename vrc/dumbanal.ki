@@ -1,10 +1,10 @@
 import state;
 
-func[H] build_u8str(help H, r *array[u8], x *lives) void {
+func[H] build_u8str(help H, r *array[u8], x *cellset) void {
   build_array_u8str(help, r, &x->all);
 }
 
-func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_num) np {
+func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, liveset *cellset, gn gr_num) np {
   mbmut genexpr_result;
   if case Printed(pm) = dumbly_analyze_expression(h, gr, liveset, gn, &mbmut) {
     return Printed(pm);
@@ -23,9 +23,9 @@ enum genexpr_result {
 }
 
 
-func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_num, out *genexpr_result) np {
+func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *cellset, gn gr_num, out *genexpr_result) np {
   gnc *gn_annot = ref_annot(h, gn);
-  if case &Computed(live lives_checksum) = &gnc->plainly_live {
+  if case &Computed(live cellset_checksum) = &gnc->plainly_live {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
     if !matches_checksum(liveset, &live) {
       return ERR(_u8("ICE: Inconsistent liveness state when revisiting node, liveset="), *liveset);
@@ -122,30 +122,30 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
     case &GrBranch(a gr_branch):
       expect_live(liveset, a.src);
 
-      end_lives lives;
+      end_liveset cellset;
       combined_mut genexpr_result = NonTerminal;
       ncases size = count(&a.cases);
       for i size = 0; i < ncases; i = i + 1 {
         cas *tup[gr_const, sq_num] = ref(&a.cases, i);
-        new_live lives = *liveset;
+        new_live cellset = *liveset;
         casmut genexpr_result;
         if case Printed(pm) = dumbly_analyze_expression(h, gr, &new_live, cas->cdr.x, &casmut) {
           return Printed(pm);
         }
-        combine_branch_mut(&new_live, &combined_mut, casmut, &end_lives);
+        combine_branch_mut(&new_live, &combined_mut, casmut, &end_liveset);
       }
 
       if case Has(def_gn sq_num) = a.default_case {
-        new_live lives = *liveset;
+        new_live cellset = *liveset;
         defcasmut genexpr_result;
         if case Printed(pm) = dumbly_analyze_expression(h, gr, &new_live, def_gn.x, &defcasmut) {
           return Printed(pm);
         }
-        combine_branch_mut(&new_live, &combined_mut, defcasmut, &end_lives);
+        combine_branch_mut(&new_live, &combined_mut, defcasmut, &end_liveset);
       }
 
       // Yes this is empty of it's NonTerminal -- it doesn't matter.
-      *liveset = end_lives;
+      *liveset = end_liveset;
       *out = combined_mut;
       return NoFail;
 
@@ -165,7 +165,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
   }
 }
 
-func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *lives) void {
+func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *cellset) void {
   paramlists array[gr_num];
   nall size = count(&live_at_app_time->all);
   for i size = 0; i < nall; i = i + 1 {
@@ -183,24 +183,24 @@ func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *lives) voi
   annotate_move(&ref_annot(h, our_gn)->lower_paramlists, &paramlists);
 }
 
-func combine_branch_mut(new_live *lives, onto *genexpr_result, case_mut genexpr_result, end_lives *lives) void {
+func combine_branch_mut(new_live *cellset, onto *genexpr_result, case_mut genexpr_result, end_liveset *cellset) void {
   switch case_mut {
   case Terminal:
     switch *onto {
     case Terminal:
-      if !matches_checksum(new_live, end_lives) {
-        ice(_u8("terminal/terminal new_live not equal, end_lives="), *end_lives, _u8(", new_live="), *new_live);
+      if !matches_checksum(new_live, end_liveset) {
+        ice(_u8("terminal/terminal new_live not equal, end_liveset="), *end_liveset, _u8(", new_live="), *new_live);
       }
     case NonTerminal:
       *onto = Terminal;
-      *end_lives = *new_live;
+      *end_liveset = *new_live;
     }
   case NonTerminal: { }
   }
 }
 
 // For deaden and other functions, prelive shows what was alive _before_ prec_muts modified it.
-func deaden(liveset *lives, c cell_num) void {
+func deaden(liveset *cellset, c cell_num) void {
   if !try_remove(&liveset->all, c) {
     ice(_u8("deaden on unlive cell "), c);
   }
@@ -208,19 +208,19 @@ func deaden(liveset *lives, c cell_num) void {
   liveset->summed = liveset->summed - ~c.x;
 }
 
-func expect_live(liveset *lives, c cell_num) void {
+func expect_live(liveset *cellset, c cell_num) void {
   if case None = lookup(&liveset->all, c) {
     ice(_u8("input on unlive cell "), c);
   }
 }
 
-func create(h *frame, liveset *lives, c cell_num) void {
+func create(h *frame, liveset *cellset, c cell_num) void {
   gr_create(liveset, c);
   note_conflicting(h, &liveset->all, c);
 }
 
 // Used in graph code because we don't note conflicting and don't have a frame (yet).
-func gr_create(liveset *lives, c cell_num) void {
+func gr_create(liveset *cellset, c cell_num) void {
   if !try_insert(&liveset->all, c) {
     ice(_u8("create on live cell "), c);
   }
