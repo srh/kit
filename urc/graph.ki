@@ -242,33 +242,23 @@ func addo(bu *sq_builder, ogn opt[gr_num]) void {
 }
 
 
-// Control flow connecting functions.  Every place we use these, we need to save/connect celltracking info.  They are:  jmp_qnop_node(done), append(done), mut_connect(done), last(done), nopq(done), and seqq(done).  The sq_ versions are ones that we've done the save/connecting celltracking modifications for.
-// TODO(): Rename the sq_ versions back to the original names.
+// Control flow connecting functions.  Every place we use these, we probably save/connect celltracking info in some explicit way.
 
 func nopq(gr *frame_graph) sq_num {
   return addq(gr, GrQNop);
 }
 
-func sq_nopq(gr *frame_graph) sq_num { return nopq(gr); }
-
-
 func seqq(gr *frame_graph, gsq gr_sequence) sq_num {
   return addq(gr, GrSequence(gsq));
 }
 
-func sq_seqq(gr *frame_graph, gsq gr_sequence) sq_num { return seqq(gr, gsq); }
-
-func sq_seqq(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
+func seqq(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
   note_celltrack(&outflow->note, gs.celltrack);
   return seqq(gs.gr, {gn, outflow->sn});
 }
 
 func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
   help_mut_qnop_node(gr, ix, {@[gr_qop]GrJmp({outflow})});
-}
-
-func sq_jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
-  return jmp_qnop_node(gr, ix, outflow);
 }
 
 func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
@@ -278,12 +268,8 @@ func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
   bu->last = rhs_nopq;
 }
 
-func sq_append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
-  append(bu, enter_rhs, rhs_nopq);
-}
-
 // Adds an unattached nopq afterward, with the given saved state restored (typically the variables-in-scope state before a return, break, continue, or goto statement).
-func sq_append_and_nopq(bu *sq_builder, outflow *tracked_target, saved *gr_savetrack) void {
+func append_and_nopq(bu *sq_builder, outflow *tracked_target, saved *gr_savetrack) void {
   note_celltrack(&outflow->note, bu->gs.celltrack);
   append(bu, outflow->sn, nopq(bu->gs.gr));
   restore_celltrack(bu->gs, saved);
@@ -298,16 +284,16 @@ func help_mut_connect(bu *sq_builder, outflow sq_num) sq_num {
   return ret;
 }
 
-func sq_mut_connect(bu *sq_builder, outflow sq_num) sq_num {
+func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
   return help_mut_connect(bu, outflow);
 }
 
-func sq_mut_connect(gs gr_statep, bu *sq_builder, outflow *tracked_target) sq_num {
+func mut_connect(gs gr_statep, bu *sq_builder, outflow *tracked_target) sq_num {
   note_celltrack(&outflow->note, gs.celltrack);
   return help_mut_connect(bu, outflow->sn);
 }
 
-func sq_uni_connect(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
+func uni_connect(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
   note_celltrack(&outflow->note, gs.celltrack);
   return seqq(gs.gr, {gn, outflow->sn});
 }
@@ -315,10 +301,6 @@ func sq_uni_connect(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
 // last(.) is used to identify the label target for gr_label_statement.
 func last(bu *sq_builder) sq_num {
   return bu->last;
-}
-
-func sq_last(bu *sq_builder) sq_num {
-  return last(bu);
 }
 
 func done(bu *sq_builder) gr_num {
@@ -492,10 +474,10 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   label_gn array[tracked_target];
   n size = count(&info->labels);
   for i size = 0; i < n; i = i + 1 {
-    push(&label_gn, mk_tracked(sq_nopq(gs.gr)));
+    push(&label_gn, mk_tracked(nopq(gs.gr)));
   }
 
-  fb fullbody_state = {info->all_vars, mk_tracked(sq_nopq(gs.gr)), label_gn, info->return_cell};
+  fb fullbody_state = {info->all_vars, mk_tracked(nopq(gs.gr)), label_gn, info->return_cell};
 
   bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_bracebody(gs, &fb, None, &x->bb, &bu) {
@@ -508,7 +490,7 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   }
   add(&bu, parameter_unwinding);
 
-  gn sq_num = sq_mut_connect(gs, &bu, &fb.final_node);
+  gn sq_num = mut_connect(gs, &bu, &fb.final_node);
 
   *out = gn.x;
   return NoFail;
@@ -612,7 +594,7 @@ func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a
     return Printed(pm);
   }
   add(bu, uw);
-  sq_append_and_nopq(bu, unHas(&obg)->break_target, &saved);
+  append_and_nopq(bu, unHas(&obg)->break_target, &saved);
   return NoFail;
 }
 
@@ -624,7 +606,7 @@ func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack]
     return Printed(pm);
   }
   add(bu, uw);
-  sq_append_and_nopq(bu, unHas(&obg)->continue_target, &saved);
+  append_and_nopq(bu, unHas(&obg)->continue_target, &saved);
   return NoFail;
 }
 
@@ -642,14 +624,14 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
     return Printed(pm);
   }
   add(bu, ww);
-  sq_append_and_nopq(bu, jmp, &saved);
+  append_and_nopq(bu, jmp, &saved);
   return NoFail;
 }
 
 func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) np {
   targ *tracked_target = ref(&fb->label_gn, un(&a->info)->label_number.x);
   note_celltrack(&targ->note, gs.celltrack);
-  sq_jmp_qnop_node(gs.gr, targ->sn, sq_last(bu));
+  jmp_qnop_node(gs.gr, targ->sn, last(bu));
   return NoFail;
 }
 
@@ -668,7 +650,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
     add(bu, @[gr_xop]GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst(enum_tag_offset)}));
   }
 
-  exit_target tracked_target = mk_tracked(sq_nopq(gs.gr));
+  exit_target tracked_target = mk_tracked(nopq(gs.gr));
 
   saved_afterswartch gr_savetrack = save_celltrack(gs);
 
@@ -701,7 +683,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
           }
           add(&case_bu, @[gr_xop]GrVirtualDead({vi->cell}));
 
-          gn sq_num = sq_mut_connect(gs, &case_bu, &exit_target);
+          gn sq_num = mut_connect(gs, &case_bu, &exit_target);
           set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         } else {
           case_bu sq_builder = mk_builder(gs);
@@ -709,7 +691,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
           if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &case_bu) {
             return Printed(pm);
           }
-          gn sq_num = sq_mut_connect(gs, &case_bu, &exit_target);
+          gn sq_num = mut_connect(gs, &case_bu, &exit_target);
           set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         }
       }
@@ -720,7 +702,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
           return Printed(pm);
         }
 
-        gn var = sq_mut_connect(gs, &case_bu, &exit_target);
+        gn var = mut_connect(gs, &case_bu, &exit_target);
         set(&default_case, gn);
       }
     }
@@ -741,7 +723,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   br sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&branch_cases), None}));
 
   note_celltrack(&exit_target.note, gs.celltrack);
-  sq_append(bu, br, exit_target.sn);
+  append(bu, br, exit_target.sn);
 
   swartch_discard_gn gr_num;
   if case Printed(pm) = gr_later_discard(gs, &a->swartch_discard, &swartch_discard_gn) {
@@ -753,7 +735,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 
 func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu *sq_builder) np {
   pre_loop_save gr_savetrack = save_celltrack(gs);
-  outflow tracked_target = mk_tracked(sq_nopq(gs.gr));
+  outflow tracked_target = mk_tracked(nopq(gs.gr));
   note_celltrack(&outflow.note, gs.celltrack);
 
   if case &Has(bi box[ast_statement]) = &a->initializer {
@@ -762,7 +744,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     }
   }
 
-  body_entry_gn sq_num = sq_nopq(gs.gr);
+  body_entry_gn sq_num = nopq(gs.gr);
 
   condition_else_gn opt[sq_num];
 
@@ -770,7 +752,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
   top.note = mk_noted(gs);
 
   if case &Has(cond ast_expr_condition) = &a->condition {
-    else_gn sq_num = sq_nopq(gs.gr);
+    else_gn sq_num = nopq(gs.gr);
     if case Printed(pm) = gr_expr_condition(gs, oo(&cond.expr), body_entry_gn, else_gn, &top.sn) {
       return Printed(pm);
     }
@@ -782,9 +764,8 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
 
   postcond_save gr_savetrack = save_celltrack(gs);
 
-  continue_nopq tracked_target = mk_tracked(sq_nopq(gs.gr));
+  continue_nopq tracked_target = mk_tracked(nopq(gs.gr));
 
-  // TODO(): Holy shit fix this.
   bp breakgrack = {&outflow, &continue_nopq};
 
   body_bu sq_builder = mk_builder(gs);
@@ -812,28 +793,28 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     if case Printed(pm) = gr_expr_discard(gs, oo(&increment), &incr_bu) {
       return Printed(pm);
     }
-    totopgn sq_num = sq_mut_connect(gs, &incr_bu, &top);
+    totopgn sq_num = mut_connect(gs, &incr_bu, &top);
     continue_target = totopgn;
     if case Has(gn gr_num) = loopcleanupgn {
-      continuegn = sq_seqq(gs.gr, {gn, totopgn});
+      continuegn = seqq(gs.gr, {gn, totopgn});
     } else {
       continuegn = totopgn;
     }
   } else {
     note_celltrack(&top.note, gs.celltrack);
     if case Has(gn gr_num) = loopcleanupgn {
-      continuegn = sq_seqq(gs.gr, {gn, top.sn});
+      continuegn = seqq(gs.gr, {gn, top.sn});
     } else {
       continuegn = top.sn;
     }
     continue_target = top.sn;
   }
 
-  sq_jmp_qnop_node(gs.gr, continue_nopq.sn, continue_target);
+  jmp_qnop_node(gs.gr, continue_nopq.sn, continue_target);
 
-  thengn sq_num = sq_mut_connect(&body_bu, continuegn);
+  thengn sq_num = mut_connect(&body_bu, continuegn);
 
-  sq_jmp_qnop_node(gs.gr, body_entry_gn, thengn);
+  jmp_qnop_node(gs.gr, body_entry_gn, thengn);
 
   if case &Has(cond ast_expr_condition) = &a->condition {
     restore_celltrack(gs, &postcond_save);
@@ -853,14 +834,14 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     }
     add(&exit_bu, loopexitgn);
 
-    exitseq sq_num = sq_mut_connect(gs, &exit_bu, &outflow);
+    exitseq sq_num = mut_connect(gs, &exit_bu, &outflow);
 
-    sq_jmp_qnop_node(gs.gr, unHas(condition_else_gn), exitseq);
+    jmp_qnop_node(gs.gr, unHas(condition_else_gn), exitseq);
   } else {
     restore_celltrack(gs, &pre_loop_save);
   }
 
-  sq_append(bu, top.sn, outflow.sn);
+  append(bu, top.sn, outflow.sn);
   return NoFail;
 }
 
@@ -874,10 +855,10 @@ func gr_condition_discard(gs gr_statep, a *ast_condition_discard_info, out *gr_n
 }
 
 func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement, bu *sq_builder) np {
-  outflow tracked_target = mk_tracked(sq_nopq(gs.gr));
+  outflow tracked_target = mk_tracked(nopq(gs.gr));
 
-  then_nop sq_num = sq_nopq(gs.gr);
-  else_nop sq_num = sq_nopq(gs.gr);
+  then_nop sq_num = nopq(gs.gr);
+  else_nop sq_num = nopq(gs.gr);
 
   then_save gr_savetrack;
   else_save gr_savetrack;
@@ -904,7 +885,7 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   }
 
   add(&body_bu, loopcleanupgn);
-  thengn sq_num = sq_mut_connect(gs, &body_bu, &top);
+  thengn sq_num = mut_connect(gs, &body_bu, &top);
 
   restore_celltrack(gs, &else_save);
 
@@ -914,20 +895,20 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   }
 
   // TODO: Would be kinda nice if break (or continue) targeted _before_ the condition discard.
-  exitseq sq_num = sq_uni_connect(gs, loopexitgn, &outflow);
+  exitseq sq_num = uni_connect(gs, loopexitgn, &outflow);
 
-  sq_jmp_qnop_node(gs.gr, then_nop, thengn);
-  sq_jmp_qnop_node(gs.gr, else_nop, exitseq);
+  jmp_qnop_node(gs.gr, then_nop, thengn);
+  jmp_qnop_node(gs.gr, else_nop, exitseq);
 
-  sq_append(bu, top.sn, outflow.sn);
+  append(bu, top.sn, outflow.sn);
   return NoFail;
 }
 
 func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, bu *sq_builder) np {
-  join_target tracked_target = mk_tracked(sq_nopq(gs.gr));
+  join_target tracked_target = mk_tracked(nopq(gs.gr));
 
-  then_nop sq_num = sq_nopq(gs.gr);
-  else_nop sq_num = sq_nopq(gs.gr);
+  then_nop sq_num = nopq(gs.gr);
+  else_nop sq_num = nopq(gs.gr);
 
   then_save gr_savetrack;
   else_save gr_savetrack;
@@ -943,19 +924,19 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu) {
     return Printed(pm);
   }
-  thengn sq_num = sq_mut_connect(gs, &then_bu, &join_target);
+  thengn sq_num = mut_connect(gs, &then_bu, &join_target);
 
   restore_celltrack(gs, &else_save);
   else_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_bracebody(gs, fb, obg, &a->elsebody, &else_bu) {
     return Printed(pm);
   }
-  elsegn sq_num = sq_mut_connect(gs, &else_bu, &join_target);
+  elsegn sq_num = mut_connect(gs, &else_bu, &join_target);
 
-  sq_jmp_qnop_node(gs.gr, then_nop, thengn);
-  sq_jmp_qnop_node(gs.gr, else_nop, elsegn);
+  jmp_qnop_node(gs.gr, then_nop, thengn);
+  jmp_qnop_node(gs.gr, else_nop, elsegn);
 
-  sq_append(bu, gn, join_target.sn);
+  append(bu, gn, join_target.sn);
 
   condition_discard_gn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
@@ -977,10 +958,10 @@ func gr_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd
 }
 
 func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthen_statement, bu *sq_builder) np {
-  join_target tracked_target = mk_tracked(sq_nopq(gs.gr));
+  join_target tracked_target = mk_tracked(nopq(gs.gr));
 
-  then_nop sq_num = sq_nopq(gs.gr);
-  else_nop sq_num = sq_nopq(gs.gr);
+  then_nop sq_num = nopq(gs.gr);
+  else_nop sq_num = nopq(gs.gr);
 
   then_save gr_savetrack;
   else_save gr_savetrack;
@@ -996,15 +977,15 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu) {
     return Printed(pm);
   }
-  bodygn sq_num = sq_mut_connect(gs, &then_bu, &join_target);
+  bodygn sq_num = mut_connect(gs, &then_bu, &join_target);
 
   restore_celltrack(gs, &else_save);
   note_celltrack(&join_target.note, gs.celltrack);
 
-  sq_jmp_qnop_node(gs.gr, then_nop, bodygn);
-  sq_jmp_qnop_node(gs.gr, else_nop, join_target.sn);
+  jmp_qnop_node(gs.gr, then_nop, bodygn);
+  jmp_qnop_node(gs.gr, else_nop, join_target.sn);
 
-  sq_append(bu, gn, join_target.sn);
+  append(bu, gn, join_target.sn);
 
   condition_discard_gn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
@@ -1021,7 +1002,7 @@ func gr_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn 
   }
   cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(bigu(0)), elsegn});
   br var = addq(gs.gr, @[gr_qop]GrBranch({result_cell(a), cases, Has(thengn)}));
-  *out = sq_mut_connect(&bu, br);
+  *out = mut_connect(&bu, br);
   return NoFail;
 }
 
@@ -1073,11 +1054,11 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
             }
           }
           *thentrack_out = save_celltrack(gs);
-          thenseq sq_num = sq_mut_connect(&case_bu, thengn);
+          thenseq sq_num = mut_connect(&case_bu, thengn);
           push(&cases, {@[gr_const]ConstInt(~tag.x), thenseq});
         } else {
           tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
-          elseseq sq_num = sq_seqq(gs.gr, {tagdead, elsegn});
+          elseseq sq_num = seqq(gs.gr, {tagdead, elsegn});
           if !saved_elsecase {
             *elsetrack_out = save_celltrack(gs);
             saved_elsecase = true;
@@ -1093,7 +1074,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
       }
 
       br_point sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None}));
-      br sq_num = sq_mut_connect(&bef_bu, br_point);
+      br sq_num = mut_connect(&bef_bu, br_point);
 
       *out = br;
       return NoFail;
@@ -1136,7 +1117,7 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
     return Printed(pm);
   }
   add(bu, uw_op);
-  sq_append_and_nopq(bu, &fb->final_node, &saved);
+  append_and_nopq(bu, &fb->final_node, &saved);
   return NoFail;
 }
 
@@ -1309,12 +1290,12 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
 }
 
 func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
-  join_target tracked_target = mk_tracked(sq_nopq(gs.gr));
+  join_target tracked_target = mk_tracked(nopq(gs.gr));
 
   conjoined cell_num = rval_cell(x);
 
-  then_nop sq_num = sq_nopq(gs.gr);
-  else_nop sq_num = sq_nopq(gs.gr);
+  then_nop sq_num = nopq(gs.gr);
+  else_nop sq_num = nopq(gs.gr);
   cond_sn sq_num;
   if case Printed(pm) = gr_expr_condition(gs, oo(&oo(&a->condition)->expr), then_nop, else_nop, &cond_sn) {
     return Printed(pm);
@@ -1328,7 +1309,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
     return Printed(pm);
   }
   add(&then_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->then_clause))}));
-  then_sn sq_num = sq_mut_connect(gs, &then_bu, &join_target);
+  then_sn sq_num = mut_connect(gs, &then_bu, &join_target);
 
   restore_celltrack(gs, &postcond_save);
 
@@ -1338,11 +1319,11 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
     return Printed(pm);
   }
   add(&else_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->else_clause))}));
-  else_sn sq_num = sq_mut_connect(gs, &else_bu, &join_target);
+  else_sn sq_num = mut_connect(gs, &else_bu, &join_target);
 
-  sq_jmp_qnop_node(gs.gr, then_nop, then_sn);
-  sq_jmp_qnop_node(gs.gr, else_nop, else_sn);
-  sq_append(bu, cond_sn, join_target.sn);
+  jmp_qnop_node(gs.gr, then_nop, then_sn);
+  jmp_qnop_node(gs.gr, else_nop, else_sn);
+  append(bu, cond_sn, join_target.sn);
 
   // TODO: We do the condcleanup at the end instead of repeating it twice right after the branch... do it right after the branch.
   condcleanupgn gr_num;
@@ -1463,8 +1444,6 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
 
   gr_deaden(lambda_gs, info->return_cell);
   if count(&lambda_celltrack.liveset.all) != 0 {
-    // TODO(): At some point this should become an ice().
-    // Not worth mentioning right now.
     ice(_u8("gr_lambda_expr sees leftover live cells"));
   }
 
@@ -1682,12 +1661,12 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
 
       postbranch_save gr_savetrack = save_celltrack(gs);
 
-      exit_nopq tracked_target = mk_tracked(sq_nopq(gs.gr));
+      exit_nopq tracked_target = mk_tracked(nopq(gs.gr));
 
       just_dead_bu sq_builder = mk_builder(gs);
       add(&just_dead_bu, @[gr_xop]GrDead({cmp_result}));
 
-      just_dead_sn sq_num = sq_mut_connect(gs, &just_dead_bu, &exit_nopq);
+      just_dead_sn sq_num = mut_connect(gs, &just_dead_bu, &exit_nopq);
 
       restore_celltrack(gs, &postbranch_save);
 
@@ -1704,14 +1683,14 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       }
       add(&do_assign_bu, assign_copy);
 
-      do_assign_sn sq_num = sq_mut_connect(gs, &do_assign_bu, &exit_nopq);
+      do_assign_sn sq_num = mut_connect(gs, &do_assign_bu, &exit_nopq);
 
       cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(bigu(0)), do_assign_sn}, {@[gr_const]ConstInt(bigu(1)), just_dead_sn});
 
       br sq_num = addq(gs.gr, @[gr_qop]GrBranch({cmp_result, cases, None}));
 
       // br is an expression node -- the cases attach to nopq's
-      sq_append(bu, br, exit_nopq.sn);
+      append(bu, br, exit_nopq.sn);
       if case DeadMe = ci.rhs_deadme {
         addo(bu, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src));
       }
@@ -1734,7 +1713,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
 }
 
 func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunction, bu *sq_builder) np {
-  end_nopq tracked_target = mk_tracked(sq_nopq(gs.gr));
+  end_nopq tracked_target = mk_tracked(nopq(gs.gr));
 
   if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->lhs), bu) {
     return Printed(pm);
@@ -1752,7 +1731,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   add(&rhs_bu, @[gr_xop]GrMemCopy({rval_cell(x), result_cell(oo(&a->rhs))}));
   add(&rhs_bu, @[gr_xop]GrDead({result_cell(oo(&a->rhs))}));
 
-  rhs_sn sq_num = sq_mut_connect(gs, &rhs_bu, &end_nopq);
+  rhs_sn sq_num = mut_connect(gs, &rhs_bu, &end_nopq);
 
   restore_celltrack(gs, &postbranch_save);
 
@@ -1760,7 +1739,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   add(&lhs_bu, @[gr_xop]GrMemCopy({rval_cell(x), result_cell(oo(&a->lhs))}));
   add(&lhs_bu, @[gr_xop]GrDead({result_cell(oo(&a->lhs))}));
 
-  lhs_sn sq_num = sq_mut_connect(gs, &lhs_bu, &end_nopq);
+  lhs_sn sq_num = mut_connect(gs, &lhs_bu, &end_nopq);
 
   cases array[tup[gr_const, gr_num]];
   short_circuit_case gr_const;
@@ -1774,7 +1753,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   }
 
   bn sq_num = addq(gs.gr, @[gr_qop]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, lhs_sn}, {eval_rhs_case, rhs_sn}), None}));
-  sq_append(bu, bn, end_nopq.sn);
+  append(bu, bn, end_nopq.sn);
   return NoFail;
 }
 
@@ -2321,7 +2300,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   add(&bu, @[gr_xop]GrLive({indexcell}));
   add(&bu, @[gr_xop]GrWriteConst({indexcell, ConstInt(bigu(init_value))}));
 
-  top tracked_target = mk_tracked(sq_nopq(&gr));
+  top tracked_target = mk_tracked(nopq(&gr));
   note_celltrack(&top.note, gs.celltrack);
 
   loop_bu sq_builder = mk_builder(gs);
@@ -2377,14 +2356,14 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
     }
   }
 
-  tie_gn sq_num = sq_mut_connect(gs, &loop_bu, &top);
+  tie_gn sq_num = mut_connect(gs, &loop_bu, &top);
 
-  deadseq_nopq sq_num = sq_nopq(&gr);
+  deadseq_nopq sq_num = nopq(&gr);
   branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray({@[gr_const]ConstInt(bigu(terminal_case)), deadseq_nopq}), Has(tie_gn)}));
 
-  sq_jmp_qnop_node(&gr, top.sn, branch_gn);
+  jmp_qnop_node(&gr, top.sn, branch_gn);
 
-  sq_append(&bu, top.sn, deadseq_nopq);
+  append(&bu, top.sn, deadseq_nopq);
 
   for i size = nargs; i > 0; {
     i = i - 1;
@@ -2459,7 +2438,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     add(&bu, @[gr_xop]GrSubcell({tc, pc, OffsetConst(enum_tag_offset)}));
   }
 
-  join_target tracked_target = mk_tracked(sq_nopq(&gr));
+  join_target tracked_target = mk_tracked(nopq(&gr));
   postbranch_save gr_savetrack = save_celltrack(gs);
 
   cases_gn array[tup[gr_const, sq_num]];
@@ -2564,7 +2543,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
 
     finalgn gr_num = done(&sub_bu);
 
-    finalseqgn sq_num = sq_seqq(gs, finalgn, &join_target);
+    finalseqgn sq_num = seqq(gs, finalgn, &join_target);
     push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), finalseqgn});
   }
 
@@ -2574,12 +2553,12 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), join_target.sn});
   } else {
     ztgn gr_num = addx(gs, @[gr_xop]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))}));
-    ztseq sq_num = sq_seqq(gs, ztgn, &join_target);
+    ztseq sq_num = seqq(gs, ztgn, &join_target);
     push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), ztseq});
   }
 
   br sq_num = addq(&gr, @[gr_qop]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None}));
-  sq_append(&bu, br, join_target.sn);
+  append(&bu, br, join_target.sn);
   for i size = nargs; i > 0; {
     i = i - 1;
     add(&bu, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
