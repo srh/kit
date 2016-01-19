@@ -1314,7 +1314,7 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     value bigint = ~ a.charspec.value;
     return ac_literal(gs, x, value, bu);
   case &StringLiteral(a ast_string_literal):
-    return gr_string_literal(gs, x, &a, bu);
+    return ac_string_literal(gs, x, &a, bu);
   case &Funcall(a ast_funcall):
     return gr_funcall(gs, x, &a, bu);
   case &LogicalConjunction(a ast_logical_conjunction):
@@ -1873,7 +1873,7 @@ func gr_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, bu *sq_builder) np {
   return NoFail;
 }
 
-func gr_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_builder) np {
+func ac_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_builder) np {
   bytes array[u8];
   nchars size = count(&a->charspecs);
   reserve(&bytes, nchars);
@@ -1885,6 +1885,7 @@ func gr_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_
     push(&bytes, ~ch);
   }
   add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstBytes(freeze(&bytes))}));
+  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x))}));
   return NoFail;
 }
 
