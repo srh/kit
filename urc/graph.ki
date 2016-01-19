@@ -1250,7 +1250,7 @@ func ac_expr_and_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard,
   if case Printed(pm) = ac_expr_after_discard_before(gs, x, aft, bu) {
     return Printed(pm);
   }
-  if case Printed(pm) = gr_expr(gs, x, bu) {
+  if case Printed(pm) = ac_expr(gs, x, bu) {
     return Printed(pm);
   }
   if case Printed(pm) = ac_expr_after_discard(gs, x, aft, bu) {
@@ -1310,7 +1310,7 @@ func ac_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume,
   if case Printed(pm) = ac_consume_actions_before(gs, x, aft, bu) {
     return Printed(pm);
   }
-  if case Printed(pm) = gr_expr(gs, x, bu) {
+  if case Printed(pm) = ac_expr(gs, x, bu) {
     return Printed(pm);
   }
   if case Printed(pm) = ac_consume_actions(gs, x, aft, bu) {
@@ -1320,14 +1320,14 @@ func ac_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume,
   return NoFail;
 }
 
-func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
+func ac_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   // TODO(): Honestly we could have some general assertions about what cells are made live or active, based on lval/rval info.
   cs *checkstate = gs.clq->cs;
   switch &x->u {
   case &NameExpr(a ast_name_expr):
     return ac_name_expr(gs, x, &a, bu);
   case &ParenExpr(a ast_paren_expr):
-    return gr_expr(gs, oo(&a.expr), bu);
+    return ac_expr(gs, oo(&a.expr), bu);
   case &NumericLiteral(a ast_numeric_literal):
     return ac_literal(gs, x, numeric_literal_value(&a), bu);
   case &BoolLiteral(a ast_bool_literal):
@@ -1375,7 +1375,7 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   case &DerefField(a ast_deref_field):
     return ac_deref_field(gs, x, &a, bu);
   case &TypedExpr(a ast_typed_expr):
-    return gr_expr(gs, oo(&a.expr), bu);
+    return ac_expr(gs, oo(&a.expr), bu);
   case &Strinit(a ast_strinit):
     return ac_mk_strinit(gs, x, &a, bu);
   case &Ternary(a ast_ternary):
@@ -1494,7 +1494,7 @@ func ac_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
       return NoFail;
     }
     case &FieldName(offset u32): {
-      if case Printed(pm) = gr_expr(gs, oo(&a->lhs), bu) {
+      if case Printed(pm) = ac_expr(gs, oo(&a->lhs), bu) {
         return Printed(pm);
       }
 
@@ -1631,7 +1631,7 @@ func ac_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
     }
     add(bu, lhs_later);
   } else {
-    if case Printed(pm) = gr_expr(gs, oo(&a->lhs), bu) {
+    if case Printed(pm) = ac_expr(gs, oo(&a->lhs), bu) {
       return Printed(pm);
     }
     if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->rhs), bu) {
@@ -1684,7 +1684,7 @@ func ac_mk_deref(gs gr_statep, x *ast_expr, a *ast_deref, bu *sq_builder) np {
 
 func ac_mk_addressof(gs gr_statep, x *ast_expr, a *ast_addressof, bu *sq_builder) np {
   // This is a total copy/paste of gr_mk_refof.
-  if case Printed(pm) = gr_expr(gs, oo(&a->rhs), bu) {
+  if case Printed(pm) = ac_expr(gs, oo(&a->rhs), bu) {
     return Printed(pm);
   }
   desc *lval_description = ellval_desc(oo(&a->rhs));
@@ -1698,7 +1698,7 @@ func ac_mk_addressof(gs gr_statep, x *ast_expr, a *ast_addressof, bu *sq_builder
 
 func ac_mk_refof(gs gr_statep, x *ast_expr, a *ast_refof, bu *sq_builder) np {
   // This is a total copy/paste of gr_mk_addressof.
-  if case Printed(pm) = gr_expr(gs, oo(&a->rhs), bu) {
+  if case Printed(pm) = ac_expr(gs, oo(&a->rhs), bu) {
     return Printed(pm);
   }
   desc *lval_description = ellval_desc(oo(&a->rhs));
@@ -1714,7 +1714,7 @@ func ac_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
   // The lhs is an lvalue.  If the rhs is an rvalue, we need to make its cell live.
   // The lhs is evaluated before the rhs.  For now.
 
-  if case Printed(pm) = gr_expr(gs, oo(&a->lhs), bu) {
+  if case Printed(pm) = ac_expr(gs, oo(&a->lhs), bu) {
     return Printed(pm);
   }
   switch un(&a->info) {
@@ -1729,7 +1729,7 @@ func ac_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
   case &ConditionalAssignment(ci ast_conditional_assignment_info): { }
   }
 
-  if case Printed(pm) = gr_expr(gs, oo(&a->rhs), bu) {
+  if case Printed(pm) = ac_expr(gs, oo(&a->rhs), bu) {
     return Printed(pm);
   }
 
