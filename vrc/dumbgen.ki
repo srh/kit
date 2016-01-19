@@ -35,6 +35,14 @@ func swap(x *lives, y *lives) void {
   y->summed = tmps;
 }
 
+func matches_checksum(a *lives, b *lives_checksum) bool {
+  return a->xored == b->xored && a->summed == b->summed;
+}
+
+func matches_checksum(a *lives, b *lives) bool {
+  return a->xored == b->xored && a->summed == b->summed;
+}
+
 struct gn_annot {
   // A checksum for the liveset before this node is evaluated. (Used for assertions.) Is also the checksum for app_time_live.
   plainly_live nc[lives_checksum];
@@ -810,9 +818,6 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         case &GrVirtualDead(a gr_virtual_dead):
           DUMBGEN("GrVirtualDead");
           // Do nothing.  (Likewise.)
-        case &GrXNop:
-          DUMBGEN("GrXNop");
-          // Do nothing (but do it less glamorously).
         }
 
       case &QOp(qn gr_qnode):

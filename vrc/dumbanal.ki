@@ -27,7 +27,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
   gnc *gn_annot = ref_annot(h, gn);
   if case &Computed(live lives_checksum) = &gnc->plainly_live {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
-    if !(liveset->xored == live.xored && liveset->summed == live.summed) {
+    if !matches_checksum(liveset, &live) {
       return ERR(_u8("ICE: Inconsistent liveness state when revisiting node, liveset="), *liveset);
     }
     *out = NonTerminal;
@@ -115,10 +115,6 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *lives, gn gr_
       deaden(liveset, a.cell);
       *out = Terminal;
       return NoFail;
-
-    case &GrXNop:
-      *out = Terminal;
-      return NoFail;
     }
 
   case &QOp(qn gr_qnode):
@@ -192,7 +188,7 @@ func combine_branch_mut(new_live *lives, onto *genexpr_result, case_mut genexpr_
   case Terminal:
     switch *onto {
     case Terminal:
-      if new_live->xored != end_lives->xored || new_live->summed != end_lives->summed {
+      if !matches_checksum(new_live, end_lives) {
         ice(_u8("terminal/terminal new_live not equal, end_lives="), *end_lives, _u8(", new_live="), *new_live);
       }
     case NonTerminal:
