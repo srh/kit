@@ -155,15 +155,22 @@ func addx(gs gr_statep, op gr_xop) gr_num {
   case &GrApply(a gr_apply):
     gr_expect_live(gs, a.retcell);
 
+    nparams size = count(&a.params);
+
     switch a.act {
     case TODOApplyNothing: { }
     case TwoActiveOps(ops gr_two_active_ops):
       gr_track_active_op(gs, ops.one);
       gr_track_active_op(gs, ops.two);
+    case StandardApply:
+      gr_deactivate(gs, a.funcell);
+      for i size = 0; i < nparams; i = i + 1 {
+        gr_deactivate(gs, get(&a.params, i));
+      }
+      gr_activate(gs, a.retcell);
     }
 
     gr_deaden(gs, a.funcell);
-    nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
       gr_deaden(gs, get(&a.params, i));
     }
@@ -351,6 +358,7 @@ struct gr_two_active_ops {
 enum gr_apply_active_change {
   TODOApplyNothing void;  // TODO()
   TwoActiveOps gr_two_active_ops;
+  StandardApply void;
 }
 
 struct gr_apply {
@@ -1261,6 +1269,7 @@ func ac_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
 }
 
 func gr_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
+  // TODO(): We could certainly assert that result_cell is the only one made live or active.  (If that remains a valid assertion.)
   add(bu, @[gr_xop]GrLive({result_cell(x)}));
   if case Printed(pm) = gr_expr_consume(gs, x, bu) {
     return Printed(pm);
@@ -1869,7 +1878,7 @@ func gr_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, bu *sq_builder) np {
     }
     push(&paramcells, result_cell(param));
   }
-  add(bu, @[gr_xop]GrApply({result_cell(oo(&a->fun)), freeze(&paramcells), rval_cell(x), TODOApplyNothing}));
+  add(bu, @[gr_xop]GrApply({result_cell(oo(&a->fun)), freeze(&paramcells), rval_cell(x), StandardApply}));
   return NoFail;
 }
 
