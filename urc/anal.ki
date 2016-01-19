@@ -298,7 +298,12 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
   case XOp(xn gr_xnode):
     switch &xn.op {
     case &GrApply(a gr_apply):
-      return XOp({GrApply({get(cm, a.funcell.x), help_adjust_params(cm, &a.params), get(cm, a.retcell.x)})});
+      act gr_apply_active_change;
+      switch a.act {
+      case TODONothing:
+        act = TODONothing;
+      }
+      return XOp({GrApply({get(cm, a.funcell.x), help_adjust_params(cm, &a.params), get(cm, a.retcell.x), act})});
     case &GrPrimApply(a gr_prim_apply):
       return XOp({GrPrimApply({a.primop, help_adjust_params(cm, &a.params), get(cm, a.retcell.x)})});
     case &GrMemCopy(a gr_memcopy):

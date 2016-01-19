@@ -326,10 +326,15 @@ inline func ref_node(gr *frame_graph, gn gr_num) *gr_node {
   return ref(&gr->ops, gn.x);
 }
 
+enum gr_apply_active_change {
+  TODONothing void;  // TODO()
+}
+
 struct gr_apply {
   funcell cell_num;
   params shray[cell_num];
   retcell cell_num;
+  act gr_apply_active_change;
 }
 
 struct gr_prim_apply {
@@ -1716,7 +1721,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       add(bu, @[gr_xop]GrAddressof({destptr, destcell}));
       add(bu, @[gr_xop]GrLive({srcptr}));
       add(bu, @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
-      add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result}));
+      add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result, TODONothing}));
 
       postbranch_save gr_savetrack = save_celltrack(gs);
 
@@ -1830,7 +1835,7 @@ func gr_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, bu *sq_builder) np {
     }
     push(&paramcells, result_cell(param));
   }
-  add(bu, @[gr_xop]GrApply({result_cell(oo(&a->fun)), freeze(&paramcells), rval_cell(x)}));
+  add(bu, @[gr_xop]GrApply({result_cell(oo(&a->fun)), freeze(&paramcells), rval_cell(x), TODONothing}));
   return NoFail;
 }
 
@@ -2026,7 +2031,13 @@ func gr_move_action(gs gr_statep, x *move_action, out *gr_num) np {
   return NoFail;
 }
 
-func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num) gr_num {
+enum uni_fun_statechange {
+  TODONothing void;  // TODO(): Remove?
+  Activate void;
+  Deactivate void;
+}
+
+func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num, statechange uni_fun_statechange) gr_num {
   argptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, arg)->type);
   voidret cu_typrop = compute_prim(gs.clq, primitive_void_type(gs.clq->cs));
   fnptr cu_typrop = compute_prim(gs.clq, fn_type(gs.clq->cs, argptr.cu.x, voidret.cu.x));
@@ -2043,7 +2054,16 @@ func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num) gr_num {
   add(&bu, @[gr_xop]GrLive({argptrcell}));
   add(&bu, @[gr_xop]GrAddressof({argptrcell, arg}));
 
-  add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid}));
+  switch statechange {
+  case TODONothing:
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, TODONothing}));
+  case Activate:
+    // TODO()
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, TODONothing}));
+  case Deactivate:
+    // TODO()
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, TODONothing}));
+  }
   add(&bu, @[gr_xop]GrDead({retvoid}));
   return done(&bu);
 }
@@ -2055,19 +2075,20 @@ func gr_init_action(gs gr_statep, x *init_action, out *gr_num) np {
   case &TrivialCtor:
     add(&bu, @[gr_xop]GrWriteConst({x->x.arg, ConstInt(bigu(0))}));
   case &FunCtor(ip instpair):
-    dp gr_num = gr_uni_fun(gs, ip, x->x.arg);
+    dp gr_num = gr_uni_fun(gs, ip, x->x.arg, TODONothing);
     add(&bu, dp);
   }
   *out = done(&bu);
   return NoFail;
 }
 
+// TODO(): Rename dead_after_destroy to be deactivate_and_dead_after_destroy (or something), and implement such.
 func gr_destroy_action(gs gr_statep, x *destroy_action, dad dead_after_destroy, out *gr_num) np {
   bu sq_builder = mk_builder(gs);
   switch &x->x.ctor {
   case &TrivialCtor: { }
   case &FunCtor(ip instpair):
-    gn gr_num = gr_uni_fun(gs, ip, x->x.arg);
+    gn gr_num = gr_uni_fun(gs, ip, x->x.arg, TODONothing);
     add(&bu, gn);
   }
   if case DeadAfterDestroyYes = dad {
@@ -2101,7 +2122,7 @@ func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num) gr_num {
   add(&bu, @[gr_xop]GrLive({srcptrcell}));
   add(&bu, @[gr_xop]GrAddressof({srcptrcell, src}));
 
-  add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid}));
+  add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TODONothing}));
 
   add(&bu, @[gr_xop]GrDead({retvoid}));
 
@@ -2408,7 +2429,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
         add(&vd_bu, @[gr_xop]GrVirtualDead({ec}));
       }
 
-      add(&vd_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell}));
+      add(&vd_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell, TODONothing}));
       add(&vd_bu, @[gr_xop]GrDead({elemretcell}));
       vd gr_num = done(&vd_bu);
       add(&loop_bu, vd);
@@ -2554,7 +2575,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
         add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 
-      add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
+      add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, TODONothing}));
       add(&sub_bu, @[gr_xop]GrDead({fieldretcell}));
     } else {
       evaled_fieldcellops bool = true;
@@ -2733,7 +2754,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
         add(&bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 
-      add(&bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
+      add(&bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, TODONothing}));
       add(&bu, @[gr_xop]GrDead({fieldretcell}));
     } else {
       evaled_fieldcellops bool = true;
@@ -2916,7 +2937,7 @@ func gr_destroy_ctor(gs gr_statep, ty *te_typeexpr, argnum cell_num, cd *ctor_de
     *gn_out = dp;
   case &FunCtor(ip instpair):
     bu sq_builder = mk_builder(gs);
-    gn gr_num = gr_uni_fun(gs, ip, argnum);
+    gn gr_num = gr_uni_fun(gs, ip, argnum, TODONothing);
     add(&bu, gn);
     add(&bu, @[gr_xop]GrDead({argnum}));
     *gn_out = done(&bu);
