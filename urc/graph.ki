@@ -2513,10 +2513,9 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   add(&bu, @[gr_xop]GrDead({indexcell}));
   add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
 
+  // We did't set the return cell active, whatever.
   gr_deaden(gs, return_cell);
-  if count(&celltrack.liveset.all) != 0 {
-    ice(_u8("gr_magic_arraytype_info leaves behind live cells"));
-  }
+  ac_check_empty(&celltrack);
 
   *gr_out = gr;
   *gn_out = done(&bu);
@@ -2707,10 +2706,9 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   }
   add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
 
+  // We didn't set the return cell active, whatever.
   gr_deaden(gs, return_cell);
-  if count(&celltrack.liveset.all) != 0 {
-    ice(_u8("gr_magic_enum_info leaves behind live cells"));
-  }
+  ac_check_empty(&celltrack);
 
   *gr_out = gr;
   *gn_out = done(&bu);
@@ -2861,10 +2859,9 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
 
   gn gr_num = done(&bu);
 
+  // We didn't set the return cell active, whatever.
   gr_deaden(gs, return_cell);
-  if count(&celltrack.liveset.all) != 0 {
-    ice(_u8("gr_magic_struct_info leaves behind live cells"));
-  }
+  ac_check_empty(&celltrack);
 
   *gr_out = gr;
   *gn_out = gn;
@@ -3063,10 +3060,11 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op pri
   argcells_copy array[cell_num] = argcells;
   argshray shray[cell_num] = freeze(&argcells_copy);
   gn gr_num = addx(gs, @[gr_xop]GrPrimApply({op, argshray, retcell}));
+
+  // GrPrimApply doesn't activate (or deactivate) anything.  Yet.
   gr_deaden(gs, retcell);
-  if count(&celltrack.liveset.all) != 0 {
-    ice(_u8("add_prim_fn_body sees leftover live cells"));
-  }
+  ac_check_empty(&celltrack);
+
   return add_fn_body(clq->cs, {informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells, InlineMust, NotComputed})});
 }
 
