@@ -1574,15 +1574,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
     name cell_num = ellval_cell(x);
     flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
     add(bu, @[gr_xop]GrLive({result_cell(&aft.car)}));
-    if case Printed(pm) = gr_consume_actions_before(gs, oo(&a->lhs), &aft.car, bu) {
-      return Printed(pm);
-    }
-
-    if case Printed(pm) = gr_expr(gs, oo(&a->lhs), bu) {
-      return Printed(pm);
-    }
-
-    if case Printed(pm) = gr_consume_actions(gs, oo(&a->lhs), &aft.car, bu) {
+    if case Printed(pm) = gr_expr_and_consume(gs, oo(&a->lhs), &aft.car, bu) {
       return Printed(pm);
     }
     if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), bu) {
