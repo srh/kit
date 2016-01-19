@@ -213,7 +213,8 @@ func addx(gs gr_statep, op gr_xop) gr_num {
   case &GrVirtualDead(a gr_virtual_dead):
     gr_deaden(gs, a.cell);
   case &GrActiveXop(a gr_active_xop):
-    gr_track_active_op(gs, a.op);
+    gr_track_active_op(gs, a.op1);
+    gr_track_active_op(gs, a.op2);
   }
 
   return untracked_addx(gs.gr, op);
@@ -407,7 +408,9 @@ enum gr_offset {
 }
 
 struct gr_active_xop {
-  op gr_active_op;
+  // These happen simultaneously -- there's no ordering.  If there's just one op, the other one will be Nothing.
+  op1 gr_active_op;
+  op2 gr_active_op;
 }
 
 struct gr_branch {
@@ -1886,13 +1889,13 @@ func ac_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_
     push(&bytes, ~ch);
   }
   add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstBytes(freeze(&bytes))}));
-  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x))}));
+  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   return NoFail;
 }
 
 func ac_literal(gs gr_statep, x *ast_expr, value bigint, bu *sq_builder) np {
   add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(value)}));
-  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x))}));
+  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   return NoFail;
 }
 
@@ -1902,10 +1905,10 @@ func ac_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) n
   case &LocalResolve(li local_info): { }
   case &GlobalResolve(gi global_info):
     add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstDef({gi.ent, gi.inst})}));
-    add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x))}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   case &EnumConstructor(ei enum_constructor_info):
     add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstDef(ei.ip)}));
-    add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x))}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   case &EnumVoidConstructed(vi enum_voidconstructed_info):
     info *ast_expr_complete_info = expr_complete_info(x);
     x_cell cell_num = rval_cell(x);
@@ -1922,7 +1925,7 @@ func ac_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) n
     addo(bu, postpadding_ogn);
     add(bu, @[gr_xop]GrVirtualDead({tag_cell}));
     // ^ This hub-bub writes a constant value to x_cell.
-    add(bu, @[gr_xop]GrActiveXop({Activate(x_cell)}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(x_cell), Nothing}));
   }
   return NoFail;
 }
@@ -2119,7 +2122,7 @@ func ac_init_action(gs gr_statep, x *init_action, out *gr_num) np {
     // It's OK to make the object active _after_ having written the zero data to the inactive value.  Instead of doing it atomically.  But if GrWriteConst gains that capability, we might as well change this code to use it.
 
     add(&bu, @[gr_xop]GrWriteConst({x->x.arg, ConstInt(bigu(0))}));
-    add(&bu, @[gr_xop]GrActiveXop({Activate(x->x.arg)}));
+    add(&bu, @[gr_xop]GrActiveXop({Activate(x->x.arg), Nothing}));
   case &FunCtor(ip instpair):
     dp gr_num = ac_uni_fun(gs, ip, x->x.arg, Activate);
     add(&bu, dp);
@@ -2134,7 +2137,7 @@ func ac_destroy_action(gs gr_statep, x *destroy_action, dad deadact_after_destro
   switch &x->x.ctor {
   case &TrivialCtor:
     if case DeadactAfterDestroyYes = dad {
-      add(&bu, @[gr_xop]GrActiveXop({Deactivate(x->x.arg)}));
+      add(&bu, @[gr_xop]GrActiveXop({Deactivate(x->x.arg), Nothing}));
       add(&bu, @[gr_xop]GrDead({x->x.arg}));
     }
   case &FunCtor(ip instpair):
@@ -2964,12 +2967,15 @@ enum bi_ctor_statechange {
 }
 
 func gr_bi_ctor(gs gr_statep, destnum cell_num, srcnum cell_num, cd *ctor_desc, statechange bi_ctor_statechange) gr_num {
+  bu sq_builder = mk_builder(gs);
   switch cd {
   case &TrivialCtor:
-    return addx(gs, @[gr_xop]GrMemCopy({destnum, srcnum}));
+    add(&bu, @[gr_xop]GrMemCopy({destnum, srcnum}));
   case &FunCtor(ip instpair):
-    return gr_bi_fun(gs, ip, destnum, srcnum);
+    gn gr_num = gr_bi_fun(gs, ip, destnum, srcnum);
+    add(&bu, gn);
   }
+  return done(&bu);
 }
 
 func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, gn_out *gr_num) np {
